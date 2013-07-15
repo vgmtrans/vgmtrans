@@ -476,6 +476,16 @@ void MidiTrack::InsertEndOfTrack(ULONG absTime)
 	bHasEndOfTrack = true;
 }
 
+void MidiTrack::AddText(const wchar_t* wstr)
+{
+	aEvents.push_back(new TextEvent(this, GetDelta(), wstr));
+}
+
+void MidiTrack::InsertText(const wchar_t* wstr, ULONG absTime)
+{
+	aEvents.push_back(new TextEvent(this, absTime, wstr));
+}
+
 // SPECIAL NON-MIDI EVENTS
 
 // Transpose events offset the key when we write the Midi file.
@@ -513,15 +523,15 @@ MidiEvent::~MidiEvent(void)
 {
 }
 
-void MidiEvent::WriteVarLength(vector<BYTE> & buf, ULONG time)
+void MidiEvent::WriteVarLength(vector<BYTE> & buf, ULONG value)
 {
    register unsigned long buffer;
-   buffer = time & 0x7F;
+   buffer = value & 0x7F;
 
-   while ( (time >>= 7) )
+   while ( (value >>= 7) )
    {
      buffer <<= 8;
-     buffer |= ((time & 0x7F) | 0x80);
+     buffer |= ((value & 0x7F) | 0x80);
    }
 
    while (true)
@@ -532,6 +542,38 @@ void MidiEvent::WriteVarLength(vector<BYTE> & buf, ULONG time)
       else
           break;
    }
+}
+
+ULONG MidiEvent::WriteSysexEvent(vector<BYTE> & buf, UINT time, BYTE* data, size_t dataSize)
+{
+	WriteVarLength(buf, AbsTime-time);
+	buf.push_back(0xF0);
+	WriteVarLength(buf, dataSize + 1);
+	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++)
+	{
+		buf.push_back(data[dataIndex]);
+	}
+	buf.push_back(0xF7);
+	return AbsTime;
+}
+
+ULONG MidiEvent::WriteMetaEvent(vector<BYTE> & buf, UINT time, BYTE metaType, BYTE* data, size_t dataSize)
+{
+	WriteVarLength(buf, AbsTime-time);
+	buf.push_back(0xFF);
+	buf.push_back(metaType);
+	WriteVarLength(buf, dataSize);
+	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++)
+	{
+		buf.push_back(data[dataIndex]);
+	}
+	return AbsTime;
+}
+
+ULONG MidiEvent::WriteMetaTextEvent(vector<BYTE> & buf, UINT time, BYTE metaType, wstring wstr)
+{
+	string str = wstring2string(wstr);
+	return WriteMetaEvent(buf, time, metaType, (BYTE*)str.c_str(), str.length());
 }
 
 //void MidiEvent::PrepareWrite(vector<MidiEvent*> & aEvents)
@@ -643,16 +685,8 @@ MastVolEvent::MastVolEvent(MidiTrack *prntTrk, BYTE channel, ULONG absoluteTime,
 
 ULONG MastVolEvent::WriteEvent(vector<BYTE> & buf, UINT time)
 {
-	WriteVarLength(buf, AbsTime-time);
-	buf.push_back(0xF0);   //F0 7F 7F 04 01 ll mm F7
-	buf.push_back(0x7F);
-	buf.push_back(0x7F);
-	buf.push_back(0x04);
-	buf.push_back(0x01);
-	buf.push_back(mastVol);		//bits 0-6 of a 14 bit volume
-	buf.push_back(mastVol);		//bits 7-13 of a 14 bit volume
-	buf.push_back(0xF7);
-	return AbsTime;
+	BYTE data[6] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, mastVol & 0x7F };
+	return WriteSysexEvent(buf, time, data, 6);
 }
 
 //  ***************
@@ -668,7 +702,7 @@ ULONG ControllerEvent::WriteEvent(vector<BYTE> & buf, UINT time)
 {
  	WriteVarLength(buf, AbsTime-time);
 	buf.push_back(0xB0+channel);
-	buf.push_back(controlNum);
+	buf.push_back(controlNum & 0x7F);
 	buf.push_back(dataByte);
 	return AbsTime;
 }
@@ -686,7 +720,7 @@ ULONG ProgChangeEvent::WriteEvent(vector<BYTE> & buf, UINT time)
 {
 	WriteVarLength(buf, AbsTime-time);
 	buf.push_back(0xC0+channel);
-	buf.push_back(programNum);
+	buf.push_back(programNum & 0x7F);
 	return AbsTime;
 }
 
@@ -722,14 +756,12 @@ TempoEvent::TempoEvent(MidiTrack* prntTrk, ULONG absoluteTime, ULONG microSecond
 
 ULONG TempoEvent::WriteEvent(vector<BYTE> & buf, UINT time)
 {
-	WriteVarLength(buf, AbsTime-time);
-	buf.push_back(0xFF);
-	buf.push_back(0x51);
-	buf.push_back(0x03);
-	buf.push_back( (BYTE)((microSecs & 0xFF0000) >> 16));
-	buf.push_back( (BYTE)((microSecs & 0x00FF00) >> 8));
-	buf.push_back(  (BYTE)(microSecs & 0x0000FF));
-	return AbsTime;
+	BYTE data[3] = {
+		(BYTE)((microSecs & 0xFF0000) >> 16),
+		(BYTE)((microSecs & 0x00FF00) >> 8),
+		(BYTE)(microSecs & 0x0000FF)
+	};
+	return WriteMetaEvent(buf, time, 0x51, data, 3);
 }
 
 
@@ -744,17 +776,13 @@ TimeSigEvent::TimeSigEvent(MidiTrack* prntTrk, ULONG absoluteTime, BYTE numerato
 
 ULONG TimeSigEvent::WriteEvent(vector<BYTE> & buf, UINT time)
 {
-	WriteVarLength(buf, AbsTime-time);
-	buf.push_back(0xFF);
-	buf.push_back(0x58);
-	buf.push_back(0x04);
-	buf.push_back(numer);
-	//denom is expressed in power of 2... so if we have 6/8 time.  it's 6 = 2^x  ==  ln6 / ln2
-	buf.push_back((BYTE)(log((double)denom)/0.69314718055994530941723212145818));	
-	buf.push_back(ticksPerQuarter/*/4*/);
-	buf.push_back(8);
-	return AbsTime;
-}
+	BYTE data[4] = {
+		numer,
+		(BYTE)(log((double)denom)/0.69314718055994530941723212145818),				//denom is expressed in power of 2... so if we have 6/8 time.  it's 6 = 2^x  ==  ln6 / ln2
+		ticksPerQuarter/*/4*/,
+		8
+	};
+	return WriteMetaEvent(buf, time, 0x58, data, 4);}
 
 
 //  ***************
@@ -769,11 +797,21 @@ EndOfTrackEvent::EndOfTrackEvent(MidiTrack* prntTrk, ULONG absoluteTime)
 
 ULONG EndOfTrackEvent::WriteEvent(vector<BYTE> & buf, UINT time)
 {
-	WriteVarLength(buf, AbsTime-time);
-	buf.push_back(0xFF);
-	buf.push_back(0x2F);
-	buf.push_back(0x00);
-	return AbsTime;
+	return WriteMetaEvent(buf, time, 0x2F, NULL, 0);
+}
+
+//  *********
+//  TextEvent
+//  *********
+
+TextEvent::TextEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr)
+: MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr)
+{
+}
+
+ULONG TextEvent::WriteEvent(vector<BYTE> & buf, UINT time)
+{
+	return WriteMetaTextEvent(buf, time, 0x01, text);
 }
 
 //***************

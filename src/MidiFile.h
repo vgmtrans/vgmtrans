@@ -49,7 +49,8 @@ typedef enum
 	MIDIEVENT_PORTAMENTOTIME,
 	MIDIEVENT_LFO,
 	MIDIEVENT_VIBRATO,
-	MIDIEVENT_ENDOFTRACK
+	MIDIEVENT_ENDOFTRACK,
+	MIDIEVENT_TEXT
 } MidiEventType;
 
 class MidiTrack
@@ -113,6 +114,8 @@ public:
 	void InsertTimeSig(BYTE numer, BYTE denom, BYTE ticksPerQuarter, ULONG absTime);
 	void AddEndOfTrack(void);
 	void InsertEndOfTrack(ULONG absTime);
+	void AddText(const wchar_t* wstr);
+	void InsertText(const wchar_t* wstr, ULONG absTime);
 
 	// SPECIAL EVENTS
 	//void AddTranspose(char semitones);
@@ -173,10 +176,13 @@ public:
 	MidiEvent(MidiTrack* thePrntTrk, ULONG absoluteTime, BYTE theChannel, char thePriority);
 	virtual ~MidiEvent(void);
 	virtual MidiEventType GetEventType() = 0;
-	void WriteVarLength(vector<BYTE> & buf, ULONG time);
+	void WriteVarLength(vector<BYTE> & buf, ULONG value);
 	//virtual void PrepareWrite(void/*vector<MidiEvent*> & aEvents*/);
 	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time) = 0;
-	
+	ULONG WriteSysexEvent(vector<BYTE> & buf, UINT time, BYTE* data, size_t dataSize);
+	ULONG WriteMetaEvent(vector<BYTE> & buf, UINT time, BYTE metaType, BYTE* data, size_t dataSize);
+	ULONG WriteMetaTextEvent(vector<BYTE> & buf, UINT time, BYTE metaType, wstring wstr);
+
 	bool operator<(const MidiEvent &) const;
 	bool operator>(const MidiEvent &) const;
 
@@ -449,6 +455,17 @@ public:
 	virtual MidiEventType GetEventType() { return MIDIEVENT_ENDOFTRACK; }
 	//virtual EndOfTrackEvent* MakeCopy();
 	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+};
+
+class TextEvent
+	: public MidiEvent
+{
+public:
+	TextEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr);
+	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
+	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+
+	wstring text;
 };
 
 // SPECIAL EVENTS THAT AFFECT OTHER MIDI EVENTS RATHER THAN DIRECTLY OUTPUT TO THE FILE
