@@ -179,6 +179,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BytePattern.cpp" />
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="KabukiDecrypt.cpp" />
     <ClCompile Include="RiffFile.cpp" />
@@ -320,6 +321,7 @@
     <ClCompile Include="VGMSeqNoTrks.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BytePattern.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="KabukiDecrypt.h" />
     <ClInclude Include="VGMMiscFile.h" />

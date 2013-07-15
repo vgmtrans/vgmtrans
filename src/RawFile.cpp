@@ -323,6 +323,48 @@ UINT RawFile::GetBytes(UINT nIndex, UINT nCount, void* pBuffer)
 	return nCount;
 }
 
+// attempts to match the data from a given offset against a given pattern.
+// If the requested data goes beyond the bounds of the file buffer, the buffer is updated.
+// If the requested size is greater than the buffer size, it always fails. (operation not supported)
+bool RawFile::MatchBytePattern(const BytePattern& pattern, UINT nIndex)
+{
+	UINT nCount = pattern.length();
+
+	if ((nIndex + nCount) > fileSize)
+		return false;
+
+	if (nCount > buf.size)
+		return false; // not supported
+	else
+	{
+		if ((nIndex < buf.startOff) || (nIndex+nCount > buf.endOff))
+			UpdateBuffer(nIndex);
+
+		return pattern.match(buf.data+nIndex-buf.startOff, nCount);
+	}
+}
+
+bool RawFile::SearchBytePattern(const BytePattern& pattern, UINT& nMatchOffset, UINT nSearchOffset, UINT nSearchSize)
+{
+	if (nSearchOffset >= fileSize)
+		return false;
+
+	if ((nSearchOffset + nSearchSize) > fileSize)
+		nSearchSize = fileSize - nSearchOffset;
+
+	if (nSearchSize < pattern.length())
+		return false;
+
+	for (UINT nIndex = nSearchOffset; nIndex < nSearchOffset + nSearchSize - pattern.length(); nIndex++)
+	{
+		if (MatchBytePattern(pattern, nIndex))
+		{
+			nMatchOffset = nIndex;
+			return true;
+		}
+	}
+	return false;
+}
 
 /*
 int RawFile::FileRead(DataSeg* dest, ULONG index, ULONG length)

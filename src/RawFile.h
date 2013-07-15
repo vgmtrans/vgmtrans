@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "DataSeg.h"
+#include "BytePattern.h"
 
 class VGMFile;
 class VGMItem;
@@ -100,6 +101,8 @@ public:
 	//USHORT GetShortBE(UINT nIndex);
 	//UINT GetWord(UINT nIndex);
 	//UINT GetWordBE(UINT nIndex);
+	bool MatchBytePattern(const BytePattern& pattern, UINT nIndex);
+	bool SearchBytePattern(const BytePattern& pattern, UINT& nMatchOffset, UINT nSearchOffset = 0, UINT nSearchSize = (UINT)-1);
 
 	void AddContainedVGMFile(VGMFile* vgmfile);
 	void RemoveContainedVGMFile(VGMFile* vgmfile);
