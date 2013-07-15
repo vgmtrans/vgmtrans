@@ -113,6 +113,9 @@
       <DataExecutionPrevention>
       </DataExecutionPrevention>
     </Link>
+    <Manifest>
+      <AdditionalManifestFiles>.\windows\res\VGMTrans.exe.manifest</AdditionalManifestFiles>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Midl>
@@ -166,6 +169,14 @@
       <DataExecutionPrevention>
       </DataExecutionPrevention>
     </Link>
+    <Manifest>
+      <AdditionalManifestFiles>.\windows\res\VGMTrans.exe.manifest</AdditionalManifestFiles>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Template|Win32'">
+    <Manifest>
+      <AdditionalManifestFiles>.\windows\res\VGMTrans.exe.manifest</AdditionalManifestFiles>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Options.cpp" />

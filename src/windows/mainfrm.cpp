@@ -587,7 +587,10 @@ void CMainFrame::InitializeDefaultPanes(void)
 	//CRect rcDock();
 
 	CImageList ilIcons;
-	ilIcons.Create(IDB_MSDEV_TAB_ICONS, 16, 4, RGB(0,255,0));
+	ilIcons.Create(16, 16, ILC_MASK | ILC_COLOR24, 0, 0);
+	CBitmap bmpIcons;
+	bmpIcons.LoadBitmap(IDB_MSDEV_TAB_ICONS);
+	ilIcons.Add((HBITMAP)bmpIcons, RGB(0,255,0));
 
 	HWND hWndFirst = 
 	//CreateVGMFilesTreeViewPane(VGMFilesView, _T("Detected VGM Files"), ilIcons.ExtractIcon(10), rcFloat, rcvgmfileDock, NULL);
