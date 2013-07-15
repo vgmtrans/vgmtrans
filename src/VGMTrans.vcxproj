@@ -169,7 +169,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Options.cpp" />
-    <ClCompile Include="Options.h" />
     <ClCompile Include="KabukiDecrypt.cpp" />
     <ClCompile Include="RiffFile.cpp" />
     <ClCompile Include="SF2File.cpp" />
@@ -178,8 +177,8 @@
     <ClCompile Include="windows\aboutdlg.cpp" />
     <ClCompile Include="windows\CollDialog.cpp" />
     <ClCompile Include="DragDropSource.cpp" />
-    <ClCompile Include="windows\FileFrame.CPP" />
-    <ClCompile Include="windows\HexView.CPP" />
+    <ClCompile Include="windows\FileFrame.cpp" />
+    <ClCompile Include="windows\HexView.cpp" />
     <ClCompile Include="HexViewFrame.cpp" />
     <ClCompile Include="ItemTreeView.cpp" />
     <ClCompile Include="windows\mainfrm.cpp" />
@@ -310,6 +309,7 @@
     <ClCompile Include="VGMSeqNoTrks.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Options.h" />
     <ClInclude Include="KabukiDecrypt.h" />
     <ClInclude Include="VGMMiscFile.h" />
     <ClInclude Include="RIFFFile.h" />

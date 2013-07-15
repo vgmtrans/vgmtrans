@@ -555,9 +555,6 @@
     <ClCompile Include="KabukiDecrypt.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="Options.h">
-      <Filter>Header Files\main</Filter>
-    </ClCompile>
     <ClCompile Include="Options.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
@@ -1024,6 +1021,9 @@
     </ClInclude>
     <ClInclude Include="KabukiDecrypt.h">
       <Filter>Header Files\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Options.h">
+      <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
