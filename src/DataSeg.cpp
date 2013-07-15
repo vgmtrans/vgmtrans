@@ -123,7 +123,7 @@ void CompDataSeg::load(BYTE* buf, ULONG startVirtOffset, ULONG theSize, ULONG co
 		ULONG destSize = (ULONG)(compBufSize * 1.2 + 12);
 		BYTE* compBlock = (BYTE*)malloc(destSize);
 		
-		compress(compBlock, &destSize, buf+(compBufSize*i), compBufSize);
+		compress(compBlock, &destSize, buf+(compBlockSize*i), compBufSize);
 		compBlock = (BYTE*)realloc(compBlock, destSize);
 		compBlocks.push_back(pair<BYTE*, long>(compBlock, destSize));
 		offset += compBufSize;
