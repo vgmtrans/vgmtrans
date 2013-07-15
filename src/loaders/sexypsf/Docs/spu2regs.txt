@@ -1,0 +1,447 @@
+------------------------------------------------------------------------------
+SPU2 notes (preliminary, etc.) by Neill Corlett
+------------------------------------------------------------------------------
+
+The SPU2 consists of a pair of SPU "cores" (CORE0, CORE1)
+Each core is largely similar to an original Playstation SPU:
+- they still have 24 voices (each, for a total of 48)
+- they still use the same old 4-bit ADPCM sample format
+- they use the same reverb processor
+
+But they have a few extra little features, and they both share a
+common 2 meg sample memory.
+
+They run off the IOP clock / 768, which can be set to two values:
+ 33868800 / 768 = 44100 Hz
+ 36864000 / 768 = 48000 Hz (native PS2 mode)
+
+CORE0 output appears as "external input" on CORE1.  CORE1's output
+becomes the final output.
+
+I'm assuming the SPU2 is register compatible with the original SPU
+(how else could it be compatible with PS1 games?) and as such can be
+accessed via the usual 1F801C00-1F801DFF regs.  HOWEVER.  To access
+the full SPU2 features, you need to use this other "native" register
+set.
+
+The SPU2 "native" registers live at BF900000-BF9007FF.
+
+There's three types of SPU2 registers:
+- Parameters (16-bit halfword values)
+- Switches   (a 24-bit mask with one bit per channel)
+- Addresses  (pair of 16-bit halfwords: high, then low)
+
+Actual addresses are expressed in terms of halfwords
+so the entire SPU2 memory is "0000 0000" to "000F FFFF"
+
+The "effect end address" (EEA) can only be expressed in terms of
+"which 128K region does it end in", so it has no lower address halfword
+and can only take one of 16 values.
+
+The reverb regs have all been twisted around so that all the offsets
+could be promoted to 32-bit (halfword precision).
+
+There's 2 DMA transfer "channels" between IOP and SPU memory, and of course
+these correspond to the two cores.
+
+Register map:
+
+BF900000   2   CORE0 SD_VP_VOLL   Voice 0 parameter: Voice volume (left)
+BF900002   2   CORE0 SD_VP_VOLR   Voice 0 parameter: Voice volume (right)
+BF900004   2   CORE0 SD_VP_PITCH  Voice 0 parameter: Sound generation pitch
+BF900006   2   CORE0 SD_VP_ADSR1  Voice 0 parameter: Envelope
+BF900008   2   CORE0 SD_VP_ADSR2  Voice 0 parameter: Envelope (2)
+BF90000A   2   CORE0 SD_VP_ENVX   Voice 0 parameter: Current value of envelope
+BF90000C   2   CORE0 SD_VP_VOLXL  Voice 0 parameter: Current volume (left)
+BF90000E   2   CORE0 SD_VP_VOLXR  Voice 0 parameter: Current volume (right)
+BF90001x  10   CORE0 SD_VP_*      Voice 1 parameters...
+BF90017x  10   CORE0 SD_VP_*      Voice 23 parameters
+BF900180   4   CORE0 SD_S_PMON    Switch: Pitch modulation
+BF900184   4   CORE0 SD_S_NON     Switch: Noise generator assignment
+BF900188   4   CORE0 SD_S_VMIXL   Switch: Voice output mixing (dry left)
+BF90018C   4   CORE0 SD_S_VMIXEL  Switch: Voice output mixing (wet left)
+BF900190   4   CORE0 SD_S_VMIXR   Switch: Voice output mixing (dry right)
+BF900194   4   CORE0 SD_S_VMIXER  Switch: Voice output mixing (wet right)
+BF900198   2   CORE0 SD_P_MMIX    Parameter: Output type after voice mixing (see details)
+BF90019A   2   CORE0 SD_C         Core attributes (see details)
+BF90019C   4   CORE0 SD_A_IRQA
+BF9001A0   4   CORE0 SD_S_KON     Switch: Key on (start sound generation)
+BF9001A4   4   CORE0 SD_S_KOFF    Switch: Key off (end sound generation)
+BF9001A8   4   CORE0 SD_A_TSA     Address: Transfer start address
+BF9001AC   2   CORE0 sound transfer data
+BF9001AE   2   CORE0 related to transfers? transfer mode?
+BF9001B0   2   CORE0 related to DMA? status word?
+...
+BF9001C0   4   CORE0 SD_VA_SSA    Voice 0 address: Top address of waveform data
+BF9001C4   4   CORE0 SD_VA_LSAX   Voice 0 address: Loop point address
+BF9001C8   4   CORE0 SD_VA_NAX    Voice 0 address: Address of waveform data that should be read next
+BF9001CC   C   CORE0 SD_VA_*      Voice 1 addresses...
+BF9002D4   C   CORE0 SD_VA_*      Voice 23 addresses
+BF9002E0   4   CORE0 SD_A_ESA     Address: Top address of working area for effects processing
+BF9002E4   4   CORE0 Reverb address FB_SRC_A
+BF9002E8   4   CORE0 Reverb address FB_SRC_B
+BF9002EC   4   CORE0 Reverb address IIR_DEST_A0
+BF9002F0   4   CORE0 Reverb address IIR_DEST_A1
+BF9002F4   4   CORE0 Reverb address ACC_SRC_A0
+BF9002F8   4   CORE0 Reverb address ACC_SRC_A1
+BF9002FC   4   CORE0 Reverb address ACC_SRC_B0
+BF900300   4   CORE0 Reverb address ACC_SRC_B1
+BF900304   4   CORE0 Reverb address IIR_SRC_A0
+BF900308   4   CORE0 Reverb address IIR_SRC_A1
+BF90030C   4   CORE0 Reverb address IIR_DEST_B0
+BF900310   4   CORE0 Reverb address IIR_DEST_B1
+BF900314   4   CORE0 Reverb address ACC_SRC_C0
+BF900318   4   CORE0 Reverb address ACC_SRC_C1
+BF90031C   4   CORE0 Reverb address ACC_SRC_D0
+BF900320   4   CORE0 Reverb address ACC_SRC_D1
+BF900324   4   CORE0 Reverb address IIR_SRC_B1
+BF900328   4   CORE0 Reverb address IIR_SRC_B0
+BF90032C   4   CORE0 Reverb address MIX_DEST_A0
+BF900330   4   CORE0 Reverb address MIX_DEST_A1
+BF900334   4   CORE0 Reverb address MIX_DEST_B0
+BF900338   4   CORE0 Reverb address MIX_DEST_B1
+BF90033C   4   CORE0 SD_A_EEA     Address: End address of working area for effects processing (upper part of address only!)
+BF900340   4   CORE0 ? (might be effect current address)
+BF900344   2   CORE0 MYSTERY_DMA_STAT? read bit 0x80 means something.
+BF900346   ?   CORE0 ?
+...
+BF900400   2   CORE1 SD_VP_VOLL   Voice 0 parameter: Voice volume (left)
+BF900402   2   CORE1 SD_VP_VOLR   Voice 0 parameter: Voice volume (right)
+BF900404   2   CORE1 SD_VP_PITCH  Voice 0 parameter: Sound generation pitch
+BF900406   2   CORE1 SD_VP_ADSR1  Voice 0 parameter: Envelope
+BF900408   2   CORE1 SD_VP_ADSR2  Voice 0 parameter: Envelope (2)
+BF90040A   2   CORE1 SD_VP_ENVX   Voice 0 parameter: Current value of envelope
+BF90040C   2   CORE1 SD_VP_VOLXL  Voice 0 parameter: Current volume (left)
+BF90040E   2   CORE1 SD_VP_VOLXR  Voice 0 parameter: Current volume (right)
+BF90041x  10   CORE1 SD_VP_*      Voice 1 parameters...
+BF90057x  10   CORE1 SD_VP_*      Voice 23 parameters
+BF900580   4   CORE1 SD_S_PMON    Switch: Pitch modulation
+BF900584   4   CORE1 SD_S_NON     Switch: Noise generator assignment
+BF900588   4   CORE1 SD_S_VMIXL   Switch: Voice output mixing (dry left)
+BF90058C   4   CORE1 SD_S_VMIXEL  Switch: Voice output mixing (wet left)
+BF900590   4   CORE1 SD_S_VMIXR   Switch: Voice output mixing (dry right)
+BF900594   4   CORE1 SD_S_VMIXER  Switch: Voice output mixing (wet right)
+BF900598   2   CORE1 SD_P_MMIX    Parameter: Output type after voice mixing (see details)
+BF90059A   2   CORE1 SD_C         Core attributes (see details)
+BF90059C   4   CORE1 SD_A_IRQA
+BF9005A0   4   CORE1 SD_S_KON     Switch: Key on (start sound generation)
+BF9005A4   4   CORE1 SD_S_KOFF    Switch: Key off (end sound generation)
+BF9005A8   4   CORE1 SD_A_TSA     Address: Transfer start address
+BF9005AC   2   CORE1 sound transfer data
+BF9005AE   2   CORE1 related to transfers? transfer mode?
+BF9005B0   2   CORE1 related to DMA? status word?
+...
+BF9005C0   4   CORE1 SD_VA_SSA    Voice 0 address: Top address of waveform data
+BF9005C4   4   CORE1 SD_VA_LSAX   Voice 0 address: Loop point address
+BF9005C8   4   CORE1 SD_VA_NAX    Voice 0 address: Address of waveform data that should be read next
+BF9005CC   C   CORE1 SD_VA_*      Voice 1 addresses...
+BF9006D4   C   CORE1 SD_VA_*      Voice 23 addresses
+BF9006E0   4   CORE1 SD_A_ESA     Address: Top address of working area for effects processing
+BF9006E4   4   CORE1 Reverb address FB_SRC_A
+BF9006E8   4   CORE1 Reverb address FB_SRC_B
+BF9006EC   4   CORE1 Reverb address IIR_DEST_A0
+BF9006F0   4   CORE1 Reverb address IIR_DEST_A1
+BF9006F4   4   CORE1 Reverb address ACC_SRC_A0
+BF9006F8   4   CORE1 Reverb address ACC_SRC_A1
+BF9006FC   4   CORE1 Reverb address ACC_SRC_B0
+BF900700   4   CORE1 Reverb address ACC_SRC_B1
+BF900704   4   CORE1 Reverb address IIR_SRC_A0
+BF900708   4   CORE1 Reverb address IIR_SRC_A1
+BF90070C   4   CORE1 Reverb address IIR_DEST_B0
+BF900710   4   CORE1 Reverb address IIR_DEST_B1
+BF900714   4   CORE1 Reverb address ACC_SRC_C0
+BF900718   4   CORE1 Reverb address ACC_SRC_C1
+BF90071C   4   CORE1 Reverb address ACC_SRC_D0
+BF900720   4   CORE1 Reverb address ACC_SRC_D1
+BF900724   4   CORE1 Reverb address IIR_SRC_B1
+BF900728   4   CORE1 Reverb address IIR_SRC_B0
+BF90072C   4   CORE1 Reverb address MIX_DEST_A0
+BF900730   4   CORE1 Reverb address MIX_DEST_A1
+BF900734   4   CORE1 Reverb address MIX_DEST_B0
+BF900738   4   CORE1 Reverb address MIX_DEST_B1
+BF90073C   4   CORE1 SD_A_EEA     Address: End address of working area for effects processing (upper part of address only!)
+BF900740   4   CORE1 ? (might be effect current address)
+BF900744   2   CORE1 MYSTERY_DMA_STAT? read bit 0x80 means something.
+BF900746   ?   CORE1 ?
+...
+BF900760   2   CORE0 SD_P_MVOLL   Parameter: Set master volume (left)
+BF900762   2   CORE0 SD_P_MVOLR   Parameter: Set master volume (right)
+BF900764   2   CORE0 SD_P_EVOLL   Parameter: Effect return volume (left)
+BF900766   2   CORE0 SD_P_EVOLR   Parameter: Effect return volume (right)
+BF900768   2   CORE0 SD_P_AVOLL   Parameter: Core external input volume (left)
+BF90076A   2   CORE0 SD_P_AVOLR   Parameter: Core external input volume (right)
+BF90076C   2   CORE0 SD_P_BVOLL   Parameter: Sound data input volume (left)
+BF90076E   2   CORE0 SD_P_BVOLR   Parameter: Sound data input volume (right)
+BF900770   2   CORE0 SD_P_MVOLXL  Parameter: Current master volume (left)
+BF900772   2   CORE0 SD_P_MVOLXR  Parameter: Current master volume (right)
+BF900774   2   CORE0 Reverb param IIR_ALPHA
+BF900776   2   CORE0 Reverb param ACC_COEF_A
+BF900778   2   CORE0 Reverb param ACC_COEF_B
+BF90077A   2   CORE0 Reverb param ACC_COEF_C
+BF90077C   2   CORE0 Reverb param ACC_COEF_D
+BF90077E   2   CORE0 Reverb param IIR_COEF
+BF900780   2   CORE0 Reverb param FB_ALPHA
+BF900782   2   CORE0 Reverb param FB_X
+BF900784   2   CORE0 Reverb param IN_COEF_L
+BF900786   2   CORE0 Reverb param IN_COEF_R
+BF900788   2   CORE1 SD_P_MVOLL   Parameter: Set master volume (left)
+BF90078A   2   CORE1 SD_P_MVOLR   Parameter: Set master volume (right)
+BF90078C   2   CORE1 SD_P_EVOLL   Parameter: Effect return volume (left)
+BF90078E   2   CORE1 SD_P_EVOLR   Parameter: Effect return volume (right)
+BF900790   2   CORE1 SD_P_AVOLL   Parameter: Core external input volume (left)
+BF900792   2   CORE1 SD_P_AVOLR   Parameter: Core external input volume (right)
+BF900794   2   CORE1 SD_P_BVOLL   Parameter: Sound data input volume (left)
+BF900796   2   CORE1 SD_P_BVOLR   Parameter: Sound data input volume (right)
+BF900798   2   CORE1 SD_P_MVOLXL  Parameter: Current master volume (left)
+BF90079A   2   CORE1 SD_P_MVOLXR  Parameter: Current master volume (right)
+BF90079C   2   CORE1 Reverb param IIR_ALPHA
+BF90079E   2   CORE1 Reverb param ACC_COEF_A
+BF9007A0   2   CORE1 Reverb param ACC_COEF_B
+BF9007A2   2   CORE1 Reverb param ACC_COEF_C
+BF9007A4   2   CORE1 Reverb param ACC_COEF_D
+BF9007A6   2   CORE1 Reverb param IIR_COEF
+BF9007A8   2   CORE1 Reverb param FB_ALPHA
+BF9007AA   2   CORE1 Reverb param FB_X
+BF9007AC   2   CORE1 Reverb param IN_COEF_L
+BF9007AE   2   CORE1 Reverb param IN_COEF_R
+...
+BF9007C0   2   unknown important
+BF9007C6   2   unknown important initialized
+BF9007C8   2   unknown important initialized
+BF9007CA   2   unknown important initialized
+
+Functional description
+
+Voice parameters:
+
+SD_VP_VOLL, SD_VP_VOLR   - Volume left/right per voice.  Assuming identical to PS1.
+SD_VP_PITCH              - Pitch scaler 0000-3FFF. Assuming identical to PS1.
+SD_VP_ADSR1, SD_VP_ADSR1 - Envelope data. Bitfields are documented as identical to PS1.
+SD_VP_ENVX               - Current envelope value. Assuming identical to PS1.
+SD_VP_VOLXL, SD_VP_VOLXR - Current voice volume left/right. Does not exist on the PS1.
+                           Guessing that this is handy for the increase/decrease modes.
+
+Voice addresses:
+
+SD_VA_SSA                - Sample start address; assuming identical to PS1
+SD_VA_LSAX               - Loop start address; assuming identical to PS1
+SD_VA_NAX                - Seems to be documented as the current playing address.
+                           Does not exist on PS1.
+
+Switches:
+
+SD_S_PMON                - Pitch mod; assuming identical to PS1
+SD_S_NON                 - Noise; assuming identical to PS1
+SD_S_VMIXL, SD_S_VMIXR   - Voice mix L/R. Guessing this is just a separate L/R version
+                           of the "voice enable" bits on the PS1.
+SD_S_VMIXEL, SD_S_VMIXER - Voice effect mix L/R. Guessing this is just a separate L/R
+                           version of the "voice reverb enable" bits on the PS1.
+SD_S_KON, SD_S_KOFF      - Key on/off; assuming identical to PS1
+
+
+Addresses:
+
+SD_A_TSA                 - Transfer start address; assuming identical to PS1
+SD_A_ESA                 - Effect start address - this is probably analogous to the
+                           PS1's reverb work area start address
+SD_A_EEA                 - Effect end address - this would've been fixed to 0x7FFFF on
+                           the PS1; settable in 128K increments on the PS2.
+SD_A_IRQA                - IRQ address; assuming identical to PS1
+
+Volume parameters:
+
+SD_P_MVOLL, SD_P_MVOLR   - Master volume L/R; assuming identical to PS1
+SD_P_EVOLL, SD_P_EVOLR   - Effect volume L/R; assuming analogous to RVOL on the PS1
+SD_P_AVOLL, SD_P_AVOLR   - External input volume L/R
+                           This is probably where CORE0 connects to CORE1
+SD_P_BVOLL, SD_P_BVOLR   - Sound data input volume - perhaps this is the volume of
+                           the raw PCM auto-DMA input? analogous to CD input volume?
+SD_P_MVOLXL, SD_P_MVOLXR - Current master volume L/R; seems self-explanatory
+
+SD_P_MMIX                - Mixer / effect enable bits.
+                            bit 11 = MSNDL  = voice output dry L
+                                10 = MSNDR  = voice output dry R
+                                 9 = MSNDEL = voice output wet L
+                                 8 = MSNDER = voice output wet R
+                                 7 = MINL   = sound data input dry L
+                                 6 = MINR   = sound data input dry R
+                                 5 = MINEL  = sound data input wet L
+                                 4 = MINER  = sound data input wet R
+                                 3 = SINL   = core external input dry L
+                                 2 = SINR   = core external input dry R
+                                 1 = SINEL  = core external input wet L
+                                 0 = SINER  = core external input wet R
+
+Core attributes (SD_C)
+  bit 4..5      - DMA related
+  bit 6         - IRQ enable
+  bit 7         - effect enable (reverb enable)
+  bit 13..8     - noise clock
+  bit 14        - mute
+
+- if you READ the two DMA related bits, if either are set, the channel is
+  considered "busy" by sceSdVoiceTrans
+
+
+
+
+Reverb parameters:
+
+Same as PS1 reverb (I used the names from my reverb doc).
+
+------------------------------------------------------------------------------
+Other PS2 IOP notes
+------------------------------------------------------------------------------
+
+There's two DMA controllers:
+- The original one at BF801080-BF8010FF (channels 0-6)
+- A new one at        BF801500-BF80157F (channels 7-13)
+
+They appear to function the same way - 7 channels each.
+
+SPU CORE0's DMA channel is 4 as per usual
+SPU CORE1's DMA channel is 7
+
+DMA channel 10 is SIF
+
+- Original INTR controller at BF801000-BF80107F
+
+All interrupt handling seems to be done using the old INTR, but
+with some new bits defined:
+
+#define IOP_INT_VBLANK  (1<<0)
+#define IOP_INT_GM      (1<<1)
+#define IOP_INT_CDROM   (1<<2)
+#define IOP_INT_DMA     (1<<3)
+#define IOP_INT_RTC0    (1<<4)
+#define IOP_INT_RTC1    (1<<5)
+#define IOP_INT_RTC2    (1<<6)
+#define IOP_INT_SIO0    (1<<7)
+#define IOP_INT_SIO1    (1<<8)
+#define IOP_INT_SPU     (1<<9)
+#define IOP_INT_PIO     (1<<10)
+#define IOP_INT_EVBLANK (1<<11)
+#define IOP_INT_DVD     (1<<12)
+#define IOP_INT_PCMCIA  (1<<13)
+#define IOP_INT_RTC3    (1<<14)
+#define IOP_INT_RTC4    (1<<15)
+#define IOP_INT_RTC5    (1<<16)
+#define IOP_INT_SIO2    (1<<17)
+#define IOP_INT_HTR0    (1<<18)
+#define IOP_INT_HTR1    (1<<19)
+#define IOP_INT_HTR2    (1<<20)
+#define IOP_INT_HTR3    (1<<21)
+#define IOP_INT_USB     (1<<22)
+#define IOP_INT_EXTR    (1<<23)
+#define IOP_INT_FWRE    (1<<24)
+#define IOP_INT_FDMA    (1<<25)
+
+Reading from BF801078 masks interrupts and returns 1 if they weren't
+masked before.  Writing 1 to BF801078 re-enables interrupts.
+Writing 0 doesn't.  Maybe it was like that on the original PS1 too.
+
+Six root counters:
+
+RTC#   address      sources           size     prescale     interrupt#
+----------------------------------------------------------------------
+0      0xBF801100   sysclock,pixel    16 bit   1 only       4
+1      0xBF801110   sysclock,hline    16 bit   1 only       5
+2      0xBF801120   sysclock          16 bit   1,8          6
+3      0xBF801480   sysclock,hline    32 bit   1 only       14
+4      0xBF801490   sysclock          32 bit   1,8,16,256   15
+5      0xBF8014A0   sysclock          32 bit   1,8,16,256   16
+
+Count (0x0) and Compare (0x8) registers work as before, only with more bits
+in the new counters.
+
+Mode (0x4) works like this when written:
+
+  bits 0..2    gate
+  bit  3       reset on target
+  bit  4       target interrupt enable
+  bit  5       overflow interrupt enable
+  bit  6       master enable (?)
+  bit  7       ?
+  bit  8       clock select
+  bit  9       prescale (OLD)
+  bit  10..12  ?
+  bit  13..14  prescale (NEW)
+  bit  15      ? always set to 1
+
+gate:
+  TM_NO_GATE                   000
+  TM_GATE_ON_Count             001
+  TM_GATE_ON_ClearStart        011
+  TM_GATE_ON_Clear_OFF_Start   101
+  TM_GATE_ON_Start             111
+
+ V-blank  ----+    +----------------------------+    +------
+              |    |                            |    |
+              |    |                            |    |
+              +----+                            +----+
+TM_NO_GATE:
+              0================================>============
+TM_GATE_ON_Count:
+              <---->0==========================><---->0=====
+TM_GATE_ON_ClearStart:
+              0====>0================================>0=====
+TM_GATE_ON_Clear_OFF_Start:
+              0====><-------------------------->0====><-----
+TM_GATE_ON_Start:
+              <---->0==========================>============
+
+reset on target: if set, counter resets to 0 when Compare value is reached
+
+target interrupt enable: if set, interrupt when Compare value is reached
+overflow interrupt enable: if set, interrupt when counter overflows
+
+master enable: if this bit is clear, the timer should do nothing.
+
+clock select: for counters 0, 1, and 3, setting this will select the alternate
+              counter (pixel or hline)
+
+prescale (OLD): for counter 2 only. set this to prescale (divide) by 8.
+
+prescale (NEW): for counters 4 and 5 only:
+  00 = prescale by 1
+  01 = prescale by 8
+  10 = prescale by 16
+  11 = prescale by 256
+
+Writing 0x4 also clears the counter. (I think.)
+
+When 0x4 is read, it becomes Status:
+
+  bit  0..10   ?
+  bit  11      compare value was reached
+  bit  12      count overflowed
+  bit  13..15  ?
+
+Reading probably clears these bits.
+
+
+
+BF8014B0 (word) - timer-related but otherwise unknown
+BF8014C0 (word) - timer-related but otherwise unknown
+
+
+don't currently know how the interrupts work for DMA ch7 yet
+
+BF801060 (word) - address of some kind.
+
+BF801450 (word) -
+  if bit 3 is SET, we're in PS1 mode.
+  if bit 3 is CLEAR, we're in PS2 IOP mode.
+
+BF802070 (byte) - unknown. status byte of some kind? visible to EE?
+
+BD000000-BD00007F (?) - SIF related
+
+BD000020 (word) - read counter of some sort?
+                  sceSifInit waits for bit 0x10000 of this to be set.
+BD000030 (word) - read counter of some sort?
+BD000040 (word) - read bits 0x20, 0x40 mean something
+BD000060 (word) - used to detect whether the SIF interface exists
+                  read must be 0x1D000060, or the top 20 bits must be zero
+
+------------------------------------------------------------------------------

@@ -1,0 +1,268 @@
+
+	Music format of
+	初芝弘也(Hiroya Hatsushiba)'s sound driver for Playstation
+
+
+This can apply the following title.
+* Star Ocean 2
+* Valkyrie Profile
+
+
+
+Note:
+* This document is wirtten with TAB = 8space.
+* About this document, music format after expansion from the slz archive is described.
+* About the address, it is an absolute value.
+* About the word(2byte) data, it is a little endian (LSB first).
+* This document written by Japanese, therefore this document is poor English.
+
+
+
+
+■(1) Header information
+━━━━━━━━━━━━━━━
+========================================
+Address		Type		Contents
++-------+-------+-------+-------+-------
+0x0000～0x0001	word		0xFFFF	(End of Track)
+0x0002～0x0003	word		File size
+0x0004～0x0005	word		unknown
+0x0006～0x0007	word		unknown
+0x0008～0x0009	word		unknown
+0x000A		byte		unknown
+0x000B～0x000E	char[4]		Music title
+0x000F		byte		Tempo [BPM]
+0x0010		byte		Time signature (upper number)
+0x0011		byte		Time signature (lower number)
+0x0012～0x0015			unknown
++-------+-------+-------+-------+-------
+0x0016～0x00D5	char[6][32]	"Track information"	… See (2)
+========================================
+
+
+
+
+
+■(2) Track information
+━━━━━━━━━━━━━━━
+There are the following 32 structures. 
+========================================
+Address		Type		Contents
++-------+-------+-------+-------+-------
+0x0000～0x0001	word		unknown
+0x0002～0x0003	word		unknown
+0x0004～0x0005	word		Address of "Track sequence data".	… See (3)
+				If not use track, then 0x0000 was witten.
+				(At the address 0x000, there is 0xFFFF.)
+========================================
+
+
+
+
+
+■(3) Track sequence data
+━━━━━━━━━━━━━━━
+In this area, 1 word is 2 byte.
+========================================
+Data byte		Contents
++-------+-------+-------+-------+-------
+0x0000～0xFFFE		Address of the "Score pattern data".	… See (4)
+0xFFFF			End of track
+========================================
+
+
+
+
+
+■(4) Score pattern data
+━━━━━━━━━━━━━━━
+========================================
+Data byte	param		Contents
++-------+-------+-------+-------+-------
+0x00～0x7F			Note (Op-code meaning note number.)
+		n1	…	Delta time from "Note on" to "Next command(op-code)".
+		(n2)	…	Delta time from "Note on" to "Note off".
+		(n3)	…	Velocity.
+
+* About the parameter (n2) and (n3), it can omit when 0x9E command is wittern.
+
+* If the same note-number as the sounding note in same track is witten,
+  It mean "Tai" between old note and new note.
+
++-------+-------+-------+-------+-------
+0x80				End of Score
+
++-------+-------+-------+-------+-------
+
+
+
++-------+-------+-------+-------+-------
+0x82				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+
++-------+-------+-------+-------+-------
+0x83				Set the Instrument
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	Instrument Number lower
+		n3	…	Instrument Number upper
+
+		n2:n3	bit  0- 6	Program number (like GM System Level.1)
+			bit  7-13	Program Bank select LSB
+			bit 14-15	Program Bank select MSB (not used?)
+
++-------+-------+-------+-------+-------
+0x84				Set the pitch bend
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	Pitch Bend(signed char: -64～63)
+
+* This parameter is the MSB of "Pitch Bend Change" message.
+
++-------+-------+-------+-------+-------
+0x85				Set the Volume
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	Volume
+
++-------+-------+-------+-------+-------
+0x86				Set the Expression
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	Expression
+
++-------+-------+-------+-------+-------
+0x87				Set the Panpot
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	Panpot
+
++-------+-------+-------+-------+-------
+0x88				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+
++-------+-------+-------+-------+-------
+0x89				Dumper (Sustain) Pedal
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	Dumper
+
++-------+-------+-------+-------+-------
+0x8A				unknown (Set the Tempo?)
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	Tempo?
+
++-------+-------+-------+-------+-------
+
+
+
++-------+-------+-------+-------+-------
+0x8D				Dal Segno: start pont
+
++-------+-------+-------+-------+-------
+0x8E				Dal Segno: end pont
+		n1	…	
+
++-------+-------+-------+-------+-------
+0x8F				Rest
+		n1	…	Delta time to "Next command(op-code)".
+
++-------+-------+-------+-------+-------
+0x90				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+
++-------+-------+-------+-------+-------
+
+
+
++-------+-------+-------+-------+-------
+0x92				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+
++-------+-------+-------+-------+-------
+0x93				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+
++-------+-------+-------+-------+-------
+0x94				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+		n3	…	
+		n4	…	
+
++-------+-------+-------+-------+-------
+0x95				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+
++-------+-------+-------+-------+-------
+0x96				Set the Pitch Bend Sensibility (RPN=0x00,0x00)
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	Bend Range
+
+* Default "Pitch Bend Range" of Hatsushiba sound driver is 12.
+  However, Pitch Bend Sensibility (Bend Range) of default is 2 on some MIDI device.
+  Therefore, un-compiled data need the "Pitch Bend Sensibility" message after some reset message (GM/GS/XG).
+
+* About the "Pitch Bend Range",
+  this is address LSB=0x00, MSB=0x00 of RPN (Registered Parameter).
+  Setting process is as follows.
+   (1) Set the 0x00 to "Control Change" No.100. (RPN MSB)
+   (2) Set the 0x00 to "Control Change" No.101. (RPN LSB)
+   (3) Set the "Bend Range" to "Control Change" No.6. (Data Entry)
+   (4) Set the 0x7F to "Control Change" No.100. (RPN MSB)
+   (5) Set the 0x7F to "Control Change" No.101. (RPN LSB)
+
+* About the "Registered Parameter", please see the MIDI specification for detail.
+	http://www.midi.org/	MIDI Manufacturers Association	(English)
+	http://www.amei.or.jp/	社団法人 電子音楽事業協会	(Japanese)
+
++-------+-------+-------+-------+-------
+0x97				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+		n3	…	
+		n4	…	
+		n5	…	
+
++-------+-------+-------+-------+-------
+
+
+
+
++-------+-------+-------+-------+-------
+0x99				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+
++-------+-------+-------+-------+-------
+0x9A				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+
++-------+-------+-------+-------+-------
+0x9B				unknown
+		n1	…	Delta time to "Next command(op-code)".
+		n2	…	
+		n3	…	
+		n4	…	
+		n5	…	
+		n6	…	
+
++-------+-------+-------+-------+-------
+
+
+
++-------+-------+-------+-------+-------
+0x9E				Default note parameter
+		n1	…	Delta time from "Note on" to "Note off".
+		n2	…	Velocity
+
+* When set the "n1" or "n2" except 0x00,
+  parameter of the note command (op-code 0x00-0x7F) is omitted.
+
++-------+-------+-------+-------+-------
+
+
+
++-------+-------+-------+-------+-------
+

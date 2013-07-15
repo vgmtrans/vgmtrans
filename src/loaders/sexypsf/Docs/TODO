@@ -1,0 +1,10 @@
+- Something?
+
+The old TODO list that I(xodnizel) will be unable to do:
+
+- Implement filter to match frequency response of a real PSX, and maybe
+do compression.
+- Reorganize source code tree, and add PSF2 support.
+- Add support for the "volume" PSF tag?  Maybe, but I don't think it's very useful...
+- Add configuration, file info, about dialogs.  A GTK+2 version of xmms would 
+be nice...bah.

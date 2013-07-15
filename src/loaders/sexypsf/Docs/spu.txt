@@ -1,0 +1,526 @@
+==========================================================================
+SPU - Sound Processing Unit. Information & Documentation.
+==========================================================================
+
+Disclaimer.
+--------------------------------------------------------------------------
+This document is a collection of all info on the SPU i could find and my
+own notes. Most of this is the result of experiment, so not all info might
+be correct. This document is most probably not complete, and not all
+capabilities and quirks of the SPU are documented. No responsibility is
+taken for anything that might occur using the information in this document.
+
+
+Introduction.
+--------------------------------------------------------------------------
+The SPU is the unit responsible for all aural capabilities of the psx. It
+handles 24 voices, has a 512kb sound buffer, has ADSR envelope filters for
+each voice and lots of other features.
+
+
+Notations and conventions
+When the format of data is given it's shown as a bitwise representation
+like this:
+
+
+bit  |0f|0e 0d 0c 0b 0a|09 08 07 06 05|04 03 02 01 00|
+desc.|                                               |
+
+The bit row shows which bits of the data are used, and separators are used
+to show where the different elements of the data stop and start. MSB is on
+the left, LSB is on the right. Stuff like |0f-08| means bit $0f to bit $08.
+The desc. row shows the description of the different elements. With
+separators where the element starts and ends.
+
+
+
+--------------------------------------------------------------------------
+The Sound Buffer
+--------------------------------------------------------------------------
+
+The SPU has control over a 512kb sound buffer. Data is stored compressed
+into blocks of 16 bytes. Each block contains 14 packed sample bytes and two
+header bytes, one for the packing and one for sample end and looping
+information. One such block is decoded into 28 sample bytes (= 14 16bit
+samples).
+
+In the first 4 kb of the buffer the SPU stores the decoded data of CD audio
+after volume processing and the sound data of voice 1 and voice 3 after
+envelope processing. The decoded data is stored as 16 bit signed values,
+one sample per clock (44.1 khz).
+
+Following this first 4kb are 8 bytes reserved by the system. The memory
+beyond that is free to store samples, up to the reverb work area if the
+effect processor is used. The size of this work area depends on which
+type of effect is being processed. More on that later.
+
+Memory layout:
+$00000-$003ff  CD audio left
+$00400-$007ff  CD audio right
+$00800-$00bff  Voice 1
+$00c00-$00fff  Voice 3
+$01000-$0100f  System area.
+$01008-$xxxxx  Sound data area.
+$0xxxx-$7ffff  Reverb work area.
+
+--------------------------------------------------------------------------
+Voices.
+--------------------------------------------------------------------------
+The SPU has 24 hardware voices. These voices can be used to reproduce sample
+data, noise or can be used as frequency modulator on the next voice.
+Each voice has it's own programmable ADSR envelope filter. The main volume
+can be programmed independently for left and right output.
+
+The ADSR envelope filter works as follows:
+Ar = Attack rate, which specifies the speed at which the volume increases
+     from zero to it's maximum value, as soon as the note on is given. The
+     slope can be set to lineair or exponential.
+Dr = Decay rate specifies the speed at which the volume decreases to the
+     sustain level. Decay is always decreasing exponentially.
+Sl = Sustain level, base level from which sustain starts.
+Sr = Sustain rate is the rate at which the volume of the sustained note
+     increases or decreases. This can be either lineair or exponential.
+Rr = Release rate is the rate at which the volume of the note decreases
+     as soon as the note off is given.
+
+     lvl |
+       ^ |     /\Dr     __
+     Sl _| _  / _ \__---  \
+         |   /       ---__ \ Rr
+         |  /Ar       Sr  \ \
+         | /                \\
+         |/___________________\________
+                                  ->time
+
+The overal volume can also be set to sweep up or down lineairly or
+exponentially from it's current value. This can be done seperately
+for left and right.
+
+
+--------------------------------------------------------------------------
+SPU Operation
+--------------------------------------------------------------------------
+
+The SPU occupies the area $1f801c00-$1f801dff. All registers are 16 bit
+wide.
+
+=============================================================
+$1f801c00-        Voice data area. For each voice there are 8 16 bit
+$1f801d7f         registers structured like this:
+
+(xx = $c0 + voice number)
+-------------------------------------------------------------
+$1f801xx0         Volume Left
+$1f801xx2         Volume Right
+
+Volume mode:
+bit  |0f|0e|0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.| 0| S|               VV                        |
+
+VV  $0000-$3fff   Voice volume.
+S        0        Phase Normal
+         1              Inverted
+
+Sweep mode:
+bit  |0f|0e|0d|0c|0b 0a 09 08 07|06 05 04 03 02 01 00|
+desc.| 1|Sl|Dr|Ph|              |VV                  |
+
+VV  $0000-$007f   Voice volume.
+Sl       0        Lineair slope
+         1        Exponential slope
+Dr       0        Increase
+         1        Decrease
+Ph       0        Normal phase
+         1        Inverted phase
+
+In sweep mode, the current volume increases to its maximum value,
+or decreases to its mimimum value, according to mode. Choose
+phase equal to the the phase of the current volume.
+-------------------------------------------------------------
+$1f801xx4         Pitch
+bit  |0f 0e|0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|     |Pt                                       |
+
+Pt  $0000-$3fff   Specifies pitch.
+
+Any value can be set, table shows only octaves:
+$0200  - 3 octaves
+$0400  - 2
+$0800  - 1
+$1000  sample pitch
+$2000  + 1
+$3fff  + 2
+-------------------------------------------------------------
+$1f801xx6         Startaddress of Sound
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|Addr                                           |
+
+Addr     Startaddress of sound in Sound buffer /8
+-------------------------------------------------------------
+$1f801xx8         Attack/Decay/Sustain level
+bit  |0f|0e 0d 0c 0b 0a 09 08|07 06 05 04|03 02 01 00|
+desc.|Am|         Ar         |Dr         |Sl         |
+
+Am       0        Attack mode Linear
+         1                    Exponential
+
+Ar       0-7f     attack rate
+Dr       0-f      decay rate
+Sl       0-f      sustain level
+-------------------------------------------------------------
+$1f801xxa         Sustain rate, Release Rate.
+bit  |0f|0e|0d|0c 0b 0a 09 08 07 06|05|04 03 02 01 00|
+desc.|Sm|Sd| 0|   Sr               |Rm|Rr            |
+
+Sm       0        sustain rate mode linear
+         1                          exponential
+Sd       0        sustain rate mode increase
+         1                          decrease
+Sr       0-7f     Sustain Rate
+Rm       0        Linear decrease
+         1        Exponential decrease
+Rr       0-1f     Release Rate
+
+Note: decay mode is always Expontial decrease, and thus cannot
+be set.
+-------------------------------------------------------------
+$1f801xxc         Current ADSR volume
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|ADSRvol                                        |
+
+ADSRvol           Returns the current envelope volume when
+                  read.
+-------------------------------------------------------------
+$1f801xxe         Repeat address.
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|Ra                                             |
+
+Ra  $0000-$ffff   Address sample loops to at end.
+
+Note: Setting this register only has effect after the voice
+has started (ie. KeyON), else the loop address gets reset
+by the sample.
+=============================================================
+$1f801d80         Mainvolume left
+$1f801d82         Mainvolume right
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|                                               |
+
+Sets Main volume, these work the same as the channel volume
+registers. See those for details.
+-------------------------------------------------------------
+$1f801d84         Reverberation depth left
+$1f801d86         Reverberation depth right
+bit  |0f|0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|P |Rvd                                         |
+
+Rvd $0000-$7fff   Sets the wet volume for the effect.
+P        0        Normal phase
+         1        Inverted phase
+=============================================================
+Following registers have a common layout:
+
+first register:
+bit  |0f|0e|0d|0c|0b|0a|09|08|07|06|05|04|03|02|01|00|
+desc.|cf|ce|cd|cc|cb|ca|c9|c8|c7|c6|c5|c4|c3|c2|c1|c0|
+
+second register:
+bit  |0f           08|07 |06 |05 |04 |03 |02 |01 | 00|
+desc.|              0|c17|c16|c15|c14|c13|c12|c11|c10|
+
+c0-c17   0        Mode for channel c?? off
+         1        Mode for channel c?? on
+-------------------------------------------------------------
+$1f801d88         Voice ON  (0-15)
+$1f801d8a         Voice ON  (16-23)
+
+Sets the current voice to key on. (ie. start ads)
+-------------------------------------------------------------
+$1f801d8c         Voice OFF (0-15)
+$1f801d8e         Voice OFF (16-23)
+
+Sets the current voice to key off.(ie. release)
+-------------------------------------------------------------
+$1f801d90         Channel FM (pitch lfo) mode (0-15)
+$1f801d92         Channel FM (pitch lfo) mode (16-23)
+
+Sets the channel frequency modulation. Uses the previous channel
+as modulator.
+-------------------------------------------------------------
+$1f801d94         Channel Noise mode (0-15)
+$1f801d96         Channel Noise mode (16-23)
+
+Sets the channel to noise.
+-------------------------------------------------------------
+$1f801d98         Channel Reverb mode (0-15)
+$1f801d9a         Channel Reverb mode (16-23)
+
+Sets reverb for the channel. As soon as the sample ends, the
+reverb for that channel is turned off.
+-------------------------------------------------------------
+$1f801d9c         Channel ON/OFF (0-15)                 ?
+$1f801d9e         Channel ON/OFF (16-23)                ?
+
+Returns wether the channel is mute or not.              ?
+=============================================================
+$1f801da2         Reverb work area start
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|Revwa                                          |
+
+Revwa $0000-$ffff Reverb work area start in sound buffer /8
+-------------------------------------------------------------
+$1f801da4         Sound buffer IRQ address.
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|IRQa                                           |
+
+IRQa  $0000-$ffff IRQ address in sound buffer /8
+??
+-------------------------------------------------------------
+$1f801da6         Sound buffer address
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|Sba                                            |
+
+SBA $0000-$ffff   Address in sound buffer divided by eight.
+                  Next transfer to this address.
+-------------------------------------------------------------
+$1f801da8         SPU data
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|                                               |
+
+Data forwarding reg, for non DMA transfer.
+-------------------------------------------------------------
+$1f801daa         SPU control                sp0
+bit  |0f|0e|0d 0c 0b 0a 09 08|07|06 |05 04|03|02|01|00|
+desc.|En|Mu|Noise            |Rv|Irq|DMA  |Er|Cr|Ee|Ce|
+
+En       0        SPU off
+         1        SPU on
+Mu       0        Mute SPU
+         1        Unmute SPU
+Noise             Noise clock frequency
+Rv       0        Reverb Disabled
+         1        Reverb Enabled
+Irq      0        Irq disabled
+         1        Irq enabled
+DMA     00
+        01        Non DMA write?  (transfer through data reg)
+        10        DMA Write
+        11        DMA Read
+Er       0        Reverb for external off
+         1        Reverb for external on
+Cr       0        Reverb for CD off
+         1        Reverb for CD on
+Ee       0        External audio off
+         1        External audio on
+Ce       0        CD audio off
+         1        CD audio on
+-------------------------------------------------------------
+$1f801dac         SPU status
+bit  |0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|                                               |
+
+Don't know what this is for, but in SPU init routines this
+register get loaded with $4.
+-------------------------------------------------------------
+$1f801dae         SPU status
+bit  |0f 0e 0d 0c|0b|0a|09 08 07 06 05 04 03 02 01 00|
+desc.|           |Dh|Rd|                             |
+
+Dh       0        Decoding in first half of buffer
+         1        Decoding in second half of buffer
+Rd       0        Spu ready to transfer
+         1        Spu not ready
+
+Some of bits 9-0 are also ready/not ready states. More on
+that later. Functions that wait for the SPU to be ready,
+wait for bits a-0 to become 0.
+-------------------------------------------------------------
+$1f801db0         CD volume left
+$1f801db2         CD volume right
+bit  |0f|0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|P |CDvol                                       |
+
+CDvol $0000-$7fff Set volume of CD input.
+P        0        Normal phase.
+         1        Inverted phase.
+-------------------------------------------------------------
+$1f801db4         Extern volume left
+$1f801db6         Extern volume right
+bit  |0f|0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01 00|
+desc.|P |Exvol                                       |
+
+Exvol $0000-$7fff Set volume of External input.
+P        0        Normal phase.
+         1        Inverted phase.
+-------------------------------------------------------------
+1dc0-1dff         Reverb configuration area
+$1f801dc0         
+$1f801dc2
+$1f801dc4         Lowpass Filter Frequency. 7fff = max value= no filtering
+$1f801dc6         Effect volume 0 - $7fff, bit 15 = phase.
+$1f801dc8
+$1f801dca
+$1f801dcc
+$1f801dce         Feedback
+$1f801dd0
+$1f801dd2
+$1f801dd4         Delaytime(see below)
+$1f801dd6         Delaytime(see below)
+$1f801dd8         Delaytime(see below)
+$1f801dda
+$1f801ddc
+$1f801dde
+$1f801de0         Delaytime(see below)
+$1f801de2
+$1f801de4
+$1f801de6
+$1f801de8
+$1f801dea
+$1f801dec
+$1f801dee
+$1f801df0
+$1f801df2
+$1f801df4         Delaytime
+$1f801df6         Delaytime
+$1f801df8
+$1f801dfa
+$1f801dfc
+$1f801dfe
+
+--------------------------------------------------------------------------
+Reverb
+--------------------------------------------------------------------------
+The SPU is equipped with an effect processor for reverb echo and delay type
+of effects. This effect processor can do one effect at a time, and for each
+voice you can specify wether it should have the effect applied or not.
+
+The effect is setup by initializing the registers $1dc0 to $1ffe to the
+desired effect. I do not exactly know how these work, but you can use
+the presets below.
+
+The effect processor needs a bit of sound buffer memory to perform it's
+calculations. The size of this depends on the effect type. For the presets
+the sizes are:
+
+Reverb off        $00000       Hall          $0ade0
+Room              $026c0       Space echo    $0f6c0
+Studio small      $01f40       Echo          $18040
+Studio medium     $04840       Delay         $18040
+Studio large      $06fe0       Half echo     $03c00
+
+The location at which the work area is location is set in register $1da2
+and it's value is the location in the sound buffer divided by eight. Common
+values are as follows:
+
+Reverb off        $FFFE        Hall          $EA44
+Room              $FB28        Space echo    $E128
+Studio small      $FC18        Echo          $CFF8
+Studio medium     $F6F8        Delay         $CFF8
+Studio large      $F204        Half echo     $F880
+
+For the delay and echo effects (not space echo or half echo) you can
+specify the delay time, and feedback. (range 0-127) Calculations are shown
+below.
+
+When you setup up a new reverb effect, take the following steps:
+
+-Turn off the reverb (bit 7 in sp0)
+-Set Depth to 0
+-First make delay & feedback calculations.
+-Copy the preset to the effect registers
+-Turn on the reverb
+-Set Depth to desired value.
+
+Also make sure there is the reverb work area is cleared, else you might get
+some unwanted noise.
+
+To use the effect on a voice, simple turn on the corresponing bit in the
+channel reverb registers. Note that these get turned off autmatically when
+the sample for the channel ends.
+
+
+-------------------------------------------------------------
+Effect presets: copy these in order to $1dc0-$1dfe
+
+Reverb off:
+$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
+$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
+$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
+$0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
+
+Room:
+$007D, $005B, $6D80, $54B8, $BED0, $0000, $0000, $BA80
+$5800, $5300, $04D6, $0333, $03F0, $0227, $0374, $01EF
+$0334, $01B5, $0000, $0000, $0000, $0000, $0000, $0000
+$0000, $0000, $01B4, $0136, $00B8, $005C, $8000, $8000
+
+Studio Small:
+$0033, $0025  $70F0  $4FA8  $BCE0  $4410  $C0F0  $9C00
+$5280  $4EC0  $03E4  $031B  $03A4  $02AF  $0372  $0266
+$031C  $025D  $025C  $018E  $022F  $0135  $01D2  $00B7
+$018F  $00B5  $00B4  $0080  $004C  $0026  $8000  $8000
+
+Studio Medium:
+$00B1  $007F  $70F0  $4FA8  $BCE0  $4510  $BEF0  $B4C0
+$5280  $4EC0  $0904  $076B  $0824  $065F  $07A2  $0616
+$076C  $05ED  $05EC  $042E  $050F  $0305  $0462  $02B7
+$042F  $0265  $0264  $01B2  $0100  $0080  $8000  $8000
+
+Studio Large:
+$00E3  $00A9  $6F60  $4FA8  $BCE0  $4510  $BEF0  $A680
+$5680  $52C0  $0DFB  $0B58  $0D09  $0A3C  $0BD9  $0973
+$0B59  $08DA  $08D9  $05E9  $07EC  $04B0  $06EF  $03D2
+$05EA  $031D  $031C  $0238  $0154  $00AA  $8000  $8000
+
+Hall:
+$01A5  $0139  $6000  $5000  $4C00  $B800  $BC00  $C000
+$6000  $5C00  $15BA  $11BB  $14C2  $10BD  $11BC  $0DC1
+$11C0  $0DC3  $0DC0  $09C1  $0BC4  $07C1  $0A00  $06CD
+$09C2  $05C1  $05C0  $041A  $0274  $013A  $8000  $8000
+
+Space Echo:
+$033D  $0231  $7E00  $5000  $B400  $B000  $4C00  $B000
+$6000  $5400  $1ED6  $1A31  $1D14  $183B  $1BC2  $16B2
+$1A32  $15EF  $15EE  $1055  $1334  $0F2D  $11F6  $0C5D
+$1056  $0AE1  $0AE0  $07A2  $0464  $0232  $8000  $8000
+
+Echo:
+$0001  $0001  $7FFF  $7FFF  $0000  $0000  $0000  $8100
+$0000  $0000  $1FFF  $0FFF  $1005  $0005  $0000  $0000
+$1005  $0005  $0000  $0000  $0000  $0000  $0000  $0000
+$0000  $0000  $1004  $1002  $0004  $0002  $8000  $8000
+
+Delay:
+
+$0001  $0001  $7FFF  $7FFF  $0000  $0000  $0000  $0000
+$0000  $0000  $1FFF  $0FFF  $1005  $0005  $0000  $0000
+$1005  $0005  $0000  $0000  $0000  $0000  $0000  $0000
+$0000  $0000  $1004  $1002  $0004  $0002  $8000  $8000
+
+Half Echo:
+$0017  $0013  $70F0  $4FA8  $BCE0  $4510  $BEF0  $8500
+$5F80  $54C0  $0371  $02AF  $02E5  $01DF  $02B0  $01D7
+$0358  $026A  $01D6  $011E  $012D  $00B1  $011F  $0059
+$01A0  $00E3  $0058  $0040  $0028  $0014  $8000  $8000
+
+-------------------------------------------------------------
+Delay time calculation:
+Choose delay time in range 0-$7f. rXXXX means register $1f80XXXX.
+
+r1dd4 = dt*64.5 - r1dc0
+r1dd6 = dt*32.5 - r1dc2
+
+r1dd8 = r1dda + dt*32.5
+r1de0 = r1de2 + dt*32.5
+r1df4 = r1df8 + dt*32.5
+r1df6 = r1dfa + dt*32.5
+
+--------------------------------------------------------------------------
+doomed@c64.org <- corrections/additions     latest update -> psx.rules.org
+--------------------------------------------------------------------------
+ 5/jun/1999     First posting. Far from completion.
+
+(thanx to ppl in <>)
+--------------------------------------------------------------------------
+thanx & hello to the usual.
+

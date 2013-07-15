@@ -1,0 +1,408 @@
+#include "stdafx.h"
+#include "AkaoInstr.h"
+#include "VGMSamp.h"
+#include "PSXSPU.h"
+#include "ScaleConversion.h"
+
+using namespace std;
+
+// ************
+// AkaoInstrSet
+// ************
+
+AkaoInstrSet::AkaoInstrSet(RawFile* file, U32 length, U32 instrOff, U32 dkitOff, U32 theID, wstring name)
+: VGMInstrSet(AkaoFormat::name, file, 0, length, name)
+{
+	id = theID;
+	drumkitOff = dkitOff;
+	bMelInstrs = instrOff > 0;
+	bDrumKit = drumkitOff > 0;
+	if (bMelInstrs)
+		dwOffset = instrOff;
+	else
+		dwOffset = drumkitOff;
+}
+
+int AkaoInstrSet::GetInstrPointers()
+{
+	if (bMelInstrs)
+	{
+		VGMHeader* SSEQHdr = AddHeader(dwOffset, 0x10, L"Instr Ptr Table");
+		int i = 0;
+		for (int j=dwOffset; (GetShort(j) != (USHORT)-1) && ((GetShort(j) != 0) || i == 0) && i < 16; j+=2)	//-1 aka 0xFFFF if signed or 0 and past the first pointer value
+		{
+			SSEQHdr->AddSimpleItem(j, 2, L"Instr Pointer");
+			aInstrs.push_back(new AkaoInstr(this, dwOffset+0x20 + GetShort(j), 0, 0, i++));
+		}
+	}
+	if (bDrumKit)
+		aInstrs.push_back(new AkaoDrumKit(this, drumkitOff, 0, 0, 127));
+	return true;
+}
+
+// *********
+// AkaoInstr
+// *********
+
+AkaoInstr::AkaoInstr(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank,
+				  ULONG theInstrNum, const wchar_t* name)
+ : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, name)
+{
+	bDrumKit = false;
+}
+
+int AkaoInstr::LoadInstr()
+{
+	for (int k=0; (GetWord(dwOffset + k*8) != 0 || GetWord(dwOffset + k*8+4) != 0) &&
+		dwOffset+k*8 < GetRawFile()->size(); k++)
+	{
+		AkaoRgn* rgn = new AkaoRgn(this, dwOffset + k*8, 8);
+		if (!rgn->LoadRgn())
+			return false;
+		aRgns.push_back(rgn);
+	}
+	if (aRgns.size() != 0)
+		unLength = 	aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
+	else
+		Alert(L"Instrument has no regions.");
+	return true;
+}
+
+// ***********
+// AkaoDrumKit
+// ***********
+
+AkaoDrumKit::AkaoDrumKit(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank,
+				  ULONG theInstrNum)
+ : 	AkaoInstr(instrSet, offset, length, theBank, theInstrNum, L"Drum Kit")
+{
+	bDrumKit = true;
+}
+
+int AkaoDrumKit::LoadInstr()
+{
+	U32 j = dwOffset;  //j = the end of the last instrument of the instrument table ie, the beginning of drumkit data
+	U32 endOffset = parInstrSet->dwOffset + parInstrSet->unLength;
+	for (UINT i=0; (i<128) && (j < endOffset); i++)
+	{
+		if ((GetWord(j) != 0) && (GetWord(j+4) != 0))	//we found some region data for the drum kit
+		{
+			if ((GetWord(j) == 0xFFFFFFFF) && (GetWord(j+4) == 0xFFFFFFFF))	//if we run into 0xFFFFFFFF FFFFFFFF, then we quit reading for drumkit regions early
+				break;
+
+			BYTE assoc_art_id =   GetByte(j + 0); //- first_sample_id;
+			BYTE lowKey = i; //-12;		//-7 CORRECT ?? WHO KNOWS?
+			BYTE highKey =	lowKey;  //the region only covers the one key	
+			AkaoRgn* rgn = (AkaoRgn*)AddRgn(new AkaoRgn(this, j, 8, lowKey, highKey, assoc_art_id));
+			rgn->drumRelUnityKey =	GetByte(j + 1);
+			BYTE vol = GetByte(j+6);
+			rgn->SetVolume((double)vol / 127.0);
+			rgn->AddGeneralItem(j, 1, L"Associated Articulation ID");
+			rgn->AddGeneralItem(j+1, 1, L"Relative Unity Key");
+			rgn->AddUnknown(j+2, 1);
+			rgn->AddUnknown(j+3, 1);
+			rgn->AddUnknown(j+4, 1);
+			rgn->AddUnknown(j+5, 1);
+			rgn->AddGeneralItem(j+6, 1, L"Attenuation");
+			rgn->AddPan(GetByte(j+7), j+7);
+		}
+		j+=8;
+	}
+
+	unLength = 	aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
+	return true;
+}
+
+
+// *******
+// AkaoRgn
+// *******
+AkaoRgn::AkaoRgn(VGMInstr* instr, ULONG offset, ULONG length, BYTE keyLow, BYTE keyHigh, 
+		BYTE artIDNum, const wchar_t* name)
+		: VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0), artNum(artIDNum)
+{
+}
+
+AkaoRgn::AkaoRgn(VGMInstr* instr, ULONG offset, ULONG length, const wchar_t* name)
+: VGMRgn(instr, offset, length, name)
+{
+}
+
+int AkaoRgn::LoadRgn()
+{
+	//instrument[i].region[k].fine_tune = stuff[(instrument[i].info_ptr + k*0x20 + 0x12)];
+	//AddUnityKey(0x3A - GetByte(dwOffset + k*0x20 + 0x13), dwOffset + k*0x20 + 0x13);
+	//instrument[i].region[k].unity_key =		0x3A - stuff[(instrument[i].info_ptr + k*0x20 + 0x13)] ;
+	AddGeneralItem(dwOffset + 0, 1, L"Associated Articulation ID");
+	artNum =	GetByte(dwOffset + 0); //- first_sample_id;
+	AddKeyLow(GetByte(dwOffset + 1), dwOffset + 1);
+	AddKeyHigh(GetByte(dwOffset + 2), dwOffset + 2);
+	//AddVelLow(GetByte(dwOffset + 3), dwOffset + 3);
+	//AddVelHigh(GetByte(dwOffset + 4), dwOffset + 4);
+	AddUnknown(dwOffset+3, 1);
+	AddUnknown(dwOffset+4, 1);
+	AddUnknown(dwOffset+5, 1);
+	AddUnknown(dwOffset+6, 1);
+	AddVolume(GetByte(dwOffset+7) / 127.0, dwOffset+7, 1);
+
+	//if (aInstrs[i]->info_ptr + (k+1)*8 >= aInstrs[i+1]->info_ptr - 8)	//if this is the last region of the instrument
+	//	aInstrs[i]->aRegions[k]->last_key = 0x7F;
+	//if (k == 0)																//if this is the first region of the instrument
+	//	aInstrs[i]->aRegions[k]->first_key = 0;
+
+	//if (keyLow > keyHigh && k > 0)	//if the first key is greater than the last key, and this isn't the first region of the instr
+	//{
+	//	keyLow = keyHigh+1; 
+	//	Alert(_T("Funkiness going down: lowKey > highKey (also, k > 0)"));
+	//}
+
+/*		if ((k > 0) && (pDoc->GetByte(aInstrs[i]->info_ptr + (k-1)*8 + 1) == aInstrs[i]->aRegions[k]->first_key))
+	{
+		if ((k > 1) && (pDoc->GetByte(aInstrs[i]->info_ptr + (k-2)*8 + 1) == aInstrs[i]->aRegions[k]->first_key))
+		{
+			aInstrs[i]->aRegions[k]->first_key += 5;
+			if (aInstrs[i]->info_ptr + (k+1)*8 < aInstrs[i+1]->info_ptr - 8)  //if there's another region in the instrument (k+1)
+				aInstrs[i]->aRegions[k]->last_key = pDoc->GetByte(aInstrs[i]->info_ptr + (k+1)*8 + 2) - 1;
+			else
+				aInstrs[i]->aRegions[k]->last_key = 0x7F;
+			aInstrs[i]->aRegions[k-1]->first_key = aInstrs[i]->aRegions[k]->first_key-5;
+			aInstrs[i]->aRegions[k-1]->last_key =  aInstrs[i]->aRegions[k]->first_key -1;
+			aInstrs[i]->aRegions[k-2]->first_key = aInstrs[i]->aRegions[k]->first_key-12;
+			aInstrs[i]->aRegions[k-2]->last_key =  aInstrs[i]->aRegions[k]->first_key-6;
+			if (k == 2)	//if this is the third region of the instrument, then we need to make sure the first region's first key is 0
+				aInstrs[i]->aRegions[k-2]->first_key = 0;
+		}
+		else
+		{
+			aInstrs[i]->aRegions[k]->first_key += 5;
+			if (aInstrs[i]->info_ptr + (k+1)*8 < aInstrs[i+1]->info_ptr - 8)  //if there's another region in the instrument (k+1)
+				aInstrs[i]->aRegions[k]->last_key = pDoc->GetByte(aInstrs[i]->info_ptr + (k+1)*8 + 2) - 1;
+			else
+				aInstrs[i]->aRegions[k]->last_key = 0x7F;
+			aInstrs[i]->aRegions[k-1]->first_key = aInstrs[i]->aRegions[k]->first_key-5;
+			aInstrs[i]->aRegions[k-1]->last_key =  aInstrs[i]->aRegions[k]->first_key-1;
+			if (k == 1)	//if this is the third region of the instrument, then we need to make sure the first region's first key is 0
+				aInstrs[i]->aRegions[k-1]->first_key = 0;
+		}
+	}*/
+
+	BYTE attenuation =	0x7F;  //default to no attenuation
+	BYTE pan =			0x40;  //default to center pan
+	
+	//aInstrs[i]->aRegions[k]->sample_offset = GetWord(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10);
+	//aInstrs[i]->aRegions[k]->loop_point =	GetWord(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 4) - GetWord(sampleinfo_offset+ instrument[i].region[k].assoc_art_id *0x10 + 0);//GetWord(sampleinfo_offset+ instrument[i].region[k].assoc_art_id *0x10 + 4) - (instrument[i].region[k].sample_offset + sample_section_offset);
+	//aInstrs[i]->aRegions[k]->fine_tune =		GetShort(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 8);
+	//aInstrs[i]->aRegions[k]->unity_key =		GetShort(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 0xA);
+	//aInstrs[i]->aRegions[k]->ADSR1 =			GetShort(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 0xC);
+	//aInstrs[i]->aRegions[k]->ADSR2 =			GetShort(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 0xE);
+	
+	//instrument[i].region[k].vel_range_high =stuff[(instrument[i].info_ptr + k*0x20 + 0x15)];
+	//instrument[i].region[k].pan =			stuff[(instrument[i].info_ptr + k*0x20 + 0x17)];
+//	AkaoRgn* rgn = AkaoRgn();
+
+	//AddRgn(new AkaoRgn(this, dwOffset+k*8, 8, lowKey, highKey, assoc_art_id));
+	return true;
+}
+
+// ************
+// AkaoSampColl
+// ************
+
+AkaoSampColl::AkaoSampColl(RawFile* file, ULONG offset, ULONG length, wstring name)
+: VGMSampColl(AkaoFormat::name, file, offset, length, name)
+{
+}
+
+AkaoSampColl::~AkaoSampColl()
+{
+}
+
+bool AkaoSampColl::GetHeaderInfo()
+{
+	//Read Sample Set header info
+	VGMHeader* hdr = AddHeader(dwOffset, 0x40);
+	hdr->AddSig(dwOffset, 4);
+	hdr->AddSimpleItem(dwOffset+4, 2, L"ID");
+	hdr->AddSimpleItem(dwOffset+0x14, 4, L"Sample Section Size");
+	hdr->AddSimpleItem(dwOffset+0x18, 4, L"Starting Articulation ID");
+	hdr->AddSimpleItem(dwOffset+0x1C, 4, L"Number of Articulations");
+	//hdr->AddUnknownItem(dwOffset+14, 2);
+
+	//sample_set_id =				GetShort(0x4+dwOffset);
+	id =						GetShort(0x4+dwOffset);
+	sample_section_size =		GetWord(0x14+dwOffset);
+	starting_art_id =			GetWord(0x18+dwOffset);
+	nNumArts =					GetWord(0x1C+dwOffset);
+	arts_offset = 0x40 + dwOffset;
+
+	if (nNumArts > 300 || nNumArts == 0)
+		return FALSE;
+
+	return true;
+}
+
+bool AkaoSampColl::GetSampleInfo()
+{
+
+	//Read Articulation Data
+	for (int i=0; i<nNumArts; i++)
+	{
+		VGMHeader* ArtHdr = AddHeader(arts_offset+i*0x10, 16, L"Articulation");
+		ArtHdr->AddSimpleItem(arts_offset + i*0x10 + 0, 4, L"Sample Offset");
+		ArtHdr->AddSimpleItem(arts_offset + i*0x10 + 4, 4, L"Loop Point");
+		ArtHdr->AddSimpleItem(arts_offset + i*0x10 + 8, 2, L"Fine Tune");
+		ArtHdr->AddSimpleItem(arts_offset + i*0x10 + 10, 2, L"Unity Key");
+		ArtHdr->AddSimpleItem(arts_offset + i*0x10 + 12, 2, L"ADSR1");
+		ArtHdr->AddSimpleItem(arts_offset + i*0x10 + 14, 2, L"ADSR2");
+
+		if (arts_offset + i*0x10 + 0x10 > rawfile->size())
+			return false;
+
+		akArts.push_back(AkaoArt());
+		akArts[i].sample_offset =	GetWord(arts_offset + i*0x10);
+		akArts[i].loop_point =	GetWord(arts_offset + i*0x10 + 4) - akArts[i].sample_offset;
+		akArts[i].fineTune =		GetShort(arts_offset + i*0x10 + 8);
+		akArts[i].unityKey =		GetShort(arts_offset + i*0x10 + 0xA);
+		akArts[i].ADSR1 =			GetShort(arts_offset + i*0x10 + 0xC);
+		akArts[i].ADSR2 =			GetShort(arts_offset + i*0x10 + 0xE);
+		akArts[i].artID =			starting_art_id+i;
+	}
+
+	//Time to organize and convert the samples
+	//First, we scan through the sample section, and determine the offsets and size of each sample
+	//We do this by searchiing for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
+	//and they will never be found at any other point within the adpcm sample data.
+
+	//Find sample offsets
+
+	//sample_section_offset = SampleSetSize - sample_section_size;
+
+	sample_section_offset = arts_offset + akArts.size() * 0x10;
+	if (sample_section_offset + sample_section_size > rawfile->size())//pDoc->GetDocumentLength())	//if the official total file size is greater than the file size of the document
+		sample_section_size = rawfile->size() - sample_section_offset;	//then shorten the sample section size to the actual end of the document
+	if (GetWord(sample_section_offset + sample_section_size - 0x10) == 0)		//check the last 10 bytes to make sure they aren't null, if they are, abbreviate things till there is no 0x10 block of null bytes
+	{	
+		ULONG j;
+		for (j=0x10; GetWord(sample_section_offset + sample_section_size - j) == 0; j+=0x10);
+			;
+		sample_section_size -= j-0x10;		//-0x10 because we went 1 0x10 block too far
+	}
+
+	if (sample_section_offset + sample_section_size > rawfile->size())	//if the official total file size is greater than the file size of the document
+		sample_section_size = rawfile->size(); //- sample_section_offset;	//then shorten the sample section size to the actual end of the document
+	//AddItem("Samples", ICON_TRACK, FileVGMItem.pTreeItem, sample_section_offset, 0, 0, &AllSampsVGMItem); //add the parent "Samples" tree item
+
+	for (ULONG j = sample_section_offset; j < sample_section_offset + sample_section_size; j+=0x10)		//until we reach the end of the sample set file
+	{
+		ULONG i;
+		for(i=0; GetByte(j+i) == 0; i++)
+			;
+		if (i >= 16)										//if we found a chunk of 00 bytes 16 bytes in size or greater, then we found the beginning a new sample
+		{
+			//PsxSamp* newSamp = new PsxSamp();
+			//CAKSSSamp* newSample = new CAKSSSamp(this);
+			//aSamps.Add(newSample);
+			//newSample->SampVGMItem.dwOffset = j;
+			PSXSamp* samp =  new PSXSamp(this, j, 0, j, 0, 1, 16, 44100, L"Sample");
+		
+			//samp->SetLoopStatus(bLoops);
+			//samp->SetLoopOffset(loopOff);
+			//samp->SetLoopLength(nonLoopLength);
+			samples.push_back(samp);
+		}
+	}
+	//num_samples = aSamps.GetCount();										//-1 to offset the last unnecessary k++
+
+	if (samples.size() == 0)
+		return false;
+
+	//FileVGMItem.unLength = sample_section_offset - ss_offset + sample_section_size;
+	//AllSampsVGMItem.unLength = sample_section_size;
+
+	//Calculate sample sizes
+	UINT i;
+	for (i=0; i<samples.size()-1; i++)
+	{
+		samples[i]->SetDataLength(samples[i+1]->dwOffset - samples[i]->dwOffset);
+		//samples[i]->uncomp_size = (aSamps[i]->comp_size/16)*56;
+		//string.Format("Sample %d", i);
+		//AddItem(string, ICON_SAMPLE, AllSampsVGMItem.pTreeItem, aSamps[i]->SampVGMItem.dwOffset,
+		//	aSamps[i]->comp_size, BG_CLR_PEACH|((i%2)?TEXT_CLR_BLUE:TEXT_CLR_BLACK), &aSamps[i]->SampVGMItem);
+	}
+	samples[i]->SetDataLength(sample_section_offset+sample_section_size - samples[i]->dwOffset);	//for the last sample size, we compare it's offset with the end of the entire sample section
+	//aSamps[i]->uncomp_size = (aSamps[i]->comp_size/16)*56;
+	//string.Format("Sample %d", i);
+	//AddItem(string, ICON_SAMPLE, AllSampsVGMItem.pTreeItem, aSamps[i]->SampVGMItem.dwOffset,	//and add the last sample tree item
+	//		aSamps[i]->comp_size, BG_CLR_PEACH|((i%2)?TEXT_CLR_BLUE:TEXT_CLR_BLACK), &aSamps[i]->SampVGMItem);
+
+	
+	//now to verify and associate each articulation with a sample index value
+
+	for (UINT i=0; i<akArts.size(); i++)			//for every instrument
+	{						
+		for (UINT l=0; l<samples.size(); l++)		//for every sample
+		{						
+			if (akArts[i].sample_offset + sample_section_offset == samples[l]->dwOffset)	//we add sample_section offset because those values are relative to the beginning of the sample section
+			{
+				akArts[i].sample_num = l;
+				break;
+			}
+		}
+	}
+
+
+	/*
+	PsxSamp* samp =  new PsxSamp(this, pSample, realSampSize+0xC, pSample+0xC,
+							     realSampSize, nChannels, bps, rate, waveType);
+	
+
+	samp->SetLoopStatus(bLoops);
+	samp->SetLoopOffset(loopOff);
+	samp->SetLoopLength(nonLoopLength);
+	samples.push_back(samp);*/
+
+/*	ULONG nSamples = GetWord(dwOffset + 0x38);
+	for (ULONG i=0; i<nSamples; i++)
+	{
+		ULONG pSample = GetWord(dwOffset + 0x3C + i*4) + dwOffset;
+		int nChannels = 1;		// note to self: may need to support stereo
+		BYTE waveType = GetByte(pSample);	//0x02 - IMA-ADPCM (most common), 0x00 - standard PCM
+		bool bLoops = GetByte(pSample+1);
+		USHORT rate = GetShort(pSample+2);
+		USHORT bps;
+		BYTE multiplier;
+		switch (waveType)
+		{
+		case NDSSamp::PCM8:
+			//multiplier = 4;
+			bps = 16;
+			break;
+		case NDSSamp::PCM16:
+			//multiplier = 1;
+			bps = 16;
+			break;
+		case NDSSamp::IMA_ADPCM:
+			//multiplier = 4;
+			bps = 16;
+			break;
+		}
+		USHORT loopOff = (GetShort(pSample+6)-((waveType == NDSSamp::IMA_ADPCM)? 1 : 0))*4;//*multiplier;		//represents loop point in words, excluding header supposedly
+		USHORT nonLoopLength = GetShort(pSample+8)*4;		//if IMA-ADPCM, subtract one for the ADPCM header
+		ULONG realSampSize = loopOff+nonLoopLength;//2*nChannels;
+		if (loopOff >= 12)
+			loopOff -= 12;
+
+
+		NDSSamp* samp =  new NDSSamp(this, pSample, realSampSize+0xC, pSample+0xC,
+								     realSampSize, nChannels, bps, rate, waveType);
+		
+
+		samp->SetLoopStatus(bLoops);
+		samp->SetLoopOffset(loopOff);
+		samp->SetLoopLength(nonLoopLength);
+		samples.push_back(samp);
+		//AddSamp(pSample, realSampSize+0xC, pSample+0xC, realSampSize, nChannels,
+		//		16, rate, loopOff);
+	}*/
+	return true;
+}

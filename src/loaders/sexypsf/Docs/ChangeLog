@@ -1,0 +1,518 @@
+0.4.7:	Moved xmms/Makefile to Makefile, and cleaned it.
+
+	Fixed several "bugs" which were breaking XMMS when it used the ALSA output plugin.
+
+0.4.6:	Fixed the header in xmms/xmms.c.  This is not Festalon. ;)
+	
+	Fixed code that was causing compiler warnings, and would have not
+	generated the correct code, and perhaps not even compiled, in
+	certain situations.  The HL BIOS emulation code still needs to be fixed.  
+	Sigh.
+
+
+0.4.5:	Various code cleanups.
+
+	Removed many ambiguous type declarations when specific types were wanted.
+
+	Structures that need to be packed are now packed, using a gcc-specific extension.
+
+	Hacked in support for _libN tags.
+
+	Filenames ending in "psflib"(case-insensitive) will no longer pass the
+	file recognization function supplied to xmms. This should make xmms' directory-adding
+	feature more usable with PSFs.
+
+	Commas are now recognized as decimal separators in length and fade tags.
+
+	Increased the default volume, to what Highly Experimental's default
+	volume is(at least with the xmms plugin).  It does seem to cause clipping
+	with some PSFs, though.  Bah.
+
+0.4.4:
+	Improved idle branch detection code.  "Xenogears" runs using much
+	less CPU now.
+
+0.4.3:
+	xmms:  "Reverse"-seeking is now implemented.  I haven't tested it
+	extensively, and it has to reload the file to work properly, and
+	then seek forward.
+
+	xmms:  Fixed an issue with seeking to near the end of the song.  
+	Prebuffering is now disabled at the end of the song, so sexyPSF will
+	no longer lock up.
+
+	xmms:  Added support for stopping the song during a seek.
+
+	sexyd_update() will now be called at normal intervals during seeking,
+	but with both arguments passed being 0.	
+
+0.4.2-addendum:
+	Now, "make" is used to build sexyPSF for xmms, and "make install" is
+	used to install it.
+
+0.4.2:
+	Fixed some variables that were being set only when sexyPSF was
+	started(or loaded as a module) and not when the virtual playstation
+	was initialized.
+
+	Made changes to the DMA emulation code.  What's said below about null
+	pointers applies here too.
+
+	Rewrote a lot of the BIOS HLE code to be safer.  It's still quite
+	easy to crash sexyPSF from inside a PSF(by causing a null-pointer
+	dereference), but running arbitrary code on the host's processor
+	should be much more difficult(hopefully impossible) now
+	(assuming the host architecture has a MMU with memory protection that 
+	can detect null-pointer dereferences).
+
+	Switched to 32-bit integer types from 64-bit integers types in the
+	reverb downsampling/upsampling code.  Some PSFs could conceivably
+	overflow now(and make loud clicks), but it would be rather difficult to
+	do on accident.
+	Maybe I should clip to input values to the reverb code to +-32767?
+	I don't know...
+
+	Made changes to the source code to get it working on big-endian
+	systems(need to compile with MSB_FIRST defined).
+
+0.4.1:
+	Wrote my own code to replace the usage of the apparently nonstandard 
+	"a" flag in sscanf in Misc.c(in the tag loading code).  I haven't
+	 extensively tested the new code, but it appears to work fine.
+	Another step to helping portability...
+
+0.4.0:
+	Updated the root counter emulation code with that from Pcsx 1.5,
+	making a few fixes.  I also Readded support for root counters 0 and
+	1.  Now those bootleg intros will play(yay?).
+
+	Removed more unused/stale code.
+
+	Updated README about -mcpu=* issues.
+
+	Abandoned the old method of getting sexyPSF working on MSB-first
+	platforms.  Working on a new method...
+
+	Modified SPU interpolation code to use an "int"-sized buffer
+	instead of "s16".  Gave a small speed boost on my system.  I also
+	replaced the artificial volume control(was a divide) with a multiply 
+	and shift.
+	
+0.3.3:
+	Fixed the "Pause" function.  Stupid typos(I left out a semi-colon.).
+
+	Fixed(I think fixed...) compiler warning in PsxHw.c
+
+	Cleaned xmms makefile a little.
+
+	Removed some stale code/definitions.
+
+0.3.2:
+	Modified the base directory finding code for miniPSFs to use dynamic 
+	memory allocation.
+
+0.3.1:	
+	gettime() will continuously return -1 until the next PSF is loaded.
+	This should fix some problems people have been having with
+	xmms not advancing to the next song.
+
+	No more crashing(and no more memory leaks) when loading of a PSF fails.
+
+	Changed "-march=pentiumpro" to "-mcpu=i686" in the xmms Makefile.
+
+	Fixed a buffer/heap overflow in the file loading code(used in
+	determining the base directory for miniPSFs).
+
+	Fixed a root counter interrupt bug (Pcsx 1.5).
+
+	Fixed a bug with rcnt exceptions in the BIOS emulation (Pcsx 1.5)...
+	and reversed the change when it broke Alundra.  Perhaps I didn't
+	do it correctly?
+
+	Made all of the spu code compile into one object file, so more
+	compiler optimizations can be done.  Made the raw playback speed 1% 
+	greater on my system.
+
+	Changed the emulation of phase inversion when setting the channel's
+	volume to something more sane, but I haven't tested it.
+
+	Cleaned up pieces of code, worked on making the emulation code
+	work on most-significant-byte-first platforms(like the Macintosh),
+	though it's not finished.
+
+0.3.0:	Sped up the PSF info loading code(used when getting titles for the
+	playlist).
+	
+	Altered reverb enable/disable bits emulation.
+
+	Optimized reverb filter emulation code.  Increased speed by 5%-6% on 
+	some songs tested.
+
+	Modified the interface between the plugin/user interface code and
+	the emulation code.
+
+0.2.6:	Cleaned up tag scanning code.
+
+	Various optimizations were made to the SPU code.
+
+0.2.5:  Tags are now scanned for case-insensitively.
+
+0.2.4:  memcmp() was being told to compare 5 bytes instead of 4, in xmms.c,
+	in the file identification function.  Fixed.
+
+	Removed some unused variables, cleaned up a bit of source code.
+
+0.2.3:	Fixed a lockup problem that occured when the song was paused and
+	and xmms tried to go to the next song.
+
+0.2.2:	More spu data structures are being initialized on reset now.  Fixes
+	some Suikoden 2 bugs(short junk sounds at the start of songs) it 
+	seems...
+	
+	Added another emulated cpu idle detection hack.  This brings down 
+	host cpu usage on many PSFs considerably.
+
+0.2.1:	PSS_STYLE is now defined in the Makefiles.
+
+	Fixed GetFileBase to return a static(and local) array, instead of a 
+	plain local one(oops).
+
+	Added a special EXE memory loader, instead of that evil plain memcpy() 
+	stuff.
+
+	Fixed a major bug in the xmms plugin code.  Under some conditions, due
+	to an integer overflow,	usleep() would be passed a negative value, 
+	causing much unpleasantness(locking up).
+	
+0.2.0:
+	Initial release.
+
+
+
+Changelog for PCSX prior to sexypsf:
+
+ChageLog:
+ v1.4:
+ * Added NetPlay support, the api is not the same for cyberpad (linuzappz)
+
+ * Errors on open/close/init are now only for negative values, 
+   plugin.c, plugins.c (linuzappz)
+
+ * Added GPUclearDynarec, for pec, plugins.c/h, plugin.c (linuzappz)
+
+ * Implemented Load Branch Delay stuff :), PsxInterpreter, iR300A.c, 
+   R3000A.h (linuzappz)
+
+ * Added States Menu WndMain.c, Misc.c/h (linuzappz)
+
+ * Fix on READ_ACK, StatP is ORed with 0x20 after now, CdRom.c (linuzappz)
+
+ * Fixed bug on iBrach for branchs on branch delay slots, iR3000A.c (linuzappz)
+
+ * Fixed Mcd Dialog in Windows, WndMain.c (jang2k)
+
+ * Added workaround in PsxCounters.c for "lost" vsync interrupts (linuzappz)
+
+ * Fixed small bug in PsxBios.c, rootcnt clear must be only when used an event,
+   also added SaveMcd on FCREAT (linuzappz)
+
+ * Fixes to PsxCounters.c, gives a bit more speed also (linuzappz)
+
+ * Added software interruption over PsxInterpreter.c, untested (linuzappz)
+
+ * Added sTitle in McdBlock Struct, Sio.c/h (linuzappz)
+
+ * Refixed a few lines on Gte.c, and some updates over pcsxdc (Mark Grilenkov)
+
+ * Finished RTPS/RTPT optimization, Gte.c (linuzappz)
+
+ * Added option for Parasite Eve 2, PsxCounters.c, ConfigurePlugins.c, WndMain.c (linuzappz)
+
+ * Removed SPUupdate support since it won't be needed anymore, plugins.c/h, 
+   PsxCounters.c/h (linuzappz)
+
+ * Changed BIAS to 2, and the cdReadTime is now 75 as it should be, PsxCommon.h, 
+   CdRom.c (linuzappz)
+
+ * Several optimizations on iR3000A.c,, ix86.c/h, added iGte.h (linuzappz)
+
+ * Largely optimized Gte.c, also optimized PsxMem.c for direct recClear (linuzappz)
+
+ * Rewritten LWL/LWR/SWL/SWR, PsxInterpreter.c (linuzappz)
+
+ * Added workaround for firstfile, PsxBios.c (linuzappz)
+
+ * Several optimizations over iR3000A.c, ix86.c/h, 10% faster (linuzappz)
+
+ * Removed CdTiming fix since it's not needed anymore, PsxCommon.h, CdRom.c (linuzappz)
+
+ * Fixed bios_write for stdout, PsxBios.c (linuzappz)
+
+ * Added DreamCast port, Dreamcast/sh4 dir, Sio.c, plugins.h, R3000A.c/h, PsxCommon.h,
+   CdRom.h, Misc.c (Mark Grilenkov)
+
+ * Small speedups over Decode_XA.c (linuzappz)
+
+ * Fixed bug in iR3000A.c, thanks to Mark Grilenkov (linuzappz)
+
+ * Small optimizations to iR3000A.c, ix86.c/h (linuzappz)
+
+ * Fixes for danger girl, legend of mana and tekken2, CdRom.c, and fix
+   for old pad plugins, ConfigurePlugins.c, thanks to jang2k (linuzappz)
+
+ * Fix for Parasite Eve 2, PsxCounters.c, thanks to psychojak (linuzappz)
+
+ v1.3:
+ * Fixed icon colors for 15/16bits, thanks to jang2k (linuzappz)
+
+ * Fix silly bug on PsxCounters.c for SPUasync (linuzappz)
+
+ * Refixed the mdecs, more correct. PsxHw.c, Mdec.c, and small fixes on
+   WndMain.c/Plugin.c, thanks to jang2k (linuzappz)
+
+ * Fix for some mdecs on MdecWrite1, Mdec.c, thanks to psychojak (linuzappz)
+
+ * CVGS Mcds now are detected by file size, also fixes to SaveMcd,
+   and added support for .gme mcds, Sio.c, thanks to jang2k (linuzappz)
+
+ * Fixed Pcsx title for some win32, small fix in Gte.c, and added
+   icons for win32 mcd dlg (still unanimated), WndMain.c, 
+   thanks to jang2k (linuzappz)
+
+ * Added rename syscall, PsxBios.c (linuzappz)
+
+ * Fixed bug in MTC2 in linux define, Gte.c (linuzappz)
+
+ * Minor fixes to GtkGui.c (linuzappz)
+
+ * More to PsxBios.c (linuzappz)
+
+ * Fixed bug when S_addr == 0 in Misc.c (linuzappz)
+
+ * Now won't close the plugins if the user press escape more than once, 
+   WinMain.c, plugin.c (linuzappz)
+
+ * Added SPUasync support, thanks to Andy and Iori (linuzappz)
+
+ * Removed the BREAK code, since the bios rom doens't handles it, 
+   thanks to psychojak (linuzappz)
+
+ * Some bugfixes to Gte.c, thanks to jang2k (linuzappz)
+
+ * "hokuto no ken" / "Crash Bandicot 2" ... fix, thanks to Taka (linuzappz)
+
+ * Renamed/rewrote some stuff for pcsx2 compat ;) (linuzappz)
+
+ * Small speedups for Mdec.c (linuzappz)
+
+ * Rewrote DisR3000A.c (linuzappz)
+
+ * Improved and rewrote partially HLE stuff (linuzappz)
+
+ * Rewrote the way we call syscalls (linuzappz)
+
+ * Added in Gte.c SUM_FLAG to opcodes that didn't have it, thanks to Taka (linuzappz)
+
+ * CdlPause Acknowledge irq timing changed to 0x40000, thanks to Taka (linuzappz)
+
+ * Fixed bug in recBLTZAL and recBGEZAL, thanks to Taka (linuzappz)
+
+ * Fixed bug in Sio.c, thanks to gunshinn (linuzappz)
+
+ * Fixed bug in Hw.c, thanks to bilgerat (linuzappz)
+
+ * Fixes to Gte.c, thanks to roor (shadow)
+
+ v1.2:
+ * Added Reg2 to cdrStruct, for Reg2 == 0x18 (non-interrupted cmds) (linuzappz)
+
+ * Fixed one bug in Counters, count < 0 (linuzappz)
+
+ * Now the cursor will be hidden in Win32 after OpenPlugins. (linuzappz)
+
+ * Refixed Getlocl (linuzappz) 
+
+ * Fixed recJALR, 31 for _Rd_ (linuzappz)
+
+ * Fixes to Gte.c (linuzappz)
+
+ * Optimized iR3000A.c for speed (linuzappz)
+
+ * Rewritten branch opcodes on iR3000A.c and removed cache stuff (linuzappz)
+
+ * PRevID changed to 0x2, thanks to shadow (linuzappz)
+
+ * Added PADstartPoll and PADpoll support, thanks to gunshinn (linuzappz)
+
+ * Speed improvements to iR3000A.c (linuzappz)
+
+ * Rewrote the cycles tests stuff, removed the workaround that reseted to 0x80000000
+   (linuzappz)
+
+ * CDRgetBufferSub and fixes to CDREAD stuff, CdRom.c, plugins.c/h (linuzappz
+
+ * Correct Mouse, AnalogJoystick and AnalogPad emulation, contributed by
+   gunshinn (linuzappz)
+
+ * MOVZX and MOVSX to ix86.h and iR3000A.h (linuzappz)
+
+ * Improved Memcard Dialog on Linux (linuzappz)
+
+ * Counters again use BIAS (linuzappz)
+
+ * Autodetect psx type should be fine now, Misc.c (linuzappz)
+
+ * Removed nasm stuff (linuzappz)
+
+ * Fixed VK_F10 in Plugin.c, WndMain.c (linuzappz)
+
+ * LWC2/SWC2 now in Gte.c/h, Interpreter.c, iR3000A.c (linuzappz)
+
+ * Fixed gte_Cxx in MVMVA, Gte.c (linuzappz)
+
+ * Fixed a bug within PIC stuff, Plugin.c (win32 and linux) (linuzappz)
+
+ * Rewrote bios_printf, Bios.c (linuzappz)
+
+ * gtk_widget_hide changed for gtk_widget_destroy, thanks to lu_zero (linuzappz)
+
+ * Fix for cpuIrq.cycle, now it won't freeze when reaching 0xffffffff, since
+   we now reset when reaches 0x80000000, Counters.c (linuzappz)
+
+ * Counters 1 and 2 (in mode 0x100) should be a little more accurate now (linuzappz)
+
+ * Made workaround for Gran Turismo, WndMain.c, ConfigurePlugins.c, LnxMain.c, 
+   Config.c, GtkGui.c (linuzappz)
+
+ * cp2NCLIP added in iGte.asm (linuzappz)
+
+ * Fixed some bugs on Memory.c (memset to memLUT) and ConfigurePlugins.c 
+   (strlen("HLE") + 1), thanks to Taka (linuzappz)
+
+ * Refixed XA quality, now should be perfect always, Decode_XA.c, and a bug on
+   the spu dma is now fixed, Dma.c, thanks to Iori for this (linuzappz)
+
+ * Fixed a bug in cp2MTC2 in iGte.asm, movsx now used (linuzappz)
+
+ * cdReadTime is now divided by 75, thanks to calb, and the CDREAD_INT is set
+   on a irq reset, CdRom.c/h (linuzappz)
+
+ v1.1:
+ * Fixed a bug in R3000A.c, hwReset() after the cpuIrq reset (linuzappz)
+
+ * Refixed RootCounters, still need to clean, Counters.c (linuzappz)
+
+ * Fixed XA quality, still in some games quality is not perfect (maybe cdrom bug)
+   Decode_XA.c (linuzappz)
+
+ * Reset var is now unused in CdRom.c, instead cdr.Ctrl is now used (linuzappz)
+
+ * Small speedup for Hw.c, Sio.c/h (linuzappz)
+
+ * Added cdrRead2 handling and fixed cddma, thanks to shunt, CdRom.c (linuzappz)
+
+ * Cleaned a bit Memory.c, R3000A.c and Hw.c (linuzappz)
+ 
+ * Support for VGS Memory Card Format (*.mem), Sio.c (linuzappz)
+
+ * Rewrote cdirq handling, CdRom.c/h, R3000A.c (linuzappz)
+
+ * Speed up on iR3000A.c code for cop2 (linuzappz)
+
+ * Improved cdrom decoder and cdirq handling, CdRom.c/h (linuzappz)
+
+ * Cleaned error checking on plugins.c/h (linuzappz)
+
+ * Improved SysPrintf as SysMessage, System.h, LnxMain.c, WndMain.c (linuzappz)
+
+ * Added sioInterrupt call, for cleaner code, Sio.c/h, R3000A.c (linuzappz)
+
+ * Cleaned a little initial regs, R3000A.c (linuzappz)
+
+ * Fixes to Dma stuff (HW_DMA_PCR is now used), hwDma3 set now only to
+   (chcr) 0x11000000 and 0x11400100, Hw.c, CdRom.c (linuzappz)
+
+ * Added status seek flag to SeekL and SeekP, CdRom.c (linuzappz)
+
+ * Icon animated support for McdDlg, GtkGui.c, Sio.c/h (linuzappz)
+
+ * Gettd now returns frame too, CdRom.c (linuzappz)
+
+ * Fixed bug in CdlPlay, CdRom.c (linuzappz)
+
+ * SPUupdate interface support Counters.c/h, plugins.c/h (linuzappz)
+
+ * Added CDRCMD_DEBUG flag in Debug.h, for CdRom.c cmd debug only (linuzappz)
+
+ * AUTOPAUSE stuff improved on Cdrom.c (linuzappz)
+
+ * Icon stuff and more on McdDlg, WndMain.c/GtkGui.c, Sio.c/h (linuzappz)
+
+ * Fixed PsxAuto buf in Misc.c (linuzappz)
+
+ * Memory Card Manager improved to handle blocks, still need
+   lotta work, WndMain.c/GtkGui.c, Sio.c/h (linuzappz)
+
+ * Fixed in LoadCdrom the System.cnf a bit more (linuzappz)
+
+ * Added Unused data to freeze functions and fixed LoadState to fail only for
+   STvX (linuzappz)
+
+ * More fixes to Gte.c, added another gte debug in Debug.h/WndMain.c
+
+ * Fixed a bug in RemoveCmdQueue, CdRom.c (linuzappz)
+
+ * Fixed Registry compatibility between versions in Win32, ConfigurePlugins.c
+   (linuzappz)
+
+ * Gte.c: total rewrite. Rage racer,Ridge racer,Bloady roar,Ridge racer 4 
+   now WORKS!!! (some small problems still althought ;p)
+   Bios.c: some more comment opcodes to biosInit.(i think that all exists now)
+   (shadow)
+
+ * Bios.c: fixed ResetEntryInt & HookEntryInt (hex was opposite)
+   add some names to BiosInit (commented)
+   A0:3b, A0:3c, A0:4a, A0:4c, added (shadow)
+
+ * Added LoadCdrom(), for HLE cdrom support, Misc.c, LnxMain.c, GtkGui.c,
+   WndMain.c (linuzappz)
+
+ * More to Bios.c: longjmp, mem2vram (thought that might fix some demos
+   but not. Maybe need a recheck..), InitPAD + biosInterrupt (some changes..
+   Not seems to work okay.. but dunno..), bios_GPU_dw (probably buggy need a
+   recheck), bios_atoi, bios_atol, bios_index, bios_rindex, bios_strchr,
+   bios_strrchr, bios_strpbrk, bios_strspn, bios_strcspn, bios_strtok,
+   bios_strstr.
+   And add some names of bios opcodes to the table.(commentted) (shadow)
+
+ * Bios.c, added: SendGPU, StartPAD, GPU_SendPackets, GPU_GetGPUStatus,
+   toupper, tolower, bcopy,  bzero, bcmp (shadow)
+
+ * Now you can change Bios and Plugins Path, in both Win32/Linux, 
+   ConfigurePlugins.c, Config.c, plugins.c, Wnd/LnxMain.c, Memory.c, (linuzappz)
+
+ * StatesC in Linux same as Win32, Plugin.c (linuzappz)
+
+ * Fixed rcntRcount, removed one BIAS, Counters.c (linuzappz)
+
+ * Added CheckCdrom() after you change a cdrom, Cdrom.c (linuzappz)
+
+ * Fixed iMdec.asm, still need to fix colours, they aren't 100% right (linuzappz)
+
+ * F8 now set to make a snapshot (linuzappz)
+
+ * Added bios syscalls names in Bios.c/R3000A.c (linuzappz)
+
+ * GetTD and GetTN cmds are now non-blocking and added error code,
+   CdRom.c (linuzappz)
+
+ * Simplified queuing code and now reads are done like cmds (instead of
+   using the synk stuff), CdRom.c/R3000A.c (linuzappz)
+
+ * Made a workaround for iso cdrom plugins, when they changed the dir,
+   Plugin.c/WndMain.c (linuzappz)
+
+ * Fixed bug in CdRom.c (gcc3 support) (linuzappz)
+
+ v1.0:
+ * First source code public release.

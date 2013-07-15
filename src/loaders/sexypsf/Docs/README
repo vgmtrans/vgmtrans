@@ -1,0 +1,28 @@
+This is sexyPSF, based off of pcsx and peops.
+
+To compile, go to the main directory, and type "make", if you're 
+running on an x86(IA32) system.
+If you want to compile for a generic LSB-first(ARM, IA32, AMD64, etc.), do 
+"make CPU=LSBFIRST".  For a generic MSB-first(PowerPC) platform,
+do "make CPU=MSBFIRST".
+
+You can then do "make install" to install it to ~/.xmms/Plugins
+
+(Replace "make" with "gmake" if necessary in the above commands)
+
+You need to have zlib installed, as well as the xmms plugin header file(s).
+
+***** IMPORTANT *****
+The minimum CPU this will run on at real time is probably a Pentium MMX 
+200MHz CPU.
+You should change the "-mcpu=i686" string in the makefile, if necessary,
+to better suit your processor.  This may be *necessary* for correct code
+generation on your platform in certain cases.  For example, if you're using
+a Pentium 1, just have "-mcpu=i586".
+
+There might be exploitable bugs in the emulation and PSF loading code.  I know
+there are bugs that can cause a segmentation fault for deferencing NULL 
+pointers, in the emulation code.  To be most safe, only play PSFs from trusted
+sources(and trusted rippers).
+
+***** END IMPORTANT ****

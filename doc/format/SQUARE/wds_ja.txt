@@ -1,0 +1,42 @@
+WDS Address table
+----------------+-------+-------------------------------
+Address		| type	| Contensts
+----------------+-------+-------------------------------
+0x0000-0000	DWORD	"WDS " / "dwds"	strings
+0x0000-0004	DWORD	
+0x0000-0008	DWORD	Size of header (1) ?　（Address of AD-PCM body ?）
+0x0000-000C	DWORD	
+0x0000-0010	DWORD	Size of header (2) ?　（Address of AD-PCM body ?）
+0x0000-0014	DWORD	Size of AD-PCM data body ?
+0x0000-0018	DWORD	Size of header (3) ?　（Address of AD-PCM body ?）
+0x0000-001C	DWORD	Instrument value
+0x0000-0020	DWORD	Instrument ID number
+0x0000-0024	DWORD	unknown
+0x0000-0028	DWORD	unknown
+0x0000-002C	DWORD	unknown
+- - - - - - - - + - - - + - - - - - - - - - - - - - - - 
+0x0000-0030	16byte	Instrument number 0 ?
+0x0000-0040	16byte	Instrument number 1 ?
+0x0000-0050	16byte	Instrument number 2 ?
+・・・
+----------------+-------+-------------------------------
+
+
+
+Instrument table
+----------------+-------+-------------------------------
+Address		| type	| Contensts
+----------------+-------+-------------------------------
+0x0000-0x0003	DWORD	Offset address of AD-PCM
+0x0004-0x0005	WORD	Loop pointer
+0x0006-0x0007	WORD	Fine tuning
+0x0008		BYTE	Attack Rate
+0x0009		BYTE	Decay Rate
+0x000A		BYTE	Sustain Rate
+0x000B		BYTE	Release Rate
+0x000C		BYTE	Sustain Level
+0x000D		BYTE	Attack Rate mode (0:linear / 1:exponential)
+0x000E		BYTE	unknown
+0x000F		BYTE	unknown
+----------------+-------+-------------------------------
+

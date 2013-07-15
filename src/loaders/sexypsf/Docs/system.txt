@@ -1,0 +1,865 @@
+--------------------------------------------------------------------------
+System Operation
+--------------------------------------------------------------------------
+
+Introduction
+--------------------------------------------------------------------------
+This text covers the usage of the R3000, the system control coprocessor and
+hardware registers, the file server and some system calls.
+
+--------------------------------------------------------------------------
+R3000
+--------------------------------------------------------------------------
+The heart of the psx is a MIPS R3000. The version in the PSX has two
+coproccors, (cop0 - System Control Coproccessor, cop2 - GTE), one
+multiplier/divider, 32 general registers, one ALU, one shifter, one
+address adder, 4kb of Instuction Cache, 1 kb of Data cache and NO floating
+point unit.
+
+Registers
+-------------------------------------------------------------
+All registers are 32 bits wide.
+
+ 0       zero     Constant, always 0
+ 1       at       Assembler temporary.
+ 2- 3    v0-v1    Subroutine return values
+ 4- 7    a0-a3    Subroutine arguments
+ 8-15    t0-t7    Temporaries, may be changed by subroutines
+16-23    s0-s7    Register variables, must be saved by subs.
+24-25    t8-t9    Temporaries, may be changed by subroutines
+26-27    k0-k1    Reserved for the kernel
+28       gp       Global pointer
+29       sp       Stack pointer
+30       fp(s8)   9th register variable, subs can use this as a frame
+                  pointer
+31       ra       Return address
+
+ -       pc       Program counter
+ -       hi,lo    Registers of the multiplier/divider.
+
+All registers behave the same, remarks are not hardware bound, but general
+programming good practice. Respect these for compatability, especially if
+you intend to use kernel routines.
+Exceptions are register 0, and 31. Zero will always return 0, regardless
+of any writing attempts. Ra is used by the normal jal instruction for the
+return address. (points to the second instruction after the jal). Note that
+the jalr instruction can use any register for the return address, though
+usually only register 31 is used.
+
+The PC is not really a register, and should not be seen like one. Hi, Lo
+are the registers which the multiplier/divider returns its results to.
+Special instructions are implemented to deal with them.
+
+-------------------------------------------------------------
+Instructions
+-------------------------------------------------------------
+rt       target register (cpu general register 0-31)
+rs       source register (cpu general register 0-31)
+rd       destination register (cpu general register 0-31)
+base     base register (cpu general register 0-31)
+imm      16 bit immediate
+b?       immediate value of ? bits wide.
+c0r      Coprocessor 0 register
+c2d      Coprocessor 2 (GTE) data register
+c2c      Coprocessor 2 (GTE) control register
+
+
+imm(base) means an address of the value in the register + the immediate
+         value.
+
+inst     instruction name.
+d        number of instructions to wait before using r1 (target reg).
+args     format of the operand fields.
+desc.    description of the instruction.
+
+
+inst  d  args        desc.
+
+*Load/Store instructions
+
+lb    1  rt,imm(base)  loads lowest byte of rt with addressed byte and
+                       extends sign.
+lbu   1  rt,imm(base)  loads lowest byte of rt with addressed byte.
+lh    1  rt,imm(base)  loads lowest halfword of rt with addressed halfword
+                        and extends sign.
+lhu   1  rt,imm(base)  loads lowest halfword of rt with addressed halfword.
+lw    1  rt,imm(base)  loads r1 with addressed word.
+lwl   0  rt,imm(base)  loads high order byte of rt with addressed byte and
+                       then loads up to the low order word boundary into rt.
+lwr   0  rt,imm(base)  loads low order byte of rt with addressed byte and
+                       then loads up to the high order word boundary into
+                       rt.
+
+                       There's no delay for lwl and lwr, so you can use them
+                       directly following eachother. fe. to load a word
+                       anywhere in memory without regard to alignment:
+                       lwl   a0,$0003(t0)
+                       lwr   a0,$0000(t0)
+
+sb    1  rt,imm(base)  stores lowest byte of rt in addressed byte.
+sh    1  rt,imm(base)  stores lowest halfword of rt in addressed halfword.
+sw    1  rt,imm(base)  stores rt in addressed word.
+swl   0  rt,imm(base)  unaligned store, see lwl
+swr   0  rt,imm(base)  unaligned store, see lwr
+
+lui   0  rt,imm        loads rt with immediate<<$10
+
+*arithmic instructions
+
+When an arithmic overflow occurs, rd will not be modified.
+
+add   0  rd,rs,rt      Adds rt to rs and stores the result in rd.
+addu  0  rd,rs,rt      Adds rt to rs, ignores arithmic overflow and stores
+                       result in rd.
+sub   0  rd,rs,rt      Substracts rt from rs and stores result in rd.
+subu  0  rd,rs,rt      Substracts rt from rs, ignores arithmic overflow and
+                       stores result in rd.
+
+addi  0  rd,rs,imm     Adds signextended immediate to rs, and stores the
+                       result in rd.
+addiu 0  rd,rs,imm     Adds signextended immediate to rs, ignores arithmic
+                       overflow and stores the result in rd.
+
+subi  0  rd,rs,imm     Substracts signextended immediate from rs and stores
+                       the result in rd.
+subiu 0  rd,rs,imm     Substracts signextended immediate from rs, ignores
+                       arithmic overflow, and stores the result in rd.
+
+mult     rs,rt         Multiplies rs with rt, and stores the 64 bit sign
+                       extended result in hi/lo.
+multu    rs,rt         Multiplies rs with rt, and stores the 64 bit result
+                       in hi/lo.
+div      rs,rt         Divides rs by rt, and stores the quotient into lo,
+                       and the remainder into high. Results are sign
+                       extended.
+divu     rs,rt         Divides rs by rt, and stores the quotient into lo,
+                       and the remainder into high.
+
+
+*logical instructions
+
+and   0  rd,rs,rt      Performs a bit wise AND between rs and rt, and
+                       stores the result in rd.
+or    0  rd,rs,rt      Performs a bit wise OR between rs and rt, and
+                       stores the result in rd.
+xor   0  rd,rs,rt      Performs a bit wise XOR between rs and rt, and
+                       stores the result in rd.
+nor   0  rd,rs,rt      Performs a bit wise NOR between rs and rt, and
+                       stores the result in rd.
+
+andi  0  rd,rs,imm     Performs a bit wise AND between rs and unsigned
+                       immediate and stores the result in rd.
+ori   0  rd,rs,imm     Performs a bit wise OR between rs and unsigned
+                       immediate and stores the result in rd.
+xori  0  rd,rs,imm     Performs a bit wise XOR between rs and unsigned
+                       immediate and stores the result in rd.
+
+*shifting instructions
+
+sllv  0  rd,rs,rt      Shifts rs rt bits to the left and stores the result
+                       in rd.
+srlv  0  rd,rs,rt      Shifts rs rt bits to the right and stores the result
+                       in rd.
+srav  0  rd,rs,rt      Shifts the value in rs rt bits to the right,
+                       preserving sign, and stores the value in rd.
+
+
+sll   0  rd,rs,b5      Shifts rs b5 bits to the left and stores the result
+                       in rd.
+srl   0  rd,rs,b5      Shifts rs b5 bits to the right and stores the result
+                       in rd.
+sra   0  rd,rs,b5      Shifts rs b5 bits to the right, preserving sign and
+                       stores the result in rd.
+
+*comparison instructions.
+
+slt   0  rd,rs,rt      rd=1 if rs < rt, else rd = 0
+sltu  0  rd,rs,rt      rd=1 if (unsigned)rs <(unsigned)rt, else rd = 0
+
+slti  0  rd,rs,imm     rd=1 if rs < imm, else rd = 0
+sltiu 0  rd,rs,imm     rd=1 if (unsigned)rs < (unsigned)imm, else rd = 0
+
+*jumps and branches
+
+Note the the instruction following the branch will always be executed.
+
+j        target        jumps to target
+jal      target        jumps to target and stores pc+8 into RA (second
+                       instruction after the jal instruction)
+
+jr       rd            jumps to address in rd
+jalr     (rt,) rd      jumps to address in rd and stores pc+8 into RA, or
+                       in rt.
+
+beq      rs,rt,imm     branches to imm if rs == rt
+bne      rs,rt,imm     branches to imm if rs != rt
+
+bgtz     rs,imm        branches to imm if rs > 0
+bltz     rs,imm        branches to imm if rs < 0
+blez     rs,imm        branches to imm if rs <= 0
+bgez     rs,imm        branches to imm if rs >= 0
+bltzal   rs,imm        branches to imm and stores pc+8 into RA if rs < 0
+bgezal   rs,imm        branches to imm rd and stores pc+8 into RA if rs >= 0
+
+*system instructions
+
+mfhi   2 rd            moves HI into rd
+mflo   2 rd            moves LO into rd
+mthi   2 rs            moves rs into HI
+mtlo   2 rs            moves rs into LO
+
+mtc0   2 rs,c0r        moves rs into cop0 register c0r
+mfc0   2 rd,c0r        moves cop0 register c0r into rd
+
+mtc2   2 rs,c2d        moves rs into cop2 data register c2d
+mfc2   2 rd,c2d        moves cop2 data register c2d into rd
+
+ctc2   2 rs,c2c        moves rs into cop2 control register c2d
+cfc2   2 rd,c2c        moves cop2 control register c2d into rd
+
+lwc2   1 c2d,imm(base) load cop2 data register with addressed word
+swc2   1 c2d,imm(base) stores cop2 data register at addressed word
+
+syscall  (b20)         generates a system call exception
+break    (b20)         generates a breakpoint exception
+                       the 20bits wide code field is not passed, but
+                       must be read from the instuction itself if you
+                       want to use it.
+
+cop2     b25           Coprocessor operation is started. b25 is
+                       passed as parameter.
+
+rfe                    restores the interrupt enable and kernel
+                       previlege bits.
+
+tlb instructions       see MIPS doc.
+
+--------------------------------------------------------------------------
+Cop0 - System control coprocessor
+--------------------------------------------------------------------------
+
+Registers:
+#    Name      rw Desciption.
+
+-------------------------------------------------------------
+16   ERREG
+-------------------------------------------------------------
+15   PRid      r  COP0 type and rev level
+bit |31                  16|15         8|7           0|
+desc|                      |Imp         |Rev          |
+
+Imp      3        CP0 type R3000A
+         7        IDT unique (3041) use REV to determine correct
+                  config.
+Rev               Revision level.
+-------------------------------------------------------------
+14   EPC       r  Return address from trap
+
+Contains the return address after an exception. This address is
+the instruction at which the exception took place, unless BD is
+set in CAUSE, when the instruction is EPC+4.
+-------------------------------------------------------------
+13   CAUSE     r  Describes the most recently recognised exception
+bit |31|30|29 28|27 26 25 24 23 22 21 20 19 18 17 16|
+desc|BD| 0|CE   |                                  0|
+bit |15 14 13 12 11 10 09 08|07|06 05 04 03 02|01 00|
+desc|Ip                     | 0|Excode        |    0|
+
+BD                Is set when last exception points to the
+                  branch instuction instead of the instruction
+                  in the branch delay slot, where the exception
+                  occurred.
+CE                Contains the coprocessor number if the exception
+                  occurred because of a coprocessor instuction for
+                  a coprocessor which wasn't enabled in SR.
+Ip                Interrupt pending field. Bit 8 and 9 are RW, and
+                  contain the last value written to them. As long
+                  as any of the bits are set they will cause an
+                  interrupt if the corresponding bit is set in IM.
+Excode            Describes what kind of exception occured:
+0        INT      Interrupt
+1        MOD      Tlb modification
+2        TLBL     Tlb load
+3        TLBS     Tlb store
+4        AdEL     Address error, load/I-fetch
+5        AdES     Address error, store
+                  The address errors occur when attempting to read
+                  outside of KUseg in user mode and when the address
+                  is misaligned.
+6        IBE      Bus error on Instruction fetch.
+7        DBE      Bus error on Data load.
+8        Syscall  Generated unconditionally by at syscall instruction
+9        BP       Breakpoint - break instruction.
+10       RI       Reserved instruction
+11       CpU      Coprocessor unusable
+12       Ov       Arithmic overflow
+-------------------------------------------------------------
+12   SR        rw System status register
+bit |31 |30 |29 |28 |27 26|25|24 23|22 |21|20|19|18|17 |16 |
+desc|CU3|CU2|CU1|CU0|    0|RE|    0|BEV|TS|PE|CM|PZ|SwC|IsC|
+
+bit |15 14 13 12 11 10 09 08|07 06|05 |04 |03 |02 |01 |00 |
+desc|Im                     |    0|KUo|IEo|KUp|IEp|KUc|IEc|
+
+CUx      0        Coprocessor x disabled
+         1        Coprocessor x enabled
+                  CU2 is for the GTE, CU1 is for the FPA, which is
+                  not available in the PSX.
+CU0      0        Cop0 in kernal mode.
+         1        Cop0 in user mode.
+                  Makes some nominally privileged instruction usable
+                  in user mode. Normal instructions are usable regardless
+                  of this bit's setting.
+RE       0        Normal 'endianness'
+         1        Reverse 'endianness'
+                  Reverses the byte order in which data is stored in
+                  memory. (lo-hi -> hi-lo)
+BEV      0        Boot exception vectors in RAM
+         1        Boot exception vectors in ROM (kseg1)
+TS                TLB shutdown. Gets set if a programm address simultaniously
+                  matches 2 TLB entries.
+PE                Cache parity error. Does not cause exception.
+CM                Shows the result of the last load operation with the D-cache
+                  isolated. It gets set if the cache really contained data
+                  for the addressed memory location.
+PZ                When set cache parity bits are written as 0.
+Isc      0        Do not isolate cache.
+         1        Isolate cache. All load and store operations are targetted
+                  to the Data cache, and never the main memory.
+Swc      0        Normal cache mode.
+         1        Swapped cache mode. I cache will act as D cache and vice
+                  versa. Use only with Isc to access & invalidate i cache
+                  entries
+Im                8 bit interrupt mask fields. When set the corresponding
+                  interrupts are allowed to cause an exception.
+KUc      0        User mode privilege     , rfe pops KUp here
+         1        Kernal mode privilege   
+IEc      0        Interrupts enabled      , rfe pops IUp here
+         1        All interrupts disabled.
+KUp               KUc gets pushed here on an exception, rfe pops KUo here
+IUp               IUc gets pushed here on an exception, rfe pops IUo here
+KUo               KUp gets pushed here on an exception
+IUo               IUp gets pushed here on an exception
+-------------------------------------------------------------
+11   BPCM      rw Execute breakpoint mask.
+
+Program counter is ANDed with this value and then compared to
+the value in BPC.
+-------------------------------------------------------------
+10   TLBHI/PID
+-------------------------------------------------------------
+9    BDAM      rw Data Access breakpoint mask.
+
+Data fetch address is ANDed with this value and then compared
+to the value in BDA
+-------------------------------------------------------------
+8    BadVaddr  r  Bad Virtual Address.
+
+Contains the address whose reference caused an exception. Set
+on any MMU type of exceptions, on references outside of kuseg
+and on any misaligned reference.
+-------------------------------------------------------------
+7    DCIC      rw Breakpoint control
+|1f 1e 1d 1c|1b|1a|19|18|17|16 15 14 13 12 11 10||0f      00|
+| 1  1  1  0| W| R|DA|PC| 1|                   0|          0|
+
+W        0
+         1        Break on Write
+R        0
+         1        Break on Read
+DA       0        Data access breakpoint disabled
+         1        Data access breakpoint enabled
+PC       0        Execution breakpoint disabled
+         1        Execution breakpoint enabled
+
+To use the Execution breakpoint, set PC. To use the Data access
+breakpoint set DA and either R, W or both. Both breakpoints
+can be used simultaniously. When a breakpoint occurs the PSX
+jumps to $00000040.
+-------------------------------------------------------------
+6    PIDMASK
+-------------------------------------------------------------
+5    BDA       rw Breakpoint on data access.
+
+Sets the breakpoint address for load/store operations
+-------------------------------------------------------------
+4    CTXT
+-------------------------------------------------------------
+3    BPC       rw Breakpoint on execute.
+
+Sets the breakpoint address to break on on execute.
+-------------------------------------------------------------
+2    TLBLO
+1    RAND
+0    INX
+
+For TLB details see mips doc.
+
+--------------------------------------------------------------------------
+PC file server
+--------------------------------------------------------------------------
+Caetla supports pcdrv: device, the SN systems device extension to access
+files on the drive of the pc. This fileserver can be accessed by using the
+kernel functions, with the 'pcdrv:' device name prefix to the filenames or
+using the SN system calls.
+
+-------------------------------------------------------------
+SN System calls
+-------------------------------------------------------------
+The following SN system calls for the fileserver are provided.
+Accessed by setting the registers and using the break command
+with the specified field.
+-------------------------------------------------------------
+PCInit   Inits the fileserver.
+break    $0101
+-------------------------------------------------------------
+PCCreat  Creates a new file on PC.
+break    $0102
+in:      a1       pointer to file name
+         a2       file attribute
+out:     v0       0 = success, -1 = failure
+         v1       file handle or error code if v0 is negative
+-------------------------------------------------------------
+PCOpen            Opens a file on the PC.
+break    $0103
+in:      a1       pointer to file name
+         a2       access mode 0     read only
+                              1     write only
+                              2     r/w
+out:     v0       0 = succes, -1 = failure
+         v1       file handle or error code if v0 is negative
+-------------------------------------------------------------
+PCClose           Closes a file on the PC.
+break    $0104
+in:      a1       file handle
+out:     v0       0 = succes, -1 = failure
+         v1       0 = succes, error code if v0 is negative
+-------------------------------------------------------------
+PCRead            Reads from an open file on PC.
+break    $0105
+in:      a1       file handle
+         a2       length in bytes
+         a3       pointer to store address
+out:     v0       0 = succes, -1 = failure
+         v1       number of read bytes or error code if v0 is
+                  negative.
+
+Note:    Does not stop at eof, so if you set more bytes to read
+         than the filelength, the fileserver will pad with zero
+         bytes. If you are not sure of the the filelength obtain
+         the filelength by PClSeek (a2 = 0, a3 = 2, v1 will return
+         the length of the file, don't forget to reset the file
+         pointer to the start before calling PCread!)
+-------------------------------------------------------------
+PCWrite           Writes to an open file on PC.
+break    $0106
+in:      a1       file handle
+         a2       length in bytes
+         a3       pointer to read address
+out:     v0       0 = succes, -1 = failure
+         v1       number of written bytes or error code if v0
+                  is negative.
+-------------------------------------------------------------
+PClSeek           Repositions the file pointer
+break    $0107
+in:      a1       file handle
+         a2       number of bytes to move.
+         a3       position from 0   Beginning of file
+                                1   Current pointer
+                                2   End of file
+out:     v0       0 = succes, -1 = failure
+         v1       file pointer
+-------------------------------------------------------------
+Attributes are passed as is. File attributes for the pc file
+system are like this:
+bit | 7  6| 5| 4| 3| 2| 1| 0|
+desc|    0| A| D| 0| S| H| R|
+
+A        Archive file
+D        Directory
+S        System file
+H        Hidden file
+R        Read only file
+-------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+System calls
+--------------------------------------------------------------------------
+Kernel system calls are accessed by loading the call number in t1, and
+jumping to the specifeed address.
+A0 call $3f means: load t1 with $3f and jump to $000000a0.
+
+-------------------------------------------------------------
+Printf            Print string to console.
+A0 call $3f
+in:      a0       Pointer to 0 terminated string.
+         a1-a3    Arguments.
+         sp+$10
+
+Prints the specified string to the console (ie. pc screen).
+String can contain standard C escape sequences and conversion
+characters, except the floating point types (%e, %f, %g).
+Variables are passed in a1 to a3. More variables are passed at
+sp+$10.
+-------------------------------------------------------------
+openevent         adds an event structure to the event table.
+B0 call $08
+in:      a0       Event class.
+         a1       Event spec.
+         a2       Event mode.
+         a3       Address of function to be executed when
+                  event occurs.
+out:     v0       Event descriptor, -1 if failed.
+
+Opens an event, should be called within a critical section.
+The return value is used to identify the event to the other
+even functions.
+A list of event classes, specs and modes is at the end of this
+section.
+-------------------------------------------------------------
+closeevent        releases an event structure from the
+B0 call $09       event table.
+in:      a0       Event descriptor.
+out:     v0       1 on success, 0 if failed.
+-------------------------------------------------------------
+enableevent       Turns on event handling for specified event.
+B0 call $0c
+in:      a0       Event descriptor.
+out:     v0       1 on success, 0 if failed.
+-------------------------------------------------------------
+disableevent      Turns off event handling for specified event.
+B0 call $0d
+in:      a0       Event descriptor.
+out:     v0       1 on success, 0 if failed.
+-------------------------------------------------------------
+open              Opens a file for IO.
+B0 call $32
+in:      a0       File name, terminated with 0
+         a1       Access mode
+out:     v0       File handle, or -1 if error.
+
+Opens a file on the target device for io. Access mode is set
+like this:
+
+bit 0    1 = Read
+    1    1 = Write
+    9    1 = New file
+   15    1 = Asynchronous mode?
+   16-31 Number of memory card blocks for a new file on the
+         memory card.
+
+The PSX can have a maximum of 16 files open at any time.
+-------------------------------------------------------------
+lseek             Move the file pointer.
+B0 call $33
+in:      a0       File handle
+         a1       Movement offset in bytes
+         a2       0 = from start of file
+                  1 = from current file pointer
+                  2 = Bugs. Should be from end of file.
+
+Moves the file pointer the number of bytes in a1, relative to
+the location specified by a2. Movement from the eof is incorrect.
+Also, movement beyond the end of the file is not checked.
+-------------------------------------------------------------
+read              Read data from an open file.
+B0 call $34
+in:      a0       File Handle
+         a1       Pointer to address to store read data
+         a2       Number of bytes to read
+out:     v0       Number of bytes actually read, -1 if failed.
+
+Reads the number of bytes from the specified open file. If length
+is not specified an error is returned. Read per $0080 bytes from
+memory card (bu:) and per $0800 from cdrom (cdrom:).
+-------------------------------------------------------------
+write             Write data to an open file.
+B0 call $35
+in:      a0       File handle
+         a1       Pointer to adress to read data from.
+         a2       Number of bytes to write.
+out:     v0       Number of bytes written.
+
+Writes the number of bytes to the specified open file. Write
+to the memory card per $0080 bytes. Writing to the cdrom returns 0.
+-------------------------------------------------------------
+close             Close an open file.
+B0 call $36
+in:      a0       File handle
+out:     v0       File hande if success, -1 if failed.
+-------------------------------------------------------------
+cd                Change the current directory on target device.
+B0 call $40
+in:      a0       Pointer to new directory path
+out:     v0       1 if success, 0 if failed.
+
+Changes the current directory on target system.
+-------------------------------------------------------------
+firstfile         Finds the first file to match the name.
+B0 call $42
+in:      a0       Pointer to the file name.
+         a1       Pointer to direntry structure.
+out:     v0       0 if unsuccessfull, else same as a1.
+
+Searches for the first file to match the name in the string
+pointed to by a0. Wildcards (?, *) may be used. Start the name
+with the device you want to address. (ie. pcdrv:) Different
+drives can be accessed as normally by their drive names (a:, c:)
+if path is omitted after the device, the current directory will
+be used.
+
+A direntry structure looks like this:
+
+$00 - $13     db  Filename, terminated with 0.
+$14           dw  File attribute
+$18           dw  File size
+$1c           dw  Pointer to next direntry
+$20 - $27     db  Reserved by system
+-------------------------------------------------------------
+nextfile          Searches for the next file to match the name.
+B0 call $43
+in:      a0       Pointer to direntry structure
+out:     v0       0 if unsuccesful, else same as a0.
+
+Uses the settings of a previous firstfile command.
+-------------------------------------------------------------
+rename            Rename a file on target device.
+B0 call $44
+in:      a0       Pointer to old file name
+         a1       Pointer to new file name
+out:     v0       1 if successful, 0 if failed.
+-------------------------------------------------------------
+delete            Delete a file on target device.
+B0 call $45
+in:      a0       Pointer to file name
+out:     v0       1 if successful, 0 if failed.
+-------------------------------------------------------------
+
+Event Classes
+
+The upper byte of each event type, is a descriptor byte, which
+identifies the type of event to kernal routines.
+
+Descriptors:
+$ff     Thread
+$f0     Hardware
+$f1     Event
+$f2     Root counter
+$f3     User event
+$f4     BIOS
+
+Hardware events:
+$f0000001    VBLANK
+$f0000002    GPU
+$f0000003    CDROM Decoder
+$f0000004    DMA controller
+$f0000005    RTC0
+$f0000006    RTC1
+$f0000007    RTC2
+$f0000008    Controller
+$f0000009    SPU
+$f000000a    PIO
+$f000000b    SIO
+$f0000010    Exception
+$f0000011    memory card
+$f0000012    memory card
+$f0000013    memory card
+
+Root counter events:
+$f2000000    counter 0 (pixel clock)
+$f2000001    counter 1 (horizontal retrace)
+$f2000002    counter 2 (one-eighth of system clock)
+$f2000003    counter 3 (vertical retrace)
+
+Bios events:
+$f4000001    memory card
+$f4000002    libmath
+
+Event Specs:
+$0001    counter becomes zero
+$0002    interrupted
+$0004    end of i/o
+$0008    file was closed
+$0010    command acknowledged
+$0020    command completed
+$0040    data ready
+$0080    data end
+$0100    time out
+$0200    unknown command
+$0400    end of read buffer
+$0800    end of write buffer
+$1000    general interrupt
+$2000    new device
+$4000    system call instruction
+$8000    error happned
+$8001    previous write error happned
+$0301    domain error in libmath
+$0302    range error in libmath
+
+Event modes:
+$1000    Handle on interrupt
+$2000    Do not handle on interrupt.
+
+--------------------------------------------------------------------------
+Root Counters
+--------------------------------------------------------------------------
+There are 4 root counters.
+
+Counter  Base address      Synced to
+0        $1f801100         pixelclock
+1        $1f801110         horizontal retrace
+2        $1f801120         1/8 system clock
+3                          vertical retrace
+
+Each have three registers, one with the current value, one with the counter
+mode, and one with a target value.
+
+-------------------------------------------------------------
+$11x0 Count  r
+bit |31                  16|15                   0|
+desc|Garbage               |Count                 |
+     
+Count    Current count value, 0-$ffff
+
+Upper word seems to contain only garbage.
+-------------------------------------------------------------
+$11x4 Mode   rw
+bit |31      10|9  |8  |7 |6  |5 |4  |3  | 2  1| 0|
+desc|Garbage   |Div|Clc|  |Iq2|  |Iq1|Tar|     |En|
+
+En       0        Counter running
+         1        Counter stopped (only counter 2)
+Tar      0        Count to $ffff
+         1        Count to value in target register
+Iq1               Set both for IRQ on target reached.
+Iq2
+Clc      0        System clock (it seems)
+         1        Pixel clock (counter 0)
+                  Horizontal retrace (counter 1)
+Div      0        System clock (it seems)
+         1        1/8 * System clock (counter 2)
+
+When Clc and Div of the counters are zero, they all run at the
+same speed. This speed seems to be about 8 times the normal
+speed of root counter 2, which is specified as 1/8 the system
+clock.
+
+Bits 10 to 31 seem to contain only garbage.
+-------------------------------------------------------------
+$11x8 Target rw
+bit |31                  16|15                       0|
+desc|Garbage?              |Target                    |
+
+Target   Target value, 0-$ffff
+
+Upper word seems to contain only garbage.
+-------------------------------------------------------------
+Quick step-by-step:
+
+To set up an interrupt using these counters you can do the following:
+1 - Reset the counter. (Mode = 0)
+2 - Set its target value, set mode.
+3 - Enable corresponding bit in the interrupt mask register ($1f801074)
+    bit 3 = Counter 3 (Vblank)
+    bit 4 = Counter 0 (System clock)
+    bit 5 = Counter 1 (Hor retrace)
+    bit 6 = Counter 2 (Pixel)
+4 - Open an event. (Openevent bios call - $b0, $08)
+    With following arguments:
+ a0-Rootcounter event descriptor or'd with the counter number.
+    ($f2000000 - counter 0, $f2000001 - counter 1,$f2000002 - counter 2,
+     $f2000003 - counter 3)
+ a1-Spec = $0002 - interrupt event.
+ a2-Mode = Interrupt handling ($1000)
+ a3-Pointer to your routine to be excuted.
+    The return value in V0 is the event identifier.
+
+5 - Enable the event, with the corresponding bioscall ($b0,$0c) with
+    the identifier as argument.
+
+6 - Make sure interrupts are enabled. (Bit 0 and bit 10 of the COP0 status
+    register must be set.)
+
+Your handler just has to restore the registers it uses, and it should
+terminate with a normal jr ra.
+
+To turn off the interrupt, first call disable event ($b0, $0d) and then
+close it using the Close event call ($b0,$09) both with the event number
+as argument.
+
+--------------------------------------------------------------------------
+DMA
+--------------------------------------------------------------------------
+
+-------------------------------------------------------------
+DPCR     Dma control register       $1f8010f0
+|1f 1c|1b 18|17 14|13 10|0f 0c|0b 08|07 04|03 00|
+|     |Dma6 |Dma5 |Dma4 |Dma3 |Dma2 |Dma1 |Dma0 |
+
+Each register has a 4 bit control block allocated in this
+register.
+Bit 3:   1= Dma Enabled
+    2:   ?
+    1:   ?
+    0:   ?
+
+Bit 3 must be set for a channel to operate.
+-------------------------------------------------------------
+DICR     Dma interrupt register     $1f8010f4
+
+-------------------------------------------------------------
+The DMA channel registers are located starting at $1f801080. The
+base adress for each channel is:
+$1f801080 DMA channel 0  MDECin
+$1f801090 DMA channel 1  MDECout
+$1f8010a0 DMA channel 2  GPU (lists + image data)
+$1f8010b0 DMA channel 3  CDrom
+$1f8010c0 DMA channel 4  SPU
+$1f8010d0 DMA channel 5  PIO
+$1f8010e0 DMA channel 6  OTC (reverse clear OT)
+
+-------------------------------------------------------------
+D_MADR           DMA base address.          $1f8010x0
+bit |1f                              00|
+desc|madr                              |
+
+madr     pointer to the adress the DMA will start reading
+         from/writing to
+-------------------------------------------------------------
+D_BCR            DMA block control          $1f8010x4
+bit |1f                   10|0f      00|
+desc|ba                     |bs        |
+
+ba       Amount of blocks
+bs       Blocksize (words)
+
+The channel will transfer ba blocks of bs words. Take care
+not to set the size larger than the buffer of the corresponding
+unit can hold. (GPU & SPU both have a $10 word buffer). A
+larger blocksize, means a faster transfer.
+-------------------------------------------------------------
+D_CHCR           DMA channel control        $1f8010x8
+bit |1f-19|18|17-0c|0b|0a|09|08|07 01|00|
+desc|    0|Tr|    0| 0|Li|Co| 0|    0|Dr|
+
+Tr       0        No DMA transfer busy.
+         1        Start DMA transfer/DMA transfer busy.
+Li       1        Transfer linked list. (GPU only)
+Co       1        Transfer continous stream of data.
+Dr       0        direction to memory
+         1        direction from memory
+-------------------------------------------------------------
+
+--------------------------------------------------------------------------
+doomed@c64.org <- corrections/additions     latest update -> psx.rules.org
+--------------------------------------------------------------------------
+16/may/1999       Initial version.
+19/may/1999       Added Breakpoint info. <Herozero>
+ 3/jun/1999       Root counters, some stuff on events and DMA added.
+
+(thanx to ppl in <>)
+--------------------------------------------------------------------------
+thanx & hello to the usual.
+
+

@@ -1,0 +1,193 @@
+================================================================
+
+		VGMTrans Version History
+
+================================================================
+
+
+
+2009. 11.07 (Sat) - by author
+
+	[1]
+
+2009. 9.29 (Tue)  -  by author
+
+	[1] MAMELoader class is now more flexible.  Attributes for each game entry
+	    are collected into a key/value map so they can be format-specific.
+	    In the future, may add a MAMEScanner class to simplify arcade game
+	    format scanners.
+
+	[2] Improved QSound driver support.  Instruments now work in more games.
+	    ADSR support remains unimplemented for now.
+
+	[3] Cleaned and updated the PSX Akao format somewhat: 
+		*Stricter file detection in scanner code.
+		*Now using GetIDMatcher. Loading .img files from game discs should work. 
+		 (Some PSF rips exclude data which associates sequences with sample
+		 collections, so collections will not always be detected when PSF files
+		 are loaded)
+		*Implemented PanSlide, ExpressionSlide, and VolumeSlide events
+		*Removed obsolete commented-out code.
+
+	[4] Implemented VolumeSlide and PanSlide events in smds sequence format.
+
+	[5] Fixed: Certain midi values were not being reset when switching
+	    playback between collections.
+
+
+2009. 9.03 (Thu)  -  by author
+
+	[1] Fixed ADSR and added pan and attenuation to HOSA instrument sets. 
+	    Also rewrote the scanner code, though it still needs work.
+
+	[2] PSXConvADSR now accepts either the 16bit ADSR1/ADSR2 SPU register values
+	    or individual ADSR values.
+
+	[3] Added the static function PSXSampColl::SearchForPSXADPCM() to assist
+	    scanning for playstation ADPCM data.  May revise in the
+	    future to return more than the first match.
+
+
+2009. 9.01 (Tue)  -   by SOUND TEST :774
+
+	[1] smdsの、リピート時にオクターブが狂うバグをFix.（したつもり）
+	    Fixed octave bug of smds (FFT, Xenogears) when repeat.
+
+	[2] TriAcePS1の音色用のソースを少し書き直した。
+	    ・・・けど鳴らない音色がある。全曲共通の音色セットが鳴ってない？
+	    Revise the TriAcePS1 instrument.
+	    But... there are track(instrument) of no sounding.
+	    Maybe, common instrument set with the all sequences?
+
+
+2009. 9.01 (Tue)  -  by author
+
+	[1] Fixed pitch tune and unity key in dwds/wds instrument sets.
+
+	[2] Added PitchBend and PitchBendRange events to TriAcePS1 sequences.
+
+
+2009. 8.31 (Mon)  -  by author
+
+	[1] Added dwds/wds (FFT, Xenogears) instrument set support,
+	    though Xenogears is broken at the moment.
+	    Pitch fine tune and a few minor ADSR values still need to
+	    be implemented correctly.
+
+	[2] Added PSXSampColl class for SampColls that are nothing more
+	    than PSX ADPCM Samples.  
+	    Now used by: SquarePS2, TriAcePS1, PS1, and dwds.
+
+	[3] Added VGMRgn::sampOffset as an alternative to VGMRgn::sampNum.
+	    sampOffset must match the offset of a sample in the SampColl
+	    relative to the beginning of the sample data, specified with 
+	    	    		    VGMSampColl::sampDataOffset (defaults to 0).
+	    Now used by: SquarePS2, TriAcePS1, and dwds.
+
+	[4] Added VGMSeq::UseLinearAmplitudeScale() to automate conversion
+	    from a linear volume scale to MIDI's logarithmic scale for all
+	    note events (velocity value), volume events, and expression events.
+
+	[5] Sample loops will now automatically be set to extend to the end
+	    of the sample if the loop length is left to the default value 0.
+	    See: DLSWsmp::SetLoopInfo()
+
+	[6] SimpleMatcher class now uses a multimap for sequences, permitting
+	    multiple collections which share the same sequence ID (FFT).
+
+	[7] Minor fixes, knick knacks, and paddywacks.
+
+
+2009. 8.29 (Sat)  -  by author
+
+	[1] Added TriAcePS1 sequence and instrument set formats.
+	    Sequence format implementation is based on the documentation
+	    provided with so2mml by Sound Test: 774.
+	    Both formats are very much WIP.
+
+	[2] Bank selection is fixed. This will allow smds/dwds and
+	    QSound to work properly in the future.  Bank selection events
+	    were being given lower priority to program change events
+	    and were always applied to channel 0.  Oops.
+
+	[3] PSFLib support. VGMTrans will attempt to recursively load 
+	    psf files pointed to by the "_lib" tag.
+
+	[4] VGMColl DLS creation code now supports collections with
+	    multiple instrument sets (TriAcePS1).
+
+	[5] Added a context menu for collections and the
+	    "Save as MIDI and DLS" option.
+
+	[6] Minor fixes and changes here and there.
+
+
+2009. 6.24 (Wed)  -  by SOUND TEST :774
+
+	[1] "smds"で使われる音色Bank"wds "形式を認識するようにした。
+	　　"*.wav"は、吐けるようになったけど、DLSへの変換は出来なかった。
+	　　どこを直せば良いんだろう？
+
+	[1] VGMTrans can read instrument bank "wds " which "smds" use.
+	　　VGMTrans can output "*.wav" files.
+	　　However, I can not re-make to output DLS file.
+	　　Where should I fix?
+
+
+
+2009. 6.20 (Sat)  -  by SOUND TEST :774
+
+	[1] HOSA.cppを書き直した。
+	　・スレ（http://schiphol.2ch.net/test/read.cgi/gamemusic/1226754407/）の、
+	　　>>849-851に書かれた作者様の助言(advice)を適用(apply)。
+	　・と、1xx01111<2> コマンドの引数は、0Byteっぽかったので、直した。
+	　　I think that 1xx01111<2> command(op-code) have no parameter.
+	　　Therfore, I remake it.
+
+
+
+2009. 6.20 (Sat)   -  by SOUND TEST :774
+
+	[1] HOSAのバグの原因がわかったので、対処。
+	変数の初期化忘れてたのが原因だった。
+	About the cause of this failure, I forgot to initialize "iDeltaTimeCounter". 
+
+	[2] HOSAを設計する際に作った、"class.xls"を添付した。
+	当該ファイルは、一部のクラスについて、以下の図が書かれています。
+	　・派生／継承(is-a)関係
+	　・ＵＭＬクラス図（has-aの関係図）
+	設計したり、改造したりしたい人がいたら、参照して下さい。
+	※自分が解るように書いた物なので、厳密なクラス図じゃないです。（メモ書き程度）
+
+
+
+2009. 6.18 (Thu)   -  by SOUND TEST :774
+
+	[1] HOSA に対応させた。
+	　　但し、原因不明のバグ有り。（There is bug.）
+
+
+
+2009. 6.17 (Wed)   -  by SOUND TEST :774
+
+	[1] AKAO
+	--------
+	I remaked "AkaoSeq.cpp".
+	・拍子（Time signature）に対応させた。
+	・未解析コマンドに対して、引数の数を併せた。
+
+
+	[2] smds
+	--------
+	I remaked "FFT.cpp", "FFT.h", "FFTFormat.h" and "root.cpp".
+
+	・smdsファイルを読み込むようにした。（"root.cpp"に追記。）
+	　（読み込まない設定になっていたのを解除）
+	・未解析コマンドに対して、引数の数を併せた。
+	　というか、それ以前に、"FFT.cpp"をかなり、書き直した。
+
+	"Scanner.cpp"は、変えてないハズだけど、タイムスタンプが新しくなってたんで、一応入れておいた。
+	I think that I do not change "*Scanner.cpp", but there is no positive.
+
+
+

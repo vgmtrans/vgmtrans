@@ -1,0 +1,554 @@
+-----------------------------------------------------------------------------
+PSF (Playstation Sound Format) specification v1.4
+by Neill Corlett
+-----------------------------------------------------------------------------
+
+Introduction
+------------
+
+The PSF format brings the functionality of NSF, SID, SPC, and GBS to next-
+generation consoles.  PSF utilizes the original music driver code from each
+game to replay sequenced music in a perfectly authentic, and size-efficient,
+way.
+
+The general idea is that a PSF file contains a zlib-compressed program which,
+if executed on the real console, would simply play the music.
+
+See the Revision History at the bottom of this file for information on what's
+changed.
+
+-----------------------------------------------------------------------------
+
+Basic File Structure
+--------------------
+
+All PSF files share the same basic stucture, described below.
+
+Alignment to any data type larger than a byte is not guaranteed in the PSF
+file.  Exercise appropriate caution.
+
+- First 3 bytes: ASCII signature: "PSF" (case sensitive)
+
+- Next 1 byte: Version byte
+  The version byte is used to determine the type of PSF file.  It does NOT
+  affect the basic structure of the file in any way.
+
+  Currently accepted version bytes are:
+    0x01: Playstation (PSF1)
+    0x02: Playstation 2 (PSF2)
+    0x11: Saturn (SSF) [TENTATIVE]
+    0x12: Dreamcast (DSF) [TENTATIVE]
+
+- Next 4 bytes: Size of reserved area (R), little-endian unsigned long
+
+- Next 4 bytes: Compressed program length (N), little-endian unsigned long
+  This is the length of the program data _after_ compression.
+
+- Next 4 bytes: Compressed program CRC-32, little-endian unsigned long
+  This is the CRC-32 of the program data _after_ compression.  Filling in
+  this value is mandatory, as a PSF file may be regarded as corrupt if it
+  does not match.
+
+- Next R bytes: Reserved area.
+  May be empty if R is 0 bytes.
+
+- Next N bytes: Compressed program, in zlib compress() format.
+  May be empty if N is 0 bytes.
+
+The following data is optional and may be omitted:
+
+- Next 5 bytes: ASCII signature: "[TAG]" (case sensitive)
+  If these 5 bytes do not match, then the remainder of the file may be
+  regarded as invalid and discarded.
+
+- Remainder of file: Uncompressed ASCII tag data.
+
+Tag data may be subject to truncation, including removal of the excess data
+from the file itself, if it exceeds 50,000 bytes.  This is by design.
+
+For future compatibility, tag editors and compressors may assume that any
+PSF file uses this basic structure.  However, the reserved area must be left
+intact, and no assumptions may be made about the format or contents of either
+the uncompressed program or reserved sections without first checking the
+version byte.
+
+Information about zlib is available at http://www.gzip.org/zlib/.
+
+-----------------------------------------------------------------------------
+
+Tag Format
+----------
+
+The tag consists of a series of lines of the format variable=value, as in the
+following example:
+
+  title=Earth Painting
+  artist=Yoko Shimomura
+  game=Legend of Mana
+  year=1999
+
+The tag is to be parsed as follows:
+
+- All characters 0x01-0x20 are considered whitespace
+- There must be no null (0x00) characters; behavior is undefined if a null
+  byte is present
+- 0x0A is the newline character
+- Additional lines of the form "variable=value" may follow
+- Variable names are case-insensitive and must be valid C identifiers
+- Whitespace at the beginning/end of the line and before/after the = are
+  ignored
+- Blank lines are ignored
+- Multiple-line variables must appear as consecutive lines using the same
+  variable name.  For instance:
+
+    comment=This is a
+    comment=multiple-line
+    comment=comment.
+
+- Tag text is to be encoded or decoded using the default system code page.
+
+Behavior is undefined if a variable name appears more than once, if a
+multiple-line variable is broken apart by an unrelated line, etc.
+
+The following variable names are predefined:
+
+title, artist, game, year, genre, comment, copyright
+  (These are self-explanatory.)
+
+psfby, ssfby, dsfby
+  The name of the person responsible for creating the .PSF (or .SSF or .DSF)
+  file.  This does not imply that said person wrote the music driver code.
+
+volume
+  Relative volume of the PSF as a simple scale coefficient.  1.0 is the
+  default.  It can by any real number, even negative.
+
+length
+fade
+  Length of the song, and the length of the ending fadeout.
+  These may be in one of three formats:
+    seconds.decimal
+    minutes:seconds.decimal
+    hours:minutes:seconds.decimal
+  The decmial portion may be omitted.  Commas are also recognized as decimal
+  separators.
+
+The following variables are reserved and should not be used:
+
+- Anything starting with an underscore (_) character
+  These are reserved for information crucial to playing, i.e. the _lib tags
+  in MiniPSF files.
+
+- filedir, filename, and fileext have special meanings in Highly
+  Experimental.  While these variables may exist, they won't be usable in
+  title format strings.
+
+-----------------------------------------------------------------------------
+
+Depending on the version byte, the reserved and program sections are
+interpreted differently.  Some tags may also be interpreted differently.
+Refer to the sections below.
+
+-----------------------------------------------------------------------------
+
+Version 0x01: Playstation (PSF1)
+--------------------------------
+
+Program section:  PS-X EXE consumer-format executable file, including header.
+Reserved section:  Not used.  May be ignored, removed, etc.
+
+File extensions:
+- psf, psf1 (self-contained program)
+- minipsf, minipsf1 (program relying on extra library data)
+- psflib, psf1lib (library for use with minipsf files)
+
+In the case of a PSF1, the program section is an executable file for use with
+the original Playstation console.  It's responsible for initializing the SPU,
+loading samples, setting up interrupts, etc. - anything a real program must
+do.  It runs at the shell level and has full access to kernel functions.
+
+There are two important variations on PSF1: the MiniPSF and PSFLib which are
+described later.
+
+Uncompressed size of the executable must not exceed 2,033,664 bytes.
+
+The executable must be in the standard consumer "PS-X EXE" format, which is
+described below for reference.
+
+First 0x800 bytes - header
+Next N bytes - text section
+
+Header format:
+
+0x000 (8 bytes): ASCII "PS-X EXE"
+0x010 (4 bytes): Initial PC, little-endian unsigned long
+0x018 (4 bytes): Text section start address, little-endian unsigned long
+0x01C (4 bytes): Text section size, little-endian unsigned long
+0x030 (4 bytes): Initial SP ($29), little-endian unsigned long
+0x04C: ASCII marker: "Sony Computer Entertainment Inc. for North America area"
+  (or similar for other regions)
+Everything else is zero.
+
+Text section should be a multiple of 2048 bytes.
+
+The region specified by the ASCII marker at 0x4C should be used to determine
+the screen refresh rate and frequency of the VBlank interrupt (NTSC vs. PAL):
+
+  "North America" = 60Hz
+  "Japan" = 60Hz
+  "Europe" = 50Hz
+  (please let me know if there are other regions I should include here)
+
+Also, if the "_refresh" tag is present, it specifies the refresh rate in Hz
+directly.  This tag overrides the region information in the EXE header.
+Currently only _refresh=50 and _refresh=60 are valid.
+
+-----------------------------------------------------------------------------
+
+PSF1: MiniPSF and PSFLib
+------------------------
+
+MiniPSF files are regular PSF1 files which import data from one or more
+PSFLib files residing in the same directory (for shared driver code, sound
+banks, etc.)
+
+PSFLib files are also regular PSF1 files.  They can also recursively import
+data from other PSFLib files.
+
+This is done via tag variables called _lib, _lib2, _lib3, etc.
+
+The proper way to load a minipsf is as follows:
+
+- Load the EXE data - this becomes the current EXE
+
+- Check for the presence of a "_lib" tag.
+  If present:
+  - RECURSIVELY load the EXE data from the given library file
+    (make sure to limit recursion to avoid crashing - I limit it to 10 levels)
+  - Make the _lib EXE the current one.
+  - We will use the initial PC/SP from the _lib EXE.
+  - Superimpose the originally loaded PSF EXE on top of the current EXE using
+    its text start address and text size.
+
+- Check for the presence of "_libN" tags for N=2 and up (use "_lib%d")
+  - RECURSIVELY load and superimpose all these EXEs on top of the current
+    EXE.  Do not modify the current PC/SP.
+  - Start at N=2.  Stop at the first tag name that doesn't exist.
+
+- (done)
+
+EXEs must always be contiguous.  When superimposing one EXE on top of
+another, grow the target EXE start/end points as necessary and fill the
+unused space with zeroes.
+
+Filenames given in any _lib* tag are relative to the directory in which the
+PSF file itself resides.  Both forward and backward slashes should be
+interpreted as path separators.  For instance:
+
+- if C:\Something\Demo.minipsf contains "_lib=Hello/Library.psflib"
+- then the library is loaded from C:\Something\Hello\Library.psflib
+
+Filenames may contain spaces within, but no leading or trailing spaces.
+
+When determining whether a PSF1 file is a MiniPSF and will need additional
+data, you should use the presence of _lib* tags to decide, rather than the
+file extension.  It's a MiniPSF if it includes a _lib or a _lib2.
+
+Region information in all _lib EXE headers should be ignored; only the
+original EXE's region information should be considered when determining the
+refresh rate.  For instance, a "Europe area" MiniPSF which imports data from
+a "North America area" PSFLib would still be considered 50Hz.
+
+If any _refresh override tags are encountered during the PSF loading process,
+the first tag seen will take effect and override all subsequent tags as well
+as all EXE header region information.  For instance:
+
+- MiniPSF has _refresh=50, and PSFLib has no _refresh tag:
+    50Hz override regardless of the EXE headers
+- MiniPSF has _refresh=50, and PSFLib has _refresh=60:
+    50Hz override regardless of the EXE headers
+- MiniPSF has no _refresh tag, and PSFLib has _refresh=60:
+    60Hz override regardless of the EXE headers
+- Neither the MiniPSF nor the PSFLib have _refresh tags:
+    MiniPSF's EXE header is used to determine the refresh rate
+
+-----------------------------------------------------------------------------
+
+PSF1 Emulation Notes
+--------------------
+
+Though this isn't relevant to the actual format, the following information
+may prove helpful.  It pertains to PSF1 only.
+
+The following are available in PSXCore0008:
+- R3000 CPU
+- Interrupts and syscalls
+- 2MB RAM (mirrored throughout the first 8MB)
+- 1KB scratchpad
+- SPU
+- DMA channel 4 (SPU)
+- Root counters 0, 1, 2, VBlank IRQs
+- All kernel functions
+
+The following are not available and should not be used or accessed:
+- Overflow exceptions
+- Breakpoints
+- GTE instructions
+- GPU, CDROM, SIO, etc. - hardware unrelated to sound
+- DMA channels other than 4
+
+The following R3000 code sequence is detected as idle, and may be used to
+conserve CPU time on the host side:
+
+  [jump or branch to the current line]
+  nop
+
+-----------------------------------------------------------------------------
+
+Version 0x02: Playstation 2 (PSF2)
+----------------------------------
+
+Program section:  Not used.  May be ignored, removed, etc.
+Reserved section:  Virtual filesystem.
+
+File extensions:
+- psf2 (self-contained filesystem)
+- minipsf2 (filesystem relying on one or more psf2lib filesystems)
+- psf2lib (filesystem providing extra data for minipsf2 filesystems)
+
+A PSF2 file consists of a virtual filesystem located entirely in the Reserved
+section.  The Program section is unused.  Filesystems may be combined using
+the _lib, _lib2, ... tags, as with the MiniPSF and PSFLib formats.
+
+Playing a PSF2 file begins by loading the "psf2.irx" IOP module from the
+virtual filesystem.  Loading and executing this module should perform all
+necessary hardware setup and play the music.
+
+PSF2 files are limited to playing sequenced music using the IOP and hardware
+(SPU2) synthesis only.  Software synthesis, generally performed by the EE, is
+not considered.
+
+The _refresh tag can be used to specify the refresh rate in Hz (50 or 60),
+just as with PSF1.
+
+-----------------------------------------------------------------------------
+
+PSF2: Runtime environment
+-------------------------
+
+IOP modules in a PSF2 may link to the following libraries.  The version
+number may be no later than the listed version.
+
+  Name       Ver.   Name       Ver.   Name       Ver.
+  --------------    --------------    --------------
+  dmacman    102    sifman     101    thmsgbx    101
+  excepman   101    ssbusc     101    thrdman    102
+  heaplib    101    stdio      103    thsemap    101
+  intrman    102    sysclib    103    thvpool    101
+  ioman      104    sysmem     101    timrman    103
+  loadcore   103    thbase     102    vblank     101
+  modload    106    thevent    101
+  sifcmd     101    thfpool    101
+
+IOP modules should use the following technique to access files in the PSF2
+virtual filesystem:
+
+1. Take argv[0] and cut it off directly after the rightmost separator,
+   defined as either a forward slash, backward slash or colon (/ \ :).
+   This string becomes the "device prefix".
+2. Append the name of the desired file to the device prefix.
+3. Use the resulting string in standard calls such as open or LoadModule.
+
+For instance, Highly Experimental may call psf2.irx with an argv[0] such as
+"hefile:/psf2.irx".  In this case, the device prefix is "hefile:/".  You
+would use the following call to open a file named "test.file":
+
+  fd = open("hefile:/test.file", O_RDONLY);
+
+Different players or environments may use different device prefixes, so don't
+always use "hefile:/".
+
+IOP modules, as a rule, should not attempt any contact with hardware which is
+unnecessary for music playing.  This includes, but is not limited to: SIF,
+CD/DVD, USB, iLink, ATA, pad, memory card, and network hardware.  This
+hardware may be emulated minimally but is not guaranteed to work.
+
+IOP modules should use a minimal amount of memory, and make good use of the
+virtual filesystem to keep large amounts of data rather than try to fit them
+all in an IRX data section.
+
+-----------------------------------------------------------------------------
+
+PSF2: Virtual filesystem format
+-------------------------------
+
+The PSF2 virtual filesystem is a directory hierarchy with filenames of up
+to 36 characters each.  Filenames are case-insensitive and must consist
+exclusively of characters in the ASCII 32-126 range, with the exception of
+the forward slash, backslash, and colon (/, \, :) characters.  The total
+length of a path must be no longer than 255 bytes.
+
+All quantities are stored in little-endian unsigned format.  All offsets are
+relative to the beginning of the Reserved section.
+
+Starting at offset 0 is the root directory.
+A directory has the following format:
+
+- First 4 bytes: Number of directory entries (N)
+- Next 48*N bytes: N directory entries
+
+N may be zero to indicate the directory is empty.
+
+The format of a directory entry is as follows:
+
+- First 36 bytes: Filename.  Must have nonzero length, and must be padded
+  with null (0x00) bytes.  Does not have to be null-terminated if it's
+  exactly 36 characters.
+- Next 4 bytes: Offset (O) of the file data or subdirectory
+- Next 4 bytes: Uncompressed size (U)
+- Next 4 bytes: Block size (B)
+
+If U, B, and O are all zero, then the entry describes a zero-length file.
+If U and B are zero and O is nonzero, the entry describes a subdirectory.
+
+Otherwise, the file data is stored as a sequence of consecutive zlib
+compress()-format blocks.
+
+- First 4*X bytes: Size table. Each entry contains the size of a compressed
+  block.
+  X = (U + B - 1) / B;
+- Remainder of file: compressed blocks where the uncompressed size must be
+  equal to B.  The last block may have an uncompressed size smaller than B.
+
+The offset of any subdirectory or file must be greater than the offset of its
+directory entry.  This provides for easier consistency checks.
+
+-----------------------------------------------------------------------------
+
+PSF2: MiniPSF2 and PSF2Lib
+--------------------------
+
+MiniPSF2 files are regular PSF2 files which import data from one or more
+PSF2Lib files residing in the same directory (for shared driver code, sound
+banks, etc.)
+
+PSF2Lib files are also regular PSF2 files.  They can also recursively import
+data from other PSF2Lib files.
+
+This is done via tag variables called _lib, _lib2, _lib3, etc.
+
+The proper way to load a MiniPSF2 is as follows:
+
+1. RECURSIVELY load the virtual filesystems from each PSF2 file named by a
+   library tag.  The first tag is "_lib".  The remaining tags are "_libN" for
+   N>=2 (use "_lib%d").  Stop at the first tag name that doesn't exist.
+2. Load the virtual filesystem from the current PSF2 file.
+
+When loading a new filesystem, any existing directory entries which have
+conflicting filenames are overwritten.  (The actual PSF2 files themselves
+should not be overwritten, of course.)
+
+Filenames given in any _lib* tag are relative to the directory in which the
+PSF file itself resides.  Both forward and backward slashes should be
+interpreted as path separators.  For instance:
+
+- if C:\Something\Demo.minipsf2 contains "_lib=Hello/Library.psf2lib"
+- then the library is loaded from C:\Something\Hello\Library.psf2lib
+
+Filenames may contain spaces within, but no leading or trailing spaces.
+
+When determining whether a PSF2 file is a MiniPSF2 and will need additional
+data, you should use the presence of the _lib tags to decide, rather than the
+file extension.  It's a MiniPSF2 if it includes a "_lib" tag.
+
+The behavior of the _refresh tag in MiniPSF2 and PSF2Lib files is identical
+to the MiniPSF and PSFLib behavior.
+
+-----------------------------------------------------------------------------
+
+Version 0x11: Saturn (SSF) [TENTATIVE]
+--------------------------
+
+Program section:  Raw 68000 sound program image.
+Reserved section:  Not used.  May be ignored, removed, etc.
+
+File extensions:
+- ssf (self-contained program)
+- minissf (program relying on extra library data)
+- ssflib (library for use with minissf files)
+
+The program section of a SSF file consists of a 4-byte LSB-first load address
+followed by raw 68000 program data, which is copied to the specified address.
+After all program data is loaded, the 68000 is reset and begins execution at
+the reset vector.
+
+The 68000 program is responsible for initializing and using the SCSP.  It
+must attempt no contact with any of the other Saturn processors.
+
+MiniSSF and SSFLib follow the same loading behavior as MiniPSF and PSFLib.
+
+Uncompressed size of the program section must not exceed 524,292 bytes.
+
+-----------------------------------------------------------------------------
+
+Version 0x12: Dreamcast (DSF) [TENTATIVE]
+-----------------------------
+
+Program section:  Raw ARM7 sound program image.
+Reserved section:  Not used.  May be ignored, removed, etc.
+
+File extensions:
+- dsf (self-contained program)
+- minidsf (program relying on extra library data)
+- dsflib (library for use with minidsf files)
+
+The program section of a DSF file consists of a 4-byte LSB-first load address
+followed by raw ARM7 program data, which is copied to the specified address.
+After all program data is loaded, the ARM7 is reset and begins execution at
+address 0.
+
+The ARM7 program is responsible for initializing and using the AICA.  It must
+attempt no contact with the main SH4 CPU.
+
+MiniDSF and DSFLib follow the same loading behavior as MiniSSF and SSFLib.
+
+Uncompressed size of the program section must not exceed 2,097,156 bytes.
+
+-----------------------------------------------------------------------------
+
+Revision History
+----------------
+
+v1.4 (23 January 2004)
+- Added SSF and DSF information [TENTATIVE]
+- Added NTSC vs. PAL information and _refresh tag for PSF1 and PSF2
+
+v1.3 (31 May 2003)
+- Changed and finalized PSF2 format
+- Updated PSF1 emulation notes to reflect changes in the newest emulation
+  core
+
+v1.2 (17 April 2003)
+- Formalized handling of the version byte
+- Details on how to handle future PSF variants
+- All tags starting with an underscore (_) now reserved
+- Various other clarifications
+- Expanded PSF2 information, still tentative
+
+v1.1 (11 March 2003)
+- Some proposed information on PSF2
+
+Update (24 January 2003)
+- Added information on MiniPSF and PSFLib
+
+Original version (?)
+
+-----------------------------------------------------------------------------
+
+Where to Find Neill Corlett
+---------------------------
+
+email: neill@neillcorlett.com
+web: http://www.neillcorlett.com/
+
+-----------------------------------------------------------------------------
