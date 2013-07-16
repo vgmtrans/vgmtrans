@@ -314,6 +314,10 @@ LRESULT CMainFrame::OnDestroy(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*
 	}
 	m_PaneWindowIcons.erase(m_PaneWindowIcons.begin(), m_PaneWindowIcons.end());
 
+#ifdef DF_FOCUS_FEATURES
+		m_focusHandler.RemoveHook(m_hWnd);
+#endif
+
 	//map<VGMFile*, CItemTreeView*> itemViewMap;
 	//map<HWND, CItemTreeView*> hwndToItemTreeView;
 	//for (map<VGMFile*, CItemTreeView*>::iterator iter = itemViewMap.begin(); iter != itemViewMap.end(); iter++)
