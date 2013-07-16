@@ -1051,31 +1051,16 @@
     <None Include="windows\res\coll4.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="windows\res\coll5.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="windows\res\coll6.ico">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="windows\res\coll7.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="windows\res\DockingDemo.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="windows\res\DockingDemodoc.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="windows\res\error.ico">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="windows\res\folder_closed.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="windows\res\folder_open.ico">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="windows\res\ico00001.ico">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="windows\res\ico00002.ico">
@@ -1090,22 +1075,10 @@
     <None Include="windows\res\ico00005.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="windows\res\ico00006.ico">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="windows\res\icon1.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="windows\res\icon2.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="windows\res\info.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="windows\res\instrset.ico">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="windows\res\log.ico">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="windows\res\metronomeLeft.ico">
@@ -1132,9 +1105,6 @@
     <None Include="windows\res\rest.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="seq.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="windows\res\seq2.ico">
       <Filter>Resource Files</Filter>
     </None>
@@ -1150,9 +1120,6 @@
     <None Include="windows\res\vgmfile_.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="windows\res\warning.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="windows\res\wav.ico">
       <Filter>Resource Files</Filter>
     </None>
@@ -1161,5 +1128,10 @@
     <ResourceCompile Include="windows\DockingDemo.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="windows\res\VGMTrans.exe.manifest">
+      <Filter>Resource Files</Filter>
+    </Manifest>
   </ItemGroup>
 </Project>

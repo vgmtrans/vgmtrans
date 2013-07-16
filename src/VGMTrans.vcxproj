@@ -485,25 +485,16 @@
     <None Include="windows\res\coll2.ico" />
     <None Include="windows\res\coll3.ico" />
     <None Include="windows\res\coll4.ico" />
-    <None Include="windows\res\coll5.ico" />
     <None Include="windows\res\coll6.ico" />
     <None Include="windows\res\coll7.ico" />
-    <None Include="windows\res\DockingDemo.ico" />
     <None Include="windows\res\DockingDemodoc.ico" />
-    <None Include="windows\res\error.ico" />
-    <None Include="windows\res\folder_closed.ico" />
     <None Include="windows\res\folder_open.ico" />
-    <None Include="windows\res\ico00001.ico" />
     <None Include="windows\res\ico00002.ico" />
     <None Include="windows\res\ico00003.ico" />
     <None Include="windows\res\ico00004.ico" />
     <None Include="windows\res\ico00005.ico" />
-    <None Include="windows\res\ico00006.ico" />
-    <None Include="windows\res\icon1.ico" />
     <None Include="windows\res\icon2.ico" />
-    <None Include="windows\res\info.ico" />
     <None Include="windows\res\instrset.ico" />
-    <None Include="windows\res\log.ico" />
     <None Include="windows\res\metronomeLeft.ico" />
     <None Include="windows\res\metronomeRight.ico" />
     <None Include="windows\res\msdev_tab_icons.bmp" />
@@ -512,17 +503,18 @@
     <None Include="windows\res\orchestra.ico" />
     <None Include="windows\res\rawfile.ico" />
     <None Include="windows\res\rest.ico" />
-    <None Include="seq.ico" />
     <None Include="windows\res\seq2.ico" />
     <None Include="windows\res\toolbar.bmp" />
     <None Include="windows\res\treble.ico" />
     <None Include="windows\res\vgmfile.ico" />
     <None Include="windows\res\vgmfile_.ico" />
-    <None Include="windows\res\warning.ico" />
     <None Include="windows\res\wav.ico" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="windows\DockingDemo.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="windows\res\VGMTrans.exe.manifest" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
