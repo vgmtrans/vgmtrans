@@ -233,6 +233,14 @@ void SeqTrack::AddEvent(SeqEvent* pSeqEvent)
 		if (unLength < length)
 			unLength = length;
 	}
+
+	// care for a case where the new event is located before the start address
+	// (example: Donkey Kong Country - Map, Track 7 of 8)
+	if (dwOffset > pSeqEvent->dwOffset)
+	{
+		unLength += (dwOffset - pSeqEvent->dwOffset);
+		dwOffset = pSeqEvent->dwOffset;
+	}
 }
 
 void SeqTrack::AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, BYTE color)

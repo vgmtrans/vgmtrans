@@ -144,7 +144,7 @@ VGMItem* VGMContainerItem::GetItemFromOffset(ULONG offset)
 					return foundItem;
 			}
 		}
-		return this;
+		return NULL; // this offset must be a "hole", so that it should return nothing
 	}
 	return NULL;
 }

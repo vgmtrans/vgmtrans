@@ -69,6 +69,7 @@ public:
 	bool bAlwaysWriteInitialVol;
 	bool bAlwaysWriteInitialExpression;
 	bool bAlwaysWriteInitialPitchBendRange;
+	bool bAllowDiscontinuousTrackData;
 	U8 initialVol;
 	U8 initialExpression;
 	U8 initialPitchBendRangeSemiTones, initialPitchBendRangeCents;

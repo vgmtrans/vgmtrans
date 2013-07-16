@@ -20,6 +20,7 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, ULONG offset, ULONG length, 
   bAlwaysWriteInitialVol(false),
   bAlwaysWriteInitialExpression(false),
   bAlwaysWriteInitialPitchBendRange(false),
+  bAllowDiscontinuousTrackData(false),
   initialVol(100),					//GM standard (dls1 spec p16)
   initialExpression(127),			//''
   initialPitchBendRangeSemiTones(2), //GM standard.  Means +/- 2 semitones (4 total range)
@@ -59,7 +60,8 @@ MidiFile* VGMSeq::ConvertToMidi()
 	{
 		aTracks[i]->readMode = READMODE_FIND_DELTA_LENGTH;
 		aTracks[i]->deltaLength = -1;
-		if (!aTracks[i]->LoadTrack(i, (i != aTracks.size()-1) ? aTracks[i+1]->dwOffset :  ((unLength) ? dwOffset+unLength : 0xFFFFFFFF)))
+		assert(aTracks[i]->unLength != 0);
+		if (!aTracks[i]->LoadTrack(i, aTracks[i]->dwOffset + aTracks[i]->unLength))
 			return NULL;
 	}
 	if (!PostLoad())
@@ -75,7 +77,8 @@ MidiFile* VGMSeq::ConvertToMidi()
 	for (int i = 0; i < numTracks; i++)
 	{
 		aTracks[i]->readMode = READMODE_CONVERT_TO_MIDI;
-		if (!aTracks[i]->LoadTrack(i, (i != aTracks.size()-1) ? aTracks[i+1]->dwOffset :  ((unLength) ? dwOffset+unLength : 0xFFFFFFFF), stopDelta))
+		assert(aTracks[i]->unLength != 0);
+		if (!aTracks[i]->LoadTrack(i, aTracks[i]->dwOffset + aTracks[i]->unLength, stopDelta))
 		{
 			delete midi;
 			this->midi = NULL;
@@ -103,19 +106,58 @@ int VGMSeq::LoadMain()
 	if (nNumTracks == 0)
 		return false;
 
-	sort(aTracks.begin(), aTracks.end(), ItemPtrOffsetCmp());
-	for (UINT i=0; i<nNumTracks; i++)
+	for (UINT i = 0; i < nNumTracks; i++)
 	{
+		U32 stopOffset = 0xFFFFFFFF;
+		if (unLength != 0)
+		{
+			stopOffset = dwOffset + unLength;
+		}
+		else
+		{
+			if (!bAllowDiscontinuousTrackData)
+			{
+				// set length from the next track by offset
+				for (UINT j = 0; j < nNumTracks; j++)
+				{
+					if (aTracks[j]->dwOffset > aTracks[i]->dwOffset &&
+						aTracks[j]->dwOffset < stopOffset)
+					{
+						stopOffset = aTracks[j]->dwOffset;
+					}
+				}
+			}
+		}
+
 		aTracks[i]->readMode = READMODE_ADD_TO_UI;
-		if (!aTracks[i]->LoadTrack(i, (i != aTracks.size()-1) ? aTracks[i+1]->dwOffset :  ((unLength) ? dwOffset+unLength : 0xFFFFFFFF)))
+		if (!aTracks[i]->LoadTrack(i, stopOffset))
 			return false;
 	}
+
 	/*if (!LoadTracks())
 		return false;*/
-	if (unLength == 0) {		//length will extend to the end of the last track (last by offset)
-		SeqTrack* lastTrk = *((vector<SeqTrack*>::const_iterator)max_element(aTracks.begin(), aTracks.end()));
-		unLength = lastTrk->dwOffset + lastTrk->unLength - dwOffset;
+
+	if (unLength == 0) {
+		// a track can sometimes cover other ones (i.e. a track has a "hole" between the head and tail)
+		// it means that the tail of the last track is not always the tail of a sequence
+		// therefore, check the length of each tracks
+
+		for (vector<SeqTrack*>::iterator itr = aTracks.begin(); itr != aTracks.end(); ++itr) {
+			assert(dwOffset <= (*itr)->dwOffset);
+
+			ULONG expectedLength = (*itr)->dwOffset + (*itr)->unLength - dwOffset;
+			if (unLength < expectedLength)
+			{
+				unLength = expectedLength;
+			}
+		}
 	}
+
+	// do not sort tracks until the loading has been finished,
+	// some engines are sensitive about the track order.
+	// TODO: aTracks must not be sorted because the order of tracks must be kept until MIDI conversion.
+	sort(aTracks.begin(), aTracks.end(), ItemPtrOffsetCmp());
+
 	return true;
 }
 
