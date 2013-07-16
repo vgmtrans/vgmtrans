@@ -122,6 +122,14 @@ PanSlideSeqEvent::PanSlideSeqEvent(SeqTrack* pTrack, BYTE targetPan, ULONG durat
 : SeqEvent(pTrack, offset, length, name, CLR_PAN), targPan(targetPan), dur(duration)
 {}
 
+// **************
+// ReverbSeqEvent
+// **************
+
+ReverbSeqEvent::ReverbSeqEvent(SeqTrack* pTrack, BYTE theReverb, ULONG offset, ULONG length, const wchar_t* name)
+: SeqEvent(pTrack, offset, length, name, CLR_REVERB), reverb(theReverb)
+{}
+
 // *****************
 // PitchBendSeqEvent
 // *****************

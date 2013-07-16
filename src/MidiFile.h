@@ -87,6 +87,12 @@ public:
 	void InsertPan(BYTE channel, BYTE pan, ULONG absTime);
 	void AddExpression(BYTE channel, BYTE expression);
 	void InsertExpression(BYTE channel, BYTE expression, ULONG absTime);
+	void AddReverb(BYTE channel, BYTE reverb);
+	void InsertReverb(BYTE channel, BYTE reverb, ULONG absTime);
+	void AddModulation(BYTE channel, BYTE depth);
+	void InsertModulation(BYTE channel, BYTE depth, ULONG absTime);
+	void AddBreath(BYTE channel, BYTE depth);
+	void InsertBreath(BYTE channel, BYTE depth, ULONG absTime);
 	void AddSustain(BYTE channel, bool bOn);
 	void InsertSustain(BYTE channel, bool bOn, ULONG absTime);
 	void AddPortamento(BYTE channel, bool bOn);
@@ -99,8 +105,6 @@ public:
 	void AddPitchBendRange(BYTE channel, BYTE semitones, BYTE cents);
 	void InsertPitchBendRange(BYTE channel, BYTE semitones, BYTE cents, ULONG absTime);
 	//void AddTranspose(BYTE channel, int transpose);
-	void AddModulation(BYTE channel, BYTE depth);
-	void AddBreath(BYTE channel, BYTE depth);
 	void AddProgramChange(BYTE channel, BYTE progNum);
 	void AddBankSelect(BYTE channel, BYTE bank);
 	void AddBankSelectFine(BYTE channel, BYTE lsb);

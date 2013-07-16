@@ -86,15 +86,21 @@ public:
 	//void InsertMastVol(ULONG offset, ULONG length, BYTE vol, ULONG absTime, const wchar_t* sEventName = "Master Volume");
 
 	void AddPan(ULONG offset, ULONG length, BYTE pan, const wchar_t* sEventName = L"Pan");
+	void AddPanNoItem(BYTE pan);
 	void AddPanSlide(ULONG offset, ULONG length, ULONG dur, BYTE targPan, const wchar_t* sEventName = L"Pan Slide");
 	void InsertPan(ULONG offset, ULONG length, BYTE pan, ULONG absTime, const wchar_t* sEventName = L"Pan");
+	void AddReverb(ULONG offset, ULONG length, BYTE reverb, const wchar_t* sEventName = L"Reverb");
+	void AddReverbNoItem(BYTE reverb);
+	void InsertReverb(ULONG offset, ULONG length, BYTE reverb, ULONG absTime, const wchar_t* sEventName = L"Reverb");
 	void AddPitchBend(ULONG offset, ULONG length, SHORT bend, const wchar_t* sEventName = L"Pitch Bend");
 	void AddPitchBendRange(ULONG offset, ULONG length, BYTE semitones, BYTE cents = 0, const wchar_t* sEventName = L"Pitch Bend Range");
 	void AddPitchBendRangeNoItem(BYTE range, BYTE cents = 0);
 	void AddTranspose(ULONG offset, ULONG length, char transpose, const wchar_t* sEventName = L"Transpose");
 	void AddPitchBendMidiFormat(ULONG offset, ULONG length, BYTE lo, BYTE hi, const wchar_t* sEventName = L"Pitch Bend");
 	void AddModulation(ULONG offset, ULONG length, BYTE depth, const wchar_t* sEventName = L"Modulation Depth");
+	void InsertModulation(ULONG offset, ULONG length, BYTE depth, ULONG absTime, const wchar_t* sEventName = L"Modulation Depth");
 	void AddBreath(ULONG offset, ULONG length, BYTE depth, const wchar_t* sEventName = L"Breath Depth");
+	void InsertBreath(ULONG offset, ULONG length, BYTE depth, ULONG absTime, const wchar_t* sEventName = L"Breath Depth");
 
 	void AddSustainEvent(ULONG offset, ULONG length, bool bOn, const wchar_t* sEventName = L"Sustain");
 	void InsertSustainEvent(ULONG offset, ULONG length, bool bOn, ULONG absTime, const wchar_t* sEventName = L"Sustain");
@@ -153,6 +159,7 @@ public:
 	BYTE expression;
 	//BYTE mastVol;
 	BYTE prevPan;
+	BYTE prevReverb;
 	char transpose;
 	bool bNoteOn;			//indicates whether a note is playing
 	ULONG curOffset;

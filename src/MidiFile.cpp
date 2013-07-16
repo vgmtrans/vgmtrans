@@ -364,14 +364,34 @@ void MidiTrack::InsertPan(BYTE channel, BYTE pan, ULONG absTime)
 	aEvents.push_back(new PanEvent(this, channel, absTime, pan));
 }
 
+void MidiTrack::AddReverb(BYTE channel, BYTE reverb)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), 91, reverb));
+}
+
+void MidiTrack::InsertReverb(BYTE channel, BYTE reverb, ULONG absTime)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 91, reverb));
+}
+
 void MidiTrack::AddModulation(BYTE channel, BYTE depth)
 {
 	aEvents.push_back(new ModulationEvent(this, channel, GetDelta(), depth));
 }
 
+void MidiTrack::InsertModulation(BYTE channel, BYTE depth, ULONG absTime)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 1, depth));
+}
+
 void MidiTrack::AddBreath(BYTE channel, BYTE depth)
 {
 	aEvents.push_back(new BreathEvent(this, channel, GetDelta(), depth));
+}
+
+void MidiTrack::InsertBreath(BYTE channel, BYTE depth, ULONG absTime)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 2, depth));
 }
 
 void MidiTrack::AddPitchBend(BYTE channel, SHORT bend)

@@ -39,6 +39,7 @@ void SeqTrack::ResetVars()
 	vol = 100;
 	expression = 127;
 	prevPan = 64;
+	prevReverb = 40;
 	channelGroup = 0;
 	transpose = 0;
 	cDrumNote = -1;
@@ -609,8 +610,15 @@ void SeqTrack::AddPan(ULONG offset, ULONG length, BYTE pan, const wchar_t* sEven
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new PanSeqEvent(this, pan, offset, length, sEventName));
-	else if (readMode == READMODE_CONVERT_TO_MIDI)
+	AddPanNoItem(pan);
+}
+
+void SeqTrack::AddPanNoItem(BYTE pan)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+	{
 		pMidiTrack->AddPan(channel, pan);
+	}
 	prevPan = pan;
 }
 
@@ -629,6 +637,30 @@ void SeqTrack::InsertPan(ULONG offset, ULONG length, BYTE pan, ULONG absTime, co
 		AddEvent(new PanSeqEvent(this, pan, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->InsertPan(channel, pan, absTime);
+}
+
+void SeqTrack::AddReverb(ULONG offset, ULONG length, BYTE reverb, const wchar_t* sEventName)
+{
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+		AddEvent(new ReverbSeqEvent(this, reverb, offset, length, sEventName));
+	AddReverbNoItem(reverb);
+}
+
+void SeqTrack::AddReverbNoItem(BYTE reverb)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+	{
+		pMidiTrack->AddReverb(channel, reverb);
+	}
+	prevReverb = reverb;
+}
+
+void SeqTrack::InsertReverb(ULONG offset, ULONG length, BYTE reverb, ULONG absTime, const wchar_t* sEventName)
+{
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+		AddEvent(new ReverbSeqEvent(this, reverb, offset, length, sEventName));
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
+		pMidiTrack->InsertReverb(channel, reverb, absTime);
 }
 
 void SeqTrack::AddPitchBendMidiFormat(ULONG offset, ULONG length, BYTE lo, BYTE hi, const wchar_t* sEventName)
@@ -675,12 +707,28 @@ void SeqTrack::AddModulation(ULONG offset, ULONG length, BYTE depth, const wchar
 		pMidiTrack->AddModulation(channel, depth);
 }
 
+void SeqTrack::InsertModulation(ULONG offset, ULONG length, BYTE depth, ULONG absTime, const wchar_t* sEventName)
+{
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+		AddEvent(new ModulationSeqEvent(this, depth, offset, length, sEventName));
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
+		pMidiTrack->InsertModulation(channel, depth, absTime);
+}
+
 void SeqTrack::AddBreath(ULONG offset, ULONG length, BYTE depth, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new BreathSeqEvent(this, depth, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->AddBreath(channel, depth);
+}
+
+void SeqTrack::InsertBreath(ULONG offset, ULONG length, BYTE depth, ULONG absTime, const wchar_t* sEventName)
+{
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+		AddEvent(new BreathSeqEvent(this, depth, offset, length, sEventName));
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
+		pMidiTrack->InsertBreath(channel, depth, absTime);
 }
 
 void SeqTrack::AddSustainEvent(ULONG offset, ULONG length, bool bOn, const wchar_t* sEventName)

@@ -25,6 +25,7 @@ enum EventType
 	EVENTTYPE_VOLUME,
 	EVENTTYPE_VOLUMESLIDE,
 	EVENTTYPE_PAN,
+	EVENTTYPE_REVERB,
 	EVENTTYPE_PROGCHANGE, 
 	EVENTTYPE_PITCHBEND,
 	EVENTTYPE_PITCHBENDRANGE,
@@ -291,6 +292,24 @@ public:
 public:
 	BYTE targPan;
 	ULONG dur;
+};
+
+
+//  **************
+//  ReverbSeqEvent
+//  **************
+
+class ReverbSeqEvent :
+	public SeqEvent
+{
+public:
+	ReverbSeqEvent(SeqTrack* pTrack, BYTE reverb, ULONG offset = 0, ULONG length = 0, const wchar_t* name = L"");
+	virtual ~ReverbSeqEvent(void) {}
+	virtual EventType GetEventType() { return EVENTTYPE_REVERB; }
+	DESCRIPTION(L"Reverb: " << (int)reverb)
+
+public:
+	BYTE reverb;
 };
 
 
