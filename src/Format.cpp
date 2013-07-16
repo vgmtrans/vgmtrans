@@ -9,14 +9,19 @@ FormatMap& Format::registry()
 	return registry;
 }
 
-Format::Format(const string& formatName)
+Format::Format(const string& formatName) :
+	scanner(NULL),
+	matcher(NULL)
 {
-	matcher = NULL;
 	registry().insert( make_pair(formatName, this) );
 }
 
 Format::~Format(void)
 {
+	if (scanner != NULL)
+		delete scanner;
+	if (matcher != NULL)
+		delete matcher;
 }
 
 Format* Format::GetFormatFromName(const string& name)
