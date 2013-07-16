@@ -19,6 +19,7 @@ SeqTrack::SeqTrack(VGMSeq* parentFile, ULONG offset, ULONG length)
 	pMidiTrack = NULL;
 	ResetVars();
 	bDetermineTrackLengthEventByEvent = false;
+	bWriteGenericEventAsTextEvent = true;
 
 	swprintf(numberedName, sizeof(numberedName)/sizeof(numberedName[0]), L"Track %d", parentSeq->aTracks.size()+1);
 	name = numberedName;
@@ -247,14 +248,32 @@ void SeqTrack::AddEvent(SeqEvent* pSeqEvent)
 void SeqTrack::AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, BYTE color)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+	{
 		AddEvent(new SeqEvent(this, offset, length, sEventName, color));
+	}
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
+	{
+		if (bWriteGenericEventAsTextEvent)
+		{
+			pMidiTrack->AddText(sEventName);
+		}
+	}
 }
 
 
 void SeqTrack::AddUnknown(ULONG offset, ULONG length, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+	{
 		AddEvent(new SeqEvent(this, offset, length, sEventName, CLR_UNKNOWN));
+	}
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
+	{
+		if (bWriteGenericEventAsTextEvent)
+		{
+			pMidiTrack->AddText(sEventName);
+		}
+	}
 }
 
 void SeqTrack::AddSetOctave(ULONG offset, ULONG length, BYTE newOctave,  const wchar_t* sEventName)

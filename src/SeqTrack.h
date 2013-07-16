@@ -178,5 +178,6 @@ public:
 protected:
 	//SETTINGS
 	bool bDetermineTrackLengthEventByEvent;
+	bool bWriteGenericEventAsTextEvent;
 
 };
