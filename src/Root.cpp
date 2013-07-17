@@ -332,7 +332,7 @@ bool VGMRoot::SaveAllAsRaw()
 			BYTE* buf = new BYTE[file->unLength];		//create a buffer the size of the file
 			file->GetBytes(file->dwOffset, file->unLength, buf);
 			result = UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);
-			delete buf;
+			delete[] buf;
 		}
 		return true;
 	}

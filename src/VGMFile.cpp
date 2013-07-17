@@ -76,7 +76,7 @@ bool VGMFile::OnSaveAsRaw()
 		BYTE* buf = new BYTE[unLength];		//create a buffer the size of the file
 		GetBytes(dwOffset, unLength, buf);
 		result = pRoot->UI_WriteBufferToFile(filepath.c_str(), buf, unLength);
-		delete buf;
+		delete[] buf;
 		return result;
 	}
 	return false;

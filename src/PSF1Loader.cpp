@@ -188,7 +188,7 @@ const wchar_t* PSF1Loader::psf_read_exe(
 			delete newRawFile;
 		}
 	}
-	delete tagSect;
+	delete[] tagSect;
 
 	destlen = textSectionSize;//exebuffersize - textSectionStart - textSectionSize;
 	if(uncompress(exebuffer+textSectionStart, &destlen, zexebuf, exe_size) == Z_DATA_ERROR)//!= Z_OK) 

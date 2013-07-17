@@ -240,6 +240,7 @@ void MusicPlayer::CloseDown()
 			COutPort.UnloadInstrument(*vpInstruments[i]); // Unloads the instrument from the port
 			delete vpInstruments[i];
 		}
+		vpInstruments.clear();
 		CloseHandle(stopPlaybackEvent); // Close the event handler
 		CloseHandle(unpausedPlaybackEvent); // Close the event handler
 		CInPort.BreakThru(0,0,0); // Breaks the thru connection

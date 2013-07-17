@@ -42,7 +42,7 @@ int FFTSeq::GetHeaderInfo(void)
 	char* songtitle = new char[titleLength];
 	GetBytes(dwOffset+ptSongTitle, titleLength, songtitle);
 	this->name = string2wstring(string(songtitle));
-	delete songtitle;
+	delete[] songtitle;
 
 	//wostringstream songnameStream;
 	//songnameStream << songtitle;
