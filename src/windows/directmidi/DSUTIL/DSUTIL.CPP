@@ -379,13 +379,13 @@ HRESULT CSoundManager::CreateFromMemory( CSound** ppSound,
     // Create the sound
     *ppSound = new CSound( apDSBuffer, dwDSBufferSize, dwNumBuffers, pWaveFile, dwCreationFlags );
 
-    SAFE_DELETE( apDSBuffer );
+    SAFE_DELETE_ARRAY( apDSBuffer );
     return S_OK;
 
 LFail:
     // Cleanup
    
-    SAFE_DELETE( apDSBuffer );
+    SAFE_DELETE_ARRAY( apDSBuffer );
     return hr;
 }
 
