@@ -35,71 +35,12 @@ CMainFrame::CMainFrame()
 
 BOOL CMainFrame::PreTranslateMessage(MSG* pMsg)
 {
-	if(pMsg == NULL)
-	{
-		return FALSE;
-	}
+	if(baseClass::PreTranslateMessage(pMsg))
+		return TRUE;
 
-	bool bCalledBaseClass = false;
-
-	if(pMsg->hwnd == m_hWnd || pMsg->hwnd == m_hWndMDIClient)
-	{
-		// Message is sent directly to main frame or
-		// to the MDIClient window
-		if(baseClass::PreTranslateMessage(pMsg))
-			return TRUE;
-
-		bCalledBaseClass = true;
-	}
-
-	HWND hWndFocus = ::GetFocus();
-	HWND hWndMDIActive = this->MDIGetActive();
-	
-	if((hWndMDIActive == hWndFocus) || (::IsChild(hWndMDIActive, hWndFocus)))
-	{
-		// Message is sent to Active MDI child frame
-		// or a descendant
-		// NOTE: IsChild checks if the window is a direct child or a descendant
-
-		if(baseClass::PreTranslateMessage(pMsg))
-			return TRUE;
-
-		bCalledBaseClass = true;
-
-		if(hWndMDIActive != NULL)
-		{
-			return (BOOL)::SendMessage(hWndMDIActive, WM_FORWARDMSG, 0, (LPARAM)pMsg);
-		}
-	}
-	else
-	{
-		for(_PaneWindowIter iter=m_PaneWindows.begin(); iter!=m_PaneWindows.end(); iter++)
-		{
-			CTabbedAutoHideDockingWindow* pPaneWindow = *iter;
-			if(pPaneWindow->IsChild(hWndFocus))
-			{
-				if(pPaneWindow->PreTranslateMessage(pMsg))
-				{
-					return TRUE;
-				}
-			}
-		}
-	}
-
-	if(!bCalledBaseClass)
-	{
-		// If the base class hasn't already had a shot at doing
-		// PreTranslateMessage (because the main frame or an
-		// MDI child didn't have focus), call it now
-		if(baseClass::PreTranslateMessage(pMsg))
-			return TRUE;
-
-		// Give active MDI child a chance.
-		if (hWndMDIActive != NULL)
-		{
-			return (BOOL)::SendMessage(hWndMDIActive, WM_FORWARDMSG, 0, (LPARAM)pMsg);
-		}
-	}
+	HWND hWnd = MDIGetActive();
+	if(hWnd != NULL)
+		return (BOOL)::SendMessage(hWnd, WM_FORWARDMSG, 0, (LPARAM)pMsg);
 
 	return FALSE;
 }
@@ -389,6 +330,18 @@ LRESULT CMainFrame::OnInitialize(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lPar
 	m_stateMgr.Add(mgrDockWnds);
 	m_stateMgr.Restore();
 	UpdateLayout();
+	return 0;
+}
+
+LRESULT CMainFrame::OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+	Alert(L"OnFileOpen is not implemented yet.");
+	return 0;
+}
+
+LRESULT CMainFrame::OnFileSave(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+	Alert(L"OnFileSave is not implemented yet.");
 	return 0;
 }
 

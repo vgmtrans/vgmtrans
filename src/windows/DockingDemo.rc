@@ -185,7 +185,7 @@ CAPTION "About"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     DEFPUSHBUTTON   "OK",IDOK,130,81,50,14
-    CTEXT           "VGMTrans\n\n(c) Copyright 2002",IDC_STATIC,25,57,78,32
+    CTEXT           "VGMTrans\n\n(c) Copyright 2002-2013 VGMTrans Team",IDC_STATIC,25,57,78,32
     ICON            IDR_MAINFRAME,IDC_STATIC,55,26,20,20
     GROUPBOX        "",IDC_STATIC,7,7,115,88
 END
@@ -195,8 +195,8 @@ STYLE DS_SETFONT | WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN
 FONT 8, "MS Sans Serif", 0, 0, 0x1
 BEGIN
     CONTROL         "",IDC_FILELIST,"SysListView32",LVS_REPORT | LVS_SHAREIMAGELISTS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,0,14,64,34
-    PUSHBUTTON      "Create New Collection",IDC_BTN_CREATE,68,2,14,12,BS_ICON | WS_DISABLED
-    EDITTEXT        IDC_NAMEEDIT,25,0,39,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Create New Collection",IDC_BTN_CREATE,68,2,14,12,BS_ICON | WS_DISABLED | WS_TABSTOP
+    EDITTEXT        IDC_NAMEEDIT,25,0,39,14,ES_AUTOHSCROLL | WS_TABSTOP
     LTEXT           "Name:",IDC_STATIC,2,2,22,8
 END
 
@@ -272,15 +272,6 @@ BEGIN
     "N",            ID_FILE_NEW,            VIRTKEY, CONTROL
     "O",            ID_FILE_OPEN,           VIRTKEY, CONTROL
     "S",            ID_FILE_SAVE,           VIRTKEY, CONTROL
-    "P",            ID_FILE_PRINT,          VIRTKEY, CONTROL
-    "Z",            ID_EDIT_UNDO,           VIRTKEY, CONTROL
-    "X",            ID_EDIT_CUT,            VIRTKEY, CONTROL
-    "C",            ID_EDIT_COPY,           VIRTKEY, CONTROL
-    "V",            ID_EDIT_PASTE,          VIRTKEY, CONTROL
-    VK_BACK,        ID_EDIT_UNDO,           VIRTKEY, ALT
-    VK_DELETE,      ID_EDIT_CUT,            VIRTKEY, SHIFT
-    VK_INSERT,      ID_EDIT_COPY,           VIRTKEY, CONTROL
-    VK_INSERT,      ID_EDIT_PASTE,          VIRTKEY, SHIFT
     VK_F6,          ID_NEXT_PANE,           VIRTKEY 
     VK_F6,          ID_PREV_PANE,           VIRTKEY, SHIFT
 END

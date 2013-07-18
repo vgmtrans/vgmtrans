@@ -129,6 +129,8 @@ public:
 		MESSAGE_HANDLER(WM_QUERYENDSESSION, OnQueryEndSession)
 		MESSAGE_HANDLER(CWM_INITIALIZE, OnInitialize)
 
+		COMMAND_ID_HANDLER(ID_FILE_OPEN, OnFileOpen)
+		COMMAND_ID_HANDLER(ID_FILE_SAVE, OnFileSave)
 		COMMAND_ID_HANDLER(ID_APP_EXIT, OnFileExit)
 		//COMMAND_ID_HANDLER(ID_FILE_NEW, OnFileNew)
 		//COMMAND_ID_HANDLER(ID_VIEW_FILEHEXVIEW, OnViewFileHexView)
@@ -173,6 +175,8 @@ public:
 	LRESULT OnQueryEndSession(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/);
 	LRESULT OnInitialize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 
+	LRESULT OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnFileSave(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnFileExit(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	//LRESULT OnFileNew(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	//LRESULT OnViewFileHexView(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
