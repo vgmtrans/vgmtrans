@@ -1,5 +1,6 @@
 #pragma once
 #include "Scanner.h"
+#include "BytePattern.h"
 
 class NinSnesScanner :
 	public VGMScanner
@@ -15,4 +16,7 @@ public:
 
 	virtual void Scan(RawFile* file, void* info = 0);
 	void SearchForNinSnesSeq (RawFile* file);
+
+private:
+	static BytePattern ptnBranchForVcmd;
 };

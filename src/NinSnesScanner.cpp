@@ -4,6 +4,20 @@
 
 #define SRCH_BUF_SIZE 0x20000
 
+//; Yoshi's Island SPC
+//; vcmd branches 80-ff
+//0813: 68 e0     cmp   a,#$e0
+//0815: 90 05     bcc   $081c
+//0817: 3f 95 08  call  $0895             ; vcmds e0-ff
+//081a: 2f b9     bra   $07d5
+BytePattern NinSnesScanner::ptnBranchForVcmd(
+	"\x68\xe0\x90\x05\x3f\x95\x08\x2f"
+	"\xb9"
+	,
+	"x?xxx??x"
+	"?"
+	,
+	9);
 
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
@@ -36,6 +50,12 @@ void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
 	if (nFileLength < 0x10000 || nFileLength > 0x10500)
 		return;
 
+	// a small logic to prevent a false positive
+	UINT ofsBranchForVcmd;
+	if (!file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
+	{
+		return;
+	}
 
 	for (ULONG i = 0x100; i+1 < nFileLength; i++)
 	{
