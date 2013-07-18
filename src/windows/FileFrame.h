@@ -42,7 +42,7 @@ public:
 
 	virtual void OnFinalMessage(HWND /*hWnd*/)
 	{
-		//delete this;
+		delete this;
 	}
 
 	void SetCommandBarCtrlForContextMenu(CTabbedMDICommandBarCtrl* pCmdBar)
