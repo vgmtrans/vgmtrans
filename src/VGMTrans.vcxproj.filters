@@ -163,6 +163,12 @@
       <UniqueIdentifier>{52b2360e-bfe0-4323-b287-13e24cb9d9ef}</UniqueIdentifier>
       <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe</Extensions>
     </Filter>
+    <Filter Include="Header Files\formats\raresnes">
+      <UniqueIdentifier>{a3c3fec5-fbd0-4adf-8081-0fe9b40abbaa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\raresnes">
+      <UniqueIdentifier>{5c5fa013-c6b0-4d7d-8112-cd60a82adf97}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\aboutdlg.cpp">
@@ -560,6 +566,12 @@
     </ClCompile>
     <ClCompile Include="BytePattern.cpp">
       <Filter>Source Files\main</Filter>
+    </ClCompile>
+    <ClCompile Include="RareSnesSeq.cpp">
+      <Filter>Source Files\formats\raresnes</Filter>
+    </ClCompile>
+    <ClCompile Include="RareSnesScanner.cpp">
+      <Filter>Source Files\formats\raresnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1030,6 +1042,15 @@
     </ClInclude>
     <ClInclude Include="BytePattern.h">
       <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="RareSnesSeq.h">
+      <Filter>Header Files\formats\raresnes</Filter>
+    </ClInclude>
+    <ClInclude Include="RareSnesFormat.h">
+      <Filter>Header Files\formats\raresnes</Filter>
+    </ClInclude>
+    <ClInclude Include="RareSnesScanner.h">
+      <Filter>Header Files\formats\raresnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

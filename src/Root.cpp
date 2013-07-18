@@ -21,6 +21,7 @@
 #include "QSoundFormat.h"
 #include "SonyPS2Format.h"
 #include "TriAcePS1Format.h"
+#include "RareSnesFormat.h"
 
 #include "PSF1Loader.h"
 #include "PSF2Loader.h"
@@ -66,6 +67,7 @@ bool VGMRoot::Init(void)
 	AddScanner("SonyPS2");
 	AddScanner("TriAcePS1");
 	AddScanner("MP2k");
+	AddScanner("RareSnes");
 
 
 	//load all the... loaders

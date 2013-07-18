@@ -182,6 +182,8 @@
     <ClCompile Include="BytePattern.cpp" />
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="KabukiDecrypt.cpp" />
+    <ClCompile Include="RareSnesScanner.cpp" />
+    <ClCompile Include="RareSnesSeq.cpp" />
     <ClCompile Include="RiffFile.cpp" />
     <ClCompile Include="SF2File.cpp" />
     <ClCompile Include="SynthFile.cpp" />
@@ -324,6 +326,9 @@
     <ClInclude Include="BytePattern.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="KabukiDecrypt.h" />
+    <ClInclude Include="RareSnesFormat.h" />
+    <ClInclude Include="RareSnesScanner.h" />
+    <ClInclude Include="RareSnesSeq.h" />
     <ClInclude Include="VGMMiscFile.h" />
     <ClInclude Include="RIFFFile.h" />
     <ClInclude Include="SF2File.h" />
