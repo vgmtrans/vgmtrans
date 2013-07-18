@@ -271,13 +271,13 @@ HRESULT CSoundManager::Create( CSound** ppSound,
     // Create the sound
     *ppSound = new CSound( apDSBuffer, dwDSBufferSize, dwNumBuffers, pWaveFile, dwCreationFlags );
     
-    SAFE_DELETE( apDSBuffer );
+    SAFE_DELETE_ARRAY( apDSBuffer );
     return hrRet;
 
 LFail:
     // Cleanup
     SAFE_DELETE( pWaveFile );
-    SAFE_DELETE( apDSBuffer );
+    SAFE_DELETE_ARRAY( apDSBuffer );
     return hr;
 }
 
