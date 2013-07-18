@@ -817,7 +817,17 @@ void InsertExpression(BYTE expression, ULONG absTime);
 void AddPanEvent(BYTE pan);
 void InsertPanEvent(BYTE pan, ULONG absTime);*/
 
-void SeqTrack::AddProgramChange(ULONG offset, ULONG length, BYTE progNum, const wchar_t* sEventName)
+void SeqTrack::AddProgramChange(ULONG offset, ULONG length, ULONG progNum, const wchar_t* sEventName)
+{
+	AddProgramChange(offset, length, progNum, false, sEventName);
+}
+
+void SeqTrack::AddProgramChange(ULONG offset, ULONG length, ULONG progNum, BYTE chan, const wchar_t* sEventName)
+{
+	AddProgramChange(offset, length, progNum, false, chan, sEventName);
+}
+
+void SeqTrack::AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool requireBank, const wchar_t* sEventName)
 {
 /*	InstrAssoc* pInstrAssoc = parentSeq->GetInstrAssoc(progNum);
 	if (pInstrAssoc)
@@ -837,20 +847,26 @@ void SeqTrack::AddProgramChange(ULONG offset, ULONG length, BYTE progNum, const 
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new ProgChangeSeqEvent(this, progNum, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-//	if (cDrumNote == -1)
-//	{
+	{
+//		if (cDrumNote == -1)
+//		{
+		if (requireBank)
+		{
+			pMidiTrack->AddBankSelect(channel, (progNum >> 14) & 0x7f);
+			pMidiTrack->AddBankSelectFine(channel, (progNum >> 7) & 0x7f);
+		}
 		pMidiTrack->AddProgramChange(channel, progNum);
-//	}
-
+//		}
+	}
 }
 
-void SeqTrack::AddProgramChange(ULONG offset, ULONG length, BYTE progNum, BYTE chan, const wchar_t* sEventName)
+void SeqTrack::AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool requireBank, BYTE chan, const wchar_t* sEventName)
 {
 	//if (selectMsg = NULL)
 	//	selectMsg.Forma
 	BYTE origChan = channel;
 	channel = chan;
-	AddProgramChange(offset, length, progNum, sEventName);
+	AddProgramChange(offset, length, progNum, requireBank, sEventName);
 	channel = origChan;
 }
 

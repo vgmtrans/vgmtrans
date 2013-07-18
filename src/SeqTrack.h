@@ -112,8 +112,10 @@ public:
 	//void AddSustainEventDur();
 	//void AddPitchBendSlide();
 	//void InsertPitchBendSlide();
-	void AddProgramChange(ULONG offset, ULONG length, BYTE progNum,const wchar_t* sEventName = L"Program Change");
-	void AddProgramChange(ULONG offset, ULONG length, BYTE progNum, BYTE chan, const wchar_t* sEventName = L"Program Change");
+	void AddProgramChange(ULONG offset, ULONG length, ULONG progNum, const wchar_t* sEventName = L"Program Change");
+	void AddProgramChange(ULONG offset, ULONG length, ULONG progNum, BYTE chan, const wchar_t* sEventName = L"Program Change");
+	void AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool requireBank, const wchar_t* sEventName = L"Program Change");
+	void AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool requireBank, BYTE chan, const wchar_t* sEventName = L"Program Change");
 	void AddBankSelectNoItem(BYTE bank);
 	void AddTempo(ULONG offset, ULONG length, ULONG microsPerQuarter, const wchar_t* sEventName = L"Tempo");
 	void AddTempoSlide(ULONG offset, ULONG length, ULONG dur, ULONG targMicrosPerQuarter, const wchar_t* sEventName = L"Tempo Slide");

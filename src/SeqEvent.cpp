@@ -199,7 +199,7 @@ PortamentoTimeSeqEvent::PortamentoTimeSeqEvent(SeqTrack* pTrack, BYTE theTime, U
 // ProgChangeSeqEvent
 // ******************
 
-ProgChangeSeqEvent::ProgChangeSeqEvent(SeqTrack* pTrack, BYTE programNumber, ULONG offset, ULONG length, const wchar_t* name)
+ProgChangeSeqEvent::ProgChangeSeqEvent(SeqTrack* pTrack, ULONG programNumber, ULONG offset, ULONG length, const wchar_t* name)
 : SeqEvent(pTrack, offset, length, name, CLR_PROGCHANGE), progNum(programNumber)
 {}
 

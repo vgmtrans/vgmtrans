@@ -693,7 +693,7 @@ int RareSnesTrack::ReadEvent(void)
 			//AddTranspose(beginOffset, curOffset-beginOffset, 0, L"Transpose (Abs)");
 
 			// add event without MIDI event
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new TransposeSeqEvent(this, newTransp, beginOffset, curOffset-beginOffset, L"Transpose (Abs)"));
 
 			cKeyCorrection = SEQ_KEYOFS;
@@ -707,7 +707,7 @@ int RareSnesTrack::ReadEvent(void)
 			//AddTranspose(beginOffset, curOffset-beginOffset, spcTransposeAbs - spcTranspose, L"Transpose (Rel)");
 
 			// add event without MIDI event
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new TransposeSeqEvent(this, deltaTransp, beginOffset, curOffset-beginOffset, L"Transpose (Rel)"));
 
 			cKeyCorrection += deltaTransp;
@@ -815,7 +815,7 @@ int RareSnesTrack::ReadEvent(void)
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 1"));
 			break;
 		}
@@ -832,7 +832,7 @@ int RareSnesTrack::ReadEvent(void)
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 2"));
 			break;
 		}
@@ -849,7 +849,7 @@ int RareSnesTrack::ReadEvent(void)
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 3"));
 			break;
 		}
@@ -866,7 +866,7 @@ int RareSnesTrack::ReadEvent(void)
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 4"));
 			break;
 		}
@@ -883,7 +883,7 @@ int RareSnesTrack::ReadEvent(void)
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 5"));
 			break;
 		}
@@ -1015,7 +1015,7 @@ int RareSnesTrack::ReadEvent(void)
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(parentSeq->presetVolL[0], parentSeq->presetVolR[0], newMidiVol, newMidiPan);
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Volume Preset"));
 			break;
 		}
@@ -1033,7 +1033,7 @@ int RareSnesTrack::ReadEvent(void)
 			break;
 
 		case EVENT_LFOOFF:
-			if (!IsOffsetUsed(beginOffset))
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
 				AddEvent(new ModulationSeqEvent(this, 0, beginOffset, curOffset-beginOffset, L"Pitch Slide/Vibrato/Tremolo Off"));
 			break;
 
@@ -1054,7 +1054,7 @@ void RareSnesTrack::AddVolLR(ULONG offset, ULONG length, BYTE spcVolL, BYTE spcV
 	BYTE newMidiPan;
 	CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
 
-	if (!IsOffsetUsed(offset))
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new VolSeqEvent(this, newMidiVol, offset, length, sEventName));
 
 	// add MIDI events only if updated

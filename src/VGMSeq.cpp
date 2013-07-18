@@ -156,7 +156,7 @@ int VGMSeq::LoadMain()
 	// do not sort tracks until the loading has been finished,
 	// some engines are sensitive about the track order.
 	// TODO: aTracks must not be sorted because the order of tracks must be kept until MIDI conversion.
-	sort(aTracks.begin(), aTracks.end(), ItemPtrOffsetCmp());
+	//sort(aTracks.begin(), aTracks.end(), ItemPtrOffsetCmp());
 
 	return true;
 }

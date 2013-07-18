@@ -459,13 +459,13 @@ class ProgChangeSeqEvent :
 	public SeqEvent
 {
 public:
-	ProgChangeSeqEvent(SeqTrack* pTrack, BYTE programNumber, ULONG offset = 0, ULONG length = 0, const wchar_t* name = L"");
+	ProgChangeSeqEvent(SeqTrack* pTrack, ULONG programNumber, ULONG offset = 0, ULONG length = 0, const wchar_t* name = L"");
 	virtual ~ProgChangeSeqEvent(void) {}
 	virtual EventType GetEventType() { return EVENTTYPE_PROGCHANGE; }
 	DESCRIPTION(L"Program Number: " << (int)progNum)
 
 public:
-	BYTE progNum;
+	ULONG progNum;
 };
 
 //  *************
