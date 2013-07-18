@@ -29,9 +29,9 @@ The "Collections" window displays file groupings that the software was able to i
 ===========================
 What you need to compile it
 ===========================
--Visual Studio 2008.  Other versions may also work but are untested.
+-Visual Studio 2010.  Other versions may also work but are untested.  Since it uses some ATL headers, you will need WDK if you use Express Edition.
 -Windows Template Library 8.0 (WTL)
--a version of the DirectX 9 SDK  which supports DirectMusic (DirectMusic was eventually removed by Microsoft.  The April 2007 SDK works, for example)
+-a version of the DirectX 9 SDK  which supports DirectMusic (DirectMusic was eventually removed by Microsoft.  The August 2007 SDK works, for example)
 
 ==============
 A special note
@@ -42,11 +42,11 @@ This software is prone to crash and its source code is extremely messy.  The sam
 Thanks
 ======
 loveemu, for your help on the DS and GBA format.
-Sound Test: 774, for your help on the HOSA format, analyzing the TriAacePS1 format and various other things.
+Sound Test: 774 (anonymous guy in 2ch BBS), for your help on the HOSA format, analyzing the TriAacePS1 format and various other things.
 
 =======
 Contact
 =======
-If you enjoy the software, or have any questions please contact the author.
+If you enjoy the software, or have any questions please contact the development team.
 
-Email: vgmtrans@gmail.com.
+https://github.com/vgmtrans/vgmtrans
