@@ -200,7 +200,13 @@ ULONG NDSScanner::LoadFromSDAT(RawFile* file, ULONG baseOff)
 			offset += 4;
 			ULONG fileSize = file->GetWord(offset);
 			NDSWaveArch* NewNDSwa = new NDSWaveArch(file, pWAFatData, fileSize, waNames[i]);
-			NewNDSwa->LoadVGMFile();
+			if (!NewNDSwa->LoadVGMFile())
+			{
+				ATLTRACE(_T("Failed to load NDSWaveArch at 0x%08x\n"), pWAFatData);
+				WAs.push_back(NULL);
+				delete NewNDSwa;
+				continue;
+			}
 			WAs.push_back(NewNDSwa);
 		}
 	}
@@ -232,7 +238,10 @@ ULONG NDSScanner::LoadFromSDAT(RawFile* file, ULONG baseOff)
 				else
 					NewNDSInstrSet->sampCollWAList.push_back(NULL);
 			}
-			NewNDSInstrSet->LoadVGMFile();
+			if (!NewNDSInstrSet->LoadVGMFile())
+			{
+				ATLTRACE(_T("Failed to load NDSInstrSet at 0x%08x\n"), pBnkFatData);
+			}
 			pair<USHORT, NDSInstrSet*> theBank(*iter, NewNDSInstrSet);
 			BNKs.push_back(theBank);
 		}
@@ -252,7 +261,10 @@ ULONG NDSScanner::LoadFromSDAT(RawFile* file, ULONG baseOff)
 			offset += 4;
 			ULONG fileSize = file->GetWord(offset);
 			NDSSeq* NewNDSSeq = new NDSSeq(file, pSeqFatData, fileSize, seqNames[i]);
-			NewNDSSeq->LoadVGMFile();
+			if (!NewNDSSeq->LoadVGMFile())
+			{
+				ATLTRACE(_T("Failed to load NDSSeq at 0x%08x\n"), pSeqFatData);
+			}
 
 			VGMColl* coll = new VGMColl(seqNames[i]);
 			coll->UseSeq(NewNDSSeq);
