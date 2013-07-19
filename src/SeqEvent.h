@@ -46,11 +46,12 @@ class SeqEvent :
 	public VGMItem
 {
 public:
-	SeqEvent(SeqTrack* pTrack, ULONG offset = 0, ULONG length = 0, const wchar_t* name = L"", BYTE color = 0);
+	SeqEvent(SeqTrack* pTrack, ULONG offset = 0, ULONG length = 0, const wchar_t* name = L"", BYTE color = 0, Icon icon = ICON_BINARY);
 	virtual ~SeqEvent(void) {}						//note: virtual destructor
 	virtual wstring GetDescription() { return wstring(name); }
 	virtual ItemType GetType() const { return ITEMTYPE_SEQEVENT; }
 	virtual EventType GetEventType() { return EVENTTYPE_UNDEFINED; }
+	virtual Icon GetIcon() { return icon; }
 
 	//BEGIN_MENU(SeqEvent)
 	//	MENU_ITEM(SeqEvent, DummyFunction, L"Dummy Function")
@@ -65,6 +66,8 @@ public:
 public:
 	BYTE channel;
 	SeqTrack* parentTrack;
+private:
+	Icon icon;
 };
 
 

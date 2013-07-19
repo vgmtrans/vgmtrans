@@ -150,6 +150,8 @@ public:
 
 	virtual Icon GetIcon() { return ICON_BINARY; };
 
+	void AddPointer(ULONG offset, ULONG length, ULONG destAddress, bool notNull, const wchar_t *name = L"Pointer");
+	void AddTempo(ULONG offset, ULONG length, const wchar_t *name = L"Tempo");
 	void AddSig(ULONG offset, ULONG length, const wchar_t *name = L"Signature");
 
 	//vector<VGMItem*> items;
@@ -163,7 +165,7 @@ class VGMHeaderItem :
 	public VGMItem
 {
 public:
-	enum HdrItemType { HIT_SIG, HIT_GENERIC, HIT_UNKNOWN};		//HIT = Header Item Type
+	enum HdrItemType { HIT_POINTER, HIT_TEMPO, HIT_SIG, HIT_GENERIC, HIT_UNKNOWN };		//HIT = Header Item Type
 
 	VGMHeaderItem(VGMHeader* hdr, HdrItemType theType, ULONG offset, ULONG length, const wchar_t* name);
 	virtual Icon GetIcon();

@@ -215,6 +215,16 @@ VGMHeader::~VGMHeader()
 	//DeleteVect<VGMItem>(items);
 }
 
+void VGMHeader::AddPointer(ULONG offset, ULONG length, ULONG destAddress, bool notNull, const wchar_t *name)
+{
+	localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_POINTER, offset, length, name));
+}
+
+void VGMHeader::AddTempo(ULONG offset, ULONG length, const wchar_t *name)
+{
+	localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_TEMPO, offset, length, name));
+}
+
 void VGMHeader::AddSig(ULONG offset, ULONG length, const wchar_t *name)
 {
 	localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_SIG, offset, length, name));
@@ -235,6 +245,10 @@ VGMItem::Icon VGMHeaderItem::GetIcon()
 	{
 	case HIT_UNKNOWN:
 		return ICON_UNKNOWN;
+	case HIT_POINTER:
+		return ICON_BINARY;
+	case HIT_TEMPO:
+		return ICON_TEMPO;
 	case HIT_SIG:
 		return ICON_BINARY;
 	default:

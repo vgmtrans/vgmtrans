@@ -247,11 +247,11 @@ void SeqTrack::AddEvent(SeqEvent* pSeqEvent)
 	}
 }
 
-void SeqTrack::AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, BYTE color)
+void SeqTrack::AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, BYTE color, Icon icon)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 	{
-		AddEvent(new SeqEvent(this, offset, length, sEventName, color));
+		AddEvent(new SeqEvent(this, offset, length, sEventName, color, icon));
 	}
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 	{

@@ -46,7 +46,7 @@ protected:
 	void AddControllerSlide(U32 offset, U32 length, U32 dur, BYTE& prevVal, BYTE targVal, 
 		void (MidiTrack::*insertFunc)(BYTE, BYTE, U32));
 public:
-	void AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, BYTE color);
+	void AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, BYTE color, Icon icon = ICON_BINARY);
 	void AddSetOctave(ULONG offset, ULONG length, BYTE newOctave, const wchar_t* sEventName = L"Set Octave");
 	void AddIncrementOctave(ULONG offset, ULONG length, const wchar_t* sEventName = L"Increment Octave");	// 1,Sep.2009 revise
 	void AddDecrementOctave(ULONG offset, ULONG length, const wchar_t* sEventName = L"Decrement Octave");	// 1,Sep.2009 revise
