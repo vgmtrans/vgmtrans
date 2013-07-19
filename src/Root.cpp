@@ -15,12 +15,13 @@
 #include "HOSAFormat.h"		//2009. 6.20(Thu.)	Add
 #include "PS1Format.h"
 #include "SquarePS2Format.h"
-#include "SquSnesFormat.h"
 #include "MP2kFormat.h"
 #include "KonamiGXFormat.h"
 #include "QSoundFormat.h"
 #include "SonyPS2Format.h"
 #include "TriAcePS1Format.h"
+#include "NinSnesFormat.h"
+#include "SquSnesFormat.h"
 #include "RareSnesFormat.h"
 
 #include "PSF1Loader.h"
@@ -47,16 +48,6 @@ VGMRoot::~VGMRoot(void)
 bool VGMRoot::Init(void)
 {
 	UI_SetRootPtr(&pRoot);
-	
-	//load all the formats
-//	AddFormat<NDSFormat>();
-//	AddFormat<AkaoFormat>();
-//	AddFormat<PS1Format>();
-//	AddFormat<SquarePS2Format>();
-//	AddFormat<KonamiGXFormat>();
-//	AddFormat<QSoundFormat>();
-//	AddFormat<MP2kFormat>();
-//	AddFormat<SquSnesFormat>();
 
 	AddScanner("NDS");
 	AddScanner("Akao");
@@ -67,8 +58,9 @@ bool VGMRoot::Init(void)
 	AddScanner("SonyPS2");
 	AddScanner("TriAcePS1");
 	AddScanner("MP2k");
+	//AddScanner("NinSnes");
+	//AddScanner("SquSnes");
 	AddScanner("RareSnes");
-
 
 	//load all the... loaders
 	AddLoader<PSF1Loader>();
