@@ -88,12 +88,14 @@ public:
 
 	virtual int GetHeaderInfo(void);
 	virtual int GetTrackPointers(void);
+	virtual void ResetVars(void);
 
 	RareSnesVersion version;
 	map<BYTE, RareSnesSeqEventType> EventMap;
 
 	static const USHORT NOTE_PITCH_TABLE[128];  // note number to frequency table
 
+	BYTE initialTempo;                          // initial tempo value written in header
 	BYTE midiReverb;                            // MIDI reverb level for SPC700 echo
 	BYTE timerFreq;                             // SPC700 timer 0 frequency (tempo base)
 	BYTE tempo;                                 // song tempo
@@ -115,7 +117,7 @@ class RareSnesTrack
 {
 public:
 	RareSnesTrack(RareSnesSeq* parentFile, long offset = 0, long length = 0);
-	void ResetVars();
+	virtual void ResetVars(void);
 	virtual int ReadEvent(void);
 
 	void AddVolLR(ULONG offset, ULONG length, BYTE spcVolL, BYTE spcVolR, const wchar_t* sEventName = L"Volume L/R");

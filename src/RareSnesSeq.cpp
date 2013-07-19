@@ -51,9 +51,9 @@ RareSnesSeq::~RareSnesSeq(void)
 {
 }
 
-int RareSnesSeq::GetHeaderInfo(void)
+void RareSnesSeq::ResetVars(void)
 {
-	SetPPQN(SEQ_PPQN);
+	VGMSeq::ResetVars();
 
 	midiReverb = 40;
 	switch(version)
@@ -65,6 +65,13 @@ int RareSnesSeq::GetHeaderInfo(void)
 		timerFreq = 0x64;
 		break;
 	}
+	tempo = initialTempo;
+	tempoBPM = GetTempoInBPM();
+}
+
+int RareSnesSeq::GetHeaderInfo(void)
+{
+	SetPPQN(SEQ_PPQN);
 
 	VGMHeader* seqHeader = AddHeader(dwOffset, MAX_TRACKS * 2 + 2, L"Sequence Header");
 	ULONG curHeaderOffset = dwOffset;
@@ -73,8 +80,7 @@ int RareSnesSeq::GetHeaderInfo(void)
 		seqHeader->AddSimpleItem(curHeaderOffset, 2, L"Track Pointer");
 		curHeaderOffset += 2;
 	}
-	tempo = GetByte(curHeaderOffset);
-	tempoBPM = GetTempoInBPM();
+	initialTempo = GetByte(curHeaderOffset);
 	seqHeader->AddSimpleItem(curHeaderOffset++, 1, L"Tempo");
 	seqHeader->AddUnknownItem(curHeaderOffset++, 1);
 
@@ -260,7 +266,7 @@ RareSnesTrack::RareSnesTrack(RareSnesSeq* parentFile, long offset, long length)
 	bWriteGenericEventAsTextEvent = true;
 }
 
-void RareSnesTrack::ResetVars()
+void RareSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
 
@@ -364,7 +370,7 @@ int RareSnesTrack::ReadEvent(void)
 			//ssTrace << L"Note: " << key << L" " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << L" P=" << spcNotePitch << std::endl;
 			//OutputDebugString(ssTrace.str().c_str());
 
-			BYTE vel = 100;
+			BYTE vel = 127;
 			AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
 			AddDelta(dur);
 		}
@@ -1044,6 +1050,10 @@ int RareSnesTrack::ReadEvent(void)
 			break;
 		}
 	}
+
+	//wostringstream ssTrace;
+	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
+	//OutputDebugString(ssTrace.str().c_str());
 
 	return bContinue;
 }

@@ -33,6 +33,7 @@ public:
 	virtual int PostLoad();
 	virtual int GetHeaderInfo(void);
 	virtual int GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
+	virtual void ResetVars(void);
 	virtual MidiFile* ConvertToMidi();
 //	virtual int LoadTracks(void);
 	//virtual int ApplyTable(void);	//create and apply table handler object for sequence

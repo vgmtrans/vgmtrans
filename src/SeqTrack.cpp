@@ -15,6 +15,7 @@ SeqTrack::SeqTrack(VGMSeq* parentFile, ULONG offset, ULONG length)
 : VGMContainerItem(parentFile, offset, length),
   parentSeq(parentFile)
 {
+	dwStartOffset = offset;
 	bMonophonic = parentSeq->bMonophonicTracks;
 	pMidiTrack = NULL;
 	ResetVars();
@@ -93,7 +94,7 @@ int SeqTrack::LoadTrackInit(int trackNum)
 int SeqTrack::LoadTrackMainLoop(U32 stopOffset, long stopDelta)
 {
 	bInLoop = false;
-	curOffset = dwOffset;	//start at beginning of track
+	curOffset = dwStartOffset;	//start at beginning of track
 	if (stopDelta == -1)
 		stopDelta = 0x7FFFFFFF;
 	while ((curOffset < stopOffset) && GetDelta() < stopDelta &&  ReadEvent())
@@ -229,12 +230,6 @@ void SeqTrack::AddEvent(SeqEvent* pSeqEvent)
 		aEvents.push_back(pSeqEvent);
 	//else
 	//	delete pSeqEvent;
-	if (bDetermineTrackLengthEventByEvent)
-	{
-		ULONG length = pSeqEvent->dwOffset + pSeqEvent->unLength - dwOffset;
-		if (unLength < length)
-			unLength = length;
-	}
 
 	// care for a case where the new event is located before the start address
 	// (example: Donkey Kong Country - Map, Track 7 of 8)
@@ -242,6 +237,13 @@ void SeqTrack::AddEvent(SeqEvent* pSeqEvent)
 	{
 		unLength += (dwOffset - pSeqEvent->dwOffset);
 		dwOffset = pSeqEvent->dwOffset;
+	}
+
+	if (bDetermineTrackLengthEventByEvent)
+	{
+		ULONG length = pSeqEvent->dwOffset + pSeqEvent->unLength - dwOffset;
+		if (unLength < length)
+			unLength = length;
 	}
 }
 

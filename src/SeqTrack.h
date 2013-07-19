@@ -39,6 +39,8 @@ public:
 	struct IsEventAtOffset;
 	virtual bool IsOffsetUsed(ULONG offset);
 
+	ULONG dwStartOffset;
+
 protected:
 	virtual void AddEvent(SeqEvent* pSeqEvent);
 	void AddControllerSlide(U32 offset, U32 length, U32 dur, BYTE& prevVal, BYTE targVal, 

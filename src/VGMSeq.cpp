@@ -56,6 +56,7 @@ MidiFile* VGMSeq::ConvertToMidi()
 	int numTracks = aTracks.size();
 	long stopDelta = -1;
 
+	ResetVars();
 	for (int i = 0; i < numTracks; i++)
 	{
 		aTracks[i]->readMode = READMODE_FIND_DELTA_LENGTH;
@@ -74,6 +75,7 @@ MidiFile* VGMSeq::ConvertToMidi()
 	MidiFile* newmidi = new MidiFile(this);
 	this->midi = newmidi;
 	this->readMode = READMODE_CONVERT_TO_MIDI;
+	ResetVars();
 	for (int i = 0; i < numTracks; i++)
 	{
 		aTracks[i]->readMode = READMODE_CONVERT_TO_MIDI;
@@ -106,6 +108,7 @@ int VGMSeq::LoadMain()
 	if (nNumTracks == 0)
 		return false;
 
+	ResetVars();
 	for (UINT i = 0; i < nNumTracks; i++)
 	{
 		U32 stopOffset = 0xFFFFFFFF;
@@ -191,6 +194,10 @@ int VGMSeq::GetHeaderInfo(void)
 int VGMSeq::GetTrackPointers(void)
 {
 	return true;
+}
+
+void VGMSeq::ResetVars(void)
+{
 }
 
 void VGMSeq::SetPPQN(WORD ppqn)
