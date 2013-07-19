@@ -79,6 +79,7 @@ int NDSSeq::GetTrackPointers(void)
 		TrkPtrs->unLength = offset - TrkPtrs->dwOffset;
 	}
 	aTracks[0]->dwOffset = offset;
+	aTracks[0]->dwStartOffset = offset;
 	return true;
 }
 
