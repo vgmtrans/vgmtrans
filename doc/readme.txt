@@ -38,11 +38,12 @@ A special note
 ==============
 This software is prone to crash and its source code is extremely messy.  The same can be said of the author - a sad, hollow shell of a man.
 
-======
-Thanks
-======
-loveemu, for your help on the DS and GBA format.
-Sound Test: 774 (anonymous guy in 2ch BBS), for your help on the HOSA format, analyzing the TriAacePS1 format and various other things.
+============
+Contributers
+============
+The original author (anonymous), worked on almost everything.
+loveemu, worked on the DS and GBA format, and small bugfixes/improvements.
+Sound Test: 774 (anonymous guy in 2ch BBS), worked on the HOSA format, analyzing the TriAacePS1 format and various other things.
 
 =======
 Contact
