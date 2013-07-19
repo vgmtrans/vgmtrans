@@ -26,8 +26,8 @@ RawFile::RawFile(const wstring name, ULONG theFileSize, bool bCanRead)
   bCanFileRead(bCanRead),
   processFlags(PF_USESCANNERS | PF_USELOADERS)
 {
-	filename = getFileNameFromFullPath(fullpath);
-	extension = getExtFromFullPath(fullpath);
+	filename = getFileNameFromPath(fullpath);
+	extension = getExtFromPath(fullpath);
 	//col = new unsigned char[filesize];
 	//memset(col, 0, filesize);
 }
@@ -113,33 +113,37 @@ long RawFile::size(void)
 }
 
 // Name says it all.
-wstring RawFile::getFileNameFromFullPath(const wstring& s)
+wstring RawFile::getFileNameFromPath(const wstring& s)
 {
-	char sep = '/';
-#ifdef _WIN32
-	sep = '\\';
-#endif
-	size_t i = s.rfind(sep, s.length( ));
+	size_t i = s.rfind('/', s.length( ));
+	size_t j = s.rfind('\\', s.length( ));
+	if (i == string::npos || (j != string::npos && i < j))
+		i = j;
 	if (i != string::npos)
 	{
 		return(s.substr(i+1, s.length( ) - i));
 	}
 	return s;
-	//return(_T(""));
 }
 
-wstring RawFile::getExtFromFullPath(const wstring& s)
+wstring RawFile::getExtFromPath(const wstring& s)
 {
-	char sep = '.';
-#ifdef _WIN32
-	sep = '.';
-#endif
-	size_t i = s.rfind(sep, s.length( ));
+	size_t i = s.rfind('.', s.length( ));
 	if (i != string::npos)
 	{
 		return(s.substr(i+1, s.length( ) - i));
 	}
 	return(_T(""));
+}
+
+wstring RawFile::removeExtFromPath(const wstring& s)
+{
+	size_t i = s.rfind('.', s.length( ));
+	if (i != string::npos)
+	{
+		return(s.substr(0, i));
+	}
+	return s;
 }
 
 

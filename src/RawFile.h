@@ -28,8 +28,9 @@ public:
 	inline const wchar_t* GetFileName() { return filename.c_str(); }	//returns the filename with extension
 	inline const wstring& GetExtension() { return extension; }
 	inline const wstring& GetParRawFileFullPath() { return parRawFileFullPath; }
-	wstring getFileNameFromFullPath(const wstring& s);
-	wstring getExtFromFullPath(const wstring& s);
+	static wstring getFileNameFromPath(const wstring& s);
+	static wstring getExtFromPath(const wstring& s);
+	static wstring removeExtFromPath(const wstring& s);
 	VGMItem* GetItemFromOffset(long offset);
 	VGMFile* GetVGMFileFromOffset(long offset);
 

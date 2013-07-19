@@ -95,6 +95,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 	UINT ofsVCmdExecASM;
 	UINT addrSeqHeader;
 	UINT addrVCmdTable;
+	wstring name = RawFile::removeExtFromPath(file->GetFileName());
 
 	if (file->SearchBytePattern(ptnSongLoadDKC2, ofsSongLoadASM))
 	{
@@ -139,7 +140,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 		return;
 	}
 
-	RareSnesSeq* newSeq = new RareSnesSeq(file, version, addrSeqHeader, file->GetFileName());
+	RareSnesSeq* newSeq = new RareSnesSeq(file, version, addrSeqHeader, name);
 	newSeq->LoadVGMFile();
 }
 
