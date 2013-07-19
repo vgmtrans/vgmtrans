@@ -339,7 +339,6 @@
     <ClInclude Include="DragDropSource.h" />
     <ClInclude Include="windows\DropFileHandler.h" />
     <ClInclude Include="windows\FileFrame.h" />
-    <ClInclude Include="GameLoop.h" />
     <ClInclude Include="windows\HexView.h" />
     <ClInclude Include="HexViewFrame.h" />
     <ClInclude Include="ItemTreeView.h" />

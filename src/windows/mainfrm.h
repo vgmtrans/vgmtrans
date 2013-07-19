@@ -22,7 +22,6 @@
 #include "VGMTransTabCtrl.h"
 #include "CollDialog.h"
 #include "DropFileHandler.h"
-//#include "GameLoop.h"
 
 //#include "FileFrame.h"
 //#include "PlainTextView.h"

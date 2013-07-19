@@ -21,6 +21,10 @@
 	// for checking for memory leaks
 	// (we call _CrtSetDbgFlag in _tWinMain)
 	#define _CRTDBG_MAP_ALLOC
+	#include <stdlib.h>
+	#include <crtdbg.h>
+	#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+	#define new DEBUG_NEW
 #endif
 
 
@@ -109,17 +113,6 @@ extern bool g_bXPOrLater;
 #include "TabbedMDI.h"
 
 #include <DWAutoHide.h>
-
-#ifdef _DEBUG
-	// When debugging, turn on the CRT's debugging facilities
-	// for checking for memory leaks
-	// (we call _CrtSetDbgFlag in _tWinMain)
-	#define _CRTDBG_MAP_ALLOC
-	#include <stdlib.h>
-	#include <crtdbg.h>
-	#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
-	#define new DEBUG_NEW
-#endif
 
 
 // Types

@@ -593,9 +593,6 @@
     <ClInclude Include="windows\FileFrame.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="GameLoop.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
     <ClInclude Include="windows\HexView.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
