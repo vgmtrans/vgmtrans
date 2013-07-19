@@ -485,38 +485,38 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="windows\res\addcoll.ico" />
-    <None Include="windows\res\BinToMusic1.ico" />
-    <None Include="windows\res\coll1.ico" />
-    <None Include="windows\res\coll2.ico" />
-    <None Include="windows\res\coll3.ico" />
-    <None Include="windows\res\coll4.ico" />
-    <None Include="windows\res\coll6.ico" />
-    <None Include="windows\res\coll7.ico" />
-    <None Include="windows\res\DockingDemodoc.ico" />
+    <None Include="windows\res\mainframe.ico" />
+    <None Include="windows\res\control.ico" />
+    <None Include="windows\res\startrep.ico" />
+    <None Include="windows\res\endrep.ico" />
+    <None Include="windows\res\timesig.ico" />
+    <None Include="windows\res\progchange.ico" />
+    <None Include="windows\res\trackend.ico" />
+    <None Include="windows\res\fileframe.ico" />
     <None Include="windows\res\folder_open.ico" />
-    <None Include="windows\res\ico00002.ico" />
-    <None Include="windows\res\ico00003.ico" />
-    <None Include="windows\res\ico00004.ico" />
-    <None Include="windows\res\ico00005.ico" />
-    <None Include="windows\res\icon2.ico" />
+    <None Include="windows\res\unknown.ico" />
+    <None Include="windows\res\offset.ico" />
+    <None Include="windows\res\default.ico" />
+    <None Include="windows\res\binary.ico" />
+    <None Include="windows\res\length.ico" />
+    <None Include="windows\res\instr.ico" />
+    <None Include="windows\res\metroleft.ico" />
+    <None Include="windows\res\metroright.ico" />
+    <None Include="windows\res\TabIcons.bmp" />
+    <None Include="windows\res\coll.ico" />
+    <None Include="windows\res\note.ico" />
     <None Include="windows\res\instrset.ico" />
-    <None Include="windows\res\metronomeLeft.ico" />
-    <None Include="windows\res\metronomeRight.ico" />
-    <None Include="windows\res\msdev_tab_icons.bmp" />
-    <None Include="windows\res\musicfolder.ico" />
-    <None Include="windows\res\note3.ico" />
-    <None Include="windows\res\orchestra.ico" />
     <None Include="windows\res\rawfile.ico" />
     <None Include="windows\res\rest.ico" />
-    <None Include="windows\res\seq2.ico" />
-    <None Include="windows\res\toolbar.bmp" />
-    <None Include="windows\res\treble.ico" />
-    <None Include="windows\res\vgmfile.ico" />
-    <None Include="windows\res\vgmfile_.ico" />
-    <None Include="windows\res\wav.ico" />
+    <None Include="windows\res\seq.ico" />
+    <None Include="windows\res\Toolbar.bmp" />
+    <None Include="windows\res\track.ico" />
+    <None Include="windows\res\samp.ico" />
+    <None Include="windows\res\sampcoll.ico" />
+    <None Include="windows\res\VGMTrans.ico" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="windows\DockingDemo.rc" />
+    <ResourceCompile Include="windows\VGMTrans.rc" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="windows\res\VGMTrans.exe.manifest" />
@@ -526,7 +526,7 @@
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties RESOURCE_FILE="windows\DockingDemo.rc" />
+      <UserProperties RESOURCE_FILE="windows\VGMTrans.rc" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>

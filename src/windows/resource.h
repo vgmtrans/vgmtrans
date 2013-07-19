@@ -1,16 +1,14 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by DockingDemo.rc
+// Used by VGMTrans.rc
 //
-#define IDR_ICON1                       4
+#define IDR_MAIN                        1
 #define IDR_FILEHEXFRAME                5
 #define IDD_ABOUTBOX                    100
 #define IDR_MAINFRAME                   128
 #define IDR_MDICHILD                    129
-#define IDB_MSDEV_TAB_ICONS             207
+#define IDB_TAB_ICONS                   207
 #define IDD_DOCKEDDIALOG                208
-#define IDI_VGMFILE3                    214
-#define IDI_VGMFILE                     214
 #define IDI_RAWFILE                     216
 #define IDI_VGMFILE_SEQ                 221
 #define IDI_VGMFILE_INSTRSET            222

@@ -546,7 +546,7 @@ void CMainFrame::InitializeDefaultPanes(void)
 	CImageList ilIcons;
 	ilIcons.Create(16, 16, ILC_MASK | ILC_COLOR24, 0, 0);
 	CBitmap bmpIcons;
-	bmpIcons.LoadBitmap(IDB_MSDEV_TAB_ICONS);
+	bmpIcons.LoadBitmap(IDB_TAB_ICONS);
 	ilIcons.Add((HBITMAP)bmpIcons, RGB(0,255,0));
 
 	HWND hWndFirst = 
