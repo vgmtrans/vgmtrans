@@ -1,11 +1,7 @@
 #pragma once
 #include "VGMSeqNoTrks.h"
-#include "Format.h"			//can replace this with SegSat-specific format header file
+#include "SegSatFormat.h"
 #include "SegSatScanner.h"
-
-BEGIN_FORMAT(SegSat)
-	USING_SCANNER(SegSatScanner)
-END_FORMAT()
 
 class SegSatSeq :
 	public VGMSeqNoTrks

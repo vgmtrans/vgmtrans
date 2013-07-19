@@ -8,7 +8,7 @@ class NinSnesScanner :
 public:
 	NinSnesScanner(void)
 	{
-		USE_EXTENSION(L"spc");
+		//USE_EXTENSION(L"spc");
 	}
 	virtual ~NinSnesScanner(void)
 	{

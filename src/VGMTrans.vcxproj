@@ -326,9 +326,11 @@
     <ClInclude Include="BytePattern.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="KabukiDecrypt.h" />
+    <ClInclude Include="OrgFormat.h" />
     <ClInclude Include="RareSnesFormat.h" />
     <ClInclude Include="RareSnesScanner.h" />
     <ClInclude Include="RareSnesSeq.h" />
+    <ClInclude Include="SegSatFormat.h" />
     <ClInclude Include="VGMMiscFile.h" />
     <ClInclude Include="RIFFFile.h" />
     <ClInclude Include="SF2File.h" />

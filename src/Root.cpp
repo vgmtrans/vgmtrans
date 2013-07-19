@@ -20,6 +20,10 @@
 #include "QSoundFormat.h"
 #include "SonyPS2Format.h"
 #include "TriAcePS1Format.h"
+#include "OrgFormat.h"
+#include "QSoundFormat.h"
+#include "SegSatFormat.h"
+#include "TaitoF3Format.h"
 #include "NinSnesFormat.h"
 #include "SquSnesFormat.h"
 #include "RareSnesFormat.h"
@@ -58,6 +62,12 @@ bool VGMRoot::Init(void)
 	AddScanner("SonyPS2");
 	AddScanner("TriAcePS1");
 	AddScanner("MP2k");
+	//AddScanner("Org");
+	//AddScanner("QSound");
+	//AddScanner("SegSat");
+	//AddScanner("TaitoF3");
+
+	// the following scanners use USE_EXTENSION
 	//AddScanner("NinSnes");
 	//AddScanner("SquSnes");
 	AddScanner("RareSnes");

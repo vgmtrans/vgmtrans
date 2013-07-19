@@ -170,7 +170,7 @@ NinSnesSection::NinSnesSection(NinSnesSeq* prntSeq, ULONG offset)
 
 NinSnesSection::~NinSnesSection()
 {
-	//DeleteVect<SeqTrack>(aSectTracks);
+	DeleteVect<SeqTrack>(aSectTracks);
 }
 
 int NinSnesSection::GetHeaderInfo(USHORT headerOffset)

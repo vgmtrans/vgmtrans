@@ -1,12 +1,8 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
-#include "Format.h"			//can replace this with Org-specific format header file
+#include "OrgFormat.h"
 #include "OrgScanner.h"
-
-BEGIN_FORMAT(Org)
-	USING_SCANNER(OrgScanner)
-END_FORMAT()
 
 class OrgSeq :
 	public VGMSeq

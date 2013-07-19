@@ -1049,6 +1049,12 @@
     <ClInclude Include="RareSnesScanner.h">
       <Filter>Header Files\formats\raresnes</Filter>
     </ClInclude>
+    <ClInclude Include="OrgFormat.h">
+      <Filter>Header Files\formats\org</Filter>
+    </ClInclude>
+    <ClInclude Include="SegSatFormat.h">
+      <Filter>Header Files\formats\segsat</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="windows\res\addcoll.ico">
