@@ -419,7 +419,7 @@ int QSoundTrack::ReadEvent(void)
 					AddNoteOn(beginOffset, curOffset-beginOffset, key, 127, L"Note On (tied)");
 				}
 				else
-					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Tie"), CLR_NOTEON);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Tie"), NULL, CLR_NOTEON);
 				bPrevNoteTie = true;
 				prevTieNote = key;
 			}
@@ -450,7 +450,7 @@ int QSoundTrack::ReadEvent(void)
 			}
 		}
 		else			//it's a rest
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Rest"), CLR_REST);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Rest"), NULL, CLR_REST);
 		AddDelta(delta);
 	}
 	else
@@ -460,24 +460,24 @@ int QSoundTrack::ReadEvent(void)
 		{
 		case 0x00 :
 			noteState ^= 0x20;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 0x20 (change duration table)"), CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 0x20 (change duration table)"), NULL, CLR_CHANGESTATE);
 			break;
 		case 0x01 :
 			noteState ^= 0x40;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 0x40 (Toggle tie)"), CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 0x40 (Toggle tie)"), NULL, CLR_CHANGESTATE);
 			break;
 		case 0x02 :
 			noteState |= (1 << 4);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State |= 0x10 (change duration table)"), CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State |= 0x10 (change duration table)"), NULL, CLR_CHANGESTATE);
 			break;
 		case 0x03 :
 			noteState ^= 8;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 8 (change octave)"), CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 8 (change octave)"), NULL, CLR_CHANGESTATE);
 			break;
 		case 0x04 :
 			noteState &= 0x97;
 			noteState |= GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Change Note State (& 0x97)"), CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Change Note State (& 0x97)"), NULL, CLR_CHANGESTATE);
 			break;
 		case 0x05 :
 			{
@@ -516,14 +516,14 @@ int QSoundTrack::ReadEvent(void)
 			break;
 		case 0x06 :
 			dur = GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Set Duration"), CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Set Duration"), NULL, CLR_CHANGESTATE);
 			break;
 		case 0x07 :
 			vol = GetByte(curOffset++);
 			vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / (double)0x1FFF);
 			//vol = round((vol_table[vol] / (double)0x1FFF)*127.0);
 			this->AddVol(beginOffset, curOffset-beginOffset, vol);
-			//AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Set Volume"), BG_CLR_STEEL);
+			//AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Set Volume"), NULL, BG_CLR_STEEL);
 			break;
 		case 0x08 :
 			{
@@ -540,7 +540,7 @@ int QSoundTrack::ReadEvent(void)
 		case 0x09 :					//effectively sets the octave
 			noteState &= 0xF8;
 			noteState |= GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Set Octave"), CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Set Octave"), NULL, CLR_CHANGESTATE);
 			break;
 		case 0x0A :					// Global Transpose
 			{
@@ -565,7 +565,7 @@ int QSoundTrack::ReadEvent(void)
 				// Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every (251/4) seconds until we hit target key.
 				BYTE portamentoRate = GetByte(curOffset++);
 				AddPortamentoTime(beginOffset, curOffset-beginOffset, portamentoRate);
-				//AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Portamento"), CLR_PITCHBEND);
+				//AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Portamento"), NULL, CLR_PITCHBEND);
 			}
 			break;
 		case 0x0E :				//loop
@@ -610,7 +610,7 @@ theLoop:	if (loop[loopNum] == 0 && loopOffset[loopNum] == 0)						//first time h
 				jump = GetShortBE(curOffset);//(GetByte(curOffset++)<<8) + GetByte(curOffset++);
 				curOffset += 2;
 			}
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Loop"), CLR_LOOP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Loop"), NULL, CLR_LOOP);
 
 			if (loop[loopNum] == 0)
 			{
@@ -626,7 +626,7 @@ theLoop:	if (loop[loopNum] == 0 && loopOffset[loopNum] == 0)						//first time h
 			//{
 			//	bInLoop = false;
 			//	curOffset+=2;
-			//	AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Loop"), BG_CLR_CHEDDAR);
+			//	AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Loop"), NULL, BG_CLR_CHEDDAR);
 			//	break;
 			//}
 
@@ -664,7 +664,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 				noteState |= GetByte(curOffset++);
 				{
 					short jump = (GetByte(curOffset++)<<8) + GetByte(curOffset++);
-					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Loop Break"), CLR_LOOP);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Loop Break"), NULL, CLR_LOOP);
 					curOffset += jump;
 				}
 			}
@@ -707,7 +707,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			{
 				//curOffset++;
 				vol = GetByte(curOffset++);
-				AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Master Volume"), CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Master Volume"), NULL, CLR_UNKNOWN);
 				//this->AddMasterVol(beginOffset, curOffset-beginOffset, vol);
 				//AddVolume(beginOffset, curOffset-beginOffset, vool);
 			}
@@ -791,7 +791,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 				{
 					bank = value;
 					AddBankSelectNoItem(bank*2);
-					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Bank Change"), CLR_PROGCHANGE);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Bank Change"), NULL, CLR_PROGCHANGE);
 				}
 					
 			}
@@ -813,7 +813,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			AddUnknown(beginOffset, curOffset-beginOffset);
 			break;
 		default :
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("UNKNOWN"), CLR_UNRECOGNIZED);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("UNKNOWN"), NULL, CLR_UNRECOGNIZED);
 		}
 	}
 	return true;

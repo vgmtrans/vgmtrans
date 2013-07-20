@@ -8,8 +8,8 @@
 
 //DECLARE_MENU(SeqEvent)
 
-SeqEvent::SeqEvent(SeqTrack* pTrack, ULONG offset, ULONG length, const wchar_t* name, BYTE color, Icon icon)
-: VGMItem((VGMFile*)pTrack->parentSeq, offset, length, name, color), icon(icon), parentTrack(pTrack)
+SeqEvent::SeqEvent(SeqTrack* pTrack, ULONG offset, ULONG length, const wchar_t* name, BYTE color, Icon icon, const wchar_t* desc)
+: VGMItem((VGMFile*)pTrack->parentSeq, offset, length, name, color), desc(desc ? desc : L""), icon(icon), parentTrack(pTrack)
 {
 }
 

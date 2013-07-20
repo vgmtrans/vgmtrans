@@ -250,33 +250,45 @@ void SeqTrack::AddEvent(SeqEvent* pSeqEvent)
 	}
 }
 
-void SeqTrack::AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, BYTE color, Icon icon)
+void SeqTrack::AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, const wchar_t* sEventDesc, BYTE color, Icon icon)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 	{
-		AddEvent(new SeqEvent(this, offset, length, sEventName, color, icon));
+		AddEvent(new SeqEvent(this, offset, length, sEventName, color, icon, sEventDesc));
 	}
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		if (bWriteGenericEventAsTextEvent)
 		{
-			pMidiTrack->AddText(sEventName);
+			wstring miditext(sEventName);
+			if (sEventDesc != NULL && sEventDesc[0] != L'\0')
+			{
+				miditext += L" - ";
+				miditext += sEventDesc;
+			}
+			pMidiTrack->AddText(miditext.c_str());
 		}
 	}
 }
 
 
-void SeqTrack::AddUnknown(ULONG offset, ULONG length, const wchar_t* sEventName)
+void SeqTrack::AddUnknown(ULONG offset, ULONG length, const wchar_t* sEventName, const wchar_t* sEventDesc)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 	{
-		AddEvent(new SeqEvent(this, offset, length, sEventName, CLR_UNKNOWN));
+		AddEvent(new SeqEvent(this, offset, length, sEventName, CLR_UNKNOWN, ICON_BINARY, sEventDesc));
 	}
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		if (bWriteGenericEventAsTextEvent)
 		{
-			pMidiTrack->AddText(sEventName);
+			wstring miditext(sEventName);
+			if (sEventDesc != NULL && sEventDesc[0] != L'\0')
+			{
+				miditext += L" - ";
+				miditext += sEventDesc;
+			}
+			pMidiTrack->AddText(miditext.c_str());
 		}
 	}
 }

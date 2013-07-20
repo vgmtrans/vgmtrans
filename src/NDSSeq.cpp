@@ -186,7 +186,7 @@ int NDSTrack::ReadEvent(void)
 
 	case 0x95:
 		loopReturnOffset = curOffset + 3;
-		AddGenericEvent(beginOffset, curOffset+3-beginOffset, L"Call", CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset+3-beginOffset, L"Call", NULL, CLR_LOOP);
 		curOffset = GetByte(curOffset) + (GetByte(curOffset+1)<<8)
 				+ (GetByte(curOffset+2)<<16) + parentSeq->dwOffset + 0x1C;	
 		break;
@@ -275,7 +275,7 @@ int NDSTrack::ReadEvent(void)
 		{
 			char transpose = (signed) GetByte(curOffset++);
 			AddTranspose(beginOffset, curOffset-beginOffset, transpose);
-//			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Transpose", BG_CLR_GREEN);
+//			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Transpose", NULL, BG_CLR_GREEN);
 		}
 		break;
 
@@ -295,7 +295,7 @@ int NDSTrack::ReadEvent(void)
 
 	case 0xC6: // [loveemu] (ex: Children of Mana: SEQ_BGM000)
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Priority", CLR_CHANGESTATE);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Priority", NULL, CLR_CHANGESTATE);
 		break;
 
 	case 0xC7: // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
@@ -412,7 +412,7 @@ int NDSTrack::ReadEvent(void)
 		break;
 
 	case 0xFD:
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Return", CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Return", NULL, CLR_LOOP);
 		curOffset = loopReturnOffset;
 		break;
 

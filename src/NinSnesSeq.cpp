@@ -349,7 +349,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 				else
 				{
 					bInLoop = false;
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", CLR_LOOP);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", NULL, CLR_LOOP);
 					curOffset = subret;
 					substart = 0;
 					subret = 0;
@@ -358,7 +358,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 			}
 			else
 			{
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"End of Section", CLR_LOOP);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"End of Section", NULL, CLR_LOOP);
 				return false;
 			}
 		}
@@ -392,7 +392,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 				AddDelta(dur);
 				MakePrevDurNoteEnd();
 				SubtractDelta(dur);
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie", CLR_TIE);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie", NULL, CLR_TIE);
 				//AddEventItem("Tie", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_STEEL);
 				
 				//	# tie
@@ -402,7 +402,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 			}
 			else if (event_type == EVENT_REST)
 			{
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Rest", CLR_REST);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Rest", NULL, CLR_REST);
 				//AddEventItem("Rest", ICON_REST, beginOffset, curOffset-beginOffset, BG_CLR_LIGHTBLUE);
 			}
 			else if (status_byte < ((NinSnesSeq*)vgmfile)->NOTE_CUTOFF)	//Note			//ADDRESS THIS.. NOTE ISN'T AN EVENT HERE
@@ -504,7 +504,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 				break;
 			case EVENT_GLOBTRANSP:		//
 				//((NinSnesSeq*)vgmfile)->globTranspose = GetByte(curOffset++);
-				//AddGenericEvent(beginOffset, curOffset-beginOffset, L"Global Transpose", BG_CLR_PINK);
+				//AddGenericEvent(beginOffset, curOffset-beginOffset, L"Global Transpose", NULL, BG_CLR_PINK);
 				{
 					char globTranspose = GetByte(curOffset++);
 					AddGlobalTranspose(beginOffset, curOffset-beginOffset, globTranspose);
@@ -514,7 +514,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 			case EVENT_TRANSP:
 				transpose = GetByte(curOffset++);
 				AddTranspose(beginOffset, curOffset-beginOffset, transpose);
-				//AddGenericEvent(beginOffset, curOffset-beginOffset, L"Track Transpose", BG_CLR_PINK);
+				//AddGenericEvent(beginOffset, curOffset-beginOffset, L"Track Transpose", NULL, BG_CLR_PINK);
 				//AddEventItem("Track Transpose", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_PINK);
 				break;
 			case EVENT_VOL:		//Volume
@@ -535,19 +535,19 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 				subret = curOffset;
 				if (substart >= vgmfile->rawfile->size())
 					return -1;
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Go Sub", CLR_LOOP);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Go Sub", NULL, CLR_LOOP);
 				//AddEventItem("Go Sub", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_YELLOW);
 				curOffset = substart;
 				break;
 			case EVENT_SETPERCBASE:
 				SetPercBase(GetByte(curOffset++));
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Perc Base", CLR_CHANGESTATE);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Perc Base", NULL, CLR_CHANGESTATE);
 				//AddEventItem("Set Perc Base", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 				break;
 			case EVENT_LOOPBEGIN:
 				loopdest = curOffset;
 				loopcount = 0;
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Perc Base", CLR_CHANGESTATE);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Perc Base", NULL, CLR_CHANGESTATE);
 				//AddEventItem("Loop Begin", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_YELLOW);
 				break;
 			case EVENT_LOOPEND:
@@ -561,7 +561,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 				{
 					if (loopcount == 1)						//if first time hitting loop
 					{
-						AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", CLR_LOOP);
+						AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", NULL, CLR_LOOP);
 						//AddEventItem("Loop End", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_YELLOW);
 						bInLoop = true;
 					}

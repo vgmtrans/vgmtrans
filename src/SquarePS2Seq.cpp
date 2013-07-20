@@ -93,7 +93,7 @@ int BGMTrack::ReadEvent(void)
 		//rest_time += current_delta_time;
 		//if (nScanMode == MODE_SCAN)
 		//	AddBGMEvent("Loop Begin", ICON_STARTREP, aBGMTracks[cur_track]->pTreeItem, offsetAtDelta, j-offsetAtDelta, BG_CLR_CYAN);
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Begin", CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Begin", NULL, CLR_LOOP);
 		break;
 
 	case 0x03 :			// Loop end
@@ -101,7 +101,7 @@ int BGMTrack::ReadEvent(void)
 //		loop_counter++;
 		//if (loop_counter < num_loops)
 		//	j = loop_start;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", NULL, CLR_LOOP);
 		break;
 
 	case 0x04 :			//end of track?
@@ -246,7 +246,7 @@ int BGMTrack::ReadEvent(void)
 		break;
 
 	default :
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", CLR_UNRECOGNIZED);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", NULL, CLR_UNRECOGNIZED);
 		break;
 
 	}

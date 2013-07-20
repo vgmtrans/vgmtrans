@@ -46,13 +46,13 @@ protected:
 	void AddControllerSlide(U32 offset, U32 length, U32 dur, BYTE& prevVal, BYTE targVal, 
 		void (MidiTrack::*insertFunc)(BYTE, BYTE, U32));
 public:
-	void AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, BYTE color, Icon icon = ICON_BINARY);
+	void AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, const wchar_t* sEventDesc, BYTE color, Icon icon = ICON_BINARY);
 	void AddSetOctave(ULONG offset, ULONG length, BYTE newOctave, const wchar_t* sEventName = L"Set Octave");
 	void AddIncrementOctave(ULONG offset, ULONG length, const wchar_t* sEventName = L"Increment Octave");	// 1,Sep.2009 revise
 	void AddDecrementOctave(ULONG offset, ULONG length, const wchar_t* sEventName = L"Decrement Octave");	// 1,Sep.2009 revise
 	void AddRest(ULONG offset, ULONG length, UINT restTime, const wchar_t* sEventName = L"Rest");
 	void AddHold(ULONG offset, ULONG length, const wchar_t* sEventName = L"Hold");
-	void AddUnknown(ULONG offset, ULONG length, const wchar_t* sEventName = L"Unknown Event");
+	void AddUnknown(ULONG offset, ULONG length, const wchar_t* sEventName = L"Unknown Event", const wchar_t* sEventDesc = NULL);
 	
 	void AddNoteOn(ULONG offset, ULONG length, char key, char vel, const wchar_t* sEventName = L"Note On");
 	void AddNoteOnNoItem(char key, char vel);

@@ -126,10 +126,10 @@ int MP2kTrack::ReadEvent(void)
 		if (GetByte(curOffset) > 0x7F)	//if the next value is greater than 0x7F, then we have an assumed note of prevKey and prevVel
 		{
 			AddNoteByDurNoItem(prevKey, prevVel, curDuration);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Duration Note State + Note On (prev key and vel)", CLR_DURNOTE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Duration Note State + Note On (prev key and vel)", NULL, CLR_DURNOTE);
 		}
 		else
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Duration Note State", CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Duration Note State", NULL, CLR_CHANGESTATE);
 	}
 	else if (status_byte >= 0xB1 && status_byte <= 0xCF)			//it's a special event
 	{
@@ -141,20 +141,20 @@ int MP2kTrack::ReadEvent(void)
 			break;
 		case 0xB2 :
 			curOffset+=4;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Goto", /*ICON_STARTREP,*/ CLR_LOOP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Goto", /*ICON_STARTREP,*/ NULL, CLR_LOOP);
 			break;
 		case 0xB3 :		//Branch
 			{
 				UINT destOffset = GetWord(curOffset);
 				curOffset+=4;
 				loopEndPos = curOffset;
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern Play", CLR_LOOP);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern Play", NULL, CLR_LOOP);
 				curOffset = destOffset - 0x8000000;
 				bInLoop = TRUE;
 			}
 			break;
 		case 0xB4 :		//Branch Break
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern End", CLR_LOOP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern End", NULL, CLR_LOOP);
 			if (bInLoop)
 			{
 				curOffset = loopEndPos;
@@ -164,7 +164,7 @@ int MP2kTrack::ReadEvent(void)
 
 		case 0xBA :
 			curOffset++;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Priority", CLR_PRIORITY);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Priority", NULL, CLR_PRIORITY);
 			break;
 
 		case 0xBB :
@@ -175,7 +175,7 @@ int MP2kTrack::ReadEvent(void)
 			break;
 		case 0xBC :
 			transpose = GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Key Shift", CLR_TRANSPOSE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Key Shift", NULL, CLR_TRANSPOSE);
 			break;
 
 		case 0xBD :
@@ -187,48 +187,48 @@ int MP2kTrack::ReadEvent(void)
 			}
 			break;
 		case 0xBE :
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Volume State", CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Volume State", NULL, CLR_CHANGESTATE);
 			state = STATE_VOL;
 			break;
 		case 0xBF :			//pan
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pan State", CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pan State", NULL, CLR_CHANGESTATE);
 			state = STATE_PAN;
 			break;
 		case 0xC0 :				//pitch bend
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Bend State", CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Bend State", NULL, CLR_CHANGESTATE);
 			state = STATE_PITCHBEND;
 			break;
 		case 0xC1 :				//pitch bend range
 			curOffset++;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Bend Range", CLR_PITCHBENDRANGE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Bend Range", NULL, CLR_PITCHBENDRANGE);
 			break;
 		case 0xC2 :				//lfo speed
 			curOffset++;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Speed", CLR_LFO);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Speed", NULL, CLR_LFO);
 			break;
 		case 0xC3 :				//lfo delay
 			curOffset++;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Delay", CLR_LFO);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Delay", NULL, CLR_LFO);
 			break;
 		case 0xC4 :				//modulation depth
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Modulation Depth State", CLR_MODULATION);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Modulation Depth State", NULL, CLR_MODULATION);
 			state = STATE_MODULATION;
 			break;
 		case 0xC5 :				//modulation type
 			curOffset++;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Modulation Type", CLR_MODULATION);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Modulation Type", NULL, CLR_MODULATION);
 			break;
 
 		case 0xC8 :
 			{
 				curOffset++;
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Microtune", CLR_PITCHBEND);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Microtune", NULL, CLR_PITCHBEND);
 			}
 			break;
 
 		case 0xCD :				//extend command
 			//curOffset++;		//don't know
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Extend Command", CLR_UNKNOWN);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Extend Command", NULL, CLR_UNKNOWN);
 			break;
 
 		case 0xCE :
@@ -237,10 +237,10 @@ int MP2kTrack::ReadEvent(void)
 				if (GetByte(curOffset) > 0x7F)			//yes, this seems to be how the actual driver code handles it.  Ex. Aria of Sorrow (U): 0x80D91C0 - handle 0xCE event
 				{
 					AddNoteOffNoItem(prevKey);
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"End Tie State + End Tie", CLR_TIE);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"End Tie State + End Tie", NULL, CLR_TIE);
 				}
 				else
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"End Tie State", CLR_TIE);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"End Tie State", NULL, CLR_TIE);
 			}
 			break;
 
@@ -249,14 +249,14 @@ int MP2kTrack::ReadEvent(void)
 			if (GetByte(curOffset) > 0x7F)
 			{
 				AddNoteOnNoItem(prevKey, prevVel);
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie State + Tie (with prev key and vel)", CLR_TIE);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie State + Tie (with prev key and vel)", NULL, CLR_TIE);
 			}
 			else
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie State", CLR_TIE);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie State", NULL, CLR_TIE);
 			break;
 
 		default :
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", CLR_UNRECOGNIZED);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", NULL, CLR_UNRECOGNIZED);
 			break;
 		}
 	}

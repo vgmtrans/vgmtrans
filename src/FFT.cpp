@@ -205,7 +205,7 @@ int FFTTrack::ReadEvent(void)
 	case 0x91 :			//Dal Segno. (Infinite loop)
 		infiniteLoopPt = curOffset;
 		infiniteLoopOctave = octave;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Track Repeat Point", CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Track Repeat Point", NULL, CLR_LOOP);
 		//AddEventItem(_T("Repeat"), ICON_STARTREP, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 		break;
 
@@ -244,13 +244,13 @@ int FFTTrack::ReadEvent(void)
 			loop_counter[loop_layer] = 0;
 			loop_repeats[loop_layer] = loopCount-1;
 			loop_octave[loop_layer] = octave;			//1,Sep.2009 revise
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Repeat Begin", CLR_LOOP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Repeat Begin", NULL, CLR_LOOP);
 			//AddEventItem("Loop Begin", ICON_STARTREP, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 		}
 		break;
 
 	case 0x99:			//Repeat End
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Repeat End", CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Repeat End", NULL, CLR_LOOP);
 		//AddEventItem("Loop End", ICON_ENDREP, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 		if (loopID[loop_layer] != curOffset) // hitting loop end for first time
 		{
@@ -278,7 +278,7 @@ int FFTTrack::ReadEvent(void)
 		break;
 
 	case 0x9A:			//Repeat break on last repeat
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Repeat Break", CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Repeat Break", NULL, CLR_LOOP);
 		//AddEventItem("Loop Break", ICON_ENDREP, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 		if (loop_counter[loop_layer] == loop_repeats[loop_layer])	// if this is the last run of the loop, we break
 		{
@@ -333,19 +333,19 @@ int FFTTrack::ReadEvent(void)
 		break;
 
 	case 0xAE :			//Percussion On
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Percussion On", CLR_CHANGESTATE);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Percussion On", NULL, CLR_CHANGESTATE);
 		break;
 
 	case 0xAF :			//Percussion Off
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Percussion Off", CLR_CHANGESTATE);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Percussion Off", NULL, CLR_CHANGESTATE);
 		break;
 
 	case 0xB0 :			//Slur On
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Slur On", CLR_PORTAMENTO);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Slur On", NULL, CLR_PORTAMENTO);
 		break;
 
 	case 0xB1 :			//Slur Off
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Slur Off", CLR_PORTAMENTO);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Slur Off", NULL, CLR_PORTAMENTO);
 		break;
 
 	case 0xB2 :			//unknown
@@ -360,32 +360,32 @@ int FFTTrack::ReadEvent(void)
 		break;
 
 	case 0xBA :			//Reverb On
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reverb On", CLR_REVERB);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reverb On", NULL, CLR_REVERB);
 		break;
 
 	case 0xBB :			//Reverb Off
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reverb Off", CLR_REVERB);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reverb Off", NULL, CLR_REVERB);
 		break;
 
 	//--------
 	//ADSR Envelope Event
 	case 0xC0 :			//ADSR Reset
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Reset", CLR_ADSR);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Reset", NULL, CLR_ADSR);
 		break;
 
 	case 0xC2 :	
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Attack Rate?", CLR_ADSR);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Attack Rate?", NULL, CLR_ADSR);
 		break;
 
 	case 0xC4 :	
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Sustain Rate?", CLR_ADSR);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Sustain Rate?", NULL, CLR_ADSR);
 		break;
 
 	case 0xC5 :
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Release Rate?", CLR_ADSR);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Release Rate?", NULL, CLR_ADSR);
 		break;
 
 	case 0xC6 :
@@ -406,12 +406,12 @@ int FFTTrack::ReadEvent(void)
 
 	case 0xC9 :	
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Decay Rate?", CLR_ADSR);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Decay Rate?", NULL, CLR_ADSR);
 		break;
 
 	case 0xCA :
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Sustain Level?", CLR_ADSR);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR: Sustain Level?", NULL, CLR_ADSR);
 		break;
 
 	//--------
@@ -428,26 +428,26 @@ int FFTTrack::ReadEvent(void)
 
 	case 0xD2 :			// unknown
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Bend?", CLR_PITCHBEND);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Bend?", NULL, CLR_PITCHBEND);
 		break;
 
 	case 0xD4 :			//Portamento (Pitch bend slide)
 		{
 			BYTE cPitchSlideTimes	= GetByte(curOffset++);		//slide times [ticks]
 			BYTE cPitchSlideDepth	= GetByte(curOffset++);		//Target Panpot
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Portamento", CLR_PORTAMENTO);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Portamento", NULL, CLR_PORTAMENTO);
 		}
 		break;
 
 	case 0xD6 :			// unknown
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Detune?", CLR_PITCHBEND);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Detune?", NULL, CLR_PITCHBEND);
 		break;
 
 	case 0xD7 :			// LFO Depth
 		{
 		BYTE cPitchLFO_Depth	= GetByte(curOffset++);		//slide times [ticks]
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Depth (Pitch bend)", CLR_LFO);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Depth (Pitch bend)", NULL, CLR_LFO);
 		}
 		break;
 
@@ -456,7 +456,7 @@ int FFTTrack::ReadEvent(void)
 			BYTE cPitchLFO_Decay2	= GetByte(curOffset++);		//
 			BYTE cPitchLFO_Cycle	= GetByte(curOffset++);		//
 			BYTE cPitchLFO_Decay1	= GetByte(curOffset++);		//
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Length (Pitch bend)", CLR_LFO);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Length (Pitch bend)", NULL, CLR_LFO);
 		}
 		break;
 
@@ -464,7 +464,7 @@ int FFTTrack::ReadEvent(void)
 		curOffset++;
 		curOffset++;
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO ? (Pitch bend)", CLR_LFO);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO ? (Pitch bend)", NULL, CLR_LFO);
 		break;
 
 	case 0xDB :			// unknown
@@ -493,7 +493,7 @@ int FFTTrack::ReadEvent(void)
 	case 0xE3 :			// LFO Depth
 		{
 			BYTE cVolLFO_Depth	= GetByte(curOffset++);		//
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Depth (Volume)", CLR_LFO);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Depth (Volume)", NULL, CLR_LFO);
 		}
 		break;
 
@@ -502,7 +502,7 @@ int FFTTrack::ReadEvent(void)
 			BYTE cVolLFO_Decay2	= GetByte(curOffset++);		//
 			BYTE cVolLFO_Cycle	= GetByte(curOffset++);		//
 			BYTE cVolLFO_Decay1	= GetByte(curOffset++);		//
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Length (Volume)", CLR_LFO);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Length (Volume)", NULL, CLR_LFO);
 		}
 		break;
 
@@ -510,7 +510,7 @@ int FFTTrack::ReadEvent(void)
 		curOffset++;
 		curOffset++;
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO ? (Volume)", CLR_LFO);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO ? (Volume)", NULL, CLR_LFO);
 		break;
 
 	case 0xE7 :			// unknown
@@ -539,7 +539,7 @@ int FFTTrack::ReadEvent(void)
 	case 0xEB :			// LFO Depth
 		{
 			BYTE cPanLFO_Depth	= GetByte(curOffset++);			//
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Depth (Panpot)", CLR_LFO);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Depth (Panpot)", NULL, CLR_LFO);
 		}
 		break;
 
@@ -548,7 +548,7 @@ int FFTTrack::ReadEvent(void)
 			BYTE cPanLFO_Decay2	= GetByte(curOffset++);			//
 			BYTE cPanLFO_Cycle	= GetByte(curOffset++);			//
 			BYTE cPanLFO_Decay1	= GetByte(curOffset++);			//
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Length (Panpot)", CLR_LFO);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Length (Panpot)", NULL, CLR_LFO);
 		}
 		break;
 
@@ -556,7 +556,7 @@ int FFTTrack::ReadEvent(void)
 		curOffset++;
 		curOffset++;
 		curOffset++;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO ? (Panpot)", CLR_LFO);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO ? (Panpot)", NULL, CLR_LFO);
 		break;
 
 	case 0xEF :			// unknown
@@ -596,7 +596,7 @@ int FFTTrack::ReadEvent(void)
 
 	case 0xFE :			// Program(WDS) bank select
 		BYTE cProgBankNum	= GetByte(curOffset++);		//Bank Number [ticks]
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Program bank select", CLR_PROGCHANGE);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Program bank select", NULL, CLR_PROGCHANGE);
 		break;
 
 	}

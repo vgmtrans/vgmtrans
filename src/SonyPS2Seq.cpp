@@ -129,8 +129,8 @@ int SonyPS2Seq::ReadEvent(void)
 				AddBreath(beginOffset, curOffset-beginOffset, value);
 				break;
 			case 6 :
-				//AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", BG_CLR_PINK);
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop start number", CLR_LOOP);
+				//AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", NULL, BG_CLR_PINK);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop start number", NULL, CLR_LOOP);
 				break;
 
 			case 7 :							//volume
@@ -146,18 +146,18 @@ int SonyPS2Seq::ReadEvent(void)
 				break;
 
 			case 38 :							//0 == endless loop
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop count", CLR_LOOP);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop count", NULL, CLR_LOOP);
 				break;
 
 			case 99 :							//(0x63) nrpn msb
 				switch (value)
 				{
 				case 0 :
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Start", CLR_LOOP);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Start", NULL, CLR_LOOP);
 					break;
 
 				case 1 :
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", CLR_LOOP);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", NULL, CLR_LOOP);
 					break;
 				}
 				break;
@@ -206,7 +206,7 @@ int SonyPS2Seq::ReadEvent(void)
 		}
 		break;
 	default: 
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", CLR_UNRECOGNIZED);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", NULL, CLR_UNRECOGNIZED);
 		return false;
 	}
 	return true;

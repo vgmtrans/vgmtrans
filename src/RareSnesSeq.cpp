@@ -394,7 +394,7 @@ int RareSnesTrack::ReadEvent(void)
 		{
 		case EVENT_UNKNOWN0:
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
-			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event");
+			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 			break;
 
 		case EVENT_UNKNOWN1:
@@ -403,7 +403,7 @@ int RareSnesTrack::ReadEvent(void)
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte
 				<< std::dec << std::setfill(L' ') << std::setw(0)
 				<< L"  Arg1: " << (int)arg1;
-			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event");
+			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 			break;
 		}
 
@@ -415,7 +415,7 @@ int RareSnesTrack::ReadEvent(void)
 				<< std::dec << std::setfill(L' ') << std::setw(0)
 				<< L"  Arg1: " << (int)arg1
 				<< L"  Arg2: " << (int)arg2;
-			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event");
+			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 			break;
 		}
 
@@ -429,7 +429,7 @@ int RareSnesTrack::ReadEvent(void)
 				<< L"  Arg1: " << (int)arg1
 				<< L"  Arg2: " << (int)arg2
 				<< L"  Arg3: " << (int)arg3;
-			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event");
+			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 			break;
 		}
 
@@ -445,7 +445,7 @@ int RareSnesTrack::ReadEvent(void)
 				<< L"  Arg2: " << (int)arg2
 				<< L"  Arg3: " << (int)arg3
 				<< L"  Arg4: " << (int)arg4;
-			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event");
+			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 			break;
 		}
 
@@ -504,7 +504,7 @@ int RareSnesTrack::ReadEvent(void)
 
 			curOffset = dest;
 			if (!IsOffsetUsed(dest))
-				AddGenericEvent(beginOffset, length, L"Jump", CLR_LOOPFOREVER);
+				AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
 			else
 				bContinue = AddLoopForever(beginOffset, length, L"Jump");
 			break;
@@ -516,7 +516,7 @@ int RareSnesTrack::ReadEvent(void)
 			USHORT dest = GetShort(curOffset); curOffset += 2;
 
 			desc << L"Times: " << (int)times << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, (times == 1 ? L"Pattern Play" : L"Pattern Repeat"), CLR_LOOP, ICON_STARTREP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, (times == 1 ? L"Pattern Play" : L"Pattern Repeat"), desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
 			if (rptNestLevel == RARESNES_RPTNESTMAX)
 			{
@@ -538,7 +538,7 @@ int RareSnesTrack::ReadEvent(void)
 			USHORT dest = GetShort(curOffset); curOffset += 2;
 
 			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern Play", CLR_LOOP, ICON_STARTREP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
 			if (rptNestLevel == RARESNES_RPTNESTMAX)
 			{
@@ -557,7 +557,7 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_RET:
 		{
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"End Pattern", CLR_TRACKEND, ICON_ENDREP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"End Pattern", desc.str().c_str(), CLR_TRACKEND, ICON_ENDREP);
 
 			if (rptNestLevel == 0)
 			{
@@ -592,31 +592,31 @@ int RareSnesTrack::ReadEvent(void)
 				defNoteDur = GetByte(curOffset++);
 			}
 
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Default Duration On", CLR_DURNOTE, ICON_NOTE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Default Duration On", desc.str().c_str(), CLR_DURNOTE, ICON_NOTE);
 			break;
 		}
 
 		case EVENT_DEFDUROFF:
 			defNoteDur = 0;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Default Duration Off", CLR_DURNOTE, ICON_NOTE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Default Duration Off", desc.str().c_str(), CLR_DURNOTE, ICON_NOTE);
 			break;
 
 		case EVENT_PITCHSLIDEUP:
 		{
 			curOffset += 5;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Up", CLR_PITCHBEND, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Up", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 			break;
 		}
 
 		case EVENT_PITCHSLIDEDOWN:
 		{
 			curOffset += 5;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Down", CLR_PITCHBEND, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Down", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 			break;
 		}
 
 		case EVENT_PITCHSLIDEOFF:
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Off", CLR_PITCHBEND, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Off", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 			break;
 
 		case EVENT_TEMPO:
@@ -638,29 +638,29 @@ int RareSnesTrack::ReadEvent(void)
 		case EVENT_VIBRATOSHORT:
 		{
 			curOffset += 3;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato (Short)", CLR_MODULATION, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato (Short)", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 			break;
 		}
 
 		case EVENT_VIBRATOOFF:
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato Off", CLR_MODULATION, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato Off", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 			break;
 
 		case EVENT_VIBRATO:
 		{
 			curOffset += 4;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato", CLR_MODULATION, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 			break;
 		}
 
 		case EVENT_TREMOLOOFF:
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tremolo Off", CLR_MODULATION, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tremolo Off", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 			break;
 
 		case EVENT_TREMOLO:
 		{
 			curOffset += 4;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tremolo", CLR_MODULATION, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tremolo", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 			break;
 		}
 
@@ -668,7 +668,7 @@ int RareSnesTrack::ReadEvent(void)
 		{
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
 			desc << L"ADSR: " << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)newADSR;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR", CLR_ADSR, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
 			break;
 		}
 
@@ -693,7 +693,7 @@ int RareSnesTrack::ReadEvent(void)
 			S8 newTuning = (signed) GetByte(curOffset++);
 			spcTuning = newTuning;
 			desc << L"Tuning: " << (int)newTuning;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tuning", CLR_PITCHBEND, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tuning", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 			break;
 		}
 
@@ -734,7 +734,7 @@ int RareSnesTrack::ReadEvent(void)
 			// TODO: update MIDI reverb value for each tracks?
 
 			desc << L"Feedback: " << (int)newFeedback << L"  Volume: " << (int)newVolL << L", " << (int)newVolR;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo Param", CLR_REVERB, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo Param", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
 			break;
 		}
 
@@ -758,7 +758,7 @@ int RareSnesTrack::ReadEvent(void)
 				desc << (int)newFIR[iFIRIndex];
 			}
 
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo FIR", CLR_REVERB, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo FIR", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
 			break;
 		}
 
@@ -766,52 +766,52 @@ int RareSnesTrack::ReadEvent(void)
 		{
 			BYTE newCLK = GetByte(curOffset++);
 			desc << L"CLK: " << (int)newCLK;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Noise Frequency", CLR_CHANGESTATE, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Noise Frequency", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
 			break;
 		}
 
 		case EVENT_NOISEON:
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Noise On", CLR_CHANGESTATE, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Noise On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
 			break;
 
 		case EVENT_NOISEOFF:
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Noise Off", CLR_CHANGESTATE, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Noise Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
 			break;
 
 		case EVENT_SETALTNOTE1:
 			altNoteByte1 = GetByte(curOffset++);
 			desc << L"Note: " << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)altNoteByte1;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Alt Note 1", CLR_CHANGESTATE, ICON_NOTE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Alt Note 1", desc.str().c_str(), CLR_CHANGESTATE, ICON_NOTE);
 			break;
 
 		case EVENT_SETALTNOTE2:
 			altNoteByte2 = GetByte(curOffset++);
 			desc << L"Note: " << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)altNoteByte2;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Alt Note 2", CLR_CHANGESTATE, ICON_NOTE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Alt Note 2", desc.str().c_str(), CLR_CHANGESTATE, ICON_NOTE);
 			break;
 
 		case EVENT_PITCHSLIDEDOWNSHORT:
 		{
 			curOffset += 4;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Down (Short)", CLR_PITCHBEND, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Down (Short)", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 			break;
 		}
 
 		case EVENT_PITCHSLIDEUPSHORT:
 		{
 			curOffset += 4;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Up (Short)", CLR_PITCHBEND, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide Up (Short)", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 			break;
 		}
 
 		case EVENT_LONGDURON:
 			useLongDur = true;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Long Duration On", CLR_DURNOTE, ICON_NOTE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Long Duration On", desc.str().c_str(), CLR_DURNOTE, ICON_NOTE);
 			break;
 
 		case EVENT_LONGDUROFF:
 			useLongDur = false;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Long Duration Off", CLR_DURNOTE, ICON_NOTE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Long Duration Off", desc.str().c_str(), CLR_DURNOTE, ICON_NOTE);
 			break;
 
 		case EVENT_SETVOLADSRPRESET1:
@@ -944,11 +944,11 @@ int RareSnesTrack::ReadEvent(void)
 		//	break;
 
 		case EVENT_RESETADSR:
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset ADSR", CLR_ADSR, ICON_CONTROL/*, L"ADSR: 8FE0"*/);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset ADSR", desc.str().c_str(), CLR_ADSR, ICON_CONTROL/*, L"ADSR: 8FE0"*/);
 			break;
 
 		case EVENT_RESETADSRSOFT:
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset ADSR (Soft)", CLR_ADSR, ICON_CONTROL/*, L"ADSR: 8EE0"*/);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset ADSR (Soft)", desc.str().c_str(), CLR_ADSR, ICON_CONTROL/*, L"ADSR: 8EE0"*/);
 			break;
 
 		case EVENT_VOICEPARAMSHORT:
@@ -1008,7 +1008,7 @@ int RareSnesTrack::ReadEvent(void)
 		{
 			BYTE newEDL = GetByte(curOffset++);
 			desc << L"Delay: " << (int)newEDL;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo Delay", CLR_REVERB, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo Delay", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
 			break;
 		}
 
@@ -1050,7 +1050,7 @@ int RareSnesTrack::ReadEvent(void)
 
 		default:
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
-			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event");
+			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 			bContinue = false;
 			break;
 		}

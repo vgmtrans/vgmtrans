@@ -39,7 +39,7 @@ int PS1Seq::GetHeaderInfo(void)
 		PS1Seq* newPS1Seq = new PS1Seq(rawfile, offset()+GetShortBE(offset()+0x11)+0x13 - 6);
 		newPS1Seq->LoadVGMFile();
 		//short relOffset = (short)GetShortBE(curOffset);
-		//AddGenericEvent(beginOffset, 4, L"Jump Relative", BG_CLR_PINK);
+		//AddGenericEvent(beginOffset, 4, L"Jump Relative", NULL, BG_CLR_PINK);
 		//curOffset += relOffset;
 	}
 	else
@@ -60,7 +60,7 @@ int PS1Seq::ReadEvent(void)
 	//if (status_byte == 0)				//Jump Relative
 	//{
 	//	short relOffset = (short)GetShortBE(curOffset);
-	//	AddGenericEvent(beginOffset, 4, L"Jump Relative", BG_CLR_PINK);
+	//	AddGenericEvent(beginOffset, 4, L"Jump Relative", NULL, BG_CLR_PINK);
 	//	curOffset += relOffset;
 
 	//	curOffset += 4;		//skip the first 4 bytes (no idea)
@@ -111,7 +111,7 @@ int PS1Seq::ReadEvent(void)
 			switch (controlNum)		//control number
 			{
 			case 6 :
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", NULL, CLR_UNKNOWN);
 				break;
 
 			case 7 :							//volume
@@ -130,11 +130,11 @@ int PS1Seq::ReadEvent(void)
 				switch (value)
 				{
 				case 20 :
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Start", CLR_LOOP);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Start", NULL, CLR_LOOP);
 					break;
 
 				case 30 :
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", CLR_LOOP);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", NULL, CLR_LOOP);
 					break;
 				}
 				break;

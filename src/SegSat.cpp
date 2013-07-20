@@ -97,7 +97,7 @@ int SegSatSeq::ReadEvent(void)
 			curOffset += 2;
 			remainingEventsInLoop = GetByte(curOffset++);
 			loopEndPos = curOffset;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reference Event", CLR_LOOP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reference Event", NULL, CLR_LOOP);
 			curOffset = loopOffset;
 			bInLoop = true;
 		}
