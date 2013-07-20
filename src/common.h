@@ -43,18 +43,21 @@ U32 StringToHex( const std::string& str );
 
 inline string wstring2string(wstring& wstr)
 {
-	string str(wstr.length(),' ');
-	copy(wstr.begin(),wstr.end(),str.begin());
+	char *mbs = new char[wstr.length() * MB_CUR_MAX + 1];
+	wcstombs(mbs, wstr.c_str(), wstr.length() * MB_CUR_MAX + 1);
+	string str(mbs);
+	delete[] mbs;
 	return str;
 }
 
 inline wstring string2wstring(string& str)
 {
-	wstring wstr(str.length(),L' ');
-	copy(str.begin(),str.end(),wstr.begin());
+	wchar_t *wcs = new wchar_t[str.length() + 1];
+	mbstowcs(wcs, str.c_str(), str.length() + 1);
+	wstring wstr(wcs);
+	delete[] wcs;
 	return wstr;
 }
-
 
 //string WstringToString(wstring& wstr)
 //{

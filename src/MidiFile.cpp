@@ -506,6 +506,26 @@ void MidiTrack::InsertText(const wchar_t* wstr, ULONG absTime)
 	aEvents.push_back(new TextEvent(this, absTime, wstr));
 }
 
+void MidiTrack::AddSeqName(const wchar_t* wstr)
+{
+	aEvents.push_back(new SeqNameEvent(this, GetDelta(), wstr));
+}
+
+void MidiTrack::InsertSeqName(const wchar_t* wstr, ULONG absTime)
+{
+	aEvents.push_back(new SeqNameEvent(this, absTime, wstr));
+}
+
+void MidiTrack::AddTrackName(const wchar_t* wstr)
+{
+	aEvents.push_back(new TrackNameEvent(this, GetDelta(), wstr));
+}
+
+void MidiTrack::InsertTrackName(const wchar_t* wstr, ULONG absTime)
+{
+	aEvents.push_back(new TrackNameEvent(this, absTime, wstr));
+}
+
 // SPECIAL NON-MIDI EVENTS
 
 // Transpose events offset the key when we write the Midi file.
@@ -832,6 +852,34 @@ TextEvent::TextEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr
 ULONG TextEvent::WriteEvent(vector<BYTE> & buf, UINT time)
 {
 	return WriteMetaTextEvent(buf, time, 0x01, text);
+}
+
+//  ************
+//  SeqNameEvent
+//  ************
+
+SeqNameEvent::SeqNameEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr)
+: MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr)
+{
+}
+
+ULONG SeqNameEvent::WriteEvent(vector<BYTE> & buf, UINT time)
+{
+	return WriteMetaTextEvent(buf, time, 0x03, text);
+}
+
+//  **************
+//  TrackNameEvent
+//  **************
+
+TrackNameEvent::TrackNameEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr)
+: MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr)
+{
+}
+
+ULONG TrackNameEvent::WriteEvent(vector<BYTE> & buf, UINT time)
+{
+	return WriteMetaTextEvent(buf, time, 0x03, text);
 }
 
 //  ************

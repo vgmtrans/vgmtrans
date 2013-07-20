@@ -121,6 +121,10 @@ public:
 	void InsertEndOfTrack(ULONG absTime);
 	void AddText(const wchar_t* wstr);
 	void InsertText(const wchar_t* wstr, ULONG absTime);
+	void AddSeqName(const wchar_t* wstr);
+	void InsertSeqName(const wchar_t* wstr, ULONG absTime);
+	void AddTrackName(const wchar_t* wstr);
+	void InsertTrackName(const wchar_t* wstr, ULONG absTime);
 	void AddGMReset();
 	void InsertGMReset(ULONG absTime);
 
@@ -469,6 +473,28 @@ class TextEvent
 {
 public:
 	TextEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr);
+	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
+	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+
+	wstring text;
+};
+
+class SeqNameEvent
+	: public MidiEvent
+{
+public:
+	SeqNameEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr);
+	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
+	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+
+	wstring text;
+};
+
+class TrackNameEvent
+	: public MidiEvent
+{
+public:
+	TrackNameEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
 	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
 

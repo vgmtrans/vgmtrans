@@ -6,6 +6,11 @@
 #include "ScaleConversion.h"
 #include "Options.h"
 
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <sstream>
+
 //  ********
 //  SeqTrack
 //  ********
@@ -79,6 +84,12 @@ int SeqTrack::LoadTrackInit(int trackNum)
 
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
+		if (trackNum == 0)
+			pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
+		wostringstream ssTrackName;
+		ssTrackName << L"Track: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << dwStartOffset << std::endl;
+		pMidiTrack->AddTrackName(ssTrackName.str().c_str());
+
 		if (trackNum == 0) {
 			pMidiTrack->AddGMReset();
 			if (parentSeq->bWriteInitialTempo)
