@@ -533,7 +533,7 @@ class CDockingSiteImpl:
     typedef CDockingSiteImpl<T,TBase,TWinTraits,TBaseImpl>  thisClass;
     typedef CDockingFrameImplBase< T, TBaseImpl ,TWinTraits > baseClass;
 public:
-    DECLARE_WND_CLASS(_T("CDockingSiteImpl"))
+    DECLARE_WND_CLASS_EX(_T("CDockingSiteImpl"), 0, COLOR_WINDOW)
     void UpdateLayout(BOOL bResizeBars = TRUE)
     {
 		bResizeBars;// avoid level 4 warning
