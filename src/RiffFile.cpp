@@ -29,8 +29,9 @@ void Chunk::SetData(const void* src, DWORD datasize)
 
 void Chunk::Write(BYTE* buffer)
 {
+	DWORD padsize = GetPaddedSize(size) - size;
 	memcpy(buffer, id, 4);
-	*(DWORD*)(buffer+4) = size;
+	*(DWORD*)(buffer+4) = size + padsize; // Microsoft says the chunkSize doesn't contain padding size, but many software cannot handle the alignment.
 	memcpy(buffer+8, data, GetPaddedSize(size));
 }
 
@@ -65,10 +66,10 @@ void ListTypeChunk::Write(BYTE* buffer)
 	}
 
 	DWORD size = bufOffset;
-	*(DWORD*)(buffer+4) = size - 8;
+	DWORD padsize = GetPaddedSize(size) - size;
+	*(DWORD*)(buffer+4) = size + padsize - 8; // Microsoft says the chunkSize doesn't contain padding size, but many software cannot handle the alignment.
 
 	// Add pad byte
-	DWORD padsize = GetPaddedSize(size) - size;
 	if (padsize != 0)
 	{
 		memset(data + size, 0, padsize);
