@@ -752,10 +752,12 @@ int RareSnesTrack::ReadEvent(void)
 			GetBytes(curOffset, 8, newFIR);
 			curOffset += 8;
 
-			desc << L"Filter: " << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase;
+			desc << L"Filter: ";
 			for (int iFIRIndex = 0; iFIRIndex < 8; iFIRIndex++)
 			{
-				desc << (int)newFIR[iFIRIndex];
+				if (iFIRIndex != 0)
+					desc << L" ";
+				desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)newFIR[iFIRIndex];
 			}
 
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo FIR", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);

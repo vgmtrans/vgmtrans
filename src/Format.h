@@ -8,8 +8,10 @@ class VGMScanner;
 class Matcher;
 class VGMScanner;
 
-//#define FORMAT_NAME(name)				\
+#if 0
+#define FORMAT_NAME(name)				\
 	virtual string GetName() {return name;}
+#endif
 
 #define DECLARE_FORMAT(_name_)						\
 _name_##Format _name_##FormatRegisterThis;			\
