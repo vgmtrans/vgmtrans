@@ -92,6 +92,7 @@ BEGIN
         MENUITEM "Detected Music Files",        ID_VIEW_VGMFILELIST
         MENUITEM "Collections",                 ID_VIEW_COLLECTIONS
         MENUITEM "Collection Info",             ID_VIEW_COLLECTIONINFO
+        MENUITEM "Logs",                        ID_VIEW_LOGLIST
     END
     POPUP "&Help"
     BEGIN
@@ -116,6 +117,7 @@ BEGIN
         MENUITEM "Detected Music Files",        ID_VIEW_VGMFILELIST
         MENUITEM "Collections",                 ID_VIEW_COLLECTIONS
         MENUITEM "Collection Info",             ID_VIEW_COLLECTIONINFO
+        MENUITEM "Logs",                        ID_VIEW_LOGLIST
     END
     POPUP "&Window"
     BEGIN
@@ -173,6 +175,9 @@ IDI_METRORIGHT          ICON                    "res\\metroright.ico"
 IDI_ADDCOLL             ICON                    "res\\addcoll.ico"
 IDR_MAINFRAME           ICON                    "res\\mainframe.ico"
 IDI_FOLDER_OPEN         ICON                    "res\\folder_open.ico"
+IDI_LEVEL_ERROR         ICON                    "res\\error.ico"
+IDI_LEVEL_WARNING       ICON                    "res\\warning.ico"
+IDI_LEVEL_INFO          ICON                    "res\\info.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //

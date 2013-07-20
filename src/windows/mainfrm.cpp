@@ -18,6 +18,7 @@
 #include "VGMFileTreeView.h"
 #include "VGMFileListView.h"
 #include "VGMCollListView.h"
+#include "LogListView.h"
 #include "HexView.h"
 #include "FileFrame.h"
 
@@ -543,6 +544,7 @@ void CMainFrame::InitializeDefaultPanes(void)
 	CRect rcItemListDock(0,0,150,300);
 	CRect rcvgmfileDock(0,0,220,/*rcClient.Width()-200*/300);
 	CRect rcCollListDock(150,150,220,/*rcClient.Width()-200*/100);
+	CRect rcLogListDock(0,0,400,80);
 	//CRect rcDock();
 
 	CImageList ilIcons;
@@ -560,6 +562,8 @@ void CMainFrame::InitializeDefaultPanes(void)
 	//this->CreatePlainTextOutputPane(m_OutputView,        _T("Output"),         ilIcons.ExtractIcon(3),  rcFloat, rcDock, hWndFirst);
 	//this->CreatePlainTextOutputPane(m_FindResultsView,   _T("Find Results 1"), ilIcons.ExtractIcon(11), rcFloat, rcDock, hWndFirst);
 	CreateCollDialogPane(theCollDialog, _T("Coll Info"),  rcFloat, rcDock, NULL);
+
+	CreateLogListViewPane(theLogListView, _T("Logs"), ilIcons.ExtractIcon(10), rcFloat, rcLogListDock, NULL);
 
 }
 
@@ -813,6 +817,44 @@ HWND CMainFrame::CreateCollDialogPane(CCollDialog& dlg, LPCTSTR sName, CRect& rc
 			pPaneWindow->DockTo(hDockTo, (int)m_PaneWindows.size());
 		}	
 	}
+	return hWndPane;
+}
+
+HWND CMainFrame::CreateLogListViewPane(CLogListView& view, LPCTSTR sName, HICON hIcon, CRect& rcFloat, CRect& rcDock, HWND hDockTo)
+{
+	HWND hWndPane = NULL;
+
+	// Task List
+	CTabbedAutoHideDockingWindow* pPaneWindow = CTabbedAutoHideDockingWindow::CreateInstance();
+	if(pPaneWindow)
+	{
+		DWORD dwStyle=WS_OVERLAPPEDWINDOW | WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+		hWndPane = pPaneWindow->Create(m_hWnd,rcFloat,sName,dwStyle);
+		DockWindow(
+			*pPaneWindow,
+			dockwins::CDockingSide(dockwins::CDockingSide::sBottom),
+			0 /*nBar*/,
+			float(0.0)/*fPctPos*/,
+			rcDock.Width() /* nWidth*/,
+			rcDock.Height() /* nHeight*/);
+
+		view.Create(hWndPane, rcDefault, NULL, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN |/* WS_HSCROLL |*/ WS_VSCROLL | WS_EX_CLIENTEDGE); //| TVS_HASBUTTONS);
+		view.SetIcon(hIcon, ICON_SMALL);
+
+		m_PaneWindowIcons.insert(m_PaneWindowIcons.end(), hIcon);
+		m_PaneWindows.insert(m_PaneWindows.end(), pPaneWindow);
+
+		pPaneWindow->SetReflectNotifications(true);
+		pPaneWindow->SetClient(view);
+
+		if(hDockTo)
+		{
+			pPaneWindow->DockTo(hDockTo, (int)m_PaneWindows.size());
+		}
+
+		pPaneWindow->PinUp(dockwins::CDockingSide::sBottom, 100, false);
+	}
+
 	return hWndPane;
 }
 

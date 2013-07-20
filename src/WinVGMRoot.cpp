@@ -4,6 +4,7 @@
 #include "VGMFileListView.h"
 #include "VGMCollListView.h"
 #include "RawFileListView.h"
+#include "LogListView.h"
 #include "ItemTreeView.h"
 #include "MusicPlayer.h"
 #include "MainFrm.h"
@@ -173,6 +174,11 @@ void WinVGMRoot::UI_AddVGMMisc(VGMMiscFile* theMiscFile)
 void WinVGMRoot::UI_AddVGMColl(VGMColl* theColl)
 {
 	theVGMCollListView.AddColl(theColl);
+}
+
+void WinVGMRoot::UI_AddLogItem(LogItem* theLog)
+{
+	theLogListView.AddLogItem(theLog);
 }
 
 void WinVGMRoot::UI_RemoveVGMFile(VGMFile* targFile)

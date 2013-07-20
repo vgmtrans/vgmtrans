@@ -573,6 +573,12 @@
     <ClCompile Include="RareSnesScanner.cpp">
       <Filter>Source Files\formats\raresnes</Filter>
     </ClCompile>
+    <ClCompile Include="LogItem.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\LogListView.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1054,6 +1060,12 @@
     </ClInclude>
     <ClInclude Include="SegSatFormat.h">
       <Filter>Header Files\formats\segsat</Filter>
+    </ClInclude>
+    <ClInclude Include="LogItem.h">
+      <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\LogListView.h">
+      <Filter>Header Files\windows</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -180,6 +180,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BytePattern.cpp" />
+    <ClCompile Include="LogItem.cpp" />
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="KabukiDecrypt.cpp" />
     <ClCompile Include="RareSnesScanner.cpp" />
@@ -195,6 +196,7 @@
     <ClCompile Include="windows\HexView.cpp" />
     <ClCompile Include="HexViewFrame.cpp" />
     <ClCompile Include="ItemTreeView.cpp" />
+    <ClCompile Include="windows\LogListView.cpp" />
     <ClCompile Include="windows\mainfrm.cpp" />
     <ClCompile Include="MediaThread.cpp" />
     <ClCompile Include="MusicPlayer.cpp" />
@@ -324,6 +326,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BytePattern.h" />
+    <ClInclude Include="LogItem.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="KabukiDecrypt.h" />
     <ClInclude Include="OrgFormat.h" />
@@ -344,6 +347,7 @@
     <ClInclude Include="windows\HexView.h" />
     <ClInclude Include="HexViewFrame.h" />
     <ClInclude Include="ItemTreeView.h" />
+    <ClInclude Include="windows\LogListView.h" />
     <ClInclude Include="windows\mainfrm.h" />
     <ClInclude Include="MediaThread.h" />
     <ClInclude Include="MusicPlayer.h" />

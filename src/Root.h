@@ -6,6 +6,7 @@
 #include "Loader.h"
 #include "Scanner.h"
 //#include "Matcher.h"
+#include "LogItem.h"
 
 class VGMColl;
 class VGMFile;
@@ -14,6 +15,7 @@ class VGMSeq;
 class VGMInstrSet;
 class VGMSampColl;
 class VGMMiscFile;
+class LogItem;
 FORWARD_DECLARE_TYPEDEF_STRUCT( ItemSet );
 
 
@@ -36,6 +38,7 @@ public:
 	void RemoveVGMFile(VGMFile* theFile, bool bRemoveFromRaw = true);
 	void AddVGMColl(VGMColl* theColl);
 	void RemoveVGMColl(VGMColl* theFile);
+	void AddLogItem(LogItem* theLog);
 		
 	//template <class T> void AddFormat()
 	//{
@@ -86,6 +89,7 @@ public:
 	virtual void UI_AddVGMSampColl(VGMSampColl* theSampColl) {}
 	virtual void UI_AddVGMMisc(VGMMiscFile* theMiscFile) {}
 	virtual void UI_AddVGMColl(VGMColl* theColl) {}
+	virtual void UI_AddLogItem(LogItem* theLog) {}
 	virtual void UI_RemoveVGMFile(VGMFile* theFile) {}
 	virtual void UI_BeginRemoveVGMFiles() {}
 	virtual void UI_EndRemoveVGMFiles() {}
@@ -105,6 +109,7 @@ protected:
 	vector<RawFile*> vRawFile;
 	vector<VGMFile*> vVGMFile;
 	vector<VGMColl*> vVGMColl;
+	vector<LogItem*> vLogItem;
 
 	vector<VGMLoader*> vLoader;
 	vector<VGMScanner*> vScanner;

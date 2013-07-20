@@ -146,11 +146,6 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 		delete newSeq;
 		return;
 	}
-
-	for (int i = 0; i < newSeq->aInstrumentsUsed.size(); i++)
-	{
-		ATLTRACE("Instrument Used: %d\n", newSeq->aInstrumentsUsed[i]);
-	}
 }
 
 void RareSnesScanner::SearchForRareSnesFromROM (RawFile* file)

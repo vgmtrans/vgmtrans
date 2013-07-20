@@ -40,6 +40,9 @@
 #define IDD_LOADINGDLG                  247
 #define IDD_SCANDLG                     247
 #define IDD_DIALOG2                     248
+#define IDI_LEVEL_ERROR                 249
+#define IDI_LEVEL_WARNING               250
+#define IDI_LEVEL_INFO                  251
 #define IDI_DEFAULT                     301
 #define IDI_OFFSET                      302
 #define IDI_LENGTH                      303
@@ -58,7 +61,8 @@
 #define ID_VIEW_RAWFILELIST             32773
 #define ID_VIEW_COLLECTIONS             32774
 #define ID_VIEW_COLLECTIONINFO          32775
-#define ID_VIEW_PANELAST                32775
+#define ID_VIEW_LOGLIST                 32776
+#define ID_VIEW_PANELAST                32776
 #define IDR_CONTEXT_MENU                32779
 #define ID_VIEW_VIEWFIRST               32780
 #define ID_VIEW_FILEHEXVIEW             32780
@@ -78,7 +82,7 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
-#define _APS_NEXT_RESOURCE_VALUE        249
+#define _APS_NEXT_RESOURCE_VALUE        252
 #define _APS_NEXT_COMMAND_VALUE         32791
 #define _APS_NEXT_CONTROL_VALUE         1008
 #define _APS_NEXT_SYMED_VALUE           101

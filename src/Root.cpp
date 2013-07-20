@@ -7,6 +7,7 @@
 #include "VGMColl.h"
 #include "Loader.h"
 #include "Scanner.h"
+#include "LogItem.h"
 
 #include "Format.h"
 #include "NDSFormat.h"
@@ -45,6 +46,7 @@ VGMRoot::~VGMRoot(void)
 	//DeleteVect<VGMScanner>(vScanner);
 	DeleteVect<RawFile>(vRawFile);
 	DeleteVect<VGMFile>(vVGMFile);
+	DeleteVect<LogItem>(vLogItem);
 }
 
 // initializes the VGMRoot class by pushing every VGMScanner and
@@ -341,4 +343,12 @@ bool VGMRoot::SaveAllAsRaw()
 		return true;
 	}
 	return false;
+}
+
+// Adds a log item to the interface.  The UI_AddLog function will handle the
+// interface-specific stuff
+void VGMRoot::AddLogItem(LogItem* theLog)
+{
+	vLogItem.push_back(theLog);
+	UI_AddLogItem(theLog);
 }

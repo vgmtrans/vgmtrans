@@ -38,6 +38,7 @@ class CItemTreeView;
 class CVGMFileTreeView;
 class CVGMFileListView;
 class CVGMCollListView;
+class CLogListView;
 class CFileFrame;
 
 #define CWM_INITIALIZE	(WMDF_LAST+1)
@@ -113,6 +114,7 @@ public:
 		UPDATE_ELEMENT(ID_VIEW_VGMFILELIST, UPDUI_MENUPOPUP)
 		UPDATE_ELEMENT(ID_VIEW_COLLECTIONS, UPDUI_MENUPOPUP)
 		UPDATE_ELEMENT(ID_VIEW_COLLECTIONINFO, UPDUI_MENUPOPUP)
+		UPDATE_ELEMENT(ID_VIEW_LOGLIST, UPDUI_MENUPOPUP)
 		UPDATE_ELEMENT(ID_PLAY, UPDUI_TOOLBAR)
 		UPDATE_ELEMENT(ID_PAUSE, UPDUI_TOOLBAR)
 		UPDATE_ELEMENT(ID_STOP, UPDUI_TOOLBAR)
@@ -220,6 +222,7 @@ protected:
 	HWND CreateVGMFilesTreeViewPane(CVGMFileTreeView& view, LPCTSTR sName, HICON hIcon, CRect& rcFloat, CRect& rcDock, HWND hDockTo);
 	HWND CreateVGMFileListViewPane(CVGMFileListView& view, LPCTSTR sName, HICON hIcon, CRect& rcFloat, CRect& rcDock, HWND hDockTo);
 	HWND CreateVGMCollListViewPane(CVGMCollListView& view, LPCTSTR sName, HICON hIcon, CRect& rcFloat, CRect& rcDock, HWND hDockTo);
+	HWND CreateLogListViewPane(CLogListView& view, LPCTSTR sName, HICON hIcon, CRect& rcFloat, CRect& rcDock, HWND hDockTo);
 	HWND CreatePlainTextOutputPane(CPlainTextView& view, LPCTSTR sName, HICON hIcon, CRect& rcFloat, CRect& rcDock, HWND hDockTo = NULL);
 	HWND CreateCollDialogPane(CCollDialog& dlg, LPCTSTR sName, CRect& rcFloat, CRect& rcDock, HWND hDockTo = NULL);
 };
