@@ -20,7 +20,7 @@ SeqTrack::SeqTrack(VGMSeq* parentFile, ULONG offset, ULONG length)
 	pMidiTrack = NULL;
 	ResetVars();
 	bDetermineTrackLengthEventByEvent = false;
-	bWriteGenericEventAsTextEvent = true;
+	bWriteGenericEventAsTextEvent = false;
 
 	swprintf(numberedName, sizeof(numberedName)/sizeof(numberedName[0]), L"Track %d", parentSeq->aTracks.size()+1);
 	name = numberedName;
@@ -79,8 +79,11 @@ int SeqTrack::LoadTrackInit(int trackNum)
 
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
-		if (parentSeq->bWriteInitialTempo && trackNum == 0)
-			pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
+		if (trackNum == 0) {
+			pMidiTrack->AddGMReset();
+			if (parentSeq->bWriteInitialTempo)
+				pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
+		}
 		if (parentSeq->bAlwaysWriteInitialVol)
 			AddVolNoItem(parentSeq->initialVol);
 		if (parentSeq->bAlwaysWriteInitialExpression)

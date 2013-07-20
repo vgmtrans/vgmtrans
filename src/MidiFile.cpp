@@ -834,6 +834,31 @@ ULONG TextEvent::WriteEvent(vector<BYTE> & buf, UINT time)
 	return WriteMetaTextEvent(buf, time, 0x01, text);
 }
 
+//  ************
+//  GMResetEvent
+//  ************
+
+GMResetEvent::GMResetEvent(MidiTrack *prntTrk, ULONG absoluteTime)
+: MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST)
+{
+}
+
+ULONG GMResetEvent::WriteEvent(vector<BYTE> & buf, UINT time)
+{
+	BYTE data[5] = { 0x7E, 0x7F, 0x09, 0x01, 0xF7 };
+	return WriteSysexEvent(buf, time, data, 5);
+}
+
+void MidiTrack::AddGMReset()
+{
+	aEvents.push_back(new GMResetEvent(this, GetDelta()));
+}
+
+void MidiTrack::InsertGMReset(ULONG absTime)
+{
+	aEvents.push_back(new GMResetEvent(this, absTime));
+}
+
 //***************
 // SPECIAL EVENTS
 //***************

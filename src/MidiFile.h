@@ -50,7 +50,8 @@ typedef enum
 	MIDIEVENT_LFO,
 	MIDIEVENT_VIBRATO,
 	MIDIEVENT_ENDOFTRACK,
-	MIDIEVENT_TEXT
+	MIDIEVENT_TEXT,
+	MIDIEVENT_RESET
 } MidiEventType;
 
 class MidiTrack
@@ -120,6 +121,8 @@ public:
 	void InsertEndOfTrack(ULONG absTime);
 	void AddText(const wchar_t* wstr);
 	void InsertText(const wchar_t* wstr, ULONG absTime);
+	void AddGMReset();
+	void InsertGMReset(ULONG absTime);
 
 	// SPECIAL EVENTS
 	//void AddTranspose(char semitones);
@@ -496,6 +499,15 @@ public:
 
 	string name;
 	BYTE databyte1, databyte2;
+};
+
+class GMResetEvent
+	: public MidiEvent
+{
+public:
+	GMResetEvent(MidiTrack* prntTrk, ULONG absoluteTime);
+	virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
+	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
 };
 
 
