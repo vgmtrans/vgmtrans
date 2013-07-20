@@ -150,24 +150,44 @@ protected:
 		void EndDrag(bool /*bCanceled*/)
 		{
 			CleanGhostRect(m_dc,&m_dockHdr.rect);
+			Reset();
 		}
 		void OnMove(long x, long y)
 		{
-			CleanGhostRect(m_dc,&m_dockHdr.rect);
-			m_dockHdr.rect.left=x;
-			m_dockHdr.rect.top=y;
-			::ClientToScreen(m_dockHdr.hdr.hWnd,reinterpret_cast<POINT*>(&m_dockHdr.rect));
-			m_dockHdr.rect.right=m_dockHdr.rect.left+m_size.cx;
-			m_dockHdr.rect.bottom=m_dockHdr.rect.top+m_size.cy;
-			m_docker.AdjustDragRect(&m_dockHdr);
-			if((GetKeyState(VK_CONTROL) & 0x8000) || !m_docker.AcceptDock(&m_dockHdr))
+			if (m_lastPos.x == x && m_lastPos.y == y)
+				return;
+
+			m_lastPos.SetPoint(x, y);
+
+			DFDOCKRECT dockHdr = m_dockHdr;
+
+			dockHdr.rect.left=x;
+			dockHdr.rect.top=y;
+
+			::ClientToScreen(dockHdr.hdr.hWnd,reinterpret_cast<POINT*>(&dockHdr.rect));
+
+			dockHdr.rect.right=dockHdr.rect.left+m_size.cx;
+			dockHdr.rect.bottom=dockHdr.rect.top+m_size.cy;
+
+			m_docker.AdjustDragRect(&dockHdr);
+
+			if((GetKeyState(VK_CONTROL) & 0x8000) || !m_docker.AcceptDock(&dockHdr))
 			{
-				m_dockHdr.hdr.hBar=HNONDOCKBAR;
-				m_dockHdr.rect.left=x+m_offset.cx;
-				m_dockHdr.rect.top=y+m_offset.cy;
-				m_dockHdr.rect.right=m_dockHdr.rect.left+m_size.cx;
-				m_dockHdr.rect.bottom=m_dockHdr.rect.top+m_size.cy;
+				dockHdr.hdr.hBar=HNONDOCKBAR;
+				dockHdr.rect.left=x+m_offset.cx;
+				dockHdr.rect.top=y+m_offset.cy;
+				dockHdr.rect.right=dockHdr.rect.left+m_size.cx;
+				dockHdr.rect.bottom=dockHdr.rect.top+m_size.cy;
 			}
+
+			if (m_lastRect == dockHdr.rect)
+				return;
+
+			CleanGhostRect(m_dc, &m_dockHdr.rect);
+
+			m_dockHdr = dockHdr;
+			m_lastRect = m_dockHdr.rect;
+
 			DrawGhostRect(m_dc,&m_dockHdr.rect);
 		}
 		bool ProcessWindowMessage(MSG* pMsg)
@@ -194,6 +214,16 @@ protected:
 		DFDOCKRECT&		m_dockHdr;
 		SIZE			m_size;
 		SIZE			m_offset;
+
+	private:
+		void Reset()
+		{
+			m_lastPos.SetPoint(-1, -1);
+			m_lastRect.SetRectEmpty();
+		}
+
+		CPoint m_lastPos;
+		CRect m_lastRect;
 	};
 public:
 	CDockingWindowBaseImpl()
