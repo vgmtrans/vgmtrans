@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "RareSnesSeq.h"
 #include "RareSnesFormat.h"
+#include "ScaleConversion.h"
 
 #include <iostream>
 #include <iomanip>
@@ -284,23 +285,27 @@ void RareSnesTrack::ResetVars(void)
 }
 
 
-void RareSnesTrack::CalcVolPanFromVolLR(BYTE volLByte, BYTE volRByte, BYTE& midiVol, BYTE& midiPan)
+void RareSnesTrack::CalcVolPanFromVolLR(S8 volLByte, S8 volRByte, BYTE& midiVol, BYTE& midiPan)
 {
-	double volL = (volLByte & 0x7f) / 127.0;
-	double volR = (volRByte & 0x7f) / 127.0;
+	double volL = abs(volLByte) / 128.0;
+	double volR = abs(volRByte) / 128.0;
 	double vol;
 	double pan;
 
-	// both input and output are linear in this function
+	// linear conversion
 	vol = (volL + volR) / 2;
+	pan = volR / (volL + volR);
+
+	// make it GM2 compatible
+	ConvertPercentVolPanToStdMidiScale(vol, pan);
+
 	midiVol = (BYTE)(vol * 127 + 0.5);
-	if (vol != 0)
+	if (midiVol != 0)
 	{
-		pan = volR / (volL + volR);
-		midiPan = (BYTE)(pan * 128 + 0.5);
-		if (midiPan == 128)
+		midiPan = (BYTE)(pan * 126 + 0.5);
+		if (midiPan != 0)
 		{
-			midiPan = 127;
+			midiPan++;
 		}
 	}
 }
@@ -460,8 +465,8 @@ int RareSnesTrack::ReadEvent(void)
 		case EVENT_PROGCHANGEVOL:
 		{
 			BYTE newProg = GetByte(curOffset++);
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
 
 			spcVolL = newVolL;
 			spcVolR = newVolR;
@@ -472,8 +477,8 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_VOLLR:
 		{
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
 
 			spcVolL = newVolL;
 			spcVolR = newVolR;
@@ -483,7 +488,7 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_VOLCENTER:
 		{
-			BYTE newVol = GetByte(curOffset++);
+			S8 newVol = (signed) GetByte(curOffset++);
 
 			spcVolL = newVol;
 			spcVolR = newVol;
@@ -676,9 +681,9 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_MASTVOLLR:
 		{
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
-			BYTE newVol = ((newVolL & 0x7f) + (newVolR & 0x7f)) / 2; // workaround: convert to mono
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
+			S8 newVol = min(abs(newVolL) + abs(newVolR), 255) / 2; // workaround: convert to mono
 			AddMasterVol(beginOffset, curOffset-beginOffset, newVol, L"Master Volume L/R");
 			break;
 		}
@@ -694,7 +699,7 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_TRANSPABS: // should be used for pitch correction of instrument
 		{
-			S8 newTransp = GetByte(curOffset++);
+			S8 newTransp = (signed) GetByte(curOffset++);
 			spcTranspose = spcTransposeAbs = newTransp;
 			//AddTranspose(beginOffset, curOffset-beginOffset, 0, L"Transpose (Abs)");
 
@@ -723,9 +728,9 @@ int RareSnesTrack::ReadEvent(void)
 		case EVENT_ECHOPARAM:
 		{
 			BYTE newFeedback = GetByte(curOffset++);
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
-			parentSeq->midiReverb = ((newVolL & 0x7f) + (newVolR & 0x7f)) / 2;
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
+			parentSeq->midiReverb = min(abs(newVolL) + abs(newVolR), 255) / 2;
 			// TODO: update MIDI reverb value for each tracks?
 
 			desc << L"Feedback: " << (int)newFeedback << L"  Volume: " << (int)newVolL << L", " << (int)newVolR;
@@ -811,8 +816,8 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_SETVOLADSRPRESET1:
 		{
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[0] = newVolL;
@@ -828,8 +833,8 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_SETVOLADSRPRESET2:
 		{
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[1] = newVolL;
@@ -845,8 +850,8 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_SETVOLADSRPRESET3:
 		{
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[2] = newVolL;
@@ -862,8 +867,8 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_SETVOLADSRPRESET4:
 		{
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[3] = newVolL;
@@ -879,8 +884,8 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_SETVOLADSRPRESET5:
 		{
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[4] = newVolL;
@@ -949,8 +954,8 @@ int RareSnesTrack::ReadEvent(void)
 		case EVENT_VOICEPARAMSHORT:
 		{
 			BYTE newProg = GetByte(curOffset++);
-			S8 newTransp = GetByte(curOffset++);
-			S8 newTuning = GetByte(curOffset++);
+			S8 newTransp = (signed) GetByte(curOffset++);
+			S8 newTuning = (signed) GetByte(curOffset++);
 
 			desc << L"Program Number: " << (int)newProg << L"  Transpose: " << (int)newTransp << L"  Tuning: " << (int)newTuning;
 
@@ -969,10 +974,10 @@ int RareSnesTrack::ReadEvent(void)
 		case EVENT_VOICEPARAM:
 		{
 			BYTE newProg = GetByte(curOffset++);
-			S8 newTransp = GetByte(curOffset++);
-			S8 newTuning = GetByte(curOffset++);
-			BYTE newVolL = GetByte(curOffset++);
-			BYTE newVolR = GetByte(curOffset++);
+			S8 newTransp = (signed) GetByte(curOffset++);
+			S8 newTuning = (signed) GetByte(curOffset++);
+			S8 newVolL = (signed) GetByte(curOffset++);
+			S8 newVolR = (signed) GetByte(curOffset++);
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			desc << L"Program Number: " << (int)newProg << L"  Transpose: " << (int)newTransp << L"  Tuning: " << (int)newTuning;
@@ -1009,10 +1014,10 @@ int RareSnesTrack::ReadEvent(void)
 
 		case EVENT_SETVOLPRESETS:
 		{
-			BYTE newVolL1 = GetByte(curOffset++);
-			BYTE newVolR1 = GetByte(curOffset++);
-			BYTE newVolL2 = GetByte(curOffset++);
-			BYTE newVolR2 = GetByte(curOffset++);
+			S8 newVolL1 = (signed) GetByte(curOffset++);
+			S8 newVolR1 = (signed) GetByte(curOffset++);
+			S8 newVolL2 = (signed) GetByte(curOffset++);
+			S8 newVolR2 = (signed) GetByte(curOffset++);
 
 			parentSeq->presetVolL[0] = newVolL1;
 			parentSeq->presetVolR[0] = newVolR1;
@@ -1058,7 +1063,7 @@ int RareSnesTrack::ReadEvent(void)
 	return bContinue;
 }
 
-void RareSnesTrack::AddVolLR(ULONG offset, ULONG length, BYTE spcVolL, BYTE spcVolR, const wchar_t* sEventName)
+void RareSnesTrack::AddVolLR(ULONG offset, ULONG length, S8 spcVolL, S8 spcVolR, const wchar_t* sEventName)
 {
 	BYTE newMidiVol;
 	BYTE newMidiPan;
@@ -1078,7 +1083,7 @@ void RareSnesTrack::AddVolLR(ULONG offset, ULONG length, BYTE spcVolL, BYTE spcV
 	}
 }
 
-void RareSnesTrack::AddVolLRNoItem(BYTE spcVolL, BYTE spcVolR)
+void RareSnesTrack::AddVolLRNoItem(S8 spcVolL, S8 spcVolR)
 {
 	BYTE newMidiVol;
 	BYTE newMidiPan;

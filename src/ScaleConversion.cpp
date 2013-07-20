@@ -139,6 +139,11 @@ BYTE ConvertPercentAmpToStdMidiVal(double percent)
 	//return round(127*pow(10.0,-0.025*atten));
 }
 
+double ConvertPercentAmpToStdMidiScale(double percent)
+{
+	return sqrt(percent);
+}
+
 double ConvertLogScaleValToAtten(double percent)
 {
 	if (percent == 0)
@@ -169,4 +174,16 @@ double SecondsToTimecents(double secs)
 long ConvertPercentPanTo10thPercentUnits(double percentPan)
 {
 	return round(percentPan * 1000) - 500;
+}
+
+// Convert a percen of linear volume/panpot value to GM2 compatible sin/cos scale.
+//  panpot: 0.0 = left, 0.5 = center, 1.0 = right
+void ConvertPercentVolPanToStdMidiScale(double& vol, double& pan)
+{
+	if (vol != 0)
+	{
+		double panPI2 = atan2(pan, 1.0 - pan);
+		vol = sqrt(vol / (cos(panPI2) + sin(panPI2)));
+		pan = panPI2 / M_PI_2;
+	}
 }

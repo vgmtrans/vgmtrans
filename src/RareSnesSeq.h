@@ -99,8 +99,8 @@ public:
 	BYTE midiReverb;                            // MIDI reverb level for SPC700 echo
 	BYTE timerFreq;                             // SPC700 timer 0 frequency (tempo base)
 	BYTE tempo;                                 // song tempo
-	BYTE presetVolL[5];                         // volume preset L
-	BYTE presetVolR[5];                         // volume preset R
+	S8 presetVolL[5];                         // volume preset L
+	S8 presetVolR[5];                         // volume preset R
 	USHORT presetADSR[5];                       // ADSR preset
 
 	double GetTempoInBPM ();
@@ -120,8 +120,8 @@ public:
 	virtual void ResetVars(void);
 	virtual int ReadEvent(void);
 
-	void AddVolLR(ULONG offset, ULONG length, BYTE spcVolL, BYTE spcVolR, const wchar_t* sEventName = L"Volume L/R");
-	void AddVolLRNoItem(BYTE spcVolL, BYTE spcVolR);
+	void AddVolLR(ULONG offset, ULONG length, S8 spcVolL, S8 spcVolR, const wchar_t* sEventName = L"Volume L/R");
+	void AddVolLRNoItem(S8 spcVolL, S8 spcVolR);
 
 private:
 	BYTE rptNestLevel;                          // nest level for repeat-subroutine command
@@ -132,11 +132,11 @@ private:
 	S8 spcTranspose;                            // transpose (compatible with actual engine)
 	S8 spcTransposeAbs;                         // transpose (without relative change)
 	S8 spcTuning;                               // tuning (compatible with actual engine)
-	BYTE spcVolL, spcVolR;                      // SPC700 left/right volume
+	S8 spcVolL, spcVolR;                      // SPC700 left/right volume
 	USHORT defNoteDur;                          // default duration for note (0:unused)
 	bool useLongDur;                            // indicates duration length
 	BYTE altNoteByte1;                          // note number preset 1
 	BYTE altNoteByte2;                          // note number preset 2
 
-	void CalcVolPanFromVolLR(BYTE volLByte, BYTE volRByte, BYTE& midiVol, BYTE& midiPan);
+	void CalcVolPanFromVolLR(S8 volLByte, S8 volRByte, BYTE& midiVol, BYTE& midiPan);
 };
