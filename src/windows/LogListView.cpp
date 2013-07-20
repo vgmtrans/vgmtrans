@@ -52,7 +52,7 @@ void CLogListView::OnDestroy()
 void CLogListView::OnSize(UINT nType, CSize size)
 {
 	int cx = size.cx;
-	SetColumnWidth(0, cx - GetColumnWidth(1));
+	SetColumnWidth(0, cx - GetColumnWidth(1) - GetColumnWidth(2));
 	ShowScrollBar(SB_HORZ, FALSE);				//this is a hacky solution.  Not sure why horiz scrollbar is there in the first place
 }
 
@@ -212,19 +212,27 @@ void CLogListView::AddLogItem(LogItem* newLog)
 	newItem.pszText = (LPWSTR)newLog->GetCText();
 	newItem.mask = LVIF_PARAM | LVIF_TEXT | LVIF_IMAGE;
 	InsertItem(&newItem);
+
+	wchar_t timeString[64];
+	DateTime timestamp = newLog->GetTime();
+	wsprintf(timeString, L"%04d-%02d-%02d %02d:%02d:%02d.%03d",
+		timestamp.get_Year(), timestamp.get_Month(), timestamp.get_Day(),
+		timestamp.get_Hour(), timestamp.get_Minute(), timestamp.get_Second(), timestamp.get_Millisecond());
+
+	SetItemText(newItem.iItem, 1, timeString);
 	switch (newLog->GetLogLevel())
 	{
 	case LOG_LEVEL_ERR:
-		SetItemText(newItem.iItem, 1, L"Error");
+		SetItemText(newItem.iItem, 2, L"Error");
 		break;
 	case LOG_LEVEL_WARN:
-		SetItemText(newItem.iItem, 1, L"Warning");
+		SetItemText(newItem.iItem, 2, L"Warning");
 		break;
 	case LOG_LEVEL_INFO:
-		SetItemText(newItem.iItem, 1, L"Information");
+		SetItemText(newItem.iItem, 2, L"Information");
 		break;
 	default:
-		SetItemText(newItem.iItem, 1, L"Unknown");
+		SetItemText(newItem.iItem, 2, L"Unknown");
 		break;
 	}
 }
@@ -244,7 +252,8 @@ void CLogListView::RemoveLogItem(LogItem* theLog)
 void CLogListView::InitColumns()
 {
 	InsertColumn ( 0, _T("Log"), LVCFMT_LEFT, 280, 0 );
-	InsertColumn ( 1, _T("Type"), LVCFMT_LEFT, 120, 0 );
+	InsertColumn ( 1, _T("Time"), LVCFMT_LEFT, 180, 0 );
+	InsertColumn ( 2, _T("Type"), LVCFMT_LEFT, 120, 0 );
 }
 
 void CLogListView::InitImageLists()
@@ -315,10 +324,17 @@ int CLogListView::SortCallback (
 
 	switch ( m_nSortedCol )
 	{
-		case 0:     // file name
+		case 0:     // log text
 			break;
 
-		case 1:     // type description
+		case 1:     // timestamp
+			if (info1.GetTime() > info2.GetTime())
+				nRet = 1;
+			else
+				nRet = -1;
+			break;
+
+		case 2:     // type description
 			if (info1.GetLogLevel() > info2.GetLogLevel())
 				nRet = 1;
 			else

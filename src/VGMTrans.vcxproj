@@ -180,6 +180,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BytePattern.cpp" />
+    <ClCompile Include="datetime.cpp" />
     <ClCompile Include="LogItem.cpp" />
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="KabukiDecrypt.cpp" />
@@ -326,6 +327,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BytePattern.h" />
+    <ClInclude Include="datetime.h" />
     <ClInclude Include="LogItem.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="KabukiDecrypt.h" />

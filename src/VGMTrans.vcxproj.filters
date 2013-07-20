@@ -579,6 +579,9 @@
     <ClCompile Include="windows\LogListView.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
+    <ClCompile Include="datetime.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1066,6 +1069,9 @@
     </ClInclude>
     <ClInclude Include="windows\LogListView.h">
       <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="datetime.h">
+      <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

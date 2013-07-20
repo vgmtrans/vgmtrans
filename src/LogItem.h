@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "datetime.h"
 
 enum LogLevel { LOG_LEVEL_ERR, LOG_LEVEL_WARN, LOG_LEVEL_INFO };
 
@@ -14,9 +15,11 @@ public:
 
 	std::wstring GetText() const;
 	const wchar_t* GetCText() const;
+	DateTime GetTime() const;
 	LogLevel GetLogLevel() const;
 
 protected:
 	std::wstring text;
+	DateTime time;
 	LogLevel level;
 };
