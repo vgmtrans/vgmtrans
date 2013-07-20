@@ -984,9 +984,10 @@ void SeqTrack::AddMarker(ULONG offset, ULONG length, string& markername, BYTE da
 // when in FIND_DELTA_LENGTH mode, returns false when we've hit the max number of loops defined in options
 bool SeqTrack::AddLoopForever(ULONG offset, ULONG length, const wchar_t* sEventName)
 {
-	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+	if (readMode == READMODE_ADD_TO_UI)
 	{
-		AddEvent(new LoopForeverSeqEvent(this, offset, length, sEventName));
+		if (!IsOffsetUsed(offset))
+			AddEvent(new LoopForeverSeqEvent(this, offset, length, sEventName));
 		return false;
 	}
 	else if (readMode == READMODE_FIND_DELTA_LENGTH)

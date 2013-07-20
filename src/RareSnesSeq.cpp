@@ -495,14 +495,13 @@ int RareSnesTrack::ReadEvent(void)
 		{
 			USHORT dest = GetShort(curOffset); curOffset += 2;
 			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
-			AddLoopForever(beginOffset, curOffset-beginOffset, L"Jump");
+			ULONG length = curOffset - beginOffset;
 
 			curOffset = dest;
-			if (IsOffsetUsed(curOffset))
-			{
-				//loaded = true;
-				bContinue = false;
-			}
+			if (!IsOffsetUsed(dest))
+				AddGenericEvent(beginOffset, length, L"Jump", CLR_LOOPFOREVER);
+			else
+				bContinue = AddLoopForever(beginOffset, length, L"Jump");
 			break;
 		}
 
