@@ -40,6 +40,7 @@ public:
 	void SetPPQN(WORD ppqn);
 	WORD GetPPQN(void);
 	//void SetTimeSignature(BYTE numer, denom);
+	void AddInstrumentRef(ULONG progNum);
 
 	void UseReverb() { bReverb = true; }
 	void HasMonophonicTracks() { bMonophonicTracks = true; }
@@ -79,6 +80,7 @@ public:
 	float reverbTime;
 
 	vector<SeqTrack*> aTracks;		//array of track pointers
+	vector<ULONG> aInstrumentsUsed;
 
 //protected:
 	//map<int, InstrAssoc> InstrMap;

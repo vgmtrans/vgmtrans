@@ -141,7 +141,16 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 	}
 
 	RareSnesSeq* newSeq = new RareSnesSeq(file, version, addrSeqHeader, name);
-	newSeq->LoadVGMFile();
+	if (!newSeq->LoadVGMFile())
+	{
+		delete newSeq;
+		return;
+	}
+
+	for (int i = 0; i < newSeq->aInstrumentsUsed.size(); i++)
+	{
+		ATLTRACE("Instrument Used: %d\n", newSeq->aInstrumentsUsed[i]);
+	}
 }
 
 void RareSnesScanner::SearchForRareSnesFromROM (RawFile* file)

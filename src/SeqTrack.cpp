@@ -849,8 +849,14 @@ void SeqTrack::AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool 
 	else
 		cDrumNote = -1;
 */
-	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
-		AddEvent(new ProgChangeSeqEvent(this, progNum, offset, length, sEventName));
+	if (readMode == READMODE_ADD_TO_UI)
+	{
+		if (!IsOffsetUsed(offset))
+		{
+			AddEvent(new ProgChangeSeqEvent(this, progNum, offset, length, sEventName));
+		}
+		parentSeq->AddInstrumentRef(progNum);
+	}
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 //		if (cDrumNote == -1)

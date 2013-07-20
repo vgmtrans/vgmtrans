@@ -166,7 +166,11 @@ int VGMSeq::LoadMain()
 
 int VGMSeq::PostLoad()
 {
-	if (readMode == READMODE_CONVERT_TO_MIDI)
+	if (readMode == READMODE_ADD_TO_UI)
+	{
+		std::sort(aInstrumentsUsed.begin(), aInstrumentsUsed.end());
+	}
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		midi->Sort();
 	}
@@ -198,6 +202,10 @@ int VGMSeq::GetTrackPointers(void)
 
 void VGMSeq::ResetVars(void)
 {
+	if (readMode == READMODE_ADD_TO_UI)
+	{
+		aInstrumentsUsed.clear();
+	}
 }
 
 void VGMSeq::SetPPQN(WORD ppqn)
@@ -211,6 +219,14 @@ WORD VGMSeq::GetPPQN(void)
 {
 	return this->ppqn;
 	//return midi->GetPPQN();
+}
+
+void VGMSeq::AddInstrumentRef(ULONG progNum)
+{
+	if (std::find(aInstrumentsUsed.begin(), aInstrumentsUsed.end(), progNum) == aInstrumentsUsed.end())
+	{
+		aInstrumentsUsed.push_back(progNum);
+	}
 }
 
 bool VGMSeq::OnSaveAsMidi(void)
