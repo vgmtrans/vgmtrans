@@ -14,20 +14,29 @@ public:
 
 public:
 	Chunk(string theId)
-		: data(0),
+		: data(NULL),
 		  size(0)
 	{
 		assert(theId.length() == 4);
 		memcpy(id, theId.c_str(), 4); 
 	}
-	~Chunk()
+	virtual ~Chunk()
 	{
-		if (data != 0)
-			delete data;
+		if (data != NULL) {
+			delete[] data;
+			data = NULL;
+		}
 	}
 	void SetData(const void* src, DWORD datasize);
-	virtual UINT GetSize();	//  Returns the size of the chunk data in bytes, including any pad byte.
+	virtual UINT GetSize();	//  Returns the size of the chunk in bytes, including any pad byte.
 	virtual void Write(BYTE* buffer);
+
+protected:
+	static inline DWORD GetPaddedSize(DWORD size) {
+		//DWORD n = size % align;
+		//return size + (n == 0 ? 0 : (align - n));
+		return size + (size % 2);
+	}
 };
 
 
@@ -48,13 +57,13 @@ public:
 		assert(theType.length() == 4);
 		memcpy(type, theType.c_str(), 4); 
 	}
-	~ListTypeChunk()
+	virtual ~ListTypeChunk()
 	{
 		DeleteList(childChunks);
 	}
 
 	Chunk* AddChildChunk(Chunk* ck);
-	virtual UINT GetSize();	//  Returns the size of the chunk data in bytes, excluding any pad byte.
+	virtual UINT GetSize();	//  Returns the size of the chunk in bytes, including any pad byte.
 	virtual void Write(BYTE* buffer);
 };
 

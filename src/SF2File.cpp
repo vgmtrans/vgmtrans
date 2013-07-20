@@ -447,5 +447,7 @@ bool SF2File::SaveSF2File(const wchar_t* filepath)
 	UINT size = this->GetSize();
 	BYTE* buf = new BYTE[size];
 	this->Write(buf);
-	return pRoot->UI_WriteBufferToFile(filepath, buf, size);
+	bool result = pRoot->UI_WriteBufferToFile(filepath, buf, size);
+	delete[] buf;
+	return result;
 }

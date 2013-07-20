@@ -4,31 +4,34 @@
 
 UINT Chunk::GetSize()
 {
-	return 8 + size;
+	return 8 + GetPaddedSize(size);
 }
 
 void Chunk::SetData(const void* src, DWORD datasize)
 {
-	// Determine if we need to pad for word alignment
-	bool bPad = datasize % 2;
+	size = datasize;
 
 	// set the size and copy from the data source
-	size = datasize + bPad;
-	if (data != 0)
-		delete data;
+	datasize = GetPaddedSize(size);
+	if (data != NULL) {
+		delete[] data;
+		data = NULL;
+	}
 	data = new BYTE[datasize];
-	memcpy(data, src, datasize);
+	memcpy(data, src, size);
 
 	// Add pad byte
-	if (bPad)
-		*(data+datasize) = 0;
+	DWORD padsize = datasize - size;
+	if (padsize != 0) {
+		memset(data + size, 0, padsize);
+	}
 }
 
 void Chunk::Write(BYTE* buffer)
 {
 	memcpy(buffer, id, 4);
 	*(DWORD*)(buffer+4) = size;
-	memcpy(buffer+8, data, size);
+	memcpy(buffer+8, data, GetPaddedSize(size));
 }
 
 Chunk* ListTypeChunk::AddChildChunk(Chunk* ck)
@@ -44,14 +47,14 @@ UINT ListTypeChunk::GetSize()
 	//for_each (ck, childChunks)
 	for	(auto iter = this->childChunks.begin(); iter != childChunks.end(); iter++)
 		size += (*iter)->GetSize();
-	return size;
+	return GetPaddedSize(size);
 }
 
 void ListTypeChunk::Write(BYTE* buffer)
 {
 	memcpy(buffer, this->id, 4);
-	*(DWORD*)(buffer+4) = GetSize()-8;
 	memcpy(buffer+8, this->type, 4);
+
 	UINT bufOffset = 12;
 	//for(Chunk ck : childChunks)			//C++0X syntax, not supported in MSVC (fuck Microsoft)
 	//for_each (ck, childChunks)
@@ -60,7 +63,16 @@ void ListTypeChunk::Write(BYTE* buffer)
 		(*iter)->Write(buffer+bufOffset);
 		bufOffset += (*iter)->GetSize();
 	}
-	//TODO: Add pad byte
+
+	DWORD size = bufOffset;
+	*(DWORD*)(buffer+4) = size - 8;
+
+	// Add pad byte
+	DWORD padsize = GetPaddedSize(size) - size;
+	if (padsize != 0)
+	{
+		memset(data + size, 0, padsize);
+	}
 }
 
 RiffFile::RiffFile(string file_name, string form)
