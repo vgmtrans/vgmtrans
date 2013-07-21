@@ -6,11 +6,25 @@
 
 
 
-2009. 11.07 (Sat) - by author
+2012. 2.24  -  revisions by mike
 
-	[1]
+	[1] Added SoundFont 2 conversion.
 
-2009. 9.29 (Tue)  -  by author
+	[2] Improvements to QSound driver: 
+            -Added all CPS2 games and QSound CPS1 games to mame_roms.xml. 
+            -Added tremolo and vibrato support. 
+            -Fixed issue when decay rate and sustain level are both 0.
+            -Fixed jump/looping events.
+
+        [3] Added sequence looping support.
+
+	[4] Improved linear/logarithmic volume scale conversion.
+
+        [5] Improved linear/logarithmic ADSR envelope conversion.
+
+	[5] Other forgotten improvements
+
+2009. 9.29  -  revisions by mike
 
 	[1] MAMELoader class is now more flexible.  Attributes for each game entry
 	    are collected into a key/value map so they can be format-specific.
@@ -35,7 +49,7 @@
 	    playback between collections.
 
 
-2009. 9.03 (Thu)  -  by author
+2009. 9.03  -  revisions by mike
 
 	[1] Fixed ADSR and added pan and attenuation to HOSA instrument sets. 
 	    Also rewrote the scanner code, though it still needs work.
@@ -48,7 +62,7 @@
 	    future to return more than the first match.
 
 
-2009. 9.01 (Tue)  -   by SOUND TEST :774
+2009. 9.01  -  revisions by SOUND TEST :774
 
 	[1] smdsの、リピート時にオクターブが狂うバグをFix.（したつもり）
 	    Fixed octave bug of smds (FFT, Xenogears) when repeat.
@@ -60,14 +74,14 @@
 	    Maybe, common instrument set with the all sequences?
 
 
-2009. 9.01 (Tue)  -  by author
+2009. 9.01  -  revisions by mike
 
 	[1] Fixed pitch tune and unity key in dwds/wds instrument sets.
 
 	[2] Added PitchBend and PitchBendRange events to TriAcePS1 sequences.
 
 
-2009. 8.31 (Mon)  -  by author
+2009. 8.31  -  revisions by mike
 
 	[1] Added dwds/wds (FFT, Xenogears) instrument set support,
 	    though Xenogears is broken at the moment.
@@ -98,7 +112,7 @@
 	[7] Minor fixes, knick knacks, and paddywacks.
 
 
-2009. 8.29 (Sat)  -  by author
+2009. 8.29  -  revisions by mike
 
 	[1] Added TriAcePS1 sequence and instrument set formats.
 	    Sequence format implementation is based on the documentation
@@ -122,7 +136,7 @@
 	[6] Minor fixes and changes here and there.
 
 
-2009. 6.24 (Wed)  -  by SOUND TEST :774
+2009. 6.24  -  revisions by SOUND TEST :774
 
 	[1] "smds"で使われる音色Bank"wds "形式を認識するようにした。
 	　　"*.wav"は、吐けるようになったけど、DLSへの変換は出来なかった。
@@ -135,7 +149,7 @@
 
 
 
-2009. 6.20 (Sat)  -  by SOUND TEST :774
+2009. 6.20  -  revisions by SOUND TEST :774
 
 	[1] HOSA.cppを書き直した。
 	　・スレ（http://schiphol.2ch.net/test/read.cgi/gamemusic/1226754407/）の、
@@ -146,7 +160,7 @@
 
 
 
-2009. 6.20 (Sat)   -  by SOUND TEST :774
+2009. 6.20   -  revisions by SOUND TEST :774
 
 	[1] HOSAのバグの原因がわかったので、対処。
 	変数の初期化忘れてたのが原因だった。
@@ -161,14 +175,14 @@
 
 
 
-2009. 6.18 (Thu)   -  by SOUND TEST :774
+2009. 6.18   -  revisions by SOUND TEST :774
 
 	[1] HOSA に対応させた。
 	　　但し、原因不明のバグ有り。（There is bug.）
 
 
 
-2009. 6.17 (Wed)   -  by SOUND TEST :774
+2009. 6.17   -  revisions by SOUND TEST :774
 
 	[1] AKAO
 	--------
