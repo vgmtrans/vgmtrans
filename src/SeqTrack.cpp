@@ -919,7 +919,10 @@ void SeqTrack::AddTempo(ULONG offset, ULONG length, ULONG microsPerQuarter, cons
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new TempoSeqEvent(this, parentSeq->tempoBPM, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->AddTempo(microsPerQuarter);
+	{
+		// Some MIDI tool can recognise tempo event only in the first track.
+		parentSeq->aTracks[0]->pMidiTrack->InsertTempo(microsPerQuarter, pMidiTrack->GetDelta());
+	}
 }
 
 void SeqTrack::AddTempoSlide(ULONG offset, ULONG length, ULONG dur, ULONG targMicrosPerQuarter, const wchar_t* sEventName)
@@ -939,8 +942,9 @@ void SeqTrack::AddTempoBPMNoItem(double bpm)
 	parentSeq->tempoBPM = bpm;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
-		pMidiTrack->AddTempoBPM(bpm);
-	}	
+		// Some MIDI tool can recognise tempo event only in the first track.
+		parentSeq->aTracks[0]->pMidiTrack->InsertTempoBPM(bpm, pMidiTrack->GetDelta());
+	}
 }
 
 void SeqTrack::AddTempoBPMSlide(ULONG offset, ULONG length, ULONG dur, double targBPM, const wchar_t* sEventName)

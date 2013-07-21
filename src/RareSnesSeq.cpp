@@ -252,7 +252,14 @@ double RareSnesSeq::GetTempoInBPM (BYTE tempo)
 
 double RareSnesSeq::GetTempoInBPM (BYTE tempo, BYTE timerFreq)
 {
-	return (double) 60000000 / (SEQ_PPQN * (125 * timerFreq)) * ((double) tempo / 256);
+	if (timerFreq != 0 && tempo != 0)
+	{
+		return (double) 60000000 / (SEQ_PPQN * (125 * timerFreq)) * ((double) tempo / 256);
+	}
+	else
+	{
+		return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
+	}
 }
 
 
@@ -266,6 +273,15 @@ RareSnesTrack::RareSnesTrack(RareSnesSeq* parentFile, long offset, long length)
 	ResetVars();
 	bDetermineTrackLengthEventByEvent = true;
 	bWriteGenericEventAsTextEvent = false;
+}
+
+int RareSnesTrack::LoadTrackInit(int trackNum)
+{
+	if (!SeqTrack::LoadTrackInit(trackNum))
+		return false;
+
+	AddReverbNoItem(0);
+	return true;
 }
 
 void RareSnesTrack::ResetVars(void)
