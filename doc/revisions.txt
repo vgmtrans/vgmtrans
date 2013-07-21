@@ -6,6 +6,18 @@
 
 
 
+2013. x.xx  -  revisions by loveemu
+
+	[1] Added Rare SNES sequence format.
+
+	[2] Fixed a lot of memory leak/corruption problem.
+
+	[3] Updated GUI icon/style.
+
+	[4] Added Log List pane.
+
+	[5] Other minor fixes/improvements.
+
 2012. 2.24  -  revisions by mike
 
 	[1] Added SoundFont 2 conversion.

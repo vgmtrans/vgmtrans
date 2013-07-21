@@ -14,6 +14,7 @@ VGMTrans converts a music files used in console video games into standard midi a
 -Capcom's QSound sequence and instrument formats used in CPS1/CPS2 arcade games
 -Squaresoft's PS1 format  used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
 -Nintendo's Gameboy Advance sequence format
+-Rare's SNES sequence format (.spc)
 
 The source code includes preliminary work on additional formats. 
 
@@ -33,15 +34,10 @@ What you need to compile it
 -Windows Template Library 8.0 (WTL)
 -a version of the DirectX 9 SDK  which supports DirectMusic (DirectMusic was eventually removed by Microsoft.  The August 2007 SDK works, for example)
 
-==============
-A special note
-==============
-This software is prone to crash and its source code is extremely messy.  The same can be said of the author - a sad, hollow shell of a man.
-
 ============
 Contributers
 ============
-The original author (anonymous), worked on almost everything.
+Mike, worked on almost everything.
 loveemu, worked on the DS and GBA format, and small bugfixes/improvements.
 Sound Test: 774 (anonymous guy in 2ch BBS), worked on the HOSA format, analyzing the TriAacePS1 format and various other things.
 
