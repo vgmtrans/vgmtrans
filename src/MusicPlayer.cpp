@@ -51,7 +51,7 @@ bool MusicPlayer::Init(HWND hWnd)
 	{
 		CPortPerformance.Initialize(CMusic8,NULL,NULL);
 		//CInPort.Initialize(CMusic8);   // Initialize the input port	
-		//COutPort.Initialize(CMusic8);  // Initialize the output port	
+		COutPort.Initialize(CMusic8);  // Initialize the output port	
 		DLSLoader.Initialize();		   // Initialize the Loader object
 		EnumPorts();				   // Enumerate ports and select the default one
 
