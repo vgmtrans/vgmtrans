@@ -72,7 +72,7 @@ protected:
 	CDirectMusic	 CMusic8;
 	CPortPerformance CPortPerformance;
 	COutputPort		 COutPort;
-	CInputPort       CInPort;
+	//CInputPort       CInPort;
 	CDLSLoader		 DLSLoader;
 	CCollection		 Collection;
 	CMusicReceiver   Receiver;

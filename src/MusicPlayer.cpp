@@ -3,6 +3,8 @@
 #include "osdepend.h"
 #include "VGMSeq.h"
 #include "DLSFile.h"
+#include "LogItem.h"
+#include "Root.h"
 
 #include "MainFrm.h"
 
@@ -48,8 +50,8 @@ bool MusicPlayer::Init(HWND hWnd)
 	try
 	{
 		CPortPerformance.Initialize(CMusic8,NULL,NULL);
-		CInPort.Initialize(CMusic8);   // Initialize the input port	
-		COutPort.Initialize(CMusic8);  // Initialize the output port	
+		//CInPort.Initialize(CMusic8);   // Initialize the input port	
+		//COutPort.Initialize(CMusic8);  // Initialize the output port	
 		DLSLoader.Initialize();		   // Initialize the Loader object
 		EnumPorts();				   // Enumerate ports and select the default one
 
@@ -64,9 +66,9 @@ bool MusicPlayer::Init(HWND hWnd)
 		SetWriteLatency(100);
 		SetWritePeriod(10);
 
-		CInPort.SetReceiver(Receiver);
-		CInPort.ActivateNotification();	// Activates event notification
-		CInPort.SetThru(0,1,0,COutPort);// Activates the Midi thru with the default output port
+		//CInPort.SetReceiver(Receiver);
+		//CInPort.ActivateNotification();	// Activates event notification
+		//CInPort.SetThru(0,1,0,COutPort);// Activates the Midi thru with the default output port
 	} catch(CDMusicException CDMusicEx)		// Gets the exception
 	{
 		switch(CDMusicEx.m_hrCode)
@@ -170,8 +172,8 @@ void MusicPlayer::EnumPorts()
 {
 	INFOPORT Info;
 	DWORD dwNumOutPorts = COutPort.GetNumPorts();
-	DWORD dwNumInPorts = CInPort.GetNumPorts();
-	DWORD dwCountInPorts = 0;
+	//DWORD dwNumInPorts = CInPort.GetNumPorts();
+	//DWORD dwCountInPorts = 0;
 	BOOL bSelected = FALSE;
 
 	// List all output ports
@@ -208,24 +210,24 @@ void MusicPlayer::EnumPorts()
 
 	// List all input ports
 
-	for(nPortCount = 1;nPortCount<=dwNumInPorts;nPortCount++)
-	{
-		//CInPort.GetPortInfo(4,&Info);
-		CInPort.GetPortInfo(nPortCount,&Info);
-		if (Info.dwType != DMUS_PORT_KERNEL_MODE)
-		{
-	//		m_InPortList.AddString(Info.szPortDescription);
-//			if (!bSelected) // Select the port
-			if (wcscmp(Info.szPortDescription,_T("EDIROL PCR-A 1 [Emulated]")) == 0)
-			{	
-				CInPort.ActivatePort(&Info);
-				bSelected = TRUE;
-	//			m_nInPortSel = dwCountInPorts;
-	//			m_InPortList.SetCurSel(m_nInPortSel);
-			}
-			dwCountInPorts++;
-		}
-	}
+	//for(nPortCount = 1;nPortCount<=dwNumInPorts;nPortCount++)
+	//{
+	//	//CInPort.GetPortInfo(4,&Info);
+	//	CInPort.GetPortInfo(nPortCount,&Info);
+	//	if (Info.dwType != DMUS_PORT_KERNEL_MODE)
+	//	{
+	//		//m_InPortList.AddString(Info.szPortDescription);
+	//		//if (!bSelected) // Select the port
+	//		if (wcscmp(Info.szPortDescription,_T("EDIROL PCR-A 1 [Emulated]")) == 0)
+	//		{	
+	//			CInPort.ActivatePort(&Info);
+	//			bSelected = TRUE;
+	//			//m_nInPortSel = dwCountInPorts;
+	//			//m_InPortList.SetCurSel(m_nInPortSel);
+	//		}
+	//		dwCountInPorts++;
+	//	}
+	//}
 }	
 
 
@@ -243,8 +245,8 @@ void MusicPlayer::CloseDown()
 		vpInstruments.clear();
 		CloseHandle(stopPlaybackEvent); // Close the event handler
 		CloseHandle(unpausedPlaybackEvent); // Close the event handler
-		CInPort.BreakThru(0,0,0); // Breaks the thru connection
-		CInPort.TerminateNotification(); // Terminates the input port notification
+		//CInPort.BreakThru(0,0,0); // Breaks the thru connection
+		//CInPort.TerminateNotification(); // Terminates the input port notification
 	} catch(CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
@@ -534,6 +536,7 @@ void MusicPlayer::ReleaseAllKeys()
 		} catch (CDMusicException CDMusicEx)
 		{
 			OutputDebugString(CDMusicEx.GetErrorDescription());
+			pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
 		}
 	}
 }
@@ -549,6 +552,7 @@ void MusicPlayer::SetWriteLatency(DWORD dwLatency)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
+		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
 	}
 }
 
@@ -563,6 +567,7 @@ void MusicPlayer::SetWritePeriod(DWORD dwPeriod)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
+		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
 	}
 }
 
@@ -585,6 +590,7 @@ void MusicPlayer::SetupReverb(VGMSeq* vgmseq)
 		catch (CDMusicException CDMusicEx)
 		{
 			OutputDebugString(CDMusicEx.GetErrorDescription());
+			pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
 		}
 		COutPort.SetEffect(SET_REVERB /*| SET_CHORUS*/);	// Activate effects
 	}
@@ -606,6 +612,7 @@ void MusicPlayer::SetVolume(long vol)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
+		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
 	}
 }
 
@@ -738,6 +745,7 @@ DWORD MusicPlayer::ProcessSeqPlayback(PVOID pParam)
 			catch(CDMusicException CDMusicEx)
 			{
 				OutputDebugString(CDMusicEx.GetErrorDescription());
+				pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
 			}
 		}
 	}
