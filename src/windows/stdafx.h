@@ -16,6 +16,9 @@
 #define _ATL_NO_MSIMG
 #define _ATL_NO_OPENGL
 
+#define WIDEN2(x) L ## x
+#define WIDEN(x) WIDEN2(x)
+
 #ifdef _DEBUG
 	// When debugging, turn on the CRT's debugging facilities
 	// for checking for memory leaks

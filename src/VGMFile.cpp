@@ -96,7 +96,7 @@ int VGMFile::LoadVGMFile()
 	if (fmt)
 		fmt->OnNewFile(this);
 
-	pRoot->AddLogItem(new LogItem(wstring(L"Loaded \"" + name + L"\" successfully."), LOG_LEVEL_INFO));
+	pRoot->AddLogItem(new LogItem(wstring(L"Loaded \"" + name + L"\" successfully.").c_str(), LOG_LEVEL_INFO, L"VGMFile"));
 	return val;
 }
 

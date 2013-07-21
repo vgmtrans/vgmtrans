@@ -8,21 +8,24 @@
 LogItem::LogItem() :
 	text(),
 	time(DateTime::get_Now()),
-	level(LOG_LEVEL_ERR)
+	level(LOG_LEVEL_ERR),
+	source()
 {
 }
 
-LogItem::LogItem(const wchar_t* text, LogLevel level) :
+LogItem::LogItem(const wchar_t* text, LogLevel level, const wchar_t* source) :
 	text(text ? text : L""),
 	time(DateTime::get_Now()),
-	level(level)
+	level(level),
+	source(source ? source : L"")
 {
 }
 
-LogItem::LogItem(std::wstring& text, LogLevel level) :
+LogItem::LogItem(std::wstring& text, LogLevel level, std::wstring& source) :
 	text(text),
 	time(DateTime::get_Now()),
-	level(level)
+	level(level),
+	source(source)
 {
 }
 
@@ -48,4 +51,14 @@ DateTime LogItem::GetTime() const
 LogLevel LogItem::GetLogLevel() const
 {
 	return level;
+}
+
+std::wstring LogItem::GetSource() const
+{
+	return std::wstring(source);
+}
+
+const wchar_t* LogItem::GetCSource() const
+{
+	return source.c_str();
 }
