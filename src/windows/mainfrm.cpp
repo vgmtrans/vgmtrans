@@ -601,6 +601,10 @@ void CMainFrame::UninitializeDefaultPanes(void)
 	{
 		theCollDialog.DestroyWindow();
 	}
+	if(theLogListView.IsWindow())
+	{
+		theLogListView.DestroyWindow();
+	}
 }
 
 HWND CMainFrame::CreatePlainTextOutputPane(CPlainTextView& view, LPCTSTR sName, HICON hIcon, CRect& rcFloat, CRect& rcDock, HWND hDockTo)
