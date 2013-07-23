@@ -23,7 +23,7 @@ public:
 
 	bool open(const wstring& filename);
 	void close();
-	long size(void);
+	unsigned long size(void);
 	inline const wchar_t* GetFullPath() { return fullpath.c_str(); }
 	inline const wchar_t* GetFileName() { return filename.c_str(); }	//returns the filename with extension
 	inline const wstring& GetExtension() { return extension; }

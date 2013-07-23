@@ -61,7 +61,7 @@ int OrgTrack::LoadTrack(int trackNum, ULONG stopOffset, long stopDelta)
 	if (trackNum == 0)
 	{
 		AddTempo(0, 0, ((OrgSeq*)parentSeq)->waitTime*4000);
-		AddTimeSig(0, 0, 4, 4, parentSeq->GetPPQN());
+		AddTimeSig(0, 0, 4, 4, (BYTE)parentSeq->GetPPQN());
 	}
 	if (channel == 10)
 		AddProgramChange(0, 0, waveNum);
@@ -89,7 +89,7 @@ int OrgTrack::ReadEvent(void)
 	if (pan == 0xFF)
 		pan = prevPan;
 	else
-		pan = GetByte(curOffset + (numNotes-curNote)*4 + numNotes*3 + curNote) * 10.66666666666666666666666666666;
+		pan = (BYTE)(GetByte(curOffset + (numNotes-curNote)*4 + numNotes*3 + curNote) * 10.66666666666666666666666666666);
 	//if (newPan > 0x7F)	//sometimes the value is 0xFF, even though the range would seem to be 0-C according to the org editor
 	//	newPan = 64;	//in this case, set it to the center position, i can't distinguish it from center on hearing tests
 	if (pan != prevPan)

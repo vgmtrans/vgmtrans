@@ -96,6 +96,9 @@ protected:
 
 extern CRawFileListView rawFileListView;
 
+#undef VIEW_STYLES
+#undef VIEW_EX_STYLES
+
 /////////////////////////////////////////////////////////////////////////////
 
 //{{AFX_INSERT_LOCATION}}

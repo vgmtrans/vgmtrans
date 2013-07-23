@@ -31,7 +31,7 @@ int MP2kSeq::GetHeaderInfo(void)
 
 int MP2kSeq::GetTrackPointers(void)
 {
-	for(int i=0; i<nNumTracks; i++)
+	for(unsigned int i=0; i<nNumTracks; i++)
 		aTracks.push_back(new MP2kTrack(this, GetWord(dwOffset + 8 + i*4)-0x8000000));
 	//	AddTrack(new MP2kTrack(this, GetWord(dwOffset + 8 + i*4)-0x8000000));
 	//{

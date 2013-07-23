@@ -62,7 +62,7 @@ int FFTSeq::GetHeaderInfo(void)
 	hdr->AddSimpleItem(dwOffset+0x20, 2, L"Drumkit Data Pointer");
 
 	VGMHeader* trackPtrs = AddHeader(dwOffset+0x22, nNumTracks*2, L"Track Pointers");
-	for (int i = 0; i < nNumTracks; i++)
+	for (unsigned int i = 0; i < nNumTracks; i++)
 		trackPtrs->AddSimpleItem(dwOffset+0x22+i*2, 2, L"Track Pointer");
 	VGMHeader* titleHdr = AddHeader(dwOffset+ptSongTitle, titleLength, L"Song Name");
 
@@ -94,7 +94,7 @@ int FFTSeq::GetHeaderInfo(void)
 
 int FFTSeq::GetTrackPointers(void)
 {
-	for(int i=0; i<nNumTracks; i++)
+	for(unsigned int i=0; i<nNumTracks; i++)
 		aTracks.push_back(new FFTTrack(this, GetShort(dwOffset+0x22+(i*2)) + dwOffset));
 	return true;
 }
@@ -229,7 +229,7 @@ int FFTTrack::ReadEvent(void)
 		{
 			BYTE numer = GetByte(curOffset++);
 			BYTE denom = GetByte(curOffset++);
-			AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, parentSeq->GetPPQN());
+			AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, (BYTE)parentSeq->GetPPQN());
 		}
 		break;
 

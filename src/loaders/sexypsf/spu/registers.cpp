@@ -37,9 +37,9 @@
  - generic cleanup for the Peops release
 
 */
-#define _IN_REGISTERS
-
 #include "stdafx.h"
+
+#define _IN_REGISTERS
 
 #include "registers.h"
 #include "spu.h"

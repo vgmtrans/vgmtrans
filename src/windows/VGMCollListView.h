@@ -105,6 +105,9 @@ protected:
 
 extern CVGMCollListView theVGMCollListView;
 
+#undef VIEW_STYLES
+#undef VIEW_EX_STYLES
+
 /////////////////////////////////////////////////////////////////////////////
 
 //{{AFX_INSERT_LOCATION}}

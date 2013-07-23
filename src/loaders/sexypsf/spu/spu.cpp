@@ -77,9 +77,10 @@
 //
 //*************************************************************************//
 
+#include "stdafx.h"
+
 #define _IN_SPU
 
-#include "stdafx.h"
 #include "spu.h"
 #include "regs.h"
 #include "registers.h"

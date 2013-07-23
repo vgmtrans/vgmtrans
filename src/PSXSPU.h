@@ -155,12 +155,12 @@ template <class T> void PSXConvADSR(T* realADSR,
 
 	int rateIncTable[8] = { 0, 4, 6, 8, 9, 10, 11, 12 };
 	long envelope_level;
-	long sustain_envelope_level;
+	//long sustain_envelope_level;
 	double samples;
 	unsigned long rate;
 	unsigned long remainder;
 	double timeInSecs;
-	double theRate;
+	//double theRate;
 	int l;
 
 	if (!bRateTableInitialized)

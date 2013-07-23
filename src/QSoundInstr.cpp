@@ -24,7 +24,7 @@ QSoundArticTable::~QSoundArticTable(void)
 
 int QSoundArticTable::LoadMain()
 {
-	int off = dwOffset;
+	DWORD off = dwOffset;
 	U32 test1=1, test2=1;
 	//for (int i = 0; (test1 || test2)  && ((test1 != 0xFFFFFFFF) || (test2 != 0xFFFFFFFF)); i++, off += sizeof(qs_samp_info) )
 	for (int i = 0; off < dwOffset+unLength; i++, off += sizeof(qs_samp_info))
@@ -73,7 +73,7 @@ QSoundSampleInfoTable::~QSoundSampleInfoTable(void)
 
 int QSoundSampleInfoTable::LoadMain()
 {
-	int off = dwOffset;
+	DWORD off = dwOffset;
 	U32 test1=1, test2=1;
 	if (unLength == 0)
 		unLength = 0xFFFFFFFF - dwOffset;
@@ -156,7 +156,7 @@ int QSoundInstrSet::GetInstrPointers()
 			instr_info_length = sizeof(qs_prog_info_ver_103);		//1.16 (Xmen vs SF) is like this
 
 		vector<U16> instr_table_ptrs;
-		for (int i=0; i<num_instr_banks; i++)
+		for (unsigned int i=0; i<num_instr_banks; i++)
 			instr_table_ptrs.push_back(GetShort(dwOffset+i*2));	//get the instr table ptrs
 		int totalInstrs = 0;
 		for (UINT i=0; i<instr_table_ptrs.size(); i++)
@@ -296,8 +296,8 @@ int QSoundInstr::LoadInstr()
 	if (this->sustain_level >= 0x7E && this->sustain_rate > 0 && this->decay_rate > 1)
 	{
 		//for a better approximation, we count the ticks to get from original Dr to original Sl
-		ticks = ceil((0xFFFF-Sl) / (double)Dr);
-		ticks +=  ceil(Sl / (double)Sr);
+		ticks = (long)ceil((0xFFFF-Sl) / (double)Dr);
+		ticks += (long)ceil(Sl / (double)Sr);
 		//double ticksToHalfVol = ((65535.0 - 20724.9866) / 65535.0)
 		rgn->decay_time = ticks * QSOUND_TICK_FREQ;
 		Sl = 0;
@@ -375,7 +375,7 @@ bool QSoundSampColl::GetSampleInfo()
 			sampLength = -sampLength;
 		//UINT loopOffset = (sampOffset+sampLength)-((sampInfo->bank<<16) + (sampInfo->loop_offset_hi<<8) + sampInfo->loop_offset_lo);
 		UINT loopOffset = ((sampInfo->bank<<16) + (sampInfo->loop_offset_hi<<8) + sampInfo->loop_offset_lo) - sampOffset;
-		if (loopOffset > sampLength)
+		if (loopOffset > (UINT)sampLength)
 			loopOffset = sampLength;
 		if (sampLength == 0 || sampOffset > unLength)
 			break;

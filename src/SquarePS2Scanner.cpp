@@ -53,7 +53,7 @@ void SquarePS2Scanner::SearchForBGMSeq(RawFile* file)
 
 void SquarePS2Scanner::SearchForWDSet(RawFile* file)
 {
-	UINT l;
+	//UINT l;
 	DWORD numRegions, firstRgnPtr;
 
 	float prevProPreRatio = file->GetProPreRatio();
@@ -81,7 +81,7 @@ void SquarePS2Scanner::SearchForWDSet(RawFile* file)
 
 					int zeroOffsetCounter = 0;
 
-					for (int curRgn=0; curRgn<numRegions; curRgn++)			//check that every region points to a valid sample by checking if first 16 bytes of sample are 0
+					for (unsigned int curRgn=0; curRgn<numRegions; curRgn++)			//check that every region points to a valid sample by checking if first 16 bytes of sample are 0
 					{
 						ULONG relativeRgnSampOffset = file->GetWord(i+firstRgnPtr+curRgn*0x20+4) & 0xFFFFFFF0;		//ignore the first nibble, it varies between versions but will be consistent this way
 						if (relativeRgnSampOffset < 0x10)

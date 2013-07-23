@@ -740,7 +740,7 @@ void CHexView::SetupColor()
 	memset(col, 0, curFile->unLength);
 
 	//BYTE* compBlock = (BYTE*)malloc(COL_BLOCKDEST_SIZE);
-	int j = 0;
+	unsigned int j = 0;
 	while (j < curFile->unLength)
 	{
 		//if (offset+j > curFile->dwOffset+curFile->unLength)

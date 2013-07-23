@@ -6,7 +6,7 @@
 //VAB Header
 struct VabHdr
 {
-	long form; /*always “VABp”*/
+	long form; /*always "VABp"*/
 	long ver; /*format version number*/
 	long id; /*bank ID*/
 	unsigned long fsize; /*file size*/
@@ -40,11 +40,11 @@ struct ProgAtr
 //Tone Attributes
 struct VagAtr
 {
-	unsigned char prior; /*tone priority (0 – 127); used for controlling allocation when more voices than can be keyed on are requested*/
+	unsigned char prior; /*tone priority (0 - 127); used for controlling allocation when more voices than can be keyed on are requested*/
 	unsigned char mode; /*tone mode (0 = normal; 4 = reverb applied */
 	unsigned char vol; /*tone volume*/
 	unsigned char pan; /*tone pan*/
-	unsigned char center; /*center note (0~127*/
+	unsigned char center; /*center note (0~127)*/
 	unsigned char shift; /*pitch correction (0~127,cent units)*/
 	unsigned char min; /*minimum note limit (0~127)*/
 	unsigned char max; /*maximum note limit (0~127, provided min < max)*/

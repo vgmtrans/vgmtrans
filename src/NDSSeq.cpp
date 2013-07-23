@@ -340,7 +340,7 @@ int NDSTrack::ReadEvent(void)
 
 	case 0xCE: // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
 		{
-			bool bPortOn = GetByte(curOffset++);
+			bool bPortOn = (GetByte(curOffset++) != 0);
 			AddPortamento(beginOffset, curOffset-beginOffset, bPortOn);
 		}
 		break;

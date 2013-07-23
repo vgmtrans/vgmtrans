@@ -70,7 +70,7 @@ int HOSASeq::GetHeaderInfo(void)
 //==============================================================
 int HOSASeq::GetTrackPointers(void)
 {
-	for(int i=0; i<nNumTracks; i++)
+	for(unsigned int i=0; i<nNumTracks; i++)
 		aTracks.push_back(new HOSATrack(this, GetShort(dwOffset+0x50+(i*2)) + dwOffset));
 		//delect object is in "VGMSeq::~VGMSeq()"
 	return true;

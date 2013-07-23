@@ -133,9 +133,9 @@ LRESULT CItemTreeView::OnContextMenu(HWND hwndCtrl, CPoint ptClick )
 
 void CItemTreeView::Init(int cx, int cy)
 {
-	int iconList[VGMItem::Icon::MAX];
+	int iconList[VGMItem::ICON_MAX];
 	//{ IDI_UNKNOWN, IDI_SEQ, IDI_NOTE IDI_UNKNOWN, IDI_UNKNOWN };
-	for (int i=0; i < VGMItem::Icon::MAX; i++)
+	for (int i=0; i < VGMItem::ICON_MAX; i++)
 		iconList[i] = i + IDI_VGMFILE_SEQ;
 
 	// NOTE: Don't Load using the LR_LOADTRANSPARENT bit, because the icon

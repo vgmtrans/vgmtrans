@@ -29,8 +29,8 @@ public:
 	virtual void AddDelta(ULONG delta);
 	virtual void AddEndOfTrack(unsigned long offset, unsigned long length, const wchar_t* sEventName = L"Track End");
 
-	void SetCurTrack(int trackNum);
-	void TryExpandMidiTracks(int numTracks);
+	void SetCurTrack(ULONG trackNum);
+	void TryExpandMidiTracks(ULONG numTracks);
 
 	//virtual VGMItem* GetItemFromOffset(long offset);
 	//virtual vector<const char*>* GetMenuItemNames() {return menu.GetMenuItemNames();}

@@ -108,7 +108,7 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 	// LOAD SEQUENCES FROM SEQUENCE TABLE AND CREATE COLLECTIONS
 	//  Set the seq table length to be the distance to the first seq pointer
 	//  as sequences seem to immediately follow the seq table.
-	int k = 0;
+	unsigned int k = 0;
 	UINT seqPointer = 0;
 	while (seqPointer == 0)
 		seqPointer = programFile->GetWordBE(seq_table_offset + (k++*4)) & 0x0FFFFF;
@@ -171,5 +171,5 @@ QSoundVer QSoundScanner::GetVersionEnum(string& versionStr)
 	if (versionStr == "1.40")  return VER_140;
 	if (versionStr == "1.71")  return VER_171;
 	if (versionStr == "1.80")  return VER_180;
-	return QSoundVer::VER_UNDEFINED;
+	return VER_UNDEFINED;
 }

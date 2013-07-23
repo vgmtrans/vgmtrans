@@ -146,7 +146,7 @@ bool VGMRoot::CreateVirtFile(BYTE *databuf, ULONG fileSize, const wstring& filen
 // to the RawFile
 bool VGMRoot::SetupNewRawFile(RawFile* newRawFile)
 {
-	newRawFile->SetProPreRatio(0.80);
+	newRawFile->SetProPreRatio((float)0.80);
 
 	if (newRawFile->processFlags & PF_USELOADERS)
 		for (UINT i=0; i<vLoader.size(); i++)

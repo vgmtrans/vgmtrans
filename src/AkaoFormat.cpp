@@ -74,7 +74,7 @@ bool AkaoColl::LoadMain()
 			double cents = log(freq_multiplier)/log((double)2)*1200;
 			if (art->fineTune < 0)
 				cents -= 1200;
-			rgn->fineTune = cents;
+			rgn->fineTune = (short)cents;
 		}
 	}
 	
@@ -143,7 +143,7 @@ bool AkaoColl::PreDLSMainCreation()
 		double cents = log(freq_multiplier)/log((double)2)*1200;
 		if (art->fineTune < 0)
 			cents -= 1200;
-		rgn->fineTune = cents;
+		rgn->fineTune = (short)cents;
 		newInstr->aRgns.push_back(rgn);
 
 		instrSet->aInstrs.push_back(newInstr);
@@ -161,7 +161,7 @@ bool AkaoColl::PostDLSMainCreation()
 	AkaoSampColl* sampcoll = (AkaoSampColl*)sampcolls[0];
 	const UINT numArts = sampcoll->akArts.size();
 	ULONG beginOffset = instrSet->aInstrs.size() - numArts;
-	for (int i=0; i<numAddedInstrs; i++)
+	for (unsigned int i=0; i<numAddedInstrs; i++)
 	{
 		delete instrSet->aInstrs.back();
 		instrSet->aInstrs.pop_back();

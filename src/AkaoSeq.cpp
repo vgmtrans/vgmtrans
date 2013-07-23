@@ -87,7 +87,7 @@ int AkaoSeq::GetHeaderInfo(void)
 
 int AkaoSeq::GetTrackPointers(void)
 {
-	for(int i=0; i<nNumTracks; i++)
+	for(unsigned int i=0; i<nNumTracks; i++)
 		aTracks.push_back(new AkaoTrack(this, GetShort(dwOffset+0x40+(i*2)) + i*2 + 0x40 + dwOffset));
 	return true;
 }
@@ -491,7 +491,7 @@ int AkaoTrack::ReadEvent(void)
 	case 0xD8 :			//pitch bend
 		{
 			BYTE cValue = GetByte(curOffset++);		//signed data byte.  range of 1 octave (0x7F = +1 octave 0x80 = -1 octave)
-			int fullValue = cValue * 64.503937007874015748031496062992;
+			int fullValue = (int)(cValue * 64.503937007874015748031496062992);
 			fullValue += 0x2000;
 			BYTE lo = fullValue & 0x7F;
 			BYTE hi = (fullValue & 0x3F80) >> 7;
@@ -558,7 +558,7 @@ int AkaoTrack::ReadEvent(void)
 		 break;
 
 	 case 0xFE :			//meta event
-		MetaEvent:
+		//MetaEvent:
 		switch (GetByte(curOffset++))
 		{
 		case 0x00 :			//tempo

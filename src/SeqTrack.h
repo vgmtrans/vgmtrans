@@ -21,7 +21,7 @@ public:
 	//virtual void AddToUI(VGMItem* parent, VGMFile* theVGMFile = NULL);
 	virtual int LoadTrack(int trackNum, ULONG stopOffset = 0xFFFFFFFF, long stopDelta = -1);
 	virtual int LoadTrackInit(int trackNum);
-	virtual int LoadTrackMainLoop(U32 stopOffset, long stopDelta);
+	virtual int LoadTrackMainLoop(ULONG stopOffset, long stopDelta);
 	virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
 	virtual int ReadEvent(void);
 
@@ -43,8 +43,8 @@ public:
 
 protected:
 	virtual void AddEvent(SeqEvent* pSeqEvent);
-	void AddControllerSlide(U32 offset, U32 length, U32 dur, BYTE& prevVal, BYTE targVal, 
-		void (MidiTrack::*insertFunc)(BYTE, BYTE, U32));
+	void AddControllerSlide(ULONG offset, ULONG length, ULONG dur, BYTE& prevVal, BYTE targVal, 
+		void (MidiTrack::*insertFunc)(BYTE, BYTE, ULONG));
 public:
 	void AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, const wchar_t* sEventDesc, BYTE color, Icon icon = ICON_BINARY);
 	void AddSetOctave(ULONG offset, ULONG length, BYTE newOctave, const wchar_t* sEventName = L"Set Octave");

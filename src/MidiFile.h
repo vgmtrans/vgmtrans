@@ -160,7 +160,7 @@ public:
 	MidiFile(ULONG thePpqn);
 	~MidiFile(void);
 	MidiTrack* AddTrack();
-	MidiTrack* InsertTrack(int trackNum);
+	MidiTrack* InsertTrack(ULONG trackNum);
 	void SetPPQN(WORD ppqn);
 	UINT GetPPQN();
 	void WriteMidiToBuffer(vector<BYTE> & buf);

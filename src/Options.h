@@ -1,7 +1,7 @@
 #pragma once
 #include "stdafx.h"
 
-static class ConversionOptions
+class ConversionOptions // static class
 {
 public:
 	ConversionOptions() { numSequenceLoops = 2; }

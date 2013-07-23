@@ -75,7 +75,7 @@ bool RawFile::open(const wstring& theFileName)
 	pbuf=file.rdbuf();
 
 	 // get file size using buffer's members
-	fileSize=pbuf->pubseekoff (0,ios::end,ios::in);
+	fileSize=(ULONG)pbuf->pubseekoff(0,ios::end,ios::in);
 	//pbuf->pubseekpos (0,ios::in);
 
 	// allocate memory to contain file data
@@ -107,7 +107,7 @@ void RawFile::close()
 }
 
 // returns the size of the file
-long RawFile::size(void)
+unsigned long RawFile::size(void)
 {
 	return fileSize;
 }
@@ -206,7 +206,7 @@ int RawFile::FileRead(void* dest, ULONG index, ULONG length)
 	assert(bCanFileRead);
 	assert(index+length <= fileSize);
 	pbuf->pubseekpos(index, ios::in);
-	return pbuf->sgetn((char*)dest, length);	//return bool value based on whether we read all requested bytes
+	return (int)pbuf->sgetn((char*)dest, length);	//return bool value based on whether we read all requested bytes
 	//dest->insert(index, temp, length);
 	//copy(temp, temp+length, dest->data.begin() + index - dest->startOff);
 }
@@ -388,15 +388,15 @@ int RawFile::FileRead(DataSeg* dest, ULONG index, ULONG length)
 // of how much data is read before and after the offset is determined by the ProPre ratio (explained above).
 void RawFile::UpdateBuffer(ULONG index)
 {
-	LONG beginOffset = 0;
-	LONG endOffset = 0;
+	ULONG beginOffset = 0;
+	ULONG endOffset = 0;
 
 	assert(bCanFileRead);
 
 	if (!buf.bAlloced)
 		buf.alloc(bufSize);
 
-	ULONG proBytes = buf.size*propreRatio;
+	ULONG proBytes = (ULONG)(buf.size*propreRatio);
 	ULONG preBytes = buf.size-proBytes;
 	if (proBytes+index > fileSize)
 	{

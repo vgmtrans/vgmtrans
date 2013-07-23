@@ -35,7 +35,7 @@ void MP2kScanner::Scan(RawFile* file, void* info)
 			{
 				testShort = file->GetShort(i+8);
 				testShort2 = file->GetShort(i+10);
-				if (testShort <= 0xFF && testShort <= testShort2 <= 0xFF)
+				if (testShort <= testShort2 && testShort2 <= 0xFF)
 				{
 					testWord =  file->GetWord(i+12);
 					testWord2 = file->GetWord(i+16);
@@ -44,7 +44,7 @@ void MP2kScanner::Scan(RawFile* file, void* info)
 					{
 						testShort = file->GetShort(i+20);
 						testShort2 = file->GetShort(i+22);
-						if (testShort <= 0xFF && testShort <= testShort2 <= 0xFF)
+						if (testShort <= testShort2 && testShort2 <= 0xFF)
 							bFirstTest = TRUE;
 					}
 				}

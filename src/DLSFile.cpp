@@ -419,10 +419,10 @@ void DLSWsmp::SetLoopInfo(Loop& loop, VGMSamp* samp)
 	cSampleLoops = loop.loopStatus;
 	ulLoopType = loop.loopType; 
 	ulLoopStart =  (loop.loopStartMeasure==LM_BYTES) ?			//In DLS, the value is in number of samples
-		(loop.loopStart * compressionRatio) / origFormatBytesPerSamp ://(16/8) :		//if the val is a raw offset of the original format, multiply it by the compression ratio
+		(ULONG)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp) ://(16/8) :		//if the val is a raw offset of the original format, multiply it by the compression ratio
 		loop.loopStart /** origFormatBytesPerSamp * compressionRatio / origFormatBytesPerSamp*/;//(16/8);	 //if the value is in samples, multiply by bytes per sample to get raw offset of original format, then multiply by compression ratio to get raw offset in standard wav, then divide bytes bytesPerSamp of standard wave (2)
 	ulLoopLength = (loop.loopLengthMeasure==LM_BYTES) ?			//In DLS, the value is in number of samples
-		(loop.loopLength * compressionRatio) / origFormatBytesPerSamp ://(16/8)  :	//if it's in raw bytes, multiply by compressionRatio to convert to Raw length in new format, and divide by bytesPerSamp of a 16 bit standard wave (16bits/8 bits per byte)
+		(ULONG)((loop.loopLength * compressionRatio) / origFormatBytesPerSamp) ://(16/8)  :	//if it's in raw bytes, multiply by compressionRatio to convert to Raw length in new format, and divide by bytesPerSamp of a 16 bit standard wave (16bits/8 bits per byte)
 		loop.loopLength /** origFormatBytesPerSamp * compressionRatio) / origFormatBytesPerSamp*/;//(16/8);
 }
 

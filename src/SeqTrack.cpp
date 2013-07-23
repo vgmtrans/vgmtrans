@@ -105,13 +105,13 @@ int SeqTrack::LoadTrackInit(int trackNum)
 	return true;
 }
 
-int SeqTrack::LoadTrackMainLoop(U32 stopOffset, long stopDelta)
+int SeqTrack::LoadTrackMainLoop(ULONG stopOffset, long stopDelta)
 {
 	bInLoop = false;
 	curOffset = dwStartOffset;	//start at beginning of track
 	if (stopDelta == -1)
 		stopDelta = 0x7FFFFFFF;
-	while ((curOffset < stopOffset) && GetDelta() < stopDelta &&  ReadEvent())
+	while ((curOffset < stopOffset) && GetDelta() < (ULONG)stopDelta &&  ReadEvent())
 		;
 	if (unLength == 0)			//if unLength has not been changed from default value of 0
 	{
@@ -190,15 +190,15 @@ ULONG SeqTrack::ReadVarLen(ULONG& offset)
     return value;
 }
 
-void SeqTrack::AddControllerSlide(U32 offset, U32 length, U32 dur, BYTE& prevVal, BYTE targVal, 
-								  void (MidiTrack::*insertFunc)(BYTE, BYTE, U32))
+void SeqTrack::AddControllerSlide(ULONG offset, ULONG length, ULONG dur, BYTE& prevVal, BYTE targVal, 
+								  void (MidiTrack::*insertFunc)(BYTE, BYTE, ULONG))
 {
 	if (readMode != READMODE_CONVERT_TO_MIDI)
 		return;
 
 	double valInc = (double)((double)(targVal-prevVal)/(double)dur);
 	char newVal = -1;
-	for (int i=0; i<dur; i++)
+	for (unsigned int i=0; i<dur; i++)
 	{
 		char prevValInSlide = newVal;
 		newVal=round(prevVal+(valInc*(i+1)));
@@ -889,7 +889,7 @@ void SeqTrack::AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool 
 			pMidiTrack->AddBankSelect(channel, (progNum >> 14) & 0x7f);
 			pMidiTrack->AddBankSelectFine(channel, (progNum >> 7) & 0x7f);
 		}
-		pMidiTrack->AddProgramChange(channel, progNum);
+		pMidiTrack->AddProgramChange(channel, progNum & 0x7f);
 //		}
 	}
 }
@@ -955,7 +955,7 @@ void SeqTrack::AddTempoBPMSlide(ULONG offset, ULONG length, ULONG dur, double ta
 	{
 		double tempoInc = (targBPM-parentSeq->tempoBPM)/((double)dur);
 		double newTempo;
-		for (int i=0; i<dur; i++)
+		for (unsigned int i=0; i<dur; i++)
 		{
 			newTempo=parentSeq->tempoBPM+(tempoInc*(i+1));
 			pMidiTrack->InsertTempoBPM(newTempo, GetDelta()+i);

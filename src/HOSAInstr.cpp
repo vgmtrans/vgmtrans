@@ -68,7 +68,7 @@ int HOSAInstrSet::GetInstrPointers()
 	ULONG	iOffset = dwOffset + sizeof(InstrHeader);	//pointer of attribute table
 
 	//‰¹F”‚¾‚¯ŒJ‚è•Ô‚·B
-	for(int i=0; i<instrheader.numInstr; i++)
+	for(unsigned int i=0; i<instrheader.numInstr; i++)
 	{
 		HOSAInstr* newInstr = new HOSAInstr(this, dwOffset+GetWord(iOffset), 0, i/0x80 , i%0x80);
 		aInstrs.push_back(newInstr);
@@ -116,7 +116,7 @@ int HOSAInstr::LoadInstr()
 	//ATLTRACE("LOADED INSTR   ProgNum: %X    BankNum: %X\n", instrinfo.progNum, instrinfo.bankNum);
 
 	U8	cKeyLow = 0x00;
-	for (int i=0; i<instrinfo.numRgns; i++)
+	for (unsigned int i=0; i<instrinfo.numRgns; i++)
 	{
 		RgnInfo* rgninfo = &rgns[i];
 		VGMRgn* rgn = new VGMRgn(this, dwOffset + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
@@ -132,7 +132,7 @@ int HOSAInstr::LoadInstr()
 
 		rgn->AddUnityKey((S8)0x3C + 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset+0x06);
 		rgn->AddSimpleItem(rgn->dwOffset+0x07, 1, L"Semi Tone Tune");
-		rgn->fineTune =		(double)rgninfo->iFineTune * (100.0/256.0);	
+		rgn->fineTune =		(short)((double)rgninfo->iFineTune * (100.0/256.0));	
 
 		// Might want to simplify the code below.  I'm being nitpicky.
 		if (rgninfo->iPan == 0x80)			rgn->pan = 0;

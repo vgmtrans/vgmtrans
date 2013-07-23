@@ -12,8 +12,8 @@ void KonamiGXScanner::Scan(RawFile* file, void* info)
 	if (!seqRomGroupEntry || !sampsRomGroupEntry)
 		return;
 	U32 seq_table_offset;
-	U32 instr_table_offset;
-	U32 samp_table_offset;
+	//U32 instr_table_offset;
+	//U32 samp_table_offset;
 	if (!seqRomGroupEntry->file || !sampsRomGroupEntry->file ||
 		!seqRomGroupEntry->GetHexAttribute("seq_table", &seq_table_offset))// ||
 		//!seqRomGroupEntry->GetHexAttribute("samp_table", &samp_table_offset))

@@ -269,10 +269,10 @@ bool NDSWaveArch::GetSampleInfo()
 		ULONG pSample = GetWord(dwOffset + 0x3C + i*4) + dwOffset;
 		int nChannels = 1;
 		BYTE waveType = GetByte(pSample);
-		bool bLoops = GetByte(pSample+1);
+		bool bLoops = (GetByte(pSample+1) != 0);
 		USHORT rate = GetShort(pSample+2);
 		USHORT bps;
-		BYTE multiplier;
+		//BYTE multiplier;
 		switch (waveType)
 		{
 		case NDSSamp::PCM8:
@@ -355,7 +355,7 @@ void NDSSamp::ConvertToStdWave(BYTE* buf)
 	else if (waveType == PCM8)
 	{
 		GetBytes(dataOff, dataLength, buf);
-		for(int i = 0; i < dataLength; i++)		//convert every byte from signed to unsigned value
+		for(unsigned int i = 0; i < dataLength; i++)		//convert every byte from signed to unsigned value
 			buf[i] ^= 0x80;			//For whatever reason, the WAV standard has PCM8 unsigned and PCM16 signed
 	}
 	else

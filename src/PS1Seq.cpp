@@ -29,7 +29,7 @@ int PS1Seq::GetHeaderInfo(void)
 	BYTE denom = GetByte(offset()+0x0E);
 	if (numer == 0 || numer > 32)				//sanity check
 		return false;
-	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, GetPPQN());
+	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, (BYTE)GetPPQN());
 
 	//name().append(L" blah");
 

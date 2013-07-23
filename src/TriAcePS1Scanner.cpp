@@ -128,7 +128,7 @@ void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSe
 
 
 //file is RawFile containing the compressed seq.  cfOff is the compressed file offset.
-TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, U32 cfOff)
+TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, ULONG cfOff)
 {
 	U32 cfSize = file->GetWord(cfOff+4);			//compressed file size
 	U32 ufSize = file->GetWord(cfOff+8);			//uncompressed file size (size of resulting file after decompression)
@@ -142,7 +142,7 @@ TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, U32 cfOff)
 	bool bDone = false;
 	ULONG ufOff = 0;
 	cfOff += 0x10;
-	while (ufOff < ufSize & !bDone)
+	while (ufOff < ufSize && !bDone)
 	{
 		BYTE cFlags = file->GetByte(cfOff++);
 		for (int i=0; (i<8) && (ufOff < ufSize); i++, cFlags>>=1)

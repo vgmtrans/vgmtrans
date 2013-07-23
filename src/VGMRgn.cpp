@@ -188,9 +188,10 @@ VGMRgnItem::VGMRgnItem(VGMRgn* rgn, RgnItemType theType, ULONG offset, ULONG len
 
 VGMItem::Icon VGMRgnItem::GetIcon()
 {
-	switch (type)
-	{
-	default:
-		return ICON_BINARY;
-	}
+	//switch (type)
+	//{
+	//default:
+	//	return ICON_BINARY;
+	//}
+	return ICON_BINARY;
 }

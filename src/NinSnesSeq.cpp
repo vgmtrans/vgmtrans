@@ -450,7 +450,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 				{
 					BYTE dur = GetByte(curOffset++);
 					ULONG targPan = pantbl[GetByte(curOffset++)];
-					AddPanSlide(beginOffset, curOffset-beginOffset, dur, targPan);
+					AddPanSlide(beginOffset, curOffset-beginOffset, dur, (BYTE)targPan);
 				}
 				break;
 			case EVENT_UNKNOWN0:		//Unknown, 0 data bytes
@@ -545,7 +545,7 @@ int NinSnesTrack::ReadEvent(ULONG totalTime)
 				//AddEventItem("Set Perc Base", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 				break;
 			case EVENT_LOOPBEGIN:
-				loopdest = curOffset;
+				loopdest = (USHORT)curOffset;
 				loopcount = 0;
 				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Perc Base", NULL, CLR_CHANGESTATE);
 				//AddEventItem("Loop Begin", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_YELLOW);

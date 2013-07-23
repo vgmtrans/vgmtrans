@@ -50,7 +50,7 @@ void VGMSamp::ConvertToStdWave(BYTE* buf)
 	//	ConvertImaAdpcm(buf);
 	case WT_PCM8:
 		GetBytes(dataOff, dataLength, buf);
-		for(int i = 0; i < dataLength; i++)		//convert every byte from signed to unsigned value
+		for(unsigned int i = 0; i < dataLength; i++)		//convert every byte from signed to unsigned value
 			buf[i] ^= 0x80;			//For no good reason, the WAV standard has PCM8 unsigned and PCM16 signed
 		break;
 	case WT_PCM16:
@@ -79,7 +79,7 @@ bool VGMSamp::SaveAsWav(const wchar_t* filepath)
 	if (this->ulUncompressedSize)
 		bufSize = this->ulUncompressedSize;
 	else
-		bufSize = ceil((double)dataLength * GetCompressionRatio());
+		bufSize = (ULONG)ceil((double)dataLength * GetCompressionRatio());
 
 	BYTE* uncompSampBuf = new BYTE[bufSize];	//create a new memory space for the uncompressed wave
 	//waveBuf.resize(bufSize );

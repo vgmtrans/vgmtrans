@@ -95,14 +95,14 @@ void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
 					{
 						theShort = file->GetShort(i+n);
 						USHORT tempShort;
-						if (theShort+p*2+1 < nFileLength)
+						if ((ULONG)(theShort+p*2+1) < nFileLength)
 							tempShort = file->GetShort(theShort+p*2);
 						else
 						{
 							bFailed = true;
 							break;
 						}
-						if (tempShort+1 < nFileLength)
+						if ((ULONG)(tempShort+1) < nFileLength)
 						{
 							if ((tempShort <= i || tempShort >= i+0x3000) && tempShort != 0)
 								bFailed = true;

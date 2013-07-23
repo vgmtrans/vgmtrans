@@ -55,7 +55,7 @@ public:
 	virtual bool SaveAsMidi(const wchar_t* filepath);
 
 public:
-	int nNumTracks;
+	ULONG nNumTracks;
 	ReadMode readMode;
 	//USHORT ppqn;		//perhaps shouldn't include this
 	MidiFile* midi;

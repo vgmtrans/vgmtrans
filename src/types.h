@@ -1,23 +1,25 @@
 #pragma once
 
-#define U32 unsigned long
-#define S32 signed long
-#define U16 unsigned short
-#define S16 signed short
-#define U8 unsigned char
-#define S8 signed char
+#include <stdint.h>
+
+typedef uint32_t U32;
+typedef int32_t S32;
+typedef uint16_t U16;
+typedef int16_t S16;
+typedef uint8_t U8;
+typedef int8_t S8;
 
 #ifndef _WIN32
 
-#define BYTE unsigned char
-#define DWORD unsigned int
-#define ULONG unsigned long
-#define LONG long
-#define BOOL bool
-#define UINT unsigned int
-#define INT int
-#define USHORT unsigned short
-#define SHORT short
+typedef uint8_t BYTE;
+typedef uint32_t DWORD;
+typedef unsigned long ULONG;
+typedef long LONG;
+typedef bool BOOL;
+typedef unsigned int UINT;
+typedef int INT;
+typedef uint16_t USHORT;
+typedef int16_t SHORT;
 #define FALSE false
 #define TRUE true
 

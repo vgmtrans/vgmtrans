@@ -134,7 +134,7 @@ int TriAcePS1Instr::LoadInstr()
 		rgn->AddSimpleItem(rgn->dwOffset+12, 1, L"Attenuation");
 		rgn->AddUnityKey((S8)0x3B - rgninfo->pitchTuneSemitones, rgn->dwOffset+13);  //You would think it would be 0x3C (middle c)
 		rgn->AddSimpleItem(rgn->dwOffset+14, 1, L"Pitch Fine Tune");
-		rgn->fineTune =  (float)rgninfo->pitchTuneFine / 1.27;
+		rgn->fineTune =  (short)((double)rgninfo->pitchTuneFine / 1.27);
 		rgn->sampCollPtr = ((VGMInstrSet*)this->vgmfile)->sampColl;
 		rgn->AddSimpleItem(rgn->dwOffset+15, 5, L"Unknown values");
 		

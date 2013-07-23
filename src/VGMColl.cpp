@@ -97,7 +97,7 @@ void VGMColl::UnpackSampColl(DLSFile& dls, VGMSampColl* sampColl, vector<VGMSamp
 		if (samp->ulUncompressedSize)
 			bufSize = samp->ulUncompressedSize;
 		else
-			bufSize = ceil((double)samp->dataLength * samp->GetCompressionRatio());
+			bufSize = (ULONG)ceil((double)samp->dataLength * samp->GetCompressionRatio());
 		//bool bOddBufSize = bufSize % 2;
 		//if (bOddBufSize)				//if the buffer size is odd, we must align it to be even for the RIFF format
 		//	bufSize++;
@@ -124,7 +124,7 @@ void VGMColl::UnpackSampColl(SynthFile& synthfile, VGMSampColl* sampColl, vector
 		if (samp->ulUncompressedSize)
 			bufSize = samp->ulUncompressedSize;
 		else
-			bufSize = ceil((double)samp->dataLength * samp->GetCompressionRatio());
+			bufSize = (ULONG)ceil((double)samp->dataLength * samp->GetCompressionRatio());
 		//bool bOddBufSize = bufSize % 2;
 		//if (bOddBufSize)				//if the buffer size is odd, we must align it to be even for the RIFF format
 		//	bufSize++;
@@ -240,7 +240,7 @@ void VGMColl::MainDLSCreation(DLSFile& dls)
 				}
 
 				// Determine the sample number within the rgn's associated SampColl
-				int realSampNum;
+				unsigned int realSampNum;
 				// If a sample offset is provided, then find the sample number based on this offset.
 				// see sampOffset declaration in header file for more info.
 				if (rgn->sampOffset != -1)
@@ -270,15 +270,15 @@ void VGMColl::MainDLSCreation(DLSFile& dls)
 
 
 				// Determine the sampCollNum (index into our finalSampColls vector)
-				int sampCollNum;
-				for (int k=0; k < finalSampColls.size(); k++)
+				unsigned int sampCollNum;
+				for (unsigned int k=0; k < finalSampColls.size(); k++)
 				{
 					if (finalSampColls[k] == sampColl)
 						sampCollNum = k;
 				}
 				//   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
 				//   in the final DLS file.
-				for (int k=0; k < sampCollNum; k++)
+				for (unsigned int k=0; k < sampCollNum; k++)
 					realSampNum += finalSampColls[k]->samples.size();	
 
 
@@ -360,9 +360,9 @@ void VGMColl::MainDLSCreation(DLSFile& dls)
 				if (rgn->volume == -1 && samp->volume == -1)
 					realAttenuation = 0;
 				else if (rgn->volume == -1)
-					realAttenuation = -(ConvertLogScaleValToAtten(samp->volume) * DLS_DECIBEL_UNIT * 10);
+					realAttenuation = (long)(-(ConvertLogScaleValToAtten(samp->volume) * DLS_DECIBEL_UNIT * 10));
 				else
-					realAttenuation = -(ConvertLogScaleValToAtten(rgn->volume) * DLS_DECIBEL_UNIT * 10) ; 
+					realAttenuation = (long)(-(ConvertLogScaleValToAtten(rgn->volume) * DLS_DECIBEL_UNIT * 10)); 
 
 
 				//attack_time = (long)ceil((log(timeInSecs)/log((double)2)) * 1200 * 65536);
@@ -384,7 +384,7 @@ void VGMColl::MainDLSCreation(DLSFile& dls)
 					//double attenInDB = 20*log10((1.0/rgn->sustain_level));
 					//convSustainLev = ((96.0-attenInDB)/96.0)*0x03e80000;		//the DLS envelope is a range from 0 to -96db. 
 					double attenInDB = ConvertLogScaleValToAtten(rgn->sustain_level);
-					convSustainLev = ((96.0-attenInDB)/96.0)*0x03e80000;		//the DLS envelope is a range from 0 to -96db. 
+					convSustainLev = (long)(((96.0-attenInDB)/96.0)*0x03e80000);		//the DLS envelope is a range from 0 to -96db. 
 					int j = 0;
 				}
 
@@ -468,7 +468,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				}
 
 				// Determine the sample number within the rgn's associated SampColl
-				int realSampNum;
+				unsigned int realSampNum;
 				// If a sample offset is provided, then find the sample number based on this offset.
 				// see sampOffset declaration in header file for more info.
 				if (rgn->sampOffset != -1)
@@ -498,7 +498,7 @@ SynthFile* VGMColl::CreateSynthFile()
 
 
 				// Determine the sampCollNum (index into our finalSampColls vector)
-				int sampCollNum;
+				unsigned int sampCollNum;
 				for (UINT i=0; i < finalSampColls.size(); i++)
 				{
 					if (finalSampColls[i] == sampColl)
@@ -506,7 +506,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				}
 				//   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
 				//   in the final DLS file.
-				for (int k=0; k < sampCollNum; k++)
+				for (UINT k=0; k < sampCollNum; k++)
 					realSampNum += finalSampColls[k]->samples.size();	
 
 				SynthRgn* newRgn = newInstr->AddRgn();

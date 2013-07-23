@@ -78,7 +78,7 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 	}
 
 	U32* sampOffsets = new U32[numSamples];
-	for (int i=0; i<numSamples; i++)
+	for (unsigned int i=0; i<numSamples; i++)
 		sampOffsets[i] = sampcoll->samples[i]->dwOffset - sampcoll->dwOffset;
 
 	UINT nFileLength = file->size();
@@ -104,7 +104,7 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 
 bool HOSAScanner::RecursiveRgnCompare(RawFile* file, int i, int sampNum, int numSamples, int numFinds, U32* sampOffsets)
 {
-	if (i+0x14 >= file->size())
+	if (i < 0 || (ULONG)(i+0x14) >= file->size())
 		return false;
 	if (sampNum >= numSamples-1)
 		return (numFinds >= MIN_SAMPLES_MATCH);

@@ -8,7 +8,9 @@
 // Copyright (c) Microsoft Corp. All rights reserved.
 //-----------------------------------------------------------------------------
 #include "stdafx.h"
+#ifndef STRICT
 #define STRICT
+#endif
 #include <windows.h>
 #include <mmsystem.h>
 #include <dxerr9.h>

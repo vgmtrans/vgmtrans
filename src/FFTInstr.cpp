@@ -87,7 +87,7 @@ int	WdsInstrSet::GetInstrPointers()
 	ULONG	iOffset = dwOffset + sizeof(WdsHdr);	//pointer of attribute table
 
 	//音色数だけ繰り返す。
-	for(int i=0; i<=hdr.iNumInstrs; i++)
+	for(unsigned int i=0; i<=hdr.iNumInstrs; i++)
 	{
 		//WdsInstr* newInstr = new WdsInstr(this,iOffset,sizeof(WdsRgnData),hdr.iBank,i);		//0 … hdr.iBank
 		WdsInstr* newInstr = new WdsInstr(this,iOffset,sizeof(WdsRgnData), i/128 , i%128);		//0 … hdr.iBank
@@ -146,7 +146,7 @@ int	WdsInstr::LoadInstr()
 	rgn->unityKey =			0x3C - rgndata.iSemiToneTune;
 	//an iFineTune value of 256 should equal 100 cents, and linear scaling seems to do the trick.
 	// see the declaration of iFineTune for info on where to find the actual code and table for this in FFT
-	rgn->fineTune =			(double)rgndata.iFineTune * (100.0/256.0);	
+	rgn->fineTune =			(short)((double)rgndata.iFineTune * (100.0/256.0));	
 
 	PSXConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
 	aRgns.push_back(rgn);

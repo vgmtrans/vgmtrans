@@ -111,7 +111,7 @@ MidiFile* VGMSeqNoTrks::ConvertToMidi()
 
 // checks whether or not we have already created the given number of MidiTracks.  If not, it appends the extra tracks.
 // doesn't ever need to be called directly by format code, since SetCurMidiTrack does so automatically.
-void VGMSeqNoTrks::TryExpandMidiTracks(int numTracks)
+void VGMSeqNoTrks::TryExpandMidiTracks(ULONG numTracks)
 {
 	if (VGMSeq::readMode != READMODE_CONVERT_TO_MIDI)
 		return;
@@ -123,7 +123,7 @@ void VGMSeqNoTrks::TryExpandMidiTracks(int numTracks)
 	}
 }
 
-void VGMSeqNoTrks::SetCurTrack(int trackNum)
+void VGMSeqNoTrks::SetCurTrack(ULONG trackNum)
 {
 	if (VGMSeq::readMode != READMODE_CONVERT_TO_MIDI)
 		return;

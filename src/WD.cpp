@@ -107,7 +107,7 @@ int WDInstr::LoadInstr()
 	bool bSecondToLastRgn = 0;
 	bool bLastRgn = 0;
 
-	int k = 0;
+	unsigned int k = 0;
 	while (k*0x20 < unLength)
 	{
 		if (bSecondToLastRgn)

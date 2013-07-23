@@ -48,6 +48,7 @@ int VGMSeq::Load()
 	//LoadLocalData();
 	//UseLocalData();
 	pRoot->AddVGMFile(this);
+	return true;
 }
 
 MidiFile* VGMSeq::ConvertToMidi()
@@ -243,7 +244,7 @@ bool VGMSeq::SaveAsMidi(const wchar_t* filepath)
 	MidiFile* midi = this->ConvertToMidi();
 	if (!midi)
 		return false;
-	int result = midi->SaveMidiFile(filepath);
+	bool result = midi->SaveMidiFile(filepath);
 	delete midi;
 	return result;
 }

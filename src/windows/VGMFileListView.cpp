@@ -826,8 +826,8 @@ int CVGMFileListView::SortCallback (
 	sz1 = info1.GetName()->c_str();
     sz2 = info2.GetName()->c_str();
 
-	ItemType type1;
-	ItemType type2;
+	//ItemType type1;
+	//ItemType type2;
 
 
     switch ( m_nSortedCol )

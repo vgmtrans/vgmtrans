@@ -40,9 +40,11 @@ bool MusicPlayer::Init(HWND hWnd)
 		CMusic8.Initialize(hWnd);
 	} catch (CDMusicException CDMusicEx)
 	{
-	//	Alert(L"Can't initialize DirectMusic objects.\n" \
+#if 0
+		Alert(L"Can't initialize DirectMusic objects.\n" \
 		L"Ensure you have an audio card device and DirectX 8.0 or above " \
 		L"installed in your system.");
+#endif
 		OutputDebugString(CDMusicEx.GetErrorDescription());
 		return false;
 	}
@@ -579,7 +581,7 @@ void MusicPlayer::SetupReverb(VGMSeq* vgmseq)
 		HRESULT hr;
 		ULONG returnValue;
 		DMUS_WAVES_REVERB_PARAMS reverbParams;
-		reverbParams.fHighFreqRTRatio = 0.001;
+		reverbParams.fHighFreqRTRatio = (float)0.001;
 		reverbParams.fInGain = 0;
 		reverbParams.fReverbTime = 3000;//4000;
 		reverbParams.fReverbMix = -10;//-8;
@@ -723,7 +725,7 @@ DWORD MusicPlayer::ProcessSeqPlayback(PVOID pParam)
 			continue;
 		while (msg[0+d] & 0x80)
 			d++;
-		if (msg.size() < d+4)
+		if (msg.size() < (ULONG)(d+4))
 			msg.resize(d+4);
 		if (msg[1+d] == 0xFF && msg[2+d] == 0x51 && msg[3+d] == 0x03)			//if it's a tempo event
 		{

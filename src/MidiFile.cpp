@@ -33,7 +33,7 @@ MidiTrack* MidiFile::AddTrack(void)
 		return aTracks.back();
 }
 
-MidiTrack* MidiFile::InsertTrack(int trackNum)
+MidiTrack* MidiFile::InsertTrack(ULONG trackNum)
 {
 	if (trackNum+1 > aTracks.size())
 		aTracks.resize(trackNum+1, NULL);

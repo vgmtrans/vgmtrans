@@ -48,7 +48,7 @@ int BGMSeq::GetHeaderInfo(void)
 int BGMSeq::GetTrackPointers(void)
 {
 	UINT pos = dwOffset+0x20;    //start at first track (fixed offset)
-	for(int i=0; i<nNumTracks; i++)
+	for(unsigned int i=0; i<nNumTracks; i++)
 	{
 		//HACK FOR TRUNCATED BGMS (ex. FFXII 113 Eastersand.psf2)
 		if (pos >= GetRawFile()->GetSize())
@@ -131,7 +131,7 @@ int BGMTrack::ReadEvent(void)
 		{
 			BYTE numer = GetByte(curOffset++);
 			BYTE denom = GetByte(curOffset++);
-			AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, parentSeq->GetPPQN());
+			AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, (BYTE)parentSeq->GetPPQN());
 
 			//for (value3 = 0; ((value2&1) != TRUE) && (value3 < 8); ++value3)	//while 
 			//	value2 >>= 1;

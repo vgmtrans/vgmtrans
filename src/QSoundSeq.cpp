@@ -158,7 +158,7 @@ int QSoundSeq::PostLoad()
 	vector<MidiTrack*>& miditracks = midi->aTracks;
 
 	// First get all tempo events, we assume they occur on track 1
-	for (int i = 0; i < miditracks[0]->aEvents.size(); i++)
+	for (unsigned int i = 0; i < miditracks[0]->aEvents.size(); i++)
 	{
 		MidiEvent* event = miditracks[0]->aEvents[i];
 		if (event->GetEventType() == MIDIEVENT_TEMPO)
@@ -166,13 +166,13 @@ int QSoundSeq::PostLoad()
 	}
 
 	// Now for each track, gather all vibrato events, lfo events, pitch bend events and track end events
-	for (int i = 0; i < miditracks.size(); i++)
+	for (unsigned int i = 0; i < miditracks.size(); i++)
 	{
 		vector<MidiEvent*> events(tempoEvents);
 		MidiTrack* track = miditracks[i];
 		int channel = this->aTracks[i]->channel;
 
-		for (int j = 0; j < track->aEvents.size(); j++)
+		for (unsigned int j = 0; j < track->aEvents.size(); j++)
 		{
 			MidiEvent* event = miditracks[i]->aEvents[j];
 			MidiEventType type = event->GetEventType();
@@ -187,7 +187,7 @@ int QSoundSeq::PostLoad()
 
 		// And now we actually add vibrato and pitch bend events
 		const ULONG ppqn = GetPPQN();					// pulses (ticks) per quarter note
-		const ULONG mpLFOt = (1/(251/4.0)) * 1000000;	// microseconds per LFO tick
+		const ULONG mpLFOt = (ULONG)((1/(251/4.0)) * 1000000);	// microseconds per LFO tick
 		ULONG mpqn = 500000;							// microseconds per quarter note - 120 bpm default
 		ULONG mpt = mpqn / ppqn;						// microseconds per MIDI tick
 		short pitchbend = 0;							// pitch bend in cents
@@ -201,7 +201,7 @@ int QSoundSeq::PostLoad()
 		long effectiveLfoVal = 0;
 		//bool bLfoRising = true;;						// is LFO rising or falling?
 		
-		long startAbsTicks = 0;							// The MIDI tick time to start from for a given vibrato segment
+		ULONG startAbsTicks = 0;							// The MIDI tick time to start from for a given vibrato segment
 
 		int numEvents = events.size();
 		for (int j = 0; j < numEvents; j++)
@@ -227,7 +227,7 @@ int QSoundSeq::PostLoad()
 				double lfoRatePerMidiTick = (numLfoPhases * 0x20000) / (double)segmentDurTicks;
 
 				const BYTE tickRes = 16;
-				U32 lfoRatePerLoop = (tickRes * lfoRatePerMidiTick) * 256;
+				U32 lfoRatePerLoop = (U32)((tickRes * lfoRatePerMidiTick) * 256);
 
 				for (int t = 0; t < segmentDurTicks; t += tickRes)
 				{
@@ -241,7 +241,7 @@ int QSoundSeq::PostLoad()
 					if (lfoStage == 1)
 						effectiveLfoVal = 0x1000000 - lfoVal;
 					else if (lfoStage == 2)
-						effectiveLfoVal = -lfoVal;
+						effectiveLfoVal = -((long)lfoVal);
 					else if (lfoStage == 3)
 						effectiveLfoVal = -0x1000000 + lfoVal;
 
@@ -249,8 +249,8 @@ int QSoundSeq::PostLoad()
 
 					if (vibrato > 0)
 					{
-						lfoCents = (lfoPercent * vibrato);
-						track->InsertPitchBend(channel, ((lfoCents + pitchbend) / (double)pitchbendRange) * 8192, startAbsTicks + t);
+						lfoCents = (short)(lfoPercent * vibrato);
+						track->InsertPitchBend(channel, (short)(((lfoCents + pitchbend) / (double)pitchbendRange) * 8192), startAbsTicks + t);
 					}
 
 					if (tremelo > 0)
@@ -282,13 +282,13 @@ int QSoundSeq::PostLoad()
 					{
 						vibrato = vibrato_depth_table[marker->databyte1] * (100/256.0);
 						//pitchbendRange = max(200, (vibrato + 50));		//50 cents to allow for pitchbend values, which range -50/+50
-						pitchbendRange = max(200, ceil((vibrato+50)/100.0)*100 );	//+50 cents to allow for pitchbend values, which range -50/+50
+						pitchbendRange = (int)max(200, ceil((vibrato+50)/100.0)*100);	//+50 cents to allow for pitchbend values, which range -50/+50
 						track->InsertPitchBendRange(channel, pitchbendRange/100, pitchbendRange%100, curTicks);
 						
-						lfoCents = ((effectiveLfoVal / (double)0x1000000) * vibrato);
+						lfoCents = (short)((effectiveLfoVal / (double)0x1000000) * vibrato);
 						
 						if (curTicks > 0)
-							track->InsertPitchBend(channel, ((lfoCents + pitchbend) / (double)pitchbendRange) * 8192, curTicks);
+							track->InsertPitchBend(channel, (short)(((lfoCents + pitchbend) / (double)pitchbendRange) * 8192), curTicks);
 					}
 					else if (marker->name == "tremelo")
 					{
@@ -309,17 +309,17 @@ int QSoundSeq::PostLoad()
 						lfoStage = 0;
 						lfoCents = 0;
 						if (vibrato > 0)
-							track->InsertPitchBend(channel, ((0 + pitchbend) / (double)pitchbendRange) * 8192, curTicks);
+							track->InsertPitchBend(channel, (short)(((0 + pitchbend) / (double)pitchbendRange) * 8192), curTicks);
 						if (tremelo > 0)
 							track->InsertExpression(channel, 127, curTicks);
 					}
 					else if (marker->name == "pitchbend")
 					{
-						pitchbend = ((char)marker->databyte1 / 256.0) * 100;
+						pitchbend = (short)(((char)marker->databyte1 / 256.0) * 100);
 						//stringstream stream;
 						//stream << "cents: " << cents << "  finalval: " <<  (cents / (double)pitchbendRange) * 8192 << "\n";
 						//ATLTRACE(stream.str().c_str());
-						track->InsertPitchBend(channel, ((lfoCents + pitchbend) / (double)pitchbendRange) * 8192, curTicks);
+						track->InsertPitchBend(channel, (short)(((lfoCents + pitchbend) / (double)pitchbendRange) * 8192), curTicks);
 					}
 				}
 				break;
@@ -398,7 +398,7 @@ int QSoundTrack::ReadEvent(void)
 		{
 			//UINT absDur = (double)(delta/256.0)*(double)dur;
 			// for 100% accuracy, we'd be shifting by 8, but that seems excessive for MIDI
-			UINT absDur = (double)(delta/(double)(256<<4))*(double)(dur<<4);
+			UINT absDur = (UINT)((double)(delta/(double)(256<<4))*(double)(dur<<4));
 
 			key = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
 

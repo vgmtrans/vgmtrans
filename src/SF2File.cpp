@@ -99,8 +99,8 @@ SF2File::SF2File(SynthFile* synthfile)
 		sfPresetHeader presetHdr;
 		memset(&presetHdr, 0, sizeof(sfPresetHeader));
 		memcpy(presetHdr.achPresetName, instr->name.c_str(), min(instr->name.length(), 20));
-		presetHdr.wPreset =			instr->ulInstrument;
-		presetHdr.wBank =			instr->ulBank;
+		presetHdr.wPreset =			(WORD)instr->ulInstrument;
+		presetHdr.wBank =			(WORD)instr->ulBank;
 		presetHdr.wPresetBagNdx =	i;
 		presetHdr.dwLibrary =		0;
 		presetHdr.dwGenre =			0;
@@ -280,27 +280,27 @@ SF2File::SF2File(SynthFile* synthfile)
 			sfInstGenList instGenList;
 			// Key range - (if exists) this must be the first chunk
 			instGenList.sfGenOper = keyRange;
-			instGenList.genAmount.ranges.byLo = rgn->usKeyLow;
-			instGenList.genAmount.ranges.byHi = rgn->usKeyHigh;
+			instGenList.genAmount.ranges.byLo = (BYTE)rgn->usKeyLow;
+			instGenList.genAmount.ranges.byHi = (BYTE)rgn->usKeyHigh;
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
 			// Velocity range (if exists) this must be the next chunk
 			instGenList.sfGenOper = velRange;
-			instGenList.genAmount.ranges.byLo = rgn->usVelLow;
-			instGenList.genAmount.ranges.byHi = rgn->usVelHigh;
+			instGenList.genAmount.ranges.byLo = (BYTE)rgn->usVelLow;
+			instGenList.genAmount.ranges.byHi = (BYTE)rgn->usVelHigh;
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
 			// initialAttenuation
 			instGenList.sfGenOper = sampleModes;
-			instGenList.genAmount.shAmount= rgn->sampinfo->attenuation * 10;
+			instGenList.genAmount.shAmount= (SHORT)(rgn->sampinfo->attenuation * 10);
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
 			// pan
 			instGenList.sfGenOper = pan;
-			instGenList.genAmount.shAmount= ConvertPercentPanTo10thPercentUnits(rgn->art->pan);
+			instGenList.genAmount.shAmount= (SHORT)ConvertPercentPanTo10thPercentUnits(rgn->art->pan);
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
@@ -332,7 +332,7 @@ SF2File::SF2File(SynthFile* synthfile)
 			instGenList.sfGenOper = sustainVolEnv;
 			if (rgn->art->sustain_lev > 100.0)
 				rgn->art->sustain_lev = 100.0;
-			instGenList.genAmount.shAmount = rgn->art->sustain_lev * 10;
+			instGenList.genAmount.shAmount = (SHORT)(rgn->art->sustain_lev * 10);
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
@@ -350,7 +350,7 @@ SF2File::SF2File(SynthFile* synthfile)
 
 			// sampleID - this is the terminal chunk
 			instGenList.sfGenOper = sampleID;
-			instGenList.genAmount.wAmount = rgn->tableIndex;
+			instGenList.genAmount.wAmount = (WORD)(rgn->tableIndex);
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
@@ -419,8 +419,8 @@ SF2File::SF2File(SynthFile* synthfile)
 		samp.dwStartloop = samp.dwStart + sampInfo->ulLoopStart;
 		samp.dwEndloop = samp.dwStartloop + sampInfo->ulLoopLength;
 		samp.dwSampleRate = wave->dwSamplesPerSec;
-		samp.byOriginalKey = sampInfo->usUnityNote;
-		samp.chCorrection = sampInfo->sFineTune;
+		samp.byOriginalKey = (BYTE)(sampInfo->usUnityNote);
+		samp.chCorrection = (CHAR)(sampInfo->sFineTune);
 		samp.wSampleLink = 0;
 		samp.sfSampleType = monoSample;
 

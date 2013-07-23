@@ -158,7 +158,7 @@ public:
 public:
 	//prog_info*	prog_infos;
 	QSoundVer fmt_version;
-	int num_instr_banks;
+	UINT num_instr_banks;
 	QSoundSampleInfoTable* sampInfoTable;
 	QSoundArticTable* articTable;
 	//U32 samp_table_offset;

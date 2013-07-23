@@ -243,9 +243,11 @@ bool AkaoSampColl::GetHeaderInfo()
 
 bool AkaoSampColl::GetSampleInfo()
 {
+	ULONG i;
+	ULONG j;
 
 	//Read Articulation Data
-	for (int i=0; i<nNumArts; i++)
+	for (i=0; i<nNumArts; i++)
 	{
 		VGMHeader* ArtHdr = AddHeader(arts_offset+i*0x10, 16, L"Articulation");
 		ArtHdr->AddSimpleItem(arts_offset + i*0x10 + 0, 4, L"Sample Offset");
@@ -262,7 +264,7 @@ bool AkaoSampColl::GetSampleInfo()
 		akArts[i].sample_offset =	GetWord(arts_offset + i*0x10);
 		akArts[i].loop_point =	GetWord(arts_offset + i*0x10 + 4) - akArts[i].sample_offset;
 		akArts[i].fineTune =		GetShort(arts_offset + i*0x10 + 8);
-		akArts[i].unityKey =		GetShort(arts_offset + i*0x10 + 0xA);
+		akArts[i].unityKey =		(BYTE)GetShort(arts_offset + i*0x10 + 0xA);
 		akArts[i].ADSR1 =			GetShort(arts_offset + i*0x10 + 0xC);
 		akArts[i].ADSR2 =			GetShort(arts_offset + i*0x10 + 0xE);
 		akArts[i].artID =			starting_art_id+i;
@@ -282,7 +284,6 @@ bool AkaoSampColl::GetSampleInfo()
 		sample_section_size = rawfile->size() - sample_section_offset;	//then shorten the sample section size to the actual end of the document
 	if (GetWord(sample_section_offset + sample_section_size - 0x10) == 0)		//check the last 10 bytes to make sure they aren't null, if they are, abbreviate things till there is no 0x10 block of null bytes
 	{	
-		ULONG j;
 		for (j=0x10; GetWord(sample_section_offset + sample_section_size - j) == 0; j+=0x10);
 			;
 		sample_section_size -= j-0x10;		//-0x10 because we went 1 0x10 block too far
@@ -292,9 +293,8 @@ bool AkaoSampColl::GetSampleInfo()
 		sample_section_size = rawfile->size(); //- sample_section_offset;	//then shorten the sample section size to the actual end of the document
 	//AddItem("Samples", ICON_TRACK, FileVGMItem.pTreeItem, sample_section_offset, 0, 0, &AllSampsVGMItem); //add the parent "Samples" tree item
 
-	for (ULONG j = sample_section_offset; j < sample_section_offset + sample_section_size; j+=0x10)		//until we reach the end of the sample set file
+	for (j = sample_section_offset; j < sample_section_offset + sample_section_size; j+=0x10)		//until we reach the end of the sample set file
 	{
-		ULONG i;
 		for(i=0; GetByte(j+i) == 0; i++)
 			;
 		if (i >= 16)										//if we found a chunk of 00 bytes 16 bytes in size or greater, then we found the beginning a new sample
@@ -320,7 +320,7 @@ bool AkaoSampColl::GetSampleInfo()
 	//AllSampsVGMItem.unLength = sample_section_size;
 
 	//Calculate sample sizes
-	UINT i;
+	//UINT i;
 	for (i=0; i<samples.size()-1; i++)
 	{
 		samples[i]->SetDataLength(samples[i+1]->dwOffset - samples[i]->dwOffset);
@@ -338,7 +338,7 @@ bool AkaoSampColl::GetSampleInfo()
 	
 	//now to verify and associate each articulation with a sample index value
 
-	for (UINT i=0; i<akArts.size(); i++)			//for every instrument
+	for (i=0; i<akArts.size(); i++)			//for every instrument
 	{						
 		for (UINT l=0; l<samples.size(); l++)		//for every sample
 		{						

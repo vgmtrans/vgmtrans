@@ -90,7 +90,7 @@ void CompDataSeg::UpdateCompBuf(ULONG offset)
 		return;
 
 	compBufIndex = newCompBufIndex;
-	assert(compBufIndex < compBlocks.size());
+	assert((unsigned)compBufIndex < compBlocks.size());
 	ULONG destLen = compBlockSize;
 	uncompress(data, &destLen, compBlocks[compBufIndex].first, compBlocks[compBufIndex].second);
 	compBlockVirtBegin = compBufIndex*compBlockSize + startOff;

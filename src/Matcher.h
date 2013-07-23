@@ -253,6 +253,7 @@ protected:
 			}
 			return true;
 		}
+		return true;
 	}
 
 	virtual int OnCloseSeq(VGMSeq* seq)
