@@ -177,55 +177,22 @@
     <ClCompile Include="windows\CollDialog.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="DragDropSource.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
     <ClCompile Include="windows\FileFrame.CPP">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
     <ClCompile Include="windows\HexView.CPP">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="HexViewFrame.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="ItemTreeView.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
     <ClCompile Include="windows\mainfrm.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="MediaThread.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="MusicPlayer.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="osdepend.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="RawFileListView.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="RawFileTreeView.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="ScanDlg.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
     <ClCompile Include="windows\stdafx.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="VGMCollListView.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
     <ClCompile Include="windows\VGMFileListView.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
     <ClCompile Include="windows\VGMTrans.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="WinVGMRoot.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
     <ClCompile Include="windows\directmidi\C3DBuffer.cpp">
@@ -283,9 +250,6 @@
       <Filter>Source Files\windows\DirectMidi</Filter>
     </ClCompile>
     <ClCompile Include="windows\directmidi\Dmhelp.cpp">
-      <Filter>Source Files\windows\DirectMidi</Filter>
-    </ClCompile>
-    <ClCompile Include="MyCoCreateInstance.cpp">
       <Filter>Source Files\windows\DirectMidi</Filter>
     </ClCompile>
     <ClCompile Include="windows\directmidi\DSUTIL\DSUTIL.CPP">
@@ -582,18 +546,48 @@
     <ClCompile Include="datetime.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
+    <ClCompile Include="windows\DragDropSource.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\HexViewFrame.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\ItemTreeView.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\MediaThread.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\MusicPlayer.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\osdepend.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\RawFileListView.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\RawFileTreeView.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\ScanDlg.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\VGMCollListView.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\WinVGMRoot.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\directmidi\MyCoCreateInstance.cpp">
+      <Filter>Source Files\windows\DirectMidi</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="BmpBtn.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
     <ClInclude Include="windows\CollDialog.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="DragDropSource.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="windows\DropFileHandler.h">
@@ -605,25 +599,7 @@
     <ClInclude Include="windows\HexView.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="HexViewFrame.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="ItemTreeView.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
     <ClInclude Include="windows\mainfrm.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="MediaThread.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="MusicPlayer.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="MySplitter.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="RawFileListView.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="windows\RawFileTreeView.h">
@@ -632,28 +608,13 @@
     <ClInclude Include="windows\resource.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="ScanDlg.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
     <ClInclude Include="windows\stdafx.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="windows\include\TabbedMDISave.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="VGMCollListView.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
     <ClInclude Include="windows\VGMFileListView.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="VGMTransTabCtrl.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="VGMTransWindow.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="WinVGMRoot.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="windows\include\atlgdix.h">
@@ -690,9 +651,6 @@
       <Filter>Header Files\windows\DirectMidi</Filter>
     </ClInclude>
     <ClInclude Include="windows\directmidi\CMidipart.h">
-      <Filter>Header Files\windows\DirectMidi</Filter>
-    </ClInclude>
-    <ClInclude Include="MyCoCreateInstance.h">
       <Filter>Header Files\windows\DirectMidi</Filter>
     </ClInclude>
     <ClInclude Include="windows\directmidi\DSUTIL\DSUTIL.H">
@@ -1016,9 +974,6 @@
     <ClInclude Include="loaders\sexypsf\spu\regs.h">
       <Filter>Header Files\loaders\SexyPSF\spu</Filter>
     </ClInclude>
-    <ClInclude Include="reverb.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
-    </ClInclude>
     <ClInclude Include="loaders\sexypsf\spu\spu.h">
       <Filter>Header Files\loaders\SexyPSF\spu</Filter>
     </ClInclude>
@@ -1072,6 +1027,51 @@
     </ClInclude>
     <ClInclude Include="datetime.h">
       <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\BmpBtn.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\DragDropSource.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\HexViewFrame.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\ItemTreeView.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\MediaThread.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\MusicPlayer.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\MySplitter.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\RawFileListView.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\ScanDlg.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\VGMCollListView.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\VGMTransTabCtrl.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\VGMTransWindow.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\WinVGMRoot.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\directmidi\MyCoCreateInstance.h">
+      <Filter>Header Files\windows\DirectMidi</Filter>
+    </ClInclude>
+    <ClInclude Include="loaders\sexypsf\spu\reverb.h">
+      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
