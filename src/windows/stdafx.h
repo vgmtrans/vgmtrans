@@ -64,7 +64,10 @@
 #else
 	#define _WTL_USE_CSTRING
 #endif
+#pragma warning(push)
+#pragma warning(disable: 4996)
 #include <atlapp.h>
+#pragma warning(pop)
 
 extern CAppModule _Module;
 extern bool g_bXPOrLater;
@@ -195,10 +198,6 @@ public:
 #include <dsound.h>
 
 
-
-#pragma warning( disable : 4996 ) // disable deprecated warning 
-#include <strsafe.h>
-#pragma warning( default : 4996 ) 
 
 #if defined(DEBUG) || defined(_DEBUG)
 #ifndef V

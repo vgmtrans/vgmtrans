@@ -95,6 +95,8 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <CompileAs>Default</CompileAs>
+      <DisableSpecificWarnings>
+      </DisableSpecificWarnings>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -150,6 +152,8 @@
       </DebugInformationFormat>
       <CompileAs>Default</CompileAs>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <DisableSpecificWarnings>
+      </DisableSpecificWarnings>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -239,25 +243,69 @@
     <ClCompile Include="PSF1Loader.cpp" />
     <ClCompile Include="PSF2Loader.cpp" />
     <ClCompile Include="SPCLoader.cpp" />
-    <ClCompile Include="loaders\sexypsf\Misc.cpp" />
-    <ClCompile Include="loaders\sexypsf\PsxBios.cpp" />
-    <ClCompile Include="loaders\sexypsf\PsxCounters.cpp" />
-    <ClCompile Include="loaders\sexypsf\PsxDma.cpp" />
-    <ClCompile Include="loaders\sexypsf\PsxHLE.cpp" />
-    <ClCompile Include="loaders\sexypsf\PsxHw.cpp" />
-    <ClCompile Include="loaders\sexypsf\PsxInterpreter.cpp" />
-    <ClCompile Include="loaders\sexypsf\PsxMem.cpp" />
-    <ClCompile Include="loaders\sexypsf\R3000A.cpp" />
-    <ClCompile Include="loaders\sexypsf\Spu.cpp" />
-    <ClCompile Include="loaders\sexypsf\spu\adsr.cpp" />
-    <ClCompile Include="loaders\sexypsf\spu\dma.cpp" />
-    <ClCompile Include="loaders\sexypsf\spu\registers.cpp" />
-    <ClCompile Include="loaders\sexypsf\spu\reverb.cpp" />
+    <ClCompile Include="loaders\sexypsf\Misc.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\PsxBios.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\PsxCounters.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\PsxDma.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\PsxHLE.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\PsxHw.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\PsxInterpreter.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\PsxMem.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\R3000A.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\Spu.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\spu\adsr.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\spu\dma.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\spu\registers.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="loaders\sexypsf\spu\reverb.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="loaders\sexypsf\spu\spu.cpp">
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)%(Filename)1.obj</ObjectFileName>
       <XMLDocumentationFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)%(Filename)1.xdc</XMLDocumentationFileName>
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)%(Filename)1.obj</ObjectFileName>
       <XMLDocumentationFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)%(Filename)1.xdc</XMLDocumentationFileName>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4244;4603</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4244;4603</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="PSXSPU.cpp" />
     <ClCompile Include="PS1Seq.cpp" />
