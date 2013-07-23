@@ -14,7 +14,7 @@ PSF1Loader::~PSF1Loader(void)
 {
 }
 
-int PSF1Loader::Apply(RawFile* file)
+PostLoadCommand PSF1Loader::Apply(RawFile* file)
 {
 	UINT sig = file->GetWord(0);
 	if ((sig & 0x00FFFFFF) == 0x465350 && ((sig & 0xFF000000) == 0x01000000 || (sig & 0xFF000000) == 0x11000000))

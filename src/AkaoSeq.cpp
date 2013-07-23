@@ -29,7 +29,7 @@ BYTE AkaoSeq::GetNumPositiveBits(ULONG ulWord)
 			((ulWord&0x8)>0)+((ulWord&0x4)>0)+((ulWord&0x2)>0)+((ulWord&0x1));
 }
 
-int AkaoSeq::GetHeaderInfo(void)
+bool AkaoSeq::GetHeaderInfo(void)
 {
 	//first do a version check to see if it's older or newer version of AKAO sequence format
 	if (GetWord(dwOffset+0x2C) == 0)
@@ -85,7 +85,7 @@ int AkaoSeq::GetHeaderInfo(void)
 }
 
 
-int AkaoSeq::GetTrackPointers(void)
+bool AkaoSeq::GetTrackPointers(void)
 {
 	for(unsigned int i=0; i<nNumTracks; i++)
 		aTracks.push_back(new AkaoTrack(this, GetShort(dwOffset+0x40+(i*2)) + i*2 + 0x40 + dwOffset));
@@ -110,7 +110,7 @@ AkaoTrack::AkaoTrack(AkaoSeq* parentFile, long offset, long length)
 //	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "“à‘ ‰¹Œ¹‚ðMIDI•ÏŠ·‚·‚éƒXƒŒ(in http://www.2ch.net)"
 //						Add un-known command(op-code).
 //--------------------------------------------------
-int AkaoTrack::ReadEvent(void)
+bool AkaoTrack::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 	BYTE status_byte = GetByte(curOffset++);

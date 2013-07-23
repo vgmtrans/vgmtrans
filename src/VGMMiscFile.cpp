@@ -12,12 +12,12 @@ VGMMiscFile::VGMMiscFile(const string& format, RawFile* file, ULONG offset, ULON
 
 }
 
-int VGMMiscFile::LoadMain()
+bool VGMMiscFile::LoadMain()
 {
 	return true;
 }
 
-int VGMMiscFile::Load()
+bool VGMMiscFile::Load()
 {
 	if (!LoadMain())
 		return false;

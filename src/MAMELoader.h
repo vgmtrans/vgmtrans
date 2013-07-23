@@ -57,7 +57,7 @@ class MAMELoader :
 public:
 	MAMELoader();
 	~MAMELoader();
-	virtual int Apply(RawFile* theFile);
+	virtual PostLoadCommand Apply(RawFile* theFile);
 private:
 	VirtFile* LoadRomGroup(MAMERomGroupEntry* romgroupentry, const string& format, unzFile& cur_file);
 	void DeleteBuffers(list<pair<BYTE*, UINT>>& buffers);

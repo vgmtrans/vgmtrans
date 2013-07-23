@@ -2,7 +2,7 @@
 
 #include "RawFile.h"
 
-enum {KEEP_IT, DELETE_IT};
+enum PostLoadCommand {KEEP_IT, DELETE_IT};
 
 class VGMLoader
 {
@@ -11,5 +11,5 @@ public:
 public:
 	virtual ~VGMLoader(void);
 
-	virtual int Apply(RawFile* theFile);
+	virtual PostLoadCommand Apply(RawFile* theFile);
 };

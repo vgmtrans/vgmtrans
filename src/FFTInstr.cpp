@@ -33,7 +33,7 @@ WdsInstrSet::~WdsInstrSet(void)
 //	Memo:
 //		VGMInstrSet::Load()ŠÖ”‚©‚çŒÄ‚Î‚ê‚é
 //==============================================================
-int	WdsInstrSet::GetHeaderInfo()
+bool	WdsInstrSet::GetHeaderInfo()
 {
 
 	//"hdr"\‘¢‘Ì‚Ö‚»‚Ì‚Ü‚Ü“]‘—
@@ -81,7 +81,7 @@ int	WdsInstrSet::GetHeaderInfo()
 //	Memo:
 //		VGMInstrSet::Load()ŠÖ”‚©‚çŒÄ‚Î‚ê‚é
 //==============================================================
-int	WdsInstrSet::GetInstrPointers()
+bool	WdsInstrSet::GetInstrPointers()
 {
 
 	ULONG	iOffset = dwOffset + sizeof(WdsHdr);	//pointer of attribute table
@@ -124,7 +124,7 @@ WdsInstr::~WdsInstr(void)
 //==============================================================
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
-int	WdsInstr::LoadInstr()
+bool	WdsInstr::LoadInstr()
 {
 
 //	WdsRgn* rgn = new WdsRgn(this, dwOffset, sizeof(WdsAttr), instrNum, parInstrSet->sampColl);

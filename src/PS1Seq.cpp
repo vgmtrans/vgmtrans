@@ -15,7 +15,7 @@ PS1Seq::~PS1Seq(void)
 }
 
 
-int PS1Seq::GetHeaderInfo(void)
+bool PS1Seq::GetHeaderInfo(void)
 {
 	name() = L"PS1 SEQ";
 
@@ -48,7 +48,7 @@ int PS1Seq::GetHeaderInfo(void)
 	return true;
 }
 
-int PS1Seq::ReadEvent(void)
+bool PS1Seq::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 	AddDelta(ReadVarLen(curOffset));

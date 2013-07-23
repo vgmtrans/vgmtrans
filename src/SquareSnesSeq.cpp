@@ -21,7 +21,7 @@ SquSnesSeq::~SquSnesSeq(void)
 {
 }
 
-int SquSnesSeq::GetHeaderInfo(void)
+bool SquSnesSeq::GetHeaderInfo(void)
 {
 	SetPPQN(0x60);
 	name = L"Square SNES Seq";
@@ -47,7 +47,7 @@ int SquSnesSeq::GetHeaderInfo(void)
 }
 
 
-int SquSnesSeq::GetTrackPointers(void)
+bool SquSnesSeq::GetTrackPointers(void)
 {
 /*	for (int i=0; i<8; i++)
 	{
@@ -84,7 +84,7 @@ SquSnesTrack::SquSnesTrack(SquSnesSeq* parentFile, long offset, long length)
 }
 
 
-int SquSnesTrack::ReadEvent(void)
+bool SquSnesTrack::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 	BYTE status_byte = GetByte(curOffset++);

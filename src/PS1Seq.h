@@ -9,8 +9,8 @@ public:
 	PS1Seq(RawFile* file, ULONG offset);
 	virtual ~PS1Seq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int ReadEvent(void);
+	virtual bool GetHeaderInfo(void);
+	virtual bool ReadEvent(void);
 
 protected:
 	BYTE runningStatus;

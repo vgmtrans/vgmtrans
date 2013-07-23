@@ -83,10 +83,10 @@ public:
 	WdsInstrSet(RawFile* file, ULONG offset);
 	virtual ~WdsInstrSet(void);
 
-	virtual int	GetHeaderInfo();		//ヘッダーの処理
+	virtual bool	GetHeaderInfo();	//ヘッダーの処理
 										//ここで、Object"VabSampColl"を生成するべき？
 										//（スキャナーでVBを検索すると、複数有るから解らなくなる。）
-	virtual int	GetInstrPointers();		//音色Object"WdsInstr"を生成する。
+	virtual bool	GetInstrPointers();	//音色Object"WdsInstr"を生成する。
 										//"aInstrs"に、登録する。
 										//各音色毎の処理
 
@@ -116,7 +116,7 @@ public:
 	WdsInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
 	virtual ~WdsInstr(void);
 
-	virtual int LoadInstr();	//Object "WdsRgn"の生成、
+	virtual bool LoadInstr();	//Object "WdsRgn"の生成、
 								//"WdsRgn->LoadRgn()"の呼び出し
 								//member "aRgns" へオブジェクトのポインタを登録
 

@@ -19,7 +19,7 @@ NinSnesSeq::~NinSnesSeq()
 }
 
 //Load() - Function to load all the sequence data into the class
-int NinSnesSeq::LoadMain()
+bool NinSnesSeq::LoadMain()
 {
 	SetPPQN(0x30);
 	for (UINT i=0; i<8; i++)
@@ -52,7 +52,7 @@ int NinSnesSeq::LoadMain()
 	return true;
 }
 
-int NinSnesSeq::GetSectionPointers()
+bool NinSnesSeq::GetSectionPointers()
 {
 	VGMHeader* PlayListHdr = AddHeader(dwOffset, 0, L"Section Play List");
 
@@ -77,7 +77,7 @@ int NinSnesSeq::GetSectionPointers()
 }
 
 
-int NinSnesSeq::LoadAllSections()
+bool NinSnesSeq::LoadAllSections()
 {
 	curDelta = 0;
 	int nextTime = 0;
@@ -173,7 +173,7 @@ NinSnesSection::~NinSnesSection()
 	DeleteVect<SeqTrack>(aSectTracks);
 }
 
-int NinSnesSection::GetHeaderInfo(USHORT headerOffset)
+bool NinSnesSection::GetHeaderInfo(USHORT headerOffset)
 {
 	hdrOffset = headerOffset;
 	for (int i=0; i<8; i++)
@@ -316,7 +316,7 @@ BYTE NinSnesTrack::GetPercBase()
 }
 
 
-int NinSnesTrack::ReadEvent(ULONG totalTime)
+bool NinSnesTrack::ReadEvent(ULONG totalTime)
 {
 	//if (totalTime >= parentSect->endTime)
 	//	return false;

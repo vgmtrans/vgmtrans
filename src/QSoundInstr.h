@@ -111,7 +111,7 @@ public:
 	QSoundArticTable(RawFile* file, wstring& name, U32 offset, U32 length);
 	virtual ~QSoundArticTable(void);
 
-	virtual int LoadMain();
+	virtual bool LoadMain();
 
 public:
 	qs_artic_info* artics;
@@ -128,7 +128,7 @@ public:
 	QSoundSampleInfoTable(RawFile* file, wstring& name, U32 offset, U32 length = 0);
 	virtual ~QSoundSampleInfoTable(void);
 
-	virtual int LoadMain();
+	virtual bool LoadMain();
 
 public:
 	qs_samp_info* infos;
@@ -152,8 +152,8 @@ public:
                    wstring& name);
 	virtual ~QSoundInstrSet(void);
 
-	virtual int GetHeaderInfo();
-	virtual int GetInstrPointers();
+	virtual bool GetHeaderInfo();
+	virtual bool GetInstrPointers();
 
 public:
 	//prog_info*	prog_infos;
@@ -181,7 +181,7 @@ class QSoundInstr
 public:
 	QSoundInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, wstring& name);
 	virtual ~QSoundInstr(void);
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 protected:
 	QSoundVer GetFormatVer() { return ((QSoundInstrSet*)parInstrSet)->fmt_version; }
 

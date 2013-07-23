@@ -12,7 +12,7 @@ public:
 public:
 	virtual ~OrgSeq(void);
 
-	virtual int GetHeaderInfo(void);
+	virtual bool GetHeaderInfo(void);
 
 public:
 	USHORT waitTime;		//I believe this is the millis per tick
@@ -28,8 +28,8 @@ class OrgTrack
 public:
 	OrgTrack(OrgSeq* parentFile, long offset, long length, BYTE realTrk);
 
-	virtual int LoadTrack(int trackNum, ULONG stopOffset, long stopDelta);
-	virtual int ReadEvent(void);
+	virtual bool LoadTrack(ULONG trackNum, ULONG stopOffset, long stopDelta);
+	virtual bool ReadEvent(void);
 
 public:
 	BYTE prevPan;

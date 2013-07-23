@@ -61,12 +61,12 @@ void SeqTrack::ResetVars()
 }*/
 
 
-int SeqTrack::ReadEvent(void)
+bool SeqTrack::ReadEvent(void)
 {
 	return false;		//by default, don't add any events, just stop immediately.
 }
 
-int SeqTrack::LoadTrack( int trackNum, ULONG stopOffset /*= 0xFFFFFFFF*/, long stopDelta /*= -1*/ )
+bool SeqTrack::LoadTrack( int trackNum, ULONG stopOffset /*= 0xFFFFFFFF*/, long stopDelta /*= -1*/ )
 {
 	if (!LoadTrackInit(trackNum))
 		return false;
@@ -75,7 +75,7 @@ int SeqTrack::LoadTrack( int trackNum, ULONG stopOffset /*= 0xFFFFFFFF*/, long s
 	return true;
 }
 
-int SeqTrack::LoadTrackInit(int trackNum)
+bool SeqTrack::LoadTrackInit(int trackNum)
 {
 	ResetVars();
 	if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -105,7 +105,7 @@ int SeqTrack::LoadTrackInit(int trackNum)
 	return true;
 }
 
-int SeqTrack::LoadTrackMainLoop(ULONG stopOffset, long stopDelta)
+bool SeqTrack::LoadTrackMainLoop(ULONG stopOffset, long stopDelta)
 {
 	bInLoop = false;
 	curOffset = dwStartOffset;	//start at beginning of track

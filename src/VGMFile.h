@@ -51,8 +51,8 @@ public:
 	bool OnSaveAsRaw();
 	bool OnSaveAllAsRaw();
 
-	int LoadVGMFile();
-	virtual int Load() = 0;
+	bool LoadVGMFile();
+	virtual bool Load() = 0;
 	//virtual Format* GetFormat() = 0;  // {return 0;}
 	Format* GetFormat();
 	const string& GetFormatName();

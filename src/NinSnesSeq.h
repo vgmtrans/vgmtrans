@@ -51,9 +51,9 @@ public:
 	NinSnesSeq(RawFile* file, ULONG offset, ULONG length = 0, wstring theName = L"NinSnes Seq");
 	virtual ~NinSnesSeq();
 
-	virtual int LoadMain();
-	int GetSectionPointers();
-	int LoadAllSections();
+	virtual bool LoadMain();
+	bool GetSectionPointers();
+	bool LoadAllSections();
 	void LoadDefaultEventMap(NinSnesSeq *pSeqFile);
 
 public:
@@ -79,7 +79,7 @@ class NinSnesSection
 public:
 	NinSnesSection(NinSnesSeq* parentSeq, ULONG offset);
 	~NinSnesSection();
-	int GetHeaderInfo(USHORT headerOffset);
+	bool GetHeaderInfo(USHORT headerOffset);
 	int LoadSection(int startTime);
 
 public:
@@ -101,7 +101,7 @@ class NinSnesTrack
 public:
 	NinSnesTrack(NinSnesSection* parentSect, ULONG offset, int trackNumber);
 	NinSnesTrack(NinSnesSeq* parentSeq, ULONG offset, int trackNumber);
-	int ReadEvent(ULONG totalTime);
+	bool ReadEvent(ULONG totalTime);
 	void AddDelta(ULONG AddDelta);
 	void SubtractDelta(ULONG SubtractDelta);
 	void SetPercBase(BYTE newBase);

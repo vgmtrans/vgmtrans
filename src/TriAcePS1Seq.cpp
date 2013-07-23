@@ -28,7 +28,7 @@ TriAcePS1Seq::~TriAcePS1Seq()
 }
 
 
-int TriAcePS1Seq::GetHeaderInfo(void)
+bool TriAcePS1Seq::GetHeaderInfo(void)
 {
 	SetPPQN(0x30);
 
@@ -47,7 +47,7 @@ int TriAcePS1Seq::GetHeaderInfo(void)
 	return true;
 }
 
-int TriAcePS1Seq::GetTrackPointers(void)
+bool TriAcePS1Seq::GetTrackPointers(void)
 {
 	VGMHeader* TrkInfoHeader = header->AddHeader(dwOffset+0x16, 6*32, L"Track Info Blocks");
 
@@ -72,7 +72,7 @@ TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset, long length
 {
 }
 
-int TriAcePS1Track::LoadTrackMainLoop(U32 stopOffset, long stopDelta)
+bool TriAcePS1Track::LoadTrackMainLoop(U32 stopOffset, long stopDelta)
 {
 	TriAcePS1Seq* seq = (TriAcePS1Seq*)parentSeq;
 	U32 scorePatternPtrOffset = dwOffset;
@@ -111,7 +111,7 @@ U32 TriAcePS1Track::ReadScorePattern(U32 offset)
 	return curOffset;
 }
 
-int TriAcePS1Track::ReadEvent(void)
+bool TriAcePS1Track::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 

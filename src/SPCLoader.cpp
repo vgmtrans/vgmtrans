@@ -10,7 +10,7 @@ SPCLoader::~SPCLoader(void)
 {
 }
 
-int SPCLoader::Apply(RawFile* file)
+PostLoadCommand SPCLoader::Apply(RawFile* file)
 {
 	if (file->size() >= 0x10100)
 	{

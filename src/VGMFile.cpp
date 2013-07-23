@@ -87,7 +87,7 @@ bool VGMFile::OnSaveAllAsRaw()
 	return pRoot->SaveAllAsRaw();
 }
 
-int VGMFile::LoadVGMFile()
+bool VGMFile::LoadVGMFile()
 {
 	int val = Load();
 	if (!val)

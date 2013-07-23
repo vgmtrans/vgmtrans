@@ -24,7 +24,7 @@ NDSInstrSet::~NDSInstrSet(void)
 {
 }*/
 
-int NDSInstrSet::GetInstrPointers()
+bool NDSInstrSet::GetInstrPointers()
 {
 	VGMHeader* header = AddHeader(dwOffset, 0x38);
 	ULONG nInstruments = GetWord(dwOffset + 0x38);
@@ -57,7 +57,7 @@ NDSInstr::NDSInstr(NDSInstrSet* instrSet, ULONG offset, ULONG length, ULONG theB
 {
 }
 
-int NDSInstr::LoadInstr()
+bool NDSInstr::LoadInstr()
 {
 	//All of the undefined case values below are used for tone or noise channels
 	switch (instrType)					

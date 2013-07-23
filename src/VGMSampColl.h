@@ -23,7 +23,7 @@ public:
 	virtual ~VGMSampColl(void);
 	void UseInstrSet(VGMInstrSet* instrset) { parInstrSet = instrset; }
 
-	virtual int Load();
+	virtual bool Load();
 	virtual bool GetHeaderInfo();		//retrieve any header data
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 

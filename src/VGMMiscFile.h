@@ -17,7 +17,7 @@ public:
 
 	virtual FileType GetFileType() { return FILETYPE_MISC; }
 
-	virtual int LoadMain();
-	virtual int Load();
+	virtual bool LoadMain();
+	virtual bool Load();
 };
 

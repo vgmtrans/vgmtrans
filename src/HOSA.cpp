@@ -36,7 +36,7 @@ HOSASeq::~HOSASeq(void)
 //	Memo
 //		VGMSeq::LoadMain() Ç©ÇÁ call Ç≥ÇÍÇÈÅB
 //==============================================================
-int HOSASeq::GetHeaderInfo(void)
+bool HOSASeq::GetHeaderInfo(void)
 {
 
 	name = L"HOSA Seq";							//this object name
@@ -68,7 +68,7 @@ int HOSASeq::GetHeaderInfo(void)
 //	Memo
 //		VGMSeq::LoadMain() Ç©ÇÁ call Ç≥ÇÍÇÈÅB
 //==============================================================
-int HOSASeq::GetTrackPointers(void)
+bool HOSASeq::GetTrackPointers(void)
 {
 	for(unsigned int i=0; i<nNumTracks; i++)
 		aTracks.push_back(new HOSATrack(this, GetShort(dwOffset+0x50+(i*2)) + dwOffset));
@@ -112,7 +112,7 @@ HOSATrack::HOSATrack(HOSASeq* parentFile, long offset, long length):
 //	Memo
 //		SeqTrack::LoadTrack() Ç©ÇÁ call Ç≥ÇÍÇÈÅB
 //==============================================================
-int HOSATrack::ReadEvent(void)
+bool HOSATrack::ReadEvent(void)
 {
 
 	//==================================

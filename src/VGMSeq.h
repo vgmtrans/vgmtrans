@@ -28,11 +28,11 @@ public:
 
 	virtual Icon GetIcon() { return ICON_SEQ; }
 	
-	virtual int Load();				//Function to load all the information about the sequence
-	virtual int LoadMain();
-	virtual int PostLoad();
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
+	virtual bool Load();				//Function to load all the information about the sequence
+	virtual bool LoadMain();
+	virtual bool PostLoad();
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
 	virtual void ResetVars(void);
 	virtual MidiFile* ConvertToMidi();
 //	virtual int LoadTracks(void);

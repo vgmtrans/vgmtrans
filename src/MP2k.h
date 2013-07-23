@@ -23,16 +23,16 @@ class MP2kSeq :
 public:
 	MP2kSeq(RawFile* file, ULONG offset);
 	virtual ~MP2kSeq(void);
-	//virtual int OnSelected(void);
-	//virtual int OnContextMenuCmd(UINT nID);
-	//virtual int OnPlay(void);
+	//virtual bool OnSelected(void);
+	//virtual bool OnContextMenuCmd(UINT nID);
+	//virtual bool OnPlay(void);
 	//virtual VGMItem* GetItemFromOffset(VGMDoc *pDoc, ULONG offset);
 
-	//virtual int Load();								//Function to load all the information about the sequence
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
-	//virtual int Load(UINT offset);
-	//virtual int ApplyTable(void);		//create and apply table handler object for sequence
+	//virtual bool Load();								//Function to load all the information about the sequence
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
+	//virtual bool Load(UINT offset);
+	//virtual bool ApplyTable(void);		//create and apply table handler object for sequence
 
 	//void OnSaveAsMidi(void);
 };
@@ -46,7 +46,7 @@ public:
 	//~FFTTrack(void) {}
 	//virtual void SetChannel(int trackNum);
 	//virtual void AddEvent(const char* sEventName, int nImage, unsigned long offset, unsigned long length, BYTE color);
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 
 public:
 	BYTE state;
@@ -64,7 +64,7 @@ class MP2kEvent :
 {
 public:
 	MP2kEvent(MP2kTrack* pTrack, BYTE stateType);
-	//virtual int OnSelected(void);
+	//virtual bool OnSelected(void);
 public:
 	BYTE eventState;					//Keep record of the state, because otherwise, all 0-0x7F events are ambiguous
 };

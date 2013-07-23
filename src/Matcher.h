@@ -32,18 +32,18 @@ public:
 	Matcher(Format* format);
 	virtual ~Matcher();
 
-	//virtual int Match() = 0;
+	//virtual bool Match() = 0;
 
 public:
-	virtual int OnNewFile(VGMFile* file);
-	virtual int OnCloseFile(VGMFile* file);
+	virtual bool OnNewFile(VGMFile* file);
+	virtual bool OnCloseFile(VGMFile* file);
 protected:
-	virtual int OnNewSeq(VGMSeq* seq) {return false;}
-	virtual int OnNewInstrSet(VGMInstrSet* instrset) {return false;}
-	virtual int OnNewSampColl(VGMSampColl* sampcoll) {return false;}
-	virtual int OnCloseSeq(VGMSeq* seq) {return false;}
-	virtual int OnCloseInstrSet(VGMInstrSet* instrset) {return false;}
-	virtual int OnCloseSampColl(VGMSampColl* sampcoll) {return false;}
+	virtual bool OnNewSeq(VGMSeq* seq) {return false;}
+	virtual bool OnNewInstrSet(VGMInstrSet* instrset) {return false;}
+	virtual bool OnNewSampColl(VGMSampColl* sampcoll) {return false;}
+	virtual bool OnCloseSeq(VGMSeq* seq) {return false;}
+	virtual bool OnCloseInstrSet(VGMInstrSet* instrset) {return false;}
+	virtual bool OnCloseSampColl(VGMSampColl* sampcoll) {return false;}
 
 	Format* fmt;
 };
@@ -64,19 +64,19 @@ public:
 	//SimpleMatcher(Format* format, bool bRequiresSampColl = false);
 
 protected:
-	//virtual int OnNewSeq(VGMSeq* seq);
-	//virtual int OnNewInstrSet(VGMInstrSet* instrset);
-	//virtual int OnNewSampColl(VGMSampColl* sampcoll);
+	//virtual bool OnNewSeq(VGMSeq* seq);
+	//virtual bool OnNewInstrSet(VGMInstrSet* instrset);
+	//virtual bool OnNewSampColl(VGMSampColl* sampcoll);
 
-	//virtual int OnCloseSeq(VGMSeq* seq);
-	//virtual int OnCloseInstrSet(VGMInstrSet* instrset);
-	//virtual int OnCloseSampColl(VGMSampColl* sampcoll);
+	//virtual bool OnCloseSeq(VGMSeq* seq);
+	//virtual bool OnCloseInstrSet(VGMInstrSet* instrset);
+	//virtual bool OnCloseSampColl(VGMSampColl* sampcoll);
 
 	// The following functions should return with the id variable containing the retrieved id of the file.
-	// The int return value is a flag for error: 1 on success and 0 on fail.
-	virtual int GetSeqId(VGMSeq* seq, IdType& id) = 0;//{return false;}	
-	virtual int GetInstrSetId(VGMInstrSet* instrset, IdType& id) = 0;//{return false;}
-	virtual int GetSampCollId(VGMSampColl* sampcoll, IdType& id) = 0;//{return false;}
+	// The bool return value is a flag for error: true on success and false on fail.
+	virtual bool GetSeqId(VGMSeq* seq, IdType& id) = 0;//{return false;}	
+	virtual bool GetInstrSetId(VGMInstrSet* instrset, IdType& id) = 0;//{return false;}
+	virtual bool GetSampCollId(VGMSampColl* sampcoll, IdType& id) = 0;//{return false;}
 
 
 	SimpleMatcher(Format* format, bool bUsingSampColl = false)
@@ -85,10 +85,10 @@ protected:
 	{
 	}
 
-	virtual int OnNewSeq(VGMSeq* seq)
+	virtual bool OnNewSeq(VGMSeq* seq)
 	{
 		IdType id;
-		int success = this->GetSeqId(seq, id);
+		bool success = this->GetSeqId(seq, id);
 		if (!success)
 			return false;
 		//if (seqs[id])
@@ -130,10 +130,10 @@ protected:
 		return true;
 	}
 
-	virtual int OnNewInstrSet(VGMInstrSet* instrset)
+	virtual bool OnNewInstrSet(VGMInstrSet* instrset)
 	{
 		IdType id;
-		int success = this->GetInstrSetId(instrset, id);
+		bool success = this->GetInstrSetId(instrset, id);
 		if (!success)
 			return false;
 		if (instrsets[id])
@@ -199,12 +199,12 @@ protected:
 		return true;
 	}
 
-	virtual int OnNewSampColl(VGMSampColl* sampcoll)
+	virtual bool OnNewSampColl(VGMSampColl* sampcoll)
 	{
 		if (bRequiresSampColl)
 		{
 			IdType id;
-			int success = this->GetSampCollId(sampcoll, id);
+			bool success = this->GetSampCollId(sampcoll, id);
 			if (!success)
 				return false;
 			if (sampcolls[id])
@@ -256,10 +256,10 @@ protected:
 		return true;
 	}
 
-	virtual int OnCloseSeq(VGMSeq* seq)
+	virtual bool OnCloseSeq(VGMSeq* seq)
 	{
 		IdType id;
-		int success = this->GetSeqId(seq, id);
+		bool success = this->GetSeqId(seq, id);
 		if (!success)
 			return false;
 		//seqs.erase(id);
@@ -281,10 +281,10 @@ protected:
 		return true;
 	}
 
-	virtual int OnCloseInstrSet(VGMInstrSet* instrset)
+	virtual bool OnCloseInstrSet(VGMInstrSet* instrset)
 	{
 		IdType id;
-		int success = this->GetInstrSetId(instrset, id);
+		bool success = this->GetInstrSetId(instrset, id);
 		if (!success)
 			return false;
 		instrsets.erase(id);
@@ -292,10 +292,10 @@ protected:
 		return true;
 	}
 
-	virtual int OnCloseSampColl(VGMSampColl* sampcoll)
+	virtual bool OnCloseSampColl(VGMSampColl* sampcoll)
 	{
 		IdType id;
-		int success = this->GetSampCollId(sampcoll, id);
+		bool success = this->GetSampCollId(sampcoll, id);
 		if (!success)
 			return false;
 		sampcolls.erase(id);
@@ -324,19 +324,19 @@ public:
 		: SimpleMatcher(format, bRequiresSampColl)
 	{}
 
-	virtual int GetSeqId(VGMSeq* seq, ULONG& id)
+	virtual bool GetSeqId(VGMSeq* seq, ULONG& id)
 	{
 		id = seq->GetID();
 		return (id != -1);
 	}
 
-	virtual int GetInstrSetId(VGMInstrSet* instrset, ULONG& id)
+	virtual bool GetInstrSetId(VGMInstrSet* instrset, ULONG& id)
 	{
 		id = instrset->GetID();
 		return (id != -1);
 	}
 
-	virtual int GetSampCollId(VGMSampColl* sampcoll, ULONG& id)
+	virtual bool GetSampCollId(VGMSampColl* sampcoll, ULONG& id)
 	{
 		id = sampcoll->GetID();
 		return (id != -1);
@@ -356,7 +356,7 @@ public:
 		: SimpleMatcher(format, bRequiresSampColl)
 	{}
 
-	virtual int GetSeqId(VGMSeq* seq, wstring& id)
+	virtual bool GetSeqId(VGMSeq* seq, wstring& id)
 	{
 		RawFile* rawfile = seq->GetRawFile();
 		id = rawfile->GetParRawFileFullPath();
@@ -365,7 +365,7 @@ public:
 		return (id != L"");
 	}
 
-	virtual int GetInstrSetId(VGMInstrSet* instrset, wstring& id)
+	virtual bool GetInstrSetId(VGMInstrSet* instrset, wstring& id)
 	{
 		RawFile* rawfile = instrset->GetRawFile();
 		id = rawfile->GetParRawFileFullPath();
@@ -374,7 +374,7 @@ public:
 		return (id != L"");
 	}
 
-	virtual int GetSampCollId(VGMSampColl* sampcoll, wstring& id)
+	virtual bool GetSampCollId(VGMSampColl* sampcoll, wstring& id)
 	{
 		RawFile* rawfile = sampcoll->GetRawFile();
 		id = rawfile->GetParRawFileFullPath();
@@ -408,13 +408,13 @@ public:
 	FilegroupMatcher(Format* format);
 
 protected:
-	virtual int OnNewSeq(VGMSeq* seq);
-	virtual int OnNewInstrSet(VGMInstrSet* instrset);
-	virtual int OnNewSampColl(VGMSampColl* sampcoll);
+	virtual bool OnNewSeq(VGMSeq* seq);
+	virtual bool OnNewInstrSet(VGMInstrSet* instrset);
+	virtual bool OnNewSampColl(VGMSampColl* sampcoll);
 
-//	virtual int OnCloseSeq(VGMSeq* seq);
-//	virtual int OnCloseInstrSet(VGMInstrSet* instrset);
-//	virtual int OnCloseSampColl(VGMSampColl* sampcoll);
+//	virtual bool OnCloseSeq(VGMSeq* seq);
+//	virtual bool OnCloseInstrSet(VGMInstrSet* instrset);
+//	virtual bool OnCloseSampColl(VGMSampColl* sampcoll);
 
 	virtual void LookForMatch();
 	template <class T> T* GetLargestVGMFileInList(list<T*> theList);

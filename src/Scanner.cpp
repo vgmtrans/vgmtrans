@@ -12,7 +12,7 @@ VGMScanner::~VGMScanner(void)
 {
 }
 
-int VGMScanner::Init()
+bool VGMScanner::Init()
 {
 	//if (!UseExtension())
 	//	return false;

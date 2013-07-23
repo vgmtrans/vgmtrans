@@ -22,7 +22,7 @@ FFTSeq::~FFTSeq(void)
 {
 }
 
-int FFTSeq::GetHeaderInfo(void)
+bool FFTSeq::GetHeaderInfo(void)
 {
 
 //-----------------------------------------------------------
@@ -92,7 +92,7 @@ int FFTSeq::GetHeaderInfo(void)
 }
 
 
-int FFTSeq::GetTrackPointers(void)
+bool FFTSeq::GetTrackPointers(void)
 {
 	for(unsigned int i=0; i<nNumTracks; i++)
 		aTracks.push_back(new FFTTrack(this, GetShort(dwOffset+0x22+(i*2)) + dwOffset));
@@ -126,7 +126,7 @@ void FFTTrack::ResetVars()
 	SeqTrack::ResetVars();
 }
 
-int FFTTrack::LoadTrackMainLoop(U32 stopOffset, long stopDelta)
+bool FFTTrack::LoadTrackMainLoop(U32 stopOffset, long stopDelta)
 {
 	octave = 3;
 	return SeqTrack::LoadTrackMainLoop(stopOffset, stopDelta);
@@ -138,7 +138,7 @@ int FFTTrack::LoadTrackMainLoop(U32 stopOffset, long stopDelta)
 //	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "“à‘ ‰¹Œ¹‚ðMIDI•ÏŠ·‚·‚éƒXƒŒ(in http://www.2ch.net)"
 //						Add un-known command(op-code).
 //--------------------------------------------------
-int FFTTrack::ReadEvent(void)
+bool FFTTrack::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 	BYTE status_byte = GetByte(curOffset++);

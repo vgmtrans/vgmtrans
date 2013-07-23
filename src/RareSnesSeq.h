@@ -86,8 +86,8 @@ public:
 	RareSnesSeq(RawFile* file, RareSnesVersion ver, ULONG seqdata_offset, wstring newName = L"Rare SNES Seq");
 	virtual ~RareSnesSeq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);
 	virtual void ResetVars(void);
 
 	RareSnesVersion version;
@@ -117,9 +117,9 @@ class RareSnesTrack
 {
 public:
 	RareSnesTrack(RareSnesSeq* parentFile, long offset = 0, long length = 0);
-	virtual int LoadTrackInit(int trackNum);
+	virtual bool LoadTrackInit(ULONG trackNum);
 	virtual void ResetVars(void);
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 
 	void AddVolLR(ULONG offset, ULONG length, S8 spcVolL, S8 spcVolR, const wchar_t* sEventName = L"Volume L/R");
 	void AddVolLRNoItem(S8 spcVolL, S8 spcVolR);

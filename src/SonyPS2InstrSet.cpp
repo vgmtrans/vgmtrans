@@ -19,7 +19,7 @@ SonyPS2InstrSet::~SonyPS2InstrSet(void)
 }
 
 
-int SonyPS2InstrSet::GetHeaderInfo()
+bool SonyPS2InstrSet::GetHeaderInfo()
 {
 	name = L"Sony PS2 InstrSet";
 	
@@ -182,7 +182,7 @@ int SonyPS2InstrSet::GetHeaderInfo()
 	return true;
 }
 
-int SonyPS2InstrSet::GetInstrPointers()
+bool SonyPS2InstrSet::GetInstrPointers()
 {
 	U32 curOffset = dwOffset + hdrCk.programChunkAddr;
 	//Now we're at the Program chunk, which starts with the sig "SCEIProg" (in 32bit little endian)
@@ -322,7 +322,7 @@ SonyPS2Instr::~SonyPS2Instr(void)
 }
 
 
-int SonyPS2Instr::LoadInstr()
+bool SonyPS2Instr::LoadInstr()
 {
 	SonyPS2InstrSet* instrset = (SonyPS2InstrSet*)parInstrSet;
 	SonyPS2InstrSet::ProgCk& progCk = instrset->progCk;

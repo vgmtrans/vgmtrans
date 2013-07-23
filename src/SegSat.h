@@ -9,16 +9,16 @@ class SegSatSeq :
 public:
 	SegSatSeq(RawFile* file, ULONG offset);
 	virtual ~SegSatSeq(void);
-	//virtual int OnSelected(void);
-	//virtual int OnContextMenuCmd(UINT nID);
-	//virtual int OnPlay(void);
+	//virtual bool OnSelected(void);
+	//virtual bool OnContextMenuCmd(UINT nID);
+	//virtual bool OnPlay(void);
 	//virtual VGMItem* GetItemFromOffset(VGMDoc *pDoc, ULONG offset);
 
-	//virtual int Load();								//Function to load all the information about the sequence
-	virtual int GetHeaderInfo(void);
-	virtual int ReadEvent(void);
-	//virtual int GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
-	//virtual int Load(UINT offset);
+	//virtual bool Load();								//Function to load all the information about the sequence
+	virtual bool GetHeaderInfo(void);
+	virtual bool ReadEvent(void);
+	//virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
+	//virtual bool Load(UINT offset);
 	//virtual int ApplyTable(void);		//create and apply table handler object for sequence
 
 	//void OnSaveAsMidi(void);

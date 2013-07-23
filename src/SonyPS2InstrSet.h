@@ -103,7 +103,7 @@ public:
 	SonyPS2Instr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
 	virtual ~SonyPS2Instr(void);
 
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 	S8 ConvertPanVal(U8 panVal);
 
 public:
@@ -251,8 +251,8 @@ public:
 	SonyPS2InstrSet(RawFile* file, ULONG offset);
 	virtual ~SonyPS2InstrSet(void);
 
-	virtual int GetHeaderInfo();
-	virtual int GetInstrPointers();
+	virtual bool GetHeaderInfo();
+	virtual bool GetInstrPointers();
 
 protected:
 	VersCk versCk;

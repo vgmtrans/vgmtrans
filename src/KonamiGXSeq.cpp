@@ -20,7 +20,7 @@ KonamiGXSeq::~KonamiGXSeq(void)
 {
 }
 
-int KonamiGXSeq::GetHeaderInfo(void)
+bool KonamiGXSeq::GetHeaderInfo(void)
 {
 	//nNumTracks = GetByte(dwOffset+8);
 	SetPPQN(0x30);
@@ -31,7 +31,7 @@ int KonamiGXSeq::GetHeaderInfo(void)
 	return true;
 }
 
-int KonamiGXSeq::GetTrackPointers(void)
+bool KonamiGXSeq::GetTrackPointers(void)
 {
 	UINT pos = dwOffset;
 	for(int i=0; i<17; i++)
@@ -46,7 +46,7 @@ int KonamiGXSeq::GetTrackPointers(void)
 	return true;
 }
 
-//int KonamiGXSeq::LoadTracks(void)
+//bool KonamiGXSeq::LoadTracks(void)
 //{
 //	for (UINT i=0; i<nNumTracks; i++)
 //	{
@@ -68,7 +68,7 @@ KonamiGXTrack::KonamiGXTrack(KonamiGXSeq* parentSeq, long offset, long length)
 
 
 // I'm going to try to follow closely to the original Salamander 2 code at 0x30C6
-int KonamiGXTrack::ReadEvent(void)
+bool KonamiGXTrack::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 	ULONG deltatest = GetDelta();

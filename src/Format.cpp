@@ -32,7 +32,7 @@ Format* Format::GetFormatFromName(const string& name)
 	return (*findIt).second;
 }
 
-int Format::OnNewFile(VGMFile* file)
+bool Format::OnNewFile(VGMFile* file)
 {
 	if (!matcher)
 		return false;
@@ -53,14 +53,14 @@ VGMColl* Format::NewCollection()
 	return new VGMColl();
 }
 
-int Format::OnCloseFile(VGMFile* file)
+bool Format::OnCloseFile(VGMFile* file)
 {
 	if (!matcher)
 		return false;
 	return matcher->OnCloseFile(file);
 }
 
-int Format::Init(void)
+bool Format::Init(void)
 {
 	scanner = NewScanner();
 	matcher = NewMatcher();

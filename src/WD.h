@@ -41,8 +41,8 @@ public:
 	WDInstrSet(RawFile* file, ULONG offset);
 	virtual ~WDInstrSet(void);
 
-	virtual int GetHeaderInfo();
-	virtual int GetInstrPointers();
+	virtual bool GetHeaderInfo();
+	virtual bool GetInstrPointers();
 
 public:
 	DWORD dwSampSectOffset;
@@ -62,7 +62,7 @@ class WDInstr
 public:
 	WDInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, wstring name);
 	virtual ~WDInstr(void);
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 
 protected:
 	int info_ptr;		//pointer to start of instrument set block

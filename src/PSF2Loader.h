@@ -13,7 +13,7 @@ public:
 public:
 	virtual ~PSF2Loader(void);
 
-	virtual int Apply(RawFile* theFile);
+	virtual PostLoadCommand Apply(RawFile* theFile);
 	uint32 get32lsb(uint8 *src);
 	int psf2_decompress_block(RawFile* file,
 							  unsigned fileoffset,

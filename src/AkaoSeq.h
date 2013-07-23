@@ -16,8 +16,8 @@ public:
 	AkaoSeq(RawFile* file, ULONG offset);
 	virtual ~AkaoSeq(void);
 
-	virtual int GetHeaderInfo();
-	virtual int GetTrackPointers(void);
+	virtual bool GetHeaderInfo();
+	virtual bool GetTrackPointers(void);
 	
 	BYTE GetNumPositiveBits(ULONG ulWord);
 
@@ -38,7 +38,7 @@ class AkaoTrack
 public:
 	AkaoTrack(AkaoSeq* parentFile, long offset = 0, long length = 0);
 	
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 
 public:
 	

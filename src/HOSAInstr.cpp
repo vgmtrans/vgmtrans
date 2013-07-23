@@ -33,7 +33,7 @@ HOSAInstrSet::~HOSAInstrSet(void)
 //	Memo:
 //		VGMInstrSet::Load()ä÷êîÇ©ÇÁåƒÇŒÇÍÇÈ
 //==============================================================
-int HOSAInstrSet::GetHeaderInfo()
+bool HOSAInstrSet::GetHeaderInfo()
 {
 
 	//"hdr"ç\ë¢ëÃÇ÷ÇªÇÃÇ‹Ç‹ì]ëó
@@ -62,7 +62,7 @@ int HOSAInstrSet::GetHeaderInfo()
 //	Memo:
 //		VGMInstrSet::Load()ä÷êîÇ©ÇÁåƒÇŒÇÍÇÈ
 //==============================================================
-int HOSAInstrSet::GetInstrPointers()
+bool HOSAInstrSet::GetInstrPointers()
 {
 
 	ULONG	iOffset = dwOffset + sizeof(InstrHeader);	//pointer of attribute table
@@ -97,7 +97,7 @@ HOSAInstr::HOSAInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG th
 //==============================================================
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
-int HOSAInstr::LoadInstr()
+bool HOSAInstr::LoadInstr()
 {
 
 //	HOSAInstrSet*	_parInstrSet	=	(HOSAInstrSet*)parInstrSet;

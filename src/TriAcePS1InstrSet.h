@@ -18,8 +18,8 @@ public:
 	TriAcePS1InstrSet(RawFile* file, ULONG offset);
 	virtual ~TriAcePS1InstrSet(void);
 
-	virtual int GetHeaderInfo();
-	virtual int GetInstrPointers();
+	virtual bool GetHeaderInfo();
+	virtual bool GetInstrPointers();
 
 public:
 
@@ -84,7 +84,7 @@ public:
 public:
 	TriAcePS1Instr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
 	~TriAcePS1Instr() { if (rgns) delete[] rgns; }
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 
 public:
 	InstrInfo instrinfo;

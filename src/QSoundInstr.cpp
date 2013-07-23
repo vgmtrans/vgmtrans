@@ -22,7 +22,7 @@ QSoundArticTable::~QSoundArticTable(void)
 		delete[] artics;
 }
 
-int QSoundArticTable::LoadMain()
+bool QSoundArticTable::LoadMain()
 {
 	DWORD off = dwOffset;
 	U32 test1=1, test2=1;
@@ -71,7 +71,7 @@ QSoundSampleInfoTable::~QSoundSampleInfoTable(void)
 		delete[] infos;
 }
 
-int QSoundSampleInfoTable::LoadMain()
+bool QSoundSampleInfoTable::LoadMain()
 {
 	DWORD off = dwOffset;
 	U32 test1=1, test2=1;
@@ -124,12 +124,12 @@ QSoundInstrSet::~QSoundInstrSet(void)
 }
 
 
-int QSoundInstrSet::GetHeaderInfo()
+bool QSoundInstrSet::GetHeaderInfo()
 {
 	return true;
 }
 
-int QSoundInstrSet::GetInstrPointers()
+bool QSoundInstrSet::GetInstrPointers()
 {
 	// Load the instr_info tables.
 
@@ -198,7 +198,7 @@ QSoundInstr::~QSoundInstr(void)
 }
 
 
-int QSoundInstr::LoadInstr()
+bool QSoundInstr::LoadInstr()
 {
 	VGMRgn* rgn;
 

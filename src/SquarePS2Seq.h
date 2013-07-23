@@ -10,8 +10,8 @@ public:
 	BGMSeq(RawFile* file, ULONG offset);
 	virtual ~BGMSeq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);
 	virtual ULONG GetID() {return assocWDID;}
 
 protected:
@@ -26,5 +26,5 @@ class BGMTrack
 public:
 	BGMTrack(BGMSeq* parentSeq, long offset = 0, long length = 0);
 
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 };

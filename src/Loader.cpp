@@ -11,7 +11,7 @@ VGMLoader::~VGMLoader(void)
 {
 }
 
-int VGMLoader::Apply(RawFile* theFile)
+PostLoadCommand VGMLoader::Apply(RawFile* theFile)
 {
 	return KEEP_IT;
 }

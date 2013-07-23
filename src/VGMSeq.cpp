@@ -34,7 +34,7 @@ VGMSeq::~VGMSeq(void)
 	DeleteVect<SeqTrack>(aTracks);
 }
 
-int VGMSeq::Load()
+bool VGMSeq::Load()
 {
 	this->readMode = READMODE_ADD_TO_UI;
 	if (!LoadMain())
@@ -99,7 +99,7 @@ MidiFile* VGMSeq::ConvertToMidi()
 }
 
 //Load() - Function to load all the sequence data into the class
-int VGMSeq::LoadMain()
+bool VGMSeq::LoadMain()
 {
 	if (!GetHeaderInfo())
 		return false;
@@ -165,7 +165,7 @@ int VGMSeq::LoadMain()
 	return true;
 }
 
-int VGMSeq::PostLoad()
+bool VGMSeq::PostLoad()
 {
 	if (readMode == READMODE_ADD_TO_UI)
 	{
@@ -188,7 +188,7 @@ int VGMSeq::PostLoad()
 //	}
 //}
 
-int VGMSeq::GetHeaderInfo(void)
+bool VGMSeq::GetHeaderInfo(void)
 {
 	return true;
 }
@@ -196,7 +196,7 @@ int VGMSeq::GetHeaderInfo(void)
 
 //GetTrackPointers() should contain logic for parsing track pointers 
 // and instantiating/adding each track in the sequence
-int VGMSeq::GetTrackPointers(void)
+bool VGMSeq::GetTrackPointers(void)
 {
 	return true;
 }

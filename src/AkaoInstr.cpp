@@ -23,7 +23,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile* file, U32 length, U32 instrOff, U32 dkitOff,
 		dwOffset = drumkitOff;
 }
 
-int AkaoInstrSet::GetInstrPointers()
+bool AkaoInstrSet::GetInstrPointers()
 {
 	if (bMelInstrs)
 	{
@@ -51,7 +51,7 @@ AkaoInstr::AkaoInstr(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG t
 	bDrumKit = false;
 }
 
-int AkaoInstr::LoadInstr()
+bool AkaoInstr::LoadInstr()
 {
 	for (int k=0; (GetWord(dwOffset + k*8) != 0 || GetWord(dwOffset + k*8+4) != 0) &&
 		dwOffset+k*8 < GetRawFile()->size(); k++)
@@ -79,7 +79,7 @@ AkaoDrumKit::AkaoDrumKit(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULO
 	bDrumKit = true;
 }
 
-int AkaoDrumKit::LoadInstr()
+bool AkaoDrumKit::LoadInstr()
 {
 	U32 j = dwOffset;  //j = the end of the last instrument of the instrument table ie, the beginning of drumkit data
 	U32 endOffset = parInstrSet->dwOffset + parInstrSet->unLength;
@@ -128,7 +128,7 @@ AkaoRgn::AkaoRgn(VGMInstr* instr, ULONG offset, ULONG length, const wchar_t* nam
 {
 }
 
-int AkaoRgn::LoadRgn()
+bool AkaoRgn::LoadRgn()
 {
 	//instrument[i].region[k].fine_tune = stuff[(instrument[i].info_ptr + k*0x20 + 0x12)];
 	//AddUnityKey(0x3A - GetByte(dwOffset + k*0x20 + 0x13), dwOffset + k*0x20 + 0x13);

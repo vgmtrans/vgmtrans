@@ -23,7 +23,7 @@ public:
 	//: usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
 	~VGMRgn(void);
 
-	virtual int LoadRgn() { return true; }
+	virtual bool LoadRgn() { return true; }
 
 	//VGMArt* AddArt(vector<connectionBlock*> connBlocks);
 	//VGMSamp* AddSamp(void);

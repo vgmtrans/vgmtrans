@@ -12,7 +12,7 @@ OrgSeq::~OrgSeq(void)
 {
 }
 
-int OrgSeq::GetHeaderInfo(void)
+bool OrgSeq::GetHeaderInfo(void)
 {
 	waitTime = GetShort(dwOffset+6);
 	beatsPerMeasure = GetByte(dwOffset+8);
@@ -46,7 +46,7 @@ OrgTrack::OrgTrack(OrgSeq* parentFile, long offset, long length, BYTE realTrk)
 {
 }
 
-int OrgTrack::LoadTrack(int trackNum, ULONG stopOffset, long stopDelta)
+bool OrgTrack::LoadTrack(ULONG trackNum, ULONG stopOffset, long stopDelta)
 {
 	pMidiTrack = parentSeq->midi->AddTrack();
 	//SetChannelAndGroupFromTrkNum(trackNum);
@@ -75,7 +75,7 @@ int OrgTrack::LoadTrack(int trackNum, ULONG stopOffset, long stopDelta)
 	return true;
 }
 
-int OrgTrack::ReadEvent(void)
+bool OrgTrack::ReadEvent(void)
 {
 	BYTE key = GetByte(curOffset + (numNotes-curNote)*4 + curNote);
 	BYTE vel = GetByte(curOffset + (numNotes-curNote)*4 + numNotes*2 + curNote)/2;

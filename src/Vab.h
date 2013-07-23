@@ -72,8 +72,8 @@ public:
 	Vab(RawFile* file, ULONG offset);
 	virtual ~Vab(void);
 
-	virtual int GetHeaderInfo();
-	virtual int GetInstrPointers();
+	virtual bool GetHeaderInfo();
+	virtual bool GetInstrPointers();
 
 public:
 	VabHdr hdr;
@@ -91,7 +91,7 @@ public:
 	VabInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
 	virtual ~VabInstr(void);
 
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 
 public:
 	ProgAtr  attr;
@@ -109,9 +109,9 @@ class VabRgn
 public:
 	VabRgn(VabInstr* instr, ULONG offset);
 	//virtual ~WDRgn(void) {}
-	//virtual int OnSelected(void);
+	//virtual bool OnSelected(void);
 
-	virtual int LoadRgn();
+	virtual bool LoadRgn();
 
 public:
 	unsigned short ADSR1;				//raw ps2 ADSR1 value (articulation data)

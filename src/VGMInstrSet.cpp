@@ -42,7 +42,7 @@ VGMInstr* VGMInstrSet::AddInstr(ULONG offset, ULONG length, unsigned long bank,
 	return instr;
 }
 
-int VGMInstrSet::Load()
+bool VGMInstrSet::Load()
 {
 	if (!GetHeaderInfo())
 		return false;
@@ -69,18 +69,18 @@ int VGMInstrSet::Load()
 	return true;
 }
 
-int VGMInstrSet::GetHeaderInfo()
+bool VGMInstrSet::GetHeaderInfo()
 {
 	return true;
 }
 
-int VGMInstrSet::GetInstrPointers()
+bool VGMInstrSet::GetInstrPointers()
 {
 	return true;
 }
 
 
-int VGMInstrSet::LoadInstrs()
+bool VGMInstrSet::LoadInstrs()
 {
 	ULONG nInstrs = aInstrs.size();
 	for (UINT i=0; i < nInstrs; i++)
@@ -190,7 +190,7 @@ VGMRgn* VGMInstr::AddRgn(ULONG offset, ULONG length, int sampNum, BYTE keyLow, B
 }
 
 
-int VGMInstr::LoadInstr()
+bool VGMInstr::LoadInstr()
 {
 	return true;
 }

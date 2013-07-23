@@ -31,10 +31,10 @@ public:
 
 	//void CreateDLSFile(DLSFile& dls);
 
-	virtual int Load();
-	virtual int GetHeaderInfo();
-	virtual int GetInstrPointers();
-	virtual int LoadInstrs();
+	virtual bool Load();
+	virtual bool GetHeaderInfo();
+	virtual bool GetInstrPointers();
+	virtual bool LoadInstrs();
 	
 	VGMInstr* AddInstr(ULONG offset, ULONG length, unsigned long bank, unsigned long instrNum, const wstring& instrName = L"");
 
@@ -77,7 +77,7 @@ public:
 	VGMRgn* AddRgn(ULONG offset, ULONG length, int sampNum, BYTE keyLow = 0,
 					BYTE keyHigh = 0x7F, BYTE velLow = 0, BYTE velHigh = 0x7F);
 
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 
 public:
 	ULONG bank;

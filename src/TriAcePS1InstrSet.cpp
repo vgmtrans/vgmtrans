@@ -26,7 +26,7 @@ TriAcePS1InstrSet::~TriAcePS1InstrSet(void)
 //	Memo:
 //		VGMInstrSet::Load()ä÷êîÇ©ÇÁåƒÇŒÇÍÇÈ
 //==============================================================
-int TriAcePS1InstrSet::GetHeaderInfo()
+bool TriAcePS1InstrSet::GetHeaderInfo()
 {
 	VGMHeader* header = AddHeader(dwOffset, sizeof(TriAcePS1InstrSet::_InstrHeader));	//1,Sep.2009 revise
 	header->AddSimpleItem(dwOffset, 4, L"InstrSet Size");
@@ -56,7 +56,7 @@ int TriAcePS1InstrSet::GetHeaderInfo()
 //	Memo:
 //		VGMInstrSet::Load()ä÷êîÇ©ÇÁåƒÇŒÇÍÇÈ
 //==============================================================
-int TriAcePS1InstrSet::GetInstrPointers()
+bool TriAcePS1InstrSet::GetInstrPointers()
 {
 
 	U32 firstWord = GetWord(dwOffset+sizeof(TriAcePS1InstrSet::_InstrHeader));		//1,Sep.2009 revise
@@ -93,7 +93,7 @@ TriAcePS1Instr::TriAcePS1Instr(VGMInstrSet* instrSet, ULONG offset, ULONG length
 //==============================================================
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
-int TriAcePS1Instr::LoadInstr()
+bool TriAcePS1Instr::LoadInstr()
 {
 	unLength = sizeof(InstrInfo) + sizeof(RgnInfo) * instrinfo.numRgns;
 

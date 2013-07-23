@@ -14,7 +14,7 @@ public:
 public:
 	virtual ~PSF1Loader(void);
 
-	virtual int Apply(RawFile* theFile);
+	virtual PostLoadCommand Apply(RawFile* theFile);
 	const wchar_t* psf_read_exe(RawFile* file, unsigned char *exebuffer, unsigned exebuffersize);
 
 	uint32 get32lsb(uint8 *src);

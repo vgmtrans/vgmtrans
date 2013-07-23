@@ -12,8 +12,8 @@ public:
 	SquSnesSeq(RawFile* file, ULONG seqdata_offset, ULONG instrtable_offset);
 	virtual ~SquSnesSeq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);
 
 private:
 	ULONG instrtable_offset;
@@ -25,7 +25,7 @@ class SquSnesTrack
 {
 public:
 	SquSnesTrack(SquSnesSeq* parentFile, long offset = 0, long length = 0);
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 
 private:
 	BYTE rpt;

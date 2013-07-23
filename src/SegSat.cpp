@@ -12,7 +12,7 @@ SegSatSeq::~SegSatSeq(void)
 {
 }
 
-int SegSatSeq::GetHeaderInfo(void)
+bool SegSatSeq::GetHeaderInfo(void)
 {
 	//unLength = GetShort(dwOffset+8);
 	SetPPQN(GetShortBE(offset()));
@@ -36,7 +36,7 @@ int SegSatSeq::GetHeaderInfo(void)
 
 int counter = 0;
 
-int SegSatSeq::ReadEvent(void)
+bool SegSatSeq::ReadEvent(void)
 {
 	if(bInLoop)
 	{

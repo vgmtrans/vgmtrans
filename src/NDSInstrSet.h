@@ -14,7 +14,7 @@ class NDSInstrSet :
 {
 public:
 	NDSInstrSet(RawFile* file, ULONG offset, ULONG length, wstring name = L"NDS Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
-	virtual int GetInstrPointers();
+	virtual bool GetInstrPointers();
 
 	vector<VGMSampColl*> sampCollWAList;
 };
@@ -30,7 +30,7 @@ class NDSInstr :
 public:
 	NDSInstr(NDSInstrSet* instrSet, ULONG offset, ULONG length, ULONG bank, ULONG instrNum, BYTE instrType);
 
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 
 	void GetSampCollPtr(VGMRgn* rgn, int waNum);
 	void GetArticData(VGMRgn* rgn, ULONG offset);

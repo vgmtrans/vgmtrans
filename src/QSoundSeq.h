@@ -12,10 +12,10 @@ public:
 	QSoundSeq(RawFile* file, ULONG offset, QSoundVer fmt_version, wstring& name);
 	virtual ~QSoundSeq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);
-	/*virtual int LoadTracks(void);*/
-	virtual int PostLoad(void);
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);
+	/*virtual bool LoadTracks(void);*/
+	virtual bool PostLoad(void);
 
 public:
 	QSoundVer fmt_version;
@@ -28,7 +28,7 @@ class QSoundTrack
 public:
 	QSoundTrack(QSoundSeq* parentSeq, long offset = 0, long length = 0);
 	virtual void ResetVars();
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 
 private:
 	QSoundVer GetVersion() { return ((QSoundSeq*)this->parentSeq)->fmt_version; }			

@@ -9,5 +9,5 @@ public:
 public:
 	virtual ~SPCLoader(void);
 
-	virtual int Apply(RawFile* theFile);
+	virtual PostLoadCommand Apply(RawFile* theFile);
 };

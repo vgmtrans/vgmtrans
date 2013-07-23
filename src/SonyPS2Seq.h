@@ -24,8 +24,8 @@ public:
 	SonyPS2Seq(RawFile* file, ULONG offset);
 	virtual ~SonyPS2Seq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int ReadEvent(void);
+	virtual bool GetHeaderInfo(void);
+	virtual bool ReadEvent(void);
 	BYTE GetDataByte(U32 offset);
 
 protected:

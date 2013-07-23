@@ -15,7 +15,7 @@ NDSSeq::~NDSSeq(void)
 }*/
 
 
-int NDSSeq::GetHeaderInfo(void)
+bool NDSSeq::GetHeaderInfo(void)
 {
 	VGMHeader* SSEQHdr = AddHeader(dwOffset, 0x10, L"SSEQ Chunk Header");
 	SSEQHdr->AddSig(dwOffset, 8);
@@ -28,7 +28,7 @@ int NDSSeq::GetHeaderInfo(void)
 	return true;		//successful
 }
 
-int NDSSeq::GetTrackPointers(void)
+bool NDSSeq::GetTrackPointers(void)
 {
 	VGMHeader* DATAHdr = AddHeader(dwOffset+0x10, 0xC, L"DATA Chunk Header");
 	DATAHdr->AddSig(dwOffset+0x10, 4);
@@ -84,7 +84,7 @@ int NDSSeq::GetTrackPointers(void)
 }
 
 #if 0 /* old version */
-int NDSSeq::GetTrackPointers(void)
+bool NDSSeq::GetTrackPointers(void)
 {
 	ULONG offset = dwOffset + 0x1F;
 	BYTE b = GetByte(offset);
@@ -133,7 +133,7 @@ void NDSTrack::SetChannelAndGroupFromTrkNum(int theTrackNum)
 }*/
 
 
-int NDSTrack::ReadEvent(void)
+bool NDSTrack::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 	BYTE status_byte = GetByte(curOffset++);
@@ -426,14 +426,6 @@ int NDSTrack::ReadEvent(void)
 		return false;
 
 	default:
-#if 0
-		{
-			// [loveemu] I don't use Alert() for some reasons
-			TCHAR hoge[8192];
-			wsprintf(hoge, L"trap [%02X] :P", status_byte);
-			MessageBox(NULL, hoge, NULL, 0);
-		}
-#endif
 		AddUnknown(beginOffset, curOffset-beginOffset);
 		return false;
 	}

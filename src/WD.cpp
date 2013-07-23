@@ -19,7 +19,7 @@ WDInstrSet::~WDInstrSet(void)
 }
 
 
-int WDInstrSet::GetHeaderInfo()
+bool WDInstrSet::GetHeaderInfo()
 {
 	VGMHeader* header = AddHeader(dwOffset, 0x10, L"Header");
 	header->AddSimpleItem(dwOffset + 0x2, 2, L"ID");
@@ -48,7 +48,7 @@ int WDInstrSet::GetHeaderInfo()
 	return true;
 }
 
-int WDInstrSet::GetInstrPointers()
+bool WDInstrSet::GetInstrPointers()
 {
 
 	ULONG j = 0x20+dwOffset;
@@ -94,7 +94,7 @@ WDInstr::~WDInstr(void)
 }
 
 
-int WDInstr::LoadInstr()
+bool WDInstr::LoadInstr()
 {
 	wostringstream	strStr;
 	ULONG j=0;

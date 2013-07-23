@@ -14,7 +14,7 @@ Matcher::~Matcher(void)
 {
 }
 
-int Matcher::OnNewFile(VGMFile* file)
+bool Matcher::OnNewFile(VGMFile* file)
 {
 	switch (file->GetFileType())
 	{
@@ -28,7 +28,7 @@ int Matcher::OnNewFile(VGMFile* file)
 	return false;
 }
 
-int Matcher::OnCloseFile(VGMFile* file)
+bool Matcher::OnCloseFile(VGMFile* file)
 {
 	switch (file->GetFileType())
 	{
@@ -60,11 +60,11 @@ AddItem(ITEM_TYPE type, ULONG id)
 //}
 //
 //template <class IdType>
-//int SimpleMatcher::OnNewSeq(VGMSeq* seq)
+//bool SimpleMatcher::OnNewSeq(VGMSeq* seq)
 //{
 //	//ULONG id = seq->GetID();
 //	IdType id;
-//	int success = this->GetSeqId(seq, id);
+//	bool success = this->GetSeqId(seq, id);
 //	if (!success)
 //		return false;
 //	//if (!id)
@@ -112,10 +112,10 @@ AddItem(ITEM_TYPE type, ULONG id)
 //}
 //
 //template <class IdType>
-//int SimpleMatcher::OnNewInstrSet(VGMInstrSet* instrset)
+//bool SimpleMatcher::OnNewInstrSet(VGMInstrSet* instrset)
 //{
 //	IdType id;
-//	int success = this->GetInstrSetId(instrset, id);
+//	bool success = this->GetInstrSetId(instrset, id);
 //	if (!success)
 //		return false;
 //	//ULONG id = instrset->GetID();
@@ -154,12 +154,12 @@ AddItem(ITEM_TYPE type, ULONG id)
 //}
 //
 //template <class IdType>
-//int SimpleMatcher::OnNewSampColl(VGMSampColl* sampcoll)
+//bool SimpleMatcher::OnNewSampColl(VGMSampColl* sampcoll)
 //{
 //	if (bRequiresSampColl)
 //	{
 //		IdType id;
-//		int success = this->GetSampCollId(sampcoll, id);
+//		bool success = this->GetSampCollId(sampcoll, id);
 //		if (!success)
 //			return false;
 //		//ULONG id = sampcoll->GetID();
@@ -185,10 +185,10 @@ AddItem(ITEM_TYPE type, ULONG id)
 //}
 //
 //template <class IdType>
-//int SimpleMatcher::OnCloseSeq(VGMSeq* seq)
+//bool SimpleMatcher::OnCloseSeq(VGMSeq* seq)
 //{
 //	IdType id;
-//	int success = this->GetSeqId(seq, id);
+//	bool success = this->GetSeqId(seq, id);
 //	if (!success)
 //		return false;
 //	seqs.erase(id);
@@ -197,10 +197,10 @@ AddItem(ITEM_TYPE type, ULONG id)
 //}
 //
 //template <class IdType>
-//int SimpleMatcher::OnCloseInstrSet(VGMInstrSet* instrset)
+//bool SimpleMatcher::OnCloseInstrSet(VGMInstrSet* instrset)
 //{
 //	IdType id;
-//	int success = this->GetInstrSetId(instrset, id);
+//	bool success = this->GetInstrSetId(instrset, id);
 //	if (!success)
 //		return false;
 //	instrsets.erase(id);
@@ -209,10 +209,10 @@ AddItem(ITEM_TYPE type, ULONG id)
 //}
 //
 //template <class IdType>
-//int SimpleMatcher::OnCloseSampColl(VGMSampColl* sampcoll)
+//bool SimpleMatcher::OnCloseSampColl(VGMSampColl* sampcoll)
 //{
 //	IdType id;
-//	int success = this->GetSampCollId(sampcoll, id);
+//	bool success = this->GetSampCollId(sampcoll, id);
 //	if (!success)
 //		return false;
 //	sampcolls.erase(id);
@@ -234,21 +234,21 @@ FilegroupMatcher::FilegroupMatcher(Format* format)
 {
 }
 
-int FilegroupMatcher::OnNewSeq(VGMSeq* seq)
+bool FilegroupMatcher::OnNewSeq(VGMSeq* seq)
 {
 	seqs.push_back(seq);
 	LookForMatch();
 	return true;
 }
 
-int FilegroupMatcher::OnNewInstrSet(VGMInstrSet* instrset)
+bool FilegroupMatcher::OnNewInstrSet(VGMInstrSet* instrset)
 {
 	instrsets.push_back(instrset);
 	LookForMatch();
 	return true;
 }
 
-int FilegroupMatcher::OnNewSampColl(VGMSampColl* sampcoll)
+bool FilegroupMatcher::OnNewSampColl(VGMSampColl* sampcoll)
 {
 	//if (instrsets.size() == 1)
 	//{

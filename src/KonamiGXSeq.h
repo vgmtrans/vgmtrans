@@ -10,9 +10,9 @@ public:
 	KonamiGXSeq(RawFile* file, ULONG offset);
 	virtual ~KonamiGXSeq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);
-	//int LoadTracks(void);
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);
+	//bool LoadTracks(void);
 
 protected:
 
@@ -25,7 +25,7 @@ class KonamiGXTrack
 public:
 	KonamiGXTrack(KonamiGXSeq* parentSeq, long offset = 0, long length = 0);
 
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 
 private:
 	bool bInJump;

@@ -44,7 +44,7 @@ VGMSampColl::~VGMSampColl(void)
 }
 
 
-int VGMSampColl::Load()
+bool VGMSampColl::Load()
 {
 	if (bLoaded)
 		return true;

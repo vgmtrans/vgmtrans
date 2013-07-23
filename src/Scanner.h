@@ -5,7 +5,7 @@ class RawFile;
 
 #define USE_EXTENSION(extension)			\
 	ExtensionDiscriminator::instance().AddExtensionScannerAssoc(extension, this);
-//	virtual int UseExtension() {return theExtensionDiscriminator.AddExtensionScannerAssoc(extension, this);}
+//	virtual bool UseExtension() {return theExtensionDiscriminator.AddExtensionScannerAssoc(extension, this);}
 
 class VGMScanner
 {
@@ -14,8 +14,8 @@ public:
 public:
 	virtual ~VGMScanner(void);
 
-	virtual int Init();
-	//virtual int UseExtension() {return true;}
+	virtual bool Init();
+	//virtual bool UseExtension() {return true;}
 	void InitiateScan(RawFile* file, void* offset = 0);
 	virtual void Scan(RawFile* file, void* offset = 0) = 0;
 };

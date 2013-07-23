@@ -19,11 +19,11 @@ public:
 	virtual Icon GetIcon() { return ICON_TRACK; };
 
 	//virtual void AddToUI(VGMItem* parent, VGMFile* theVGMFile = NULL);
-	virtual int LoadTrack(int trackNum, ULONG stopOffset = 0xFFFFFFFF, long stopDelta = -1);
-	virtual int LoadTrackInit(int trackNum);
-	virtual int LoadTrackMainLoop(ULONG stopOffset, long stopDelta);
+	virtual bool LoadTrack(int trackNum, ULONG stopOffset = 0xFFFFFFFF, long stopDelta = -1);
+	virtual bool LoadTrackInit(int trackNum);
+	virtual bool LoadTrackMainLoop(ULONG stopOffset, long stopDelta);
 	virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 
 	ULONG GetDelta(void);
 	void SetDelta(ULONG NewDelta);

@@ -36,7 +36,7 @@ public:
 	//virtual vector<const char*>* GetMenuItemNames() {return menu.GetMenuItemNames();}
 	//virtual bool CallMenuItem(VGMItem* item, int menuItemNum){ return menu.CallMenuItem(item, menuItemNum); }
 			
-	virtual int LoadMain();				//Function to load all the information about the sequence
+	virtual bool LoadMain();				//Function to load all the information about the sequence
 	//virtual int GetHeaderInfo(void);
 //	virtual void AddTrack(SeqTrack* track);		//should be called for all tracks before LoadTracks.
 	virtual bool LoadEvents();

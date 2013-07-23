@@ -166,7 +166,7 @@ int MAMELoader::LoadRomGroupEntry(TiXmlElement* romgroupElmt, MAMEGameEntry* gam
 }
 
 
-int MAMELoader::Apply(RawFile* file)
+PostLoadCommand MAMELoader::Apply(RawFile* file)
 {
 	if (!bLoadedXml)
 		return KEEP_IT;

@@ -15,7 +15,7 @@ BGMSeq::~BGMSeq(void)
 {
 }
 
-int BGMSeq::GetHeaderInfo(void)
+bool BGMSeq::GetHeaderInfo(void)
 {
 	nNumTracks = GetByte(dwOffset+8);
 	seqID = GetShort(dwOffset+4);
@@ -25,7 +25,7 @@ int BGMSeq::GetHeaderInfo(void)
 	return true;
 }
 
-int BGMSeq::GetTrackPointers(void)
+bool BGMSeq::GetTrackPointers(void)
 {
 	UINT pos = dwOffset+0x20;    //start at first track (fixed offset)
 	for(int i=0; i<nNumTracks; i++)
@@ -48,7 +48,7 @@ BGMTrack::BGMTrack(BGMSeq* parentSeq, long offset, long length)
 }
 
 
-int BGMTrack::ReadEvent(void)
+bool BGMTrack::ReadEvent(void)
 {
 	int value1;
 

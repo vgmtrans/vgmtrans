@@ -24,7 +24,7 @@ SonyPS2Seq::~SonyPS2Seq(void)
 {
 }
 
-int SonyPS2Seq::GetHeaderInfo(void)
+bool SonyPS2Seq::GetHeaderInfo(void)
 {
 	name() = L"Sony PS2 Seq";
 	U32 curOffset = offset();
@@ -68,7 +68,7 @@ int SonyPS2Seq::GetHeaderInfo(void)
 }
 
 
-int SonyPS2Seq::ReadEvent(void)
+bool SonyPS2Seq::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 	ULONG deltaTime;

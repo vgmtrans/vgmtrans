@@ -97,7 +97,7 @@ QSoundSeq::~QSoundSeq(void)
 {
 }
 
-int QSoundSeq::GetHeaderInfo(void)
+bool QSoundSeq::GetHeaderInfo(void)
 {
 	// for 100% accuracy, we'd left shift by 256, but that seems unnecessary and excessive
 	SetPPQN(0x30 << 4);
@@ -105,7 +105,7 @@ int QSoundSeq::GetHeaderInfo(void)
 }
 
 
-int QSoundSeq::GetTrackPointers(void)
+bool QSoundSeq::GetTrackPointers(void)
 {
 	// Hack for D&D Shadow over Mystara...
 	if (GetByte(dwOffset) == 0x92)
@@ -134,7 +134,7 @@ int QSoundSeq::GetTrackPointers(void)
 	return true;
 }
 
-//int QSoundSeq::LoadTracks(void)
+//bool QSoundSeq::LoadTracks(void)
 //{
 //	for (UINT i=0; i<nNumTracks; i++)
 //	{
@@ -144,7 +144,7 @@ int QSoundSeq::GetTrackPointers(void)
 //	aTracks[0]->InsertTimeSig(0, 0, 4, 4, GetPPQN(), 0);
 //}
 
-int QSoundSeq::PostLoad()
+bool QSoundSeq::PostLoad()
 {
 	if (readMode != READMODE_CONVERT_TO_MIDI)
 		return true;
@@ -360,7 +360,7 @@ void QSoundTrack::ResetVars()
 }
 
 
-int QSoundTrack::ReadEvent(void)
+bool QSoundTrack::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
 	BYTE status_byte = GetByte(curOffset++);

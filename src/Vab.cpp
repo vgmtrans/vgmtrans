@@ -14,7 +14,7 @@ Vab::~Vab(void)
 }
 
 
-int Vab::GetHeaderInfo()
+bool Vab::GetHeaderInfo()
 {
 	name = L"VAB";
 
@@ -34,7 +34,7 @@ int Vab::GetHeaderInfo()
 	return true;
 }
 
-int Vab::GetInstrPointers()
+bool Vab::GetInstrPointers()
 {
 	ULONG j = 0x20 + dwOffset;
 
@@ -90,7 +90,7 @@ VabInstr::~VabInstr(void)
 
 
 
-int VabInstr::LoadInstr()
+bool VabInstr::LoadInstr()
 {
 	char numRgns = attr.tones;
 	for (int i = 0; i < numRgns; i++)
@@ -118,7 +118,7 @@ VabRgn::VabRgn(VabInstr* instr, ULONG offset)
  
 
 
-int VabRgn::LoadRgn()
+bool VabRgn::LoadRgn()
 {
 	VabInstr* instr = (VabInstr*) parInstr;
 	unLength = 0x20;

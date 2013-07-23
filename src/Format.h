@@ -70,7 +70,7 @@ public:
 
 	static Format* GetFormatFromName(const string& name);
 
-	virtual int Init(void);
+	virtual bool Init(void);
 	virtual const string& GetName() = 0;
 	//virtual string GetName() = 0;
 	//virtual ULONG GetFormatID() = 0;
@@ -78,12 +78,12 @@ public:
 			VGMScanner& GetScanner() {return *scanner;}
 	virtual Matcher* NewMatcher() {return NULL;}
 	virtual VGMColl* NewCollection();
-	virtual int OnNewFile(VGMFile* file);
-	virtual int OnCloseFile(VGMFile* file);
+	virtual bool OnNewFile(VGMFile* file);
+	virtual bool OnCloseFile(VGMFile* file);
 	//virtual int OnNewSeq(VGMSeq* seq);
 	//virtual int OnNewInstrSet(VGMInstrSet* instrset);
 	//virtual int OnNewSampColl(VGMSampColl* sampcoll);
-	virtual int OnMatch(vector<VGMFile*>& files) {return true;}
+	virtual bool OnMatch(vector<VGMFile*>& files) {return true;}
 
 public:
 	Matcher* matcher;

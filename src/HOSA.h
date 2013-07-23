@@ -13,8 +13,8 @@ public:
 	HOSASeq(RawFile* file, ULONG offset);
 	virtual ~HOSASeq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
 	virtual ULONG GetID() {return assocHOSA_ID;}
 
 protected:
@@ -34,7 +34,7 @@ public:
 	HOSATrack(HOSASeq* parentFile, long offset = 0, long length = 0);
 //	~HOSATrack(void) {}
 //	virtual		void	SetChannel(int trackNum);
-	virtual		int		ReadEvent(void);
+	virtual		bool	ReadEvent(void);
 				void	ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable);
 	unsigned	int		DecodeVariable();	//Decode of ‰Â•Ï’·
 

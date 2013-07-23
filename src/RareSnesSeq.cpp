@@ -70,7 +70,7 @@ void RareSnesSeq::ResetVars(void)
 	tempoBPM = GetTempoInBPM();
 }
 
-int RareSnesSeq::GetHeaderInfo(void)
+bool RareSnesSeq::GetHeaderInfo(void)
 {
 	SetPPQN(SEQ_PPQN);
 
@@ -90,7 +90,7 @@ int RareSnesSeq::GetHeaderInfo(void)
 }
 
 
-int RareSnesSeq::GetTrackPointers(void)
+bool RareSnesSeq::GetTrackPointers(void)
 {
 	for (int i = 0; i < MAX_TRACKS; i++)
 	{
@@ -275,7 +275,7 @@ RareSnesTrack::RareSnesTrack(RareSnesSeq* parentFile, long offset, long length)
 	bWriteGenericEventAsTextEvent = false;
 }
 
-int RareSnesTrack::LoadTrackInit(int trackNum)
+bool RareSnesTrack::LoadTrackInit(ULONG trackNum)
 {
 	if (!SeqTrack::LoadTrackInit(trackNum))
 		return false;
@@ -329,7 +329,7 @@ void RareSnesTrack::CalcVolPanFromVolLR(S8 volLByte, S8 volRByte, BYTE& midiVol,
 #define EVENT_WITH_MIDITEXT_START	bWriteGenericEventAsTextEventTmp = bWriteGenericEventAsTextEvent; bWriteGenericEventAsTextEvent = true;
 #define EVENT_WITH_MIDITEXT_END	bWriteGenericEventAsTextEvent = bWriteGenericEventAsTextEventTmp;
 
-int RareSnesTrack::ReadEvent(void)
+bool RareSnesTrack::ReadEvent(void)
 {
 	RareSnesSeq* parentSeq = (RareSnesSeq*)this->parentSeq;
 	ULONG beginOffset = curOffset;

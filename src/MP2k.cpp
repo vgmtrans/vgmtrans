@@ -13,7 +13,7 @@ MP2kSeq::~MP2kSeq(void)
 {
 }
 
-int MP2kSeq::GetHeaderInfo(void)
+bool MP2kSeq::GetHeaderInfo(void)
 {
 	//unLength = GetShort(dwOffset+8);
 	nNumTracks = GetShort(dwOffset);
@@ -29,7 +29,7 @@ int MP2kSeq::GetHeaderInfo(void)
 }
 
 
-int MP2kSeq::GetTrackPointers(void)
+bool MP2kSeq::GetTrackPointers(void)
 {
 	for(unsigned int i=0; i<nNumTracks; i++)
 		aTracks.push_back(new MP2kTrack(this, GetWord(dwOffset + 8 + i*4)-0x8000000));
@@ -46,7 +46,7 @@ int MP2kSeq::GetTrackPointers(void)
 	return true;
 }
 
-//virtual int Load(UINT offset)
+//virtual bool Load(UINT offset)
 //{
 //	return true;
 //}
@@ -72,7 +72,7 @@ MP2kTrack::MP2kTrack(MP2kSeq* parentFile, long offset, long length)
 	}
 }*/
 
-int MP2kTrack::ReadEvent(void)
+bool MP2kTrack::ReadEvent(void)
 {
 
 	ULONG beginOffset = curOffset;

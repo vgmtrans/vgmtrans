@@ -9,8 +9,8 @@ public:
 public:
 	virtual ~BGMSeq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
 
 protected:
 	unsigned short seqID;
@@ -24,5 +24,5 @@ class BGMTrack
 public:
 	BGMTrack(BGMSeq* parentSeq, long offset = 0, long length = 0);
 
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 };

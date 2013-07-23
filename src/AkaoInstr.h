@@ -13,7 +13,7 @@ class AkaoInstrSet : public VGMInstrSet
 {
 public:
 	AkaoInstrSet(RawFile* file, U32 length, U32 instrOff, U32 dkitOff, U32 id, wstring name = L"Akao Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
-	virtual int GetInstrPointers();
+	virtual bool GetInstrPointers();
 public:
 	bool bMelInstrs, bDrumKit;
 	ULONG drumkitOff;
@@ -28,7 +28,7 @@ class AkaoInstr : public VGMInstr
 {
 public:
 	AkaoInstr(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG bank, ULONG instrNum, const wchar_t* name = L"Instrument");
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 
 public:
 	BYTE instrType;
@@ -44,7 +44,7 @@ class AkaoDrumKit : public AkaoInstr
 {
 public:
 	AkaoDrumKit(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG bank, ULONG instrNum);
-	virtual int LoadInstr();
+	virtual bool LoadInstr();
 };
 
 
@@ -60,7 +60,7 @@ public:
 	AkaoRgn(VGMInstr* instr, ULONG offset, ULONG length, BYTE keyLow, BYTE keyHigh, 
 		BYTE artIDNum, const wchar_t* name = L"Region");
 
-	virtual int LoadRgn();
+	virtual bool LoadRgn();
 
 public:
 	unsigned short ADSR1;				//raw psx ADSR1 value (articulation data)

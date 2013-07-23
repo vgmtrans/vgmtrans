@@ -113,8 +113,8 @@ LRESULT CFileFrame::OnShowTabContextMenu(UINT /*uMsg*/, WPARAM /*wParam*/, LPARA
 
 		mnuContext.AppendMenu((MF_ENABLED | MF_STRING), ID_FILE_SAVE, sSave);
 		mnuContext.AppendMenu((MF_ENABLED | MF_STRING), ID_FILE_CLOSE, _T("&Close\tCtrl+F4"));
-		mnuContext.AppendMenu(MF_SEPARATOR);
-		mnuContext.AppendMenu((MF_ENABLED | MF_STRING), ID_VIEW_SOURCE, _T("&View Source"));
+		//mnuContext.AppendMenu(MF_SEPARATOR);
+		//mnuContext.AppendMenu((MF_ENABLED | MF_STRING), ID_VIEW_SOURCE, _T("&View Source"));
 
 		if(m_pCmdBar != NULL)
 		{

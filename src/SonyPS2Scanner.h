@@ -16,7 +16,7 @@ public:
 	{
 	}
 	
-	//virtual int UseExtension()
+	//virtual bool UseExtension()
 	//{
 	//	theExtensionDiscriminator.AddExtensionScannerAssoc(L"sq", this);
 	//	theExtensionDiscriminator.AddExtensionScannerAssoc(L"hd", this);

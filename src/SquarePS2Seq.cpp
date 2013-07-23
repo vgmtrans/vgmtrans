@@ -21,7 +21,7 @@ BGMSeq::~BGMSeq(void)
 {
 }
 
-int BGMSeq::GetHeaderInfo(void)
+bool BGMSeq::GetHeaderInfo(void)
 {
 	VGMHeader* header = AddHeader(dwOffset, 0x20, L"Header");
 	header->AddSimpleItem(dwOffset, 4, L"Signature");
@@ -45,7 +45,7 @@ int BGMSeq::GetHeaderInfo(void)
 	return true;
 }
 
-int BGMSeq::GetTrackPointers(void)
+bool BGMSeq::GetTrackPointers(void)
 {
 	UINT pos = dwOffset+0x20;    //start at first track (fixed offset)
 	for(unsigned int i=0; i<nNumTracks; i++)
@@ -72,7 +72,7 @@ BGMTrack::BGMTrack(BGMSeq* parentSeq, long offset, long length)
 }
 
 
-int BGMTrack::ReadEvent(void)
+bool BGMTrack::ReadEvent(void)
 {
 	int value1;
 

@@ -20,8 +20,8 @@ public:
 	TriAcePS1Seq(RawFile* file, ULONG offset);
 	virtual ~TriAcePS1Seq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);
 
 	VGMHeader* header;
 	TrkInfo TrkInfos[32];
@@ -45,11 +45,11 @@ class TriAcePS1Track
 public:
 	TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset = 0, long length = 0);
 
-	virtual int LoadTrackMainLoop(U32 stopOffset, long stopDelta);
+	virtual bool LoadTrackMainLoop(U32 stopOffset, long stopDelta);
 	U32 ReadScorePattern(U32 offset);
 	virtual bool IsOffsetUsed(ULONG offset);
 	virtual void AddEvent(SeqEvent* pSeqEvent);
-	virtual int ReadEvent(void);
+	virtual bool ReadEvent(void);
 
 	BYTE impliedNoteDur;
 	BYTE impliedVelocity;

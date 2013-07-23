@@ -24,8 +24,8 @@ public:
 	FFTSeq(RawFile* file, ULONG offset);
 	virtual ~FFTSeq(void);
 
-	virtual int GetHeaderInfo(void);
-	virtual int GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
+	virtual bool GetHeaderInfo(void);
+	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
 	virtual ULONG GetID() {return assocWdsID;}
 
 	//virtual int ApplyTable(void);		//create and apply table handler object for sequence
@@ -43,8 +43,8 @@ class FFTTrack
 public:
 	FFTTrack(FFTSeq* parentFile, long offset = 0, long length = 0);
 	virtual void ResetVars();
-	virtual int LoadTrackMainLoop(U32 stopOffset, long stopDelta);
-	virtual int ReadEvent(void);
+	virtual bool LoadTrackMainLoop(U32 stopOffset, long stopDelta);
+	virtual bool ReadEvent(void);
 
 public:
 	bool bNoteOn;

@@ -12,7 +12,7 @@ PSF2Loader::~PSF2Loader(void)
 {
 }
 
-int PSF2Loader::Apply(RawFile* file)
+PostLoadCommand PSF2Loader::Apply(RawFile* file)
 {
 	UINT sig = file->GetWord(0);
 	if ((sig & 0x00FFFFFF) == 0x465350 && ((sig & 0xFF000000) == 0x02000000))	//if the sig is PSF 0x02
