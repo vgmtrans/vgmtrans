@@ -112,7 +112,7 @@ bool VGMSeq::LoadMain()
 	ResetVars();
 	for (UINT i = 0; i < nNumTracks; i++)
 	{
-		U32 stopOffset = 0xFFFFFFFF;
+		ULONG stopOffset = 0xFFFFFFFF;
 		if (unLength != 0)
 		{
 			stopOffset = dwOffset + unLength;

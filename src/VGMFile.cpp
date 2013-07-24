@@ -89,7 +89,7 @@ bool VGMFile::OnSaveAllAsRaw()
 
 bool VGMFile::LoadVGMFile()
 {
-	int val = Load();
+	bool val = Load();
 	if (!val)
 		return false;
 	Format* fmt = GetFormat();

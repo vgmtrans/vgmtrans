@@ -126,7 +126,7 @@ void FFTTrack::ResetVars()
 	SeqTrack::ResetVars();
 }
 
-bool FFTTrack::LoadTrackMainLoop(U32 stopOffset, long stopDelta)
+bool FFTTrack::LoadTrackMainLoop(ULONG stopOffset, long stopDelta)
 {
 	octave = 3;
 	return SeqTrack::LoadTrackMainLoop(stopOffset, stopDelta);
