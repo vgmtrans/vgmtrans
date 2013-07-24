@@ -550,10 +550,8 @@
     <None Include="windows\res\fileframe.ico" />
     <None Include="windows\res\folder_open.ico" />
     <None Include="windows\res\unknown.ico" />
-    <None Include="windows\res\offset.ico" />
     <None Include="windows\res\default.ico" />
     <None Include="windows\res\binary.ico" />
-    <None Include="windows\res\length.ico" />
     <None Include="windows\res\instr.ico" />
     <None Include="windows\res\metroleft.ico" />
     <None Include="windows\res\metroright.ico" />

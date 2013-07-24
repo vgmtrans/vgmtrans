@@ -1108,16 +1108,10 @@
     <None Include="windows\res\unknown.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="windows\res\offset.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="windows\res\default.ico">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="windows\res\binary.ico">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="windows\res\length.ico">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="windows\res\instr.ico">
