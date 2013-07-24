@@ -120,6 +120,7 @@ LRESULT CVGMFileListView::OnContextMenu(HWND hwndCtrl, CPoint ptClick )
 		CMenuHandle pPopup = mnuContext.GetSubMenu(0);
 		ClientToScreen(&ptClick);
 		pPopup.TrackPopupMenu( TPM_LEFTALIGN, ptClick.x, ptClick.y, hwndCtrl );
+		return NULL;
 	}
 
 	VGMFile* pvgmfile = (VGMFile*)GetItemData(iItem);//(VGMFile*)treeitem.GetData();
