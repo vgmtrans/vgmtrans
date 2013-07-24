@@ -113,19 +113,37 @@ LRESULT CVGMFileListView::OnContextMenu(HWND hwndCtrl, CPoint ptClick )
 	if( iItem == -1 )
 		return 0;
 
-	if (GetSelectedCount() > 1)
+	vector<VGMFile*> vgmfiles;
+	UINT selectedCount = GetSelectedCount();
+	if (selectedCount > 1)
+	{
+		iItem = -1;
+		for (UINT i = 0; i < selectedCount; i++)
+		{
+			iItem = GetNextItem(iItem, LVNI_SELECTED);
+			ATLASSERT(iItem != -1);
+			vgmfiles.push_back((VGMFile*)GetItemData(iItem));
+		}
+	}
+	else
+	{
+		vgmfiles.push_back((VGMFile*)GetItemData(iItem));
+	}
+
+	if (vgmfiles.size() > 1)
 	{
 		CMenu mnuContext;
 		mnuContext.LoadMenu(IDR_RAWFILE);
 		CMenuHandle pPopup = mnuContext.GetSubMenu(0);
 		ClientToScreen(&ptClick);
 		pPopup.TrackPopupMenu( TPM_LEFTALIGN, ptClick.x, ptClick.y, hwndCtrl );
-		return NULL;
 	}
-
-	VGMFile* pvgmfile = (VGMFile*)GetItemData(iItem);//(VGMFile*)treeitem.GetData();
-	ClientToScreen(&ptClick);
-	ItemContextMenu(hwndCtrl, ptClick, pvgmfile);
+	else
+	{
+		VGMFile* pvgmfile = vgmfiles[0];
+		ClientToScreen(&ptClick);
+		ItemContextMenu(hwndCtrl, ptClick, pvgmfile);
+	}
 
 	return NULL;
 }
