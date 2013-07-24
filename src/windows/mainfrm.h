@@ -115,6 +115,7 @@ public:
 		UPDATE_ELEMENT(ID_VIEW_COLLECTIONS, UPDUI_MENUPOPUP)
 		UPDATE_ELEMENT(ID_VIEW_COLLECTIONINFO, UPDUI_MENUPOPUP)
 		UPDATE_ELEMENT(ID_VIEW_LOGLIST, UPDUI_MENUPOPUP)
+		UPDATE_ELEMENT(ID_FILE_SAVE, UPDUI_TOOLBAR)
 		UPDATE_ELEMENT(ID_PLAY, UPDUI_TOOLBAR)
 		UPDATE_ELEMENT(ID_PAUSE, UPDUI_TOOLBAR)
 		UPDATE_ELEMENT(ID_STOP, UPDUI_TOOLBAR)
@@ -207,6 +208,7 @@ public:
 	//void SetItemTreeViewPane(VGMFile* vgmfile);
 	void SelectItem(VGMItem* item);
 	void SelectColl(VGMColl* coll);
+	VGMFile* GetActiveFile(void);
 
 // CDropFilesHandler requisites.
 	void SetPaneWidths(int* arrWidths, int nPanes);

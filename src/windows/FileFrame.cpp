@@ -149,7 +149,7 @@ LRESULT CFileFrame::OnShowTabContextMenu(UINT /*uMsg*/, WPARAM /*wParam*/, LPARA
 
 LRESULT CFileFrame::OnFileSave(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
-	this->MessageBox(_T("OnFileSave"));
+	m_vgmfile->OnSaveAsRaw();
 	return 0;
 }
 

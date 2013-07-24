@@ -159,6 +159,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 	UISetCheck(ID_VIEW_TOOLBAR, 1);
 	UISetCheck(ID_VIEW_STATUS_BAR, 1);
 
+	UIEnable(ID_FILE_SAVE, 0);
 	UIEnable(ID_STOP, 0);
 	UIEnable(ID_PAUSE, 0);
 	UIEnable(ID_PLAY, 0);
@@ -344,7 +345,9 @@ LRESULT CMainFrame::OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCt
 
 LRESULT CMainFrame::OnFileSave(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
-	Alert(L"OnFileSave is not implemented yet.");
+	VGMFile* pvgmfile = GetActiveFile();
+	if (pvgmfile != NULL)
+		pvgmfile->OnSaveAsRaw();
 	return 0;
 }
 
@@ -362,7 +365,7 @@ void CMainFrame::ShowVGMFileFrame(VGMFile* vgmfile)
 	//if (p != frameMap.end())
 	if (frameMap[vgmfile])
 	{
-	   //TODO bring it into bring focus
+		//TODO bring it into bring focus
 	}
 	else
 	{
@@ -373,6 +376,8 @@ void CMainFrame::ShowVGMFileFrame(VGMFile* vgmfile)
 
 		pChild->SetTitle(vgmfile->GetName()->c_str());
 	}
+
+	UIEnable(ID_FILE_SAVE, 1);
 }
 /*
 void CMainFrame::CloseVGMFileFrame(VGMFile* vgmfile)
@@ -381,7 +386,7 @@ void CMainFrame::CloseVGMFileFrame(VGMFile* vgmfile)
 	//if (p != frameMap.end())
 	if (frameMap[vgmfile])
 	{
-	   //TODO bring it into bring focus
+		//TODO bring it into bring focus
 	}
 	else
 	{
@@ -399,6 +404,10 @@ void CMainFrame::CloseVGMFileFrame(VGMFile* vgmfile)
 void CMainFrame::OnCloseVGMFileFrame(VGMFile* vgmfile)
 {
 	frameMap.erase(frameMap.find(vgmfile));
+	if (frameMap.size() > 0)
+		UIEnable(ID_FILE_SAVE, 1);
+	else
+		UIEnable(ID_FILE_SAVE, 0);
 }
 
 
@@ -917,6 +926,24 @@ void CMainFrame::SelectColl(VGMColl* coll)
 		//WriteItemToStatusBar(pItem);
 	}
 		
+}
+
+VGMFile* CMainFrame::GetActiveFile(void)
+{
+	HWND hActiveTab = MDIGetActive();
+	if (hActiveTab != NULL)
+	{
+		map<VGMFile*, CFileFrame*>::iterator it = frameMap.begin();
+		while(it != frameMap.end())
+		{
+			if (hActiveTab == (*it).second->m_hWnd)
+			{
+				return (*it).first;
+			}
+			++it;
+		}
+	}
+	return NULL;
 }
 
 // CDropFilesHandler
