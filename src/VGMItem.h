@@ -150,6 +150,7 @@ protected:
 	UINT GetWord(ULONG offset);	
 	USHORT GetShortBE(ULONG offset);
 	UINT GetWordBE(ULONG offset);
+	bool IsValidOffset(ULONG offset);
 
 public:
 	BYTE color;

@@ -104,6 +104,11 @@ UINT VGMItem::GetWordBE(ULONG offset)
 	return GetRawFile()->GetWordBE(offset);
 }
 
+bool VGMItem::IsValidOffset(ULONG offset)
+{
+	return vgmfile->IsValidOffset(offset);
+}
+
 
 
 //  ****************

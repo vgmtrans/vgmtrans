@@ -116,7 +116,14 @@ public:
 		else
 			return data.GetWordBE(offset);
 	}
-		
+
+	inline bool IsValidOffset(ULONG offset)
+	{
+		if (bUsingRawFile)
+			return rawfile->IsValidOffset(offset);
+		else
+			return data.IsValidOffset(offset);
+	}
 
 protected:
 	DataSeg data, col;

@@ -44,32 +44,38 @@ public:
 
 	inline BYTE GetByte(UINT nIndex)
 	{
+		assert((nIndex >= startOff) && (nIndex+1 <= endOff));
 		return data[nIndex-startOff];
 	}
 
 	inline USHORT GetShort(UINT nIndex)
 	{
-		assert((nIndex >= startOff) || (nIndex+2 <= endOff));
+		assert((nIndex >= startOff) && (nIndex+2 <= endOff));
 		return *((USHORT*)(data+nIndex-startOff));
 	}
 
 	inline UINT GetWord(UINT nIndex)
 	{
-		assert((nIndex >= startOff) || (nIndex+4 <= endOff));
+		assert((nIndex >= startOff) && (nIndex+4 <= endOff));
 		return *((UINT*)(data+nIndex-startOff));
 	}
 
 	inline USHORT GetShortBE(UINT nIndex)
 	{
-		assert((nIndex >= startOff) || (nIndex+2 <= endOff));
+		assert((nIndex >= startOff) && (nIndex+2 <= endOff));
 		return ((BYTE)(data[nIndex-startOff]) << 8) + ((BYTE)data[nIndex+1-startOff]);
 	}
 
 	inline UINT GetWordBE(UINT nIndex)
 	{
-		assert((nIndex >= startOff) || (nIndex+4 <= endOff));
+		assert((nIndex >= startOff) && (nIndex+4 <= endOff));
 		return ((BYTE)data[nIndex-startOff] << 24) + ((BYTE)data[nIndex+1-startOff] << 16)
 			 + ((BYTE)data[nIndex+2-startOff] << 8) + (BYTE)data[nIndex+3-startOff];
+	}
+
+	inline bool IsValidOffset(UINT nIndex)
+	{
+		return (nIndex >= startOff && nIndex < endOff);
 	}
 
 

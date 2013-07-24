@@ -51,9 +51,10 @@ bool PS1Seq::GetHeaderInfo(void)
 bool PS1Seq::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
-	AddDelta(ReadVarLen(curOffset));
+	ULONG delta = ReadVarLen(curOffset);
 	if (curOffset >= rawfile->size())
 		return false;
+	AddDelta(delta);
 
 	BYTE status_byte = GetByte(curOffset++);
 

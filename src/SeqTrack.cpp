@@ -175,19 +175,21 @@ void SeqTrack::ResetDelta(void)
 
 ULONG SeqTrack::ReadVarLen(ULONG& offset)
 {
-    register ULONG value;
-    register UCHAR c;
+	register ULONG value;
+	register UCHAR c;
 
-    if ( (value = GetByte(offset++)) & 0x80 )
-    {
-       value &= 0x7F;
-       do
-       {
-         value = (value << 7) + ((c = GetByte(offset++)) & 0x7F);
-       } while (c & 0x80);
-    }
+	if (IsValidOffset(offset) && (value = GetByte(offset++)) & 0x80)
+	{
+		value &= 0x7F;
+		do
+		{
+			if (!IsValidOffset(offset))
+				break;
+			value = (value << 7) + ((c = GetByte(offset++)) & 0x7F);
+		} while (c & 0x80);
+	}
 
-    return value;
+	return value;
 }
 
 void SeqTrack::AddControllerSlide(ULONG offset, ULONG length, ULONG dur, BYTE& prevVal, BYTE targVal, 

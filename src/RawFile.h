@@ -86,6 +86,11 @@ public:
 		return buf.GetWordBE(nIndex);
 	}
 
+	inline bool IsValidOffset(UINT nIndex)
+	{
+		return (nIndex < fileSize);
+	}
+
 	inline ULONG GetSize()
 	{
 		return fileSize;
