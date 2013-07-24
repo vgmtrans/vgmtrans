@@ -344,7 +344,16 @@ END
 STRINGTABLE 
 BEGIN
     ID_APP_ABOUT            "Display program information, version number and copyright\nAbout"
-    ID_APP_EXIT             "Quit the application; prompts to save documents\nExit"
+    ID_APP_EXIT             "Quit the application\nExit"
+END
+
+STRINGTABLE 
+BEGIN
+    ID_VIEW_RAWFILELIST     "Show or hide the Scanned Files pane\nToggle Scanned Files Pane"
+    ID_VIEW_VGMFILELIST     "Show or hide the Detected Music Files pane\nToggle Detected Music Files Pane"
+    ID_VIEW_COLLECTIONS     "Show or hide the Collections pane\nToggle Collections Pane"
+    ID_VIEW_COLLECTIONINFO  "Show or hide the Collection Info pane\nToggle Collection Info Pane"
+    ID_VIEW_LOGLIST         "Show or hide the Logs pane\nToggle Logs Pane"
 END
 
 STRINGTABLE 

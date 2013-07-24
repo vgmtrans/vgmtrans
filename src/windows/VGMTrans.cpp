@@ -10,15 +10,21 @@
 #include "aboutdlg.h"
 #include "MainFrm.h"
 #include "MediaThread.h"
+#include "Root.h"
 
 CAppModule _Module;
 bool g_bXPOrLater;
 
 CMainFrame* pMainFrame;
 
-int Run(LPTSTR /*lpstrCmdLine*/ = NULL, int nCmdShow = SW_SHOWDEFAULT)
+int Run(LPTSTR lpstrCmdLine, int nCmdShow = SW_SHOWDEFAULT)
 {
 	nCmdShow; //avoid level 4 warning
+
+	int argc;
+	lpstrCmdLine = GetCommandLine(); // wWinMain lpszCmdLine does not work well (do not know why)
+	LPWSTR* argv = CommandLineToArgvW(lpstrCmdLine, &argc);
+
 	CMessageLoop theLoop;
 	_Module.AddMessageLoop(&theLoop);
 
@@ -27,6 +33,7 @@ int Run(LPTSTR /*lpstrCmdLine*/ = NULL, int nCmdShow = SW_SHOWDEFAULT)
 	if(wndMain.CreateEx() == NULL)
 	{
 		ATLTRACE(_T("Main window creation failed!\n"));
+		LocalFree((HLOCAL)argv);
 		return 0;
 	}
 
@@ -36,10 +43,17 @@ int Run(LPTSTR /*lpstrCmdLine*/ = NULL, int nCmdShow = SW_SHOWDEFAULT)
 	mediaThread.Init();
 	//mediaThread.Run();
 
+	for (int argi = 1; argi < argc; argi++)
+	{
+		pRoot->OpenRawFile(argv[argi]);
+	}
+
 	int nRet = theLoop.Run();
 
 	//mediaThread.Terminate();
 	_Module.RemoveMessageLoop();
+
+	LocalFree((HLOCAL)argv);
 	return nRet;
 }
 
