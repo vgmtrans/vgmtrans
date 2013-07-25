@@ -4,6 +4,9 @@
 #include <zlib.h>
 #include ".\loaders\sexypsf\driver.h"
 
+#define PSF_TAG_SIG             "[TAG]"
+#define PSF_TAG_SIG_LEN         5
+
 wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
 
 PSF1Loader::PSF1Loader(void)
@@ -95,6 +98,7 @@ const wchar_t* PSF1Loader::psf_read_exe(
 ) 
 {
 	uint8 *zexebuf;
+	uint8 *reservebuf;
 	uLong destlen;
 	uint32 reserved_size;
 	uint32 exe_size;
@@ -128,9 +132,11 @@ const wchar_t* PSF1Loader::psf_read_exe(
 		((16+reserved_size+exe_size) > fl))
 		return L"PSF header is inconsistent";
 
-	zexebuf= new uint8[exe_size];
+	zexebuf= new uint8[exe_size ? exe_size : 1];
 	if(!zexebuf)
+	{
 		return L"Out of memory reading the file";
+	}
 	file->GetBytes(16+reserved_size, exe_size, zexebuf);
 	//fseek(f, 16+reserved_size, SEEK_SET);
 	//fread(zexebuf, 1, exe_size, f);
@@ -142,6 +148,109 @@ const wchar_t* PSF1Loader::psf_read_exe(
 		return L"CRC failure - executable data is corrupt";
 	}
 
+	reservebuf= new uint8[reserved_size ? reserved_size : 1];
+	if(!reservebuf)
+	{
+		return L"Out of memory reading the file";
+	}
+	file->GetBytes(16, reserved_size, reservebuf);
+
+	UINT tagSectionOffset = 16 + reserved_size + exe_size;
+	UINT tagSectionSize = file->GetSize() - tagSectionOffset;
+	bool hasTagSection = false;
+	if (tagSectionSize >= PSF_TAG_SIG_LEN)
+	{
+		BYTE tagSig[5];
+		file->GetBytes(tagSectionOffset, PSF_TAG_SIG_LEN, tagSig);
+		if (memcmp(tagSig, PSF_TAG_SIG, PSF_TAG_SIG_LEN) == 0)
+		{
+			hasTagSection = true;
+		}
+	}
+
+	// Check if tag field exists.
+	char* tagSect = new char[tagSectionSize + 1];
+	if(tagSect == NULL)
+	{
+		delete[] zexebuf;
+		delete[] reservebuf;
+		return L"Out of memory reading the file";
+	}
+	file->GetBytes(tagSectionOffset, tagSectionSize, tagSect);
+	tagSect[tagSectionSize] = '\0';
+
+	// Parse tag section. Details are available here:
+	// http://wiki.neillcorlett.com/PSFTagFormat
+	map<string, string> tagMap;
+	UINT tagCurPos = PSF_TAG_SIG_LEN;
+	while (tagCurPos < tagSectionSize)
+	{
+		// Search the end position of the current line.
+		char* pNewLine = strchr(&tagSect[tagCurPos], 0x0a);
+		if (pNewLine == NULL)
+		{
+			// Tag section must end with a newline.
+			// Read the all remaining bytes if a newline lacks though.
+			pNewLine = tagSect + tagSectionSize;
+		}
+
+		// Replace the newline with NUL,
+		// for better C string function compatibility.
+		*pNewLine = '\0';
+
+		// Search the variable=value separator.
+		char* pSeparator = strchr(&tagSect[tagCurPos], '=');
+		if (pSeparator == NULL)
+		{
+			// Blank lines, or lines not of the form "variable=value", are ignored.
+			tagCurPos = pNewLine + 1 - tagSect;
+			continue;
+		}
+
+		// Determine the start/end position of variable.
+		char* pVarName = &tagSect[tagCurPos];
+		char* pVarNameEnd = pSeparator;
+		char* pVarVal = pSeparator + 1;
+		char* pVarValEnd = pNewLine;
+
+		// Whitespace at the beginning/end of the line and before/after the = are ignored.
+		// All characters 0x01-0x20 are considered whitespace.
+		// (There must be no null (0x00) characters.)
+		// Trim them.
+		while (pVarNameEnd > pVarName && *(unsigned char*)(pVarNameEnd - 1) <= 0x20)
+			pVarNameEnd--;
+		while (pVarValEnd > pVarVal && *(unsigned char*)(pVarValEnd - 1) <= 0x20)
+			pVarValEnd--;
+		while (pVarName < pVarNameEnd && *(unsigned char*)pVarName <= 0x20)
+			pVarName++;
+		while (pVarVal < pVarValEnd && *(unsigned char*)pVarVal <= 0x20)
+			pVarVal++;
+
+		// Read variable=value as string.
+		string varName(pVarName, pVarNameEnd - pVarName);
+		string varVal(pVarVal, pVarValEnd - pVarVal);
+
+		// Multiple-line variables must appear as consecutive lines using the same variable name.
+		// For instance:
+		//   comment=This is a
+		//   comment=multiple-line
+		//   comment=comment.
+		// Therefore, check if the variable had already appeared.
+		map<string, string>::iterator it = tagMap.lower_bound(varName);
+		if (it != tagMap.end() && it->first == varName)
+		{
+			it->second += "\n";
+			it->second += varVal;
+		}
+		else
+		{
+			tagMap.insert(it, make_pair(varName, varVal));
+		}
+
+		tagCurPos = pNewLine + 1 - tagSect;
+	}
+	delete[] tagSect;
+
 	// Now we get into the stuff related to recursive psflib loading.
 	// the actual size of the header is 0x800, but we only need the first 0x20 for the text section offset/size
 	BYTE exeHdr[0x20];
@@ -149,6 +258,7 @@ const wchar_t* PSF1Loader::psf_read_exe(
 	if (uncompress(exeHdr, &destlen, zexebuf, exe_size) == Z_DATA_ERROR)
 	{
 		delete[] zexebuf;
+		delete[] reservebuf;
 		return L"Decompression failed";
 	}
 
@@ -157,43 +267,34 @@ const wchar_t* PSF1Loader::psf_read_exe(
 	if (textSectionStart + textSectionSize > 0x200000)
 	{
 		delete[] zexebuf;
+		delete[] reservebuf;
 		return L"Text section start and/or size values are corrupt in PSX-EXE header.";
 	}
 
 	// search exclusively for _lib tag, and if found, perform a recursive load
-	// No, this isn't really proper, but i'm lazy at the moment.
-	int tagSectionSize = file->GetSize() - (exe_size+0x10);
-	char* tagSect = new char[tagSectionSize];
-	file->GetBytes(exe_size+0x10, tagSectionSize, tagSect);
-	for (int i = 0; i < tagSectionSize - 7; i++)	//5 bytes for sig, 1 for filename, 1 for 0x0A ending
+	// TODO: process _libN (N=2 and up)
+	map<string, string>::iterator itLibTag = tagMap.find("_lib");
+	if (itLibTag != tagMap.end())
 	{
-		if (tagSect[i] == '_' && tagSect[i+1] == 'l' &&
-			tagSect[i+2] == 'i' && tagSect[i+3] == 'b' && tagSect[i+4] == '=')	//0x0A '_' 'l' 'i' 'b' '='
-		{
-			char* fnStart = tagSect+i+5;
-			char* fnEnd = strchr(fnStart, 0x0A);
-			
+		wchar_t tempfn[_MAX_PATH] = { 0 };
+		mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
 
-			wchar_t tempfn[_MAX_PATH];
-			mbstowcs(tempfn, fnStart, fnEnd-fnStart);
-			tempfn[fnEnd-fnStart] = 0;
+		wchar_t *fullPath;
+		fullPath=GetFileWithBase(file->GetFullPath(),tempfn);
 
-			wchar_t *fullPath;
-			fullPath=GetFileWithBase(file->GetFullPath(),tempfn);
-			
-			RawFile* newRawFile = new RawFile(fullPath);
-			if (newRawFile->open(fullPath))
-				psf_read_exe(newRawFile, exebuffer, exebuffersize);
-			delete fullPath;
-			delete newRawFile;
-		}
+		// TODO: Make sure to limit recursion to avoid crashing.
+		RawFile* newRawFile = new RawFile(fullPath);
+		if (newRawFile->open(fullPath))
+			psf_read_exe(newRawFile, exebuffer, exebuffersize);
+		delete fullPath;
+		delete newRawFile;
 	}
-	delete[] tagSect;
 
 	destlen = textSectionSize;//exebuffersize - textSectionStart - textSectionSize;
 	if(uncompress(exebuffer+textSectionStart, &destlen, zexebuf, exe_size) == Z_DATA_ERROR)//!= Z_OK) 
 	{
 		delete[] zexebuf;
+		delete[] reservebuf;
 		return L"Decompression failed";
 	}
 
@@ -206,6 +307,7 @@ const wchar_t* PSF1Loader::psf_read_exe(
 	*/
 
 	delete[] zexebuf;
+	delete[] reservebuf;
 	//free(zexebuf);
 
 	return NULL;
