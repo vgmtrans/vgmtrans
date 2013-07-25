@@ -32,7 +32,8 @@ void PS1SeqScanner::SearchForPS1Seq (RawFile* file)
 		if ((*file)[i] == 'p' && (*file)[i+1] == 'Q' && (*file)[i+2] == 'E' && (*file)[i+3] == 'S')
 		{
 			PS1Seq* newPS1Seq = new PS1Seq(file, i);
-			newPS1Seq->LoadVGMFile();
+			if (!newPS1Seq->LoadVGMFile())
+				delete newPS1Seq;
 		}
 	}
 }
@@ -46,7 +47,8 @@ void PS1SeqScanner::SearchForVab (RawFile* file)
 		if ((*file)[i] == 'p' && (*file)[i+1] == 'B' && (*file)[i+2] == 'A' && (*file)[i+3] == 'V')
 		{
 			Vab* newVab = new Vab(file, i);
-			newVab->LoadVGMFile();
+			if (!newVab->LoadVGMFile())
+				delete newVab;
 		}
 	}
 }

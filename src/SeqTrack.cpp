@@ -923,7 +923,10 @@ void SeqTrack::AddTempo(ULONG offset, ULONG length, ULONG microsPerQuarter, cons
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		// Some MIDI tool can recognise tempo event only in the first track.
-		parentSeq->aTracks[0]->pMidiTrack->InsertTempo(microsPerQuarter, pMidiTrack->GetDelta());
+		MidiTrack* pTempoMidiTrack = pMidiTrack;
+		if (parentSeq->aTracks.size() > 0)
+			pTempoMidiTrack = parentSeq->aTracks[0]->pMidiTrack;
+		pTempoMidiTrack->InsertTempo(microsPerQuarter, pMidiTrack->GetDelta());
 	}
 }
 
@@ -945,7 +948,10 @@ void SeqTrack::AddTempoBPMNoItem(double bpm)
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		// Some MIDI tool can recognise tempo event only in the first track.
-		parentSeq->aTracks[0]->pMidiTrack->InsertTempoBPM(bpm, pMidiTrack->GetDelta());
+		MidiTrack* pTempoMidiTrack = pMidiTrack;
+		if (parentSeq->aTracks.size() > 0)
+			pTempoMidiTrack = parentSeq->aTracks[0]->pMidiTrack;
+		pTempoMidiTrack->InsertTempoBPM(bpm, pMidiTrack->GetDelta());
 	}
 }
 
@@ -959,8 +965,11 @@ void SeqTrack::AddTempoBPMSlide(ULONG offset, ULONG length, ULONG dur, double ta
 		double newTempo;
 		for (unsigned int i=0; i<dur; i++)
 		{
+			MidiTrack* pTempoMidiTrack = pMidiTrack;
+			if (parentSeq->aTracks.size() > 0)
+				pTempoMidiTrack = parentSeq->aTracks[0]->pMidiTrack;
 			newTempo=parentSeq->tempoBPM+(tempoInc*(i+1));
-			pMidiTrack->InsertTempoBPM(newTempo, GetDelta()+i);
+			pTempoMidiTrack->InsertTempoBPM(newTempo, GetDelta()+i);
 		}
 	}
 	parentSeq->tempoBPM = targBPM;

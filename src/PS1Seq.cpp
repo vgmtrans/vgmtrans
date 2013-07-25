@@ -37,7 +37,8 @@ bool PS1Seq::GetHeaderInfo(void)
 	{
 		SetEventsOffset(offset() + 0x0F + 4);
 		PS1Seq* newPS1Seq = new PS1Seq(rawfile, offset()+GetShortBE(offset()+0x11)+0x13 - 6);
-		newPS1Seq->LoadVGMFile();
+		if (!newPS1Seq->LoadVGMFile())
+			delete newPS1Seq;
 		//short relOffset = (short)GetShortBE(curOffset);
 		//AddGenericEvent(beginOffset, 4, L"Jump Relative", NULL, BG_CLR_PINK);
 		//curOffset += relOffset;

@@ -97,7 +97,10 @@ bool VabInstr::LoadInstr()
 	{
 		VabRgn* rgn = new VabRgn(this, dwOffset+i*0x20);
 		if (!rgn->LoadRgn())
+		{
+			delete rgn;
 			return false;
+		}
 		aRgns.push_back(rgn);
 	}
 	return TRUE;
