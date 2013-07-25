@@ -1,10 +1,6 @@
 #pragma once
 #include "Loader.h"
-
-
-#define uint32 unsigned
-#define uint16 unsigned short
-#define uint8 unsigned char
+#include "PSFFile.h"
 
 class PSF1Loader :
 	public VGMLoader
@@ -16,9 +12,6 @@ public:
 
 	virtual PostLoadCommand Apply(RawFile* theFile);
 	const wchar_t* psf_read_exe(RawFile* file, unsigned char *exebuffer, unsigned exebuffersize);
-
-	uint32 get32lsb(uint8 *src);
+private:
+	const wchar_t* load_psf_libs(PSFFile& psf, RawFile* file, unsigned char *exebuffer, unsigned exebuffersize);
 };
-
-
-

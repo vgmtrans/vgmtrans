@@ -209,7 +209,7 @@ bool PSFFile::ReadExe(BYTE* buf, size_t len, size_t* preadlen) const
 		//errorstr = L"Decompression failed";
 		return false;
 	}
-	if (preadlen == NULL)
+	if (preadlen != NULL)
 		*preadlen = destlen;
 	return true;
 }
@@ -230,7 +230,7 @@ bool PSFFile::Decompress(size_t decompressed_size)
 	}
 
 	uLong destlen = decompressed_size;
-	if (uncompress(buf, &destlen, exeCompData->data, exeCompData->size) != Z_OK)
+	if (uncompress(buf, &destlen, exeCompData->data, exeCompData->size) == Z_DATA_ERROR)
 	{
 		errorstr = L"Decompression failed";
 		delete[] buf;
@@ -280,7 +280,7 @@ void PSFFile::Clear()
 	parent = NULL;
 }
 
-wchar_t* PSFFile::GetError(void) const
+const wchar_t* PSFFile::GetError(void) const
 {
 	return errorstr;
 }
