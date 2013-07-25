@@ -35,7 +35,8 @@ void SonyPS2Scanner::SearchForSeq (RawFile* file)
 			continue;
 		
 		SonyPS2Seq* newSeq = new SonyPS2Seq(file, i);
-		newSeq->LoadVGMFile();
+		if (!newSeq->LoadVGMFile())
+			delete newSeq;
 	}
 }
 
@@ -60,7 +61,8 @@ void SonyPS2Scanner::SearchForInstrSet (RawFile* file)
 			continue;
 		
 		SonyPS2InstrSet* newInstrSet= new SonyPS2InstrSet(file, i);
-		newInstrSet->LoadVGMFile();
+		if (!newInstrSet->LoadVGMFile())
+			delete newInstrSet;
 	}
 }
 

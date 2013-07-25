@@ -29,7 +29,8 @@ void AkaoScanner::Scan(RawFile* file, void* info)
 				continue;
 
 			AkaoSeq* NewAkaoSeq = new AkaoSeq(file, i);
-			NewAkaoSeq->LoadVGMFile();
+			if (!NewAkaoSeq->LoadVGMFile())
+				delete NewAkaoSeq;
 		}
 		else
 		{
@@ -43,7 +44,8 @@ void AkaoScanner::Scan(RawFile* file, void* info)
 				continue;
 
 			AkaoSampColl* sampColl = new AkaoSampColl(file, i, 0);
-			sampColl->LoadVGMFile();
+			if (!sampColl->LoadVGMFile())
+				delete sampColl;
 		}
 	}
 	return;

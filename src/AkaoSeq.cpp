@@ -79,7 +79,11 @@ bool AkaoSeq::GetHeaderInfo(void)
 	else
 		instrSetLength = unLength - (drumkitOff - dwOffset);
 	instrset = new AkaoInstrSet(rawfile, instrSetLength, instrOff, drumkitOff, id, L"Akao Instr Set");
-	instrset->LoadVGMFile();
+	if (!instrset->LoadVGMFile())
+	{
+		delete instrset;
+		instrset = NULL;
+	}
 
 	return true;		//successful
 }

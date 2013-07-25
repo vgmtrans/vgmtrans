@@ -19,5 +19,6 @@ void SquSnesScanner::SearchForSquSnesSeq (RawFile* file)
 
 
 	SquSnesSeq* newSeq = new SquSnesSeq(file, 0x2000, 0x5F10);
-	newSeq->LoadVGMFile();
+	if (!newSeq->LoadVGMFile())
+		delete newSeq;
 }

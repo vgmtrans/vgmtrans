@@ -58,7 +58,11 @@ HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 			continue;
 
 		HOSASeq* seq = new HOSASeq(file, i);
-		seq->LoadVGMFile();
+		if (!seq->LoadVGMFile())
+		{
+			delete seq;
+			return NULL;
+		}
 		return seq;
 	}
 	return NULL;
@@ -92,7 +96,12 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 					continue;
 
 				HOSAInstrSet* instrset = new HOSAInstrSet(file, i);
-				instrset->LoadVGMFile();
+				if (!instrset->LoadVGMFile())
+				{
+					delete instrset;
+					delete[] sampOffsets;
+					return NULL;
+				}
 				delete[] sampOffsets;
 				return instrset;
 			}

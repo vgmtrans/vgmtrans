@@ -46,7 +46,8 @@ void SegSatScanner::Scan(RawFile* file, void* info)
 			//NewFFTSeq->Load();
 			SegSatSeq* newSegSatSeq = new SegSatSeq(file, i+5);//this, pDoc, pDoc->GetWord(i+24 + k*8)-0x8000000);
 			//aMP2kSeqs.push_back(NewMP2kSeq);
-			newSegSatSeq->LoadVGMFile();
+			if (!newSegSatSeq->LoadVGMFile())
+				delete newSegSatSeq;
 		}
 		j++;
 	}

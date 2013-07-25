@@ -45,7 +45,8 @@ void SquarePS2Scanner::SearchForBGMSeq(RawFile* file)
 				}
 
 				BGMSeq* NewBGMSeq = new BGMSeq(file, i);
-				NewBGMSeq->LoadVGMFile();
+				if (!NewBGMSeq->LoadVGMFile())
+					delete NewBGMSeq;
 			}
 		}
 	}
@@ -107,7 +108,8 @@ void SquarePS2Scanner::SearchForWDSet(RawFile* file)
 					if (bValid)				//then there was a row of 16 00 bytes.  yay
 					{
 						WDInstrSet* instrset = new WDInstrSet(file, i);
-						instrset->LoadVGMFile();
+						if (!instrset->LoadVGMFile())
+							delete instrset;
 					}
 				}
 			}

@@ -112,7 +112,8 @@ void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
 				if (!bFailed)
 				{
 					NinSnesSeq* newSeq = new NinSnesSeq(file, i);
-					newSeq->LoadVGMFile();
+					if (!newSeq->LoadVGMFile())
+						delete newSeq;
 					i += m;
 				}
 			}

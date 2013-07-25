@@ -43,7 +43,8 @@ void FFTScanner::SearchForFFTSeq (RawFile* file)
 			continue;
 
 		FFTSeq* NewFFTSeq = new FFTSeq(file, i);
-		NewFFTSeq->LoadVGMFile();
+		if (!NewFFTSeq->LoadVGMFile())
+			delete NewFFTSeq;
 	}
 }
 
@@ -77,7 +78,8 @@ void FFTScanner::SearchForFFTwds (RawFile* file)
 		//	continue;
 
 		WdsInstrSet* newWds = new WdsInstrSet(file, i);
-		newWds->LoadVGMFile();
+		if (!newWds->LoadVGMFile())
+			delete newWds;
 	}
 }
 

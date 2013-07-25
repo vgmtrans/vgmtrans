@@ -27,7 +27,7 @@ public:
 	inline void SetEventsOffset(long offset) { SeqTrack::dwOffset = offset;}		//this function must be called in GetHeaderInfo or before LoadEvents is called
 
 	virtual void AddDelta(ULONG delta);
-	virtual void AddEndOfTrack(unsigned long offset, unsigned long length, const wchar_t* sEventName = L"Track End");
+	//virtual bool AddEndOfTrack(ULONG offset, ULONG length, const wchar_t* sEventName = L"Track End");
 
 	void SetCurTrack(ULONG trackNum);
 	void TryExpandMidiTracks(ULONG numTracks);

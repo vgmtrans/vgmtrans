@@ -18,6 +18,7 @@ VGMSeqNoTrks::~VGMSeqNoTrks(void)
 void VGMSeqNoTrks::ResetVars()
 {
 	midiTracks.clear();		//no need to delete the contents, that happens when the midi is deleted
+	VGMSeq::ResetVars();
 	SeqTrack::ResetVars();
 }
 
@@ -146,8 +147,9 @@ void VGMSeqNoTrks::AddDelta(ULONG delta)
 }
 
 
-void VGMSeqNoTrks::AddEndOfTrack(unsigned long offset, unsigned long length, const wchar_t* sEventName)
-{
-	if (bInLoop == false)
-		AddEvent(new TrackEndSeqEvent(this, offset, length, sEventName));
-}
+//bool VGMSeqNoTrks::AddEndOfTrack(ULONG offset, ULONG length, const wchar_t* sEventName)
+//{
+//	if (bInLoop == false)
+//		AddEvent(new TrackEndSeqEvent(this, offset, length, sEventName));
+//	return false;
+//}

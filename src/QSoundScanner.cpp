@@ -96,13 +96,25 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 	if (artic_table_offset)
 	{
 		articTable = new QSoundArticTable(programFile, artic_table_name, artic_table_offset, artic_table_length);
-		articTable->LoadVGMFile();
+		if (!articTable->LoadVGMFile())
+		{
+			delete articTable;
+			articTable = NULL;
+		}
 	}
 
 	instrset = new QSoundInstrSet(programFile, ver, instr_table_offset, num_instr_banks, sampInfoTable, articTable, instrset_name);
-	instrset->LoadVGMFile();
+	if (!instrset->LoadVGMFile())
+	{
+		delete instrset;
+		instrset = NULL;
+	}
 	sampcoll = new QSoundSampColl(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
-	sampcoll->LoadVGMFile();
+	if (!sampcoll->LoadVGMFile())
+	{
+		delete sampcoll;
+		sampcoll = NULL;
+	}
 
 
 	// LOAD SEQUENCES FROM SEQUENCE TABLE AND CREATE COLLECTIONS
@@ -116,7 +128,11 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 
 	// Add SeqTable as Miscfile
 	VGMMiscFile* seqTable = new VGMMiscFile(QSoundFormat::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
-	seqTable->LoadVGMFile();
+	if (!seqTable->LoadVGMFile())
+	{
+		delete seqTable;
+		seqTable = NULL;
+	}
 	
 	for (k=0; (seq_table_length == 0 || k < seq_table_length); k+=4)
 	{

@@ -30,7 +30,8 @@ void OrgScanner::SearchForOrgSeq (RawFile* file)
 			if (file->GetShort(i+6))
 			{
 				OrgSeq* NewOrgSeq = new OrgSeq(file, i);
-				NewOrgSeq->LoadVGMFile();
+				if (!NewOrgSeq->LoadVGMFile())
+					delete NewOrgSeq;
 			}
 		}
 	}

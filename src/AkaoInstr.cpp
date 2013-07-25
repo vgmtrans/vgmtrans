@@ -58,7 +58,10 @@ bool AkaoInstr::LoadInstr()
 	{
 		AkaoRgn* rgn = new AkaoRgn(this, dwOffset + k*8, 8);
 		if (!rgn->LoadRgn())
+		{
+			delete rgn;
 			return false;
+		}
 		aRgns.push_back(rgn);
 	}
 	if (aRgns.size() != 0)

@@ -34,7 +34,8 @@ void KonamiGXScanner::LoadSeqTable(RawFile* file, UINT offset)
 		if (seqOffset == 0 || seqOffset >= nFileLength)
 			break;
 		KonamiGXSeq* newSeq = new KonamiGXSeq(file, seqOffset);
-		newSeq->LoadVGMFile();
+		if (!newSeq->LoadVGMFile())
+			delete newSeq;
 		offset += 12;
 	}
 }

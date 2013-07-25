@@ -114,7 +114,8 @@ void MP2kScanner::Scan(RawFile* file, void* info)
 							ULONG seqOffset = file->GetWord(i+24 + k*8)-0x8000000;
 							MP2kSeq* NewMP2kSeq = new MP2kSeq(file, seqOffset);//this, pDoc, pDoc->GetWord(i+24 + k*8)-0x8000000);
 							//aMP2kSeqs.push_back(NewMP2kSeq);
-							NewMP2kSeq->LoadVGMFile();
+							if (!NewMP2kSeq->LoadVGMFile())
+								delete NewMP2kSeq;
 						}
 
 						k++;
