@@ -12,7 +12,7 @@ public:
 	virtual ~PSFFile(void);
 
 	bool Load(RawFile* file);
-	bool ReadExe(BYTE* buf, size_t readlen) const;
+	bool ReadExe(BYTE* buf, size_t len, size_t* preadlen) const;
 	bool Decompress(size_t decompressed_size);
 	bool IsDecompressed(void) const;
 	BYTE GetVersion(void) const;

@@ -201,14 +201,16 @@ bool PSFFile::Load(RawFile* file)
 	return true;
 }
 
-bool PSFFile::ReadExe(BYTE* buf, size_t readlen) const
+bool PSFFile::ReadExe(BYTE* buf, size_t len, size_t* preadlen) const
 {
-	uLong destlen = readlen;
+	uLong destlen = len;
 	if (uncompress(buf, &destlen, exeCompData->data, exeCompData->size) == Z_DATA_ERROR)
 	{
 		//errorstr = L"Decompression failed";
 		return false;
 	}
+	if (preadlen == NULL)
+		*preadlen = destlen;
 	return true;
 }
 
@@ -217,16 +219,7 @@ bool PSFFile::Decompress(size_t decompressed_size)
 	if (decompressed_size == 0)
 	{
 		exeData->clear();
-		if (exeCompData->size == 0)
-		{
-			return true;
-		}
-		else
-		{
-			// Mismatched length.
-			errorstr = L"Decompression failed";
-			return false;
-		}
+		return true;
 	}
 
 	BYTE* buf = new BYTE[decompressed_size];
@@ -243,8 +236,9 @@ bool PSFFile::Decompress(size_t decompressed_size)
 		delete[] buf;
 		return false;
 	}
+	size_t actualSize = destlen;
 
-	exeData->load(buf, 0, decompressed_size);
+	exeData->load(buf, 0, actualSize);
 	decompressed = true;
 	return true;
 }
