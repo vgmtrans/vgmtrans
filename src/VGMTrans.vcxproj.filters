@@ -582,6 +582,9 @@
     <ClCompile Include="windows\directmidi\MyCoCreateInstance.cpp">
       <Filter>Source Files\windows\DirectMidi</Filter>
     </ClCompile>
+    <ClCompile Include="PSFFile.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1072,6 +1075,9 @@
     </ClInclude>
     <ClInclude Include="loaders\sexypsf\spu\reverb.h">
       <Filter>Header Files\loaders\SexyPSF\spu</Filter>
+    </ClInclude>
+    <ClInclude Include="PSFFile.h">
+      <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

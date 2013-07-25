@@ -32,24 +32,23 @@ void DataSeg::reposition(ULONG newBegin)
 void DataSeg::alloc(ULONG theSize)
 {
 	assert(!bAlloced);
-	data = new BYTE[theSize];
-	//memset(data, defValue, theSize);
+
+	if (bAlloced)
+	{
+		// alloc() does not save the existing data.
+		delete[] data;
+	}
+
+	data = new BYTE[theSize > 0 ? theSize : 1];
 	size = theSize;
 	bAlloced = true;
 }
 
 void DataSeg::load(BYTE* buf, ULONG startVirtOffset, ULONG theSize)
 {
-	/*if (!bAlloced)
-	{
-		data = new BYTE[theSize];
-		size = theSize;
-	}
-	else
-		assert(theSize <= size);*/
+	clear();
 
 	data = buf;
-	//memcpy(data, buf, theSize);
 	startOff = startVirtOffset;
 	size = theSize;
 	endOff = startOff+size;

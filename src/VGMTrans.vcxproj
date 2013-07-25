@@ -188,6 +188,7 @@
     <ClCompile Include="LogItem.cpp" />
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="KabukiDecrypt.cpp" />
+    <ClCompile Include="PSFFile.cpp" />
     <ClCompile Include="RareSnesScanner.cpp" />
     <ClCompile Include="RareSnesSeq.cpp" />
     <ClCompile Include="RiffFile.cpp" />
@@ -380,6 +381,7 @@
     <ClInclude Include="Options.h" />
     <ClInclude Include="KabukiDecrypt.h" />
     <ClInclude Include="OrgFormat.h" />
+    <ClInclude Include="PSFFile.h" />
     <ClInclude Include="RareSnesFormat.h" />
     <ClInclude Include="RareSnesScanner.h" />
     <ClInclude Include="RareSnesSeq.h" />

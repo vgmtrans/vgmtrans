@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "PSFFile.h"
 #include "PSF1Loader.h"
 #include "Root.h"
 #include <zlib.h>
@@ -115,7 +116,7 @@ const wchar_t* PSF1Loader::psf_read_exe(
 	*/
 	if(fl >= 0x10000000)
 		return L"PSF too large - likely corrupt";
-	if(fl < 0x10) 
+	if(fl < 0x10)
 		return L"PSF too small - likely corrupt";
 	file->GetBytes(0, 0x10, hdr);
 	if(memcmp(hdr, "PSF", 3))
