@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zlib.h>
 #include "types.h"
 #include "DataSeg.h"
 #include "RawFile.h"
@@ -12,7 +13,8 @@ public:
 	virtual ~PSFFile(void);
 
 	bool Load(RawFile* file);
-	bool ReadExe(BYTE* buf, size_t len, size_t* preadlen) const;
+	bool ReadExe(BYTE* buf, size_t len, size_t stripLen) const;
+	bool ReadExeDataSeg(DataSeg*& seg, size_t len, size_t stripLen) const;
 	bool Decompress(size_t decompressed_size);
 	bool IsDecompressed(void) const;
 	BYTE GetVersion(void) const;
@@ -20,7 +22,7 @@ public:
 	size_t GetCompressedExeSize(void) const;
 	size_t GetReservedSize(void) const;
 	void Clear(void);
-	wchar_t* GetError(void) const;
+	const wchar_t* GetError(void) const;
 
 public:
 	PSFFile* parent;
@@ -36,4 +38,8 @@ private:
 	uint32_t exeCRC;
 	bool decompressed;
 	wchar_t* errorstr;
+	BYTE* stripBuf;
+	size_t stripBufSize;
+
+	int myuncompress(Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen, uLong stripLen) const;
 };

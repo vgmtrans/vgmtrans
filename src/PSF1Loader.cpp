@@ -101,11 +101,13 @@ const wchar_t* PSF1Loader::psf_read_exe(
 
 	// Now we get into the stuff related to recursive psflib loading.
 	// the actual size of the header is 0x800, but we only need the first 0x20 for the text section offset/size
-	if (!psf.Decompress(0x20))
+	DataSeg* psfExeHeadSeg;
+	if (!psf.ReadExeDataSeg(psfExeHeadSeg, 0x20, 0))
 		return psf.GetError();
 
-	uint32_t textSectionStart = psf.exe().GetWord(0x18) & 0x3FFFFF;
-	uint32_t textSectionSize  = psf.exe().GetWord(0x1C);
+	uint32_t textSectionStart = psfExeHeadSeg->GetWord(0x18) & 0x3FFFFF;
+	uint32_t textSectionSize  = psfExeHeadSeg->GetWord(0x1C);
+	delete psfExeHeadSeg;
 	if (textSectionStart + textSectionSize > 0x200000)
 		return L"Text section start and/or size values are corrupt in PSX-EXE header.";
 
@@ -114,7 +116,7 @@ const wchar_t* PSF1Loader::psf_read_exe(
 	if (psflibError != NULL)
 		return psflibError;
 
-	if (!psf.ReadExe(exebuffer + textSectionStart, textSectionSize, NULL))
+	if (!psf.ReadExe(exebuffer + textSectionStart, textSectionSize, 0x800))
 		return L"Decompression failed";
 
 	return NULL;

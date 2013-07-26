@@ -8,9 +8,14 @@
 
 #define PSF_TAG_SIG             "[TAG]"
 #define PSF_TAG_SIG_LEN         5
+#define PSF_STRIP_BUF_SIZE      4096
 
-PSFFile::PSFFile(void)
+PSFFile::PSFFile(void) :
+	stripBuf(NULL),
+	stripBufSize(PSF_STRIP_BUF_SIZE)
 {
+	stripBuf = new BYTE[PSF_STRIP_BUF_SIZE];
+
 	exeData = new DataSeg();
 	exeCompData = new DataSeg();
 	reservedData = new DataSeg();
@@ -18,8 +23,13 @@ PSFFile::PSFFile(void)
 	Clear();
 }
 
-PSFFile::PSFFile(RawFile* file)
+PSFFile::PSFFile(RawFile* file) :
+	stripBuf(NULL),
+	stripBufSize(PSF_STRIP_BUF_SIZE)
 {
+	stripBuf = new BYTE[PSF_STRIP_BUF_SIZE];
+	stripBufSize = PSF_STRIP_BUF_SIZE;
+
 	exeData = new DataSeg();
 	exeCompData = new DataSeg();
 	reservedData = new DataSeg();
@@ -32,6 +42,7 @@ PSFFile::~PSFFile(void)
 	delete exeData;
 	delete exeCompData;
 	delete reservedData;
+	delete[] stripBuf;
 }
 
 bool PSFFile::Load(RawFile* file)
@@ -201,16 +212,42 @@ bool PSFFile::Load(RawFile* file)
 	return true;
 }
 
-bool PSFFile::ReadExe(BYTE* buf, size_t len, size_t* preadlen) const
+bool PSFFile::ReadExe(BYTE* buf, size_t len, size_t stripLen) const
 {
 	uLong destlen = len;
-	if (uncompress(buf, &destlen, exeCompData->data, exeCompData->size) == Z_DATA_ERROR)
+	int zRet = myuncompress(buf, &destlen, exeCompData->data, exeCompData->size, stripLen);
+	if (zRet != Z_OK)
 	{
 		//errorstr = L"Decompression failed";
 		return false;
 	}
-	if (preadlen != NULL)
-		*preadlen = destlen;
+	return true;
+}
+
+bool PSFFile::ReadExeDataSeg(DataSeg*& seg, size_t len, size_t stripLen) const
+{
+	DataSeg* newSeg = new DataSeg();
+	if (len == 0)
+	{
+		seg = newSeg;
+		return true;
+	}
+
+	BYTE* buf = new BYTE[len];
+	uLong destlen = len;
+	int zRet = myuncompress(buf, &destlen, exeCompData->data, exeCompData->size, stripLen);
+	if (zRet != Z_OK)
+	{
+		//errorstr = L"Decompression failed";
+		seg = NULL;
+		delete newSeg;
+		delete[] buf;
+		return false;
+	}
+
+	size_t actualSize = destlen;
+	newSeg->load(buf, 0, actualSize);
+	seg = newSeg;
 	return true;
 }
 
@@ -219,7 +256,15 @@ bool PSFFile::Decompress(size_t decompressed_size)
 	if (decompressed_size == 0)
 	{
 		exeData->clear();
-		return true;
+		if (exeCompData->size == 0)
+		{
+			return true;
+		}
+		else
+		{
+			errorstr = L"Decompression failed";
+			return false;
+		}
 	}
 
 	BYTE* buf = new BYTE[decompressed_size];
@@ -230,7 +275,8 @@ bool PSFFile::Decompress(size_t decompressed_size)
 	}
 
 	uLong destlen = decompressed_size;
-	if (uncompress(buf, &destlen, exeCompData->data, exeCompData->size) == Z_DATA_ERROR)
+	int zRet = uncompress(buf, &destlen, exeCompData->data, exeCompData->size);
+	if (zRet != Z_STREAM_END)
 	{
 		errorstr = L"Decompression failed";
 		delete[] buf;
@@ -283,4 +329,85 @@ void PSFFile::Clear()
 const wchar_t* PSFFile::GetError(void) const
 {
 	return errorstr;
+}
+
+// original from zlib/uncompr.c
+int PSFFile::myuncompress (
+	Bytef *dest,
+	uLongf *destLen,
+	const Bytef *source,
+	uLong sourceLen,
+	uLong stripLen) const
+{
+	z_stream stream;
+	int err;
+
+	uLong stripAvailLen = 0;
+	uLong strippedLen = 0;
+
+	stream.next_in = (z_const Bytef *)source;
+	stream.avail_in = (uInt)sourceLen;
+	/* Check for source > 64K on 16-bit machine: */
+	if ((uLong)stream.avail_in != sourceLen) return Z_BUF_ERROR;
+
+	stream.next_out = dest;
+	stream.avail_out = (uInt)*destLen;
+	if ((uLong)stream.avail_out != *destLen) return Z_BUF_ERROR;
+
+	if (stripLen != 0)
+	{
+		stripAvailLen = min(stripLen, stripBufSize);
+		stream.next_out = (z_const Bytef *)stripBuf;
+		stream.avail_out = (uInt)stripAvailLen;
+	}
+
+	stream.zalloc = (alloc_func)0;
+	stream.zfree = (free_func)0;
+
+	err = inflateInit(&stream);
+	if (err != Z_OK) return err;
+
+	while (true)
+	{
+		err = inflate(&stream, Z_NO_FLUSH);
+		if (err == Z_OK && strippedLen + stripAvailLen < stripLen)
+		{
+			// try stripping more bytes
+			strippedLen += stripAvailLen;
+			stripAvailLen = min(stripLen - strippedLen, stripBufSize);
+			stream.next_out = (z_const Bytef *)stripBuf;
+			stream.avail_out = (uInt)stripAvailLen;
+		}
+		else if (err == Z_OK && stripAvailLen != 0)
+		{
+			// finish stripping
+			strippedLen += stripAvailLen;
+			stripAvailLen = 0;
+			stream.next_out = dest;
+			stream.avail_out = (uInt)*destLen;
+		}
+		else
+		{
+			if (err == Z_OK)
+			{
+				inflateEnd(&stream);
+				if (stripAvailLen != 0)
+					*destLen = 0;
+				else
+					*destLen = stream.total_out;
+				return Z_OK;
+			}
+			else if (err != Z_STREAM_END) {
+				inflateEnd(&stream);
+				if (err == Z_NEED_DICT)
+					return Z_DATA_ERROR;
+				return err;
+			}
+			*destLen = stream.total_out;
+			break;
+		}
+	}
+
+	err = inflateEnd(&stream);
+	return err;
 }
