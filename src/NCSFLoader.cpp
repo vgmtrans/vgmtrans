@@ -1,34 +1,36 @@
 #include "stdafx.h"
 #include "PSFFile.h"
-#include "PSF1Loader.h"
+#include "NCSFLoader.h"
 #include "Root.h"
 #include <zlib.h>
 #include ".\loaders\sexypsf\driver.h"
 
+#define NCSF_VERSION	0x25
+#define NCSF_MAX_ROM_SIZE	0x10000000
+
 wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
 
-PSF1Loader::PSF1Loader(void)
+NCSFLoader::NCSFLoader(void)
 {
 }
 
-PSF1Loader::~PSF1Loader(void)
+NCSFLoader::~NCSFLoader(void)
 {
 }
 
-PostLoadCommand PSF1Loader::Apply(RawFile* file)
+PostLoadCommand NCSFLoader::Apply(RawFile* file)
 {
 	BYTE sig[4];
 	file->GetBytes(0, 4, sig);
 	if (memcmp(sig, "PSF", 3) == 0)
 	{
 		BYTE version = sig[3];
-		if (version == 0x01)
+		if (version == NCSF_VERSION)
 		{
 			const wchar_t *complaint;
-			const size_t exebufsize = 0x200000;
-			//UINT exeRealSize;
-			BYTE* exebuf = new BYTE[exebufsize];
-			memset(exebuf, 0, exebufsize);
+			size_t exebufsize = NCSF_MAX_ROM_SIZE;
+			BYTE* exebuf = NULL;
+			//memset(exebuf, 0, exebufsize);
 
 			complaint = psf_read_exe(file, exebuf, exebufsize);
 			if(complaint) 
@@ -37,34 +39,9 @@ PostLoadCommand PSF1Loader::Apply(RawFile* file)
 				delete[] exebuf;
 				return KEEP_IT; 
 			}
-			//pRoot->UI_WriteBufferToFile(L"uncomp.raw", exebuf, 0x200000);
-
-			//BYTE* cutbuf = new BYTE[exeRealSize];
-			//memcpy(cutbuf, exebuf, exeRealSize);
-			//delete[] exebuf;
-
-			//DO EMULATION
-
-			//if (!sexy_load(file->GetFullPath()))
-			//{
-			//	delete exebuf;
-			//	return DELETE_IT;
-			//}
-			////sexy_execute(200000);//10000000);
-			//sexy_execute(10000000);
-			//
-			//memcpy(exebuf, GetPSXMainMemBuf(), 0x200000);
-
-			//pRoot->UI_WriteBufferToFile(L"dump.raw", exebuf, 0x200000);
-
-			////EmulatePSX(cutbuf
+			//pRoot->UI_WriteBufferToFile(L"uncomp.sdat", exebuf, exebufsize);
 
 			wstring str = file->GetFileName();
-			//wstring::size_type pos = str.find_last_of('.');
-			//str.erase(pos);
-			//str.append(L" MemDump");
-
-			//pRoot->CreateVirtFile(str.data(), exebuf, 0x200000);
 			pRoot->CreateVirtFile(exebuf, exebufsize, str.data());
 			return DELETE_IT;
 		}
@@ -86,44 +63,49 @@ PostLoadCommand PSF1Loader::Apply(RawFile* file)
 **
 ** Returns the error message, or NULL on success
 */
-const wchar_t* PSF1Loader::psf_read_exe(
+const wchar_t* NCSFLoader::psf_read_exe(
   RawFile* file,
-  unsigned char *exebuffer,
-  unsigned exebuffersize
+  unsigned char*& exebuffer,
+  size_t& exebuffersize
 ) 
 {
-	UINT fileSize = file->size();
-	if (fileSize >= 0x10000000)
-		return L"PSF too large - likely corrupt";
-
 	PSFFile psf;
 	if (!psf.Load(file))
 		return psf.GetError();
-
-	// Now we get into the stuff related to recursive psflib loading.
-	// the actual size of the header is 0x800, but we only need the first 0x20 for the text section offset/size
-	DataSeg* psfExeHeadSeg;
-	if (!psf.ReadExeDataSeg(psfExeHeadSeg, 0x20, 0))
-		return psf.GetError();
-
-	uint32_t textSectionStart = psfExeHeadSeg->GetWord(0x18) & 0x3FFFFF;
-	uint32_t textSectionSize  = psfExeHeadSeg->GetWord(0x1C);
-	delete psfExeHeadSeg;
-	if (textSectionStart + textSectionSize > 0x200000)
-		return L"Text section start and/or size values are corrupt in PSX-EXE header.";
 
 	// search exclusively for _lib tag, and if found, perform a recursive load
 	const wchar_t* psflibError = load_psf_libs(psf, file, exebuffer, exebuffersize);
 	if (psflibError != NULL)
 		return psflibError;
 
-	if (!psf.ReadExe(exebuffer + textSectionStart, textSectionSize, 0x800))
+	DataSeg* ncsfExeHeadSeg;
+	if (!psf.ReadExeDataSeg(ncsfExeHeadSeg, 0x0c, 0))
+		return psf.GetError();
+
+	uint32_t ncsfRomStart = 0;
+	uint32_t ncsfRomSize = ncsfExeHeadSeg->GetWord(0x08);
+	delete ncsfExeHeadSeg;
+	if (ncsfRomStart + ncsfRomSize > exebuffersize || (exebuffer == NULL && exebuffersize == 0))
+		return L"NCSF ROM section start and/or size values are likely corrupt.";
+
+	if (exebuffer == NULL)
+	{
+		exebuffersize = ncsfRomStart + ncsfRomSize;
+		exebuffer = new BYTE[exebuffersize];
+		if (exebuffer == NULL)
+		{
+			return L"NCSF ROM memory allocation error.";
+		}
+		memset(exebuffer, 0, exebuffersize);
+	}
+
+	if (!psf.ReadExe(exebuffer + ncsfRomStart, ncsfRomSize, 0))
 		return L"Decompression failed";
 
 	return NULL;
 }
 
-const wchar_t* PSF1Loader::load_psf_libs(PSFFile& psf, RawFile* file, unsigned char *exebuffer, unsigned exebuffersize)
+const wchar_t* NCSFLoader::load_psf_libs(PSFFile& psf, RawFile* file, unsigned char*& exebuffer, size_t& exebuffersize)
 {
 	char libTagName[16];
 	int libIndex = 1;

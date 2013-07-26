@@ -31,6 +31,10 @@
 
 #include "PSF1Loader.h"
 #include "PSF2Loader.h"
+#include "GSFLoader.h"
+#include "SNSFLoader.h"
+#include "NDS2SFLoader.h"
+#include "NCSFLoader.h"
 #include "SPCLoader.h"
 #include "MAMELoader.h"
 
@@ -77,6 +81,10 @@ bool VGMRoot::Init(void)
 	//load all the... loaders
 	AddLoader<PSF1Loader>();
 	AddLoader<PSF2Loader>();
+	AddLoader<GSFLoader>();
+	AddLoader<SNSFLoader>();
+	AddLoader<NDS2SFLoader>();
+	AddLoader<NCSFLoader>();
 	AddLoader<SPCLoader>();
 	AddLoader<MAMELoader>();
 

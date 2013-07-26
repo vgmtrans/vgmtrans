@@ -214,6 +214,11 @@ bool PSFFile::Load(RawFile* file)
 
 bool PSFFile::ReadExe(BYTE* buf, size_t len, size_t stripLen) const
 {
+	if (len == 0)
+	{
+		return true;
+	}
+
 	uLong destlen = len;
 	int zRet = myuncompress(buf, &destlen, exeCompData->data, exeCompData->size, stripLen);
 	if (zRet != Z_OK)

@@ -185,7 +185,10 @@
   <ItemGroup>
     <ClCompile Include="BytePattern.cpp" />
     <ClCompile Include="datetime.cpp" />
+    <ClCompile Include="GSFLoader.cpp" />
     <ClCompile Include="LogItem.cpp" />
+    <ClCompile Include="NCSFLoader.cpp" />
+    <ClCompile Include="NDS2SFLoader.cpp" />
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="KabukiDecrypt.cpp" />
     <ClCompile Include="PSFFile.cpp" />
@@ -193,6 +196,7 @@
     <ClCompile Include="RareSnesSeq.cpp" />
     <ClCompile Include="RiffFile.cpp" />
     <ClCompile Include="SF2File.cpp" />
+    <ClCompile Include="SNSFLoader.cpp" />
     <ClCompile Include="SynthFile.cpp" />
     <ClCompile Include="VGMMiscFile.cpp" />
     <ClCompile Include="windows\aboutdlg.cpp" />
@@ -377,7 +381,10 @@
   <ItemGroup>
     <ClInclude Include="BytePattern.h" />
     <ClInclude Include="datetime.h" />
+    <ClInclude Include="GSFLoader.h" />
     <ClInclude Include="LogItem.h" />
+    <ClInclude Include="NCSFLoader.h" />
+    <ClInclude Include="NDS2SFLoader.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="KabukiDecrypt.h" />
     <ClInclude Include="OrgFormat.h" />
@@ -386,6 +393,7 @@
     <ClInclude Include="RareSnesScanner.h" />
     <ClInclude Include="RareSnesSeq.h" />
     <ClInclude Include="SegSatFormat.h" />
+    <ClInclude Include="SNSFLoader.h" />
     <ClInclude Include="VGMMiscFile.h" />
     <ClInclude Include="RIFFFile.h" />
     <ClInclude Include="SF2File.h" />

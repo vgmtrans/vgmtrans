@@ -585,6 +585,18 @@
     <ClCompile Include="PSFFile.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
+    <ClCompile Include="GSFLoader.cpp">
+      <Filter>Source Files\loaders</Filter>
+    </ClCompile>
+    <ClCompile Include="SNSFLoader.cpp">
+      <Filter>Source Files\loaders</Filter>
+    </ClCompile>
+    <ClCompile Include="NDS2SFLoader.cpp">
+      <Filter>Source Files\loaders</Filter>
+    </ClCompile>
+    <ClCompile Include="NCSFLoader.cpp">
+      <Filter>Source Files\loaders</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1078,6 +1090,18 @@
     </ClInclude>
     <ClInclude Include="PSFFile.h">
       <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="GSFLoader.h">
+      <Filter>Header Files\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="SNSFLoader.h">
+      <Filter>Header Files\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="NDS2SFLoader.h">
+      <Filter>Header Files\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="NCSFLoader.h">
+      <Filter>Header Files\loaders</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
