@@ -149,7 +149,7 @@ template <class T> void PSXConvADSR(T* realADSR,
 		((Sd & 0xFE) == 0) ||
 		((Sr & 0x80) == 0))
 	{
-		pRoot->AddLogItem(new LogItem(L"ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
+		pRoot->AddLogItem(new LogItem(L"PSX ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
 		return;
 	}
 
