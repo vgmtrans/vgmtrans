@@ -23,7 +23,7 @@ VGMInstrSet::VGMInstrSet(const string& format,/*FmtID fmtID,*/ RawFile* file, UL
 VGMInstrSet::~VGMInstrSet()
 {	
 	DeleteVect<VGMInstr>(aInstrs);
-	//VGMSampColl* sampColl;
+	delete sampColl;
 }
 
 
