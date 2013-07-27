@@ -159,11 +159,13 @@ void VGMColl::UnpackSampColl(SynthFile& synthfile, VGMSampColl* sampColl, vector
 }
 
 
-void VGMColl::CreateDLSFile(DLSFile& dls)
+bool VGMColl::CreateDLSFile(DLSFile& dls)
 {
-	PreDLSMainCreation();
-	MainDLSCreation(dls);
-	PostDLSMainCreation();
+	bool result = true;
+	result &= PreDLSMainCreation();
+	result &= MainDLSCreation(dls);
+	result &= PostDLSMainCreation();
+	return result;
 }
 
 SF2File* VGMColl::CreateSF2File()
@@ -178,7 +180,7 @@ SF2File* VGMColl::CreateSF2File()
 	//PostDLSMainCreation(sf2);
 }
 
-void VGMColl::MainDLSCreation(DLSFile& dls)
+bool VGMColl::MainDLSCreation(DLSFile& dls)
 {
 	//DLSFile* dls = new DLSFile();
 	vector<VGMSamp*> finalSamps;
@@ -187,7 +189,7 @@ void VGMColl::MainDLSCreation(DLSFile& dls)
 	vector<VGMSampColl*> finalSampColls;	
 
 	if (!instrsets.size() /*|| !sampcolls.size()*/ || !seq)
-		return;
+		return false;
 
 	// if there are independent SampColl(s) in the collection
 	if (sampcolls.size())
@@ -207,6 +209,9 @@ void VGMColl::MainDLSCreation(DLSFile& dls)
 			UnpackSampColl(dls, instrsets[i]->sampColl, finalSamps);
 		}
 	}
+
+	if (finalSamps.size() == 0)
+		return false;
 
 
 	for (UINT inst = 0; inst<instrsets.size(); inst++)
@@ -399,6 +404,7 @@ void VGMColl::MainDLSCreation(DLSFile& dls)
 		}
 	}
 	//dls.SaveDLSFile(name.c_str());
+	return true;
 }
 
 
@@ -435,6 +441,9 @@ SynthFile* VGMColl::CreateSynthFile()
 			UnpackSampColl(*synthfile, instrsets[i]->sampColl, finalSamps);
 		}
 	}
+
+	if (finalSamps.size() == 0)
+		return NULL;
 
 
 	for (UINT inst = 0; inst<instrsets.size(); inst++)
@@ -602,9 +611,14 @@ bool VGMColl::OnSaveAllDLS()
 	{
 		DLSFile dlsfile;
 		wstring filepath = dirpath + L"\\" + this->name + L".dls";
-		CreateDLSFile(dlsfile);
-		if (!dlsfile.SaveDLSFile(filepath.c_str()))
+		if (CreateDLSFile(dlsfile))
+		{
+			if (!dlsfile.SaveDLSFile(filepath.c_str()))
+				Alert(L"Failed to save DLS file.");
+		}
+		else
 			Alert(L"Failed to save DLS file.");
+
 		filepath = dirpath + L"\\" + this->name + L".mid";
 		if (!this->seq->SaveAsMidi(filepath.c_str()))
 			Alert(L"Failed to save MIDI file.");
@@ -619,14 +633,14 @@ bool VGMColl::OnSaveAllSF2()
 	{
 		wstring filepath = dirpath + L"\\" + this->name + L".sf2";
 		SF2File* sf2file = CreateSF2File();
-		if (!sf2file->SaveSF2File(filepath.c_str()))
-			Alert(L"Failed to create SF2 file.");
 		if (sf2file != NULL)
 		{	
 			if (!sf2file->SaveSF2File(filepath.c_str()))
 				Alert(L"Failed to save SF2 file.");
 			delete sf2file;
 		}
+		else
+			Alert(L"Failed to save SF2 file.");
 
 		filepath = dirpath + L"\\" + this->name + L".mid";
 		if (!this->seq->SaveAsMidi(filepath.c_str()))

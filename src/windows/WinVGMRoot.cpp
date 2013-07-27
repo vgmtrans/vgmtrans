@@ -61,7 +61,11 @@ void WinVGMRoot::Play(void)
 		if (loadedColl != selectedColl)
 		{
 			DLSFile dls;
-			selectedColl->CreateDLSFile(dls);
+			if (!selectedColl->CreateDLSFile(dls))
+			{
+				Alert(L"Unable to create DLS. It is likely corrupted.");
+				return;
+			}
 			musicplayer.ChangeDLS(&dls);
 			loadedColl = selectedColl;
 		}

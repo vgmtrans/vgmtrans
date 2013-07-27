@@ -29,7 +29,7 @@ public:
 				VGMSampColl* theSampColl = NULL);
 	virtual ~VGMInstrSet(void);
 
-	//void CreateDLSFile(DLSFile& dls);
+	//bool CreateDLSFile(DLSFile& dls);
 
 	virtual bool Load();
 	virtual bool GetHeaderInfo();

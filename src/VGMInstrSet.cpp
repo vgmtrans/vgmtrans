@@ -61,8 +61,7 @@ bool VGMInstrSet::Load()
 	{
 		if (!sampColl->Load())
 		{
-			delete sampColl;
-			sampColl = NULL;
+			pRoot->AddLogItem(new LogItem(L"Failed to load VGMSampColl.", LOG_LEVEL_ERR, L"VGMInstrSet"));
 		}
 	}
 
@@ -122,14 +121,21 @@ bool VGMInstrSet::OnSaveAsSF2(void)
 bool VGMInstrSet::SaveAsDLS(const wchar_t* filepath)
 {
 	DLSFile dlsfile;
+	bool dlsCreationSucceeded = false;
+
 //	if (sampColl)
 //		CreateDLSFile(dlsfile);
 //	else 
 	if (assocColls.size())
-		assocColls.front()->CreateDLSFile(dlsfile);
+		dlsCreationSucceeded = assocColls.front()->CreateDLSFile(dlsfile);
 	else
 		return false;
-	return dlsfile.SaveDLSFile(filepath);
+
+	if (dlsCreationSucceeded)
+	{
+		return dlsfile.SaveDLSFile(filepath);
+	}
+	return false;
 }
 
 bool VGMInstrSet::SaveAsSF2(const wchar_t* filepath)

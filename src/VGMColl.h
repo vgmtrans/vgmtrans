@@ -34,11 +34,11 @@ public:
 	void AddMiscFile(VGMFile* theMiscFile);
 	bool Load();
 	virtual bool LoadMain() {return true;}
-	virtual void CreateDLSFile(DLSFile& dls);
+	virtual bool CreateDLSFile(DLSFile& dls);
 	virtual SF2File* CreateSF2File();
 	virtual bool PreDLSMainCreation() { return true; }
 	virtual SynthFile* CreateSynthFile();
-	virtual void MainDLSCreation(DLSFile& dls);
+	virtual bool MainDLSCreation(DLSFile& dls);
 	virtual bool PostDLSMainCreation() { return true; }
 
 	bool OnSaveAllDLS();
