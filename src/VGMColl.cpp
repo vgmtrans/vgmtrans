@@ -421,7 +421,10 @@ SynthFile* VGMColl::CreateSynthFile()
 	vector<VGMSampColl*> finalSampColls;	
 
 	if (!instrsets.size() /*|| !sampcolls.size()*/ || !seq)
+	{
+		delete synthfile;
 		return NULL;
+	}
 
 	// if there are independent SampColl(s) in the collection
 	if (sampcolls.size())
@@ -443,7 +446,10 @@ SynthFile* VGMColl::CreateSynthFile()
 	}
 
 	if (finalSamps.size() == 0)
+	{
+		delete synthfile;
 		return NULL;
+	}
 
 
 	for (UINT inst = 0; inst<instrsets.size(); inst++)
