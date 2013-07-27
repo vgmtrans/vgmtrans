@@ -139,15 +139,15 @@ template <class T> void PSXConvADSR(T* realADSR,
 									U8 Sm, U8 Sd, U8 Sr, U8 Rm, U8 Rr, bool bPS2)
 {
 	// Make sure all the ADSR values are within the valid ranges
-	if (((Am & 0xFE) == 0) ||
-		((Ar & 0x80) == 0) ||
-		((Dr & 0xF0) == 0) ||
-		((Sl & 0xF0) == 0) ||
-		((Rm & 0xFE) == 0) ||
-		((Rr & 0xE0) == 0) ||
-		((Sm & 0xFE) == 0) ||
-		((Sd & 0xFE) == 0) ||
-		((Sr & 0x80) == 0))
+	if (((Am & 0xFE) != 0) ||
+		((Ar & 0x80) != 0) ||
+		((Dr & 0xF0) != 0) ||
+		((Sl & 0xF0) != 0) ||
+		((Rm & 0xFE) != 0) ||
+		((Rr & 0xE0) != 0) ||
+		((Sm & 0xFE) != 0) ||
+		((Sd & 0xFE) != 0) ||
+		((Sr & 0x80) != 0))
 	{
 		pRoot->AddLogItem(new LogItem(L"PSX ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
 		return;
