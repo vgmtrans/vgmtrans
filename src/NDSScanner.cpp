@@ -285,7 +285,10 @@ ULONG NDSScanner::LoadFromSDAT(RawFile* file, ULONG baseOff)
 				if (WAnum != -1)
 					coll->AddSampColl(WAs[WAnum]);
 			}
-			coll->Load();
+			if (!coll->Load())
+			{
+				delete coll;
+			}
 		}
 	}
 	return SDATLength;

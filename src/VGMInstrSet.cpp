@@ -57,8 +57,14 @@ bool VGMInstrSet::Load()
 	if (unLength == 0)
 		unLength = aInstrs.back()->dwOffset + aInstrs.back()->unLength - dwOffset;
 
-	if (sampColl)
-		sampColl->Load();
+	if (sampColl != NULL)
+	{
+		if (!sampColl->Load())
+		{
+			delete sampColl;
+			sampColl = NULL;
+		}
+	}
 
 	//CreateDLSFile();
 

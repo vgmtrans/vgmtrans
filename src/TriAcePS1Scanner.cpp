@@ -72,7 +72,10 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 		coll->UseSeq(seq);
 		for (UINT i=0; i<instrsets.size(); i++)
 			coll->AddInstrSet(instrsets[i]);
-		coll->Load();
+		if (!coll->Load())
+		{
+			delete coll;
+		}
 	}
 }
 

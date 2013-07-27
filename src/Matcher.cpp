@@ -95,7 +95,7 @@ AddItem(ITEM_TYPE type, ULONG id)
 //				coll->UseSeq(seq);
 //				coll->AddInstrSet(matchingInstrSet);
 //				coll->AddSampColl(matchingSampColl);
-//				coll->Load();
+//				coll->Load(); // needs error check
 //			}
 //		}
 //		else
@@ -104,7 +104,7 @@ AddItem(ITEM_TYPE type, ULONG id)
 //			coll->SetName(seq->GetName());
 //			coll->UseSeq(seq);
 //			coll->AddInstrSet(matchingInstrSet);
-//			coll->Load();
+//			coll->Load(); // needs error check
 //		}
 //	}
 //
@@ -138,7 +138,7 @@ AddItem(ITEM_TYPE type, ULONG id)
 //				coll->UseSeq(matchingSeq);
 //				coll->AddInstrSet(instrset);
 //				coll->AddSampColl(matchingSampColl);
-//				coll->Load();
+//				coll->Load(); // needs error check
 //			}
 //		}
 ////		if (bUsingSampColl)
@@ -148,7 +148,7 @@ AddItem(ITEM_TYPE type, ULONG id)
 //		coll->SetName(matchingSeq->GetName());
 //		coll->UseSeq(matchingSeq);
 //		coll->AddInstrSet(instrset);
-//		coll->Load();
+//		coll->Load(); // needs error check
 //	}
 //	return true;
 //}
@@ -178,7 +178,7 @@ AddItem(ITEM_TYPE type, ULONG id)
 //			coll->UseSeq(matchingSeq);
 //			coll->AddInstrSet(matchingInstrSet);
 //			coll->AddSampColl(sampcoll);
-//			coll->Load();
+//			coll->Load(); // needs error check
 //		}
 //		return true;
 //	}
@@ -275,7 +275,7 @@ void FilegroupMatcher::LookForMatch()
 	//	coll->UseSeq(seq);
 	//	coll->AddInstrSet(instrset);
 	//	coll->AddSampColl(sampcoll);
-	//	coll->Load();
+	//	coll->Load(); // needs error check
 
 	//}
 	if (seqs.size() >= 1 && instrsets.size() == 1 && sampcolls.size() == 1)
@@ -290,7 +290,10 @@ void FilegroupMatcher::LookForMatch()
 			coll->UseSeq(seq);
 			coll->AddInstrSet(instrset);
 			coll->AddSampColl(sampcoll);
-			coll->Load();
+			if (!coll->Load())
+			{
+				delete coll;
+			}
 		}
 		seqs.clear();
 		instrsets.clear();

@@ -112,7 +112,11 @@ protected:
 					coll->UseSeq(seq);
 					coll->AddInstrSet(matchingInstrSet);
 					coll->AddSampColl(matchingSampColl);
-					coll->Load();
+					if (!coll->Load())
+					{
+						delete coll;
+						return false;
+					}
 				}
 			}
 			else
@@ -123,7 +127,11 @@ protected:
 				coll->SetName(seq->GetName());
 				coll->UseSeq(seq);
 				coll->AddInstrSet(matchingInstrSet);
-				coll->Load();
+				if (!coll->Load())
+				{
+					delete coll;
+					return false;
+				}
 			}
 		}
 
@@ -192,7 +200,11 @@ protected:
 				coll->SetName(matchingSeq->GetName());
 				coll->UseSeq(matchingSeq);
 				coll->AddInstrSet(instrset);
-				coll->Load();
+				if (!coll->Load())
+				{
+					delete coll;
+					return false;
+				}
 			}
 		//}
 		}
@@ -248,7 +260,11 @@ protected:
 					coll->UseSeq(matchingSeq);
 					coll->AddInstrSet(matchingInstrSet);
 					coll->AddSampColl(sampcoll);
-					coll->Load();
+					if (!coll->Load())
+					{
+						delete coll;
+						return false;
+					}
 				}
 			}
 			return true;

@@ -21,7 +21,11 @@ int AkaoFormat::OnMatch(vector<VGMFile*>& files)
 	coll->UseSeq(seq);
 	coll->AddInstrSet(instrset);
 	coll->AddSampColl(sampcoll);
-	coll->Load();
+	if (!coll->Load())
+	{
+		delete coll;
+		return false;
+	}
 	return true;
 }*/
 

@@ -155,7 +155,10 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 			coll->AddMiscFile(sampInfoTable);
 			if (articTable)
 				coll->AddMiscFile(articTable);
-			coll->Load();
+			if (!coll->Load())
+			{
+				delete coll;
+			}
 		}
 		else
 		{

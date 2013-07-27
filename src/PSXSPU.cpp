@@ -156,7 +156,11 @@ PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format
 
 			//VabSampColl* newSampColl = new VabSampColl(file, i);
 			PSXSampColl* newSampColl = new PSXSampColl(format, file, i);
-			newSampColl->LoadVGMFile();
+			if (!newSampColl->LoadVGMFile())
+			{
+				delete newSampColl;
+				return NULL;
+			}
 			return newSampColl;
 			//i += newSampColl->unLength-1;
 		}
