@@ -139,15 +139,19 @@ template <class T> void PSXConvADSR(T* realADSR,
 									U8 Sm, U8 Sd, U8 Sr, U8 Rm, U8 Rr, bool bPS2)
 {
 	// Make sure all the ADSR values are within the valid ranges
-	assert((Am & 0xFE) == 0);
-	assert((Ar & 0x80) == 0);
-	assert((Dr & 0xF0) == 0);
-	assert((Sl & 0xF0) == 0);
-	assert((Rm & 0xFE) == 0);
-	assert((Rr & 0xE0) == 0);
-	assert((Sm & 0xFE) == 0);
-	assert((Sd & 0xFE) == 0);
-	assert((Sr & 0x80) == 0);
+	if (((Am & 0xFE) == 0) ||
+		((Ar & 0x80) == 0) ||
+		((Dr & 0xF0) == 0) ||
+		((Sl & 0xF0) == 0) ||
+		((Rm & 0xFE) == 0) ||
+		((Rr & 0xE0) == 0) ||
+		((Sm & 0xFE) == 0) ||
+		((Sd & 0xFE) == 0) ||
+		((Sr & 0x80) == 0))
+	{
+		pRoot->AddLogItem(new LogItem(L"ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
+		return;
+	}
 
 	// PS1 games use 44k, PS2 uses 48k
 	double sampleRate = bPS2 ? 48000 : 44100;
