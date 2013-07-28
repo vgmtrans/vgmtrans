@@ -102,12 +102,23 @@ bool AkaoSeq::GetTrackPointers(void)
 
 
 AkaoTrack::AkaoTrack(AkaoSeq* parentFile, long offset, long length)
-: SeqTrack(parentFile, offset, length), loop_begin_layer(0), loop_layer(0), bNotePlaying(0)
+: SeqTrack(parentFile, offset, length)
 {
-	memset(loopID, 0, 8);
-	memset(loop_counter, 0, 8);
 }
 
+void AkaoTrack::ResetVars(void)
+{
+	SeqTrack::ResetVars();
+
+	memset(loopID, 0, 8);
+	memset(loop_counter, 0, 8);
+
+	loop_begin_layer = 0;
+	loop_layer = 0;
+	bNotePlaying = false;
+
+	vCondJumpAddr.clear();
+}
 
 //--------------------------------------------------
 //Revisions:
@@ -606,6 +617,27 @@ bool AkaoTrack::ReadEvent(void)
 
 		case 0x06 :			//Branch Relative
 			{
+				ULONG dest = (S16)GetShort(curOffset) + curOffset;
+				curOffset += 2;
+				ULONG eventLength = curOffset - beginOffset;
+				bool bContinue = false;
+
+				curOffset = dest;
+
+				// Check the remaining area that will be processed by CPU-controlled jump.
+				for (vector<ULONG>::iterator itAddr = vCondJumpAddr.begin(); itAddr != vCondJumpAddr.end(); ++itAddr)
+				{
+					if (!IsOffsetUsed(*itAddr))
+					{
+						// There is an area not visited yet, VGMTrans must try to go there.
+						bContinue = true;
+						break;
+					}
+				}
+
+				AddGenericEvent(beginOffset, eventLength, L"Dal Segno.(Loop)", NULL, CLR_LOOP);
+				return bContinue;
+
 				/*USHORT siValue = GetShort(pDoc, j);
 				if (nScanMode == MODE_CONVERT_MIDI)		//if we are converting the midi, the actually branch
 				{
@@ -616,17 +648,33 @@ bool AkaoTrack::ReadEvent(void)
 				}
 				else
 					curOffset += 2;								//otherwise, just skip over the relative branch offset*/
-				curOffset += 2;
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno.(Loop)", NULL, CLR_LOOP);
-				return false;
 			}
 			break;
 
 		case 0x07 :			//Permanence Loop break with conditional.
-			curOffset++;
-			curOffset++;
-			curOffset++;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno (Loop) Break", NULL, CLR_LOOP);
+			{
+				BYTE condValue = GetByte(curOffset++);
+				ULONG dest = (S16)GetShort(curOffset) + curOffset;
+				curOffset += 2;
+				ULONG eventLength = curOffset - beginOffset;
+
+				// This event performs conditional jump if certain CPU variable matches to the condValue.
+				// VGMTrans will simply try to parse all events as far as possible, instead.
+				// (Test case: FF9 416 Final Battle)
+				if (!IsOffsetUsed(beginOffset))
+				{
+					// For the first time, VGMTrans just skips the event,
+					// but remembers the destination address for future jump.
+					vCondJumpAddr.push_back(dest);
+				}
+				else
+				{
+					// For the second time, VGMTrans jumps to the destination address.
+					curOffset = dest;
+				}
+
+				AddGenericEvent(beginOffset, eventLength, L"Dal Segno (Loop) Break", NULL, CLR_LOOP);
+			}
 			break;
 
 		case 0x09 :			//Repeat break with conditional.

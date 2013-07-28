@@ -38,6 +38,7 @@ class AkaoTrack
 public:
 	AkaoTrack(AkaoSeq* parentFile, long offset = 0, long length = 0);
 	
+	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
 
 public:
@@ -52,4 +53,5 @@ protected:
 	int loop_layer;
 	int loop_begin_layer;
 	bool bNotePlaying;
+	vector<ULONG> vCondJumpAddr;
 };
