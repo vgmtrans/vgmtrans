@@ -150,8 +150,16 @@ template <class T> void PSXConvADSR(T* realADSR,
 		((Sr & 0x80) != 0))
 	{
 		pRoot->AddLogItem(new LogItem(L"PSX ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
-		return;
 	}
+	Am &= 0x01;
+	Ar &= 0x7F;
+	Dr &= 0x0F;
+	Sl &= 0x0F;
+	Rm &= 0x01;
+	Rr &= 0x1F;
+	Sm &= 0x01;
+	Sd &= 0x01;
+	Sr &= 0x7F;
 
 	// PS1 games use 44k, PS2 uses 48k
 	double sampleRate = bPS2 ? 48000 : 44100;
