@@ -552,7 +552,11 @@ SynthFile* VGMColl::CreateSynthFile()
 							sampInfo->SetLoopInfo(rgn->loop, samp);
 						}
 					}
-					else throw;
+					else
+					{
+						delete synthfile;
+						throw;
+					}
 				}
 				// The normal method: First, we check if the rgn has loop info defined. 
 				// If it doesn't, then use the sample's loop info.
@@ -560,7 +564,11 @@ SynthFile* VGMColl::CreateSynthFile()
 				{
 					if (samp->loop.loopStatus != -1)
 						sampInfo->SetLoopInfo(samp->loop, samp);
-					else throw;
+					else
+					{
+						delete synthfile;
+						throw;
+					}
 				}
 				else
 					sampInfo->SetLoopInfo(rgn->loop, samp);
