@@ -67,7 +67,7 @@ bool AkaoInstr::LoadInstr()
 	if (aRgns.size() != 0)
 		unLength = 	aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
 	else
-		Alert(L"Instrument has no regions.");
+		pRoot->AddLogItem(new LogItem(L"Instrument has no regions.", LOG_LEVEL_WARN, L"AkaoInstr"));
 	return true;
 }
 
@@ -112,7 +112,10 @@ bool AkaoDrumKit::LoadInstr()
 		j+=8;
 	}
 
-	unLength = 	aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
+	if (aRgns.size() != 0)
+		unLength = 	aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
+	else
+		pRoot->AddLogItem(new LogItem(L"Instrument has no regions.", LOG_LEVEL_WARN, L"AkaoInstr"));
 	return true;
 }
 
