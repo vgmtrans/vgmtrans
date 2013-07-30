@@ -550,7 +550,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 			if (rptNestLevel == RARESNES_RPTNESTMAX)
 			{
-				OutputDebugString(L"RareSnesSeq: subroutine nest level overflow\n");
+				pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
 				bContinue = false;
 				break;
 			}
@@ -572,7 +572,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 			if (rptNestLevel == RARESNES_RPTNESTMAX)
 			{
-				OutputDebugString(L"RareSnesSeq: subroutine nest level overflow\n");
+				pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
 				bContinue = false;
 				break;
 			}
@@ -591,7 +591,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 			if (rptNestLevel == 0)
 			{
-				OutputDebugString(L"RareSnesSeq: subroutine nest level overflow\n");
+				pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
 				bContinue = false;
 				break;
 			}

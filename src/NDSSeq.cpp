@@ -172,10 +172,13 @@ bool NDSTrack::ReadEvent(void)
 			ULONG jumpAddr = GetByte(curOffset) + (GetByte(curOffset+1)<<8)
 							+ (GetByte(curOffset+2)<<16) + parentSeq->dwOffset + 0x1C;
 			curOffset += 3;
+
 			// Add an End Track if it exists afterward, for completeness sake
-			// TODO: FIX THIS SO WE DON'T ADD AN ACTUAL MIDI EVENT HERE. LEAVING IT BLANK FOR NOW
-			//if (GetByte(curOffset) == 0xFF)
-			//	AddEndOfTrack(curOffset, 1);
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(curOffset))
+			{
+				if (GetByte(curOffset) == 0xFF)
+					AddEndOfTrack(curOffset, 1);
+			}
 
 			curOffset = jumpAddr;
 			return this->AddLoopForever(beginOffset, 4, L"Loop");

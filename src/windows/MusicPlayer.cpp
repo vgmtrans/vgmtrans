@@ -538,7 +538,7 @@ void MusicPlayer::ReleaseAllKeys()
 		} catch (CDMusicException CDMusicEx)
 		{
 			OutputDebugString(CDMusicEx.GetErrorDescription());
-			pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
+			pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 		}
 	}
 }
@@ -554,7 +554,7 @@ void MusicPlayer::SetWriteLatency(DWORD dwLatency)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
-		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
+		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 	}
 }
 
@@ -569,7 +569,7 @@ void MusicPlayer::SetWritePeriod(DWORD dwPeriod)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
-		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
+		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 	}
 }
 
@@ -592,7 +592,7 @@ void MusicPlayer::SetupReverb(VGMSeq* vgmseq)
 		catch (CDMusicException CDMusicEx)
 		{
 			OutputDebugString(CDMusicEx.GetErrorDescription());
-			pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
+			pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 		}
 		COutPort.SetEffect(SET_REVERB /*| SET_CHORUS*/);	// Activate effects
 	}
@@ -614,7 +614,7 @@ void MusicPlayer::SetVolume(long vol)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
-		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
+		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 	}
 }
 
@@ -747,7 +747,7 @@ DWORD MusicPlayer::ProcessSeqPlayback(PVOID pParam)
 			catch(CDMusicException CDMusicEx)
 			{
 				OutputDebugString(CDMusicEx.GetErrorDescription());
-				pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_ERR, L"MusicPlayer"));
+				pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 			}
 		}
 	}

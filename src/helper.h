@@ -72,3 +72,20 @@ inline void PushBackStringOnVector(vector<BYTE> &theVector, string &str)
 	theVector.insert(theVector.end(), str.data(), str.data()+str.length());
 }
 
+template <class Tstring> inline Tstring FormatString(const Tstring fmt, ...)
+{
+	va_list va;
+	std::vector<Tstring::value_type> output(128);
+	while (true)
+	{
+		va_start(va, fmt);
+		int n = _vsnwprintf(&output[0], output.size(), fmt.c_str(), va);
+		va_end(va);
+
+		if (n != -1 && (size_t)n < output.size())
+			break;
+
+		output.resize(output.size() * 2);
+	}
+	return Tstring(output.begin(), output.end());
+}
