@@ -53,7 +53,8 @@ VGMSeq* VGMColl::GetSeq(void)
 
 void VGMColl::UseSeq(VGMSeq* theSeq)
 {
-	theSeq->AddCollAssoc(this);
+	if (theSeq != NULL)
+		theSeq->AddCollAssoc(this);
 	if (seq && (theSeq != seq))	//if we associated with a previous sequence
 		seq->RemoveCollAssoc(this);
 	seq = theSeq;
@@ -61,20 +62,29 @@ void VGMColl::UseSeq(VGMSeq* theSeq)
 
 void VGMColl::AddInstrSet(VGMInstrSet* theInstrSet)
 {
-	theInstrSet->AddCollAssoc(this);
-	instrsets.push_back(theInstrSet);
+	if (theInstrSet != NULL)
+	{
+		theInstrSet->AddCollAssoc(this);
+		instrsets.push_back(theInstrSet);
+	}
 }
 
 void VGMColl::AddSampColl(VGMSampColl* theSampColl)
 {
-	theSampColl->AddCollAssoc(this);
-	sampcolls.push_back(theSampColl);
+	if (theSampColl != NULL)
+	{
+		theSampColl->AddCollAssoc(this);
+		sampcolls.push_back(theSampColl);
+	}
 }
 
 void VGMColl::AddMiscFile(VGMFile* theMiscFile)
 {
-	theMiscFile->AddCollAssoc(this);
-	miscfiles.push_back(theMiscFile);
+	if (theMiscFile != NULL)
+	{
+		theMiscFile->AddCollAssoc(this);
+		miscfiles.push_back(theMiscFile);
+	}
 }
 
 
@@ -88,6 +98,8 @@ bool VGMColl::Load()
 
 void VGMColl::UnpackSampColl(DLSFile& dls, VGMSampColl* sampColl, vector<VGMSamp*>& finalSamps)
 {
+	assert(sampColl != NULL);
+
 	int nSamples = sampColl->samples.size();
 	for (int i=0; i<nSamples; i++)
 	{
@@ -115,6 +127,8 @@ void VGMColl::UnpackSampColl(DLSFile& dls, VGMSampColl* sampColl, vector<VGMSamp
 
 void VGMColl::UnpackSampColl(SynthFile& synthfile, VGMSampColl* sampColl, vector<VGMSamp*>& finalSamps)
 {
+	assert(sampColl != NULL);
+
 	int nSamples = sampColl->samples.size();
 	for (int i=0; i<nSamples; i++)
 	{
