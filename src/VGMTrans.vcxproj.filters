@@ -597,6 +597,9 @@
     <ClCompile Include="NCSFLoader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
+    <ClCompile Include="SeqNoteManager.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1102,6 +1105,12 @@
     </ClInclude>
     <ClInclude Include="NCSFLoader.h">
       <Filter>Header Files\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="SeqNoteManager.h">
+      <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="SeqNoteParam.h">
+      <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
