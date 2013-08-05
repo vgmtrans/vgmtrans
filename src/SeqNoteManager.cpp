@@ -33,6 +33,35 @@ void SeqNoteManager::Clear()
 	notes.clear();
 }
 
+void SeqNoteManager::SetNoteOffTime(int time, int channel, int key)
+{
+	std::vector<SeqNoteParam>::iterator pNote = notes.begin();
+	while (pNote != notes.end())
+	{
+		if (channel != -1 && pNote->channel != channel)
+		{
+			++pNote;
+			continue;
+		}
+
+		if (key != -1 && pNote->key != key)
+		{
+			++pNote;
+			continue;
+		}
+
+		if (pNote->time <= time)
+		{
+			pNote = notes.erase(pNote);
+		}
+		else
+		{
+			pNote->length = time - pNote->time;
+			++pNote;
+		}
+	}
+}
+
 void SeqNoteManager::RemoveRange(int timeBegin, int timeEnd, int channel, SeqNoteParamCallback callback)
 {
 	sort(notes.begin(), notes.end(), CompareNote);
