@@ -133,11 +133,12 @@ private:
 	S8 spcTranspose;                            // transpose (compatible with actual engine)
 	S8 spcTransposeAbs;                         // transpose (without relative change)
 	S8 spcTuning;                               // tuning (compatible with actual engine)
-	S8 spcVolL, spcVolR;                      // SPC700 left/right volume
+	S8 spcVolL, spcVolR;                        // SPC700 left/right volume
 	USHORT defNoteDur;                          // default duration for note (0:unused)
 	bool useLongDur;                            // indicates duration length
 	BYTE altNoteByte1;                          // note number preset 1
 	BYTE altNoteByte2;                          // note number preset 2
 
+	double GetTuningInSemitones(S8 tuning);
 	void CalcVolPanFromVolLR(S8 volLByte, S8 volRByte, BYTE& midiVol, BYTE& midiPan);
 };

@@ -301,6 +301,11 @@ void RareSnesTrack::ResetVars(void)
 }
 
 
+double RareSnesTrack::GetTuningInSemitones(S8 tuning)
+{
+	return 12 * log((1024 + tuning) / 1024.0) / log(2.0);
+}
+
 void RareSnesTrack::CalcVolPanFromVolLR(S8 volLByte, S8 volRByte, BYTE& midiVol, BYTE& midiPan)
 {
 	double volL = abs(volLByte) / 128.0;
@@ -360,7 +365,7 @@ bool RareSnesTrack::ReadEvent(void)
 		}
 
 		BYTE key = noteByte - 0x81;
-		BYTE spcKey = min(max(key + spcTranspose, 0), 0x7f);
+		BYTE spcKey = min(max(noteByte - 0x80 + 36 + spcTranspose, 0), 0x7f);
 
 		USHORT dur;
 		if (defNoteDur != 0)
@@ -390,7 +395,8 @@ bool RareSnesTrack::ReadEvent(void)
 		}
 		else
 		{
-			spcNotePitch = RareSnesSeq::NOTE_PITCH_TABLE[spcKey]; // TODO: +tuning to the pitch?
+			spcNotePitch = RareSnesSeq::NOTE_PITCH_TABLE[spcKey];
+			spcNotePitch = (spcNotePitch * (1024 + spcTuning) + (spcTuning < 0 ? 1023 : 0)) / 1024;
 
 			//wostringstream ssTrace;
 			//ssTrace << L"Note: " << key << L" " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << L" P=" << spcNotePitch << std::endl;
@@ -740,7 +746,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			S8 newTuning = (signed) GetByte(curOffset++);
 			spcTuning = newTuning;
-			desc << L"Tuning: " << (int)newTuning;
+			desc << L"Tuning: " << (int)newTuning << L" (" << (int)(GetTuningInSemitones(newTuning) * 100 + 0.5) << L" cents)";
 			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tuning", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 			EVENT_WITH_MIDITEXT_END
@@ -1041,7 +1047,7 @@ bool RareSnesTrack::ReadEvent(void)
 			S8 newTransp = (signed) GetByte(curOffset++);
 			S8 newTuning = (signed) GetByte(curOffset++);
 
-			desc << L"Program Number: " << (int)newProg << L"  Transpose: " << (int)newTransp << L"  Tuning: " << (int)newTuning;
+			desc << L"Program Number: " << (int)newProg << L"  Transpose: " << (int)newTransp << L"  Tuning: " << (int)newTuning << L" (" << (int)(GetTuningInSemitones(newTuning) * 100 + 0.5) << L" cents)";;
 
 			// instrument
 			AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true, L"Program Change, Transpose, Tuning");
@@ -1064,7 +1070,7 @@ bool RareSnesTrack::ReadEvent(void)
 			S8 newVolR = (signed) GetByte(curOffset++);
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
 
-			desc << L"Program Number: " << (int)newProg << L"  Transpose: " << (int)newTransp << L"  Tuning: " << (int)newTuning;
+			desc << L"Program Number: " << (int)newProg << L"  Transpose: " << (int)newTransp << L"  Tuning: " << (int)newTuning << L" (" << (int)(GetTuningInSemitones(newTuning) * 100 + 0.5) << L" cents)";;
 			desc << L"  Volume: " << (int)newVolL << L", " << (int)newVolR;
 			desc << L"  ADSR: " << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)newADSR;
 
