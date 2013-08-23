@@ -20,6 +20,7 @@ TriAcePS1Seq::TriAcePS1Seq(RawFile* file, ULONG offset)
 	UseLinearAmplitudeScale();
 	UseReverb();
 	AlwaysWriteInitialPitchBendRange(12, 0);
+	bLoadTrackByTrack = true;
 }
 
 TriAcePS1Seq::~TriAcePS1Seq()
@@ -78,7 +79,7 @@ TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset, long length
 {
 }
 
-bool TriAcePS1Track::LoadTrackMainLoop(ULONG stopOffset, long stopDelta)
+bool TriAcePS1Track::LoadTrackMainLoop(ULONG stopOffset)
 {
 	TriAcePS1Seq* seq = (TriAcePS1Seq*)parentSeq;
 	U32 scorePatternPtrOffset = dwOffset;
@@ -318,7 +319,7 @@ bool TriAcePS1Track::ReadEvent(void)
 	}
 
 	if (event_dur)
-		AddDelta(event_dur);
+		AddTime(event_dur);
 
 	return true;
 }

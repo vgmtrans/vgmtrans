@@ -102,8 +102,9 @@ public:
 	NinSnesTrack(NinSnesSection* parentSect, ULONG offset, int trackNumber);
 	NinSnesTrack(NinSnesSeq* parentSeq, ULONG offset, int trackNumber);
 	bool ReadEvent(ULONG totalTime);
-	void AddDelta(ULONG AddDelta);
-	void SubtractDelta(ULONG SubtractDelta);
+	void AddTime(ULONG AddDelta);
+	void SetTime(ULONG NewDelta);
+	void SubtractTime(ULONG SubtractDelta);
 	void SetPercBase(BYTE newBase);
 	BYTE GetPercBase();
 

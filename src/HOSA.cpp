@@ -334,7 +334,7 @@ bool HOSATrack::ReadEvent(void)
 	//	[ Process of "Setting Delta time" ]
 	//----------------------------------
 	//iDeltaTimeCounter = iDeltaTimeCom;
-	AddDelta(iDeltaTimeCom);
+	AddTime(iDeltaTimeCom);
 
 
 

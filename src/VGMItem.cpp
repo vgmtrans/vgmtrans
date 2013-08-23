@@ -109,6 +109,11 @@ bool VGMItem::IsValidOffset(ULONG offset)
 	return vgmfile->IsValidOffset(offset);
 }
 
+ULONG VGMItem::GetEndOffset()
+{
+	return vgmfile->GetEndOffset();
+}
+
 
 
 //  ****************

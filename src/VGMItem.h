@@ -151,6 +151,7 @@ protected:
 	USHORT GetShortBE(ULONG offset);
 	UINT GetWordBE(ULONG offset);
 	bool IsValidOffset(ULONG offset);
+	ULONG GetEndOffset();
 
 public:
 	BYTE color;

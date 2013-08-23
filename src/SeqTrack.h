@@ -19,17 +19,17 @@ public:
 	virtual Icon GetIcon() { return ICON_TRACK; };
 
 	//virtual void AddToUI(VGMItem* parent, VGMFile* theVGMFile = NULL);
-	virtual bool LoadTrack(int trackNum, ULONG stopOffset = 0xFFFFFFFF, long stopDelta = -1);
 	virtual bool LoadTrackInit(int trackNum);
-	virtual bool LoadTrackMainLoop(ULONG stopOffset, long stopDelta);
+	virtual bool LoadTrackMainLoop(ULONG stopOffset);
 	virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
 	virtual bool ReadEvent(void);
+	virtual void OnTickBegin(){};
+	virtual void OnTickEnd(){};
 
-	ULONG GetDelta(void);
-	void SetDelta(ULONG NewDelta);
-	void AddDelta(ULONG AddDelta);
-	void SubtractDelta(ULONG SubtractDelta);
-	void ResetDelta(void);
+	ULONG GetTime(void);
+	void SetTime(ULONG NewDelta); // in general, derived class should not use this method.
+	void AddTime(ULONG AddDelta);
+	void ResetTime(void);
 
 	ULONG ReadVarLen(ULONG& offset);
 
@@ -150,8 +150,10 @@ public:
 
 	long deltaLength;
 	int foreverLoops;
+	bool active;			//indicates whether a VGMSeq is loading this track
 
-	ULONG deltaTime;
+	long time;				//absolute current time (ticks)
+	long deltaTime;			//delta time, an interval to the next event (ticks)
 	char vel;
 	char key;
 	ULONG dur;

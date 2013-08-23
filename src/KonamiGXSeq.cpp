@@ -71,7 +71,7 @@ KonamiGXTrack::KonamiGXTrack(KonamiGXSeq* parentSeq, long offset, long length)
 bool KonamiGXTrack::ReadEvent(void)
 {
 	ULONG beginOffset = curOffset;
-	ULONG deltatest = GetDelta();
+	ULONG deltatest = GetTime();
 	//AddDelta(ReadVarLen(curOffset));
 
 	BYTE status_byte = GetByte(curOffset++);
@@ -133,7 +133,7 @@ bool KonamiGXTrack::ReadEvent(void)
 		if (newdur == 0)
 			newdur = 1;
 		AddNoteByDur(beginOffset, curOffset-beginOffset, note, vel, newdur);
-		AddDelta(delta);
+		AddTime(delta);
 		if (newdur > delta)
 			ATLTRACE("newdur > delta.  %X > %X.  occurring at %X\n", newdur, delta, beginOffset);
 		//AddDelta(dur);
@@ -168,7 +168,7 @@ bool KonamiGXTrack::ReadEvent(void)
 	case 0xE0:		//Rest
 		{
 			BYTE delta = GetByte(curOffset++);
-			AddDelta(delta);
+			AddTime(delta);
 		}
 		break;
 	case 0xE1:		//Hold
@@ -176,9 +176,9 @@ bool KonamiGXTrack::ReadEvent(void)
 			BYTE delta = GetByte(curOffset++);
 			BYTE dur = GetByte(curOffset++);
 			UINT newdur = (delta*dur)/0x64;
-			AddDelta(newdur);
+			AddTime(newdur);
 			this->MakePrevDurNoteEnd();
-			AddDelta(delta-newdur);
+			AddTime(delta-newdur);
 		}
 		break;
 	case 0xE2:			//program change

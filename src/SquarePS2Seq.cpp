@@ -77,7 +77,7 @@ bool BGMTrack::ReadEvent(void)
 	int value1;
 
 	ULONG beginOffset = curOffset;
-	AddDelta(ReadVarLen(curOffset));
+	AddTime(ReadVarLen(curOffset));
 
 	BYTE status_byte = GetByte(curOffset++);
 

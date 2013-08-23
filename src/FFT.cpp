@@ -124,12 +124,8 @@ void FFTTrack::ResetVars()
 	memset(loop_octave, 0, sizeof(loop_octave));
 	memset(loop_end_octave, 0, sizeof(loop_end_octave));
 	SeqTrack::ResetVars();
-}
 
-bool FFTTrack::LoadTrackMainLoop(ULONG stopOffset, long stopDelta)
-{
 	octave = 3;
-	return SeqTrack::LoadTrackMainLoop(stopOffset, stopDelta);
 }
 
 
@@ -155,7 +151,7 @@ bool FFTTrack::ReadEvent(void)
 		if(bNoteOn)	
 			AddNoteOffNoItem(prevKey);
 		AddNoteOn(beginOffset, curOffset-beginOffset, octave*12 + relative_key, vel);
-		AddDelta(iDeltaTime);
+		AddTime(iDeltaTime);
 
 //		if (delta_time_table[delta_byte] == 0)
 //			AddNoteOn(beginOffset, curOffset-beginOffset+1, octave*12 + relative_key, vel);
@@ -186,7 +182,7 @@ bool FFTTrack::ReadEvent(void)
 		break;
 
 	case 0x81 :			//hold (Tie)
-		AddDelta(GetByte(curOffset++));
+		AddTime(GetByte(curOffset++));
 		AddHold(beginOffset, curOffset-beginOffset, L"Tie");
 		break;
 

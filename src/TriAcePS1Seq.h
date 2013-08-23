@@ -47,7 +47,7 @@ class TriAcePS1Track
 public:
 	TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset = 0, long length = 0);
 
-	virtual bool LoadTrackMainLoop(ULONG stopOffset, long stopDelta);
+	virtual bool LoadTrackMainLoop(ULONG stopOffset);
 	U32 ReadScorePattern(U32 offset);
 	virtual bool IsOffsetUsed(ULONG offset);
 	virtual void AddEvent(SeqEvent* pSeqEvent);

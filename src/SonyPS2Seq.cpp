@@ -76,7 +76,7 @@ bool SonyPS2Seq::ReadEvent(void)
 		deltaTime = 0;
 	else
 		deltaTime = ReadVarLen(curOffset);
-	AddDelta(deltaTime);
+	AddTime(deltaTime);
 	if (curOffset >= rawfile->size())
 		return false;
 

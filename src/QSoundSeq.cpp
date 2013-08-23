@@ -439,7 +439,7 @@ bool QSoundTrack::ReadEvent(void)
 					}
 					else
 					{
-						AddDelta(absDur);
+						AddTime(absDur);
 						delta -= absDur;
 						AddNoteOff(beginOffset, curOffset-beginOffset, 0, L"Note Off (tied)");
 					}
@@ -451,7 +451,7 @@ bool QSoundTrack::ReadEvent(void)
 		}
 		else			//it's a rest
 			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Rest"), NULL, CLR_REST);
-		AddDelta(delta);
+		AddTime(delta);
 	}
 	else
 	{

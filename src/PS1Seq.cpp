@@ -55,7 +55,7 @@ bool PS1Seq::ReadEvent(void)
 	ULONG delta = ReadVarLen(curOffset);
 	if (curOffset >= rawfile->size())
 		return false;
-	AddDelta(delta);
+	AddTime(delta);
 
 	BYTE status_byte = GetByte(curOffset++);
 

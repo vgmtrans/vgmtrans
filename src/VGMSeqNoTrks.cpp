@@ -25,7 +25,7 @@ void VGMSeqNoTrks::ResetVars()
 //LoadMain() - loads all sequence data into the class
 bool VGMSeqNoTrks::LoadMain()
 {
-	this->SeqTrack::readMode = this->VGMSeq::readMode;
+	this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_ADD_TO_UI;
 	if (!GetHeaderInfo())
 		return false;
 
@@ -62,8 +62,12 @@ bool VGMSeqNoTrks::LoadEvents(void)
 
 	bInLoop = false;
 	curOffset = eventsOffset();	//start at beginning of track
-	while (curOffset < rawfile->size() && ReadEvent())
+	while (curOffset < rawfile->size())
 	{
+		if (!ReadEvent())
+		{
+			break;
+		}
 	}
 	if (VGMSeq::unLength == 0)
 		VGMSeq::unLength = curOffset - VGMSeq::dwOffset;
@@ -134,16 +138,14 @@ void VGMSeqNoTrks::SetCurTrack(ULONG trackNum)
 }
 
 
-void VGMSeqNoTrks::AddDelta(ULONG delta)
+void VGMSeqNoTrks::AddTime(ULONG delta)
 {
-	if (VGMSeq::readMode != READMODE_CONVERT_TO_MIDI)
+	time += delta;
+	if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI)
 	{
-		deltaTime += delta;
-		return;
+		for (UINT i=0; i<midiTracks.size(); i++)
+			midiTracks[i]->AddDelta(delta);
 	}
-
-	for (UINT i=0; i<midiTracks.size(); i++)
-		midiTracks[i]->AddDelta(delta);
 }
 
 

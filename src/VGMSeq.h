@@ -30,12 +30,10 @@ public:
 	
 	virtual bool Load();				//Function to load all the information about the sequence
 	virtual bool LoadMain();
-	virtual bool PostLoad();
 	virtual bool GetHeaderInfo(void);
 	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
 	virtual void ResetVars(void);
 	virtual MidiFile* ConvertToMidi();
-//	virtual int LoadTracks(void);
 	//virtual int ApplyTable(void);	//create and apply table handler object for sequence
 	void SetPPQN(WORD ppqn);
 	WORD GetPPQN(void);
@@ -53,6 +51,14 @@ public:
 
 	bool OnSaveAsMidi(void);
 	virtual bool SaveAsMidi(const wchar_t* filepath);
+
+	virtual bool HasActiveTracks();
+	virtual void InactiveAllTracks();
+	virtual int GetForeverLoops();
+
+protected:
+	virtual bool LoadTracks(ReadMode readMode, long stopTime = 1000000);
+	virtual bool PostLoad();
 
 public:
 	ULONG nNumTracks;
@@ -72,6 +78,7 @@ public:
 	bool bAlwaysWriteInitialExpression;
 	bool bAlwaysWriteInitialPitchBendRange;
 	bool bAllowDiscontinuousTrackData;
+	bool bLoadTrackByTrack;
 	U8 initialVol;
 	U8 initialExpression;
 	U8 initialPitchBendRangeSemiTones, initialPitchBendRangeCents;

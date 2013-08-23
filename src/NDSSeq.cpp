@@ -145,7 +145,7 @@ bool NDSTrack::ReadEvent(void)
 		AddNoteByDur(beginOffset, curOffset-beginOffset, status_byte, vel, dur);
 		if(noteWithDelta)
 		{
-			AddDelta(dur);
+			AddTime(dur);
 		}
 	}
 	else switch (status_byte)

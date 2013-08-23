@@ -43,7 +43,6 @@ class FFTTrack
 public:
 	FFTTrack(FFTSeq* parentFile, long offset = 0, long length = 0);
 	virtual void ResetVars();
-	virtual bool LoadTrackMainLoop(ULONG stopOffset, long stopDelta);
 	virtual bool ReadEvent(void);
 
 public:

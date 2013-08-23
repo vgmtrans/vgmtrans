@@ -127,7 +127,7 @@ bool SquSnesTrack::ReadEvent(void)
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Rest");
 		}
 
-		AddDelta(dur);
+		AddTime(dur);
 	}
 	else								//command
 	{

@@ -163,11 +163,11 @@ bool AkaoTrack::ReadEvent(void)
 			AddNoteOn(beginOffset, curOffset-beginOffset, base_key + relative_key, vel);
 			bNotePlaying = true;
 
-			AddDelta(delta_time_table[k]);
+			AddTime(delta_time_table[k]);
 		}
 		else if (status_byte < 0x8F)  //if it's between 0x83 and 0x8E it is a tie event
 		{
-			AddDelta(delta_time_table[k]);
+			AddTime(delta_time_table[k]);
 			if (loop_counter[loop_layer] == 0 && loop_layer == 0)		//do this so we don't repeat this for every single time it loops
 				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie", NULL, CLR_TIE);
 		}
@@ -192,7 +192,7 @@ bool AkaoTrack::ReadEvent(void)
 		}
 		bNotePlaying = true;
 		AddNoteOn(beginOffset, curOffset-beginOffset+1, base_key + relative_key, vel);
-		AddDelta(GetByte(curOffset++));
+		AddTime(GetByte(curOffset++));
 	}
 	else switch (status_byte)
 	{
@@ -556,7 +556,7 @@ bool AkaoTrack::ReadEvent(void)
 		 //if (nVersion == VERSION_1 || nVersion == VERSION_2)
 		//	 goto MetaEvent;
 		 //rest_time += pDoc->GetByte(j++);
-		AddDelta(GetByte(curOffset++));
+		AddTime(GetByte(curOffset++));
 		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie (custom)", NULL, CLR_TIE);
 		break;
 
@@ -634,6 +634,9 @@ bool AkaoTrack::ReadEvent(void)
 						break;
 					}
 				}
+
+				if (readMode == READMODE_FIND_DELTA_LENGTH)
+					deltaLength = GetTime();
 
 				AddGenericEvent(beginOffset, eventLength, L"Dal Segno.(Loop)", NULL, CLR_LOOP);
 				return bContinue;

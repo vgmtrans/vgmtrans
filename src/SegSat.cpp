@@ -64,7 +64,7 @@ bool SegSatSeq::ReadEvent(void)
 		key = GetByte(curOffset++);
 		vel = GetByte(curOffset++);
 		dur = GetByte(curOffset++);
-		AddDelta(GetByte(curOffset++));
+		AddTime(GetByte(curOffset++));
 		AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
 	}
 	else

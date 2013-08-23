@@ -125,6 +125,14 @@ public:
 			return data.IsValidOffset(offset);
 	}
 
+	inline ULONG GetEndOffset()
+	{
+		if (bUsingRawFile)
+			return rawfile->GetSize();
+		else
+			return data.endOff;
+	}
+
 protected:
 	DataSeg data, col;
 	FileType file_type;

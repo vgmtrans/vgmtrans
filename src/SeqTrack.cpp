@@ -5,6 +5,7 @@
 #include "MidiFile.h"
 #include "ScaleConversion.h"
 #include "Options.h"
+#include "Root.h"
 
 #include <iostream>
 #include <iomanip>
@@ -39,10 +40,12 @@ SeqTrack::~SeqTrack()
 
 void SeqTrack::ResetVars()
 {
+	active = true;
 	bInLoop = false;
 	foreverLoops = 0;
 	deltaLength = -1;
-	deltaTime = 0;	
+	time = 0;
+	deltaTime = 0;
 	vol = 100;
 	expression = 127;
 	prevPan = 64;
@@ -66,21 +69,14 @@ bool SeqTrack::ReadEvent(void)
 	return false;		//by default, don't add any events, just stop immediately.
 }
 
-bool SeqTrack::LoadTrack( int trackNum, ULONG stopOffset /*= 0xFFFFFFFF*/, long stopDelta /*= -1*/ )
-{
-	if (!LoadTrackInit(trackNum))
-		return false;
-	if (!LoadTrackMainLoop(stopOffset, stopDelta))
-		return false;
-	return true;
-}
-
 bool SeqTrack::LoadTrackInit(int trackNum)
 {
 	ResetVars();
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack = parentSeq->midi->AddTrack();
 	SetChannelAndGroupFromTrkNum(trackNum);
+
+	curOffset = dwStartOffset;	//start at beginning of track
 
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
@@ -105,23 +101,37 @@ bool SeqTrack::LoadTrackInit(int trackNum)
 	return true;
 }
 
-bool SeqTrack::LoadTrackMainLoop(ULONG stopOffset, long stopDelta)
+bool SeqTrack::LoadTrackMainLoop(ULONG stopOffset)
 {
-	bInLoop = false;
-	curOffset = dwStartOffset;	//start at beginning of track
-	if (stopDelta == -1)
-		stopDelta = 0x7FFFFFFF;
-	while ((curOffset < stopOffset) && GetDelta() < (ULONG)stopDelta &&  ReadEvent())
-		;
-	if (unLength == 0)			//if unLength has not been changed from default value of 0
-	{
-		//unLength = curOffset-dwOffset;
-		//SeqEvent* lastTrkEvent = *((vector<SeqEvent*>::const_iterator)max_element(aEvents.begin(), aEvents.end()));
-		SeqEvent* lastTrkEvent = aEvents.back();
-		unLength = lastTrkEvent->dwOffset + lastTrkEvent->unLength - dwOffset;
-	}
-		
+	if (!active)
+		return true;
 
+	OnTickBegin();
+
+	if (deltaTime > 0)
+		deltaTime--;
+
+	while (deltaTime == 0)
+	{
+		if (curOffset >= stopOffset)
+		{
+			if (readMode == READMODE_FIND_DELTA_LENGTH)
+				deltaLength = GetTime();
+
+			active = false;
+			break;
+		}
+
+		if (!ReadEvent())
+		{
+			active = false;
+			break;
+		}
+	}
+
+	OnTickEnd();
+
+	SetTime(GetTime() + 1);
 	return true;
 }
 
@@ -139,35 +149,35 @@ void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum)
 		pMidiTrack->SetChannelGroup(channelGroup);
 }
 
-ULONG SeqTrack::GetDelta()
+ULONG SeqTrack::GetTime()
 {
-	return deltaTime;
-	//return pMidiTrack->GetDelta();
+	return time;
 }
 
-void SeqTrack::SetDelta(ULONG NewDelta)
+void SeqTrack::SetTime(ULONG NewDelta)
 {
-	deltaTime = NewDelta;
+	time = NewDelta;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->SetDelta(NewDelta);
 }
 
-void SeqTrack::AddDelta(ULONG AddDelta)
+void SeqTrack::AddTime(ULONG AddDelta)
 {
-	deltaTime += AddDelta;
-	if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->AddDelta(AddDelta);
+	if (!parentSeq->bLoadTrackByTrack)
+	{
+		deltaTime += AddDelta;
+	}
+	else
+	{
+		time += AddDelta;
+		if (readMode == READMODE_CONVERT_TO_MIDI)
+			pMidiTrack->AddDelta(AddDelta);
+	}
 }
 
-void SeqTrack::SubtractDelta(ULONG SubtractDelta)
+void SeqTrack::ResetTime(void)
 {
-	deltaTime -= SubtractDelta;
-	if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->SubtractDelta(SubtractDelta);
-}
-
-void SeqTrack::ResetDelta(void)
-{
+	time = 0;
 	deltaTime = 0;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->ResetDelta();
@@ -211,7 +221,7 @@ void SeqTrack::AddControllerSlide(ULONG offset, ULONG length, ULONG dur, BYTE& p
 				newVal = 0;
 			if (newVal > 0x7F)
 				newVal = 0x7F;
-			(pMidiTrack->*insertFunc)(channel, newVal, GetDelta()+i);
+			(pMidiTrack->*insertFunc)(channel, newVal, GetTime()+i);
 		}
 	}
 	prevVal = targVal;
@@ -332,7 +342,7 @@ void SeqTrack::AddRest(ULONG offset, ULONG length, UINT restTime,  const wchar_t
 	
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new RestSeqEvent(this, restTime, offset, length, sEventName));
-	AddDelta(restTime);
+	AddTime(restTime);
 }
 
 void SeqTrack::AddHold(ULONG offset, ULONG length, const wchar_t* sEventName)
@@ -549,7 +559,7 @@ void SeqTrack::InsertNoteByDur(ULONG offset, ULONG length, char key, char vel, U
 void SeqTrack::MakePrevDurNoteEnd()
 {
 	if (readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->prevDurNoteOff)
-		pMidiTrack->prevDurNoteOff->AbsTime = GetDelta();
+		pMidiTrack->prevDurNoteOff->AbsTime = GetTime();
 }
 
 void SeqTrack::AddVol(ULONG offset, ULONG length, BYTE newVol, const wchar_t* sEventName)
@@ -969,7 +979,7 @@ void SeqTrack::AddTempoBPMSlide(ULONG offset, ULONG length, ULONG dur, double ta
 			if (parentSeq->aTracks.size() > 0)
 				pTempoMidiTrack = parentSeq->aTracks[0]->pMidiTrack;
 			newTempo=parentSeq->tempoBPM+(tempoInc*(i+1));
-			pTempoMidiTrack->InsertTempoBPM(newTempo, GetDelta()+i);
+			pTempoMidiTrack->InsertTempoBPM(newTempo, GetTime()+i);
 		}
 	}
 	parentSeq->tempoBPM = targBPM;
@@ -1003,7 +1013,7 @@ bool SeqTrack::AddEndOfTrack(ULONG offset, ULONG length, const wchar_t* sEventNa
 bool SeqTrack::AddEndOfTrackNoItem()
 {
 	if (readMode == READMODE_FIND_DELTA_LENGTH)
-		deltaLength = GetDelta();
+		deltaLength = GetTime();
 	return false;
 }
 
@@ -1012,7 +1022,7 @@ void SeqTrack::AddGlobalTranspose(ULONG offset, ULONG length, char semitones, co
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new TransposeSeqEvent(this, semitones, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		parentSeq->midi->globalTrack.InsertGlobalTranspose(GetDelta(), semitones);
+		parentSeq->midi->globalTrack.InsertGlobalTranspose(GetTime(), semitones);
 	//pMidiTrack->(channel, transpose);
 }
 
@@ -1028,6 +1038,7 @@ void SeqTrack::AddMarker(ULONG offset, ULONG length, string& markername, BYTE da
 // when in FIND_DELTA_LENGTH mode, returns false when we've hit the max number of loops defined in options
 bool SeqTrack::AddLoopForever(ULONG offset, ULONG length, const wchar_t* sEventName)
 {
+	this->foreverLoops++;
 	if (readMode == READMODE_ADD_TO_UI)
 	{
 		if (!IsOffsetUsed(offset))
@@ -1036,8 +1047,8 @@ bool SeqTrack::AddLoopForever(ULONG offset, ULONG length, const wchar_t* sEventN
 	}
 	else if (readMode == READMODE_FIND_DELTA_LENGTH)
 	{
-		deltaLength = GetDelta();
-		return (this->foreverLoops++ < ConversionOptions::GetNumSequenceLoops());
+		deltaLength = GetTime();
+		return (this->foreverLoops < ConversionOptions::GetNumSequenceLoops());
 	}
 	return true;
 

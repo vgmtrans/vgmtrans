@@ -219,7 +219,7 @@ int NinSnesSection::LoadSection(int startTime)
 				theTrack->SetChannelAndGroupFromTrkNum(theTrack->trackNum);
 			}
 		}
-		theTrack->SetDelta(((NinSnesSeq*)vgmfile)->curDelta);
+		theTrack->SetTime(((NinSnesSeq*)vgmfile)->curDelta);
 
 		// Get Index of first event for Section Track
 		((NinSnesTrack*)aSectTracks[j])->beginEventIndex =
@@ -270,7 +270,7 @@ int NinSnesSection::LoadSection(int startTime)
 			theSongTrk->aEvents.size()-1;
 	}
 
-	return aSongTracks[i]->GetDelta();	//return the current delta of the last track written to
+	return aSongTracks[i]->GetTime();	//return the current delta of the last track written to
 }
 
 
@@ -291,14 +291,23 @@ NinSnesTrack::NinSnesTrack(NinSnesSeq* parentSeq, ULONG offset, int trackNumber)
 }
 
 
-void NinSnesTrack::AddDelta(ULONG AddDelta)
+void NinSnesTrack::AddTime(ULONG AddDelta)
 {
 	nextEventTime += AddDelta;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->AddDelta(AddDelta);
 }
 
-void NinSnesTrack::SubtractDelta(ULONG SubtractDelta)
+// TODO: SetTime - remove it, it will make things complicated.
+void NinSnesTrack::SetTime(ULONG NewDelta)
+{
+	time = NewDelta;
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+		pMidiTrack->SetDelta(NewDelta);
+}
+
+// TODO: SubtractTime - remove it, it will make things complicated.
+void NinSnesTrack::SubtractTime(ULONG SubtractDelta)
 {
 	nextEventTime -= SubtractDelta;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -389,9 +398,9 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 
 			if (event_type == EVENT_TIE)		//Tie
 			{
-				AddDelta(dur);
+				AddTime(dur);
 				MakePrevDurNoteEnd();
-				SubtractDelta(dur);
+				SubtractTime(dur);
 				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie", NULL, CLR_TIE);
 				//AddEventItem("Tie", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_STEEL);
 				
@@ -421,7 +430,7 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 				AddPercNoteByDur(beginOffset, curOffset-beginOffset, mnote/*-transpose-parentSeq->globTranspose*/, vel, dur);
 				//AddNoteByDur(beginOffset, curOffset-beginOffset, mnote-transpose-parentSeq->globTranspose, vel, dur, 9, "Percussion Note", "Percussion Note");
 			}
-			AddDelta(dur);
+			AddTime(dur);
 		}
 		else
 		{
