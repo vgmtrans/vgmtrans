@@ -16,7 +16,30 @@ Vab::~Vab(void)
 
 bool Vab::GetHeaderInfo()
 {
+	UINT nEndOffset = GetEndOffset();
+	UINT nMaxLength = nEndOffset - dwOffset;
+
+	if (nMaxLength < 0x20)
+	{
+		return false;
+	}
+
 	name = L"VAB";
+
+	VGMHeader* vabHdr = AddHeader(dwOffset, 0x20, L"VAB Header");
+	vabHdr->AddSimpleItem(dwOffset + 0x00, 4, L"ID");
+	vabHdr->AddSimpleItem(dwOffset + 0x04, 4, L"Version");
+	vabHdr->AddSimpleItem(dwOffset + 0x08, 4, L"VAB ID");
+	vabHdr->AddSimpleItem(dwOffset + 0x0c, 4, L"Total Size");
+	vabHdr->AddSimpleItem(dwOffset + 0x10, 2, L"Reserved");
+	vabHdr->AddSimpleItem(dwOffset + 0x12, 2, L"Number of Programs");
+	vabHdr->AddSimpleItem(dwOffset + 0x14, 2, L"Number of Tones");
+	vabHdr->AddSimpleItem(dwOffset + 0x16, 2, L"Number of VAGs");
+	vabHdr->AddSimpleItem(dwOffset + 0x18, 1, L"Master Volume");
+	vabHdr->AddSimpleItem(dwOffset + 0x19, 1, L"Master Pan");
+	vabHdr->AddSimpleItem(dwOffset + 0x1a, 1, L"Bank Attributes 1");
+	vabHdr->AddSimpleItem(dwOffset + 0x1b, 1, L"Bank Attributes 2");
+	vabHdr->AddSimpleItem(dwOffset + 0x1c, 4, L"Reserved");
 
 	GetBytes(dwOffset, 0x20, &hdr);
 
@@ -36,35 +59,74 @@ bool Vab::GetHeaderInfo()
 
 bool Vab::GetInstrPointers()
 {
-	ULONG j = 0x20 + dwOffset;
+	UINT nEndOffset = GetEndOffset();
+	UINT nMaxLength = nEndOffset - dwOffset;
 
-	VGMHeader* instrptrHdr = AddHeader(j, 128, L"Instrument Pointers");
+	ULONG offProgs = dwOffset + 0x20;
+	ULONG offToneAttrs = offProgs + (16 * 128);
 
-	for (int i = 0; i < 128; i++)
+	USHORT numPrograms = GetShort(dwOffset + 0x12);
+	USHORT numVAGs = GetShort(dwOffset + 0x16);
+
+	ULONG offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
+
+	VGMHeader* progsHdr = AddHeader(offProgs, 16 * 128, L"Program Table");
+	VGMHeader* toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, L"Tone Attributes Table");
+
+	if (numPrograms > 128)
 	{
-		BYTE numTones = GetByte(j);
-		if (numTones != 0 && numTones <= 32)
-		{
-			VabInstr* newInstr = new VabInstr(this, dwOffset+0x20+128*0x10 + aInstrs.size()*0x20*16 , 0x20*16, 0, i);
-			aInstrs.push_back(newInstr);
-			GetBytes(j, 0x10, &newInstr->attr);
-
-			VGMHeader* hdr = instrptrHdr->AddHeader(j, 10, L"Pointer");
-			hdr->AddSimpleItem(j, 1, L"Number of Tones");
-			hdr->AddSimpleItem(j+1, 1, L"Master Volume");
-			hdr->AddSimpleItem(j+2, 1, L"Mode");
-			hdr->AddSimpleItem(j+3, 1, L"Master Pan");
-			hdr->AddSimpleItem(j+4, 1, L"Reserved");
-			hdr->AddSimpleItem(j+5, 2, L"Attribute");
-			hdr->AddSimpleItem(j+7, 2, L"Reserved");
-			hdr->AddSimpleItem(j+9, 2, L"Reserved");
-
-			newInstr->masterVol = GetByte(j+1);
-		}
-		j += 0x10;
+		return false;
 	}
 
-	instrptrHdr->unLength = j - instrptrHdr->dwOffset;
+	for (ULONG i = 0; i < numPrograms; i++)
+	{
+		ULONG offCurrProg = offProgs + (i * 16);
+		ULONG offCurrToneAttrs = offToneAttrs + (i * 32 * 16);
+
+		if (nEndOffset < offCurrToneAttrs + (32 * 16))
+		{
+			break;
+		}
+
+		BYTE numTones = GetByte(offCurrProg);
+		if (numTones != 0 && numTones <= 32)
+		{
+			VabInstr* newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, i);
+			aInstrs.push_back(newInstr);
+			GetBytes(offCurrProg, 0x10, &newInstr->attr);
+
+			VGMHeader* hdr = progsHdr->AddHeader(offCurrProg, 0x10, L"Program");
+			hdr->AddSimpleItem(offCurrProg + 0x00, 1, L"Number of Tones");
+			hdr->AddSimpleItem(offCurrProg + 0x01, 1, L"Volume");
+			hdr->AddSimpleItem(offCurrProg + 0x02, 1, L"Priority");
+			hdr->AddSimpleItem(offCurrProg + 0x03, 1, L"Mode");
+			hdr->AddSimpleItem(offCurrProg + 0x04, 1, L"Pan");
+			hdr->AddSimpleItem(offCurrProg + 0x05, 1, L"Reserved");
+			hdr->AddSimpleItem(offCurrProg + 0x06, 2, L"Attribute");
+			hdr->AddSimpleItem(offCurrProg + 0x08, 4, L"Reserved");
+			hdr->AddSimpleItem(offCurrProg + 0x0c, 4, L"Reserved");
+
+			newInstr->masterVol = GetByte(offCurrProg + 0x01);
+
+			toneAttrsHdr->unLength = offCurrToneAttrs + (32 * 16) - offToneAttrs;
+		}
+	}
+
+	if ((offVAGOffsets + 2 * 256) <= nEndOffset)
+	{
+		wchar_t name[256];
+		VGMHeader* vagOffsetHdr = AddHeader(offVAGOffsets, 2 * 256, L"VAG Pointer Table");
+		for (ULONG i = 0; i < 256; i++)
+		{
+			if (i > numVAGs)
+			{
+				break;
+			}
+			wsprintf(name,  L"VAG Size /8 #%u", i);
+			vagOffsetHdr->AddSimpleItem(offVAGOffsets + i * 2, 2, name);
+		}
+		unLength = (offVAGOffsets + 2 * 256) - dwOffset;
+	}
 
 	return true;
 }
@@ -78,8 +140,8 @@ bool Vab::GetInstrPointers()
 // VabInstr
 // ********
 
-VabInstr::VabInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum)
- : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum),
+VabInstr::VabInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, const wstring& name)
+ : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, name),
 	masterVol(127)
 {
 }
