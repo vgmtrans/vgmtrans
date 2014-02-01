@@ -202,7 +202,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 	//embedded sampcolls
 	vector<VGMSampColl*> finalSampColls;	
 
-	if (!instrsets.size() /*|| !sampcolls.size()*/ || !seq)
+	if (!instrsets.size() /*|| !sampcolls.size()*/)
 		return false;
 
 	// if there are independent SampColl(s) in the collection
@@ -434,7 +434,7 @@ SynthFile* VGMColl::CreateSynthFile()
 	//embedded sampcolls
 	vector<VGMSampColl*> finalSampColls;	
 
-	if (!instrsets.size() /*|| !sampcolls.size()*/ || !seq)
+	if (!instrsets.size() /*|| !sampcolls.size()*/)
 	{
 		delete synthfile;
 		return NULL;

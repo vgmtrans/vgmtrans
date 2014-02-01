@@ -278,16 +278,33 @@ void FilegroupMatcher::LookForMatch()
 	//	coll->Load(); // needs error check
 
 	//}
-	if (seqs.size() >= 1 && instrsets.size() == 1 && sampcolls.size() == 1)
+	if (instrsets.size() == 1 && sampcolls.size() == 1)
 	{
-		for (list<VGMSeq*>::iterator iter = seqs.begin(); iter != seqs.end(); iter++)
+		if (seqs.size() >= 1)
 		{
-			VGMSeq* seq = *iter;
+			for (list<VGMSeq*>::iterator iter = seqs.begin(); iter != seqs.end(); iter++)
+			{
+				VGMSeq* seq = *iter;
+				VGMInstrSet* instrset = instrsets.front();
+				VGMSampColl* sampcoll = sampcolls.front();
+				VGMColl* coll = fmt->NewCollection();
+				coll->SetName(seq->GetName());
+				coll->UseSeq(seq);
+				coll->AddInstrSet(instrset);
+				coll->AddSampColl(sampcoll);
+				if (!coll->Load())
+				{
+					delete coll;
+				}
+			}
+		}
+		else
+		{
 			VGMInstrSet* instrset = instrsets.front();
 			VGMSampColl* sampcoll = sampcolls.front();
 			VGMColl* coll = fmt->NewCollection();
-			coll->SetName(seq->GetName());
-			coll->UseSeq(seq);
+			coll->SetName(instrset->GetName());
+			coll->UseSeq(NULL);
 			coll->AddInstrSet(instrset);
 			coll->AddSampColl(sampcoll);
 			if (!coll->Load())

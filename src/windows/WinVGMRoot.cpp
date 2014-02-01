@@ -58,6 +58,11 @@ void WinVGMRoot::Play(void)
 		return;
 	if (selectedColl)
 	{
+		VGMSeq * seq = selectedColl->GetSeq();
+		if (seq == NULL)
+		{
+			return;
+		}
 		if (loadedColl != selectedColl)
 		{
 			DLSFile dls;
@@ -69,7 +74,7 @@ void WinVGMRoot::Play(void)
 			musicplayer.ChangeDLS(&dls);
 			loadedColl = selectedColl;
 		}
-		musicplayer.Play((VGMItem*)selectedColl->GetSeq(), 0);
+		musicplayer.Play((VGMItem*)seq, 0);
 	}
 	else	
 		musicplayer.Play(selectedItem, 0);
