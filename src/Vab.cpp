@@ -77,6 +77,10 @@ bool Vab::GetInstrPointers()
 	{
 		return false;
 	}
+	if (numVAGs > 255)
+	{
+		return false;
+	}
 
 	for (ULONG i = 0; i < numPrograms; i++)
 	{
@@ -115,17 +119,63 @@ bool Vab::GetInstrPointers()
 	if ((offVAGOffsets + 2 * 256) <= nEndOffset)
 	{
 		wchar_t name[256];
+		std::vector<SizeOffsetPair> vagLocations;
+		ULONG totalVAGSize = 0;
 		VGMHeader* vagOffsetHdr = AddHeader(offVAGOffsets, 2 * 256, L"VAG Pointer Table");
-		for (ULONG i = 0; i < 256; i++)
+
+		ULONG vagStartOffset = GetShort(offVAGOffsets) * 8;
+		vagOffsetHdr->AddSimpleItem(offVAGOffsets, 2, L"VAG Size /8 #0");
+		totalVAGSize = vagStartOffset;
+
+		for (ULONG i = 0; i < numVAGs; i++)
 		{
-			if (i > numVAGs)
+			ULONG vagOffset;
+			ULONG vagSize;
+
+			if (i == 0)
 			{
-				break;
+				vagOffset = vagStartOffset;
+				vagSize = GetShort(offVAGOffsets + (i + 1) * 2) * 8;
 			}
-			wsprintf(name,  L"VAG Size /8 #%u", i);
-			vagOffsetHdr->AddSimpleItem(offVAGOffsets + i * 2, 2, name);
+			else
+			{
+				vagOffset = vagStartOffset + vagLocations[i - 1].offset + vagLocations[i - 1].size;
+				vagSize = GetShort(offVAGOffsets + (i + 1) * 2) * 8;
+			}
+
+			wsprintf(name,  L"VAG Size /8 #%u", i + 1);
+			vagOffsetHdr->AddSimpleItem(offVAGOffsets + (i + 1) * 2, 2, name);
+
+			if (vagOffset + vagSize <= nEndOffset)
+			{
+				vagLocations.push_back(SizeOffsetPair(vagOffset, vagSize));
+				totalVAGSize += vagSize;
+			}
+			else
+			{
+				wchar_t log[512];
+				wsprintf(log,  L"VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i + 1, vagOffset, vagSize);
+				pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
+			}
 		}
 		unLength = (offVAGOffsets + 2 * 256) - dwOffset;
+
+		// single VAB file?
+		ULONG offVAGs = offVAGOffsets + 2 * 256;
+		if (GetStartOffset() == 0 && vagLocations.size() != 0)
+		{
+			// load samples as well
+			PSXSampColl* newSampColl = new PSXSampColl(format, this, offVAGs, totalVAGSize, vagLocations);
+			if (newSampColl->LoadVGMFile())
+			{
+				pRoot->AddVGMFile(newSampColl);
+				//this->sampColl = newSampColl;
+			}
+			else
+			{
+				delete newSampColl;
+			}
+		}
 	}
 
 	return true;

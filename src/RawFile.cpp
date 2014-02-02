@@ -195,7 +195,7 @@ void RawFile::RemoveContainedVGMFile(VGMFile* vgmfile)
 	if (iter != containedVGMFiles.end())
 		containedVGMFiles.erase(iter);
 	else
-		Alert(L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles.");
+		OutputDebugString(L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles.");
 	if (containedVGMFiles.size() == 0)
 		pRoot->CloseRawFile(this);
 }

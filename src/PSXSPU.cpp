@@ -6,7 +6,7 @@
 #include "PSXSPU.h"
 #include "DLSFile.h"
 #include "RawFile.h"
-
+#include "PS1Format.h"
 
 
 
@@ -26,62 +26,99 @@ PSXSampColl::PSXSampColl(const string& format, VGMInstrSet* instrset, U32 offset
 {
 }
 
+PSXSampColl::PSXSampColl(const string& format, VGMInstrSet* instrset, U32 offset, U32 length, const std::vector<SizeOffsetPair>& vagLocations)
+: VGMSampColl(format, instrset->rawfile, instrset, offset, length), vagLocations(vagLocations)
+{
+}
+
 bool PSXSampColl::GetSampleInfo()
 {
-	//We scan through the sample section, and determine the offsets and size of each sample
-	//We do this by searchiing for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
-	//and they will never be found at any other point within the adpcm sample data.
-
-	UINT nFileLength = dwOffset+unLength;// = rawfile->size();
-	if (unLength == 0)
-		nFileLength = rawfile->size();  
-
-	ULONG i = dwOffset;
-	while (i < nFileLength-32)
+	if (vagLocations.size() == 0)
 	{
-		if (GetWord(i) == 0 && GetWord(i+4) == 0 && GetWord(i+8) == 0 && GetWord(i+12) == 0  )
-		{
-			ULONG extraGunkLength = 0;
-			BYTE filterRangeByte = GetByte(i+16);
-			BYTE keyFlagByte = GetByte(i+16+1);
-			if ((keyFlagByte & 0xF8) != 0)
-				break;
-			
-			//if (filterRangeByte == 0 && keyFlagByte == 0)	// Breaking on FFXII 309 - Eruyt Village at 61D50 of the WD
-			if (GetWord(i+16) == 0 && GetWord(i+20) == 0 && GetWord(i+24) == 0 && GetWord(i+28) == 0  )
-				break;
+		//We scan through the sample section, and determine the offsets and size of each sample
+		//We do this by searchiing for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
+		//and they will never be found at any other point within the adpcm sample data.
 
-			ULONG beginOffset = i;
-			i += 16;
-			
-			//skip through until we reach the chunk with the end flag set
-			for  ( ; (i < nFileLength) && ((GetByte(i+1) & 1) != 1); i += 16)
-				;
-			
-			if (i+16 < nFileLength)
+		UINT nEndOffset = dwOffset + unLength;
+		if (unLength == 0)
+			nEndOffset = GetEndOffset();  
+
+		ULONG i = dwOffset;
+		while (i < nEndOffset-32)
+		{
+			if (GetWord(i) == 0 && GetWord(i+4) == 0 && GetWord(i+8) == 0 && GetWord(i+12) == 0  )
 			{
+				ULONG extraGunkLength = 0;
+				BYTE filterRangeByte = GetByte(i+16);
+				BYTE keyFlagByte = GetByte(i+16+1);
+				if ((keyFlagByte & 0xF8) != 0)
+					break;
+				
+				//if (filterRangeByte == 0 && keyFlagByte == 0)	// Breaking on FFXII 309 - Eruyt Village at 61D50 of the WD
+				if (GetWord(i+16) == 0 && GetWord(i+20) == 0 && GetWord(i+24) == 0 && GetWord(i+28) == 0  )
+					break;
+
+				ULONG beginOffset = i;
 				i += 16;
-				BYTE theByte = GetByte(i+1); 
+				
+				//skip through until we reach the chunk with the end flag set
+				for  ( ; (i + 16 <= nEndOffset) && ((GetByte(i+1) & 1) != 1); i += 16)
+					;
+
 				//deal with exceptional cases where we see 00 07 77 77 77 77 77 etc.
-				while (((theByte & 1) == 1) &&  (i < nFileLength))
+				while (i + 16 <= nEndOffset)
 				{
+					BYTE theByte = GetByte(i+1);
+					if ((theByte & 1) == 0)
+					{
+						break;
+					}
 					extraGunkLength += 16;
 					i += 16;
-					theByte = GetByte(i+1);
 				}
+				//for (BYTE theByte = GetByte(i+1); ((theByte & 1) == 1) && (i < nEndOffset); i += 16)						
+				//	theByte = GetByte(i+1);
+
+				wostringstream name;
+				name << L"Sample " << samples.size();
+				PSXSamp* samp = new PSXSamp(this, beginOffset, i-beginOffset, beginOffset, i-beginOffset-extraGunkLength, 1, 16, 44100, name.str());
+				samples.push_back(samp);
 			}
-			//for (BYTE theByte = GetByte(i+1); ((theByte & 1) == 1) && (i < nFileLength); i += 16)						
-			//	theByte = GetByte(i+1);
+			else
+				break;
+		}
+		unLength = i - dwOffset;
+	}
+	else
+	{
+		ULONG sampleIndex = 0;
+		for (std::vector<SizeOffsetPair>::iterator it = vagLocations.begin(); it != vagLocations.end(); ++it)
+		{
+			ULONG offSampStart = dwOffset + it->offset;
+			ULONG offDataEnd = offSampStart + it->size;
+			ULONG offSampEnd = offSampStart;
+
+			// detect loop end and ignore garbages like 00 07 77 77 77 77 77 etc.
+			bool lastBlock;
+			do
+			{
+				if (offSampEnd + 16 > offDataEnd)
+				{
+					offSampEnd = offDataEnd;
+					break;
+				}
+
+				lastBlock = ((GetByte(offSampEnd + 1) & 1) != 0);
+				offSampEnd += 16;
+			} while (!lastBlock);
 
 			wostringstream name;
-			name << L"Sample " << samples.size();
-			PSXSamp* samp = new PSXSamp(this, beginOffset, i-beginOffset, beginOffset, i-beginOffset-extraGunkLength, 1, 16, 44100, name.str());
+			name << L"Sample " << sampleIndex;
+			PSXSamp* samp = new PSXSamp(this, dwOffset + it->offset, it->size, dwOffset + it->offset, offSampEnd - offSampStart, 1, 16, 44100, name.str());
 			samples.push_back(samp);
+			sampleIndex++;
 		}
-		else
-			break;
 	}
-	unLength = i - dwOffset;
 	return true;
 }
 
@@ -155,7 +192,7 @@ PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format
 				continue;
 
 			//VabSampColl* newSampColl = new VabSampColl(file, i);
-			PSXSampColl* newSampColl = new PSXSampColl(format, file, i);
+			PSXSampColl* newSampColl = new PSXSampColl(PS1Format::name, file, i);
 			if (!newSampColl->LoadVGMFile())
 			{
 				delete newSampColl;
@@ -215,31 +252,51 @@ void PSXSamp::ConvertToStdWave(BYTE* buf)
 {
 	SHORT* uncompBuf = (SHORT*)buf;
 	VAGBlk theBlock;
-	f32 prev1;
-	f32 prev2;
+	f32 prev1 = 0;
+	f32 prev2 = 0;
 
 	if (this->bSetLoopOnConversion)
 		SetLoopStatus(0); //loopStatus is initiated to -1.  We should default it now to not loop
 
+	bool addrOutOfVirtFile = false;
 	for (UINT k=0; k<dataLength; k+=0x10)				//for every adpcm chunk
 	{
+		if (dwOffset + k + 16 > GetEndOffset())
+		{
+			wchar_t log[512];
+			wsprintf(log,  L"\"%s\" unexpected EOF.", name.c_str());
+			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"PSXSamp"));
+			break;
+		}
+		else if (!addrOutOfVirtFile && k + 16 > unLength)
+		{
+			wchar_t log[512];
+			wsprintf(log,  L"\"%s\" unexpected end of PSXSamp.", name.c_str());
+			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"PSXSamp"));
+			addrOutOfVirtFile = true;
+		}
+
 		theBlock.range =		GetByte(dwOffset+k) & 0xF;
 		theBlock.filter =		(GetByte(dwOffset+k) & 0xF0) >> 4;
 		theBlock.flag.end =		GetByte(dwOffset+k+1) & 1; 
 		theBlock.flag.looping =	 (GetByte(dwOffset+k+1) & 2) > 0;
 		
 		theBlock.flag.loop =	(GetByte(dwOffset+k+1) & 4) > 0; //this can be the loop point, but in wd, this info is stored in the instrset
-		if (theBlock.flag.loop)
+		if (this->bSetLoopOnConversion)
 		{
-			if (this->bSetLoopOnConversion)
+			if (theBlock.flag.loop)
 			{
 				this->SetLoopOffset( k );
 				this->SetLoopLength( dataLength - k );
 			}
+			if (theBlock.flag.end && theBlock.flag.looping)
+			{
+				SetLoopStatus(1);
+			}
 		}
 		
-		if (this->bSetLoopOnConversion)
-			SetLoopStatus( GetLoopStatus() | theBlock.flag.looping );
+		//if (this->bSetLoopOnConversion)
+		//	SetLoopStatus( GetLoopStatus() | theBlock.flag.looping );
 		GetRawFile()->GetBytes(dwOffset+k+2, 14, theBlock.brr);
 
 		DecompVAGBlk(uncompBuf+((k*28)/16), &theBlock, &prev1, &prev2);	//each decompressed pcm block is 52 bytes   EDIT: (wait, isn't it 56 bytes? or is it 28?)

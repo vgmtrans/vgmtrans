@@ -95,6 +95,7 @@ extern bool g_bXPOrLater;
 #include <hash_map>
 #include <string>
 #include <sstream>
+#include <iterator>
 #include <wchar.h> 
 #include <ctype.h>
 

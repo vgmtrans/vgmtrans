@@ -125,6 +125,14 @@ public:
 			return data.IsValidOffset(offset);
 	}
 
+	inline ULONG GetStartOffset()
+	{
+		if (bUsingRawFile)
+			return 0;
+		else
+			return data.startOff;
+	}
+
 	inline ULONG GetEndOffset()
 	{
 		if (bUsingRawFile)

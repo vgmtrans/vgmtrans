@@ -99,4 +99,22 @@ inline int CountBytesOfVal(BYTE* buf, UINT numBytes, BYTE val)
 	// return (BYTE)(x + 0.5);
  //}
 
+struct SizeOffsetPair
+{
+	ULONG size;
+	ULONG offset;
+
+	SizeOffsetPair() :
+		size(0),
+		offset(0)
+	{
+	}
+
+	SizeOffsetPair(ULONG offset, ULONG size) :
+		size(size),
+		offset(offset)
+	{
+	}
+};
+
 #endif // !defined(COMMON_H)

@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "PS1Seq.h"
+#include "PS1Format.h"
 
 DECLARE_FORMAT(PS1)
 

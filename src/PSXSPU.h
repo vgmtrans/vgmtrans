@@ -363,9 +363,13 @@ class PSXSampColl
 public:
 	PSXSampColl(const string& format, RawFile* rawfile, U32 offset, U32 length = 0);
 	PSXSampColl(const string& format, VGMInstrSet* instrset, U32 offset, U32 length = 0);
+	PSXSampColl(const string& format, VGMInstrSet* instrset, U32 offset, U32 length, const std::vector<SizeOffsetPair>& vagLocations);
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 	static PSXSampColl* SearchForPSXADPCM (RawFile* file, const string& format);
+
+protected:
+	std::vector<SizeOffsetPair> vagLocations;
 };
 
 

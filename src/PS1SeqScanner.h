@@ -1,5 +1,7 @@
 #pragma once
 #include "scanner.h"
+#include "PS1Seq.h"
+#include "Vab.h"
 
 class PS1SeqScanner :
 	public VGMScanner
@@ -9,6 +11,6 @@ public:
 	virtual ~PS1SeqScanner(void);
 
 	virtual void Scan(RawFile* file, void* info = 0);
-	void SearchForPS1Seq (RawFile* file);
-	void SearchForVab (RawFile* file);
+	std::vector<PS1Seq*> SearchForPS1Seq (RawFile* file);
+	std::vector<Vab*> SearchForVab (RawFile* file);
 };
