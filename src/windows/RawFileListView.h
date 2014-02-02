@@ -54,6 +54,7 @@ public:
 		MSG_WM_SIZE(OnSize)
 		MSG_WM_KEYDOWN(OnKeyDown)
 		MSG_WM_CONTEXTMENU(OnContextMenu)
+		COMMAND_ID_HANDLER_EX(ID_SAVERAWFILE, OnSaveAsRaw)
 		COMMAND_ID_HANDLER_EX(IDC_CLOSEFILE, OnCloseFile)
 		//NOTIFY_CODE_HANDLER(TVN_SELCHANGED, OnTvnSelchanged) 
 		//COMMAND_RANGE_HANDLER(IDC_FIRST_FILE_CLOSE_BUTTON, IDC_LAST_FILE_CLOSE_BUTTON, OnCloseButton)
@@ -79,6 +80,7 @@ public:
 	LRESULT OnTvnSelchanged(int idCtrl, LPNMHDR pnmh, BOOL& bHandled);
 	LRESULT OnNMRClick(int idCtrl, LPNMHDR pnmh, BOOL& bHandled);
 	LRESULT OnContextMenu(HWND hwndCtrl, CPoint ptClick );
+	void OnSaveAsRaw(UINT uCode, int nID, HWND hwndCtrl);
 	void OnCloseFile(UINT uCode, int nID, HWND hwndCtrl);
 
 	void Init();

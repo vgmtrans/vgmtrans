@@ -135,6 +135,7 @@ IDR_RAWFILE MENU
 BEGIN
     POPUP ""
     BEGIN
+        MENUITEM "Save as original format",     ID_SAVERAWFILE
         MENUITEM "Close File",                  IDC_CLOSEFILE
     END
 END

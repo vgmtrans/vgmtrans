@@ -113,6 +113,8 @@ public:
 	void AddContainedVGMFile(VGMFile* vgmfile);
 	void RemoveContainedVGMFile(VGMFile* vgmfile);
 
+	bool OnSaveAsRaw();
+
 public:
 	DataSeg buf;
 	ULONG bufSize;

@@ -431,6 +431,20 @@ void RawFile::UpdateBuffer(ULONG index)
 	}
 }
 
+bool RawFile::OnSaveAsRaw()
+{
+	wstring filepath = pRoot->UI_GetSaveFilePath(filename.c_str());
+	if (filepath.length() != 0)
+	{
+		bool result;
+		BYTE* buf = new BYTE[fileSize];		//create a buffer the size of the file
+		GetBytes(0, fileSize, buf);
+		result = pRoot->UI_WriteBufferToFile(filepath.c_str(), buf, fileSize);
+		delete[] buf;
+		return result;
+	}
+	return false;
+}
 
 
 

@@ -305,9 +305,28 @@ LRESULT CRawFileListView::OnContextMenu(HWND hwndCtrl, CPoint ptClick )
 	return 0;
 }
 
+void CRawFileListView::OnSaveAsRaw(UINT uCode, int nID, HWND hwndCtrl)
+{
+	std::vector<RawFile*> files;
+	for (int i = GetNextItem(-1, LVNI_SELECTED); i != -1; i = GetNextItem(i, LVNI_SELECTED) )
+	{
+		LVITEM item;
+		item.iItem = i;
+		item.iSubItem = 0;
+		item.mask = LVIF_PARAM;
+		GetItem(&item);
+		files.push_back((RawFile*)item.lParam);
+	}
+
+	for (std::vector<RawFile*>::iterator it = files.begin(); it != files.end(); ++it)
+	{
+		(*it)->OnSaveAsRaw();
+	}
+}
+
 void CRawFileListView::OnCloseFile(UINT uCode, int nID, HWND hwndCtrl)
 {
-	for (int i = GetNextItem(-1, LVNI_SELECTED); i != -1; i = GetNextItem(-1, LVNI_SELECTED) )
+	for (int i = GetNextItem(-1, LVNI_SELECTED); i != -1; i = GetNextItem(i, LVNI_SELECTED) )
 	{
 		LVITEM item;
 		item.iItem = i;
