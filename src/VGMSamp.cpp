@@ -90,7 +90,7 @@ bool VGMSamp::SaveAsWav(const wchar_t* filepath)
 	bool hasLoop = (this->loop.loopStatus != -1 && this->loop.loopStatus != 0);
 
 	PushTypeOnVectBE<UINT>(waveBuf, 0x52494646);			//"RIFF"
-	PushTypeOnVect<UINT>(waveBuf, 0x24 + bufSize + (hasLoop ? 0x50 : 0));	//size
+	PushTypeOnVect<UINT>(waveBuf, 0x24 + ((bufSize + 1) & ~1) + (hasLoop ? 0x50 : 0));	//size
 
 	//WriteLIST(waveBuf, 0x43564157, bufSize+24);			//write "WAVE" list
 	PushTypeOnVectBE<UINT>(waveBuf, 0x57415645);			//"WAVE"
