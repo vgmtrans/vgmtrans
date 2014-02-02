@@ -82,10 +82,11 @@ bool Vab::GetInstrPointers()
 		return false;
 	}
 
-	for (ULONG i = 0; i < numPrograms; i++)
+	// Scan all 128 entries regardless of header info.
+	for (ULONG i = 0; i < 128; i++)
 	{
 		ULONG offCurrProg = offProgs + (i * 16);
-		ULONG offCurrToneAttrs = offToneAttrs + (i * 32 * 16);
+		ULONG offCurrToneAttrs = offToneAttrs + (aInstrs.size() * 32 * 16);
 
 		if (nEndOffset < offCurrToneAttrs + (32 * 16))
 		{
@@ -93,7 +94,13 @@ bool Vab::GetInstrPointers()
 		}
 
 		BYTE numTones = GetByte(offCurrProg);
-		if (numTones != 0 && numTones <= 32)
+		if (numTones > 32)
+		{
+			wchar_t log[512];
+			wsprintf(log,  L"Too many tones (%u) in Program #%u.", numTones, i);
+			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
+		}
+		else if (numTones != 0)
 		{
 			VabInstr* newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, i);
 			aInstrs.push_back(newInstr);

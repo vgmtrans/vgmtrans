@@ -70,10 +70,13 @@ bool PSXSampColl::GetSampleInfo()
 				}
 
 				//deal with exceptional cases where we see 00 07 77 77 77 77 77 etc.
-				loopEnd = (i + 16 <= nEndOffset) && ((GetByte(i + 1) & 1) != 0);
-				while (i + 16 <= nEndOffset && loopEnd)
+				while (i + 16 <= nEndOffset)
 				{
 					loopEnd = ((GetByte(i + 1) & 1) != 0);
+					if (!loopEnd)
+					{
+						break;
+					}
 					extraGunkLength += 16;
 					i += 16;
 				}
