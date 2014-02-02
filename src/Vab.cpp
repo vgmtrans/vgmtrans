@@ -272,9 +272,9 @@ bool VabRgn::LoadRgn()
 	if (keyLow > keyHigh)
 		return false;
 
-	signed char ft = (signed char)GetByte(dwOffset+5);
-	
-	double cents = (double)ft;//((double)ft/(double)127) * 100.0;
+	//signed char ft = (signed char)GetByte(dwOffset+5);
+	//
+	//double cents = (double)ft;//((double)ft/(double)127) * 100.0;
 	
 	//ineTune
 	//short ft = art->fineTune;
@@ -285,6 +285,13 @@ bool VabRgn::LoadRgn()
 	//		if (art->fineTune < 0)
 	//			cents -= 1200;
 	//		rgn->fineTune = cents;
+
+	// gocha: AFAIK, the valid range of pitch is 0-127. It must not be negative.
+	// If it exceeds 127, driver clips the value and it will become 127. (In Hokuto no Ken, at least)
+	// I am not sure if the interpretation of this value depends on a driver or VAB version.
+	// The following code takes the byte as signed, since it could be a typical extended implementation.
+	signed char ft = (signed char) GetByte(dwOffset + 5);
+	double cents = ft * 100.0 / 128.0;
 	SetFineTune((short)cents);
 
 	PSXConvADSR<VabRgn>(this, ADSR1, ADSR2, false);
