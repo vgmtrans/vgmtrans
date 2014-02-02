@@ -36,7 +36,7 @@ bool PSXSampColl::GetSampleInfo()
 	if (vagLocations.size() == 0)
 	{
 		//We scan through the sample section, and determine the offsets and size of each sample
-		//We do this by searchiing for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
+		//We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
 		//and they will never be found at any other point within the adpcm sample data.
 
 		UINT nEndOffset = dwOffset + unLength;
@@ -44,7 +44,7 @@ bool PSXSampColl::GetSampleInfo()
 			nEndOffset = GetEndOffset();  
 
 		ULONG i = dwOffset;
-		while (i < nEndOffset-32)
+		while (i + 32 <= nEndOffset)
 		{
 			if (GetWord(i) == 0 && GetWord(i+4) == 0 && GetWord(i+8) == 0 && GetWord(i+12) == 0  )
 			{
@@ -62,22 +62,21 @@ bool PSXSampColl::GetSampleInfo()
 				i += 16;
 				
 				//skip through until we reach the chunk with the end flag set
-				for  ( ; (i + 16 <= nEndOffset) && ((GetByte(i+1) & 1) != 1); i += 16)
-					;
+				bool loopEnd = false;
+				while (i + 16 <= nEndOffset && !loopEnd)
+				{
+					loopEnd = ((GetByte(i + 1) & 1) != 0);
+					i += 16;
+				}
 
 				//deal with exceptional cases where we see 00 07 77 77 77 77 77 etc.
-				while (i + 16 <= nEndOffset)
+				loopEnd = (i + 16 <= nEndOffset) && ((GetByte(i + 1) & 1) != 0);
+				while (i + 16 <= nEndOffset && loopEnd)
 				{
-					BYTE theByte = GetByte(i+1);
-					if ((theByte & 1) == 0)
-					{
-						break;
-					}
+					loopEnd = ((GetByte(i + 1) & 1) != 0);
 					extraGunkLength += 16;
 					i += 16;
 				}
-				//for (BYTE theByte = GetByte(i+1); ((theByte & 1) == 1) && (i < nEndOffset); i += 16)						
-				//	theByte = GetByte(i+1);
 
 				wostringstream name;
 				name << L"Sample " << samples.size();

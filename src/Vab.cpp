@@ -162,7 +162,7 @@ bool Vab::GetInstrPointers()
 
 		// single VAB file?
 		ULONG offVAGs = offVAGOffsets + 2 * 256;
-		if (GetStartOffset() == 0 && vagLocations.size() != 0)
+		if (dwOffset == 0 && vagLocations.size() != 0)
 		{
 			// load samples as well
 			PSXSampColl* newSampColl = new PSXSampColl(format, this, offVAGs, totalVAGSize, vagLocations);
