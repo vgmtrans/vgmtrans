@@ -285,7 +285,7 @@ bool VabRgn::LoadRgn()
 	//		if (art->fineTune < 0)
 	//			cents -= 1200;
 	//		rgn->fineTune = cents;
-	fineTune = (short)cents;
+	SetFineTune((short)cents);
 
 	PSXConvADSR<VabRgn>(this, ADSR1, ADSR2, false);
 	return true;
