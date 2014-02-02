@@ -325,9 +325,14 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 					rgn->velLow, rgn->velHigh);
 				newRgn->SetWaveLinkInfo(0, 0, 1, realSampNum);
 
-				//if (realSampNum >= finalSamps.size())
-				//	realSampNum = finalSamps.size()-1;
-				assert(realSampNum < finalSamps.size());
+				if (realSampNum >= finalSamps.size())
+				{
+					wchar_t log[256];
+					wsprintf(log, L"Sample %u does not exist.", realSampNum);
+					pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
+					realSampNum = finalSamps.size() - 1;
+				}
+
 				VGMSamp* samp = finalSamps[realSampNum];//sampColl->samples[rgn->sampNum];
 				DLSWsmp* newWsmp = newRgn->AddWsmp();
 
@@ -543,9 +548,14 @@ SynthFile* VGMColl::CreateSynthFile()
 					rgn->velLow, rgn->velHigh);
 				newRgn->SetWaveLinkInfo(0, 0, 1, realSampNum);
 
-				//if (realSampNum >= finalSamps.size())
-				//	realSampNum = finalSamps.size()-1;
-				assert(realSampNum < finalSamps.size());
+				if (realSampNum >= finalSamps.size())
+				{
+					wchar_t log[256];
+					wsprintf(log, L"Sample %u does not exist.", realSampNum);
+					pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
+					realSampNum = finalSamps.size() - 1;
+				}
+
 				VGMSamp* samp = finalSamps[realSampNum];//sampColl->samples[rgn->sampNum];
 				SynthSampInfo* sampInfo = newRgn->AddSampInfo();
 
