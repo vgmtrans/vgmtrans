@@ -83,6 +83,8 @@ bool Vab::GetInstrPointers()
 	}
 
 	// Scan all 128 entries regardless of header info.
+	// There could be null instruments that has no tones.
+	// See Clock Tower PSF for example of null instrument.
 	for (ULONG i = 0; i < 128; i++)
 	{
 		ULONG offCurrProg = offProgs + (i * 16);
