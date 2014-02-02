@@ -90,7 +90,7 @@ bool Vab::GetInstrPointers()
 		ULONG offCurrProg = offProgs + (i * 16);
 		ULONG offCurrToneAttrs = offToneAttrs + (aInstrs.size() * 32 * 16);
 
-		if (offCurrToneAttrs + (32 * 16) <= nEndOffset)
+		if (offCurrToneAttrs + (32 * 16) > nEndOffset)
 		{
 			break;
 		}
