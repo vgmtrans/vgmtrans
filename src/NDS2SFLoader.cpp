@@ -3,7 +3,6 @@
 #include "NDS2SFLoader.h"
 #include "Root.h"
 #include <zlib.h>
-#include ".\loaders\sexypsf\driver.h"
 
 #define NDS2SF_VERSION	0x24
 #define NDS2SF_MAX_ROM_SIZE	0x10000000

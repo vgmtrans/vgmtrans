@@ -3,7 +3,6 @@
 #include "SNSFLoader.h"
 #include "Root.h"
 #include <zlib.h>
-#include ".\loaders\sexypsf\driver.h"
 
 #define SNSF_VERSION	0x23
 #define SNSF_MAX_ROM_SIZE	0x600000

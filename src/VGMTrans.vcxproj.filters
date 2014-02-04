@@ -17,12 +17,6 @@
     <Filter Include="Source Files\loaders">
       <UniqueIdentifier>{1b674e82-abf9-481f-80e8-f69aa45a2030}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\loaders\SexyPSF">
-      <UniqueIdentifier>{2c20e07e-0689-4462-bec4-b0fee5065e73}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\loaders\SexyPSF\spu">
-      <UniqueIdentifier>{55442e77-9063-4718-8460-e087fe1529db}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\formats">
       <UniqueIdentifier>{2d2a5716-43c4-4bea-b563-30321360f468}</UniqueIdentifier>
     </Filter>
@@ -150,12 +144,6 @@
     <Filter Include="Header Files\loaders">
       <UniqueIdentifier>{60f1ce40-2852-4478-877a-07e372dbcffe}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\loaders\SexyPSF">
-      <UniqueIdentifier>{c7461027-1703-4623-856b-5647462fdde1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\loaders\SexyPSF\spu">
-      <UniqueIdentifier>{4906cbec-ecf9-4c12-88d4-d4460f9848e8}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\tinyxml">
       <UniqueIdentifier>{d27aab88-a075-4c62-9cc1-3ef682c48849}</UniqueIdentifier>
     </Filter>
@@ -269,51 +257,6 @@
     </ClCompile>
     <ClCompile Include="SPCLoader.cpp">
       <Filter>Source Files\loaders</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\Misc.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\PsxBios.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\PsxCounters.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\PsxDma.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\PsxHLE.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\PsxHw.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\PsxInterpreter.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\PsxMem.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\R3000A.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\Spu.cpp">
-      <Filter>Source Files\loaders\SexyPSF</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\spu\adsr.cpp">
-      <Filter>Source Files\loaders\SexyPSF\spu</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\spu\dma.cpp">
-      <Filter>Source Files\loaders\SexyPSF\spu</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\spu\registers.cpp">
-      <Filter>Source Files\loaders\SexyPSF\spu</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\spu\reverb.cpp">
-      <Filter>Source Files\loaders\SexyPSF\spu</Filter>
-    </ClCompile>
-    <ClCompile Include="loaders\sexypsf\spu\spu.cpp">
-      <Filter>Source Files\loaders\SexyPSF\spu</Filter>
     </ClCompile>
     <ClCompile Include="PSXSPU.cpp">
       <Filter>Source Files\formats</Filter>
@@ -938,63 +881,6 @@
     <ClInclude Include="SPCLoader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
-    <ClInclude Include="loaders\sexypsf\driver.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\Misc.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\PsxBios.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\PsxCommon.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\PsxCounters.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\PsxDma.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\PsxHLE.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\PsxHw.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\PsxMem.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\R3000A.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\Spu.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\types.h">
-      <Filter>Header Files\loaders\SexyPSF</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\spu\adsr.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\spu\dma.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\spu\externals.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\spu\gauss_i.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\spu\registers.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\spu\regs.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\spu\spu.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
-    </ClInclude>
     <ClInclude Include="tinyxml\tinystr.h">
       <Filter>Header Files\tinyxml</Filter>
     </ClInclude>
@@ -1087,9 +973,6 @@
     </ClInclude>
     <ClInclude Include="windows\directmidi\MyCoCreateInstance.h">
       <Filter>Header Files\windows\DirectMidi</Filter>
-    </ClInclude>
-    <ClInclude Include="loaders\sexypsf\spu\reverb.h">
-      <Filter>Header Files\loaders\SexyPSF\spu</Filter>
     </ClInclude>
     <ClInclude Include="PSFFile.h">
       <Filter>Header Files\main</Filter>

@@ -3,7 +3,6 @@
 #include "NCSFLoader.h"
 #include "Root.h"
 #include <zlib.h>
-#include ".\loaders\sexypsf\driver.h"
 
 #define NCSF_VERSION	0x25
 #define NCSF_MAX_ROM_SIZE	0x10000000

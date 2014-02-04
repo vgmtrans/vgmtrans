@@ -117,4 +117,6 @@ struct SizeOffsetPair
 	}
 };
 
+wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
+
 #endif // !defined(COMMON_H)

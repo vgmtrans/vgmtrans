@@ -3,7 +3,6 @@
 #include "PSF1Loader.h"
 #include "Root.h"
 #include <zlib.h>
-#include ".\loaders\sexypsf\driver.h"
 
 wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
 
