@@ -13,7 +13,6 @@
 #define _RICHEDIT_VER	0x0100
 
 #define _ATL_APARTMENT_THREADED
-#define _ATL_NO_MSIMG
 #define _ATL_NO_OPENGL
 
 #define WIDEN2(x) L ## x

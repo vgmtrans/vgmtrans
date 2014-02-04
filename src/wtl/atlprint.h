@@ -1,9 +1,9 @@
-// Windows Template Library - WTL version 8.0
-// Copyright (C) Microsoft Corporation. All rights reserved.
+// Windows Template Library - WTL version 9.0
+// Copyright (C) Microsoft Corporation, WTL Team. All rights reserved.
 //
 // This file is a part of the Windows Template Library.
 // The use and distribution terms for this software are covered by the
-// Common Public License 1.0 (http://opensource.org/osi3.0/licenses/cpl1.0.php)
+// Common Public License 1.0 (http://opensource.org/licenses/cpl1.0.php)
 // which can be found in the file CPL.TXT at the root of this distribution.
 // By using this software in any fashion, you are agreeing to be bound by
 // the terms of this license. You must not remove this notice, or
@@ -13,10 +13,6 @@
 #define __ATLPRINT_H__
 
 #pragma once
-
-#ifndef __cplusplus
-	#error ATL requires C++ compilation (use a .cpp suffix)
-#endif
 
 #ifdef _WIN32_WCE
 	#error atlprint.h is not supported on Windows CE
@@ -200,8 +196,7 @@ public:
 	{
 		ClosePrinter();
 		const int cchBuff = 512;
-		TCHAR buffer[cchBuff];
-		buffer[0] = 0;
+		TCHAR buffer[cchBuff] = { 0 };
 		::GetProfileString(_T("windows"), _T("device"), _T(",,,"), buffer, cchBuff);
 		int nLen = lstrlen(buffer);
 		if (nLen != 0)

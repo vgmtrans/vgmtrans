@@ -1,9 +1,9 @@
-// Windows Template Library - WTL version 8.0
-// Copyright (C) Microsoft Corporation. All rights reserved.
+// Windows Template Library - WTL version 9.0
+// Copyright (C) Microsoft Corporation, WTL Team. All rights reserved.
 //
 // This file is a part of the Windows Template Library.
 // The use and distribution terms for this software are covered by the
-// Common Public License 1.0 (http://opensource.org/osi3.0/licenses/cpl1.0.php)
+// Common Public License 1.0 (http://opensource.org/licenses/cpl1.0.php)
 // which can be found in the file CPL.TXT at the root of this distribution.
 // By using this software in any fashion, you are agreeing to be bound by
 // the terms of this license. You must not remove this notice, or
@@ -13,10 +13,6 @@
 #define __ATLCTRLW_H__
 
 #pragma once
-
-#ifndef __cplusplus
-	#error ATL requires C++ compilation (use a .cpp suffix)
-#endif
 
 #ifdef _WIN32_WCE
 	#error atlctrlw.h is not supported on Windows CE
@@ -539,7 +535,7 @@ public:
 
 			T* pT = static_cast<T*>(this);
 			pT;   // avoid level 4 warning
-			TCHAR szString[pT->_nMaxMenuItemTextLength];
+			TCHAR szString[pT->_nMaxMenuItemTextLength] = { 0 };
 			for(int i = 0; i < nItems; i++)
 			{
 				CMenuItemInfo mii;
@@ -1291,7 +1287,7 @@ public:
 
 			T* pT = static_cast<T*>(this);
 			pT;   // avoid level 4 warning
-			TCHAR szString[pT->_nMaxMenuItemTextLength];
+			TCHAR szString[pT->_nMaxMenuItemTextLength] = { 0 };
 			BOOL bRet = FALSE;
 			for(int i = 0; i < menuPopup.GetMenuItemCount(); i++)
 			{
@@ -1473,7 +1469,7 @@ public:
 			int nCount = ::GetMenuItemCount(menu);
 			int nRetCode = MNC_EXECUTE;
 			BOOL bRet = FALSE;
-			TCHAR szString[pT->_nMaxMenuItemTextLength];
+			TCHAR szString[pT->_nMaxMenuItemTextLength] = { 0 };
 			WORD wMnem = 0;
 			bool bFound = false;
 			for(int i = 0; i < nCount; i++)
@@ -2991,11 +2987,17 @@ public:
 		dc.SelectFont(hFontOld);
 
 		// get Windows version
+#ifndef _versionhelpers_H_INCLUDED_
 		OSVERSIONINFO ovi = { sizeof(OSVERSIONINFO) };
 		::GetVersionEx(&ovi);
+#endif // !_versionhelpers_H_INCLUDED_
 
 		// query keyboard cues mode (Windows 2000 or later)
-		if(ovi.dwMajorVersion >= 5)
+#ifdef _versionhelpers_H_INCLUDED_
+		if(::IsWindowsVersionOrGreater(5, 0, 0))
+#else // !_versionhelpers_H_INCLUDED_
+		if (ovi.dwMajorVersion >= 5)
+#endif // _versionhelpers_H_INCLUDED_
 		{
 #ifndef SPI_GETKEYBOARDCUES
 			const UINT SPI_GETKEYBOARDCUES = 0x100A;
@@ -3008,7 +3010,11 @@ public:
 		}
 
 		// query flat menu mode (Windows XP or later)
-		if((ovi.dwMajorVersion == 5 && ovi.dwMinorVersion >= 1) || (ovi.dwMajorVersion > 5))
+#ifdef _versionhelpers_H_INCLUDED_
+		if(::IsWindowsXPOrGreater())
+#else // !_versionhelpers_H_INCLUDED_
+		if ((ovi.dwMajorVersion == 5 && ovi.dwMinorVersion >= 1) || (ovi.dwMajorVersion > 5))
+#endif // _versionhelpers_H_INCLUDED_
 		{
 #ifndef SPI_GETFLATMENU
 			const UINT SPI_GETFLATMENU = 0x1022;
@@ -3147,16 +3153,16 @@ public:
 	void _AddVistaBitmapsFromImageList(int nStartIndex, int nCount)
 	{
 		// Create display compatible memory DC
-		HDC hDC = ::GetDC(NULL);
+		CClientDC dc(NULL);
 		CDC dcMem;
-		dcMem.CreateCompatibleDC(hDC);
+		dcMem.CreateCompatibleDC(dc);
 		HBITMAP hBitmapSave = dcMem.GetCurrentBitmap();
 
 		T* pT = static_cast<T*>(this);
 		// Create bitmaps for all menu items
 		for(int i = 0; i < nCount; i++)
 		{
-			HBITMAP hBitmap = pT->_CreateVistaBitmapHelper(nStartIndex + i, hDC, dcMem);
+			HBITMAP hBitmap = pT->_CreateVistaBitmapHelper(nStartIndex + i, dc, dcMem);
 			dcMem.SelectBitmap(hBitmapSave);
 			m_arrVistaBitmap.Add(hBitmap);
 		}
@@ -3165,14 +3171,14 @@ public:
 	void _AddVistaBitmapFromImageList(int nIndex)
 	{
 		// Create display compatible memory DC
-		HDC hDC = ::GetDC(NULL);
+		CClientDC dc(NULL);
 		CDC dcMem;
-		dcMem.CreateCompatibleDC(hDC);
+		dcMem.CreateCompatibleDC(dc);
 		HBITMAP hBitmapSave = dcMem.GetCurrentBitmap();
 
 		// Create bitmap for menu item
 		T* pT = static_cast<T*>(this);
-		HBITMAP hBitmap = pT->_CreateVistaBitmapHelper(nIndex, hDC, dcMem);
+		HBITMAP hBitmap = pT->_CreateVistaBitmapHelper(nIndex, dc, dcMem);
 
 		// Select saved bitmap back and add bitmap to the array
 		dcMem.SelectBitmap(hBitmapSave);
@@ -3186,14 +3192,14 @@ public:
 			::DeleteObject(m_arrVistaBitmap[nIndex]);
 
 		// Create display compatible memory DC
-		HDC hDC = ::GetDC(NULL);
+		CClientDC dc(NULL);
 		CDC dcMem;
-		dcMem.CreateCompatibleDC(hDC);
+		dcMem.CreateCompatibleDC(dc);
 		HBITMAP hBitmapSave = dcMem.GetCurrentBitmap();
 
 		// Create bitmap for menu item
 		T* pT = static_cast<T*>(this);
-		HBITMAP hBitmap = pT->_CreateVistaBitmapHelper(nIndex, hDC, dcMem);
+		HBITMAP hBitmap = pT->_CreateVistaBitmapHelper(nIndex, dc, dcMem);
 
 		// Select saved bitmap back and replace bitmap in the array
 		dcMem.SelectBitmap(hBitmapSave);
