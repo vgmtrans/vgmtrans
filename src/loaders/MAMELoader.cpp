@@ -1,7 +1,7 @@
 #include "stdafx.h"
+#include <tinyxml.h>
 #include "MAMELoader.h"
 #include "Root.h"
-#include "./tinyxml/tinyxml.h"
 #include "RawFile.h"
 #include "Format.h"
 #include "KabukiDecrypt.h"
