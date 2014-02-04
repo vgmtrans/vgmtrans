@@ -144,9 +144,6 @@
     <Filter Include="Header Files\loaders">
       <UniqueIdentifier>{60f1ce40-2852-4478-877a-07e372dbcffe}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\tinyxml">
-      <UniqueIdentifier>{d27aab88-a075-4c62-9cc1-3ef682c48849}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Resource Files">
       <UniqueIdentifier>{52b2360e-bfe0-4323-b287-13e24cb9d9ef}</UniqueIdentifier>
       <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe</Extensions>
@@ -172,9 +169,6 @@
       <Filter>Source Files\windows</Filter>
     </ClCompile>
     <ClCompile Include="windows\mainfrm.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="windows\stdafx.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
     <ClCompile Include="windows\VGMFileListView.cpp">
@@ -246,142 +240,142 @@
     <ClCompile Include="windows\directmidi\DSUTIL\DXUTIL.CPP">
       <Filter>Source Files\windows\DirectMidi\DSUtil</Filter>
     </ClCompile>
-    <ClCompile Include="MAMELoader.cpp">
+    <ClCompile Include="loaders\MAMELoader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="PSF1Loader.cpp">
+    <ClCompile Include="loaders\PSF1Loader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="PSF2Loader.cpp">
+    <ClCompile Include="loaders\PSF2Loader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="SPCLoader.cpp">
+    <ClCompile Include="loaders\SPCLoader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="PSXSPU.cpp">
+    <ClCompile Include="formats\PSXSPU.cpp">
       <Filter>Source Files\formats</Filter>
     </ClCompile>
-    <ClCompile Include="PS1Seq.cpp">
+    <ClCompile Include="formats\PS1Seq.cpp">
       <Filter>Source Files\formats\ps1</Filter>
     </ClCompile>
-    <ClCompile Include="PS1SeqScanner.cpp">
+    <ClCompile Include="formats\PS1SeqScanner.cpp">
       <Filter>Source Files\formats\ps1</Filter>
     </ClCompile>
-    <ClCompile Include="Vab.cpp">
+    <ClCompile Include="formats\Vab.cpp">
       <Filter>Source Files\formats\ps1</Filter>
     </ClCompile>
-    <ClCompile Include="SquarePS2Scanner.cpp">
+    <ClCompile Include="formats\SquarePS2Scanner.cpp">
       <Filter>Source Files\formats\squareps2</Filter>
     </ClCompile>
-    <ClCompile Include="SquarePS2Seq.cpp">
+    <ClCompile Include="formats\SquarePS2Seq.cpp">
       <Filter>Source Files\formats\squareps2</Filter>
     </ClCompile>
-    <ClCompile Include="WD.cpp">
+    <ClCompile Include="formats\WD.cpp">
       <Filter>Source Files\formats\squareps2</Filter>
     </ClCompile>
-    <ClCompile Include="AkaoFormat.cpp">
+    <ClCompile Include="formats\AkaoFormat.cpp">
       <Filter>Source Files\formats\akao</Filter>
     </ClCompile>
-    <ClCompile Include="AkaoInstr.cpp">
+    <ClCompile Include="formats\AkaoInstr.cpp">
       <Filter>Source Files\formats\akao</Filter>
     </ClCompile>
-    <ClCompile Include="AkaoScanner.cpp">
+    <ClCompile Include="formats\AkaoScanner.cpp">
       <Filter>Source Files\formats\akao</Filter>
     </ClCompile>
-    <ClCompile Include="AkaoSeq.cpp">
+    <ClCompile Include="formats\AkaoSeq.cpp">
       <Filter>Source Files\formats\akao</Filter>
     </ClCompile>
-    <ClCompile Include="NDSInstrSet.cpp">
+    <ClCompile Include="formats\NDSInstrSet.cpp">
       <Filter>Source Files\formats\nds</Filter>
     </ClCompile>
-    <ClCompile Include="NDSScanner.cpp">
+    <ClCompile Include="formats\NDSScanner.cpp">
       <Filter>Source Files\formats\nds</Filter>
     </ClCompile>
-    <ClCompile Include="NDSSeq.cpp">
+    <ClCompile Include="formats\NDSSeq.cpp">
       <Filter>Source Files\formats\nds</Filter>
     </ClCompile>
-    <ClCompile Include="FFT.cpp">
+    <ClCompile Include="formats\FFT.cpp">
       <Filter>Source Files\formats\fft</Filter>
     </ClCompile>
-    <ClCompile Include="FFTInstr.cpp">
+    <ClCompile Include="formats\FFTInstr.cpp">
       <Filter>Source Files\formats\fft</Filter>
     </ClCompile>
-    <ClCompile Include="FFTScanner.cpp">
+    <ClCompile Include="formats\FFTScanner.cpp">
       <Filter>Source Files\formats\fft</Filter>
     </ClCompile>
-    <ClCompile Include="SquareSnesSeq.cpp">
+    <ClCompile Include="formats\SquareSnesSeq.cpp">
       <Filter>Source Files\formats\squsnes</Filter>
     </ClCompile>
-    <ClCompile Include="SquSnesScanner.cpp">
+    <ClCompile Include="formats\SquSnesScanner.cpp">
       <Filter>Source Files\formats\squsnes</Filter>
     </ClCompile>
-    <ClCompile Include="OrgScanner.cpp">
+    <ClCompile Include="formats\OrgScanner.cpp">
       <Filter>Source Files\formats\org</Filter>
     </ClCompile>
-    <ClCompile Include="OrgSeq.cpp">
+    <ClCompile Include="formats\OrgSeq.cpp">
       <Filter>Source Files\formats\org</Filter>
     </ClCompile>
-    <ClCompile Include="NinSnesScanner.cpp">
+    <ClCompile Include="formats\NinSnesScanner.cpp">
       <Filter>Source Files\formats\ninsnes</Filter>
     </ClCompile>
-    <ClCompile Include="NinSnesSeq.cpp">
+    <ClCompile Include="formats\NinSnesSeq.cpp">
       <Filter>Source Files\formats\ninsnes</Filter>
     </ClCompile>
-    <ClCompile Include="SegSat.cpp">
+    <ClCompile Include="formats\SegSat.cpp">
       <Filter>Source Files\formats\segsat</Filter>
     </ClCompile>
-    <ClCompile Include="SegSatScanner.cpp">
+    <ClCompile Include="formats\SegSatScanner.cpp">
       <Filter>Source Files\formats\segsat</Filter>
     </ClCompile>
-    <ClCompile Include="MP2k.cpp">
+    <ClCompile Include="formats\MP2k.cpp">
       <Filter>Source Files\formats\mp2k</Filter>
     </ClCompile>
-    <ClCompile Include="MP2kScanner.cpp">
+    <ClCompile Include="formats\MP2kScanner.cpp">
       <Filter>Source Files\formats\mp2k</Filter>
     </ClCompile>
-    <ClCompile Include="KonamiGXScanner.cpp">
+    <ClCompile Include="formats\KonamiGXScanner.cpp">
       <Filter>Source Files\formats\konami_gx</Filter>
     </ClCompile>
-    <ClCompile Include="KonamiGXSeq.cpp">
+    <ClCompile Include="formats\KonamiGXSeq.cpp">
       <Filter>Source Files\formats\konami_gx</Filter>
     </ClCompile>
-    <ClCompile Include="QSoundInstr.cpp">
+    <ClCompile Include="formats\QSoundInstr.cpp">
       <Filter>Source Files\formats\qsound</Filter>
     </ClCompile>
-    <ClCompile Include="QSoundScanner.cpp">
+    <ClCompile Include="formats\QSoundScanner.cpp">
       <Filter>Source Files\formats\qsound</Filter>
     </ClCompile>
-    <ClCompile Include="QSoundSeq.cpp">
+    <ClCompile Include="formats\QSoundSeq.cpp">
       <Filter>Source Files\formats\qsound</Filter>
     </ClCompile>
-    <ClCompile Include="SonyPS2InstrSet.cpp">
+    <ClCompile Include="formats\SonyPS2InstrSet.cpp">
       <Filter>Source Files\formats\sonyps2</Filter>
     </ClCompile>
-    <ClCompile Include="SonyPS2Scanner.cpp">
+    <ClCompile Include="formats\SonyPS2Scanner.cpp">
       <Filter>Source Files\formats\sonyps2</Filter>
     </ClCompile>
-    <ClCompile Include="SonyPS2Seq.cpp">
+    <ClCompile Include="formats\SonyPS2Seq.cpp">
       <Filter>Source Files\formats\sonyps2</Filter>
     </ClCompile>
-    <ClCompile Include="HOSA.cpp">
+    <ClCompile Include="formats\HOSA.cpp">
       <Filter>Source Files\formats\hosa</Filter>
     </ClCompile>
-    <ClCompile Include="HOSAInstr.cpp">
+    <ClCompile Include="formats\HOSAInstr.cpp">
       <Filter>Source Files\formats\hosa</Filter>
     </ClCompile>
-    <ClCompile Include="HOSAScanner.cpp">
+    <ClCompile Include="formats\HOSAScanner.cpp">
       <Filter>Source Files\formats\hosa</Filter>
     </ClCompile>
-    <ClCompile Include="TriAcePS1InstrSet.cpp">
+    <ClCompile Include="formats\TriAcePS1InstrSet.cpp">
       <Filter>Source Files\formats\triaceps1</Filter>
     </ClCompile>
-    <ClCompile Include="TriAcePS1Scanner.cpp">
+    <ClCompile Include="formats\TriAcePS1Scanner.cpp">
       <Filter>Source Files\formats\triaceps1</Filter>
     </ClCompile>
-    <ClCompile Include="TriAcePS1Seq.cpp">
+    <ClCompile Include="formats\TriAcePS1Seq.cpp">
       <Filter>Source Files\formats\triaceps1</Filter>
     </ClCompile>
-    <ClCompile Include="TaitoF3Scanner.cpp">
+    <ClCompile Include="formats\TaitoF3Scanner.cpp">
       <Filter>Source Files\formats\taito_f3</Filter>
     </ClCompile>
     <ClCompile Include="common.cpp">
@@ -465,7 +459,7 @@
     <ClCompile Include="VGMMiscFile.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
-    <ClCompile Include="KabukiDecrypt.cpp">
+    <ClCompile Include="loaders\KabukiDecrypt.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
     <ClCompile Include="Options.cpp">
@@ -474,10 +468,10 @@
     <ClCompile Include="BytePattern.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
-    <ClCompile Include="RareSnesSeq.cpp">
+    <ClCompile Include="formats\RareSnesSeq.cpp">
       <Filter>Source Files\formats\raresnes</Filter>
     </ClCompile>
-    <ClCompile Include="RareSnesScanner.cpp">
+    <ClCompile Include="formats\RareSnesScanner.cpp">
       <Filter>Source Files\formats\raresnes</Filter>
     </ClCompile>
     <ClCompile Include="LogItem.cpp">
@@ -522,25 +516,28 @@
     <ClCompile Include="windows\WinVGMRoot.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="windows\directmidi\MyCoCreateInstance.cpp">
-      <Filter>Source Files\windows\DirectMidi</Filter>
-    </ClCompile>
     <ClCompile Include="PSFFile.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
-    <ClCompile Include="GSFLoader.cpp">
+    <ClCompile Include="loaders\GSFLoader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="SNSFLoader.cpp">
+    <ClCompile Include="loaders\SNSFLoader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="NDS2SFLoader.cpp">
+    <ClCompile Include="loaders\NDS2SFLoader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="NCSFLoader.cpp">
+    <ClCompile Include="loaders\NCSFLoader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
     <ClCompile Include="SeqNoteManager.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\MyCoCreateInstance.cpp">
+      <Filter>Source Files\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
   </ItemGroup>
@@ -567,9 +564,6 @@
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="windows\resource.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="windows\stdafx.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="windows\include\TabbedMDISave.h">
@@ -620,169 +614,169 @@
     <ClInclude Include="windows\directmidi\DSUTIL\DXUTIL.H">
       <Filter>Header Files\windows\DirectMidi\DSUtil</Filter>
     </ClInclude>
-    <ClInclude Include="PSXSPU.h">
+    <ClInclude Include="formats\PSXSPU.h">
       <Filter>Header Files\formats</Filter>
     </ClInclude>
-    <ClInclude Include="FFT.h">
+    <ClInclude Include="formats\FFT.h">
       <Filter>Header Files\formats\fft</Filter>
     </ClInclude>
-    <ClInclude Include="FFTFormat.h">
+    <ClInclude Include="formats\FFTFormat.h">
       <Filter>Header Files\formats\fft</Filter>
     </ClInclude>
-    <ClInclude Include="FFTInstr.h">
+    <ClInclude Include="formats\FFTInstr.h">
       <Filter>Header Files\formats\fft</Filter>
     </ClInclude>
-    <ClInclude Include="FFTScanner.h">
+    <ClInclude Include="formats\FFTScanner.h">
       <Filter>Header Files\formats\fft</Filter>
     </ClInclude>
-    <ClInclude Include="MP2k.h">
+    <ClInclude Include="formats\MP2k.h">
       <Filter>Header Files\formats\mp2k</Filter>
     </ClInclude>
-    <ClInclude Include="MP2kFormat.h">
+    <ClInclude Include="formats\MP2kFormat.h">
       <Filter>Header Files\formats\mp2k</Filter>
     </ClInclude>
-    <ClInclude Include="MP2kScanner.h">
+    <ClInclude Include="formats\MP2kScanner.h">
       <Filter>Header Files\formats\mp2k</Filter>
     </ClInclude>
-    <ClInclude Include="AkaoFormat.h">
+    <ClInclude Include="formats\AkaoFormat.h">
       <Filter>Header Files\formats\akao</Filter>
     </ClInclude>
-    <ClInclude Include="AkaoInstr.h">
+    <ClInclude Include="formats\AkaoInstr.h">
       <Filter>Header Files\formats\akao</Filter>
     </ClInclude>
-    <ClInclude Include="AkaoScanner.h">
+    <ClInclude Include="formats\AkaoScanner.h">
       <Filter>Header Files\formats\akao</Filter>
     </ClInclude>
-    <ClInclude Include="AkaoSeq.h">
+    <ClInclude Include="formats\AkaoSeq.h">
       <Filter>Header Files\formats\akao</Filter>
     </ClInclude>
-    <ClInclude Include="SquarePS2Format.h">
+    <ClInclude Include="formats\SquarePS2Format.h">
       <Filter>Header Files\formats\squareps2</Filter>
     </ClInclude>
-    <ClInclude Include="SquarePS2Scanner.h">
+    <ClInclude Include="formats\SquarePS2Scanner.h">
       <Filter>Header Files\formats\squareps2</Filter>
     </ClInclude>
-    <ClInclude Include="SquarePS2Seq.h">
+    <ClInclude Include="formats\SquarePS2Seq.h">
       <Filter>Header Files\formats\squareps2</Filter>
     </ClInclude>
-    <ClInclude Include="WD.h">
+    <ClInclude Include="formats\WD.h">
       <Filter>Header Files\formats\squareps2</Filter>
     </ClInclude>
-    <ClInclude Include="NDSFormat.h">
+    <ClInclude Include="formats\NDSFormat.h">
       <Filter>Header Files\formats\nds</Filter>
     </ClInclude>
-    <ClInclude Include="NDSInstrSet.h">
+    <ClInclude Include="formats\NDSInstrSet.h">
       <Filter>Header Files\formats\nds</Filter>
     </ClInclude>
-    <ClInclude Include="NDSScanner.h">
+    <ClInclude Include="formats\NDSScanner.h">
       <Filter>Header Files\formats\nds</Filter>
     </ClInclude>
-    <ClInclude Include="NDSSeq.h">
+    <ClInclude Include="formats\NDSSeq.h">
       <Filter>Header Files\formats\nds</Filter>
     </ClInclude>
-    <ClInclude Include="PS1Format.h">
+    <ClInclude Include="formats\PS1Format.h">
       <Filter>Header Files\formats\ps1</Filter>
     </ClInclude>
-    <ClInclude Include="PS1Seq.h">
+    <ClInclude Include="formats\PS1Seq.h">
       <Filter>Header Files\formats\ps1</Filter>
     </ClInclude>
-    <ClInclude Include="PS1SeqScanner.h">
+    <ClInclude Include="formats\PS1SeqScanner.h">
       <Filter>Header Files\formats\ps1</Filter>
     </ClInclude>
-    <ClInclude Include="Vab.h">
+    <ClInclude Include="formats\Vab.h">
       <Filter>Header Files\formats\ps1</Filter>
     </ClInclude>
-    <ClInclude Include="OrgScanner.h">
+    <ClInclude Include="formats\OrgScanner.h">
       <Filter>Header Files\formats\org</Filter>
     </ClInclude>
-    <ClInclude Include="OrgSeq.h">
+    <ClInclude Include="formats\OrgSeq.h">
       <Filter>Header Files\formats\org</Filter>
     </ClInclude>
-    <ClInclude Include="NinSnesFormat.h">
+    <ClInclude Include="formats\NinSnesFormat.h">
       <Filter>Header Files\formats\ninsnes</Filter>
     </ClInclude>
-    <ClInclude Include="NinSnesScanner.h">
+    <ClInclude Include="formats\NinSnesScanner.h">
       <Filter>Header Files\formats\ninsnes</Filter>
     </ClInclude>
-    <ClInclude Include="NinSnesSeq.h">
+    <ClInclude Include="formats\NinSnesSeq.h">
       <Filter>Header Files\formats\ninsnes</Filter>
     </ClInclude>
-    <ClInclude Include="SquSnesFormat.h">
+    <ClInclude Include="formats\SquSnesFormat.h">
       <Filter>Header Files\formats\squsnes</Filter>
     </ClInclude>
-    <ClInclude Include="SquSnesScanner.h">
+    <ClInclude Include="formats\SquSnesScanner.h">
       <Filter>Header Files\formats\squsnes</Filter>
     </ClInclude>
-    <ClInclude Include="SquSnesSeq.h">
+    <ClInclude Include="formats\SquSnesSeq.h">
       <Filter>Header Files\formats\squsnes</Filter>
     </ClInclude>
-    <ClInclude Include="SegSat.h">
+    <ClInclude Include="formats\SegSat.h">
       <Filter>Header Files\formats\segsat</Filter>
     </ClInclude>
-    <ClInclude Include="SegSatScanner.h">
+    <ClInclude Include="formats\SegSatScanner.h">
       <Filter>Header Files\formats\segsat</Filter>
     </ClInclude>
-    <ClInclude Include="KonamiGXFormat.h">
+    <ClInclude Include="formats\KonamiGXFormat.h">
       <Filter>Header Files\formats\konami_gx</Filter>
     </ClInclude>
-    <ClInclude Include="KonamiGXScanner.h">
+    <ClInclude Include="formats\KonamiGXScanner.h">
       <Filter>Header Files\formats\konami_gx</Filter>
     </ClInclude>
-    <ClInclude Include="KonamiGXSeq.h">
+    <ClInclude Include="formats\KonamiGXSeq.h">
       <Filter>Header Files\formats\konami_gx</Filter>
     </ClInclude>
-    <ClInclude Include="QSoundFormat.h">
+    <ClInclude Include="formats\QSoundFormat.h">
       <Filter>Header Files\formats\qsound</Filter>
     </ClInclude>
-    <ClInclude Include="QSoundInstr.h">
+    <ClInclude Include="formats\QSoundInstr.h">
       <Filter>Header Files\formats\qsound</Filter>
     </ClInclude>
-    <ClInclude Include="QSoundScanner.h">
+    <ClInclude Include="formats\QSoundScanner.h">
       <Filter>Header Files\formats\qsound</Filter>
     </ClInclude>
-    <ClInclude Include="QSoundSeq.h">
+    <ClInclude Include="formats\QSoundSeq.h">
       <Filter>Header Files\formats\qsound</Filter>
     </ClInclude>
-    <ClInclude Include="SonyPS2Format.h">
+    <ClInclude Include="formats\SonyPS2Format.h">
       <Filter>Header Files\formats\sonyps2</Filter>
     </ClInclude>
-    <ClInclude Include="SonyPS2InstrSet.h">
+    <ClInclude Include="formats\SonyPS2InstrSet.h">
       <Filter>Header Files\formats\sonyps2</Filter>
     </ClInclude>
-    <ClInclude Include="SonyPS2Scanner.h">
+    <ClInclude Include="formats\SonyPS2Scanner.h">
       <Filter>Header Files\formats\sonyps2</Filter>
     </ClInclude>
-    <ClInclude Include="SonyPS2Seq.h">
+    <ClInclude Include="formats\SonyPS2Seq.h">
       <Filter>Header Files\formats\sonyps2</Filter>
     </ClInclude>
-    <ClInclude Include="HOSA.h">
+    <ClInclude Include="formats\HOSA.h">
       <Filter>Header Files\formats\hosa</Filter>
     </ClInclude>
-    <ClInclude Include="HOSAFormat.h">
+    <ClInclude Include="formats\HOSAFormat.h">
       <Filter>Header Files\formats\hosa</Filter>
     </ClInclude>
-    <ClInclude Include="HOSAInstr.h">
+    <ClInclude Include="formats\HOSAInstr.h">
       <Filter>Header Files\formats\hosa</Filter>
     </ClInclude>
-    <ClInclude Include="HOSAScanner.h">
+    <ClInclude Include="formats\HOSAScanner.h">
       <Filter>Header Files\formats\hosa</Filter>
     </ClInclude>
-    <ClInclude Include="TriAcePS1Format.h">
+    <ClInclude Include="formats\TriAcePS1Format.h">
       <Filter>Header Files\formats\triaceps1</Filter>
     </ClInclude>
-    <ClInclude Include="TriAcePS1InstrSet.h">
+    <ClInclude Include="formats\TriAcePS1InstrSet.h">
       <Filter>Header Files\formats\triaceps1</Filter>
     </ClInclude>
-    <ClInclude Include="TriAcePS1Scanner.h">
+    <ClInclude Include="formats\TriAcePS1Scanner.h">
       <Filter>Header Files\formats\triaceps1</Filter>
     </ClInclude>
-    <ClInclude Include="TriAcePS1Seq.h">
+    <ClInclude Include="formats\TriAcePS1Seq.h">
       <Filter>Header Files\formats\triaceps1</Filter>
     </ClInclude>
-    <ClInclude Include="TaitoF3Format.h">
+    <ClInclude Include="formats\TaitoF3Format.h">
       <Filter>Header Files\formats\taito_f3</Filter>
     </ClInclude>
-    <ClInclude Include="TaitoF3Scanner.h">
+    <ClInclude Include="formats\TaitoF3Scanner.h">
       <Filter>Header Files\formats\taito_f3</Filter>
     </ClInclude>
     <ClInclude Include="common.h">
@@ -869,23 +863,17 @@
     <ClInclude Include="VGMSeqNoTrks.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
-    <ClInclude Include="MAMELoader.h">
+    <ClInclude Include="loaders\MAMELoader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
-    <ClInclude Include="PSF1Loader.h">
+    <ClInclude Include="loaders\PSF1Loader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
-    <ClInclude Include="PSF2Loader.h">
+    <ClInclude Include="loaders\PSF2Loader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
-    <ClInclude Include="SPCLoader.h">
+    <ClInclude Include="loaders\SPCLoader.h">
       <Filter>Header Files\loaders</Filter>
-    </ClInclude>
-    <ClInclude Include="tinyxml\tinystr.h">
-      <Filter>Header Files\tinyxml</Filter>
-    </ClInclude>
-    <ClInclude Include="tinyxml\tinyxml.h">
-      <Filter>Header Files\tinyxml</Filter>
     </ClInclude>
     <ClInclude Include="SF2File.h">
       <Filter>Header Files\main</Filter>
@@ -899,7 +887,7 @@
     <ClInclude Include="VGMMiscFile.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
-    <ClInclude Include="KabukiDecrypt.h">
+    <ClInclude Include="loaders\KabukiDecrypt.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
     <ClInclude Include="Options.h">
@@ -908,19 +896,19 @@
     <ClInclude Include="BytePattern.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
-    <ClInclude Include="RareSnesSeq.h">
+    <ClInclude Include="formats\RareSnesSeq.h">
       <Filter>Header Files\formats\raresnes</Filter>
     </ClInclude>
-    <ClInclude Include="RareSnesFormat.h">
+    <ClInclude Include="formats\RareSnesFormat.h">
       <Filter>Header Files\formats\raresnes</Filter>
     </ClInclude>
-    <ClInclude Include="RareSnesScanner.h">
+    <ClInclude Include="formats\RareSnesScanner.h">
       <Filter>Header Files\formats\raresnes</Filter>
     </ClInclude>
-    <ClInclude Include="OrgFormat.h">
+    <ClInclude Include="formats\OrgFormat.h">
       <Filter>Header Files\formats\org</Filter>
     </ClInclude>
-    <ClInclude Include="SegSatFormat.h">
+    <ClInclude Include="formats\SegSatFormat.h">
       <Filter>Header Files\formats\segsat</Filter>
     </ClInclude>
     <ClInclude Include="LogItem.h">
@@ -971,28 +959,31 @@
     <ClInclude Include="windows\WinVGMRoot.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="windows\directmidi\MyCoCreateInstance.h">
-      <Filter>Header Files\windows\DirectMidi</Filter>
-    </ClInclude>
     <ClInclude Include="PSFFile.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
-    <ClInclude Include="GSFLoader.h">
+    <ClInclude Include="loaders\GSFLoader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
-    <ClInclude Include="SNSFLoader.h">
+    <ClInclude Include="loaders\SNSFLoader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
-    <ClInclude Include="NDS2SFLoader.h">
+    <ClInclude Include="loaders\NDS2SFLoader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
-    <ClInclude Include="NCSFLoader.h">
+    <ClInclude Include="loaders\NCSFLoader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
     <ClInclude Include="SeqNoteManager.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
     <ClInclude Include="SeqNoteParam.h">
+      <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\MyCoCreateInstance.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
