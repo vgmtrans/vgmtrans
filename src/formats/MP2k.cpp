@@ -1,3 +1,11 @@
+/**
+ * GBA MusicPlayer2000 (Sappy)
+ *
+ * Special Thanks / Respects To:
+ * GBAMusRiper (c) 2012 by Bregalad
+ * http://www.romhacking.net/utilities/881/
+ */
+
 #include "stdafx.h"
 #include "MP2k.h"
 #include "MP2kFormat.h"
