@@ -26,12 +26,11 @@ Once loaded, double-clicking a file listed under "Detected Music Files" will bri
 
 The "Collections" window displays file groupings that the software was able to infer.  A sequence file will be paired with one or more instrument sets and/or sample collections. A collection can be played by highlighting it and pressing the play button or spacebar.
 
-What you need to compile it
----------------------------
+How to compile it
+-----------------
 
-- Visual Studio 2010.  Other versions may also work but are untested.  Since it uses some ATL headers, you will need WDK if you use Express Edition.
-- Windows Template Library 8.0 (WTL)
-- DirectX 9 SDK which supports DirectMusic (DirectMusic was eventually removed by Microsoft. The August 2007 SDK works, for example)
+Please read VGMTrans wiki page:
+<https://github.com/vgmtrans/vgmtrans/wiki/Build-Instructions>
 
 Contributers
 ------------
