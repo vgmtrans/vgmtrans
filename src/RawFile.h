@@ -91,11 +91,6 @@ public:
 		return (nIndex < fileSize);
 	}
 
-	inline ULONG GetSize()
-	{
-		return fileSize;
-	}
-
 	inline void UseLoaders() { processFlags |= PF_USELOADERS; }
 	inline void DontUseLoaders() { processFlags &= ~PF_USELOADERS; }
 	inline void UseScanners() { processFlags |= PF_USESCANNERS; }

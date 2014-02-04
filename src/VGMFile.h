@@ -136,15 +136,15 @@ public:
 	inline ULONG GetEndOffset()
 	{
 		if (bUsingRawFile)
-			return rawfile->GetSize();
+			return rawfile->size();
 		else
 			return data.endOff;
 	}
 
-	inline ULONG GetSize()
+	inline unsigned long size()
 	{
 		if (bUsingRawFile)
-			return rawfile->GetSize();
+			return rawfile->size();
 		else
 			return data.size;
 	}

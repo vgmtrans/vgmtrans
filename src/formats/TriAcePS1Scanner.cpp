@@ -97,7 +97,7 @@ void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSe
 		if (instrSectSize <= 0x20 || instrSectSize > 0x4000)
 			continue;
 		//Make sure the size doesn't point beyond the end of the file
-		if (i + instrSectSize > file->GetSize() - 0x100)
+		if (i + instrSectSize > file->size() - 0x100)
 			continue;
 
 		

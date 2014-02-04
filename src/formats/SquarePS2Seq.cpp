@@ -51,7 +51,7 @@ bool BGMSeq::GetTrackPointers(void)
 	for(unsigned int i=0; i<nNumTracks; i++)
 	{
 		//HACK FOR TRUNCATED BGMS (ex. FFXII 113 Eastersand.psf2)
-		if (pos >= GetRawFile()->GetSize())
+		if (pos >= GetRawFile()->size())
 			return true;
 		//END HACK
 		UINT trackSize = GetWord(pos);		//get the track size (first word before track data)
