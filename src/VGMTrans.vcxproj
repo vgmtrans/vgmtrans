@@ -62,10 +62,10 @@
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Template|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Template|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Template|Win32'" />
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)dependencies\dxAug07\include;$(ProjectDir)dependencies\wtl;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)dependencies\dxAug07\lib\x86;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\lib\win32;$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)dependencies\dxAug07\include;$(ProjectDir)dependencies\wtl;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)dependencies\dxAug07\lib\x86;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\lib\win32;$(LibraryPath)</LibraryPath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)dependencies\dxAug07\include;$(ProjectDir)dependencies\wtl;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\include;$(ProjectDir)dependencies\yaml-cpp\include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)dependencies\dxAug07\lib\x86;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\lib\win32;$(ProjectDir)dependencies\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)dependencies\dxAug07\include;$(ProjectDir)dependencies\wtl;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\include;$(ProjectDir)dependencies\yaml-cpp\include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)dependencies\dxAug07\lib\x86;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\lib\win32;$(ProjectDir)dependencies\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Midl>
@@ -104,7 +104,7 @@
     </ResourceCompile>
     <Link>
       <AdditionalOptions>/MACHINE:I386 /NODEFAULTLIB:libcmt.lib %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmldSTL.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmldSTL.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>.\Debug/VGMTrans.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -160,9 +160,8 @@
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalOptions>/MACHINE:I386
- %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/MACHINE:I386 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>.\Release/VGMTrans.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
