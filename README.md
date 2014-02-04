@@ -1,11 +1,6 @@
 VGMTrans - Video Game Music Translator
 ======================================
 
-This software is released under the zlib/libpng License.  See LICENSE.txt.
-
-What is it?
------------
-
 VGMTrans converts a music files used in console video games into standard midi and dls files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
 
 - Sony's PS2 sequence and instrument formats (.bq, .hd, .bd)
@@ -19,6 +14,8 @@ VGMTrans converts a music files used in console video games into standard midi a
 - Rare's SNES sequence format (.spc)
 
 The source code includes preliminary work on additional formats. 
+
+This software is released under the zlib/libpng License. See LICENSE.txt.
 
 How to use it
 -------------
