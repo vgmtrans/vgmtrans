@@ -141,6 +141,14 @@ public:
 			return data.endOff;
 	}
 
+	inline ULONG GetSize()
+	{
+		if (bUsingRawFile)
+			return rawfile->GetSize();
+		else
+			return data.size;
+	}
+
 protected:
 	DataSeg data, col;
 	FileType file_type;

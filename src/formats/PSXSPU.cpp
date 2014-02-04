@@ -263,7 +263,7 @@ void PSXSamp::ConvertToStdWave(BYTE* buf)
 	bool addrOutOfVirtFile = false;
 	for (UINT k=0; k<dataLength; k+=0x10)				//for every adpcm chunk
 	{
-		if (dwOffset + k + 16 > GetEndOffset())
+		if (dwOffset + k + 16 > vgmfile->GetEndOffset())
 		{
 			wchar_t log[512];
 			wsprintf(log,  L"\"%s\" unexpected EOF.", name.c_str());
