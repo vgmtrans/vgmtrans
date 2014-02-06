@@ -12,9 +12,10 @@
 
 DECLARE_FORMAT(MP2k);
 
-MP2kSeq::MP2kSeq(RawFile* file, ULONG offset)
-: VGMSeq(MP2kFormat::name, file, offset)
+MP2kSeq::MP2kSeq(RawFile* file, ULONG offset, std::wstring name)
+: VGMSeq(MP2kFormat::name, file, offset, 0, name)
 {
+	bAllowDiscontinuousTrackData = true;
 }
 
 MP2kSeq::~MP2kSeq(void)
@@ -23,33 +24,63 @@ MP2kSeq::~MP2kSeq(void)
 
 bool MP2kSeq::GetHeaderInfo(void)
 {
-	//unLength = GetShort(dwOffset+8);
+	if (dwOffset + 2 > vgmfile->GetEndOffset())
+	{
+		return false;
+	}
+
 	nNumTracks = GetShort(dwOffset);
 	if (nNumTracks == 0 || nNumTracks > 24)		//if there are no tracks or there are more tracks than allowed
-		return FALSE;							//return an error, the sequence shall be deleted
+	{
+		return false;							//return an error, the sequence shall be deleted
+	}
+	if (dwOffset + 8 + nNumTracks * 4 > vgmfile->GetEndOffset())
+	{
+		return false;
+	}
+
+	VGMHeader* seqHdr = AddHeader(dwOffset, 8 + nNumTracks * 4, L"Sequence Header");
+	seqHdr->AddSimpleItem(dwOffset, 1, L"Number of Tracks");
+	seqHdr->AddSimpleItem(dwOffset + 1, 1, L"Unknown");
+	seqHdr->AddSimpleItem(dwOffset + 2, 1, L"Priority");
+	seqHdr->AddSimpleItem(dwOffset + 3, 1, L"Reverb");
+	DWORD dwInstPtr = GetWord(dwOffset + 4);
+	seqHdr->AddPointer(dwOffset + 4, 4, dwInstPtr - 0x8000000, true, L"Instrument Pointer");
+	for (unsigned int i = 0; i < nNumTracks; i++)
+	{
+		DWORD dwTrackPtrOffset = dwOffset + 8 + i * 4;
+		DWORD dwTrackPtr = GetWord(dwTrackPtrOffset);
+		seqHdr->AddPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, L"Track Pointer");
+	}
+
 	SetPPQN(0x30);
-
-
-	//name.Format("MP2000 Seq %d", GetCount());
-	name = L"MP2000 Seq";
-
 	return true;		//successful
 }
 
 
 bool MP2kSeq::GetTrackPointers(void)
 {
-	for(unsigned int i=0; i<nNumTracks; i++)
-		aTracks.push_back(new MP2kTrack(this, GetWord(dwOffset + 8 + i*4)-0x8000000));
-	//	AddTrack(new MP2kTrack(this, GetWord(dwOffset + 8 + i*4)-0x8000000));
-	//{
-		//MP2kTrack* newTrack = new MP2kTrack(this);
-		//newTrack->dwOffset = GetWord(dwOffset + 8 + i*4)-0x8000000;
-		//aTracks.push_back(newTrack);
-	//}	
+	// Add each tracks
+	for (unsigned int i = 0; i < nNumTracks; i++)
+	{
+		DWORD dwTrackPtrOffset = dwOffset + 8 + i * 4;
+		DWORD dwTrackPtr = GetWord(dwTrackPtrOffset);
+		aTracks.push_back(new MP2kTrack(this, dwTrackPtr - 0x8000000));
+	}
 
-	unLength = (dwOffset+8+nNumTracks*4) - aTracks.front()->dwOffset;
-	dwOffset = aTracks.front()->dwOffset;			//make seq offset the first track offset
+	// Make seq offset the first track offset
+	for (vector<SeqTrack*>::iterator itr = aTracks.begin(); itr != aTracks.end(); ++itr)
+	{
+		SeqTrack * track = (*itr);
+		if (track->dwOffset < dwOffset)
+		{
+			if (unLength != 0)
+			{
+				unLength += (dwOffset - track->dwOffset);
+			}
+			dwOffset = track->dwOffset;
+		}
+	}
 
 	return true;
 }
@@ -152,19 +183,7 @@ bool MP2kTrack::ReadEvent(void)
 				UINT destOffset = GetWord(curOffset) - 0x8000000;
 				curOffset += 4;
 				ULONG length = curOffset - beginOffset;
-
-				// Add next end of track event
-				if (readMode == READMODE_ADD_TO_UI)
-				{
-					if (curOffset < dwOffset + unLength)
-					{
-						BYTE nextCmdByte = GetByte(curOffset);
-						if (nextCmdByte == 0xB1)
-						{
-							AddEndOfTrack(beginOffset, curOffset-beginOffset);
-						}
-					}
-				}
+				UINT dwEndTrackOffset = curOffset;
 
 				curOffset = destOffset;
 				if (!IsOffsetUsed(destOffset) || loopEndPositions.size() != 0)
@@ -174,6 +193,19 @@ bool MP2kTrack::ReadEvent(void)
 				else
 				{
 					AddLoopForever(beginOffset, length, L"Goto");
+				}
+
+				// Add next end of track event
+				if (readMode == READMODE_ADD_TO_UI)
+				{
+					if (dwEndTrackOffset < this->parentSeq->vgmfile->GetEndOffset())
+					{
+						BYTE nextCmdByte = GetByte(dwEndTrackOffset);
+						if (nextCmdByte == 0xB1)
+						{
+							AddEndOfTrack(dwEndTrackOffset, 1);
+						}
+					}
 				}
 				break;
 			}
@@ -317,7 +349,7 @@ bool MP2kTrack::ReadEvent(void)
 			break;
 
 		default :
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", NULL, CLR_UNRECOGNIZED);
+			AddUnknown(beginOffset, curOffset-beginOffset);
 			break;
 		}
 	}

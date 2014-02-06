@@ -21,7 +21,7 @@ class MP2kSeq :
 	public VGMSeq
 {
 public:
-	MP2kSeq(RawFile* file, ULONG offset);
+	MP2kSeq(RawFile* file, ULONG offset, std::wstring name = L"MP2kSeq");
 	virtual ~MP2kSeq(void);
 	//virtual bool OnSelected(void);
 	//virtual bool OnContextMenuCmd(UINT nID);
