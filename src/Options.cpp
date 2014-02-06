@@ -1,4 +1,4 @@
 #include "stdafx.h"
 #include "Options.h"
 
-int ConversionOptions::numSequenceLoops;
+int ConversionOptions::numSequenceLoops = 1;
