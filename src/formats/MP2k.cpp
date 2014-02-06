@@ -4,6 +4,7 @@
  * Special Thanks / Respects To:
  * GBAMusRiper (c) 2012 by Bregalad
  * http://www.romhacking.net/utilities/881/
+ * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
 #include "stdafx.h"
