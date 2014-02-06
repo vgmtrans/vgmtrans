@@ -54,7 +54,7 @@ public:
 	BYTE current_vel;
 	//BOOL bInitHold;
 	//BOOL bInLoop;
-	ULONG loopEndPos;
+	std::vector<ULONG> loopEndPositions;
 	//BOOL bWasJustInLoop;
 };
 

@@ -148,25 +148,51 @@ bool MP2kTrack::ReadEvent(void)
 			return false;
 			break;
 		case 0xB2 :
-			curOffset+=4;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Goto", /*ICON_STARTREP,*/ NULL, CLR_LOOP);
+			{
+				UINT destOffset = GetWord(curOffset) - 0x8000000;
+				curOffset += 4;
+				ULONG length = curOffset - beginOffset;
+
+				// Add next end of track event
+				if (readMode == READMODE_ADD_TO_UI)
+				{
+					if (curOffset < dwOffset + unLength)
+					{
+						BYTE nextCmdByte = GetByte(curOffset);
+						if (nextCmdByte == 0xB1)
+						{
+							AddEndOfTrack(beginOffset, curOffset-beginOffset);
+						}
+					}
+				}
+
+				curOffset = destOffset;
+				if (!IsOffsetUsed(destOffset) || loopEndPositions.size() != 0)
+				{
+					AddGenericEvent(beginOffset, length, L"Goto", NULL, CLR_LOOPFOREVER);
+				}
+				else
+				{
+					AddLoopForever(beginOffset, length, L"Goto");
+				}
+				break;
+			}
 			break;
 		case 0xB3 :		//Branch
 			{
 				UINT destOffset = GetWord(curOffset);
 				curOffset+=4;
-				loopEndPos = curOffset;
+				loopEndPositions.push_back(curOffset);
 				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern Play", NULL, CLR_LOOP);
 				curOffset = destOffset - 0x8000000;
-				bInLoop = TRUE;
 			}
 			break;
 		case 0xB4 :		//Branch Break
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern End", NULL, CLR_LOOP);
-			if (bInLoop)
+			if (loopEndPositions.size() != 0)
 			{
-				curOffset = loopEndPos;
-				bInLoop = FALSE;
+				curOffset = loopEndPositions.back();
+				loopEndPositions.pop_back();
 			}
 			break;
 
@@ -189,8 +215,6 @@ bool MP2kTrack::ReadEvent(void)
 		case 0xBD :
 			{
 				BYTE progNum = GetByte(curOffset++);
-				if (progNum > 119)
-					channel = 9;//SetChannel(9);	//possibly get rid of this
 				AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
 			}
 			break;
@@ -235,8 +259,37 @@ bool MP2kTrack::ReadEvent(void)
 			break;
 
 		case 0xCD :				//extend command
-			//curOffset++;		//don't know
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Extend Command", NULL, CLR_UNKNOWN);
+			{
+				// This command has a subcommand-byte and its arguments.
+				// xIECV = 0x08;		//  imi.echo vol   ***lib
+				// xIECL = 0x09;		//  imi.echo len   ***lib
+				//
+				// Probably, some games extends this command by their own code.
+
+				BYTE subCommand = GetByte(curOffset++);
+				BYTE subParam = GetByte(curOffset);
+
+				if (subCommand == 0x08 && subParam <= 127)
+				{
+					curOffset++;
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo Volume", NULL, CLR_MISC);
+				}
+				else if (subCommand == 0x09 && subParam <= 127)
+				{
+					curOffset++;
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo Length", NULL, CLR_MISC);
+				}
+				else
+				{
+					// Heuristic method
+					while (subParam <= 127)
+					{
+						curOffset++;
+						subParam = GetByte(curOffset);
+					}
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Extend Command", NULL, CLR_UNKNOWN);
+				}
+			}
 			break;
 
 		case 0xCE :
