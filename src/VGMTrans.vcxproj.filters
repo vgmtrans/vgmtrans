@@ -540,6 +540,9 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
+    <ClCompile Include="formats\SNESDSP.cpp">
+      <Filter>Source Files\formats</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -985,6 +988,9 @@
     </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\SNESDSP.h">
+      <Filter>Header Files\formats</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

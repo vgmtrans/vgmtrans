@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "RareSnesScanner.h"
 #include "RareSnesSeq.h"
+#include "SNESDSP.h"
 
 //; Donkey Kong Country SPC
 //1123: e8 01     mov   a,#$01
@@ -146,6 +147,21 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 		delete newSeq;
 		return;
 	}
+
+	// BRR test
+#if 1
+	for (int i = 0; i < 16; i++)
+	{
+		uint16_t addr = file->GetShort(0x3100 + (i * 4));
+		uint16_t loopaddr = file->GetShort(0x3100 + (i * 4 + 2));
+		ULONG length = SNESSamp::GetSampleLength(file, addr);
+		SNESSamp * samp = new SNESSamp(NULL, addr, length, addr, length, loopaddr, L"BRR");
+//		if (!samp->LoadVGMFile())
+//				{
+//			delete samp;
+//}
+	}
+#endif
 }
 
 void RareSnesScanner::SearchForRareSnesFromROM (RawFile* file)

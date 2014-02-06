@@ -184,6 +184,7 @@
   <ItemGroup>
     <ClCompile Include="BytePattern.cpp" />
     <ClCompile Include="datetime.cpp" />
+    <ClCompile Include="formats\SNESDSP.cpp" />
     <ClCompile Include="loaders\GSFLoader.cpp" />
     <ClCompile Include="LogItem.cpp" />
     <ClCompile Include="loaders\NCSFLoader.cpp" />
@@ -317,6 +318,7 @@
   <ItemGroup>
     <ClInclude Include="BytePattern.h" />
     <ClInclude Include="datetime.h" />
+    <ClInclude Include="formats\SNESDSP.h" />
     <ClInclude Include="loaders\GSFLoader.h" />
     <ClInclude Include="LogItem.h" />
     <ClInclude Include="loaders\NCSFLoader.h" />
