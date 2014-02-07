@@ -57,7 +57,24 @@ bool VGMSampColl::Load()
 		return false;
 
 	if (unLength == 0)
-		unLength = samples.back()->dwOffset + samples.back()->unLength - dwOffset;
+	{
+		for (std::vector<VGMSamp*>::iterator itr = samples.begin(); itr != samples.end(); ++itr)
+		{
+			VGMSamp* samp = (*itr);
+
+			assert(dwOffset <= samp->dwOffset);
+			//if (dwOffset > samp->dwOffset)
+			//{
+			//	unLength += samp->dwOffset - dwOffset;
+			//	dwOffset = samp->dwOffset;
+			//}
+
+			if (dwOffset + unLength < samp->dwOffset + samp->unLength)
+			{
+				unLength = (samp->dwOffset + samp->unLength) - dwOffset;
+			}
+		}
+	}
 
 	UseRawFileData();
 	if (!parInstrSet)

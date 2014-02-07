@@ -2,16 +2,103 @@
 
 #include "stdafx.h"
 #include "SNESDSP.h"
-#include "DLSFile.h"
 #include "RawFile.h"
 #include "Root.h"
+
+// ************
+// SNESSampColl
+// ************
+
+SNESSampColl::SNESSampColl(const string& format, RawFile* rawfile, U32 offset) :
+	VGMSampColl(format, rawfile, offset, 0),
+	spcDirAddr(offset)
+{
+	SetDefaultTargets();
+}
+
+SNESSampColl::SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset) :
+	VGMSampColl(format, instrset->rawfile, instrset, offset, 0),
+	spcDirAddr(offset)
+{
+	SetDefaultTargets();
+}
+
+SNESSampColl::SNESSampColl(const string& format, RawFile* rawfile, U32 offset,
+		const std::vector<BYTE>& targetSRCNs, std::wstring name) :
+	VGMSampColl(format, rawfile, offset, 0, name),
+	spcDirAddr(offset),
+	targetSRCNs(targetSRCNs)
+{
+}
+
+SNESSampColl::SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset,
+		const std::vector<BYTE>& targetSRCNs, std::wstring name) :
+	VGMSampColl(format, instrset->rawfile, instrset, offset, 0, name),
+	spcDirAddr(offset),
+	targetSRCNs(targetSRCNs)
+{
+}
+
+SNESSampColl::~SNESSampColl()
+{
+}
+
+void SNESSampColl::SetDefaultTargets()
+{
+	// fix table length
+	UINT expectedLength = 4 * 256;
+
+	// target all samples
+	for (UINT i = 0; i < 256; i++)
+	{
+		if (i * 4 > expectedLength)
+		{
+			break;
+		}
+
+		targetSRCNs.push_back(i);
+	}
+}
+
+bool SNESSampColl::GetSampleInfo()
+{
+	for (std::vector<BYTE>::iterator itr = this->targetSRCNs.begin(); itr != this->targetSRCNs.end(); ++itr)
+	{
+		BYTE srcn = (*itr);
+
+		UINT offDirEnt = spcDirAddr + (srcn * 4);
+		if (offDirEnt + 4 > 0x10000)
+		{
+			continue;
+		}
+
+		uint16_t addrSampStart = GetShort(offDirEnt);
+		uint16_t addrSampLoop = GetShort(offDirEnt + 2);
+		if (addrSampStart > addrSampLoop)
+		{
+			continue;
+		}
+
+		UINT length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart);
+		if (length == 0)
+		{
+			continue;
+		}
+
+		wostringstream name;
+		name << L"Sample " << srcn;
+		SNESSamp* samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length, addrSampLoop, name.str());
+		samples.push_back(samp);
+	}
+	return samples.size() != 0;
+}
 
 //  ********
 //  SNESSamp
 //  ********
 
 SNESSamp::SNESSamp(VGMSampColl* sampColl, ULONG offset, ULONG length, ULONG dataOffset,
-				 ULONG dataLen, ULONG loopOffset, wstring name)
+				 ULONG dataLen, ULONG loopOffset, std::wstring name)
 : VGMSamp(sampColl, offset, length, dataOffset, dataLen, 1, 16, 32000, name),
 	brrLoopOffset(loopOffset)
 {
@@ -30,7 +117,7 @@ ULONG SNESSamp::GetSampleLength(RawFile * file, ULONG offset)
 		currOffset += 9;
 
 		// end?
-		if (flag & 1)
+		if ((flag & 1) != 0 || (flag & 2) != 0)
 		{
 			break;
 		}
@@ -63,15 +150,15 @@ void SNESSamp::ConvertToStdWave(BYTE* buf)
 			break;
 		}
 
-		theBlock.flag.range = GetByte(dwOffset + k) & 0x0f;
+		theBlock.flag.range = (GetByte(dwOffset + k) & 0xf0) >> 4;
 		theBlock.flag.filter = (GetByte(dwOffset + k) & 0x0c) >> 2;
 		theBlock.flag.end = (GetByte(dwOffset + k) & 0x01) != 0; 
 		theBlock.flag.loop = (GetByte(dwOffset+k) & 0x02) != 0;
 
 		GetRawFile()->GetBytes(dwOffset + k + 1, 8, theBlock.brr);
-		DecompBRRBlk((int16_t*)&buf[k * 32 / 9], &theBlock, &prev1, &prev2);	//each decompressed pcm block is 52 bytes   EDIT: (wait, isn't it 56 bytes? or is it 28?)
+		DecompBRRBlk((int16_t*)(&buf[k * 32 / 9]), &theBlock, &prev1, &prev2);	//each decompressed pcm block is 52 bytes   EDIT: (wait, isn't it 56 bytes? or is it 28?)
 
-		if (theBlock.flag.loop)
+		if (theBlock.flag.loop && !theBlock.flag.end)
 		{
 			if (brrLoopOffset < k)
 			{
@@ -79,6 +166,9 @@ void SNESSamp::ConvertToStdWave(BYTE* buf)
 				SetLoopLength((k + 9) - brrLoopOffset);
 				SetLoopStatus(1);
 			}
+		}
+		if (theBlock.flag.loop || theBlock.flag.end)
+		{
 			break;
 		}
 	}

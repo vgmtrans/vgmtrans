@@ -19,6 +19,8 @@ public:
 	void SearchForRareSnesFromROM (RawFile* file);
 
 private:
+	static BytePattern ptnLoadDIR;
+	static BytePattern ptnReadSRCNTable;
 	static BytePattern ptnSongLoadDKC;
 	static BytePattern ptnSongLoadDKC2;
 	static BytePattern ptnVCmdExecDKC;

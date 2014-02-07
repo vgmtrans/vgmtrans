@@ -1,7 +1,31 @@
 #include "stdafx.h"
 #include "RareSnesScanner.h"
 #include "RareSnesSeq.h"
+#include "RareSnesInstr.h"
 #include "SNESDSP.h"
+
+// ; Load DIR address
+// 10df: 8f 5d f2  mov   $f2,#$5d
+// 10e2: 8f 32 f3  mov   $f3,#$32
+BytePattern RareSnesScanner::ptnLoadDIR(
+	"\x8f\x5d\xf2\x8f\x32\xf3"
+	,
+	"xxxx?x"
+	,
+	6);
+
+//; Donkey Kong Country SPC
+// 0ac0: 4d        push  x
+// 0ac1: f7 01     mov   a,($01)+y
+// 0ac3: 5d        mov   x,a
+// 0ac4: f5 e0 04  mov   a,$04e0+x         ; read SRCN table
+// 0ac7: ce        pop   x
+BytePattern RareSnesScanner::ptnReadSRCNTable(
+	"\x4d\xf7\x01\x5d\xf5\xe0\x04\xce"
+	,
+	"xx?xx??x"
+	,
+	8);
 
 //; Donkey Kong Country SPC
 //1123: e8 01     mov   a,#$01
@@ -98,6 +122,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 	UINT addrVCmdTable;
 	wstring name = RawFile::removeExtFromPath(file->GetFileName());
 
+	// find a sequence
 	if (file->SearchBytePattern(ptnSongLoadDKC2, ofsSongLoadASM))
 	{
 		addrSeqHeader = file->GetShort(file->GetByte(ofsSongLoadASM + 8));
@@ -112,6 +137,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 		return;
 	}
 
+	// guess engine version
 	if (file->SearchBytePattern(ptnVCmdExecDKC2, ofsVCmdExecASM))
 	{
 		addrVCmdTable = file->GetShort(ofsVCmdExecASM + 10);
@@ -141,6 +167,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 		return;
 	}
 
+	// load sequence
 	RareSnesSeq* newSeq = new RareSnesSeq(file, version, addrSeqHeader, name);
 	if (!newSeq->LoadVGMFile())
 	{
@@ -148,20 +175,63 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 		return;
 	}
 
-	// BRR test
-#if 1
-	for (int i = 0; i < 16; i++)
+	// Rare engine has a instrument # <--> SRCN # table, find it
+	UINT ofsReadSRCNASM;
+	if (!file->SearchBytePattern(ptnReadSRCNTable, ofsReadSRCNASM))
 	{
-		uint16_t addr = file->GetShort(0x3100 + (i * 4));
-		uint16_t loopaddr = file->GetShort(0x3100 + (i * 4 + 2));
-		ULONG length = SNESSamp::GetSampleLength(file, addr);
-		SNESSamp * samp = new SNESSamp(NULL, addr, length, addr, length, loopaddr, L"BRR");
-//		if (!samp->LoadVGMFile())
-//				{
-//			delete samp;
-//}
+		return;
 	}
-#endif
+	UINT addrSRCNTable = file->GetShort(ofsReadSRCNASM + 5);
+	if (addrSRCNTable + 0x100 > 0x10000)
+	{
+		return;
+	}
+
+	// find DIR address
+	UINT ofsSetDIRASM;
+	if (!file->SearchBytePattern(ptnLoadDIR, ofsSetDIRASM))
+	{
+		return;
+	}
+	UINT spcDirAddr = file->GetByte(ofsSetDIRASM + 4) << 8;
+
+	// scan SRCN table
+	RareSnesInstrSet * newInstrSet = new RareSnesInstrSet(file, addrSRCNTable, spcDirAddr);
+	if (!newInstrSet->LoadVGMFile())
+	{
+		delete newInstrSet;
+		return;
+	}
+
+	// get SRCN # range
+	BYTE maxSRCN = 0;
+	std::vector<BYTE> usedSRCNs;
+	const std::vector<BYTE>& availInstruments = newInstrSet->GetAvailableInstruments();
+	for (std::vector<BYTE>::const_iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr)
+	{
+		BYTE inst = (*itr);
+		BYTE srcn = file->GetByte(addrSRCNTable + inst);
+
+		if (maxSRCN < srcn)
+		{
+			maxSRCN = srcn;
+		}
+
+		std::vector<BYTE>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+		if (itrSRCN == usedSRCNs.end())
+		{
+			usedSRCNs.push_back(srcn);
+		}
+	}
+	std::sort(usedSRCNs.begin(), usedSRCNs.end());
+
+	// load BRR samples
+	SNESSampColl * newSampColl = new SNESSampColl(RareSnesFormat::name, file, spcDirAddr, usedSRCNs);
+	if (!newSampColl->LoadVGMFile())
+	{
+		delete newSampColl;
+		return;
+	}
 }
 
 void RareSnesScanner::SearchForRareSnesFromROM (RawFile* file)
