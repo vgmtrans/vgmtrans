@@ -125,7 +125,7 @@ bool TriAcePS1Instr::LoadInstr()
 		rgn->AddKeyLow (rgninfo->note_range_low, rgn->dwOffset);
 		rgn->AddKeyHigh(rgninfo->note_range_high, rgn->dwOffset+1);
 		rgn->AddVelLow (rgninfo->vel_range_low, rgn->dwOffset+2);
-		rgn->AddVelHigh(rgninfo->vel_range_low, rgn->dwOffset+3);
+		rgn->AddVelHigh(rgninfo->vel_range_high, rgn->dwOffset+3);
 		rgn->AddSimpleItem(rgn->dwOffset+4, 4, L"Sample Offset");
 		rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->dwOffset;
 		rgn->AddSimpleItem(rgn->dwOffset+8, 4, L"Sample Loop Point");
