@@ -156,12 +156,12 @@ void SNESSamp::ConvertToStdWave(BYTE* buf)
 		GetRawFile()->GetBytes(dwOffset + k + 1, 8, theBlock.brr);
 		DecompBRRBlk((int16_t*)(&buf[k * 32 / 9]), &theBlock, &prev1, &prev2);	//each decompressed pcm block is 52 bytes   EDIT: (wait, isn't it 56 bytes? or is it 28?)
 
-		if (theBlock.flag.loop && !theBlock.flag.end)
+		if (theBlock.flag.loop)
 		{
-			if (brrLoopOffset < k)
+			if (brrLoopOffset <= dwOffset + k)
 			{
-				SetLoopOffset(brrLoopOffset);
-				SetLoopLength((k + 9) - brrLoopOffset);
+				SetLoopOffset(brrLoopOffset - dwOffset);
+				SetLoopLength((k + 9) - (brrLoopOffset - dwOffset));
 				SetLoopStatus(1);
 			}
 		}
