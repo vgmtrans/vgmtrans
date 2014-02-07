@@ -27,8 +27,8 @@ class SNESSampColl
 	: public VGMSampColl
 {
 public:
-	SNESSampColl(const string& format, RawFile* rawfile, U32 offset);
-	SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset);
+	SNESSampColl(const string& format, RawFile* rawfile, U32 offset, UINT maxNumSamps = 256);
+	SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset, UINT maxNumSamps = 256);
 	SNESSampColl(const string& format, RawFile* rawfile, U32 offset, const std::vector<BYTE>& targetSRCNs, std::wstring name = L"SNESSampColl");
 	SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset, const std::vector<BYTE>& targetSRCNs, std::wstring name = L"SNESSampColl");
 	virtual ~SNESSampColl();
@@ -39,7 +39,7 @@ protected:
 	std::vector<BYTE> targetSRCNs;
 	U32 spcDirAddr;
 
-	void SetDefaultTargets();
+	void SetDefaultTargets(UINT maxNumSamps);
 };
 
 // ********

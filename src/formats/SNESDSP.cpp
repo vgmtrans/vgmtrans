@@ -9,18 +9,18 @@
 // SNESSampColl
 // ************
 
-SNESSampColl::SNESSampColl(const string& format, RawFile* rawfile, U32 offset) :
+SNESSampColl::SNESSampColl(const string& format, RawFile* rawfile, U32 offset, UINT maxNumSamps) :
 	VGMSampColl(format, rawfile, offset, 0),
 	spcDirAddr(offset)
 {
-	SetDefaultTargets();
+	SetDefaultTargets(maxNumSamps);
 }
 
-SNESSampColl::SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset) :
+SNESSampColl::SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset, UINT maxNumSamps) :
 	VGMSampColl(format, instrset->rawfile, instrset, offset, 0),
 	spcDirAddr(offset)
 {
-	SetDefaultTargets();
+	SetDefaultTargets(maxNumSamps);
 }
 
 SNESSampColl::SNESSampColl(const string& format, RawFile* rawfile, U32 offset,
@@ -43,19 +43,17 @@ SNESSampColl::~SNESSampColl()
 {
 }
 
-void SNESSampColl::SetDefaultTargets()
+void SNESSampColl::SetDefaultTargets(UINT maxNumSamps)
 {
-	// fix table length
-	UINT expectedLength = 4 * 256;
+	// limit sample count to 256
+	if (maxNumSamps > 256)
+	{
+		maxNumSamps = 256;
+	}
 
 	// target all samples
-	for (UINT i = 0; i < 256; i++)
+	for (UINT i = 0; i < maxNumSamps; i++)
 	{
-		if (i * 4 > expectedLength)
-		{
-			break;
-		}
-
 		targetSRCNs.push_back(i);
 	}
 }
