@@ -1179,6 +1179,14 @@ bool RareSnesTrack::ReadEvent(void)
 	return bContinue;
 }
 
+void RareSnesTrack::OnTickBegin(void)
+{
+}
+
+void RareSnesTrack::OnTickEnd(void)
+{
+}
+
 void RareSnesTrack::AddVolLR(ULONG offset, ULONG length, S8 spcVolL, S8 spcVolR, const wchar_t* sEventName)
 {
 	BYTE newMidiVol;

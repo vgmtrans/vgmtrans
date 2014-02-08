@@ -19,6 +19,44 @@ typedef struct _BRRBlk							//Sample Block
 	uint8_t	brr[8];								//Compressed samples
 } BRRBlk;
 
+// *************
+// SNES Envelope
+// *************
+
+template <class T> void SNESConvADSR(T* rgn, U8 adsr1, U8 adsr2, U8 gain)
+{
+	bool adsr_enabled = (adsr1 & 0x80) != 0;
+
+	if (adsr_enabled)
+	{
+		// ADSR mode
+		U8 ar = adsr1 & 0x0f;
+		U8 dr = (adsr1 & 0x70) >> 4;
+		U8 sl = (adsr2 & 0xe0) >> 5;
+		U8 sr = adsr2 & 0x1f;
+
+		// TODO: more acculate implementation?
+		const double arTable[] = { 4.1, 2.6, 1.5, 1.0, 0.640, 0.380, 0.260, 0.160, 0.096, 0.064, 0.040, 0.024, 0.016, 0.010, 0.006, 0.0 };
+		const double drTable[] = { 1.2, 0.740, 0.440, 0.290, 0.180, 0.110, 0.074, 0.037 };
+		const double srTable[] = { -1, 38.0, 28.0, 24.0, 19.0, 14.0, 12.0, 9.4, 7.1, 5.9, 4.7, 3.5, 2.9, 2.4, 1.8, 1.5 };
+		rgn->attack_time = arTable[ar];
+		rgn->decay_time = drTable[dr];
+		rgn->sustain_level = sl / 8.0;
+		if (sr == 0)
+		{
+			rgn->sustain_time = -1; // infinite
+		}
+		else
+		{
+			rgn->sustain_time = srTable[sr];
+		}
+	}
+	else
+	{
+		// TODO: GAIN mode
+	}
+}
+
 // ************
 // SNESSampColl
 // ************

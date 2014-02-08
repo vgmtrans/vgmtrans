@@ -201,6 +201,7 @@ RareSnesRgn::RareSnesRgn(RareSnesInstr* instr, ULONG offset, double transpose, U
 	// 0x80 + (73 - 36) = 0xA5
 	SetUnityKey(36 + 36 - relKey);
 	SetFineTune(fineTune);
+	SNESConvADSR<VGMRgn>(this, adsr >> 8, adsr & 0xff, 0);
 }
 
 RareSnesRgn::~RareSnesRgn()
@@ -209,6 +210,5 @@ RareSnesRgn::~RareSnesRgn()
 
 bool RareSnesRgn::LoadRgn()
 {
-	
 	return true;
 }

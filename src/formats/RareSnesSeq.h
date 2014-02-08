@@ -123,6 +123,8 @@ public:
 	virtual bool LoadTrackInit(ULONG trackNum);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
+	virtual void OnTickBegin(void);
+	virtual void OnTickEnd(void);
 
 	void AddVolLR(ULONG offset, ULONG length, S8 spcVolL, S8 spcVolR, const wchar_t* sEventName = L"Volume L/R");
 	void AddVolLRNoItem(S8 spcVolL, S8 spcVolR);
