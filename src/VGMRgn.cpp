@@ -20,12 +20,12 @@ VGMRgn::VGMRgn(VGMInstr* instr, ULONG offset, ULONG length, const wchar_t* name)
   fineTune(0),
   pan(0.5),
   volume(-1),
-  attack_time(-1),
-  attack_transform(-1),
-  decay_time(-1),
+  attack_time(0),
+  attack_transform(no_transform),
+  decay_time(0),
   sustain_level(-1),
-  release_transform(-1),
-  release_time(-1)
+  release_transform(no_transform),
+  release_time(0)
 {
 	AddContainer<VGMRgnItem>(items);
 }
@@ -45,13 +45,13 @@ VGMRgn::VGMRgn(VGMInstr* instr, ULONG offset, ULONG length, BYTE theKeyLow, BYTE
   fineTune(0),
   pan(0.5),
   volume(-1),
-  attack_time(-1),
-  attack_transform(-1),
-  decay_time(-1),
+  attack_time(0),
+  attack_transform(no_transform),
+  decay_time(0),
   sustain_level(-1),
-  sustain_time(-1),
-  release_transform(-1),
-  release_time(-1)
+  sustain_time(0),
+  release_transform(no_transform),
+  release_time(0)
 {
 	AddContainer<VGMRgnItem>(items);
 }

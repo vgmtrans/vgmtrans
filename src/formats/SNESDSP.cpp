@@ -115,7 +115,7 @@ ULONG SNESSamp::GetSampleLength(RawFile * file, ULONG offset)
 		currOffset += 9;
 
 		// end?
-		if ((flag & 1) != 0 || (flag & 2) != 0)
+		if ((flag & 1) != 0)
 		{
 			break;
 		}
@@ -151,22 +151,22 @@ void SNESSamp::ConvertToStdWave(BYTE* buf)
 		theBlock.flag.range = (GetByte(dwOffset + k) & 0xf0) >> 4;
 		theBlock.flag.filter = (GetByte(dwOffset + k) & 0x0c) >> 2;
 		theBlock.flag.end = (GetByte(dwOffset + k) & 0x01) != 0; 
-		theBlock.flag.loop = (GetByte(dwOffset+k) & 0x02) != 0;
+		theBlock.flag.loop = (GetByte(dwOffset + k) & 0x02) != 0;
 
 		GetRawFile()->GetBytes(dwOffset + k + 1, 8, theBlock.brr);
-		DecompBRRBlk((int16_t*)(&buf[k * 32 / 9]), &theBlock, &prev1, &prev2);	//each decompressed pcm block is 52 bytes   EDIT: (wait, isn't it 56 bytes? or is it 28?)
+		DecompBRRBlk((int16_t*)(&buf[k * 32 / 9]), &theBlock, &prev1, &prev2);	//each decompressed pcm block is 32 bytes
 
-		if (theBlock.flag.loop)
+		if (theBlock.flag.end)
 		{
-			if (brrLoopOffset <= dwOffset + k)
+			if (theBlock.flag.loop)
 			{
-				SetLoopOffset(brrLoopOffset - dwOffset);
-				SetLoopLength((k + 9) - (brrLoopOffset - dwOffset));
-				SetLoopStatus(1);
+				if (brrLoopOffset <= dwOffset + k)
+				{
+					SetLoopOffset(brrLoopOffset - dwOffset);
+					SetLoopLength((k + 9) - (brrLoopOffset - dwOffset));
+					SetLoopStatus(1);
+				}
 			}
-		}
-		if (theBlock.flag.loop || theBlock.flag.end)
-		{
 			break;
 		}
 	}

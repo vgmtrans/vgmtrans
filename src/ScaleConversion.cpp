@@ -147,21 +147,19 @@ double ConvertPercentAmpToStdMidiScale(double percent)
 double ConvertLogScaleValToAtten(double percent)
 {
 	if (percent == 0)
-		return 100.0;		//assume 0 is 100db attenuation
-	double atten = -20*log10(percent);
-	return min(atten, 100.0);
+		return 100.0;		// assume 0 is -100.0db attenuation
+	double atten = 20*log10(percent)*2;
+	return min(-atten, 100.0);
 }
 
 // Convert a percent of volume value to it's attenuation in decibels.
-//  ex: ConvertPercentVolToAttenDB(0.5) returns 10db = half perceived loudness
+//  ex: ConvertPercentVolToAttenDB(0.5) returns -(-6.02db) = half perceived loudness
 double ConvertPercentAmplitudeToAttenDB(double percent)
 {
 	if (percent == 0)
-		return 100.0;		//assume 0 is 100db attenuation
-	double atten = -20*log10(percent);
-	return min(atten, 100.0);
-	//return -10*log10(percent);
-	//return -33.22*log10(percent);
+		return 100.0;		// assume 0 is -100.0db attenuation
+	double atten = 20*log10(percent);
+	return min(-atten, 100.0);
 }
 
 double SecondsToTimecents(double secs)

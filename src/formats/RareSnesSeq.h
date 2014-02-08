@@ -99,8 +99,8 @@ public:
 	BYTE midiReverb;                            // MIDI reverb level for SPC700 echo
 	BYTE timerFreq;                             // SPC700 timer 0 frequency (tempo base)
 	BYTE tempo;                                 // song tempo
-	S8 presetVolL[5];                         // volume preset L
-	S8 presetVolR[5];                         // volume preset R
+	S8 presetVolL[5];                           // volume preset L
+	S8 presetVolR[5];                           // volume preset R
 	USHORT presetADSR[5];                       // ADSR preset
 
 	double GetTempoInBPM ();

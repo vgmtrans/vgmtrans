@@ -898,8 +898,9 @@ void SeqTrack::AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool 
 //		{
 		if (requireBank)
 		{
-			pMidiTrack->AddBankSelect(channel, (progNum >> 14) & 0x7f);
-			pMidiTrack->AddBankSelectFine(channel, (progNum >> 7) & 0x7f);
+			pMidiTrack->AddBankSelect(channel, (progNum >> 7) & 0x7f);
+			//pMidiTrack->AddBankSelect(channel, (progNum >> 14) & 0x7f);
+			//pMidiTrack->AddBankSelectFine(channel, (progNum >> 7) & 0x7f);
 		}
 		pMidiTrack->AddProgramChange(channel, progNum & 0x7f);
 //		}

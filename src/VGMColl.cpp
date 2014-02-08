@@ -626,7 +626,11 @@ SynthFile* VGMColl::CreateSynthFile()
 				//if (rgn->attack_time < .001)
 				//	rgn->attack_time = .001;
 
-				double sustainLevAttenDb =  ConvertPercentAmplitudeToAttenDB(rgn->sustain_level);
+				double sustainLevAttenDb;
+				if (rgn->sustain_level == -1)
+					sustainLevAttenDb = 0.0;
+				else
+					sustainLevAttenDb = ConvertPercentAmplitudeToAttenDB(rgn->sustain_level);
 
 				SynthArt* newArt = newRgn->AddArt();
 				newArt->AddPan(rgn->pan);

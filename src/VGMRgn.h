@@ -1,4 +1,5 @@
 #pragma once
+#include "SynthFile.h"
 #include "VGMItem.h"
 #include "Loop.h"
 

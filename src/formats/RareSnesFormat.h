@@ -1,5 +1,6 @@
 #pragma once
 #include "Format.h"
+#include "Matcher.h"
 #include "Root.h"
 #include "RareSnesScanner.h"
 
@@ -10,6 +11,7 @@
 
 BEGIN_FORMAT(RareSnes)
 	USING_SCANNER(RareSnesScanner)
+	USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
 

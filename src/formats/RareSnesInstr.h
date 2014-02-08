@@ -21,6 +21,7 @@ public:
 
 protected:
 	U32 spcDirAddr;
+	BYTE maxSRCNValue;
 	std::vector<BYTE> availInstruments;
 
 	void ScanAvailableInstruments();
