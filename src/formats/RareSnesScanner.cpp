@@ -196,7 +196,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 	UINT spcDirAddr = file->GetByte(ofsSetDIRASM + 4) << 8;
 
 	// scan SRCN table
-	RareSnesInstrSet * newInstrSet = new RareSnesInstrSet(file, addrSRCNTable, spcDirAddr);
+	RareSnesInstrSet * newInstrSet = new RareSnesInstrSet(file, addrSRCNTable, spcDirAddr, newSeq->instrUnityKeyHints, newSeq->instrADSRHints);
 	if (!newInstrSet->LoadVGMFile())
 	{
 		delete newInstrSet;

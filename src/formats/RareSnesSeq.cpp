@@ -294,6 +294,8 @@ void RareSnesTrack::ResetVars(void)
 	spcNotePitch = 0;
 	spcTranspose = 0;
 	spcTransposeAbs = 0;
+	spcInstr = 0;
+	spcADSR = 0x8EE0;
 	spcTuning = 0;
 	defNoteDur = 0;
 	useLongDur = false;
@@ -395,6 +397,16 @@ bool RareSnesTrack::ReadEvent(void)
 		}
 		else
 		{
+			// a note, add hints for instrument
+			if (parentSeq->instrUnityKeyHints.find(spcInstr) == parentSeq->instrUnityKeyHints.end())
+			{
+				parentSeq->instrUnityKeyHints[spcInstr] = spcTransposeAbs + GetTuningInSemitones(spcTuning);
+			}
+			if (parentSeq->instrADSRHints.find(spcInstr) == parentSeq->instrADSRHints.end())
+			{
+				parentSeq->instrADSRHints[spcInstr] = spcADSR;
+			}
+
 			spcNotePitch = RareSnesSeq::NOTE_PITCH_TABLE[spcKey];
 			spcNotePitch = (spcNotePitch * (1024 + spcTuning) + (spcTuning < 0 ? 1023 : 0)) / 1024;
 
@@ -494,6 +506,7 @@ bool RareSnesTrack::ReadEvent(void)
 		case EVENT_PROGCHANGE:
 		{
 			BYTE newProg = GetByte(curOffset++);
+			spcInstr = newProg;
 			AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true);
 			break;
 		}
@@ -504,6 +517,7 @@ bool RareSnesTrack::ReadEvent(void)
 			S8 newVolL = (signed) GetByte(curOffset++);
 			S8 newVolR = (signed) GetByte(curOffset++);
 
+			spcInstr = newProg;
 			spcVolL = newVolL;
 			spcVolR = newVolR;
 			AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true, L"Program Change, Volume");
@@ -719,6 +733,8 @@ bool RareSnesTrack::ReadEvent(void)
 		case EVENT_ADSR:
 		{
 			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
+			spcADSR = newADSR;
+
 			desc << L"ADSR: " << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)newADSR;
 			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"ADSR", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
@@ -1030,12 +1046,14 @@ bool RareSnesTrack::ReadEvent(void)
 		//	break;
 
 		case EVENT_RESETADSR:
+			spcADSR = 0x8FE0;
 			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset ADSR", L"ADSR: 8FE0", CLR_ADSR, ICON_CONTROL);
 			EVENT_WITH_MIDITEXT_END
 			break;
 
 		case EVENT_RESETADSRSOFT:
+			spcADSR = 0x8EE0;
 			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset ADSR (Soft)", L"ADSR: 8EE0", CLR_ADSR, ICON_CONTROL);
 			EVENT_WITH_MIDITEXT_END
@@ -1050,6 +1068,7 @@ bool RareSnesTrack::ReadEvent(void)
 			desc << L"Program Number: " << (int)newProg << L"  Transpose: " << (int)newTransp << L"  Tuning: " << (int)newTuning << L" (" << (int)(GetTuningInSemitones(newTuning) * 100 + 0.5) << L" cents)";;
 
 			// instrument
+			spcInstr = newProg;
 			AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true, L"Program Change, Transpose, Tuning");
 
 			// transpose
@@ -1075,6 +1094,7 @@ bool RareSnesTrack::ReadEvent(void)
 			desc << L"  ADSR: " << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)newADSR;
 
 			// instrument
+			spcInstr = newProg;
 			AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true, L"Program Change, Transpose, Tuning, Volume L/R, ADSR");
 
 			// transpose
@@ -1090,6 +1110,7 @@ bool RareSnesTrack::ReadEvent(void)
 			AddVolLRNoItem(spcVolL, spcVolR);
 
 			// ADSR
+			spcADSR = newADSR;
 
 			break;
 		}

@@ -93,6 +93,9 @@ public:
 	RareSnesVersion version;
 	map<BYTE, RareSnesSeqEventType> EventMap;
 
+	std::map<BYTE, double> instrUnityKeyHints;
+	std::map<BYTE, USHORT> instrADSRHints;
+
 	static const USHORT NOTE_PITCH_TABLE[128];  // note number to frequency table
 
 	BYTE initialTempo;                          // initial tempo value written in header
@@ -134,6 +137,8 @@ private:
 	S8 spcTransposeAbs;                         // transpose (without relative change)
 	S8 spcTuning;                               // tuning (compatible with actual engine)
 	S8 spcVolL, spcVolR;                        // SPC700 left/right volume
+	BYTE spcInstr;                              // SPC700 instrument index (NOT SRCN value)
+	USHORT spcADSR;                             // SPC700 ADSR value
 	USHORT defNoteDur;                          // default duration for note (0:unused)
 	bool useLongDur;                            // indicates duration length
 	BYTE altNoteByte1;                          // note number preset 1
