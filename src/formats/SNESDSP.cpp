@@ -5,6 +5,79 @@
 #include "RawFile.h"
 #include "Root.h"
 
+// *************
+// SNES Envelope
+// *************
+
+// Simulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
+// return elapsed time in sample count, and final env value if requested.
+UINT GetSNESGAINEnvLength(U8 gain, S16 env, S16 env_to, S16 * env_after)
+{
+	U8 mode = gain >> 5;
+	U8 rate = gain & 0x1f;
+	UINT tick = 0;
+
+	if (env < 0 || env > 0x7ff)
+	{
+		return 0;
+	}
+	if (env_to < 0 || env_to > 0x7ff)
+	{
+		return 0;
+	}
+
+	if (mode < 4) // direct
+	{
+		env = gain * 0x10;
+		rate = 31;
+		tick = 0;
+	}
+	else if ( mode == 4 ) // 4: linear decrease
+	{
+		while (env > env_to)
+		{
+			env -= 0x20;
+			if (env < 0)
+				env = 0;
+			tick++;
+		}
+	}
+	else if ( mode < 6 ) // 5: exponential decrease
+	{
+		while (env > env_to)
+		{
+			env--;
+			env -= env >> 8;
+			tick++;
+		}
+	}
+	else // 6,7: linear increase
+	{
+		S16 env_prev = (env >= 0x20) ? env - 0x20 : 0; // obviously not true, but I guess it's not wrong in most cases.
+
+		while (env < env_to)
+		{
+			env += 0x20;
+			if ( mode > 6 && (unsigned) env_prev >= 0x600 )
+			{
+				env += 0x8 - 0x20; // 7: two-slope linear increase
+			}
+			env_prev = env;
+			if (env > 0x7ff)
+			{
+				env = 0x7ff;
+			}
+			tick++;
+		}
+	}
+
+	if (env_after != NULL)
+	{
+		*env_after = env;
+	}
+	return tick * SDSP_COUNTER_RATES[rate];
+}
+
 // ************
 // SNESSampColl
 // ************
