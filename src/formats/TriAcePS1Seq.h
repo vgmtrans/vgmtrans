@@ -17,7 +17,7 @@ public:
 	} TrkInfo;
 
 
-	TriAcePS1Seq(RawFile* file, ULONG offset);
+	TriAcePS1Seq(RawFile* file, uint32_t offset);
 	virtual ~TriAcePS1Seq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -29,14 +29,14 @@ public:
 	std::vector<TriAcePS1ScorePattern*> aScorePatterns;
 	TriAcePS1ScorePattern* curScorePattern;
 	std::map<uint32_t, TriAcePS1ScorePattern*> patternMap;
-	BYTE initialTempoBPM;
+	uint8_t initialTempoBPM;
 };
 
 class TriAcePS1ScorePattern
 	: public VGMContainerItem
 {
 public:
-	TriAcePS1ScorePattern(TriAcePS1Seq* parentSeq, ULONG offset)
+	TriAcePS1ScorePattern(TriAcePS1Seq* parentSeq, uint32_t offset)
 	   : VGMContainerItem(parentSeq, offset, 0, L"Score Pattern") { }
 };
 
@@ -47,12 +47,12 @@ class TriAcePS1Track
 public:
 	TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset = 0, long length = 0);
 
-	virtual bool LoadTrackMainLoop(ULONG stopOffset);
+	virtual bool LoadTrackMainLoop(uint32_t stopOffset);
 	uint32_t ReadScorePattern(uint32_t offset);
-	virtual bool IsOffsetUsed(ULONG offset);
+	virtual bool IsOffsetUsed(uint32_t offset);
 	virtual void AddEvent(SeqEvent* pSeqEvent);
 	virtual bool ReadEvent(void);
 
-	BYTE impliedNoteDur;
-	BYTE impliedVelocity;
+	uint8_t impliedNoteDur;
+	uint8_t impliedVelocity;
 };

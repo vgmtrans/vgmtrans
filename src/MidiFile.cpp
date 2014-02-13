@@ -41,7 +41,7 @@ MidiTrack* MidiFile::InsertTrack(uint32_t trackNum)
 		return aTracks[trackNum];
 }
 
-void MidiFile::SetPPQN(WORD ppqn)
+void MidiFile::SetPPQN(uint16_t ppqn)
 {
 	this->ppqn = ppqn;
 }
@@ -84,7 +84,7 @@ void MidiFile::WriteMidiToBuffer(vector<uint8_t> & buf)
 	//	if (aTracks[i])
 	//		nNumTracks++;
 	//}
-	int nNumTracks = aTracks.size();
+	size_t nNumTracks = aTracks.size();
 	buf.push_back('M');
 	buf.push_back('T');
 	buf.push_back('h');
@@ -187,17 +187,17 @@ void MidiTrack::WriteTrack(vector<uint8_t> & buf)
 	stable_sort(finalEvents.begin(), finalEvents.end(), PriorityCmp());	//Sort all the events by priority
 	stable_sort(finalEvents.begin(), finalEvents.end(), AbsTimeCmp());	//Sort all the events by absolute time, so that delta times can be recorded correctly
 
-	int numEvents = finalEvents.size();
+	size_t numEvents = finalEvents.size();
 
 	//sort(aFinalEvents.begin(), aFinalEvents.end(), PriorityCmp());	//Sort all the events by priority
 	//stable_sort(aFinalEvents.begin(), aFinalEvents.end(), AbsTimeCmp());	//Sort all the events by absolute time, so that delta times can be recorded correctly
 	//if (!bHasEndOfTrack && aFinalEvents.size())
 	//	aFinalEvents.push_back(new EndOfTrackEvent(this, aFinalEvents.back()->AbsTime));
 	//int nNumEvents = aEvents.size();
-	for (int i=0; i<numEvents; i++)
+	for (size_t i=0; i<numEvents; i++)
 		time = finalEvents[i]->WriteEvent(buf, time);		//write all events into the buffer
 
-	uint32_t trackSize = buf.size() - 8;						//-8 for MTrk and size that shouldn't be accounted for
+	uint32_t trackSize = (uint32_t)(buf.size() - 8);		//-8 for MTrk and size that shouldn't be accounted for
 	buf[4] = (uint8_t)((trackSize & 0xFF000000) >> 24);
 	buf[5] = (uint8_t)((trackSize & 0x00FF0000) >> 16);
 	buf[6] = (uint8_t)((trackSize & 0x0000FF00) >> 8);
@@ -588,7 +588,7 @@ uint32_t MidiEvent::WriteSysexEvent(vector<uint8_t> & buf, uint32_t time, uint8_
 {
 	WriteVarLength(buf, AbsTime-time);
 	buf.push_back(0xF0);
-	WriteVarLength(buf, dataSize + 1);
+	WriteVarLength(buf, (uint32_t)(dataSize + 1));
 	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++)
 	{
 		buf.push_back(data[dataIndex]);
@@ -602,7 +602,7 @@ uint32_t MidiEvent::WriteMetaEvent(vector<uint8_t> & buf, uint32_t time, uint8_t
 	WriteVarLength(buf, AbsTime-time);
 	buf.push_back(0xFF);
 	buf.push_back(metaType);
-	WriteVarLength(buf, dataSize);
+	WriteVarLength(buf, (uint32_t)dataSize);
 	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++)
 	{
 		buf.push_back(data[dataIndex]);

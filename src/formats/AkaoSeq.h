@@ -13,18 +13,18 @@ class AkaoSeq :
 	public VGMSeq
 {
 public:
-	AkaoSeq(RawFile* file, ULONG offset);
+	AkaoSeq(RawFile* file, uint32_t offset);
 	virtual ~AkaoSeq(void);
 
 	virtual bool GetHeaderInfo();
 	virtual bool GetTrackPointers(void);
 	
-	BYTE GetNumPositiveBits(ULONG ulWord);
+	uint8_t GetNumPositiveBits(uint32_t ulWord);
 
 public:
 	AkaoInstrSet* instrset;
-	USHORT seq_id;
-	USHORT assoc_ss_id;
+	uint16_t seq_id;
+	uint16_t assoc_ss_id;
 	int nVersion;		//version of the AKAO format
 
 	bool bUsesIndividualArts;
@@ -45,13 +45,13 @@ public:
 	
 
 protected:
-	BYTE relative_key, base_key;
-	ULONG current_delta_time;
+	uint8_t relative_key, base_key;
+	uint32_t current_delta_time;
 	unsigned long loop_begin_loc[8];
 	unsigned long loopID[8];
 	int loop_counter[8];
 	int loop_layer;
 	int loop_begin_layer;
 	bool bNotePlaying;
-	std::vector<ULONG> vCondJumpAddr;
+	std::vector<uint32_t> vCondJumpAddr;
 };

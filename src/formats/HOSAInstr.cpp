@@ -14,7 +14,7 @@
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-HOSAInstrSet::HOSAInstrSet(RawFile* file, ULONG offset)
+HOSAInstrSet::HOSAInstrSet(RawFile* file, uint32_t offset)
 : VGMInstrSet(HOSAFormat::name, file, offset, 0, L"HOSAWAH ")
 {
 }
@@ -65,7 +65,7 @@ bool HOSAInstrSet::GetHeaderInfo()
 bool HOSAInstrSet::GetInstrPointers()
 {
 
-	ULONG	iOffset = dwOffset + sizeof(InstrHeader);	//pointer of attribute table
+	uint32_t	iOffset = dwOffset + sizeof(InstrHeader);	//pointer of attribute table
 
 	//âπêFêîÇæÇØåJÇËï‘Ç∑ÅB
 	for(unsigned int i=0; i<instrheader.numInstr; i++)
@@ -88,7 +88,7 @@ bool HOSAInstrSet::GetInstrPointers()
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-HOSAInstr::HOSAInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum)
+HOSAInstr::HOSAInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum),
 	rgns(NULL)
 {

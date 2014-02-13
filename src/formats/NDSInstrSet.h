@@ -13,7 +13,7 @@ class NDSInstrSet :
 	public VGMInstrSet
 {
 public:
-	NDSInstrSet(RawFile* file, ULONG offset, ULONG length, std::wstring name = L"NDS Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
+	NDSInstrSet(RawFile* file, uint32_t offset, uint32_t length, std::wstring name = L"NDS Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
 	virtual bool GetInstrPointers();
 
 	std::vector<VGMSampColl*> sampCollWAList;
@@ -28,15 +28,15 @@ class NDSInstr :
 	public VGMInstr
 {
 public:
-	NDSInstr(NDSInstrSet* instrSet, ULONG offset, ULONG length, ULONG bank, ULONG instrNum, BYTE instrType);
+	NDSInstr(NDSInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum, uint8_t instrType);
 
 	virtual bool LoadInstr();
 
 	void GetSampCollPtr(VGMRgn* rgn, int waNum);
-	void GetArticData(VGMRgn* rgn, ULONG offset);
-	USHORT GetFallingRate(BYTE DecayTime);
+	void GetArticData(VGMRgn* rgn, uint32_t offset);
+	uint16_t GetFallingRate(uint8_t DecayTime);
 private:
-	BYTE instrType;
+	uint8_t instrType;
 };
 
 
@@ -96,7 +96,7 @@ class NDSWaveArch :
 	public VGMSampColl
 {
 public:
-	NDSWaveArch(RawFile* file, ULONG offset, ULONG length, std::wstring name = L"NDS Wave Archive");
+	NDSWaveArch(RawFile* file, uint32_t offset, uint32_t length, std::wstring name = L"NDS Wave Archive");
 	virtual ~NDSWaveArch();
 
 	virtual bool GetHeaderInfo();
@@ -113,15 +113,15 @@ class NDSSamp :
 	public VGMSamp
 {
 public:
-	NDSSamp(VGMSampColl* sampColl, ULONG offset = 0, ULONG length = 0,
-						ULONG dataOffset = 0, ULONG dataLength = 0, BYTE channels = 1, USHORT bps = 16,
-						ULONG rate = 0, BYTE waveType = 0, std::wstring name = L"Sample");
+	NDSSamp(VGMSampColl* sampColl, uint32_t offset = 0, uint32_t length = 0,
+						uint32_t dataOffset = 0, uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16,
+						uint32_t rate = 0, uint8_t waveType = 0, std::wstring name = L"Sample");
 
 	virtual double GetCompressionRatio(); // ratio of space conserved.  should generally be > 1
 								  // used to calculate both uncompressed sample size and loopOff after conversion
-	virtual void ConvertToStdWave(BYTE* buf);
+	virtual void ConvertToStdWave(uint8_t* buf);
 	
-	void ConvertImaAdpcm(BYTE *buf);
+	void ConvertImaAdpcm(uint8_t *buf);
 
 	static inline void clamp_step_index(int& stepIndex);
 	static inline void clamp_sample(int& decompSample);
@@ -129,6 +129,6 @@ public:
 
 	enum { PCM8, PCM16, IMA_ADPCM };
 
-	BYTE waveType;
+	uint8_t waveType;
 };
 

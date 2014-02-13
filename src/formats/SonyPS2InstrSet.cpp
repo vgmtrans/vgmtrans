@@ -10,7 +10,7 @@ using namespace std;
 // SonyPS2InstrSet
 // ***************
 
-SonyPS2InstrSet::SonyPS2InstrSet(RawFile* file, ULONG offset)
+SonyPS2InstrSet::SonyPS2InstrSet(RawFile* file, uint32_t offset)
 : VGMInstrSet(SonyPS2Format::name, file, offset)
 {
 }
@@ -288,10 +288,10 @@ bool SonyPS2InstrSet::GetInstrPointers()
 	progParamsHdr->unLength = (curOffset + progCk.programOffsetAddr[maxProgNum]) + sizeof(SonyPS2Instr::ProgParam) + 
 		progCk.progParamBlock[maxProgNum].nSplit * sizeof(SonyPS2Instr::SplitBlock) - progParamsHdr->dwOffset;
 
-	//ULONG j = 0x20+dwOffset;
-	//for (UINT i=0; i<dwNumInstrs; i++)
+	//uint32_t j = 0x20+dwOffset;
+	//for (uint32_t i=0; i<dwNumInstrs; i++)
 	//{
-	//	ULONG instrLength;
+	//	uint32_t instrLength;
 	//	if (i != dwNumInstrs-1)	//while not the last instr
 	//		instrLength = GetWord(j+((i+1)*4)) - GetWord(j+(i*4));
 	//	else
@@ -309,7 +309,7 @@ bool SonyPS2InstrSet::GetInstrPointers()
 // ************
 
 
-SonyPS2Instr::SonyPS2Instr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum)
+SonyPS2Instr::SonyPS2Instr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, L"Program Param"),
     splitBlocks(0)
 {
@@ -367,7 +367,7 @@ bool SonyPS2Instr::LoadInstr()
 			if (pan > 0x7F) pan = 0x7F;
 			if (pan < 0) pan = 0;
 			//double realPan = (pan-0x40)* (1.0/(double)0x40);
-			rgn->SetPan((BYTE)pan);
+			rgn->SetPan((uint8_t)pan);
 			rgn->SetFineTune(splitblock.splitTranspose * 100 + splitblock.splitDetune);
 
 			long vol = progParam.progVolume * splitblock.splitVolume * sampParam.sampleVolume;
@@ -397,7 +397,7 @@ int8_t SonyPS2Instr::ConvertPanVal(uint8_t panVal)
 // SonyPS2SampColl
 // ***************
 
-SonyPS2SampColl::SonyPS2SampColl(RawFile* rawfile, ULONG offset, ULONG length)
+SonyPS2SampColl::SonyPS2SampColl(RawFile* rawfile, uint32_t offset, uint32_t length)
 : VGMSampColl(SonyPS2Format::name, rawfile, offset, length)
 {
 	this->LoadOnInstrMatch();

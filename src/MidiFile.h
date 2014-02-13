@@ -160,7 +160,7 @@ public:
 	~MidiFile(void);
 	MidiTrack* AddTrack();
 	MidiTrack* InsertTrack(uint32_t trackNum);
-	void SetPPQN(WORD ppqn);
+	void SetPPQN(uint16_t ppqn);
 	uint32_t GetPPQN();
 	void WriteMidiToBuffer(std::vector<uint8_t> & buf);
 	void Sort(void);
@@ -172,7 +172,7 @@ protected:
 
 public:
 	VGMSeq* assocSeq;
-	WORD ppqn;
+	uint16_t ppqn;
 
 	std::vector<MidiTrack*> aTracks;
 	MidiTrack globalTrack;			//events in the globalTrack will be copied into every other track

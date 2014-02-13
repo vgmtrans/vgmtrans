@@ -10,7 +10,7 @@ using namespace std;
 // WDInstrSet
 // **********
 
-WDInstrSet::WDInstrSet(RawFile* file, ULONG offset)
+WDInstrSet::WDInstrSet(RawFile* file, uint32_t offset)
 : VGMInstrSet(SquarePS2Format::name, file, offset)
 {
 }
@@ -40,8 +40,8 @@ bool WDInstrSet::GetHeaderInfo()
 	theName << L"WD " << id;
 	name = theName.str();
 
-	ULONG sampCollOff = dwOffset + GetWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
-	//ULONG sampCollOff = (((dwNumInstrs/4)+(dwNumInstrs%4 > 0))* 0x10) + dwTotalRegions * 0x20 + 0x20 + dwOffset;
+	uint32_t sampCollOff = dwOffset + GetWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
+	//uint32_t sampCollOff = (((dwNumInstrs/4)+(dwNumInstrs%4 > 0))* 0x10) + dwTotalRegions * 0x20 + 0x20 + dwOffset;
 	
 	sampColl = new PSXSampColl(SquarePS2Format::name, this, sampCollOff, dwSampSectSize);
 	unLength = sampCollOff+dwSampSectSize - dwOffset;
@@ -52,20 +52,20 @@ bool WDInstrSet::GetHeaderInfo()
 bool WDInstrSet::GetInstrPointers()
 {
 
-	ULONG j = 0x20+dwOffset;
+	uint32_t j = 0x20+dwOffset;
 
 	//check for bouncer WDs with 0xFFFFFFFF as the last instr pointer.  If it's there ignore it
-	for (UINT i=0; i<dwNumInstrs; i++)
+	for (uint32_t i=0; i<dwNumInstrs; i++)
 	{
 		if (GetWord(j + i*4) == 0xFFFFFFFF)
 			dwNumInstrs = i;
 	}
 
-	for (UINT i=0; i<dwNumInstrs; i++)
+	for (uint32_t i=0; i<dwNumInstrs; i++)
 	{
 		
 
-		ULONG instrLength;
+		uint32_t instrLength;
 		if (i != dwNumInstrs-1)	//while not the last instr
 			instrLength = GetWord(j+((i+1)*4)) - GetWord(j+(i*4));
 		else
@@ -85,7 +85,7 @@ bool WDInstrSet::GetInstrPointers()
 // *******
 
 
-WDInstr::WDInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, const wstring name)
+WDInstr::WDInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum, const wstring name)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, name)
 {
 }
@@ -98,7 +98,7 @@ WDInstr::~WDInstr(void)
 bool WDInstr::LoadInstr()
 {
 	wostringstream	strStr;
-	ULONG j=0;
+	uint32_t j=0;
 	long startAddress = 0;
 	BOOL notSampleStart = false;
 
@@ -145,7 +145,7 @@ bool WDInstr::LoadInstr()
 		rgn->keyHigh =  GetByte(k*0x20 + 0x14 + dwOffset);
 		rgn->velHigh = Convert7bitPercentVolValToStdMidiVal( GetByte(k*0x20 + 0x15 + dwOffset) );
 
-		BYTE vol = GetByte(k*0x20 + 0x16 + dwOffset);
+		uint8_t vol = GetByte(k*0x20 + 0x16 + dwOffset);
 		rgn->SetVolume((double)vol / 127.0);
 
 		rgn->pan =  (double)GetByte(k*0x20 + 0x17 + dwOffset);		//need to convert
@@ -175,9 +175,9 @@ bool WDInstr::LoadInstr()
 	}
 
 	//First, do key and velocity ranges
-	BYTE prevKeyHigh = 0;
-	BYTE prevVelHigh = 0;
-	for (UINT k=0; k<aRgns.size(); k++)
+	uint8_t prevKeyHigh = 0;
+	uint8_t prevVelHigh = 0;
+	for (uint32_t k=0; k<aRgns.size(); k++)
 	{
 		// Key Ranges
 		if (((WDRgn*)aRgns[k])->bFirstRegion) //&& !instrument[i].region[k].bLastRegion) //used in ffx2 0049 YRP battle 1.  check out first instrument, flags are weird
@@ -224,7 +224,7 @@ bool WDInstr::LoadInstr()
 // WDRgn
 // *****
 
-WDRgn::WDRgn(WDInstr* instr, ULONG offset)
+WDRgn::WDRgn(WDInstr* instr, uint32_t offset)
 : VGMRgn(instr, offset, 0x20)
 {
 }

@@ -88,7 +88,7 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 
 	RawFile* programFile = seqRomGroupEntry->file;
 	RawFile* samplesFile = sampsRomGroupEntry->file;
-	UINT nProgramFileLength = programFile->size();
+	uint32_t nProgramFileLength = programFile->size();
 
 	// LOAD INSTRUMENTS AND SAMPLES
 	if (!samp_table_length && (artic_table_offset > samp_table_offset))		//fix because Vampire Savior sample table bleeds into artic table and no way to detect this
@@ -123,7 +123,7 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 	//  Set the seq table length to be the distance to the first seq pointer
 	//  as sequences seem to immediately follow the seq table.
 	unsigned int k = 0;
-	UINT seqPointer = 0;
+	uint32_t seqPointer = 0;
 	while (seqPointer == 0)
 		seqPointer = programFile->GetWordBE(seq_table_offset + (k++*4)) & 0x0FFFFF;
 	seq_table_length = seqPointer - seq_table_offset;

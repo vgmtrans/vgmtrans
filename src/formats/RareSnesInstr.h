@@ -11,22 +11,22 @@ class RareSnesInstrSet :
 	public VGMInstrSet
 {
 public:
-	RareSnesInstrSet(RawFile* file, ULONG offset, uint32_t spcDirAddr, const std::wstring & name = L"RareSnesInstrSet");
-	RareSnesInstrSet(RawFile* file, ULONG offset, uint32_t spcDirAddr, const std::map<BYTE, double> & instrUnityKeyHints, const std::map<BYTE, USHORT> & instrADSRHints, const std::wstring & name = L"RareSnesInstrSet");
+	RareSnesInstrSet(RawFile* file, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name = L"RareSnesInstrSet");
+	RareSnesInstrSet(RawFile* file, uint32_t offset, uint32_t spcDirAddr, const std::map<uint8_t, double> & instrUnityKeyHints, const std::map<uint8_t, uint16_t> & instrADSRHints, const std::wstring & name = L"RareSnesInstrSet");
 	virtual ~RareSnesInstrSet(void);
 
 	virtual void Initialize();
 	virtual bool GetHeaderInfo();
 	virtual bool GetInstrPointers();
 
-	const std::vector<BYTE>& GetAvailableInstruments();
+	const std::vector<uint8_t>& GetAvailableInstruments();
 
 protected:
 	uint32_t spcDirAddr;
-	BYTE maxSRCNValue;
-	std::vector<BYTE> availInstruments;
-	std::map<BYTE, double> instrUnityKeyHints;
-	std::map<BYTE, USHORT> instrADSRHints;
+	uint8_t maxSRCNValue;
+	std::vector<uint8_t> availInstruments;
+	std::map<uint8_t, double> instrUnityKeyHints;
+	std::map<uint8_t, uint16_t> instrADSRHints;
 
 	void ScanAvailableInstruments();
 };
@@ -39,7 +39,7 @@ class RareSnesInstr
 	: public VGMInstr
 {
 public:
-	RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, uint32_t spcDirAddr, double transpose = 0, uint16_t adsr = 0x8FE0, const std::wstring& name = L"RareSnesInstr");
+	RareSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, double transpose = 0, uint16_t adsr = 0x8FE0, const std::wstring& name = L"RareSnesInstr");
 	virtual ~RareSnesInstr(void);
 
 	virtual bool LoadInstr();
@@ -58,7 +58,7 @@ class RareSnesRgn
 	: public VGMRgn
 {
 public:
-	RareSnesRgn(RareSnesInstr* instr, ULONG offset, double transpose = 0, uint16_t adsr = 0x8FE0);
+	RareSnesRgn(RareSnesInstr* instr, uint32_t offset, double transpose = 0, uint16_t adsr = 0x8FE0);
 	virtual ~RareSnesRgn(void);
 
 	virtual bool LoadRgn();

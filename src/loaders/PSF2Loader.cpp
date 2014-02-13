@@ -14,7 +14,7 @@ PSF2Loader::~PSF2Loader(void)
 
 PostLoadCommand PSF2Loader::Apply(RawFile* file)
 {
-	UINT sig = file->GetWord(0);
+	uint32_t sig = file->GetWord(0);
 	if ((sig & 0x00FFFFFF) == 0x465350 && ((sig & 0xFF000000) == 0x02000000))	//if the sig is PSF 0x02
 	{
 		int r;
@@ -144,8 +144,8 @@ int PSF2Loader::psf2unpack(RawFile* file, unsigned long fileoffset, unsigned lon
 			//WriteStatusBar(string);
 			blockcount = ((filesize + buffersize) - 1) / buffersize;
 
-			BYTE* newdataBuf = new BYTE[filesize];
-			UINT actualFileSize = filesize;
+			uint8_t* newdataBuf = new uint8_t[filesize];
+			uint32_t actualFileSize = filesize;
 			k = 0;
 
 			dblock = new uint8[buffersize];

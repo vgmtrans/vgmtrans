@@ -21,12 +21,12 @@ public:
 		uint32_t seSongChunkAddr;
 	} HdrCk;
 
-	SonyPS2Seq(RawFile* file, ULONG offset);
+	SonyPS2Seq(RawFile* file, uint32_t offset);
 	virtual ~SonyPS2Seq(void);
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool ReadEvent(void);
-	BYTE GetDataByte(uint32_t offset);
+	uint8_t GetDataByte(uint32_t offset);
 
 protected:
 	VersCk versCk;
@@ -38,6 +38,6 @@ protected:
 	uint16_t compOption;		//determines compression mode for midi data block 0
 
 	bool bSkipDeltaTime;
-	BYTE runningStatus;
+	uint8_t runningStatus;
 };
 

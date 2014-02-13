@@ -22,20 +22,20 @@ void SquarePS2Scanner::Scan(RawFile* file, void* info)
 
 void SquarePS2Scanner::SearchForBGMSeq(RawFile* file)
 {
-	UINT nFileLength;
+	uint32_t nFileLength;
 	nFileLength = file->size();
-	for (UINT i=0; i+4<nFileLength; i++)
+	for (uint32_t i=0; i+4<nFileLength; i++)
 	{
 		if ((*file)[i] == 'B' && (*file)[i+1] == 'G' && (*file)[i+2] == 'M' && (*file)[i+3] == ' ')
 		{
 			if (file->GetWord(i+0x14) == 0 && file->GetWord(i+0x18) == 0 && file->GetWord(i+0x1C) == 0)
 			{
-				BYTE nNumTracks = (*file)[i+8];
-				UINT pos = i+0x20;    //start at first track (fixed offset)
+				uint8_t nNumTracks = (*file)[i+8];
+				uint32_t pos = i+0x20;    //start at first track (fixed offset)
 				bool bValid = true;
 				for(int j=0; j<nNumTracks; j++)
 				{
-					UINT trackSize = file->GetWord(pos);		//get the track size (first word before track data)
+					uint32_t trackSize = file->GetWord(pos);		//get the track size (first word before track data)
 					if (trackSize+pos+j > nFileLength || trackSize == 0 || trackSize > 0xFFFF)
 					{
 						bValid = false;
@@ -54,14 +54,14 @@ void SquarePS2Scanner::SearchForBGMSeq(RawFile* file)
 
 void SquarePS2Scanner::SearchForWDSet(RawFile* file)
 {
-	//UINT l;
-	DWORD numRegions, firstRgnPtr;
+	//uint32_t l;
+	uint32_t numRegions, firstRgnPtr;
 
 	float prevProPreRatio = file->GetProPreRatio();
 	file->SetProPreRatio(1);
 
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+0x3000<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+0x3000<nFileLength; i++)
 	{
 		if ((*file)[i] == 'W' && (*file)[i+1] == 'D' && (*file)[i+3] < 0x03)
 		{
@@ -78,16 +78,16 @@ void SquarePS2Scanner::SearchForWDSet(RawFile* file)
 				if (firstRgnPtr <= 0x1000)
 				{
 					bool bValid = true;
-					ULONG offsetOfFirstSamp = i+firstRgnPtr+numRegions*0x20;
+					uint32_t offsetOfFirstSamp = i+firstRgnPtr+numRegions*0x20;
 
 					int zeroOffsetCounter = 0;
 
 					for (unsigned int curRgn=0; curRgn<numRegions; curRgn++)			//check that every region points to a valid sample by checking if first 16 bytes of sample are 0
 					{
-						ULONG relativeRgnSampOffset = file->GetWord(i+firstRgnPtr+curRgn*0x20+4) & 0xFFFFFFF0;		//ignore the first nibble, it varies between versions but will be consistent this way
+						uint32_t relativeRgnSampOffset = file->GetWord(i+firstRgnPtr+curRgn*0x20+4) & 0xFFFFFFF0;		//ignore the first nibble, it varies between versions but will be consistent this way
 						if (relativeRgnSampOffset < 0x10)
 							relativeRgnSampOffset = 0;
-						ULONG rgnSampOffset =  relativeRgnSampOffset + offsetOfFirstSamp;
+						uint32_t rgnSampOffset =  relativeRgnSampOffset + offsetOfFirstSamp;
 
 						if (relativeRgnSampOffset == 0)
 							zeroOffsetCounter++;

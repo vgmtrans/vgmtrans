@@ -124,8 +124,8 @@ void VGMSeqNoTrks::TryExpandMidiTracks(uint32_t numTracks)
 		return;
 	if (midiTracks.size() < numTracks)
 	{
-		int initialTrackSize = midiTracks.size();
-		for (uint32_t i=0; i<numTracks-initialTrackSize; i++)
+		size_t initialTrackSize = midiTracks.size();
+		for (size_t i=0; i<numTracks-initialTrackSize; i++)
 			midiTracks.push_back( midi->AddTrack());
 	}
 }

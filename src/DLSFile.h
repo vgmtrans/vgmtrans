@@ -85,13 +85,13 @@ public:
 	DLSInstr* AddInstr(unsigned long bank, unsigned long instrNum, std::string Name);
 	void DeleteInstr(unsigned long bank, unsigned long instrNum);
 	DLSWave* AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
-					 uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, BYTE* waveData,
+					 uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t* waveData,
 					 std::string name = "Unnamed Wave");
 	void SetName(std::string dls_name);
 
 	uint32_t GetSize(void);
 
-	int WriteDLSToBuffer(std::vector<BYTE> &buf);
+	int WriteDLSToBuffer(std::vector<uint8_t> &buf);
 	bool SaveDLSFile(const wchar_t* filepath);
 
 public:
@@ -113,7 +113,7 @@ public:
 	DLSRgn* AddRgn(DLSRgn rgn);
 
 	uint32_t GetSize(void);
-	void Write(std::vector<BYTE> &buf);
+	void Write(std::vector<uint8_t> &buf);
 
 public:
 	uint32_t ulBank;
@@ -142,7 +142,7 @@ public:
 	void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
 
 	uint32_t GetSize(void);
-	void Write(std::vector<BYTE> &buf);
+	void Write(std::vector<uint8_t> &buf);
 
 public:
 	uint16_t usKeyLow;
@@ -168,7 +168,7 @@ public:
 		~ConnectionBlock(void) {}
 
 	uint32_t GetSize(void) {return 12;}
-	void Write(std::vector<BYTE> &buf);
+	void Write(std::vector<uint8_t> &buf);
 
 private:
 	uint16_t usSource;
@@ -190,7 +190,7 @@ public:
 	void AddPan(long pan);
 
 	uint32_t GetSize(void);
-	void Write(std::vector<BYTE> &buf);
+	void Write(std::vector<uint8_t> &buf);
 
 private:
 	std::vector<ConnectionBlock*> aConnBlocks;
@@ -209,7 +209,7 @@ public:
 	void SetPitchInfo(uint16_t unityNote, short fineTune, long attenuation);
 
 	uint32_t GetSize(void);
-	void Write(std::vector<BYTE> &buf);
+	void Write(std::vector<uint8_t> &buf);
 
 private:
 	unsigned short usUnityNote;
@@ -260,7 +260,7 @@ public:
 //		return dataSize;
 	}
 	uint32_t GetSize(void);
-	void Write(std::vector<BYTE> &buf);
+	void Write(std::vector<uint8_t> &buf);
 
 private:
 	DLSWsmp* Wsmp;

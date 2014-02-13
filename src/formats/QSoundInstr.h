@@ -8,52 +8,52 @@ class QSoundInstr;
 extern enum QSoundVer;
 
 typedef struct _qs_qs_prog_info_ver_101 {	// ex: Punisher
-	BYTE sample_index;
-	BYTE ignored;		//only seen used in slammast, but the game never reads the val
-	BYTE attack_rate;
-	BYTE decay_rate;
-	BYTE sustain_level;
-	BYTE sustain_rate;
-	BYTE release_rate;
-	BYTE unknown;
+	uint8_t sample_index;
+	uint8_t ignored;		//only seen used in slammast, but the game never reads the val
+	uint8_t attack_rate;
+	uint8_t decay_rate;
+	uint8_t sustain_level;
+	uint8_t sustain_rate;
+	uint8_t release_rate;
+	uint8_t unknown;
 } qs_prog_info_ver_101;
 
 typedef struct _qs_qs_prog_info_ver_103 {	// ex: Super Street Fighter 2
-	WORD sample_index;
-	BYTE unknown;
-	BYTE attack_rate;
-	BYTE decay_rate;
-	BYTE sustain_level;
-	BYTE sustain_rate;
-	BYTE release_rate;
+	uint16_t sample_index;
+	uint8_t unknown;
+	uint8_t attack_rate;
+	uint8_t decay_rate;
+	uint8_t sustain_level;
+	uint8_t sustain_rate;
+	uint8_t release_rate;
 } qs_prog_info_ver_103;
 
 typedef struct _qs_prog_info_ver_130 {
-	WORD sample_index;
-	BYTE unknown;
-	BYTE artic_index;
+	uint16_t sample_index;
+	uint8_t unknown;
+	uint8_t artic_index;
 } qs_prog_info_ver_130;
 
 typedef struct _qs_artic_info {
-	BYTE attack_rate;
-	BYTE decay_rate;
-	BYTE sustain_level;
-	BYTE sustain_rate;
-	BYTE release_rate;
-	BYTE unknown_5;
-	BYTE unknown_6;
-	BYTE unknown_7;
+	uint8_t attack_rate;
+	uint8_t decay_rate;
+	uint8_t sustain_level;
+	uint8_t sustain_rate;
+	uint8_t release_rate;
+	uint8_t unknown_5;
+	uint8_t unknown_6;
+	uint8_t unknown_7;
 } qs_artic_info;
 
 typedef struct _qs_samp_info {
-	BYTE bank;
-	BYTE start_addr_lo;
-	BYTE start_addr_hi;
-	BYTE loop_offset_lo;
-	BYTE loop_offset_hi;
-	BYTE end_addr_lo;
-	BYTE end_addr_hi;
-	BYTE unity_key;
+	uint8_t bank;
+	uint8_t start_addr_lo;
+	uint8_t start_addr_hi;
+	uint8_t loop_offset_lo;
+	uint8_t loop_offset_hi;
+	uint8_t end_addr_lo;
+	uint8_t end_addr_hi;
+	uint8_t unity_key;
 } qs_samp_info;
 
 // The QSound interrupt clock is set to 251hz in mame.  But the main sound
@@ -64,7 +64,7 @@ typedef struct _qs_samp_info {
 // the tables below are taken from sfa2
 //  have verified that the exact same values are stored in dinosaurs & cadillacs (early qsound driver)
 
-const WORD linear_table[128] = {
+const uint16_t linear_table[128] = {
 	0, 0x3FF, 0x5FE, 0x7FF, 0x9FE, 0xBFE, 0xDFD, 0xFFF, 0x11FE, 0x13FE,
 	0x15FD, 0x17FE, 0x19FD, 0x1BFD, 0x1DFC, 0x1FFF, 0x21FD, 0x23FE, 0x25FD,
 	0x27FE, 0x29FD, 0x2BFD, 0x2DFC, 0x2FFE, 0x31FD, 0x33FD, 0x35FC, 0x37FD,
@@ -82,7 +82,7 @@ const WORD linear_table[128] = {
 	0xF5FA, 0xF7FB, 0xF9FA, 0xFBFA, 0xFDF9, 0xFFFE
 };
 
-const WORD attack_rate_table[64] = {
+const uint16_t attack_rate_table[64] = {
 	0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 9, 0x0B, 0x0D, 0x0F,
 	0x11, 0x22, 0x33, 0x44, 0x55, 0x64, 0x84, 0x0A4, 0x0C5, 0x0E6, 0x107, 0x149,
 	0x18B, 0x1CC, 0x20E, 0x292, 0x315, 0x398, 0x41C, 0x523, 0x62A, 0x731, 0x838,
@@ -91,7 +91,7 @@ const WORD attack_rate_table[64] = {
 	0xE61C, 0xEFFF, 0xF3FF, 0xF9FF, 0xFCFF, 0xFFFF
 };
 
-const WORD decay_rate_table[64] = {
+const uint16_t decay_rate_table[64] = {
 	0, 1, 2, 2, 3, 3, 4, 4, 5, 6, 8, 0x0A, 0x0C, 0x0E, 0x11, 0x13,
 	0x18, 0x1D, 0x21, 0x26, 0x30, 0x39, 0x43, 0x4C, 0x5F, 0x72, 0x85, 0x98, 0x0BE,
 	0x0E4, 0x10A, 0x130, 0x17D, 0x1C9, 0x215, 0x260, 0x2F9, 0x391, 0x42A, 0x4C1,
@@ -158,13 +158,13 @@ public:
 public:
 	//prog_info*	prog_infos;
 	QSoundVer fmt_version;
-	UINT num_instr_banks;
+	uint32_t num_instr_banks;
 	QSoundSampleInfoTable* sampInfoTable;
 	QSoundArticTable* articTable;
 	//uint32_t samp_table_offset;
 	//uint32_t samp_table_length;
 	//qs_samp_info*	qs_samp_infos;
-	//UINT numSamples;
+	//uint32_t numSamples;
 
 protected:
 	
@@ -179,18 +179,18 @@ class QSoundInstr
 	: public VGMInstr
 {
 public:
-	QSoundInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, std::wstring& name);
+	QSoundInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum, std::wstring& name);
 	virtual ~QSoundInstr(void);
 	virtual bool LoadInstr();
 protected:
 	QSoundVer GetFormatVer() { return ((QSoundInstrSet*)parInstrSet)->fmt_version; }
 
 protected:
-	BYTE attack_rate;
-	BYTE decay_rate;
-	BYTE sustain_level;
-	BYTE sustain_rate;
-	BYTE release_rate;
+	uint8_t attack_rate;
+	uint8_t decay_rate;
+	uint8_t sustain_level;
+	uint8_t sustain_rate;
+	uint8_t release_rate;
 
 	int info_ptr;		//pointer to start of instrument set block
 	int nNumRegions;
@@ -205,7 +205,7 @@ protected:
 //	: public VGMRgn
 //{
 //public:
-//	WDRgn(QSoundInstr* instr, ULONG offset);
+//	WDRgn(QSoundInstr* instr, uint32_t offset);
 //	//virtual ~WDRgn(void) {}
 //	//virtual int OnSelected(void);
 //
@@ -217,7 +217,7 @@ protected:
 //	unsigned char bFirstRegion;
 //	unsigned char bLastRegion;
 //	unsigned char bUnknownFlag2;
-//	ULONG sample_offset;
+//	uint32_t sample_offset;
 //};
 
 
@@ -230,8 +230,8 @@ class QSoundSampColl
 	: public VGMSampColl
 {
 public:
-	QSoundSampColl(RawFile* file, QSoundInstrSet* instrset, QSoundSampleInfoTable* sampinfotable, ULONG offset, 
-		           ULONG length = 0, std::wstring& name = std::wstring(L"QSound Sample Collection"));
+	QSoundSampColl(RawFile* file, QSoundInstrSet* instrset, QSoundSampleInfoTable* sampinfotable, uint32_t offset, 
+		           uint32_t length = 0, std::wstring& name = std::wstring(L"QSound Sample Collection"));
 	virtual bool GetHeaderInfo();		//retrieve any header data
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 

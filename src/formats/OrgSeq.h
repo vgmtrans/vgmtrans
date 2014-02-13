@@ -8,15 +8,15 @@ class OrgSeq :
 	public VGMSeq
 {
 public:
-	OrgSeq(RawFile* file, ULONG offset);
+	OrgSeq(RawFile* file, uint32_t offset);
 public:
 	virtual ~OrgSeq(void);
 
 	virtual bool GetHeaderInfo(void);
 
 public:
-	USHORT waitTime;		//I believe this is the millis per tick
-	BYTE beatsPerMeasure;
+	uint16_t waitTime;		//I believe this is the millis per tick
+	uint8_t beatsPerMeasure;
 };
 
 
@@ -26,17 +26,17 @@ class OrgTrack
 	: public SeqTrack
 {
 public:
-	OrgTrack(OrgSeq* parentFile, long offset, long length, BYTE realTrk);
+	OrgTrack(OrgSeq* parentFile, long offset, long length, uint8_t realTrk);
 
-	virtual bool LoadTrack(ULONG trackNum, ULONG stopOffset, long stopDelta);
+	virtual bool LoadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta);
 	virtual bool ReadEvent(void);
 
 public:
-	BYTE prevPan;
+	uint8_t prevPan;
 
-	USHORT curNote;
-	BYTE realTrkNum;
-	USHORT freq;
-	BYTE waveNum;
-	USHORT numNotes;
+	uint16_t curNote;
+	uint8_t realTrkNum;
+	uint16_t freq;
+	uint8_t waveNum;
+	uint16_t numNotes;
 };

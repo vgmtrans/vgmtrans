@@ -15,7 +15,7 @@ class HOSAInstrSet
 {
 
 public:
-	HOSAInstrSet(RawFile* file, ULONG offset);
+	HOSAInstrSet(RawFile* file, uint32_t offset);
 	virtual ~HOSAInstrSet(void);
 
 	virtual bool GetHeaderInfo();
@@ -66,7 +66,7 @@ public:
 
 
 public:
-	HOSAInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
+	HOSAInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
 	~HOSAInstr() { if (rgns) delete[] rgns; }
 	virtual bool LoadInstr();
 

@@ -34,8 +34,8 @@ void FFTScanner::Scan(RawFile* file, void* info)
 //--------------------------------------------------------------
 void FFTScanner::SearchForFFTSeq (RawFile* file)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+4<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+4<nFileLength; i++)
 	{
 		if (file->GetWordBE(i) != 0x736D6473)
 			continue;
@@ -57,8 +57,8 @@ void FFTScanner::SearchForFFTSeq (RawFile* file)
 //--------------------------------------------------------------
 void FFTScanner::SearchForFFTwds (RawFile* file)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+0x30<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+0x30<nFileLength; i++)
 	{
 		uint32_t sig = file->GetWordBE(i);
 		if (sig != 0x64776473 && sig != 0x77647320)

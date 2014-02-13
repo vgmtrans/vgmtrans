@@ -10,7 +10,7 @@
 // TriAcePS1InstrSet
 // *****************
 
-TriAcePS1InstrSet::TriAcePS1InstrSet(RawFile* file, ULONG offset)
+TriAcePS1InstrSet::TriAcePS1InstrSet(RawFile* file, uint32_t offset)
 : VGMInstrSet(TriAcePS1Format::name, file, offset, 0, L"TriAce InstrSet")
 {
 }
@@ -84,7 +84,7 @@ bool TriAcePS1InstrSet::GetInstrPointers()
 // TriAcePS1Instr
 // **************
 
-TriAcePS1Instr::TriAcePS1Instr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum)
+TriAcePS1Instr::TriAcePS1Instr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum),
 	rgns(NULL)
 {

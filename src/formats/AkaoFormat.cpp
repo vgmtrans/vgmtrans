@@ -11,7 +11,7 @@ using namespace std;
 /*
 int AkaoFormat::OnMatch(vector<VGMFile*>& files)
 {
-	UINT i;
+	uint32_t i;
 	for (i=0; files[i]->GetFileType() != FILETYPE_SEQ  &&  i<2; i++)
 		;
 
@@ -38,11 +38,11 @@ bool AkaoColl::LoadMain()
 	AkaoSampColl* sampcoll = (AkaoSampColl*)sampcolls[0];
 
 	//Set the sample numbers of each region using the articulation data references of each region
-	for (UINT i = 0; i<instrset->aInstrs.size(); i++)
+	for (uint32_t i = 0; i<instrset->aInstrs.size(); i++)
 	{
 		AkaoInstr* instr = (AkaoInstr*)instrset->aInstrs[i];
 		vector<VGMRgn*>* rgns = &instr->aRgns;
-		for (UINT j=0; j<rgns->size(); j++)
+		for (uint32_t j=0; j<rgns->size(); j++)
 		{
 			AkaoRgn* rgn = (AkaoRgn*)(*rgns)[j];
 
@@ -99,13 +99,13 @@ bool AkaoColl::PreDLSMainCreation()
 	AkaoInstrSet* newInstrSet = new AkaoInstrSet(NULL, 0, 0, 0, L"");
 	*newInstrSet = *origInstrSet;
 	//copy all of the instruments so that we have copied instruments deleted on the destructor of the Instrument Set
-	for (UINT i=0; i<origInstrSet->aInstrs.size(); i++)
+	for (uint32_t i=0; i<origInstrSet->aInstrs.size(); i++)
 	{
 		AkaoInstr* cpyInstr = new AkaoInstr(newInstrSet, 0, 0, 0, 0);
 		*cpyInstr = *((AkaoInstr*)origInstrSet->aInstrs[i]);
 		newInstrSet->aInstrs[i] =  cpyInstr;
 		//ditto for all regions in the instruments
-		for (UINT j=0; j<cpyInstr->aRgns.size(); j++)
+		for (uint32_t j=0; j<cpyInstr->aRgns.size(); j++)
 		{
 			AkaoRgn* cpyRgn = new AkaoRgn(cpyInstr, 0, 0, L"");
 			*cpyRgn = *((AkaoRgn*)cpyInstr->aRgns[j]);
@@ -121,14 +121,14 @@ bool AkaoColl::PreDLSMainCreation()
 	AkaoInstrSet* instrSet = (AkaoInstrSet*)instrsets[0];
 
 	AkaoSampColl* sampcoll = (AkaoSampColl*)sampcolls[0];
-	const UINT numArts = sampcoll->akArts.size();
-	const UINT origNumInstrs = instrSet->aInstrs.size();
+	const uint32_t numArts = sampcoll->akArts.size();
+	const uint32_t origNumInstrs = instrSet->aInstrs.size();
 	if (origNumInstrs + numArts > 0x7F)
 		numAddedInstrs = 0x7F - origNumInstrs;
 	else
 		numAddedInstrs = numArts;
 
-	for (UINT i=0; i<numAddedInstrs; i++)
+	for (uint32_t i=0; i<numAddedInstrs; i++)
 	{
 		AkaoArt* art = &sampcoll->akArts[i];
 		AkaoInstr* newInstr = new AkaoInstr(instrSet, 0, 0, 0, origNumInstrs + sampcoll->starting_art_id + i);
@@ -165,9 +165,9 @@ bool AkaoColl::PostDLSMainCreation()
 
 	AkaoInstrSet* instrSet = (AkaoInstrSet*)instrsets[0];
 	AkaoSampColl* sampcoll = (AkaoSampColl*)sampcolls[0];
-	const UINT numArts = sampcoll->akArts.size();
-	ULONG beginOffset = instrSet->aInstrs.size() - numArts;
-	for (unsigned int i=0; i<numAddedInstrs; i++)
+	const size_t numArts = sampcoll->akArts.size();
+	size_t beginOffset = instrSet->aInstrs.size() - numArts;
+	for (size_t i=0; i<numAddedInstrs; i++)
 	{
 		delete instrSet->aInstrs.back();
 		instrSet->aInstrs.pop_back();

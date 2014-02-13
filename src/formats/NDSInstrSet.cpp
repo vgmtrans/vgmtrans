@@ -17,7 +17,7 @@ using namespace std;
 // NDSInstrSet
 // ***********
 
-NDSInstrSet::NDSInstrSet(RawFile* file, ULONG offset, ULONG length, wstring name)
+NDSInstrSet::NDSInstrSet(RawFile* file, uint32_t offset, uint32_t length, wstring name)
 : VGMInstrSet(NDSFormat::name, file, offset, length, name)
 {
 }
@@ -29,17 +29,17 @@ NDSInstrSet::~NDSInstrSet(void)
 bool NDSInstrSet::GetInstrPointers()
 {
 	VGMHeader* header = AddHeader(dwOffset, 0x38);
-	ULONG nInstruments = GetWord(dwOffset + 0x38);
+	uint32_t nInstruments = GetWord(dwOffset + 0x38);
 	VGMHeader* instrptrHdr = AddHeader(dwOffset+0x38, nInstruments*4+4, L"Instrument Pointers");
 
-	for (UINT i=0; i<nInstruments; i++)
+	for (uint32_t i=0; i<nInstruments; i++)
 	{
-		ULONG instrPtrOff = dwOffset + 0x3C + i*4;
-		ULONG temp = GetWord(instrPtrOff);
+		uint32_t instrPtrOff = dwOffset + 0x3C + i*4;
+		uint32_t temp = GetWord(instrPtrOff);
 		if (temp == 0)
 			continue;
-		BYTE instrType = temp & 0xFF;
-		ULONG pInstr = temp >> 8;
+		uint8_t instrType = temp & 0xFF;
+		uint32_t pInstr = temp >> 8;
 		aInstrs.push_back(new NDSInstr(this, pInstr+dwOffset, 0, 0, i, instrType));
 
 		VGMHeader* hdr = instrptrHdr->AddHeader(instrPtrOff, 4, L"Pointer");
@@ -53,8 +53,8 @@ bool NDSInstrSet::GetInstrPointers()
 // NDSInstr
 // ********
 
-NDSInstr::NDSInstr(NDSInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank,
-				  ULONG theInstrNum, BYTE theInstrType)
+NDSInstr::NDSInstr(NDSInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
+				  uint32_t theInstrNum, uint8_t theInstrType)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum), instrType(theInstrType)
 {
 }
@@ -94,10 +94,10 @@ bool NDSInstr::LoadInstr()
 	case 0x10:		//drumset
 		{
 			name = L"Drumset";
-			BYTE lowKey = GetByte(dwOffset);
-			BYTE highKey = GetByte(dwOffset+1);
-			BYTE nRgns = (highKey-lowKey) + 1;
-			for (BYTE i=0; i < nRgns; i++)
+			uint8_t lowKey = GetByte(dwOffset);
+			uint8_t highKey = GetByte(dwOffset+1);
+			uint8_t nRgns = (highKey-lowKey) + 1;
+			for (uint8_t i=0; i < nRgns; i++)
 			{
 				VGMRgn* rgn = AddRgn(dwOffset+2+i*12, 12, GetShort(dwOffset+2 +2 + i*12), lowKey+i, lowKey+i);
 				GetSampCollPtr(rgn, GetShort(dwOffset+2 + (i*12) + 4));
@@ -111,8 +111,8 @@ bool NDSInstr::LoadInstr()
 	case 0x11:		//multiple regions format
 		{
 			name = L"Multi-Region Instrument";
-			BYTE keyRanges[8];
-			BYTE nRgns = 0;
+			uint8_t keyRanges[8];
+			uint8_t nRgns = 0;
 			for (int i=0; i<8; i++)
 			{
 				keyRanges[i] = GetByte(dwOffset+i);
@@ -141,17 +141,17 @@ void NDSInstr::GetSampCollPtr(VGMRgn* rgn, int waNum)
 	rgn->sampCollPtr = ((NDSInstrSet*)parInstrSet)->sampCollWAList[waNum];
 }
 
-void NDSInstr::GetArticData(VGMRgn* rgn, ULONG offset)
+void NDSInstr::GetArticData(VGMRgn* rgn, uint32_t offset)
 {
 	short realDecay;
 	short realRelease;
-	BYTE realAttack;
+	uint8_t realAttack;
 	long realSustainLev;
-	const BYTE AttackTimeTable[] = { 0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26,
+	const uint8_t AttackTimeTable[] = { 0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26,
 		0x33, 0x3F, 0x49, 0x54, 0x5C, 0x64, 0x6D, 0x74, 0x7B, 0x7F, 0x84,
 		0x89, 0x8F};
 
-	const USHORT sustainLevTable[] = { 0xFD2D, 0xFD2E, 0xFD2F, 0xFD75, 0xFDA7, 0xFDCE, 0xFDEE, 0xFE09, 0xFE20, 0xFE34, 0xFE46, 0xFE57, 0xFE66, 0xFE74,
+	const uint16_t sustainLevTable[] = { 0xFD2D, 0xFD2E, 0xFD2F, 0xFD75, 0xFDA7, 0xFDCE, 0xFDEE, 0xFE09, 0xFE20, 0xFE34, 0xFE46, 0xFE57, 0xFE66, 0xFE74,
 	0xFE81, 0xFE8D, 0xFE98, 0xFEA3, 0xFEAD, 0xFEB6, 0xFEBF, 0xFEC7, 0xFECF, 0xFED7, 0xFEDF, 0xFEE6, 0xFEEC, 0xFEF3,
 	0xFEF9, 0xFEFF, 0xFF05, 0xFF0B, 0xFF11, 0xFF16, 0xFF1B, 0xFF20, 0xFF25, 0xFF2A, 0xFF2E, 0xFF33, 0xFF37, 0xFF3C,
 	0xFF40, 0xFF44, 0xFF48, 0xFF4C, 0xFF50, 0xFF53, 0xFF57, 0xFF5B, 0xFF5E, 0xFF62, 0xFF65, 0xFF68, 0xFF6B, 0xFF6F,
@@ -163,11 +163,11 @@ void NDSInstr::GetArticData(VGMRgn* rgn, ULONG offset)
 	0xFFFF, 0x0000 };
 
 	rgn->SetUnityKey(GetByte(offset++));
-	BYTE AttackTime = GetByte(offset++);
-	BYTE DecayTime = GetByte(offset++);
-	BYTE SustainLev = GetByte(offset++);
-	BYTE ReleaseTime = GetByte(offset++);
-	BYTE Pan = GetByte(offset++);
+	uint8_t AttackTime = GetByte(offset++);
+	uint8_t DecayTime = GetByte(offset++);
+	uint8_t SustainLev = GetByte(offset++);
+	uint8_t ReleaseTime = GetByte(offset++);
+	uint8_t Pan = GetByte(offset++);
 
 	if (AttackTime >= 0x6D)
 		realAttack = AttackTimeTable[0x7F-AttackTime];
@@ -214,9 +214,9 @@ void NDSInstr::GetArticData(VGMRgn* rgn, ULONG offset)
 		rgn->pan = (double)Pan/(double)127;
 }
 
-USHORT NDSInstr::GetFallingRate(BYTE DecayTime)
+uint16_t NDSInstr::GetFallingRate(uint8_t DecayTime)
 {
-	ULONG realDecay;
+	uint32_t realDecay;
 	if (DecayTime == 0x7F)
 		realDecay = 0xFFFF;
 	else if (DecayTime == 0x7E)
@@ -234,7 +234,7 @@ USHORT NDSInstr::GetFallingRate(BYTE DecayTime)
 		realDecay /= DecayTime;		//there is a whole subroutine that seems to resolve simply to this.  I have tested all cases
 		realDecay &= 0xFFFF;
 	}
-	return (USHORT)realDecay;
+	return (uint16_t)realDecay;
 }
 
 
@@ -248,7 +248,7 @@ USHORT NDSInstr::GetFallingRate(BYTE DecayTime)
 // NDSWaveArch
 // ***********
 
-NDSWaveArch::NDSWaveArch(RawFile* file, ULONG offset, ULONG length, wstring name)
+NDSWaveArch::NDSWaveArch(RawFile* file, uint32_t offset, uint32_t length, wstring name)
 : VGMSampColl(NDSFormat::name, file, offset, length, name)
 {
 }
@@ -265,16 +265,16 @@ bool NDSWaveArch::GetHeaderInfo()
 
 bool NDSWaveArch::GetSampleInfo()
 {
-	ULONG nSamples = GetWord(dwOffset + 0x38);
-	for (ULONG i=0; i<nSamples; i++)
+	uint32_t nSamples = GetWord(dwOffset + 0x38);
+	for (uint32_t i=0; i<nSamples; i++)
 	{
-		ULONG pSample = GetWord(dwOffset + 0x3C + i*4) + dwOffset;
+		uint32_t pSample = GetWord(dwOffset + 0x3C + i*4) + dwOffset;
 		int nChannels = 1;
-		BYTE waveType = GetByte(pSample);
+		uint8_t waveType = GetByte(pSample);
 		bool bLoops = (GetByte(pSample+1) != 0);
-		USHORT rate = GetShort(pSample+2);
-		USHORT bps;
-		//BYTE multiplier;
+		uint16_t rate = GetShort(pSample+2);
+		uint16_t bps;
+		//uint8_t multiplier;
 		switch (waveType)
 		{
 		case NDSSamp::PCM8:
@@ -287,10 +287,10 @@ bool NDSWaveArch::GetSampleInfo()
 			bps = 16;
 			break;
 		}
-		ULONG loopOff = (GetShort(pSample+6))*4;//*multiplier;		//represents loop point in words, excluding header supposedly
-		ULONG nonLoopLength = GetShort(pSample+8)*4;		//if IMA-ADPCM, subtract one for the ADPCM header
+		uint32_t loopOff = (GetShort(pSample+6))*4;//*multiplier;		//represents loop point in words, excluding header supposedly
+		uint32_t nonLoopLength = GetShort(pSample+8)*4;		//if IMA-ADPCM, subtract one for the ADPCM header
 
-		ULONG dataStart, dataLength;
+		uint32_t dataStart, dataLength;
 		if (waveType == NDSSamp::IMA_ADPCM)
 		{
 			dataStart = pSample+0x10;
@@ -333,9 +333,9 @@ bool NDSWaveArch::GetSampleInfo()
 // NDSSamp
 // *******
 
-NDSSamp::NDSSamp(VGMSampColl* sampColl, ULONG offset, ULONG length, ULONG dataOffset,
-				 ULONG dataLen, BYTE nChannels, USHORT theBPS,
-				 ULONG theRate, BYTE theWaveType, wstring name)
+NDSSamp::NDSSamp(VGMSampColl* sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
+				 uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
+				 uint32_t theRate, uint8_t theWaveType, wstring name)
 : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS,
 		  theRate, name), waveType(theWaveType)
 {
@@ -350,7 +350,7 @@ double NDSSamp::GetCompressionRatio()
 		return 1.0;
 }
 
-void NDSSamp::ConvertToStdWave(BYTE* buf)
+void NDSSamp::ConvertToStdWave(uint8_t* buf)
 {
 	if (waveType == IMA_ADPCM)
 		ConvertImaAdpcm(buf);
@@ -375,26 +375,26 @@ void NDSSamp::ConvertToStdWave(BYTE* buf)
 // As far as I can tell, the NDS IMA-ADPCM format has one difference from standard IMA-ADPCM:
 // it clamps min (and max?) sample values differently (see below).  I really don't know how much of a difference
 // it makes, but this implementation is, to my knowledge, the proper way of doing things for NDS.
-void NDSSamp::ConvertImaAdpcm(BYTE *buf)
+void NDSSamp::ConvertImaAdpcm(uint8_t *buf)
 {
-	ULONG destOff = 0;
-	UINT sampHeader = GetWord(dataOff-4);
+	uint32_t destOff = 0;
+	uint32_t sampHeader = GetWord(dataOff-4);
 	int decompSample = sampHeader & 0xFFFF;
 	int stepIndex = (sampHeader >> 16) & 0x7F;
 	//int decompSample = GetShort(dataOff);
 	//int stepIndex = GetShort(dataOff+2);
-	ULONG curOffset = dataOff;
-	((SHORT*)buf)[destOff++] = (SHORT)decompSample;
+	uint32_t curOffset = dataOff;
+	((int16_t*)buf)[destOff++] = (int16_t)decompSample;
 	
 	
-	BYTE compByte;
+	uint8_t compByte;
 	while (curOffset < dataOff+dataLength)
 	{
 		compByte = GetByte(curOffset++);
 		process_nibble(compByte, stepIndex, decompSample);
-		((SHORT*)buf)[destOff++] = (SHORT)decompSample;
+		((int16_t*)buf)[destOff++] = (int16_t)decompSample;
 		process_nibble((compByte & 0xF0) >> 4, stepIndex, decompSample);
-		((SHORT*)buf)[destOff++] = (SHORT)decompSample;
+		((int16_t*)buf)[destOff++] = (int16_t)decompSample;
 	}
 }
 

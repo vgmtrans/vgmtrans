@@ -83,7 +83,7 @@ class RareSnesSeq
 	: public VGMSeq
 {
 public:
-	RareSnesSeq(RawFile* file, RareSnesVersion ver, ULONG seqdata_offset, std::wstring newName = L"Rare SNES Seq");
+	RareSnesSeq(RawFile* file, RareSnesVersion ver, uint32_t seqdata_offset, std::wstring newName = L"Rare SNES Seq");
 	virtual ~RareSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -91,24 +91,24 @@ public:
 	virtual void ResetVars(void);
 
 	RareSnesVersion version;
-	std::map<BYTE, RareSnesSeqEventType> EventMap;
+	std::map<uint8_t, RareSnesSeqEventType> EventMap;
 
-	std::map<BYTE, double> instrUnityKeyHints;
-	std::map<BYTE, USHORT> instrADSRHints;
+	std::map<uint8_t, double> instrUnityKeyHints;
+	std::map<uint8_t, uint16_t> instrADSRHints;
 
-	static const USHORT NOTE_PITCH_TABLE[128];  // note number to frequency table
+	static const uint16_t NOTE_PITCH_TABLE[128];  // note number to frequency table
 
-	BYTE initialTempo;                          // initial tempo value written in header
-	BYTE midiReverb;                            // MIDI reverb level for SPC700 echo
-	BYTE timerFreq;                             // SPC700 timer 0 frequency (tempo base)
-	BYTE tempo;                                 // song tempo
+	uint8_t initialTempo;                          // initial tempo value written in header
+	uint8_t midiReverb;                            // MIDI reverb level for SPC700 echo
+	uint8_t timerFreq;                             // SPC700 timer 0 frequency (tempo base)
+	uint8_t tempo;                                 // song tempo
 	int8_t presetVolL[5];                           // volume preset L
 	int8_t presetVolR[5];                           // volume preset R
-	USHORT presetADSR[5];                       // ADSR preset
+	uint16_t presetADSR[5];                       // ADSR preset
 
 	double GetTempoInBPM ();
-	double GetTempoInBPM (BYTE tempo);
-	double GetTempoInBPM (BYTE tempo, BYTE timerFreq);
+	double GetTempoInBPM (uint8_t tempo);
+	double GetTempoInBPM (uint8_t tempo, uint8_t timerFreq);
 
 private:
 	void LoadEventMap(RareSnesSeq *pSeqFile);
@@ -120,32 +120,32 @@ class RareSnesTrack
 {
 public:
 	RareSnesTrack(RareSnesSeq* parentFile, long offset = 0, long length = 0);
-	virtual bool LoadTrackInit(ULONG trackNum);
+	virtual bool LoadTrackInit(uint32_t trackNum);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
 	virtual void OnTickBegin(void);
 	virtual void OnTickEnd(void);
 
-	void AddVolLR(ULONG offset, ULONG length, int8_t spcVolL, int8_t spcVolR, const wchar_t* sEventName = L"Volume L/R");
+	void AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR, const wchar_t* sEventName = L"Volume L/R");
 	void AddVolLRNoItem(int8_t spcVolL, int8_t spcVolR);
 
 private:
-	BYTE rptNestLevel;                          // nest level for repeat-subroutine command
-	BYTE rptCount[RARESNES_RPTNESTMAX];         // repeat count for repeat-subroutine command
-	ULONG rptStart[RARESNES_RPTNESTMAX];        // loop start address for repeat-subroutine command
-	ULONG rptRetnAddr[RARESNES_RPTNESTMAX];     // return address for repeat-subroutine command
-	USHORT spcNotePitch;                        // SPC700 pitch register value (0000-3fff), converter will need it for pitch slide
+	uint8_t rptNestLevel;                          // nest level for repeat-subroutine command
+	uint8_t rptCount[RARESNES_RPTNESTMAX];         // repeat count for repeat-subroutine command
+	uint32_t rptStart[RARESNES_RPTNESTMAX];        // loop start address for repeat-subroutine command
+	uint32_t rptRetnAddr[RARESNES_RPTNESTMAX];     // return address for repeat-subroutine command
+	uint16_t spcNotePitch;                        // SPC700 pitch register value (0000-3fff), converter will need it for pitch slide
 	int8_t spcTranspose;                            // transpose (compatible with actual engine)
 	int8_t spcTransposeAbs;                         // transpose (without relative change)
 	int8_t spcTuning;                               // tuning (compatible with actual engine)
 	int8_t spcVolL, spcVolR;                        // SPC700 left/right volume
-	BYTE spcInstr;                              // SPC700 instrument index (NOT SRCN value)
-	USHORT spcADSR;                             // SPC700 ADSR value
-	USHORT defNoteDur;                          // default duration for note (0:unused)
+	uint8_t spcInstr;                              // SPC700 instrument index (NOT SRCN value)
+	uint16_t spcADSR;                             // SPC700 ADSR value
+	uint16_t defNoteDur;                          // default duration for note (0:unused)
 	bool useLongDur;                            // indicates duration length
-	BYTE altNoteByte1;                          // note number preset 1
-	BYTE altNoteByte2;                          // note number preset 2
+	uint8_t altNoteByte1;                          // note number preset 1
+	uint8_t altNoteByte2;                          // note number preset 2
 
 	double GetTuningInSemitones(int8_t tuning);
-	void CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, BYTE& midiVol, BYTE& midiPan);
+	void CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, uint8_t& midiVol, uint8_t& midiPan);
 };

@@ -1,11 +1,11 @@
 #pragma once
 
-typedef unsigned char       BYTE;
+typedef unsigned char       uint8_t;
 
 class KabukiDecrypter
 {
 public:
-	static void kabuki_decode(BYTE* src, BYTE* dest_op, BYTE* dest_data,
+	static void kabuki_decode(uint8_t* src, uint8_t* dest_op, uint8_t* dest_data,
 		int base_addr,int length,int swap_key1,int swap_key2,int addr_key,int xor_key);
 
 private:

@@ -11,11 +11,11 @@
 
 // Simulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
 // return elapsed time in sample count, and final env value if requested.
-UINT GetSNESGAINEnvLength(uint8_t gain, int16_t env, int16_t env_to, int16_t * env_after)
+uint32_t GetSNESGAINEnvLength(uint8_t gain, int16_t env, int16_t env_to, int16_t * env_after)
 {
 	uint8_t mode = gain >> 5;
 	uint8_t rate = gain & 0x1f;
-	UINT tick = 0;
+	uint32_t tick = 0;
 
 	if (env < 0 || env > 0x7ff)
 	{
@@ -82,14 +82,14 @@ UINT GetSNESGAINEnvLength(uint8_t gain, int16_t env, int16_t env_to, int16_t * e
 // SNESSampColl
 // ************
 
-SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, UINT maxNumSamps) :
+SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, uint32_t maxNumSamps) :
 	VGMSampColl(format, rawfile, offset, 0),
 	spcDirAddr(offset)
 {
 	SetDefaultTargets(maxNumSamps);
 }
 
-SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, UINT maxNumSamps) :
+SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, uint32_t maxNumSamps) :
 	VGMSampColl(format, instrset->rawfile, instrset, offset, 0),
 	spcDirAddr(offset)
 {
@@ -97,7 +97,7 @@ SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, uin
 }
 
 SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset,
-		const std::vector<BYTE>& targetSRCNs, std::wstring name) :
+		const std::vector<uint8_t>& targetSRCNs, std::wstring name) :
 	VGMSampColl(format, rawfile, offset, 0, name),
 	spcDirAddr(offset),
 	targetSRCNs(targetSRCNs)
@@ -105,7 +105,7 @@ SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t
 }
 
 SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset,
-		const std::vector<BYTE>& targetSRCNs, std::wstring name) :
+		const std::vector<uint8_t>& targetSRCNs, std::wstring name) :
 	VGMSampColl(format, instrset->rawfile, instrset, offset, 0, name),
 	spcDirAddr(offset),
 	targetSRCNs(targetSRCNs)
@@ -116,7 +116,7 @@ SNESSampColl::~SNESSampColl()
 {
 }
 
-void SNESSampColl::SetDefaultTargets(UINT maxNumSamps)
+void SNESSampColl::SetDefaultTargets(uint32_t maxNumSamps)
 {
 	// limit sample count to 256
 	if (maxNumSamps > 256)
@@ -125,7 +125,7 @@ void SNESSampColl::SetDefaultTargets(UINT maxNumSamps)
 	}
 
 	// target all samples
-	for (UINT i = 0; i < maxNumSamps; i++)
+	for (uint32_t i = 0; i < maxNumSamps; i++)
 	{
 		targetSRCNs.push_back(i);
 	}
@@ -133,11 +133,11 @@ void SNESSampColl::SetDefaultTargets(UINT maxNumSamps)
 
 bool SNESSampColl::GetSampleInfo()
 {
-	for (std::vector<BYTE>::iterator itr = this->targetSRCNs.begin(); itr != this->targetSRCNs.end(); ++itr)
+	for (std::vector<uint8_t>::iterator itr = this->targetSRCNs.begin(); itr != this->targetSRCNs.end(); ++itr)
 	{
-		BYTE srcn = (*itr);
+		uint8_t srcn = (*itr);
 
-		UINT offDirEnt = spcDirAddr + (srcn * 4);
+		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
 		if (offDirEnt + 4 > 0x10000)
 		{
 			continue;
@@ -150,7 +150,7 @@ bool SNESSampColl::GetSampleInfo()
 			continue;
 		}
 
-		UINT length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart);
+		uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart);
 		if (length == 0)
 		{
 			continue;
@@ -168,8 +168,8 @@ bool SNESSampColl::GetSampleInfo()
 //  SNESSamp
 //  ********
 
-SNESSamp::SNESSamp(VGMSampColl* sampColl, ULONG offset, ULONG length, ULONG dataOffset,
-				 ULONG dataLen, ULONG loopOffset, std::wstring name)
+SNESSamp::SNESSamp(VGMSampColl* sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
+				 uint32_t dataLen, uint32_t loopOffset, std::wstring name)
 : VGMSamp(sampColl, offset, length, dataOffset, dataLen, 1, 16, 32000, name),
 	brrLoopOffset(loopOffset)
 {
@@ -179,12 +179,12 @@ SNESSamp::~SNESSamp()
 {
 }
 
-ULONG SNESSamp::GetSampleLength(RawFile * file, ULONG offset)
+uint32_t SNESSamp::GetSampleLength(RawFile * file, uint32_t offset)
 {
-	ULONG currOffset = offset;
+	uint32_t currOffset = offset;
 	while (currOffset + 9 <= file->size())
 	{
-		BYTE flag = file->GetByte(currOffset);
+		uint8_t flag = file->GetByte(currOffset);
 		currOffset += 9;
 
 		// end?
@@ -201,7 +201,7 @@ double SNESSamp::GetCompressionRatio()
 	return ((16.0/9.0)*2); //aka 3.55...;
 }
 
-void SNESSamp::ConvertToStdWave(BYTE* buf)
+void SNESSamp::ConvertToStdWave(uint8_t* buf)
 {
 	BRRBlk theBlock;
 	int32_t prev1 = 0;
@@ -211,7 +211,7 @@ void SNESSamp::ConvertToStdWave(BYTE* buf)
 	SetLoopStatus(0);
 
 	assert(dataLength % 9 == 0);
-	for (UINT k = 0; k + 9 <= dataLength; k += 9)				//for every adpcm chunk
+	for (uint32_t k = 0; k + 9 <= dataLength; k += 9)				//for every adpcm chunk
 	{
 		if (dwOffset + k + 9 > GetRawFile()->size())
 		{

@@ -15,7 +15,7 @@ DECLARE_FORMAT(MP2k);
 
 using namespace std;
 
-MP2kSeq::MP2kSeq(RawFile* file, ULONG offset, std::wstring name)
+MP2kSeq::MP2kSeq(RawFile* file, uint32_t offset, std::wstring name)
 : VGMSeq(MP2kFormat::name, file, offset, 0, name)
 {
 	bAllowDiscontinuousTrackData = true;
@@ -47,12 +47,12 @@ bool MP2kSeq::GetHeaderInfo(void)
 	seqHdr->AddSimpleItem(dwOffset + 1, 1, L"Unknown");
 	seqHdr->AddSimpleItem(dwOffset + 2, 1, L"Priority");
 	seqHdr->AddSimpleItem(dwOffset + 3, 1, L"Reverb");
-	DWORD dwInstPtr = GetWord(dwOffset + 4);
+	uint32_t dwInstPtr = GetWord(dwOffset + 4);
 	seqHdr->AddPointer(dwOffset + 4, 4, dwInstPtr - 0x8000000, true, L"Instrument Pointer");
 	for (unsigned int i = 0; i < nNumTracks; i++)
 	{
-		DWORD dwTrackPtrOffset = dwOffset + 8 + i * 4;
-		DWORD dwTrackPtr = GetWord(dwTrackPtrOffset);
+		uint32_t dwTrackPtrOffset = dwOffset + 8 + i * 4;
+		uint32_t dwTrackPtr = GetWord(dwTrackPtrOffset);
 		seqHdr->AddPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, L"Track Pointer");
 	}
 
@@ -66,8 +66,8 @@ bool MP2kSeq::GetTrackPointers(void)
 	// Add each tracks
 	for (unsigned int i = 0; i < nNumTracks; i++)
 	{
-		DWORD dwTrackPtrOffset = dwOffset + 8 + i * 4;
-		DWORD dwTrackPtr = GetWord(dwTrackPtrOffset);
+		uint32_t dwTrackPtrOffset = dwOffset + 8 + i * 4;
+		uint32_t dwTrackPtr = GetWord(dwTrackPtrOffset);
 		aTracks.push_back(new MP2kTrack(this, dwTrackPtr - 0x8000000));
 	}
 
@@ -88,7 +88,7 @@ bool MP2kSeq::GetTrackPointers(void)
 	return true;
 }
 
-//virtual bool Load(UINT offset)
+//virtual bool Load(uint32_t offset)
 //{
 //	return true;
 //}
@@ -103,7 +103,7 @@ MP2kTrack::MP2kTrack(MP2kSeq* parentFile, long offset, long length)
 {
 }
 
-/*void MP2kTrack::AddEvent(const char* sEventName, int nImage, unsigned long offset, unsigned long length, BYTE color)
+/*void MP2kTrack::AddEvent(const char* sEventName, int nImage, unsigned long offset, unsigned long length, uint8_t color)
 {
 	if (mode == MODE_SCAN && bInLoop == false)
 	{
@@ -117,8 +117,8 @@ MP2kTrack::MP2kTrack(MP2kSeq* parentFile, long offset, long length)
 bool MP2kTrack::ReadEvent(void)
 {
 
-	ULONG beginOffset = curOffset;
-	BYTE status_byte = GetByte(curOffset++);
+	uint32_t beginOffset = curOffset;
+	uint8_t status_byte = GetByte(curOffset++);
 
 	if (status_byte <= 0x7F)		//it's a status event (note, vel (fade), vol, more?)
 	{
@@ -152,7 +152,7 @@ bool MP2kTrack::ReadEvent(void)
 			AddPan(beginOffset, curOffset-beginOffset, status_byte);
 			break;
 		case STATE_PITCHBEND :
-			AddPitchBend(beginOffset, curOffset-beginOffset, ((SHORT)(status_byte-0x40))*128);
+			AddPitchBend(beginOffset, curOffset-beginOffset, ((int16_t)(status_byte-0x40))*128);
 			break;
 		case STATE_MODULATION :
 			AddModulation(beginOffset, curOffset-beginOffset, status_byte);
@@ -183,10 +183,10 @@ bool MP2kTrack::ReadEvent(void)
 			break;
 		case 0xB2 :
 			{
-				UINT destOffset = GetWord(curOffset) - 0x8000000;
+				uint32_t destOffset = GetWord(curOffset) - 0x8000000;
 				curOffset += 4;
-				ULONG length = curOffset - beginOffset;
-				UINT dwEndTrackOffset = curOffset;
+				uint32_t length = curOffset - beginOffset;
+				uint32_t dwEndTrackOffset = curOffset;
 
 				curOffset = destOffset;
 				if (!IsOffsetUsed(destOffset) || loopEndPositions.size() != 0)
@@ -203,7 +203,7 @@ bool MP2kTrack::ReadEvent(void)
 				{
 					if (dwEndTrackOffset < this->parentSeq->vgmfile->GetEndOffset())
 					{
-						BYTE nextCmdByte = GetByte(dwEndTrackOffset);
+						uint8_t nextCmdByte = GetByte(dwEndTrackOffset);
 						if (nextCmdByte == 0xB1)
 						{
 							AddEndOfTrack(dwEndTrackOffset, 1);
@@ -215,7 +215,7 @@ bool MP2kTrack::ReadEvent(void)
 			break;
 		case 0xB3 :		//Branch
 			{
-				UINT destOffset = GetWord(curOffset);
+				uint32_t destOffset = GetWord(curOffset);
 				curOffset+=4;
 				loopEndPositions.push_back(curOffset);
 				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern Play", NULL, CLR_LOOP);
@@ -238,7 +238,7 @@ bool MP2kTrack::ReadEvent(void)
 
 		case 0xBB :
 			{
-				BYTE tempo = GetByte(curOffset++)*2;		//tempo in bpm is data byte * 2
+				uint8_t tempo = GetByte(curOffset++)*2;		//tempo in bpm is data byte * 2
 				AddTempoBPM(beginOffset, curOffset-beginOffset, tempo);
 			}
 			break;
@@ -249,7 +249,7 @@ bool MP2kTrack::ReadEvent(void)
 
 		case 0xBD :
 			{
-				BYTE progNum = GetByte(curOffset++);
+				uint8_t progNum = GetByte(curOffset++);
 				AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
 			}
 			break;
@@ -301,8 +301,8 @@ bool MP2kTrack::ReadEvent(void)
 				//
 				// Probably, some games extends this command by their own code.
 
-				BYTE subCommand = GetByte(curOffset++);
-				BYTE subParam = GetByte(curOffset);
+				uint8_t subCommand = GetByte(curOffset++);
+				uint8_t subParam = GetByte(curOffset);
 
 				if (subCommand == 0x08 && subParam <= 127)
 				{
@@ -374,7 +374,7 @@ void FFTSeq::OnSaveAllAsMidi(void)
 //  MP2kEvent
 //  *********
 
-MP2kEvent::MP2kEvent(MP2kTrack* pTrack, BYTE stateType)
+MP2kEvent::MP2kEvent(MP2kTrack* pTrack, uint8_t stateType)
 : SeqEvent(pTrack), eventState(stateType)
 {
 }

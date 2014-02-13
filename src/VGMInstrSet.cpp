@@ -88,8 +88,8 @@ bool VGMInstrSet::GetInstrPointers()
 
 bool VGMInstrSet::LoadInstrs()
 {
-	uint32_t nInstrs = aInstrs.size();
-	for (uint32_t i=0; i < nInstrs; i++)
+	size_t nInstrs = aInstrs.size();
+	for (size_t i=0; i < nInstrs; i++)
 	{
 		if (!aInstrs[i]->LoadInstr())
 			return false;

@@ -15,5 +15,5 @@ public:
 	virtual void Scan(RawFile* file, void* info = 0);
 	void SearchForSLZSeq (RawFile* file);
 	void SearchForInstrSet (RawFile* file, std::vector<TriAcePS1InstrSet*>& instrsets);
-	TriAcePS1Seq* TriAceSLZ1Decompress(RawFile* file, ULONG cfOff);
+	TriAcePS1Seq* TriAceSLZ1Decompress(RawFile* file, uint32_t cfOff);
 };

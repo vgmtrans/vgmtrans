@@ -142,7 +142,7 @@ bool PSFFile::Load(RawFile* file)
 
 	// Parse tag section. Details are available here:
 	// http://wiki.neillcorlett.com/PSFTagFormat
-	uint32_t tagCurPos = PSF_TAG_SIG_LEN;
+	size_t tagCurPos = PSF_TAG_SIG_LEN;
 	while (tagCurPos < tagSectionSize)
 	{
 		// Search the end position of the current line.
@@ -221,8 +221,8 @@ bool PSFFile::ReadExe(uint8_t* buf, size_t len, size_t stripLen) const
 		return true;
 	}
 
-	uLong destlen = len;
-	int zRet = myuncompress(buf, &destlen, exeCompData->data, exeCompData->size, stripLen);
+	uLong destlen = (uLong) len;
+	int zRet = myuncompress(buf, &destlen, exeCompData->data, (uLong) exeCompData->size, (uLong) stripLen);
 	if (zRet != Z_OK)
 	{
 		//errorstr = L"Decompression failed";
@@ -241,8 +241,8 @@ bool PSFFile::ReadExeDataSeg(DataSeg*& seg, size_t len, size_t stripLen) const
 	}
 
 	uint8_t* buf = new uint8_t[len];
-	uLong destlen = len;
-	int zRet = myuncompress(buf, &destlen, exeCompData->data, exeCompData->size, stripLen);
+	uLong destlen = (uLong) len;
+	int zRet = myuncompress(buf, &destlen, exeCompData->data, (uLong) exeCompData->size, (uLong) stripLen);
 	if (zRet != Z_OK)
 	{
 		//errorstr = L"Decompression failed";
@@ -281,8 +281,8 @@ bool PSFFile::Decompress(size_t decompressed_size)
 		return false;
 	}
 
-	uLong destlen = decompressed_size;
-	int zRet = uncompress(buf, &destlen, exeCompData->data, exeCompData->size);
+	uLong destlen = (uLong) decompressed_size;
+	int zRet = uncompress(buf, &destlen, exeCompData->data, (uLong) exeCompData->size);
 	if (zRet != Z_STREAM_END)
 	{
 		errorstr = L"Decompression failed";
@@ -363,7 +363,7 @@ int PSFFile::myuncompress (
 
 	if (stripLen != 0)
 	{
-		stripAvailLen = min(stripLen, stripBufSize);
+		stripAvailLen = min(stripLen, (uLong) stripBufSize);
 		stream.next_out = (z_const Bytef *)stripBuf;
 		stream.avail_out = (uInt)stripAvailLen;
 	}
@@ -381,7 +381,7 @@ int PSFFile::myuncompress (
 		{
 			// try stripping more bytes
 			strippedLen += stripAvailLen;
-			stripAvailLen = min(stripLen - strippedLen, stripBufSize);
+			stripAvailLen = min(stripLen - strippedLen, (uLong) stripBufSize);
 			stream.next_out = (z_const Bytef *)stripBuf;
 			stream.avail_out = (uInt)stripAvailLen;
 		}

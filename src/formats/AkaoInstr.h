@@ -16,7 +16,7 @@ public:
 	virtual bool GetInstrPointers();
 public:
 	bool bMelInstrs, bDrumKit;
-	ULONG drumkitOff;
+	uint32_t drumkitOff;
 };
 
 // *********
@@ -27,11 +27,11 @@ public:
 class AkaoInstr : public VGMInstr
 {
 public:
-	AkaoInstr(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG bank, ULONG instrNum, const wchar_t* name = L"Instrument");
+	AkaoInstr(AkaoInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum, const wchar_t* name = L"Instrument");
 	virtual bool LoadInstr();
 
 public:
-	BYTE instrType;
+	uint8_t instrType;
 	bool bDrumKit;
 };
 
@@ -43,7 +43,7 @@ public:
 class AkaoDrumKit : public AkaoInstr
 {
 public:
-	AkaoDrumKit(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG bank, ULONG instrNum);
+	AkaoDrumKit(AkaoInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum);
 	virtual bool LoadInstr();
 };
 
@@ -56,17 +56,17 @@ class AkaoRgn :
 	public VGMRgn
 {
 public:
-	AkaoRgn(VGMInstr* instr, ULONG offset, ULONG length = 0, const wchar_t* name = L"Region");
-	AkaoRgn(VGMInstr* instr, ULONG offset, ULONG length, BYTE keyLow, BYTE keyHigh, 
-		BYTE artIDNum, const wchar_t* name = L"Region");
+	AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length = 0, const wchar_t* name = L"Region");
+	AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, 
+		uint8_t artIDNum, const wchar_t* name = L"Region");
 
 	virtual bool LoadRgn();
 
 public:
 	unsigned short ADSR1;				//raw psx ADSR1 value (articulation data)
 	unsigned short ADSR2;				//raw psx ADSR2 value (articulation data)
-	BYTE artNum;
-	BYTE drumRelUnityKey;
+	uint8_t artNum;
+	uint8_t drumRelUnityKey;
 };
 
 
@@ -77,13 +77,13 @@ public:
 
 typedef struct _AkaoArt
 {
-	BYTE unityKey;
+	uint8_t unityKey;
 	short fineTune;
-	ULONG sample_offset;
-	ULONG loop_point;
-	USHORT ADSR1;
-	USHORT ADSR2;
-	ULONG artID;
+	uint32_t sample_offset;
+	uint32_t loop_point;
+	uint16_t ADSR1;
+	uint16_t ADSR2;
+	uint32_t artID;
 	int sample_num;
 } AkaoArt;
 
@@ -95,7 +95,7 @@ class AkaoSampColl :
 	public VGMSampColl
 {
 public:
-	AkaoSampColl(RawFile* file, ULONG offset, ULONG length, std::wstring name = L"Akao Sample Collection");
+	AkaoSampColl(RawFile* file, uint32_t offset, uint32_t length, std::wstring name = L"Akao Sample Collection");
 	virtual ~AkaoSampColl();
 
 	virtual bool GetHeaderInfo();
@@ -103,13 +103,13 @@ public:
 
 public:
 	std::vector<AkaoArt> akArts;
-	ULONG starting_art_id;
-	USHORT sample_set_id;
+	uint32_t starting_art_id;
+	uint16_t sample_set_id;
 
 private:
-	ULONG sample_section_size;
-	ULONG nNumArts;
-	ULONG arts_offset;
-	ULONG sample_section_offset;
+	uint32_t sample_section_size;
+	uint32_t nNumArts;
+	uint32_t arts_offset;
+	uint32_t sample_section_offset;
 };
 

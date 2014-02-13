@@ -6,7 +6,7 @@ DECLARE_FORMAT(NDS);
 
 using namespace std;
 
-NDSSeq::NDSSeq(RawFile* file, ULONG offset, ULONG length, wstring name)
+NDSSeq::NDSSeq(RawFile* file, uint32_t offset, uint32_t length, wstring name)
 : VGMSeq(NDSFormat::name, file, offset, length, name)
 {
 }
@@ -36,8 +36,8 @@ bool NDSSeq::GetTrackPointers(void)
 	DATAHdr->AddSig(dwOffset+0x10, 4);
 	DATAHdr->AddSimpleItem(dwOffset+0x10+4, 4, L"Size");
 	DATAHdr->AddSimpleItem(dwOffset+0x10+8, 4, L"Data Pointer");
-	ULONG offset = dwOffset + 0x1C;
-	BYTE b = GetByte(offset);
+	uint32_t offset = dwOffset + 0x1C;
+	uint8_t b = GetByte(offset);
 	aTracks.push_back(new NDSTrack(this));
 
 	if (b == 0xFE)		//FE XX XX signifies multiple tracks, each true bit in the XX values signifies there is a track for that channel
@@ -46,12 +46,12 @@ bool NDSSeq::GetTrackPointers(void)
 		TrkPtrs->AddSimpleItem(offset, 3, L"Valid Tracks");
 		offset += 3;	//but all we need to do is check for subsequent 0x93 track pointer events
 		b = GetByte(offset);
-		ULONG songDelay = 0;
+		uint32_t songDelay = 0;
 		while (b == 0x80)
 		{
-			register ULONG value;
+			register uint32_t value;
 			register UCHAR c;
-			ULONG beginOffset = offset;
+			uint32_t beginOffset = offset;
 			offset++;
 			if ( (value = GetByte(offset++)) & 0x80 )
 			{
@@ -70,7 +70,7 @@ bool NDSSeq::GetTrackPointers(void)
 		while (b == 0x93)		//Track/Channel assignment and pointer.  Channel # is irrelevant
 		{
 			TrkPtrs->AddSimpleItem(offset, 5, L"Track Pointer");
-			ULONG trkOffset = GetByte(offset+2) + (GetByte(offset+3)<<8) + 
+			uint32_t trkOffset = GetByte(offset+2) + (GetByte(offset+3)<<8) + 
 								(GetByte(offset+4)<<16) + dwOffset + 0x1C;
 			NDSTrack* newTrack = new NDSTrack(this, trkOffset);
 			aTracks.push_back(newTrack);
@@ -88,12 +88,12 @@ bool NDSSeq::GetTrackPointers(void)
 #if 0 /* old version */
 bool NDSSeq::GetTrackPointers(void)
 {
-	ULONG offset = dwOffset + 0x1F;
-	BYTE b = GetByte(offset);
+	uint32_t offset = dwOffset + 0x1F;
+	uint8_t b = GetByte(offset);
 	aTracks.push_back(new NDSTrack(this));
 	while (b == 0x93)
 	{
-		ULONG trkOffset = GetByte(offset+2) + (GetByte(offset+3)<<8) + 
+		uint32_t trkOffset = GetByte(offset+2) + (GetByte(offset+3)<<8) + 
 							(GetByte(offset+4)<<16) + dwOffset + 0x1C;
 		aTracks.push_back(new NDSTrack(this, trkOffset));
 		offset += 5;
@@ -108,7 +108,7 @@ bool NDSSeq::GetTrackPointers(void)
 //  NDSTrack
 //  ********
 
-NDSTrack::NDSTrack(NDSSeq* parentFile, ULONG offset, ULONG length)
+NDSTrack::NDSTrack(NDSSeq* parentFile, uint32_t offset, uint32_t length)
 : SeqTrack(parentFile, offset, length)
 {
 	ResetVars();
@@ -137,12 +137,12 @@ void NDSTrack::SetChannelAndGroupFromTrkNum(int theTrackNum)
 
 bool NDSTrack::ReadEvent(void)
 {
-	ULONG beginOffset = curOffset;
-	BYTE status_byte = GetByte(curOffset++);
+	uint32_t beginOffset = curOffset;
+	uint8_t status_byte = GetByte(curOffset++);
 
 	if (status_byte < 0x80) //then it's a note on event
 	{
-		BYTE vel = GetByte(curOffset++);
+		uint8_t vel = GetByte(curOffset++);
 		dur = ReadVarLen(curOffset);//GetByte(curOffset++);
 		AddNoteByDur(beginOffset, curOffset-beginOffset, status_byte, vel, dur);
 		if(noteWithDelta)
@@ -159,7 +159,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0x81:
 		{
-			BYTE newProg = (BYTE) ReadVarLen(curOffset);
+			uint8_t newProg = (uint8_t) ReadVarLen(curOffset);
 			AddProgramChange(beginOffset, curOffset-beginOffset, newProg);
 		}
 		break;
@@ -171,7 +171,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0x94:
 		{
-			ULONG jumpAddr = GetByte(curOffset) + (GetByte(curOffset+1)<<8)
+			uint32_t jumpAddr = GetByte(curOffset) + (GetByte(curOffset+1)<<8)
 							+ (GetByte(curOffset+2)<<16) + parentSeq->dwOffset + 0x1C;
 			curOffset += 3;
 
@@ -198,9 +198,9 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xA0: // [loveemu] (ex: Hanjuku Hero DS: NSE_45, New Mario Bros: BGM_AMB_CHIKA, Slime Morimori Dragon Quest 2: SE_187, SE_210, Advance Wars)
 		{
-			BYTE subStatusByte;
-			SHORT randMin;
-			SHORT randMax;
+			uint8_t subStatusByte;
+			int16_t randMin;
+			int16_t randMax;
 
 			subStatusByte = GetByte(curOffset++);
 			randMin = (signed) GetShort(curOffset);
@@ -214,8 +214,8 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xA1: // [loveemu] (ex: New Mario Bros: BGM_AMB_SABAKU)
 		{
-			BYTE subStatusByte = GetByte(curOffset++);
-			BYTE varNumber = GetByte(curOffset++);
+			uint8_t subStatusByte = GetByte(curOffset++);
+			uint8_t varNumber = GetByte(curOffset++);
 
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Cmd with Variable");
 		}
@@ -241,8 +241,8 @@ bool NDSTrack::ReadEvent(void)
 	case 0xBC: // [loveemu] 
 	case 0xBD: // [loveemu] 
 		{
-			BYTE varNumber;
-			SHORT val;
+			uint8_t varNumber;
+			int16_t val;
 			const wchar_t* eventName[] = {
 				L"Set Variable", L"Add Variable", L"Sub Variable", L"Mul Variable", L"Div Variable", 
 				L"Shift Vabiable", L"Rand Variable", L"", L"If Variable ==", L"If Variable >=", 
@@ -259,7 +259,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xC0:
 		{
-			BYTE pan = GetByte(curOffset++);
+			uint8_t pan = GetByte(curOffset++);
 			AddPan(beginOffset, curOffset-beginOffset, pan);
 		}
 		break;
@@ -271,7 +271,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xC2: // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_BOSS1_)
 		{
-			BYTE mvol = GetByte(curOffset++);
+			uint8_t mvol = GetByte(curOffset++);
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Master Volume");
 		}
 		break;
@@ -286,14 +286,14 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xC4: // [loveemu] pitch bend (ex: Castlevania Dawn of Sorrow: BGM_BOSS2)
 		{
-			SHORT bend = (signed) GetByte(curOffset++) * 64;
+			int16_t bend = (signed) GetByte(curOffset++) * 64;
 			AddPitchBend(beginOffset, curOffset-beginOffset, bend);
 		}
 		break;
 
 	case 0xC5: // [loveemu] pitch bend range (ex: Castlevania Dawn of Sorrow: BGM_BOSS2)
 		{
-			BYTE semitones = GetByte(curOffset++);
+			uint8_t semitones = GetByte(curOffset++);
 			AddPitchBendRange(beginOffset, curOffset-beginOffset, semitones);
 		}
 		break;
@@ -305,7 +305,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xC7: // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
 		{
-			BYTE notewait = GetByte(curOffset++);
+			uint8_t notewait = GetByte(curOffset++);
 			noteWithDelta = (notewait != 0);
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Notewait Mode");
 		}
@@ -323,7 +323,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xCA: // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
 		{
-			BYTE amount = GetByte(curOffset++);
+			uint8_t amount = GetByte(curOffset++);
 			AddModulation(beginOffset, curOffset-beginOffset, amount, L"Modulation Depth");
 		}
 		break;
@@ -352,7 +352,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xCF: // [loveemu] (ex: Bomberman: SEQ_AREA04)
 		{
-			BYTE portTime = GetByte(curOffset++);
+			uint8_t portTime = GetByte(curOffset++);
 			AddPortamentoTime(beginOffset, curOffset-beginOffset, portTime);
 		}
 		break;
@@ -384,7 +384,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xD5:
 		{
-			BYTE expression = GetByte(curOffset++);
+			uint8_t expression = GetByte(curOffset++);
 			AddExpression(beginOffset, curOffset-beginOffset, expression);
 		}
 		break;
@@ -401,7 +401,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xE1:
 		{
-			USHORT bpm = GetShort(curOffset);
+			uint16_t bpm = GetShort(curOffset);
 			curOffset += 2;
 			AddTempoBPM(beginOffset, curOffset-beginOffset, bpm);
 		}

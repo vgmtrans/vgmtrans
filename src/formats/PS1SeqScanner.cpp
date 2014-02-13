@@ -29,9 +29,9 @@ void PS1SeqScanner::Scan(RawFile* file, void* info)
 
 std::vector<PS1Seq*> PS1SeqScanner::SearchForPS1Seq (RawFile* file)
 {
-	UINT nFileLength = file->size();
+	uint32_t nFileLength = file->size();
 	std::vector<PS1Seq*> loadedFiles;
-	for (UINT i=0; i+4<nFileLength; i++)
+	for (uint32_t i=0; i+4<nFileLength; i++)
 	{
 		if ((*file)[i] == 'p' && (*file)[i+1] == 'Q' && (*file)[i+2] == 'E' && (*file)[i+3] == 'S')
 		{
@@ -52,9 +52,9 @@ std::vector<PS1Seq*> PS1SeqScanner::SearchForPS1Seq (RawFile* file)
 
 std::vector<Vab*> PS1SeqScanner::SearchForVab (RawFile* file)
 {
-	UINT nFileLength = file->size();
+	uint32_t nFileLength = file->size();
 	std::vector<Vab*> loadedFiles;
-	for (UINT i=0; i+4<nFileLength; i++)
+	for (uint32_t i=0; i+4<nFileLength; i++)
 	{
 		if ((*file)[i] == 'p' && (*file)[i+1] == 'B' && (*file)[i+2] == 'A' && (*file)[i+3] == 'V')
 		{

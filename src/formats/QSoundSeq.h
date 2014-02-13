@@ -9,7 +9,7 @@ class QSoundSeq :
 	public VGMSeq
 {
 public:
-	QSoundSeq(RawFile* file, ULONG offset, QSoundVer fmt_version, std::wstring& name);
+	QSoundSeq(RawFile* file, uint32_t offset, QSoundVer fmt_version, std::wstring& name);
 	virtual ~QSoundSeq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -34,11 +34,11 @@ private:
 	QSoundVer GetVersion() { return ((QSoundSeq*)this->parentSeq)->fmt_version; }			
 
 	bool bPrevNoteTie;
-	BYTE prevTieNote;
-	BYTE origTieNote;
-	BYTE curDeltaTable;
-	BYTE noteState;
-	BYTE bank;
-	BYTE loop[4];
+	uint8_t prevTieNote;
+	uint8_t origTieNote;
+	uint8_t curDeltaTable;
+	uint8_t noteState;
+	uint8_t bank;
+	uint8_t loop[4];
 	uint32_t loopOffset[4];	//used for detecting infinite loops, which truly occur in certain games
 };

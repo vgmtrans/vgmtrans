@@ -7,7 +7,7 @@ class KonamiGXSeq :
 	public VGMSeq
 {
 public:
-	KonamiGXSeq(RawFile* file, ULONG offset);
+	KonamiGXSeq(RawFile* file, uint32_t offset);
 	virtual ~KonamiGXSeq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -29,7 +29,7 @@ public:
 
 private:
 	bool bInJump;
-	BYTE prevDelta;
-	BYTE prevDur;
-	UINT jump_return_offset;
+	uint8_t prevDelta;
+	uint8_t prevDur;
+	uint32_t jump_return_offset;
 };

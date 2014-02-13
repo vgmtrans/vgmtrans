@@ -13,7 +13,7 @@ DECLARE_FORMAT(TriAcePS1);
 // TriAcePS1Seq
 // ************
 
-TriAcePS1Seq::TriAcePS1Seq(RawFile* file, ULONG offset)
+TriAcePS1Seq::TriAcePS1Seq(RawFile* file, uint32_t offset)
 : VGMSeq(TriAcePS1Format::name, file, offset)
 {
 	AddContainer<TriAcePS1ScorePattern>(aScorePatterns);
@@ -79,7 +79,7 @@ TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset, long length
 {
 }
 
-bool TriAcePS1Track::LoadTrackMainLoop(ULONG stopOffset)
+bool TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset)
 {
 	TriAcePS1Seq* seq = (TriAcePS1Seq*)parentSeq;
 	uint32_t scorePatternPtrOffset = dwOffset;
@@ -120,17 +120,17 @@ uint32_t TriAcePS1Track::ReadScorePattern(uint32_t offset)
 
 bool TriAcePS1Track::ReadEvent(void)
 {
-	ULONG beginOffset = curOffset;
+	uint32_t beginOffset = curOffset;
 
-	BYTE status_byte = GetByte(curOffset++);
-	BYTE event_dur = 0;
+	uint8_t status_byte = GetByte(curOffset++);
+	uint8_t event_dur = 0;
 
 	//0-0x7F is a note event
 	if (status_byte <= 0x7F)
 	{
 		event_dur = GetByte(curOffset++); //Delta time from "Note on" to "Next command(op-code)".
-		BYTE note_dur;
-		BYTE velocity;
+		uint8_t note_dur;
+		uint8_t velocity;
 		if (!impliedNoteDur) note_dur = GetByte(curOffset++);  //Delta time from "Note on" to "Note off".
 		else note_dur = impliedNoteDur;
 		if (!impliedVelocity) velocity = GetByte(curOffset++);
@@ -158,12 +158,12 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x83 :			//program change
 			{
 				event_dur = GetByte(curOffset++);
-				BYTE progNum = GetByte(curOffset++);
-				BYTE bankNum = GetByte(curOffset++);
+				uint8_t progNum = GetByte(curOffset++);
+				uint8_t bankNum = GetByte(curOffset++);
 
 				//ATLTRACE("PROGRAM CHANGE   ProgNum: %X    BankNum: %X", progNum, bankNum);
 				
-				BYTE bank = (bankNum*2) + ((progNum > 0x7F) ? 1 : 0);
+				uint8_t bank = (bankNum*2) + ((progNum > 0x7F) ? 1 : 0);
 				if (progNum > 0x7F)
 					progNum -= 0x80;
 
@@ -185,7 +185,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x85 :			//volume
 			{
 				event_dur = GetByte(curOffset++);
-				BYTE val = GetByte(curOffset++);
+				uint8_t val = GetByte(curOffset++);
 				AddVol(beginOffset, curOffset-beginOffset, val);
 			}
 			break;
@@ -193,7 +193,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x86 :			//expression
 			{
 				event_dur = GetByte(curOffset++);
-				BYTE val = GetByte(curOffset++);
+				uint8_t val = GetByte(curOffset++);
 				AddExpression(beginOffset, curOffset-beginOffset, val);
 			}
 			break;
@@ -201,7 +201,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x87 :			//pan
 			{
 				event_dur = GetByte(curOffset++);
-				BYTE pan = GetByte(curOffset++);
+				uint8_t pan = GetByte(curOffset++);
 				AddPan(beginOffset, curOffset-beginOffset, pan);
 			}
 			break;
@@ -215,7 +215,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x89 :			//damper pedal
 			{
 				event_dur = GetByte(curOffset++);
-				BYTE val = GetByte(curOffset++);
+				uint8_t val = GetByte(curOffset++);
 				AddSustainEvent(beginOffset, curOffset-beginOffset, (val>0));
 			}
 			break;
@@ -223,7 +223,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x8A :			//unknown (tempo?)
 			{
 				event_dur = GetByte(curOffset++);
-				BYTE val = GetByte(curOffset++);
+				uint8_t val = GetByte(curOffset++);
 				AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event (tempo?)");
 			}
 			break;
@@ -239,7 +239,7 @@ bool TriAcePS1Track::ReadEvent(void)
 
 		case 0x8F :			//rest
 			{
-				BYTE rest = GetByte(curOffset++);
+				uint8_t rest = GetByte(curOffset++);
 				AddRest(beginOffset, curOffset-beginOffset, rest);
 			}
 			break;
@@ -277,7 +277,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x96 :			//Pitch Bend Range
 			{
 				event_dur = GetByte(curOffset++);
-				BYTE semitones = GetByte(curOffset++);
+				uint8_t semitones = GetByte(curOffset++);
 				AddPitchBendRange(beginOffset, curOffset-beginOffset, semitones);
 			}
 			break;
@@ -325,7 +325,7 @@ bool TriAcePS1Track::ReadEvent(void)
 }
 
 // The following two functions are overridden so that events become children of the Score Patterns and not the tracks.
-bool TriAcePS1Track::IsOffsetUsed(ULONG offset)
+bool TriAcePS1Track::IsOffsetUsed(uint32_t offset)
 {
 	return false;
 }

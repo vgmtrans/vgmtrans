@@ -27,8 +27,8 @@ void NinSnesScanner::Scan(RawFile* file, void* info)
 /*
 void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+6<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+6<nFileLength; i++)
 	{
 		if ((*file)[i] == 'O' && (*file)[i+1] == 'r' && (*file)[i+2] == 'g' && (*file)[i+3] == '-' &&
 			  (*file)[i+4] == '0' && (*file)[i+5] == '2')
@@ -46,21 +46,21 @@ void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
 
 void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
 {
-	ULONG nFileLength = file->size();
+	uint32_t nFileLength = file->size();
 	if (nFileLength < 0x10000 || nFileLength > 0x10500)
 		return;
 
 	// a small logic to prevent a false positive
-	UINT ofsBranchForVcmd;
+	uint32_t ofsBranchForVcmd;
 	if (!file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
 	{
 		return;
 	}
 
-	for (ULONG i = 0x100; i+1 < nFileLength; i++)
+	for (uint32_t i = 0x100; i+1 < nFileLength; i++)
 	{
-		USHORT theShort2;
-		USHORT theShort = file->GetShort(i);
+		uint16_t theShort2;
+		uint16_t theShort = file->GetShort(i);
 		if (theShort > i && theShort < i + /*0x150*/0x200)
 		{
 			bool bFailed = false;
@@ -94,15 +94,15 @@ void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
 					for (int p=0; p<8; p++)
 					{
 						theShort = file->GetShort(i+n);
-						USHORT tempShort;
-						if ((ULONG)(theShort+p*2+1) < nFileLength)
+						uint16_t tempShort;
+						if ((uint32_t)(theShort+p*2+1) < nFileLength)
 							tempShort = file->GetShort(theShort+p*2);
 						else
 						{
 							bFailed = true;
 							break;
 						}
-						if ((ULONG)(tempShort+1) < nFileLength)
+						if ((uint32_t)(tempShort+1) < nFileLength)
 						{
 							if ((tempShort <= i || tempShort >= i+0x3000) && tempShort != 0)
 								bFailed = true;

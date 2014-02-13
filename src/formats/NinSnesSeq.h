@@ -34,12 +34,12 @@ enum
 	EVENT_LOOPEND
 };
 
-const BYTE voltbl[16] = { 0x19, 0x32, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98,
+const uint8_t voltbl[16] = { 0x19, 0x32, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98,
 					 0xa5, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc };
 
-const BYTE durpcttbl[8] = { 0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xfc };
+const uint8_t durpcttbl[8] = { 0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xfc };
 
-const BYTE pantbl[0x15] = { 0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
+const uint8_t pantbl[0x15] = { 0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
 							0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
 							0x7a, 0x7c, 0x7d, 0x7e, 0x7f };
 
@@ -48,7 +48,7 @@ class NinSnesSeq :
 	public VGMSeq
 {
 public:
-	NinSnesSeq(RawFile* file, ULONG offset, ULONG length = 0, std::wstring theName = L"NinSnes Seq");
+	NinSnesSeq(RawFile* file, uint32_t offset, uint32_t length = 0, std::wstring theName = L"NinSnes Seq");
 	virtual ~NinSnesSeq();
 
 	virtual bool LoadMain();
@@ -57,39 +57,39 @@ public:
 	void LoadDefaultEventMap(NinSnesSeq *pSeqFile);
 
 public:
-	std::vector<USHORT> sectPlayList;
-	USHORT playListRptPtr;
+	std::vector<uint16_t> sectPlayList;
+	uint16_t playListRptPtr;
 
 	std::vector<NinSnesSection*> aSections;
-	std::map<USHORT, NinSnesSection*> sectionMap;
+	std::map<uint16_t, NinSnesSection*> sectionMap;
 
-	ULONG curDelta;
-	BYTE META_CUTOFF;
-	BYTE NOTEREST_CUTOFF;
-	BYTE NOTE_CUTOFF;
-	std::map<BYTE, int> EventMap;
-	std::map<BYTE, BYTE> DrumMap;
-	BYTE percbase;
-	BYTE mvol;
+	uint32_t curDelta;
+	uint8_t META_CUTOFF;
+	uint8_t NOTEREST_CUTOFF;
+	uint8_t NOTE_CUTOFF;
+	std::map<uint8_t, int> EventMap;
+	std::map<uint8_t, uint8_t> DrumMap;
+	uint8_t percbase;
+	uint8_t mvol;
 };
 
 class NinSnesSection
 	: public VGMContainerItem
 {
 public:
-	NinSnesSection(NinSnesSeq* parentSeq, ULONG offset);
+	NinSnesSection(NinSnesSeq* parentSeq, uint32_t offset);
 	~NinSnesSection();
-	bool GetHeaderInfo(USHORT headerOffset);
+	bool GetHeaderInfo(uint16_t headerOffset);
 	int LoadSection(int startTime);
 
 public:
 	ReadMode readMode;
-	//ULONG endTime;
-	//ULONG totalTime;
+	//uint32_t endTime;
+	//uint32_t totalTime;
 	
-	//ULONG endTime;		//when the end of Section event is hit, the absolute time is stored here.  This method assumes the end of section occurs on first track
-	UINT hdrOffset;
-	std::vector<USHORT> trackOffsets;
+	//uint32_t endTime;		//when the end of Section event is hit, the absolute time is stored here.  This method assumes the end of section occurs on first track
+	uint32_t hdrOffset;
+	std::vector<uint16_t> trackOffsets;
 	std::vector<SeqTrack*> aSectTracks;
 	std::vector<SeqTrack*> aSongTracks;
 };
@@ -99,28 +99,28 @@ class NinSnesTrack
 	: public SeqTrack
 {
 public:
-	NinSnesTrack(NinSnesSection* parentSect, ULONG offset, int trackNumber);
-	NinSnesTrack(NinSnesSeq* parentSeq, ULONG offset, int trackNumber);
-	bool ReadEvent(ULONG totalTime);
-	void AddTime(ULONG AddDelta);
-	void SetTime(ULONG NewDelta);
-	void SubtractTime(ULONG SubtractDelta);
-	void SetPercBase(BYTE newBase);
-	BYTE GetPercBase();
+	NinSnesTrack(NinSnesSection* parentSect, uint32_t offset, int trackNumber);
+	NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset, int trackNumber);
+	bool ReadEvent(uint32_t totalTime);
+	void AddTime(uint32_t AddDelta);
+	void SetTime(uint32_t NewDelta);
+	void SubtractTime(uint32_t SubtractDelta);
+	void SetPercBase(uint8_t newBase);
+	uint8_t GetPercBase();
 
 public:
 	NinSnesSection* prntSect;
-	ULONG beginEventIndex;
-	ULONG endEventIndex;
+	size_t beginEventIndex;
+	size_t endEventIndex;
 	int trackNum;
-	ULONG nextEventTime;
+	uint32_t nextEventTime;
 
-	ULONG notedur;
-	ULONG durpct;
+	uint32_t notedur;
+	uint32_t durpct;
 
-	ULONG substart;
-	ULONG subret;
-    BYTE subcount;
-	USHORT loopdest;
-	BYTE loopcount;
+	uint32_t substart;
+	uint32_t subret;
+    uint8_t subcount;
+	uint16_t loopdest;
+	uint8_t loopcount;
 };

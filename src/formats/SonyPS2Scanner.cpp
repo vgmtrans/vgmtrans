@@ -16,8 +16,8 @@ void SonyPS2Scanner::Scan(RawFile* file, void* info)
 
 void SonyPS2Scanner::SearchForSeq (RawFile* file)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+0x40<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+0x40<nFileLength; i++)
 	{
 		uint32_t sig1 = file->GetWord(i);
 		uint32_t sig2 = file->GetWord(i+4);
@@ -42,8 +42,8 @@ void SonyPS2Scanner::SearchForSeq (RawFile* file)
 
 void SonyPS2Scanner::SearchForInstrSet (RawFile* file)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+0x40<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+0x40<nFileLength; i++)
 	{
 		uint32_t sig1 = file->GetWord(i);
 		uint32_t sig2 = file->GetWord(i+4);
@@ -68,7 +68,7 @@ void SonyPS2Scanner::SearchForInstrSet (RawFile* file)
 
 void SonyPS2Scanner::SearchForSampColl (RawFile* file)
 {
-	UINT nFileLength = file->size();
+	uint32_t nFileLength = file->size();
 	if (nFileLength < 32)
 		return;
 
@@ -76,13 +76,13 @@ void SonyPS2Scanner::SearchForSampColl (RawFile* file)
 	{
 		// Hack for incorrectly ripped bd files.  Should ALWAYS start with 16 0x00 bytes (must... suppress... rage)
 		// If it doesn't, we'll throw out this file and create a new one with the correct formating
-		BYTE buf[16];
+		uint8_t buf[16];
 		file->GetBytes(0, 16, buf);
 		int num = CountBytesOfVal(buf, 16, 0);		//The first 16 bytes must be all 0x00
 		if (num != 16)
 		{
 			uint32_t newFileSize = file->size() + 16;
-			BYTE* newdataBuf = new BYTE[newFileSize];
+			uint8_t* newdataBuf = new uint8_t[newFileSize];
 			file->GetBytes(0, file->size(), newdataBuf+16);
 			memset(newdataBuf, 0, 16);
 			pRoot->CreateVirtFile(newdataBuf, newFileSize, file->GetFileName(), file->GetParRawFileFullPath().c_str());
@@ -96,7 +96,7 @@ void SonyPS2Scanner::SearchForSampColl (RawFile* file)
 			fmt->OnNewFile(sampColl);
 	}
 
-	//BYTE buf[32];
+	//uint8_t buf[32];
 	//file->GetBytes(0, 32, buf);
 	//int num = CountBytesOfVal(buf, 16, 0);		//The first 16 bytes must be all 0x00
 	//if (num != 16)	

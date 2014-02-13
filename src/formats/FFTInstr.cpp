@@ -15,7 +15,7 @@ using namespace std;
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-WdsInstrSet::WdsInstrSet(RawFile* file, ULONG offset):
+WdsInstrSet::WdsInstrSet(RawFile* file, uint32_t offset):
 	VGMInstrSet(FFTFormat::name, file, offset)
 {
 }
@@ -84,7 +84,7 @@ bool	WdsInstrSet::GetHeaderInfo()
 bool	WdsInstrSet::GetInstrPointers()
 {
 
-	ULONG	iOffset = dwOffset + sizeof(WdsHdr);	//pointer of attribute table
+	uint32_t	iOffset = dwOffset + sizeof(WdsHdr);	//pointer of attribute table
 
 	//âπêFêîÇæÇØåJÇËï‘Ç∑ÅB
 	for(unsigned int i=0; i<=hdr.iNumInstrs; i++)
@@ -109,7 +109,7 @@ bool	WdsInstrSet::GetInstrPointers()
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-WdsInstr::WdsInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum):
+WdsInstr::WdsInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum):
 	VGMInstr(instrSet, offset, length, theBank, theInstrNum)
 {
 }

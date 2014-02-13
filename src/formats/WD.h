@@ -38,17 +38,17 @@ class WDInstrSet
 	: public VGMInstrSet
 {
 public:
-	WDInstrSet(RawFile* file, ULONG offset);
+	WDInstrSet(RawFile* file, uint32_t offset);
 	virtual ~WDInstrSet(void);
 
 	virtual bool GetHeaderInfo();
 	virtual bool GetInstrPointers();
 
 public:
-	DWORD dwSampSectOffset;
-	DWORD dwSampSectSize;
-	DWORD dwNumInstrs;
-	DWORD dwTotalRegions;
+	uint32_t dwSampSectOffset;
+	uint32_t dwSampSectSize;
+	uint32_t dwNumInstrs;
+	uint32_t dwTotalRegions;
 };
 
 
@@ -60,7 +60,7 @@ class WDInstr
 	: public VGMInstr
 {
 public:
-	WDInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, std::wstring name);
+	WDInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum, std::wstring name);
 	virtual ~WDInstr(void);
 	virtual bool LoadInstr();
 
@@ -78,7 +78,7 @@ class WDRgn
 	: public VGMRgn
 {
 public:
-	WDRgn(WDInstr* instr, ULONG offset);
+	WDRgn(WDInstr* instr, uint32_t offset);
 
 public:
 	unsigned short ADSR1;				//raw ps2 ADSR1 value (articulation data)

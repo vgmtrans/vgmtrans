@@ -25,7 +25,7 @@ public:
 
 public:
 	AkaoInstrSet* origInstrSet;
-	UINT numAddedInstrs;
+	uint32_t numAddedInstrs;
 };
 
 // ***********

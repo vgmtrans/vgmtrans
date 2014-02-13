@@ -18,17 +18,17 @@ PSF1Loader::~PSF1Loader(void)
 
 PostLoadCommand PSF1Loader::Apply(RawFile* file)
 {
-	BYTE sig[4];
+	uint8_t sig[4];
 	file->GetBytes(0, 4, sig);
 	if (memcmp(sig, "PSF", 3) == 0)
 	{
-		BYTE version = sig[3];
+		uint8_t version = sig[3];
 		if (version == 0x01)
 		{
 			const wchar_t *complaint;
 			const size_t exebufsize = 0x200000;
-			//UINT exeRealSize;
-			BYTE* exebuf = new BYTE[exebufsize];
+			//uint32_t exeRealSize;
+			uint8_t* exebuf = new uint8_t[exebufsize];
 			memset(exebuf, 0, exebufsize);
 
 			complaint = psf_read_exe(file, exebuf, exebufsize);
@@ -40,7 +40,7 @@ PostLoadCommand PSF1Loader::Apply(RawFile* file)
 			}
 			//pRoot->UI_WriteBufferToFile(L"uncomp.raw", exebuf, 0x200000);
 
-			//BYTE* cutbuf = new BYTE[exeRealSize];
+			//uint8_t* cutbuf = new uint8_t[exeRealSize];
 			//memcpy(cutbuf, exebuf, exeRealSize);
 			//delete[] exebuf;
 
@@ -93,7 +93,7 @@ const wchar_t* PSF1Loader::psf_read_exe(
   unsigned exebuffersize
 ) 
 {
-	UINT fileSize = file->size();
+	uint32_t fileSize = file->size();
 	if (fileSize >= 0x10000000)
 		return L"PSF too large - likely corrupt";
 

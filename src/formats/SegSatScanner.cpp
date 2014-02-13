@@ -16,19 +16,19 @@ SegSatScanner::~SegSatScanner(void)
 
 void SegSatScanner::Scan(RawFile* file, void* info)
 {
-	UINT nFileLength;
-	BYTE *buf;
-	UINT j;
-	UINT progPos= 0;
+	uint32_t nFileLength;
+	uint8_t *buf;
+	uint32_t j;
+	uint32_t progPos= 0;
 
 	//text.Format(_T("Searching For SDMS Sequences"));
 	//pDoc->SetDLLProgText(text);
 
-	buf = new BYTE[SRCH_BUF_SIZE];
+	buf = new uint8_t[SRCH_BUF_SIZE];
 	nFileLength = file->size();
 	file->GetBytes(0, SRCH_BUF_SIZE, buf);
 	j = 0;
-	for (UINT i=0; i+4<nFileLength; i++)
+	for (uint32_t i=0; i+4<nFileLength; i++)
 	{
 		if (j+4 > SRCH_BUF_SIZE)
 		{

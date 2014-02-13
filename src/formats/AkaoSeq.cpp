@@ -7,7 +7,7 @@ DECLARE_FORMAT(Akao);
 
 using namespace std;
 
-AkaoSeq::AkaoSeq(RawFile* file, ULONG offset)
+AkaoSeq::AkaoSeq(RawFile* file, uint32_t offset)
 : VGMSeq(AkaoFormat::name, file, offset)
 {
 	UseLinearAmplitudeScale();		//I THINK THIS APPLIES, BUT NOT POSITIVE, see FF9 320, track 3 for example of problem
@@ -19,7 +19,7 @@ AkaoSeq::~AkaoSeq(void)
 {
 }
 
-BYTE AkaoSeq::GetNumPositiveBits(ULONG ulWord)
+uint8_t AkaoSeq::GetNumPositiveBits(uint32_t ulWord)
 {
 	return	((ulWord&0x80000000)>0) + ((ulWord&0x40000000)>0) + ((ulWord&0x20000000)>0) + ((ulWord&0x10000000)>0) +
 			((ulWord&0x8000000)>0)+((ulWord&0x4000000)>0)+((ulWord&0x2000000)>0)+((ulWord&0x1000000)>0) +
@@ -129,8 +129,8 @@ void AkaoTrack::ResetVars(void)
 //--------------------------------------------------
 bool AkaoTrack::ReadEvent(void)
 {
-	ULONG beginOffset = curOffset;
-	BYTE status_byte = GetByte(curOffset++);
+	uint32_t beginOffset = curOffset;
+	uint8_t status_byte = GetByte(curOffset++);
 
 	int i, k;
 
@@ -208,8 +208,8 @@ bool AkaoTrack::ReadEvent(void)
 	 case 0xA1 :			// change program to articulation number
 		{
 			((AkaoSeq*)parentSeq)->bUsesIndividualArts = true;
-			BYTE artNum = GetByte(curOffset++);
-			BYTE progNum = ((AkaoSeq*)parentSeq)->instrset->aInstrs.size() + artNum;
+			uint8_t artNum = GetByte(curOffset++);
+			uint8_t progNum = (uint8_t)(((AkaoSeq*)parentSeq)->instrset->aInstrs.size() + artNum);
 			AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
 		}
 		break;
@@ -226,8 +226,8 @@ bool AkaoTrack::ReadEvent(void)
 
 	 case 0xA4:			// pitch slide half steps.  (Portamento)
 		{
-			BYTE dur = GetByte(curOffset++);		//first byte is duration of slide
-			BYTE steps = GetByte(curOffset++);		//second byte is number of halfsteps to slide... not sure if signed or not, only seen positive
+			uint8_t dur = GetByte(curOffset++);		//first byte is duration of slide
+			uint8_t steps = GetByte(curOffset++);		//second byte is number of halfsteps to slide... not sure if signed or not, only seen positive
 			//AddPitchBendSlide(
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Portamento", NULL, CLR_PORTAMENTO);
 		}
@@ -251,7 +251,7 @@ bool AkaoTrack::ReadEvent(void)
 			 //vel = GetByte(curOffset++);
 			 //vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES, BUT NOT POSITIVE
 			 //AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Velocity", NULL, BG_CLR_CYAN);
-			 BYTE cExpression = GetByte(curOffset++);
+			 uint8_t cExpression = GetByte(curOffset++);
 ////			 ‚±‚Á‚¿‚Ìlog‰‰ŽZ‚Í—v‚ç‚È‚¢
 ////			 vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES, BUT NOT POSITIVE
 			 vel = 127;		//‚Æ‚è‚ ‚¦‚¸ 127 ‚É‚µ‚Ä‚¨‚­
@@ -261,23 +261,23 @@ bool AkaoTrack::ReadEvent(void)
 
 	 case 0xA9 :			//set Expression fade
 		 {
-			BYTE dur = GetByte(curOffset++);
-			BYTE targExpr = GetByte(curOffset++);			//reads the target velocity value - the velocity value we are fading toward
+			uint8_t dur = GetByte(curOffset++);
+			uint8_t targExpr = GetByte(curOffset++);			//reads the target velocity value - the velocity value we are fading toward
 			AddExpressionSlide(beginOffset, curOffset-beginOffset, dur, targExpr);
 		 }
 		 break;
 
 	 case 0xAA :			//set pan
 		 {
-			BYTE pan = GetByte(curOffset++);
+			uint8_t pan = GetByte(curOffset++);
 			AddPan(beginOffset, curOffset-beginOffset, pan);
 		 }
 		break;
 
 	 case 0xAB :			//set pan fade
 		 {
-			BYTE dur = GetByte(curOffset++);
-			BYTE targPan = GetByte(curOffset++);			//reads the target velocity value - the velocity value we are fading toward
+			uint8_t dur = GetByte(curOffset++);
+			uint8_t targPan = GetByte(curOffset++);			//reads the target velocity value - the velocity value we are fading toward
 			AddPanSlide(beginOffset, curOffset-beginOffset, dur, targPan);
 		 }
 		 break;
@@ -383,7 +383,7 @@ bool AkaoTrack::ReadEvent(void)
 		 break;
 	 case 0xC1 :
 		 {
-			BYTE cTranspose = GetByte(curOffset++);
+			uint8_t cTranspose = GetByte(curOffset++);
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Transpose move", NULL, CLR_TRANSPOSE);
 		 }
 		 break;
@@ -418,7 +418,7 @@ bool AkaoTrack::ReadEvent(void)
 
 	case 0xC9 :
 		{
-			BYTE value1 = GetByte(curOffset++);
+			uint8_t value1 = GetByte(curOffset++);
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Repeat End", NULL, CLR_LOOP);
 			if (loop_begin_layer == 0)		//if loop_begin_layer == 0, then there was never a matching loop begin event!  this is seen in ff9 402 and ff9 hunter's chance
 				break;
@@ -450,7 +450,7 @@ bool AkaoTrack::ReadEvent(void)
 
 	case 0xCA :
 		{
-			BYTE value1 = 2;
+			uint8_t value1 = 2;
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Repeat End", NULL, CLR_LOOP);
 			if (loop_begin_layer == 0)
 				break;
@@ -507,11 +507,11 @@ bool AkaoTrack::ReadEvent(void)
 
 	case 0xD8 :			//pitch bend
 		{
-			BYTE cValue = GetByte(curOffset++);		//signed data byte.  range of 1 octave (0x7F = +1 octave 0x80 = -1 octave)
+			uint8_t cValue = GetByte(curOffset++);		//signed data byte.  range of 1 octave (0x7F = +1 octave 0x80 = -1 octave)
 			int fullValue = (int)(cValue * 64.503937007874015748031496062992);
 			fullValue += 0x2000;
-			BYTE lo = fullValue & 0x7F;
-			BYTE hi = (fullValue & 0x3F80) >> 7;
+			uint8_t lo = fullValue & 0x7F;
+			uint8_t hi = (fullValue & 0x3F80) >> 7;
 			AddPitchBendMidiFormat(beginOffset, curOffset-beginOffset, lo, hi);
 		}
 		break;
@@ -569,7 +569,7 @@ bool AkaoTrack::ReadEvent(void)
 				 AddNoteOffNoItem(prevKey);
 		 		bNotePlaying = false;
 			 }
-			 BYTE restTime = GetByte(curOffset++);
+			 uint8_t restTime = GetByte(curOffset++);
 			 AddRest(beginOffset, curOffset-beginOffset, restTime);
 		 }
 		 break;
@@ -580,8 +580,8 @@ bool AkaoTrack::ReadEvent(void)
 		{
 		case 0x00 :			//tempo
 			{
-				BYTE value1 = GetByte(curOffset++);
-				BYTE value2 = GetByte(curOffset++);
+				uint8_t value1 = GetByte(curOffset++);
+				uint8_t value2 = GetByte(curOffset++);
 				double dValue1 = ((value2<<8) + value1)/218.4555555555555555555555555;		//no clue how this magic number is properly derived
 				AddTempoBPM(beginOffset, curOffset-beginOffset, dValue1);
 			}
@@ -589,8 +589,8 @@ bool AkaoTrack::ReadEvent(void)
 
 		case 0x01 :			//tempo slide
 			{
-				BYTE value1 = GetByte(curOffset++);    //NEED TO ADDRESS value 1	
-				BYTE value2 = GetByte(curOffset++);
+				uint8_t value1 = GetByte(curOffset++);    //NEED TO ADDRESS value 1	
+				uint8_t value2 = GetByte(curOffset++);
 				//AddTempoSlide(
 				//RecordMidiSetTempo(current_delta_time, value2); 
 			}
@@ -619,15 +619,15 @@ bool AkaoTrack::ReadEvent(void)
 
 		case 0x06 :			//Branch Relative
 			{
-				ULONG dest = (int16_t)GetShort(curOffset) + curOffset;
+				uint32_t dest = (int16_t)GetShort(curOffset) + curOffset;
 				curOffset += 2;
-				ULONG eventLength = curOffset - beginOffset;
+				uint32_t eventLength = curOffset - beginOffset;
 				bool bContinue = false;
 
 				curOffset = dest;
 
 				// Check the remaining area that will be processed by CPU-controlled jump.
-				for (vector<ULONG>::iterator itAddr = vCondJumpAddr.begin(); itAddr != vCondJumpAddr.end(); ++itAddr)
+				for (vector<uint32_t>::iterator itAddr = vCondJumpAddr.begin(); itAddr != vCondJumpAddr.end(); ++itAddr)
 				{
 					if (!IsOffsetUsed(*itAddr))
 					{
@@ -643,7 +643,7 @@ bool AkaoTrack::ReadEvent(void)
 				AddGenericEvent(beginOffset, eventLength, L"Dal Segno.(Loop)", NULL, CLR_LOOP);
 				return bContinue;
 
-				/*USHORT siValue = GetShort(pDoc, j);
+				/*uint16_t siValue = GetShort(pDoc, j);
 				if (nScanMode == MODE_CONVERT_MIDI)		//if we are converting the midi, the actually branch
 				{
 					if (seq_repeat_counter-- > 0)
@@ -658,10 +658,10 @@ bool AkaoTrack::ReadEvent(void)
 
 		case 0x07 :			//Permanence Loop break with conditional.
 			{
-				BYTE condValue = GetByte(curOffset++);
-				ULONG dest = (int16_t)GetShort(curOffset) + curOffset;
+				uint8_t condValue = GetByte(curOffset++);
+				uint32_t dest = (int16_t)GetShort(curOffset) + curOffset;
 				curOffset += 2;
-				ULONG eventLength = curOffset - beginOffset;
+				uint32_t eventLength = curOffset - beginOffset;
 
 				// This event performs conditional jump if certain CPU variable matches to the condValue.
 				// VGMTrans will simply try to parse all events as far as possible, instead.
@@ -699,7 +699,7 @@ bool AkaoTrack::ReadEvent(void)
 
 		case 0x14 :			//program change
 			{
-				BYTE curProgram = GetByte(curOffset++);
+				uint8_t curProgram = GetByte(curOffset++);
 				//if (!bAssociatedWithSSTable)
 				//	RecordMidiProgramChange(current_delta_time, curProgram, hFile);
 				AddProgramChange(beginOffset, curOffset-beginOffset, curProgram);
@@ -708,8 +708,8 @@ bool AkaoTrack::ReadEvent(void)
 
 		case 0x15 :			//Time Signature
 			{
-				BYTE denom = 4; curOffset++;//(192 / GetByte(curOffset++));
-				BYTE numer = GetByte(curOffset++);
+				uint8_t denom = 4; curOffset++;//(192 / GetByte(curOffset++));
+				uint8_t numer = GetByte(curOffset++);
 				//AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, parentSeq->GetPPQN());
 			}
 			break;

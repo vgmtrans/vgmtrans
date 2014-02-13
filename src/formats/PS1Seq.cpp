@@ -4,7 +4,7 @@
 
 DECLARE_FORMAT(PS1)
 
-PS1Seq::PS1Seq(RawFile* file, ULONG offset)
+PS1Seq::PS1Seq(RawFile* file, uint32_t offset)
 : VGMSeqNoTrks(PS1Format::name, file, offset)
 {
 	//UseReverb();
@@ -26,11 +26,11 @@ bool PS1Seq::GetHeaderInfo(void)
 	channel = 0;
 	SetCurTrack(channel);
 	AddTempo(offset()+10, 3, GetWordBE(offset()+9) & 0xFFFFFF);
-	BYTE numer = GetByte(offset()+0x0D);
-	BYTE denom = GetByte(offset()+0x0E);
+	uint8_t numer = GetByte(offset()+0x0D);
+	uint8_t denom = GetByte(offset()+0x0E);
 	if (numer == 0 || numer > 32)				//sanity check
 		return false;
-	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, (BYTE)GetPPQN());
+	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, (uint8_t)GetPPQN());
 
 	//name().append(L" blah");
 
@@ -52,13 +52,13 @@ bool PS1Seq::GetHeaderInfo(void)
 
 bool PS1Seq::ReadEvent(void)
 {
-	ULONG beginOffset = curOffset;
-	ULONG delta = ReadVarLen(curOffset);
+	uint32_t beginOffset = curOffset;
+	uint32_t delta = ReadVarLen(curOffset);
 	if (curOffset >= rawfile->size())
 		return false;
 	AddTime(delta);
 
-	BYTE status_byte = GetByte(curOffset++);
+	uint8_t status_byte = GetByte(curOffset++);
 
 	//if (status_byte == 0)				//Jump Relative
 	//{
@@ -71,8 +71,8 @@ bool PS1Seq::ReadEvent(void)
 	//	curOffset += 2;
 	//	AddTempo(curOffset, 3, GetWordBE(curOffset-1) & 0xFFFFFF);
 	//	curOffset += 3;
-	//	BYTE numer = GetByte(curOffset++);
-	//	BYTE denom = GetByte(curOffset++);
+	//	uint8_t numer = GetByte(curOffset++);
+	//	uint8_t denom = GetByte(curOffset++);
 	//	if (numer == 0 || numer > 32)				//sanity check
 	//		return false;
 	//	AddTimeSig(curOffset-2, 2, numer, 1<<denom, GetPPQN());
@@ -109,8 +109,8 @@ bool PS1Seq::ReadEvent(void)
 
 	case 0xB0 :
 		{
-			BYTE controlNum = GetByte(curOffset++);
-			BYTE value = GetByte(curOffset++);
+			uint8_t controlNum = GetByte(curOffset++);
+			uint8_t value = GetByte(curOffset++);
 			switch (controlNum)		//control number
 			{
 			case 6 :
@@ -147,15 +147,15 @@ bool PS1Seq::ReadEvent(void)
 
 	case 0xC0 :
 		{
-			BYTE progNum = GetByte(curOffset++);
+			uint8_t progNum = GetByte(curOffset++);
 			AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
 		}
 		break;
 
 	case 0xE0 :
 		{
-			BYTE hi = GetByte(curOffset++);
-			BYTE lo = GetByte(curOffset++);
+			uint8_t hi = GetByte(curOffset++);
+			uint8_t lo = GetByte(curOffset++);
 			AddPitchBendMidiFormat(beginOffset, curOffset-beginOffset, hi, lo);
 		}
 		break;

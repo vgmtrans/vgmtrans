@@ -26,8 +26,8 @@ void TriAcePS1Scanner::Scan(RawFile* file, void* info)
 
 void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+0x40<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+0x40<nFileLength; i++)
 	{
 		uint32_t sig1 = file->GetWordBE(i);
 
@@ -71,7 +71,7 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 
 		VGMColl* coll = new VGMColl(_T("TriAce Song"));
 		coll->UseSeq(seq);
-		for (UINT i=0; i<instrsets.size(); i++)
+		for (uint32_t i=0; i<instrsets.size(); i++)
 			coll->AddInstrSet(instrsets[i]);
 		if (!coll->Load())
 		{
@@ -82,8 +82,8 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 
 void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSet*>& instrsets)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=4; i+0x800<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=4; i+0x800<nFileLength; i++)
 	{
 		uint8_t precedingByte = file->GetByte(i+3);
 		if (precedingByte != 0)
@@ -132,7 +132,7 @@ void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSe
 
 
 //file is RawFile containing the compressed seq.  cfOff is the compressed file offset.
-TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, ULONG cfOff)
+TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, uint32_t cfOff)
 {
 	uint32_t cfSize = file->GetWord(cfOff+4);			//compressed file size
 	uint32_t ufSize = file->GetWord(cfOff+8);			//uncompressed file size (size of resulting file after decompression)
@@ -141,22 +141,22 @@ TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, ULONG cfOff)
 	if (ufSize == 0)
 		ufSize = DEFAULT_UFSIZE;
 
-	BYTE* uf = new BYTE[ufSize];
+	uint8_t* uf = new uint8_t[ufSize];
 
 	bool bDone = false;
-	ULONG ufOff = 0;
+	uint32_t ufOff = 0;
 	cfOff += 0x10;
 	while (ufOff < ufSize && !bDone)
 	{
-		BYTE cFlags = file->GetByte(cfOff++);
+		uint8_t cFlags = file->GetByte(cfOff++);
 		for (int i=0; (i<8) && (ufOff < ufSize); i++, cFlags>>=1)
 		{
 			if (cFlags & 1)				//uncompressed byte, just copy it over
 				uf[ufOff++] = file->GetByte(cfOff++);
 			else						//compressed section
 			{
-				BYTE byte1 = file->GetByte(cfOff);
-				BYTE byte2 = file->GetByte(cfOff+1);
+				uint8_t byte1 = file->GetByte(cfOff);
+				uint8_t byte2 = file->GetByte(cfOff+1);
 
 				if (byte1 == 0 && byte2 == 0)
 				{
@@ -164,8 +164,8 @@ TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, ULONG cfOff)
 					break;
 				}
 
-				ULONG backPtr = ufOff - (((byte2 & 0x0F)<<8) + byte1);
-				BYTE bytesToRead = (byte2 >> 4) + 3;
+				uint32_t backPtr = ufOff - (((byte2 & 0x0F)<<8) + byte1);
+				uint8_t bytesToRead = (byte2 >> 4) + 3;
 				
 				for (; bytesToRead > 0; bytesToRead--)
 					uf[ufOff++] = uf[backPtr++];
@@ -180,7 +180,7 @@ TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, ULONG cfOff)
 	//then create a new buffer of the correct size now that we know it, and delete the old one.
 	if (ufSize == DEFAULT_UFSIZE)
 	{
-		BYTE* newUF = new BYTE[ufOff];
+		uint8_t* newUF = new uint8_t[ufOff];
 		memcpy(newUF, uf, ufOff);
 		delete[] uf;
 		uf = newUF;

@@ -11,7 +11,7 @@ DECLARE_FORMAT(HOSA);
 //==============================================================
 //		Constructor
 //==============================================================
-HOSASeq::HOSASeq(RawFile* file, ULONG offset)
+HOSASeq::HOSASeq(RawFile* file, uint32_t offset)
 :	VGMSeq(HOSAFormat::name, file, offset)
 {
 	UseReverb();
@@ -44,7 +44,7 @@ bool HOSASeq::GetHeaderInfo(void)
 
 //	About the unLength, if (unLength==0), 
 //	"VGMSeq::LoadMain()" will calculate the unLength after "SeqTrack::LoadTrack()".
-	nNumTracks		= GetByte(dwOffset+0x06);	//BYTE (8bit)
+	nNumTracks		= GetByte(dwOffset+0x06);	//uint8_t (8bit)
 	assocHOSA_ID	= 0x00;
 
 //	Add the new object "VGMHeader" in this object "HOSASeq"（Super class："VGMContainerItem")
@@ -118,12 +118,12 @@ bool HOSATrack::ReadEvent(void)
 	//==================================
 	//	[ Local 変数 ]
 	//----------------------------------
-	const		ULONG	beginOffset	= curOffset;					//start offset point
+	const		uint32_t	beginOffset	= curOffset;					//start offset point
 
-	const		BYTE	cCommand	= GetByte(curOffset++);			//command (op-code)
-	const		BYTE	cCom_bit0	= (cCommand & 0x1F);			//length / contents
-	const		BYTE	cCom_bit5	= (cCommand & 0x60) >> 5;		//Delta times
-	const		BYTE	cCom_bit7	= (cCommand & 0x80) >> 7;		//0=Notes / 1=Controls
+	const		uint8_t	cCommand	= GetByte(curOffset++);			//command (op-code)
+	const		uint8_t	cCom_bit0	= (cCommand & 0x1F);			//length / contents
+	const		uint8_t	cCom_bit5	= (cCommand & 0x60) >> 5;		//Delta times
+	const		uint8_t	cCom_bit7	= (cCommand & 0x80) >> 7;		//0=Notes / 1=Controls
 
 //	unsigned 	int					iMinLengthCounter;				//デルタタイム最小値
 //				int					i;		//general
@@ -292,7 +292,7 @@ bool HOSATrack::ReadEvent(void)
 
 			//--------
 			//[3]Delta time
-			ULONG	beginOffset2 = curOffset;
+			uint32_t	beginOffset2 = curOffset;
 			ReadDeltaTime(cCom_bit5, &iDeltaTimeCom);
 			if(curOffset != beginOffset2){
 				AddGenericEvent(beginOffset2,curOffset-beginOffset2, L"Delta time", NULL, CLR_CHANGESTATE);

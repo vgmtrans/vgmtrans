@@ -10,7 +10,7 @@ using namespace std;
 // KonamiGXSeq
 // ***********
 
-KonamiGXSeq::KonamiGXSeq(RawFile* file, ULONG offset)
+KonamiGXSeq::KonamiGXSeq(RawFile* file, uint32_t offset)
 : VGMSeq(KonamiGXFormat::name, file, offset)
 {
 	UseReverb();
@@ -34,10 +34,10 @@ bool KonamiGXSeq::GetHeaderInfo(void)
 
 bool KonamiGXSeq::GetTrackPointers(void)
 {
-	UINT pos = dwOffset;
+	uint32_t pos = dwOffset;
 	for(int i=0; i<17; i++)
 	{
-		UINT trackOffset = GetWordBE(pos);
+		uint32_t trackOffset = GetWordBE(pos);
 		if (GetByte(trackOffset) == 0xFF)	// skip empty tracks. don't even bother making them tracks
 			continue;
 		nNumTracks++;
@@ -49,7 +49,7 @@ bool KonamiGXSeq::GetTrackPointers(void)
 
 //bool KonamiGXSeq::LoadTracks(void)
 //{
-//	for (UINT i=0; i<nNumTracks; i++)
+//	for (uint32_t i=0; i<nNumTracks; i++)
 //	{
 //		if (!aTracks[i]->LoadTrack(i, 0xFFFFFFFF))
 //			return false;
@@ -71,11 +71,11 @@ KonamiGXTrack::KonamiGXTrack(KonamiGXSeq* parentSeq, long offset, long length)
 // I'm going to try to follow closely to the original Salamander 2 code at 0x30C6
 bool KonamiGXTrack::ReadEvent(void)
 {
-	ULONG beginOffset = curOffset;
-	ULONG deltatest = GetTime();
+	uint32_t beginOffset = curOffset;
+	uint32_t deltatest = GetTime();
 	//AddDelta(ReadVarLen(curOffset));
 
-	BYTE status_byte = GetByte(curOffset++);
+	uint8_t status_byte = GetByte(curOffset++);
 
 	if (status_byte == 0xFF)
 	{
@@ -100,7 +100,7 @@ bool KonamiGXTrack::ReadEvent(void)
 	}
 	else if (status_byte < 0xC0)		//note event
 	{
-		BYTE note, delta;
+		uint8_t note, delta;
 		if (status_byte < 0x62)
 		{
 			delta = GetByte(curOffset++);
@@ -113,8 +113,8 @@ bool KonamiGXTrack::ReadEvent(void)
 			note = status_byte - 0x62;
 		}
 		
-		BYTE nextDataByte = GetByte(curOffset++);
-		BYTE dur, vel;
+		uint8_t nextDataByte = GetByte(curOffset++);
+		uint8_t dur, vel;
 		if (nextDataByte < 0x80)
 		{
 			dur = nextDataByte;
@@ -130,7 +130,7 @@ bool KonamiGXTrack::ReadEvent(void)
 		//AddNoteOn(beginOffset, curOffset-beginOffset, note, vel);
 		//AddDelta(dur);
 		//AddNoteOffNoItem(note);
-		UINT newdur = (delta*dur)/0x64;
+		uint32_t newdur = (delta*dur)/0x64;
 		if (newdur == 0)
 			newdur = 1;
 		AddNoteByDur(beginOffset, curOffset-beginOffset, note, vel, newdur);
@@ -168,15 +168,15 @@ bool KonamiGXTrack::ReadEvent(void)
 		break;
 	case 0xE0:		//Rest
 		{
-			BYTE delta = GetByte(curOffset++);
+			uint8_t delta = GetByte(curOffset++);
 			AddTime(delta);
 		}
 		break;
 	case 0xE1:		//Hold
 		{
-			BYTE delta = GetByte(curOffset++);
-			BYTE dur = GetByte(curOffset++);
-			UINT newdur = (delta*dur)/0x64;
+			uint8_t delta = GetByte(curOffset++);
+			uint8_t dur = GetByte(curOffset++);
+			uint32_t newdur = (delta*dur)/0x64;
 			AddTime(newdur);
 			this->MakePrevDurNoteEnd();
 			AddTime(delta-newdur);
@@ -184,7 +184,7 @@ bool KonamiGXTrack::ReadEvent(void)
 		break;
 	case 0xE2:			//program change
 		{
-			BYTE progNum = GetByte(curOffset++);
+			uint8_t progNum = GetByte(curOffset++);
 			AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
 		}
 		break;
@@ -213,7 +213,7 @@ bool KonamiGXTrack::ReadEvent(void)
 		break;
 	case 0xEA:			//tempo
 		{
-			BYTE bpm = GetByte(curOffset++);
+			uint8_t bpm = GetByte(curOffset++);
 			AddTempoBPM(beginOffset, curOffset-beginOffset, bpm);
 		}
 		break;
@@ -223,7 +223,7 @@ bool KonamiGXTrack::ReadEvent(void)
 		break;
 	case 0xEE:			//master vol
 		{
-			BYTE vol = GetByte(curOffset++);
+			uint8_t vol = GetByte(curOffset++);
 			//AddMasterVol(beginOffset, curOffset-beginOffset, vol);
 		}
 		break;

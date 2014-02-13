@@ -334,8 +334,8 @@ void MusicPlayer::ChangeDLS(DLSFile* dlsfile)
 	//DLSLoader.LoadDLS(_T("TEST.dls"),Collection);	// Loads the standard GM set
 
 	//while (Collection.EnumInstrument(dwIndex,&InstInfo) != S_FALSE)
-	UINT nInstrs = dlsfile->aInstrs.size();
-	for (UINT dwIndex=0; dwIndex < nInstrs /*&& dwIndex < 0x50*/; dwIndex++)
+	DWORD nInstrs = (DWORD)dlsfile->aInstrs.size();
+	for (DWORD dwIndex=0; dwIndex < nInstrs /*&& dwIndex < 0x50*/; dwIndex++)
 	{
 		Collection.EnumInstrument(dwIndex,&InstInfo);
 		vpInstruments.push_back(new CInstrument());
@@ -655,7 +655,7 @@ DWORD MusicPlayer::ProcessSeqPlayback(PVOID pParam)
 {
 	MidiFile* pMidi = reinterpret_cast<MidiFile*>(pParam);
 	vector<MidiEvent*> pvEvent;
-	UINT reserveSize = 0;
+	size_t reserveSize = 0;
 	for (UINT i=0; i<pMidi->aTracks.size(); i++)
 		reserveSize += pMidi->aTracks[i]->aEvents.size();
 	pvEvent.reserve(reserveSize);

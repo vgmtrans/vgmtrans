@@ -103,7 +103,7 @@ BytePattern RareSnesScanner::ptnVCmdExecDKC2(
 
 void RareSnesScanner::Scan(RawFile* file, void* info)
 {
-	ULONG nFileLength = file->size();
+	uint32_t nFileLength = file->size();
 	if (nFileLength == 0x10000)
 	{
 		SearchForRareSnesFromARAM(file);
@@ -206,20 +206,20 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 	}
 
 	// get SRCN # range
-	BYTE maxSRCN = 0;
-	std::vector<BYTE> usedSRCNs;
-	const std::vector<BYTE>& availInstruments = newInstrSet->GetAvailableInstruments();
-	for (std::vector<BYTE>::const_iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr)
+	uint8_t maxSRCN = 0;
+	std::vector<uint8_t> usedSRCNs;
+	const std::vector<uint8_t>& availInstruments = newInstrSet->GetAvailableInstruments();
+	for (std::vector<uint8_t>::const_iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr)
 	{
-		BYTE inst = (*itr);
-		BYTE srcn = file->GetByte(addrSRCNTable + inst);
+		uint8_t inst = (*itr);
+		uint8_t srcn = file->GetByte(addrSRCNTable + inst);
 
 		if (maxSRCN < srcn)
 		{
 			maxSRCN = srcn;
 		}
 
-		std::vector<BYTE>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+		std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
 		if (itrSRCN == usedSRCNs.end())
 		{
 			usedSRCNs.push_back(srcn);

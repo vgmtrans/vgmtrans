@@ -51,14 +51,14 @@ bool VGMSeq::Load()
 
 MidiFile* VGMSeq::ConvertToMidi()
 {
-	int numTracks = aTracks.size();
+	size_t numTracks = aTracks.size();
 
 	if (!LoadTracks(READMODE_FIND_DELTA_LENGTH))
 		return NULL;
 
 	// Find the greatest length of all tracks to use as stop point for every track
 	long stopTime = -1;
-	for (int i = 0; i < numTracks; i++)
+	for (size_t i = 0; i < numTracks; i++)
 		stopTime = max(stopTime, aTracks[i]->deltaLength);
 
 	MidiFile* newmidi = new MidiFile(this);
@@ -330,14 +330,14 @@ void VGMSeq::ResetVars(void)
 	}
 }
 
-void VGMSeq::SetPPQN(WORD ppqn)
+void VGMSeq::SetPPQN(uint16_t ppqn)
 {
 	this->ppqn = ppqn;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 		midi->SetPPQN(ppqn);
 }
 
-WORD VGMSeq::GetPPQN(void)
+uint16_t VGMSeq::GetPPQN(void)
 {
 	return this->ppqn;
 	//return midi->GetPPQN();

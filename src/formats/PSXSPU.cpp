@@ -39,18 +39,18 @@ bool PSXSampColl::GetSampleInfo()
 		//We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
 		//and they will never be found at any other point within the adpcm sample data.
 
-		UINT nEndOffset = dwOffset + unLength;
+		uint32_t nEndOffset = dwOffset + unLength;
 		if (unLength == 0)
 			nEndOffset = GetEndOffset();  
 
-		ULONG i = dwOffset;
+		uint32_t i = dwOffset;
 		while (i + 32 <= nEndOffset)
 		{
 			if (GetWord(i) == 0 && GetWord(i+4) == 0 && GetWord(i+8) == 0 && GetWord(i+12) == 0  )
 			{
-				ULONG extraGunkLength = 0;
-				BYTE filterRangeByte = GetByte(i+16);
-				BYTE keyFlagByte = GetByte(i+16+1);
+				uint32_t extraGunkLength = 0;
+				uint8_t filterRangeByte = GetByte(i+16);
+				uint8_t keyFlagByte = GetByte(i+16+1);
 				if ((keyFlagByte & 0xF8) != 0)
 					break;
 				
@@ -58,7 +58,7 @@ bool PSXSampColl::GetSampleInfo()
 				if (GetWord(i+16) == 0 && GetWord(i+20) == 0 && GetWord(i+24) == 0 && GetWord(i+28) == 0  )
 					break;
 
-				ULONG beginOffset = i;
+				uint32_t beginOffset = i;
 				i += 16;
 				
 				//skip through until we reach the chunk with the end flag set
@@ -93,12 +93,12 @@ bool PSXSampColl::GetSampleInfo()
 	}
 	else
 	{
-		ULONG sampleIndex = 0;
+		uint32_t sampleIndex = 0;
 		for (std::vector<SizeOffsetPair>::iterator it = vagLocations.begin(); it != vagLocations.end(); ++it)
 		{
-			ULONG offSampStart = dwOffset + it->offset;
-			ULONG offDataEnd = offSampStart + it->size;
-			ULONG offSampEnd = offSampStart;
+			uint32_t offSampStart = dwOffset + it->offset;
+			uint32_t offDataEnd = offSampStart + it->size;
+			uint32_t offSampEnd = offSampStart;
 
 			// detect loop end and ignore garbages like 00 07 77 77 77 77 77 etc.
 			bool lastBlock;
@@ -138,16 +138,16 @@ bool PSXSampColl::GetSampleInfo()
 // GENERIC FUNCTION USED FOR SCANNERS
 PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+16+NUM_CHUNKS_READAHEAD*16<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+16+NUM_CHUNKS_READAHEAD*16<nFileLength; i++)
 	{
 		// if we have 16 0s in a row.
 		if (file->GetWord(i) == 0 && file->GetWord(i+4) == 0 && file->GetWord(i+8) == 0 && file->GetWord(i+12) == 0  )
 		{
 			bool bBad = false;
-			ULONG firstChunk = i+16;
-			BYTE filterRangeByte = file->GetByte(firstChunk);
-			BYTE keyFlagByte = file->GetByte(firstChunk+1);
+			uint32_t firstChunk = i+16;
+			uint8_t filterRangeByte = file->GetByte(firstChunk);
+			uint8_t keyFlagByte = file->GetByte(firstChunk+1);
 
 			if (filterRangeByte == 0 && keyFlagByte == 0)
 				continue;
@@ -156,14 +156,14 @@ PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format
 			if ((keyFlagByte & 0xF8) != 0)
 				continue;
 
-			BYTE maxRangeChange = 0;
-			BYTE maxFilterChange = 0;
+			uint8_t maxRangeChange = 0;
+			uint8_t maxFilterChange = 0;
 			int prevRange = file->GetByte(firstChunk+16) & 0xF;					//+16 because we're skipping the first chunk for uncertain reasons
 			int prevFilter = (file->GetByte(firstChunk+16) & 0xF0) >> 4;
-			for (UINT j=0; j < NUM_CHUNKS_READAHEAD; j++)
+			for (uint32_t j=0; j < NUM_CHUNKS_READAHEAD; j++)
 			{
-				ULONG curChunk = firstChunk+16+j*16;
-				BYTE keyFlagByte = file->GetByte(curChunk + 1);
+				uint32_t curChunk = firstChunk+16+j*16;
+				uint8_t keyFlagByte = file->GetByte(curChunk + 1);
 				if ((keyFlagByte & 0xFC) != 0)
 				{
 					bBad = true;
@@ -215,9 +215,9 @@ PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format
 //  PSXSamp
 //  *******
 
-PSXSamp::PSXSamp(VGMSampColl* sampColl, ULONG offset, ULONG length, ULONG dataOffset,
-				 ULONG dataLen, BYTE nChannels, USHORT theBPS,
-				 ULONG theRate, wstring name, bool bSetloopOnConversion)
+PSXSamp::PSXSamp(VGMSampColl* sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
+				 uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
+				 uint32_t theRate, wstring name, bool bSetloopOnConversion)
 : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
   bSetLoopOnConversion(bSetloopOnConversion)
 {
@@ -234,7 +234,7 @@ double PSXSamp::GetCompressionRatio()
 }
 
 
-/*PSXSamp::PSXSamp(VGMInstrSet* parentSet, ULONG offset, DWORD compressedSize)
+/*PSXSamp::PSXSamp(VGMInstrSet* parentSet, uint32_t offset, uint32_t compressedSize)
 : VGMItem(parentSet, offset), parentInstrSet(parentSet), bLoops(false)
 {
 	SetCompressedSize(compressedSize);
@@ -244,15 +244,15 @@ PSXSamp::~PSXSamp(void)
 {
 }*/
 
-/*void PSXSamp::SetCompressedSize(DWORD compSize)
+/*void PSXSamp::SetCompressedSize(uint32_t compSize)
 {
 	dwCompSize = compSize;
 	dwUncompSize = (compSize/16)*56;
 }*/
 
-void PSXSamp::ConvertToStdWave(BYTE* buf)
+void PSXSamp::ConvertToStdWave(uint8_t* buf)
 {
-	SHORT* uncompBuf = (SHORT*)buf;
+	int16_t* uncompBuf = (int16_t*)buf;
 	VAGBlk theBlock;
 	f32 prev1 = 0;
 	f32 prev2 = 0;
@@ -261,7 +261,7 @@ void PSXSamp::ConvertToStdWave(BYTE* buf)
 		SetLoopStatus(0); //loopStatus is initiated to -1.  We should default it now to not loop
 
 	bool addrOutOfVirtFile = false;
-	for (UINT k=0; k<dataLength; k+=0x10)				//for every adpcm chunk
+	for (uint32_t k=0; k<dataLength; k+=0x10)				//for every adpcm chunk
 	{
 		if (dwOffset + k + 16 > vgmfile->GetEndOffset())
 		{
@@ -313,14 +313,14 @@ void PSXSamp::ConvertToStdWave(BYTE* buf)
 	}
 }
 /*
-int PSXSamp::UncompSample(SHORT* uncompBuf)
+int PSXSamp::UncompSample(int16_t* uncompBuf)
 {
 	VAGBlk theBlock;
 	f32 prev1;
 	f32 prev2;
 	//VGMDoc* pDoc = assocDoc;
 
-	for (UINT k=0; k<dwCompSize; k+=0x10)				//for every adpcm chunk
+	for (uint32_t k=0; k<dwCompSize; k+=0x10)				//for every adpcm chunk
 	{
 		theBlock.range =		GetByte(dwOffset+k) & 0xF; //stuff[sample[i].offset+k] & 0xF;
 		theBlock.filter =		(GetByte(dwOffset+k) & 0xF0) >> 4; //(stuff[sample[i].offset+k] & 0xF0) >> 4;

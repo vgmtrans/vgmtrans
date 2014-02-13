@@ -6,7 +6,7 @@
 
 using namespace std;
 
-Vab::Vab(RawFile* file, ULONG offset)
+Vab::Vab(RawFile* file, uint32_t offset)
 : VGMInstrSet(PS1Format::name, file, offset)
 {
 }
@@ -18,8 +18,8 @@ Vab::~Vab(void)
 
 bool Vab::GetHeaderInfo()
 {
-	UINT nEndOffset = GetEndOffset();
-	UINT nMaxLength = nEndOffset - dwOffset;
+	uint32_t nEndOffset = GetEndOffset();
+	uint32_t nMaxLength = nEndOffset - dwOffset;
 
 	if (nMaxLength < 0x20)
 	{
@@ -45,13 +45,13 @@ bool Vab::GetHeaderInfo()
 
 	GetBytes(dwOffset, 0x20, &hdr);
 
-//	ULONG sampCollOff = (((dwNumInstrs/4)+(dwNumInstrs%4 > 0))* 0x10) + dwTotalRegions * 0x20 + 0x20;
+//	uint32_t sampCollOff = (((dwNumInstrs/4)+(dwNumInstrs%4 > 0))* 0x10) + dwTotalRegions * 0x20 + 0x20;
 //	sampColl = new WDSampColl(this, sampCollOff, dwSampSectSize);
 
 
 //	unLength = 0x9000;
 
-//	ULONG sampCollOff = dwOffset+0x20 + 128*0x10 + hdr.ps*16*0x20;
+//	uint32_t sampCollOff = dwOffset+0x20 + 128*0x10 + hdr.ps*16*0x20;
 //	sampColl = new VabSampColl(this, sampCollOff, 0, hdr.vs);
 	
 //	sampColl->Load();
@@ -61,16 +61,16 @@ bool Vab::GetHeaderInfo()
 
 bool Vab::GetInstrPointers()
 {
-	UINT nEndOffset = GetEndOffset();
-	UINT nMaxLength = nEndOffset - dwOffset;
+	uint32_t nEndOffset = GetEndOffset();
+	uint32_t nMaxLength = nEndOffset - dwOffset;
 
-	ULONG offProgs = dwOffset + 0x20;
-	ULONG offToneAttrs = offProgs + (16 * 128);
+	uint32_t offProgs = dwOffset + 0x20;
+	uint32_t offToneAttrs = offProgs + (16 * 128);
 
-	USHORT numPrograms = GetShort(dwOffset + 0x12);
-	USHORT numVAGs = GetShort(dwOffset + 0x16);
+	uint16_t numPrograms = GetShort(dwOffset + 0x12);
+	uint16_t numVAGs = GetShort(dwOffset + 0x16);
 
-	ULONG offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
+	uint32_t offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
 
 	VGMHeader* progsHdr = AddHeader(offProgs, 16 * 128, L"Program Table");
 	VGMHeader* toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, L"Tone Attributes Table");
@@ -87,17 +87,17 @@ bool Vab::GetInstrPointers()
 	// Scan all 128 entries regardless of header info.
 	// There could be null instruments that has no tones.
 	// See Clock Tower PSF for example of null instrument.
-	for (ULONG i = 0; i < 128; i++)
+	for (uint32_t i = 0; i < 128; i++)
 	{
-		ULONG offCurrProg = offProgs + (i * 16);
-		ULONG offCurrToneAttrs = offToneAttrs + (aInstrs.size() * 32 * 16);
+		uint32_t offCurrProg = offProgs + (i * 16);
+		uint32_t offCurrToneAttrs = offToneAttrs + (aInstrs.size() * 32 * 16);
 
 		if (offCurrToneAttrs + (32 * 16) > nEndOffset)
 		{
 			break;
 		}
 
-		BYTE numTones = GetByte(offCurrProg);
+		uint8_t numTones = GetByte(offCurrProg);
 		if (numTones > 32)
 		{
 			wchar_t log[512];
@@ -131,17 +131,17 @@ bool Vab::GetInstrPointers()
 	{
 		wchar_t name[256];
 		std::vector<SizeOffsetPair> vagLocations;
-		ULONG totalVAGSize = 0;
+		uint32_t totalVAGSize = 0;
 		VGMHeader* vagOffsetHdr = AddHeader(offVAGOffsets, 2 * 256, L"VAG Pointer Table");
 
-		ULONG vagStartOffset = GetShort(offVAGOffsets) * 8;
+		uint32_t vagStartOffset = GetShort(offVAGOffsets) * 8;
 		vagOffsetHdr->AddSimpleItem(offVAGOffsets, 2, L"VAG Size /8 #0");
 		totalVAGSize = vagStartOffset;
 
-		for (ULONG i = 0; i < numVAGs; i++)
+		for (uint32_t i = 0; i < numVAGs; i++)
 		{
-			ULONG vagOffset;
-			ULONG vagSize;
+			uint32_t vagOffset;
+			uint32_t vagSize;
 
 			if (i == 0)
 			{
@@ -172,7 +172,7 @@ bool Vab::GetInstrPointers()
 		unLength = (offVAGOffsets + 2 * 256) - dwOffset;
 
 		// single VAB file?
-		ULONG offVAGs = offVAGOffsets + 2 * 256;
+		uint32_t offVAGs = offVAGOffsets + 2 * 256;
 		if (dwOffset == 0 && vagLocations.size() != 0)
 		{
 			// load samples as well
@@ -201,7 +201,7 @@ bool Vab::GetInstrPointers()
 // VabInstr
 // ********
 
-VabInstr::VabInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, const wstring& name)
+VabInstr::VabInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum, const wstring& name)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, name),
 	masterVol(127)
 {
@@ -237,7 +237,7 @@ bool VabInstr::LoadInstr()
 // VabRgn
 // ******
 
-VabRgn::VabRgn(VabInstr* instr, ULONG offset)
+VabRgn::VabRgn(VabInstr* instr, uint32_t offset)
 : VGMRgn(instr, offset)
 {
 }

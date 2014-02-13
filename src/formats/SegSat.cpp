@@ -3,7 +3,7 @@
 
 DECLARE_FORMAT(SegSat);
 
-SegSatSeq::SegSatSeq(RawFile* file, ULONG offset)
+SegSatSeq::SegSatSeq(RawFile* file, uint32_t offset)
 : VGMSeqNoTrks(SegSatFormat::name, file, offset)
 {
 }
@@ -48,8 +48,8 @@ bool SegSatSeq::ReadEvent(void)
 		}
 	}
 	
-	ULONG beginOffset = curOffset;
-	BYTE status_byte = GetByte(curOffset++);
+	uint32_t beginOffset = curOffset;
+	uint8_t status_byte = GetByte(curOffset++);
 
 	if (status_byte <= 0x7F)			// note on
 	{
@@ -78,7 +78,7 @@ bool SegSatSeq::ReadEvent(void)
 		{
 			channel = status_byte&0x0F;
 			SetCurTrack(channel);
-			BYTE progNum = GetByte(curOffset++);
+			uint8_t progNum = GetByte(curOffset++);
 			curOffset++;
 			AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
 		}
@@ -89,11 +89,11 @@ bool SegSatSeq::ReadEvent(void)
 		}
 		else if (status_byte == 0x81)		//loop x # of events
 		{
-			USHORT test1 = GetShortBE(curOffset);
-			ULONG test2 = GetShortBE(curOffset);
-			ULONG test3 = eventsOffset();
-			BYTE test4 = GetByte(curOffset);
-			ULONG loopOffset = eventsOffset() + GetShortBE(curOffset);
+			uint16_t test1 = GetShortBE(curOffset);
+			uint32_t test2 = GetShortBE(curOffset);
+			uint32_t test3 = eventsOffset();
+			uint8_t test4 = GetByte(curOffset);
+			uint32_t loopOffset = eventsOffset() + GetShortBE(curOffset);
 			curOffset += 2;
 			remainingEventsInLoop = GetByte(curOffset++);
 			loopEndPos = curOffset;

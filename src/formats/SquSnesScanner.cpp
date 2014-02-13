@@ -13,7 +13,7 @@ void SquSnesScanner::Scan(RawFile* file, void* info)
 
 void SquSnesScanner::SearchForSquSnesSeq (RawFile* file)
 {
-	ULONG nFileLength = file->size();
+	uint32_t nFileLength = file->size();
 	if (nFileLength < 0x10000 || nFileLength > 0x10500)
 		return;
 

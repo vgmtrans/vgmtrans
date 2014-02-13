@@ -29,7 +29,7 @@ bool AkaoInstrSet::GetInstrPointers()
 	{
 		VGMHeader* SSEQHdr = AddHeader(dwOffset, 0x10, L"Instr Ptr Table");
 		int i = 0;
-		for (int j=dwOffset; (GetShort(j) != (USHORT)-1) && ((GetShort(j) != 0) || i == 0) && i < 16; j+=2)	//-1 aka 0xFFFF if signed or 0 and past the first pointer value
+		for (int j=dwOffset; (GetShort(j) != (uint16_t)-1) && ((GetShort(j) != 0) || i == 0) && i < 16; j+=2)	//-1 aka 0xFFFF if signed or 0 and past the first pointer value
 		{
 			SSEQHdr->AddSimpleItem(j, 2, L"Instr Pointer");
 			aInstrs.push_back(new AkaoInstr(this, dwOffset+0x20 + GetShort(j), 0, 0, i++));
@@ -44,8 +44,8 @@ bool AkaoInstrSet::GetInstrPointers()
 // AkaoInstr
 // *********
 
-AkaoInstr::AkaoInstr(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank,
-				  ULONG theInstrNum, const wchar_t* name)
+AkaoInstr::AkaoInstr(AkaoInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
+				  uint32_t theInstrNum, const wchar_t* name)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, name)
 {
 	bDrumKit = false;
@@ -75,8 +75,8 @@ bool AkaoInstr::LoadInstr()
 // AkaoDrumKit
 // ***********
 
-AkaoDrumKit::AkaoDrumKit(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank,
-				  ULONG theInstrNum)
+AkaoDrumKit::AkaoDrumKit(AkaoInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
+				  uint32_t theInstrNum)
  : 	AkaoInstr(instrSet, offset, length, theBank, theInstrNum, L"Drum Kit")
 {
 	bDrumKit = true;
@@ -86,19 +86,19 @@ bool AkaoDrumKit::LoadInstr()
 {
 	uint32_t j = dwOffset;  //j = the end of the last instrument of the instrument table ie, the beginning of drumkit data
 	uint32_t endOffset = parInstrSet->dwOffset + parInstrSet->unLength;
-	for (UINT i=0; (i<128) && (j < endOffset); i++)
+	for (uint32_t i=0; (i<128) && (j < endOffset); i++)
 	{
 		if ((GetWord(j) != 0) && (GetWord(j+4) != 0))	//we found some region data for the drum kit
 		{
 			if ((GetWord(j) == 0xFFFFFFFF) && (GetWord(j+4) == 0xFFFFFFFF))	//if we run into 0xFFFFFFFF FFFFFFFF, then we quit reading for drumkit regions early
 				break;
 
-			BYTE assoc_art_id =   GetByte(j + 0); //- first_sample_id;
-			BYTE lowKey = i; //-12;		//-7 CORRECT ?? WHO KNOWS?
-			BYTE highKey =	lowKey;  //the region only covers the one key	
+			uint8_t assoc_art_id =   GetByte(j + 0); //- first_sample_id;
+			uint8_t lowKey = i; //-12;		//-7 CORRECT ?? WHO KNOWS?
+			uint8_t highKey =	lowKey;  //the region only covers the one key	
 			AkaoRgn* rgn = (AkaoRgn*)AddRgn(new AkaoRgn(this, j, 8, lowKey, highKey, assoc_art_id));
 			rgn->drumRelUnityKey =	GetByte(j + 1);
-			BYTE vol = GetByte(j+6);
+			uint8_t vol = GetByte(j+6);
 			rgn->SetVolume((double)vol / 127.0);
 			rgn->AddGeneralItem(j, 1, L"Associated Articulation ID");
 			rgn->AddGeneralItem(j+1, 1, L"Relative Unity Key");
@@ -123,13 +123,13 @@ bool AkaoDrumKit::LoadInstr()
 // *******
 // AkaoRgn
 // *******
-AkaoRgn::AkaoRgn(VGMInstr* instr, ULONG offset, ULONG length, BYTE keyLow, BYTE keyHigh, 
-		BYTE artIDNum, const wchar_t* name)
+AkaoRgn::AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, 
+		uint8_t artIDNum, const wchar_t* name)
 		: VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0), artNum(artIDNum)
 {
 }
 
-AkaoRgn::AkaoRgn(VGMInstr* instr, ULONG offset, ULONG length, const wchar_t* name)
+AkaoRgn::AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, const wchar_t* name)
 : VGMRgn(instr, offset, length, name)
 {
 }
@@ -192,8 +192,8 @@ bool AkaoRgn::LoadRgn()
 		}
 	}*/
 
-	BYTE attenuation =	0x7F;  //default to no attenuation
-	BYTE pan =			0x40;  //default to center pan
+	uint8_t attenuation =	0x7F;  //default to no attenuation
+	uint8_t pan =			0x40;  //default to center pan
 	
 	//aInstrs[i]->aRegions[k]->sample_offset = GetWord(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10);
 	//aInstrs[i]->aRegions[k]->loop_point =	GetWord(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 4) - GetWord(sampleinfo_offset+ instrument[i].region[k].assoc_art_id *0x10 + 0);//GetWord(sampleinfo_offset+ instrument[i].region[k].assoc_art_id *0x10 + 4) - (instrument[i].region[k].sample_offset + sample_section_offset);
@@ -214,7 +214,7 @@ bool AkaoRgn::LoadRgn()
 // AkaoSampColl
 // ************
 
-AkaoSampColl::AkaoSampColl(RawFile* file, ULONG offset, ULONG length, wstring name)
+AkaoSampColl::AkaoSampColl(RawFile* file, uint32_t offset, uint32_t length, wstring name)
 : VGMSampColl(AkaoFormat::name, file, offset, length, name)
 {
 }
@@ -249,8 +249,8 @@ bool AkaoSampColl::GetHeaderInfo()
 
 bool AkaoSampColl::GetSampleInfo()
 {
-	ULONG i;
-	ULONG j;
+	uint32_t i;
+	uint32_t j;
 
 	//Read Articulation Data
 	for (i=0; i<nNumArts; i++)
@@ -270,7 +270,7 @@ bool AkaoSampColl::GetSampleInfo()
 		akArts[i].sample_offset =	GetWord(arts_offset + i*0x10);
 		akArts[i].loop_point =	GetWord(arts_offset + i*0x10 + 4) - akArts[i].sample_offset;
 		akArts[i].fineTune =		GetShort(arts_offset + i*0x10 + 8);
-		akArts[i].unityKey =		(BYTE)GetShort(arts_offset + i*0x10 + 0xA);
+		akArts[i].unityKey =		(uint8_t)GetShort(arts_offset + i*0x10 + 0xA);
 		akArts[i].ADSR1 =			GetShort(arts_offset + i*0x10 + 0xC);
 		akArts[i].ADSR2 =			GetShort(arts_offset + i*0x10 + 0xE);
 		akArts[i].artID =			starting_art_id+i;
@@ -326,7 +326,7 @@ bool AkaoSampColl::GetSampleInfo()
 	//AllSampsVGMItem.unLength = sample_section_size;
 
 	//Calculate sample sizes
-	//UINT i;
+	//uint32_t i;
 	for (i=0; i<samples.size()-1; i++)
 	{
 		samples[i]->SetDataLength(samples[i+1]->dwOffset - samples[i]->dwOffset);
@@ -346,7 +346,7 @@ bool AkaoSampColl::GetSampleInfo()
 
 	for (i=0; i<akArts.size(); i++)			//for every instrument
 	{						
-		for (UINT l=0; l<samples.size(); l++)		//for every sample
+		for (uint32_t l=0; l<samples.size(); l++)		//for every sample
 		{						
 			if (akArts[i].sample_offset + sample_section_offset == samples[l]->dwOffset)	//we add sample_section offset because those values are relative to the beginning of the sample section
 			{
@@ -367,16 +367,16 @@ bool AkaoSampColl::GetSampleInfo()
 	samp->SetLoopLength(nonLoopLength);
 	samples.push_back(samp);*/
 
-/*	ULONG nSamples = GetWord(dwOffset + 0x38);
-	for (ULONG i=0; i<nSamples; i++)
+/*	uint32_t nSamples = GetWord(dwOffset + 0x38);
+	for (uint32_t i=0; i<nSamples; i++)
 	{
-		ULONG pSample = GetWord(dwOffset + 0x3C + i*4) + dwOffset;
+		uint32_t pSample = GetWord(dwOffset + 0x3C + i*4) + dwOffset;
 		int nChannels = 1;		// note to self: may need to support stereo
-		BYTE waveType = GetByte(pSample);	//0x02 - IMA-ADPCM (most common), 0x00 - standard PCM
+		uint8_t waveType = GetByte(pSample);	//0x02 - IMA-ADPCM (most common), 0x00 - standard PCM
 		bool bLoops = GetByte(pSample+1);
-		USHORT rate = GetShort(pSample+2);
-		USHORT bps;
-		BYTE multiplier;
+		uint16_t rate = GetShort(pSample+2);
+		uint16_t bps;
+		uint8_t multiplier;
 		switch (waveType)
 		{
 		case NDSSamp::PCM8:
@@ -392,9 +392,9 @@ bool AkaoSampColl::GetSampleInfo()
 			bps = 16;
 			break;
 		}
-		USHORT loopOff = (GetShort(pSample+6)-((waveType == NDSSamp::IMA_ADPCM)? 1 : 0))*4;//*multiplier;		//represents loop point in words, excluding header supposedly
-		USHORT nonLoopLength = GetShort(pSample+8)*4;		//if IMA-ADPCM, subtract one for the ADPCM header
-		ULONG realSampSize = loopOff+nonLoopLength;//2*nChannels;
+		uint16_t loopOff = (GetShort(pSample+6)-((waveType == NDSSamp::IMA_ADPCM)? 1 : 0))*4;//*multiplier;		//represents loop point in words, excluding header supposedly
+		uint16_t nonLoopLength = GetShort(pSample+8)*4;		//if IMA-ADPCM, subtract one for the ADPCM header
+		uint32_t realSampSize = loopOff+nonLoopLength;//2*nChannels;
 		if (loopOff >= 12)
 			loopOff -= 12;
 

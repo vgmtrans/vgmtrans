@@ -43,8 +43,8 @@ void HOSAScanner::Scan(RawFile* file, void* info)
 
 HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+4<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+4<nFileLength; i++)
 	{
 		// Signature must match
 		if (file->GetWordBE(i) != 0x484F5341 || file->GetByte(i+4) != 'V')		//"HOSAV"
@@ -77,7 +77,7 @@ HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 #define MIN_SAMPLES_MATCH 4
 HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sampcoll)
 {
-	uint32_t numSamples = sampcoll->samples.size();
+	size_t numSamples = sampcoll->samples.size();
 	if (numSamples < MIN_NUM_SAMPLES_COMPARE)
 	{
 		pRoot->RemoveVGMFile(sampcoll);
@@ -88,8 +88,8 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 	for (unsigned int i=0; i<numSamples; i++)
 		sampOffsets[i] = sampcoll->samples[i]->dwOffset - sampcoll->dwOffset;
 
-	UINT nFileLength = file->size();
-	for (UINT i=0x20; i+0x14<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0x20; i+0x14<nFileLength; i++)
 	{
 		if (RecursiveRgnCompare(file, i, 0, numSamples, 0, sampOffsets))
 		{
@@ -116,7 +116,7 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 
 bool HOSAScanner::RecursiveRgnCompare(RawFile* file, int i, int sampNum, int numSamples, int numFinds, uint32_t* sampOffsets)
 {
-	if (i < 0 || (ULONG)(i+0x14) >= file->size())
+	if (i < 0 || (uint32_t)(i+0x14) >= file->size())
 		return false;
 	if (sampNum >= numSamples-1)
 		return (numFinds >= MIN_SAMPLES_MATCH);

@@ -11,7 +11,7 @@ using namespace std;
 // BGMSeq
 // ******
 
-SonyPS2Seq::SonyPS2Seq(RawFile* file, ULONG offset)
+SonyPS2Seq::SonyPS2Seq(RawFile* file, uint32_t offset)
 : VGMSeqNoTrks(SonyPS2Format::name, file, offset),
   compOption(0),
   bSkipDeltaTime(0)
@@ -50,7 +50,7 @@ bool SonyPS2Seq::GetHeaderInfo(void)
 	midiOffsetAddr = GetWord(curOffset+16) + curOffset;	
 	curOffset = midiOffsetAddr;
 	//Now we're at the Midi Data Block
-	ULONG sequenceOffset = GetWord(curOffset);		//read sequence offset
+	uint32_t sequenceOffset = GetWord(curOffset);		//read sequence offset
 	SetEventsOffset(curOffset + sequenceOffset);	
 	SetPPQN(GetShort(curOffset+4));					//read ppqn value
 	if (sequenceOffset != 6)						//if a compression mode is being applied
@@ -72,8 +72,8 @@ bool SonyPS2Seq::GetHeaderInfo(void)
 
 bool SonyPS2Seq::ReadEvent(void)
 {
-	ULONG beginOffset = curOffset;
-	ULONG deltaTime;
+	uint32_t beginOffset = curOffset;
+	uint32_t deltaTime;
 	if (bSkipDeltaTime)
 		deltaTime = 0;
 	else
@@ -84,7 +84,7 @@ bool SonyPS2Seq::ReadEvent(void)
 
 	bSkipDeltaTime = false;
 
-	BYTE status_byte = GetByte(curOffset++);
+	uint8_t status_byte = GetByte(curOffset++);
 
 	if (status_byte <= 0x7F)			// Running Status
 	{
@@ -120,8 +120,8 @@ bool SonyPS2Seq::ReadEvent(void)
 
 	case 0xB0 :
 		{
-			BYTE controlNum = GetByte(curOffset++);
-			BYTE value = GetDataByte(curOffset++);
+			uint8_t controlNum = GetByte(curOffset++);
+			uint8_t value = GetDataByte(curOffset++);
 			switch (controlNum)		//control number
 			{
 			case 1 :
@@ -169,15 +169,15 @@ bool SonyPS2Seq::ReadEvent(void)
 
 	case 0xC0 :
 		{
-			BYTE progNum = GetDataByte(curOffset++);
+			uint8_t progNum = GetDataByte(curOffset++);
 			AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
 		}
 		break;
 
 	case 0xE0 :
 		{
-			BYTE hi = GetByte(curOffset++);
-			BYTE lo = GetDataByte(curOffset++);
+			uint8_t hi = GetByte(curOffset++);
+			uint8_t lo = GetDataByte(curOffset++);
 			AddPitchBendMidiFormat(beginOffset, curOffset-beginOffset, hi, lo);
 		}
 		break;
@@ -214,9 +214,9 @@ bool SonyPS2Seq::ReadEvent(void)
 	return true;
 }
 
-BYTE SonyPS2Seq::GetDataByte(uint32_t offset)
+uint8_t SonyPS2Seq::GetDataByte(uint32_t offset)
 {
-	BYTE dataByte = GetByte(offset);
+	uint8_t dataByte = GetByte(offset);
 	if (dataByte & 0x80)
 	{
 		bSkipDeltaTime = true;

@@ -17,5 +17,5 @@ public:
 
 	virtual void Scan(RawFile* file, void* info = 0);
 	void SearchForSDAT (RawFile* file);
-	ULONG LoadFromSDAT(RawFile* file, ULONG offset);
+	uint32_t LoadFromSDAT(RawFile* file, uint32_t offset);
 };

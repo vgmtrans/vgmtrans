@@ -38,8 +38,8 @@ RawFile::RawFile(const wstring name, uint32_t theFileSize, bool bCanRead)
 RawFile::~RawFile(void)
 {
 	pRoot->UI_BeginRemoveVGMFiles();
-	int size = containedVGMFiles.size();
-	for (int i=0; i<size; i++)
+	size_t size = containedVGMFiles.size();
+	for (size_t i=0; i<size; i++)
 	{
 		pRoot->RemoveVGMFile(containedVGMFiles.front(), false);
 		containedVGMFiles.erase(containedVGMFiles.begin());
@@ -334,7 +334,7 @@ uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer)
 // If the requested size is greater than the buffer size, it always fails. (operation not supported)
 bool RawFile::MatchBytePattern(const BytePattern& pattern, uint32_t nIndex)
 {
-	uint32_t nCount = pattern.length();
+	size_t nCount = pattern.length();
 
 	if ((nIndex + nCount) > fileSize)
 		return false;

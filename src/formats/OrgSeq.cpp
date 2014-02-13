@@ -3,7 +3,7 @@
 
 DECLARE_FORMAT(Org);
 
-OrgSeq::OrgSeq(RawFile* file, ULONG offset)
+OrgSeq::OrgSeq(RawFile* file, uint32_t offset)
 : VGMSeq(OrgFormat::name, file, offset)
 {
 }
@@ -19,7 +19,7 @@ bool OrgSeq::GetHeaderInfo(void)
 	SetPPQN(GetByte(dwOffset+9));
 	name = L"Org Seq";
 
-	ULONG notesSoFar = 0;		//this must be used to determine the length of the entire seq
+	uint32_t notesSoFar = 0;		//this must be used to determine the length of the entire seq
 
 	for (int i=0; i<16; i++)
 	{
@@ -41,12 +41,12 @@ bool OrgSeq::GetHeaderInfo(void)
 	return true;		//successful
 }
 
-OrgTrack::OrgTrack(OrgSeq* parentFile, long offset, long length, BYTE realTrk)
+OrgTrack::OrgTrack(OrgSeq* parentFile, long offset, long length, uint8_t realTrk)
 : SeqTrack(parentFile, offset, length), realTrkNum(realTrk)
 {
 }
 
-bool OrgTrack::LoadTrack(ULONG trackNum, ULONG stopOffset, long stopDelta)
+bool OrgTrack::LoadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta)
 {
 	pMidiTrack = parentSeq->midi->AddTrack();
 	//SetChannelAndGroupFromTrkNum(trackNum);
@@ -61,7 +61,7 @@ bool OrgTrack::LoadTrack(ULONG trackNum, ULONG stopOffset, long stopDelta)
 	if (trackNum == 0)
 	{
 		AddTempo(0, 0, ((OrgSeq*)parentSeq)->waitTime*4000);
-		AddTimeSig(0, 0, 4, 4, (BYTE)parentSeq->GetPPQN());
+		AddTimeSig(0, 0, 4, 4, (uint8_t)parentSeq->GetPPQN());
 	}
 	if (channel == 10)
 		AddProgramChange(0, 0, waveNum);
@@ -69,7 +69,7 @@ bool OrgTrack::LoadTrack(ULONG trackNum, ULONG stopOffset, long stopDelta)
 	bInLoop = false;
 	curOffset = dwOffset;	//start at beginning of track
 	curNote = 0;
-	for (USHORT i=0; i<numNotes; i++)
+	for (uint16_t i=0; i<numNotes; i++)
 		ReadEvent();
 
 	return true;
@@ -77,19 +77,19 @@ bool OrgTrack::LoadTrack(ULONG trackNum, ULONG stopOffset, long stopDelta)
 
 bool OrgTrack::ReadEvent(void)
 {
-	BYTE key = GetByte(curOffset + (numNotes-curNote)*4 + curNote);
-	BYTE vel = GetByte(curOffset + (numNotes-curNote)*4 + numNotes*2 + curNote)/2;
-	BYTE dur = GetByte(curOffset + (numNotes-curNote)*4 + numNotes + curNote);
+	uint8_t key = GetByte(curOffset + (numNotes-curNote)*4 + curNote);
+	uint8_t vel = GetByte(curOffset + (numNotes-curNote)*4 + numNotes*2 + curNote)/2;
+	uint8_t dur = GetByte(curOffset + (numNotes-curNote)*4 + numNotes + curNote);
 	if (key == 0xFF)
 		key = prevKey;
-	ULONG absTime = GetWord(curOffset);
+	uint32_t absTime = GetWord(curOffset);
 
 	InsertNoteByDur(curOffset, 4, key, vel, dur, absTime);
-	BYTE pan = GetByte(curOffset + (numNotes-curNote)*4 + numNotes*3 + curNote);
+	uint8_t pan = GetByte(curOffset + (numNotes-curNote)*4 + numNotes*3 + curNote);
 	if (pan == 0xFF)
 		pan = prevPan;
 	else
-		pan = (BYTE)(GetByte(curOffset + (numNotes-curNote)*4 + numNotes*3 + curNote) * 10.66666666666666666666666666666);
+		pan = (uint8_t)(GetByte(curOffset + (numNotes-curNote)*4 + numNotes*3 + curNote) * 10.66666666666666666666666666666);
 	//if (newPan > 0x7F)	//sometimes the value is 0xFF, even though the range would seem to be 0-C according to the org editor
 	//	newPan = 64;	//in this case, set it to the center position, i can't distinguish it from center on hearing tests
 	if (pan != prevPan)

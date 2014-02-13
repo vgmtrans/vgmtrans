@@ -7,7 +7,7 @@ class BGMSeq :
 	public VGMSeq
 {
 public:
-	BGMSeq(RawFile* file, ULONG offset);
+	BGMSeq(RawFile* file, uint32_t offset);
 	virtual ~BGMSeq(void);
 
 	virtual bool GetHeaderInfo(void);

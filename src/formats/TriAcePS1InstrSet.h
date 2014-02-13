@@ -15,7 +15,7 @@ class TriAcePS1InstrSet
 {
 
 public:
-	TriAcePS1InstrSet(RawFile* file, ULONG offset);
+	TriAcePS1InstrSet(RawFile* file, uint32_t offset);
 	virtual ~TriAcePS1InstrSet(void);
 
 	virtual bool GetHeaderInfo();
@@ -39,10 +39,10 @@ public:
 	uint8_t  numInstrs;				// to do delete
 	//-----------------------
 
-	//DWORD dwSampSectOffset;
-	//DWORD dwSampSectSize;
-	//DWORD dwNumInstrs;
-	//DWORD dwTotalRegions;
+	//uint32_t dwSampSectOffset;
+	//uint32_t dwSampSectSize;
+	//uint32_t dwNumInstrs;
+	//uint32_t dwTotalRegions;
 };
 
 
@@ -82,7 +82,7 @@ public:
 
 
 public:
-	TriAcePS1Instr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
+	TriAcePS1Instr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
 	~TriAcePS1Instr() { if (rgns) delete[] rgns; }
 	virtual bool LoadInstr();
 

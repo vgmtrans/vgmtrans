@@ -80,7 +80,7 @@ class WdsInstrSet :
 	public VGMInstrSet
 {
 public:
-	WdsInstrSet(RawFile* file, ULONG offset);
+	WdsInstrSet(RawFile* file, uint32_t offset);
 	virtual ~WdsInstrSet(void);
 
 	virtual bool	GetHeaderInfo();	//ヘッダーの処理
@@ -113,7 +113,7 @@ class WdsInstr
 	: public VGMInstr
 {
 public:
-	WdsInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
+	WdsInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
 	virtual ~WdsInstr(void);
 
 	virtual bool LoadInstr();	//Object "WdsRgn"の生成、

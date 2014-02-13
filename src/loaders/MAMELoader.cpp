@@ -230,8 +230,8 @@ PostLoadCommand MAMELoader::Apply(RawFile* file)
 
 VirtFile* MAMELoader::LoadRomGroup(MAMERomGroupEntry* entry, const string& format, unzFile& cur_file)
 {
-	UINT destFileSize = 0;
-	list<pair<BYTE*, UINT>> buffers;
+	uint32_t destFileSize = 0;
+	list<pair<uint8_t*, uint32_t>> buffers;
 	list<string>& roms = entry->roms;
 	for (list<string>::iterator it = roms.begin(); it != roms.end(); ++it)
 	{
@@ -258,7 +258,7 @@ VirtFile* MAMELoader::LoadRomGroup(MAMERomGroupEntry* entry, const string& forma
 			DeleteBuffers(buffers);
 			return 0;
 		}
-		BYTE* buf = new BYTE[info.uncompressed_size];
+		uint8_t* buf = new uint8_t[info.uncompressed_size];
 		ret = unzReadCurrentFile(cur_file, buf, info.uncompressed_size);
 		if(ret != info.uncompressed_size)
 		{
@@ -277,14 +277,14 @@ VirtFile* MAMELoader::LoadRomGroup(MAMERomGroupEntry* entry, const string& forma
 		buffers.push_back(make_pair(buf, info.uncompressed_size));
 	}
 	
-	BYTE* destFile = new BYTE[destFileSize];
+	uint8_t* destFile = new uint8_t[destFileSize];
 	switch (entry->loadmethod)
 	{
 	case LM_APPEND:
 		// append the files
 		{
-			UINT curOffset = 0;
-			for (list<pair<BYTE*, UINT>>::iterator it = buffers.begin(); it != buffers.end(); ++it)
+			uint32_t curOffset = 0;
+			for (list<pair<uint8_t*, uint32_t>>::iterator it = buffers.begin(); it != buffers.end(); ++it)
 			{
 				memcpy(destFile+curOffset, it->first, it->second);
 				curOffset += it->second;
@@ -294,13 +294,13 @@ VirtFile* MAMELoader::LoadRomGroup(MAMERomGroupEntry* entry, const string& forma
 	case LM_APPEND_SWAP16:
 		// append the files and swap every 16 byte word
 		{
-			UINT curDestOffset = 0;
-			for (list<pair<BYTE*, UINT>>::iterator it = buffers.begin(); it != buffers.end(); ++it)
+			uint32_t curDestOffset = 0;
+			for (list<pair<uint8_t*, uint32_t>>::iterator it = buffers.begin(); it != buffers.end(); ++it)
 			{
 
-				BYTE* romBuf = it->first;
-				UINT romSize = it->second;
-				for (UINT i = 0; i < romSize; i += 2)
+				uint8_t* romBuf = it->first;
+				uint32_t romSize = it->second;
+				for (uint32_t i = 0; i < romSize; i += 2)
 				{
 					destFile[curDestOffset+i] = romBuf[i+1];
 					destFile[curDestOffset+i+1] = romBuf[i];
@@ -312,11 +312,11 @@ VirtFile* MAMELoader::LoadRomGroup(MAMERomGroupEntry* entry, const string& forma
 	case LM_DEINTERLACE:
 		// interlace the bytes from each rom
 		{
-			UINT curDestOffset = 0;
-			UINT curRomOffset = 0;
+			uint32_t curDestOffset = 0;
+			uint32_t curRomOffset = 0;
 			while (curDestOffset < destFileSize)
 			{
-				for (list<pair<BYTE*, UINT>>::iterator it = buffers.begin(); it != buffers.end(); ++it)
+				for (list<pair<uint8_t*, uint32_t>>::iterator it = buffers.begin(); it != buffers.end(); ++it)
 					destFile[curDestOffset++] = it->first[curRomOffset];
 				curRomOffset++;
 			}
@@ -339,7 +339,7 @@ VirtFile* MAMELoader::LoadRomGroup(MAMERomGroupEntry* entry, const string& forma
 				delete[] destFile;
 				return 0;
 			}
-			BYTE* decrypt = new BYTE[0x8000];
+			uint8_t* decrypt = new uint8_t[0x8000];
 			KabukiDecrypter::kabuki_decode(destFile,decrypt,destFile,0x0000,0x8000, swap_key1,swap_key2,addr_key,xor_key);
 			//pRoot->UI_WriteBufferToFile(L"opcodesdump", decrypt, destFileSize);
 			delete[] decrypt;
@@ -362,8 +362,8 @@ VirtFile* MAMELoader::LoadRomGroup(MAMERomGroupEntry* entry, const string& forma
 
 
 
-void MAMELoader::DeleteBuffers(list<pair<BYTE*, UINT>>& buffers)
+void MAMELoader::DeleteBuffers(list<pair<uint8_t*, uint32_t>>& buffers)
 {
-	for (list<pair<BYTE*, UINT>>::iterator it = buffers.begin(); it != buffers.end(); ++it)
+	for (list<pair<uint8_t*, uint32_t>>::iterator it = buffers.begin(); it != buffers.end(); ++it)
 		delete[] it->first;
 }

@@ -13,8 +13,8 @@ AkaoScanner::~AkaoScanner(void)
 
 void AkaoScanner::Scan(RawFile* file, void* info)
 {
-	UINT nFileLength = file->size();
-	for (UINT i=0; i+0x60<nFileLength; i++)
+	uint32_t nFileLength = file->size();
+	for (uint32_t i=0; i+0x60<nFileLength; i++)
 	{
 		if (file->GetWordBE(i) != 0x414B414F)	//sig must match ascii characters "AKAO"
 			continue;

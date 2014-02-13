@@ -212,7 +212,7 @@ template <class T> void PSXConvADSR(T* realADSR,
 	envelope_level = 0x7FFFFFFF;
 	
 	bool bSustainLevFound = false;
-	ULONG realSustainLevel;
+	uint32_t realSustainLevel;
 	for (l=0; envelope_level > 0; l++)		//DLS decay rate value is to -96db (silence) not the sustain level
 	{
 		if (4*(Dr^0x1F) < 0x18)
@@ -378,19 +378,19 @@ class PSXSamp
 	: public VGMSamp
 {
 public:
-	//PSXSamp(VGMInstrSet* parentSet, ULONG offset, DWORD compressedSize = 0);
-	PSXSamp(VGMSampColl* sampColl, ULONG offset, ULONG length, ULONG dataOffset,
-				 ULONG dataLen, BYTE nChannels, USHORT theBPS,
-				 ULONG theRate, std::wstring name, bool bSetLoopOnConversion = true);
+	//PSXSamp(VGMInstrSet* parentSet, uint32_t offset, uint32_t compressedSize = 0);
+	PSXSamp(VGMSampColl* sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
+				 uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
+				 uint32_t theRate, std::wstring name, bool bSetLoopOnConversion = true);
 	virtual ~PSXSamp(void);
 
 	virtual double GetCompressionRatio();	// ratio of space conserved.  should generally be > 1
 											// used to calculate both uncompressed sample size and loopOff after conversion
-	virtual void ConvertToStdWave(BYTE* buf);
+	virtual void ConvertToStdWave(uint8_t* buf);
 	void SetLoopOnConversion(bool bDoIt) { bSetLoopOnConversion = bDoIt; }
 
-	//void SetCompressedSize(DWORD compSize);
-	//int UncompSample(SHORT* uncompBuf);
+	//void SetCompressedSize(uint32_t compSize);
+	//int UncompSample(int16_t* uncompBuf);
 	
 private:
 	void DecompVAGBlk(s16 *pSmp, VAGBlk *pVBlk, f32 *prev1, f32 *prev2);
@@ -401,7 +401,7 @@ public:
 
 	bool bSetLoopOnConversion;
 	//bool bUseADPCMLoopInfoOnConversion;
-	DWORD dwCompSize;
-	DWORD dwUncompSize;
+	uint32_t dwCompSize;
+	uint32_t dwUncompSize;
 	BOOL bLoops;
 };

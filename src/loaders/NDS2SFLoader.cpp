@@ -21,16 +21,16 @@ NDS2SFLoader::~NDS2SFLoader(void)
 
 PostLoadCommand NDS2SFLoader::Apply(RawFile* file)
 {
-	BYTE sig[4];
+	uint8_t sig[4];
 	file->GetBytes(0, 4, sig);
 	if (memcmp(sig, "PSF", 3) == 0)
 	{
-		BYTE version = sig[3];
+		uint8_t version = sig[3];
 		if (version == NDS2SF_VERSION)
 		{
 			const wchar_t *complaint;
 			size_t exebufsize = NDS2SF_MAX_ROM_SIZE;
-			BYTE* exebuf = NULL;
+			uint8_t* exebuf = NULL;
 			//memset(exebuf, 0, exebufsize);
 
 			complaint = psf_read_exe(file, exebuf, exebufsize);
@@ -92,7 +92,7 @@ const wchar_t* NDS2SFLoader::psf_read_exe(
 	if (exebuffer == NULL)
 	{
 		exebuffersize = nds2sfRomStart + nds2sfRomSize;
-		exebuffer = new BYTE[exebuffersize];
+		exebuffer = new uint8_t[exebuffersize];
 		if (exebuffer == NULL)
 		{
 			return L"2SF ROM memory allocation error.";

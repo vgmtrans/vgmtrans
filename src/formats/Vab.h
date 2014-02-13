@@ -69,7 +69,7 @@ class Vab :
 	public VGMInstrSet
 {
 public:
-	Vab(RawFile* file, ULONG offset);
+	Vab(RawFile* file, uint32_t offset);
 	virtual ~Vab(void);
 
 	virtual bool GetHeaderInfo();
@@ -88,14 +88,14 @@ class VabInstr
 	: public VGMInstr
 {
 public:
-	VabInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, const std::wstring& name = L"Instrument");
+	VabInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum, const std::wstring& name = L"Instrument");
 	virtual ~VabInstr(void);
 
 	virtual bool LoadInstr();
 
 public:
 	ProgAtr  attr;
-	BYTE masterVol;
+	uint8_t masterVol;
 };
 
 
@@ -107,7 +107,7 @@ class VabRgn
 	: public VGMRgn
 {
 public:
-	VabRgn(VabInstr* instr, ULONG offset);
+	VabRgn(VabInstr* instr, uint32_t offset);
 	//virtual ~WDRgn(void) {}
 	//virtual bool OnSelected(void);
 
@@ -121,7 +121,7 @@ public:
 	unsigned char bFirstRegion;
 	unsigned char bLastRegion;
 	unsigned char bUnknownFlag2;
-	ULONG sample_offset;
+	uint32_t sample_offset;
 
 	VagAtr attr;
 };

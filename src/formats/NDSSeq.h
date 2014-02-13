@@ -7,7 +7,7 @@ class NDSSeq :
 	public VGMSeq
 {
 public:
-	NDSSeq(RawFile* file, ULONG offset, ULONG length = 0, std::wstring theName = L"NDSSeq");
+	NDSSeq(RawFile* file, uint32_t offset, uint32_t length = 0, std::wstring theName = L"NDSSeq");
 	//virtual ~NDSSeq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -20,12 +20,12 @@ class NDSTrack
 	: public SeqTrack
 {
 public:
-	NDSTrack(NDSSeq* parentFile, ULONG offset = 0, ULONG length = 0);
+	NDSTrack(NDSSeq* parentFile, uint32_t offset = 0, uint32_t length = 0);
 	void ResetVars();
 	virtual bool ReadEvent(void);
 	//virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
 
-	BYTE jumpCount;
-	ULONG loopReturnOffset;
+	uint8_t jumpCount;
+	uint32_t loopReturnOffset;
 	bool noteWithDelta;
 };

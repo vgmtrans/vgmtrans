@@ -25,7 +25,7 @@ QSoundArticTable::~QSoundArticTable(void)
 
 bool QSoundArticTable::LoadMain()
 {
-	DWORD off = dwOffset;
+	uint32_t off = dwOffset;
 	uint32_t test1=1, test2=1;
 	//for (int i = 0; (test1 || test2)  && ((test1 != 0xFFFFFFFF) || (test2 != 0xFFFFFFFF)); i++, off += sizeof(qs_samp_info) )
 	for (int i = 0; off < dwOffset+unLength; i++, off += sizeof(qs_samp_info))
@@ -74,7 +74,7 @@ QSoundSampleInfoTable::~QSoundSampleInfoTable(void)
 
 bool QSoundSampleInfoTable::LoadMain()
 {
-	DWORD off = dwOffset;
+	uint32_t off = dwOffset;
 	uint32_t test1=1, test2=1;
 	if (unLength == 0)
 		unLength = 0xFFFFFFFF - dwOffset;
@@ -142,8 +142,8 @@ bool QSoundInstrSet::GetInstrPointers()
 		
 		//dwOffset is the offset to the instr_info_table
 		
-		for (UINT bank = 0; bank < num_instr_banks; bank++)
-			for (UINT i=0; i<256; i++)
+		for (uint32_t bank = 0; bank < num_instr_banks; bank++)
+			for (uint32_t i=0; i<256; i++)
 			{
 				wostringstream name;
 				name << L"Instrument " << bank*256 + i;
@@ -160,7 +160,7 @@ bool QSoundInstrSet::GetInstrPointers()
 		for (unsigned int i=0; i<num_instr_banks; i++)
 			instr_table_ptrs.push_back(GetShort(dwOffset+i*2));	//get the instr table ptrs
 		int totalInstrs = 0;
-		for (UINT i=0; i<instr_table_ptrs.size(); i++)
+		for (uint32_t i=0; i<instr_table_ptrs.size(); i++)
 		{
 			uint16_t endOffset;
 			// The following is actually incorrect.  There is a max of 256 instruments per bank
@@ -189,7 +189,7 @@ bool QSoundInstrSet::GetInstrPointers()
 // QSoundInstr
 // ***********
 
-QSoundInstr::QSoundInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, wstring& name)
+QSoundInstr::QSoundInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum, wstring& name)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, name)
 {
 }
@@ -273,11 +273,11 @@ bool QSoundInstr::LoadInstr()
 	if (rgn->sampNum >= ((QSoundInstrSet*)parInstrSet)->sampInfoTable->numSamples)
 		rgn->sampNum = 0;
 
-	WORD Ar = attack_rate_table[this->attack_rate];
-	WORD Dr = decay_rate_table[this->decay_rate];
-	WORD Sl = linear_table[this->sustain_level];
-	WORD Sr = decay_rate_table[this->sustain_rate];
-	WORD Rr = decay_rate_table[this->release_rate];
+	uint16_t Ar = attack_rate_table[this->attack_rate];
+	uint16_t Dr = decay_rate_table[this->decay_rate];
+	uint16_t Sl = linear_table[this->sustain_level];
+	uint16_t Sr = decay_rate_table[this->sustain_rate];
+	uint16_t Rr = decay_rate_table[this->release_rate];
 
 	long ticks = 0;
 
@@ -340,7 +340,7 @@ bool QSoundInstr::LoadInstr()
 // QSoundSampColl
 // **************
 
-QSoundSampColl::QSoundSampColl(RawFile* file, QSoundInstrSet* theinstrset, QSoundSampleInfoTable* sampinfotable, ULONG offset, ULONG length, wstring& name)
+QSoundSampColl::QSoundSampColl(RawFile* file, QSoundInstrSet* theinstrset, QSoundSampleInfoTable* sampinfotable, uint32_t offset, uint32_t length, wstring& name)
 : VGMSampColl(QSoundFormat::name, file, offset, length, name), 
   instrset(theinstrset),
   sampInfoTable(sampinfotable)
@@ -359,14 +359,14 @@ bool QSoundSampColl::GetHeaderInfo()
 bool QSoundSampColl::GetSampleInfo()
 {
 	//QSoundInstrSet* instrset = (QSoundInstrSet*)instrset;
-	UINT numSamples = instrset->sampInfoTable->numSamples;
-	for (UINT i=0; i<numSamples; i++)
+	uint32_t numSamples = instrset->sampInfoTable->numSamples;
+	for (uint32_t i=0; i<numSamples; i++)
 	{
 		wostringstream name;
 		name << L"Sample " << i;
 
 		qs_samp_info* sampInfo = &sampInfoTable->infos[i];
-		UINT sampOffset = (sampInfo->bank<<16) + (sampInfo->start_addr_hi<<8) + sampInfo->start_addr_lo;
+		uint32_t sampOffset = (sampInfo->bank<<16) + (sampInfo->start_addr_hi<<8) + sampInfo->start_addr_lo;
 		int sampLength;
 		if (sampInfo->end_addr_hi == 0 && sampInfo->end_addr_lo == 0)
 			sampLength = ((sampInfo->bank+1)<<16) - sampOffset;
@@ -374,9 +374,9 @@ bool QSoundSampColl::GetSampleInfo()
 			sampLength = (sampInfo->bank<<16) + (sampInfo->end_addr_hi<<8) + sampInfo->end_addr_lo - sampOffset;
 		if (sampLength < 0)
 			sampLength = -sampLength;
-		//UINT loopOffset = (sampOffset+sampLength)-((sampInfo->bank<<16) + (sampInfo->loop_offset_hi<<8) + sampInfo->loop_offset_lo);
-		UINT loopOffset = ((sampInfo->bank<<16) + (sampInfo->loop_offset_hi<<8) + sampInfo->loop_offset_lo) - sampOffset;
-		if (loopOffset > (UINT)sampLength)
+		//uint32_t loopOffset = (sampOffset+sampLength)-((sampInfo->bank<<16) + (sampInfo->loop_offset_hi<<8) + sampInfo->loop_offset_lo);
+		uint32_t loopOffset = ((sampInfo->bank<<16) + (sampInfo->loop_offset_hi<<8) + sampInfo->loop_offset_lo) - sampOffset;
+		if (loopOffset > (uint32_t)sampLength)
 			loopOffset = sampLength;
 		if (sampLength == 0 || sampOffset > unLength)
 			break;

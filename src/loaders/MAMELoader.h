@@ -58,7 +58,7 @@ public:
 	virtual PostLoadCommand Apply(RawFile* theFile);
 private:
 	VirtFile* LoadRomGroup(MAMERomGroupEntry* romgroupentry, const std::string& format, unzFile& cur_file);
-	void DeleteBuffers(std::list<std::pair<BYTE*, UINT>>& buffers);
+	void DeleteBuffers(std::list<std::pair<uint8_t*, uint32_t>>& buffers);
 private:
 	int LoadXML();
 	MAMEGameEntry* LoadGameEntry(TiXmlElement* gameElmt);

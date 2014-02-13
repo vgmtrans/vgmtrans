@@ -100,8 +100,8 @@ void VGMColl::UnpackSampColl(DLSFile& dls, VGMSampColl* sampColl, vector<VGMSamp
 {
 	assert(sampColl != NULL);
 
-	int nSamples = sampColl->samples.size();
-	for (int i=0; i<nSamples; i++)
+	size_t nSamples = sampColl->samples.size();
+	for (size_t i=0; i<nSamples; i++)
 	{
 		VGMSamp* samp = sampColl->samples[i];
 
@@ -129,8 +129,8 @@ void VGMColl::UnpackSampColl(SynthFile& synthfile, VGMSampColl* sampColl, vector
 {
 	assert(sampColl != NULL);
 
-	int nSamples = sampColl->samples.size();
-	for (int i=0; i<nSamples; i++)
+	size_t nSamples = sampColl->samples.size();
+	for (size_t i=0; i<nSamples; i++)
 	{
 		VGMSamp* samp = sampColl->samples[i];
 
@@ -228,14 +228,14 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 		return false;
 
 
-	for (uint32_t inst = 0; inst<instrsets.size(); inst++)
+	for (size_t inst = 0; inst<instrsets.size(); inst++)
 	{
 		VGMInstrSet* set = instrsets[inst];
-		uint32_t nInstrs = set->aInstrs.size();
-		for (uint32_t i=0; i<nInstrs; i++)
+		size_t nInstrs = set->aInstrs.size();
+		for (size_t i=0; i<nInstrs; i++)
 		{
 			VGMInstr* vgminstr = set->aInstrs[i];
-			uint32_t nRgns = vgminstr->aRgns.size();
+			size_t nRgns = vgminstr->aRgns.size();
 			if (nRgns == 0)								//do not write an instrument if it has no regions
 				continue;
 			DLSInstr* newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum);
@@ -259,7 +259,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				}
 
 				// Determine the sample number within the rgn's associated SampColl
-				unsigned int realSampNum;
+				size_t realSampNum;
 				// If a sample offset is provided, then find the sample number based on this offset.
 				// see sampOffset declaration in header file for more info.
 				if (rgn->sampOffset != -1)
@@ -471,14 +471,14 @@ SynthFile* VGMColl::CreateSynthFile()
 	}
 
 
-	for (uint32_t inst = 0; inst<instrsets.size(); inst++)
+	for (size_t inst = 0; inst<instrsets.size(); inst++)
 	{
 		VGMInstrSet* set = instrsets[inst];
-		uint32_t nInstrs = set->aInstrs.size();
-		for (uint32_t i=0; i<nInstrs; i++)
+		size_t nInstrs = set->aInstrs.size();
+		for (size_t i=0; i<nInstrs; i++)
 		{
 			VGMInstr* vgminstr = set->aInstrs[i];
-			uint32_t nRgns = vgminstr->aRgns.size();
+			size_t nRgns = vgminstr->aRgns.size();
 			if (nRgns == 0)								//do not write an instrument if it has no regions
 				continue;
 			SynthInstr* newInstr = synthfile->AddInstr(vgminstr->bank, vgminstr->instrNum);
@@ -502,7 +502,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				}
 
 				// Determine the sample number within the rgn's associated SampColl
-				unsigned int realSampNum;
+				size_t realSampNum;
 				// If a sample offset is provided, then find the sample number based on this offset.
 				// see sampOffset declaration in header file for more info.
 				if (rgn->sampOffset != -1)

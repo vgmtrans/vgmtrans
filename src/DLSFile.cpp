@@ -91,7 +91,7 @@ uint32_t DLSFile::GetSize(void)
 
 int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf)
 {
-	uint32_t theUINT;
+	uint32_t theDWORD;
 
 	PushTypeOnVectBE<uint32_t>(buf, 0x52494646);			//"RIFF"
 	PushTypeOnVect<uint32_t>(buf, GetSize() - 8);			//size
@@ -99,39 +99,39 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf)
 
 	PushTypeOnVectBE<uint32_t>(buf, 0x636F6C68);			//"colh "
 	PushTypeOnVect<uint32_t>(buf, 4);						//size
-	PushTypeOnVect<uint32_t>(buf, aInstrs.size());			//cInstruments - number of instruments
-	theUINT = 4;										//account for 4 "lins" bytes
+	PushTypeOnVect<uint32_t>(buf, (uint32_t)aInstrs.size());	//cInstruments - number of instruments
+	theDWORD = 4;										//account for 4 "lins" bytes
 	for (uint32_t i = 0; i < aInstrs.size(); i++)
-		theUINT += aInstrs[i]->GetSize();				//each "ins " list
-	WriteLIST(buf, 0x6C696E73, theUINT);				//Write the "lins" LIST
+		theDWORD += aInstrs[i]->GetSize();				//each "ins " list
+	WriteLIST(buf, 0x6C696E73, theDWORD);				//Write the "lins" LIST
 	for (uint32_t i = 0; i < aInstrs.size(); i++)
 		aInstrs[i]->Write(buf);							//Write each "ins " list
 
 	PushTypeOnVectBE<uint32_t>(buf, 0x7074626C);			//"ptbl"
-	theUINT = 8;
-	theUINT += (uint32_t)aWaves.size() * sizeof(uint32_t);		//each wave gets a poolcue 
-	PushTypeOnVect<uint32_t>(buf, theUINT);					//size
+	theDWORD = 8;
+	theDWORD += (uint32_t)aWaves.size() * sizeof(uint32_t);		//each wave gets a poolcue 
+	PushTypeOnVect<uint32_t>(buf, theDWORD);					//size
 	PushTypeOnVect<uint32_t>(buf, 8);						//cbSize
-	PushTypeOnVect<uint32_t>(buf, aWaves.size());			//cCues
-	theUINT = 0;
+	PushTypeOnVect<uint32_t>(buf, (uint32_t)aWaves.size());		//cCues
+	theDWORD = 0;
 	for (uint32_t i=0; i<(uint32_t)aWaves.size(); i++)
 	{
-		PushTypeOnVect<uint32_t>(buf, theUINT);				//write the poolcue for each sample
-		//hFile->Write(&theUINT, sizeof(uint32_t));			//write the poolcue for each sample
-		theUINT += aWaves[i]->GetSize();				//increment the offset to the next wave
+		PushTypeOnVect<uint32_t>(buf, theDWORD);				//write the poolcue for each sample
+		//hFile->Write(&theDWORD, sizeof(uint32_t));			//write the poolcue for each sample
+		theDWORD += aWaves[i]->GetSize();				//increment the offset to the next wave
 	}
 
-	theUINT = 4;
+	theDWORD = 4;
 	for (uint32_t i = 0; i < aWaves.size(); i++)
-		theUINT += aWaves[i]->GetSize();				//each "wave" list
-	WriteLIST(buf, 0x7776706C, theUINT);				//Write the "wvpl" LIST
+		theDWORD += aWaves[i]->GetSize();				//each "wave" list
+	WriteLIST(buf, 0x7776706C, theDWORD);				//Write the "wvpl" LIST
 	for (uint32_t i = 0; i < aWaves.size(); i++)
 		aWaves[i]->Write(buf);							//Write each "wave" list
 
-	theUINT = 12 + (uint32_t)name.size();					//"INFO" + "INAM" + size + the string size
-	WriteLIST(buf, 0x494E464F, theUINT);				//write the "INFO" list
+	theDWORD = 12 + (uint32_t)name.size();					//"INFO" + "INAM" + size + the string size
+	WriteLIST(buf, 0x494E464F, theDWORD);				//write the "INFO" list
 	PushTypeOnVectBE<uint32_t>(buf, 0x494E414D);			//"INAM"
-	PushTypeOnVect<uint32_t>(buf, name.size());	//size
+	PushTypeOnVect<uint32_t>(buf, (uint32_t)name.size());	//size
 	PushBackStringOnVector(buf, name);		//The Instrument Name string
 
 	return true;
@@ -193,29 +193,29 @@ uint32_t DLSInstr::GetSize(void)
 
 void DLSInstr::Write(vector<uint8_t> &buf)
 {
-	uint32_t theUINT;
+	uint32_t theDWORD;
 	
-	theUINT = GetSize() - 8;
-	RiffFile::WriteLIST(buf, 0x696E7320, theUINT);				//write "ins " list
+	theDWORD = GetSize() - 8;
+	RiffFile::WriteLIST(buf, 0x696E7320, theDWORD);				//write "ins " list
 	PushTypeOnVectBE<uint32_t>(buf, 0x696E7368);			//"insh"
 	PushTypeOnVect<uint32_t>(buf, INSH_SIZE - 8);			//size
 	PushTypeOnVect<uint32_t>(buf, (uint32_t)aRgns.size());		//cRegions
 	PushTypeOnVect<uint32_t>(buf, ulBank);					//ulBank
 	PushTypeOnVect<uint32_t>(buf, ulInstrument);			//ulInstrument
 
-	theUINT = 4;
+	theDWORD = 4;
 	for (uint32_t i = 0; i < aRgns.size(); i++)
-		theUINT += aRgns[i]->GetSize();					//get the size of each "rgn2" list
-	RiffFile::WriteLIST(buf, 0x6C72676E, theUINT);				//write the "lrgn" list
+		theDWORD += aRgns[i]->GetSize();					//get the size of each "rgn2" list
+	RiffFile::WriteLIST(buf, 0x6C72676E, theDWORD);				//write the "lrgn" list
 	for (uint32_t i = 0; i < aRgns.size(); i++)
 		aRgns[i]->Write(buf);							//write each "rgn2" list
 
 
-	theUINT = 12 + (uint32_t)name.size();					//"INFO" + "INAM" + size + the string size
-	RiffFile::WriteLIST(buf, 0x494E464F, theUINT);				//write the "INFO" list
+	theDWORD = 12 + (uint32_t)name.size();					//"INFO" + "INAM" + size + the string size
+	RiffFile::WriteLIST(buf, 0x494E464F, theDWORD);				//write the "INFO" list
 	PushTypeOnVectBE<uint32_t>(buf, 0x494E414D);			//"INAM"
-	theUINT = (uint32_t)name.size();
-	PushTypeOnVect<uint32_t>(buf, theUINT);					//size
+	theDWORD = (uint32_t)name.size();
+	PushTypeOnVect<uint32_t>(buf, theDWORD);					//size
 	PushBackStringOnVector(buf, name);					//The Instrument Name string
 }
 
@@ -467,7 +467,7 @@ uint32_t DLSWave::GetSize()
 
 void DLSWave::Write(vector<uint8_t> &buf)
 {
-	uint32_t theUINT;
+	uint32_t theDWORD;
 
 	RiffFile::WriteLIST(buf, 0x77617665, GetSize()-8);	//write "wave" list
 	PushTypeOnVectBE<uint32_t>(buf, 0x666D7420);			//"fmt "
@@ -489,9 +489,9 @@ void DLSWave::Write(vector<uint8_t> &buf)
 	buf.insert(buf.end(), data, data+dataSize);	//Write the sample
 	if (dataSize%2)
 		buf.push_back(0);
-	theUINT = 12 + (uint32_t)name.size();					//"INFO" + "INAM" + size + the string size
-	RiffFile::WriteLIST(buf, 0x494E464F, theUINT);				//write the "INFO" list
+	theDWORD = 12 + (uint32_t)name.size();					//"INFO" + "INAM" + size + the string size
+	RiffFile::WriteLIST(buf, 0x494E464F, theDWORD);				//write the "INFO" list
 	PushTypeOnVectBE<uint32_t>(buf, 0x494E414D);			//"INAM"
-	PushTypeOnVect<uint32_t>(buf, name.size());				//size
+	PushTypeOnVect<uint32_t>(buf, (uint32_t)name.size());	//size
 	PushBackStringOnVector(buf, name);
 }

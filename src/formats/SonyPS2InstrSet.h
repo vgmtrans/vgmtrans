@@ -100,7 +100,7 @@ public:
 		int8_t splitDetune;
 	} SplitBlock;
 
-	SonyPS2Instr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
+	SonyPS2Instr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
 	virtual ~SonyPS2Instr(void);
 
 	virtual bool LoadInstr();
@@ -248,7 +248,7 @@ public:
 		VAGInfoParam* vagInfoParam;
 	} VAGInfoCk;
 
-	SonyPS2InstrSet(RawFile* file, ULONG offset);
+	SonyPS2InstrSet(RawFile* file, uint32_t offset);
 	virtual ~SonyPS2InstrSet(void);
 
 	virtual bool GetHeaderInfo();
@@ -272,7 +272,7 @@ class SonyPS2SampColl
 	: public VGMSampColl
 {
 public:
-	SonyPS2SampColl(RawFile* file, ULONG offset, ULONG length = 0);
+	SonyPS2SampColl(RawFile* file, uint32_t offset, uint32_t length = 0);
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 };

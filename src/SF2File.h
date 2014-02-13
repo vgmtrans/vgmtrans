@@ -3,7 +3,7 @@
 #include "common.h"
 #include "RiffFile.h"
 
-typedef enum : WORD
+typedef enum : uint16_t
 {       
     // Oscillator
     startAddrsOffset,       //sample start address -4 (0 to 0xffffff)   0
@@ -87,7 +87,7 @@ typedef enum : WORD
     endOper                     //                                      60
 } SFGenerator;
 
-typedef enum : WORD
+typedef enum : uint16_t
 {		
     /* Start of MIDI modulation operators */
     cc1_Mod,
@@ -104,7 +104,7 @@ typedef enum : WORD
     endMod
 } SFModulator;
 
-typedef enum : WORD
+typedef enum : uint16_t
 {
 	linear
 } SFTransform;
@@ -165,16 +165,16 @@ typedef enum : WORD
 
 struct sfVersionTag
 {
-	WORD wMajor;
-	WORD wMinor;
+	uint16_t wMajor;
+	uint16_t wMinor;
 };
 
 struct sfPresetHeader
 {
 	CHAR achPresetName[20];
-	WORD wPreset;
-	WORD wBank;
-	WORD wPresetBagNdx;
+	uint16_t wPreset;
+	uint16_t wBank;
+	uint16_t wPresetBagNdx;
 	uint32_t dwLibrary;
 	uint32_t dwGenre;
 	uint32_t dwMorphology;
@@ -182,8 +182,8 @@ struct sfPresetHeader
 
 struct sfPresetBag
 {
-	WORD wGenNdx;
-	WORD wModNdx;
+	uint16_t wGenNdx;
+	uint16_t wModNdx;
 };
 
 struct sfModList
@@ -205,7 +205,7 @@ typedef union
 {
 	rangesType ranges;
 	int16_t shAmount;
-	WORD wAmount;
+	uint16_t wAmount;
 } genAmountType;
 
 struct sfGenList
@@ -232,16 +232,16 @@ struct sfInstGenList
 struct sfInst
 {
 	CHAR achInstName[20];
-	WORD wInstBagNdx;
+	uint16_t wInstBagNdx;
 };
 
 struct sfInstBag
 {
-	WORD wInstGenNdx;
-	WORD wInstModNdx;
+	uint16_t wInstGenNdx;
+	uint16_t wInstModNdx;
 };
 
-typedef enum : WORD
+typedef enum : uint16_t
 {
 	monoSample = 1,
 	rightSample = 2,
@@ -263,7 +263,7 @@ struct sfSample
 	uint32_t dwSampleRate;
 	uint8_t byOriginalKey;
 	CHAR chCorrection;
-	WORD wSampleLink;
+	uint16_t wSampleLink;
 	SFSampleLink sfSampleType;
 };
 
@@ -277,7 +277,7 @@ public:
 	SF2StringChunk(std::string ckSig, std::string info)
 		: Chunk(ckSig)
 	{
-		SetData(info.c_str(), info.length());
+		SetData(info.c_str(), (uint32_t)info.length());
 	}
 };
 

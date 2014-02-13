@@ -35,8 +35,8 @@ public:
 	virtual void ResetVars(void);
 	virtual MidiFile* ConvertToMidi();
 	//virtual int ApplyTable(void);	//create and apply table handler object for sequence
-	void SetPPQN(WORD ppqn);
-	WORD GetPPQN(void);
+	void SetPPQN(uint16_t ppqn);
+	uint16_t GetPPQN(void);
 	//void SetTimeSignature(uint8_t numer, denom);
 	void AddInstrumentRef(uint32_t progNum);
 
@@ -66,7 +66,7 @@ public:
 	//uint16_t ppqn;		//perhaps shouldn't include this
 	MidiFile* midi;
 	double tempoBPM;
-	WORD ppqn;
+	uint16_t ppqn;
 
 //attributes
 	bool bMonophonicTracks;		//Only 1 voice at a time on a track.  We can assume note offs always use last note on key.

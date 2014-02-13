@@ -140,7 +140,7 @@ int KabukiDecrypter::bytedecode(int src,int swap_key1,int swap_key2,int xor_key,
 	return src;
 }
 
-void KabukiDecrypter::kabuki_decode(UINT8 *src,UINT8 *dest_op,UINT8 *dest_data,
+void KabukiDecrypter::kabuki_decode(uint8_t *src,uint8_t *dest_op,uint8_t *dest_data,
 		int base_addr,int length,int swap_key1,int swap_key2,int addr_key,int xor_key)
 {
 	int A;

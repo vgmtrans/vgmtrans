@@ -6,5 +6,5 @@ class TaitoF3Scanner :
 {
 public:
 	virtual void Scan(RawFile* file, void* info = 0);
-	//void LoadSeqTable(RawFile* file, UINT offset);
+	//void LoadSeqTable(RawFile* file, uint32_t offset);
 };

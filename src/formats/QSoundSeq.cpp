@@ -9,15 +9,15 @@ DECLARE_FORMAT(QSound);
 
 using namespace std;
 
-const BYTE delta_table[3][7] = { 2, 4, 8, 0x10, 0x20, 0x40, 0x80,
+const uint8_t delta_table[3][7] = { 2, 4, 8, 0x10, 0x20, 0x40, 0x80,
 								  3, 6, 0xC, 0x18, 0x30, 0x60, 0xC0,
 								  0, 9, 0x12, 0x24, 0x48, 0x90, 0 };
 //octave_table provides the note value for the start of each octave.
 //wholly unnecessary for me include it, but i'm following the original driver code verbatim for now
-const BYTE octave_table[] = { 0x00, 0x0C, 0x18, 0x24, 0x30, 0x3C, 0x48, 0x54,
+const uint8_t octave_table[] = { 0x00, 0x0C, 0x18, 0x24, 0x30, 0x3C, 0x48, 0x54,
 						   0x18, 0x24, 0x30, 0x3C, 0x48, 0x54, 0x60, 0x6C };
 
-const WORD vol_table[128] = {
+const uint16_t vol_table[128] = {
 	0, 0xA, 0x18, 0x26, 0x34, 0x42, 0x51, 0x5F, 0x6E, 0x7D, 0x8C, 0x9B, 0xAA,
 	0xBA, 0xC9, 0xD9, 0xE9, 0xF8, 0x109, 0x119, 0x129, 0x13A, 0x14A, 0x15B,
 	0x16C, 0x17D, 0x18E, 0x1A0, 0x1B2, 0x1C3, 0x1D5, 0x1E8, 0x1FC, 0x20D, 0x21F,
@@ -33,7 +33,7 @@ const WORD vol_table[128] = {
 };
 
 // Note that 0x100 = 1 semitone.  so the lower byte represents x / 256 cents
-const WORD vibrato_depth_table[128] = {
+const uint16_t vibrato_depth_table[128] = {
 	0x0, 0xC, 0xD, 0xE, 0xE, 0xF, 0x10, 0x11, 0x12, 0x12, 0x13, 0x14, 0x15,
 	0x16, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1C, 0x1D, 0x1F, 0x20, 0x22, 0x24, 0x25,
 	0x27, 0x29, 0x2A, 0x2C, 0x2D, 0x2F, 0x31, 0x32, 0x34, 0x38, 0x3B, 0x3E, 0x41,
@@ -47,7 +47,7 @@ const WORD vibrato_depth_table[128] = {
 	0x8E8, 0x948, 0x9A8, 0xA08, 0xA68, 0xAC8, 0xB28, 0xB88, 0xBE8
 };
 
-const WORD tremelo_depth_table[128] = {
+const uint16_t tremelo_depth_table[128] = {
 	0, 0x1B9, 0x2B5, 0x3B1, 0x4AD, 0x5A9, 0x6A5, 0x7A1, 0x89D, 0x999, 0xA95,
 	0xB91, 0xC8D, 0xD89, 0xE85, 0xF81, 0x107D, 0x1179, 0x1275, 0x1371,
 	0x146D, 0x1569, 0x1665, 0x1761, 0x185D, 0x1959, 0x1A55, 0x1B51, 0x1C4D,
@@ -65,7 +65,7 @@ const WORD tremelo_depth_table[128] = {
 	0xF609, 0xFA05, 0xFE01
 };
 
-const WORD lfo_rate_table[128] = {
+const uint16_t lfo_rate_table[128] = {
 	0, 0x118, 0x126, 0x133, 0x142, 0x150, 0x15D, 0x16C, 0x179, 0x187, 0x196,
 	0x1A3, 0x1B1, 0x1C0, 0x1DB, 0x1F7, 0x213, 0x22F, 0x24B, 0x267, 0x283, 0x29F,
 	0x2BB, 0x2D7, 0x2F3, 0x30F, 0x32B, 0x347, 0x363, 0x37F, 0x3B7, 0x3EF, 0x427,
@@ -87,7 +87,7 @@ const WORD lfo_rate_table[128] = {
 // QSoundSeq
 // *********
 
-QSoundSeq::QSoundSeq(RawFile* file, ULONG offset, QSoundVer fmtVersion, wstring& name)
+QSoundSeq::QSoundSeq(RawFile* file, uint32_t offset, QSoundVer fmtVersion, wstring& name)
 : VGMSeq(QSoundFormat::name, file, offset, 0, name), 
   fmt_version(fmtVersion)
 {
@@ -118,7 +118,7 @@ bool QSoundSeq::GetTrackPointers(void)
 
 	for (int i=0; i<16; i++)
 	{
-		UINT offset = GetShortBE(dwOffset+1+i*2);
+		uint32_t offset = GetShortBE(dwOffset+1+i*2);
 		if (offset == 0)
 		{
 			header->AddSimpleItem(dwOffset+1 + (i*2), 2, L"No Track");
@@ -138,7 +138,7 @@ bool QSoundSeq::GetTrackPointers(void)
 
 //bool QSoundSeq::LoadTracks(void)
 //{
-//	for (UINT i=0; i<nNumTracks; i++)
+//	for (uint32_t i=0; i<nNumTracks; i++)
 //	{
 //		if (!aTracks[i]->LoadTrack(i, 0xFFFFFFFF))
 //			return false;
@@ -188,28 +188,28 @@ bool QSoundSeq::PostLoad()
 		
 
 		// And now we actually add vibrato and pitch bend events
-		const ULONG ppqn = GetPPQN();					// pulses (ticks) per quarter note
-		const ULONG mpLFOt = (ULONG)((1/(251/4.0)) * 1000000);	// microseconds per LFO tick
-		ULONG mpqn = 500000;							// microseconds per quarter note - 120 bpm default
-		ULONG mpt = mpqn / ppqn;						// microseconds per MIDI tick
+		const uint32_t ppqn = GetPPQN();					// pulses (ticks) per quarter note
+		const uint32_t mpLFOt = (uint32_t)((1/(251/4.0)) * 1000000);	// microseconds per LFO tick
+		uint32_t mpqn = 500000;							// microseconds per quarter note - 120 bpm default
+		uint32_t mpt = mpqn / ppqn;						// microseconds per MIDI tick
 		short pitchbend = 0;							// pitch bend in cents
 		int pitchbendRange = 200;						// pitch bend range in cents default 2 semitones
 		double vibrato = 0;								// vibrato depth in cents
-		WORD tremelo = 0;								// tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
-		WORD lfoRate = 0;								// value added to lfo env every lfo tick
+		uint16_t tremelo = 0;								// tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
+		uint16_t lfoRate = 0;								// value added to lfo env every lfo tick
 		uint32_t lfoVal = 0;									// LFO envelope value. 0 - 0xFFFFFF .  Effective envelope range is -0x1000000 to +0x1000000
 		int lfoStage = 0;								// 0 = rising from mid, 1 = falling from peak, 2 = falling from mid 3 = rising from bottom
 		short lfoCents = 0;								// cents adjustment from most recent LFO val excluding pitchbend.
 		long effectiveLfoVal = 0;
 		//bool bLfoRising = true;;						// is LFO rising or falling?
 		
-		ULONG startAbsTicks = 0;							// The MIDI tick time to start from for a given vibrato segment
+		uint32_t startAbsTicks = 0;							// The MIDI tick time to start from for a given vibrato segment
 
-		int numEvents = events.size();
-		for (int j = 0; j < numEvents; j++)
+		size_t numEvents = events.size();
+		for (size_t j = 0; j < numEvents; j++)
 		{
 			MidiEvent* event = events[j];
-			ULONG curTicks = event->AbsTime;			//current absolute ticks
+			uint32_t curTicks = event->AbsTime;			//current absolute ticks
 			
 			if (curTicks > 0 /*&& (vibrato > 0 || tremelo > 0)*/ && startAbsTicks < curTicks)
 			{
@@ -228,7 +228,7 @@ bool QSoundSeq::PostLoad()
 				//double centsPerMidiTick = vibrato / midiTicksPerPhase;
 				double lfoRatePerMidiTick = (numLfoPhases * 0x20000) / (double)segmentDurTicks;
 
-				const BYTE tickRes = 16;
+				const uint8_t tickRes = 16;
 				uint32_t lfoRatePerLoop = (uint32_t)((tickRes * lfoRatePerMidiTick) * 256);
 
 				for (int t = 0; t < segmentDurTicks; t += tickRes)
@@ -257,7 +257,7 @@ bool QSoundSeq::PostLoad()
 
 					if (tremelo > 0)
 					{
-						BYTE expression = ConvertPercentAmpToStdMidiVal((0x10000 - (tremelo*abs(lfoPercent))) / (double)0x10000);
+						uint8_t expression = ConvertPercentAmpToStdMidiVal((0x10000 - (tremelo*abs(lfoPercent))) / (double)0x10000);
 						track->InsertExpression(channel, expression, startAbsTicks + t);
 					}
 				}
@@ -364,10 +364,10 @@ void QSoundTrack::ResetVars()
 
 bool QSoundTrack::ReadEvent(void)
 {
-	ULONG beginOffset = curOffset;
-	BYTE status_byte = GetByte(curOffset++);
+	uint32_t beginOffset = curOffset;
+	uint8_t status_byte = GetByte(curOffset++);
 
-	UINT delta;
+	uint32_t delta;
 
 	if (status_byte >= 0x20)
 	{
@@ -398,9 +398,9 @@ bool QSoundTrack::ReadEvent(void)
 
 		if ((status_byte & 0x1F) != 0)		//if it's not a rest
 		{
-			//UINT absDur = (double)(delta/256.0)*(double)dur;
+			//uint32_t absDur = (double)(delta/256.0)*(double)dur;
 			// for 100% accuracy, we'd be shifting by 8, but that seems excessive for MIDI
-			UINT absDur = (UINT)((double)(delta/(double)(256<<4))*(double)(dur<<4));
+			uint32_t absDur = (uint32_t)((double)(delta/(double)(256<<4))*(double)(dur<<4));
 
 			key = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
 
@@ -430,7 +430,7 @@ bool QSoundTrack::ReadEvent(void)
 				
 				//if (pMidiTrack->prevDurNoteOff && pMidiTrack->prevDurNoteOff->AbsTime > GetDelta())
 				//	MakePrevDurNoteEnd();
-				//BYTE convVel = ConvertPercentVolToAttenDB(vel_table[vel] / (double)vel_table[sizeof(vel_table)-1]);
+				//uint8_t convVel = ConvertPercentVolToAttenDB(vel_table[vel] / (double)vel_table[sizeof(vel_table)-1]);
 				if (bPrevNoteTie)
 				{
 					if (key != prevTieNote)
@@ -490,7 +490,7 @@ bool QSoundTrack::ReadEvent(void)
 					// This byte is clearly the desired BPM, however there is a loss of resolution when the driver
 					// converts this value because it is represented with 16 bits... See the table in sfa3 at 0x3492.
 					// I've decided to keep the desired BPM rather than use the exact tempo value from the table
-					BYTE tempo = GetByte(curOffset++);
+					uint8_t tempo = GetByte(curOffset++);
 					AddTempoBPM(beginOffset, curOffset-beginOffset, tempo);
 				}
 				else
@@ -508,7 +508,7 @@ bool QSoundTrack::ReadEvent(void)
 					//   x = 3.26375
 					// So we must divide the provided tempo value by 3.26375 to get the actual BPM.  Btw, there is a table in
 					// sfa3 at 0x3492 which converts a BPM index to the x value in the first equation.  It seems to confirm our math
-					USHORT tempo = GetShortBE(curOffset);
+					uint16_t tempo = GetShortBE(curOffset);
 					double fTempo = tempo/3.26375;
 					curOffset+=2;
 					AddTempoBPM(beginOffset, curOffset-beginOffset, fTempo);
@@ -529,7 +529,7 @@ bool QSoundTrack::ReadEvent(void)
 			break;
 		case 0x08 :
 			{
-				BYTE progNum = GetByte(curOffset++);
+				uint8_t progNum = GetByte(curOffset++);
 				//if (((QSoundSeq*)parentSeq)->fmt_version < VER_116)
 				{
 					AddBankSelectNoItem((bank*2) + (progNum/128));
@@ -556,7 +556,7 @@ bool QSoundTrack::ReadEvent(void)
 			break;
 		case 0x0C :				//Pitch bend - only gets applied at Note-on, but don't care.  It's used mostly as a detune for chorus effect
 			{
-				BYTE pitchbend = GetByte(curOffset++);
+				uint8_t pitchbend = GetByte(curOffset++);
 				//double cents = (pitchbend / 256.0) * 100;
 				AddMarker(beginOffset, curOffset-beginOffset, string("pitchbend"), pitchbend, 0, L"Pitch Bend", PRIORITY_MIDDLE, CLR_PITCHBEND);
 				//AddPitchBend(beginOffset, curOffset-beginOffset, (cents / 200) * 8192);
@@ -565,7 +565,7 @@ bool QSoundTrack::ReadEvent(void)
 		case 0x0D :	
 			{
 				// Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every (251/4) seconds until we hit target key.
-				BYTE portamentoRate = GetByte(curOffset++);
+				uint8_t portamentoRate = GetByte(curOffset++);
 				AddPortamentoTime(beginOffset, curOffset-beginOffset, portamentoRate);
 				//AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Portamento"), NULL, CLR_PITCHBEND);
 			}
@@ -693,7 +693,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 		case 0x18 :				// pan
 			{
 				//the pan value is b/w 0 and 0x20.  0 - hard left, 0x10 - center, 0x20 - hard right
-				BYTE pan = GetByte(curOffset++) * 4;
+				uint8_t pan = GetByte(curOffset++) * 4;
 				if (pan != 0)
 					pan--;
 				//pan *= 4;
@@ -717,7 +717,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			break;
 		case 0x1B :				//Vibrato depth... 
 			{
-				BYTE vibratoDepth;
+				uint8_t vibratoDepth;
 				if (GetVersion() < VER_171)
 				{
 					vibratoDepth = GetByte(curOffset++);
@@ -726,8 +726,8 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 				else
 				{
 					// First data byte defines behavior 0-3
-					BYTE type = GetByte(curOffset++);
-					BYTE data = GetByte(curOffset++);
+					uint8_t type = GetByte(curOffset++);
+					uint8_t data = GetByte(curOffset++);
 					switch (type)
 					{
 					case 0:		// vibrato
@@ -748,7 +748,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			break;
 		case 0x1C :
 			{
-				BYTE tremeloDepth;
+				uint8_t tremeloDepth;
 				if (GetVersion() < VER_171)
 				{
 					tremeloDepth = GetByte(curOffset++);
@@ -765,7 +765,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			break;
 		case 0x1D :	// LFO rate (for versions < 1.71)
 			{
-				BYTE rate = GetByte(curOffset++);
+				uint8_t rate = GetByte(curOffset++);
 				if (GetVersion() < VER_171)
 					AddMarker(beginOffset, curOffset-beginOffset, string("lfo"), rate, 0, _T("LFO Rate"), PRIORITY_MIDDLE, CLR_LFO);
 				else
@@ -774,7 +774,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			break;
 		case 0x1E :	// Reset LFO state (for versions < 1.71)
 			{
-				BYTE data = GetByte(curOffset++);
+				uint8_t data = GetByte(curOffset++);
 				if (GetVersion() < VER_171)
 					AddMarker(beginOffset, curOffset-beginOffset, string("resetlfo"), data, 0, _T("LFO Reset"), PRIORITY_MIDDLE, CLR_LFO);
 				else

@@ -42,7 +42,7 @@ static unsigned const SDSP_COUNTER_RATES [32] =
 
 // Simulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
 // return elapsed time in sample count, and final env value if requested.
-UINT GetSNESGAINEnvLength(uint8_t gain, int16_t env, int16_t env_to, int16_t * env_after);
+uint32_t GetSNESGAINEnvLength(uint8_t gain, int16_t env, int16_t env_to, int16_t * env_after);
 
 // See Anomie's S-DSP document for technical details
 // http://www.romhacking.net/documents/191/
@@ -54,11 +54,11 @@ template <class T> void SNESConvADSR(T* rgn, uint8_t adsr1, uint8_t adsr2, uint8
 
 	int16_t env;
 	int16_t env_sim;
-	UINT decay_samples;
-	UINT decay_full_samples;
-	UINT sustain_samples;
-	UINT sustain_full_samples;
-	UINT samples;
+	uint32_t decay_samples;
+	uint32_t decay_full_samples;
+	uint32_t sustain_samples;
+	uint32_t sustain_full_samples;
+	uint32_t samples;
 	double timeInSec;
 
 	if (adsr_enabled)
@@ -239,19 +239,19 @@ class SNESSampColl
 	: public VGMSampColl
 {
 public:
-	SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, UINT maxNumSamps = 256);
-	SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, UINT maxNumSamps = 256);
-	SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, const std::vector<BYTE>& targetSRCNs, std::wstring name = L"SNESSampColl");
-	SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, const std::vector<BYTE>& targetSRCNs, std::wstring name = L"SNESSampColl");
+	SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, uint32_t maxNumSamps = 256);
+	SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, uint32_t maxNumSamps = 256);
+	SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, const std::vector<uint8_t>& targetSRCNs, std::wstring name = L"SNESSampColl");
+	SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, const std::vector<uint8_t>& targetSRCNs, std::wstring name = L"SNESSampColl");
 	virtual ~SNESSampColl();
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 
 protected:
-	std::vector<BYTE> targetSRCNs;
+	std::vector<uint8_t> targetSRCNs;
 	uint32_t spcDirAddr;
 
-	void SetDefaultTargets(UINT maxNumSamps);
+	void SetDefaultTargets(uint32_t maxNumSamps);
 };
 
 // ********
@@ -262,19 +262,19 @@ class SNESSamp
 	: public VGMSamp
 {
 public:
-	SNESSamp(VGMSampColl* sampColl, ULONG offset, ULONG length, ULONG dataOffset,
-		ULONG dataLen, ULONG loopOffset, std::wstring name = L"BRR");
+	SNESSamp(VGMSampColl* sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
+		uint32_t dataLen, uint32_t loopOffset, std::wstring name = L"BRR");
 	virtual ~SNESSamp(void);
 
-	static ULONG GetSampleLength(RawFile * file, ULONG offset);
+	static uint32_t GetSampleLength(RawFile * file, uint32_t offset);
 
 	virtual double GetCompressionRatio();	// ratio of space conserved.  should generally be > 1
 											// used to calculate both uncompressed sample size and loopOff after conversion
-	virtual void ConvertToStdWave(BYTE* buf);
+	virtual void ConvertToStdWave(uint8_t* buf);
 
 private:
 	void DecompBRRBlk(int16_t *pSmp, BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2);
 
 private:
-	ULONG brrLoopOffset;
+	uint32_t brrLoopOffset;
 };

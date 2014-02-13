@@ -3,8 +3,8 @@
 
 std::wstring StringToUpper(std::wstring myString)
 {
-  const int length = myString.length();
-  for(int i=0; i!=length; ++i)
+  const size_t length = myString.length();
+  for(size_t i=0; i!=length; ++i)
   {
     myString[i] = toupper(myString[i]);
   }
@@ -13,8 +13,8 @@ std::wstring StringToUpper(std::wstring myString)
 
 std::wstring StringToLower(std::wstring myString)
 {
-  const int length = myString.length();
-  for(int i=0; i!=length; ++i)
+  const size_t length = myString.length();
+  for(size_t i=0; i!=length; ++i)
   {
     myString[i] = tolower(myString[i]);
   }

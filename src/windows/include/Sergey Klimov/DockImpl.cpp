@@ -44,11 +44,11 @@ void DrawEllipsisText(CDC& dc,LPCTSTR sText,int n,LPRECT prc,bool bHorizontal)
 		sTmp.reserve(sEllipsis.size()+n);
 		sTmp.append(sEllipsis);
 		sTmp.append(sText, n);
-		bRes=(GetTextExtentExPoint(dc,sTmp.c_str(),sTmp.size(),width,&n,NULL,&size)!=FALSE);
+		bRes=(GetTextExtentExPoint(dc,sTmp.c_str(),(int)sTmp.size(),width,&n,NULL,&size)!=FALSE);
 		if(bRes)
 		{
 			if(n<static_cast<int>(sEllipsis.size()+1))
-				n=sEllipsis.size()+1;
+				n=(int)(sEllipsis.size()+1);
 			sTmp.assign(sText, n-sEllipsis.size());
 			sTmp.append(sEllipsis);
 			sText=sTmp.c_str();

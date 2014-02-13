@@ -21,7 +21,7 @@ class FFTSeq
 	: public VGMSeq
 {
 public:
-	FFTSeq(RawFile* file, ULONG offset);
+	FFTSeq(RawFile* file, uint32_t offset);
 	virtual ~FFTSeq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -47,16 +47,16 @@ public:
 
 public:
 	bool bNoteOn;
-	ULONG infiniteLoopPt;
-	BYTE infiniteLoopOctave;
-	ULONG loopID[5];
+	uint32_t infiniteLoopPt;
+	uint8_t infiniteLoopOctave;
+	uint32_t loopID[5];
 	int loop_counter[5];
 	int loop_repeats[5];
 	int loop_layer;
-	ULONG loop_begin_loc[5];
-	ULONG loop_end_loc[5];
-	BYTE loop_octave[5];		//1,Sep.2009 revise 
-	BYTE loop_end_octave[5];	//1,Sep.2009 revise
+	uint32_t loop_begin_loc[5];
+	uint32_t loop_end_loc[5];
+	uint8_t loop_octave[5];		//1,Sep.2009 revise 
+	uint8_t loop_end_octave[5];	//1,Sep.2009 revise
 };
 
 /*
@@ -66,6 +66,6 @@ public:
 	FFTSeqTableHandler(void);
 
 	virtual void SetNames(void);
-	//virtual bool Apply(VGMFile *pVGMFile, ULONG CRC32);
+	//virtual bool Apply(VGMFile *pVGMFile, uint32_t CRC32);
 };
 */

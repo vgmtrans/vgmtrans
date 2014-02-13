@@ -14,7 +14,7 @@ DECLARE_FORMAT(RareSnes);
 #define SEQ_PPQN    32
 #define SEQ_KEYOFS  36
 
-const USHORT RareSnesSeq::NOTE_PITCH_TABLE[128] = {
+const uint16_t RareSnesSeq::NOTE_PITCH_TABLE[128] = {
 	0x0000, 0x0040, 0x0044, 0x0048, 0x004c, 0x0051, 0x0055, 0x005b,
 	0x0060, 0x0066, 0x006c, 0x0072, 0x0079, 0x0080, 0x0088, 0x0090,
 	0x0098, 0x00a1, 0x00ab, 0x00b5, 0x00c0, 0x00cb, 0x00d7, 0x00e4,
@@ -33,7 +33,7 @@ const USHORT RareSnesSeq::NOTE_PITCH_TABLE[128] = {
 	0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff
 };
 
-RareSnesSeq::RareSnesSeq(RawFile* file, RareSnesVersion ver, ULONG seqdataOffset, wstring newName)
+RareSnesSeq::RareSnesSeq(RawFile* file, RareSnesVersion ver, uint32_t seqdataOffset, wstring newName)
 : VGMSeq(RareSnesFormat::name, file, seqdataOffset), version(ver)
 {
 	name = newName;
@@ -72,10 +72,10 @@ bool RareSnesSeq::GetHeaderInfo(void)
 	SetPPQN(SEQ_PPQN);
 
 	VGMHeader* seqHeader = AddHeader(dwOffset, MAX_TRACKS * 2 + 2, L"Sequence Header");
-	ULONG curHeaderOffset = dwOffset;
+	uint32_t curHeaderOffset = dwOffset;
 	for (int i = 0; i < MAX_TRACKS; i++)
 	{
-		USHORT trkOff = GetShort(curHeaderOffset);
+		uint16_t trkOff = GetShort(curHeaderOffset);
 		seqHeader->AddPointer(curHeaderOffset, 2, trkOff, (trkOff != 0), L"Track Pointer");
 		curHeaderOffset += 2;
 	}
@@ -91,7 +91,7 @@ bool RareSnesSeq::GetTrackPointers(void)
 {
 	for (int i = 0; i < MAX_TRACKS; i++)
 	{
-		USHORT trkOff = GetShort(dwOffset + i * 2);
+		uint16_t trkOff = GetShort(dwOffset + i * 2);
 		if (trkOff != 0)
 			aTracks.push_back(new RareSnesTrack(this, trkOff));
 	}
@@ -242,12 +242,12 @@ double RareSnesSeq::GetTempoInBPM ()
 	return GetTempoInBPM(tempo, timerFreq);
 }
 
-double RareSnesSeq::GetTempoInBPM (BYTE tempo)
+double RareSnesSeq::GetTempoInBPM (uint8_t tempo)
 {
 	return GetTempoInBPM(tempo, timerFreq);
 }
 
-double RareSnesSeq::GetTempoInBPM (BYTE tempo, BYTE timerFreq)
+double RareSnesSeq::GetTempoInBPM (uint8_t tempo, uint8_t timerFreq)
 {
 	if (timerFreq != 0 && tempo != 0)
 	{
@@ -272,7 +272,7 @@ RareSnesTrack::RareSnesTrack(RareSnesSeq* parentFile, long offset, long length)
 	bWriteGenericEventAsTextEvent = false;
 }
 
-bool RareSnesTrack::LoadTrackInit(ULONG trackNum)
+bool RareSnesTrack::LoadTrackInit(uint32_t trackNum)
 {
 	if (!SeqTrack::LoadTrackInit(trackNum))
 		return false;
@@ -305,7 +305,7 @@ double RareSnesTrack::GetTuningInSemitones(int8_t tuning)
 	return 12 * log((1024 + tuning) / 1024.0) / log(2.0);
 }
 
-void RareSnesTrack::CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, BYTE& midiVol, BYTE& midiPan)
+void RareSnesTrack::CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, uint8_t& midiVol, uint8_t& midiPan)
 {
 	double volL = abs(volLByte) / 128.0;
 	double volR = abs(volRByte) / 128.0;
@@ -319,10 +319,10 @@ void RareSnesTrack::CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, BYTE& 
 	// make it GM2 compatible
 	ConvertPercentVolPanToStdMidiScale(vol, pan);
 
-	midiVol = (BYTE)(vol * 127 + 0.5);
+	midiVol = (uint8_t)(vol * 127 + 0.5);
 	if (midiVol != 0)
 	{
-		midiPan = (BYTE)(pan * 126 + 0.5);
+		midiPan = (uint8_t)(pan * 126 + 0.5);
 		if (midiPan != 0)
 		{
 			midiPan++;
@@ -336,22 +336,22 @@ void RareSnesTrack::CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, BYTE& 
 bool RareSnesTrack::ReadEvent(void)
 {
 	RareSnesSeq* parentSeq = (RareSnesSeq*)this->parentSeq;
-	ULONG beginOffset = curOffset;
+	uint32_t beginOffset = curOffset;
 	if (curOffset >= 0x10000)
 	{
 		return false;
 	}
 
 	bool bWriteGenericEventAsTextEventTmp;
-	BYTE statusByte = GetByte(curOffset++);
-	BYTE newMidiVol, newMidiPan;
+	uint8_t statusByte = GetByte(curOffset++);
+	uint8_t newMidiVol, newMidiPan;
 	bool bContinue = true;
 
 	wstringstream desc;
 
 	if (statusByte >= 0x80)
 	{
-		BYTE noteByte = statusByte;
+		uint8_t noteByte = statusByte;
 
 		// check for "reuse last key"
 		if (noteByte == 0xe1)
@@ -363,10 +363,10 @@ bool RareSnesTrack::ReadEvent(void)
 			noteByte = altNoteByte1;
 		}
 
-		BYTE key = noteByte - 0x81;
-		BYTE spcKey = min(max(noteByte - 0x80 + 36 + spcTranspose, 0), 0x7f);
+		uint8_t key = noteByte - 0x81;
+		uint8_t spcKey = min(max(noteByte - 0x80 + 36 + spcTranspose, 0), 0x7f);
 
-		USHORT dur;
+		uint16_t dur;
 		if (defNoteDur != 0)
 		{
 			dur = defNoteDur;
@@ -411,7 +411,7 @@ bool RareSnesTrack::ReadEvent(void)
 			//ssTrace << L"Note: " << key << L" " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << L" P=" << spcNotePitch << std::endl;
 			//OutputDebugString(ssTrace.str().c_str());
 
-			BYTE vel = 127;
+			uint8_t vel = 127;
 			AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
 			AddTime(dur);
 		}
@@ -419,7 +419,7 @@ bool RareSnesTrack::ReadEvent(void)
 	else
 	{
 		RareSnesSeqEventType eventType = (RareSnesSeqEventType)0;
-		map<BYTE, RareSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+		map<uint8_t, RareSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
 		if (pEventType != parentSeq->EventMap.end())
 		{
 			eventType = pEventType->second;
@@ -436,7 +436,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_UNKNOWN1:
 		{
-			BYTE arg1 = GetByte(curOffset++);
+			uint8_t arg1 = GetByte(curOffset++);
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte
 				<< std::dec << std::setfill(L' ') << std::setw(0)
 				<< L"  Arg1: " << (int)arg1;
@@ -448,8 +448,8 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_UNKNOWN2:
 		{
-			BYTE arg1 = GetByte(curOffset++);
-			BYTE arg2 = GetByte(curOffset++);
+			uint8_t arg1 = GetByte(curOffset++);
+			uint8_t arg2 = GetByte(curOffset++);
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte
 				<< std::dec << std::setfill(L' ') << std::setw(0)
 				<< L"  Arg1: " << (int)arg1
@@ -462,9 +462,9 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_UNKNOWN3:
 		{
-			BYTE arg1 = GetByte(curOffset++);
-			BYTE arg2 = GetByte(curOffset++);
-			BYTE arg3 = GetByte(curOffset++);
+			uint8_t arg1 = GetByte(curOffset++);
+			uint8_t arg2 = GetByte(curOffset++);
+			uint8_t arg3 = GetByte(curOffset++);
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte
 				<< std::dec << std::setfill(L' ') << std::setw(0)
 				<< L"  Arg1: " << (int)arg1
@@ -478,10 +478,10 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_UNKNOWN4:
 		{
-			BYTE arg1 = GetByte(curOffset++);
-			BYTE arg2 = GetByte(curOffset++);
-			BYTE arg3 = GetByte(curOffset++);
-			BYTE arg4 = GetByte(curOffset++);
+			uint8_t arg1 = GetByte(curOffset++);
+			uint8_t arg2 = GetByte(curOffset++);
+			uint8_t arg3 = GetByte(curOffset++);
+			uint8_t arg4 = GetByte(curOffset++);
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte
 				<< std::dec << std::setfill(L' ') << std::setw(0)
 				<< L"  Arg1: " << (int)arg1
@@ -502,7 +502,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_PROGCHANGE:
 		{
-			BYTE newProg = GetByte(curOffset++);
+			uint8_t newProg = GetByte(curOffset++);
 			spcInstr = newProg;
 			AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true);
 			break;
@@ -510,7 +510,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_PROGCHANGEVOL:
 		{
-			BYTE newProg = GetByte(curOffset++);
+			uint8_t newProg = GetByte(curOffset++);
 			int8_t newVolL = (signed) GetByte(curOffset++);
 			int8_t newVolR = (signed) GetByte(curOffset++);
 
@@ -545,9 +545,9 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_GOTO:
 		{
-			USHORT dest = GetShort(curOffset); curOffset += 2;
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
 			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
-			ULONG length = curOffset - beginOffset;
+			uint32_t length = curOffset - beginOffset;
 
 			curOffset = dest;
 			if (!IsOffsetUsed(dest) || rptNestLevel != 0) // nest level check is required for Stickerbrush Symphony
@@ -559,8 +559,8 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_CALLNTIMES:
 		{
-			BYTE times = GetByte(curOffset++);
-			USHORT dest = GetShort(curOffset); curOffset += 2;
+			uint8_t times = GetByte(curOffset++);
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
 
 			desc << L"Times: " << (int)times << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 			AddGenericEvent(beginOffset, curOffset-beginOffset, (times == 1 ? L"Pattern Play" : L"Pattern Repeat"), desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
@@ -582,7 +582,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_CALLONCE:
 		{
-			USHORT dest = GetShort(curOffset); curOffset += 2;
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
 
 			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
@@ -674,7 +674,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_TEMPO:
 		{
-			BYTE newTempo = GetByte(curOffset++);
+			uint8_t newTempo = GetByte(curOffset++);
 			parentSeq->tempo = newTempo;
 			AddTempoBPM(beginOffset, curOffset-beginOffset, parentSeq->GetTempoInBPM());
 			break;
@@ -729,7 +729,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_ADSR:
 		{
-			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
 			spcADSR = newADSR;
 
 			desc << L"ADSR: " << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)newADSR;
@@ -741,7 +741,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_MASTVOL:
 		{
-			BYTE newVol = GetByte(curOffset++);
+			uint8_t newVol = GetByte(curOffset++);
 			AddMasterVol(beginOffset, curOffset-beginOffset, newVol & 0x7f);
 			break;
 		}
@@ -796,7 +796,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_ECHOPARAM:
 		{
-			BYTE newFeedback = GetByte(curOffset++);
+			uint8_t newFeedback = GetByte(curOffset++);
 			int8_t newVolL = (signed) GetByte(curOffset++);
 			int8_t newVolR = (signed) GetByte(curOffset++);
 			parentSeq->midiReverb = min(abs(newVolL) + abs(newVolR), 255) / 2;
@@ -823,7 +823,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_ECHOFIR:
 		{
-			BYTE newFIR[8];
+			uint8_t newFIR[8];
 			GetBytes(curOffset, 8, newFIR);
 			curOffset += 8;
 
@@ -843,7 +843,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_NOISECLK:
 		{
-			BYTE newCLK = GetByte(curOffset++);
+			uint8_t newCLK = GetByte(curOffset++);
 			desc << L"CLK: " << (int)newCLK;
 			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Noise Frequency", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
@@ -907,7 +907,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (signed) GetByte(curOffset++);
 			int8_t newVolR = (signed) GetByte(curOffset++);
-			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[0] = newVolL;
 			parentSeq->presetVolR[0] = newVolR;
@@ -924,7 +924,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (signed) GetByte(curOffset++);
 			int8_t newVolR = (signed) GetByte(curOffset++);
-			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[1] = newVolL;
 			parentSeq->presetVolR[1] = newVolR;
@@ -941,7 +941,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (signed) GetByte(curOffset++);
 			int8_t newVolR = (signed) GetByte(curOffset++);
-			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[2] = newVolL;
 			parentSeq->presetVolR[2] = newVolR;
@@ -958,7 +958,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (signed) GetByte(curOffset++);
 			int8_t newVolR = (signed) GetByte(curOffset++);
-			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[3] = newVolL;
 			parentSeq->presetVolR[3] = newVolR;
@@ -975,7 +975,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (signed) GetByte(curOffset++);
 			int8_t newVolR = (signed) GetByte(curOffset++);
-			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			parentSeq->presetVolL[4] = newVolL;
 			parentSeq->presetVolR[4] = newVolR;
@@ -1030,7 +1030,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_TIMERFREQ:
 		{
-			BYTE newFreq = GetByte(curOffset++);
+			uint8_t newFreq = GetByte(curOffset++);
 			parentSeq->timerFreq = newFreq;
 			AddTempoBPM(beginOffset, curOffset-beginOffset, parentSeq->GetTempoInBPM(), L"Timer Frequency");
 			break;
@@ -1058,7 +1058,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_VOICEPARAMSHORT:
 		{
-			BYTE newProg = GetByte(curOffset++);
+			uint8_t newProg = GetByte(curOffset++);
 			int8_t newTransp = (signed) GetByte(curOffset++);
 			int8_t newTuning = (signed) GetByte(curOffset++);
 
@@ -1079,12 +1079,12 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_VOICEPARAM:
 		{
-			BYTE newProg = GetByte(curOffset++);
+			uint8_t newProg = GetByte(curOffset++);
 			int8_t newTransp = (signed) GetByte(curOffset++);
 			int8_t newTuning = (signed) GetByte(curOffset++);
 			int8_t newVolL = (signed) GetByte(curOffset++);
 			int8_t newVolR = (signed) GetByte(curOffset++);
-			USHORT newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
 
 			desc << L"Program Number: " << (int)newProg << L"  Transpose: " << (int)newTransp << L"  Tuning: " << (int)newTuning << L" (" << (int)(GetTuningInSemitones(newTuning) * 100 + 0.5) << L" cents)";;
 			desc << L"  Volume: " << (int)newVolL << L", " << (int)newVolR;
@@ -1114,7 +1114,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_ECHODELAY:
 		{
-			BYTE newEDL = GetByte(curOffset++);
+			uint8_t newEDL = GetByte(curOffset++);
 			desc << L"Delay: " << (int)newEDL;
 			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo Delay", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
@@ -1184,10 +1184,10 @@ void RareSnesTrack::OnTickEnd(void)
 {
 }
 
-void RareSnesTrack::AddVolLR(ULONG offset, ULONG length, int8_t spcVolL, int8_t spcVolR, const wchar_t* sEventName)
+void RareSnesTrack::AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR, const wchar_t* sEventName)
 {
-	BYTE newMidiVol;
-	BYTE newMidiPan;
+	uint8_t newMidiVol;
+	uint8_t newMidiPan;
 	CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
 
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
@@ -1206,8 +1206,8 @@ void RareSnesTrack::AddVolLR(ULONG offset, ULONG length, int8_t spcVolL, int8_t 
 
 void RareSnesTrack::AddVolLRNoItem(int8_t spcVolL, int8_t spcVolR)
 {
-	BYTE newMidiVol;
-	BYTE newMidiPan;
+	uint8_t newMidiVol;
+	uint8_t newMidiPan;
 	CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
 
 	// add MIDI events only if updated

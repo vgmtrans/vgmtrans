@@ -2,7 +2,7 @@
 #include "SquSnesSeq.h"
 #include "SquSnesFormat.h"
 
-const BYTE durtbl[14] = { 0xBF, 0x8F, 0x5F, 0x47, 0x2F, 0x23, 0x1F, 0x17, 0x0F, 0x0B, 0x07, 0x05, 0x02, 0x00 };
+const uint8_t durtbl[14] = { 0xBF, 0x8F, 0x5F, 0x47, 0x2F, 0x23, 0x1F, 0x17, 0x0F, 0x0B, 0x07, 0x05, 0x02, 0x00 };
 
 
 DECLARE_FORMAT(SquSnes);
@@ -12,7 +12,7 @@ DECLARE_FORMAT(SquSnes);
 //  **********
 
 
-SquSnesSeq::SquSnesSeq(RawFile* file, ULONG seqdataOffset, ULONG instrtableOffset)
+SquSnesSeq::SquSnesSeq(RawFile* file, uint32_t seqdataOffset, uint32_t instrtableOffset)
 : VGMSeq(SquSnesFormat::name, file, seqdataOffset), instrtable_offset(instrtableOffset)
 {
 }
@@ -28,14 +28,14 @@ bool SquSnesSeq::GetHeaderInfo(void)
 
 	for (int i = 0; i < 8; i++)
 	{
-		USHORT trkOffset = GetShort(dwOffset + i*2);
+		uint16_t trkOffset = GetShort(dwOffset + i*2);
 		aTracks.push_back(new SquSnesTrack(this, trkOffset));
 	}
 
 //	unLength = 0x7A4;
 
 	/*int i = 0x10;
-	BYTE testByte = GetByte(dwOffset + i)
+	uint8_t testByte = GetByte(dwOffset + i)
 	while (testByte != 0xFF)
 	{
 		//TODO: add perc table code
@@ -51,7 +51,7 @@ bool SquSnesSeq::GetTrackPointers(void)
 {
 /*	for (int i=0; i<8; i++)
 	{
-		USHORT trkOff = GetShort(dwOffset+i*2);
+		uint16_t trkOff = GetShort(dwOffset+i*2);
 		if (trkOff)
 			aTracks.push_back(new SquSnesTrack(this, trkOff);
 	}
@@ -86,13 +86,13 @@ SquSnesTrack::SquSnesTrack(SquSnesSeq* parentFile, long offset, long length)
 
 bool SquSnesTrack::ReadEvent(void)
 {
-	ULONG beginOffset = curOffset;
-	BYTE status_byte = GetByte(curOffset++);
+	uint32_t beginOffset = curOffset;
+	uint8_t status_byte = GetByte(curOffset++);
 
 	if (status_byte < 0xC4) //then it's a note
 	{
-		BYTE dur = status_byte / 14;
-		BYTE note = status_byte % 14;
+		uint8_t dur = status_byte / 14;
+		uint8_t note = status_byte % 14;
 
 		if (dur == 13)
 			dur = GetByte(curOffset++);
@@ -102,8 +102,8 @@ bool SquSnesTrack::ReadEvent(void)
 
 		if (note < 12)
 		{
-			BYTE notedur = dur;
-			BYTE realNote = 12 * (octave) + note;		//NEEDS MODIFYING
+			uint8_t notedur = dur;
+			uint8_t realNote = 12 * (octave) + note;		//NEEDS MODIFYING
 			//if (percmode)
 			//{
 
@@ -135,7 +135,7 @@ bool SquSnesTrack::ReadEvent(void)
 		{
 		case 0xD1:							//tempo
 			{
-				BYTE tempo = GetByte(curOffset++);
+				uint8_t tempo = GetByte(curOffset++);
 				AddTempo(beginOffset, curOffset-beginOffset, tempo * 125 * 48);
 			}
 			break;
@@ -147,7 +147,7 @@ bool SquSnesTrack::ReadEvent(void)
 		case 0xE0:							//volume
 		case 0xE2:							//ditto
 			{
-				BYTE vol = GetByte(curOffset++);
+				uint8_t vol = GetByte(curOffset++);
 				AddVol(beginOffset, curOffset-beginOffset, vol);
 			}
 			break;
@@ -157,7 +157,7 @@ bool SquSnesTrack::ReadEvent(void)
 
 		case 0xE7:							//balance/pan
 			{
-				BYTE pan = GetByte(curOffset++);
+				uint8_t pan = GetByte(curOffset++);
 				AddPan(beginOffset, curOffset-beginOffset, pan >> 1);
 			}
 			break;
@@ -167,14 +167,14 @@ bool SquSnesTrack::ReadEvent(void)
 
 		case 0xDE:							//program change
 			{
-				BYTE newProg = GetByte(curOffset++);
+				uint8_t newProg = GetByte(curOffset++);
 				AddProgramChange(beginOffset, curOffset-beginOffset, newProg);
 			}
 			break;
 
 		case 0xC6:							//set octave
 			{
-				BYTE newOctave = GetByte(curOffset++);
+				uint8_t newOctave = GetByte(curOffset++);
 				AddSetOctave(beginOffset, curOffset-beginOffset, newOctave);
 			}
 			break;

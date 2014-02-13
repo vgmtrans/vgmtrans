@@ -3,20 +3,20 @@
 #include "SeqTrack.h"
 #include "SquSnesFormat.h"
 
-extern const BYTE durtbl[14];
+extern const uint8_t durtbl[14];
 
 class SquSnesSeq
 	: public VGMSeq
 {
 public:
-	SquSnesSeq(RawFile* file, ULONG seqdata_offset, ULONG instrtable_offset);
+	SquSnesSeq(RawFile* file, uint32_t seqdata_offset, uint32_t instrtable_offset);
 	virtual ~SquSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool GetTrackPointers(void);
 
 private:
-	ULONG instrtable_offset;
+	uint32_t instrtable_offset;
 };
 
 
@@ -28,9 +28,9 @@ public:
 	virtual bool ReadEvent(void);
 
 private:
-	BYTE rpt;
-	BYTE rptcnt[10];
-	ULONG rptpos[10];
-	BYTE rptcur[10];
-	BYTE rptoct[10];
+	uint8_t rpt;
+	uint8_t rptcnt[10];
+	uint32_t rptpos[10];
+	uint8_t rptcur[10];
+	uint8_t rptoct[10];
 };

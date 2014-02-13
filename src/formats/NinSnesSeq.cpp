@@ -6,7 +6,7 @@ DECLARE_FORMAT(NinSnes);
 
 using namespace std;
 
-NinSnesSeq::NinSnesSeq(RawFile* file, ULONG offset, ULONG length, wstring name)
+NinSnesSeq::NinSnesSeq(RawFile* file, uint32_t offset, uint32_t length, wstring name)
 : VGMSeq(NinSnesFormat::name, file, offset, length, name)
 {
 	AddContainer<NinSnesSection>(aSections);
@@ -24,12 +24,12 @@ NinSnesSeq::~NinSnesSeq()
 bool NinSnesSeq::LoadMain()
 {
 	SetPPQN(0x30);
-	for (UINT i=0; i<8; i++)
+	for (uint32_t i=0; i<8; i++)
 		aTracks.push_back(new NinSnesTrack(this, dwOffset, i));
 	if (!GetSectionPointers())
 		return false;
 
-	int nNumSections = aSections.size();
+	size_t nNumSections = aSections.size();
 	if (nNumSections == 0)
 		return false;
 
@@ -40,7 +40,7 @@ bool NinSnesSeq::LoadMain()
 		return false;
 
 	//DeleteVect<SeqTrack>(aTracks);
-	//for (UINT i=0; i<aTracks.size(); i++)
+	//for (uint32_t i=0; i<aTracks.size(); i++)
 	//{
 	//	if (aTracks[i]->aEvents.size() == 0)
 	//		aTracks.erase(aTracks.begin() + i--);
@@ -48,7 +48,7 @@ bool NinSnesSeq::LoadMain()
 
 	dwOffset = 0;
 	unLength = vgmfile->rawfile->size();
-	//for (UINT i=0; i<nNumSections; i++)
+	//for (uint32_t i=0; i<nNumSections; i++)
 	//	unLength += aSections[i]->unLength;
 	//unLength = 0x200;
 	return true;
@@ -58,11 +58,11 @@ bool NinSnesSeq::GetSectionPointers()
 {
 	VGMHeader* PlayListHdr = AddHeader(dwOffset, 0, L"Section Play List");
 
-	ULONG offset;
+	uint32_t offset;
 	
 	for (offset = dwOffset; GetShort(offset) >= 0x100; offset+=2)
 	{
-		USHORT sectPtr = GetShort(offset);
+		uint16_t sectPtr = GetShort(offset);
 		sectPlayList.push_back(sectPtr);
 		if (!sectionMap[sectPtr])
 		{
@@ -85,15 +85,15 @@ bool NinSnesSeq::LoadAllSections()
 	int nextTime = 0;
 	//initialize first section tracks (will be retained by subsequent sections)
 	mvol = 0xC0;
-	//for (UINT i=0; aTracks.size(); i++)
+	//for (uint32_t i=0; aTracks.size(); i++)
 	//	aTracks[i]->AddMastVolNoItem(mvol);
 
 	//for (int i=0; i<aSections[0]->aTracks.size(); i++)
 	//	aSections[0]->aTracks[i]->AddMastVolNoItem(mvol);
 
 
-	//for (UINT i=0; i<aSections.size(); i++)
-	for (UINT i=0; i < sectPlayList.size(); i++)
+	//for (uint32_t i=0; i<aSections.size(); i++)
+	for (uint32_t i=0; i < sectPlayList.size(); i++)
 	{
 		NinSnesSection* section = sectionMap[sectPlayList[i]];
 		section->readMode = readMode;
@@ -103,9 +103,9 @@ bool NinSnesSeq::LoadAllSections()
 		curDelta = nextTime;
 	}
 	//Time to create the Section individual Tracks out of the large Sequence Tracks
-	for (UINT i=0; i < aSections.size(); i++)
+	for (uint32_t i=0; i < aSections.size(); i++)
 	{
-		for (UINT j=0; j < aSections[i]->aSectTracks.size(); j++)	//for every section track
+		for (uint32_t j=0; j < aSections[i]->aSectTracks.size(); j++)	//for every section track
 		{
 			NinSnesTrack* songTrack = (NinSnesTrack*)aSections[i]->aSongTracks[j];
 			NinSnesTrack* sectTrack = (NinSnesTrack*)aSections[i]->aSectTracks[j];
@@ -164,7 +164,7 @@ void NinSnesSeq::LoadDefaultEventMap(NinSnesSeq *pSeqFile)
 // **************
 
 
-NinSnesSection::NinSnesSection(NinSnesSeq* prntSeq, ULONG offset)
+NinSnesSection::NinSnesSection(NinSnesSeq* prntSeq, uint32_t offset)
 : VGMContainerItem(prntSeq, offset, 0, L"Section")
 {
 	AddContainer<SeqTrack>(aSectTracks);
@@ -175,14 +175,14 @@ NinSnesSection::~NinSnesSection()
 	DeleteVect<SeqTrack>(aSectTracks);
 }
 
-bool NinSnesSection::GetHeaderInfo(USHORT headerOffset)
+bool NinSnesSection::GetHeaderInfo(uint16_t headerOffset)
 {
 	hdrOffset = headerOffset;
 	for (int i=0; i<8; i++)
 	{
 		if (GetShort(hdrOffset+i*2))
 		{
-			USHORT trackOffset = GetShort(hdrOffset+i*2);
+			uint16_t trackOffset = GetShort(hdrOffset+i*2);
 			if (trackOffset >= vgmfile->rawfile->size())
 				return false;
 			//NinSnesTrack* newTrack = new NinSnesTrack(this, trackOffset, i);
@@ -202,12 +202,12 @@ bool NinSnesSection::GetHeaderInfo(USHORT headerOffset)
 
 int NinSnesSection::LoadSection(int startTime)
 {
-	ULONG totalTime = 0;
+	uint32_t totalTime = 0;
 	int infLoopDetOffset = 0;
 	int numNothingLoops = 0;
 	int result;
 	int i;
-	for (UINT j=0; j<aSongTracks.size(); j++)
+	for (uint32_t j=0; j<aSongTracks.size(); j++)
 	{
 		NinSnesTrack* theTrack = ((NinSnesTrack*)aSongTracks[j]);
 		theTrack->subcount = 0;
@@ -256,7 +256,7 @@ int NinSnesSection::LoadSection(int startTime)
 
 	dwOffset = trackOffsets[0];
 	unLength=0;
-	for (UINT n=0; n<aSongTracks.size(); n++)
+	for (uint32_t n=0; n<aSongTracks.size(); n++)
 	{
 		NinSnesTrack* theSongTrk = ((NinSnesTrack*)aSongTracks[n]);
 		NinSnesTrack* theSectTrk = ((NinSnesTrack*)aSectTracks[n]);
@@ -280,20 +280,20 @@ int NinSnesSection::LoadSection(int startTime)
 //  NinSnesTrack
 //  ************
 
-NinSnesTrack::NinSnesTrack(NinSnesSection* parentSect, ULONG offset, int trackNumber)
+NinSnesTrack::NinSnesTrack(NinSnesSection* parentSect, uint32_t offset, int trackNumber)
 : SeqTrack((VGMSeq*)parentSect->vgmfile, offset, 0), prntSect(parentSect), trackNum(trackNumber)
 {
 	bDetermineTrackLengthEventByEvent = true;
 }
 
-NinSnesTrack::NinSnesTrack(NinSnesSeq* parentSeq, ULONG offset, int trackNumber)
+NinSnesTrack::NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset, int trackNumber)
 : SeqTrack((VGMSeq*)parentSeq, offset, 0), prntSect(NULL), trackNum(trackNumber)
 {
 	bDetermineTrackLengthEventByEvent = true;
 }
 
 
-void NinSnesTrack::AddTime(ULONG AddDelta)
+void NinSnesTrack::AddTime(uint32_t AddDelta)
 {
 	nextEventTime += AddDelta;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -301,7 +301,7 @@ void NinSnesTrack::AddTime(ULONG AddDelta)
 }
 
 // TODO: SetTime - remove it, it will make things complicated.
-void NinSnesTrack::SetTime(ULONG NewDelta)
+void NinSnesTrack::SetTime(uint32_t NewDelta)
 {
 	time = NewDelta;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -309,25 +309,25 @@ void NinSnesTrack::SetTime(ULONG NewDelta)
 }
 
 // TODO: SubtractTime - remove it, it will make things complicated.
-void NinSnesTrack::SubtractTime(ULONG SubtractDelta)
+void NinSnesTrack::SubtractTime(uint32_t SubtractDelta)
 {
 	nextEventTime -= SubtractDelta;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->SubtractDelta(SubtractDelta);
 }
 
-void NinSnesTrack::SetPercBase(BYTE newBase)
+void NinSnesTrack::SetPercBase(uint8_t newBase)
 {
 	((NinSnesSeq*)vgmfile)->percbase = newBase;
 }
 
-BYTE NinSnesTrack::GetPercBase()
+uint8_t NinSnesTrack::GetPercBase()
 {
 	return ((NinSnesSeq*)vgmfile)->percbase;
 }
 
 
-bool NinSnesTrack::ReadEvent(ULONG totalTime)
+bool NinSnesTrack::ReadEvent(uint32_t totalTime)
 {
 	//if (totalTime >= parentSect->endTime)
 	//	return false;
@@ -335,14 +335,14 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 	//	return true;
 	while (totalTime == nextEventTime/* || GetByte(curOffset) == 0*/)
 	{
-		ULONG beginOffset = curOffset;
+		uint32_t beginOffset = curOffset;
 
 		if (curOffset >= 0x10000-5)
 			return false;
 
-		map<BYTE, int>::iterator p;
-		BYTE event_type = 0;
-		BYTE status_byte = GetByte(curOffset++);
+		map<uint8_t, int>::iterator p;
+		uint8_t event_type = 0;
+		uint8_t status_byte = GetByte(curOffset++);
 		p =  ((NinSnesSeq*)vgmfile)->EventMap.find(status_byte);
 		if (p != ((NinSnesSeq*)vgmfile)->EventMap.end())
 			event_type = p->second;		//found the status_byte in the map - use it
@@ -376,7 +376,7 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 		else if (status_byte < ((NinSnesSeq*)vgmfile)->NOTEREST_CUTOFF)
 		{
 			dur = status_byte;
-			BYTE op1 = GetByte(curOffset++);
+			uint8_t op1 = GetByte(curOffset++);
 			if (op1 < ((NinSnesSeq*)vgmfile)->NOTEREST_CUTOFF)
 			{
 				durpct = durpcttbl[(op1 >> 4) & 0x7];
@@ -421,7 +421,7 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 				status_byte &= 0x7F;
 				octave = status_byte/12;
 				key = status_byte%12;
-				BYTE mnote = 12 * (octave + /*t+*/2) + key; //don't include transpose or globTranspose because AddNoteByDur does it	//didn't include transpose (vs transpose[v])
+				uint8_t mnote = 12 * (octave + /*t+*/2) + key; //don't include transpose or globTranspose because AddNoteByDur does it	//didn't include transpose (vs transpose[v])
 				AddNoteByDur(beginOffset, curOffset-beginOffset, mnote, vel, notedur);
 			}
 			else							//Percussion Note
@@ -452,16 +452,16 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 				break;
 			case EVENT_PAN:		//Pan
 				{
-					BYTE pan = GetByte(curOffset++) & 0x1F;
+					uint8_t pan = GetByte(curOffset++) & 0x1F;
 					pan = pantbl[pan];
 					AddPan(beginOffset, curOffset-beginOffset, pan);
 				}
 				break;
 			case EVENT_PANFADE:		//Pan Fade
 				{
-					BYTE dur = GetByte(curOffset++);
-					ULONG targPan = pantbl[GetByte(curOffset++)];
-					AddPanSlide(beginOffset, curOffset-beginOffset, dur, (BYTE)targPan);
+					uint8_t dur = GetByte(curOffset++);
+					uint32_t targPan = pantbl[GetByte(curOffset++)];
+					AddPanSlide(beginOffset, curOffset-beginOffset, dur, (uint8_t)targPan);
 				}
 				break;
 			case EVENT_UNKNOWN0:		//Unknown, 0 data bytes
@@ -481,7 +481,7 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 				break;
 			case EVENT_MASTVOL:		//Master Volume
 				{
-					BYTE newMVol = GetByte(curOffset++)/2;
+					uint8_t newMVol = GetByte(curOffset++)/2;
 					//SetMVol(GetByte(curOffset++));
 				//	AddMasterVol(beginOffset, curOffset-beginOffset, newMVol);
 					//for (int i=0; i<((NinSnesSeq*)vgmfile)->aTracks.size(); i++)
@@ -492,8 +492,8 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 			case EVENT_MASTVOLFADE:		//Master Volume Fade
 				{
 					curOffset+=2;
-		/*			BYTE dur = GetByte(curOffset++);
-					BYTE targVol = GetByte(curOffset++);
+		/*			uint8_t dur = GetByte(curOffset++);
+					uint8_t targVol = GetByte(curOffset++);
 					for (int i=0; i<parentSeq->aTracks.size(); i++)
 						((NinSnesSeq*)vgmfile)->aTracks[i]->AddMastVolSlide(beginOffset, curOffset-beginOffset, dur, targVol);
 					SetMVol(targVol);*/
@@ -501,14 +501,14 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 				break;
 			case EVENT_TEMPO:		//Tempo
 				{
-					BYTE tempo = GetByte(curOffset++);
+					uint8_t tempo = GetByte(curOffset++);
 					AddTempo(beginOffset, curOffset-beginOffset, 24000000/tempo);
 				 }
 				break;
 			case EVENT_TEMPOFADE:		//Tempo Fade
 				{
-					BYTE dur = GetByte(curOffset++);
-					ULONG targTempo = 24000000/GetByte(curOffset++);
+					uint8_t dur = GetByte(curOffset++);
+					uint32_t targTempo = 24000000/GetByte(curOffset++);
 					AddTempoSlide(beginOffset, curOffset-beginOffset, dur, targTempo);
 					//AddEventItem("Tempo Fade", ICON_CONTROL, beginOffset, curOffset-beginOffset, CLR_UNKNOWN);
 				}
@@ -534,8 +534,8 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 				break;
 			case EVENT_VOLFADE:		//Volume Slide
 				{
-					BYTE dur = GetByte(curOffset++);
-					BYTE targVol = GetByte(curOffset++)/2;
+					uint8_t dur = GetByte(curOffset++);
+					uint8_t targVol = GetByte(curOffset++)/2;
 					AddVolSlide(beginOffset, curOffset-beginOffset, dur, targVol);
 				}
 				break;
@@ -556,7 +556,7 @@ bool NinSnesTrack::ReadEvent(ULONG totalTime)
 				//AddEventItem("Set Perc Base", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 				break;
 			case EVENT_LOOPBEGIN:
-				loopdest = (USHORT)curOffset;
+				loopdest = (uint16_t)curOffset;
 				loopcount = 0;
 				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Perc Base", NULL, CLR_CHANGESTATE);
 				//AddEventItem("Loop Begin", ICON_CONTROL, beginOffset, curOffset-beginOffset, BG_CLR_YELLOW);
