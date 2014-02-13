@@ -47,9 +47,9 @@
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)dependencies\dxAug07\include;$(ProjectDir)dependencies\wtl;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\include;$(ProjectDir)dependencies\yaml-cpp\include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)dependencies\dxAug07\lib\x86;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\lib\win32;$(ProjectDir)dependencies\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)dependencies\dxAug07\lib\x86;$(ProjectDir)dependencies\tinyxml\lib\win32;$(ProjectDir)dependencies\zlib\lib\win32;$(ProjectDir)dependencies\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)dependencies\dxAug07\include;$(ProjectDir)dependencies\wtl;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\include;$(ProjectDir)dependencies\yaml-cpp\include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)dependencies\dxAug07\lib\x86;$(ProjectDir)dependencies\tinyxml;$(ProjectDir)dependencies\zlib\lib\win32;$(ProjectDir)dependencies\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)dependencies\dxAug07\lib\x86;$(ProjectDir)dependencies\tinyxml\lib\win32;$(ProjectDir)dependencies\zlib\lib\win32;$(ProjectDir)dependencies\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Midl>
@@ -72,7 +72,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmldSTL.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL-mtd.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
@@ -102,7 +102,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
