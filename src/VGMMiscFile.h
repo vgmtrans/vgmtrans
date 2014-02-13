@@ -13,7 +13,7 @@ class VGMMiscFile :
 	public VGMFile
 {
 public:
-	VGMMiscFile(const string& format, RawFile* file, ULONG offset, ULONG length = 0, wstring name = L"VGMMiscFile");
+	VGMMiscFile(const std::string& format, RawFile* file, ULONG offset, ULONG length = 0, std::wstring name = L"VGMMiscFile");
 
 	virtual FileType GetFileType() { return FILETYPE_MISC; }
 

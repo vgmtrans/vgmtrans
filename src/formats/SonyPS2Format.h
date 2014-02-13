@@ -5,8 +5,6 @@
 #include "Matcher.h"
 #include "VGMColl.h"
 
-using namespace std;
-
 typedef struct _VersCk
 {
 	U32 Creator;
@@ -25,7 +23,7 @@ class SonyPS2Coll :
 	public VGMColl
 {
 public:
-	SonyPS2Coll(wstring name = L"Unnamed Collection") : VGMColl(name) {}
+	SonyPS2Coll(std::wstring name = L"Unnamed Collection") : VGMColl(name) {}
 	virtual ~SonyPS2Coll() {}
 };
 

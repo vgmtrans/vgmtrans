@@ -5,6 +5,7 @@
 #include "VGMColl.h"
 #include "VGMFile.h"
 
+using namespace std;
 
 #define DEFAULT_UFSIZE 0x100000
 

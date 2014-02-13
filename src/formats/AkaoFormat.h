@@ -4,8 +4,6 @@
 #include "VGMColl.h"
 #include "Matcher.h"
 
-using namespace std;
-
 class AkaoInstrSet;
 
 //const THIS_FORMAT FMT_AKAO;
@@ -18,7 +16,7 @@ class AkaoColl :
 	public VGMColl
 {
 public:
-	AkaoColl(wstring name = L"Unnamed Collection") : VGMColl(name) {}
+	AkaoColl(std::wstring name = L"Unnamed Collection") : VGMColl(name) {}
 	virtual ~AkaoColl() {}
 
 	virtual bool LoadMain();

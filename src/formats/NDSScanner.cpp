@@ -5,6 +5,8 @@
 #include "NDSInstrSet.h"
 #include "NDSFormat.h"
 
+using namespace std;
+
 #define SRCH_BUF_SIZE 0x20000
 
 

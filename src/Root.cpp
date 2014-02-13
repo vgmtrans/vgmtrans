@@ -38,6 +38,8 @@
 #include "SPCLoader.h"
 #include "MAMELoader.h"
 
+using namespace std;
+
 VGMRoot* pRoot;
 
 VGMRoot::VGMRoot(void)

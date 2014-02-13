@@ -6,6 +6,7 @@
 #include "Root.h"
 #include "BmpBtn.h"
 
+using namespace std;
 
 CRawFileTreeView rawFileTreeView;
 

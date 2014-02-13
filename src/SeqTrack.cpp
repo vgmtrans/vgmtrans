@@ -7,10 +7,7 @@
 #include "Options.h"
 #include "Root.h"
 
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <sstream>
+using namespace std;
 
 //  ********
 //  SeqTrack

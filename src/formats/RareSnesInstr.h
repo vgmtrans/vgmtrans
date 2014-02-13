@@ -39,7 +39,7 @@ class RareSnesInstr
 	: public VGMInstr
 {
 public:
-	RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, U32 spcDirAddr, double transpose = 0, U16 adsr = 0x8FE0, const wstring& name = L"RareSnesInstr");
+	RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, U32 spcDirAddr, double transpose = 0, U16 adsr = 0x8FE0, const std::wstring& name = L"RareSnesInstr");
 	virtual ~RareSnesInstr(void);
 
 	virtual bool LoadInstr();

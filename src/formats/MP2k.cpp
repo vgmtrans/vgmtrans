@@ -13,6 +13,8 @@
 
 DECLARE_FORMAT(MP2k);
 
+using namespace std;
+
 MP2kSeq::MP2kSeq(RawFile* file, ULONG offset, std::wstring name)
 : VGMSeq(MP2kFormat::name, file, offset, 0, name)
 {

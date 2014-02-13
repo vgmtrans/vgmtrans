@@ -94,7 +94,7 @@ protected:
 		//if (seqs[id])
 		//	return false;
 		//seqs[id] = seq;
-		seqs.insert(pair<IdType, VGMSeq*>(id, seq));
+		seqs.insert(std::pair<IdType, VGMSeq*>(id, seq));
 
 		VGMInstrSet* matchingInstrSet = NULL;
 		matchingInstrSet = instrsets[id];
@@ -164,12 +164,12 @@ protected:
 			}
 		}
 
-		pair<multimap<IdType, VGMSeq*>::iterator, multimap<IdType, VGMSeq*>::iterator> itPair;
+		std::pair<std::multimap<IdType, VGMSeq*>::iterator, std::multimap<IdType, VGMSeq*>::iterator> itPair;
 		// equal_range(b) returns pair<iterator,iterator> representing the range
 		// of element with key b
 		itPair = seqs.equal_range(id);
 		// Loop through range of maps with id key
-		for (multimap<IdType, VGMSeq*>::iterator it2 = itPair.first;
+		for (std::multimap<IdType, VGMSeq*>::iterator it2 = itPair.first;
 		   it2 != itPair.second;
 		   ++it2)
 		{
@@ -240,12 +240,12 @@ protected:
 				}
 			}
 
-			pair<multimap<IdType, VGMSeq*>::iterator, multimap<IdType, VGMSeq*>::iterator> itPair;
+			std::pair<std::multimap<IdType, VGMSeq*>::iterator, std::multimap<IdType, VGMSeq*>::iterator> itPair;
 			// equal_range(b) returns pair<iterator,iterator> representing the range
 			// of element with key b
 			itPair = seqs.equal_range(id);
 			// Loop through range of maps with id key
-			for (multimap<IdType, VGMSeq*>::iterator it2 = itPair.first;
+			for (std::multimap<IdType, VGMSeq*>::iterator it2 = itPair.first;
 			   it2 != itPair.second;
 			   ++it2)
 			{
@@ -282,7 +282,7 @@ protected:
 		//seqs.erase(seq->GetID());
 
 		//Find the first matching key.
-		multimap<IdType, VGMSeq*>::iterator itr = seqs.find(id);
+		std::multimap<IdType, VGMSeq*>::iterator itr = seqs.find(id);
 		//Search for the specific seq to remove.
 		if (itr != seqs.end()) {
 			do {
@@ -323,9 +323,9 @@ protected:
 private:
 	bool bRequiresSampColl;
 
-	multimap<IdType, VGMSeq*> seqs;
-	map<IdType, VGMInstrSet*> instrsets;
-	map<IdType, VGMSampColl*> sampcolls;
+	std::multimap<IdType, VGMSeq*> seqs;
+	std::map<IdType, VGMInstrSet*> instrsets;
+	std::map<IdType, VGMSampColl*> sampcolls;
 };
 
 // ************
@@ -365,14 +365,14 @@ public:
 // ***************
 
 class FilenameMatcher :
-	public SimpleMatcher<wstring>
+	public SimpleMatcher<std::wstring>
 {
 public:
 	FilenameMatcher(Format* format, bool bRequiresSampColl = false)
 		: SimpleMatcher(format, bRequiresSampColl)
 	{}
 
-	virtual bool GetSeqId(VGMSeq* seq, wstring& id)
+	virtual bool GetSeqId(VGMSeq* seq, std::wstring& id)
 	{
 		RawFile* rawfile = seq->GetRawFile();
 		id = rawfile->GetParRawFileFullPath();
@@ -381,7 +381,7 @@ public:
 		return (id != L"");
 	}
 
-	virtual bool GetInstrSetId(VGMInstrSet* instrset, wstring& id)
+	virtual bool GetInstrSetId(VGMInstrSet* instrset, std::wstring& id)
 	{
 		RawFile* rawfile = instrset->GetRawFile();
 		id = rawfile->GetParRawFileFullPath();
@@ -390,7 +390,7 @@ public:
 		return (id != L"");
 	}
 
-	virtual bool GetSampCollId(VGMSampColl* sampcoll, wstring& id)
+	virtual bool GetSampCollId(VGMSampColl* sampcoll, std::wstring& id)
 	{
 		RawFile* rawfile = sampcoll->GetRawFile();
 		id = rawfile->GetParRawFileFullPath();
@@ -433,13 +433,13 @@ protected:
 //	virtual bool OnCloseSampColl(VGMSampColl* sampcoll);
 
 	virtual void LookForMatch();
-	template <class T> T* GetLargestVGMFileInList(list<T*> theList);
+	template <class T> T* GetLargestVGMFileInList(std::list<T*> theList);
 
 
 protected:
-	list<VGMSeq*> seqs;
-	list<VGMInstrSet*> instrsets;
-	list<VGMSampColl*> sampcolls;
+	std::list<VGMSeq*> seqs;
+	std::list<VGMInstrSet*> instrsets;
+	std::list<VGMSampColl*> sampcolls;
 };
 //
 //

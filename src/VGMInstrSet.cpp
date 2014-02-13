@@ -8,6 +8,7 @@
 
 DECLARE_MENU(VGMInstrSet)
 
+using namespace std;
 
 // ***********
 // VGMInstrSet

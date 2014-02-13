@@ -48,7 +48,7 @@ class NinSnesSeq :
 	public VGMSeq
 {
 public:
-	NinSnesSeq(RawFile* file, ULONG offset, ULONG length = 0, wstring theName = L"NinSnes Seq");
+	NinSnesSeq(RawFile* file, ULONG offset, ULONG length = 0, std::wstring theName = L"NinSnes Seq");
 	virtual ~NinSnesSeq();
 
 	virtual bool LoadMain();
@@ -57,18 +57,18 @@ public:
 	void LoadDefaultEventMap(NinSnesSeq *pSeqFile);
 
 public:
-	vector<USHORT> sectPlayList;
+	std::vector<USHORT> sectPlayList;
 	USHORT playListRptPtr;
 
-	vector<NinSnesSection*> aSections;
-	map<USHORT, NinSnesSection*> sectionMap;
+	std::vector<NinSnesSection*> aSections;
+	std::map<USHORT, NinSnesSection*> sectionMap;
 
 	ULONG curDelta;
 	BYTE META_CUTOFF;
 	BYTE NOTEREST_CUTOFF;
 	BYTE NOTE_CUTOFF;
-	map<BYTE, int> EventMap;
-	map<BYTE, BYTE> DrumMap;
+	std::map<BYTE, int> EventMap;
+	std::map<BYTE, BYTE> DrumMap;
 	BYTE percbase;
 	BYTE mvol;
 };
@@ -89,9 +89,9 @@ public:
 	
 	//ULONG endTime;		//when the end of Section event is hit, the absolute time is stored here.  This method assumes the end of section occurs on first track
 	UINT hdrOffset;
-	vector<USHORT> trackOffsets;
-	vector<SeqTrack*> aSectTracks;
-	vector<SeqTrack*> aSongTracks;
+	std::vector<USHORT> trackOffsets;
+	std::vector<SeqTrack*> aSectTracks;
+	std::vector<SeqTrack*> aSongTracks;
 };
 
 

@@ -7,6 +7,8 @@
 #include "ItemTreeView.h"
 #include "WinVGMRoot.h"
 
+using namespace std;
+
 //CItemTreeView itemTreeView;
 
 

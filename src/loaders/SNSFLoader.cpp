@@ -4,6 +4,8 @@
 #include "Root.h"
 #include <zlib.h>
 
+using namespace std;
+
 #define SNSF_VERSION	0x23
 #define SNSF_MAX_ROM_SIZE	0x600000
 

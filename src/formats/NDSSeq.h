@@ -7,7 +7,7 @@ class NDSSeq :
 	public VGMSeq
 {
 public:
-	NDSSeq(RawFile* file, ULONG offset, ULONG length = 0, wstring theName = L"NDSSeq");
+	NDSSeq(RawFile* file, ULONG offset, ULONG length = 0, std::wstring theName = L"NDSSeq");
 	//virtual ~NDSSeq(void);
 
 	virtual bool GetHeaderInfo(void);

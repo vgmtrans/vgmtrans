@@ -107,7 +107,7 @@ public:
 
 public:
 	VGMItem();
-	VGMItem(VGMFile* thevgmfile, ULONG theOffset, ULONG theLength = 0, const wstring theName = L"", BYTE color = 0);
+	VGMItem(VGMFile* thevgmfile, ULONG theOffset, ULONG theLength = 0, const std::wstring theName = L"", BYTE color = 0);
 	virtual ~VGMItem(void);
 
 	friend bool operator>	(VGMItem &item1, VGMItem &item2);
@@ -131,9 +131,9 @@ public:
 	//inline void SetOffset(ULONG newOffset);
 	//inline void SetLength(ULONG newLength);
 
-	virtual vector<const wchar_t*>* GetMenuItemNames() { return NULL; }
+	virtual std::vector<const wchar_t*>* GetMenuItemNames() { return NULL; }
 	virtual bool CallMenuItem(VGMItem* item, int menuItemNum) { return false; }
-	virtual wstring GetDescription() { return name; }
+	virtual std::wstring GetDescription() { return name; }
 	virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
 	virtual Icon GetIcon() { return ICON_BINARY;/*ICON_UNKNOWN*/ }
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
@@ -156,7 +156,7 @@ public:
 	BYTE color;
 	//RawFile* file;
 	VGMFile* vgmfile;
-	wstring name;
+	std::wstring name;
 	//VGMHeader* header;
 	//VGMItem* parent;
 	ULONG dwOffset;			//offset in the pDoc data buffer
@@ -170,7 +170,7 @@ class VGMContainerItem
 {
 public:
 	VGMContainerItem();
-	VGMContainerItem(VGMFile* thevgmfile, ULONG theOffset, ULONG theLength = 0, const wstring theName = L"", BYTE color = CLR_HEADER);
+	VGMContainerItem(VGMFile* thevgmfile, ULONG theOffset, ULONG theLength = 0, const std::wstring theName = L"", BYTE color = CLR_HEADER);
 	virtual ~VGMContainerItem(void);
 	virtual VGMItem* GetItemFromOffset(ULONG offset);
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
@@ -186,13 +186,13 @@ public:
 	//void AddSimpleHeaderItem(ULONG offset, ULONG length, const wchar_t* name);
 	
 
-	template <class T> void AddContainer(vector<T*>& container)
+	template <class T> void AddContainer(std::vector<T*>& container)
 	{
-		containers.push_back((vector<VGMItem*>*)&container);
+		containers.push_back((std::vector<VGMItem*>*)&container);
 	}
-	template <class T> bool RemoveContainer(vector<T*>& container)
+	template <class T> bool RemoveContainer(std::vector<T*>& container)
 	{
-		vector<vector<VGMItem*>*>::iterator iter = find(containers.begin(),
+		std::vector<vector<VGMItem*>*>::iterator iter = find(containers.begin(),
 			containers.end(), (vector<VGMItem*>*)&container);
 		if (iter != containers.end())
 		{
@@ -203,10 +203,10 @@ public:
 			return false;
 	}
 public:
-	vector<VGMHeader*> headers;
-	vector<vector<VGMItem*>*> containers;
+	std::vector<VGMHeader*> headers;
+	std::vector<std::vector<VGMItem*>*> containers;
 
-	vector<VGMItem*> localitems;
+	std::vector<VGMItem*> localitems;
 	//vector<void*> containers;
 };
 
@@ -223,7 +223,7 @@ public:
 };
 
 
-template <class T> VGMItem* GetItemAtOffsetInItemVector(ULONG offset, vector<T*> &theArray)
+template <class T> VGMItem* GetItemAtOffsetInItemVector(ULONG offset, std::vector<T*> &theArray)
 {
 	int nArraySize = (int)theArray.size ();
 	for (int i=0; i<nArraySize; i++)

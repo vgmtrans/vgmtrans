@@ -4,6 +4,8 @@
 #include "Root.h"
 #include <zlib.h>
 
+using namespace std;
+
 #define GSF_VERSION	0x22
 #define GSF_MAX_ROM_SIZE	0x2000000
 

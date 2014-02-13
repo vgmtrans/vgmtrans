@@ -13,7 +13,7 @@ public:
 	BYTE* data;		//  The actual data not including a possible pad byte to word align
 
 public:
-	Chunk(string theId)
+	Chunk(std::string theId)
 		: data(NULL),
 		  size(0)
 	{
@@ -51,7 +51,7 @@ public:
 	std::list<Chunk*> childChunks;
 
 public:
-	ListTypeChunk(string theId, string theType)
+	ListTypeChunk(std::string theId, std::string theType)
 		: Chunk(theId)
 	{ 
 		assert(theType.length() == 4);
@@ -73,7 +73,7 @@ public:
 class RIFFChunk : public ListTypeChunk
 {
 public:
-	RIFFChunk(string form) : ListTypeChunk("RIFF", form) {}
+	RIFFChunk(std::string form) : ListTypeChunk("RIFF", form) {}
 };
 
 ////////////////////////////////////////////////////////////////////////////
@@ -82,7 +82,7 @@ public:
 class LISTChunk : public ListTypeChunk
 {
 public:
-	LISTChunk(string type) : ListTypeChunk("LIST", type) {}
+	LISTChunk(std::string type) : ListTypeChunk("LIST", type) {}
 };
 
 
@@ -92,9 +92,9 @@ public:
 class RiffFile : public RIFFChunk
 {
 public:
-	RiffFile(string file_name, string form);
+	RiffFile(std::string file_name, std::string form);
 
-	static void RiffFile::WriteLIST(vector<BYTE> & buf, UINT listName, UINT listSize)
+	static void RiffFile::WriteLIST(std::vector<BYTE> & buf, UINT listName, UINT listSize)
 	{
 		PushTypeOnVectBE<UINT>(buf, 0x4C495354);	//write "LIST"
 		PushTypeOnVect<UINT>(buf, listSize);
@@ -102,7 +102,7 @@ public:
 	}
 
 	//Adds a null byte and ensures 16 bit alignment of a text string
-	static void RiffFile::AlignName(string &name)
+	static void RiffFile::AlignName(std::string &name)
 	{
 		name += (char)0x00;
 		if (name.size() % 2)						//if the size of the name string is odd
@@ -111,5 +111,5 @@ public:
 
 
 protected:
-	string name;
+	std::string name;
 };

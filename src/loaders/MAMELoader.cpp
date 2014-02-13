@@ -6,6 +6,7 @@
 #include "Format.h"
 #include "KabukiDecrypt.h"
 
+using namespace std;
 
 //template < class T >
 //bool MAMERomGroupEntry::GetAttribute( const std::string& attrName, T* out )

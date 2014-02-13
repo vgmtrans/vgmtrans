@@ -32,7 +32,7 @@ public:
 
 	VGMSamp(VGMSampColl* sampColl, ULONG offset = 0, ULONG length = 0,
 						ULONG dataOffset = 0, ULONG dataLength = 0, BYTE channels = 1, USHORT bps = 16,
-						ULONG rate = 0, wstring name = L"Sample");
+						ULONG rate = 0, std::wstring name = L"Sample");
 	virtual ~VGMSamp();
 
 	virtual Icon GetIcon() { return ICON_SAMP; };
@@ -77,5 +77,5 @@ public:
 	long pan;
 
 	VGMSampColl* parSampColl;
-	wstring sampName;
+	std::wstring sampName;
 };

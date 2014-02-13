@@ -2,8 +2,6 @@
 #include "Loader.h"
 #include <unzip.h>
 
-using namespace std;
-
 class TiXmlElement;
 class VirtFile;
 
@@ -28,27 +26,27 @@ typedef struct _MAMERomGroupEntry
 	bool GetHexAttribute( const std::string& attrName, U32* out );
 
 	LoadMethod loadmethod;
-	string type;
-	string encryption;
-	map<const std::string, std::string> attributes;
-	list<string> roms;
+	std::string type;
+	std::string encryption;
+	std::map<const std::string, std::string> attributes;
+	std::list<std::string> roms;
 	VirtFile* file;
 } MAMERomGroupEntry;
 
 typedef struct _MAMEGameEntry
 {
 	_MAMEGameEntry() {}
-	MAMERomGroupEntry* GetRomGroupOfType(const string& strType);
+	MAMERomGroupEntry* GetRomGroupOfType(const std::string& strType);
 
-	string name;
-	string format;
+	std::string name;
+	std::string format;
 	float fmt_version;
-	string fmt_version_str;
+	std::string fmt_version_str;
 	//map<const std::string, const std::string> attributes;
-	list<MAMERomGroupEntry> romgroupentries;
+	std::list<MAMERomGroupEntry> romgroupentries;
 } MAMEGameEntry;
 
-typedef map<string, MAMEGameEntry*> GameMap;
+typedef std::map<std::string, MAMEGameEntry*> GameMap;
 
 
 class MAMELoader :
@@ -59,8 +57,8 @@ public:
 	~MAMELoader();
 	virtual PostLoadCommand Apply(RawFile* theFile);
 private:
-	VirtFile* LoadRomGroup(MAMERomGroupEntry* romgroupentry, const string& format, unzFile& cur_file);
-	void DeleteBuffers(list<pair<BYTE*, UINT>>& buffers);
+	VirtFile* LoadRomGroup(MAMERomGroupEntry* romgroupentry, const std::string& format, unzFile& cur_file);
+	void DeleteBuffers(std::list<std::pair<BYTE*, UINT>>& buffers);
 private:
 	int LoadXML();
 	MAMEGameEntry* LoadGameEntry(TiXmlElement* gameElmt);

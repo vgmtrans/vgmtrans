@@ -3,9 +3,9 @@
 #include "Menu.h"
 
 #define DESCRIPTION(_str_)									\
-	virtual wstring GetDescription()						\
+	virtual std::wstring GetDescription()					\
 	{														\
-		wostringstream	desc;								\
+		std::wostringstream	desc;							\
 		desc << name << L" -  " << _str_;					\
 		return desc.str();									\
 	}
@@ -48,7 +48,7 @@ class SeqEvent :
 public:
 	SeqEvent(SeqTrack* pTrack, ULONG offset = 0, ULONG length = 0, const wchar_t* name = L"", BYTE color = 0, Icon icon = ICON_BINARY, const wchar_t* desc = L"");
 	virtual ~SeqEvent(void) {}						//note: virtual destructor
-	virtual wstring GetDescription() { return desc.empty() ? wstring(name) : (wstring(name) + L" - " + desc); }
+	virtual std::wstring GetDescription() { return desc.empty() ? std::wstring(name) : (std::wstring(name) + L" - " + desc); }
 	virtual ItemType GetType() const { return ITEMTYPE_SEQEVENT; }
 	virtual EventType GetEventType() { return EVENTTYPE_UNDEFINED; }
 	virtual Icon GetIcon() { return icon; }
@@ -68,7 +68,7 @@ public:
 	SeqTrack* parentTrack;
 private:
 	Icon icon;
-	wstring desc;
+	std::wstring desc;
 };
 
 
@@ -535,7 +535,7 @@ class MarkerSeqEvent :
 	public SeqEvent
 {
 public:
-	MarkerSeqEvent(SeqTrack* pTrack, string& markername, BYTE databyte1, BYTE databyte2, ULONG offset = 0, ULONG length = 0,
+	MarkerSeqEvent(SeqTrack* pTrack, std::string& markername, BYTE databyte1, BYTE databyte2, ULONG offset = 0, ULONG length = 0,
 				   const wchar_t* name = L"", BYTE color = CLR_MARKER) 
 	: SeqEvent(pTrack, offset, length, name, color), databyte1(databyte1), databyte2(databyte2)
 	{}

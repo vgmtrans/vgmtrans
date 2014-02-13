@@ -5,6 +5,8 @@
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 
+using namespace std;
+
 Matcher::Matcher(Format* format)
 {
 	fmt = format;

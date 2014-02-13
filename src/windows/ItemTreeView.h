@@ -7,8 +7,6 @@
 
 #pragma once
 
-using namespace stdext;
-
 #include "VGMFile.h"
 #include "VGMTransWindow.h"
 
@@ -35,7 +33,7 @@ protected:
 	//int nIconIndexNormal, nIconIndexSelected;
 	
 	//hash_map<VGMItem*, CTreeItem> items;
-	map<VGMItem*, CTreeItem> items;
+	std::map<VGMItem*, CTreeItem> items;
 
 public:
 	DECLARE_WND_SUPERCLASS(NULL, CTreeViewCtrlEx::GetWndClassName())
@@ -63,7 +61,7 @@ public:
 
 	void Init(int cx, int cy);
 	//void ChangeCurVGMFile(VGMFile* file);
-	inline void AddItem(VGMItem* item, VGMItem* parent, const wstring& itemName)
+	inline void AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName)
 	{
 		int iconIndex = item->GetIcon();
 		if (parent != parItemCache)
@@ -78,7 +76,7 @@ public:
 		//lItems.push_back(newItem);
 	}
 	//void PopulateWithItem(VGMItem* item, VGMItem* parent);
-	void AddItemSet(VGMFile* file, vector<ItemSet>* itemset);
+	void AddItemSet(VGMFile* file, std::vector<ItemSet>* itemset);
 	void RemoveItem(VGMItem* theItem);
 	void RemoveAllItems(void);
 	BOOL SelectItem(VGMItem* item);

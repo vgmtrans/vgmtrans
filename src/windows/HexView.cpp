@@ -7,6 +7,8 @@
 //#include "VGMSeq.h"
 #include <zlib.h>
 
+using namespace std;
+
 //CHexView fileView;
 
 CHexView::CHexView(CHexViewFrame* parentFrame)

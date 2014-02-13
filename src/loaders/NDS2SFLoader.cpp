@@ -4,6 +4,8 @@
 #include "Root.h"
 #include <zlib.h>
 
+using namespace std;
+
 #define NDS2SF_VERSION	0x24
 #define NDS2SF_MAX_ROM_SIZE	0x10000000
 

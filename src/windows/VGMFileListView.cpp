@@ -8,6 +8,8 @@
 #include "WinVGMRoot.h"
 #include "mainfrm.h"
 
+using namespace std;
+
 CVGMFileListView theVGMFileListView;
 
 struct __declspec(uuid("DE5BF786-477A-11d2-839D-00C04FD918D0")) IDragSourceHelper;

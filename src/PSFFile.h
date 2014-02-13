@@ -28,7 +28,7 @@ public:
 	PSFFile* parent;
 	DataSeg& exe(void) { return *exeData; }
 	DataSeg& reserved(void) { return *reservedData; }
-	std::map<string, string> tags;
+	std::map<std::string, std::string> tags;
 
 private:
 	BYTE version;

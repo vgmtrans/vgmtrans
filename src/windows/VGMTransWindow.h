@@ -5,8 +5,6 @@
 #include "resource.h"
 //#include "mainfrm.h"
 
-using namespace stdext;
-
 template <class T>
 class VGMTransWindow
 {
@@ -35,7 +33,7 @@ public:
 			//sSave += sWindowText;
 			//sSave += _T("'");
 
-			vector<const wchar_t*>* menuItemNames = item->GetMenuItemNames();
+			std::vector<const wchar_t*>* menuItemNames = item->GetMenuItemNames();
 
 			if (!menuItemNames)
 				return false;

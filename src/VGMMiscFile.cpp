@@ -2,6 +2,8 @@
 #include "VGMMiscFile.h"
 #include "Root.h"
 
+using namespace std;
+
 // ***********
 // VGMMiscFile
 // ***********

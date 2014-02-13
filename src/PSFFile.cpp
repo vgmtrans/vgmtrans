@@ -6,6 +6,8 @@
 #include "PSFFile.h"
 #include "types.h"
 
+using namespace std;
+
 #define PSF_TAG_SIG             "[TAG]"
 #define PSF_TAG_SIG_LEN         5
 #define PSF_STRIP_BUF_SIZE      4096

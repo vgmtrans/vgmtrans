@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include <list>
-using namespace std;
 
 class VGMSeq;
 
@@ -61,7 +60,7 @@ public:
 	virtual ~MidiTrack(void);
 
 	void Sort(void);
-	void WriteTrack(vector<BYTE> & buf);
+	void WriteTrack(std::vector<BYTE> & buf);
 
 	//void SetChannel(int theChannel);
 	void SetChannelGroup(int theChannelGroup);
@@ -131,7 +130,7 @@ public:
 	// SPECIAL EVENTS
 	//void AddTranspose(char semitones);
 	void InsertGlobalTranspose(ULONG absTime, char semitones);
-	void AddMarker(BYTE channel, string& markername, BYTE databyte1, BYTE databyte2, char priority = PRIORITY_MIDDLE);
+	void AddMarker(BYTE channel, std::string& markername, BYTE databyte1, BYTE databyte2, char priority = PRIORITY_MIDDLE);
 
 public:
 	MidiFile* parentSeq;
@@ -150,7 +149,7 @@ public:
 	//BYTE expression;
 	bool bSustain;
 
-	vector<MidiEvent*> aEvents;
+	std::vector<MidiEvent*> aEvents;
 };
 
 class MidiFile
@@ -163,7 +162,7 @@ public:
 	MidiTrack* InsertTrack(ULONG trackNum);
 	void SetPPQN(WORD ppqn);
 	UINT GetPPQN();
-	void WriteMidiToBuffer(vector<BYTE> & buf);
+	void WriteMidiToBuffer(std::vector<BYTE> & buf);
 	void Sort(void);
 	bool SaveMidiFile(const wchar_t* filepath);
 
@@ -175,7 +174,7 @@ public:
 	VGMSeq* assocSeq;
 	WORD ppqn;
 
-	vector<MidiTrack*> aTracks;
+	std::vector<MidiTrack*> aTracks;
 	MidiTrack globalTrack;			//events in the globalTrack will be copied into every other track
 	char globalTranspose;
 	bool bMonophonicTracks;
@@ -187,12 +186,12 @@ public:
 	MidiEvent(MidiTrack* thePrntTrk, ULONG absoluteTime, BYTE theChannel, char thePriority);
 	virtual ~MidiEvent(void);
 	virtual MidiEventType GetEventType() = 0;
-	void WriteVarLength(vector<BYTE> & buf, ULONG value);
+	void WriteVarLength(std::vector<BYTE> & buf, ULONG value);
 	//virtual void PrepareWrite(void/*vector<MidiEvent*> & aEvents*/);
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time) = 0;
-	ULONG WriteSysexEvent(vector<BYTE> & buf, UINT time, BYTE* data, size_t dataSize);
-	ULONG WriteMetaEvent(vector<BYTE> & buf, UINT time, BYTE metaType, BYTE* data, size_t dataSize);
-	ULONG WriteMetaTextEvent(vector<BYTE> & buf, UINT time, BYTE metaType, wstring wstr);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time) = 0;
+	ULONG WriteSysexEvent(std::vector<BYTE> & buf, UINT time, BYTE* data, size_t dataSize);
+	ULONG WriteMetaEvent(std::vector<BYTE> & buf, UINT time, BYTE metaType, BYTE* data, size_t dataSize);
+	ULONG WriteMetaTextEvent(std::vector<BYTE> & buf, UINT time, BYTE metaType, std::wstring wstr);
 
 	bool operator<(const MidiEvent &) const;
 	bool operator>(const MidiEvent &) const;
@@ -227,7 +226,7 @@ class NoteEvent
 public:
 	NoteEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, bool bnoteDown, BYTE theKey, BYTE theVel = 64);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_NOTEON; }
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	bool bNoteDown;
 	bool bUsePrevKey;
@@ -240,8 +239,8 @@ public:
 //{
 //public:
 //	DurNoteEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, BYTE theKey, BYTE theVel, ULONG theDur);
-//	//virtual void PrepareWrite(vector<MidiEvent*> & aEvents);
-//	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+//	//virtual void PrepareWrite(std::vector<MidiEvent*> & aEvents);
+//	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 //
 //	bool bNoteDown;
 //	char key;
@@ -255,7 +254,7 @@ class ControllerEvent
 public:
 	ControllerEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, BYTE controllerNum, BYTE theDataByte, char thePriority = PRIORITY_MIDDLE);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_UNDEFINED; }
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	BYTE controlNum;
 	BYTE dataByte;
@@ -368,7 +367,7 @@ class VolEvent
 public:
 	VolEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, BYTE theVol, char thePriority = PRIORITY_MIDDLE);
 	virtual VolEvent* MakeCopy();
-	//virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	//virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	BYTE vol;
 };
@@ -379,7 +378,7 @@ class VolMarkerEvent
 public:
 	VolMarkerEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, BYTE theVol, char thePriority = PRIORITY_HIGHER);
 	virtual VolMarkerEvent* MakeCopy();
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	BYTE vol;
 };*/
@@ -391,7 +390,7 @@ public:
 	MastVolEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, BYTE mastVol);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_MASTERVOL; }
 	//virtual MastVolEvent* MakeCopy();
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	BYTE mastVol;
 };
@@ -402,7 +401,7 @@ class ExpressionEvent
 public:
 	ExpressionEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, BYTE expression, char thePriority = PRIORITY_HIGHER);
 	virtual ExpressionEvent* MakeCopy();
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	BYTE expression;
 };*/
@@ -414,7 +413,7 @@ public:
 	ProgChangeEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, BYTE progNum);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_PROGRAMCHANGE; }
 	//virtual ProgChangeEvent* MakeCopy();
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	BYTE programNum;
 };
@@ -426,7 +425,7 @@ public:
 	PitchBendEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, SHORT bend);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_PITCHBEND; }
 	//virtual PitchBendEvent* MakeCopy();
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	SHORT bend;
 };
@@ -439,7 +438,7 @@ public:
 	TempoEvent(MidiTrack* prntTrk, ULONG absoluteTime, ULONG microSeconds);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TEMPO; }
 	//virtual TempoEvent* MakeCopy();
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	ULONG microSecs;
 };
@@ -451,7 +450,7 @@ public:
 	TimeSigEvent(MidiTrack* prntTrk, ULONG absoluteTime, BYTE numerator, BYTE denominator, BYTE clicksPerQuarter);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TIMESIG; }
 	//virtual TimeSigEvent* MakeCopy();
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	BYTE numer;
 	BYTE denom;
@@ -465,7 +464,7 @@ public:
 	EndOfTrackEvent(MidiTrack* prntTrk, ULONG absoluteTime);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_ENDOFTRACK; }
 	//virtual EndOfTrackEvent* MakeCopy();
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 };
 
 class TextEvent
@@ -474,9 +473,9 @@ class TextEvent
 public:
 	TextEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
-	wstring text;
+	std::wstring text;
 };
 
 class SeqNameEvent
@@ -485,9 +484,9 @@ class SeqNameEvent
 public:
 	SeqNameEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
-	wstring text;
+	std::wstring text;
 };
 
 class TrackNameEvent
@@ -496,9 +495,9 @@ class TrackNameEvent
 public:
 	TrackNameEvent(MidiTrack* prntTrk, ULONG absoluteTime, const wchar_t* wstr);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
-	wstring text;
+	std::wstring text;
 };
 
 // SPECIAL EVENTS THAT AFFECT OTHER MIDI EVENTS RATHER THAN DIRECTLY OUTPUT TO THE FILE
@@ -508,7 +507,7 @@ class GlobalTransposeEvent
 public:
 	GlobalTransposeEvent(MidiTrack* prntTrk, ULONG absoluteTime, char semitones);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_GLOBALTRANSPOSE; }
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 
 	char semitones;
 };
@@ -517,13 +516,13 @@ class MarkerEvent
 	: public MidiEvent
 {
 public:
-	MarkerEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, string& name, BYTE databyte1, BYTE databyte2, char thePriority = PRIORITY_MIDDLE)
+	MarkerEvent(MidiTrack* prntTrk, BYTE channel, ULONG absoluteTime, std::string& name, BYTE databyte1, BYTE databyte2, char thePriority = PRIORITY_MIDDLE)
 		: MidiEvent(prntTrk, absoluteTime, channel, thePriority), name(name), databyte1(databyte1), databyte2(databyte2)
 	{}
 	virtual MidiEventType GetEventType() { return MIDIEVENT_MARKER; }
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time) { return time; }
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time) { return time; }
 
-	string name;
+	std::string name;
 	BYTE databyte1, databyte2;
 };
 
@@ -533,7 +532,7 @@ class GMResetEvent
 public:
 	GMResetEvent(MidiTrack* prntTrk, ULONG absoluteTime);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
-	virtual ULONG WriteEvent(vector<BYTE> & buf, UINT time);
+	virtual ULONG WriteEvent(std::vector<BYTE> & buf, UINT time);
 };
 
 

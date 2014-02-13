@@ -7,8 +7,6 @@
 
 #pragma once
 
-using namespace std;
-
 #include "LogItem.h"
 #include "VGMTransWindow.h"
 

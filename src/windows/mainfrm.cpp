@@ -22,6 +22,8 @@
 #include "HexView.h"
 #include "FileFrame.h"
 
+using namespace std;
+
 HANDLE killProgramSem;
 
 CMainFrame::CMainFrame()

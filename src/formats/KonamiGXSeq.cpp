@@ -4,6 +4,7 @@
 
 DECLARE_FORMAT(KonamiGX);
 
+using namespace std;
 
 // ***********
 // KonamiGXSeq

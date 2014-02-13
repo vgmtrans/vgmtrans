@@ -5,6 +5,8 @@
 
 DECLARE_FORMAT(Akao);
 
+using namespace std;
+
 AkaoSeq::AkaoSeq(RawFile* file, ULONG offset)
 : VGMSeq(AkaoFormat::name, file, offset)
 {

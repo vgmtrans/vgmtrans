@@ -4,6 +4,8 @@
 
 DECLARE_FORMAT(NinSnes);
 
+using namespace std;
+
 NinSnesSeq::NinSnesSeq(RawFile* file, ULONG offset, ULONG length, wstring name)
 : VGMSeq(NinSnesFormat::name, file, offset, length, name)
 {

@@ -3,10 +3,7 @@
 #include "RareSnesFormat.h"
 #include "ScaleConversion.h"
 
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <sstream>
+using namespace std;
 
 DECLARE_FORMAT(RareSnes);
 

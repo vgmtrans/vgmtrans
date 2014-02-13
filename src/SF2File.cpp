@@ -7,7 +7,7 @@
 #include "common.h"
 #include "Root.h"
 
-
+using namespace std;
 
 SF2InfoListChunk::SF2InfoListChunk(string name)
 	: LISTChunk("INFO")

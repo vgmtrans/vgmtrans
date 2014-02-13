@@ -30,8 +30,8 @@ public:
 	bool Init(void);
 	void Reset(void);
 	void Exit(void);
-	bool OpenRawFile(const wstring& filename);
-	bool CreateVirtFile(BYTE *databuf, ULONG fileSize, const wstring& filename, const wstring& parRawFileFullPath=L"");
+	bool OpenRawFile(const std::wstring& filename);
+	bool CreateVirtFile(BYTE *databuf, ULONG fileSize, const std::wstring& filename, const std::wstring& parRawFileFullPath=L"");
 	bool SetupNewRawFile(RawFile* newRawFile);
 	bool CloseRawFile(RawFile* targFile);
 	void AddVGMFile(VGMFile* theFile);
@@ -62,7 +62,7 @@ public:
 	//}
 
 	//void AddScanner(VGMScanner& scanner)
-	void AddScanner(const string& formatname);
+	void AddScanner(const std::string& formatname);
 
 	template <class T> void AddLoader()
 	{
@@ -95,26 +95,26 @@ public:
 	virtual void UI_EndRemoveVGMFiles() {}
 	virtual void UI_RemoveVGMColl(VGMColl* theColl) {}
 	//virtual void UI_RemoveVGMFileRange(VGMFile* first, VGMFile* last) {}
-	virtual void UI_AddItem(VGMItem* item, VGMItem* parent, const wstring& itemName, VOID* UI_specific) {}
-	virtual void UI_AddItemSet(VOID* UI_specific, vector<ItemSet>* itemset) {}
-	virtual wstring UI_GetSaveFilePath(const wstring& suggestedFilename, const wstring& extension = L"") = 0;
-	virtual wstring UI_GetSaveDirPath(const wstring& suggestedDir = L"") = 0;
-	virtual bool UI_WriteBufferToFile(const wstring& filepath, BYTE* buf, ULONG size);
+	virtual void UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName, VOID* UI_specific) {}
+	virtual void UI_AddItemSet(VOID* UI_specific, std::vector<ItemSet>* itemset) {}
+	virtual std::wstring UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension = L"") = 0;
+	virtual std::wstring UI_GetSaveDirPath(const std::wstring& suggestedDir = L"") = 0;
+	virtual bool UI_WriteBufferToFile(const std::wstring& filepath, BYTE* buf, ULONG size);
 
 
 	bool SaveAllAsRaw();
 
 protected:
 	//MatchMaker matchmaker;
-	vector<RawFile*> vRawFile;
-	vector<VGMFile*> vVGMFile;
-	vector<VGMColl*> vVGMColl;
-	vector<LogItem*> vLogItem;
+	std::vector<RawFile*> vRawFile;
+	std::vector<VGMFile*> vVGMFile;
+	std::vector<VGMColl*> vVGMColl;
+	std::vector<LogItem*> vLogItem;
 
-	vector<VGMLoader*> vLoader;
-	vector<VGMScanner*> vScanner;
-	//map<ULONG, Format*> fmt_map;
-	//vector<Format*> vFormats;
+	std::vector<VGMLoader*> vLoader;
+	std::vector<VGMScanner*> vScanner;
+	//std::map<ULONG, Format*> fmt_map;
+	//std::vector<Format*> vFormats;
 };
 
 extern VGMRoot* pRoot;

@@ -23,7 +23,7 @@ public:
 		MENU_ITEM(VGMSeq, OnSaveAsMidi, L"Save as MIDI")
 	END_MENU()
 
-	VGMSeq(const string& format, RawFile* file, ULONG offset, ULONG length = 0, wstring name = L"VGM Sequence");
+	VGMSeq(const std::string& format, RawFile* file, ULONG offset, ULONG length = 0, std::wstring name = L"VGM Sequence");
 	virtual ~VGMSeq(void);
 
 	virtual Icon GetIcon() { return ICON_SEQ; }
@@ -86,8 +86,8 @@ public:
 	bool bReverb;
 	float reverbTime;
 
-	vector<SeqTrack*> aTracks;		//array of track pointers
-	vector<ULONG> aInstrumentsUsed;
+	std::vector<SeqTrack*> aTracks;		//array of track pointers
+	std::vector<ULONG> aInstrumentsUsed;
 
 //protected:
 	//map<int, InstrAssoc> InstrMap;

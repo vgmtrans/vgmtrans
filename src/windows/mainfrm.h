@@ -90,7 +90,7 @@ protected:
 	//tabbed mdi child views
 	bool FileFrameVis;
 
-	map<VGMFile*, CFileFrame*> frameMap;
+	std::map<VGMFile*, CFileFrame*> frameMap;
 
 	CTabbedAutoHideDockingWindow* pItemTreePaneWindow;
 

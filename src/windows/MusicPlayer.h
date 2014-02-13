@@ -64,7 +64,7 @@ protected:
 
 	bool m_bSwSynth;
 
-	vector<CInstrument*> vpInstruments;
+	std::vector<CInstrument*> vpInstruments;
 
 	//CCriticalSection CS;		// Critical Section for synchronization 
 

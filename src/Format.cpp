@@ -3,6 +3,8 @@
 #include "Matcher.h"
 #include "VGMColl.h"
 
+using namespace std;
+
 FormatMap& Format::registry()
 {
 	static FormatMap registry;

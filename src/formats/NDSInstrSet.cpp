@@ -3,6 +3,8 @@
 #include "VGMRgn.h"
 #include "math.h"
 
+using namespace std;
+
 // INTR_FREQUENCY is the interval in seconds between updates to the vol for articulation.
 // In the original software, this is done via a hardware interrupt timer.
 // After calculating the number of volume updates that will be made for the articulation values, 

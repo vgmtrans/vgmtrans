@@ -2,8 +2,6 @@
 
 #include <deque>
 
-using namespace std;
-
 //DataSeg is a very simple class for allocating a block of data with a
 //variable reference point for indexing.  Some formats use
 //absolute offset references (the Nintendo SNES seq format, for example)
@@ -180,5 +178,5 @@ protected:
 	ULONG compBlockSize;
 	ULONG compBlockVirtBegin;
 	ULONG compBlockVirtEnd;
-	vector< pair<BYTE*, long> > compBlocks;
+	std::vector< std::pair<BYTE*, long> > compBlocks;
 };

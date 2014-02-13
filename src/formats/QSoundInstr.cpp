@@ -5,13 +5,14 @@
 #include "VGMRgn.h"
 #include "ScaleConversion.h"
 
+using namespace std;
 
 // ****************
 // QSoundArticTable
 // ****************
 
 
-QSoundArticTable::QSoundArticTable(RawFile* file, wstring& name, U32 offset, U32 length)
+QSoundArticTable::QSoundArticTable(RawFile* file, std::wstring& name, U32 offset, U32 length)
 	: VGMMiscFile(QSoundFormat::name, file, offset, length, name)
 {
 }

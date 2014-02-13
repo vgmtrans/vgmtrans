@@ -3,6 +3,7 @@
 #include "VGMSampColl.h"
 #include "Root.h"
 
+using namespace std;
 
 // *******
 // VGMSamp

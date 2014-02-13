@@ -10,6 +10,8 @@
 
 DECLARE_MENU(VGMSeq)
 
+using namespace std;
+
 VGMSeq::VGMSeq(const string& format, RawFile* file, ULONG offset, ULONG length, wstring name)
 : VGMFile(FILETYPE_SEQ, format, file, offset, length, name),
   //midi(this),

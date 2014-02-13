@@ -130,7 +130,7 @@ public:
 	bool AddEndOfTrackNoItem();
 
 	void AddGlobalTranspose(ULONG offset, ULONG length, char semitones, const wchar_t* sEventName = L"Global Transpose");
-	void AddMarker(ULONG offset, ULONG length, string& markername, BYTE databyte1, BYTE databyte2, const wchar_t* sEventName, char priority = 0, BYTE color = CLR_MISC);
+	void AddMarker(ULONG offset, ULONG length, std::string& markername, BYTE databyte1, BYTE databyte2, const wchar_t* sEventName, char priority = 0, BYTE color = CLR_MISC);
 
 	bool AddLoopForever(ULONG offset, ULONG length, const wchar_t* sEventName = L"Loop Forever");
 
@@ -179,7 +179,7 @@ public:
 
 
 	//CTypedPtrArray<CPtrArray, SeqEvent*> aEvents;
-	vector<SeqEvent*> aEvents;
+	std::vector<SeqEvent*> aEvents;
 
 protected:
 	//SETTINGS

@@ -361,12 +361,12 @@ class PSXSampColl
 	: public VGMSampColl
 {
 public:
-	PSXSampColl(const string& format, RawFile* rawfile, U32 offset, U32 length = 0);
-	PSXSampColl(const string& format, VGMInstrSet* instrset, U32 offset, U32 length = 0);
-	PSXSampColl(const string& format, VGMInstrSet* instrset, U32 offset, U32 length, const std::vector<SizeOffsetPair>& vagLocations);
+	PSXSampColl(const std::string& format, RawFile* rawfile, U32 offset, U32 length = 0);
+	PSXSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset, U32 length = 0);
+	PSXSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset, U32 length, const std::vector<SizeOffsetPair>& vagLocations);
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
-	static PSXSampColl* SearchForPSXADPCM (RawFile* file, const string& format);
+	static PSXSampColl* SearchForPSXADPCM (RawFile* file, const std::string& format);
 
 protected:
 	std::vector<SizeOffsetPair> vagLocations;
@@ -381,7 +381,7 @@ public:
 	//PSXSamp(VGMInstrSet* parentSet, ULONG offset, DWORD compressedSize = 0);
 	PSXSamp(VGMSampColl* sampColl, ULONG offset, ULONG length, ULONG dataOffset,
 				 ULONG dataLen, BYTE nChannels, USHORT theBPS,
-				 ULONG theRate, wstring name, bool bSetLoopOnConversion = true);
+				 ULONG theRate, std::wstring name, bool bSetLoopOnConversion = true);
 	virtual ~PSXSamp(void);
 
 	virtual double GetCompressionRatio();	// ratio of space conserved.  should generally be > 1

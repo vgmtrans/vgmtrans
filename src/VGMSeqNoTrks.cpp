@@ -3,6 +3,8 @@
 #include "SeqEvent.h"
 #include "Root.h"
 
+using namespace std;
+
 VGMSeqNoTrks::VGMSeqNoTrks(const string& format, RawFile* file, ULONG offset)
 : VGMSeq(format, file, offset),
   SeqTrack(this)

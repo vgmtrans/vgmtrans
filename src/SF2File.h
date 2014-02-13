@@ -274,7 +274,7 @@ struct sfSample
 class SF2StringChunk : public Chunk
 {
 public:
-	SF2StringChunk(string ckSig, string info)
+	SF2StringChunk(std::string ckSig, std::string info)
 		: Chunk(ckSig)
 	{
 		SetData(info.c_str(), info.length());
@@ -284,7 +284,7 @@ public:
 class SF2InfoListChunk : public LISTChunk
 {
 public:
-	SF2InfoListChunk(string name);
+	SF2InfoListChunk(std::string name);
 };
 
 
@@ -316,8 +316,8 @@ public:
 //class DLSWsmp;
 //class DLSWave;
 
-inline void WriteLIST(vector<BYTE> &buf, string listName, UINT listSize);
-inline void AlignName(string& name);
+inline void WriteLIST(std::vector<BYTE> &buf, std::string listName, UINT listSize);
+inline void AlignName(std::string& name);
 
 class SynthFile;
 

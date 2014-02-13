@@ -4,6 +4,7 @@
 #include "PSXSPU.h"
 #include "ScaleConversion.h"
 
+using namespace std;
 
 // **********
 // WDInstrSet

@@ -21,12 +21,12 @@ public:
 		//MENU_ITEM(VGMFile, OnSaveAllAsRaw, L"Save all as original format")
 	END_MENU()
 
-	VGMColl(wstring name = L"Unnamed Collection");
+	VGMColl(std::wstring name = L"Unnamed Collection");
 	virtual ~VGMColl(void);
 
 	void RemoveFileAssocs();
-	const wstring* GetName(void) const;
-	void SetName(const wstring* newName);
+	const std::wstring* GetName(void) const;
+	void SetName(const std::wstring* newName);
 	VGMSeq* GetSeq();
 	void UseSeq(VGMSeq* theSeq);
 	void AddInstrSet(VGMInstrSet* theInstrSet);
@@ -45,14 +45,14 @@ public:
 	bool OnSaveAllSF2();
 
 	VGMSeq* seq;
-	vector<VGMInstrSet*> instrsets;
-	vector<VGMSampColl*> sampcolls;
-	vector<VGMFile*>	 miscfiles;
+	std::vector<VGMInstrSet*> instrsets;
+	std::vector<VGMSampColl*> sampcolls;
+	std::vector<VGMFile*>	 miscfiles;
 
 protected:
-	void UnpackSampColl(DLSFile& dls, VGMSampColl* sampColl, vector<VGMSamp*>& finalSamps);
-	void UnpackSampColl(SynthFile& synthfile, VGMSampColl* sampColl, vector<VGMSamp*>& finalSamps);
+	void UnpackSampColl(DLSFile& dls, VGMSampColl* sampColl, std::vector<VGMSamp*>& finalSamps);
+	void UnpackSampColl(SynthFile& synthfile, VGMSampColl* sampColl, std::vector<VGMSamp*>& finalSamps);
 
 protected:
-	wstring name;
+	std::wstring name;
 };

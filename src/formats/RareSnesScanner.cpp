@@ -4,6 +4,8 @@
 #include "RareSnesInstr.h"
 #include "SNESDSP.h"
 
+using namespace std;
+
 // ; Load DIR address
 // 10df: 8f 5d f2  mov   $f2,#$5d
 // 10e2: 8f 32 f3  mov   $f3,#$32

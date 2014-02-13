@@ -5,6 +5,8 @@
 #include "MAMELoader.h"
 #include "common.h"
 
+using namespace std;
+
 //#define PROG_INFO_TABLE_OFFSET 0x7000
 //#define qs_samp_info_TABLE_OFFSET 0x8000
 

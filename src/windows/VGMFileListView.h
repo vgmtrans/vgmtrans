@@ -7,8 +7,6 @@
 
 #pragma once
 
-using namespace std;//stdext;
-
 #include "VGMFile.h"
 #include "VGMTransWindow.h"
 

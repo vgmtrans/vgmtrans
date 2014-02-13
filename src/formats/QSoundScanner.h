@@ -33,5 +33,5 @@ class QSoundScanner :
 {
 public:
 	virtual void Scan(RawFile* file, void* info = 0);
-	QSoundVer QSoundScanner::GetVersionEnum(string& versionStr);
+	QSoundVer QSoundScanner::GetVersionEnum(std::string& versionStr);
 };

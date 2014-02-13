@@ -8,7 +8,7 @@
 #include "RawFile.h"
 #include "PS1Format.h"
 
-
+using namespace std;
 
 
 

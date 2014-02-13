@@ -7,7 +7,7 @@ class VGMSeqNoTrks :
 	public SeqTrack
 {
 public:
-	VGMSeqNoTrks(const string& format, RawFile* file, ULONG offset);
+	VGMSeqNoTrks(const std::string& format, RawFile* file, ULONG offset);
 public:
 	virtual ~VGMSeqNoTrks(void);
 
@@ -21,7 +21,7 @@ public:
 	inline UINT GetWordBE(ULONG offset) { return VGMSeq::GetWordBE(offset);}
 	inline ULONG& offset(void) { return VGMSeq::dwOffset;}
 	inline ULONG& length(void) { return VGMSeq::unLength;}
-	inline wstring& name(void) { return VGMSeq::name;}
+	inline std::wstring& name(void) { return VGMSeq::name;}
 
 	inline ULONG& eventsOffset() { return SeqTrack::dwOffset;}
 	inline void SetEventsOffset(long offset) { SeqTrack::dwOffset = offset;}		//this function must be called in GetHeaderInfo or before LoadEvents is called
@@ -46,6 +46,6 @@ public:
 	//virtual bool SaveAsMidi(const wchar_t* filepath);
 
 protected:
-	vector<MidiTrack*> midiTracks;		//an array of midi tracks... we will change pMidiTrack, which all the SeqTrack functions write to, to the correct one of these
+	std::vector<MidiTrack*> midiTracks;		//an array of midi tracks... we will change pMidiTrack, which all the SeqTrack functions write to, to the correct one of these
 										//tracks before we write every event
 };

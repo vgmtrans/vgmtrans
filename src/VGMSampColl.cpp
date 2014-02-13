@@ -4,7 +4,7 @@
 #include "VGMInstrSet.h"
 #include "Root.h"
 
-
+using namespace std;
 
 // ***********
 // VGMSampColl

@@ -1,8 +1,6 @@
 #pragma once
 //#include "Root.h"
 
-using namespace std;
-
 class VGMColl;
 class VGMScanner;
 class Matcher;
@@ -10,12 +8,12 @@ class VGMScanner;
 
 #if 0
 #define FORMAT_NAME(name)				\
-	virtual string GetName() {return name;}
+	virtual std::string GetName() {return name;}
 #endif
 
 #define DECLARE_FORMAT(_name_)						\
 _name_##Format _name_##FormatRegisterThis;			\
-const string _name_##Format::name = #_name_;
+const std::string _name_##Format::name = #_name_;
 
 //#define DECLARE_FORMAT(_name_)	const string _name_##Format::name = #_name_;
 
@@ -27,9 +25,9 @@ class _name_##Format : public Format			\
 {											\
 public:										\
 	static const _name_##Format _name_##FormatRegisterThis;		\
-	static const string name;									\
+	static const std::string name;								\
 	_name_##Format() : Format(#_name_) { Init(); }				\
-	virtual const string& GetName() { return name; }
+	virtual const std::string& GetName() { return name; }
 
 #define END_FORMAT()						\
 };
@@ -58,20 +56,20 @@ public:										\
 class Format;
 class VGMFile;
 
-typedef map<string, Format*> FormatMap;
+typedef std::map<std::string, Format*> FormatMap;
 
 class Format
 {
 protected:
 	static FormatMap& registry();
 public:
-	Format(const string& scannerName);
+	Format(const std::string& scannerName);
 	virtual ~Format(void);
 
-	static Format* GetFormatFromName(const string& name);
+	static Format* GetFormatFromName(const std::string& name);
 
 	virtual bool Init(void);
-	virtual const string& GetName() = 0;
+	virtual const std::string& GetName() = 0;
 	//virtual string GetName() = 0;
 	//virtual ULONG GetFormatID() = 0;
 	virtual VGMScanner* NewScanner() {return NULL;}
@@ -83,7 +81,7 @@ public:
 	//virtual int OnNewSeq(VGMSeq* seq);
 	//virtual int OnNewInstrSet(VGMInstrSet* instrset);
 	//virtual int OnNewSampColl(VGMSampColl* sampcoll);
-	virtual bool OnMatch(vector<VGMFile*>& files) {return true;}
+	virtual bool OnMatch(std::vector<VGMFile*>& files) {return true;}
 
 public:
 	Matcher* matcher;

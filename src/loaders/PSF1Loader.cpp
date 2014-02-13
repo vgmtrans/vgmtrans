@@ -4,6 +4,8 @@
 #include "Root.h"
 #include <zlib.h>
 
+using namespace std;
+
 wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
 
 PSF1Loader::PSF1Loader(void)

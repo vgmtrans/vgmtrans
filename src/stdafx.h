@@ -95,6 +95,8 @@ extern bool g_bXPOrLater;
 #include <string>
 #include <sstream>
 #include <iterator>
+#include <iostream>
+#include <iomanip>
 #include <wchar.h> 
 #include <ctype.h>
 

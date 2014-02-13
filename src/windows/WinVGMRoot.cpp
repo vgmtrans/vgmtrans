@@ -11,6 +11,8 @@
 #include "ScanDlg.h"
 #include "DLSFile.h"
 
+using namespace std;
+
 WinVGMRoot winroot;
 
 extern HANDLE killProgramSem;

@@ -21,24 +21,24 @@ typedef enum {
 class SynthFile
 {
 public:
-	SynthFile(const string synth_name = "Instrument Set");
+	SynthFile(const std::string synth_name = "Instrument Set");
 	~SynthFile(void);
 
 	SynthInstr* AddInstr(unsigned long bank, unsigned long instrNum);
-	SynthInstr* AddInstr(unsigned long bank, unsigned long instrNum, string Name);
+	SynthInstr* AddInstr(unsigned long bank, unsigned long instrNum, std::string Name);
 	void DeleteInstr(unsigned long bank, unsigned long instrNum);
 	SynthWave* AddWave(USHORT formatTag, USHORT channels, int samplesPerSec, int aveBytesPerSec,
 					 USHORT blockAlign, USHORT bitsPerSample, ULONG waveDataSize, BYTE* waveData,
-					 string name = "Unnamed Wave");
-	void SetName(string synth_name);
+					 std::string name = "Unnamed Wave");
+	void SetName(std::string synth_name);
 
-	//int WriteDLSToBuffer(vector<BYTE> &buf);
+	//int WriteDLSToBuffer(std::vector<BYTE> &buf);
 	//bool SaveDLSFile(const wchar_t* filepath);
 
 public:
-	vector<SynthInstr*> vInstrs;
-	vector<SynthWave*> vWaves; 
-	string name;
+	std::vector<SynthInstr*> vInstrs;
+	std::vector<SynthWave*> vWaves; 
+	std::string name;
 };
 
 class SynthInstr
@@ -46,11 +46,11 @@ class SynthInstr
 public:
 	SynthInstr(void);
 	SynthInstr(ULONG bank, ULONG instrument);
-	SynthInstr(ULONG bank, ULONG instrument, string instrName);
-	SynthInstr(ULONG bank, ULONG instrument, string instrName, vector<SynthRgn*> listRgns);
+	SynthInstr(ULONG bank, ULONG instrument, std::string instrName);
+	SynthInstr(ULONG bank, ULONG instrument, std::string instrName, std::vector<SynthRgn*> listRgns);
 	~SynthInstr(void);
 
-	void AddRgnList(vector<SynthRgn>& RgnList);
+	void AddRgnList(std::vector<SynthRgn>& RgnList);
 	SynthRgn* AddRgn(void);
 	SynthRgn* AddRgn(SynthRgn rgn);
 
@@ -58,8 +58,8 @@ public:
 	ULONG ulBank;
 	ULONG ulInstrument;
  
-	vector<SynthRgn*> vRgns;
-	string name;
+	std::vector<SynthRgn*> vRgns;
+	std::string name;
 
 };
 
@@ -73,7 +73,7 @@ public:
 	~SynthRgn(void);
 
 	SynthArt* AddArt(void);
-	SynthArt* AddArt(vector<SynthConnectionBlock*> connBlocks);
+	SynthArt* AddArt(std::vector<SynthConnectionBlock*> connBlocks);
 	SynthSampInfo* AddSampInfo(void);
 	SynthSampInfo* AddSampInfo(SynthSampInfo wsmp);
 	void SetRanges(USHORT keyLow = 0, USHORT keyHigh = 0x7F, USHORT velLow = 0, USHORT velHigh = 0x7F);
@@ -98,7 +98,7 @@ class SynthArt
 {
 public:
 	SynthArt(void) {}
-	SynthArt(vector<SynthConnectionBlock>& connectionBlocks);
+	SynthArt(std::vector<SynthConnectionBlock>& connectionBlocks);
 	//SynthArt(USHORT source, USHORT control, USHORT destination, USHORT transform);
 	~SynthArt(void);
 
@@ -155,7 +155,7 @@ public:
 		RiffFile::AlignName(name); 
 	}
 	SynthWave(USHORT formatTag, USHORT channels, int samplesPerSec, int aveBytesPerSec, USHORT blockAlign,
-		USHORT bitsPerSample, ULONG waveDataSize, unsigned char* waveData, string waveName = "Untitled Wave")
+		USHORT bitsPerSample, ULONG waveDataSize, unsigned char* waveData, std::string waveName = "Untitled Wave")
 		: wFormatTag(formatTag),
 		  wChannels(channels),
 		  dwSamplesPerSec(samplesPerSec),
@@ -188,6 +188,6 @@ public:
 	unsigned long dataSize;
 	unsigned char* data;
 
-	string name;
+	std::string name;
 };
 

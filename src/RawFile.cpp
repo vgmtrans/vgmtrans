@@ -5,6 +5,8 @@
 #include "VGMFile.h"
 #include "Root.h"
 
+using namespace std;
+
 #define BUF_SIZE 0x100000		//1mb
 
 RawFile::RawFile(void)

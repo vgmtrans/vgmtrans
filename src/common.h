@@ -1,8 +1,6 @@
 #if !defined(COMMON_H)
 #define COMMON_H
 
-using namespace std;
-
 #include "osdepend.h"
 #include "helper.h"
 #include "types.h"
@@ -41,34 +39,34 @@ template < class T >
 
 U32 StringToHex( const std::string& str );
 
-inline string wstring2string(wstring& wstr)
+inline std::string wstring2string(std::wstring& wstr)
 {
 	char *mbs = new char[wstr.length() * MB_CUR_MAX + 1];
 	wcstombs(mbs, wstr.c_str(), wstr.length() * MB_CUR_MAX + 1);
-	string str(mbs);
+	std::string str(mbs);
 	delete[] mbs;
 	return str;
 }
 
-inline wstring string2wstring(string& str)
+inline std::wstring string2wstring(std::string& str)
 {
 	wchar_t *wcs = new wchar_t[str.length() + 1];
 	mbstowcs(wcs, str.c_str(), str.length() + 1);
-	wstring wstr(wcs);
+	std::wstring wstr(wcs);
 	delete[] wcs;
 	return wstr;
 }
 
-//string WstringToString(wstring& wstr)
+//std::string WstringToString(std::wstring& wstr)
 //{
-//	stringstream stream;
+//	std::stringstream stream;
 //	stream << wstr;
 //	return stream.str();
 //}
 //
-//wstring StringToWstring(string& str)
+//std::wstring StringToWstring(std::string& str)
 //{
-//	wostringstream stream;
+//	std::wostringstream stream;
 //	stream << str;
 //	return stream.str();
 //}

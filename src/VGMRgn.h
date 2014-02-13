@@ -92,7 +92,7 @@ public:
 	USHORT release_transform;
 	double release_time;		//in seconds
 
-	vector<VGMRgnItem*> items;
+	std::vector<VGMRgnItem*> items;
 };
 
 

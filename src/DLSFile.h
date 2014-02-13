@@ -78,25 +78,25 @@ class DLSWave;
 class DLSFile : public RiffFile
 {
 public:
-	DLSFile(string dls_name = "Instrument Set");
+	DLSFile(std::string dls_name = "Instrument Set");
 	~DLSFile(void);
 
 	DLSInstr* AddInstr(unsigned long bank, unsigned long instrNum);
-	DLSInstr* AddInstr(unsigned long bank, unsigned long instrNum, string Name);
+	DLSInstr* AddInstr(unsigned long bank, unsigned long instrNum, std::string Name);
 	void DeleteInstr(unsigned long bank, unsigned long instrNum);
 	DLSWave* AddWave(USHORT formatTag, USHORT channels, int samplesPerSec, int aveBytesPerSec,
 					 USHORT blockAlign, USHORT bitsPerSample, ULONG waveDataSize, BYTE* waveData,
-					 string name = "Unnamed Wave");
-	void SetName(string dls_name);
+					 std::string name = "Unnamed Wave");
+	void SetName(std::string dls_name);
 
 	UINT GetSize(void);
 
-	int WriteDLSToBuffer(vector<BYTE> &buf);
+	int WriteDLSToBuffer(std::vector<BYTE> &buf);
 	bool SaveDLSFile(const wchar_t* filepath);
 
 public:
-	vector<DLSInstr*> aInstrs;
-	vector<DLSWave*> aWaves; 
+	std::vector<DLSInstr*> aInstrs;
+	std::vector<DLSWave*> aWaves; 
 };
 
 class DLSInstr
@@ -104,23 +104,23 @@ class DLSInstr
 public:
 	DLSInstr(void);
 	DLSInstr(ULONG bank, ULONG instrument);
-	DLSInstr(ULONG bank, ULONG instrument, string instrName);
-	DLSInstr(ULONG bank, ULONG instrument, string instrName, vector<DLSRgn*> listRgns);
+	DLSInstr(ULONG bank, ULONG instrument, std::string instrName);
+	DLSInstr(ULONG bank, ULONG instrument, std::string instrName, std::vector<DLSRgn*> listRgns);
 	~DLSInstr(void);
 
-	void AddRgnList(vector<DLSRgn>& RgnList);
+	void AddRgnList(std::vector<DLSRgn>& RgnList);
 	DLSRgn* AddRgn(void);
 	DLSRgn* AddRgn(DLSRgn rgn);
 
 	UINT GetSize(void);
-	void Write(vector<BYTE> &buf);
+	void Write(std::vector<BYTE> &buf);
 
 public:
 	ULONG ulBank;
 	ULONG ulInstrument;
  
-	vector<DLSRgn*> aRgns;
-	string name;
+	std::vector<DLSRgn*> aRgns;
+	std::string name;
 
 };
 
@@ -135,14 +135,14 @@ public:
 	~DLSRgn(void);
 
 	DLSArt* AddArt(void);
-	DLSArt* AddArt(vector<connectionBlock*> connBlocks);
+	DLSArt* AddArt(std::vector<connectionBlock*> connBlocks);
 	DLSWsmp* AddWsmp(void);
 	DLSWsmp* AddWsmp(DLSWsmp wsmp);
 	void SetRanges(USHORT keyLow = 0, USHORT keyHigh = 0x7F, USHORT velLow = 0, USHORT velHigh = 0x7F);
 	void SetWaveLinkInfo(USHORT options, USHORT phaseGroup, ULONG theChannel, ULONG theTableIndex);
 
 	UINT GetSize(void);
-	void Write(vector<BYTE> &buf);
+	void Write(std::vector<BYTE> &buf);
 
 public:
 	USHORT usKeyLow;
@@ -168,7 +168,7 @@ public:
 		~ConnectionBlock(void) {}
 
 	UINT GetSize(void) {return 12;}
-	void Write(vector<BYTE> &buf);
+	void Write(std::vector<BYTE> &buf);
 
 private:
 	USHORT usSource;
@@ -182,7 +182,7 @@ class DLSArt
 {
 public:
 	DLSArt(void) {}
-	DLSArt(vector<ConnectionBlock>& connectionBlocks);
+	DLSArt(std::vector<ConnectionBlock>& connectionBlocks);
 	//DLSArt(USHORT source, USHORT control, USHORT destination, USHORT transform);
 	~DLSArt(void);
 
@@ -190,10 +190,10 @@ public:
 	void AddPan(long pan);
 
 	UINT GetSize(void);
-	void Write(vector<BYTE> &buf);
+	void Write(std::vector<BYTE> &buf);
 
 private:
-	vector<ConnectionBlock*> aConnBlocks;
+	std::vector<ConnectionBlock*> aConnBlocks;
 };
 
 class DLSWsmp
@@ -209,7 +209,7 @@ public:
 	void SetPitchInfo(USHORT unityNote, short fineTune, long attenuation);
 
 	UINT GetSize(void);
-	void Write(vector<BYTE> &buf);
+	void Write(std::vector<BYTE> &buf);
 
 private:
 	unsigned short usUnityNote;
@@ -233,7 +233,7 @@ public:
 		RiffFile::AlignName(name); 
 	}
 	DLSWave(USHORT formatTag, USHORT channels, int samplesPerSec, int aveBytesPerSec, USHORT blockAlign,
-		USHORT bitsPerSample, ULONG waveDataSize, unsigned char* waveData, string waveName = "Untitled Wave")
+		USHORT bitsPerSample, ULONG waveDataSize, unsigned char* waveData, std::string waveName = "Untitled Wave")
 		: wFormatTag(formatTag),
 		  wChannels(channels),
 		  dwSamplesPerSec(samplesPerSec),
@@ -260,7 +260,7 @@ public:
 //		return dataSize;
 	}
 	UINT GetSize(void);
-	void Write(vector<BYTE> &buf);
+	void Write(std::vector<BYTE> &buf);
 
 private:
 	DLSWsmp* Wsmp;
@@ -275,6 +275,6 @@ private:
 	unsigned long dataSize;
 	unsigned char* data;
 
-	string name;
+	std::string name;
 };
 

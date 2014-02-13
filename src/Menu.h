@@ -19,7 +19,7 @@
 	protected:																			\
 		static origclassMenu<origclass> menu;											\
 	public:																				\
-		virtual vector<const wchar_t*>* GetMenuItemNames()								\
+		virtual std::vector<const wchar_t*>* GetMenuItemNames()							\
 		{																				\
 			return menu.GetMenuItemNames();												\
 		}																				\
@@ -40,7 +40,7 @@
 	protected:																			\
 		static origclassMenu<origclass> menu;											\
 	public:																				\
-		virtual vector<const wchar_t*>* GetMenuItemNames()								\
+		virtual std::vector<const wchar_t*>* GetMenuItemNames()							\
 		{																				\
 			return menu.GetMenuItemNames();												\
 		}																				\
@@ -96,7 +96,7 @@ public:
 		return (((T*)item)->*funcs[menuItemNum])();
 	}
 
-	vector<const wchar_t*>* GetMenuItemNames(void)
+	std::vector<const wchar_t*>* GetMenuItemNames(void)
 	{
 		return &names;
 	}
@@ -106,7 +106,7 @@ public:
 	//}
 
 protected:
-	vector<const wchar_t*> names;
-	vector<bool (T::*)(void)> funcs;
+	std::vector<const wchar_t*> names;
+	std::vector<bool (T::*)(void)> funcs;
 	//vector<MenuItem> menuItems;
 };

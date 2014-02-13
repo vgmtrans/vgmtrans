@@ -6,6 +6,8 @@
 #include "Root.h"
 #include "RiffFile.h"
 
+using namespace std;
+
 //void WriteLIST(vector<BYTE> & buf, UINT listName, UINT listSize)
 //{
 //	PushTypeOnVectBE<UINT>(buf, 0x4C495354);	//write "LIST"

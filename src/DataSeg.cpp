@@ -124,7 +124,7 @@ void CompDataSeg::load(BYTE* buf, ULONG startVirtOffset, ULONG theSize, ULONG co
 		
 		compress(compBlock, &destSize, buf+(compBlockSize*i), compBufSize);
 		compBlock = (BYTE*)realloc(compBlock, destSize);
-		compBlocks.push_back(pair<BYTE*, long>(compBlock, destSize));
+		compBlocks.push_back(std::pair<BYTE*, long>(compBlock, destSize));
 		offset += compBufSize;
 	}
 	//memcpy(data, buf, theSize);

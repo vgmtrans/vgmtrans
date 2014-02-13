@@ -108,7 +108,7 @@ class QSoundArticTable
 	: public VGMMiscFile
 {
 public:
-	QSoundArticTable(RawFile* file, wstring& name, U32 offset, U32 length);
+	QSoundArticTable(RawFile* file, std::wstring& name, U32 offset, U32 length);
 	virtual ~QSoundArticTable(void);
 
 	virtual bool LoadMain();
@@ -125,7 +125,7 @@ class QSoundSampleInfoTable
 	: public VGMMiscFile
 {
 public:
-	QSoundSampleInfoTable(RawFile* file, wstring& name, U32 offset, U32 length = 0);
+	QSoundSampleInfoTable(RawFile* file, std::wstring& name, U32 offset, U32 length = 0);
 	virtual ~QSoundSampleInfoTable(void);
 
 	virtual bool LoadMain();
@@ -149,7 +149,7 @@ public:
 				   int numInstrBanks,
 				   QSoundSampleInfoTable* sampInfoTable,
 				   QSoundArticTable* articTable,
-                   wstring& name);
+                   std::wstring& name);
 	virtual ~QSoundInstrSet(void);
 
 	virtual bool GetHeaderInfo();
@@ -179,7 +179,7 @@ class QSoundInstr
 	: public VGMInstr
 {
 public:
-	QSoundInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, wstring& name);
+	QSoundInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, std::wstring& name);
 	virtual ~QSoundInstr(void);
 	virtual bool LoadInstr();
 protected:
@@ -231,7 +231,7 @@ class QSoundSampColl
 {
 public:
 	QSoundSampColl(RawFile* file, QSoundInstrSet* instrset, QSoundSampleInfoTable* sampinfotable, ULONG offset, 
-		           ULONG length = 0, wstring& name = wstring(L"QSound Sample Collection"));
+		           ULONG length = 0, std::wstring& name = std::wstring(L"QSound Sample Collection"));
 	virtual bool GetHeaderInfo();		//retrieve any header data
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 

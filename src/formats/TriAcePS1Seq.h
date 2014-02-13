@@ -26,9 +26,9 @@ public:
 
 	VGMHeader* header;
 	TrkInfo TrkInfos[32];
-	vector<TriAcePS1ScorePattern*> aScorePatterns;
+	std::vector<TriAcePS1ScorePattern*> aScorePatterns;
 	TriAcePS1ScorePattern* curScorePattern;
-	map<U32, TriAcePS1ScorePattern*> patternMap;
+	std::map<U32, TriAcePS1ScorePattern*> patternMap;
 	BYTE initialTempoBPM;
 };
 

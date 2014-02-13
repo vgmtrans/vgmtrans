@@ -7,6 +7,7 @@
 
 DECLARE_MENU(VGMFile)
 
+using namespace std;
 
 VGMFile::VGMFile(FileType fileType, const string& fmt, RawFile* theRawFile, ULONG offset, ULONG length, wstring theName)
 : VGMContainerItem(this, offset, length),

@@ -5,6 +5,8 @@
 
 DECLARE_FORMAT(SquarePS2);
 
+using namespace std;
+
 // ******
 // BGMSeq
 // ******

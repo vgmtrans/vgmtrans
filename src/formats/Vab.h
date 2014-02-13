@@ -88,7 +88,7 @@ class VabInstr
 	: public VGMInstr
 {
 public:
-	VabInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, const wstring& name = L"Instrument");
+	VabInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, const std::wstring& name = L"Instrument");
 	virtual ~VabInstr(void);
 
 	virtual bool LoadInstr();

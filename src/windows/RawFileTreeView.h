@@ -7,8 +7,6 @@
 
 #pragma once
 
-using namespace std;//stdext;
-
 #include "VGMTransWindow.h"
 //dockable views
 
@@ -34,7 +32,7 @@ protected:
 	WTL::CImageList m_ImageList;
 	//int nIconFolderIndexNormal, nIconFolderIndexSelected;
 	int nIconIndexNormal, nIconIndexSelected;
-	hash_map<RawFile*, CTreeItem> items;//, hash<RawFile*>, equal_to> items;
+	std::hash_map<RawFile*, CTreeItem> items;//, hash<RawFile*>, equal_to> items;
 
 public:
 	DECLARE_WND_SUPERCLASS(NULL, CTreeViewCtrlEx::GetWndClassName())
@@ -86,9 +84,9 @@ public:
 // Helpers
 
 protected:
-	map<unsigned int, CTreeItem> IDtoTreeItem;
-	map<CTreeItem, CBmpBtn*> TreeItemtoBtn;
-	list<CBmpBtn*> btns;
+	std::map<unsigned int, CTreeItem> IDtoTreeItem;
+	std::map<CTreeItem, CBmpBtn*> TreeItemtoBtn;
+	std::list<CBmpBtn*> btns;
 };
 
 extern CRawFileTreeView rawFileTreeView;

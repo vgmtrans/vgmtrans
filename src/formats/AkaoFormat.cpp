@@ -6,6 +6,8 @@
 #include "VGMColl.h"
 #include "PSXSPU.h"
 
+using namespace std;
+
 /*
 int AkaoFormat::OnMatch(vector<VGMFile*>& files)
 {

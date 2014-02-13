@@ -4,6 +4,8 @@
 #include "PSXSpu.h"
 #include "PS1Format.h"
 
+using namespace std;
+
 Vab::Vab(RawFile* file, ULONG offset)
 : VGMInstrSet(PS1Format::name, file, offset)
 {

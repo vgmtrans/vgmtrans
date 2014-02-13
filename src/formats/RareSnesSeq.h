@@ -83,7 +83,7 @@ class RareSnesSeq
 	: public VGMSeq
 {
 public:
-	RareSnesSeq(RawFile* file, RareSnesVersion ver, ULONG seqdata_offset, wstring newName = L"Rare SNES Seq");
+	RareSnesSeq(RawFile* file, RareSnesVersion ver, ULONG seqdata_offset, std::wstring newName = L"Rare SNES Seq");
 	virtual ~RareSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -91,7 +91,7 @@ public:
 	virtual void ResetVars(void);
 
 	RareSnesVersion version;
-	map<BYTE, RareSnesSeqEventType> EventMap;
+	std::map<BYTE, RareSnesSeqEventType> EventMap;
 
 	std::map<BYTE, double> instrUnityKeyHints;
 	std::map<BYTE, USHORT> instrADSRHints;

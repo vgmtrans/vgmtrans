@@ -4,6 +4,8 @@
 #include "HexView.h"
 #include "mainfrm.h"
 
+using namespace std;
+
 CHexViewFrame::CHexViewFrame()
 : bPopulatingItemTreeView(false), m_HexView(this), m_ItemTreeView(this)
 {

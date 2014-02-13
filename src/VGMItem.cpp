@@ -4,6 +4,8 @@
 #include "VGMFile.h"
 #include "Root.h"
 
+using namespace std;
+
 VGMItem::VGMItem()
 : color(0)
 {

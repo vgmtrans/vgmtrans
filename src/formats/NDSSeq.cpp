@@ -4,6 +4,8 @@
 
 DECLARE_FORMAT(NDS);
 
+using namespace std;
+
 NDSSeq::NDSSeq(RawFile* file, ULONG offset, ULONG length, wstring name)
 : VGMSeq(NDSFormat::name, file, offset, length, name)
 {

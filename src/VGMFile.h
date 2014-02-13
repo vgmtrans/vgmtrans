@@ -34,7 +34,7 @@ public:
 	END_MENU()
 
 public:
-	VGMFile(FileType fileType, /*FmtID fmtID,*/const string& format, RawFile* theRawFile, ULONG offset, ULONG length = 0, wstring theName = L"VGM File");
+	VGMFile(FileType fileType, /*FmtID fmtID,*/const std::string& format, RawFile* theRawFile, ULONG offset, ULONG length = 0, std::wstring theName = L"VGM File");
 	virtual ~VGMFile(void);
 
 	virtual ItemType GetType() const { return ITEMTYPE_VGMFILE; }
@@ -43,7 +43,7 @@ public:
 
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 
-	const wstring* GetName(void) const;
+	const std::wstring* GetName(void) const;
 	//void AddItem(VGMItem* item, VGMItem* parent, const wchar_t* itemName = NULL);
 	//void AddItemSet(vector<ItemSet>* itemset);
 
@@ -55,7 +55,7 @@ public:
 	virtual bool Load() = 0;
 	//virtual Format* GetFormat() = 0;  // {return 0;}
 	Format* GetFormat();
-	const string& GetFormatName();
+	const std::string& GetFormatName();
 
 	virtual ULONG GetID() { return id;}
 	//virtual void Announce() {}
@@ -152,13 +152,13 @@ public:
 protected:
 	DataSeg data, col;
 	FileType file_type;
-	const string& format; 
+	const std::string& format; 
 	//FmtID fmt_id;
 	ULONG id;
-	wstring name;
+	std::wstring name;
 public:
 	RawFile* rawfile;
-	list<VGMColl*> assocColls;
+	std::list<VGMColl*> assocColls;
 	bool bUsingRawFile;
 	bool bUsingCompressedLocalData;
 };

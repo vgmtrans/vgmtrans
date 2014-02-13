@@ -2,6 +2,8 @@
 #include "RiffFile.h"
 #include "common.h"
 
+using namespace std;
+
 UINT Chunk::GetSize()
 {
 	return 8 + GetPaddedSize(size);

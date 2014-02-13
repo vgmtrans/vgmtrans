@@ -53,5 +53,5 @@ protected:
 	int loop_layer;
 	int loop_begin_layer;
 	bool bNotePlaying;
-	vector<ULONG> vCondJumpAddr;
+	std::vector<ULONG> vCondJumpAddr;
 };

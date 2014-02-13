@@ -60,7 +60,7 @@ class WDInstr
 	: public VGMInstr
 {
 public:
-	WDInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, wstring name);
+	WDInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum, std::wstring name);
 	virtual ~WDInstr(void);
 	virtual bool LoadInstr();
 

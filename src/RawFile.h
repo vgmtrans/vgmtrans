@@ -15,22 +15,22 @@ class RawFile
 {
 public:
 	RawFile(void);
-	RawFile(const wstring name, ULONG fileSize = 0, bool bCanRead = true);
+	RawFile(const std::wstring name, ULONG fileSize = 0, bool bCanRead = true);
 public:
 	virtual ~RawFile(void);
 
 //	void kill(void);
 
-	bool open(const wstring& filename);
+	bool open(const std::wstring& filename);
 	void close();
 	unsigned long size(void);
 	inline const wchar_t* GetFullPath() { return fullpath.c_str(); }
 	inline const wchar_t* GetFileName() { return filename.c_str(); }	//returns the filename with extension
-	inline const wstring& GetExtension() { return extension; }
-	inline const wstring& GetParRawFileFullPath() { return parRawFileFullPath; }
-	static wstring getFileNameFromPath(const wstring& s);
-	static wstring getExtFromPath(const wstring& s);
-	static wstring removeExtFromPath(const wstring& s);
+	inline const std::wstring& GetExtension() { return extension; }
+	inline const std::wstring& GetParRawFileFullPath() { return parRawFileFullPath; }
+	static std::wstring getFileNameFromPath(const std::wstring& s);
+	static std::wstring getExtFromPath(const std::wstring& s);
+	static std::wstring removeExtFromPath(const std::wstring& s);
 	VGMItem* GetItemFromOffset(long offset);
 	VGMFile* GetVGMFileFromOffset(long offset);
 
@@ -120,16 +120,16 @@ public:
 	//unsigned char *col;
 
 protected:
-	ifstream file;
-	filebuf *pbuf;
+	std::ifstream file;
+	std::filebuf *pbuf;
 	bool bCanFileRead;
 	unsigned long fileSize;
-	wstring fullpath;
-	wstring filename;
-	wstring extension;
-	wstring parRawFileFullPath;
+	std::wstring fullpath;
+	std::wstring filename;
+	std::wstring extension;
+	std::wstring parRawFileFullPath;
 public:
-	list<VGMFile*> containedVGMFiles;
+	std::list<VGMFile*> containedVGMFiles;
 };
 
 
@@ -137,5 +137,5 @@ class VirtFile : public RawFile
 {
 public:
 	VirtFile();
-	VirtFile(BYTE* data, ULONG fileSize, const wstring& name, const wchar_t* parRawFileFullPath = L"");
+	VirtFile(BYTE* data, ULONG fileSize, const std::wstring& name, const wchar_t* parRawFileFullPath = L"");
 };

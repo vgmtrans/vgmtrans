@@ -25,7 +25,7 @@ public:
 		MENU_ITEM(VGMInstrSet, OnSaveAsSF2, L"Convert to SoundFont 2")
 	END_MENU()
 
-	VGMInstrSet(const string& format, RawFile* file, ULONG offset, ULONG length = 0, wstring name = L"VGMInstrSet",
+	VGMInstrSet(const std::string& format, RawFile* file, ULONG offset, ULONG length = 0, std::wstring name = L"VGMInstrSet",
 				VGMSampColl* theSampColl = NULL);
 	virtual ~VGMInstrSet(void);
 
@@ -36,7 +36,7 @@ public:
 	virtual bool GetInstrPointers();
 	virtual bool LoadInstrs();
 	
-	VGMInstr* AddInstr(ULONG offset, ULONG length, unsigned long bank, unsigned long instrNum, const wstring& instrName = L"");
+	VGMInstr* AddInstr(ULONG offset, ULONG length, unsigned long bank, unsigned long instrNum, const std::wstring& instrName = L"");
 
 	virtual FileType GetFileType() { return FILETYPE_INSTRSET; }
 
@@ -47,7 +47,7 @@ public:
 	virtual bool SaveAsSF2(const wchar_t* filepath);
 
 public:
-	vector<VGMInstr*> aInstrs;
+	std::vector<VGMInstr*> aInstrs;
 	VGMSampColl* sampColl;
 	DLSFile dls;			//needs to be deleted after I change WD.cpp
 };
@@ -65,7 +65,7 @@ class VGMInstr :
 {
 public:
 	VGMInstr(VGMInstrSet* parInstrSet, ULONG offset, ULONG length, ULONG bank,
-			 ULONG instrNum, const wstring& name = L"Instrument");
+			 ULONG instrNum, const std::wstring& name = L"Instrument");
 	virtual ~VGMInstr(void);
 
 	virtual Icon GetIcon() { return ICON_INSTR; };
@@ -84,6 +84,6 @@ public:
 	ULONG instrNum;
  
 	VGMInstrSet* parInstrSet;
-	vector<VGMRgn*> aRgns;
+	std::vector<VGMRgn*> aRgns;
 	//string name;
 };

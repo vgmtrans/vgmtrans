@@ -156,7 +156,7 @@ const std::vector<BYTE>& RareSnesInstrSet::GetAvailableInstruments()
 // RareSnesInstr
 // *************
 
-RareSnesInstr::RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, U32 spcDirAddr, double transpose, U16 adsr, const wstring& name) :
+RareSnesInstr::RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, U32 spcDirAddr, double transpose, U16 adsr, const std::wstring& name) :
 	VGMInstr(instrSet, offset, 1, theBank, theInstrNum, name),
 	spcDirAddr(spcDirAddr),
 	transpose(transpose),

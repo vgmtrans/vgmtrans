@@ -40,11 +40,11 @@ public:
 	virtual void UI_BeginRemoveVGMFiles();
 	virtual void UI_EndRemoveVGMFiles();
 	//virtual void UI_RemoveVGMFileRange(VGMFile* first, VGMFile* last);
-	virtual void UI_AddItem(VGMItem* item, VGMItem* parent, const wstring& itemName, VOID* UI_specific);
-	virtual void UI_AddItemSet(VGMFile* file, vector<ItemSet>* itemset);
-	virtual wstring UI_GetSaveFilePath(const wstring& suggestedFilename, const wstring& extension = L"");
-	virtual wstring UI_GetSaveDirPath(const wstring& suggestedDir = L"");
-	bool GetFolder(std::wstring& folderpath, const wstring& szCaption = NULL, HWND hOwner = NULL);
+	virtual void UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName, VOID* UI_specific);
+	virtual void UI_AddItemSet(VGMFile* file, std::vector<ItemSet>* itemset);
+	virtual std::wstring UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension = L"");
+	virtual std::wstring UI_GetSaveDirPath(const std::wstring& suggestedDir = L"");
+	bool GetFolder(std::wstring& folderpath, const std::wstring& szCaption = NULL, HWND hOwner = NULL);
 
 	//virtual bool UI_WriteBufferToFile(const char* filepath, const char* buf, unsigned long size);
 

@@ -82,21 +82,21 @@ UINT GetSNESGAINEnvLength(U8 gain, S16 env, S16 env_to, S16 * env_after)
 // SNESSampColl
 // ************
 
-SNESSampColl::SNESSampColl(const string& format, RawFile* rawfile, U32 offset, UINT maxNumSamps) :
+SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, U32 offset, UINT maxNumSamps) :
 	VGMSampColl(format, rawfile, offset, 0),
 	spcDirAddr(offset)
 {
 	SetDefaultTargets(maxNumSamps);
 }
 
-SNESSampColl::SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset, UINT maxNumSamps) :
+SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset, UINT maxNumSamps) :
 	VGMSampColl(format, instrset->rawfile, instrset, offset, 0),
 	spcDirAddr(offset)
 {
 	SetDefaultTargets(maxNumSamps);
 }
 
-SNESSampColl::SNESSampColl(const string& format, RawFile* rawfile, U32 offset,
+SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, U32 offset,
 		const std::vector<BYTE>& targetSRCNs, std::wstring name) :
 	VGMSampColl(format, rawfile, offset, 0, name),
 	spcDirAddr(offset),
@@ -104,7 +104,7 @@ SNESSampColl::SNESSampColl(const string& format, RawFile* rawfile, U32 offset,
 {
 }
 
-SNESSampColl::SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset,
+SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset,
 		const std::vector<BYTE>& targetSRCNs, std::wstring name) :
 	VGMSampColl(format, instrset->rawfile, instrset, offset, 0, name),
 	spcDirAddr(offset),
@@ -156,7 +156,7 @@ bool SNESSampColl::GetSampleInfo()
 			continue;
 		}
 
-		wostringstream name;
+		std::wostringstream name;
 		name << L"Sample " << srcn;
 		SNESSamp* samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length, addrSampLoop, name.str());
 		samples.push_back(samp);

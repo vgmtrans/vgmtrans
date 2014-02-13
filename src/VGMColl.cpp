@@ -9,7 +9,7 @@
 #include "ScaleConversion.h"
 #include "Root.h"
 
-#include <math.h>
+using namespace std;
 
 DECLARE_MENU(VGMColl)
 

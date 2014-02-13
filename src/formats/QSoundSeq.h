@@ -9,7 +9,7 @@ class QSoundSeq :
 	public VGMSeq
 {
 public:
-	QSoundSeq(RawFile* file, ULONG offset, QSoundVer fmt_version, wstring& name);
+	QSoundSeq(RawFile* file, ULONG offset, QSoundVer fmt_version, std::wstring& name);
 	virtual ~QSoundSeq(void);
 
 	virtual bool GetHeaderInfo(void);

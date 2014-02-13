@@ -239,10 +239,10 @@ class SNESSampColl
 	: public VGMSampColl
 {
 public:
-	SNESSampColl(const string& format, RawFile* rawfile, U32 offset, UINT maxNumSamps = 256);
-	SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset, UINT maxNumSamps = 256);
-	SNESSampColl(const string& format, RawFile* rawfile, U32 offset, const std::vector<BYTE>& targetSRCNs, std::wstring name = L"SNESSampColl");
-	SNESSampColl(const string& format, VGMInstrSet* instrset, U32 offset, const std::vector<BYTE>& targetSRCNs, std::wstring name = L"SNESSampColl");
+	SNESSampColl(const std::string& format, RawFile* rawfile, U32 offset, UINT maxNumSamps = 256);
+	SNESSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset, UINT maxNumSamps = 256);
+	SNESSampColl(const std::string& format, RawFile* rawfile, U32 offset, const std::vector<BYTE>& targetSRCNs, std::wstring name = L"SNESSampColl");
+	SNESSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset, const std::vector<BYTE>& targetSRCNs, std::wstring name = L"SNESSampColl");
 	virtual ~SNESSampColl();
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.

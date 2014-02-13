@@ -12,7 +12,7 @@
 class AkaoInstrSet : public VGMInstrSet
 {
 public:
-	AkaoInstrSet(RawFile* file, U32 length, U32 instrOff, U32 dkitOff, U32 id, wstring name = L"Akao Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
+	AkaoInstrSet(RawFile* file, U32 length, U32 instrOff, U32 dkitOff, U32 id, std::wstring name = L"Akao Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
 	virtual bool GetInstrPointers();
 public:
 	bool bMelInstrs, bDrumKit;
@@ -95,14 +95,14 @@ class AkaoSampColl :
 	public VGMSampColl
 {
 public:
-	AkaoSampColl(RawFile* file, ULONG offset, ULONG length, wstring name = L"Akao Sample Collection");
+	AkaoSampColl(RawFile* file, ULONG offset, ULONG length, std::wstring name = L"Akao Sample Collection");
 	virtual ~AkaoSampColl();
 
 	virtual bool GetHeaderInfo();
 	virtual bool GetSampleInfo();
 
 public:
-	vector<AkaoArt> akArts;
+	std::vector<AkaoArt> akArts;
 	ULONG starting_art_id;
 	USHORT sample_set_id;
 
