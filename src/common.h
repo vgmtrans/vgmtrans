@@ -3,7 +3,6 @@
 
 #include "osdepend.h"
 #include "helper.h"
-#include "types.h"
 
 #define VERSION "1.0.3"
 
@@ -37,7 +36,7 @@ template < class T >
 	assert(! val.fail() );
 }
 
-U32 StringToHex( const std::string& str );
+uint32_t StringToHex( const std::string& str );
 
 inline std::string wstring2string(std::wstring& wstr)
 {
@@ -71,10 +70,10 @@ inline std::wstring string2wstring(std::string& str)
 //	return stream.str();
 //}
 
-inline int CountBytesOfVal(BYTE* buf, UINT numBytes, BYTE val)
+inline int CountBytesOfVal(uint8_t* buf, uint32_t numBytes, uint8_t val)
 {
 	int count = 0;
-	for (UINT i=0; i<numBytes; i++)
+	for (uint32_t i=0; i<numBytes; i++)
 		if (buf[i] == val)
 			count++;
 	return count;
@@ -92,15 +91,15 @@ inline int CountBytesOfVal(BYTE* buf, UINT numBytes, BYTE val)
 	 return (x > 0) ? (int)(x + 0.5) : (int)(x - 0.5);
  }
 
- //inline BYTE round(double x)
+ //inline uint8_t round(double x)
  //{
-	// return (BYTE)(x + 0.5);
+	// return (uint8_t)(x + 0.5);
  //}
 
 struct SizeOffsetPair
 {
-	ULONG size;
-	ULONG offset;
+	uint32_t size;
+	uint32_t offset;
 
 	SizeOffsetPair() :
 		size(0),
@@ -108,7 +107,7 @@ struct SizeOffsetPair
 	{
 	}
 
-	SizeOffsetPair(ULONG offset, ULONG size) :
+	SizeOffsetPair(uint32_t offset, uint32_t size) :
 		size(size),
 		offset(offset)
 	{

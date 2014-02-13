@@ -453,7 +453,6 @@
     <ClInclude Include="Scanner.h" />
     <ClInclude Include="SeqEvent.h" />
     <ClInclude Include="SeqTrack.h" />
-    <ClInclude Include="types.h" />
     <ClInclude Include="VGMColl.h" />
     <ClInclude Include="VGMFile.h" />
     <ClInclude Include="VGMInstrSet.h" />

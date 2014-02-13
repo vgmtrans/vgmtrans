@@ -16,11 +16,11 @@ class VGMRgn :
 {
 public:
 	//VGMRgn(void): Wsmp(NULL), Art(NULL) {}
-	//VGMRgn(USHORT keyLow, USHORT keyHigh, USHORT velLow, USHORT velHigh)
+	//VGMRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
 	//	: usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh), Wsmp(NULL), Art(NULL) {}
-	VGMRgn(VGMInstr* instr, ULONG offset, ULONG length = 0, const wchar_t* name = L"Region");
-	VGMRgn(VGMInstr* instr, ULONG offset, ULONG length, BYTE keyLow, BYTE keyHigh, BYTE velLow,
-		   BYTE velHigh, int sampNum, const wchar_t* name = L"Region");
+	VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length = 0, const wchar_t* name = L"Region");
+	VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, uint8_t velLow,
+		   uint8_t velHigh, int sampNum, const wchar_t* name = L"Region");
 	//: usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
 	~VGMRgn(void);
 
@@ -28,54 +28,54 @@ public:
 
 	//VGMArt* AddArt(vector<connectionBlock*> connBlocks);
 	//VGMSamp* AddSamp(void);
-	void SetRanges(BYTE keyLow, BYTE keyHigh, BYTE velLow = 0, BYTE velHigh = 0x7F);
-	void SetUnityKey(BYTE unityNote);
-	void SetSampNum(BYTE sampNumber);
-	void SetLoopInfo(int theLoopStatus, ULONG theLoopStart, ULONG theLoopLength);
-	void SetADSR(long attack_time, USHORT atk_transform, long decay_time, long sustain_lev,
-				 USHORT rls_transform, long release_time);
+	void SetRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
+	void SetUnityKey(uint8_t unityNote);
+	void SetSampNum(uint8_t sampNumber);
+	void SetLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength);
+	void SetADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
+				 uint16_t rls_transform, long release_time);
 
-	void AddGeneralItem(ULONG offset, ULONG length, const wchar_t* name);
-	void AddUnknown(ULONG offset, ULONG length);
-	void SetFineTune(S16 relativePitchCents) { fineTune = relativePitchCents; }
-	void SetPan(BYTE pan);
-	void AddPan(BYTE pan, ULONG offset, ULONG length = 1);
+	void AddGeneralItem(uint32_t offset, uint32_t length, const wchar_t* name);
+	void AddUnknown(uint32_t offset, uint32_t length);
+	void SetFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
+	void SetPan(uint8_t pan);
+	void AddPan(uint8_t pan, uint32_t offset, uint32_t length = 1);
 	//void SetAttenuation(long attenuation);
-	//void AddAttenuation(long atten, ULONG offset, ULONG length = 1);
+	//void AddAttenuation(long atten, uint32_t offset, uint32_t length = 1);
 	void SetVolume(double volume);
-	void AddVolume(double volume, ULONG offset, ULONG length = 1);
-	void AddUnityKey(BYTE unityKey, ULONG offset, ULONG length = 1);
-	void AddKeyLow(BYTE keyLow, ULONG offset, ULONG length = 1);
-	void AddKeyHigh(BYTE keyHigh, ULONG offset, ULONG length = 1);
-	void AddVelLow(BYTE velLow, ULONG offset, ULONG length = 1);
-	void AddVelHigh(BYTE velHigh, ULONG offset, ULONG length = 1);
-	void AddSampNum(int sampNum, ULONG offset, ULONG length = 1);
+	void AddVolume(double volume, uint32_t offset, uint32_t length = 1);
+	void AddUnityKey(uint8_t unityKey, uint32_t offset, uint32_t length = 1);
+	void AddKeyLow(uint8_t keyLow, uint32_t offset, uint32_t length = 1);
+	void AddKeyHigh(uint8_t keyHigh, uint32_t offset, uint32_t length = 1);
+	void AddVelLow(uint8_t velLow, uint32_t offset, uint32_t length = 1);
+	void AddVelHigh(uint8_t velHigh, uint32_t offset, uint32_t length = 1);
+	void AddSampNum(int sampNum, uint32_t offset, uint32_t length = 1);
 	//void SetAttack();
 	//void SetDelay();
 	//void SetSustain();
 	//void SetRelease();
 
-	//void SetWaveLinkInfo(USHORT options, USHORT phaseGroup, ULONG theChannel, ULONG theTableIndex);
+	//void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
 
 public:
 	VGMInstr* parInstr;
-	BYTE keyLow;
-	BYTE keyHigh;
-	BYTE velLow;
-	BYTE velHigh;
+	uint8_t keyLow;
+	uint8_t keyHigh;
+	uint8_t velLow;
+	uint8_t velHigh;
 
-	BYTE unityKey;
+	uint8_t unityKey;
 	short fineTune;
 
 	Loop loop;
 
-	//USHORT fusOptions;
-	//USHORT usPhaseGroup;
-	//ULONG channel;
-	//ULONG tableIndex;
+	//uint16_t fusOptions;
+	//uint16_t usPhaseGroup;
+	//uint32_t channel;
+	//uint32_t tableIndex;
 
 	int sampNum;
-	U32 sampOffset;		//optional value. If a sample offset is provided, then find the sample number based on this offset.
+	uint32_t sampOffset;		//optional value. If a sample offset is provided, then find the sample number based on this offset.
 						// This is an absolute offset into the SampColl.  It's not necessarily relative to the beginning of the
 						// actual sample data, unless the sample data begins at offset 0.
 	//int sampCollNum;	//optional value. for formats that use multiple sampColls and reference samples base 0 for each sampColl (NDS, for instance)
@@ -85,11 +85,11 @@ public:
 	double volume;	// as percentage of full volume.  This will be converted to to an attenuation when we convert to a SynthFile
 	double pan;		//percentage.  0 = full left. 0.5 = center.  1 = full right
 	double attack_time;			//in seconds
-	USHORT attack_transform;
+	uint16_t attack_transform;
 	double decay_time;			//in seconds
 	double sustain_level;		//as a percentage
 	double sustain_time;		//in seconds (we don't support positive rate here, as is possible on psx)
-	USHORT release_transform;
+	uint16_t release_transform;
 	double release_time;		//in seconds
 
 	std::vector<VGMRgnItem*> items;
@@ -107,7 +107,7 @@ class VGMRgnItem :
 public:
 	enum RgnItemType { RIT_GENERIC, RIT_UNKNOWN, RIT_UNITYKEY, RIT_KEYLOW, RIT_KEYHIGH, RIT_VELLOW, RIT_VELHIGH, RIT_PAN, RIT_VOL, RIT_SAMPNUM};		//HIT = Header Item Type
 
-	VGMRgnItem(VGMRgn* rgn, RgnItemType theType, ULONG offset, ULONG length, const wchar_t* name);
+	VGMRgnItem(VGMRgn* rgn, RgnItemType theType, uint32_t offset, uint32_t length, const wchar_t* name);
 	virtual Icon GetIcon();
 
 public:

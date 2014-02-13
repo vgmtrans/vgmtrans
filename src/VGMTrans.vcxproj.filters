@@ -839,9 +839,6 @@
     <ClInclude Include="SeqTrack.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
-    <ClInclude Include="types.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
     <ClInclude Include="VGMColl.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>

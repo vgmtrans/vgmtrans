@@ -333,26 +333,26 @@ private:
 // ************
 
 class GetIdMatcher :
-	public SimpleMatcher<ULONG>
+	public SimpleMatcher<uint32_t>
 {
 public:
 	GetIdMatcher(Format* format, bool bRequiresSampColl = false)
 		: SimpleMatcher(format, bRequiresSampColl)
 	{}
 
-	virtual bool GetSeqId(VGMSeq* seq, ULONG& id)
+	virtual bool GetSeqId(VGMSeq* seq, uint32_t& id)
 	{
 		id = seq->GetID();
 		return (id != -1);
 	}
 
-	virtual bool GetInstrSetId(VGMInstrSet* instrset, ULONG& id)
+	virtual bool GetInstrSetId(VGMInstrSet* instrset, uint32_t& id)
 	{
 		id = instrset->GetID();
 		return (id != -1);
 	}
 
-	virtual bool GetSampCollId(VGMSampColl* sampcoll, ULONG& id)
+	virtual bool GetSampCollId(VGMSampColl* sampcoll, uint32_t& id)
 	{
 		id = sampcoll->GetID();
 		return (id != -1);

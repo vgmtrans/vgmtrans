@@ -7,12 +7,12 @@
 
 typedef struct _VersCk
 {
-	U32 Creator;
-	U32 Type;
-	U32 chunkSize;
-	U16 reserved;
-	U8 versionMajor;
-	U8 versionMinor;
+	uint32_t Creator;
+	uint32_t Type;
+	uint32_t chunkSize;
+	uint16_t reserved;
+	uint8_t versionMajor;
+	uint8_t versionMinor;
 } VersCk;
 
 // ***********

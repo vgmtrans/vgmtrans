@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "types.h"
+#include <stdint.h>
 
 template <class T> void DeleteVect(std::vector<T*> &theArray)
 {
@@ -38,33 +38,33 @@ template <class T1, class T2> void DeleteMap(std::map<T1,T2*> &container)
 
 
 
-template <class T> inline void PushTypeOnVect(std::vector<BYTE> &theVector, T unit)
+template <class T> inline void PushTypeOnVect(std::vector<uint8_t> &theVector, T unit)
 {
-	UINT i = sizeof(T);
-	theVector.insert(theVector.end(), ((BYTE*)&unit), ((BYTE*)(&unit))+sizeof(T) );
+	uint32_t i = sizeof(T);
+	theVector.insert(theVector.end(), ((uint8_t*)&unit), ((uint8_t*)(&unit))+sizeof(T) );
 }
 
-template <class T> inline void PushTypeOnVectBE(std::vector<BYTE> &theVector, T unit)
+template <class T> inline void PushTypeOnVectBE(std::vector<uint8_t> &theVector, T unit)
 {
-	//::reverse_iterator<BYTE*> begin = ::reverse_iterator<BYTE*>((BYTE*)&unit);
-	//::reverse_iterator<BYTE*> end = ::reverse_iterator<BYTE*>(((BYTE*)(&unit))+sizeof(T));
+	//::reverse_iterator<uint8_t*> begin = ::reverse_iterator<uint8_t*>((uint8_t*)&unit);
+	//::reverse_iterator<uint8_t*> end = ::reverse_iterator<uint8_t*>(((uint8_t*)(&unit))+sizeof(T));
 	//theVector.insert(theVector.end(), begin, end);
-	for (UINT i=0; i<sizeof(T); i++)
-		theVector.push_back(*(((BYTE*)(&unit))-i+sizeof(T)-1));
+	for (uint32_t i=0; i<sizeof(T); i++)
+		theVector.push_back(*(((uint8_t*)(&unit))-i+sizeof(T)-1));
 }
 
 
-//inline void PushBackWordOnVectorBE(vector<BYTE> &theVector, UINT theWord)
+//inline void PushBackWordOnVectorBE(vector<uint8_t> &theVector, uint32_t theWord)
 //{
-//	theVector.insert(theVector.end(), ((BYTE*)&theWord), ((BYTE*)((&theWord)+sizeof(theWord))) );
+//	theVector.insert(theVector.end(), ((uint8_t*)&theWord), ((uint8_t*)((&theWord)+sizeof(theWord))) );
 //}
 
-//inline void PushBackShortOnVectorBE(vector<BYTE> &theVector, USHORT theShort)
+//inline void PushBackShortOnVectorBE(vector<uint8_t> &theVector, uint16_t theShort)
 //{
-//	theVector.insert(theVector.end(), ((BYTE*)&theShort), ((BYTE*)((&theShort)+sizeof(theShort))) );
+//	theVector.insert(theVector.end(), ((uint8_t*)&theShort), ((uint8_t*)((&theShort)+sizeof(theShort))) );
 //}
 
-inline void PushBackStringOnVector(std::vector<BYTE> &theVector, std::string &str)
+inline void PushBackStringOnVector(std::vector<uint8_t> &theVector, std::string &str)
 {
 	theVector.insert(theVector.end(), str.data(), str.data()+str.length());
 }

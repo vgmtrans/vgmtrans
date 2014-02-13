@@ -11,7 +11,7 @@ class SeqTrack :
 	public VGMContainerItem
 {
 public:
-	SeqTrack(VGMSeq* parentSeqFile, ULONG offset = 0, ULONG length = 0);
+	SeqTrack(VGMSeq* parentSeqFile, uint32_t offset = 0, uint32_t length = 0);
 	virtual ~SeqTrack(void);								//note: virtual destructor
 	virtual void ResetVars();
 	//virtual int OnSelected(void);
@@ -20,119 +20,119 @@ public:
 
 	//virtual void AddToUI(VGMItem* parent, VGMFile* theVGMFile = NULL);
 	virtual bool LoadTrackInit(int trackNum);
-	virtual bool LoadTrackMainLoop(ULONG stopOffset);
+	virtual bool LoadTrackMainLoop(uint32_t stopOffset);
 	virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
 	virtual bool ReadEvent(void);
 	virtual void OnTickBegin(){};
 	virtual void OnTickEnd(){};
 
-	ULONG GetTime(void);
-	void SetTime(ULONG NewDelta); // in general, derived class should not use this method.
-	void AddTime(ULONG AddDelta);
+	uint32_t GetTime(void);
+	void SetTime(uint32_t NewDelta); // in general, derived class should not use this method.
+	void AddTime(uint32_t AddDelta);
 	void ResetTime(void);
 
-	ULONG ReadVarLen(ULONG& offset);
+	uint32_t ReadVarLen(uint32_t& offset);
 
 public:
-	static ULONG offsetInQuestion;
+	static uint32_t offsetInQuestion;
 	
 	struct IsEventAtOffset;
-	virtual bool IsOffsetUsed(ULONG offset);
+	virtual bool IsOffsetUsed(uint32_t offset);
 
-	ULONG dwStartOffset;
+	uint32_t dwStartOffset;
 
 protected:
 	virtual void AddEvent(SeqEvent* pSeqEvent);
-	void AddControllerSlide(ULONG offset, ULONG length, ULONG dur, BYTE& prevVal, BYTE targVal, 
-		void (MidiTrack::*insertFunc)(BYTE, BYTE, ULONG));
+	void AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t& prevVal, uint8_t targVal, 
+		void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t));
 public:
-	void AddGenericEvent(ULONG offset, ULONG length, const wchar_t* sEventName, const wchar_t* sEventDesc, BYTE color, Icon icon = ICON_BINARY);
-	void AddSetOctave(ULONG offset, ULONG length, BYTE newOctave, const wchar_t* sEventName = L"Set Octave");
-	void AddIncrementOctave(ULONG offset, ULONG length, const wchar_t* sEventName = L"Increment Octave");	// 1,Sep.2009 revise
-	void AddDecrementOctave(ULONG offset, ULONG length, const wchar_t* sEventName = L"Decrement Octave");	// 1,Sep.2009 revise
-	void AddRest(ULONG offset, ULONG length, UINT restTime, const wchar_t* sEventName = L"Rest");
-	void AddHold(ULONG offset, ULONG length, const wchar_t* sEventName = L"Hold");
-	void AddUnknown(ULONG offset, ULONG length, const wchar_t* sEventName = L"Unknown Event", const wchar_t* sEventDesc = NULL);
+	void AddGenericEvent(uint32_t offset, uint32_t length, const wchar_t* sEventName, const wchar_t* sEventDesc, uint8_t color, Icon icon = ICON_BINARY);
+	void AddSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const wchar_t* sEventName = L"Set Octave");
+	void AddIncrementOctave(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Increment Octave");	// 1,Sep.2009 revise
+	void AddDecrementOctave(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Decrement Octave");	// 1,Sep.2009 revise
+	void AddRest(uint32_t offset, uint32_t length, uint32_t restTime, const wchar_t* sEventName = L"Rest");
+	void AddHold(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Hold");
+	void AddUnknown(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Unknown Event", const wchar_t* sEventDesc = NULL);
 	
-	void AddNoteOn(ULONG offset, ULONG length, char key, char vel, const wchar_t* sEventName = L"Note On");
+	void AddNoteOn(uint32_t offset, uint32_t length, char key, char vel, const wchar_t* sEventName = L"Note On");
 	void AddNoteOnNoItem(char key, char vel);
-	void AddPercNoteOn(ULONG offset, ULONG length, char key, char vel, const wchar_t* sEventName = L"Percussion Note On");
+	void AddPercNoteOn(uint32_t offset, uint32_t length, char key, char vel, const wchar_t* sEventName = L"Percussion Note On");
 	void AddPercNoteOnNoItem(char key, char vel);
-	void InsertNoteOn(ULONG offset, ULONG length, char key, char vel, ULONG absTime, const wchar_t* sEventName = L"Note On");
+	void InsertNoteOn(uint32_t offset, uint32_t length, char key, char vel, uint32_t absTime, const wchar_t* sEventName = L"Note On");
 
-	void AddNoteOff(ULONG offset, ULONG length, char key, const wchar_t* sEventName = L"Note Off");
+	void AddNoteOff(uint32_t offset, uint32_t length, char key, const wchar_t* sEventName = L"Note Off");
 	void AddNoteOffNoItem(char key);
-	void AddPercNoteOff(ULONG offset, ULONG length, char key, const wchar_t* sEventName = L"Percussion Note Off");
+	void AddPercNoteOff(uint32_t offset, uint32_t length, char key, const wchar_t* sEventName = L"Percussion Note Off");
 	void AddPercNoteOffNoItem(char key);
-	void InsertNoteOff(ULONG offset, ULONG length, char key, ULONG absTime, const wchar_t* sEventName = L"Note Off");
+	void InsertNoteOff(uint32_t offset, uint32_t length, char key, uint32_t absTime, const wchar_t* sEventName = L"Note Off");
 
-	void AddNoteByDur(ULONG offset, ULONG length, char key, char vel, UINT dur, const wchar_t* sEventName = L"Note with Duration");
-	void AddNoteByDurNoItem(char key, char vel, UINT dur);
-	void AddPercNoteByDur(ULONG offset, ULONG length, char key, char vel, UINT dur, const wchar_t* sEventName = L"Percussion Note with Duration");
-	void AddPercNoteByDurNoItem(char key, char vel, UINT dur);
-	//void AddNoteByDur(ULONG offset, ULONG length, char key, char vel, UINT dur, BYTE chan, const wchar_t* sEventName = "Note On With Duration");
-	void InsertNoteByDur(ULONG offset, ULONG length, char key, char vel, UINT dur, ULONG absTime, const wchar_t* sEventName = L"Note On With Duration");
+	void AddNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, const wchar_t* sEventName = L"Note with Duration");
+	void AddNoteByDurNoItem(char key, char vel, uint32_t dur);
+	void AddPercNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, const wchar_t* sEventName = L"Percussion Note with Duration");
+	void AddPercNoteByDurNoItem(char key, char vel, uint32_t dur);
+	//void AddNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, uint8_t chan, const wchar_t* sEventName = "Note On With Duration");
+	void InsertNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, uint32_t absTime, const wchar_t* sEventName = L"Note On With Duration");
 
 	void MakePrevDurNoteEnd();
-	void AddVol(ULONG offset, ULONG length, BYTE vol, const wchar_t* sEventName = L"Volume");
-	void AddVolNoItem(BYTE vol);
-	void AddVolSlide(ULONG offset, ULONG length, ULONG dur, BYTE targVol, const wchar_t* sEventName = L"Volume Slide");
-	void InsertVol(ULONG offset, ULONG length, BYTE vol, ULONG absTime, const wchar_t* sEventName = L"Volume");
-	void AddExpression(ULONG offset, ULONG length, BYTE level, const wchar_t* sEventName = L"Expression");
-	void AddExpressionNoItem(BYTE level);
-	void AddExpressionSlide(ULONG offset, ULONG length, ULONG dur, BYTE targExpr, const wchar_t* sEventName = L"Expression Slide");
-	void InsertExpression(ULONG offset, ULONG length, BYTE level, ULONG absTime, const wchar_t* sEventName = L"Expression");
-	void AddMasterVol(ULONG offset, ULONG length, BYTE vol, const wchar_t* sEventName = L"Master Volume");
-	void AddMasterVolNoItem(BYTE newVol);
-	//void AddMastVolSlide(ULONG offset, ULONG length, ULONG dur, BYTE targVol, const wchar_t* sEventName = "Master Volume Slide");
-	//void InsertMastVol(ULONG offset, ULONG length, BYTE vol, ULONG absTime, const wchar_t* sEventName = "Master Volume");
+	void AddVol(uint32_t offset, uint32_t length, uint8_t vol, const wchar_t* sEventName = L"Volume");
+	void AddVolNoItem(uint8_t vol);
+	void AddVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const wchar_t* sEventName = L"Volume Slide");
+	void InsertVol(uint32_t offset, uint32_t length, uint8_t vol, uint32_t absTime, const wchar_t* sEventName = L"Volume");
+	void AddExpression(uint32_t offset, uint32_t length, uint8_t level, const wchar_t* sEventName = L"Expression");
+	void AddExpressionNoItem(uint8_t level);
+	void AddExpressionSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targExpr, const wchar_t* sEventName = L"Expression Slide");
+	void InsertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const wchar_t* sEventName = L"Expression");
+	void AddMasterVol(uint32_t offset, uint32_t length, uint8_t vol, const wchar_t* sEventName = L"Master Volume");
+	void AddMasterVolNoItem(uint8_t newVol);
+	//void AddMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const wchar_t* sEventName = "Master Volume Slide");
+	//void InsertMastVol(uint32_t offset, uint32_t length, uint8_t vol, uint32_t absTime, const wchar_t* sEventName = "Master Volume");
 
-	void AddPan(ULONG offset, ULONG length, BYTE pan, const wchar_t* sEventName = L"Pan");
-	void AddPanNoItem(BYTE pan);
-	void AddPanSlide(ULONG offset, ULONG length, ULONG dur, BYTE targPan, const wchar_t* sEventName = L"Pan Slide");
-	void InsertPan(ULONG offset, ULONG length, BYTE pan, ULONG absTime, const wchar_t* sEventName = L"Pan");
-	void AddReverb(ULONG offset, ULONG length, BYTE reverb, const wchar_t* sEventName = L"Reverb");
-	void AddReverbNoItem(BYTE reverb);
-	void InsertReverb(ULONG offset, ULONG length, BYTE reverb, ULONG absTime, const wchar_t* sEventName = L"Reverb");
-	void AddPitchBend(ULONG offset, ULONG length, SHORT bend, const wchar_t* sEventName = L"Pitch Bend");
-	void AddPitchBendRange(ULONG offset, ULONG length, BYTE semitones, BYTE cents = 0, const wchar_t* sEventName = L"Pitch Bend Range");
-	void AddPitchBendRangeNoItem(BYTE range, BYTE cents = 0);
-	void AddTranspose(ULONG offset, ULONG length, char transpose, const wchar_t* sEventName = L"Transpose");
-	void AddPitchBendMidiFormat(ULONG offset, ULONG length, BYTE lo, BYTE hi, const wchar_t* sEventName = L"Pitch Bend");
-	void AddModulation(ULONG offset, ULONG length, BYTE depth, const wchar_t* sEventName = L"Modulation Depth");
-	void InsertModulation(ULONG offset, ULONG length, BYTE depth, ULONG absTime, const wchar_t* sEventName = L"Modulation Depth");
-	void AddBreath(ULONG offset, ULONG length, BYTE depth, const wchar_t* sEventName = L"Breath Depth");
-	void InsertBreath(ULONG offset, ULONG length, BYTE depth, ULONG absTime, const wchar_t* sEventName = L"Breath Depth");
+	void AddPan(uint32_t offset, uint32_t length, uint8_t pan, const wchar_t* sEventName = L"Pan");
+	void AddPanNoItem(uint8_t pan);
+	void AddPanSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targPan, const wchar_t* sEventName = L"Pan Slide");
+	void InsertPan(uint32_t offset, uint32_t length, uint8_t pan, uint32_t absTime, const wchar_t* sEventName = L"Pan");
+	void AddReverb(uint32_t offset, uint32_t length, uint8_t reverb, const wchar_t* sEventName = L"Reverb");
+	void AddReverbNoItem(uint8_t reverb);
+	void InsertReverb(uint32_t offset, uint32_t length, uint8_t reverb, uint32_t absTime, const wchar_t* sEventName = L"Reverb");
+	void AddPitchBend(uint32_t offset, uint32_t length, int16_t bend, const wchar_t* sEventName = L"Pitch Bend");
+	void AddPitchBendRange(uint32_t offset, uint32_t length, uint8_t semitones, uint8_t cents = 0, const wchar_t* sEventName = L"Pitch Bend Range");
+	void AddPitchBendRangeNoItem(uint8_t range, uint8_t cents = 0);
+	void AddTranspose(uint32_t offset, uint32_t length, char transpose, const wchar_t* sEventName = L"Transpose");
+	void AddPitchBendMidiFormat(uint32_t offset, uint32_t length, uint8_t lo, uint8_t hi, const wchar_t* sEventName = L"Pitch Bend");
+	void AddModulation(uint32_t offset, uint32_t length, uint8_t depth, const wchar_t* sEventName = L"Modulation Depth");
+	void InsertModulation(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const wchar_t* sEventName = L"Modulation Depth");
+	void AddBreath(uint32_t offset, uint32_t length, uint8_t depth, const wchar_t* sEventName = L"Breath Depth");
+	void InsertBreath(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const wchar_t* sEventName = L"Breath Depth");
 
-	void AddSustainEvent(ULONG offset, ULONG length, bool bOn, const wchar_t* sEventName = L"Sustain");
-	void InsertSustainEvent(ULONG offset, ULONG length, bool bOn, ULONG absTime, const wchar_t* sEventName = L"Sustain");
-	void AddPortamento(ULONG offset, ULONG length, bool bOn, const wchar_t* sEventName = L"Portamento");
+	void AddSustainEvent(uint32_t offset, uint32_t length, bool bOn, const wchar_t* sEventName = L"Sustain");
+	void InsertSustainEvent(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const wchar_t* sEventName = L"Sustain");
+	void AddPortamento(uint32_t offset, uint32_t length, bool bOn, const wchar_t* sEventName = L"Portamento");
 	void AddPortamentoNoItem(bool bOn);
-	void InsertPortamento(ULONG offset, ULONG length, bool bOn, ULONG absTime, const wchar_t* sEventName = L"Portamento");
-	void AddPortamentoTime(ULONG offset, ULONG length, BYTE time, const wchar_t* sEventName = L"Portamento Time");
-	void InsertPortamentoTime(ULONG offset, ULONG length, BYTE time, ULONG absTime, const wchar_t* sEventName = L"Portamento Time");
+	void InsertPortamento(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const wchar_t* sEventName = L"Portamento");
+	void AddPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, const wchar_t* sEventName = L"Portamento Time");
+	void InsertPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, uint32_t absTime, const wchar_t* sEventName = L"Portamento Time");
 	//void AddSustainEventDur();
 	//void AddPitchBendSlide();
 	//void InsertPitchBendSlide();
-	void AddProgramChange(ULONG offset, ULONG length, ULONG progNum, const wchar_t* sEventName = L"Program Change");
-	void AddProgramChange(ULONG offset, ULONG length, ULONG progNum, BYTE chan, const wchar_t* sEventName = L"Program Change");
-	void AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool requireBank, const wchar_t* sEventName = L"Program Change");
-	void AddProgramChange(ULONG offset, ULONG length, ULONG progNum, bool requireBank, BYTE chan, const wchar_t* sEventName = L"Program Change");
-	void AddBankSelectNoItem(BYTE bank);
-	void AddTempo(ULONG offset, ULONG length, ULONG microsPerQuarter, const wchar_t* sEventName = L"Tempo");
-	void AddTempoSlide(ULONG offset, ULONG length, ULONG dur, ULONG targMicrosPerQuarter, const wchar_t* sEventName = L"Tempo Slide");
-	void AddTempoBPM(ULONG offset, ULONG length, double bpm, const wchar_t* sEventName = L"Tempo");
+	void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const wchar_t* sEventName = L"Program Change");
+	void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const wchar_t* sEventName = L"Program Change");
+	void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const wchar_t* sEventName = L"Program Change");
+	void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, uint8_t chan, const wchar_t* sEventName = L"Program Change");
+	void AddBankSelectNoItem(uint8_t bank);
+	void AddTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuarter, const wchar_t* sEventName = L"Tempo");
+	void AddTempoSlide(uint32_t offset, uint32_t length, uint32_t dur, uint32_t targMicrosPerQuarter, const wchar_t* sEventName = L"Tempo Slide");
+	void AddTempoBPM(uint32_t offset, uint32_t length, double bpm, const wchar_t* sEventName = L"Tempo");
 	void AddTempoBPMNoItem(double bpm);
-	void AddTempoBPMSlide(ULONG offset, ULONG length, ULONG dur, double targBPM, const wchar_t* sEventName = L"Tempo Slide");
-	void AddTimeSig(ULONG offset, ULONG length, BYTE numer, BYTE denom, BYTE ticksPerQuarter,const wchar_t* sEventName = L"Time Signature");
-	void InsertTimeSig(ULONG offset, ULONG length, BYTE numer, BYTE denom, BYTE ticksPerQuarter,ULONG absTime,const wchar_t* sEventName = L"Time Signature");
-	bool AddEndOfTrack(ULONG offset, ULONG length, const wchar_t* sEventName = L"Track End");
+	void AddTempoBPMSlide(uint32_t offset, uint32_t length, uint32_t dur, double targBPM, const wchar_t* sEventName = L"Tempo Slide");
+	void AddTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter,const wchar_t* sEventName = L"Time Signature");
+	void InsertTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter,uint32_t absTime,const wchar_t* sEventName = L"Time Signature");
+	bool AddEndOfTrack(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Track End");
 	bool AddEndOfTrackNoItem();
 
-	void AddGlobalTranspose(ULONG offset, ULONG length, char semitones, const wchar_t* sEventName = L"Global Transpose");
-	void AddMarker(ULONG offset, ULONG length, std::string& markername, BYTE databyte1, BYTE databyte2, const wchar_t* sEventName, char priority = 0, BYTE color = CLR_MISC);
+	void AddGlobalTranspose(uint32_t offset, uint32_t length, char semitones, const wchar_t* sEventName = L"Global Transpose");
+	void AddMarker(uint32_t offset, uint32_t length, std::string& markername, uint8_t databyte1, uint8_t databyte2, const wchar_t* sEventName, char priority = 0, uint8_t color = CLR_MISC);
 
-	bool AddLoopForever(ULONG offset, ULONG length, const wchar_t* sEventName = L"Loop Forever");
+	bool AddLoopForever(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Loop Forever");
 
 	//void SetChannel(int theChannel);
 
@@ -156,20 +156,20 @@ public:
 	long deltaTime;			//delta time, an interval to the next event (ticks)
 	char vel;
 	char key;
-	ULONG dur;
-	BYTE prevKey;
-	BYTE prevVel;
-	//BYTE prevDur;
-	BYTE octave;
-	BYTE vol;
-	BYTE expression;
-	//BYTE mastVol;
-	BYTE prevPan;
-	BYTE prevReverb;
+	uint32_t dur;
+	uint8_t prevKey;
+	uint8_t prevVel;
+	//uint8_t prevDur;
+	uint8_t octave;
+	uint8_t vol;
+	uint8_t expression;
+	//uint8_t mastVol;
+	uint8_t prevPan;
+	uint8_t prevReverb;
 	char transpose;
 	bool bNoteOn;			//indicates whether a note is playing
-	ULONG curOffset;
-	BOOL bInLoop;
+	uint32_t curOffset;
+	bool bInLoop;
 	char cDrumNote;			//-1 signals do not use drumNote, otherwise,
 
 	wchar_t numberedName[10];

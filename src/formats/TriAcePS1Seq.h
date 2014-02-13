@@ -11,9 +11,9 @@ class TriAcePS1Seq :
 public:
 	typedef struct _TrkInfo
 	{
-		U16 unknown1;
-		U16 unknown2;
-		U16 trkOffset;
+		uint16_t unknown1;
+		uint16_t unknown2;
+		uint16_t trkOffset;
 	} TrkInfo;
 
 
@@ -28,7 +28,7 @@ public:
 	TrkInfo TrkInfos[32];
 	std::vector<TriAcePS1ScorePattern*> aScorePatterns;
 	TriAcePS1ScorePattern* curScorePattern;
-	std::map<U32, TriAcePS1ScorePattern*> patternMap;
+	std::map<uint32_t, TriAcePS1ScorePattern*> patternMap;
 	BYTE initialTempoBPM;
 };
 
@@ -48,7 +48,7 @@ public:
 	TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset = 0, long length = 0);
 
 	virtual bool LoadTrackMainLoop(ULONG stopOffset);
-	U32 ReadScorePattern(U32 offset);
+	uint32_t ReadScorePattern(uint32_t offset);
 	virtual bool IsOffsetUsed(ULONG offset);
 	virtual void AddEvent(SeqEvent* pSeqEvent);
 	virtual bool ReadEvent(void);

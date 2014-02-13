@@ -4,12 +4,12 @@
 
 using namespace std;
 
-UINT Chunk::GetSize()
+uint32_t Chunk::GetSize()
 {
 	return 8 + GetPaddedSize(size);
 }
 
-void Chunk::SetData(const void* src, DWORD datasize)
+void Chunk::SetData(const void* src, uint32_t datasize)
 {
 	size = datasize;
 
@@ -19,21 +19,21 @@ void Chunk::SetData(const void* src, DWORD datasize)
 		delete[] data;
 		data = NULL;
 	}
-	data = new BYTE[datasize];
+	data = new uint8_t[datasize];
 	memcpy(data, src, size);
 
 	// Add pad byte
-	DWORD padsize = datasize - size;
+	uint32_t padsize = datasize - size;
 	if (padsize != 0) {
 		memset(data + size, 0, padsize);
 	}
 }
 
-void Chunk::Write(BYTE* buffer)
+void Chunk::Write(uint8_t* buffer)
 {
-	DWORD padsize = GetPaddedSize(size) - size;
+	uint32_t padsize = GetPaddedSize(size) - size;
 	memcpy(buffer, id, 4);
-	*(DWORD*)(buffer+4) = size + padsize; // Microsoft says the chunkSize doesn't contain padding size, but many software cannot handle the alignment.
+	*(uint32_t*)(buffer+4) = size + padsize; // Microsoft says the chunkSize doesn't contain padding size, but many software cannot handle the alignment.
 	memcpy(buffer+8, data, GetPaddedSize(size));
 }
 
@@ -43,9 +43,9 @@ Chunk* ListTypeChunk::AddChildChunk(Chunk* ck)
 	return ck;
 }
 
-UINT ListTypeChunk::GetSize()
+uint32_t ListTypeChunk::GetSize()
 {
-	UINT size = 12;		//id + size + "LIST"
+	uint32_t size = 12;		//id + size + "LIST"
 	//for(Chunk ck : childChunks)			//C++0X syntax, not supported in MSVC (fuck Microsoft)
 	//for_each (ck, childChunks)
 	for	(auto iter = this->childChunks.begin(); iter != childChunks.end(); iter++)
@@ -53,12 +53,12 @@ UINT ListTypeChunk::GetSize()
 	return GetPaddedSize(size);
 }
 
-void ListTypeChunk::Write(BYTE* buffer)
+void ListTypeChunk::Write(uint8_t* buffer)
 {
 	memcpy(buffer, this->id, 4);
 	memcpy(buffer+8, this->type, 4);
 
-	UINT bufOffset = 12;
+	uint32_t bufOffset = 12;
 	//for(Chunk ck : childChunks)			//C++0X syntax, not supported in MSVC (fuck Microsoft)
 	//for_each (ck, childChunks)
 	for	(auto iter = this->childChunks.begin(); iter != childChunks.end(); iter++)
@@ -67,9 +67,9 @@ void ListTypeChunk::Write(BYTE* buffer)
 		bufOffset += (*iter)->GetSize();
 	}
 
-	DWORD size = bufOffset;
-	DWORD padsize = GetPaddedSize(size) - size;
-	*(DWORD*)(buffer+4) = size + padsize - 8; // Microsoft says the chunkSize doesn't contain padding size, but many software cannot handle the alignment.
+	uint32_t size = bufOffset;
+	uint32_t padsize = GetPaddedSize(size) - size;
+	*(uint32_t*)(buffer+4) = size + padsize - 8; // Microsoft says the chunkSize doesn't contain padding size, but many software cannot handle the alignment.
 
 	// Add pad byte
 	if (padsize != 0)

@@ -82,8 +82,8 @@ TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset, long length
 bool TriAcePS1Track::LoadTrackMainLoop(ULONG stopOffset)
 {
 	TriAcePS1Seq* seq = (TriAcePS1Seq*)parentSeq;
-	U32 scorePatternPtrOffset = dwOffset;
-	U16 scorePatternOffset = GetShort(scorePatternPtrOffset);
+	uint32_t scorePatternPtrOffset = dwOffset;
+	uint16_t scorePatternOffset = GetShort(scorePatternPtrOffset);
 	while (scorePatternOffset != 0xFFFF)
 	{
 		if (seq->patternMap[scorePatternOffset])
@@ -95,7 +95,7 @@ bool TriAcePS1Track::LoadTrackMainLoop(ULONG stopOffset)
 			seq->curScorePattern = pattern;
 			seq->aScorePatterns.push_back(pattern);
 		}
-		U32 endOffset = ReadScorePattern(scorePatternOffset);
+		uint32_t endOffset = ReadScorePattern(scorePatternOffset);
 		if (seq->curScorePattern)
 			seq->curScorePattern->unLength = endOffset - seq->curScorePattern->dwOffset;
 		AddSimpleItem(scorePatternPtrOffset, 2, L"Score Pattern Ptr");
@@ -108,7 +108,7 @@ bool TriAcePS1Track::LoadTrackMainLoop(ULONG stopOffset)
 }
 
 
-U32 TriAcePS1Track::ReadScorePattern(U32 offset)
+uint32_t TriAcePS1Track::ReadScorePattern(uint32_t offset)
 {
 	curOffset = offset;	//start at beginning of track
 	impliedNoteDur = 0;	//reset the implied values (from event 0x9E)

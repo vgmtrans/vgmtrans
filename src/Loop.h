@@ -14,9 +14,9 @@ struct Loop							//Sample Block
 	{ }
 
 	int loopStatus;
-	ULONG loopType;				//can't think of it off my head, look it up in DLS specs.  I set it to 0 always
-	BYTE loopStartMeasure;
-	BYTE loopLengthMeasure;
-	ULONG loopStart;
-	ULONG loopLength;
+	uint32_t loopType;				//can't think of it off my head, look it up in DLS specs.  I set it to 0 always
+	uint8_t loopStartMeasure;
+	uint8_t loopLengthMeasure;
+	uint32_t loopStart;
+	uint32_t loopLength;
 };

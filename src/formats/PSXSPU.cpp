@@ -16,17 +16,17 @@ using namespace std;
 // PSXSampColl
 // ***********
 
-PSXSampColl::PSXSampColl(const string& format, RawFile* rawfile, U32 offset, U32 length)
+PSXSampColl::PSXSampColl(const string& format, RawFile* rawfile, uint32_t offset, uint32_t length)
 : VGMSampColl(format, rawfile, offset, length)
 {
 }
 
-PSXSampColl::PSXSampColl(const string& format, VGMInstrSet* instrset, U32 offset, U32 length)
+PSXSampColl::PSXSampColl(const string& format, VGMInstrSet* instrset, uint32_t offset, uint32_t length)
 : VGMSampColl(format, instrset->rawfile, instrset, offset, length)
 {
 }
 
-PSXSampColl::PSXSampColl(const string& format, VGMInstrSet* instrset, U32 offset, U32 length, const std::vector<SizeOffsetPair>& vagLocations)
+PSXSampColl::PSXSampColl(const string& format, VGMInstrSet* instrset, uint32_t offset, uint32_t length, const std::vector<SizeOffsetPair>& vagLocations)
 : VGMSampColl(format, instrset->rawfile, instrset, offset, length), vagLocations(vagLocations)
 {
 }

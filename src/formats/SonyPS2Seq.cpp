@@ -29,7 +29,7 @@ SonyPS2Seq::~SonyPS2Seq(void)
 bool SonyPS2Seq::GetHeaderInfo(void)
 {
 	name() = L"Sony PS2 Seq";
-	U32 curOffset = offset();
+	uint32_t curOffset = offset();
 	//read the version chunk
 	GetBytes(curOffset, 0x10, &versCk);		
 	VGMHeader* versCkHdr = VGMSeq::AddHeader(curOffset, versCk.chunkSize, L"Version Chunk");
@@ -190,7 +190,7 @@ bool SonyPS2Seq::ReadEvent(void)
 				{
 				case 0x51 :			//tempo. identical to SMF
 					{
-						U32 microsPerQuarter = GetWordBE(curOffset) & 0x00FFFFFF;	//mask out the hi byte 0x03
+						uint32_t microsPerQuarter = GetWordBE(curOffset) & 0x00FFFFFF;	//mask out the hi byte 0x03
 						AddTempo(beginOffset, curOffset+4-beginOffset, microsPerQuarter);
 						curOffset += 4;
 					}
@@ -214,7 +214,7 @@ bool SonyPS2Seq::ReadEvent(void)
 	return true;
 }
 
-BYTE SonyPS2Seq::GetDataByte(U32 offset)
+BYTE SonyPS2Seq::GetDataByte(uint32_t offset)
 {
 	BYTE dataByte = GetByte(offset);
 	if (dataByte & 0x80)

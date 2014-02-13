@@ -2,8 +2,8 @@
 
 double LinAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten);
 
-BYTE Convert7bitPercentVolValToStdMidiVal(BYTE percentVal);
-BYTE ConvertPercentAmpToStdMidiVal(double percent);
+uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal);
+uint8_t ConvertPercentAmpToStdMidiVal(double percent);
 double ConvertPercentAmpToStdMidiScale(double percent);
 long ConvertPercentToLogVolScale(long maxVal, double percent);
 double ConvertLogScaleValToAtten(double percent);

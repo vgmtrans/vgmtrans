@@ -50,61 +50,61 @@ public:
 
 	typedef struct _ProgParam
 	{
-		U32 splitBlockAddr;
-		U8 nSplit;
-		U8 sizeSplitBlock;
-		U8 progVolume;
-		S8 progPanpot;
-		S8 progTranspose;
-		S8 progDetune;
-		S8 keyFollowPan;
-		U8 keyFollowPanCenter;
-		U8 progAttr;
-		U8 reserved;
-		U8 progLfoWave;
-		U8 progLfoWave2;
-		U8 progLfoStartPhase;
-		U8 progLfoStartPhase2;
-		U8 progLfoPhaseRandom;
-		U8 progLfoPhaseRandom2;
-		U16 progLfoCycle;
-		U16 progLfoCycle2;
-		S16 progLfoPitchDepth;
-		S16 progLfoPitchDepth2;
-		S16 progLfoMidiPitchDepth;
-		S16 progLfoMidiPitchDepth2;
-		S8 progLfoAmpDepth;
-		S8 progLfoAmpDepth2;
-		S8 progLfoMidiAmpDepth;
-		S8 progLfoMidiAmpDepth2;
+		uint32_t splitBlockAddr;
+		uint8_t nSplit;
+		uint8_t sizeSplitBlock;
+		uint8_t progVolume;
+		int8_t progPanpot;
+		int8_t progTranspose;
+		int8_t progDetune;
+		int8_t keyFollowPan;
+		uint8_t keyFollowPanCenter;
+		uint8_t progAttr;
+		uint8_t reserved;
+		uint8_t progLfoWave;
+		uint8_t progLfoWave2;
+		uint8_t progLfoStartPhase;
+		uint8_t progLfoStartPhase2;
+		uint8_t progLfoPhaseRandom;
+		uint8_t progLfoPhaseRandom2;
+		uint16_t progLfoCycle;
+		uint16_t progLfoCycle2;
+		int16_t progLfoPitchDepth;
+		int16_t progLfoPitchDepth2;
+		int16_t progLfoMidiPitchDepth;
+		int16_t progLfoMidiPitchDepth2;
+		int8_t progLfoAmpDepth;
+		int8_t progLfoAmpDepth2;
+		int8_t progLfoMidiAmpDepth;
+		int8_t progLfoMidiAmpDepth2;
 	} ProgParam;
 
 	typedef struct _SplitBlock
 	{
-		U16 sampleSetIndex;
-		U8 splitRangeLow;
-		U8 splitCrossFade;
-		U8 splitRangeHigh;
-		U8 splitNumber;
-		U16 splitBendRangeLow; 
-		U16 SplitBendRangeHigh;
-		S8 keyFollowPitch;
-		U8 keyFollowPitchCenter;
-		S8 keyFollowAmp;
-		U8 keyFollowAmpCenter;
-		S8 keyFollowPan;
-		U8 keyFollowPanCenter;
-		U8 splitVolume;
-		S8 splitPanpot;
-		S8 splitTranspose;
-		S8 splitDetune;
+		uint16_t sampleSetIndex;
+		uint8_t splitRangeLow;
+		uint8_t splitCrossFade;
+		uint8_t splitRangeHigh;
+		uint8_t splitNumber;
+		uint16_t splitBendRangeLow; 
+		uint16_t SplitBendRangeHigh;
+		int8_t keyFollowPitch;
+		uint8_t keyFollowPitchCenter;
+		int8_t keyFollowAmp;
+		uint8_t keyFollowAmpCenter;
+		int8_t keyFollowPan;
+		uint8_t keyFollowPanCenter;
+		uint8_t splitVolume;
+		int8_t splitPanpot;
+		int8_t splitTranspose;
+		int8_t splitDetune;
 	} SplitBlock;
 
 	SonyPS2Instr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank, ULONG theInstrNum);
 	virtual ~SonyPS2Instr(void);
 
 	virtual bool LoadInstr();
-	S8 ConvertPanVal(U8 panVal);
+	int8_t ConvertPanVal(uint8_t panVal);
 
 public:
 	SplitBlock* splitBlocks;
@@ -125,17 +125,17 @@ class SonyPS2InstrSet
 public:
 	typedef struct _HdrCk
 	{
-		U32 Creator;
-		U32 Type;
-		U32 chunkSize;
-		U32 fileSize;
-		U32	bodySize;
-		U32 programChunkAddr;
-		U32 samplesetChunkAddr;
-		U32 sampleChunkAddr;
-		U32 vagInfoChunkAddr;
-		U32 seTimbreChunkAddr;
-		U32 reserved[8];
+		uint32_t Creator;
+		uint32_t Type;
+		uint32_t chunkSize;
+		uint32_t fileSize;
+		uint32_t	bodySize;
+		uint32_t programChunkAddr;
+		uint32_t samplesetChunkAddr;
+		uint32_t sampleChunkAddr;
+		uint32_t vagInfoChunkAddr;
+		uint32_t seTimbreChunkAddr;
+		uint32_t reserved[8];
 	} HdrCk;
 
 	typedef struct _ProgCk
@@ -143,11 +143,11 @@ public:
 		_ProgCk() : programOffsetAddr(0), progParamBlock(0) {}
 		~_ProgCk() { if (programOffsetAddr) delete[] programOffsetAddr;
 		             if (progParamBlock) delete[] progParamBlock;}
-		U32 Creator;
-		U32 Type;
-		U32 chunkSize;
-		U32 maxProgramNumber;
-		U32* programOffsetAddr;
+		uint32_t Creator;
+		uint32_t Type;
+		uint32_t chunkSize;
+		uint32_t maxProgramNumber;
+		uint32_t* programOffsetAddr;
 		SonyPS2Instr::ProgParam* progParamBlock;
 	} ProgCk;
 
@@ -155,11 +155,11 @@ public:
 	{
 		_SampSetParam() : sampleIndex(0) {}
 		~_SampSetParam() { if (sampleIndex) delete[] sampleIndex; }
-		U8 velCurve;
-		U8 velLimitLow;
-		U8 velLimitHigh;
-		U8 nSample;
-		U16* sampleIndex;
+		uint8_t velCurve;
+		uint8_t velLimitLow;
+		uint8_t velLimitHigh;
+		uint8_t nSample;
+		uint16_t* sampleIndex;
 	} SampSetParam;
 
 	typedef struct _SampSetCk
@@ -167,51 +167,51 @@ public:
 		_SampSetCk() : sampleSetOffsetAddr(0), sampleSetParam(0) {}
 		~_SampSetCk() { if (sampleSetOffsetAddr) delete[] sampleSetOffsetAddr;
 		                if (sampleSetParam) delete[] sampleSetParam; }
-		U32 Creator;
-		U32 Type;
-		U32 chunkSize;
-		U32 maxSampleSetNumber;
-		U32* sampleSetOffsetAddr;
+		uint32_t Creator;
+		uint32_t Type;
+		uint32_t chunkSize;
+		uint32_t maxSampleSetNumber;
+		uint32_t* sampleSetOffsetAddr;
 		SampSetParam* sampleSetParam;
 	} SampSetCk;
 
 	typedef struct _SampleParam
 	{
-		U16 VagIndex;
-		U8 velRangeLow;
-		U8 velCrossFade;
-		U8 velRangeHigh;
-		S8 velFollowPitch;
-		U8 velFollowPitchCenter;
-		U8 velFollowPitchVelCurve;
-		S8 velFollowAmp;
-		U8 velFollowAmpCenter; 
-		U8 velFollowAmpVelCurve;
-		U8 sampleBaseNote;
-		S8 sampleDetune; 
-		S8 samplePanpot;
-		U8 sampleGroup;
-		U8 samplePriority;
-		U8 sampleVolume;
-		U8 reserved;
-		U16 sampleAdsr1;
-		U16 sampleAdsr2;
-		S8 keyFollowAr;
-		U8 keyFollowArCenter;
-		S8 keyFollowDr;
-		U8 keyFollowDrCenter;
-		S8 keyFollowSr;
-		U8 keyFollowSrCenter;
-		S8 keyFollowRr;
-		U8 keyFollowRrCenter;
-		S8 keyFollowSl;
-		U8 keyFollowSlCenter;
-		U16 samplePitchLfoDelay;
-		U16 samplePitchLfoFade;
-		U16 sampleAmpLfoDelay;
-		U16 sampleAmpLfoFade;
-		U8 sampleLfoAttr;
-		U8 sampleSpuAttr;
+		uint16_t VagIndex;
+		uint8_t velRangeLow;
+		uint8_t velCrossFade;
+		uint8_t velRangeHigh;
+		int8_t velFollowPitch;
+		uint8_t velFollowPitchCenter;
+		uint8_t velFollowPitchVelCurve;
+		int8_t velFollowAmp;
+		uint8_t velFollowAmpCenter; 
+		uint8_t velFollowAmpVelCurve;
+		uint8_t sampleBaseNote;
+		int8_t sampleDetune; 
+		int8_t samplePanpot;
+		uint8_t sampleGroup;
+		uint8_t samplePriority;
+		uint8_t sampleVolume;
+		uint8_t reserved;
+		uint16_t sampleAdsr1;
+		uint16_t sampleAdsr2;
+		int8_t keyFollowAr;
+		uint8_t keyFollowArCenter;
+		int8_t keyFollowDr;
+		uint8_t keyFollowDrCenter;
+		int8_t keyFollowSr;
+		uint8_t keyFollowSrCenter;
+		int8_t keyFollowRr;
+		uint8_t keyFollowRrCenter;
+		int8_t keyFollowSl;
+		uint8_t keyFollowSlCenter;
+		uint16_t samplePitchLfoDelay;
+		uint16_t samplePitchLfoFade;
+		uint16_t sampleAmpLfoDelay;
+		uint16_t sampleAmpLfoFade;
+		uint8_t sampleLfoAttr;
+		uint8_t sampleSpuAttr;
 	} SampleParam;
 
 	typedef struct _SampCk
@@ -219,20 +219,20 @@ public:
 		_SampCk() : sampleOffsetAddr(0), sampleParam(0) {}
 		~_SampCk() { if (sampleOffsetAddr) delete[] sampleOffsetAddr;
 		             if (sampleParam) delete[] sampleParam; }
-		U32 Creator;
-		U32 Type;
-		U32 chunkSize;
-		U32 maxSampleNumber;
-		U32* sampleOffsetAddr;
+		uint32_t Creator;
+		uint32_t Type;
+		uint32_t chunkSize;
+		uint32_t maxSampleNumber;
+		uint32_t* sampleOffsetAddr;
 		SampleParam* sampleParam;
 	} SampCk;
 
 	typedef struct _VAGInfoParam
 	{
-		U32 vagOffsetAddr;
-		U16 vagSampleRate;
-		U8 vagAttribute;
-		U8 reserved;
+		uint32_t vagOffsetAddr;
+		uint16_t vagSampleRate;
+		uint8_t vagAttribute;
+		uint8_t reserved;
 	} VAGInfoParam;
 
 	typedef struct _VAGInfoCk
@@ -240,11 +240,11 @@ public:
 		_VAGInfoCk() : vagInfoOffsetAddr(0), vagInfoParam(0) {}
 		~_VAGInfoCk() { if (vagInfoOffsetAddr) delete[] vagInfoOffsetAddr;
 		                if (vagInfoParam) delete[] vagInfoParam; }
-		U32 Creator;
-		U32 Type;
-		U32 chunkSize;
-		U32 maxVagInfoNumber;
-		U32* vagInfoOffsetAddr;
+		uint32_t Creator;
+		uint32_t Type;
+		uint32_t chunkSize;
+		uint32_t maxVagInfoNumber;
+		uint32_t* vagInfoOffsetAddr;
 		VAGInfoParam* vagInfoParam;
 	} VAGInfoCk;
 

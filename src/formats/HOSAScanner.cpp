@@ -53,7 +53,7 @@ HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 		if (file->GetByte(i+6) > 24)
 			continue;
 		// First track pointer must != 0
-		U16 firstTrkPtr = file->GetShort(i+0x50);
+		uint16_t firstTrkPtr = file->GetShort(i+0x50);
 		if (firstTrkPtr == 0)
 			continue;
 		// First track pointer must be > second track pointer (if more than one track)
@@ -77,14 +77,14 @@ HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 #define MIN_SAMPLES_MATCH 4
 HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sampcoll)
 {
-	U32 numSamples = sampcoll->samples.size();
+	uint32_t numSamples = sampcoll->samples.size();
 	if (numSamples < MIN_NUM_SAMPLES_COMPARE)
 	{
 		pRoot->RemoveVGMFile(sampcoll);
 		return NULL;
 	}
 
-	U32* sampOffsets = new U32[numSamples];
+	uint32_t* sampOffsets = new uint32_t[numSamples];
 	for (unsigned int i=0; i<numSamples; i++)
 		sampOffsets[i] = sampcoll->samples[i]->dwOffset - sampcoll->dwOffset;
 
@@ -114,7 +114,7 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 	return NULL;
 }
 
-bool HOSAScanner::RecursiveRgnCompare(RawFile* file, int i, int sampNum, int numSamples, int numFinds, U32* sampOffsets)
+bool HOSAScanner::RecursiveRgnCompare(RawFile* file, int i, int sampNum, int numSamples, int numFinds, uint32_t* sampOffsets)
 {
 	if (i < 0 || (ULONG)(i+0x14) >= file->size())
 		return false;
@@ -122,9 +122,9 @@ bool HOSAScanner::RecursiveRgnCompare(RawFile* file, int i, int sampNum, int num
 		return (numFinds >= MIN_SAMPLES_MATCH);
 	// i+0 would be sample pointer of next region of same instr
 	// i+4 would be sample pointer of first region in new instr
-	U32 word1 = file->GetWord(i);
-	U32 word2 = file->GetWord(i+4);
-	U32 sampOffset = sampOffsets[sampNum];
+	uint32_t word1 = file->GetWord(i);
+	uint32_t word2 = file->GetWord(i+4);
+	uint32_t sampOffset = sampOffsets[sampNum];
 	if (word1 == sampOffset)
 		return RecursiveRgnCompare(file, i+0x10, sampNum+1, numSamples, numFinds+1, sampOffsets);	
 	else if (word1 == 0)

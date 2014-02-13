@@ -118,25 +118,25 @@ inline int RoundToZero(int val)
 template <class T> void PSXConvADSR(T* realADSR, unsigned short ADSR1, unsigned short ADSR2, bool bPS2)
 {
 	
-	U8 Am = (ADSR1 & 0x8000) > 0;	// if 1, then Exponential, else linear
-	U8 Ar = (ADSR1 & 0x7F00) >> 8;
-	U8 Dr = (ADSR1 & 0x00F0) >> 4;
-	U8 Sl = ADSR1 & 0x000F;
-	U8 Rm = (ADSR2 & 0x0020) > 0;
-	U8 Rr = ADSR2 & 0x001F;
+	uint8_t Am = (ADSR1 & 0x8000) > 0;	// if 1, then Exponential, else linear
+	uint8_t Ar = (ADSR1 & 0x7F00) >> 8;
+	uint8_t Dr = (ADSR1 & 0x00F0) >> 4;
+	uint8_t Sl = ADSR1 & 0x000F;
+	uint8_t Rm = (ADSR2 & 0x0020) > 0;
+	uint8_t Rr = ADSR2 & 0x001F;
 
 	// The following are unimplemented in conversion (because DLS does not support Sustain Rate)
-	U8 Sm = (ADSR2 & 0x8000) > 0;
-	U8 Sd = (ADSR2 & 0x4000) > 0;
-	U8 Sr = (ADSR2 >> 6) & 0x7F;
+	uint8_t Sm = (ADSR2 & 0x8000) > 0;
+	uint8_t Sd = (ADSR2 & 0x4000) > 0;
+	uint8_t Sr = (ADSR2 >> 6) & 0x7F;
 
 	PSXConvADSR(realADSR, Am, Ar, Dr, Sl, Sm, Sd, Sr, Rm, Rr, bPS2);
 }
 
 
 template <class T> void PSXConvADSR(T* realADSR,
-									U8 Am, U8 Ar, U8 Dr, U8 Sl,
-									U8 Sm, U8 Sd, U8 Sr, U8 Rm, U8 Rr, bool bPS2)
+									uint8_t Am, uint8_t Ar, uint8_t Dr, uint8_t Sl,
+									uint8_t Sm, uint8_t Sd, uint8_t Sr, uint8_t Rm, uint8_t Rr, bool bPS2)
 {
 	// Make sure all the ADSR values are within the valid ranges
 	if (((Am & 0xFE) != 0) ||
@@ -361,9 +361,9 @@ class PSXSampColl
 	: public VGMSampColl
 {
 public:
-	PSXSampColl(const std::string& format, RawFile* rawfile, U32 offset, U32 length = 0);
-	PSXSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset, U32 length = 0);
-	PSXSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset, U32 length, const std::vector<SizeOffsetPair>& vagLocations);
+	PSXSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, uint32_t length = 0);
+	PSXSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, uint32_t length = 0);
+	PSXSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, uint32_t length, const std::vector<SizeOffsetPair>& vagLocations);
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 	static PSXSampColl* SearchForPSXADPCM (RawFile* file, const std::string& format);

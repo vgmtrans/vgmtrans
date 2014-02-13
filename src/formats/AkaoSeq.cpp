@@ -69,13 +69,13 @@ bool AkaoSeq::GetHeaderInfo(void)
 
 	//There must be either a melodic instrument section, a drumkit, or both.  We determiine
 	//the start of the InstrSet based on whether a melodic instrument section is given.
-	U32 instrOff = GetWord(dwOffset + 0x30);
-	U32 drumkitOff = GetWord(dwOffset + 0x34);
+	uint32_t instrOff = GetWord(dwOffset + 0x30);
+	uint32_t drumkitOff = GetWord(dwOffset + 0x34);
 	if (instrOff != 0)
 		instrOff += 0x30 + dwOffset;
 	if (drumkitOff != 0)
 		drumkitOff += 0x34 + dwOffset;
-	U32 instrSetLength;
+	uint32_t instrSetLength;
 	if (instrOff != 0)
 		instrSetLength = unLength - (instrOff - dwOffset);
 	else
@@ -619,7 +619,7 @@ bool AkaoTrack::ReadEvent(void)
 
 		case 0x06 :			//Branch Relative
 			{
-				ULONG dest = (S16)GetShort(curOffset) + curOffset;
+				ULONG dest = (int16_t)GetShort(curOffset) + curOffset;
 				curOffset += 2;
 				ULONG eventLength = curOffset - beginOffset;
 				bool bContinue = false;
@@ -659,7 +659,7 @@ bool AkaoTrack::ReadEvent(void)
 		case 0x07 :			//Permanence Loop break with conditional.
 			{
 				BYTE condValue = GetByte(curOffset++);
-				ULONG dest = (S16)GetShort(curOffset) + curOffset;
+				ULONG dest = (int16_t)GetShort(curOffset) + curOffset;
 				curOffset += 2;
 				ULONG eventLength = curOffset - beginOffset;
 

@@ -10,7 +10,7 @@ using namespace std;
 // AkaoInstrSet
 // ************
 
-AkaoInstrSet::AkaoInstrSet(RawFile* file, U32 length, U32 instrOff, U32 dkitOff, U32 theID, wstring name)
+AkaoInstrSet::AkaoInstrSet(RawFile* file, uint32_t length, uint32_t instrOff, uint32_t dkitOff, uint32_t theID, wstring name)
 : VGMInstrSet(AkaoFormat::name, file, 0, length, name)
 {
 	id = theID;
@@ -84,8 +84,8 @@ AkaoDrumKit::AkaoDrumKit(AkaoInstrSet* instrSet, ULONG offset, ULONG length, ULO
 
 bool AkaoDrumKit::LoadInstr()
 {
-	U32 j = dwOffset;  //j = the end of the last instrument of the instrument table ie, the beginning of drumkit data
-	U32 endOffset = parInstrSet->dwOffset + parInstrSet->unLength;
+	uint32_t j = dwOffset;  //j = the end of the last instrument of the instrument table ie, the beginning of drumkit data
+	uint32_t endOffset = parInstrSet->dwOffset + parInstrSet->unLength;
 	for (UINT i=0; (i<128) && (j < endOffset); i++)
 	{
 		if ((GetWord(j) != 0) && (GetWord(j+4) != 0))	//we found some region data for the drum kit

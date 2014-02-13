@@ -102,8 +102,8 @@ public:
 	BYTE midiReverb;                            // MIDI reverb level for SPC700 echo
 	BYTE timerFreq;                             // SPC700 timer 0 frequency (tempo base)
 	BYTE tempo;                                 // song tempo
-	S8 presetVolL[5];                           // volume preset L
-	S8 presetVolR[5];                           // volume preset R
+	int8_t presetVolL[5];                           // volume preset L
+	int8_t presetVolR[5];                           // volume preset R
 	USHORT presetADSR[5];                       // ADSR preset
 
 	double GetTempoInBPM ();
@@ -126,8 +126,8 @@ public:
 	virtual void OnTickBegin(void);
 	virtual void OnTickEnd(void);
 
-	void AddVolLR(ULONG offset, ULONG length, S8 spcVolL, S8 spcVolR, const wchar_t* sEventName = L"Volume L/R");
-	void AddVolLRNoItem(S8 spcVolL, S8 spcVolR);
+	void AddVolLR(ULONG offset, ULONG length, int8_t spcVolL, int8_t spcVolR, const wchar_t* sEventName = L"Volume L/R");
+	void AddVolLRNoItem(int8_t spcVolL, int8_t spcVolR);
 
 private:
 	BYTE rptNestLevel;                          // nest level for repeat-subroutine command
@@ -135,10 +135,10 @@ private:
 	ULONG rptStart[RARESNES_RPTNESTMAX];        // loop start address for repeat-subroutine command
 	ULONG rptRetnAddr[RARESNES_RPTNESTMAX];     // return address for repeat-subroutine command
 	USHORT spcNotePitch;                        // SPC700 pitch register value (0000-3fff), converter will need it for pitch slide
-	S8 spcTranspose;                            // transpose (compatible with actual engine)
-	S8 spcTransposeAbs;                         // transpose (without relative change)
-	S8 spcTuning;                               // tuning (compatible with actual engine)
-	S8 spcVolL, spcVolR;                        // SPC700 left/right volume
+	int8_t spcTranspose;                            // transpose (compatible with actual engine)
+	int8_t spcTransposeAbs;                         // transpose (without relative change)
+	int8_t spcTuning;                               // tuning (compatible with actual engine)
+	int8_t spcVolL, spcVolR;                        // SPC700 left/right volume
 	BYTE spcInstr;                              // SPC700 instrument index (NOT SRCN value)
 	USHORT spcADSR;                             // SPC700 ADSR value
 	USHORT defNoteDur;                          // default duration for note (0:unused)
@@ -146,6 +146,6 @@ private:
 	BYTE altNoteByte1;                          // note number preset 1
 	BYTE altNoteByte2;                          // note number preset 2
 
-	double GetTuningInSemitones(S8 tuning);
-	void CalcVolPanFromVolLR(S8 volLByte, S8 volRByte, BYTE& midiVol, BYTE& midiPan);
+	double GetTuningInSemitones(int8_t tuning);
+	void CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, BYTE& midiVol, BYTE& midiPan);
 };

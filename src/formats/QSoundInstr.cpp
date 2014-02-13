@@ -12,7 +12,7 @@ using namespace std;
 // ****************
 
 
-QSoundArticTable::QSoundArticTable(RawFile* file, std::wstring& name, U32 offset, U32 length)
+QSoundArticTable::QSoundArticTable(RawFile* file, std::wstring& name, uint32_t offset, uint32_t length)
 	: VGMMiscFile(QSoundFormat::name, file, offset, length, name)
 {
 }
@@ -26,7 +26,7 @@ QSoundArticTable::~QSoundArticTable(void)
 bool QSoundArticTable::LoadMain()
 {
 	DWORD off = dwOffset;
-	U32 test1=1, test2=1;
+	uint32_t test1=1, test2=1;
 	//for (int i = 0; (test1 || test2)  && ((test1 != 0xFFFFFFFF) || (test2 != 0xFFFFFFFF)); i++, off += sizeof(qs_samp_info) )
 	for (int i = 0; off < dwOffset+unLength; i++, off += sizeof(qs_samp_info))
 	{
@@ -61,7 +61,7 @@ bool QSoundArticTable::LoadMain()
 // *********************
 
 
-QSoundSampleInfoTable::QSoundSampleInfoTable(RawFile* file, wstring& name, U32 offset, U32 length)
+QSoundSampleInfoTable::QSoundSampleInfoTable(RawFile* file, wstring& name, uint32_t offset, uint32_t length)
 	: VGMMiscFile(QSoundFormat::name, file, offset, length, name)
 {
 }
@@ -75,7 +75,7 @@ QSoundSampleInfoTable::~QSoundSampleInfoTable(void)
 bool QSoundSampleInfoTable::LoadMain()
 {
 	DWORD off = dwOffset;
-	U32 test1=1, test2=1;
+	uint32_t test1=1, test2=1;
 	if (unLength == 0)
 		unLength = 0xFFFFFFFF - dwOffset;
 	for (int i = 0; (test1 || test2)  && ((test1 != 0xFFFFFFFF) || (test2 != 0xFFFFFFFF)) && off < dwOffset+unLength; i++, off += sizeof(qs_samp_info) )
@@ -107,7 +107,7 @@ bool QSoundSampleInfoTable::LoadMain()
 
 QSoundInstrSet::QSoundInstrSet(RawFile* file,
 							   QSoundVer version,
-							   U32 offset,
+							   uint32_t offset,
 							   int numInstrBanks,
 							   QSoundSampleInfoTable* theSampInfoTable,
 							   QSoundArticTable* theArticTable,
@@ -152,17 +152,17 @@ bool QSoundInstrSet::GetInstrPointers()
 	}
 	else
 	{
-		U8 instr_info_length = sizeof(qs_prog_info_ver_130);
+		uint8_t instr_info_length = sizeof(qs_prog_info_ver_130);
 		if (fmt_version < VER_130)
 			instr_info_length = sizeof(qs_prog_info_ver_103);		//1.16 (Xmen vs SF) is like this
 
-		vector<U16> instr_table_ptrs;
+		vector<uint16_t> instr_table_ptrs;
 		for (unsigned int i=0; i<num_instr_banks; i++)
 			instr_table_ptrs.push_back(GetShort(dwOffset+i*2));	//get the instr table ptrs
 		int totalInstrs = 0;
 		for (UINT i=0; i<instr_table_ptrs.size(); i++)
 		{
-			U16 endOffset;
+			uint16_t endOffset;
 			// The following is actually incorrect.  There is a max of 256 instruments per bank
 			if (i+1 < instr_table_ptrs.size())	
 				endOffset = instr_table_ptrs[i+1];

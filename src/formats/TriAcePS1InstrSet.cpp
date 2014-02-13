@@ -59,10 +59,10 @@ bool TriAcePS1InstrSet::GetHeaderInfo()
 bool TriAcePS1InstrSet::GetInstrPointers()
 {
 
-	U32 firstWord = GetWord(dwOffset+sizeof(TriAcePS1InstrSet::_InstrHeader));		//1,Sep.2009 revise
+	uint32_t firstWord = GetWord(dwOffset+sizeof(TriAcePS1InstrSet::_InstrHeader));		//1,Sep.2009 revise
 
 	//0xFFFFFFFFÇ…Ç»ÇÈÇ‹Ç≈åJÇËï‘Ç∑ÅB
-	for (U32 i = dwOffset+sizeof(TriAcePS1InstrSet::_InstrHeader);					//1,Sep.2009 revise
+	for (uint32_t i = dwOffset+sizeof(TriAcePS1InstrSet::_InstrHeader);					//1,Sep.2009 revise
 	  ((firstWord != 0xFFFFFFFF) && (i < dwOffset+unLength));
 	  i+=sizeof(TriAcePS1Instr::InstrInfo), firstWord = GetWord(i))
 	{
@@ -132,7 +132,7 @@ bool TriAcePS1Instr::LoadInstr()
 		//rgn->loop.loopStatus = (rgninfo->loopOffset != rgninfo->sampOffset) && (rgninfo->loopOffset != 0);
 		rgn->loop.loopStart = rgninfo->loopOffset;
 		rgn->AddSimpleItem(rgn->dwOffset+12, 1, L"Attenuation");
-		rgn->AddUnityKey((S8)0x3B - rgninfo->pitchTuneSemitones, rgn->dwOffset+13);  //You would think it would be 0x3C (middle c)
+		rgn->AddUnityKey((int8_t)0x3B - rgninfo->pitchTuneSemitones, rgn->dwOffset+13);  //You would think it would be 0x3C (middle c)
 		rgn->AddSimpleItem(rgn->dwOffset+14, 1, L"Pitch Fine Tune");
 		rgn->fineTune =  (short)((double)rgninfo->pitchTuneFine / 1.27);
 		rgn->sampCollPtr = ((VGMInstrSet*)this->vgmfile)->sampColl;

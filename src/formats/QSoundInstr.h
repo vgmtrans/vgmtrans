@@ -108,7 +108,7 @@ class QSoundArticTable
 	: public VGMMiscFile
 {
 public:
-	QSoundArticTable(RawFile* file, std::wstring& name, U32 offset, U32 length);
+	QSoundArticTable(RawFile* file, std::wstring& name, uint32_t offset, uint32_t length);
 	virtual ~QSoundArticTable(void);
 
 	virtual bool LoadMain();
@@ -125,7 +125,7 @@ class QSoundSampleInfoTable
 	: public VGMMiscFile
 {
 public:
-	QSoundSampleInfoTable(RawFile* file, std::wstring& name, U32 offset, U32 length = 0);
+	QSoundSampleInfoTable(RawFile* file, std::wstring& name, uint32_t offset, uint32_t length = 0);
 	virtual ~QSoundSampleInfoTable(void);
 
 	virtual bool LoadMain();
@@ -145,7 +145,7 @@ class QSoundInstrSet
 public:
 	QSoundInstrSet(RawFile* file,
 				   QSoundVer fmt_version,
-				   U32 offset, 
+				   uint32_t offset, 
 				   int numInstrBanks,
 				   QSoundSampleInfoTable* sampInfoTable,
 				   QSoundArticTable* articTable,
@@ -161,8 +161,8 @@ public:
 	UINT num_instr_banks;
 	QSoundSampleInfoTable* sampInfoTable;
 	QSoundArticTable* articTable;
-	//U32 samp_table_offset;
-	//U32 samp_table_length;
+	//uint32_t samp_table_offset;
+	//uint32_t samp_table_length;
 	//qs_samp_info*	qs_samp_infos;
 	//UINT numSamples;
 

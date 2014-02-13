@@ -17,15 +17,15 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 	MAMERomGroupEntry* sampsRomGroupEntry = gameentry->GetRomGroupOfType("qsound");
 	if (!seqRomGroupEntry || !sampsRomGroupEntry)
 		return;
-	U32 seq_table_offset;
-	U32 seq_table_length = 0;
-	U32 instr_table_offset;
-	U32 samp_table_offset;
-	U32 samp_table_length = 0;
-	U32 artic_table_offset = 0;
-	U32 artic_table_length = 0x800;
-	U32 num_instr_banks;
-	U32 instr_tables_end = 0;
+	uint32_t seq_table_offset;
+	uint32_t seq_table_length = 0;
+	uint32_t instr_table_offset;
+	uint32_t samp_table_offset;
+	uint32_t samp_table_length = 0;
+	uint32_t artic_table_offset = 0;
+	uint32_t artic_table_length = 0x800;
+	uint32_t num_instr_banks;
+	uint32_t instr_tables_end = 0;
 	if (!seqRomGroupEntry->file || !sampsRomGroupEntry->file ||
 		!seqRomGroupEntry->GetHexAttribute("seq_table", &seq_table_offset) ||
 		!seqRomGroupEntry->GetHexAttribute("samp_table", &samp_table_offset) ||

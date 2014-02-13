@@ -61,7 +61,7 @@ double LinAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten)
 }
 
 
-BYTE Convert7bitPercentVolValToStdMidiVal(BYTE percentVal)
+uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal)
 {
 	// MIDI uses the following formula for db attenuation on velocity/volume values.
 	// (see http://www.midi.org/techspecs/gmguide2.pdf pg9 or dls1 spec page 14)
@@ -130,12 +130,12 @@ BYTE Convert7bitPercentVolValToStdMidiVal(BYTE percentVal)
 
 // Takes a percentage amplitude value - that is one using a -20*log10(percent) scale for db attenuation
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
-BYTE ConvertPercentAmpToStdMidiVal(double percent)
+uint8_t ConvertPercentAmpToStdMidiVal(double percent)
 {
 	//should be able to just do 127*sqrt(percent)
 	return round(127.0*sqrt(percent));
 	//double atten = ConvertLogScaleValToAtten(percent);
-	//BYTE test = round(127*pow(10.0,-0.025*atten));
+	//uint8_t test = round(127*pow(10.0,-0.025*atten));
 	//return round(127*pow(10.0,-0.025*atten));
 }
 

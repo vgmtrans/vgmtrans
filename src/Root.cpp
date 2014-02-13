@@ -117,8 +117,8 @@ void VGMRoot::Reset(void)
 	//Close all RawFiles
 	DeleteVect<RawFile>(vRawFile);
 
-	//UINT nRawFiles = vRawFile.size();
-	//for (UINT i=0; i<nRawFiles; i++)
+	//uint32_t nRawFiles = vRawFile.size();
+	//for (uint32_t i=0; i<nRawFiles; i++)
 	//{
 	//	RawFile* rawfile = vRawFile[i];
 	//	UI_CloseRawFile(rawfile);
@@ -146,7 +146,7 @@ bool VGMRoot::OpenRawFile(const wstring& filename)
 // creates a virtual file, a RawFile that was data was created manually,
 // not actually opened from the filesystem.  Used, for example, when decompressing
 // the contents of PSF2 files
-bool VGMRoot::CreateVirtFile(BYTE *databuf, ULONG fileSize, const wstring& filename, const wstring& parRawFileFullPath)
+bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const wstring& filename, const wstring& parRawFileFullPath)
 {
 	assert(fileSize);
 	return SetupNewRawFile(new VirtFile(databuf, fileSize, filename.c_str(), parRawFileFullPath.c_str()));
@@ -159,7 +159,7 @@ bool VGMRoot::SetupNewRawFile(RawFile* newRawFile)
 	newRawFile->SetProPreRatio((float)0.80);
 
 	if (newRawFile->processFlags & PF_USELOADERS)
-		for (UINT i=0; i<vLoader.size(); i++)
+		for (uint32_t i=0; i<vLoader.size(); i++)
 		{
 			if (vLoader[i]->Apply(newRawFile) == DELETE_IT)
 			{
@@ -182,7 +182,7 @@ bool VGMRoot::SetupNewRawFile(RawFile* newRawFile)
 		else
 		{
 			//otherwise, use every scanner
-			for (UINT i=0; i<vScanner.size(); i++)
+			for (uint32_t i=0; i<vScanner.size(); i++)
 				vScanner[i]->Scan(newRawFile);
 		}
 	}
@@ -314,7 +314,7 @@ void VGMRoot::UI_AddVGMFile(VGMFile* theFile)
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_WriteBufferToFile(const wstring& filepath, BYTE* buf, ULONG size)
+bool VGMRoot::UI_WriteBufferToFile(const wstring& filepath, uint8_t* buf, uint32_t size)
 {	
 #if _MSC_VER < 1400			//if we're not using VC8, and the new STL that supports widechar filenames in ofstream...
 	char newpath[_MAX_PATH];
@@ -340,12 +340,12 @@ bool VGMRoot::SaveAllAsRaw()
 	wstring dirpath = UI_GetSaveDirPath();\
 	if (dirpath.length() != 0)
 	{
-		for (UINT i=0; i<vVGMFile.size(); i++)
+		for (uint32_t i=0; i<vVGMFile.size(); i++)
 		{
 			bool result;
 			VGMFile* file = vVGMFile[i];
 			wstring filepath = dirpath + L"\\" + file->GetName()->c_str();
-			BYTE* buf = new BYTE[file->unLength];		//create a buffer the size of the file
+			uint8_t* buf = new uint8_t[file->unLength];		//create a buffer the size of the file
 			file->GetBytes(file->dwOffset, file->unLength, buf);
 			result = UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);
 			delete[] buf;

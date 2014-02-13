@@ -34,12 +34,12 @@ public:
 	END_MENU()
 
 public:
-	VGMFile(FileType fileType, /*FmtID fmtID,*/const std::string& format, RawFile* theRawFile, ULONG offset, ULONG length = 0, std::wstring theName = L"VGM File");
+	VGMFile(FileType fileType, /*FmtID fmtID,*/const std::string& format, RawFile* theRawFile, uint32_t offset, uint32_t length = 0, std::wstring theName = L"VGM File");
 	virtual ~VGMFile(void);
 
 	virtual ItemType GetType() const { return ITEMTYPE_VGMFILE; }
 	FileType GetFileType() { return file_type; }
-	virtual VGMItem* GetItemFromOffset(ULONG offset);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset);
 
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 
@@ -57,9 +57,9 @@ public:
 	Format* GetFormat();
 	const std::string& GetFormatName();
 
-	virtual ULONG GetID() { return id;}
+	virtual uint32_t GetID() { return id;}
 	//virtual void Announce() {}
-	//virtual VGMItem* GetItemFromOffset(ULONG offset) = 0;
+	//virtual VGMItem* GetItemFromOffset(uint32_t offset) = 0;
 
 	void AddCollAssoc(VGMColl* coll);
 	void RemoveCollAssoc(VGMColl* coll);
@@ -69,9 +69,9 @@ public:
 	void UseRawFileData();
 
 public:
-	UINT GetBytes(UINT nIndex, UINT nCount, void* pBuffer);
+	uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer);
 		
-	inline BYTE GetByte(ULONG offset)
+	inline uint8_t GetByte(uint32_t offset)
 	{
 		if (bUsingRawFile)
 			return rawfile->GetByte(offset);
@@ -79,19 +79,19 @@ public:
 			return data[offset];
 	}
 
-	inline USHORT GetShort(ULONG offset)
+	inline uint16_t GetShort(uint32_t offset)
 	{
 		//if (nIndex+1 >= filesize)
 		//	return 0;
 
-		//return *((USHORT*)(data+nIndex));
+		//return *((uint16_t*)(data+nIndex));
 		if (bUsingRawFile)
 			return rawfile->GetShort(offset);
 		else
 			return data.GetShort(offset);
 	}
 
-	inline UINT GetWord(ULONG offset)
+	inline uint32_t GetWord(uint32_t offset)
 	{
 		if (bUsingRawFile)
 			return rawfile->GetWord(offset);
@@ -100,7 +100,7 @@ public:
 	}
 
 	//GetShort Big Endian
-	inline USHORT GetShortBE(ULONG offset)
+	inline uint16_t GetShortBE(uint32_t offset)
 	{
 		if (bUsingRawFile)
 			return rawfile->GetShortBE(offset);
@@ -109,7 +109,7 @@ public:
 	}
 
 	//GetWord Big Endian
-	inline UINT GetWordBE(ULONG offset)
+	inline uint32_t GetWordBE(uint32_t offset)
 	{
 		if (bUsingRawFile)
 			return rawfile->GetWordBE(offset);
@@ -117,7 +117,7 @@ public:
 			return data.GetWordBE(offset);
 	}
 
-	inline bool IsValidOffset(ULONG offset)
+	inline bool IsValidOffset(uint32_t offset)
 	{
 		if (bUsingRawFile)
 			return rawfile->IsValidOffset(offset);
@@ -125,7 +125,7 @@ public:
 			return data.IsValidOffset(offset);
 	}
 
-	inline ULONG GetStartOffset()
+	inline uint32_t GetStartOffset()
 	{
 		if (bUsingRawFile)
 			return 0;
@@ -133,7 +133,7 @@ public:
 			return data.startOff;
 	}
 
-	inline ULONG GetEndOffset()
+	inline uint32_t GetEndOffset()
 	{
 		if (bUsingRawFile)
 			return rawfile->size();
@@ -154,7 +154,7 @@ protected:
 	FileType file_type;
 	const std::string& format; 
 	//FmtID fmt_id;
-	ULONG id;
+	uint32_t id;
 	std::wstring name;
 public:
 	RawFile* rawfile;
@@ -176,14 +176,14 @@ class VGMHeader :
 	public VGMContainerItem
 {
 public:
-	VGMHeader(VGMItem* parItem, ULONG offset = 0, ULONG length = 0, const wchar_t* name = L"Header");
+	VGMHeader(VGMItem* parItem, uint32_t offset = 0, uint32_t length = 0, const wchar_t* name = L"Header");
 	virtual ~VGMHeader();
 
 	virtual Icon GetIcon() { return ICON_BINARY; };
 
-	void AddPointer(ULONG offset, ULONG length, ULONG destAddress, bool notNull, const wchar_t *name = L"Pointer");
-	void AddTempo(ULONG offset, ULONG length, const wchar_t *name = L"Tempo");
-	void AddSig(ULONG offset, ULONG length, const wchar_t *name = L"Signature");
+	void AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull, const wchar_t *name = L"Pointer");
+	void AddTempo(uint32_t offset, uint32_t length, const wchar_t *name = L"Tempo");
+	void AddSig(uint32_t offset, uint32_t length, const wchar_t *name = L"Signature");
 
 	//vector<VGMItem*> items;
 };
@@ -198,7 +198,7 @@ class VGMHeaderItem :
 public:
 	enum HdrItemType { HIT_POINTER, HIT_TEMPO, HIT_SIG, HIT_GENERIC, HIT_UNKNOWN };		//HIT = Header Item Type
 
-	VGMHeaderItem(VGMHeader* hdr, HdrItemType theType, ULONG offset, ULONG length, const wchar_t* name);
+	VGMHeaderItem(VGMHeader* hdr, HdrItemType theType, uint32_t offset, uint32_t length, const wchar_t* name);
 	virtual Icon GetIcon();
 
 public:

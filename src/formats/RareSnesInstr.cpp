@@ -8,7 +8,7 @@
 // RareSnesInstrSet
 // ****************
 
-RareSnesInstrSet::RareSnesInstrSet(RawFile* file, ULONG offset, U32 spcDirAddr, const std::wstring & name) :
+RareSnesInstrSet::RareSnesInstrSet(RawFile* file, ULONG offset, uint32_t spcDirAddr, const std::wstring & name) :
 	VGMInstrSet(RareSnesFormat::name, file, offset, 0, name),
 	spcDirAddr(spcDirAddr),
 	maxSRCNValue(255)
@@ -16,7 +16,7 @@ RareSnesInstrSet::RareSnesInstrSet(RawFile* file, ULONG offset, U32 spcDirAddr, 
 	Initialize();
 }
 
-RareSnesInstrSet::RareSnesInstrSet(RawFile* file, ULONG offset, U32 spcDirAddr,
+RareSnesInstrSet::RareSnesInstrSet(RawFile* file, ULONG offset, uint32_t spcDirAddr,
 		const std::map<BYTE, double> & instrUnityKeyHints, const std::map<BYTE, USHORT> & instrADSRHints,
 		const std::wstring & name) :
 	VGMInstrSet(RareSnesFormat::name, file, offset, 0, name),
@@ -156,7 +156,7 @@ const std::vector<BYTE>& RareSnesInstrSet::GetAvailableInstruments()
 // RareSnesInstr
 // *************
 
-RareSnesInstr::RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, U32 spcDirAddr, double transpose, U16 adsr, const std::wstring& name) :
+RareSnesInstr::RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, uint32_t spcDirAddr, double transpose, uint16_t adsr, const std::wstring& name) :
 	VGMInstr(instrSet, offset, 1, theBank, theInstrNum, name),
 	spcDirAddr(spcDirAddr),
 	transpose(transpose),
@@ -189,7 +189,7 @@ bool RareSnesInstr::LoadInstr()
 // RareSnesRgn
 // ***********
 
-RareSnesRgn::RareSnesRgn(RareSnesInstr* instr, ULONG offset, double transpose, U16 adsr) :
+RareSnesRgn::RareSnesRgn(RareSnesInstr* instr, ULONG offset, double transpose, uint16_t adsr) :
 	VGMRgn(instr, offset, 1),
 	transpose(transpose),
 	adsr(adsr)

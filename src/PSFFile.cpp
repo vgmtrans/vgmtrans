@@ -1,10 +1,10 @@
 #include "stdafx.h"
 
 #include <zlib.h>
+#include <stdint.h>
 #include "Root.h"
 #include "DataSeg.h"
 #include "PSFFile.h"
-#include "types.h"
 
 using namespace std;
 
@@ -16,7 +16,7 @@ PSFFile::PSFFile(void) :
 	stripBuf(NULL),
 	stripBufSize(PSF_STRIP_BUF_SIZE)
 {
-	stripBuf = new BYTE[PSF_STRIP_BUF_SIZE];
+	stripBuf = new uint8_t[PSF_STRIP_BUF_SIZE];
 
 	exeData = new DataSeg();
 	exeCompData = new DataSeg();
@@ -29,7 +29,7 @@ PSFFile::PSFFile(RawFile* file) :
 	stripBuf(NULL),
 	stripBufSize(PSF_STRIP_BUF_SIZE)
 {
-	stripBuf = new BYTE[PSF_STRIP_BUF_SIZE];
+	stripBuf = new uint8_t[PSF_STRIP_BUF_SIZE];
 	stripBufSize = PSF_STRIP_BUF_SIZE;
 
 	exeData = new DataSeg();
@@ -52,7 +52,7 @@ bool PSFFile::Load(RawFile* file)
 	Clear();
 
 	// Check file size.
-	UINT fileSize = file->size();
+	uint32_t fileSize = file->size();
 	if (fileSize < 0x10)
 	{
 		errorstr = L"PSF too small - likely corrupt";
@@ -60,7 +60,7 @@ bool PSFFile::Load(RawFile* file)
 	}
 
 	// Check PSF signature.
-	BYTE psfSig[4];
+	uint8_t psfSig[4];
 	file->GetBytes(0, 4, psfSig);
 	if (memcmp(psfSig, "PSF", 3) != 0)
 	{
@@ -86,7 +86,7 @@ bool PSFFile::Load(RawFile* file)
 	}
 
 	// Read compressed program section.
-	BYTE* zexebuf = new BYTE[exeSize > 0 ? exeSize : 1];
+	uint8_t* zexebuf = new uint8_t[exeSize > 0 ? exeSize : 1];
 	if (zexebuf == NULL)
 	{
 		errorstr = L"Out of memory reading the file";
@@ -104,7 +104,7 @@ bool PSFFile::Load(RawFile* file)
 	}
 
 	// Read reserved section.
-	BYTE* reservebuf = new BYTE[reservedSize ? reservedSize : 1];
+	uint8_t* reservebuf = new uint8_t[reservedSize ? reservedSize : 1];
 	if (reservebuf == NULL)
 	{
 		errorstr = L"Out of memory reading the file";
@@ -115,12 +115,12 @@ bool PSFFile::Load(RawFile* file)
 	reservedData->load(reservebuf, 0, reservedSize);
 
 	// Check existence of tag section.
-	UINT tagSectionOffset = 16 + reservedSize + exeSize;
-	UINT tagSectionSize = fileSize - tagSectionOffset;
+	uint32_t tagSectionOffset = 16 + reservedSize + exeSize;
+	uint32_t tagSectionSize = fileSize - tagSectionOffset;
 	bool hasTagSection = false;
 	if (tagSectionSize >= PSF_TAG_SIG_LEN)
 	{
-		BYTE tagSig[5];
+		uint8_t tagSig[5];
 		file->GetBytes(tagSectionOffset, PSF_TAG_SIG_LEN, tagSig);
 		if (memcmp(tagSig, PSF_TAG_SIG, PSF_TAG_SIG_LEN) == 0)
 		{
@@ -142,7 +142,7 @@ bool PSFFile::Load(RawFile* file)
 
 	// Parse tag section. Details are available here:
 	// http://wiki.neillcorlett.com/PSFTagFormat
-	UINT tagCurPos = PSF_TAG_SIG_LEN;
+	uint32_t tagCurPos = PSF_TAG_SIG_LEN;
 	while (tagCurPos < tagSectionSize)
 	{
 		// Search the end position of the current line.
@@ -214,7 +214,7 @@ bool PSFFile::Load(RawFile* file)
 	return true;
 }
 
-bool PSFFile::ReadExe(BYTE* buf, size_t len, size_t stripLen) const
+bool PSFFile::ReadExe(uint8_t* buf, size_t len, size_t stripLen) const
 {
 	if (len == 0)
 	{
@@ -240,7 +240,7 @@ bool PSFFile::ReadExeDataSeg(DataSeg*& seg, size_t len, size_t stripLen) const
 		return true;
 	}
 
-	BYTE* buf = new BYTE[len];
+	uint8_t* buf = new uint8_t[len];
 	uLong destlen = len;
 	int zRet = myuncompress(buf, &destlen, exeCompData->data, exeCompData->size, stripLen);
 	if (zRet != Z_OK)
@@ -274,7 +274,7 @@ bool PSFFile::Decompress(size_t decompressed_size)
 		}
 	}
 
-	BYTE* buf = new BYTE[decompressed_size];
+	uint8_t* buf = new uint8_t[decompressed_size];
 	if (buf == NULL)
 	{
 		errorstr = L"Out of memory reading the file";
@@ -301,7 +301,7 @@ bool PSFFile::IsDecompressed() const
 	return decompressed;
 }
 
-BYTE PSFFile::GetVersion(void) const
+uint8_t PSFFile::GetVersion(void) const
 {
 	return version;
 }

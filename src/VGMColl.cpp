@@ -28,11 +28,11 @@ void VGMColl::RemoveFileAssocs()
 {
 	if (seq)
 		seq->RemoveCollAssoc(this);
-	for (UINT i=0; i<instrsets.size(); i++)
+	for (uint32_t i=0; i<instrsets.size(); i++)
 		instrsets[i]->RemoveCollAssoc(this);
-	for (UINT i=0; i<sampcolls.size(); i++)
+	for (uint32_t i=0; i<sampcolls.size(); i++)
 		sampcolls[i]->RemoveCollAssoc(this);
-	for (UINT i=0; i<miscfiles.size(); i++)
+	for (uint32_t i=0; i<miscfiles.size(); i++)
 		miscfiles[i]->RemoveCollAssoc(this);
 }
 
@@ -105,20 +105,20 @@ void VGMColl::UnpackSampColl(DLSFile& dls, VGMSampColl* sampColl, vector<VGMSamp
 	{
 		VGMSamp* samp = sampColl->samples[i];
 
-		ULONG bufSize;
+		uint32_t bufSize;
 		if (samp->ulUncompressedSize)
 			bufSize = samp->ulUncompressedSize;
 		else
-			bufSize = (ULONG)ceil((double)samp->dataLength * samp->GetCompressionRatio());
+			bufSize = (uint32_t)ceil((double)samp->dataLength * samp->GetCompressionRatio());
 		//bool bOddBufSize = bufSize % 2;
 		//if (bOddBufSize)				//if the buffer size is odd, we must align it to be even for the RIFF format
 		//	bufSize++;
-		BYTE* uncompSampBuf = new BYTE[bufSize];	//create a new memory space for the uncompressed wave
+		uint8_t* uncompSampBuf = new uint8_t[bufSize];	//create a new memory space for the uncompressed wave
 		samp->ConvertToStdWave(uncompSampBuf);			//and uncompress into that space
 		//if (bOddBufSize)
 		//	uncompSampBuf[bufSize] = 0;		//set the last (should be unused) byte to 0;
 
-		USHORT blockAlign = samp->bps / 8*samp->channels;
+		uint16_t blockAlign = samp->bps / 8*samp->channels;
 		dls.AddWave(1, samp->channels, samp->rate, samp->rate*blockAlign, blockAlign,
 			samp->bps, bufSize, uncompSampBuf, wstring2string(samp->name));
 		finalSamps.push_back(samp);
@@ -134,20 +134,20 @@ void VGMColl::UnpackSampColl(SynthFile& synthfile, VGMSampColl* sampColl, vector
 	{
 		VGMSamp* samp = sampColl->samples[i];
 
-		ULONG bufSize;
+		uint32_t bufSize;
 		if (samp->ulUncompressedSize)
 			bufSize = samp->ulUncompressedSize;
 		else
-			bufSize = (ULONG)ceil((double)samp->dataLength * samp->GetCompressionRatio());
+			bufSize = (uint32_t)ceil((double)samp->dataLength * samp->GetCompressionRatio());
 		//bool bOddBufSize = bufSize % 2;
 		//if (bOddBufSize)				//if the buffer size is odd, we must align it to be even for the RIFF format
 		//	bufSize++;
-		BYTE* uncompSampBuf = new BYTE[bufSize];	//create a new memory space for the uncompressed wave
+		uint8_t* uncompSampBuf = new uint8_t[bufSize];	//create a new memory space for the uncompressed wave
 		samp->ConvertToStdWave(uncompSampBuf);			//and uncompress into that space
 		//if (bOddBufSize)
 		//	uncompSampBuf[bufSize] = 0;		//set the last (should be unused) byte to 0;
 
-		USHORT blockAlign = samp->bps / 8*samp->channels;
+		uint16_t blockAlign = samp->bps / 8*samp->channels;
 		SynthWave* wave = synthfile.AddWave(1, samp->channels, samp->rate, samp->rate*blockAlign, blockAlign,
 			samp->bps, bufSize, uncompSampBuf, wstring2string(samp->name));
 		finalSamps.push_back(samp);
@@ -166,7 +166,7 @@ void VGMColl::UnpackSampColl(SynthFile& synthfile, VGMSampColl* sampColl, vector
 			sampInfo->SetLoopInfo(samp->loop, samp);
 
 		double attenuation = (samp->volume != -1) ? ConvertLogScaleValToAtten(samp->volume) : 0;
-		BYTE unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
+		uint8_t unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
 		short fineTune = samp->fineTune;
 		sampInfo->SetPitchInfo(unityKey, fineTune, attenuation);
 	}
@@ -208,7 +208,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 	// if there are independent SampColl(s) in the collection
 	if (sampcolls.size())
 	{
-		for (UINT sam = 0; sam<sampcolls.size(); sam++)
+		for (uint32_t sam = 0; sam<sampcolls.size(); sam++)
 		{
 			finalSampColls.push_back(sampcolls[sam]);
 			UnpackSampColl(dls, sampcolls[sam], finalSamps);
@@ -217,7 +217,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 	// otherwise, the SampColl(s) are children of the InstrSet(s)
 	else
 	{
-		for (UINT i=0; i<instrsets.size(); i++)
+		for (uint32_t i=0; i<instrsets.size(); i++)
 		{
 			finalSampColls.push_back(instrsets[i]->sampColl);
 			UnpackSampColl(dls, instrsets[i]->sampColl, finalSamps);
@@ -228,18 +228,18 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 		return false;
 
 
-	for (UINT inst = 0; inst<instrsets.size(); inst++)
+	for (uint32_t inst = 0; inst<instrsets.size(); inst++)
 	{
 		VGMInstrSet* set = instrsets[inst];
-		UINT nInstrs = set->aInstrs.size();
-		for (UINT i=0; i<nInstrs; i++)
+		uint32_t nInstrs = set->aInstrs.size();
+		for (uint32_t i=0; i<nInstrs; i++)
 		{
 			VGMInstr* vgminstr = set->aInstrs[i];
-			UINT nRgns = vgminstr->aRgns.size();
+			uint32_t nRgns = vgminstr->aRgns.size();
 			if (nRgns == 0)								//do not write an instrument if it has no regions
 				continue;
 			DLSInstr* newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum);
-			for (UINT j=0; j<nRgns; j++)
+			for (uint32_t j=0; j<nRgns; j++)
 			{
 				VGMRgn* rgn = vgminstr->aRgns[j];
 				//				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
@@ -265,7 +265,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				if (rgn->sampOffset != -1)
 				{
 					bool bFoundIt = false;
-					for (UINT s=0; s<sampColl->samples.size(); s++) {							//for every sample
+					for (uint32_t s=0; s<sampColl->samples.size(); s++) {							//for every sample
 						if (rgn->sampOffset  == sampColl->samples[s]->dwOffset - sampColl->dwOffset - sampColl->sampDataOffset)
 						{
 							realSampNum = s;
@@ -307,7 +307,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				//if (rgn->sampCollNum == -1)	//if a sampCollPtr is defined
 				//{
 				//	// find the sampColl's index in samplecolls (the sampCollNum, effectively)
-				//	for (UINT i=0; i < finalSampColls.size(); i++)
+				//	for (uint32_t i=0; i < finalSampColls.size(); i++)
 				//	{
 				//		if (finalSampColls[i] == sampColl)
 				//			rgn->sampCollNum = i;
@@ -366,7 +366,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				else
 					newWsmp->SetLoopInfo(rgn->loop, samp);
 
-				BYTE realUnityKey;
+				uint8_t realUnityKey;
 				if (rgn->unityKey == -1)
 					realUnityKey = samp->unityKey;
 				else
@@ -448,7 +448,7 @@ SynthFile* VGMColl::CreateSynthFile()
 	// if there are independent SampColl(s) in the collection
 	if (sampcolls.size())
 	{
-		for (UINT sam = 0; sam<sampcolls.size(); sam++)
+		for (uint32_t sam = 0; sam<sampcolls.size(); sam++)
 		{
 			finalSampColls.push_back(sampcolls[sam]);
 			UnpackSampColl(*synthfile, sampcolls[sam], finalSamps);
@@ -457,7 +457,7 @@ SynthFile* VGMColl::CreateSynthFile()
 	// otherwise, the SampColl(s) are children of the InstrSet(s)
 	else
 	{
-		for (UINT i=0; i<instrsets.size(); i++)
+		for (uint32_t i=0; i<instrsets.size(); i++)
 		{
 			finalSampColls.push_back(instrsets[i]->sampColl);
 			UnpackSampColl(*synthfile, instrsets[i]->sampColl, finalSamps);
@@ -471,18 +471,18 @@ SynthFile* VGMColl::CreateSynthFile()
 	}
 
 
-	for (UINT inst = 0; inst<instrsets.size(); inst++)
+	for (uint32_t inst = 0; inst<instrsets.size(); inst++)
 	{
 		VGMInstrSet* set = instrsets[inst];
-		UINT nInstrs = set->aInstrs.size();
-		for (UINT i=0; i<nInstrs; i++)
+		uint32_t nInstrs = set->aInstrs.size();
+		for (uint32_t i=0; i<nInstrs; i++)
 		{
 			VGMInstr* vgminstr = set->aInstrs[i];
-			UINT nRgns = vgminstr->aRgns.size();
+			uint32_t nRgns = vgminstr->aRgns.size();
 			if (nRgns == 0)								//do not write an instrument if it has no regions
 				continue;
 			SynthInstr* newInstr = synthfile->AddInstr(vgminstr->bank, vgminstr->instrNum);
-			for (UINT j=0; j<nRgns; j++)
+			for (uint32_t j=0; j<nRgns; j++)
 			{
 				VGMRgn* rgn = vgminstr->aRgns[j];
 				//				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
@@ -508,7 +508,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				if (rgn->sampOffset != -1)
 				{
 					bool bFoundIt = false;
-					for (UINT s=0; s<sampColl->samples.size(); s++) {							//for every sample
+					for (uint32_t s=0; s<sampColl->samples.size(); s++) {							//for every sample
 						if (rgn->sampOffset  == sampColl->samples[s]->dwOffset - sampColl->dwOffset - sampColl->sampDataOffset)
 						{
 							realSampNum = s;
@@ -533,14 +533,14 @@ SynthFile* VGMColl::CreateSynthFile()
 
 				// Determine the sampCollNum (index into our finalSampColls vector)
 				unsigned int sampCollNum;
-				for (UINT i=0; i < finalSampColls.size(); i++)
+				for (uint32_t i=0; i < finalSampColls.size(); i++)
 				{
 					if (finalSampColls[i] == sampColl)
 						sampCollNum = i;
 				}
 				//   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
 				//   in the final DLS file.
-				for (UINT k=0; k < sampCollNum; k++)
+				for (uint32_t k=0; k < sampCollNum; k++)
 					realSampNum += finalSampColls[k]->samples.size();	
 
 				SynthRgn* newRgn = newInstr->AddRgn();
@@ -597,7 +597,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				else
 					sampInfo->SetLoopInfo(rgn->loop, samp);
 
-				BYTE realUnityKey;
+				uint8_t realUnityKey;
 				if (rgn->unityKey == -1)
 					realUnityKey = samp->unityKey;
 				else

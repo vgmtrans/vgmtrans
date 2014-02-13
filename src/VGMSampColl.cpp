@@ -12,7 +12,7 @@ using namespace std;
 
 DECLARE_MENU(VGMSampColl)
 
-VGMSampColl::VGMSampColl(const string& format, RawFile* rawfile, ULONG offset, ULONG length, wstring theName)
+VGMSampColl::VGMSampColl(const string& format, RawFile* rawfile, uint32_t offset, uint32_t length, wstring theName)
 : VGMFile(FILETYPE_SAMPCOLL, format, rawfile, offset, length, theName),
   parInstrSet(NULL),
   bLoadOnInstrSetMatch(false),
@@ -23,7 +23,7 @@ VGMSampColl::VGMSampColl(const string& format, RawFile* rawfile, ULONG offset, U
 }
 
 VGMSampColl::VGMSampColl(const string& format, RawFile* rawfile, VGMInstrSet* instrset, 
-						 ULONG offset, ULONG length, wstring theName)
+						 uint32_t offset, uint32_t length, wstring theName)
 : VGMFile(FILETYPE_SAMPCOLL, format, rawfile, offset, length, theName),
   parInstrSet(instrset),
   bLoadOnInstrSetMatch(false),
@@ -33,7 +33,7 @@ VGMSampColl::VGMSampColl(const string& format, RawFile* rawfile, VGMInstrSet* in
 	AddContainer<VGMSamp>(samples);
 }
 
-/*VGMSampColl::VGMSampColl(VGMInstrSet* instrSet, ULONG offset)
+/*VGMSampColl::VGMSampColl(VGMInstrSet* instrSet, uint32_t offset)
 : parInstrSet(instrSet), VGMFile(instrSet->GetRawFile(), offset)
 {
 }*/
@@ -94,8 +94,8 @@ bool VGMSampColl::GetSampleInfo()
 	return true;
 }
 
-VGMSamp* VGMSampColl::AddSamp(ULONG offset, ULONG length, ULONG dataOffset, ULONG dataLength,
-					 BYTE nChannels, USHORT bps, ULONG theRate, wstring name)
+VGMSamp* VGMSampColl::AddSamp(uint32_t offset, uint32_t length, uint32_t dataOffset, uint32_t dataLength,
+					 uint8_t nChannels, uint16_t bps, uint32_t theRate, wstring name)
 {
 	VGMSamp* newSamp = new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels,
 									bps, theRate, name);
@@ -108,7 +108,7 @@ bool VGMSampColl::OnSaveAllAsWav()
 	wstring dirpath = pRoot->UI_GetSaveDirPath();
 	if (dirpath.length() != 0)
 	{
-		for (UINT i=0; i<samples.size(); i++)
+		for (uint32_t i=0; i<samples.size(); i++)
 		{
 			wstring filepath = dirpath + L"\\" + samples[i]->sampName + L".wav";
 			samples[i]->SaveAsWav(filepath.c_str());

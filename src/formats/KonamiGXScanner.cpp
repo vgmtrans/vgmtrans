@@ -11,9 +11,9 @@ void KonamiGXScanner::Scan(RawFile* file, void* info)
 	MAMERomGroupEntry* sampsRomGroupEntry = gameentry->GetRomGroupOfType("shared");
 	if (!seqRomGroupEntry || !sampsRomGroupEntry)
 		return;
-	U32 seq_table_offset;
-	//U32 instr_table_offset;
-	//U32 samp_table_offset;
+	uint32_t seq_table_offset;
+	//uint32_t instr_table_offset;
+	//uint32_t samp_table_offset;
 	if (!seqRomGroupEntry->file || !sampsRomGroupEntry->file ||
 		!seqRomGroupEntry->GetHexAttribute("seq_table", &seq_table_offset))// ||
 		//!seqRomGroupEntry->GetHexAttribute("samp_table", &samp_table_offset))

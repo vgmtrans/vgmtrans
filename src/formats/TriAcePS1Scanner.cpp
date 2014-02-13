@@ -29,19 +29,19 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 	UINT nFileLength = file->size();
 	for (UINT i=0; i+0x40<nFileLength; i++)
 	{
-		U32 sig1 = file->GetWordBE(i);
+		uint32_t sig1 = file->GetWordBE(i);
 
 		if (sig1 != 0x534C5A01)	// "SLZ" + 0x01 in ASCII
 			continue;
 
-		U16 headerBytes = file->GetShort(i+0x11);
+		uint16_t headerBytes = file->GetShort(i+0x11);
 
 		if (headerBytes != 0xFFFF)		//First two bytes of the sequence is always 0xFFFF
 			continue;
 
-		U32 size1 = file->GetWord(i+4);		//unknown.  compressed size or something
-		U32 size2 = file->GetWord(i+8);		//uncompressed file size (size of resulting file after decompression)
-		U32 size3 = file->GetWord(i+12);	//unknown compressed file size or something
+		uint32_t size1 = file->GetWord(i+4);		//unknown.  compressed size or something
+		uint32_t size2 = file->GetWord(i+8);		//uncompressed file size (size of resulting file after decompression)
+		uint32_t size3 = file->GetWord(i+12);	//unknown compressed file size or something
 
 		if (size1 > 0x30000 || size2 > 0x30000 || size3 > 0x30000)	//sanity check.  Sequences won't be > 0x30000 bytes
 			continue;
@@ -59,7 +59,7 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 		vector<TriAcePS1InstrSet*> instrsets;
 		SearchForInstrSet(file, instrsets);
 
-		//U32 cfSize = file->GetWord(i-4);
+		//uint32_t cfSize = file->GetWord(i-4);
 		//TriAcePS1InstrSet* instrset = new TriAcePS1InstrSet(file, i-4 + cfSize);
 		//if (!instrset->LoadVGMFile())
 		//{
@@ -85,7 +85,7 @@ void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSe
 	UINT nFileLength = file->size();
 	for (UINT i=4; i+0x800<nFileLength; i++)
 	{
-		U8 precedingByte = file->GetByte(i+3);
+		uint8_t precedingByte = file->GetByte(i+3);
 		if (precedingByte != 0)
 			continue;
 		
@@ -93,7 +93,7 @@ void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSe
 		if (file->GetWord(i+8) > 0xFF)
 			continue;
 
-		U16 instrSectSize = file->GetShort(i+4);
+		uint16_t instrSectSize = file->GetShort(i+4);
 		//The instrSectSize should be more than the size of one instrdata block and not insanely large
 		if (instrSectSize <= 0x20 || instrSectSize > 0x4000)
 			continue;
@@ -102,7 +102,7 @@ void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSe
 			continue;
 
 		
-		U32 instrSetSize = file->GetWord(i);
+		uint32_t instrSetSize = file->GetWord(i);
 		if (instrSetSize < 0x1000)
 			continue;
 		//The entire InstrSet size must be larger than the instrdata region, of course
@@ -134,9 +134,9 @@ void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSe
 //file is RawFile containing the compressed seq.  cfOff is the compressed file offset.
 TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, ULONG cfOff)
 {
-	U32 cfSize = file->GetWord(cfOff+4);			//compressed file size
-	U32 ufSize = file->GetWord(cfOff+8);			//uncompressed file size (size of resulting file after decompression)
-	U32 blockSize = file->GetWord(cfOff+12);		//size of entire compressed block (slightly larger than cfSize
+	uint32_t cfSize = file->GetWord(cfOff+4);			//compressed file size
+	uint32_t ufSize = file->GetWord(cfOff+8);			//uncompressed file size (size of resulting file after decompression)
+	uint32_t blockSize = file->GetWord(cfOff+12);		//size of entire compressed block (slightly larger than cfSize
 
 	if (ufSize == 0)
 		ufSize = DEFAULT_UFSIZE;

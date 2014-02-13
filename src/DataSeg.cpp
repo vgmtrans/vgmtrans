@@ -13,23 +13,23 @@ DataSeg::~DataSeg(void)
 	clear();
 }
 
-void DataSeg::reposition(ULONG newBegin)
+void DataSeg::reposition(uint32_t newBegin)
 {
 	if (newBegin < endOff && newBegin >= startOff)
 	{
-		ULONG diff = newBegin-startOff;
+		uint32_t diff = newBegin-startOff;
 		memmove(data, data+diff, size-diff);
 	}
 	else if (newBegin+size <= endOff && newBegin+size >= startOff)
 	{
-		ULONG diff = endOff - (newBegin+size);
+		uint32_t diff = endOff - (newBegin+size);
 		memmove(data+diff, data, size-diff);
 	}
 	startOff = newBegin;
 	endOff = startOff+size;
 }
 
-void DataSeg::alloc(ULONG theSize)
+void DataSeg::alloc(uint32_t theSize)
 {
 	assert(!bAlloced);
 
@@ -39,12 +39,12 @@ void DataSeg::alloc(ULONG theSize)
 		delete[] data;
 	}
 
-	data = new BYTE[theSize > 0 ? theSize : 1];
+	data = new uint8_t[theSize > 0 ? theSize : 1];
 	size = theSize;
 	bAlloced = true;
 }
 
-void DataSeg::load(BYTE* buf, ULONG startVirtOffset, ULONG theSize)
+void DataSeg::load(uint8_t* buf, uint32_t startVirtOffset, uint32_t theSize)
 {
 	clear();
 
@@ -68,7 +68,7 @@ void DataSeg::clear()
 }
 
 
-//bool AttemptExpand(ULONG offset)
+//bool AttemptExpand(uint32_t offset)
 //{
 
 CompDataSeg::CompDataSeg(void)
@@ -81,7 +81,7 @@ CompDataSeg::~CompDataSeg(void)
 	clear();
 }
 
-void CompDataSeg::UpdateCompBuf(ULONG offset)
+void CompDataSeg::UpdateCompBuf(uint32_t offset)
 {
 	assert((offset >= startOff) && (offset < endOff));
 	int newCompBufIndex = (offset-startOff)/compBlockSize;
@@ -90,7 +90,7 @@ void CompDataSeg::UpdateCompBuf(ULONG offset)
 
 	compBufIndex = newCompBufIndex;
 	assert((unsigned)compBufIndex < compBlocks.size());
-	ULONG destLen = compBlockSize;
+	uLongf destLen = compBlockSize;
 	uncompress(data, &destLen, compBlocks[compBufIndex].first, compBlocks[compBufIndex].second);
 	compBlockVirtBegin = compBufIndex*compBlockSize + startOff;
 	compBlockVirtEnd = compBlockVirtBegin + compBlockSize;
@@ -98,7 +98,7 @@ void CompDataSeg::UpdateCompBuf(ULONG offset)
 
 
 
-void CompDataSeg::load(BYTE* buf, ULONG startVirtOffset, ULONG theSize, ULONG compBufSize)
+void CompDataSeg::load(uint8_t* buf, uint32_t startVirtOffset, uint32_t theSize, uint32_t compBufSize)
 {
 	clear();
 	int nSegments = theSize / compBufSize;
@@ -108,23 +108,23 @@ void CompDataSeg::load(BYTE* buf, ULONG startVirtOffset, ULONG theSize, ULONG co
 		compBlockSize = theSize;
 	else
 		compBlockSize = compBufSize;
-	data = new BYTE[compBlockSize];	
+	data = new uint8_t[compBlockSize];	
 
 	//clear out the comp blocks, if they were previously used
 	
 
 	compBlocks.reserve(nSegments);
-	ULONG offset = startVirtOffset;
+	uint32_t offset = startVirtOffset;
 	for (int i = 0; i < nSegments; i++)
 	{
 		if (offset + compBufSize > startVirtOffset+theSize)
 			compBufSize = startVirtOffset+theSize - offset;
-		ULONG destSize = (ULONG)(compBufSize * 1.2 + 12);
-		BYTE* compBlock = (BYTE*)malloc(destSize);
+		uLongf destSize = (uLongf)(compBufSize * 1.2 + 12);
+		uint8_t* compBlock = (uint8_t*)malloc(destSize);
 		
 		compress(compBlock, &destSize, buf+(compBlockSize*i), compBufSize);
-		compBlock = (BYTE*)realloc(compBlock, destSize);
-		compBlocks.push_back(std::pair<BYTE*, long>(compBlock, destSize));
+		compBlock = (uint8_t*)realloc(compBlock, destSize);
+		compBlocks.push_back(std::pair<uint8_t*, long>(compBlock, destSize));
 		offset += compBufSize;
 	}
 	//memcpy(data, buf, theSize);
@@ -140,7 +140,7 @@ void CompDataSeg::clear()
 {
 	if (!bAlloced)
 		return;
-	for (UINT i=0; i<compBlocks.size(); i++)
+	for (uint32_t i=0; i<compBlocks.size(); i++)
 		free(compBlocks[i].first);
 	compBlocks.clear();
 	delete[] data;

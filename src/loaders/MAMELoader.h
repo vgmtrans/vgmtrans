@@ -23,7 +23,7 @@ typedef struct _MAMERomGroupEntry
 		FromString(strValue, out);
 		return true;
 	}
-	bool GetHexAttribute( const std::string& attrName, U32* out );
+	bool GetHexAttribute( const std::string& attrName, uint32_t* out );
 
 	LoadMethod loadmethod;
 	std::string type;

@@ -11,9 +11,9 @@ using namespace std;
 
 DECLARE_MENU(VGMSamp)
 
-VGMSamp::VGMSamp(VGMSampColl* sampColl, ULONG offset, ULONG length, ULONG dataOffset,
-				 ULONG dataLen, BYTE nChannels, USHORT theBPS,
-				 ULONG theRate, wstring theName)
+VGMSamp::VGMSamp(VGMSampColl* sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
+				 uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
+				 uint32_t theRate, wstring theName)
  : parSampColl(sampColl),
    sampName(theName),
    VGMItem(sampColl->vgmfile, offset, length), 
@@ -43,7 +43,7 @@ double VGMSamp::GetCompressionRatio()
 	return 1.0;
 }
 
-void VGMSamp::ConvertToStdWave(BYTE* buf)
+void VGMSamp::ConvertToStdWave(uint8_t* buf)
 {
 	switch (waveType)
 	{
@@ -71,41 +71,41 @@ bool VGMSamp::OnSaveAsWav()
 
 bool VGMSamp::SaveAsWav(const wchar_t* filepath)
 {
-//	vector<BYTE> midiBuf;
+//	vector<uint8_t> midiBuf;
 //	WriteMidiToBuffer(midiBuf);
 //	return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], midiBuf.size());
 
-	vector<BYTE> waveBuf;
-	ULONG bufSize;
+	vector<uint8_t> waveBuf;
+	uint32_t bufSize;
 	if (this->ulUncompressedSize)
 		bufSize = this->ulUncompressedSize;
 	else
-		bufSize = (ULONG)ceil((double)dataLength * GetCompressionRatio());
+		bufSize = (uint32_t)ceil((double)dataLength * GetCompressionRatio());
 
-	BYTE* uncompSampBuf = new BYTE[bufSize];	//create a new memory space for the uncompressed wave
+	uint8_t* uncompSampBuf = new uint8_t[bufSize];	//create a new memory space for the uncompressed wave
 	//waveBuf.resize(bufSize );
 	ConvertToStdWave(uncompSampBuf);			//and uncompress into that space
 
-	USHORT blockAlign = bps / 8*channels;
+	uint16_t blockAlign = bps / 8*channels;
 
 	bool hasLoop = (this->loop.loopStatus != -1 && this->loop.loopStatus != 0);
 
-	PushTypeOnVectBE<UINT>(waveBuf, 0x52494646);			//"RIFF"
-	PushTypeOnVect<UINT>(waveBuf, 0x24 + ((bufSize + 1) & ~1) + (hasLoop ? 0x50 : 0));	//size
+	PushTypeOnVectBE<uint32_t>(waveBuf, 0x52494646);			//"RIFF"
+	PushTypeOnVect<uint32_t>(waveBuf, 0x24 + ((bufSize + 1) & ~1) + (hasLoop ? 0x50 : 0));	//size
 
 	//WriteLIST(waveBuf, 0x43564157, bufSize+24);			//write "WAVE" list
-	PushTypeOnVectBE<UINT>(waveBuf, 0x57415645);			//"WAVE"
-	PushTypeOnVectBE<UINT>(waveBuf, 0x666D7420);			//"fmt "
-	PushTypeOnVect<UINT>(waveBuf, 16);						//size
-	PushTypeOnVect<USHORT>(waveBuf, 1);						//wFormatTag
-	PushTypeOnVect<USHORT>(waveBuf, channels);				//wChannels
-	PushTypeOnVect<ULONG>(waveBuf, rate);					//dwSamplesPerSec
-	PushTypeOnVect<ULONG>(waveBuf, rate*blockAlign);		//dwAveBytesPerSec
-	PushTypeOnVect<USHORT>(waveBuf, blockAlign);			//wBlockAlign
-	PushTypeOnVect<USHORT>(waveBuf, bps);					//wBitsPerSample
+	PushTypeOnVectBE<uint32_t>(waveBuf, 0x57415645);			//"WAVE"
+	PushTypeOnVectBE<uint32_t>(waveBuf, 0x666D7420);			//"fmt "
+	PushTypeOnVect<uint32_t>(waveBuf, 16);						//size
+	PushTypeOnVect<uint16_t>(waveBuf, 1);						//wFormatTag
+	PushTypeOnVect<uint16_t>(waveBuf, channels);				//wChannels
+	PushTypeOnVect<uint32_t>(waveBuf, rate);					//dwSamplesPerSec
+	PushTypeOnVect<uint32_t>(waveBuf, rate*blockAlign);		//dwAveBytesPerSec
+	PushTypeOnVect<uint16_t>(waveBuf, blockAlign);			//wBlockAlign
+	PushTypeOnVect<uint16_t>(waveBuf, bps);					//wBitsPerSample
 
-	PushTypeOnVectBE<UINT>(waveBuf, 0x64617461);			//"data"
-	PushTypeOnVect<UINT>(waveBuf, bufSize);			//size
+	PushTypeOnVectBE<uint32_t>(waveBuf, 0x64617461);			//"data"
+	PushTypeOnVect<uint32_t>(waveBuf, bufSize);			//size
 	waveBuf.insert(waveBuf.end(), uncompSampBuf, uncompSampBuf+bufSize);	//Write the sample
 	if (bufSize % 2)
 		waveBuf.push_back(0);
@@ -117,37 +117,37 @@ bool VGMSamp::SaveAsWav(const wchar_t* filepath)
 
 		// If the sample loops, but the loop length is 0, then assume the length should
 		// extend to the end of the sample.
-		ULONG loopLength = loop.loopLength;
+		uint32_t loopLength = loop.loopLength;
 		if (loop.loopStatus && loop.loopLength == 0)
 		{
 			loopLength = dataLength - loop.loopStart;
 		}
 
-		ULONG loopStart =  (loop.loopStartMeasure==LM_BYTES) ?			//In sample chunk, the value is in number of samples
-			(ULONG)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp) ://(16/8) :		//if the val is a raw offset of the original format, multiply it by the compression ratio
+		uint32_t loopStart =  (loop.loopStartMeasure==LM_BYTES) ?			//In sample chunk, the value is in number of samples
+			(uint32_t)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp) ://(16/8) :		//if the val is a raw offset of the original format, multiply it by the compression ratio
 			loop.loopStart /** origFormatBytesPerSamp * compressionRatio / origFormatBytesPerSamp*/;//(16/8);	 //if the value is in samples, multiply by bytes per sample to get raw offset of original format, then multiply by compression ratio to get raw offset in standard wav, then divide bytes bytesPerSamp of standard wave (2)
-		ULONG loopLenInSamp = (loop.loopLengthMeasure==LM_BYTES) ?		//In sample chunk, the value is in number of samples
-			(ULONG)((loopLength * compressionRatio) / origFormatBytesPerSamp) ://(16/8)  :	//if it's in raw bytes, multiply by compressionRatio to convert to Raw length in new format, and divide by bytesPerSamp of a 16 bit standard wave (16bits/8 bits per byte)
+		uint32_t loopLenInSamp = (loop.loopLengthMeasure==LM_BYTES) ?		//In sample chunk, the value is in number of samples
+			(uint32_t)((loopLength * compressionRatio) / origFormatBytesPerSamp) ://(16/8)  :	//if it's in raw bytes, multiply by compressionRatio to convert to Raw length in new format, and divide by bytesPerSamp of a 16 bit standard wave (16bits/8 bits per byte)
 			loopLength /** origFormatBytesPerSamp * compressionRatio) / origFormatBytesPerSamp*/;//(16/8);
-		ULONG loopEnd = loopStart + loopLenInSamp;
+		uint32_t loopEnd = loopStart + loopLenInSamp;
 
-		PushTypeOnVectBE<UINT>(waveBuf, 0x736D706C);		//"smpl"
-		PushTypeOnVect<UINT>(waveBuf, 0x50);				//size
-		PushTypeOnVect<UINT>(waveBuf, 0);					//manufacturer
-		PushTypeOnVect<UINT>(waveBuf, 0);					//product
-		PushTypeOnVect<UINT>(waveBuf, 1000000000/rate);		//sample period
-		PushTypeOnVect<UINT>(waveBuf, 60);					//MIDI uniti note (C5)
-		PushTypeOnVect<UINT>(waveBuf, 0);					//MIDI pitch fraction
-		PushTypeOnVect<UINT>(waveBuf, 0);					//SMPTE format
-		PushTypeOnVect<UINT>(waveBuf, 0);					//SMPTE offset
-		PushTypeOnVect<UINT>(waveBuf, 1);					//sample loops
-		PushTypeOnVect<UINT>(waveBuf, 0);					//sampler data
-		PushTypeOnVect<UINT>(waveBuf, 0);					//cue point ID
-		PushTypeOnVect<UINT>(waveBuf, 0);					//type (loop forward)
-		PushTypeOnVect<UINT>(waveBuf, loopStart);			//start sample #
-		PushTypeOnVect<UINT>(waveBuf, loopEnd);				//end sample #
-		PushTypeOnVect<UINT>(waveBuf, 0);					//fraction
-		PushTypeOnVect<UINT>(waveBuf, 0);					//playcount
+		PushTypeOnVectBE<uint32_t>(waveBuf, 0x736D706C);		//"smpl"
+		PushTypeOnVect<uint32_t>(waveBuf, 0x50);				//size
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//manufacturer
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//product
+		PushTypeOnVect<uint32_t>(waveBuf, 1000000000/rate);		//sample period
+		PushTypeOnVect<uint32_t>(waveBuf, 60);					//MIDI uniti note (C5)
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//MIDI pitch fraction
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//SMPTE format
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//SMPTE offset
+		PushTypeOnVect<uint32_t>(waveBuf, 1);					//sample loops
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//sampler data
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//cue point ID
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//type (loop forward)
+		PushTypeOnVect<uint32_t>(waveBuf, loopStart);			//start sample #
+		PushTypeOnVect<uint32_t>(waveBuf, loopEnd);				//end sample #
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//fraction
+		PushTypeOnVect<uint32_t>(waveBuf, 0);					//playcount
 	}
 	
 	//DLSWave dlswave(1, channels, rate, rate*blockAlign, blockAlign, bps, bufSize, uncompSampBuf);

@@ -31,7 +31,7 @@ public:
 	void Reset(void);
 	void Exit(void);
 	bool OpenRawFile(const std::wstring& filename);
-	bool CreateVirtFile(BYTE *databuf, ULONG fileSize, const std::wstring& filename, const std::wstring& parRawFileFullPath=L"");
+	bool CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::wstring& filename, const std::wstring& parRawFileFullPath=L"");
 	bool SetupNewRawFile(RawFile* newRawFile);
 	bool CloseRawFile(RawFile* targFile);
 	void AddVGMFile(VGMFile* theFile);
@@ -69,7 +69,7 @@ public:
 		vLoader.push_back(new T());
 	}
 
-	//Format* GetFormat(ULONG fmt_id)
+	//Format* GetFormat(uint32_t fmt_id)
 	//{
 	//	return fmt_map[fmt_id];
 	//}
@@ -99,7 +99,7 @@ public:
 	virtual void UI_AddItemSet(VOID* UI_specific, std::vector<ItemSet>* itemset) {}
 	virtual std::wstring UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension = L"") = 0;
 	virtual std::wstring UI_GetSaveDirPath(const std::wstring& suggestedDir = L"") = 0;
-	virtual bool UI_WriteBufferToFile(const std::wstring& filepath, BYTE* buf, ULONG size);
+	virtual bool UI_WriteBufferToFile(const std::wstring& filepath, uint8_t* buf, uint32_t size);
 
 
 	bool SaveAllAsRaw();
@@ -113,7 +113,7 @@ protected:
 
 	std::vector<VGMLoader*> vLoader;
 	std::vector<VGMScanner*> vScanner;
-	//std::map<ULONG, Format*> fmt_map;
+	//std::map<uint32_t, Format*> fmt_map;
 	//std::vector<Format*> vFormats;
 };
 

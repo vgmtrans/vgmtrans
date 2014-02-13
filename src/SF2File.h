@@ -175,9 +175,9 @@ struct sfPresetHeader
 	WORD wPreset;
 	WORD wBank;
 	WORD wPresetBagNdx;
-	DWORD dwLibrary;
-	DWORD dwGenre;
-	DWORD dwMorphology;
+	uint32_t dwLibrary;
+	uint32_t dwGenre;
+	uint32_t dwMorphology;
 };
 
 struct sfPresetBag
@@ -190,21 +190,21 @@ struct sfModList
 {
 	SFModulator sfModSrcOper;
 	SFGenerator sfModDestOper;
-	SHORT modAmount;
+	int16_t modAmount;
 	SFModulator sfModAmtSrcOper;
 	SFTransform sfModTransOper;
 };
 
 typedef struct
 {
-	BYTE byLo;
-	BYTE byHi;
+	uint8_t byLo;
+	uint8_t byHi;
 } rangesType;
 	
 typedef union
 {
 	rangesType ranges;
-	SHORT shAmount;
+	int16_t shAmount;
 	WORD wAmount;
 } genAmountType;
 
@@ -218,7 +218,7 @@ struct sfInstModList
 {
 	SFModulator sfModSrcOper;
 	SFGenerator sfModDestOper;
-	SHORT modAmount;
+	int16_t modAmount;
 	SFModulator sfModAmtSrcOper;
 	SFTransform sfModTransOper;
 };
@@ -256,12 +256,12 @@ typedef enum : WORD
 struct sfSample
 {
 	CHAR achSampleName[20];
-	DWORD dwStart;
-	DWORD dwEnd;
-	DWORD dwStartloop;
-	DWORD dwEndloop;
-	DWORD dwSampleRate;
-	BYTE byOriginalKey;
+	uint32_t dwStart;
+	uint32_t dwEnd;
+	uint32_t dwStartloop;
+	uint32_t dwEndloop;
+	uint32_t dwSampleRate;
+	uint8_t byOriginalKey;
 	CHAR chCorrection;
 	WORD wSampleLink;
 	SFSampleLink sfSampleType;
@@ -316,7 +316,7 @@ public:
 //class DLSWsmp;
 //class DLSWave;
 
-inline void WriteLIST(std::vector<BYTE> &buf, std::string listName, UINT listSize);
+inline void WriteLIST(std::vector<uint8_t> &buf, std::string listName, uint32_t listSize);
 inline void AlignName(std::string& name);
 
 class SynthFile;
@@ -333,14 +333,14 @@ public:
 	//SF2File* AddInstr(unsigned long bank, unsigned long instrNum);
 	//SF2File* AddInstr(unsigned long bank, unsigned long instrNum, string Name);
 	//void DeleteInstr(unsigned long bank, unsigned long instrNum);
-	//DLSWave* AddWave(USHORT formatTag, USHORT channels, int samplesPerSec, int aveBytesPerSec,
-	//				 USHORT blockAlign, USHORT bitsPerSample, ULONG waveDataSize, BYTE* waveData,
+	//DLSWave* AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
+	//				 uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t* waveData,
 	//				 string name = "Unnamed Wave");
 	//void SetName(string dls_name);
 
-	//UINT GetSize(void);
+	//uint32_t GetSize(void);
 
-	//int WriteDLSToBuffer(vector<BYTE> &buf);
+	//int WriteDLSToBuffer(vector<uint8_t> &buf);
 	bool SaveSF2File(const wchar_t* filepath);
 
 public:

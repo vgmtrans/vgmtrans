@@ -67,14 +67,14 @@
 /*class MenuItem
 {
 public:
-	MenuItem( bool (VGMItem::*functionPtr)(void), const char* theName, BYTE theFlag = 0)
+	MenuItem( bool (VGMItem::*functionPtr)(void), const char* theName, uint8_t theFlag = 0)
 		: func(functionPtr), name(theName), flag(theFlag) {}
 	~MenuItem() {}
 
 public:
 	const char* name;
 	bool (*func)(void);
-	BYTE flag;
+	uint8_t flag;
 };*/
 
 template <class T>
@@ -84,7 +84,7 @@ public:
 	Menu() {}
 	virtual ~Menu() {}
 
-	void AddMenuItem(bool (T::*funcPtr)(void), const wchar_t* name, BYTE flag = 0)
+	void AddMenuItem(bool (T::*funcPtr)(void), const wchar_t* name, uint8_t flag = 0)
 	{
 		funcs.push_back(funcPtr);
 		names.push_back(name);

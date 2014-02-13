@@ -11,14 +11,14 @@ class SonyPS2Seq :
 public:
 	typedef struct _HdrCk
 	{
-		U32 Creator;
-		U32 Type;
-		U32 chunkSize;
-		U32 fileSize;
-		U32	songChunkAddr;
-		U32 midiChunkAddr;
-		U32 seSequenceChunkAddr;
-		U32 seSongChunkAddr;
+		uint32_t Creator;
+		uint32_t Type;
+		uint32_t chunkSize;
+		uint32_t fileSize;
+		uint32_t	songChunkAddr;
+		uint32_t midiChunkAddr;
+		uint32_t seSequenceChunkAddr;
+		uint32_t seSongChunkAddr;
 	} HdrCk;
 
 	SonyPS2Seq(RawFile* file, ULONG offset);
@@ -26,16 +26,16 @@ public:
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool ReadEvent(void);
-	BYTE GetDataByte(U32 offset);
+	BYTE GetDataByte(uint32_t offset);
 
 protected:
 	VersCk versCk;
 	HdrCk hdrCk;
-	U32 midiChunkSize;
-	U32 maxMidiNumber;	//this determines the number of midi blocks.  Seems very similar to SMF Type 2 (blech!)
+	uint32_t midiChunkSize;
+	uint32_t maxMidiNumber;	//this determines the number of midi blocks.  Seems very similar to SMF Type 2 (blech!)
 						//for the moment, I'm going to assume the maxMidiNumber is always 0 (meaning one midi data block)
-	U32 midiOffsetAddr;	//the offset for midi data block 0.  I won't bother with > 0 data blocks for the time being
-	U16 compOption;		//determines compression mode for midi data block 0
+	uint32_t midiOffsetAddr;	//the offset for midi data block 0.  I won't bother with > 0 data blocks for the time being
+	uint16_t compOption;		//determines compression mode for midi data block 0
 
 	bool bSkipDeltaTime;
 	BYTE runningStatus;

@@ -5,7 +5,7 @@
 
 using namespace std;
 
-VGMSeqNoTrks::VGMSeqNoTrks(const string& format, RawFile* file, ULONG offset)
+VGMSeqNoTrks::VGMSeqNoTrks(const string& format, RawFile* file, uint32_t offset)
 : VGMSeq(format, file, offset),
   SeqTrack(this)
 {
@@ -118,19 +118,19 @@ MidiFile* VGMSeqNoTrks::ConvertToMidi()
 
 // checks whether or not we have already created the given number of MidiTracks.  If not, it appends the extra tracks.
 // doesn't ever need to be called directly by format code, since SetCurMidiTrack does so automatically.
-void VGMSeqNoTrks::TryExpandMidiTracks(ULONG numTracks)
+void VGMSeqNoTrks::TryExpandMidiTracks(uint32_t numTracks)
 {
 	if (VGMSeq::readMode != READMODE_CONVERT_TO_MIDI)
 		return;
 	if (midiTracks.size() < numTracks)
 	{
 		int initialTrackSize = midiTracks.size();
-		for (UINT i=0; i<numTracks-initialTrackSize; i++)
+		for (uint32_t i=0; i<numTracks-initialTrackSize; i++)
 			midiTracks.push_back( midi->AddTrack());
 	}
 }
 
-void VGMSeqNoTrks::SetCurTrack(ULONG trackNum)
+void VGMSeqNoTrks::SetCurTrack(uint32_t trackNum)
 {
 	if (VGMSeq::readMode != READMODE_CONVERT_TO_MIDI)
 		return;
@@ -140,18 +140,18 @@ void VGMSeqNoTrks::SetCurTrack(ULONG trackNum)
 }
 
 
-void VGMSeqNoTrks::AddTime(ULONG delta)
+void VGMSeqNoTrks::AddTime(uint32_t delta)
 {
 	time += delta;
 	if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI)
 	{
-		for (UINT i=0; i<midiTracks.size(); i++)
+		for (uint32_t i=0; i<midiTracks.size(); i++)
 			midiTracks[i]->AddDelta(delta);
 	}
 }
 
 
-//bool VGMSeqNoTrks::AddEndOfTrack(ULONG offset, ULONG length, const wchar_t* sEventName)
+//bool VGMSeqNoTrks::AddEndOfTrack(uint32_t offset, uint32_t length, const wchar_t* sEventName)
 //{
 //	if (bInLoop == false)
 //		AddEvent(new TrackEndSeqEvent(this, offset, length, sEventName));

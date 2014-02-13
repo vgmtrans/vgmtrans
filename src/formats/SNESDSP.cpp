@@ -11,10 +11,10 @@
 
 // Simulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
 // return elapsed time in sample count, and final env value if requested.
-UINT GetSNESGAINEnvLength(U8 gain, S16 env, S16 env_to, S16 * env_after)
+UINT GetSNESGAINEnvLength(uint8_t gain, int16_t env, int16_t env_to, int16_t * env_after)
 {
-	U8 mode = gain >> 5;
-	U8 rate = gain & 0x1f;
+	uint8_t mode = gain >> 5;
+	uint8_t rate = gain & 0x1f;
 	UINT tick = 0;
 
 	if (env < 0 || env > 0x7ff)
@@ -53,7 +53,7 @@ UINT GetSNESGAINEnvLength(U8 gain, S16 env, S16 env_to, S16 * env_after)
 	}
 	else // 6,7: linear increase
 	{
-		S16 env_prev = (env >= 0x20) ? env - 0x20 : 0; // obviously not true, but I guess it's not wrong in most cases.
+		int16_t env_prev = (env >= 0x20) ? env - 0x20 : 0; // obviously not true, but I guess it's not wrong in most cases.
 
 		while (env < env_to)
 		{
@@ -82,21 +82,21 @@ UINT GetSNESGAINEnvLength(U8 gain, S16 env, S16 env_to, S16 * env_after)
 // SNESSampColl
 // ************
 
-SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, U32 offset, UINT maxNumSamps) :
+SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, UINT maxNumSamps) :
 	VGMSampColl(format, rawfile, offset, 0),
 	spcDirAddr(offset)
 {
 	SetDefaultTargets(maxNumSamps);
 }
 
-SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset, UINT maxNumSamps) :
+SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, UINT maxNumSamps) :
 	VGMSampColl(format, instrset->rawfile, instrset, offset, 0),
 	spcDirAddr(offset)
 {
 	SetDefaultTargets(maxNumSamps);
 }
 
-SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, U32 offset,
+SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset,
 		const std::vector<BYTE>& targetSRCNs, std::wstring name) :
 	VGMSampColl(format, rawfile, offset, 0, name),
 	spcDirAddr(offset),
@@ -104,7 +104,7 @@ SNESSampColl::SNESSampColl(const std::string& format, RawFile* rawfile, U32 offs
 {
 }
 
-SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, U32 offset,
+SNESSampColl::SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset,
 		const std::vector<BYTE>& targetSRCNs, std::wstring name) :
 	VGMSampColl(format, instrset->rawfile, instrset, offset, 0, name),
 	spcDirAddr(offset),

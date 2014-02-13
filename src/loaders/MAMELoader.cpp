@@ -19,7 +19,7 @@ using namespace std;
 //	return true;
 //}
 
-bool MAMERomGroupEntry::GetHexAttribute( const std::string& attrName, U32* out )
+bool MAMERomGroupEntry::GetHexAttribute( const std::string& attrName, uint32_t* out )
 {
 	string strValue = attributes[attrName];
 	if (strValue.empty())
@@ -330,7 +330,7 @@ VirtFile* MAMELoader::LoadRomGroup(MAMERomGroupEntry* entry, const string& forma
 	{
 		if (entry->encryption == "kabuki")
 		{
-			U32 swap_key1, swap_key2, addr_key, xor_key;
+			uint32_t swap_key1, swap_key2, addr_key, xor_key;
 			if (!entry->GetHexAttribute("kabuki_swap_key1", &swap_key1) ||
 				!entry->GetHexAttribute("kabuki_swap_key2", &swap_key2) ||
 				!entry->GetHexAttribute("kabuki_addr_key", &addr_key) ||

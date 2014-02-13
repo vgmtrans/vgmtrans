@@ -43,8 +43,8 @@ void SynthFile::DeleteInstr(unsigned long bank, unsigned long instrNum)
 
 }
 
-SynthWave* SynthFile::AddWave(USHORT formatTag, USHORT channels, int samplesPerSec, int aveBytesPerSec,
-						  USHORT blockAlign, USHORT bitsPerSample, ULONG waveDataSize, unsigned char* waveData,
+SynthWave* SynthFile::AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
+						  uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, unsigned char* waveData,
 						  string name)
 {
 	vWaves.insert(vWaves.end(), new SynthWave(formatTag, channels, samplesPerSec, aveBytesPerSec, blockAlign, bitsPerSample, waveDataSize, waveData, name));
@@ -56,7 +56,7 @@ SynthWave* SynthFile::AddWave(USHORT formatTag, USHORT channels, int samplesPerS
 //  **********
 
 
-SynthInstr::SynthInstr(ULONG bank, ULONG instrument)
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument)
 : ulBank(bank), ulInstrument(instrument)
 {
 	stringstream str;
@@ -65,13 +65,13 @@ SynthInstr::SynthInstr(ULONG bank, ULONG instrument)
 	//RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(ULONG bank, ULONG instrument, string instrName)
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName)
 : ulBank(bank), ulInstrument(instrument), name(instrName)
 {
 	//RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(ULONG bank, ULONG instrument, string instrName, vector<SynthRgn*> listRgns)
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName, vector<SynthRgn*> listRgns)
 : ulBank(bank), ulInstrument(instrument), name(instrName)
 {
 	//RiffFile::AlignName(name);
@@ -121,7 +121,7 @@ SynthSampInfo* SynthRgn::AddSampInfo(void)
 	return sampinfo;
 }
 
-void SynthRgn::SetRanges(USHORT keyLow, USHORT keyHigh, USHORT velLow, USHORT velHigh)
+void SynthRgn::SetRanges(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
 {
 	usKeyLow = keyLow;
 	usKeyHigh = keyHigh;
@@ -129,7 +129,7 @@ void SynthRgn::SetRanges(USHORT keyLow, USHORT keyHigh, USHORT velLow, USHORT ve
 	usVelHigh = velHigh;
 }
 
-void SynthRgn::SetWaveLinkInfo(USHORT options, USHORT phaseGroup, ULONG theChannel, ULONG theTableIndex)
+void SynthRgn::SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex)
 {
 	fusOptions = options;
 	usPhaseGroup = phaseGroup;
@@ -181,14 +181,14 @@ void SynthSampInfo::SetLoopInfo(Loop& loop, VGMSamp* samp)
 	cSampleLoops = loop.loopStatus;
 	ulLoopType = loop.loopType; 
 	ulLoopStart =  (loop.loopStartMeasure==LM_BYTES) ?			//In DLS, the value is in number of samples
-		(ULONG)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp) ://(16/8) :		//if the val is a raw offset of the original format, multiply it by the compression ratio
+		(uint32_t)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp) ://(16/8) :		//if the val is a raw offset of the original format, multiply it by the compression ratio
 		loop.loopStart /** origFormatBytesPerSamp * compressionRatio / origFormatBytesPerSamp*/;//(16/8);	 //if the value is in samples, multiply by bytes per sample to get raw offset of original format, then multiply by compression ratio to get raw offset in standard wav, then divide bytes bytesPerSamp of standard wave (2)
 	ulLoopLength = (loop.loopLengthMeasure==LM_BYTES) ?			//In DLS, the value is in number of samples
-		(ULONG)((loop.loopLength * compressionRatio) / origFormatBytesPerSamp) ://(16/8)  :	//if it's in raw bytes, multiply by compressionRatio to convert to Raw length in new format, and divide by bytesPerSamp of a 16 bit standard wave (16bits/8 bits per byte)
+		(uint32_t)((loop.loopLength * compressionRatio) / origFormatBytesPerSamp) ://(16/8)  :	//if it's in raw bytes, multiply by compressionRatio to convert to Raw length in new format, and divide by bytesPerSamp of a 16 bit standard wave (16bits/8 bits per byte)
 		loop.loopLength /** origFormatBytesPerSamp * compressionRatio) / origFormatBytesPerSamp*/;//(16/8);
 }
 
-void SynthSampInfo::SetPitchInfo(USHORT unityNote, short fineTune, double atten)
+void SynthSampInfo::SetPitchInfo(uint16_t unityNote, short fineTune, double atten)
 {
 	usUnityNote = unityNote;
 	sFineTune = fineTune;
@@ -208,11 +208,11 @@ void SynthWave::ConvertTo16bitSigned()
 		this->wBlockAlign = 16 / 8*this->wChannels;
 		this->dwAveBytesPerSec *= 2;
 		
-		S16* newData = new S16[this->dataSize];
+		int16_t* newData = new int16_t[this->dataSize];
 		for (unsigned int i = 0; i < this->dataSize; i++)
-			newData[i] = ((S16)this->data[i] - 128) << 8;
+			newData[i] = ((int16_t)this->data[i] - 128) << 8;
 		delete[] this->data;
-		this->data = (U8*)newData;
+		this->data = (uint8_t*)newData;
 		this->dataSize *= 2;
 	}
 }

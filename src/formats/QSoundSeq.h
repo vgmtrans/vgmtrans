@@ -40,5 +40,5 @@ private:
 	BYTE noteState;
 	BYTE bank;
 	BYTE loop[4];
-	U32 loopOffset[4];	//used for detecting infinite loops, which truly occur in certain games
+	uint32_t loopOffset[4];	//used for detecting infinite loops, which truly occur in certain games
 };

@@ -15,7 +15,7 @@ class RawFile
 {
 public:
 	RawFile(void);
-	RawFile(const std::wstring name, ULONG fileSize = 0, bool bCanRead = true);
+	RawFile(const std::wstring name, uint32_t fileSize = 0, bool bCanRead = true);
 public:
 	virtual ~RawFile(void);
 
@@ -34,16 +34,16 @@ public:
 	VGMItem* GetItemFromOffset(long offset);
 	VGMFile* GetVGMFileFromOffset(long offset);
 
-	//UINT GetColors(UINT nIndex, UINT nCount, void* pBuffer);
-	//UINT SetColor(UINT nIndex, UINT nCount, BYTE color);
-	virtual int FileRead(void* dest, ULONG index, ULONG length);
+	//uint32_t GetColors(uint32_t nIndex, uint32_t nCount, void* pBuffer);
+	//uint32_t SetColor(uint32_t nIndex, uint32_t nCount, uint8_t color);
+	virtual int FileRead(void* dest, uint32_t index, uint32_t length);
 
-	void UpdateBuffer(ULONG index);
+	void UpdateBuffer(uint32_t index);
 
 	float GetProPreRatio(void) { return propreRatio; }
 	void SetProPreRatio(float newRatio);
 
-	inline BYTE& operator[](ULONG offset)
+	inline uint8_t& operator[](uint32_t offset)
 	{
 		if ((offset < buf.startOff) || (offset >= buf.endOff))
 			UpdateBuffer(offset);
@@ -51,42 +51,42 @@ public:
 	}
 
 	
-	inline BYTE GetByte(UINT nIndex)
+	inline uint8_t GetByte(uint32_t nIndex)
 	{
 		if ((nIndex < buf.startOff) || (nIndex+1 > buf.endOff))
 			UpdateBuffer(nIndex);
 		return buf[nIndex];
 	}
 
-	inline USHORT GetShort(UINT nIndex)
+	inline uint16_t GetShort(uint32_t nIndex)
 	{
 		if ((nIndex < buf.startOff) || (nIndex+2 > buf.endOff))
 			UpdateBuffer(nIndex);
 		return buf.GetShort(nIndex);
 	}
 
-	inline UINT GetWord(UINT nIndex)
+	inline uint32_t GetWord(uint32_t nIndex)
 	{
 		if ((nIndex < buf.startOff) || (nIndex+4 > buf.endOff))
 			UpdateBuffer(nIndex);
 		return buf.GetWord(nIndex);
 	}
 
-	inline USHORT GetShortBE(UINT nIndex)
+	inline uint16_t GetShortBE(uint32_t nIndex)
 	{
 		if ((nIndex < buf.startOff) || (nIndex+2 > buf.endOff))
 			UpdateBuffer(nIndex);
 		return buf.GetShortBE(nIndex);
 	}
 
-	inline UINT GetWordBE(UINT nIndex)
+	inline uint32_t GetWordBE(uint32_t nIndex)
 	{
 		if ((nIndex < buf.startOff) || (nIndex+4 > buf.endOff))
 			UpdateBuffer(nIndex);
 		return buf.GetWordBE(nIndex);
 	}
 
-	inline bool IsValidOffset(UINT nIndex)
+	inline bool IsValidOffset(uint32_t nIndex)
 	{
 		return (nIndex < fileSize);
 	}
@@ -96,14 +96,14 @@ public:
 	inline void UseScanners() { processFlags |= PF_USESCANNERS; }
 	inline void DontUseScanners() { processFlags &= ~PF_USESCANNERS; }
 
-	UINT GetBytes(UINT nIndex, UINT nCount, void* pBuffer);
-	//BYTE GetByte(UINT nIndex);
-	//USHORT GetShort(UINT nIndex);
-	//USHORT GetShortBE(UINT nIndex);
-	//UINT GetWord(UINT nIndex);
-	//UINT GetWordBE(UINT nIndex);
-	bool MatchBytePattern(const BytePattern& pattern, UINT nIndex);
-	bool SearchBytePattern(const BytePattern& pattern, UINT& nMatchOffset, UINT nSearchOffset = 0, UINT nSearchSize = (UINT)-1);
+	uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer);
+	//uint8_t GetByte(uint32_t nIndex);
+	//uint16_t GetShort(uint32_t nIndex);
+	//uint16_t GetShortBE(uint32_t nIndex);
+	//uint32_t GetWord(uint32_t nIndex);
+	//uint32_t GetWordBE(uint32_t nIndex);
+	bool MatchBytePattern(const BytePattern& pattern, uint32_t nIndex);
+	bool SearchBytePattern(const BytePattern& pattern, uint32_t& nMatchOffset, uint32_t nSearchOffset = 0, uint32_t nSearchSize = (uint32_t)-1);
 
 	void AddContainedVGMFile(VGMFile* vgmfile);
 	void RemoveContainedVGMFile(VGMFile* vgmfile);
@@ -112,10 +112,10 @@ public:
 
 public:
 	DataSeg buf;
-	ULONG bufSize;
+	uint32_t bufSize;
 	float propreRatio;
-	BYTE processFlags;
-	//ULONG buf_size;
+	uint8_t processFlags;
+	//uint32_t buf_size;
 	//unsigned char *data;
 	//unsigned char *col;
 
@@ -137,5 +137,5 @@ class VirtFile : public RawFile
 {
 public:
 	VirtFile();
-	VirtFile(BYTE* data, ULONG fileSize, const std::wstring& name, const wchar_t* parRawFileFullPath = L"");
+	VirtFile(uint8_t* data, uint32_t fileSize, const std::wstring& name, const wchar_t* parRawFileFullPath = L"");
 };

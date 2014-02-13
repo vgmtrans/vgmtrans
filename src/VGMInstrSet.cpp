@@ -14,7 +14,7 @@ using namespace std;
 // VGMInstrSet
 // ***********
 
-VGMInstrSet::VGMInstrSet(const string& format,/*FmtID fmtID,*/ RawFile* file, ULONG offset, ULONG length, wstring name,
+VGMInstrSet::VGMInstrSet(const string& format,/*FmtID fmtID,*/ RawFile* file, uint32_t offset, uint32_t length, wstring name,
 						 VGMSampColl* theSampColl)
 : VGMFile(FILETYPE_INSTRSET, /*fmtID,*/format, file, offset, length, name), sampColl(theSampColl)
 {	
@@ -29,7 +29,7 @@ VGMInstrSet::~VGMInstrSet()
 
 
 
-VGMInstr* VGMInstrSet::AddInstr(ULONG offset, ULONG length, unsigned long bank,
+VGMInstr* VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
 								unsigned long instrNum, const wstring& instrName)
 {
 	wostringstream	name;
@@ -88,8 +88,8 @@ bool VGMInstrSet::GetInstrPointers()
 
 bool VGMInstrSet::LoadInstrs()
 {
-	ULONG nInstrs = aInstrs.size();
-	for (UINT i=0; i < nInstrs; i++)
+	uint32_t nInstrs = aInstrs.size();
+	for (uint32_t i=0; i < nInstrs; i++)
 	{
 		if (!aInstrs[i]->LoadInstr())
 			return false;
@@ -163,8 +163,8 @@ bool VGMInstrSet::SaveAsSF2(const wchar_t* filepath)
 // VGMInstr
 // ********
 
-VGMInstr::VGMInstr(VGMInstrSet* instrSet, ULONG offset, ULONG length, ULONG theBank,
-				  ULONG theInstrNum, const wstring& name)
+VGMInstr::VGMInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
+				  uint32_t theInstrNum, const wstring& name)
  : 	VGMContainerItem(instrSet, offset, length, name), 
     parInstrSet(instrSet), 
 	bank(theBank), 
@@ -178,12 +178,12 @@ VGMInstr::~VGMInstr()
 	DeleteVect<VGMRgn>(aRgns);
 }
 
-void VGMInstr::SetBank(ULONG bankNum)
+void VGMInstr::SetBank(uint32_t bankNum)
 {
 	bank = bankNum;
 }
 
-void VGMInstr::SetInstrNum(ULONG theInstrNum)
+void VGMInstr::SetInstrNum(uint32_t theInstrNum)
 {
 	instrNum = theInstrNum;
 }
@@ -194,8 +194,8 @@ VGMRgn* VGMInstr::AddRgn(VGMRgn* rgn)
 	return rgn;
 }
 
-VGMRgn* VGMInstr::AddRgn(ULONG offset, ULONG length, int sampNum, BYTE keyLow, BYTE keyHigh,
-			   BYTE velLow, BYTE velHigh)
+VGMRgn* VGMInstr::AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow, uint8_t keyHigh,
+			   uint8_t velLow, uint8_t velHigh)
 {
 	VGMRgn* newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
 	aRgns.push_back(newRgn);

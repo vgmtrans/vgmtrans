@@ -21,9 +21,9 @@ std::wstring StringToLower(std::wstring myString)
   return myString;
 }
 
-U32 StringToHex( const std::string& str )
+uint32_t StringToHex( const std::string& str )
 {
-	U32 value;
+	uint32_t value;
 	std::stringstream convert ( str );			
 	convert >> std::hex >> value;		//read seq_table as hexadecimal value
 	return value;

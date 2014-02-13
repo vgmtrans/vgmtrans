@@ -16,7 +16,7 @@ public:
 	virtual void Scan(RawFile* file, void* info = 0);
 	HOSASeq* SearchForHOSASeq (RawFile* file);
 	HOSAInstrSet* SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sampcoll);
-	bool RecursiveRgnCompare(RawFile* file, int i, int sampNum, int numSamples, int numFinds, U32* sampOffsets);
+	bool RecursiveRgnCompare(RawFile* file, int i, int sampNum, int numSamples, int numFinds, uint32_t* sampOffsets);
 };
 
 

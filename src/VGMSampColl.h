@@ -16,10 +16,10 @@ public:
 		MENU_ITEM(VGMSampColl, OnSaveAllAsWav, L"Save all as WAV")
 	END_MENU()
 
-	VGMSampColl(const std::string& format, RawFile* rawfile, ULONG offset, ULONG length = 0,
+	VGMSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, uint32_t length = 0,
 	            std::wstring theName = L"VGMSampColl");
 	VGMSampColl(const std::string& format, RawFile* rawfile, VGMInstrSet* instrset,
-		        ULONG offset, ULONG length = 0, std::wstring theName = L"VGMSampColl");
+		        uint32_t offset, uint32_t length = 0, std::wstring theName = L"VGMSampColl");
 	virtual ~VGMSampColl(void);
 	void UseInstrSet(VGMInstrSet* instrset) { parInstrSet = instrset; }
 
@@ -27,8 +27,8 @@ public:
 	virtual bool GetHeaderInfo();		//retrieve any header data
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 
-	VGMSamp* AddSamp(ULONG offset, ULONG length, ULONG dataOffset, ULONG dataLength,
-					 BYTE nChannels = 1, USHORT bps = 16, ULONG theRate = 0,
+	VGMSamp* AddSamp(uint32_t offset, uint32_t length, uint32_t dataOffset, uint32_t dataLength,
+					 uint8_t nChannels = 1, uint16_t bps = 16, uint32_t theRate = 0,
 					 std::wstring name = L"Sample");
 	bool OnSaveAllAsWav();
 
@@ -38,7 +38,7 @@ protected:
 public:
 	bool bLoadOnInstrSetMatch, bLoaded;
 
-	U32 sampDataOffset;			//offset of the beginning of the sample data.  Used for rgn->sampOffset matching
+	uint32_t sampDataOffset;			//offset of the beginning of the sample data.  Used for rgn->sampOffset matching
 	VGMInstrSet* parInstrSet;
 	std::vector<VGMSamp*> samples;
 };

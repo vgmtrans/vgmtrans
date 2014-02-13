@@ -197,7 +197,7 @@ bool QSoundSeq::PostLoad()
 		double vibrato = 0;								// vibrato depth in cents
 		WORD tremelo = 0;								// tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
 		WORD lfoRate = 0;								// value added to lfo env every lfo tick
-		U32 lfoVal = 0;									// LFO envelope value. 0 - 0xFFFFFF .  Effective envelope range is -0x1000000 to +0x1000000
+		uint32_t lfoVal = 0;									// LFO envelope value. 0 - 0xFFFFFF .  Effective envelope range is -0x1000000 to +0x1000000
 		int lfoStage = 0;								// 0 = rising from mid, 1 = falling from peak, 2 = falling from mid 3 = rising from bottom
 		short lfoCents = 0;								// cents adjustment from most recent LFO val excluding pitchbend.
 		long effectiveLfoVal = 0;
@@ -229,7 +229,7 @@ bool QSoundSeq::PostLoad()
 				double lfoRatePerMidiTick = (numLfoPhases * 0x20000) / (double)segmentDurTicks;
 
 				const BYTE tickRes = 16;
-				U32 lfoRatePerLoop = (U32)((tickRes * lfoRatePerMidiTick) * 256);
+				uint32_t lfoRatePerLoop = (uint32_t)((tickRes * lfoRatePerMidiTick) * 256);
 
 				for (int t = 0; t < segmentDurTicks; t += tickRes)
 				{
@@ -783,7 +783,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			break;
 		case 0x1F :
 			{
-				U8 value = GetByte(curOffset++);
+				uint8_t value = GetByte(curOffset++);
 				if (((QSoundSeq*)parentSeq)->fmt_version < VER_116)
 				{
 					AddBankSelectNoItem(2+(value/128));

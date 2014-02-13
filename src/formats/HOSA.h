@@ -15,7 +15,7 @@ public:
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
-	virtual ULONG GetID() {return assocHOSA_ID;}
+	virtual uint32_t GetID() {return assocHOSA_ID;}
 
 protected:
 	unsigned short seqID;

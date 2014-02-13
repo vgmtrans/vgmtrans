@@ -12,7 +12,7 @@ public:
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool GetTrackPointers(void);
-	virtual ULONG GetID() {return assocWDID;}
+	virtual uint32_t GetID() {return assocWDID;}
 
 protected:
 	unsigned short seqID;

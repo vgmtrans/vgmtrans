@@ -12,7 +12,7 @@
 class AkaoInstrSet : public VGMInstrSet
 {
 public:
-	AkaoInstrSet(RawFile* file, U32 length, U32 instrOff, U32 dkitOff, U32 id, std::wstring name = L"Akao Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
+	AkaoInstrSet(RawFile* file, uint32_t length, uint32_t instrOff, uint32_t dkitOff, uint32_t id, std::wstring name = L"Akao Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
 	virtual bool GetInstrPointers();
 public:
 	bool bMelInstrs, bDrumKit;

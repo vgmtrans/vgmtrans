@@ -60,7 +60,7 @@ void FFTScanner::SearchForFFTwds (RawFile* file)
 	UINT nFileLength = file->size();
 	for (UINT i=0; i+0x30<nFileLength; i++)
 	{
-		U32 sig = file->GetWordBE(i);
+		uint32_t sig = file->GetWordBE(i);
 		if (sig != 0x64776473 && sig != 0x77647320)
 			continue;
 
@@ -68,7 +68,7 @@ void FFTScanner::SearchForFFTwds (RawFile* file)
 		if (file->GetWord(i+0x14) > 0x100000)
 			continue;
 
-		U32 hdrSize = file->GetWord(i+0x10);
+		uint32_t hdrSize = file->GetWord(i+0x10);
 		//First 0x10 bytes of sample section should be 0s
 		if (file->GetWord(i+hdrSize) != 0 || file->GetWord(i+hdrSize+4) != 0 ||
 			file->GetWord(i+hdrSize+8) != 0 || file->GetWord(i+hdrSize+12) != 0)

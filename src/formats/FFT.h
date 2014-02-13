@@ -26,7 +26,7 @@ public:
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
-	virtual ULONG GetID() {return assocWdsID;}
+	virtual uint32_t GetID() {return assocWdsID;}
 
 	//virtual int ApplyTable(void);		//create and apply table handler object for sequence
 	//void OnSaveAsMidi(void);

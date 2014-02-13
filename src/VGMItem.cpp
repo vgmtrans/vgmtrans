@@ -11,7 +11,7 @@ VGMItem::VGMItem()
 {
 }
 
-VGMItem::VGMItem(VGMFile* thevgmfile, ULONG theOffset, ULONG theLength, const wstring theName, BYTE theColor)
+VGMItem::VGMItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength, const wstring theName, uint8_t theColor)
 : vgmfile(thevgmfile),
   name(theName),
   dwOffset(theOffset),
@@ -51,7 +51,7 @@ RawFile* VGMItem::GetRawFile()
 }
 
 
-VGMItem* VGMItem::GetItemFromOffset(ULONG offset)
+VGMItem* VGMItem::GetItemFromOffset(uint32_t offset)
 {
 	if (IsItemAtOffset(offset))
 		return this;
@@ -64,49 +64,49 @@ void VGMItem::AddToUI(VGMItem* parent, VOID* UI_specific)
 }
 
 /*
-void SetOffset(ULONG newOffset)
+void SetOffset(uint32_t newOffset)
 {
 	dwOffset = newOffset;
 }
 
-void SetLength(ULONG newLength)
+void SetLength(uint32_t newLength)
 {
 	unLength = newLength;
 }*/
 
-UINT VGMItem::GetBytes(UINT nIndex, UINT nCount, void* pBuffer)
+uint32_t VGMItem::GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer)
 {
 	return vgmfile->GetBytes(nIndex, nCount, pBuffer);
 }
 
-BYTE VGMItem::GetByte(ULONG offset)
+uint8_t VGMItem::GetByte(uint32_t offset)
 {
 	return vgmfile->GetByte(offset);
 }
 
-USHORT VGMItem::GetShort(ULONG offset)
+uint16_t VGMItem::GetShort(uint32_t offset)
 {
 	return vgmfile->GetShort(offset);
 }
 
-UINT VGMItem::GetWord(ULONG offset)
+uint32_t VGMItem::GetWord(uint32_t offset)
 {
 	return GetRawFile()->GetWord(offset);
 }
 
 //GetShort Big Endian
-USHORT VGMItem::GetShortBE(ULONG offset)
+uint16_t VGMItem::GetShortBE(uint32_t offset)
 {
 	return GetRawFile()->GetShortBE(offset);
 }
 
 //GetWord Big Endian
-UINT VGMItem::GetWordBE(ULONG offset)
+uint32_t VGMItem::GetWordBE(uint32_t offset)
 {
 	return GetRawFile()->GetWordBE(offset);
 }
 
-bool VGMItem::IsValidOffset(ULONG offset)
+bool VGMItem::IsValidOffset(uint32_t offset)
 {
 	return vgmfile->IsValidOffset(offset);
 }
@@ -125,7 +125,7 @@ VGMContainerItem::VGMContainerItem()
 }
 
 
-VGMContainerItem::VGMContainerItem(VGMFile* thevgmfile, ULONG theOffset, ULONG theLength, const wstring theName, BYTE color)
+VGMContainerItem::VGMContainerItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength, const wstring theName, uint8_t color)
 : VGMItem(thevgmfile, theOffset, theLength, theName, color)
 {
 	AddContainer(headers);
@@ -138,13 +138,13 @@ VGMContainerItem::~VGMContainerItem()
 	DeleteVect(localitems);
 }
 
-VGMItem* VGMContainerItem::GetItemFromOffset(ULONG offset)
+VGMItem* VGMContainerItem::GetItemFromOffset(uint32_t offset)
 {
 	if (IsItemAtOffset(offset))				//if the offset is within this item
 	{
-		for (UINT i=0; i<containers.size(); i++)
+		for (uint32_t i=0; i<containers.size(); i++)
 		{
-			for (UINT j=0; j<containers[i]->size(); j++)	
+			for (uint32_t j=0; j<containers[i]->size(); j++)	
 			{
 				VGMItem* foundItem = (*containers[i])[j]->GetItemFromOffset(offset);
 				if (foundItem)
@@ -159,14 +159,14 @@ VGMItem* VGMContainerItem::GetItemFromOffset(ULONG offset)
 void VGMContainerItem::AddToUI(VGMItem* parent, VOID* UI_specific)
 {
 	VGMItem::AddToUI(parent, UI_specific);
-	for (UINT i=0; i<containers.size(); i++)
+	for (uint32_t i=0; i<containers.size(); i++)
 	{
-		for (UINT j=0; j<containers[i]->size(); j++)
+		for (uint32_t j=0; j<containers[i]->size(); j++)
 			(*containers[i])[j]->AddToUI(this, UI_specific);
 	}
 }
 
-VGMHeader* VGMContainerItem::AddHeader(ULONG offset, ULONG length, const wchar_t* name)
+VGMHeader* VGMContainerItem::AddHeader(uint32_t offset, uint32_t length, const wchar_t* name)
 {
 	VGMHeader* header = new VGMHeader(this, offset, length, name);
 	headers.push_back(header);
@@ -178,13 +178,13 @@ void VGMContainerItem::AddItem(VGMItem* item)
 	localitems.push_back(item);
 }
 
-void VGMContainerItem::AddSimpleItem(ULONG offset, ULONG length, const wchar_t *name)
+void VGMContainerItem::AddSimpleItem(uint32_t offset, uint32_t length, const wchar_t *name)
 {
 	localitems.push_back(new VGMItem(this->vgmfile, offset, length, name, CLR_HEADER));
 	//items.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_GENERIC, offset, length, name));
 }
 
-void VGMContainerItem::AddUnknownItem(ULONG offset, ULONG length)
+void VGMContainerItem::AddUnknownItem(uint32_t offset, uint32_t length)
 {
 	localitems.push_back(new VGMItem(this->vgmfile, offset, length, L"Unknown"));
 	//items.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_UNKNOWN, offset, length, L"Unknown"));
@@ -196,7 +196,7 @@ void VGMContainerItem::AddHeaderItem(VGMItem* item)
 	header->AddItem(item);
 }
 	
-void VGMContainerItem::AddSimpleHeaderItem(ULONG offset, ULONG length, const wchar_t* name)
+void VGMContainerItem::AddSimpleHeaderItem(uint32_t offset, uint32_t length, const wchar_t* name)
 {
 	header->AddSimpleItem(offset, length, name);
 }
@@ -205,7 +205,7 @@ void VGMContainerItem::AddSimpleHeaderItem(ULONG offset, ULONG length, const wch
 
 //VGMContainerItem::~VGMContainerItem(void)
 //{
-//	//for (UINT i=0; i<containers.size(); i++)
+//	//for (uint32_t i=0; i<containers.size(); i++)
 //	//	DeleteVect<VGMItem>(*containers[i]);
 //		//DeleteVect<VGMItem>(*containers[i]);
 //}

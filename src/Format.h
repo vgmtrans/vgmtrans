@@ -71,7 +71,7 @@ public:
 	virtual bool Init(void);
 	virtual const std::string& GetName() = 0;
 	//virtual string GetName() = 0;
-	//virtual ULONG GetFormatID() = 0;
+	//virtual uint32_t GetFormatID() = 0;
 	virtual VGMScanner* NewScanner() {return NULL;}
 			VGMScanner& GetScanner() {return *scanner;}
 	virtual Matcher* NewMatcher() {return NULL;}

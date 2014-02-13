@@ -11,8 +11,8 @@ class RareSnesInstrSet :
 	public VGMInstrSet
 {
 public:
-	RareSnesInstrSet(RawFile* file, ULONG offset, U32 spcDirAddr, const std::wstring & name = L"RareSnesInstrSet");
-	RareSnesInstrSet(RawFile* file, ULONG offset, U32 spcDirAddr, const std::map<BYTE, double> & instrUnityKeyHints, const std::map<BYTE, USHORT> & instrADSRHints, const std::wstring & name = L"RareSnesInstrSet");
+	RareSnesInstrSet(RawFile* file, ULONG offset, uint32_t spcDirAddr, const std::wstring & name = L"RareSnesInstrSet");
+	RareSnesInstrSet(RawFile* file, ULONG offset, uint32_t spcDirAddr, const std::map<BYTE, double> & instrUnityKeyHints, const std::map<BYTE, USHORT> & instrADSRHints, const std::wstring & name = L"RareSnesInstrSet");
 	virtual ~RareSnesInstrSet(void);
 
 	virtual void Initialize();
@@ -22,7 +22,7 @@ public:
 	const std::vector<BYTE>& GetAvailableInstruments();
 
 protected:
-	U32 spcDirAddr;
+	uint32_t spcDirAddr;
 	BYTE maxSRCNValue;
 	std::vector<BYTE> availInstruments;
 	std::map<BYTE, double> instrUnityKeyHints;
@@ -39,15 +39,15 @@ class RareSnesInstr
 	: public VGMInstr
 {
 public:
-	RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, U32 spcDirAddr, double transpose = 0, U16 adsr = 0x8FE0, const std::wstring& name = L"RareSnesInstr");
+	RareSnesInstr(VGMInstrSet* instrSet, ULONG offset, ULONG theBank, ULONG theInstrNum, uint32_t spcDirAddr, double transpose = 0, uint16_t adsr = 0x8FE0, const std::wstring& name = L"RareSnesInstr");
 	virtual ~RareSnesInstr(void);
 
 	virtual bool LoadInstr();
 
 protected:
-	U32 spcDirAddr;
+	uint32_t spcDirAddr;
 	double transpose;
-	U16 adsr;
+	uint16_t adsr;
 };
 
 // ***********
@@ -58,12 +58,12 @@ class RareSnesRgn
 	: public VGMRgn
 {
 public:
-	RareSnesRgn(RareSnesInstr* instr, ULONG offset, double transpose = 0, U16 adsr = 0x8FE0);
+	RareSnesRgn(RareSnesInstr* instr, ULONG offset, double transpose = 0, uint16_t adsr = 0x8FE0);
 	virtual ~RareSnesRgn(void);
 
 	virtual bool LoadRgn();
 
 protected:
 	double transpose;
-	U16 adsr;
+	uint16_t adsr;
 };

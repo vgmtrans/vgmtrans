@@ -46,7 +46,7 @@ bool HOSAInstrSet::GetHeaderInfo()
 	//ÉwÉbÉ_Å[objectÇÃê∂ê¨
 	VGMHeader* wdsHeader = AddHeader(dwOffset, sizeof(InstrHeader));
 	wdsHeader->AddSig(dwOffset, 8);
-	wdsHeader->AddSimpleItem(dwOffset+8,sizeof(U32),L"Number of Instruments");
+	wdsHeader->AddSimpleItem(dwOffset+8,sizeof(uint32_t),L"Number of Instruments");
 
 	//îgå`objectÇÃê∂ê¨
 	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800);
@@ -105,7 +105,7 @@ bool HOSAInstr::LoadInstr()
 	// Get the instr data
 	GetBytes(dwOffset, sizeof(InstrInfo), &instrinfo);
 	unLength = sizeof(InstrInfo) + sizeof(RgnInfo) * instrinfo.numRgns;
-	AddSimpleItem(dwOffset,sizeof(U32),L"Number of Rgns");
+	AddSimpleItem(dwOffset,sizeof(uint32_t),L"Number of Rgns");
 
 	// Get the rgn data
 	rgns = new RgnInfo[instrinfo.numRgns];
@@ -115,7 +115,7 @@ bool HOSAInstr::LoadInstr()
 
 	//ATLTRACE("LOADED INSTR   ProgNum: %X    BankNum: %X\n", instrinfo.progNum, instrinfo.bankNum);
 
-	U8	cKeyLow = 0x00;
+	uint8_t	cKeyLow = 0x00;
 	for (unsigned int i=0; i<instrinfo.numRgns; i++)
 	{
 		RgnInfo* rgninfo = &rgns[i];
@@ -130,7 +130,7 @@ bool HOSAInstr::LoadInstr()
 		rgn->AddKeyHigh(rgninfo->note_range_high, rgn->dwOffset+0x05);
 		cKeyLow = (rgninfo->note_range_high) + 1;
 
-		rgn->AddUnityKey((S8)0x3C + 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset+0x06);
+		rgn->AddUnityKey((int8_t)0x3C + 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset+0x06);
 		rgn->AddSimpleItem(rgn->dwOffset+0x07, 1, L"Semi Tone Tune");
 		rgn->fineTune =		(short)((double)rgninfo->iFineTune * (100.0/256.0));	
 
@@ -143,12 +143,12 @@ bool HOSAInstr::LoadInstr()
 
 		// The ADSR value ordering is all messed up for the hell of it.  This was a bitch to reverse-engineer.
 		rgn->AddSimpleItem(rgn->dwOffset+0x0C, 4, L"ADSR Values (non-standard ordering)");
-		U8 Ar = (rgninfo->ADSR_vals >> 20) & 0x7F;
-		U8 Dr = (rgninfo->ADSR_vals >> 16) & 0xF;
-		U8 Sr = ((rgninfo->ADSR_vals >> 8) & 0xFF) >> 1;
-		U8 Rr = (rgninfo->ADSR_vals >> 4) & 0x1F;
-		U8 Sl = rgninfo->ADSR_vals & 0xF;
-		U8 Am = ((rgninfo->ADSR_Am & 0xF) ^ 5) < 1;			//Not sure what other role this nibble plays, if any.
+		uint8_t Ar = (rgninfo->ADSR_vals >> 20) & 0x7F;
+		uint8_t Dr = (rgninfo->ADSR_vals >> 16) & 0xF;
+		uint8_t Sr = ((rgninfo->ADSR_vals >> 8) & 0xFF) >> 1;
+		uint8_t Rr = (rgninfo->ADSR_vals >> 4) & 0x1F;
+		uint8_t Sl = rgninfo->ADSR_vals & 0xF;
+		uint8_t Am = ((rgninfo->ADSR_Am & 0xF) ^ 5) < 1;			//Not sure what other role this nibble plays, if any.
 		PSXConvADSR(rgn, Am, Ar, Dr, Sl, 1, 1, Sr, 1, Rr, false);
 
 

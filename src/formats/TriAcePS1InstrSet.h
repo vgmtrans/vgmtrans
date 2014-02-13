@@ -28,15 +28,15 @@ public:
 	//-----------------------
 	typedef struct _InstrHeader
 	{
-		U32 FileSize;	//
-		U16 InstSize;	//End of Instruction information
-		U16 unk_06;		//
-		U16 unk_08;		//
-		U16 unk_0A;		//
+		uint32_t FileSize;	//
+		uint16_t InstSize;	//End of Instruction information
+		uint16_t unk_06;		//
+		uint16_t unk_08;		//
+		uint16_t unk_0A;		//
 	} InstrHeader;
 	//	Å™Å@Å™Å@Å™
-	U16 instrSectionSize;		// to do delete
-	U8  numInstrs;				// to do delete
+	uint16_t instrSectionSize;		// to do delete
+	uint8_t  numInstrs;				// to do delete
 	//-----------------------
 
 	//DWORD dwSampSectOffset;
@@ -57,27 +57,27 @@ public:
 	
 	typedef struct _RgnInfo
 	{
-		U8 note_range_low;		//These ranges only seem to kick in when the instr has more than 1 rgn
-		U8 note_range_high;
-		U8 vel_range_low;
-		U8 vel_range_high;
-		U32 sampOffset;
-		U32 loopOffset;
-		U8 attenuation;
-		S8 pitchTuneSemitones;
-		S8 pitchTuneFine;
-		U8 unk_17;
-		U32 unk_18;
+		uint8_t note_range_low;		//These ranges only seem to kick in when the instr has more than 1 rgn
+		uint8_t note_range_high;
+		uint8_t vel_range_low;
+		uint8_t vel_range_high;
+		uint32_t sampOffset;
+		uint32_t loopOffset;
+		uint8_t attenuation;
+		int8_t pitchTuneSemitones;
+		int8_t pitchTuneFine;
+		uint8_t unk_17;
+		uint32_t unk_18;
 	} RgnInfo;
 
 	typedef struct _InstrInfo
 	{
-		U8 progNum;
-		U8 bankNum;
-		U16 ADSR1;
-		U16 ADSR2;
-		U8 unk_06;
-		U8 numRgns;
+		uint8_t progNum;
+		uint8_t bankNum;
+		uint16_t ADSR1;
+		uint16_t ADSR2;
+		uint8_t unk_06;
+		uint8_t numRgns;
 	} InstrInfo;
 
 

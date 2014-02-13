@@ -51,7 +51,7 @@ struct WdsRgnData
 	unsigned	long	ptBody;							//Offset address to AD-PCM ”gŒ`ŽÀ‘Ì
 	unsigned	short	ptLoop;							//size?  loop?  unknown
 	unsigned	char	iFineTune;		// Pitch table is at 800290D8 in FFT.  See function at 80017424
-										//  takes $a0: U16- MSB = semitone (note+semitone_tune),
+										//  takes $a0: uint16_t- MSB = semitone (note+semitone_tune),
 										//                  LSB = fine tune index
 				char	iSemiToneTune;	// Pitch tune in semitones (determines unitykey)
 	unsigned	char	Ar;				// & 0x7F attack rate

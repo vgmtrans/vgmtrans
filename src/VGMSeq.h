@@ -23,7 +23,7 @@ public:
 		MENU_ITEM(VGMSeq, OnSaveAsMidi, L"Save as MIDI")
 	END_MENU()
 
-	VGMSeq(const std::string& format, RawFile* file, ULONG offset, ULONG length = 0, std::wstring name = L"VGM Sequence");
+	VGMSeq(const std::string& format, RawFile* file, uint32_t offset, uint32_t length = 0, std::wstring name = L"VGM Sequence");
 	virtual ~VGMSeq(void);
 
 	virtual Icon GetIcon() { return ICON_SEQ; }
@@ -37,15 +37,15 @@ public:
 	//virtual int ApplyTable(void);	//create and apply table handler object for sequence
 	void SetPPQN(WORD ppqn);
 	WORD GetPPQN(void);
-	//void SetTimeSignature(BYTE numer, denom);
-	void AddInstrumentRef(ULONG progNum);
+	//void SetTimeSignature(uint8_t numer, denom);
+	void AddInstrumentRef(uint32_t progNum);
 
 	void UseReverb() { bReverb = true; }
 	void HasMonophonicTracks() { bMonophonicTracks = true; }
 	void UseLinearAmplitudeScale() { bUseLinearAmplitudeScale = true; }
-	void AlwaysWriteInitialVol(BYTE theVol = 100) { bAlwaysWriteInitialVol = true; initialVol = theVol; }
-	void AlwaysWriteInitialExpression(BYTE level = 127) { bAlwaysWriteInitialExpression = true; initialExpression = level;}
-	void AlwaysWriteInitialPitchBendRange(U8 semitones, U8 cents) 
+	void AlwaysWriteInitialVol(uint8_t theVol = 100) { bAlwaysWriteInitialVol = true; initialVol = theVol; }
+	void AlwaysWriteInitialExpression(uint8_t level = 127) { bAlwaysWriteInitialExpression = true; initialExpression = level;}
+	void AlwaysWriteInitialPitchBendRange(uint8_t semitones, uint8_t cents) 
 	{ bAlwaysWriteInitialPitchBendRange = true; initialPitchBendRangeSemiTones = semitones;
 	  initialPitchBendRangeCents = cents; }
 
@@ -61,9 +61,9 @@ protected:
 	virtual bool PostLoad();
 
 public:
-	ULONG nNumTracks;
+	uint32_t nNumTracks;
 	ReadMode readMode;
-	//USHORT ppqn;		//perhaps shouldn't include this
+	//uint16_t ppqn;		//perhaps shouldn't include this
 	MidiFile* midi;
 	double tempoBPM;
 	WORD ppqn;
@@ -79,15 +79,15 @@ public:
 	bool bAlwaysWriteInitialPitchBendRange;
 	bool bAllowDiscontinuousTrackData;
 	bool bLoadTrackByTrack;
-	U8 initialVol;
-	U8 initialExpression;
-	U8 initialPitchBendRangeSemiTones, initialPitchBendRangeCents;
+	uint8_t initialVol;
+	uint8_t initialExpression;
+	uint8_t initialPitchBendRangeSemiTones, initialPitchBendRangeCents;
 
 	bool bReverb;
 	float reverbTime;
 
 	std::vector<SeqTrack*> aTracks;		//array of track pointers
-	std::vector<ULONG> aInstrumentsUsed;
+	std::vector<uint32_t> aInstrumentsUsed;
 
 //protected:
 	//map<int, InstrAssoc> InstrMap;
@@ -96,4 +96,4 @@ public:
 };
 
 
-extern BYTE mode;
+extern uint8_t mode;

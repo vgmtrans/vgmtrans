@@ -151,17 +151,17 @@ bool	WdsInstr::LoadInstr()
 	PSXConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
 	aRgns.push_back(rgn);
 
-	rgn->AddGeneralItem(dwOffset+0x00, sizeof(U32), L"Sample Offset");
-	rgn->AddGeneralItem(dwOffset+0x04, sizeof(U16), L"Loop Offset");
-	rgn->AddGeneralItem(dwOffset+0x06, sizeof(U16), L"Pitch Fine Tune");
-	rgn->AddGeneralItem(dwOffset+0x08, sizeof(U8), L"Attack Rate");
-	rgn->AddGeneralItem(dwOffset+0x09, sizeof(U8), L"Decay Rate");
-	rgn->AddGeneralItem(dwOffset+0x0A, sizeof(U8), L"Sustain Rate");
-	rgn->AddGeneralItem(dwOffset+0x0B, sizeof(U8), L"Release Rate");
-	rgn->AddGeneralItem(dwOffset+0x0C, sizeof(U8), L"Sustain Level");
-	rgn->AddGeneralItem(dwOffset+0x0D, sizeof(U8), L"Attack Rate Mode?");
-	rgn->AddGeneralItem(dwOffset+0x0E, sizeof(U8), L"unknown");
-	rgn->AddGeneralItem(dwOffset+0x0F, sizeof(U8), L"unknown");
+	rgn->AddGeneralItem(dwOffset+0x00, sizeof(uint32_t), L"Sample Offset");
+	rgn->AddGeneralItem(dwOffset+0x04, sizeof(uint16_t), L"Loop Offset");
+	rgn->AddGeneralItem(dwOffset+0x06, sizeof(uint16_t), L"Pitch Fine Tune");
+	rgn->AddGeneralItem(dwOffset+0x08, sizeof(uint8_t), L"Attack Rate");
+	rgn->AddGeneralItem(dwOffset+0x09, sizeof(uint8_t), L"Decay Rate");
+	rgn->AddGeneralItem(dwOffset+0x0A, sizeof(uint8_t), L"Sustain Rate");
+	rgn->AddGeneralItem(dwOffset+0x0B, sizeof(uint8_t), L"Release Rate");
+	rgn->AddGeneralItem(dwOffset+0x0C, sizeof(uint8_t), L"Sustain Level");
+	rgn->AddGeneralItem(dwOffset+0x0D, sizeof(uint8_t), L"Attack Rate Mode?");
+	rgn->AddGeneralItem(dwOffset+0x0E, sizeof(uint8_t), L"unknown");
+	rgn->AddGeneralItem(dwOffset+0x0F, sizeof(uint8_t), L"unknown");
 
 	return TRUE;
 }

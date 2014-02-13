@@ -19,8 +19,8 @@ void SonyPS2Scanner::SearchForSeq (RawFile* file)
 	UINT nFileLength = file->size();
 	for (UINT i=0; i+0x40<nFileLength; i++)
 	{
-		U32 sig1 = file->GetWord(i);
-		U32 sig2 = file->GetWord(i+4);
+		uint32_t sig1 = file->GetWord(i);
+		uint32_t sig2 = file->GetWord(i+4);
 		if (sig1 != 0x53434549 || sig2 != 0x56657273)	// "SCEIVers" in ASCII
 			continue;
 
@@ -45,8 +45,8 @@ void SonyPS2Scanner::SearchForInstrSet (RawFile* file)
 	UINT nFileLength = file->size();
 	for (UINT i=0; i+0x40<nFileLength; i++)
 	{
-		U32 sig1 = file->GetWord(i);
-		U32 sig2 = file->GetWord(i+4);
+		uint32_t sig1 = file->GetWord(i);
+		uint32_t sig2 = file->GetWord(i+4);
 		if (sig1 != 0x53434549 || sig2 != 0x56657273)	// "SCEIVers" in ASCII
 			continue;
 
@@ -81,7 +81,7 @@ void SonyPS2Scanner::SearchForSampColl (RawFile* file)
 		int num = CountBytesOfVal(buf, 16, 0);		//The first 16 bytes must be all 0x00
 		if (num != 16)
 		{
-			U32 newFileSize = file->size() + 16;
+			uint32_t newFileSize = file->size() + 16;
 			BYTE* newdataBuf = new BYTE[newFileSize];
 			file->GetBytes(0, file->size(), newdataBuf+16);
 			memset(newdataBuf, 0, 16);

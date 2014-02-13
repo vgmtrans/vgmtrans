@@ -46,7 +46,7 @@ bool Matcher::OnCloseFile(VGMFile* file)
 
 
 /*
-AddItem(ITEM_TYPE type, ULONG id)
+AddItem(ITEM_TYPE type, uint32_t id)
 {
 	
 }*/
@@ -64,7 +64,7 @@ AddItem(ITEM_TYPE type, ULONG id)
 //template <class IdType>
 //bool SimpleMatcher::OnNewSeq(VGMSeq* seq)
 //{
-//	//ULONG id = seq->GetID();
+//	//uint32_t id = seq->GetID();
 //	IdType id;
 //	bool success = this->GetSeqId(seq, id);
 //	if (!success)
@@ -120,7 +120,7 @@ AddItem(ITEM_TYPE type, ULONG id)
 //	bool success = this->GetInstrSetId(instrset, id);
 //	if (!success)
 //		return false;
-//	//ULONG id = instrset->GetID();
+//	//uint32_t id = instrset->GetID();
 //	//if (!id)						//for the time being, 0 isn't a valid value of id
 //	//	return false;
 //	if (instrsets[id])
@@ -164,7 +164,7 @@ AddItem(ITEM_TYPE type, ULONG id)
 //		bool success = this->GetSampCollId(sampcoll, id);
 //		if (!success)
 //			return false;
-//		//ULONG id = sampcoll->GetID();
+//		//uint32_t id = sampcoll->GetID();
 //		//if (!id)
 //		//	return false;
 //		if (sampcolls[id])
@@ -329,7 +329,7 @@ void FilegroupMatcher::LookForMatch()
 
 template <class T> T* FilegroupMatcher::GetLargestVGMFileInList(list<T*> theList)
 {
-	ULONG s = 0;
+	uint32_t s = 0;
 	T* curWinner = NULL;
 	for (list<T*>::iterator iter = theList.begin(); iter != theList.end(); iter++)
 	{

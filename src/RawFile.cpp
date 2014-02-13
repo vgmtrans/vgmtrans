@@ -19,7 +19,7 @@ RawFile::RawFile(void)
 	bufSize = (BUF_SIZE > fileSize) ? fileSize : BUF_SIZE;
 }
 
-RawFile::RawFile(const wstring name, ULONG theFileSize, bool bCanRead)
+RawFile::RawFile(const wstring name, uint32_t theFileSize, bool bCanRead)
 : fileSize(theFileSize), /*data(databuf),*/
   //filename(name),
   fullpath(name),
@@ -77,7 +77,7 @@ bool RawFile::open(const wstring& theFileName)
 	pbuf=file.rdbuf();
 
 	 // get file size using buffer's members
-	fileSize=(ULONG)pbuf->pubseekoff(0,ios::end,ios::in);
+	fileSize=(uint32_t)pbuf->pubseekoff(0,ios::end,ios::in);
 	//pbuf->pubseekpos (0,ios::in);
 
 	// allocate memory to contain file data
@@ -203,7 +203,7 @@ void RawFile::RemoveContainedVGMFile(VGMFile* vgmfile)
 }
 
 // read data directly from the file
-int RawFile::FileRead(void* dest, ULONG index, ULONG length)
+int RawFile::FileRead(void* dest, uint32_t index, uint32_t length)
 {
 	assert(bCanFileRead);
 	assert(index+length <= fileSize);
@@ -219,23 +219,23 @@ int RawFile::FileRead(void* dest, ULONG index, ULONG length)
 //is a read attempt that is beyond the current range of the buffer.  There is a max size
 //of the buffer (buf_size).  UpdateBuffer makes sure that we're not trying to read more from the buffer
 //than is allowed (I might want to allow for this in future)... TODO finish the explanation
-void RawFile::UpdateBuffer(ULONG index, ULONG size)
+void RawFile::UpdateBuffer(uint32_t index, uint32_t size)
 {
-	LONG beginOffset = 0;
-	LONG endOffset = 0;
-	ULONG beginLength = 0;
-	ULONG endLength = 0;
+	int32_t beginOffset = 0;
+	int32_t endOffset = 0;
+	uint32_t beginLength = 0;
+	uint32_t endLength = 0;
 
 	assert(bCanFileRead);
 	assert(index+size <= fileSize);		//better not ask for data beyond the length of the file
 	assert(size <= buf_size);			//the size can't be greater than the max buf size (could handle this differently)
-	//ULONG buf_size = buf_size;
+	//uint32_t buf_size = buf_size;
 	if (buf_size > fileSize)
 		buf_size = fileSize;
 
 	if (size/2 > buf_size)
 	{
-		//ULONG padding = (buf_size - size) / 2;
+		//uint32_t padding = (buf_size - size) / 2;
 		//if (padding <= index && index+size)	//if the padding is > index, then we'd get a negative offset if we subtracted it
 		beginOffset = index;
 		endOffset = index+buf_size;
@@ -244,7 +244,7 @@ void RawFile::UpdateBuffer(ULONG index, ULONG size)
 	}
 	else
 	{
-		LONG originOff;
+		int32_t originOff;
 		if (index < buf.startOff)
 			originOff = index;
 		else if (index+size > buf.endOff)
@@ -278,7 +278,7 @@ void RawFile::UpdateBuffer(ULONG index, ULONG size)
 			endLength = buf_size;
 	}
 
-	ULONG origbufEndOff;
+	uint32_t origbufEndOff;
 	if (buf.endOff < beginOffset)
 		origbufEndOff = beginOffset;
 	else
@@ -294,7 +294,7 @@ void RawFile::UpdateBuffer(ULONG index, ULONG size)
 
 
 /*
-UINT RawFile::GetBytes(UINT nIndex, UINT nCount, void* pBuffer)
+uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer)
 {
     //assert(nIndex+nCount < filesize);
 	if ((nIndex + nCount) > fileSize)
@@ -303,8 +303,8 @@ UINT RawFile::GetBytes(UINT nIndex, UINT nCount, void* pBuffer)
 	if ((nIndex < buf.startOff) || (nIndex+nCount > buf.endOff))
 		UpdateBuffer(nIndex, nCount);
     
-	UINT realIndex = nIndex-buf.startOff;
-	copy<deque<BYTE>::iterator, BYTE*>(buf.data.begin()+realIndex, buf.data.begin()+realIndex+nCount, (BYTE*)pBuffer);
+	uint32_t realIndex = nIndex-buf.startOff;
+	copy<deque<uint8_t>::iterator, uint8_t*>(buf.data.begin()+realIndex, buf.data.begin()+realIndex+nCount, (uint8_t*)pBuffer);
 	//memcpy(pBuffer, &buf[nIndex], nCount);
 	return nCount;
 }*/
@@ -312,7 +312,7 @@ UINT RawFile::GetBytes(UINT nIndex, UINT nCount, void* pBuffer)
 // reads a bunch of data from a given offset.  If the requested data goes beyond the bounds
 // of the file buffer, the buffer is updated.  If the requested size is greater than the buffer size
 // a direct read from the file is executed.
-UINT RawFile::GetBytes(UINT nIndex, UINT nCount, void* pBuffer)
+uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer)
 {
 	if ((nIndex + nCount) > fileSize)
         nCount = fileSize - nIndex;
@@ -332,9 +332,9 @@ UINT RawFile::GetBytes(UINT nIndex, UINT nCount, void* pBuffer)
 // attempts to match the data from a given offset against a given pattern.
 // If the requested data goes beyond the bounds of the file buffer, the buffer is updated.
 // If the requested size is greater than the buffer size, it always fails. (operation not supported)
-bool RawFile::MatchBytePattern(const BytePattern& pattern, UINT nIndex)
+bool RawFile::MatchBytePattern(const BytePattern& pattern, uint32_t nIndex)
 {
-	UINT nCount = pattern.length();
+	uint32_t nCount = pattern.length();
 
 	if ((nIndex + nCount) > fileSize)
 		return false;
@@ -350,7 +350,7 @@ bool RawFile::MatchBytePattern(const BytePattern& pattern, UINT nIndex)
 	}
 }
 
-bool RawFile::SearchBytePattern(const BytePattern& pattern, UINT& nMatchOffset, UINT nSearchOffset, UINT nSearchSize)
+bool RawFile::SearchBytePattern(const BytePattern& pattern, uint32_t& nMatchOffset, uint32_t nSearchOffset, uint32_t nSearchSize)
 {
 	if (nSearchOffset >= fileSize)
 		return false;
@@ -361,7 +361,7 @@ bool RawFile::SearchBytePattern(const BytePattern& pattern, UINT& nMatchOffset, 
 	if (nSearchSize < pattern.length())
 		return false;
 
-	for (UINT nIndex = nSearchOffset; nIndex < nSearchOffset + nSearchSize - pattern.length(); nIndex++)
+	for (uint32_t nIndex = nSearchOffset; nIndex < nSearchOffset + nSearchSize - pattern.length(); nIndex++)
 	{
 		if (MatchBytePattern(pattern, nIndex))
 		{
@@ -373,11 +373,11 @@ bool RawFile::SearchBytePattern(const BytePattern& pattern, UINT& nMatchOffset, 
 }
 
 /*
-int RawFile::FileRead(DataSeg* dest, ULONG index, ULONG length)
+int RawFile::FileRead(DataSeg* dest, uint32_t index, uint32_t length)
 {
 	assert(index+length <= fileSize);
 	pbuf->pubseekpos(index, ios::in);
-	BYTE* temp = new BYTE[length];
+	uint8_t* temp = new uint8_t[length];
 	pbuf->sgetn((char*)temp, length);	//return bool value based on whether we read all requested bytes
 	//dest->insert(index, temp, length);
 	copy(temp, temp+length, dest->data.begin() + index - dest->startOff);
@@ -388,18 +388,18 @@ int RawFile::FileRead(DataSeg* dest, ULONG index, ULONG length)
 
 // Given a requested offset, fills the buffer with data surrounding that offset.  The ratio
 // of how much data is read before and after the offset is determined by the ProPre ratio (explained above).
-void RawFile::UpdateBuffer(ULONG index)
+void RawFile::UpdateBuffer(uint32_t index)
 {
-	ULONG beginOffset = 0;
-	ULONG endOffset = 0;
+	uint32_t beginOffset = 0;
+	uint32_t endOffset = 0;
 
 	assert(bCanFileRead);
 
 	if (!buf.bAlloced)
 		buf.alloc(bufSize);
 
-	ULONG proBytes = (ULONG)(buf.size*propreRatio);
-	ULONG preBytes = buf.size-proBytes;
+	uint32_t proBytes = (uint32_t)(buf.size*propreRatio);
+	uint32_t preBytes = buf.size-proBytes;
 	if (proBytes+index > fileSize)
 	{
 		preBytes += (proBytes+index)-fileSize;
@@ -415,13 +415,13 @@ void RawFile::UpdateBuffer(ULONG index)
 
 	if (beginOffset >= buf.startOff && beginOffset < buf.endOff)
 	{
-		ULONG prevEndOff = buf.endOff;
+		uint32_t prevEndOff = buf.endOff;
 		buf.reposition(beginOffset);
 		FileRead(buf.data+prevEndOff-buf.startOff, prevEndOff, endOffset - prevEndOff);
 	}
 	else if (endOffset >= buf.startOff && endOffset < buf.endOff)
 	{
-		ULONG prevStartOff = buf.startOff;
+		uint32_t prevStartOff = buf.startOff;
 		buf.reposition(beginOffset);
 		FileRead(buf.data, beginOffset, prevStartOff - beginOffset);
 	}
@@ -439,7 +439,7 @@ bool RawFile::OnSaveAsRaw()
 	if (filepath.length() != 0)
 	{
 		bool result;
-		BYTE* buf = new BYTE[fileSize];		//create a buffer the size of the file
+		uint8_t* buf = new uint8_t[fileSize];		//create a buffer the size of the file
 		GetBytes(0, fileSize, buf);
 		result = pRoot->UI_WriteBufferToFile(filepath.c_str(), buf, fileSize);
 		delete[] buf;
@@ -465,7 +465,7 @@ VirtFile::VirtFile()
 {
 }
 
-VirtFile::VirtFile(BYTE* data, ULONG fileSize, const wstring& name, const wchar_t* rawFileName)
+VirtFile::VirtFile(uint8_t* data, uint32_t fileSize, const wstring& name, const wchar_t* rawFileName)
 : RawFile(name, fileSize, false)
 {
 	parRawFileFullPath = rawFileName;

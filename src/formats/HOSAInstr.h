@@ -26,7 +26,7 @@ public:
 	typedef struct _InstrHeader
 	{
 		char	strHeader[8];
-		U32		numInstr;
+		uint32_t		numInstr;
 	} InstrHeader;
 
 public:
@@ -45,23 +45,23 @@ public:
 	
 	typedef struct _InstrInfo
 	{
-		U32 numRgns;
+		uint32_t numRgns;
 	} InstrInfo;
 
 	typedef struct _RgnInfo
 	{
-		U32	sampOffset;
-		U8	volume;					//percent volume 0-0xFF
-		U8	note_range_high;
-		U8	iSemiToneTune;			//unity key
-		U8	iFineTune;				//unknown - definitely not finetune
-		U8	ADSR_unk;				//the nibbles get read individually.  Conditional code related to this gets 0'd out in PSF file
+		uint32_t	sampOffset;
+		uint8_t	volume;					//percent volume 0-0xFF
+		uint8_t	note_range_high;
+		uint8_t	iSemiToneTune;			//unity key
+		uint8_t	iFineTune;				//unknown - definitely not finetune
+		uint8_t	ADSR_unk;				//the nibbles get read individually.  Conditional code related to this gets 0'd out in PSF file
 									//I disassembled (removed during optimization), so I can't see what it does. probably determines
 									//Sm and Sd, so not terribly important.
-		U8	ADSR_Am;				// Determines ADSR Attack Mode value.
-		U8	unk_A;
-		U8	iPan;					//pan 0x80 - hard left    0xFF - hard right.  anything below results in center (but may be undefined)
-		U32	ADSR_vals;				//The ordering is all messed up.  The code which loads these values is at 8007D8EC
+		uint8_t	ADSR_Am;				// Determines ADSR Attack Mode value.
+		uint8_t	unk_A;
+		uint8_t	iPan;					//pan 0x80 - hard left    0xFF - hard right.  anything below results in center (but may be undefined)
+		uint32_t	ADSR_vals;				//The ordering is all messed up.  The code which loads these values is at 8007D8EC
 	} RgnInfo;
 
 

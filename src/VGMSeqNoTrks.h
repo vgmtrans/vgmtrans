@@ -7,30 +7,30 @@ class VGMSeqNoTrks :
 	public SeqTrack
 {
 public:
-	VGMSeqNoTrks(const std::string& format, RawFile* file, ULONG offset);
+	VGMSeqNoTrks(const std::string& format, RawFile* file, uint32_t offset);
 public:
 	virtual ~VGMSeqNoTrks(void);
 
 	virtual void ResetVars();
 
-	inline UINT GetBytes(UINT nIndex, UINT nCount, void *pBuffer) { return VGMSeq::GetBytes(nIndex, nCount, pBuffer); }
-	inline BYTE GetByte(ULONG offset) { return VGMSeq::GetByte(offset);}
-	inline USHORT GetShort(ULONG offset) { return VGMSeq::GetShort(offset);}
-	inline UINT GetWord(ULONG offset) { return VGMSeq::GetWord(offset);}
-	inline USHORT GetShortBE(ULONG offset) { return VGMSeq::GetShortBE(offset);}
-	inline UINT GetWordBE(ULONG offset) { return VGMSeq::GetWordBE(offset);}
-	inline ULONG& offset(void) { return VGMSeq::dwOffset;}
-	inline ULONG& length(void) { return VGMSeq::unLength;}
+	inline uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) { return VGMSeq::GetBytes(nIndex, nCount, pBuffer); }
+	inline uint8_t GetByte(uint32_t offset) { return VGMSeq::GetByte(offset);}
+	inline uint16_t GetShort(uint32_t offset) { return VGMSeq::GetShort(offset);}
+	inline uint32_t GetWord(uint32_t offset) { return VGMSeq::GetWord(offset);}
+	inline uint16_t GetShortBE(uint32_t offset) { return VGMSeq::GetShortBE(offset);}
+	inline uint32_t GetWordBE(uint32_t offset) { return VGMSeq::GetWordBE(offset);}
+	inline uint32_t& offset(void) { return VGMSeq::dwOffset;}
+	inline uint32_t& length(void) { return VGMSeq::unLength;}
 	inline std::wstring& name(void) { return VGMSeq::name;}
 
-	inline ULONG& eventsOffset() { return SeqTrack::dwOffset;}
+	inline uint32_t& eventsOffset() { return SeqTrack::dwOffset;}
 	inline void SetEventsOffset(long offset) { SeqTrack::dwOffset = offset;}		//this function must be called in GetHeaderInfo or before LoadEvents is called
 
-	virtual void AddTime(ULONG delta);
-	//virtual bool AddEndOfTrack(ULONG offset, ULONG length, const wchar_t* sEventName = L"Track End");
+	virtual void AddTime(uint32_t delta);
+	//virtual bool AddEndOfTrack(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Track End");
 
-	void SetCurTrack(ULONG trackNum);
-	void TryExpandMidiTracks(ULONG numTracks);
+	void SetCurTrack(uint32_t trackNum);
+	void TryExpandMidiTracks(uint32_t numTracks);
 
 	//virtual VGMItem* GetItemFromOffset(long offset);
 	//virtual vector<const char*>* GetMenuItemNames() {return menu.GetMenuItemNames();}

@@ -107,7 +107,7 @@ public:
 
 public:
 	VGMItem();
-	VGMItem(VGMFile* thevgmfile, ULONG theOffset, ULONG theLength = 0, const std::wstring theName = L"", BYTE color = 0);
+	VGMItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength = 0, const std::wstring theName = L"", uint8_t color = 0);
 	virtual ~VGMItem(void);
 
 	friend bool operator>	(VGMItem &item1, VGMItem &item2);
@@ -116,20 +116,20 @@ public:
 	friend bool operator>= (VGMItem &item1, VGMItem &item2);
 
 public:
-	//inline bool IsItemAtOffset(ULONG offset);
-	inline bool IsItemAtOffset(ULONG offset)
+	//inline bool IsItemAtOffset(uint32_t offset);
+	inline bool IsItemAtOffset(uint32_t offset)
 	{
 		if ((offset >= dwOffset) && (offset < dwOffset+unLength))
 			return true;
 		else
 			return false;
 	}
-	virtual VGMItem* GetItemFromOffset(ULONG offset);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset);
 
 	RawFile* GetRawFile();
 
-	//inline void SetOffset(ULONG newOffset);
-	//inline void SetLength(ULONG newLength);
+	//inline void SetOffset(uint32_t newOffset);
+	//inline void SetLength(uint32_t newLength);
 
 	virtual std::vector<const wchar_t*>* GetMenuItemNames() { return NULL; }
 	virtual bool CallMenuItem(VGMItem* item, int menuItemNum) { return false; }
@@ -139,28 +139,28 @@ public:
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 	virtual bool IsContainerItem() { return false; }
 
-	//bool AddHeader(ULONG offset, ULONG length, const wchar_t* name = L"Header");
-	//bool VGMHeader(VGMItem* parItem, ULONG offset, ULONG length, const wchar_t* name);
+	//bool AddHeader(uint32_t offset, uint32_t length, const wchar_t* name = L"Header");
+	//bool VGMHeader(VGMItem* parItem, uint32_t offset, uint32_t length, const wchar_t* name);
 
 protected:
 	//TODO make inline
-	UINT GetBytes(UINT nIndex, UINT nCount, void* pBuffer);
-	BYTE GetByte(ULONG offset);
-	USHORT GetShort(ULONG offset);
-	UINT GetWord(ULONG offset);	
-	USHORT GetShortBE(ULONG offset);
-	UINT GetWordBE(ULONG offset);
-	bool IsValidOffset(ULONG offset);
+	uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer);
+	uint8_t GetByte(uint32_t offset);
+	uint16_t GetShort(uint32_t offset);
+	uint32_t GetWord(uint32_t offset);	
+	uint16_t GetShortBE(uint32_t offset);
+	uint32_t GetWordBE(uint32_t offset);
+	bool IsValidOffset(uint32_t offset);
 
 public:
-	BYTE color;
+	uint8_t color;
 	//RawFile* file;
 	VGMFile* vgmfile;
 	std::wstring name;
 	//VGMHeader* header;
 	//VGMItem* parent;
-	ULONG dwOffset;			//offset in the pDoc data buffer
-	ULONG unLength;			//num of bytes the event engulfs
+	uint32_t dwOffset;			//offset in the pDoc data buffer
+	uint32_t unLength;			//num of bytes the event engulfs
 };
 
 
@@ -170,20 +170,20 @@ class VGMContainerItem
 {
 public:
 	VGMContainerItem();
-	VGMContainerItem(VGMFile* thevgmfile, ULONG theOffset, ULONG theLength = 0, const std::wstring theName = L"", BYTE color = CLR_HEADER);
+	VGMContainerItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength = 0, const std::wstring theName = L"", uint8_t color = CLR_HEADER);
 	virtual ~VGMContainerItem(void);
-	virtual VGMItem* GetItemFromOffset(ULONG offset);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset);
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 	virtual bool IsContainerItem() { return true; }
 
-	VGMHeader* AddHeader(ULONG offset, ULONG length, const wchar_t* name = L"Header");
+	VGMHeader* AddHeader(uint32_t offset, uint32_t length, const wchar_t* name = L"Header");
 
 	void AddItem(VGMItem* item);
-	void AddSimpleItem(ULONG offset, ULONG length, const wchar_t *theName);
-	void AddUnknownItem(ULONG offset, ULONG length);
+	void AddSimpleItem(uint32_t offset, uint32_t length, const wchar_t *theName);
+	void AddUnknownItem(uint32_t offset, uint32_t length);
 
 	//void AddHeaderItem(VGMItem* item);
-	//void AddSimpleHeaderItem(ULONG offset, ULONG length, const wchar_t* name);
+	//void AddSimpleHeaderItem(uint32_t offset, uint32_t length, const wchar_t* name);
 	
 
 	template <class T> void AddContainer(std::vector<T*>& container)
@@ -223,7 +223,7 @@ public:
 };
 
 
-template <class T> VGMItem* GetItemAtOffsetInItemVector(ULONG offset, std::vector<T*> &theArray)
+template <class T> VGMItem* GetItemAtOffsetInItemVector(uint32_t offset, std::vector<T*> &theArray)
 {
 	int nArraySize = (int)theArray.size ();
 	for (int i=0; i<nArraySize; i++)
