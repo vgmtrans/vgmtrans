@@ -818,9 +818,6 @@
     <ClInclude Include="MidiFile.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
-    <ClInclude Include="osdepend.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
     <ClInclude Include="RawFile.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
@@ -994,6 +991,9 @@
     </ClInclude>
     <ClInclude Include="formats\RareSnesInstr.h">
       <Filter>Header Files\formats\raresnes</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\osdepend.h">
+      <Filter>Header Files\windows</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

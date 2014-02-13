@@ -446,7 +446,7 @@
     <ClInclude Include="Matcher.h" />
     <ClInclude Include="Menu.h" />
     <ClInclude Include="MidiFile.h" />
-    <ClInclude Include="osdepend.h" />
+    <ClInclude Include="windows\osdepend.h" />
     <ClInclude Include="RawFile.h" />
     <ClInclude Include="Root.h" />
     <ClInclude Include="ScaleConversion.h" />
