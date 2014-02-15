@@ -85,6 +85,7 @@ bool SeqTrack::LoadTrackInit(int trackNum)
 
 		if (trackNum == 0) {
 			pMidiTrack->AddGMReset();
+			pMidiTrack->AddGM2Reset();
 			if (parentSeq->bWriteInitialTempo)
 				pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
 		}

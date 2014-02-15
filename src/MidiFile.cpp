@@ -907,6 +907,31 @@ void MidiTrack::InsertGMReset(uint32_t absTime)
 	aEvents.push_back(new GMResetEvent(this, absTime));
 }
 
+//  *************
+//  GM2ResetEvent
+//  *************
+
+GM2ResetEvent::GM2ResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
+: MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST)
+{
+}
+
+uint32_t GM2ResetEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
+{
+	uint8_t data[5] = { 0x7E, 0x7F, 0x09, 0x03, 0xF7 };
+	return WriteSysexEvent(buf, time, data, 5);
+}
+
+void MidiTrack::AddGM2Reset()
+{
+	aEvents.push_back(new GM2ResetEvent(this, GetDelta()));
+}
+
+void MidiTrack::InsertGM2Reset(uint32_t absTime)
+{
+	aEvents.push_back(new GM2ResetEvent(this, absTime));
+}
+
 //***************
 // SPECIAL EVENTS
 //***************
