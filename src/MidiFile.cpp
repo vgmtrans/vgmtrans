@@ -932,6 +932,56 @@ void MidiTrack::InsertGM2Reset(uint32_t absTime)
 	aEvents.push_back(new GM2ResetEvent(this, absTime));
 }
 
+//  ************
+//  GSResetEvent
+//  ************
+
+GSResetEvent::GSResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
+: MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST)
+{
+}
+
+uint32_t GSResetEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
+{
+	uint8_t data[10] = { 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, 0xF7 };
+	return WriteSysexEvent(buf, time, data, 10);
+}
+
+void MidiTrack::AddGSReset()
+{
+	aEvents.push_back(new GSResetEvent(this, GetDelta()));
+}
+
+void MidiTrack::InsertGSReset(uint32_t absTime)
+{
+	aEvents.push_back(new GSResetEvent(this, absTime));
+}
+
+//  ************
+//  XGResetEvent
+//  ************
+
+XGResetEvent::XGResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
+: MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST)
+{
+}
+
+uint32_t XGResetEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
+{
+	uint8_t data[8] = { 0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00, 0xF7 };
+	return WriteSysexEvent(buf, time, data, 8);
+}
+
+void MidiTrack::AddXGReset()
+{
+	aEvents.push_back(new XGResetEvent(this, GetDelta()));
+}
+
+void MidiTrack::InsertXGReset(uint32_t absTime)
+{
+	aEvents.push_back(new XGResetEvent(this, absTime));
+}
+
 //***************
 // SPECIAL EVENTS
 //***************

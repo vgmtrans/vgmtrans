@@ -128,6 +128,10 @@ public:
 	void InsertGMReset(uint32_t absTime);
 	void AddGM2Reset();
 	void InsertGM2Reset(uint32_t absTime);
+	void AddGSReset();
+	void InsertGSReset(uint32_t absTime);
+	void AddXGReset();
+	void InsertXGReset(uint32_t absTime);
 
 	// SPECIAL EVENTS
 	//void AddTranspose(char semitones);
@@ -542,6 +546,24 @@ class GM2ResetEvent
 {
 public:
 	GM2ResetEvent(MidiTrack* prntTrk, uint32_t absoluteTime);
+	virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
+	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
+};
+
+class GSResetEvent
+	: public MidiEvent
+{
+public:
+	GSResetEvent(MidiTrack* prntTrk, uint32_t absoluteTime);
+	virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
+	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
+};
+
+class XGResetEvent
+	: public MidiEvent
+{
+public:
+	XGResetEvent(MidiTrack* prntTrk, uint32_t absoluteTime);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
 	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 };
