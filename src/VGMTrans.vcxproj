@@ -213,6 +213,8 @@
   <ItemGroup>
     <ClCompile Include="BytePattern.cpp" />
     <ClCompile Include="datetime.cpp" />
+    <ClCompile Include="formats\HeartBeatPS1Seq.cpp" />
+    <ClCompile Include="formats\HeartBeatPS1SeqScanner.cpp" />
     <ClCompile Include="formats\RareSnesInstr.cpp" />
     <ClCompile Include="formats\SNESDSP.cpp" />
     <ClCompile Include="loaders\GSFLoader.cpp" />
@@ -350,6 +352,8 @@
   <ItemGroup>
     <ClInclude Include="BytePattern.h" />
     <ClInclude Include="datetime.h" />
+    <ClInclude Include="formats\HeartBeatPS1Seq.h" />
+    <ClInclude Include="formats\HeartBeatPS1SeqScanner.h" />
     <ClInclude Include="formats\RareSnesInstr.h" />
     <ClInclude Include="formats\SNESDSP.h" />
     <ClInclude Include="loaders\GSFLoader.h" />

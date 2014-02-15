@@ -1,15 +1,15 @@
 #pragma once
 #include "VGMSeqNoTrks.h"
 
-class PS1Seq :
+class HeartBeatPS1Seq :
 	public VGMSeqNoTrks
 {
 public:
-	PS1Seq(RawFile* file, uint32_t offset);
-	virtual ~PS1Seq(void);
+	HeartBeatPS1Seq(RawFile* file, uint32_t offset);
+	virtual ~HeartBeatPS1Seq(void);
 
 	virtual bool GetHeaderInfo(void);
-	virtual void ResetVars(void);
+	virtual void ResetVars();
 	virtual bool ReadEvent(void);
 
 protected:

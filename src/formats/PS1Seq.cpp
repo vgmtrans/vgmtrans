@@ -50,6 +50,11 @@ bool PS1Seq::GetHeaderInfo(void)
 	return true;
 }
 
+void PS1Seq::ResetVars(void)
+{
+	VGMSeqNoTrks::ResetVars();
+}
+
 bool PS1Seq::ReadEvent(void)
 {
 	uint32_t beginOffset = curOffset;
@@ -168,7 +173,7 @@ bool PS1Seq::ReadEvent(void)
 				{
 				case 0x51 :			//tempo.  This is different from SMF, where we'd expect a 51 then 03.  Also, supports
 									//a string of tempo events
-					AddTempo(beginOffset, curOffset+3-beginOffset, GetWordBE(curOffset-1) & 0xFFFFFF);
+					AddTempo(beginOffset, curOffset+3-beginOffset, (GetShortBE(curOffset) << 8) | GetByte(curOffset + 2));
 					curOffset += 3;
 					break;
 				

@@ -154,6 +154,12 @@
     <Filter Include="Source Files\formats\raresnes">
       <UniqueIdentifier>{5c5fa013-c6b0-4d7d-8112-cd60a82adf97}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\heartbeatps1">
+      <UniqueIdentifier>{1953315d-d70b-4e0c-90f0-2c5321a22ede}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\heartbeatps1">
+      <UniqueIdentifier>{869e1c42-6555-4c35-9559-dcdcb4774758}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\aboutdlg.cpp">
@@ -545,6 +551,12 @@
     </ClCompile>
     <ClCompile Include="formats\RareSnesInstr.cpp">
       <Filter>Source Files\formats\raresnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\HeartBeatPS1Seq.cpp">
+      <Filter>Source Files\formats\heartbeatps1</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\HeartBeatPS1SeqScanner.cpp">
+      <Filter>Source Files\formats\heartbeatps1</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -994,6 +1006,12 @@
     </ClInclude>
     <ClInclude Include="windows\osdepend.h">
       <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\HeartBeatPS1Seq.h">
+      <Filter>Header Files\formats\heartbeatps1</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\HeartBeatPS1SeqScanner.h">
+      <Filter>Header Files\formats\heartbeatps1</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
