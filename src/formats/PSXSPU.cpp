@@ -46,7 +46,57 @@ bool PSXSampColl::GetSampleInfo()
 		uint32_t i = dwOffset;
 		while (i + 32 <= nEndOffset)
 		{
-			if (GetWord(i) == 0 && GetWord(i+4) == 0 && GetWord(i+8) == 0 && GetWord(i+12) == 0  )
+			bool isSample = false;
+
+			if (GetWord(i) == 0 && GetWord(i+4) == 0 && GetWord(i+8) == 0 && GetWord(i+12) == 0)
+			{
+				// most of samples starts with 0s
+				isSample = true;
+			}
+			else
+			{
+				// some sample blocks may not start with 0.
+				// so here is a dirty hack for it.
+				// (Dragon Quest VII, for example)
+				int countOfContinue = 0;
+				uint8_t continueByte = 0xff;
+				bool badBlock = false;
+				while (i + (countOfContinue * 16) + 16 <= nEndOffset)
+				{
+					uint8_t keyFlagByte = GetByte(i + (countOfContinue * 16) + 1);
+
+					if ((keyFlagByte & 0xF8) != 0)
+					{
+						badBlock = true;
+						break;
+					}
+
+					if (continueByte == 0xff)
+					{
+						if (keyFlagByte == 0 || keyFlagByte == 2)
+						{
+							continueByte = keyFlagByte;
+						}
+					}
+
+					if (keyFlagByte != continueByte)
+					{
+						if (keyFlagByte == 0 || keyFlagByte == 2)
+						{
+							badBlock = true;
+						}
+						break;
+					}
+					countOfContinue++;
+				}
+				if (!badBlock && ((continueByte == 0 && countOfContinue >= 16) ||
+					(continueByte == 2 && countOfContinue >= 3)))
+				{
+					isSample = true;
+				}
+			}
+
+			if (isSample)
 			{
 				uint32_t extraGunkLength = 0;
 				uint8_t filterRangeByte = GetByte(i+16);
