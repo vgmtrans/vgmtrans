@@ -302,7 +302,7 @@ void RareSnesTrack::ResetVars(void)
 
 double RareSnesTrack::GetTuningInSemitones(int8_t tuning)
 {
-	return 12 * log((1024 + tuning) / 1024.0) / log(2.0);
+	return 12.0 * log((1024 + tuning) / 1024.0) / log(2.0);
 }
 
 void RareSnesTrack::CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, uint8_t& midiVol, uint8_t& midiPan)
@@ -397,7 +397,8 @@ bool RareSnesTrack::ReadEvent(void)
 			// a note, add hints for instrument
 			if (parentSeq->instrUnityKeyHints.find(spcInstr) == parentSeq->instrUnityKeyHints.end())
 			{
-				parentSeq->instrUnityKeyHints[spcInstr] = spcTransposeAbs + GetTuningInSemitones(spcTuning);
+				parentSeq->instrUnityKeyHints[spcInstr] = spcTransposeAbs;
+				parentSeq->instrPitchHints[spcInstr] = (int16_t) round(GetTuningInSemitones(spcTuning) * 100.0);
 			}
 			if (parentSeq->instrADSRHints.find(spcInstr) == parentSeq->instrADSRHints.end())
 			{

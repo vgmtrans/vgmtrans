@@ -93,7 +93,8 @@ public:
 	RareSnesVersion version;
 	std::map<uint8_t, RareSnesSeqEventType> EventMap;
 
-	std::map<uint8_t, double> instrUnityKeyHints;
+	std::map<uint8_t, int8_t> instrUnityKeyHints;
+	std::map<uint8_t, int16_t> instrPitchHints;
 	std::map<uint8_t, uint16_t> instrADSRHints;
 
 	static const uint16_t NOTE_PITCH_TABLE[128];  // note number to frequency table
