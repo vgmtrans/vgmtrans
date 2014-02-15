@@ -73,6 +73,14 @@ MidiFile* VGMSeq::ConvertToMidi()
 	return newmidi;
 }
 
+MidiTrack* VGMSeq::GetFirstMidiTrack()
+{
+	MidiTrack* pFirstMidiTrack = NULL;
+	if (aTracks.size() > 0)
+		pFirstMidiTrack = aTracks[0]->pMidiTrack;
+	return pFirstMidiTrack;
+}
+
 //Load() - Function to load all the sequence data into the class
 bool VGMSeq::LoadMain()
 {

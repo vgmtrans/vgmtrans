@@ -34,6 +34,7 @@ public:
 	virtual bool GetTrackPointers(void);	//Function to find all of the track pointers.   Returns number of total tracks.
 	virtual void ResetVars(void);
 	virtual MidiFile* ConvertToMidi();
+	virtual MidiTrack* GetFirstMidiTrack();
 	//virtual int ApplyTable(void);	//create and apply table handler object for sequence
 	void SetPPQN(uint16_t ppqn);
 	uint16_t GetPPQN(void);

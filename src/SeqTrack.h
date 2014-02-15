@@ -120,6 +120,7 @@ public:
 	void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, uint8_t chan, const wchar_t* sEventName = L"Program Change");
 	void AddBankSelectNoItem(uint8_t bank);
 	void AddTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuarter, const wchar_t* sEventName = L"Tempo");
+	void AddTempoNoItem(uint32_t microsPerQuarter);
 	void AddTempoSlide(uint32_t offset, uint32_t length, uint32_t dur, uint32_t targMicrosPerQuarter, const wchar_t* sEventName = L"Tempo Slide");
 	void AddTempoBPM(uint32_t offset, uint32_t length, double bpm, const wchar_t* sEventName = L"Tempo");
 	void AddTempoBPMNoItem(double bpm);

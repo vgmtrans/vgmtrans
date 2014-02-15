@@ -20,6 +20,11 @@ VGMSeqNoTrks::~VGMSeqNoTrks(void)
 void VGMSeqNoTrks::ResetVars()
 {
 	midiTracks.clear();		//no need to delete the contents, that happens when the midi is deleted
+	TryExpandMidiTracks(nNumTracks);
+
+	channel = 0;
+	SetCurTrack(channel);
+
 	VGMSeq::ResetVars();
 	SeqTrack::ResetVars();
 }
@@ -45,8 +50,6 @@ bool VGMSeqNoTrks::LoadMain()
 bool VGMSeqNoTrks::LoadEvents(void)
 {
 	ResetVars();
-	TryExpandMidiTracks(nNumTracks);
-	SetCurTrack(0);
 	if (bWriteInitialTempo)
 		AddTempoBPMNoItem(tempoBPM);
 	if (bAlwaysWriteInitialVol)
@@ -59,8 +62,6 @@ bool VGMSeqNoTrks::LoadEvents(void)
 			channel = i;
 			AddPitchBendRangeNoItem(initialPitchBendRangeSemiTones, initialPitchBendRangeCents);
 		}
-	channel = 0;
-
 
 	bInLoop = false;
 	curOffset = eventsOffset();	//start at beginning of track
@@ -110,6 +111,18 @@ MidiFile* VGMSeqNoTrks::ConvertToMidi()
 	return newmidi;
 }
 
+MidiTrack* VGMSeqNoTrks::GetFirstMidiTrack()
+{
+	if (midiTracks.size() > 0)
+	{
+		return midiTracks[0];
+	}
+	else
+	{
+		return pMidiTrack;
+	}
+}
+
 //bool VGMSeqNoTrks::SaveAsMidi(const wchar_t* filepath)
 //{
 //	return midi->SaveMidiFile(filepath);
@@ -149,7 +162,6 @@ void VGMSeqNoTrks::AddTime(uint32_t delta)
 			midiTracks[i]->AddDelta(delta);
 	}
 }
-
 
 //bool VGMSeqNoTrks::AddEndOfTrack(uint32_t offset, uint32_t length, const wchar_t* sEventName)
 //{

@@ -925,16 +925,20 @@ void SeqTrack::AddBankSelectNoItem(uint8_t bank)
 
 void SeqTrack::AddTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuarter, const wchar_t* sEventName)
 {
-	parentSeq->tempoBPM = ((double)60000000/microsPerQuarter);
+	double bpm = 60000000.0 / microsPerQuarter;
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
-		AddEvent(new TempoSeqEvent(this, parentSeq->tempoBPM, offset, length, sEventName));
-	else if (readMode == READMODE_CONVERT_TO_MIDI)
+		AddEvent(new TempoSeqEvent(this, bpm, offset, length, sEventName));
+	AddTempoNoItem(microsPerQuarter);
+}
+
+void SeqTrack::AddTempoNoItem(uint32_t microsPerQuarter)
+{
+	parentSeq->tempoBPM = 60000000.0 / microsPerQuarter;
+	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		// Some MIDI tool can recognise tempo event only in the first track.
-		MidiTrack* pTempoMidiTrack = pMidiTrack;
-		if (parentSeq->aTracks.size() > 0)
-			pTempoMidiTrack = parentSeq->aTracks[0]->pMidiTrack;
-		pTempoMidiTrack->InsertTempo(microsPerQuarter, pMidiTrack->GetDelta());
+		MidiTrack* pFirstMidiTrack = parentSeq->GetFirstMidiTrack();
+		pFirstMidiTrack->InsertTempo(microsPerQuarter, pMidiTrack->GetDelta());
 	}
 }
 
@@ -956,10 +960,8 @@ void SeqTrack::AddTempoBPMNoItem(double bpm)
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		// Some MIDI tool can recognise tempo event only in the first track.
-		MidiTrack* pTempoMidiTrack = pMidiTrack;
-		if (parentSeq->aTracks.size() > 0)
-			pTempoMidiTrack = parentSeq->aTracks[0]->pMidiTrack;
-		pTempoMidiTrack->InsertTempoBPM(bpm, pMidiTrack->GetDelta());
+		MidiTrack* pFirstMidiTrack = parentSeq->GetFirstMidiTrack();
+		pFirstMidiTrack->InsertTempoBPM(bpm, pMidiTrack->GetDelta());
 	}
 }
 
@@ -973,11 +975,10 @@ void SeqTrack::AddTempoBPMSlide(uint32_t offset, uint32_t length, uint32_t dur, 
 		double newTempo;
 		for (unsigned int i=0; i<dur; i++)
 		{
-			MidiTrack* pTempoMidiTrack = pMidiTrack;
-			if (parentSeq->aTracks.size() > 0)
-				pTempoMidiTrack = parentSeq->aTracks[0]->pMidiTrack;
+			// Some MIDI tool can recognise tempo event only in the first track.
+			MidiTrack* pFirstMidiTrack = parentSeq->GetFirstMidiTrack();
 			newTempo=parentSeq->tempoBPM+(tempoInc*(i+1));
-			pTempoMidiTrack->InsertTempoBPM(newTempo, GetTime()+i);
+			pFirstMidiTrack->InsertTempoBPM(newTempo, GetTime()+i);
 		}
 	}
 	parentSeq->tempoBPM = targBPM;
@@ -986,17 +987,27 @@ void SeqTrack::AddTempoBPMSlide(uint32_t offset, uint32_t length, uint32_t dur, 
 void SeqTrack::AddTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter,  const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+	{
 		AddEvent(new TimeSigSeqEvent(this, numer, denom, ticksPerQuarter, offset, length, sEventName));
+	}
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->AddTimeSig(numer, denom, ticksPerQuarter);
+	{
+		MidiTrack* pFirstMidiTrack = parentSeq->GetFirstMidiTrack();
+		pFirstMidiTrack->AddTimeSig(numer, denom, ticksPerQuarter);
+	}
 }
 
 void SeqTrack::InsertTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter,uint32_t absTime,const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+	{
 		AddEvent(new TimeSigSeqEvent(this, numer, denom, ticksPerQuarter, offset, length, sEventName));
+	}
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->InsertTimeSig(numer, denom, ticksPerQuarter, absTime);
+	{
+		MidiTrack* pFirstMidiTrack = parentSeq->GetFirstMidiTrack();
+		pFirstMidiTrack->InsertTimeSig(numer, denom, ticksPerQuarter, absTime);
+	}
 }
 
 bool SeqTrack::AddEndOfTrack(uint32_t offset, uint32_t length, const wchar_t* sEventName)

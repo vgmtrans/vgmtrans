@@ -8,7 +8,7 @@ PS1Seq::PS1Seq(RawFile* file, uint32_t offset)
 : VGMSeqNoTrks(PS1Format::name, file, offset)
 {
 	//UseReverb();
-	bWriteInitialTempo = true;
+	//bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
 
 PS1Seq::~PS1Seq(void)
@@ -21,18 +21,12 @@ bool PS1Seq::GetHeaderInfo(void)
 	name() = L"PS1 SEQ";
 
 	SetPPQN(GetShortBE(offset()+8));
-	//TryExpandMidiTracks(16);
 	nNumTracks = 16;
-	channel = 0;
-	SetCurTrack(channel);
-	AddTempo(offset()+10, 3, GetWordBE(offset()+9) & 0xFFFFFF);
+
 	uint8_t numer = GetByte(offset()+0x0D);
 	uint8_t denom = GetByte(offset()+0x0E);
 	if (numer == 0 || numer > 32)				//sanity check
 		return false;
-	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, (uint8_t)GetPPQN());
-
-	//name().append(L" blah");
 
 	if (GetByte(offset()+0xF) == 0 && GetByte(offset()+0x10) == 0)
 	{
@@ -53,6 +47,13 @@ bool PS1Seq::GetHeaderInfo(void)
 void PS1Seq::ResetVars(void)
 {
 	VGMSeqNoTrks::ResetVars();
+
+	uint32_t initialTempo = (GetShortBE(offset()+10) << 8) | GetByte(offset()+12);
+	AddTempo(offset()+10, 3, initialTempo);
+
+	uint8_t numer = GetByte(offset()+0x0D);
+	uint8_t denom = GetByte(offset()+0x0E);
+	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, (uint8_t)GetPPQN());
 }
 
 bool PS1Seq::ReadEvent(void)

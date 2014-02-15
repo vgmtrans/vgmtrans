@@ -11,7 +11,7 @@ HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile* file, uint32_t offset)
 : VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset)
 {
 	//UseReverb();
-	bWriteInitialTempo = true;
+	//bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
 
 HeartBeatPS1Seq::~HeartBeatPS1Seq(void)
@@ -29,18 +29,18 @@ bool HeartBeatPS1Seq::GetHeaderInfo(void)
 	}
 
 	SetPPQN(GetShortBE(offset()+8));
-	//TryExpandMidiTracks(16);
 	nNumTracks = 16;
-	channel = 0;
-	SetCurTrack(channel);
-	AddTempo(offset()+10, 3, GetWordBE(offset()+0x0A) & 0xFFFFFF);
+
 	uint8_t numer = GetByte(offset()+0x0D);
 	uint8_t denom = GetByte(offset()+0x0E);
 	if (numer == 0 || numer > 32)				//sanity check
 		return false;
-	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, (uint8_t)GetPPQN());
 
-	//name().append(L" blah");
+	uint8_t trackCount = GetByte(offset()+0x0F);
+	if (trackCount > 0 && trackCount <= 16)
+	{
+		nNumTracks = trackCount;
+	}
 
 	SetEventsOffset(offset() + 0x10);
 
@@ -50,6 +50,13 @@ bool HeartBeatPS1Seq::GetHeaderInfo(void)
 void HeartBeatPS1Seq::ResetVars(void)
 {
 	VGMSeqNoTrks::ResetVars();
+
+	uint32_t initialTempo = (GetShortBE(offset()+10) << 8) | GetByte(offset()+10+2);
+	AddTempo(offset()+10, 3, initialTempo);
+
+	uint8_t numer = GetByte(offset()+0x0D);
+	uint8_t denom = GetByte(offset()+0x0E);
+	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, (uint8_t)GetPPQN());
 }
 
 bool HeartBeatPS1Seq::ReadEvent(void)

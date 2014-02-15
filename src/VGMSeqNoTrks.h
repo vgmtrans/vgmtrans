@@ -23,8 +23,14 @@ public:
 	inline uint32_t& length(void) { return VGMSeq::unLength;}
 	inline std::wstring& name(void) { return VGMSeq::name;}
 
-	inline uint32_t& eventsOffset() { return SeqTrack::dwOffset;}
-	inline void SetEventsOffset(long offset) { SeqTrack::dwOffset = offset;}		//this function must be called in GetHeaderInfo or before LoadEvents is called
+	inline uint32_t& eventsOffset() { return dwEventsOffset;}
+	inline void SetEventsOffset(long offset) {	//this function must be called in GetHeaderInfo or before LoadEvents is called
+		dwEventsOffset = offset;
+		if (SeqTrack::readMode == READMODE_ADD_TO_UI)
+		{
+			SeqTrack::dwOffset = offset;
+		}
+	}
 
 	virtual void AddTime(uint32_t delta);
 	//virtual bool AddEndOfTrack(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Track End");
@@ -41,9 +47,12 @@ public:
 //	virtual void AddTrack(SeqTrack* track);		//should be called for all tracks before LoadTracks.
 	virtual bool LoadEvents();
 	virtual MidiFile* ConvertToMidi();
+	virtual MidiTrack* GetFirstMidiTrack();
 	//virtual int ApplyTable(void);	//create and apply table handler object for sequence
 
 	//virtual bool SaveAsMidi(const wchar_t* filepath);
+
+	uint32_t dwEventsOffset;
 
 protected:
 	std::vector<MidiTrack*> midiTracks;		//an array of midi tracks... we will change pMidiTrack, which all the SeqTrack functions write to, to the correct one of these
