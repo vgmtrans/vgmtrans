@@ -38,6 +38,9 @@ Contributers
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
 - Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAacePS1 format and such.
+
+### Special Thanks
+
 - Bregalad: Author of [GBAMusRiper](http://www.romhacking.net/utilities/881/), great reference of MP2k interpretation.
 
 Contact
