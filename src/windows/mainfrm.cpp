@@ -341,7 +341,10 @@ LRESULT CMainFrame::OnInitialize(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lPar
 
 LRESULT CMainFrame::OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
-	Alert(L"OnFileOpen is not implemented yet.");
+	std::wstring filename = pRoot->UI_GetOpenFilePath();
+	if (!filename.empty()) {
+		pRoot->OpenRawFile(filename);
+	}
 	return 0;
 }
 

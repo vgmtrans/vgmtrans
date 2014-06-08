@@ -42,6 +42,7 @@ public:
 	//virtual void UI_RemoveVGMFileRange(VGMFile* first, VGMFile* last);
 	virtual void UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName, VOID* UI_specific);
 	virtual void UI_AddItemSet(VGMFile* file, std::vector<ItemSet>* itemset);
+	virtual std::wstring UI_GetOpenFilePath(const std::wstring& suggestedFilename = L"", const std::wstring& extension = L"");
 	virtual std::wstring UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension = L"");
 	virtual std::wstring UI_GetSaveDirPath(const std::wstring& suggestedDir = L"");
 	bool GetFolder(std::wstring& folderpath, const std::wstring& szCaption = NULL, HWND hOwner = NULL);
