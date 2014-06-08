@@ -150,8 +150,19 @@ bool VGMRoot::OpenRawFile(const wstring& filename)
 // the contents of PSF2 files
 bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const wstring& filename, const wstring& parRawFileFullPath)
 {
-	assert(fileSize);
-	return SetupNewRawFile(new VirtFile(databuf, fileSize, filename.c_str(), parRawFileFullPath.c_str()));
+	assert(fileSize != 0);
+
+	VirtFile * newVirtFile = new VirtFile(databuf, fileSize, filename.c_str(), parRawFileFullPath.c_str());
+	if (newVirtFile == NULL) {
+		return false;
+	}
+
+	if (!SetupNewRawFile(newVirtFile)) {
+		delete newVirtFile;
+		return false;
+	}
+
+	return true;
 }
 
 // called by OpenRawFile.  Applies all of the loaders and scanners

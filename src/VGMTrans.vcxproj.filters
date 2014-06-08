@@ -558,6 +558,9 @@
     <ClCompile Include="formats\HeartBeatPS1SeqScanner.cpp">
       <Filter>Source Files\formats\heartbeatps1</Filter>
     </ClCompile>
+    <ClCompile Include="VGMTag.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1012,6 +1015,9 @@
     </ClInclude>
     <ClInclude Include="formats\HeartBeatPS1SeqScanner.h">
       <Filter>Header Files\formats\heartbeatps1</Filter>
+    </ClInclude>
+    <ClInclude Include="VGMTag.h">
+      <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

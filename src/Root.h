@@ -31,7 +31,7 @@ public:
 	void Reset(void);
 	void Exit(void);
 	bool OpenRawFile(const std::wstring& filename);
-	bool CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::wstring& filename, const std::wstring& parRawFileFullPath=L"");
+	bool CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::wstring& filename, const std::wstring& parRawFileFullPath = L"");
 	bool SetupNewRawFile(RawFile* newRawFile);
 	bool CloseRawFile(RawFile* targFile);
 	void AddVGMFile(VGMFile* theFile);

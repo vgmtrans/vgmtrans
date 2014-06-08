@@ -2,6 +2,7 @@
 #include "common.h"
 #include "DataSeg.h"
 #include "BytePattern.h"
+#include "VGMTag.h"
 
 class VGMFile;
 class VGMItem;
@@ -130,6 +131,7 @@ protected:
 	std::wstring parRawFileFullPath;
 public:
 	std::list<VGMFile*> containedVGMFiles;
+	VGMTag tag;
 };
 
 
