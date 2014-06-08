@@ -122,7 +122,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 	UINT ofsVCmdExecASM;
 	UINT addrSeqHeader;
 	UINT addrVCmdTable;
-	wstring name = RawFile::removeExtFromPath(file->GetFileName());
+	wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// find a sequence
 	if (file->SearchBytePattern(ptnSongLoadDKC2, ofsSongLoadASM))
