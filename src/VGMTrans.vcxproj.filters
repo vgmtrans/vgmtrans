@@ -160,6 +160,12 @@
     <Filter Include="Source Files\formats\heartbeatps1">
       <UniqueIdentifier>{869e1c42-6555-4c35-9559-dcdcb4774758}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\capcomsnes">
+      <UniqueIdentifier>{7d5f10e9-0198-4576-893c-3dd0d06ae015}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\capcomsnes">
+      <UniqueIdentifier>{f30ddbb1-0e1d-48ab-98c7-fdb6a47fb5f5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\aboutdlg.cpp">
@@ -560,6 +566,12 @@
     </ClCompile>
     <ClCompile Include="VGMTag.cpp">
       <Filter>Source Files\main</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\CapcomSnesScanner.cpp">
+      <Filter>Source Files\formats\capcomsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\CapcomSnesSeq.cpp">
+      <Filter>Source Files\formats\capcomsnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1018,6 +1030,15 @@
     </ClInclude>
     <ClInclude Include="VGMTag.h">
       <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\CapcomSnesFormat.h">
+      <Filter>Header Files\formats\capcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\CapcomSnesScanner.h">
+      <Filter>Header Files\formats\capcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\CapcomSnesSeq.h">
+      <Filter>Header Files\formats\capcomsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

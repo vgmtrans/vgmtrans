@@ -213,6 +213,8 @@
   <ItemGroup>
     <ClCompile Include="BytePattern.cpp" />
     <ClCompile Include="datetime.cpp" />
+    <ClCompile Include="formats\CapcomSnesScanner.cpp" />
+    <ClCompile Include="formats\CapcomSnesSeq.cpp" />
     <ClCompile Include="formats\HeartBeatPS1Seq.cpp" />
     <ClCompile Include="formats\HeartBeatPS1SeqScanner.cpp" />
     <ClCompile Include="formats\RareSnesInstr.cpp" />
@@ -353,6 +355,9 @@
   <ItemGroup>
     <ClInclude Include="BytePattern.h" />
     <ClInclude Include="datetime.h" />
+    <ClInclude Include="formats\CapcomSnesFormat.h" />
+    <ClInclude Include="formats\CapcomSnesScanner.h" />
+    <ClInclude Include="formats\CapcomSnesSeq.h" />
     <ClInclude Include="formats\HeartBeatPS1Seq.h" />
     <ClInclude Include="formats\HeartBeatPS1SeqScanner.h" />
     <ClInclude Include="formats\RareSnesInstr.h" />
