@@ -2,6 +2,8 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
+enum CapcomSnesVersion; // see CapcomSnesFormat.h
+
 class CapcomSnesScanner :
 	public VGMScanner
 {
@@ -17,9 +19,13 @@ public:
 	virtual void Scan(RawFile* file, void* info = 0);
 	void SearchForCapcomSnesFromARAM (RawFile* file);
 	void SearchForCapcomSnesFromROM (RawFile* file);
-	bool IsValidBGMHeader (RawFile* file, UINT addrSongHeader);
 
 private:
+	int GetLengthOfSongList (RawFile* file, uint16_t addrSongList);
+	uint16_t GetCurrentPlayAddressFromARAM (RawFile* file, CapcomSnesVersion version, uint8_t channel);
+	int8_t GuessCurrentSongFromARAM (RawFile* file, CapcomSnesVersion version, uint16_t addrSongList);
+	bool IsValidBGMHeader (RawFile* file, UINT addrSongHeader);
+
 	static BytePattern ptnReadSongList;
 	static BytePattern ptnReadBGMAddress;
 };

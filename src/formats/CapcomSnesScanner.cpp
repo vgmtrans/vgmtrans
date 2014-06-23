@@ -68,14 +68,14 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 	UINT addrSongList;
 	UINT addrBGMHeader;
 
-	wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+	wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
+	wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
 	// find a song list
 	hasSongList = file->SearchBytePattern(ptnReadSongList, ofsReadSongListASM);
 	if (hasSongList)
 	{
-		UINT addrSongListPtr = min(file->GetShort(ofsReadSongListASM + 3), file->GetShort(ofsReadSongListASM + 8));
-		addrSongList = file->GetShort(addrSongListPtr);
+		addrSongList = min(file->GetShort(ofsReadSongListASM + 3), file->GetShort(ofsReadSongListASM + 8));
 	}
 
 	// find BGM address
@@ -122,13 +122,160 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 		}
 	}
 
-	// TODO: load songs from list
+	// load songs from list
+	if (hasSongList)
+	{
+		// guess current song number
+		int8_t guessedSongIndex = -1;
+		if (!bgmAtFixedAddress)
+		{
+			guessedSongIndex = GuessCurrentSongFromARAM(file, version, addrSongList);
+		}
+
+		bool loadOnlyCurrentSong = false;
+		if (loadOnlyCurrentSong)
+		{
+			// load current song if possible
+			if (guessedSongIndex != -1)
+			{
+				uint16_t addrSongHeader = file->GetShortBE(addrSongList + guessedSongIndex * 2);
+				CapcomSnesSeq* newSeq = new CapcomSnesSeq(file, version, addrSongHeader, true, name);
+				if (!newSeq->LoadVGMFile())
+				{
+					delete newSeq;
+					return;
+				}
+			}
+		}
+		else
+		{
+			// load all songs in the list
+			for (int songIndex = 0; songIndex < GetLengthOfSongList(file, addrSongList); songIndex++)
+			{
+				uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
+				if (addrSongHeader == 0)
+				{
+					continue;
+				}
+
+				CapcomSnesSeq* newSeq = new CapcomSnesSeq(file, version, addrSongHeader, true, (songIndex == guessedSongIndex) ? name : basefilename);
+				if (!newSeq->LoadVGMFile())
+				{
+					delete newSeq;
+					return;
+				}
+			}
+		}
+	}
 
 	// TODO: scan samples
 }
 
 void CapcomSnesScanner::SearchForCapcomSnesFromROM (RawFile* file)
 {
+}
+
+uint16_t CapcomSnesScanner::GetCurrentPlayAddressFromARAM (RawFile* file, CapcomSnesVersion version, uint8_t channel)
+{
+	uint16_t currentAddress;
+	if (version == V1_BGM_IN_LIST)
+	{
+		currentAddress = file->GetByte(0x00 + channel * 2 + 1) | (file->GetByte(0x10 + channel * 2 + 1) << 8);
+	}
+	else
+	{
+		currentAddress = file->GetByte(0x00 + channel) | (file->GetByte(0x08 + channel) << 8);
+	}
+	return currentAddress;
+}
+
+int CapcomSnesScanner::GetLengthOfSongList (RawFile* file, uint16_t addrSongList)
+{
+	int length = 0;
+
+	// do heuristic search for each songs
+	for (int8_t songIndex = 0; songIndex <= 0x7f; songIndex++)
+	{
+		// check the address range of song pointer
+		if (addrSongList + songIndex * 2 + 2 > 0x10000)
+		{
+			break;
+		}
+
+		// get header address and validate it
+		uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
+		if (addrSongHeader == 0)
+		{
+			length++;
+			continue;
+		}
+		else if (!IsValidBGMHeader(file, addrSongHeader))
+		{
+			break;
+		}
+
+		length++;
+	}
+
+	return length;
+}
+
+int8_t CapcomSnesScanner::GuessCurrentSongFromARAM (RawFile* file, CapcomSnesVersion version, uint16_t addrSongList)
+{
+	int8_t guessedSongIndex = -1;
+	int guessBestScore = INT_MAX;
+
+	// do heuristic search for each songs
+	for (int songIndex = 0; songIndex < GetLengthOfSongList(file, addrSongList); songIndex++)
+	{
+		// get header address
+		uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
+		if (addrSongHeader == 0)
+		{
+			continue;
+		}
+
+		// read start address for each voices
+		int guessScore = 0;
+		int validTrackCount = 0;
+		for (int track = 0; track < 8; track++)
+		{
+			uint16_t addrScoreData = file->GetShortBE(addrSongHeader + 1 + track * 2);
+			uint16_t currentAddress = this->GetCurrentPlayAddressFromARAM(file, version, 7 - track);
+
+			// next if the voice is stopped, or not loaded yet
+			if (currentAddress == 0)
+			{
+				continue;
+			}
+
+			// current address must be greater than start address
+			if (addrScoreData > currentAddress)
+			{
+				validTrackCount = 0;
+				break;
+			}
+
+			// measure the distance
+			guessScore += (currentAddress - addrScoreData);
+			validTrackCount++;
+		}
+
+		// update search result if necessary
+		if (validTrackCount > 0)
+		{
+			// calculate the average score of all tracks
+			// (also, make it a fixed-point number)
+			guessScore = (guessScore * 16) / validTrackCount;
+			if (guessBestScore > guessScore)
+			{
+				guessBestScore = guessScore;
+				guessedSongIndex = songIndex;
+			}
+		}
+	}
+
+	return guessedSongIndex;
 }
 
 bool CapcomSnesScanner::IsValidBGMHeader (RawFile* file, UINT addrSongHeader)
@@ -140,7 +287,7 @@ bool CapcomSnesScanner::IsValidBGMHeader (RawFile* file, UINT addrSongHeader)
 
 	for (int track = 0; track < 8; track++)
 	{
-		UINT addrScoreData = file->GetShortBE(addrSongHeader + 1 + track * 2);
+		uint16_t addrScoreData = file->GetShortBE(addrSongHeader + 1 + track * 2);
 		if ((addrScoreData & 0xff00) == 0) {
 			return false;
 		}
