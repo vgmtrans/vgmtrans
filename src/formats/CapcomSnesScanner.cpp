@@ -43,6 +43,39 @@ BytePattern CapcomSnesScanner::ptnReadBGMAddress(
 	,
 	16);
 
+//; Mega Man X SPC
+// 0451: 8d 03     mov   y,#$03
+// 0453: f6 63 04  mov   a,$0463+y         ; DSP reg initialize table -1 (address)
+// 0456: c5 f2 00  mov   $00f2,a
+// 0459: f6 66 04  mov   a,$0466+y         ; DSP reg initialize table -1 (value)
+// 045c: c5 f3 00  mov   $00f3,a           ; initialize DSP reg
+// 045f: fe f2     dbnz  y,$0453
+BytePattern CapcomSnesScanner::ptnDspRegInit(
+	"\x8d\x03\xf6\x63\x04\xc5\xf2\x00"
+	"\xf6\x66\x04\xc5\xf3\x00\xfe\xf2"
+	,
+	"x?x??xxx"
+	"x??xxxx?"
+	,
+	16);
+
+// ; Super Ghouls 'N Ghosts SPC
+// 0b29: f5 f9 0b  mov   a,$0bf9+x         ; DSP reg initialize table (address)
+// 0b2c: fd        mov   y,a
+// 0b2d: f5 05 0c  mov   a,$0c05+x         ; DSP reg initialize table (value)
+// 0b30: 3f f2 0b  call  $0bf2             ; initialize DSP reg
+// 0b33: 3d        inc   x
+// 0b34: c8 0c     cmp   x,#$0c
+// 0b36: d0 f1     bne   $0b29
+BytePattern CapcomSnesScanner::ptnDspRegInitOldVer(
+	"\xf5\xf9\x0b\xfd\xf5\x05\x0c\x3f"
+	"\xf2\x0b\x3d\xc8\x0c\xd0\xf1"
+	,
+	"x??xx??x"
+	"??xx?x?"
+	,
+	15);
+
 void CapcomSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -106,9 +139,13 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 			version = V1_BGM_IN_LIST;
 		}
 	}
-	else
+	else if (bgmAtFixedAddress)
 	{
 		version = V3_BGM_FIXED_LOCATION;
+	}
+	else
+	{
+		return;
 	}
 
 	// load a sequence from BGM region
@@ -169,6 +206,7 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 	}
 
 	// TODO: scan samples
+	uint16_t dirAddress = this->GetDIRAddress(file);
 }
 
 void CapcomSnesScanner::SearchForCapcomSnesFromROM (RawFile* file)
@@ -294,4 +332,51 @@ bool CapcomSnesScanner::IsValidBGMHeader (RawFile* file, UINT addrSongHeader)
 	}
 
 	return true;
+}
+
+uint16_t CapcomSnesScanner::GetDIRAddress (RawFile* file)
+{
+	uint16_t dirAddress = 0;
+
+	UINT ofsDspRegInitASM;
+	UINT ofsDspRegInitOldVerASM;
+	UINT dspRegCount = 0;
+	UINT addrDspRegList;
+	UINT addrDspValueList;
+
+	// find a code block which initializes dsp registers
+	if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM))
+	{
+		dspRegCount = file->GetByte(ofsDspRegInitASM + 1);
+		addrDspRegList = file->GetShort(ofsDspRegInitASM + 3) + 1;
+		addrDspValueList = file->GetShort(ofsDspRegInitASM + 9) + 1;
+	}
+	else if (file->SearchBytePattern(ptnDspRegInitOldVer, ofsDspRegInitOldVerASM))
+	{
+		dspRegCount = file->GetByte(ofsDspRegInitOldVerASM + 12);
+		addrDspRegList = file->GetShort(ofsDspRegInitOldVerASM + 1);
+		addrDspValueList = file->GetShort(ofsDspRegInitOldVerASM + 5);
+	}
+	else
+	{
+		return 0;
+	}
+	
+	// check address range
+	if (addrDspRegList + dspRegCount > 0x10000 || addrDspValueList + dspRegCount > 0x10000)
+	{
+		return 0;
+	}
+
+	// read DIR ($5d) value from table
+	for (UINT regIndex = 0; regIndex < dspRegCount; regIndex++)
+	{
+		if (file->GetByte(addrDspRegList + regIndex) == 0x5d)
+		{
+			dirAddress = file->GetByte(addrDspValueList + regIndex) << 8;
+			break;
+		}
+	}
+
+	return dirAddress;
 }
