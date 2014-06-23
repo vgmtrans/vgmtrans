@@ -430,7 +430,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			uint8_t attributes = GetByte(curOffset++);
 			noteAttributes &= ~(CAPCOM_SNES_MASK_NOTE_OCTAVE_UP | CAPCOM_SNES_MASK_NOTE_TRIPLET | CAPCOM_SNES_MASK_NOTE_SLURRED);
 			noteAttributes |= attributes;
-			desc << L"Triplet: " << (isNoteTriplet() ? L"On" : L"Off") << L"  " << L"Slur: " << (isNoteSlurred() ? L"On" : L"Off") << L"  " << L"2-Octave Up: " << (isNoteOctaveUp() ? L"On" : L"Off") << L"  ";
+			desc << L"Triplet: " << (isNoteTriplet() ? L"On" : L"Off") << L"  " << L"Slur: " << (isNoteSlurred() ? L"On" : L"Off") << L"  " << L"2-Octave Up: " << (isNoteOctaveUp() ? L"On" : L"Off");
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Note Attributes", desc.str().c_str(), CLR_DURNOTE, ICON_CONTROL);
 			break;
 		}
@@ -534,7 +534,24 @@ bool CapcomSnesTrack::ReadEvent(void)
 			}
 
 			desc << L"Times: " << (int)times << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, repeatEventName, desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+			if (times == 0 && repeatCount[repeatSlot] == 0)
+			{
+				// infinite loop
+				AddLoopForever(beginOffset, curOffset-beginOffset, repeatEventName);
+
+				if (readMode == READMODE_ADD_TO_UI)
+				{
+					if (GetByte(curOffset) == 0x17)
+					{
+						AddEndOfTrack(curOffset, 1);
+					}
+				}
+			}
+			else
+			{
+				// regular N-times loop
+				AddGenericEvent(beginOffset, curOffset-beginOffset, repeatEventName, desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+			}
 
 			if (repeatCount[repeatSlot] == 0)
 			{
@@ -558,7 +575,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 		case EVENT_REPEAT_BREAK_3:
 		case EVENT_REPEAT_BREAK_4:
 		{
-			uint8_t times = GetByte(curOffset++);
+			uint8_t attributes = GetByte(curOffset++);
 			uint16_t dest = GetShortBE(curOffset); curOffset += 2;
 
 			uint8_t repeatSlot;
@@ -571,28 +588,19 @@ bool CapcomSnesTrack::ReadEvent(void)
 			case EVENT_REPEAT_BREAK_4: repeatSlot = 3; repeatEventName = L"Repeat Break #4"; break;
 			}
 
-			desc << L"Times: " << (int)times << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+			desc << L"Note: { " << L"Triplet: " << (isNoteTriplet() ? L"On" : L"Off") << L"  " << L"Slur: " << (isNoteSlurred() ? L"On" : L"Off") << L"  " << L"2-Octave Up: " << (isNoteOctaveUp() ? L"On" : L"Off") << L" }  " << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 			AddGenericEvent(beginOffset, curOffset-beginOffset, repeatEventName, desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
 			if (repeatCount[repeatSlot] == 1)
 			{
 				repeatCount[repeatSlot] = 0;
+				noteAttributes &= ~(CAPCOM_SNES_MASK_NOTE_OCTAVE_UP | CAPCOM_SNES_MASK_NOTE_TRIPLET | CAPCOM_SNES_MASK_NOTE_SLURRED);
+				noteAttributes |= attributes;
 				curOffset = dest;
 			}
 
 			break;
 		}
-
-	/*
-	pSeqFile->EventMap[0x0e] = EVENT_REPEAT_UNTIL_1;
-	pSeqFile->EventMap[0x0f] = EVENT_REPEAT_UNTIL_2;
-	pSeqFile->EventMap[0x10] = EVENT_REPEAT_UNTIL_3;
-	pSeqFile->EventMap[0x11] = EVENT_REPEAT_UNTIL_4;
-	pSeqFile->EventMap[0x12] = EVENT_REPEAT_BREAK_1;
-	pSeqFile->EventMap[0x13] = EVENT_REPEAT_BREAK_2;
-	pSeqFile->EventMap[0x14] = EVENT_REPEAT_BREAK_3;
-	pSeqFile->EventMap[0x15] = EVENT_REPEAT_BREAK_4;
-	*/
 
 		case EVENT_GOTO:
 		{
