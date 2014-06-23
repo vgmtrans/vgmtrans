@@ -25,10 +25,11 @@ private:
 	uint16_t GetCurrentPlayAddressFromARAM (RawFile* file, CapcomSnesVersion version, uint8_t channel);
 	int8_t GuessCurrentSongFromARAM (RawFile* file, CapcomSnesVersion version, uint16_t addrSongList);
 	bool IsValidBGMHeader (RawFile* file, UINT addrSongHeader);
-	uint16_t GetDIRAddress (RawFile* file);
+	std::map<uint8_t, uint8_t> GetInitDspRegMap (RawFile* file);
 
 	static BytePattern ptnReadSongList;
 	static BytePattern ptnReadBGMAddress;
 	static BytePattern ptnDspRegInit;
 	static BytePattern ptnDspRegInitOldVer;
+	static BytePattern ptnLoadInstrTableAddress;
 };

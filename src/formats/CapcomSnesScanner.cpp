@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "CapcomSnesScanner.h"
 #include "CapcomSnesSeq.h"
+#include "CapcomSnesInstr.h"
 #include "SNESDSP.h"
 
 using namespace std;
@@ -76,6 +77,22 @@ BytePattern CapcomSnesScanner::ptnDspRegInitOldVer(
 	,
 	15);
 
+//; Mega Man X SPC
+// 0974: 8d 06     mov   y,#$06
+// 0976: cf        mul   ya
+// 0977: da a0     movw  $a0,ya
+// 0979: 60        clrc
+// 097a: 98 ac a0  adc   $a0,#$ac
+// 097d: 98 47 a1  adc   $a1,#$47          ; $a0 = instrument entry address (0x47ac + (patch * 6))
+BytePattern CapcomSnesScanner::ptnLoadInstrTableAddress(
+	"\x8d\x06\xcf\xda\xa0\x60\x98\xac"
+	"\xa0\x98\x47\xa1"
+	,
+	"xxxx?xx?"
+	"?x??"
+	,
+	12);
+
 void CapcomSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -96,10 +113,12 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 
 	UINT ofsReadSongListASM;
 	UINT ofsReadBGMAddressASM;
+	UINT ofsLoadInstrTableAddressASM;
 	bool hasSongList;
 	bool bgmAtFixedAddress;
 	UINT addrSongList;
 	UINT addrBGMHeader;
+	UINT addrInstrTable;
 
 	wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
@@ -205,8 +224,32 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 		}
 	}
 
-	// TODO: scan samples
-	uint16_t dirAddress = this->GetDIRAddress(file);
+	// scan for instrument table
+	UINT instrItemLength = 6;
+	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM))
+	{
+		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
+	}
+	else
+	{
+		return;
+	}
+
+	// get sample map address from DIR register value
+	std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
+	std::map<uint8_t, uint8_t>::iterator itSpcDIR = dspRegMap.find(0x5d);
+	if (itSpcDIR == dspRegMap.end())
+	{
+		return;
+	}
+	uint8_t spcDIR = itSpcDIR->second;
+
+	CapcomSnesInstrSet * newInstrSet = new CapcomSnesInstrSet(file, addrInstrTable, spcDIR << 8);
+	if (!newInstrSet->LoadVGMFile())
+	{
+		delete newInstrSet;
+		return;
+	}
 }
 
 void CapcomSnesScanner::SearchForCapcomSnesFromROM (RawFile* file)
@@ -334,9 +377,9 @@ bool CapcomSnesScanner::IsValidBGMHeader (RawFile* file, UINT addrSongHeader)
 	return true;
 }
 
-uint16_t CapcomSnesScanner::GetDIRAddress (RawFile* file)
+std::map<uint8_t, uint8_t> CapcomSnesScanner::GetInitDspRegMap (RawFile* file)
 {
-	uint16_t dirAddress = 0;
+	std::map<uint8_t, uint8_t> dspRegMap;
 
 	UINT ofsDspRegInitASM;
 	UINT ofsDspRegInitOldVerASM;
@@ -359,24 +402,22 @@ uint16_t CapcomSnesScanner::GetDIRAddress (RawFile* file)
 	}
 	else
 	{
-		return 0;
+		return dspRegMap;
 	}
 	
 	// check address range
 	if (addrDspRegList + dspRegCount > 0x10000 || addrDspValueList + dspRegCount > 0x10000)
 	{
-		return 0;
+		return dspRegMap;
 	}
 
-	// read DIR ($5d) value from table
+	// store dsp reg/value pairs to map
 	for (UINT regIndex = 0; regIndex < dspRegCount; regIndex++)
 	{
-		if (file->GetByte(addrDspRegList + regIndex) == 0x5d)
-		{
-			dirAddress = file->GetByte(addrDspValueList + regIndex) << 8;
-			break;
-		}
+		uint8_t dspReg = file->GetByte(addrDspRegList + regIndex);
+		uint8_t dspValue = file->GetByte(addrDspValueList + regIndex);
+		dspRegMap[dspReg] = dspValue;
 	}
 
-	return dirAddress;
+	return dspRegMap;
 }

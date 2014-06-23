@@ -45,6 +45,7 @@ public:
 	void SetVolume(double volume);
 	void AddVolume(double volume, uint32_t offset, uint32_t length = 1);
 	void AddUnityKey(uint8_t unityKey, uint32_t offset, uint32_t length = 1);
+	void AddFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length = 1);
 	void AddKeyLow(uint8_t keyLow, uint32_t offset, uint32_t length = 1);
 	void AddKeyHigh(uint8_t keyHigh, uint32_t offset, uint32_t length = 1);
 	void AddVelLow(uint8_t velLow, uint32_t offset, uint32_t length = 1);
@@ -105,7 +106,7 @@ class VGMRgnItem :
 	public VGMItem
 {
 public:
-	enum RgnItemType { RIT_GENERIC, RIT_UNKNOWN, RIT_UNITYKEY, RIT_KEYLOW, RIT_KEYHIGH, RIT_VELLOW, RIT_VELHIGH, RIT_PAN, RIT_VOL, RIT_SAMPNUM};		//HIT = Header Item Type
+	enum RgnItemType { RIT_GENERIC, RIT_UNKNOWN, RIT_UNITYKEY, RIT_FINETUNE, RIT_KEYLOW, RIT_KEYHIGH, RIT_VELLOW, RIT_VELHIGH, RIT_PAN, RIT_VOL, RIT_SAMPNUM};		//HIT = Header Item Type
 
 	VGMRgnItem(VGMRgn* rgn, RgnItemType theType, uint32_t offset, uint32_t length, const wchar_t* name);
 	virtual Icon GetIcon();

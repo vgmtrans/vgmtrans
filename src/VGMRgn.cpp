@@ -146,6 +146,12 @@ void VGMRgn::AddUnityKey(uint8_t uk, uint32_t offset, uint32_t length)
 	items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_UNITYKEY, offset, length, L"Unity Key"));
 }
 
+void VGMRgn::AddFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length)
+{
+	this->fineTune = relativePitchCents;
+	items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_FINETUNE, offset, length, L"Fine Tune"));
+}
+
 void VGMRgn::AddKeyLow(uint8_t kl, uint32_t offset, uint32_t length)
 {
 	keyLow = kl;
