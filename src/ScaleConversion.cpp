@@ -183,7 +183,7 @@ uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal)
 	}
 	else
 	{
-		return (uint8_t) (ConvertPercentPanToStdMidiScale((percentVal - 1) / 126.0) * 126.0 + 0.5);
+		return (uint8_t) (ConvertPercentPanToStdMidiScale((percentVal - 1) / 126.0) * 126 + 1);
 	}
 }
 

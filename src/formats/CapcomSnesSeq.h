@@ -70,6 +70,9 @@ public:
 	int8_t transpose;
 	uint16_t tempo;
 
+	static const uint8_t volTable[];
+	static const uint8_t panTable[];
+
 	double GetTempoInBPM ();
 	double GetTempoInBPM (uint16_t tempo);
 

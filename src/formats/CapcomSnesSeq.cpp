@@ -14,6 +14,20 @@ DECLARE_FORMAT(CapcomSnes);
 #define SEQ_PPQN    48
 #define SEQ_KEYOFS  0
 
+// volume table
+const uint8_t CapcomSnesSeq::volTable[] = {
+	0x00, 0x0c, 0x19, 0x26, 0x33, 0x40, 0x4c, 0x59,
+	0x66, 0x73, 0x80, 0x8c, 0x99, 0xb3, 0xcc, 0xe6,
+	0xff,
+};
+
+// pan table (compatible with Nintendo engine)
+const uint8_t CapcomSnesSeq::panTable[] = {
+	0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
+	0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
+	0x7a, 0x7c, 0x7d, 0x7e, 0x7f, 0x7f,
+};
+
 CapcomSnesSeq::CapcomSnesSeq(RawFile* file, CapcomSnesVersion ver, uint32_t seqdataOffset, bool priorityInHeader, wstring newName)
 : VGMSeq(CapcomSnesFormat::name, file, seqdataOffset), version(ver), priorityInHeader(priorityInHeader)
 {
@@ -454,9 +468,24 @@ bool CapcomSnesTrack::ReadEvent(void)
 
 		case EVENT_VOLUME:
 		{
-			// TODO: correct volume calculation
 			uint8_t newVolume = GetByte(curOffset++);
-			AddVol(beginOffset, curOffset-beginOffset, newVolume / 2);
+			uint8_t midiVolume;
+
+			if (parentSeq->version == V1_BGM_IN_LIST)
+			{
+				// linear volume
+				midiVolume = newVolume >> 1;
+			}
+			else
+			{
+				// use volume table (with linear interpolation)
+				uint8_t volIndex = (newVolume * 16) >> 8;
+				uint8_t volRate = (newVolume * 16) & 0xff;
+				midiVolume = CapcomSnesSeq::volTable[volIndex] + ((CapcomSnesSeq::volTable[volIndex + 1] - CapcomSnesSeq::volTable[volIndex]) * volRate / 256);
+			}
+			midiVolume = Convert7bitPercentVolValToStdMidiVal(midiVolume >> 1);
+
+			AddVol(beginOffset, curOffset-beginOffset, newVolume);
 			break;
 		}
 
@@ -635,17 +664,47 @@ bool CapcomSnesTrack::ReadEvent(void)
 
 		case EVENT_PAN:
 		{
-			// TODO: correct panpot calculation
 			int8_t newPan = GetByte(curOffset++);
-			AddPan(beginOffset, curOffset-beginOffset, (newPan + 128) / 2);
+			uint8_t midiPan;
+
+			if (parentSeq->version == V1_BGM_IN_LIST)
+			{
+				// TODO: actual pan algorithm?
+				midiPan = newPan >> 1;
+			}
+			else
+			{
+				// use pan table (with linear interpolation)
+				uint8_t panIndex = (newPan * 20) >> 8;
+				uint8_t panRate = (newPan * 20) & 0xff;
+				midiPan = CapcomSnesSeq::panTable[panIndex] + ((CapcomSnesSeq::panTable[panIndex + 1] - CapcomSnesSeq::panTable[panIndex]) * panRate / 256);
+			}
+			midiPan = Convert7bitPercentPanValToStdMidiVal(midiPan);
+
+			AddPan(beginOffset, curOffset-beginOffset, midiPan);
 			break;
 		}
 
 		case EVENT_MASTER_VOLUME:
 		{
-			// TODO: correct volume calculation
-			uint8_t newMasterVolume = GetByte(curOffset++);
-			AddMasterVol(beginOffset, curOffset-beginOffset, newMasterVolume / 2);
+			uint8_t newVolume = GetByte(curOffset++);
+			uint8_t midiVolume;
+
+			if (parentSeq->version == V1_BGM_IN_LIST)
+			{
+				// linear volume
+				midiVolume = newVolume >> 1;
+			}
+			else
+			{
+				// use volume table (with linear interpolation)
+				uint8_t volIndex = (newVolume * 16) >> 8;
+				uint8_t volRate = (newVolume * 16) & 0xff;
+				midiVolume = CapcomSnesSeq::volTable[volIndex] + ((CapcomSnesSeq::volTable[volIndex + 1] - CapcomSnesSeq::volTable[volIndex]) * volRate / 256);
+			}
+			midiVolume = Convert7bitPercentVolValToStdMidiVal(midiVolume >> 1);
+
+			AddMasterVol(beginOffset, curOffset-beginOffset, newVolume);
 			break;
 		}
 
