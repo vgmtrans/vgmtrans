@@ -167,6 +167,26 @@ double SecondsToTimecents(double secs)
 	return log(secs)/log((double)2) * 1200;
 }
 
+// Takes a percentage pan value (linear volume curve)
+// and converts it to a standard midi curve (sin/cos curve)
+double ConvertPercentPanToStdMidiScale(double percent)
+{
+	double panPI2 = atan2(percent, 1.0 - percent);
+	return panPI2 / M_PI_2;
+}
+
+uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal)
+{
+	if (percentVal == 0)
+	{
+		return 0;
+	}
+	else
+	{
+		return (uint8_t) (ConvertPercentPanToStdMidiScale((percentVal - 1) / 126.0) * 126.0 + 0.5);
+	}
+}
+
 // Convert a pan value where 0 = left 0.5 = center and 1 = right to
 // 0.1% units where -50% = left 0 = center 50% = right (shared by DLS and SF2)
 long ConvertPercentPanTo10thPercentUnits(double percentPan)

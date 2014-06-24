@@ -10,6 +10,8 @@ double ConvertLogScaleValToAtten(double percent);
 double ConvertPercentAmplitudeToAttenDB(double percent);
 
 double SecondsToTimecents(double secs);
+double ConvertPercentPanToStdMidiScale(double percent);
+uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal);
 long ConvertPercentPanTo10thPercentUnits(double percentPan);
 void ConvertPercentVolPanToStdMidiScale(double& vol, double& pan);
 
