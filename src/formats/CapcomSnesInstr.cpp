@@ -140,9 +140,10 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr* instr, uint32_t offset) :
 	uint8_t gain = GetByte(offset + 3);
 	int16_t pitch_scale = GetShortBE(offset + 4);
 
+	const double pitch_fixer = 1.0238 * (32768.0 / 32000.0); // 1.0238 <- pitch table vs. equal temperament
 	double fine_tuning;
 	double coarse_tuning;
-	fine_tuning = modf((log(pitch_scale / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
+	fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
 
 	// normalize
 	if (fine_tuning >= 0.5)
