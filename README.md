@@ -12,6 +12,7 @@ VGMTrans converts a music files used in console video games into standard midi a
 - Squaresoft's PS1 format  used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
 - Nintendo's Gameboy Advance sequence format
 - Rare's SNES sequence format (.spc)
+- Capcom's SNES sequence format (.spc)
 
 The source code includes preliminary work on additional formats. 
 
