@@ -124,7 +124,7 @@ void AkaoTrack::ResetVars(void)
 
 //--------------------------------------------------
 //Revisions:
-//	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "“à‘ ‰¹Œ¹‚ğMIDI•ÏŠ·‚·‚éƒXƒŒ(in http://www.2ch.net)"
+//	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "å†…è”µéŸ³æºã‚’MIDIå¤‰æ›ã™ã‚‹ã‚¹ãƒ¬(in http://www.2ch.net)"
 //						Add un-known command(op-code).
 //--------------------------------------------------
 bool AkaoTrack::ReadEvent(void)
@@ -252,9 +252,9 @@ bool AkaoTrack::ReadEvent(void)
 			 //vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES, BUT NOT POSITIVE
 			 //AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Velocity", NULL, BG_CLR_CYAN);
 			 uint8_t cExpression = GetByte(curOffset++);
-////			 ‚±‚Á‚¿‚Ìlog‰‰Z‚Í—v‚ç‚È‚¢
+////			 ã“ã£ã¡ã®logæ¼”ç®—ã¯è¦ã‚‰ãªã„
 ////			 vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES, BUT NOT POSITIVE
-			 vel = 127;		//‚Æ‚è‚ ‚¦‚¸ 127 ‚É‚µ‚Ä‚¨‚­
+			 vel = 127;		//ã¨ã‚Šã‚ãˆãš 127 ã«ã—ã¦ãŠã
 			 AddExpression(beginOffset, curOffset-beginOffset, cExpression);
 		 }
 		 break;

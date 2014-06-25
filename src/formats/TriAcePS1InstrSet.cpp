@@ -21,10 +21,10 @@ TriAcePS1InstrSet::~TriAcePS1InstrSet(void)
 
 
 //==============================================================
-//		ƒwƒbƒ_[î•ñ‚Ìæ“¾
+//		ãƒ˜ãƒƒãƒ€ãƒ¼æƒ…å ±ã®å–å¾—
 //--------------------------------------------------------------
 //	Memo:
-//		VGMInstrSet::Load()ŠÖ”‚©‚çŒÄ‚Î‚ê‚é
+//		VGMInstrSet::Load()é–¢æ•°ã‹ã‚‰å‘¼ã°ã‚Œã‚‹
 //==============================================================
 bool TriAcePS1InstrSet::GetHeaderInfo()
 {
@@ -34,10 +34,10 @@ bool TriAcePS1InstrSet::GetHeaderInfo()
 	//header->AddSimpleItem(dwOffset+6, 1, L"Number of Instruments");
 
 	//-----------------------
-	//1,Sep.2009 revise		to do ‚±‚¤‚µ‚½‚¢B
+	//1,Sep.2009 revise		to do ã“ã†ã—ãŸã„ã€‚
 	//-----------------------
 	//	GetBytes(dwOffset, sizeof(TriAcePS1InstrSet::_InstrHeader), &InstrHeader);
-	//		ª@ª@ª
+	//		â†‘ã€€â†‘ã€€â†‘
 	unLength =				GetWord(dwOffset);			// to do delete
 	instrSectionSize =		GetShort(dwOffset+4);		// to do delete
 	//-----------------------
@@ -51,17 +51,17 @@ bool TriAcePS1InstrSet::GetHeaderInfo()
 }
 
 //==============================================================
-//		Še‰¹F‚Ìî•ñæ“¾
+//		å„éŸ³è‰²ã®æƒ…å ±å–å¾—
 //--------------------------------------------------------------
 //	Memo:
-//		VGMInstrSet::Load()ŠÖ”‚©‚çŒÄ‚Î‚ê‚é
+//		VGMInstrSet::Load()é–¢æ•°ã‹ã‚‰å‘¼ã°ã‚Œã‚‹
 //==============================================================
 bool TriAcePS1InstrSet::GetInstrPointers()
 {
 
 	uint32_t firstWord = GetWord(dwOffset+sizeof(TriAcePS1InstrSet::_InstrHeader));		//1,Sep.2009 revise
 
-	//0xFFFFFFFF‚É‚È‚é‚Ü‚ÅŒJ‚è•Ô‚·B
+	//0xFFFFFFFFã«ãªã‚‹ã¾ã§ç¹°ã‚Šè¿”ã™ã€‚
 	for (uint32_t i = dwOffset+sizeof(TriAcePS1InstrSet::_InstrHeader);					//1,Sep.2009 revise
 	  ((firstWord != 0xFFFFFFFF) && (i < dwOffset+unLength));
 	  i+=sizeof(TriAcePS1Instr::InstrInfo), firstWord = GetWord(i))

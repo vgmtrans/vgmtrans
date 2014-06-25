@@ -44,11 +44,11 @@ struct WdsHdr
 //--------------------------------------------------------------
 //	Memo:
 //			Offset Address	= 0x0030
-//			Size			= 0x0010 ~ iQuantity
+//			Size			= 0x0010 Ã— iQuantity
 //--------------------------------------------------------------
 struct WdsRgnData
 {
-	unsigned	long	ptBody;							//Offset address to AD-PCM ”gŒ`À‘Ì
+	unsigned	long	ptBody;							//Offset address to AD-PCM æ³¢å½¢å®Ÿä½“
 	unsigned	short	ptLoop;							//size?  loop?  unknown
 	unsigned	char	iFineTune;		// Pitch table is at 800290D8 in FFT.  See function at 80017424
 										//  takes $a0: uint16_t- MSB = semitone (note+semitone_tune),
@@ -74,7 +74,7 @@ struct WdsRgnData
 /*																*/
 /****************************************************************/
 //==============================================================
-//		Instrument Set		(Bank‘S‘Ì)
+//		Instrument Set		(Bankå…¨ä½“)
 //--------------------------------------------------------------
 class WdsInstrSet :
 	public VGMInstrSet
@@ -83,12 +83,12 @@ public:
 	WdsInstrSet(RawFile* file, uint32_t offset);
 	virtual ~WdsInstrSet(void);
 
-	virtual bool	GetHeaderInfo();	//ƒwƒbƒ_[‚Ìˆ—
-										//‚±‚±‚ÅAObject"VabSampColl"‚ğ¶¬‚·‚é‚×‚«H
-										//iƒXƒLƒƒƒi[‚ÅVB‚ğŒŸõ‚·‚é‚ÆA•¡”—L‚é‚©‚ç‰ğ‚ç‚È‚­‚È‚éBj
-	virtual bool	GetInstrPointers();	//‰¹FObject"WdsInstr"‚ğ¶¬‚·‚éB
-										//"aInstrs"‚ÉA“o˜^‚·‚éB
-										//Še‰¹F–ˆ‚Ìˆ—
+	virtual bool	GetHeaderInfo();	//ãƒ˜ãƒƒãƒ€ãƒ¼ã®å‡¦ç†
+										//ã“ã“ã§ã€Object"VabSampColl"ã‚’ç”Ÿæˆã™ã‚‹ã¹ãï¼Ÿ
+										//ï¼ˆã‚¹ã‚­ãƒ£ãƒŠãƒ¼ã§VBã‚’æ¤œç´¢ã™ã‚‹ã¨ã€è¤‡æ•°æœ‰ã‚‹ã‹ã‚‰è§£ã‚‰ãªããªã‚‹ã€‚ï¼‰
+	virtual bool	GetInstrPointers();	//éŸ³è‰²Object"WdsInstr"ã‚’ç”Ÿæˆã™ã‚‹ã€‚
+										//"aInstrs"ã«ã€ç™»éŒ²ã™ã‚‹ã€‚
+										//å„éŸ³è‰²æ¯ã®å‡¦ç†
 
 	enum Version { VERSION_DWDS, VERSION_WDS };
 
@@ -97,10 +97,10 @@ public:
 	Version version;
 
 /*	member of "VGMInstrSet"
-	VGMInstrSet::aInstrs		//‰¹Fî•ñ‚Ìvector
-	VGMInstrSet::dls			//class DLS‚ğì‚é—p
+	VGMInstrSet::aInstrs		//éŸ³è‰²æƒ…å ±ã®vector
+	VGMInstrSet::dls			//class DLSã‚’ä½œã‚‹ç”¨
 	VGMInstrSet::menu			//
-	VGMInstrSet::sampColl		//”gŒ`À‘Ì‚ÌƒIƒuƒWƒFƒNƒg
+	VGMInstrSet::sampColl		//æ³¢å½¢å®Ÿä½“ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
 */
 };
 
@@ -116,9 +116,9 @@ public:
 	WdsInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
 	virtual ~WdsInstr(void);
 
-	virtual bool LoadInstr();	//Object "WdsRgn"‚Ì¶¬A
-								//"WdsRgn->LoadRgn()"‚ÌŒÄ‚Ño‚µ
-								//member "aRgns" ‚ÖƒIƒuƒWƒFƒNƒg‚Ìƒ|ƒCƒ“ƒ^‚ğ“o˜^
+	virtual bool LoadInstr();	//Object "WdsRgn"ã®ç”Ÿæˆã€
+								//"WdsRgn->LoadRgn()"ã®å‘¼ã³å‡ºã—
+								//member "aRgns" ã¸ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ãƒã‚¤ãƒ³ã‚¿ã‚’ç™»éŒ²
 
 public:
 	WdsRgnData rgndata;

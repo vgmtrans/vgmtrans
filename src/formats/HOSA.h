@@ -36,7 +36,7 @@ public:
 //	virtual		void	SetChannel(int trackNum);
 	virtual		bool	ReadEvent(void);
 				void	ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable);
-	unsigned	int		DecodeVariable();	//Decode of �ϒ�
+	unsigned	int		DecodeVariable();	//Decode of 可変長
 
 public:
 	unsigned 	int		iDeltaTimeCom;		//Default delta time for Command

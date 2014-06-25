@@ -34,7 +34,7 @@ HOSASeq::~HOSASeq(void)
 //		flag		true	=	successful
 //					false	=	error
 //	Memo
-//		VGMSeq::LoadMain() ‚©‚ç call ‚³‚ê‚éB
+//		VGMSeq::LoadMain() ã‹ã‚‰ call ã•ã‚Œã‚‹ã€‚
 //==============================================================
 bool HOSASeq::GetHeaderInfo(void)
 {
@@ -47,7 +47,7 @@ bool HOSASeq::GetHeaderInfo(void)
 	nNumTracks		= GetByte(dwOffset+0x06);	//uint8_t (8bit)
 	assocHOSA_ID	= 0x00;
 
-//	Add the new object "VGMHeader" in this object "HOSASeq"iSuper classF"VGMContainerItem")
+//	Add the new object "VGMHeader" in this object "HOSASeq"ï¼ˆSuper classï¼š"VGMContainerItem")
 //	Delect object is in "VGMContainerItem::~VGMContainerItem()"
 	VGMHeader* hdr = AddHeader(dwOffset, 0x0050);
 	hdr->AddSig(dwOffset, 4);
@@ -66,7 +66,7 @@ bool HOSASeq::GetHeaderInfo(void)
 //		flag		true	=	successful
 //					false	=	
 //	Memo
-//		VGMSeq::LoadMain() ‚©‚ç call ‚³‚ê‚éB
+//		VGMSeq::LoadMain() ã‹ã‚‰ call ã•ã‚Œã‚‹ã€‚
 //==============================================================
 bool HOSASeq::GetTrackPointers(void)
 {
@@ -84,7 +84,7 @@ bool HOSASeq::GetTrackPointers(void)
 //		HOSATrack
 //**************************************************************
 //==============================================================
-//		Constructor		with initialize all member •Ï”
+//		Constructor		with initialize all member å¤‰æ•°
 //--------------------------------------------------------------
 //	Input
 //		Nothing
@@ -110,13 +110,13 @@ HOSATrack::HOSATrack(HOSASeq* parentFile, long offset, long length):
 //	Output
 //		Nothing
 //	Memo
-//		SeqTrack::LoadTrack() ‚©‚ç call ‚³‚ê‚éB
+//		SeqTrack::LoadTrack() ã‹ã‚‰ call ã•ã‚Œã‚‹ã€‚
 //==============================================================
 bool HOSATrack::ReadEvent(void)
 {
 
 	//==================================
-	//	[ Local •Ï” ]
+	//	[ Local å¤‰æ•° ]
 	//----------------------------------
 	const		uint32_t	beginOffset	= curOffset;					//start offset point
 
@@ -125,7 +125,7 @@ bool HOSATrack::ReadEvent(void)
 	const		uint8_t	cCom_bit5	= (cCommand & 0x60) >> 5;		//Delta times
 	const		uint8_t	cCom_bit7	= (cCommand & 0x80) >> 7;		//0=Notes / 1=Controls
 
-//	unsigned 	int					iMinLengthCounter;				//ƒfƒ‹ƒ^ƒ^ƒCƒ€Å¬’l
+//	unsigned 	int					iMinLengthCounter;				//ãƒ‡ãƒ«ã‚¿ã‚¿ã‚¤ãƒ æœ€å°å€¤
 //				int					i;		//general
 //	vector<char>::iterator			it_note;
 //	vector<int unsigned >::iterator	it_Length;
@@ -135,7 +135,7 @@ bool HOSATrack::ReadEvent(void)
 	//==================================
 	//	[ Process of "Delta time" and "Note off Event" ]
 	//----------------------------------
-	//Command—p‚Ì(DeltaCounter==0)‚Ü‚ÅŒJ‚è•Ô‚µB
+	//Commandç”¨ã®(DeltaCounter==0)ã¾ã§ç¹°ã‚Šè¿”ã—ã€‚
 	//while(iDeltaTimeCounter!=0){
 
 	//	//Search the minimum length time [ticks]
@@ -354,7 +354,7 @@ void	HOSATrack::ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable){
 
 	switch(cCom_bit5){
 		//----
-		case(2):	//	2 : ‰Â•Ï’·
+		case(2):	//	2 : å¯å¤‰é•·
 //			*iVariable = ReadVarLen(curOffset);		//No count curOffset
 			*iVariable = DecodeVariable();
 			break;
@@ -381,7 +381,7 @@ void	HOSATrack::ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable){
 unsigned	int		HOSATrack::DecodeVariable(){
 
 	//==================================
-	//	[ Local •Ï” ]
+	//	[ Local å¤‰æ•° ]
 	//----------------------------------
 	unsigned	__int32		iVariable=0;	// Result of decode
 	unsigned	int			count=4;		// for counter

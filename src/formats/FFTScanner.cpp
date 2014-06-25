@@ -53,7 +53,7 @@ void FFTScanner::SearchForFFTSeq (RawFile* file)
 //		scan "wds"		(Instrumnt)
 //--------------------------------------------------------------
 //	memo:
-//		object "SampColl" ‚ÍAclass "WdsInstrSet"“à‚Å¶¬‚·‚éB
+//		object "SampColl" ã¯ã€class "WdsInstrSet"å†…ã§ç”Ÿæˆã™ã‚‹ã€‚
 //--------------------------------------------------------------
 void FFTScanner::SearchForFFTwds (RawFile* file)
 {

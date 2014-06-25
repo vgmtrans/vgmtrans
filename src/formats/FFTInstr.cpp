@@ -9,7 +9,7 @@ using namespace std;
 
 /****************************************************************/
 /*																*/
-/*			Instrument Set		(Bank‘S‘Ì)						*/
+/*			Instrument Set		(Bankå…¨ä½“)						*/
 /*																*/
 /****************************************************************/
 //==============================================================
@@ -28,15 +28,15 @@ WdsInstrSet::~WdsInstrSet(void)
 }
 
 //==============================================================
-//		ƒwƒbƒ_[î•ñ‚Ìæ“¾
+//		ãƒ˜ãƒƒãƒ€ãƒ¼æƒ…å ±ã®å–å¾—
 //--------------------------------------------------------------
 //	Memo:
-//		VGMInstrSet::Load()ŠÖ”‚©‚çŒÄ‚Î‚ê‚é
+//		VGMInstrSet::Load()é–¢æ•°ã‹ã‚‰å‘¼ã°ã‚Œã‚‹
 //==============================================================
 bool	WdsInstrSet::GetHeaderInfo()
 {
 
-	//"hdr"\‘¢‘Ì‚Ö‚»‚Ì‚Ü‚Ü“]‘—
+	//"hdr"æ§‹é€ ä½“ã¸ãã®ã¾ã¾è»¢é€
 	GetBytes(dwOffset, sizeof(WdsHdr), &hdr);
 	unLength	= hdr.szHeader1 + hdr.szSampColl;	//header size + samp coll size
 	id			= hdr.iBank;						//Bank number.
@@ -46,12 +46,12 @@ bool	WdsInstrSet::GetHeaderInfo()
 	else if (hdr.sig == 0x20736477)
 		version = VERSION_WDS;
 
-	//ƒoƒCƒiƒŠƒGƒfƒBƒ^•\¦—p
+	//ãƒã‚¤ãƒŠãƒªã‚¨ãƒ‡ã‚£ã‚¿è¡¨ç¤ºç”¨
 	wostringstream	theName;
 	theName << L"wds " << id;
 	name = theName.str();
 
-	//ƒwƒbƒ_[object‚Ì¶¬
+	//ãƒ˜ãƒƒãƒ€ãƒ¼objectã®ç”Ÿæˆ
 	VGMHeader* wdsHeader = AddHeader(dwOffset, sizeof(WdsHdr));
 	wdsHeader->AddSig(dwOffset, sizeof(long));
 	wdsHeader->AddUnknownItem(dwOffset+0x04, sizeof(long));
@@ -66,33 +66,33 @@ bool	WdsInstrSet::GetHeaderInfo()
 	wdsHeader->AddUnknownItem(dwOffset+0x28, sizeof(long));
 	wdsHeader->AddUnknownItem(dwOffset+0x2C, sizeof(long));
 
-	//”gŒ`object‚Ì¶¬
+	//æ³¢å½¢objectã®ç”Ÿæˆ
 	sampColl = new PSXSampColl(FFTFormat::name, this, dwOffset + hdr.szHeader1, hdr.szSampColl);
-//	sampColl->Load();				//VGMInstrSet::Load()ŠÖ”“à‚Å‚â‚Á‚Ä‚¢‚éB
-//	sampColl->UseInstrSet(this);	//"WD.cpp"‚Å‚ÍA“¯—l‚Ì–‚ğ‚â‚Á‚Ä‚¢‚éB
+//	sampColl->Load();				//VGMInstrSet::Load()é–¢æ•°å†…ã§ã‚„ã£ã¦ã„ã‚‹ã€‚
+//	sampColl->UseInstrSet(this);	//"WD.cpp"ã§ã¯ã€åŒæ§˜ã®äº‹ã‚’ã‚„ã£ã¦ã„ã‚‹ã€‚
 
 	return true;
 
 }
 
 //==============================================================
-//		Še‰¹F‚Ìî•ñæ“¾
+//		å„éŸ³è‰²ã®æƒ…å ±å–å¾—
 //--------------------------------------------------------------
 //	Memo:
-//		VGMInstrSet::Load()ŠÖ”‚©‚çŒÄ‚Î‚ê‚é
+//		VGMInstrSet::Load()é–¢æ•°ã‹ã‚‰å‘¼ã°ã‚Œã‚‹
 //==============================================================
 bool	WdsInstrSet::GetInstrPointers()
 {
 
 	uint32_t	iOffset = dwOffset + sizeof(WdsHdr);	//pointer of attribute table
 
-	//‰¹F”‚¾‚¯ŒJ‚è•Ô‚·B
+	//éŸ³è‰²æ•°ã ã‘ç¹°ã‚Šè¿”ã™ã€‚
 	for(unsigned int i=0; i<=hdr.iNumInstrs; i++)
 	{
-		//WdsInstr* newInstr = new WdsInstr(this,iOffset,sizeof(WdsRgnData),hdr.iBank,i);		//0 c hdr.iBank
-		WdsInstr* newInstr = new WdsInstr(this,iOffset,sizeof(WdsRgnData), i/128 , i%128);		//0 c hdr.iBank
+		//WdsInstr* newInstr = new WdsInstr(this,iOffset,sizeof(WdsRgnData),hdr.iBank,i);		//0 â€¦ hdr.iBank
+		WdsInstr* newInstr = new WdsInstr(this,iOffset,sizeof(WdsRgnData), i/128 , i%128);		//0 â€¦ hdr.iBank
 		aInstrs.push_back(newInstr);
-	//	newInstr->LoadInstr();		//VGMInstrSet::Load()ŠÖ”“àiLoadInstrs()j‚Å‚â‚Á‚Ä‚¢‚éB
+	//	newInstr->LoadInstr();		//VGMInstrSet::Load()é–¢æ•°å†…ï¼ˆLoadInstrs()ï¼‰ã§ã‚„ã£ã¦ã„ã‚‹ã€‚
 		iOffset += sizeof(WdsRgnData);	// size = 0x0010
 	}
 
@@ -133,9 +133,9 @@ bool	WdsInstr::LoadInstr()
 	//	return false;
 	//aRgns.push_back(rgn);
 
-	////Object "VGMRgn"‚Æ"VGMSampColl"‚ÌŠÖ˜A•t‚¯H
+	////Object "VGMRgn"ã¨"VGMSampColl"ã®é–¢é€£ä»˜ã‘ï¼Ÿ
 	//rgn->sampNum		= instrNum;					//Wave number.
-//	rgn->sampCollPtr	= parInstrSet->sampColl;	//NDS—pHiInstSet‚ÉASampColl‚ª•¡”—L‚é‚æ‚¤‚Èformatj
+//	rgn->sampCollPtr	= parInstrSet->sampColl;	//NDSç”¨ï¼Ÿï¼ˆInstSetã«ã€SampCollãŒè¤‡æ•°æœ‰ã‚‹ã‚ˆã†ãªformatï¼‰
 
 	GetBytes(dwOffset, sizeof(WdsRgnData), &rgndata);
 	VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);

@@ -27,12 +27,12 @@ bool FFTSeq::GetHeaderInfo(void)
 {
 
 //-----------------------------------------------------------
-//	Written by "Sound tester 774" in "“à‘ ‰¹Œ¹‚ðMIDI•ÏŠ·‚·‚éƒXƒŒ(in http://www.2ch.net)"
+//	Written by "Sound tester 774" in "å†…è”µéŸ³æºã‚’MIDIå¤‰æ›ã™ã‚‹ã‚¹ãƒ¬(in http://www.2ch.net)"
 //	2009. 6.17 (Wed.)
 //	2009. 6.30 (Thu.)
 //-----------------------------------------------------------
 					unLength		= GetShort(dwOffset+0x08);
-					nNumTracks		= GetByte(dwOffset+0x14);	//uint8_t (8bit)		GetWord() ‚©‚çC³
+					nNumTracks		= GetByte(dwOffset+0x14);	//uint8_t (8bit)		GetWord() ã‹ã‚‰ä¿®æ­£
 	unsigned char	cNumPercussion	= GetByte(dwOffset+0x15);	//uint8_t (8bit)	Quantity of Percussion struct
 //	unsigned char	cBankNum		= GetByte(dwOffset+0x16);
 					assocWdsID		= GetShort(dwOffset+0x16);	//uint16_t (16bit)	Default program bank No.
@@ -51,7 +51,7 @@ bool FFTSeq::GetHeaderInfo(void)
 
 //	name = L"smds Seq";
 
-	VGMHeader* hdr = AddHeader(dwOffset, 0x22);					//ƒwƒbƒ_[î•ñ‚àA16i”‰æ–Ê‚Éo—Í‚·‚éB
+	VGMHeader* hdr = AddHeader(dwOffset, 0x22);					//ãƒ˜ãƒƒãƒ€ãƒ¼æƒ…å ±ã‚‚ã€16é€²æ•°ç”»é¢ã«å‡ºåŠ›ã™ã‚‹ã€‚
 																//Header information set
 
 	hdr->AddSig(dwOffset, 4);
@@ -67,7 +67,7 @@ bool FFTSeq::GetHeaderInfo(void)
 		trackPtrs->AddSimpleItem(dwOffset+0x22+i*2, 2, L"Track Pointer");
 	VGMHeader* titleHdr = AddHeader(dwOffset+ptSongTitle, titleLength, L"Song Name");
 
-//	if(cNumPercussion!=0){										//‚±‚êA‚â‚Á‚ÏA‚¢‚ç‚È‚¢B
+//	if(cNumPercussion!=0){										//ã“ã‚Œã€ã‚„ã£ã±ã€ã„ã‚‰ãªã„ã€‚
 //		hdr->AddSimpleItem(dwOffset+ptPercussionTbl, cNumPercussion*5, L"Drumkit Struct");
 //	}
 //-----------------------------------------------------------
@@ -80,13 +80,13 @@ bool FFTSeq::GetHeaderInfo(void)
 
 //	while (j && j != '.')
 //	{
-////		j = GetByte(dwOffset+0x22+nNumTracks*2+2 + i++);		//C³
+////		j = GetByte(dwOffset+0x22+nNumTracks*2+2 + i++);		//ä¿®æ­£
 //		j = GetByte(dwOffset + ptSongTitle + (i++));
 //		name += (char)j;
 //	}
 
 
-//	hdr->AddSimpleItem(dwOffset + ptMusicTile, i, L"Music title");		//‚â‚Á‚Ï‘‚©‚È‚¢‚Å‚¢‚¢‚âB
+//	hdr->AddSimpleItem(dwOffset + ptMusicTile, i, L"Music title");		//ã‚„ã£ã±æ›¸ã‹ãªã„ã§ã„ã„ã‚„ã€‚
 
 
 	return true;		//successful
@@ -132,7 +132,7 @@ void FFTTrack::ResetVars()
 
 //--------------------------------------------------
 //Revisions:
-//	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "“à‘ ‰¹Œ¹‚ðMIDI•ÏŠ·‚·‚éƒXƒŒ(in http://www.2ch.net)"
+//	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "å†…è”µéŸ³æºã‚’MIDIå¤‰æ›ã™ã‚‹ã‚¹ãƒ¬(in http://www.2ch.net)"
 //						Add un-known command(op-code).
 //--------------------------------------------------
 bool FFTTrack::ReadEvent(void)

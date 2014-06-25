@@ -8,7 +8,7 @@
 
 /****************************************************************/
 /*																*/
-/*			Instrument Set		(Bank‘S‘Ì)						*/
+/*			Instrument Set		(Bankå…¨ä½“)						*/
 /*																*/
 /****************************************************************/
 //==============================================================
@@ -28,46 +28,46 @@ HOSAInstrSet::~HOSAInstrSet(void)
 
 
 //==============================================================
-//		ƒwƒbƒ_[î•ñ‚Ìæ“¾
+//		ãƒ˜ãƒƒãƒ€ãƒ¼æƒ…å ±ã®å–å¾—
 //--------------------------------------------------------------
 //	Memo:
-//		VGMInstrSet::Load()ŠÖ”‚©‚çŒÄ‚Î‚ê‚é
+//		VGMInstrSet::Load()é–¢æ•°ã‹ã‚‰å‘¼ã°ã‚Œã‚‹
 //==============================================================
 bool HOSAInstrSet::GetHeaderInfo()
 {
 
-	//"hdr"\‘¢‘Ì‚Ö‚»‚Ì‚Ü‚Ü“]‘—
+	//"hdr"æ§‹é€ ä½“ã¸ãã®ã¾ã¾è»¢é€
 	GetBytes(dwOffset, sizeof(InstrHeader), &instrheader);
 	id			= 0;						//Bank number.
 
-	//ƒoƒCƒiƒŠƒGƒfƒBƒ^•\¦—p
+	//ãƒã‚¤ãƒŠãƒªã‚¨ãƒ‡ã‚£ã‚¿è¡¨ç¤ºç”¨
 	name = L"HOSAWAH";
 
-	//ƒwƒbƒ_[object‚Ì¶¬
+	//ãƒ˜ãƒƒãƒ€ãƒ¼objectã®ç”Ÿæˆ
 	VGMHeader* wdsHeader = AddHeader(dwOffset, sizeof(InstrHeader));
 	wdsHeader->AddSig(dwOffset, 8);
 	wdsHeader->AddSimpleItem(dwOffset+8,sizeof(uint32_t),L"Number of Instruments");
 
-	//”gŒ`object‚Ì¶¬
+	//æ³¢å½¢objectã®ç”Ÿæˆ
 	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800);
-//	sampColl->Load();				//VGMInstrSet::Load()ŠÖ”“à‚Å‚â‚Á‚Ä‚¢‚éB
-//	sampColl->UseInstrSet(this);	//"WD.cpp"‚Å‚ÍA“¯—l‚Ì–‚ğ‚â‚Á‚Ä‚¢‚éB
+//	sampColl->Load();				//VGMInstrSet::Load()é–¢æ•°å†…ã§ã‚„ã£ã¦ã„ã‚‹ã€‚
+//	sampColl->UseInstrSet(this);	//"WD.cpp"ã§ã¯ã€åŒæ§˜ã®äº‹ã‚’ã‚„ã£ã¦ã„ã‚‹ã€‚
 
 	return true;
 }
 
 //==============================================================
-//		Še‰¹F‚Ìî•ñæ“¾
+//		å„éŸ³è‰²ã®æƒ…å ±å–å¾—
 //--------------------------------------------------------------
 //	Memo:
-//		VGMInstrSet::Load()ŠÖ”‚©‚çŒÄ‚Î‚ê‚é
+//		VGMInstrSet::Load()é–¢æ•°ã‹ã‚‰å‘¼ã°ã‚Œã‚‹
 //==============================================================
 bool HOSAInstrSet::GetInstrPointers()
 {
 
 	uint32_t	iOffset = dwOffset + sizeof(InstrHeader);	//pointer of attribute table
 
-	//‰¹F”‚¾‚¯ŒJ‚è•Ô‚·B
+	//éŸ³è‰²æ•°ã ã‘ç¹°ã‚Šè¿”ã™ã€‚
 	for(unsigned int i=0; i<instrheader.numInstr; i++)
 	{
 		HOSAInstr* newInstr = new HOSAInstr(this, dwOffset+GetWord(iOffset), 0, i/0x80 , i%0x80);

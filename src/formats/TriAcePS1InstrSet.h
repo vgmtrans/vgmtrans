@@ -24,7 +24,7 @@ public:
 public:
 
 	//-----------------------
-	//1,Sep.2009 revise		to do ‚±‚¤‚µ‚½‚¢B
+	//1,Sep.2009 revise		to do ã“ã†ã—ãŸã„ã€‚
 	//-----------------------
 	typedef struct _InstrHeader
 	{
@@ -34,7 +34,7 @@ public:
 		uint16_t unk_08;		//
 		uint16_t unk_0A;		//
 	} InstrHeader;
-	//	ª@ª@ª
+	//	â†‘ã€€â†‘ã€€â†‘
 	uint16_t instrSectionSize;		// to do delete
 	uint8_t  numInstrs;				// to do delete
 	//-----------------------
