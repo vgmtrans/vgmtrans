@@ -1,6 +1,6 @@
 #pragma once
 
-double LinAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten);
+double LinAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten, int linearVolumeRange);
 
 uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal);
 uint8_t ConvertPercentAmpToStdMidiVal(double percent);

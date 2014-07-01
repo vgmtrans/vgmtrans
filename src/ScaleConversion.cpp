@@ -48,16 +48,12 @@
 
 // This next function converts seconds to full attenuation in a linear amplitude decay scale
 // and approximates the time to full attenuation in a linear DB decay scale.
-// It does this using the above technique of setting time to half vol as equal in both.
-double LinAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten)
+double LinAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten, int linearVolumeRange)
 {
-	// The percent amplitude at which we hit 10db (half vol) is 
-	// -20*log10(x) = 10db.
-	// x = 1 / sqrt(10) = 31.6228 %
-	// Take the seconds to full atten, and multiply it by (1 - .316) to get seconds
-	// to half vol.  Then multiply this by 10 to get linear DB seconds to 100db.
-	
-	return secondsToFullAtten * 5;//(1 - 0.316228) * 10.0;
+	double expMinDecibel = -100.0;
+	double linearMinDecibel = log10(1.0 / linearVolumeRange) * 20.0;
+	double linearToExpScale = log(linearMinDecibel - expMinDecibel) / log(2.0);
+	return secondsToFullAtten * linearToExpScale;
 }
 
 

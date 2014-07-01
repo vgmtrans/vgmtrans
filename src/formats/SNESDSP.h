@@ -223,7 +223,7 @@ template <class T> void SNESConvADSR(T* rgn, uint8_t adsr1, uint8_t adsr2, uint8
 		// decrease envelope by 8 for every sample
 		samples = (env + 7) / 8;
 		timeInSec = samples / 32000.0; // time for full value to 0
-		rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(timeInSec);
+		rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(timeInSec, 0x800);
 	}
 	else
 	{

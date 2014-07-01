@@ -308,7 +308,7 @@ bool QSoundInstr::LoadInstr()
 		ticks = Dr ? (0xFFFF / Dr) : 0;
 		rgn->decay_time = (Dr == 0xFFFF) ? 0 :ticks * QSOUND_TICK_FREQ;
 	}
-	rgn->decay_time = LinAmpDecayTimeToLinDBDecayTime(rgn->decay_time);
+	rgn->decay_time = LinAmpDecayTimeToLinDBDecayTime(rgn->decay_time, 0x800);
 
 	// Sustain level
 	//    if the Decay rate is 0, then the sustain level is effectively max
@@ -322,11 +322,11 @@ bool QSoundInstr::LoadInstr()
 	// Sustain rate 138D in sfa2
 	ticks = Sr ? 0xFFFF / Sr : 0;
 	rgn->sustain_time = (Sr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
-	rgn->sustain_time = LinAmpDecayTimeToLinDBDecayTime(rgn->sustain_time);
+	rgn->sustain_time = LinAmpDecayTimeToLinDBDecayTime(rgn->sustain_time, 0x800);
 
 	ticks = Rr ? 0xFFFF / Rr : 0;
 	rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
-	rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time);
+	rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0x800);
 
 	if (rgn->sampNum == 0xFFFF || rgn->sampNum >= ((QSoundInstrSet*)parInstrSet)->sampInfoTable->numSamples)
 		rgn->sampNum = 0;

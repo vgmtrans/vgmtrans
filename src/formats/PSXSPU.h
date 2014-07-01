@@ -276,7 +276,7 @@ template <class T> void PSXConvADSR(T* realADSR,
 
 			}
 			timeInSecs = samples / sampleRate;
-			realADSR->sustain_time = /*Sm ? timeInSecs : */LinAmpDecayTimeToLinDBDecayTime(timeInSecs);
+			realADSR->sustain_time = /*Sm ? timeInSecs : */LinAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
 		}
 	}
 
@@ -338,16 +338,16 @@ template <class T> void PSXConvADSR(T* realADSR,
 	//if (Rm == 0) // if it's linear
 	//	timeInSecs *=  LINEAR_RELEASE_COMPENSATION;
 
-	realADSR->release_time = /*Rm ? timeInSecs : */LinAmpDecayTimeToLinDBDecayTime(timeInSecs);
+	realADSR->release_time = /*Rm ? timeInSecs : */LinAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
 
 	// We need to compensate the decay and release times to represent them as the time from full vol to -100db 
 	// where the drop in db is a fixed amount per time unit (SoundFont2 spec for vol envelopes, pg44.)
 	//  We assume the psx envelope is using a linear scale wherein envelope_level / 2 == half loudness.  
 	//  For a linear release mode (Rm == 0), the time to reach half volume is simply half the time to reach 0.  
 	// Half perceived loudness is -10db. Therefore, time_to_half_vol * 10 == full_time * 5 == the correct SF2 time
-	//realADSR->decay_time = LinAmpDecayTimeToLinDBDecayTime(realADSR->decay_time);	
-	//realADSR->sustain_time = LinAmpDecayTimeToLinDBDecayTime(realADSR->sustain_time);
-	//realADSR->release_time = LinAmpDecayTimeToLinDBDecayTime(realADSR->release_time);
+	//realADSR->decay_time = LinAmpDecayTimeToLinDBDecayTime(realADSR->decay_time, 0x800);	
+	//realADSR->sustain_time = LinAmpDecayTimeToLinDBDecayTime(realADSR->sustain_time, 0x800);
+	//realADSR->release_time = LinAmpDecayTimeToLinDBDecayTime(realADSR->release_time, 0x800);
 
 
 
