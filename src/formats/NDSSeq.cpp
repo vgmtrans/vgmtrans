@@ -278,7 +278,7 @@ bool NDSTrack::ReadEvent(void)
 
 	case 0xC3: // [loveemu] (ex: Puyo Pop Fever 2: BGM00)
 		{
-			char transpose = (signed) GetByte(curOffset++);
+			int8_t transpose = (signed) GetByte(curOffset++);
 			AddTranspose(beginOffset, curOffset-beginOffset, transpose);
 //			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Transpose", NULL, BG_CLR_GREEN);
 		}

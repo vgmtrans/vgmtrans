@@ -546,7 +546,7 @@ bool QSoundTrack::ReadEvent(void)
 			break;
 		case 0x0A :					// Global Transpose
 			{
-				char globTranspose = GetByte(curOffset++);
+				int8_t globTranspose = GetByte(curOffset++);
 				AddGlobalTranspose(beginOffset, curOffset-beginOffset, globTranspose);
 			}
 			break;

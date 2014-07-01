@@ -54,24 +54,24 @@ public:
 	void AddHold(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Hold");
 	void AddUnknown(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Unknown Event", const wchar_t* sEventDesc = NULL);
 	
-	void AddNoteOn(uint32_t offset, uint32_t length, char key, char vel, const wchar_t* sEventName = L"Note On");
-	void AddNoteOnNoItem(char key, char vel);
-	void AddPercNoteOn(uint32_t offset, uint32_t length, char key, char vel, const wchar_t* sEventName = L"Percussion Note On");
-	void AddPercNoteOnNoItem(char key, char vel);
-	void InsertNoteOn(uint32_t offset, uint32_t length, char key, char vel, uint32_t absTime, const wchar_t* sEventName = L"Note On");
+	void AddNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const wchar_t* sEventName = L"Note On");
+	void AddNoteOnNoItem(int8_t key, int8_t vel);
+	void AddPercNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const wchar_t* sEventName = L"Percussion Note On");
+	void AddPercNoteOnNoItem(int8_t key, int8_t vel);
+	void InsertNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t absTime, const wchar_t* sEventName = L"Note On");
 
-	void AddNoteOff(uint32_t offset, uint32_t length, char key, const wchar_t* sEventName = L"Note Off");
-	void AddNoteOffNoItem(char key);
-	void AddPercNoteOff(uint32_t offset, uint32_t length, char key, const wchar_t* sEventName = L"Percussion Note Off");
-	void AddPercNoteOffNoItem(char key);
-	void InsertNoteOff(uint32_t offset, uint32_t length, char key, uint32_t absTime, const wchar_t* sEventName = L"Note Off");
+	void AddNoteOff(uint32_t offset, uint32_t length, int8_t key, const wchar_t* sEventName = L"Note Off");
+	void AddNoteOffNoItem(int8_t key);
+	void AddPercNoteOff(uint32_t offset, uint32_t length, int8_t key, const wchar_t* sEventName = L"Percussion Note Off");
+	void AddPercNoteOffNoItem(int8_t key);
+	void InsertNoteOff(uint32_t offset, uint32_t length, int8_t key, uint32_t absTime, const wchar_t* sEventName = L"Note Off");
 
-	void AddNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, const wchar_t* sEventName = L"Note with Duration");
-	void AddNoteByDurNoItem(char key, char vel, uint32_t dur);
-	void AddPercNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, const wchar_t* sEventName = L"Percussion Note with Duration");
-	void AddPercNoteByDurNoItem(char key, char vel, uint32_t dur);
-	//void AddNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, uint8_t chan, const wchar_t* sEventName = "Note On With Duration");
-	void InsertNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, uint32_t absTime, const wchar_t* sEventName = L"Note On With Duration");
+	void AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName = L"Note with Duration");
+	void AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
+	void AddPercNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName = L"Percussion Note with Duration");
+	void AddPercNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
+	//void AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint8_t chan, const wchar_t* sEventName = "Note On With Duration");
+	void InsertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint32_t absTime, const wchar_t* sEventName = L"Note On With Duration");
 
 	void MakePrevDurNoteEnd();
 	void AddVol(uint32_t offset, uint32_t length, uint8_t vol, const wchar_t* sEventName = L"Volume");
@@ -97,7 +97,7 @@ public:
 	void AddPitchBend(uint32_t offset, uint32_t length, int16_t bend, const wchar_t* sEventName = L"Pitch Bend");
 	void AddPitchBendRange(uint32_t offset, uint32_t length, uint8_t semitones, uint8_t cents = 0, const wchar_t* sEventName = L"Pitch Bend Range");
 	void AddPitchBendRangeNoItem(uint8_t range, uint8_t cents = 0);
-	void AddTranspose(uint32_t offset, uint32_t length, char transpose, const wchar_t* sEventName = L"Transpose");
+	void AddTranspose(uint32_t offset, uint32_t length, int8_t transpose, const wchar_t* sEventName = L"Transpose");
 	void AddPitchBendMidiFormat(uint32_t offset, uint32_t length, uint8_t lo, uint8_t hi, const wchar_t* sEventName = L"Pitch Bend");
 	void AddModulation(uint32_t offset, uint32_t length, uint8_t depth, const wchar_t* sEventName = L"Modulation Depth");
 	void InsertModulation(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const wchar_t* sEventName = L"Modulation Depth");
@@ -130,8 +130,8 @@ public:
 	bool AddEndOfTrack(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Track End");
 	bool AddEndOfTrackNoItem();
 
-	void AddGlobalTranspose(uint32_t offset, uint32_t length, char semitones, const wchar_t* sEventName = L"Global Transpose");
-	void AddMarker(uint32_t offset, uint32_t length, std::string& markername, uint8_t databyte1, uint8_t databyte2, const wchar_t* sEventName, char priority = 0, uint8_t color = CLR_MISC);
+	void AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const wchar_t* sEventName = L"Global Transpose");
+	void AddMarker(uint32_t offset, uint32_t length, std::string& markername, uint8_t databyte1, uint8_t databyte2, const wchar_t* sEventName, int8_t priority = 0, uint8_t color = CLR_MISC);
 
 	bool AddLoopForever(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Loop Forever");
 
@@ -155,8 +155,8 @@ public:
 
 	long time;				//absolute current time (ticks)
 	long deltaTime;			//delta time, an interval to the next event (ticks)
-	char vel;
-	char key;
+	int8_t vel;
+	int8_t key;
 	uint32_t dur;
 	uint8_t prevKey;
 	uint8_t prevVel;
@@ -167,16 +167,16 @@ public:
 	//uint8_t mastVol;
 	uint8_t prevPan;
 	uint8_t prevReverb;
-	char transpose;
+	int8_t transpose;
 	bool bNoteOn;			//indicates whether a note is playing
 	uint32_t curOffset;
 	bool bInLoop;
-	char cDrumNote;			//-1 signals do not use drumNote, otherwise,
+	int8_t cDrumNote;			//-1 signals do not use drumNote, otherwise,
 
 	wchar_t numberedName[10];
 
 	//Table Related Variables
-	char cKeyCorrection;	//steps to offset the key by
+	int8_t cKeyCorrection;	//steps to offset the key by
 
 
 	//CTypedPtrArray<CPtrArray, SeqEvent*> aEvents;

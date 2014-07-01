@@ -24,7 +24,7 @@ SynthFile::~SynthFile(void)
 	DeleteVect(vWaves);
 }
 
-SynthInstr* SynthFile::AddInstr(unsigned long bank, unsigned long instrNum)
+SynthInstr* SynthFile::AddInstr(uint32_t bank, uint32_t instrNum)
 {
 	stringstream str;
 	str << "Instr bnk" << bank << " num" << instrNum;
@@ -32,13 +32,13 @@ SynthInstr* SynthFile::AddInstr(unsigned long bank, unsigned long instrNum)
 	return vInstrs.back();
 }
 
-SynthInstr* SynthFile::AddInstr(unsigned long bank, unsigned long instrNum, string name)
+SynthInstr* SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, string name)
 {
 	vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, name));
 	return vInstrs.back();
 }
 
-void SynthFile::DeleteInstr(unsigned long bank, unsigned long instrNum)
+void SynthFile::DeleteInstr(uint32_t bank, uint32_t instrNum)
 {
 
 }

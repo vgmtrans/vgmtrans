@@ -426,7 +426,7 @@ bool NinSnesTrack::ReadEvent(uint32_t totalTime)
 			}
 			else							//Percussion Note
 			{
-				char mnote = /*-patchmap[*/status_byte-((NinSnesSeq*)vgmfile)->NOTE_CUTOFF;//+GetPercBase();];
+				int8_t mnote = /*-patchmap[*/status_byte-((NinSnesSeq*)vgmfile)->NOTE_CUTOFF;//+GetPercBase();];
 				//selectMsg.Format("Drum Num: %X", mnote);
 				//in this next line, we subtract globTranspose and transpose, because it is added by the AddNoteByDur function later, and we don't want them
 				AddPercNoteByDur(beginOffset, curOffset-beginOffset, mnote/*-transpose-parentSeq->globTranspose*/, vel, dur);
@@ -440,7 +440,7 @@ bool NinSnesTrack::ReadEvent(uint32_t totalTime)
 			{
 			case EVENT_PROGCHANGE:		//Program Change
 				{
-					char progNum = GetByte(curOffset++);
+					int8_t progNum = GetByte(curOffset++);
 					if (progNum < 0) //>= ((FZeroSeq*)parentSeq)->NOTEREST_CUTOFF)
 						progNum = progNum - ((NinSnesSeq*)vgmfile)->NOTE_CUTOFF + GetPercBase();
 					
@@ -517,7 +517,7 @@ bool NinSnesTrack::ReadEvent(uint32_t totalTime)
 				//((NinSnesSeq*)vgmfile)->globTranspose = GetByte(curOffset++);
 				//AddGenericEvent(beginOffset, curOffset-beginOffset, L"Global Transpose", NULL, BG_CLR_PINK);
 				{
-					char globTranspose = GetByte(curOffset++);
+					int8_t globTranspose = GetByte(curOffset++);
 					AddGlobalTranspose(beginOffset, curOffset-beginOffset, globTranspose);
 				}
 				

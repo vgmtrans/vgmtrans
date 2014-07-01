@@ -207,10 +207,10 @@ void SeqTrack::AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur
 		return;
 
 	double valInc = (double)((double)(targVal-prevVal)/(double)dur);
-	char newVal = -1;
+	int8_t newVal = -1;
 	for (unsigned int i=0; i<dur; i++)
 	{
-		char prevValInSlide = newVal;
+		int8_t prevValInSlide = newVal;
 		newVal=round(prevVal+(valInc*(i+1)));
 		//only create an event if the pan value has changed since the last iteration
 		if (prevValInSlide != newVal)
@@ -349,14 +349,14 @@ void SeqTrack::AddHold(uint32_t offset, uint32_t length, const wchar_t* sEventNa
 		AddEvent(new SeqEvent(this, offset, length, sEventName, CLR_TIE));
 }
 
-void SeqTrack::AddNoteOn(uint32_t offset, uint32_t length, char key, char vel, const wchar_t* sEventName)
+void SeqTrack::AddNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new NoteOnSeqEvent(this, key, vel, offset, length, sEventName));
 	AddNoteOnNoItem(key, vel);
 }
 
-void SeqTrack::AddNoteOnNoItem(char key, char vel)
+void SeqTrack::AddNoteOnNoItem(int8_t key, int8_t vel)
 {
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
@@ -377,11 +377,11 @@ void SeqTrack::AddNoteOnNoItem(char key, char vel)
 }
 
 
-void SeqTrack::AddPercNoteOn(uint32_t offset, uint32_t length, char key, char vel, const wchar_t* sEventName)
+void SeqTrack::AddPercNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const wchar_t* sEventName)
 {
 	uint8_t origChan = channel;
 	channel = 9;
-	char origDrumNote = cDrumNote;
+	int8_t origDrumNote = cDrumNote;
 	cDrumNote = -1;
 //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
 //	if (pDrumAssoc)
@@ -391,11 +391,11 @@ void SeqTrack::AddPercNoteOn(uint32_t offset, uint32_t length, char key, char ve
 	channel = origChan;
 }
 
-void SeqTrack::AddPercNoteOnNoItem(char key, char vel)
+void SeqTrack::AddPercNoteOnNoItem(int8_t key, int8_t vel)
 {
 	uint8_t origChan = channel;
 	channel = 9;
-	char origDrumNote = cDrumNote;
+	int8_t origDrumNote = cDrumNote;
 	cDrumNote = -1;
 //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
 //	if (pDrumAssoc)
@@ -405,7 +405,7 @@ void SeqTrack::AddPercNoteOnNoItem(char key, char vel)
 	channel = origChan;
 }
 
-void SeqTrack::InsertNoteOn(uint32_t offset, uint32_t length, char key, char vel, uint32_t absTime, const wchar_t* sEventName)
+void SeqTrack::InsertNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t absTime, const wchar_t* sEventName)
 {
 	uint8_t finalVel = vel;
 	if (parentSeq->bUseLinearAmplitudeScale)
@@ -419,14 +419,14 @@ void SeqTrack::InsertNoteOn(uint32_t offset, uint32_t length, char key, char vel
 	prevVel = vel;
 }
 
-void SeqTrack::AddNoteOff(uint32_t offset, uint32_t length, char key, const wchar_t* sEventName)
+void SeqTrack::AddNoteOff(uint32_t offset, uint32_t length, int8_t key, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new NoteOffSeqEvent(this, key, offset, length, sEventName));
 	AddNoteOffNoItem(key);
 }
 
-void SeqTrack::AddNoteOffNoItem(char key)
+void SeqTrack::AddNoteOffNoItem(int8_t key)
 {
 	if (readMode != READMODE_CONVERT_TO_MIDI)
 		return;
@@ -439,11 +439,11 @@ void SeqTrack::AddNoteOffNoItem(char key)
 }
 
 
-void SeqTrack::AddPercNoteOff(uint32_t offset, uint32_t length, char key,const wchar_t* sEventName)
+void SeqTrack::AddPercNoteOff(uint32_t offset, uint32_t length, int8_t key,const wchar_t* sEventName)
 {
 	uint8_t origChan = channel;
 	channel = 9;
-	char origDrumNote = cDrumNote;
+	int8_t origDrumNote = cDrumNote;
 	cDrumNote = -1;
 //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
 //	if (pDrumAssoc)
@@ -453,11 +453,11 @@ void SeqTrack::AddPercNoteOff(uint32_t offset, uint32_t length, char key,const w
 	channel = origChan;
 }
 
-void SeqTrack::AddPercNoteOffNoItem(char key)
+void SeqTrack::AddPercNoteOffNoItem(int8_t key)
 {
 	uint8_t origChan = channel;
 	channel = 9;
-	char origDrumNote = cDrumNote;
+	int8_t origDrumNote = cDrumNote;
 	cDrumNote = -1;
 //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
 //	if (pDrumAssoc)
@@ -467,7 +467,7 @@ void SeqTrack::AddPercNoteOffNoItem(char key)
 	channel = origChan;
 }
 
-void SeqTrack::InsertNoteOff(uint32_t offset, uint32_t length, char key, uint32_t absTime, const wchar_t* sEventName)
+void SeqTrack::InsertNoteOff(uint32_t offset, uint32_t length, int8_t key, uint32_t absTime, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new NoteOffSeqEvent(this, key, offset, length, sEventName));
@@ -475,14 +475,14 @@ void SeqTrack::InsertNoteOff(uint32_t offset, uint32_t length, char key, uint32_
 		pMidiTrack->InsertNoteOff(channel, key+cKeyCorrection+transpose, absTime);
 }
 
-void SeqTrack::AddNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, const wchar_t* sEventName)
+void SeqTrack::AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new DurNoteSeqEvent(this, key, vel, dur, offset, length, sEventName));
 	AddNoteByDurNoItem(key, vel, dur);
 }
 
-void SeqTrack::AddNoteByDurNoItem(char key, char vel, uint32_t dur)
+void SeqTrack::AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur)
 {
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
@@ -502,11 +502,11 @@ void SeqTrack::AddNoteByDurNoItem(char key, char vel, uint32_t dur)
 	return;
 }
 
-void SeqTrack::AddPercNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, const wchar_t* sEventName)
+void SeqTrack::AddPercNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName)
 {
 	uint8_t origChan = channel;
 	channel = 9;
-	char origDrumNote = cDrumNote;
+	int8_t origDrumNote = cDrumNote;
 	cDrumNote = -1;
 //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
 //	if (pDrumAssoc)
@@ -516,11 +516,11 @@ void SeqTrack::AddPercNoteByDur(uint32_t offset, uint32_t length, char key, char
 	channel = origChan;
 }
 
-void SeqTrack::AddPercNoteByDurNoItem(char key, char vel, uint32_t dur)
+void SeqTrack::AddPercNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur)
 {
 	uint8_t origChan = channel;
 	channel = 9;
-	char origDrumNote = cDrumNote;
+	int8_t origDrumNote = cDrumNote;
 	cDrumNote = -1;
 //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
 //	if (pDrumAssoc)
@@ -530,7 +530,7 @@ void SeqTrack::AddPercNoteByDurNoItem(char key, char vel, uint32_t dur)
 	channel = origChan;
 }
 
-/*void SeqTrack::AddNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, uint8_t chan, const wchar_t* sEventName)
+/*void SeqTrack::AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint8_t chan, const wchar_t* sEventName)
 {
 	uint8_t origChan = channel;
 	channel = chan;
@@ -538,7 +538,7 @@ void SeqTrack::AddPercNoteByDurNoItem(char key, char vel, uint32_t dur)
 	channel = origChan;
 }*/
 
-void SeqTrack::InsertNoteByDur(uint32_t offset, uint32_t length, char key, char vel, uint32_t dur, uint32_t absTime, const wchar_t* sEventName)
+void SeqTrack::InsertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint32_t absTime, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
@@ -747,7 +747,7 @@ void SeqTrack::AddPitchBendRangeNoItem(uint8_t semitones, uint8_t cents)
 		pMidiTrack->AddPitchBendRange(channel, semitones, cents);
 }
 
-void SeqTrack::AddTranspose(uint32_t offset, uint32_t length, char theTranspose, const wchar_t* sEventName)
+void SeqTrack::AddTranspose(uint32_t offset, uint32_t length, int8_t theTranspose, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new TransposeSeqEvent(this, transpose, offset, length, sEventName));
@@ -843,11 +843,11 @@ void SeqTrack::InsertPortamentoTime(uint32_t offset, uint32_t length, uint8_t ti
 
 
 
-/*void InsertNoteOnEvent(char key, char vel, uint32_t absTime);
-void AddNoteOffEvent(char key);
-void InsertNoteOffEvent(char key, char vel, uint32_t absTime);
-void AddNoteByDur(char key, char vel);
-void InsertNoteByDur(char key, char vel, uint32_t absTime);
+/*void InsertNoteOnEvent(int8_t key, int8_t vel, uint32_t absTime);
+void AddNoteOffEvent(int8_t key);
+void InsertNoteOffEvent(int8_t key, int8_t vel, uint32_t absTime);
+void AddNoteByDur(int8_t key, int8_t vel);
+void InsertNoteByDur(int8_t key, int8_t vel, uint32_t absTime);
 void AddVolumeEvent(uint8_t vol);
 void InsertVolumeEvent(uint8_t vol, uint32_t absTime);
 void AddExpression(uint8_t expression);
@@ -1027,7 +1027,7 @@ bool SeqTrack::AddEndOfTrackNoItem()
 	return false;
 }
 
-void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, char semitones, const wchar_t* sEventName)
+void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new TransposeSeqEvent(this, semitones, offset, length, sEventName));
@@ -1037,7 +1037,7 @@ void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, char semiton
 }
 
 void SeqTrack::AddMarker(uint32_t offset, uint32_t length, string& markername, uint8_t databyte1, uint8_t databyte2,
-						 const wchar_t* sEventName, char priority, uint8_t color)
+						 const wchar_t* sEventName, int8_t priority, uint8_t color)
 {
 	if (!IsOffsetUsed(offset))
 		AddEvent(new MarkerSeqEvent(this, markername, databyte1, databyte2, offset, length, sEventName, color));

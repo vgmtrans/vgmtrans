@@ -377,7 +377,7 @@ bool AkaoTrack::ReadEvent(void)
 
 	 case 0xC0 :
 		 {
-			char cTranspose = GetByte(curOffset++);
+			int8_t cTranspose = GetByte(curOffset++);
 			AddTranspose(beginOffset, curOffset-beginOffset,cTranspose);
 		 }
 		 break;

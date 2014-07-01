@@ -236,7 +236,7 @@ void MidiTrack::ResetDelta(void)
 }
 
 
-void MidiTrack::AddNoteOn(uint8_t channel, char key, char vel)
+void MidiTrack::AddNoteOn(uint8_t channel, int8_t key, int8_t vel)
 {
 	aEvents.push_back(new NoteEvent(this, channel, GetDelta(), true, key, vel));
 
@@ -250,42 +250,42 @@ void MidiTrack::AddNoteOn(uint8_t channel, char key, char vel)
 	//rest_time = 0;
 }
 
-void MidiTrack::InsertNoteOn(uint8_t channel, char key, char vel, uint32_t absTime)
+void MidiTrack::InsertNoteOn(uint8_t channel, int8_t key, int8_t vel, uint32_t absTime)
 {
 	aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));
 }
 
-void MidiTrack::AddNoteOff(uint8_t channel, char key)
+void MidiTrack::AddNoteOff(uint8_t channel, int8_t key)
 {
 	aEvents.push_back(new NoteEvent(this, channel, GetDelta(), false, key));
 }
 
-void MidiTrack::InsertNoteOff(uint8_t channel, char key, uint32_t absTime)
+void MidiTrack::InsertNoteOff(uint8_t channel, int8_t key, uint32_t absTime)
 {
 	aEvents.push_back(new NoteEvent(this, channel, absTime, false, key));
 }
 
-void MidiTrack::AddNoteByDur(uint8_t channel, char key, char vel, uint32_t duration)
+void MidiTrack::AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration)
 {
 	aEvents.push_back(new NoteEvent(this, channel, GetDelta(), true, key, vel));		//add note on
 	prevDurNoteOff = new NoteEvent(this, channel, GetDelta()+duration, false, key);
 	aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
 }
 
-void MidiTrack::InsertNoteByDur(uint8_t channel, char key, char vel, uint32_t duration, uint32_t absTime)
+void MidiTrack::InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime)
 {
 	aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));		//add note on
 	prevDurNoteOff = new NoteEvent(this, channel, absTime+duration, false, key);
 	aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
 }
 
-/*void MidiTrack::AddVolMarker(uint8_t channel, uint8_t vol, char priority)
+/*void MidiTrack::AddVolMarker(uint8_t channel, uint8_t vol, int8_t priority)
 {
 	MidiEvent* newEvent = new VolMarkerEvent(this, channel, GetDelta(), vol);
 	aEvents.push_back(newEvent);
 }
 
-void MidiTrack::InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, char priority)
+void MidiTrack::InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, int8_t priority)
 {
 	MidiEvent* newEvent = new VolMarkerEvent(this, channel, absTime, vol);
 	aEvents.push_back(newEvent);
@@ -531,19 +531,19 @@ void MidiTrack::InsertTrackName(const wchar_t* wstr, uint32_t absTime)
 // Transpose events offset the key when we write the Midi file.
 //  used to implement global transpose events found in QSound
 
-//void MidiTrack::AddTranspose(char semitones)
+//void MidiTrack::AddTranspose(int8_t semitones)
 //{
 //	aEvents.push_back(new TransposeEvent(this, GetDelta(), semitones));
 //}
 
-void MidiTrack::InsertGlobalTranspose(uint32_t absTime, char semitones)
+void MidiTrack::InsertGlobalTranspose(uint32_t absTime, int8_t semitones)
 {
 	aEvents.push_back(new GlobalTransposeEvent(this, absTime, semitones));
 }
 
 
 
-void MidiTrack::AddMarker(uint8_t channel, string& markername, uint8_t databyte1, uint8_t databyte2, char priority)
+void MidiTrack::AddMarker(uint8_t channel, string& markername, uint8_t databyte1, uint8_t databyte2, int8_t priority)
 {
 	aEvents.push_back(new MarkerEvent(this, channel, GetDelta(), markername, databyte1, databyte2, priority));
 }
@@ -554,7 +554,7 @@ void MidiTrack::AddMarker(uint8_t channel, string& markername, uint8_t databyte1
 //  MidiEvent
 //  *********
 
-MidiEvent::MidiEvent(MidiTrack* thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, char thePriority)
+MidiEvent::MidiEvent(MidiTrack* thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, int8_t thePriority)
 : prntTrk(thePrntTrk), AbsTime(absoluteTime), channel(theChannel), priority(thePriority)
 {
 }
@@ -703,7 +703,7 @@ DurNoteEvent* DurNoteEvent::MakeCopy()
 //  VolEvent
 //  ********
 
-/*VolEvent::VolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theVol, char thePriority)
+/*VolEvent::VolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theVol, int8_t thePriority)
 : ControllerEvent(prntTrk, channel, absoluteTime, 7), vol(theVol)
 {
 }
@@ -733,7 +733,7 @@ uint32_t MastVolEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 //  ControllerEvent
 //  ***************
 
-ControllerEvent::ControllerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t controllerNum, uint8_t theDataByte, char thePriority)
+ControllerEvent::ControllerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t controllerNum, uint8_t theDataByte, int8_t thePriority)
 : MidiEvent(prntTrk, absoluteTime, channel, thePriority), controlNum(controllerNum), dataByte(theDataByte)
 {
 }
@@ -991,7 +991,7 @@ void MidiTrack::InsertXGReset(uint32_t absTime)
 //  **************
 
 
-GlobalTransposeEvent::GlobalTransposeEvent( MidiTrack* prntTrk, uint32_t absoluteTime, char theSemitones )
+GlobalTransposeEvent::GlobalTransposeEvent( MidiTrack* prntTrk, uint32_t absoluteTime, int8_t theSemitones )
 	: MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST)
 {
 	semitones = theSemitones;

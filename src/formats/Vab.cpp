@@ -215,7 +215,7 @@ VabInstr::~VabInstr(void)
 
 bool VabInstr::LoadInstr()
 {
-	char numRgns = attr.tones;
+	int8_t numRgns = attr.tones;
 	for (int i = 0; i < numRgns; i++)
 	{
 		VabRgn* rgn = new VabRgn(this, dwOffset+i*0x20);
@@ -283,7 +283,7 @@ bool VabRgn::LoadRgn()
 	if (keyLow > keyHigh)
 		return false;
 
-	//signed char ft = (signed char)GetByte(dwOffset+5);
+	//int8_t ft = (signed char)GetByte(dwOffset+5);
 	//
 	//double cents = (double)ft;//((double)ft/(double)127) * 100.0;
 	
@@ -301,9 +301,9 @@ bool VabRgn::LoadRgn()
 	// If it exceeds 127, driver clips the value and it will become 127. (In Hokuto no Ken, at least)
 	// I am not sure if the interpretation of this value depends on a driver or VAB version.
 	// The following code takes the byte as signed, since it could be a typical extended implementation.
-	signed char ft = (signed char) GetByte(dwOffset + 5);
+	int8_t ft = (int8_t) GetByte(dwOffset + 5);
 	double cents = ft * 100.0 / 128.0;
-	SetFineTune((short)cents);
+	SetFineTune((int16_t)cents);
 
 	PSXConvADSR<VabRgn>(this, ADSR1, ADSR2, false);
 	return true;

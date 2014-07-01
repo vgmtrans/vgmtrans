@@ -71,18 +71,18 @@ public:
 	void SubtractDelta(uint32_t SubtractDelta);
 	void ResetDelta(void);
 
-	void AddNoteOn(uint8_t channel, char key, char vel);
-	void InsertNoteOn(uint8_t channel, char key, char vel, uint32_t absTime);
-	void AddNoteOff(uint8_t channel, char key);
-	void InsertNoteOff(uint8_t channel, char key, uint32_t absTime);
-	void AddNoteByDur(uint8_t channel, char key, char vel, uint32_t duration);
-	void InsertNoteByDur(uint8_t channel, char key, char vel, uint32_t duration, uint32_t absTime);
-	//void AddVolMarker(uint8_t channel, uint8_t vol, char priority = PRIORITY_HIGHER);
-	//void InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, char priority = PRIORITY_HIGHER);
-	void AddVol(uint8_t channel, uint8_t vol/*, char priority = PRIORITY_MIDDLE*/);
-	void InsertVol(uint8_t channel, uint8_t vol, uint32_t absTime/*, char priority = PRIORITY_MIDDLE*/);
-	void AddMasterVol(uint8_t channel, uint8_t mastVol/*, char priority = PRIORITY_HIGHER*/);
-	void InsertMasterVol(uint8_t channel, uint8_t mastVol, uint32_t absTime/*, char priority = PRIORITY_HIGHER*/);
+	void AddNoteOn(uint8_t channel, int8_t key, int8_t vel);
+	void InsertNoteOn(uint8_t channel, int8_t key, int8_t vel, uint32_t absTime);
+	void AddNoteOff(uint8_t channel, int8_t key);
+	void InsertNoteOff(uint8_t channel, int8_t key, uint32_t absTime);
+	void AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
+	void InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime);
+	//void AddVolMarker(uint8_t channel, uint8_t vol, int8_t priority = PRIORITY_HIGHER);
+	//void InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, int8_t priority = PRIORITY_HIGHER);
+	void AddVol(uint8_t channel, uint8_t vol/*, int8_t priority = PRIORITY_MIDDLE*/);
+	void InsertVol(uint8_t channel, uint8_t vol, uint32_t absTime/*, int8_t priority = PRIORITY_MIDDLE*/);
+	void AddMasterVol(uint8_t channel, uint8_t mastVol/*, int8_t priority = PRIORITY_HIGHER*/);
+	void InsertMasterVol(uint8_t channel, uint8_t mastVol, uint32_t absTime/*, int8_t priority = PRIORITY_HIGHER*/);
 	void AddPan(uint8_t channel, uint8_t pan);
 	void InsertPan(uint8_t channel, uint8_t pan, uint32_t absTime);
 	void AddExpression(uint8_t channel, uint8_t expression);
@@ -134,9 +134,9 @@ public:
 	void InsertXGReset(uint32_t absTime);
 
 	// SPECIAL EVENTS
-	//void AddTranspose(char semitones);
-	void InsertGlobalTranspose(uint32_t absTime, char semitones);
-	void AddMarker(uint8_t channel, std::string& markername, uint8_t databyte1, uint8_t databyte2, char priority = PRIORITY_MIDDLE);
+	//void AddTranspose(int8_t semitones);
+	void InsertGlobalTranspose(uint32_t absTime, int8_t semitones);
+	void AddMarker(uint8_t channel, std::string& markername, uint8_t databyte1, uint8_t databyte2, int8_t priority = PRIORITY_MIDDLE);
 
 public:
 	MidiFile* parentSeq;
@@ -149,7 +149,7 @@ public:
 
 	DurNoteEvent* prevDurEvent;
 	NoteEvent* prevDurNoteOff;
-	char prevKey;
+	int8_t prevKey;
 	//uint8_t mastVol;
 	//uint8_t vol;
 	//uint8_t expression;
@@ -182,14 +182,14 @@ public:
 
 	std::vector<MidiTrack*> aTracks;
 	MidiTrack globalTrack;			//events in the globalTrack will be copied into every other track
-	char globalTranspose;
+	int8_t globalTranspose;
 	bool bMonophonicTracks;
 };
 
 class MidiEvent
 {
 public:
-	MidiEvent(MidiTrack* thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, char thePriority);
+	MidiEvent(MidiTrack* thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, int8_t thePriority);
 	virtual ~MidiEvent(void);
 	virtual MidiEventType GetEventType() = 0;
 	void WriteVarLength(std::vector<uint8_t> & buf, uint32_t value);
@@ -203,7 +203,7 @@ public:
 	bool operator>(const MidiEvent &) const;
 
 	MidiTrack* prntTrk;
-	char priority;
+	int8_t priority;
 	uint8_t channel;
 	uint32_t AbsTime;			//absolute time... the number of ticks from the very beginning of the sequence at which this event occurs
 };
@@ -236,8 +236,8 @@ public:
 
 	bool bNoteDown;
 	bool bUsePrevKey;
-	char key;
-	char vel;
+	int8_t key;
+	int8_t vel;
 };
 
 //class DurNoteEvent
@@ -249,8 +249,8 @@ public:
 //	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 //
 //	bool bNoteDown;
-//	char key;
-//	char vel;
+//	int8_t key;
+//	int8_t vel;
 //	uint32_t duration;
 //};
 
@@ -258,7 +258,7 @@ class ControllerEvent
 	: public MidiEvent
 {
 public:
-	ControllerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t controllerNum, uint8_t theDataByte, char thePriority = PRIORITY_MIDDLE);
+	ControllerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t controllerNum, uint8_t theDataByte, int8_t thePriority = PRIORITY_MIDDLE);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_UNDEFINED; }
 	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 
@@ -371,7 +371,7 @@ class VolEvent
 	: public ControllerEvent
 {
 public:
-	VolEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theVol, char thePriority = PRIORITY_MIDDLE);
+	VolEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theVol, int8_t thePriority = PRIORITY_MIDDLE);
 	virtual VolEvent* MakeCopy();
 	//virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 
@@ -382,7 +382,7 @@ class VolMarkerEvent
 	: public MidiEvent
 {
 public:
-	VolMarkerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theVol, char thePriority = PRIORITY_HIGHER);
+	VolMarkerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theVol, int8_t thePriority = PRIORITY_HIGHER);
 	virtual VolMarkerEvent* MakeCopy();
 	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 
@@ -405,7 +405,7 @@ class ExpressionEvent
 	: public MidiEvent
 {
 public:
-	ExpressionEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t expression, char thePriority = PRIORITY_HIGHER);
+	ExpressionEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t expression, int8_t thePriority = PRIORITY_HIGHER);
 	virtual ExpressionEvent* MakeCopy();
 	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 
@@ -511,18 +511,18 @@ class GlobalTransposeEvent
 	: public MidiEvent
 {
 public:
-	GlobalTransposeEvent(MidiTrack* prntTrk, uint32_t absoluteTime, char semitones);
+	GlobalTransposeEvent(MidiTrack* prntTrk, uint32_t absoluteTime, int8_t semitones);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_GLOBALTRANSPOSE; }
 	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 
-	char semitones;
+	int8_t semitones;
 };
 
 class MarkerEvent
 	: public MidiEvent
 {
 public:
-	MarkerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, std::string& name, uint8_t databyte1, uint8_t databyte2, char thePriority = PRIORITY_MIDDLE)
+	MarkerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, std::string& name, uint8_t databyte1, uint8_t databyte2, int8_t thePriority = PRIORITY_MIDDLE)
 		: MidiEvent(prntTrk, absoluteTime, channel, thePriority), name(name), databyte1(databyte1), databyte2(databyte2)
 	{}
 	virtual MidiEventType GetEventType() { return MIDIEVENT_MARKER; }
@@ -587,8 +587,8 @@ public:
 	NoteEvent(void);
 	~NoteEvent(void);
 
-	char key;
-	char vel;
+	int8_t key;
+	int8_t vel;
 };*/
 
 /*class AFX_EXT_CLASS NoteEventDur
@@ -598,6 +598,6 @@ public:
 	NoteEvent(void);
 	~NoteEvent(void);
 
-	char key;
-	char vel;
+	int8_t key;
+	int8_t vel;
 }*/

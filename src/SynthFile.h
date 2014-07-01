@@ -24,9 +24,9 @@ public:
 	SynthFile(const std::string synth_name = "Instrument Set");
 	~SynthFile(void);
 
-	SynthInstr* AddInstr(unsigned long bank, unsigned long instrNum);
-	SynthInstr* AddInstr(unsigned long bank, unsigned long instrNum, std::string Name);
-	void DeleteInstr(unsigned long bank, unsigned long instrNum);
+	SynthInstr* AddInstr(uint32_t bank, uint32_t instrNum);
+	SynthInstr* AddInstr(uint32_t bank, uint32_t instrNum, std::string Name);
+	void DeleteInstr(uint32_t bank, uint32_t instrNum);
 	SynthWave* AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
 					 uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t* waveData,
 					 std::string name = "Unnamed Wave");
@@ -124,20 +124,20 @@ class SynthSampInfo
 {
 public:
 	SynthSampInfo(void) {}
-	SynthSampInfo(uint16_t unityNote, int16_t fineTune, double atten, char sampleLoops, uint32_t loopType, uint32_t loopStart, uint32_t loopLength)
+	SynthSampInfo(uint16_t unityNote, int16_t fineTune, double atten, int8_t sampleLoops, uint32_t loopType, uint32_t loopStart, uint32_t loopLength)
 		: usUnityNote(unityNote), sFineTune(fineTune), attenuation(atten), cSampleLoops(sampleLoops), ulLoopType(loopType),
 		ulLoopStart(loopStart), ulLoopLength(loopLength) {}
 	~SynthSampInfo(void) {}
 
 	void SetLoopInfo(Loop& loop, VGMSamp* samp);
-	//void SetPitchInfo(uint16_t unityNote, short fineTune, double attenuation);
-	void SetPitchInfo(uint16_t unityNote, short fineTune, double attenuation);
+	//void SetPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
+	void SetPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
 
 public:
-	unsigned short usUnityNote;
-	short sFineTune;
+	uint16_t usUnityNote;
+	int16_t sFineTune;
 	double attenuation;	// in decibels.
-	char cSampleLoops;
+	int8_t cSampleLoops;
 
 	uint32_t ulLoopType;
 	uint32_t ulLoopStart;
@@ -155,7 +155,7 @@ public:
 		RiffFile::AlignName(name); 
 	}
 	SynthWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec, uint16_t blockAlign,
-		uint16_t bitsPerSample, uint32_t waveDataSize, unsigned char* waveData, std::string waveName = "Untitled Wave")
+		uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t* waveData, std::string waveName = "Untitled Wave")
 		: wFormatTag(formatTag),
 		  wChannels(channels),
 		  dwSamplesPerSec(samplesPerSec),
@@ -178,15 +178,15 @@ public:
 public:
 	SynthSampInfo* sampinfo;
 
-	unsigned short wFormatTag;
-	unsigned short wChannels;
+	uint16_t wFormatTag;
+	uint16_t wChannels;
 	uint32_t dwSamplesPerSec;
 	uint32_t dwAveBytesPerSec;
-	unsigned short wBlockAlign;
-	unsigned short wBitsPerSample;
+	uint16_t wBlockAlign;
+	uint16_t wBitsPerSample;
 
-	unsigned long dataSize;
-	unsigned char* data;
+	uint32_t dataSize;
+	uint8_t* data;
 
 	std::string name;
 };

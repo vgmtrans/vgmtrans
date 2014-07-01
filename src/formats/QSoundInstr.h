@@ -210,13 +210,13 @@ protected:
 //	//virtual int OnSelected(void);
 //
 //public:
-//	unsigned short ADSR1;				//raw ps2 ADSR1 value (articulation data)
-//	unsigned short ADSR2;				//raw ps2 ADSR2 value (articulation data)
-//	unsigned char bStereoRegion;
-//	unsigned char StereoPairOrder;
-//	unsigned char bFirstRegion;
-//	unsigned char bLastRegion;
-//	unsigned char bUnknownFlag2;
+//	uint16_t ADSR1;				//raw ps2 ADSR1 value (articulation data)
+//	uint16_t ADSR2;				//raw ps2 ADSR2 value (articulation data)
+//	uint8_t bStereoRegion;
+//	uint8_t StereoPairOrder;
+//	uint8_t bFirstRegion;
+//	uint8_t bLastRegion;
+//	uint8_t bUnknownFlag2;
 //	uint32_t sample_offset;
 //};
 

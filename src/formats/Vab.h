@@ -6,61 +6,61 @@
 //VAB Header
 struct VabHdr
 {
-	long form; /*always "VABp"*/
-	long ver; /*format version number*/
-	long id; /*bank ID*/
-	unsigned long fsize; /*file size*/
-	unsigned short reserved0; /*system reserved*/
-	unsigned short ps; /*total number of programs in this bank*/
-	unsigned short ts; /*total number of effective tones*/
-	unsigned short vs; /*number of waveforms (VAG)*/
-	unsigned char mvol; /*master volume*/
-	unsigned char pan; /*master pan*/
-	unsigned char attr1; /*bank attribute*/
-	unsigned char attr2; /*bank attribute*/
-	unsigned long reserved1; /*system reserved*/
+	int32_t form; /*always "VABp"*/
+	int32_t ver; /*format version number*/
+	int32_t id; /*bank ID*/
+	uint32_t fsize; /*file size*/
+	uint16_t reserved0; /*system reserved*/
+	uint16_t ps; /*total number of programs in this bank*/
+	uint16_t ts; /*total number of effective tones*/
+	uint16_t vs; /*number of waveforms (VAG)*/
+	uint8_t mvol; /*master volume*/
+	uint8_t pan; /*master pan*/
+	uint8_t attr1; /*bank attribute*/
+	uint8_t attr2; /*bank attribute*/
+	uint32_t reserved1; /*system reserved*/
 };
 
 
 //Program Attributes
 struct ProgAtr 
 {
-	unsigned char tones; /*number of effective tones which compose the program*/
-	unsigned char mvol; /*program volume*/
-	unsigned char prior; /*program priority*/
-	unsigned char mode; /*program mode*/
-	unsigned char mpan; /*program pan*/
-	char reserved0; /*system reserved*/
-	short attr; /*program attribute*/
-	unsigned long reserved1; /*system reserved*/
-	unsigned long reserved2; /*system reserved*/
+	uint8_t tones; /*number of effective tones which compose the program*/
+	uint8_t mvol; /*program volume*/
+	uint8_t prior; /*program priority*/
+	uint8_t mode; /*program mode*/
+	uint8_t mpan; /*program pan*/
+	int8_t reserved0; /*system reserved*/
+	int16_t attr; /*program attribute*/
+	uint32_t reserved1; /*system reserved*/
+	uint32_t reserved2; /*system reserved*/
 };
 
 
 //Tone Attributes
 struct VagAtr
 {
-	unsigned char prior; /*tone priority (0 - 127); used for controlling allocation when more voices than can be keyed on are requested*/
-	unsigned char mode; /*tone mode (0 = normal; 4 = reverb applied */
-	unsigned char vol; /*tone volume*/
-	unsigned char pan; /*tone pan*/
-	unsigned char center; /*center note (0~127)*/
-	unsigned char shift; /*pitch correction (0~127,cent units)*/
-	unsigned char min; /*minimum note limit (0~127)*/
-	unsigned char max; /*maximum note limit (0~127, provided min < max)*/
-	unsigned char vibW; /*vibrato width (1/128 rate,0~127)*/
-	unsigned char vibT; /*1 cycle time of vibrato (tick units)*/
-	unsigned char porW; /*portamento width (1/128 rate, 0~127)*/
-	unsigned char porT; /*portamento holding time (tick units)*/
-	unsigned char pbmin; /*pitch bend (-0~127, 127 = 1 octave)*/
-	unsigned char pbmax; /*pitch bend (+0~127, 127 = 1 octave)*/
-	unsigned char reserved1; /*system reserved*/
-	unsigned char reserved2; /*system reserved*/
-	unsigned short adsr1; /*ADSR1*/
-	unsigned short adsr2; /*ADSR2*/
-	short prog; /*parent program*/
-	short vag; /*waveform (VAG) used*/
-	short reserved[4]; /*system reserved*/
+	uint8_t prior; /*tone priority (0 - 127); used for controlling allocation when more voices than can be keyed on are requested*/
+	uint8_t mode; /*tone mode (0 = normal; 4 = reverb applied */
+	uint8_t vol; /*tone volume*/
+	uint8_t pan; /*tone pan*/
+	uint8_t center; /*center note (0~127)*/
+	uint8_t shift; /*pitch correction (0~127,cent units)*/
+	uint8_t min; /*minimum note limit (0~127)*/
+	uint8_t max; /*maximum note limit (0~127, provided min < max)*/
+	uint8_t vibW; /*vibrato width (1/128 rate,0~127)*/
+	uint8_t vibT; /*1 cycle time of vibrato (tick units)*/
+	uint8_t porW; /*portamento width (1/128 rate, 0~127)*/
+	uint8_t porT; /*portamento holding time (tick units)*/
+	uint8_t pbmin; /*pitch bend (-0~127, 127 = 1 octave)*/
+	uint8_t pbmax; /*pitch bend (+0~127, 127 = 1 octave)*/
+	uint8_t reserved1; /*system reserved*/
+	uint8_t reserved2; /*system reserved*/
+	uint16_t adsr1; /*ADSR1*/
+	uint16_t adsr2; /*ADSR2*/
+	int16_t prog; /*parent program*/
+	int16_t vag; /*waveform (VAG) used*/
+	int16_t reserved[4]; /*system reserved*/
 };
 
 
@@ -114,13 +114,13 @@ public:
 	virtual bool LoadRgn();
 
 public:
-	unsigned short ADSR1;				//raw ps2 ADSR1 value (articulation data)
-	unsigned short ADSR2;				//raw ps2 ADSR2 value (articulation data)
-	unsigned char bStereoRegion;
-	unsigned char StereoPairOrder;
-	unsigned char bFirstRegion;
-	unsigned char bLastRegion;
-	unsigned char bUnknownFlag2;
+	uint16_t ADSR1;				//raw ps2 ADSR1 value (articulation data)
+	uint16_t ADSR2;				//raw ps2 ADSR2 value (articulation data)
+	uint8_t bStereoRegion;
+	uint8_t StereoPairOrder;
+	uint8_t bFirstRegion;
+	uint8_t bLastRegion;
+	uint8_t bUnknownFlag2;
 	uint32_t sample_offset;
 
 	VagAtr attr;
