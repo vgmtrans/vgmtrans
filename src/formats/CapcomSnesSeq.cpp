@@ -95,7 +95,7 @@ void CapcomSnesSeq::LoadEventMap(CapcomSnesSeq *pSeqFile)
 	pSeqFile->EventMap[0x07] = EVENT_VOLUME;
 	pSeqFile->EventMap[0x08] = EVENT_PROGRAM_CHANGE;
 	pSeqFile->EventMap[0x09] = EVENT_OCTAVE;
-	pSeqFile->EventMap[0x0a] = EVENT_MASTER_TRANSPOSE;
+	pSeqFile->EventMap[0x0a] = EVENT_GLOBAL_TRANSPOSE;
 	pSeqFile->EventMap[0x0b] = EVENT_TRANSPOSE;
 	pSeqFile->EventMap[0x0c] = EVENT_TUNING;
 	pSeqFile->EventMap[0x0d] = EVENT_PORTAMENTO_TIME;
@@ -505,14 +505,10 @@ bool CapcomSnesTrack::ReadEvent(void)
 			break;
 		}
 
-		case EVENT_MASTER_TRANSPOSE:
+		case EVENT_GLOBAL_TRANSPOSE:
 		{
-			// TODO: master transpose
 			int8_t newTranspose = GetByte(curOffset++);
-			desc << L"Key: " << (int)newTranspose;
-			EVENT_WITH_MIDITEXT_START
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Master Transpose", desc.str().c_str(), CLR_TRANSPOSE, ICON_CONTROL);
-			EVENT_WITH_MIDITEXT_END
+			AddGlobalTranspose(beginOffset, curOffset-beginOffset, newTranspose);
 			break;
 		}
 
