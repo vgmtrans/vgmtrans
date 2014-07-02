@@ -46,6 +46,7 @@ void CapcomSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
 
+	midiReverb = 40;
 	transpose = 0;
 }
 
@@ -162,6 +163,7 @@ bool CapcomSnesTrack::LoadTrackInit(uint32_t trackNum)
 	if (!SeqTrack::LoadTrackInit(trackNum))
 		return false;
 
+	AddReverbNoItem(0);
 	return true;
 }
 
@@ -728,11 +730,16 @@ bool CapcomSnesTrack::ReadEvent(void)
 
 		case EVENT_ECHO_ONOFF:
 		{
-			// TODO: write echo as reverb
 			bool echoOn = (GetByte(curOffset++) & 1) != 0;
-			desc << L"Echo: " << (echoOn ? L"On" : L"Off");
 			EVENT_WITH_MIDITEXT_START
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo On/Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+			if (echoOn)
+			{
+				AddReverb(beginOffset, curOffset-beginOffset, parentSeq->midiReverb, L"Echo On");
+			}
+			else
+			{
+				AddReverb(beginOffset, curOffset-beginOffset, 0, L"Echo Off");
+			}
 			EVENT_WITH_MIDITEXT_END
 			break;
 		}

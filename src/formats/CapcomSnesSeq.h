@@ -69,6 +69,7 @@ public:
 	bool priorityInHeader;
 	int8_t transpose;
 	uint16_t tempo;
+	uint8_t midiReverb;
 
 	static const uint8_t volTable[];
 	static const uint8_t panTable[];
