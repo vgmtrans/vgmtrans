@@ -660,12 +660,11 @@ bool CapcomSnesTrack::ReadEvent(void)
 
 		case EVENT_PAN:
 		{
-			int8_t newPan = GetByte(curOffset++);
+			uint8_t newPan = GetByte(curOffset++) + 0x80; // signed -> unsigned
 			uint8_t midiPan;
 
 			if (parentSeq->version == V1_BGM_IN_LIST)
 			{
-				// TODO: actual pan algorithm?
 				midiPan = newPan >> 1;
 			}
 			else
@@ -673,7 +672,8 @@ bool CapcomSnesTrack::ReadEvent(void)
 				// use pan table (with linear interpolation)
 				uint8_t panIndex = (newPan * 20) >> 8;
 				uint8_t panRate = (newPan * 20) & 0xff;
-				midiPan = CapcomSnesSeq::panTable[panIndex] + ((CapcomSnesSeq::panTable[panIndex + 1] - CapcomSnesSeq::panTable[panIndex]) * panRate / 256);
+				midiPan = CapcomSnesSeq::panTable[panIndex] + ((CapcomSnesSeq::panTable[panIndex + 1] - CapcomSnesSeq::panTable[panIndex]) * panRate >> 8);
+
 			}
 			midiPan = Convert7bitPercentPanValToStdMidiVal(midiPan);
 
