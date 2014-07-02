@@ -438,7 +438,7 @@ void MidiTrack::AddFineTuning(uint8_t channel, double cents)
 void MidiTrack::InsertFineTuning(uint8_t channel, double cents, uint32_t absTime)
 {
 	double semitones = max(-1.0, min(1.0, cents / 100.0));
-	int16_t midiTuning = max((int)(8192 * semitones + 0.5), 8191) + 8192;
+	int16_t midiTuning = min((int)(8192 * semitones + 0.5), 8191) + 8192;
 	InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
