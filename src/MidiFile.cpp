@@ -442,26 +442,55 @@ void MidiTrack::InsertFineTuning(uint8_t channel, double cents, uint32_t absTime
 	InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
-void MidiTrack::AddCoarseTuning(uint8_t channel, int8_t semitones)
+void MidiTrack::AddCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb)
+{
+	InsertCoarseTuning(channel, msb, lsb, GetDelta());
+}
+
+void MidiTrack::InsertCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER-1));	//want to give them a unique priority so they are grouped together correction
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 2, PRIORITY_HIGHER-1));
+	aEvents.push_back(new ControllerEvent(this, channel, absTime,  6, msb, PRIORITY_HIGHER-1));
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER-1));
+}
+
+void MidiTrack::AddCoarseTuning(uint8_t channel, double semitones)
 {
 	InsertCoarseTuning(channel, semitones, GetDelta());
 }
 
-void MidiTrack::InsertCoarseTuning(uint8_t channel, int8_t semitones, uint32_t absTime)
+void MidiTrack::InsertCoarseTuning(uint8_t channel, double semitones, uint32_t absTime)
 {
-	semitones = max(-64, min(63, semitones));
-	aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER-1));	//want to give them a unique priority so they are grouped together correction
-	aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 2, PRIORITY_HIGHER-1));
-	aEvents.push_back(new ControllerEvent(this, channel, absTime,  6, 64 + semitones, PRIORITY_HIGHER-1));
-	//aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, 0, PRIORITY_HIGHER-1));
+	semitones = max(-64.0, min(64.0, semitones));
+	int16_t midiTuning = min((int)(128 * semitones + 0.5), 8191) + 8192;
+	InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
-//void MidiTrack::AddTranspose(uint8_t channel, int transpose)
-//{
-//	aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), 101, 0));
-//	aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), 100, 2));
-//	aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), 6, 64 - transpose));
-//}
+void MidiTrack::AddModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb)
+{
+	InsertModulationDepthRange(channel, msb, lsb, GetDelta());
+}
+
+void MidiTrack::InsertModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER-1));	//want to give them a unique priority so they are grouped together correction
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 5, PRIORITY_HIGHER-1));
+	aEvents.push_back(new ControllerEvent(this, channel, absTime,  6, msb, PRIORITY_HIGHER-1));
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER-1));
+}
+
+void MidiTrack::AddModulationDepthRange(uint8_t channel, double semitones)
+{
+	InsertModulationDepthRange(channel, semitones, GetDelta());
+}
+
+void MidiTrack::InsertModulationDepthRange(uint8_t channel, double semitones, uint32_t absTime)
+{
+	semitones = max(-64.0, min(64.0, semitones));
+	int16_t midiTuning = min((int)(128 * semitones + 0.5), 8191) + 8192;
+	InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
+}
 
 void MidiTrack::AddProgramChange(uint8_t channel, uint8_t progNum)
 {

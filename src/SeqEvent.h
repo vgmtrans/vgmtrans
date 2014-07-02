@@ -370,6 +370,23 @@ public:
 	double cents;
 };
 
+//  ****************************
+//  ModulationDepthRangeSeqEvent
+//  ****************************
+
+class ModulationDepthRangeSeqEvent :
+	public SeqEvent
+{
+public:
+	ModulationDepthRangeSeqEvent(SeqTrack* pTrack, double semitones, 
+		uint32_t offset = 0, uint32_t length = 0, const wchar_t* name = L"");
+	virtual EventType GetEventType() { return EVENTTYPE_PITCHBENDRANGE; }
+	DESCRIPTION(L"Modulation Depth Range: " << (semitones * 100.0) << L" cents")
+
+public:
+	double semitones;
+};
+
 //  *****************
 //  TransposeSeqEvent
 //  *****************

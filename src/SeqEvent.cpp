@@ -156,6 +156,15 @@ FineTuningSeqEvent::FineTuningSeqEvent(SeqTrack* pTrack, double cents,
 : SeqEvent(pTrack, offset, length, name, CLR_MISC), cents(cents)
 {}
 
+// ****************************
+// ModulationDepthRangeSeqEvent
+// ****************************
+
+ModulationDepthRangeSeqEvent::ModulationDepthRangeSeqEvent(SeqTrack* pTrack, double semitones,
+											   uint32_t offset, uint32_t length, const wchar_t* name)
+: SeqEvent(pTrack, offset, length, name, CLR_MISC), semitones(semitones)
+{}
+
 // *****************
 // TransposeSeqEvent
 // *****************

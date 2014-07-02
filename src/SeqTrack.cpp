@@ -761,6 +761,20 @@ void SeqTrack::AddFineTuningNoItem(double cents)
 		pMidiTrack->AddFineTuning(channel, cents);
 }
 
+void SeqTrack::AddModulationDepthRange(uint32_t offset, uint32_t length, double semitones, const wchar_t* sEventName)
+{
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+		AddEvent(new ModulationDepthRangeSeqEvent(this, semitones, offset, length, sEventName));
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
+		pMidiTrack->AddModulationDepthRange(channel, semitones);
+}
+
+void SeqTrack::AddModulationDepthRangeNoItem(double semitones)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+		pMidiTrack->AddModulationDepthRange(channel, semitones);
+}
+
 void SeqTrack::AddTranspose(uint32_t offset, uint32_t length, int8_t theTranspose, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
