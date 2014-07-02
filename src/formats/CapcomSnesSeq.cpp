@@ -524,9 +524,9 @@ bool CapcomSnesTrack::ReadEvent(void)
 		case EVENT_TUNING:
 		{
 			int8_t newTuning = (int8_t) GetByte(curOffset++);
-			desc << L"Tuning: " << (int)newTuning << L" (" << (int)(GetTuningInSemitones(newTuning) * 100 + 0.5) << L" cents)";
+			double cents = GetTuningInSemitones(newTuning) * 100.0;
 			EVENT_WITH_MIDITEXT_START
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tuning", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+			AddFineTuning(beginOffset, curOffset-beginOffset, cents);
 			EVENT_WITH_MIDITEXT_END
 			break;
 		}

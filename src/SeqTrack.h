@@ -97,6 +97,8 @@ public:
 	void AddPitchBend(uint32_t offset, uint32_t length, int16_t bend, const wchar_t* sEventName = L"Pitch Bend");
 	void AddPitchBendRange(uint32_t offset, uint32_t length, uint8_t semitones, uint8_t cents = 0, const wchar_t* sEventName = L"Pitch Bend Range");
 	void AddPitchBendRangeNoItem(uint8_t range, uint8_t cents = 0);
+	void AddFineTuning(uint32_t offset, uint32_t length, double cents, const wchar_t* sEventName = L"Fine Tuning");
+	void AddFineTuningNoItem(double cents);
 	void AddTranspose(uint32_t offset, uint32_t length, int8_t transpose, const wchar_t* sEventName = L"Transpose");
 	void AddPitchBendMidiFormat(uint32_t offset, uint32_t length, uint8_t lo, uint8_t hi, const wchar_t* sEventName = L"Pitch Bend");
 	void AddModulation(uint32_t offset, uint32_t length, uint8_t depth, const wchar_t* sEventName = L"Modulation Depth");

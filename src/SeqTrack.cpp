@@ -747,6 +747,20 @@ void SeqTrack::AddPitchBendRangeNoItem(uint8_t semitones, uint8_t cents)
 		pMidiTrack->AddPitchBendRange(channel, semitones, cents);
 }
 
+void SeqTrack::AddFineTuning(uint32_t offset, uint32_t length, double cents, const wchar_t* sEventName)
+{
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+		AddEvent(new FineTuningSeqEvent(this, cents, offset, length, sEventName));
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
+		pMidiTrack->AddFineTuning(channel, cents);
+}
+
+void SeqTrack::AddFineTuningNoItem(double cents)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+		pMidiTrack->AddFineTuning(channel, cents);
+}
+
 void SeqTrack::AddTranspose(uint32_t offset, uint32_t length, int8_t theTranspose, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))

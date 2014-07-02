@@ -29,6 +29,7 @@ enum EventType
 	EVENTTYPE_PROGCHANGE, 
 	EVENTTYPE_PITCHBEND,
 	EVENTTYPE_PITCHBENDRANGE,
+	EVENTTYPE_FINETUNING,
 	EVENTTYPE_TRANSPOSE,
 	EVENTTYPE_TEMPO, 
 	EVENTTYPE_TIMESIG,
@@ -350,6 +351,23 @@ public:
 public:
 	uint8_t semitones;
 	uint8_t cents;
+};
+
+//  ******************
+//  FineTuningSeqEvent
+//  ******************
+
+class FineTuningSeqEvent :
+	public SeqEvent
+{
+public:
+	FineTuningSeqEvent(SeqTrack* pTrack, double cents, 
+		uint32_t offset = 0, uint32_t length = 0, const wchar_t* name = L"");
+	virtual EventType GetEventType() { return EVENTTYPE_PITCHBENDRANGE; }
+	DESCRIPTION(L"Fine Tuning: " << cents << L" cents")
+
+public:
+	double cents;
 };
 
 //  *****************

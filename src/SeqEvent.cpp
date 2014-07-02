@@ -147,6 +147,15 @@ PitchBendRangeSeqEvent::PitchBendRangeSeqEvent(SeqTrack* pTrack, uint8_t theSemi
 : SeqEvent(pTrack, offset, length, name, CLR_PITCHBENDRANGE), semitones(theSemiTones), cents(theCents)
 {}
 
+// ******************
+// FineTuningSeqEvent
+// ******************
+
+FineTuningSeqEvent::FineTuningSeqEvent(SeqTrack* pTrack, double cents,
+											   uint32_t offset, uint32_t length, const wchar_t* name)
+: SeqEvent(pTrack, offset, length, name, CLR_MISC), cents(cents)
+{}
+
 // *****************
 // TransposeSeqEvent
 // *****************

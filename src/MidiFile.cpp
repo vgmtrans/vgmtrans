@@ -417,6 +417,45 @@ void MidiTrack::InsertPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t
 	aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, cents, PRIORITY_HIGHER-1));
 }
 
+void MidiTrack::AddFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb)
+{
+	InsertFineTuning(channel, msb, lsb, GetDelta());
+}
+
+void MidiTrack::InsertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER-1));	//want to give them a unique priority so they are grouped together correction
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 1, PRIORITY_HIGHER-1));
+	aEvents.push_back(new ControllerEvent(this, channel, absTime,  6, msb, PRIORITY_HIGHER-1));
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER-1));
+}
+
+void MidiTrack::AddFineTuning(uint8_t channel, double cents)
+{
+	InsertFineTuning(channel, cents, GetDelta());
+}
+
+void MidiTrack::InsertFineTuning(uint8_t channel, double cents, uint32_t absTime)
+{
+	double semitones = max(-1.0, min(1.0, cents / 100.0));
+	int16_t midiTuning = max((int)(8192 * semitones + 0.5), 8191) + 8192;
+	InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
+}
+
+void MidiTrack::AddCoarseTuning(uint8_t channel, int8_t semitones)
+{
+	InsertCoarseTuning(channel, semitones, GetDelta());
+}
+
+void MidiTrack::InsertCoarseTuning(uint8_t channel, int8_t semitones, uint32_t absTime)
+{
+	semitones = max(-64, min(63, semitones));
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER-1));	//want to give them a unique priority so they are grouped together correction
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 2, PRIORITY_HIGHER-1));
+	aEvents.push_back(new ControllerEvent(this, channel, absTime,  6, 64 + semitones, PRIORITY_HIGHER-1));
+	//aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, 0, PRIORITY_HIGHER-1));
+}
+
 //void MidiTrack::AddTranspose(uint8_t channel, int transpose)
 //{
 //	aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), 101, 0));

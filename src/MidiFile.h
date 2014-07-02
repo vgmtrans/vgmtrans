@@ -104,6 +104,12 @@ public:
 	void InsertPitchBend(uint8_t channel, short bend, uint32_t absTime);
 	void AddPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t cents);
 	void InsertPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t cents, uint32_t absTime);
+	void AddFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb);
+	void InsertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
+	void AddFineTuning(uint8_t channel, double cents);
+	void InsertFineTuning(uint8_t channel, double cents, uint32_t absTime);
+	void AddCoarseTuning(uint8_t channel, int8_t semitones);
+	void InsertCoarseTuning(uint8_t channel, int8_t semitones, uint32_t absTime);
 	//void AddTranspose(uint8_t channel, int transpose);
 	void AddProgramChange(uint8_t channel, uint8_t progNum);
 	void AddBankSelect(uint8_t channel, uint8_t bank);
