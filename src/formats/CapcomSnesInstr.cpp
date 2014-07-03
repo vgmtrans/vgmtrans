@@ -29,6 +29,18 @@ bool CapcomSnesInstrSet::GetInstrPointers()
 	for (int instr = 0; instr <= 0xff; instr++)
 	{
 		uint32_t addrInstrHeader = dwOffset + (6 * instr);
+		if (addrInstrHeader + 6 > 0x10000)
+		{
+			return false;
+		}
+
+		// skip blank slot (Mega Man X2)
+		if (GetByte(addrInstrHeader) == 0xff && GetByte(addrInstrHeader + 1) == 0xff && GetByte(addrInstrHeader + 2) == 0xff &&
+			GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff && GetByte(addrInstrHeader + 5) == 0xff)
+		{
+			continue;
+		}
+
 		if (!CapcomSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr))
 		{
 			break;
