@@ -544,6 +544,8 @@ bool CapcomSnesTrack::ReadEvent(void)
 			desc << L"Time: " << (int)newPortamentoTime;
 			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Portamento Time", desc.str().c_str(), CLR_PORTAMENTOTIME, ICON_CONTROL);
+			AddPortamentoTimeNoItem(newPortamentoTime >> 1);
+			AddPortamentoNoItem(newPortamentoTime != 0);
 			EVENT_WITH_MIDITEXT_END
 			break;
 		}

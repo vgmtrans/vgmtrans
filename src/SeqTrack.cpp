@@ -859,7 +859,12 @@ void SeqTrack::AddPortamentoTime(uint32_t offset, uint32_t length, uint8_t time,
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new PortamentoTimeSeqEvent(this, time, offset, length, sEventName));
-	else if (readMode == READMODE_CONVERT_TO_MIDI)
+	AddPortamentoTimeNoItem(time);
+}
+
+void SeqTrack::AddPortamentoTimeNoItem(uint8_t time)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->AddPortamentoTime(channel, time);
 }
 

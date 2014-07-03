@@ -114,6 +114,7 @@ public:
 	void AddPortamentoNoItem(bool bOn);
 	void InsertPortamento(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const wchar_t* sEventName = L"Portamento");
 	void AddPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, const wchar_t* sEventName = L"Portamento Time");
+	void AddPortamentoTimeNoItem(uint8_t time);
 	void InsertPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, uint32_t absTime, const wchar_t* sEventName = L"Portamento Time");
 	//void AddSustainEventDur();
 	//void AddPitchBendSlide();
