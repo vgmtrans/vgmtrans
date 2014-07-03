@@ -46,6 +46,7 @@ public:
 	void UseLinearAmplitudeScale() { bUseLinearAmplitudeScale = true; }
 	void AlwaysWriteInitialVol(uint8_t theVol = 100) { bAlwaysWriteInitialVol = true; initialVol = theVol; }
 	void AlwaysWriteInitialExpression(uint8_t level = 127) { bAlwaysWriteInitialExpression = true; initialExpression = level;}
+	void AlwaysWriteInitialReverb(uint8_t level = 127) { bAlwaysWriteInitialReverb = true; initialReverb = level;}
 	void AlwaysWriteInitialPitchBendRange(uint8_t semitones, uint8_t cents) 
 	{ bAlwaysWriteInitialPitchBendRange = true; initialPitchBendRangeSemiTones = semitones;
 	  initialPitchBendRangeCents = cents; }
@@ -77,11 +78,13 @@ public:
 	bool bWriteInitialTempo;
 	bool bAlwaysWriteInitialVol;
 	bool bAlwaysWriteInitialExpression;
+	bool bAlwaysWriteInitialReverb;
 	bool bAlwaysWriteInitialPitchBendRange;
 	bool bAllowDiscontinuousTrackData;
 	bool bLoadTrackByTrack;
 	uint8_t initialVol;
 	uint8_t initialExpression;
+	uint8_t initialReverb;
 	uint8_t initialPitchBendRangeSemiTones, initialPitchBendRangeCents;
 
 	bool bReverb;

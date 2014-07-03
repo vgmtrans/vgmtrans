@@ -40,7 +40,9 @@ RareSnesSeq::RareSnesSeq(RawFile* file, RareSnesVersion ver, uint32_t seqdataOff
 
 	bAllowDiscontinuousTrackData = true;
 	bWriteInitialTempo = true;
-//	bLoadTrackOneByOne = false;
+
+	UseReverb();
+	AlwaysWriteInitialReverb(0);
 
 	LoadEventMap(this);
 }
@@ -277,7 +279,6 @@ bool RareSnesTrack::LoadTrackInit(uint32_t trackNum)
 	if (!SeqTrack::LoadTrackInit(trackNum))
 		return false;
 
-	AddReverbNoItem(0);
 	return true;
 }
 

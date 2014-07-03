@@ -93,6 +93,8 @@ bool SeqTrack::LoadTrackInit(int trackNum)
 			AddVolNoItem(parentSeq->initialVol);
 		if (parentSeq->bAlwaysWriteInitialExpression)
 			AddExpressionNoItem(parentSeq->initialExpression);
+		if (parentSeq->bAlwaysWriteInitialReverb)
+			AddReverbNoItem(parentSeq->initialReverb);
 		if (parentSeq->bAlwaysWriteInitialPitchBendRange)
 			AddPitchBendRangeNoItem(parentSeq->initialPitchBendRangeSemiTones, parentSeq->initialPitchBendRangeCents);
 	}

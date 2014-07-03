@@ -35,6 +35,13 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile* file, CapcomSnesVersion ver, uint32_t seqd
 
 	bAllowDiscontinuousTrackData = true;
 
+	double volumeScale;
+	ConvertPercentPanToStdMidiScale(0.5, &volumeScale);
+
+	UseReverb();
+	AlwaysWriteInitialExpression((int)(sqrt(volumeScale) * 127.0 + 0.5));
+	AlwaysWriteInitialReverb(0);
+
 	LoadEventMap(this);
 }
 
@@ -163,11 +170,6 @@ bool CapcomSnesTrack::LoadTrackInit(uint32_t trackNum)
 	if (!SeqTrack::LoadTrackInit(trackNum))
 		return false;
 
-	double volumeScale;
-	ConvertPercentPanToStdMidiScale(0.5, &volumeScale);
-
-	AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
-	AddReverbNoItem(0);
 	return true;
 }
 

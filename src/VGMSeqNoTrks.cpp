@@ -56,6 +56,8 @@ bool VGMSeqNoTrks::LoadEvents(void)
 		for (int i=0; i<16; i++) { channel = i; AddVolNoItem(initialVol); }
 	if (bAlwaysWriteInitialExpression)
 		for (int i=0; i<16; i++) { channel = i; AddExpressionNoItem(initialExpression); }
+	if (bAlwaysWriteInitialReverb)
+		for (int i=0; i<16; i++) { channel = i; AddReverbNoItem(initialReverb); }
 	if (bAlwaysWriteInitialPitchBendRange)
 		for (int i=0; i<16; i++) 
 		{
