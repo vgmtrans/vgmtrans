@@ -163,6 +163,10 @@ bool CapcomSnesTrack::LoadTrackInit(uint32_t trackNum)
 	if (!SeqTrack::LoadTrackInit(trackNum))
 		return false;
 
+	double volumeScale;
+	ConvertPercentPanToStdMidiScale(0.5, &volumeScale);
+
+	AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
 	AddReverbNoItem(0);
 	return true;
 }
@@ -664,6 +668,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 		{
 			uint8_t newPan = GetByte(curOffset++) + 0x80; // signed -> unsigned
 			uint8_t midiPan;
+			double volumeScale;
 
 			if (parentSeq->version == V1_BGM_IN_LIST)
 			{
@@ -677,9 +682,10 @@ bool CapcomSnesTrack::ReadEvent(void)
 				midiPan = CapcomSnesSeq::panTable[panIndex] + ((CapcomSnesSeq::panTable[panIndex + 1] - CapcomSnesSeq::panTable[panIndex]) * panRate >> 8);
 
 			}
-			midiPan = Convert7bitPercentPanValToStdMidiVal(midiPan);
+			midiPan = Convert7bitPercentPanValToStdMidiVal(midiPan, &volumeScale);
 
 			AddPan(beginOffset, curOffset-beginOffset, midiPan);
+			AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
 			break;
 		}
 

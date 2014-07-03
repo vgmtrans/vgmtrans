@@ -165,21 +165,29 @@ double SecondsToTimecents(double secs)
 
 // Takes a percentage pan value (linear volume curve)
 // and converts it to a standard midi curve (sin/cos curve)
-double ConvertPercentPanToStdMidiScale(double percent)
+double ConvertPercentPanToStdMidiScale(double percent, double * ptr_volume_scale)
 {
 	double panPI2 = atan2(percent, 1.0 - percent);
+	if (ptr_volume_scale != NULL)
+	{
+		*ptr_volume_scale = 1.0 / (cos(panPI2) + sin(panPI2)); // <= 1.0
+	}
 	return panPI2 / M_PI_2;
 }
 
-uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal)
+uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal, double * ptr_volume_scale)
 {
 	if (percentVal == 0)
 	{
+		if (ptr_volume_scale != NULL)
+		{
+			*ptr_volume_scale = 1.0;
+		}
 		return 0;
 	}
 	else
 	{
-		return (uint8_t) (ConvertPercentPanToStdMidiScale((percentVal - 1) / 126.0) * 126 + 1);
+		return (uint8_t) (ConvertPercentPanToStdMidiScale((percentVal - 1) / 126.0, ptr_volume_scale) * 126 + 1);
 	}
 }
 
