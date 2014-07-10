@@ -80,7 +80,8 @@ bool VGMRoot::Init(void)
 	// the following scanners use USE_EXTENSION
 	//AddScanner("NinSnes");
 	//AddScanner("SquSnes");
-	AddScanner("RareSnes");
+	//AddScanner("CapcomSnes");
+	//AddScanner("RareSnes");
 
 	//load all the... loaders
 	AddLoader<PSF1Loader>();

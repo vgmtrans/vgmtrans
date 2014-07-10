@@ -8,15 +8,18 @@ class NinSnesScanner :
 public:
 	NinSnesScanner(void)
 	{
-		//USE_EXTENSION(L"spc");
+		USE_EXTENSION(L"spc");
 	}
 	virtual ~NinSnesScanner(void)
 	{
 	}
 
 	virtual void Scan(RawFile* file, void* info = 0);
-	void SearchForNinSnesSeq (RawFile* file);
+	void SearchForNinSnesFromARAM (RawFile* file);
+	void SearchForNinSnesFromROM (RawFile* file);
 
 private:
 	static BytePattern ptnBranchForVcmd;
+	static BytePattern ptnJumpToVcmd;
+	static BytePattern ptnIncSectionPtr;
 };

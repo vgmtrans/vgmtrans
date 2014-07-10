@@ -11,8 +11,7 @@
 
 BEGIN_FORMAT(NinSnes)
 	USING_SCANNER(NinSnesScanner)
-	//USING_MATCHER(GetIdMatcher)
-	//USING_MATCHER(SimpleMatcher)
+	USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
 enum NinSnesVersion
