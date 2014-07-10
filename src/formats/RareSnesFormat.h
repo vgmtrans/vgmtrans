@@ -17,9 +17,9 @@ END_FORMAT()
 
 enum RareSnesVersion
 {
-	NONE = 0,   // Unknown Version
-	DKC,        // Donkey Kong Country
-	KI,         // Killer Instinct
-	DKC2,       // Donkey Kong Country 2 (and DKC3)
-	WNRN,       // Ken Griffey Jr. Winning Run
+	RARESNES_NONE = 0,  // Unknown Version
+	RARESNES_DKC,       // Donkey Kong Country
+	RARESNES_KI,        // Killer Instinct
+	RARESNES_DKC2,      // Donkey Kong Country 2 (and DKC3)
+	RARESNES_WNRN,      // Ken Griffey Jr. Winning Run
 };

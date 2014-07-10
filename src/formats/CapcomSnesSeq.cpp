@@ -128,7 +128,7 @@ void CapcomSnesSeq::LoadEventMap(CapcomSnesSeq *pSeqFile)
 
 	switch(pSeqFile->version)
 	{
-	case V1_BGM_IN_LIST:
+	case CAPCOMSNES_V1_BGM_IN_LIST:
 		pSeqFile->EventMap[0x1e] = EVENT_UNKNOWN1;
 		pSeqFile->EventMap[0x1f] = EVENT_UNKNOWN1;
 		break;
@@ -479,7 +479,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			uint8_t newVolume = GetByte(curOffset++);
 			uint8_t midiVolume;
 
-			if (parentSeq->version == V1_BGM_IN_LIST)
+			if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST)
 			{
 				// linear volume
 				midiVolume = newVolume >> 1;
@@ -674,7 +674,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			uint8_t midiPan;
 			double volumeScale;
 
-			if (parentSeq->version == V1_BGM_IN_LIST)
+			if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST)
 			{
 				midiPan = newPan >> 1;
 			}
@@ -698,7 +698,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			uint8_t newVolume = GetByte(curOffset++);
 			uint8_t midiVolume;
 
-			if (parentSeq->version == V1_BGM_IN_LIST)
+			if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST)
 			{
 				// linear volume
 				midiVolume = newVolume >> 1;

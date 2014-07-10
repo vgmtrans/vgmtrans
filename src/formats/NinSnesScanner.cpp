@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "NinSnesFormat.h"
 #include "NinSnesScanner.h"
 #include "NinSnesSeq.h"
 
@@ -111,7 +112,7 @@ void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
 				}
 				if (!bFailed)
 				{
-					NinSnesSeq* newSeq = new NinSnesSeq(file, i);
+					NinSnesSeq* newSeq = new NinSnesSeq(file, NINSNES_STANDARD, i);
 					if (!newSeq->LoadVGMFile())
 						delete newSeq;
 					i += m;

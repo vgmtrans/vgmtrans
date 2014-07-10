@@ -117,7 +117,7 @@ void RareSnesScanner::Scan(RawFile* file, void* info)
 
 void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 {
-	RareSnesVersion version = NONE;
+	RareSnesVersion version = RARESNES_NONE;
 	UINT ofsSongLoadASM;
 	UINT ofsVCmdExecASM;
 	UINT addrSeqHeader;
@@ -147,22 +147,22 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 		{
 			if (file->GetShort(addrVCmdTable + (0x11 * 2)) != 0)
 			{
-				version = WNRN;
+				version = RARESNES_WNRN;
 			}
 			else
 			{
-				version = DKC2;
+				version = RARESNES_DKC2;
 			}
 		}
 		else
 		{
-			version = KI;
+			version = RARESNES_KI;
 		}
 	}
 	else if (file->SearchBytePattern(ptnVCmdExecDKC, ofsVCmdExecASM))
 	{
 		addrVCmdTable = file->GetShort(ofsVCmdExecASM + 12);
-		version = DKC;
+		version = RARESNES_DKC;
 	}
 	else
 	{

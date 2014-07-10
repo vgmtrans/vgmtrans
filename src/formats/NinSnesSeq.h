@@ -2,6 +2,7 @@
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "Format.h"			//can replace this with NinSNES-specific format header file
+#include "NinSnesFormat.h"
 #include "NinSnesScanner.h"
 
 class NinSnesSection;
@@ -48,7 +49,7 @@ class NinSnesSeq :
 	public VGMSeq
 {
 public:
-	NinSnesSeq(RawFile* file, uint32_t offset, uint32_t length = 0, std::wstring theName = L"NinSnes Seq");
+	NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint32_t length = 0, std::wstring theName = L"NinSnes Seq");
 	virtual ~NinSnesSeq();
 
 	virtual bool LoadMain();
@@ -57,6 +58,8 @@ public:
 	void LoadDefaultEventMap(NinSnesSeq *pSeqFile);
 
 public:
+	NinSnesVersion version;
+
 	std::vector<uint16_t> sectPlayList;
 	uint16_t playListRptPtr;
 

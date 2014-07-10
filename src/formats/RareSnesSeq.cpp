@@ -58,7 +58,7 @@ void RareSnesSeq::ResetVars(void)
 	midiReverb = 40;
 	switch(version)
 	{
-	case DKC:
+	case RARESNES_DKC:
 		timerFreq = 0x3c;
 		break;
 	default:
@@ -140,7 +140,7 @@ void RareSnesSeq::LoadEventMap(RareSnesSeq *pSeqFile)
 
 	switch(pSeqFile->version)
 	{
-	case DKC:
+	case RARESNES_DKC:
 		pSeqFile->EventMap[0x1c] = EVENT_SETVOLADSRPRESET1;
 		pSeqFile->EventMap[0x1d] = EVENT_SETVOLADSRPRESET2;
 		pSeqFile->EventMap[0x1e] = EVENT_SETVOLADSRPRESET3;
@@ -160,7 +160,7 @@ void RareSnesSeq::LoadEventMap(RareSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0x30] = EVENT_TREMOLOOFF;
 		break;
 
-	case KI:
+	case RARESNES_KI:
 		//removed common events
 		pSeqFile->EventMap.erase(0x0c);
 		pSeqFile->EventMap.erase(0x0d);
@@ -190,7 +190,7 @@ void RareSnesSeq::LoadEventMap(RareSnesSeq *pSeqFile)
 		//pSeqFile->EventMap[0x30] = null;
 		break;
 
-	case DKC2:
+	case RARESNES_DKC2:
 		//removed common events
 		pSeqFile->EventMap.erase(0x11);
 
@@ -213,7 +213,7 @@ void RareSnesSeq::LoadEventMap(RareSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0x32] = EVENT_ECHOOFF; // duplicated
 		break;
 
-	case WNRN:
+	case RARESNES_WNRN:
 		//removed common events
 		pSeqFile->EventMap.erase(0x19);
 		pSeqFile->EventMap.erase(0x1a);

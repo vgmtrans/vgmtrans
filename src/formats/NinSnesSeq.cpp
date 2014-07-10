@@ -6,8 +6,8 @@ DECLARE_FORMAT(NinSnes);
 
 using namespace std;
 
-NinSnesSeq::NinSnesSeq(RawFile* file, uint32_t offset, uint32_t length, wstring name)
-: VGMSeq(NinSnesFormat::name, file, offset, length, name)
+NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint32_t length, wstring name)
+: VGMSeq(NinSnesFormat::name, file, offset, length, name), version(ver)
 {
 	AddContainer<NinSnesSection>(aSections);
 	if (!RemoveContainer<SeqTrack>(aTracks))

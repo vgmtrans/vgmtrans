@@ -109,7 +109,7 @@ void CapcomSnesScanner::Scan(RawFile* file, void* info)
 
 void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 {
-	CapcomSnesVersion version = NONE;
+	CapcomSnesVersion version = CAPCOMSNES_NONE;
 
 	UINT ofsReadSongListASM;
 	UINT ofsReadBGMAddressASM;
@@ -142,7 +142,7 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 	{
 		if (bgmAtFixedAddress)
 		{
-			version = V2_BGM_USUALLY_AT_FIXED_LOCATION;
+			version = CAPCOMSNES_V2_BGM_USUALLY_AT_FIXED_LOCATION;
 
 			// Some games still use BGM/SFX list, apparently.
 			// - The Magical Quest Starring Mickey Mouse
@@ -155,12 +155,12 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 		}
 		else
 		{
-			version = V1_BGM_IN_LIST;
+			version = CAPCOMSNES_V1_BGM_IN_LIST;
 		}
 	}
 	else if (bgmAtFixedAddress)
 	{
-		version = V3_BGM_FIXED_LOCATION;
+		version = CAPCOMSNES_V3_BGM_FIXED_LOCATION;
 	}
 	else
 	{
@@ -259,7 +259,7 @@ void CapcomSnesScanner::SearchForCapcomSnesFromROM (RawFile* file)
 uint16_t CapcomSnesScanner::GetCurrentPlayAddressFromARAM (RawFile* file, CapcomSnesVersion version, uint8_t channel)
 {
 	uint16_t currentAddress;
-	if (version == V1_BGM_IN_LIST)
+	if (version == CAPCOMSNES_V1_BGM_IN_LIST)
 	{
 		currentAddress = file->GetByte(0x00 + channel * 2 + 1) | (file->GetByte(0x10 + channel * 2 + 1) << 8);
 	}
