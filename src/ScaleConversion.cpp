@@ -62,10 +62,6 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal)
 	// MIDI uses the following formula for db attenuation on velocity/volume values.
 	// (see http://www.midi.org/techspecs/gmguide2.pdf pg9 or dls1 spec page 14)
 	//
-	//   20*log10(x^2/127^2) 
-	// = 40*log10(x/127)
-	// 
-	// So the values translate as follows:
 	//   CC#7  Amplitude
 	//   --------------
 	//    127      0db
@@ -75,43 +71,8 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal)
 	//     16  -36.0db
 	//      0  -infinity
 	//
-	// A 16-bit PCM sample uses a different formula for amplitude:
-	//   20*log10(abs(x)/32767)
-	//
-	// So if a game uses this formula with volume values ranging from 0-127 like MIDI,
-	// we would get the following chart:
-	//   CC#7  Amplitude
-	//   --------------
-	//    127      0db
-	//     96   -2.4db
-	//     64   -6.0db
-	//     32  -12.0db
-	//     16  -18.0db
-	//      0  -infinity
-	//
-	// This doesn't offer much dynamic range, as -10db is perceived as half-volume.
-	//
-	// To convert a range 0-127 value using the second formula to the MIDI formula, 
-	// solve for y using the following equation:
-	//   20*log10(x/127) = 40*log10(y/127)
-	//   y = sqrt(x*127)
 
-
-	//In standard MIDI, the attenuation for volume in db is 40*log10(127/val) == 20*log10(127^2/val^2). (dls1 spec page 14)
-	// (Also stated in GM guidelines page 9 http://www.midi.org/techspecs/gmguide2.pdf)
-	//Here, the scale is different.  We get rid of the exponents
-	// so it's just 20*log10(127/val).
-	//Therefore, we must convert from one scale to the other.
-	//The equation for the first line is obvious.
-	//For the second line, I simply solved db = 40*log10(127/val) for val.
-	//The result is val = 127*10^(-0.025*db).  So, by plugging in the original val into
-	//the original scale equation, we get a db that we can plug into that second equation to get
-	//the new val.
-
-	//double origAttenInDB = 20*log10((127/(double)percentVal));
-	//double origAttenInDB = ConvertLogScaleValToAtten(percentVal/(double)127);
-	//return ceil(127*pow(10.0,-0.025*origAttenInDB));
-	return round( sqrt((double)(percentVal*127)) );
+	return round(sqrt(percentVal / 127.0) * 127.0);
 }
 
 // returns the attenuation in decibel units in the scale provided by maxVal;
@@ -128,11 +89,7 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal)
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
 uint8_t ConvertPercentAmpToStdMidiVal(double percent)
 {
-	//should be able to just do 127*sqrt(percent)
-	return round(127.0*sqrt(percent));
-	//double atten = ConvertLogScaleValToAtten(percent);
-	//uint8_t test = round(127*pow(10.0,-0.025*atten));
-	//return round(127*pow(10.0,-0.025*atten));
+	return round(127.0 * sqrt(percent));
 }
 
 double ConvertPercentAmpToStdMidiScale(double percent)
