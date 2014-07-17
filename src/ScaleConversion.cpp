@@ -72,7 +72,7 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal)
 	//      0  -infinity
 	//
 
-	return round(sqrt(percentVal / 127.0) * 127.0);
+	return ConvertPercentAmpToStdMidiVal(percentVal / 127.0);
 }
 
 // returns the attenuation in decibel units in the scale provided by maxVal;
