@@ -644,7 +644,7 @@ void MusicPlayer::ResetMidi()
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 6, 64), grp+1);			// +/- 0 cents
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 38, 0), grp+1);			// +/- 0 cents
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 101, 0), grp+1);			//Reset RPN Coarse Tuning
-			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 100, 1), grp+1);			//Reset RPN Coarse Tuning
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 100, 2), grp+1);			//Reset RPN Coarse Tuning
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 6, 64), grp+1);			// +/- 0 semitones
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 38, 0), grp+1);			// +/- 0 cents
 		}
