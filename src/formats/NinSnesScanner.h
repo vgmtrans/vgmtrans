@@ -22,4 +22,7 @@ private:
 	static BytePattern ptnBranchForVcmd;
 	static BytePattern ptnJumpToVcmd;
 	static BytePattern ptnIncSectionPtr;
+	static BytePattern ptnLoadInstrTableAddress;
+	static BytePattern ptnSetDIR;
+	static BytePattern ptnSetDIRYI;
 };

@@ -225,7 +225,6 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 	}
 
 	// scan for instrument table
-	UINT instrItemLength = 6;
 	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM))
 	{
 		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);

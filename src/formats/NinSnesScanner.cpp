@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanner.h"
+#include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
 
 //; Yoshi's Island SPC
@@ -61,6 +62,43 @@ BytePattern NinSnesScanner::ptnIncSectionPtr(
 	,
 	13);
 
+//; Yoshi's Island SPC
+//0b14: 8d 06     mov   y,#$06
+//0b16: cf        mul   ya
+//0b17: da 10     movw  $10,ya
+//0b19: 60        clrc
+//0b1a: 98 00 10  adc   $10,#$00
+//0b1d: 98 05 11  adc   $11,#$05
+BytePattern NinSnesScanner::ptnLoadInstrTableAddress(
+	"\x8d\x06\xcf\xda\x10\x60\x98\x00"
+	"\x10\x98\x05\x11"
+	,
+	"xxxx?xx?"
+	"?x??"
+	,
+	12);
+
+//; Kirby Super Star SPC
+//071e: 8f 5d f2  mov   $f2,#$5d
+//0721: 8f 03 f3  mov   $f3,#$03          ; source dir = $0300
+BytePattern NinSnesScanner::ptnSetDIR(
+	"\x8f\x5d\xf2\x8f\x03\xf3"
+	,
+	"xxxx?x"
+	,
+	6);
+
+//; Yoshi's Island SPC
+//042c: e8 3c     mov   a,#$3c
+//042e: 8d 5d     mov   y,#$5d
+//0430: 3f fa 05  call  $05fa             ; source dir = $3c00
+BytePattern NinSnesScanner::ptnSetDIRYI(
+	"\xe8\x3c\x8d\x5d\x3f\xfa\x05"
+	,
+	"x?xxx??"
+	,
+	7);
+
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -78,6 +116,10 @@ void NinSnesScanner::Scan(RawFile* file, void* info)
 void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 {
 	NinSnesVersion version = NINSNES_NONE;
+
+	UINT ofsLoadInstrTableAddressASM;
+	UINT ofsSetDIRASM;
+	UINT addrInstrTable;
 
 	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
@@ -179,6 +221,38 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	if (!newSeq->LoadVGMFile())
 	{
 		delete newSeq;
+		return;
+	}
+
+	// scan for instrument table
+	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM))
+	{
+		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
+	}
+	else
+	{
+		return;
+	}
+
+	// scan for DIR address
+	uint8_t spcDIR;
+	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIRASM))
+	{
+		spcDIR = file->GetByte(ofsSetDIRASM + 4);
+	}
+	else if (file->SearchBytePattern(ptnSetDIRYI, ofsSetDIRASM))
+	{
+		spcDIR = file->GetByte(ofsSetDIRASM + 1);
+	}
+	else
+	{
+		return;
+	}
+
+	NinSnesInstrSet * newInstrSet = new NinSnesInstrSet(file, addrInstrTable, spcDIR << 8);
+	if (!newInstrSet->LoadVGMFile())
+	{
+		delete newInstrSet;
 		return;
 	}
 

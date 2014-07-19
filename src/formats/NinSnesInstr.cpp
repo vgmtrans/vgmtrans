@@ -1,29 +1,29 @@
 #include "stdafx.h"
-#include "CapcomSnesInstr.h"
+#include "NinSnesInstr.h"
 #include "Format.h"
 #include "SNESDSP.h"
-#include "CapcomSnesFormat.h"
+#include "NinSnesFormat.h"
 
 // ****************
-// CapcomSnesInstrSet
+// NinSnesInstrSet
 // ****************
 
-CapcomSnesInstrSet::CapcomSnesInstrSet(RawFile* file, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name) :
-	VGMInstrSet(CapcomSnesFormat::name, file, offset, 0, name),
+NinSnesInstrSet::NinSnesInstrSet(RawFile* file, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name) :
+	VGMInstrSet(NinSnesFormat::name, file, offset, 0, name),
 	spcDirAddr(spcDirAddr)
 {
 }
 
-CapcomSnesInstrSet::~CapcomSnesInstrSet()
+NinSnesInstrSet::~NinSnesInstrSet()
 {
 }
 
-bool CapcomSnesInstrSet::GetHeaderInfo()
+bool NinSnesInstrSet::GetHeaderInfo()
 {
 	return true;
 }
 
-bool CapcomSnesInstrSet::GetInstrPointers()
+bool NinSnesInstrSet::GetInstrPointers()
 {
 	usedSRCNs.clear();
 	for (int instr = 0; instr <= 0xff; instr++)
@@ -34,14 +34,14 @@ bool CapcomSnesInstrSet::GetInstrPointers()
 			return false;
 		}
 
-		// skip blank slot (Mega Man X2)
+		// skip blank slot (Kirby Super Star)
 		if (GetByte(addrInstrHeader) == 0xff && GetByte(addrInstrHeader + 1) == 0xff && GetByte(addrInstrHeader + 2) == 0xff &&
 			GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff && GetByte(addrInstrHeader + 5) == 0xff)
 		{
 			continue;
 		}
 
-		if (!CapcomSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr))
+		if (!NinSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr))
 		{
 			break;
 		}
@@ -53,7 +53,7 @@ bool CapcomSnesInstrSet::GetInstrPointers()
 			usedSRCNs.push_back(srcn);
 		}
 
-		CapcomSnesInstr * newInstr = new CapcomSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr);
+		NinSnesInstr * newInstr = new NinSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr);
 		aInstrs.push_back(newInstr);
 	}
 	if (aInstrs.size() == 0)
@@ -62,7 +62,7 @@ bool CapcomSnesInstrSet::GetInstrPointers()
 	}
 
 	std::sort(usedSRCNs.begin(), usedSRCNs.end());
-	SNESSampColl * newSampColl = new SNESSampColl(CapcomSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+	SNESSampColl * newSampColl = new SNESSampColl(NinSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
 	if (!newSampColl->LoadVGMFile())
 	{
 		delete newSampColl;
@@ -73,20 +73,20 @@ bool CapcomSnesInstrSet::GetInstrPointers()
 }
 
 // *************
-// CapcomSnesInstr
+// NinSnesInstr
 // *************
 
-CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name) :
+NinSnesInstr::NinSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name) :
 	VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name),
 	spcDirAddr(spcDirAddr)
 {
 }
 
-CapcomSnesInstr::~CapcomSnesInstr()
+NinSnesInstr::~NinSnesInstr()
 {
 }
 
-bool CapcomSnesInstr::LoadInstr()
+bool NinSnesInstr::LoadInstr()
 {
 	uint8_t srcn = GetByte(dwOffset);
 	uint32_t offDirEnt = spcDirAddr + (srcn * 4);
@@ -97,14 +97,14 @@ bool CapcomSnesInstr::LoadInstr()
 
 	uint16_t addrSampStart = GetShort(offDirEnt);
 
-	CapcomSnesRgn * rgn = new CapcomSnesRgn(this, dwOffset);
+	NinSnesRgn * rgn = new NinSnesRgn(this, dwOffset);
 	rgn->sampOffset = addrSampStart - spcDirAddr;
 	aRgns.push_back(rgn);
 
 	return true;
 }
 
-bool CapcomSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint32_t spcDirAddr)
+bool NinSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint32_t spcDirAddr)
 {
 	if (addrInstrHeader + 6 > 0x10000)
 	{
@@ -140,10 +140,10 @@ bool CapcomSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, ui
 }
 
 // ***********
-// CapcomSnesRgn
+// NinSnesRgn
 // ***********
 
-CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr* instr, uint32_t offset) :
+NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, uint32_t offset) :
 	VGMRgn(instr, offset, 6)
 {
 	uint8_t srcn = GetByte(offset);
@@ -178,11 +178,11 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr* instr, uint32_t offset) :
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
-CapcomSnesRgn::~CapcomSnesRgn()
+NinSnesRgn::~NinSnesRgn()
 {
 }
 
-bool CapcomSnesRgn::LoadRgn()
+bool NinSnesRgn::LoadRgn()
 {
 	return true;
 }

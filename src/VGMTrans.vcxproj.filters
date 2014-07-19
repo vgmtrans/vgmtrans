@@ -576,6 +576,9 @@
     <ClCompile Include="formats\CapcomSnesInstr.cpp">
       <Filter>Source Files\formats\capcomsnes</Filter>
     </ClCompile>
+    <ClCompile Include="formats\NinSnesInstr.cpp">
+      <Filter>Source Files\formats\ninsnes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1045,6 +1048,9 @@
     </ClInclude>
     <ClInclude Include="formats\CapcomSnesInstr.h">
       <Filter>Header Files\formats\capcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\NinSnesInstr.h">
+      <Filter>Header Files\formats\ninsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
