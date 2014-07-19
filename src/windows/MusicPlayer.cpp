@@ -628,15 +628,25 @@ void MusicPlayer::ResetMidi()
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 121, 0), grp+1);
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 0, 0), grp+1);			//Reset Bank Select
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 32, 0), grp+1);			//Reset Bank Select Fine
-			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 10, 64), grp+1);			//reset pan
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 1, 64), grp+1);			//reset modulation
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 7, 100), grp+1);			//reset volume
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 10, 64), grp+1);			//reset pan
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 11, 127), grp+1);		//reset expression
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 91, 40), grp+1);			//reset reverb
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 93, 0), grp+1);			//reset chorus
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xE0+chan, 0, 0x40), grp+1);		//reset pitchbend -> 0x2000
-			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 101, 0), grp+1);			//Reset RPN Pitch Bend Range Coarse
-			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 100, 0), grp+1);			//Reset RPN Pitch Bend Range Fine
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 101, 0), grp+1);			//Reset RPN Pitch Bend Range
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 100, 0), grp+1);			//Reset RPN Pitch Bend Range
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 6, 2), grp+1);//12), grp+1);		// +/- 2 semitones
 			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 38, 0), grp+1);					// +/- 0 cents
-
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 101, 0), grp+1);			//Reset RPN Fine Tuning
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 100, 1), grp+1);			//Reset RPN Fine Tuning
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 6, 64), grp+1);			// +/- 0 cents
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 38, 0), grp+1);			// +/- 0 cents
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 101, 0), grp+1);			//Reset RPN Coarse Tuning
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 100, 1), grp+1);			//Reset RPN Coarse Tuning
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 6, 64), grp+1);			// +/- 0 semitones
+			COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(0xB0+chan, 38, 0), grp+1);			// +/- 0 cents
 		}
 	}
 }
