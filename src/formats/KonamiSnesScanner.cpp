@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "KonamiSnesScanner.h"
 #include "KonamiSnesSeq.h"
+#include "KonamiSnesInstr.h"
 #include "SNESDSP.h"
 
 using namespace std;
@@ -38,6 +39,57 @@ BytePattern KonamiSnesScanner::ptnJumpToVcmd(
 	,
 	15);
 
+//; Ganbare Goemon 4
+//0266: 8f 5d f2  mov   $f2,#$5d
+//0269: 8f 04 f3  mov   $f3,#$04          ; source dir = $0400
+BytePattern KonamiSnesScanner::ptnSetDIR(
+	"\x8f\x5d\xf2\x8f\x04\xf3"
+	,
+	"xxxx?x"
+	,
+	6);
+
+//; Ganbare Goemon 4
+//; vcmd e2 - set instrument
+//1b95: 09 11 10  or    ($10),($11)
+//1b98: fd        mov   y,a
+//1b99: f5 a1 01  mov   a,$01a1+x
+//1b9c: d0 27     bne   $1bc5
+//1b9e: dd        mov   a,y
+//1b9f: 68 28     cmp   a,#$28
+//1ba1: b0 0c     bcs   $1baf             ; use another map if patch number is large
+//1ba3: 8f 3c 04  mov   $04,#$3c
+//1ba6: 8f 0a 05  mov   $05,#$0a          ; sample map = #$0a3c
+//1ba9: 3f ee 1b  call  $1bee
+//1bac: 5f e2 18  jmp   $18e2
+//; use another map
+//1baf: a8 28     sbc   a,#$28            ; patch -= 0x28
+//1bb1: 2d        push  a
+//1bb2: eb 25     mov   y,$25
+//1bb4: f6 20 0a  mov   a,$0a20+y
+//1bb7: c4 04     mov   $04,a
+//1bb9: f6 21 0a  mov   a,$0a21+y
+//1bbc: c4 05     mov   $05,a             ; sample map = *(u16)($0a20 + $25 * 2)
+//1bbe: ae        pop   a
+//1bbf: 3f ee 1b  call  $1bee
+//1bc2: 5f e2 18  jmp   $18e2
+BytePattern KonamiSnesScanner::ptnLoadInstr(
+	"\x09\x11\x10\xfd\xf5\xa1\x01\xd0"
+	"\x27\xdd\x68\x28\xb0\x0c\x8f\x3c"
+	"\x04\x8f\x0a\x05\x3f\xee\x1b\x5f"
+	"\xe2\x18\xa8\x28\x2d\xeb\x25\xf6"
+	"\x20\x0a\xc4\x04\xf6\x21\x0a\xc4"
+	"\x05\xae\x3f\xee\x1b\x5f\xe2\x18"
+	,
+	"x??xx??x"
+	"?xx?xxx?"
+	"?x??x??x"
+	"??x?xx?x"
+	"??x?x??x"
+	"?xx??x??"
+	,
+	48);
+
 void KonamiSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -59,8 +111,11 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	bool hasSongList;
 	UINT ofsSetSongHeaderAddressASM;
 	UINT ofsJumpToVcmdASM;
+	UINT ofsSetDIRASM;
+	UINT ofsLoadInstrASM;
 	uint16_t addrSongHeader;
 	uint16_t addrVoiceCmdLengthTable;
+	uint16_t addrInstrTable;
 
 	wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
@@ -120,6 +175,35 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 			delete newSeq;
 			return;
 		}
+	}
+
+	// scan for DIR address
+	uint8_t spcDIR;
+	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIRASM))
+	{
+		spcDIR = file->GetByte(ofsSetDIRASM + 4);
+	}
+	else
+	{
+		return;
+	}
+
+	// scan for instrument table
+	// TODO: alternative maps, percussive notes
+	if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstrASM))
+	{
+		addrInstrTable = file->GetByte(ofsLoadInstrASM + 15) | (file->GetByte(ofsLoadInstrASM + 18) << 8);
+	}
+	else
+	{
+		return;
+	}
+
+	KonamiSnesInstrSet * newInstrSet = new KonamiSnesInstrSet(file, addrInstrTable, spcDIR << 8);
+	if (!newInstrSet->LoadVGMFile())
+	{
+		delete newInstrSet;
+		return;
 	}
 }
 
