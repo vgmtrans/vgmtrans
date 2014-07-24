@@ -25,4 +25,5 @@ private:
 	static BytePattern ptnJumpToVcmd;
 	static BytePattern ptnSetDIR;
 	static BytePattern ptnLoadInstr;
+	static BytePattern ptnLoadPercInstr;
 };

@@ -59,17 +59,17 @@ BytePattern KonamiSnesScanner::ptnSetDIR(
 //1b9f: 68 28     cmp   a,#$28
 //1ba1: b0 0c     bcs   $1baf             ; use another map if patch number is large
 //1ba3: 8f 3c 04  mov   $04,#$3c
-//1ba6: 8f 0a 05  mov   $05,#$0a          ; sample map = #$0a3c
+//1ba6: 8f 0a 05  mov   $05,#$0a          ; common sample map = #$0a3c
 //1ba9: 3f ee 1b  call  $1bee
 //1bac: 5f e2 18  jmp   $18e2
 //; use another map
 //1baf: a8 28     sbc   a,#$28            ; patch -= 0x28
 //1bb1: 2d        push  a
-//1bb2: eb 25     mov   y,$25
+//1bb2: eb 25     mov   y,$25             ; bank number
 //1bb4: f6 20 0a  mov   a,$0a20+y
 //1bb7: c4 04     mov   $04,a
 //1bb9: f6 21 0a  mov   a,$0a21+y
-//1bbc: c4 05     mov   $05,a             ; sample map = *(u16)($0a20 + $25 * 2)
+//1bbc: c4 05     mov   $05,a             ; sample map = *(u16)($0a20 + bank * 2)
 //1bbe: ae        pop   a
 //1bbf: 3f ee 1b  call  $1bee
 //1bc2: 5f e2 18  jmp   $18e2
@@ -89,6 +89,25 @@ BytePattern KonamiSnesScanner::ptnLoadInstr(
 	"?xx??x??"
 	,
 	48);
+
+//; Ganbare Goemon 4
+//; load instrument for percussive note
+//1be8: 8f e6 04  mov   $04,#$e6
+//1beb: 8f 0d 05  mov   $05,#$0d          ; $04 = #$0de6
+//; load instrument attributes from instrument table
+//; a = patch number, $04 = instrument table address
+//1bee: 8d 07     mov   y,#$07
+//1bf0: cf        mul   ya
+//1bf1: 7a 04     addw  ya,$04
+//1bf3: da 04     movw  $04,ya            ; load address by index `$04 += (patch * 7)`
+BytePattern KonamiSnesScanner::ptnLoadPercInstr(
+	"\x8f\xe6\x04\x8f\x0d\x05\x8d\x07"
+	"\xcf\x7a\x04\xda\x04"
+	,
+	"x??x??xx"
+	"xx?x?"
+	,
+	13);
 
 void KonamiSnesScanner::Scan(RawFile* file, void* info)
 {
@@ -113,9 +132,15 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	UINT ofsJumpToVcmdASM;
 	UINT ofsSetDIRASM;
 	UINT ofsLoadInstrASM;
+	UINT ofsLoadPercInstrASM;
 	uint16_t addrSongHeader;
+	uint16_t addrCommonInstrTable;
+	uint16_t addrBankedInstrTable;
+	uint16_t addrPercInstrTable;
 	uint16_t addrVoiceCmdLengthTable;
-	uint16_t addrInstrTable;
+	uint16_t addrInstrTableBanks;
+	uint16_t addrCurrentBank;
+	uint8_t firstBankedInstr;
 
 	wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
@@ -178,6 +203,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	}
 
 	// scan for DIR address
+	// geez, it sometimes fails (gg4-11.spc, for example)
 	uint8_t spcDIR;
 	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIRASM))
 	{
@@ -189,17 +215,30 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	}
 
 	// scan for instrument table
-	// TODO: alternative maps, percussive notes
 	if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstrASM))
 	{
-		addrInstrTable = file->GetByte(ofsLoadInstrASM + 15) | (file->GetByte(ofsLoadInstrASM + 18) << 8);
+		addrCommonInstrTable = file->GetByte(ofsLoadInstrASM + 15) | (file->GetByte(ofsLoadInstrASM + 18) << 8);
+		firstBankedInstr = file->GetByte(ofsLoadInstrASM + 11);
+		addrCurrentBank = file->GetByte(ofsLoadInstrASM + 30);
+		addrInstrTableBanks = file->GetShort(ofsLoadInstrASM + 32);
+		addrBankedInstrTable = addrInstrTableBanks + (file->GetByte(addrCurrentBank) * 2);
 	}
 	else
 	{
 		return;
 	}
 
-	KonamiSnesInstrSet * newInstrSet = new KonamiSnesInstrSet(file, addrInstrTable, spcDIR << 8);
+	// scan for percussive instrument table
+	if (file->SearchBytePattern(ptnLoadPercInstr, ofsLoadPercInstrASM))
+	{
+		addrPercInstrTable = file->GetByte(ofsLoadInstrASM + 1) | (file->GetByte(ofsLoadInstrASM + 4) << 8);
+	}
+	else
+	{
+		return;
+	}
+
+	KonamiSnesInstrSet * newInstrSet = new KonamiSnesInstrSet(file, addrCommonInstrTable, addrBankedInstrTable, firstBankedInstr, addrPercInstrTable, spcDIR << 8);
 	if (!newInstrSet->LoadVGMFile())
 	{
 		delete newInstrSet;

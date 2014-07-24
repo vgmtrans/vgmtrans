@@ -11,13 +11,16 @@ class KonamiSnesInstrSet :
 	public VGMInstrSet
 {
 public:
-	KonamiSnesInstrSet(RawFile* file, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name = L"KonamiSnesInstrSet");
+	KonamiSnesInstrSet(RawFile* file, uint32_t offset, uint32_t bankedInstrOffset, uint8_t firstBankedInstr, uint32_t percInstrOffset, uint32_t spcDirAddr, const std::wstring & name = L"KonamiSnesInstrSet");
 	virtual ~KonamiSnesInstrSet(void);
 
 	virtual bool GetHeaderInfo();
 	virtual bool GetInstrPointers();
 
 protected:
+	uint32_t bankedInstrOffset;
+	uint8_t firstBankedInstr;
+	uint32_t percInstrOffset;
 	uint32_t spcDirAddr;
 	std::vector<uint8_t> usedSRCNs;
 };

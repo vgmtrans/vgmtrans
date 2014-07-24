@@ -8,8 +8,16 @@
 // KonamiSnesInstrSet
 // ******************
 
-KonamiSnesInstrSet::KonamiSnesInstrSet(RawFile* file, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name) :
+// Actually, this engine has 3 instrument tables:
+//     - Common samples
+//     - Switchable samples
+//     - Percussive samples
+// KonamiSnesInstrSet tries to load all these samples to merge them into a single DLS.
+KonamiSnesInstrSet::KonamiSnesInstrSet(RawFile* file, uint32_t offset, uint32_t bankedInstrOffset, uint8_t firstBankedInstr, uint32_t percInstrOffset, uint32_t spcDirAddr, const std::wstring & name) :
 	VGMInstrSet(KonamiSnesFormat::name, file, offset, 0, name),
+	bankedInstrOffset(bankedInstrOffset),
+	firstBankedInstr(firstBankedInstr),
+	percInstrOffset(percInstrOffset),
 	spcDirAddr(spcDirAddr)
 {
 }
@@ -28,19 +36,21 @@ bool KonamiSnesInstrSet::GetInstrPointers()
 	usedSRCNs.clear();
 	for (int instr = 0; instr <= 0xff; instr++)
 	{
-		uint32_t addrInstrHeader = dwOffset + (7 * instr);
+		uint32_t addrInstrHeader;
+		if (instr < firstBankedInstr)
+		{
+			// common samples
+			addrInstrHeader = dwOffset + (7 * instr);
+		}
+		else
+		{
+			// switchable samples
+			addrInstrHeader = bankedInstrOffset + (7 * instr);
+		}
 		if (addrInstrHeader + 7 > 0x10000)
 		{
 			return false;
 		}
-
-		// skip blank slot
-		//if (GetByte(addrInstrHeader) == 0xff && GetByte(addrInstrHeader + 1) == 0xff && GetByte(addrInstrHeader + 2) == 0xff &&
-		//	GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff && GetByte(addrInstrHeader + 5) == 0xff &&
-		//	GetByte(addrInstrHeader + 6) == 0xff)
-		//{
-		//	continue;
-		//}
 
 		if (!KonamiSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr))
 		{
@@ -61,6 +71,8 @@ bool KonamiSnesInstrSet::GetInstrPointers()
 	{
 		return false;
 	}
+
+	// TODO: percussive samples
 
 	std::sort(usedSRCNs.begin(), usedSRCNs.end());
 	SNESSampColl * newSampColl = new SNESSampColl(KonamiSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
