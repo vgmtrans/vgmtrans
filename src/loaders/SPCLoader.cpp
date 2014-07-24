@@ -66,7 +66,80 @@ PostLoadCommand SPCLoader::Apply(RawFile* file)
 		}
 	}
 
-	// TODO: Extended ID666 support
+	// Parse Extended ID666 if available
+	if (file->size() >= 0x10208) {
+		char xid6_signature[4] = { 0 };
+		file->GetBytes(0x10200, 4, xid6_signature);
+		UINT xid6_end_offset = 0x10208 + file->GetWord(0x10204);
+		if (memcmp(xid6_signature, "xid6", 4) == 0 && file->size() >= xid6_end_offset) {
+			UINT xid6_offset = 0x10208;
+			while (xid6_offset + 4 < xid6_end_offset)
+			{
+				uint8_t xid6_id = file->GetByte(xid6_offset);
+				uint8_t xid6_type = file->GetByte(xid6_offset + 1);
+				uint16_t xid6_data = file->GetByte(xid6_offset + 2);
+
+				// get the length of this field
+				uint16_t xid6_length;
+				if (xid6_type == 0) {
+					xid6_length = 0;
+				}
+				else {
+					xid6_length = xid6_data;
+				}
+
+				// check size error
+				if (xid6_end_offset < xid6_offset + 4 + xid6_length)
+				{
+					break;
+				}
+
+				switch (xid6_type) {
+				case 0:
+					// Data
+					break;
+
+				case 1:
+				{
+					// String (data contains null character)
+					std::wstring xid6_string = string2wstring(std::string((char*)(file->buf.data + xid6_offset + 4), xid6_length - 1));
+					switch (xid6_id) {
+					case 1:
+						// Song name
+						spcFile->tag.title = xid6_string;
+						break;
+
+					case 2:
+						// Game name
+						spcFile->tag.album = xid6_string;
+						break;
+
+					case 3:
+						// Artist
+						spcFile->tag.artist = xid6_string;
+						break;
+
+					case 7:
+						// Comments
+						spcFile->tag.comment = xid6_string;
+						break;
+					}
+					break;
+				}
+
+				case 4:
+					// Integer
+					break;
+
+				default:
+					// Unknown
+					break;
+				}
+
+				xid6_offset += 4 + ((xid6_length + 3) / 4 * 4);
+			}
+		}
+	}
 
 	// Load SPC after parsing tag
 	if (!pRoot->SetupNewRawFile(spcFile)) {
