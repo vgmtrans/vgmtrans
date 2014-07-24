@@ -203,11 +203,16 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	}
 
 	// scan for DIR address
-	// geez, it sometimes fails (gg4-11.spc, for example)
 	uint8_t spcDIR;
+	std::map<std::wstring, std::vector<uint8_t>>::iterator itrDSP;
 	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIRASM))
 	{
 		spcDIR = file->GetByte(ofsSetDIRASM + 4);
+	}
+	else if ((itrDSP = file->tag.binaries.find(L"dsp")) != file->tag.binaries.end())
+	{
+		// read DIR from SPC700 snapshot
+		spcDIR = itrDSP->second[0x5d];
 	}
 	else
 	{

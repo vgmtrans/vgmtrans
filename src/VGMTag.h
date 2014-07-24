@@ -19,6 +19,7 @@ public:
 	std::wstring artist;
 	std::wstring album;
 	std::wstring comment;
+	std::map<std::wstring, std::vector<uint8_t>> binaries;
 
 	/** Track number */
 	int track_number;
