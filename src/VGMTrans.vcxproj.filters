@@ -549,9 +549,6 @@
     <ClCompile Include="loaders\NCSFLoader.cpp">
       <Filter>Source Files\loaders</Filter>
     </ClCompile>
-    <ClCompile Include="SeqNoteManager.cpp">
-      <Filter>Source Files\main</Filter>
-    </ClCompile>
     <ClCompile Include="windows\MyCoCreateInstance.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
@@ -593,6 +590,9 @@
     </ClCompile>
     <ClCompile Include="formats\KonamiSnesInstr.cpp">
       <Filter>Source Files\formats\konamisnes</Filter>
+    </ClCompile>
+    <ClCompile Include="SeqVoiceAllocator.cpp">
+      <Filter>Source Files\main</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1022,12 +1022,6 @@
     <ClInclude Include="loaders\NCSFLoader.h">
       <Filter>Header Files\loaders</Filter>
     </ClInclude>
-    <ClInclude Include="SeqNoteManager.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
-    <ClInclude Include="SeqNoteParam.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
     <ClInclude Include="windows\MyCoCreateInstance.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
@@ -1078,6 +1072,12 @@
     </ClInclude>
     <ClInclude Include="formats\KonamiSnesInstr.h">
       <Filter>Header Files\formats\konamisnes</Filter>
+    </ClInclude>
+    <ClInclude Include="SeqNote.h">
+      <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="SeqVoiceAllocator.h">
+      <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
