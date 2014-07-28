@@ -34,15 +34,19 @@ public:
 	void Tick();
 
 	/** Add new note */
-	void NoteOn(int8_t track, int8_t channel, int32_t time, int8_t key, int8_t velocity);
+	void NoteOn(int8_t track, int8_t channel, int8_t key, int8_t velocity);
 	/** Add new note with duration */
-	void NoteWithDur(int8_t track, int8_t channel, int32_t time, int8_t key, int8_t velocity, int32_t duration);
+	void NoteByDur(int8_t track, int8_t channel, int8_t key, int8_t velocity, int32_t duration);
 	/** Remove a note */
-	void NoteOff(int8_t track, int8_t key);
+	void NoteOff(int8_t track, int8_t channel, int8_t key);
 	/** Remove all notes of specific track */
 	void TrackNotesOff(int8_t track);
 	/** Remove all notes */
 	void AllNotesOff();
+	/** Remove all notes and reset timer */
+	void Clear();
+	/** Add duration to the notes of a track */
+	void AddDuration(int8_t track, int32_t delta_time);
 
 private:
 	/** Remove a note from list */

@@ -41,6 +41,17 @@ MidiTrack* MidiFile::InsertTrack(uint32_t trackNum)
 		return aTracks[trackNum];
 }
 
+int MidiFile::GetMidiTrackIndex(MidiTrack * midiTrack)
+{
+	std::vector<MidiTrack *>::iterator it = std::find(aTracks.begin(), aTracks.end(), midiTrack);
+	if (it != aTracks.end()) {
+		return std::distance(aTracks.begin(), it);
+	}
+	else {
+		return -1;
+	}
+}
+
 void MidiFile::SetPPQN(uint16_t ppqn)
 {
 	this->ppqn = ppqn;

@@ -2,6 +2,7 @@
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
+#include "SeqVoiceAllocator.h"
 #include "Menu.h"
 
 class SeqTrack;
@@ -67,6 +68,7 @@ public:
 	ReadMode readMode;
 	//uint16_t ppqn;		//perhaps shouldn't include this
 	MidiFile* midi;
+	SeqVoiceAllocator* voices;
 	double tempoBPM;
 	uint16_t ppqn;
 

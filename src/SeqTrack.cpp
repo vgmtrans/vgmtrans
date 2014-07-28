@@ -413,10 +413,12 @@ void SeqTrack::InsertNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t
 	if (parentSeq->bUseLinearAmplitudeScale)
 		finalVel = Convert7bitPercentVolValToStdMidiVal(vel);
 
-	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset)) {
 		AddEvent(new NoteOnSeqEvent(this, key, vel, offset, length, sEventName));
-	else if (readMode == READMODE_CONVERT_TO_MIDI)
+	}
+	else if (readMode == READMODE_CONVERT_TO_MIDI) {
 		pMidiTrack->InsertNoteOn(channel, key+cKeyCorrection+transpose, finalVel, absTime);
+	}
 	prevKey = key;
 	prevVel = vel;
 }
@@ -433,10 +435,12 @@ void SeqTrack::AddNoteOffNoItem(int8_t key)
 	if (readMode != READMODE_CONVERT_TO_MIDI)
 		return;
 
-	if (cDrumNote == -1)
-		pMidiTrack->AddNoteOff(channel, key+cKeyCorrection+transpose);
-	else
+	if (cDrumNote == -1) {
+				pMidiTrack->AddNoteOff(channel, key+cKeyCorrection+transpose);
+	}
+	else {
 		AddPercNoteOffNoItem(cDrumNote);
+	}
 	return;
 }
 
@@ -558,6 +562,10 @@ void SeqTrack::InsertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int
 
 void SeqTrack::MakePrevDurNoteEnd()
 {
+	// TODO: Remove all prevDurNoteOff mechanisms.
+	// It is used for tied note, but it cannot handle two or more notes.
+	// (That is required by SNES Mint (Akihiko Mori's) music engine, for example)
+	// Hopefully, SeqVoiceAllocator will provide enough functions to replace prevDurNoteOff.
 	if (readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->prevDurNoteOff)
 		pMidiTrack->prevDurNoteOff->AbsTime = GetTime();
 }

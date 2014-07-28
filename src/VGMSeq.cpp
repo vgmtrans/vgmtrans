@@ -16,6 +16,7 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
 : VGMFile(FILETYPE_SEQ, format, file, offset, length, name),
   //midi(this),
   midi(NULL),
+  voices(NULL),
   bMonophonicTracks(false),
   bReverb(false),
   bUseLinearAmplitudeScale(false),
@@ -32,16 +33,19 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   initialPitchBendRangeSemiTones(2), //GM standard.  Means +/- 2 semitones (4 total range)
   initialPitchBendRangeCents(0)
 {
+	voices = new SeqVoiceAllocator();
 	AddContainer<SeqTrack>(aTracks);
 }
 
 VGMSeq::~VGMSeq(void)
 {
+	delete voices;
 	DeleteVect<SeqTrack>(aTracks);
 }
 
 bool VGMSeq::Load()
 {
+	voices->Clear();
 	if (!LoadMain())
 		return false;
 
@@ -65,13 +69,16 @@ MidiFile* VGMSeq::ConvertToMidi()
 
 	MidiFile* newmidi = new MidiFile(this);
 	this->midi = newmidi;
+	this->voices->SetMidiFile(midi);
 	if (!LoadTracks(READMODE_CONVERT_TO_MIDI, stopTime))
 	{
 		delete midi;
 		this->midi = NULL;
+		this->voices->SetMidiFile(NULL);
 		return NULL;
 	}
 	this->midi = NULL;
+	this->voices->SetMidiFile(NULL);
 	return newmidi;
 }
 
@@ -375,7 +382,9 @@ bool VGMSeq::SaveAsMidi(const wchar_t* filepath)
 	MidiFile* midi = this->ConvertToMidi();
 	if (!midi)
 		return false;
+	this->voices->SetMidiFile(midi);
 	bool result = midi->SaveMidiFile(filepath);
 	delete midi;
+	this->voices->SetMidiFile(NULL);
 	return result;
 }

@@ -33,14 +33,12 @@ void SeqVoiceAllocator::Tick()
 	std::list<SeqNote>::iterator nextNote;
 
 	note = notes.begin();
-	while (note != notes.end())
-	{
+	while (note != notes.end()) {
 		nextNote = note;
 		++nextNote;
 
 		// remove expired note
-		if (note->duration != 0 && note->time + note->duration >= time)
-		{
+		if (note->duration != 0 && note->time + note->duration >= time) {
 			NoteOff(note);
 		}
 
@@ -50,7 +48,7 @@ void SeqVoiceAllocator::Tick()
 	time++;
 }
 
-void SeqVoiceAllocator::NoteOn(int8_t track, int8_t channel, int32_t time, int8_t key, int8_t velocity)
+void SeqVoiceAllocator::NoteOn(int8_t track, int8_t channel, int8_t key, int8_t velocity)
 {
 	SeqNote note(track, channel, time, key, velocity, 0);
 
@@ -60,7 +58,7 @@ void SeqVoiceAllocator::NoteOn(int8_t track, int8_t channel, int32_t time, int8_
 	}
 }
 
-void SeqVoiceAllocator::NoteWithDur(int8_t track, int8_t channel, int32_t time, int8_t key, int8_t velocity, int32_t duration)
+void SeqVoiceAllocator::NoteByDur(int8_t track, int8_t channel, int8_t key, int8_t velocity, int32_t duration)
 {
 	SeqNote note(track, channel, time, key, velocity, duration);
 
@@ -78,18 +76,17 @@ void SeqVoiceAllocator::NoteOff(std::list<SeqNote>::iterator note)
 	notes.erase(note);
 }
 
-void SeqVoiceAllocator::NoteOff(int8_t track, int8_t key)
+void SeqVoiceAllocator::NoteOff(int8_t track, int8_t channel, int8_t key)
 {
 	std::list<SeqNote>::iterator note;
 	std::list<SeqNote>::iterator nextNote;
 
 	note = notes.begin();
-	while (note != notes.end())
-	{
+	while (note != notes.end()) {
 		nextNote = note;
 		++nextNote;
 
-		if (note->track == track && note->key == key)
+		if (note->track == track && note->channel == channel && note->key == key)
 		{
 			NoteOff(note);
 			break;
@@ -105,13 +102,11 @@ void SeqVoiceAllocator::TrackNotesOff(int8_t track)
 	std::list<SeqNote>::iterator nextNote;
 
 	note = notes.begin();
-	while (note != notes.end())
-	{
+	while (note != notes.end()) {
 		nextNote = note;
 		++nextNote;
 
-		if (note->track == track)
-		{
+		if (note->track == track) {
 			NoteOff(note);
 		}
 
@@ -125,13 +120,32 @@ void SeqVoiceAllocator::AllNotesOff()
 	std::list<SeqNote>::iterator nextNote;
 
 	note = notes.begin();
-	while (note != notes.end())
-	{
+	while (note != notes.end()) {
 		nextNote = note;
 		++nextNote;
 
 		NoteOff(note);
 
 		note = nextNote;
+	}
+}
+
+void SeqVoiceAllocator::Clear()
+{
+	AllNotesOff();
+	time = 0;
+}
+
+void SeqVoiceAllocator::AddDuration(int8_t track, int32_t delta_time)
+{
+	if (delta_time <= 0) {
+		return;
+	}
+
+	for (std::list<SeqNote>::iterator note = notes.begin(); note != notes.end(); ++note)
+	{
+		if (note->track == track && note->duration != 0) {
+			note->duration += delta_time;
+		}
 	}
 }

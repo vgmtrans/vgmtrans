@@ -178,6 +178,7 @@ public:
 	~MidiFile(void);
 	MidiTrack* AddTrack();
 	MidiTrack* InsertTrack(uint32_t trackNum);
+	int GetMidiTrackIndex(MidiTrack * midiTrack);
 	void SetPPQN(uint16_t ppqn);
 	uint32_t GetPPQN();
 	void WriteMidiToBuffer(std::vector<uint8_t> & buf);
