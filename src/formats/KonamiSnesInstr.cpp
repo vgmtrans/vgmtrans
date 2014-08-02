@@ -159,16 +159,16 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset) :
 	VGMRgn(instr, offset, 7)
 {
 	uint8_t srcn = GetByte(offset);
-	int16_t pitch_scale = GetShortBE(offset + 1);
+	int16_t pitch = GetShortBE(offset + 1);
 	uint8_t adsr1 = GetByte(offset + 3);
 	uint8_t adsr2 = GetByte(offset + 4);
+	uint8_t pan = GetByte(offset + 5);
 	uint8_t gain = adsr2;
 	bool use_adsr = ((adsr1 & 0x80) != 0);
 
-	const double pitch_fixer = 1.0238 * (32768.0 / 32000.0); // 1.0238 <- pitch table vs. equal temperament
 	double fine_tuning;
 	double coarse_tuning;
-	fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
+	fine_tuning = modf(pitch / 256.0, &coarse_tuning);
 
 	// normalize
 	if (fine_tuning >= 0.5)
@@ -187,7 +187,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset) :
 	AddFineTune((int16_t)(fine_tuning * 100.0), offset + 2, 1);
 	AddSimpleItem(offset + 3, 1, L"ADSR1");
 	AddSimpleItem(offset + 4, 1, use_adsr ? L"ADSR2" : L"GAIN");
-	AddUnknownItem(offset + 5, 1);
+	AddSimpleItem(offset + 5, 1, L"Pan");
 	AddUnknownItem(offset + 6, 1);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
