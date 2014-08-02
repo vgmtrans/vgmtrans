@@ -188,7 +188,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset) :
 	AddSimpleItem(offset + 3, 1, L"ADSR1");
 	AddSimpleItem(offset + 4, 1, use_adsr ? L"ADSR2" : L"GAIN");
 	AddSimpleItem(offset + 5, 1, L"Pan");
-	AddUnknownItem(offset + 6, 1);
+	AddSimpleItem(offset + 6, 1, L"Volume (Decrease)");
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
