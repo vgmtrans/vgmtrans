@@ -176,12 +176,14 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset, bool percu
 	uint8_t adsr1 = GetByte(offset + 3);
 	uint8_t adsr2 = GetByte(offset + 4);
 	uint8_t pan = GetByte(offset + 5);
+	uint8_t vol = GetByte(offset + 6);
+
 	uint8_t gain = adsr2;
 	bool use_adsr = ((adsr1 & 0x80) != 0);
 
 	double fine_tuning;
 	double coarse_tuning;
-	fine_tuning = modf(key + (tuning / 256), &coarse_tuning);
+	fine_tuning = modf(key + (tuning / 256.0), &coarse_tuning);
 
 	// normalize
 	if (fine_tuning >= 0.5)
@@ -201,7 +203,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset, bool percu
 	AddSimpleItem(offset + 3, 1, L"ADSR1");
 	AddSimpleItem(offset + 4, 1, use_adsr ? L"ADSR2" : L"GAIN");
 	AddSimpleItem(offset + 5, 1, L"Pan");
-	AddSimpleItem(offset + 6, 1, L"Volume (Decrease)");
+	AddVolume(1.0 - (max(-vol, -127) / 127.0), offset + 6);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
