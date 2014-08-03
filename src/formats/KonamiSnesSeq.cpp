@@ -203,6 +203,7 @@ void KonamiSnesTrack::ResetVars(void)
 	loopPitchDelta2 = 0;
 	voltaEndMeansPlayFromStart = false;
 	voltaEndMeansPlayNextVolta = false;
+	percussion = false;
 
 	noteLength = 0;
 	noteDurationRate = 0;
@@ -211,6 +212,7 @@ void KonamiSnesTrack::ResetVars(void)
 	loopReturnAddr2 = 0;
 	voltaLoopStart = 0;
 	voltaLoopEnd = 0;
+	instrument = 0;
 }
 
 double KonamiSnesTrack::GetTuningInSemitones(int8_t tuning)
@@ -384,14 +386,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 			}
 		}
 
-		if (percussion)
-		{
-			AddPercNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
-		}
-		else
-		{
-			AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
-		}
+		AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
 		AddTime(len);
 
 		break;
@@ -399,19 +394,21 @@ bool KonamiSnesTrack::ReadEvent(void)
 
 	case EVENT_PERCUSSION_ON:
 	{
-		EVENT_WITH_MIDITEXT_START
 		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Percussion On", desc.str().c_str(), CLR_CHANGESTATE);
-		EVENT_WITH_MIDITEXT_END
-		percussion = true;
+		if (!percussion) {
+			AddProgramChange(beginOffset, curOffset-beginOffset, 127 << 7, true);
+			percussion = true;
+		}
 		break;
 	}
 
 	case EVENT_PERCUSSION_OFF:
 	{
-		EVENT_WITH_MIDITEXT_START
 		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Percussion Off", desc.str().c_str(), CLR_CHANGESTATE);
-		EVENT_WITH_MIDITEXT_END
-		percussion = false;
+		if (percussion) {
+			AddProgramChange(beginOffset, curOffset-beginOffset, instrument, true);
+			percussion = false;
+		}
 		break;
 	}
 
@@ -445,6 +442,8 @@ bool KonamiSnesTrack::ReadEvent(void)
 	case EVENT_PROGCHANGE:
 	{
 		uint8_t newProg = GetByte(curOffset++);
+
+		instrument = newProg;
 		AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true);
 		break;
 	}
@@ -454,6 +453,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 		uint8_t newVolume = GetByte(curOffset++);
 		uint8_t newProg = GetByte(curOffset++);
 
+		instrument = newProg;
 		AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true);
 
 		uint8_t midiVolume = ConvertPercentAmpToStdMidiVal(newVolume / 255.0);

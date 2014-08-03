@@ -104,6 +104,7 @@ public:
 	bool voltaEndMeansPlayFromStart;
 	bool voltaEndMeansPlayNextVolta;
 	bool percussion;
+	uint8_t instrument;
 
 private:
 	double GetTuningInSemitones(int8_t tuning);

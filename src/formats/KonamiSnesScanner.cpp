@@ -236,7 +236,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	// scan for percussive instrument table
 	if (file->SearchBytePattern(ptnLoadPercInstr, ofsLoadPercInstrASM))
 	{
-		addrPercInstrTable = file->GetByte(ofsLoadInstrASM + 1) | (file->GetByte(ofsLoadInstrASM + 4) << 8);
+		addrPercInstrTable = file->GetByte(ofsLoadPercInstrASM + 1) | (file->GetByte(ofsLoadPercInstrASM + 4) << 8);
 	}
 	else
 	{

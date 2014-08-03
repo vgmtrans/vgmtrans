@@ -33,7 +33,7 @@ class KonamiSnesInstr
 	: public VGMInstr
 {
 public:
-	KonamiSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name = L"KonamiSnesInstr");
+	KonamiSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, bool percussion, const std::wstring& name = L"KonamiSnesInstr");
 	virtual ~KonamiSnesInstr(void);
 
 	virtual bool LoadInstr();
@@ -42,6 +42,7 @@ public:
 
 protected:
 	uint32_t spcDirAddr;
+	bool percussion;
 };
 
 // *************
@@ -52,7 +53,7 @@ class KonamiSnesRgn
 	: public VGMRgn
 {
 public:
-	KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset);
+	KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset, bool percussion);
 	virtual ~KonamiSnesRgn(void);
 
 	virtual bool LoadRgn();

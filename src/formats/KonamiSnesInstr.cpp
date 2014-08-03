@@ -66,7 +66,7 @@ bool KonamiSnesInstrSet::GetInstrPointers()
 
 		std::wostringstream instrName;
 		instrName << L"Instrument " << instr;
-		KonamiSnesInstr * newInstr = new KonamiSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
+		KonamiSnesInstr * newInstr = new KonamiSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, false, instrName.str());
 		aInstrs.push_back(newInstr);
 	}
 	if (aInstrs.size() == 0)
@@ -74,7 +74,9 @@ bool KonamiSnesInstrSet::GetInstrPointers()
 		return false;
 	}
 
-	// TODO: percussive samples
+	// percussive samples
+	KonamiSnesInstr * newInstr = new KonamiSnesInstr(this, percInstrOffset, 127, 0, spcDirAddr, true, L"Percussions");
+	aInstrs.push_back(newInstr);
 
 	std::sort(usedSRCNs.begin(), usedSRCNs.end());
 	SNESSampColl * newSampColl = new SNESSampColl(KonamiSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
@@ -91,9 +93,10 @@ bool KonamiSnesInstrSet::GetInstrPointers()
 // KonamiSnesInstr
 // ***************
 
-KonamiSnesInstr::KonamiSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name) :
+KonamiSnesInstr::KonamiSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, bool percussion, const std::wstring& name) :
 	VGMInstr(instrSet, offset, 7, theBank, theInstrNum, name),
-	spcDirAddr(spcDirAddr)
+	spcDirAddr(spcDirAddr),
+	percussion(percussion)
 {
 }
 
@@ -103,6 +106,11 @@ KonamiSnesInstr::~KonamiSnesInstr()
 
 bool KonamiSnesInstr::LoadInstr()
 {
+	// TODO: percussive samples
+	if (percussion) {
+		return true;
+	}
+
 	uint8_t srcn = GetByte(dwOffset);
 	uint32_t offDirEnt = spcDirAddr + (srcn * 4);
 	if (offDirEnt + 4 > 0x10000)
@@ -112,7 +120,7 @@ bool KonamiSnesInstr::LoadInstr()
 
 	uint16_t addrSampStart = GetShort(offDirEnt);
 
-	KonamiSnesRgn * rgn = new KonamiSnesRgn(this, dwOffset);
+	KonamiSnesRgn * rgn = new KonamiSnesRgn(this, dwOffset, percussion);
 	rgn->sampOffset = addrSampStart - spcDirAddr;
 	aRgns.push_back(rgn);
 
@@ -157,9 +165,11 @@ bool KonamiSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, ui
 // KonamiSnesRgn
 // *************
 
-KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset) :
+KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset, bool percussion) :
 	VGMRgn(instr, offset, 7)
 {
+	// TODO: percussive samples
+
 	uint8_t srcn = GetByte(offset);
 	int8_t key = GetByte(offset + 1);
 	int8_t tuning = GetByte(offset + 2);
