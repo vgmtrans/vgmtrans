@@ -64,7 +64,9 @@ bool KonamiSnesInstrSet::GetInstrPointers()
 			usedSRCNs.push_back(srcn);
 		}
 
-		KonamiSnesInstr * newInstr = new KonamiSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr);
+		std::wostringstream instrName;
+		instrName << L"Instrument " << instr;
+		KonamiSnesInstr * newInstr = new KonamiSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
 		aInstrs.push_back(newInstr);
 	}
 	if (aInstrs.size() == 0)

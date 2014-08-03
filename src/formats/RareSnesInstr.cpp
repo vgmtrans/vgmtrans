@@ -150,7 +150,9 @@ bool RareSnesInstrSet::GetInstrPointers()
 			adsr = itrADSR->second;
 		}
 
-		RareSnesInstr * newInstr = new RareSnesInstr(this, dwOffset + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose, pitch, adsr);
+		std::wostringstream instrName;
+		instrName << L"Instrument " << inst;
+		RareSnesInstr * newInstr = new RareSnesInstr(this, dwOffset + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose, pitch, adsr, instrName.str());
 		aInstrs.push_back(newInstr);
 	}
 	return aInstrs.size() != 0;

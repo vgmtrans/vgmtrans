@@ -53,7 +53,9 @@ bool CapcomSnesInstrSet::GetInstrPointers()
 			usedSRCNs.push_back(srcn);
 		}
 
-		CapcomSnesInstr * newInstr = new CapcomSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr);
+		std::wostringstream instrName;
+		instrName << L"Instrument " << instr;
+		CapcomSnesInstr * newInstr = new CapcomSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
 		aInstrs.push_back(newInstr);
 	}
 	if (aInstrs.size() == 0)
