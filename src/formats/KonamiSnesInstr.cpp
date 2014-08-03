@@ -161,7 +161,8 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset) :
 	VGMRgn(instr, offset, 7)
 {
 	uint8_t srcn = GetByte(offset);
-	int16_t pitch = GetShortBE(offset + 1);
+	int8_t key = GetByte(offset + 1);
+	int8_t tuning = GetByte(offset + 2);
 	uint8_t adsr1 = GetByte(offset + 3);
 	uint8_t adsr2 = GetByte(offset + 4);
 	uint8_t pan = GetByte(offset + 5);
@@ -170,7 +171,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset) :
 
 	double fine_tuning;
 	double coarse_tuning;
-	fine_tuning = modf(pitch / 256.0, &coarse_tuning);
+	fine_tuning = modf(key + (tuning / 256), &coarse_tuning);
 
 	// normalize
 	if (fine_tuning >= 0.5)
@@ -185,7 +186,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset) :
 	}
 
 	AddSampNum(srcn, offset, 1);
-	AddUnityKey(96 - (int)(coarse_tuning), offset + 1, 1);
+	AddUnityKey(95 - (int)(coarse_tuning), offset + 1, 1);
 	AddFineTune((int16_t)(fine_tuning * 100.0), offset + 2, 1);
 	AddSimpleItem(offset + 3, 1, L"ADSR1");
 	AddSimpleItem(offset + 4, 1, use_adsr ? L"ADSR2" : L"GAIN");
