@@ -45,7 +45,7 @@ bool KonamiSnesInstrSet::GetInstrPointers()
 		else
 		{
 			// switchable samples
-			addrInstrHeader = bankedInstrOffset + (7 * instr);
+			addrInstrHeader = bankedInstrOffset + (7 * (instr - firstBankedInstr));
 		}
 		if (addrInstrHeader + 7 > 0x10000)
 		{

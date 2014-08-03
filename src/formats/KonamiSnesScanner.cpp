@@ -226,7 +226,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 		firstBankedInstr = file->GetByte(ofsLoadInstrASM + 11);
 		addrCurrentBank = file->GetByte(ofsLoadInstrASM + 30);
 		addrInstrTableBanks = file->GetShort(ofsLoadInstrASM + 32);
-		addrBankedInstrTable = addrInstrTableBanks + (file->GetByte(addrCurrentBank) * 2);
+		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
 	}
 	else
 	{
