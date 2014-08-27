@@ -1,10 +1,13 @@
-#include "stdafx.h"
-#include <tinyxml.h>
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
+#include "tinyxml.h"
 #include "MAMELoader.h"
 #include "Root.h"
 #include "RawFile.h"
 #include "Format.h"
 #include "KabukiDecrypt.h"
+#include "common.h"
 
 using namespace std;
 
@@ -171,10 +174,11 @@ PostLoadCommand MAMELoader::Apply(RawFile* file)
 {
 	if (!bLoadedXml)
 		return KEEP_IT;
-	if (file->GetExtension() != _T("zip"))
+	if (file->GetExtension() != L"zip")
 		return KEEP_IT;
 
-	string fullfilename = wstring2string(wstring(file->GetFileName()));
+    wstring fullfilename_w = file->GetFileName();
+	string fullfilename = wstring2string(fullfilename_w);
 	const char* endoffilename = strrchr(fullfilename.c_str(), '.');
 	char filename[10] = { 0 };
 	strncpy(filename, fullfilename.c_str(), endoffilename - fullfilename.c_str());

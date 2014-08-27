@@ -164,12 +164,12 @@ protected:
 			}
 		}
 
-		std::pair<std::multimap<IdType, VGMSeq*>::iterator, std::multimap<IdType, VGMSeq*>::iterator> itPair;
+		std::pair<typename std::multimap<IdType, VGMSeq*>::iterator, typename std::multimap<IdType, VGMSeq*>::iterator> itPair;
 		// equal_range(b) returns pair<iterator,iterator> representing the range
 		// of element with key b
 		itPair = seqs.equal_range(id);
 		// Loop through range of maps with id key
-		for (std::multimap<IdType, VGMSeq*>::iterator it2 = itPair.first;
+		for (typename std::multimap<IdType, VGMSeq*>::iterator it2 = itPair.first;
 		   it2 != itPair.second;
 		   ++it2)
 		{
@@ -240,12 +240,12 @@ protected:
 				}
 			}
 
-			std::pair<std::multimap<IdType, VGMSeq*>::iterator, std::multimap<IdType, VGMSeq*>::iterator> itPair;
+			std::pair<typename std::multimap<IdType, VGMSeq*>::iterator, typename std::multimap<IdType, VGMSeq*>::iterator> itPair;
 			// equal_range(b) returns pair<iterator,iterator> representing the range
 			// of element with key b
 			itPair = seqs.equal_range(id);
 			// Loop through range of maps with id key
-			for (std::multimap<IdType, VGMSeq*>::iterator it2 = itPair.first;
+			for (typename std::multimap<IdType, VGMSeq*>::iterator it2 = itPair.first;
 			   it2 != itPair.second;
 			   ++it2)
 			{
@@ -282,7 +282,7 @@ protected:
 		//seqs.erase(seq->GetID());
 
 		//Find the first matching key.
-		std::multimap<IdType, VGMSeq*>::iterator itr = seqs.find(id);
+		typename std::multimap<IdType, VGMSeq*>::iterator itr = seqs.find(id);
 		//Search for the specific seq to remove.
 		if (itr != seqs.end()) {
 			do {

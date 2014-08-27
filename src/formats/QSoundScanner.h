@@ -1,12 +1,12 @@
 #pragma once
-#include "Scanner.h"
+#include "../Scanner.h"
 
 class QSoundInstrSet;
 class QSoundSampColl;
 class QSoundSampleInfoTable;
 class QSoundArticTable;
 
-enum QSoundVer {
+enum QSoundVer : uint8_t {
 	VER_UNDEFINED,
 	VER_100,
 	VER_101,
@@ -33,5 +33,5 @@ class QSoundScanner :
 {
 public:
 	virtual void Scan(RawFile* file, void* info = 0);
-	QSoundVer QSoundScanner::GetVersionEnum(std::string& versionStr);
+	QSoundVer GetVersionEnum(std::string& versionStr);
 };

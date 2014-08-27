@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "NinSnesFormat.h"
 #include "NinSnesScanner.h"
 #include "NinSnesInstr.h"
@@ -117,9 +119,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 {
 	NinSnesVersion version = NINSNES_NONE;
 
-	UINT ofsLoadInstrTableAddressASM;
-	UINT ofsSetDIRASM;
-	UINT addrInstrTable;
+	uint32_t ofsLoadInstrTableAddressASM;
+    uint32_t ofsSetDIRASM;
+    uint32_t addrInstrTable;
 
 	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;

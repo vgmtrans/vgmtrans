@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "MidiFile.h"
 #include "VGMSeq.h"
 #include "common.h"
@@ -804,7 +806,7 @@ MastVolEvent::MastVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absolut
 
 uint32_t MastVolEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 {
-	uint8_t data[6] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, mastVol & 0x7F };
+	uint8_t data[6] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, (uint8_t)(mastVol & 0x7F) };
 	return WriteSysexEvent(buf, time, data, 6);
 }
 

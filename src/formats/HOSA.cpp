@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "HOSA.h"
 #include "HOSAFormat.h"
 
@@ -383,9 +385,9 @@ unsigned	int		HOSATrack::DecodeVariable(){
 	//==================================
 	//	[ Local 変数 ]
 	//----------------------------------
-	unsigned	__int32		iVariable=0;	// Result of decode
-	unsigned	int			count=4;		// for counter
-	unsigned	char		cFread;			// for reading
+	int32_t		iVariable=0;	// Result of decode
+	uint32_t			count=4;		// for counter
+	uint8_t		cFread;			// for reading
 
 	//==================================
 	//	[ Read Variable ]

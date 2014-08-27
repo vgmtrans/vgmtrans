@@ -2,7 +2,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum KonamiSnesVersion; // see KonamiSnesFormat.h
+enum KonamiSnesVersion : uint8_t; // see KonamiSnesFormat.h
 
 class KonamiSnesScanner :
 	public VGMScanner

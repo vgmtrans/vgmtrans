@@ -1,7 +1,8 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "NDSInstrSet.h"
 #include "VGMRgn.h"
-#include "math.h"
 
 using namespace std;
 

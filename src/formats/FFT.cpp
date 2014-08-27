@@ -1,4 +1,8 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
+
+#include <codecvt>
 #include "FFT.h"
 #include "FFTFormat.h"
 
@@ -42,7 +46,8 @@ bool FFTSeq::GetHeaderInfo(void)
 	int titleLength = ptPercussionTbl-ptSongTitle;
 	char* songtitle = new char[titleLength];
 	GetBytes(dwOffset+ptSongTitle, titleLength, songtitle);
-	this->name = string2wstring(string(songtitle));
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	this->name = converter.from_bytes(songtitle);
 	delete[] songtitle;
 
 	//wostringstream songnameStream;

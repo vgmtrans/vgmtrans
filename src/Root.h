@@ -95,8 +95,8 @@ public:
 	virtual void UI_EndRemoveVGMFiles() {}
 	virtual void UI_RemoveVGMColl(VGMColl* theColl) {}
 	//virtual void UI_RemoveVGMFileRange(VGMFile* first, VGMFile* last) {}
-	virtual void UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName, VOID* UI_specific) {}
-	virtual void UI_AddItemSet(VOID* UI_specific, std::vector<ItemSet>* itemset) {}
+	virtual void UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName, void* UI_specific) {}
+	virtual void UI_AddItemSet(void* UI_specific, std::vector<ItemSet>* itemset) {}
 	virtual std::wstring UI_GetOpenFilePath(const std::wstring& suggestedFilename = L"", const std::wstring& extension = L"") = 0;
 	virtual std::wstring UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension = L"") = 0;
 	virtual std::wstring UI_GetSaveDirPath(const std::wstring& suggestedDir = L"") = 0;

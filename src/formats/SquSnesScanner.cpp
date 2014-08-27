@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "SquSnesScanner.h"
 #include "SquSnesSeq.h"
 //#include "AkaoInstr.h"

@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "PSF2Loader.h"
 #include "Root.h"
 #include "RawFile.h"
@@ -66,7 +68,7 @@ int PSF2Loader::psf2_decompress_block(
 
 	if(!blocks)
 	{
-		Alert(L"Out of Memory");
+        Alert(L"Out of Memory");
 		return -1;
 	}
 	
@@ -76,7 +78,7 @@ int PSF2Loader::psf2_decompress_block(
 
 	if(!zblock)
 	{
-		Alert(L"Out of Memory");
+        Alert(L"Out of Memory");
 		delete[] blocks;
 		return -1;
 	}
@@ -133,7 +135,7 @@ int PSF2Loader::psf2unpack(RawFile* file, unsigned long fileoffset, unsigned lon
 			r=psf2unpack(file, offset+0x14,filesize);
 			if (r)
 			{
-				Alert(L"Directory decompression failed");
+                Alert(L"Directory decompression failed");
 				return -1;
 			}
 			//AfxMessageBox(_T("Going up one Directory"), MB_OK, NULL);
@@ -151,7 +153,7 @@ int PSF2Loader::psf2unpack(RawFile* file, unsigned long fileoffset, unsigned lon
 			dblock = new uint8[buffersize];
 			if (!dblock)
 			{
-				Alert(L"Out of Memory");
+                Alert(L"Out of Memory");
 				return -1;
 			}
 

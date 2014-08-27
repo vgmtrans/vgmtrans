@@ -94,7 +94,7 @@ class RiffFile : public RIFFChunk
 public:
 	RiffFile(std::string file_name, std::string form);
 
-	static void RiffFile::WriteLIST(std::vector<uint8_t> & buf, uint32_t listName, uint32_t listSize)
+	static void WriteLIST(std::vector<uint8_t> & buf, uint32_t listName, uint32_t listSize)
 	{
 		PushTypeOnVectBE<uint32_t>(buf, 0x4C495354);	//write "LIST"
 		PushTypeOnVect<uint32_t>(buf, listSize);
@@ -102,7 +102,7 @@ public:
 	}
 
 	//Adds a null byte and ensures 16 bit alignment of a text string
-	static void RiffFile::AlignName(std::string &name)
+	static void AlignName(std::string &name)
 	{
 		name += (char)0x00;
 		if (name.size() % 2)						//if the size of the name string is odd

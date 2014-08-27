@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "SonyPS2InstrSet.h"
 #include "SonyPS2Format.h"
 #include "PSXSPU.h"
@@ -379,7 +381,7 @@ bool SonyPS2Instr::LoadInstr()
 			//splitblock->splitRangeLow
 		}
 	}
-	return TRUE;
+	return true;
 }
 
 int8_t SonyPS2Instr::ConvertPanVal(uint8_t panVal)

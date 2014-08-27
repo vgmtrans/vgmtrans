@@ -1,7 +1,7 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "Format.h"			//Replace with MP2k-specific format header when that's ready
+#include "../VGMSeq.h"
+#include "../SeqTrack.h"
+#include "../Format.h"
 
 static const unsigned char delta_time_table[] = { 0, 192, 144, 96, 72, 64, 48, 36, 32, 24, 18, 16, 12, 9, 8, 6, 4, 3, 2};
 				//	これ・・・無駄じゃね？

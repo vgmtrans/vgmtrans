@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "common.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
@@ -186,7 +188,8 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 			{
 				if (readMode == READMODE_ADD_TO_UI)
 				{
-					pRoot->AddLogItem(new LogItem(wstring(*this->GetName()) + L" - Abort loading tracks by time limit.", LOG_LEVEL_WARN, wstring(L"VGMSeq")));
+                    wstring itemName = *this->GetName() + L" - Abort loading tracks by time limit.";
+					pRoot->AddLogItem(new LogItem(itemName.c_str(), LOG_LEVEL_WARN, L"VGMSeq"));
 				}
 
 				InactiveAllTracks();

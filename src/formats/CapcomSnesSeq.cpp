@@ -1,7 +1,10 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "CapcomSnesSeq.h"
 #include "CapcomSnesFormat.h"
 #include "ScaleConversion.h"
+#include "osdepend.h"
 
 using namespace std;
 
@@ -769,7 +772,8 @@ bool CapcomSnesTrack::ReadEvent(void)
 			EVENT_WITH_MIDITEXT_START
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 			EVENT_WITH_MIDITEXT_END
-			pRoot->AddLogItem(new LogItem(wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, wstring(L"CapcomSnesSeq")));
+            wstring itemName = L"Unknown Event - " + desc.str();
+			pRoot->AddLogItem(new LogItem(itemName.c_str(), LOG_LEVEL_ERR, L"CapcomSnesSeq"));
 			bContinue = false;
 			break;
 		}
@@ -777,7 +781,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 
 	//wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
-	//OutputDebugString(ssTrace.str().c_str());
+	//LogDebug(ssTrace.str().c_str());
 
 	return bContinue;
 }

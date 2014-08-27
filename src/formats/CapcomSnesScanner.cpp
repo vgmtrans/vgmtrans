@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "CapcomSnesScanner.h"
 #include "CapcomSnesSeq.h"
 #include "CapcomSnesInstr.h"
@@ -111,14 +113,14 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 {
 	CapcomSnesVersion version = CAPCOMSNES_NONE;
 
-	UINT ofsReadSongListASM;
-	UINT ofsReadBGMAddressASM;
-	UINT ofsLoadInstrTableAddressASM;
+	uint32_t ofsReadSongListASM;
+	uint32_t ofsReadBGMAddressASM;
+	uint32_t ofsLoadInstrTableAddressASM;
 	bool hasSongList;
 	bool bgmAtFixedAddress;
-	UINT addrSongList;
-	UINT addrBGMHeader;
-	UINT addrInstrTable;
+	uint32_t addrSongList;
+	uint32_t addrBGMHeader;
+	uint32_t addrInstrTable;
 
 	wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
@@ -358,7 +360,7 @@ int8_t CapcomSnesScanner::GuessCurrentSongFromARAM (RawFile* file, CapcomSnesVer
 	return guessedSongIndex;
 }
 
-bool CapcomSnesScanner::IsValidBGMHeader (RawFile* file, UINT addrSongHeader)
+bool CapcomSnesScanner::IsValidBGMHeader (RawFile* file, uint32_t addrSongHeader)
 {
 	if (addrSongHeader + 17 > 0x10000)
 	{
@@ -380,11 +382,11 @@ std::map<uint8_t, uint8_t> CapcomSnesScanner::GetInitDspRegMap (RawFile* file)
 {
 	std::map<uint8_t, uint8_t> dspRegMap;
 
-	UINT ofsDspRegInitASM;
-	UINT ofsDspRegInitOldVerASM;
-	UINT dspRegCount = 0;
-	UINT addrDspRegList;
-	UINT addrDspValueList;
+	uint32_t ofsDspRegInitASM;
+	uint32_t ofsDspRegInitOldVerASM;
+	uint32_t dspRegCount = 0;
+	uint32_t addrDspRegList;
+	uint32_t addrDspValueList;
 
 	// find a code block which initializes dsp registers
 	if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM))
@@ -411,7 +413,7 @@ std::map<uint8_t, uint8_t> CapcomSnesScanner::GetInitDspRegMap (RawFile* file)
 	}
 
 	// store dsp reg/value pairs to map
-	for (UINT regIndex = 0; regIndex < dspRegCount; regIndex++)
+	for (uint32_t regIndex = 0; regIndex < dspRegCount; regIndex++)
 	{
 		uint8_t dspReg = file->GetByte(addrDspRegList + regIndex);
 		uint8_t dspValue = file->GetByte(addrDspValueList + regIndex);

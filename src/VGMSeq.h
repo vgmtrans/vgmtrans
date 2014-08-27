@@ -8,7 +8,7 @@
 class SeqTrack;
 class SeqEvent;
 
-typedef enum ReadMode
+typedef enum ReadMode : uint8_t
 {
 	READMODE_ADD_TO_UI,
 	READMODE_CONVERT_TO_MIDI,
@@ -16,8 +16,7 @@ typedef enum ReadMode
 };
 
 
-class VGMSeq :
-	public VGMFile
+class VGMSeq : public VGMFile
 {
 public:
 	BEGIN_MENU_SUB(VGMSeq, VGMFile)
@@ -94,11 +93,6 @@ public:
 
 	std::vector<SeqTrack*> aTracks;		//array of track pointers
 	std::vector<uint32_t> aInstrumentsUsed;
-
-//protected:
-	//map<int, InstrAssoc> InstrMap;
-	//map<int, DrumAssoc> DrumMap;
-	//static int count;
 };
 
 

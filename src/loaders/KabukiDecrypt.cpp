@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "KabukiDecrypt.h"
 
 // The following is taken directly from the MAME source code in kabuki.c

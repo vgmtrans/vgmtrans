@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "NinSnesSeq.h"
 #include "NinSnesFormat.h"
 
@@ -11,7 +13,7 @@ NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint3
 {
 	AddContainer<NinSnesSection>(aSections);
 	if (!RemoveContainer<SeqTrack>(aTracks))
-		Alert(L"Problem removing song tracks container");
+        Alert(L"Problem removing song tracks container");
 }
 
 

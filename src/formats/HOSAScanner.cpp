@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "HOSAScanner.h"
 #include "HOSA.h"
 #include "HOSAInstr.h"
@@ -30,7 +32,7 @@ void HOSAScanner::Scan(RawFile* file, void* info)
 	}
 	sampcoll->UseInstrSet(instrset);
 
-	VGMColl* coll = new VGMColl(_T("HOSA Song"));
+	VGMColl* coll = new VGMColl(L"HOSA Song");
 	coll->UseSeq(seq);
 	coll->AddInstrSet(instrset);
 	if (!coll->Load())

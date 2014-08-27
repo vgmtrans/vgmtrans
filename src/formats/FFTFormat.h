@@ -1,8 +1,8 @@
 #pragma once
-#include "Format.h"
-#include "Root.h"
-#include "VGMColl.h"
-#include "Matcher.h"
+#include "../Format.h"
+#include "../Root.h"
+#include "../VGMColl.h"
+#include "../Matcher.h"
 #include "FFTScanner.h"
 
 BEGIN_FORMAT(FFT)

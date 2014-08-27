@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "TriAcePS1Scanner.h"
 #include "TriAcePS1Seq.h"
 #include "TriAcePS1InstrSet.h"
@@ -69,7 +71,7 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 		if (!instrsets.size())
 			return;
 
-		VGMColl* coll = new VGMColl(_T("TriAce Song"));
+		VGMColl* coll = new VGMColl(L"TriAce Song");
 		coll->UseSeq(seq);
 		for (uint32_t i=0; i<instrsets.size(); i++)
 			coll->AddInstrSet(instrsets[i]);
@@ -174,7 +176,7 @@ TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, uint32_t cfO
 		}		
 	}
 	if (ufOff > ufSize)
-		Alert(L"ufOff > ufSize!");
+        Alert(L"ufOff > ufSize!");
 
 	//If we had to use DEFAULT_UFSIZE because the uncompressed file size was not given (Valkyrie Profile),
 	//then create a new buffer of the correct size now that we know it, and delete the old one.

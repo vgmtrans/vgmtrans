@@ -1,5 +1,5 @@
 #pragma once
-#include "Loader.h"
+#include "../Loader.h"
 #include <unzip.h>
 
 class TiXmlElement;
@@ -11,12 +11,14 @@ enum LoadMethod {
 	LM_DEINTERLACE
 };
 
+using namespace std;
+
 typedef struct _MAMERomGroupEntry
 {
 	_MAMERomGroupEntry() : file(NULL) {}
 	template < class T > bool GetAttribute( const std::string& attrName, T* out )
 	{
-		string strValue = attributes[attrName];
+        string strValue = attributes[attrName];
 		if (strValue.empty())
 			return false;			//Attribute name does not exist.
 

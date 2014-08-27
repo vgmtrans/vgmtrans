@@ -1,9 +1,11 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "QSoundSeq.h"
 #include "QSoundInstr.h"
 #include "QSoundFormat.h"
-#include "ScaleConversion.h"
-#include "SeqEvent.h"
+#include "../ScaleConversion.h"
+#include "../SeqEvent.h"
 
 DECLARE_FORMAT(QSound);
 
@@ -257,7 +259,7 @@ bool QSoundSeq::PostLoad()
 
 					if (tremelo > 0)
 					{
-						uint8_t expression = ConvertPercentAmpToStdMidiVal((0x10000 - (tremelo*abs(lfoPercent))) / (double)0x10000);
+						uint8_t expression = ConvertPercentAmpToStdMidiVal((0x10000 - (tremelo * fabs(lfoPercent))) / (double)0x10000);
 						track->InsertExpression(channel, expression, startAbsTicks + t);
 					}
 				}
@@ -284,7 +286,7 @@ bool QSoundSeq::PostLoad()
 					{
 						vibrato = vibrato_depth_table[marker->databyte1] * (100/256.0);
 						//pitchbendRange = max(200, (vibrato + 50));		//50 cents to allow for pitchbend values, which range -50/+50
-						pitchbendRange = (int)max(200, ceil((vibrato+50)/100.0)*100);	//+50 cents to allow for pitchbend values, which range -50/+50
+						pitchbendRange = std::max<int>(200, ceil((vibrato+50)/100.0)*100);	//+50 cents to allow for pitchbend values, which range -50/+50
 						track->InsertPitchBendRange(channel, pitchbendRange/100, pitchbendRange%100, curTicks);
 						
 						lfoCents = (short)((effectiveLfoVal / (double)0x1000000) * vibrato);
@@ -421,7 +423,7 @@ bool QSoundTrack::ReadEvent(void)
 					AddNoteOn(beginOffset, curOffset-beginOffset, key, 127, L"Note On (tied)");
 				}
 				else
-					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Tie"), NULL, CLR_NOTEON);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tie", NULL, CLR_NOTEON);
 				bPrevNoteTie = true;
 				prevTieNote = key;
 			}
@@ -452,7 +454,7 @@ bool QSoundTrack::ReadEvent(void)
 			}
 		}
 		else			//it's a rest
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Rest"), NULL, CLR_REST);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Rest", NULL, CLR_REST);
 		AddTime(delta);
 	}
 	else
@@ -462,24 +464,24 @@ bool QSoundTrack::ReadEvent(void)
 		{
 		case 0x00 :
 			noteState ^= 0x20;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 0x20 (change duration table)"), NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Note State xor 0x20 (change duration table)", NULL, CLR_CHANGESTATE);
 			break;
 		case 0x01 :
 			noteState ^= 0x40;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 0x40 (Toggle tie)"), NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Note State xor 0x40 (Toggle tie)", NULL, CLR_CHANGESTATE);
 			break;
 		case 0x02 :
 			noteState |= (1 << 4);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State |= 0x10 (change duration table)"), NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Note State |= 0x10 (change duration table)", NULL, CLR_CHANGESTATE);
 			break;
 		case 0x03 :
 			noteState ^= 8;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Note State xor 8 (change octave)"), NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Note State xor 8 (change octave)", NULL, CLR_CHANGESTATE);
 			break;
 		case 0x04 :
 			noteState &= 0x97;
 			noteState |= GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Change Note State (& 0x97)"), NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Change Note State (& 0x97)", NULL, CLR_CHANGESTATE);
 			break;
 		case 0x05 :
 			{
@@ -518,7 +520,7 @@ bool QSoundTrack::ReadEvent(void)
 			break;
 		case 0x06 :
 			dur = GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Set Duration"), NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Duration", NULL, CLR_CHANGESTATE);
 			break;
 		case 0x07 :
 			vol = GetByte(curOffset++);
@@ -542,7 +544,7 @@ bool QSoundTrack::ReadEvent(void)
 		case 0x09 :					//effectively sets the octave
 			noteState &= 0xF8;
 			noteState |= GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Set Octave"), NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Octave", NULL, CLR_CHANGESTATE);
 			break;
 		case 0x0A :					// Global Transpose
 			{
@@ -612,7 +614,7 @@ theLoop:	if (loop[loopNum] == 0 && loopOffset[loopNum] == 0)						//first time h
 				jump = GetShortBE(curOffset);//(GetByte(curOffset++)<<8) + GetByte(curOffset++);
 				curOffset += 2;
 			}
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Loop"), NULL, CLR_LOOP);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop", NULL, CLR_LOOP);
 
 			if (loop[loopNum] == 0)
 			{
@@ -666,7 +668,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 				noteState |= GetByte(curOffset++);
 				{
 					short jump = (GetByte(curOffset++)<<8) + GetByte(curOffset++);
-					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Loop Break"), NULL, CLR_LOOP);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Break", NULL, CLR_LOOP);
 					curOffset += jump;
 				}
 			}
@@ -709,7 +711,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			{
 				//curOffset++;
 				vol = GetByte(curOffset++);
-				AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Master Volume"), NULL, CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Master Volume", NULL, CLR_UNKNOWN);
 				//this->AddMasterVol(beginOffset, curOffset-beginOffset, vol);
 				//AddVolume(beginOffset, curOffset-beginOffset, vool);
 			}
@@ -721,7 +723,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 				if (GetVersion() < VER_171)
 				{
 					vibratoDepth = GetByte(curOffset++);
-					AddMarker(beginOffset, curOffset-beginOffset, string("vibrato"), vibratoDepth, 0, _T("Vibrato"), PRIORITY_HIGH, CLR_PITCHBEND);
+					AddMarker(beginOffset, curOffset-beginOffset, string("vibrato"), vibratoDepth, 0, L"Vibrato", PRIORITY_HIGH, CLR_PITCHBEND);
 				}
 				else
 				{
@@ -731,16 +733,16 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 					switch (type)
 					{
 					case 0:		// vibrato
-						AddMarker(beginOffset, curOffset-beginOffset, string("vibrato"), data, 0, _T("Vibrato"), PRIORITY_HIGH, CLR_PITCHBEND);
+						AddMarker(beginOffset, curOffset-beginOffset, string("vibrato"), data, 0, L"Vibrato", PRIORITY_HIGH, CLR_PITCHBEND);
 						break;
 					case 1:		// tremelo
-						AddMarker(beginOffset, curOffset-beginOffset, string("tremelo"), data, 0, _T("Tremelo"), PRIORITY_MIDDLE, CLR_EXPRESSION);
+						AddMarker(beginOffset, curOffset-beginOffset, string("tremelo"), data, 0, L"Tremelo", PRIORITY_MIDDLE, CLR_EXPRESSION);
 						break;
 					case 2:		// LFO rate
-						AddMarker(beginOffset, curOffset-beginOffset, string("lfo"), data, 0, _T("LFO Rate"), PRIORITY_MIDDLE, CLR_LFO);
+						AddMarker(beginOffset, curOffset-beginOffset, string("lfo"), data, 0, L"LFO Rate", PRIORITY_MIDDLE, CLR_LFO);
 						break;
 					case 3:		// LFO reset
-						AddMarker(beginOffset, curOffset-beginOffset, string("resetlfo"), data, 0, _T("LFO Reset"), PRIORITY_MIDDLE, CLR_LFO);
+						AddMarker(beginOffset, curOffset-beginOffset, string("resetlfo"), data, 0, L"LFO Reset", PRIORITY_MIDDLE, CLR_LFO);
 						break;
 					}
 				}				
@@ -752,7 +754,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 				if (GetVersion() < VER_171)
 				{
 					tremeloDepth = GetByte(curOffset++);
-					AddMarker(beginOffset, curOffset-beginOffset, string("tremelo"), tremeloDepth, 0, _T("Tremelo"), PRIORITY_MIDDLE, CLR_EXPRESSION);
+					AddMarker(beginOffset, curOffset-beginOffset, string("tremelo"), tremeloDepth, 0, L"Tremelo", PRIORITY_MIDDLE, CLR_EXPRESSION);
 				}
 				else
 				{
@@ -767,7 +769,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			{
 				uint8_t rate = GetByte(curOffset++);
 				if (GetVersion() < VER_171)
-					AddMarker(beginOffset, curOffset-beginOffset, string("lfo"), rate, 0, _T("LFO Rate"), PRIORITY_MIDDLE, CLR_LFO);
+					AddMarker(beginOffset, curOffset-beginOffset, string("lfo"), rate, 0, L"LFO Rate", PRIORITY_MIDDLE, CLR_LFO);
 				else
 					AddUnknown(beginOffset, curOffset-beginOffset, L"NOP");
 			}
@@ -776,7 +778,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			{
 				uint8_t data = GetByte(curOffset++);
 				if (GetVersion() < VER_171)
-					AddMarker(beginOffset, curOffset-beginOffset, string("resetlfo"), data, 0, _T("LFO Reset"), PRIORITY_MIDDLE, CLR_LFO);
+					AddMarker(beginOffset, curOffset-beginOffset, string("resetlfo"), data, 0, L"LFO Reset", PRIORITY_MIDDLE, CLR_LFO);
 				else
 					AddUnknown(beginOffset, curOffset-beginOffset, L"NOP");
 			}
@@ -793,7 +795,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 				{
 					bank = value;
 					AddBankSelectNoItem(bank*2);
-					AddGenericEvent(beginOffset, curOffset-beginOffset, _T("Bank Change"), NULL, CLR_PROGCHANGE);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Bank Change", NULL, CLR_PROGCHANGE);
 				}
 					
 			}
@@ -815,7 +817,7 @@ loopBreak:	if (loop[loopNum]-1 == 0)
 			AddUnknown(beginOffset, curOffset-beginOffset);
 			break;
 		default :
-			AddGenericEvent(beginOffset, curOffset-beginOffset, _T("UNKNOWN"), NULL, CLR_UNRECOGNIZED);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", NULL, CLR_UNRECOGNIZED);
 		}
 	}
 	return true;

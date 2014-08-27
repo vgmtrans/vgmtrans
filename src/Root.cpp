@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 
 #include "common.h"
 #include "Root.h"
@@ -8,6 +10,7 @@
 #include "Loader.h"
 #include "Scanner.h"
 #include "LogItem.h"
+#include "osdepend.h"
 
 #include "Format.h"
 #include "NDSFormat.h"
@@ -222,7 +225,7 @@ bool VGMRoot::CloseRawFile(RawFile* targFile)
 	if (iter != vRawFile.end())
 		vRawFile.erase(iter);
 	else
-		OutputDebugString(L"Error: trying to delete a rawfile which cannot be found in vRawFile.");
+		LogDebug(L"Error: trying to delete a rawfile which cannot be found in vRawFile.");
 	
 	delete targFile;
 	return true;
@@ -250,7 +253,7 @@ void VGMRoot::AddVGMFile(VGMFile* theFile)
 	if (fIter != vVGMFile.end() && lIter != vVGMFile.end())
 		vVGMFile.erase(fIter, lIter);
 	else
-		OutputDebugString(L"Error: trying to delete a vgmfile which cannot be found in vVGMFile.");
+		LogDebug(L"Error: trying to delete a vgmfile which cannot be found in vVGMFile.");
 	//delete targFile;
 }*/
 
@@ -268,7 +271,7 @@ void VGMRoot::RemoveVGMFile(VGMFile* targFile, bool bRemoveFromRaw)
 	if (iter != vVGMFile.end())
 		vVGMFile.erase(iter);
 	else
-		OutputDebugString(L"Error: trying to delete a VGMFile which cannot be found in vVGMFile.");
+		LogDebug(L"Error: trying to delete a VGMFile which cannot be found in vVGMFile.");
 	if (bRemoveFromRaw)
 		targFile->rawfile->RemoveContainedVGMFile(targFile);
 	while (targFile->assocColls.size())
@@ -296,7 +299,7 @@ void VGMRoot::RemoveVGMColl(VGMColl* targColl)
 	if (iter != vVGMColl.end())
 		vVGMColl.erase(iter);
 	else
-		OutputDebugString(L"Error: trying to delete a VGMColl which cannot be found in vVGMColl.");
+		LogDebug(L"Error: trying to delete a VGMColl which cannot be found in vVGMColl.");
 	UI_RemoveVGMColl(targColl);
 	delete targColl;
 }
@@ -331,8 +334,8 @@ void VGMRoot::UI_AddVGMFile(VGMFile* theFile)
 bool VGMRoot::UI_WriteBufferToFile(const wstring& filepath, uint8_t* buf, uint32_t size)
 {	
 #if _MSC_VER < 1400			//if we're not using VC8, and the new STL that supports widechar filenames in ofstream...
-	char newpath[_MAX_PATH];
-	wcstombs(newpath, filepath, _MAX_PATH);
+	char newpath[PATH_MAX];
+	wcstombs(newpath, filepath.c_str(), PATH_MAX);
 	ofstream outfile (newpath, ios::out | ios::trunc | ios::binary);
 #else
 	ofstream outfile (filepath, ios::out | ios::trunc | ios::binary);

@@ -4,7 +4,7 @@
 #include "RawFile.h"
 #include "Menu.h"
 
-extern enum FmtID;
+extern enum FmtID : unsigned int;
 class VGMColl;
 class Format;
 
@@ -41,7 +41,7 @@ public:
 	FileType GetFileType() { return file_type; }
 	virtual VGMItem* GetItemFromOffset(uint32_t offset);
 
-	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
+	virtual void AddToUI(VGMItem* parent, void* UI_specific);
 
 	const std::wstring* GetName(void) const;
 	//void AddItem(VGMItem* item, VGMItem* parent, const wchar_t* itemName = NULL);
