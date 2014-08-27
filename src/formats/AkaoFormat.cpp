@@ -59,7 +59,7 @@ bool AkaoColl::LoadMain()
 			
 			if (rgn->artNum - sampcoll->starting_art_id >= sampcoll->akArts.size() )
 			{
-				ShowAlertMessage(L"referencing an articulation that was not loaded.");
+				Alert(L"referencing an articulation that was not loaded.");
 				art = &sampcoll->akArts.back();
 			}
 			else
