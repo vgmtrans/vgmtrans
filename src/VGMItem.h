@@ -136,7 +136,7 @@ public:
 	virtual std::wstring GetDescription() { return name; }
 	virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
 	virtual Icon GetIcon() { return ICON_BINARY;/*ICON_UNKNOWN*/ }
-	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
+	virtual void AddToUI(VGMItem* parent, void* UI_specific);
 	virtual bool IsContainerItem() { return false; }
 
 	//bool AddHeader(uint32_t offset, uint32_t length, const wchar_t* name = L"Header");
@@ -173,7 +173,7 @@ public:
 	VGMContainerItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength = 0, const std::wstring theName = L"", uint8_t color = CLR_HEADER);
 	virtual ~VGMContainerItem(void);
 	virtual VGMItem* GetItemFromOffset(uint32_t offset);
-	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
+	virtual void AddToUI(VGMItem* parent, void* UI_specific);
 	virtual bool IsContainerItem() { return true; }
 
 	VGMHeader* AddHeader(uint32_t offset, uint32_t length, const wchar_t* name = L"Header");
@@ -192,8 +192,8 @@ public:
 	}
 	template <class T> bool RemoveContainer(std::vector<T*>& container)
 	{
-		std::vector<vector<VGMItem*>*>::iterator iter = find(containers.begin(),
-			containers.end(), (vector<VGMItem*>*)&container);
+		std::vector<std::vector<VGMItem*>*>::iterator iter = find(containers.begin(),
+			containers.end(), (std::vector<VGMItem*>*)&container);
 		if (iter != containers.end())
 		{
 			containers.erase(iter);

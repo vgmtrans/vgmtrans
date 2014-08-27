@@ -1,6 +1,8 @@
 // Many thanks to bsnes and snes9x.
 
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "SNESDSP.h"
 #include "RawFile.h"
 #include "Root.h"
@@ -216,7 +218,7 @@ void SNESSamp::ConvertToStdWave(uint8_t* buf)
 		if (dwOffset + k + 9 > GetRawFile()->size())
 		{
 			wchar_t log[512];
-			wsprintf(log,  L"\"%s\" unexpected EOF.", name.c_str());
+			swprintf(log, 512,  L"\"%s\" unexpected EOF.", name.c_str());
 			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"SNESSamp"));
 			break;
 		}

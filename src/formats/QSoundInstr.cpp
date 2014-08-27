@@ -1,9 +1,11 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
+#include "../VGMSamp.h"
+#include "../VGMRgn.h"
+#include "../ScaleConversion.h"
 #include "QSoundInstr.h"
 #include "QSoundFormat.h"
-#include "VGMSamp.h"
-#include "VGMRgn.h"
-#include "ScaleConversion.h"
 
 using namespace std;
 
@@ -145,9 +147,8 @@ bool QSoundInstrSet::GetInstrPointers()
 		for (uint32_t bank = 0; bank < num_instr_banks; bank++)
 			for (uint32_t i=0; i<256; i++)
 			{
-				wostringstream name;
-				name << L"Instrument " << bank*256 + i;
-				aInstrs.push_back(new QSoundInstr(this, dwOffset+i*8+(bank*256*8), 8, (bank*2)+(i/128), i%128, name.str()));
+                std::wstring name = L"Instrument + " + std::to_wstring(bank*256 + i);
+				aInstrs.push_back(new QSoundInstr(this, dwOffset+i*8+(bank*256*8), 8, (bank*2)+(i/128), i%128, name));
 			}
 	}
 	else
@@ -174,9 +175,8 @@ bool QSoundInstrSet::GetInstrPointers()
 			{
 				if (GetShort(j) == 0 && GetByte(j+2) == 0 && i != 0)
 					break;
-				wostringstream name;
-				name << L"Instrument " << totalInstrs + k;
-				aInstrs.push_back(new QSoundInstr(this, j, instr_info_length, (i*2) + (k / 128), (k % 128), name.str()));
+                std::wstring name = L"Instrument " + std::to_wstring(totalInstrs + k);
+				aInstrs.push_back(new QSoundInstr(this, j, instr_info_length, (i*2) + (k / 128), (k % 128), name));
 			}
 			totalInstrs += k;
 		}
@@ -340,7 +340,7 @@ bool QSoundInstr::LoadInstr()
 // QSoundSampColl
 // **************
 
-QSoundSampColl::QSoundSampColl(RawFile* file, QSoundInstrSet* theinstrset, QSoundSampleInfoTable* sampinfotable, uint32_t offset, uint32_t length, wstring& name)
+QSoundSampColl::QSoundSampColl(RawFile* file, QSoundInstrSet* theinstrset, QSoundSampleInfoTable* sampinfotable, uint32_t offset, uint32_t length, wstring name)
 : VGMSampColl(QSoundFormat::name, file, offset, length, name), 
   instrset(theinstrset),
   sampInfoTable(sampinfotable)

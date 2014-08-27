@@ -1,8 +1,10 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "QSoundScanner.h"
 #include "QSoundSeq.h"
 #include "QSoundInstr.h"
-#include "MAMELoader.h"
+#include "../loaders/MAMELoader.h"
 #include "common.h"
 
 using namespace std;
@@ -39,7 +41,7 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 	if (ver == VER_UNDEFINED)
 	{
 		wstring alert = L"XML entry uses an undefined QSound version: " + string2wstring(gameentry->fmt_version_str);
-		Alert(alert.c_str());
+        Alert(alert.c_str());
 		return;
 	}
 
@@ -148,7 +150,8 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 		VGMColl* coll = new VGMColl(name.str());
 		name.str(L"");
 		name << gameentry->name.c_str() << L" seq " << k/4;
-		QSoundSeq* newSeq = new QSoundSeq(programFile, seqPointer, ver, name.str());
+        wstring seqName = name.str();
+		QSoundSeq* newSeq = new QSoundSeq(programFile, seqPointer, ver, seqName);
 		if (newSeq->LoadVGMFile())
 		{
 			coll->UseSeq(newSeq);

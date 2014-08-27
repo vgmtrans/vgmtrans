@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "SquarePS2Seq.h"
 #include "SquarePS2Format.h"
 #include "ScaleConversion.h"

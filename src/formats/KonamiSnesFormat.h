@@ -15,7 +15,7 @@ BEGIN_FORMAT(KonamiSnes)
 END_FORMAT()
 
 
-enum KonamiSnesVersion
+enum KonamiSnesVersion : uint8_t
 {
 	KONAMISNES_NONE = 0,        // Unknown Version
 	KONAMISNES_NORMAL_REV1,     // Ganbare Goemon 2, etc.

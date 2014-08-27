@@ -1,9 +1,9 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+#include "../VGMSeq.h"
+#include "../SeqTrack.h"
 #include "QSoundFormat.h"
 
-extern enum QSoundVer;
+extern enum QSoundVer : uint8_t;
 
 class QSoundSeq :
 	public VGMSeq

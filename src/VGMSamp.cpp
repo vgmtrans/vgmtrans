@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "Root.h"

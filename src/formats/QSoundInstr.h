@@ -1,11 +1,11 @@
 #pragma once
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMMiscFile.h"
+#include "../VGMInstrSet.h"
+#include "../VGMSampColl.h"
+#include "../VGMMiscFile.h"
 
 class QSoundInstr;
 
-extern enum QSoundVer;
+extern enum QSoundVer : uint8_t;
 
 typedef struct _qs_qs_prog_info_ver_101 {	// ex: Punisher
 	uint8_t sample_index;
@@ -231,7 +231,7 @@ class QSoundSampColl
 {
 public:
 	QSoundSampColl(RawFile* file, QSoundInstrSet* instrset, QSoundSampleInfoTable* sampinfotable, uint32_t offset, 
-		           uint32_t length = 0, std::wstring& name = std::wstring(L"QSound Sample Collection"));
+		           uint32_t length = 0, std::wstring name = std::wstring(L"QSound Sample Collection"));
 	virtual bool GetHeaderInfo();		//retrieve any header data
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 

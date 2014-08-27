@@ -2,7 +2,9 @@
 //	VGMTrans.pch will be the pre-compiled header
 //	stdafx.obj will contain the pre-compiled type information
 
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 
 #if (_ATL_VER < 0x0700)
 #include <atlimpl.cpp>

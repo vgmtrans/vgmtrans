@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "PSFFile.h"
 #include "PSF1Loader.h"
 #include "Root.h"
@@ -139,7 +141,7 @@ const wchar_t* PSF1Loader::load_psf_libs(PSFFile& psf, RawFile* file, unsigned c
 		if (itLibTag == psf.tags.end())
 			break;
 
-		wchar_t tempfn[_MAX_PATH] = { 0 };
+		wchar_t tempfn[PATH_MAX] = { 0 };
 		mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
 
 		wchar_t *fullPath;

@@ -1,5 +1,6 @@
-#include "stdafx.h"
-#include <math.h>
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "AkaoFormat.h"
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
@@ -58,7 +59,7 @@ bool AkaoColl::LoadMain()
 			
 			if (rgn->artNum - sampcoll->starting_art_id >= sampcoll->akArts.size() )
 			{
-				Alert(L"referencing an articulation that was not loaded.");
+				ShowAlertMessage(L"referencing an articulation that was not loaded.");
 				art = &sampcoll->akArts.back();
 			}
 			else

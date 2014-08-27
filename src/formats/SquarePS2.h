@@ -1,11 +1,10 @@
 #pragma once
 #include "VGMSeq.h"
 
-class BGMSeq :
-	public VGMSeq
+class BGMSeq : public VGMSeq
 {
 public:
-	BGMSeq(RawFile* file, ULONG offset);
+	BGMSeq(RawFile* file, uint32_t offset);
 public:
 	virtual ~BGMSeq(void);
 
@@ -18,8 +17,7 @@ protected:
 };
 
 
-class BGMTrack
-	: public SeqTrack
+class BGMTrack : public SeqTrack
 {
 public:
 	BGMTrack(BGMSeq* parentSeq, long offset = 0, long length = 0);

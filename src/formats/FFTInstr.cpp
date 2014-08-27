@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "FFTFormat.h"
 #include "FFTInstr.h"
 #include "Vab.h"
@@ -163,5 +165,5 @@ bool	WdsInstr::LoadInstr()
 	rgn->AddGeneralItem(dwOffset+0x0E, sizeof(uint8_t), L"unknown");
 	rgn->AddGeneralItem(dwOffset+0x0F, sizeof(uint8_t), L"unknown");
 
-	return TRUE;
+	return true;
 }

@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "SonyPS2Seq.h"
 #include "SonyPS2Format.h"
 #include "ScaleConversion.h"

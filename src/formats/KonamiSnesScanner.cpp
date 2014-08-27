@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "KonamiSnesScanner.h"
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesInstr.h"
@@ -128,11 +130,11 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	KonamiSnesVersion version = KONAMISNES_NONE;
 
 	bool hasSongList;
-	UINT ofsSetSongHeaderAddressASM;
-	UINT ofsJumpToVcmdASM;
-	UINT ofsSetDIRASM;
-	UINT ofsLoadInstrASM;
-	UINT ofsLoadPercInstrASM;
+	uint32_t ofsSetSongHeaderAddressASM;
+    uint32_t ofsJumpToVcmdASM;
+    uint32_t ofsSetDIRASM;
+    uint32_t ofsLoadInstrASM;
+    uint32_t ofsLoadPercInstrASM;
 	uint16_t addrSongHeader;
 	uint16_t addrCommonInstrTable;
 	uint16_t addrBankedInstrTable;

@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "common.h"
 #include "NDSScanner.h"
 #include "NDSSeq.h"
@@ -85,7 +87,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile* file, uint32_t baseOff)
 		}
 		else
 		{
-			wsprintf(wtemp, L"SSEQ_%04d", i);
+			swprintf(wtemp, 32, L"SSEQ_%04d", i);
 		}
 		seqNames.push_back(wtemp);
 	}
@@ -102,7 +104,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile* file, uint32_t baseOff)
 		}
 		else
 		{
-			wsprintf(wtemp, L"SBNK_%04d", i);
+			swprintf(wtemp, 32, L"SBNK_%04d", i);
 		}
 		bnkNames.push_back(wtemp);
 	}
@@ -119,7 +121,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile* file, uint32_t baseOff)
 		}
 		else
 		{
-			wsprintf(wtemp, L"SWAR_%04d", i);
+			swprintf(wtemp, 32, L"SWAR_%04d", i);
 		}
 		waNames.push_back(wtemp);
 	}

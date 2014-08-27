@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "SF2File.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
@@ -13,10 +15,8 @@ SF2InfoListChunk::SF2InfoListChunk(string name)
 	: LISTChunk("INFO")
 {
 	// Create a date string
-	SYSTEMTIME time;
-	GetLocalTime(&time);
-	stringstream datestr;
-	datestr << time.wMonth << "/" << time.wDay << "/" << time.wYear;
+    time_t current_time = time(NULL);
+    char* c_time_string = ctime(&current_time);
 
 	// Add the child info chunks
 	Chunk* ifilCk = new Chunk("ifil");
@@ -27,7 +27,7 @@ SF2InfoListChunk::SF2InfoListChunk(string name)
 	AddChildChunk(ifilCk);
 	AddChildChunk(new SF2StringChunk("isng", "EMU8000"));
 	AddChildChunk(new SF2StringChunk("INAM", name));
-	AddChildChunk(new SF2StringChunk("ICRD", datestr.str()));
+	AddChildChunk(new SF2StringChunk("ICRD", string(c_time_string)));
 	AddChildChunk(new SF2StringChunk("ISFT", string("VGMTrans " + string(VERSION)) ));
 }
 
@@ -98,7 +98,7 @@ SF2File::SF2File(SynthFile* synthfile)
 		
 		sfPresetHeader presetHdr;
 		memset(&presetHdr, 0, sizeof(sfPresetHeader));
-		memcpy(presetHdr.achPresetName, instr->name.c_str(), min(instr->name.length(), 20));
+		memcpy(presetHdr.achPresetName, instr->name.c_str(), min(instr->name.length(), (unsigned long)20));
 		presetHdr.wPreset =			(uint16_t)instr->ulInstrument;
 		presetHdr.wBank =			(uint16_t)instr->ulBank;
 		presetHdr.wPresetBagNdx =	(uint16_t)i;
@@ -200,7 +200,7 @@ SF2File::SF2File(SynthFile* synthfile)
 
 		sfInst inst;
 		memset(&inst, 0, sizeof(sfInst));
-		memcpy(inst.achInstName, instr->name.c_str(), min(instr->name.length(), 20));
+		memcpy(inst.achInstName, instr->name.c_str(), min(instr->name.length(), (unsigned long)20));
 		inst.wInstBagNdx = (uint16_t)rgnCounter;
 		rgnCounter += instr->vRgns.size();
 
@@ -387,7 +387,7 @@ SF2File::SF2File(SynthFile* synthfile)
 
 		sfSample samp;
 		memset(&samp, 0, sizeof(sfSample));
-		memcpy(samp.achSampleName, wave->name.c_str(), min(wave->name.length(), 20));
+		memcpy(samp.achSampleName, wave->name.c_str(), min(wave->name.length(), (unsigned long)20));
 		samp.dwStart = sampOffset;
 		samp.dwEnd = samp.dwStart + (wave->dataSize / sizeof(uint16_t));
 		sampOffset = samp.dwEnd + 46;		// plus the 46 padding samples required by sf2 spec
@@ -420,7 +420,7 @@ SF2File::SF2File(SynthFile* synthfile)
 		samp.dwEndloop = samp.dwStartloop + sampInfo->ulLoopLength;
 		samp.dwSampleRate = wave->dwSamplesPerSec;
 		samp.byOriginalKey = (uint8_t)(sampInfo->usUnityNote);
-		samp.chCorrection = (CHAR)(sampInfo->sFineTune);
+		samp.chCorrection = (char)(sampInfo->sFineTune);
 		samp.wSampleLink = 0;
 		samp.sfSampleType = monoSample;
 

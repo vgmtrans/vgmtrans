@@ -1,7 +1,7 @@
 #pragma once
-#include "Format.h"
-#include "Root.h"
-#include "VGMColl.h"
+#include "../Format.h"
+#include "../Root.h"
+#include "../VGMColl.h"
 #include "QSoundScanner.h"
 
 

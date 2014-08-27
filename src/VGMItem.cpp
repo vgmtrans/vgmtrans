@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "VGMItem.h"
 #include "RawFile.h"
 #include "VGMFile.h"
@@ -58,7 +60,7 @@ VGMItem* VGMItem::GetItemFromOffset(uint32_t offset)
 	return NULL;
 }
 
-void VGMItem::AddToUI(VGMItem* parent, VOID* UI_specific)
+void VGMItem::AddToUI(VGMItem* parent, void* UI_specific)
 {
 	pRoot->UI_AddItem(this, parent, name, UI_specific);
 }
@@ -156,7 +158,7 @@ VGMItem* VGMContainerItem::GetItemFromOffset(uint32_t offset)
 	return NULL;
 }
 
-void VGMContainerItem::AddToUI(VGMItem* parent, VOID* UI_specific)
+void VGMContainerItem::AddToUI(VGMItem* parent, void* UI_specific)
 {
 	VGMItem::AddToUI(parent, UI_specific);
 	for (uint32_t i=0; i<containers.size(); i++)

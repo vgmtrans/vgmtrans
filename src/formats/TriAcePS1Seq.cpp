@@ -1,7 +1,9 @@
 // The following sequence analysis code is based on the work of Sound Tester 774 from 2ch.net,
 // author of so2mml. The code is based on his write-up of the format specifications.  Many thanks to him.
 
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "TriAcePS1Seq.h"
 #include "TriAcePS1Format.h"
 #include "ScaleConversion.h"
@@ -313,7 +315,6 @@ bool TriAcePS1Track::ReadEvent(void)
 			break;
 
 		default :
-			Alert(L"Unknown event opcode %X at %X", status_byte, beginOffset);
 			AddUnknown(beginOffset, curOffset-beginOffset);
 			return false;
 	}

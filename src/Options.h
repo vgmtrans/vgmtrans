@@ -1,5 +1,7 @@
 #pragma once
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 
 class ConversionOptions // static class
 {

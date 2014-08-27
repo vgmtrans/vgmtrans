@@ -1,8 +1,10 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "WD.h"
 #include "SquarePS2Format.h"
 #include "PSXSPU.h"
-#include "ScaleConversion.h"
+#include "../ScaleConversion.h"
 
 using namespace std;
 
@@ -100,7 +102,7 @@ bool WDInstr::LoadInstr()
 	wostringstream	strStr;
 	uint32_t j=0;
 	long startAddress = 0;
-	BOOL notSampleStart = false;
+	bool notSampleStart = false;
 
 	//Read region data 
 	
@@ -216,7 +218,7 @@ bool WDInstr::LoadInstr()
 		else
 			aRgns[k]->velLow = aRgns[k-1]->velHigh+1;
 	}
-	return TRUE;
+	return true;
 }
 
 

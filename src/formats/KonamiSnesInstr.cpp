@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "KonamiSnesInstr.h"
 #include "Format.h"
 #include "SNESDSP.h"
@@ -203,7 +205,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, uint32_t offset, bool percu
 	AddSimpleItem(offset + 3, 1, L"ADSR1");
 	AddSimpleItem(offset + 4, 1, use_adsr ? L"ADSR2" : L"GAIN");
 	AddSimpleItem(offset + 5, 1, L"Pan");
-	AddVolume(1.0 - (max(-vol, -127) / 127.0), offset + 6);
+	AddVolume(1.0 - (fmax(-vol, -127) / 127.0), offset + 6);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 

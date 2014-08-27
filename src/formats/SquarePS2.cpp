@@ -1,12 +1,17 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "SquarePS2.h"
+#include "SquarePS2Format.h"
+
+DECLARE_FORMAT(SquarePS2)
 
 // ******
 // BGMSeq
 // ******
 
-BGMSeq::BGMSeq(RawFile* file, ULONG offset)
-: VGMSeq(file, offset)
+BGMSeq::BGMSeq(RawFile* file, uint32_t offset)
+: VGMSeq(SquarePS2Format::name, file, offset)
 {
 	UseReverb();
 }
@@ -27,10 +32,10 @@ bool BGMSeq::GetHeaderInfo(void)
 
 bool BGMSeq::GetTrackPointers(void)
 {
-	UINT pos = dwOffset+0x20;    //start at first track (fixed offset)
+	uint32_t pos = dwOffset+0x20;    //start at first track (fixed offset)
 	for(int i=0; i<nNumTracks; i++)
 	{
-		UINT trackSize = GetWord(pos);		//get the track size (first word before track data)
+		uint32_t trackSize = GetWord(pos);		//get the track size (first word before track data)
 		aTracks.push_back(new BGMTrack(this, pos+4, trackSize));
 		pos += trackSize+4;				//jump to the next track
 	}
@@ -52,10 +57,10 @@ bool BGMTrack::ReadEvent(void)
 {
 	int value1;
 
-	ULONG beginOffset = curOffset;
+	uint32_t beginOffset = curOffset;
 	AddDelta(ReadVarLen(curOffset));
 
-	BYTE status_byte = GetByte(curOffset++);
+	uint8_t status_uint8_t = GetByte(curOffset++);
 
 	switch (status_byte)
 	{
@@ -86,7 +91,7 @@ bool BGMTrack::ReadEvent(void)
 
 	case 0x08 :			//set tempo
 		{
-			BYTE bpm = GetByte(curOffset++);
+			uint8_t bpm = GetByte(curOffset++);
 			AddTempoBPM(beginOffset, curOffset-beginOffset, bpm);
 		}
 		break;
@@ -105,8 +110,8 @@ bool BGMTrack::ReadEvent(void)
 
 	case 0x0C :			//time signature?
 		{
-			BYTE numer = GetByte(curOffset++);
-			BYTE denom = GetByte(curOffset++);
+			uint8_t numer = GetByte(curOffset++);
+			uint8_t denom = GetByte(curOffset++);
 			AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, parentSeq->GetPPQN());
 
 			//for (value3 = 0; ((value2&1) != TRUE) && (value3 < 8); ++value3)	//while 
@@ -153,7 +158,7 @@ bool BGMTrack::ReadEvent(void)
 
 	case 0x20 :		//assign instrument
 		{
-			BYTE progNum = GetByte(curOffset++);
+			uint8_t progNum = GetByte(curOffset++);
 			AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
 		}
 		break;
@@ -165,14 +170,14 @@ bool BGMTrack::ReadEvent(void)
 
 	case 0x24 :		//expression
 		{
-			BYTE expression = GetByte(curOffset++);			//expression value
+			uint8_t expression = GetByte(curOffset++);			//expression value
 			AddExpression(beginOffset, curOffset-beginOffset, expression);
 		}
 		break;
 
 	case 0x26 :		//pan?
 		{
-			BYTE pan = GetByte(curOffset++);
+			uint8_t pan = GetByte(curOffset++);
 			AddPan(beginOffset, curOffset-beginOffset, pan);
 		}
 		break;
@@ -197,8 +202,8 @@ bool BGMTrack::ReadEvent(void)
 	case 0x5C :		//pitch bend		I SHOULD GO BACK AND VERIFY THE RANGE OF THE PITCH BEND
 		//curOffset+=2;
 		{
-			BYTE lsb = GetByte(curOffset++);
-			BYTE msb = GetByte(curOffset++);
+			uint8_t lsb = GetByte(curOffset++);
+			uint8_t msb = GetByte(curOffset++);
 			AddPitchBendMidiFormat(beginOffset, curOffset-beginOffset, lsb, msb);
 		}
 

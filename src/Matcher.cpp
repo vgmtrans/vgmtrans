@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "Matcher.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
@@ -331,7 +333,7 @@ template <class T> T* FilegroupMatcher::GetLargestVGMFileInList(list<T*> theList
 {
 	uint32_t s = 0;
 	T* curWinner = NULL;
-	for (list<T*>::iterator iter = theList.begin(); iter != theList.end(); iter++)
+	for (typename list<T*>::iterator iter = theList.begin(); iter != theList.end(); iter++)
 	{
 		if ((*iter)->unLength > s)
 		{

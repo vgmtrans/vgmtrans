@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesFormat.h"
 #include "ScaleConversion.h"
@@ -468,7 +470,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 		double midiScalePan;
 		double volumeScale;
 
-		newPan = min(newPan, 40);
+		newPan = std::min<uint8_t>(newPan, 40);
 
 		midiScalePan = ConvertPercentPanToStdMidiScale(KonamiSnesSeq::panTable[newPan] / 256.0, &volumeScale);
 		if (midiScalePan == 0.0) {
@@ -873,14 +875,15 @@ bool KonamiSnesTrack::ReadEvent(void)
 		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 		EVENT_WITH_MIDITEXT_END
-		pRoot->AddLogItem(new LogItem(wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, wstring(L"KonamiSnesSeq")));
+        wstring itemName = L"Unknown Event - " + desc.str();
+		pRoot->AddLogItem(new LogItem(itemName.c_str(), LOG_LEVEL_ERR, L"KonamiSnesSeq"));
 		bContinue = false;
 		break;
 	}
 
 	//wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
-	//OutputDebugString(ssTrace.str().c_str());
+	//LogDebug(ssTrace.str().c_str());
 
 	return bContinue;
 }

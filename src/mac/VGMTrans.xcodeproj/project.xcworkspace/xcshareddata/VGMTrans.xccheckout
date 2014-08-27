@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>9A796B56-747C-48B2-AC81-257EA3E1CA99</string>
+	<key>IDESourceControlProjectName</key>
+	<string>VGMTrans</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>0996759B-B702-41FD-A834-709274DA811A</key>
+		<string>https://github.com/vgmtrans/vgmtrans.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>src/mac/VGMTrans.xcodeproj/project.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>0996759B-B702-41FD-A834-709274DA811A</key>
+		<string>../../../..</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://github.com/vgmtrans/vgmtrans.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>110</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>0996759B-B702-41FD-A834-709274DA811A</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>0996759B-B702-41FD-A834-709274DA811A</string>
+			<key>IDESourceControlWCCName</key>
+			<string>vgmtrans</string>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "VGMColl.h"
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
@@ -328,7 +330,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				if (realSampNum >= finalSamps.size())
 				{
 					wchar_t log[256];
-					wsprintf(log, L"Sample %u does not exist.", realSampNum);
+					swprintf(log, 256, L"Sample %u does not exist.", realSampNum);
 					pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
 					realSampNum = finalSamps.size() - 1;
 				}
@@ -551,7 +553,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				if (realSampNum >= finalSamps.size())
 				{
 					wchar_t log[256];
-					wsprintf(log, L"Sample %u does not exist.", realSampNum);
+					swprintf(log, 256, L"Sample %u does not exist.", realSampNum);
 					pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
 					realSampNum = finalSamps.size() - 1;
 				}

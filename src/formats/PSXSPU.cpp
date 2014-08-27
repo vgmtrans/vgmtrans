@@ -2,10 +2,12 @@
 // Most of the code below is based on his work.
 // Also, thanks to Antires for his ADPCM decompression routine.
 
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "PSXSPU.h"
-#include "DLSFile.h"
-#include "RawFile.h"
+#include "../DLSFile.h"
+#include "../RawFile.h"
 #include "PS1Format.h"
 
 using namespace std;
@@ -315,16 +317,14 @@ void PSXSamp::ConvertToStdWave(uint8_t* buf)
 	{
 		if (dwOffset + k + 16 > vgmfile->GetEndOffset())
 		{
-			wchar_t log[512];
-			wsprintf(log,  L"\"%s\" unexpected EOF.", name.c_str());
-			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"PSXSamp"));
+            std::wstring log = L"\"" + name + L"\" unexpected EOF.";
+			pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, L"PSXSamp"));
 			break;
 		}
 		else if (!addrOutOfVirtFile && k + 16 > unLength)
 		{
-			wchar_t log[512];
-			wsprintf(log,  L"\"%s\" unexpected end of PSXSamp.", name.c_str());
-			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"PSXSamp"));
+            std::wstring log = L"\"" + name + L"\" unexpected end of PSXSamp.";
+			pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, L"PSXSamp"));
 			addrOutOfVirtFile = true;
 		}
 

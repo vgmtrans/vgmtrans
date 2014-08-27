@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 #include "ScaleConversion.h"

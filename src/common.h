@@ -1,6 +1,8 @@
 #if !defined(COMMON_H)
 #define COMMON_H
 
+#import <sstream>
+#import <assert.h>
 #include "osdepend.h"
 #include "helper.h"
 
@@ -81,20 +83,8 @@ inline int CountBytesOfVal(uint8_t* buf, uint32_t numBytes, uint8_t val)
 
  inline bool isEqual(float x, float y)
  {
-   //const double epsilon = 0.00001/* some small number such as 1e-5 */;
-   return std::abs(x - y) <= F_EPSILON * std::abs(x);
-   // see Knuth section 4.2.2 pages 217-218
- } 
-
- inline int round(double x)
- {
-	 return (x > 0) ? (int)(x + 0.5) : (int)(x - 0.5);
+   return abs(x - y) <= F_EPSILON * abs(x);
  }
-
- //inline uint8_t round(double x)
- //{
-	// return (uint8_t)(x + 0.5);
- //}
 
 struct SizeOffsetPair
 {

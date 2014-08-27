@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+	#include "stdafx.h"
+#endif
 #include "RareSnesSeq.h"
 #include "RareSnesFormat.h"
 #include "ScaleConversion.h"
@@ -389,7 +391,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			//wostringstream ssTrace;
 			//ssTrace << L"Rest: " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << std::endl;
-			//OutputDebugString(ssTrace.str().c_str());
+			//LogDebug(ssTrace.str().c_str());
 
 			AddRest(beginOffset, curOffset-beginOffset, dur);
 		}
@@ -411,7 +413,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 			//wostringstream ssTrace;
 			//ssTrace << L"Note: " << key << L" " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << L" P=" << spcNotePitch << std::endl;
-			//OutputDebugString(ssTrace.str().c_str());
+			//LogDebug(ssTrace.str().c_str());
 
 			uint8_t vel = 127;
 			AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
@@ -1165,7 +1167,8 @@ bool RareSnesTrack::ReadEvent(void)
 			EVENT_WITH_MIDITEXT_START
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 			EVENT_WITH_MIDITEXT_END
-			pRoot->AddLogItem(new LogItem(wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, wstring(L"RareSnesSeq")));
+            wstring itemName = L"Unknown Event - " + desc.str();
+			pRoot->AddLogItem(new LogItem(itemName.c_str(), LOG_LEVEL_ERR, L"RareSnesSeq"));
 			bContinue = false;
 			break;
 		}
@@ -1173,7 +1176,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 	//wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
-	//OutputDebugString(ssTrace.str().c_str());
+	//LogDebug(ssTrace.str().c_str());
 
 	return bContinue;
 }
