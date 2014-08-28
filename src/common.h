@@ -1,8 +1,6 @@
 #if !defined(COMMON_H)
 #define COMMON_H
 
-#import <sstream>
-#import <assert.h>
 #include "osdepend.h"
 #include "helper.h"
 

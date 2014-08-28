@@ -1,6 +1,5 @@
 #pragma once
 
-#import <fstream>
 #include "common.h"
 #include "DataSeg.h"
 #include "BytePattern.h"
