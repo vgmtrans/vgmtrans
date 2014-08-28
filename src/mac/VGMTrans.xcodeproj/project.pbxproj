@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2704A02019AEA4E100A70368 /* VGMasterViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 2704A01E19AEA4E100A70368 /* VGMasterViewController.m */; };
+		2704A02119AEA4E100A70368 /* VGMasterViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 2704A01F19AEA4E100A70368 /* VGMasterViewController.xib */; };
+		2704A02419AEB89F00A70368 /* MacVGMRoot.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2704A02219AEB89F00A70368 /* MacVGMRoot.mm */; };
 		2746346E19AAB0C8009A3437 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2746346D19AAB0C8009A3437 /* XCTest.framework */; };
 		2746385819AD5818009A3437 /* tinystr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2746385119AD5818009A3437 /* tinystr.cpp */; };
 		2746385919AD5818009A3437 /* tinyxml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2746385319AD5818009A3437 /* tinyxml.cpp */; };
@@ -147,6 +150,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		2704A01D19AEA4E100A70368 /* VGMasterViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = VGMasterViewController.h; sourceTree = SOURCE_ROOT; };
+		2704A01E19AEA4E100A70368 /* VGMasterViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = VGMasterViewController.m; sourceTree = SOURCE_ROOT; };
+		2704A01F19AEA4E100A70368 /* VGMasterViewController.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = VGMasterViewController.xib; sourceTree = SOURCE_ROOT; };
+		2704A02219AEB89F00A70368 /* MacVGMRoot.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MacVGMRoot.mm; sourceTree = SOURCE_ROOT; };
+		2704A02319AEB89F00A70368 /* MacVGMRoot.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MacVGMRoot.h; sourceTree = SOURCE_ROOT; };
 		2746344B19AAB0C8009A3437 /* VGMTrans.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VGMTrans.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2746345119AAB0C8009A3437 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		2746345219AAB0C8009A3437 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
@@ -568,6 +576,11 @@
 				3323FE9592DB1CE102DA6D3F /* Supporting Files */,
 				3323FD4BFDEF92E812E9C0A4 /* osdepend.cpp */,
 				3323F7FA52EFD75CBADD2F8E /* osdepend.h */,
+				2704A01D19AEA4E100A70368 /* VGMasterViewController.h */,
+				2704A01E19AEA4E100A70368 /* VGMasterViewController.m */,
+				2704A01F19AEA4E100A70368 /* VGMasterViewController.xib */,
+				2704A02219AEB89F00A70368 /* MacVGMRoot.mm */,
+				2704A02319AEB89F00A70368 /* MacVGMRoot.h */,
 			);
 			name = mac;
 			path = VGMTrans;
@@ -1097,6 +1110,7 @@
 				3323F9CA0A3BA393773AA969 /* MainMenu.xib in Resources */,
 				3323F243EB996DCFBF2F1D44 /* Images.xcassets in Resources */,
 				3323F8C044C81EE306A3971D /* VGMTrans-Info.plist in Resources */,
+				2704A02119AEA4E100A70368 /* VGMasterViewController.xib in Resources */,
 				3323F1B92F281CC2B8C29D80 /* InfoPlist.strings in Resources */,
 				3323F2B9A6FEDE855B798F30 /* tinyxmlSTL-mt.lib in Resources */,
 				3323FB1EEE62AF47F67EBB07 /* tinyxmlSTL-mtd.lib in Resources */,
@@ -1138,6 +1152,7 @@
 				3323FC5CE21C58CE4C3E205F /* FFTInstr.cpp in Sources */,
 				3323F75212CBB7730F95F50F /* FFTScanner.cpp in Sources */,
 				3323F2EC1CE97D714CC85F42 /* HeartBeatPS1Seq.cpp in Sources */,
+				2704A02419AEB89F00A70368 /* MacVGMRoot.mm in Sources */,
 				3323F9381585CF4DD365DB25 /* HeartBeatPS1SeqScanner.cpp in Sources */,
 				3323F6FD13440F9DC81C0C74 /* HOSA.cpp in Sources */,
 				2746385B19AD5818009A3437 /* tinyxmlparser.cpp in Sources */,
@@ -1147,6 +1162,7 @@
 				3323F8E9D013B43A6B0E039A /* KonamiGXScanner.cpp in Sources */,
 				3323F2009B84B86D0043609A /* KonamiGXSeq.cpp in Sources */,
 				3323F4C83BE72C8A68D6EB84 /* KonamiSnesInstr.cpp in Sources */,
+				2704A02019AEA4E100A70368 /* VGMasterViewController.m in Sources */,
 				3323F05FDFA1A0B962C6649B /* KonamiSnesScanner.cpp in Sources */,
 				2746387919AD6506009A3437 /* zip.c in Sources */,
 				3323FAF9C10D130F5F27B0B8 /* KonamiSnesSeq.cpp in Sources */,
