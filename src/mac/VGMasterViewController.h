@@ -2,7 +2,7 @@
 //  VGMasterViewController.h
 //  VGMTrans
 //
-//  Created by Michael Lowin on 8/27/14.
+//  Created by Mike on 8/27/14.
 //
 //
 

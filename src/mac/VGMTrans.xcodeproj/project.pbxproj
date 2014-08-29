@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2704A02019AEA4E100A70368 /* VGMasterViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 2704A01E19AEA4E100A70368 /* VGMasterViewController.m */; };
+		2704A02019AEA4E100A70368 /* VGMasterViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2704A01E19AEA4E100A70368 /* VGMasterViewController.mm */; };
 		2704A02119AEA4E100A70368 /* VGMasterViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 2704A01F19AEA4E100A70368 /* VGMasterViewController.xib */; };
-		2704A02419AEB89F00A70368 /* MacVGMRoot.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2704A02219AEB89F00A70368 /* MacVGMRoot.mm */; };
+		2704A02419AEB89F00A70368 /* MacVGMRootCpp.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2704A02219AEB89F00A70368 /* MacVGMRootCpp.mm */; };
 		2746346E19AAB0C8009A3437 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2746346D19AAB0C8009A3437 /* XCTest.framework */; };
 		2746385819AD5818009A3437 /* tinystr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2746385119AD5818009A3437 /* tinystr.cpp */; };
 		2746385919AD5818009A3437 /* tinyxml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2746385319AD5818009A3437 /* tinyxml.cpp */; };
@@ -20,6 +20,9 @@
 		2746387819AD6506009A3437 /* unzip.c in Sources */ = {isa = PBXBuildFile; fileRef = 2746386F19AD6505009A3437 /* unzip.c */; };
 		2746387919AD6506009A3437 /* zip.c in Sources */ = {isa = PBXBuildFile; fileRef = 2746387119AD6505009A3437 /* zip.c */; };
 		2746387B19AD6811009A3437 /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2746387A19AD6811009A3437 /* libz.dylib */; };
+		2746388E19AF59EC009A3437 /* libfluidsynth.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2746388D19AF59EC009A3437 /* libfluidsynth.dylib */; };
+		2746389419AF5C5F009A3437 /* VGMusicPlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 2746389319AF5C5F009A3437 /* VGMusicPlayer.m */; };
+		2746389919AF5CFA009A3437 /* libfluidsynth.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2746389819AF5CFA009A3437 /* libfluidsynth.dylib */; };
 		3323F02894BB29ABEE359A74 /* SonyPS2InstrSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323FD9A24A5E49234845C13 /* SonyPS2InstrSet.cpp */; };
 		3323F03C12D6CC310B636859 /* VGMSeqNoTrks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F573AF090A46BCDD186B /* VGMSeqNoTrks.cpp */; };
 		3323F04AF40803A6E54A3E76 /* SeqVoiceAllocator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323FDD08DE45B6B5942339B /* SeqVoiceAllocator.cpp */; };
@@ -49,11 +52,13 @@
 		3323F2EC1CE97D714CC85F42 /* HeartBeatPS1Seq.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F5051A7E012CA7C7C778 /* HeartBeatPS1Seq.cpp */; };
 		3323F3573581A8EF461A3795 /* TriAcePS1InstrSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F5B60BA6422FCDFCA638 /* TriAcePS1InstrSet.cpp */; };
 		3323F38E569EE241DA4CCD7E /* TriAcePS1Seq.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F952C4326444C810D064 /* TriAcePS1Seq.cpp */; };
+		3323F3B77EBC413832D840D3 /* NSString+VGMTrans.m in Sources */ = {isa = PBXBuildFile; fileRef = 3323FDC9B53457414B08F4A1 /* NSString+VGMTrans.m */; };
 		3323F3D44084E48F190C5F4B /* OrgSeq.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F3067A5E2C56A29DB2C5 /* OrgSeq.cpp */; };
 		3323F3F617CB73E8BB887E25 /* DLSFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F3EC77BD23AD67191372 /* DLSFile.cpp */; };
 		3323F3FB93221873A8C6E412 /* CapcomSnesSeq.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F4684D8FC0DAB89B3D47 /* CapcomSnesSeq.cpp */; };
 		3323F3FF70DFFEC81AACDC4A /* QSoundScanner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F63D6140E436E2C87812 /* QSoundScanner.cpp */; };
 		3323F41084012B925E5E1188 /* Scanner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F044CFEA6F9A1E0E6710 /* Scanner.cpp */; };
+		3323F426A3A69606ADCE2F40 /* MacVGMRoot.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3323F8E8BAC2F2412B96ADFF /* MacVGMRoot.mm */; };
 		3323F4663923E41F6395E45E /* Menu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323FF51BE59FE72345A2B5A /* Menu.cpp */; };
 		3323F4A93CBBB98DBF945209 /* MidiFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F4F66321654AF557D647 /* MidiFile.cpp */; };
 		3323F4C83BE72C8A68D6EB84 /* KonamiSnesInstr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F2E70113F50AC7C63F22 /* KonamiSnesInstr.cpp */; };
@@ -114,6 +119,7 @@
 		3323FB052DAD33FADB3CFF7C /* NDSSeq.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F95097F3C7C40C012313 /* NDSSeq.cpp */; };
 		3323FB1EEE62AF47F67EBB07 /* tinyxmlSTL-mtd.lib in Resources */ = {isa = PBXBuildFile; fileRef = 3323F664897EF0B4E7375A61 /* tinyxmlSTL-mtd.lib */; };
 		3323FB9E8703725724795AFE /* tinyxmlSTL-mt.lib in Resources */ = {isa = PBXBuildFile; fileRef = 3323FD6FCD1D21AD4CE7B023 /* tinyxmlSTL-mt.lib */; };
+		3323FBB0262B4901620FF691 /* VGRawFileTableView.m in Sources */ = {isa = PBXBuildFile; fileRef = 3323FA96B498751236152B52 /* VGRawFileTableView.m */; };
 		3323FBDF1196C883D3ABB48A /* PSFFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F664D8B44A9A458B61C4 /* PSFFile.cpp */; };
 		3323FBE6188DE616FC5514AC /* SynthFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F3205177A55A0F47AD13 /* SynthFile.cpp */; };
 		3323FBF254957A1E32458E6D /* AkaoFormat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3323F1A07062E29F7E599F24 /* AkaoFormat.cpp */; };
@@ -151,10 +157,10 @@
 
 /* Begin PBXFileReference section */
 		2704A01D19AEA4E100A70368 /* VGMasterViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = VGMasterViewController.h; sourceTree = SOURCE_ROOT; };
-		2704A01E19AEA4E100A70368 /* VGMasterViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = VGMasterViewController.m; sourceTree = SOURCE_ROOT; };
+		2704A01E19AEA4E100A70368 /* VGMasterViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = VGMasterViewController.mm; sourceTree = SOURCE_ROOT; };
 		2704A01F19AEA4E100A70368 /* VGMasterViewController.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = VGMasterViewController.xib; sourceTree = SOURCE_ROOT; };
-		2704A02219AEB89F00A70368 /* MacVGMRoot.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MacVGMRoot.mm; sourceTree = SOURCE_ROOT; };
-		2704A02319AEB89F00A70368 /* MacVGMRoot.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MacVGMRoot.h; sourceTree = SOURCE_ROOT; };
+		2704A02219AEB89F00A70368 /* MacVGMRootCpp.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MacVGMRootCpp.mm; sourceTree = SOURCE_ROOT; };
+		2704A02319AEB89F00A70368 /* MacVGMRootCpp.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = MacVGMRootCpp.hh; sourceTree = SOURCE_ROOT; };
 		2746344B19AAB0C8009A3437 /* VGMTrans.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VGMTrans.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2746345119AAB0C8009A3437 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		2746345219AAB0C8009A3437 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
@@ -176,6 +182,28 @@
 		2746387119AD6505009A3437 /* zip.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = zip.c; sourceTree = "<group>"; };
 		2746387219AD6505009A3437 /* zip.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = zip.h; sourceTree = "<group>"; };
 		2746387A19AD6811009A3437 /* libz.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libz.dylib; path = usr/lib/libz.dylib; sourceTree = SDKROOT; };
+		2746388D19AF59EC009A3437 /* libfluidsynth.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libfluidsynth.dylib; path = ../dependencies/fluidsynth/libfluidsynth.dylib; sourceTree = "<group>"; };
+		2746389219AF5C5F009A3437 /* VGMusicPlayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = VGMusicPlayer.h; sourceTree = SOURCE_ROOT; };
+		2746389319AF5C5F009A3437 /* VGMusicPlayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = VGMusicPlayer.m; sourceTree = SOURCE_ROOT; };
+		2746389619AF5CFA009A3437 /* fluidsynth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fluidsynth.h; sourceTree = "<group>"; };
+		2746389819AF5CFA009A3437 /* libfluidsynth.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libfluidsynth.dylib; sourceTree = "<group>"; };
+		2746389B19AF5DDF009A3437 /* audio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = audio.h; sourceTree = "<group>"; };
+		2746389C19AF5DDF009A3437 /* event.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = event.h; sourceTree = "<group>"; };
+		2746389D19AF5DDF009A3437 /* gen.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gen.h; sourceTree = "<group>"; };
+		2746389E19AF5DDF009A3437 /* log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = log.h; sourceTree = "<group>"; };
+		2746389F19AF5DDF009A3437 /* midi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = midi.h; sourceTree = "<group>"; };
+		274638A019AF5DDF009A3437 /* misc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = misc.h; sourceTree = "<group>"; };
+		274638A119AF5DDF009A3437 /* mod.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mod.h; sourceTree = "<group>"; };
+		274638A219AF5DDF009A3437 /* ramsfont.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ramsfont.h; sourceTree = "<group>"; };
+		274638A319AF5DDF009A3437 /* seq.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = seq.h; sourceTree = "<group>"; };
+		274638A419AF5DDF009A3437 /* seqbind.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = seqbind.h; sourceTree = "<group>"; };
+		274638A519AF5DDF009A3437 /* settings.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = settings.h; sourceTree = "<group>"; };
+		274638A619AF5DDF009A3437 /* sfont.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = sfont.h; sourceTree = "<group>"; };
+		274638A719AF5DDF009A3437 /* shell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = shell.h; sourceTree = "<group>"; };
+		274638A819AF5DDF009A3437 /* synth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = synth.h; sourceTree = "<group>"; };
+		274638A919AF5DDF009A3437 /* types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = types.h; sourceTree = "<group>"; };
+		274638AA19AF5DDF009A3437 /* version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = version.h; sourceTree = "<group>"; };
+		274638AB19AF5DDF009A3437 /* voice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = voice.h; sourceTree = "<group>"; };
 		3323F01585547F7E46F1D84A /* SeqTrack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SeqTrack.h; path = ../SeqTrack.h; sourceTree = "<group>"; };
 		3323F024E06530DFA724A99B /* NinSnesSeq.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NinSnesSeq.cpp; sourceTree = "<group>"; };
 		3323F02FC5439773A9CB38DB /* exceptions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = exceptions.h; sourceTree = "<group>"; };
@@ -196,6 +224,7 @@
 		3323F181E930DEF42B0D4004 /* HeartBeatPS1Seq.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HeartBeatPS1Seq.h; sourceTree = "<group>"; };
 		3323F182CB18724F802156C4 /* VGMItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VGMItem.h; path = ../VGMItem.h; sourceTree = "<group>"; };
 		3323F193F45A23AB9C684272 /* DataSeg.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DataSeg.cpp; path = ../DataSeg.cpp; sourceTree = "<group>"; };
+		3323F19942CBAB86AD45F99D /* VGRawFileTableView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = VGRawFileTableView.h; sourceTree = SOURCE_ROOT; };
 		3323F1A07062E29F7E599F24 /* AkaoFormat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AkaoFormat.cpp; sourceTree = "<group>"; };
 		3323F1B35DBC29A590D83718 /* FFTScanner.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FFTScanner.h; sourceTree = "<group>"; };
 		3323F1C8960F04DCD68C8FBD /* HOSA.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HOSA.cpp; sourceTree = "<group>"; };
@@ -325,6 +354,7 @@
 		3323F8DE604093524005161B /* tinyxml.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tinyxml.h; sourceTree = "<group>"; };
 		3323F8DF3CE0EAFC0001BA8F /* RareSnesScanner.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RareSnesScanner.cpp; sourceTree = "<group>"; };
 		3323F8E1FC1EF3672A6DE979 /* TriAcePS1Seq.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TriAcePS1Seq.h; sourceTree = "<group>"; };
+		3323F8E8BAC2F2412B96ADFF /* MacVGMRoot.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MacVGMRoot.mm; sourceTree = SOURCE_ROOT; };
 		3323F8EE4002213A7DF54155 /* OrgScanner.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OrgScanner.h; sourceTree = "<group>"; };
 		3323F8FF898EAFA7DA060BE6 /* MP2k.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MP2k.h; sourceTree = "<group>"; };
 		3323F90F0D877EEA7F93FFD8 /* emitter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = emitter.h; sourceTree = "<group>"; };
@@ -360,6 +390,7 @@
 		3323FA7E831D75C734FF5EE6 /* VGMTag.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = VGMTag.cpp; path = ../VGMTag.cpp; sourceTree = "<group>"; };
 		3323FA927DB13DC678504127 /* impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = impl.h; sourceTree = "<group>"; };
 		3323FA953B50161898BFE175 /* RareSnesScanner.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RareSnesScanner.h; sourceTree = "<group>"; };
+		3323FA96B498751236152B52 /* VGRawFileTableView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = VGRawFileTableView.m; sourceTree = SOURCE_ROOT; };
 		3323FA9E698D107B79841DAD /* DLSFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DLSFile.h; path = ../DLSFile.h; sourceTree = "<group>"; };
 		3323FA9F2B4DD570FD971FEF /* SeqTrack.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SeqTrack.cpp; path = ../SeqTrack.cpp; sourceTree = "<group>"; };
 		3323FAA85551E9AEB0B02F33 /* VGMColl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = VGMColl.cpp; path = ../VGMColl.cpp; sourceTree = "<group>"; };
@@ -370,6 +401,7 @@
 		3323FB10EA0903A39456516E /* SNSFLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SNSFLoader.h; sourceTree = "<group>"; };
 		3323FB13E3CD4ECC3120A4A7 /* TriAcePS1InstrSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TriAcePS1InstrSet.h; sourceTree = "<group>"; };
 		3323FB1E22C0794BF8E62E08 /* eventhandler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = eventhandler.h; sourceTree = "<group>"; };
+		3323FB1F657FB780EFB5D14B /* MacVGMRoot.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = MacVGMRoot.hh; sourceTree = SOURCE_ROOT; };
 		3323FB2A371D4995FA062AAA /* SeqEvent.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SeqEvent.h; path = ../SeqEvent.h; sourceTree = "<group>"; };
 		3323FB32C2136180D8AF97B6 /* tinyxmlSTL-mt.lib */ = {isa = PBXFileReference; lastKnownFileType = file.lib; path = "tinyxmlSTL-mt.lib"; sourceTree = "<group>"; };
 		3323FB354A830B061E5D0222 /* SquareSnesSeq.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SquareSnesSeq.cpp; sourceTree = "<group>"; };
@@ -415,8 +447,10 @@
 		3323FD8C42D933AB41261F8D /* VGMSampColl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSampColl.cpp; path = ../VGMSampColl.cpp; sourceTree = "<group>"; };
 		3323FD8F88CFC9BDE8EEE727 /* KonamiGXScanner.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KonamiGXScanner.h; sourceTree = "<group>"; };
 		3323FD9A24A5E49234845C13 /* SonyPS2InstrSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SonyPS2InstrSet.cpp; sourceTree = "<group>"; };
+		3323FDA57224C12962ED7366 /* NSString+VGMTrans.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSString+VGMTrans.h"; sourceTree = SOURCE_ROOT; };
 		3323FDAAE1C6A83FC69031E9 /* NinSnesScanner.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NinSnesScanner.cpp; sourceTree = "<group>"; };
 		3323FDC9563551EBB729B895 /* TaitoF3Scanner.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TaitoF3Scanner.cpp; sourceTree = "<group>"; };
+		3323FDC9B53457414B08F4A1 /* NSString+VGMTrans.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSString+VGMTrans.m"; sourceTree = SOURCE_ROOT; };
 		3323FDCA9FEA391668B72F28 /* VGMMiscFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VGMMiscFile.h; path = ../VGMMiscFile.h; sourceTree = "<group>"; };
 		3323FDD08DE45B6B5942339B /* SeqVoiceAllocator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SeqVoiceAllocator.cpp; path = ../SeqVoiceAllocator.cpp; sourceTree = "<group>"; };
 		3323FDF18B26D4A6E102560D /* node_data.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = node_data.h; sourceTree = "<group>"; };
@@ -465,7 +499,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2746388E19AF59EC009A3437 /* libfluidsynth.dylib in Frameworks */,
 				2746387B19AD6811009A3437 /* libz.dylib in Frameworks */,
+				2746389919AF5CFA009A3437 /* libfluidsynth.dylib in Frameworks */,
 				3323F19FF4641C232373B43B /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -502,6 +538,7 @@
 		2746344D19AAB0C8009A3437 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				2746388D19AF59EC009A3437 /* libfluidsynth.dylib */,
 				2746387A19AD6811009A3437 /* libz.dylib */,
 				2746346D19AAB0C8009A3437 /* XCTest.framework */,
 				2746345019AAB0C8009A3437 /* Other Frameworks */,
@@ -548,6 +585,56 @@
 			path = minizip;
 			sourceTree = "<group>";
 		};
+		2746388F19AF5ABC009A3437 /* fluidsynth */ = {
+			isa = PBXGroup;
+			children = (
+				2746389519AF5CFA009A3437 /* include */,
+				2746389719AF5CFA009A3437 /* lib */,
+			);
+			path = fluidsynth;
+			sourceTree = "<group>";
+		};
+		2746389519AF5CFA009A3437 /* include */ = {
+			isa = PBXGroup;
+			children = (
+				2746389A19AF5DDF009A3437 /* fluidsynth */,
+				2746389619AF5CFA009A3437 /* fluidsynth.h */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+		2746389719AF5CFA009A3437 /* lib */ = {
+			isa = PBXGroup;
+			children = (
+				2746389819AF5CFA009A3437 /* libfluidsynth.dylib */,
+			);
+			path = lib;
+			sourceTree = "<group>";
+		};
+		2746389A19AF5DDF009A3437 /* fluidsynth */ = {
+			isa = PBXGroup;
+			children = (
+				2746389B19AF5DDF009A3437 /* audio.h */,
+				2746389C19AF5DDF009A3437 /* event.h */,
+				2746389D19AF5DDF009A3437 /* gen.h */,
+				2746389E19AF5DDF009A3437 /* log.h */,
+				2746389F19AF5DDF009A3437 /* midi.h */,
+				274638A019AF5DDF009A3437 /* misc.h */,
+				274638A119AF5DDF009A3437 /* mod.h */,
+				274638A219AF5DDF009A3437 /* ramsfont.h */,
+				274638A319AF5DDF009A3437 /* seq.h */,
+				274638A419AF5DDF009A3437 /* seqbind.h */,
+				274638A519AF5DDF009A3437 /* settings.h */,
+				274638A619AF5DDF009A3437 /* sfont.h */,
+				274638A719AF5DDF009A3437 /* shell.h */,
+				274638A819AF5DDF009A3437 /* synth.h */,
+				274638A919AF5DDF009A3437 /* types.h */,
+				274638AA19AF5DDF009A3437 /* version.h */,
+				274638AB19AF5DDF009A3437 /* voice.h */,
+			);
+			path = fluidsynth;
+			sourceTree = "<group>";
+		};
 		3323F07ACC9F543A22D90526 /* contrib */ = {
 			isa = PBXGroup;
 			children = (
@@ -577,10 +664,18 @@
 				3323FD4BFDEF92E812E9C0A4 /* osdepend.cpp */,
 				3323F7FA52EFD75CBADD2F8E /* osdepend.h */,
 				2704A01D19AEA4E100A70368 /* VGMasterViewController.h */,
-				2704A01E19AEA4E100A70368 /* VGMasterViewController.m */,
+				2704A01E19AEA4E100A70368 /* VGMasterViewController.mm */,
 				2704A01F19AEA4E100A70368 /* VGMasterViewController.xib */,
-				2704A02219AEB89F00A70368 /* MacVGMRoot.mm */,
-				2704A02319AEB89F00A70368 /* MacVGMRoot.h */,
+				2704A02219AEB89F00A70368 /* MacVGMRootCpp.mm */,
+				2704A02319AEB89F00A70368 /* MacVGMRootCpp.hh */,
+				3323F8E8BAC2F2412B96ADFF /* MacVGMRoot.mm */,
+				3323FB1F657FB780EFB5D14B /* MacVGMRoot.hh */,
+				3323FDC9B53457414B08F4A1 /* NSString+VGMTrans.m */,
+				3323FDA57224C12962ED7366 /* NSString+VGMTrans.h */,
+				3323FA96B498751236152B52 /* VGRawFileTableView.m */,
+				3323F19942CBAB86AD45F99D /* VGRawFileTableView.h */,
+				2746389219AF5C5F009A3437 /* VGMusicPlayer.h */,
+				2746389319AF5C5F009A3437 /* VGMusicPlayer.m */,
 			);
 			name = mac;
 			path = VGMTrans;
@@ -870,6 +965,7 @@
 		3323FF6EA5FABABF7FE89889 /* dependencies */ = {
 			isa = PBXGroup;
 			children = (
+				2746388F19AF5ABC009A3437 /* fluidsynth */,
 				2746386519AD6505009A3437 /* minizip */,
 				3323F7AF3182761B14F8B819 /* tinyxml */,
 				3323F55D84538F210555C15F /* yaml-cpp */,
@@ -1152,7 +1248,7 @@
 				3323FC5CE21C58CE4C3E205F /* FFTInstr.cpp in Sources */,
 				3323F75212CBB7730F95F50F /* FFTScanner.cpp in Sources */,
 				3323F2EC1CE97D714CC85F42 /* HeartBeatPS1Seq.cpp in Sources */,
-				2704A02419AEB89F00A70368 /* MacVGMRoot.mm in Sources */,
+				2704A02419AEB89F00A70368 /* MacVGMRootCpp.mm in Sources */,
 				3323F9381585CF4DD365DB25 /* HeartBeatPS1SeqScanner.cpp in Sources */,
 				3323F6FD13440F9DC81C0C74 /* HOSA.cpp in Sources */,
 				2746385B19AD5818009A3437 /* tinyxmlparser.cpp in Sources */,
@@ -1162,7 +1258,7 @@
 				3323F8E9D013B43A6B0E039A /* KonamiGXScanner.cpp in Sources */,
 				3323F2009B84B86D0043609A /* KonamiGXSeq.cpp in Sources */,
 				3323F4C83BE72C8A68D6EB84 /* KonamiSnesInstr.cpp in Sources */,
-				2704A02019AEA4E100A70368 /* VGMasterViewController.m in Sources */,
+				2704A02019AEA4E100A70368 /* VGMasterViewController.mm in Sources */,
 				3323F05FDFA1A0B962C6649B /* KonamiSnesScanner.cpp in Sources */,
 				2746387919AD6506009A3437 /* zip.c in Sources */,
 				3323FAF9C10D130F5F27B0B8 /* KonamiSnesSeq.cpp in Sources */,
@@ -1195,6 +1291,7 @@
 				3323F92DAC81DE7FD1D259E3 /* SonyPS2Seq.cpp in Sources */,
 				3323F543B2990DBD82BEFBDD /* SquarePS2Scanner.cpp in Sources */,
 				3323F7130896A7D88D7C6F9F /* SquarePS2Seq.cpp in Sources */,
+				2746389419AF5C5F009A3437 /* VGMusicPlayer.m in Sources */,
 				3323F570BBDB3E364A73C6ED /* SquareSnesSeq.cpp in Sources */,
 				3323F2392EE6CD7AF6DEEBF6 /* SquSnesScanner.cpp in Sources */,
 				3323F9D7DB53450EBE7572D0 /* TaitoF3Scanner.cpp in Sources */,
@@ -1250,6 +1347,9 @@
 				3323F50937B666DE240D4FEA /* VGMSeq.cpp in Sources */,
 				3323F03C12D6CC310B636859 /* VGMSeqNoTrks.cpp in Sources */,
 				3323FE5CD3CDE4EFAB3D5ACF /* VGMTag.cpp in Sources */,
+				3323F426A3A69606ADCE2F40 /* MacVGMRoot.mm in Sources */,
+				3323F3B77EBC413832D840D3 /* NSString+VGMTrans.m in Sources */,
+				3323FBB0262B4901620FF691 /* VGRawFileTableView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1384,6 +1484,8 @@
 					/Users/mike/vgmtrans/src/dependencies/zlib/lib/win32,
 					/Users/mike/vgmtrans/src/dependencies/zlib/lib/x64,
 					/Users/mike/vgmtrans/src/dependencies/zlib/lib/mac,
+					/Users/mike/vgmtrans/src/dependencies/fluidsynth,
+					/Users/mike/vgmtrans/src/dependencies/fluidsynth/lib,
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
@@ -1414,6 +1516,8 @@
 					/Users/mike/vgmtrans/src/dependencies/zlib/lib/win32,
 					/Users/mike/vgmtrans/src/dependencies/zlib/lib/x64,
 					/Users/mike/vgmtrans/src/dependencies/zlib/lib/mac,
+					/Users/mike/vgmtrans/src/dependencies/fluidsynth,
+					/Users/mike/vgmtrans/src/dependencies/fluidsynth/lib,
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;

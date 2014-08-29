@@ -1,117 +1,141 @@
 //
-//  MacVGMRoot.cpp
-//  VGMTrans
-//
-//  Created by Mike on 8/27/14.
-//
+// Created by Mike on 8/27/14.
 //
 
-#include "MacVGMRoot.h"
+#import "MacVGMRoot.hh"
+#import "MacVGMRootCpp.hh"
+#import "NSString+VGMTrans.h"
+#import "VGRawFileTableView.h"
 
-void MacVGMRoot::SelectItem(VGMItem* item)
+class VGMItem;
+class VGMFile;
+class VGMColl;
+class VGMRoot;
+class VGMSeq;
+class VGMInstrSet;
+class VGMSampColl;
+class VGMMiscFile;
+class LogItem;
+class RawFile;
+
+NSString * const kVGDidAddRawFileNotification = @"kVGDidAddRawFileNotification";
+NSString * const kVGDidRemoveRawFileNotification = @"kVGDidRemoveRawFileNotification";
+NSString * const kVGDidAddVGMFileNotification = @"kVGDidAddVGMFileNotification";
+NSString * const kVGDidRemoveVGMFileNotification = @"kVGDidRemoveVGMFileNotification";
+NSString * const kVGDidAddCollectionNotification = @"kVGDidAddCollectionNotification";
+NSString * const kVGDidRemoveCollectionNotification = @"kVGDidRemoveCollectionNotification";
+NSString * const kVGDidAddLogItemNotification = @"kVGDidAddLogItemNotification";
+
+@implementation MacVGMRoot
+
++ (instancetype)sharedInstance
+{
+    static dispatch_once_t once;
+    static MacVGMRoot *sharedInstance;
+    dispatch_once(&once, ^ { sharedInstance = [[self alloc] init]; });
+    return sharedInstance;
+}
+
+- (void) Init
+{
+    macroot.Init();
+}
+
+- (void) Reset
+{
+    macroot.Reset();
+}
+
+- (void) Exit
+{
+    macroot.Exit();
+}
+
+- (bool) OpenRawFile:(NSString *)filename
+{
+    NSLog(@"TESTING");
+    return macroot.OpenRawFile([NSString wcharFromString:filename]);
+}
+
+- (bool) CreateVirtFile:(uint8_t *)databuf fileSize:(uint32_t)fileSize filename:(NSString *)filename parRawFileFullPath:(NSString *)parRawFileFullPath
+{
+    return macroot.CreateVirtFile(databuf, fileSize, [NSString wcharFromString:filename], [NSString wcharFromString:parRawFileFullPath]);
+}
+
+- (bool) SetupNewRawFile:(RawFile *)newRawFile
+{
+    return macroot.SetupNewRawFile(newRawFile);
+}
+
+- (bool) CloseRawFile:(RawFile *)targFile
+{
+    return macroot.CloseRawFile(targFile);
+}
+
+- (void) AddVGMFile:(VGMFile *)theFile
+{
+    macroot.AddVGMFile(theFile);
+}
+
+- (void) RemoveVGMFile:(VGMFile *)theFile bRemoveFromRaw:(bool)bRemoveFromRaw
+{
+    macroot.RemoveVGMFile(theFile, bRemoveFromRaw);
+}
+
+- (void) AddVGMColl:(VGMColl *)theColl
+{
+    macroot.AddVGMColl(theColl);
+}
+
+- (void) RemoveVGMColl:(VGMColl *)theFile;
+{
+    macroot.RemoveVGMColl(theFile);
+}
+
+- (void) AddLogItem:(LogItem *)theLog
+{
+    macroot.AddLogItem(theLog);
+}
+
+//- (void) UI_SetRootPtr:(VGMRoot**) theRoot
+//{
+//    *theRoot = &macroot;
+//}
+
+- (void) UI_AddRawFile:(RawFile*)newFile
+{
+    [[NSNotificationCenter defaultCenter] postNotificationName:kVGDidAddRawFileNotification object:nil];
+}
+
+- (void) UI_CloseRawFile:(RawFile*)newFile
+{
+    [[NSNotificationCenter defaultCenter] postNotificationName:kVGDidRemoveRawFileNotification object:nil];
+}
+
+- (void) UI_AddVGMFile:(VGMFile*)theFile
+{
+    [[NSNotificationCenter defaultCenter] postNotificationName:kVGDidAddVGMFileNotification object:nil];
+}
+
+- (void) UI_RemoveVGMFile:(VGMFile*)theFile
+{
+    [[NSNotificationCenter defaultCenter] postNotificationName:kVGDidRemoveVGMFileNotification object:nil];
+}
+
+- (void) UI_AddVGMColl:(void*) theColl
+{
+    [[NSNotificationCenter defaultCenter] postNotificationName:kVGDidAddCollectionNotification object:nil];
+}
+
+- (void) UI_RemoveVGMColl:(void*) theColl
+{
+    [[NSNotificationCenter defaultCenter] postNotificationName:kVGDidRemoveCollectionNotification object:nil];
+}
+
+- (void) UI_AddLogItem:(void*) theLog
 {
 
 }
 
-void MacVGMRoot::SelectColl(VGMColl* coll)
-{
+@end
 
-}
-
-void MacVGMRoot::Play(void)
-{
-
-}
-
-void MacVGMRoot::Pause(void)
-{
-
-}
-
-void MacVGMRoot::Stop(void)
-{
-
-}
-
-void MacVGMRoot::UI_SetRootPtr(VGMRoot** theRoot)
-{
-
-}
-
-void MacVGMRoot::UI_PreExit()
-{}
-
-void MacVGMRoot::UI_Exit()
-{}
-
-void MacVGMRoot::UI_AddRawFile(RawFile* newFile)
-{}
-
-void MacVGMRoot::UI_CloseRawFile(RawFile* targFile)
-{}
-
-void MacVGMRoot::UI_OnBeginScan()
-{}
-
-void MacVGMRoot::UI_SetScanInfo()
-{}
-
-void MacVGMRoot::UI_OnEndScan()
-{}
-
-void MacVGMRoot::UI_AddVGMFile(VGMFile* theFile)
-{}
-
-void MacVGMRoot::UI_AddVGMSeq(VGMSeq* theSeq)
-{}
-
-void MacVGMRoot::UI_AddVGMInstrSet(VGMInstrSet* theInstrSet)
-{}
-
-void MacVGMRoot::UI_AddVGMSampColl(VGMSampColl* theSampColl)
-{}
-
-void MacVGMRoot::UI_AddVGMMisc(VGMMiscFile* theMiscFile)
-{}
-
-void MacVGMRoot::UI_AddVGMColl(VGMColl* theColl)
-{}
-
-void MacVGMRoot::UI_AddLogItem(LogItem* theLog)
-{}
-
-void MacVGMRoot::UI_RemoveVGMFile(VGMFile* targFile)
-{}
-
-void MacVGMRoot::UI_RemoveVGMColl(VGMColl* targColl)
-{}
-
-void MacVGMRoot::UI_BeginRemoveVGMFiles()
-{}
-
-void MacVGMRoot::UI_EndRemoveVGMFiles()
-{}
-
-void MacVGMRoot::UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName, void* UI_specific)
-{}
-
-void MacVGMRoot::UI_AddItemSet(VGMFile* file, std::vector<ItemSet>* itemset)
-{}
-
-std::wstring MacVGMRoot::UI_GetOpenFilePath(const std::wstring& suggestedFilename = L"", const std::wstring& extension = L"")
-{
-    std::wstring path = L"Placeholder";
-    return path;
-}
-
-std::wstring MacVGMRoot::UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension = L"")
-{
-    std::wstring path = L"Placeholder";
-    return path;
-}
-
-std::wstring MacVGMRoot::UI_GetSaveDirPath(const std::wstring& suggestedDir = L"")
-{
-    std::wstring path = L"Placeholder";
-    return path;
-}

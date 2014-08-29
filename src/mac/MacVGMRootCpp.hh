@@ -10,14 +10,15 @@
 #include "../Root.h"
 
 class VGMItem;
+class VGMColl;
 
-class MacVGMRoot :
+class MacVGMRootCpp :
 public VGMRoot
 {
 public:
-	MacVGMRoot(void);
+	MacVGMRootCpp(void);
 public:
-	virtual ~MacVGMRoot(void);
+	virtual ~MacVGMRootCpp(void);
     
 	void SelectItem(VGMItem* item);
 	void SelectColl(VGMColl* coll);
@@ -62,4 +63,4 @@ private:
 };
 
 
-extern "C" MacVGMRoot macroot;
+extern "C" MacVGMRootCpp macroot;
