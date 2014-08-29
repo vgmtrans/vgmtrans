@@ -105,7 +105,7 @@ public:
 
 	bool SaveAllAsRaw();
 
-protected:
+public:
 	//MatchMaker matchmaker;
 	std::vector<RawFile*> vRawFile;
 	std::vector<VGMFile*> vVGMFile;
