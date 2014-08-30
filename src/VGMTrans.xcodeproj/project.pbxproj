@@ -51,6 +51,7 @@
 		34017A37364CD709D7E9FF22 /* KonamiSnesInstr.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = FE25F9A168CC5984DA7264EA /* KonamiSnesInstr.cpp */; settings = {ATTRIBUTES = (); }; };
 		34F7A646DCFAC41B6C7CA772 /* TaitoF3Scanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 6194FDB0E34AAC50F58A2357 /* TaitoF3Scanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		38BF65CB5350159D6750F9C9 /* MAMELoader.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = BF399FFE6F4CB75028278D3E /* MAMELoader.cpp */; settings = {ATTRIBUTES = (); }; };
+		3A7FC125CA6A5A3B108A30F0 /* QtWidgets.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = AFCECA1569ECD8FC3A042C50 /* QtWidgets.framework */; settings = {}; };
 		3D1183AFA79A14A7BA9968C3 /* SegSatScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 42A348A2A3252502F1B09C7E /* SegSatScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		3D6204EAC4DFFB95B067F30B /* VGMColl.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = D04A127E9C3456E531C752E7 /* VGMColl.cpp */; settings = {ATTRIBUTES = (); }; };
 		3E34D37FE3213EF08E690B82 /* TriAcePS1Scanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8E75FC098D8B65C66D803303 /* TriAcePS1Scanner.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -64,9 +65,9 @@
 		468B0A25AEA9676C1FB53230 /* SeqVoiceAllocator.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = BFADD2FB09303BFEABF0B238 /* SeqVoiceAllocator.cpp */; settings = {ATTRIBUTES = (); }; };
 		47EC7C8ABC7D5D4B346832AD /* HOSA.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 0CBEF104572B85DD130A25A3 /* HOSA.cpp */; settings = {ATTRIBUTES = (); }; };
 		48435D16CBDFAFFF539B1126 /* HeartBeatPS1Seq.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 53E0901A0B0D6AF9C8B43891 /* HeartBeatPS1Seq.cpp */; settings = {ATTRIBUTES = (); }; };
-		489EB1FA0DEC3B73A40EA4D3 /* QtGui.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 3B5A06A238B0B3E162D52B23 /* QtGui.framework */; settings = {}; };
 		4AC322A99AA8341869358036 /* AkaoScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = F95AB6D092B40BDA9FE7115B /* AkaoScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		58AB77687FD5A97DCDA9F056 /* PS1SeqScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 793755AC3C7A37397E19447B /* PS1SeqScanner.cpp */; settings = {ATTRIBUTES = (); }; };
+		5A8BFCC2D3E074FA2C64674C /* QtCore.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = A70B73ADEFAAFE0B8A57A97E /* QtCore.framework */; settings = {}; };
 		5C9F2C188A63B28828B97B4E /* WD.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = FC1FBA96644CF90F2C0D042E /* WD.cpp */; settings = {ATTRIBUTES = (); }; };
 		5DB1082AF50F1D729C1E5D83 /* ioapi.c in Compile Sources */ = {isa = PBXBuildFile; fileRef = 4C719AAFC333B51E2582C96E /* ioapi.c */; settings = {ATTRIBUTES = (); }; };
 		5E95AB41675746B6463A0AB2 /* tinystr.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 726EE3591DD6BFD8CE2F755A /* tinystr.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -86,6 +87,7 @@
 		8AAABF5C3F4EB6573487AA56 /* CapcomSnesSeq.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 3B2E1DF0E99ED4CE348EECAB /* CapcomSnesSeq.cpp */; settings = {ATTRIBUTES = (); }; };
 		8D49B40228EB2D0F8A038CB8 /* NDSScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = E2A477F7772D14B733E764A1 /* NDSScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		91C179FADEA934723CC536EE /* VGMSampColl.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 45E95654F70AD8D314DA0BE0 /* VGMSampColl.cpp */; settings = {ATTRIBUTES = (); }; };
+		939E61E1D6EDB28D7C8F2A3C /* QtGui.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 1C68D2CCC1918B9AFA3A16E5 /* QtGui.framework */; settings = {}; };
 		95537AC9DAAF4B024298FFEE /* NinSnesInstr.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = D3D38FCF90B522541B0A6884 /* NinSnesInstr.cpp */; settings = {ATTRIBUTES = (); }; };
 		95B0013488340B18198E749F /* SquSnesScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 0F9DF781BA49CA48E481383E /* SquSnesScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		9735E93470CD528572CE8A87 /* SquarePS2Scanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 17816F23038B214C888DC09D /* SquarePS2Scanner.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -120,8 +122,6 @@
 		CB6B110579ED0FD3BB255346 /* VGMItem.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = D413684B554195533799B94C /* VGMItem.cpp */; settings = {ATTRIBUTES = (); }; };
 		CD1069AC85D4E50D21301A28 /* mainwindow.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 2C3D79E7939408B8763C4AB3 /* mainwindow.cpp */; settings = {ATTRIBUTES = (); }; };
 		D0F60462DF8A3CF8AA35021F /* KonamiGXScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 5EED6C8C7F77FED0ADDBA809 /* KonamiGXScanner.cpp */; settings = {ATTRIBUTES = (); }; };
-		D1F7A94B52DD62C744EA72B5 /* QtWidgets.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 36A2B172D904F85679591936 /* QtWidgets.framework */; settings = {}; };
-		D20912A03AB12392803998C5 /* QtCore.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = FC3502FC8F95EA7126F85143 /* QtCore.framework */; settings = {}; };
 		D3A5DD2C4F3626B51EEEE182 /* DataSeg.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 7369F190CF48537242D9C872 /* DataSeg.cpp */; settings = {ATTRIBUTES = (); }; };
 		D599800664CF31E8247D72D5 /* RareSnesInstr.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8884161B8E3492AFA0DC2485 /* RareSnesInstr.cpp */; settings = {ATTRIBUTES = (); }; };
 		D933E23664206466ECAA10CD /* LogItem.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 11457854D64BD0FD50FF5CB1 /* LogItem.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -148,378 +148,376 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		01885D244AF2999190B0C198 /* Root.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Root.cpp; path = main/Root.cpp; sourceTree = "<absolute>"; };
-		01B60B2CEA4062ABCB2AA4B1 /* qt_lib_nfc_private.pri */ = {isa = PBXFileReference; name = qt_lib_nfc_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_nfc_private.pri; sourceTree = "<absolute>"; };
-		030539F53FF4D8B7746CB099 /* OrgSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OrgSeq.h; path = main/formats/OrgSeq.h; sourceTree = "<absolute>"; };
-		0315CD744B8B713D36C23E86 /* qmake.conf */ = {isa = PBXFileReference; name = qmake.conf; path = "../../Qt/5.3/clang_64/mkspecs/macx-xcode/qmake.conf"; sourceTree = "<absolute>"; };
-		033F67E422C2C5AA00925107 /* unzip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = unzip.h; path = lib/minizip/unzip.h; sourceTree = "<absolute>"; };
-		0343648275BC86BA1860EAAE /* qt_lib_bluetooth.pri */ = {isa = PBXFileReference; name = qt_lib_bluetooth.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_bluetooth.pri; sourceTree = "<absolute>"; };
-		046C351F588E80ECD012AB45 /* OrgSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OrgSeq.cpp; path = main/formats/OrgSeq.cpp; sourceTree = "<absolute>"; };
-		04937CEA5C324C45485F61A0 /* TriAcePS1Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TriAcePS1Seq.cpp; path = main/formats/TriAcePS1Seq.cpp; sourceTree = "<absolute>"; };
-		05436BE41765AB07FF1531BC /* VGMSeqNoTrks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMSeqNoTrks.h; path = main/VGMSeqNoTrks.h; sourceTree = "<absolute>"; };
-		07630FCF2D198F66F6D4E680 /* VGMSeqNoTrks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSeqNoTrks.cpp; path = main/VGMSeqNoTrks.cpp; sourceTree = "<absolute>"; };
-		08131D42C08FFEE3245E3036 /* unzip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = unzip.h; path = lib/zlib/include/unzip.h; sourceTree = "<absolute>"; };
-		08B38BE7302ED43312F82A86 /* qt_lib_sensors.pri */ = {isa = PBXFileReference; name = qt_lib_sensors.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_sensors.pri; sourceTree = "<absolute>"; };
-		0AB3A3CD88D3C76DCC650769 /* NDSScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSScanner.h; path = main/formats/NDSScanner.h; sourceTree = "<absolute>"; };
-		0AD06042180FFFF42EFD4A4C /* RiffFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RiffFile.h; path = main/RiffFile.h; sourceTree = "<absolute>"; };
-		0B11590C12B24677DEE726C3 /* crypt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = crypt.h; path = lib/minizip/crypt.h; sourceTree = "<absolute>"; };
-		0B2D88F8F4D5E28FF63B1B73 /* tinyxml.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = tinyxml.h; path = lib/tinyxml/src/tinyxml.h; sourceTree = "<absolute>"; };
-		0BA86129FD5A9B75A950C436 /* SquSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquSnesSeq.h; path = main/formats/SquSnesSeq.h; sourceTree = "<absolute>"; };
-		0BBC3F6FD22E9C2137385C72 /* qt_lib_qmltest_private.pri */ = {isa = PBXFileReference; name = qt_lib_qmltest_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_qmltest_private.pri; sourceTree = "<absolute>"; };
-		0C179345E0C91F3D8D62A65B /* ioapi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ioapi.h; path = lib/minizip/ioapi.h; sourceTree = "<absolute>"; };
-		0CBEF104572B85DD130A25A3 /* HOSA.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HOSA.cpp; path = main/formats/HOSA.cpp; sourceTree = "<absolute>"; };
-		0D5B3CA4B928E70D7D01277B /* NinSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesSeq.h; path = main/formats/NinSnesSeq.h; sourceTree = "<absolute>"; };
-		0DEB17FC23C5D130167ECEB5 /* qt_lib_webkit.pri */ = {isa = PBXFileReference; name = qt_lib_webkit.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_webkit.pri; sourceTree = "<absolute>"; };
-		0E3D2141A55CF663E5D6B58E /* log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = log.h; path = lib/fluidsynth/include/fluidsynth/log.h; sourceTree = "<absolute>"; };
-		0F72C68D3A7B5BC24F10C1E6 /* qt_lib_qmldevtools_private.pri */ = {isa = PBXFileReference; name = qt_lib_qmldevtools_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_qmldevtools_private.pri; sourceTree = "<absolute>"; };
-		0F9DF781BA49CA48E481383E /* SquSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquSnesScanner.cpp; path = main/formats/SquSnesScanner.cpp; sourceTree = "<absolute>"; };
-		0FEF27929745BFA09B9469A2 /* MP2kScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MP2kScanner.cpp; path = main/formats/MP2kScanner.cpp; sourceTree = "<absolute>"; };
-		102E81CC7F392951B0C78FF4 /* zconf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = zconf.h; path = lib/zlib/include/zconf.h; sourceTree = "<absolute>"; };
-		11457854D64BD0FD50FF5CB1 /* LogItem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = LogItem.cpp; path = main/LogItem.cpp; sourceTree = "<absolute>"; };
-		1194A4A9AF2FFD9841102627 /* SynthFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SynthFile.cpp; path = main/SynthFile.cpp; sourceTree = "<absolute>"; };
-		122B06E6533510920615D466 /* MP2kScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MP2kScanner.h; path = main/formats/MP2kScanner.h; sourceTree = "<absolute>"; };
-		12E4D8C45B4DDC12B5D069CC /* RareSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesScanner.h; path = main/formats/RareSnesScanner.h; sourceTree = "<absolute>"; };
-		14C88E80899B6CA4868E2E40 /* common.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = common.cpp; path = main/common.cpp; sourceTree = "<absolute>"; };
-		14FC341785BA96AB43F4A352 /* Root.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Root.h; path = main/Root.h; sourceTree = "<absolute>"; };
-		15636DB4C4B703F2B99D99CD /* qt_lib_help.pri */ = {isa = PBXFileReference; name = qt_lib_help.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_help.pri; sourceTree = "<absolute>"; };
-		15A5ED4AA9ACC7F205EC51CA /* Menu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Menu.h; path = main/Menu.h; sourceTree = "<absolute>"; };
-		15E00C6AE7C2DC665B4D090F /* RareSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesSeq.h; path = main/formats/RareSnesSeq.h; sourceTree = "<absolute>"; };
-		162E3CCE68470BE49EC3030A /* zip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = zip.h; path = lib/minizip/zip.h; sourceTree = "<absolute>"; };
-		164D715C170D01CFB09A1164 /* qt_lib_scripttools.pri */ = {isa = PBXFileReference; name = qt_lib_scripttools.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_scripttools.pri; sourceTree = "<absolute>"; };
-		16FB8800BAEBA386A2BF417D /* qt_lib_webkitwidgets_private.pri */ = {isa = PBXFileReference; name = qt_lib_webkitwidgets_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_webkitwidgets_private.pri; sourceTree = "<absolute>"; };
-		170CF08F47B97F0C6FC4358D /* FFTFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FFTFormat.h; path = main/formats/FFTFormat.h; sourceTree = "<absolute>"; };
-		1746C9092D1FA677E9D2886F /* qt_lib_sql_private.pri */ = {isa = PBXFileReference; name = qt_lib_sql_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_sql_private.pri; sourceTree = "<absolute>"; };
-		176CCA3DD3939A59B80DEE77 /* Matcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Matcher.h; path = main/Matcher.h; sourceTree = "<absolute>"; };
-		1777227F22DF5A24ECFBC23F /* NinSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NinSnesScanner.cpp; path = main/formats/NinSnesScanner.cpp; sourceTree = "<absolute>"; };
-		17816F23038B214C888DC09D /* SquarePS2Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquarePS2Scanner.cpp; path = main/formats/SquarePS2Scanner.cpp; sourceTree = "<absolute>"; };
-		17AFEA471E66F97C28D7429A /* FFTInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FFTInstr.h; path = main/formats/FFTInstr.h; sourceTree = "<absolute>"; };
-		1849AB668FCCDCB4BF32B623 /* PS1Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PS1Seq.h; path = main/formats/PS1Seq.h; sourceTree = "<absolute>"; };
-		1934A359C2F8313A9EEFF08A /* unzip.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = unzip.c; path = lib/minizip/unzip.c; sourceTree = "<absolute>"; };
-		19586532D4FAC6758C9B6311 /* TriAcePS1Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1Format.h; path = main/formats/TriAcePS1Format.h; sourceTree = "<absolute>"; };
-		19A8F21DDEDE3836B7B33FC2 /* TriAcePS1Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1Scanner.h; path = main/formats/TriAcePS1Scanner.h; sourceTree = "<absolute>"; };
-		19C2BF027845D9AF47E02BF3 /* Vab.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Vab.cpp; path = main/formats/Vab.cpp; sourceTree = "<absolute>"; };
-		19FACDF33F2094886B603103 /* HeartBeatPS1Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HeartBeatPS1Format.h; path = main/formats/HeartBeatPS1Format.h; sourceTree = "<absolute>"; };
-		1BD0A1515986FB4D30ECD753 /* SquareSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquareSnesSeq.cpp; path = main/formats/SquareSnesSeq.cpp; sourceTree = "<absolute>"; };
-		1C5592B49F597A78D8D510E7 /* clang.conf */ = {isa = PBXFileReference; name = clang.conf; path = ../../Qt/5.3/clang_64/mkspecs/common/clang.conf; sourceTree = "<absolute>"; };
-		1CB7BFCD77FDFA26132919D8 /* qt_lib_qml_private.pri */ = {isa = PBXFileReference; name = qt_lib_qml_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_qml_private.pri; sourceTree = "<absolute>"; };
-		1D8C9327B0FF309C84820F00 /* NDSInstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NDSInstrSet.cpp; path = main/formats/NDSInstrSet.cpp; sourceTree = "<absolute>"; };
-		1D8CED11B3FA5F4FBD40B368 /* qt_lib_enginio_private.pri */ = {isa = PBXFileReference; name = qt_lib_enginio_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_enginio_private.pri; sourceTree = "<absolute>"; };
-		1E12E5B6247A3799181D1A64 /* audio.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = audio.h; path = lib/fluidsynth/include/fluidsynth/audio.h; sourceTree = "<absolute>"; };
-		1E5806D4F4D8AA8052732EC2 /* qt_lib_gui_private.pri */ = {isa = PBXFileReference; name = qt_lib_gui_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_gui_private.pri; sourceTree = "<absolute>"; };
-		1F14EE02E7E5D0004DC82063 /* QSoundScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = QSoundScanner.cpp; path = main/formats/QSoundScanner.cpp; sourceTree = "<absolute>"; };
-		1F698A27687AB016A3E6B346 /* MidiFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MidiFile.h; path = main/MidiFile.h; sourceTree = "<absolute>"; };
-		1FF0478D26488DB43404E273 /* VGMSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMSeq.h; path = main/VGMSeq.h; sourceTree = "<absolute>"; };
-		20413A76CEF5CF5007E73522 /* NinSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NinSnesSeq.cpp; path = main/formats/NinSnesSeq.cpp; sourceTree = "<absolute>"; };
-		2203E7459E6558B6B6593978 /* VGMFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMFile.h; path = main/VGMFile.h; sourceTree = "<absolute>"; };
-		22388D85423BD036C5651F7A /* qt_lib_positioning.pri */ = {isa = PBXFileReference; name = qt_lib_positioning.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_positioning.pri; sourceTree = "<absolute>"; };
-		224CC66542F28187FED3090A /* NDSFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSFormat.h; path = main/formats/NDSFormat.h; sourceTree = "<absolute>"; };
-		237DCB3F7AA7D02625557DE5 /* gcc-base.conf */ = {isa = PBXFileReference; name = "gcc-base.conf"; path = "../../Qt/5.3/clang_64/mkspecs/common/gcc-base.conf"; sourceTree = "<absolute>"; };
-		251DF10414F9EBBFFFD40EDC /* tinyxmlerror.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxmlerror.cpp; path = lib/tinyxml/src/tinyxmlerror.cpp; sourceTree = "<absolute>"; };
-		255465A08E5569125DA3E5EF /* Matcher.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Matcher.cpp; path = main/Matcher.cpp; sourceTree = "<absolute>"; };
-		26120FBC11B917C9AE721ABB /* Loop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Loop.h; path = main/Loop.h; sourceTree = "<absolute>"; };
-		26F6AAD0B0E528397C1AAA88 /* qt_lib_clucene_private.pri */ = {isa = PBXFileReference; name = qt_lib_clucene_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_clucene_private.pri; sourceTree = "<absolute>"; };
-		2902BDD135183ED3B90E91A4 /* qt_lib_testlib_private.pri */ = {isa = PBXFileReference; name = qt_lib_testlib_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_testlib_private.pri; sourceTree = "<absolute>"; };
-		2A1C461D755983BFCB337E2A /* TriAcePS1InstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TriAcePS1InstrSet.cpp; path = main/formats/TriAcePS1InstrSet.cpp; sourceTree = "<absolute>"; };
-		2A4D1AFEDD7A50D91333458A /* HOSAFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSAFormat.h; path = main/formats/HOSAFormat.h; sourceTree = "<absolute>"; };
-		2B56B8174D182F9C2567DEAC /* PS1Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PS1Format.h; path = main/formats/PS1Format.h; sourceTree = "<absolute>"; };
-		2C1A7B492C988926554C8320 /* qt_lib_svg.pri */ = {isa = PBXFileReference; name = qt_lib_svg.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_svg.pri; sourceTree = "<absolute>"; };
-		2C3D79E7939408B8763C4AB3 /* mainwindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = mainwindow.cpp; path = ui/qt/mainwindow.cpp; sourceTree = "<absolute>"; };
-		2D63C4BF069DA6101B1725D6 /* KonamiGXSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiGXSeq.h; path = main/formats/KonamiGXSeq.h; sourceTree = "<absolute>"; };
-		2E304D1B4B081DA3268B9266 /* DataSeg.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DataSeg.h; path = main/DataSeg.h; sourceTree = "<absolute>"; };
-		2E3307D91B4EE653D9978A14 /* SonyPS2Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SonyPS2Scanner.cpp; path = main/formats/SonyPS2Scanner.cpp; sourceTree = "<absolute>"; };
-		2E4457B6F329CB377E7CB9D0 /* SNESDSP.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SNESDSP.h; path = main/formats/SNESDSP.h; sourceTree = "<absolute>"; };
-		2F85FB0D31CC85D3FDBE77FD /* SonyPS2InstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2InstrSet.h; path = main/formats/SonyPS2InstrSet.h; sourceTree = "<absolute>"; };
-		300E7EBB04413FD04BFBFFE9 /* qt_lib_declarative.pri */ = {isa = PBXFileReference; name = qt_lib_declarative.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_declarative.pri; sourceTree = "<absolute>"; };
-		324108495A60BD72C5517AEB /* version.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = version.h; path = lib/fluidsynth/include/fluidsynth/version.h; sourceTree = "<absolute>"; };
-		3327C009E005AE682FE8DB25 /* MAMELoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MAMELoader.h; path = main/loaders/MAMELoader.h; sourceTree = "<absolute>"; };
-		334A1A36440ACE4733489168 /* qt_lib_openglextensions.pri */ = {isa = PBXFileReference; name = qt_lib_openglextensions.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_openglextensions.pri; sourceTree = "<absolute>"; };
-		336D1D01B737BAB898FFFB51 /* qt_lib_designercomponents_private.pri */ = {isa = PBXFileReference; name = qt_lib_designercomponents_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_designercomponents_private.pri; sourceTree = "<absolute>"; };
-		3394EF31656142C880EB40AC /* ramsfont.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ramsfont.h; path = lib/fluidsynth/include/fluidsynth/ramsfont.h; sourceTree = "<absolute>"; };
-		33C87B1DBBB9E2ADE751CEA8 /* dropsitewindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = dropsitewindow.cpp; path = ui/qt/dropsitewindow.cpp; sourceTree = "<absolute>"; };
-		348518C9393C06166FC020BF /* seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = seq.h; path = lib/fluidsynth/include/fluidsynth/seq.h; sourceTree = "<absolute>"; };
-		35A675B0446F79EF379187BB /* tinystr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = tinystr.h; path = lib/tinyxml/src/tinystr.h; sourceTree = "<absolute>"; };
-		35C5C7B6BEEFF1AA8CB92969 /* AkaoInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoInstr.h; path = main/formats/AkaoInstr.h; sourceTree = "<absolute>"; };
-		36A2B172D904F85679591936 /* QtWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtWidgets.framework; path = ../../Qt/5.3/clang_64/lib/QtWidgets.framework; refType = 4; sourceTree = "<absolute>"; };
-		37336A5C519185C94E064F60 /* RareSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesScanner.cpp; path = main/formats/RareSnesScanner.cpp; sourceTree = "<absolute>"; };
-		376F35DA1EA0B6FE68525861 /* qt_lib_bluetooth_private.pri */ = {isa = PBXFileReference; name = qt_lib_bluetooth_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_bluetooth_private.pri; sourceTree = "<absolute>"; };
-		387DCE80DF116174A936738A /* VGMTag.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMTag.cpp; path = main/VGMTag.cpp; sourceTree = "<absolute>"; };
-		39EBCA0E68922034F084E941 /* unix.conf */ = {isa = PBXFileReference; name = unix.conf; path = ../../Qt/5.3/clang_64/mkspecs/common/unix.conf; sourceTree = "<absolute>"; };
-		3A62D0DFE47ED4E48111D637 /* SquarePS2Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquarePS2Scanner.h; path = main/formats/SquarePS2Scanner.h; sourceTree = "<absolute>"; };
-		3A89ED40FB2F98CF770F34F3 /* zlib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = zlib.h; path = lib/zlib/include/zlib.h; sourceTree = "<absolute>"; };
-		3AF0CBB4E39054A26A8AA7E0 /* qt_lib_nfc.pri */ = {isa = PBXFileReference; name = qt_lib_nfc.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_nfc.pri; sourceTree = "<absolute>"; };
-		3B2E1DF0E99ED4CE348EECAB /* CapcomSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CapcomSnesSeq.cpp; path = main/formats/CapcomSnesSeq.cpp; sourceTree = "<absolute>"; };
-		3B5A06A238B0B3E162D52B23 /* QtGui.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtGui.framework; path = ../../Qt/5.3/clang_64/lib/QtGui.framework; refType = 4; sourceTree = "<absolute>"; };
-		3B828E94618ADB36A68C3BED /* tinystr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = tinystr.h; path = lib/tinyxml/tinystr.h; sourceTree = "<absolute>"; };
-		3CADF21F608FB2CE69FD7E1D /* KonamiSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiSnesSeq.cpp; path = main/formats/KonamiSnesSeq.cpp; sourceTree = "<absolute>"; };
-		3EAF15021446ABFB26B8D0DC /* midi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = midi.h; path = lib/fluidsynth/include/fluidsynth/midi.h; sourceTree = "<absolute>"; };
-		3FB8AC9145612B367A5EA67D /* KonamiSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiSnesSeq.h; path = main/formats/KonamiSnesSeq.h; sourceTree = "<absolute>"; };
-		4154C2B123D255441AFCFBCF /* qt_lib_quickparticles_private.pri */ = {isa = PBXFileReference; name = qt_lib_quickparticles_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_quickparticles_private.pri; sourceTree = "<absolute>"; };
-		41CEDAEA67DED531E640B80F /* CapcomSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CapcomSnesInstr.h; path = main/formats/CapcomSnesInstr.h; sourceTree = "<absolute>"; };
-		41D90207964763EFF6F9AEE0 /* SegSat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SegSat.h; path = main/formats/SegSat.h; sourceTree = "<absolute>"; };
-		41FC946AA8DA57A9034DCA0D /* qt_lib_uitools_private.pri */ = {isa = PBXFileReference; name = qt_lib_uitools_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_uitools_private.pri; sourceTree = "<absolute>"; };
-		422C4527F87AD425FA1938C0 /* SynthFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SynthFile.h; path = main/SynthFile.h; sourceTree = "<absolute>"; };
-		42A348A2A3252502F1B09C7E /* SegSatScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SegSatScanner.cpp; path = main/formats/SegSatScanner.cpp; sourceTree = "<absolute>"; };
-		43B03B7BF4C2523009132F8D /* HeartBeatPS1SeqScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HeartBeatPS1SeqScanner.cpp; path = main/formats/HeartBeatPS1SeqScanner.cpp; sourceTree = "<absolute>"; };
-		4400182C0EACD0EE83A32EAD /* SNSFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SNSFLoader.cpp; path = main/loaders/SNSFLoader.cpp; sourceTree = "<absolute>"; };
-		4488C723CA75B63CF5D6DAB3 /* VGMFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMFile.cpp; path = main/VGMFile.cpp; sourceTree = "<absolute>"; };
-		45E95654F70AD8D314DA0BE0 /* VGMSampColl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSampColl.cpp; path = main/VGMSampColl.cpp; sourceTree = "<absolute>"; };
-		4630804AD9F2A14787232699 /* osdepend.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = osdepend.cpp; path = ui/qt/osdepend.cpp; sourceTree = "<absolute>"; };
-		46DD1B111215379C127167B0 /* HOSA.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSA.h; path = main/formats/HOSA.h; sourceTree = "<absolute>"; };
-		47420F9215AA4D00BADF0BBF /* qt_lib_concurrent_private.pri */ = {isa = PBXFileReference; name = qt_lib_concurrent_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_concurrent_private.pri; sourceTree = "<absolute>"; };
-		474AAF9FB08B9537A88EC2F7 /* Vab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Vab.h; path = main/formats/Vab.h; sourceTree = "<absolute>"; };
-		496E7DC335104D69B8B9EDC4 /* qt_lib_dbus_private.pri */ = {isa = PBXFileReference; name = qt_lib_dbus_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_dbus_private.pri; sourceTree = "<absolute>"; };
-		49847D78E2926D91376DA4D3 /* Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Scanner.h; path = main/Scanner.h; sourceTree = "<absolute>"; };
-		4ABCCF37597BAD0ADCFBE055 /* Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Format.h; path = main/Format.h; sourceTree = "<absolute>"; };
-		4C04EC031FB12288A38586F4 /* SquarePS2Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquarePS2Seq.h; path = main/formats/SquarePS2Seq.h; sourceTree = "<absolute>"; };
-		4C719AAFC333B51E2582C96E /* ioapi.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ioapi.c; path = lib/minizip/ioapi.c; sourceTree = "<absolute>"; };
-		4FCEA4845F5B21E91A8582D0 /* qt_lib_multimediawidgets_private.pri */ = {isa = PBXFileReference; name = qt_lib_multimediawidgets_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_multimediawidgets_private.pri; sourceTree = "<absolute>"; };
-		50ABF888640EA07DEB393B0D /* qt_lib_qtmultimediaquicktools_private.pri */ = {isa = PBXFileReference; name = qt_lib_qtmultimediaquicktools_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_qtmultimediaquicktools_private.pri; sourceTree = "<absolute>"; };
-		51C73CEA3E645A5DDF11474A /* MidiFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MidiFile.cpp; path = main/MidiFile.cpp; sourceTree = "<absolute>"; };
-		536E856F5CA524A2F642A8C6 /* PSF1Loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSF1Loader.h; path = main/loaders/PSF1Loader.h; sourceTree = "<absolute>"; };
-		53E0901A0B0D6AF9C8B43891 /* HeartBeatPS1Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HeartBeatPS1Seq.cpp; path = main/formats/HeartBeatPS1Seq.cpp; sourceTree = "<absolute>"; };
-		54B7D827BA5B6FDAAA0D77BD /* SonyPS2Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SonyPS2Seq.cpp; path = main/formats/SonyPS2Seq.cpp; sourceTree = "<absolute>"; };
-		54FE6DF9289E0C07725FFD49 /* qt_lib_macextras_private.pri */ = {isa = PBXFileReference; name = qt_lib_macextras_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_macextras_private.pri; sourceTree = "<absolute>"; };
-		551226D141D046D1B31D3A38 /* qt_lib_webkit_private.pri */ = {isa = PBXFileReference; name = qt_lib_webkit_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_webkit_private.pri; sourceTree = "<absolute>"; };
-		552D4357BE280A025C035607 /* TaitoF3Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaitoF3Scanner.h; path = main/formats/TaitoF3Scanner.h; sourceTree = "<absolute>"; };
-		5559DD213EA37E5FAB3DFBC2 /* mztools.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = mztools.c; path = lib/minizip/mztools.c; sourceTree = "<absolute>"; };
-		560E3633E4555F3B6D18DDAB /* VGMItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMItem.h; path = main/VGMItem.h; sourceTree = "<absolute>"; };
-		5680D8856D2C6879BD6470C0 /* GSFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GSFLoader.cpp; path = main/loaders/GSFLoader.cpp; sourceTree = "<absolute>"; };
-		56DE08FF3DE1A4D6FAE58B1A /* HOSAScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HOSAScanner.cpp; path = main/formats/HOSAScanner.cpp; sourceTree = "<absolute>"; };
-		57E30DD8C1575C47568C8D9E /* mztools.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = mztools.h; path = lib/minizip/mztools.h; sourceTree = "<absolute>"; };
-		58A230991AB4AA1A48CBB688 /* PSXSPU.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSXSPU.h; path = main/formats/PSXSPU.h; sourceTree = "<absolute>"; };
-		591DADECE3D43A8F5F868EEB /* qt_lib_scripttools_private.pri */ = {isa = PBXFileReference; name = qt_lib_scripttools_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_scripttools_private.pri; sourceTree = "<absolute>"; };
-		5A1A13F51DBFFB19506B2129 /* qt_lib_script_private.pri */ = {isa = PBXFileReference; name = qt_lib_script_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_script_private.pri; sourceTree = "<absolute>"; };
-		5A34A6C6E368C9328E639B5A /* QSoundSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = QSoundSeq.cpp; path = main/formats/QSoundSeq.cpp; sourceTree = "<absolute>"; };
-		5AB4F81CB99120BE414DA3CE /* qt_lib_bootstrap_private.pri */ = {isa = PBXFileReference; name = qt_lib_bootstrap_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_bootstrap_private.pri; sourceTree = "<absolute>"; };
-		5AB93FE9541A663005952BED /* VGMTrans.pro */ = {isa = PBXFileReference; lastKnownFileType = text; path = VGMTrans.pro; sourceTree = "<absolute>"; };
-		5AE336B370D7F39E9F673CD8 /* qt_lib_webkitwidgets.pri */ = {isa = PBXFileReference; name = qt_lib_webkitwidgets.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_webkitwidgets.pri; sourceTree = "<absolute>"; };
-		5AF629E453EC0309CC01950E /* SeqTrack.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqTrack.h; path = main/SeqTrack.h; sourceTree = "<absolute>"; };
-		5C7589E227C0292A35DF95C5 /* qt_lib_quickwidgets_private.pri */ = {isa = PBXFileReference; name = qt_lib_quickwidgets_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_quickwidgets_private.pri; sourceTree = "<absolute>"; };
-		5D4FEA746A5B48430CB137F1 /* Loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Loader.h; path = main/Loader.h; sourceTree = "<absolute>"; };
-		5EEA3A36B0B9E03BEF2187FD /* mac.conf */ = {isa = PBXFileReference; name = mac.conf; path = ../../Qt/5.3/clang_64/mkspecs/common/mac.conf; sourceTree = "<absolute>"; };
-		5EED6C8C7F77FED0ADDBA809 /* KonamiGXScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiGXScanner.cpp; path = main/formats/KonamiGXScanner.cpp; sourceTree = "<absolute>"; };
-		60B4D74FEA98D492F8ADEBB6 /* types.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = types.h; path = lib/fluidsynth/include/fluidsynth/types.h; sourceTree = "<absolute>"; };
-		6194FDB0E34AAC50F58A2357 /* TaitoF3Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TaitoF3Scanner.cpp; path = main/formats/TaitoF3Scanner.cpp; sourceTree = "<absolute>"; };
-		62E05702229680BFFC43EAAA /* AkaoScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoScanner.h; path = main/formats/AkaoScanner.h; sourceTree = "<absolute>"; };
-		633B5E60D81988A363098871 /* NDSSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NDSSeq.cpp; path = main/formats/NDSSeq.cpp; sourceTree = "<absolute>"; };
-		63494C0466375E757B3AF6EC /* RawFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RawFile.cpp; path = main/RawFile.cpp; sourceTree = "<absolute>"; };
-		637ADC6191954DBD6FAE3050 /* SonyPS2Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2Scanner.h; path = main/formats/SonyPS2Scanner.h; sourceTree = "<absolute>"; };
-		63AC5062CCA4DB16EED76C1E /* KonamiSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiSnesInstr.h; path = main/formats/KonamiSnesInstr.h; sourceTree = "<absolute>"; };
-		64133BB9EA319B4BB0F75FC5 /* qt_lib_multimediawidgets.pri */ = {isa = PBXFileReference; name = qt_lib_multimediawidgets.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_multimediawidgets.pri; sourceTree = "<absolute>"; };
-		642239BD1A0A52CF56C8EA33 /* MP2k.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MP2k.cpp; path = main/formats/MP2k.cpp; sourceTree = "<absolute>"; };
-		6704B3E389946960F2879951 /* SeqVoiceAllocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqVoiceAllocator.h; path = main/SeqVoiceAllocator.h; sourceTree = "<absolute>"; };
-		6774A22CB712CE4C71FE662F /* SPCLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SPCLoader.h; path = main/loaders/SPCLoader.h; sourceTree = "<absolute>"; };
-		67F6415E36CE6638FD229DAF /* SquarePS2Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquarePS2Seq.cpp; path = main/formats/SquarePS2Seq.cpp; sourceTree = "<absolute>"; };
-		6851D10AA5B3253D09ABC502 /* qt_lib_qmltest.pri */ = {isa = PBXFileReference; name = qt_lib_qmltest.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_qmltest.pri; sourceTree = "<absolute>"; };
-		689A13197591809CBBFBDEEF /* qt_lib_script.pri */ = {isa = PBXFileReference; name = qt_lib_script.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_script.pri; sourceTree = "<absolute>"; };
-		69288B8E7C0C926205147D6E /* SeqNote.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqNote.h; path = main/SeqNote.h; sourceTree = "<absolute>"; };
-		697275EF2698DAE4C8AB1278 /* AkaoSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoSeq.h; path = main/formats/AkaoSeq.h; sourceTree = "<absolute>"; };
-		6AE0DDAE7BD08D21EAF497BD /* qt_lib_network.pri */ = {isa = PBXFileReference; name = qt_lib_network.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_network.pri; sourceTree = "<absolute>"; };
-		6B1E0F17934093E495B7CB6F /* shell-unix.conf */ = {isa = PBXFileReference; name = "shell-unix.conf"; path = "../../Qt/5.3/clang_64/mkspecs/common/shell-unix.conf"; sourceTree = "<absolute>"; };
-		6B795795CF32524146CE85B8 /* NinSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesInstr.h; path = main/formats/NinSnesInstr.h; sourceTree = "<absolute>"; };
-		6C2427088D2EDE4ADA770BC1 /* moc_droparea.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_droparea.cpp; sourceTree = "<absolute>"; };
-		6DA883F1B50A39094C857C31 /* ExtensionDiscriminator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ExtensionDiscriminator.cpp; path = main/ExtensionDiscriminator.cpp; sourceTree = "<absolute>"; };
-		6DD987938617F837BAAB2A29 /* TriAcePS1InstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1InstrSet.h; path = main/formats/TriAcePS1InstrSet.h; sourceTree = "<absolute>"; };
-		6E158B706F4F5FCD8389DA98 /* settings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = settings.h; path = lib/fluidsynth/include/fluidsynth/settings.h; sourceTree = "<absolute>"; };
-		6F0B2745FE8742F7211FC507 /* RareSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesInstr.h; path = main/formats/RareSnesInstr.h; sourceTree = "<absolute>"; };
-		7124D63A9FA50DEC3B1B526D /* MP2k.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MP2k.h; path = main/formats/MP2k.h; sourceTree = "<absolute>"; };
-		721C1DE06B327393E3F7D7E1 /* moc_mainwindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_mainwindow.cpp; sourceTree = "<absolute>"; };
-		726EE3591DD6BFD8CE2F755A /* tinystr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinystr.cpp; path = lib/tinyxml/src/tinystr.cpp; sourceTree = "<absolute>"; };
-		7369F190CF48537242D9C872 /* DataSeg.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = DataSeg.cpp; path = main/DataSeg.cpp; sourceTree = "<absolute>"; };
-		73F068BF38A61395105860B6 /* qt_lib_sql.pri */ = {isa = PBXFileReference; name = qt_lib_sql.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_sql.pri; sourceTree = "<absolute>"; };
-		743C32546CBFABE42D7F9C27 /* common.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = common.h; path = main/common.h; sourceTree = "<absolute>"; };
-		775D41D6CAE3588816D7486A /* datetime.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = datetime.cpp; path = main/datetime.cpp; sourceTree = "<absolute>"; };
-		77736672BB1BB5066B866B2B /* RareSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesSeq.cpp; path = main/formats/RareSnesSeq.cpp; sourceTree = "<absolute>"; };
-		77C5B489E7766E7FC3FDD738 /* VGMSamp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSamp.cpp; path = main/VGMSamp.cpp; sourceTree = "<absolute>"; };
-		789CD89D2CB7B97F62A5A1BB /* VGMInstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMInstrSet.h; path = main/VGMInstrSet.h; sourceTree = "<absolute>"; };
-		793755AC3C7A37397E19447B /* PS1SeqScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PS1SeqScanner.cpp; path = main/formats/PS1SeqScanner.cpp; sourceTree = "<absolute>"; };
-		79976E2652CC699E24B1E4AE /* tinyxml.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = tinyxml.h; path = lib/tinyxml/tinyxml.h; sourceTree = "<absolute>"; };
-		7B7518079F7AB6682A8208D9 /* SF2File.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SF2File.h; path = main/SF2File.h; sourceTree = "<absolute>"; };
-		7B9414BC4E5F2FE4B8B3D650 /* qt_lib_help_private.pri */ = {isa = PBXFileReference; name = qt_lib_help_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_help_private.pri; sourceTree = "<absolute>"; };
-		7BA1B635430219DD0BD10B06 /* SegSat.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SegSat.cpp; path = main/formats/SegSat.cpp; sourceTree = "<absolute>"; };
-		7BCD29496D6B56C50525C815 /* ExtensionDiscriminator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ExtensionDiscriminator.h; path = main/ExtensionDiscriminator.h; sourceTree = "<absolute>"; };
-		7C955966B02D83B7C4CE245E /* VGMTag.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMTag.h; path = main/VGMTag.h; sourceTree = "<absolute>"; };
-		7CC4555B524ECCCF385D7931 /* RawFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RawFile.h; path = main/RawFile.h; sourceTree = "<absolute>"; };
-		7CD01C4EF1904670FF12376D /* VGMColl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMColl.h; path = main/VGMColl.h; sourceTree = "<absolute>"; };
-		7D4F0DE235284A86EAF17111 /* event.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = event.h; path = lib/fluidsynth/include/fluidsynth/event.h; sourceTree = "<absolute>"; };
-		8075EA2A685DA7B9A3911962 /* MP2kFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MP2kFormat.h; path = main/formats/MP2kFormat.h; sourceTree = "<absolute>"; };
-		8075F90620D3002AEE439D7E /* WD.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = WD.h; path = main/formats/WD.h; sourceTree = "<absolute>"; };
-		80E43DB24E46D7E211B1374E /* qmake.conf */ = {isa = PBXFileReference; name = qmake.conf; path = "../../Qt/5.3/clang_64/mkspecs/macx-clang/qmake.conf"; sourceTree = "<absolute>"; };
-		814B037EF60F4C0B5A7CCB6A /* ScaleConversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ScaleConversion.h; path = main/ScaleConversion.h; sourceTree = "<absolute>"; };
-		81EA1F9CAB8D45C1D35C84DA /* AkaoInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = AkaoInstr.cpp; path = main/formats/AkaoInstr.cpp; sourceTree = "<absolute>"; };
-		8304471614409E7E1D3CD23B /* SegSatFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SegSatFormat.h; path = main/formats/SegSatFormat.h; sourceTree = "<absolute>"; };
-		834299FDD7016FF7CCF3E321 /* qt_lib_concurrent.pri */ = {isa = PBXFileReference; name = qt_lib_concurrent.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_concurrent.pri; sourceTree = "<absolute>"; };
-		8472350A89E6FD72691C1CF2 /* qconfig.pri */ = {isa = PBXFileReference; name = qconfig.pri; path = ../../Qt/5.3/clang_64/mkspecs/qconfig.pri; sourceTree = "<absolute>"; };
-		84733C8DFF4363941D876591 /* PSF2Loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSF2Loader.h; path = main/loaders/PSF2Loader.h; sourceTree = "<absolute>"; };
-		85DDA0661C949483B04BF84E /* AkaoFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoFormat.h; path = main/formats/AkaoFormat.h; sourceTree = "<absolute>"; };
-		86394B2043D63C0C69E87B01 /* qt_lib_widgets_private.pri */ = {isa = PBXFileReference; name = qt_lib_widgets_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_widgets_private.pri; sourceTree = "<absolute>"; };
-		86D22A6A01282D360BE9F56F /* qt_lib_websockets.pri */ = {isa = PBXFileReference; name = qt_lib_websockets.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_websockets.pri; sourceTree = "<absolute>"; };
-		87DD4CBA05505F97C178100D /* VGMInstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMInstrSet.cpp; path = main/VGMInstrSet.cpp; sourceTree = "<absolute>"; };
-		88251B74BEE968DC1C58467B /* SonyPS2Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2Seq.h; path = main/formats/SonyPS2Seq.h; sourceTree = "<absolute>"; };
-		8884161B8E3492AFA0DC2485 /* RareSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesInstr.cpp; path = main/formats/RareSnesInstr.cpp; sourceTree = "<absolute>"; };
-		8A48ECA471F746C683B8F2D5 /* qt_lib_serialport_private.pri */ = {isa = PBXFileReference; name = qt_lib_serialport_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_serialport_private.pri; sourceTree = "<absolute>"; };
-		8BF97BA3EA8ED3C9ED9BD635 /* qt_lib_network_private.pri */ = {isa = PBXFileReference; name = qt_lib_network_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_network_private.pri; sourceTree = "<absolute>"; };
-		8BFEB3EBE701C7F46727BDA9 /* tinyxmlparser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxmlparser.cpp; path = lib/tinyxml/src/tinyxmlparser.cpp; sourceTree = "<absolute>"; };
-		8D0517802306B79FDDDD7CD7 /* KonamiGXFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiGXFormat.h; path = main/formats/KonamiGXFormat.h; sourceTree = "<absolute>"; };
-		8D9815BDB5BD9F90D2BC05C5 /* AGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AGL.framework; path = /System/Library/Frameworks/AGL.framework; refType = 0; sourceTree = "<absolute>"; };
-		8E75FC098D8B65C66D803303 /* TriAcePS1Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TriAcePS1Scanner.cpp; path = main/formats/TriAcePS1Scanner.cpp; sourceTree = "<absolute>"; };
-		8F5D00EDFC069D4CEA208A44 /* OrgScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OrgScanner.h; path = main/formats/OrgScanner.h; sourceTree = "<absolute>"; };
-		8F9BF557DB7F44CD07D270D9 /* qt_lib_designer_private.pri */ = {isa = PBXFileReference; name = qt_lib_designer_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_designer_private.pri; sourceTree = "<absolute>"; };
-		8FB6844A211F2117179A35EE /* gen.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = gen.h; path = lib/fluidsynth/include/fluidsynth/gen.h; sourceTree = "<absolute>"; };
-		8FC61BA909B95ADF96ADC42D /* ScaleConversion.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScaleConversion.cpp; path = main/ScaleConversion.cpp; sourceTree = "<absolute>"; };
-		8FE554C5F4C9450537EDCDC7 /* qt_lib_multimedia_private.pri */ = {isa = PBXFileReference; name = qt_lib_multimedia_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_multimedia_private.pri; sourceTree = "<absolute>"; };
-		9144D33B783AB8AAECCCEE42 /* AkaoFormat.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = AkaoFormat.cpp; path = main/formats/AkaoFormat.cpp; sourceTree = "<absolute>"; };
-		91BC1725F0E3D0D5AF2B6B05 /* VGMRgn.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMRgn.cpp; path = main/VGMRgn.cpp; sourceTree = "<absolute>"; };
-		91DF15B49972C051F99BAEB1 /* droparea.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = droparea.h; path = ui/qt/droparea.h; sourceTree = "<absolute>"; };
-		9216D9FABE58E95C2ACBDB58 /* GSFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GSFLoader.h; path = main/loaders/GSFLoader.h; sourceTree = "<absolute>"; };
-		922A52A03C19C4669E1AF4BA /* CapcomSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CapcomSnesFormat.h; path = main/formats/CapcomSnesFormat.h; sourceTree = "<absolute>"; };
-		925CD3715596CDDDF5DF1128 /* NDS2SFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NDS2SFLoader.cpp; path = main/loaders/NDS2SFLoader.cpp; sourceTree = "<absolute>"; };
-		928E7F853D1DB58709B3753E /* clang-mac.conf */ = {isa = PBXFileReference; name = "clang-mac.conf"; path = "../../Qt/5.3/clang_64/mkspecs/common/clang-mac.conf"; sourceTree = "<absolute>"; };
-		944810252FFCCDEC1570D88F /* qt_lib_core_private.pri */ = {isa = PBXFileReference; name = qt_lib_core_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_core_private.pri; sourceTree = "<absolute>"; };
-		94A4537841111EFDC33AC6D2 /* VGMSampColl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMSampColl.h; path = main/VGMSampColl.h; sourceTree = "<absolute>"; };
-		965EB517F9F932508ABA8188 /* SPCLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SPCLoader.cpp; path = main/loaders/SPCLoader.cpp; sourceTree = "<absolute>"; };
-		967DFDE3EAFF9FD0540D52CA /* AkaoSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = AkaoSeq.cpp; path = main/formats/AkaoSeq.cpp; sourceTree = "<absolute>"; };
-		969176528E918C44CFF81079 /* RiffFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RiffFile.cpp; path = main/RiffFile.cpp; sourceTree = "<absolute>"; };
-		971D814246C2490D3A445326 /* HOSAInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSAInstr.h; path = main/formats/HOSAInstr.h; sourceTree = "<absolute>"; };
-		97959CA23067462380A5BEB9 /* Options.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Options.cpp; path = main/Options.cpp; sourceTree = "<absolute>"; };
-		98A0595B18195A98D51FB790 /* KonamiGXSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiGXSeq.cpp; path = main/formats/KonamiGXSeq.cpp; sourceTree = "<absolute>"; };
-		9930E2513C973D34C605CF33 /* datetime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = datetime.h; path = main/datetime.h; sourceTree = "<absolute>"; };
-		9C11F37191BD332C3EA5D89D /* NCSFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NCSFLoader.h; path = main/loaders/NCSFLoader.h; sourceTree = "<absolute>"; };
-		9C927A4B0722CD8AE3B554E7 /* KonamiSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiSnesScanner.h; path = main/formats/KonamiSnesScanner.h; sourceTree = "<absolute>"; };
-		9CE518FB57AE54FEC39E9F06 /* z */ = {isa = PBXFileReference; name = z; path = lib/zlib/lib/libz.a; refType = 4; sourceTree = "<absolute>"; };
-		9DEFA1AD8710BADF9D5B4429 /* NinSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesScanner.h; path = main/formats/NinSnesScanner.h; sourceTree = "<absolute>"; };
-		9EB6B82FC2B32A0E7659B65E /* SeqEvent.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqEvent.h; path = main/SeqEvent.h; sourceTree = "<absolute>"; };
-		9EBAFA65E2D94F90CBFB58E8 /* qt_lib_sensors_private.pri */ = {isa = PBXFileReference; name = qt_lib_sensors_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_sensors_private.pri; sourceTree = "<absolute>"; };
-		A099B961439A08683EBAB388 /* HOSAInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HOSAInstr.cpp; path = main/formats/HOSAInstr.cpp; sourceTree = "<absolute>"; };
-		A3037EE7FFC0750CC5CFF4BE /* HOSAScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSAScanner.h; path = main/formats/HOSAScanner.h; sourceTree = "<absolute>"; };
-		A41F23B51BE195C6DD5C6435 /* BytePattern.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = BytePattern.h; path = main/BytePattern.h; sourceTree = "<absolute>"; };
-		A4B4DA3817D8E4DEC2A0DB4B /* VGMSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSeq.cpp; path = main/VGMSeq.cpp; sourceTree = "<absolute>"; };
-		A5908DBF027DCD73D5BD6512 /* SF2File.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SF2File.cpp; path = main/SF2File.cpp; sourceTree = "<absolute>"; };
-		A696ED2D73960A66B6411A93 /* misc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = misc.h; path = lib/fluidsynth/include/fluidsynth/misc.h; sourceTree = "<absolute>"; };
-		A6B9DB02AD9A398DF02325EB /* qt_lib_dbus.pri */ = {isa = PBXFileReference; name = qt_lib_dbus.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_dbus.pri; sourceTree = "<absolute>"; };
-		A714EFBEFCEC73BE0C329C87 /* SonyPS2InstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SonyPS2InstrSet.cpp; path = main/formats/SonyPS2InstrSet.cpp; sourceTree = "<absolute>"; };
-		A7212D78BD0FA00AE33CD536 /* qt_lib_positioning_private.pri */ = {isa = PBXFileReference; name = qt_lib_positioning_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_positioning_private.pri; sourceTree = "<absolute>"; };
-		A739561CFE6FB6C41027648C /* Loader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Loader.cpp; path = main/Loader.cpp; sourceTree = "<absolute>"; };
-		A74956F18BA9FDB128FBF38C /* qt_lib_opengl_private.pri */ = {isa = PBXFileReference; name = qt_lib_opengl_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_opengl_private.pri; sourceTree = "<absolute>"; };
-		A7868AF0EC89D1CBEC5B583D /* RareSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesFormat.h; path = main/formats/RareSnesFormat.h; sourceTree = "<absolute>"; };
-		A895B1FCFE2727F932892A0F /* SeqTrack.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SeqTrack.cpp; path = main/SeqTrack.cpp; sourceTree = "<absolute>"; };
-		A9D0CE8883AA4B9D12EB1FB9 /* qt_lib_printsupport_private.pri */ = {isa = PBXFileReference; name = qt_lib_printsupport_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_printsupport_private.pri; sourceTree = "<absolute>"; };
-		AA2BC9E7B88641B9DE2BDB19 /* SonyPS2Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2Format.h; path = main/formats/SonyPS2Format.h; sourceTree = "<absolute>"; };
-		AA536B785126C1F60AED45BF /* PSFFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PSFFile.cpp; path = main/PSFFile.cpp; sourceTree = "<absolute>"; };
-		AB51F2D16EC2847374ECD876 /* VGMSamp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMSamp.h; path = main/VGMSamp.h; sourceTree = "<absolute>"; };
-		AB745978DF0F41D1801ABDA6 /* .qmake.stash */ = {isa = PBXFileReference; path = .qmake.stash; sourceTree = "<absolute>"; };
-		AB9244695382569D0035F420 /* PSXSPU.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PSXSPU.cpp; path = main/formats/PSXSPU.cpp; sourceTree = "<absolute>"; };
-		AC844820BF435065A599020E /* mod.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = mod.h; path = lib/fluidsynth/include/fluidsynth/mod.h; sourceTree = "<absolute>"; };
-		AC869340C7CF6260B5C457AC /* osdepend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = osdepend.h; path = ui/qt/osdepend.h; sourceTree = "<absolute>"; };
-		AD09F01C5B14E3DF1690323D /* qt_lib_opengl.pri */ = {isa = PBXFileReference; name = qt_lib_opengl.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_opengl.pri; sourceTree = "<absolute>"; };
-		AD3DFC97848208D33A869A59 /* SquarePS2Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquarePS2Format.h; path = main/formats/SquarePS2Format.h; sourceTree = "<absolute>"; };
-		ADC6493641E441C7FB8E3242 /* FFT.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FFT.cpp; path = main/formats/FFT.cpp; sourceTree = "<absolute>"; };
-		AE4EB09C97D50167463C6F14 /* ioapi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ioapi.h; path = lib/zlib/include/ioapi.h; sourceTree = "<absolute>"; };
-		AEDF8717FD19E3DB3911B050 /* SquSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquSnesScanner.h; path = main/formats/SquSnesScanner.h; sourceTree = "<absolute>"; };
-		B120151EEB9082637BEF821A /* seqbind.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = seqbind.h; path = lib/fluidsynth/include/fluidsynth/seqbind.h; sourceTree = "<absolute>"; };
-		B171F9E956260E2897C36A8D /* PSF2Loader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PSF2Loader.cpp; path = main/loaders/PSF2Loader.cpp; sourceTree = "<absolute>"; };
-		B1CD036C9BCBE019B484228F /* gcc-base-mac.conf */ = {isa = PBXFileReference; name = "gcc-base-mac.conf"; path = "../../Qt/5.3/clang_64/mkspecs/common/gcc-base-mac.conf"; sourceTree = "<absolute>"; };
-		B204D56334EC893D77338147 /* KabukiDecrypt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KabukiDecrypt.h; path = main/loaders/KabukiDecrypt.h; sourceTree = "<absolute>"; };
-		B2F73DF4CF243D51BFD171F9 /* fluidsynth.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = fluidsynth.h; path = lib/fluidsynth/include/fluidsynth.h; sourceTree = "<absolute>"; };
-		B44ABA0AD79E39C8EA263854 /* DLSFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = DLSFile.cpp; path = main/DLSFile.cpp; sourceTree = "<absolute>"; };
-		B677B2A79C4640C6FD724C2A /* NDS2SFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDS2SFLoader.h; path = main/loaders/NDS2SFLoader.h; sourceTree = "<absolute>"; };
-		B6B80DF2858241DA7BA33811 /* NCSFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NCSFLoader.cpp; path = main/loaders/NCSFLoader.cpp; sourceTree = "<absolute>"; };
-		B782616D1F2C3B8B04E51640 /* SNESDSP.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SNESDSP.cpp; path = main/formats/SNESDSP.cpp; sourceTree = "<absolute>"; };
-		B8B5BB88AC6EC9FB007D87AF /* CapcomSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CapcomSnesScanner.h; path = main/formats/CapcomSnesScanner.h; sourceTree = "<absolute>"; };
-		B90C302B86438149E0D0129F /* qt_lib_declarative_private.pri */ = {isa = PBXFileReference; name = qt_lib_declarative_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_declarative_private.pri; sourceTree = "<absolute>"; };
-		B920A1504C9E37ABB81A48CB /* FFTScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FFTScanner.h; path = main/formats/FFTScanner.h; sourceTree = "<absolute>"; };
-		B9E4A650A4E911239DCF6B55 /* qt_lib_quick.pri */ = {isa = PBXFileReference; name = qt_lib_quick.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_quick.pri; sourceTree = "<absolute>"; };
-		BA44E8F85B4ED757C589E0A6 /* macx.conf */ = {isa = PBXFileReference; name = macx.conf; path = ../../Qt/5.3/clang_64/mkspecs/common/macx.conf; sourceTree = "<absolute>"; };
-		BBEC59E3993416DE8F4AD0D5 /* qt_lib_xmlpatterns.pri */ = {isa = PBXFileReference; name = qt_lib_xmlpatterns.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_xmlpatterns.pri; sourceTree = "<absolute>"; };
-		BD7E92F3EF273571EAA00D92 /* FFTInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FFTInstr.cpp; path = main/formats/FFTInstr.cpp; sourceTree = "<absolute>"; };
-		BE1337DDAB2545B271C67D76 /* OrgScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OrgScanner.cpp; path = main/formats/OrgScanner.cpp; sourceTree = "<absolute>"; };
-		BEF172D78CFD314BD1E77FF8 /* qdevice.pri */ = {isa = PBXFileReference; name = qdevice.pri; path = ../../Qt/5.3/clang_64/mkspecs/qdevice.pri; sourceTree = "<absolute>"; };
-		BEFB1D4B7782FD9A23CC06F1 /* CapcomSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CapcomSnesSeq.h; path = main/formats/CapcomSnesSeq.h; sourceTree = "<absolute>"; };
-		BF399FFE6F4CB75028278D3E /* MAMELoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MAMELoader.cpp; path = main/loaders/MAMELoader.cpp; sourceTree = "<absolute>"; };
-		BFADD2FB09303BFEABF0B238 /* SeqVoiceAllocator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SeqVoiceAllocator.cpp; path = main/SeqVoiceAllocator.cpp; sourceTree = "<absolute>"; };
-		BFF46FF7AD6444CC915001A4 /* VGMMiscFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMMiscFile.cpp; path = main/VGMMiscFile.cpp; sourceTree = "<absolute>"; };
-		BFF5CE11EAC65BA47ED0C5AB /* QSoundSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundSeq.h; path = main/formats/QSoundSeq.h; sourceTree = "<absolute>"; };
-		C0B34BE3CB8114ABCA5A1B89 /* qt_lib_uitools.pri */ = {isa = PBXFileReference; name = qt_lib_uitools.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_uitools.pri; sourceTree = "<absolute>"; };
-		C1CF443D744BA501ED1FAC1D /* PS1Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PS1Seq.cpp; path = main/formats/PS1Seq.cpp; sourceTree = "<absolute>"; };
-		C3CCC369C23B705C934FD7A0 /* SNSFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SNSFLoader.h; path = main/loaders/SNSFLoader.h; sourceTree = "<absolute>"; };
-		C5F86E6047F2C97611523F85 /* DLSFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DLSFile.h; path = main/DLSFile.h; sourceTree = "<absolute>"; };
-		C65D718273FD45669625A68C /* qt_lib_qml.pri */ = {isa = PBXFileReference; name = qt_lib_qml.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_qml.pri; sourceTree = "<absolute>"; };
-		C6907BB0636E55D1D9CDB857 /* Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Scanner.cpp; path = main/Scanner.cpp; sourceTree = "<absolute>"; };
-		C8F8D27A64B56EDEF00F6956 /* KonamiSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiSnesScanner.cpp; path = main/formats/KonamiSnesScanner.cpp; sourceTree = "<absolute>"; };
-		C910708F2DB7659330D4A746 /* voice.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = voice.h; path = lib/fluidsynth/include/fluidsynth/voice.h; sourceTree = "<absolute>"; };
-		C9804FC0DF859D3C66FB30DE /* CapcomSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CapcomSnesInstr.cpp; path = main/formats/CapcomSnesInstr.cpp; sourceTree = "<absolute>"; };
-		C998E1D60B88941B9A42DD1C /* qt_lib_core.pri */ = {isa = PBXFileReference; name = qt_lib_core.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_core.pri; sourceTree = "<absolute>"; };
-		C9A1D7F43F7134BBAD4875FB /* SegSatScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SegSatScanner.h; path = main/formats/SegSatScanner.h; sourceTree = "<absolute>"; };
-		CCD11A9B1628ABADBC396A8F /* shell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = shell.h; path = lib/fluidsynth/include/fluidsynth/shell.h; sourceTree = "<absolute>"; };
-		D01BE9028FA920CBDEF14CD6 /* KabukiDecrypt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KabukiDecrypt.cpp; path = main/loaders/KabukiDecrypt.cpp; sourceTree = "<absolute>"; };
-		D04A127E9C3456E531C752E7 /* VGMColl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMColl.cpp; path = main/VGMColl.cpp; sourceTree = "<absolute>"; };
-		D1B0AFD193D8E28EFE1FF833 /* helper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = helper.h; path = main/helper.h; sourceTree = "<absolute>"; };
-		D1C261D20FDF788712EC09CF /* KonamiSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiSnesFormat.h; path = main/formats/KonamiSnesFormat.h; sourceTree = "<absolute>"; };
-		D1DE281C1CADF2985FDAC73B /* qt_lib_printsupport.pri */ = {isa = PBXFileReference; name = qt_lib_printsupport.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_printsupport.pri; sourceTree = "<absolute>"; };
-		D2BCA9D4A1077CB93EFD38E3 /* qt_lib_xml_private.pri */ = {isa = PBXFileReference; name = qt_lib_xml_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_xml_private.pri; sourceTree = "<absolute>"; };
-		D32883D1BA92547E51348825 /* qt_lib_quickwidgets.pri */ = {isa = PBXFileReference; name = qt_lib_quickwidgets.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_quickwidgets.pri; sourceTree = "<absolute>"; };
-		D3D38FCF90B522541B0A6884 /* NinSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NinSnesInstr.cpp; path = main/formats/NinSnesInstr.cpp; sourceTree = "<absolute>"; };
-		D40E7DED98ECCB35EDAE69DD /* SquSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquSnesFormat.h; path = main/formats/SquSnesFormat.h; sourceTree = "<absolute>"; };
-		D413684B554195533799B94C /* VGMItem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMItem.cpp; path = main/VGMItem.cpp; sourceTree = "<absolute>"; };
-		D4B32C2222F82AC56BADEB21 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = /System/Library/Frameworks/OpenGL.framework; refType = 0; sourceTree = "<absolute>"; };
-		D50FFC66C9DFF03E77B2AA6B /* sfont.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = sfont.h; path = lib/fluidsynth/include/fluidsynth/sfont.h; sourceTree = "<absolute>"; };
-		D51A8919149C890D64823984 /* PSF1Loader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PSF1Loader.cpp; path = main/loaders/PSF1Loader.cpp; sourceTree = "<absolute>"; };
-		D5DB4EF3EBAF70E8B0DFD314 /* qt_lib_openglextensions_private.pri */ = {isa = PBXFileReference; name = qt_lib_openglextensions_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_openglextensions_private.pri; sourceTree = "<absolute>"; };
-		D66D1863CEFA5BA6F616B349 /* CapcomSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CapcomSnesScanner.cpp; path = main/formats/CapcomSnesScanner.cpp; sourceTree = "<absolute>"; };
-		D6DB87EF86A0DBBF986BABD5 /* qt_lib_widgets.pri */ = {isa = PBXFileReference; name = qt_lib_widgets.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_widgets.pri; sourceTree = "<absolute>"; };
-		D790F796C145BF637F681729 /* qt_lib_websockets_private.pri */ = {isa = PBXFileReference; name = qt_lib_websockets_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_websockets_private.pri; sourceTree = "<absolute>"; };
-		D79FC4A5CB7D728C6E9E967B /* HeartBeatPS1Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HeartBeatPS1Seq.h; path = main/formats/HeartBeatPS1Seq.h; sourceTree = "<absolute>"; };
-		D7FD8C5897C7EF8D85EFE323 /* dropsitewindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = dropsitewindow.h; path = ui/qt/dropsitewindow.h; sourceTree = "<absolute>"; };
-		D884A06DDDE2620A118822FC /* Format.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Format.cpp; path = main/Format.cpp; sourceTree = "<absolute>"; };
-		DA529470329D9BE5C5B4A523 /* HeartBeatPS1SeqScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HeartBeatPS1SeqScanner.h; path = main/formats/HeartBeatPS1SeqScanner.h; sourceTree = "<absolute>"; };
-		DAF61A76B4BF945542555F84 /* qt_lib_serialport.pri */ = {isa = PBXFileReference; name = qt_lib_serialport.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_serialport.pri; sourceTree = "<absolute>"; };
-		DB10201B769030CF50AFDA37 /* Options.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Options.h; path = main/Options.h; sourceTree = "<absolute>"; };
-		DC94524D383457923C8B1B51 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = ui/qt/main.cpp; sourceTree = "<absolute>"; };
-		DD8A497834B3AC2B8F651A64 /* PSFFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSFFile.h; path = main/PSFFile.h; sourceTree = "<absolute>"; };
-		DE5E6D7F22C0F18786AA7491 /* NDSSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSSeq.h; path = main/formats/NDSSeq.h; sourceTree = "<absolute>"; };
-		DEF1EA719EFABF4D8A224292 /* droparea.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = droparea.cpp; path = ui/qt/droparea.cpp; sourceTree = "<absolute>"; };
-		DF37BFC5BA4709D3282D9859 /* moc_dropsitewindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_dropsitewindow.cpp; sourceTree = "<absolute>"; };
-		DF818B10CFB6A6C246F8F6DA /* qt_lib_xmlpatterns_private.pri */ = {isa = PBXFileReference; name = qt_lib_xmlpatterns_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_xmlpatterns_private.pri; sourceTree = "<absolute>"; };
-		E06A9BBC284E154F823B983F /* BytePattern.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BytePattern.cpp; path = main/BytePattern.cpp; sourceTree = "<absolute>"; };
-		E0B3131E09FCD5756D2FFA9B /* QSoundFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundFormat.h; path = main/formats/QSoundFormat.h; sourceTree = "<absolute>"; };
-		E1686E7EE79E2A50A8925640 /* LogItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = LogItem.h; path = main/LogItem.h; sourceTree = "<absolute>"; };
-		E19C8AF8C67AF9D375A849AA /* qt_lib_platformsupport_private.pri */ = {isa = PBXFileReference; name = qt_lib_platformsupport_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_platformsupport_private.pri; sourceTree = "<absolute>"; };
-		E1C89C9D9F10C0BD479122E7 /* NDSInstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSInstrSet.h; path = main/formats/NDSInstrSet.h; sourceTree = "<absolute>"; };
-		E222ACA2E84FDACABF36DED6 /* mainwindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = mainwindow.h; path = ui/qt/mainwindow.h; sourceTree = "<absolute>"; };
-		E2A477F7772D14B733E764A1 /* NDSScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NDSScanner.cpp; path = main/formats/NDSScanner.cpp; sourceTree = "<absolute>"; };
-		E5460FEDD5C69778617B10D5 /* KonamiGXScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiGXScanner.h; path = main/formats/KonamiGXScanner.h; sourceTree = "<absolute>"; };
-		E6125F8D7C4BE74BDB10C515 /* qt_lib_quick_private.pri */ = {isa = PBXFileReference; name = qt_lib_quick_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_quick_private.pri; sourceTree = "<absolute>"; };
-		E7BA006F72F544EC80D0BF0F /* TaitoF3Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaitoF3Format.h; path = main/formats/TaitoF3Format.h; sourceTree = "<absolute>"; };
-		E83B6F7C0BEC66CB514B236F /* NinSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesFormat.h; path = main/formats/NinSnesFormat.h; sourceTree = "<absolute>"; };
-		E8BEA92F1F42652F6941A612 /* SeqEvent.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SeqEvent.cpp; path = main/SeqEvent.cpp; sourceTree = "<absolute>"; };
-		E93E788AD9C633DF02E96DA7 /* qt_lib_designer.pri */ = {isa = PBXFileReference; name = qt_lib_designer.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_designer.pri; sourceTree = "<absolute>"; };
-		E9B74B1FF03E80956BD70707 /* qt_lib_xml.pri */ = {isa = PBXFileReference; name = qt_lib_xml.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_xml.pri; sourceTree = "<absolute>"; };
-		E9DF8D044C56FB9DC971E04D /* PS1SeqScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PS1SeqScanner.h; path = main/formats/PS1SeqScanner.h; sourceTree = "<absolute>"; };
-		EBD7CD1E99CC6A7A1AAA9A97 /* FFT.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FFT.h; path = main/formats/FFT.h; sourceTree = "<absolute>"; };
-		ED3EC1BB64121307E59B37CF /* synth.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = synth.h; path = lib/fluidsynth/include/fluidsynth/synth.h; sourceTree = "<absolute>"; };
-		EDA626D94F2C2CC5C5738054 /* qt_lib_enginio.pri */ = {isa = PBXFileReference; name = qt_lib_enginio.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_enginio.pri; sourceTree = "<absolute>"; };
-		EE863AA19364B3A25C6E5A48 /* qt_lib_macextras.pri */ = {isa = PBXFileReference; name = qt_lib_macextras.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_macextras.pri; sourceTree = "<absolute>"; };
-		F004D87D07B40303E8238D7D /* qt_lib_multimedia.pri */ = {isa = PBXFileReference; name = qt_lib_multimedia.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_multimedia.pri; sourceTree = "<absolute>"; };
-		F01340966064A4BB6000DDF2 /* QSoundScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundScanner.h; path = main/formats/QSoundScanner.h; sourceTree = "<absolute>"; };
-		F212EFCE06DFDD97056BDE6D /* VGMRgn.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMRgn.h; path = main/VGMRgn.h; sourceTree = "<absolute>"; };
-		F279CCD3D18BA56075D1AD4C /* QSoundInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = QSoundInstr.cpp; path = main/formats/QSoundInstr.cpp; sourceTree = "<absolute>"; };
+		0076E7A53FC1E369A42ED3F0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg.pri; sourceTree = SOURCE_ROOT; };
+		01885D244AF2999190B0C198 /* Root.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Root.cpp; path = main/Root.cpp; sourceTree = SOURCE_ROOT; };
+		0190452BDB3B2ABD6AD2FDE7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_gui.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_gui.pri; sourceTree = SOURCE_ROOT; };
+		0299D80E17D3952F34F3C0A4 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimedia_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimedia_private.pri; sourceTree = SOURCE_ROOT; };
+		030539F53FF4D8B7746CB099 /* OrgSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OrgSeq.h; path = main/formats/OrgSeq.h; sourceTree = SOURCE_ROOT; };
+		033F67E422C2C5AA00925107 /* unzip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = unzip.h; path = lib/minizip/unzip.h; sourceTree = SOURCE_ROOT; };
+		046C351F588E80ECD012AB45 /* OrgSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OrgSeq.cpp; path = main/formats/OrgSeq.cpp; sourceTree = SOURCE_ROOT; };
+		04937CEA5C324C45485F61A0 /* TriAcePS1Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TriAcePS1Seq.cpp; path = main/formats/TriAcePS1Seq.cpp; sourceTree = SOURCE_ROOT; };
+		05436BE41765AB07FF1531BC /* VGMSeqNoTrks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMSeqNoTrks.h; path = main/VGMSeqNoTrks.h; sourceTree = SOURCE_ROOT; };
+		0550EEB364738B6334FD0A4C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_opengl_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_opengl_private.pri; sourceTree = SOURCE_ROOT; };
+		07630FCF2D198F66F6D4E680 /* VGMSeqNoTrks.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSeqNoTrks.cpp; path = main/VGMSeqNoTrks.cpp; sourceTree = SOURCE_ROOT; };
+		08131D42C08FFEE3245E3036 /* unzip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = unzip.h; path = lib/zlib/include/unzip.h; sourceTree = SOURCE_ROOT; };
+		0AB3A3CD88D3C76DCC650769 /* NDSScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSScanner.h; path = main/formats/NDSScanner.h; sourceTree = SOURCE_ROOT; };
+		0AD06042180FFFF42EFD4A4C /* RiffFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RiffFile.h; path = main/RiffFile.h; sourceTree = SOURCE_ROOT; };
+		0B11590C12B24677DEE726C3 /* crypt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = crypt.h; path = lib/minizip/crypt.h; sourceTree = SOURCE_ROOT; };
+		0B2D88F8F4D5E28FF63B1B73 /* tinyxml.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = tinyxml.h; path = lib/tinyxml/src/tinyxml.h; sourceTree = SOURCE_ROOT; };
+		0B8F67A35BC82CD1FB17B30B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_enginio.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_enginio.pri; sourceTree = SOURCE_ROOT; };
+		0BA86129FD5A9B75A950C436 /* SquSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquSnesSeq.h; path = main/formats/SquSnesSeq.h; sourceTree = SOURCE_ROOT; };
+		0C179345E0C91F3D8D62A65B /* ioapi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ioapi.h; path = lib/minizip/ioapi.h; sourceTree = SOURCE_ROOT; };
+		0CBEF104572B85DD130A25A3 /* HOSA.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HOSA.cpp; path = main/formats/HOSA.cpp; sourceTree = SOURCE_ROOT; };
+		0D5B3CA4B928E70D7D01277B /* NinSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesSeq.h; path = main/formats/NinSnesSeq.h; sourceTree = SOURCE_ROOT; };
+		0E3D2141A55CF663E5D6B58E /* log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = log.h; path = lib/fluidsynth/include/fluidsynth/log.h; sourceTree = SOURCE_ROOT; };
+		0E512B018D2A599753A531C2 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designer.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designer.pri; sourceTree = SOURCE_ROOT; };
+		0F9DF781BA49CA48E481383E /* SquSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquSnesScanner.cpp; path = main/formats/SquSnesScanner.cpp; sourceTree = SOURCE_ROOT; };
+		0FEF27929745BFA09B9469A2 /* MP2kScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MP2kScanner.cpp; path = main/formats/MP2kScanner.cpp; sourceTree = SOURCE_ROOT; };
+		102E81CC7F392951B0C78FF4 /* zconf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = zconf.h; path = lib/zlib/include/zconf.h; sourceTree = SOURCE_ROOT; };
+		11457854D64BD0FD50FF5CB1 /* LogItem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = LogItem.cpp; path = main/LogItem.cpp; sourceTree = SOURCE_ROOT; };
+		1194A4A9AF2FFD9841102627 /* SynthFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SynthFile.cpp; path = main/SynthFile.cpp; sourceTree = SOURCE_ROOT; };
+		122B06E6533510920615D466 /* MP2kScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MP2kScanner.h; path = main/formats/MP2kScanner.h; sourceTree = SOURCE_ROOT; };
+		12E4D8C45B4DDC12B5D069CC /* RareSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesScanner.h; path = main/formats/RareSnesScanner.h; sourceTree = SOURCE_ROOT; };
+		14C88E80899B6CA4868E2E40 /* common.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = common.cpp; path = main/common.cpp; sourceTree = SOURCE_ROOT; };
+		14FC341785BA96AB43F4A352 /* Root.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Root.h; path = main/Root.h; sourceTree = SOURCE_ROOT; };
+		15A5ED4AA9ACC7F205EC51CA /* Menu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Menu.h; path = main/Menu.h; sourceTree = SOURCE_ROOT; };
+		15E00C6AE7C2DC665B4D090F /* RareSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesSeq.h; path = main/formats/RareSnesSeq.h; sourceTree = SOURCE_ROOT; };
+		162E3CCE68470BE49EC3030A /* zip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = zip.h; path = lib/minizip/zip.h; sourceTree = SOURCE_ROOT; };
+		170CF08F47B97F0C6FC4358D /* FFTFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FFTFormat.h; path = main/formats/FFTFormat.h; sourceTree = SOURCE_ROOT; };
+		176CCA3DD3939A59B80DEE77 /* Matcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Matcher.h; path = main/Matcher.h; sourceTree = SOURCE_ROOT; };
+		1777227F22DF5A24ECFBC23F /* NinSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NinSnesScanner.cpp; path = main/formats/NinSnesScanner.cpp; sourceTree = SOURCE_ROOT; };
+		17816F23038B214C888DC09D /* SquarePS2Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquarePS2Scanner.cpp; path = main/formats/SquarePS2Scanner.cpp; sourceTree = SOURCE_ROOT; };
+		17835AB794638076E729E8C4 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimediawidgets.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimediawidgets.pri; sourceTree = SOURCE_ROOT; };
+		17AFEA471E66F97C28D7429A /* FFTInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FFTInstr.h; path = main/formats/FFTInstr.h; sourceTree = SOURCE_ROOT; };
+		1849AB668FCCDCB4BF32B623 /* PS1Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PS1Seq.h; path = main/formats/PS1Seq.h; sourceTree = SOURCE_ROOT; };
+		1934A359C2F8313A9EEFF08A /* unzip.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = unzip.c; path = lib/minizip/unzip.c; sourceTree = SOURCE_ROOT; };
+		19586532D4FAC6758C9B6311 /* TriAcePS1Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1Format.h; path = main/formats/TriAcePS1Format.h; sourceTree = SOURCE_ROOT; };
+		19A8F21DDEDE3836B7B33FC2 /* TriAcePS1Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1Scanner.h; path = main/formats/TriAcePS1Scanner.h; sourceTree = SOURCE_ROOT; };
+		19C2BF027845D9AF47E02BF3 /* Vab.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Vab.cpp; path = main/formats/Vab.cpp; sourceTree = SOURCE_ROOT; };
+		19FACDF33F2094886B603103 /* HeartBeatPS1Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HeartBeatPS1Format.h; path = main/formats/HeartBeatPS1Format.h; sourceTree = SOURCE_ROOT; };
+		1A89B859B45ACCD231C2A4EE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qtmultimediaquicktools_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qtmultimediaquicktools_private.pri; sourceTree = SOURCE_ROOT; };
+		1ADA52192DA8F54783E963DE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bootstrap_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bootstrap_private.pri; sourceTree = SOURCE_ROOT; };
+		1BD0A1515986FB4D30ECD753 /* SquareSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquareSnesSeq.cpp; path = main/formats/SquareSnesSeq.cpp; sourceTree = SOURCE_ROOT; };
+		1C68D2CCC1918B9AFA3A16E5 /* QtGui.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtGui.framework; path = /usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework; refType = 0; sourceTree = SOURCE_ROOT; };
+		1D8C9327B0FF309C84820F00 /* NDSInstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NDSInstrSet.cpp; path = main/formats/NDSInstrSet.cpp; sourceTree = SOURCE_ROOT; };
+		1E12E5B6247A3799181D1A64 /* audio.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = audio.h; path = lib/fluidsynth/include/fluidsynth/audio.h; sourceTree = SOURCE_ROOT; };
+		1F14EE02E7E5D0004DC82063 /* QSoundScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = QSoundScanner.cpp; path = main/formats/QSoundScanner.cpp; sourceTree = SOURCE_ROOT; };
+		1F698A27687AB016A3E6B346 /* MidiFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MidiFile.h; path = main/MidiFile.h; sourceTree = SOURCE_ROOT; };
+		1FF0478D26488DB43404E273 /* VGMSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMSeq.h; path = main/VGMSeq.h; sourceTree = SOURCE_ROOT; };
+		20413A76CEF5CF5007E73522 /* NinSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NinSnesSeq.cpp; path = main/formats/NinSnesSeq.cpp; sourceTree = SOURCE_ROOT; };
+		204577D288ACBD89250ED64F /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xml_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xml_private.pri; sourceTree = SOURCE_ROOT; };
+		2108637BB3F26E37060809F1 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/mac.conf */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/common/mac.conf; sourceTree = SOURCE_ROOT; };
+		2203E7459E6558B6B6593978 /* VGMFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMFile.h; path = main/VGMFile.h; sourceTree = SOURCE_ROOT; };
+		224CC66542F28187FED3090A /* NDSFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSFormat.h; path = main/formats/NDSFormat.h; sourceTree = SOURCE_ROOT; };
+		22C6671D0D93EA289B1866F0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_core.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_core.pri; sourceTree = SOURCE_ROOT; };
+		22FA60E07B8A024A862BD84D /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_openglextensions.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_openglextensions.pri; sourceTree = SOURCE_ROOT; };
+		251DF10414F9EBBFFFD40EDC /* tinyxmlerror.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxmlerror.cpp; path = lib/tinyxml/src/tinyxmlerror.cpp; sourceTree = SOURCE_ROOT; };
+		255465A08E5569125DA3E5EF /* Matcher.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Matcher.cpp; path = main/Matcher.cpp; sourceTree = SOURCE_ROOT; };
+		26120FBC11B917C9AE721ABB /* Loop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Loop.h; path = main/Loop.h; sourceTree = SOURCE_ROOT; };
+		2A1C461D755983BFCB337E2A /* TriAcePS1InstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TriAcePS1InstrSet.cpp; path = main/formats/TriAcePS1InstrSet.cpp; sourceTree = SOURCE_ROOT; };
+		2A4D1AFEDD7A50D91333458A /* HOSAFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSAFormat.h; path = main/formats/HOSAFormat.h; sourceTree = SOURCE_ROOT; };
+		2B56B8174D182F9C2567DEAC /* PS1Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PS1Format.h; path = main/formats/PS1Format.h; sourceTree = SOURCE_ROOT; };
+		2BBEB0CCFFEE069A81CA9138 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_macextras.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_macextras.pri; sourceTree = SOURCE_ROOT; };
+		2C3D79E7939408B8763C4AB3 /* mainwindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = mainwindow.cpp; path = ui/qt/mainwindow.cpp; sourceTree = SOURCE_ROOT; };
+		2D63C4BF069DA6101B1725D6 /* KonamiGXSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiGXSeq.h; path = main/formats/KonamiGXSeq.h; sourceTree = SOURCE_ROOT; };
+		2E304D1B4B081DA3268B9266 /* DataSeg.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DataSeg.h; path = main/DataSeg.h; sourceTree = SOURCE_ROOT; };
+		2E3307D91B4EE653D9978A14 /* SonyPS2Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SonyPS2Scanner.cpp; path = main/formats/SonyPS2Scanner.cpp; sourceTree = SOURCE_ROOT; };
+		2E4457B6F329CB377E7CB9D0 /* SNESDSP.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SNESDSP.h; path = main/formats/SNESDSP.h; sourceTree = SOURCE_ROOT; };
+		2F85FB0D31CC85D3FDBE77FD /* SonyPS2InstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2InstrSet.h; path = main/formats/SonyPS2InstrSet.h; sourceTree = SOURCE_ROOT; };
+		324108495A60BD72C5517AEB /* version.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = version.h; path = lib/fluidsynth/include/fluidsynth/version.h; sourceTree = SOURCE_ROOT; };
+		3327C009E005AE682FE8DB25 /* MAMELoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MAMELoader.h; path = main/loaders/MAMELoader.h; sourceTree = SOURCE_ROOT; };
+		3394EF31656142C880EB40AC /* ramsfont.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ramsfont.h; path = lib/fluidsynth/include/fluidsynth/ramsfont.h; sourceTree = SOURCE_ROOT; };
+		33C87B1DBBB9E2ADE751CEA8 /* dropsitewindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = dropsitewindow.cpp; path = ui/qt/dropsitewindow.cpp; sourceTree = SOURCE_ROOT; };
+		348518C9393C06166FC020BF /* seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = seq.h; path = lib/fluidsynth/include/fluidsynth/seq.h; sourceTree = SOURCE_ROOT; };
+		35184A25195AA6E48310C05D /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_platformsupport_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_platformsupport_private.pri; sourceTree = SOURCE_ROOT; };
+		35A675B0446F79EF379187BB /* tinystr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = tinystr.h; path = lib/tinyxml/src/tinystr.h; sourceTree = SOURCE_ROOT; };
+		35C5C7B6BEEFF1AA8CB92969 /* AkaoInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoInstr.h; path = main/formats/AkaoInstr.h; sourceTree = SOURCE_ROOT; };
+		36E56E077A89378E078F898C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/gcc-base.conf */ = {isa = PBXFileReference; path = "/usr/local/Cellar/qt5/5.3.1/mkspecs/common/gcc-base.conf"; sourceTree = SOURCE_ROOT; };
+		37336A5C519185C94E064F60 /* RareSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesScanner.cpp; path = main/formats/RareSnesScanner.cpp; sourceTree = SOURCE_ROOT; };
+		387DCE80DF116174A936738A /* VGMTag.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMTag.cpp; path = main/VGMTag.cpp; sourceTree = SOURCE_ROOT; };
+		38B354CB53C2E25E82BBB52E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang/qmake.conf */ = {isa = PBXFileReference; path = "/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang/qmake.conf"; sourceTree = SOURCE_ROOT; };
+		3A2DCDD146783EDC4C293628 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg_private.pri; sourceTree = SOURCE_ROOT; };
+		3A62D0DFE47ED4E48111D637 /* SquarePS2Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquarePS2Scanner.h; path = main/formats/SquarePS2Scanner.h; sourceTree = SOURCE_ROOT; };
+		3A89ED40FB2F98CF770F34F3 /* zlib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = zlib.h; path = lib/zlib/include/zlib.h; sourceTree = SOURCE_ROOT; };
+		3B2E1DF0E99ED4CE348EECAB /* CapcomSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CapcomSnesSeq.cpp; path = main/formats/CapcomSnesSeq.cpp; sourceTree = SOURCE_ROOT; };
+		3B828E94618ADB36A68C3BED /* tinystr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = tinystr.h; path = lib/tinyxml/tinystr.h; sourceTree = SOURCE_ROOT; };
+		3BC5B572D56C1D1C61CDCD47 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_widgets.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_widgets.pri; sourceTree = SOURCE_ROOT; };
+		3CADF21F608FB2CE69FD7E1D /* KonamiSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiSnesSeq.cpp; path = main/formats/KonamiSnesSeq.cpp; sourceTree = SOURCE_ROOT; };
+		3D05F31345616468614D061E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_websockets_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_websockets_private.pri; sourceTree = SOURCE_ROOT; };
+		3EAAF4C0B9C4A6105E085B0B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sensors_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sensors_private.pri; sourceTree = SOURCE_ROOT; };
+		3EAF15021446ABFB26B8D0DC /* midi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = midi.h; path = lib/fluidsynth/include/fluidsynth/midi.h; sourceTree = SOURCE_ROOT; };
+		3FB8AC9145612B367A5EA67D /* KonamiSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiSnesSeq.h; path = main/formats/KonamiSnesSeq.h; sourceTree = SOURCE_ROOT; };
+		404D8F909B34493D662319A8 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_websockets.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_websockets.pri; sourceTree = SOURCE_ROOT; };
+		41CEDAEA67DED531E640B80F /* CapcomSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CapcomSnesInstr.h; path = main/formats/CapcomSnesInstr.h; sourceTree = SOURCE_ROOT; };
+		41D90207964763EFF6F9AEE0 /* SegSat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SegSat.h; path = main/formats/SegSat.h; sourceTree = SOURCE_ROOT; };
+		422C4527F87AD425FA1938C0 /* SynthFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SynthFile.h; path = main/SynthFile.h; sourceTree = SOURCE_ROOT; };
+		42A348A2A3252502F1B09C7E /* SegSatScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SegSatScanner.cpp; path = main/formats/SegSatScanner.cpp; sourceTree = SOURCE_ROOT; };
+		42B99ABFD755760778C770E1 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/qconfig.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/qconfig.pri; sourceTree = SOURCE_ROOT; };
+		43B03B7BF4C2523009132F8D /* HeartBeatPS1SeqScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HeartBeatPS1SeqScanner.cpp; path = main/formats/HeartBeatPS1SeqScanner.cpp; sourceTree = SOURCE_ROOT; };
+		4400182C0EACD0EE83A32EAD /* SNSFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SNSFLoader.cpp; path = main/loaders/SNSFLoader.cpp; sourceTree = SOURCE_ROOT; };
+		4488C723CA75B63CF5D6DAB3 /* VGMFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMFile.cpp; path = main/VGMFile.cpp; sourceTree = SOURCE_ROOT; };
+		45E95654F70AD8D314DA0BE0 /* VGMSampColl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSampColl.cpp; path = main/VGMSampColl.cpp; sourceTree = SOURCE_ROOT; };
+		4630804AD9F2A14787232699 /* osdepend.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = osdepend.cpp; path = ui/qt/osdepend.cpp; sourceTree = SOURCE_ROOT; };
+		46DD1B111215379C127167B0 /* HOSA.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSA.h; path = main/formats/HOSA.h; sourceTree = SOURCE_ROOT; };
+		474AAF9FB08B9537A88EC2F7 /* Vab.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Vab.h; path = main/formats/Vab.h; sourceTree = SOURCE_ROOT; };
+		47EB898996BE89DDFB200A86 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sensors.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sensors.pri; sourceTree = SOURCE_ROOT; };
+		49847D78E2926D91376DA4D3 /* Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Scanner.h; path = main/Scanner.h; sourceTree = SOURCE_ROOT; };
+		4ABCCF37597BAD0ADCFBE055 /* Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Format.h; path = main/Format.h; sourceTree = SOURCE_ROOT; };
+		4C04EC031FB12288A38586F4 /* SquarePS2Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquarePS2Seq.h; path = main/formats/SquarePS2Seq.h; sourceTree = SOURCE_ROOT; };
+		4C719AAFC333B51E2582C96E /* ioapi.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ioapi.c; path = lib/minizip/ioapi.c; sourceTree = SOURCE_ROOT; };
+		50D37A73E5253E467BDADE9B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_printsupport.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_printsupport.pri; sourceTree = SOURCE_ROOT; };
+		51C73CEA3E645A5DDF11474A /* MidiFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MidiFile.cpp; path = main/MidiFile.cpp; sourceTree = SOURCE_ROOT; };
+		536E856F5CA524A2F642A8C6 /* PSF1Loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSF1Loader.h; path = main/loaders/PSF1Loader.h; sourceTree = SOURCE_ROOT; };
+		53E0901A0B0D6AF9C8B43891 /* HeartBeatPS1Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HeartBeatPS1Seq.cpp; path = main/formats/HeartBeatPS1Seq.cpp; sourceTree = SOURCE_ROOT; };
+		542F4766F9696493C50123B0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_macextras_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_macextras_private.pri; sourceTree = SOURCE_ROOT; };
+		549FBFD4CCB0BB4B3756FFB9 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_core_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_core_private.pri; sourceTree = SOURCE_ROOT; };
+		54B7D827BA5B6FDAAA0D77BD /* SonyPS2Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SonyPS2Seq.cpp; path = main/formats/SonyPS2Seq.cpp; sourceTree = SOURCE_ROOT; };
+		5508E9370EA453F5B37BCDAD /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_printsupport_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_printsupport_private.pri; sourceTree = SOURCE_ROOT; };
+		552D4357BE280A025C035607 /* TaitoF3Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaitoF3Scanner.h; path = main/formats/TaitoF3Scanner.h; sourceTree = SOURCE_ROOT; };
+		5559DD213EA37E5FAB3DFBC2 /* mztools.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = mztools.c; path = lib/minizip/mztools.c; sourceTree = SOURCE_ROOT; };
+		559ED9BD9258B2881B5F4CAC /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmltest_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmltest_private.pri; sourceTree = SOURCE_ROOT; };
+		560E3633E4555F3B6D18DDAB /* VGMItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMItem.h; path = main/VGMItem.h; sourceTree = SOURCE_ROOT; };
+		5680D8856D2C6879BD6470C0 /* GSFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GSFLoader.cpp; path = main/loaders/GSFLoader.cpp; sourceTree = SOURCE_ROOT; };
+		56DE08FF3DE1A4D6FAE58B1A /* HOSAScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HOSAScanner.cpp; path = main/formats/HOSAScanner.cpp; sourceTree = SOURCE_ROOT; };
+		57CFA65F0DDE332848B9BF0C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bluetooth.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bluetooth.pri; sourceTree = SOURCE_ROOT; };
+		57E30DD8C1575C47568C8D9E /* mztools.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = mztools.h; path = lib/minizip/mztools.h; sourceTree = SOURCE_ROOT; };
+		58A230991AB4AA1A48CBB688 /* PSXSPU.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSXSPU.h; path = main/formats/PSXSPU.h; sourceTree = SOURCE_ROOT; };
+		59F7EA869B0099D4A9B6E990 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designer_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designer_private.pri; sourceTree = SOURCE_ROOT; };
+		5A34A6C6E368C9328E639B5A /* QSoundSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = QSoundSeq.cpp; path = main/formats/QSoundSeq.cpp; sourceTree = SOURCE_ROOT; };
+		5AB93FE9541A663005952BED /* VGMTrans.pro */ = {isa = PBXFileReference; lastKnownFileType = text; path = VGMTrans.pro; sourceTree = SOURCE_ROOT; };
+		5AF629E453EC0309CC01950E /* SeqTrack.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqTrack.h; path = main/SeqTrack.h; sourceTree = SOURCE_ROOT; };
+		5D4FEA746A5B48430CB137F1 /* Loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Loader.h; path = main/Loader.h; sourceTree = SOURCE_ROOT; };
+		5D94EB7312E530B938C054AF /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickparticles_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickparticles_private.pri; sourceTree = SOURCE_ROOT; };
+		5EED6C8C7F77FED0ADDBA809 /* KonamiGXScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiGXScanner.cpp; path = main/formats/KonamiGXScanner.cpp; sourceTree = SOURCE_ROOT; };
+		60B4D74FEA98D492F8ADEBB6 /* types.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = types.h; path = lib/fluidsynth/include/fluidsynth/types.h; sourceTree = SOURCE_ROOT; };
+		6194FDB0E34AAC50F58A2357 /* TaitoF3Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TaitoF3Scanner.cpp; path = main/formats/TaitoF3Scanner.cpp; sourceTree = SOURCE_ROOT; };
+		621B9151B2B2705AA9710192 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_clucene_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_clucene_private.pri; sourceTree = SOURCE_ROOT; };
+		62E05702229680BFFC43EAAA /* AkaoScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoScanner.h; path = main/formats/AkaoScanner.h; sourceTree = SOURCE_ROOT; };
+		633B5E60D81988A363098871 /* NDSSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NDSSeq.cpp; path = main/formats/NDSSeq.cpp; sourceTree = SOURCE_ROOT; };
+		63494C0466375E757B3AF6EC /* RawFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RawFile.cpp; path = main/RawFile.cpp; sourceTree = SOURCE_ROOT; };
+		637ADC6191954DBD6FAE3050 /* SonyPS2Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2Scanner.h; path = main/formats/SonyPS2Scanner.h; sourceTree = SOURCE_ROOT; };
+		63AC5062CCA4DB16EED76C1E /* KonamiSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiSnesInstr.h; path = main/formats/KonamiSnesInstr.h; sourceTree = SOURCE_ROOT; };
+		642239BD1A0A52CF56C8EA33 /* MP2k.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MP2k.cpp; path = main/formats/MP2k.cpp; sourceTree = SOURCE_ROOT; };
+		6704B3E389946960F2879951 /* SeqVoiceAllocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqVoiceAllocator.h; path = main/SeqVoiceAllocator.h; sourceTree = SOURCE_ROOT; };
+		6774A22CB712CE4C71FE662F /* SPCLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SPCLoader.h; path = main/loaders/SPCLoader.h; sourceTree = SOURCE_ROOT; };
+		67F6415E36CE6638FD229DAF /* SquarePS2Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquarePS2Seq.cpp; path = main/formats/SquarePS2Seq.cpp; sourceTree = SOURCE_ROOT; };
+		69288B8E7C0C926205147D6E /* SeqNote.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqNote.h; path = main/SeqNote.h; sourceTree = SOURCE_ROOT; };
+		697275EF2698DAE4C8AB1278 /* AkaoSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoSeq.h; path = main/formats/AkaoSeq.h; sourceTree = SOURCE_ROOT; };
+		6A344C4CC3F9F9BA9B9C86DF /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc.pri; sourceTree = SOURCE_ROOT; };
+		6B795795CF32524146CE85B8 /* NinSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesInstr.h; path = main/formats/NinSnesInstr.h; sourceTree = SOURCE_ROOT; };
+		6C2427088D2EDE4ADA770BC1 /* moc_droparea.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_droparea.cpp; sourceTree = SOURCE_ROOT; };
+		6CB116514A2A4F215B1DA996 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_enginio_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_enginio_private.pri; sourceTree = SOURCE_ROOT; };
+		6DA883F1B50A39094C857C31 /* ExtensionDiscriminator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ExtensionDiscriminator.cpp; path = main/ExtensionDiscriminator.cpp; sourceTree = SOURCE_ROOT; };
+		6DD987938617F837BAAB2A29 /* TriAcePS1InstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1InstrSet.h; path = main/formats/TriAcePS1InstrSet.h; sourceTree = SOURCE_ROOT; };
+		6E158B706F4F5FCD8389DA98 /* settings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = settings.h; path = lib/fluidsynth/include/fluidsynth/settings.h; sourceTree = SOURCE_ROOT; };
+		6F0B2745FE8742F7211FC507 /* RareSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesInstr.h; path = main/formats/RareSnesInstr.h; sourceTree = SOURCE_ROOT; };
+		7124D63A9FA50DEC3B1B526D /* MP2k.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MP2k.h; path = main/formats/MP2k.h; sourceTree = SOURCE_ROOT; };
+		720B1D7CFBCC0AE2B09A8BBE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xmlpatterns_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xmlpatterns_private.pri; sourceTree = SOURCE_ROOT; };
+		721C1DE06B327393E3F7D7E1 /* moc_mainwindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_mainwindow.cpp; sourceTree = SOURCE_ROOT; };
+		726EE3591DD6BFD8CE2F755A /* tinystr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinystr.cpp; path = lib/tinyxml/src/tinystr.cpp; sourceTree = SOURCE_ROOT; };
+		7369F190CF48537242D9C872 /* DataSeg.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = DataSeg.cpp; path = main/DataSeg.cpp; sourceTree = SOURCE_ROOT; };
+		743C32546CBFABE42D7F9C27 /* common.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = common.h; path = main/common.h; sourceTree = SOURCE_ROOT; };
+		75718E3F6395BC6AB36B6DB7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning.pri; sourceTree = SOURCE_ROOT; };
+		7674D49A043123494A12F384 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/macx-xcode/qmake.conf */ = {isa = PBXFileReference; path = "/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-xcode/qmake.conf"; sourceTree = SOURCE_ROOT; };
+		775D41D6CAE3588816D7486A /* datetime.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = datetime.cpp; path = main/datetime.cpp; sourceTree = SOURCE_ROOT; };
+		77736672BB1BB5066B866B2B /* RareSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesSeq.cpp; path = main/formats/RareSnesSeq.cpp; sourceTree = SOURCE_ROOT; };
+		77C5B489E7766E7FC3FDD738 /* VGMSamp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSamp.cpp; path = main/VGMSamp.cpp; sourceTree = SOURCE_ROOT; };
+		789CD89D2CB7B97F62A5A1BB /* VGMInstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMInstrSet.h; path = main/VGMInstrSet.h; sourceTree = SOURCE_ROOT; };
+		793755AC3C7A37397E19447B /* PS1SeqScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PS1SeqScanner.cpp; path = main/formats/PS1SeqScanner.cpp; sourceTree = SOURCE_ROOT; };
+		79976E2652CC699E24B1E4AE /* tinyxml.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = tinyxml.h; path = lib/tinyxml/tinyxml.h; sourceTree = SOURCE_ROOT; };
+		7B7518079F7AB6682A8208D9 /* SF2File.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SF2File.h; path = main/SF2File.h; sourceTree = SOURCE_ROOT; };
+		7BA1B635430219DD0BD10B06 /* SegSat.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SegSat.cpp; path = main/formats/SegSat.cpp; sourceTree = SOURCE_ROOT; };
+		7BCD29496D6B56C50525C815 /* ExtensionDiscriminator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ExtensionDiscriminator.h; path = main/ExtensionDiscriminator.h; sourceTree = SOURCE_ROOT; };
+		7C13944E291FA2BFB74C9D90 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/qdevice.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/qdevice.pri; sourceTree = SOURCE_ROOT; };
+		7C955966B02D83B7C4CE245E /* VGMTag.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMTag.h; path = main/VGMTag.h; sourceTree = SOURCE_ROOT; };
+		7CC4555B524ECCCF385D7931 /* RawFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RawFile.h; path = main/RawFile.h; sourceTree = SOURCE_ROOT; };
+		7CD01C4EF1904670FF12376D /* VGMColl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMColl.h; path = main/VGMColl.h; sourceTree = SOURCE_ROOT; };
+		7D4F0DE235284A86EAF17111 /* event.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = event.h; path = lib/fluidsynth/include/fluidsynth/event.h; sourceTree = SOURCE_ROOT; };
+		7E52D8B9B91A460793E092A2 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_concurrent.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_concurrent.pri; sourceTree = SOURCE_ROOT; };
+		8075EA2A685DA7B9A3911962 /* MP2kFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MP2kFormat.h; path = main/formats/MP2kFormat.h; sourceTree = SOURCE_ROOT; };
+		8075F90620D3002AEE439D7E /* WD.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = WD.h; path = main/formats/WD.h; sourceTree = SOURCE_ROOT; };
+		814B037EF60F4C0B5A7CCB6A /* ScaleConversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ScaleConversion.h; path = main/ScaleConversion.h; sourceTree = SOURCE_ROOT; };
+		8155A9307BA8FD7D8DF64BD7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_declarative_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_declarative_private.pri; sourceTree = SOURCE_ROOT; };
+		81EA1F9CAB8D45C1D35C84DA /* AkaoInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = AkaoInstr.cpp; path = main/formats/AkaoInstr.cpp; sourceTree = SOURCE_ROOT; };
+		8304471614409E7E1D3CD23B /* SegSatFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SegSatFormat.h; path = main/formats/SegSatFormat.h; sourceTree = SOURCE_ROOT; };
+		84733C8DFF4363941D876591 /* PSF2Loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSF2Loader.h; path = main/loaders/PSF2Loader.h; sourceTree = SOURCE_ROOT; };
+		85DDA0661C949483B04BF84E /* AkaoFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoFormat.h; path = main/formats/AkaoFormat.h; sourceTree = SOURCE_ROOT; };
+		87DD4CBA05505F97C178100D /* VGMInstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMInstrSet.cpp; path = main/VGMInstrSet.cpp; sourceTree = SOURCE_ROOT; };
+		88251B74BEE968DC1C58467B /* SonyPS2Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2Seq.h; path = main/formats/SonyPS2Seq.h; sourceTree = SOURCE_ROOT; };
+		8884161B8E3492AFA0DC2485 /* RareSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesInstr.cpp; path = main/formats/RareSnesInstr.cpp; sourceTree = SOURCE_ROOT; };
+		8B48DB79B17DB3D7394F6C55 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designercomponents_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designercomponents_private.pri; sourceTree = SOURCE_ROOT; };
+		8BFEB3EBE701C7F46727BDA9 /* tinyxmlparser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxmlparser.cpp; path = lib/tinyxml/src/tinyxmlparser.cpp; sourceTree = SOURCE_ROOT; };
+		8D0517802306B79FDDDD7CD7 /* KonamiGXFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiGXFormat.h; path = main/formats/KonamiGXFormat.h; sourceTree = SOURCE_ROOT; };
+		8D9815BDB5BD9F90D2BC05C5 /* AGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AGL.framework; path = /System/Library/Frameworks/AGL.framework; refType = 0; sourceTree = SOURCE_ROOT; };
+		8E75FC098D8B65C66D803303 /* TriAcePS1Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TriAcePS1Scanner.cpp; path = main/formats/TriAcePS1Scanner.cpp; sourceTree = SOURCE_ROOT; };
+		8F5D00EDFC069D4CEA208A44 /* OrgScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OrgScanner.h; path = main/formats/OrgScanner.h; sourceTree = SOURCE_ROOT; };
+		8F60FEADA1448B7AB868B269 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkitwidgets.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkitwidgets.pri; sourceTree = SOURCE_ROOT; };
+		8FB6844A211F2117179A35EE /* gen.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = gen.h; path = lib/fluidsynth/include/fluidsynth/gen.h; sourceTree = SOURCE_ROOT; };
+		8FC61BA909B95ADF96ADC42D /* ScaleConversion.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ScaleConversion.cpp; path = main/ScaleConversion.cpp; sourceTree = SOURCE_ROOT; };
+		907E052B49D4D096F098CB0C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_scripttools_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_scripttools_private.pri; sourceTree = SOURCE_ROOT; };
+		9144D33B783AB8AAECCCEE42 /* AkaoFormat.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = AkaoFormat.cpp; path = main/formats/AkaoFormat.cpp; sourceTree = SOURCE_ROOT; };
+		91BC1725F0E3D0D5AF2B6B05 /* VGMRgn.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMRgn.cpp; path = main/VGMRgn.cpp; sourceTree = SOURCE_ROOT; };
+		91DF15B49972C051F99BAEB1 /* droparea.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = droparea.h; path = ui/qt/droparea.h; sourceTree = SOURCE_ROOT; };
+		9216D9FABE58E95C2ACBDB58 /* GSFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = GSFLoader.h; path = main/loaders/GSFLoader.h; sourceTree = SOURCE_ROOT; };
+		922A52A03C19C4669E1AF4BA /* CapcomSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CapcomSnesFormat.h; path = main/formats/CapcomSnesFormat.h; sourceTree = SOURCE_ROOT; };
+		92419A124F09CC5C82A3E0BA /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_serialport_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_serialport_private.pri; sourceTree = SOURCE_ROOT; };
+		925CD3715596CDDDF5DF1128 /* NDS2SFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NDS2SFLoader.cpp; path = main/loaders/NDS2SFLoader.cpp; sourceTree = SOURCE_ROOT; };
+		94A4537841111EFDC33AC6D2 /* VGMSampColl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMSampColl.h; path = main/VGMSampColl.h; sourceTree = SOURCE_ROOT; };
+		965EB517F9F932508ABA8188 /* SPCLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SPCLoader.cpp; path = main/loaders/SPCLoader.cpp; sourceTree = SOURCE_ROOT; };
+		967DFDE3EAFF9FD0540D52CA /* AkaoSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = AkaoSeq.cpp; path = main/formats/AkaoSeq.cpp; sourceTree = SOURCE_ROOT; };
+		969176528E918C44CFF81079 /* RiffFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RiffFile.cpp; path = main/RiffFile.cpp; sourceTree = SOURCE_ROOT; };
+		969BDCAEA116E614C1354E2A /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmldevtools_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmldevtools_private.pri; sourceTree = SOURCE_ROOT; };
+		96F3ED2E63E026B5E23EE765 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkit_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkit_private.pri; sourceTree = SOURCE_ROOT; };
+		971D814246C2490D3A445326 /* HOSAInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSAInstr.h; path = main/formats/HOSAInstr.h; sourceTree = SOURCE_ROOT; };
+		976D7F6B00CFC964E82BF145 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_uitools_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_uitools_private.pri; sourceTree = SOURCE_ROOT; };
+		97959CA23067462380A5BEB9 /* Options.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Options.cpp; path = main/Options.cpp; sourceTree = SOURCE_ROOT; };
+		98A0595B18195A98D51FB790 /* KonamiGXSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiGXSeq.cpp; path = main/formats/KonamiGXSeq.cpp; sourceTree = SOURCE_ROOT; };
+		9930E2513C973D34C605CF33 /* datetime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = datetime.h; path = main/datetime.h; sourceTree = SOURCE_ROOT; };
+		99EDBBE4944B91C30A481888 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/macx.conf */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/common/macx.conf; sourceTree = SOURCE_ROOT; };
+		9AEC1229ADD38B3BF07855D0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sql.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sql.pri; sourceTree = SOURCE_ROOT; };
+		9B171B8795D36666E21851FE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qml_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qml_private.pri; sourceTree = SOURCE_ROOT; };
+		9BDD541634B9277495D02032 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickwidgets.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickwidgets.pri; sourceTree = SOURCE_ROOT; };
+		9C11F37191BD332C3EA5D89D /* NCSFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NCSFLoader.h; path = main/loaders/NCSFLoader.h; sourceTree = SOURCE_ROOT; };
+		9C927A4B0722CD8AE3B554E7 /* KonamiSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiSnesScanner.h; path = main/formats/KonamiSnesScanner.h; sourceTree = SOURCE_ROOT; };
+		9CE518FB57AE54FEC39E9F06 /* z */ = {isa = PBXFileReference; name = z; path = lib/zlib/lib/libz.a; refType = 4; sourceTree = SOURCE_ROOT; };
+		9DEFA1AD8710BADF9D5B4429 /* NinSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesScanner.h; path = main/formats/NinSnesScanner.h; sourceTree = SOURCE_ROOT; };
+		9EB6B82FC2B32A0E7659B65E /* SeqEvent.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqEvent.h; path = main/SeqEvent.h; sourceTree = SOURCE_ROOT; };
+		A01715C7F2597BC394C303EE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quick_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quick_private.pri; sourceTree = SOURCE_ROOT; };
+		A089B93D08CF6B7F97A8D2ED /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_script_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_script_private.pri; sourceTree = SOURCE_ROOT; };
+		A099B961439A08683EBAB388 /* HOSAInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HOSAInstr.cpp; path = main/formats/HOSAInstr.cpp; sourceTree = SOURCE_ROOT; };
+		A2651D2FC9D6AA021ACEA2B9 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/unix.conf */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/common/unix.conf; sourceTree = SOURCE_ROOT; };
+		A3037EE7FFC0750CC5CFF4BE /* HOSAScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSAScanner.h; path = main/formats/HOSAScanner.h; sourceTree = SOURCE_ROOT; };
+		A41F23B51BE195C6DD5C6435 /* BytePattern.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = BytePattern.h; path = main/BytePattern.h; sourceTree = SOURCE_ROOT; };
+		A4B4DA3817D8E4DEC2A0DB4B /* VGMSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSeq.cpp; path = main/VGMSeq.cpp; sourceTree = SOURCE_ROOT; };
+		A5908DBF027DCD73D5BD6512 /* SF2File.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SF2File.cpp; path = main/SF2File.cpp; sourceTree = SOURCE_ROOT; };
+		A696ED2D73960A66B6411A93 /* misc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = misc.h; path = lib/fluidsynth/include/fluidsynth/misc.h; sourceTree = SOURCE_ROOT; };
+		A70B73ADEFAAFE0B8A57A97E /* QtCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtCore.framework; path = /usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework; refType = 0; sourceTree = SOURCE_ROOT; };
+		A714EFBEFCEC73BE0C329C87 /* SonyPS2InstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SonyPS2InstrSet.cpp; path = main/formats/SonyPS2InstrSet.cpp; sourceTree = SOURCE_ROOT; };
+		A739561CFE6FB6C41027648C /* Loader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Loader.cpp; path = main/Loader.cpp; sourceTree = SOURCE_ROOT; };
+		A7868AF0EC89D1CBEC5B583D /* RareSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesFormat.h; path = main/formats/RareSnesFormat.h; sourceTree = SOURCE_ROOT; };
+		A895B1FCFE2727F932892A0F /* SeqTrack.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SeqTrack.cpp; path = main/SeqTrack.cpp; sourceTree = SOURCE_ROOT; };
+		A97441CFA2975396CF9E8038 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/shell-unix.conf */ = {isa = PBXFileReference; path = "/usr/local/Cellar/qt5/5.3.1/mkspecs/common/shell-unix.conf"; sourceTree = SOURCE_ROOT; };
+		AA2BC9E7B88641B9DE2BDB19 /* SonyPS2Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2Format.h; path = main/formats/SonyPS2Format.h; sourceTree = SOURCE_ROOT; };
+		AA536B785126C1F60AED45BF /* PSFFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PSFFile.cpp; path = main/PSFFile.cpp; sourceTree = SOURCE_ROOT; };
+		AB51F2D16EC2847374ECD876 /* VGMSamp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMSamp.h; path = main/VGMSamp.h; sourceTree = SOURCE_ROOT; };
+		AB745978DF0F41D1801ABDA6 /* .qmake.stash */ = {isa = PBXFileReference; path = .qmake.stash; sourceTree = SOURCE_ROOT; };
+		AB9244695382569D0035F420 /* PSXSPU.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PSXSPU.cpp; path = main/formats/PSXSPU.cpp; sourceTree = SOURCE_ROOT; };
+		AC844820BF435065A599020E /* mod.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = mod.h; path = lib/fluidsynth/include/fluidsynth/mod.h; sourceTree = SOURCE_ROOT; };
+		AC869340C7CF6260B5C457AC /* osdepend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = osdepend.h; path = ui/qt/osdepend.h; sourceTree = SOURCE_ROOT; };
+		AD2B3AC43D7180C6543FFF36 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_gui_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_gui_private.pri; sourceTree = SOURCE_ROOT; };
+		AD3DFC97848208D33A869A59 /* SquarePS2Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquarePS2Format.h; path = main/formats/SquarePS2Format.h; sourceTree = SOURCE_ROOT; };
+		ADC6493641E441C7FB8E3242 /* FFT.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FFT.cpp; path = main/formats/FFT.cpp; sourceTree = SOURCE_ROOT; };
+		AE4EB09C97D50167463C6F14 /* ioapi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ioapi.h; path = lib/zlib/include/ioapi.h; sourceTree = SOURCE_ROOT; };
+		AEDF8717FD19E3DB3911B050 /* SquSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquSnesScanner.h; path = main/formats/SquSnesScanner.h; sourceTree = SOURCE_ROOT; };
+		AFCECA1569ECD8FC3A042C50 /* QtWidgets.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtWidgets.framework; path = /usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework; refType = 0; sourceTree = SOURCE_ROOT; };
+		B120151EEB9082637BEF821A /* seqbind.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = seqbind.h; path = lib/fluidsynth/include/fluidsynth/seqbind.h; sourceTree = SOURCE_ROOT; };
+		B171F9E956260E2897C36A8D /* PSF2Loader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PSF2Loader.cpp; path = main/loaders/PSF2Loader.cpp; sourceTree = SOURCE_ROOT; };
+		B204D56334EC893D77338147 /* KabukiDecrypt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KabukiDecrypt.h; path = main/loaders/KabukiDecrypt.h; sourceTree = SOURCE_ROOT; };
+		B2F73DF4CF243D51BFD171F9 /* fluidsynth.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = fluidsynth.h; path = lib/fluidsynth/include/fluidsynth.h; sourceTree = SOURCE_ROOT; };
+		B328733C23926A787636E6C2 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/gcc-base-mac.conf */ = {isa = PBXFileReference; path = "/usr/local/Cellar/qt5/5.3.1/mkspecs/common/gcc-base-mac.conf"; sourceTree = SOURCE_ROOT; };
+		B3C179FECC687D887D09C357 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sql_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sql_private.pri; sourceTree = SOURCE_ROOT; };
+		B44ABA0AD79E39C8EA263854 /* DLSFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = DLSFile.cpp; path = main/DLSFile.cpp; sourceTree = SOURCE_ROOT; };
+		B569A739A3E42193E7D22FCA /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_uitools.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_uitools.pri; sourceTree = SOURCE_ROOT; };
+		B677B2A79C4640C6FD724C2A /* NDS2SFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDS2SFLoader.h; path = main/loaders/NDS2SFLoader.h; sourceTree = SOURCE_ROOT; };
+		B6B80DF2858241DA7BA33811 /* NCSFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NCSFLoader.cpp; path = main/loaders/NCSFLoader.cpp; sourceTree = SOURCE_ROOT; };
+		B6B8E9F387B27B26EEFEA828 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkitwidgets_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkitwidgets_private.pri; sourceTree = SOURCE_ROOT; };
+		B782616D1F2C3B8B04E51640 /* SNESDSP.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SNESDSP.cpp; path = main/formats/SNESDSP.cpp; sourceTree = SOURCE_ROOT; };
+		B8B5BB88AC6EC9FB007D87AF /* CapcomSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CapcomSnesScanner.h; path = main/formats/CapcomSnesScanner.h; sourceTree = SOURCE_ROOT; };
+		B8E1A7D9F90836CC1EB7BCCD /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_opengl.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_opengl.pri; sourceTree = SOURCE_ROOT; };
+		B920A1504C9E37ABB81A48CB /* FFTScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FFTScanner.h; path = main/formats/FFTScanner.h; sourceTree = SOURCE_ROOT; };
+		BCF86F7E0139359E9B622C2B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_network.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_network.pri; sourceTree = SOURCE_ROOT; };
+		BD7E92F3EF273571EAA00D92 /* FFTInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FFTInstr.cpp; path = main/formats/FFTInstr.cpp; sourceTree = SOURCE_ROOT; };
+		BE1337DDAB2545B271C67D76 /* OrgScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OrgScanner.cpp; path = main/formats/OrgScanner.cpp; sourceTree = SOURCE_ROOT; };
+		BE965D7E4A7E475D8970EA3F /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_widgets_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_widgets_private.pri; sourceTree = SOURCE_ROOT; };
+		BEE05A87C3CBC6D897E03D95 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_scripttools.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_scripttools.pri; sourceTree = SOURCE_ROOT; };
+		BEFB1D4B7782FD9A23CC06F1 /* CapcomSnesSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = CapcomSnesSeq.h; path = main/formats/CapcomSnesSeq.h; sourceTree = SOURCE_ROOT; };
+		BF399FFE6F4CB75028278D3E /* MAMELoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MAMELoader.cpp; path = main/loaders/MAMELoader.cpp; sourceTree = SOURCE_ROOT; };
+		BFADD2FB09303BFEABF0B238 /* SeqVoiceAllocator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SeqVoiceAllocator.cpp; path = main/SeqVoiceAllocator.cpp; sourceTree = SOURCE_ROOT; };
+		BFF46FF7AD6444CC915001A4 /* VGMMiscFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMMiscFile.cpp; path = main/VGMMiscFile.cpp; sourceTree = SOURCE_ROOT; };
+		BFF5CE11EAC65BA47ED0C5AB /* QSoundSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundSeq.h; path = main/formats/QSoundSeq.h; sourceTree = SOURCE_ROOT; };
+		C09DCDCC527B150F1412DE84 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmltest.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmltest.pri; sourceTree = SOURCE_ROOT; };
+		C100C9A02307C88C25FC090A /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimedia.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimedia.pri; sourceTree = SOURCE_ROOT; };
+		C1CF443D744BA501ED1FAC1D /* PS1Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PS1Seq.cpp; path = main/formats/PS1Seq.cpp; sourceTree = SOURCE_ROOT; };
+		C1E36CEE2AF25E45469BA211 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickwidgets_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickwidgets_private.pri; sourceTree = SOURCE_ROOT; };
+		C2D06A436E8E56928B90FC2C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_network_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_network_private.pri; sourceTree = SOURCE_ROOT; };
+		C3CCC369C23B705C934FD7A0 /* SNSFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SNSFLoader.h; path = main/loaders/SNSFLoader.h; sourceTree = SOURCE_ROOT; };
+		C5F86E6047F2C97611523F85 /* DLSFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DLSFile.h; path = main/DLSFile.h; sourceTree = SOURCE_ROOT; };
+		C6907BB0636E55D1D9CDB857 /* Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Scanner.cpp; path = main/Scanner.cpp; sourceTree = SOURCE_ROOT; };
+		C7C8F5B360772206E4F6534E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_help_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_help_private.pri; sourceTree = SOURCE_ROOT; };
+		C8F8D27A64B56EDEF00F6956 /* KonamiSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiSnesScanner.cpp; path = main/formats/KonamiSnesScanner.cpp; sourceTree = SOURCE_ROOT; };
+		C910708F2DB7659330D4A746 /* voice.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = voice.h; path = lib/fluidsynth/include/fluidsynth/voice.h; sourceTree = SOURCE_ROOT; };
+		C9804FC0DF859D3C66FB30DE /* CapcomSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CapcomSnesInstr.cpp; path = main/formats/CapcomSnesInstr.cpp; sourceTree = SOURCE_ROOT; };
+		C9A1D7F43F7134BBAD4875FB /* SegSatScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SegSatScanner.h; path = main/formats/SegSatScanner.h; sourceTree = SOURCE_ROOT; };
+		CADFB52F4FB0B8FA3B43041E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/clang-mac.conf */ = {isa = PBXFileReference; path = "/usr/local/Cellar/qt5/5.3.1/mkspecs/common/clang-mac.conf"; sourceTree = SOURCE_ROOT; };
+		CCD11A9B1628ABADBC396A8F /* shell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = shell.h; path = lib/fluidsynth/include/fluidsynth/shell.h; sourceTree = SOURCE_ROOT; };
+		CCE9F36B9672FE678802576C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkit.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkit.pri; sourceTree = SOURCE_ROOT; };
+		D01BE9028FA920CBDEF14CD6 /* KabukiDecrypt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KabukiDecrypt.cpp; path = main/loaders/KabukiDecrypt.cpp; sourceTree = SOURCE_ROOT; };
+		D04A127E9C3456E531C752E7 /* VGMColl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMColl.cpp; path = main/VGMColl.cpp; sourceTree = SOURCE_ROOT; };
+		D1B0AFD193D8E28EFE1FF833 /* helper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = helper.h; path = main/helper.h; sourceTree = SOURCE_ROOT; };
+		D1C261D20FDF788712EC09CF /* KonamiSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiSnesFormat.h; path = main/formats/KonamiSnesFormat.h; sourceTree = SOURCE_ROOT; };
+		D3D38FCF90B522541B0A6884 /* NinSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NinSnesInstr.cpp; path = main/formats/NinSnesInstr.cpp; sourceTree = SOURCE_ROOT; };
+		D40E7DED98ECCB35EDAE69DD /* SquSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquSnesFormat.h; path = main/formats/SquSnesFormat.h; sourceTree = SOURCE_ROOT; };
+		D413684B554195533799B94C /* VGMItem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMItem.cpp; path = main/VGMItem.cpp; sourceTree = SOURCE_ROOT; };
+		D4B0173C94A40FDFEC99A1B0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_serialport.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_serialport.pri; sourceTree = SOURCE_ROOT; };
+		D4B32C2222F82AC56BADEB21 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = /System/Library/Frameworks/OpenGL.framework; refType = 0; sourceTree = SOURCE_ROOT; };
+		D50FFC66C9DFF03E77B2AA6B /* sfont.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = sfont.h; path = lib/fluidsynth/include/fluidsynth/sfont.h; sourceTree = SOURCE_ROOT; };
+		D51A8919149C890D64823984 /* PSF1Loader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PSF1Loader.cpp; path = main/loaders/PSF1Loader.cpp; sourceTree = SOURCE_ROOT; };
+		D66D1863CEFA5BA6F616B349 /* CapcomSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CapcomSnesScanner.cpp; path = main/formats/CapcomSnesScanner.cpp; sourceTree = SOURCE_ROOT; };
+		D79FC4A5CB7D728C6E9E967B /* HeartBeatPS1Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HeartBeatPS1Seq.h; path = main/formats/HeartBeatPS1Seq.h; sourceTree = SOURCE_ROOT; };
+		D7FD8C5897C7EF8D85EFE323 /* dropsitewindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = dropsitewindow.h; path = ui/qt/dropsitewindow.h; sourceTree = SOURCE_ROOT; };
+		D884A06DDDE2620A118822FC /* Format.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Format.cpp; path = main/Format.cpp; sourceTree = SOURCE_ROOT; };
+		D90387DE73D6571D4C9C9E78 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_script.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_script.pri; sourceTree = SOURCE_ROOT; };
+		D95A3C20086527871684D12E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimediawidgets_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimediawidgets_private.pri; sourceTree = SOURCE_ROOT; };
+		D960718E548808D8C468D65E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qml.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qml.pri; sourceTree = SOURCE_ROOT; };
+		DA529470329D9BE5C5B4A523 /* HeartBeatPS1SeqScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HeartBeatPS1SeqScanner.h; path = main/formats/HeartBeatPS1SeqScanner.h; sourceTree = SOURCE_ROOT; };
+		DB0FDD1A2B692B4805656015 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xmlpatterns.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xmlpatterns.pri; sourceTree = SOURCE_ROOT; };
+		DB10201B769030CF50AFDA37 /* Options.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Options.h; path = main/Options.h; sourceTree = SOURCE_ROOT; };
+		DC94524D383457923C8B1B51 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = ui/qt/main.cpp; sourceTree = SOURCE_ROOT; };
+		DD8A497834B3AC2B8F651A64 /* PSFFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSFFile.h; path = main/PSFFile.h; sourceTree = SOURCE_ROOT; };
+		DE5E6D7F22C0F18786AA7491 /* NDSSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSSeq.h; path = main/formats/NDSSeq.h; sourceTree = SOURCE_ROOT; };
+		DEA29EF47CEF6E016D17A8B8 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_testlib.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_testlib.pri; sourceTree = SOURCE_ROOT; };
+		DEF1EA719EFABF4D8A224292 /* droparea.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = droparea.cpp; path = ui/qt/droparea.cpp; sourceTree = SOURCE_ROOT; };
+		DF37BFC5BA4709D3282D9859 /* moc_dropsitewindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_dropsitewindow.cpp; sourceTree = SOURCE_ROOT; };
+		E06A9BBC284E154F823B983F /* BytePattern.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BytePattern.cpp; path = main/BytePattern.cpp; sourceTree = SOURCE_ROOT; };
+		E08209955CBE410D714990C5 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc_private.pri; sourceTree = SOURCE_ROOT; };
+		E0B3131E09FCD5756D2FFA9B /* QSoundFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundFormat.h; path = main/formats/QSoundFormat.h; sourceTree = SOURCE_ROOT; };
+		E1686E7EE79E2A50A8925640 /* LogItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = LogItem.h; path = main/LogItem.h; sourceTree = SOURCE_ROOT; };
+		E1C89C9D9F10C0BD479122E7 /* NDSInstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSInstrSet.h; path = main/formats/NDSInstrSet.h; sourceTree = SOURCE_ROOT; };
+		E222ACA2E84FDACABF36DED6 /* mainwindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = mainwindow.h; path = ui/qt/mainwindow.h; sourceTree = SOURCE_ROOT; };
+		E2A477F7772D14B733E764A1 /* NDSScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NDSScanner.cpp; path = main/formats/NDSScanner.cpp; sourceTree = SOURCE_ROOT; };
+		E5460FEDD5C69778617B10D5 /* KonamiGXScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiGXScanner.h; path = main/formats/KonamiGXScanner.h; sourceTree = SOURCE_ROOT; };
+		E7BA006F72F544EC80D0BF0F /* TaitoF3Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TaitoF3Format.h; path = main/formats/TaitoF3Format.h; sourceTree = SOURCE_ROOT; };
+		E83B6F7C0BEC66CB514B236F /* NinSnesFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesFormat.h; path = main/formats/NinSnesFormat.h; sourceTree = SOURCE_ROOT; };
+		E8BEA92F1F42652F6941A612 /* SeqEvent.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SeqEvent.cpp; path = main/SeqEvent.cpp; sourceTree = SOURCE_ROOT; };
+		E9DF8D044C56FB9DC971E04D /* PS1SeqScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PS1SeqScanner.h; path = main/formats/PS1SeqScanner.h; sourceTree = SOURCE_ROOT; };
+		E9FA4959EC01E10534F9E2D8 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xml.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xml.pri; sourceTree = SOURCE_ROOT; };
+		EB50DB6F28EB6C9DB093CD7E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_openglextensions_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_openglextensions_private.pri; sourceTree = SOURCE_ROOT; };
+		EBD7CD1E99CC6A7A1AAA9A97 /* FFT.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FFT.h; path = main/formats/FFT.h; sourceTree = SOURCE_ROOT; };
+		EC894DFEC68073DB708A6BD7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_testlib_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_testlib_private.pri; sourceTree = SOURCE_ROOT; };
+		ECAF2388E9FD791A3D95DD5B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_concurrent_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_concurrent_private.pri; sourceTree = SOURCE_ROOT; };
+		ED3EC1BB64121307E59B37CF /* synth.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = synth.h; path = lib/fluidsynth/include/fluidsynth/synth.h; sourceTree = SOURCE_ROOT; };
+		F01340966064A4BB6000DDF2 /* QSoundScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundScanner.h; path = main/formats/QSoundScanner.h; sourceTree = SOURCE_ROOT; };
+		F03E96C184FBC435DA82325F /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quick.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quick.pri; sourceTree = SOURCE_ROOT; };
+		F212EFCE06DFDD97056BDE6D /* VGMRgn.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMRgn.h; path = main/VGMRgn.h; sourceTree = SOURCE_ROOT; };
+		F279CCD3D18BA56075D1AD4C /* QSoundInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = QSoundInstr.cpp; path = main/formats/QSoundInstr.cpp; sourceTree = SOURCE_ROOT; };
 		F2D5B17BD9A63C728FC9D0CE /* VGMTrans.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VGMTrans.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F37E38E2C76B55B4CC64422F /* zip.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = zip.c; path = lib/minizip/zip.c; sourceTree = "<absolute>"; };
-		F50D2A5C807C148DF50C3B18 /* VGMMiscFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMMiscFile.h; path = main/VGMMiscFile.h; sourceTree = "<absolute>"; };
-		F50F698630F4F650F5DBBE60 /* FFTScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FFTScanner.cpp; path = main/formats/FFTScanner.cpp; sourceTree = "<absolute>"; };
-		F565C6A7E9DD38A86BDF8455 /* Menu.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Menu.cpp; path = main/Menu.cpp; sourceTree = "<absolute>"; };
-		F5C2069CCBBF6A575A664821 /* OrgFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OrgFormat.h; path = main/formats/OrgFormat.h; sourceTree = "<absolute>"; };
-		F826C8C3652940DDF3BAE327 /* tinyxml.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxml.cpp; path = lib/tinyxml/src/tinyxml.cpp; sourceTree = "<absolute>"; };
-		F95AB6D092B40BDA9FE7115B /* AkaoScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = AkaoScanner.cpp; path = main/formats/AkaoScanner.cpp; sourceTree = "<absolute>"; };
-		F964B1B1B613C376F37AD6FD /* QSoundInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundInstr.h; path = main/formats/QSoundInstr.h; sourceTree = "<absolute>"; };
-		FC1FBA96644CF90F2C0D042E /* WD.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = WD.cpp; path = main/formats/WD.cpp; sourceTree = "<absolute>"; };
-		FC3502FC8F95EA7126F85143 /* QtCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtCore.framework; path = ../../Qt/5.3/clang_64/lib/QtCore.framework; refType = 4; sourceTree = "<absolute>"; };
-		FC8AF02FAF8E9FAC5D7501AE /* qt_lib_gui.pri */ = {isa = PBXFileReference; name = qt_lib_gui.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_gui.pri; sourceTree = "<absolute>"; };
-		FDD32686C2D097FC29F8130B /* qt_lib_svg_private.pri */ = {isa = PBXFileReference; name = qt_lib_svg_private.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_svg_private.pri; sourceTree = "<absolute>"; };
-		FDE4C096BD0EECA3EB3EF4AC /* TriAcePS1Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1Seq.h; path = main/formats/TriAcePS1Seq.h; sourceTree = "<absolute>"; };
-		FE002DFEA3F55D6B8671200A /* qt_lib_testlib.pri */ = {isa = PBXFileReference; name = qt_lib_testlib.pri; path = ../../Qt/5.3/clang_64/mkspecs/modules/qt_lib_testlib.pri; sourceTree = "<absolute>"; };
-		FE25F9A168CC5984DA7264EA /* KonamiSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiSnesInstr.cpp; path = main/formats/KonamiSnesInstr.cpp; sourceTree = "<absolute>"; };
-		FF9FEDBACE0EC85B1B2768A7 /* pch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = pch.h; path = ui/qt/pch.h; sourceTree = "<absolute>"; };
+		F37E38E2C76B55B4CC64422F /* zip.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = zip.c; path = lib/minizip/zip.c; sourceTree = SOURCE_ROOT; };
+		F4E2445B758690BABE661477 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning_private.pri; sourceTree = SOURCE_ROOT; };
+		F50D2A5C807C148DF50C3B18 /* VGMMiscFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMMiscFile.h; path = main/VGMMiscFile.h; sourceTree = SOURCE_ROOT; };
+		F50F698630F4F650F5DBBE60 /* FFTScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FFTScanner.cpp; path = main/formats/FFTScanner.cpp; sourceTree = SOURCE_ROOT; };
+		F565C6A7E9DD38A86BDF8455 /* Menu.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Menu.cpp; path = main/Menu.cpp; sourceTree = SOURCE_ROOT; };
+		F5B124D5A4A4026C0FE4CB90 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_declarative.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_declarative.pri; sourceTree = SOURCE_ROOT; };
+		F5C2069CCBBF6A575A664821 /* OrgFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OrgFormat.h; path = main/formats/OrgFormat.h; sourceTree = SOURCE_ROOT; };
+		F71674EFC3C4751DF9F95A33 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/clang.conf */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/common/clang.conf; sourceTree = SOURCE_ROOT; };
+		F826C8C3652940DDF3BAE327 /* tinyxml.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxml.cpp; path = lib/tinyxml/src/tinyxml.cpp; sourceTree = SOURCE_ROOT; };
+		F95AB6D092B40BDA9FE7115B /* AkaoScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = AkaoScanner.cpp; path = main/formats/AkaoScanner.cpp; sourceTree = SOURCE_ROOT; };
+		F964B1B1B613C376F37AD6FD /* QSoundInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundInstr.h; path = main/formats/QSoundInstr.h; sourceTree = SOURCE_ROOT; };
+		FAD619D6CFCBE0973A7CB690 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bluetooth_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bluetooth_private.pri; sourceTree = SOURCE_ROOT; };
+		FC1FBA96644CF90F2C0D042E /* WD.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = WD.cpp; path = main/formats/WD.cpp; sourceTree = SOURCE_ROOT; };
+		FC8729E56A13C21A6F3ECE43 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_help.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_help.pri; sourceTree = SOURCE_ROOT; };
+		FDE4C096BD0EECA3EB3EF4AC /* TriAcePS1Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1Seq.h; path = main/formats/TriAcePS1Seq.h; sourceTree = SOURCE_ROOT; };
+		FE25F9A168CC5984DA7264EA /* KonamiSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiSnesInstr.cpp; path = main/formats/KonamiSnesInstr.cpp; sourceTree = SOURCE_ROOT; };
+		FF9FEDBACE0EC85B1B2768A7 /* pch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = pch.h; path = ui/qt/pch.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -528,9 +526,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A16B459E34504315BC0B6D42 /* z in Link Binary With Libraries */,
-				D1F7A94B52DD62C744EA72B5 /* QtWidgets.framework in Link Binary With Libraries */,
-				489EB1FA0DEC3B73A40EA4D3 /* QtGui.framework in Link Binary With Libraries */,
-				D20912A03AB12392803998C5 /* QtCore.framework in Link Binary With Libraries */,
+				3A7FC125CA6A5A3B108A30F0 /* QtWidgets.framework in Link Binary With Libraries */,
+				939E61E1D6EDB28D7C8F2A3C /* QtGui.framework in Link Binary With Libraries */,
+				5A8BFCC2D3E074FA2C64674C /* QtCore.framework in Link Binary With Libraries */,
 				8771A8C96E9C391044035D99 /* OpenGL.framework in Link Binary With Libraries */,
 				E45E51A644D5FC9F942ECE55 /* AGL.framework in Link Binary With Libraries */,
 			);
@@ -540,21 +538,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		03B6D81ED10F0B72FE9560A3 /* common */ = {
-			isa = PBXGroup;
-			children = (
-				6B1E0F17934093E495B7CB6F /* shell-unix.conf */,
-				39EBCA0E68922034F084E941 /* unix.conf */,
-				5EEA3A36B0B9E03BEF2187FD /* mac.conf */,
-				BA44E8F85B4ED757C589E0A6 /* macx.conf */,
-				237DCB3F7AA7D02625557DE5 /* gcc-base.conf */,
-				B1CD036C9BCBE019B484228F /* gcc-base-mac.conf */,
-				1C5592B49F597A78D8D510E7 /* clang.conf */,
-				928E7F853D1DB58709B3753E /* clang-mac.conf */,
-			);
-			name = common;
-			sourceTree = "<Group>";
-		};
 		25B08E2869634E9BCBA333A2 /* Generated Sources */ = {
 			isa = PBXGroup;
 			children = (
@@ -581,22 +564,6 @@
 				FF4E77D5E07E696515AA77A0 /* qt */,
 			);
 			name = ui;
-			sourceTree = "<Group>";
-		};
-		35A022BA52A944E55BE8A2F8 /* .. */ = {
-			isa = PBXGroup;
-			children = (
-				526B51760231933FCDB699CC /* Qt */,
-			);
-			name = ..;
-			sourceTree = "<Group>";
-		};
-		4227D704D8052279885F757A /* macx-clang */ = {
-			isa = PBXGroup;
-			children = (
-				80E43DB24E46D7E211B1374E /* qmake.conf */,
-			);
-			name = "macx-clang";
 			sourceTree = "<Group>";
 		};
 		4471B353A255A03CF2666BC8 /* zlib */ = {
@@ -630,22 +597,6 @@
 				6774A22CB712CE4C71FE662F /* SPCLoader.h */,
 			);
 			name = loaders;
-			sourceTree = "<Group>";
-		};
-		4F73930972960E67FDCCB473 /* macx-xcode */ = {
-			isa = PBXGroup;
-			children = (
-				0315CD744B8B713D36C23E86 /* qmake.conf */,
-			);
-			name = "macx-xcode";
-			sourceTree = "<Group>";
-		};
-		526B51760231933FCDB699CC /* Qt */ = {
-			isa = PBXGroup;
-			children = (
-				879F6A3BEEDCC7FA298FD5AB /* 5.3 */,
-			);
-			name = Qt;
 			sourceTree = "<Group>";
 		};
 		585C8033A0C93CD1E165E8CE /* main */ = {
@@ -730,92 +681,6 @@
 			name = main;
 			sourceTree = "<Group>";
 		};
-		5A141A41247611D7531BD6D5 /* modules */ = {
-			isa = PBXGroup;
-			children = (
-				0343648275BC86BA1860EAAE /* qt_lib_bluetooth.pri */,
-				376F35DA1EA0B6FE68525861 /* qt_lib_bluetooth_private.pri */,
-				5AB4F81CB99120BE414DA3CE /* qt_lib_bootstrap_private.pri */,
-				26F6AAD0B0E528397C1AAA88 /* qt_lib_clucene_private.pri */,
-				834299FDD7016FF7CCF3E321 /* qt_lib_concurrent.pri */,
-				47420F9215AA4D00BADF0BBF /* qt_lib_concurrent_private.pri */,
-				C998E1D60B88941B9A42DD1C /* qt_lib_core.pri */,
-				944810252FFCCDEC1570D88F /* qt_lib_core_private.pri */,
-				A6B9DB02AD9A398DF02325EB /* qt_lib_dbus.pri */,
-				496E7DC335104D69B8B9EDC4 /* qt_lib_dbus_private.pri */,
-				300E7EBB04413FD04BFBFFE9 /* qt_lib_declarative.pri */,
-				B90C302B86438149E0D0129F /* qt_lib_declarative_private.pri */,
-				E93E788AD9C633DF02E96DA7 /* qt_lib_designer.pri */,
-				8F9BF557DB7F44CD07D270D9 /* qt_lib_designer_private.pri */,
-				336D1D01B737BAB898FFFB51 /* qt_lib_designercomponents_private.pri */,
-				EDA626D94F2C2CC5C5738054 /* qt_lib_enginio.pri */,
-				1D8CED11B3FA5F4FBD40B368 /* qt_lib_enginio_private.pri */,
-				FC8AF02FAF8E9FAC5D7501AE /* qt_lib_gui.pri */,
-				1E5806D4F4D8AA8052732EC2 /* qt_lib_gui_private.pri */,
-				15636DB4C4B703F2B99D99CD /* qt_lib_help.pri */,
-				7B9414BC4E5F2FE4B8B3D650 /* qt_lib_help_private.pri */,
-				EE863AA19364B3A25C6E5A48 /* qt_lib_macextras.pri */,
-				54FE6DF9289E0C07725FFD49 /* qt_lib_macextras_private.pri */,
-				F004D87D07B40303E8238D7D /* qt_lib_multimedia.pri */,
-				8FE554C5F4C9450537EDCDC7 /* qt_lib_multimedia_private.pri */,
-				64133BB9EA319B4BB0F75FC5 /* qt_lib_multimediawidgets.pri */,
-				4FCEA4845F5B21E91A8582D0 /* qt_lib_multimediawidgets_private.pri */,
-				6AE0DDAE7BD08D21EAF497BD /* qt_lib_network.pri */,
-				8BF97BA3EA8ED3C9ED9BD635 /* qt_lib_network_private.pri */,
-				3AF0CBB4E39054A26A8AA7E0 /* qt_lib_nfc.pri */,
-				01B60B2CEA4062ABCB2AA4B1 /* qt_lib_nfc_private.pri */,
-				AD09F01C5B14E3DF1690323D /* qt_lib_opengl.pri */,
-				A74956F18BA9FDB128FBF38C /* qt_lib_opengl_private.pri */,
-				334A1A36440ACE4733489168 /* qt_lib_openglextensions.pri */,
-				D5DB4EF3EBAF70E8B0DFD314 /* qt_lib_openglextensions_private.pri */,
-				E19C8AF8C67AF9D375A849AA /* qt_lib_platformsupport_private.pri */,
-				22388D85423BD036C5651F7A /* qt_lib_positioning.pri */,
-				A7212D78BD0FA00AE33CD536 /* qt_lib_positioning_private.pri */,
-				D1DE281C1CADF2985FDAC73B /* qt_lib_printsupport.pri */,
-				A9D0CE8883AA4B9D12EB1FB9 /* qt_lib_printsupport_private.pri */,
-				C65D718273FD45669625A68C /* qt_lib_qml.pri */,
-				1CB7BFCD77FDFA26132919D8 /* qt_lib_qml_private.pri */,
-				0F72C68D3A7B5BC24F10C1E6 /* qt_lib_qmldevtools_private.pri */,
-				6851D10AA5B3253D09ABC502 /* qt_lib_qmltest.pri */,
-				0BBC3F6FD22E9C2137385C72 /* qt_lib_qmltest_private.pri */,
-				50ABF888640EA07DEB393B0D /* qt_lib_qtmultimediaquicktools_private.pri */,
-				B9E4A650A4E911239DCF6B55 /* qt_lib_quick.pri */,
-				E6125F8D7C4BE74BDB10C515 /* qt_lib_quick_private.pri */,
-				4154C2B123D255441AFCFBCF /* qt_lib_quickparticles_private.pri */,
-				D32883D1BA92547E51348825 /* qt_lib_quickwidgets.pri */,
-				5C7589E227C0292A35DF95C5 /* qt_lib_quickwidgets_private.pri */,
-				689A13197591809CBBFBDEEF /* qt_lib_script.pri */,
-				5A1A13F51DBFFB19506B2129 /* qt_lib_script_private.pri */,
-				164D715C170D01CFB09A1164 /* qt_lib_scripttools.pri */,
-				591DADECE3D43A8F5F868EEB /* qt_lib_scripttools_private.pri */,
-				08B38BE7302ED43312F82A86 /* qt_lib_sensors.pri */,
-				9EBAFA65E2D94F90CBFB58E8 /* qt_lib_sensors_private.pri */,
-				DAF61A76B4BF945542555F84 /* qt_lib_serialport.pri */,
-				8A48ECA471F746C683B8F2D5 /* qt_lib_serialport_private.pri */,
-				73F068BF38A61395105860B6 /* qt_lib_sql.pri */,
-				1746C9092D1FA677E9D2886F /* qt_lib_sql_private.pri */,
-				2C1A7B492C988926554C8320 /* qt_lib_svg.pri */,
-				FDD32686C2D097FC29F8130B /* qt_lib_svg_private.pri */,
-				FE002DFEA3F55D6B8671200A /* qt_lib_testlib.pri */,
-				2902BDD135183ED3B90E91A4 /* qt_lib_testlib_private.pri */,
-				C0B34BE3CB8114ABCA5A1B89 /* qt_lib_uitools.pri */,
-				41FC946AA8DA57A9034DCA0D /* qt_lib_uitools_private.pri */,
-				0DEB17FC23C5D130167ECEB5 /* qt_lib_webkit.pri */,
-				551226D141D046D1B31D3A38 /* qt_lib_webkit_private.pri */,
-				5AE336B370D7F39E9F673CD8 /* qt_lib_webkitwidgets.pri */,
-				16FB8800BAEBA386A2BF417D /* qt_lib_webkitwidgets_private.pri */,
-				86D22A6A01282D360BE9F56F /* qt_lib_websockets.pri */,
-				D790F796C145BF637F681729 /* qt_lib_websockets_private.pri */,
-				D6DB87EF86A0DBBF986BABD5 /* qt_lib_widgets.pri */,
-				86394B2043D63C0C69E87B01 /* qt_lib_widgets_private.pri */,
-				E9B74B1FF03E80956BD70707 /* qt_lib_xml.pri */,
-				D2BCA9D4A1077CB93EFD38E3 /* qt_lib_xml_private.pri */,
-				BBEC59E3993416DE8F4AD0D5 /* qt_lib_xmlpatterns.pri */,
-				DF818B10CFB6A6C246F8F6DA /* qt_lib_xmlpatterns_private.pri */,
-			);
-			name = modules;
-			sourceTree = "<Group>";
-		};
 		5F1C258D258B7B1D72C11209 /* include */ = {
 			isa = PBXGroup;
 			children = (
@@ -853,7 +718,95 @@
 			isa = PBXGroup;
 			children = (
 				5AB93FE9541A663005952BED /* VGMTrans.pro */,
-				A3E1AA9917EC82D3446C262A /* .. */,
+				7C13944E291FA2BFB74C9D90 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/qdevice.pri */,
+				A97441CFA2975396CF9E8038 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/shell-unix.conf */,
+				A2651D2FC9D6AA021ACEA2B9 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/unix.conf */,
+				2108637BB3F26E37060809F1 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/mac.conf */,
+				99EDBBE4944B91C30A481888 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/macx.conf */,
+				36E56E077A89378E078F898C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/gcc-base.conf */,
+				B328733C23926A787636E6C2 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/gcc-base-mac.conf */,
+				F71674EFC3C4751DF9F95A33 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/clang.conf */,
+				CADFB52F4FB0B8FA3B43041E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/common/clang-mac.conf */,
+				42B99ABFD755760778C770E1 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/qconfig.pri */,
+				57CFA65F0DDE332848B9BF0C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bluetooth.pri */,
+				FAD619D6CFCBE0973A7CB690 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bluetooth_private.pri */,
+				1ADA52192DA8F54783E963DE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_bootstrap_private.pri */,
+				621B9151B2B2705AA9710192 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_clucene_private.pri */,
+				7E52D8B9B91A460793E092A2 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_concurrent.pri */,
+				ECAF2388E9FD791A3D95DD5B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_concurrent_private.pri */,
+				22C6671D0D93EA289B1866F0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_core.pri */,
+				549FBFD4CCB0BB4B3756FFB9 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_core_private.pri */,
+				F5B124D5A4A4026C0FE4CB90 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_declarative.pri */,
+				8155A9307BA8FD7D8DF64BD7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_declarative_private.pri */,
+				0E512B018D2A599753A531C2 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designer.pri */,
+				59F7EA869B0099D4A9B6E990 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designer_private.pri */,
+				8B48DB79B17DB3D7394F6C55 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designercomponents_private.pri */,
+				0B8F67A35BC82CD1FB17B30B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_enginio.pri */,
+				6CB116514A2A4F215B1DA996 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_enginio_private.pri */,
+				0190452BDB3B2ABD6AD2FDE7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_gui.pri */,
+				AD2B3AC43D7180C6543FFF36 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_gui_private.pri */,
+				FC8729E56A13C21A6F3ECE43 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_help.pri */,
+				C7C8F5B360772206E4F6534E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_help_private.pri */,
+				2BBEB0CCFFEE069A81CA9138 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_macextras.pri */,
+				542F4766F9696493C50123B0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_macextras_private.pri */,
+				C100C9A02307C88C25FC090A /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimedia.pri */,
+				0299D80E17D3952F34F3C0A4 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimedia_private.pri */,
+				17835AB794638076E729E8C4 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimediawidgets.pri */,
+				D95A3C20086527871684D12E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimediawidgets_private.pri */,
+				BCF86F7E0139359E9B622C2B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_network.pri */,
+				C2D06A436E8E56928B90FC2C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_network_private.pri */,
+				6A344C4CC3F9F9BA9B9C86DF /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc.pri */,
+				E08209955CBE410D714990C5 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc_private.pri */,
+				B8E1A7D9F90836CC1EB7BCCD /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_opengl.pri */,
+				0550EEB364738B6334FD0A4C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_opengl_private.pri */,
+				22FA60E07B8A024A862BD84D /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_openglextensions.pri */,
+				EB50DB6F28EB6C9DB093CD7E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_openglextensions_private.pri */,
+				35184A25195AA6E48310C05D /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_platformsupport_private.pri */,
+				75718E3F6395BC6AB36B6DB7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning.pri */,
+				F4E2445B758690BABE661477 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning_private.pri */,
+				50D37A73E5253E467BDADE9B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_printsupport.pri */,
+				5508E9370EA453F5B37BCDAD /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_printsupport_private.pri */,
+				D960718E548808D8C468D65E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qml.pri */,
+				9B171B8795D36666E21851FE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qml_private.pri */,
+				969BDCAEA116E614C1354E2A /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmldevtools_private.pri */,
+				C09DCDCC527B150F1412DE84 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmltest.pri */,
+				559ED9BD9258B2881B5F4CAC /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qmltest_private.pri */,
+				1A89B859B45ACCD231C2A4EE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_qtmultimediaquicktools_private.pri */,
+				F03E96C184FBC435DA82325F /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quick.pri */,
+				A01715C7F2597BC394C303EE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quick_private.pri */,
+				5D94EB7312E530B938C054AF /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickparticles_private.pri */,
+				9BDD541634B9277495D02032 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickwidgets.pri */,
+				C1E36CEE2AF25E45469BA211 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_quickwidgets_private.pri */,
+				D90387DE73D6571D4C9C9E78 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_script.pri */,
+				A089B93D08CF6B7F97A8D2ED /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_script_private.pri */,
+				BEE05A87C3CBC6D897E03D95 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_scripttools.pri */,
+				907E052B49D4D096F098CB0C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_scripttools_private.pri */,
+				47EB898996BE89DDFB200A86 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sensors.pri */,
+				3EAAF4C0B9C4A6105E085B0B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sensors_private.pri */,
+				D4B0173C94A40FDFEC99A1B0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_serialport.pri */,
+				92419A124F09CC5C82A3E0BA /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_serialport_private.pri */,
+				9AEC1229ADD38B3BF07855D0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sql.pri */,
+				B3C179FECC687D887D09C357 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sql_private.pri */,
+				0076E7A53FC1E369A42ED3F0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg.pri */,
+				3A2DCDD146783EDC4C293628 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg_private.pri */,
+				DEA29EF47CEF6E016D17A8B8 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_testlib.pri */,
+				EC894DFEC68073DB708A6BD7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_testlib_private.pri */,
+				B569A739A3E42193E7D22FCA /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_uitools.pri */,
+				976D7F6B00CFC964E82BF145 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_uitools_private.pri */,
+				CCE9F36B9672FE678802576C /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkit.pri */,
+				96F3ED2E63E026B5E23EE765 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkit_private.pri */,
+				8F60FEADA1448B7AB868B269 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkitwidgets.pri */,
+				B6B8E9F387B27B26EEFEA828 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkitwidgets_private.pri */,
+				404D8F909B34493D662319A8 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_websockets.pri */,
+				3D05F31345616468614D061E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_websockets_private.pri */,
+				3BC5B572D56C1D1C61CDCD47 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_widgets.pri */,
+				BE965D7E4A7E475D8970EA3F /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_widgets_private.pri */,
+				E9FA4959EC01E10534F9E2D8 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xml.pri */,
+				204577D288ACBD89250ED64F /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xml_private.pri */,
+				DB0FDD1A2B692B4805656015 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xmlpatterns.pri */,
+				720B1D7CFBCC0AE2B09A8BBE /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xmlpatterns_private.pri */,
+				38B354CB53C2E25E82BBB52E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang/qmake.conf */,
+				7674D49A043123494A12F384 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/macx-xcode/qmake.conf */,
 				AB745978DF0F41D1801ABDA6 /* .qmake.stash */,
 			);
 			name = "Supporting Files";
@@ -869,42 +822,13 @@
 			name = tinyxml;
 			sourceTree = "<Group>";
 		};
-		879F6A3BEEDCC7FA298FD5AB /* 5.3 */ = {
-			isa = PBXGroup;
-			children = (
-				D20B8ACAB6101170D1666AD7 /* clang_64 */,
-			);
-			name = 5.3;
-			sourceTree = "<Group>";
-		};
-		8B0052806105DCEFE76BA298 /* mkspecs */ = {
-			isa = PBXGroup;
-			children = (
-				BEF172D78CFD314BD1E77FF8 /* qdevice.pri */,
-				03B6D81ED10F0B72FE9560A3 /* common */,
-				8472350A89E6FD72691C1CF2 /* qconfig.pri */,
-				5A141A41247611D7531BD6D5 /* modules */,
-				4227D704D8052279885F757A /* macx-clang */,
-				4F73930972960E67FDCCB473 /* macx-xcode */,
-			);
-			name = mkspecs;
-			sourceTree = "<Group>";
-		};
-		A3E1AA9917EC82D3446C262A /* .. */ = {
-			isa = PBXGroup;
-			children = (
-				35A022BA52A944E55BE8A2F8 /* .. */,
-			);
-			name = ..;
-			sourceTree = "<Group>";
-		};
 		AF39DD055C3EF8226FBE929D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				9CE518FB57AE54FEC39E9F06 /* z */,
-				36A2B172D904F85679591936 /* QtWidgets.framework */,
-				3B5A06A238B0B3E162D52B23 /* QtGui.framework */,
-				FC3502FC8F95EA7126F85143 /* QtCore.framework */,
+				AFCECA1569ECD8FC3A042C50 /* QtWidgets.framework */,
+				1C68D2CCC1918B9AFA3A16E5 /* QtGui.framework */,
+				A70B73ADEFAAFE0B8A57A97E /* QtCore.framework */,
 				D4B32C2222F82AC56BADEB21 /* OpenGL.framework */,
 				8D9815BDB5BD9F90D2BC05C5 /* AGL.framework */,
 			);
@@ -1045,14 +969,6 @@
 				8075F90620D3002AEE439D7E /* WD.h */,
 			);
 			name = formats;
-			sourceTree = "<Group>";
-		};
-		D20B8ACAB6101170D1666AD7 /* clang_64 */ = {
-			isa = PBXGroup;
-			children = (
-				8B0052806105DCEFE76BA298 /* mkspecs */,
-			);
-			name = clang_64;
 			sourceTree = "<Group>";
 		};
 		D3E00F9FCA6A4365FD39021D /* fluidsynth */ = {
@@ -1356,8 +1272,8 @@
 				DYLIB_COMPATIBILITY_VERSION = 1.0;
 				DYLIB_CURRENT_VERSION = 1.0.0;
 				FRAMEWORK_SEARCH_PATHS = (
-					/Users/mike/Qt/5.3/clang_64/lib,
-					/Users/mike/Qt/5.3/clang_64/lib,
+					/usr/local/Cellar/qt5/5.3.1/lib,
+					/usr/local/Cellar/qt5/5.3.1/lib,
 				);
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
@@ -1373,19 +1289,19 @@
 					main/loaders,
 					ui/qt,
 					lib/zlib/include,
-					../../Qt/5.3/clang_64/lib/QtWidgets.framework/Versions/5/Headers,
-					../../Qt/5.3/clang_64/lib/QtGui.framework/Versions/5/Headers,
-					../../Qt/5.3/clang_64/lib/QtCore.framework/Versions/5/Headers,
+					/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers,
+					/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Versions/5/Headers,
+					/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers,
 					.,
-					/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.8.sdk/System/Library/Frameworks/OpenGL.framework/Versions/A/Headers,
-					/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.8.sdk/System/Library/Frameworks/AGL.framework/Headers,
-					"../../Qt/5.3/clang_64/mkspecs/macx-clang",
+					/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks/OpenGL.framework/Versions/A/Headers,
+					/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks/AGL.framework/Headers,
+					"/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang",
 				);
 				INFOPLIST_FILE = Info.plist;
 				LDPLUSPLUS = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++";
 				LIBRARY_SEARCH_PATHS = (
 					/Users/mike/vgmtrans/src/lib/zlib/lib/,
-					/Users/mike/Qt/5.3/clang_64/lib,
+					/usr/local/Cellar/qt5/5.3.1/lib,
 					/System/Library/Frameworks/,
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.7;
@@ -1417,12 +1333,12 @@
 				OTHER_LDFLAGS = (
 					"-headerpad_max_install_names",
 					"-stdlib=libc++",
-					"-F/Users/mike/Qt/5.3/clang_64/lib",
+					"-F/usr/local/Cellar/qt5/5.3.1/lib",
 					"-L/Users/mike/vgmtrans/src/lib/zlib/lib/",
 				);
 				PRODUCT_NAME = VGMTrans;
 				QT_LIBRARY_SUFFIX = "";
-				SDKROOT = macosx10.8;
+				SDKROOT = macosx;
 				SYMROOT = /Users/mike/vgmtrans/src;
 			};
 			name = Release;
@@ -1436,8 +1352,8 @@
 				DYLIB_COMPATIBILITY_VERSION = 1.0;
 				DYLIB_CURRENT_VERSION = 1.0.0;
 				FRAMEWORK_SEARCH_PATHS = (
-					/Users/mike/Qt/5.3/clang_64/lib,
-					/Users/mike/Qt/5.3/clang_64/lib,
+					/usr/local/Cellar/qt5/5.3.1/lib,
+					/usr/local/Cellar/qt5/5.3.1/lib,
 				);
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -1454,19 +1370,19 @@
 					main/loaders,
 					ui/qt,
 					lib/zlib/include,
-					../../Qt/5.3/clang_64/lib/QtWidgets.framework/Versions/5/Headers,
-					../../Qt/5.3/clang_64/lib/QtGui.framework/Versions/5/Headers,
-					../../Qt/5.3/clang_64/lib/QtCore.framework/Versions/5/Headers,
+					/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers,
+					/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Versions/5/Headers,
+					/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers,
 					.,
-					/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.8.sdk/System/Library/Frameworks/OpenGL.framework/Versions/A/Headers,
-					/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.8.sdk/System/Library/Frameworks/AGL.framework/Headers,
-					"../../Qt/5.3/clang_64/mkspecs/macx-clang",
+					/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks/OpenGL.framework/Versions/A/Headers,
+					/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks/AGL.framework/Headers,
+					"/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang",
 				);
 				INFOPLIST_FILE = Info.plist;
 				LDPLUSPLUS = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++";
 				LIBRARY_SEARCH_PATHS = (
 					/Users/mike/vgmtrans/src/lib/zlib/lib/,
-					/Users/mike/Qt/5.3/clang_64/lib,
+					/usr/local/Cellar/qt5/5.3.1/lib,
 					/System/Library/Frameworks/,
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.7;
@@ -1498,12 +1414,12 @@
 				OTHER_LDFLAGS = (
 					"-headerpad_max_install_names",
 					"-stdlib=libc++",
-					"-F/Users/mike/Qt/5.3/clang_64/lib",
+					"-F/usr/local/Cellar/qt5/5.3.1/lib",
 					"-L/Users/mike/vgmtrans/src/lib/zlib/lib/",
 				);
 				PRODUCT_NAME = VGMTrans;
-				QT_LIBRARY_SUFFIX = _debug;
-				SDKROOT = macosx10.8;
+				QT_LIBRARY_SUFFIX = "";
+				SDKROOT = macosx;
 				SYMROOT = /Users/mike/vgmtrans/src;
 			};
 			name = Debug;
@@ -1515,7 +1431,7 @@
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				PRODUCT_NAME = VGMTrans;
 				QT_LIBRARY_SUFFIX = "";
-				SDKROOT = macosx10.8;
+				SDKROOT = macosx;
 			};
 			name = Release;
 		};
@@ -1526,8 +1442,8 @@
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				PRODUCT_NAME = VGMTrans;
-				QT_LIBRARY_SUFFIX = _debug;
-				SDKROOT = macosx10.8;
+				QT_LIBRARY_SUFFIX = "";
+				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
