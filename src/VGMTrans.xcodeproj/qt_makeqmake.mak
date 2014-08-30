@@ -105,6 +105,7 @@ VGMTrans.xcodeproj/project.pbxproj: VGMTrans.pro ../../Qt/5.3/clang_64/mkspecs/m
 		../../Qt/5.3/clang_64/mkspecs/macx-clang/qmake.conf \
 		../../Qt/5.3/clang_64/mkspecs/macx-xcode/qmake.conf \
 		../../Qt/5.3/clang_64/mkspecs/features/spec_post.prf \
+		.qmake.stash \
 		../../Qt/5.3/clang_64/mkspecs/features/exclusive_builds.prf \
 		../../Qt/5.3/clang_64/mkspecs/features/default_pre.prf \
 		../../Qt/5.3/clang_64/mkspecs/features/mac/default_pre.prf \
@@ -228,6 +229,7 @@ VGMTrans.xcodeproj/project.pbxproj: VGMTrans.pro ../../Qt/5.3/clang_64/mkspecs/m
 ../../Qt/5.3/clang_64/mkspecs/macx-clang/qmake.conf:
 ../../Qt/5.3/clang_64/mkspecs/macx-xcode/qmake.conf:
 ../../Qt/5.3/clang_64/mkspecs/features/spec_post.prf:
+.qmake.stash:
 ../../Qt/5.3/clang_64/mkspecs/features/exclusive_builds.prf:
 ../../Qt/5.3/clang_64/mkspecs/features/default_pre.prf:
 ../../Qt/5.3/clang_64/mkspecs/features/mac/default_pre.prf:

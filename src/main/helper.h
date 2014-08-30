@@ -1,11 +1,5 @@
 #pragma once
 
-//#include <vector>
-//#include <list>
-//#include <map>
-//#include <string>
-//#include <stdint.h>
-
 template <class T> void DeleteVect(std::vector<T*> &theArray)
 {
 	int nArraySize = (int)theArray.size();

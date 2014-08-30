@@ -1,11 +1,8 @@
 #pragma once
 
 #include "common.h"
-//#include "RawFile.h"
-//#include "VGMInstrSet.h"
 #include "Loader.h"
 #include "Scanner.h"
-//#include "Matcher.h"
 #include "LogItem.h"
 
 class VGMColl;
