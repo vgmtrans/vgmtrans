@@ -140,7 +140,11 @@ SOURCES += ui/qt/main.cpp\
     lib/minizip/ioapi.c \
     lib/minizip/mztools.c \
     lib/minizip/unzip.c \
-    lib/minizip/zip.c
+    lib/minizip/zip.c \
+    ui/qt/QtVGMRoot.cpp \
+    ui/qt/VGMFileListView.cpp \
+    ui/qt/RawFileListView.cpp \
+    ui/qt/VGMCollListView.cpp
 
 HEADERS  += ui/qt/mainwindow.h \
     ui/qt/droparea.h \
@@ -298,7 +302,11 @@ HEADERS  += ui/qt/mainwindow.h \
     lib/zlib/include/ioapi.h \
     lib/zlib/include/unzip.h \
     lib/zlib/include/zconf.h \
-    lib/zlib/include/zlib.h
+    lib/zlib/include/zlib.h \
+    ui/qt/QtVGMRoot.h \
+    ui/qt/VGMFileListView.h \
+    ui/qt/RawFileListView.h \
+    ui/qt/VGMCollListView.h
 
 #win32 {
 #    SOURCES += lib/minizip/iowin32.c
