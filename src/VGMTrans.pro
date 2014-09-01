@@ -29,6 +29,8 @@ INCLUDEPATH = lib/zlib/include \
 CONFIG += precompile_header
 PRECOMPILED_HEADER  = ui/qt/pch.h
 
+RESOURCES = ui/qt/resources/resources.qrc
+
 SOURCES += ui/qt/main.cpp\
     ui/qt/mainwindow.cpp \
     ui/qt/droparea.cpp \
@@ -140,7 +142,12 @@ SOURCES += ui/qt/main.cpp\
     lib/minizip/ioapi.c \
     lib/minizip/mztools.c \
     lib/minizip/unzip.c \
-    lib/minizip/zip.c
+    lib/minizip/zip.c \
+    ui/qt/QtVGMRoot.cpp \
+    ui/qt/VGMFileListView.cpp \
+    ui/qt/RawFileListView.cpp \
+    ui/qt/VGMCollListView.cpp \
+    ui/qt/MusicPlayer.cpp
 
 HEADERS  += ui/qt/mainwindow.h \
     ui/qt/droparea.h \
@@ -298,7 +305,12 @@ HEADERS  += ui/qt/mainwindow.h \
     lib/zlib/include/ioapi.h \
     lib/zlib/include/unzip.h \
     lib/zlib/include/zconf.h \
-    lib/zlib/include/zlib.h
+    lib/zlib/include/zlib.h \
+    ui/qt/QtVGMRoot.h \
+    ui/qt/VGMFileListView.h \
+    ui/qt/RawFileListView.h \
+    ui/qt/VGMCollListView.h \
+    ui/qt/MusicPlayer.h
 
 #win32 {
 #    SOURCES += lib/minizip/iowin32.c
@@ -312,3 +324,13 @@ DEPENDPATH += $$PWD/lib/zlib/include
 
 win32:!win32-g++: PRE_TARGETDEPS += $$PWD/lib/zlib/lib/z.lib
 else:unix|win32-g++: PRE_TARGETDEPS += $$PWD/lib/zlib/lib/libz.a
+
+LIBS += -F$$PWD/lib/fluidsynth/lib/ -framework FluidSynth
+
+#unix|win32: LIBS += -L$$PWD/lib/fluidsynth/lib/ -lfluidsynth
+
+#INCLUDEPATH += $$PWD/lib/fluidsynth/include
+#DEPENDPATH += $$PWD/lib/fluidsynth/include
+
+#win32:!win32-g++: PRE_TARGETDEPS += $$PWD/lib/fluidsynth/lib/fluidsynth.lib
+#else:unix|win32-g++: PRE_TARGETDEPS += $$PWD/lib/fluidsynth/lib/libfluidsynth.a

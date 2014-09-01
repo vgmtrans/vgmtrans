@@ -1179,7 +1179,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 2746344619AAB0C8009A3437 /* Build configuration list for PBXProject "VGMTrans" */;
+			buildConfigurationList = 2746344619AAB0C8009A3437 /* Build configuration list for PBXProject "NONOVGMTrans" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
@@ -1567,7 +1567,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2746344619AAB0C8009A3437 /* Build configuration list for PBXProject "VGMTrans" */ = {
+		2746344619AAB0C8009A3437 /* Build configuration list for PBXProject "NONOVGMTrans" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2746347A19AAB0C8009A3437 /* Debug */,

@@ -127,6 +127,7 @@ VGMTrans.xcodeproj/project.pbxproj: VGMTrans.pro /usr/local/Cellar/qt5/5.3.1/mks
 		/usr/local/Cellar/qt5/5.3.1/mkspecs/features/yacc.prf \
 		/usr/local/Cellar/qt5/5.3.1/mkspecs/features/lex.prf \
 		VGMTrans.pro \
+		ui/qt/resources/resources.qrc \
 		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/QtWidgets.prl \
 		/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/QtGui.prl \
 		/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/QtCore.prl
@@ -249,6 +250,7 @@ VGMTrans.xcodeproj/project.pbxproj: VGMTrans.pro /usr/local/Cellar/qt5/5.3.1/mks
 /usr/local/Cellar/qt5/5.3.1/mkspecs/features/yacc.prf:
 /usr/local/Cellar/qt5/5.3.1/mkspecs/features/lex.prf:
 VGMTrans.pro:
+ui/qt/resources/resources.qrc:
 /usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/QtWidgets.prl:
 /usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/QtGui.prl:
 /usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/QtCore.prl:

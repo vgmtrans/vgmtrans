@@ -1,5 +1,7 @@
 #ifdef __cplusplus
 
+    #include <QDebug>
+
     #include <assert.h>
     #include <wchar.h>
     #include <cmath>

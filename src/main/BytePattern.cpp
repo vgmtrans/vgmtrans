@@ -6,7 +6,7 @@
 #endif
 
 #include <stdlib.h>
-#include <memory.h>
+//#include <memory.h>
 #include <assert.h>
 #include "BytePattern.h"
 

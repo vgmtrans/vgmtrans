@@ -31,30 +31,95 @@ mocables: compiler_moc_header_make_all compiler_moc_source_make_all
 
 check: first
 
-compilers: moc_mainwindow.cpp moc_droparea.cpp moc_dropsitewindow.cpp
+compilers: qrc_resources.cpp moc_mainwindow.cpp moc_droparea.cpp moc_dropsitewindow.cpp\
+	 moc_QtVGMRoot.cpp moc_VGMFileListView.cpp moc_RawFileListView.cpp\
+	 moc_VGMCollListView.cpp
 compiler_objective_c_make_all:
 compiler_objective_c_clean:
 compiler_no_pch_compiler_make_all:
 compiler_no_pch_compiler_clean:
-compiler_rcc_make_all:
+compiler_rcc_make_all: qrc_resources.cpp
 compiler_rcc_clean:
-compiler_moc_header_make_all: moc_mainwindow.cpp moc_droparea.cpp moc_dropsitewindow.cpp
+	-$(DEL_FILE) qrc_resources.cpp
+qrc_resources.cpp: ui/qt/resources/resources.qrc \
+		ui/qt/resources/images/note_music-32.png \
+		ui/qt/resources/images/audio_wave-32.png \
+		ui/qt/resources/images/piano-32.png \
+		ui/qt/resources/images/audio_file-32.png \
+		ui/qt/resources/images/treble_clef-32.png \
+		ui/qt/resources/images/bugle-32.png \
+		ui/qt/resources/images/music_transcripts-32.png \
+		ui/qt/resources/images/music_folder-32.png \
+		ui/qt/resources/images/file-32.png \
+		ui/qt/resources/test/DoS_02.sf2 \
+		ui/qt/resources/test/DoS_02.mid
+	/usr/local/Cellar/qt5/5.3.1/bin/rcc -name resources ui/qt/resources/resources.qrc -o qrc_resources.cpp
+
+compiler_moc_header_make_all: moc_mainwindow.cpp moc_droparea.cpp moc_dropsitewindow.cpp moc_QtVGMRoot.cpp moc_VGMFileListView.cpp moc_RawFileListView.cpp moc_VGMCollListView.cpp
 compiler_moc_header_clean:
-	-$(DEL_FILE) moc_mainwindow.cpp moc_droparea.cpp moc_dropsitewindow.cpp
+	-$(DEL_FILE) moc_mainwindow.cpp moc_droparea.cpp moc_dropsitewindow.cpp moc_QtVGMRoot.cpp moc_VGMFileListView.cpp moc_RawFileListView.cpp moc_VGMCollListView.cpp
 moc_mainwindow.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/QMainWindow \
-		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/qmainwindow.h \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/qsplitter.h \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/qtreeview.h \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/qlistview.h \
 		ui/qt/mainwindow.h
 	/usr/local/Cellar/qt5/5.3.1/bin/moc $(DEFINES) -D__APPLE__ -D__GNUC__=4 -I/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang -I/Users/mike/vgmtrans/src -I/Users/mike/vgmtrans/src/lib/zlib/include -I/Users/mike/vgmtrans/src/lib/minizip -I/Users/mike/vgmtrans/src/lib/tinyxml/src -I/Users/mike/vgmtrans/src/lib/fluidsynth/include/fluidsynth -I/Users/mike/vgmtrans/src/main -I/Users/mike/vgmtrans/src/main/formats -I/Users/mike/vgmtrans/src/main/loaders -I/Users/mike/vgmtrans/src/ui/qt -I/Users/mike/vgmtrans/src/lib/zlib/include -I/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1/backward -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/5.1/include -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include -F/usr/local/Cellar/qt5/5.3.1/lib ui/qt/mainwindow.h -o moc_mainwindow.cpp
 
 moc_droparea.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/QLabel \
-		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/qlabel.h \
 		ui/qt/droparea.h
 	/usr/local/Cellar/qt5/5.3.1/bin/moc $(DEFINES) -D__APPLE__ -D__GNUC__=4 -I/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang -I/Users/mike/vgmtrans/src -I/Users/mike/vgmtrans/src/lib/zlib/include -I/Users/mike/vgmtrans/src/lib/minizip -I/Users/mike/vgmtrans/src/lib/tinyxml/src -I/Users/mike/vgmtrans/src/lib/fluidsynth/include/fluidsynth -I/Users/mike/vgmtrans/src/main -I/Users/mike/vgmtrans/src/main/formats -I/Users/mike/vgmtrans/src/main/loaders -I/Users/mike/vgmtrans/src/ui/qt -I/Users/mike/vgmtrans/src/lib/zlib/include -I/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1/backward -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/5.1/include -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include -F/usr/local/Cellar/qt5/5.3.1/lib ui/qt/droparea.h -o moc_droparea.cpp
 
 moc_dropsitewindow.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/QWidget \
-		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/qwidget.h \
 		ui/qt/dropsitewindow.h
 	/usr/local/Cellar/qt5/5.3.1/bin/moc $(DEFINES) -D__APPLE__ -D__GNUC__=4 -I/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang -I/Users/mike/vgmtrans/src -I/Users/mike/vgmtrans/src/lib/zlib/include -I/Users/mike/vgmtrans/src/lib/minizip -I/Users/mike/vgmtrans/src/lib/tinyxml/src -I/Users/mike/vgmtrans/src/lib/fluidsynth/include/fluidsynth -I/Users/mike/vgmtrans/src/main -I/Users/mike/vgmtrans/src/main/formats -I/Users/mike/vgmtrans/src/main/loaders -I/Users/mike/vgmtrans/src/ui/qt -I/Users/mike/vgmtrans/src/lib/zlib/include -I/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1/backward -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/5.1/include -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include -F/usr/local/Cellar/qt5/5.3.1/lib ui/qt/dropsitewindow.h -o moc_dropsitewindow.cpp
+
+moc_QtVGMRoot.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QObject \
+		main/Root.h \
+		main/common.h \
+		ui/qt/osdepend.h \
+		main/helper.h \
+		main/Loader.h \
+		main/RawFile.h \
+		main/DataSeg.h \
+		main/BytePattern.h \
+		main/VGMTag.h \
+		main/Scanner.h \
+		main/ExtensionDiscriminator.h \
+		main/LogItem.h \
+		main/datetime.h \
+		ui/qt/QtVGMRoot.h
+	/usr/local/Cellar/qt5/5.3.1/bin/moc $(DEFINES) -D__APPLE__ -D__GNUC__=4 -I/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang -I/Users/mike/vgmtrans/src -I/Users/mike/vgmtrans/src/lib/zlib/include -I/Users/mike/vgmtrans/src/lib/minizip -I/Users/mike/vgmtrans/src/lib/tinyxml/src -I/Users/mike/vgmtrans/src/lib/fluidsynth/include/fluidsynth -I/Users/mike/vgmtrans/src/main -I/Users/mike/vgmtrans/src/main/formats -I/Users/mike/vgmtrans/src/main/loaders -I/Users/mike/vgmtrans/src/ui/qt -I/Users/mike/vgmtrans/src/lib/zlib/include -I/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1/backward -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/5.1/include -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include -F/usr/local/Cellar/qt5/5.3.1/lib ui/qt/QtVGMRoot.h -o moc_QtVGMRoot.cpp
+
+moc_VGMFileListView.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QAbstractListModel \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QEvent \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/QListView \
+		ui/qt/VGMFileListView.h
+	/usr/local/Cellar/qt5/5.3.1/bin/moc $(DEFINES) -D__APPLE__ -D__GNUC__=4 -I/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang -I/Users/mike/vgmtrans/src -I/Users/mike/vgmtrans/src/lib/zlib/include -I/Users/mike/vgmtrans/src/lib/minizip -I/Users/mike/vgmtrans/src/lib/tinyxml/src -I/Users/mike/vgmtrans/src/lib/fluidsynth/include/fluidsynth -I/Users/mike/vgmtrans/src/main -I/Users/mike/vgmtrans/src/main/formats -I/Users/mike/vgmtrans/src/main/loaders -I/Users/mike/vgmtrans/src/ui/qt -I/Users/mike/vgmtrans/src/lib/zlib/include -I/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1/backward -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/5.1/include -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include -F/usr/local/Cellar/qt5/5.3.1/lib ui/qt/VGMFileListView.h -o moc_VGMFileListView.cpp
+
+moc_RawFileListView.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QAbstractListModel \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/QListView \
+		ui/qt/QtVGMRoot.h \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QObject \
+		main/Root.h \
+		main/common.h \
+		ui/qt/osdepend.h \
+		main/helper.h \
+		main/Loader.h \
+		main/RawFile.h \
+		main/DataSeg.h \
+		main/BytePattern.h \
+		main/VGMTag.h \
+		main/Scanner.h \
+		main/ExtensionDiscriminator.h \
+		main/LogItem.h \
+		main/datetime.h \
+		ui/qt/RawFileListView.h
+	/usr/local/Cellar/qt5/5.3.1/bin/moc $(DEFINES) -D__APPLE__ -D__GNUC__=4 -I/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang -I/Users/mike/vgmtrans/src -I/Users/mike/vgmtrans/src/lib/zlib/include -I/Users/mike/vgmtrans/src/lib/minizip -I/Users/mike/vgmtrans/src/lib/tinyxml/src -I/Users/mike/vgmtrans/src/lib/fluidsynth/include/fluidsynth -I/Users/mike/vgmtrans/src/main -I/Users/mike/vgmtrans/src/main/formats -I/Users/mike/vgmtrans/src/main/loaders -I/Users/mike/vgmtrans/src/ui/qt -I/Users/mike/vgmtrans/src/lib/zlib/include -I/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1/backward -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/5.1/include -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include -F/usr/local/Cellar/qt5/5.3.1/lib ui/qt/RawFileListView.h -o moc_RawFileListView.cpp
+
+moc_VGMCollListView.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QAbstractListModel \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Versions/5/Headers/QListView \
+		ui/qt/VGMCollListView.h
+	/usr/local/Cellar/qt5/5.3.1/bin/moc $(DEFINES) -D__APPLE__ -D__GNUC__=4 -I/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang -I/Users/mike/vgmtrans/src -I/Users/mike/vgmtrans/src/lib/zlib/include -I/Users/mike/vgmtrans/src/lib/minizip -I/Users/mike/vgmtrans/src/lib/tinyxml/src -I/Users/mike/vgmtrans/src/lib/fluidsynth/include/fluidsynth -I/Users/mike/vgmtrans/src/main -I/Users/mike/vgmtrans/src/main/formats -I/Users/mike/vgmtrans/src/main/loaders -I/Users/mike/vgmtrans/src/ui/qt -I/Users/mike/vgmtrans/src/lib/zlib/include -I/usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtGui.framework/Headers -I/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include/c++/4.2.1/backward -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/5.1/include -I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/include -F/usr/local/Cellar/qt5/5.3.1/lib ui/qt/VGMCollListView.h -o moc_VGMCollListView.cpp
 
 compiler_moc_source_make_all:
 compiler_moc_source_clean:
@@ -68,5 +133,5 @@ compiler_yacc_impl_make_all:
 compiler_yacc_impl_clean:
 compiler_lex_make_all:
 compiler_lex_clean:
-compiler_clean: compiler_moc_header_clean 
+compiler_clean: compiler_rcc_clean compiler_moc_header_clean 
 
