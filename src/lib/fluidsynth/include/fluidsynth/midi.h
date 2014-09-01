@@ -51,6 +51,8 @@ FLUIDSYNTH_API int fluid_midi_event_get_pitch(fluid_midi_event_t* evt);
 FLUIDSYNTH_API int fluid_midi_event_set_pitch(fluid_midi_event_t* evt, int val);
 FLUIDSYNTH_API int fluid_midi_event_set_sysex(fluid_midi_event_t* evt, void *data,
                                               int size, int dynamic);
+FLUIDSYNTH_API void *fluid_midi_event_get_track(fluid_midi_event_t* evt);
+
 
 /**
  * MIDI router rule type.

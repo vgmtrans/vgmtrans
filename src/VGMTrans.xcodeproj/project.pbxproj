@@ -31,6 +31,7 @@
 		09A0D75C1B406A4E2F9158E9 /* moc_droparea.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 6C2427088D2EDE4ADA770BC1 /* moc_droparea.cpp */; settings = {ATTRIBUTES = (); }; };
 		0B74CA59AE3C5FF6464D4935 /* MP2k.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 642239BD1A0A52CF56C8EA33 /* MP2k.cpp */; settings = {ATTRIBUTES = (); }; };
 		0BA79A59893F502EE7DCFFFD /* DLSFile.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = B44ABA0AD79E39C8EA263854 /* DLSFile.cpp */; settings = {ATTRIBUTES = (); }; };
+		0CAE5EAB709C0CF97646D960 /* MusicPlayer.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = DDFBADEC37FC7383214C9185 /* MusicPlayer.cpp */; settings = {ATTRIBUTES = (); }; };
 		0E7AF9DEA9605778C310FA5B /* Format.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = D884A06DDDE2620A118822FC /* Format.cpp */; settings = {ATTRIBUTES = (); }; };
 		10151E593084CAF407A2118B /* RareSnesSeq.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 77736672BB1BB5066B866B2B /* RareSnesSeq.cpp */; settings = {ATTRIBUTES = (); }; };
 		10293081D32666A22965EE2A /* VGMFile.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 4488C723CA75B63CF5D6DAB3 /* VGMFile.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -50,13 +51,16 @@
 		2F9983ACB124B74F32685F47 /* moc_mainwindow.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 721C1DE06B327393E3F7D7E1 /* moc_mainwindow.cpp */; settings = {ATTRIBUTES = (); }; };
 		34017A37364CD709D7E9FF22 /* KonamiSnesInstr.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = FE25F9A168CC5984DA7264EA /* KonamiSnesInstr.cpp */; settings = {ATTRIBUTES = (); }; };
 		34F7A646DCFAC41B6C7CA772 /* TaitoF3Scanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 6194FDB0E34AAC50F58A2357 /* TaitoF3Scanner.cpp */; settings = {ATTRIBUTES = (); }; };
+		3581B44F962832CE35D09BB0 /* moc_VGMFileListView.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = DF623F338F6B095167EC1B2D /* moc_VGMFileListView.cpp */; settings = {ATTRIBUTES = (); }; };
 		38BF65CB5350159D6750F9C9 /* MAMELoader.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = BF399FFE6F4CB75028278D3E /* MAMELoader.cpp */; settings = {ATTRIBUTES = (); }; };
+		3A2F3CA20217D052E8528F58 /* moc_RawFileListView.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = FE7B9860C317ABC6A358F138 /* moc_RawFileListView.cpp */; settings = {ATTRIBUTES = (); }; };
 		3A7FC125CA6A5A3B108A30F0 /* QtWidgets.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = AFCECA1569ECD8FC3A042C50 /* QtWidgets.framework */; settings = {}; };
 		3D1183AFA79A14A7BA9968C3 /* SegSatScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 42A348A2A3252502F1B09C7E /* SegSatScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		3D6204EAC4DFFB95B067F30B /* VGMColl.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = D04A127E9C3456E531C752E7 /* VGMColl.cpp */; settings = {ATTRIBUTES = (); }; };
 		3E34D37FE3213EF08E690B82 /* TriAcePS1Scanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8E75FC098D8B65C66D803303 /* TriAcePS1Scanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		3F7ED79BC81F379072BEA1A7 /* PSXSPU.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = AB9244695382569D0035F420 /* PSXSPU.cpp */; settings = {ATTRIBUTES = (); }; };
 		3FBCCB7ADB855F07D00A91CD /* tinyxmlparser.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8BFEB3EBE701C7F46727BDA9 /* tinyxmlparser.cpp */; settings = {ATTRIBUTES = (); }; };
+		41DE7D46CD43A6653C1A8668 /* moc_VGMCollListView.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 38F7E63FF344F927FE779821 /* moc_VGMCollListView.cpp */; settings = {ATTRIBUTES = (); }; };
 		42AC62247FA50BF38C2A6CB9 /* Menu.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = F565C6A7E9DD38A86BDF8455 /* Menu.cpp */; settings = {ATTRIBUTES = (); }; };
 		42FBC43926F714ACCEA79FC9 /* PSFFile.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = AA536B785126C1F60AED45BF /* PSFFile.cpp */; settings = {ATTRIBUTES = (); }; };
 		43C4D54A9F978908CD17BBB6 /* tinyxml.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = F826C8C3652940DDF3BAE327 /* tinyxml.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -66,11 +70,14 @@
 		47EC7C8ABC7D5D4B346832AD /* HOSA.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 0CBEF104572B85DD130A25A3 /* HOSA.cpp */; settings = {ATTRIBUTES = (); }; };
 		48435D16CBDFAFFF539B1126 /* HeartBeatPS1Seq.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 53E0901A0B0D6AF9C8B43891 /* HeartBeatPS1Seq.cpp */; settings = {ATTRIBUTES = (); }; };
 		4AC322A99AA8341869358036 /* AkaoScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = F95AB6D092B40BDA9FE7115B /* AkaoScanner.cpp */; settings = {ATTRIBUTES = (); }; };
+		4C10315C77E6D529D1323577 /* moc_QtVGMRoot.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 024737378FB59289394E8156 /* moc_QtVGMRoot.cpp */; settings = {ATTRIBUTES = (); }; };
+		53D6578F8FC5E00AC255E71F /* QtVGMRoot.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 2EFC747F7E866D3A0A5E1EAF /* QtVGMRoot.cpp */; settings = {ATTRIBUTES = (); }; };
 		58AB77687FD5A97DCDA9F056 /* PS1SeqScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 793755AC3C7A37397E19447B /* PS1SeqScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		5A8BFCC2D3E074FA2C64674C /* QtCore.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = A70B73ADEFAAFE0B8A57A97E /* QtCore.framework */; settings = {}; };
 		5C9F2C188A63B28828B97B4E /* WD.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = FC1FBA96644CF90F2C0D042E /* WD.cpp */; settings = {ATTRIBUTES = (); }; };
 		5DB1082AF50F1D729C1E5D83 /* ioapi.c in Compile Sources */ = {isa = PBXBuildFile; fileRef = 4C719AAFC333B51E2582C96E /* ioapi.c */; settings = {ATTRIBUTES = (); }; };
 		5E95AB41675746B6463A0AB2 /* tinystr.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 726EE3591DD6BFD8CE2F755A /* tinystr.cpp */; settings = {ATTRIBUTES = (); }; };
+		626519FCE7104F4C7E994554 /* FluidSynth.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 3A0B530AB438AAA0EBC91512 /* FluidSynth.framework */; settings = {}; };
 		6A78F1CA8B34844430045C4A /* QSoundInstr.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = F279CCD3D18BA56075D1AD4C /* QSoundInstr.cpp */; settings = {ATTRIBUTES = (); }; };
 		6ECA883D6C0FB8096B6614F9 /* dropsitewindow.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 33C87B1DBBB9E2ADE751CEA8 /* dropsitewindow.cpp */; settings = {ATTRIBUTES = (); }; };
 		719303045CBB1871DAAFE433 /* PSF1Loader.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = D51A8919149C890D64823984 /* PSF1Loader.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -92,6 +99,7 @@
 		95B0013488340B18198E749F /* SquSnesScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 0F9DF781BA49CA48E481383E /* SquSnesScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		9735E93470CD528572CE8A87 /* SquarePS2Scanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 17816F23038B214C888DC09D /* SquarePS2Scanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		9B72BC869BDCEE3099303212 /* VGMSeqNoTrks.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 07630FCF2D198F66F6D4E680 /* VGMSeqNoTrks.cpp */; settings = {ATTRIBUTES = (); }; };
+		A083D02C294FB83D11CC8378 /* RawFileListView.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 694E4BFE54528AC744074BCE /* RawFileListView.cpp */; settings = {ATTRIBUTES = (); }; };
 		A16B459E34504315BC0B6D42 /* z in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 9CE518FB57AE54FEC39E9F06 /* z */; settings = {}; };
 		A2ADD9DE00D7739372E9CD42 /* NDS2SFLoader.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 925CD3715596CDDDF5DF1128 /* NDS2SFLoader.cpp */; settings = {ATTRIBUTES = (); }; };
 		A477FCDC60990FB58AD2C546 /* HOSAScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 56DE08FF3DE1A4D6FAE58B1A /* HOSAScanner.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -110,6 +118,7 @@
 		B2B1004CCC74D7B9864EABED /* RareSnesScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 37336A5C519185C94E064F60 /* RareSnesScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		B4209F326CC2A7050B98C903 /* VGMMiscFile.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = BFF46FF7AD6444CC915001A4 /* VGMMiscFile.cpp */; settings = {ATTRIBUTES = (); }; };
 		B561E1BD68DB31C8535C3DF2 /* NCSFLoader.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = B6B80DF2858241DA7BA33811 /* NCSFLoader.cpp */; settings = {ATTRIBUTES = (); }; };
+		B6B768034A6F6D8927736E0D /* VGMCollListView.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 2625E925D2DAC426A643FDB2 /* VGMCollListView.cpp */; settings = {ATTRIBUTES = (); }; };
 		B6B7E3E266F07BA48B18BE56 /* datetime.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 775D41D6CAE3588816D7486A /* datetime.cpp */; settings = {ATTRIBUTES = (); }; };
 		B810BA04C1AA08A62D3B0DAE /* SF2File.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = A5908DBF027DCD73D5BD6512 /* SF2File.cpp */; settings = {ATTRIBUTES = (); }; };
 		B8BDB28BBF592807AC90E956 /* ScaleConversion.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8FC61BA909B95ADF96ADC42D /* ScaleConversion.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -121,6 +130,7 @@
 		CA09F5D6821E2CB52B430CA5 /* NDSInstrSet.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 1D8C9327B0FF309C84820F00 /* NDSInstrSet.cpp */; settings = {ATTRIBUTES = (); }; };
 		CB6B110579ED0FD3BB255346 /* VGMItem.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = D413684B554195533799B94C /* VGMItem.cpp */; settings = {ATTRIBUTES = (); }; };
 		CD1069AC85D4E50D21301A28 /* mainwindow.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 2C3D79E7939408B8763C4AB3 /* mainwindow.cpp */; settings = {ATTRIBUTES = (); }; };
+		CDEE11F2F6164D3D47FF69C9 /* qrc_resources.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = B6332CE6B3399115AD5D7562 /* qrc_resources.cpp */; settings = {ATTRIBUTES = (); }; };
 		D0F60462DF8A3CF8AA35021F /* KonamiGXScanner.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 5EED6C8C7F77FED0ADDBA809 /* KonamiGXScanner.cpp */; settings = {ATTRIBUTES = (); }; };
 		D3A5DD2C4F3626B51EEEE182 /* DataSeg.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 7369F190CF48537242D9C872 /* DataSeg.cpp */; settings = {ATTRIBUTES = (); }; };
 		D599800664CF31E8247D72D5 /* RareSnesInstr.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8884161B8E3492AFA0DC2485 /* RareSnesInstr.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -138,6 +148,7 @@
 		F12AEDD7DA29A7ECCD66A77D /* NinSnesSeq.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 20413A76CEF5CF5007E73522 /* NinSnesSeq.cpp */; settings = {ATTRIBUTES = (); }; };
 		F1A0B82A278BFE13D9A71A9A /* VGMTag.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 387DCE80DF116174A936738A /* VGMTag.cpp */; settings = {ATTRIBUTES = (); }; };
 		F4E75BFDA8AB136D0788F233 /* SNSFLoader.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 4400182C0EACD0EE83A32EAD /* SNSFLoader.cpp */; settings = {ATTRIBUTES = (); }; };
+		F7D9F2EAEE43CD98B783E903 /* VGMFileListView.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 120B859A61A2309C29062692 /* VGMFileListView.cpp */; settings = {ATTRIBUTES = (); }; };
 		F853AA0637181443F3852C2F /* FFT.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = ADC6493641E441C7FB8E3242 /* FFT.cpp */; settings = {ATTRIBUTES = (); }; };
 		F90C4E80F1AA0311C32519F9 /* Matcher.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 255465A08E5569125DA3E5EF /* Matcher.cpp */; settings = {ATTRIBUTES = (); }; };
 		F93AA609828F7E56AA74B33A /* RawFile.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 63494C0466375E757B3AF6EC /* RawFile.cpp */; settings = {ATTRIBUTES = (); }; };
@@ -151,6 +162,7 @@
 		0076E7A53FC1E369A42ED3F0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg.pri; sourceTree = SOURCE_ROOT; };
 		01885D244AF2999190B0C198 /* Root.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Root.cpp; path = main/Root.cpp; sourceTree = SOURCE_ROOT; };
 		0190452BDB3B2ABD6AD2FDE7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_gui.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_gui.pri; sourceTree = SOURCE_ROOT; };
+		024737378FB59289394E8156 /* moc_QtVGMRoot.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_QtVGMRoot.cpp; sourceTree = SOURCE_ROOT; };
 		0299D80E17D3952F34F3C0A4 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimedia_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_multimedia_private.pri; sourceTree = SOURCE_ROOT; };
 		030539F53FF4D8B7746CB099 /* OrgSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OrgSeq.h; path = main/formats/OrgSeq.h; sourceTree = SOURCE_ROOT; };
 		033F67E422C2C5AA00925107 /* unzip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = unzip.h; path = lib/minizip/unzip.h; sourceTree = SOURCE_ROOT; };
@@ -176,6 +188,7 @@
 		102E81CC7F392951B0C78FF4 /* zconf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = zconf.h; path = lib/zlib/include/zconf.h; sourceTree = SOURCE_ROOT; };
 		11457854D64BD0FD50FF5CB1 /* LogItem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = LogItem.cpp; path = main/LogItem.cpp; sourceTree = SOURCE_ROOT; };
 		1194A4A9AF2FFD9841102627 /* SynthFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SynthFile.cpp; path = main/SynthFile.cpp; sourceTree = SOURCE_ROOT; };
+		120B859A61A2309C29062692 /* VGMFileListView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMFileListView.cpp; path = ui/qt/VGMFileListView.cpp; sourceTree = SOURCE_ROOT; };
 		122B06E6533510920615D466 /* MP2kScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MP2kScanner.h; path = main/formats/MP2kScanner.h; sourceTree = SOURCE_ROOT; };
 		12E4D8C45B4DDC12B5D069CC /* RareSnesScanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RareSnesScanner.h; path = main/formats/RareSnesScanner.h; sourceTree = SOURCE_ROOT; };
 		14C88E80899B6CA4868E2E40 /* common.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = common.cpp; path = main/common.cpp; sourceTree = SOURCE_ROOT; };
@@ -214,6 +227,7 @@
 		251DF10414F9EBBFFFD40EDC /* tinyxmlerror.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxmlerror.cpp; path = lib/tinyxml/src/tinyxmlerror.cpp; sourceTree = SOURCE_ROOT; };
 		255465A08E5569125DA3E5EF /* Matcher.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Matcher.cpp; path = main/Matcher.cpp; sourceTree = SOURCE_ROOT; };
 		26120FBC11B917C9AE721ABB /* Loop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Loop.h; path = main/Loop.h; sourceTree = SOURCE_ROOT; };
+		2625E925D2DAC426A643FDB2 /* VGMCollListView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMCollListView.cpp; path = ui/qt/VGMCollListView.cpp; sourceTree = SOURCE_ROOT; };
 		2A1C461D755983BFCB337E2A /* TriAcePS1InstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = TriAcePS1InstrSet.cpp; path = main/formats/TriAcePS1InstrSet.cpp; sourceTree = SOURCE_ROOT; };
 		2A4D1AFEDD7A50D91333458A /* HOSAFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = HOSAFormat.h; path = main/formats/HOSAFormat.h; sourceTree = SOURCE_ROOT; };
 		2B56B8174D182F9C2567DEAC /* PS1Format.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PS1Format.h; path = main/formats/PS1Format.h; sourceTree = SOURCE_ROOT; };
@@ -223,6 +237,7 @@
 		2E304D1B4B081DA3268B9266 /* DataSeg.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DataSeg.h; path = main/DataSeg.h; sourceTree = SOURCE_ROOT; };
 		2E3307D91B4EE653D9978A14 /* SonyPS2Scanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SonyPS2Scanner.cpp; path = main/formats/SonyPS2Scanner.cpp; sourceTree = SOURCE_ROOT; };
 		2E4457B6F329CB377E7CB9D0 /* SNESDSP.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SNESDSP.h; path = main/formats/SNESDSP.h; sourceTree = SOURCE_ROOT; };
+		2EFC747F7E866D3A0A5E1EAF /* QtVGMRoot.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = QtVGMRoot.cpp; path = ui/qt/QtVGMRoot.cpp; sourceTree = SOURCE_ROOT; };
 		2F85FB0D31CC85D3FDBE77FD /* SonyPS2InstrSet.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2InstrSet.h; path = main/formats/SonyPS2InstrSet.h; sourceTree = SOURCE_ROOT; };
 		324108495A60BD72C5517AEB /* version.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = version.h; path = lib/fluidsynth/include/fluidsynth/version.h; sourceTree = SOURCE_ROOT; };
 		3327C009E005AE682FE8DB25 /* MAMELoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MAMELoader.h; path = main/loaders/MAMELoader.h; sourceTree = SOURCE_ROOT; };
@@ -236,6 +251,8 @@
 		37336A5C519185C94E064F60 /* RareSnesScanner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesScanner.cpp; path = main/formats/RareSnesScanner.cpp; sourceTree = SOURCE_ROOT; };
 		387DCE80DF116174A936738A /* VGMTag.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMTag.cpp; path = main/VGMTag.cpp; sourceTree = SOURCE_ROOT; };
 		38B354CB53C2E25E82BBB52E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang/qmake.conf */ = {isa = PBXFileReference; path = "/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang/qmake.conf"; sourceTree = SOURCE_ROOT; };
+		38F7E63FF344F927FE779821 /* moc_VGMCollListView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_VGMCollListView.cpp; sourceTree = SOURCE_ROOT; };
+		3A0B530AB438AAA0EBC91512 /* FluidSynth.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FluidSynth.framework; path = lib/fluidsynth/lib/FluidSynth.framework; refType = 4; sourceTree = SOURCE_ROOT; };
 		3A2DCDD146783EDC4C293628 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_svg_private.pri; sourceTree = SOURCE_ROOT; };
 		3A62D0DFE47ED4E48111D637 /* SquarePS2Scanner.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SquarePS2Scanner.h; path = main/formats/SquarePS2Scanner.h; sourceTree = SOURCE_ROOT; };
 		3A89ED40FB2F98CF770F34F3 /* zlib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = zlib.h; path = lib/zlib/include/zlib.h; sourceTree = SOURCE_ROOT; };
@@ -267,6 +284,7 @@
 		4C719AAFC333B51E2582C96E /* ioapi.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = ioapi.c; path = lib/minizip/ioapi.c; sourceTree = SOURCE_ROOT; };
 		50D37A73E5253E467BDADE9B /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_printsupport.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_printsupport.pri; sourceTree = SOURCE_ROOT; };
 		51C73CEA3E645A5DDF11474A /* MidiFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MidiFile.cpp; path = main/MidiFile.cpp; sourceTree = SOURCE_ROOT; };
+		52A0A805C3BA8D9771BAA605 /* MusicPlayer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = MusicPlayer.h; path = ui/qt/MusicPlayer.h; sourceTree = SOURCE_ROOT; };
 		536E856F5CA524A2F642A8C6 /* PSF1Loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSF1Loader.h; path = main/loaders/PSF1Loader.h; sourceTree = SOURCE_ROOT; };
 		53E0901A0B0D6AF9C8B43891 /* HeartBeatPS1Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = HeartBeatPS1Seq.cpp; path = main/formats/HeartBeatPS1Seq.cpp; sourceTree = SOURCE_ROOT; };
 		542F4766F9696493C50123B0 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_macextras_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_macextras_private.pri; sourceTree = SOURCE_ROOT; };
@@ -302,6 +320,7 @@
 		6774A22CB712CE4C71FE662F /* SPCLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SPCLoader.h; path = main/loaders/SPCLoader.h; sourceTree = SOURCE_ROOT; };
 		67F6415E36CE6638FD229DAF /* SquarePS2Seq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = SquarePS2Seq.cpp; path = main/formats/SquarePS2Seq.cpp; sourceTree = SOURCE_ROOT; };
 		69288B8E7C0C926205147D6E /* SeqNote.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SeqNote.h; path = main/SeqNote.h; sourceTree = SOURCE_ROOT; };
+		694E4BFE54528AC744074BCE /* RawFileListView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RawFileListView.cpp; path = ui/qt/RawFileListView.cpp; sourceTree = SOURCE_ROOT; };
 		697275EF2698DAE4C8AB1278 /* AkaoSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AkaoSeq.h; path = main/formats/AkaoSeq.h; sourceTree = SOURCE_ROOT; };
 		6A344C4CC3F9F9BA9B9C86DF /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc.pri; sourceTree = SOURCE_ROOT; };
 		6B795795CF32524146CE85B8 /* NinSnesInstr.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NinSnesInstr.h; path = main/formats/NinSnesInstr.h; sourceTree = SOURCE_ROOT; };
@@ -319,6 +338,7 @@
 		743C32546CBFABE42D7F9C27 /* common.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = common.h; path = main/common.h; sourceTree = SOURCE_ROOT; };
 		75718E3F6395BC6AB36B6DB7 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning.pri; sourceTree = SOURCE_ROOT; };
 		7674D49A043123494A12F384 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/macx-xcode/qmake.conf */ = {isa = PBXFileReference; path = "/usr/local/Cellar/qt5/5.3.1/mkspecs/macx-xcode/qmake.conf"; sourceTree = SOURCE_ROOT; };
+		768C30C2B5D1A62F0C1FCBA3 /* resources.qrc */ = {isa = PBXFileReference; lastKnownFileType = text; name = resources.qrc; path = ui/qt/resources/resources.qrc; sourceTree = SOURCE_ROOT; };
 		775D41D6CAE3588816D7486A /* datetime.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = datetime.cpp; path = main/datetime.cpp; sourceTree = SOURCE_ROOT; };
 		77736672BB1BB5066B866B2B /* RareSnesSeq.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesSeq.cpp; path = main/formats/RareSnesSeq.cpp; sourceTree = SOURCE_ROOT; };
 		77C5B489E7766E7FC3FDD738 /* VGMSamp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMSamp.cpp; path = main/VGMSamp.cpp; sourceTree = SOURCE_ROOT; };
@@ -345,6 +365,7 @@
 		87DD4CBA05505F97C178100D /* VGMInstrSet.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = VGMInstrSet.cpp; path = main/VGMInstrSet.cpp; sourceTree = SOURCE_ROOT; };
 		88251B74BEE968DC1C58467B /* SonyPS2Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SonyPS2Seq.h; path = main/formats/SonyPS2Seq.h; sourceTree = SOURCE_ROOT; };
 		8884161B8E3492AFA0DC2485 /* RareSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RareSnesInstr.cpp; path = main/formats/RareSnesInstr.cpp; sourceTree = SOURCE_ROOT; };
+		88A048081C9CCC6186C43754 /* RawFileListView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RawFileListView.h; path = ui/qt/RawFileListView.h; sourceTree = SOURCE_ROOT; };
 		8B48DB79B17DB3D7394F6C55 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designercomponents_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_designercomponents_private.pri; sourceTree = SOURCE_ROOT; };
 		8BFEB3EBE701C7F46727BDA9 /* tinyxmlparser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxmlparser.cpp; path = lib/tinyxml/src/tinyxmlparser.cpp; sourceTree = SOURCE_ROOT; };
 		8D0517802306B79FDDDD7CD7 /* KonamiGXFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = KonamiGXFormat.h; path = main/formats/KonamiGXFormat.h; sourceTree = SOURCE_ROOT; };
@@ -418,6 +439,7 @@
 		B3C179FECC687D887D09C357 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sql_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_sql_private.pri; sourceTree = SOURCE_ROOT; };
 		B44ABA0AD79E39C8EA263854 /* DLSFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = DLSFile.cpp; path = main/DLSFile.cpp; sourceTree = SOURCE_ROOT; };
 		B569A739A3E42193E7D22FCA /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_uitools.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_uitools.pri; sourceTree = SOURCE_ROOT; };
+		B6332CE6B3399115AD5D7562 /* qrc_resources.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = qrc_resources.cpp; sourceTree = SOURCE_ROOT; };
 		B677B2A79C4640C6FD724C2A /* NDS2SFLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDS2SFLoader.h; path = main/loaders/NDS2SFLoader.h; sourceTree = SOURCE_ROOT; };
 		B6B80DF2858241DA7BA33811 /* NCSFLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NCSFLoader.cpp; path = main/loaders/NCSFLoader.cpp; sourceTree = SOURCE_ROOT; };
 		B6B8E9F387B27B26EEFEA828 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkitwidgets_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_webkitwidgets_private.pri; sourceTree = SOURCE_ROOT; };
@@ -473,11 +495,15 @@
 		DB0FDD1A2B692B4805656015 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xmlpatterns.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_xmlpatterns.pri; sourceTree = SOURCE_ROOT; };
 		DB10201B769030CF50AFDA37 /* Options.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Options.h; path = main/Options.h; sourceTree = SOURCE_ROOT; };
 		DC94524D383457923C8B1B51 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = ui/qt/main.cpp; sourceTree = SOURCE_ROOT; };
+		DCE1FB8DE9FE1CF65E508430 /* VGMCollListView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMCollListView.h; path = ui/qt/VGMCollListView.h; sourceTree = SOURCE_ROOT; };
+		DD7841BBD05F604BE50A4359 /* QtVGMRoot.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QtVGMRoot.h; path = ui/qt/QtVGMRoot.h; sourceTree = SOURCE_ROOT; };
 		DD8A497834B3AC2B8F651A64 /* PSFFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PSFFile.h; path = main/PSFFile.h; sourceTree = SOURCE_ROOT; };
+		DDFBADEC37FC7383214C9185 /* MusicPlayer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MusicPlayer.cpp; path = ui/qt/MusicPlayer.cpp; sourceTree = SOURCE_ROOT; };
 		DE5E6D7F22C0F18786AA7491 /* NDSSeq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NDSSeq.h; path = main/formats/NDSSeq.h; sourceTree = SOURCE_ROOT; };
 		DEA29EF47CEF6E016D17A8B8 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_testlib.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_testlib.pri; sourceTree = SOURCE_ROOT; };
 		DEF1EA719EFABF4D8A224292 /* droparea.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = droparea.cpp; path = ui/qt/droparea.cpp; sourceTree = SOURCE_ROOT; };
 		DF37BFC5BA4709D3282D9859 /* moc_dropsitewindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_dropsitewindow.cpp; sourceTree = SOURCE_ROOT; };
+		DF623F338F6B095167EC1B2D /* moc_VGMFileListView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_VGMFileListView.cpp; sourceTree = SOURCE_ROOT; };
 		E06A9BBC284E154F823B983F /* BytePattern.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = BytePattern.cpp; path = main/BytePattern.cpp; sourceTree = SOURCE_ROOT; };
 		E08209955CBE410D714990C5 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_nfc_private.pri; sourceTree = SOURCE_ROOT; };
 		E0B3131E09FCD5756D2FFA9B /* QSoundFormat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = QSoundFormat.h; path = main/formats/QSoundFormat.h; sourceTree = SOURCE_ROOT; };
@@ -501,6 +527,7 @@
 		F212EFCE06DFDD97056BDE6D /* VGMRgn.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMRgn.h; path = main/VGMRgn.h; sourceTree = SOURCE_ROOT; };
 		F279CCD3D18BA56075D1AD4C /* QSoundInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = QSoundInstr.cpp; path = main/formats/QSoundInstr.cpp; sourceTree = SOURCE_ROOT; };
 		F2D5B17BD9A63C728FC9D0CE /* VGMTrans.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VGMTrans.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F31E1315BDFA6834E94FFA06 /* VGMFileListView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMFileListView.h; path = ui/qt/VGMFileListView.h; sourceTree = SOURCE_ROOT; };
 		F37E38E2C76B55B4CC64422F /* zip.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = zip.c; path = lib/minizip/zip.c; sourceTree = SOURCE_ROOT; };
 		F4E2445B758690BABE661477 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning_private.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_positioning_private.pri; sourceTree = SOURCE_ROOT; };
 		F50D2A5C807C148DF50C3B18 /* VGMMiscFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = VGMMiscFile.h; path = main/VGMMiscFile.h; sourceTree = SOURCE_ROOT; };
@@ -517,6 +544,7 @@
 		FC8729E56A13C21A6F3ECE43 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_help.pri */ = {isa = PBXFileReference; path = /usr/local/Cellar/qt5/5.3.1/mkspecs/modules/qt_lib_help.pri; sourceTree = SOURCE_ROOT; };
 		FDE4C096BD0EECA3EB3EF4AC /* TriAcePS1Seq.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TriAcePS1Seq.h; path = main/formats/TriAcePS1Seq.h; sourceTree = SOURCE_ROOT; };
 		FE25F9A168CC5984DA7264EA /* KonamiSnesInstr.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KonamiSnesInstr.cpp; path = main/formats/KonamiSnesInstr.cpp; sourceTree = SOURCE_ROOT; };
+		FE7B9860C317ABC6A358F138 /* moc_RawFileListView.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_RawFileListView.cpp; sourceTree = SOURCE_ROOT; };
 		FF9FEDBACE0EC85B1B2768A7 /* pch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = pch.h; path = ui/qt/pch.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -526,6 +554,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A16B459E34504315BC0B6D42 /* z in Link Binary With Libraries */,
+				626519FCE7104F4C7E994554 /* FluidSynth.framework in Link Binary With Libraries */,
 				3A7FC125CA6A5A3B108A30F0 /* QtWidgets.framework in Link Binary With Libraries */,
 				939E61E1D6EDB28D7C8F2A3C /* QtGui.framework in Link Binary With Libraries */,
 				5A8BFCC2D3E074FA2C64674C /* QtCore.framework in Link Binary With Libraries */,
@@ -538,14 +567,43 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		04C756FFCC2C6F0DF976EDDB /* qt */ = {
+			isa = PBXGroup;
+			children = (
+				2DA99163600DAE6AA784538C /* resources */,
+			);
+			name = qt;
+			sourceTree = "<Group>";
+		};
+		0ED04824BA49F95900DC9D05 /* resources */ = {
+			isa = PBXGroup;
+			children = (
+				768C30C2B5D1A62F0C1FCBA3 /* resources.qrc */,
+			);
+			name = resources;
+			sourceTree = "<Group>";
+		};
 		25B08E2869634E9BCBA333A2 /* Generated Sources */ = {
 			isa = PBXGroup;
 			children = (
+				B6332CE6B3399115AD5D7562 /* qrc_resources.cpp */,
 				721C1DE06B327393E3F7D7E1 /* moc_mainwindow.cpp */,
 				6C2427088D2EDE4ADA770BC1 /* moc_droparea.cpp */,
 				DF37BFC5BA4709D3282D9859 /* moc_dropsitewindow.cpp */,
+				024737378FB59289394E8156 /* moc_QtVGMRoot.cpp */,
+				DF623F338F6B095167EC1B2D /* moc_VGMFileListView.cpp */,
+				FE7B9860C317ABC6A358F138 /* moc_RawFileListView.cpp */,
+				38F7E63FF344F927FE779821 /* moc_VGMCollListView.cpp */,
 			);
 			name = "Generated Sources";
+			sourceTree = "<Group>";
+		};
+		2DA99163600DAE6AA784538C /* resources */ = {
+			isa = PBXGroup;
+			children = (
+				768C30C2B5D1A62F0C1FCBA3 /* resources.qrc */,
+			);
+			name = resources;
 			sourceTree = "<Group>";
 		};
 		2EB56BE3C2D93CDAB0C52E67 /* Sources */ = {
@@ -597,6 +655,14 @@
 				6774A22CB712CE4C71FE662F /* SPCLoader.h */,
 			);
 			name = loaders;
+			sourceTree = "<Group>";
+		};
+		56246E9071B5500122DD96F9 /* ui */ = {
+			isa = PBXGroup;
+			children = (
+				9665D6E56D590D7B3A9BC189 /* qt */,
+			);
+			name = ui;
 			sourceTree = "<Group>";
 		};
 		585C8033A0C93CD1E165E8CE /* main */ = {
@@ -808,6 +874,7 @@
 				38B354CB53C2E25E82BBB52E /* /usr/local/Cellar/qt5/5.3.1/mkspecs/macx-clang/qmake.conf */,
 				7674D49A043123494A12F384 /* /usr/local/Cellar/qt5/5.3.1/mkspecs/macx-xcode/qmake.conf */,
 				AB745978DF0F41D1801ABDA6 /* .qmake.stash */,
+				97B76B1EEC49905774B59F5B /* ui */,
 			);
 			name = "Supporting Files";
 			sourceTree = "<Group>";
@@ -822,10 +889,35 @@
 			name = tinyxml;
 			sourceTree = "<Group>";
 		};
+		87DF60DE337FB58864343E39 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				56246E9071B5500122DD96F9 /* ui */,
+			);
+			name = Resources;
+			sourceTree = "<Group>";
+		};
+		9665D6E56D590D7B3A9BC189 /* qt */ = {
+			isa = PBXGroup;
+			children = (
+				0ED04824BA49F95900DC9D05 /* resources */,
+			);
+			name = qt;
+			sourceTree = "<Group>";
+		};
+		97B76B1EEC49905774B59F5B /* ui */ = {
+			isa = PBXGroup;
+			children = (
+				04C756FFCC2C6F0DF976EDDB /* qt */,
+			);
+			name = ui;
+			sourceTree = "<Group>";
+		};
 		AF39DD055C3EF8226FBE929D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				9CE518FB57AE54FEC39E9F06 /* z */,
+				3A0B530AB438AAA0EBC91512 /* FluidSynth.framework */,
 				AFCECA1569ECD8FC3A042C50 /* QtWidgets.framework */,
 				1C68D2CCC1918B9AFA3A16E5 /* QtGui.framework */,
 				A70B73ADEFAAFE0B8A57A97E /* QtCore.framework */,
@@ -1009,6 +1101,7 @@
 				2EB56BE3C2D93CDAB0C52E67 /* Sources */,
 				25B08E2869634E9BCBA333A2 /* Generated Sources */,
 				74B182DB50CB5611B5C1C297 /* Supporting Files */,
+				87DF60DE337FB58864343E39 /* Resources */,
 				AF39DD055C3EF8226FBE929D /* Frameworks */,
 				FE0A091FDBFB3E9C31B7A1BD /* Products */,
 			);
@@ -1058,11 +1151,21 @@
 				DEF1EA719EFABF4D8A224292 /* droparea.cpp */,
 				33C87B1DBBB9E2ADE751CEA8 /* dropsitewindow.cpp */,
 				4630804AD9F2A14787232699 /* osdepend.cpp */,
+				2EFC747F7E866D3A0A5E1EAF /* QtVGMRoot.cpp */,
+				120B859A61A2309C29062692 /* VGMFileListView.cpp */,
+				694E4BFE54528AC744074BCE /* RawFileListView.cpp */,
+				2625E925D2DAC426A643FDB2 /* VGMCollListView.cpp */,
+				DDFBADEC37FC7383214C9185 /* MusicPlayer.cpp */,
 				E222ACA2E84FDACABF36DED6 /* mainwindow.h */,
 				91DF15B49972C051F99BAEB1 /* droparea.h */,
 				D7FD8C5897C7EF8D85EFE323 /* dropsitewindow.h */,
 				FF9FEDBACE0EC85B1B2768A7 /* pch.h */,
 				AC869340C7CF6260B5C457AC /* osdepend.h */,
+				DD7841BBD05F604BE50A4359 /* QtVGMRoot.h */,
+				F31E1315BDFA6834E94FFA06 /* VGMFileListView.h */,
+				88A048081C9CCC6186C43754 /* RawFileListView.h */,
+				DCE1FB8DE9FE1CF65E508430 /* VGMCollListView.h */,
+				52A0A805C3BA8D9771BAA605 /* MusicPlayer.h */,
 			);
 			name = qt;
 			sourceTree = "<Group>";
@@ -1246,9 +1349,19 @@
 				264B5A22F11ED5B9C5D4D523 /* mztools.c in Compile Sources */,
 				C5DA63A32A7D7EE7B914456D /* unzip.c in Compile Sources */,
 				7E406320789429F4C21F75B5 /* zip.c in Compile Sources */,
+				53D6578F8FC5E00AC255E71F /* QtVGMRoot.cpp in Compile Sources */,
+				F7D9F2EAEE43CD98B783E903 /* VGMFileListView.cpp in Compile Sources */,
+				A083D02C294FB83D11CC8378 /* RawFileListView.cpp in Compile Sources */,
+				B6B768034A6F6D8927736E0D /* VGMCollListView.cpp in Compile Sources */,
+				0CAE5EAB709C0CF97646D960 /* MusicPlayer.cpp in Compile Sources */,
+				CDEE11F2F6164D3D47FF69C9 /* qrc_resources.cpp in Compile Sources */,
 				2F9983ACB124B74F32685F47 /* moc_mainwindow.cpp in Compile Sources */,
 				09A0D75C1B406A4E2F9158E9 /* moc_droparea.cpp in Compile Sources */,
 				7363F475358C4AC90A7495E5 /* moc_dropsitewindow.cpp in Compile Sources */,
+				4C10315C77E6D529D1323577 /* moc_QtVGMRoot.cpp in Compile Sources */,
+				3581B44F962832CE35D09BB0 /* moc_VGMFileListView.cpp in Compile Sources */,
+				3A2F3CA20217D052E8528F58 /* moc_RawFileListView.cpp in Compile Sources */,
+				41DE7D46CD43A6653C1A8668 /* moc_VGMCollListView.cpp in Compile Sources */,
 			);
 			name = "Compile Sources";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1274,6 +1387,7 @@
 				FRAMEWORK_SEARCH_PATHS = (
 					/usr/local/Cellar/qt5/5.3.1/lib,
 					/usr/local/Cellar/qt5/5.3.1/lib,
+					/Users/mike/vgmtrans/src/lib/fluidsynth/lib/,
 				);
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
@@ -1301,6 +1415,7 @@
 				LDPLUSPLUS = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++";
 				LIBRARY_SEARCH_PATHS = (
 					/Users/mike/vgmtrans/src/lib/zlib/lib/,
+					/Users/mike/vgmtrans/src/lib/fluidsynth/lib/,
 					/usr/local/Cellar/qt5/5.3.1/lib,
 					/System/Library/Frameworks/,
 				);
@@ -1335,6 +1450,7 @@
 					"-stdlib=libc++",
 					"-F/usr/local/Cellar/qt5/5.3.1/lib",
 					"-L/Users/mike/vgmtrans/src/lib/zlib/lib/",
+					"-F/Users/mike/vgmtrans/src/lib/fluidsynth/lib/",
 				);
 				PRODUCT_NAME = VGMTrans;
 				QT_LIBRARY_SUFFIX = "";
@@ -1354,6 +1470,7 @@
 				FRAMEWORK_SEARCH_PATHS = (
 					/usr/local/Cellar/qt5/5.3.1/lib,
 					/usr/local/Cellar/qt5/5.3.1/lib,
+					/Users/mike/vgmtrans/src/lib/fluidsynth/lib/,
 				);
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -1382,6 +1499,7 @@
 				LDPLUSPLUS = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++";
 				LIBRARY_SEARCH_PATHS = (
 					/Users/mike/vgmtrans/src/lib/zlib/lib/,
+					/Users/mike/vgmtrans/src/lib/fluidsynth/lib/,
 					/usr/local/Cellar/qt5/5.3.1/lib,
 					/System/Library/Frameworks/,
 				);
@@ -1416,6 +1534,7 @@
 					"-stdlib=libc++",
 					"-F/usr/local/Cellar/qt5/5.3.1/lib",
 					"-L/Users/mike/vgmtrans/src/lib/zlib/lib/",
+					"-F/Users/mike/vgmtrans/src/lib/fluidsynth/lib/",
 				);
 				PRODUCT_NAME = VGMTrans;
 				QT_LIBRARY_SUFFIX = "";
