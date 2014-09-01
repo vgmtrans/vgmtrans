@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "3DC11720AFE487EC0791833D"
-               BuildableName = "VGMTrans.app"
+               BuildableName = "Qt Preprocess"
                BlueprintName = "Qt Preprocess"
                ReferencedContainer = "container:VGMTrans.xcodeproj">
             </BuildableReference>
