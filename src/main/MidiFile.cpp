@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "MidiFile.h"
 #include "VGMSeq.h"
 #include "common.h"

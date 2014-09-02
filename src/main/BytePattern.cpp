@@ -1,9 +1,7 @@
 // Byte pattern class for flexible byte sequence search
 // Heavily inspired by SigScan at GameDeception.net
 
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 
 #include <stdlib.h>
 //#include <memory.h>

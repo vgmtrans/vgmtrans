@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "../VGMSamp.h"
 #include "../VGMRgn.h"
 #include "../ScaleConversion.h"

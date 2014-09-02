@@ -1,9 +1,7 @@
 // The following sequence analysis code is based on the work of Sound Tester 774 from 2ch.net,
 // author of so2mml. The code is based on his write-up of the format specifications.  Many thanks to him.
 
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "TriAcePS1Seq.h"
 #include "TriAcePS1Format.h"
 #include "ScaleConversion.h"

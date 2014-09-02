@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "Format.h"
 #include "Matcher.h"
 #include "VGMColl.h"

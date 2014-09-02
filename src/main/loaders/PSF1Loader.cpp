@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "PSFFile.h"
 #include "PSF1Loader.h"
 #include "Root.h"

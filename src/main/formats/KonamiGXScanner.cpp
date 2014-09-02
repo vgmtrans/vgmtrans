@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "KonamiGXScanner.h"
 #include "KonamiGXSeq.h"
 #include "../loaders/MAMELoader.h"

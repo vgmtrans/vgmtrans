@@ -2,9 +2,7 @@
 // Most of the code below is based on his work.
 // Also, thanks to Antires for his ADPCM decompression routine.
 
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "PSXSPU.h"
 #include "../DLSFile.h"
 #include "../RawFile.h"

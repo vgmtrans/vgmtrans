@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "HeartBeatPS1SeqScanner.h"
 #include "HeartBeatPS1Format.h"
 #include "HeartBeatPS1Seq.h"

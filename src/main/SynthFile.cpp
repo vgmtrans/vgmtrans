@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "SynthFile.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"

@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "FFTFormat.h"
 #include "FFTInstr.h"
 #include "Vab.h"
