@@ -1,7 +1,5 @@
 
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "SeqVoiceAllocator.h"
 
 SeqVoiceAllocator::SeqVoiceAllocator() :

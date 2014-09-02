@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "RareSnesSeq.h"
 #include "RareSnesFormat.h"
 #include "ScaleConversion.h"

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pch.h"
 #include <deque>
 
 //DataSeg is a very simple class for allocating a block of data with a

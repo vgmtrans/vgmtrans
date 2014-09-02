@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "SquarePS2.h"
 #include "SquarePS2Format.h"
 

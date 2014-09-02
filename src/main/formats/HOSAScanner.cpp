@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "HOSAScanner.h"
 #include "HOSA.h"
 #include "HOSAInstr.h"

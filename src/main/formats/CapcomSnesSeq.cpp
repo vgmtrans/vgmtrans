@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "CapcomSnesSeq.h"
 #include "CapcomSnesFormat.h"
 #include "ScaleConversion.h"

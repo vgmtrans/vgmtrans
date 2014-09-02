@@ -7,9 +7,7 @@
  * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "MP2kScanner.h"
 #include "MP2k.h"
 

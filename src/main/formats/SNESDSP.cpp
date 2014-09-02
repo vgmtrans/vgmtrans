@@ -1,8 +1,6 @@
 // Many thanks to bsnes and snes9x.
 
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "SNESDSP.h"
 #include "RawFile.h"
 #include "Root.h"

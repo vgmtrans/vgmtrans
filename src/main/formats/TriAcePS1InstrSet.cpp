@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "TriAcePS1InstrSet.h"
 #include "TriAcePS1Format.h"
 #include "VGMRgn.h"

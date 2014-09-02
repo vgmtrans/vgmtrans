@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "VGMItem.h"
 #include "RawFile.h"
 #include "VGMFile.h"

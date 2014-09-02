@@ -1,9 +1,7 @@
 // If you want to convert it without losing any events,
 // check seqq2mid tool created by loveemu <https://code.google.com/p/loveemu/>
 
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "HeartBeatPS1Seq.h"
 #include "HeartBeatPS1Format.h"
 

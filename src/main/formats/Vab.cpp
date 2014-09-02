@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "Vab.h"
 #include "Format.h"			//include PS1-specific format header file when it is ready
 #include "PSXSpu.h"

@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "TaitoF3Scanner.h"
 #include "TaitoF3Format.h"
 //#include "TaitoF3Seq.h"

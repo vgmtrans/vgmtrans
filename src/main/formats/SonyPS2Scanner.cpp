@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "SonyPS2Scanner.h"
 #include "SonyPS2Seq.h"
 #include "SonyPS2InstrSet.h"

@@ -1,6 +1,4 @@
-#ifdef _WIN32
-	#include "stdafx.h"
-#endif
+#include "pch.h"
 #include "PSFFile.h"
 #include "SNSFLoader.h"
 #include "Root.h"
