@@ -22,5 +22,4 @@
     #include <ctype.h>
 #endif
 
-// TINYXML
 #define TIXML_USE_STL

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.4)
 project(vgmtrans)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
 # Tell CMake to run moc when necessary:
 set(CMAKE_AUTOMOC ON)
 # As moc files are generated in the binary dir, tell CMake
@@ -16,8 +18,6 @@ add_definitions(${Qt5Widgets_DEFINITIONS})
 # Executables fail to build with Qt 5 in the default configuration
 # without -fPIE. We add that here.
 set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
-
-
 
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -322,7 +322,10 @@ set(SOURCE_FILES
     ui/qt/pch.h
 )
 
-add_executable(vgmtrans ${SOURCE_FILES})
+
+qt5_add_resources(UI_RESOURCES ui/qt/resources/resources.qrc)
+
+add_executable(vgmtrans ${SOURCE_FILES} ${UI_RESOURCES})
 
 # The Qt5Widgets_LIBRARIES variable also includes QtGui and QtCore
 target_link_libraries(vgmtrans ${Qt5Widgets_LIBRARIES})
@@ -333,13 +336,34 @@ if (ZLIB_FOUND)
   target_link_libraries (vgmtrans ${ZLIB_LIBRARIES})
 endif (ZLIB_FOUND)
 
-find_package (ZLIB)
-if (ZLIB_FOUND)
-  include_directories(${ZLIB_INCLUDE_DIRS})
-  target_link_libraries (vgmtrans ${ZLIB_LIBRARIES})
-endif (ZLIB_FOUND)
+find_package(GLIB REQUIRED)
+include_directories(${GLIB_INCLUDE_DIRS})
+#set(LIBS ${LIBS} ${GLIB_LIBRARIES})
+target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
+
+find_package(READLINE REQUIRED)
+include_directories(${READLINE_INCLUDE_DIRS})
+#set(LIBS ${LIBS} ${GLIB_LIBRARIES})
+target_link_libraries(vgmtrans ${READLINE_LIBRARIES})
+
+IF (APPLE)
+   FIND_LIBRARY(COREMIDI_LIBRARY CoreMIDI)
+   FIND_LIBRARY(COREAUDIO_LIBRARY CoreAudio)
+   FIND_LIBRARY(AUDIOUNIT_LIBRARY AudioUnit)
+   FIND_LIBRARY(COREFOUNDATION_LIBRARY CoreFoundation)
+   FIND_LIBRARY(CORESERVICES_LIBRARY CoreServices)
+   TARGET_LINK_LIBRARIES(vgmtrans
+    ${COREMIDI_LIBRARY}
+    ${COREAUDIO_LIBRARY}
+    ${AUDIOUNIT_LIBRARY}
+    ${COREFOUNDATION_LIBRARY}
+    ${CORESERVICES_LIBRARY}
+    )
+ENDIF (APPLE)
+
+add_definitions(-DTIXML_USE_STL)
 
 
-find_library (fluidsynth PATHS lib/fluidsynth/lib)
+#find_library (fluidsynth PATHS lib/fluidsynth/lib)
 #link_directories(lib/fluidsynth/lib)
-target_link_libraries(vgmtrans libfluidsynth.a)
+target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/fluidsynth/lib/libfluidsynth.a)
