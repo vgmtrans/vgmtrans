@@ -34,12 +34,12 @@ How to compile it
 Please read VGMTrans wiki page:
 <https://github.com/vgmtrans/vgmtrans/wiki/Build-Instructions>
 
-Contributers
+Contributors
 ------------
 
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
-- Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAacePS1 format and such.
+- Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
 
 ### Special Thanks
 
