@@ -20,7 +20,6 @@ TriAcePS1Seq::TriAcePS1Seq(RawFile* file, uint32_t offset)
 	UseLinearAmplitudeScale();
 	UseReverb();
 	AlwaysWriteInitialPitchBendRange(12, 0);
-	bLoadTrackByTrack = true;
 }
 
 TriAcePS1Seq::~TriAcePS1Seq()

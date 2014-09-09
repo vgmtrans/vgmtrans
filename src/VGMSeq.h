@@ -83,7 +83,18 @@ public:
 	bool bAlwaysWriteInitialReverb;
 	bool bAlwaysWriteInitialPitchBendRange;
 	bool bAllowDiscontinuousTrackData;
-	bool bLoadTrackByTrack;
+
+	// True if each tracks in a sequence needs to be loaded simultaneously in tick by tick, as the real music player does.
+	// Pros:
+	//   - It allows to share some variables between two or more tracks.
+	//   - It might be useful when you want to emulate envelopes like vibrato for every ticks.
+	// Cons:
+	//   - It prohibits that each tracks have different timings (delta time).
+	//   - It is not very suitable for formats like SMF format 1 (multitrack, delta time first format),
+	//     because a track must pause the parsing every time a parser encounters to delta time event.
+	//     It can be used anyway, but it is useless and annoys you, in most cases.
+	bool bLoadTickByTick;
+
 	uint8_t initialVol;
 	uint8_t initialExpression;
 	uint8_t initialReverb;

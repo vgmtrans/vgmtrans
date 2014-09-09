@@ -163,7 +163,7 @@ void SeqTrack::SetTime(uint32_t NewDelta)
 
 void SeqTrack::AddTime(uint32_t AddDelta)
 {
-	if (!parentSeq->bLoadTrackByTrack)
+	if (parentSeq->bLoadTickByTick)
 	{
 		deltaTime += AddDelta;
 	}

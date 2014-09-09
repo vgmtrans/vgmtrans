@@ -33,6 +33,7 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile* file, CapcomSnesVersion ver, uint32_t seqd
 {
 	name = newName;
 
+	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
 
 	double volumeScale;

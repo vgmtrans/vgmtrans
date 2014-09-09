@@ -38,6 +38,7 @@ RareSnesSeq::RareSnesSeq(RawFile* file, RareSnesVersion ver, uint32_t seqdataOff
 {
 	name = newName;
 
+	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
 	bWriteInitialTempo = true;
 

@@ -26,7 +26,7 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   bAlwaysWriteInitialReverb(false),
   bAlwaysWriteInitialPitchBendRange(false),
   bAllowDiscontinuousTrackData(false),
-  bLoadTrackByTrack(false),
+  bLoadTickByTick(false),
   initialVol(100),					//GM standard (dls1 spec p16)
   initialExpression(127),			//''
   initialReverb(40),				//GM standard
@@ -176,7 +176,7 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 
 	// load all tracks
 	bool succeeded = true;
-	if (!bLoadTrackByTrack)
+	if (bLoadTickByTick)
 	{
 		long time = 0;
 		while (HasActiveTracks())
