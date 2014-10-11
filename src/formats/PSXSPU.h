@@ -367,6 +367,7 @@ public:
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 	static PSXSampColl* SearchForPSXADPCM (RawFile* file, const std::string& format);
+	static std::vector<PSXSampColl*>& SearchForPSXADPCMs (RawFile* file, const std::string& format);
 
 protected:
 	std::vector<SizeOffsetPair> vagLocations;
