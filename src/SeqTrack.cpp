@@ -826,20 +826,20 @@ void SeqTrack::InsertBreath(uint32_t offset, uint32_t length, uint8_t depth, uin
 		pMidiTrack->InsertBreath(channel, depth, absTime);
 }
 
-void SeqTrack::AddSustainEvent(uint32_t offset, uint32_t length, bool bOn, const wchar_t* sEventName)
+void SeqTrack::AddSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
-		AddEvent(new SustainSeqEvent(this, bOn, offset, length, sEventName));
+		AddEvent(new SustainSeqEvent(this, depth, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->AddSustain(channel, bOn);
+		pMidiTrack->AddSustain(channel, depth);
 }
 
-void SeqTrack::InsertSustainEvent(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const wchar_t* sEventName)
+void SeqTrack::InsertSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
-		AddEvent(new SustainSeqEvent(this, bOn, offset, length, sEventName));
+		AddEvent(new SustainSeqEvent(this, depth, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->InsertSustain(channel, bOn, absTime);
+		pMidiTrack->InsertSustain(channel, depth, absTime);
 }
 
 void SeqTrack::AddPortamento(uint32_t offset, uint32_t length, bool bOn, const wchar_t* sEventName)

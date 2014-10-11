@@ -432,7 +432,7 @@ public:
 	BreathSeqEvent(SeqTrack* pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0, const wchar_t* name = L"");
 	virtual ~BreathSeqEvent(void) {}
 	virtual EventType GetEventType() { return EVENTTYPE_BREATH; }
-	DESCRIPTION(L"Depth: " << (int)depth)
+	DESCRIPTION(L"Breath: " << (int)depth)
 
 public:
 	uint8_t depth;
@@ -446,13 +446,13 @@ class SustainSeqEvent :
 	public SeqEvent
 {
 public:
-	SustainSeqEvent(SeqTrack* pTrack, bool bSustain, uint32_t offset = 0, uint32_t length = 0, const wchar_t* name = L"");
+	SustainSeqEvent(SeqTrack* pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0, const wchar_t* name = L"");
 	virtual ~SustainSeqEvent(void) {}
 	virtual EventType GetEventType() { return EVENTTYPE_SUSTAIN; }
-	DESCRIPTION(L"Sustain Pedal: " << (bOn)?L"On":L"Off")
+	DESCRIPTION(L"Sustain Pedal: " << (int)depth);
 
 public:
-	bool bOn;
+	uint8_t depth;
 };
 
 //  ******************

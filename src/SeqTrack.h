@@ -108,8 +108,8 @@ public:
 	void AddBreath(uint32_t offset, uint32_t length, uint8_t depth, const wchar_t* sEventName = L"Breath Depth");
 	void InsertBreath(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const wchar_t* sEventName = L"Breath Depth");
 
-	void AddSustainEvent(uint32_t offset, uint32_t length, bool bOn, const wchar_t* sEventName = L"Sustain");
-	void InsertSustainEvent(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const wchar_t* sEventName = L"Sustain");
+	void AddSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, const wchar_t* sEventName = L"Sustain");
+	void InsertSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const wchar_t* sEventName = L"Sustain");
 	void AddPortamento(uint32_t offset, uint32_t length, bool bOn, const wchar_t* sEventName = L"Portamento");
 	void AddPortamentoNoItem(bool bOn);
 	void InsertPortamento(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const wchar_t* sEventName = L"Portamento");

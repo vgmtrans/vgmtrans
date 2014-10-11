@@ -215,7 +215,7 @@ bool TriAcePS1Track::ReadEvent(void)
 			{
 				event_dur = GetByte(curOffset++);
 				uint8_t val = GetByte(curOffset++);
-				AddSustainEvent(beginOffset, curOffset-beginOffset, (val>0));
+				AddSustainEvent(beginOffset, curOffset-beginOffset, val);
 			}
 			break;
 

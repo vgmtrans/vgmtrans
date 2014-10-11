@@ -302,6 +302,16 @@ void MidiTrack::InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, 
 	aEvents.push_back(newEvent);
 }*/
 
+void MidiTrack::AddControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), controllerNum, theDataByte));
+}
+
+void MidiTrack::InsertControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte, uint32_t absTime)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, controllerNum, theDataByte));
+}
+
 void MidiTrack::AddVol(uint8_t channel, uint8_t vol)
 {
 	aEvents.push_back(new VolumeEvent(this, channel, GetDelta(), vol));
@@ -335,14 +345,14 @@ void MidiTrack::InsertExpression(uint8_t channel, uint8_t expression, uint32_t a
 	aEvents.push_back(new ExpressionEvent(this, channel, absTime, expression));
 }
 
-void MidiTrack::AddSustain(uint8_t channel, bool bOn)
+void MidiTrack::AddSustain(uint8_t channel, uint8_t depth)
 {
-	aEvents.push_back(new SustainEvent(this, channel, GetDelta(), bOn));
+	aEvents.push_back(new SustainEvent(this, channel, GetDelta(), depth));
 }
 
-void MidiTrack::InsertSustain(uint8_t channel, bool bOn, uint32_t absTime)
+void MidiTrack::InsertSustain(uint8_t channel, uint8_t depth, uint32_t absTime)
 {
-	aEvents.push_back(new SustainEvent(this, channel, absTime, bOn));
+	aEvents.push_back(new SustainEvent(this, channel, absTime, depth));
 }
 
 void MidiTrack::AddPortamento(uint8_t channel, bool bOn)

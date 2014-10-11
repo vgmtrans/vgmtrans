@@ -193,8 +193,8 @@ BreathSeqEvent::BreathSeqEvent(SeqTrack* pTrack, uint8_t theDepth, uint32_t offs
 // SustainSeqEvent
 // ***************
 
-SustainSeqEvent::SustainSeqEvent(SeqTrack* pTrack, bool bSustain, uint32_t offset, uint32_t length, const wchar_t* name)
-: SeqEvent(pTrack, offset, length, name, CLR_SUSTAIN), bOn(bSustain)
+SustainSeqEvent::SustainSeqEvent(SeqTrack* pTrack, uint8_t theDepth, uint32_t offset, uint32_t length, const wchar_t* name)
+: SeqEvent(pTrack, offset, length, name, CLR_SUSTAIN), depth(theDepth)
 {}
 
 // ******************

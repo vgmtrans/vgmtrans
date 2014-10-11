@@ -77,6 +77,8 @@ public:
 	void InsertNoteOff(uint8_t channel, int8_t key, uint32_t absTime);
 	void AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
 	void InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime);
+	void AddControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte); // This function should be used for only redirection output of MIDI-like formats
+	void InsertControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte, uint32_t absTime); // This function should be used for only redirection output of MIDI-like formats
 	//void AddVolMarker(uint8_t channel, uint8_t vol, int8_t priority = PRIORITY_HIGHER);
 	//void InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, int8_t priority = PRIORITY_HIGHER);
 	void AddVol(uint8_t channel, uint8_t vol/*, int8_t priority = PRIORITY_MIDDLE*/);
@@ -93,8 +95,8 @@ public:
 	void InsertModulation(uint8_t channel, uint8_t depth, uint32_t absTime);
 	void AddBreath(uint8_t channel, uint8_t depth);
 	void InsertBreath(uint8_t channel, uint8_t depth, uint32_t absTime);
-	void AddSustain(uint8_t channel, bool bOn);
-	void InsertSustain(uint8_t channel, bool bOn, uint32_t absTime);
+	void AddSustain(uint8_t channel, uint8_t depth);
+	void InsertSustain(uint8_t channel, uint8_t depth, uint32_t absTime);
 	void AddPortamento(uint8_t channel, bool bOn);
 	void InsertPortamento(uint8_t channel, bool bOn, uint32_t absTime);
 	void AddPortamentoTime(uint8_t channel, uint8_t time);
@@ -303,8 +305,8 @@ class SustainEvent
 	: public ControllerEvent
 {
 public:
-	SustainEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t bOn) 
-		: ControllerEvent(prntTrk, channel, absoluteTime, 64, (bOn) ? 0x7F : 0, PRIORITY_MIDDLE) 
+	SustainEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t depth) 
+		: ControllerEvent(prntTrk, channel, absoluteTime, 64, depth, PRIORITY_MIDDLE) 
 	{}
 	virtual MidiEventType GetEventType() { return MIDIEVENT_SUSTAIN; }
 };

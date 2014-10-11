@@ -206,7 +206,7 @@ bool BGMTrack::ReadEvent(void)
 
 	case 0x3C :		//Sustain Pedal
 		value1 = GetByte(curOffset++);
-		AddSustainEvent(beginOffset, curOffset-beginOffset, (value1>0));
+		AddSustainEvent(beginOffset, curOffset-beginOffset, value1);
 		break;
 
 	case 0x40 :		//found in ffxi 208.bgm couple times
