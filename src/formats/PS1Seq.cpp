@@ -28,18 +28,27 @@ bool PS1Seq::GetHeaderInfo(void)
 	if (numer == 0 || numer > 32)				//sanity check
 		return false;
 
+	VGMHeader* seqHeader = VGMSeq::AddHeader(offset(), 11, L"Sequence Header");
+	seqHeader->AddSimpleItem(offset(), 4, L"ID");
+	seqHeader->AddSimpleItem(offset()+0x04, 4, L"Version");
+	seqHeader->AddSimpleItem(offset()+0x08, 2, L"Resolution of quarter note");
+	seqHeader->AddTempo(offset()+0x0A, 3);
+	seqHeader->AddSig(offset()+0x0D, 2); // Rhythm (Numerator) and Rhythm (Denominator) (2^n)
+
 	if (GetByte(offset()+0xF) == 0 && GetByte(offset()+0x10) == 0)
 	{
 		SetEventsOffset(offset() + 0x0F + 4);
 		PS1Seq* newPS1Seq = new PS1Seq(rawfile, offset()+GetShortBE(offset()+0x11)+0x13 - 6);
-		if (!newPS1Seq->LoadVGMFile())
+		if (!newPS1Seq->LoadVGMFile()) {
 			delete newPS1Seq;
+		}
 		//short relOffset = (short)GetShortBE(curOffset);
 		//AddGenericEvent(beginOffset, 4, L"Jump Relative", NULL, BG_CLR_PINK);
 		//curOffset += relOffset;
 	}
-	else
+	else {
 		SetEventsOffset(offset() + 0x0F);
+	}
 	
 	return true;
 }

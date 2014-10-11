@@ -131,6 +131,7 @@ public:
 	void AddTempoBPMNoItem(double bpm);
 	void AddTempoBPMSlide(uint32_t offset, uint32_t length, uint32_t dur, double targBPM, const wchar_t* sEventName = L"Tempo Slide");
 	void AddTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter,const wchar_t* sEventName = L"Time Signature");
+	void AddTimeSigNoItem(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter);
 	void InsertTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter,uint32_t absTime,const wchar_t* sEventName = L"Time Signature");
 	bool AddEndOfTrack(uint32_t offset, uint32_t length, const wchar_t* sEventName = L"Track End");
 	bool AddEndOfTrackNoItem();

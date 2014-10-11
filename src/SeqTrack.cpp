@@ -1034,7 +1034,12 @@ void SeqTrack::AddTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8
 	{
 		AddEvent(new TimeSigSeqEvent(this, numer, denom, ticksPerQuarter, offset, length, sEventName));
 	}
-	else if (readMode == READMODE_CONVERT_TO_MIDI)
+	AddTimeSigNoItem(numer, denom, ticksPerQuarter); 
+}
+
+void SeqTrack::AddTimeSigNoItem(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		MidiTrack* pFirstMidiTrack = parentSeq->GetFirstMidiTrack();
 		pFirstMidiTrack->AddTimeSig(numer, denom, ticksPerQuarter);
