@@ -123,23 +123,38 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 			switch (controlNum)		//control number
 			{
 			case 1:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Modulation");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Modulation", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 2: // identical to CC#11?
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Breath Controller?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Breath Controller?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 4:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Foot Controller?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Foot Controller?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 5:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Portamento Time?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Portamento Time?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 6 :
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", NULL, CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", NULL, CLR_MISC);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 7 :							//volume
@@ -147,7 +162,10 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 				break;
 
 			case 9:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 9");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 9", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 10 :							//pan
@@ -159,99 +177,182 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 				break;
 
 			case 20:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 20");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 20", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 21:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 21");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 21", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 22:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 22");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 22", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 23:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 23");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 23", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 32:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Bank LSB?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Bank LSB?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 52:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 52");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 52", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 53:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 53");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 53", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 54:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 54");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 54", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 55:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 55");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 55", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 56:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 56");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 56", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 64:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Hold 1?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Hold 1?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 69:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Hold 2?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Hold 2?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 71:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Resonance?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Resonance?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 72:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Release Time?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Release Time?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 73:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Attack Time?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Attack Time?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 74:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Cut Off Frequency?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Cut Off Frequency?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 75:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Decay Time?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Decay Time?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 76:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Vibrato Late?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato Rate?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 77:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Vibrato Depth?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato Depth?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 78:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Vibrato Delay?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Vibrato Delay?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 79:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Control 79");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control 79", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 91:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Reverb?");
+				AddReverb(beginOffset, curOffset-beginOffset, value);
 				break;
 
 			case 92:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Tremolo Depth?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Tremolo Depth?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 98:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"NRPN LSB?");
+				switch (value)
+				{
+				case 20 :
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #20", NULL, CLR_MISC);
+					break;
+
+				case 30 :
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #30", NULL, CLR_MISC);
+					break;
+
+				default:
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1", NULL, CLR_MISC);
+					break;
+				}
+
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 99 :							//(0x63) nrpn msb
@@ -266,25 +367,41 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 					break;
 
 				default:
-					AddUnknown(beginOffset, curOffset-beginOffset, L"NRPN MSB");
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 2", NULL, CLR_MISC);
 					break;
+				}
+
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
 				}
 				break;
 
 			case 121:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Reset All Controller?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset All Controllers", NULL, CLR_MISC);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 126:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"MONO?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"MONO?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 127:
-				AddUnknown(beginOffset, curOffset-beginOffset, L"Poly?");
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Poly?", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			default:
-				AddUnknown(beginOffset, curOffset-beginOffset);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control Event", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 			}
 		}
