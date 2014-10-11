@@ -261,6 +261,33 @@ bool FilegroupMatcher::OnNewSampColl(VGMSampColl* sampcoll)
 	return true;
 }
 
+bool FilegroupMatcher::OnCloseSeq(VGMSeq* seq)
+{
+	std::list<VGMSeq*>::iterator iterator = std::find(seqs.begin(), seqs.end(), seq);
+	if (iterator != seqs.end()) {
+		seqs.erase(iterator);
+	}
+	return true;
+}
+
+bool FilegroupMatcher::OnCloseInstrSet(VGMInstrSet* instrset)
+{
+	std::list<VGMInstrSet*>::iterator iterator = std::find(instrsets.begin(), instrsets.end(), instrset);
+	if (iterator != instrsets.end()) {
+		instrsets.erase(iterator);
+	}
+	return true;
+}
+
+bool FilegroupMatcher::OnCloseSampColl(VGMSampColl* sampcoll)
+{
+	std::list<VGMSampColl*>::iterator iterator = std::find(sampcolls.begin(), sampcolls.end(), sampcoll);
+	if (iterator != sampcolls.end()) {
+		sampcolls.erase(iterator);
+	}
+	return true;
+}
+
 
 
 void FilegroupMatcher::LookForMatch()
