@@ -183,12 +183,21 @@ bool PS1Seq::ReadEvent(void)
 					return false;
 
 				default :
-					AddEndOfTrack(beginOffset, curOffset-beginOffset-1);
+					AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown SysEx Event");
 					return false;
 				}
 			}
+			else
+			{
+				AddUnknown(beginOffset, curOffset-beginOffset);
+				return false;
+			}
 		}
 		break;
+
+	default:
+		AddUnknown(beginOffset, curOffset-beginOffset);
+		return false;
 	}
 	return true;
 }
