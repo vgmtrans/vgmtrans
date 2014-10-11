@@ -128,7 +128,11 @@ bool PS1Seq::ReadEvent(void)
 			uint8_t value = GetByte(curOffset++);
 			switch (controlNum)		//control number
 			{
-			case 6 :
+			case 0 :							//bank select
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Bank Select", NULL, CLR_UNKNOWN);
+				break;
+
+			case 6 :							//data entry
 				AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", NULL, CLR_UNKNOWN);
 				break;
 
@@ -144,7 +148,32 @@ bool PS1Seq::ReadEvent(void)
 				AddExpression(beginOffset, curOffset-beginOffset, value);
 				break;
 
-			case 99 :							//(0x63) nrpn msb
+			case 64 :							//damper (hold)
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Damper", NULL, CLR_UNKNOWN);
+				break;
+
+			case 91 :							//reverb depth (_SsContExternal)
+				AddReverb(beginOffset, curOffset-beginOffset, value);
+				break;
+
+			case 98 :							//(0x62) NRPN 1 (LSB)
+				switch (value)
+				{
+				case 20 :
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #20", NULL, CLR_UNKNOWN);
+					break;
+
+				case 30 :
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #30", NULL, CLR_UNKNOWN);
+					break;
+
+				default:
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1", NULL, CLR_UNKNOWN);
+					break;
+				}
+				break;
+
+			case 99 :							//(0x63) NRPN 2 (MSB)
 				switch (value)
 				{
 				case 20 :
@@ -154,7 +183,27 @@ bool PS1Seq::ReadEvent(void)
 				case 30 :
 					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", NULL, CLR_LOOP);
 					break;
+
+				default:
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 2", NULL, CLR_UNKNOWN);
+					break;
 				}
+				break;
+
+			case 100 :							//(0x64) RPN 1 (LSB), no effect?
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"RPN 1", NULL, CLR_UNKNOWN);
+				break;
+
+			case 101 :							//(0x65) RPN 2 (MSB), no effect?
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"RPN 2", NULL, CLR_UNKNOWN);
+				break;
+
+			case 121 :							//reset all controllers
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset All Controllers", NULL, CLR_UNKNOWN);
+				break;
+
+			default:
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control Event", NULL, CLR_UNKNOWN);
 				break;
 			}
 		}
@@ -192,7 +241,7 @@ bool PS1Seq::ReadEvent(void)
 					return false;
 
 				default :
-					AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown SysEx Event");
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Meta Event", NULL, CLR_UNKNOWN);
 					return false;
 				}
 			}
