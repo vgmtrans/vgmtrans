@@ -129,11 +129,15 @@ bool PS1Seq::ReadEvent(void)
 			switch (controlNum)		//control number
 			{
 			case 0 :							//bank select
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Bank Select", NULL, CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Bank Select", NULL, CLR_MISC);
+				AddBankSelectNoItem(value);
 				break;
 
 			case 6 :							//data entry
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", NULL, CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", NULL, CLR_MISC);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 7 :							//volume
@@ -149,7 +153,7 @@ bool PS1Seq::ReadEvent(void)
 				break;
 
 			case 64 :							//damper (hold)
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Damper", NULL, CLR_UNKNOWN);
+				AddSustainEvent(beginOffset, curOffset-beginOffset, value);
 				break;
 
 			case 91 :							//reverb depth (_SsContExternal)
@@ -160,16 +164,20 @@ bool PS1Seq::ReadEvent(void)
 				switch (value)
 				{
 				case 20 :
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #20", NULL, CLR_UNKNOWN);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #20", NULL, CLR_MISC);
 					break;
 
 				case 30 :
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #30", NULL, CLR_UNKNOWN);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #30", NULL, CLR_MISC);
 					break;
 
 				default:
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1", NULL, CLR_UNKNOWN);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1", NULL, CLR_MISC);
 					break;
+				}
+
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
 				}
 				break;
 
@@ -185,25 +193,41 @@ bool PS1Seq::ReadEvent(void)
 					break;
 
 				default:
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 2", NULL, CLR_UNKNOWN);
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 2", NULL, CLR_MISC);
 					break;
+				}
+
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
 				}
 				break;
 
 			case 100 :							//(0x64) RPN 1 (LSB), no effect?
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"RPN 1", NULL, CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"RPN 1", NULL, CLR_MISC);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 101 :							//(0x65) RPN 2 (MSB), no effect?
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"RPN 2", NULL, CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"RPN 2", NULL, CLR_MISC);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			case 121 :							//reset all controllers
-				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset All Controllers", NULL, CLR_UNKNOWN);
+				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Reset All Controllers", NULL, CLR_MISC);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 
 			default:
 				AddGenericEvent(beginOffset, curOffset-beginOffset, L"Control Event", NULL, CLR_UNKNOWN);
+				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+					pMidiTrack->AddControllerEvent(channel, controlNum, value);
+				}
 				break;
 			}
 		}
@@ -241,7 +265,7 @@ bool PS1Seq::ReadEvent(void)
 					return false;
 
 				default :
-					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Meta Event", NULL, CLR_UNKNOWN);
+					AddUnknown(beginOffset, curOffset-beginOffset, L"Meta Event");
 					return false;
 				}
 			}
