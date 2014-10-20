@@ -508,6 +508,33 @@ void SeqTrack::AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur)
 	return;
 }
 
+void SeqTrack::AddNoteByDur_TriAce(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName)
+{
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+		AddEvent(new DurNoteSeqEvent(this, key, vel, dur, offset, length, sEventName));
+	AddNoteByDurNoItem_TriAce(key, vel, dur);
+}
+
+void SeqTrack::AddNoteByDurNoItem_TriAce(int8_t key, int8_t vel, uint32_t dur)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+	{
+		uint8_t finalVel = vel;
+		if (parentSeq->bUseLinearAmplitudeScale)
+			finalVel = Convert7bitPercentVolValToStdMidiVal(vel);
+
+		if (cDrumNote == -1)
+		{
+			pMidiTrack->AddNoteByDur_TriAce(channel, key+cKeyCorrection+transpose, finalVel, dur);
+		}
+		else
+			AddPercNoteByDurNoItem(cDrumNote, vel, dur);
+	}
+	prevKey = key;
+	prevVel = vel;
+	return;
+}
+
 void SeqTrack::AddPercNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName)
 {
 	uint8_t origChan = channel;

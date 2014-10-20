@@ -134,7 +134,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		else note_dur = impliedNoteDur;
 		if (!impliedVelocity) velocity = GetByte(curOffset++);
 		else velocity = impliedVelocity;
-		AddNoteByDur(beginOffset, curOffset-beginOffset, status_byte, velocity, note_dur);
+		AddNoteByDur_TriAce(beginOffset, curOffset-beginOffset, status_byte, velocity, note_dur);
 	}
 	else switch (status_byte)
 	{

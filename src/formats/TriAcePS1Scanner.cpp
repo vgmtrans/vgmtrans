@@ -31,8 +31,12 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 	{
 		uint32_t sig1 = file->GetWordBE(i);
 
-		if (sig1 != 0x534C5A01)	// "SLZ" + 0x01 in ASCII
+		//if (sig1 != 0x534C5A01)	// "SLZ" + 0x01 in ASCII
+		if ((sig1 & 0xFFFFFF00) != 0x534C5A00)	// "SLZ" in ASCII
 			continue;
+		if ((sig1 & 0xFF) != 0x01)
+			continue;	// currently only SLZ v1 is supported
+		// Note: SLZ v2 is used by a few tracks in Valkyrie Profile.
 
 		uint16_t headerBytes = file->GetShort(i+0x11);
 

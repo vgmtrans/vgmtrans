@@ -285,12 +285,15 @@ SF2File::SF2File(SynthFile* synthfile)
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
-			// Velocity range (if exists) this must be the next chunk
-			instGenList.sfGenOper = velRange;
-			instGenList.genAmount.ranges.byLo = (uint8_t)rgn->usVelLow;
-			instGenList.genAmount.ranges.byHi = (uint8_t)rgn->usVelHigh;
-			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
-			dataPtr += sizeof(sfInstGenList);
+			if (rgn->usVelHigh)	// 0 means 'not set', fixes TriAce instruments
+			{
+				// Velocity range (if exists) this must be the next chunk
+				instGenList.sfGenOper = velRange;
+				instGenList.genAmount.ranges.byLo = (uint8_t)rgn->usVelLow;
+				instGenList.genAmount.ranges.byHi = (uint8_t)rgn->usVelHigh;
+				memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+				dataPtr += sizeof(sfInstGenList);
+			}
 
 			// initialAttenuation
 			instGenList.sfGenOper = sampleModes;
