@@ -30,12 +30,14 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 	for (uint32_t i=0; i+0x40<nFileLength; i++)
 	{
 		uint32_t sig1 = file->GetWordBE(i);
+		uint8_t mode;
 
-		//if (sig1 != 0x534C5A01)	// "SLZ" + 0x01 in ASCII
-		if ((sig1 & 0xFFFFFF00) != 0x534C5A00)	// "SLZ" in ASCII
+		mode = sig1 & 0xFF;
+		sig1 >>= 8;
+		if (sig1 != 0x534C5A)	// "SLZ" in ASCII
 			continue;
-		if ((sig1 & 0xFF) != 0x01)
-			continue;	// currently only SLZ v1 is supported
+		if (mode > 0x03)
+			continue;	// only SLZ v0-3 is supported
 		// Note: SLZ v2 is used by a few tracks in Valkyrie Profile.
 
 		uint16_t headerBytes = file->GetShort(i+0x11);
@@ -52,7 +54,7 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 		if (size1 > size2 || size3 > size2)	//the compressed file size ought to be smaller than the decompressed size
 			continue;
 		
-		TriAcePS1Seq* seq = TriAceSLZ1Decompress(file, i);
+		TriAcePS1Seq* seq = TriAceSLZDecompress(file, i);
 		if (!seq)
 			return;
 		if (i < 4 || file->GetWord(i-4) == 0)
@@ -136,46 +138,85 @@ void TriAcePS1Scanner::SearchForInstrSet (RawFile* file, vector<TriAcePS1InstrSe
 
 
 //file is RawFile containing the compressed seq.  cfOff is the compressed file offset.
-TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZ1Decompress(RawFile* file, uint32_t cfOff)
+TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZDecompress(RawFile* file, uint32_t cfOff)
 {
+	uint8_t cmode = file->GetByte(cfOff+3);				//compression mode
 	uint32_t cfSize = file->GetWord(cfOff+4);			//compressed file size
 	uint32_t ufSize = file->GetWord(cfOff+8);			//uncompressed file size (size of resulting file after decompression)
-	uint32_t blockSize = file->GetWord(cfOff+12);		//size of entire compressed block (slightly larger than cfSize
+	uint32_t blockSize = file->GetWord(cfOff+12);		//size of entire compressed block (slightly larger than cfSize)
 
 	if (ufSize == 0)
 		ufSize = DEFAULT_UFSIZE;
 
 	uint8_t* uf = new uint8_t[ufSize];
 
-	bool bDone = false;
 	uint32_t ufOff = 0;
 	cfOff += 0x10;
-	while (ufOff < ufSize && !bDone)
+	if (cmode == 0)
 	{
-		uint8_t cFlags = file->GetByte(cfOff++);
-		for (int i=0; (i<8) && (ufOff < ufSize); i++, cFlags>>=1)
+		ufOff += file->GetBytes(cfOff, ufSize, uf);
+	}
+	else
+	{
+		// The decompression code is based on CUE's SLZ decompressor.
+		// compression mode: 0/STORE, 1/LZSS, 2/LZSS+RLE, 3/LZSS16
+		bool bDone = false;
+		int bits = (cmode == 3) ? 16 : 8;
+		while (ufOff < ufSize && !bDone)
 		{
-			if (cFlags & 1)				//uncompressed byte, just copy it over
-				uf[ufOff++] = file->GetByte(cfOff++);
-			else						//compressed section
+			uint16_t cFlags;
+			if (bits == 8)
+				cFlags = file->GetByte(cfOff++);
+			else
 			{
-				uint8_t byte1 = file->GetByte(cfOff);
-				uint8_t byte2 = file->GetByte(cfOff+1);
-
-				if (byte1 == 0 && byte2 == 0)
-				{
-					bDone = true;
-					break;
-				}
-
-				uint32_t backPtr = ufOff - (((byte2 & 0x0F)<<8) + byte1);
-				uint8_t bytesToRead = (byte2 >> 4) + 3;
-				
-				for (; bytesToRead > 0; bytesToRead--)
-					uf[ufOff++] = uf[backPtr++];
+				cFlags = file->GetShort(cfOff);
 				cfOff += 2;
 			}
-		}		
+			for (int i=0; (i<bits) && (ufOff < ufSize); i++, cFlags>>=1)
+			{
+				if (cFlags & 1)				//uncompressed byte, just copy it over
+				{
+					uf[ufOff++] = file->GetByte(cfOff++);
+					if (bits == 16)
+						uf[ufOff++] = file->GetByte(cfOff++);
+				}
+				else						//compressed section
+				{
+					uint8_t byte1 = file->GetByte(cfOff);
+					uint8_t byte2 = file->GetByte(cfOff+1);
+					if (byte1 == 0 && byte2 == 0)
+					{
+						bDone = true;
+						break;
+					}
+					cfOff += 2;
+
+					uint8_t bytesToRead;
+					if (cmode == 2 && byte2 >= 0xF0)
+					{
+						if (byte2 == 0xF0)
+						{
+							bytesToRead = byte1 + 0x13;
+							byte1 = file->GetByte(cfOff++);
+						}
+						else
+						{
+							bytesToRead = (byte2 & 0x0F) + 3;
+						}
+						for (; bytesToRead > 0; bytesToRead--)
+							uf[ufOff++] = byte1;
+					}
+					else
+					{
+						uint32_t backPtr = ufOff - (((byte2 & 0x0F)<<8) + byte1);
+						bytesToRead = (byte2 >> 4) + 3;
+				
+						for (; bytesToRead > 0; bytesToRead--)
+							uf[ufOff++] = uf[backPtr++];
+					}
+				}
+			}
+		}
 	}
 	if (ufOff > ufSize)
 		Alert(L"ufOff > ufSize!");
