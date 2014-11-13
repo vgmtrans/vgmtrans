@@ -68,8 +68,8 @@ public:
 
 	void AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName = L"Note with Duration");
 	void AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
-	void AddNoteByDur_TriAce(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName = L"Note with Duration");
-	void AddNoteByDurNoItem_TriAce(int8_t key, int8_t vel, uint32_t dur);
+	void AddNoteByDur_Extend(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName = L"Note with Duration (Extended)");
+	void AddNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur);
 	void AddPercNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName = L"Percussion Note with Duration");
 	void AddPercNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
 	//void AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint8_t chan, const wchar_t* sEventName = "Note On With Duration");

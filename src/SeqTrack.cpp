@@ -508,14 +508,14 @@ void SeqTrack::AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur)
 	return;
 }
 
-void SeqTrack::AddNoteByDur_TriAce(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName)
+void SeqTrack::AddNoteByDur_Extend(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new DurNoteSeqEvent(this, key, vel, dur, offset, length, sEventName));
-	AddNoteByDurNoItem_TriAce(key, vel, dur);
+	AddNoteByDurNoItem_Extend(key, vel, dur);
 }
 
-void SeqTrack::AddNoteByDurNoItem_TriAce(int8_t key, int8_t vel, uint32_t dur)
+void SeqTrack::AddNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur)
 {
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
