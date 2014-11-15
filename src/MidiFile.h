@@ -76,6 +76,7 @@ public:
 	void AddNoteOff(uint8_t channel, int8_t key);
 	void InsertNoteOff(uint8_t channel, int8_t key, uint32_t absTime);
 	void AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
+	void AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
 	void InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime);
 	void AddControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte); // This function should be used for only redirection output of MIDI-like formats
 	void InsertControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte, uint32_t absTime); // This function should be used for only redirection output of MIDI-like formats

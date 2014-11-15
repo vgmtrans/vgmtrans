@@ -283,6 +283,48 @@ void MidiTrack::AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t d
 	aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
 }
 
+void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration)
+{
+	uint32_t CurDelta = GetDelta();
+	int nNumEvents = aEvents.size();
+	NoteEvent* ContNote;	// Continuted Note
+	
+	ContNote = NULL;
+	for (int curEvt = 0; curEvt < nNumEvents; curEvt ++)
+	{
+		// Check for a event on this track with the following conditions:
+		//	1. Its Event Delta Time is > current Delta Time.
+		//	2. It's a Note Off event
+		//	3. Its key matches the key of the new note.
+		// If so, we're restarting an already played note. In the case of the TriAce driver that means,
+		// that we resume the note, so we need to move the NoteOff event.
+		
+		// Note: In previous TriAce drivers (like MegaDrive and SNES versions),
+		//       a Note gets extended by a Note On event at the tick where another note expires.
+		//       Valkyrie Profile: 225 Fragments of the Heart confirms, that this is NOT the case in the PS1 version.
+		if (aEvents[curEvt]->AbsTime > CurDelta && aEvents[curEvt]->GetEventType() == MIDIEVENT_NOTEON)
+		{
+			NoteEvent* NoteEvt = (NoteEvent*)aEvents[curEvt];
+			if (NoteEvt->key == key && ! NoteEvt->bNoteDown)
+			{
+				ContNote = NoteEvt;
+				break;
+			}
+		}
+	}
+	
+	if (ContNote == NULL)
+	{
+		aEvents.push_back(new NoteEvent(this, channel, CurDelta, true, key, vel));		//add note on
+		prevDurNoteOff = new NoteEvent(this, channel, CurDelta+duration, false, key);
+		aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
+	}
+	else
+	{
+		ContNote->AbsTime = CurDelta + duration;	// fix DeltaTime of the already inserted NoteOff event
+	}
+}
+
 void MidiTrack::InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime)
 {
 	aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));		//add note on
