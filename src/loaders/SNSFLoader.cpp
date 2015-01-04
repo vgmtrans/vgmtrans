@@ -43,7 +43,7 @@ PostLoadCommand SNSFLoader::Apply(RawFile* file)
 			//pRoot->UI_WriteBufferToFile(L"uncomp.smc", exebuf, exebufsize);
 
 			wstring str = file->GetFileName();
-			pRoot->CreateVirtFile(exebuf, exebufsize, str.data());
+			pRoot->CreateVirtFile(exebuf, (uint32_t)exebufsize, str.data());
 			return DELETE_IT;
 		}
 	}

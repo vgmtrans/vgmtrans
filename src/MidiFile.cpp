@@ -45,7 +45,7 @@ int MidiFile::GetMidiTrackIndex(MidiTrack * midiTrack)
 {
 	std::vector<MidiTrack *>::iterator it = std::find(aTracks.begin(), aTracks.end(), midiTrack);
 	if (it != aTracks.end()) {
-		return std::distance(aTracks.begin(), it);
+		return (int)std::distance(aTracks.begin(), it);
 	}
 	else {
 		return -1;
@@ -84,7 +84,7 @@ bool MidiFile::SaveMidiFile(const wchar_t* filepath)
 {
 	vector<uint8_t> midiBuf;
 	WriteMidiToBuffer(midiBuf);
-	return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], midiBuf.size());
+	return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], (uint32_t)midiBuf.size());
 }
 
 void MidiFile::WriteMidiToBuffer(vector<uint8_t> & buf)
@@ -286,7 +286,7 @@ void MidiTrack::AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t d
 void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration)
 {
 	uint32_t CurDelta = GetDelta();
-	int nNumEvents = aEvents.size();
+	size_t nNumEvents = aEvents.size();
 	NoteEvent* ContNote;	// Continuted Note
 	
 	ContNote = NULL;

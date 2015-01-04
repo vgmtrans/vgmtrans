@@ -97,7 +97,7 @@ bool VGMSeq::LoadMain()
 		return false;
 	if (!GetTrackPointers())
 		return false;
-	nNumTracks = aTracks.size();
+	nNumTracks = (uint32_t)aTracks.size();
 	if (nNumTracks == 0)
 		return false;
 

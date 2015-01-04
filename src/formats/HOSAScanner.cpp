@@ -91,7 +91,7 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 	uint32_t nFileLength = file->size();
 	for (uint32_t i=0x20; i+0x14<nFileLength; i++)
 	{
-		if (RecursiveRgnCompare(file, i, 0, numSamples, 0, sampOffsets))
+		if (RecursiveRgnCompare(file, i, 0, (int)numSamples, 0, sampOffsets))
 		{
 			for (; i>=0x20; i-=4)
 			{

@@ -285,7 +285,7 @@ bool AkaoSampColl::GetSampleInfo()
 
 	//sample_section_offset = SampleSetSize - sample_section_size;
 
-	sample_section_offset = arts_offset + akArts.size() * 0x10;
+	sample_section_offset = arts_offset + (uint32_t)(akArts.size() * 0x10);
 	if (sample_section_offset + sample_section_size > rawfile->size())//pDoc->GetDocumentLength())	//if the official total file size is greater than the file size of the document
 		sample_section_size = rawfile->size() - sample_section_offset;	//then shorten the sample section size to the actual end of the document
 	if (GetWord(sample_section_offset + sample_section_size - 0x10) == 0)		//check the last 10 bytes to make sure they aren't null, if they are, abbreviate things till there is no 0x10 block of null bytes

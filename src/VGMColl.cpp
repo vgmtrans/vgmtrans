@@ -323,7 +323,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				DLSRgn* newRgn = newInstr->AddRgn();
 				newRgn->SetRanges(rgn->keyLow, rgn->keyHigh,
 					rgn->velLow, rgn->velHigh);
-				newRgn->SetWaveLinkInfo(0, 0, 1, realSampNum);
+				newRgn->SetWaveLinkInfo(0, 0, 1, (uint32_t)realSampNum);
 
 				if (realSampNum >= finalSamps.size())
 				{
@@ -546,7 +546,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				SynthRgn* newRgn = newInstr->AddRgn();
 				newRgn->SetRanges(rgn->keyLow, rgn->keyHigh,
 					rgn->velLow, rgn->velHigh);
-				newRgn->SetWaveLinkInfo(0, 0, 1, realSampNum);
+				newRgn->SetWaveLinkInfo(0, 0, 1, (uint32_t)realSampNum);
 
 				if (realSampNum >= finalSamps.size())
 				{

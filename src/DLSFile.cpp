@@ -143,7 +143,7 @@ bool DLSFile::SaveDLSFile(const wchar_t* filepath)
 {
 	vector<uint8_t> dlsBuf;
 	WriteDLSToBuffer(dlsBuf);
-	return pRoot->UI_WriteBufferToFile(filepath, &dlsBuf[0], dlsBuf.size());
+	return pRoot->UI_WriteBufferToFile(filepath, &dlsBuf[0], (uint32_t)dlsBuf.size());
 }
 
 
