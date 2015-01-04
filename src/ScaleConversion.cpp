@@ -125,7 +125,7 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal)
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
 uint8_t ConvertPercentAmpToStdMidiVal(double percent)
 {
-	return round(127.0 * sqrt(percent));
+	return roundi(127.0 * sqrt(percent));
 }
 
 double ConvertPercentAmpToStdMidiScale(double percent)
@@ -188,7 +188,7 @@ uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal, double * ptr_vo
 // 0.1% units where -50% = left 0 = center 50% = right (shared by DLS and SF2)
 long ConvertPercentPanTo10thPercentUnits(double percentPan)
 {
-	return round(percentPan * 1000) - 500;
+	return roundi(percentPan * 1000) - 500;
 }
 
 // Convert a percen of linear volume/panpot value to GM2 compatible sin/cos scale.

@@ -398,8 +398,8 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				//if (rgn->attack_time < .001)
 				//	rgn->attack_time = .001;
 
-				long convAttack = (long)round(SecondsToTimecents(rgn->attack_time) * 65536);
-				long convDecay = (long)round(SecondsToTimecents(rgn->decay_time) * 65536);
+				long convAttack = (long)roundi(SecondsToTimecents(rgn->attack_time) * 65536);
+				long convDecay = (long)roundi(SecondsToTimecents(rgn->decay_time) * 65536);
 				long convSustainLev;
 				if (rgn->sustain_level == -1)
 					convSustainLev = 0x03e80000;		//sustain at full if no sustain level provided
@@ -412,7 +412,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 					int j = 0;
 				}
 
-				long convRelease = (long)round(SecondsToTimecents(rgn->release_time) * 65536);
+				long convRelease = (long)roundi(SecondsToTimecents(rgn->release_time) * 65536);
 
 				DLSArt* newArt = newRgn->AddArt();
 				newArt->AddPan(ConvertPercentPanTo10thPercentUnits(rgn->pan) * 65536);

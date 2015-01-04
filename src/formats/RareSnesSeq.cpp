@@ -400,7 +400,7 @@ bool RareSnesTrack::ReadEvent(void)
 			if (parentSeq->instrUnityKeyHints.find(spcInstr) == parentSeq->instrUnityKeyHints.end())
 			{
 				parentSeq->instrUnityKeyHints[spcInstr] = spcTransposeAbs;
-				parentSeq->instrPitchHints[spcInstr] = (int16_t) round(GetTuningInSemitones(spcTuning) * 100.0);
+				parentSeq->instrPitchHints[spcInstr] = (int16_t) roundi(GetTuningInSemitones(spcTuning) * 100.0);
 			}
 			if (parentSeq->instrADSRHints.find(spcInstr) == parentSeq->instrADSRHints.end())
 			{

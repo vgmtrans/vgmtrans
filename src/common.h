@@ -86,7 +86,7 @@ inline int CountBytesOfVal(uint8_t* buf, uint32_t numBytes, uint8_t val)
    // see Knuth section 4.2.2 pages 217-218
  } 
 
- inline int round(double x)
+ inline int roundi(double x)
  {
 	 return (x > 0) ? (int)(x + 0.5) : (int)(x - 0.5);
  }

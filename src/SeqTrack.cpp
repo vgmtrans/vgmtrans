@@ -213,7 +213,7 @@ void SeqTrack::AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur
 	for (unsigned int i=0; i<dur; i++)
 	{
 		int8_t prevValInSlide = newVal;
-		newVal=round(prevVal+(valInc*(i+1)));
+		newVal=roundi(prevVal+(valInc*(i+1)));
 		//only create an event if the pan value has changed since the last iteration
 		if (prevValInSlide != newVal)
 		{

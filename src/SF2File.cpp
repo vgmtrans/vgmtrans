@@ -321,13 +321,13 @@ SF2File::SF2File(SynthFile* synthfile)
 
 			// attackVolEnv
 			instGenList.sfGenOper = attackVolEnv;
-			instGenList.genAmount.shAmount = (rgn->art->attack_time == 0) ?  -32768 : round(SecondsToTimecents(rgn->art->attack_time));
+			instGenList.genAmount.shAmount = (rgn->art->attack_time == 0) ?  -32768 : roundi(SecondsToTimecents(rgn->art->attack_time));
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
 			// decayVolEnv
 			instGenList.sfGenOper = decayVolEnv;
-			instGenList.genAmount.shAmount = (rgn->art->decay_time == 0) ?  -32768 :  round(SecondsToTimecents(rgn->art->decay_time));
+			instGenList.genAmount.shAmount = (rgn->art->decay_time == 0) ?  -32768 :  roundi(SecondsToTimecents(rgn->art->decay_time));
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
@@ -341,7 +341,7 @@ SF2File::SF2File(SynthFile* synthfile)
 
 			// releaseVolEnv
 			instGenList.sfGenOper = releaseVolEnv;
-			instGenList.genAmount.shAmount = (rgn->art->release_time == 0) ?  -32768 : round(SecondsToTimecents(rgn->art->release_time));
+			instGenList.genAmount.shAmount = (rgn->art->release_time == 0) ?  -32768 : roundi(SecondsToTimecents(rgn->art->release_time));
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 

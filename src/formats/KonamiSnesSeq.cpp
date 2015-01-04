@@ -475,7 +475,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 			midiPan = 0;
 		}
 		else {
-			midiPan = 1 + round(midiScalePan * 126.0);
+			midiPan = 1 + roundi(midiScalePan * 126.0);
 		}
 
 		AddPan(beginOffset, curOffset-beginOffset, midiPan);
