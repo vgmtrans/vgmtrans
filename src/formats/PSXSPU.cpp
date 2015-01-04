@@ -197,7 +197,7 @@ PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format
 	}
 }
 
-std::vector<PSXSampColl*>& PSXSampColl::SearchForPSXADPCMs (RawFile* file, const string& format)
+std::vector<PSXSampColl*> PSXSampColl::SearchForPSXADPCMs (RawFile* file, const string& format)
 {
 	std::vector<PSXSampColl*> sampColls;
 	uint32_t nFileLength = file->size();

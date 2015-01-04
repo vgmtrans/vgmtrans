@@ -290,7 +290,7 @@ void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uin
 	NoteEvent* ContNote;	// Continuted Note
 	
 	ContNote = NULL;
-	for (int curEvt = 0; curEvt < nNumEvents; curEvt ++)
+	for (size_t curEvt = 0; curEvt < nNumEvents; curEvt++)
 	{
 		// Check for a event on this track with the following conditions:
 		//	1. Its Event Delta Time is > current Delta Time.
