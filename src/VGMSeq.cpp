@@ -200,7 +200,7 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 					continue;
 
 				// tick
-				if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum]))
+				if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime))
 				{
 					succeeded = false;
 					break;
@@ -222,7 +222,7 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 		// load track by track
 		for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
 		{
-			if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum]))
+			if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime))
 			{
 				succeeded = false;
 				break;

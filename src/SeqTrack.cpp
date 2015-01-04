@@ -101,37 +101,60 @@ bool SeqTrack::LoadTrackInit(int trackNum)
 	return true;
 }
 
-bool SeqTrack::LoadTrackMainLoop(uint32_t stopOffset)
+bool SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 {
-	if (!active)
+	if (!active) {
 		return true;
+	}
 
-	OnTickBegin();
+	if (stopTime == -1) {
+		stopTime = 0x7FFFFFFF;
+	}
 
-	if (deltaTime > 0)
-		deltaTime--;
+	if (GetTime() >= (unsigned) stopTime) {
+		active = false;
+		return true;
+	}
 
-	while (deltaTime == 0)
-	{
-		if (curOffset >= stopOffset)
-		{
-			if (readMode == READMODE_FIND_DELTA_LENGTH)
-				deltaLength = GetTime();
+	if (parentSeq->bLoadTickByTick) {
+		OnTickBegin();
 
-			active = false;
-			break;
+		if (deltaTime > 0) {
+			deltaTime--;
 		}
 
-		if (!ReadEvent())
-		{
-			active = false;
-			break;
+		while (deltaTime == 0) {
+			if (curOffset >= stopOffset) {
+				if (readMode == READMODE_FIND_DELTA_LENGTH)
+					deltaLength = GetTime();
+
+				active = false;
+				break;
+			}
+
+			if (!ReadEvent()) {
+				active = false;
+				break;
+			}
+		}
+
+		OnTickEnd();
+
+		SetTime(GetTime() + 1);
+	}
+	else {
+		while (curOffset < stopOffset && GetTime() < (unsigned) stopTime) {
+			if (!ReadEvent()) {
+				active = false;
+				break;
+			}
+		}
+
+		if (readMode == READMODE_FIND_DELTA_LENGTH) {
+			deltaLength = GetTime();
 		}
 	}
 
-	OnTickEnd();
-
-	SetTime(GetTime() + 1);
 	return true;
 }
 
