@@ -116,15 +116,8 @@ public:
 	friend bool operator>= (VGMItem &item1, VGMItem &item2);
 
 public:
-	//inline bool IsItemAtOffset(uint32_t offset);
-	inline bool IsItemAtOffset(uint32_t offset)
-	{
-		if ((offset >= dwOffset) && (offset < dwOffset+unLength))
-			return true;
-		else
-			return false;
-	}
-	virtual VGMItem* GetItemFromOffset(uint32_t offset);
+	virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
 
 	RawFile* GetRawFile();
 
@@ -172,7 +165,7 @@ public:
 	VGMContainerItem();
 	VGMContainerItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength = 0, const std::wstring theName = L"", uint8_t color = CLR_HEADER);
 	virtual ~VGMContainerItem(void);
-	virtual VGMItem* GetItemFromOffset(uint32_t offset);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 	virtual bool IsContainerItem() { return true; }
 

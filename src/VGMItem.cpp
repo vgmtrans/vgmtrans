@@ -51,11 +51,24 @@ RawFile* VGMItem::GetRawFile()
 }
 
 
-VGMItem* VGMItem::GetItemFromOffset(uint32_t offset)
+bool VGMItem::IsItemAtOffset(uint32_t offset, bool includeContainer)
 {
-	if (IsItemAtOffset(offset))
+	if (GetItemFromOffset(offset, includeContainer) != NULL) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+VGMItem* VGMItem::GetItemFromOffset(uint32_t offset, bool includeContainer)
+{
+	if ((offset >= dwOffset) && (offset < dwOffset + unLength)) {
 		return this;
-	return NULL;
+	}
+	else {
+		return NULL;
+	}
 }
 
 void VGMItem::AddToUI(VGMItem* parent, VOID* UI_specific)
@@ -138,22 +151,24 @@ VGMContainerItem::~VGMContainerItem()
 	DeleteVect(localitems);
 }
 
-VGMItem* VGMContainerItem::GetItemFromOffset(uint32_t offset)
+VGMItem* VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContainer)
 {
-	if (IsItemAtOffset(offset))				//if the offset is within this item
+	for (uint32_t i = 0; i<containers.size(); i++)
 	{
-		for (uint32_t i=0; i<containers.size(); i++)
+		for (uint32_t j = 0; j<containers[i]->size(); j++)
 		{
-			for (uint32_t j=0; j<containers[i]->size(); j++)	
-			{
-				VGMItem* foundItem = (*containers[i])[j]->GetItemFromOffset(offset);
-				if (foundItem)
-					return foundItem;
-			}
+			VGMItem* foundItem = (*containers[i])[j]->GetItemFromOffset(offset, includeContainer);
+			if (foundItem)
+				return foundItem;
 		}
-		return NULL; // this offset must be a "hole", so that it should return nothing
 	}
-	return NULL;
+
+	if (includeContainer && (offset >= dwOffset) && (offset < dwOffset + unLength)) {
+		return this;
+	}
+	else {
+		return NULL;
+	}
 }
 
 void VGMContainerItem::AddToUI(VGMItem* parent, VOID* UI_specific)

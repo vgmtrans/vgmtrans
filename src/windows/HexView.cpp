@@ -747,7 +747,7 @@ void CHexView::SetupColor()
 	{
 		//if (offset+j > curFile->dwOffset+curFile->unLength)
 		//	break;
-		VGMItem* item = curFile->GetItemFromOffset(offset+j);
+		VGMItem* item = curFile->GetItemFromOffset(offset+j, false);
 		if (item)
 		{
 			ULONG itemSize = item->unLength;

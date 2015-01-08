@@ -249,22 +249,9 @@ void SeqTrack::AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur
 }
 
 
-uint32_t SeqTrack::offsetInQuestion;
-
-struct SeqTrack::IsEventAtOffset : unary_function< SeqEvent, bool >
-{
-	inline bool operator()( const SeqEvent* theEvent ) const
-	{
-		return (theEvent->dwOffset == offsetInQuestion);
-	}
-};
-
-
 bool SeqTrack::IsOffsetUsed(uint32_t offset)
 {
-	offsetInQuestion = offset;
-	vector<SeqEvent*>::iterator iter = find_if(aEvents.begin(), aEvents.end(), IsEventAtOffset());
-	return (iter != aEvents.end());
+	return IsItemAtOffset(offset, false);
 }
 
 

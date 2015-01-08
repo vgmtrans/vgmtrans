@@ -39,7 +39,6 @@ public:
 
 	virtual ItemType GetType() const { return ITEMTYPE_VGMFILE; }
 	FileType GetFileType() { return file_type; }
-	virtual VGMItem* GetItemFromOffset(uint32_t offset);
 
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 

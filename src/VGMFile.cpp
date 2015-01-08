@@ -37,26 +37,6 @@ void VGMFile::AddToUI(VGMItem* parent, VOID* UI_specific)
 	}
 }
 
-// All we do is remove "return this", because we do not want to select the entire file when we click
-// an unspecified region of the file.
-VGMItem* VGMFile::GetItemFromOffset(uint32_t offset)
-{
-	if (IsItemAtOffset(offset))				//if the offset is within this item
-	{
-		for (uint32_t i=0; i<containers.size(); i++)
-		{
-			for (uint32_t j=0; j<containers[i]->size(); j++)	
-			{
-				VGMItem* foundItem = (*containers[i])[j]->GetItemFromOffset(offset);
-				if (foundItem)
-					return foundItem;
-			}
-		}
-	}
-	return NULL;
-}
-
-
 //void VGMFile::kill(void)
 //{
 //	delete this;

@@ -34,9 +34,6 @@ public:
 	uint32_t ReadVarLen(uint32_t& offset);
 
 public:
-	static uint32_t offsetInQuestion;
-	
-	struct IsEventAtOffset;
 	virtual bool IsOffsetUsed(uint32_t offset);
 
 	uint32_t dwStartOffset;
