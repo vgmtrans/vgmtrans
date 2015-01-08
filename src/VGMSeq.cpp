@@ -31,7 +31,8 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   initialExpression(127),			//''
   initialReverb(40),				//GM standard
   initialPitchBendRangeSemiTones(2), //GM standard.  Means +/- 2 semitones (4 total range)
-  initialPitchBendRangeCents(0)
+  initialPitchBendRangeCents(0),
+  nNumTracks(0)
 {
 	voices = new SeqVoiceAllocator();
 	AddContainer<SeqTrack>(aTracks);
