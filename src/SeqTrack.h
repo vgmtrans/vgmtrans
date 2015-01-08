@@ -11,7 +11,7 @@ class SeqTrack :
 	public VGMContainerItem
 {
 public:
-	SeqTrack(VGMSeq* parentSeqFile, uint32_t offset = 0, uint32_t length = 0);
+	SeqTrack(VGMSeq* parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::wstring name = L"Track");
 	virtual ~SeqTrack(void);								//note: virtual destructor
 	virtual void ResetVars();
 	//virtual int OnSelected(void);
@@ -180,8 +180,6 @@ public:
 	uint32_t curOffset;
 	bool bInLoop;
 	int8_t cDrumNote;			//-1 signals do not use drumNote, otherwise,
-
-	wchar_t numberedName[10];
 
 	//Table Related Variables
 	int8_t cKeyCorrection;	//steps to offset the key by

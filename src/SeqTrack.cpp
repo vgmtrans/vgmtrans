@@ -14,8 +14,8 @@ using namespace std;
 //  ********
 
 
-SeqTrack::SeqTrack(VGMSeq* parentFile, uint32_t offset, uint32_t length)
-: VGMContainerItem(parentFile, offset, length),
+SeqTrack::SeqTrack(VGMSeq* parentFile, uint32_t offset, uint32_t length, wstring name)
+: VGMContainerItem(parentFile, offset, length, name),
   parentSeq(parentFile)
 {
 	dwStartOffset = offset;
@@ -25,8 +25,6 @@ SeqTrack::SeqTrack(VGMSeq* parentFile, uint32_t offset, uint32_t length)
 	bDetermineTrackLengthEventByEvent = false;
 	bWriteGenericEventAsTextEvent = false;
 
-	swprintf(numberedName, sizeof(numberedName)/sizeof(numberedName[0]), L"Track %d", parentSeq->aTracks.size()+1);
-	name = numberedName;
 	AddContainer<SeqEvent>(aEvents);
 }
 
