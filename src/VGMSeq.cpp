@@ -253,32 +253,7 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 			// sequence length
 			if (unLength == 0)
 			{
-				// a track can sometimes cover other ones (i.e. a track has a "hole" between the head and tail)
-				// it means that the tail of the last track is not always the tail of a sequence, even if they are sorted by start address
-				// therefore, check the length of each tracks
-
-				for (vector<SeqTrack*>::iterator itr = aTracks.begin(); itr != aTracks.end(); ++itr)
-				{
-					assert(dwOffset <= (*itr)->dwOffset);
-
-					uint32_t expectedLength = (*itr)->dwOffset + (*itr)->unLength - dwOffset;
-					if (unLength < expectedLength)
-					{
-						unLength = expectedLength;
-					}
-				}
-
-				// process header items as well
-				for (vector<VGMHeader*>::iterator itr = headers.begin(); itr != headers.end(); ++itr)
-				{
-					assert(dwOffset <= (*itr)->dwOffset);
-
-					uint32_t expectedLength = (*itr)->dwOffset + (*itr)->unLength - dwOffset;
-					if (unLength < expectedLength)
-					{
-						unLength = expectedLength;
-					}
-				}
+				unLength = GuessLength();
 			}
 		}
 

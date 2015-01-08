@@ -71,6 +71,11 @@ VGMItem* VGMItem::GetItemFromOffset(uint32_t offset, bool includeContainer)
 	}
 }
 
+uint32_t VGMItem::GuessLength(void)
+{
+	return unLength;
+}
+
 void VGMItem::AddToUI(VGMItem* parent, VOID* UI_specific)
 {
 	pRoot->UI_AddItem(this, parent, name, UI_specific);
@@ -169,6 +174,33 @@ VGMItem* VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContai
 	else {
 		return NULL;
 	}
+}
+
+// Guess length of a container from its descendants
+uint32_t VGMContainerItem::GuessLength(void)
+{
+	uint32_t guessedLength = 0;
+
+	// Note: children items can sometimes overwrap each other
+	for (uint32_t i = 0; i < containers.size(); i++) {
+		for (uint32_t j = 0; j < containers[i]->size(); j++) {
+			VGMItem* item = (*containers[i])[j];
+
+			assert(dwOffset <= item->dwOffset);
+
+			uint32_t itemLength = item->unLength;
+			if (unLength == 0) {
+				itemLength = item->GuessLength();
+			}
+
+			uint32_t expectedLength = item->dwOffset + itemLength - dwOffset;
+			if (guessedLength < expectedLength) {
+				guessedLength = expectedLength;
+			}
+		}
+	}
+
+	return guessedLength;
 }
 
 void VGMContainerItem::AddToUI(VGMItem* parent, VOID* UI_specific)

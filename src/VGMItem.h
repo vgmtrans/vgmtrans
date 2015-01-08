@@ -118,6 +118,7 @@ public:
 public:
 	virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true);
 	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
+	virtual uint32_t GuessLength(void);
 
 	RawFile* GetRawFile();
 
@@ -166,6 +167,7 @@ public:
 	VGMContainerItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength = 0, const std::wstring theName = L"", uint8_t color = CLR_HEADER);
 	virtual ~VGMContainerItem(void);
 	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
+	virtual uint32_t GuessLength(void);
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 	virtual bool IsContainerItem() { return true; }
 
