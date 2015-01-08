@@ -187,8 +187,8 @@ public:
 	}
 	template <class T> bool RemoveContainer(std::vector<T*>& container)
 	{
-		std::vector<vector<VGMItem*>*>::iterator iter = find(containers.begin(),
-			containers.end(), (vector<VGMItem*>*)&container);
+		std::vector<std::vector<VGMItem*>*>::iterator iter = std::find(containers.begin(),
+			containers.end(), (std::vector<VGMItem*>*)&container);
 		if (iter != containers.end())
 		{
 			containers.erase(iter);
