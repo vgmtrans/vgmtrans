@@ -241,6 +241,8 @@
     <ClCompile Include="loaders\SNSFLoader.cpp" />
     <ClCompile Include="SynthFile.cpp" />
     <ClCompile Include="VGMMiscFile.cpp" />
+    <ClCompile Include="VGMMultiSectionSeq.cpp" />
+    <ClCompile Include="VGMSeqSection.cpp" />
     <ClCompile Include="VGMTag.cpp" />
     <ClCompile Include="windows\aboutdlg.cpp" />
     <ClCompile Include="windows\CollDialog.cpp" />
@@ -394,6 +396,8 @@
     <ClInclude Include="RIFFFile.h" />
     <ClInclude Include="SF2File.h" />
     <ClInclude Include="SynthFile.h" />
+    <ClInclude Include="VGMMultiSectionSeq.h" />
+    <ClInclude Include="VGMSeqSection.h" />
     <ClInclude Include="VGMTag.h" />
     <ClInclude Include="windows\aboutdlg.h" />
     <ClInclude Include="windows\BmpBtn.h" />

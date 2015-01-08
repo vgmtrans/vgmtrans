@@ -594,6 +594,12 @@
     <ClCompile Include="SeqVoiceAllocator.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
+    <ClCompile Include="VGMMultiSectionSeq.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
+    <ClCompile Include="VGMSeqSection.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1077,6 +1083,12 @@
       <Filter>Header Files\main</Filter>
     </ClInclude>
     <ClInclude Include="SeqVoiceAllocator.h">
+      <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="VGMMultiSectionSeq.h">
+      <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="VGMSeqSection.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>

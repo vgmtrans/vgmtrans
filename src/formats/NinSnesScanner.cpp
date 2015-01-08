@@ -217,7 +217,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 	// load the song
 	uint16_t addrSongStart = file->GetShort(addrSongList + guessedSongIndex * 2);
-	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart);
+	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, name);
 	if (!newSeq->LoadVGMFile())
 	{
 		delete newSeq;
