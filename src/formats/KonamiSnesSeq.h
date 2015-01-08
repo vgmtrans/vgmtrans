@@ -81,7 +81,6 @@ class KonamiSnesTrack
 {
 public:
 	KonamiSnesTrack(KonamiSnesSeq* parentFile, long offset = 0, long length = 0);
-	virtual bool LoadTrackInit(uint32_t trackNum);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
 	virtual void OnTickBegin(void);

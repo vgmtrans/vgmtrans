@@ -64,37 +64,46 @@ bool SeqTrack::ReadEvent(void)
 	return false;		//by default, don't add any events, just stop immediately.
 }
 
-bool SeqTrack::LoadTrackInit(int trackNum)
+bool SeqTrack::LoadTrackInit(int trackNum, MidiTrack* preparedMidiTrack)
 {
 	ResetVars();
-	if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack = parentSeq->midi->AddTrack();
+	if (readMode == READMODE_CONVERT_TO_MIDI) {
+		if (preparedMidiTrack != NULL) {
+			pMidiTrack = preparedMidiTrack;
+		}
+		else {
+			pMidiTrack = parentSeq->midi->AddTrack();
+		}
+	}
 	SetChannelAndGroupFromTrkNum(trackNum);
 
 	curOffset = dwStartOffset;	//start at beginning of track
 
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
-		if (trackNum == 0)
-			pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
-		wostringstream ssTrackName;
-		ssTrackName << L"Track: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << dwStartOffset << std::endl;
-		pMidiTrack->AddTrackName(ssTrackName.str().c_str());
+		if (preparedMidiTrack == NULL)
+		{
+			if (trackNum == 0)
+				pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
+			wostringstream ssTrackName;
+			ssTrackName << L"Track: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << dwStartOffset << std::endl;
+			pMidiTrack->AddTrackName(ssTrackName.str().c_str());
 
-		if (trackNum == 0) {
-			pMidiTrack->AddGMReset();
-			pMidiTrack->AddGM2Reset();
-			if (parentSeq->bWriteInitialTempo)
-				pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
+			if (trackNum == 0) {
+				pMidiTrack->AddGMReset();
+				pMidiTrack->AddGM2Reset();
+				if (parentSeq->bWriteInitialTempo)
+					pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
+			}
+			if (parentSeq->bAlwaysWriteInitialVol)
+				AddVolNoItem(parentSeq->initialVol);
+			if (parentSeq->bAlwaysWriteInitialExpression)
+				AddExpressionNoItem(parentSeq->initialExpression);
+			if (parentSeq->bAlwaysWriteInitialReverb)
+				AddReverbNoItem(parentSeq->initialReverb);
+			if (parentSeq->bAlwaysWriteInitialPitchBendRange)
+				AddPitchBendRangeNoItem(parentSeq->initialPitchBendRangeSemiTones, parentSeq->initialPitchBendRangeCents);
 		}
-		if (parentSeq->bAlwaysWriteInitialVol)
-			AddVolNoItem(parentSeq->initialVol);
-		if (parentSeq->bAlwaysWriteInitialExpression)
-			AddExpressionNoItem(parentSeq->initialExpression);
-		if (parentSeq->bAlwaysWriteInitialReverb)
-			AddReverbNoItem(parentSeq->initialReverb);
-		if (parentSeq->bAlwaysWriteInitialPitchBendRange)
-			AddPitchBendRangeNoItem(parentSeq->initialPitchBendRangeSemiTones, parentSeq->initialPitchBendRangeCents);
 	}
 	return true;
 }

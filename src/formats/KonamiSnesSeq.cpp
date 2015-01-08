@@ -180,14 +180,6 @@ KonamiSnesTrack::KonamiSnesTrack(KonamiSnesSeq* parentFile, long offset, long le
 	bWriteGenericEventAsTextEvent = false;
 }
 
-bool KonamiSnesTrack::LoadTrackInit(uint32_t trackNum)
-{
-	if (!SeqTrack::LoadTrackInit(trackNum))
-		return false;
-
-	return true;
-}
-
 void KonamiSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();

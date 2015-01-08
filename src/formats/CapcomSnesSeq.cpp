@@ -166,14 +166,6 @@ CapcomSnesTrack::CapcomSnesTrack(CapcomSnesSeq* parentFile, long offset, long le
 	bWriteGenericEventAsTextEvent = false;
 }
 
-bool CapcomSnesTrack::LoadTrackInit(uint32_t trackNum)
-{
-	if (!SeqTrack::LoadTrackInit(trackNum))
-		return false;
-
-	return true;
-}
-
 void CapcomSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();

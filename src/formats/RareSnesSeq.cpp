@@ -275,14 +275,6 @@ RareSnesTrack::RareSnesTrack(RareSnesSeq* parentFile, long offset, long length)
 	bWriteGenericEventAsTextEvent = false;
 }
 
-bool RareSnesTrack::LoadTrackInit(uint32_t trackNum)
-{
-	if (!SeqTrack::LoadTrackInit(trackNum))
-		return false;
-
-	return true;
-}
-
 void RareSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();

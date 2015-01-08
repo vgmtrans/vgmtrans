@@ -137,7 +137,7 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 	ResetVars();
 	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
 	{
-		if (!aTracks[trackNum]->LoadTrackInit(trackNum))
+		if (!aTracks[trackNum]->LoadTrackInit(trackNum, NULL))
 			return false;
 	}
 

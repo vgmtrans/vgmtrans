@@ -19,7 +19,7 @@ public:
 	virtual Icon GetIcon() { return ICON_TRACK; };
 
 	//virtual void AddToUI(VGMItem* parent, VGMFile* theVGMFile = NULL);
-	virtual bool LoadTrackInit(int trackNum);
+	virtual bool LoadTrackInit(int trackNum, MidiTrack* preparedMidiTrack);
 	virtual bool LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
 	virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
 	virtual bool ReadEvent(void);
