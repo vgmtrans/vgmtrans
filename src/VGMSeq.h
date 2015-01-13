@@ -61,6 +61,7 @@ public:
 
 protected:
 	virtual bool LoadTracks(ReadMode readMode, long stopTime = 1000000);
+	virtual bool LoadTracksMain(long stopTime);
 	virtual bool PostLoad();
 
 public:

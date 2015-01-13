@@ -142,6 +142,11 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 			return false;
 	}
 
+	return LoadTracksMain(stopTime);
+}
+
+bool VGMSeq::LoadTracksMain(long stopTime)
+{
 	// determine the stop offsets
 	uint32_t* aStopOffset = new uint32_t[nNumTracks];
 	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)

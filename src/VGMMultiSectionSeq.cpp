@@ -90,6 +90,33 @@ bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, long stopTime)
 	return succeeded;
 }
 
+bool VGMMultiSectionSeq::LoadSection(VGMSeqSection* section, long stopTime)
+{
+	// reset variables
+	assert(aTracks.size() == 0 || aTracks.size() == section->aTracks.size());
+	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
+	{
+		MidiTrack* previousMidiTrack = NULL;
+		if (aTracks.size() != 0) {
+			previousMidiTrack = aTracks[trackNum]->pMidiTrack;
+		}
+
+		section->aTracks[trackNum]->readMode = this->readMode;
+		if (!section->aTracks[trackNum]->LoadTrackInit(trackNum, previousMidiTrack)) {
+			return false;
+		}
+
+		if (aTracks.size() != 0) {
+			section->aTracks[trackNum]->time = aTracks[trackNum]->time;
+		}
+	}
+
+	// set new track pointers
+	aTracks.assign(section->aTracks.begin(), section->aTracks.end());
+
+	return LoadTracksMain(stopTime);
+}
+
 bool VGMMultiSectionSeq::IsOffsetUsed(uint32_t offset)
 {
 	return IsItemAtOffset(offset, false);

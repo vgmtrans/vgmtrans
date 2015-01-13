@@ -4,13 +4,14 @@
 #include "NinSnesFormat.h"
 #include "NinSnesScanner.h"
 
-enum NintSnesSeqEventType
+enum NinSnesSeqEventType
 {
 	EVENT_UNKNOWN0 = 1, //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
 	EVENT_UNKNOWN1,
 	EVENT_UNKNOWN2,
 	EVENT_UNKNOWN3,
 	EVENT_UNKNOWN4,
+	EVENT_END,
 	EVENT_NOTE_PARAM,
 	EVENT_NOTE,
 	EVENT_TIE,
@@ -23,6 +24,14 @@ enum NintSnesSeqEventType
 	EVENT_VIBRATO_OFF,
 	EVENT_MASTER_VOLUME,
 	EVENT_MASTER_VOLUME_FADE,
+	EVENT_TEMPO,
+	EVENT_TEMPO_FADE,
+	EVENT_TRANSPOSE_ABS,
+	EVENT_TRANSPOSE_REL,
+	EVENT_TREMOLO_ON,
+	EVENT_TREMOLO_OFF,
+	EVENT_VOLUME,
+	EVENT_VOLUME_FADE,
 	EVENT_CALL,
 	EVENT_VIBRATO_FADE,
 	EVENT_PITCH_ENVELOPE_TO,
@@ -48,17 +57,24 @@ public:
 	virtual void ResetVars();
 	virtual bool ReadEvent();
 
+	double GetTempoInBPM();
+	double GetTempoInBPM(uint8_t tempo);
+
 	NinSnesVersion version;
-	std::map<uint8_t, NintSnesSeqEventType> EventMap;
+	std::map<uint8_t, NinSnesSeqEventType> EventMap;
 
-	uint8_t* volumeTable;
-	uint8_t* durRateTable;
-	uint8_t* panTable;
+	std::vector<uint8_t> volumeTable;
+	std::vector<uint8_t> durRateTable;
+	std::vector<uint8_t> panTable;
 
+	uint8_t spcTempo;
 	uint8_t sectionRepeatCount;
 
 protected:
 	VGMHeader* header;
+
+private:
+	void LoadEventMap(NinSnesSeq *pSeqFile);
 };
 
 class NinSnesSection
@@ -76,9 +92,17 @@ class NinSnesTrack
 public:
 	NinSnesTrack(NinSnesSection* parentSection, long offset = 0, long length = 0, const wchar_t* theName = NULL);
 
+	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
 
 	NinSnesSection* parentSection;
-
 	bool available;
+
+private:
+	uint8_t spcNoteDuration;
+	uint8_t spcNoteDurRate;
+	uint8_t spcNoteVolume;
+	uint16_t loopReturnAddress;
+	uint16_t loopStartAddress;
+	uint8_t loopCount;
 };

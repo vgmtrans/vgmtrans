@@ -18,7 +18,16 @@ VGMSeqSection::~VGMSeqSection(void)
 
 bool VGMSeqSection::Load()
 {
-	return GetTrackPointers();
+	ReadMode readMode = parentSeq->readMode;
+
+	if (readMode == READMODE_ADD_TO_UI)
+	{
+		if (!GetTrackPointers()) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 bool VGMSeqSection::GetTrackPointers()
