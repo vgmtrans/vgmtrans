@@ -548,7 +548,7 @@ bool RareSnesTrack::ReadEvent(void)
 			if (!IsOffsetUsed(dest) || rptNestLevel != 0) // nest level check is required for Stickerbrush Symphony
 				AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
 			else
-				AddLoopForever(beginOffset, length, L"Jump");
+				bContinue = AddLoopForever(beginOffset, length, L"Jump");
 			break;
 		}
 

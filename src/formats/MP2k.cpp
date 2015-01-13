@@ -119,6 +119,7 @@ bool MP2kTrack::ReadEvent(void)
 
 	uint32_t beginOffset = curOffset;
 	uint8_t status_byte = GetByte(curOffset++);
+	bool bContinue = true;
 
 	if (status_byte <= 0x7F)		//it's a status event (note, vel (fade), vol, more?)
 	{
@@ -195,7 +196,7 @@ bool MP2kTrack::ReadEvent(void)
 				}
 				else
 				{
-					AddLoopForever(beginOffset, length, L"Goto");
+					bContinue = AddLoopForever(beginOffset, length, L"Goto");
 				}
 
 				// Add next end of track event
@@ -356,7 +357,7 @@ bool MP2kTrack::ReadEvent(void)
 			break;
 		}
 	}
-	return true;
+	return bContinue;
 }
 
 /*void FFTSeq::OnSaveAsMidi(void)

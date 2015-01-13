@@ -565,7 +565,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			if (times == 0 && repeatCount[repeatSlot] == 0)
 			{
 				// infinite loop
-				AddLoopForever(beginOffset, curOffset-beginOffset, repeatEventName);
+				bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, repeatEventName);
 
 				if (readMode == READMODE_ADD_TO_UI)
 				{
@@ -642,7 +642,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			}
 			else
 			{
-				AddLoopForever(beginOffset, length, L"Jump");
+				bContinue = AddLoopForever(beginOffset, length, L"Jump");
 
 				if (readMode == READMODE_ADD_TO_UI)
 				{

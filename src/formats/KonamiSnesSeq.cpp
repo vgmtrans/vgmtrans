@@ -514,7 +514,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 		desc << L"Times: " << (int)times << L"  Volume Delta: " << (int)volumeDelta << L"  Pitch Delta: " << (int)pitchDelta;
 		if (times == 0)
 		{
-			AddLoopForever(beginOffset, curOffset-beginOffset, L"Loop End");
+			bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, L"Loop End");
 		}
 		else
 		{
@@ -564,7 +564,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 		desc << L"Times: " << (int)times << L"  Volume Delta: " << (int)volumeDelta << L"  Pitch Delta: " << (int)pitchDelta;
 		if (times == 0)
 		{
-			AddLoopForever(beginOffset, curOffset-beginOffset, L"Loop End #2");
+			bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, L"Loop End #2");
 		}
 		else
 		{
@@ -825,7 +825,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 			AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
 		}
 		else {
-			AddLoopForever(beginOffset, length, L"Jump");
+			bContinue = AddLoopForever(beginOffset, length, L"Jump");
 		}
 		break;
 	}
