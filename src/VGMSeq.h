@@ -72,6 +72,7 @@ public:
 	SeqVoiceAllocator* voices;
 	double tempoBPM;
 	uint16_t ppqn;
+	long time;				//absolute current time (ticks)
 
 //attributes
 	bool bMonophonicTracks;		//Only 1 voice at a time on a track.  We can assume note offs always use last note on key.

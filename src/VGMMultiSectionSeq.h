@@ -20,7 +20,7 @@ protected:
 	virtual bool LoadTracks(ReadMode readMode, long stopTime = 1000000);
 	virtual bool LoadSection(VGMSeqSection* section, long stopTime = 1000000);
 	virtual bool IsOffsetUsed(uint32_t offset);
-	virtual bool ReadEvent();
+	virtual bool ReadEvent(long stopTime);
 
 public:
 	uint32_t dwStartOffset;

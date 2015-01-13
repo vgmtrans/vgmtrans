@@ -32,7 +32,8 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   initialReverb(40),				//GM standard
   initialPitchBendRangeSemiTones(2), //GM standard.  Means +/- 2 semitones (4 total range)
   initialPitchBendRangeCents(0),
-  nNumTracks(0)
+  nNumTracks(0),
+  time(0)
 {
 	voices = new SeqVoiceAllocator();
 	AddContainer<SeqTrack>(aTracks);
@@ -184,7 +185,6 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 	bool succeeded = true;
 	if (bLoadTickByTick)
 	{
-		long time = 0;
 		while (HasActiveTracks())
 		{
 			// check time limit
@@ -234,6 +234,7 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 				break;
 			}
 			aTracks[trackNum]->active = false;
+			time = max(time, aTracks[trackNum]->time);
 		}
 	}
 	delete[] aStopOffset;
@@ -322,6 +323,8 @@ bool VGMSeq::GetTrackPointers(void)
 
 void VGMSeq::ResetVars(void)
 {
+	time = 0;
+
 	if (readMode == READMODE_ADD_TO_UI)
 	{
 		aInstrumentsUsed.clear();

@@ -21,6 +21,8 @@ VGMMultiSectionSeq::~VGMMultiSectionSeq()
 
 void VGMMultiSectionSeq::ResetVars()
 {
+	VGMSeq::ResetVars();
+
 	foreverLoops = 0;
 }
 
@@ -41,13 +43,16 @@ bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, long stopTime)
 
 	curOffset = dwStartOffset;
 
+	// Clear all track pointers to prevent delete, they must be aliases of section tracks
+	aTracks.clear();
+
 	// reset variables
 	ResetVars();
 
 	// load all tracks
 	uint32_t stopOffset = vgmfile->GetEndOffset();
-	while (curOffset < stopOffset) {
-		if (!ReadEvent()) {
+	while (curOffset < stopOffset && time < stopTime) {
+		if (!ReadEvent(stopTime)) {
 			break;
 		}
 	}
@@ -101,7 +106,7 @@ bool VGMMultiSectionSeq::LoadSection(VGMSeqSection* section, long stopTime)
 			previousMidiTrack = aTracks[trackNum]->pMidiTrack;
 		}
 
-		section->aTracks[trackNum]->readMode = this->readMode;
+		section->aTracks[trackNum]->readMode = readMode;
 		if (!section->aTracks[trackNum]->LoadTrackInit(trackNum, previousMidiTrack)) {
 			return false;
 		}
@@ -122,7 +127,7 @@ bool VGMMultiSectionSeq::IsOffsetUsed(uint32_t offset)
 	return IsItemAtOffset(offset, false);
 }
 
-bool VGMMultiSectionSeq::ReadEvent()
+bool VGMMultiSectionSeq::ReadEvent(long stopTime)
 {
 	return false;		//by default, don't add any events, just stop immediately.
 }

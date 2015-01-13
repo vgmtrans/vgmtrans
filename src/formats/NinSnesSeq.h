@@ -55,7 +55,7 @@ public:
 
 	virtual bool GetHeaderInfo();
 	virtual void ResetVars();
-	virtual bool ReadEvent();
+	virtual bool ReadEvent(long stopTime);
 
 	double GetTempoInBPM();
 	double GetTempoInBPM(uint8_t tempo);

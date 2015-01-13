@@ -50,7 +50,7 @@ bool NinSnesSeq::GetHeaderInfo()
 	return true;
 }
 
-bool NinSnesSeq::ReadEvent()
+bool NinSnesSeq::ReadEvent(long stopTime)
 {
 	uint32_t beginOffset = curOffset;
 	if (curOffset + 1 >= 0x10000) {
@@ -137,7 +137,9 @@ bool NinSnesSeq::ReadEvent()
 			AddSection(section);
 		}
 
-		LoadSection(section);
+		if (!LoadSection(section, stopTime)) {
+			bContinue = false;
+		}
 	}
 
 	return bContinue;

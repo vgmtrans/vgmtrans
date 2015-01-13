@@ -157,7 +157,8 @@ void VGMSeqNoTrks::SetCurTrack(uint32_t trackNum)
 
 void VGMSeqNoTrks::AddTime(uint32_t delta)
 {
-	time += delta;
+	VGMSeq::time += delta;
+	SeqTrack::time += delta;
 	if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI)
 	{
 		for (uint32_t i=0; i<midiTracks.size(); i++)
