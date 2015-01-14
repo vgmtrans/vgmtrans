@@ -26,8 +26,8 @@ enum NinSnesSeqEventType
 	EVENT_MASTER_VOLUME_FADE,
 	EVENT_TEMPO,
 	EVENT_TEMPO_FADE,
-	EVENT_TRANSPOSE_ABS,
-	EVENT_TRANSPOSE_REL,
+	EVENT_GLOBAL_TRANSPOSE,
+	EVENT_TRANSPOSE,
 	EVENT_TREMOLO_ON,
 	EVENT_TREMOLO_OFF,
 	EVENT_VOLUME,
@@ -61,13 +61,17 @@ public:
 	double GetTempoInBPM(uint8_t tempo);
 
 	NinSnesVersion version;
+	uint8_t STATUS_NOTE_MIN;
+	uint8_t STATUS_NOTE_MAX;
+	uint8_t STATUS_PERCUSSION_NOTE_MIN;
+	uint8_t STATUS_PERCUSSION_NOTE_MAX;
 	std::map<uint8_t, NinSnesSeqEventType> EventMap;
 
 	std::vector<uint8_t> volumeTable;
 	std::vector<uint8_t> durRateTable;
 	std::vector<uint8_t> panTable;
 
-	uint8_t spcTempo;
+	uint8_t spcPercussionBase;
 	uint8_t sectionRepeatCount;
 
 protected:

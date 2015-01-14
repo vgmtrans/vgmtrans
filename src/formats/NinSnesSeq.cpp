@@ -37,6 +37,7 @@ void NinSnesSeq::ResetVars()
 {
 	VGMMultiSectionSeq::ResetVars();
 
+	spcPercussionBase = 0;
 	sectionRepeatCount = 0;
 }
 
@@ -149,20 +150,25 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 {
 	int statusByte;
 
+	STATUS_NOTE_MIN = 0x80;
+	STATUS_NOTE_MAX = 0xc7;
+	STATUS_PERCUSSION_NOTE_MIN = 0xca;
+	STATUS_PERCUSSION_NOTE_MAX = 0xdf;
+
 	pSeqFile->EventMap[0x00] = EVENT_END;
 
-	for (statusByte = 0x01; statusByte <= 0x7f; statusByte++) {
+	for (statusByte = 0x01; statusByte < STATUS_NOTE_MIN; statusByte++) {
 		pSeqFile->EventMap[statusByte] = EVENT_NOTE_PARAM;
 	}
 
-	for (statusByte = 0x80; statusByte <= 0xc7; statusByte++) {
+	for (statusByte = STATUS_NOTE_MIN; statusByte <= STATUS_NOTE_MAX; statusByte++) {
 		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
 	}
 
-	pSeqFile->EventMap[0xc8] = EVENT_TIE;
-	pSeqFile->EventMap[0xc9] = EVENT_REST;
+	pSeqFile->EventMap[STATUS_NOTE_MAX + 1] = EVENT_TIE;
+	pSeqFile->EventMap[STATUS_NOTE_MAX + 2] = EVENT_REST;
 
-	for (statusByte = 0xca; statusByte <= 0xdf; statusByte++) {
+	for (statusByte = STATUS_PERCUSSION_NOTE_MIN; statusByte <= STATUS_PERCUSSION_NOTE_MAX; statusByte++) {
 		pSeqFile->EventMap[statusByte] = EVENT_PERCUSSION_NOTE;
 	}
 
@@ -175,8 +181,8 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 	pSeqFile->EventMap[0xe6] = EVENT_MASTER_VOLUME_FADE;
 	pSeqFile->EventMap[0xe7] = EVENT_TEMPO;
 	pSeqFile->EventMap[0xe8] = EVENT_TEMPO_FADE;
-	pSeqFile->EventMap[0xe9] = EVENT_TRANSPOSE_ABS;
-	pSeqFile->EventMap[0xea] = EVENT_TRANSPOSE_REL;
+	pSeqFile->EventMap[0xe9] = EVENT_GLOBAL_TRANSPOSE;
+	pSeqFile->EventMap[0xea] = EVENT_TRANSPOSE;
 	pSeqFile->EventMap[0xeb] = EVENT_TREMOLO_ON;
 	pSeqFile->EventMap[0xec] = EVENT_TREMOLO_OFF;
 	pSeqFile->EventMap[0xed] = EVENT_VOLUME;
@@ -211,11 +217,6 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 		0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
 	};
 	panTable.assign(std::begin(ninpanTableStandard), std::end(ninpanTableStandard));
-}
-
-double NinSnesSeq::GetTempoInBPM()
-{
-	return GetTempoInBPM(spcTempo);
 }
 
 double NinSnesSeq::GetTempoInBPM(uint8_t tempo)
@@ -385,9 +386,10 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_END:
 	{
 		if (loopCount == 0) {
-			AddEndOfTrack(beginOffset, curOffset - beginOffset);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
 
 			// finish this section as soon as possible
+			// TODO: cancel all expected note and fader-output events
 			parentSeq->InactivateAllTracks();
 			bContinue = false;
 		}
@@ -409,14 +411,20 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		// param #1: duration
 		spcNoteDuration = statusByte;
+		desc << L"Duration: " << (int)spcNoteDuration;
 
 		// param #2: quantize and velocity (optional)
 		if (curOffset + 1 < 0x10000) {
 			uint8_t quantizeAndVelocity = GetByte(curOffset);
 			if (quantizeAndVelocity <= 0x7f) {
+				uint8_t durIndex = (quantizeAndVelocity >> 4) & 7;
+				uint8_t velIndex = quantizeAndVelocity & 15;
+
 				curOffset++;
-				spcNoteDurRate = parentSeq->durRateTable[(quantizeAndVelocity >> 4) & 7];
-				spcNoteVolume = parentSeq->volumeTable[quantizeAndVelocity & 15];
+				spcNoteDurRate = parentSeq->durRateTable[durIndex];
+				spcNoteVolume = parentSeq->volumeTable[velIndex];
+
+				desc << L"  Quantize: " << (int)durIndex << L" (" << (int)spcNoteDurRate << L"/256)" << L"  Velocity: " << (int)velIndex << L" (" << (int)spcNoteVolume << L"/256)";
 			}
 		}
 
@@ -426,8 +434,9 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_NOTE:
 	{
-		uint8_t noteNumber = statusByte - 0x80;
+		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
 		uint8_t duration = max((spcNoteDuration * spcNoteDurRate) >> 8, 1);
+
 		AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, spcNoteVolume / 2, duration, L"Note");
 		AddTime(spcNoteDuration);
 		break;
@@ -443,7 +452,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_PERCUSSION_NOTE:
 	{
-		uint8_t noteNumber = statusByte - 0x80;
+		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
 		uint8_t duration = max((spcNoteDuration * spcNoteDurRate) >> 8, 1);
 		AddPercNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, spcNoteVolume / 2, duration, L"Percussion Note");
 		AddTime(spcNoteDuration);
@@ -482,6 +491,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t spcPan = parentSeq->panTable[panIndex];
 		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal(spcPan);
 
+		// TODO: fade in real curve
 		AddPanSlide(beginOffset, curOffset - beginOffset, fadeLength, newPan);
 	}
 
@@ -491,6 +501,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t vibratoRate = GetByte(curOffset++);
 		uint8_t vibratoDepth = GetByte(curOffset++);
 
+		desc << L"Delay: " << (int)vibratoDelay << L"  Rate: " << (int)vibratoRate << L"  Depth: " << (int)vibratoDepth;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 		break;
 	}
@@ -512,6 +523,8 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t fadeLength = GetByte(curOffset++);
 		uint8_t newVol = GetByte(curOffset++);
+
+		desc << L"Length: " << (int)fadeLength << L"  Volume: " << (int)newVol;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Master Volume Fade", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
 		break;
 	}
@@ -519,8 +532,7 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_TEMPO:
 	{
 		uint8_t newTempo = GetByte(curOffset++);
-		parentSeq->spcTempo = newTempo;
-		AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM());
+		AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo));
 		break;
 	}
 
@@ -529,22 +541,21 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		uint8_t newTempo = GetByte(curOffset++);
 
-		parentSeq->spcTempo = newTempo;
 		AddTempoSlide(beginOffset, curOffset - beginOffset, fadeLength, (int)(60000000 / parentSeq->GetTempoInBPM(newTempo)));
 		break;
 	}
 
-	case EVENT_TRANSPOSE_ABS:
+	case EVENT_GLOBAL_TRANSPOSE:
 	{
-		curOffset++;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Transpose (Absolute)", desc.str().c_str(), CLR_TRANSPOSE, ICON_CONTROL);
+		int8_t semitones = GetByte(curOffset++);
+		AddGlobalTranspose(beginOffset, curOffset - beginOffset, semitones);
 		break;
 	}
 
-	case EVENT_TRANSPOSE_REL:
+	case EVENT_TRANSPOSE:
 	{
-		curOffset++;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Transpose (Relative)", desc.str().c_str(), CLR_TRANSPOSE, ICON_CONTROL);
+		int8_t semitones = GetByte(curOffset++);
+		AddTranspose(beginOffset, curOffset - beginOffset, semitones);
 		break;
 	}
 
@@ -554,6 +565,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t tremoloRate = GetByte(curOffset++);
 		uint8_t tremoloDepth = GetByte(curOffset++);
 
+		desc << L"Delay: " << (int)tremoloDelay << L"  Rate: " << (int)tremoloRate << L"  Depth: " << (int)tremoloDepth;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 		break;
 	}
@@ -582,12 +594,14 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_CALL:
 	{
 		uint16_t dest = GetShort(curOffset); curOffset += 2;
-		uint8_t count = GetByte(curOffset++);
+		uint8_t times = GetByte(curOffset++);
 
 		loopReturnAddress = curOffset;
 		loopStartAddress = dest;
-		loopCount = count;
+		loopCount = times;
 
+		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest
+			<< std::dec << std::setfill(L' ') << std::setw(0) << L"  Times: " << (int)times;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 		break;
 	}
@@ -595,6 +609,7 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_VIBRATO_FADE:
 	{
 		uint8_t fadeLength = GetByte(curOffset++);
+		desc << L"Length: " << (int)fadeLength;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Fade", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 		break;
 	}
@@ -603,8 +618,9 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t pitchEnvDelay = GetByte(curOffset++);
 		uint8_t pitchEnvLength = GetByte(curOffset++);
-		int8_t pitchEnvKey = (int8_t)GetByte(curOffset++);
+		int8_t pitchEnvSemitones = (int8_t)GetByte(curOffset++);
 
+		desc << L"Delay: " << (int)pitchEnvDelay << L"  Length: " << (int)pitchEnvLength << L"  Semitones: " << (int)pitchEnvSemitones;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope (To)", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 		break;
 	}
@@ -613,8 +629,9 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t pitchEnvDelay = GetByte(curOffset++);
 		uint8_t pitchEnvLength = GetByte(curOffset++);
-		int8_t pitchEnvKey = (int8_t)GetByte(curOffset++);
+		int8_t pitchEnvSemitones = (int8_t)GetByte(curOffset++);
 
+		desc << L"Delay: " << (int)pitchEnvDelay << L"  Length: " << (int)pitchEnvLength << L"  Semitones: " << (int)pitchEnvSemitones;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope (From)", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 		break;
 	}
@@ -638,6 +655,17 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t spcEVOL_L = GetByte(curOffset++);
 		uint8_t spcEVOL_R = GetByte(curOffset++);
 
+		desc << L"Channels: ";
+		for (int channelNo = MAX_TRACKS - 1; channelNo >= 0; channelNo--) {
+			if ((spcEON & (1 << channelNo)) != 0) {
+				desc << (int)channelNo;
+			}
+			else {
+				desc << L"-";
+			}
+		}
+
+		desc << L"  Volume Left: " << (int)spcEVOL_L << L"  Volume Right: " << (int)spcEVOL_R;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
 		break;
 	}
@@ -654,6 +682,9 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t spcEFB = GetByte(curOffset++);
 		uint8_t spcFIR = GetByte(curOffset++);
 
+		// TODO: dump actual FIR filter values
+
+		desc << L"Delay: " << (int)spcEDL << L"  Feedback: " << (int)spcEFB << L"  FIR: " << (int)spcFIR;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
 		break;
 	}
@@ -664,6 +695,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t spcEVOL_L = GetByte(curOffset++);
 		uint8_t spcEVOL_R = GetByte(curOffset++);
 
+		desc << L"Length: " << (int)fadeLength << L"  Volume Left: " << (int)spcEVOL_L << L"  Volume Right: " << (int)spcEVOL_R;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume Fade", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
 		break;
 	}
@@ -674,14 +706,17 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t pitchSlideLength = GetByte(curOffset++);
 		uint8_t pitchSlideTargetNote = GetByte(curOffset++);
 
+		desc << L"Delay: " << (int)pitchSlideDelay << L"  Length: " << (int)pitchSlideLength << L"  Note: " << (int)(pitchSlideTargetNote - 0x80);
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 		break;
 	}
 
 	case EVENT_PERCCUSION_PATCH_BASE:
 	{
-		uint8_t percBase = GetByte(curOffset++);
+		uint8_t percussionBase = GetByte(curOffset++);
+		parentSeq->spcPercussionBase = percussionBase;
 
+		desc << L"Percussion Base: " << (int)percussionBase;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Base", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
 		break;
 	}
