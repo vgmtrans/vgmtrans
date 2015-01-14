@@ -445,6 +445,9 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		if (loopCount == 0) {
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+			if (readMode == READMODE_FIND_DELTA_LENGTH) {
+				deltaLength = GetTime();
+			}
 
 			// finish this section as soon as possible
 			// TODO: cancel all expected note and fader-output events
