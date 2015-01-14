@@ -1,7 +1,7 @@
 #pragma once
 #include "Format.h"
 #include "Root.h"
-#include "SquSnesScanner.h"
+#include "AkaoSnesScanner.h"
 //#include "Matcher.h"
 //#include "VGMColl.h"
 
@@ -22,8 +22,8 @@ public:
 // SquarePS2Format
 // ***************
 
-BEGIN_FORMAT(SquSnes)
-	USING_SCANNER(SquSnesScanner)
+BEGIN_FORMAT(AkaoSnes)
+	USING_SCANNER(AkaoSnesScanner)
 	//USING_MATCHER(SimpleMatcher)
 	//USING_COLL(SquarePS2Coll)
 END_FORMAT()

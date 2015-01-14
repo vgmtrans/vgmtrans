@@ -312,8 +312,8 @@
     <ClCompile Include="formats\FFT.cpp" />
     <ClCompile Include="formats\FFTInstr.cpp" />
     <ClCompile Include="formats\FFTScanner.cpp" />
-    <ClCompile Include="formats\SquareSnesSeq.cpp" />
-    <ClCompile Include="formats\SquSnesScanner.cpp" />
+    <ClCompile Include="formats\AkaoSnesSeq.cpp" />
+    <ClCompile Include="formats\AkaoSnesScanner.cpp" />
     <ClCompile Include="formats\OrgScanner.cpp" />
     <ClCompile Include="formats\OrgSeq.cpp" />
     <ClCompile Include="formats\NinSnesScanner.cpp" />
@@ -468,9 +468,9 @@
     <ClInclude Include="formats\NinSnesFormat.h" />
     <ClInclude Include="formats\NinSnesScanner.h" />
     <ClInclude Include="formats\NinSnesSeq.h" />
-    <ClInclude Include="formats\SquSnesFormat.h" />
-    <ClInclude Include="formats\SquSnesScanner.h" />
-    <ClInclude Include="formats\SquSnesSeq.h" />
+    <ClInclude Include="formats\AkaoSnesFormat.h" />
+    <ClInclude Include="formats\AkaoSnesScanner.h" />
+    <ClInclude Include="formats\AkaoSnesSeq.h" />
     <ClInclude Include="formats\SegSat.h" />
     <ClInclude Include="formats\SegSatScanner.h" />
     <ClInclude Include="formats\KonamiGXFormat.h" />

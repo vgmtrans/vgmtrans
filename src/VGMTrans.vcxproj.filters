@@ -35,9 +35,6 @@
     <Filter Include="Source Files\formats\fft">
       <UniqueIdentifier>{126f4594-01ff-430d-9f87-27be934abf8d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\formats\squsnes">
-      <UniqueIdentifier>{417fba57-759c-4cd4-9c92-e9907956db05}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\formats\org">
       <UniqueIdentifier>{950d042d-ff35-47bd-b6b3-8967de5bba3f}</UniqueIdentifier>
     </Filter>
@@ -114,9 +111,6 @@
     <Filter Include="Header Files\formats\ninsnes">
       <UniqueIdentifier>{f97cdd52-a1a9-442e-8ef7-ed12c7b92ee0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\formats\squsnes">
-      <UniqueIdentifier>{478e1111-bacf-4097-a852-5a4c1618e59a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\formats\segsat">
       <UniqueIdentifier>{33ab6f4b-7e26-47ea-ae8c-6a78a152c5e9}</UniqueIdentifier>
     </Filter>
@@ -171,6 +165,12 @@
     </Filter>
     <Filter Include="Source Files\formats\konamisnes">
       <UniqueIdentifier>{b2ea5e95-f02a-4a76-82f4-53e42f235fe8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\akaosnes">
+      <UniqueIdentifier>{478e1111-bacf-4097-a852-5a4c1618e59a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\akaosnes">
+      <UniqueIdentifier>{417fba57-759c-4cd4-9c92-e9907956db05}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -320,12 +320,6 @@
     </ClCompile>
     <ClCompile Include="formats\FFTScanner.cpp">
       <Filter>Source Files\formats\fft</Filter>
-    </ClCompile>
-    <ClCompile Include="formats\SquareSnesSeq.cpp">
-      <Filter>Source Files\formats\squsnes</Filter>
-    </ClCompile>
-    <ClCompile Include="formats\SquSnesScanner.cpp">
-      <Filter>Source Files\formats\squsnes</Filter>
     </ClCompile>
     <ClCompile Include="formats\OrgScanner.cpp">
       <Filter>Source Files\formats\org</Filter>
@@ -600,6 +594,12 @@
     <ClCompile Include="VGMSeqSection.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
+    <ClCompile Include="formats\AkaoSnesSeq.cpp">
+      <Filter>Source Files\formats\akaosnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\AkaoSnesScanner.cpp">
+      <Filter>Source Files\formats\akaosnes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -760,15 +760,6 @@
     </ClInclude>
     <ClInclude Include="formats\NinSnesSeq.h">
       <Filter>Header Files\formats\ninsnes</Filter>
-    </ClInclude>
-    <ClInclude Include="formats\SquSnesFormat.h">
-      <Filter>Header Files\formats\squsnes</Filter>
-    </ClInclude>
-    <ClInclude Include="formats\SquSnesScanner.h">
-      <Filter>Header Files\formats\squsnes</Filter>
-    </ClInclude>
-    <ClInclude Include="formats\SquSnesSeq.h">
-      <Filter>Header Files\formats\squsnes</Filter>
     </ClInclude>
     <ClInclude Include="formats\SegSat.h">
       <Filter>Header Files\formats\segsat</Filter>
@@ -1090,6 +1081,15 @@
     </ClInclude>
     <ClInclude Include="VGMSeqSection.h">
       <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\AkaoSnesFormat.h">
+      <Filter>Header Files\formats\akaosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\AkaoSnesScanner.h">
+      <Filter>Header Files\formats\akaosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\AkaoSnesSeq.h">
+      <Filter>Header Files\formats\akaosnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
