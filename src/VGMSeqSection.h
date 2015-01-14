@@ -17,6 +17,7 @@ public:
 
 	virtual bool Load();
 	virtual bool GetTrackPointers();
+	virtual bool PostLoad();
 
 	VGMMultiSectionSeq * parentSeq;
 	std::vector<SeqTrack*> aTracks;

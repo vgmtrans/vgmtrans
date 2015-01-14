@@ -115,8 +115,9 @@ bool VGMSeq::PostLoad()
 	{
 		std::sort(aInstrumentsUsed.begin(), aInstrumentsUsed.end());
 
-		for (uint32_t i=0; i<aTracks.size(); i++)
-			sort(aTracks[i]->aEvents.begin(), aTracks[i]->aEvents.end(), ItemPtrOffsetCmp());
+		for (uint32_t i = 0; i < aTracks.size(); i++) {
+			std::sort(aTracks[i]->aEvents.begin(), aTracks[i]->aEvents.end(), ItemPtrOffsetCmp());
+		}
 	}
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
@@ -143,7 +144,12 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 			return false;
 	}
 
-	return LoadTracksMain(stopTime);
+	bool succeeded = LoadTracksMain(stopTime);
+	if (succeeded) {
+		PostLoad();
+	}
+
+	return succeeded;
 }
 
 bool VGMSeq::LoadTracksMain(long stopTime)
@@ -242,17 +248,9 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 	}
 	delete[] aStopOffset;
 
-	if (succeeded)
+	if (readMode == READMODE_ADD_TO_UI)
 	{
-		if (readMode == READMODE_ADD_TO_UI)
-		{
-			SetGuessedLength();
-		}
-
-		if (!PostLoad())
-		{
-			succeeded = false;
-		}
+		SetGuessedLength();
 	}
 
 	return succeeded;

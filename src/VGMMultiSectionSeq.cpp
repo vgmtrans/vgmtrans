@@ -94,7 +94,12 @@ bool VGMMultiSectionSeq::LoadSection(VGMSeqSection* section, long stopTime)
 	// set new track pointers
 	aTracks.assign(section->aTracks.begin(), section->aTracks.end());
 
-	return LoadTracksMain(stopTime);
+	bool succeeded = LoadTracksMain(stopTime);
+	if (succeeded) {
+		section->PostLoad();
+	}
+
+	return succeeded;
 }
 
 bool VGMMultiSectionSeq::IsOffsetUsed(uint32_t offset)
