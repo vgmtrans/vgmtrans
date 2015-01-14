@@ -129,6 +129,8 @@ bool VGMSeq::PostLoad()
 
 bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 {
+	bool succeeded = true;
+
 	// set read mode
 	this->readMode = readMode;
 	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
@@ -144,15 +146,20 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 			return false;
 	}
 
-	bool succeeded = LoadTracksMain(stopTime);
-	if (succeeded) {
-		PostLoad();
+	LoadTracksMain(stopTime);
+	if (readMode == READMODE_ADD_TO_UI)
+	{
+		SetGuessedLength();
+	}
+
+	if (!PostLoad()) {
+		succeeded = false;
 	}
 
 	return succeeded;
 }
 
-bool VGMSeq::LoadTracksMain(long stopTime)
+void VGMSeq::LoadTracksMain(long stopTime)
 {
 	// determine the stop offsets
 	uint32_t* aStopOffset = new uint32_t[nNumTracks];
@@ -212,11 +219,7 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 					continue;
 
 				// tick
-				if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime))
-				{
-					succeeded = false;
-					break;
-				}
+				aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime);
 			}
 			time++;
 
@@ -238,22 +241,13 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 		{
 			time = initialTime;
 
-			if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime))
-			{
-				succeeded = false;
-				break;
-			}
+			aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime);
 			aTracks[trackNum]->active = false;
 		}
 	}
 	delete[] aStopOffset;
 
-	if (readMode == READMODE_ADD_TO_UI)
-	{
-		SetGuessedLength();
-	}
-
-	return succeeded;
+	return;
 }
 
 bool VGMSeq::HasActiveTracks()

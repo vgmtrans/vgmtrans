@@ -305,7 +305,7 @@ bool NinSnesTrack::ReadEvent(void)
 {
 	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
 	uint32_t beginOffset = curOffset;
-	if (curOffset >= 0x10000)
+	if (curOffset >= 0x10000 || !available)
 	{
 		return false;
 	}
@@ -386,6 +386,9 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		if (loopCount == 0) {
 			AddEndOfTrack(beginOffset, curOffset - beginOffset);
+
+			// finish this section as soon as possible
+			parentSeq->InactivateAllTracks();
 			bContinue = false;
 		}
 		else {

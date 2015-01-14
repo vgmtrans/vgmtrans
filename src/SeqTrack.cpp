@@ -107,10 +107,10 @@ bool SeqTrack::LoadTrackInit(int trackNum, MidiTrack* preparedMidiTrack)
 	return true;
 }
 
-bool SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
+void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 {
 	if (!active) {
-		return true;
+		return;
 	}
 
 	if (stopTime == -1) {
@@ -119,7 +119,7 @@ bool SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 
 	if (GetTime() >= (unsigned) stopTime) {
 		active = false;
-		return true;
+		return;
 	}
 
 	if (parentSeq->bLoadTickByTick) {
@@ -146,8 +146,11 @@ bool SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 
 		OnTickEnd();
 
-		if (readMode == READMODE_CONVERT_TO_MIDI)
-			pMidiTrack->AddDelta(1);
+		if (readMode == READMODE_CONVERT_TO_MIDI) {
+			if (deltaTime != 0) {
+				pMidiTrack->AddDelta(1);
+			}
+		}
 	}
 	else {
 		while (curOffset < stopOffset && GetTime() < (unsigned) stopTime) {
@@ -162,7 +165,7 @@ bool SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 		}
 	}
 
-	return true;
+	return;
 }
 
 void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum)

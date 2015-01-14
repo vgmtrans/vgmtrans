@@ -57,18 +57,15 @@ bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, long stopTime)
 		}
 	}
 
-	bool succeeded = true; // TODO: check the real result
-	if (succeeded)
+	if (readMode == READMODE_ADD_TO_UI)
 	{
-		if (readMode == READMODE_ADD_TO_UI)
-		{
-			SetGuessedLength();
-		}
+		SetGuessedLength();
+	}
 
-		if (!PostLoad())
-		{
-			succeeded = false;
-		}
+	bool succeeded = true;
+	if (!PostLoad())
+	{
+		succeeded = false;
 	}
 
 	return succeeded;
@@ -94,12 +91,13 @@ bool VGMMultiSectionSeq::LoadSection(VGMSeqSection* section, long stopTime)
 	// set new track pointers
 	aTracks.assign(section->aTracks.begin(), section->aTracks.end());
 
-	bool succeeded = LoadTracksMain(stopTime);
-	if (succeeded) {
-		section->PostLoad();
+	LoadTracksMain(stopTime);
+
+	if (!section->PostLoad()) {
+		return false;
 	}
 
-	return succeeded;
+	return true;
 }
 
 bool VGMMultiSectionSeq::IsOffsetUsed(uint32_t offset)

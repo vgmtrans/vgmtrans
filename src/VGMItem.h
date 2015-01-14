@@ -119,6 +119,7 @@ public:
 	virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true);
 	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
 	virtual uint32_t GuessLength(void);
+	virtual void SetGuessedLength(void);
 
 	RawFile* GetRawFile();
 
@@ -168,7 +169,7 @@ public:
 	virtual ~VGMContainerItem(void);
 	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
 	virtual uint32_t GuessLength(void);
-	void SetGuessedLength(void);
+	virtual void SetGuessedLength(void);
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 	virtual bool IsContainerItem() { return true; }
 
