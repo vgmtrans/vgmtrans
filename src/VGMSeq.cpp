@@ -195,7 +195,7 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 					pRoot->AddLogItem(new LogItem(wstring(*this->GetName()) + L" - Abort loading tracks by time limit.", LOG_LEVEL_WARN, wstring(L"VGMSeq")));
 				}
 
-				InactiveAllTracks();
+				InactivateAllTracks();
 				break;
 			}
 
@@ -218,7 +218,7 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 			int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 : ConversionOptions::GetNumSequenceLoops();
 			if (GetForeverLoops() >= requiredLoops)
 			{
-				InactiveAllTracks();
+				InactivateAllTracks();
 				break;
 			}
 		}
@@ -286,7 +286,7 @@ bool VGMSeq::HasActiveTracks()
 	return false;
 }
 
-void VGMSeq::InactiveAllTracks()
+void VGMSeq::InactivateAllTracks()
 {
 	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
 	{

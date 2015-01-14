@@ -56,7 +56,7 @@ public:
 	virtual bool SaveAsMidi(const wchar_t* filepath);
 
 	virtual bool HasActiveTracks();
-	virtual void InactiveAllTracks();
+	virtual void InactivateAllTracks();
 	virtual int GetForeverLoops();
 
 protected:
