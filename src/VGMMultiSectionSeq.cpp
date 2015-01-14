@@ -110,10 +110,6 @@ bool VGMMultiSectionSeq::LoadSection(VGMSeqSection* section, long stopTime)
 		if (!section->aTracks[trackNum]->LoadTrackInit(trackNum, previousMidiTrack)) {
 			return false;
 		}
-
-		if (aTracks.size() != 0) {
-			section->aTracks[trackNum]->time = aTracks[trackNum]->time;
-		}
 	}
 
 	// set new track pointers

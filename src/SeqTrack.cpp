@@ -39,7 +39,6 @@ void SeqTrack::ResetVars()
 	bInLoop = false;
 	foreverLoops = 0;
 	deltaLength = -1;
-	time = 0;
 	deltaTime = 0;
 	vol = 100;
 	expression = 127;
@@ -147,7 +146,8 @@ bool SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 
 		OnTickEnd();
 
-		SetTime(GetTime() + 1);
+		if (readMode == READMODE_CONVERT_TO_MIDI)
+			pMidiTrack->AddDelta(1);
 	}
 	else {
 		while (curOffset < stopOffset && GetTime() < (unsigned) stopTime) {
@@ -181,12 +181,12 @@ void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum)
 
 uint32_t SeqTrack::GetTime()
 {
-	return time;
+	return parentSeq->time;
 }
 
 void SeqTrack::SetTime(uint32_t NewDelta)
 {
-	time = NewDelta;
+	parentSeq->time = NewDelta;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->SetDelta(NewDelta);
 }
@@ -199,18 +199,10 @@ void SeqTrack::AddTime(uint32_t AddDelta)
 	}
 	else
 	{
-		time += AddDelta;
+		parentSeq->time += AddDelta;
 		if (readMode == READMODE_CONVERT_TO_MIDI)
 			pMidiTrack->AddDelta(AddDelta);
 	}
-}
-
-void SeqTrack::ResetTime(void)
-{
-	time = 0;
-	deltaTime = 0;
-	if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->ResetDelta();
 }
 
 uint32_t SeqTrack::ReadVarLen(uint32_t& offset)

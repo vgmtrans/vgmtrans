@@ -29,7 +29,6 @@ public:
 	uint32_t GetTime(void);
 	void SetTime(uint32_t NewDelta); // in general, derived class should not use this method.
 	void AddTime(uint32_t AddDelta);
-	void ResetTime(void);
 
 	uint32_t ReadVarLen(uint32_t& offset);
 
@@ -158,7 +157,6 @@ public:
 	int foreverLoops;
 	bool active;			//indicates whether a VGMSeq is loading this track
 
-	long time;				//absolute current time (ticks)
 	long deltaTime;			//delta time, an interval to the next event (ticks)
 	int8_t vel;
 	int8_t key;

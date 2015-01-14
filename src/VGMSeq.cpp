@@ -225,16 +225,19 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 	}
 	else
 	{
+		uint32_t initialTime = time; // preserve current time for multi section sequence
+
 		// load track by track
 		for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
 		{
+			time = initialTime;
+
 			if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime))
 			{
 				succeeded = false;
 				break;
 			}
 			aTracks[trackNum]->active = false;
-			time = max(time, aTracks[trackNum]->time);
 		}
 	}
 	delete[] aStopOffset;
