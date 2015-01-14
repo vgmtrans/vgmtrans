@@ -479,7 +479,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal(spcPan);
 
 		// TODO: fade in real curve
-		AddPanSlide(beginOffset, curOffset - beginOffset, fadeLength, newPan);
+		AddPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);
 	}
 
 	case EVENT_VIBRATO_ON:
