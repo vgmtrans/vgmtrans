@@ -60,30 +60,9 @@ bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, long stopTime)
 	bool succeeded = true; // TODO: check the real result
 	if (succeeded)
 	{
-		// adjust container length
 		if (readMode == READMODE_ADD_TO_UI)
 		{
-			// headers
-			for (size_t headerIndex = 0; headerIndex < headers.size(); headerIndex++) {
-				VGMHeader* header = headers[headerIndex];
-				if (header->unLength == 0) {
-					header->unLength = header->GuessLength();
-				}
-			}
-
-			// sections
-			for (size_t sectionIndex = 0; sectionIndex < aSections.size(); sectionIndex++) {
-				VGMSeqSection* section = aSections[sectionIndex];
-				if (section->unLength == 0) {
-					section->unLength = section->GuessLength();
-				}
-			}
-
-			// sequence
-			if (unLength == 0)
-			{
-				unLength = GuessLength();
-			}
+			SetGuessedLength();
 		}
 
 		if (!PostLoad())

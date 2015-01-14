@@ -244,27 +244,9 @@ bool VGMSeq::LoadTracksMain(long stopTime)
 
 	if (succeeded)
 	{
-		// adjust container length
 		if (readMode == READMODE_ADD_TO_UI)
 		{
-			// track length
-			for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
-			{
-				if (aTracks[trackNum]->unLength == 0)			//if unLength has not been changed from default value of 0
-				{
-					if (!aTracks[trackNum]->aEvents.empty())
-					{
-						SeqEvent* lastTrkEvent = aTracks[trackNum]->aEvents.back();
-						aTracks[trackNum]->unLength = lastTrkEvent->dwOffset + lastTrkEvent->unLength - aTracks[trackNum]->dwOffset;
-					}
-				}
-			}
-
-			// sequence length
-			if (unLength == 0)
-			{
-				unLength = GuessLength();
-			}
+			SetGuessedLength();
 		}
 
 		if (!PostLoad())

@@ -203,6 +203,23 @@ uint32_t VGMContainerItem::GuessLength(void)
 	return guessedLength;
 }
 
+void VGMContainerItem::SetGuessedLength(void)
+{
+	for (uint32_t i = 0; i < containers.size(); i++) {
+		for (uint32_t j = 0; j < containers[i]->size(); j++) {
+			VGMItem* item = (*containers[i])[j];
+
+			if (item->unLength == 0) {
+				item->unLength = item->GuessLength();
+			}
+		}
+	}
+
+	if (unLength == 0) {
+		unLength = GuessLength();
+	}
+}
+
 void VGMContainerItem::AddToUI(VGMItem* parent, VOID* UI_specific)
 {
 	VGMItem::AddToUI(parent, UI_specific);
