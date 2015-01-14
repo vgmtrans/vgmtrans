@@ -78,7 +78,7 @@ TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset, long length
 {
 }
 
-bool TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset)
+void TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 {
 	TriAcePS1Seq* seq = (TriAcePS1Seq*)parentSeq;
 	uint32_t scorePatternPtrOffset = dwOffset;
@@ -103,7 +103,7 @@ bool TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset)
 	}
 	AddEndOfTrack(scorePatternPtrOffset, 2);
 	unLength = scorePatternPtrOffset+2 - dwOffset;
-	return true;
+	return;
 }
 
 
