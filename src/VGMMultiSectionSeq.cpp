@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "common.h"
 #include "Root.h"
+#include "Options.h"
 #include "VGMMultiSectionSeq.h"
 
 VGMMultiSectionSeq::VGMMultiSectionSeq(const std::string& format, RawFile* file, uint32_t offset, uint32_t length, std::wstring name)
@@ -113,6 +114,20 @@ bool VGMMultiSectionSeq::ReadEvent(long stopTime)
 void VGMMultiSectionSeq::AddSection(VGMSeqSection* section)
 {
 	aSections.push_back(section);
+}
+
+bool VGMMultiSectionSeq::AddLoopForeverNoItem()
+{
+	foreverLoops++;
+	if (readMode == READMODE_ADD_TO_UI)
+	{
+		return false;
+	}
+	else if (readMode == READMODE_FIND_DELTA_LENGTH)
+	{
+		return (foreverLoops < ConversionOptions::GetNumSequenceLoops());
+	}
+	return true;
 }
 
 VGMSeqSection* VGMMultiSectionSeq::GetSectionFromOffset(uint32_t offset)

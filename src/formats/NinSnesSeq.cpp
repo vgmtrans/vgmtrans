@@ -2,7 +2,6 @@
 #include "NinSnesSeq.h"
 #include "NinSnesFormat.h"
 #include "SeqEvent.h"
-#include "Options.h"
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(NinSnes);
@@ -97,21 +96,9 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 		}
 
 		// add event to sequence
+		header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Playlist Jump");
 		if (infiniteLoop) {
-			header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Playlist Jump");
-			foreverLoops++;
-
-			if (readMode == READMODE_ADD_TO_UI)
-			{
-				bContinue = false;
-			}
-			else if (readMode == READMODE_FIND_DELTA_LENGTH)
-			{
-				bContinue = (foreverLoops < ConversionOptions::GetNumSequenceLoops());
-			}
-		}
-		else {
-			header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Playlist Jump");
+			bContinue = AddLoopForeverNoItem();
 		}
 
 		// add the last event too, if available

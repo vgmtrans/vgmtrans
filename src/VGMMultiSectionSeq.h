@@ -14,6 +14,7 @@ public:
 	virtual bool LoadMain();
 
 	void AddSection(VGMSeqSection* section);
+	bool AddLoopForeverNoItem();
 	VGMSeqSection* GetSectionFromOffset(uint32_t offset);
 
 protected:
