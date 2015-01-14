@@ -137,10 +137,20 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 {
 	int statusByte;
 
-	STATUS_NOTE_MIN = 0x80;
-	STATUS_NOTE_MAX = 0xc7;
-	STATUS_PERCUSSION_NOTE_MIN = 0xca;
-	STATUS_PERCUSSION_NOTE_MAX = 0xdf;
+	switch (version) {
+	case NINSNES_EARLIER:
+		STATUS_NOTE_MIN = 0x80;
+		STATUS_NOTE_MAX = 0xc5;
+		STATUS_PERCUSSION_NOTE_MIN = 0xd0;
+		STATUS_PERCUSSION_NOTE_MAX = 0xd9;
+		break;
+
+	default:
+		STATUS_NOTE_MIN = 0x80;
+		STATUS_NOTE_MAX = 0xc7;
+		STATUS_PERCUSSION_NOTE_MIN = 0xca;
+		STATUS_PERCUSSION_NOTE_MAX = 0xdf;
+	}
 
 	pSeqFile->EventMap[0x00] = EVENT_END;
 
@@ -159,51 +169,112 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 		pSeqFile->EventMap[statusByte] = EVENT_PERCUSSION_NOTE;
 	}
 
-	pSeqFile->EventMap[0xe0] = EVENT_PROGCHANGE;
-	pSeqFile->EventMap[0xe1] = EVENT_PAN;
-	pSeqFile->EventMap[0xe2] = EVENT_PAN_FADE;
-	pSeqFile->EventMap[0xe3] = EVENT_VIBRATO_ON;
-	pSeqFile->EventMap[0xe4] = EVENT_VIBRATO_OFF;
-	pSeqFile->EventMap[0xe5] = EVENT_MASTER_VOLUME;
-	pSeqFile->EventMap[0xe6] = EVENT_MASTER_VOLUME_FADE;
-	pSeqFile->EventMap[0xe7] = EVENT_TEMPO;
-	pSeqFile->EventMap[0xe8] = EVENT_TEMPO_FADE;
-	pSeqFile->EventMap[0xe9] = EVENT_GLOBAL_TRANSPOSE;
-	pSeqFile->EventMap[0xea] = EVENT_TRANSPOSE;
-	pSeqFile->EventMap[0xeb] = EVENT_TREMOLO_ON;
-	pSeqFile->EventMap[0xec] = EVENT_TREMOLO_OFF;
-	pSeqFile->EventMap[0xed] = EVENT_VOLUME;
-	pSeqFile->EventMap[0xee] = EVENT_VOLUME_FADE;
-	pSeqFile->EventMap[0xef] = EVENT_CALL;
-	pSeqFile->EventMap[0xf0] = EVENT_VIBRATO_FADE;
-	pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_TO;
-	pSeqFile->EventMap[0xf2] = EVENT_PITCH_ENVELOPE_FROM;
-	pSeqFile->EventMap[0xf3] = EVENT_PITCH_ENVELOPE_OFF;
-	pSeqFile->EventMap[0xf4] = EVENT_TUNING;
-	pSeqFile->EventMap[0xf5] = EVENT_ECHO_ON;
-	pSeqFile->EventMap[0xf6] = EVENT_ECHO_OFF;
-	pSeqFile->EventMap[0xf7] = EVENT_ECHO_PARAM;
-	pSeqFile->EventMap[0xf8] = EVENT_ECHO_VOLUME_FADE;
-	pSeqFile->EventMap[0xf9] = EVENT_PITCH_SLIDE;
-	pSeqFile->EventMap[0xfa] = EVENT_PERCCUSION_PATCH_BASE;
+	switch (version) {
+	case NINSNES_EARLIER:
+		pSeqFile->EventMap[0xda] = EVENT_PROGCHANGE;
+		pSeqFile->EventMap[0xdb] = EVENT_PAN;
+		pSeqFile->EventMap[0xdc] = EVENT_PAN_FADE;
+		pSeqFile->EventMap[0xdd] = EVENT_PITCH_SLIDE;
+		pSeqFile->EventMap[0xde] = EVENT_VIBRATO_ON;
+		pSeqFile->EventMap[0xdf] = EVENT_VIBRATO_OFF;
+		pSeqFile->EventMap[0xe0] = EVENT_MASTER_VOLUME;
+		pSeqFile->EventMap[0xe1] = EVENT_MASTER_VOLUME_FADE;
+		pSeqFile->EventMap[0xe2] = EVENT_TEMPO;
+		pSeqFile->EventMap[0xe3] = EVENT_TEMPO_FADE;
+		pSeqFile->EventMap[0xe4] = EVENT_GLOBAL_TRANSPOSE;
+		pSeqFile->EventMap[0xe5] = EVENT_TREMOLO_ON;
+		pSeqFile->EventMap[0xe6] = EVENT_TREMOLO_OFF;
+		pSeqFile->EventMap[0xe7] = EVENT_VOLUME;
+		pSeqFile->EventMap[0xe8] = EVENT_VOLUME_FADE;
+		pSeqFile->EventMap[0xe9] = EVENT_CALL;
+		pSeqFile->EventMap[0xea] = EVENT_VIBRATO_FADE;
+		pSeqFile->EventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
+		pSeqFile->EventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
+		//pSeqFile->EventMap[0xed] = EVENT_PITCH_ENVELOPE_OFF;
+		pSeqFile->EventMap[0xee] = EVENT_TUNING;
+		pSeqFile->EventMap[0xef] = EVENT_ECHO_ON;
+		pSeqFile->EventMap[0xf0] = EVENT_ECHO_OFF;
+		pSeqFile->EventMap[0xf1] = EVENT_ECHO_PARAM;
+		pSeqFile->EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
 
-	const uint8_t ninVolumeTableStandard[16] = {
-		0x4c, 0x59, 0x6d, 0x7f, 0x87, 0x8e, 0x98, 0xa0,
-		0xa8, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
-	};
-	volumeTable.assign(std::begin(ninVolumeTableStandard), std::end(ninVolumeTableStandard));
+		if (volumeTable.empty()) {
+			const uint8_t ninVolumeTableEarlier[16] = {
+				0x08, 0x12, 0x1b, 0x24, 0x2c, 0x35, 0x3e, 0x47,
+				0x51, 0x5a, 0x62, 0x6b, 0x7d, 0x8f, 0xa1, 0xb3,
+			};
+			volumeTable.assign(std::begin(ninVolumeTableEarlier), std::end(ninVolumeTableEarlier));
+		}
 
-	const uint8_t ninDurRateTableStandard[8] = {
-		0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xf2, 0xfc,
-	};
-	durRateTable.assign(std::begin(ninDurRateTableStandard), std::end(ninDurRateTableStandard));
+		if (durRateTable.empty()) {
+			const uint8_t ninDurRateTableEarlier[8] = {
+				0x33, 0x66, 0x80, 0x99, 0xb3, 0xcc, 0xe6, 0xff,
+			};
+			durRateTable.assign(std::begin(ninDurRateTableEarlier), std::end(ninDurRateTableEarlier));
+		}
 
-	const uint8_t ninpanTableStandard[21] = {
-		0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
-		0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
-		0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
-	};
-	panTable.assign(std::begin(ninpanTableStandard), std::end(ninpanTableStandard));
+		if (panTable.empty()) {
+			const uint8_t ninpanTableEarlier[21] = {
+				0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
+				0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
+				0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
+			};
+			panTable.assign(std::begin(ninpanTableEarlier), std::end(ninpanTableEarlier));
+		}
+		break;
+
+	default:
+		pSeqFile->EventMap[0xe0] = EVENT_PROGCHANGE;
+		pSeqFile->EventMap[0xe1] = EVENT_PAN;
+		pSeqFile->EventMap[0xe2] = EVENT_PAN_FADE;
+		pSeqFile->EventMap[0xe3] = EVENT_VIBRATO_ON;
+		pSeqFile->EventMap[0xe4] = EVENT_VIBRATO_OFF;
+		pSeqFile->EventMap[0xe5] = EVENT_MASTER_VOLUME;
+		pSeqFile->EventMap[0xe6] = EVENT_MASTER_VOLUME_FADE;
+		pSeqFile->EventMap[0xe7] = EVENT_TEMPO;
+		pSeqFile->EventMap[0xe8] = EVENT_TEMPO_FADE;
+		pSeqFile->EventMap[0xe9] = EVENT_GLOBAL_TRANSPOSE;
+		pSeqFile->EventMap[0xea] = EVENT_TRANSPOSE;
+		pSeqFile->EventMap[0xeb] = EVENT_TREMOLO_ON;
+		pSeqFile->EventMap[0xec] = EVENT_TREMOLO_OFF;
+		pSeqFile->EventMap[0xed] = EVENT_VOLUME;
+		pSeqFile->EventMap[0xee] = EVENT_VOLUME_FADE;
+		pSeqFile->EventMap[0xef] = EVENT_CALL;
+		pSeqFile->EventMap[0xf0] = EVENT_VIBRATO_FADE;
+		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_TO;
+		pSeqFile->EventMap[0xf2] = EVENT_PITCH_ENVELOPE_FROM;
+		pSeqFile->EventMap[0xf3] = EVENT_PITCH_ENVELOPE_OFF;
+		pSeqFile->EventMap[0xf4] = EVENT_TUNING;
+		pSeqFile->EventMap[0xf5] = EVENT_ECHO_ON;
+		pSeqFile->EventMap[0xf6] = EVENT_ECHO_OFF;
+		pSeqFile->EventMap[0xf7] = EVENT_ECHO_PARAM;
+		pSeqFile->EventMap[0xf8] = EVENT_ECHO_VOLUME_FADE;
+		pSeqFile->EventMap[0xf9] = EVENT_PITCH_SLIDE;
+		pSeqFile->EventMap[0xfa] = EVENT_PERCCUSION_PATCH_BASE;
+
+		if (volumeTable.empty()) {
+			const uint8_t ninVolumeTableStandard[16] = {
+				0x4c, 0x59, 0x6d, 0x7f, 0x87, 0x8e, 0x98, 0xa0,
+				0xa8, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
+			};
+			volumeTable.assign(std::begin(ninVolumeTableStandard), std::end(ninVolumeTableStandard));
+		}
+
+		if (durRateTable.empty()) {
+			const uint8_t ninDurRateTableStandard[8] = {
+				0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xf2, 0xfc,
+			};
+			durRateTable.assign(std::begin(ninDurRateTableStandard), std::end(ninDurRateTableStandard));
+		}
+
+		if (panTable.empty()) {
+			const uint8_t ninpanTableStandard[21] = {
+				0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
+				0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
+				0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
+			};
+			panTable.assign(std::begin(ninpanTableStandard), std::end(ninpanTableStandard));
+		}
+	}
 }
 
 double NinSnesSeq::GetTempoInBPM(uint8_t tempo)

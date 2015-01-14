@@ -43,6 +43,39 @@ BytePattern NinSnesScanner::ptnJumpToVcmd(
 	,
 	18);
 
+//; Super Mario World SPC
+//; dispatch vcmd in A (da-f2)
+//0d40: 1c        asl   a
+//0d41: 5d        mov   x,a
+//0d42: e8 00     mov   a,#$00
+//0d44: 1f dc 0e  jmp   ($0edc+x)
+BytePattern NinSnesScanner::ptnJumpToVcmdSMW(
+	"\x1c\x5d\xe8\x00\x1f\xdc\x0e"
+	,
+	"xxxxx??"
+	,
+	7);
+
+//; Super Mario World SPC
+//; read vcmd length table
+//10c3: 68 da     cmp   a,#$da
+//10c5: 90 0a     bcc   $10d1
+//10c7: 6d        push  y
+//10c8: fd        mov   y,a
+//10c9: ae        pop   a
+//10ca: 60        clrc
+//10cb: 96 e8 0e  adc   a,$0ee8+y
+//10ce: fd        mov   y,a
+//10cf: 2f e3     bra   $10b4
+BytePattern NinSnesScanner::ptnReadVcmdLengthSMW(
+	"\x68\xda\x90\x0a\x6d\xfd\xae\x60"
+	"\x96\xe8\x0e\xfd\x2f\xe3"
+	,
+	"x?xxxxxx"
+	"x??xx?"
+	,
+	14);
+
 //; Yoshi's Island SPC
 //; dereference and increment the section pointer $40/1
 //06d7: 8d 00     mov   y,#$00
@@ -78,6 +111,22 @@ BytePattern NinSnesScanner::ptnLoadInstrTableAddress(
 	,
 	12);
 
+//; Super Mario World SPC
+//0d4e: 8d 05     mov   y,#$05
+//0d50: 8f 46 14  mov   $14,#$46
+//0d53: 8f 5f 15  mov   $15,#$5f
+//0d56: cf        mul   ya
+//0d57: 7a 14     addw  ya,$14
+//0d59: da 14     movw  $14,ya
+BytePattern NinSnesScanner::ptnLoadInstrTableAddressSMW(
+	"\x8d\x05\x8f\x46\x14\x8f\x5f\x15"
+	"\xcf\x7a\x14\xda\x14"
+	,
+	"xxx??x??"
+	"xx?x?"
+	,
+	13);
+
 //; Kirby Super Star SPC
 //071e: 8f 5d f2  mov   $f2,#$5d
 //0721: 8f 03 f3  mov   $f3,#$03          ; source dir = $0300
@@ -99,6 +148,19 @@ BytePattern NinSnesScanner::ptnSetDIRYI(
 	,
 	7);
 
+//; Super Mario World SPC
+//; default values for DSP regs
+//1295: db $7f,$7f,$00,$00,$2f,$60,$00,$00,$00,$80,$60,$02 
+//12a1: db $0c,$1c,$2c,$3c,$6c,$0d,$2d,$3d,$4d,$5d,$6d,$7d
+BytePattern NinSnesScanner::ptnSetDIRSMW(
+	"\x7f\x7f\x00\x00\x2f\x60\x00\x00\x00\x80\x60\x02"
+	"\x0c\x1c\x2c\x3c\x6c\x0d\x2d\x3d\x4d\x5d\x6d\x7d"
+	,
+	"????????????"
+	"xxxxxxxxxxxx"
+	,
+	24);
+
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -116,10 +178,6 @@ void NinSnesScanner::Scan(RawFile* file, void* info)
 void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 {
 	NinSnesVersion version = NINSNES_NONE;
-
-	UINT ofsLoadInstrTableAddressASM;
-	UINT ofsSetDIRASM;
-	UINT addrInstrTable;
 
 	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
@@ -152,7 +210,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		ptnInitSectionPtrBytes
 		,
 		"x??xx??x"
-		"?"
+		"x"
 		,
 		9);
 
@@ -175,12 +233,34 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		ptnInitSectionPtrBytesYI
 		,
 		"xxx??xxx"
-		"x?xx??x?"
+		"x?xx??xx"
 		,
 		16);
 
+	//; Super Mario World SPC
+	//; set initial value to section pointer
+	//0b5f: 1c        asl   a
+	//0b60: fd        mov   y,a
+	//0b61: f6 5e 13  mov   a,$135e+y
+	//0b64: c4 40     mov   $40,a
+	//0b66: f6 5f 13  mov   a,$135f+y
+	//0b69: c4 41     mov   $41,a
+	char ptnInitSectionPtrBytesSMW[] =
+		"\x1c\xfd\xf6\x5e\x13\xc4\x40\xf6"
+		"\x5f\x13\xc4\x41";
+	ptnInitSectionPtrBytesSMW[6] = addrSectionPtr;
+	ptnInitSectionPtrBytesSMW[11] = addrSectionPtr + 1;
+	BytePattern ptnInitSectionPtrSMW(
+		ptnInitSectionPtrBytesSMW
+		,
+		"xxx??xxx"
+		"??xx"
+		,
+		12);
+
 	// END DYNAMIC PATTERN DEFINITIONS
 
+	// ACQUIRE SEQUENCE LIST ADDRESS:
 	// find the initialization code of the section pointer,
 	// and acquire the sequence list address
 	uint32_t ofsInitSectionPtr = 0;
@@ -193,13 +273,52 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	{
 		addrSongList = file->GetShort(ofsInitSectionPtr + 12);
 	}
+	else if (file->SearchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr))
+	{
+		addrSongList = file->GetShort(ofsInitSectionPtr + 3);
+	}
 	else
 	{
 		return;
 	}
 
-	// TODO: version detection
-	version = NINSNES_STANDARD;
+	// ACQUIRE VOICE COMMAND LIST & DETECT ENGINE VERSION
+	// (Minor classification for derived versions should come later as far as possible)
+
+	// find a branch for voice command,
+	// and acquire the following info for standard engines.
+	// 
+	// - First voice command (usually $e0)
+	// - Voice command address table
+	// - Voice command length table
+
+	uint32_t ofsBranchForVcmd = 0;
+	if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
+	{
+		uint8_t firstVoiceCmd = 0;
+		uint32_t ofsJumpToVcmd = 0;
+		uint32_t ofsReadVcmdLength = 0;
+		uint16_t addrVoiceCmdAddressTable = 0;
+		uint16_t addrVoiceCmdLengthTable = 0;
+
+		firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 1);
+
+		// find a jump to address_table[cmd * 2]
+		if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd))
+		{
+			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
+			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
+			version = NINSNES_STANDARD;
+		}
+		else if (file->SearchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
+			// search vcmd length table as well
+			if (file->SearchBytePattern(ptnReadVcmdLengthSMW, ofsReadVcmdLength)) {
+				addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 5) + ((firstVoiceCmd * 2) & 0xff);
+				addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 9) + firstVoiceCmd;
+				version = NINSNES_EARLIER;
+			}
+		}
+	}
 
 	// guess current song number
 	// TODO: add heuristic search
@@ -225,9 +344,15 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	}
 
 	// scan for instrument table
+	UINT ofsLoadInstrTableAddressASM;
+	UINT addrInstrTable;
 	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM))
 	{
 		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
+	}
+	else if (file->SearchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM))
+	{
+		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 3) | (file->GetByte(ofsLoadInstrTableAddressASM + 6) << 8);
 	}
 	else
 	{
@@ -236,6 +361,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 	// scan for DIR address
 	uint8_t spcDIR;
+	UINT ofsSetDIRASM;
 	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIRASM))
 	{
 		spcDIR = file->GetByte(ofsSetDIRASM + 4);
@@ -244,130 +370,23 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	{
 		spcDIR = file->GetByte(ofsSetDIRASM + 1);
 	}
+	else if (file->SearchBytePattern(ptnSetDIRSMW, ofsSetDIRASM))
+	{
+		spcDIR = file->GetByte(ofsSetDIRASM + 9);
+	}
 	else
 	{
 		return;
 	}
 
-	NinSnesInstrSet * newInstrSet = new NinSnesInstrSet(file, addrInstrTable, spcDIR << 8);
+	NinSnesInstrSet * newInstrSet = new NinSnesInstrSet(file, version, addrInstrTable, spcDIR << 8);
 	if (!newInstrSet->LoadVGMFile())
 	{
 		delete newInstrSet;
 		return;
 	}
-
-#if 0
-	// BEGIN STANDARD VERSION DETECTION
-
-	uint8_t firstVoiceCmd = 0;
-	uint16_t addrVoiceCmdAddressTable = 0;
-	uint16_t addrVoiceCmdLengthTable = 0;
-
-	// find a branch for voice command,
-	// and acquire the following info for standard engines.
-	// 
-	// - First voice command (usually $e0)
-	// - Voice command address table
-	// - Voice command length table
-
-	uint32_t ofsBranchForVcmd = 0;
-	uint32_t ofsJumpToVcmd = 0;
-	if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
-	{
-		firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 1);
-
-		// find a jump to address_table[cmd * 2]
-		if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd))
-		{
-			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
-			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
-			version = NINSNES_STANDARD;
-		}
-	}
-
-	// END STANDARD VERSION DETECTION
-#endif
 }
 
 void NinSnesScanner::SearchForNinSnesFromROM (RawFile* file)
 {
 }
-
-/*
-void NinSnesScanner::SearchForNinSnesSeq (RawFile* file)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength < 0x10000 || nFileLength > 0x10500)
-		return;
-
-	// a small logic to prevent a false positive
-	uint32_t ofsBranchForVcmd;
-	if (!file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
-	{
-		return;
-	}
-
-	for (uint32_t i = 0x100; i+1 < nFileLength; i++)
-	{
-		uint16_t theShort2;
-		uint16_t theShort = file->GetShort(i);
-		if (theShort > i && theShort < i + 0x200)
-		{
-			bool bFailed = false;
-			int m = 0;
-			while (true)
-			{
-				m+=2;
-				if (i+m <= nFileLength-2)
-				{
-					theShort2 = file->GetShort(i+m);
-					if (theShort2 > i+m && theShort2 < i+m+0x200)
-						continue;
-					else if (theShort2 == 0 || theShort2 < 0x100)//== 0xFF)
-						break;
-					else
-					{
-						bFailed = true;
-						break;
-					}
-				}
-				else
-				{
-					bFailed = true;
-					break;
-				}
-			}
-			if (!bFailed)
-			{
-				for (int n=0; n<m; n+=2)
-				{
-					for (int p=0; p<8; p++)
-					{
-						theShort = file->GetShort(i+n);
-						uint16_t tempShort;
-						if ((uint32_t)(theShort+p*2+1) < nFileLength)
-							tempShort = file->GetShort(theShort+p*2);
-						else
-						{
-							bFailed = true;
-							break;
-						}
-						if ((uint32_t)(tempShort+1) < nFileLength)
-						{
-							if ((tempShort <= i || tempShort >= i+0x3000) && tempShort != 0)
-								bFailed = true;
-						}
-					}
-				}
-				if (!bFailed)
-				{
-					NinSnesSeq* newSeq = new NinSnesSeq(file, NINSNES_STANDARD, i);
-					if (!newSeq->LoadVGMFile())
-						delete newSeq;
-					i += m;
-				}
-			}
-		}
-	}
-}
-*/

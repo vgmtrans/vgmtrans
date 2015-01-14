@@ -8,8 +8,8 @@
 // NinSnesInstrSet
 // ****************
 
-NinSnesInstrSet::NinSnesInstrSet(RawFile* file, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name) :
-	VGMInstrSet(NinSnesFormat::name, file, offset, 0, name),
+NinSnesInstrSet::NinSnesInstrSet(RawFile* file, NinSnesVersion ver, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name) :
+	VGMInstrSet(NinSnesFormat::name, file, offset, 0, name), version(ver),
 	spcDirAddr(spcDirAddr)
 {
 }
@@ -28,20 +28,23 @@ bool NinSnesInstrSet::GetInstrPointers()
 	usedSRCNs.clear();
 	for (int instr = 0; instr <= 0xff; instr++)
 	{
-		uint32_t addrInstrHeader = dwOffset + (6 * instr);
-		if (addrInstrHeader + 6 > 0x10000)
+		size_t instrItemSize = NinSnesInstr::ExpectedSize(version);
+		uint32_t addrInstrHeader = dwOffset + (instrItemSize * instr);
+		if (addrInstrHeader + instrItemSize > 0x10000)
 		{
 			return false;
 		}
 
 		// skip blank slot (Kirby Super Star)
-		if (GetByte(addrInstrHeader) == 0xff && GetByte(addrInstrHeader + 1) == 0xff && GetByte(addrInstrHeader + 2) == 0xff &&
-			GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff && GetByte(addrInstrHeader + 5) == 0xff)
-		{
-			continue;
+		if (version != NINSNES_EARLIER) {
+			if (GetByte(addrInstrHeader) == 0xff && GetByte(addrInstrHeader + 1) == 0xff && GetByte(addrInstrHeader + 2) == 0xff &&
+				GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff && GetByte(addrInstrHeader + 5) == 0xff)
+			{
+				continue;
+			}
 		}
 
-		if (!NinSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr))
+		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr))
 		{
 			break;
 		}
@@ -55,7 +58,7 @@ bool NinSnesInstrSet::GetInstrPointers()
 
 		std::wostringstream instrName;
 		instrName << L"Instrument " << instr;
-		NinSnesInstr * newInstr = new NinSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
+		NinSnesInstr * newInstr = new NinSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
 		aInstrs.push_back(newInstr);
 	}
 	if (aInstrs.size() == 0)
@@ -78,8 +81,8 @@ bool NinSnesInstrSet::GetInstrPointers()
 // NinSnesInstr
 // *************
 
-NinSnesInstr::NinSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name) :
-	VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name),
+NinSnesInstr::NinSnesInstr(VGMInstrSet* instrSet, NinSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name) :
+	VGMInstr(instrSet, offset, NinSnesInstr::ExpectedSize(ver), theBank, theInstrNum, name), version(ver),
 	spcDirAddr(spcDirAddr)
 {
 }
@@ -99,16 +102,18 @@ bool NinSnesInstr::LoadInstr()
 
 	uint16_t addrSampStart = GetShort(offDirEnt);
 
-	NinSnesRgn * rgn = new NinSnesRgn(this, dwOffset);
+	NinSnesRgn * rgn = new NinSnesRgn(this, version, dwOffset);
 	rgn->sampOffset = addrSampStart - spcDirAddr;
 	aRgns.push_back(rgn);
 
 	return true;
 }
 
-bool NinSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint32_t spcDirAddr)
+bool NinSnesInstr::IsValidHeader(RawFile * file, NinSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr)
 {
-	if (addrInstrHeader + 6 > 0x10000)
+	size_t instrItemSize = NinSnesInstr::ExpectedSize(version);
+
+	if (addrInstrHeader + instrItemSize > 0x10000)
 	{
 		return false;
 	}
@@ -117,7 +122,6 @@ bool NinSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint3
 	uint8_t adsr1 = file->GetByte(addrInstrHeader + 1);
 	uint8_t adsr2 = file->GetByte(addrInstrHeader + 2);
 	uint8_t gain = file->GetByte(addrInstrHeader + 3);
-	int16_t pitch_scale = file->GetShortBE(addrInstrHeader + 4);
 
 	if (srcn >= 0x80 || (adsr1 == 0 && gain == 0))
 	{
@@ -141,18 +145,34 @@ bool NinSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint3
 	return true;
 }
 
+size_t NinSnesInstr::ExpectedSize(NinSnesVersion version)
+{
+	if (version == NINSNES_EARLIER) {
+		return 5;
+	}
+	else {
+		return 6;
+	}
+}
+
 // ***********
 // NinSnesRgn
 // ***********
 
-NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, uint32_t offset) :
-	VGMRgn(instr, offset, 6)
+NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset) :
+	VGMRgn(instr, offset, NinSnesInstr::ExpectedSize(ver)), version(ver)
 {
 	uint8_t srcn = GetByte(offset);
 	uint8_t adsr1 = GetByte(offset + 1);
 	uint8_t adsr2 = GetByte(offset + 2);
 	uint8_t gain = GetByte(offset + 3);
-	int16_t pitch_scale = GetShortBE(offset + 4);
+	int16_t pitch_scale;
+	if (version == NINSNES_EARLIER) {
+		pitch_scale = (int8_t)GetByte(offset + 4);
+	}
+	else {
+		pitch_scale = GetShortBE(offset + 4);
+	}
 
 	const double pitch_fixer = 1.0238 * (32768.0 / 32000.0); // 1.0238 <- pitch table vs. equal temperament
 	double fine_tuning;
@@ -175,8 +195,13 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, uint32_t offset) :
 	AddSimpleItem(offset + 1, 1, L"ADSR1");
 	AddSimpleItem(offset + 2, 1, L"ADSR2");
 	AddSimpleItem(offset + 3, 1, L"GAIN");
-	AddUnityKey(96 - (int)(coarse_tuning), offset + 4, 1);
-	AddFineTune((int16_t)(fine_tuning * 100.0), offset + 5, 1);
+	if (version == NINSNES_EARLIER) {
+		AddFineTune((int16_t)(fine_tuning * 100.0), offset + 4, 1);
+	}
+	else {
+		AddUnityKey(96 - (int)(coarse_tuning), offset + 4, 1);
+		AddFineTune((int16_t)(fine_tuning * 100.0), offset + 5, 1);
+	}
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 

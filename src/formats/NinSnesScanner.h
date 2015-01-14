@@ -21,8 +21,12 @@ public:
 private:
 	static BytePattern ptnBranchForVcmd;
 	static BytePattern ptnJumpToVcmd;
+	static BytePattern ptnJumpToVcmdSMW;
+	static BytePattern ptnReadVcmdLengthSMW;
 	static BytePattern ptnIncSectionPtr;
 	static BytePattern ptnLoadInstrTableAddress;
+	static BytePattern ptnLoadInstrTableAddressSMW;
 	static BytePattern ptnSetDIR;
 	static BytePattern ptnSetDIRYI;
+	static BytePattern ptnSetDIRSMW;
 };
