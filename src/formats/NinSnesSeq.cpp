@@ -502,6 +502,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_TIE:
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE);
+		AddTime(spcNoteDuration);
 		break;
 
 	case EVENT_REST:
