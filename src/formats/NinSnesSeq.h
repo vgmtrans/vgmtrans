@@ -61,6 +61,7 @@ public:
 	double GetTempoInBPM(uint8_t tempo);
 
 	NinSnesVersion version;
+	uint8_t STATUS_END;
 	uint8_t STATUS_NOTE_MIN;
 	uint8_t STATUS_NOTE_MAX;
 	uint8_t STATUS_PERCUSSION_NOTE_MIN;

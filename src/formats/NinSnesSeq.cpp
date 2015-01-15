@@ -139,6 +139,7 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 
 	switch (version) {
 	case NINSNES_EARLIER:
+		STATUS_END = 0x00;
 		STATUS_NOTE_MIN = 0x80;
 		STATUS_NOTE_MAX = 0xc5;
 		STATUS_PERCUSSION_NOTE_MIN = 0xd0;
@@ -146,6 +147,7 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 		break;
 
 	default:
+		STATUS_END = 0x00;
 		STATUS_NOTE_MIN = 0x80;
 		STATUS_NOTE_MAX = 0xc7;
 		STATUS_PERCUSSION_NOTE_MIN = 0xca;
@@ -449,8 +451,9 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_END:
 	{
+		// AddEvent is called at the last of this function
+
 		if (loopCount == 0) {
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
 			if (readMode == READMODE_FIND_DELTA_LENGTH) {
 				deltaLength = GetTime();
 			}
@@ -472,8 +475,6 @@ bool NinSnesTrack::ReadEvent(void)
 				// repeat again
 				curOffset = loopStartAddress;
 			}
-
-			AddGenericEvent(beginOffset, eventLength, L"Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
 		}
 		break;
 	}
@@ -679,6 +680,16 @@ bool NinSnesTrack::ReadEvent(void)
 			<< std::dec << std::setfill(L' ') << std::setw(0) << L"  Times: " << (int)times;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
+		// Add the next "END" event to UI
+		if (curOffset < 0x10000 && GetByte(curOffset) == parentSeq->STATUS_END) {
+			if (loopCount == 0) {
+				AddGenericEvent(curOffset, 1, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+			}
+			else {
+				AddGenericEvent(curOffset, 1, L"Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+			}
+		}
+
 		curOffset = loopStartAddress;
 		break;
 	}
@@ -797,6 +808,17 @@ bool NinSnesTrack::ReadEvent(void)
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Base", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
 		break;
 	}
+	}
+
+	// Add the next "END" event to UI
+	// (because it often gets interrupted by the end of other track)
+	if (curOffset + 1 < 0x10000 && statusByte != parentSeq->STATUS_END && GetByte(curOffset + 1) == parentSeq->STATUS_END) {
+		if (loopCount == 0) {
+			AddGenericEvent(curOffset + 1, 1, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+		}
+		else {
+			AddGenericEvent(curOffset + 1, 1, L"Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+		}
 	}
 
 	return bContinue;
