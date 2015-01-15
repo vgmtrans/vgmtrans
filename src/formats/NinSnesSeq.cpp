@@ -341,7 +341,8 @@ NinSnesTrack::NinSnesTrack(NinSnesSection* parentSection, long offset, long leng
 	available(true),
 	spcNoteDuration(1),
 	spcNoteDurRate(0xfc),
-	spcNoteVolume(0xfc)
+	spcNoteVolume(0xfc),
+	lastNoteNumberForTie(0)
 {
 	if (theName != NULL) {
 		name = theName;
@@ -507,6 +508,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
 		uint8_t duration = max((spcNoteDuration * spcNoteDurRate) >> 8, 1);
 
+		lastNoteNumberForTie = noteNumber;
 		AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, spcNoteVolume / 2, duration, L"Note");
 		AddTime(spcNoteDuration);
 		break;
@@ -514,6 +516,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_TIE:
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE);
+		AddNoteByDurNoItem(lastNoteNumberForTie, spcNoteVolume / 2, spcNoteDuration);
 		AddTime(spcNoteDuration);
 		break;
 

@@ -109,4 +109,5 @@ private:
 	uint16_t loopReturnAddress;
 	uint16_t loopStartAddress;
 	uint8_t loopCount;
+	uint8_t lastNoteNumberForTie; // temporary workaround
 };
