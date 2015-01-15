@@ -458,7 +458,11 @@ bool NinSnesTrack::ReadEvent(void)
 			uint32_t eventLength = curOffset - beginOffset;
 
 			loopCount--;
-			if (loopCount != 0) {
+			if (loopCount == 0) {
+				// repeat end
+				curOffset = loopReturnAddress;
+			}
+			else {
 				// repeat again
 				curOffset = loopStartAddress;
 			}
@@ -665,6 +669,8 @@ bool NinSnesTrack::ReadEvent(void)
 		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest
 			<< std::dec << std::setfill(L' ') << std::setw(0) << L"  Times: " << (int)times;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+
+		curOffset = loopStartAddress;
 		break;
 	}
 
