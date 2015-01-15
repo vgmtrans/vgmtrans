@@ -168,7 +168,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset)
 	uint8_t gain = GetByte(offset + 3);
 	int16_t pitch_scale;
 	if (version == NINSNES_EARLIER) {
-		pitch_scale = (int8_t)GetByte(offset + 4);
+		pitch_scale = (int8_t)GetByte(offset + 4) * 256;
 	}
 	else {
 		pitch_scale = GetShortBE(offset + 4);
@@ -196,6 +196,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset)
 	AddSimpleItem(offset + 2, 1, L"ADSR2");
 	AddSimpleItem(offset + 3, 1, L"GAIN");
 	if (version == NINSNES_EARLIER) {
+		AddUnityKey(96 - (int)(coarse_tuning), offset + 4, 1);
 		AddFineTune((int16_t)(fine_tuning * 100.0), offset + 4, 1);
 	}
 	else {
