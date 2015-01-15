@@ -320,20 +320,80 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		}
 	}
 
-	// guess current song number
-	// TODO: add heuristic search
+	// GUESS CURRENT SONG NUMBER
 	int8_t guessedSongIndex = -1;
-	switch (version)
-	{
-	case NINSNES_STANDARD:
-		guessedSongIndex = file->GetByte(0xf4);
-		break;
 
-	default:
-		guessedSongIndex = 1;
-		break;
+	// scan for a song that contains the current section
+	uint16_t addrCurrentSection = file->GetShort(addrSectionPtr);
+	if (addrCurrentSection >= 0x0100 && addrCurrentSection < 0xfff0 && (addrCurrentSection % 2) == (addrSongList % 2)) {
+		int8_t songIndexCandidate = -1;
+		uint16_t bestSectionDistance = 0xffff;
+
+		for (int songIndex = 0; songIndex <= 0x7f; songIndex++) {
+			UINT addrSectionListPtr = addrSongList + songIndex * 2;
+			if (addrSectionListPtr >= 0x10000) {
+				break;
+			}
+
+			uint16_t firstSectionAddress = file->GetShort(addrSectionListPtr);
+			if (firstSectionAddress > addrCurrentSection) {
+				continue;
+			}
+
+			uint16_t curAddress = firstSectionAddress;
+			while (curAddress >= 0x0100 && curAddress < 0xfff0) {
+				uint16_t addrSection = file->GetShort(curAddress);
+
+				if ((addrSection & 0xff00) == 0) {
+					// section list end / jump
+					break;
+				}
+
+				if (curAddress == addrCurrentSection) {
+					uint16_t sectionDistance = addrCurrentSection - firstSectionAddress;
+					if (sectionDistance < bestSectionDistance) {
+						songIndexCandidate = songIndex;
+						bestSectionDistance = sectionDistance;
+					}
+					break;
+				}
+
+				curAddress += 2;
+			}
+
+			if (bestSectionDistance == 0) {
+				break;
+			}
+		}
+
+		guessedSongIndex = songIndexCandidate;
 	}
 
+	// acquire song index from APU port
+	if (guessedSongIndex == -1) {
+		int8_t songIndexCandidate;
+
+		switch (version)
+		{
+		case NINSNES_EARLIER:
+			songIndexCandidate = file->GetByte(0xf6);
+			break;
+
+		case NINSNES_STANDARD:
+			songIndexCandidate = file->GetByte(0xf4);
+			break;
+		}
+
+		if (songIndexCandidate >= 0 && songIndexCandidate <= 0x7f) {
+			guessedSongIndex = songIndexCandidate;
+		}
+	}
+
+	// use first song if no hints available
+	if (guessedSongIndex == -1) {
+		guessedSongIndex = 1;
+	}
+	
 	// load the song
 	uint16_t addrSongStart = file->GetShort(addrSongList + guessedSongIndex * 2);
 	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, name);
