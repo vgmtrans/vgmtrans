@@ -28,7 +28,7 @@ bool NinSnesInstrSet::GetInstrPointers()
 	usedSRCNs.clear();
 	for (int instr = 0; instr <= 0xff; instr++)
 	{
-		size_t instrItemSize = NinSnesInstr::ExpectedSize(version);
+		uint32_t instrItemSize = NinSnesInstr::ExpectedSize(version);
 		uint32_t addrInstrHeader = dwOffset + (instrItemSize * instr);
 		if (addrInstrHeader + instrItemSize > 0x10000)
 		{
@@ -145,7 +145,7 @@ bool NinSnesInstr::IsValidHeader(RawFile * file, NinSnesVersion version, uint32_
 	return true;
 }
 
-size_t NinSnesInstr::ExpectedSize(NinSnesVersion version)
+uint32_t NinSnesInstr::ExpectedSize(NinSnesVersion version)
 {
 	if (version == NINSNES_EARLIER) {
 		return 5;

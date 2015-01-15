@@ -532,7 +532,7 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t newPan = GetByte(curOffset++);
 
-		uint8_t panIndex = min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
+		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
 		bool reverseLeft = (newPan & 0x80) != 0;
 		bool reverseRight = (newPan & 0x40) != 0;
 
@@ -548,7 +548,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		uint8_t newPan = GetByte(curOffset++);
 
-		uint8_t panIndex = min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
+		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
 
 		uint8_t spcPan = parentSeq->panTable[panIndex];
 		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal(spcPan);
