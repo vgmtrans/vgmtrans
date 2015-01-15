@@ -316,7 +316,7 @@ bool NinSnesSection::GetTrackPointers()
 		}
 		else {
 			// add an inactive track
-			NinSnesTrack* track = new NinSnesTrack(this, curOffset, 0, L"NULL");
+			NinSnesTrack* track = new NinSnesTrack(this, curOffset, 2, L"NULL");
 			track->available = false;
 			aTracks.push_back(track);
 		}
@@ -362,9 +362,14 @@ void NinSnesTrack::ResetVars(void)
 
 bool NinSnesTrack::ReadEvent(void)
 {
+	if (!available) {
+		AddTime(1);
+		return true;
+	}
+
 	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
 	uint32_t beginOffset = curOffset;
-	if (curOffset >= 0x10000 || !available)
+	if (curOffset >= 0x10000)
 	{
 		return false;
 	}
