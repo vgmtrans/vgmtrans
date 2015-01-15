@@ -172,6 +172,12 @@
     <Filter Include="Source Files\formats\akaosnes">
       <UniqueIdentifier>{417fba57-759c-4cd4-9c92-e9907956db05}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\compilesnes">
+      <UniqueIdentifier>{d4ac6a6c-aa64-41c0-884b-1a4b8aacf7c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\compilesnes">
+      <UniqueIdentifier>{80e1769e-4771-4a33-8f31-741f059d946f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\aboutdlg.cpp">
@@ -599,6 +605,12 @@
     </ClCompile>
     <ClCompile Include="formats\AkaoSnesScanner.cpp">
       <Filter>Source Files\formats\akaosnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\CompileSnesScanner.cpp">
+      <Filter>Source Files\formats\compilesnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\CompileSnesSeq.cpp">
+      <Filter>Source Files\formats\compilesnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1090,6 +1102,15 @@
     </ClInclude>
     <ClInclude Include="formats\AkaoSnesSeq.h">
       <Filter>Header Files\formats\akaosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\CompileSnesScanner.h">
+      <Filter>Header Files\formats\compilesnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\CompileSnesSeq.h">
+      <Filter>Header Files\formats\compilesnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\CompileSnesFormat.h">
+      <Filter>Header Files\formats\compilesnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
