@@ -148,7 +148,7 @@ bool HOSAInstr::LoadInstr()
 		uint8_t Sr = ((rgninfo->ADSR_vals >> 8) & 0xFF) >> 1;
 		uint8_t Rr = (rgninfo->ADSR_vals >> 4) & 0x1F;
 		uint8_t Sl = rgninfo->ADSR_vals & 0xF;
-		uint8_t Am = ((rgninfo->ADSR_Am & 0xF) ^ 5) < 1;			//Not sure what other role this nibble plays, if any.
+		uint8_t Am = (((rgninfo->ADSR_Am & 0xF) ^ 5) < 1) ? 1 : 0;	//Not sure what other role this nibble plays, if any.
 		PSXConvADSR(rgn, Am, Ar, Dr, Sl, 1, 1, Sr, 1, Rr, false);
 
 
