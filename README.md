@@ -8,8 +8,9 @@ VGMTrans converts a music files used in console video games into standard midi a
 - Nintendo's Nintendo DS sequence and instrument formats (SDAT)
 - Late versions of Squaresoft's PS1 format known as AKAO - sequences and instruments
 - Sony's PS1 sequence and instrument formats (.seq, .vab)
+- Heartbeat's PS1 sequence format used in PS1 Dragon Quest games (.seqq)
 - Capcom's QSound sequence and instrument formats used in CPS1/CPS2 arcade games
-- Squaresoft's PS1 format  used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
+- Squaresoft's PS1 format used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
 - Nintendo's Gameboy Advance sequence format
 - Rare's SNES sequence and instrument format (.spc)
 - Capcom's SNES sequence and instrument format (.spc)
