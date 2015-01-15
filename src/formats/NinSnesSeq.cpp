@@ -559,6 +559,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 		// TODO: fade in real curve
 		AddPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);
+		break;
 	}
 
 	case EVENT_VIBRATO_ON:
