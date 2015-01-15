@@ -70,7 +70,7 @@ bool CompileSnesSeq::GetHeaderInfo(void)
 		trackHeader->AddSimpleItem(curOffset, 1, L"Channel");
 		trackHeader->AddSimpleItem(curOffset + 1, 1, L"Flags");
 		trackHeader->AddSimpleItem(curOffset + 2, 1, L"Volume");
-		trackHeader->AddSimpleItem(curOffset + 3, 1, L"Envelope");
+		trackHeader->AddSimpleItem(curOffset + 3, 1, L"Volume Envelope");
 		trackHeader->AddSimpleItem(curOffset + 4, 1, L"Vibrato");
 		trackHeader->AddSimpleItem(curOffset + 5, 1, L"Transpose");
 		trackHeader->AddTempo(curOffset + 6, 1);
