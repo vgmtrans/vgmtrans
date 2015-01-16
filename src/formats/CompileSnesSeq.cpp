@@ -444,6 +444,7 @@ bool CompileSnesTrack::ReadEvent(void)
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Count", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
 		repeatCount[repeatNest] = times;
+		break;
 	}
 
 	case EVENT_FLAGS:
@@ -451,6 +452,7 @@ bool CompileSnesTrack::ReadEvent(void)
 		uint8_t flags = GetByte(curOffset++);
 		spcFlags = flags;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Flags", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
 	}
 
 	case EVENT_TEMPO:
