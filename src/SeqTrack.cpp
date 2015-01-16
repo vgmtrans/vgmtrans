@@ -145,12 +145,6 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 		}
 
 		OnTickEnd();
-
-		if (readMode == READMODE_CONVERT_TO_MIDI) {
-			if (deltaTime != 0) {
-				pMidiTrack->AddDelta(1);
-			}
-		}
 	}
 	else {
 		while (curOffset < stopOffset && GetTime() < (unsigned) stopTime) {

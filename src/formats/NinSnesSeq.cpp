@@ -366,8 +366,7 @@ void NinSnesTrack::ResetVars(void)
 bool NinSnesTrack::ReadEvent(void)
 {
 	if (!available) {
-		AddTime(1);
-		return true;
+		return false;
 	}
 
 	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;

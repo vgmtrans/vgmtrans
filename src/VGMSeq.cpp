@@ -223,6 +223,17 @@ void VGMSeq::LoadTracksMain(long stopTime)
 			}
 			time++;
 
+			if (readMode == READMODE_CONVERT_TO_MIDI)
+			{
+				for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
+				{
+					if (aTracks[trackNum]->pMidiTrack != NULL)
+					{
+						aTracks[trackNum]->pMidiTrack->SetDelta(time);
+					}
+				}
+			}
+
 			// check loop count
 			int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 : ConversionOptions::GetNumSequenceLoops();
 			if (GetForeverLoops() >= requiredLoops)
