@@ -215,6 +215,8 @@ public:
 	uint32_t WriteMetaEvent(std::vector<uint8_t> & buf, uint32_t time, uint8_t metaType, uint8_t* data, size_t dataSize);
 	uint32_t WriteMetaTextEvent(std::vector<uint8_t> & buf, uint32_t time, uint8_t metaType, std::wstring wstr);
 
+	static std::wstring GetNoteName(int noteNumber);
+
 	bool operator<(const MidiEvent &) const;
 	bool operator>(const MidiEvent &) const;
 

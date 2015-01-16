@@ -752,6 +752,27 @@ uint32_t MidiEvent::WriteMetaTextEvent(vector<uint8_t> & buf, uint32_t time, uin
 	//aEvents.push_back(MakeCopy());
 //}
 
+std::wstring MidiEvent::GetNoteName(int noteNumber)
+{
+	const wchar_t* noteNames[12] = { L"C", L"C#", L"D", L"D#", L"E", L"F", L"F#", L"G", L"G#", L"A", L"A#", L"B" };
+
+	int octave;
+	int key;
+	if (noteNumber >= 0) {
+		octave = noteNumber / 12;
+		key = noteNumber % 12;
+	}
+	else {
+		octave = -(-noteNumber / 12) - 1;
+		key = 12 - (-(noteNumber + 1) % 12) - 1;
+	}
+	octave--;
+
+	std::wstringstream name;
+	name << noteNames[key] << " " << octave;
+	return name.str();
+}
+
 
 bool MidiEvent::operator<(const MidiEvent &theMidiEvent) const
 {

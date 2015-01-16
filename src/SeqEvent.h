@@ -1,6 +1,7 @@
 #pragma once
 #include "VGMItem.h"
 #include "Menu.h"
+#include "MidiFile.h"
 
 #define DESCRIPTION(_str_)									\
 	virtual std::wstring GetDescription()					\
@@ -85,7 +86,7 @@ public:
 	virtual ~DurNoteSeqEvent(void) {}
 	virtual EventType GetEventType() { return EVENTTYPE_DURNOTE; }
 	virtual Icon GetIcon() { return ICON_NOTE; }
-	DESCRIPTION(L"Abs Key: " << (int)absKey << L"  Velocity: " << (int)vel << L"  Duration: " << dur)
+	DESCRIPTION(L"Abs Key: " << (int)absKey << " (" << MidiEvent::GetNoteName(absKey) << ") " << L"  Velocity: " << (int)vel << L"  Duration: " << dur)
 public:
 	uint8_t absKey;
 	uint8_t vel;
@@ -104,7 +105,7 @@ public:
 	virtual ~NoteOnSeqEvent(void) {}
 	virtual EventType GetEventType() { return EVENTTYPE_NOTEON; }
 	virtual Icon GetIcon() { return ICON_NOTE; }
-	DESCRIPTION(L"Abs Key: " << (int)absKey << L"  Velocity: " << (int)vel)
+	DESCRIPTION(L"Abs Key: " << (int)absKey << " (" << MidiEvent::GetNoteName(absKey) << ") " << L"  Velocity: " << (int)vel)
 public:
 	uint8_t absKey;
 	uint8_t vel;
@@ -122,7 +123,7 @@ public:
 	virtual ~NoteOffSeqEvent(void) {}
 	virtual EventType GetEventType() { return EVENTTYPE_NOTEOFF; }
 	virtual Icon GetIcon() { return ICON_NOTE; }
-	DESCRIPTION(L"Abs Key: " << (int)absKey)
+	DESCRIPTION(L"Abs Key: " << (int)absKey << " (" << MidiEvent::GetNoteName(absKey) << ") ")
 public:
 	uint8_t absKey;
 };
