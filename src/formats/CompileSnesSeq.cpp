@@ -10,6 +10,7 @@ DECLARE_FORMAT(CompileSnes);
 //  **************
 #define MAX_TRACKS  8
 #define SEQ_PPQN    12
+#define SEQ_KEYOFS  24
 
 #define COMPILESNES_FLAGS_PORTAMENTO    0x10
 
@@ -198,6 +199,8 @@ CompileSnesTrack::CompileSnesTrack(CompileSnesSeq* parentFile, long offset, long
 void CompileSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
+
+	cKeyCorrection = SEQ_KEYOFS;
 
 	spcNoteDuration = 1;
 	spcFlags = spcInitialFlags;
