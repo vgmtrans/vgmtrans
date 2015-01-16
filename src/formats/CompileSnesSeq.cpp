@@ -215,6 +215,18 @@ void CompileSnesTrack::ResetVars(void)
 	transpose = spcTranspose;
 }
 
+void CompileSnesTrack::AddInitialMidiEvents(int trackNum)
+{
+	SeqTrack::AddInitialMidiEvents(trackNum);
+
+	double volumeScale;
+	AddProgramChangeNoItem(spcSRCN, true);
+	AddVolNoItem(Convert7bitPercentVolValToStdMidiVal(spcVolume / 2));
+	AddPanNoItem(Convert7bitPercentPanValToStdMidiVal((uint8_t)(spcPan + 0x80) / 2, &volumeScale));
+	AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
+	AddReverbNoItem(0);
+}
+
 #define EVENT_WITH_MIDITEXT_START	bWriteGenericEventAsTextEventTmp = bWriteGenericEventAsTextEvent; bWriteGenericEventAsTextEvent = true;
 #define EVENT_WITH_MIDITEXT_END	bWriteGenericEventAsTextEvent = bWriteGenericEventAsTextEventTmp;
 
@@ -545,9 +557,8 @@ bool CompileSnesTrack::ReadEvent(void)
 		spcPan = newPan;
 
 		double volumeScale;
-		double panpotScale;
-		ConvertPercentVolPanToStdMidiScale(volumeScale, panpotScale);
-		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal((uint8_t)(newPan + 0x80) / 2);
+		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal((uint8_t)(newPan + 0x80) / 2, &volumeScale);
+		AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
 		break;
 	}

@@ -75,6 +75,7 @@ class CompileSnesTrack
 public:
 	CompileSnesTrack(CompileSnesSeq* parentFile, long offset = 0, long length = 0);
 	virtual void ResetVars(void);
+	virtual void AddInitialMidiEvents(int trackNum);
 	virtual bool ReadEvent(void);
 
 	uint8_t spcNoteDuration;
