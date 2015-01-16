@@ -325,7 +325,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 	// scan for a song that contains the current section
 	uint16_t addrCurrentSection = file->GetShort(addrSectionPtr);
-	if (addrCurrentSection >= 0x0100 && addrCurrentSection < 0xfff0 && (addrCurrentSection % 2) == (addrSongList % 2)) {
+	if (addrCurrentSection >= 0x0100 && addrCurrentSection < 0xfff0) {
 		int8_t songIndexCandidate = -1;
 		uint16_t bestSectionDistance = 0xffff;
 
@@ -341,28 +341,30 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			}
 
 			uint16_t curAddress = firstSectionAddress;
-			while (curAddress >= 0x0100 && curAddress < 0xfff0) {
-				uint16_t addrSection = file->GetShort(curAddress);
+			if ((addrCurrentSection % 2) == (curAddress % 2)) {
+				while (curAddress >= 0x0100 && curAddress < 0xfff0) {
+					uint16_t addrSection = file->GetShort(curAddress);
 
-				if ((addrSection & 0xff00) == 0) {
-					// section list end / jump
-					break;
-				}
-
-				if (curAddress == addrCurrentSection) {
-					uint16_t sectionDistance = addrCurrentSection - firstSectionAddress;
-					if (sectionDistance < bestSectionDistance) {
-						songIndexCandidate = songIndex;
-						bestSectionDistance = sectionDistance;
+					if ((addrSection & 0xff00) == 0) {
+						// section list end / jump
+						break;
 					}
-					break;
+
+					if (curAddress == addrCurrentSection) {
+						uint16_t sectionDistance = addrCurrentSection - firstSectionAddress;
+						if (sectionDistance < bestSectionDistance) {
+							songIndexCandidate = songIndex;
+							bestSectionDistance = sectionDistance;
+						}
+						break;
+					}
+
+					curAddress += 2;
 				}
 
-				curAddress += 2;
-			}
-
-			if (bestSectionDistance == 0) {
-				break;
+				if (bestSectionDistance == 0) {
+					break;
+				}
 			}
 		}
 
