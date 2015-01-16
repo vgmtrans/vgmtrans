@@ -150,6 +150,9 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 	if (readMode == READMODE_ADD_TO_UI)
 	{
 		SetGuessedLength();
+		if (unLength == 0) {
+			return false;
+		}
 	}
 
 	if (!PostLoad()) {
