@@ -84,7 +84,6 @@ public:
 	bool bAlwaysWriteInitialExpression;
 	bool bAlwaysWriteInitialReverb;
 	bool bAlwaysWriteInitialPitchBendRange;
-	bool bAlwaysWriteInitialProgChange;
 	bool bAllowDiscontinuousTrackData;
 
 	// True if each tracks in a sequence needs to be loaded simultaneously in tick by tick, as the real music player does.
@@ -98,7 +97,6 @@ public:
 	//     It can be used anyway, but it is useless and annoys you, in most cases.
 	bool bLoadTickByTick;
 
-	uint32_t initialProgNum;
 	uint8_t initialVol;
 	uint8_t initialExpression;
 	uint8_t initialReverb;

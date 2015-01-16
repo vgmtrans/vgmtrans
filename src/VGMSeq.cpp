@@ -21,14 +21,12 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   bReverb(false),
   bUseLinearAmplitudeScale(false),
   bWriteInitialTempo(false),
-  bAlwaysWriteInitialProgChange(false),
   bAlwaysWriteInitialVol(false),
   bAlwaysWriteInitialExpression(false),
   bAlwaysWriteInitialReverb(false),
   bAlwaysWriteInitialPitchBendRange(false),
   bAllowDiscontinuousTrackData(false),
   bLoadTickByTick(false),
-  initialProgNum(0),
   initialVol(100),					//GM standard (dls1 spec p16)
   initialExpression(127),			//''
   initialReverb(40),				//GM standard

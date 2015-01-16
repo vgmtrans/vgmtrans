@@ -22,6 +22,7 @@ public:
 	virtual bool LoadTrackInit(int trackNum, MidiTrack* preparedMidiTrack);
 	virtual void LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
 	virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
+	virtual void AddInitialMidiEvents(int trackNum);
 	virtual bool ReadEvent(void);
 	virtual void OnTickBegin(){};
 	virtual void OnTickEnd(){};

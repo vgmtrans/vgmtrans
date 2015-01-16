@@ -52,8 +52,6 @@ bool VGMSeqNoTrks::LoadEvents(void)
 	ResetVars();
 	if (bWriteInitialTempo)
 		AddTempoBPMNoItem(tempoBPM);
-	if (bAlwaysWriteInitialProgChange)
-		for (int i = 0; i<16; i++) { channel = i; AddProgramChangeNoItem(initialProgNum, true); }
 	if (bAlwaysWriteInitialVol)
 		for (int i = 0; i<16; i++) { channel = i; AddVolNoItem(initialVol); }
 	if (bAlwaysWriteInitialExpression)

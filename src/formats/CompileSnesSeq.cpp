@@ -33,7 +33,6 @@ CompileSnesSeq::CompileSnesSeq(RawFile* file, CompileSnesVersion ver, uint32_t s
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
 	bWriteInitialTempo = true;
-	bAlwaysWriteInitialProgChange = true;
 
 	LoadEventMap(this);
 }

@@ -82,28 +82,7 @@ bool SeqTrack::LoadTrackInit(int trackNum, MidiTrack* preparedMidiTrack)
 	{
 		if (preparedMidiTrack == NULL)
 		{
-			if (trackNum == 0)
-				pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
-			wostringstream ssTrackName;
-			ssTrackName << L"Track: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << dwStartOffset << std::endl;
-			pMidiTrack->AddTrackName(ssTrackName.str().c_str());
-
-			if (trackNum == 0) {
-				pMidiTrack->AddGMReset();
-				pMidiTrack->AddGM2Reset();
-				if (parentSeq->bWriteInitialTempo)
-					pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
-			}
-			if (parentSeq->bAlwaysWriteInitialProgChange)
-				AddProgramChangeNoItem(parentSeq->initialProgNum, true);
-			if (parentSeq->bAlwaysWriteInitialVol)
-				AddVolNoItem(parentSeq->initialVol);
-			if (parentSeq->bAlwaysWriteInitialExpression)
-				AddExpressionNoItem(parentSeq->initialExpression);
-			if (parentSeq->bAlwaysWriteInitialReverb)
-				AddReverbNoItem(parentSeq->initialReverb);
-			if (parentSeq->bAlwaysWriteInitialPitchBendRange)
-				AddPitchBendRangeNoItem(parentSeq->initialPitchBendRangeSemiTones, parentSeq->initialPitchBendRangeCents);
+			AddInitialMidiEvents(trackNum);
 		}
 	}
 	return true;
@@ -176,6 +155,30 @@ void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum)
 	channelGroup = theTrackNum/16;
 	if (readMode == READMODE_CONVERT_TO_MIDI)
 		pMidiTrack->SetChannelGroup(channelGroup);
+}
+
+void SeqTrack::AddInitialMidiEvents(int trackNum)
+{
+	if (trackNum == 0)
+		pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
+	wostringstream ssTrackName;
+	ssTrackName << L"Track: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << dwStartOffset << std::endl;
+	pMidiTrack->AddTrackName(ssTrackName.str().c_str());
+
+	if (trackNum == 0) {
+		pMidiTrack->AddGMReset();
+		pMidiTrack->AddGM2Reset();
+		if (parentSeq->bWriteInitialTempo)
+			pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
+	}
+	if (parentSeq->bAlwaysWriteInitialVol)
+		AddVolNoItem(parentSeq->initialVol);
+	if (parentSeq->bAlwaysWriteInitialExpression)
+		AddExpressionNoItem(parentSeq->initialExpression);
+	if (parentSeq->bAlwaysWriteInitialReverb)
+		AddReverbNoItem(parentSeq->initialReverb);
+	if (parentSeq->bAlwaysWriteInitialPitchBendRange)
+		AddPitchBendRangeNoItem(parentSeq->initialPitchBendRangeSemiTones, parentSeq->initialPitchBendRangeCents);
 }
 
 uint32_t SeqTrack::GetTime()
