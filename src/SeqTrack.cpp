@@ -94,6 +94,8 @@ bool SeqTrack::LoadTrackInit(int trackNum, MidiTrack* preparedMidiTrack)
 				if (parentSeq->bWriteInitialTempo)
 					pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
 			}
+			if (parentSeq->bAlwaysWriteInitialProgChange)
+				AddProgramChangeNoItem(parentSeq->initialProgNum, true);
 			if (parentSeq->bAlwaysWriteInitialVol)
 				AddVolNoItem(parentSeq->initialVol);
 			if (parentSeq->bAlwaysWriteInitialExpression)
@@ -966,19 +968,7 @@ void SeqTrack::AddProgramChange(uint32_t offset, uint32_t length, uint32_t progN
 		}
 		parentSeq->AddInstrumentRef(progNum);
 	}
-	else if (readMode == READMODE_CONVERT_TO_MIDI)
-	{
-//		if (cDrumNote == -1)
-//		{
-		if (requireBank)
-		{
-			//pMidiTrack->AddBankSelect(channel, (progNum >> 7) & 0x7f);
-			pMidiTrack->AddBankSelect(channel, (progNum >> 14) & 0x7f);
-			pMidiTrack->AddBankSelectFine(channel, (progNum >> 7) & 0x7f);
-		}
-		pMidiTrack->AddProgramChange(channel, progNum & 0x7f);
-//		}
-	}
+	AddProgramChangeNoItem(progNum, requireBank);
 }
 
 void SeqTrack::AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, uint8_t chan, const wchar_t* sEventName)
@@ -989,6 +979,19 @@ void SeqTrack::AddProgramChange(uint32_t offset, uint32_t length, uint32_t progN
 	channel = chan;
 	AddProgramChange(offset, length, progNum, requireBank, sEventName);
 	channel = origChan;
+}
+
+void SeqTrack::AddProgramChangeNoItem(uint32_t progNum, bool requireBank)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+	{
+		if (requireBank)
+		{
+			pMidiTrack->AddBankSelect(channel, (progNum >> 14) & 0x7f);
+			pMidiTrack->AddBankSelectFine(channel, (progNum >> 7) & 0x7f);
+		}
+		pMidiTrack->AddProgramChange(channel, progNum & 0x7f);
+	}
 }
 
 void SeqTrack::AddBankSelectNoItem(uint8_t bank)

@@ -33,6 +33,7 @@ CompileSnesSeq::CompileSnesSeq(RawFile* file, CompileSnesVersion ver, uint32_t s
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
 	bWriteInitialTempo = true;
+	bAlwaysWriteInitialProgChange = true;
 
 	LoadEventMap(this);
 }
@@ -99,6 +100,7 @@ bool CompileSnesSeq::GetTrackPointers(void)
 		track->spcInitialVolume = GetByte(curOffset + 2);
 		track->spcInitialTranspose = (int8_t)GetByte(curOffset + 5);
 		track->spcInitialTempo = GetByte(curOffset + 6);
+		track->spcInitialSRCN = GetByte(curOffset + 10);
 		track->spcInitialPan = (int8_t)GetByte(curOffset + 12);
 		aTracks.push_back(track);
 
@@ -207,6 +209,7 @@ void CompileSnesTrack::ResetVars(void)
 	spcVolume = spcInitialVolume;
 	spcTranspose = spcInitialTranspose;
 	spcTempo = spcInitialTempo;
+	spcSRCN = spcInitialSRCN;
 	spcPan = spcInitialPan;
 	memset(repeatCount, 0, sizeof(repeatCount));
 

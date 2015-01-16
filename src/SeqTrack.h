@@ -121,6 +121,7 @@ public:
 	void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const wchar_t* sEventName = L"Program Change");
 	void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const wchar_t* sEventName = L"Program Change");
 	void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, uint8_t chan, const wchar_t* sEventName = L"Program Change");
+	void AddProgramChangeNoItem(uint32_t progNum, bool requireBank);
 	void AddBankSelectNoItem(uint8_t bank);
 	void AddTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuarter, const wchar_t* sEventName = L"Tempo");
 	void AddTempoNoItem(uint32_t microsPerQuarter);

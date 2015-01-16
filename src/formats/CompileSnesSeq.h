@@ -82,12 +82,14 @@ public:
 	uint8_t spcVolume;
 	int8_t spcTranspose;
 	uint8_t spcTempo;
+	uint8_t spcSRCN;
 	int8_t spcPan;
 
 	uint8_t spcInitialFlags;
 	uint8_t spcInitialVolume;
 	int8_t spcInitialTranspose;
 	uint8_t spcInitialTempo;
+	uint8_t spcInitialSRCN;
 	int8_t spcInitialPan;
 
 	uint16_t subReturnAddress;
