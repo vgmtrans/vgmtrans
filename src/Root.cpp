@@ -149,11 +149,11 @@ bool VGMRoot::OpenRawFile(const wstring& filename)
 // creates a virtual file, a RawFile that was data was created manually,
 // not actually opened from the filesystem.  Used, for example, when decompressing
 // the contents of PSF2 files
-bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const wstring& filename, const wstring& parRawFileFullPath)
+bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const wstring& filename, const wstring& parRawFileFullPath, const VGMTag tag)
 {
 	assert(fileSize != 0);
 
-	VirtFile * newVirtFile = new VirtFile(databuf, fileSize, filename.c_str(), parRawFileFullPath.c_str());
+	VirtFile * newVirtFile = new VirtFile(databuf, fileSize, filename.c_str(), parRawFileFullPath.c_str(), tag);
 	if (newVirtFile == NULL) {
 		return false;
 	}

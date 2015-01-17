@@ -66,7 +66,7 @@ PostLoadCommand PSF1Loader::Apply(RawFile* file)
 			//str.append(L" MemDump");
 
 			//pRoot->CreateVirtFile(str.data(), exebuf, 0x200000);
-			pRoot->CreateVirtFile(exebuf, exebufsize, str.data());
+			pRoot->CreateVirtFile(exebuf, exebufsize, str.data(), L"", file->tag);
 			return DELETE_IT;
 		}
 	}
@@ -120,6 +120,20 @@ const wchar_t* PSF1Loader::psf_read_exe(
 
 	if (!psf.ReadExe(exebuffer + textSectionStart, textSectionSize, 0x800))
 		return L"Decompression failed";
+
+	// set tags to RawFile
+	if (psf.tags.count("title") != 0) {
+		file->tag.title = string2wstring(psf.tags["title"]);
+	}
+	if (psf.tags.count("artist") != 0) {
+		file->tag.artist = string2wstring(psf.tags["artist"]);
+	}
+	if (psf.tags.count("game") != 0) {
+		file->tag.album = string2wstring(psf.tags["game"]);
+	}
+	if (psf.tags.count("comment") != 0) {
+		file->tag.comment = string2wstring(psf.tags["comment"]);
+	}
 
 	return NULL;
 }

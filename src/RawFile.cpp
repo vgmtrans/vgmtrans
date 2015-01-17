@@ -19,13 +19,14 @@ RawFile::RawFile(void)
 	bufSize = (BUF_SIZE > fileSize) ? fileSize : BUF_SIZE;
 }
 
-RawFile::RawFile(const wstring name, uint32_t theFileSize, bool bCanRead)
+RawFile::RawFile(const wstring name, uint32_t theFileSize, bool bCanRead, const VGMTag tag)
 : fileSize(theFileSize), /*data(databuf),*/
   //filename(name),
   fullpath(name),
   parRawFileFullPath(L""),		//this should only be defined by VirtFile
   propreRatio(0.5),
   bCanFileRead(bCanRead),
+  tag(tag),
   processFlags(PF_USESCANNERS | PF_USELOADERS)
 {
 	filename = getFileNameFromPath(fullpath);
@@ -465,8 +466,8 @@ VirtFile::VirtFile()
 {
 }
 
-VirtFile::VirtFile(uint8_t* data, uint32_t fileSize, const wstring& name, const wchar_t* rawFileName)
-: RawFile(name, fileSize, false)
+VirtFile::VirtFile(uint8_t* data, uint32_t fileSize, const wstring& name, const wchar_t* rawFileName, const VGMTag tag)
+: RawFile(name, fileSize, false, tag)
 {
 	parRawFileFullPath = rawFileName;
 	buf.load(data, 0, fileSize);

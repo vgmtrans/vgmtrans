@@ -16,7 +16,7 @@ class RawFile
 {
 public:
 	RawFile(void);
-	RawFile(const std::wstring name, uint32_t fileSize = 0, bool bCanRead = true);
+	RawFile(const std::wstring name, uint32_t fileSize = 0, bool bCanRead = true, const VGMTag tag = VGMTag());
 public:
 	virtual ~RawFile(void);
 
@@ -139,5 +139,5 @@ class VirtFile : public RawFile
 {
 public:
 	VirtFile();
-	VirtFile(uint8_t* data, uint32_t fileSize, const std::wstring& name, const wchar_t* parRawFileFullPath = L"");
+	VirtFile(uint8_t* data, uint32_t fileSize, const std::wstring& name, const wchar_t* parRawFileFullPath = L"", const VGMTag tag = VGMTag());
 };

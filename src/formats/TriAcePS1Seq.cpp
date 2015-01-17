@@ -13,8 +13,8 @@ DECLARE_FORMAT(TriAcePS1);
 // TriAcePS1Seq
 // ************
 
-TriAcePS1Seq::TriAcePS1Seq(RawFile* file, uint32_t offset)
-: VGMSeq(TriAcePS1Format::name, file, offset)
+TriAcePS1Seq::TriAcePS1Seq(RawFile* file, uint32_t offset, const std::wstring& name)
+: VGMSeq(TriAcePS1Format::name, file, offset, 0, name)
 {
 	AddContainer<TriAcePS1ScorePattern>(aScorePatterns);
 	UseLinearAmplitudeScale();
@@ -41,8 +41,6 @@ bool TriAcePS1Seq::GetHeaderInfo(void)
 	unLength = GetShort(dwOffset+2);
 	initialTempoBPM = GetByte(dwOffset+0xF);
 	bWriteInitialTempo = true;
-
-	name = L"TriAce Seq";
 	return true;
 }
 

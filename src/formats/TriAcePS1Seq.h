@@ -17,7 +17,7 @@ public:
 	} TrkInfo;
 
 
-	TriAcePS1Seq(RawFile* file, uint32_t offset);
+	TriAcePS1Seq(RawFile* file, uint32_t offset, const std::wstring& name = std::wstring(L"TriAce Seq"));
 	virtual ~TriAcePS1Seq(void);
 
 	virtual bool GetHeaderInfo(void);

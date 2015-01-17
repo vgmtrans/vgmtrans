@@ -75,7 +75,8 @@ void TriAcePS1Scanner::SearchForSLZSeq (RawFile* file)
 		if (!instrsets.size())
 			return;
 
-		VGMColl* coll = new VGMColl(_T("TriAce Song"));
+		std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+		VGMColl* coll = new VGMColl(name);
 		coll->UseSeq(seq);
 		for (uint32_t i=0; i<instrsets.size(); i++)
 			coll->AddInstrSet(instrsets[i]);
@@ -233,9 +234,10 @@ TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZDecompress(RawFile* file, uint32_t cfOf
 	//pRoot->UI_WriteBufferToFile(L"uncomp.raw", uf, ufOff);
 
 	//Create the new virtual file, and analyze the sequence
-	VirtFile* newVirtFile = newVirtFile = new VirtFile(uf, ufOff, L"TriAce Seq", file->GetParRawFileFullPath().c_str());
+	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+	VirtFile* newVirtFile = newVirtFile = new VirtFile(uf, ufOff, name + std::wstring(L" Sequence"), file->GetParRawFileFullPath().c_str());
 
-	TriAcePS1Seq* newSeq = new TriAcePS1Seq(newVirtFile, 0);
+	TriAcePS1Seq* newSeq = new TriAcePS1Seq(newVirtFile, 0, name);
 	bool bLoadSucceed = newSeq->LoadVGMFile();
 
 	newVirtFile->DontUseLoaders();
