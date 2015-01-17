@@ -662,7 +662,7 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t fadeLength = GetByte(curOffset++);
 		uint8_t newVol = GetByte(curOffset++);
-		AddVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol);
+		AddVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
 		break;
 	}
 
