@@ -10,7 +10,7 @@ DECLARE_FORMAT(HeartBeatPS1)
 HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile* file, uint32_t offset)
 : VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset)
 {
-	//UseReverb();
+	UseReverb();
 	//bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
 

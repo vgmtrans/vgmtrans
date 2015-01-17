@@ -7,7 +7,7 @@ DECLARE_FORMAT(PS1)
 PS1Seq::PS1Seq(RawFile* file, uint32_t offset)
 : VGMSeqNoTrks(PS1Format::name, file, offset)
 {
-	//UseReverb();
+	UseReverb();
 	//bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
 
