@@ -826,7 +826,7 @@ void SeqTrack::AddModulationDepthRangeNoItem(double semitones)
 void SeqTrack::AddTranspose(uint32_t offset, uint32_t length, int8_t theTranspose, const wchar_t* sEventName)
 {
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
-		AddEvent(new TransposeSeqEvent(this, transpose, offset, length, sEventName));
+		AddEvent(new TransposeSeqEvent(this, theTranspose, offset, length, sEventName));
 	//pMidiTrack->AddTranspose(transpose);
 	transpose = theTranspose;
 }
