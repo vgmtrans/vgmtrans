@@ -116,6 +116,13 @@ bool VGMMultiSectionSeq::ReadEvent(long stopTime)
 
 void VGMMultiSectionSeq::AddSection(VGMSeqSection* section)
 {
+	if (dwOffset > section->dwOffset) {
+		uint32_t distance = dwOffset - section->dwOffset;
+		dwOffset = section->dwOffset;
+		if (unLength != 0) {
+			unLength += distance;
+		}
+	}
 	aSections.push_back(section);
 }
 
