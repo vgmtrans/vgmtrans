@@ -46,6 +46,23 @@ enum NinSnesSeqEventType
 	EVENT_PERCCUSION_PATCH_BASE,
 };
 
+class NinSnesTrackSharedData
+{
+public:
+	NinSnesTrackSharedData();
+
+	virtual void ResetVars(void);
+
+	uint8_t spcNoteDuration;
+	uint8_t spcNoteDurRate;
+	uint8_t spcNoteVolume;
+	int8_t spcTranspose;
+	uint16_t loopReturnAddress;
+	uint16_t loopStartAddress;
+	uint8_t loopCount;
+	uint8_t lastNoteNumberForTie; // temporary workaround
+};
+
 class NinSnesSeq :
 	public VGMMultiSectionSeq
 {
@@ -67,6 +84,8 @@ public:
 	uint8_t STATUS_PERCUSSION_NOTE_MIN;
 	uint8_t STATUS_PERCUSSION_NOTE_MAX;
 	std::map<uint8_t, NinSnesSeqEventType> EventMap;
+
+	NinSnesTrackSharedData sharedTrackData[8];
 
 	std::vector<uint8_t> volumeTable;
 	std::vector<uint8_t> durRateTable;
@@ -101,14 +120,6 @@ public:
 	virtual bool ReadEvent(void);
 
 	NinSnesSection* parentSection;
+	NinSnesTrackSharedData* shared;
 	bool available;
-
-private:
-	uint8_t spcNoteDuration;
-	uint8_t spcNoteDurRate;
-	uint8_t spcNoteVolume;
-	uint16_t loopReturnAddress;
-	uint16_t loopStartAddress;
-	uint8_t loopCount;
-	uint8_t lastNoteNumberForTie; // temporary workaround
 };

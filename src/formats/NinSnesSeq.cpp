@@ -38,6 +38,10 @@ void NinSnesSeq::ResetVars()
 
 	spcPercussionBase = 0;
 	sectionRepeatCount = 0;
+
+	for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+		sharedTrackData[trackIndex].ResetVars();
+	}
 }
 
 bool NinSnesSeq::GetHeaderInfo()
@@ -325,6 +329,7 @@ NinSnesSection::NinSnesSection(NinSnesSeq* parentFile, long offset, long length)
 
 bool NinSnesSection::GetTrackPointers()
 {
+	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
 	uint32_t curOffset = dwOffset;
 
 	VGMHeader* header = AddHeader(curOffset, 16);
@@ -336,15 +341,17 @@ bool NinSnesSection::GetTrackPointers()
 		uint16_t startAddress = GetShort(curOffset);
 
 		bool active = ((startAddress & 0xff00) != 0);
+		NinSnesTrack* track;
 		if (active) {
-			aTracks.push_back(new NinSnesTrack(this, startAddress));
+			track = new NinSnesTrack(this, startAddress);
 		}
 		else {
 			// add an inactive track
-			NinSnesTrack* track = new NinSnesTrack(this, curOffset, 2, L"NULL");
+			track = new NinSnesTrack(this, curOffset, 2, L"NULL");
 			track->available = false;
-			aTracks.push_back(track);
 		}
+		track->shared = &parentSeq->sharedTrackData[trackIndex];
+		aTracks.push_back(track);
 
 		wchar_t name[32];
 		wsprintf(name, L"Track Pointer #%d", trackIndex + 1);
@@ -356,6 +363,23 @@ bool NinSnesSection::GetTrackPointers()
 	return true;
 }
 
+NinSnesTrackSharedData::NinSnesTrackSharedData()
+{
+	ResetVars();
+}
+
+void NinSnesTrackSharedData::ResetVars(void)
+{
+	loopCount = 0;
+	spcTranspose = 0;
+
+	// just in case
+	spcNoteDuration = 1;
+	spcNoteDurRate = 0xfc;
+	spcNoteVolume = 0xfc;
+	lastNoteNumberForTie = 0;
+}
+
 //  ************
 //  NinSnesTrack
 //  ************
@@ -363,11 +387,8 @@ bool NinSnesSection::GetTrackPointers()
 NinSnesTrack::NinSnesTrack(NinSnesSection* parentSection, long offset, long length, const wchar_t* theName)
 	: SeqTrack(parentSection->parentSeq, offset, length),
 	parentSection(parentSection),
-	available(true),
-	spcNoteDuration(1),
-	spcNoteDurRate(0xfc),
-	spcNoteVolume(0xfc),
-	lastNoteNumberForTie(0)
+	shared(NULL),
+	available(true)
 {
 	if (theName != NULL) {
 		name = theName;
@@ -382,8 +403,9 @@ void NinSnesTrack::ResetVars(void)
 	SeqTrack::ResetVars();
 
 	cKeyCorrection = SEQ_KEYOFS;
-
-	loopCount = 0;
+	if (shared != NULL) {
+		transpose = shared->spcTranspose;
+	}
 }
 
 bool NinSnesTrack::ReadEvent(void)
@@ -475,7 +497,7 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		// AddEvent is called at the last of this function
 
-		if (loopCount == 0) {
+		if (shared->loopCount == 0) {
 			if (readMode == READMODE_FIND_DELTA_LENGTH) {
 				deltaLength = GetTime();
 			}
@@ -488,14 +510,14 @@ bool NinSnesTrack::ReadEvent(void)
 		else {
 			uint32_t eventLength = curOffset - beginOffset;
 
-			loopCount--;
-			if (loopCount == 0) {
+			shared->loopCount--;
+			if (shared->loopCount == 0) {
 				// repeat end
-				curOffset = loopReturnAddress;
+				curOffset = shared->loopReturnAddress;
 			}
 			else {
 				// repeat again
-				curOffset = loopStartAddress;
+				curOffset = shared->loopStartAddress;
 			}
 		}
 		break;
@@ -504,8 +526,8 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_NOTE_PARAM:
 	{
 		// param #1: duration
-		spcNoteDuration = statusByte;
-		desc << L"Duration: " << (int)spcNoteDuration;
+		shared->spcNoteDuration = statusByte;
+		desc << L"Duration: " << (int)shared->spcNoteDuration;
 
 		// param #2: quantize and velocity (optional)
 		if (curOffset + 1 < 0x10000) {
@@ -515,10 +537,10 @@ bool NinSnesTrack::ReadEvent(void)
 				uint8_t velIndex = quantizeAndVelocity & 15;
 
 				curOffset++;
-				spcNoteDurRate = parentSeq->durRateTable[durIndex];
-				spcNoteVolume = parentSeq->volumeTable[velIndex];
+				shared->spcNoteDurRate = parentSeq->durRateTable[durIndex];
+				shared->spcNoteVolume = parentSeq->volumeTable[velIndex];
 
-				desc << L"  Quantize: " << (int)durIndex << L" (" << (int)spcNoteDurRate << L"/256)" << L"  Velocity: " << (int)velIndex << L" (" << (int)spcNoteVolume << L"/256)";
+				desc << L"  Quantize: " << (int)durIndex << L" (" << (int)shared->spcNoteDurRate << L"/256)" << L"  Velocity: " << (int)velIndex << L" (" << (int)shared->spcNoteVolume << L"/256)";
 			}
 		}
 
@@ -529,30 +551,30 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_NOTE:
 	{
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
-		uint8_t duration = max((spcNoteDuration * spcNoteDurRate) >> 8, 1);
+		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
 
-		lastNoteNumberForTie = noteNumber;
-		AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, spcNoteVolume / 2, duration, L"Note");
-		AddTime(spcNoteDuration);
+		shared->lastNoteNumberForTie = noteNumber;
+		AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Note");
+		AddTime(shared->spcNoteDuration);
 		break;
 	}
 
 	case EVENT_TIE:
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE);
-		AddNoteByDurNoItem(lastNoteNumberForTie, spcNoteVolume / 2, spcNoteDuration);
-		AddTime(spcNoteDuration);
+		AddNoteByDurNoItem(shared->lastNoteNumberForTie, shared->spcNoteVolume / 2, shared->spcNoteDuration);
+		AddTime(shared->spcNoteDuration);
 		break;
 
 	case EVENT_REST:
-		AddRest(beginOffset, curOffset - beginOffset, spcNoteDuration);
+		AddRest(beginOffset, curOffset - beginOffset, shared->spcNoteDuration);
 		break;
 
 	case EVENT_PERCUSSION_NOTE:
 	{
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
-		uint8_t duration = max((spcNoteDuration * spcNoteDurRate) >> 8, 1);
-		AddPercNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, spcNoteVolume / 2, duration, L"Percussion Note");
-		AddTime(spcNoteDuration);
+		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
+		AddPercNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Percussion Note");
+		AddTime(shared->spcNoteDuration);
 		break;
 	}
 
@@ -653,6 +675,7 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_TRANSPOSE:
 	{
 		int8_t semitones = GetByte(curOffset++);
+		shared->spcTranspose = semitones;
 		AddTranspose(beginOffset, curOffset - beginOffset, semitones);
 		break;
 	}
@@ -694,9 +717,9 @@ bool NinSnesTrack::ReadEvent(void)
 		uint16_t dest = GetShort(curOffset); curOffset += 2;
 		uint8_t times = GetByte(curOffset++);
 
-		loopReturnAddress = curOffset;
-		loopStartAddress = dest;
-		loopCount = times;
+		shared->loopReturnAddress = curOffset;
+		shared->loopStartAddress = dest;
+		shared->loopCount = times;
 
 		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest
 			<< std::dec << std::setfill(L' ') << std::setw(0) << L"  Times: " << (int)times;
@@ -704,7 +727,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 		// Add the next "END" event to UI
 		if (curOffset < 0x10000 && GetByte(curOffset) == parentSeq->STATUS_END) {
-			if (loopCount == 0) {
+			if (shared->loopCount == 0) {
 				AddGenericEvent(curOffset, 1, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
 			}
 			else {
@@ -712,7 +735,7 @@ bool NinSnesTrack::ReadEvent(void)
 			}
 		}
 
-		curOffset = loopStartAddress;
+		curOffset = shared->loopStartAddress;
 		break;
 	}
 
@@ -835,7 +858,7 @@ bool NinSnesTrack::ReadEvent(void)
 	// Add the next "END" event to UI
 	// (because it often gets interrupted by the end of other track)
 	if (curOffset + 1 < 0x10000 && statusByte != parentSeq->STATUS_END && GetByte(curOffset + 1) == parentSeq->STATUS_END) {
-		if (loopCount == 0) {
+		if (shared->loopCount == 0) {
 			AddGenericEvent(curOffset + 1, 1, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
 		}
 		else {
