@@ -133,9 +133,11 @@ void SNESSampColl::SetDefaultTargets(uint32_t maxNumSamps)
 
 bool SNESSampColl::GetSampleInfo()
 {
+	spcDirHeader = AddHeader(spcDirAddr, 0, L"Sample DIR");
 	for (std::vector<uint8_t>::iterator itr = this->targetSRCNs.begin(); itr != this->targetSRCNs.end(); ++itr)
 	{
 		uint8_t srcn = (*itr);
+		std::wostringstream name;
 
 		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
 		if (offDirEnt + 4 > 0x10000)
@@ -163,7 +165,14 @@ bool SNESSampColl::GetSampleInfo()
 			continue;
 		}
 
-		std::wostringstream name;
+		name << L"SA " << srcn;
+		spcDirHeader->AddSimpleItem(offDirEnt, 2, name.str().c_str());
+
+		name.str(L"");
+		name << L"LSA " << srcn;
+		spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, name.str().c_str());
+
+		name.str(L"");
 		name << L"Sample " << srcn;
 		SNESSamp* samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length, addrSampLoop, name.str());
 		samples.push_back(samp);

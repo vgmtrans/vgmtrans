@@ -248,6 +248,7 @@ public:
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 
 protected:
+	VGMHeader* spcDirHeader;
 	std::vector<uint8_t> targetSRCNs;
 	uint32_t spcDirAddr;
 
