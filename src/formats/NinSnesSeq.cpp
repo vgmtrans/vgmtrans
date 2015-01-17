@@ -343,6 +343,16 @@ bool NinSnesSection::GetTrackPointers()
 		bool active = ((startAddress & 0xff00) != 0);
 		NinSnesTrack* track;
 		if (active) {
+			// correct sequence address
+			// probably it's not necessary for regular case, but just in case...
+			if (startAddress < dwOffset) {
+				uint32_t distance = dwOffset - startAddress;
+				dwOffset = startAddress;
+				if (unLength != 0) {
+					unLength += distance;
+				}
+			}
+
 			track = new NinSnesTrack(this, startAddress);
 		}
 		else {
