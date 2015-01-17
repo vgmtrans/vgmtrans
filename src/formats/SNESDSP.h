@@ -266,7 +266,7 @@ public:
 		uint32_t dataLen, uint32_t loopOffset, std::wstring name = L"BRR");
 	virtual ~SNESSamp(void);
 
-	static uint32_t GetSampleLength(RawFile * file, uint32_t offset);
+	static uint32_t GetSampleLength(RawFile * file, uint32_t offset, bool& loop);
 
 	virtual double GetCompressionRatio();	// ratio of space conserved.  should generally be > 1
 											// used to calculate both uncompressed sample size and loopOff after conversion

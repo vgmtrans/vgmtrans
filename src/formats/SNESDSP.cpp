@@ -145,13 +145,20 @@ bool SNESSampColl::GetSampleInfo()
 
 		uint16_t addrSampStart = GetShort(offDirEnt);
 		uint16_t addrSampLoop = GetShort(offDirEnt + 2);
-		if (addrSampStart > addrSampLoop)
+		if (addrSampLoop < addrSampStart)
 		{
 			continue;
 		}
 
-		uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart);
+		bool loop;
+		uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart, loop);
 		if (length == 0)
+		{
+			continue;
+		}
+
+		uint16_t addrSampEnd = addrSampStart + length;
+		if (loop && addrSampLoop >= addrSampEnd)
 		{
 			continue;
 		}
@@ -179,7 +186,7 @@ SNESSamp::~SNESSamp()
 {
 }
 
-uint32_t SNESSamp::GetSampleLength(RawFile * file, uint32_t offset)
+uint32_t SNESSamp::GetSampleLength(RawFile * file, uint32_t offset, bool & loop)
 {
 	uint32_t currOffset = offset;
 	while (currOffset + 9 <= file->size())
@@ -190,6 +197,7 @@ uint32_t SNESSamp::GetSampleLength(RawFile * file, uint32_t offset)
 		// end?
 		if ((flag & 1) != 0)
 		{
+			loop = (flag & 2) != 0;
 			break;
 		}
 	}
