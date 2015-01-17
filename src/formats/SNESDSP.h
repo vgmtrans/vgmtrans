@@ -247,6 +247,8 @@ public:
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 
+	static bool IsValidSampleDir(RawFile * file, uint32_t spcDirEntAddr);
+
 protected:
 	VGMHeader* spcDirHeader;
 	std::vector<uint8_t> targetSRCNs;

@@ -129,16 +129,13 @@ bool NinSnesInstr::IsValidHeader(RawFile * file, NinSnesVersion version, uint32_
 	}
 
 	uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-	if (addrDIRentry + 4 > 0x10000)
-	{
+	if (!SNESSampColl::IsValidSampleDir(file, addrDIRentry)) {
 		return false;
 	}
 
 	uint16_t srcAddr = file->GetShort(addrDIRentry);
 	uint16_t loopStartAddr = file->GetShort(addrDIRentry + 2);
-
-	if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0 || srcAddr + 9 > 0x10000)
-	{
+	if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0) {
 		return false;
 	}
 

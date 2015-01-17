@@ -140,30 +140,15 @@ bool SNESSampColl::GetSampleInfo()
 		std::wostringstream name;
 
 		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-		if (offDirEnt + 4 > 0x10000)
-		{
+		if (!SNESSampColl::IsValidSampleDir(GetRawFile(), offDirEnt)) {
 			continue;
 		}
 
 		uint16_t addrSampStart = GetShort(offDirEnt);
 		uint16_t addrSampLoop = GetShort(offDirEnt + 2);
-		if (addrSampLoop < addrSampStart)
-		{
-			continue;
-		}
 
 		bool loop;
 		uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart, loop);
-		if (length == 0)
-		{
-			continue;
-		}
-
-		uint16_t addrSampEnd = addrSampStart + length;
-		if (loop && addrSampLoop >= addrSampEnd)
-		{
-			continue;
-		}
 
 		name << L"SA " << srcn;
 		spcDirHeader->AddSimpleItem(offDirEnt, 2, name.str().c_str());
@@ -178,6 +163,32 @@ bool SNESSampColl::GetSampleInfo()
 		samples.push_back(samp);
 	}
 	return samples.size() != 0;
+}
+
+bool SNESSampColl::IsValidSampleDir(RawFile * file, uint32_t spcDirEntAddr)
+{
+	if (spcDirEntAddr + 4 > 0x10000) {
+		return false;
+	}
+
+	uint16_t addrSampStart = file->GetShort(spcDirEntAddr);
+	uint16_t addrSampLoop = file->GetShort(spcDirEntAddr + 2);
+	if (addrSampLoop < addrSampStart) {
+		return false;
+	}
+
+	bool loop;
+	uint32_t length = SNESSamp::GetSampleLength(file, addrSampStart, loop);
+	if (length == 0) {
+		return false;
+	}
+
+	uint16_t addrSampEnd = addrSampStart + length;
+	if (loop && addrSampLoop >= addrSampEnd) {
+		return false;
+	}
+
+	return true;
 }
 
 //  ********
@@ -198,8 +209,13 @@ SNESSamp::~SNESSamp()
 uint32_t SNESSamp::GetSampleLength(RawFile * file, uint32_t offset, bool & loop)
 {
 	uint32_t currOffset = offset;
-	while (currOffset + 9 <= file->size())
+	while (true)
 	{
+		if (currOffset + 9 > file->size()) {
+			// address out of range, it's apparently corrupt
+			return 0;
+		}
+
 		uint8_t flag = file->GetByte(currOffset);
 		currOffset += 9;
 
