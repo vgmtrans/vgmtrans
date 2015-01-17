@@ -247,7 +247,7 @@ public:
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 
-	static bool IsValidSampleDir(RawFile * file, uint32_t spcDirEntAddr);
+	static bool IsValidSampleDir(RawFile * file, uint32_t spcDirEntAddr, bool validateSample);
 
 protected:
 	VGMHeader* spcDirHeader;

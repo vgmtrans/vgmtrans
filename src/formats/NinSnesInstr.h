@@ -38,7 +38,7 @@ public:
 
 	virtual bool LoadInstr();
 
-	static bool IsValidHeader(RawFile * file, NinSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr);
+	static bool IsValidHeader(RawFile * file, NinSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
 	static uint32_t ExpectedSize(NinSnesVersion version);
 
 	NinSnesVersion version;

@@ -44,9 +44,11 @@ bool NinSnesInstrSet::GetInstrPointers()
 			}
 		}
 
-		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr))
-		{
+		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, false)) {
 			break;
+		}
+		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, true)) {
+			continue;
 		}
 
 		uint8_t srcn = GetByte(addrInstrHeader);
@@ -109,7 +111,7 @@ bool NinSnesInstr::LoadInstr()
 	return true;
 }
 
-bool NinSnesInstr::IsValidHeader(RawFile * file, NinSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr)
+bool NinSnesInstr::IsValidHeader(RawFile * file, NinSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample)
 {
 	size_t instrItemSize = NinSnesInstr::ExpectedSize(version);
 
@@ -129,7 +131,7 @@ bool NinSnesInstr::IsValidHeader(RawFile * file, NinSnesVersion version, uint32_
 	}
 
 	uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-	if (!SNESSampColl::IsValidSampleDir(file, addrDIRentry)) {
+	if (!SNESSampColl::IsValidSampleDir(file, addrDIRentry, validateSample)) {
 		return false;
 	}
 

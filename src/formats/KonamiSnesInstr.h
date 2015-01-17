@@ -38,7 +38,7 @@ public:
 
 	virtual bool LoadInstr();
 
-	static bool IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint32_t spcDirAddr);
+	static bool IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
 
 protected:
 	uint32_t spcDirAddr;
