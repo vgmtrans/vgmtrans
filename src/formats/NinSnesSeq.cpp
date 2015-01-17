@@ -57,12 +57,22 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 		return false;
 	}
 
+	if (curOffset < header->dwOffset) {
+		uint32_t distance = header->dwOffset - curOffset;
+		header->dwOffset = curOffset;
+		if (header->unLength != 0) {
+			header->unLength += distance;
+		}
+	}
+
 	uint16_t sectionAddress = GetShort(curOffset); curOffset += 2;
 	bool bContinue = true;
 
 	if (sectionAddress == 0) {
 		// End
-		header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Section Playlist End");
+		if (!IsOffsetUsed(beginOffset)) {
+			header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Section Playlist End");
+		}
 		bContinue = false;
 	}
 	else if (sectionAddress <= 0xff) {
@@ -96,24 +106,37 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 		}
 
 		// add event to sequence
-		header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Playlist Jump");
-		if (infiniteLoop) {
-			bContinue = AddLoopForeverNoItem();
+		if (!IsOffsetUsed(beginOffset)) {
+			header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Playlist Jump");
+
+			// add the last event too, if available
+			if (curOffset + 1 < 0x10000 && GetShort(curOffset) == 0x0000) {
+				header->AddSimpleItem(curOffset, 2, L"Playlist End");
+			}
 		}
 
-		// add the last event too, if available
-		if (curOffset + 1 < 0x10000 && GetShort(curOffset) == 0x0000) {
-			header->AddSimpleItem(curOffset, 2, L"Playlist End");
+		if (infiniteLoop) {
+			bContinue = AddLoopForeverNoItem();
 		}
 
 		// do actual jump, at last
 		if (doJump) {
 			curOffset = dest;
+
+			if (curOffset < dwOffset) {
+				uint32_t distance = dwOffset - curOffset;
+				dwOffset = curOffset;
+				if (unLength != 0) {
+					unLength += distance;
+				}
+			}
 		}
 	}
 	else {
 		// Play the section
-		header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Section Pointer");
+		if (!IsOffsetUsed(beginOffset)) {
+			header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Section Pointer");
+		}
 
 		NinSnesSection* section = (NinSnesSection*)GetSectionFromOffset(sectionAddress);
 		if (section == NULL) {
