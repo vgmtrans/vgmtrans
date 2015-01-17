@@ -345,17 +345,17 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 				while (curAddress >= 0x0100 && curAddress < 0xfff0) {
 					uint16_t addrSection = file->GetShort(curAddress);
 
-					if ((addrSection & 0xff00) == 0) {
-						// section list end / jump
-						break;
-					}
-
 					if (curAddress == addrCurrentSection) {
 						uint16_t sectionDistance = addrCurrentSection - firstSectionAddress;
 						if (sectionDistance < bestSectionDistance) {
 							songIndexCandidate = songIndex;
 							bestSectionDistance = sectionDistance;
 						}
+						break;
+					}
+
+					if ((addrSection & 0xff00) == 0) {
+						// section list end / jump
 						break;
 					}
 
