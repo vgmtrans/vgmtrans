@@ -26,7 +26,7 @@
 #include "SegSatFormat.h"
 #include "TaitoF3Format.h"
 #include "NinSnesFormat.h"
-#include "AkaoSnesFormat.h"
+#include "SuzukiSnesFormat.h"
 #include "RareSnesFormat.h"
 #include "HeartBeatPS1Format.h"
 
@@ -79,7 +79,7 @@ bool VGMRoot::Init(void)
 
 	// the following scanners use USE_EXTENSION
 	//AddScanner("NinSnes");
-	//AddScanner("AkaoSnes");
+	//AddScanner("SuzukiSnes");
 	//AddScanner("CapcomSnes");
 	//AddScanner("RareSnes");
 

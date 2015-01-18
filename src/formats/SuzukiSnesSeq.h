@@ -1,16 +1,16 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
-#include "AkaoSnesFormat.h"
+#include "SuzukiSnesFormat.h"
 
 extern const uint8_t durtbl[14];
 
-class AkaoSnesSeq
+class SuzukiSnesSeq
 	: public VGMSeq
 {
 public:
-	AkaoSnesSeq(RawFile* file, uint32_t seqdata_offset, uint32_t instrtable_offset);
-	virtual ~AkaoSnesSeq(void);
+	SuzukiSnesSeq(RawFile* file, uint32_t seqdata_offset, uint32_t instrtable_offset);
+	virtual ~SuzukiSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool GetTrackPointers(void);
@@ -20,11 +20,11 @@ private:
 };
 
 
-class AkaoSnesTrack
+class SuzukiSnesTrack
 	: public SeqTrack
 {
 public:
-	AkaoSnesTrack(AkaoSnesSeq* parentFile, long offset = 0, long length = 0);
+	SuzukiSnesTrack(SuzukiSnesSeq* parentFile, long offset = 0, long length = 0);
 	virtual bool ReadEvent(void);
 
 private:

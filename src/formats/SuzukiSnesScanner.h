@@ -1,18 +1,19 @@
 #pragma once
 #include "Scanner.h"
 
-class AkaoSnesScanner :
+class SuzukiSnesScanner :
 	public VGMScanner
 {
 public:
-	AkaoSnesScanner(void)
+	SuzukiSnesScanner(void)
 	{
 		//USE_EXTENSION(L"spc");
 	}
-	virtual ~AkaoSnesScanner(void)
+
+	virtual ~SuzukiSnesScanner(void)
 	{
 	}
 
 	virtual void Scan(RawFile* file, void* info = 0);
-	void SearchForAkaoSnesSeq (RawFile* file);
+	void SearchForSuzukiSnesSeq (RawFile* file);
 };

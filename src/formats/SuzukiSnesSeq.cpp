@@ -1,35 +1,35 @@
 #include "stdafx.h"
-#include "AkaoSnesSeq.h"
-#include "AkaoSnesFormat.h"
+#include "SuzukiSnesSeq.h"
+#include "SuzukiSnesFormat.h"
 
 const uint8_t durtbl[14] = { 0xBF, 0x8F, 0x5F, 0x47, 0x2F, 0x23, 0x1F, 0x17, 0x0F, 0x0B, 0x07, 0x05, 0x02, 0x00 };
 
 
-DECLARE_FORMAT(AkaoSnes);
+DECLARE_FORMAT(SuzukiSnes);
 
-//  **********
-//  AkaoSnesSeq
-//  **********
+//  *************
+//  SuzukiSnesSeq
+//  *************
 
 
-AkaoSnesSeq::AkaoSnesSeq(RawFile* file, uint32_t seqdataOffset, uint32_t instrtableOffset)
-: VGMSeq(AkaoSnesFormat::name, file, seqdataOffset), instrtable_offset(instrtableOffset)
+SuzukiSnesSeq::SuzukiSnesSeq(RawFile* file, uint32_t seqdataOffset, uint32_t instrtableOffset)
+: VGMSeq(SuzukiSnesFormat::name, file, seqdataOffset), instrtable_offset(instrtableOffset)
 {
 }
 
-AkaoSnesSeq::~AkaoSnesSeq(void)
+SuzukiSnesSeq::~SuzukiSnesSeq(void)
 {
 }
 
-bool AkaoSnesSeq::GetHeaderInfo(void)
+bool SuzukiSnesSeq::GetHeaderInfo(void)
 {
 	SetPPQN(0x60);
-	name = L"Square SNES Seq";
+	name = L"Square SUZUKI SNES Seq";
 
 	for (int i = 0; i < 8; i++)
 	{
 		uint16_t trkOffset = GetShort(dwOffset + i*2);
-		aTracks.push_back(new AkaoSnesTrack(this, trkOffset));
+		aTracks.push_back(new SuzukiSnesTrack(this, trkOffset));
 	}
 
 //	unLength = 0x7A4;
@@ -47,23 +47,23 @@ bool AkaoSnesSeq::GetHeaderInfo(void)
 }
 
 
-bool AkaoSnesSeq::GetTrackPointers(void)
+bool SuzukiSnesSeq::GetTrackPointers(void)
 {
 /*	for (int i=0; i<8; i++)
 	{
 		uint16_t trkOff = GetShort(dwOffset+i*2);
 		if (trkOff)
-			aTracks.push_back(new AkaoSnesTrack(this, trkOff);
+			aTracks.push_back(new SuzukiSnesTrack(this, trkOff);
 	}
 */	return true;
 }
 
 
-//  ************
-//  AkaoSnesTrack
-//  ************
+//  ***************
+//  SuzukiSnesTrack
+//  ***************
 
-AkaoSnesTrack::AkaoSnesTrack(AkaoSnesSeq* parentFile, long offset, long length)
+SuzukiSnesTrack::SuzukiSnesTrack(SuzukiSnesSeq* parentFile, long offset, long length)
 : SeqTrack(parentFile, offset, length)
 {
 	vel = 100;
@@ -84,7 +84,7 @@ AkaoSnesTrack::AkaoSnesTrack(AkaoSnesSeq* parentFile, long offset, long length)
 }
 
 
-bool AkaoSnesTrack::ReadEvent(void)
+bool SuzukiSnesTrack::ReadEvent(void)
 {
 	uint32_t beginOffset = curOffset;
 	uint8_t status_byte = GetByte(curOffset++);
