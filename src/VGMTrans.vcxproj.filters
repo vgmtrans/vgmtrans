@@ -178,6 +178,12 @@
     <Filter Include="Header Files\formats\suzukisnes">
       <UniqueIdentifier>{478e1111-bacf-4097-a852-5a4c1618e59a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\formats\akaosnes">
+      <UniqueIdentifier>{0e0d2438-b9b2-4e58-9423-dae4aa1b9c5c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\akaosnes">
+      <UniqueIdentifier>{4e1e5424-638c-46a5-83c4-578d5f7de01c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\aboutdlg.cpp">
@@ -611,6 +617,12 @@
     </ClCompile>
     <ClCompile Include="formats\SuzukiSnesScanner.cpp">
       <Filter>Source Files\formats\suzukisnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\AkaoSnesScanner.cpp">
+      <Filter>Source Files\formats\akaosnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\AkaoSnesSeq.cpp">
+      <Filter>Source Files\formats\akaosnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1111,6 +1123,15 @@
     </ClInclude>
     <ClInclude Include="formats\SuzukiSnesSeq.h">
       <Filter>Header Files\formats\suzukisnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\AkaoSnesFormat.h">
+      <Filter>Header Files\formats\akaosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\AkaoSnesScanner.h">
+      <Filter>Header Files\formats\akaosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\AkaoSnesSeq.h">
+      <Filter>Header Files\formats\akaosnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

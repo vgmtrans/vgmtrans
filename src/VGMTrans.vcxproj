@@ -215,6 +215,8 @@
   <ItemGroup>
     <ClCompile Include="BytePattern.cpp" />
     <ClCompile Include="datetime.cpp" />
+    <ClCompile Include="formats\AkaoSnesScanner.cpp" />
+    <ClCompile Include="formats\AkaoSnesSeq.cpp" />
     <ClCompile Include="formats\CapcomSnesInstr.cpp" />
     <ClCompile Include="formats\CapcomSnesScanner.cpp" />
     <ClCompile Include="formats\CapcomSnesSeq.cpp" />
@@ -366,6 +368,9 @@
   <ItemGroup>
     <ClInclude Include="BytePattern.h" />
     <ClInclude Include="datetime.h" />
+    <ClInclude Include="formats\AkaoSnesFormat.h" />
+    <ClInclude Include="formats\AkaoSnesScanner.h" />
+    <ClInclude Include="formats\AkaoSnesSeq.h" />
     <ClInclude Include="formats\CapcomSnesFormat.h" />
     <ClInclude Include="formats\CapcomSnesInstr.h" />
     <ClInclude Include="formats\CapcomSnesScanner.h" />
