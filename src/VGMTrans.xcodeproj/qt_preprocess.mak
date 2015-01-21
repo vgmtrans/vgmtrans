@@ -50,9 +50,7 @@ qrc_resources.cpp: ui/qt/resources/resources.qrc \
 		ui/qt/resources/images/bugle-32.png \
 		ui/qt/resources/images/music_transcripts-32.png \
 		ui/qt/resources/images/music_folder-32.png \
-		ui/qt/resources/images/file-32.png \
-		ui/qt/resources/test/DoS_02.sf2 \
-		ui/qt/resources/test/DoS_02.mid
+		ui/qt/resources/images/file-32.png
 	/usr/local/Cellar/qt5/5.3.1/bin/rcc -name resources ui/qt/resources/resources.qrc -o qrc_resources.cpp
 
 compiler_moc_header_make_all: moc_mainwindow.cpp moc_droparea.cpp moc_dropsitewindow.cpp moc_QtVGMRoot.cpp moc_VGMFileListView.cpp moc_RawFileListView.cpp moc_VGMCollListView.cpp
@@ -76,6 +74,8 @@ moc_dropsitewindow.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtWidgets.framework/Vers
 moc_QtVGMRoot.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QObject \
 		main/Root.h \
 		main/common.h \
+		ui/qt/pch.h \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QDebug \
 		ui/qt/osdepend.h \
 		main/helper.h \
 		main/Loader.h \
@@ -102,6 +102,8 @@ moc_RawFileListView.cpp: /usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versio
 		/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QObject \
 		main/Root.h \
 		main/common.h \
+		ui/qt/pch.h \
+		/usr/local/Cellar/qt5/5.3.1/lib/QtCore.framework/Versions/5/Headers/QDebug \
 		ui/qt/osdepend.h \
 		main/helper.h \
 		main/Loader.h \
