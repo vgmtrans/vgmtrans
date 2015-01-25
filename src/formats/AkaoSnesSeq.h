@@ -48,7 +48,7 @@ class AkaoSnesSeq
 	: public VGMSeq
 {
 public:
-	AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, std::wstring newName = L"Square SNES Seq");
+	AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, std::wstring newName = L"Square AKAO SNES Seq");
 	virtual ~AkaoSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
