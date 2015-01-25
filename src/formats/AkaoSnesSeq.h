@@ -48,16 +48,22 @@ class AkaoSnesSeq
 	: public VGMSeq
 {
 public:
-	AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, std::wstring newName = L"Square SNES Seq");
+	AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, std::wstring newName = L"Square SNES Seq");
 	virtual ~AkaoSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool GetTrackPointers(void);
 	virtual void ResetVars(void);
 
+	uint16_t ROMAddressToAPUAddress(uint16_t romAddress);
+	uint16_t GetShortAddress(uint32_t offset);
+
 	AkaoSnesVersion version;
 	AkaoSnesMinorVersion minorVersion;
 	std::map<uint8_t, AkaoSnesSeqEventType> EventMap;
+	uint32_t addrAPURelocBase;
+	uint32_t addrROMRelocBase;
+	uint32_t addrSequenceEnd;
 
 private:
 	void LoadEventMap(AkaoSnesSeq *pSeqFile);
@@ -71,4 +77,7 @@ public:
 	AkaoSnesTrack(AkaoSnesSeq* parentFile, long offset = 0, long length = 0);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
+
+	uint16_t ROMAddressToAPUAddress(uint16_t romAddress);
+	uint16_t GetShortAddress(uint32_t offset);
 };

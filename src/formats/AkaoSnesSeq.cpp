@@ -11,8 +11,13 @@ DECLARE_FORMAT(AkaoSnes);
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
 
-AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, std::wstring newName)
-	: VGMSeq(AkaoSnesFormat::name, file, seqdataOffset, 0, newName), version(ver), minorVersion(minorVer)
+AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, std::wstring newName)
+	: VGMSeq(AkaoSnesFormat::name, file, seqdataOffset, 0, newName),
+	version(ver),
+	minorVersion(minorVer),
+	addrAPURelocBase(addrAPURelocBase),
+	addrROMRelocBase(addrAPURelocBase),
+	addrSequenceEnd(0)
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
@@ -36,7 +41,55 @@ bool AkaoSnesSeq::GetHeaderInfo(void)
 {
 	SetPPQN(SEQ_PPQN);
 
-	// TODO: AkaoSnesSeq::GetHeaderInfo
+	VGMHeader* header = AddHeader(dwOffset, 0);
+	uint32_t curOffset = dwOffset;
+	if (version == AKAOSNES_V1 || version == AKAOSNES_V2) {
+		// Earlier versions are not relocatable
+		// All addresses are plain APU addresses
+		addrROMRelocBase = addrAPURelocBase;
+		addrSequenceEnd = ROMAddressToAPUAddress(0);
+	}
+	else {
+		// Later versions are relocatable
+		if (version == AKAOSNES_V3) {
+			header->AddSimpleItem(curOffset, 2, L"ROM Address Base");
+			addrROMRelocBase = GetShort(curOffset);
+			if (minorVersion != AKAOSNES_V3_FFMQ) {
+				curOffset += 2;
+			}
+
+			header->AddSimpleItem(curOffset + MAX_TRACKS * 2, 2, L"End Address");
+			addrSequenceEnd = GetShortAddress(curOffset + MAX_TRACKS * 2);
+		}
+		else if (version == AKAOSNES_V4) {
+			header->AddSimpleItem(curOffset, 2, L"ROM Address Base");
+			addrROMRelocBase = GetShort(curOffset); curOffset += 2;
+
+			header->AddSimpleItem(curOffset, 2, L"End Address");
+			addrSequenceEnd = GetShortAddress(curOffset); curOffset += 2;
+		}
+
+		// calculate sequence length
+		if (addrSequenceEnd < dwOffset) {
+			return false;
+		}
+		unLength = addrSequenceEnd - dwOffset;
+	}
+
+	for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+		uint16_t addrTrackStart = GetShortAddress(curOffset);
+		if (addrTrackStart != addrSequenceEnd) {
+			std::wstringstream trackName;
+			trackName << L"Track Pointer " << (trackIndex + 1);
+			header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+		}
+		else {
+			header->AddSimpleItem(curOffset, 2, L"NULL");
+		}
+		curOffset += 2;
+	}
+
+	header->SetGuessedLength();
 
 	return true;		//successful
 }
@@ -44,7 +97,25 @@ bool AkaoSnesSeq::GetHeaderInfo(void)
 
 bool AkaoSnesSeq::GetTrackPointers(void)
 {
-	// TODO: AkaoSnesSeq::GetTrackPointers
+	uint32_t curOffset = dwOffset;
+	if (version == AKAOSNES_V3) {
+		if (minorVersion != AKAOSNES_V3_FFMQ) {
+			curOffset += 2;
+		}
+	}
+	else if (version == AKAOSNES_V4) {
+		curOffset += 4;
+	}
+
+	for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+		uint16_t addrTrackStart = GetShortAddress(curOffset);
+		if (addrTrackStart != addrSequenceEnd) {
+			AkaoSnesTrack* track = new AkaoSnesTrack(this, addrTrackStart);
+			aTracks.push_back(track);
+		}
+		curOffset += 2;
+	}
+
 	return true;
 }
 
@@ -53,6 +124,15 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 	// TODO: AkaoSnesSeq::LoadEventMap
 }
 
+uint16_t AkaoSnesSeq::ROMAddressToAPUAddress(uint16_t romAddress)
+{
+	return (romAddress - addrROMRelocBase) + addrAPURelocBase;
+}
+
+uint16_t AkaoSnesSeq::GetShortAddress(uint32_t offset)
+{
+	return ROMAddressToAPUAddress(GetShort(offset));
+}
 
 //  ************
 //  AkaoSnesTrack
@@ -164,4 +244,15 @@ bool AkaoSnesTrack::ReadEvent(void)
 	//OutputDebugString(ssTrace.str().c_str());
 
 	return bContinue;
+}
+
+uint16_t AkaoSnesTrack::ROMAddressToAPUAddress(uint16_t romAddress)
+{
+	AkaoSnesSeq* parentSeq = (AkaoSnesSeq*)this->parentSeq;
+	return parentSeq->ROMAddressToAPUAddress(romAddress);
+}
+
+uint16_t AkaoSnesTrack::GetShortAddress(uint32_t offset)
+{
+	return ROMAddressToAPUAddress(GetShort(offset));
 }

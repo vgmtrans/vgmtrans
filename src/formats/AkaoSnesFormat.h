@@ -23,7 +23,7 @@ enum AkaoSnesVersion
 	AKAOSNES_V1,                    // Final Fantasy 4
 	AKAOSNES_V2,                    // Romancing SaGa
 	AKAOSNES_V3,                    // Final Fantasy 5, etc.
-	AKAOSNES_V4,                    // Final Fantasy 6, Romancing SaGa 2, etc.
+	AKAOSNES_V4,                    // Romancing SaGa 2, Final Fantasy 6, etc.
 };
 
 enum AkaoSnesMinorVersion {
