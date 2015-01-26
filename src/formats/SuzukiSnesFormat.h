@@ -18,6 +18,7 @@ END_FORMAT()
 enum SuzukiSnesVersion
 {
 	SUZUKISNES_NONE = 0,              // Unknown Version
-	SUZUKISNES_V1,                    // Seiken Densetsu 3
-	SUZUKISNES_V2,                    // Bahamut Lagoon, Super Mario RPG
+	SUZUKISNES_SD3,                   // Seiken Densetsu 3
+	SUZUKISNES_BL,                    // Bahamut Lagoon
+	SUZUKISNES_SMR,                   // Super Mario RPG (mostly identical to Bahamut Lagoon)
 };

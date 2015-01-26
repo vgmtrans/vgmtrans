@@ -3,7 +3,7 @@
 #include "SeqTrack.h"
 #include "SuzukiSnesFormat.h"
 
-extern const uint8_t durtbl[14];
+#define SUZUKISNES_LOOP_LEVEL_MAX   10
 
 enum SuzukiSnesSeqEventType
 {
@@ -81,8 +81,14 @@ public:
 	virtual bool GetTrackPointers(void);
 	virtual void ResetVars(void);
 
+	double GetTempoInBPM(uint8_t tempo);
+
 	SuzukiSnesVersion version;
 	std::map<uint8_t, SuzukiSnesSeqEventType> EventMap;
+
+	static const uint8_t NOTE_DUR_TABLE[13];
+
+	uint8_t spcTempo;
 
 private:
 	void LoadEventMap(SuzukiSnesSeq *pSeqFile);
@@ -98,9 +104,11 @@ public:
 	virtual bool ReadEvent(void);
 
 private:
-	uint8_t rpt;
-	uint8_t rptcnt[10];
-	uint32_t rptpos[10];
-	uint8_t rptcur[10];
-	uint8_t rptoct[10];
+	uint16_t infiniteLoopPoint;
+
+	uint8_t loopLevel;
+	uint8_t loopCount[SUZUKISNES_LOOP_LEVEL_MAX];
+	uint16_t loopStart[SUZUKISNES_LOOP_LEVEL_MAX];
+	uint16_t loopEnd[SUZUKISNES_LOOP_LEVEL_MAX];
+	uint8_t loopOctave[SUZUKISNES_LOOP_LEVEL_MAX];
 };

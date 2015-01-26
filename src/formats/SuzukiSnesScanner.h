@@ -21,6 +21,7 @@ public:
 	void SearchForSuzukiSnesFromROM(RawFile* file);
 
 private:
-	static BytePattern ptnLoadSongV1;
-	static BytePattern ptnLoadSongV2;
+	static BytePattern ptnLoadSongSD3;
+	static BytePattern ptnLoadSongBL;
+	static BytePattern ptnExecVCmdBL;
 };
