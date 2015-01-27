@@ -103,6 +103,7 @@ public:
 	//uint16_t GetShortBE(uint32_t nIndex);
 	//uint32_t GetWord(uint32_t nIndex);
 	//uint32_t GetWordBE(uint32_t nIndex);
+	bool MatchBytes(const uint8_t* pattern, uint32_t nIndex, size_t nCount);
 	bool MatchBytePattern(const BytePattern& pattern, uint32_t nIndex);
 	bool SearchBytePattern(const BytePattern& pattern, uint32_t& nMatchOffset, uint32_t nSearchOffset = 0, uint32_t nSearchSize = (uint32_t)-1);
 

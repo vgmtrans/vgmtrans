@@ -333,6 +333,25 @@ uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer)
 // attempts to match the data from a given offset against a given pattern.
 // If the requested data goes beyond the bounds of the file buffer, the buffer is updated.
 // If the requested size is greater than the buffer size, it always fails. (operation not supported)
+bool RawFile::MatchBytes(const uint8_t* pattern, uint32_t nIndex, size_t nCount)
+{
+	if ((nIndex + nCount) > fileSize)
+		return false;
+
+	if (nCount > buf.size)
+		return false; // not supported
+	else
+	{
+		if ((nIndex < buf.startOff) || (nIndex + nCount > buf.endOff))
+			UpdateBuffer(nIndex);
+
+		return (memcmp(buf.data + nIndex - buf.startOff, pattern, nCount) == 0);
+	}
+}
+
+// attempts to match the data from a given offset against a given pattern.
+// If the requested data goes beyond the bounds of the file buffer, the buffer is updated.
+// If the requested size is greater than the buffer size, it always fails. (operation not supported)
 bool RawFile::MatchBytePattern(const BytePattern& pattern, uint32_t nIndex)
 {
 	size_t nCount = pattern.length();
