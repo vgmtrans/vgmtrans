@@ -11,14 +11,13 @@ DECLARE_FORMAT(AkaoSnes);
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
 
-AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, uint8_t timer0Freq, std::wstring newName)
+AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, std::wstring newName)
 	: VGMSeq(AkaoSnesFormat::name, file, seqdataOffset, 0, newName),
 	version(ver),
 	minorVersion(minorVer),
 	addrAPURelocBase(addrAPURelocBase),
 	addrROMRelocBase(addrAPURelocBase),
-	addrSequenceEnd(0),
-	TIMER0_FREQUENCY(timer0Freq)
+	addrSequenceEnd(0)
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
@@ -169,6 +168,38 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 			0xc0, 0x60, 0x40, 0x48, 0x30, 0x20, 0x24, 0x18, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03
 		};
 		NOTE_DUR_TABLE.assign(std::begin(NOTE_DUR_TABLE_RS2), std::end(NOTE_DUR_TABLE_RS2));
+	}
+
+	// timer 0 frequency
+	if (version == AKAOSNES_V4) {
+		if (minorVersion == AKAOSNES_V4_RS2 || minorVersion == AKAOSNES_V4_LAL) {
+			TIMER0_FREQUENCY = 0x24;
+		}
+		else if (minorVersion == AKAOSNES_V4_FM || minorVersion == AKAOSNES_V4_CT) {
+			TIMER0_FREQUENCY = 0x2a;
+		}
+		else {
+			TIMER0_FREQUENCY = 0x27;
+		}
+	}
+	else { // AKAOSNES_V1, AKAOSNES_V2, AKAOSNES_V3
+		TIMER0_FREQUENCY = 0x24;
+	}
+
+	// pan bitdepth
+	if (version == AKAOSNES_V1 || version == AKAOSNES_V3) {
+		PAN_8BIT = true;
+	}
+	else if (version == AKAOSNES_V2) {
+		PAN_8BIT = false;
+	}
+	else { // AKAOSNES_V4
+		if (minorVersion == AKAOSNES_V4_RS2 || minorVersion == AKAOSNES_V4_LAL) {
+			PAN_8BIT = true;
+		}
+		else {
+			PAN_8BIT = false;
+		}
 	}
 
 	for (statusByte = 0x00; statusByte <= STATUS_NOTE_MAX; statusByte++) {
@@ -573,15 +604,14 @@ bool AkaoSnesTrack::ReadEvent(void)
 
 	case EVENT_PAN:
 	{
-		// TODO: support both 7bit/8bit bitdepth
 		uint8_t pan = GetByte(curOffset++);
-		AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
+		uint8_t panShift = parentSeq->PAN_8BIT ? 0 : 1;
+		AddPan(beginOffset, curOffset - beginOffset, pan >> panShift);
 		break;
 	}
 
 	case EVENT_PAN_FADE:
 	{
-		// TODO: support both 7bit/8bit bitdepth
 		uint16_t fadeLength;
 		if (parentSeq->version == AKAOSNES_V1) {
 			fadeLength = GetShort(curOffset); curOffset += 2;
@@ -590,13 +620,14 @@ bool AkaoSnesTrack::ReadEvent(void)
 			fadeLength = GetByte(curOffset++);
 		}
 		uint8_t pan = GetByte(curOffset++);
+		uint8_t panShift = parentSeq->PAN_8BIT ? 0 : 1;
 
 		if (fadeLength != 0) {
 			desc << L"Fade Length: " << (int)fadeLength << L"  Pan: " << (int)pan;
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan Fade", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
 		}
 		else {
-			AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
+			AddPan(beginOffset, curOffset - beginOffset, pan >> panShift);
 		}
 		break;
 	}

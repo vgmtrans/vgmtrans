@@ -76,7 +76,7 @@ class AkaoSnesSeq
 	: public VGMSeq
 {
 public:
-	AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, uint8_t timer0Freq = 0x24, std::wstring newName = L"Square AKAO SNES Seq");
+	AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, std::wstring newName = L"Square AKAO SNES Seq");
 	virtual ~AkaoSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -98,6 +98,7 @@ public:
 	std::vector<uint8_t> NOTE_DUR_TABLE;
 
 	uint8_t TIMER0_FREQUENCY;
+	bool PAN_8BIT;
 
 	uint32_t addrAPURelocBase;
 	uint32_t addrROMRelocBase;
