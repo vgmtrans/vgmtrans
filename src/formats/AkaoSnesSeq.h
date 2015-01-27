@@ -3,6 +3,8 @@
 #include "SeqTrack.h"
 #include "AkaoSnesFormat.h"
 
+#define AKAOSNES_LOOP_LEVEL_MAX 4
+
 enum AkaoSnesSeqEventType
 {
 	EVENT_UNKNOWN0 = 1, //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
@@ -42,8 +44,8 @@ enum AkaoSnesSeqEventType
 	EVENT_TUNING,
 	EVENT_PROGCHANGE,
 	EVENT_VOLUME_ENVELOPE,
-	EVENT_GAIN_SUSTAIN,
 	EVENT_GAIN_RELEASE,
+	EVENT_DURATION_RATE,
 	EVENT_ADSR_AR,
 	EVENT_ADSR_DR,
 	EVENT_ADSR_SL,
@@ -55,7 +57,7 @@ enum AkaoSnesSeqEventType
 	EVENT_SLUR_OFF,
 	EVENT_LEGATO_ON,
 	EVENT_LEGATO_OFF,
-	EVENT_FORCE_NEXT_NOTE_LENGTH,
+	EVENT_ONETIME_DURATION,
 	EVENT_JUMP_TO_SFX_LO,
 	EVENT_JUMP_TO_SFX_HI,
 	EVENT_END,
@@ -65,7 +67,7 @@ enum AkaoSnesSeqEventType
 	EVENT_ECHO_VOLUME_FADE,
 	EVENT_ECHO_FEEDBACK_FIR,
 	EVENT_MASTER_VOLUME,
-	EVENT_CONDITIONAL_JUMP,
+	EVENT_LOOP_BREAK,
 	EVENT_GOTO,
 	EVENT_CPU_CONTROLED_JUMP,
 };
@@ -81,6 +83,8 @@ public:
 	virtual bool GetTrackPointers(void);
 	virtual void ResetVars(void);
 
+	double GetTempoInBPM(uint8_t tempo);
+
 	uint16_t ROMAddressToAPUAddress(uint16_t romAddress);
 	uint16_t GetShortAddress(uint32_t offset);
 
@@ -89,6 +93,11 @@ public:
 	std::map<uint8_t, AkaoSnesSeqEventType> EventMap;
 
 	uint8_t STATUS_NOTE_MAX;
+	uint8_t STATUS_NOTEINDEX_TIE;
+	uint8_t STATUS_NOTEINDEX_REST;
+	std::vector<uint8_t> NOTE_DUR_TABLE;
+
+	uint8_t TIMER0_FREQUENCY;
 
 	uint32_t addrAPURelocBase;
 	uint32_t addrROMRelocBase;
@@ -109,4 +118,12 @@ public:
 
 	uint16_t ROMAddressToAPUAddress(uint16_t romAddress);
 	uint16_t GetShortAddress(uint32_t offset);
+
+private:
+	uint8_t onetimeDuration;
+
+	uint8_t loopLevel;
+	uint8_t loopIncCount[AKAOSNES_LOOP_LEVEL_MAX];
+	uint8_t loopDecCount[AKAOSNES_LOOP_LEVEL_MAX];
+	uint16_t loopStart[AKAOSNES_LOOP_LEVEL_MAX];
 };

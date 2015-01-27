@@ -17,7 +17,8 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersio
 	minorVersion(minorVer),
 	addrAPURelocBase(addrAPURelocBase),
 	addrROMRelocBase(addrAPURelocBase),
-	addrSequenceEnd(0)
+	addrSequenceEnd(0),
+	TIMER0_FREQUENCY(0x24) // TODO: set correct timer 0 frequency
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
@@ -123,11 +124,51 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 {
 	int statusByte;
 
-	if (version == AKAOSNES_V4) {
-		STATUS_NOTE_MAX = 0xc3;
-	}
-	else {
+	// opcode min/max
+	switch (version) {
+	case AKAOSNES_V1:
 		STATUS_NOTE_MAX = 0xd1;
+		STATUS_NOTEINDEX_REST = 12;
+		STATUS_NOTEINDEX_TIE = 13;
+		break;
+
+	case AKAOSNES_V2:
+		STATUS_NOTE_MAX = 0xd1;
+		STATUS_NOTEINDEX_TIE = 12;
+		STATUS_NOTEINDEX_REST = 13;
+		break;
+
+	case AKAOSNES_V3:
+		STATUS_NOTE_MAX = 0xd1;
+		STATUS_NOTEINDEX_TIE = 12;
+		STATUS_NOTEINDEX_REST = 13;
+		break;
+
+	case AKAOSNES_V4:
+		STATUS_NOTE_MAX = 0xc3;
+		STATUS_NOTEINDEX_TIE = 12;
+		STATUS_NOTEINDEX_REST = 13;
+		break;
+	}
+
+	// duration table
+	if (version == AKAOSNES_V1) {
+		const uint8_t NOTE_DUR_TABLE_FF4[15] = {
+			0xc0, 0x90, 0x60, 0x48, 0x40, 0x30, 0x24, 0x20, 0x18, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03
+		};
+		NOTE_DUR_TABLE.assign(std::begin(NOTE_DUR_TABLE_FF4), std::end(NOTE_DUR_TABLE_FF4));
+	}
+	else if (version == AKAOSNES_V2 || version == AKAOSNES_V3) {
+		const uint8_t NOTE_DUR_TABLE_RS1[15] = {
+			0xc0, 0x90, 0x60, 0x40, 0x48, 0x30, 0x20, 0x24, 0x18, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03
+		};
+		NOTE_DUR_TABLE.assign(std::begin(NOTE_DUR_TABLE_RS1), std::end(NOTE_DUR_TABLE_RS1));
+	}
+	else { // AKAOSNES_V4
+		const uint8_t NOTE_DUR_TABLE_RS2[14] = {
+			0xc0, 0x60, 0x40, 0x48, 0x30, 0x20, 0x24, 0x18, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03
+		};
+		NOTE_DUR_TABLE.assign(std::begin(NOTE_DUR_TABLE_RS2), std::end(NOTE_DUR_TABLE_RS2));
 	}
 
 	for (statusByte = 0x00; statusByte <= STATUS_NOTE_MAX; statusByte++) {
@@ -147,7 +188,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xdb] = EVENT_PROGCHANGE;
 		pSeqFile->EventMap[0xdc] = EVENT_VOLUME_ENVELOPE;
 		pSeqFile->EventMap[0xdd] = EVENT_GAIN_RELEASE;
-		pSeqFile->EventMap[0xde] = EVENT_GAIN_SUSTAIN;
+		pSeqFile->EventMap[0xde] = EVENT_DURATION_RATE;
 		pSeqFile->EventMap[0xdf] = EVENT_NOISE_FREQ;
 		pSeqFile->EventMap[0xe0] = EVENT_LOOP_START;
 		pSeqFile->EventMap[0xe1] = EVENT_OCTAVE_UP;
@@ -170,7 +211,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xf2] = EVENT_VOLUME_FADE;
 		pSeqFile->EventMap[0xf3] = EVENT_PAN_FADE;
 		pSeqFile->EventMap[0xf4] = EVENT_GOTO;
-		pSeqFile->EventMap[0xf5] = EVENT_CONDITIONAL_JUMP;
+		pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
 		pSeqFile->EventMap[0xf6] = EVENT_UNKNOWN0; // cpu-controled jump?
 		pSeqFile->EventMap[0xf7] = EVENT_END; // duplicated
 		pSeqFile->EventMap[0xf8] = EVENT_END; // duplicated
@@ -213,7 +254,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xed] = EVENT_OCTAVE_DOWN;
 		pSeqFile->EventMap[0xee] = EVENT_LOOP_START;
 		pSeqFile->EventMap[0xef] = EVENT_LOOP_END;
-		pSeqFile->EventMap[0xf0] = EVENT_CONDITIONAL_JUMP;
+		pSeqFile->EventMap[0xf0] = EVENT_LOOP_BREAK;
 		pSeqFile->EventMap[0xf1] = EVENT_GOTO;
 		pSeqFile->EventMap[0xf2] = EVENT_SLUR_ON;
 		pSeqFile->EventMap[0xf3] = EVENT_PROGCHANGE;
@@ -273,7 +314,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xf6] = EVENT_ECHO_VOLUME_FADE; // No Operation in Seiken Densetsu 2
 		pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FIR; // No Operation in Seiken Densetsu 2
 		pSeqFile->EventMap[0xf8] = EVENT_MASTER_VOLUME;
-		pSeqFile->EventMap[0xf9] = EVENT_CONDITIONAL_JUMP;
+		pSeqFile->EventMap[0xf9] = EVENT_LOOP_BREAK;
 		pSeqFile->EventMap[0xfa] = EVENT_GOTO;
 		pSeqFile->EventMap[0xfb] = EVENT_CPU_CONTROLED_JUMP;
 	}
@@ -317,10 +358,10 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xe5] = EVENT_SLUR_OFF;
 		pSeqFile->EventMap[0xe6] = EVENT_LEGATO_ON;
 		pSeqFile->EventMap[0xe7] = EVENT_LEGATO_OFF;
-		pSeqFile->EventMap[0xe8] = EVENT_FORCE_NEXT_NOTE_LENGTH;
+		pSeqFile->EventMap[0xe8] = EVENT_ONETIME_DURATION;
 		pSeqFile->EventMap[0xe9] = EVENT_JUMP_TO_SFX_LO;
 		pSeqFile->EventMap[0xea] = EVENT_JUMP_TO_SFX_HI;
-		pSeqFile->EventMap[0xeb] = EVENT_END; // TODO: not always true, see Romancing SaGa 2 and Gun Hazard
+		pSeqFile->EventMap[0xeb] = EVENT_END; // TODO: vcmd eb does not always mean "end", see Gun Hazard
 		pSeqFile->EventMap[0xec] = EVENT_END; // duplicated
 		pSeqFile->EventMap[0xed] = EVENT_END; // duplicated
 		pSeqFile->EventMap[0xee] = EVENT_END; // duplicated
@@ -332,6 +373,18 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 	}
 
 	// TODO: game-specific mappings
+}
+
+double AkaoSnesSeq::GetTempoInBPM(uint8_t tempo)
+{
+	if (tempo != 0 && TIMER0_FREQUENCY != 0)
+	{
+		return 60000000.0 / (SEQ_PPQN * (125 * TIMER0_FREQUENCY)) * (tempo / 256.0);
+	}
+	else
+	{
+		return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
+	}
 }
 
 uint16_t AkaoSnesSeq::ROMAddressToAPUAddress(uint16_t romAddress)
@@ -359,6 +412,11 @@ AkaoSnesTrack::AkaoSnesTrack(AkaoSnesSeq* parentFile, long offset, long length)
 void AkaoSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
+
+	vel = 100;
+	octave = 6;
+	onetimeDuration = 0;
+	loopLevel = 0;
 }
 
 
@@ -441,6 +499,37 @@ bool AkaoSnesTrack::ReadEvent(void)
 		break;
 	}
 
+	case EVENT_NOTE: // 0x00..0xc3
+	{
+		uint8_t durIndex = statusByte % parentSeq->NOTE_DUR_TABLE.size();
+		uint8_t noteIndex = statusByte / parentSeq->NOTE_DUR_TABLE.size();
+		uint8_t dur = parentSeq->NOTE_DUR_TABLE[durIndex];
+
+		if (onetimeDuration != 0) {
+			dur = onetimeDuration;
+			onetimeDuration = 0;
+		}
+
+		if (noteIndex < 12) {
+			uint8_t note = octave * 12 + noteIndex;
+
+			// TODO: percussion note
+
+			AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
+			AddTime(dur);
+		}
+		else if (noteIndex == parentSeq->STATUS_NOTEINDEX_TIE) {
+			MakePrevDurNoteEnd();
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
+			AddTime(dur);
+		}
+		else {
+			AddRest(beginOffset, curOffset - beginOffset, dur);
+		}
+
+		break;
+	}
+
 	case EVENT_NOP:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
@@ -457,7 +546,7 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_VOLUME:
 	{
 		uint8_t vol = GetByte(curOffset++);
-		AddVol(beginOffset, curOffset - beginOffset, vol);
+		AddVol(beginOffset, curOffset - beginOffset, vol >> 1);
 		break;
 	}
 
@@ -472,8 +561,492 @@ bool AkaoSnesTrack::ReadEvent(void)
 		}
 		uint8_t vol = GetByte(curOffset++);
 
-		desc << L"Fade Length: " << (int)fadeLength << L"  Volume: " << (int)vol;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume Fade", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
+		if (fadeLength != 0) {
+			desc << L"Fade Length: " << (int)fadeLength << L"  Volume: " << (int)vol;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume Fade", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
+		}
+		else {
+			AddVol(beginOffset, curOffset - beginOffset, vol >> 1);
+		}
+		break;
+	}
+
+	case EVENT_PAN:
+	{
+		// TODO: support both 7bit/8bit bitdepth
+		uint8_t pan = GetByte(curOffset++);
+		AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
+		break;
+	}
+
+	case EVENT_PAN_FADE:
+	{
+		// TODO: support both 7bit/8bit bitdepth
+		uint8_t fadeLength = GetByte(curOffset++);
+		uint8_t pan = GetByte(curOffset++);
+
+		if (fadeLength != 0) {
+			desc << L"Fade Length: " << (int)fadeLength << L"  Pan: " << (int)pan;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan Fade", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
+		}
+		else {
+			AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
+		}
+		break;
+	}
+
+	case EVENT_PITCH_SLIDE_ON:
+	{
+		int8_t pitchSlideSemitones;
+		uint8_t pitchSlideDelay;
+		uint8_t pitchSlideLength;
+
+		if (parentSeq->version == AKAOSNES_V1) {
+			pitchSlideDelay = GetByte(curOffset++);
+			pitchSlideLength = GetByte(curOffset++);
+			pitchSlideSemitones = GetByte(curOffset++);
+			desc << L"Delay: " << (int)pitchSlideDelay << L"  Length: " << (int)pitchSlideLength << L"  Key: " << (int)pitchSlideSemitones << L" semitones";
+		}
+		else { // AKAOSNES_V2
+			pitchSlideSemitones = GetByte(curOffset++);
+			pitchSlideDelay = GetByte(curOffset++);
+			pitchSlideLength = GetByte(curOffset++);
+			desc << L"Key: " << (int)pitchSlideSemitones << L" semitones  Delay: " << (int)pitchSlideDelay << L"  Length: " << (int)pitchSlideLength;
+		}
+
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide On", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PITCH_SLIDE_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide Off", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_VIBRATO_ON:
+	{
+		uint8_t lfoDelay = GetByte(curOffset++);
+		uint8_t lfoRate = GetByte(curOffset++);
+		uint8_t lfoDepth = GetByte(curOffset++);
+		desc << L"Delay: " << (int)lfoDelay << L"  Rate: " << (int)lfoRate << L"  Depth: " << (int)lfoDepth;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_VIBRATO_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Off", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_TREMOLO_ON:
+	{
+		uint8_t lfoDelay = GetByte(curOffset++);
+		uint8_t lfoRate = GetByte(curOffset++);
+		uint8_t lfoDepth = GetByte(curOffset++);
+		desc << L"Delay: " << (int)lfoDelay << L"  Rate: " << (int)lfoRate << L"  Depth: " << (int)lfoDepth;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_TREMOLO_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo Off", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PAN_LFO_ON:
+	{
+		uint8_t lfoDepth = GetByte(curOffset++);
+		uint8_t lfoRate = GetByte(curOffset++);
+		desc << L"Depth: " << (int)lfoDepth << L"  Rate: " << (int)lfoRate;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PAN_LFO_ON_WITH_DELAY:
+	{
+		uint8_t lfoDelay = GetByte(curOffset++);
+		uint8_t lfoRate = GetByte(curOffset++);
+		uint8_t lfoDepth = GetByte(curOffset++);
+		desc << L"Delay: " << (int)lfoDelay << L"  Rate: " << (int)lfoRate << L"  Depth: " << (int)lfoDepth;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PAN_LFO_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO Off", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_NOISE_FREQ:
+	{
+		uint8_t newNCK = GetByte(curOffset++) & 0x1f;
+		desc << L"Noise Frequency (NCK): " << (int)newNCK;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Frequency", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_NOISE_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_NOISE_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PITCHMOD_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Modulation On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PITCHMOD_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Modulation Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo On", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_OCTAVE:
+	{
+		uint8_t newOctave = GetByte(curOffset++);
+		AddSetOctave(beginOffset, curOffset - beginOffset, newOctave);
+		break;
+	}
+
+	case EVENT_OCTAVE_UP:
+	{
+		AddIncrementOctave(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	case EVENT_OCTAVE_DOWN:
+	{
+		AddDecrementOctave(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	case EVENT_TRANSPOSE_ABS:
+	{
+		int8_t newTranspose = GetByte(curOffset++);
+		AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+		break;
+	}
+
+	case EVENT_TRANSPOSE_REL:
+	{
+		int8_t newTranspose = GetByte(curOffset++);
+		AddTranspose(beginOffset, curOffset - beginOffset, transpose + newTranspose, L"Transpose (Relative)");
+		break;
+	}
+
+	case EVENT_TUNING:
+	{
+		int8_t newTuning = GetByte(curOffset++);
+		AddFineTuning(beginOffset, curOffset - beginOffset, newTuning / 16.0);
+		break;
+	}
+
+	case EVENT_PROGCHANGE:
+	{
+		uint8_t newProg = GetByte(curOffset++);
+		AddProgramChange(beginOffset, curOffset - beginOffset, newProg);
+		break;
+	}
+
+	case EVENT_VOLUME_ENVELOPE:
+	{
+		uint8_t envelopeIndex = GetByte(curOffset++);
+		desc << L"Envelope: " << (int)envelopeIndex;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume Envelope", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_GAIN_RELEASE:
+	{
+		uint8_t gain = GetByte(curOffset++) & 0x1f;
+		desc << L"GAIN: " << (int)gain;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Release Rate (GAIN)", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_DURATION_RATE:
+	{
+		uint8_t rate = GetByte(curOffset++);
+		if (rate == 0 || rate == 100) {
+			rate = 100;
+		}
+
+		desc << L"Note Length: " << (int)rate << " %";
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration Rate", desc.str().c_str(), CLR_DURNOTE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ADSR_AR:
+	{
+		uint8_t newAR = GetByte(curOffset++) & 15;
+		desc << L"AR: " << (int)newAR;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Attack Rate", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ADSR_DR:
+	{
+		uint8_t newDR = GetByte(curOffset++) & 7;
+		desc << L"DR: " << (int)newDR;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Decay Rate", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ADSR_SL:
+	{
+		uint8_t newSL = GetByte(curOffset++) & 7;
+		desc << L"SL: " << (int)newSL;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Level", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ADSR_SR:
+	{
+		uint8_t newSR = GetByte(curOffset++) & 15;
+		desc << L"SR: " << (int)newSR;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Rate", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ADSR_DEFAULT:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Default ADSR", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_LOOP_START:
+	{
+		uint8_t count = GetByte(curOffset++);
+		if (count != 0) {
+			count++;
+		}
+
+		desc << L"Loop Count: " << (int)count;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+
+		loopStart[loopLevel] = curOffset;
+		if (parentSeq->version == AKAOSNES_V4) {
+			loopIncCount[loopLevel] = 1;
+		}
+		else { // AKAOSNES_V1, AKAOSNES_V2, AKAOSNES_V3
+			loopIncCount[loopLevel] = 0;
+		}
+		loopDecCount[loopLevel] = count;
+		loopLevel = (loopLevel + 1) % AKAOSNES_LOOP_LEVEL_MAX;
+		break;
+	}
+
+	case EVENT_LOOP_END:
+	{
+		uint8_t prevLoopLevel = (loopLevel != 0 ? loopLevel : AKAOSNES_LOOP_LEVEL_MAX) - 1;
+		if (parentSeq->version == AKAOSNES_V4) {
+			loopIncCount[prevLoopLevel]++;
+		}
+
+		if (loopDecCount[prevLoopLevel] == 0) {
+			// infinite loop
+			bContinue = AddLoopForever(beginOffset, curOffset - beginOffset);
+			curOffset = loopStart[prevLoopLevel];
+		}
+		else {
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+
+			if (loopDecCount[prevLoopLevel] - 1 == 0) {
+				// repeat end
+				loopLevel = prevLoopLevel;
+			}
+			else {
+				// repeat again
+				loopDecCount[prevLoopLevel]--;
+				curOffset = loopStart[prevLoopLevel];
+			}
+		}
+
+		break;
+	}
+
+	case EVENT_SLUR_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_SLUR_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_LEGATO_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_LEGATO_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ONETIME_DURATION:
+	{
+		uint8_t dur = GetByte(curOffset++);
+		onetimeDuration = dur;
+		desc << L"Duration: " << (int)dur;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration (One-Time)", desc.str().c_str(), CLR_DURNOTE);
+		break;
+	}
+
+	case EVENT_JUMP_TO_SFX_LO:
+	{
+		// TODO: EVENT_JUMP_TO_SFX_LO
+		uint8_t sfxIndex = GetByte(curOffset++);
+		desc << L"SFX: " << (int)sfxIndex;
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Jump to SFX (LOWORD)", desc.str().c_str());
+		bContinue = false;
+		break;
+	}
+
+	case EVENT_JUMP_TO_SFX_HI:
+	{
+		// TODO: EVENT_JUMP_TO_SFX_HI
+		uint8_t sfxIndex = GetByte(curOffset++);
+		desc << L"SFX: " << (int)sfxIndex;
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Jump to SFX (HIWORD)", desc.str().c_str());
+		bContinue = false;
+		break;
+	}
+
+	case EVENT_END:
+	{
+		AddEndOfTrack(beginOffset, curOffset - beginOffset);
+		bContinue = false;
+		break;
+	}
+
+	case EVENT_TEMPO:
+	{
+		uint8_t newTempo = GetByte(curOffset++);
+		AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo));
+		break;
+	}
+
+	case EVENT_TEMPO_FADE:
+	{
+		uint8_t fadeLength = GetByte(curOffset++);
+		uint8_t newTempo = GetByte(curOffset++);
+
+		if (fadeLength != 0) {
+			desc << L"Fade Length: " << (int)fadeLength << L"  BPM: " << parentSeq->GetTempoInBPM(newTempo);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tempo Fade", desc.str().c_str(), CLR_TEMPO, ICON_TEMPO);
+		}
+		else {
+			AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo));
+		}
+		break;
+	}
+
+	case EVENT_ECHO_VOLUME:
+	{
+		uint8_t vol = GetByte(curOffset++);
+		desc << L"Volume: " << (int)vol;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_VOLUME_FADE:
+	{
+		uint16_t fadeLength = GetByte(curOffset++);
+		uint8_t vol = GetByte(curOffset++);
+
+		if (fadeLength != 0) {
+			desc << L"Fade Length: " << (int)fadeLength << L"  Volume: " << (int)vol;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume Fade", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		}
+		else {
+			desc << L"Volume: " << (int)vol;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		}
+		break;
+	}
+
+	case EVENT_ECHO_FEEDBACK_FIR:
+	{
+		int8_t feedback = GetByte(curOffset++);
+		uint8_t filterIndex = GetByte(curOffset++);
+		desc << L"Feedback: " << (int)feedback << L"  FIR: " << (int)filterIndex;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Feedback & FIR", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_MASTER_VOLUME:
+	{
+		uint8_t newVol = GetByte(curOffset++);
+		AddMasterVol(beginOffset, curOffset - beginOffset, newVol / 2);
+		break;
+	}
+
+	case EVENT_LOOP_BREAK:
+	{
+		uint8_t count = GetByte(curOffset++);
+		uint16_t dest = GetShortAddress(curOffset); curOffset += 2;
+
+		desc << L"Count: " << (int)count << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Break / Jump to Volta", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+
+		uint8_t prevLoopLevel = (loopLevel != 0 ? loopLevel : AKAOSNES_LOOP_LEVEL_MAX) - 1;
+		if (parentSeq->version != AKAOSNES_V4) { // AKAOSNES_V1, AKAOSNES_V2, AKAOSNES_V3
+			loopIncCount[prevLoopLevel]++;
+		}
+
+		if (count == loopIncCount[prevLoopLevel]) {
+			if (loopDecCount[prevLoopLevel] - 1 == 0) {
+				loopLevel = prevLoopLevel;
+			}
+			curOffset = dest;
+		}
+
+		break;
+	}
+
+	case EVENT_GOTO:
+	{
+		uint16_t dest = GetShortAddress(curOffset); curOffset += 2;
+		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+		uint32_t length = curOffset - beginOffset;
+
+		curOffset = dest;
+		if (!IsOffsetUsed(dest)) {
+			AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
+		}
+		else {
+			bContinue = AddLoopForever(beginOffset, length, L"Jump");
+		}
 		break;
 	}
 
