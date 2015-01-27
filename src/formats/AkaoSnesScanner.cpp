@@ -401,7 +401,24 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 		minorVersion = AKAOSNES_V4_LAL;
 	}
 	else if (file->MatchBytes(FM_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FM_VCMD_LEN_TABLE))) {
-		minorVersion = AKAOSNES_V4_FM;
+		//; Chrono Trigger SPC
+		//1cf6: 28 0f     and   a,#$0f
+		//1cf8: c4 7b     mov   $7b,a
+		//1cfa: 6f        ret
+		BytePattern ptnVCmdF9CT(
+			"\x28\x0f\xc4\x7b\x6f"
+			,
+			"xxx?x"
+			,
+			5);
+
+		uint16_t addrVCmdF9 = file->GetShort(addrVCmdAddressTable + 53 * 2);
+		if (file->MatchBytePattern(ptnVCmdF9CT, addrVCmdF9)) {
+			minorVersion = AKAOSNES_V4_CT;
+		}
+		else {
+			minorVersion = AKAOSNES_V4_FM;
+		}
 	}
 	else if (file->MatchBytes(RS3_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(RS3_VCMD_LEN_TABLE))) {
 		minorVersion = AKAOSNES_V4_RS3;
