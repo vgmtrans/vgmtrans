@@ -46,6 +46,7 @@ BytePattern AkaoSnesScanner::ptnReadNoteLengthV4(
 	8);
 
 //; Final Fantasy 4 SPC
+//; This pattern is applicable to earlier V4 engines (e.g. Romancing SaGa 2)
 //0c71: a8 d2     sbc   a,#$d2
 //0c73: 1c        asl   a
 //0c74: fd        mov   y,a
@@ -58,7 +59,7 @@ BytePattern AkaoSnesScanner::ptnReadNoteLengthV4(
 //0c7f: fd        mov   y,a
 //0c80: f6 49 18  mov   a,$1849+y
 //0c83: f0 0a     beq   $0c8f
-BytePattern AkaoSnesScanner::ptnVCmdExecV1(
+BytePattern AkaoSnesScanner::ptnVCmdExecFF4(
 	"\xa8\xd2\x1c\xfd\xf6\xee\x17\x2d"
 	"\xf6\xed\x17\x2d\xdd\x5c\xfd\xf6"
 	"\x49\x18\xf0\x0a"
@@ -81,7 +82,7 @@ BytePattern AkaoSnesScanner::ptnVCmdExecV1(
 //073f: eb a6     mov   y,$a6
 //0741: f6 cd 16  mov   a,$16cd+y
 //0744: d0 01     bne   $0747
-BytePattern AkaoSnesScanner::ptnVCmdExecV4(
+BytePattern AkaoSnesScanner::ptnVCmdExecRS3(
 	"\xa8\xc4\xc4\xa6\x1c\xfd\xf6\x56"
 	"\x16\x2d\xf6\x55\x16\x2d\xeb\xa6"
 	"\xf6\xcd\x16\xd0\x01"
@@ -182,6 +183,66 @@ BytePattern AkaoSnesScanner::ptnReadSeqHeaderV4(
 	,
 	18);
 
+//; Final Fantasy 4 SPC
+//0832: e8 f0     mov   a,#$f0
+//0834: c4 f1     mov   $f1,a             ; clear ports, stop timers
+//0836: e8 24     mov   a,#$24
+//0838: c4 fa     mov   $fa,a             ; set timer 0 latch to #$24 (222.2 Hz)
+//083a: e8 80     mov   a,#$80
+//083c: c4 fb     mov   $fb,a             ; set timer 1 latch to #$80 (62.5 Hz)
+//083e: e8 03     mov   a,#$03
+//0840: c4 f1     mov   $f1,a             ; start timers 0 and 1
+BytePattern AkaoSnesScanner::ptnTimer0InitFF4(
+	"\xe8\xf0\xc4\xf1\xe8\x24\xc4\xfa"
+	"\xe8\x80\xc4\xfb\xe8\x03\xc4\xf1"
+	,
+	"x?xxx?xx"
+	"x?xxxxxx"
+	,
+	16);
+
+//; Romancing SaGa SPC
+//0851: 8f f0 f1  mov   $f1,#$f0
+//0854: 8f 24 fa  mov   $fa,#$24
+//0857: 8f 80 fb  mov   $fb,#$80
+//085a: 8f 03 f1  mov   $f1,#$03
+BytePattern AkaoSnesScanner::ptnTimer0InitRS(
+	"\x8f\xf0\xf1\x8f\x24\xfa\x8f\x80"
+	"\xfb\x8f\x03\xf1"
+	,
+	"x?xx?xx?"
+	"xxxx"
+	,
+	12);
+
+//; Seiken Densetsu 2 SPC
+//0248: 8f f0 f1  mov   $f1,#$f0          ; clear ports
+//024b: 8f 24 fa  mov   $fa,#$24          ; set timer0 latch to 24 (4.5ms, 222 Hz)
+//024e: 8f 01 f1  mov   $f1,#$01          ; start timer0
+BytePattern AkaoSnesScanner::ptnTimer0InitSD2(
+	"\x8f\xf0\xf1\x8f\x24\xfa\x8f\x01"
+	"\xf1"
+	,
+	"x?xx?xxx"
+	"x"
+	,
+	9);
+
+//; Romancing SaGa 2 SPC
+//024a: 8f f0 f1  mov   $f1,#$f0          ; clear ports
+//024d: 8f 24 fa  mov   $fa,#$24          ; set timer0 latch to #$27 (205 Hz, 4.875ms)
+//0250: 8f 80 fb  mov   $fb,#$80          ; set timer1 latch to #$80 (62.5 Hz, 16ms)
+//0253: 8f 05 fc  mov   $fc,#$05          ; set timer2 latch to #$05 (12.8 KHz, 78 us)
+//0256: 8f 07 f1  mov   $f1,#$07          ; start all timers
+BytePattern AkaoSnesScanner::ptnTimer0InitRS2(
+	"\x8f\xf0\xf1\x8f\x24\xfa\x8f\x80"
+	"\xfb\x8f\x05\xfc\x8f\x07\xf1"
+	,
+	"x?xx?xx?"
+	"xx?xxxx"
+	,
+	15);
+
 void AkaoSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -227,18 +288,15 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 	uint8_t firstVCmd;
 	uint16_t addrVCmdAddressTable;
 	uint16_t addrVCmdLengthTable;
-	AkaoSnesVersion verVCmdExec = AKAOSNES_NONE;
-	if (file->SearchBytePattern(ptnVCmdExecV4, ofsVCmdExec)) {
+	if (file->SearchBytePattern(ptnVCmdExecRS3, ofsVCmdExec)) {
 		firstVCmd = file->GetByte(ofsVCmdExec + 1);
 		addrVCmdAddressTable = file->GetShort(ofsVCmdExec + 11);
 		addrVCmdLengthTable = file->GetShort(ofsVCmdExec + 17);
-		verVCmdExec = AKAOSNES_V4;
 	}
-	else if (file->SearchBytePattern(ptnVCmdExecV1, ofsVCmdExec)) {
+	else if (file->SearchBytePattern(ptnVCmdExecFF4, ofsVCmdExec)) {
 		firstVCmd = file->GetByte(ofsVCmdExec + 1);
 		addrVCmdAddressTable = file->GetShort(ofsVCmdExec + 9);
 		addrVCmdLengthTable = file->GetShort(ofsVCmdExec + 16);
-		verVCmdExec = AKAOSNES_V1;
 	}
 	else {
 		return;
@@ -291,11 +349,28 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 		return;
 	}
 
+	// optional: read timer 0 frequency for tempo
+	UINT ofsTimer0Init;
+	byte timer0Freq = 0x24;
+	if (file->SearchBytePattern(ptnTimer0InitRS2, ofsTimer0Init)) {
+		timer0Freq = file->GetByte(ofsTimer0Init + 4);
+	}
+	else if (file->SearchBytePattern(ptnTimer0InitSD2, ofsTimer0Init)) {
+		timer0Freq = file->GetByte(ofsTimer0Init + 4);
+	}
+	else if (file->SearchBytePattern(ptnTimer0InitRS, ofsTimer0Init)) {
+		timer0Freq = file->GetByte(ofsTimer0Init + 4);
+	}
+	else if (file->SearchBytePattern(ptnTimer0InitFF4, ofsTimer0Init)) {
+		timer0Freq = file->GetByte(ofsTimer0Init + 5);
+	}
+
 	// TODO: classify minor version
-	// TODO: gather more information if necessary (pan bitdepth, timer frequency, etc.)
+
+	// TODO: gather more information if necessary (pan bitdepth, etc.)
 
 	// load sequence
-	AkaoSnesSeq* newSeq = new AkaoSnesSeq(file, version, minorVersion, addrSeqHeader, addrAPURelocBase, name);
+	AkaoSnesSeq* newSeq = new AkaoSnesSeq(file, version, minorVersion, addrSeqHeader, addrAPURelocBase, timer0Freq, name);
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
 		return;

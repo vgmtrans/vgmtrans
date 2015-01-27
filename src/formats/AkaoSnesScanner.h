@@ -24,10 +24,14 @@ private:
 	static BytePattern ptnReadNoteLengthV1;
 	static BytePattern ptnReadNoteLengthV2;
 	static BytePattern ptnReadNoteLengthV4;
-	static BytePattern ptnVCmdExecV1;
-	static BytePattern ptnVCmdExecV4;
+	static BytePattern ptnVCmdExecFF4;
+	static BytePattern ptnVCmdExecRS3;
 	static BytePattern ptnReadSeqHeaderV1;
 	static BytePattern ptnReadSeqHeaderV2;
 	static BytePattern ptnReadSeqHeaderFFMQ;
 	static BytePattern ptnReadSeqHeaderV4;
+	static BytePattern ptnTimer0InitFF4;
+	static BytePattern ptnTimer0InitRS;
+	static BytePattern ptnTimer0InitSD2;
+	static BytePattern ptnTimer0InitRS2;
 };

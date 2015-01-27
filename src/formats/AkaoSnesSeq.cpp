@@ -11,14 +11,14 @@ DECLARE_FORMAT(AkaoSnes);
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
 
-AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, std::wstring newName)
+AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersion minorVer, uint32_t seqdataOffset, uint32_t addrAPURelocBase, uint8_t timer0Freq, std::wstring newName)
 	: VGMSeq(AkaoSnesFormat::name, file, seqdataOffset, 0, newName),
 	version(ver),
 	minorVersion(minorVer),
 	addrAPURelocBase(addrAPURelocBase),
 	addrROMRelocBase(addrAPURelocBase),
 	addrSequenceEnd(0),
-	TIMER0_FREQUENCY(0x24) // TODO: set correct timer 0 frequency
+	TIMER0_FREQUENCY(timer0Freq)
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
@@ -582,7 +582,13 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_PAN_FADE:
 	{
 		// TODO: support both 7bit/8bit bitdepth
-		uint8_t fadeLength = GetByte(curOffset++);
+		uint16_t fadeLength;
+		if (parentSeq->version == AKAOSNES_V1) {
+			fadeLength = GetShort(curOffset); curOffset += 2;
+		}
+		else {
+			fadeLength = GetByte(curOffset++);
+		}
 		uint8_t pan = GetByte(curOffset++);
 
 		if (fadeLength != 0) {
@@ -958,7 +964,13 @@ bool AkaoSnesTrack::ReadEvent(void)
 
 	case EVENT_TEMPO_FADE:
 	{
-		uint8_t fadeLength = GetByte(curOffset++);
+		uint16_t fadeLength;
+		if (parentSeq->version == AKAOSNES_V1) {
+			fadeLength = GetShort(curOffset); curOffset += 2;
+		}
+		else {
+			fadeLength = GetByte(curOffset++);
+		}
 		uint8_t newTempo = GetByte(curOffset++);
 
 		if (fadeLength != 0) {
