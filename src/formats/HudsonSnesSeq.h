@@ -12,6 +12,22 @@ enum HudsonSnesSeqEventType
 	EVENT_UNKNOWN4,
 };
 
+enum HudsonSnesSeqHeaderEventType
+{
+	HEADER_EVENT_END = 1,
+	HEADER_EVENT_TIMEBASE,
+	HEADER_EVENT_TRACKS,
+	HEADER_EVENT_INSTRUMENTS_V1,
+	HEADER_EVENT_PERCUSSIONS_V1,
+	HEADER_EVENT_INSTRUMENTS_V2,
+	HEADER_EVENT_PERCUSSIONS_V2,
+	HEADER_EVENT_05,
+	HEADER_EVENT_06,
+	HEADER_EVENT_ECHO_PARAM,
+	HEADER_EVENT_08,
+	HEADER_EVENT_09,
+};
+
 class HudsonSnesSeq
 	: public VGMSeq
 {
@@ -20,11 +36,16 @@ public:
 	virtual ~HudsonSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
+	bool GetTrackPointersInHeaderInfo(VGMHeader* header, uint32_t & offset);
 	virtual bool GetTrackPointers(void);
 	virtual void ResetVars(void);
 
 	HudsonSnesVersion version;
 	std::map<uint8_t, HudsonSnesSeqEventType> EventMap;
+	std::map<uint8_t, HudsonSnesSeqHeaderEventType> HeaderEventMap;
+
+	uint8_t TrackAvailableBits;
+	uint16_t TrackAddresses[8];
 
 private:
 	void LoadEventMap(HudsonSnesSeq *pSeqFile);

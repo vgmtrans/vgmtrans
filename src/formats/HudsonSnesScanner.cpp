@@ -86,20 +86,21 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 	UINT ofsGetSeqTableAddr;
 	uint16_t addrSongList;
 	if (file->SearchBytePattern(ptnGetSeqTableAddrV1V2, ofsGetSeqTableAddr)) {
-		addrSongList = file->GetShort(ofsGetSeqTableAddr + 1);
-		if (addrSongList == 0x07c2) {
+		uint16_t addrSongListPtr = file->GetShort(ofsGetSeqTableAddr + 1);
+		if (addrSongListPtr == 0x07c2) {
 			version = HUDSONSNES_V1;
 		}
-		else if (addrSongList == 0x0803) {
+		else if (addrSongListPtr == 0x0803) {
 			version = HUDSONSNES_V2;
 		}
 		else {
 			return;
 		}
+		addrSongList = file->GetShort(addrSongListPtr);
 	}
 	else if (file->SearchBytePattern(ptnGetSeqTableAddrV0, ofsGetSeqTableAddr)) {
 		uint8_t addrSongListPtr = file->GetByte(ofsGetSeqTableAddr + 4);
-		addrSongList = file->GetShort(addrSongListPtr + 1);
+		addrSongList = file->GetShort(addrSongListPtr);
 		version = HUDSONSNES_V0;
 	}
 	else {
