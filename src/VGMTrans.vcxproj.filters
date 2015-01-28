@@ -184,6 +184,12 @@
     <Filter Include="Header Files\formats\akaosnes">
       <UniqueIdentifier>{4e1e5424-638c-46a5-83c4-578d5f7de01c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\formats\hudsonsnes">
+      <UniqueIdentifier>{f5161b19-9dd3-4017-acfe-e91472d7da81}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\hudsonsnes">
+      <UniqueIdentifier>{2204cdc0-76e7-4a98-925f-0a0903031fa5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\aboutdlg.cpp">
@@ -623,6 +629,12 @@
     </ClCompile>
     <ClCompile Include="formats\AkaoSnesSeq.cpp">
       <Filter>Source Files\formats\akaosnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\HudsonSnesScanner.cpp">
+      <Filter>Source Files\formats\hudsonsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\HudsonSnesSeq.cpp">
+      <Filter>Source Files\formats\hudsonsnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1132,6 +1144,15 @@
     </ClInclude>
     <ClInclude Include="formats\AkaoSnesSeq.h">
       <Filter>Header Files\formats\akaosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\HudsonSnesFormat.h">
+      <Filter>Header Files\formats\hudsonsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\HudsonSnesScanner.h">
+      <Filter>Header Files\formats\hudsonsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\HudsonSnesSeq.h">
+      <Filter>Header Files\formats\hudsonsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
