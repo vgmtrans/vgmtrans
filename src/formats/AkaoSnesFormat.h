@@ -34,8 +34,8 @@ enum AkaoSnesMinorVersion {
 	AKAOSNES_V3_SD2,                // Seiken Densetsu 2
 	AKAOSNES_V3_FFMQ,               // Final Fantasy Mystic Quest
 	AKAOSNES_V4_RS2,                // Romancing SaGa 2
-	AKAOSNES_V4_FF6,                // Final Fantasy 6
 	AKAOSNES_V4_LAL,                // Live A Live
+	AKAOSNES_V4_FF6,                // Final Fantasy 6
 	AKAOSNES_V4_FM,                 // Front Mission
 	AKAOSNES_V4_CT,                 // Chrono Trigger
 	AKAOSNES_V4_RS3,                // Romancing SaGa 3

@@ -337,7 +337,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xf0] = EVENT_LOOP_START;
 		pSeqFile->EventMap[0xf1] = EVENT_LOOP_END;
 
-		// V3 specific
+		// V3 common
 		pSeqFile->EventMap[0xf2] = EVENT_END;
 		pSeqFile->EventMap[0xf3] = EVENT_TEMPO;
 		pSeqFile->EventMap[0xf4] = EVENT_TEMPO_FADE;
@@ -348,6 +348,20 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xf9] = EVENT_LOOP_BREAK;
 		pSeqFile->EventMap[0xfa] = EVENT_GOTO;
 		pSeqFile->EventMap[0xfb] = EVENT_CPU_CONTROLED_JUMP;
+
+		// game-specific mappings
+		if (minorVersion == AKAOSNES_V3_SD2) {
+			//pSeqFile->EventMap[0xfc] = (AkaoSnesSeqEventType)0;
+			//pSeqFile->EventMap[0xfd] = (AkaoSnesSeqEventType)0;
+			pSeqFile->EventMap[0xfe] = EVENT_END;
+			pSeqFile->EventMap[0xff] = EVENT_END;
+		}
+		else {
+			pSeqFile->EventMap[0xfc] = EVENT_END;
+			pSeqFile->EventMap[0xfd] = EVENT_END;
+			pSeqFile->EventMap[0xfe] = EVENT_END;
+			pSeqFile->EventMap[0xff] = EVENT_END;
+		}
 	}
 	else if (version == AKAOSNES_V4) {
 		// V3-V4 common
@@ -384,7 +398,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xe2] = EVENT_LOOP_START;
 		pSeqFile->EventMap[0xe3] = EVENT_LOOP_END;
 
-		// V4 specific
+		// V4 common
 		pSeqFile->EventMap[0xe4] = EVENT_SLUR_ON;
 		pSeqFile->EventMap[0xe5] = EVENT_SLUR_OFF;
 		pSeqFile->EventMap[0xe6] = EVENT_LEGATO_ON;
@@ -392,7 +406,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xe8] = EVENT_ONETIME_DURATION;
 		pSeqFile->EventMap[0xe9] = EVENT_JUMP_TO_SFX_LO;
 		pSeqFile->EventMap[0xea] = EVENT_JUMP_TO_SFX_HI;
-		pSeqFile->EventMap[0xeb] = EVENT_END; // TODO: vcmd eb does not always mean "end", see Gun Hazard
+		pSeqFile->EventMap[0xeb] = EVENT_END; // exception: Gun Hazard
 		pSeqFile->EventMap[0xec] = EVENT_END; // duplicated
 		pSeqFile->EventMap[0xed] = EVENT_END; // duplicated
 		pSeqFile->EventMap[0xee] = EVENT_END; // duplicated
@@ -401,9 +415,124 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 		pSeqFile->EventMap[0xf1] = EVENT_TEMPO_FADE;
 		pSeqFile->EventMap[0xf2] = EVENT_ECHO_VOLUME;
 		pSeqFile->EventMap[0xf3] = EVENT_ECHO_VOLUME_FADE;
-	}
 
-	// TODO: game-specific mappings
+		// game-specific mappings
+		if (minorVersion == AKAOSNES_V4_RS2) {
+			pSeqFile->EventMap[0xf4] = EVENT_ECHO_FEEDBACK_FIR;
+			pSeqFile->EventMap[0xf5] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf6] = EVENT_LOOP_BREAK;
+			pSeqFile->EventMap[0xf7] = EVENT_GOTO;
+			pSeqFile->EventMap[0xf8] = EVENT_INC_CPU_SHARED_COUNTER;
+			pSeqFile->EventMap[0xf9] = EVENT_ZERO_CPU_SHARED_COUNTER;
+			pSeqFile->EventMap[0xfa] = EVENT_MUTE;
+			pSeqFile->EventMap[0xfb] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xfc] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		}
+		else if (minorVersion == AKAOSNES_V4_LAL) {
+			pSeqFile->EventMap[0xf4] = EVENT_ECHO_FEEDBACK_FIR;
+			pSeqFile->EventMap[0xf5] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf6] = EVENT_LOOP_BREAK;
+			pSeqFile->EventMap[0xf7] = EVENT_GOTO;
+			pSeqFile->EventMap[0xf8] = EVENT_INC_CPU_SHARED_COUNTER;
+			pSeqFile->EventMap[0xf9] = EVENT_ZERO_CPU_SHARED_COUNTER;
+			pSeqFile->EventMap[0xfa] = EVENT_IGNORE_MASTER_VOLUME;
+			pSeqFile->EventMap[0xfb] = EVENT_CPU_CONTROLED_JUMP;
+			pSeqFile->EventMap[0xfc] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		}
+		else if (minorVersion == AKAOSNES_V4_FF6) {
+			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
+			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
+			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
+			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
+			pSeqFile->EventMap[0xf9] = EVENT_INC_CPU_SHARED_COUNTER;
+			pSeqFile->EventMap[0xfa] = EVENT_ZERO_CPU_SHARED_COUNTER;
+			pSeqFile->EventMap[0xfb] = EVENT_IGNORE_MASTER_VOLUME;
+			pSeqFile->EventMap[0xfc] = EVENT_CPU_CONTROLED_JUMP;
+			pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		}
+		else if (minorVersion == AKAOSNES_V4_FM) {
+			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
+			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
+			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
+			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
+			//pSeqFile->EventMap[0xf9] = (AkaoSnesSeqEventType)0;
+			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
+			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
+			pSeqFile->EventMap[0xfd] = EVENT_VOLUME_ALT;
+			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		}
+		else if (minorVersion == AKAOSNES_V4_CT) {
+			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
+			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
+			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
+			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
+			pSeqFile->EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
+			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
+			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
+			pSeqFile->EventMap[0xfd] = EVENT_VOLUME_ALT;
+			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		}
+		else if (minorVersion == AKAOSNES_V4_RS3) {
+			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
+			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
+			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
+			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR;
+			pSeqFile->EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
+			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
+			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
+			//pSeqFile->EventMap[0xfd] = (AkaoSnesSeqEventType)0;
+			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		}
+		else if (minorVersion == AKAOSNES_V4_GH) {
+			pSeqFile->EventMap[0xeb] = EVENT_UNKNOWN1;
+			pSeqFile->EventMap[0xec] = EVENT_END;
+
+			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
+			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
+			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
+			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR;
+			pSeqFile->EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
+			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
+			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
+			pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
+			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		}
+		else if (minorVersion == AKAOSNES_V4_BSGAME) {
+			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
+			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
+			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
+			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR;
+			pSeqFile->EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
+			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
+			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
+			//pSeqFile->EventMap[0xfd] = (AkaoSnesSeqEventType)0;
+			//pSeqFile->EventMap[0xfe] = (AkaoSnesSeqEventType)0;
+			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		}
+	}
 }
 
 double AkaoSnesSeq::GetTempoInBPM(uint8_t tempo)
@@ -576,6 +705,7 @@ bool AkaoSnesTrack::ReadEvent(void)
 
 	case EVENT_VOLUME:
 	{
+		// TODO: correct volume bitdepth?
 		uint8_t vol = GetByte(curOffset++);
 		AddVol(beginOffset, curOffset - beginOffset, vol >> 1);
 		break;
@@ -583,6 +713,7 @@ bool AkaoSnesTrack::ReadEvent(void)
 
 	case EVENT_VOLUME_FADE:
 	{
+		// TODO: correct volume bitdepth?
 		uint16_t fadeLength;
 		if (parentSeq->version == AKAOSNES_V1) {
 			fadeLength = GetShort(curOffset); curOffset += 2;
@@ -604,9 +735,8 @@ bool AkaoSnesTrack::ReadEvent(void)
 
 	case EVENT_PAN:
 	{
-		uint8_t pan = GetByte(curOffset++);
-		uint8_t panShift = parentSeq->PAN_8BIT ? 0 : 1;
-		AddPan(beginOffset, curOffset - beginOffset, pan >> panShift);
+		uint8_t pan = GetByte(curOffset++) << (parentSeq->PAN_8BIT ? 0 : 1);
+		AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
 		break;
 	}
 
@@ -619,15 +749,14 @@ bool AkaoSnesTrack::ReadEvent(void)
 		else {
 			fadeLength = GetByte(curOffset++);
 		}
-		uint8_t pan = GetByte(curOffset++);
-		uint8_t panShift = parentSeq->PAN_8BIT ? 0 : 1;
+		uint8_t pan = GetByte(curOffset++) << (parentSeq->PAN_8BIT ? 0 : 1);
 
 		if (fadeLength != 0) {
 			desc << L"Fade Length: " << (int)fadeLength << L"  Pan: " << (int)pan;
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan Fade", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
 		}
 		else {
-			AddPan(beginOffset, curOffset - beginOffset, pan >> panShift);
+			AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
 		}
 		break;
 	}
@@ -658,6 +787,15 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_PITCH_SLIDE_OFF:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide Off", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PITCH_SLIDE:
+	{
+		uint8_t pitchSlideLength = GetByte(curOffset++);
+		int8_t pitchSlideSemitones = GetByte(curOffset++);
+		desc << L"Length: " << (int)pitchSlideLength << L"  Key: " << (int)pitchSlideSemitones << L" semitones";
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 		break;
 	}
 
@@ -989,6 +1127,9 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_TEMPO:
 	{
 		uint8_t newTempo = GetByte(curOffset++);
+		if (parentSeq->minorVersion == AKAOSNES_V4_FM || parentSeq->minorVersion == AKAOSNES_V4_CT) {
+			newTempo += (newTempo * 0x14) >> 8;
+		}
 		AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo));
 		break;
 	}
@@ -1002,7 +1143,11 @@ bool AkaoSnesTrack::ReadEvent(void)
 		else {
 			fadeLength = GetByte(curOffset++);
 		}
+
 		uint8_t newTempo = GetByte(curOffset++);
+		if (parentSeq->minorVersion == AKAOSNES_V4_FM || parentSeq->minorVersion == AKAOSNES_V4_CT) {
+			newTempo += (newTempo * 0x14) >> 8;
+		}
 
 		if (fadeLength != 0) {
 			desc << L"Fade Length: " << (int)fadeLength << L"  BPM: " << parentSeq->GetTempoInBPM(newTempo);
@@ -1025,16 +1170,10 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_ECHO_VOLUME_FADE:
 	{
 		uint16_t fadeLength = GetByte(curOffset++);
-		uint8_t vol = GetByte(curOffset++);
+		int8_t vol = GetByte(curOffset++);
 
-		if (fadeLength != 0) {
-			desc << L"Fade Length: " << (int)fadeLength << L"  Volume: " << (int)vol;
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume Fade", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
-		}
-		else {
-			desc << L"Volume: " << (int)vol;
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
-		}
+		desc << L"Fade Length: " << (int)fadeLength << L"  Volume: " << (int)vol;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume Fade", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
 		break;
 	}
 
@@ -1090,6 +1229,101 @@ bool AkaoSnesTrack::ReadEvent(void)
 		else {
 			bContinue = AddLoopForever(beginOffset, length, L"Jump");
 		}
+		break;
+	}
+
+	case EVENT_INC_CPU_SHARED_COUNTER:
+	{
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Increment CPU-Shared Counter", desc.str().c_str());
+		break;
+	}
+
+	case EVENT_ZERO_CPU_SHARED_COUNTER:
+	{
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Zero CPU-Shared Counter", desc.str().c_str());
+		break;
+	}
+
+	case EVENT_ECHO_FEEDBACK_FADE:
+	{
+		uint16_t fadeLength = GetByte(curOffset++);
+		uint8_t feedback = GetByte(curOffset++);
+
+		desc << L"Fade Length: " << (int)fadeLength << L"  Feedback: " << (int)feedback;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Feedback Fade", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_FIR_FADE:
+	{
+		uint16_t fadeLength = GetByte(curOffset++);
+		uint8_t filterIndex = GetByte(curOffset++);
+
+		desc << L"Fade Length: " << (int)fadeLength << L"  FIR: " << (int)vol;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo FIR Fade", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_FEEDBACK:
+	{
+		uint8_t feedback = GetByte(curOffset++);
+		desc << L"Feedback: " << (int)feedback;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Feedback", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_FIR:
+	{
+		uint8_t filterIndex = GetByte(curOffset++);
+		desc << L"FIR: " << (int)vol;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo FIR", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_CPU_CONTROLED_SET_VALUE:
+	{
+		uint8_t value = GetByte(curOffset++);
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Set Value for CPU-Controled Jump", desc.str().c_str());
+		break;
+	}
+
+	case EVENT_CPU_CONTROLED_JUMP:
+	{
+		uint8_t arg1 = GetByte(curOffset++) & 15;
+		uint16_t dest = GetShortAddress(curOffset); curOffset += 2;
+		desc << L"Arg1: " << (int)arg1 << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+		AddUnknown(beginOffset, curOffset - beginOffset, L"CPU-Controled Jump", desc.str().c_str());
+		break;
+	}
+
+	case EVENT_PERC_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PERC_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_MUTE:
+	{
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Mute Channel", desc.str().c_str());
+		break;
+	}
+
+	case EVENT_IGNORE_MASTER_VOLUME:
+	{
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Ignore Master Volume", desc.str().c_str());
+		break;
+	}
+
+	case EVENT_VOLUME_ALT:
+	{
+		uint8_t vol = GetByte(curOffset++) & 0x7f;
+		AddExpression(beginOffset, curOffset - beginOffset, vol);
 		break;
 	}
 
