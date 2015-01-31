@@ -387,7 +387,6 @@ void NinSnesTrackSharedData::ResetVars(void)
 	spcNoteDuration = 1;
 	spcNoteDurRate = 0xfc;
 	spcNoteVolume = 0xfc;
-	lastNoteNumberForTie = 0;
 }
 
 //  ************
@@ -563,17 +562,20 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
 		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
 
-		shared->lastNoteNumberForTie = noteNumber;
 		AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Note");
 		AddTime(shared->spcNoteDuration);
 		break;
 	}
 
 	case EVENT_TIE:
+	{
+		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
+		desc << L"Duration: " << (int)duration;
+		MakePrevDurNoteEnd(GetTime() + duration);
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE);
-		AddNoteByDurNoItem(shared->lastNoteNumberForTie, shared->spcNoteVolume / 2, shared->spcNoteDuration);
 		AddTime(shared->spcNoteDuration);
 		break;
+	}
 
 	case EVENT_REST:
 		AddRest(beginOffset, curOffset - beginOffset, shared->spcNoteDuration);
