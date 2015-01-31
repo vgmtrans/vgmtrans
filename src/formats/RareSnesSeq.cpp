@@ -389,10 +389,16 @@ bool RareSnesTrack::ReadEvent(void)
 		else
 		{
 			// a note, add hints for instrument
+			int8_t instrTuningDelta = 0;
 			if (parentSeq->instrUnityKeyHints.find(spcInstr) == parentSeq->instrUnityKeyHints.end())
 			{
 				parentSeq->instrUnityKeyHints[spcInstr] = spcTransposeAbs;
 				parentSeq->instrPitchHints[spcInstr] = (int16_t) roundi(GetTuningInSemitones(spcTuning) * 100.0);
+			}
+			else {
+				// check difference between preserved tuning and current tuning
+				// example case: Donkey Kong Country 2 - Forest Interlude (Pads)
+				instrTuningDelta = spcTransposeAbs - parentSeq->instrUnityKeyHints[spcInstr];
 			}
 			if (parentSeq->instrADSRHints.find(spcInstr) == parentSeq->instrADSRHints.end())
 			{
@@ -407,7 +413,7 @@ bool RareSnesTrack::ReadEvent(void)
 			//OutputDebugString(ssTrace.str().c_str());
 
 			uint8_t vel = 127;
-			AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
+			AddNoteByDur(beginOffset, curOffset - beginOffset, key + instrTuningDelta, vel, dur);
 			AddTime(dur);
 		}
 	}
