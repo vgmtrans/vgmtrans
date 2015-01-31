@@ -339,7 +339,7 @@ void MidiTrack::InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_
 
 void MidiTrack::PurgePrevNoteOffs()
 {
-	PurgePrevNoteOffs(GetDelta());
+	prevDurNoteOffs.clear();
 }
 
 void MidiTrack::PurgePrevNoteOffs(uint32_t absTime)

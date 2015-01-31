@@ -74,6 +74,8 @@ public:
 
 	void MakePrevDurNoteEnd();
 	void MakePrevDurNoteEnd(uint32_t absTime);
+	void LimitPrevDurNoteEnd();
+	void LimitPrevDurNoteEnd(uint32_t absTime);
 	void AddVol(uint32_t offset, uint32_t length, uint8_t vol, const wchar_t* sEventName = L"Volume");
 	void AddVolNoItem(uint8_t vol);
 	void AddVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const wchar_t* sEventName = L"Volume Slide");

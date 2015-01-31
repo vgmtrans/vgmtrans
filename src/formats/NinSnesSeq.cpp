@@ -507,12 +507,19 @@ bool NinSnesTrack::ReadEvent(void)
 		// AddEvent is called at the last of this function
 
 		if (shared->loopCount == 0) {
+			// finish this section as soon as possible
 			if (readMode == READMODE_FIND_DELTA_LENGTH) {
-				deltaLength = GetTime();
+				for (int trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
+					parentSeq->aTracks[trackIndex]->deltaLength = GetTime();
+				}
+			}
+			else if (readMode == READMODE_CONVERT_TO_MIDI) {
+				// TODO: cancel all expected notes and fader-output events
+				for (int trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
+					parentSeq->aTracks[trackIndex]->LimitPrevDurNoteEnd();
+				}
 			}
 
-			// finish this section as soon as possible
-			// TODO: cancel all expected note and fader-output events
 			parentSeq->InactivateAllTracks();
 			bContinue = false;
 		}
@@ -869,12 +876,12 @@ bool NinSnesTrack::ReadEvent(void)
 
 	// Add the next "END" event to UI
 	// (because it often gets interrupted by the end of other track)
-	if (curOffset + 1 < 0x10000 && statusByte != parentSeq->STATUS_END && GetByte(curOffset + 1) == parentSeq->STATUS_END) {
+	if (curOffset + 1 <= 0x10000 && statusByte != parentSeq->STATUS_END && GetByte(curOffset) == parentSeq->STATUS_END) {
 		if (shared->loopCount == 0) {
-			AddGenericEvent(curOffset + 1, 1, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+			AddGenericEvent(curOffset, 1, L"Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
 		}
 		else {
-			AddGenericEvent(curOffset + 1, 1, L"Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+			AddGenericEvent(curOffset, 1, L"Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
 		}
 	}
 

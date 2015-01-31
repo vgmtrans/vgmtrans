@@ -183,14 +183,7 @@ void SeqTrack::AddInitialMidiEvents(int trackNum)
 
 uint32_t SeqTrack::GetTime()
 {
-	if (parentSeq->bLoadTickByTick)
-	{
-		return parentSeq->time + deltaTime;
-	}
-	else
-	{
-		return parentSeq->time;
-	}
+	return parentSeq->time;
 }
 
 void SeqTrack::SetTime(uint32_t NewDelta)
@@ -611,7 +604,7 @@ void SeqTrack::InsertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int
 
 void SeqTrack::MakePrevDurNoteEnd()
 {
-	MakePrevDurNoteEnd(GetTime());
+	MakePrevDurNoteEnd(GetTime() + (parentSeq->bLoadTickByTick ? deltaTime : 0));
 }
 
 void SeqTrack::MakePrevDurNoteEnd(uint32_t absTime)
@@ -619,6 +612,22 @@ void SeqTrack::MakePrevDurNoteEnd(uint32_t absTime)
 	if (readMode == READMODE_CONVERT_TO_MIDI) {
 		for (auto it = pMidiTrack->prevDurNoteOffs.begin(); it != pMidiTrack->prevDurNoteOffs.end(); ++it) {
 			(*it)->AbsTime = absTime;
+		}
+	}
+}
+
+void SeqTrack::LimitPrevDurNoteEnd()
+{
+	LimitPrevDurNoteEnd(GetTime() + (parentSeq->bLoadTickByTick ? deltaTime : 0));
+}
+
+void SeqTrack::LimitPrevDurNoteEnd(uint32_t absTime)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI) {
+		for (auto it = pMidiTrack->prevDurNoteOffs.begin(); it != pMidiTrack->prevDurNoteOffs.end(); ++it) {
+			if ((*it)->AbsTime > absTime) {
+				(*it)->AbsTime = absTime;
+			}
 		}
 	}
 }
