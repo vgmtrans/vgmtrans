@@ -662,7 +662,7 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_NOTE: // 0x00..0xc3
 	{
 		uint8_t durIndex = statusByte % parentSeq->NOTE_DUR_TABLE.size();
-		uint8_t noteIndex = statusByte / parentSeq->NOTE_DUR_TABLE.size();
+		uint8_t noteIndex = (uint8_t) (statusByte / parentSeq->NOTE_DUR_TABLE.size());
 		uint8_t dur = parentSeq->NOTE_DUR_TABLE[durIndex];
 
 		if (onetimeDuration != 0) {

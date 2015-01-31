@@ -509,13 +509,13 @@ bool NinSnesTrack::ReadEvent(void)
 		if (shared->loopCount == 0) {
 			// finish this section as soon as possible
 			if (readMode == READMODE_FIND_DELTA_LENGTH) {
-				for (int trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
+				for (size_t trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
 					parentSeq->aTracks[trackIndex]->deltaLength = GetTime();
 				}
 			}
 			else if (readMode == READMODE_CONVERT_TO_MIDI) {
 				// TODO: cancel all expected notes and fader-output events
-				for (int trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
+				for (size_t trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
 					parentSeq->aTracks[trackIndex]->LimitPrevDurNoteEnd();
 				}
 			}
