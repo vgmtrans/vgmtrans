@@ -183,7 +183,14 @@ void SeqTrack::AddInitialMidiEvents(int trackNum)
 
 uint32_t SeqTrack::GetTime()
 {
-	return parentSeq->time;
+	if (parentSeq->bLoadTickByTick)
+	{
+		return parentSeq->time + deltaTime;
+	}
+	else
+	{
+		return parentSeq->time;
+	}
 }
 
 void SeqTrack::SetTime(uint32_t NewDelta)
@@ -604,7 +611,7 @@ void SeqTrack::MakePrevDurNoteEnd()
 	// It is used for tied note, but it cannot handle two or more notes.
 	// (That is required by SNES Mint (Akihiko Mori's) music engine, for example)
 	// Hopefully, SeqVoiceAllocator will provide enough functions to replace prevDurNoteOff.
-	if (readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->prevDurNoteOff)
+	if (readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->prevDurNoteOff != NULL)
 		pMidiTrack->prevDurNoteOff->AbsTime = GetTime();
 }
 

@@ -175,7 +175,9 @@ void CapcomSnesTrack::ResetVars(void)
 	noteAttributes = 0;
 	durationRate = 0;
 	transpose = 0;
-    for (int i = 0; i < CAPCOM_SNES_REPEAT_SLOT_MAX; i++) {
+	lastNoteSlurred = false;
+	lastKey = -1;
+	for (int i = 0; i < CAPCOM_SNES_REPEAT_SLOT_MAX; i++) {
         repeatCount[i] = 0;
 	}
 }
@@ -306,6 +308,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 		if (rest)
 		{
 			AddRest(beginOffset, curOffset-beginOffset, len);
+			lastKey = -1;
 		}
 		else
 		{
@@ -316,7 +319,6 @@ bool CapcomSnesTrack::ReadEvent(void)
 			if (isNoteSlurred())
 			{
 				// slurred/tied note must be full-length.
-				// TODO: handle tied note!
 				dur = len << 8;
 			}
 			else
@@ -338,8 +340,18 @@ bool CapcomSnesTrack::ReadEvent(void)
 
 			uint8_t key = (keyIndex - 1) + (getNoteOctave() * 12) + (isNoteOctaveUp() ? 24 : 0);
 			uint8_t vel = 127;
-			AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
-			AddTime(len);
+			if (lastNoteSlurred && key == lastKey) {
+				AddTime(dur);
+				MakePrevDurNoteEnd();
+				AddTime(len - dur);
+				AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
+			}
+			else {
+				AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+				AddTime(len);
+				lastKey = key;
+			}
+			lastNoteSlurred = isNoteSlurred();
 		}
 	}
 	else

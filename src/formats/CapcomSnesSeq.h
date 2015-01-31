@@ -109,5 +109,8 @@ private:
 	uint8_t durationRate;
 	//int8_t transpose;
 
+	bool lastNoteSlurred;
+	int8_t lastKey;
+
 	double GetTuningInSemitones(int8_t tuning);
 };
