@@ -78,6 +78,8 @@ public:
 	void AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
 	void AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
 	void InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime);
+	void PurgePrevNoteOffs();
+	void PurgePrevNoteOffs(uint32_t absTime);
 	void AddControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte); // This function should be used for only redirection output of MIDI-like formats
 	void InsertControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte, uint32_t absTime); // This function should be used for only redirection output of MIDI-like formats
 	//void AddVolMarker(uint8_t channel, uint8_t vol, int8_t priority = PRIORITY_HIGHER);
@@ -163,7 +165,7 @@ public:
 	uint32_t DeltaTime;			//a time value to be used for AddEvent
 
 	DurNoteEvent* prevDurEvent;
-	NoteEvent* prevDurNoteOff;
+	std::vector<NoteEvent*> prevDurNoteOffs;
 	int8_t prevKey;
 	//uint8_t mastVol;
 	//uint8_t vol;

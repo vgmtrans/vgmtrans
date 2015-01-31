@@ -358,8 +358,12 @@ void SeqTrack::AddDecrementOctave(uint32_t offset, uint32_t length, const wchar_
 void SeqTrack::AddRest(uint32_t offset, uint32_t length, uint32_t restTime,  const wchar_t* sEventName)
 {
 	
-	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset)) {
 		AddEvent(new RestSeqEvent(this, restTime, offset, length, sEventName));
+	}
+	else if (readMode == READMODE_CONVERT_TO_MIDI) {
+		pMidiTrack->PurgePrevNoteOffs();
+	}
 	AddTime(restTime);
 }
 
@@ -607,12 +611,16 @@ void SeqTrack::InsertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int
 
 void SeqTrack::MakePrevDurNoteEnd()
 {
-	// TODO: Remove all prevDurNoteOff mechanisms.
-	// It is used for tied note, but it cannot handle two or more notes.
-	// (That is required by SNES Mint (Akihiko Mori's) music engine, for example)
-	// Hopefully, SeqVoiceAllocator will provide enough functions to replace prevDurNoteOff.
-	if (readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->prevDurNoteOff != NULL)
-		pMidiTrack->prevDurNoteOff->AbsTime = GetTime();
+	MakePrevDurNoteEnd(GetTime());
+}
+
+void SeqTrack::MakePrevDurNoteEnd(uint32_t absTime)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI) {
+		for (auto it = pMidiTrack->prevDurNoteOffs.begin(); it != pMidiTrack->prevDurNoteOffs.end(); ++it) {
+			(*it)->AbsTime = absTime;
+		}
+	}
 }
 
 void SeqTrack::AddVol(uint32_t offset, uint32_t length, uint8_t newVol, const wchar_t* sEventName)

@@ -73,6 +73,7 @@ public:
 	void InsertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint32_t absTime, const wchar_t* sEventName = L"Note On With Duration");
 
 	void MakePrevDurNoteEnd();
+	void MakePrevDurNoteEnd(uint32_t absTime);
 	void AddVol(uint32_t offset, uint32_t length, uint8_t vol, const wchar_t* sEventName = L"Volume");
 	void AddVolNoItem(uint8_t vol);
 	void AddVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const wchar_t* sEventName = L"Volume Slide");

@@ -141,7 +141,6 @@ MidiTrack::MidiTrack(MidiFile* theParentSeq, bool monophonic)
   bMonophonic(monophonic),
   DeltaTime(0),
   prevDurEvent(NULL),
-  prevDurNoteOff(NULL),
   prevKey(0),
   channelGroup(0),
   bHasEndOfTrack(false)
@@ -278,8 +277,10 @@ void MidiTrack::InsertNoteOff(uint8_t channel, int8_t key, uint32_t absTime)
 
 void MidiTrack::AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration)
 {
+	PurgePrevNoteOffs(GetDelta());
 	aEvents.push_back(new NoteEvent(this, channel, GetDelta(), true, key, vel));		//add note on
-	prevDurNoteOff = new NoteEvent(this, channel, GetDelta()+duration, false, key);
+	NoteEvent* prevDurNoteOff = new NoteEvent(this, channel, GetDelta() + duration, false, key);
+	prevDurNoteOffs.push_back(prevDurNoteOff);
 	aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
 }
 
@@ -315,8 +316,10 @@ void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uin
 	
 	if (ContNote == NULL)
 	{
+		PurgePrevNoteOffs(CurDelta);
 		aEvents.push_back(new NoteEvent(this, channel, CurDelta, true, key, vel));		//add note on
-		prevDurNoteOff = new NoteEvent(this, channel, CurDelta+duration, false, key);
+		NoteEvent* prevDurNoteOff = new NoteEvent(this, channel, CurDelta + duration, false, key);
+		prevDurNoteOffs.push_back(prevDurNoteOff);
 		aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
 	}
 	else
@@ -327,9 +330,29 @@ void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uin
 
 void MidiTrack::InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime)
 {
+	PurgePrevNoteOffs(max(GetDelta(), absTime));
 	aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));		//add note on
-	prevDurNoteOff = new NoteEvent(this, channel, absTime+duration, false, key);
+	NoteEvent* prevDurNoteOff = new NoteEvent(this, channel, absTime + duration, false, key);
+	prevDurNoteOffs.push_back(prevDurNoteOff);
 	aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
+}
+
+void MidiTrack::PurgePrevNoteOffs()
+{
+	PurgePrevNoteOffs(GetDelta());
+}
+
+void MidiTrack::PurgePrevNoteOffs(uint32_t absTime)
+{
+	auto it = prevDurNoteOffs.begin();
+	while (it != prevDurNoteOffs.end()) {
+		if ((*it)->AbsTime <= absTime) {
+			it = prevDurNoteOffs.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
 }
 
 /*void MidiTrack::AddVolMarker(uint8_t channel, uint8_t vol, int8_t priority)
