@@ -323,7 +323,7 @@ bool SuzukiSnesTrack::ReadEvent(void)
 			AddTime(dur);
 		}
 		else if (noteIndex == 13) {
-			MakePrevDurNoteEnd();
+			MakePrevDurNoteEnd(GetTime() + dur);
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
 			AddTime(dur);
 		}

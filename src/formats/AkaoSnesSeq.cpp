@@ -679,7 +679,7 @@ bool AkaoSnesTrack::ReadEvent(void)
 			AddTime(dur);
 		}
 		else if (noteIndex == parentSeq->STATUS_NOTEINDEX_TIE) {
-			MakePrevDurNoteEnd();
+			MakePrevDurNoteEnd(GetTime() + dur);
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
 			AddTime(dur);
 		}
