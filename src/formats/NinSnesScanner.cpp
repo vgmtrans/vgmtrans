@@ -324,7 +324,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	int8_t guessedSongIndex = -1;
 
 	// scan for a song that contains the current section
-	uint16_t addrCurrentSection = file->GetShort(addrSectionPtr);
+	// (note that the section pointer points to the "next" section actually)
+	// edge case: Super Mario World - Valley of Bowser
+	uint16_t addrCurrentSection = file->GetShort(addrSectionPtr) - 2;
 	if (addrCurrentSection >= 0x0100 && addrCurrentSection < 0xfff0) {
 		int8_t songIndexCandidate = -1;
 		uint16_t bestSectionDistance = 0xffff;
