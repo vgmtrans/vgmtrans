@@ -936,7 +936,7 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_TUNING:
 	{
 		int8_t newTuning = GetByte(curOffset++);
-		AddFineTuning(beginOffset, curOffset - beginOffset, newTuning / 16.0);
+		AddFineTuning(beginOffset, curOffset - beginOffset, (newTuning / 16.0) * 100.0);
 		break;
 	}
 

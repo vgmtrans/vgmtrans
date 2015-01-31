@@ -797,7 +797,7 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_TUNING:
 	{
 		uint8_t newTuning = GetByte(curOffset++);
-		AddFineTuning(beginOffset, curOffset - beginOffset, newTuning / 256.0);
+		AddFineTuning(beginOffset, curOffset - beginOffset, (newTuning / 256.0) * 100.0);
 		break;
 	}
 
