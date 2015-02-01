@@ -233,6 +233,7 @@
     <ClCompile Include="formats\NinSnesInstr.cpp" />
     <ClCompile Include="formats\RareSnesInstr.cpp" />
     <ClCompile Include="formats\SNESDSP.cpp" />
+    <ClCompile Include="formats\SuzukiSnesInstr.cpp" />
     <ClCompile Include="loaders\GSFLoader.cpp" />
     <ClCompile Include="LogItem.cpp" />
     <ClCompile Include="loaders\NCSFLoader.cpp" />
@@ -394,6 +395,7 @@
     <ClInclude Include="formats\NinSnesInstr.h" />
     <ClInclude Include="formats\RareSnesInstr.h" />
     <ClInclude Include="formats\SNESDSP.h" />
+    <ClInclude Include="formats\SuzukiSnesInstr.h" />
     <ClInclude Include="loaders\GSFLoader.h" />
     <ClInclude Include="LogItem.h" />
     <ClInclude Include="loaders\NCSFLoader.h" />

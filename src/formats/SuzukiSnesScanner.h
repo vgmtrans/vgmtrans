@@ -24,4 +24,6 @@ private:
 	static BytePattern ptnLoadSongSD3;
 	static BytePattern ptnLoadSongBL;
 	static BytePattern ptnExecVCmdBL;
+	static BytePattern ptnLoadDIR;
+	static BytePattern ptnLoadInstr;
 };

@@ -639,6 +639,9 @@
     <ClCompile Include="formats\AkaoSnesInstr.cpp">
       <Filter>Source Files\formats\akaosnes</Filter>
     </ClCompile>
+    <ClCompile Include="formats\SuzukiSnesInstr.cpp">
+      <Filter>Source Files\formats\suzukisnes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1159,6 +1162,9 @@
     </ClInclude>
     <ClInclude Include="formats\AkaoSnesInstr.h">
       <Filter>Header Files\formats\akaosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\SuzukiSnesInstr.h">
+      <Filter>Header Files\formats\suzukisnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

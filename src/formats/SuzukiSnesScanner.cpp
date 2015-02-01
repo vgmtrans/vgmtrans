@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "SuzukiSnesScanner.h"
+#include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
 #include "SNESDSP.h"
 
@@ -95,6 +96,50 @@ BytePattern SuzukiSnesScanner::ptnExecVCmdBL(
 	,
 	38);
 
+//; Seiken Densetsu 3 SPC
+//0345: 8f 5d f2  mov   $f2,#$5d
+//0348: 8f 5e f3  mov   $f3,#$5e
+BytePattern SuzukiSnesScanner::ptnLoadDIR(
+	"\x8f\x5d\xf2\x8f\x5e\xf3"
+	,
+	"xxxx?x"
+	,
+	6);
+
+//; Seiken Densetsu 3 SPC
+//1266: d6 48 01  mov   $0148+y,a         ; save instrument #
+//1269: 5d        mov   x,a
+//126a: f5 80 5e  mov   a,$5e80+x         ; SRCN table
+//126d: 1c        asl   a
+//126e: 5d        mov   x,a
+//126f: f5 01 5f  mov   a,$5f01+x
+//1272: d6 60 01  mov   $0160+y,a         ; volume
+//1275: eb 23     mov   y,$23
+//1277: f5 40 5f  mov   a,$5f40+x         ; ADSR(1)
+//127a: d6 78 01  mov   $0178+y,a
+//127d: f5 41 5f  mov   a,$5f41+x         ; ADSR(2)
+//1280: d6 79 01  mov   $0179+y,a
+//1283: f5 80 5f  mov   a,$5f80+x         ; coarse tuning
+//1286: d6 a8 01  mov   $01a8+y,a
+//1289: f5 81 5f  mov   a,$5f81+x         ; fine tuning
+//128c: d6 a9 01  mov   $01a9+y,a
+BytePattern SuzukiSnesScanner::ptnLoadInstr(
+	"\xd6\x48\x01\x5d\xf5\x80\x5e\x1c"
+	"\x5d\xf5\x01\x5f\xd6\x60\x01\xeb"
+	"\x23\xf5\x40\x5f\xd6\x78\x01\xf5"
+	"\x41\x5f\xd6\x79\x01\xf5\x80\x5f"
+	"\xd6\xa8\x01\xf5\x81\x5f\xd6\xa9"
+	"\x01"
+	,
+	"x??xx??x"
+	"xx??x??x"
+	"?x??x??x"
+	"??x??x??"
+	"x??x??x?"
+	"?"
+	,
+	41);
+
 void SuzukiSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -149,6 +194,37 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile* file)
 	SuzukiSnesSeq* newSeq = new SuzukiSnesSeq(file, version, addrSeqHeader, name);
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
+		return;
+	}
+
+	UINT ofsLoadDIR;
+	uint16_t spcDirAddr;
+	if (file->SearchBytePattern(ptnLoadDIR, ofsLoadDIR)) {
+		spcDirAddr = file->GetByte(ofsLoadDIR + 4) << 8;
+	}
+	else {
+		return;
+	}
+
+	UINT ofsLoadInstr;
+	uint16_t addrSRCNTable;
+	uint16_t addrVolumeTable;
+	uint16_t addrTuningTable;
+	uint16_t addrADSRTable;
+	if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
+		addrSRCNTable = file->GetShort(ofsLoadInstr + 5);
+		addrVolumeTable = file->GetShort(ofsLoadInstr + 10);
+		addrADSRTable = file->GetShort(ofsLoadInstr + 18);
+		addrTuningTable = file->GetShort(ofsLoadInstr + 30);
+	}
+	else {
+		return;
+	}
+
+	SuzukiSnesInstrSet * newInstrSet = new SuzukiSnesInstrSet(file, version, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable, addrTuningTable);
+	if (!newInstrSet->LoadVGMFile())
+	{
+		delete newInstrSet;
 		return;
 	}
 }
