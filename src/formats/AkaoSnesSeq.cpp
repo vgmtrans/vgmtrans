@@ -935,8 +935,19 @@ bool AkaoSnesTrack::ReadEvent(void)
 
 	case EVENT_TUNING:
 	{
-		int8_t newTuning = GetByte(curOffset++);
-		AddFineTuning(beginOffset, curOffset - beginOffset, (newTuning / 16.0) * 100.0);
+		uint8_t newTuning = GetByte(curOffset++);
+
+		// TODO: actually we need to check per-instrument tuning to grab real tuning amount...
+		double pitchScale;
+		if (newTuning <= 0x7f) {
+			pitchScale = 1.0 + (newTuning / 256.0);
+		}
+		else {
+			pitchScale = newTuning / 256.0;
+		}
+
+		double semitones = (log(pitchScale) / log(2.0)) * 12.0;
+		AddFineTuning(beginOffset, curOffset - beginOffset, semitones * 100.0);
 		break;
 	}
 
