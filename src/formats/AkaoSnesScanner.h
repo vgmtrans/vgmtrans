@@ -30,4 +30,8 @@ private:
 	static BytePattern ptnReadSeqHeaderV2;
 	static BytePattern ptnReadSeqHeaderFFMQ;
 	static BytePattern ptnReadSeqHeaderV4;
+	static BytePattern ptnLoadDIRV1;
+	static BytePattern ptnLoadDIRV3;
+	static BytePattern ptnLoadInstrV2;
+	static BytePattern ptnLoadInstrV3;
 };

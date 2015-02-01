@@ -937,7 +937,6 @@ bool AkaoSnesTrack::ReadEvent(void)
 	{
 		uint8_t newTuning = GetByte(curOffset++);
 
-		// TODO: actually we need to check per-instrument tuning to grab real tuning amount...
 		double pitchScale;
 		if (newTuning <= 0x7f) {
 			pitchScale = 1.0 + (newTuning / 256.0);

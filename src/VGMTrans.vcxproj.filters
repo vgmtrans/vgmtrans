@@ -636,6 +636,9 @@
     <ClCompile Include="formats\HudsonSnesSeq.cpp">
       <Filter>Source Files\formats\hudsonsnes</Filter>
     </ClCompile>
+    <ClCompile Include="formats\AkaoSnesInstr.cpp">
+      <Filter>Source Files\formats\akaosnes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows\aboutdlg.h">
@@ -1153,6 +1156,9 @@
     </ClInclude>
     <ClInclude Include="formats\HudsonSnesSeq.h">
       <Filter>Header Files\formats\hudsonsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\AkaoSnesInstr.h">
+      <Filter>Header Files\formats\akaosnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

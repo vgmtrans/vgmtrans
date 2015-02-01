@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "AkaoSnesScanner.h"
+#include "AkaoSnesInstr.h"
 #include "AkaoSnesSeq.h"
 #include "SNESDSP.h"
 
@@ -183,6 +184,101 @@ BytePattern AkaoSnesScanner::ptnReadSeqHeaderV4(
 	,
 	18);
 
+//; Final Fantasy 4 SPC
+//082b: e8 1e     mov   a,#$1e
+//082d: 8d 5d     mov   y,#$5d
+//082f: 3f e9 10  call  $10e9
+BytePattern AkaoSnesScanner::ptnLoadDIRV1(
+	"\xe8\x1e\x8d\x5d\x3f\xe9\x10"
+	,
+	"x?xxx??"
+	,
+	7);
+
+//; Final Fantasy 5 SPC
+//0234: 8d 5d     mov   y,#$5d
+//0236: e8 1b     mov   a,#$1b
+//0238: 3f 55 06  call  $0655
+BytePattern AkaoSnesScanner::ptnLoadDIRV3(
+	"\x8d\x5d\xe8\x1b\x3f\x55\x06"
+	,
+	"xxx?x??"
+	,
+	7);
+
+//; Romancing SaGa SPC
+//0fa9: d4 a6     mov   $a6+x,a
+//0fab: fd        mov   y,a
+//0fac: f6 40 1e  mov   a,$1e40+y
+//0faf: d5 a0 03  mov   $03a0+x,a
+//0fb2: c8 10     cmp   x,#$10
+//0fb4: b0 06     bcs   $0fbc
+//0fb6: e4 93     mov   a,$93
+//0fb8: 24 8f     and   a,$8f
+//0fba: d0 1f     bne   $0fdb
+//0fbc: 7d        mov   a,x
+//0fbd: 9f        xcn   a
+//0fbe: 5c        lsr   a
+//0fbf: 08 04     or    a,#$04
+//0fc1: 5d        mov   x,a
+//0fc2: d8 f2     mov   $f2,x
+//0fc4: cb f3     mov   $f3,y
+//0fc6: 3d        inc   x
+//0fc7: dd        mov   a,y
+//0fc8: 1c        asl   a
+//0fc9: fd        mov   y,a
+//0fca: f6 80 1e  mov   a,$1e80+y
+//0fcd: d8 f2     mov   $f2,x
+//0fcf: c4 f3     mov   $f3,a
+//0fd1: 3d        inc   x
+//0fd2: f6 81 1e  mov   a,$1e81+y
+//0fd5: d8 f2     mov   $f2,x
+//0fd7: c4 f3     mov   $f3,a
+//0fd9: f8 06     mov   x,$06
+//0fdb: 6f        ret
+BytePattern AkaoSnesScanner::ptnLoadInstrV2(
+	"\xd4\xa6\xfd\xf6\x40\x1e\xd5\xa0"
+	"\x03\xc8\x10\xb0\x06\xe4\x93\x24"
+	"\x8f\xd0\x1f\x7d\x9f\x5c\x08\x04"
+	"\x5d\xd8\xf2\xcb\xf3\x3d\xdd\x1c"
+	"\xfd\xf6\x80\x1e\xd8\xf2\xc4\xf3"
+	"\x3d\xf6\x81\x1e\xd8\xf2\xc4\xf3"
+	"\xf8\x06\x6f"
+	,
+	"x?xx??x?"
+	"?xxxxx?x"
+	"?xxxxxxx"
+	"xxxxxxxx"
+	"xx??xxxx"
+	"xx??xxxx"
+	"x?x"
+	,
+	51);
+
+//; Final Fantasy 5 SPC
+//08f7: 1c        asl   a
+//08f8: fd        mov   y,a
+//08f9: f6 00 1a  mov   a,$1a00+y
+//08fc: d5 20 fb  mov   $fb20+x,a
+//08ff: f6 01 1a  mov   a,$1a01+y
+//0902: d5 21 fb  mov   $fb21+x,a         ; tune factor for patch (from 1A00)
+//0905: f6 80 1a  mov   a,$1a80+y
+//0908: d5 80 fc  mov   $fc80+x,a         ; default ADSR1 for patch (from 1A80)
+//090b: f6 81 1a  mov   a,$1a81+y
+//090e: d5 81 fc  mov   $fc81+x,a         ; default ADSR2 for patch
+BytePattern AkaoSnesScanner::ptnLoadInstrV3(
+	"\x1c\xfd\xf6\x00\x1a\xd5\x20\xfb"
+	"\xf6\x01\x1a\xd5\x21\xfb\xf6\x80"
+	"\x1a\xd5\x80\xfc\xf6\x81\x1a\xd5"
+	"\x81\xfc\x6f"
+	,
+	"xxxx?x??"
+	"xx?x??xx"
+	"?x??xx?x"
+	"??"
+	,
+	26);
+
 void AkaoSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -354,12 +450,44 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 		minorVersion = AKAOSNES_V4_BSGAME;
 	}
 
-	// TODO: gather more information if necessary (pan bitdepth, etc.)
-
 	// load sequence
 	AkaoSnesSeq* newSeq = new AkaoSnesSeq(file, version, minorVersion, addrSeqHeader, addrAPURelocBase, name);
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
+		return;
+	}
+
+	UINT ofsLoadDIR;
+	uint16_t spcDirAddr;
+	if (file->SearchBytePattern(ptnLoadDIRV1, ofsLoadDIR)) {
+		spcDirAddr = file->GetByte(ofsLoadDIR + 1) << 8;
+	}
+	else if (file->SearchBytePattern(ptnLoadDIRV3, ofsLoadDIR)) {
+		spcDirAddr = file->GetByte(ofsLoadDIR + 3) << 8;
+	}
+	else {
+		return;
+	}
+
+	UINT ofsLoadInstr;
+	uint16_t addrTuningTable;
+	uint16_t addrADSRTable;
+	if (file->SearchBytePattern(ptnLoadInstrV2, ofsLoadInstr)) {
+		addrTuningTable = file->GetShort(ofsLoadInstr + 4);
+		addrADSRTable = file->GetShort(ofsLoadInstr + 34);
+	}
+	else if (file->SearchBytePattern(ptnLoadInstrV3, ofsLoadInstr)) {
+		addrTuningTable = file->GetShort(ofsLoadInstr + 3);
+		addrADSRTable = file->GetShort(ofsLoadInstr + 15);
+	}
+	else {
+		return;
+	}
+
+	AkaoSnesInstrSet * newInstrSet = new AkaoSnesInstrSet(file, version, spcDirAddr, addrTuningTable, addrADSRTable);
+	if (!newInstrSet->LoadVGMFile())
+	{
+		delete newInstrSet;
 		return;
 	}
 }
