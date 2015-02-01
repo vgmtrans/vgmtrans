@@ -21,6 +21,7 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersio
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
+	bUseLinearAmplitudeScale = true;
 
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
