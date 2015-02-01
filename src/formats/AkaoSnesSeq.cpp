@@ -578,6 +578,8 @@ void AkaoSnesTrack::ResetVars(void)
 	octave = 6;
 	onetimeDuration = 0;
 	loopLevel = 0;
+	slur = false;
+	legato = false;
 }
 
 
@@ -671,7 +673,10 @@ bool AkaoSnesTrack::ReadEvent(void)
 			onetimeDuration = 0;
 		}
 
-		uint8_t dur = (len > 0) ? len - 1 : 0;
+		uint8_t dur = len;
+		if (!slur && !legato) {
+			dur = (dur > 2) ? dur - 2 : 1;
+		}
 
 		if (noteIndex < 12) {
 			uint8_t note = octave * 12 + noteIndex;
@@ -1079,25 +1084,29 @@ bool AkaoSnesTrack::ReadEvent(void)
 
 	case EVENT_SLUR_ON:
 	{
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On (No Key Off/On)", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		slur = true;
 		break;
 	}
 
 	case EVENT_SLUR_OFF:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		slur = false;
 		break;
 	}
 
 	case EVENT_LEGATO_ON:
 	{
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato On (No Key Off)", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		legato = true;
 		break;
 	}
 
 	case EVENT_LEGATO_OFF:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		legato = false;
 		break;
 	}
 

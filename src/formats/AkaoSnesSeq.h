@@ -134,6 +134,8 @@ public:
 
 private:
 	uint8_t onetimeDuration;
+	bool slur;
+	bool legato;
 
 	uint8_t loopLevel;
 	uint8_t loopIncCount[AKAOSNES_LOOP_LEVEL_MAX];
