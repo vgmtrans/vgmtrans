@@ -134,8 +134,8 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 
 	case AKAOSNES_V2:
 		STATUS_NOTE_MAX = 0xd1;
-		STATUS_NOTEINDEX_TIE = 12;
-		STATUS_NOTEINDEX_REST = 13;
+		STATUS_NOTEINDEX_REST = 12;
+		STATUS_NOTEINDEX_TIE = 13;
 		break;
 
 	case AKAOSNES_V3:
