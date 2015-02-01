@@ -488,7 +488,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_RS3) {
-			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf4] = EVENT_VOLUME_ALT;
 			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
 			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
 			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
@@ -505,7 +505,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 			pSeqFile->EventMap[0xeb] = EVENT_UNKNOWN1;
 			pSeqFile->EventMap[0xec] = EVENT_END;
 
-			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf4] = EVENT_VOLUME_ALT;
 			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
 			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
 			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
@@ -519,7 +519,7 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_BSGAME) {
-			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			pSeqFile->EventMap[0xf4] = EVENT_VOLUME_ALT;
 			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
 			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
 			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
