@@ -603,9 +603,6 @@
     <ClCompile Include="formats\KonamiSnesInstr.cpp">
       <Filter>Source Files\formats\konamisnes</Filter>
     </ClCompile>
-    <ClCompile Include="SeqVoiceAllocator.cpp">
-      <Filter>Source Files\main</Filter>
-    </ClCompile>
     <ClCompile Include="VGMMultiSectionSeq.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
@@ -1113,9 +1110,6 @@
       <Filter>Header Files\formats\konamisnes</Filter>
     </ClInclude>
     <ClInclude Include="SeqNote.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
-    <ClInclude Include="SeqVoiceAllocator.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
     <ClInclude Include="VGMMultiSectionSeq.h">
