@@ -664,12 +664,14 @@ bool AkaoSnesTrack::ReadEvent(void)
 	{
 		uint8_t durIndex = statusByte % parentSeq->NOTE_DUR_TABLE.size();
 		uint8_t noteIndex = (uint8_t) (statusByte / parentSeq->NOTE_DUR_TABLE.size());
-		uint8_t dur = parentSeq->NOTE_DUR_TABLE[durIndex];
+		uint8_t len = parentSeq->NOTE_DUR_TABLE[durIndex];
 
 		if (onetimeDuration != 0) {
-			dur = onetimeDuration;
+			len = onetimeDuration;
 			onetimeDuration = 0;
 		}
+
+		uint8_t dur = (len > 0) ? len - 1 : 0;
 
 		if (noteIndex < 12) {
 			uint8_t note = octave * 12 + noteIndex;
@@ -677,15 +679,15 @@ bool AkaoSnesTrack::ReadEvent(void)
 			// TODO: percussion note
 
 			AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
-			AddTime(dur);
+			AddTime(len);
 		}
 		else if (noteIndex == parentSeq->STATUS_NOTEINDEX_TIE) {
 			MakePrevDurNoteEnd(GetTime() + dur);
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
-			AddTime(dur);
+			AddTime(len);
 		}
 		else {
-			AddRest(beginOffset, curOffset - beginOffset, dur);
+			AddRest(beginOffset, curOffset - beginOffset, len);
 		}
 
 		break;
