@@ -162,6 +162,7 @@ bool SNESSampColl::GetSampleInfo()
 		SNESSamp* samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length, addrSampLoop, name.str());
 		samples.push_back(samp);
 	}
+	spcDirHeader->SetGuessedLength();
 	return samples.size() != 0;
 }
 
