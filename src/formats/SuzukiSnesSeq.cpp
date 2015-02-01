@@ -138,9 +138,14 @@ void SuzukiSnesSeq::LoadEventMap(SuzukiSnesSeq *pSeqFile)
 	pSeqFile->EventMap[0xdd] = EVENT_DURATION_RATE;
 	pSeqFile->EventMap[0xde] = EVENT_PROGCHANGE;
 	pSeqFile->EventMap[0xdf] = EVENT_NOISE_FREQ_REL;
-	pSeqFile->EventMap[0xe0] = EVENT_VOLUME;
+	if (version == SUZUKISNES_SD3) {
+		pSeqFile->EventMap[0xe0] = EVENT_VOLUME;
+	}
+	else { // SUZUKISNES_BL, SUZUKISNES_SMR
+		pSeqFile->EventMap[0xe0] = EVENT_UNKNOWN1;
+	}
 	//pSeqFile->EventMap[0xe1] = (SuzukiSnesSeqEventType)0;
-	pSeqFile->EventMap[0xe2] = EVENT_VOLUME; // DUPLICATED
+	pSeqFile->EventMap[0xe2] = EVENT_VOLUME;
 	pSeqFile->EventMap[0xe3] = EVENT_VOLUME_REL;
 	pSeqFile->EventMap[0xe4] = EVENT_VOLUME_FADE;
 	pSeqFile->EventMap[0xe5] = EVENT_PORTAMENTO;
