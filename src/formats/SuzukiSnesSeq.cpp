@@ -21,6 +21,7 @@ SuzukiSnesSeq::SuzukiSnesSeq(RawFile* file, SuzukiSnesVersion ver, uint32_t seqd
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
+	bUseLinearAmplitudeScale = true;
 
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
@@ -216,8 +217,8 @@ void SuzukiSnesTrack::ResetVars(void)
 	SeqTrack::ResetVars();
 
 	vel = 100;
-	vol = 0;
 	octave = 6;
+	spcVolume = 100;
 	loopLevel = 0;
 	infiniteLoopPoint = 0;
 }
@@ -617,16 +618,16 @@ bool SuzukiSnesTrack::ReadEvent(void)
 	case EVENT_VOLUME:
 	{
 		uint8_t vol = GetByte(curOffset++);
-		AddVol(beginOffset, curOffset - beginOffset, vol);
+		spcVolume = vol & 0x7f;
+		AddVol(beginOffset, curOffset - beginOffset, spcVolume);
 		break;
 	}
 
 	case EVENT_VOLUME_REL:
 	{
-		// TODO: process volume delta
 		int8_t delta = GetByte(curOffset++);
-		desc << L"Volume Delta: " << (int)delta;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume (Relative)", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
+		spcVolume = (spcVolume + delta) & 0x7f;
+		AddVol(beginOffset, curOffset - beginOffset, spcVolume, L"Volume (Relative)");
 		break;
 	}
 
@@ -656,6 +657,9 @@ bool SuzukiSnesTrack::ReadEvent(void)
 
 	case EVENT_PAN:
 	{
+		// For left pan, the engine will decrease right volume (linear), but will do nothing to left volume.
+		// For right pan, the engine will do the opposite.
+		// For center pan, it will not decrease any volumes.
 		uint8_t pan = GetByte(curOffset++);
 		AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
 		break;

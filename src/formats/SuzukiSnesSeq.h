@@ -106,6 +106,8 @@ public:
 private:
 	uint16_t infiniteLoopPoint;
 
+	uint8_t spcVolume;
+
 	uint8_t loopLevel;
 	uint8_t loopCount[SUZUKISNES_LOOP_LEVEL_MAX];
 	uint16_t loopStart[SUZUKISNES_LOOP_LEVEL_MAX];
