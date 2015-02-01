@@ -329,7 +329,104 @@ void HudsonSnesSeq::LoadEventMap(HudsonSnesSeq *pSeqFile)
 		HeaderEventMap[0x09] = HEADER_EVENT_09;
 	}
 
-	// TODO: HudsonSnesSeq::LoadEventMap
+	for (int statusByte = 0x00; statusByte <= 0xcf; statusByte++) {
+		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
+	}
+
+	pSeqFile->EventMap[0xd0] = EVENT_NOP;
+	pSeqFile->EventMap[0xd1] = EVENT_TEMPO;
+	pSeqFile->EventMap[0xd2] = EVENT_OCTAVE;
+	pSeqFile->EventMap[0xd3] = EVENT_OCTAVE_UP;
+	pSeqFile->EventMap[0xd4] = EVENT_OCTAVE_DOWN;
+	pSeqFile->EventMap[0xd5] = EVENT_QUANTIZE;
+	pSeqFile->EventMap[0xd6] = EVENT_PROGCHANGE;
+	pSeqFile->EventMap[0xd7] = EVENT_NOP1;
+	pSeqFile->EventMap[0xd8] = EVENT_NOP1;
+	pSeqFile->EventMap[0xd9] = EVENT_VOLUME;
+	pSeqFile->EventMap[0xda] = EVENT_PAN;
+	pSeqFile->EventMap[0xdb] = EVENT_REVERSE_PHASE;
+	pSeqFile->EventMap[0xdc] = EVENT_VOLUME_REL;
+	pSeqFile->EventMap[0xdd] = EVENT_LOOP_START;
+	pSeqFile->EventMap[0xde] = EVENT_LOOP_END;
+	pSeqFile->EventMap[0xdf] = EVENT_SUBROUTINE;
+	pSeqFile->EventMap[0xe0] = EVENT_GOTO;
+	pSeqFile->EventMap[0xe1] = EVENT_TUNING;
+	pSeqFile->EventMap[0xe2] = EVENT_VIBRATO;
+	pSeqFile->EventMap[0xe3] = EVENT_VIBRATO_DELAY;
+	pSeqFile->EventMap[0xe4] = EVENT_ECHO_VOLUME;
+	pSeqFile->EventMap[0xe5] = EVENT_ECHO_PARAM;
+	pSeqFile->EventMap[0xe6] = EVENT_ECHO_ON;
+	pSeqFile->EventMap[0xe7] = EVENT_TRANSPOSE_ABS;
+	pSeqFile->EventMap[0xe8] = EVENT_TRANSPOSE_REL;
+	pSeqFile->EventMap[0xe9] = EVENT_PITCH_ATTACK_ENV_ON;
+	pSeqFile->EventMap[0xea] = EVENT_PITCH_ATTACK_ENV_OFF;
+	pSeqFile->EventMap[0xeb] = EVENT_LOOP_POSITION;
+	pSeqFile->EventMap[0xec] = EVENT_JUMP_TO_LOOP_POSITION;
+	pSeqFile->EventMap[0xed] = EVENT_LOOP_POSITION_ALT;
+	pSeqFile->EventMap[0xee] = EVENT_VOLUME_FROM_TABLE;
+	pSeqFile->EventMap[0xef] = EVENT_UNKNOWN2;
+	pSeqFile->EventMap[0xf0] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xf1] = EVENT_PORTAMENTO;
+	pSeqFile->EventMap[0xf2] = EVENT_NOP;
+	pSeqFile->EventMap[0xf3] = EVENT_NOP;
+	pSeqFile->EventMap[0xf4] = EVENT_NOP;
+	pSeqFile->EventMap[0xf5] = EVENT_NOP;
+	pSeqFile->EventMap[0xf6] = EVENT_NOP;
+	pSeqFile->EventMap[0xf7] = EVENT_NOP;
+	pSeqFile->EventMap[0xf8] = EVENT_NOP;
+	pSeqFile->EventMap[0xf9] = EVENT_NOP;
+	pSeqFile->EventMap[0xfa] = EVENT_NOP;
+	pSeqFile->EventMap[0xfb] = EVENT_NOP;
+	pSeqFile->EventMap[0xfc] = EVENT_NOP;
+	pSeqFile->EventMap[0xfd] = EVENT_NOP;
+	pSeqFile->EventMap[0xfe] = EVENT_SUBEVENT;
+	pSeqFile->EventMap[0xff] = EVENT_END;
+
+	pSeqFile->SubEventMap[0x00] = SUBEVENT_END;
+	pSeqFile->SubEventMap[0x01] = SUBEVENT_ECHO_OFF;
+	pSeqFile->SubEventMap[0x02] = SUBEVENT_UNKNOWN0;
+	pSeqFile->SubEventMap[0x03] = SUBEVENT_PERC_ON;
+	pSeqFile->SubEventMap[0x04] = SUBEVENT_PERC_OFF;
+	pSeqFile->SubEventMap[0x05] = SUBEVENT_VIBRATO_TYPE;
+	pSeqFile->SubEventMap[0x06] = SUBEVENT_VIBRATO_TYPE;
+	pSeqFile->SubEventMap[0x07] = SUBEVENT_VIBRATO_TYPE;
+	pSeqFile->SubEventMap[0x08] = SUBEVENT_UNKNOWN0;
+	pSeqFile->SubEventMap[0x09] = SUBEVENT_UNKNOWN0;
+
+	if (version == HUDSONSNES_V2) {
+		pSeqFile->EventMap[0xd0] = EVENT_UNKNOWN0;
+		pSeqFile->EventMap[0xd7] = EVENT_NOP;
+		pSeqFile->EventMap[0xd8] = EVENT_NOP;
+		pSeqFile->EventMap[0xe2] = EVENT_VIBRATO;
+		pSeqFile->EventMap[0xee] = EVENT_NOP;
+		pSeqFile->EventMap[0xf2] = EVENT_UNKNOWN1;
+		pSeqFile->EventMap[0xf3] = EVENT_UNKNOWN1;
+
+		pSeqFile->SubEventMap[0x05] = SUBEVENT_NOP;
+		pSeqFile->SubEventMap[0x06] = SUBEVENT_NOP;
+		pSeqFile->SubEventMap[0x07] = SUBEVENT_NOP;
+		pSeqFile->SubEventMap[0x0a] = SUBEVENT_UNKNOWN0;
+		pSeqFile->SubEventMap[0x0b] = SUBEVENT_UNKNOWN0;
+		pSeqFile->SubEventMap[0x0c] = SUBEVENT_UNKNOWN0;
+		pSeqFile->SubEventMap[0x0d] = SUBEVENT_UNKNOWN1;
+		pSeqFile->SubEventMap[0x0e] = SUBEVENT_NOP;
+		pSeqFile->SubEventMap[0x0f] = SUBEVENT_NOP;
+		pSeqFile->SubEventMap[0x10] = SUBEVENT_MOV_IMM;
+		pSeqFile->SubEventMap[0x11] = SUBEVENT_MOV;
+		pSeqFile->SubEventMap[0x12] = SUBEVENT_CMP_IMM;
+		pSeqFile->SubEventMap[0x13] = SUBEVENT_CMP;
+		pSeqFile->SubEventMap[0x14] = SUBEVENT_BNE;
+		pSeqFile->SubEventMap[0x15] = SUBEVENT_BEQ;
+		pSeqFile->SubEventMap[0x16] = SUBEVENT_BCS;
+		pSeqFile->SubEventMap[0x17] = SUBEVENT_BCC;
+		pSeqFile->SubEventMap[0x18] = SUBEVENT_BMI;
+		pSeqFile->SubEventMap[0x19] = SUBEVENT_BPL;
+		pSeqFile->SubEventMap[0x1a] = SUBEVENT_ADSR_AR;
+		pSeqFile->SubEventMap[0x1b] = SUBEVENT_ADSR_DR;
+		pSeqFile->SubEventMap[0x1c] = SUBEVENT_ADSR_SL;
+		pSeqFile->SubEventMap[0x1d] = SUBEVENT_ADSR_SR;
+		pSeqFile->SubEventMap[0x1e] = SUBEVENT_ADSR_RR;
+	}
 }
 
 //  ***************
