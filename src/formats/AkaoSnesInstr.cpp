@@ -57,7 +57,7 @@ bool AkaoSnesInstrSet::GetInstrPointers()
 		}
 
 		uint32_t ofsADSREntry = addrADSRTable + srcn * 2;
-		if (addrADSRTable + 2 > 0x10000) {
+		if (ofsADSREntry + 2 > 0x10000) {
 			break;
 		}
 
