@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CompileSnesScanner.h"
+#include "CompileSnesInstr.h"
 #include "CompileSnesSeq.h"
 #include "SNESDSP.h"
 
@@ -102,6 +103,14 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM (RawFile* file)
 				return;
 			}
 		}
+	}
+
+	uint16_t spcDirAddr = file->GetByte(addrEngineHeader + 0x0e) << 8;
+	uint16_t addrTuningTable = file->GetShort(addrEngineHeader + 0x13);
+	CompileSnesInstrSet * newInstrSet = new CompileSnesInstrSet(file, version, addrTuningTable, spcDirAddr);
+	if (!newInstrSet->LoadVGMFile()) {
+		delete newInstrSet;
+		return;
 	}
 }
 
