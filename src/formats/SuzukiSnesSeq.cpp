@@ -455,6 +455,7 @@ bool SuzukiSnesTrack::ReadEvent(void)
 			AddEndOfTrack(beginOffset, curOffset - beginOffset);
 			bContinue = false;
 		}
+		break;
 	}
 
 	case EVENT_TEMPO:
