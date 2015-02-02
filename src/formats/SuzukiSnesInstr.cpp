@@ -30,13 +30,16 @@ bool SuzukiSnesInstrSet::GetHeaderInfo()
 bool SuzukiSnesInstrSet::GetInstrPointers()
 {
 	usedSRCNs.clear();
-	for (uint8_t instrNum = 0; instrNum <= 0x1f; instrNum++)
+	for (uint8_t instrNum = 0; instrNum <= 0x7f; instrNum++)
 	{
 		uint32_t ofsSRCNEntry = addrSRCNTable + instrNum;
 		if (ofsSRCNEntry + 1 > 0x10000) {
 			continue;
 		}
 		uint8_t srcn = GetByte(ofsSRCNEntry);
+		if (srcn >= 0x40) {
+			continue;
+		}
 
 		uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
 		if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
@@ -48,7 +51,7 @@ bool SuzukiSnesInstrSet::GetInstrPointers()
 			continue;
 		}
 
-		uint32_t ofsVolumeEntry = addrVolumeTable + srcn;
+		uint32_t ofsVolumeEntry = addrVolumeTable + srcn * 2;
 		if (ofsVolumeEntry + 1 > 0x10000) {
 			break;
 		}
@@ -144,18 +147,18 @@ SuzukiSnesRgn::SuzukiSnesRgn(SuzukiSnesInstr* instr, SuzukiSnesVersion ver, uint
 	version(ver)
 {
 	uint8_t srcn = GetByte(addrSRCNTable + instrNum);
-	uint8_t vol = GetByte(addrVolumeTable + srcn);
+	uint8_t vol = GetByte(addrVolumeTable + srcn * 2);
 	uint8_t adsr1 = GetByte(addrADSRTable + srcn * 2);
 	uint8_t adsr2 = GetByte(addrADSRTable + srcn * 2 + 1);
-	uint8_t coarse_tuning = GetByte(addrTuningTable + srcn * 2);
-	int8_t fine_tuning = GetByte(addrTuningTable + srcn * 2 + 1);
+	uint8_t fine_tuning = GetByte(addrTuningTable + srcn * 2);
+	int8_t coarse_tuning = GetByte(addrTuningTable + srcn * 2 + 1);
 
 	AddSampNum(srcn, addrSRCNTable + instrNum, 1);
 	AddSimpleItem(addrADSRTable + srcn * 2, 1, L"ADSR1");
 	AddSimpleItem(addrADSRTable + srcn * 2 + 1, 1, L"ADSR2");
-	AddUnityKey(69 - coarse_tuning, addrTuningTable + srcn * 2, 1);
-	AddFineTune((int16_t)(fine_tuning * 100.0), addrTuningTable + srcn * 2 + 1, 1);
-	AddVolume(vol / 256.0, addrVolumeTable + srcn, 1);
+	AddFineTune((int16_t)(fine_tuning / 256.0 * 100.0), addrTuningTable + srcn * 2, 1);
+	AddUnityKey(69 - coarse_tuning, addrTuningTable + srcn * 2 + 1, 1);
+	AddVolume(vol / 256.0, addrVolumeTable + srcn * 2, 1);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 
 	SetGuessedLength();
