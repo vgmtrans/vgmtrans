@@ -9,7 +9,7 @@
 // ****************
 
 AkaoSnesInstrSet::AkaoSnesInstrSet(RawFile* file, AkaoSnesVersion ver, uint32_t spcDirAddr, uint16_t addrTuningTable, uint16_t addrADSRTable, const std::wstring & name) :
-	VGMInstrSet(AkaoSnesFormat::name, file, min(addrTuningTable, addrADSRTable), 0, name), version(ver),
+	VGMInstrSet(AkaoSnesFormat::name, file, addrTuningTable, 0, name), version(ver),
 	spcDirAddr(spcDirAddr),
 	addrTuningTable(addrTuningTable),
 	addrADSRTable(addrADSRTable)
@@ -56,13 +56,15 @@ bool AkaoSnesInstrSet::GetInstrPointers()
 			continue;
 		}
 
-		uint32_t ofsADSREntry = addrADSRTable + srcn * 2;
-		if (ofsADSREntry + 2 > 0x10000) {
-			break;
-		}
+		if (version != AKAOSNES_V1) {
+			uint32_t ofsADSREntry = addrADSRTable + srcn * 2;
+			if (ofsADSREntry + 2 > 0x10000) {
+				break;
+			}
 
-		if (GetShort(ofsADSREntry) == 0x0000) {
-			break;
+			if (GetShort(ofsADSREntry) == 0x0000) {
+				break;
+			}
 		}
 
 		usedSRCNs.push_back(srcn);
@@ -93,7 +95,7 @@ bool AkaoSnesInstrSet::GetInstrPointers()
 // *************
 
 AkaoSnesInstr::AkaoSnesInstr(VGMInstrSet* instrSet, AkaoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t addrTuningTable, uint16_t addrADSRTable, const std::wstring& name) :
-	VGMInstr(instrSet, min(addrTuningTable, addrADSRTable), 0, 0, srcn, name), version(ver),
+	VGMInstr(instrSet, addrTuningTable, 0, 0, srcn, name), version(ver),
 	spcDirAddr(spcDirAddr),
 	addrTuningTable(addrTuningTable),
 	addrADSRTable(addrADSRTable)
@@ -127,21 +129,36 @@ bool AkaoSnesInstr::LoadInstr()
 // ***********
 
 AkaoSnesRgn::AkaoSnesRgn(AkaoSnesInstr* instr, AkaoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t addrTuningTable, uint16_t addrADSRTable) :
-	VGMRgn(instr, min(addrTuningTable, addrADSRTable), 0),
+	VGMRgn(instr, addrTuningTable, 0),
 	version(ver)
 {
-	uint8_t adsr1 = GetByte(addrADSRTable + srcn * 2);
-	uint8_t adsr2 = GetByte(addrADSRTable + srcn * 2 + 1);
+	uint8_t adsr1;
+	uint8_t adsr2;
+	if (version == AKAOSNES_V1) {
+		adsr1 = 0xff;
+		adsr2 = 0xe0;
+	}
+	else {
+		adsr1 = GetByte(addrADSRTable + srcn * 2);
+		adsr2 = GetByte(addrADSRTable + srcn * 2 + 1);
+
+		AddSimpleItem(addrADSRTable + srcn * 2, 1, L"ADSR1");
+		AddSimpleItem(addrADSRTable + srcn * 2 + 1, 1, L"ADSR2");
+	}
 
 	uint8_t tuning1;
 	uint8_t tuning2;
 	if (version == AKAOSNES_V2) {
 		tuning1 = GetByte(addrTuningTable + srcn);
 		tuning2 = 0;
+
+		AddSimpleItem(addrTuningTable + srcn, 1, L"Tuning");
 	}
 	else {
 		tuning1 = GetByte(addrTuningTable + srcn * 2);
 		tuning2 = GetByte(addrTuningTable + srcn * 2 + 1);
+
+		AddSimpleItem(addrTuningTable + srcn * 2, 2, L"Tuning");
 	}
 
 	double pitch_scale;
@@ -170,16 +187,8 @@ AkaoSnesRgn::AkaoSnesRgn(AkaoSnesInstr* instr, AkaoSnesVersion ver, uint8_t srcn
 	}
 
 	sampNum = srcn;
-	AddSimpleItem(addrADSRTable + srcn * 2, 1, L"ADSR1");
-	AddSimpleItem(addrADSRTable + srcn * 2 + 1, 1, L"ADSR2");
 	unityKey = 69 - (int)(coarse_tuning);
 	fineTune = (int16_t)(fine_tuning * 100.0);
-	if (version == AKAOSNES_V2) {
-		AddSimpleItem(addrTuningTable + srcn, 1, L"Tuning");
-	}
-	else {
-		AddSimpleItem(addrTuningTable + srcn * 2, 2, L"Tuning");
-	}
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 
 	SetGuessedLength();

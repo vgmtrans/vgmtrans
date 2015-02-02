@@ -206,6 +206,21 @@ BytePattern AkaoSnesScanner::ptnLoadDIRV3(
 	,
 	7);
 
+//; Final Fantasy 4 SPC
+//0f13: d5 c1 02  mov   $02c1+x,a
+//0f16: fd        mov   y,a
+//0f17: f6 00 ff  mov   a,$ff00+y
+//0f1a: d5 00 03  mov   $0300+x,a
+//0f1d: 6f        ret
+BytePattern AkaoSnesScanner::ptnLoadInstrV1(
+	"\xd5\xc1\x02\xfd\xf6\x00\xff\xd5"
+	"\x00\x03\x6f"
+	,
+	"x??xxx?x"
+	"??x"
+	,
+	11);
+
 //; Romancing SaGa SPC
 //0fa9: d4 a6     mov   $a6+x,a
 //0fab: fd        mov   y,a
@@ -472,7 +487,11 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 	UINT ofsLoadInstr;
 	uint16_t addrTuningTable;
 	uint16_t addrADSRTable;
-	if (file->SearchBytePattern(ptnLoadInstrV2, ofsLoadInstr)) {
+	if (version == AKAOSNES_V1 && file->SearchBytePattern(ptnLoadInstrV1, ofsLoadInstr)) {
+		addrTuningTable = file->GetShort(ofsLoadInstr + 5);
+		addrADSRTable = 0; // N/A
+	}
+	else if (version == AKAOSNES_V2 && file->SearchBytePattern(ptnLoadInstrV2, ofsLoadInstr)) {
 		addrTuningTable = file->GetShort(ofsLoadInstr + 4);
 		addrADSRTable = file->GetShort(ofsLoadInstr + 34);
 	}
