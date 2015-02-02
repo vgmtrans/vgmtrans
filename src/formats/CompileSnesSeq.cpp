@@ -181,8 +181,11 @@ void CompileSnesSeq::LoadEventMap(CompileSnesSeq *pSeqFile)
 
 double CompileSnesSeq::GetTempoInBPM (uint8_t tempo)
 {
+	// cite: <http://www6.atpages.jp/appsouko/work/TAS/doc/fps.html>
+	const double SNES_NTSC_FRAMERATE = 39375000.0 / 655171.0;
+
 	unsigned int tempoValue = (tempo == 0) ? 256 : tempo;
-	return 60000000.0 / (SEQ_PPQN * (125 * 0x80)) * (tempo / 256.0);
+	return 60000000.0 / (SEQ_PPQN * (1000000.0 / SNES_NTSC_FRAMERATE)) * (tempoValue / 256.0);
 }
 
 
