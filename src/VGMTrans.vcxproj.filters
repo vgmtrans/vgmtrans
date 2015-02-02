@@ -190,6 +190,12 @@
     <Filter Include="Header Files\formats\hudsonsnes">
       <UniqueIdentifier>{2204cdc0-76e7-4a98-925f-0a0903031fa5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\mintsnes">
+      <UniqueIdentifier>{9e29b9f5-21eb-4942-8695-d4706e3cd2a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\mintsnes">
+      <UniqueIdentifier>{fcb61a35-8942-4644-8123-2bbbb267fc04}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\aboutdlg.cpp">
@@ -644,6 +650,12 @@
     </ClCompile>
     <ClCompile Include="formats\HudsonSnesInstr.cpp">
       <Filter>Source Files\formats\hudsonsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\MintSnesScanner.cpp">
+      <Filter>Source Files\formats\mintsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\MintSnesSeq.cpp">
+      <Filter>Source Files\formats\mintsnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1171,6 +1183,15 @@
     </ClInclude>
     <ClInclude Include="formats\HudsonSnesInstr.h">
       <Filter>Header Files\formats\hudsonsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\MintSnesFormat.h">
+      <Filter>Header Files\formats\mintsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\MintSnesScanner.h">
+      <Filter>Header Files\formats\mintsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\MintSnesSeq.h">
+      <Filter>Header Files\formats\mintsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
