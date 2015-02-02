@@ -3,6 +3,9 @@
 #include "SeqTrack.h"
 #include "HudsonSnesFormat.h"
 
+#define HUDSONSNES_CALLSTACK_SIZE   0x10
+#define HUDSONSNES_USERRAM_SIZE     0x08
+
 enum HudsonSnesSeqEventType
 {
 	EVENT_UNKNOWN0 = 1, //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
@@ -37,9 +40,9 @@ enum HudsonSnesSeqEventType
 	EVENT_TRANSPOSE_REL,
 	EVENT_PITCH_ATTACK_ENV_ON,
 	EVENT_PITCH_ATTACK_ENV_OFF,
-	EVENT_LOOP_POSITION,
-	EVENT_JUMP_TO_LOOP_POSITION,
-	EVENT_LOOP_POSITION_ALT,
+	EVENT_LOOP_POINT,
+	EVENT_JUMP_TO_LOOP_POINT,
+	EVENT_LOOP_POINT_ONCE,
 	EVENT_VOLUME_FROM_TABLE,
 	EVENT_PORTAMENTO,
 	EVENT_SUBEVENT,
@@ -109,8 +112,17 @@ public:
 	std::map<uint8_t, HudsonSnesSeqSubEventType> SubEventMap;
 	std::map<uint8_t, HudsonSnesSeqHeaderEventType> HeaderEventMap;
 
+	uint8_t TimebaseShift;
 	uint8_t TrackAvailableBits;
 	uint16_t TrackAddresses[8];
+	uint16_t InstrumentTableAddress;
+	uint8_t InstrumentTableSize;
+	uint16_t PercussionTableAddress;
+	uint8_t PercussionTableSize;
+
+	uint8_t UserRAM[HUDSONSNES_USERRAM_SIZE];
+	uint8_t UserCmpReg;
+	bool UserCarry;
 
 private:
 	void LoadEventMap(HudsonSnesSeq *pSeqFile);
@@ -124,4 +136,12 @@ public:
 	HudsonSnesTrack(HudsonSnesSeq* parentFile, long offset = 0, long length = 0);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
+
+private:
+	uint16_t infiniteLoopPoint;
+	bool loopPointOnceProcessed;
+	uint8_t spcNoteQuantize;
+	uint8_t spcVolume;
+	uint8_t spcCallStack[HUDSONSNES_CALLSTACK_SIZE]; // shared by multiple commands
+	uint8_t spcCallStackPtr;
 };

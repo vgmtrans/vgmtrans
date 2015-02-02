@@ -14,10 +14,16 @@ DECLARE_FORMAT(HudsonSnes);
 HudsonSnesSeq::HudsonSnesSeq(RawFile* file, HudsonSnesVersion ver, uint32_t seqdataOffset, std::wstring newName)
 	: VGMSeq(HudsonSnesFormat::name, file, seqdataOffset, 0, newName),
 	version(ver),
-	TrackAvailableBits(0)
+	TimebaseShift(2),
+	TrackAvailableBits(0),
+	InstrumentTableAddress(0),
+	InstrumentTableSize(0),
+	PercussionTableAddress(0),
+	PercussionTableSize(0)
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
+	bUseLinearAmplitudeScale = true;
 
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
@@ -32,6 +38,10 @@ HudsonSnesSeq::~HudsonSnesSeq(void)
 void HudsonSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
+
+	memset(UserRAM, 0, HUDSONSNES_USERRAM_SIZE);
+	UserCmpReg = 0;
+	UserCarry = false;
 }
 
 bool HudsonSnesSeq::GetHeaderInfo(void)
@@ -77,8 +87,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void)
 			VGMHeader* aHeader = header->AddHeader(beginOffset, 1, L"Timebase");
 			aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
 
+			// actual music engine decreases timebase based on the following value.
+			// however, we always use SEQ_PPQN and adjust note lengths when necessary instead.
 			aHeader->AddSimpleItem(curOffset, 1, L"Timebase");
-			uint8_t timebaseShift = GetByte(curOffset++) & 3;
+			TimebaseShift = GetByte(curOffset++) & 3;
 
 			aHeader->unLength = curOffset - beginOffset;
 			break;
@@ -106,7 +118,21 @@ bool HudsonSnesSeq::GetHeaderInfo(void)
 				return false;
 			}
 
-			instrHeader->AddUnknownItem(curOffset, tableSize);
+			InstrumentTableAddress = curOffset;
+			InstrumentTableSize = tableSize;
+
+			// instrument table should be parsed by HudsonSnesInstr
+			uint8_t tableLength = tableSize / 4;
+			for (uint8_t instrNum = 0; instrNum < tableLength; instrNum++) {
+				uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
+				std::wstringstream instrName;
+				instrName << L"Instrument " << instrNum;
+				VGMHeader* aInstrHeader = instrHeader->AddHeader(addrInstrItem, 4, instrName.str().c_str());
+				aInstrHeader->AddSimpleItem(addrInstrItem, 1, L"SRCN");
+				aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, L"ADSR(1)");
+				aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, L"ADSR(2)");
+				aInstrHeader->AddSimpleItem(addrInstrItem + 3, 1, L"GAIN");
+			}
 			curOffset += tableSize;
 
 			instrHeader->unLength = curOffset - beginOffset;
@@ -124,7 +150,20 @@ bool HudsonSnesSeq::GetHeaderInfo(void)
 				return false;
 			}
 
-			percHeader->AddUnknownItem(curOffset, tableSize);
+			PercussionTableAddress = curOffset;
+			PercussionTableSize = tableSize;
+
+			uint8_t tableLength = tableSize / 4;
+			for (uint8_t percNote = 0; percNote < tableLength; percNote++) {
+				uint16_t addrPercItem = PercussionTableAddress + percNote * 4;
+				std::wstringstream percNoteName;
+				percNoteName << L"Percussion " << percNote;
+				VGMHeader* percNoteHeader = percHeader->AddHeader(addrPercItem, 4, percNoteName.str().c_str());
+				percNoteHeader->AddSimpleItem(addrPercItem, 1, L"Instrument");
+				percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, L"Unity Key");
+				percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, L"Volume");
+				percNoteHeader->AddSimpleItem(addrPercItem + 3, 1, L"Pan");
+			}
 			curOffset += tableSize;
 
 			percHeader->unLength = curOffset - beginOffset;
@@ -142,7 +181,21 @@ bool HudsonSnesSeq::GetHeaderInfo(void)
 				return false;
 			}
 
-			instrHeader->AddUnknownItem(curOffset, tableSize);
+			InstrumentTableAddress = curOffset;
+			InstrumentTableSize = tableSize;
+
+			// instrument table should be parsed by HudsonSnesInstr
+			uint8_t tableLength = tableSize / 4;
+			for (uint8_t instrNum = 0; instrNum < tableLength; instrNum++) {
+				uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
+				std::wstringstream instrName;
+				instrName << L"Instrument " << instrNum;
+				VGMHeader* aInstrHeader = instrHeader->AddHeader(addrInstrItem, 4, instrName.str().c_str());
+				aInstrHeader->AddSimpleItem(addrInstrItem, 1, L"SRCN");
+				aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, L"ADSR(1)");
+				aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, L"ADSR(2)");
+				aInstrHeader->AddSimpleItem(addrInstrItem + 3, 1, L"GAIN");
+			}
 			curOffset += tableSize;
 
 			instrHeader->unLength = curOffset - beginOffset;
@@ -160,7 +213,20 @@ bool HudsonSnesSeq::GetHeaderInfo(void)
 				return false;
 			}
 
-			percHeader->AddUnknownItem(curOffset, tableSize);
+			PercussionTableAddress = curOffset;
+			PercussionTableSize = tableSize;
+
+			uint8_t tableLength = tableSize / 4;
+			for (uint8_t percNote = 0; percNote < tableLength; percNote++) {
+				uint16_t addrPercItem = PercussionTableAddress + percNote * 4;
+				std::wstringstream percNoteName;
+				percNoteName << L"Percussion " << percNote;
+				VGMHeader* percNoteHeader = percHeader->AddHeader(addrPercItem, 4, percNoteName.str().c_str());
+				percNoteHeader->AddSimpleItem(addrPercItem, 1, L"Instrument");
+				percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, L"Unity Key");
+				percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, L"Volume");
+				percNoteHeader->AddSimpleItem(addrPercItem + 3, 1, L"Pan");
+			}
 			curOffset += tableSize;
 
 			percHeader->unLength = curOffset - beginOffset;
@@ -360,9 +426,9 @@ void HudsonSnesSeq::LoadEventMap(HudsonSnesSeq *pSeqFile)
 	pSeqFile->EventMap[0xe8] = EVENT_TRANSPOSE_REL;
 	pSeqFile->EventMap[0xe9] = EVENT_PITCH_ATTACK_ENV_ON;
 	pSeqFile->EventMap[0xea] = EVENT_PITCH_ATTACK_ENV_OFF;
-	pSeqFile->EventMap[0xeb] = EVENT_LOOP_POSITION;
-	pSeqFile->EventMap[0xec] = EVENT_JUMP_TO_LOOP_POSITION;
-	pSeqFile->EventMap[0xed] = EVENT_LOOP_POSITION_ALT;
+	pSeqFile->EventMap[0xeb] = EVENT_LOOP_POINT;
+	pSeqFile->EventMap[0xec] = EVENT_JUMP_TO_LOOP_POINT;
+	pSeqFile->EventMap[0xed] = EVENT_LOOP_POINT_ONCE;
 	pSeqFile->EventMap[0xee] = EVENT_VOLUME_FROM_TABLE;
 	pSeqFile->EventMap[0xef] = EVENT_UNKNOWN2;
 	pSeqFile->EventMap[0xf0] = EVENT_UNKNOWN1;
@@ -444,6 +510,14 @@ HudsonSnesTrack::HudsonSnesTrack(HudsonSnesSeq* parentFile, long offset, long le
 void HudsonSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
+
+	vel = 100;
+	octave = 2;
+	infiniteLoopPoint = dwStartOffset;
+	loopPointOnceProcessed = false;
+	spcNoteQuantize = 8;
+	spcVolume = 100;
+	spcCallStackPtr = 0;
 }
 
 
@@ -523,6 +597,745 @@ bool HudsonSnesTrack::ReadEvent(void)
 			<< L"  Arg3: " << (int)arg3
 			<< L"  Arg4: " << (int)arg4;
 		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+		break;
+	}
+
+	case EVENT_NOP:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
+		break;
+	}
+
+	case EVENT_NOP1:
+	{
+		curOffset++;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
+		break;
+	}
+
+	case EVENT_NOTE:
+	{
+		const uint8_t NOTE_DUR_TABLE[8] = {
+			0xc0, 0x60, 0x30, 0x18, 0x0c, 0x06, 0x03, 0x01
+		};
+
+		uint8_t lenIndex = statusByte & 7;
+		bool noKeyoff = (statusByte & 8) != 0; // i.e. slur/tie
+		uint8_t keyIndex = statusByte >> 4;
+
+		uint8_t len;
+		if (lenIndex != 0) {
+			// actually driver adds TimebaseShift to lenIndex.
+			// we do not need to decrease the length because we always use SEQ_PPQN.
+
+			if (lenIndex >= 8) {
+				// out of range (undefined behavior)
+				lenIndex = 7;
+			}
+			len = NOTE_DUR_TABLE[lenIndex - 1];
+		}
+		else {
+			len = GetByte(curOffset++);
+
+			// adjust note length to fit to SEQ_PPQN
+			len <<= parentSeq->TimebaseShift;
+		}
+
+		uint8_t dur;
+		if (noKeyoff) {
+			// slur/tie = full-length
+			dur = len;
+		}
+		else {
+			if (spcNoteQuantize <= 8) {
+				// q1-q8 (len * N/8)
+				dur = len * spcNoteQuantize / 8;
+			}
+			else {
+				// @qN (len - N)
+				uint8_t q = spcNoteQuantize - 8;
+				uint8_t restDur = q << parentSeq->TimebaseShift;
+
+				if (restDur < len) {
+					dur = len - restDur;
+				}
+				else {
+					dur = 1 << parentSeq->TimebaseShift; // TODO: needs verifying
+				}
+			}
+		}
+
+		bool rest = (keyIndex == 0);
+		if (rest) {
+			AddRest(beginOffset, curOffset - beginOffset, len);
+		}
+		else {
+			int8_t key = (octave * 12) + (keyIndex - 1);
+			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+		}
+
+		break;
+	}
+
+	case EVENT_TEMPO:
+	{
+		uint8_t newTempo = GetByte(curOffset++);
+		AddTempoBPM(beginOffset, curOffset - beginOffset, newTempo);
+		break;
+	}
+
+	case EVENT_OCTAVE:
+	{
+		uint8_t newOctave = GetByte(curOffset++);
+		AddSetOctave(beginOffset, curOffset - beginOffset, newOctave);
+		break;
+	}
+
+	case EVENT_OCTAVE_UP:
+	{
+		AddIncrementOctave(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	case EVENT_OCTAVE_DOWN:
+	{
+		AddDecrementOctave(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	case EVENT_QUANTIZE:
+	{
+		uint8_t newQuantize = GetByte(curOffset++);
+		if (newQuantize <= 8) {
+			desc << L"Length: " << (int)newQuantize << L"/8";
+		}
+		else {
+			desc << L"Length: " << L"Full-Length - " << (int)(newQuantize - 8);
+		}
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration Rate", desc.str().c_str(), CLR_DURNOTE);
+		break;
+	}
+
+	case EVENT_PROGCHANGE:
+	{
+		uint8_t newProg = GetByte(curOffset++);
+		AddProgramChange(beginOffset, curOffset - beginOffset, newProg);
+		break;
+	}
+
+	case EVENT_VOLUME:
+	{
+		uint8_t vol = GetByte(curOffset++);
+		spcVolume = vol;
+		AddVol(beginOffset, curOffset - beginOffset, spcVolume >> 1);
+		break;
+	}
+
+	case EVENT_PAN:
+	{
+		const uint8_t PAN_TABLE[31] = {
+			0x00, 0x07, 0x0d, 0x14, 0x1a, 0x21, 0x27, 0x2e,
+			0x34, 0x3a, 0x40, 0x45, 0x4b, 0x50, 0x55, 0x5a,
+			0x5e, 0x63, 0x67, 0x6b, 0x6e, 0x71, 0x74, 0x77,
+			0x79, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f, 0x7f,
+		};
+
+		uint8_t panIndex = GetByte(curOffset++) & 0x1f;
+		if (panIndex > 30) {
+			// out of range
+			panIndex = 30;
+		}
+
+		// TODO: calculate accurate pan value
+		// Left Volume  = PAN_TABLE[panIndex];
+		// Right Volume = PAN_TABLE[30 - panIndex];
+		AddPan(beginOffset, curOffset - beginOffset, PAN_TABLE[30 - panIndex]);
+
+		break;
+	}
+
+	case EVENT_REVERSE_PHASE:
+	{
+		uint8_t reverse = GetByte(curOffset++);
+		bool reverseLeft = (reverse & 2) != 0;
+		bool reverseRight = (reverse & 1) != 0;
+		desc << L"Reverse Left: " << (reverseLeft ? L"On" : L"Off") << L"Reverse Right: " << (reverseRight ? L"On" : L"Off");
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverse Phase", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_VOLUME_REL:
+	{
+		int8_t delta = GetByte(curOffset++);
+		int newVolume = spcVolume + delta;
+		if (newVolume < 0) {
+			newVolume = 0;
+		}
+		else if (newVolume > 0xff) {
+			newVolume = 0xff;
+		}
+		spcVolume = (uint8_t)newVolume;
+		AddVol(beginOffset, curOffset - beginOffset, spcVolume >> 1, L"Volume (Relative)");
+		break;
+	}
+
+	case EVENT_LOOP_START:
+	{
+		uint8_t count = GetByte(curOffset);
+		desc << L"Loop Count: " << (int)count;
+		AddGenericEvent(beginOffset, 2, L"Loop Start", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+
+		if (spcCallStackPtr + 3 > HUDSONSNES_CALLSTACK_SIZE) {
+			// stack overflow
+			bContinue = false;
+			break;
+		}
+
+		// save loop start address and repeat count
+		spcCallStack[spcCallStackPtr++] = curOffset & 0xff;
+		spcCallStack[spcCallStackPtr++] = (curOffset >> 8) & 0xff;
+		spcCallStack[spcCallStackPtr++] = count;
+
+		// increment pointer after pushing return address
+		curOffset++;
+
+		break;
+	}
+
+	case EVENT_LOOP_END:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+
+		if (spcCallStackPtr < 3) {
+			// access violation
+			bContinue = false;
+			break;
+		}
+
+		uint8_t count = spcCallStack[spcCallStackPtr - 1];
+		if (--count == 0) {
+			// repeat end, fall through
+			spcCallStackPtr -= 3;
+		}
+		else {
+			// repeat again
+			spcCallStack[spcCallStackPtr - 1] = count;
+			curOffset = (spcCallStack[spcCallStackPtr - 3] | (spcCallStack[spcCallStackPtr - 2] << 8)) + 1;
+		}
+
+		break;
+	}
+
+	case EVENT_SUBROUTINE:
+	{
+		uint16_t dest = GetShort(curOffset);
+		desc << "Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+		AddGenericEvent(beginOffset, 3, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+
+		if (spcCallStackPtr + 2 > HUDSONSNES_CALLSTACK_SIZE) {
+			// stack overflow
+			bContinue = false;
+			break;
+		}
+
+		// save loop start address and repeat count
+		spcCallStack[spcCallStackPtr++] = curOffset & 0xff;
+		spcCallStack[spcCallStackPtr++] = (curOffset >> 8) & 0xff;
+
+		// jump to subroutine address
+		curOffset = dest;
+
+		break;
+	}
+
+	case EVENT_GOTO:
+	{
+		uint16_t dest = GetShort(curOffset); curOffset += 2;
+		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+		uint32_t length = curOffset - beginOffset;
+
+		curOffset = dest;
+		if (!IsOffsetUsed(dest)) {
+			AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
+		}
+		else {
+			bContinue = AddLoopForever(beginOffset, length, L"Jump");
+		}
+		break;
+	}
+
+	case EVENT_TUNING:
+	{
+		int8_t newTuning = GetByte(curOffset++);
+		double semitones = newTuning / 256.0;
+		AddFineTuning(beginOffset, curOffset - beginOffset, semitones * 100.0);
+		break;
+	}
+
+	case EVENT_VIBRATO:
+	{
+		if (parentSeq->version == HUDSONSNES_V0 || parentSeq->version == HUDSONSNES_V1) {
+			uint8_t lfoRate = GetByte(curOffset++);
+			uint8_t lfoDepth = GetByte(curOffset++);
+			desc << L"Rate: " << (int)lfoRate << L"  Depth: " << (int)lfoDepth;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		}
+		else { // HUDSONSNES_V2
+			uint8_t arg1 = GetByte(curOffset++);
+			uint8_t arg2 = GetByte(curOffset++);
+			uint8_t arg3 = GetByte(curOffset++);
+			desc << L"Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		}
+		break;
+	}
+
+	case EVENT_VIBRATO_DELAY:
+	{
+		uint8_t lfoDelay = GetByte(curOffset++);
+		desc << L"Delay: " << (int)lfoDelay;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Delay", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_VOLUME:
+	{
+		int8_t volumeLeft = GetByte(curOffset++);
+		int8_t volumeRight = GetByte(curOffset++);
+		desc << L"Left Volume: " << (int)volumeLeft << L"  Right Volume: " << (int)volumeRight;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_PARAM:
+	{
+		uint8_t delay = GetByte(curOffset++);
+		uint8_t feedback = GetByte(curOffset++);
+		uint8_t filterIndex = GetByte(curOffset++);
+		desc << L"Echo Delay: " << (int)delay << L"  Echo Feedback: " << (int)feedback << L"  FIR: " << (int)filterIndex;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Parameter", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo On", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_TRANSPOSE_ABS:
+	{
+		int8_t newTranspose = GetByte(curOffset++);
+		AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+		break;
+	}
+
+	case EVENT_TRANSPOSE_REL:
+	{
+		int8_t delta = GetByte(curOffset++);
+		AddTranspose(beginOffset, curOffset - beginOffset, transpose + delta, L"Transpose (Relative)");
+		break;
+	}
+
+	case EVENT_PITCH_ATTACK_ENV_ON:
+	{
+		uint8_t speed = GetByte(curOffset++);
+		uint8_t depth = GetByte(curOffset++);
+		uint8_t direction = GetByte(curOffset++);
+		bool upTo = (direction != 0);
+		desc << L"Speed: " << (int)speed << L"  Depth: " << (int)depth << L"  Direction: " << (upTo ? L"Up" : L"Down");
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Attack Pitch Envelope On", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PITCH_ATTACK_ENV_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Attack Pitch Envelope Off", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_LOOP_POINT:
+	{
+		infiniteLoopPoint = curOffset;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Infinite Loop Point", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+		break;
+	}
+
+	case EVENT_JUMP_TO_LOOP_POINT:
+	{
+		bContinue = AddLoopForever(beginOffset, curOffset - beginOffset);
+		curOffset = infiniteLoopPoint;
+		break;
+	}
+
+	case EVENT_LOOP_POINT_ONCE:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Infinite Loop Point (Ignore after the Second Time)", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+		if (!loopPointOnceProcessed) {
+			infiniteLoopPoint = curOffset;
+			loopPointOnceProcessed = true;
+		}
+		break;
+	}
+
+	case EVENT_VOLUME_FROM_TABLE:
+	{
+		const uint8_t VOLUME_TABLE[91] = {
+			0x00, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+			0x02, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
+			0x04, 0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x05,
+			0x06, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09,
+			0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0d, 0x0e,
+			0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
+			0x17, 0x18, 0x1a, 0x1b, 0x1d, 0x1e, 0x20, 0x22,
+			0x24, 0x26, 0x28, 0x2b, 0x2d, 0x30, 0x33, 0x36,
+			0x39, 0x3c, 0x40, 0x44, 0x48, 0x4c, 0x51, 0x55,
+			0x5a, 0x60, 0x66, 0x6c, 0x72, 0x79, 0x80, 0x87,
+			0x8f, 0x98, 0xa1, 0xaa, 0xb5, 0xbf, 0xcb, 0xd7,
+			0xe3, 0xf1, 0xff,
+		};
+
+		uint8_t volIndex = GetByte(curOffset++);
+		if (volIndex > 90) {
+			// out of range
+			volIndex = 90;
+		}
+
+		spcVolume = VOLUME_TABLE[volIndex];
+		AddVol(beginOffset, curOffset - beginOffset, spcVolume >> 1, L"Volume From Table");
+		break;
+	}
+
+	case EVENT_PORTAMENTO:
+	{
+		uint8_t portamentoTime = GetByte(curOffset++);
+		uint8_t arg2 = GetByte(curOffset++);
+
+		if (portamentoTime == 0) {
+			AddPortamento(beginOffset, curOffset - beginOffset, false);
+			AddPortamentoTimeNoItem(0);
+		}
+		else {
+			AddPortamento(beginOffset, curOffset - beginOffset, true);
+			AddPortamentoTimeNoItem(portamentoTime);
+		}
+
+		break;
+	}
+
+	case EVENT_END:
+	{
+		if (spcCallStackPtr == 0) {
+			// end of track
+			AddEndOfTrack(beginOffset, curOffset - beginOffset);
+			bContinue = false;
+		}
+		else {
+			// end subroutine
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"End Pattern", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+
+			if (spcCallStackPtr < 2) {
+				// access violation
+				bContinue = false;
+				break;
+			}
+
+			curOffset = (spcCallStack[spcCallStackPtr - 2] | (spcCallStack[spcCallStackPtr - 1] << 8)) + 2;
+			spcCallStackPtr -= 2;
+		}
+		break;
+	}
+
+	case EVENT_SUBEVENT:
+	{
+		uint8_t subStatusByte = GetByte(curOffset++);
+		HudsonSnesSeqSubEventType subEventType = (HudsonSnesSeqSubEventType)0;
+		std::map<uint8_t, HudsonSnesSeqSubEventType>::iterator pSubEventType = parentSeq->SubEventMap.find(subStatusByte);
+		if (pSubEventType != parentSeq->SubEventMap.end()) {
+			subEventType = pSubEventType->second;
+		}
+
+		switch (subEventType)
+		{
+		case SUBEVENT_UNKNOWN0:
+			desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)subStatusByte;
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+			break;
+
+		case SUBEVENT_UNKNOWN1:
+		{
+			uint8_t arg1 = GetByte(curOffset++);
+			desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)subStatusByte
+				<< std::dec << std::setfill(L' ') << std::setw(0)
+				<< L"  Arg1: " << (int)arg1;
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+			break;
+		}
+
+		case SUBEVENT_UNKNOWN2:
+		{
+			uint8_t arg1 = GetByte(curOffset++);
+			uint8_t arg2 = GetByte(curOffset++);
+			desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)subStatusByte
+				<< std::dec << std::setfill(L' ') << std::setw(0)
+				<< L"  Arg1: " << (int)arg1
+				<< L"  Arg2: " << (int)arg2;
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+			break;
+		}
+
+		case SUBEVENT_UNKNOWN3:
+		{
+			uint8_t arg1 = GetByte(curOffset++);
+			uint8_t arg2 = GetByte(curOffset++);
+			uint8_t arg3 = GetByte(curOffset++);
+			desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)subStatusByte
+				<< std::dec << std::setfill(L' ') << std::setw(0)
+				<< L"  Arg1: " << (int)arg1
+				<< L"  Arg2: " << (int)arg2
+				<< L"  Arg3: " << (int)arg3;
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+			break;
+		}
+
+		case SUBEVENT_UNKNOWN4:
+		{
+			uint8_t arg1 = GetByte(curOffset++);
+			uint8_t arg2 = GetByte(curOffset++);
+			uint8_t arg3 = GetByte(curOffset++);
+			uint8_t arg4 = GetByte(curOffset++);
+			desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)subStatusByte
+				<< std::dec << std::setfill(L' ') << std::setw(0)
+				<< L"  Arg1: " << (int)arg1
+				<< L"  Arg2: " << (int)arg2
+				<< L"  Arg3: " << (int)arg3
+				<< L"  Arg4: " << (int)arg4;
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+			break;
+		}
+
+		case SUBEVENT_NOP:
+		{
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
+			break;
+		}
+
+		case SUBEVENT_END:
+		{
+			AddEndOfTrack(beginOffset, curOffset - beginOffset);
+			bContinue = false;
+			break;
+		}
+
+		case SUBEVENT_ECHO_OFF:
+		{
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+			break;
+		}
+
+		case SUBEVENT_PERC_ON:
+		{
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion On", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+			break;
+		}
+
+		case SUBEVENT_PERC_OFF:
+		{
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Off", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+			break;
+		}
+
+		case SUBEVENT_VIBRATO_TYPE:
+		{
+			uint8_t vibratoType = subStatusByte - 0x05;
+			desc << L"Vibrato Type: " << (int)vibratoType;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Type", desc.str().c_str(), CLR_LFO, ICON_CONTROL);
+			break;
+		}
+
+		case SUBEVENT_MOV_IMM:
+		{
+			uint8_t reg = GetByte(curOffset++);
+			uint8_t val = GetByte(curOffset++);
+			desc << L"Register: " << (int)reg << L"  Value: " << (int)val;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"MOV (Immediate)", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+
+			if (reg < HUDSONSNES_USERRAM_SIZE) {
+				parentSeq->UserRAM[reg] = val;
+				parentSeq->UserCmpReg = val;
+			}
+			break;
+		}
+
+		case SUBEVENT_MOV:
+		{
+			uint8_t regDst = GetByte(curOffset++);
+			uint8_t regSrc = GetByte(curOffset++);
+			desc << L"Destination Register: " << (int)regDst << L"  Source Register: " << (int)regSrc;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"MOV", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+
+			if (regDst < HUDSONSNES_USERRAM_SIZE && regSrc < HUDSONSNES_USERRAM_SIZE) {
+				uint8_t val = parentSeq->UserRAM[regSrc];
+				parentSeq->UserRAM[regDst] = val;
+				parentSeq->UserCmpReg = val;
+			}
+			break;
+		}
+
+		case SUBEVENT_CMP_IMM:
+		{
+			uint8_t reg = GetByte(curOffset++);
+			uint8_t val = GetByte(curOffset++);
+			desc << L"Register: " << (int)reg << L"  Value: " << (int)val;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"CMP (Immediate)", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+
+			if (reg < HUDSONSNES_USERRAM_SIZE) {
+				parentSeq->UserCmpReg = parentSeq->UserRAM[reg] - val;
+				parentSeq->UserCarry = (parentSeq->UserRAM[reg] > val);
+			}
+			break;
+		}
+
+		case SUBEVENT_CMP:
+		{
+			uint8_t regDst = GetByte(curOffset++);
+			uint8_t regSrc = GetByte(curOffset++);
+			desc << L"Destination Register: " << (int)regDst << L"  Source Register: " << (int)regSrc;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"CMP", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+
+			if (regDst < HUDSONSNES_USERRAM_SIZE && regSrc < HUDSONSNES_USERRAM_SIZE) {
+				parentSeq->UserCmpReg = parentSeq->UserRAM[regDst] - parentSeq->UserRAM[regSrc];
+				parentSeq->UserCarry = (parentSeq->UserRAM[regDst] > parentSeq->UserRAM[regSrc]);
+			}
+			break;
+		}
+
+		case SUBEVENT_BNE:
+		{
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
+			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"BNE", desc.str().c_str(), CLR_MISC);
+
+			if (parentSeq->UserCmpReg != 0) {
+				curOffset = dest;
+			}
+
+			break;
+		}
+
+		case SUBEVENT_BEQ:
+		{
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
+			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"BEQ", desc.str().c_str(), CLR_MISC);
+
+			if (parentSeq->UserCmpReg != 0) {
+				curOffset = dest;
+			}
+
+			break;
+		}
+
+		case SUBEVENT_BCS:
+		{
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
+			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"BCS", desc.str().c_str(), CLR_MISC);
+
+			if (parentSeq->UserCarry) {
+				curOffset = dest;
+			}
+
+			break;
+		}
+
+		case SUBEVENT_BCC:
+		{
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
+			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"BCC", desc.str().c_str(), CLR_MISC);
+
+			if (!parentSeq->UserCarry) {
+				curOffset = dest;
+			}
+
+			break;
+		}
+
+		case SUBEVENT_BMI:
+		{
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
+			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"BMI", desc.str().c_str(), CLR_MISC);
+
+			if ((parentSeq->UserCmpReg & 0x80) != 0) {
+				curOffset = dest;
+			}
+
+			break;
+		}
+
+		case SUBEVENT_BPL:
+		{
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
+			desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"BPL", desc.str().c_str(), CLR_MISC);
+
+			if ((parentSeq->UserCmpReg & 0x80) == 0) {
+				curOffset = dest;
+			}
+
+			break;
+		}
+
+		case SUBEVENT_ADSR_AR:
+		{
+			uint8_t newAR = GetByte(curOffset++) & 15;
+			desc << L"AR: " << (int)newAR;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Attack Rate", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			break;
+		}
+
+		case SUBEVENT_ADSR_DR:
+		{
+			uint8_t newDR = GetByte(curOffset++) & 7;
+			desc << L"DR: " << (int)newDR;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Decay Rate", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			break;
+		}
+
+		case SUBEVENT_ADSR_SL:
+		{
+			uint8_t newSL = GetByte(curOffset++) & 7;
+			desc << L"SL: " << (int)newSL;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Level", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			break;
+		}
+
+		case SUBEVENT_ADSR_SR:
+		{
+			uint8_t newSR = GetByte(curOffset++) & 15;
+			desc << L"SR: " << (int)newSR;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Rate", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			break;
+		}
+
+		case SUBEVENT_ADSR_RR:
+		{
+			uint8_t newSR = GetByte(curOffset++) & 15;
+			desc << L"SR: " << (int)newSR;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Release Rate", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			break;
+		}
+
+		default:
+			desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)subStatusByte;
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+			pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"HudsonSnesSeq")));
+			bContinue = false;
+			break;
+		}
+
 		break;
 	}
 
