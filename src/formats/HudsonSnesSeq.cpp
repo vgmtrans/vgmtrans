@@ -121,7 +121,7 @@ bool HudsonSnesSeq::GetHeaderInfo(void)
 			InstrumentTableAddress = curOffset;
 			InstrumentTableSize = tableSize;
 
-			// instrument table should be parsed by HudsonSnesInstr
+			// instrument table will be parsed by HudsonSnesInstr, too
 			uint8_t tableLength = tableSize / 4;
 			for (uint8_t instrNum = 0; instrNum < tableLength; instrNum++) {
 				uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
@@ -184,7 +184,7 @@ bool HudsonSnesSeq::GetHeaderInfo(void)
 			InstrumentTableAddress = curOffset;
 			InstrumentTableSize = tableSize;
 
-			// instrument table should be parsed by HudsonSnesInstr
+			// instrument table will be parsed by HudsonSnesInstr, too
 			uint8_t tableLength = tableSize / 4;
 			for (uint8_t instrNum = 0; instrNum < tableLength; instrNum++) {
 				uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;

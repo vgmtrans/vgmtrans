@@ -24,4 +24,5 @@ private:
 	static BytePattern ptnNoteLenTable;
 	static BytePattern ptnGetSeqTableAddrV0;
 	static BytePattern ptnGetSeqTableAddrV1V2;
+	static BytePattern ptnLoadDIRV0;
 };

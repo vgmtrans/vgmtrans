@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "HudsonSnesScanner.h"
+#include "HudsonSnesInstr.h"
 #include "HudsonSnesSeq.h"
 #include "SNESDSP.h"
 
@@ -55,6 +56,17 @@ BytePattern HudsonSnesScanner::ptnGetSeqTableAddrV1V2(
 	,
 	35);
 
+//; Super Bomberman 2 SPC
+//0bf8: e4 4b     mov   a,$4b
+//0bfa: 8d 5d     mov   y,#$5d
+//0bfc: 4f 0c     pcall $0c
+BytePattern HudsonSnesScanner::ptnLoadDIRV0(
+	"\xe4\x4b\x8d\x5d\x4f\x0c"
+	,
+	"x?xxxx"
+	,
+	6);
+
 void HudsonSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -84,23 +96,27 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 
 	// search song list and detect engine version
 	UINT ofsGetSeqTableAddr;
+	uint16_t addrEngineHeader;
 	uint16_t addrSongList;
 	if (file->SearchBytePattern(ptnGetSeqTableAddrV1V2, ofsGetSeqTableAddr)) {
-		uint16_t addrSongListPtr = file->GetShort(ofsGetSeqTableAddr + 1);
-		if (addrSongListPtr == 0x07c2) {
+		addrEngineHeader = file->GetShort(ofsGetSeqTableAddr + 1);
+
+		if (addrEngineHeader == 0x07c2) {
 			version = HUDSONSNES_V1;
 		}
-		else if (addrSongListPtr == 0x0803) {
+		else if (addrEngineHeader == 0x0803) {
 			version = HUDSONSNES_V2;
 		}
 		else {
 			return;
 		}
-		addrSongList = file->GetShort(addrSongListPtr);
+
+		addrSongList = file->GetShort(addrEngineHeader);
 	}
 	else if (file->SearchBytePattern(ptnGetSeqTableAddrV0, ofsGetSeqTableAddr)) {
 		uint8_t addrSongListPtr = file->GetByte(ofsGetSeqTableAddr + 4);
 		addrSongList = file->GetShort(addrSongListPtr);
+		addrEngineHeader = 0; // N/A
 		version = HUDSONSNES_V0;
 	}
 	else {
@@ -128,6 +144,30 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 		if (!newSeq->LoadVGMFile()) {
 			delete newSeq;
 			break;
+		}
+
+		// load instrument set if available
+		if (newSeq->InstrumentTableSize != 0) {
+			uint16_t spcDirAddr;
+			if (version == HUDSONSNES_V0) {
+				UINT ofsLoadDIR;
+				if (file->SearchBytePattern(ptnLoadDIRV0, ofsLoadDIR)) {
+					uint8_t addrDIRPtr = file->GetByte(ofsLoadDIR + 1);
+					spcDirAddr = file->GetByte(0x100 + addrDIRPtr) << 8;
+				}
+				else {
+					return;
+				}
+			}
+			else { // HUDSONSNES_V1, HUDSONSNES_V2
+				spcDirAddr = file->GetByte(addrEngineHeader + 6) << 8;
+			}
+
+			HudsonSnesInstrSet * newInstrSet = new HudsonSnesInstrSet(file, version, newSeq->InstrumentTableAddress, newSeq->InstrumentTableSize, spcDirAddr, name);
+			if (!newInstrSet->LoadVGMFile()) {
+				delete newInstrSet;
+				return;
+			}
 		}
 	}
 }

@@ -226,6 +226,7 @@
     <ClCompile Include="formats\CompileSnesSeq.cpp" />
     <ClCompile Include="formats\HeartBeatPS1Seq.cpp" />
     <ClCompile Include="formats\HeartBeatPS1SeqScanner.cpp" />
+    <ClCompile Include="formats\HudsonSnesInstr.cpp" />
     <ClCompile Include="formats\HudsonSnesScanner.cpp" />
     <ClCompile Include="formats\HudsonSnesSeq.cpp" />
     <ClCompile Include="formats\KonamiSnesInstr.cpp" />
@@ -387,6 +388,7 @@
     <ClInclude Include="formats\HeartBeatPS1Seq.h" />
     <ClInclude Include="formats\HeartBeatPS1SeqScanner.h" />
     <ClInclude Include="formats\HudsonSnesFormat.h" />
+    <ClInclude Include="formats\HudsonSnesInstr.h" />
     <ClInclude Include="formats\HudsonSnesScanner.h" />
     <ClInclude Include="formats\HudsonSnesSeq.h" />
     <ClInclude Include="formats\KonamiSnesFormat.h" />
