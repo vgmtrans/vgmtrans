@@ -28,7 +28,8 @@ bool AkaoSnesInstrSet::GetHeaderInfo()
 bool AkaoSnesInstrSet::GetInstrPointers()
 {
 	usedSRCNs.clear();
-	for (uint8_t srcn = 0; srcn <= 0x3f; srcn++)
+	uint8_t srcn_max = (version == AKAOSNES_V1) ? 0x7f : 0x3f;
+	for (uint8_t srcn = 0; srcn <= srcn_max; srcn++)
 	{
 		uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
 		if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
@@ -41,7 +42,7 @@ bool AkaoSnesInstrSet::GetInstrPointers()
 		}
 
 		uint32_t ofsTuningEntry;
-		if (version == AKAOSNES_V2) {
+		if (version == AKAOSNES_V1 || version == AKAOSNES_V2) {
 			ofsTuningEntry = addrTuningTable + srcn;
 		}
 		else {
@@ -148,7 +149,7 @@ AkaoSnesRgn::AkaoSnesRgn(AkaoSnesInstr* instr, AkaoSnesVersion ver, uint8_t srcn
 
 	uint8_t tuning1;
 	uint8_t tuning2;
-	if (version == AKAOSNES_V2) {
+	if (version == AKAOSNES_V1 || version == AKAOSNES_V2) {
 		tuning1 = GetByte(addrTuningTable + srcn);
 		tuning2 = 0;
 
