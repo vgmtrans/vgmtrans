@@ -12,7 +12,7 @@ class HudsonSnesInstrSet :
 	public VGMInstrSet
 {
 public:
-	HudsonSnesInstrSet(RawFile* file, HudsonSnesVersion ver, uint32_t offset, uint32_t length, uint32_t spcDirAddr, const std::wstring & name = L"HudsonSnesInstrSet");
+	HudsonSnesInstrSet(RawFile* file, HudsonSnesVersion ver, uint32_t offset, uint32_t length, uint32_t spcDirAddr, uint32_t addrSampTuningTable, const std::wstring & name = L"HudsonSnesInstrSet");
 	virtual ~HudsonSnesInstrSet(void);
 
 	virtual bool GetHeaderInfo();
@@ -22,6 +22,7 @@ public:
 
 protected:
 	uint32_t spcDirAddr;
+	uint32_t addrSampTuningTable;
 	std::vector<uint8_t> usedSRCNs;
 };
 
@@ -33,7 +34,7 @@ class HudsonSnesInstr
 	: public VGMInstr
 {
 public:
-	HudsonSnesInstr(VGMInstrSet* instrSet, HudsonSnesVersion ver, uint32_t offset, uint8_t instrNum, uint32_t spcDirAddr, const std::wstring& name = L"HudsonSnesInstr");
+	HudsonSnesInstr(VGMInstrSet* instrSet, HudsonSnesVersion ver, uint32_t offset, uint8_t instrNum, uint32_t spcDirAddr, uint32_t addrSampTuningTable, const std::wstring& name = L"HudsonSnesInstr");
 	virtual ~HudsonSnesInstr(void);
 
 	virtual bool LoadInstr();
@@ -42,6 +43,7 @@ public:
 
 protected:
 	uint32_t spcDirAddr;
+	uint32_t addrSampTuningTable;
 };
 
 // *************
@@ -52,7 +54,7 @@ class HudsonSnesRgn
 	: public VGMRgn
 {
 public:
-	HudsonSnesRgn(HudsonSnesInstr* instr, HudsonSnesVersion ver, uint32_t offset, uint32_t spcDirAddr);
+	HudsonSnesRgn(HudsonSnesInstr* instr, HudsonSnesVersion ver, uint32_t offset, uint32_t spcDirAddr, uint32_t addrTuningEntry);
 	virtual ~HudsonSnesRgn(void);
 
 	virtual bool LoadRgn();

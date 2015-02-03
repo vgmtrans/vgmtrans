@@ -18,14 +18,26 @@ BytePattern HudsonSnesScanner::ptnNoteLenTable(
 //0b36: f6 6b 0f  mov   a,$0f6b+y
 //0b39: c4 0e     mov   $0e,a
 //0b3b: 2f d8     bra   $0b15
+//0b3d: f6 6b 0f  mov   a,$0f6b+y
+//0b40: c4 0f     mov   $0f,a
+//0b42: fc        inc   y
+//0b43: f6 6b 0f  mov   a,$0f6b+y
+//0b46: c4 10     mov   $10,a
+//0b48: 2f cb     bra   $0b15
+//0b4a: f6 6b 0f  mov   a,$0f6b+y
+//0b4d: c5 4b 01  mov   $014b,a
 BytePattern HudsonSnesScanner::ptnGetSeqTableAddrV0(
 	"\xf6\x6b\x0f\xc4\x0d\xfc\xf6\x6b"
-	"\x0f\xc4\x0e\x2f\xd8"
+	"\x0f\xc4\x0e\x2f\xd8\xf6\x6b\x0f"
+	"\xc4\x0f\xfc\xf6\x6b\x0f\xc4\x10"
+	"\x2f\xcb\xf6\x6b\x0f\xc5\x4b\x01"
 	,
-	"x??xxxx?"
-	"?xxx?"
+	"x??x?xx?"
+	"?x?x?x??"
+	"x?xx??x?"
+	"x?x??x??"
 	,
-	13);
+	32);
 
 //; Super Bomberman 3 SPC
 //08d0: e5 c2 07  mov   a,$07c2
@@ -134,7 +146,7 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 
 		// get song pointer
 		uint16_t addrSongPtr = file->GetShort(ofsSongPtr);
-		if (addrSongPtr + 1 > 0x10000) {
+		if (addrSongPtr + 2 > 0x10000) {
 			break;
 		}
 
@@ -149,11 +161,15 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 		// load instrument set if available
 		if (newSeq->InstrumentTableSize != 0) {
 			uint16_t spcDirAddr;
+			uint16_t addrSampTuningTable;
 			if (version == HUDSONSNES_V0) {
 				UINT ofsLoadDIR;
 				if (file->SearchBytePattern(ptnLoadDIRV0, ofsLoadDIR)) {
 					uint8_t addrDIRPtr = file->GetByte(ofsLoadDIR + 1);
 					spcDirAddr = file->GetByte(0x100 + addrDIRPtr) << 8;
+
+					uint16_t addrSampRegionPtr = file->GetShort(ofsGetSeqTableAddr + 30);
+					addrSampTuningTable = (file->GetByte(addrSampRegionPtr) + 1) << 8;
 				}
 				else {
 					return;
@@ -161,9 +177,10 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 			}
 			else { // HUDSONSNES_V1, HUDSONSNES_V2
 				spcDirAddr = file->GetByte(addrEngineHeader + 6) << 8;
+				addrSampTuningTable = file->GetShort(addrEngineHeader + 4);
 			}
 
-			HudsonSnesInstrSet * newInstrSet = new HudsonSnesInstrSet(file, version, newSeq->InstrumentTableAddress, newSeq->InstrumentTableSize, spcDirAddr, name);
+			HudsonSnesInstrSet * newInstrSet = new HudsonSnesInstrSet(file, version, newSeq->InstrumentTableAddress, newSeq->InstrumentTableSize, spcDirAddr, addrSampTuningTable, name);
 			if (!newInstrSet->LoadVGMFile()) {
 				delete newInstrSet;
 				return;
