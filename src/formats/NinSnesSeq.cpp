@@ -155,6 +155,10 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 		if (!LoadSection(section, stopTime)) {
 			bContinue = false;
 		}
+
+		if (version == NINSNES_UNKNOWN) {
+			bContinue = false;
+		}
 	}
 
 	return bContinue;
@@ -163,6 +167,10 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 {
 	int statusByte;
+
+	if (version == NINSNES_UNKNOWN) {
+		return;
+	}
 
 	switch (version) {
 	case NINSNES_EARLIER:
@@ -875,6 +883,13 @@ bool NinSnesTrack::ReadEvent(void)
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Base", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
 		break;
 	}
+
+	default:
+		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"AkaoSnesSeq")));
+		bContinue = false;
+		break;
 	}
 
 	// Add the next "END" event to UI

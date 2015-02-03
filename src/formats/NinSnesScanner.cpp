@@ -308,7 +308,14 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		{
 			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
 			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
-			version = NINSNES_STANDARD;
+
+			const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
+			if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
+				version = NINSNES_STANDARD;
+			}
+			else {
+				version = NINSNES_UNKNOWN;
+			}
 		}
 		else if (file->SearchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
 			// search vcmd length table as well
@@ -404,6 +411,11 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	if (!newSeq->LoadVGMFile())
 	{
 		delete newSeq;
+		return;
+	}
+
+	// skip unknown instruments
+	if (version == NINSNES_UNKNOWN) {
 		return;
 	}
 
