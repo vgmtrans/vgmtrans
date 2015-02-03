@@ -138,6 +138,8 @@ public:
 	virtual bool ReadEvent(void);
 
 private:
+	int8_t prevNoteKey;
+	bool prevNoteSlurred;
 	uint16_t infiniteLoopPoint;
 	bool loopPointOnceProcessed;
 	uint8_t spcNoteQuantize;

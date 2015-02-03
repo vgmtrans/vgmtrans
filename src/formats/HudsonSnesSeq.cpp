@@ -513,6 +513,8 @@ void HudsonSnesTrack::ResetVars(void)
 
 	vel = 100;
 	octave = 2;
+	prevNoteKey = -1;
+	prevNoteSlurred = false;
 	infiniteLoopPoint = dwStartOffset;
 	loopPointOnceProcessed = false;
 	spcNoteQuantize = 8;
@@ -668,10 +670,21 @@ bool HudsonSnesTrack::ReadEvent(void)
 		bool rest = (keyIndex == 0);
 		if (rest) {
 			AddRest(beginOffset, curOffset - beginOffset, len);
+			prevNoteSlurred = false;
 		}
 		else {
 			int8_t key = (octave * 12) + (keyIndex - 1);
-			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+			if (prevNoteSlurred && key == prevNoteKey) {
+				// tie
+				MakePrevDurNoteEnd(GetTime() + dur);
+				AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
+			}
+			else {
+				// note
+				AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+				prevNoteKey = key;
+			}
+			prevNoteSlurred = noKeyoff;
 			AddTime(len);
 		}
 
