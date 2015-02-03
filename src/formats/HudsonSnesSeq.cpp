@@ -672,6 +672,7 @@ bool HudsonSnesTrack::ReadEvent(void)
 		else {
 			int8_t key = (octave * 12) + (keyIndex - 1);
 			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+			AddTime(len);
 		}
 
 		break;
