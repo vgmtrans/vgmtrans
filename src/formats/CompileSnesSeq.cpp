@@ -10,7 +10,7 @@ DECLARE_FORMAT(CompileSnes);
 //  **************
 #define MAX_TRACKS  8
 #define SEQ_PPQN    12
-#define SEQ_KEYOFS  24
+#define SEQ_KEYOFS  12
 
 #define COMPILESNES_FLAGS_PORTAMENTO    0x10
 

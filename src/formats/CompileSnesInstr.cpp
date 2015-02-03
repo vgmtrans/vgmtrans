@@ -114,7 +114,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr* instr, CompileSnesVersion ver, 
 	int8_t transpose = GetByte(dwOffset);
 	uint8_t pitchTableIndex = GetByte(dwOffset + 1);
 
-	AddUnityKey(69 - transpose, dwOffset, 1);
+	AddUnityKey(72 + transpose, dwOffset, 1);
 	AddSimpleItem(dwOffset + 1, 1, L"Pitch Table Index");
 
 	uint8_t adsr1 = 0xff;
