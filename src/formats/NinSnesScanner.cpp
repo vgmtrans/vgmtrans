@@ -209,19 +209,19 @@ BytePattern NinSnesScanner::ptnJumpToVcmdCTOW(
 	22);
 
 //; Lemmings SPC
-// 0ad0: 30 1e     bmi   $0af0             ; vcmds 01-7f - note info:
-// 0ad2: d5 00 02  mov   $0200+x,a         ; set duration by opcode
-// 0ad5: 3f 85 0b  call  $0b85             ; read next byte
-// 0ad8: 30 16     bmi   $0af0             ; process it, if < $80
-// 0ada: c4 11     mov   $11,a
-// 0adc: 4b 11     lsr   $11
-// 0ade: 1c        asl   a                 ; a  = (a << 1) | (a & 1)
-// 0adf: 84 11     adc   a,$11             ; a += (a >> 1)
-// 0ae1: d5 01 02  mov   $0201+x,a         ; set duration rate
-// 0ae4: 3f 85 0b  call  $0b85             ; read next byte
-// 0ae7: 30 07     bmi   $0af0             ; process it, if < $80
-// 0ae9: 1c        asl   a                 ; a *= 2
-// 0aea: d5 10 02  mov   $0210+x,a         ; set per-note volume (velocity)
+//0ad0: 30 1e     bmi   $0af0             ; vcmds 01-7f - note info:
+//0ad2: d5 00 02  mov   $0200+x,a         ; set duration by opcode
+//0ad5: 3f 85 0b  call  $0b85             ; read next byte
+//0ad8: 30 16     bmi   $0af0             ; process it, if < $80
+//0ada: c4 11     mov   $11,a
+//0adc: 4b 11     lsr   $11
+//0ade: 1c        asl   a                 ; a  = (a << 1) | (a & 1)
+//0adf: 84 11     adc   a,$11             ; a += (a >> 1)
+//0ae1: d5 01 02  mov   $0201+x,a         ; set duration rate
+//0ae4: 3f 85 0b  call  $0b85             ; read next byte
+//0ae7: 30 07     bmi   $0af0             ; process it, if < $80
+//0ae9: 1c        asl   a                 ; a *= 2
+//0aea: d5 10 02  mov   $0210+x,a         ; set per-note volume (velocity)
 BytePattern NinSnesScanner::ptnDispatchNoteLEM(
 	"\x30\x1e\xd5\x00\x02\x3f\x85\x0b"
 	"\x30\x16\xc4\x11\x4b\x11\x1c\x84"
@@ -234,6 +234,55 @@ BytePattern NinSnesScanner::ptnDispatchNoteLEM(
 	"xxx??"
 	,
 	29);
+
+// Fire Emblem 3 SPC
+//; intelligent style - set from larger table
+//062f: 68 40     cmp   a,#$40
+//0631: b0 0c     bcs   $063f
+//; 00-3f - set dur% from least 6 bits
+//0633: 28 3f     and   a,#$3f
+//0635: fd        mov   y,a
+//0636: f6 00 ff  mov   a,$ff00+y
+//0639: d5 01 02  mov   $0201+x,a
+//063c: 5f 43 07  jmp   $0743
+//; 40-7f - set per-note vol from least 6 bits
+//063f: 28 3f     and   a,#$3f
+//0641: fd        mov   y,a
+//0642: f6 00 ff  mov   a,$ff00+y
+//0645: d5 10 02  mov   $0210+x,a
+//0648: 5f 22 07  jmp   $0722
+BytePattern NinSnesScanner::ptnDispatchNoteFE3(
+	"\x68\x40\xb0\x0c\x28\x3f\xfd\xf6"
+	"\x00\xff\xd5\x01\x02\x5f\x43\x07"
+	"\x28\x3f\xfd\xf6\x00\xff\xd5\x10"
+	"\x02\x5f\x22\x07"
+	,
+	"xxxxxxxx"
+	"??x??x??"
+	"xxxx??x?"
+	"?x??"
+	,
+	28);
+
+//; Fire Emblem 4 SPC
+//0932: 68 40     cmp   a,#$40
+//0934: 28 3f     and   a,#$3f
+//0936: fd        mov   y,a
+//0937: f6 38 10  mov   a,$1038+y
+//093a: b0 05     bcs   $0941
+//093c: d5 11 02  mov   $0211+x,a         ;   00-3f - set dur%
+//093f: 2f ee     bra   $092f             ;   check more bytes
+//0941: d5 20 02  mov   $0220+x,a         ;   40-7f - set vel
+BytePattern NinSnesScanner::ptnDispatchNoteFE4(
+	"\x68\x40\x28\x3f\xfd\xf6\x38\x10"
+	"\xb0\x05\xd5\x11\x02\x2f\xee\xd5"
+	"\x20\x02"
+	,
+	"xxxxxx??"
+	"xxx??x?x"
+	"??"
+	,
+	18);
 
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
@@ -438,7 +487,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			return;
 		}
 	}
-	// DERIVED VERSIONS
 	else {
 		return;
 	}
@@ -446,7 +494,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// CLASSIFY DERIVED VERSIONS
 	if (version == NINSNES_STANDARD)
 	{
-		UINT ofsDispatchNote;
 		const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
 		if (firstVoiceCmd == 0xe0 && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
 			if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
@@ -457,11 +504,23 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 				version = NINSNES_STANDARD;
 			}
 		}
-		else if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
-			version = NINSNES_UNKNOWN; // TODO: set different version code (Lemmings)
-		}
 		else {
 			version = NINSNES_UNKNOWN;
+
+			UINT ofsDispatchNote;
+			if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
+				version = NINSNES_UNKNOWN; // TODO: set different version code (Lemmings)
+			}
+			else if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
+				if (firstVoiceCmd == 0xd6) {
+					version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 3)
+				}
+			}
+			else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
+				if (firstVoiceCmd == 0xda) {
+					version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 4)
+				}
+			}
 		}
 	}
 

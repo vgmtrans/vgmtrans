@@ -34,4 +34,6 @@ private:
 	static BytePattern ptnIncSectionPtrGD3;
 	static BytePattern ptnJumpToVcmdCTOW;
 	static BytePattern ptnDispatchNoteLEM;
+	static BytePattern ptnDispatchNoteFE3;
+	static BytePattern ptnDispatchNoteFE4;
 };
