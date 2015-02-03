@@ -183,7 +183,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
 	// get section pointer address
-	uint32_t ofsIncSectionPtr = 0;
+	uint32_t ofsIncSectionPtr;
 	uint8_t addrSectionPtr;
 	if (file->SearchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr))
 	{
@@ -263,8 +263,8 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// ACQUIRE SEQUENCE LIST ADDRESS:
 	// find the initialization code of the section pointer,
 	// and acquire the sequence list address
-	uint32_t ofsInitSectionPtr = 0;
-	uint32_t addrSongList = 0;
+	uint32_t ofsInitSectionPtr;
+	uint32_t addrSongList;
 	if (file->SearchBytePattern(ptnInitSectionPtr, ofsInitSectionPtr))
 	{
 		addrSongList = file->GetShort(ofsInitSectionPtr + 5);
@@ -292,14 +292,13 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// - Voice command address table
 	// - Voice command length table
 
-	uint32_t ofsBranchForVcmd = 0;
+	uint32_t ofsBranchForVcmd;
+	uint8_t firstVoiceCmd;
+	uint16_t addrVoiceCmdAddressTable;
+	uint16_t addrVoiceCmdLengthTable;
 	if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
 	{
-		uint8_t firstVoiceCmd = 0;
-		uint32_t ofsJumpToVcmd = 0;
-		uint32_t ofsReadVcmdLength = 0;
-		uint16_t addrVoiceCmdAddressTable = 0;
-		uint16_t addrVoiceCmdLengthTable = 0;
+		uint32_t ofsJumpToVcmd;
 
 		firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 1);
 
@@ -309,21 +308,36 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
 			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
 
-			const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
-			if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
-				version = NINSNES_STANDARD;
-			}
-			else {
-				version = NINSNES_UNKNOWN;
-			}
+			// false-positive needs to be fixed in later classification
+			version = NINSNES_STANDARD;
 		}
 		else if (file->SearchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
 			// search vcmd length table as well
+			uint32_t ofsReadVcmdLength;
 			if (file->SearchBytePattern(ptnReadVcmdLengthSMW, ofsReadVcmdLength)) {
 				addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 5) + ((firstVoiceCmd * 2) & 0xff);
 				addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 9) + firstVoiceCmd;
 				version = NINSNES_EARLIER;
 			}
+			else {
+				return;
+			}
+		}
+		else {
+			return;
+		}
+	}
+
+	// CLASSIFY DERIVED VERSIONS
+	if (version == NINSNES_STANDARD)
+	{
+		const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
+		if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable &&
+			file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
+			version = NINSNES_STANDARD;
+		}
+		else {
+			version = NINSNES_UNKNOWN;
 		}
 	}
 
