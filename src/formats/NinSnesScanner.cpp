@@ -161,6 +161,27 @@ BytePattern NinSnesScanner::ptnSetDIRSMW(
 	,
 	24);
 
+// PATTERNS FOR DERIVED VERSIONS
+
+//; Gradius 3 SPC
+//0724: 8d 00     mov   y,#$00
+//0726: f7 40     mov   a,($40)+y
+//0728: 3a 40     incw  $40
+//072a: 2d        push  a
+//072b: f7 40     mov   a,($40)+y
+//072d: f0 08     beq   $0737
+//072f: 3a 40     incw  $40
+//0731: fd        mov   y,a
+//0732: ae        pop   a
+BytePattern NinSnesScanner::ptnIncSectionPtrGD3(
+	"\x8d\x00\xf7\x40\x3a\x40\x2d\xf7"
+	"\x40\xf0\x08\x3a\x40\xfd\xae"
+	,
+	"xxx?x?xx"
+	"?x?x?xx"
+	,
+	15);
+
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -186,6 +207,11 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	uint32_t ofsIncSectionPtr;
 	uint8_t addrSectionPtr;
 	if (file->SearchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr))
+	{
+		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
+	}
+	// DERIVED VERSIONS
+	else if (file->SearchBytePattern(ptnIncSectionPtrGD3, ofsIncSectionPtr))
 	{
 		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
 	}
@@ -258,6 +284,27 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		,
 		12);
 
+	// DERIVED VERSIONS
+
+	//; Gradius 3 SPC
+	//08b7: 5d        mov   x,a
+	//08b8: f5 fc 11  mov   a,$11fc+x
+	//08bb: f0 ee     beq   $08ab
+	//08bd: fd        mov   y,a
+	//08be: f5 fb 11  mov   a,$11fb+x
+	//08c1: da 40     movw  $40,ya            ; song metaindex ptr
+	char ptnInitSectionPtrBytesGD3[] =
+		"\x5d\xf5\xfc\x11\xf0\xee\xfd\xf5"
+		"\xfb\x11\xda\x40";
+	ptnInitSectionPtrBytesGD3[11] = addrSectionPtr;
+	BytePattern ptnInitSectionPtrGD3(
+		ptnInitSectionPtrBytesGD3
+		,
+		"xx??x?xx"
+		"??xx"
+		,
+		12);
+
 	// END DYNAMIC PATTERN DEFINITIONS
 
 	// ACQUIRE SEQUENCE LIST ADDRESS:
@@ -276,6 +323,11 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	else if (file->SearchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr))
 	{
 		addrSongList = file->GetShort(ofsInitSectionPtr + 3);
+	}
+	// DERIVED VERSIONS
+	else if (file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr))
+	{
+		addrSongList = file->GetShort(ofsInitSectionPtr + 8);
 	}
 	else
 	{
@@ -354,7 +406,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 		for (int songIndex = 0; songIndex <= 0x7f; songIndex++) {
 			UINT addrSectionListPtr = addrSongList + songIndex * 2;
-			if (addrSectionListPtr >= 0x10000) {
+			if (addrSectionListPtr + 2 > 0x10000) {
 				break;
 			}
 

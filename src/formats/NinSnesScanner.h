@@ -29,4 +29,7 @@ private:
 	static BytePattern ptnSetDIR;
 	static BytePattern ptnSetDIRYI;
 	static BytePattern ptnSetDIRSMW;
+
+	// PATTERNS FOR DERIVED VERSIONS
+	static BytePattern ptnIncSectionPtrGD3;
 };
