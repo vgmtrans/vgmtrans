@@ -33,4 +33,5 @@ private:
 	// PATTERNS FOR DERIVED VERSIONS
 	static BytePattern ptnIncSectionPtrGD3;
 	static BytePattern ptnJumpToVcmdCTOW;
+	static BytePattern ptnDispatchNoteLEM;
 };

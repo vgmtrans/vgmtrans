@@ -208,6 +208,33 @@ BytePattern NinSnesScanner::ptnJumpToVcmdCTOW(
 	,
 	22);
 
+//; Lemmings SPC
+// 0ad0: 30 1e     bmi   $0af0             ; vcmds 01-7f - note info:
+// 0ad2: d5 00 02  mov   $0200+x,a         ; set duration by opcode
+// 0ad5: 3f 85 0b  call  $0b85             ; read next byte
+// 0ad8: 30 16     bmi   $0af0             ; process it, if < $80
+// 0ada: c4 11     mov   $11,a
+// 0adc: 4b 11     lsr   $11
+// 0ade: 1c        asl   a                 ; a  = (a << 1) | (a & 1)
+// 0adf: 84 11     adc   a,$11             ; a += (a >> 1)
+// 0ae1: d5 01 02  mov   $0201+x,a         ; set duration rate
+// 0ae4: 3f 85 0b  call  $0b85             ; read next byte
+// 0ae7: 30 07     bmi   $0af0             ; process it, if < $80
+// 0ae9: 1c        asl   a                 ; a *= 2
+// 0aea: d5 10 02  mov   $0210+x,a         ; set per-note volume (velocity)
+BytePattern NinSnesScanner::ptnDispatchNoteLEM(
+	"\x30\x1e\xd5\x00\x02\x3f\x85\x0b"
+	"\x30\x16\xc4\x11\x4b\x11\x1c\x84"
+	"\x11\xd5\x01\x02\x3f\x85\x0b\x30"
+	"\x07\x1c\xd5\x10\x02"
+	,
+	"xxx??x??"
+	"x?x?x?xx"
+	"?x??x??x"
+	"xxx??"
+	,
+	29);
+
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -415,10 +442,14 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// CLASSIFY DERIVED VERSIONS
 	if (version == NINSNES_STANDARD)
 	{
+		UINT ofsDispatchNote;
 		const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
 		if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable &&
 			file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
 			version = NINSNES_STANDARD;
+		}
+		else if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
+			version = NINSNES_UNKNOWN; // TODO: set different version code (Lemmings)
 		}
 		else {
 			version = NINSNES_UNKNOWN;
