@@ -182,6 +182,27 @@ BytePattern NinSnesScanner::ptnIncSectionPtrGD3(
 	,
 	15);
 
+//; Yoshi's Safari SPC
+//14ae: 8d 00     mov   y,#$00
+//14b0: f7 4c     mov   a,($4c)+y
+//14b2: c4 00     mov   $00,a
+//14b4: c4 4e     mov   $4e,a
+//14b6: 3a 4c     incw  $4c
+//14b8: f7 4c     mov   a,($4c)+y
+//14ba: c4 01     mov   $01,a
+//14bc: c4 4f     mov   $4f,a
+//14be: 3a 4c     incw  $4c               ; read a word from section list ptr
+BytePattern NinSnesScanner::ptnIncSectionPtrYSFR(
+	"\x8d\x00\xf7\x4c\xc4\x00\xc4\x4e"
+	"\x3a\x4c\xf7\x4c\xc4\x01\xc4\x4f"
+	"\x3a\x4c"
+	,
+	"xxx?x?x?"
+	"x?x?x?x?"
+	"x?"
+	,
+	18);
+
 //; Clock Tower SPC
 // 07cc: 80        setc
 // 07cd: a8 e0     sbc   a,#$e0
@@ -207,6 +228,39 @@ BytePattern NinSnesScanner::ptnJumpToVcmdCTOW(
 	"x??xx?"
 	,
 	22);
+
+//; Yoshi's Safari SPC
+//10ce: 28 1f     and   a,#$1f
+//10d0: 1c        asl   a
+//10d1: fd        mov   y,a
+//10d2: f6 dc 10  mov   a,$10dc+y
+//10d5: 2d        push  a
+//10d6: f6 db 10  mov   a,$10db+y
+//10d9: 2d        push  a
+//10da: 6f        ret
+BytePattern NinSnesScanner::ptnJumpToVcmdYSFR(
+	"\x28\x1f\x1c\xfd\xf6\xdc\x10\x2d"
+	"\xf6\xdb\x10\x2d\x6f"
+	,
+	"xxxxx??x"
+	"x??xx"
+	,
+	13);
+
+//; Yoshi's Safari SPC
+//0b2a: 80        setc
+//0b2b: a8 e0     sbc   a,#$e0
+//0b2d: cb 00     mov   $00,y
+//0b2f: fd        mov   y,a
+//0b30: f6 eb 0b  mov   a,$0beb+y ; read vcmd length
+BytePattern NinSnesScanner::ptnReadVcmdLengthYSFR(
+	"\x80\xa8\xe0\xcb\x00\xfd\xf6\xeb"
+	"\x0b"
+	,
+	"xx?x?xx?"
+	"?"
+	,
+	9);
 
 //; Lemmings SPC
 //0ad0: 30 1e     bmi   $0af0             ; vcmds 01-7f - note info:
@@ -317,6 +371,10 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	{
 		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
 	}
+	else if (file->SearchBytePattern(ptnIncSectionPtrYSFR, ofsIncSectionPtr))
+	{
+		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
+	}
 	else
 	{
 		return;
@@ -407,6 +465,26 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		,
 		12);
 
+	//; Yoshi's Safari SPC
+	//1488: fd        mov   y,a
+	//1489: f7 48     mov   a,($48)+y
+	//148b: c4 4c     mov   $4c,a
+	//148d: fc        inc   y
+	//148e: f7 48     mov   a,($48)+y
+	//1490: c4 4d     mov   $4d,a
+	char ptnInitSectionPtrBytesYSFR[] =
+		"\xfd\xf7\x48\xc4\x4c\xfc\xf7\x48"
+		"\xc4\x4d";
+	ptnInitSectionPtrBytesYSFR[4] = addrSectionPtr;
+	ptnInitSectionPtrBytesYSFR[9] = addrSectionPtr + 1;
+	BytePattern ptnInitSectionPtrYSFR(
+		ptnInitSectionPtrBytesYSFR
+		,
+		"xx?xxxx?"
+		"xx"
+		,
+		10);
+
 	// END DYNAMIC PATTERN DEFINITIONS
 
 	// ACQUIRE SEQUENCE LIST ADDRESS:
@@ -430,6 +508,29 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	else if (file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr))
 	{
 		addrSongList = file->GetShort(ofsInitSectionPtr + 8);
+	}
+	else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr))
+	{
+		byte addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
+
+		//; Yoshi's Safari SPC
+		//0886: 8f 00 48  mov   $48,#$00
+		//0889: 8f 1e 49  mov   $49,#$1e
+		char ptnInitSongListPtrBytesYSFR[] =
+			"\x8f\x00\x48\x8f\x1e\x49";
+		ptnInitSectionPtrBytesYSFR[2] = addrSongListPtr;
+		ptnInitSectionPtrBytesYSFR[5] = addrSongListPtr + 1;
+		BytePattern ptnInitSongListPtrYSFR(
+			ptnInitSongListPtrBytesYSFR
+			,
+			"x?xx?x"
+			,
+			6);
+
+		UINT ofsInitSongListPtr;
+		if (file->SearchBytePattern(ptnInitSongListPtrYSFR, ofsInitSongListPtr)) {
+			addrSongList = file->GetByte(ofsInitSongListPtr + 1) | (file->GetByte(ofsInitSongListPtr + 4) << 8);
+		}
 	}
 	else
 	{
@@ -487,11 +588,28 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			return;
 		}
 	}
+	// DERIVED VERSIONS
+	else if (file->SearchBytePattern(ptnJumpToVcmdYSFR, ofsBranchForVcmd)) {
+		addrVoiceCmdAddressTable = file->GetShort(ofsBranchForVcmd + 9);
+
+		uint32_t ofsReadVcmdLength;
+		if (file->SearchBytePattern(ptnReadVcmdLengthYSFR, ofsReadVcmdLength)) {
+			firstVoiceCmd = file->GetByte(ofsReadVcmdLength + 2);
+			addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 7);
+
+			if (firstVoiceCmd == 0xe0) {
+				version = NINSNES_UNKNOWN; // TODO: set different version code (Yoshi's Safari)
+			}
+		}
+		else {
+			return;
+		}
+	}
 	else {
 		return;
 	}
 
-	// CLASSIFY DERIVED VERSIONS
+	// CLASSIFY DERIVED VERSIONS (fix false-positive)
 	if (version == NINSNES_STANDARD)
 	{
 		const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };

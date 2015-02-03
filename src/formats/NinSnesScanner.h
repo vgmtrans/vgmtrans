@@ -32,7 +32,10 @@ private:
 
 	// PATTERNS FOR DERIVED VERSIONS
 	static BytePattern ptnIncSectionPtrGD3;
+	static BytePattern ptnIncSectionPtrYSFR;
 	static BytePattern ptnJumpToVcmdCTOW;
+	static BytePattern ptnJumpToVcmdYSFR;
+	static BytePattern ptnReadVcmdLengthYSFR;
 	static BytePattern ptnDispatchNoteLEM;
 	static BytePattern ptnDispatchNoteFE3;
 	static BytePattern ptnDispatchNoteFE4;
