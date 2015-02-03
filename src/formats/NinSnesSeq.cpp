@@ -568,6 +568,7 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
 		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
+		duration = (duration > 2) ? duration - 2 : 1;
 
 		AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Note");
 		AddTime(shared->spcNoteDuration);
@@ -577,6 +578,7 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_TIE:
 	{
 		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
+		duration = (duration > 2) ? duration - 2 : 1;
 		desc << L"Duration: " << (int)duration;
 		MakePrevDurNoteEnd(GetTime() + duration);
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE);
@@ -592,6 +594,7 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
 		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
+		duration = (duration > 2) ? duration - 2 : 1;
 		AddPercNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Percussion Note");
 		AddTime(shared->spcNoteDuration);
 		break;
