@@ -438,15 +438,24 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			return;
 		}
 	}
+	// DERIVED VERSIONS
+	else {
+		return;
+	}
 
 	// CLASSIFY DERIVED VERSIONS
 	if (version == NINSNES_STANDARD)
 	{
 		UINT ofsDispatchNote;
 		const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
-		if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable &&
-			file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
-			version = NINSNES_STANDARD;
+		if (firstVoiceCmd == 0xe0 && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
+			if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
+				version = NINSNES_STANDARD;
+			}
+			else {
+				// compatible version?
+				version = NINSNES_STANDARD;
+			}
 		}
 		else if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
 			version = NINSNES_UNKNOWN; // TODO: set different version code (Lemmings)
