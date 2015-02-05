@@ -196,6 +196,12 @@
     <Filter Include="Source Files\formats\mintsnes">
       <UniqueIdentifier>{fcb61a35-8942-4644-8123-2bbbb267fc04}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\chunsnes">
+      <UniqueIdentifier>{bfc3e9ee-51d8-4b4f-9e63-40a2576fcd56}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\chunsnes">
+      <UniqueIdentifier>{e147eed3-4cce-4b72-af5b-3a697dd34dd7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\aboutdlg.cpp">
@@ -656,6 +662,12 @@
     </ClCompile>
     <ClCompile Include="formats\MintSnesSeq.cpp">
       <Filter>Source Files\formats\mintsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\ChunSnesScanner.cpp">
+      <Filter>Source Files\formats\chunsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\ChunSnesSeq.cpp">
+      <Filter>Source Files\formats\chunsnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1192,6 +1204,15 @@
     </ClInclude>
     <ClInclude Include="formats\MintSnesSeq.h">
       <Filter>Header Files\formats\mintsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\ChunSnesFormat.h">
+      <Filter>Header Files\formats\chunsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\ChunSnesScanner.h">
+      <Filter>Header Files\formats\chunsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\ChunSnesSeq.h">
+      <Filter>Header Files\formats\chunsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
