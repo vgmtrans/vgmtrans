@@ -31,6 +31,9 @@ MintSnesSeq::~MintSnesSeq(void)
 void MintSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
+
+	spcTempo = 0x20;
+	fastTempo = false;
 }
 
 bool MintSnesSeq::GetHeaderInfo(void)
@@ -99,7 +102,70 @@ bool MintSnesSeq::GetTrackPointers(void)
 
 void MintSnesSeq::LoadEventMap(MintSnesSeq *pSeqFile)
 {
-	// TODO: MintSnesSeq::LoadEventMap
+	int statusByte;
+
+	for (statusByte = 0x00; statusByte <= 0x7f; statusByte++) {
+		pSeqFile->EventMap[statusByte] = EVENT_NOTE_PARAM;
+	}
+
+	for (statusByte = 0x80; statusByte <= 0x9f; statusByte++) {
+		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
+	}
+
+	for (statusByte = 0xa0; statusByte <= 0xbf; statusByte++) {
+		pSeqFile->EventMap[statusByte] = EVENT_NOTE_WITH_PARAM;
+	}
+
+	pSeqFile->EventMap[0xc0] = EVENT_PROGCHANGE;
+	pSeqFile->EventMap[0xc1] = EVENT_PAN;
+	pSeqFile->EventMap[0xc2] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xc3] = EVENT_TEMPO;
+	pSeqFile->EventMap[0xc4] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xc5] = EVENT_VOLUME;
+	pSeqFile->EventMap[0xc6] = EVENT_PRIORITY;
+	pSeqFile->EventMap[0xc7] = EVENT_TUNING;
+	pSeqFile->EventMap[0xc8] = EVENT_ECHO_ON;
+	pSeqFile->EventMap[0xc9] = EVENT_ECHO_OFF;
+	pSeqFile->EventMap[0xca] = EVENT_ECHO_PARAM;
+	pSeqFile->EventMap[0xcb] = EVENT_GOTO;
+	pSeqFile->EventMap[0xcc] = EVENT_CALL;
+	pSeqFile->EventMap[0xcd] = EVENT_RET;
+	pSeqFile->EventMap[0xce] = EVENT_LOOP_START;
+	pSeqFile->EventMap[0xcf] = EVENT_LOOP_END;
+	pSeqFile->EventMap[0xd0] = EVENT_END;
+	pSeqFile->EventMap[0xd1] = EVENT_NOTE_NUMBER;
+	pSeqFile->EventMap[0xd2] = EVENT_OCTAVE_UP;
+	pSeqFile->EventMap[0xd3] = EVENT_OCTAVE_DOWN;
+	pSeqFile->EventMap[0xd4] = EVENT_REST;
+	pSeqFile->EventMap[0xd5] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xd6] = EVENT_PITCHBENDRANGE;
+	pSeqFile->EventMap[0xd7] = EVENT_TRANSPOSE;
+	pSeqFile->EventMap[0xd8] = EVENT_TRANSPOSE_REL;
+	pSeqFile->EventMap[0xd9] = EVENT_TUNING_REL;
+	pSeqFile->EventMap[0xda] = EVENT_KEY_ON;
+	pSeqFile->EventMap[0xdb] = EVENT_KEY_OFF;
+	pSeqFile->EventMap[0xdc] = EVENT_VOLUME_REL;
+	pSeqFile->EventMap[0xdd] = EVENT_PITCHBEND;
+	pSeqFile->EventMap[0xdf] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xe0] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xe1] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xe2] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xe3] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xe4] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xe5] = EVENT_UNKNOWN1;
+	pSeqFile->EventMap[0xe6] = EVENT_TIMEBASE;
+}
+
+double MintSnesSeq::GetTempoInBPM(uint8_t tempo, bool fastTempo)
+{
+	if (tempo != 0)
+	{
+		return 60000000.0 / ((SEQ_PPQN / (fastTempo ? 1 : 2)) * (125 * 0x4f)) * (tempo / 256.0);
+	}
+	else
+	{
+		return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
+	}
 }
 
 //  ***************
@@ -117,6 +183,15 @@ MintSnesTrack::MintSnesTrack(MintSnesSeq* parentFile, long offset, long length)
 void MintSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
+
+	spcDeltaTime = 0;
+	spcNoteNumberBase = 0;
+	spcNoteDuration = 1;
+	spcNoteVelocity = 1;
+	spcVolume = 200;
+	spcTranspose = 0;
+	spcTuning = 0;
+	spcCallStackPtr = 0;
 }
 
 
@@ -133,6 +208,42 @@ bool MintSnesTrack::ReadEvent(void)
 	bool bContinue = true;
 
 	std::wstringstream desc;
+
+	// note param
+	if (statusByte < 0x80) {
+		uint8_t newDelta = statusByte;
+		if (newDelta != 0) {
+			desc << L"Delta Time: " << (int)newDelta;
+			spcDeltaTime = newDelta;
+		}
+		else {
+			desc << L"Delta Time: (Keep)";
+		}
+
+		statusByte = GetByte(curOffset);
+		if (statusByte < 0x80) {
+			spcNoteDuration = statusByte;
+			desc << L"  Dulation: " << (int)spcNoteDuration;
+			curOffset++;
+
+			statusByte = GetByte(curOffset);
+			if (statusByte < 0x80) {
+				spcNoteVelocity = statusByte;
+				desc << L"  Velocity: " << (int)spcNoteVelocity;
+				curOffset++;
+			}
+		}
+
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Param", desc.str().c_str(), CLR_DURNOTE);
+		beginOffset = curOffset;
+		desc.str(L"");
+
+		if (curOffset >= 0x10000) {
+			return false;
+		}
+
+		statusByte = GetByte(curOffset++);
+	}
 
 	MintSnesSeqEventType eventType = (MintSnesSeqEventType)0;
 	std::map<uint8_t, MintSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
@@ -199,6 +310,322 @@ bool MintSnesTrack::ReadEvent(void)
 		break;
 	}
 
+	case EVENT_NOTE:
+	case EVENT_NOTE_WITH_PARAM:
+	{
+		uint8_t keyOffset = statusByte & 0x1f;
+
+		wchar_t* eventName;
+		if (eventType == EVENT_NOTE_WITH_PARAM) {
+			uint8_t noteParam = GetByte(curOffset++);
+			if (noteParam <= 0x7f) {
+				spcNoteDuration = noteParam;
+				eventName = L"Note with Duration";
+			}
+			else {
+				spcNoteVelocity = (noteParam & 0x7f);
+				eventName = L"Note with Velocity";
+			}
+		}
+		else {
+			eventName = L"Note";
+		}
+
+		AddNoteByDur(beginOffset, curOffset - beginOffset, spcNoteNumberBase + keyOffset, spcNoteVelocity, spcNoteDuration, eventName);
+		break;
+	}
+
+	case EVENT_PROGCHANGE:
+	{
+		uint16_t seqAddress = GetShort(curOffset); curOffset += 2;
+		desc << L"Envelope: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)seqAddress;
+
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Program Change", desc.str().c_str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+		AddProgramChangeNoItem(0, false);
+		break;
+	}
+
+	case EVENT_PAN:
+	{
+		int8_t newPan = GetByte(curOffset++);
+		if (newPan >= 0) {
+			if (newPan > 32) {
+				// out of range (unexpected behavior)
+				newPan = 32;
+			}
+
+			uint8_t midiPan = min(newPan * 4, 127);
+			AddPan(beginOffset, curOffset - beginOffset, midiPan);
+		}
+		else {
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Random Pan", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
+		}
+		break;
+	}
+
+	case EVENT_TEMPO:
+	{
+		uint8_t newTempo = GetByte(curOffset++);
+		parentSeq->spcTempo = newTempo;
+		AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo, parentSeq->fastTempo));
+		break;
+	}
+
+	case EVENT_VOLUME:
+	{
+		uint8_t newVolume = GetByte(curOffset++);
+		spcVolume = newVolume;
+		AddVol(beginOffset, curOffset - beginOffset, spcVolume / 2);
+		break;
+	}
+
+	case EVENT_PRIORITY:
+	{
+		uint8_t newPriority = GetByte(curOffset++);
+		desc << L"Priority: " << (int)newPriority;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Priority", desc.str().c_str(), CLR_PRIORITY);
+		break;
+	}
+
+	case EVENT_TUNING:
+	{
+		uint8_t newTuning = GetByte(curOffset++);
+		spcTuning = newTuning;
+
+		double semitones = spcTuning / 256.0;
+		AddFineTuning(beginOffset, curOffset - beginOffset, semitones * 100.0);
+		break;
+	}
+
+	case EVENT_ECHO_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo On", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_ECHO_PARAM:
+	{
+		uint8_t delay = GetByte(curOffset++);
+		int8_t volume = GetByte(curOffset++);
+		int8_t feedback = GetByte(curOffset++);
+		uint8_t filterIndex = GetByte(curOffset++);
+		desc << L"Delay: " << (int)delay << L"  FIR: " << (int)volume << L"  volume: " << (int)feedback << L"  FIR: " << (int)filterIndex;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Param", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_GOTO:
+	{
+		uint16_t dest = GetShort(curOffset); curOffset += 2;
+		dest += curOffset; // relative offset to address
+		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+		uint32_t length = curOffset - beginOffset;
+
+		curOffset = dest;
+		if (!IsOffsetUsed(dest)) {
+			AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
+		}
+		else {
+			bContinue = AddLoopForever(beginOffset, length, L"Jump");
+		}
+		break;
+	}
+
+	case EVENT_CALL:
+	{
+		uint16_t dest = GetShort(curOffset); curOffset += 2;
+		dest += curOffset; // relative offset to address
+		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+
+		if (spcCallStackPtr + 2 > MINTSNES_CALLSTACK_SIZE) {
+			// stack overflow
+			bContinue = false;
+			break;
+		}
+
+		// save return address
+		spcCallStack[spcCallStackPtr++] = curOffset & 0xff;
+		spcCallStack[spcCallStackPtr++] = (curOffset >> 8) & 0xff;
+
+		curOffset = dest;
+		break;
+	}
+
+	case EVENT_RET:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"End Pattern", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+
+		if (spcCallStackPtr < 2) {
+			// access violation
+			bContinue = false;
+			break;
+		}
+
+		curOffset = spcCallStack[spcCallStackPtr - 2] | (spcCallStack[spcCallStackPtr - 1] << 8);
+		spcCallStackPtr -= 2;
+		break;
+	}
+
+	case EVENT_LOOP_START:
+	{
+		uint8_t count = GetByte(curOffset++);
+		desc << L"Loop Count: " << (int)count;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+
+		if (spcCallStackPtr + 3 > MINTSNES_CALLSTACK_SIZE) {
+			// stack overflow
+			bContinue = false;
+			break;
+		}
+
+		// save loop start address and repeat count
+		spcCallStack[spcCallStackPtr++] = curOffset & 0xff;
+		spcCallStack[spcCallStackPtr++] = (curOffset >> 8) & 0xff;
+		spcCallStack[spcCallStackPtr++] = count;
+
+		break;
+	}
+
+	case EVENT_LOOP_END:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+
+		if (spcCallStackPtr < 3) {
+			// access violation
+			bContinue = false;
+			break;
+		}
+
+		uint8_t count = spcCallStack[spcCallStackPtr - 1];
+		if (--count == 0) {
+			// repeat end, fall through
+			spcCallStackPtr -= 3;
+		}
+		else {
+			// repeat again
+			spcCallStack[spcCallStackPtr - 1] = count;
+			curOffset = spcCallStack[spcCallStackPtr - 3] | (spcCallStack[spcCallStackPtr - 2] << 8);
+		}
+
+		break;
+	}
+
+	case EVENT_END:
+	{
+		AddEndOfTrack(beginOffset, curOffset - beginOffset);
+		bContinue = false;
+		break;
+	}
+
+	case EVENT_NOTE_NUMBER:
+	{
+		int8_t newNoteNumber = GetByte(curOffset++);
+		spcNoteNumberBase = newNoteNumber;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Number Base", desc.str().c_str(), CLR_NOTEON);
+		break;
+	}
+
+	case EVENT_OCTAVE_UP:
+	{
+		AddIncrementOctave(beginOffset, curOffset - beginOffset);
+		spcNoteNumberBase += 12;
+		break;
+	}
+
+	case EVENT_OCTAVE_DOWN:
+	{
+		AddDecrementOctave(beginOffset, curOffset - beginOffset);
+		spcNoteNumberBase -= 12;
+		break;
+	}
+
+	case EVENT_REST:
+	{
+		AddRest(beginOffset, curOffset - beginOffset, spcDeltaTime); // this does AddTime(spcDeltaTime);
+		break;
+	}
+
+	case EVENT_PITCHBENDRANGE:
+	{
+		uint8_t newRange = GetByte(curOffset++);
+		AddPitchBendRange(beginOffset, curOffset - beginOffset, newRange);
+		break;
+	}
+
+	case EVENT_TRANSPOSE:
+	{
+		int8_t newTranspose = GetByte(curOffset++);
+		spcTranspose = newTranspose;
+		AddTranspose(beginOffset, curOffset - beginOffset, spcTranspose);
+	}
+
+	case EVENT_TRANSPOSE_REL:
+	{
+		int8_t delta = GetByte(curOffset++);
+		spcTranspose += delta;
+		AddTranspose(beginOffset, curOffset - beginOffset, spcTranspose, L"Transpose (Relative)");
+	}
+
+	case EVENT_TUNING_REL:
+	{
+		int8_t delta = GetByte(curOffset++);
+		spcTuning += delta;
+
+		double semitones = spcTuning / 256.0;
+		AddFineTuning(beginOffset, curOffset - beginOffset, semitones * 100.0);
+		break;
+	}
+
+	case EVENT_KEY_ON:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Key On", desc.str().c_str(), CLR_NOTEON, ICON_NOTE);
+		break;
+	}
+
+	case EVENT_KEY_OFF:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Key Off", desc.str().c_str(), CLR_NOTEOFF, ICON_NOTE);
+		break;
+	}
+
+	case EVENT_VOLUME_REL:
+	{
+		int8_t delta = GetByte(curOffset++);
+
+		int newVolume = min(max(spcVolume + delta, 0), 0xff);
+		spcVolume += newVolume;
+
+		AddVol(beginOffset, curOffset - beginOffset, spcVolume / 2, L"Volume (Relative)");
+		break;
+	}
+
+	case EVENT_PITCHBEND:
+	{
+		int8_t pitch = GetByte(curOffset++);
+		AddPitchBend(beginOffset, curOffset - beginOffset, pitch * 64);
+		break;
+	}
+
+	case EVENT_TIMEBASE:
+	{
+		bool fast = ((GetByte(curOffset++) & 1) != 0);
+		desc << L"Timebase: " << (fast ? SEQ_PPQN : SEQ_PPQN / 2);
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Timebase", desc.str().c_str(), CLR_TEMPO, ICON_TEMPO);
+
+		if (parentSeq->fastTempo != fast) {
+			AddTempoBPMNoItem(parentSeq->GetTempoInBPM(parentSeq->spcTempo, fast));
+			parentSeq->fastTempo = fast;
+		}
+		break;
+	}
+
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
 		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
@@ -210,6 +637,11 @@ bool MintSnesTrack::ReadEvent(void)
 	//wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
 	//OutputDebugString(ssTrace.str().c_str());
+
+	// increase delta-time
+	if (eventType != EVENT_REST) {
+		AddTime(spcDeltaTime);
+	}
 
 	return bContinue;
 }
