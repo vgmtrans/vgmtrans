@@ -193,6 +193,7 @@ void ChunSnesScanner::Scan(RawFile* file, void* info)
 void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 {
 	ChunSnesVersion version = CHUNSNES_NONE;
+	ChunSnesMinorVersion minorVersion = CHUNSNES_NOMINORVERSION;
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search song list and detect engine version
@@ -200,11 +201,13 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 	uint16_t addrSongList;
 	if (file->SearchBytePattern(ptnLoadSeqWinterV3, ofsLoadSeq)) {
 		addrSongList = file->GetByte(ofsLoadSeq + 8) | (file->GetByte(ofsLoadSeq + 11) << 8);
-		version = CHUNSNES_WINTER_V3;
+		version = CHUNSNES_WINTER;
+		minorVersion = CHUNSNES_WINTER_V3;
 	}
 	else if (file->SearchBytePattern(ptnLoadSeqWinterV1V2, ofsLoadSeq)) {
 		addrSongList = file->GetByte(ofsLoadSeq + 8) | (file->GetByte(ofsLoadSeq + 11) << 8);
-		version = CHUNSNES_WINTER_V1; // TODO: classify V1/V2
+		version = CHUNSNES_WINTER;
+		minorVersion = CHUNSNES_WINTER_V1; // TODO: classify V1/V2
 	}
 	else if (file->SearchBytePattern(ptnLoadSeqSummerV2, ofsLoadSeq)) {
 		uint16_t addrSongListPtr = file->GetShort(ofsLoadSeq + 8);
@@ -213,7 +216,8 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 		}
 
 		addrSongList = file->GetShort(addrSongListPtr);
-		version = CHUNSNES_SUMMER_V2;
+		version = CHUNSNES_SUMMER;
+		minorVersion = CHUNSNES_SUMMER_V2;
 	}
 	else {
 		return;
@@ -222,7 +226,7 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 	// summer/winter const definitions
 	uint8_t CHUNSNES_SEQENT_SIZE;
 	uint8_t CHUNSNES_SEQENT_OFFSET_OF_HEADER;
-	if (version == CHUNSNES_SUMMER_V2) {
+	if (version == CHUNSNES_SUMMER) {
 		CHUNSNES_SEQENT_SIZE = 2;
 		CHUNSNES_SEQENT_OFFSET_OF_HEADER = 0;
 	}
@@ -240,7 +244,7 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 	}
 
 	uint16_t addrSeqHeader = file->GetShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
-	ChunSnesSeq* newSeq = new ChunSnesSeq(file, version, addrSeqHeader, name);
+	ChunSnesSeq* newSeq = new ChunSnesSeq(file, version, minorVersion, addrSeqHeader, name);
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
 		return;
