@@ -80,6 +80,8 @@ public:
 	virtual bool ReadEvent(void);
 
 private:
+	std::vector<int8_t> tiedNoteKeys;
+
 	uint8_t spcDeltaTime;
 	int8_t spcNoteNumberBase;
 	uint8_t spcNoteDuration;

@@ -160,7 +160,7 @@ double MintSnesSeq::GetTempoInBPM(uint8_t tempo, bool fastTempo)
 {
 	if (tempo != 0)
 	{
-		return 60000000.0 / ((SEQ_PPQN / (fastTempo ? 1 : 2)) * (125 * 0x4f)) * (tempo / 256.0);
+		return 60000000.0 / ((SEQ_PPQN / (fastTempo ? 2 : 1)) * (125 * 0x4f)) * (tempo / 256.0);
 	}
 	else
 	{
@@ -184,6 +184,7 @@ void MintSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
 
+	tiedNoteKeys.clear();
 	spcDeltaTime = 0;
 	spcNoteNumberBase = 0;
 	spcNoteDuration = 1;
@@ -210,14 +211,12 @@ bool MintSnesTrack::ReadEvent(void)
 	std::wstringstream desc;
 
 	// note param
+	uint8_t newDelta = spcDeltaTime;
 	if (statusByte < 0x80) {
-		uint8_t newDelta = statusByte;
+		newDelta = statusByte;
+		desc << L"Delta Time: " << (int)newDelta;
 		if (newDelta != 0) {
-			desc << L"Delta Time: " << (int)newDelta;
 			spcDeltaTime = newDelta;
-		}
-		else {
-			desc << L"Delta Time: (Keep)";
 		}
 
 		statusByte = GetByte(curOffset);
@@ -331,7 +330,31 @@ bool MintSnesTrack::ReadEvent(void)
 			eventName = L"Note";
 		}
 
-		AddNoteByDur(beginOffset, curOffset - beginOffset, spcNoteNumberBase + keyOffset, spcNoteVelocity, spcNoteDuration, eventName);
+		bool tied = (spcNoteDuration == 0);
+		uint8_t dur = spcNoteDuration;
+		if (tied) {
+			dur = spcDeltaTime;
+		}
+
+		int8_t key = spcNoteNumberBase + keyOffset;
+		auto prevTiedNoteIter = std::find(tiedNoteKeys.begin(), tiedNoteKeys.end(), key);
+		if (prevTiedNoteIter != tiedNoteKeys.end()) {
+			MakePrevDurNoteEnd(GetTime() + dur);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
+
+			if (!tied) {
+				// finish tied note
+				tiedNoteKeys.erase(prevTiedNoteIter);
+			}
+		}
+		else {
+			AddNoteByDur(beginOffset, curOffset - beginOffset, key, spcNoteVelocity, dur, eventName);
+			if (tied) {
+				// register tied note
+				tiedNoteKeys.push_back(key);
+			}
+		}
+		AddTime(newDelta);
 		break;
 	}
 
@@ -548,7 +571,7 @@ bool MintSnesTrack::ReadEvent(void)
 
 	case EVENT_REST:
 	{
-		AddRest(beginOffset, curOffset - beginOffset, spcDeltaTime); // this does AddTime(spcDeltaTime);
+		AddRest(beginOffset, curOffset - beginOffset, newDelta); // this does AddTime(spcDeltaTime);
 		break;
 	}
 
@@ -571,6 +594,7 @@ bool MintSnesTrack::ReadEvent(void)
 		int8_t delta = GetByte(curOffset++);
 		spcTranspose += delta;
 		AddTranspose(beginOffset, curOffset - beginOffset, spcTranspose, L"Transpose (Relative)");
+		break;
 	}
 
 	case EVENT_TUNING_REL:
@@ -609,7 +633,7 @@ bool MintSnesTrack::ReadEvent(void)
 	case EVENT_PITCHBEND:
 	{
 		int8_t pitch = GetByte(curOffset++);
-		AddPitchBend(beginOffset, curOffset - beginOffset, pitch * 64);
+		AddPitchBend(beginOffset, curOffset - beginOffset, pitch * 16);
 		break;
 	}
 
@@ -639,9 +663,9 @@ bool MintSnesTrack::ReadEvent(void)
 	//OutputDebugString(ssTrace.str().c_str());
 
 	// increase delta-time
-	if (eventType != EVENT_REST) {
-		AddTime(spcDeltaTime);
-	}
+	//if (eventType == EVENT_NOTE || eventType == EVENT_NOTE_WITH_PARAM) { // rest is 
+	//	AddTime(spcDeltaTime);
+	//}
 
 	return bContinue;
 }
