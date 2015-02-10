@@ -136,7 +136,7 @@ void MintSnesSeq::LoadEventMap(MintSnesSeq *pSeqFile)
 	pSeqFile->EventMap[0xd1] = EVENT_NOTE_NUMBER;
 	pSeqFile->EventMap[0xd2] = EVENT_OCTAVE_UP;
 	pSeqFile->EventMap[0xd3] = EVENT_OCTAVE_DOWN;
-	pSeqFile->EventMap[0xd4] = EVENT_REST;
+	pSeqFile->EventMap[0xd4] = EVENT_WAIT;
 	pSeqFile->EventMap[0xd5] = EVENT_UNKNOWN1;
 	pSeqFile->EventMap[0xd6] = EVENT_PITCHBENDRANGE;
 	pSeqFile->EventMap[0xd7] = EVENT_TRANSPOSE;
@@ -569,9 +569,13 @@ bool MintSnesTrack::ReadEvent(void)
 		break;
 	}
 
-	case EVENT_REST:
+	case EVENT_WAIT:
 	{
-		AddRest(beginOffset, curOffset - beginOffset, newDelta); // this does AddTime(spcDeltaTime);
+		// do not stop tied note here
+		// example: Gokinjo Bouken Tai - Battle (28:0000, Sax at 3rd channel)
+		desc << L"Duration: " << spcDeltaTime;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Wait", desc.str().c_str(), CLR_REST, ICON_REST);
+		AddTime(spcDeltaTime);
 		break;
 	}
 
