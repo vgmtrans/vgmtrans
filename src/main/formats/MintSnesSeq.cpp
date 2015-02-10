@@ -34,6 +34,8 @@ void MintSnesSeq::ResetVars(void)
 
 	spcTempo = 0x20;
 	fastTempo = false;
+
+	InstrumentAddresses.clear();
 }
 
 bool MintSnesSeq::GetHeaderInfo(void)
@@ -363,8 +365,20 @@ bool MintSnesTrack::ReadEvent(void)
 		uint16_t seqAddress = GetShort(curOffset); curOffset += 2;
 		desc << L"Envelope: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)seqAddress;
 
+		uint8_t instrNum;
+		for (instrNum = 0; instrNum < parentSeq->InstrumentAddresses.size(); instrNum++) {
+			if (parentSeq->InstrumentAddresses[instrNum] == seqAddress) {
+				break;
+			}
+		}
+
+		// new instrument?
+		if (instrNum == parentSeq->InstrumentAddresses.size()) {
+			parentSeq->InstrumentAddresses.push_back(seqAddress);
+		}
+
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Program Change", desc.str().c_str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
-		AddProgramChangeNoItem(0, false);
+		AddProgramChangeNoItem(instrNum, false);
 		break;
 	}
 

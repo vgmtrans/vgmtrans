@@ -62,6 +62,7 @@ public:
 	std::map<uint8_t, MintSnesSeqEventType> EventMap;
 
 	uint16_t TrackStartAddress[10];
+	std::vector<uint16_t> InstrumentAddresses;
 
 	uint8_t spcTempo;
 	bool fastTempo;
@@ -80,7 +81,7 @@ public:
 	virtual bool ReadEvent(void);
 
 private:
-	std::vector<int8_t> tiedNoteKeys;
+	std::list<int8_t> tiedNoteKeys;
 
 	uint8_t spcDeltaTime;
 	int8_t spcNoteNumberBase;
