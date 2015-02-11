@@ -36,6 +36,7 @@ void MintSnesSeq::ResetVars(void)
 	fastTempo = false;
 
 	InstrumentAddresses.clear();
+	InstrumentHints.clear();
 }
 
 bool MintSnesSeq::GetHeaderInfo(void)
@@ -148,6 +149,7 @@ void MintSnesSeq::LoadEventMap(MintSnesSeq *pSeqFile)
 	pSeqFile->EventMap[0xdb] = EVENT_KEY_OFF;
 	pSeqFile->EventMap[0xdc] = EVENT_VOLUME_REL;
 	pSeqFile->EventMap[0xdd] = EVENT_PITCHBEND;
+	pSeqFile->EventMap[0xde] = EVENT_INSTR;
 	pSeqFile->EventMap[0xdf] = EVENT_UNKNOWN1;
 	pSeqFile->EventMap[0xe0] = EVENT_UNKNOWN1;
 	pSeqFile->EventMap[0xe1] = EVENT_UNKNOWN1;
@@ -362,19 +364,21 @@ bool MintSnesTrack::ReadEvent(void)
 
 	case EVENT_PROGCHANGE:
 	{
-		uint16_t seqAddress = GetShort(curOffset); curOffset += 2;
-		desc << L"Envelope: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)seqAddress;
+		int16_t instrOffset = GetShort(curOffset); curOffset += 2;
+		uint16_t instrAddress = curOffset + instrOffset;
+		desc << L"Envelope: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)instrAddress;
 
 		uint8_t instrNum;
 		for (instrNum = 0; instrNum < parentSeq->InstrumentAddresses.size(); instrNum++) {
-			if (parentSeq->InstrumentAddresses[instrNum] == seqAddress) {
+			if (parentSeq->InstrumentAddresses[instrNum] == instrAddress) {
 				break;
 			}
 		}
 
 		// new instrument?
 		if (instrNum == parentSeq->InstrumentAddresses.size()) {
-			parentSeq->InstrumentAddresses.push_back(seqAddress);
+			parentSeq->InstrumentAddresses.push_back(instrAddress);
+			ParseInstrument(instrAddress, instrNum);
 		}
 
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Program Change", desc.str().c_str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
@@ -686,4 +690,249 @@ bool MintSnesTrack::ReadEvent(void)
 	//}
 
 	return bContinue;
+}
+
+void MintSnesTrack::ParseInstrument(uint16_t instrAddress, uint8_t instrNum)
+{
+	MintSnesSeq* parentSeq = (MintSnesSeq*)this->parentSeq;
+
+	uint16_t curOffset = instrAddress;
+
+	bool percussion = ((GetByte(curOffset++) & 1) != 0);
+	parentSeq->InstrumentHints[instrAddress].percussion = percussion;
+
+	if (!percussion) {
+		ParseInstrumentEvents(curOffset, instrNum);
+	}
+	else {
+		int16_t instrOffset;
+		int16_t prevInstrOffset = -1;
+		uint16_t instrPtrAddressMax = 0xffff;
+		uint8_t percNoteKey = 0;
+		while (curOffset < instrPtrAddressMax) {
+			instrOffset = GetShort(curOffset); curOffset += 2;
+			if (instrOffset <= prevInstrOffset) {
+				break;
+			}
+			prevInstrOffset = instrOffset;
+
+			uint16_t percInstrAddress = curOffset + instrOffset;
+			instrPtrAddressMax = percInstrAddress;
+
+			ParseInstrumentEvents(percInstrAddress, instrNum, percussion, percNoteKey);
+			percNoteKey++;
+		}
+	}
+}
+
+void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion, uint8_t percNoteKey)
+{
+	MintSnesSeq* parentSeq = (MintSnesSeq*)this->parentSeq;
+	uint16_t instrAddress = parentSeq->InstrumentAddresses[instrNum];
+
+	MintSnesInstrHint* instrHint;
+	if (!percussion) {
+		instrHint = &parentSeq->InstrumentHints[instrAddress].instrHint;
+	}
+	else {
+		parentSeq->InstrumentHints[instrAddress].percHints.resize(percNoteKey + 1);
+		instrHint = &parentSeq->InstrumentHints[instrAddress].percHints[percNoteKey];
+	}
+	
+	bool bContinue = true;
+	uint16_t curOffset = offset;
+
+	uint8_t instrDeltaTime = 0;
+	uint8_t instrCallStackPtr = 0;
+	uint8_t instrCallStack[MINTSNES_CALLSTACK_SIZE];
+
+	while (bContinue) {
+		uint16_t beginOffset = curOffset;
+		if (curOffset >= 0x10000) {
+			break;
+		}
+
+		uint8_t statusByte = GetByte(curOffset++);
+
+		uint8_t newDelta = instrDeltaTime;
+		if (statusByte < 0x80) {
+			newDelta = statusByte;
+			if (newDelta != 0) {
+				instrDeltaTime = newDelta;
+			}
+
+			statusByte = GetByte(curOffset);
+			if (statusByte < 0x80) {
+				// duration
+				curOffset++;
+
+				statusByte = GetByte(curOffset);
+				if (statusByte < 0x80) {
+					// velocity
+					curOffset++;
+				}
+			}
+
+			beginOffset = curOffset;
+			if (curOffset >= 0x10000) {
+				break;
+			}
+
+			statusByte = GetByte(curOffset++);
+		}
+
+		MintSnesSeqEventType eventType = (MintSnesSeqEventType)0;
+		std::map<uint8_t, MintSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+		if (pEventType != parentSeq->EventMap.end()) {
+			eventType = pEventType->second;
+		}
+
+		switch (eventType)
+		{
+		case EVENT_PAN:
+			curOffset++;
+			break;
+
+		case EVENT_VOLUME:
+			curOffset++;
+			break;
+
+		case EVENT_TUNING:
+			curOffset++;
+			break;
+
+		case EVENT_GOTO:
+		{
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
+			dest += curOffset; // relative offset to address
+
+			if (dest > curOffset) {
+				// Gokinjo Bouken Tai - Town ($1581)
+				curOffset = dest;
+			}
+			else {
+				// prevent infinite loop
+				bContinue = false;
+			}
+
+			break;
+		}
+
+		case EVENT_CALL:
+		{
+			uint16_t dest = GetShort(curOffset); curOffset += 2;
+			dest += curOffset; // relative offset to address
+
+			if (instrCallStackPtr + 2 > MINTSNES_CALLSTACK_SIZE) {
+				// stack overflow
+				bContinue = false;
+				break;
+			}
+
+			// save return address
+			instrCallStack[instrCallStackPtr++] = curOffset & 0xff;
+			instrCallStack[instrCallStackPtr++] = (curOffset >> 8) & 0xff;
+
+			curOffset = dest;
+			break;
+		}
+
+		case EVENT_RET:
+		{
+			if (instrCallStackPtr < 2) {
+				// access violation
+				bContinue = false;
+				break;
+			}
+
+			curOffset = instrCallStack[instrCallStackPtr - 2] | (instrCallStack[instrCallStackPtr - 1] << 8);
+			instrCallStackPtr -= 2;
+			break;
+		}
+
+		case EVENT_LOOP_START:
+		{
+			uint8_t count = GetByte(curOffset++);
+
+			if (instrCallStackPtr + 3 > MINTSNES_CALLSTACK_SIZE) {
+				// stack overflow
+				bContinue = false;
+				break;
+			}
+
+			// save loop start address and repeat count
+			instrCallStack[instrCallStackPtr++] = curOffset & 0xff;
+			instrCallStack[instrCallStackPtr++] = (curOffset >> 8) & 0xff;
+			instrCallStack[instrCallStackPtr++] = count;
+
+			break;
+		}
+
+		case EVENT_LOOP_END:
+		{
+			if (instrCallStackPtr < 3) {
+				// access violation
+				bContinue = false;
+				break;
+			}
+
+			uint8_t count = instrCallStack[instrCallStackPtr - 1];
+			if (--count == 0) {
+				// repeat end, fall through
+				instrCallStackPtr -= 3;
+			}
+			else {
+				// repeat again
+				instrCallStack[instrCallStackPtr - 1] = count;
+				curOffset = instrCallStack[instrCallStackPtr - 3] | (instrCallStack[instrCallStackPtr - 2] << 8);
+			}
+
+			break;
+		}
+
+		case EVENT_END:
+			bContinue = false;
+			break;
+
+		case EVENT_TRANSPOSE:
+			curOffset++;
+			break;
+
+		case EVENT_TRANSPOSE_REL:
+			curOffset++;
+			break;
+
+		case EVENT_TUNING_REL:
+			curOffset++;
+			break;
+
+		case EVENT_KEY_ON:
+			break;
+
+		case EVENT_KEY_OFF:
+			break;
+
+		case EVENT_VOLUME_REL:
+			curOffset++;
+			break;
+
+		case EVENT_INSTR:
+		{
+			int16_t rgnOffset = GetShort(curOffset); curOffset += 2;
+			uint16_t rgnAddress = curOffset + rgnOffset;
+			instrHint->rgnAddress = rgnAddress;
+			break;
+		}
+
+		default:
+#ifdef _WIN32
+			std::wostringstream ssTrace;
+			ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
+			OutputDebugString(ssTrace.str().c_str());
+#endif
+
+			bContinue = false;
+			break;
+		}
+	}
 }

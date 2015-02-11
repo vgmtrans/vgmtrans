@@ -42,7 +42,20 @@ enum MintSnesSeqEventType
 	EVENT_KEY_OFF,
 	EVENT_VOLUME_REL,
 	EVENT_PITCHBEND,
+	EVENT_INSTR,
 	EVENT_TIMEBASE,
+};
+
+struct MintSnesInstrHint
+{
+	uint16_t rgnAddress;
+};
+
+struct MintSnesInstrHintDir
+{
+	bool percussion;
+	MintSnesInstrHint instrHint;
+	std::vector<MintSnesInstrHint> percHints;
 };
 
 class MintSnesSeq
@@ -63,6 +76,7 @@ public:
 
 	uint16_t TrackStartAddress[10];
 	std::vector<uint16_t> InstrumentAddresses;
+	std::map<uint16_t, MintSnesInstrHintDir> InstrumentHints;
 
 	uint8_t spcTempo;
 	bool fastTempo;
@@ -71,7 +85,6 @@ private:
 	void LoadEventMap(MintSnesSeq *pSeqFile);
 };
 
-
 class MintSnesTrack
 	: public SeqTrack
 {
@@ -79,6 +92,9 @@ public:
 	MintSnesTrack(MintSnesSeq* parentFile, long offset = 0, long length = 0);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
+
+	void ParseInstrument(uint16_t instrAddress, uint8_t instrNum);
+	void ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion = false, uint8_t percNoteKey = 0);
 
 private:
 	std::list<int8_t> tiedNoteKeys;
