@@ -214,8 +214,7 @@ MintSnesRgn::MintSnesRgn(MintSnesInstr* instr, MintSnesVersion ver, uint32_t spc
 		pan = instrHint.pan / 32.0;
 	}
 	if (percNoteKey >= 0) {
-		int8_t noteNumber = instrHint.transpose;
-		int8_t unityKeyCandidate = noteNumber - unityKey; // TODO: correct pitch
+		int8_t unityKeyCandidate = percNoteKey - (instrHint.transpose - unityKey); // correct?
 		int8_t negativeUnityKeyAmount = 0;
 		if (unityKeyCandidate < 0) {
 			negativeUnityKeyAmount = -unityKeyCandidate;
