@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "HeartBeatSnesScanner.h"
 #include "HeartBeatSnesSeq.h"
+#include "HeartBeatSnesInstr.h"
 #include "SNESDSP.h"
 
 //; Dragon Quest 6 SPC
@@ -23,6 +24,20 @@ BytePattern HeartBeatSnesScanner::ptnReadSongList(
 	"?xx"
 	,
 	19);
+
+//; Dragon Quest 6 SPC
+//1343: e8 02     mov   a,#$02
+//1345: 8d 5d     mov   y,#$5d
+//1347: 3f 48 14  call  $1448
+//134a: e8 00     mov   a,#$00
+BytePattern HeartBeatSnesScanner::ptnSetDIR(
+	"\xe8\x02\x8d\x5d\x3f\x48\x14\xe8"
+	"\x00"
+	,
+	"x?xxx??x"
+	"x"
+	,
+	9);
 
 void HeartBeatSnesScanner::Scan(RawFile* file, void* info)
 {
@@ -70,10 +85,45 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 	// TODO: guess song index
 	int8_t songIndex = 0;
 
+	// search DIR address
+	UINT ofsSetDIR;
+	uint16_t spcDirAddr = 0;
+	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+	}
+
 	uint16_t addrSeqHeader = file->GetByte(addrSongListLo + songIndex) | (file->GetByte(addrSongListHi + songIndex) << 8);
 	HeartBeatSnesSeq* newSeq = new HeartBeatSnesSeq(file, version, addrSeqHeader, name);
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
+		return;
+	}
+
+	if (spcDirAddr == 0) {
+		return;
+	}
+
+	uint16_t ofsInstrTable = file->GetShort(addrSeqHeader);
+	uint16_t ofsFirstTrack = file->GetShort(addrSeqHeader + 2);
+	if (ofsInstrTable >= ofsFirstTrack || addrSeqHeader + ofsInstrTable >= 0x10000) {
+		return;
+	}
+
+	uint16_t addrInstrTable = addrSeqHeader + ofsInstrTable;
+	uint16_t instrTableSize = ofsFirstTrack - ofsInstrTable;
+
+	// we sometimes need to shorten the expected table size
+	// example: Dragon Quest 6 - Through the Fields
+	for (uint16_t newTableSize = 0; newTableSize < instrTableSize; newTableSize++) {
+		if (newSeq->IsItemAtOffset(addrInstrTable + newTableSize, false)) {
+			instrTableSize = newTableSize;
+			break;
+		}
+	}
+
+	HeartBeatSnesInstrSet * newInstrSet = new HeartBeatSnesInstrSet(file, version, addrInstrTable, instrTableSize, spcDirAddr);
+	if (!newInstrSet->LoadVGMFile()) {
+		delete newInstrSet;
 		return;
 	}
 }

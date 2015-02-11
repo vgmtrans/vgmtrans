@@ -22,4 +22,5 @@ public:
 
 private:
 	static BytePattern ptnReadSongList;
+	static BytePattern ptnSetDIR;
 };

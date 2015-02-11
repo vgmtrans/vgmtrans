@@ -687,6 +687,9 @@
     <ClCompile Include="main\formats\HeartBeatSnesScanner.cpp">
       <Filter>Source Files\formats\heartbeatsnes</Filter>
     </ClCompile>
+    <ClCompile Include="main\formats\HeartBeatSnesInstr.cpp">
+      <Filter>Source Files\formats\heartbeatsnes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ui\windows\aboutdlg.h">
@@ -1245,6 +1248,9 @@
       <Filter>Header Files\formats\heartbeatsnes</Filter>
     </ClInclude>
     <ClInclude Include="main\formats\HeartBeatSnesSeq.h">
+      <Filter>Header Files\formats\heartbeatsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\HeartBeatSnesInstr.h">
       <Filter>Header Files\formats\heartbeatsnes</Filter>
     </ClInclude>
   </ItemGroup>
