@@ -442,12 +442,14 @@ bool MintSnesTrack::ReadEvent(void)
 	case EVENT_ECHO_ON:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo On", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		AddReverbNoItem(40);
 		break;
 	}
 
 	case EVENT_ECHO_OFF:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+		AddReverbNoItem(0);
 		break;
 	}
 
@@ -600,8 +602,8 @@ bool MintSnesTrack::ReadEvent(void)
 
 	case EVENT_PITCHBENDRANGE:
 	{
-		uint8_t newRange = GetByte(curOffset++);
-		AddPitchBendRange(beginOffset, curOffset - beginOffset, newRange);
+		uint8_t newRange = GetByte(curOffset++); // actual range is value/8
+		AddPitchBendRange(beginOffset, curOffset - beginOffset, newRange / 8); // range <= 24 is recommended in General MIDI spec
 		break;
 	}
 
@@ -656,7 +658,7 @@ bool MintSnesTrack::ReadEvent(void)
 	case EVENT_PITCHBEND:
 	{
 		int8_t pitch = GetByte(curOffset++);
-		AddPitchBend(beginOffset, curOffset - beginOffset, pitch * 16);
+		AddPitchBend(beginOffset, curOffset - beginOffset, pitch * 64);
 		break;
 	}
 
