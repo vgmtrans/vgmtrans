@@ -221,6 +221,7 @@
     <ClCompile Include="main\formats\CapcomSnesInstr.cpp" />
     <ClCompile Include="main\formats\CapcomSnesScanner.cpp" />
     <ClCompile Include="main\formats\CapcomSnesSeq.cpp" />
+    <ClCompile Include="main\formats\ChunSnesInstr.cpp" />
     <ClCompile Include="main\formats\ChunSnesScanner.cpp" />
     <ClCompile Include="main\formats\ChunSnesSeq.cpp" />
     <ClCompile Include="main\formats\CompileSnesInstr.cpp" />
@@ -387,6 +388,7 @@
     <ClInclude Include="main\formats\CapcomSnesScanner.h" />
     <ClInclude Include="main\formats\CapcomSnesSeq.h" />
     <ClInclude Include="main\formats\ChunSnesFormat.h" />
+    <ClInclude Include="main\formats\ChunSnesInstr.h" />
     <ClInclude Include="main\formats\ChunSnesScanner.h" />
     <ClInclude Include="main\formats\ChunSnesSeq.h" />
     <ClInclude Include="main\formats\CompileSnesFormat.h" />

@@ -25,4 +25,7 @@ private:
 	static BytePattern ptnLoadSeqWinterV1V2;
 	static BytePattern ptnLoadSeqWinterV3;
 	static BytePattern ptnSaveSongIndexSummerV2;
+	static BytePattern ptnDSPInitTable;
+	static BytePattern ptnProgChangeVCmdSummer;
+	static BytePattern ptnProgChangeVCmdWinter;
 };

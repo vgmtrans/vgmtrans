@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "ChunSnesScanner.h"
 #include "ChunSnesSeq.h"
+#include "ChunSnesInstr.h"
 #include "SNESDSP.h"
 
 //; Otogirisou SPC
@@ -191,6 +192,198 @@ BytePattern ChunSnesScanner::ptnSaveSongIndexSummerV2(
 	,
 	12);
 
+//; Otogirisou SPC
+//078e: db $6c,$f0 ; DSP FLG reset
+//0790: db $7d,$01 ; echo delay 16ms
+//0792: db $6d,$f7 ; echo start addr $f700
+//0794: db $1c,$7f ; main volume R #$7f
+//0796: db $0c,$7f ; main volume L #$7f
+//0798: db $3c,$00 ; echo volume R zero
+//079a: db $2c,$00 ; echo volume L zero
+//079c: db $4c,$00 ; key on
+//079e: db $5c,$00 ; key off
+//07a0: db $6c,$23 ; DSP FLG echo on, noise clock 25 Hz
+//07a2: db $0d,$00 ; echo feedback zero
+//07a4: db $2d,$00 ; pitch modulation off
+//07a6: db $3d,$00 ; noise off
+//07a8: db $4d,$00 ; echo off
+//07aa: db $5d,$07 ; sample dir $0700
+//07ac: db $0d,$00 ; echo feedback zero
+//07ae: db $00     ; end of table
+BytePattern ChunSnesScanner::ptnDSPInitTable(
+	"\x6c\xf0\x7d\x01\x6d\xf7\x1c\x7f"
+	"\x0c\x7f\x3c\x00\x2c\x00\x4c\x00"
+	"\x5c\x00\x6c\x23\x0d\x00\x2d\x00"
+	"\x3d\x00\x4d\x00\x5d\x07\x0d\x00"
+	"\x00"
+	,
+	"x?x?x?x?"
+	"x?x?x?x?"
+	"x?x?x?x?"
+	"x?x?x?x?"
+	"?"
+	,
+	33);
+
+//; Otogirisou SPC
+//1413: 3f aa 15  call  $15aa             ; arg1 (patch number)
+//1416: 2d        push  a
+//1417: f5 dd 03  mov   a,$03dd+x
+//141a: fd        mov   y,a
+//141b: f6 1d 05  mov   a,$051d+y
+//141e: fd        mov   y,a
+//141f: 4d        push  x
+//1420: 8f 03 c4  mov   $c4,#$03
+//1423: 8f 02 c5  mov   $c5,#$02          ; $c4 = instrument table
+//1426: cd 00     mov   x,#$00
+//1428: ad 00     cmp   y,#$00
+//142a: f0 0e     beq   $143a             ; while y ~= 0 do
+//142c: e7 c4     mov   a,($c4+x)         ;   read instrument count
+//142e: bc        inc   a
+//142f: 6d        push  y
+//1430: 8d 00     mov   y,#$00
+//1432: 7a c4     addw  ya,$c4            ;   skip (1 + instrument_count) bytes
+//1434: da c4     movw  $c4,ya
+//1436: ee        pop   y
+//1437: dc        dec   y
+//1438: 2f ee     bra   $1428             ; end
+//143a: ce        pop   x
+//143b: ae        pop   a                 ; patch number in A
+//143c: bc        inc   a                 ; skip offset +0: number of instruments
+//143d: fd        mov   y,a
+//143e: f7 c4     mov   a,($c4)+y         ; read global instrument number
+//1440: fd        mov   y,a
+//1441: f6 67 05  mov   a,$0567+y
+//1444: 68 ff     cmp   a,#$ff
+//1446: d0 02     bne   $144a
+//;
+//1448: 00        nop
+//1449: bc        inc   a
+//; read sample info table (A=SRCN)
+//144a: d5 0e 04  mov   $040e+x,a         ; save SRCN
+//144d: 8d 04     mov   y,#$04
+//144f: 3f 65 17  call  $1765             ; SRCN
+//1452: 8d 08     mov   y,#$08
+//1454: cf        mul   ya
+//1455: 8f 2f c4  mov   $c4,#$2f
+//1458: 8f 06 c5  mov   $c5,#$06          ; $062f = sample info table
+//145b: 7a c4     addw  ya,$c4
+//145d: da c4     movw  $c4,ya            ; $c4 = &SampInfoTable[patch * 8]
+BytePattern ChunSnesScanner::ptnProgChangeVCmdSummer(
+	"\x3f\xaa\x15\x2d\xf5\xdd\x03\xfd"
+	"\xf6\x1d\x05\xfd\x4d\x8f\x03\xc4"
+	"\x8f\x02\xc5\xcd\x00\xad\x00\xf0"
+	"\x0e\xe7\xc4\xbc\x6d\x8d\x00\x7a"
+	"\xc4\xda\xc4\xee\xdc\x2f\xee\xce"
+	"\xae\xbc\xfd\xf7\xc4\xfd\xf6\x67"
+	"\x05\x68\xff\xd0\x02\x00\xbc\xd5"
+	"\x0e\x04\x8d\x04\x3f\x65\x17\x8d"
+	"\x08\xcf\x8f\x2f\xc4\x8f\x06\xc5"
+	"\x7a\xc4\xda\xc4"
+	,
+	"x??xx??x"
+	"x??xxx??"
+	"x??xxxxx"
+	"xx?xxxxx"
+	"?x?xxxxx"
+	"xxxx?xx?"
+	"?xxxxxxx"
+	"??xxx??x"
+	"xxx??x??"
+	"x?x?"
+	,
+	76);
+
+//; Dragon Quest 5 SPC
+//182e: 3f bd 19  call  $19bd             ; arg1 (patch number)
+//1831: 2d        push  a
+//1832: f5 a3 02  mov   a,$02a3+x
+//1835: fd        mov   y,a
+//1836: f6 af 03  mov   a,$03af+y         ; instrument table selector
+//1839: fd        mov   y,a
+//183a: 4d        push  x
+//183b: e5 e9 28  mov   a,$28e9
+//183e: c4 a4     mov   $a4,a
+//1840: e5 ea 28  mov   a,$28ea
+//1843: c4 a5     mov   $a5,a             ; $a4 = instrument table
+//1845: cd 00     mov   x,#$00
+//1847: ad 00     cmp   y,#$00
+//1849: f0 0f     beq   $185a             ; while y ~= 0 do
+//184b: e7 a4     mov   a,($a4+x)         ;   read instrument count
+//184d: bc        inc   a
+//184e: bc        inc   a
+//184f: 6d        push  y
+//1850: 8d 00     mov   y,#$00
+//1852: 7a a4     addw  ya,$a4            ;   skip (2 + instrument_count) bytes
+//1854: da a4     movw  $a4,ya
+//1856: ee        pop   y
+//1857: dc        dec   y
+//1858: 2f ed     bra   $1847             ; end
+//185a: ce        pop   x
+//185b: ae        pop   a                 ; patch number in A
+//185c: bc        inc   a                 ; skip offset +0: number of instruments
+//185d: bc        inc   a                 ; skip offset +1: ?
+//185e: fd        mov   y,a
+//185f: f7 a4     mov   a,($a4)+y         ; read global instrument number
+//1861: 65 84 01  cmp   a,$0184
+//1864: f0 08     beq   $186e
+//1866: fd        mov   y,a
+//1867: f6 ff 03  mov   a,$03ff+y         ; read SRCN by global instrument number
+//186a: 68 ff     cmp   a,#$ff
+//186c: d0 15     bne   $1883
+//;
+//186e: f5 cb 02  mov   a,$02cb+x
+//1871: 08 80     or    a,#$80
+//1873: d5 cb 02  mov   $02cb+x,a
+//1876: 3f 9e 1a  call  $1a9e
+//1879: 3f 3e 1c  call  $1c3e
+//187c: b0 04     bcs   $1882
+//187e: fd        mov   y,a
+//187f: 3f 93 1a  call  $1a93
+//1882: 6f        ret
+//; read sample info table (A=SRCN)
+//1883: d5 cc 02  mov   $02cc+x,a         ; save SRCN
+//1886: 8d 04     mov   y,#$04
+//1888: 3f 23 1b  call  $1b23             ; SRCN
+//188b: 8d 08     mov   y,#$08
+//188d: cf        mul   ya
+//188e: 8f 35 a4  mov   $a4,#$35
+//1891: 8f 05 a5  mov   $a5,#$05          ; $0535 = sample info table
+//1894: 7a a4     addw  ya,$a4
+//1896: da a4     movw  $a4,ya            ; $a4 = &SampInfoTable[patch * 8]
+BytePattern ChunSnesScanner::ptnProgChangeVCmdWinter(
+	"\x3f\xbd\x19\x2d\xf5\xa3\x02\xfd"
+	"\xf6\xaf\x03\xfd\x4d\xe5\xe9\x28"
+	"\xc4\xa4\xe5\xea\x28\xc4\xa5\xcd"
+	"\x00\xad\x00\xf0\x0f\xe7\xa4\xbc"
+	"\xbc\x6d\x8d\x00\x7a\xa4\xda\xa4"
+	"\xee\xdc\x2f\xed\xce\xae\xbc\xbc"
+	"\xfd\xf7\xa4\x65\x84\x01\xf0\x08"
+	"\xfd\xf6\xff\x03\x68\xff\xd0\x15"
+	"\xf5\xcb\x02\x08\x80\xd5\xcb\x02"
+	"\x3f\x9e\x1a\x3f\x3e\x1c\xb0\x04"
+	"\xfd\x3f\x93\x1a\x6f\xd5\xcc\x02"
+	"\x8d\x04\x3f\x23\x1b\x8d\x08\xcf"
+	"\x8f\x35\xa4\x8f\x05\xa5\x7a\xa4"
+	"\xda\xa4"
+	,
+	"x??xx??x"
+	"x??xxx??"
+	"x?x??x?x"
+	"xxxxxx?x"
+	"xxxxx?x?"
+	"xxxxxxxx"
+	"xx?x??xx"
+	"xx??xxxx"
+	"x??xxx??"
+	"x??x??xx"
+	"xx??xx??"
+	"xxx??xxx"
+	"x??x??x?"
+	"x?"
+	,
+	106);
+
 void ChunSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -323,6 +516,56 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 	ChunSnesSeq* newSeq = new ChunSnesSeq(file, version, minorVersion, addrSeqHeader, name);
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
+		return;
+	}
+
+	UINT ofsDSPInitTable;
+	uint16_t spcDirAddr;
+	if (file->SearchBytePattern(ptnDSPInitTable, ofsDSPInitTable)) {
+		spcDirAddr = file->GetByte(ofsDSPInitTable + 29) << 8;
+	}
+	else {
+		return;
+	}
+
+	UINT ofsProgChangeVCmd;
+	uint16_t addrInstrSetTable;
+	uint16_t addrSampNumTable;
+	uint16_t addrSampleTable;
+	if (file->SearchBytePattern(ptnProgChangeVCmdSummer, ofsProgChangeVCmd)) {
+		addrInstrSetTable = file->GetByte(ofsProgChangeVCmd + 14) | (file->GetByte(ofsProgChangeVCmd + 17) << 8);
+		addrSampNumTable = file->GetShort(ofsProgChangeVCmd + 47);
+		addrSampleTable = file->GetByte(ofsProgChangeVCmd + 67) | (file->GetByte(ofsProgChangeVCmd + 70) << 8);
+	}
+	else if (file->SearchBytePattern(ptnProgChangeVCmdWinter, ofsProgChangeVCmd)) {
+		uint16_t addrInstrumentTablePtr = file->GetShort(ofsProgChangeVCmd + 14);
+		addrInstrSetTable = file->GetShort(addrInstrumentTablePtr);
+		addrSampNumTable = file->GetShort(ofsProgChangeVCmd + 58);
+		addrSampleTable = file->GetByte(ofsProgChangeVCmd + 97) | (file->GetByte(ofsProgChangeVCmd + 100) << 8);
+	}
+	else {
+		return;
+	}
+
+	uint32_t addrInstrSet = addrInstrSetTable;
+	for (uint8_t i = 0; i < songIndex; i++) {
+		if (addrInstrSet + 2 > 0x10000) {
+			return;
+		}
+
+		uint8_t nNumInstrs = file->GetByte(addrInstrSet);
+		if (version == CHUNSNES_SUMMER) {
+			addrInstrSet += 1;
+		}
+		else { // CHUNSNES_WINTER
+			addrInstrSet += 2;
+		}
+		addrInstrSet += nNumInstrs;
+	}
+
+	ChunSnesInstrSet * newInstrSet = new ChunSnesInstrSet(file, version, addrInstrSet, addrSampNumTable, addrSampleTable, spcDirAddr);
+	if (!newInstrSet->LoadVGMFile()) {
+		delete newInstrSet;
 		return;
 	}
 }
