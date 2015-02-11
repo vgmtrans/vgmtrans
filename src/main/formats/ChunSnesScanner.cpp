@@ -176,6 +176,21 @@ BytePattern ChunSnesScanner::ptnLoadSeqWinterV3(
 	,
 	68);
 
+//; Otogirisou SPC
+//0ec5: 3f c3 0f  call  $0fc3             ; set X >= 0, $0525+X != 0
+//0ec8: b0 ce     bcs   $0e98
+//0eca: d5 1d 05  mov   $051d+x,a         ; $051D+X = A
+//0ecd: c9 66 05  mov   $0566,x
+//0ed0: 2d        push  a
+BytePattern ChunSnesScanner::ptnSaveSongIndexSummerV2(
+	"\x3f\xc3\x0f\xb0\xce\xd5\x1d\x05"
+	"\xc9\x66\x05\x2d"
+	,
+	"x??x?x??"
+	"x??x"
+	,
+	12);
+
 void ChunSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -235,8 +250,69 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 		CHUNSNES_SEQENT_OFFSET_OF_HEADER = 1;
 	}
 
-	// TODO: guess song index
-	int songIndex = 1;
+	// guess song index
+	int8_t songIndex = -1;
+	UINT ofsSaveSongIndex;
+	if (file->SearchBytePattern(ptnSaveSongIndexSummerV2, ofsSaveSongIndex)) {
+		uint16_t addrSongIndexArray = file->GetShort(ofsSaveSongIndex + 6);
+		uint16_t addrSongSlotIndex = file->GetShort(ofsSaveSongIndex + 9);
+		uint8_t songSlotIndex = file->GetByte(addrSongSlotIndex);
+		songIndex = file->GetByte(addrSongIndexArray + songSlotIndex);
+	}
+	else {
+		// read voice stream pointer value of the first track
+		uint16_t addrCurrentPos = file->GetShort(0x0000);
+		uint16_t bestDistance = 0xffff;
+
+		// search the nearest address
+		if (addrCurrentPos != 0) {
+			int8_t guessedSongIndex = -1;
+
+			for (int8_t songIndexCandidate = 0; songIndexCandidate < 0x7f; songIndexCandidate++) {
+				uint16_t addrSeqEntry = addrSongList + (songIndexCandidate * CHUNSNES_SEQENT_SIZE);
+				if ((addrSeqEntry & 0xff00) == 0 || (addrSeqEntry & 0xff00) == 0xff00) {
+					continue;
+				}
+
+				uint16_t addrSeqHeader = file->GetShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
+				if ((addrSeqHeader & 0xff00) == 0 || (addrSeqHeader & 0xff00) == 0xff00) {
+					continue;
+				}
+
+				uint8_t nNumTracks = file->GetByte(addrSeqHeader + 1);
+				if (nNumTracks == 0 || nNumTracks > 8) {
+					continue;
+				}
+
+				uint16_t ofsTrackStart = file->GetShort(addrSeqHeader + 2);
+				uint16_t addrTrackStart;
+				if (version == CHUNSNES_SUMMER) {
+					addrTrackStart = ofsTrackStart;
+				}
+				else {
+					addrTrackStart = addrSeqHeader + ofsTrackStart;
+				}
+
+				if (addrTrackStart > addrCurrentPos) {
+					continue;
+				}
+
+				uint16_t distance = addrCurrentPos - addrTrackStart;
+				if (distance < bestDistance) {
+					bestDistance = distance;
+					guessedSongIndex = songIndexCandidate;
+				}
+			}
+
+			if (guessedSongIndex != -1) {
+				songIndex = guessedSongIndex;
+			}
+		}
+	}
+
+	if (songIndex == -1) {
+		songIndex = 1;
+	}
 
 	uint16_t addrSeqEntry = addrSongList + (songIndex * CHUNSNES_SEQENT_SIZE);
 	if (addrSeqEntry + CHUNSNES_SEQENT_SIZE > 0x10000) {
