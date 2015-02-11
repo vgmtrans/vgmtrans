@@ -150,6 +150,8 @@ MintSnesInstr::~MintSnesInstr()
 
 bool MintSnesInstr::LoadInstr()
 {
+	AddSimpleItem(dwOffset, 1, L"Melody/Percussion");
+
 	if (!instrHintDir.percussion) {
 		MintSnesInstrHint* instrHint = &instrHintDir.instrHint;
 		uint8_t srcn = GetByte(instrHint->rgnAddress);
@@ -158,6 +160,8 @@ bool MintSnesInstr::LoadInstr()
 		if (offDirEnt + 4 > 0x10000) {
 			return false;
 		}
+
+		AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, L"Envelope Sequence");
 
 		uint16_t addrSampStart = GetShort(offDirEnt);
 		MintSnesRgn * rgn = new MintSnesRgn(this, version, spcDirAddr, *instrHint);
@@ -173,6 +177,14 @@ bool MintSnesInstr::LoadInstr()
 			if (offDirEnt + 4 > 0x10000) {
 				return false;
 			}
+
+			std::wostringstream seqOffsetName;
+			seqOffsetName << L"Sequence Offset " << (int)percNoteKey;
+			AddSimpleItem(dwOffset + 1 + (percNoteKey * 2), 2, seqOffsetName.str().c_str());
+
+			std::wostringstream seqName;
+			seqName << L"Envelope Sequence " << (int)percNoteKey;
+			AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, seqName.str().c_str());
 
 			uint16_t addrSampStart = GetShort(offDirEnt);
 			MintSnesRgn * rgn = new MintSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);

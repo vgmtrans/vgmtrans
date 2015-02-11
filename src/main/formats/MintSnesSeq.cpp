@@ -709,16 +709,10 @@ void MintSnesTrack::ParseInstrument(uint16_t instrAddress, uint8_t instrNum)
 	}
 	else {
 		int16_t instrOffset;
-		int16_t prevInstrOffset = -1;
 		uint16_t instrPtrAddressMax = 0xffff;
 		uint8_t percNoteKey = 0;
 		while (curOffset < instrPtrAddressMax) {
 			instrOffset = GetShort(curOffset); curOffset += 2;
-			if (instrOffset <= prevInstrOffset) {
-				break;
-			}
-			prevInstrOffset = instrOffset;
-
 			uint16_t percInstrAddress = curOffset + instrOffset;
 			if (percInstrAddress < instrPtrAddressMax) {
 				instrPtrAddressMax = percInstrAddress;
