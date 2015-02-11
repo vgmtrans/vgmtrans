@@ -229,6 +229,8 @@
     <ClCompile Include="main\formats\CompileSnesSeq.cpp" />
     <ClCompile Include="main\formats\HeartBeatPS1Seq.cpp" />
     <ClCompile Include="main\formats\HeartBeatPS1SeqScanner.cpp" />
+    <ClCompile Include="main\formats\HeartBeatSnesScanner.cpp" />
+    <ClCompile Include="main\formats\HeartBeatSnesSeq.cpp" />
     <ClCompile Include="main\formats\HudsonSnesInstr.cpp" />
     <ClCompile Include="main\formats\HudsonSnesScanner.cpp" />
     <ClCompile Include="main\formats\HudsonSnesSeq.cpp" />
@@ -397,6 +399,9 @@
     <ClInclude Include="main\formats\CompileSnesSeq.h" />
     <ClInclude Include="main\formats\HeartBeatPS1Seq.h" />
     <ClInclude Include="main\formats\HeartBeatPS1SeqScanner.h" />
+    <ClInclude Include="main\formats\HeartBeatSnesFormat.h" />
+    <ClInclude Include="main\formats\HeartBeatSnesScanner.h" />
+    <ClInclude Include="main\formats\HeartBeatSnesSeq.h" />
     <ClInclude Include="main\formats\HudsonSnesFormat.h" />
     <ClInclude Include="main\formats\HudsonSnesInstr.h" />
     <ClInclude Include="main\formats\HudsonSnesScanner.h" />
