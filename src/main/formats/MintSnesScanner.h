@@ -22,4 +22,5 @@ public:
 
 private:
 	static BytePattern ptnLoadSeq;
+	static BytePattern ptnSetDIR;
 };

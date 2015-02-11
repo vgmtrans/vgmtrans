@@ -2,6 +2,7 @@
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "MintSnesFormat.h"
+#include "MintSnesInstr.h"
 
 #define MINTSNES_CALLSTACK_SIZE 10
 
@@ -44,18 +45,6 @@ enum MintSnesSeqEventType
 	EVENT_PITCHBEND,
 	EVENT_INSTR,
 	EVENT_TIMEBASE,
-};
-
-struct MintSnesInstrHint
-{
-	uint16_t rgnAddress;
-};
-
-struct MintSnesInstrHintDir
-{
-	bool percussion;
-	MintSnesInstrHint instrHint;
-	std::vector<MintSnesInstrHint> percHints;
 };
 
 class MintSnesSeq

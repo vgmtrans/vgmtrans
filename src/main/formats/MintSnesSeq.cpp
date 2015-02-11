@@ -17,6 +17,7 @@ MintSnesSeq::MintSnesSeq(RawFile* file, MintSnesVersion ver, uint32_t seqdataOff
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
+	bUseLinearAmplitudeScale = true;
 
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
@@ -717,7 +718,9 @@ void MintSnesTrack::ParseInstrument(uint16_t instrAddress, uint8_t instrNum)
 			prevInstrOffset = instrOffset;
 
 			uint16_t percInstrAddress = curOffset + instrOffset;
-			instrPtrAddressMax = percInstrAddress;
+			if (percInstrAddress < instrPtrAddressMax) {
+				instrPtrAddressMax = percInstrAddress;
+			}
 
 			ParseInstrumentEvents(percInstrAddress, instrNum, percussion, percNoteKey);
 			percNoteKey++;
@@ -741,6 +744,8 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 	
 	bool bContinue = true;
 	uint16_t curOffset = offset;
+	uint16_t seqStartAddress = curOffset;
+	uint16_t seqEndAddress = curOffset;
 
 	uint8_t instrDeltaTime = 0;
 	uint8_t instrCallStackPtr = 0;
@@ -750,6 +755,10 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 		uint16_t beginOffset = curOffset;
 		if (curOffset >= 0x10000) {
 			break;
+		}
+
+		if (curOffset < seqStartAddress) {
+			seqStartAddress = curOffset;
 		}
 
 		uint8_t statusByte = GetByte(curOffset++);
@@ -790,8 +799,14 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 		switch (eventType)
 		{
 		case EVENT_PAN:
-			curOffset++;
+		{
+			int8_t newPan = GetByte(curOffset++);
+			if (newPan > 32) {
+				newPan = 32;
+			}
+			instrHint->pan = newPan;
 			break;
+		}
 
 		case EVENT_VOLUME:
 			curOffset++;
@@ -895,12 +910,15 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 			break;
 
 		case EVENT_TRANSPOSE:
-			curOffset++;
+			instrHint->transpose = GetByte(curOffset++);
 			break;
 
 		case EVENT_TRANSPOSE_REL:
-			curOffset++;
+		{
+			int8_t delta = GetByte(curOffset++);
+			instrHint->transpose += delta;
 			break;
+		}
 
 		case EVENT_TUNING_REL:
 			curOffset++;
@@ -933,6 +951,25 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 
 			bContinue = false;
 			break;
+		}
+
+		if (curOffset > seqEndAddress) {
+			seqEndAddress = curOffset;
+		}
+	}
+
+	instrHint->seqAddress = seqStartAddress;
+	instrHint->seqSize = seqEndAddress - seqStartAddress;
+
+	instrHint->startAddress = instrHint->seqAddress;
+	instrHint->size = instrHint->seqSize;
+
+	if (instrHint->rgnAddress != 0) {
+		if (instrHint->rgnAddress < instrHint->startAddress) {
+			instrHint->startAddress = instrHint->rgnAddress;
+		}
+		if (instrHint->rgnAddress + 7 > instrHint->startAddress + instrHint->size) {
+			instrHint->size = (instrHint->rgnAddress + 7) - instrHint->startAddress;
 		}
 	}
 }

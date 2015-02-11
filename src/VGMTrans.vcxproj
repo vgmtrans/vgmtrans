@@ -234,6 +234,7 @@
     <ClCompile Include="main\formats\KonamiSnesInstr.cpp" />
     <ClCompile Include="main\formats\KonamiSnesScanner.cpp" />
     <ClCompile Include="main\formats\KonamiSnesSeq.cpp" />
+    <ClCompile Include="main\formats\MintSnesInstr.cpp" />
     <ClCompile Include="main\formats\MintSnesScanner.cpp" />
     <ClCompile Include="main\formats\MintSnesSeq.cpp" />
     <ClCompile Include="main\formats\NinSnesInstr.cpp" />
@@ -403,6 +404,7 @@
     <ClInclude Include="main\formats\KonamiSnesScanner.h" />
     <ClInclude Include="main\formats\KonamiSnesSeq.h" />
     <ClInclude Include="main\formats\MintSnesFormat.h" />
+    <ClInclude Include="main\formats\MintSnesInstr.h" />
     <ClInclude Include="main\formats\MintSnesScanner.h" />
     <ClInclude Include="main\formats\MintSnesSeq.h" />
     <ClInclude Include="main\formats\NinSnesInstr.h" />

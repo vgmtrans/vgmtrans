@@ -21,6 +21,16 @@ BytePattern MintSnesScanner::ptnLoadSeq(
 	,
 	16);
 
+//; Gokinjo Bouken Tai
+//02f1: 8f 11 f3  mov   $f3,#$11
+//02f4: 8f 6c f2  mov   $f2,#$6c
+BytePattern MintSnesScanner::ptnSetDIR(
+	"\x8f\x11\xf3\x8f\x6c\xf2"
+	,
+	"x?xxxx"
+	,
+	6);
+
 void MintSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -56,6 +66,13 @@ void MintSnesScanner::SearchForMintSnesFromARAM(RawFile* file)
 		guessedSongIndex = 1;
 	}
 
+	// scan DIR address
+	UINT ofsSetDIR;
+	uint16_t spcDirAddr = 0;
+	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+	}
+
 	UINT addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
 	if (addrSongHeaderPtr + 2 <= 0x10000) {
 		uint16_t addrSongHeader = file->GetShort(addrSongHeaderPtr);
@@ -64,6 +81,15 @@ void MintSnesScanner::SearchForMintSnesFromARAM(RawFile* file)
 		if (!newSeq->LoadVGMFile()) {
 			delete newSeq;
 			return;
+		}
+
+		if (spcDirAddr != 0) {
+			MintSnesInstrSet * newInstrSet = new MintSnesInstrSet(file, version, spcDirAddr, newSeq->InstrumentAddresses, newSeq->InstrumentHints);
+			if (!newInstrSet->LoadVGMFile())
+			{
+				delete newInstrSet;
+				return;
+			}
 		}
 	}
 }

@@ -669,6 +669,9 @@
     <ClCompile Include="main\formats\ChunSnesSeq.cpp">
       <Filter>Source Files\formats\chunsnes</Filter>
     </ClCompile>
+    <ClCompile Include="main\formats\MintSnesInstr.cpp">
+      <Filter>Source Files\formats\mintsnes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ui\windows\aboutdlg.h">
@@ -1213,6 +1216,9 @@
     </ClInclude>
     <ClInclude Include="main\formats\ChunSnesSeq.h">
       <Filter>Header Files\formats\chunsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\MintSnesInstr.h">
+      <Filter>Header Files\formats\mintsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
