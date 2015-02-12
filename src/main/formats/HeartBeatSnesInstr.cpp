@@ -8,9 +8,10 @@
 // HeartBeatSnesInstrSet
 // *********************
 
-HeartBeatSnesInstrSet::HeartBeatSnesInstrSet(RawFile* file, HeartBeatSnesVersion ver, uint32_t offset, uint32_t length, uint16_t addrSRCNTable, uint32_t spcDirAddr, const std::wstring & name) :
+HeartBeatSnesInstrSet::HeartBeatSnesInstrSet(RawFile* file, HeartBeatSnesVersion ver, uint32_t offset, uint32_t length, uint16_t addrSRCNTable, uint8_t songIndex, uint32_t spcDirAddr, const std::wstring & name) :
 	VGMInstrSet(HeartBeatSnesFormat::name, file, offset, length, name), version(ver),
 	addrSRCNTable(addrSRCNTable),
+	songIndex(songIndex),
 	spcDirAddr(spcDirAddr)
 {
 }
@@ -39,7 +40,7 @@ bool HeartBeatSnesInstrSet::GetInstrPointers()
 			break;
 		}
 
-		uint8_t sampleIndex = GetByte(addrInstrHeader);
+		uint8_t sampleIndex = GetByte(addrInstrHeader) + (songIndex * 0x10);
 		if (addrSRCNTable + sampleIndex + 1 > 0x10000) {
 			break;
 		}
@@ -65,7 +66,7 @@ bool HeartBeatSnesInstrSet::GetInstrPointers()
 
 		std::wostringstream instrName;
 		instrName << L"Instrument " << instrNum;
-		HeartBeatSnesInstr * newInstr = new HeartBeatSnesInstr(this, version, addrInstrHeader, instrNum >> 7, instrNum & 0x7f, addrSRCNTable, spcDirAddr, instrName.str());
+		HeartBeatSnesInstr * newInstr = new HeartBeatSnesInstr(this, version, addrInstrHeader, instrNum >> 7, instrNum & 0x7f, addrSRCNTable, songIndex, spcDirAddr, instrName.str());
 		aInstrs.push_back(newInstr);
 	}
 
@@ -87,9 +88,10 @@ bool HeartBeatSnesInstrSet::GetInstrPointers()
 // HeartBeatSnesInstr
 // ******************
 
-HeartBeatSnesInstr::HeartBeatSnesInstr(VGMInstrSet* instrSet, HeartBeatSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint16_t addrSRCNTable, uint32_t spcDirAddr, const std::wstring& name) :
+HeartBeatSnesInstr::HeartBeatSnesInstr(VGMInstrSet* instrSet, HeartBeatSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint16_t addrSRCNTable, uint8_t songIndex, uint32_t spcDirAddr, const std::wstring& name) :
 	VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), version(ver),
 	addrSRCNTable(addrSRCNTable),
+	songIndex(songIndex),
 	spcDirAddr(spcDirAddr)
 {
 }
@@ -100,7 +102,7 @@ HeartBeatSnesInstr::~HeartBeatSnesInstr()
 
 bool HeartBeatSnesInstr::LoadInstr()
 {
-	uint8_t sampleIndex = GetByte(dwOffset);
+	uint8_t sampleIndex = GetByte(dwOffset) + (songIndex * 0x10);
 	if (addrSRCNTable + sampleIndex + 1 > 0x10000) {
 		return false;
 	}

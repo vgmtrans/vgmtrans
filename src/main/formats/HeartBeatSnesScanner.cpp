@@ -100,12 +100,14 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 	UINT ofsReadSongList;
 	uint16_t addrSongListLo;
 	uint16_t addrSongListHi;
-	uint8_t maxSongIndex;
+	uint8_t addrSeqHeaderPtr;
+	int8_t maxSongIndex;
 	if (file->SearchBytePattern(ptnReadSongList, ofsReadSongList)) {
 		addrSongListLo = file->GetShort(ofsReadSongList + 2);
 		addrSongListHi = file->GetShort(ofsReadSongList + 7);
+		addrSeqHeaderPtr = file->GetByte(ofsReadSongList + 5);
 
-		if (addrSongListLo >= addrSongListHi || addrSongListHi - addrSongListLo >= 0x80) {
+		if (addrSongListLo >= addrSongListHi || addrSongListHi - addrSongListLo >= 0x10) {
 			return;
 		}
 
@@ -120,8 +122,24 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	// TODO: guess song index
-	int8_t songIndex = 0;
+	// guess song index
+	int8_t songIndex = -1;
+	for (int8_t songIndexCandidate = 0; songIndexCandidate < maxSongIndex; songIndexCandidate++) {
+		uint16_t addrSeqHeader = file->GetByte(addrSongListLo + songIndexCandidate) | (file->GetByte(addrSongListHi + songIndexCandidate) << 8);
+		if (addrSeqHeader == 0) {
+			break;
+		}
+
+		uint16_t addrTargetSeqHeader = file->GetShort(addrSeqHeaderPtr);
+		if (addrSeqHeader == addrTargetSeqHeader) {
+			songIndex = songIndexCandidate;
+			break;
+		}
+	}
+
+	if (songIndex == -1) {
+		songIndex = 0;
+	}
 
 	// search DIR address
 	UINT ofsSetDIR;
@@ -166,7 +184,7 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 		}
 	}
 
-	HeartBeatSnesInstrSet * newInstrSet = new HeartBeatSnesInstrSet(file, version, addrInstrTable, instrTableSize, addrSRCNTable, spcDirAddr);
+	HeartBeatSnesInstrSet * newInstrSet = new HeartBeatSnesInstrSet(file, version, addrInstrTable, instrTableSize, addrSRCNTable, songIndex, spcDirAddr);
 	if (!newInstrSet->LoadVGMFile()) {
 		delete newInstrSet;
 		return;
