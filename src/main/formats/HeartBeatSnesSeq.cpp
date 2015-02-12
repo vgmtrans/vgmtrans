@@ -63,14 +63,17 @@ bool HeartBeatSnesSeq::GetHeaderInfo(void)
 
 	for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
 		uint16_t ofsTrackStart = GetShort(curOffset);
-		if (ofsTrackStart != 0) {
-			std::wstringstream trackName;
-			trackName << L"Track Pointer " << (trackIndex + 1);
-			header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+		if (ofsTrackStart == 0) {
+			// example: Dragon Quest 6 - Brave Fight
+			header->AddSimpleItem(curOffset, 2, L"Track Pointer End");
+			curOffset += 2;
+			break;
 		}
-		else {
-			header->AddSimpleItem(curOffset, 2, L"NULL");
-		}
+
+		std::wstringstream trackName;
+		trackName << L"Track Pointer " << (trackIndex + 1);
+		header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+
 		curOffset += 2;
 	}
 
@@ -84,17 +87,18 @@ bool HeartBeatSnesSeq::GetTrackPointers(void)
 	curOffset += 2;
 
 	for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-		uint16_t ofsTrackStart = GetShort(curOffset);
-		if (ofsTrackStart != 0) {
-			uint16_t addrTrackStart = dwOffset + ofsTrackStart;
-			if (addrTrackStart < dwOffset) {
-				return false;
-			}
-
-			HeartBeatSnesTrack* track = new HeartBeatSnesTrack(this, addrTrackStart);
-			aTracks.push_back(track);
+		uint16_t ofsTrackStart = GetShort(curOffset); curOffset += 2;
+		if (ofsTrackStart == 0) {
+			break;
 		}
-		curOffset += 2;
+
+		uint16_t addrTrackStart = dwOffset + ofsTrackStart;
+		if (addrTrackStart < dwOffset) {
+			return false;
+		}
+
+		HeartBeatSnesTrack* track = new HeartBeatSnesTrack(this, addrTrackStart);
+		aTracks.push_back(track);
 	}
 
 	return true;
