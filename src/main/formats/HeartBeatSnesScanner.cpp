@@ -77,6 +77,23 @@ BytePattern HeartBeatSnesScanner::ptnLoadSRCN(
 	,
 	39);
 
+//; Dragon Quest 6 SPC
+//0bd4: f5 e0 08  mov   a,$08e0+x
+//0bd7: 28 0f     and   a,#$0f
+//0bd9: fd        mov   y,a
+//0bda: f6 0d 0a  mov   a,$0a0d+y
+//0bdd: c4 3b     mov   $3b,a
+//0bdf: f6 19 0a  mov   a,$0a19+y
+//0be2: c4 3c     mov   $3c,a
+BytePattern HeartBeatSnesScanner::ptnSaveSeqHeaderAddress(
+	"\xf5\xe0\x08\x28\x0f\xfd\xf6\x0d"
+	"\x0a\xc4\x3b\xf6\x19\x0a\xc4\x3c"
+	,
+	"x??xxxx?"
+	"?x?x??x?"
+	,
+	16);
+
 void HeartBeatSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -100,12 +117,10 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 	UINT ofsReadSongList;
 	uint16_t addrSongListLo;
 	uint16_t addrSongListHi;
-	uint8_t addrSeqHeaderPtr;
 	int8_t maxSongIndex;
 	if (file->SearchBytePattern(ptnReadSongList, ofsReadSongList)) {
 		addrSongListLo = file->GetShort(ofsReadSongList + 2);
 		addrSongListHi = file->GetShort(ofsReadSongList + 7);
-		addrSeqHeaderPtr = file->GetByte(ofsReadSongList + 5);
 
 		if (addrSongListLo >= addrSongListHi || addrSongListHi - addrSongListLo >= 0x10) {
 			return;
@@ -117,6 +132,15 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 		}
 
 		version = HEARTBEATSNES_STANDARD;
+	}
+	else {
+		return;
+	}
+
+	UINT ofsSaveSeqHeaderAddress;
+	uint8_t addrSeqHeaderPtr;
+	if (file->SearchBytePattern(ptnSaveSeqHeaderAddress, ofsSaveSeqHeaderAddress)) {
+		addrSeqHeaderPtr = file->GetByte(ofsSaveSeqHeaderAddress + 10);
 	}
 	else {
 		return;
