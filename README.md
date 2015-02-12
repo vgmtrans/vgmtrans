@@ -18,8 +18,10 @@ VGMTrans converts a music files used in console video games into standard midi a
 - Konami's SNES sequence and instrument format (.spc)
 - Hudson's SNES sequence and instrument format (.spc)
 - Rare's SNES sequence and instrument format (.spc)
+- Heartbeat's SNES sequence and instrument format used in SNES Dragon Quest VI and III (.spc)
 - Mint's (Akihiko Mori's) SNES sequence and instrument format (.spc)
 - Compile's SNES sequence format (.spc)
+- Chunsoft's SNES sequence format (.spc)
 
 The source code includes preliminary work on additional formats. 
 
