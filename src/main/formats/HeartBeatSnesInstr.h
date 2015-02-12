@@ -12,7 +12,7 @@ class HeartBeatSnesInstrSet :
 	public VGMInstrSet
 {
 public:
-	HeartBeatSnesInstrSet(RawFile* file, HeartBeatSnesVersion ver, uint32_t offset, uint32_t length, uint32_t spcDirAddr, const std::wstring & name = L"HeartBeatSnesInstrSet");
+	HeartBeatSnesInstrSet(RawFile* file, HeartBeatSnesVersion ver, uint32_t offset, uint32_t length, uint16_t addrSRCNTable, uint32_t spcDirAddr, const std::wstring & name = L"HeartBeatSnesInstrSet");
 	virtual ~HeartBeatSnesInstrSet(void);
 
 	virtual bool GetHeaderInfo();
@@ -21,6 +21,7 @@ public:
 	HeartBeatSnesVersion version;
 
 protected:
+	uint16_t addrSRCNTable;
 	uint32_t spcDirAddr;
 	std::vector<uint8_t> usedSRCNs;
 };
@@ -33,7 +34,7 @@ class HeartBeatSnesInstr
 	: public VGMInstr
 {
 public:
-	HeartBeatSnesInstr(VGMInstrSet* instrSet, HeartBeatSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name = L"HeartBeatSnesInstr");
+	HeartBeatSnesInstr(VGMInstrSet* instrSet, HeartBeatSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint16_t addrSRCNTable, uint32_t spcDirAddr, const std::wstring& name = L"HeartBeatSnesInstr");
 	virtual ~HeartBeatSnesInstr(void);
 
 	virtual bool LoadInstr();
@@ -41,6 +42,7 @@ public:
 	HeartBeatSnesVersion version;
 
 protected:
+	uint16_t addrSRCNTable;
 	uint32_t spcDirAddr;
 };
 

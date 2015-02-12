@@ -39,6 +39,44 @@ BytePattern HeartBeatSnesScanner::ptnSetDIR(
 	,
 	9);
 
+//; Dragon Quest 6 SPC
+//1505: 3f c3 12  call  $12c3             ; read arg1: set patch
+//1508: 8d 06     mov   y,#$06
+//150a: cf        mul   ya                ; offset = patch * 6
+//150b: fd        mov   y,a               ; use lower 8 bits
+//150c: 6d        push  y
+//150d: f7 08     mov   a,($08)+y         ; offset +0: sample index
+//150f: d5 d8 03  mov   $03d8+x,a
+//1512: eb 36     mov   y,$36
+//1514: f6 e0 08  mov   a,$08e0+y
+//1517: 28 0f     and   a,#$0f
+//1519: 8d 10     mov   y,#$10
+//151b: cf        mul   ya
+//151c: ee        pop   y
+//151d: 60        clrc
+//151e: 97 08     adc   a,($08)+y         ; offset +0: sample index + (n * 0x10)
+//1520: fc        inc   y
+//1521: 6d        push  y
+//1522: fd        mov   y,a
+//1523: f6 25 0a  mov   a,$0a25+y         ; read actual SRCN
+//1526: 8d 04     mov   y,#$04
+//1528: 3f 37 14  call  $1437             ; set SRCN
+//152b: ee        pop   y
+BytePattern HeartBeatSnesScanner::ptnLoadSRCN(
+	"\x3f\xc3\x12\x8d\x06\xcf\xfd\x6d"
+	"\xf7\x08\xd5\xd8\x03\xeb\x36\xf6"
+	"\xe0\x08\x28\x0f\x8d\x10\xcf\xee"
+	"\x60\x97\x08\xfc\x6d\xfd\xf6\x25"
+	"\x0a\x8d\x04\x3f\x37\x14\xee"
+	,
+	"x??xxxxx"
+	"x?x??x?x"
+	"??xxxxxx"
+	"xx?xxxx?"
+	"?xxx??x"
+	,
+	39);
+
 void HeartBeatSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -92,6 +130,13 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
 	}
 
+	// search SRCN lookup table
+	UINT ofsLoadSRCN;
+	uint16_t addrSRCNTable = 0;
+	if (file->SearchBytePattern(ptnLoadSRCN, ofsLoadSRCN)) {
+		addrSRCNTable = file->GetShort(ofsLoadSRCN + 31);
+	}
+
 	uint16_t addrSeqHeader = file->GetByte(addrSongListLo + songIndex) | (file->GetByte(addrSongListHi + songIndex) << 8);
 	HeartBeatSnesSeq* newSeq = new HeartBeatSnesSeq(file, version, addrSeqHeader, name);
 	if (!newSeq->LoadVGMFile()) {
@@ -99,7 +144,7 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	if (spcDirAddr == 0) {
+	if (spcDirAddr == 0 || addrSRCNTable == 0) {
 		return;
 	}
 
@@ -121,7 +166,7 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 		}
 	}
 
-	HeartBeatSnesInstrSet * newInstrSet = new HeartBeatSnesInstrSet(file, version, addrInstrTable, instrTableSize, spcDirAddr);
+	HeartBeatSnesInstrSet * newInstrSet = new HeartBeatSnesInstrSet(file, version, addrInstrTable, instrTableSize, addrSRCNTable, spcDirAddr);
 	if (!newInstrSet->LoadVGMFile()) {
 		delete newInstrSet;
 		return;

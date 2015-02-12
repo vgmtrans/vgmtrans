@@ -87,6 +87,7 @@ bool HeartBeatSnesSeq::GetTrackPointers(void)
 		uint16_t ofsTrackStart = GetShort(curOffset);
 		if (ofsTrackStart != 0) {
 			uint16_t addrTrackStart = dwOffset + ofsTrackStart;
+			assert(addrTrackStart >= dwOffset);
 			HeartBeatSnesTrack* track = new HeartBeatSnesTrack(this, addrTrackStart);
 			aTracks.push_back(track);
 		}
