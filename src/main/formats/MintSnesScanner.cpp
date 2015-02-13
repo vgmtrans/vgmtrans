@@ -12,14 +12,20 @@
 //0c46: c4 05     mov   $05,a             ; set song header ptr
 //0c48: 8d 00     mov   y,#$00
 //0c4a: f7 04     mov   a,($04)+y         ; read first byte
+//0c4c: 10 05     bpl   $0c53
+//0c4e: 68 ff     cmp   a,#$ff
+//0c50: d0 14     bne   $0c66
+//0c52: 6f        ret
 BytePattern MintSnesScanner::ptnLoadSeq(
 	"\x1c\xfd\xf6\xfe\x11\xc4\x04\xf6"
 	"\xff\x11\xc4\x05\x8d\x00\xf7\x04"
+	"\x10\x05\x68\xff\xd0\x14\x6f"
 	,
 	"xxx??x?x"
 	"??x?xxx?"
+	"xxxxx?x"
 	,
-	16);
+	23);
 
 //; Gokinjo Bouken Tai
 //02f1: 8f 11 f3  mov   $f3,#$11
