@@ -4,8 +4,6 @@
 #include "KonamiSnesInstr.h"
 #include "SNESDSP.h"
 
-using namespace std;
-
 //; Ganbare Goemon 4
 //13d3: 8f 1e 06  mov   $06,#$1e
 //13d6: 8f 00 0a  mov   $0a,#$00
@@ -19,6 +17,42 @@ BytePattern KonamiSnesScanner::ptnSetSongHeaderAddress(
 	"xxx"
 	,
 	11);
+
+//; Contra 3 SPC
+//197a: e4 0c     mov   a,$0c             ; song index (1 origin)
+//197c: 8f e6 04  mov   $04,#$e6
+//197f: 8f 03 05  mov   $05,#$03          ; sequence header table address
+//1982: 9c        dec   a
+//1983: 8d 05     mov   y,#$05            ; 5 bytes
+//1985: cf        mul   ya
+//1986: 7a 04     addw  ya,$04
+//1988: da 04     movw  $04,ya
+//198a: 8d 00     mov   y,#$00
+//198c: cd 00     mov   x,#$00
+//198e: f7 04     mov   a,($04)+y
+//1990: c4 20     mov   $20,a             ; offset +0
+//1992: fc        inc   y
+//1993: f7 04     mov   a,($04)+y
+//1995: c4 06     mov   $06,a             ; offset +1
+//1997: e4 0c     mov   a,$0c
+//1999: 68 60     cmp   a,#$60
+//199b: b0 64     bcs   $1a01
+//199d: 68 5c     cmp   a,#$5c
+//199f: 90 0a     bcc   $19ab
+BytePattern KonamiSnesScanner::ptnReadSongListCNTR3(
+	"\xe4\x0c\x8f\xe6\x04\x8f\x03\x05"
+	"\x9c\x8d\x05\xcf\x7a\x04\xda\x04"
+	"\x8d\x00\xcd\x00\xf7\x04\xc4\x20"
+	"\xfc\xf7\x04\xc4\x06\xe4\x0c\x68"
+	"\x60\xb0\x64\x68\x5c\x90\x0a"
+	,
+	"x?x??x??"
+	"xxxxx?x?"
+	"xxxxx?x?"
+	"xx?x?x?x"
+	"?x?x?x?"
+	,
+	39);
 
 //; Ganbare Goemon 4
 //; dispatch vcmd (e0-ff)
@@ -39,6 +73,48 @@ BytePattern KonamiSnesScanner::ptnJumpToVcmd(
 	,
 	15);
 
+//; Contra 3 SPC
+//0e61: 80        setc
+//0e62: a4 04     sbc   a,$04
+//0e64: 1c        asl   a
+//0e65: fd        mov   y,a
+//0e66: f6 de 0d  mov   a,$0dde+y
+//0e69: 2d        push  a
+//0e6a: f6 dd 0d  mov   a,$0ddd+y
+//0e6d: 2d        push  a
+//0e6e: dd        mov   a,y
+//0e6f: 5c        lsr   a
+//0e70: fd        mov   y,a
+//0e71: f6 27 0e  mov   a,$0e27+y
+//0e74: f0 08     beq   $0e7e
+BytePattern KonamiSnesScanner::ptnJumpToVcmdCNTR3(
+	"\x80\xa4\x04\x1c\xfd\xf6\xde\x0d"
+	"\x2d\xf6\xdd\x0d\x2d\xdd\x5c\xfd"
+	"\xf6\x27\x0e\xf0\x08"
+	,
+	"xx?xxx??"
+	"xx??xxxx"
+	"x??x?"
+	,
+	21);
+
+//; Contra 3 SPC
+//0e4c: e4 08     mov   a,$08
+//0e4e: 8f db 04  mov   $04,#$db
+//0e51: 68 e0     cmp   a,#$e0
+//0e53: b0 0c     bcs   $0e61
+//0e55: 68 65     cmp   a,#$65
+//0e57: 90 05     bcc   $0e5e
+BytePattern KonamiSnesScanner::ptnBranchForVcmd6xCNTR3(
+	"\x80\xa4\x04\x1c\xfd\xf6\xde\x0d"
+	"\x2d\xf6\xdd\x0d\x2d\xdd\x5c\xfd"
+	"\xf6\x27\x0e\xf0\x08"
+	,
+	"x?xxxxxx"
+	"?xxx?"
+	,
+	13);
+
 //; Ganbare Goemon 4
 //0266: 8f 5d f2  mov   $f2,#$5d
 //0269: 8f 04 f3  mov   $f3,#$04          ; source dir = $0400
@@ -48,6 +124,20 @@ BytePattern KonamiSnesScanner::ptnSetDIR(
 	"xxxx?x"
 	,
 	6);
+
+//; Contra 3 SPC
+//0919: e8 50     mov   a,#$50
+//091b: 8d 5d     mov   y,#$5d
+//091d: cc f2 00  mov   $00f2,y
+//0920: c5 f3 00  mov   $00f3,a           ; DIR = $5000
+BytePattern KonamiSnesScanner::ptnSetDIRCNTR3(
+	"\xe8\x50\x8d\x5d\xcc\xf2\x00\xc5"
+	"\xf3\x00"
+	,
+	"x?xxxxxx"
+	"xx"
+	,
+	10);
 
 //; Ganbare Goemon 4
 //; vcmd e2 - set instrument
@@ -65,11 +155,11 @@ BytePattern KonamiSnesScanner::ptnSetDIR(
 //; use another map
 //1baf: a8 28     sbc   a,#$28            ; patch -= 0x28
 //1bb1: 2d        push  a
-//1bb2: eb 25     mov   y,$25             ; bank number
+//1bb2: eb 25     mov   y,$25             ; bank offset
 //1bb4: f6 20 0a  mov   a,$0a20+y
 //1bb7: c4 04     mov   $04,a
 //1bb9: f6 21 0a  mov   a,$0a21+y
-//1bbc: c4 05     mov   $05,a             ; sample map = *(u16)($0a20 + bank * 2)
+//1bbc: c4 05     mov   $05,a             ; sample map = *(u16)($0a20 + bank_offset)
 //1bbe: ae        pop   a
 //1bbf: 3f ee 1b  call  $1bee
 //1bc2: 5f e2 18  jmp   $18e2
@@ -89,6 +179,71 @@ BytePattern KonamiSnesScanner::ptnLoadInstr(
 	"?xx??x??"
 	,
 	48);
+
+//; Contra 3 SPC
+//; vcmd e2 - set instrument
+//0ef1: 09 20 17  or    ($17),($20)
+//0ef4: d5 97 02  mov   $0297+x,a         ; instrument #
+//0ef7: 68 19     cmp   a,#$19
+//0ef9: b0 04     bcs   $0eff             ; branch if patch number >= 25
+//0efb: 68 14     cmp   a,#$14
+//0efd: b0 11     bcs   $0f10             ; branch if patch number >= 20
+//0eff: e8 36     mov   a,#$36
+//0f01: c4 04     mov   $04,a
+//0f03: e8 06     mov   a,#$06
+//0f05: c4 05     mov   $05,a             ; common sample map = $0636
+//0f07: f5 97 02  mov   a,$0297+x
+//0f0a: 3f 36 0f  call  $0f36
+//0f0d: 5f 8c 0c  jmp   $0c8c
+//; use another map
+//0f10: e5 05 02  mov   a,$0205           ; bank number
+//0f13: 1c        asl   a
+//0f14: fd        mov   y,a
+//0f15: f6 28 06  mov   a,$0628+y
+//0f18: c4 04     mov   $04,a
+//0f1a: f6 29 06  mov   a,$0629+y
+//0f1d: c4 05     mov   $05,a             ; sample map = *(u16)($0628 + bank * 2)
+//0f1f: f5 97 02  mov   a,$0297+x         ; instrument #
+//0f22: 80        setc
+//0f23: a8 14     sbc   a,#$14            ; patch -= 0x14
+//0f25: 3f 36 0f  call  $0f36
+//0f28: 5f 8c 0c  jmp   $0c8c
+//; update sample (percussion note)
+//0f2b: e8 fe     mov   a,#$fe
+//0f2d: c4 04     mov   $04,a
+//0f2f: e8 06     mov   a,#$06
+//0f31: c4 05     mov   $05,a             ; $04/5 = $06fe
+////; load instrument attributes from instrument table
+////; a = patch number, $04 = instrument table address
+//0f33: f5 97 02  mov   a,$0297+x
+//0f36: 8d 08     mov   y,#$08
+//0f38: cf        mul   ya
+//0f39: 7a 04     addw  ya,$04
+//0f3b: da 04     movw  $04,ya            ; load address by index `$04 += (patch * 8)`
+BytePattern KonamiSnesScanner::ptnLoadInstrCNTR3(
+	"\x09\x20\x17\xd5\x97\x02\x68\x19"
+	"\xb0\x04\x68\x14\xb0\x11\xe8\x36"
+	"\xc4\x04\xe8\x06\xc4\x05\xf5\x97"
+	"\x02\x3f\x36\x0f\x5f\x8c\x0c\xe5"
+	"\x05\x02\x1c\xfd\xf6\x28\x06\xc4"
+	"\x04\xf6\x29\x06\xc4\x05\xf5\x97"
+	"\x02\x80\xa8\x14\x3f\x36\x0f\x5f"
+	"\x8c\x0c\xe8\xfe\xc4\x04\xe8\x06"
+	"\xc4\x05\xf5\x97\x02\x8d\x08\xcf"
+	"\x7a\x04\xda\x04"
+	,
+	"x??x??x?"
+	"xxx?xxx?"
+	"x?x?x?x?"
+	"?x??x??x"
+	"??xxx??x"
+	"?x??x?x?"
+	"?xx?x??x"
+	"??x?x?x?"
+	"x?x??xxx"
+	"x?x?"
+	,
+	76);
 
 //; Ganbare Goemon 4
 //; load instrument for percussive note
@@ -128,124 +283,160 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	KonamiSnesVersion version = KONAMISNES_NONE;
 
 	bool hasSongList;
-	UINT ofsSetSongHeaderAddressASM;
-	UINT ofsJumpToVcmdASM;
-	UINT ofsSetDIRASM;
-	UINT ofsLoadInstrASM;
-	UINT ofsLoadPercInstrASM;
-	uint16_t addrSongHeader;
-	uint16_t addrCommonInstrTable;
-	uint16_t addrBankedInstrTable;
-	uint16_t addrPercInstrTable;
-	uint16_t addrVoiceCmdLengthTable;
-	uint16_t addrInstrTableBanks;
-	uint16_t addrCurrentBank;
-	uint8_t firstBankedInstr;
 
-	wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
-	wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
+	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
 	// find a song header
-	if (file->SearchBytePattern(ptnSetSongHeaderAddress, ofsSetSongHeaderAddressASM))
-	{
-		addrSongHeader = file->GetByte(ofsSetSongHeaderAddressASM + 4) | (file->GetByte(ofsSetSongHeaderAddressASM + 7) << 8);
+	UINT ofsSetSongHeaderAddress;
+	UINT ofsReadSongList;
+	uint16_t addrSongHeader;
+	uint16_t addrSongList;
+	int8_t primarySongIndex;
+	if (file->SearchBytePattern(ptnSetSongHeaderAddress, ofsSetSongHeaderAddress)) {
+		addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 4) | (file->GetByte(ofsSetSongHeaderAddress + 7) << 8);
 		hasSongList = false;
 	}
-	else
-	{
+	else if (file->SearchBytePattern(ptnReadSongListCNTR3, ofsReadSongList)) {
+		addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
+		primarySongIndex = file->GetByte(ofsReadSongList + 32);
+		hasSongList = true;
+	}
+	else {
 		return;
 	}
 
 	// find the vcmd length table
-	if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmdASM))
-	{
-		addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmdASM + 11);
+	UINT ofsJumpToVcmd;
+	uint16_t addrVcmdLengthTable;
+	uint8_t vcmd6XCountInList;
+	if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd)) {
+		addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 11);
+		vcmd6XCountInList = 0;
 
 		// check table length
-		if (addrVoiceCmdLengthTable + 0x20 >= 0x10000)
-		{
+		if (addrVcmdLengthTable + vcmd6XCountInList + 0x20 >= 0x10000) {
 			return;
 		}
 	}
-	else
-	{
+	else if (file->SearchBytePattern(ptnJumpToVcmdCNTR3, ofsJumpToVcmd)) {
+		addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
+
+		UINT ofsBranchForVcmd6x;
+		if (file->SearchBytePattern(ptnBranchForVcmd6xCNTR3, ofsBranchForVcmd6x)) {
+			// vcmd 60-64 is in the list
+			vcmd6XCountInList = 5;
+		}
+		else {
+			return;
+		}
+
+		// check table length
+		if (addrVcmdLengthTable + vcmd6XCountInList + 0x20 >= 0x10000) {
+			return;
+		}
+	}
+	else {
 		return;
 	}
 
 	// detect revision by vcmd length
-	if (file->GetByte(addrVoiceCmdLengthTable + (0xed - 0xe0)) == 3)
-	{
-		version = KONAMISNES_NORMAL_REV1;
-	}
-	else if (file->GetByte(addrVoiceCmdLengthTable + (0xfc - 0xe0)) == 2)
-	{
-		version = KONAMISNES_NORMAL_REV2;
-	}
-	else
-	{
-		version = KONAMISNES_NORMAL_REV3;
-	}
-
-	// load song(s)
-	if (hasSongList)
-	{
-		// TODO: NYI - Pop'n Twinbee
-		return;
-	}
-	else
-	{
-		KonamiSnesSeq* newSeq = new KonamiSnesSeq(file, version, addrSongHeader, name);
-		if (!newSeq->LoadVGMFile())
-		{
-			delete newSeq;
+	if (hasSongList) {
+		if (vcmd6XCountInList == 5) {
+			version = KONAMISNES_V1;
+		}
+		else {
 			return;
 		}
 	}
+	else {
+		assert(vcmd6XCountInList == 0);
+		if (file->GetByte(addrVcmdLengthTable + (0xed - 0xe0)) == 3) {
+			version = KONAMISNES_V3;
+		}
+		else if (file->GetByte(addrVcmdLengthTable + (0xfc - 0xe0)) == 2) {
+			version = KONAMISNES_V4;
+		}
+		else {
+			version = KONAMISNES_V5;
+		}
+	}
+
+	// load song(s)
+	if (hasSongList) {
+		int8_t songIndex = primarySongIndex;
+
+		uint32_t addrSongHeaderPtr = addrSongList + songIndex * 5;
+		if (addrSongHeaderPtr + 5 > 0x10000) {
+			return;
+		}
+
+		addrSongHeader = file->GetShort(addrSongHeaderPtr + 3);
+	}
+
+	KonamiSnesSeq* newSeq = new KonamiSnesSeq(file, version, addrSongHeader, name);
+	if (!newSeq->LoadVGMFile()) {
+		delete newSeq;
+		return;
+	}
 
 	// scan for DIR address
-	uint8_t spcDIR;
+	UINT ofsSetDIR;
+	uint16_t spcDirAddr;
 	std::map<std::wstring, std::vector<uint8_t>>::iterator itrDSP;
-	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIRASM))
-	{
-		spcDIR = file->GetByte(ofsSetDIRASM + 4);
+	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
 	}
-	else if ((itrDSP = file->tag.binaries.find(L"dsp")) != file->tag.binaries.end())
-	{
+	else if (file->SearchBytePattern(ptnSetDIRCNTR3, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+	}
+	else if ((itrDSP = file->tag.binaries.find(L"dsp")) != file->tag.binaries.end()) {
 		// read DIR from SPC700 snapshot
-		spcDIR = itrDSP->second[0x5d];
+		spcDirAddr = itrDSP->second[0x5d] << 8;
 	}
-	else
-	{
+	else {
 		return;
 	}
 
 	// scan for instrument table
-	if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstrASM))
-	{
-		addrCommonInstrTable = file->GetByte(ofsLoadInstrASM + 15) | (file->GetByte(ofsLoadInstrASM + 18) << 8);
-		firstBankedInstr = file->GetByte(ofsLoadInstrASM + 11);
-		addrCurrentBank = file->GetByte(ofsLoadInstrASM + 30);
-		addrInstrTableBanks = file->GetShort(ofsLoadInstrASM + 32);
+	UINT ofsLoadInstr;
+	uint16_t addrCommonInstrTable;
+	uint16_t addrBankedInstrTable;
+	uint8_t firstBankedInstr;
+	uint16_t addrPercInstrTable;
+	if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
+		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 18) << 8);
+		firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
+
+		uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 30);
+		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 32);
 		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+
+		// scan for percussive instrument table
+		UINT ofsLoadPercInstr;
+		if (file->SearchBytePattern(ptnLoadPercInstr, ofsLoadPercInstr)) {
+			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+		}
+		else {
+			return;
+		}
 	}
-	else
-	{
+	else if (file->SearchBytePattern(ptnLoadInstrCNTR3, ofsLoadInstr)) {
+		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 19) << 8);
+		firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
+
+		uint16_t addrCurrentBank = file->GetShort(ofsLoadInstr + 32);
+		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 37);
+		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank) * 2);
+
+		addrPercInstrTable = file->GetByte(ofsLoadInstr + 59) | (file->GetByte(ofsLoadInstr + 63) << 8);
+	}
+	else {
 		return;
 	}
 
-	// scan for percussive instrument table
-	if (file->SearchBytePattern(ptnLoadPercInstr, ofsLoadPercInstrASM))
-	{
-		addrPercInstrTable = file->GetByte(ofsLoadPercInstrASM + 1) | (file->GetByte(ofsLoadPercInstrASM + 4) << 8);
-	}
-	else
-	{
-		return;
-	}
-
-	KonamiSnesInstrSet * newInstrSet = new KonamiSnesInstrSet(file, addrCommonInstrTable, addrBankedInstrTable, firstBankedInstr, addrPercInstrTable, spcDIR << 8);
-	if (!newInstrSet->LoadVGMFile())
-	{
+	KonamiSnesInstrSet * newInstrSet = new KonamiSnesInstrSet(file, version, addrCommonInstrTable, addrBankedInstrTable, firstBankedInstr, addrPercInstrTable, spcDirAddr);
+	if (!newInstrSet->LoadVGMFile()) {
 		delete newInstrSet;
 		return;
 	}

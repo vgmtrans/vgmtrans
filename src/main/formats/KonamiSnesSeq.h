@@ -34,7 +34,8 @@ enum KonamiSnesSeqEventType
 	EVENT_VOLUME,
 	EVENT_VOLUME_FADE,
 	EVENT_PORTAMENTO,
-	EVENT_PITCH_ENVELOPE,
+	EVENT_PITCH_ENVELOPE_V1,
+	EVENT_PITCH_ENVELOPE_V2,
 	EVENT_TUNING,
 	EVENT_PITCH_SLIDE,
 	EVENT_ECHO,
@@ -83,8 +84,6 @@ public:
 	KonamiSnesTrack(KonamiSnesSeq* parentFile, long offset = 0, long length = 0);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
-	virtual void OnTickBegin(void);
-	virtual void OnTickEnd(void);
 
 	uint8_t noteLength;
 	uint8_t noteDurationRate;

@@ -18,7 +18,8 @@ END_FORMAT()
 enum KonamiSnesVersion
 {
 	KONAMISNES_NONE = 0,        // Unknown Version
-	KONAMISNES_NORMAL_REV1,     // Ganbare Goemon 2, etc.
-	KONAMISNES_NORMAL_REV2,     // Ganbare Goemon 3, etc.
-	KONAMISNES_NORMAL_REV3,     // Animaniacs
+	KONAMISNES_V1,              // Contra 3, etc.
+	KONAMISNES_V3,              // Ganbare Goemon 2, etc.
+	KONAMISNES_V4,              // Ganbare Goemon 3, etc.
+	KONAMISNES_V5,              // Animaniacs
 };

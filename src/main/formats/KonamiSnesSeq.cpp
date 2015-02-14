@@ -3,8 +3,6 @@
 #include "KonamiSnesFormat.h"
 #include "ScaleConversion.h"
 
-using namespace std;
-
 DECLARE_FORMAT(KonamiSnes);
 
 //  **********
@@ -12,7 +10,7 @@ DECLARE_FORMAT(KonamiSnes);
 //  **********
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
-#define SEQ_KEYOFS  24
+#define SEQ_KEYOFS  0
 
 // pan table (compatible with Nintendo engine)
 const uint8_t KonamiSnesSeq::panTable[] = {
@@ -24,7 +22,7 @@ const uint8_t KonamiSnesSeq::panTable[] = {
 	0xfe, 0xfe
 };
 
-KonamiSnesSeq::KonamiSnesSeq(RawFile* file, KonamiSnesVersion ver, uint32_t seqdataOffset, wstring newName)
+KonamiSnesSeq::KonamiSnesSeq(RawFile* file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::wstring newName)
 : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset), version(ver)
 {
 	name = newName;
@@ -63,6 +61,8 @@ bool KonamiSnesSeq::GetHeaderInfo(void)
 		uint16_t trkOff = GetShort(trackPointerOffset);
 		seqHeader->AddPointer(trackPointerOffset, 2, trkOff, true, L"Track Pointer");
 
+		assert(trkOff >= dwOffset);
+
 		if (trkOff - dwOffset < nNumTracks * 2)
 		{
 			nNumTracks = (trkOff - dwOffset) / 2;
@@ -93,9 +93,22 @@ void KonamiSnesSeq::LoadEventMap(KonamiSnesSeq *pSeqFile)
 
 	pSeqFile->EventMap[0x60] = EVENT_PERCUSSION_ON;
 	pSeqFile->EventMap[0x61] = EVENT_PERCUSSION_OFF;
-	pSeqFile->EventMap[0x62] = EVENT_GAIN;
-	for (uint8_t statusByte = 0x63; statusByte <= 0x7f; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_UNKNOWN0;
+
+	if (version == KONAMISNES_V1) {
+		pSeqFile->EventMap[0x62] = EVENT_UNKNOWN1;
+		pSeqFile->EventMap[0x63] = EVENT_UNKNOWN1;
+		pSeqFile->EventMap[0x64] = EVENT_UNKNOWN2;
+
+		for (uint8_t statusByte = 0x65; statusByte <= 0x7f; statusByte++) {
+			pSeqFile->EventMap[statusByte] = EVENT_UNKNOWN0;
+		}
+	}
+	else {
+		pSeqFile->EventMap[0x62] = EVENT_GAIN;
+
+		for (uint8_t statusByte = 0x63; statusByte <= 0x7f; statusByte++) {
+			pSeqFile->EventMap[statusByte] = EVENT_UNKNOWN0;
+		}
 	}
 
 	pSeqFile->EventMap[0xe0] = EVENT_REST;
@@ -115,7 +128,7 @@ void KonamiSnesSeq::LoadEventMap(KonamiSnesSeq *pSeqFile)
 	pSeqFile->EventMap[0xee] = EVENT_VOLUME;
 	pSeqFile->EventMap[0xef] = EVENT_VOLUME_FADE;
 	pSeqFile->EventMap[0xf0] = EVENT_PORTAMENTO;
-	pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE;
+	pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
 	pSeqFile->EventMap[0xf2] = EVENT_TUNING;
 	pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE;
 	pSeqFile->EventMap[0xf4] = EVENT_ECHO;
@@ -133,19 +146,41 @@ void KonamiSnesSeq::LoadEventMap(KonamiSnesSeq *pSeqFile)
 
 	switch(pSeqFile->version)
 	{
-	case KONAMISNES_NORMAL_REV1:
+	case KONAMISNES_V1:
+		pSeqFile->EventMap[0xe0] = EVENT_REST;
+		pSeqFile->EventMap[0xed] = EVENT_UNKNOWN3; // nop
+		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
+		pSeqFile->EventMap[0xf3] = EVENT_UNKNOWN3; // nop
+		pSeqFile->EventMap[0xfa] = EVENT_UNKNOWN3;
+		pSeqFile->EventMap[0xfb] = EVENT_UNKNOWN1;
+		pSeqFile->EventMap.erase(0xfc); // game-specific?
+		break;
+
+	case KONAMISNES_V3:
 		pSeqFile->EventMap[0xe0] = EVENT_UNKNOWN2;
 		pSeqFile->EventMap[0xed] = EVENT_UNKNOWN3;
+		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+		pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE;
+		pSeqFile->EventMap[0xfa] = EVENT_ADSR_GAIN;
+		pSeqFile->EventMap[0xfb] = EVENT_ADSR2;
 		break;
 
-	case KONAMISNES_NORMAL_REV2:
+	case KONAMISNES_V4:
 		pSeqFile->EventMap[0xe0] = EVENT_UNKNOWN2;
 		pSeqFile->EventMap[0xed] = EVENT_ADSR1;
+		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+		pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE;
+		pSeqFile->EventMap[0xfa] = EVENT_ADSR_GAIN;
+		pSeqFile->EventMap[0xfb] = EVENT_ADSR2;
 		break;
 
-	case KONAMISNES_NORMAL_REV3:
+	case KONAMISNES_V5:
 		pSeqFile->EventMap[0xe0] = EVENT_REST;
 		pSeqFile->EventMap[0xed] = EVENT_ADSR1;
+		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+		pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE;
+		pSeqFile->EventMap[0xfa] = EVENT_ADSR_GAIN;
+		pSeqFile->EventMap[0xfb] = EVENT_ADSR2;
 		break;
 	}
 }
@@ -157,12 +192,18 @@ double KonamiSnesSeq::GetTempoInBPM ()
 
 double KonamiSnesSeq::GetTempoInBPM (uint8_t tempo)
 {
-	if (tempo != 0)
-	{
-		return 60000000.0 / (SEQ_PPQN * (125 * 0x20) * 2) * (tempo / 256.0);
+	if (tempo != 0) {
+		uint8_t timerFreq;
+		if (version == KONAMISNES_V1) {
+			timerFreq = 0x20;
+		}
+		else {
+			timerFreq = 0x40;
+		}
+
+		return 60000000.0 / (SEQ_PPQN * (125 * timerFreq)) * (tempo / 256.0);
 	}
-	else
-	{
+	else {
 		return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
 	}
 }
@@ -245,10 +286,10 @@ bool KonamiSnesTrack::ReadEvent(void)
 	uint8_t statusByte = GetByte(curOffset++);
 	bool bContinue = true;
 
-	wstringstream desc;
+	std::wstringstream desc;
 
 	KonamiSnesSeqEventType eventType = (KonamiSnesSeqEventType)0;
-	map<uint8_t, KonamiSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+	std::map<uint8_t, KonamiSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
 	if (pEventType != parentSeq->EventMap.end())
 	{
 		eventType = pEventType->second;
@@ -512,35 +553,31 @@ bool KonamiSnesTrack::ReadEvent(void)
 		int8_t pitchDelta = GetByte(curOffset++);
 
 		desc << L"Times: " << (int)times << L"  Volume Delta: " << (int)volumeDelta << L"  Pitch Delta: " << (int)pitchDelta;
-		if (times == 0)
-		{
+		if (times == 0) {
 			bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, L"Loop End");
 		}
-		else
-		{
+		else {
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 		}
 
 		bool loopAgain;
-		if (times == 0)
-		{
+		if (times == 0) {
 			// infinite loop
 			loopAgain = true;
 		}
-		else
-		{
+		else {
 			loopCount++;
 			loopAgain = (loopCount != times);
 		}
 
-		if (loopAgain)
-		{
+		if (loopAgain) {
 			curOffset = loopReturnAddr;
 			loopVolumeDelta += volumeDelta;
 			loopPitchDelta += pitchDelta;
+
+			assert(loopReturnAddr != 0);
 		}
-		else
-		{
+		else {
 			loopCount = 0;
 			loopVolumeDelta = 0;
 			loopPitchDelta = 0;
@@ -562,35 +599,31 @@ bool KonamiSnesTrack::ReadEvent(void)
 		int8_t pitchDelta = GetByte(curOffset++);
 
 		desc << L"Times: " << (int)times << L"  Volume Delta: " << (int)volumeDelta << L"  Pitch Delta: " << (int)pitchDelta;
-		if (times == 0)
-		{
+		if (times == 0) {
 			bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, L"Loop End #2");
 		}
-		else
-		{
+		else {
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End #2", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 		}
 
 		bool loopAgain;
-		if (times == 0)
-		{
+		if (times == 0) {
 			// infinite loop
 			loopAgain = true;
 		}
-		else
-		{
+		else {
 			loopCount2++;
 			loopAgain = (loopCount2 != times);
 		}
 
-		if (loopAgain)
-		{
+		if (loopAgain) {
 			curOffset = loopReturnAddr2;
 			loopVolumeDelta2 += volumeDelta;
 			loopPitchDelta2 += pitchDelta;
+
+			assert(loopReturnAddr2 != 0);
 		}
-		else
-		{
+		else {
 			loopCount2 = 0;
 			loopVolumeDelta2 = 0;
 			loopPitchDelta2 = 0;
@@ -675,17 +708,29 @@ bool KonamiSnesTrack::ReadEvent(void)
 		break;
 	}
 
-	case EVENT_PITCH_ENVELOPE:
+	case EVENT_PITCH_ENVELOPE_V1:
+	{
+		uint8_t pitchEnvDelay = GetByte(curOffset++);
+		uint8_t pitchEnvSpeed = GetByte(curOffset++);
+		uint8_t pitchEnvDepth = GetByte(curOffset++);
+		EVENT_WITH_MIDITEXT_START
+			desc << L"Delay: " << (int)pitchEnvDelay << L"  Speed: " << (int)pitchEnvSpeed << L"  Depth: " << (int)-pitchEnvDepth;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+		EVENT_WITH_MIDITEXT_END
+			break;
+	}
+
+	case EVENT_PITCH_ENVELOPE_V2:
 	{
 		uint8_t pitchEnvDelay = GetByte(curOffset++);
 		uint8_t pitchEnvLength = GetByte(curOffset++);
 		uint8_t pitchEnvOffset = GetByte(curOffset++);
 		int16_t pitchDelta = GetShort(curOffset); curOffset += 2;
 		EVENT_WITH_MIDITEXT_START
-		desc << L"Delay: " << (int)pitchEnvDelay << L"  Length: " << (int)pitchEnvLength << L"  Offset: " << (int)-pitchEnvOffset << L" semitones" << L"  Delta: " << (pitchDelta / 256.0) << L" semitones";
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Envelope", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+			desc << L"Delay: " << (int)pitchEnvDelay << L"  Length: " << (int)pitchEnvLength << L"  Offset: " << (int)-pitchEnvOffset << L" semitones" << L"  Delta: " << (pitchDelta / 256.0) << L" semitones";
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope", desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
 		EVENT_WITH_MIDITEXT_END
-		break;
+			break;
 	}
 
 	case EVENT_TUNING:
@@ -820,6 +865,8 @@ bool KonamiSnesTrack::ReadEvent(void)
 		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 		uint32_t length = curOffset - beginOffset;
 
+		assert(dest >= dwOffset);
+
 		curOffset = dest;
 		if (!IsOffsetUsed(dest)) {
 			AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
@@ -836,6 +883,8 @@ bool KonamiSnesTrack::ReadEvent(void)
 
 		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+
+		assert(dest >= dwOffset);
 
 		subReturnAddr = curOffset;
 		inSubroutine = true;
@@ -865,22 +914,14 @@ bool KonamiSnesTrack::ReadEvent(void)
 		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
 		EVENT_WITH_MIDITEXT_END
-		pRoot->AddLogItem(new LogItem(wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, wstring(L"KonamiSnesSeq")));
+		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"KonamiSnesSeq")));
 		bContinue = false;
 		break;
 	}
 
-	//wostringstream ssTrace;
+	//std::wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
 	//OutputDebugString(ssTrace.str().c_str());
 
 	return bContinue;
-}
-
-void KonamiSnesTrack::OnTickBegin(void)
-{
-}
-
-void KonamiSnesTrack::OnTickEnd(void)
-{
 }
