@@ -26,6 +26,7 @@ private:
 	static BytePattern ptnReadSongListCNTR3;
 	static BytePattern ptnJumpToVcmd;
 	static BytePattern ptnJumpToVcmdCNTR3;
+	static BytePattern ptnBranchForVcmd6xMDR2;
 	static BytePattern ptnBranchForVcmd6xCNTR3;
 	static BytePattern ptnSetDIR;
 	static BytePattern ptnSetDIRCNTR3;

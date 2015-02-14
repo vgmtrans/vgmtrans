@@ -52,7 +52,12 @@ bool KonamiSnesInstrSet::GetInstrPointers()
 		}
 
 		if (!KonamiSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, false)) {
-			break;
+			if (instr < firstBankedInstr) {
+				continue;
+			}
+			else {
+				break;
+			}
 		}
 		if (!KonamiSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, true)) {
 			continue;
@@ -170,7 +175,7 @@ bool KonamiSnesInstr::IsValidHeader(RawFile * file, KonamiSnesVersion version, u
 
 uint32_t KonamiSnesInstr::ExpectedSize(KonamiSnesVersion version)
 {
-	if (version == KONAMISNES_V1) {
+	if (version == KONAMISNES_V1 || version == KONAMISNES_V2) {
 		return 8;
 	}
 	else {
@@ -222,7 +227,8 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, KonamiSnesVersion ver, uint
 	AddSimpleItem(offset + 5, 1, L"Pan");
 	// volume is *decreased* by final volume value
 	// so it is impossible to convert it in 100% accuracy
-	AddVolume(1.0 - (vol / 128.0), offset + 6);
+	// the following value 48.0 is chosen as a "average channel volume level"
+	AddVolume(1.0 - (vol / 48.0), offset + 6);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 

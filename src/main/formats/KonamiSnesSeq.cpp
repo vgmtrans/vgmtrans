@@ -147,6 +147,7 @@ void KonamiSnesSeq::LoadEventMap(KonamiSnesSeq *pSeqFile)
 	switch(pSeqFile->version)
 	{
 	case KONAMISNES_V1:
+	case KONAMISNES_V2:
 		pSeqFile->EventMap[0xe0] = EVENT_REST;
 		pSeqFile->EventMap[0xed] = EVENT_UNKNOWN3; // nop
 		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;

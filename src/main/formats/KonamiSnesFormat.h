@@ -19,6 +19,7 @@ enum KonamiSnesVersion
 {
 	KONAMISNES_NONE = 0,        // Unknown Version
 	KONAMISNES_V1,              // Contra 3, etc.
+	KONAMISNES_V2,              // Madara 2, etc.
 	KONAMISNES_V3,              // Ganbare Goemon 2, etc.
 	KONAMISNES_V4,              // Ganbare Goemon 3, etc.
 	KONAMISNES_V5,              // Animaniacs

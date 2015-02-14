@@ -137,6 +137,23 @@ BytePattern KonamiSnesScanner::ptnJumpToVcmdCNTR3(
 	,
 	21);
 
+//; Madara 2
+//0e5b: e4 08     mov   a,$08
+//0e5d: 8f de 04  mov   $04,#$de
+//0e60: 68 e0     cmp   a,#$e0
+//0e62: b0 0c     bcs   $0e70             ; branch if vcmd e0..ff
+//0e64: 8f 60 04  mov   $04,#$60
+//0e67: 68 62     cmp   a,#$62
+//0e69: 90 05     bcc   $0e70             ; branch if vcmd 60..61
+BytePattern KonamiSnesScanner::ptnBranchForVcmd6xMDR2(
+	"\xe4\x08\x8f\xde\x04\x68\xe0\xb0"
+	"\x0c\x8f\x60\x04\x68\x62\x90\x05"
+	,
+	"x?x??xxx"
+	"?x??xxx?"
+	,
+	15);
+
 //; Contra 3 SPC
 //0e4c: e4 08     mov   a,$08
 //0e4e: 8f db 04  mov   $04,#$db
@@ -144,15 +161,14 @@ BytePattern KonamiSnesScanner::ptnJumpToVcmdCNTR3(
 //0e53: b0 0c     bcs   $0e61
 //0e55: 68 65     cmp   a,#$65
 //0e57: 90 05     bcc   $0e5e
-//0e59: a2 26     set5  $26
 BytePattern KonamiSnesScanner::ptnBranchForVcmd6xCNTR3(
 	"\xe4\x08\x8f\xdb\x04\x68\xe0\xb0"
-	"\x0c\x68\x65\x90\x05\xa2\x26"
+	"\x0c\x68\x65\x90\x05"
 	,
 	"x?x??xxx"
-	"?xx??x?"
+	"?xx??"
 	,
-	15);
+	13);
 
 //; Ganbare Goemon 4
 //0266: 8f 5d f2  mov   $f2,#$5d
@@ -371,6 +387,10 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 			// vcmd 60-64 is in the list
 			vcmd6XCountInList = 5;
 		}
+		else if (file->SearchBytePattern(ptnBranchForVcmd6xMDR2, ofsBranchForVcmd6x)) {
+			// vcmd 60-61 is in the list
+			vcmd6XCountInList = 2;
+		}
 		else {
 			return;
 		}
@@ -390,7 +410,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 			version = KONAMISNES_V1;
 		}
 		else {
-			return;
+			version = KONAMISNES_V2;
 		}
 	}
 	else {

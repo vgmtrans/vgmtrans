@@ -174,9 +174,6 @@ bool SNESSampColl::IsValidSampleDir(RawFile * file, uint32_t spcDirEntAddr, bool
 
 	uint16_t addrSampStart = file->GetShort(spcDirEntAddr);
 	uint16_t addrSampLoop = file->GetShort(spcDirEntAddr + 2);
-	if (addrSampStart == 0 || addrSampStart == 0xffff || addrSampLoop == 0 || addrSampLoop == 0xffff) {
-		return false;
-	}
 	if (addrSampLoop < addrSampStart || addrSampStart + 9 >= 0x10000) {
 		return false;
 	}
