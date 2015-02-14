@@ -251,7 +251,7 @@ void KonamiSnesTrack::ResetVars(void)
 
 double KonamiSnesTrack::GetTuningInSemitones(int8_t tuning)
 {
-	return tuning / 128.0;
+	return tuning * 4 / 256.0;
 }
 
 
