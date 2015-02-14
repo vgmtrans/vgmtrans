@@ -167,6 +167,10 @@ void KonamiSnesSeq::LoadEventMap(KonamiSnesSeq *pSeqFile)
 		break;
 
 	case KONAMISNES_V4:
+		for (uint8_t statusByte = 0x70; statusByte <= 0x7f; statusByte++) {
+			pSeqFile->EventMap[statusByte] = EVENT_INSTANT_TUNING;
+		}
+
 		pSeqFile->EventMap[0xe0] = EVENT_UNKNOWN2;
 		pSeqFile->EventMap[0xed] = EVENT_ADSR1;
 		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
@@ -176,6 +180,10 @@ void KonamiSnesSeq::LoadEventMap(KonamiSnesSeq *pSeqFile)
 		break;
 
 	case KONAMISNES_V5:
+		for (uint8_t statusByte = 0x70; statusByte <= 0x7f; statusByte++) {
+			pSeqFile->EventMap[statusByte] = EVENT_INSTANT_TUNING;
+		}
+
 		pSeqFile->EventMap[0xe0] = EVENT_REST;
 		pSeqFile->EventMap[0xed] = EVENT_ADSR1;
 		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
@@ -455,6 +463,19 @@ bool KonamiSnesTrack::ReadEvent(void)
 		desc << L"GAIN: " << (int)newGAINAmount << L" ($" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)newGAIN << L")";
 		AddGenericEvent(beginOffset, curOffset-beginOffset, L"GAIN", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
 		EVENT_WITH_MIDITEXT_END
+		break;
+	}
+
+	case EVENT_INSTANT_TUNING:
+	{
+		int8_t newTuning = statusByte & 0x0f;
+		if (newTuning > 8) {
+			// extend sign
+			newTuning -= 16;
+		}
+
+		double cents = GetTuningInSemitones(newTuning) * 100.0;
+		AddFineTuning(beginOffset, curOffset - beginOffset, cents, L"Instant Fine Tuning");
 		break;
 	}
 
