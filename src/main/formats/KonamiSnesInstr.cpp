@@ -193,7 +193,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, KonamiSnesVersion ver, uint
 	uint8_t adsr1 = GetByte(offset + 3);
 	uint8_t adsr2 = GetByte(offset + 4);
 	uint8_t pan = GetByte(offset + 5);
-	uint8_t vol = GetByte(offset + 6);
+	int8_t vol = GetByte(offset + 6);
 
 	uint8_t gain = adsr2;
 	bool use_adsr = ((adsr1 & 0x80) != 0);
@@ -220,7 +220,9 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, KonamiSnesVersion ver, uint
 	AddSimpleItem(offset + 3, 1, L"ADSR1");
 	AddSimpleItem(offset + 4, 1, use_adsr ? L"ADSR2" : L"GAIN");
 	AddSimpleItem(offset + 5, 1, L"Pan");
-	AddVolume(1.0 - (min(vol, 128) / 128.0), offset + 6);
+	// volume is *decreased* by final volume value
+	// so it is impossible to convert it in 100% accuracy
+	AddVolume(1.0 - (vol / 128.0), offset + 6);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 

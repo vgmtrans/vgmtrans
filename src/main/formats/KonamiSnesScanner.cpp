@@ -18,6 +18,45 @@ BytePattern KonamiSnesScanner::ptnSetSongHeaderAddress(
 	,
 	11);
 
+//; Axelay SPC
+//1948: e4 0c     mov   a,$0c             ; song index (1 origin)
+//194a: 8f e6 04  mov   $04,#$e6
+//194d: 8f 03 05  mov   $05,#$03          ; $04/5 = $03e6 (sequence header table)
+//1950: 9c        dec   a
+//1951: 8d 05     mov   y,#$05            ; 5 bytes
+//1953: cf        mul   ya
+//1954: 7a 04     addw  ya,$04
+//1956: da 04     movw  $04,ya
+//1958: 8d 00     mov   y,#$00
+//195a: cd 00     mov   x,#$00
+//195c: f7 04     mov   a,($04)+y
+//195e: c4 20     mov   $20,a             ; offset +0: ?
+//1960: fc        inc   y
+//1961: f7 04     mov   a,($04)+y
+//1963: c4 06     mov   $06,a             ; offset +1: ?
+//1965: e4 0c     mov   a,$0c
+//1967: 68 4d     cmp   a,#$4d
+//1969: b0 5a     bcs   $19c5             ; branch if song >= 77
+//196b: cd 0c     mov   x,#$0c
+//196d: 68 41     cmp   a,#$41
+//196f: b0 4a     bcs   $19bb             ; branch if song >= 65
+BytePattern KonamiSnesScanner::ptnReadSongListAXE(
+	"\xe4\x0c\x8f\xe6\x04\x8f\x03\x05"
+	"\x9c\x8d\x05\xcf\x7a\x04\xda\x04"
+	"\x8d\x00\xcd\x00\xf7\x04\xc4\x20"
+	"\xfc\xf7\x04\xc4\x06\xe4\x0c\x68"
+	"\x4d\xb0\x5a\xcd\x0c\x68\x41\xb0"
+	"\x4a"
+	,
+	"x?x??x??"
+	"xxxxx?x?"
+	"xxxxx?x?"
+	"xx?x?x?x"
+	"?x?x?x?x"
+	"?"
+	,
+	41);
+
 //; Contra 3 SPC
 //197a: e4 0c     mov   a,$0c             ; song index (1 origin)
 //197c: 8f e6 04  mov   $04,#$e6
@@ -105,15 +144,15 @@ BytePattern KonamiSnesScanner::ptnJumpToVcmdCNTR3(
 //0e53: b0 0c     bcs   $0e61
 //0e55: 68 65     cmp   a,#$65
 //0e57: 90 05     bcc   $0e5e
+//0e59: a2 26     set5  $26
 BytePattern KonamiSnesScanner::ptnBranchForVcmd6xCNTR3(
-	"\x80\xa4\x04\x1c\xfd\xf6\xde\x0d"
-	"\x2d\xf6\xdd\x0d\x2d\xdd\x5c\xfd"
-	"\xf6\x27\x0e\xf0\x08"
+	"\xe4\x08\x8f\xdb\x04\x68\xe0\xb0"
+	"\x0c\x68\x65\x90\x05\xa2\x26"
 	,
-	"x?xxxxxx"
-	"?xxx?"
+	"x?x??xxx"
+	"?xx??x?"
 	,
-	13);
+	15);
 
 //; Ganbare Goemon 4
 //0266: 8f 5d f2  mov   $f2,#$5d
@@ -297,6 +336,11 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 		addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 4) | (file->GetByte(ofsSetSongHeaderAddress + 7) << 8);
 		hasSongList = false;
 	}
+	else if (file->SearchBytePattern(ptnReadSongListAXE, ofsReadSongList)) {
+		addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
+		primarySongIndex = file->GetByte(ofsReadSongList + 32);
+		hasSongList = true;
+	}
 	else if (file->SearchBytePattern(ptnReadSongListCNTR3, ofsReadSongList)) {
 		addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
 		primarySongIndex = file->GetByte(ofsReadSongList + 32);
@@ -364,6 +408,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 
 	// load song(s)
 	if (hasSongList) {
+		// TODO: song index search
 		int8_t songIndex = primarySongIndex;
 
 		uint32_t addrSongHeaderPtr = addrSongList + songIndex * 5;
