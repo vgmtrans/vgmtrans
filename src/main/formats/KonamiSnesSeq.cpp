@@ -11,8 +11,32 @@ DECLARE_FORMAT(KonamiSnes);
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
 
+const uint8_t KonamiSnesSeq::PAN_VOLUME_LEFT_V1[] = {
+	0x00, 0x05, 0x0c, 0x14, 0x1e, 0x28, 0x32, 0x3c,
+	0x46, 0x50, 0x59, 0x62, 0x69, 0x6f, 0x74, 0x78,
+	0x7b, 0x7d, 0x7e, 0x7e, 0x7f
+};
+
+const uint8_t KonamiSnesSeq::PAN_VOLUME_RIGHT_V1[] = {
+	0x7f, 0x7e, 0x7e, 0x7d, 0x7b, 0x78, 0x74, 0x6f,
+	0x69, 0x62, 0x59, 0x50, 0x46, 0x3c, 0x32, 0x28,
+	0x1e, 0x14, 0x0c, 0x05, 0x00
+};
+
+const uint8_t KonamiSnesSeq::PAN_VOLUME_LEFT_V2[] = {
+	0x00, 0x0a, 0x18, 0x28, 0x3c, 0x50, 0x64, 0x78,
+	0x8c, 0xa0, 0xb2, 0xc4, 0xd2, 0xde, 0xe8, 0xf0,
+	0xf6, 0xfa, 0xfc, 0xfc, 0xfe
+};
+
+const uint8_t KonamiSnesSeq::PAN_VOLUME_RIGHT_V2[] = {
+	0xfe, 0xfc, 0xfc, 0xfa, 0xf6, 0xf0, 0xe8, 0xde,
+	0xd2, 0xc4, 0xb2, 0xa0, 0x8c, 0x78, 0x64, 0x50,
+	0x3c, 0x28, 0x18, 0x0a, 0x00
+};
+
 // pan table (compatible with Nintendo engine)
-const uint8_t KonamiSnesSeq::panTable[] = {
+const uint8_t KonamiSnesSeq::PAN_TABLE[] = {
 	0x00, 0x04, 0x08, 0x0e, 0x14, 0x1a, 0x20, 0x28,
 	0x30, 0x38, 0x40, 0x48, 0x50, 0x5a, 0x64, 0x6e,
 	0x78, 0x82, 0x8c, 0x96, 0xa0, 0xa8, 0xb0, 0xb8,
@@ -129,7 +153,7 @@ void KonamiSnesSeq::LoadEventMap()
 	EventMap[0xf0] = EVENT_PORTAMENTO;
 	EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
 	EventMap[0xf2] = EVENT_TUNING;
-	EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
+	EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
 	EventMap[0xf4] = EVENT_ECHO;
 	EventMap[0xf5] = EVENT_ECHO_PARAM;
 	EventMap[0xf6] = EVENT_LOOP_WITH_VOLTA_START;
@@ -146,7 +170,6 @@ void KonamiSnesSeq::LoadEventMap()
 	switch(version)
 	{
 	case KONAMISNES_V1:
-	case KONAMISNES_V2:
 		EventMap[0xed] = EVENT_UNKNOWN3; // nop
 		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
 		EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
@@ -155,10 +178,19 @@ void KonamiSnesSeq::LoadEventMap()
 		EventMap.erase(0xfc); // game-specific?
 		break;
 
+	case KONAMISNES_V2:
+		EventMap[0xed] = EVENT_UNKNOWN3; // nop
+		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
+		EventMap[0xfa] = EVENT_UNKNOWN3;
+		EventMap[0xfb] = EVENT_UNKNOWN1;
+		EventMap.erase(0xfc); // game-specific?
+		break;
+
 	case KONAMISNES_V3:
 		EventMap[0xed] = EVENT_UNKNOWN3; // nop
 		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
-		EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
 		EventMap[0xfa] = EVENT_UNKNOWN3;
 		EventMap[0xfb] = EVENT_UNKNOWN1;
 		EventMap[0xfc] = EVENT_UNKNOWN2;
@@ -167,7 +199,7 @@ void KonamiSnesSeq::LoadEventMap()
 	case KONAMISNES_V4:
 		EventMap[0xed] = EVENT_UNKNOWN3;
 		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
-		EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
 		EventMap[0xfa] = EVENT_ADSR_GAIN;
 		EventMap[0xfb] = EVENT_ADSR2;
 		EventMap[0xfc] = EVENT_PROGCHANGEVOL;
@@ -180,7 +212,7 @@ void KonamiSnesSeq::LoadEventMap()
 
 		EventMap[0xed] = EVENT_ADSR1;
 		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
-		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
 		EventMap[0xfa] = EVENT_ADSR_GAIN;
 		EventMap[0xfb] = EVENT_ADSR2;
 		EventMap[0xfc] = EVENT_PROGCHANGEVOL;
@@ -193,7 +225,7 @@ void KonamiSnesSeq::LoadEventMap()
 
 		EventMap[0xed] = EVENT_ADSR1;
 		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
-		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
 		EventMap[0xfa] = EVENT_ADSR_GAIN;
 		EventMap[0xfb] = EVENT_ADSR2;
 		EventMap[0xfc] = EVENT_PROGCHANGEVOL;
@@ -535,22 +567,71 @@ bool KonamiSnesTrack::ReadEvent(void)
 	case EVENT_PAN:
 	{
 		uint8_t newPan = GetByte(curOffset++);
-		uint8_t midiPan;
-		double midiScalePan;
-		double volumeScale;
 
-		newPan = min(newPan, 40);
+		bool instrumentPanOff;
+		bool instrumentPanOn;
+		switch (parentSeq->version) {
+		case KONAMISNES_V1:
+		case KONAMISNES_V2:
+			instrumentPanOff = (newPan == 0x15);
+			instrumentPanOn = (newPan == 0x16);
+			break;
 
-		midiScalePan = ConvertPercentPanToStdMidiScale(KonamiSnesSeq::panTable[newPan] / 256.0, &volumeScale);
-		if (midiScalePan == 0.0) {
-			midiPan = 0;
+		default:
+			instrumentPanOff = (newPan == 0x2a);
+			instrumentPanOn = (newPan == 0x2c);
+		}
+
+		if (instrumentPanOff) {
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Per-Instrument Pan Off", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
+		}
+		else if (instrumentPanOn) {
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Per-Instrument Pan On", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
 		}
 		else {
-			midiPan = 1 + roundi(midiScalePan * 126.0);
-		}
+			uint8_t midiPan;
+			double midiScalePan;
+			double volumeScale;
 
-		AddPan(beginOffset, curOffset-beginOffset, midiPan);
-		AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
+			switch (parentSeq->version) {
+			case KONAMISNES_V1:
+			case KONAMISNES_V2:
+			{
+				const uint8_t* PAN_VOLUME_LEFT;
+				const uint8_t* PAN_VOLUME_RIGHT;
+				if (parentSeq->version == KONAMISNES_V1) {
+					PAN_VOLUME_LEFT = parentSeq->PAN_VOLUME_LEFT_V1;
+					PAN_VOLUME_RIGHT = parentSeq->PAN_VOLUME_RIGHT_V1;
+				}
+				else { // KONAMISNES_V2
+					PAN_VOLUME_LEFT = parentSeq->PAN_VOLUME_LEFT_V2;
+					PAN_VOLUME_RIGHT = parentSeq->PAN_VOLUME_RIGHT_V2;
+				}
+
+				// TODO: accurate volume scale
+				newPan = min(newPan, 20);
+				uint8_t volumeLeft = PAN_VOLUME_LEFT[newPan];
+				uint8_t volumeRight = PAN_VOLUME_RIGHT[newPan];
+				double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
+				midiScalePan = ConvertPercentPanToStdMidiScale(linearPan, &volumeScale);
+				break;
+			}
+
+			default:
+				newPan = min(newPan, 40);
+				midiScalePan = ConvertPercentPanToStdMidiScale(KonamiSnesSeq::PAN_TABLE[40 - newPan] / 256.0, &volumeScale);
+			}
+
+			if (midiScalePan == 0.0) {
+				midiPan = 0;
+			}
+			else {
+				midiPan = 1 + roundi(midiScalePan * 126.0);
+			}
+
+			AddPan(beginOffset, curOffset - beginOffset, midiPan);
+			AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
+		}
 		break;
 	}
 
@@ -767,6 +848,16 @@ bool KonamiSnesTrack::ReadEvent(void)
 		uint8_t arg2 = GetByte(curOffset++);
 		uint8_t arg3 = GetByte(curOffset++);
 		desc << L"Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_PITCH_SLIDE_V2:
+	{
+		uint8_t arg1 = GetByte(curOffset++);
+		uint8_t arg2 = GetByte(curOffset++);
+		uint8_t arg3 = GetByte(curOffset++);
+		desc << L"Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
 
 		if (arg2 != 0) {
 			uint8_t arg4 = GetByte(curOffset++);
@@ -779,7 +870,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 		break;
 	}
 
-	case EVENT_PITCH_SLIDE_V2:
+	case EVENT_PITCH_SLIDE_V3:
 	{
 		uint8_t pitchSlideDelay = GetByte(curOffset++);
 		uint8_t pitchSlideLength = GetByte(curOffset++);

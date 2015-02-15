@@ -40,6 +40,7 @@ enum KonamiSnesSeqEventType
 	EVENT_TUNING,
 	EVENT_PITCH_SLIDE_V1,
 	EVENT_PITCH_SLIDE_V2,
+	EVENT_PITCH_SLIDE_V3,
 	EVENT_ECHO,
 	EVENT_ECHO_PARAM,
 	EVENT_LOOP_WITH_VOLTA_START,
@@ -69,7 +70,11 @@ public:
 	KonamiSnesVersion version;
 	std::map<uint8_t, KonamiSnesSeqEventType> EventMap;
 
-	static const uint8_t panTable[];
+	static const uint8_t PAN_VOLUME_LEFT_V1[];
+	static const uint8_t PAN_VOLUME_RIGHT_V1[];
+	static const uint8_t PAN_VOLUME_LEFT_V2[];
+	static const uint8_t PAN_VOLUME_RIGHT_V2[];
+	static const uint8_t PAN_TABLE[];
 
 	double GetTempoInBPM ();
 	double GetTempoInBPM (uint8_t tempo);
