@@ -71,7 +71,7 @@ public:
 	bool fastTempo;
 
 private:
-	void LoadEventMap(MintSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 class MintSnesTrack

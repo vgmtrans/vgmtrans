@@ -61,7 +61,7 @@ public:
 	uint8_t initialTempo;
 
 private:
-	void LoadEventMap(ChunSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 

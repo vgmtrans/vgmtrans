@@ -125,7 +125,7 @@ public:
 	bool UserCarry;
 
 private:
-	void LoadEventMap(HudsonSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 

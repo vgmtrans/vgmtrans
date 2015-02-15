@@ -25,7 +25,7 @@ NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, std::
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 NinSnesSeq::~NinSnesSeq()
@@ -164,7 +164,7 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 	return bContinue;
 }
 
-void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
+void NinSnesSeq::LoadEventMap()
 {
 	int statusByte;
 
@@ -189,50 +189,50 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 		STATUS_PERCUSSION_NOTE_MAX = 0xdf;
 	}
 
-	pSeqFile->EventMap[0x00] = EVENT_END;
+	EventMap[0x00] = EVENT_END;
 
 	for (statusByte = 0x01; statusByte < STATUS_NOTE_MIN; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE_PARAM;
+		EventMap[statusByte] = EVENT_NOTE_PARAM;
 	}
 
 	for (statusByte = STATUS_NOTE_MIN; statusByte <= STATUS_NOTE_MAX; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
+		EventMap[statusByte] = EVENT_NOTE;
 	}
 
-	pSeqFile->EventMap[STATUS_NOTE_MAX + 1] = EVENT_TIE;
-	pSeqFile->EventMap[STATUS_NOTE_MAX + 2] = EVENT_REST;
+	EventMap[STATUS_NOTE_MAX + 1] = EVENT_TIE;
+	EventMap[STATUS_NOTE_MAX + 2] = EVENT_REST;
 
 	for (statusByte = STATUS_PERCUSSION_NOTE_MIN; statusByte <= STATUS_PERCUSSION_NOTE_MAX; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_PERCUSSION_NOTE;
+		EventMap[statusByte] = EVENT_PERCUSSION_NOTE;
 	}
 
 	switch (version) {
 	case NINSNES_EARLIER:
-		pSeqFile->EventMap[0xda] = EVENT_PROGCHANGE;
-		pSeqFile->EventMap[0xdb] = EVENT_PAN;
-		pSeqFile->EventMap[0xdc] = EVENT_PAN_FADE;
-		pSeqFile->EventMap[0xdd] = EVENT_PITCH_SLIDE;
-		pSeqFile->EventMap[0xde] = EVENT_VIBRATO_ON;
-		pSeqFile->EventMap[0xdf] = EVENT_VIBRATO_OFF;
-		pSeqFile->EventMap[0xe0] = EVENT_MASTER_VOLUME;
-		pSeqFile->EventMap[0xe1] = EVENT_MASTER_VOLUME_FADE;
-		pSeqFile->EventMap[0xe2] = EVENT_TEMPO;
-		pSeqFile->EventMap[0xe3] = EVENT_TEMPO_FADE;
-		pSeqFile->EventMap[0xe4] = EVENT_GLOBAL_TRANSPOSE;
-		pSeqFile->EventMap[0xe5] = EVENT_TREMOLO_ON;
-		pSeqFile->EventMap[0xe6] = EVENT_TREMOLO_OFF;
-		pSeqFile->EventMap[0xe7] = EVENT_VOLUME;
-		pSeqFile->EventMap[0xe8] = EVENT_VOLUME_FADE;
-		pSeqFile->EventMap[0xe9] = EVENT_CALL;
-		pSeqFile->EventMap[0xea] = EVENT_VIBRATO_FADE;
-		pSeqFile->EventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
-		pSeqFile->EventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
-		//pSeqFile->EventMap[0xed] = EVENT_PITCH_ENVELOPE_OFF;
-		pSeqFile->EventMap[0xee] = EVENT_TUNING;
-		pSeqFile->EventMap[0xef] = EVENT_ECHO_ON;
-		pSeqFile->EventMap[0xf0] = EVENT_ECHO_OFF;
-		pSeqFile->EventMap[0xf1] = EVENT_ECHO_PARAM;
-		pSeqFile->EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
+		EventMap[0xda] = EVENT_PROGCHANGE;
+		EventMap[0xdb] = EVENT_PAN;
+		EventMap[0xdc] = EVENT_PAN_FADE;
+		EventMap[0xdd] = EVENT_PITCH_SLIDE;
+		EventMap[0xde] = EVENT_VIBRATO_ON;
+		EventMap[0xdf] = EVENT_VIBRATO_OFF;
+		EventMap[0xe0] = EVENT_MASTER_VOLUME;
+		EventMap[0xe1] = EVENT_MASTER_VOLUME_FADE;
+		EventMap[0xe2] = EVENT_TEMPO;
+		EventMap[0xe3] = EVENT_TEMPO_FADE;
+		EventMap[0xe4] = EVENT_GLOBAL_TRANSPOSE;
+		EventMap[0xe5] = EVENT_TREMOLO_ON;
+		EventMap[0xe6] = EVENT_TREMOLO_OFF;
+		EventMap[0xe7] = EVENT_VOLUME;
+		EventMap[0xe8] = EVENT_VOLUME_FADE;
+		EventMap[0xe9] = EVENT_CALL;
+		EventMap[0xea] = EVENT_VIBRATO_FADE;
+		EventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
+		EventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
+		//EventMap[0xed] = EVENT_PITCH_ENVELOPE_OFF;
+		EventMap[0xee] = EVENT_TUNING;
+		EventMap[0xef] = EVENT_ECHO_ON;
+		EventMap[0xf0] = EVENT_ECHO_OFF;
+		EventMap[0xf1] = EVENT_ECHO_PARAM;
+		EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
 
 		if (volumeTable.empty()) {
 			const uint8_t ninVolumeTableEarlier[16] = {
@@ -260,33 +260,33 @@ void NinSnesSeq::LoadEventMap(NinSnesSeq *pSeqFile)
 		break;
 
 	default:
-		pSeqFile->EventMap[0xe0] = EVENT_PROGCHANGE;
-		pSeqFile->EventMap[0xe1] = EVENT_PAN;
-		pSeqFile->EventMap[0xe2] = EVENT_PAN_FADE;
-		pSeqFile->EventMap[0xe3] = EVENT_VIBRATO_ON;
-		pSeqFile->EventMap[0xe4] = EVENT_VIBRATO_OFF;
-		pSeqFile->EventMap[0xe5] = EVENT_MASTER_VOLUME;
-		pSeqFile->EventMap[0xe6] = EVENT_MASTER_VOLUME_FADE;
-		pSeqFile->EventMap[0xe7] = EVENT_TEMPO;
-		pSeqFile->EventMap[0xe8] = EVENT_TEMPO_FADE;
-		pSeqFile->EventMap[0xe9] = EVENT_GLOBAL_TRANSPOSE;
-		pSeqFile->EventMap[0xea] = EVENT_TRANSPOSE;
-		pSeqFile->EventMap[0xeb] = EVENT_TREMOLO_ON;
-		pSeqFile->EventMap[0xec] = EVENT_TREMOLO_OFF;
-		pSeqFile->EventMap[0xed] = EVENT_VOLUME;
-		pSeqFile->EventMap[0xee] = EVENT_VOLUME_FADE;
-		pSeqFile->EventMap[0xef] = EVENT_CALL;
-		pSeqFile->EventMap[0xf0] = EVENT_VIBRATO_FADE;
-		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_TO;
-		pSeqFile->EventMap[0xf2] = EVENT_PITCH_ENVELOPE_FROM;
-		pSeqFile->EventMap[0xf3] = EVENT_PITCH_ENVELOPE_OFF;
-		pSeqFile->EventMap[0xf4] = EVENT_TUNING;
-		pSeqFile->EventMap[0xf5] = EVENT_ECHO_ON;
-		pSeqFile->EventMap[0xf6] = EVENT_ECHO_OFF;
-		pSeqFile->EventMap[0xf7] = EVENT_ECHO_PARAM;
-		pSeqFile->EventMap[0xf8] = EVENT_ECHO_VOLUME_FADE;
-		pSeqFile->EventMap[0xf9] = EVENT_PITCH_SLIDE;
-		pSeqFile->EventMap[0xfa] = EVENT_PERCCUSION_PATCH_BASE;
+		EventMap[0xe0] = EVENT_PROGCHANGE;
+		EventMap[0xe1] = EVENT_PAN;
+		EventMap[0xe2] = EVENT_PAN_FADE;
+		EventMap[0xe3] = EVENT_VIBRATO_ON;
+		EventMap[0xe4] = EVENT_VIBRATO_OFF;
+		EventMap[0xe5] = EVENT_MASTER_VOLUME;
+		EventMap[0xe6] = EVENT_MASTER_VOLUME_FADE;
+		EventMap[0xe7] = EVENT_TEMPO;
+		EventMap[0xe8] = EVENT_TEMPO_FADE;
+		EventMap[0xe9] = EVENT_GLOBAL_TRANSPOSE;
+		EventMap[0xea] = EVENT_TRANSPOSE;
+		EventMap[0xeb] = EVENT_TREMOLO_ON;
+		EventMap[0xec] = EVENT_TREMOLO_OFF;
+		EventMap[0xed] = EVENT_VOLUME;
+		EventMap[0xee] = EVENT_VOLUME_FADE;
+		EventMap[0xef] = EVENT_CALL;
+		EventMap[0xf0] = EVENT_VIBRATO_FADE;
+		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_TO;
+		EventMap[0xf2] = EVENT_PITCH_ENVELOPE_FROM;
+		EventMap[0xf3] = EVENT_PITCH_ENVELOPE_OFF;
+		EventMap[0xf4] = EVENT_TUNING;
+		EventMap[0xf5] = EVENT_ECHO_ON;
+		EventMap[0xf6] = EVENT_ECHO_OFF;
+		EventMap[0xf7] = EVENT_ECHO_PARAM;
+		EventMap[0xf8] = EVENT_ECHO_VOLUME_FADE;
+		EventMap[0xf9] = EVENT_PITCH_SLIDE;
+		EventMap[0xfa] = EVENT_PERCCUSION_PATCH_BASE;
 
 		if (volumeTable.empty()) {
 			const uint8_t ninVolumeTableStandard[16] = {

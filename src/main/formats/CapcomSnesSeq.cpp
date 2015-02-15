@@ -43,7 +43,7 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile* file, CapcomSnesVersion ver, uint32_t seqd
 	AlwaysWriteInitialExpression((int)(sqrt(volumeScale) * 127.0 + 0.5));
 	AlwaysWriteInitialReverb(0);
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 CapcomSnesSeq::~CapcomSnesSeq(void)
@@ -92,46 +92,46 @@ bool CapcomSnesSeq::GetTrackPointers(void)
 	return true;
 }
 
-void CapcomSnesSeq::LoadEventMap(CapcomSnesSeq *pSeqFile)
+void CapcomSnesSeq::LoadEventMap()
 {
-	pSeqFile->EventMap[0x00] = EVENT_TOGGLE_TRIPLET;
-	pSeqFile->EventMap[0x01] = EVENT_TOGGLE_SLUR;
-	pSeqFile->EventMap[0x02] = EVENT_DOTTED_NOTE_ON;
-	pSeqFile->EventMap[0x03] = EVENT_TOGGLE_OCTAVE_UP;
-	pSeqFile->EventMap[0x04] = EVENT_NOTE_ATTRIBUTES;
-	pSeqFile->EventMap[0x05] = EVENT_TEMPO;
-	pSeqFile->EventMap[0x06] = EVENT_DURATION;
-	pSeqFile->EventMap[0x07] = EVENT_VOLUME;
-	pSeqFile->EventMap[0x08] = EVENT_PROGRAM_CHANGE;
-	pSeqFile->EventMap[0x09] = EVENT_OCTAVE;
-	pSeqFile->EventMap[0x0a] = EVENT_GLOBAL_TRANSPOSE;
-	pSeqFile->EventMap[0x0b] = EVENT_TRANSPOSE;
-	pSeqFile->EventMap[0x0c] = EVENT_TUNING;
-	pSeqFile->EventMap[0x0d] = EVENT_PORTAMENTO_TIME;
-	pSeqFile->EventMap[0x0e] = EVENT_REPEAT_UNTIL_1;
-	pSeqFile->EventMap[0x0f] = EVENT_REPEAT_UNTIL_2;
-	pSeqFile->EventMap[0x10] = EVENT_REPEAT_UNTIL_3;
-	pSeqFile->EventMap[0x11] = EVENT_REPEAT_UNTIL_4;
-	pSeqFile->EventMap[0x12] = EVENT_REPEAT_BREAK_1;
-	pSeqFile->EventMap[0x13] = EVENT_REPEAT_BREAK_2;
-	pSeqFile->EventMap[0x14] = EVENT_REPEAT_BREAK_3;
-	pSeqFile->EventMap[0x15] = EVENT_REPEAT_BREAK_4;
-	pSeqFile->EventMap[0x16] = EVENT_GOTO;
-	pSeqFile->EventMap[0x17] = EVENT_END;
-	pSeqFile->EventMap[0x18] = EVENT_PAN;
-	pSeqFile->EventMap[0x19] = EVENT_MASTER_VOLUME;
-	pSeqFile->EventMap[0x1a] = EVENT_LFO;
-	pSeqFile->EventMap[0x1b] = EVENT_ECHO_PARAM;
-	pSeqFile->EventMap[0x1c] = EVENT_ECHO_ONOFF;
-	pSeqFile->EventMap[0x1d] = EVENT_RELEASE_RATE;
-	pSeqFile->EventMap[0x1e] = EVENT_NOP;
-	pSeqFile->EventMap[0x1f] = EVENT_NOP;
+	EventMap[0x00] = EVENT_TOGGLE_TRIPLET;
+	EventMap[0x01] = EVENT_TOGGLE_SLUR;
+	EventMap[0x02] = EVENT_DOTTED_NOTE_ON;
+	EventMap[0x03] = EVENT_TOGGLE_OCTAVE_UP;
+	EventMap[0x04] = EVENT_NOTE_ATTRIBUTES;
+	EventMap[0x05] = EVENT_TEMPO;
+	EventMap[0x06] = EVENT_DURATION;
+	EventMap[0x07] = EVENT_VOLUME;
+	EventMap[0x08] = EVENT_PROGRAM_CHANGE;
+	EventMap[0x09] = EVENT_OCTAVE;
+	EventMap[0x0a] = EVENT_GLOBAL_TRANSPOSE;
+	EventMap[0x0b] = EVENT_TRANSPOSE;
+	EventMap[0x0c] = EVENT_TUNING;
+	EventMap[0x0d] = EVENT_PORTAMENTO_TIME;
+	EventMap[0x0e] = EVENT_REPEAT_UNTIL_1;
+	EventMap[0x0f] = EVENT_REPEAT_UNTIL_2;
+	EventMap[0x10] = EVENT_REPEAT_UNTIL_3;
+	EventMap[0x11] = EVENT_REPEAT_UNTIL_4;
+	EventMap[0x12] = EVENT_REPEAT_BREAK_1;
+	EventMap[0x13] = EVENT_REPEAT_BREAK_2;
+	EventMap[0x14] = EVENT_REPEAT_BREAK_3;
+	EventMap[0x15] = EVENT_REPEAT_BREAK_4;
+	EventMap[0x16] = EVENT_GOTO;
+	EventMap[0x17] = EVENT_END;
+	EventMap[0x18] = EVENT_PAN;
+	EventMap[0x19] = EVENT_MASTER_VOLUME;
+	EventMap[0x1a] = EVENT_LFO;
+	EventMap[0x1b] = EVENT_ECHO_PARAM;
+	EventMap[0x1c] = EVENT_ECHO_ONOFF;
+	EventMap[0x1d] = EVENT_RELEASE_RATE;
+	EventMap[0x1e] = EVENT_NOP;
+	EventMap[0x1f] = EVENT_NOP;
 
-	switch(pSeqFile->version)
+	switch(version)
 	{
 	case CAPCOMSNES_V1_BGM_IN_LIST:
-		pSeqFile->EventMap[0x1e] = EVENT_UNKNOWN1;
-		pSeqFile->EventMap[0x1f] = EVENT_UNKNOWN1;
+		EventMap[0x1e] = EVENT_UNKNOWN1;
+		EventMap[0x1f] = EVENT_UNKNOWN1;
 		break;
 	}
 }
@@ -267,7 +267,6 @@ bool CapcomSnesTrack::ReadEvent(void)
 		return false;
 	}
 
-	bool bWriteGenericEventAsTextEventTmp;
 	uint8_t statusByte = GetByte(curOffset++);
 	bool bContinue = true;
 

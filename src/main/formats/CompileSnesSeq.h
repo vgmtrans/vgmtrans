@@ -65,7 +65,7 @@ public:
 	double GetTempoInBPM(uint8_t tempo);
 
 private:
-	void LoadEventMap(CompileSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 

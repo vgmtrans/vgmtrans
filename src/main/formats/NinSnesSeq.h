@@ -97,7 +97,7 @@ protected:
 	VGMHeader* header;
 
 private:
-	void LoadEventMap(NinSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 class NinSnesSection

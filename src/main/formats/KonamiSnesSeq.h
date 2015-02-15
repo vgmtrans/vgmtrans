@@ -75,7 +75,7 @@ public:
 	double GetTempoInBPM (uint8_t tempo);
 
 private:
-	void LoadEventMap(KonamiSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 

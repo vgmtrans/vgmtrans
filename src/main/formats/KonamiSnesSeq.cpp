@@ -32,7 +32,7 @@ KonamiSnesSeq::KonamiSnesSeq(RawFile* file, KonamiSnesVersion ver, uint32_t seqd
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 KonamiSnesSeq::~KonamiSnesSeq(void)
@@ -84,108 +84,108 @@ bool KonamiSnesSeq::GetTrackPointers(void)
 	return true;
 }
 
-void KonamiSnesSeq::LoadEventMap(KonamiSnesSeq *pSeqFile)
+void KonamiSnesSeq::LoadEventMap()
 {
 	for (uint8_t statusByte = 0x00; statusByte <= 0x5f; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
-		pSeqFile->EventMap[statusByte | 0x80] = EVENT_NOTE;
+		EventMap[statusByte] = EVENT_NOTE;
+		EventMap[statusByte | 0x80] = EVENT_NOTE;
 	}
 
-	pSeqFile->EventMap[0x60] = EVENT_PERCUSSION_ON;
-	pSeqFile->EventMap[0x61] = EVENT_PERCUSSION_OFF;
+	EventMap[0x60] = EVENT_PERCUSSION_ON;
+	EventMap[0x61] = EVENT_PERCUSSION_OFF;
 
 	if (version == KONAMISNES_V1) {
-		pSeqFile->EventMap[0x62] = EVENT_UNKNOWN1;
-		pSeqFile->EventMap[0x63] = EVENT_UNKNOWN1;
-		pSeqFile->EventMap[0x64] = EVENT_UNKNOWN2;
+		EventMap[0x62] = EVENT_UNKNOWN1;
+		EventMap[0x63] = EVENT_UNKNOWN1;
+		EventMap[0x64] = EVENT_UNKNOWN2;
 
 		for (uint8_t statusByte = 0x65; statusByte <= 0x7f; statusByte++) {
-			pSeqFile->EventMap[statusByte] = EVENT_UNKNOWN0;
+			EventMap[statusByte] = EVENT_UNKNOWN0;
 		}
 	}
 	else {
-		pSeqFile->EventMap[0x62] = EVENT_GAIN;
+		EventMap[0x62] = EVENT_GAIN;
 
 		for (uint8_t statusByte = 0x63; statusByte <= 0x7f; statusByte++) {
-			pSeqFile->EventMap[statusByte] = EVENT_UNKNOWN0;
+			EventMap[statusByte] = EVENT_UNKNOWN0;
 		}
 	}
 
-	pSeqFile->EventMap[0xe0] = EVENT_REST;
-	pSeqFile->EventMap[0xe1] = EVENT_REST_WITH_DURATION;
-	pSeqFile->EventMap[0xe2] = EVENT_PROGCHANGE;
-	pSeqFile->EventMap[0xe3] = EVENT_PAN;
-	pSeqFile->EventMap[0xe4] = EVENT_VIBRATO;
-	pSeqFile->EventMap[0xe5] = EVENT_RANDOM_PITCH;
-	pSeqFile->EventMap[0xe6] = EVENT_LOOP_START;
-	pSeqFile->EventMap[0xe7] = EVENT_LOOP_END;
-	pSeqFile->EventMap[0xe8] = EVENT_LOOP_START_2;
-	pSeqFile->EventMap[0xe9] = EVENT_LOOP_END_2;
-	pSeqFile->EventMap[0xea] = EVENT_TEMPO;
-	pSeqFile->EventMap[0xeb] = EVENT_TEMPO_FADE;
-	pSeqFile->EventMap[0xec] = EVENT_TRANSPABS;
-	pSeqFile->EventMap[0xed] = EVENT_ADSR1;
-	pSeqFile->EventMap[0xee] = EVENT_VOLUME;
-	pSeqFile->EventMap[0xef] = EVENT_VOLUME_FADE;
-	pSeqFile->EventMap[0xf0] = EVENT_PORTAMENTO;
-	pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
-	pSeqFile->EventMap[0xf2] = EVENT_TUNING;
-	pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
-	pSeqFile->EventMap[0xf4] = EVENT_ECHO;
-	pSeqFile->EventMap[0xf5] = EVENT_ECHO_PARAM;
-	pSeqFile->EventMap[0xf6] = EVENT_LOOP_WITH_VOLTA_START;
-	pSeqFile->EventMap[0xf7] = EVENT_LOOP_WITH_VOLTA_END;
-	pSeqFile->EventMap[0xf8] = EVENT_PAN_FADE;
-	pSeqFile->EventMap[0xf9] = EVENT_VIBRATO_FADE;
-	pSeqFile->EventMap[0xfa] = EVENT_ADSR_GAIN;
-	pSeqFile->EventMap[0xfb] = EVENT_ADSR2;
-	pSeqFile->EventMap[0xfc] = EVENT_PROGCHANGEVOL;
-	pSeqFile->EventMap[0xfd] = EVENT_GOTO;
-	pSeqFile->EventMap[0xfe] = EVENT_CALL;
-	pSeqFile->EventMap[0xff] = EVENT_END;
+	EventMap[0xe0] = EVENT_REST;
+	EventMap[0xe1] = EVENT_REST_WITH_DURATION;
+	EventMap[0xe2] = EVENT_PROGCHANGE;
+	EventMap[0xe3] = EVENT_PAN;
+	EventMap[0xe4] = EVENT_VIBRATO;
+	EventMap[0xe5] = EVENT_RANDOM_PITCH;
+	EventMap[0xe6] = EVENT_LOOP_START;
+	EventMap[0xe7] = EVENT_LOOP_END;
+	EventMap[0xe8] = EVENT_LOOP_START_2;
+	EventMap[0xe9] = EVENT_LOOP_END_2;
+	EventMap[0xea] = EVENT_TEMPO;
+	EventMap[0xeb] = EVENT_TEMPO_FADE;
+	EventMap[0xec] = EVENT_TRANSPABS;
+	EventMap[0xed] = EVENT_ADSR1;
+	EventMap[0xee] = EVENT_VOLUME;
+	EventMap[0xef] = EVENT_VOLUME_FADE;
+	EventMap[0xf0] = EVENT_PORTAMENTO;
+	EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+	EventMap[0xf2] = EVENT_TUNING;
+	EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
+	EventMap[0xf4] = EVENT_ECHO;
+	EventMap[0xf5] = EVENT_ECHO_PARAM;
+	EventMap[0xf6] = EVENT_LOOP_WITH_VOLTA_START;
+	EventMap[0xf7] = EVENT_LOOP_WITH_VOLTA_END;
+	EventMap[0xf8] = EVENT_PAN_FADE;
+	EventMap[0xf9] = EVENT_VIBRATO_FADE;
+	EventMap[0xfa] = EVENT_ADSR_GAIN;
+	EventMap[0xfb] = EVENT_ADSR2;
+	EventMap[0xfc] = EVENT_PROGCHANGEVOL;
+	EventMap[0xfd] = EVENT_GOTO;
+	EventMap[0xfe] = EVENT_CALL;
+	EventMap[0xff] = EVENT_END;
 
-	switch(pSeqFile->version)
+	switch(version)
 	{
 	case KONAMISNES_V1:
 	case KONAMISNES_V2:
-		pSeqFile->EventMap[0xed] = EVENT_UNKNOWN3; // nop
-		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
-		pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
-		pSeqFile->EventMap[0xfa] = EVENT_UNKNOWN3;
-		pSeqFile->EventMap[0xfb] = EVENT_UNKNOWN1;
-		pSeqFile->EventMap.erase(0xfc); // game-specific?
+		EventMap[0xed] = EVENT_UNKNOWN3; // nop
+		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
+		EventMap[0xfa] = EVENT_UNKNOWN3;
+		EventMap[0xfb] = EVENT_UNKNOWN1;
+		EventMap.erase(0xfc); // game-specific?
 		break;
 
 	case KONAMISNES_V3:
-		pSeqFile->EventMap[0xed] = EVENT_UNKNOWN3;
-		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
-		pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
-		pSeqFile->EventMap[0xfa] = EVENT_ADSR_GAIN;
-		pSeqFile->EventMap[0xfb] = EVENT_ADSR2;
+		EventMap[0xed] = EVENT_UNKNOWN3;
+		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
+		EventMap[0xfa] = EVENT_ADSR_GAIN;
+		EventMap[0xfb] = EVENT_ADSR2;
 		break;
 
 	case KONAMISNES_V4:
 		for (uint8_t statusByte = 0x70; statusByte <= 0x7f; statusByte++) {
-			pSeqFile->EventMap[statusByte] = EVENT_INSTANT_TUNING;
+			EventMap[statusByte] = EVENT_INSTANT_TUNING;
 		}
 
-		pSeqFile->EventMap[0xed] = EVENT_ADSR1;
-		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
-		pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
-		pSeqFile->EventMap[0xfa] = EVENT_ADSR_GAIN;
-		pSeqFile->EventMap[0xfb] = EVENT_ADSR2;
+		EventMap[0xed] = EVENT_ADSR1;
+		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
+		EventMap[0xfa] = EVENT_ADSR_GAIN;
+		EventMap[0xfb] = EVENT_ADSR2;
 		break;
 
 	case KONAMISNES_V5:
 		for (uint8_t statusByte = 0x70; statusByte <= 0x7f; statusByte++) {
-			pSeqFile->EventMap[statusByte] = EVENT_INSTANT_TUNING;
+			EventMap[statusByte] = EVENT_INSTANT_TUNING;
 		}
 
-		pSeqFile->EventMap[0xed] = EVENT_ADSR1;
-		pSeqFile->EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
-		pSeqFile->EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
-		pSeqFile->EventMap[0xfa] = EVENT_ADSR_GAIN;
-		pSeqFile->EventMap[0xfb] = EVENT_ADSR2;
+		EventMap[0xed] = EVENT_ADSR1;
+		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
+		EventMap[0xfa] = EVENT_ADSR_GAIN;
+		EventMap[0xfb] = EVENT_ADSR2;
 		break;
 	}
 }
@@ -284,7 +284,6 @@ bool KonamiSnesTrack::ReadEvent(void)
 		return false;
 	}
 
-	bool bWriteGenericEventAsTextEventTmp;
 	uint8_t statusByte = GetByte(curOffset++);
 	bool bContinue = true;
 

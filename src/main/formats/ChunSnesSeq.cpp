@@ -24,7 +24,7 @@ ChunSnesSeq::ChunSnesSeq(RawFile* file, ChunSnesVersion ver, ChunSnesMinorVersio
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 ChunSnesSeq::~ChunSnesSeq(void)
@@ -89,63 +89,63 @@ bool ChunSnesSeq::GetTrackPointers(void)
 	return true;
 }
 
-void ChunSnesSeq::LoadEventMap(ChunSnesSeq *pSeqFile)
+void ChunSnesSeq::LoadEventMap()
 {
 	int statusByte;
 
 	for (statusByte = 0x00; statusByte <= 0x9f; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
+		EventMap[statusByte] = EVENT_NOTE;
 	}
 	for (statusByte = 0xa0; statusByte <= 0xdc; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOP; // DQ5 Bridal March uses it
+		EventMap[statusByte] = EVENT_NOP; // DQ5 Bridal March uses it
 	}
-	pSeqFile->EventMap[0xdd] = EVENT_ADSR_RR;
-	pSeqFile->EventMap[0xde] = EVENT_ADSR_AND_RR;
-	pSeqFile->EventMap[0xdf] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe0] = EVENT_CPU_CONTROLED_JUMP;
-	pSeqFile->EventMap[0xe1] = EVENT_UNKNOWN0;
-	pSeqFile->EventMap[0xe2] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe3] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe4] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe5] = EVENT_UNKNOWN2;
-	pSeqFile->EventMap[0xe6] = EVENT_EXPRESSION_FADE;
-	pSeqFile->EventMap[0xe7] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe8] = EVENT_PAN_FADE;
-	pSeqFile->EventMap[0xe9] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xea] = EVENT_GOTO;
-	pSeqFile->EventMap[0xeb] = EVENT_TEMPO;
-	pSeqFile->EventMap[0xec] = EVENT_DURATION_RATE;
-	pSeqFile->EventMap[0xed] = EVENT_VOLUME;
-	pSeqFile->EventMap[0xee] = EVENT_PAN;
-	pSeqFile->EventMap[0xef] = EVENT_ADSR;
-	pSeqFile->EventMap[0xf0] = EVENT_PROGCHANGE;
-	pSeqFile->EventMap[0xf1] = EVENT_UNKNOWN0;
-	pSeqFile->EventMap[0xf2] = EVENT_SYNC_NOTE_LEN_ON;
-	pSeqFile->EventMap[0xf3] = EVENT_SYNC_NOTE_LEN_OFF;
-	pSeqFile->EventMap[0xf4] = EVENT_LOOP_AGAIN;
-	pSeqFile->EventMap[0xf5] = EVENT_LOOP_UNTIL;
-	pSeqFile->EventMap[0xf6] = EVENT_EXPRESSION;
-	pSeqFile->EventMap[0xf7] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xf8] = EVENT_CALL;
-	pSeqFile->EventMap[0xf9] = EVENT_RET;
-	pSeqFile->EventMap[0xfa] = EVENT_TRANSPOSE;
-	pSeqFile->EventMap[0xfb] = EVENT_PITCH_SLIDE;
-	pSeqFile->EventMap[0xfc] = EVENT_UNKNOWN0;
-	pSeqFile->EventMap[0xfd] = EVENT_UNKNOWN0;
-	pSeqFile->EventMap[0xfe] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xff] = EVENT_END;
+	EventMap[0xdd] = EVENT_ADSR_RR;
+	EventMap[0xde] = EVENT_ADSR_AND_RR;
+	EventMap[0xdf] = EVENT_UNKNOWN1;
+	EventMap[0xe0] = EVENT_CPU_CONTROLED_JUMP;
+	EventMap[0xe1] = EVENT_UNKNOWN0;
+	EventMap[0xe2] = EVENT_UNKNOWN1;
+	EventMap[0xe3] = EVENT_UNKNOWN1;
+	EventMap[0xe4] = EVENT_UNKNOWN1;
+	EventMap[0xe5] = EVENT_UNKNOWN2;
+	EventMap[0xe6] = EVENT_EXPRESSION_FADE;
+	EventMap[0xe7] = EVENT_UNKNOWN1;
+	EventMap[0xe8] = EVENT_PAN_FADE;
+	EventMap[0xe9] = EVENT_UNKNOWN1;
+	EventMap[0xea] = EVENT_GOTO;
+	EventMap[0xeb] = EVENT_TEMPO;
+	EventMap[0xec] = EVENT_DURATION_RATE;
+	EventMap[0xed] = EVENT_VOLUME;
+	EventMap[0xee] = EVENT_PAN;
+	EventMap[0xef] = EVENT_ADSR;
+	EventMap[0xf0] = EVENT_PROGCHANGE;
+	EventMap[0xf1] = EVENT_UNKNOWN0;
+	EventMap[0xf2] = EVENT_SYNC_NOTE_LEN_ON;
+	EventMap[0xf3] = EVENT_SYNC_NOTE_LEN_OFF;
+	EventMap[0xf4] = EVENT_LOOP_AGAIN;
+	EventMap[0xf5] = EVENT_LOOP_UNTIL;
+	EventMap[0xf6] = EVENT_EXPRESSION;
+	EventMap[0xf7] = EVENT_UNKNOWN1;
+	EventMap[0xf8] = EVENT_CALL;
+	EventMap[0xf9] = EVENT_RET;
+	EventMap[0xfa] = EVENT_TRANSPOSE;
+	EventMap[0xfb] = EVENT_PITCH_SLIDE;
+	EventMap[0xfc] = EVENT_UNKNOWN0;
+	EventMap[0xfd] = EVENT_UNKNOWN0;
+	EventMap[0xfe] = EVENT_UNKNOWN1;
+	EventMap[0xff] = EVENT_END;
 
 	if (version != CHUNSNES_SUMMER) {
 		for (statusByte = 0xa0; statusByte <= 0xb5; statusByte++) {
-			pSeqFile->EventMap[statusByte] = EVENT_DURATION_FROM_TABLE;
+			EventMap[statusByte] = EVENT_DURATION_FROM_TABLE;
 		}
 
 		// b5-da - not used
 
-		pSeqFile->EventMap[0xdb] = EVENT_LOOP_BREAK_ALT;
-		pSeqFile->EventMap[0xdc] = EVENT_LOOP_AGAIN_ALT;
-		pSeqFile->EventMap[0xf1] = EVENT_SYNC_NOTE_LEN_ON;
-		pSeqFile->EventMap[0xf7] = EVENT_NOP;
+		EventMap[0xdb] = EVENT_LOOP_BREAK_ALT;
+		EventMap[0xdc] = EVENT_LOOP_AGAIN_ALT;
+		EventMap[0xf1] = EVENT_SYNC_NOTE_LEN_ON;
+		EventMap[0xf7] = EVENT_NOP;
 	}
 }
 

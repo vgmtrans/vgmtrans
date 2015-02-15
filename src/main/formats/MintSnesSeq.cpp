@@ -22,7 +22,7 @@ MintSnesSeq::MintSnesSeq(RawFile* file, MintSnesVersion ver, uint32_t seqdataOff
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 MintSnesSeq::~MintSnesSeq(void)
@@ -104,61 +104,61 @@ bool MintSnesSeq::GetTrackPointers(void)
 	return true;
 }
 
-void MintSnesSeq::LoadEventMap(MintSnesSeq *pSeqFile)
+void MintSnesSeq::LoadEventMap()
 {
 	int statusByte;
 
 	for (statusByte = 0x00; statusByte <= 0x7f; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE_PARAM;
+		EventMap[statusByte] = EVENT_NOTE_PARAM;
 	}
 
 	for (statusByte = 0x80; statusByte <= 0x9f; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
+		EventMap[statusByte] = EVENT_NOTE;
 	}
 
 	for (statusByte = 0xa0; statusByte <= 0xbf; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE_WITH_PARAM;
+		EventMap[statusByte] = EVENT_NOTE_WITH_PARAM;
 	}
 
-	pSeqFile->EventMap[0xc0] = EVENT_PROGCHANGE;
-	pSeqFile->EventMap[0xc1] = EVENT_PAN;
-	pSeqFile->EventMap[0xc2] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xc3] = EVENT_TEMPO;
-	pSeqFile->EventMap[0xc4] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xc5] = EVENT_VOLUME;
-	pSeqFile->EventMap[0xc6] = EVENT_PRIORITY;
-	pSeqFile->EventMap[0xc7] = EVENT_TUNING;
-	pSeqFile->EventMap[0xc8] = EVENT_ECHO_ON;
-	pSeqFile->EventMap[0xc9] = EVENT_ECHO_OFF;
-	pSeqFile->EventMap[0xca] = EVENT_ECHO_PARAM;
-	pSeqFile->EventMap[0xcb] = EVENT_GOTO;
-	pSeqFile->EventMap[0xcc] = EVENT_CALL;
-	pSeqFile->EventMap[0xcd] = EVENT_RET;
-	pSeqFile->EventMap[0xce] = EVENT_LOOP_START;
-	pSeqFile->EventMap[0xcf] = EVENT_LOOP_END;
-	pSeqFile->EventMap[0xd0] = EVENT_END;
-	pSeqFile->EventMap[0xd1] = EVENT_NOTE_NUMBER;
-	pSeqFile->EventMap[0xd2] = EVENT_OCTAVE_UP;
-	pSeqFile->EventMap[0xd3] = EVENT_OCTAVE_DOWN;
-	pSeqFile->EventMap[0xd4] = EVENT_WAIT;
-	pSeqFile->EventMap[0xd5] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xd6] = EVENT_PITCHBENDRANGE;
-	pSeqFile->EventMap[0xd7] = EVENT_TRANSPOSE;
-	pSeqFile->EventMap[0xd8] = EVENT_TRANSPOSE_REL;
-	pSeqFile->EventMap[0xd9] = EVENT_TUNING_REL;
-	pSeqFile->EventMap[0xda] = EVENT_KEY_ON;
-	pSeqFile->EventMap[0xdb] = EVENT_KEY_OFF;
-	pSeqFile->EventMap[0xdc] = EVENT_VOLUME_REL;
-	pSeqFile->EventMap[0xdd] = EVENT_PITCHBEND;
-	pSeqFile->EventMap[0xde] = EVENT_INSTR;
-	pSeqFile->EventMap[0xdf] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe0] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe1] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe2] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe3] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe4] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe5] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xe6] = EVENT_TIMEBASE;
+	EventMap[0xc0] = EVENT_PROGCHANGE;
+	EventMap[0xc1] = EVENT_PAN;
+	EventMap[0xc2] = EVENT_UNKNOWN1;
+	EventMap[0xc3] = EVENT_TEMPO;
+	EventMap[0xc4] = EVENT_UNKNOWN1;
+	EventMap[0xc5] = EVENT_VOLUME;
+	EventMap[0xc6] = EVENT_PRIORITY;
+	EventMap[0xc7] = EVENT_TUNING;
+	EventMap[0xc8] = EVENT_ECHO_ON;
+	EventMap[0xc9] = EVENT_ECHO_OFF;
+	EventMap[0xca] = EVENT_ECHO_PARAM;
+	EventMap[0xcb] = EVENT_GOTO;
+	EventMap[0xcc] = EVENT_CALL;
+	EventMap[0xcd] = EVENT_RET;
+	EventMap[0xce] = EVENT_LOOP_START;
+	EventMap[0xcf] = EVENT_LOOP_END;
+	EventMap[0xd0] = EVENT_END;
+	EventMap[0xd1] = EVENT_NOTE_NUMBER;
+	EventMap[0xd2] = EVENT_OCTAVE_UP;
+	EventMap[0xd3] = EVENT_OCTAVE_DOWN;
+	EventMap[0xd4] = EVENT_WAIT;
+	EventMap[0xd5] = EVENT_UNKNOWN1;
+	EventMap[0xd6] = EVENT_PITCHBENDRANGE;
+	EventMap[0xd7] = EVENT_TRANSPOSE;
+	EventMap[0xd8] = EVENT_TRANSPOSE_REL;
+	EventMap[0xd9] = EVENT_TUNING_REL;
+	EventMap[0xda] = EVENT_KEY_ON;
+	EventMap[0xdb] = EVENT_KEY_OFF;
+	EventMap[0xdc] = EVENT_VOLUME_REL;
+	EventMap[0xdd] = EVENT_PITCHBEND;
+	EventMap[0xde] = EVENT_INSTR;
+	EventMap[0xdf] = EVENT_UNKNOWN1;
+	EventMap[0xe0] = EVENT_UNKNOWN1;
+	EventMap[0xe1] = EVENT_UNKNOWN1;
+	EventMap[0xe2] = EVENT_UNKNOWN1;
+	EventMap[0xe3] = EVENT_UNKNOWN1;
+	EventMap[0xe4] = EVENT_UNKNOWN1;
+	EventMap[0xe5] = EVENT_UNKNOWN1;
+	EventMap[0xe6] = EVENT_TIMEBASE;
 }
 
 double MintSnesSeq::GetTempoInBPM(uint8_t tempo, bool fastTempo)

@@ -26,7 +26,7 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile* file, AkaoSnesVersion ver, AkaoSnesMinorVersio
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 AkaoSnesSeq::~AkaoSnesSeq(void)
@@ -120,7 +120,7 @@ bool AkaoSnesSeq::GetTrackPointers(void)
 	return true;
 }
 
-void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
+void AkaoSnesSeq::LoadEventMap()
 {
 	int statusByte;
 
@@ -204,334 +204,334 @@ void AkaoSnesSeq::LoadEventMap(AkaoSnesSeq *pSeqFile)
 	}
 
 	for (statusByte = 0x00; statusByte <= STATUS_NOTE_MAX; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
+		EventMap[statusByte] = EVENT_NOTE;
 	}
 
 	if (version == AKAOSNES_V1) {
-		pSeqFile->EventMap[0xd2] = EVENT_TEMPO_FADE;
-		pSeqFile->EventMap[0xd3] = EVENT_NOP1;
-		pSeqFile->EventMap[0xd4] = EVENT_ECHO_VOLUME;
-		pSeqFile->EventMap[0xd5] = EVENT_ECHO_FEEDBACK_FIR;
-		pSeqFile->EventMap[0xd6] = EVENT_PITCH_SLIDE_ON;
-		pSeqFile->EventMap[0xd7] = EVENT_TREMOLO_ON;
-		pSeqFile->EventMap[0xd8] = EVENT_VIBRATO_ON;
-		pSeqFile->EventMap[0xd9] = EVENT_PAN_LFO_ON_WITH_DELAY;
-		pSeqFile->EventMap[0xda] = EVENT_OCTAVE;
-		pSeqFile->EventMap[0xdb] = EVENT_PROGCHANGE;
-		pSeqFile->EventMap[0xdc] = EVENT_VOLUME_ENVELOPE;
-		pSeqFile->EventMap[0xdd] = EVENT_GAIN_RELEASE;
-		pSeqFile->EventMap[0xde] = EVENT_DURATION_RATE;
-		pSeqFile->EventMap[0xdf] = EVENT_NOISE_FREQ;
-		pSeqFile->EventMap[0xe0] = EVENT_LOOP_START;
-		pSeqFile->EventMap[0xe1] = EVENT_OCTAVE_UP;
-		pSeqFile->EventMap[0xe2] = EVENT_OCTAVE_DOWN;
-		pSeqFile->EventMap[0xe3] = EVENT_NOP;
-		pSeqFile->EventMap[0xe4] = EVENT_NOP;
-		pSeqFile->EventMap[0xe5] = EVENT_NOP;
-		pSeqFile->EventMap[0xe6] = EVENT_PITCH_SLIDE_OFF;
-		pSeqFile->EventMap[0xe7] = EVENT_TREMOLO_OFF;
-		pSeqFile->EventMap[0xe8] = EVENT_VIBRATO_OFF;
-		pSeqFile->EventMap[0xe9] = EVENT_PAN_LFO_OFF;
-		pSeqFile->EventMap[0xea] = EVENT_ECHO_ON;
-		pSeqFile->EventMap[0xeb] = EVENT_ECHO_OFF;
-		pSeqFile->EventMap[0xec] = EVENT_NOISE_ON;
-		pSeqFile->EventMap[0xed] = EVENT_NOISE_OFF;
-		pSeqFile->EventMap[0xee] = EVENT_PITCHMOD_ON;
-		pSeqFile->EventMap[0xef] = EVENT_PITCHMOD_OFF;
-		pSeqFile->EventMap[0xf0] = EVENT_LOOP_END;
-		pSeqFile->EventMap[0xf1] = EVENT_END;
-		pSeqFile->EventMap[0xf2] = EVENT_VOLUME_FADE;
-		pSeqFile->EventMap[0xf3] = EVENT_PAN_FADE;
-		pSeqFile->EventMap[0xf4] = EVENT_GOTO;
-		pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
-		pSeqFile->EventMap[0xf6] = EVENT_UNKNOWN0; // cpu-controled jump?
-		pSeqFile->EventMap[0xf7] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xf8] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xf9] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfa] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfb] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfc] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		EventMap[0xd2] = EVENT_TEMPO_FADE;
+		EventMap[0xd3] = EVENT_NOP1;
+		EventMap[0xd4] = EVENT_ECHO_VOLUME;
+		EventMap[0xd5] = EVENT_ECHO_FEEDBACK_FIR;
+		EventMap[0xd6] = EVENT_PITCH_SLIDE_ON;
+		EventMap[0xd7] = EVENT_TREMOLO_ON;
+		EventMap[0xd8] = EVENT_VIBRATO_ON;
+		EventMap[0xd9] = EVENT_PAN_LFO_ON_WITH_DELAY;
+		EventMap[0xda] = EVENT_OCTAVE;
+		EventMap[0xdb] = EVENT_PROGCHANGE;
+		EventMap[0xdc] = EVENT_VOLUME_ENVELOPE;
+		EventMap[0xdd] = EVENT_GAIN_RELEASE;
+		EventMap[0xde] = EVENT_DURATION_RATE;
+		EventMap[0xdf] = EVENT_NOISE_FREQ;
+		EventMap[0xe0] = EVENT_LOOP_START;
+		EventMap[0xe1] = EVENT_OCTAVE_UP;
+		EventMap[0xe2] = EVENT_OCTAVE_DOWN;
+		EventMap[0xe3] = EVENT_NOP;
+		EventMap[0xe4] = EVENT_NOP;
+		EventMap[0xe5] = EVENT_NOP;
+		EventMap[0xe6] = EVENT_PITCH_SLIDE_OFF;
+		EventMap[0xe7] = EVENT_TREMOLO_OFF;
+		EventMap[0xe8] = EVENT_VIBRATO_OFF;
+		EventMap[0xe9] = EVENT_PAN_LFO_OFF;
+		EventMap[0xea] = EVENT_ECHO_ON;
+		EventMap[0xeb] = EVENT_ECHO_OFF;
+		EventMap[0xec] = EVENT_NOISE_ON;
+		EventMap[0xed] = EVENT_NOISE_OFF;
+		EventMap[0xee] = EVENT_PITCHMOD_ON;
+		EventMap[0xef] = EVENT_PITCHMOD_OFF;
+		EventMap[0xf0] = EVENT_LOOP_END;
+		EventMap[0xf1] = EVENT_END;
+		EventMap[0xf2] = EVENT_VOLUME_FADE;
+		EventMap[0xf3] = EVENT_PAN_FADE;
+		EventMap[0xf4] = EVENT_GOTO;
+		EventMap[0xf5] = EVENT_LOOP_BREAK;
+		EventMap[0xf6] = EVENT_UNKNOWN0; // cpu-controled jump?
+		EventMap[0xf7] = EVENT_END; // duplicated
+		EventMap[0xf8] = EVENT_END; // duplicated
+		EventMap[0xf9] = EVENT_END; // duplicated
+		EventMap[0xfa] = EVENT_END; // duplicated
+		EventMap[0xfb] = EVENT_END; // duplicated
+		EventMap[0xfc] = EVENT_END; // duplicated
+		EventMap[0xfd] = EVENT_END; // duplicated
+		EventMap[0xfe] = EVENT_END; // duplicated
+		EventMap[0xff] = EVENT_END; // duplicated
 	}
 	else if (version == AKAOSNES_V2) {
-		pSeqFile->EventMap[0xd2] = EVENT_TEMPO;
-		pSeqFile->EventMap[0xd3] = EVENT_TEMPO_FADE;
-		pSeqFile->EventMap[0xd4] = EVENT_VOLUME;
-		pSeqFile->EventMap[0xd5] = EVENT_VOLUME_FADE;
-		pSeqFile->EventMap[0xd6] = EVENT_PAN;
-		pSeqFile->EventMap[0xd7] = EVENT_PAN_FADE;
-		pSeqFile->EventMap[0xd8] = EVENT_ECHO_VOLUME;
-		pSeqFile->EventMap[0xd9] = EVENT_ECHO_VOLUME_FADE;
-		pSeqFile->EventMap[0xda] = EVENT_TRANSPOSE_ABS;
-		pSeqFile->EventMap[0xdb] = EVENT_PITCH_SLIDE_ON;
-		pSeqFile->EventMap[0xdc] = EVENT_PITCH_SLIDE_OFF;
-		pSeqFile->EventMap[0xdd] = EVENT_TREMOLO_ON;
-		pSeqFile->EventMap[0xde] = EVENT_TREMOLO_OFF;
-		pSeqFile->EventMap[0xdf] = EVENT_VIBRATO_ON;
-		pSeqFile->EventMap[0xe0] = EVENT_VIBRATO_OFF;
-		pSeqFile->EventMap[0xe1] = EVENT_NOISE_FREQ;
-		pSeqFile->EventMap[0xe2] = EVENT_NOISE_ON;
-		pSeqFile->EventMap[0xe3] = EVENT_NOISE_OFF;
-		pSeqFile->EventMap[0xe4] = EVENT_PITCHMOD_ON;
-		pSeqFile->EventMap[0xe5] = EVENT_PITCHMOD_OFF;
-		pSeqFile->EventMap[0xe6] = EVENT_ECHO_FEEDBACK_FIR;
-		pSeqFile->EventMap[0xe7] = EVENT_ECHO_ON;
-		pSeqFile->EventMap[0xe8] = EVENT_ECHO_OFF;
-		pSeqFile->EventMap[0xe9] = EVENT_PAN_LFO_ON;
-		pSeqFile->EventMap[0xea] = EVENT_PAN_LFO_OFF;
-		pSeqFile->EventMap[0xeb] = EVENT_OCTAVE;
-		pSeqFile->EventMap[0xec] = EVENT_OCTAVE_UP;
-		pSeqFile->EventMap[0xed] = EVENT_OCTAVE_DOWN;
-		pSeqFile->EventMap[0xee] = EVENT_LOOP_START;
-		pSeqFile->EventMap[0xef] = EVENT_LOOP_END;
-		pSeqFile->EventMap[0xf0] = EVENT_LOOP_BREAK;
-		pSeqFile->EventMap[0xf1] = EVENT_GOTO;
-		pSeqFile->EventMap[0xf2] = EVENT_SLUR_ON;
-		pSeqFile->EventMap[0xf3] = EVENT_PROGCHANGE;
-		pSeqFile->EventMap[0xf4] = EVENT_VOLUME_ENVELOPE;
-		pSeqFile->EventMap[0xf5] = EVENT_SLUR_OFF;
-		pSeqFile->EventMap[0xf6] = EVENT_UNKNOWN2; // cpu-controled jump?
-		pSeqFile->EventMap[0xf7] = EVENT_TUNING;
-		pSeqFile->EventMap[0xf8] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xf9] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfa] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfb] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfc] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+		EventMap[0xd2] = EVENT_TEMPO;
+		EventMap[0xd3] = EVENT_TEMPO_FADE;
+		EventMap[0xd4] = EVENT_VOLUME;
+		EventMap[0xd5] = EVENT_VOLUME_FADE;
+		EventMap[0xd6] = EVENT_PAN;
+		EventMap[0xd7] = EVENT_PAN_FADE;
+		EventMap[0xd8] = EVENT_ECHO_VOLUME;
+		EventMap[0xd9] = EVENT_ECHO_VOLUME_FADE;
+		EventMap[0xda] = EVENT_TRANSPOSE_ABS;
+		EventMap[0xdb] = EVENT_PITCH_SLIDE_ON;
+		EventMap[0xdc] = EVENT_PITCH_SLIDE_OFF;
+		EventMap[0xdd] = EVENT_TREMOLO_ON;
+		EventMap[0xde] = EVENT_TREMOLO_OFF;
+		EventMap[0xdf] = EVENT_VIBRATO_ON;
+		EventMap[0xe0] = EVENT_VIBRATO_OFF;
+		EventMap[0xe1] = EVENT_NOISE_FREQ;
+		EventMap[0xe2] = EVENT_NOISE_ON;
+		EventMap[0xe3] = EVENT_NOISE_OFF;
+		EventMap[0xe4] = EVENT_PITCHMOD_ON;
+		EventMap[0xe5] = EVENT_PITCHMOD_OFF;
+		EventMap[0xe6] = EVENT_ECHO_FEEDBACK_FIR;
+		EventMap[0xe7] = EVENT_ECHO_ON;
+		EventMap[0xe8] = EVENT_ECHO_OFF;
+		EventMap[0xe9] = EVENT_PAN_LFO_ON;
+		EventMap[0xea] = EVENT_PAN_LFO_OFF;
+		EventMap[0xeb] = EVENT_OCTAVE;
+		EventMap[0xec] = EVENT_OCTAVE_UP;
+		EventMap[0xed] = EVENT_OCTAVE_DOWN;
+		EventMap[0xee] = EVENT_LOOP_START;
+		EventMap[0xef] = EVENT_LOOP_END;
+		EventMap[0xf0] = EVENT_LOOP_BREAK;
+		EventMap[0xf1] = EVENT_GOTO;
+		EventMap[0xf2] = EVENT_SLUR_ON;
+		EventMap[0xf3] = EVENT_PROGCHANGE;
+		EventMap[0xf4] = EVENT_VOLUME_ENVELOPE;
+		EventMap[0xf5] = EVENT_SLUR_OFF;
+		EventMap[0xf6] = EVENT_UNKNOWN2; // cpu-controled jump?
+		EventMap[0xf7] = EVENT_TUNING;
+		EventMap[0xf8] = EVENT_END; // duplicated
+		EventMap[0xf9] = EVENT_END; // duplicated
+		EventMap[0xfa] = EVENT_END; // duplicated
+		EventMap[0xfb] = EVENT_END; // duplicated
+		EventMap[0xfc] = EVENT_END; // duplicated
+		EventMap[0xfd] = EVENT_END; // duplicated
+		EventMap[0xfe] = EVENT_END; // duplicated
+		EventMap[0xff] = EVENT_END; // duplicated
 	}
 	else if (version == AKAOSNES_V3) {
 		// V3-V4 common
-		pSeqFile->EventMap[0xd2] = EVENT_VOLUME;
-		pSeqFile->EventMap[0xd3] = EVENT_VOLUME_FADE;
-		pSeqFile->EventMap[0xd4] = EVENT_PAN;
-		pSeqFile->EventMap[0xd5] = EVENT_PAN_FADE;
-		pSeqFile->EventMap[0xd6] = EVENT_PITCH_SLIDE;
-		pSeqFile->EventMap[0xd7] = EVENT_VIBRATO_ON;
-		pSeqFile->EventMap[0xd8] = EVENT_VIBRATO_OFF;
-		pSeqFile->EventMap[0xd9] = EVENT_TREMOLO_ON;
-		pSeqFile->EventMap[0xda] = EVENT_TREMOLO_OFF;
-		pSeqFile->EventMap[0xdb] = EVENT_PAN_LFO_ON;
-		pSeqFile->EventMap[0xdc] = EVENT_PAN_LFO_OFF;
-		pSeqFile->EventMap[0xdd] = EVENT_NOISE_FREQ;
-		pSeqFile->EventMap[0xde] = EVENT_NOISE_ON;
-		pSeqFile->EventMap[0xdf] = EVENT_NOISE_OFF;
-		pSeqFile->EventMap[0xe0] = EVENT_PITCHMOD_ON;
-		pSeqFile->EventMap[0xe1] = EVENT_PITCHMOD_OFF;
-		pSeqFile->EventMap[0xe2] = EVENT_ECHO_ON;
-		pSeqFile->EventMap[0xe3] = EVENT_ECHO_OFF;
-		pSeqFile->EventMap[0xe4] = EVENT_OCTAVE;
-		pSeqFile->EventMap[0xe5] = EVENT_OCTAVE_UP;
-		pSeqFile->EventMap[0xe6] = EVENT_OCTAVE_DOWN;
-		pSeqFile->EventMap[0xe7] = EVENT_TRANSPOSE_ABS;
-		pSeqFile->EventMap[0xe8] = EVENT_TRANSPOSE_REL;
-		pSeqFile->EventMap[0xe9] = EVENT_TUNING;
-		pSeqFile->EventMap[0xea] = EVENT_PROGCHANGE;
-		pSeqFile->EventMap[0xeb] = EVENT_ADSR_AR;
-		pSeqFile->EventMap[0xec] = EVENT_ADSR_DR;
-		pSeqFile->EventMap[0xed] = EVENT_ADSR_SL;
-		pSeqFile->EventMap[0xee] = EVENT_ADSR_SR;
-		pSeqFile->EventMap[0xef] = EVENT_ADSR_DEFAULT;
-		pSeqFile->EventMap[0xf0] = EVENT_LOOP_START;
-		pSeqFile->EventMap[0xf1] = EVENT_LOOP_END;
+		EventMap[0xd2] = EVENT_VOLUME;
+		EventMap[0xd3] = EVENT_VOLUME_FADE;
+		EventMap[0xd4] = EVENT_PAN;
+		EventMap[0xd5] = EVENT_PAN_FADE;
+		EventMap[0xd6] = EVENT_PITCH_SLIDE;
+		EventMap[0xd7] = EVENT_VIBRATO_ON;
+		EventMap[0xd8] = EVENT_VIBRATO_OFF;
+		EventMap[0xd9] = EVENT_TREMOLO_ON;
+		EventMap[0xda] = EVENT_TREMOLO_OFF;
+		EventMap[0xdb] = EVENT_PAN_LFO_ON;
+		EventMap[0xdc] = EVENT_PAN_LFO_OFF;
+		EventMap[0xdd] = EVENT_NOISE_FREQ;
+		EventMap[0xde] = EVENT_NOISE_ON;
+		EventMap[0xdf] = EVENT_NOISE_OFF;
+		EventMap[0xe0] = EVENT_PITCHMOD_ON;
+		EventMap[0xe1] = EVENT_PITCHMOD_OFF;
+		EventMap[0xe2] = EVENT_ECHO_ON;
+		EventMap[0xe3] = EVENT_ECHO_OFF;
+		EventMap[0xe4] = EVENT_OCTAVE;
+		EventMap[0xe5] = EVENT_OCTAVE_UP;
+		EventMap[0xe6] = EVENT_OCTAVE_DOWN;
+		EventMap[0xe7] = EVENT_TRANSPOSE_ABS;
+		EventMap[0xe8] = EVENT_TRANSPOSE_REL;
+		EventMap[0xe9] = EVENT_TUNING;
+		EventMap[0xea] = EVENT_PROGCHANGE;
+		EventMap[0xeb] = EVENT_ADSR_AR;
+		EventMap[0xec] = EVENT_ADSR_DR;
+		EventMap[0xed] = EVENT_ADSR_SL;
+		EventMap[0xee] = EVENT_ADSR_SR;
+		EventMap[0xef] = EVENT_ADSR_DEFAULT;
+		EventMap[0xf0] = EVENT_LOOP_START;
+		EventMap[0xf1] = EVENT_LOOP_END;
 
 		// V3 common
-		pSeqFile->EventMap[0xf2] = EVENT_END;
-		pSeqFile->EventMap[0xf3] = EVENT_TEMPO;
-		pSeqFile->EventMap[0xf4] = EVENT_TEMPO_FADE;
-		pSeqFile->EventMap[0xf5] = EVENT_ECHO_VOLUME; // No Operation in Seiken Densetsu 2
-		pSeqFile->EventMap[0xf6] = EVENT_ECHO_VOLUME_FADE; // No Operation in Seiken Densetsu 2
-		pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FIR; // No Operation in Seiken Densetsu 2
-		pSeqFile->EventMap[0xf8] = EVENT_MASTER_VOLUME;
-		pSeqFile->EventMap[0xf9] = EVENT_LOOP_BREAK;
-		pSeqFile->EventMap[0xfa] = EVENT_GOTO;
-		pSeqFile->EventMap[0xfb] = EVENT_CPU_CONTROLED_JUMP;
+		EventMap[0xf2] = EVENT_END;
+		EventMap[0xf3] = EVENT_TEMPO;
+		EventMap[0xf4] = EVENT_TEMPO_FADE;
+		EventMap[0xf5] = EVENT_ECHO_VOLUME; // No Operation in Seiken Densetsu 2
+		EventMap[0xf6] = EVENT_ECHO_VOLUME_FADE; // No Operation in Seiken Densetsu 2
+		EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FIR; // No Operation in Seiken Densetsu 2
+		EventMap[0xf8] = EVENT_MASTER_VOLUME;
+		EventMap[0xf9] = EVENT_LOOP_BREAK;
+		EventMap[0xfa] = EVENT_GOTO;
+		EventMap[0xfb] = EVENT_CPU_CONTROLED_JUMP;
 
 		// game-specific mappings
 		if (minorVersion == AKAOSNES_V3_SD2) {
-			//pSeqFile->EventMap[0xfc] = (AkaoSnesSeqEventType)0;
-			//pSeqFile->EventMap[0xfd] = (AkaoSnesSeqEventType)0;
-			pSeqFile->EventMap[0xfe] = EVENT_END;
-			pSeqFile->EventMap[0xff] = EVENT_END;
+			//EventMap[0xfc] = (AkaoSnesSeqEventType)0;
+			//EventMap[0xfd] = (AkaoSnesSeqEventType)0;
+			EventMap[0xfe] = EVENT_END;
+			EventMap[0xff] = EVENT_END;
 		}
 		else {
-			pSeqFile->EventMap[0xfc] = EVENT_END;
-			pSeqFile->EventMap[0xfd] = EVENT_END;
-			pSeqFile->EventMap[0xfe] = EVENT_END;
-			pSeqFile->EventMap[0xff] = EVENT_END;
+			EventMap[0xfc] = EVENT_END;
+			EventMap[0xfd] = EVENT_END;
+			EventMap[0xfe] = EVENT_END;
+			EventMap[0xff] = EVENT_END;
 		}
 	}
 	else if (version == AKAOSNES_V4) {
 		// V3-V4 common
-		pSeqFile->EventMap[0xc4] = EVENT_VOLUME;
-		pSeqFile->EventMap[0xc5] = EVENT_VOLUME_FADE;
-		pSeqFile->EventMap[0xc6] = EVENT_PAN;
-		pSeqFile->EventMap[0xc7] = EVENT_PAN_FADE;
-		pSeqFile->EventMap[0xc8] = EVENT_PITCH_SLIDE;
-		pSeqFile->EventMap[0xc9] = EVENT_VIBRATO_ON;
-		pSeqFile->EventMap[0xca] = EVENT_VIBRATO_OFF;
-		pSeqFile->EventMap[0xcb] = EVENT_TREMOLO_ON;
-		pSeqFile->EventMap[0xcc] = EVENT_TREMOLO_OFF;
-		pSeqFile->EventMap[0xcd] = EVENT_PAN_LFO_ON;
-		pSeqFile->EventMap[0xce] = EVENT_PAN_LFO_OFF;
-		pSeqFile->EventMap[0xcf] = EVENT_NOISE_FREQ;
-		pSeqFile->EventMap[0xd0] = EVENT_NOISE_ON;
-		pSeqFile->EventMap[0xd1] = EVENT_NOISE_OFF;
-		pSeqFile->EventMap[0xd2] = EVENT_PITCHMOD_ON;
-		pSeqFile->EventMap[0xd3] = EVENT_PITCHMOD_OFF;
-		pSeqFile->EventMap[0xd4] = EVENT_ECHO_ON;
-		pSeqFile->EventMap[0xd5] = EVENT_ECHO_OFF;
-		pSeqFile->EventMap[0xd6] = EVENT_OCTAVE;
-		pSeqFile->EventMap[0xd7] = EVENT_OCTAVE_UP;
-		pSeqFile->EventMap[0xd8] = EVENT_OCTAVE_DOWN;
-		pSeqFile->EventMap[0xd9] = EVENT_TRANSPOSE_ABS;
-		pSeqFile->EventMap[0xda] = EVENT_TRANSPOSE_REL;
-		pSeqFile->EventMap[0xdb] = EVENT_TUNING;
-		pSeqFile->EventMap[0xdc] = EVENT_PROGCHANGE;
-		pSeqFile->EventMap[0xdd] = EVENT_ADSR_AR;
-		pSeqFile->EventMap[0xde] = EVENT_ADSR_DR;
-		pSeqFile->EventMap[0xdf] = EVENT_ADSR_SL;
-		pSeqFile->EventMap[0xe0] = EVENT_ADSR_SR;
-		pSeqFile->EventMap[0xe1] = EVENT_ADSR_DEFAULT;
-		pSeqFile->EventMap[0xe2] = EVENT_LOOP_START;
-		pSeqFile->EventMap[0xe3] = EVENT_LOOP_END;
+		EventMap[0xc4] = EVENT_VOLUME;
+		EventMap[0xc5] = EVENT_VOLUME_FADE;
+		EventMap[0xc6] = EVENT_PAN;
+		EventMap[0xc7] = EVENT_PAN_FADE;
+		EventMap[0xc8] = EVENT_PITCH_SLIDE;
+		EventMap[0xc9] = EVENT_VIBRATO_ON;
+		EventMap[0xca] = EVENT_VIBRATO_OFF;
+		EventMap[0xcb] = EVENT_TREMOLO_ON;
+		EventMap[0xcc] = EVENT_TREMOLO_OFF;
+		EventMap[0xcd] = EVENT_PAN_LFO_ON;
+		EventMap[0xce] = EVENT_PAN_LFO_OFF;
+		EventMap[0xcf] = EVENT_NOISE_FREQ;
+		EventMap[0xd0] = EVENT_NOISE_ON;
+		EventMap[0xd1] = EVENT_NOISE_OFF;
+		EventMap[0xd2] = EVENT_PITCHMOD_ON;
+		EventMap[0xd3] = EVENT_PITCHMOD_OFF;
+		EventMap[0xd4] = EVENT_ECHO_ON;
+		EventMap[0xd5] = EVENT_ECHO_OFF;
+		EventMap[0xd6] = EVENT_OCTAVE;
+		EventMap[0xd7] = EVENT_OCTAVE_UP;
+		EventMap[0xd8] = EVENT_OCTAVE_DOWN;
+		EventMap[0xd9] = EVENT_TRANSPOSE_ABS;
+		EventMap[0xda] = EVENT_TRANSPOSE_REL;
+		EventMap[0xdb] = EVENT_TUNING;
+		EventMap[0xdc] = EVENT_PROGCHANGE;
+		EventMap[0xdd] = EVENT_ADSR_AR;
+		EventMap[0xde] = EVENT_ADSR_DR;
+		EventMap[0xdf] = EVENT_ADSR_SL;
+		EventMap[0xe0] = EVENT_ADSR_SR;
+		EventMap[0xe1] = EVENT_ADSR_DEFAULT;
+		EventMap[0xe2] = EVENT_LOOP_START;
+		EventMap[0xe3] = EVENT_LOOP_END;
 
 		// V4 common
-		pSeqFile->EventMap[0xe4] = EVENT_SLUR_ON;
-		pSeqFile->EventMap[0xe5] = EVENT_SLUR_OFF;
-		pSeqFile->EventMap[0xe6] = EVENT_LEGATO_ON;
-		pSeqFile->EventMap[0xe7] = EVENT_LEGATO_OFF;
-		pSeqFile->EventMap[0xe8] = EVENT_ONETIME_DURATION;
-		pSeqFile->EventMap[0xe9] = EVENT_JUMP_TO_SFX_LO;
-		pSeqFile->EventMap[0xea] = EVENT_JUMP_TO_SFX_HI;
-		pSeqFile->EventMap[0xeb] = EVENT_END; // exception: Gun Hazard
-		pSeqFile->EventMap[0xec] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xed] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xee] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xef] = EVENT_END; // duplicated
-		pSeqFile->EventMap[0xf0] = EVENT_TEMPO;
-		pSeqFile->EventMap[0xf1] = EVENT_TEMPO_FADE;
-		pSeqFile->EventMap[0xf2] = EVENT_ECHO_VOLUME;
-		pSeqFile->EventMap[0xf3] = EVENT_ECHO_VOLUME_FADE;
+		EventMap[0xe4] = EVENT_SLUR_ON;
+		EventMap[0xe5] = EVENT_SLUR_OFF;
+		EventMap[0xe6] = EVENT_LEGATO_ON;
+		EventMap[0xe7] = EVENT_LEGATO_OFF;
+		EventMap[0xe8] = EVENT_ONETIME_DURATION;
+		EventMap[0xe9] = EVENT_JUMP_TO_SFX_LO;
+		EventMap[0xea] = EVENT_JUMP_TO_SFX_HI;
+		EventMap[0xeb] = EVENT_END; // exception: Gun Hazard
+		EventMap[0xec] = EVENT_END; // duplicated
+		EventMap[0xed] = EVENT_END; // duplicated
+		EventMap[0xee] = EVENT_END; // duplicated
+		EventMap[0xef] = EVENT_END; // duplicated
+		EventMap[0xf0] = EVENT_TEMPO;
+		EventMap[0xf1] = EVENT_TEMPO_FADE;
+		EventMap[0xf2] = EVENT_ECHO_VOLUME;
+		EventMap[0xf3] = EVENT_ECHO_VOLUME_FADE;
 
 		// game-specific mappings
 		if (minorVersion == AKAOSNES_V4_RS2) {
-			pSeqFile->EventMap[0xf4] = EVENT_ECHO_FEEDBACK_FIR;
-			pSeqFile->EventMap[0xf5] = EVENT_MASTER_VOLUME;
-			pSeqFile->EventMap[0xf6] = EVENT_LOOP_BREAK;
-			pSeqFile->EventMap[0xf7] = EVENT_GOTO;
-			pSeqFile->EventMap[0xf8] = EVENT_INC_CPU_SHARED_COUNTER;
-			pSeqFile->EventMap[0xf9] = EVENT_ZERO_CPU_SHARED_COUNTER;
-			pSeqFile->EventMap[0xfa] = EVENT_MUTE;
-			pSeqFile->EventMap[0xfb] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xfc] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+			EventMap[0xf4] = EVENT_ECHO_FEEDBACK_FIR;
+			EventMap[0xf5] = EVENT_MASTER_VOLUME;
+			EventMap[0xf6] = EVENT_LOOP_BREAK;
+			EventMap[0xf7] = EVENT_GOTO;
+			EventMap[0xf8] = EVENT_INC_CPU_SHARED_COUNTER;
+			EventMap[0xf9] = EVENT_ZERO_CPU_SHARED_COUNTER;
+			EventMap[0xfa] = EVENT_MUTE;
+			EventMap[0xfb] = EVENT_END; // duplicated
+			EventMap[0xfc] = EVENT_END; // duplicated
+			EventMap[0xfd] = EVENT_END; // duplicated
+			EventMap[0xfe] = EVENT_END; // duplicated
+			EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_LAL) {
-			pSeqFile->EventMap[0xf4] = EVENT_ECHO_FEEDBACK_FIR;
-			pSeqFile->EventMap[0xf5] = EVENT_MASTER_VOLUME;
-			pSeqFile->EventMap[0xf6] = EVENT_LOOP_BREAK;
-			pSeqFile->EventMap[0xf7] = EVENT_GOTO;
-			pSeqFile->EventMap[0xf8] = EVENT_INC_CPU_SHARED_COUNTER;
-			pSeqFile->EventMap[0xf9] = EVENT_ZERO_CPU_SHARED_COUNTER;
-			pSeqFile->EventMap[0xfa] = EVENT_IGNORE_MASTER_VOLUME;
-			pSeqFile->EventMap[0xfb] = EVENT_CPU_CONTROLED_JUMP;
-			pSeqFile->EventMap[0xfc] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+			EventMap[0xf4] = EVENT_ECHO_FEEDBACK_FIR;
+			EventMap[0xf5] = EVENT_MASTER_VOLUME;
+			EventMap[0xf6] = EVENT_LOOP_BREAK;
+			EventMap[0xf7] = EVENT_GOTO;
+			EventMap[0xf8] = EVENT_INC_CPU_SHARED_COUNTER;
+			EventMap[0xf9] = EVENT_ZERO_CPU_SHARED_COUNTER;
+			EventMap[0xfa] = EVENT_IGNORE_MASTER_VOLUME;
+			EventMap[0xfb] = EVENT_CPU_CONTROLED_JUMP;
+			EventMap[0xfc] = EVENT_END; // duplicated
+			EventMap[0xfd] = EVENT_END; // duplicated
+			EventMap[0xfe] = EVENT_END; // duplicated
+			EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_FF6) {
-			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
-			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
-			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
-			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
-			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
-			pSeqFile->EventMap[0xf9] = EVENT_INC_CPU_SHARED_COUNTER;
-			pSeqFile->EventMap[0xfa] = EVENT_ZERO_CPU_SHARED_COUNTER;
-			pSeqFile->EventMap[0xfb] = EVENT_IGNORE_MASTER_VOLUME;
-			pSeqFile->EventMap[0xfc] = EVENT_CPU_CONTROLED_JUMP;
-			pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+			EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			EventMap[0xf5] = EVENT_LOOP_BREAK;
+			EventMap[0xf6] = EVENT_GOTO;
+			EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
+			EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
+			EventMap[0xf9] = EVENT_INC_CPU_SHARED_COUNTER;
+			EventMap[0xfa] = EVENT_ZERO_CPU_SHARED_COUNTER;
+			EventMap[0xfb] = EVENT_IGNORE_MASTER_VOLUME;
+			EventMap[0xfc] = EVENT_CPU_CONTROLED_JUMP;
+			EventMap[0xfd] = EVENT_END; // duplicated
+			EventMap[0xfe] = EVENT_END; // duplicated
+			EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_FM) {
-			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
-			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
-			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
-			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
-			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
-			//pSeqFile->EventMap[0xf9] = (AkaoSnesSeqEventType)0;
-			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
-			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
-			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
-			pSeqFile->EventMap[0xfd] = EVENT_VOLUME_ALT;
-			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+			EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			EventMap[0xf5] = EVENT_LOOP_BREAK;
+			EventMap[0xf6] = EVENT_GOTO;
+			EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
+			EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
+			//EventMap[0xf9] = (AkaoSnesSeqEventType)0;
+			EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			EventMap[0xfb] = EVENT_PERC_ON;
+			EventMap[0xfc] = EVENT_PERC_OFF;
+			EventMap[0xfd] = EVENT_VOLUME_ALT;
+			EventMap[0xfe] = EVENT_END; // duplicated
+			EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_CT) {
-			pSeqFile->EventMap[0xf4] = EVENT_MASTER_VOLUME;
-			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
-			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
-			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
-			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
-			pSeqFile->EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
-			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
-			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
-			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
-			pSeqFile->EventMap[0xfd] = EVENT_VOLUME_ALT;
-			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+			EventMap[0xf4] = EVENT_MASTER_VOLUME;
+			EventMap[0xf5] = EVENT_LOOP_BREAK;
+			EventMap[0xf6] = EVENT_GOTO;
+			EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
+			EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
+			EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
+			EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			EventMap[0xfb] = EVENT_PERC_ON;
+			EventMap[0xfc] = EVENT_PERC_OFF;
+			EventMap[0xfd] = EVENT_VOLUME_ALT;
+			EventMap[0xfe] = EVENT_END; // duplicated
+			EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_RS3) {
-			pSeqFile->EventMap[0xf4] = EVENT_VOLUME_ALT;
-			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
-			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
-			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
-			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR;
-			pSeqFile->EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
-			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
-			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
-			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
-			//pSeqFile->EventMap[0xfd] = (AkaoSnesSeqEventType)0;
-			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+			EventMap[0xf4] = EVENT_VOLUME_ALT;
+			EventMap[0xf5] = EVENT_LOOP_BREAK;
+			EventMap[0xf6] = EVENT_GOTO;
+			EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
+			EventMap[0xf8] = EVENT_ECHO_FIR;
+			EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
+			EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			EventMap[0xfb] = EVENT_PERC_ON;
+			EventMap[0xfc] = EVENT_PERC_OFF;
+			//EventMap[0xfd] = (AkaoSnesSeqEventType)0;
+			EventMap[0xfe] = EVENT_END; // duplicated
+			EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_GH) {
-			pSeqFile->EventMap[0xeb] = EVENT_UNKNOWN1;
-			pSeqFile->EventMap[0xec] = EVENT_END;
+			EventMap[0xeb] = EVENT_UNKNOWN1;
+			EventMap[0xec] = EVENT_END;
 
-			pSeqFile->EventMap[0xf4] = EVENT_VOLUME_ALT;
-			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
-			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
-			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
-			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR;
-			pSeqFile->EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
-			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
-			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
-			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
-			pSeqFile->EventMap[0xfd] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xfe] = EVENT_END; // duplicated
-			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+			EventMap[0xf4] = EVENT_VOLUME_ALT;
+			EventMap[0xf5] = EVENT_LOOP_BREAK;
+			EventMap[0xf6] = EVENT_GOTO;
+			EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
+			EventMap[0xf8] = EVENT_ECHO_FIR;
+			EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
+			EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			EventMap[0xfb] = EVENT_PERC_ON;
+			EventMap[0xfc] = EVENT_PERC_OFF;
+			EventMap[0xfd] = EVENT_END; // duplicated
+			EventMap[0xfe] = EVENT_END; // duplicated
+			EventMap[0xff] = EVENT_END; // duplicated
 		}
 		else if (minorVersion == AKAOSNES_V4_BSGAME) {
-			pSeqFile->EventMap[0xf4] = EVENT_VOLUME_ALT;
-			pSeqFile->EventMap[0xf5] = EVENT_LOOP_BREAK;
-			pSeqFile->EventMap[0xf6] = EVENT_GOTO;
-			pSeqFile->EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
-			pSeqFile->EventMap[0xf8] = EVENT_ECHO_FIR;
-			pSeqFile->EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
-			pSeqFile->EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
-			pSeqFile->EventMap[0xfb] = EVENT_PERC_ON;
-			pSeqFile->EventMap[0xfc] = EVENT_PERC_OFF;
-			//pSeqFile->EventMap[0xfd] = (AkaoSnesSeqEventType)0;
-			//pSeqFile->EventMap[0xfe] = (AkaoSnesSeqEventType)0;
-			pSeqFile->EventMap[0xff] = EVENT_END; // duplicated
+			EventMap[0xf4] = EVENT_VOLUME_ALT;
+			EventMap[0xf5] = EVENT_LOOP_BREAK;
+			EventMap[0xf6] = EVENT_GOTO;
+			EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
+			EventMap[0xf8] = EVENT_ECHO_FIR;
+			EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
+			EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+			EventMap[0xfb] = EVENT_PERC_ON;
+			EventMap[0xfc] = EVENT_PERC_OFF;
+			//EventMap[0xfd] = (AkaoSnesSeqEventType)0;
+			//EventMap[0xfe] = (AkaoSnesSeqEventType)0;
+			EventMap[0xff] = EVENT_END; // duplicated
 		}
 	}
 }

@@ -112,7 +112,7 @@ public:
 	double GetTempoInBPM (uint8_t tempo, uint8_t timerFreq);
 
 private:
-	void LoadEventMap(RareSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 

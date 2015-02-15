@@ -36,7 +36,7 @@ HeartBeatSnesSeq::HeartBeatSnesSeq(RawFile* file, HeartBeatSnesVersion ver, uint
 
 	UseReverb();
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 HeartBeatSnesSeq::~HeartBeatSnesSeq(void)
@@ -104,72 +104,72 @@ bool HeartBeatSnesSeq::GetTrackPointers(void)
 	return true;
 }
 
-void HeartBeatSnesSeq::LoadEventMap(HeartBeatSnesSeq *pSeqFile)
+void HeartBeatSnesSeq::LoadEventMap()
 {
 	int statusByte;
 
-	pSeqFile->EventMap[0x00] = EVENT_END;
+	EventMap[0x00] = EVENT_END;
 
 	for (statusByte = 0x01; statusByte <= 0x7f; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE_LENGTH;
+		EventMap[statusByte] = EVENT_NOTE_LENGTH;
 	}
 
 	for (statusByte = 0x80; statusByte <= 0xcf; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
+		EventMap[statusByte] = EVENT_NOTE;
 	}
 
-	pSeqFile->EventMap[0xd0] = EVENT_TIE;
-	pSeqFile->EventMap[0xd1] = EVENT_REST;
-	pSeqFile->EventMap[0xd2] = EVENT_SLUR_ON;
-	pSeqFile->EventMap[0xd3] = EVENT_SLUR_OFF;
-	pSeqFile->EventMap[0xd4] = EVENT_PROGCHANGE;
-	pSeqFile->EventMap[0xd5] = EVENT_UNKNOWN0; // 7 bytes?
-	pSeqFile->EventMap[0xd6] = EVENT_PAN;
-	pSeqFile->EventMap[0xd7] = EVENT_PAN_FADE;
-	pSeqFile->EventMap[0xd8] = EVENT_VIBRATO_ON;
-	pSeqFile->EventMap[0xd9] = EVENT_VIBRATO_FADE;
-	pSeqFile->EventMap[0xda] = EVENT_VIBRATO_OFF;
-	pSeqFile->EventMap[0xdb] = EVENT_MASTER_VOLUME;
-	pSeqFile->EventMap[0xdc] = EVENT_MASTER_VOLUME_FADE;
-	pSeqFile->EventMap[0xdd] = EVENT_TEMPO;
-	pSeqFile->EventMap[0xde] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xdf] = EVENT_GLOBAL_TRANSPOSE;
-	pSeqFile->EventMap[0xe0] = EVENT_TRANSPOSE;
-	pSeqFile->EventMap[0xe1] = EVENT_TREMOLO_ON;
-	pSeqFile->EventMap[0xe2] = EVENT_TREMOLO_OFF;
-	pSeqFile->EventMap[0xe3] = EVENT_VOLUME;
-	pSeqFile->EventMap[0xe4] = EVENT_VOLUME_FADE;
-	pSeqFile->EventMap[0xe5] = EVENT_UNKNOWN3;
-	pSeqFile->EventMap[0xe6] = EVENT_PITCH_ENVELOPE_TO;
-	pSeqFile->EventMap[0xe7] = EVENT_PITCH_ENVELOPE_FROM;
-	pSeqFile->EventMap[0xe8] = EVENT_PITCH_ENVELOPE_OFF;
-	pSeqFile->EventMap[0xe9] = EVENT_TUNING;
-	pSeqFile->EventMap[0xea] = EVENT_ECHO_VOLUME;
-	pSeqFile->EventMap[0xeb] = EVENT_ECHO_PARAM;
-	pSeqFile->EventMap[0xec] = EVENT_UNKNOWN3;
-	pSeqFile->EventMap[0xed] = EVENT_ECHO_OFF;
-	pSeqFile->EventMap[0xee] = EVENT_ECHO_ON;
-	pSeqFile->EventMap[0xef] = EVENT_ECHO_FIR;
-	pSeqFile->EventMap[0xf0] = EVENT_ADSR;
-	pSeqFile->EventMap[0xf1] = EVENT_NOTE_PARAM;
-	pSeqFile->EventMap[0xf2] = EVENT_GOTO;
-	pSeqFile->EventMap[0xf3] = EVENT_CALL;
-	pSeqFile->EventMap[0xf4] = EVENT_RET;
-	pSeqFile->EventMap[0xf5] = EVENT_NOISE_ON;
-	pSeqFile->EventMap[0xf6] = EVENT_NOISE_OFF;
-	pSeqFile->EventMap[0xf7] = EVENT_NOISE_FREQ;
-	pSeqFile->EventMap[0xf8] = EVENT_UNKNOWN0;
-	pSeqFile->EventMap[0xf9] = EVENT_SUBEVENT;
+	EventMap[0xd0] = EVENT_TIE;
+	EventMap[0xd1] = EVENT_REST;
+	EventMap[0xd2] = EVENT_SLUR_ON;
+	EventMap[0xd3] = EVENT_SLUR_OFF;
+	EventMap[0xd4] = EVENT_PROGCHANGE;
+	EventMap[0xd5] = EVENT_UNKNOWN0; // 7 bytes?
+	EventMap[0xd6] = EVENT_PAN;
+	EventMap[0xd7] = EVENT_PAN_FADE;
+	EventMap[0xd8] = EVENT_VIBRATO_ON;
+	EventMap[0xd9] = EVENT_VIBRATO_FADE;
+	EventMap[0xda] = EVENT_VIBRATO_OFF;
+	EventMap[0xdb] = EVENT_MASTER_VOLUME;
+	EventMap[0xdc] = EVENT_MASTER_VOLUME_FADE;
+	EventMap[0xdd] = EVENT_TEMPO;
+	EventMap[0xde] = EVENT_UNKNOWN1;
+	EventMap[0xdf] = EVENT_GLOBAL_TRANSPOSE;
+	EventMap[0xe0] = EVENT_TRANSPOSE;
+	EventMap[0xe1] = EVENT_TREMOLO_ON;
+	EventMap[0xe2] = EVENT_TREMOLO_OFF;
+	EventMap[0xe3] = EVENT_VOLUME;
+	EventMap[0xe4] = EVENT_VOLUME_FADE;
+	EventMap[0xe5] = EVENT_UNKNOWN3;
+	EventMap[0xe6] = EVENT_PITCH_ENVELOPE_TO;
+	EventMap[0xe7] = EVENT_PITCH_ENVELOPE_FROM;
+	EventMap[0xe8] = EVENT_PITCH_ENVELOPE_OFF;
+	EventMap[0xe9] = EVENT_TUNING;
+	EventMap[0xea] = EVENT_ECHO_VOLUME;
+	EventMap[0xeb] = EVENT_ECHO_PARAM;
+	EventMap[0xec] = EVENT_UNKNOWN3;
+	EventMap[0xed] = EVENT_ECHO_OFF;
+	EventMap[0xee] = EVENT_ECHO_ON;
+	EventMap[0xef] = EVENT_ECHO_FIR;
+	EventMap[0xf0] = EVENT_ADSR;
+	EventMap[0xf1] = EVENT_NOTE_PARAM;
+	EventMap[0xf2] = EVENT_GOTO;
+	EventMap[0xf3] = EVENT_CALL;
+	EventMap[0xf4] = EVENT_RET;
+	EventMap[0xf5] = EVENT_NOISE_ON;
+	EventMap[0xf6] = EVENT_NOISE_OFF;
+	EventMap[0xf7] = EVENT_NOISE_FREQ;
+	EventMap[0xf8] = EVENT_UNKNOWN0;
+	EventMap[0xf9] = EVENT_SUBEVENT;
 
-	pSeqFile->SubEventMap[0x00] = SUBEVENT_LOOP_COUNT;
-	pSeqFile->SubEventMap[0x01] = SUBEVENT_LOOP_AGAIN;
-	pSeqFile->SubEventMap[0x02] = SUBEVENT_UNKNOWN0;
-	pSeqFile->SubEventMap[0x03] = SUBEVENT_ADSR_AR;
-	pSeqFile->SubEventMap[0x04] = SUBEVENT_ADSR_DR;
-	pSeqFile->SubEventMap[0x05] = SUBEVENT_ADSR_SL;
-	pSeqFile->SubEventMap[0x06] = SUBEVENT_ADSR_RR;
-	pSeqFile->SubEventMap[0x07] = SUBEVENT_ADSR_SR;
-	pSeqFile->SubEventMap[0x09] = SUBEVENT_SURROUND;
+	SubEventMap[0x00] = SUBEVENT_LOOP_COUNT;
+	SubEventMap[0x01] = SUBEVENT_LOOP_AGAIN;
+	SubEventMap[0x02] = SUBEVENT_UNKNOWN0;
+	SubEventMap[0x03] = SUBEVENT_ADSR_AR;
+	SubEventMap[0x04] = SUBEVENT_ADSR_DR;
+	SubEventMap[0x05] = SUBEVENT_ADSR_SL;
+	SubEventMap[0x06] = SUBEVENT_ADSR_RR;
+	SubEventMap[0x07] = SUBEVENT_ADSR_SR;
+	SubEventMap[0x09] = SUBEVENT_SURROUND;
 }
 
 double HeartBeatSnesSeq::GetTempoInBPM(uint8_t tempo)

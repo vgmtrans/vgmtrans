@@ -45,7 +45,7 @@ RareSnesSeq::RareSnesSeq(RawFile* file, RareSnesVersion ver, uint32_t seqdataOff
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 RareSnesSeq::~RareSnesSeq(void)
@@ -101,141 +101,141 @@ bool RareSnesSeq::GetTrackPointers(void)
 	return true;
 }
 
-void RareSnesSeq::LoadEventMap(RareSnesSeq *pSeqFile)
+void RareSnesSeq::LoadEventMap()
 {
 	// common events
-	pSeqFile->EventMap[0x00] = EVENT_END;
-	pSeqFile->EventMap[0x01] = EVENT_PROGCHANGE;
-	pSeqFile->EventMap[0x02] = EVENT_VOLLR;
-	pSeqFile->EventMap[0x03] = EVENT_GOTO;
-	pSeqFile->EventMap[0x04] = EVENT_CALLNTIMES;
-	pSeqFile->EventMap[0x05] = EVENT_RET;
-	pSeqFile->EventMap[0x06] = EVENT_DEFDURON;
-	pSeqFile->EventMap[0x07] = EVENT_DEFDUROFF;
-	pSeqFile->EventMap[0x08] = EVENT_PITCHSLIDEUP;
-	pSeqFile->EventMap[0x09] = EVENT_PITCHSLIDEDOWN;
-	pSeqFile->EventMap[0x0a] = EVENT_PITCHSLIDEOFF;
-	pSeqFile->EventMap[0x0b] = EVENT_TEMPO;
-	pSeqFile->EventMap[0x0c] = EVENT_TEMPOADD;
-	pSeqFile->EventMap[0x0d] = EVENT_VIBRATOSHORT;
-	pSeqFile->EventMap[0x0e] = EVENT_VIBRATOOFF;
-	pSeqFile->EventMap[0x0f] = EVENT_VIBRATO;
-	pSeqFile->EventMap[0x10] = EVENT_ADSR;
-	pSeqFile->EventMap[0x11] = EVENT_MASTVOLLR;
-	pSeqFile->EventMap[0x12] = EVENT_TUNING;
-	pSeqFile->EventMap[0x13] = EVENT_TRANSPABS;
-	pSeqFile->EventMap[0x14] = EVENT_TRANSPREL;
-	pSeqFile->EventMap[0x15] = EVENT_ECHOPARAM;
-	pSeqFile->EventMap[0x16] = EVENT_ECHOON;
-	pSeqFile->EventMap[0x17] = EVENT_ECHOOFF;
-	pSeqFile->EventMap[0x18] = EVENT_ECHOFIR;
-	pSeqFile->EventMap[0x19] = EVENT_NOISECLK;
-	pSeqFile->EventMap[0x1a] = EVENT_NOISEON;
-	pSeqFile->EventMap[0x1b] = EVENT_NOISEOFF;
-	pSeqFile->EventMap[0x1c] = EVENT_SETALTNOTE1;
-	pSeqFile->EventMap[0x1d] = EVENT_SETALTNOTE2;
-	pSeqFile->EventMap[0x26] = EVENT_PITCHSLIDEDOWNSHORT;
-	pSeqFile->EventMap[0x27] = EVENT_PITCHSLIDEUPSHORT;
-	pSeqFile->EventMap[0x2b] = EVENT_LONGDURON;
-	pSeqFile->EventMap[0x2c] = EVENT_LONGDUROFF;
+	EventMap[0x00] = EVENT_END;
+	EventMap[0x01] = EVENT_PROGCHANGE;
+	EventMap[0x02] = EVENT_VOLLR;
+	EventMap[0x03] = EVENT_GOTO;
+	EventMap[0x04] = EVENT_CALLNTIMES;
+	EventMap[0x05] = EVENT_RET;
+	EventMap[0x06] = EVENT_DEFDURON;
+	EventMap[0x07] = EVENT_DEFDUROFF;
+	EventMap[0x08] = EVENT_PITCHSLIDEUP;
+	EventMap[0x09] = EVENT_PITCHSLIDEDOWN;
+	EventMap[0x0a] = EVENT_PITCHSLIDEOFF;
+	EventMap[0x0b] = EVENT_TEMPO;
+	EventMap[0x0c] = EVENT_TEMPOADD;
+	EventMap[0x0d] = EVENT_VIBRATOSHORT;
+	EventMap[0x0e] = EVENT_VIBRATOOFF;
+	EventMap[0x0f] = EVENT_VIBRATO;
+	EventMap[0x10] = EVENT_ADSR;
+	EventMap[0x11] = EVENT_MASTVOLLR;
+	EventMap[0x12] = EVENT_TUNING;
+	EventMap[0x13] = EVENT_TRANSPABS;
+	EventMap[0x14] = EVENT_TRANSPREL;
+	EventMap[0x15] = EVENT_ECHOPARAM;
+	EventMap[0x16] = EVENT_ECHOON;
+	EventMap[0x17] = EVENT_ECHOOFF;
+	EventMap[0x18] = EVENT_ECHOFIR;
+	EventMap[0x19] = EVENT_NOISECLK;
+	EventMap[0x1a] = EVENT_NOISEON;
+	EventMap[0x1b] = EVENT_NOISEOFF;
+	EventMap[0x1c] = EVENT_SETALTNOTE1;
+	EventMap[0x1d] = EVENT_SETALTNOTE2;
+	EventMap[0x26] = EVENT_PITCHSLIDEDOWNSHORT;
+	EventMap[0x27] = EVENT_PITCHSLIDEUPSHORT;
+	EventMap[0x2b] = EVENT_LONGDURON;
+	EventMap[0x2c] = EVENT_LONGDUROFF;
 
-	switch(pSeqFile->version)
+	switch(version)
 	{
 	case RARESNES_DKC:
-		pSeqFile->EventMap[0x1c] = EVENT_SETVOLADSRPRESET1;
-		pSeqFile->EventMap[0x1d] = EVENT_SETVOLADSRPRESET2;
-		pSeqFile->EventMap[0x1e] = EVENT_SETVOLADSRPRESET3;
-		pSeqFile->EventMap[0x1f] = EVENT_SETVOLADSRPRESET4;
-		pSeqFile->EventMap[0x20] = EVENT_SETVOLADSRPRESET5;
-		pSeqFile->EventMap[0x21] = EVENT_GETVOLADSRPRESET1;
-		pSeqFile->EventMap[0x22] = EVENT_GETVOLADSRPRESET2;
-		pSeqFile->EventMap[0x23] = EVENT_GETVOLADSRPRESET3;
-		pSeqFile->EventMap[0x24] = EVENT_GETVOLADSRPRESET4;
-		pSeqFile->EventMap[0x25] = EVENT_GETVOLADSRPRESET5;
-		pSeqFile->EventMap[0x28] = EVENT_PROGCHANGEVOL;
-		pSeqFile->EventMap[0x29] = EVENT_UNKNOWN1;
-		pSeqFile->EventMap[0x2a] = EVENT_TIMERFREQ;
-		pSeqFile->EventMap[0x2d] = EVENT_CONDJUMP;
-		pSeqFile->EventMap[0x2e] = EVENT_SETCONDJUMPPARAM;
-		pSeqFile->EventMap[0x2f] = EVENT_TREMOLO;
-		pSeqFile->EventMap[0x30] = EVENT_TREMOLOOFF;
+		EventMap[0x1c] = EVENT_SETVOLADSRPRESET1;
+		EventMap[0x1d] = EVENT_SETVOLADSRPRESET2;
+		EventMap[0x1e] = EVENT_SETVOLADSRPRESET3;
+		EventMap[0x1f] = EVENT_SETVOLADSRPRESET4;
+		EventMap[0x20] = EVENT_SETVOLADSRPRESET5;
+		EventMap[0x21] = EVENT_GETVOLADSRPRESET1;
+		EventMap[0x22] = EVENT_GETVOLADSRPRESET2;
+		EventMap[0x23] = EVENT_GETVOLADSRPRESET3;
+		EventMap[0x24] = EVENT_GETVOLADSRPRESET4;
+		EventMap[0x25] = EVENT_GETVOLADSRPRESET5;
+		EventMap[0x28] = EVENT_PROGCHANGEVOL;
+		EventMap[0x29] = EVENT_UNKNOWN1;
+		EventMap[0x2a] = EVENT_TIMERFREQ;
+		EventMap[0x2d] = EVENT_CONDJUMP;
+		EventMap[0x2e] = EVENT_SETCONDJUMPPARAM;
+		EventMap[0x2f] = EVENT_TREMOLO;
+		EventMap[0x30] = EVENT_TREMOLOOFF;
 		break;
 
 	case RARESNES_KI:
 		//removed common events
-		pSeqFile->EventMap.erase(0x0c);
-		pSeqFile->EventMap.erase(0x0d);
-		pSeqFile->EventMap.erase(0x11);
-		pSeqFile->EventMap.erase(0x15);
-		pSeqFile->EventMap.erase(0x18);
-		pSeqFile->EventMap.erase(0x19);
-		pSeqFile->EventMap.erase(0x1a);
-		pSeqFile->EventMap.erase(0x1b);
-		pSeqFile->EventMap.erase(0x1c);
-		pSeqFile->EventMap.erase(0x1d);
+		EventMap.erase(0x0c);
+		EventMap.erase(0x0d);
+		EventMap.erase(0x11);
+		EventMap.erase(0x15);
+		EventMap.erase(0x18);
+		EventMap.erase(0x19);
+		EventMap.erase(0x1a);
+		EventMap.erase(0x1b);
+		EventMap.erase(0x1c);
+		EventMap.erase(0x1d);
 
-		pSeqFile->EventMap[0x1e] = EVENT_VOLCENTER;
-		pSeqFile->EventMap[0x1f] = EVENT_CALLONCE;
-		pSeqFile->EventMap[0x20] = EVENT_RESETADSR;
-		pSeqFile->EventMap[0x21] = EVENT_RESETADSRSOFT;
-		pSeqFile->EventMap[0x22] = EVENT_VOICEPARAMSHORT;
-		pSeqFile->EventMap[0x23] = EVENT_ECHODELAY;
-		//pSeqFile->EventMap[0x24] = null;
-		//pSeqFile->EventMap[0x25] = null;
-		//pSeqFile->EventMap[0x28] = null;
-		//pSeqFile->EventMap[0x29] = null;
-		//pSeqFile->EventMap[0x2a] = null;
-		//pSeqFile->EventMap[0x2d] = null;
-		//pSeqFile->EventMap[0x2e] = null;
-		//pSeqFile->EventMap[0x2f] = null;
-		//pSeqFile->EventMap[0x30] = null;
+		EventMap[0x1e] = EVENT_VOLCENTER;
+		EventMap[0x1f] = EVENT_CALLONCE;
+		EventMap[0x20] = EVENT_RESETADSR;
+		EventMap[0x21] = EVENT_RESETADSRSOFT;
+		EventMap[0x22] = EVENT_VOICEPARAMSHORT;
+		EventMap[0x23] = EVENT_ECHODELAY;
+		//EventMap[0x24] = null;
+		//EventMap[0x25] = null;
+		//EventMap[0x28] = null;
+		//EventMap[0x29] = null;
+		//EventMap[0x2a] = null;
+		//EventMap[0x2d] = null;
+		//EventMap[0x2e] = null;
+		//EventMap[0x2f] = null;
+		//EventMap[0x30] = null;
 		break;
 
 	case RARESNES_DKC2:
 		//removed common events
-		pSeqFile->EventMap.erase(0x11);
+		EventMap.erase(0x11);
 
-		pSeqFile->EventMap[0x1e] = EVENT_SETVOLPRESETS;
-		pSeqFile->EventMap[0x1f] = EVENT_ECHODELAY;
-		pSeqFile->EventMap[0x20] = EVENT_GETVOLPRESET1;
-		pSeqFile->EventMap[0x21] = EVENT_CALLONCE;
-		pSeqFile->EventMap[0x22] = EVENT_VOICEPARAM;
-		pSeqFile->EventMap[0x23] = EVENT_VOLCENTER;
-		pSeqFile->EventMap[0x24] = EVENT_MASTVOL;
-		//pSeqFile->EventMap[0x25] = null;
-		//pSeqFile->EventMap[0x28] = null;
-		//pSeqFile->EventMap[0x29] = null;
-		//pSeqFile->EventMap[0x2a] = null;
-		//pSeqFile->EventMap[0x2d] = null;
-		//pSeqFile->EventMap[0x2e] = null;
-		//pSeqFile->EventMap[0x2f] = null;
-		pSeqFile->EventMap[0x30] = EVENT_ECHOOFF; // duplicated
-		pSeqFile->EventMap[0x31] = EVENT_GETVOLPRESET2;
-		pSeqFile->EventMap[0x32] = EVENT_ECHOOFF; // duplicated
+		EventMap[0x1e] = EVENT_SETVOLPRESETS;
+		EventMap[0x1f] = EVENT_ECHODELAY;
+		EventMap[0x20] = EVENT_GETVOLPRESET1;
+		EventMap[0x21] = EVENT_CALLONCE;
+		EventMap[0x22] = EVENT_VOICEPARAM;
+		EventMap[0x23] = EVENT_VOLCENTER;
+		EventMap[0x24] = EVENT_MASTVOL;
+		//EventMap[0x25] = null;
+		//EventMap[0x28] = null;
+		//EventMap[0x29] = null;
+		//EventMap[0x2a] = null;
+		//EventMap[0x2d] = null;
+		//EventMap[0x2e] = null;
+		//EventMap[0x2f] = null;
+		EventMap[0x30] = EVENT_ECHOOFF; // duplicated
+		EventMap[0x31] = EVENT_GETVOLPRESET2;
+		EventMap[0x32] = EVENT_ECHOOFF; // duplicated
 		break;
 
 	case RARESNES_WNRN:
 		//removed common events
-		pSeqFile->EventMap.erase(0x19);
-		pSeqFile->EventMap.erase(0x1a);
-		pSeqFile->EventMap.erase(0x1b);
+		EventMap.erase(0x19);
+		EventMap.erase(0x1a);
+		EventMap.erase(0x1b);
 
-		//pSeqFile->EventMap[0x1e] = null;
-		//pSeqFile->EventMap[0x1f] = null;
-		pSeqFile->EventMap[0x20] = EVENT_MASTVOL;
-		pSeqFile->EventMap[0x21] = EVENT_VOLCENTER;
-		pSeqFile->EventMap[0x22] = EVENT_UNKNOWN3;
-		pSeqFile->EventMap[0x23] = EVENT_CALLONCE;
-		pSeqFile->EventMap[0x24] = EVENT_LFOOFF;
-		pSeqFile->EventMap[0x25] = EVENT_UNKNOWN4;
-		pSeqFile->EventMap[0x28] = EVENT_PROGCHANGEVOL;
-		pSeqFile->EventMap[0x29] = EVENT_UNKNOWN1;
-		pSeqFile->EventMap[0x2a] = EVENT_TIMERFREQ;
-		//pSeqFile->EventMap[0x2d] = null;
-		//pSeqFile->EventMap[0x2e] = null;
-		pSeqFile->EventMap[0x2f] = EVENT_TREMOLO;
-		pSeqFile->EventMap[0x30] = EVENT_TREMOLOOFF;
-		//pSeqFile->EventMap[0x31] = EVENT_RESET;
+		//EventMap[0x1e] = null;
+		//EventMap[0x1f] = null;
+		EventMap[0x20] = EVENT_MASTVOL;
+		EventMap[0x21] = EVENT_VOLCENTER;
+		EventMap[0x22] = EVENT_UNKNOWN3;
+		EventMap[0x23] = EVENT_CALLONCE;
+		EventMap[0x24] = EVENT_LFOOFF;
+		EventMap[0x25] = EVENT_UNKNOWN4;
+		EventMap[0x28] = EVENT_PROGCHANGEVOL;
+		EventMap[0x29] = EVENT_UNKNOWN1;
+		EventMap[0x2a] = EVENT_TIMERFREQ;
+		//EventMap[0x2d] = null;
+		//EventMap[0x2e] = null;
+		EventMap[0x2f] = EVENT_TREMOLO;
+		EventMap[0x30] = EVENT_TREMOLOOFF;
+		//EventMap[0x31] = EVENT_RESET;
 		break;
 	}
 }

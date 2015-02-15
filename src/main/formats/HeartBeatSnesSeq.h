@@ -90,7 +90,7 @@ public:
 	static const uint8_t PAN_TABLE[22];
 
 private:
-	void LoadEventMap(HeartBeatSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 

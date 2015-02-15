@@ -78,7 +78,7 @@ public:
 	double GetTempoInBPM (uint16_t tempo);
 
 private:
-	void LoadEventMap(CapcomSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 

@@ -34,7 +34,7 @@ CompileSnesSeq::CompileSnesSeq(RawFile* file, CompileSnesVersion ver, uint32_t s
 	bAllowDiscontinuousTrackData = true;
 	bWriteInitialTempo = true;
 
-	LoadEventMap(this);
+	LoadEventMap();
 }
 
 CompileSnesSeq::~CompileSnesSeq(void)
@@ -109,72 +109,72 @@ bool CompileSnesSeq::GetTrackPointers(void)
 	return true;
 }
 
-void CompileSnesSeq::LoadEventMap(CompileSnesSeq *pSeqFile)
+void CompileSnesSeq::LoadEventMap()
 {
 	for (unsigned int statusByte = 0x00; statusByte <= 0x7f; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_NOTE;
+		EventMap[statusByte] = EVENT_NOTE;
 	}
 
-	pSeqFile->EventMap[0x80] = EVENT_GOTO;
-	pSeqFile->EventMap[0x81] = EVENT_LOOP_END;
-	pSeqFile->EventMap[0x82] = EVENT_END;
-	pSeqFile->EventMap[0x83] = EVENT_VIBRATO;
-	pSeqFile->EventMap[0x84] = EVENT_PORTAMENTO_TIME;
-	//pSeqFile->EventMap[0x85] = 0;
-	//pSeqFile->EventMap[0x86] = 0;
-	pSeqFile->EventMap[0x87] = EVENT_VOLUME;
-	pSeqFile->EventMap[0x88] = EVENT_VOLUME_ENVELOPE;
-	pSeqFile->EventMap[0x89] = EVENT_TRANSPOSE;
-	pSeqFile->EventMap[0x8a] = EVENT_VOLUME_REL;
-	pSeqFile->EventMap[0x8b] = EVENT_UNKNOWN2;
-	pSeqFile->EventMap[0x8c] = EVENT_UNKNOWN1; // NOP
-	pSeqFile->EventMap[0x8d] = EVENT_LOOP_COUNT;
-	pSeqFile->EventMap[0x8e] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0x8f] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0x90] = EVENT_FLAGS;
-	pSeqFile->EventMap[0x91] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0x92] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0x93] = EVENT_UNKNOWN2;
-	pSeqFile->EventMap[0x94] = EVENT_UNKNOWN1;
+	EventMap[0x80] = EVENT_GOTO;
+	EventMap[0x81] = EVENT_LOOP_END;
+	EventMap[0x82] = EVENT_END;
+	EventMap[0x83] = EVENT_VIBRATO;
+	EventMap[0x84] = EVENT_PORTAMENTO_TIME;
+	//EventMap[0x85] = 0;
+	//EventMap[0x86] = 0;
+	EventMap[0x87] = EVENT_VOLUME;
+	EventMap[0x88] = EVENT_VOLUME_ENVELOPE;
+	EventMap[0x89] = EVENT_TRANSPOSE;
+	EventMap[0x8a] = EVENT_VOLUME_REL;
+	EventMap[0x8b] = EVENT_UNKNOWN2;
+	EventMap[0x8c] = EVENT_UNKNOWN1; // NOP
+	EventMap[0x8d] = EVENT_LOOP_COUNT;
+	EventMap[0x8e] = EVENT_UNKNOWN1;
+	EventMap[0x8f] = EVENT_UNKNOWN1;
+	EventMap[0x90] = EVENT_FLAGS;
+	EventMap[0x91] = EVENT_UNKNOWN1;
+	EventMap[0x92] = EVENT_UNKNOWN1;
+	EventMap[0x93] = EVENT_UNKNOWN2;
+	EventMap[0x94] = EVENT_UNKNOWN1;
 	// 95 no version differences
-	pSeqFile->EventMap[0x96] = EVENT_TEMPO;
-	pSeqFile->EventMap[0x97] = EVENT_TUNING;
-	pSeqFile->EventMap[0x98] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0x99] = EVENT_UNKNOWN0;
-	pSeqFile->EventMap[0x9a] = EVENT_CALL;
-	pSeqFile->EventMap[0x9b] = EVENT_RET;
-	//pSeqFile->EventMap[0x9c] = 0;
-	pSeqFile->EventMap[0x9d] = EVENT_UNKNOWN1;
-	//pSeqFile->EventMap[0x9e] = 0;
-	pSeqFile->EventMap[0x9f] = EVENT_ADSR;
-	pSeqFile->EventMap[0xa0] = EVENT_PROGCHANGE;
-	pSeqFile->EventMap[0xa1] = EVENT_PORTAMENTO_ON;
-	pSeqFile->EventMap[0xa2] = EVENT_PORTAMENTO_OFF;
-	pSeqFile->EventMap[0xa3] = EVENT_PANPOT_ENVELOPE;
-	pSeqFile->EventMap[0xa4] = EVENT_UNKNOWN1; // conditional do (channel match), for delay
-	pSeqFile->EventMap[0xa5] = EVENT_UNKNOWN3; // conditional jump
-	pSeqFile->EventMap[0xa6] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xa7] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xab] = EVENT_PAN;
-	pSeqFile->EventMap[0xac] = EVENT_UNKNOWN1;
-	pSeqFile->EventMap[0xad] = EVENT_LOOP_BREAK;
-	pSeqFile->EventMap[0xae] = EVENT_UNKNOWN0;
-	pSeqFile->EventMap[0xaf] = EVENT_UNKNOWN0;
+	EventMap[0x96] = EVENT_TEMPO;
+	EventMap[0x97] = EVENT_TUNING;
+	EventMap[0x98] = EVENT_UNKNOWN1;
+	EventMap[0x99] = EVENT_UNKNOWN0;
+	EventMap[0x9a] = EVENT_CALL;
+	EventMap[0x9b] = EVENT_RET;
+	//EventMap[0x9c] = 0;
+	EventMap[0x9d] = EVENT_UNKNOWN1;
+	//EventMap[0x9e] = 0;
+	EventMap[0x9f] = EVENT_ADSR;
+	EventMap[0xa0] = EVENT_PROGCHANGE;
+	EventMap[0xa1] = EVENT_PORTAMENTO_ON;
+	EventMap[0xa2] = EVENT_PORTAMENTO_OFF;
+	EventMap[0xa3] = EVENT_PANPOT_ENVELOPE;
+	EventMap[0xa4] = EVENT_UNKNOWN1; // conditional do (channel match), for delay
+	EventMap[0xa5] = EVENT_UNKNOWN3; // conditional jump
+	EventMap[0xa6] = EVENT_UNKNOWN1;
+	EventMap[0xa7] = EVENT_UNKNOWN1;
+	EventMap[0xab] = EVENT_PAN;
+	EventMap[0xac] = EVENT_UNKNOWN1;
+	EventMap[0xad] = EVENT_LOOP_BREAK;
+	EventMap[0xae] = EVENT_UNKNOWN0;
+	EventMap[0xaf] = EVENT_UNKNOWN0;
 
 	for (unsigned int statusByte = STATUS_PERCUSSION_NOTE_MIN; statusByte <= STATUS_PERCUSSION_NOTE_MAX; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_PERCUSSION_NOTE;
+		EventMap[statusByte] = EVENT_PERCUSSION_NOTE;
 	}
 
-	pSeqFile->EventMap[STATUS_DURATION_DIRECT] = EVENT_DURATION_DIRECT;
+	EventMap[STATUS_DURATION_DIRECT] = EVENT_DURATION_DIRECT;
 	for (unsigned int statusByte = STATUS_DURATION_MIN; statusByte <= STATUS_DURATION_MAX; statusByte++) {
-		pSeqFile->EventMap[statusByte] = EVENT_DURATION;
+		EventMap[statusByte] = EVENT_DURATION;
 	}
 
 	switch (version) {
 	case COMPILESNES_ALESTE:
-		pSeqFile->EventMap[0xa4] = EVENT_UNKNOWN1;
-		pSeqFile->EventMap[0xa5] = EVENT_UNKNOWN1;
-		pSeqFile->EventMap[0xa6] = EVENT_UNKNOWN1;
+		EventMap[0xa4] = EVENT_UNKNOWN1;
+		EventMap[0xa5] = EVENT_UNKNOWN1;
+		EventMap[0xa6] = EVENT_UNKNOWN1;
 		break;
 	}
 }
@@ -239,7 +239,6 @@ bool CompileSnesTrack::ReadEvent(void)
 		return false;
 	}
 
-	bool bWriteGenericEventAsTextEventTmp;
 	uint8_t statusByte = GetByte(curOffset++);
 	bool bContinue = true;
 

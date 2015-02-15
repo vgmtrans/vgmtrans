@@ -91,7 +91,7 @@ public:
 	uint8_t spcTempo;
 
 private:
-	void LoadEventMap(SuzukiSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 

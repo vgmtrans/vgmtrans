@@ -117,7 +117,7 @@ public:
 	uint32_t addrSequenceEnd;
 
 private:
-	void LoadEventMap(AkaoSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 
