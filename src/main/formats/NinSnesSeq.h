@@ -113,7 +113,7 @@ class NinSnesTrack
 	: public SeqTrack
 {
 public:
-	NinSnesTrack(NinSnesSection* parentSection, long offset = 0, long length = 0, const wchar_t* theName = NULL);
+	NinSnesTrack(NinSnesSection* parentSection, long offset = 0, long length = 0, const std::wstring& theName = L"");
 
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);

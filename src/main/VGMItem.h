@@ -173,14 +173,14 @@ public:
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 	virtual bool IsContainerItem() { return true; }
 
-	VGMHeader* AddHeader(uint32_t offset, uint32_t length, const wchar_t* name = L"Header");
+	VGMHeader* AddHeader(uint32_t offset, uint32_t length, const std::wstring& name = L"Header");
 
 	void AddItem(VGMItem* item);
-	void AddSimpleItem(uint32_t offset, uint32_t length, const wchar_t *theName);
+	void AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring& theName);
 	void AddUnknownItem(uint32_t offset, uint32_t length);
 
 	//void AddHeaderItem(VGMItem* item);
-	//void AddSimpleHeaderItem(uint32_t offset, uint32_t length, const wchar_t* name);
+	//void AddSimpleHeaderItem(uint32_t offset, uint32_t length, const std::wstring& name);
 	
 
 	template <class T> void AddContainer(std::vector<T*>& container)

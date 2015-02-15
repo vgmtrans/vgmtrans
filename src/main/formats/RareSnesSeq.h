@@ -126,7 +126,7 @@ public:
 	virtual void OnTickBegin(void);
 	virtual void OnTickEnd(void);
 
-	void AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR, const wchar_t* sEventName = L"Volume L/R");
+	void AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR, const std::wstring& sEventName = L"Volume L/R");
 	void AddVolLRNoItem(int8_t spcVolL, int8_t spcVolR);
 
 private:

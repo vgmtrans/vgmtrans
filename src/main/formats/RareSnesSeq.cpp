@@ -1115,7 +1115,7 @@ void RareSnesTrack::OnTickEnd(void)
 {
 }
 
-void RareSnesTrack::AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR, const wchar_t* sEventName)
+void RareSnesTrack::AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR, const std::wstring& sEventName)
 {
 	uint8_t newMidiVol;
 	uint8_t newMidiPan;

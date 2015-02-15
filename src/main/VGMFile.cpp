@@ -109,7 +109,7 @@ void VGMFile::RemoveCollAssoc(VGMColl* coll)
 		assocColls.erase(iter);
 }
 
-//void VGMFile::AddItem(VGMItem* item, VGMItem* parent, const wchar_t* itemName)
+//void VGMFile::AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName)
 //{
 //	if (itemName == NULL)
 //	{
@@ -186,7 +186,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer)
 // VGMHeader
 // *********
 
-VGMHeader::VGMHeader(VGMItem* parItem, uint32_t offset, uint32_t length, const wchar_t* name)
+VGMHeader::VGMHeader(VGMItem* parItem, uint32_t offset, uint32_t length, const std::wstring& name)
 : VGMContainerItem(parItem->vgmfile, offset, length, name)
 {
 	//AddContainer<VGMItem>(items);
@@ -197,17 +197,17 @@ VGMHeader::~VGMHeader()
 	//DeleteVect<VGMItem>(items);
 }
 
-void VGMHeader::AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull, const wchar_t *name)
+void VGMHeader::AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull, const std::wstring& name)
 {
 	localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_POINTER, offset, length, name));
 }
 
-void VGMHeader::AddTempo(uint32_t offset, uint32_t length, const wchar_t *name)
+void VGMHeader::AddTempo(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_TEMPO, offset, length, name));
 }
 
-void VGMHeader::AddSig(uint32_t offset, uint32_t length, const wchar_t *name)
+void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_SIG, offset, length, name));
 }
@@ -216,7 +216,7 @@ void VGMHeader::AddSig(uint32_t offset, uint32_t length, const wchar_t *name)
 // VGMHeaderItem
 // *************
 
-VGMHeaderItem::VGMHeaderItem(VGMHeader* hdr, HdrItemType theType, uint32_t offset, uint32_t length, const wchar_t* name)
+VGMHeaderItem::VGMHeaderItem(VGMHeader* hdr, HdrItemType theType, uint32_t offset, uint32_t length, const std::wstring& name)
 : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType)
 {
 }

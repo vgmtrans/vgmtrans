@@ -232,7 +232,7 @@ void VGMContainerItem::AddToUI(VGMItem* parent, VOID* UI_specific)
 	}
 }
 
-VGMHeader* VGMContainerItem::AddHeader(uint32_t offset, uint32_t length, const wchar_t* name)
+VGMHeader* VGMContainerItem::AddHeader(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	VGMHeader* header = new VGMHeader(this, offset, length, name);
 	headers.push_back(header);
@@ -244,7 +244,7 @@ void VGMContainerItem::AddItem(VGMItem* item)
 	localitems.push_back(item);
 }
 
-void VGMContainerItem::AddSimpleItem(uint32_t offset, uint32_t length, const wchar_t *name)
+void VGMContainerItem::AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	localitems.push_back(new VGMItem(this->vgmfile, offset, length, name, CLR_HEADER));
 	//items.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_GENERIC, offset, length, name));
@@ -262,7 +262,7 @@ void VGMContainerItem::AddHeaderItem(VGMItem* item)
 	header->AddItem(item);
 }
 	
-void VGMContainerItem::AddSimpleHeaderItem(uint32_t offset, uint32_t length, const wchar_t* name)
+void VGMContainerItem::AddSimpleHeaderItem(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	header->AddSimpleItem(offset, length, name);
 }

@@ -43,7 +43,7 @@ public:
 	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
 
 	const std::wstring* GetName(void) const;
-	//void AddItem(VGMItem* item, VGMItem* parent, const wchar_t* itemName = NULL);
+	//void AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName = L"");
 	//void AddItemSet(vector<ItemSet>* itemset);
 
 	bool OnClose();
@@ -175,14 +175,14 @@ class VGMHeader :
 	public VGMContainerItem
 {
 public:
-	VGMHeader(VGMItem* parItem, uint32_t offset = 0, uint32_t length = 0, const wchar_t* name = L"Header");
+	VGMHeader(VGMItem* parItem, uint32_t offset = 0, uint32_t length = 0, const std::wstring& name = L"Header");
 	virtual ~VGMHeader();
 
 	virtual Icon GetIcon() { return ICON_BINARY; };
 
-	void AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull, const wchar_t *name = L"Pointer");
-	void AddTempo(uint32_t offset, uint32_t length, const wchar_t *name = L"Tempo");
-	void AddSig(uint32_t offset, uint32_t length, const wchar_t *name = L"Signature");
+	void AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull, const std::wstring& name = L"Pointer");
+	void AddTempo(uint32_t offset, uint32_t length, const std::wstring& name = L"Tempo");
+	void AddSig(uint32_t offset, uint32_t length, const std::wstring& name = L"Signature");
 
 	//vector<VGMItem*> items;
 };
@@ -197,7 +197,7 @@ class VGMHeaderItem :
 public:
 	enum HdrItemType { HIT_POINTER, HIT_TEMPO, HIT_SIG, HIT_GENERIC, HIT_UNKNOWN };		//HIT = Header Item Type
 
-	VGMHeaderItem(VGMHeader* hdr, HdrItemType theType, uint32_t offset, uint32_t length, const wchar_t* name);
+	VGMHeaderItem(VGMHeader* hdr, HdrItemType theType, uint32_t offset, uint32_t length, const std::wstring& name);
 	virtual Icon GetIcon();
 
 public:

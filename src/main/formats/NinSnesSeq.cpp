@@ -14,11 +14,9 @@ DECLARE_FORMAT(NinSnes);
 #define SEQ_KEYOFS  24
 
 NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, std::wstring theName)
-	: VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0), version(ver),
+	: VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName), version(ver),
 	header(NULL)
 {
-	name = theName;
-
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
 
@@ -401,16 +399,12 @@ void NinSnesTrackSharedData::ResetVars(void)
 //  NinSnesTrack
 //  ************
 
-NinSnesTrack::NinSnesTrack(NinSnesSection* parentSection, long offset, long length, const wchar_t* theName)
-	: SeqTrack(parentSection->parentSeq, offset, length),
+NinSnesTrack::NinSnesTrack(NinSnesSection* parentSection, long offset, long length, const std::wstring& theName)
+	: SeqTrack(parentSection->parentSeq, offset, length, theName),
 	parentSection(parentSection),
 	shared(NULL),
 	available(true)
 {
-	if (theName != NULL) {
-		name = theName;
-	}
-
 	ResetVars();
 	bDetermineTrackLengthEventByEvent = true;
 }

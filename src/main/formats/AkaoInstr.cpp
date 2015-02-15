@@ -45,7 +45,7 @@ bool AkaoInstrSet::GetInstrPointers()
 // *********
 
 AkaoInstr::AkaoInstr(AkaoInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-				  uint32_t theInstrNum, const wchar_t* name)
+	uint32_t theInstrNum, const std::wstring& name)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, name)
 {
 	bDrumKit = false;
@@ -124,12 +124,12 @@ bool AkaoDrumKit::LoadInstr()
 // AkaoRgn
 // *******
 AkaoRgn::AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, 
-		uint8_t artIDNum, const wchar_t* name)
+	uint8_t artIDNum, const std::wstring& name)
 		: VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0), artNum(artIDNum)
 {
 }
 
-AkaoRgn::AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, const wchar_t* name)
+AkaoRgn::AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, const std::wstring& name)
 : VGMRgn(instr, offset, length, name)
 {
 }

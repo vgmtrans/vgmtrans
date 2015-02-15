@@ -18,9 +18,9 @@ public:
 	//VGMRgn(void): Wsmp(NULL), Art(NULL) {}
 	//VGMRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
 	//	: usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh), Wsmp(NULL), Art(NULL) {}
-	VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length = 0, const wchar_t* name = L"Region");
+	VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length = 0, const std::wstring& name = L"Region");
 	VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, uint8_t velLow,
-		   uint8_t velHigh, int sampNum, const wchar_t* name = L"Region");
+		uint8_t velHigh, int sampNum, const std::wstring& name = L"Region");
 	//: usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
 	~VGMRgn(void);
 
@@ -35,7 +35,7 @@ public:
 	void SetADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
 				 uint16_t rls_transform, long release_time);
 
-	void AddGeneralItem(uint32_t offset, uint32_t length, const wchar_t* name);
+	void AddGeneralItem(uint32_t offset, uint32_t length, const std::wstring& name);
 	void AddUnknown(uint32_t offset, uint32_t length);
 	void SetFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
 	void SetPan(uint8_t pan);
@@ -108,7 +108,7 @@ class VGMRgnItem :
 public:
 	enum RgnItemType { RIT_GENERIC, RIT_UNKNOWN, RIT_UNITYKEY, RIT_FINETUNE, RIT_KEYLOW, RIT_KEYHIGH, RIT_VELLOW, RIT_VELHIGH, RIT_PAN, RIT_VOL, RIT_SAMPNUM};		//HIT = Header Item Type
 
-	VGMRgnItem(VGMRgn* rgn, RgnItemType theType, uint32_t offset, uint32_t length, const wchar_t* name);
+	VGMRgnItem(VGMRgn* rgn, RgnItemType theType, uint32_t offset, uint32_t length, const std::wstring& name);
 	virtual Icon GetIcon();
 
 public:

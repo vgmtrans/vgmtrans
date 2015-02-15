@@ -135,12 +135,12 @@ public:
 	void InsertTimeSig(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime);
 	void AddEndOfTrack(void);
 	void InsertEndOfTrack(uint32_t absTime);
-	void AddText(const wchar_t* wstr);
-	void InsertText(const wchar_t* wstr, uint32_t absTime);
-	void AddSeqName(const wchar_t* wstr);
-	void InsertSeqName(const wchar_t* wstr, uint32_t absTime);
-	void AddTrackName(const wchar_t* wstr);
-	void InsertTrackName(const wchar_t* wstr, uint32_t absTime);
+	void AddText(const std::wstring& wstr);
+	void InsertText(const std::wstring& wstr, uint32_t absTime);
+	void AddSeqName(const std::wstring& wstr);
+	void InsertSeqName(const std::wstring& wstr, uint32_t absTime);
+	void AddTrackName(const std::wstring& wstr);
+	void InsertTrackName(const std::wstring& wstr, uint32_t absTime);
 	void AddGMReset();
 	void InsertGMReset(uint32_t absTime);
 	void AddGM2Reset();
@@ -497,7 +497,7 @@ class TextEvent
 	: public MidiEvent
 {
 public:
-	TextEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const wchar_t* wstr);
+	TextEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const std::wstring& wstr);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
 	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 
@@ -508,7 +508,7 @@ class SeqNameEvent
 	: public MidiEvent
 {
 public:
-	SeqNameEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const wchar_t* wstr);
+	SeqNameEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const std::wstring& wstr);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
 	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 
@@ -519,7 +519,7 @@ class TrackNameEvent
 	: public MidiEvent
 {
 public:
-	TrackNameEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const wchar_t* wstr);
+	TrackNameEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const std::wstring& wstr);
 	virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
 	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 
