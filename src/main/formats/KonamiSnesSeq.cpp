@@ -726,13 +726,18 @@ bool KonamiSnesTrack::ReadEvent(void)
 
 	case EVENT_PITCH_SLIDE_V1:
 	{
-		uint8_t pitchSlideDelay = GetByte(curOffset++);
-		uint8_t pitchSlideSpeed = GetByte(curOffset++);
-		uint8_t pitchSlideNote = GetByte(curOffset++);
+		uint8_t arg1 = GetByte(curOffset++);
+		uint8_t arg2 = GetByte(curOffset++);
+		uint8_t arg3 = GetByte(curOffset++);
+		desc << L"Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
 
-		uint8_t pitchSlideNoteNumber = (pitchSlideNote & 0x7f) + cKeyCorrection + transpose;
+		if (arg2 != 0) {
+			uint8_t arg4 = GetByte(curOffset++);
+			uint8_t arg5 = GetByte(curOffset++);
+			uint8_t arg6 = GetByte(curOffset++);
+			desc << L"Arg4: " << (int)arg4 << L"  Arg5: " << (int)arg5 << L"  Arg6: " << (int)arg6;
+		}
 
-		desc << L"Delay: " << (int)pitchSlideDelay << L"  Speed: " << (int)pitchSlideSpeed << L"  Final Note: " << (int)pitchSlideNoteNumber;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 		break;
 	}
