@@ -348,18 +348,22 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	uint16_t addrSongHeader;
 	uint16_t addrSongList;
 	int8_t primarySongIndex;
+	uint8_t vcmdLenItemSize;
 	if (file->SearchBytePattern(ptnSetSongHeaderAddress, ofsSetSongHeaderAddress)) {
 		addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 4) | (file->GetByte(ofsSetSongHeaderAddress + 7) << 8);
+		vcmdLenItemSize = 2;
 		hasSongList = false;
 	}
 	else if (file->SearchBytePattern(ptnReadSongListAXE, ofsReadSongList)) {
 		addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
 		primarySongIndex = file->GetByte(ofsReadSongList + 32);
+		vcmdLenItemSize = 1;
 		hasSongList = true;
 	}
 	else if (file->SearchBytePattern(ptnReadSongListCNTR3, ofsReadSongList)) {
 		addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
 		primarySongIndex = file->GetByte(ofsReadSongList + 32);
+		vcmdLenItemSize = 1;
 		hasSongList = true;
 	}
 	else {
@@ -396,7 +400,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 		}
 
 		// check table length
-		if (addrVcmdLengthTable + vcmd6XCountInList + 0x20 >= 0x10000) {
+		if (addrVcmdLengthTable + (vcmd6XCountInList + 0x20) * vcmdLenItemSize >= 0x10000) {
 			return;
 		}
 	}
@@ -415,10 +419,10 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	}
 	else {
 		assert(vcmd6XCountInList == 0);
-		if (file->GetByte(addrVcmdLengthTable + (0xed - 0xe0)) == 3) {
+		if (file->GetByte(addrVcmdLengthTable + (0xed - 0xe0) * vcmdLenItemSize) == 3) {
 			version = KONAMISNES_V3;
 		}
-		else if (file->GetByte(addrVcmdLengthTable + (0xfc - 0xe0)) == 2) {
+		else if (file->GetByte(addrVcmdLengthTable + (0xfc - 0xe0) * vcmdLenItemSize) == 2) {
 			version = KONAMISNES_V4;
 		}
 		else {
