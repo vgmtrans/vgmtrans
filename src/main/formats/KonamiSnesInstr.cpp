@@ -205,7 +205,8 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, KonamiSnesVersion ver, uint
 
 	double fine_tuning;
 	double coarse_tuning;
-	fine_tuning = modf(key + (tuning / 256.0), &coarse_tuning);
+	const double pitch_fixer = log(4096.0 / 4286.0) / log(2); // from pitch table ($10be vs $1000)
+	fine_tuning = modf((key + (tuning / 256.0)) + pitch_fixer, &coarse_tuning);
 
 	// normalize
 	if (fine_tuning >= 0.5)
