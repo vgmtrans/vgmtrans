@@ -21,18 +21,19 @@ public:
 	void SearchForKonamiSnesFromROM (RawFile* file);
 
 private:
-	static BytePattern ptnSetSongHeaderAddress;
+	static BytePattern ptnSetSongHeaderAddressGG4;
 	static BytePattern ptnReadSongListPNTB;
 	static BytePattern ptnReadSongListAXE;
 	static BytePattern ptnReadSongListCNTR3;
-	static BytePattern ptnJumpToVcmd;
+	static BytePattern ptnJumpToVcmdGG4;
 	static BytePattern ptnJumpToVcmdCNTR3;
 	static BytePattern ptnBranchForVcmd6xMDR2;
 	static BytePattern ptnBranchForVcmd6xCNTR3;
-	static BytePattern ptnSetDIR;
+	static BytePattern ptnSetDIRGG4;
 	static BytePattern ptnSetDIRCNTR3;
-	static BytePattern ptnLoadInstr;
+	static BytePattern ptnLoadInstrGP;
+	static BytePattern ptnLoadInstrGG4;
 	static BytePattern ptnLoadInstrPNTB;
 	static BytePattern ptnLoadInstrCNTR3;
-	static BytePattern ptnLoadPercInstr;
+	static BytePattern ptnLoadPercInstrGG4;
 };

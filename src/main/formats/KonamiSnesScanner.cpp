@@ -9,7 +9,7 @@
 //13d6: 8f 00 0a  mov   $0a,#$00
 //13d9: 8f 39 0b  mov   $0b,#$39          ; set header address $3900 to $0a/b
 //13dc: cd 00     mov   x,#$00
-BytePattern KonamiSnesScanner::ptnSetSongHeaderAddress(
+BytePattern KonamiSnesScanner::ptnSetSongHeaderAddressGG4(
 	"\x8f\x1e\x06\x8f\x00\x0a\x8f\x39"
 	"\x0b\xcd\x00"
 	,
@@ -136,7 +136,7 @@ BytePattern KonamiSnesScanner::ptnReadSongListCNTR3(
 //1950: 2d        push  a                 ; push vcmd func address, as a return address
 //1951: f6 fb 1a  mov   a,$1afb+y
 //1954: f0 08     beq   $195e
-BytePattern KonamiSnesScanner::ptnJumpToVcmd(
+BytePattern KonamiSnesScanner::ptnJumpToVcmdGG4(
 	"\x1c\xfd\xf6\xbc\x1a\x2d\xf6\xbb"
 	"\x1a\x2d\xf6\xfb\x1a\xf0\x08"
 	,
@@ -206,7 +206,7 @@ BytePattern KonamiSnesScanner::ptnBranchForVcmd6xCNTR3(
 //; Ganbare Goemon 4
 //0266: 8f 5d f2  mov   $f2,#$5d
 //0269: 8f 04 f3  mov   $f3,#$04          ; source dir = $0400
-BytePattern KonamiSnesScanner::ptnSetDIR(
+BytePattern KonamiSnesScanner::ptnSetDIRGG4(
 	"\x8f\x5d\xf2\x8f\x04\xf3"
 	,
 	"xxxx?x"
@@ -226,6 +226,47 @@ BytePattern KonamiSnesScanner::ptnSetDIRCNTR3(
 	"xx"
 	,
 	10);
+
+//; Gokujou Parodius
+//; vcmd e2 - set instrument
+//13db: 09 11 10  or    ($10),($11)
+//13de: fd        mov   y,a
+//13df: f4 d1     mov   a,$d1+x
+//13e1: d0 2d     bne   $1410
+//13e3: dd        mov   a,y
+//13e4: 68 1f     cmp   a,#$1f
+//13e6: b0 0c     bcs   $13f4             ; use another map if patch number is large
+//13e8: 8f 68 04  mov   $04,#$68
+//13eb: 8f 05 05  mov   $05,#$05          ; common sample map = #$0568
+//13ee: 3f 31 14  call  $1431
+//13f1: 5f 45 11  jmp   $1145
+//; use another map
+//13f4: a8 1f     sbc   a,#$1f            ; patch -= 0x1f
+//13f6: 2d        push  a
+//13f7: eb 25     mov   y,$25             ; bank offset
+//13f9: f6 58 05  mov   a,$0558+y
+//13fc: c4 04     mov   $04,a
+//13fe: f6 59 05  mov   a,$0559+y
+//1401: c4 05     mov   $05,a             ; sample map = *(u16)($0558 + bank_offset)
+//1403: ae        pop   a
+//1404: 3f 31 14  call  $1431
+//1407: 5f 45 11  jmp   $1145
+BytePattern KonamiSnesScanner::ptnLoadInstrGP(
+	"\x09\x11\x10\xfd\xf4\xd1\xd0\x2d"
+	"\xdd\x68\x1f\xb0\x0c\x8f\x68\x04"
+	"\x8f\x05\x05\x3f\x31\x14\x5f\x45"
+	"\x11\xa8\x1f\x2d\xeb\x25\xf6\x58"
+	"\x05\xc4\x04\xf6\x59\x05\xc4\x05"
+	"\xae\x3f\x31\x14\x5f\x45\x11"
+	,
+	"x??xx?x?"
+	"xx?xxx??"
+	"x??x??x?"
+	"?x?xx?x?"
+	"?x?x??x?"
+	"xx??x??"
+	,
+	47);
 
 //; Ganbare Goemon 4
 //; vcmd e2 - set instrument
@@ -251,7 +292,7 @@ BytePattern KonamiSnesScanner::ptnSetDIRCNTR3(
 //1bbe: ae        pop   a
 //1bbf: 3f ee 1b  call  $1bee
 //1bc2: 5f e2 18  jmp   $18e2
-BytePattern KonamiSnesScanner::ptnLoadInstr(
+BytePattern KonamiSnesScanner::ptnLoadInstrGG4(
 	"\x09\x11\x10\xfd\xf5\xa1\x01\xd0"
 	"\x27\xdd\x68\x28\xb0\x0c\x8f\x3c"
 	"\x04\x8f\x0a\x05\x3f\xee\x1b\x5f"
@@ -397,7 +438,7 @@ BytePattern KonamiSnesScanner::ptnLoadInstrCNTR3(
 //1bf0: cf        mul   ya
 //1bf1: 7a 04     addw  ya,$04
 //1bf3: da 04     movw  $04,ya            ; load address by index `$04 += (patch * 7)`
-BytePattern KonamiSnesScanner::ptnLoadPercInstr(
+BytePattern KonamiSnesScanner::ptnLoadPercInstrGG4(
 	"\x8f\xe6\x04\x8f\x0d\x05\x8d\x07"
 	"\xcf\x7a\x04\xda\x04"
 	,
@@ -436,7 +477,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	uint16_t addrSongList;
 	int8_t primarySongIndex;
 	uint8_t vcmdLenItemSize;
-	if (file->SearchBytePattern(ptnSetSongHeaderAddress, ofsSetSongHeaderAddress)) {
+	if (file->SearchBytePattern(ptnSetSongHeaderAddressGG4, ofsSetSongHeaderAddress)) {
 		addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 4) | (file->GetByte(ofsSetSongHeaderAddress + 7) << 8);
 		vcmdLenItemSize = 2;
 		hasSongList = false;
@@ -467,7 +508,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	UINT ofsJumpToVcmd;
 	uint16_t addrVcmdLengthTable;
 	uint8_t vcmd6XCountInList;
-	if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd)) {
+	if (file->SearchBytePattern(ptnJumpToVcmdGG4, ofsJumpToVcmd)) {
 		addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 11);
 		vcmd6XCountInList = 0;
 
@@ -557,7 +598,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	UINT ofsSetDIR;
 	uint16_t spcDirAddr;
 	std::map<std::wstring, std::vector<uint8_t>>::iterator itrDSP;
-	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+	if (file->SearchBytePattern(ptnSetDIRGG4, ofsSetDIR)) {
 		spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
 	}
 	else if (file->SearchBytePattern(ptnSetDIRCNTR3, ofsSetDIR)) {
@@ -577,7 +618,24 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	uint16_t addrBankedInstrTable;
 	uint8_t firstBankedInstr;
 	uint16_t addrPercInstrTable;
-	if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
+	if (file->SearchBytePattern(ptnLoadInstrGP, ofsLoadInstr)) {
+		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 14) | (file->GetByte(ofsLoadInstr + 17) << 8);
+		firstBankedInstr = file->GetByte(ofsLoadInstr + 10);
+
+		uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 29);
+		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 31);
+		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+
+		// scan for percussive instrument table
+		UINT ofsLoadPercInstr;
+		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
+			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+		}
+		else {
+			return;
+		}
+	}
+	else if (file->SearchBytePattern(ptnLoadInstrGG4, ofsLoadInstr)) {
 		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 18) << 8);
 		firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
 
@@ -587,7 +645,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 
 		// scan for percussive instrument table
 		UINT ofsLoadPercInstr;
-		if (file->SearchBytePattern(ptnLoadPercInstr, ofsLoadPercInstr)) {
+		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
 			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
 		}
 		else {
