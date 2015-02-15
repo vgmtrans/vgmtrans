@@ -228,8 +228,8 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, KonamiSnesVersion ver, uint
 	AddSimpleItem(offset + 5, 1, L"Pan");
 	// volume is *decreased* by final volume value
 	// so it is impossible to convert it in 100% accuracy
-	// the following value 48.0 is chosen as a "average channel volume level"
-	AddVolume(max(1.0 - (vol / 48.0), 0.0), offset + 6);
+	// the following value 72.0 is chosen as a "average channel volume level (before pan processing)"
+	AddVolume(max(1.0 - (vol / 72.0), 0.0), offset + 6);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
