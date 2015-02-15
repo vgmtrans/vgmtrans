@@ -212,16 +212,31 @@ MintSnesRgn::MintSnesRgn(MintSnesInstr* instr, MintSnesVersion ver, uint32_t spc
 	uint8_t adsr2 = GetByte(curOffset++);
 	uint8_t gain = GetByte(curOffset++);
 	uint8_t keyOffDelay = GetByte(curOffset++);
-	int8_t coarse_tuning = GetByte(curOffset++);
-	uint8_t fine_tuning = GetByte(curOffset++);
+	int8_t key = GetByte(curOffset++);
+	uint8_t tuning = GetByte(curOffset++);
+
+	double fine_tuning;
+	double coarse_tuning;
+	const double pitch_fixer = log(4096.0 / 4286.0) / log(2); // from pitch table ($10be vs $1000)
+	fine_tuning = modf((key + (tuning / 256.0)) + pitch_fixer, &coarse_tuning);
+
+	// normalize
+	if (fine_tuning >= 0.5) {
+		coarse_tuning += 1.0;
+		fine_tuning -= 1.0;
+	}
+	else if (fine_tuning <= -0.5) {
+		coarse_tuning -= 1.0;
+		fine_tuning += 1.0;
+	}
 
 	AddSampNum(srcn, rgnAddress, 1);
 	AddSimpleItem(rgnAddress + 1, 1, L"ADSR1");
 	AddSimpleItem(rgnAddress + 2, 1, L"ADSR2");
 	AddSimpleItem(rgnAddress + 3, 1, L"GAIN");
 	AddSimpleItem(rgnAddress + 4, 1, L"Key-Off Delay");
-	AddUnityKey(71 - coarse_tuning, rgnAddress + 5, 1);
-	AddFineTune((int16_t)(fine_tuning / 256.0 * 100.0), rgnAddress + 6, 1);
+	AddUnityKey(71 - (int)(coarse_tuning), rgnAddress + 5, 1);
+	AddFineTune((int16_t)(fine_tuning * 100.0), rgnAddress + 6, 1);
 	if (instrHint.pan > 0) {
 		pan = instrHint.pan / 32.0;
 	}
