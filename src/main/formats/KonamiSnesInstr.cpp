@@ -198,7 +198,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr* instr, KonamiSnesVersion ver, uint
 	uint8_t adsr1 = GetByte(offset + 3);
 	uint8_t adsr2 = GetByte(offset + 4);
 	uint8_t pan = GetByte(offset + 5);
-	int8_t vol = GetByte(offset + 6);
+	uint8_t vol = GetByte(offset + 6);
 
 	uint8_t gain = adsr2;
 	bool use_adsr = ((adsr1 & 0x80) != 0);
