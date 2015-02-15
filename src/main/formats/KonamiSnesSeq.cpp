@@ -572,6 +572,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 
 		instrument = newProg;
 		AddProgramChange(beginOffset, curOffset-beginOffset, newProg, true);
+		AddPanNoItem(64); // TODO: apply true pan from instrument table
 		break;
 	}
 
@@ -585,6 +586,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 
 		uint8_t midiVolume = ConvertPercentAmpToStdMidiVal(newVolume / 255.0);
 		AddVolNoItem(midiVolume);
+		AddPanNoItem(64); // TODO: apply true pan from instrument table
 		break;
 	}
 
