@@ -1006,6 +1006,10 @@ bool KonamiSnesTrack::ReadEvent(void)
 
 		assert(dest >= dwOffset);
 
+		if (curOffset < 0x10000 && GetByte(curOffset) == 0xff) {
+			AddGenericEvent(curOffset, 1, L"End of Track", L"", CLR_TRACKEND, ICON_TRACKEND);
+		}
+
 		curOffset = dest;
 		if (!IsOffsetUsed(dest)) {
 			AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
