@@ -81,6 +81,10 @@ bool KonamiSnesSeq::GetHeaderInfo(void)
 	for (uint32_t trackNumber = 0; trackNumber < nNumTracks; trackNumber++)
 	{
 		uint32_t trackPointerOffset = dwOffset + (trackNumber * 2);
+		if (trackPointerOffset + 2 > 0x10000) {
+			return false;
+		}
+
 		uint16_t trkOff = GetShort(trackPointerOffset);
 		seqHeader->AddPointer(trackPointerOffset, 2, trkOff, true, L"Track Pointer");
 

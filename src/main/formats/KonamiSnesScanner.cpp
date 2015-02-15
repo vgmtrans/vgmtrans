@@ -227,6 +227,43 @@ BytePattern KonamiSnesScanner::ptnSetDIRCNTR3(
 	,
 	10);
 
+//; Jikkyou Oshaberi Parodius
+//; vcmd e2 - set instrument
+//17c5: 09 11 10  or    ($10),($11)
+//17c8: 68 24     cmp   a,#$24
+//17ca: b0 0c     bcs   $17d8
+//17cc: 8f a0 04  mov   $04,#$a0
+//17cf: 8f 05 05  mov   $05,#$05          ; common sample map = #$05a0
+//17d2: 3f f5 17  call  $17f5
+//17d5: 5f 12 15  jmp   $1512
+//; use another map
+//17d8: a8 24     sbc   a,#$24            ; patch -= 0x24
+//17da: 2d        push  a
+//17db: ec e0 01  mov   y,$01e0           ; bank offset
+//17de: f6 8a 05  mov   a,$058a+y
+//17e1: c4 04     mov   $04,a
+//17e3: f6 8b 05  mov   a,$058b+y
+//17e6: c4 05     mov   $05,a             ; sample map = *(u16)($058a + bank_offset)
+//17e8: ae        pop   a
+//17e9: 3f f5 17  call  $17f5
+//17ec: 5f 12 15  jmp   $1512
+BytePattern KonamiSnesScanner::ptnLoadInstrJOP(
+	"\x09\x11\x10\x68\x24\xb0\x0c\x8f"
+	"\xa0\x04\x8f\x05\x05\x3f\xf5\x17"
+	"\x5f\x12\x15\xa8\x24\x2d\xec\xe0"
+	"\x01\xf6\x8a\x05\xc4\x04\xf6\x8b"
+	"\x05\xc4\x05\xae\x3f\xf5\x17\x5f"
+	"\x12\x15"
+	,
+	"x??x?xxx"
+	"??x??x??"
+	"x??x?xx?"
+	"?x??x?x?"
+	"?x?xx??x"
+	"??"
+	,
+	42);
+
 //; Gokujou Parodius
 //; vcmd e2 - set instrument
 //13db: 09 11 10  or    ($10),($11)
@@ -618,7 +655,24 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	uint16_t addrBankedInstrTable;
 	uint8_t firstBankedInstr;
 	uint16_t addrPercInstrTable;
-	if (file->SearchBytePattern(ptnLoadInstrGP, ofsLoadInstr)) {
+	if (file->SearchBytePattern(ptnLoadInstrJOP, ofsLoadInstr)) {
+		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 8) | (file->GetByte(ofsLoadInstr + 11) << 8);
+		firstBankedInstr = file->GetByte(ofsLoadInstr + 4);
+
+		uint8_t addrCurrentBank = file->GetShort(ofsLoadInstr + 23);
+		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 26);
+		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+
+		// scan for percussive instrument table
+		UINT ofsLoadPercInstr;
+		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
+			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+		}
+		else {
+			return;
+		}
+	}
+	else if (file->SearchBytePattern(ptnLoadInstrGP, ofsLoadInstr)) {
 		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 14) | (file->GetByte(ofsLoadInstr + 17) << 8);
 		firstBankedInstr = file->GetByte(ofsLoadInstr + 10);
 

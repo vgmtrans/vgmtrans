@@ -31,6 +31,7 @@ private:
 	static BytePattern ptnBranchForVcmd6xCNTR3;
 	static BytePattern ptnSetDIRGG4;
 	static BytePattern ptnSetDIRCNTR3;
+	static BytePattern ptnLoadInstrJOP;
 	static BytePattern ptnLoadInstrGP;
 	static BytePattern ptnLoadInstrGG4;
 	static BytePattern ptnLoadInstrPNTB;
