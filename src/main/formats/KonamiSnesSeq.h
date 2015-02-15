@@ -18,7 +18,7 @@ enum KonamiSnesSeqEventType
 	EVENT_GAIN,
 	EVENT_INSTANT_TUNING,
 	EVENT_REST,
-	EVENT_REST_WITH_DURATION,
+	EVENT_TIE,
 	EVENT_PAN,
 	EVENT_VIBRATO,
 	EVENT_RANDOM_PITCH,
@@ -105,6 +105,8 @@ public:
 	bool voltaEndMeansPlayNextVolta;
 	bool percussion;
 	uint8_t instrument;
+	int8_t prevNoteKey;
+	bool prevNoteSlurred;
 
 private:
 	double GetTuningInSemitones(int8_t tuning);

@@ -10,7 +10,6 @@ DECLARE_FORMAT(KonamiSnes);
 //  **********
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
-#define SEQ_KEYOFS  0
 
 // pan table (compatible with Nintendo engine)
 const uint8_t KonamiSnesSeq::panTable[] = {
@@ -112,7 +111,7 @@ void KonamiSnesSeq::LoadEventMap()
 	}
 
 	EventMap[0xe0] = EVENT_REST;
-	EventMap[0xe1] = EVENT_REST_WITH_DURATION;
+	EventMap[0xe1] = EVENT_TIE;
 	EventMap[0xe2] = EVENT_PROGCHANGE;
 	EventMap[0xe3] = EVENT_PAN;
 	EventMap[0xe4] = EVENT_VIBRATO;
@@ -242,8 +241,6 @@ void KonamiSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
 
-	cKeyCorrection = SEQ_KEYOFS;
-
 	inSubroutine = false;
 	loopCount = 0;
 	loopVolumeDelta = 0;
@@ -263,6 +260,9 @@ void KonamiSnesTrack::ResetVars(void)
 	voltaLoopStart = 0;
 	voltaLoopEnd = 0;
 	instrument = 0;
+
+	prevNoteKey = -1;
+	prevNoteSlurred = false;
 }
 
 double KonamiSnesTrack::GetTuningInSemitones(int8_t tuning)
@@ -420,7 +420,15 @@ bool KonamiSnesTrack::ReadEvent(void)
 			}
 		}
 
-		AddNoteByDur(beginOffset, curOffset-beginOffset, key, vel, dur);
+		if (prevNoteSlurred && key == prevNoteKey) {
+			MakePrevDurNoteEnd(GetTime() + dur);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
+		}
+		else {
+			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+			prevNoteKey = key;
+		}
+		prevNoteSlurred = (noteDurationRate == 0x7f);
 		AddTime(len);
 
 		break;
@@ -473,14 +481,32 @@ bool KonamiSnesTrack::ReadEvent(void)
 	{
 		noteLength = GetByte(curOffset++);
 		AddRest(beginOffset, curOffset-beginOffset, noteLength);
+		prevNoteSlurred = false;
 		break;
 	}
 
-	case EVENT_REST_WITH_DURATION:
+	case EVENT_TIE:
 	{
 		noteLength = GetByte(curOffset++);
 		noteDurationRate = GetByte(curOffset++);
-		AddRest(beginOffset, curOffset-beginOffset, noteLength);
+		if (prevNoteSlurred) {
+			uint8_t dur = noteLength;
+			if (noteDurationRate != 0x7f) {
+				dur = (noteLength * (noteDurationRate << 1)) >> 8;
+				if (dur == 0) {
+					dur = 1;
+				}
+			}
+
+			MakePrevDurNoteEnd(GetTime() + dur);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
+			AddTime(noteLength);
+			prevNoteSlurred = (noteDurationRate == 0x7f);
+		}
+		else {
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
+			AddTime(noteLength);
+		}
 		break;
 	}
 
@@ -760,7 +786,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 		uint8_t pitchSlideNote = GetByte(curOffset++);
 		int16_t pitchDelta = GetShort(curOffset); curOffset += 2;
 
-		uint8_t pitchSlideNoteNumber = (pitchSlideNote & 0x7f) + cKeyCorrection + transpose;
+		uint8_t pitchSlideNoteNumber = (pitchSlideNote & 0x7f) + transpose;
 
 		desc << L"Delay: " << (int)pitchSlideDelay << L"  Length: " << (int)pitchSlideLength << L"  Final Note: " << (int)pitchSlideNoteNumber << L"  Delta: " << (pitchDelta / 256.0) << L" semitones";
 		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Pitch Slide", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
