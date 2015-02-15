@@ -109,6 +109,13 @@ bool KonamiSnesSeq::GetTrackPointers(void)
 
 void KonamiSnesSeq::LoadEventMap()
 {
+	if (version == KONAMISNES_V1) {
+		NOTE_DUR_RATE_MAX = 100;
+	}
+	else {
+		NOTE_DUR_RATE_MAX = 127;
+	}
+
 	for (uint8_t statusByte = 0x00; statusByte <= 0x5f; statusByte++) {
 		EventMap[statusByte] = EVENT_NOTE;
 		EventMap[statusByte | 0x80] = EVENT_NOTE;
@@ -435,7 +442,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 		vel = GetByte(curOffset++);
 		bool hasNoteDuration = ((vel & 0x80) == 0);
 		if (hasNoteDuration) {
-			noteDurationRate = vel;
+			noteDurationRate = min(vel, parentSeq->NOTE_DUR_RATE_MAX);
 			vel = GetByte(curOffset++);
 		}
 		vel &= 0x7f;
@@ -445,8 +452,14 @@ bool KonamiSnesTrack::ReadEvent(void)
 		}
 
 		uint8_t dur = len;
-		if (noteDurationRate != 0x7f) {
-			dur = (len * (noteDurationRate << 1)) >> 8;
+		if (noteDurationRate != parentSeq->NOTE_DUR_RATE_MAX) {
+			if (parentSeq->version == KONAMISNES_V1) {
+				dur = (len * noteDurationRate) / 100;
+			}
+			else {
+				dur = (len * (noteDurationRate << 1)) >> 8;
+			}
+
 			if (dur == 0) {
 				dur = 1;
 			}
@@ -460,7 +473,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
 			prevNoteKey = key;
 		}
-		prevNoteSlurred = (noteDurationRate == 0x7f);
+		prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX);
 		AddTime(len);
 
 		break;
@@ -521,10 +534,17 @@ bool KonamiSnesTrack::ReadEvent(void)
 	{
 		noteLength = GetByte(curOffset++);
 		noteDurationRate = GetByte(curOffset++);
+		noteDurationRate = min(noteDurationRate, parentSeq->NOTE_DUR_RATE_MAX);
 		if (prevNoteSlurred) {
 			uint8_t dur = noteLength;
-			if (noteDurationRate != 0x7f) {
-				dur = (noteLength * (noteDurationRate << 1)) >> 8;
+			if (noteDurationRate < parentSeq->NOTE_DUR_RATE_MAX) {
+				if (parentSeq->version == KONAMISNES_V1) {
+					dur = (noteLength * noteDurationRate) / 100;
+				}
+				else {
+					dur = (noteLength * (noteDurationRate << 1)) >> 8;
+				}
+
 				if (dur == 0) {
 					dur = 1;
 				}
@@ -533,7 +553,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 			MakePrevDurNoteEnd(GetTime() + dur);
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
 			AddTime(noteLength);
-			prevNoteSlurred = (noteDurationRate == 0x7f);
+			prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX);
 		}
 		else {
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);

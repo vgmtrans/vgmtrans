@@ -76,6 +76,8 @@ public:
 	static const uint8_t PAN_VOLUME_RIGHT_V2[];
 	static const uint8_t PAN_TABLE[];
 
+	uint8_t NOTE_DUR_RATE_MAX;
+
 	double GetTempoInBPM ();
 	double GetTempoInBPM (uint8_t tempo);
 
