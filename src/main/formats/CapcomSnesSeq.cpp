@@ -258,9 +258,6 @@ double CapcomSnesTrack::GetTuningInSemitones(int8_t tuning)
 	return tuning / 256.0;
 }
 
-#define EVENT_WITH_MIDITEXT_START	bWriteGenericEventAsTextEventTmp = bWriteGenericEventAsTextEvent; bWriteGenericEventAsTextEvent = true;
-#define EVENT_WITH_MIDITEXT_END	bWriteGenericEventAsTextEvent = bWriteGenericEventAsTextEventTmp;
-
 bool CapcomSnesTrack::ReadEvent(void)
 {
 	CapcomSnesSeq* parentSeq = (CapcomSnesSeq*)this->parentSeq;
@@ -367,9 +364,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 		{
 		case EVENT_UNKNOWN0:
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
-			EVENT_WITH_MIDITEXT_START
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-			EVENT_WITH_MIDITEXT_END
 			break;
 
 		case EVENT_UNKNOWN1:
@@ -378,9 +373,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte
 				<< std::dec << std::setfill(L' ') << std::setw(0)
 				<< L"  Arg1: " << (int)arg1;
-			EVENT_WITH_MIDITEXT_START
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
@@ -392,9 +385,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 				<< std::dec << std::setfill(L' ') << std::setw(0)
 				<< L"  Arg1: " << (int)arg1
 				<< L"  Arg2: " << (int)arg2;
-			EVENT_WITH_MIDITEXT_START
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
@@ -408,9 +399,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 				<< L"  Arg1: " << (int)arg1
 				<< L"  Arg2: " << (int)arg2
 				<< L"  Arg3: " << (int)arg3;
-			EVENT_WITH_MIDITEXT_START
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
@@ -426,9 +415,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 				<< L"  Arg2: " << (int)arg2
 				<< L"  Arg3: " << (int)arg3
 				<< L"  Arg4: " << (int)arg4;
-			EVENT_WITH_MIDITEXT_START
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
@@ -536,9 +523,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 		{
 			int8_t newTuning = (int8_t) GetByte(curOffset++);
 			double cents = GetTuningInSemitones(newTuning) * 100.0;
-			EVENT_WITH_MIDITEXT_START
 			AddFineTuning(beginOffset, curOffset-beginOffset, cents);
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
@@ -547,11 +532,9 @@ bool CapcomSnesTrack::ReadEvent(void)
 			// TODO: calculate portamento time in milliseconds
 			uint8_t newPortamentoTime = GetByte(curOffset++);
 			desc << L"Time: " << (int)newPortamentoTime;
-			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Portamento Time", desc.str().c_str(), CLR_PORTAMENTOTIME, ICON_CONTROL);
 			AddPortamentoTimeNoItem(newPortamentoTime >> 1);
 			AddPortamentoNoItem(newPortamentoTime != 0);
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
@@ -726,9 +709,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			uint8_t lfoType = GetByte(curOffset++);
 			uint8_t lfoAmount = GetByte(curOffset++);
 			desc << L"Type: " << (int)lfoType << L"  Amount: " << (int)lfoAmount;
-			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"LFO Param", desc.str().c_str(), CLR_LFO, ICON_CONTROL);
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
@@ -737,16 +718,13 @@ bool CapcomSnesTrack::ReadEvent(void)
 			uint8_t echoArg1 = GetByte(curOffset++);
 			uint8_t echoPreset = GetByte(curOffset++);
 			desc << L"Arg1: " << (int)echoArg1 << L"  Preset: " << (int)echoPreset;
-			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Echo Param", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
 		case EVENT_ECHO_ONOFF:
 		{
 			bool echoOn = (GetByte(curOffset++) & 1) != 0;
-			EVENT_WITH_MIDITEXT_START
 			if (echoOn)
 			{
 				AddReverb(beginOffset, curOffset-beginOffset, parentSeq->midiReverb, L"Echo On");
@@ -755,7 +733,6 @@ bool CapcomSnesTrack::ReadEvent(void)
 			{
 				AddReverb(beginOffset, curOffset-beginOffset, 0, L"Echo Off");
 			}
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
@@ -763,17 +740,13 @@ bool CapcomSnesTrack::ReadEvent(void)
 		{
 			uint8_t gain = GetByte(curOffset++) | 0xa0;
 			desc << L"GAIN: $" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)gain;
-			EVENT_WITH_MIDITEXT_START
 			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Release Rate", desc.str().c_str(), CLR_SUSTAIN, ICON_CONTROL);
-			EVENT_WITH_MIDITEXT_END
 			break;
 		}
 
 		default:
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
-			EVENT_WITH_MIDITEXT_START
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-			EVENT_WITH_MIDITEXT_END
 			pRoot->AddLogItem(new LogItem(wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, wstring(L"CapcomSnesSeq")));
 			bContinue = false;
 			break;

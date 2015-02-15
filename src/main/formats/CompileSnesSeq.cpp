@@ -230,9 +230,6 @@ void CompileSnesTrack::AddInitialMidiEvents(int trackNum)
 	AddReverbNoItem(0);
 }
 
-#define EVENT_WITH_MIDITEXT_START	bWriteGenericEventAsTextEventTmp = bWriteGenericEventAsTextEvent; bWriteGenericEventAsTextEvent = true;
-#define EVENT_WITH_MIDITEXT_END	bWriteGenericEventAsTextEvent = bWriteGenericEventAsTextEventTmp;
-
 bool CompileSnesTrack::ReadEvent(void)
 {
 	CompileSnesSeq* parentSeq = (CompileSnesSeq*)this->parentSeq;
@@ -258,9 +255,7 @@ bool CompileSnesTrack::ReadEvent(void)
 	{
 	case EVENT_UNKNOWN0:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
-		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-		EVENT_WITH_MIDITEXT_END
 		break;
 
 	case EVENT_UNKNOWN1:
@@ -269,9 +264,7 @@ bool CompileSnesTrack::ReadEvent(void)
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte
 			<< std::dec << std::setfill(L' ') << std::setw(0)
 			<< L"  Arg1: " << (int)arg1;
-		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-		EVENT_WITH_MIDITEXT_END
 		break;
 	}
 
@@ -283,9 +276,7 @@ bool CompileSnesTrack::ReadEvent(void)
 			<< std::dec << std::setfill(L' ') << std::setw(0)
 			<< L"  Arg1: " << (int)arg1
 			<< L"  Arg2: " << (int)arg2;
-		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-		EVENT_WITH_MIDITEXT_END
 		break;
 	}
 
@@ -299,9 +290,7 @@ bool CompileSnesTrack::ReadEvent(void)
 			<< L"  Arg1: " << (int)arg1
 			<< L"  Arg2: " << (int)arg2
 			<< L"  Arg3: " << (int)arg3;
-		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-		EVENT_WITH_MIDITEXT_END
 		break;
 	}
 
@@ -317,9 +306,7 @@ bool CompileSnesTrack::ReadEvent(void)
 			<< L"  Arg2: " << (int)arg2
 			<< L"  Arg3: " << (int)arg3
 			<< L"  Arg4: " << (int)arg4;
-		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-		EVENT_WITH_MIDITEXT_END
 		break;
 	}
 
@@ -337,9 +324,7 @@ bool CompileSnesTrack::ReadEvent(void)
 			<< L"  Arg3: " << (int)arg3
 			<< L"  Arg4: " << (int)arg4
 			<< L"  Arg5: " << (int)arg5;
-		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-		EVENT_WITH_MIDITEXT_END
 		break;
 	}
 
@@ -627,9 +612,7 @@ bool CompileSnesTrack::ReadEvent(void)
 
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
-		EVENT_WITH_MIDITEXT_START
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-		EVENT_WITH_MIDITEXT_END
 		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"CompileSnesSeq")));
 		bContinue = false;
 		break;
