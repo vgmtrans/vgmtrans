@@ -22,6 +22,7 @@ public:
 
 private:
 	static BytePattern ptnSetSongHeaderAddress;
+	static BytePattern ptnReadSongListPNTB;
 	static BytePattern ptnReadSongListAXE;
 	static BytePattern ptnReadSongListCNTR3;
 	static BytePattern ptnJumpToVcmd;
@@ -31,6 +32,7 @@ private:
 	static BytePattern ptnSetDIR;
 	static BytePattern ptnSetDIRCNTR3;
 	static BytePattern ptnLoadInstr;
+	static BytePattern ptnLoadInstrPNTB;
 	static BytePattern ptnLoadInstrCNTR3;
 	static BytePattern ptnLoadPercInstr;
 };

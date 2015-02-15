@@ -157,23 +157,21 @@ void KonamiSnesSeq::LoadEventMap()
 		break;
 
 	case KONAMISNES_V3:
+		EventMap[0xed] = EVENT_UNKNOWN3; // nop
+		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
+		EventMap[0xfa] = EVENT_UNKNOWN3;
+		EventMap[0xfb] = EVENT_UNKNOWN1;
+		EventMap[0xfc] = EVENT_UNKNOWN2;
+		break;
+
+	case KONAMISNES_V4:
 		EventMap[0xed] = EVENT_UNKNOWN3;
 		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
 		EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
 		EventMap[0xfa] = EVENT_ADSR_GAIN;
 		EventMap[0xfb] = EVENT_ADSR2;
-		break;
-
-	case KONAMISNES_V4:
-		for (uint8_t statusByte = 0x70; statusByte <= 0x7f; statusByte++) {
-			EventMap[statusByte] = EVENT_INSTANT_TUNING;
-		}
-
-		EventMap[0xed] = EVENT_ADSR1;
-		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
-		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
-		EventMap[0xfa] = EVENT_ADSR_GAIN;
-		EventMap[0xfb] = EVENT_ADSR2;
+		EventMap[0xfc] = EVENT_PROGCHANGEVOL;
 		break;
 
 	case KONAMISNES_V5:
@@ -186,6 +184,20 @@ void KonamiSnesSeq::LoadEventMap()
 		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
 		EventMap[0xfa] = EVENT_ADSR_GAIN;
 		EventMap[0xfb] = EVENT_ADSR2;
+		EventMap[0xfc] = EVENT_PROGCHANGEVOL;
+		break;
+
+	case KONAMISNES_V6:
+		for (uint8_t statusByte = 0x70; statusByte <= 0x7f; statusByte++) {
+			EventMap[statusByte] = EVENT_INSTANT_TUNING;
+		}
+
+		EventMap[0xed] = EVENT_ADSR1;
+		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
+		EventMap[0xfa] = EVENT_ADSR_GAIN;
+		EventMap[0xfb] = EVENT_ADSR2;
+		EventMap[0xfc] = EVENT_PROGCHANGEVOL;
 		break;
 	}
 }

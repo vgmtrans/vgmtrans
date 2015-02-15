@@ -175,7 +175,7 @@ bool KonamiSnesInstr::IsValidHeader(RawFile * file, KonamiSnesVersion version, u
 
 uint32_t KonamiSnesInstr::ExpectedSize(KonamiSnesVersion version)
 {
-	if (version == KONAMISNES_V1 || version == KONAMISNES_V2) {
+	if (version == KONAMISNES_V1 || version == KONAMISNES_V2 || version == KONAMISNES_V3) {
 		return 8;
 	}
 	else {
