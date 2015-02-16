@@ -34,6 +34,7 @@ void NamcoSnesSeq::ResetVars(void)
 {
 	VGMSeqNoTrks::ResetVars();
 
+	vel = 100;
 	spcDeltaTime = 1;
 	spcDeltaTimeScale = 1;
 	subReturnAddress = 0;
