@@ -342,9 +342,6 @@
     <ClCompile Include="main\formats\NDSSeq.cpp">
       <Filter>Source Files\formats\nds</Filter>
     </ClCompile>
-    <ClCompile Include="main\formats\FFT.cpp">
-      <Filter>Source Files\formats\fft</Filter>
-    </ClCompile>
     <ClCompile Include="main\formats\FFTInstr.cpp">
       <Filter>Source Files\formats\fft</Filter>
     </ClCompile>
@@ -363,14 +360,8 @@
     <ClCompile Include="main\formats\NinSnesSeq.cpp">
       <Filter>Source Files\formats\ninsnes</Filter>
     </ClCompile>
-    <ClCompile Include="main\formats\SegSat.cpp">
-      <Filter>Source Files\formats\segsat</Filter>
-    </ClCompile>
     <ClCompile Include="main\formats\SegSatScanner.cpp">
       <Filter>Source Files\formats\segsat</Filter>
-    </ClCompile>
-    <ClCompile Include="main\formats\MP2k.cpp">
-      <Filter>Source Files\formats\mp2k</Filter>
     </ClCompile>
     <ClCompile Include="main\formats\MP2kScanner.cpp">
       <Filter>Source Files\formats\mp2k</Filter>
@@ -398,9 +389,6 @@
     </ClCompile>
     <ClCompile Include="main\formats\SonyPS2Seq.cpp">
       <Filter>Source Files\formats\sonyps2</Filter>
-    </ClCompile>
-    <ClCompile Include="main\formats\HOSA.cpp">
-      <Filter>Source Files\formats\hosa</Filter>
     </ClCompile>
     <ClCompile Include="main\formats\HOSAInstr.cpp">
       <Filter>Source Files\formats\hosa</Filter>
@@ -681,6 +669,18 @@
     <ClCompile Include="main\formats\HeartBeatSnesInstr.cpp">
       <Filter>Source Files\formats\heartbeatsnes</Filter>
     </ClCompile>
+    <ClCompile Include="main\formats\SegSatSeq.cpp">
+      <Filter>Source Files\formats\segsat</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\MP2kSeq.cpp">
+      <Filter>Source Files\formats\mp2k</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\HOSASeq.cpp">
+      <Filter>Source Files\formats\hosa</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\FFTSeq.cpp">
+      <Filter>Source Files\formats\fft</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ui\windows\aboutdlg.h">
@@ -758,9 +758,6 @@
     <ClInclude Include="main\formats\PSXSPU.h">
       <Filter>Header Files\formats</Filter>
     </ClInclude>
-    <ClInclude Include="main\formats\FFT.h">
-      <Filter>Header Files\formats\fft</Filter>
-    </ClInclude>
     <ClInclude Include="main\formats\FFTFormat.h">
       <Filter>Header Files\formats\fft</Filter>
     </ClInclude>
@@ -769,9 +766,6 @@
     </ClInclude>
     <ClInclude Include="main\formats\FFTScanner.h">
       <Filter>Header Files\formats\fft</Filter>
-    </ClInclude>
-    <ClInclude Include="main\formats\MP2k.h">
-      <Filter>Header Files\formats\mp2k</Filter>
     </ClInclude>
     <ClInclude Include="main\formats\MP2kFormat.h">
       <Filter>Header Files\formats\mp2k</Filter>
@@ -842,9 +836,6 @@
     <ClInclude Include="main\formats\NinSnesSeq.h">
       <Filter>Header Files\formats\ninsnes</Filter>
     </ClInclude>
-    <ClInclude Include="main\formats\SegSat.h">
-      <Filter>Header Files\formats\segsat</Filter>
-    </ClInclude>
     <ClInclude Include="main\formats\SegSatScanner.h">
       <Filter>Header Files\formats\segsat</Filter>
     </ClInclude>
@@ -880,9 +871,6 @@
     </ClInclude>
     <ClInclude Include="main\formats\SonyPS2Seq.h">
       <Filter>Header Files\formats\sonyps2</Filter>
-    </ClInclude>
-    <ClInclude Include="main\formats\HOSA.h">
-      <Filter>Header Files\formats\hosa</Filter>
     </ClInclude>
     <ClInclude Include="main\formats\HOSAFormat.h">
       <Filter>Header Files\formats\hosa</Filter>
@@ -1237,6 +1225,18 @@
     </ClInclude>
     <ClInclude Include="main\formats\HeartBeatSnesInstr.h">
       <Filter>Header Files\formats\heartbeatsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\SegSatSeq.h">
+      <Filter>Header Files\formats\segsat</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\MP2kSeq.h">
+      <Filter>Header Files\formats\mp2k</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\HOSASeq.h">
+      <Filter>Header Files\formats\hosa</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\FFTSeq.h">
+      <Filter>Header Files\formats\fft</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

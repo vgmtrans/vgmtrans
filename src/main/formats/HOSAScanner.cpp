@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "HOSAScanner.h"
-#include "HOSA.h"
+#include "HOSASeq.h"
 #include "HOSAInstr.h"
 #include "PSXSPU.h"
 

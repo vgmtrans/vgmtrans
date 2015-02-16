@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "HOSA.h"
+#include "HOSASeq.h"
 #include "HOSAFormat.h"
 
 DECLARE_FORMAT(HOSA);

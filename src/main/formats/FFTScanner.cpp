@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "FFTScanner.h"
-#include "FFT.h"
+#include "FFTSeq.h"
 #include "FFTInstr.h"
 
 #define SRCH_BUF_SIZE 0x20000

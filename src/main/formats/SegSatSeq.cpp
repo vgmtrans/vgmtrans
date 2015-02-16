@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "SegSat.h"
+#include "SegSatSeq.h"
 
 DECLARE_FORMAT(SegSat);
 

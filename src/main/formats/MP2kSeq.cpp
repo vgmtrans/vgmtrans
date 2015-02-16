@@ -8,7 +8,7 @@
  */
 
 #include "stdafx.h"
-#include "MP2k.h"
+#include "MP2kSeq.h"
 #include "MP2kFormat.h"
 
 DECLARE_FORMAT(MP2k);

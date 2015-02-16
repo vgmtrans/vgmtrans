@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "FFT.h"
+#include "FFTSeq.h"
 #include "FFTFormat.h"
 
 DECLARE_FORMAT(FFT);

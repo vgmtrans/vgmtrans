@@ -9,7 +9,7 @@
 
 #include "stdafx.h"
 #include "MP2kScanner.h"
-#include "MP2k.h"
+#include "MP2kSeq.h"
 
 #define SRCH_BUF_SIZE 0x20000
 

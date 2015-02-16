@@ -327,7 +327,7 @@
     <ClCompile Include="main\formats\NDSInstrSet.cpp" />
     <ClCompile Include="main\formats\NDSScanner.cpp" />
     <ClCompile Include="main\formats\NDSSeq.cpp" />
-    <ClCompile Include="main\formats\FFT.cpp" />
+    <ClCompile Include="main\formats\FFTSeq.cpp" />
     <ClCompile Include="main\formats\FFTInstr.cpp" />
     <ClCompile Include="main\formats\FFTScanner.cpp" />
     <ClCompile Include="main\formats\SuzukiSnesSeq.cpp" />
@@ -336,9 +336,9 @@
     <ClCompile Include="main\formats\OrgSeq.cpp" />
     <ClCompile Include="main\formats\NinSnesScanner.cpp" />
     <ClCompile Include="main\formats\NinSnesSeq.cpp" />
-    <ClCompile Include="main\formats\SegSat.cpp" />
+    <ClCompile Include="main\formats\SegSatSeq.cpp" />
     <ClCompile Include="main\formats\SegSatScanner.cpp" />
-    <ClCompile Include="main\formats\MP2k.cpp" />
+    <ClCompile Include="main\formats\MP2kSeq.cpp" />
     <ClCompile Include="main\formats\MP2kScanner.cpp" />
     <ClCompile Include="main\formats\KonamiGXScanner.cpp" />
     <ClCompile Include="main\formats\KonamiGXSeq.cpp" />
@@ -348,7 +348,7 @@
     <ClCompile Include="main\formats\SonyPS2InstrSet.cpp" />
     <ClCompile Include="main\formats\SonyPS2Scanner.cpp" />
     <ClCompile Include="main\formats\SonyPS2Seq.cpp" />
-    <ClCompile Include="main\formats\HOSA.cpp" />
+    <ClCompile Include="main\formats\HOSASeq.cpp" />
     <ClCompile Include="main\formats\HOSAInstr.cpp" />
     <ClCompile Include="main\formats\HOSAScanner.cpp" />
     <ClCompile Include="main\formats\TriAcePS1InstrSet.cpp" />
@@ -481,11 +481,11 @@
     <ClInclude Include="ui\windows\directmidi\DSUTIL\DSUTIL.H" />
     <ClInclude Include="ui\windows\directmidi\DSUTIL\DXUTIL.H" />
     <ClInclude Include="main\formats\PSXSPU.h" />
-    <ClInclude Include="main\formats\FFT.h" />
+    <ClInclude Include="main\formats\FFTSeq.h" />
     <ClInclude Include="main\formats\FFTFormat.h" />
     <ClInclude Include="main\formats\FFTInstr.h" />
     <ClInclude Include="main\formats\FFTScanner.h" />
-    <ClInclude Include="main\formats\MP2k.h" />
+    <ClInclude Include="main\formats\MP2kSeq.h" />
     <ClInclude Include="main\formats\MP2kFormat.h" />
     <ClInclude Include="main\formats\MP2kScanner.h" />
     <ClInclude Include="main\formats\AkaoFormat.h" />
@@ -512,7 +512,7 @@
     <ClInclude Include="main\formats\SuzukiSnesFormat.h" />
     <ClInclude Include="main\formats\SuzukiSnesScanner.h" />
     <ClInclude Include="main\formats\SuzukiSnesSeq.h" />
-    <ClInclude Include="main\formats\SegSat.h" />
+    <ClInclude Include="main\formats\SegSatSeq.h" />
     <ClInclude Include="main\formats\SegSatScanner.h" />
     <ClInclude Include="main\formats\KonamiGXFormat.h" />
     <ClInclude Include="main\formats\KonamiGXScanner.h" />
@@ -525,7 +525,7 @@
     <ClInclude Include="main\formats\SonyPS2InstrSet.h" />
     <ClInclude Include="main\formats\SonyPS2Scanner.h" />
     <ClInclude Include="main\formats\SonyPS2Seq.h" />
-    <ClInclude Include="main\formats\HOSA.h" />
+    <ClInclude Include="main\formats\HOSASeq.h" />
     <ClInclude Include="main\formats\HOSAFormat.h" />
     <ClInclude Include="main\formats\HOSAInstr.h" />
     <ClInclude Include="main\formats\HOSAScanner.h" />
