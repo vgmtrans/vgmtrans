@@ -214,6 +214,12 @@
     <Filter Include="Source Files\formats\namcosnes">
       <UniqueIdentifier>{f5e10915-c213-495a-9e97-2ac1069f0fd6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\pandoraboxsnes">
+      <UniqueIdentifier>{4654e78d-6ce2-448e-95b3-9eb746d13f3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\pandoraboxsnes">
+      <UniqueIdentifier>{edb6a92c-1c60-4b52-84ad-5150ac06cbb9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ui\windows\aboutdlg.cpp">
@@ -707,6 +713,12 @@
     </ClCompile>
     <ClCompile Include="main\formats\NamcoSnesSeq.cpp">
       <Filter>Source Files\formats\namcosnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\PandoraBoxSnesScanner.cpp">
+      <Filter>Source Files\formats\pandoraboxsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\PandoraBoxSnesSeq.cpp">
+      <Filter>Source Files\formats\pandoraboxsnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1285,6 +1297,15 @@
     </ClInclude>
     <ClInclude Include="main\formats\NamcoSnesSeq.h">
       <Filter>Header Files\formats\namcosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PandoraBoxSnesFormat.h">
+      <Filter>Header Files\formats\pandoraboxsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PandoraBoxSnesScanner.h">
+      <Filter>Header Files\formats\pandoraboxsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PandoraBoxSnesSeq.h">
+      <Filter>Header Files\formats\pandoraboxsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
