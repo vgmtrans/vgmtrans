@@ -244,6 +244,8 @@
     <ClCompile Include="main\formats\MintSnesInstr.cpp" />
     <ClCompile Include="main\formats\MintSnesScanner.cpp" />
     <ClCompile Include="main\formats\MintSnesSeq.cpp" />
+    <ClCompile Include="main\formats\NamcoSnesScanner.cpp" />
+    <ClCompile Include="main\formats\NamcoSnesSeq.cpp" />
     <ClCompile Include="main\formats\NinSnesInstr.cpp" />
     <ClCompile Include="main\formats\RareSnesInstr.cpp" />
     <ClCompile Include="main\formats\SNESDSP.cpp" />
@@ -422,6 +424,9 @@
     <ClInclude Include="main\formats\MintSnesInstr.h" />
     <ClInclude Include="main\formats\MintSnesScanner.h" />
     <ClInclude Include="main\formats\MintSnesSeq.h" />
+    <ClInclude Include="main\formats\NamcoSnesFormat.h" />
+    <ClInclude Include="main\formats\NamcoSnesScanner.h" />
+    <ClInclude Include="main\formats\NamcoSnesSeq.h" />
     <ClInclude Include="main\formats\NinSnesInstr.h" />
     <ClInclude Include="main\formats\RareSnesInstr.h" />
     <ClInclude Include="main\formats\SNESDSP.h" />

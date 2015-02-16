@@ -208,6 +208,12 @@
     <Filter Include="Header Files\formats\graphressnes">
       <UniqueIdentifier>{44572361-fb6e-4e28-a119-2c87ec9762db}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\namcosnes">
+      <UniqueIdentifier>{2c468926-a68f-42e7-b2a6-19d70fef56d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\namcosnes">
+      <UniqueIdentifier>{f5e10915-c213-495a-9e97-2ac1069f0fd6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ui\windows\aboutdlg.cpp">
@@ -695,6 +701,12 @@
     </ClCompile>
     <ClCompile Include="main\formats\GraphResSnesInstr.cpp">
       <Filter>Source Files\formats\graphressnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\NamcoSnesScanner.cpp">
+      <Filter>Source Files\formats\namcosnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\NamcoSnesSeq.cpp">
+      <Filter>Source Files\formats\namcosnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1264,6 +1276,15 @@
     </ClInclude>
     <ClInclude Include="main\formats\GraphResSnesInstr.h">
       <Filter>Header Files\formats\graphressnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\NamcoSnesFormat.h">
+      <Filter>Header Files\formats\namcosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\NamcoSnesScanner.h">
+      <Filter>Header Files\formats\namcosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\NamcoSnesSeq.h">
+      <Filter>Header Files\formats\namcosnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

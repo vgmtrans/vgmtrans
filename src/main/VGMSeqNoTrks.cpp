@@ -5,8 +5,8 @@
 
 using namespace std;
 
-VGMSeqNoTrks::VGMSeqNoTrks(const string& format, RawFile* file, uint32_t offset)
-: VGMSeq(format, file, offset),
+VGMSeqNoTrks::VGMSeqNoTrks(const string& format, RawFile* file, uint32_t offset, wstring name)
+: VGMSeq(format, file, offset, 0, name),
   SeqTrack(this)
 {
 	ResetVars();
@@ -41,13 +41,16 @@ bool VGMSeqNoTrks::LoadMain()
 
 	if (!LoadEvents())
 		return false;
-	if (length() == 0)
-		length() = (aEvents.back()->dwOffset+aEvents.back()->unLength) - offset();			//length == to the end of the last event
+
+	if (length() == 0) {
+		VGMSeq::SetGuessedLength();
+//		length() = (aEvents.back()->dwOffset + aEvents.back()->unLength) - offset();			//length == to the end of the last event
+	}
 	
 	return true;
 }
 
-bool VGMSeqNoTrks::LoadEvents(void)
+bool VGMSeqNoTrks::LoadEvents(long stopTime)
 {
 	ResetVars();
 	if (bWriteInitialTempo)
@@ -69,13 +72,14 @@ bool VGMSeqNoTrks::LoadEvents(void)
 	curOffset = eventsOffset();	//start at beginning of track
 	while (curOffset < rawfile->size())
 	{
-		if (!ReadEvent())
-		{
+		if (GetTime() >= (unsigned) stopTime) {
+			break;
+		}
+
+		if (!ReadEvent()) {
 			break;
 		}
 	}
-	if (VGMSeq::unLength == 0)
-		VGMSeq::unLength = curOffset - VGMSeq::dwOffset;
 	return true;
 }
 
@@ -83,21 +87,19 @@ bool VGMSeqNoTrks::LoadEvents(void)
 MidiFile* VGMSeqNoTrks::ConvertToMidi()
 {
 	this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_FIND_DELTA_LENGTH;
-	long stopDelta = -1;
 
 	if (!LoadEvents())
 		return false;
 	if (!PostLoad())
 		return NULL;
 
-	// Find the greatest delta length of all tracks to use as stop point for every track
-	//for (int i = 0; i < numTracks; i++)
-	//	stopDelta = max(stopDelta, aTracks[i]->deltaLength);
+	long stopTime = -1;
+	stopTime = deltaLength;
 
 	MidiFile* newmidi = new MidiFile(this);
 	this->midi = newmidi;
 	this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_CONVERT_TO_MIDI;
-	if (!LoadEvents())
+	if (!LoadEvents(stopTime))
 	{
 		delete midi;
 		this->midi = NULL;
