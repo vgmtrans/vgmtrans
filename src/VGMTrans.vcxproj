@@ -354,7 +354,6 @@
     <ClCompile Include="main\formats\TriAcePS1InstrSet.cpp" />
     <ClCompile Include="main\formats\TriAcePS1Scanner.cpp" />
     <ClCompile Include="main\formats\TriAcePS1Seq.cpp" />
-    <ClCompile Include="main\formats\TaitoF3Scanner.cpp" />
     <ClCompile Include="main\common.cpp" />
     <ClCompile Include="main\DataSeg.cpp" />
     <ClCompile Include="main\DLSFile.cpp" />
@@ -534,8 +533,6 @@
     <ClInclude Include="main\formats\TriAcePS1InstrSet.h" />
     <ClInclude Include="main\formats\TriAcePS1Scanner.h" />
     <ClInclude Include="main\formats\TriAcePS1Seq.h" />
-    <ClInclude Include="main\formats\TaitoF3Format.h" />
-    <ClInclude Include="main\formats\TaitoF3Scanner.h" />
     <ClInclude Include="main\common.h" />
     <ClInclude Include="main\DataSeg.h" />
     <ClInclude Include="main\DLSFile.h" />

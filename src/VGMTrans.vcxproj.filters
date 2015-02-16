@@ -62,9 +62,6 @@
     <Filter Include="Source Files\formats\triaceps1">
       <UniqueIdentifier>{466440c9-1cd1-4c92-80f6-89d655444163}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\formats\taito_f3">
-      <UniqueIdentifier>{8c91307f-2a18-459d-82b4-cb0687e2f944}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\main">
       <UniqueIdentifier>{7be060d7-ec1c-4e18-8d94-9f6cf09ca528}</UniqueIdentifier>
     </Filter>
@@ -128,9 +125,6 @@
     </Filter>
     <Filter Include="Header Files\formats\triaceps1">
       <UniqueIdentifier>{6c721201-680a-42ed-9c94-7f73092c30ff}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\formats\taito_f3">
-      <UniqueIdentifier>{ccaff79f-678a-45e9-b1a9-302c61fb0fc3}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\main">
       <UniqueIdentifier>{1e84d3e3-f7a9-4506-82e8-0c02eee95717}</UniqueIdentifier>
@@ -422,9 +416,6 @@
     </ClCompile>
     <ClCompile Include="main\formats\TriAcePS1Seq.cpp">
       <Filter>Source Files\formats\triaceps1</Filter>
-    </ClCompile>
-    <ClCompile Include="main\formats\TaitoF3Scanner.cpp">
-      <Filter>Source Files\formats\taito_f3</Filter>
     </ClCompile>
     <ClCompile Include="main\common.cpp">
       <Filter>Source Files\main</Filter>
@@ -913,12 +904,6 @@
     </ClInclude>
     <ClInclude Include="main\formats\TriAcePS1Seq.h">
       <Filter>Header Files\formats\triaceps1</Filter>
-    </ClInclude>
-    <ClInclude Include="main\formats\TaitoF3Format.h">
-      <Filter>Header Files\formats\taito_f3</Filter>
-    </ClInclude>
-    <ClInclude Include="main\formats\TaitoF3Scanner.h">
-      <Filter>Header Files\formats\taito_f3</Filter>
     </ClInclude>
     <ClInclude Include="main\common.h">
       <Filter>Header Files\main</Filter>

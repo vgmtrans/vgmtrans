@@ -24,7 +24,6 @@
 #include "OrgFormat.h"
 #include "QSoundFormat.h"
 #include "SegSatFormat.h"
-#include "TaitoF3Format.h"
 #include "NinSnesFormat.h"
 #include "SuzukiSnesFormat.h"
 #include "RareSnesFormat.h"
