@@ -202,6 +202,12 @@
     <Filter Include="Source Files\formats\heartbeatsnes">
       <UniqueIdentifier>{ff06dcd1-ce29-44fe-ac10-d1c0ef1eabcc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\formats\graphressnes">
+      <UniqueIdentifier>{ef9bddab-9aba-4982-bc9b-12793b6d62e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\graphressnes">
+      <UniqueIdentifier>{44572361-fb6e-4e28-a119-2c87ec9762db}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ui\windows\aboutdlg.cpp">
@@ -680,6 +686,15 @@
     </ClCompile>
     <ClCompile Include="main\formats\FFTSeq.cpp">
       <Filter>Source Files\formats\fft</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\GraphResSnesScanner.cpp">
+      <Filter>Source Files\formats\graphressnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\GraphResSnesSeq.cpp">
+      <Filter>Source Files\formats\graphressnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\GraphResSnesInstr.cpp">
+      <Filter>Source Files\formats\graphressnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1237,6 +1252,18 @@
     </ClInclude>
     <ClInclude Include="main\formats\FFTSeq.h">
       <Filter>Header Files\formats\fft</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\GraphResSnesFormat.h">
+      <Filter>Header Files\formats\graphressnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\GraphResSnesScanner.h">
+      <Filter>Header Files\formats\graphressnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\GraphResSnesSeq.h">
+      <Filter>Header Files\formats\graphressnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\GraphResSnesInstr.h">
+      <Filter>Header Files\formats\graphressnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
