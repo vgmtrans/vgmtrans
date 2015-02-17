@@ -220,6 +220,12 @@
     <Filter Include="Source Files\formats\pandoraboxsnes">
       <UniqueIdentifier>{edb6a92c-1c60-4b52-84ad-5150ac06cbb9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\softcreatsnes">
+      <UniqueIdentifier>{df486a62-4f15-4926-a694-77b0a28660d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\softcreatsnes">
+      <UniqueIdentifier>{d7a56e05-c539-4af1-85df-444d83e61b49}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ui\windows\aboutdlg.cpp">
@@ -719,6 +725,12 @@
     </ClCompile>
     <ClCompile Include="main\formats\PandoraBoxSnesSeq.cpp">
       <Filter>Source Files\formats\pandoraboxsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\SoftCreatSnesScanner.cpp">
+      <Filter>Source Files\formats\softcreatsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\SoftCreatSnesSeq.cpp">
+      <Filter>Source Files\formats\softcreatsnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1306,6 +1318,15 @@
     </ClInclude>
     <ClInclude Include="main\formats\PandoraBoxSnesSeq.h">
       <Filter>Header Files\formats\pandoraboxsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\SoftCreatSnesFormat.h">
+      <Filter>Header Files\formats\softcreatsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\SoftCreatSnesScanner.h">
+      <Filter>Header Files\formats\softcreatsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\SoftCreatSnesSeq.h">
+      <Filter>Header Files\formats\softcreatsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

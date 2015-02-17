@@ -251,6 +251,8 @@
     <ClCompile Include="main\formats\PandoraBoxSnesSeq.cpp" />
     <ClCompile Include="main\formats\RareSnesInstr.cpp" />
     <ClCompile Include="main\formats\SNESDSP.cpp" />
+    <ClCompile Include="main\formats\SoftCreatSnesScanner.cpp" />
+    <ClCompile Include="main\formats\SoftCreatSnesSeq.cpp" />
     <ClCompile Include="main\formats\SuzukiSnesInstr.cpp" />
     <ClCompile Include="main\loaders\GSFLoader.cpp" />
     <ClCompile Include="main\LogItem.cpp" />
@@ -435,6 +437,9 @@
     <ClInclude Include="main\formats\PandoraBoxSnesSeq.h" />
     <ClInclude Include="main\formats\RareSnesInstr.h" />
     <ClInclude Include="main\formats\SNESDSP.h" />
+    <ClInclude Include="main\formats\SoftCreatSnesFormat.h" />
+    <ClInclude Include="main\formats\SoftCreatSnesScanner.h" />
+    <ClInclude Include="main\formats\SoftCreatSnesSeq.h" />
     <ClInclude Include="main\formats\SuzukiSnesInstr.h" />
     <ClInclude Include="main\loaders\GSFLoader.h" />
     <ClInclude Include="main\LogItem.h" />
