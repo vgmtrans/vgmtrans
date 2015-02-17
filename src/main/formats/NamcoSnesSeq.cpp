@@ -398,6 +398,9 @@ bool NamcoSnesSeq::ReadEvent(void)
 
 						case NOTE_PERCUSSION:
 							AddProgramChangeNoItem(127, false);
+
+							// actual music engine applies per-instrument pan
+							AddPanNoItem(64);
 							break;
 						}
 
@@ -525,8 +528,25 @@ bool NamcoSnesSeq::ReadEvent(void)
 						break;
 
 					case CONTROL_PAN:
-						// TODO: write pan event
+					{
+						uint8_t volumeLeft = newValue & 0xf0;
+						uint8_t volumeRight = (newValue & 0x0f) << 4;
+
+						// TODO: apply volume scale
+						double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
+						double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
+
+						uint8_t midiPan;
+						if (midiScalePan == 0.0) {
+							midiPan = 0;
+						}
+						else {
+							midiPan = 1 + roundi(midiScalePan * 126.0);
+						}
+
+						AddPanNoItem(midiPan);
 						break;
+					}
 					}
 				}
 			}
