@@ -188,7 +188,7 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 			guessedSongIndex = GuessCurrentSongFromARAM(file, version, addrSongList);
 		}
 
-		bool loadOnlyCurrentSong = false;
+		bool loadOnlyCurrentSong = true;
 		if (loadOnlyCurrentSong)
 		{
 			// load current song if possible
@@ -206,7 +206,8 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
 		else
 		{
 			// load all songs in the list
-			for (int songIndex = 0; songIndex < GetLengthOfSongList(file, addrSongList); songIndex++)
+			int songListLength = GetLengthOfSongList(file, addrSongList);
+			for (int songIndex = 0; songIndex < songListLength; songIndex++)
 			{
 				uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
 				if (addrSongHeader == 0)
@@ -306,7 +307,8 @@ int8_t CapcomSnesScanner::GuessCurrentSongFromARAM (RawFile* file, CapcomSnesVer
 	int guessBestScore = INT_MAX;
 
 	// do heuristic search for each songs
-	for (int songIndex = 0; songIndex < GetLengthOfSongList(file, addrSongList); songIndex++)
+	int songListLength = GetLengthOfSongList(file, addrSongList);
+	for (int songIndex = 0; songIndex < songListLength; songIndex++)
 	{
 		// get header address
 		uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
