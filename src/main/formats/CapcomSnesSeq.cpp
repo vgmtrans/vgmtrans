@@ -420,22 +420,22 @@ bool CapcomSnesTrack::ReadEvent(void)
 
 		case EVENT_TOGGLE_TRIPLET:
 			setNoteTriplet(!isNoteTriplet());
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Toggle Triplet", NULL, CLR_DURNOTE, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Toggle Triplet", L"", CLR_DURNOTE, ICON_CONTROL);
 			break;
 
 		case EVENT_TOGGLE_SLUR:
 			setNoteSlurred(!isNoteSlurred());
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Toggle Slur/Tie", NULL, CLR_DURNOTE, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Toggle Slur/Tie", L"", CLR_DURNOTE, ICON_CONTROL);
 			break;
 
 		case EVENT_DOTTED_NOTE_ON:
 			setNoteDotted(true);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dotted Note On", NULL, CLR_DURNOTE, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dotted Note On", L"", CLR_DURNOTE, ICON_CONTROL);
 			break;
 
 		case EVENT_TOGGLE_OCTAVE_UP:
 			setNoteOctaveUp(!isNoteOctaveUp());
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Toggle 2-Octave Up", NULL, CLR_DURNOTE, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Toggle 2-Octave Up", L"", CLR_DURNOTE, ICON_CONTROL);
 			break;
 
 		case EVENT_NOTE_ATTRIBUTES:

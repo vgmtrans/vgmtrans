@@ -137,7 +137,7 @@ bool TriAcePS1Track::ReadEvent(void)
 	else switch (status_byte)
 	{
 		case 0x80 :
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Score Pattern End", NULL, CLR_TRACKEND);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Score Pattern End", L"", CLR_TRACKEND);
 			return false;
 
 		case 0x81 :			//unknown
@@ -226,12 +226,12 @@ bool TriAcePS1Track::ReadEvent(void)
 			break;
 
 		case 0x8D :			//Dal Segno: start point
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno: start point", NULL, CLR_UNKNOWN);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno: start point", L"", CLR_UNKNOWN);
 			break;
 
 		case 0x8E :			//Dal Segno: end point
 			curOffset++;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno: end point", NULL, CLR_UNKNOWN);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno: end point", L"", CLR_UNKNOWN);
 			break;
 
 		case 0x8F :			//rest
@@ -306,7 +306,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x9E :			//imply note params
 			impliedNoteDur = GetByte(curOffset++);
 			impliedVelocity = GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Imply Note Params", NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Imply Note Params", L"", CLR_CHANGESTATE);
 			break;
 
 		default :
