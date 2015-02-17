@@ -617,7 +617,6 @@ bool KonamiSnesTrack::ReadEvent(void)
 		else {
 			uint8_t midiPan;
 			double midiScalePan;
-			double volumeScale;
 
 			switch (parentSeq->version) {
 			case KONAMISNES_V1:
@@ -634,18 +633,17 @@ bool KonamiSnesTrack::ReadEvent(void)
 					PAN_VOLUME_RIGHT = parentSeq->PAN_VOLUME_RIGHT_V2;
 				}
 
-				// TODO: accurate volume scale
 				newPan = min(newPan, 20);
 				uint8_t volumeLeft = PAN_VOLUME_LEFT[newPan];
 				uint8_t volumeRight = PAN_VOLUME_RIGHT[newPan];
 				double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
-				midiScalePan = ConvertPercentPanToStdMidiScale(linearPan, &volumeScale);
+				midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
 				break;
 			}
 
 			default:
 				newPan = min(newPan, 40);
-				midiScalePan = ConvertPercentPanToStdMidiScale(KonamiSnesSeq::PAN_TABLE[40 - newPan] / 256.0, &volumeScale);
+				midiScalePan = ConvertPercentPanToStdMidiScale(KonamiSnesSeq::PAN_TABLE[40 - newPan] / 256.0);
 			}
 
 			if (midiScalePan == 0.0) {
@@ -655,8 +653,8 @@ bool KonamiSnesTrack::ReadEvent(void)
 				midiPan = 1 + roundi(midiScalePan * 126.0);
 			}
 
+			// TODO: apply volume scale
 			AddPan(beginOffset, curOffset - beginOffset, midiPan);
-			AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
 		}
 		break;
 	}
