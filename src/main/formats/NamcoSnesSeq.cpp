@@ -9,7 +9,7 @@ DECLARE_FORMAT(NamcoSnes);
 //  NamcoSnesSeq
 //  ************
 #define MAX_TRACKS  8
-#define SEQ_PPQN    32
+#define SEQ_PPQN    48
 
 NamcoSnesSeq::NamcoSnesSeq(RawFile* file, NamcoSnesVersion ver, uint32_t seqdataOffset, std::wstring newName)
 	: VGMSeqNoTrks(NamcoSnesFormat::name, file, seqdataOffset, newName),
@@ -40,11 +40,19 @@ void NamcoSnesSeq::ResetVars(void)
 	subReturnAddress = 0;
 	loopCount = 0;
 	loopCountAlt = 0;
+
+	for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+		prevNoteKey[trackIndex] = -1;
+		prevNoteType[trackIndex] = NOTE_MELODY;
+		instrNum[trackIndex] = -1;
+	}
 }
 
 bool NamcoSnesSeq::GetHeaderInfo(void)
 {
 	SetPPQN(SEQ_PPQN);
+	nNumTracks = MAX_TRACKS;
+
 	SetEventsOffset(VGMSeq::dwOffset);
 	return true;
 }
@@ -61,7 +69,7 @@ void NamcoSnesSeq::LoadEventMap()
 	EventMap[0x01] = EVENT_OPEN_TRACKS;
 	EventMap[0x02] = EVENT_CALL;
 	EventMap[0x03] = EVENT_END;
-	EventMap[0x04] = EVENT_TIMEBASE;
+	EventMap[0x04] = EVENT_DELTA_MULTIPLIER;
 	EventMap[0x05] = EVENT_MASTER_VOLUME;
 	EventMap[0x06] = EVENT_LOOP_AGAIN;
 	EventMap[0x07] = EVENT_LOOP_BREAK;
@@ -127,6 +135,10 @@ bool NamcoSnesSeq::ReadEvent(void)
 	if (pEventType != EventMap.end()) {
 		eventType = pEventType->second;
 	}
+
+	// default first track
+	channel = 0;
+	SetCurTrack(channel);
 
 	switch (eventType)
 	{
@@ -221,11 +233,11 @@ bool NamcoSnesSeq::ReadEvent(void)
 		break;
 	}
 
-	case EVENT_TIMEBASE:
+	case EVENT_DELTA_MULTIPLIER:
 	{
 		spcDeltaTimeScale = GetByte(curOffset++);
 		desc << L"Delta Time Scale: " << spcDeltaTimeScale;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Timebase", desc.str(), CLR_MISC, ICON_TEMPO);
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Delta Time Multiplier", desc.str(), CLR_MISC, ICON_TEMPO);
 		break;
 	}
 
@@ -342,29 +354,59 @@ bool NamcoSnesSeq::ReadEvent(void)
 				uint8_t keyByte = GetByte(curOffset++);
 
 				int8_t key;
+				NamcoSnesSeqNoteType noteType;
 				if (keyByte >= NOTE_NUMBER_PERCUSSION_MIN) {
 					key = keyByte - NOTE_NUMBER_PERCUSSION_MIN;
+					noteType = NOTE_PERCUSSION;
 					desc << L" [" << (trackIndex + 1) << L"] " << L"Perc " << key;
 				}
 				else if (keyByte >= NOTE_NUMBER_NOISE_MIN) {
 					key = keyByte & 0x1f;
+					noteType = NOTE_NOISE;
 					desc << L" [" << (trackIndex + 1) << L"] " << L"Noise " << key;
 				}
 				else if (keyByte == NOTE_NUMBER_REST) {
+					noteType = prevNoteType[trackIndex];
 					desc << L" [" << (trackIndex + 1) << L"] " << L"Rest";
 				}
 				else {
 					key = keyByte;
+					noteType = NOTE_MELODY;
 					desc << L" [" << (trackIndex + 1) << L"] " << key << L" (" << MidiEvent::GetNoteName(key + transpose) << L")";
 				}
 
 				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
 					channel = trackIndex;
-					
+					SetCurTrack(channel);
+
+					// key off previous note
+					if (prevNoteKey[trackIndex] != -1) {
+						AddNoteOffNoItem(prevNoteKey[trackIndex]);
+						prevNoteKey[trackIndex] = -1;
+					}
+
+					// program changes for noise/percussion
+					if (noteType != prevNoteType[trackIndex]) {
+						switch (noteType) {
+						case NOTE_MELODY:
+							AddProgramChangeNoItem(instrNum[trackIndex], false);
+							break;
+
+						case NOTE_NOISE:
+							AddProgramChangeNoItem(126, false);
+							break;
+
+						case NOTE_PERCUSSION:
+							AddProgramChangeNoItem(127, false);
+							break;
+						}
+
+						noteType = prevNoteType[trackIndex];
+					}
+
 					if (keyByte != NOTE_NUMBER_REST) {
-						// TODO: handle tied note
-						// TODO: program changes for noise/percussion
-						AddNoteByDurNoItem(key, vel, dur);
+						prevNoteKey[trackIndex] = key;
+						AddNoteOnNoItem(key, vel);
 					}
 				}
 			}
@@ -411,7 +453,7 @@ bool NamcoSnesSeq::ReadEvent(void)
 	{
 		uint16_t dur = spcDeltaTime * spcDeltaTimeScale;
 		desc << L"Delta Time: " << spcDeltaTime;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Wait", desc.str(), CLR_MISC);
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Wait", desc.str(), CLR_TIE);
 		AddTime(dur);
 		break;
 	}
@@ -470,10 +512,12 @@ bool NamcoSnesSeq::ReadEvent(void)
 
 				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
 					channel = trackIndex;
+					SetCurTrack(channel);
 
 					switch (controlType) {
 					case CONTROL_PROGCHANGE:
 						AddProgramChangeNoItem(newValue, false);
+						instrNum[trackIndex] = newValue;
 						break;
 
 					case CONTROL_VOLUME:
@@ -526,4 +570,28 @@ bool NamcoSnesSeq::ReadEvent(void)
 	//OutputDebugString(ssTrace.str().c_str());
 
 	return bContinue;
+}
+
+bool NamcoSnesSeq::PostLoad(void)
+{
+	bool succeeded = VGMSeqNoTrks::PostLoad();
+
+	if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+		KeyOffAllNotes();
+	}
+
+	return succeeded;
+}
+
+void NamcoSnesSeq::KeyOffAllNotes(void)
+{
+	for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+		if (prevNoteKey[trackIndex] != -1) {
+			channel = trackIndex;
+			SetCurTrack(channel);
+
+			AddNoteOffNoItem(prevNoteKey[trackIndex]);
+			prevNoteKey[trackIndex] = -1;
+		}
+	}
 }

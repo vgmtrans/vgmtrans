@@ -13,7 +13,7 @@ enum NamcoSnesSeqEventType
 	EVENT_OPEN_TRACKS,
 	EVENT_CALL,
 	EVENT_END,
-	EVENT_TIMEBASE,
+	EVENT_DELTA_MULTIPLIER,
 	EVENT_MASTER_VOLUME,
 	EVENT_LOOP_AGAIN,
 	EVENT_LOOP_BREAK,
@@ -40,6 +40,13 @@ enum NamcoSnesSeqControlType
 	CONTROL_ADSR,
 };
 
+enum NamcoSnesSeqNoteType
+{
+	NOTE_MELODY = 1,
+	NOTE_NOISE,
+	NOTE_PERCUSSION,
+};
+
 class NamcoSnesSeq
 	: public VGMSeqNoTrks
 {
@@ -50,6 +57,7 @@ public:
 	virtual bool GetHeaderInfo(void);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
+	virtual bool PostLoad(void);
 
 	NamcoSnesVersion version;
 	std::map<uint8_t, NamcoSnesSeqEventType> EventMap;
@@ -58,10 +66,15 @@ public:
 
 private:
 	void LoadEventMap(void);
+	void KeyOffAllNotes(void);
 
 	uint8_t NOTE_NUMBER_REST;
 	uint8_t NOTE_NUMBER_NOISE_MIN;
 	uint8_t NOTE_NUMBER_PERCUSSION_MIN;
+
+	int8_t prevNoteKey[8];
+	NamcoSnesSeqNoteType prevNoteType[8];
+	int8_t instrNum[8];
 
 	uint8_t spcDeltaTime;
 	uint8_t spcDeltaTimeScale;
