@@ -129,7 +129,7 @@ void GraphResSnesSeq::LoadEventMap()
 	EventMap[0xfb] = EVENT_UNKNOWN1;
 	EventMap[0xfc] = EVENT_PROGCHANGE;
 	EventMap[0xfd] = EVENT_DEFAULT_LENGTH;
-	EventMap[0xfe] = EVENT_UNKNOWN1;
+	EventMap[0xfe] = EVENT_UNKNOWN0;
 	EventMap[0xff] = EVENT_END;
 }
 
@@ -150,6 +150,8 @@ void GraphResSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
 
+	prevNoteKey = -1;
+	prevNoteSlurred = false;
 	octave = 4;
 	vel = 100;
 	defaultNoteLength = 1;
@@ -259,7 +261,17 @@ bool GraphResSnesTrack::ReadEvent(void)
 		uint8_t durRate = max(durationRate, 8); // rate > 8 will cause unexpected result
 		uint8_t dur = max(min(len * durRate / 8, len - 1), 1);
 
-		if ((key & 7) != 7) {
+		if (key == 7) {
+			AddRest(beginOffset, curOffset - beginOffset, len);
+			prevNoteKey = -1;
+		}
+		else if (key == 15) {
+			// undefined event
+			AddUnknown(beginOffset, curOffset - beginOffset);
+			AddTime(len);
+			prevNoteKey = -1;
+		}
+		else {
 			// a note, add hints for instrument
 			if (parentSeq->instrADSRHints.find(spcInstr) == parentSeq->instrADSRHints.end()) {
 				parentSeq->instrADSRHints[spcInstr] = spcADSR;
@@ -271,12 +283,26 @@ bool GraphResSnesTrack::ReadEvent(void)
 			};
 
 			int8_t midiKey = (octave * 12) + NOTE_KEY_TABLE[key];
-			AddNoteByDur(beginOffset, curOffset - beginOffset, midiKey, vel, dur, hasLength ? L"Note with Duration" : L"Note");
-			AddTime(len);
+			if (prevNoteSlurred && midiKey == prevNoteKey) {
+				desc << L"Duration: " << dur;
+				AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str(), CLR_TIE, ICON_NOTE);
+				MakePrevDurNoteEnd(GetTime() + dur);
+				AddTime(len);
+			}
+			else {
+				AddNoteByDur(beginOffset, curOffset - beginOffset, midiKey, vel, dur, hasLength ? L"Note with Duration" : L"Note");
+				AddTime(len);
+			}
+
+			prevNoteKey = midiKey;
+		}
+
+		// handle the next slur/tie event here
+		if (curOffset + 1 <= 0x10000 && GetByte(curOffset) == 0xfe) {
+			prevNoteSlurred = true;
 		}
 		else {
-			assert(key != 15);
-			AddRest(beginOffset, curOffset - beginOffset, len);
+			prevNoteSlurred = false;
 		}
 
 		break;
@@ -285,7 +311,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 	case EVENT_INSTANT_VOLUME:
 	{
 		uint8_t vol = statusByte & 15;
-		AddVol(beginOffset, curOffset - beginOffset, vol << 3);
+		AddVol(beginOffset, curOffset - beginOffset, vol);
 		break;
 	}
 
@@ -411,9 +437,8 @@ bool GraphResSnesTrack::ReadEvent(void)
 
 	case EVENT_VOLUME:
 	{
-		uint8_t newVol = GetByte(curOffset++);
-		newVol = min(newVol, 15); // actual music engine does not limit the maximum value
-		AddVol(beginOffset, curOffset - beginOffset, vol << 3);
+		int8_t newVol = GetByte(curOffset++);
+		AddVol(beginOffset, curOffset - beginOffset, min(abs(newVol), 127));
 		break;
 	}
 
@@ -459,7 +484,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 
 	case EVENT_ADSR:
 	{
-		uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
+		uint16_t newADSR = GetShort(curOffset); curOffset += 2;
 		spcADSR = newADSR;
 
 		desc << L"ADSR: " << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)newADSR;
@@ -537,6 +562,10 @@ bool GraphResSnesTrack::ReadEvent(void)
 		break;
 	}
 
+	case EVENT_SLUR:
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On", desc.str(), CLR_TIE);
+		break;
+
 	case EVENT_END:
 		AddEndOfTrack(beginOffset, curOffset - beginOffset);
 		bContinue = false;
@@ -550,7 +579,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 		break;
 	}
 
-	//wostringstream ssTrace;
+	//std::wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
 	//OutputDebugString(ssTrace.str().c_str());
 

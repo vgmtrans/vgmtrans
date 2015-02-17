@@ -44,18 +44,17 @@ bool GraphResSnesInstrSet::GetInstrPointers()
 			break;
 		}
 
+		if (addrSampStart == 0) {
+			break;
+		}
+
 		if (addrSampStart < addrSampEntryMax) {
 			addrSampEntryMax = addrSampStart;
 		}
 
-		const uint8_t nullSampBlock[9] = { 0 };
-		if (rawfile->MatchBytes(nullSampBlock, addrSampStart, 9)) {
-			continue;
-		}
-
 		usedSRCNs.push_back(srcn);
 
-		uint16_t adsr = 0x8ff0;
+		uint16_t adsr = 0x8fe0;
 		if (instrADSRHints.count(srcn)) {
 			adsr = instrADSRHints[srcn];
 		}
@@ -86,7 +85,8 @@ bool GraphResSnesInstrSet::GetInstrPointers()
 
 GraphResSnesInstr::GraphResSnesInstr(VGMInstrSet* instrSet, GraphResSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr, const std::wstring& name) :
 	VGMInstr(instrSet, spcDirAddr + srcn * 4, 4, 0, srcn, name), version(ver),
-	spcDirAddr(spcDirAddr)
+	spcDirAddr(spcDirAddr),
+	adsr(adsr)
 {
 }
 

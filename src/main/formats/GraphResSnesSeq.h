@@ -38,6 +38,7 @@ enum GraphResSnesSeqEventType
 	EVENT_GOTO,
 	EVENT_PROGCHANGE,
 	EVENT_DEFAULT_LENGTH,
+	EVENT_SLUR,
 	EVENT_END,
 };
 
@@ -71,6 +72,8 @@ public:
 	virtual bool ReadEvent(void);
 
 private:
+	int8_t prevNoteKey;
+	bool prevNoteSlurred;
 	uint8_t durationRate;
 	uint8_t defaultNoteLength;
 	int8_t spcPan;
