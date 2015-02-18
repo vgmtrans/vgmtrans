@@ -44,17 +44,29 @@ bool NinSnesInstrSet::GetInstrPointers()
 			}
 		}
 
-		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, false)) {
+		uint8_t srcn = GetByte(addrInstrHeader);
+
+		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+		if (offDirEnt + 4 > 0x10000) {
 			break;
+		}
+
+		uint16_t addrSampStart = GetShort(offDirEnt);
+		uint16_t addrLoopStart = GetShort(offDirEnt + 2);
+
+		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, false)) {
+			if (addrSampStart == 0xffff && addrLoopStart == 0xffff) {
+				// example: Yoshi's Island - Bowser
+				continue;
+			}
+			else {
+				break;
+			}
 		}
 		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, true)) {
 			continue;
 		}
 
-		uint8_t srcn = GetByte(addrInstrHeader);
-
-		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-		uint16_t addrSampStart = GetShort(offDirEnt);
 		if (version == NINSNES_EARLIER || version == NINSNES_STANDARD) {
 			if (addrSampStart < offDirEnt + 4) {
 				continue;
