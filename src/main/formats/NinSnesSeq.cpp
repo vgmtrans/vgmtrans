@@ -498,6 +498,9 @@ void NinSnesSeq::LoadEventMap()
 		volumeTable.clear();
 		durRateTable.clear();
 		break;
+
+	case NINSNES_HUMAN:
+		break;
 	}
 }
 

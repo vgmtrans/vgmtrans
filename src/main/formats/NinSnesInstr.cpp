@@ -25,8 +25,13 @@ bool NinSnesInstrSet::GetHeaderInfo()
 
 bool NinSnesInstrSet::GetInstrPointers()
 {
+	uint8_t instr_max = 0x7f;
+	if (version == NINSNES_HUMAN) {
+		instr_max = 0x200 / NinSnesInstr::ExpectedSize(version);
+	}
+
 	usedSRCNs.clear();
-	for (int instr = 0; instr <= 0xff; instr++)
+	for (int instr = 0; instr <= instr_max; instr++)
 	{
 		uint32_t instrItemSize = NinSnesInstr::ExpectedSize(version);
 		uint32_t addrInstrHeader = dwOffset + (instrItemSize * instr);

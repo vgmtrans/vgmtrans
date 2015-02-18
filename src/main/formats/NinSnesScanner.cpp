@@ -368,6 +368,68 @@ BytePattern NinSnesScanner::ptnIntelliVCmdFA(
 	,
 	23);
 
+//; S.O.S. (Septentrion) SPC
+//0441: 8f 00 00  mov   $00,#$00
+//0444: 8f 3e 01  mov   $01,#$3e
+//0447: 68 00     cmp   a,#$00
+//0449: 10 06     bpl   $0451
+//044b: 80        setc
+//044c: a8 ca     sbc   a,#$ca
+//044e: 60        clrc
+//044f: 84 40     adc   a,$40
+//0451: 8d 06     mov   y,#$06
+//0453: cf        mul   ya
+//0454: 7a 00     addw  ya,$00
+//0456: da 00     movw  $00,ya
+BytePattern NinSnesScanner::ptnLoadInstrTableAddressSOS(
+	"\x8f\x00\x00\x8f\x3e\x01\x68\x00"
+	"\x10\x06\x80\xa8\xca\x60\x84\x40"
+	"\x8d\x06\xcf\x7a\x00\xda\x00"
+	,
+	"x??x??x?"
+	"xxxx?xx?"
+	"xxxx?x?"
+	,
+	23);
+
+//; Clock Tower SPC
+//0810: 2d        push  a
+//0811: 78 00 04  cmp   $04,#$00
+//0814: d0 08     bne   $081e
+//0816: 8f 00 00  mov   $00,#$00
+//0819: 8f 3c 01  mov   $01,#$3c
+//081c: 2f 06     bra   $0824
+//081e: 8f 00 00  mov   $00,#$00
+//0821: 8f 3e 01  mov   $01,#$3e
+//0824: ae        pop   a
+//0825: 8d 06     mov   y,#$06
+//0827: cf        mul   ya
+//0828: 7a 00     addw  ya,$00
+//082a: da 00     movw  $00,ya
+BytePattern NinSnesScanner::ptnLoadInstrTableAddressCTOW(
+	"\x2d\x78\x00\x04\xd0\x08\x8f\x00"
+	"\x00\x8f\x3c\x01\x2f\x06\x8f\x00"
+	"\x00\x8f\x3e\x01\xae\x8d\x06\xcf"
+	"\x7a\x00\xda\x00"
+	,
+	"xx??xxx?"
+	"?x??xxx?"
+	"?x??xxxx"
+	"x?x?"
+	,
+	28);
+
+//; Clock Tower SPC
+//11a6: 8d 5d     mov   y,#$5d
+//11a8: e8 3a     mov   a,#$3a
+//11aa: 3f 0b 05  call  $050b             ; set DIR
+BytePattern NinSnesScanner::ptnSetDIRCTOW(
+	"\x8d\x5d\xe8\x3a\x3f\x0b\x05"
+	,
+	"xxx?x??"
+	,
+	7);
+
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -604,9 +666,10 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		}
 		// DERIVED VERSIONS
 		else if (file->SearchBytePattern(ptnJumpToVcmdCTOW, ofsJumpToVcmd)) {
+			// Human Games: Clock Tower, Firemen, S.O.S. (Septentrion)
 			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 10);
 			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
-			version = NINSNES_STANDARD; // TODO: set different version code (Human Games: Clock Tower, Firemen, Septentrion)
+			version = NINSNES_HUMAN;
 		}
 		else {
 			return;
@@ -797,6 +860,18 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	{
 		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 3) | (file->GetByte(ofsLoadInstrTableAddressASM + 6) << 8);
 	}
+	// DERIVED VERSIONS
+	else if (version == NINSNES_HUMAN) {
+		if (file->SearchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
+			addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
+		}
+		else if (file->SearchBytePattern(ptnLoadInstrTableAddressSOS, ofsLoadInstrTableAddressASM)) {
+			addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 1) | (file->GetByte(ofsLoadInstrTableAddressASM + 4) << 8);
+		}
+		else {
+			return;
+		}
+	}
 	else
 	{
 		return;
@@ -816,6 +891,11 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	else if (file->SearchBytePattern(ptnSetDIRSMW, ofsSetDIRASM))
 	{
 		spcDIR = file->GetByte(ofsSetDIRASM + 9);
+	}
+	// DERIVED VERSIONS
+	else if (file->SearchBytePattern(ptnSetDIRCTOW, ofsSetDIRASM))
+	{
+		spcDIR = file->GetByte(ofsSetDIRASM + 3);
 	}
 	else
 	{

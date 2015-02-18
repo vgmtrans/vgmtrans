@@ -40,4 +40,7 @@ private:
 	static BytePattern ptnDispatchNoteFE3;
 	static BytePattern ptnDispatchNoteFE4;
 	static BytePattern ptnIntelliVCmdFA;
+	static BytePattern ptnLoadInstrTableAddressSOS;
+	static BytePattern ptnLoadInstrTableAddressCTOW;
+	static BytePattern ptnSetDIRCTOW;
 };

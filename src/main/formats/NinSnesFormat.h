@@ -22,8 +22,9 @@ enum NinSnesVersion
 	NINSNES_STANDARD,           // Common version with voice commands $e0-fa (e.g. Yoshi Island)
 
 	// derived formats
-	NINSNES_KONAMI,             // Old Konami games (e.g. Gradius III, Legend of the Mystical Ninja)
+	NINSNES_KONAMI,             // Old Konami games (e.g. Gradius III, Castlevania IV, Legend of the Mystical Ninja)
 	NINSNES_LEMMINGS,           // Lemmings
 	NINSNES_INTELLI_FE3,        // Fire Emblem 3
 	NINSNES_INTELLI_FE4,        // Fire Emblem 4
+	NINSNES_HUMAN,              // Human games (e.g. Clock Tower, Firemen, Septentrion)
 };
