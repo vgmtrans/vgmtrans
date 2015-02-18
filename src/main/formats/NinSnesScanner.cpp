@@ -374,30 +374,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		uint8_t konamiBaseAddressPtr = file->GetByte(ofsIncSectionPtr + 16);
 		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
 		konamiBaseAddress = file->GetShort(konamiBaseAddressPtr);
-
-#if 0
-		if (konamiBaseAddress == 0) {
-			//; Gradius 3 SPC
-			//087b: 8d 0c     mov   y,#$0c
-			//087d: cb 4c     mov   $4c,y
-			//087f: 8f 00 4b  mov   $4b,#$00
-			char ptnSetBaseAddressBytes[] =
-				"\x8d\x0c\xcb\x4c\x8f\x00\x4b";
-			ptnSetBaseAddressBytes[3] = konamiBaseAddressPtr + 1;
-			ptnSetBaseAddressBytes[6] = konamiBaseAddressPtr;
-			BytePattern ptnSetBaseAddress(
-				ptnSetBaseAddressBytes
-				,
-				"x?xxxxx"
-				,
-				7);
-
-			UINT ofsSetBaseAddress;
-			if (file->SearchBytePattern(ptnSetBaseAddress, ofsSetBaseAddress)) {
-				konamiBaseAddress = file->GetByte(ofsSetBaseAddress + 5) | (file->GetByte(ofsSetBaseAddress + 1) << 8);
-			}
-		}
-#endif
 	}
 	else if (file->SearchBytePattern(ptnIncSectionPtrYSFR, ofsIncSectionPtr)) {
 		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
