@@ -11,6 +11,7 @@ enum NinSnesSeqEventType
 	EVENT_UNKNOWN2,
 	EVENT_UNKNOWN3,
 	EVENT_UNKNOWN4,
+	EVENT_NOP,
 	EVENT_END,
 	EVENT_NOTE_PARAM,
 	EVENT_NOTE,
@@ -44,6 +45,11 @@ enum NinSnesSeqEventType
 	EVENT_ECHO_VOLUME_FADE,
 	EVENT_PITCH_SLIDE,
 	EVENT_PERCCUSION_PATCH_BASE,
+
+	// Konami:
+	EVENT_KONAMI_LOOP_START,
+	EVENT_KONAMI_LOOP_END,
+	EVENT_KONAMI_ADSR_AND_GAIN,
 };
 
 class NinSnesTrackSharedData
@@ -60,6 +66,10 @@ public:
 	uint16_t loopReturnAddress;
 	uint16_t loopStartAddress;
 	uint8_t loopCount;
+
+	// Konami:
+	uint16_t konamiLoopStart;
+	uint8_t konamiLoopCount;
 };
 
 class NinSnesSeq :
@@ -75,6 +85,9 @@ public:
 
 	double GetTempoInBPM();
 	double GetTempoInBPM(uint8_t tempo);
+
+	uint16_t ConvertToAPUAddress(uint16_t offset);
+	uint16_t GetShortAddress(uint32_t offset);
 
 	NinSnesVersion version;
 	uint8_t STATUS_END;
@@ -93,6 +106,9 @@ public:
 	uint8_t spcPercussionBase;
 	uint8_t sectionRepeatCount;
 
+	// Konami:
+	uint16_t konamiBaseAddress;
+
 protected:
 	VGMHeader* header;
 
@@ -107,16 +123,22 @@ public:
 	NinSnesSection(NinSnesSeq* parentFile, long offset = 0, long length = 0);
 
 	virtual bool GetTrackPointers();
+
+	uint16_t ConvertToAPUAddress(uint16_t offset);
+	uint16_t GetShortAddress(uint32_t offset);
 };
 
 class NinSnesTrack
 	: public SeqTrack
 {
 public:
-	NinSnesTrack(NinSnesSection* parentSection, long offset = 0, long length = 0, const std::wstring& theName = L"");
+	NinSnesTrack(NinSnesSection* parentSection, long offset = 0, long length = 0, const std::wstring& theName = L"NinSnes Track");
 
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
+
+	uint16_t ConvertToAPUAddress(uint16_t offset);
+	uint16_t GetShortAddress(uint32_t offset);
 
 	NinSnesSection* parentSection;
 	NinSnesTrackSharedData* shared;

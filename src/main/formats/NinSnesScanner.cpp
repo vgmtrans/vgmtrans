@@ -173,14 +173,17 @@ BytePattern NinSnesScanner::ptnSetDIRSMW(
 //072f: 3a 40     incw  $40
 //0731: fd        mov   y,a
 //0732: ae        pop   a
+//0733: 7a 4b     addw  ya,$4b            ; add address base
 BytePattern NinSnesScanner::ptnIncSectionPtrGD3(
 	"\x8d\x00\xf7\x40\x3a\x40\x2d\xf7"
-	"\x40\xf0\x08\x3a\x40\xfd\xae"
+	"\x40\xf0\x08\x3a\x40\xfd\xae\x7a"
+	"\x4b"
 	,
 	"xxx?x?xx"
-	"?x?x?xx"
+	"?x?x?xxx"
+	"?"
 	,
-	15);
+	17);
 
 //; Yoshi's Safari SPC
 //14ae: 8d 00     mov   y,#$00
@@ -362,21 +365,44 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// get section pointer address
 	uint32_t ofsIncSectionPtr;
 	uint8_t addrSectionPtr;
-	if (file->SearchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr))
-	{
+	uint16_t konamiBaseAddress = 0xffff;
+	if (file->SearchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr)) {
 		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
 	}
 	// DERIVED VERSIONS
-	else if (file->SearchBytePattern(ptnIncSectionPtrGD3, ofsIncSectionPtr))
-	{
+	else if (file->SearchBytePattern(ptnIncSectionPtrGD3, ofsIncSectionPtr)) {
+		uint8_t konamiBaseAddressPtr = file->GetByte(ofsIncSectionPtr + 16);
+		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
+		konamiBaseAddress = file->GetShort(konamiBaseAddressPtr);
+
+#if 0
+		if (konamiBaseAddress == 0) {
+			//; Gradius 3 SPC
+			//087b: 8d 0c     mov   y,#$0c
+			//087d: cb 4c     mov   $4c,y
+			//087f: 8f 00 4b  mov   $4b,#$00
+			char ptnSetBaseAddressBytes[] =
+				"\x8d\x0c\xcb\x4c\x8f\x00\x4b";
+			ptnSetBaseAddressBytes[3] = konamiBaseAddressPtr + 1;
+			ptnSetBaseAddressBytes[6] = konamiBaseAddressPtr;
+			BytePattern ptnSetBaseAddress(
+				ptnSetBaseAddressBytes
+				,
+				"x?xxxxx"
+				,
+				7);
+
+			UINT ofsSetBaseAddress;
+			if (file->SearchBytePattern(ptnSetBaseAddress, ofsSetBaseAddress)) {
+				konamiBaseAddress = file->GetByte(ofsSetBaseAddress + 5) | (file->GetByte(ofsSetBaseAddress + 1) << 8);
+			}
+		}
+#endif
+	}
+	else if (file->SearchBytePattern(ptnIncSectionPtrYSFR, ofsIncSectionPtr)) {
 		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
 	}
-	else if (file->SearchBytePattern(ptnIncSectionPtrYSFR, ofsIncSectionPtr))
-	{
-		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
-	}
-	else
-	{
+	else {
 		return;
 	}
 
@@ -492,25 +518,22 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// and acquire the sequence list address
 	uint32_t ofsInitSectionPtr;
 	uint32_t addrSongList;
-	if (file->SearchBytePattern(ptnInitSectionPtr, ofsInitSectionPtr))
-	{
-		addrSongList = file->GetShort(ofsInitSectionPtr + 5);
-	}
-	else if (file->SearchBytePattern(ptnInitSectionPtrYI, ofsInitSectionPtr))
-	{
-		addrSongList = file->GetShort(ofsInitSectionPtr + 12);
-	}
-	else if (file->SearchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr))
-	{
-		addrSongList = file->GetShort(ofsInitSectionPtr + 3);
-	}
-	// DERIVED VERSIONS
-	else if (file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr))
-	{
+	// SPECIFIC DERIVED VERSIONS
+	if (konamiBaseAddress != 0xffff && file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr)) {
 		addrSongList = file->GetShort(ofsInitSectionPtr + 8);
 	}
-	else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr))
-	{
+	// STANDARD VERSIONS
+	else if (file->SearchBytePattern(ptnInitSectionPtr, ofsInitSectionPtr)) {
+		addrSongList = file->GetShort(ofsInitSectionPtr + 5);
+	}
+	else if (file->SearchBytePattern(ptnInitSectionPtrYI, ofsInitSectionPtr)) {
+		addrSongList = file->GetShort(ofsInitSectionPtr + 12);
+	}
+	else if (file->SearchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr)) {
+		addrSongList = file->GetShort(ofsInitSectionPtr + 3);
+	}
+	// OTHER DERIVED VERSIONS
+	else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
 		byte addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
 
 		//; Yoshi's Safari SPC
@@ -532,8 +555,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			addrSongList = file->GetByte(ofsInitSongListPtr + 1) | (file->GetByte(ofsInitSongListPtr + 4) << 8);
 		}
 	}
-	else
-	{
+	else {
 		return;
 	}
 
@@ -558,8 +580,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 1);
 
 		// find a jump to address_table[cmd * 2]
-		if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd))
-		{
+		if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd)) {
 			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
 			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
 
@@ -612,31 +633,36 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// CLASSIFY DERIVED VERSIONS (fix false-positive)
 	if (version == NINSNES_STANDARD)
 	{
-		const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
-		if (firstVoiceCmd == 0xe0 && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
-			if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
-				version = NINSNES_STANDARD;
-			}
-			else {
-				// compatible version?
-				version = NINSNES_STANDARD;
-			}
+		if (konamiBaseAddress != 0xffff) {
+			version = NINSNES_KONAMI;
 		}
 		else {
-			version = NINSNES_UNKNOWN;
-
-			UINT ofsDispatchNote;
-			if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
-				version = NINSNES_UNKNOWN; // TODO: set different version code (Lemmings)
-			}
-			else if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
-				if (firstVoiceCmd == 0xd6) {
-					version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 3)
+			const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
+			if (firstVoiceCmd == 0xe0 && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
+				if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
+					version = NINSNES_STANDARD;
+				}
+				else {
+					// compatible version?
+					version = NINSNES_STANDARD;
 				}
 			}
-			else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
-				if (firstVoiceCmd == 0xda) {
-					version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 4)
+			else {
+				version = NINSNES_UNKNOWN;
+
+				UINT ofsDispatchNote;
+				if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
+					version = NINSNES_UNKNOWN; // TODO: set different version code (Lemmings)
+				}
+				else if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
+					if (firstVoiceCmd == 0xd6) {
+						version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 3)
+					}
+				}
+				else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
+					if (firstVoiceCmd == 0xda) {
+						version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 4)
+					}
 				}
 			}
 		}
@@ -660,6 +686,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			}
 
 			uint16_t firstSectionAddress = file->GetShort(addrSectionListPtr);
+			if (version == NINSNES_KONAMI) {
+				firstSectionAddress += konamiBaseAddress;
+			}
 			if (firstSectionAddress > addrCurrentSection) {
 				continue;
 			}
@@ -668,6 +697,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			if ((addrCurrentSection % 2) == (curAddress % 2)) {
 				while (curAddress >= 0x0100 && curAddress < 0xfff0) {
 					uint16_t addrSection = file->GetShort(curAddress);
+					if (version == NINSNES_KONAMI) {
+						addrSection += konamiBaseAddress;
+					}
 
 					if (curAddress == addrCurrentSection) {
 						uint16_t sectionDistance = addrCurrentSection - firstSectionAddress;
@@ -722,7 +754,12 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	
 	// load the song
 	uint16_t addrSongStart = file->GetShort(addrSongList + guessedSongIndex * 2);
+	if (version == NINSNES_KONAMI) {
+		addrSongStart += konamiBaseAddress;
+	}
+
 	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, name);
+	newSeq->konamiBaseAddress = konamiBaseAddress;
 	if (!newSeq->LoadVGMFile())
 	{
 		delete newSeq;

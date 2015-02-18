@@ -55,8 +55,10 @@ bool NinSnesInstrSet::GetInstrPointers()
 
 		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
 		uint16_t addrSampStart = GetShort(offDirEnt);
-		if (addrSampStart < offDirEnt + 4) {
-			continue;
+		if (version == NINSNES_EARLIER || version == NINSNES_STANDARD) {
+			if (addrSampStart < offDirEnt + 4) {
+				continue;
+			}
 		}
 
 		std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);

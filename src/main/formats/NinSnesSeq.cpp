@@ -15,7 +15,8 @@ DECLARE_FORMAT(NinSnes);
 
 NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, std::wstring theName)
 	: VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName), version(ver),
-	header(NULL)
+	header(NULL),
+	konamiBaseAddress(0)
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
@@ -84,7 +85,7 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 		}
 
 		uint16_t repeatCount = sectionAddress;
-		uint16_t dest = GetShort(curOffset); curOffset += 2;
+		uint16_t dest = GetShortAddress(curOffset); curOffset += 2;
 
 		bool startNewRepeat = false;
 		bool doJump = false;
@@ -135,6 +136,8 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 		}
 	}
 	else {
+		sectionAddress = ConvertToAPUAddress(sectionAddress);
+
 		// Play the section
 		if (!IsOffsetUsed(beginOffset)) {
 			header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Section Pointer");
@@ -257,7 +260,7 @@ void NinSnesSeq::LoadEventMap()
 		}
 		break;
 
-	default:
+	default: // NINSNES_STANDARD compatible versions
 		EventMap[0xe0] = EVENT_PROGCHANGE;
 		EventMap[0xe1] = EVENT_PAN;
 		EventMap[0xe2] = EVENT_PAN_FADE;
@@ -310,6 +313,25 @@ void NinSnesSeq::LoadEventMap()
 			panTable.assign(std::begin(ninpanTableStandard), std::end(ninpanTableStandard));
 		}
 	}
+
+	// Remapping of derived versions
+	switch (version) {
+	case NINSNES_KONAMI:
+		EventMap[0xe4] = EVENT_UNKNOWN2;
+		EventMap[0xe5] = EVENT_KONAMI_LOOP_START;
+		EventMap[0xe6] = EVENT_KONAMI_LOOP_END;
+		EventMap[0xe8] = EVENT_NOP;
+		EventMap[0xe9] = EVENT_NOP;
+		EventMap[0xf5] = EVENT_UNKNOWN0;
+		EventMap[0xf6] = EVENT_UNKNOWN0;
+		EventMap[0xf7] = EVENT_UNKNOWN0;
+		EventMap[0xf8] = EVENT_UNKNOWN0;
+		EventMap[0xfb] = EVENT_KONAMI_ADSR_AND_GAIN;
+		EventMap[0xfc] = EVENT_NOP;
+		EventMap[0xfd] = EVENT_NOP;
+		EventMap[0xfe] = EVENT_NOP;
+		break;
+	}
 }
 
 double NinSnesSeq::GetTempoInBPM(uint8_t tempo)
@@ -322,6 +344,21 @@ double NinSnesSeq::GetTempoInBPM(uint8_t tempo)
 	{
 		return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
 	}
+}
+
+uint16_t NinSnesSeq::ConvertToAPUAddress(uint16_t offset)
+{
+	if (version == NINSNES_KONAMI) {
+		return konamiBaseAddress + offset;
+	}
+	else {
+		return offset;
+	}
+}
+
+uint16_t NinSnesSeq::GetShortAddress(uint32_t offset)
+{
+	return ConvertToAPUAddress(GetShort(offset));
 }
 
 //  **************
@@ -349,6 +386,8 @@ bool NinSnesSection::GetTrackPointers()
 		bool active = ((startAddress & 0xff00) != 0);
 		NinSnesTrack* track;
 		if (active) {
+			startAddress = ConvertToAPUAddress(startAddress);
+
 			// correct sequence address
 			// probably it's not necessary for regular case, but just in case...
 			if (startAddress < dwOffset) {
@@ -359,7 +398,9 @@ bool NinSnesSection::GetTrackPointers()
 				}
 			}
 
-			track = new NinSnesTrack(this, startAddress);
+			std::wstringstream trackName;
+			trackName << L"Track " << (trackIndex + 1);
+			track = new NinSnesTrack(this, startAddress, 0, trackName.str());
 		}
 		else {
 			// add an inactive track
@@ -379,6 +420,18 @@ bool NinSnesSection::GetTrackPointers()
 	return true;
 }
 
+uint16_t NinSnesSection::ConvertToAPUAddress(uint16_t offset)
+{
+	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
+	return parentSeq->ConvertToAPUAddress(offset);
+}
+
+uint16_t NinSnesSection::GetShortAddress(uint32_t offset)
+{
+	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
+	return parentSeq->GetShortAddress(offset);
+}
+
 NinSnesTrackSharedData::NinSnesTrackSharedData()
 {
 	ResetVars();
@@ -393,6 +446,9 @@ void NinSnesTrackSharedData::ResetVars(void)
 	spcNoteDuration = 1;
 	spcNoteDurRate = 0xfc;
 	spcNoteVolume = 0xfc;
+
+	konamiLoopStart = 0;
+	konamiLoopCount = 0;
 }
 
 //  ************
@@ -501,6 +557,12 @@ bool NinSnesTrack::ReadEvent(void)
 			<< L"  Arg3: " << (int)arg3
 			<< L"  Arg4: " << (int)arg4;
 		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+		break;
+	}
+
+	case EVENT_NOP:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
 		break;
 	}
 
@@ -738,7 +800,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_CALL:
 	{
-		uint16_t dest = GetShort(curOffset); curOffset += 2;
+		uint16_t dest = GetShortAddress(curOffset); curOffset += 2;
 		uint8_t times = GetByte(curOffset++);
 
 		shared->loopReturnAddress = curOffset;
@@ -878,6 +940,46 @@ bool NinSnesTrack::ReadEvent(void)
 		break;
 	}
 
+	// KONAMI EVENTS START >>
+
+	case EVENT_KONAMI_LOOP_START:
+	{
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+		shared->konamiLoopStart = curOffset;
+		shared->konamiLoopCount = 0;
+		break;
+	}
+
+	case EVENT_KONAMI_LOOP_END:
+	{
+		uint8_t times = GetByte(curOffset++);
+		int8_t volumeDelta = GetByte(curOffset++);
+		int8_t pitchDelta = GetByte(curOffset++);
+
+		desc << L"Times: " << (int)times << L"  Volume Delta: " << (int)volumeDelta << L"  Pitch Delta: " << (int)pitchDelta << L"/16 semitones";
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+
+		shared->konamiLoopCount++;
+		if (shared->konamiLoopCount != times) {
+			// repeat again
+			curOffset = shared->konamiLoopStart;
+		}
+
+		break;
+	}
+
+	case EVENT_KONAMI_ADSR_AND_GAIN:
+	{
+		uint8_t adsr1 = GetByte(curOffset++);
+		uint8_t adsr2 = GetByte(curOffset++);
+		uint8_t gain = GetByte(curOffset++);
+		desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << L"ADSR(1): $" << adsr1 << L"  ADSR(2): $" << adsr2 << L"  GAIN: $" << gain;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR/GAIN", desc.str(), CLR_ADSR, ICON_CONTROL);
+		break;
+	}
+
+	// << KONAMI EVENTS END
+
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
 		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
@@ -898,4 +1000,16 @@ bool NinSnesTrack::ReadEvent(void)
 	}
 
 	return bContinue;
+}
+
+uint16_t NinSnesTrack::ConvertToAPUAddress(uint16_t offset)
+{
+	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
+	return parentSeq->ConvertToAPUAddress(offset);
+}
+
+uint16_t NinSnesTrack::GetShortAddress(uint32_t offset)
+{
+	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
+	return parentSeq->GetShortAddress(offset);
 }

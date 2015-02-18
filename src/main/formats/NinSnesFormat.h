@@ -20,4 +20,7 @@ enum NinSnesVersion
 	NINSNES_UNKNOWN,            // Unknown version (only header support)
 	NINSNES_EARLIER,            // Eariler version (Super Mario World, Pilotwings)
 	NINSNES_STANDARD,           // Common version with voice commands $e0-fa (e.g. Yoshi Island)
+
+	// derived formats
+	NINSNES_KONAMI,             // Old Konami games (e.g. Gradius III, Legend of the Mystical Ninja)
 };
