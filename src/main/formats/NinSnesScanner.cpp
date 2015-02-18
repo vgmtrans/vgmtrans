@@ -341,6 +341,33 @@ BytePattern NinSnesScanner::ptnDispatchNoteFE4(
 	,
 	18);
 
+//; Fire Emblem 3 (developed by Intelligent Systems)
+//; vcmd fa
+//0884: 30 dd     bmi   $0863
+//0886: f4 22     mov   a,$22+x
+//0888: c4 b6     mov   $b6,a
+//088a: f4 23     mov   a,$23+x
+//088c: c4 b7     mov   $b7,a             ; set reading ptr to $b6/7
+//088e: e8 04     mov   a,#$04
+//0890: cf        mul   ya                ; skip arg1*4 bytes
+//; add A to reading ptr
+//0891: 60        clrc
+//0892: 94 22     adc   a,$22+x
+//0894: d4 22     mov   $22+x,a
+//0896: 90 02     bcc   $089a
+//0898: bb 23     inc   $23+x
+//089a: 6f        ret
+BytePattern NinSnesScanner::ptnIntelliVCmdFA(
+	"\x30\xdd\xf4\x22\xc4\xb6\xf4\x23"
+	"\xc4\xb7\xe8\x04\xcf\x60\x94\x22"
+	"\xd4\x22\x90\x02\xbb\x23\x6f"
+	,
+	"x?x?x?x?"
+	"x?x?xxx?"
+	"x?xxx?x"
+	,
+	23);
+
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -635,14 +662,21 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			else {
 				version = NINSNES_UNKNOWN;
 
-				if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
-					if (firstVoiceCmd == 0xd6) {
-						version = NINSNES_INTELLI_FE3;
+				UINT ofsIntelliVCmdFA;
+				if (file->SearchBytePattern(ptnIntelliVCmdFA, ofsIntelliVCmdFA)) {
+					// Intelligent Systems
+					if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
+						if (firstVoiceCmd == 0xd6) {
+							version = NINSNES_INTELLI_FE3;
+						}
 					}
-				}
-				else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
-					if (firstVoiceCmd == 0xda) {
-						version = NINSNES_INTELLI_FE4;
+					else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
+						if (firstVoiceCmd == 0xda) {
+							version = NINSNES_INTELLI_FE4;
+						}
+					}
+					else {
+						version = NINSNES_UNKNOWN; // TODO: Tetris Attack
 					}
 				}
 			}

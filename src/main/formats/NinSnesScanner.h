@@ -39,4 +39,5 @@ private:
 	static BytePattern ptnDispatchNoteLEM;
 	static BytePattern ptnDispatchNoteFE3;
 	static BytePattern ptnDispatchNoteFE4;
+	static BytePattern ptnIntelliVCmdFA;
 };
