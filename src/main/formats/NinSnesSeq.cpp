@@ -13,6 +13,8 @@ DECLARE_FORMAT(NinSnes);
 #define SEQ_PPQN    48
 #define SEQ_KEYOFS  24
 
+#define NINSNES_INTELLI_FE3FLAGS_NEW_NOTE_PARAM 0x80
+
 NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, std::wstring theName)
 	: VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName), version(ver),
 	header(NULL),
@@ -173,6 +175,58 @@ void NinSnesSeq::LoadEventMap()
 		return;
 	}
 
+	const uint8_t NINSNES_VOL_TABLE_EARLIER[16] = {
+		0x08, 0x12, 0x1b, 0x24, 0x2c, 0x35, 0x3e, 0x47,
+		0x51, 0x5a, 0x62, 0x6b, 0x7d, 0x8f, 0xa1, 0xb3,
+	};
+
+	const uint8_t NINSNES_DUR_TABLE_EARLIER[8] = {
+		0x33, 0x66, 0x80, 0x99, 0xb3, 0xcc, 0xe6, 0xff,
+	};
+
+	const uint8_t NINSNES_PAN_TABLE_EARLIER[21] = {
+		0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
+		0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
+		0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
+	};
+
+	const uint8_t NINSNES_VOL_TABLE_STANDARD[16] = {
+		0x4c, 0x59, 0x6d, 0x7f, 0x87, 0x8e, 0x98, 0xa0,
+		0xa8, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
+	};
+
+	const uint8_t NINSNES_DUR_TABLE_STANDARD[8] = {
+		0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xf2, 0xfc,
+	};
+
+	const uint8_t NINSNES_PAN_TABLE_STANDARD[21] = {
+		0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
+		0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
+		0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
+	};
+
+	const uint8_t NINSNES_DURVOL_TABLE_INTELLI_FE3[64] = {
+		0x00, 0x0c, 0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59,
+		0x66, 0x72, 0x75, 0x77, 0x70, 0x7c, 0x7f, 0x82,
+		0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96,
+		0x99, 0x9b, 0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa,
+		0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc, 0xbf,
+		0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3,
+		0xd6, 0xd8, 0xdb, 0xdd, 0xe0, 0xe2, 0xe5, 0xe8,
+		0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
+	};
+
+	const uint8_t NINSNES_DURVOL_TABLE_INTELLI_FE4[64] = {
+		0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x6d,
+		0x70, 0x72, 0x75, 0x77, 0x70, 0x7c, 0x7f, 0x82,
+		0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96,
+		0x99, 0x9b, 0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa,
+		0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc, 0xbf,
+		0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3,
+		0xd6, 0xd8, 0xdb, 0xdd, 0xe0, 0xe2, 0xe5, 0xe8,
+		0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
+	};
+
 	switch (version) {
 	case NINSNES_EARLIER:
 		STATUS_END = 0x00;
@@ -236,28 +290,137 @@ void NinSnesSeq::LoadEventMap()
 		EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
 
 		if (volumeTable.empty()) {
-			const uint8_t ninVolumeTableEarlier[16] = {
-				0x08, 0x12, 0x1b, 0x24, 0x2c, 0x35, 0x3e, 0x47,
-				0x51, 0x5a, 0x62, 0x6b, 0x7d, 0x8f, 0xa1, 0xb3,
-			};
-			volumeTable.assign(std::begin(ninVolumeTableEarlier), std::end(ninVolumeTableEarlier));
+			volumeTable.assign(std::begin(NINSNES_VOL_TABLE_EARLIER), std::end(NINSNES_VOL_TABLE_EARLIER));
 		}
 
 		if (durRateTable.empty()) {
-			const uint8_t ninDurRateTableEarlier[8] = {
-				0x33, 0x66, 0x80, 0x99, 0xb3, 0xcc, 0xe6, 0xff,
-			};
-			durRateTable.assign(std::begin(ninDurRateTableEarlier), std::end(ninDurRateTableEarlier));
+			durRateTable.assign(std::begin(NINSNES_DUR_TABLE_EARLIER), std::end(NINSNES_DUR_TABLE_EARLIER));
 		}
 
 		if (panTable.empty()) {
-			const uint8_t ninpanTableEarlier[21] = {
-				0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
-				0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
-				0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
-			};
-			panTable.assign(std::begin(ninpanTableEarlier), std::end(ninpanTableEarlier));
+			panTable.assign(std::begin(NINSNES_PAN_TABLE_EARLIER), std::end(NINSNES_PAN_TABLE_EARLIER));
 		}
+
+		break;
+
+	case NINSNES_INTELLI_FE3:
+		for (statusByte = 0x01; statusByte < STATUS_NOTE_MIN; statusByte++) {
+			EventMap[statusByte] = EVENT_INTELLI_NOTE_PARAM;
+		}
+
+		// standard vcmds
+		EventMap[0xd6] = EVENT_PROGCHANGE;
+		EventMap[0xd7] = EVENT_PAN;
+		EventMap[0xd8] = EVENT_PAN_FADE;
+		EventMap[0xd9] = EVENT_VIBRATO_ON;
+		EventMap[0xda] = EVENT_VIBRATO_OFF;
+		EventMap[0xdb] = EVENT_MASTER_VOLUME;
+		EventMap[0xdc] = EVENT_MASTER_VOLUME_FADE;
+		EventMap[0xdd] = EVENT_TEMPO;
+		EventMap[0xde] = EVENT_TEMPO_FADE;
+		EventMap[0xdf] = EVENT_GLOBAL_TRANSPOSE;
+		EventMap[0xe0] = EVENT_TRANSPOSE;
+		EventMap[0xe1] = EVENT_TREMOLO_ON;
+		EventMap[0xe2] = EVENT_TREMOLO_OFF;
+		EventMap[0xe3] = EVENT_VOLUME;
+		EventMap[0xe4] = EVENT_VOLUME_FADE;
+		EventMap[0xe5] = EVENT_CALL;
+		EventMap[0xe6] = EVENT_VIBRATO_FADE;
+		EventMap[0xe7] = EVENT_PITCH_ENVELOPE_TO;
+		EventMap[0xe8] = EVENT_PITCH_ENVELOPE_FROM;
+		EventMap[0xe9] = EVENT_PITCH_ENVELOPE_OFF;
+		EventMap[0xea] = EVENT_TUNING;
+		EventMap[0xeb] = EVENT_ECHO_ON;
+		EventMap[0xec] = EVENT_ECHO_OFF;
+		EventMap[0xed] = EVENT_ECHO_PARAM;
+		EventMap[0xee] = EVENT_ECHO_VOLUME_FADE;
+		EventMap[0xef] = EVENT_PITCH_SLIDE;
+		EventMap[0xf0] = EVENT_PERCCUSION_PATCH_BASE;
+
+		EventMap[0xf1] = EVENT_UNKNOWN0;
+		EventMap[0xf2] = EVENT_UNKNOWN0;
+		EventMap[0xf3] = EVENT_UNKNOWN0;
+		EventMap[0xf4] = EVENT_UNKNOWN0;
+		EventMap[0xf5] = EVENT_INTELLI_FE3_UNKNOWN_EVENT_F5;
+		EventMap[0xf6] = EVENT_UNKNOWN1;
+		EventMap[0xf7] = EVENT_UNKNOWN1;
+		EventMap[0xf8] = EVENT_INTELLI_JUMP_SHORT;
+		EventMap[0xf9] = EVENT_INTELLI_FE3_UNKNOWN_EVENT_F9;
+		EventMap[0xfa] = EVENT_INTELLI_FE3_UNKNOWN_EVENT_FA;
+		EventMap[0xfb] = EVENT_UNKNOWN1;
+		EventMap[0xfc] = EVENT_UNKNOWN2;
+		EventMap[0xfd] = EVENT_UNKNOWN2;
+
+		if (volumeTable.empty()) {
+			volumeTable.assign(std::begin(NINSNES_VOL_TABLE_STANDARD), std::end(NINSNES_VOL_TABLE_STANDARD));
+		}
+
+		if (durRateTable.empty()) {
+			durRateTable.assign(std::begin(NINSNES_DUR_TABLE_STANDARD), std::end(NINSNES_DUR_TABLE_STANDARD));
+		}
+
+		if (intelliDurVolTable.empty()) {
+			intelliDurVolTable.assign(std::begin(NINSNES_DURVOL_TABLE_INTELLI_FE3), std::end(NINSNES_DURVOL_TABLE_INTELLI_FE3));
+		}
+
+		if (panTable.empty()) {
+			panTable.assign(std::begin(NINSNES_PAN_TABLE_STANDARD), std::end(NINSNES_PAN_TABLE_STANDARD));
+		}
+
+		break;
+
+	case NINSNES_INTELLI_FE4:
+		for (statusByte = 0x01; statusByte < STATUS_NOTE_MIN; statusByte++) {
+			EventMap[statusByte] = EVENT_INTELLI_NOTE_PARAM;
+		}
+
+		// standard vcmds
+		EventMap[0xda] = EVENT_PROGCHANGE;
+		EventMap[0xdb] = EVENT_PAN;
+		EventMap[0xdc] = EVENT_PAN_FADE;
+		EventMap[0xdd] = EVENT_VIBRATO_ON;
+		EventMap[0xde] = EVENT_VIBRATO_OFF;
+		EventMap[0xdf] = EVENT_MASTER_VOLUME;
+		EventMap[0xe0] = EVENT_MASTER_VOLUME_FADE;
+		EventMap[0xe1] = EVENT_TEMPO;
+		EventMap[0xe2] = EVENT_TEMPO_FADE;
+		EventMap[0xe3] = EVENT_GLOBAL_TRANSPOSE;
+		EventMap[0xe4] = EVENT_TRANSPOSE;
+		EventMap[0xe5] = EVENT_TREMOLO_ON;
+		EventMap[0xe6] = EVENT_TREMOLO_OFF;
+		EventMap[0xe7] = EVENT_VOLUME;
+		EventMap[0xe8] = EVENT_VOLUME_FADE;
+		EventMap[0xe9] = EVENT_CALL;
+		EventMap[0xea] = EVENT_VIBRATO_FADE;
+		EventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
+		EventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
+		EventMap[0xed] = EVENT_PITCH_ENVELOPE_OFF;
+		EventMap[0xee] = EVENT_TUNING;
+		EventMap[0xef] = EVENT_ECHO_ON;
+		EventMap[0xf0] = EVENT_ECHO_OFF;
+		EventMap[0xf1] = EVENT_ECHO_PARAM;
+		EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
+		EventMap[0xf3] = EVENT_PITCH_SLIDE;
+		EventMap[0xf4] = EVENT_PERCCUSION_PATCH_BASE;
+
+		EventMap[0xf5] = EVENT_UNKNOWN0;
+		EventMap[0xf6] = EVENT_UNKNOWN0;
+		EventMap[0xf7] = EVENT_UNKNOWN1;
+		EventMap[0xf8] = EventMap[0xf7];
+		EventMap[0xf9] = EVENT_UNKNOWN0;
+		EventMap[0xfa] = EVENT_INTELLI_FE3_UNKNOWN_EVENT_FA;
+		EventMap[0xfb] = EVENT_UNKNOWN1;
+		EventMap[0xfc] = EVENT_INTELLI_FE4_UNKNOWN_EVENT_FC;
+		EventMap[0xfd] = EVENT_INTELLI_FE4_UNKNOWN_EVENT_FD;
+
+		if (intelliDurVolTable.empty()) {
+			intelliDurVolTable.assign(std::begin(NINSNES_DURVOL_TABLE_INTELLI_FE4), std::end(NINSNES_DURVOL_TABLE_INTELLI_FE4));
+		}
+
+		if (panTable.empty()) {
+			panTable.assign(std::begin(NINSNES_PAN_TABLE_STANDARD), std::end(NINSNES_PAN_TABLE_STANDARD));
+		}
+
 		break;
 
 	default: // NINSNES_STANDARD compatible versions
@@ -290,27 +453,15 @@ void NinSnesSeq::LoadEventMap()
 		EventMap[0xfa] = EVENT_PERCCUSION_PATCH_BASE;
 
 		if (volumeTable.empty()) {
-			const uint8_t ninVolumeTableStandard[16] = {
-				0x4c, 0x59, 0x6d, 0x7f, 0x87, 0x8e, 0x98, 0xa0,
-				0xa8, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
-			};
-			volumeTable.assign(std::begin(ninVolumeTableStandard), std::end(ninVolumeTableStandard));
+			volumeTable.assign(std::begin(NINSNES_VOL_TABLE_STANDARD), std::end(NINSNES_VOL_TABLE_STANDARD));
 		}
 
 		if (durRateTable.empty()) {
-			const uint8_t ninDurRateTableStandard[8] = {
-				0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xf2, 0xfc,
-			};
-			durRateTable.assign(std::begin(ninDurRateTableStandard), std::end(ninDurRateTableStandard));
+			durRateTable.assign(std::begin(NINSNES_DUR_TABLE_STANDARD), std::end(NINSNES_DUR_TABLE_STANDARD));
 		}
 
 		if (panTable.empty()) {
-			const uint8_t ninpanTableStandard[21] = {
-				0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
-				0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
-				0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
-			};
-			panTable.assign(std::begin(ninpanTableStandard), std::end(ninpanTableStandard));
+			panTable.assign(std::begin(NINSNES_PAN_TABLE_STANDARD), std::end(NINSNES_PAN_TABLE_STANDARD));
 		}
 	}
 
@@ -343,6 +494,9 @@ void NinSnesSeq::LoadEventMap()
 		EventMap[0xfc] = EVENT_UNKNOWN0;
 		EventMap[0xfd] = EVENT_UNKNOWN0;
 		EventMap[0xfe] = EVENT_UNKNOWN0;
+
+		volumeTable.clear();
+		durRateTable.clear();
 		break;
 	}
 }
@@ -460,8 +614,12 @@ void NinSnesTrackSharedData::ResetVars(void)
 	spcNoteDurRate = 0xfc;
 	spcNoteVolume = 0xfc;
 
+	// Konami:
 	konamiLoopStart = 0;
 	konamiLoopCount = 0;
+
+	// Intelligent Systems:
+	intelliFE3NoteFlags = NINSNES_INTELLI_FE3FLAGS_NEW_NOTE_PARAM;
 }
 
 //  ************
@@ -625,6 +783,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_NOTE_PARAM:
 	{
+	OnEventNoteParam:
 		// param #0: duration
 		shared->spcNoteDuration = statusByte;
 		desc << L"Duration: " << (int)shared->spcNoteDuration;
@@ -919,8 +1078,6 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t spcEFB = GetByte(curOffset++);
 		uint8_t spcFIR = GetByte(curOffset++);
 
-		// TODO: dump actual FIR filter values
-
 		desc << L"Delay: " << (int)spcEDL << L"  Feedback: " << (int)spcEFB << L"  FIR: " << (int)spcFIR;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
 		break;
@@ -1012,6 +1169,7 @@ bool NinSnesTrack::ReadEvent(void)
 			shared->spcNoteDurRate = (durByte << 1) + (durByte >> 1) + (durByte & 1); // approx percent?
 			desc << L"  Quantize: " << durByte << L" (" << shared->spcNoteDurRate << L"/256)";
 
+			// param #2: velocity (optional)
 			if (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
 				uint8_t velByte = GetByte(curOffset++);
 				shared->spcNoteVolume = velByte << 1;
@@ -1024,6 +1182,116 @@ bool NinSnesTrack::ReadEvent(void)
 	}
 
 	// << LEMMINGS EVENTS END
+
+	// INTELLIGENT SYSTEMS EVENTS START >>
+
+	case EVENT_INTELLI_NOTE_PARAM:
+	{
+		if (parentSeq->version == NINSNES_INTELLI_FE3 &&
+			(shared->intelliFE3NoteFlags & NINSNES_INTELLI_FE3FLAGS_NEW_NOTE_PARAM) == 0) {
+			goto OnEventNoteParam;
+		}
+
+		// param #0: duration
+		shared->spcNoteDuration = statusByte;
+		desc << L"Duration: " << (int)shared->spcNoteDuration;
+
+		// param #1,2...: quantize/velocity (optional)
+		while (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
+			uint8_t noteParam = GetByte(curOffset++);
+			if (noteParam < 0x40) { // 00..3f
+				uint8_t durIndex = noteParam & 0x3f;
+				shared->spcNoteDurRate = parentSeq->intelliDurVolTable[durIndex];
+				desc << L"  Quantize: " << durIndex << L" (" << shared->spcNoteDurRate << L"/256)";
+			}
+			else { // 40..7f
+				uint8_t velIndex = noteParam & 0x3f;
+				shared->spcNoteVolume = parentSeq->intelliDurVolTable[velIndex];
+				desc << L"  Velocity: " << velIndex << L" (" << shared->spcNoteVolume << L"/256)";
+			}
+		}
+
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Param", desc.str().c_str(), CLR_DURNOTE, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_INTELLI_JUMP_SHORT:
+	{
+		uint8_t offset = GetByte(curOffset++);
+		uint16_t dest = curOffset + offset;
+
+		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Jump (Short)", desc.str().c_str(), CLR_MISC);
+
+		curOffset = dest;
+		break;
+	}
+
+	case EVENT_INTELLI_FE3_UNKNOWN_EVENT_F5:
+	{
+		int8_t param = GetByte(curOffset++);
+		if (param >= 0) {
+			uint8_t bit = 1 << (param & 7);
+			if (param & 8) {
+				shared->intelliFE3NoteFlags |= bit;
+			}
+			else {
+				shared->intelliFE3NoteFlags &= ~bit;
+			}
+		}
+		AddUnknown(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	case EVENT_INTELLI_FE3_UNKNOWN_EVENT_F9:
+	{
+		curOffset += 36;
+		AddUnknown(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	case EVENT_INTELLI_FE3_UNKNOWN_EVENT_FA:
+	{
+		int8_t arg1 = GetByte(curOffset++);
+		if (arg1 >= 0) {
+			curOffset += arg1 * 4;
+		}
+		else {
+			if (parentSeq->version == NINSNES_INTELLI_FE3) {
+				curOffset += 6;
+			}
+		}
+		AddUnknown(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	case EVENT_INTELLI_FE4_UNKNOWN_EVENT_FC:
+	{
+		uint8_t arg1 = GetByte(curOffset++);
+		curOffset += ((arg1 & 15) + 1) * 3;
+		AddUnknown(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	case EVENT_INTELLI_FE4_UNKNOWN_EVENT_FD:
+	{
+		uint8_t type = GetByte(curOffset++);
+
+		switch (type) {
+		case 0x01:
+			curOffset++;
+			break;
+
+		case 0x02:
+			curOffset++;
+			break;
+		}
+
+		AddUnknown(beginOffset, curOffset - beginOffset);
+		break;
+	}
+
+	// << INTELLIGENT SYSTEMS EVENTS END
 
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;

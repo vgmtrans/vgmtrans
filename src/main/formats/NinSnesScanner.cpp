@@ -637,12 +637,12 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 				if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
 					if (firstVoiceCmd == 0xd6) {
-						version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 3)
+						version = NINSNES_INTELLI_FE3;
 					}
 				}
 				else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
 					if (firstVoiceCmd == 0xda) {
-						version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 4)
+						version = NINSNES_INTELLI_FE4;
 					}
 				}
 			}

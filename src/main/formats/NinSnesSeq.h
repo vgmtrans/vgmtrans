@@ -54,6 +54,16 @@ enum NinSnesSeqEventType
 
 	// Lemmings:
 	EVENT_LEMMINGS_NOTE_PARAM,
+
+	// Intelligent Systems:
+	// Fire Emblem 3 & 4:
+	EVENT_INTELLI_NOTE_PARAM,
+	EVENT_INTELLI_JUMP_SHORT,
+	EVENT_INTELLI_FE3_UNKNOWN_EVENT_F5,
+	EVENT_INTELLI_FE3_UNKNOWN_EVENT_F9,
+	EVENT_INTELLI_FE3_UNKNOWN_EVENT_FA,
+	EVENT_INTELLI_FE4_UNKNOWN_EVENT_FC,
+	EVENT_INTELLI_FE4_UNKNOWN_EVENT_FD,
 };
 
 class NinSnesTrackSharedData
@@ -74,6 +84,9 @@ public:
 	// Konami:
 	uint16_t konamiLoopStart;
 	uint8_t konamiLoopCount;
+
+	// Intelligent Systems:
+	uint8_t intelliFE3NoteFlags;
 };
 
 class NinSnesSeq :
@@ -112,6 +125,9 @@ public:
 
 	// Konami:
 	uint16_t konamiBaseAddress;
+
+	// Intelligent Systems:
+	std::vector<uint8_t> intelliDurVolTable;
 
 protected:
 	VGMHeader* header;
