@@ -583,12 +583,8 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// and acquire the sequence list address
 	uint32_t ofsInitSectionPtr;
 	uint32_t addrSongList;
-	// SPECIFIC DERIVED VERSIONS
-	if (konamiBaseAddress != 0xffff && file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr)) {
-		addrSongList = file->GetShort(ofsInitSectionPtr + 8);
-	}
 	// STANDARD VERSIONS
-	else if (file->SearchBytePattern(ptnInitSectionPtr, ofsInitSectionPtr)) {
+	if (file->SearchBytePattern(ptnInitSectionPtr, ofsInitSectionPtr)) {
 		addrSongList = file->GetShort(ofsInitSectionPtr + 5);
 	}
 	else if (file->SearchBytePattern(ptnInitSectionPtrYI, ofsInitSectionPtr)) {
@@ -597,7 +593,14 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	else if (file->SearchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr)) {
 		addrSongList = file->GetShort(ofsInitSectionPtr + 3);
 	}
-	// OTHER DERIVED VERSIONS
+	// DERIVED VERSIONS
+	else if (file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr)) {
+		addrSongList = file->GetShort(ofsInitSectionPtr + 8);
+		if (konamiBaseAddress == 0xffff) {
+			// Parodius Da! does not have base address
+			konamiBaseAddress = 0;
+		}
+	}
 	else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
 		byte addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
 
