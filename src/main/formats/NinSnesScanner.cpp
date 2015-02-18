@@ -609,8 +609,17 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// CLASSIFY DERIVED VERSIONS (fix false-positive)
 	if (version == NINSNES_STANDARD)
 	{
+		UINT ofsDispatchNote;
 		if (konamiBaseAddress != 0xffff) {
 			version = NINSNES_KONAMI;
+		}
+		else if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
+			if (firstVoiceCmd == 0xe0) {
+				version = NINSNES_LEMMINGS;
+			}
+			else {
+				version = NINSNES_UNKNOWN;
+			}
 		}
 		else {
 			const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
@@ -626,11 +635,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			else {
 				version = NINSNES_UNKNOWN;
 
-				UINT ofsDispatchNote;
-				if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
-					version = NINSNES_UNKNOWN; // TODO: set different version code (Lemmings)
-				}
-				else if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
+				if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
 					if (firstVoiceCmd == 0xd6) {
 						version = NINSNES_UNKNOWN; // TODO: set different version code (Fire Emblem 3)
 					}

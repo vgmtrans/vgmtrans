@@ -23,4 +23,5 @@ enum NinSnesVersion
 
 	// derived formats
 	NINSNES_KONAMI,             // Old Konami games (e.g. Gradius III, Legend of the Mystical Ninja)
+	NINSNES_LEMMINGS,           // Lemmings
 };

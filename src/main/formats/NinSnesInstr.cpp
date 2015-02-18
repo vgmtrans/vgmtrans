@@ -54,14 +54,14 @@ bool NinSnesInstrSet::GetInstrPointers()
 		uint16_t addrSampStart = GetShort(offDirEnt);
 		uint16_t addrLoopStart = GetShort(offDirEnt + 2);
 
+		if (addrSampStart == 0x0000 && addrLoopStart == 0x0000 ||
+			addrSampStart == 0xffff && addrLoopStart == 0xffff) {
+			// example: Lemmings - Stage Clear (00 00 00 00)
+			// example: Yoshi's Island - Bowser (ff ff ff ff)
+			continue;
+		}
 		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, false)) {
-			if (addrSampStart == 0xffff && addrLoopStart == 0xffff) {
-				// example: Yoshi's Island - Bowser
-				continue;
-			}
-			else {
-				break;
-			}
+			break;
 		}
 		if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, true)) {
 			continue;

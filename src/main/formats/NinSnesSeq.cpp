@@ -331,6 +331,19 @@ void NinSnesSeq::LoadEventMap()
 		EventMap[0xfd] = EVENT_NOP;
 		EventMap[0xfe] = EVENT_NOP;
 		break;
+
+	case NINSNES_LEMMINGS:
+		for (statusByte = 0x01; statusByte < STATUS_NOTE_MIN; statusByte++) {
+			EventMap[statusByte] = EVENT_LEMMINGS_NOTE_PARAM;
+		}
+
+		EventMap[0xe5] = EVENT_UNKNOWN1; // master volume NYI?
+		EventMap[0xe6] = EVENT_UNKNOWN2; // master volume fade?
+		EventMap[0xfb] = EVENT_NOP1;
+		EventMap[0xfc] = EVENT_UNKNOWN0;
+		EventMap[0xfd] = EVENT_UNKNOWN0;
+		EventMap[0xfe] = EVENT_UNKNOWN0;
+		break;
 	}
 }
 
@@ -566,6 +579,13 @@ bool NinSnesTrack::ReadEvent(void)
 		break;
 	}
 
+	case EVENT_NOP1:
+	{
+		curOffset++;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
+		break;
+	}
+
 	case EVENT_END:
 	{
 		// AddEvent is called at the last of this function
@@ -605,23 +625,21 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_NOTE_PARAM:
 	{
-		// param #1: duration
+		// param #0: duration
 		shared->spcNoteDuration = statusByte;
 		desc << L"Duration: " << (int)shared->spcNoteDuration;
 
-		// param #2: quantize and velocity (optional)
-		if (curOffset + 1 < 0x10000) {
-			uint8_t quantizeAndVelocity = GetByte(curOffset);
-			if (quantizeAndVelocity <= 0x7f) {
-				uint8_t durIndex = (quantizeAndVelocity >> 4) & 7;
-				uint8_t velIndex = quantizeAndVelocity & 15;
+		// param #1: quantize and velocity (optional)
+		if (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
+			uint8_t quantizeAndVelocity = GetByte(curOffset++);
 
-				curOffset++;
-				shared->spcNoteDurRate = parentSeq->durRateTable[durIndex];
-				shared->spcNoteVolume = parentSeq->volumeTable[velIndex];
+			uint8_t durIndex = (quantizeAndVelocity >> 4) & 7;
+			uint8_t velIndex = quantizeAndVelocity & 15;
 
-				desc << L"  Quantize: " << (int)durIndex << L" (" << (int)shared->spcNoteDurRate << L"/256)" << L"  Velocity: " << (int)velIndex << L" (" << (int)shared->spcNoteVolume << L"/256)";
-			}
+			shared->spcNoteDurRate = parentSeq->durRateTable[durIndex];
+			shared->spcNoteVolume = parentSeq->volumeTable[velIndex];
+
+			desc << L"  Quantize: " << (int)durIndex << L" (" << (int)shared->spcNoteDurRate << L"/256)" << L"  Velocity: " << (int)velIndex << L" (" << (int)shared->spcNoteVolume << L"/256)";
 		}
 
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Param", desc.str().c_str(), CLR_DURNOTE, ICON_CONTROL);
@@ -979,6 +997,33 @@ bool NinSnesTrack::ReadEvent(void)
 	}
 
 	// << KONAMI EVENTS END
+
+	// LEMMINGS EVENTS START >>
+
+	case EVENT_LEMMINGS_NOTE_PARAM:
+	{
+		// param #0: duration
+		shared->spcNoteDuration = statusByte;
+		desc << L"Duration: " << (int)shared->spcNoteDuration;
+
+		// param #1: quantize (optional)
+		if (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
+			uint8_t durByte = GetByte(curOffset++);
+			shared->spcNoteDurRate = (durByte << 1) + (durByte >> 1) + (durByte & 1); // approx percent?
+			desc << L"  Quantize: " << durByte << L" (" << shared->spcNoteDurRate << L"/256)";
+
+			if (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
+				uint8_t velByte = GetByte(curOffset++);
+				shared->spcNoteVolume = velByte << 1;
+				desc << L"  Velocity: " << velByte << L" (" << shared->spcNoteVolume << L"/256)";
+			}
+		}
+
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Param", desc.str().c_str(), CLR_DURNOTE, ICON_CONTROL);
+		break;
+	}
+
+	// << LEMMINGS EVENTS END
 
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
