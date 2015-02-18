@@ -1172,7 +1172,7 @@ bool HudsonSnesTrack::ReadEvent(void)
 			uint8_t reg = GetByte(curOffset++);
 			uint8_t val = GetByte(curOffset++);
 			desc << L"Register: " << (int)reg << L"  Value: " << (int)val;
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"MOV (Immediate)", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"MOV (Immediate)", desc.str().c_str(), CLR_MISC);
 
 			if (reg < HUDSONSNES_USERRAM_SIZE) {
 				parentSeq->UserRAM[reg] = val;
@@ -1186,7 +1186,7 @@ bool HudsonSnesTrack::ReadEvent(void)
 			uint8_t regDst = GetByte(curOffset++);
 			uint8_t regSrc = GetByte(curOffset++);
 			desc << L"Destination Register: " << (int)regDst << L"  Source Register: " << (int)regSrc;
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"MOV", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"MOV", desc.str().c_str(), CLR_MISC);
 
 			if (regDst < HUDSONSNES_USERRAM_SIZE && regSrc < HUDSONSNES_USERRAM_SIZE) {
 				uint8_t val = parentSeq->UserRAM[regSrc];
@@ -1201,7 +1201,7 @@ bool HudsonSnesTrack::ReadEvent(void)
 			uint8_t reg = GetByte(curOffset++);
 			uint8_t val = GetByte(curOffset++);
 			desc << L"Register: " << (int)reg << L"  Value: " << (int)val;
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"CMP (Immediate)", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"CMP (Immediate)", desc.str().c_str(), CLR_MISC);
 
 			if (reg < HUDSONSNES_USERRAM_SIZE) {
 				parentSeq->UserCmpReg = parentSeq->UserRAM[reg] - val;
@@ -1215,7 +1215,7 @@ bool HudsonSnesTrack::ReadEvent(void)
 			uint8_t regDst = GetByte(curOffset++);
 			uint8_t regSrc = GetByte(curOffset++);
 			desc << L"Destination Register: " << (int)regDst << L"  Source Register: " << (int)regSrc;
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"CMP", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"CMP", desc.str().c_str(), CLR_MISC);
 
 			if (regDst < HUDSONSNES_USERRAM_SIZE && regSrc < HUDSONSNES_USERRAM_SIZE) {
 				parentSeq->UserCmpReg = parentSeq->UserRAM[regDst] - parentSeq->UserRAM[regSrc];
