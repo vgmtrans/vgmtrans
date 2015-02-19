@@ -57,6 +57,8 @@ public:
 	PandoraBoxSnesVersion version;
 	std::map<uint8_t, PandoraBoxSnesSeqEventType> EventMap;
 
+	std::map<uint8_t, uint16_t> instrADSRHints;
+
 private:
 	void LoadEventMap(void);
 };
@@ -78,6 +80,8 @@ private:
 	uint8_t spcNoteLength;
 	uint8_t spcNoteQuantize;
 	uint8_t spcVolumeIndex;
+	uint8_t spcInstr;
+	uint16_t spcADSR;
 	uint8_t spcCallStack[PANDORABOXSNES_CALLSTACK_SIZE];
 	uint8_t spcCallStackPtr;
 };

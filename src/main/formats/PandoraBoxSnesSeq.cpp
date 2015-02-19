@@ -162,6 +162,8 @@ void PandoraBoxSnesTrack::ResetVars(void)
 	spcNoteLength = 1; // just in case
 	spcNoteQuantize = 0;
 	spcVolumeIndex = 15;
+	spcInstr = 0;
+	spcADSR = 0x8ff0;
 	spcCallStackPtr = 0;
 }
 
@@ -279,6 +281,11 @@ bool PandoraBoxSnesTrack::ReadEvent(void)
 			prevNoteSlurred = false;
 		}
 		else {
+			// a note, add hints for instrument
+			if (parentSeq->instrADSRHints.find(spcInstr) == parentSeq->instrADSRHints.end()) {
+				parentSeq->instrADSRHints[spcInstr] = spcADSR;
+			}
+
 			int8_t key = (octave * 12) + (keyIndex - 1);
 			if (prevNoteSlurred && key == prevNoteKey) {
 				// tie
@@ -327,6 +334,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void)
 	case EVENT_PROGCHANGE:
 	{
 		uint8_t instrNum = (statusByte - 0x60);
+		spcInstr = instrNum;
 		AddProgramChange(beginOffset, curOffset - beginOffset, instrNum);
 		break;
 	}
@@ -574,6 +582,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void)
 		uint8_t dr = (drRate * 0x07) / 255;
 		uint8_t sl = (slRate * 0x07) / 255;
 		uint8_t sr = (srRate * 0x1f) / 255;
+		spcADSR = ((0x80 | (dr << 4) | ar) << 8) | ((sl << 5) | sr);
 
 		desc << L"AR: " << arRate << L"/255" << L" (" << ar << L")" <<
 			L"  DR: " << drRate << L"/255" << L" (" << dr << L")" <<

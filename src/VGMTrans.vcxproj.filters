@@ -732,6 +732,9 @@
     <ClCompile Include="main\formats\SoftCreatSnesSeq.cpp">
       <Filter>Source Files\formats\softcreatsnes</Filter>
     </ClCompile>
+    <ClCompile Include="main\formats\PandoraBoxSnesInstr.cpp">
+      <Filter>Source Files\formats\pandoraboxsnes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ui\windows\aboutdlg.h">
@@ -1327,6 +1330,9 @@
     </ClInclude>
     <ClInclude Include="main\formats\SoftCreatSnesSeq.h">
       <Filter>Header Files\formats\softcreatsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PandoraBoxSnesInstr.h">
+      <Filter>Header Files\formats\pandoraboxsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

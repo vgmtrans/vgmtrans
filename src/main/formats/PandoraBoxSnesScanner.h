@@ -21,4 +21,6 @@ public:
 private:
 	static BytePattern ptnLoadSeqKKO;
 	static BytePattern ptnLoadSeqTSP;
+	static BytePattern ptnSetDIR;
+	static BytePattern ptnLoadSRCN;
 };

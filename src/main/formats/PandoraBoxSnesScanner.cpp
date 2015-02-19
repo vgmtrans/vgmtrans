@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "PandoraBoxSnesScanner.h"
 #include "PandoraBoxSnesSeq.h"
+#include "PandoraBoxSnesInstr.h"
 #include "SNESDSP.h"
 
 // ; Kishin Kourinden Oni SPC
@@ -44,6 +45,41 @@ BytePattern PandoraBoxSnesScanner::ptnLoadSeqTSP(
 	,
 	19);
 
+//; Gakkou de atta Kowai Hanashi SPC
+//f9d8: e8 fb     mov   a,#$fb
+//f9da: 8d 5d     mov   y,#$5d
+//f9dc: 61        tcall 6                 ; write dsp DIR
+BytePattern PandoraBoxSnesScanner::ptnSetDIR(
+	"\xe8\xfb\x8d\x5d\x61"
+	,
+	"x?xxx"
+	,
+	5);
+
+//; Gakkou de atta Kowai Hanashi SPC
+//f664: 8d 0c     mov   y,#$0c
+//f666: 60        clrc
+//f667: 97 d9     adc   a,($d9)+y         ; add offset to instrument #
+//f669: fd        mov   y,a               ; use it for index
+//f66a: f7 d9     mov   a,($d9)+y         ; get global instrument number
+//f66c: ec c3 01  mov   y,$01c3
+//f66f: f0 07     beq   $f678
+//f671: 76 3f 01  cmp   a,$013f+y         ; search for global instrument number
+//f674: f0 03     beq   $f679
+//f676: fe f9     dbnz  y,$f671
+//f678: fc        inc   y
+//f679: dc        dec   y                 ; SRCN is index of the global instrument number (0 if not found)
+BytePattern PandoraBoxSnesScanner::ptnLoadSRCN(
+	"\x8d\x0c\x60\x97\xd9\xfd\xf7\xd9"
+	"\xec\xc3\x01\xf0\x07\x76\x3f\x01"
+	"\xf0\x03\xfe\xf9\xfc\xdc"
+	,
+	"xxxx?xx?"
+	"x??xxx??"
+	"xxxxxx"
+	,
+	22);
+
 void PandoraBoxSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -80,6 +116,49 @@ void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM (RawFile* file)
 	PandoraBoxSnesSeq* newSeq = new PandoraBoxSnesSeq(file, version, addrSeqHeader, name);
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
+		return;
+	}
+
+	// scan for DIR address
+	uint16_t spcDirAddr;
+	UINT ofsSetDIR;
+	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+	}
+	else {
+		return;
+	}
+
+	// scan for instrument table
+	UINT ofsLoadSRCN;
+	uint16_t addrLocalInstrTable;
+	uint16_t addrGlobalInstrTable;
+	uint8_t globalInstrumentCount;
+	if (file->SearchBytePattern(ptnLoadSRCN, ofsLoadSRCN)) {
+		uint8_t addrInstrWorkAreaPtr = file->GetByte(ofsLoadSRCN + 4);
+		uint16_t addrInstrWorkArea = file->GetShort(addrInstrWorkAreaPtr);
+		if (addrInstrWorkArea == 0 || addrInstrWorkArea + 12 >= 0x10000) {
+			return;
+		}
+
+		uint8_t ofsLocalInstrTable = file->GetByte(addrInstrWorkArea + 12);
+		if (addrInstrWorkArea + ofsLocalInstrTable >= 0x10000) {
+			return;
+		}
+		addrLocalInstrTable = addrInstrWorkArea + ofsLocalInstrTable;
+
+		addrGlobalInstrTable = file->GetShort(ofsLoadSRCN + 14) + 1;
+
+		uint16_t availInstrCountPtr = file->GetShort(ofsLoadSRCN + 9);
+		globalInstrumentCount = file->GetByte(availInstrCountPtr);
+	}
+	else {
+		return;
+	}
+
+	PandoraBoxSnesInstrSet * newInstrSet = new PandoraBoxSnesInstrSet(file, version, spcDirAddr, addrLocalInstrTable, addrGlobalInstrTable, globalInstrumentCount, newSeq->instrADSRHints);
+	if (!newInstrSet->LoadVGMFile()) {
+		delete newInstrSet;
 		return;
 	}
 }
