@@ -341,6 +341,33 @@ BytePattern NinSnesScanner::ptnDispatchNoteFE4(
 	,
 	18);
 
+//; Super Metroid (developed by Nintendo RD1)
+//; vcmd fa - set perc patch base
+//1af1: c4 5f     mov   $5f,a
+//1af3: 6f        ret
+//; vcmd fb - skip 2 bytes
+//1af4: 3f f1 18  call  $18f1
+//1af7: 6f        ret
+//; vcmd fc
+//1af8: bc        inc   a
+//1af9: d5 00 04  mov   $0400+x,a
+//1afc: 6f        ret
+//; vcmd fd
+//1afd: bc        inc   a
+//; vcmd fe
+//1afe: c4 1b     mov   $1b,a
+//1b00: 5f 50 17  jmp   $1750
+BytePattern NinSnesScanner::ptnRD1VCmd_FA_FE(
+	"\xc4\x5f\x6f\x3f\xf1\x18\x6f\xbc"
+	"\xd5\x00\x04\x6f\xbc\xc4\x1b\x5f"
+	"\x50\x17"
+	,
+	"x?xx??xx"
+	"x??xxx?x"
+	"??"
+	,
+	18);
+
 //; Marvelous (developed by Nintendo RD2)
 //; vcmd fb - set instrument with ADSR
 //108f: 2d        push  a                 ; arg1 - sample number
@@ -754,8 +781,12 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 					// compatible design, but customized anyway
 					version = NINSNES_STANDARD;
 
+					UINT ofsRD1VCmd_FA_FE;
 					UINT ofsRD2VCmdInstrADSR;
-					if (file->SearchBytePattern(ptnRD2VCmdInstrADSR, ofsRD2VCmdInstrADSR)) {
+					if (file->SearchBytePattern(ptnRD1VCmd_FA_FE, ofsRD1VCmd_FA_FE)) {
+						version = NINSNES_RD1;
+					}
+					else if (file->SearchBytePattern(ptnRD2VCmdInstrADSR, ofsRD2VCmdInstrADSR)) {
 						// Marvelous
 						version = NINSNES_RD2;
 					}

@@ -467,6 +467,13 @@ void NinSnesSeq::LoadEventMap()
 
 	// Modify mapping for derived versions
 	switch (version) {
+	case NINSNES_RD1:
+		EventMap[0xfb] = EVENT_UNKNOWN2;
+		EventMap[0xfc] = EVENT_UNKNOWN0;
+		EventMap[0xfd] = EVENT_UNKNOWN0;
+		EventMap[0xfe] = EVENT_UNKNOWN0;
+		break;
+
 	case NINSNES_RD2:
 		EventMap[0xfb] = EVENT_RD2_PROGCHANGE_AND_ADSR;
 		EventMap[0xfd] = EVENT_PROGCHANGE; // duplicated

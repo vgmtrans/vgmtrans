@@ -39,6 +39,7 @@ private:
 	static BytePattern ptnDispatchNoteLEM;
 	static BytePattern ptnDispatchNoteFE3;
 	static BytePattern ptnDispatchNoteFE4;
+	static BytePattern ptnRD1VCmd_FA_FE;
 	static BytePattern ptnRD2VCmdInstrADSR;
 	static BytePattern ptnIntelliVCmdFA;
 	static BytePattern ptnLoadInstrTableAddressSOS;
