@@ -146,6 +146,18 @@ bool NinSnesInstr::IsValidHeader(RawFile * file, NinSnesVersion version, uint32_
 		return false;
 	}
 
+	bool hasUniqueByte = false;
+	for (size_t offset = 0; offset <= instrItemSize; offset++) {
+		uint8_t theByte = file->GetByte(addrInstrHeader + offset);
+		if (theByte != 0x00 && theByte != 0xff) {
+			hasUniqueByte = true;
+			break;
+		}
+	}
+	if (!hasUniqueByte) {
+		return false;
+	}
+
 	uint8_t srcn = file->GetByte(addrInstrHeader);
 	uint8_t adsr1 = file->GetByte(addrInstrHeader + 1);
 	uint8_t adsr2 = file->GetByte(addrInstrHeader + 2);

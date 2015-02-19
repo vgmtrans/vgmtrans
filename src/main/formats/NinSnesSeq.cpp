@@ -465,8 +465,13 @@ void NinSnesSeq::LoadEventMap()
 		}
 	}
 
-	// Remapping of derived versions
+	// Modify mapping for derived versions
 	switch (version) {
+	case NINSNES_RD2:
+		EventMap[0xfb] = EVENT_RD2_PROGCHANGE_AND_ADSR;
+		EventMap[0xfd] = EVENT_PROGCHANGE; // duplicated
+		break;
+
 	case NINSNES_KONAMI:
 		EventMap[0xe4] = EVENT_UNKNOWN2;
 		EventMap[0xe5] = EVENT_KONAMI_LOOP_START;
@@ -1117,6 +1122,20 @@ bool NinSnesTrack::ReadEvent(void)
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Base", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
 		break;
 	}
+
+	// NINTENDO RD2 EVENTS START >>
+
+	case EVENT_RD2_PROGCHANGE_AND_ADSR:
+	{
+		// This event overwrites ADSR in instrument table
+		uint8_t newProgNum = GetByte(curOffset++);
+		uint8_t adsr1 = GetByte(curOffset++);
+		uint8_t adsr2 = GetByte(curOffset++);
+		AddProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true, L"Program Change & ADSR");
+		break;
+	}
+
+	// << NINTENDO RD2 EVENTS END
 
 	// KONAMI EVENTS START >>
 

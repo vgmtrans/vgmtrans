@@ -22,6 +22,7 @@ enum NinSnesVersion
 	NINSNES_STANDARD,           // Common version with voice commands $e0-fa (e.g. Yoshi Island)
 
 	// derived formats
+	NINSNES_RD2,                // Nintendo RD2 (e.g. Marvelous)
 	NINSNES_KONAMI,             // Old Konami games (e.g. Gradius III, Castlevania IV, Legend of the Mystical Ninja)
 	NINSNES_LEMMINGS,           // Lemmings
 	NINSNES_INTELLI_FE3,        // Fire Emblem 3

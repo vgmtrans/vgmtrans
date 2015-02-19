@@ -341,6 +341,36 @@ BytePattern NinSnesScanner::ptnDispatchNoteFE4(
 	,
 	18);
 
+//; Marvelous (developed by Nintendo RD2)
+//; vcmd fb - set instrument with ADSR
+//108f: 2d        push  a                 ; arg1 - sample number
+//1090: 8d 06     mov   y,#$06
+//1092: cf        mul   ya
+//1093: da 14     movw  $14,ya
+//1095: 60        clrc
+//1096: 98 00 14  adc   $14,#$00
+//1099: 98 5e 15  adc   $15,#$5e          ; $14/5 = $5e00 + (arg1 * 6)
+//109c: 3f f4 09  call  $09f4
+//109f: 8d 01     mov   y,#$01
+//10a1: d7 14     mov   ($14)+y,a         ; ADSR(1)
+//10a3: 3f f4 09  call  $09f4
+//10a6: 8d 02     mov   y,#$02
+//10a8: d7 14     mov   ($14)+y,a         ; ADSR(2)
+//10aa: ae        pop   a
+//10ab: 5f fe 09  jmp   $09fe             ; set instrument
+BytePattern NinSnesScanner::ptnRD2VCmdInstrADSR(
+	"\x2d\x8d\x06\xcf\xda\x14\x60\x98"
+	"\x00\x14\x98\x5e\x15\x3f\xf4\x09"
+	"\x8d\x01\xd7\x14\x3f\xf4\x09\x8d"
+	"\x02\xd7\x14\xae\x5f\xfe\x09"
+	,
+	"xxxxx?xx"
+	"??x??x??"
+	"xxx?x??x"
+	"xx?xx??"
+	,
+	31);
+
 //; Fire Emblem 3 (developed by Intelligent Systems)
 //; vcmd fa
 //0884: 30 dd     bmi   $0863
@@ -721,8 +751,14 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 					version = NINSNES_STANDARD;
 				}
 				else {
-					// compatible version?
+					// compatible design, but customized anyway
 					version = NINSNES_STANDARD;
+
+					UINT ofsRD2VCmdInstrADSR;
+					if (file->SearchBytePattern(ptnRD2VCmdInstrADSR, ofsRD2VCmdInstrADSR)) {
+						// Marvelous
+						version = NINSNES_RD2;
+					}
 				}
 			}
 			else {
