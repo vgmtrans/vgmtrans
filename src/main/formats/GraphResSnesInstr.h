@@ -12,7 +12,7 @@ class GraphResSnesInstrSet :
 	public VGMInstrSet
 {
 public:
-	GraphResSnesInstrSet(RawFile* file, GraphResSnesVersion ver, uint32_t spcDirAddr, const std::map<uint8_t, uint16_t> & instrADSRHints, const std::wstring & name = L"GraphResSnesInstrSet");
+	GraphResSnesInstrSet(RawFile* file, GraphResSnesVersion ver, uint32_t spcDirAddr, const std::map<uint8_t, uint16_t> & instrADSRHints = std::map<uint8_t, uint16_t>(), const std::wstring & name = L"GraphResSnesInstrSet");
 	virtual ~GraphResSnesInstrSet(void);
 
 	virtual bool GetHeaderInfo();
@@ -43,8 +43,6 @@ public:
 
 protected:
 	uint32_t spcDirAddr;
-	int8_t transpose;
-	int16_t pitch;
 	uint16_t adsr;
 };
 
@@ -62,9 +60,4 @@ public:
 	virtual bool LoadRgn();
 
 	GraphResSnesVersion version;
-
-protected:
-	int8_t transpose;
-	int16_t pitch;
-	uint16_t adsr;
 };

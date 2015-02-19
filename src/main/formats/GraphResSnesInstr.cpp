@@ -54,7 +54,7 @@ bool GraphResSnesInstrSet::GetInstrPointers()
 
 		usedSRCNs.push_back(srcn);
 
-		uint16_t adsr = 0x8fe0;
+		uint16_t adsr = 0x8ff0;
 		if (instrADSRHints.count(srcn)) {
 			adsr = instrADSRHints[srcn];
 		}
