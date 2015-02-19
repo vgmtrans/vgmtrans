@@ -34,7 +34,7 @@ class GraphResSnesInstr
 	: public VGMInstr
 {
 public:
-	GraphResSnesInstr(VGMInstrSet* instrSet, GraphResSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8ff0, const std::wstring& name = L"GraphResSnesInstr");
+	GraphResSnesInstr(VGMInstrSet* instrSet, GraphResSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8fe0, const std::wstring& name = L"GraphResSnesInstr");
 	virtual ~GraphResSnesInstr(void);
 
 	virtual bool LoadInstr();
@@ -54,7 +54,7 @@ class GraphResSnesRgn
 	: public VGMRgn
 {
 public:
-	GraphResSnesRgn(GraphResSnesInstr* instr, GraphResSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8ff0);
+	GraphResSnesRgn(GraphResSnesInstr* instr, GraphResSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8fe0);
 	virtual ~GraphResSnesRgn(void);
 
 	virtual bool LoadRgn();
