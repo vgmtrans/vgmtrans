@@ -38,7 +38,7 @@ class PandoraBoxSnesInstr
 	: public VGMInstr
 {
 public:
-	PandoraBoxSnesInstr(VGMInstrSet* instrSet, PandoraBoxSnesVersion ver, uint32_t offset, uint8_t theInstrNum, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8ff0, const std::wstring& name = L"PandoraBoxSnesInstr");
+	PandoraBoxSnesInstr(VGMInstrSet* instrSet, PandoraBoxSnesVersion ver, uint32_t offset, uint8_t theInstrNum, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8fe0, const std::wstring& name = L"PandoraBoxSnesInstr");
 	virtual ~PandoraBoxSnesInstr(void);
 
 	virtual bool LoadInstr();
@@ -59,7 +59,7 @@ class PandoraBoxSnesRgn
 	: public VGMRgn
 {
 public:
-	PandoraBoxSnesRgn(PandoraBoxSnesInstr* instr, PandoraBoxSnesVersion ver, uint32_t offset, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8ff0);
+	PandoraBoxSnesRgn(PandoraBoxSnesInstr* instr, PandoraBoxSnesVersion ver, uint32_t offset, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8fe0);
 	virtual ~PandoraBoxSnesRgn(void);
 
 	virtual bool LoadRgn();

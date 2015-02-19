@@ -72,7 +72,7 @@ bool PandoraBoxSnesInstrSet::GetInstrPointers()
 			usedSRCNs.push_back(srcn);
 		}
 
-		uint16_t adsr = 0x8ff0;
+		uint16_t adsr = 0x8fe0;
 		if (instrADSRHints.count(srcn)) {
 			adsr = instrADSRHints[srcn];
 		}
@@ -144,7 +144,7 @@ PandoraBoxSnesRgn::PandoraBoxSnesRgn(PandoraBoxSnesInstr* instr, PandoraBoxSnesV
 	AddSimpleItem(dwOffset, 1, L"Global Instrument #");
 
 	sampNum = srcn;
-	unityKey = 57; // o4a = $1000
+	unityKey = 45; // o3a = $1000
 	fineTune = 0;
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 }

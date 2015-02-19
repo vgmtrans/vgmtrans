@@ -135,17 +135,11 @@ void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM (RawFile* file)
 	uint16_t addrGlobalInstrTable;
 	uint8_t globalInstrumentCount;
 	if (file->SearchBytePattern(ptnLoadSRCN, ofsLoadSRCN)) {
-		uint8_t addrInstrWorkAreaPtr = file->GetByte(ofsLoadSRCN + 4);
-		uint16_t addrInstrWorkArea = file->GetShort(addrInstrWorkAreaPtr);
-		if (addrInstrWorkArea == 0 || addrInstrWorkArea + 12 >= 0x10000) {
+		uint8_t ofsLocalInstrTable = file->GetByte(addrSeqHeader + 12);
+		if (addrSeqHeader + ofsLocalInstrTable >= 0x10000) {
 			return;
 		}
-
-		uint8_t ofsLocalInstrTable = file->GetByte(addrInstrWorkArea + 12);
-		if (addrInstrWorkArea + ofsLocalInstrTable >= 0x10000) {
-			return;
-		}
-		addrLocalInstrTable = addrInstrWorkArea + ofsLocalInstrTable;
+		addrLocalInstrTable = addrSeqHeader + ofsLocalInstrTable;
 
 		addrGlobalInstrTable = file->GetShort(ofsLoadSRCN + 14) + 1;
 

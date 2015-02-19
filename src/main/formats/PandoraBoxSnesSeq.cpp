@@ -36,6 +36,9 @@ PandoraBoxSnesSeq::~PandoraBoxSnesSeq(void)
 void PandoraBoxSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
+
+	bWriteInitialTempo = true;
+	tempoBPM = GetByte(dwOffset + 6);
 }
 
 bool PandoraBoxSnesSeq::GetHeaderInfo(void)
@@ -50,8 +53,6 @@ bool PandoraBoxSnesSeq::GetHeaderInfo(void)
 	AddSimpleItem(dwOffset + 6, 1, L"Tempo");
 	AddSimpleItem(dwOffset + 7, 1, L"Timebase");
 
-	bWriteInitialTempo = true;
-	tempoBPM = GetByte(dwOffset + 6);
 	uint8_t timebase = GetByte(dwOffset + 7);
 	assert((timebase % 4) == 0);
 	SetPPQN(timebase / 4);
@@ -163,7 +164,7 @@ void PandoraBoxSnesTrack::ResetVars(void)
 	spcNoteQuantize = 0;
 	spcVolumeIndex = 15;
 	spcInstr = 0;
-	spcADSR = 0x8ff0;
+	spcADSR = 0x8fe0;
 	spcCallStackPtr = 0;
 }
 
@@ -578,17 +579,17 @@ bool PandoraBoxSnesTrack::ReadEvent(void)
 		uint8_t slRate = GetByte(curOffset++);
 		uint8_t xxRate = GetByte(curOffset++);
 
-		uint8_t ar = (arRate * 0x0f) / 255;
-		uint8_t dr = (drRate * 0x07) / 255;
-		uint8_t sl = (slRate * 0x07) / 255;
-		uint8_t sr = (srRate * 0x1f) / 255;
+		uint8_t ar = (arRate * 0x0f) / 127;
+		uint8_t dr = (drRate * 0x07) / 127;
+		uint8_t sl = (slRate * 0x07) / 127;
+		uint8_t sr = (srRate * 0x1f) / 127;
 		spcADSR = ((0x80 | (dr << 4) | ar) << 8) | ((sl << 5) | sr);
 
-		desc << L"AR: " << arRate << L"/255" << L" (" << ar << L")" <<
-			L"  DR: " << drRate << L"/255" << L" (" << dr << L")" <<
-			L"  SR: " << srRate << L"/255" << L" (" << sr << L")" <<
-			L"  SL: " << slRate << L"/255" << L" (" << sl << L")" <<
-			L"  Arg5: " << xxRate << L"/255";
+		desc << L"AR: " << arRate << L"/127" << L" (" << ar << L")" <<
+			L"  DR: " << drRate << L"/127" << L" (" << dr << L")" <<
+			L"  SR: " << srRate << L"/127" << L" (" << sr << L")" <<
+			L"  SL: " << slRate << L"/127" << L" (" << sl << L")" <<
+			L"  Arg5: " << xxRate << L"/127";
 
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
 		break;
