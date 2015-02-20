@@ -956,6 +956,66 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		}
 	}
 
+	// GUESS SONG COUNT
+	// Test Case: Star Fox, Kirby Super Star
+	// Note that the result sometimes exceeds the real length
+	uint8_t songListLength = 1;
+	uint16_t addrSectionListCutoff = 0xffff;
+	// skip index 0, it's not a part of table in most games
+	for (int8_t songIndex = 1; songIndex <= 0x7f; songIndex++) {
+		UINT addrSectionListPtr = addrSongList + songIndex * 2;
+		if (addrSectionListPtr >= addrSectionListCutoff) {
+			break;
+		}
+
+		uint16_t firstSectionPtr = file->GetShort(addrSectionListPtr);
+		if (version == NINSNES_KONAMI) {
+			firstSectionPtr += konamiBaseAddress;
+		}
+		if (firstSectionPtr == 0) {
+			continue;
+		}
+		if ((firstSectionPtr & 0xff00) == 0 || firstSectionPtr == 0xffff) {
+			break;
+		}
+		if (firstSectionPtr >= addrSectionListPtr) {
+			addrSectionListCutoff = min(addrSectionListCutoff, firstSectionPtr);
+		}
+
+		uint16_t addrFirstSection = file->GetShort(firstSectionPtr);
+		if (addrFirstSection < 0x0100) {
+			// usually it does not appear
+			break;
+		}
+
+		if (version == NINSNES_KONAMI) {
+			addrFirstSection += konamiBaseAddress;
+		}
+		if (addrFirstSection + 16 > 0x10000) {
+			break;
+		}
+
+		bool hasIllegalTrack = false;
+		for (uint8_t trackIndex = 0; trackIndex < 8; trackIndex++) {
+			uint16_t addrTrackStart = file->GetShort(addrFirstSection + trackIndex * 2);
+			if (addrTrackStart != 0) {
+				if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
+					hasIllegalTrack = true;
+					break;
+				}
+
+				if (version == NINSNES_KONAMI) {
+					addrTrackStart += konamiBaseAddress;
+				}
+			}
+		}
+		if (hasIllegalTrack) {
+			break;
+		}
+
+		songListLength = songIndex + 1;
+	}
+
 	// GUESS CURRENT SONG NUMBER
 	int8_t guessedSongIndex = -1;
 
@@ -967,21 +1027,21 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		int8_t songIndexCandidate = -1;
 		uint16_t bestSectionDistance = 0xffff;
 
-		for (int songIndex = 0; songIndex <= 0x7f; songIndex++) {
+		for (int8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
 			UINT addrSectionListPtr = addrSongList + songIndex * 2;
 			if (addrSectionListPtr + 2 > 0x10000) {
 				break;
 			}
 
-			uint16_t firstSectionAddress = file->GetShort(addrSectionListPtr);
+			uint16_t firstSectionPtr = file->GetShort(addrSectionListPtr);
 			if (version == NINSNES_KONAMI) {
-				firstSectionAddress += konamiBaseAddress;
+				firstSectionPtr += konamiBaseAddress;
 			}
-			if (firstSectionAddress > addrCurrentSection) {
+			if (firstSectionPtr > addrCurrentSection) {
 				continue;
 			}
 
-			uint16_t curAddress = firstSectionAddress;
+			uint16_t curAddress = firstSectionPtr;
 			if ((addrCurrentSection % 2) == (curAddress % 2)) {
 				while (curAddress >= 0x0100 && curAddress < 0xfff0) {
 					uint16_t addrSection = file->GetShort(curAddress);
@@ -990,7 +1050,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 					}
 
 					if (curAddress == addrCurrentSection) {
-						uint16_t sectionDistance = addrCurrentSection - firstSectionAddress;
+						uint16_t sectionDistance = addrCurrentSection - firstSectionPtr;
 						if (sectionDistance < bestSectionDistance) {
 							songIndexCandidate = songIndex;
 							bestSectionDistance = sectionDistance;
