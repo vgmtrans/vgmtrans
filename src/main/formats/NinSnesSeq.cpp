@@ -904,35 +904,18 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t newPan = GetByte(curOffset++);
 
+		uint8_t panIndex = newPan;
+		bool reverseLeft = false;
+		bool reverseRight = false;
+		if (parentSeq->version != NINSNES_TOSE) {
+			panIndex &= 0x1f;
+			reverseLeft = (newPan & 0x80) != 0;
+			reverseRight = (newPan & 0x40) != 0;
+		}
+
 		double volumeLeft;
 		double volumeRight;
-		if (parentSeq->version == NINSNES_TOSE) {
-			if (newPan <= 10) {
-				// pan right, decrease left volume
-				volumeLeft = (255 - 25 * max(10 - newPan, 0)) / 256.0;
-				volumeRight = 1.0;
-			}
-			else {
-				// pan left, decrease right volume
-				volumeLeft = 1.0;
-				volumeRight = (255 - 25 * max(newPan - 10, 0)) / 256.0;
-			}
-		}
-		else {
-			uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
-			bool reverseLeft = (newPan & 0x80) != 0;
-			bool reverseRight = (newPan & 0x40) != 0;
-
-			uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
-			if (panIndex >= parentSeq->panTable.size()) {
-				// unexpected behavior
-				panIndex = panMaxIndex;
-			}
-
-			// actual engine divides pan by 256, though pan value is 7-bit
-			volumeLeft = parentSeq->panTable[panMaxIndex - panIndex] / 128.0;
-			volumeRight = parentSeq->panTable[panIndex] / 128.0;
-		}
+		GetVolumeBalance(panIndex << 8, volumeLeft, volumeRight);
 
 		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
 		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
@@ -957,33 +940,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 		double volumeLeft;
 		double volumeRight;
-		if (parentSeq->version == NINSNES_TOSE) {
-			if (newPan <= 10) {
-				// pan right, decrease left volume
-				volumeLeft = (255 - 25 * max(10 - newPan, 0)) / 256.0;
-				volumeRight = 1.0;
-			}
-			else {
-				// pan left, decrease right volume
-				volumeLeft = 1.0;
-				volumeRight = (255 - 25 * max(newPan - 10, 0)) / 256.0;
-			}
-		}
-		else {
-			uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
-			bool reverseLeft = (newPan & 0x80) != 0;
-			bool reverseRight = (newPan & 0x40) != 0;
-
-			uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
-			if (panIndex >= parentSeq->panTable.size()) {
-				// unexpected behavior
-				panIndex = panMaxIndex;
-			}
-
-			// actual engine divides pan by 256, though pan value is 7-bit
-			volumeLeft = parentSeq->panTable[panMaxIndex - panIndex] / 128.0;
-			volumeRight = parentSeq->panTable[panIndex] / 128.0;
-		}
+		GetVolumeBalance(newPan << 8, volumeLeft, volumeRight);
 
 		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
 		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
@@ -1462,4 +1419,34 @@ uint16_t NinSnesTrack::GetShortAddress(uint32_t offset)
 {
 	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
 	return parentSeq->GetShortAddress(offset);
+}
+
+void NinSnesTrack::GetVolumeBalance(uint16_t pan, double & volumeLeft, double & volumeRight)
+{
+	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
+
+	uint8_t panIndex = pan >> 8;
+	if (parentSeq->version == NINSNES_TOSE) {
+		if (panIndex <= 10) {
+			// pan right, decrease left volume
+			volumeLeft = (255 - 25 * max(10 - panIndex, 0)) / 256.0;
+			volumeRight = 1.0;
+		}
+		else {
+			// pan left, decrease right volume
+			volumeLeft = 1.0;
+			volumeRight = (255 - 25 * max(panIndex - 10, 0)) / 256.0;
+		}
+	}
+	else {
+		uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
+		if (panIndex > panMaxIndex) {
+			// unexpected behavior
+			panIndex = panMaxIndex;
+		}
+
+		// actual engine divides pan by 256, though pan value is 7-bit
+		volumeLeft = parentSeq->panTable[panMaxIndex - panIndex] / 128.0;
+		volumeRight = parentSeq->panTable[panIndex] / 128.0;
+	}
 }

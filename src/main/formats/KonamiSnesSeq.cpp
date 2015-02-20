@@ -470,6 +470,8 @@ bool KonamiSnesTrack::ReadEvent(void)
 		}
 
 		if (prevNoteSlurred && key == prevNoteKey) {
+			// TODO: Note volume can be changed during a tied note
+			// See the end of Konami Logo sequence for example
 			MakePrevDurNoteEnd(GetTime() + dur);
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
 		}
