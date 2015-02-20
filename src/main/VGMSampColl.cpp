@@ -62,7 +62,11 @@ bool VGMSampColl::Load()
 		{
 			VGMSamp* samp = (*itr);
 
-			assert(dwOffset <= samp->dwOffset);
+			// Some formats can have negative sample offset
+			// For example, Konami's SNES format and Hudson's SNES format
+			// TODO: Fix negative sample offset without breaking instrument
+			//assert(dwOffset <= samp->dwOffset);
+
 			//if (dwOffset > samp->dwOffset)
 			//{
 			//	unLength += samp->dwOffset - dwOffset;
