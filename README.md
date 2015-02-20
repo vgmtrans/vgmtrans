@@ -1,7 +1,7 @@
 VGMTrans - Video Game Music Translator
 ======================================
 
-VGMTrans converts a music files used in console video games into standard midi and dls files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
+VGMTrans converts a music files used in console video games into standard midi and dls/sf2 files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
 
 - Sony's PS2 sequence and instrument formats (.bq, .hd, .bd)
 - Squaresoft's PS2 sequence and instrument formats (.bgm, .wd)
