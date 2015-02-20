@@ -163,6 +163,7 @@ public:
 	uint16_t ConvertToAPUAddress(uint16_t offset);
 	uint16_t GetShortAddress(uint32_t offset);
 	void GetVolumeBalance(uint16_t pan, double & volumeLeft, double & volumeRight);
+	uint8_t ReadPanTable(uint16_t pan);
 
 	NinSnesSection* parentSection;
 	NinSnesTrackSharedData* shared;

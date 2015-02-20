@@ -1442,11 +1442,41 @@ void NinSnesTrack::GetVolumeBalance(uint16_t pan, double & volumeLeft, double & 
 		uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
 		if (panIndex > panMaxIndex) {
 			// unexpected behavior
+			pan = panMaxIndex << 8;
 			panIndex = panMaxIndex;
 		}
 
 		// actual engine divides pan by 256, though pan value is 7-bit
-		volumeLeft = parentSeq->panTable[panMaxIndex - panIndex] / 128.0;
-		volumeRight = parentSeq->panTable[panIndex] / 128.0;
+		volumeLeft = ReadPanTable((panMaxIndex << 8) - pan) / 128.0;
+		volumeRight = ReadPanTable(pan) / 128.0;
 	}
+}
+
+uint8_t NinSnesTrack::ReadPanTable(uint16_t pan)
+{
+	NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
+
+	if (parentSeq->version == NINSNES_TOSE) {
+		// no pan table
+		return 0;
+	}
+
+	uint8_t panIndex = pan >> 8;
+	uint8_t panFraction = pan & 0xff;
+
+	uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
+	if (panIndex > panMaxIndex) {
+		// unexpected behavior
+		panIndex = panMaxIndex;
+		panFraction = 0; // floor(pan)
+	}
+
+	uint8_t volumeRate = parentSeq->panTable[panIndex];
+
+	// linear interpolation for pan fade
+	uint8_t nextVolumeRate = (panIndex < panMaxIndex) ? parentSeq->panTable[panIndex + 1] : volumeRate;
+	uint8_t volumeRateDelta = nextVolumeRate - volumeRate;
+	volumeRate += (volumeRateDelta * panFraction) >> 8;
+
+	return volumeRate;
 }
