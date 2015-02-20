@@ -15,11 +15,12 @@ DECLARE_FORMAT(NinSnes);
 
 #define NINSNES_INTELLI_FE3FLAGS_NEW_NOTE_PARAM 0x80
 
-NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, const std::vector<uint8_t>& theVolumeTable, const std::vector<uint8_t>& theDurRateTable, std::wstring theName)
+NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint8_t percussion_base, const std::vector<uint8_t>& theVolumeTable, const std::vector<uint8_t>& theDurRateTable, std::wstring theName)
 	: VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName), version(ver),
 	header(NULL),
 	volumeTable(theVolumeTable),
 	durRateTable(theDurRateTable),
+	spcPercussionBaseInit(percussion_base),
 	konamiBaseAddress(0)
 {
 	bLoadTickByTick = true;
@@ -39,7 +40,7 @@ void NinSnesSeq::ResetVars()
 {
 	VGMMultiSectionSeq::ResetVars();
 
-	spcPercussionBase = 0;
+	spcPercussionBase = spcPercussionBaseInit;
 	sectionRepeatCount = 0;
 
 	for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
@@ -896,6 +897,10 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_PROGCHANGE:
 	{
 		uint8_t newProgNum = GetByte(curOffset++);
+		if (newProgNum >= 0x80) {
+			// standard engine does nothing special, but Star Fox does
+			newProgNum = (newProgNum - parentSeq->STATUS_PERCUSSION_NOTE_MIN) + parentSeq->spcPercussionBase;
+		}
 		AddProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true);
 		break;
 	}

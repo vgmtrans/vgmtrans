@@ -96,7 +96,7 @@ class NinSnesSeq :
 	public VGMMultiSectionSeq
 {
 public:
-	NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(), const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(), std::wstring theName = L"NinSnes Seq");
+	NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint8_t percussion_base = 0, const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(), const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(), std::wstring theName = L"NinSnes Seq");
 	virtual ~NinSnesSeq();
 
 	virtual bool GetHeaderInfo();
@@ -137,6 +137,8 @@ protected:
 
 private:
 	void LoadEventMap(void);
+
+	uint8_t spcPercussionBaseInit;
 };
 
 class NinSnesSection

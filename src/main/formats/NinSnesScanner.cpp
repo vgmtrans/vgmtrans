@@ -1105,7 +1105,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		addrSongStart += konamiBaseAddress;
 	}
 
-	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, volumeTable, durRateTable, name);
+	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, 0, volumeTable, durRateTable, name);
 	newSeq->konamiBaseAddress = konamiBaseAddress;
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
