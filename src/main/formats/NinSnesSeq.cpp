@@ -95,20 +95,48 @@ bool NinSnesSeq::ReadEvent(long stopTime)
 		bool doJump = false;
 		bool infiniteLoop = false;
 
-		// decrease 8-bit counter
-		sectionRepeatCount--;
-		// check overflow (end of loop)
-		if (sectionRepeatCount >= 0x80) {
-			// it's over, set new repeat count
-			sectionRepeatCount = (uint8_t)repeatCount;
-			startNewRepeat = true;
-		}
+		if (version == NINSNES_TOSE) {
+			if (sectionRepeatCount == 0) {
+				// set new repeat count
+				sectionRepeatCount = (uint8_t)repeatCount;
+				startNewRepeat = true;
+				doJump = true;
+			}
+			else {
+				// infinite loop?
+				if (sectionRepeatCount == 0xff) {
+					if (IsOffsetUsed(dest)) {
+						infiniteLoop = true;
+					}
+					doJump = true;
+				}
+				else {
+					// decrease 8-bit counter
+					sectionRepeatCount--;
 
-		// jump if the counter is zero
-		if (sectionRepeatCount != 0) {
-			doJump = true;
-			if (IsOffsetUsed(dest) && sectionRepeatCount > 0x80) {
-				infiniteLoop = true;
+					// jump if the counter is zero
+					if (sectionRepeatCount != 0) {
+						doJump = true;
+					}
+				}
+			}
+		}
+		else {
+			// decrease 8-bit counter
+			sectionRepeatCount--;
+			// check overflow (end of loop)
+			if (sectionRepeatCount >= 0x80) {
+				// set new repeat count
+				sectionRepeatCount = (uint8_t)repeatCount;
+				startNewRepeat = true;
+			}
+
+			// jump if the counter is zero
+			if (sectionRepeatCount != 0) {
+				doJump = true;
+				if (IsOffsetUsed(dest) && sectionRepeatCount > 0x80) {
+					infiniteLoop = true;
+				}
 			}
 		}
 
@@ -515,6 +543,10 @@ void NinSnesSeq::LoadEventMap()
 
 	case NINSNES_HUMAN:
 		break;
+
+	case NINSNES_TOSE:
+		panTable.clear();
+		break;
 	}
 }
 
@@ -872,13 +904,48 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t newPan = GetByte(curOffset++);
 
-		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
-		bool reverseLeft = (newPan & 0x80) != 0;
-		bool reverseRight = (newPan & 0x40) != 0;
+		double volumeLeft;
+		double volumeRight;
+		if (parentSeq->version == NINSNES_TOSE) {
+			if (newPan <= 10) {
+				// pan right, decrease left volume
+				volumeLeft = (255 - 25 * max(10 - newPan, 0)) / 256.0;
+				volumeRight = 1.0;
+			}
+			else {
+				// pan left, decrease right volume
+				volumeLeft = 1.0;
+				volumeRight = (255 - 25 * max(newPan - 10, 0)) / 256.0;
+			}
+		}
+		else {
+			uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
+			bool reverseLeft = (newPan & 0x80) != 0;
+			bool reverseRight = (newPan & 0x40) != 0;
 
-		uint8_t spcPan = parentSeq->panTable[panIndex];
-		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal(spcPan);
+			uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
+			if (panIndex >= parentSeq->panTable.size()) {
+				// unexpected behavior
+				panIndex = panMaxIndex;
+			}
 
+			// actual engine divides pan by 256, though pan value is 7-bit
+			volumeLeft = parentSeq->panTable[panMaxIndex - panIndex] / 128.0;
+			volumeRight = parentSeq->panTable[panIndex] / 128.0;
+		}
+
+		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
+		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
+
+		int8_t midiPan;
+		if (midiScalePan == 0.0) {
+			midiPan = 0;
+		}
+		else {
+			midiPan = 1 + roundi(midiScalePan * 126.0);
+		}
+
+		// TODO: apply volume scale
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
 		break;
 	}
@@ -888,10 +955,46 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		uint8_t newPan = GetByte(curOffset++);
 
-		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
+		double volumeLeft;
+		double volumeRight;
+		if (parentSeq->version == NINSNES_TOSE) {
+			if (newPan <= 10) {
+				// pan right, decrease left volume
+				volumeLeft = (255 - 25 * max(10 - newPan, 0)) / 256.0;
+				volumeRight = 1.0;
+			}
+			else {
+				// pan left, decrease right volume
+				volumeLeft = 1.0;
+				volumeRight = (255 - 25 * max(newPan - 10, 0)) / 256.0;
+			}
+		}
+		else {
+			uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), parentSeq->panTable.size() - 1);
+			bool reverseLeft = (newPan & 0x80) != 0;
+			bool reverseRight = (newPan & 0x40) != 0;
 
-		uint8_t spcPan = parentSeq->panTable[panIndex];
-		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal(spcPan);
+			uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
+			if (panIndex >= parentSeq->panTable.size()) {
+				// unexpected behavior
+				panIndex = panMaxIndex;
+			}
+
+			// actual engine divides pan by 256, though pan value is 7-bit
+			volumeLeft = parentSeq->panTable[panMaxIndex - panIndex] / 128.0;
+			volumeRight = parentSeq->panTable[panIndex] / 128.0;
+		}
+
+		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
+		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
+
+		int8_t midiPan;
+		if (midiScalePan == 0.0) {
+			midiPan = 0;
+		}
+		else {
+			midiPan = 1 + roundi(midiScalePan * 126.0);
+		}
 
 		// TODO: fade in real curve
 		AddPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);

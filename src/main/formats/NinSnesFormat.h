@@ -29,4 +29,5 @@ enum NinSnesVersion
 	NINSNES_INTELLI_FE3,        // Fire Emblem 3
 	NINSNES_INTELLI_FE4,        // Fire Emblem 4
 	NINSNES_HUMAN,              // Human games (e.g. Clock Tower, Firemen, Septentrion)
+	NINSNES_TOSE,               // TOSE games (e.g. Yoshi's Safari, Dragon Ball Z: Super Butouden 2)
 };

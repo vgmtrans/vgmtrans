@@ -552,6 +552,30 @@ BytePattern NinSnesScanner::ptnLoadInstrTableAddressCTOW(
 	,
 	28);
 
+//; Yoshi's Safari SPC
+//0877: 8d 5d     mov   y,#$5d
+//0879: e8 1b     mov   a,#$1b
+//087b: c4 45     mov   $45,a
+//087d: 3f 99 10  call  $1099             ; set DIR
+//0880: 8f 00 46  mov   $46,#$00
+//0883: 8f 1c 47  mov   $47,#$1c          ; instrument list = $1c00
+//0886: 8f 00 48  mov   $48,#$00
+//0889: 8f 1e 49  mov   $49,#$1e          ; song list = $1e00
+//088c: 8f 00 4a  mov   $4a,#$00
+//088f: 8f 1f 4b  mov   $4b,#$1f
+BytePattern NinSnesScanner::ptnLoadInstrTableAddressYSFR(
+	"\x8d\x5d\xe8\x1b\xc4\x45\x3f\x99"
+	"\x10\x8f\x00\x46\x8f\x1c\x47\x8f"
+	"\x00\x48\x8f\x1e\x49\x8f\x00\x4a"
+	"\x8f\x1f\x4b"
+	,
+	"xxx?x?x?"
+	"?x??x??x"
+	"??x??x??"
+	"x??"
+	,
+	27);
+
 //; Clock Tower SPC
 //11a6: 8d 5d     mov   y,#$5d
 //11a8: e8 3a     mov   a,#$3a
@@ -742,8 +766,8 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		//0889: 8f 1e 49  mov   $49,#$1e
 		char ptnInitSongListPtrBytesYSFR[] =
 			"\x8f\x00\x48\x8f\x1e\x49";
-		ptnInitSectionPtrBytesYSFR[2] = addrSongListPtr;
-		ptnInitSectionPtrBytesYSFR[5] = addrSongListPtr + 1;
+		ptnInitSongListPtrBytesYSFR[2] = addrSongListPtr;
+		ptnInitSongListPtrBytesYSFR[5] = addrSongListPtr + 1;
 		BytePattern ptnInitSongListPtrYSFR(
 			ptnInitSongListPtrBytesYSFR
 			,
@@ -774,7 +798,25 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	uint8_t firstVoiceCmd;
 	uint16_t addrVoiceCmdAddressTable;
 	uint16_t addrVoiceCmdLengthTable;
-	if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
+	// DERIVED VERSIONS
+	if (file->SearchBytePattern(ptnJumpToVcmdYSFR, ofsBranchForVcmd)) {
+		addrVoiceCmdAddressTable = file->GetShort(ofsBranchForVcmd + 9);
+
+		uint32_t ofsReadVcmdLength;
+		if (file->SearchBytePattern(ptnReadVcmdLengthYSFR, ofsReadVcmdLength)) {
+			firstVoiceCmd = file->GetByte(ofsReadVcmdLength + 2);
+			addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 7);
+
+			if (firstVoiceCmd == 0xe0) {
+				version = NINSNES_TOSE;
+			}
+		}
+		else {
+			return;
+		}
+	}
+	// STANDARD VERSION (this pattern search sometimes make a false-positive)
+	else if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
 	{
 		uint32_t ofsJumpToVcmd;
 
@@ -806,23 +848,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 10);
 			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
 			version = NINSNES_HUMAN;
-		}
-		else {
-			return;
-		}
-	}
-	// DERIVED VERSIONS
-	else if (file->SearchBytePattern(ptnJumpToVcmdYSFR, ofsBranchForVcmd)) {
-		addrVoiceCmdAddressTable = file->GetShort(ofsBranchForVcmd + 9);
-
-		uint32_t ofsReadVcmdLength;
-		if (file->SearchBytePattern(ptnReadVcmdLengthYSFR, ofsReadVcmdLength)) {
-			firstVoiceCmd = file->GetByte(ofsReadVcmdLength + 2);
-			addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 7);
-
-			if (firstVoiceCmd == 0xe0) {
-				version = NINSNES_UNKNOWN; // TODO: set different version code (Yoshi's Safari)
-			}
 		}
 		else {
 			return;
@@ -1036,6 +1061,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// scan for instrument table
 	UINT ofsLoadInstrTableAddressASM;
 	UINT addrInstrTable;
+	uint16_t spcDirAddr = 0;
 	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
 		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
 	}
@@ -1054,28 +1080,38 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			return;
 		}
 	}
+	else if (version == NINSNES_TOSE) {
+		if (file->SearchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
+			spcDirAddr = file->GetByte(ofsLoadInstrTableAddressASM + 3) << 8;
+			addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 10) | (file->GetByte(ofsLoadInstrTableAddressASM + 13) << 8);
+		}
+		else {
+			return;
+		}
+	}
 	else {
 		return;
 	}
 
 	// scan for DIR address
-	uint16_t spcDirAddr;
-	UINT ofsSetDIR;
-	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
-		spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
-	}
-	else if (file->SearchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
-		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-	}
-	else if (file->SearchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
-		spcDirAddr = file->GetByte(ofsSetDIR + 9) << 8;
-	}
-	// DERIVED VERSIONS
-	else if (file->SearchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
-		spcDirAddr = file->GetByte(ofsSetDIR + 3) << 8;
-	}
-	else {
-		return;
+	if (spcDirAddr == 0) {
+		UINT ofsSetDIR;
+		if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+			spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
+		}
+		else if (file->SearchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
+			spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+		}
+		else if (file->SearchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
+			spcDirAddr = file->GetByte(ofsSetDIR + 9) << 8;
+		}
+		// DERIVED VERSIONS
+		else if (file->SearchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
+			spcDirAddr = file->GetByte(ofsSetDIR + 3) << 8;
+		}
+		else {
+			return;
+		}
 	}
 
 	NinSnesInstrSet * newInstrSet = new NinSnesInstrSet(file, version, addrInstrTable, spcDirAddr);

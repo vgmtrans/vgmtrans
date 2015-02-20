@@ -47,5 +47,6 @@ private:
 	static BytePattern ptnIntelliVCmdFA;
 	static BytePattern ptnLoadInstrTableAddressSOS;
 	static BytePattern ptnLoadInstrTableAddressCTOW;
+	static BytePattern ptnLoadInstrTableAddressYSFR;
 	static BytePattern ptnSetDIRCTOW;
 };
