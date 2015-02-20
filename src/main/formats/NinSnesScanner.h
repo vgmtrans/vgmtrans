@@ -23,6 +23,7 @@ private:
 	static BytePattern ptnJumpToVcmd;
 	static BytePattern ptnJumpToVcmdSMW;
 	static BytePattern ptnReadVcmdLengthSMW;
+	static BytePattern ptnDispatchNoteYI;
 	static BytePattern ptnIncSectionPtr;
 	static BytePattern ptnLoadInstrTableAddress;
 	static BytePattern ptnLoadInstrTableAddressSMW;
@@ -36,6 +37,8 @@ private:
 	static BytePattern ptnJumpToVcmdCTOW;
 	static BytePattern ptnJumpToVcmdYSFR;
 	static BytePattern ptnReadVcmdLengthYSFR;
+	static BytePattern ptnDispatchNoteGD3;
+	static BytePattern ptnDispatchNoteYSFR;
 	static BytePattern ptnDispatchNoteLEM;
 	static BytePattern ptnDispatchNoteFE3;
 	static BytePattern ptnDispatchNoteFE4;

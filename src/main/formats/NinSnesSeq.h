@@ -96,7 +96,7 @@ class NinSnesSeq :
 	public VGMMultiSectionSeq
 {
 public:
-	NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, std::wstring theName = L"NinSnes Seq");
+	NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(), const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(), std::wstring theName = L"NinSnes Seq");
 	virtual ~NinSnesSeq();
 
 	virtual bool GetHeaderInfo();

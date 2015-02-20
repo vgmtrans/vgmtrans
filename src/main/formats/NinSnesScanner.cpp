@@ -77,6 +77,29 @@ BytePattern NinSnesScanner::ptnReadVcmdLengthSMW(
 	14);
 
 //; Yoshi's Island SPC
+//07fb: 2d        push  a
+//07fc: 9f        xcn   a
+//07fd: 28 07     and   a,#$07
+//07ff: fd        mov   y,a
+//0800: f6 e8 3f  mov   a,$3fe8+y
+//0803: d5 01 02  mov   $0201+x,a         ;   set dur% from high nybble
+//0806: ae        pop   a
+//0807: 28 0f     and   a,#$0f
+//0809: fd        mov   y,a
+//080a: f6 f0 3f  mov   a,$3ff0+y
+//080d: d5 10 02  mov   $0210+x,a         ;   set per-note vol from low nybble
+BytePattern NinSnesScanner::ptnDispatchNoteYI(
+	"\x2d\x9f\x28\x07\xfd\xf6\xe8\x3f"
+	"\xd5\x01\x02\xae\x28\x0f\xfd\xf6"
+	"\xf0\x3f\xd5\x10\x02"
+	,
+	"xxxxxx??"
+	"x??xxxxx"
+	"??x??"
+	,
+	21);
+
+//; Yoshi's Island SPC
 //; dereference and increment the section pointer $40/1
 //06d7: 8d 00     mov   y,#$00
 //06d9: f7 40     mov   a,($40)+y
@@ -195,14 +218,16 @@ BytePattern NinSnesScanner::ptnIncSectionPtrGD3(
 //14ba: c4 01     mov   $01,a
 //14bc: c4 4f     mov   $4f,a
 //14be: 3a 4c     incw  $4c               ; read a word from section list ptr
+//14c0: 68 00     cmp   a,#$00
+//14c2: d0 28     bne   $14ec             ; >= $0100, load that section ($00/1)
 BytePattern NinSnesScanner::ptnIncSectionPtrYSFR(
 	"\x8d\x00\xf7\x4c\xc4\x00\xc4\x4e"
 	"\x3a\x4c\xf7\x4c\xc4\x01\xc4\x4f"
-	"\x3a\x4c"
+	"\x3a\x4c\x68\x00\x68\x00\xd0\x28"
 	,
 	"xxx?x?x?"
 	"x?x?x?x?"
-	"x?"
+	"x?xxx?"
 	,
 	18);
 
@@ -264,6 +289,57 @@ BytePattern NinSnesScanner::ptnReadVcmdLengthYSFR(
 	"?"
 	,
 	9);
+
+//; Gradius 3 SPC
+//09fe: 2d        push  a
+//09ff: 9f        xcn   a
+//0a00: 28 07     and   a,#$07
+//0a02: fd        mov   y,a
+//0a03: f6 e5 10  mov   a,$10e5+y
+//0a06: d5 01 02  mov   $0201+x,a         ;   set dur% from high nybble
+//0a09: ae        pop   a
+//0a0a: 28 0f     and   a,#$0f
+//0a0c: fd        mov   y,a
+//0a0d: f6 ed 10  mov   a,$10ed+y
+//0a10: 60        clrc
+//0a11: 95 01 01  adc   a,$0101+x         ;   add volume delta of repeat vcmd
+//0a14: d5 10 02  mov   $0210+x,a         ;   set per-note vol from low nybble
+BytePattern NinSnesScanner::ptnDispatchNoteGD3(
+	"\x2d\x9f\x28\x07\xfd\xf6\xe5\x10"
+	"\xd5\x01\x02\xae\x28\x0f\xfd\xf6"
+	"\xed\x10\x60\x95\x01\x01\xd5\x10"
+	"\x02"
+	,
+	"xxxxxx??"
+	"x??xxxxx"
+	"??xx??x?"
+	"?"
+	,
+	25);
+
+//; Yoshi's Safari SPC
+//0a47: 28 0f     and   a,#$0f
+//0a49: fd        mov   y,a
+//0a4a: f6 0b 0c  mov   a,$0c0b+y
+//0a4d: d5 90 03  mov   $0390+x,a         ; set per-note vol from low nybble
+//0a50: ae        pop   a
+//0a51: 5c        lsr   a
+//0a52: 5c        lsr   a
+//0a53: 5c        lsr   a
+//0a54: 5c        lsr   a
+//0a55: fd        mov   y,a
+//0a56: f6 80 1d  mov   a,$1d80+y
+//0a59: d5 40 06  mov   $0640+x,a         ; set dur% from high nybble
+BytePattern NinSnesScanner::ptnDispatchNoteYSFR(
+	"\x28\x0f\xfd\xf6\x0b\x0c\xd5\x90"
+	"\x03\xae\x5c\x5c\x5c\x5c\xfd\xf6"
+	"\x80\x1d\xd5\x40\x06"
+	,
+	"xxxx??x?"
+	"?xxxxxxx"
+	"??x??"
+	,
+	21);
 
 //; Lemmings SPC
 //0ad0: 30 1e     bmi   $0af0             ; vcmds 01-7f - note info:
@@ -756,10 +832,49 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		return;
 	}
 
+	// TRY TO GRAB NOTE VOLUME/DURATION TABLE
+	UINT ofsDispatchNote = 0;
+	uint16_t addrDurRateTable = 0;
+	uint16_t addrVolumeTable = 0;
+	std::vector<uint8_t> durRateTable;
+	std::vector<uint8_t> volumeTable;
+	if (file->SearchBytePattern(ptnDispatchNoteYI, ofsDispatchNote)) {
+		addrDurRateTable = file->GetShort(ofsDispatchNote + 6);
+		for (uint8_t offset = 0; offset < 8; offset++) {
+			durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
+		}
+
+		addrVolumeTable = file->GetShort(ofsDispatchNote + 16);
+		for (uint8_t offset = 0; offset < 16; offset++) {
+			volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
+		}
+	}
+	else if (file->SearchBytePattern(ptnDispatchNoteGD3, ofsDispatchNote)) {
+		addrDurRateTable = file->GetShort(ofsDispatchNote + 6);
+		for (uint8_t offset = 0; offset < 8; offset++) {
+			durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
+		}
+
+		addrVolumeTable = file->GetShort(ofsDispatchNote + 16);
+		for (uint8_t offset = 0; offset < 16; offset++) {
+			volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
+		}
+	}
+	else if (file->SearchBytePattern(ptnDispatchNoteYSFR, ofsDispatchNote)) {
+		addrDurRateTable = file->GetShort(ofsDispatchNote + 16);
+		for (uint8_t offset = 0; offset < 8; offset++) {
+			durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
+		}
+
+		addrVolumeTable = file->GetShort(ofsDispatchNote + 4);
+		for (uint8_t offset = 0; offset < 16; offset++) {
+			volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
+		}
+	}
+
 	// CLASSIFY DERIVED VERSIONS (fix false-positive)
 	if (version == NINSNES_STANDARD)
 	{
-		UINT ofsDispatchNote;
 		if (konamiBaseAddress != 0xffff) {
 			version = NINSNES_KONAMI;
 		}
@@ -906,10 +1021,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		addrSongStart += konamiBaseAddress;
 	}
 
-	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, name);
+	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, volumeTable, durRateTable, name);
 	newSeq->konamiBaseAddress = konamiBaseAddress;
-	if (!newSeq->LoadVGMFile())
-	{
+	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
 		return;
 	}
@@ -922,12 +1036,10 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// scan for instrument table
 	UINT ofsLoadInstrTableAddressASM;
 	UINT addrInstrTable;
-	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM))
-	{
+	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
 		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
 	}
-	else if (file->SearchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM))
-	{
+	else if (file->SearchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM)) {
 		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 3) | (file->GetByte(ofsLoadInstrTableAddressASM + 6) << 8);
 	}
 	// DERIVED VERSIONS
@@ -942,39 +1054,32 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			return;
 		}
 	}
-	else
-	{
+	else {
 		return;
 	}
 
 	// scan for DIR address
-	uint8_t spcDIR;
-	UINT ofsSetDIRASM;
-	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIRASM))
-	{
-		spcDIR = file->GetByte(ofsSetDIRASM + 4);
+	uint16_t spcDirAddr;
+	UINT ofsSetDIR;
+	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
 	}
-	else if (file->SearchBytePattern(ptnSetDIRYI, ofsSetDIRASM))
-	{
-		spcDIR = file->GetByte(ofsSetDIRASM + 1);
+	else if (file->SearchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
 	}
-	else if (file->SearchBytePattern(ptnSetDIRSMW, ofsSetDIRASM))
-	{
-		spcDIR = file->GetByte(ofsSetDIRASM + 9);
+	else if (file->SearchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 9) << 8;
 	}
 	// DERIVED VERSIONS
-	else if (file->SearchBytePattern(ptnSetDIRCTOW, ofsSetDIRASM))
-	{
-		spcDIR = file->GetByte(ofsSetDIRASM + 3);
+	else if (file->SearchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
+		spcDirAddr = file->GetByte(ofsSetDIR + 3) << 8;
 	}
-	else
-	{
+	else {
 		return;
 	}
 
-	NinSnesInstrSet * newInstrSet = new NinSnesInstrSet(file, version, addrInstrTable, spcDIR << 8);
-	if (!newInstrSet->LoadVGMFile())
-	{
+	NinSnesInstrSet * newInstrSet = new NinSnesInstrSet(file, version, addrInstrTable, spcDirAddr);
+	if (!newInstrSet->LoadVGMFile()) {
 		delete newInstrSet;
 		return;
 	}

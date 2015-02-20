@@ -15,9 +15,11 @@ DECLARE_FORMAT(NinSnes);
 
 #define NINSNES_INTELLI_FE3FLAGS_NEW_NOTE_PARAM 0x80
 
-NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, std::wstring theName)
+NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, const std::vector<uint8_t>& theVolumeTable, const std::vector<uint8_t>& theDurRateTable, std::wstring theName)
 	: VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName), version(ver),
 	header(NULL),
+	volumeTable(theVolumeTable),
+	durRateTable(theDurRateTable),
 	konamiBaseAddress(0)
 {
 	bLoadTickByTick = true;
@@ -191,12 +193,12 @@ void NinSnesSeq::LoadEventMap()
 	};
 
 	const uint8_t NINSNES_VOL_TABLE_STANDARD[16] = {
-		0x4c, 0x59, 0x6d, 0x7f, 0x87, 0x8e, 0x98, 0xa0,
-		0xa8, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
+		0x19, 0x33, 0x4c, 0x66, 0x72, 0x7f, 0x8c, 0x99,
+		0xa5, 0xb2, 0xbf, 0xcc, 0xd8, 0xe5, 0xf2, 0xfc,
 	};
 
 	const uint8_t NINSNES_DUR_TABLE_STANDARD[8] = {
-		0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xf2, 0xfc,
+		0x33, 0x66, 0x7f, 0x99, 0xb2, 0xcc, 0xe5, 0xfc,
 	};
 
 	const uint8_t NINSNES_PAN_TABLE_STANDARD[21] = {
@@ -823,9 +825,10 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_NOTE:
 	{
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
-		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
-		duration = (duration > 2) ? duration - 2 : 1;
+		uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
+		duration = min(max(duration, 1), shared->spcNoteDuration - 2);
 
+		// Note: Konami engine can have volume=0
 		AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Note");
 		AddTime(shared->spcNoteDuration);
 		break;
@@ -833,8 +836,8 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_TIE:
 	{
-		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
-		duration = (duration > 2) ? duration - 2 : 1;
+		uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
+		duration = min(max(duration, 1), shared->spcNoteDuration - 2);
 		desc << L"Duration: " << (int)duration;
 		MakePrevDurNoteEnd(GetTime() + duration);
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE);
@@ -848,9 +851,11 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_PERCUSSION_NOTE:
 	{
-		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
-		uint8_t duration = max((shared->spcNoteDuration * shared->spcNoteDurRate) >> 8, 1);
-		duration = (duration > 2) ? duration - 2 : 1;
+		uint8_t noteNumber = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN; // + percussion base
+		uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
+		duration = min(max(duration, 1), shared->spcNoteDuration - 2);
+
+		// Note: Konami engine can have volume=0
 		AddPercNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Percussion Note");
 		AddTime(shared->spcNoteDuration);
 		break;
