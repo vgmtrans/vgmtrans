@@ -957,12 +957,12 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	}
 
 	// GUESS SONG COUNT
-	// Test Case: Star Fox, Kirby Super Star
+	// Test Case: Star Fox, Kirby Super Star, Earthbound
 	// Note that the result sometimes exceeds the real length
 	uint8_t songListLength = 1;
 	uint16_t addrSectionListCutoff = 0xffff;
 	// skip index 0, it's not a part of table in most games
-	for (int8_t songIndex = 1; songIndex <= 0x7f; songIndex++) {
+	for (uint8_t songIndex = 1; songIndex <= 0x7f; songIndex++) {
 		UINT addrSectionListPtr = addrSongList + songIndex * 2;
 		if (addrSectionListPtr >= addrSectionListCutoff) {
 			break;
@@ -985,7 +985,8 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		uint16_t addrFirstSection = file->GetShort(firstSectionPtr);
 		if (addrFirstSection < 0x0100) {
 			// usually it does not appear
-			break;
+			// probably it's broken
+			continue;
 		}
 
 		if (version == NINSNES_KONAMI) {
@@ -999,13 +1000,18 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		for (uint8_t trackIndex = 0; trackIndex < 8; trackIndex++) {
 			uint16_t addrTrackStart = file->GetShort(addrFirstSection + trackIndex * 2);
 			if (addrTrackStart != 0) {
-				if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
+				if (addrTrackStart == 0xffff) {
 					hasIllegalTrack = true;
 					break;
 				}
 
 				if (version == NINSNES_KONAMI) {
 					addrTrackStart += konamiBaseAddress;
+				}
+
+				if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
+					hasIllegalTrack = true;
+					break;
 				}
 			}
 		}
@@ -1017,19 +1023,18 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	}
 
 	// GUESS CURRENT SONG NUMBER
-	int8_t guessedSongIndex = -1;
+	uint8_t guessedSongIndex = 0xff;
 
 	// scan for a song that contains the current section
-	// (note that the section pointer points to the "next" section actually)
-	uint16_t addrCurrentSection = file->GetShort(addrSectionPtr) - 2;
+	// (note that the section pointer points to the "next" section actually, in most cases)
+	uint16_t addrCurrentSection = file->GetShort(addrSectionPtr);
 	if (addrCurrentSection >= 0x0100 && addrCurrentSection < 0xfff0) {
-		int8_t songIndexCandidate = -1;
-		uint16_t bestSectionDistance = 0xffff;
+		uint8_t songIndexCandidate = 0xff;
 
-		for (int8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
+		for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
 			UINT addrSectionListPtr = addrSongList + songIndex * 2;
-			if (addrSectionListPtr + 2 > 0x10000) {
-				break;
+			if (addrSectionListPtr == 0 || addrSectionListPtr == 0xffff) {
+				continue;
 			}
 
 			uint16_t firstSectionPtr = file->GetShort(addrSectionListPtr);
@@ -1042,18 +1047,15 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 			uint16_t curAddress = firstSectionPtr;
 			if ((addrCurrentSection % 2) == (curAddress % 2)) {
-				while (curAddress >= 0x0100 && curAddress < 0xfff0) {
+				uint8_t sectionCount = 0; // prevent overrun of illegal data
+				while (curAddress >= 0x0100 && curAddress < 0xfff0 && sectionCount < 32) {
 					uint16_t addrSection = file->GetShort(curAddress);
 					if (version == NINSNES_KONAMI) {
 						addrSection += konamiBaseAddress;
 					}
 
 					if (curAddress == addrCurrentSection) {
-						uint16_t sectionDistance = addrCurrentSection - firstSectionPtr;
-						if (sectionDistance < bestSectionDistance) {
-							songIndexCandidate = songIndex;
-							bestSectionDistance = sectionDistance;
-						}
+						songIndexCandidate = songIndex;
 						break;
 					}
 
@@ -1063,40 +1065,22 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 					}
 
 					curAddress += 2;
+					sectionCount++;
 				}
 
-				if (bestSectionDistance == 0) {
+				if (songIndexCandidate != 0xff) {
 					break;
 				}
 			}
 		}
 
-		guessedSongIndex = songIndexCandidate;
-	}
-
-	// acquire song index from APU port
-	if (guessedSongIndex == -1) {
-		int8_t songIndexCandidate;
-
-		switch (version)
-		{
-		case NINSNES_EARLIER:
-			songIndexCandidate = file->GetByte(0xf6);
-			break;
-
-		case NINSNES_STANDARD:
-			songIndexCandidate = file->GetByte(0xf4);
-			break;
-		}
-
-		if (songIndexCandidate >= 0 && songIndexCandidate <= 0x7f) {
+		if (songIndexCandidate != 0xff) {
 			guessedSongIndex = songIndexCandidate;
 		}
 	}
 
-	// use first song if no hints available
-	if (guessedSongIndex == -1) {
-		guessedSongIndex = 1;
+	if (guessedSongIndex == 0xff) {
+		return;
 	}
 	
 	// load the song

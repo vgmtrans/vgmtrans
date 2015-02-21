@@ -53,6 +53,37 @@ bool NinSnesSeq::GetHeaderInfo()
 	SetPPQN(SEQ_PPQN);
 	nNumTracks = MAX_TRACKS;
 
+	if (dwStartOffset + 2 > 0x10000) {
+		return false;
+	}
+
+	// validate first section
+	uint16_t firstSectionPtr = dwStartOffset;
+	uint16_t addrFirstSection = GetShort(firstSectionPtr);
+	if (addrFirstSection + 16 > 0x10000) {
+		return false;
+	}
+
+	if (addrFirstSection >= 0x0100) {
+		addrFirstSection = ConvertToAPUAddress(addrFirstSection);
+
+		uint8_t numActiveTracks = 0;
+		for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+			uint16_t addrTrackStart = GetShort(addrFirstSection + trackIndex * 2);
+			if (addrTrackStart != 0) {
+				addrTrackStart = ConvertToAPUAddress(addrTrackStart);
+
+				if (addrTrackStart < addrFirstSection) {
+					return false;
+				}
+				numActiveTracks++;
+			}
+		}
+		if (numActiveTracks == 0) {
+			return false;
+		}
+	}
+
 	// events will be added later, see ReadEvent
 	header = AddHeader(dwStartOffset, 0);
 	return true;
@@ -593,6 +624,7 @@ bool NinSnesSection::GetTrackPointers()
 	uint32_t curOffset = dwOffset;
 
 	VGMHeader* header = AddHeader(curOffset, 16);
+	uint8_t numActiveTracks = 0;
 	for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
 		if (curOffset + 1 >= 0x10000) {
 			return false;
@@ -618,6 +650,8 @@ bool NinSnesSection::GetTrackPointers()
 			std::wstringstream trackName;
 			trackName << L"Track " << (trackIndex + 1);
 			track = new NinSnesTrack(this, startAddress, 0, trackName.str());
+
+			numActiveTracks++;
 		}
 		else {
 			// add an inactive track
@@ -632,6 +666,10 @@ bool NinSnesSection::GetTrackPointers()
 
 		header->AddSimpleItem(curOffset, 2, name);
 		curOffset += 2;
+	}
+
+	if (numActiveTracks == 0) {
+		return false;
 	}
 
 	return true;
