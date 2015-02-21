@@ -935,9 +935,11 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_PROGCHANGE:
 	{
 		uint8_t newProgNum = GetByte(curOffset++);
-		if (newProgNum >= 0x80) {
-			// standard engine does nothing special, but Star Fox does
-			newProgNum = (newProgNum - parentSeq->STATUS_PERCUSSION_NOTE_MIN) + parentSeq->spcPercussionBase;
+		if (parentSeq->version != NINSNES_HUMAN) {
+			if (newProgNum >= 0x80) {
+				// standard engine does nothing special, but Star Fox does
+				newProgNum = (newProgNum - parentSeq->STATUS_PERCUSSION_NOTE_MIN) + parentSeq->spcPercussionBase;
+			}
 		}
 		AddProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true);
 		break;
