@@ -42,6 +42,7 @@ void SeqTrack::ResetVars()
 	deltaTime = 0;
 	vol = 100;
 	expression = 127;
+	mastVol = 127;
 	prevPan = 64;
 	prevReverb = 40;
 	channelGroup = 0;
@@ -725,14 +726,23 @@ void SeqTrack::AddMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, co
 
 void SeqTrack::AddMasterVolNoItem(uint8_t newVol)
 {
-	if (readMode != READMODE_CONVERT_TO_MIDI)
-		return;
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+	{
+		uint8_t finalVol = newVol;
+		if (parentSeq->bUseLinearAmplitudeScale)
+			finalVol = Convert7bitPercentVolValToStdMidiVal(newVol);
 
-	uint8_t finalVol = newVol;
-	if (parentSeq->bUseLinearAmplitudeScale)
-		finalVol = Convert7bitPercentVolValToStdMidiVal(newVol);
+		pMidiTrack->AddMasterVol(channel, finalVol);
+	}
+	mastVol = newVol;
+}
 
-	pMidiTrack->AddMasterVol(channel, finalVol);
+void SeqTrack::AddMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::wstring& sEventName)
+{
+	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
+		AddEvent(new MastVolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
+	else if (readMode == READMODE_CONVERT_TO_MIDI)
+		AddControllerSlide(offset, length, dur, mastVol, targVol, &MidiTrack::InsertMasterVol);
 }
 
 void SeqTrack::AddPan(uint32_t offset, uint32_t length, uint8_t pan, const std::wstring& sEventName)

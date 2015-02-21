@@ -1033,7 +1033,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t newVol = GetByte(curOffset++);
 
 		desc << L"Length: " << (int)fadeLength << L"  Volume: " << (int)newVol;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Master Volume Fade", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
+		AddMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
 		break;
 	}
 

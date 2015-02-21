@@ -86,8 +86,7 @@ public:
 	void InsertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const std::wstring& sEventName = L"Expression");
 	void AddMasterVol(uint32_t offset, uint32_t length, uint8_t vol, const std::wstring& sEventName = L"Master Volume");
 	void AddMasterVolNoItem(uint8_t newVol);
-	//void AddMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::wstring& sEventName = "Master Volume Slide");
-	//void InsertMastVol(uint32_t offset, uint32_t length, uint8_t vol, uint32_t absTime, const std::wstring& sEventName = "Master Volume");
+	void AddMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::wstring& sEventName = L"Master Volume Slide");
 
 	void AddPan(uint32_t offset, uint32_t length, uint8_t pan, const std::wstring& sEventName = L"Pan");
 	void AddPanNoItem(uint8_t pan);
@@ -172,7 +171,7 @@ public:
 	uint8_t octave;
 	uint8_t vol;
 	uint8_t expression;
-	//uint8_t mastVol;
+	uint8_t mastVol;
 	uint8_t prevPan;
 	uint8_t prevReverb;
 	int8_t transpose;
