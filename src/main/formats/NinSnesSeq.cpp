@@ -1180,9 +1180,11 @@ bool NinSnesTrack::ReadEvent(void)
 		for (int channelNo = MAX_TRACKS - 1; channelNo >= 0; channelNo--) {
 			if ((spcEON & (1 << channelNo)) != 0) {
 				desc << (int)channelNo;
+				parentSeq->aTracks[channelNo]->AddReverbNoItem(40);
 			}
 			else {
 				desc << L"-";
+				parentSeq->aTracks[channelNo]->AddReverbNoItem(0);
 			}
 		}
 
