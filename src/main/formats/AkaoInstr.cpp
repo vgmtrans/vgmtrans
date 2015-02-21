@@ -309,7 +309,9 @@ bool AkaoSampColl::GetSampleInfo()
 			//CAKSSSamp* newSample = new CAKSSSamp(this);
 			//aSamps.Add(newSample);
 			//newSample->SampVGMItem.dwOffset = j;
-			PSXSamp* samp =  new PSXSamp(this, j, 0, j, 0, 1, 16, 44100, L"Sample");
+			wostringstream name;
+			name << L"Sample " << samples.size();
+			PSXSamp* samp = new PSXSamp(this, j, 0, j, 0, 1, 16, 44100, name.str());
 		
 			//samp->SetLoopStatus(bLoops);
 			//samp->SetLoopOffset(loopOff);
