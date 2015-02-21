@@ -963,7 +963,10 @@ bool NinSnesTrack::ReadEvent(void)
 		GetVolumeBalance(panIndex << 8, volumeLeft, volumeRight);
 
 		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
-		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
+		double volumeScale;
+		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan, &volumeScale);
+		volumeScale /= volumeLeft + volumeRight;
+		volumeScale = min(max(volumeScale, 0.0), 1.0);
 
 		int8_t midiPan;
 		if (midiScalePan == 0.0) {
@@ -973,8 +976,8 @@ bool NinSnesTrack::ReadEvent(void)
 			midiPan = 1 + roundi(midiScalePan * 126.0);
 		}
 
-		// TODO: apply volume scale
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
+		AddExpressionNoItem(roundi(sqrt(volumeScale) * 127.0));
 		break;
 	}
 
@@ -999,6 +1002,7 @@ bool NinSnesTrack::ReadEvent(void)
 		}
 
 		// TODO: fade in real curve
+		// TODO: apply volume scale
 		AddPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);
 		break;
 	}
