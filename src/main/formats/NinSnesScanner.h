@@ -45,6 +45,7 @@ private:
 	static BytePattern ptnRD1VCmd_FA_FE;
 	static BytePattern ptnRD2VCmdInstrADSR;
 	static BytePattern ptnIntelliVCmdFA;
+	static BytePattern ptnInstrVCmdGD3;
 	static BytePattern ptnLoadInstrTableAddressSOS;
 	static BytePattern ptnLoadInstrTableAddressCTOW;
 	static BytePattern ptnLoadInstrTableAddressYSFR;

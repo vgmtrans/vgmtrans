@@ -20,6 +20,9 @@ public:
 
 	NinSnesVersion version;
 
+	uint16_t konamiTuningTableAddress;
+	uint8_t konamiTuningTableSize;
+
 protected:
 	uint32_t spcDirAddr;
 	std::vector<uint8_t> usedSRCNs;
@@ -43,6 +46,9 @@ public:
 
 	NinSnesVersion version;
 
+	uint16_t konamiTuningTableAddress;
+	uint8_t konamiTuningTableSize;
+
 protected:
 	uint32_t spcDirAddr;
 };
@@ -55,7 +61,7 @@ class NinSnesRgn
 	: public VGMRgn
 {
 public:
-	NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset);
+	NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset, uint16_t konamiTuningTableAddress = 0, uint8_t konamiTuningTableSize = 0);
 	virtual ~NinSnesRgn(void);
 
 	virtual bool LoadRgn();

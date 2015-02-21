@@ -501,6 +501,36 @@ BytePattern NinSnesScanner::ptnIntelliVCmdFA(
 	,
 	23);
 
+//; Gradius 3 SPC
+//; vcmd e0 - instrument
+//0a9b: d5 11 02  mov   $0211+x,a
+//0a9e: fd        mov   y,a
+//0a9f: 30 15     bmi   $0ab6
+//; set sample
+//0aa1: 2d        push  a
+//0aa2: 4d        push  x
+//0aa3: 5d        mov   x,a
+//0aa4: f5 73 0a  mov   a,$0a73+x
+//0aa7: fd        mov   y,a
+//0aa8: f5 87 0a  mov   a,$0a87+x
+//0aab: ce        pop   x
+//0aac: d5 91 03  mov   $0391+x,a
+//0aaf: dd        mov   a,y
+//0ab0: d5 90 03  mov   $0390+x,a         ; save per-instrument tuning
+//0ab3: ae        pop   a
+BytePattern NinSnesScanner::ptnInstrVCmdGD3(
+	"\xd5\x11\x02\xfd\x30\x15\x2d\x4d"
+	"\x5d\xf5\x73\x0a\xfd\xf5\x87\x0a"
+	"\xce\xd5\x91\x03\xdd\xd5\x90\x03"
+	"\xae"
+	,
+	"x??xx?xx"
+	"xx??xx??"
+	"xx??xx??"
+	"x"
+	,
+	25);
+
 //; S.O.S. (Septentrion) SPC
 //0441: 8f 00 00  mov   $00,#$00
 //0444: 8f 3e 01  mov   $01,#$3e
@@ -1157,7 +1187,26 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		}
 	}
 
+	uint16_t konamiTuningTableAddress = 0;
+	uint8_t konamiTuningTableSize = 0;
+	if (version == NINSNES_KONAMI) {
+		UINT ofsInstrVCmd;
+		if (file->SearchBytePattern(ptnInstrVCmdGD3, ofsInstrVCmd)) {
+			uint16_t konamiAddrTuningTableLow = file->GetShort(ofsInstrVCmd + 10);
+			uint16_t konamiAddrTuningTableHigh = file->GetShort(ofsInstrVCmd + 14);
+
+			if (konamiAddrTuningTableHigh > konamiAddrTuningTableLow &&
+				konamiAddrTuningTableHigh - konamiAddrTuningTableLow <= 0x7f)
+			{
+				konamiTuningTableAddress = konamiAddrTuningTableLow;
+				konamiTuningTableSize = konamiAddrTuningTableHigh - konamiAddrTuningTableLow;
+			}
+		}
+	}
+
 	NinSnesInstrSet * newInstrSet = new NinSnesInstrSet(file, version, addrInstrTable, spcDirAddr);
+	newInstrSet->konamiTuningTableAddress = konamiTuningTableAddress;
+	newInstrSet->konamiTuningTableSize = konamiTuningTableSize;
 	if (!newInstrSet->LoadVGMFile()) {
 		delete newInstrSet;
 		return;

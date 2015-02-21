@@ -10,7 +10,9 @@
 
 NinSnesInstrSet::NinSnesInstrSet(RawFile* file, NinSnesVersion ver, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name) :
 	VGMInstrSet(NinSnesFormat::name, file, offset, 0, name), version(ver),
-	spcDirAddr(spcDirAddr)
+	spcDirAddr(spcDirAddr),
+	konamiTuningTableAddress(0),
+	konamiTuningTableSize(0)
 {
 }
 
@@ -87,6 +89,8 @@ bool NinSnesInstrSet::GetInstrPointers()
 		std::wostringstream instrName;
 		instrName << L"Instrument " << instr;
 		NinSnesInstr * newInstr = new NinSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
+		newInstr->konamiTuningTableAddress = konamiTuningTableAddress;
+		newInstr->konamiTuningTableSize = konamiTuningTableSize;
 		aInstrs.push_back(newInstr);
 	}
 	if (aInstrs.size() == 0)
@@ -111,7 +115,9 @@ bool NinSnesInstrSet::GetInstrPointers()
 
 NinSnesInstr::NinSnesInstr(VGMInstrSet* instrSet, NinSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name) :
 	VGMInstr(instrSet, offset, NinSnesInstr::ExpectedSize(ver), theBank, theInstrNum, name), version(ver),
-	spcDirAddr(spcDirAddr)
+	spcDirAddr(spcDirAddr),
+	konamiTuningTableAddress(0),
+	konamiTuningTableSize(0)
 {
 }
 
@@ -130,7 +136,7 @@ bool NinSnesInstr::LoadInstr()
 
 	uint16_t addrSampStart = GetShort(offDirEnt);
 
-	NinSnesRgn * rgn = new NinSnesRgn(this, version, dwOffset);
+	NinSnesRgn * rgn = new NinSnesRgn(this, version, dwOffset, konamiTuningTableAddress, konamiTuningTableSize);
 	rgn->sampOffset = addrSampStart - spcDirAddr;
 	aRgns.push_back(rgn);
 
@@ -196,7 +202,7 @@ uint32_t NinSnesInstr::ExpectedSize(NinSnesVersion version)
 // NinSnesRgn
 // ***********
 
-NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset) :
+NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset, uint16_t konamiTuningTableAddress, uint8_t konamiTuningTableSize) :
 	VGMRgn(instr, offset, NinSnesInstr::ExpectedSize(ver)), version(ver)
 {
 	uint8_t srcn = GetByte(offset);
@@ -236,9 +242,28 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset)
 		AddUnityKey(96 - (int)(coarse_tuning), offset + 4, 1);
 		AddFineTune((int16_t)(fine_tuning * 100.0), offset + 4, 1);
 	}
-	else if (version == NINSNES_KONAMI) {
-		AddUnityKey(120 - (int)(coarse_tuning), offset + 4, 1);
-		AddFineTune((int16_t)(fine_tuning * 100.0), offset + 5, 1);
+	else if (version == NINSNES_KONAMI && konamiTuningTableAddress != 0) {
+		uint16_t addrTuningTableCoarse = konamiTuningTableAddress;
+		uint16_t addrTuningTableFine = konamiTuningTableAddress + konamiTuningTableSize;
+
+		int8_t coarse_tuning;
+		uint8_t fine_tuning;
+		if (srcn < konamiTuningTableSize) {
+			coarse_tuning = GetByte(addrTuningTableCoarse + srcn);
+			fine_tuning = GetByte(addrTuningTableFine + srcn);
+		}
+		else {
+			coarse_tuning = 0;
+			fine_tuning = 0;
+		}
+
+		double fine_tune_real = fine_tuning / 256.0;
+		fine_tune_real += log(4045.0 / 4096.0) / log(2) * 12; // -21.691 cents
+
+		unityKey = 71 - coarse_tuning;
+		fineTune = (int16_t)(fine_tune_real * 100.0);
+
+		AddSimpleItem(offset + 4, 2, L"Tuning (Unused)");
 	}
 	else if (version == NINSNES_INTELLI_FE4) {
 		AddUnityKey(108 - (int)(coarse_tuning), offset + 4, 1);
