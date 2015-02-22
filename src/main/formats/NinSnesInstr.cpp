@@ -217,7 +217,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset,
 		pitch_scale = GetShortBE(offset + 4);
 	}
 
-	const double pitch_fixer = 1.0238 * (32768.0 / 32000.0); // 1.0238 <- pitch table vs. equal temperament
+	const double pitch_fixer = 4286.0 / 4096.0;
 	double fine_tuning;
 	double coarse_tuning;
 	fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
