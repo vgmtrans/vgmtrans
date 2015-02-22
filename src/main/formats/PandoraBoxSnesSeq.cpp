@@ -581,7 +581,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void)
 
 		uint8_t ar = (arRate * 0x0f) / 127;
 		uint8_t dr = (drRate * 0x07) / 127;
-		uint8_t sl = (slRate * 0x07) / 127;
+		uint8_t sl = 7 - ((slRate * 0x07) / 127);
 		uint8_t sr = (srRate * 0x1f) / 127;
 		spcADSR = ((0x80 | (dr << 4) | ar) << 8) | ((sl << 5) | sr);
 
