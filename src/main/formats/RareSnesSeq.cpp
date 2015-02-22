@@ -710,8 +710,10 @@ bool RareSnesTrack::ReadEvent(void)
 
 		case EVENT_MASTVOL:
 		{
+			// TODO: At least it's not Master Volume in Donkey Kong Country 2
 			uint8_t newVol = GetByte(curOffset++);
-			AddMasterVol(beginOffset, curOffset-beginOffset, newVol & 0x7f);
+			desc << L"Volume: " << newVol;
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Master Volume?", desc.str(), CLR_VOLUME, ICON_CONTROL);
 			break;
 		}
 
