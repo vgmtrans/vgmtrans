@@ -170,13 +170,13 @@
     <ResourceCompile />
     <Link>
       <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Manifest />
   </ItemDefinitionGroup>
@@ -202,13 +202,13 @@
     <ResourceCompile />
     <Link>
       <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Manifest />
   </ItemDefinitionGroup>
