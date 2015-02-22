@@ -630,7 +630,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				if (rgn->sustain_level == -1)
 					sustainLevAttenDb = 0.0;
 				else
-					sustainLevAttenDb = ConvertPercentAmplitudeToAttenDB(rgn->sustain_level);
+					sustainLevAttenDb = ConvertPercentAmplitudeToAttenDB_SF2(rgn->sustain_level);
 
 				SynthArt* newArt = newRgn->AddArt();
 				newArt->AddPan(rgn->pan);

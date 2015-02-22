@@ -142,8 +142,15 @@ double ConvertLogScaleValToAtten(double percent)
 }
 
 // Convert a percent of volume value to it's attenuation in decibels.
-//  ex: ConvertPercentVolToAttenDB(0.5) returns -(-6.02db) = half perceived loudness
+//  ex: ConvertPercentVolToAttenDB(0.5) returns -6.02db = half perceived loudness
 double ConvertPercentAmplitudeToAttenDB(double percent)
+{
+	return 20 * log10(percent);
+}
+
+// Convert a percent of volume value to it's attenuation in decibels.
+//  ex: ConvertPercentVolToAttenDB_SF2(0.5) returns -(-6.02db) = half perceived loudness
+double ConvertPercentAmplitudeToAttenDB_SF2(double percent)
 {
 	if (percent == 0)
 		return 100.0;		// assume 0 is -100.0db attenuation
