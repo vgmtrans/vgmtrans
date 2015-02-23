@@ -106,6 +106,8 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 
 	// TODO: fix "An American Tail: Fievel Goes West"
 
+	// TODO: guess song index (Super Bomberman 2 etc.)
+
 	// search song list and detect engine version
 	UINT ofsGetSeqTableAddr;
 	uint16_t addrEngineHeader;
