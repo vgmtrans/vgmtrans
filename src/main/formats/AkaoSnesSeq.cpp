@@ -425,7 +425,7 @@ void AkaoSnesSeq::LoadEventMap()
 			EventMap[0xf7] = EVENT_GOTO;
 			EventMap[0xf8] = EVENT_INC_CPU_SHARED_COUNTER;
 			EventMap[0xf9] = EVENT_ZERO_CPU_SHARED_COUNTER;
-			EventMap[0xfa] = EVENT_MUTE;
+			EventMap[0xfa] = EVENT_IGNORE_MASTER_VOLUME_BROKEN;
 			EventMap[0xfb] = EVENT_END; // duplicated
 			EventMap[0xfc] = EVENT_END; // duplicated
 			EventMap[0xfd] = EVENT_END; // duplicated
@@ -1330,15 +1330,17 @@ bool AkaoSnesTrack::ReadEvent(void)
 		break;
 	}
 
-	case EVENT_MUTE:
+	case EVENT_IGNORE_MASTER_VOLUME_BROKEN:
 	{
-		AddUnknown(beginOffset, curOffset - beginOffset, L"Mute Channel", desc.str().c_str());
+		// multiply (1 << channel) / 256.0 to channel volume, instead of applying master volume
+		// apparently, it is caused by wrong destination address of conditional branch
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Ignore Master Volume (Broken)", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
 		break;
 	}
 
 	case EVENT_IGNORE_MASTER_VOLUME:
 	{
-		AddUnknown(beginOffset, curOffset - beginOffset, L"Ignore Master Volume", desc.str().c_str());
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Ignore Master Volume", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
 		break;
 	}
 
