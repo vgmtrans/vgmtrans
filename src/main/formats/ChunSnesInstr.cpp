@@ -163,7 +163,7 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr* instr, ChunSnesVersion ver, uint8_t srcn
 	uint8_t gain = GetByte(dwOffset + 4);
 
 	sampNum = srcn;
-	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
+	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
 ChunSnesRgn::~ChunSnesRgn()

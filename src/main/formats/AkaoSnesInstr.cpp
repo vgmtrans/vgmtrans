@@ -190,7 +190,7 @@ AkaoSnesRgn::AkaoSnesRgn(AkaoSnesInstr* instr, AkaoSnesVersion ver, uint8_t srcn
 	sampNum = srcn;
 	unityKey = 69 - (int)(coarse_tuning);
 	fineTune = (int16_t)(fine_tuning * 100.0);
-	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
+	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0xa0);
 
 	SetGuessedLength();
 }

@@ -119,7 +119,8 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr* instr, CompileSnesVersion ver, 
 
 	uint8_t adsr1 = 0xff;
 	uint8_t adsr2 = 0xe0;
-	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
+	uint8_t gain = 0;
+	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
 CompileSnesRgn::~CompileSnesRgn()

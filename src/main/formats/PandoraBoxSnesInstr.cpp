@@ -146,7 +146,7 @@ PandoraBoxSnesRgn::PandoraBoxSnesRgn(PandoraBoxSnesInstr* instr, PandoraBoxSnesV
 	sampNum = srcn;
 	unityKey = 45; // o3a = $1000
 	fineTune = 0;
-	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
+	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0x7f);
 }
 
 PandoraBoxSnesRgn::~PandoraBoxSnesRgn()
