@@ -32,7 +32,8 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   initialPitchBendRangeSemiTones(2), //GM standard.  Means +/- 2 semitones (4 total range)
   initialPitchBendRangeCents(0),
   nNumTracks(0),
-  time(0)
+  time(0),
+  readMode(READMODE_ADD_TO_UI)
 {
 	AddContainer<SeqTrack>(aTracks);
 }
@@ -88,6 +89,8 @@ MidiTrack* VGMSeq::GetFirstMidiTrack()
 //Load() - Function to load all the sequence data into the class
 bool VGMSeq::LoadMain()
 {
+	readMode = READMODE_ADD_TO_UI;
+
 	if (!GetHeaderInfo())
 		return false;
 	if (!GetTrackPointers())
@@ -96,7 +99,7 @@ bool VGMSeq::LoadMain()
 	if (nNumTracks == 0)
 		return false;
 
-	if (!LoadTracks(READMODE_ADD_TO_UI))
+	if (!LoadTracks(readMode))
 		return false;
 
 	return true;

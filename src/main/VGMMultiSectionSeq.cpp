@@ -29,10 +29,12 @@ void VGMMultiSectionSeq::ResetVars()
 
 bool VGMMultiSectionSeq::LoadMain()
 {
+	readMode = READMODE_ADD_TO_UI;
+
 	if (!GetHeaderInfo())
 		return false;
 
-	if (!LoadTracks(READMODE_ADD_TO_UI))
+	if (!LoadTracks(readMode))
 		return false;
 
 	return true;
