@@ -185,7 +185,7 @@ BytePattern KonamiSnesScanner::ptnBranchForVcmd6xMDR2(
 	"x?x??xxx"
 	"?x??xxx?"
 	,
-	15);
+	16);
 
 //; Contra 3 SPC
 //0e4c: e4 08     mov   a,$08

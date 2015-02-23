@@ -24,7 +24,7 @@ BytePattern::BytePattern(const char *pattern, size_t length):
 	{
 		if (pattern != NULL)
 		{
-			ptn_str = new char [length];
+			ptn_str = new char[length];
 			memcpy(ptn_str, pattern, length);
 		}
 	}
@@ -44,7 +44,9 @@ BytePattern::BytePattern(const char *pattern, const char *mask, size_t length):
 
 			if (mask != NULL)
 			{
-				ptn_mask = new char [length];
+				assert(strlen(mask) == length);
+
+				ptn_mask = new char[length];
 				memcpy(ptn_mask, mask, length);
 			}
 		}
@@ -64,7 +66,7 @@ BytePattern::BytePattern(const BytePattern& obj):
 
 	if (obj.ptn_mask != NULL)
 	{
-		ptn_mask = new char [ptn_len];
+		ptn_mask = new char[ptn_len];
 		memcpy(ptn_mask, obj.ptn_mask, ptn_len);
 	}
 }

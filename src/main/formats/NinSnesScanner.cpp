@@ -223,13 +223,13 @@ BytePattern NinSnesScanner::ptnIncSectionPtrGD3(
 BytePattern NinSnesScanner::ptnIncSectionPtrYSFR(
 	"\x8d\x00\xf7\x4c\xc4\x00\xc4\x4e"
 	"\x3a\x4c\xf7\x4c\xc4\x01\xc4\x4f"
-	"\x3a\x4c\x68\x00\x68\x00\xd0\x28"
+	"\x3a\x4c\x68\x00\xd0\x28"
 	,
 	"xxx?x?x?"
 	"x?x?x?x?"
 	"x?xxx?"
 	,
-	18);
+	22);
 
 //; Clock Tower SPC
 // 07cc: 80        setc
