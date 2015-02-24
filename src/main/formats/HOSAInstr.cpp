@@ -99,8 +99,9 @@ HOSAInstr::HOSAInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, ui
 //--------------------------------------------------------------
 bool HOSAInstr::LoadInstr()
 {
-
-//	HOSAInstrSet*	_parInstrSet	=	(HOSAInstrSet*)parInstrSet;
+	if (dwOffset + sizeof(InstrInfo) > vgmfile->GetEndOffset()) {
+		return false;
+	}
 
 	// Get the instr data
 	GetBytes(dwOffset, sizeof(InstrInfo), &instrinfo);
