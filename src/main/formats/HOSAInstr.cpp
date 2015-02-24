@@ -49,7 +49,7 @@ bool HOSAInstrSet::GetHeaderInfo()
 	wdsHeader->AddSimpleItem(dwOffset+8,sizeof(uint32_t),L"Number of Instruments");
 
 	//波形objectの生成
-	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800);
+//	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800); // moved to HOSAScanner
 //	sampColl->Load();				//VGMInstrSet::Load()関数内でやっている。
 //	sampColl->UseInstrSet(this);	//"WD.cpp"では、同様の事をやっている。
 

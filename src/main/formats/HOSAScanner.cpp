@@ -43,8 +43,6 @@ void HOSAScanner::Scan(RawFile* file, void* info)
 		return;
 	}
 
-	sampcoll->UseInstrSet(instrset);
-
 	VGMColl* coll = new VGMColl(_T("HOSA Song"));
 	coll->UseSeq(seq);
 	coll->AddInstrSet(instrset);
