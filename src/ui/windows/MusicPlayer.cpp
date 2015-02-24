@@ -172,66 +172,34 @@ bool MusicPlayer::Init(HWND hWnd)
 
 void MusicPlayer::EnumPorts()
 {
-	INFOPORT Info;
-	DWORD dwNumOutPorts = COutPort.GetNumPorts();
-	//DWORD dwNumInPorts = CInPort.GetNumPorts();
-	//DWORD dwCountInPorts = 0;
-	BOOL bSelected = FALSE;
+	m_bSwSynth = FALSE;
 
-	// List all output ports
-	DWORD nPortCount;
-
-	for(nPortCount = 1; nPortCount<=dwNumOutPorts; nPortCount++)
-	{
-		COutPort.GetPortInfo(nPortCount,&Info);
-		//m_OutPortList.AddString(Info.szPortDescription);
-		//m_OutPortList.SetItemData(nPortCount - 1,Info.dwFlags);
-		if ((Info.dwFlags & DMUS_PC_DLS) && (Info.dwFlags & DMUS_PC_DLS2))
-		{
-			if (!bSelected) // Select the port
-			{	
-				//Info.dwMaxChannelGroups = 5;
-				COutPort.SetPortParams(Info.dwMaxVoices, Info.dwMaxAudioChannels, NUM_CHANNEL_GROUPS, Info.dwEffectFlags, 44100);
-				COutPort.ActivatePort(&Info);
-				bSelected = TRUE;
-			//	m_nOutPortSel = nPortCount - 1;
-			//	m_OutPortList.SetCurSel(m_nOutPortSel);
-				if ((Info.dwFlags & DMUS_PC_DLS) || (Info.dwFlags & DMUS_PC_DLS2))
-				{	
-					m_bSwSynth = TRUE; // It's working with a Sw. Synth.
-					PrepareSoftwareSynth();
-				}
-				else
-					m_bSwSynth = FALSE;
-			}
-		}
-				
-	}
-
-	bSelected = FALSE;
-
-	// List all input ports
-
-	//for(nPortCount = 1;nPortCount<=dwNumInPorts;nPortCount++)
-	//{
-	//	//CInPort.GetPortInfo(4,&Info);
-	//	CInPort.GetPortInfo(nPortCount,&Info);
-	//	if (Info.dwType != DMUS_PORT_KERNEL_MODE)
-	//	{
-	//		//m_InPortList.AddString(Info.szPortDescription);
-	//		//if (!bSelected) // Select the port
-	//		if (wcscmp(Info.szPortDescription,_T("EDIROL PCR-A 1 [Emulated]")) == 0)
-	//		{	
-	//			CInPort.ActivatePort(&Info);
-	//			bSelected = TRUE;
-	//			//m_nInPortSel = dwCountInPorts;
-	//			//m_InPortList.SetCurSel(m_nInPortSel);
-	//		}
-	//		dwCountInPorts++;
-	//	}
-	//}
+	COutPort.EnumPort(EnumPortsCallback, this);
 }	
 
+BOOL MusicPlayer::EnumPortsProc(LPINFOPORT lpInfoPort)
+{
+	if ((lpInfoPort->dwFlags & DMUS_PC_DLS) != 0 && (lpInfoPort->dwFlags & DMUS_PC_DLS2) != 0)
+	{
+		COutPort.SetPortParams(lpInfoPort->dwMaxVoices, lpInfoPort->dwMaxAudioChannels, NUM_CHANNEL_GROUPS, lpInfoPort->dwEffectFlags, 44100);
+		COutPort.ActivatePort(lpInfoPort);
+
+		m_bSwSynth = TRUE; // It's working with a Sw. Synth.
+		PrepareSoftwareSynth();
+
+		// finish port scan
+		return FALSE;
+	}
+
+	// process next port
+	return TRUE;
+}
+
+BOOL MusicPlayer::EnumPortsCallback(LPINFOPORT lpInfoPort, LPVOID lpUserParam)
+{
+	MusicPlayer* player = (MusicPlayer*)lpUserParam;
+	return player->EnumPortsProc(lpInfoPort);
+}
 
 void MusicPlayer::CloseDown()
 {
