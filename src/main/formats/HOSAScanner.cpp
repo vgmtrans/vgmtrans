@@ -43,7 +43,7 @@ void HOSAScanner::Scan(RawFile* file, void* info)
 		return;
 	}
 
-	VGMColl* coll = new VGMColl(_T("HOSA Song"));
+	VGMColl* coll = new VGMColl(*seq->GetName());
 	coll->UseSeq(seq);
 	coll->AddInstrSet(instrset);
 	coll->AddSampColl(sampcoll);
@@ -56,6 +56,8 @@ void HOSAScanner::Scan(RawFile* file, void* info)
 
 HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 {
+	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+
 	uint32_t nFileLength = file->size();
 	for (uint32_t i=0; i+4<nFileLength; i++)
 	{
@@ -73,7 +75,7 @@ HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 		if (firstTrkPtr >= file->GetShort(i+0x54) && firstTrkPtr != 0x54)
 			continue;
 
-		HOSASeq* seq = new HOSASeq(file, i);
+		HOSASeq* seq = new HOSASeq(file, i, name);
 		if (!seq->LoadVGMFile())
 		{
 			delete seq;

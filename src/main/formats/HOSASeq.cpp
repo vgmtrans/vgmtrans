@@ -11,8 +11,8 @@ DECLARE_FORMAT(HOSA);
 //==============================================================
 //		Constructor
 //==============================================================
-HOSASeq::HOSASeq(RawFile* file, uint32_t offset)
-:	VGMSeq(HOSAFormat::name, file, offset)
+HOSASeq::HOSASeq(RawFile* file, uint32_t offset, const std::wstring& name)
+	: VGMSeq(HOSAFormat::name, file, offset, 0, name)
 {
 	UseReverb();
 	UseLinearAmplitudeScale();
@@ -38,10 +38,6 @@ HOSASeq::~HOSASeq(void)
 //==============================================================
 bool HOSASeq::GetHeaderInfo(void)
 {
-
-	name = L"HOSA Seq";							//this object name
-
-
 //	About the unLength, if (unLength==0), 
 //	"VGMSeq::LoadMain()" will calculate the unLength after "SeqTrack::LoadTrack()".
 	nNumTracks		= GetByte(dwOffset+0x06);	//uint8_t (8bit)

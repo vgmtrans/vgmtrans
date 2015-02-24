@@ -10,7 +10,7 @@
 class HOSASeq : public VGMSeq
 {
 public:
-	HOSASeq(RawFile* file, uint32_t offset);
+	HOSASeq(RawFile* file, uint32_t offset, const std::wstring& name = L"HOSA Seq");
 	virtual ~HOSASeq(void);
 
 	virtual bool GetHeaderInfo(void);
