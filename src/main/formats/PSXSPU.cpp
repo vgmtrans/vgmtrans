@@ -190,7 +190,16 @@ PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format
 {
 	std::vector<PSXSampColl*>& sampColls = SearchForPSXADPCMs(file, format);
 	if (sampColls.size() != 0) {
-		return sampColls[0];
+		// pick up one of the SampColls
+		size_t bestSampleCount = 0;
+		PSXSampColl* bestSampColl = sampColls[0];
+		for (size_t i = 0; i < sampColls.size(); i++) {
+			if (sampColls[i]->samples.size() > bestSampleCount) {
+				bestSampleCount = sampColls[i]->samples.size();
+				bestSampColl = sampColls[i];
+			}
+		}
+		return bestSampColl;
 	}
 	else {
 		return NULL;
