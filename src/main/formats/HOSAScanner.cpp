@@ -80,7 +80,6 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 	size_t numSamples = sampcoll->samples.size();
 	if (numSamples < MIN_NUM_SAMPLES_COMPARE)
 	{
-		pRoot->RemoveVGMFile(sampcoll);
 		return NULL;
 	}
 
