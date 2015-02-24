@@ -532,11 +532,17 @@ SynthFile* VGMColl::CreateSynthFile()
 
 
 				// Determine the sampCollNum (index into our finalSampColls vector)
-				unsigned int sampCollNum;
+				unsigned int sampCollNum = finalSampColls.size();
 				for (uint32_t i=0; i < finalSampColls.size(); i++)
 				{
 					if (finalSampColls[i] == sampColl)
 						sampCollNum = i;
+				}
+				if (sampCollNum == finalSampColls.size()) {
+					wchar_t log[256];
+					wsprintf(log, L"SampColl does not exist.");
+					pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
+					return NULL;
 				}
 				//   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
 				//   in the final DLS file.
