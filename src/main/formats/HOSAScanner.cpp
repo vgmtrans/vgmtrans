@@ -17,25 +17,39 @@ HOSAScanner::~HOSAScanner(void)
 void HOSAScanner::Scan(RawFile* file, void* info)
 {
 	HOSASeq* seq = SearchForHOSASeq(file);
-	if (!seq)
-		return;
-	PSXSampColl* sampcoll = PSXSampColl::SearchForPSXADPCM(file, HOSAFormat::name);
-	if (!sampcoll)
-		return;
-	HOSAInstrSet* instrset = SearchForHOSAInstrSet(file, sampcoll);
-	if (!instrset)
-	{
-		pRoot->RemoveVGMFile(sampcoll);
+	if (seq == NULL) {
 		return;
 	}
+
+	std::vector<PSXSampColl*> sampcolls = PSXSampColl::SearchForPSXADPCMs(file, HOSAFormat::name);
+
+	PSXSampColl* sampcoll = NULL;
+	HOSAInstrSet* instrset = NULL;
+	for (size_t i = 0; i < sampcolls.size(); i++) {
+		instrset = SearchForHOSAInstrSet(file, sampcolls[i]);
+		if (instrset != NULL) {
+			sampcoll = sampcolls[i];
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < sampcolls.size(); i++) {
+		if (sampcolls[i] != sampcoll) {
+			pRoot->RemoveVGMFile(sampcolls[i]);
+		}
+	}
+
+	if (instrset == NULL) {
+		return;
+	}
+
 	sampcoll->UseInstrSet(instrset);
 
 	VGMColl* coll = new VGMColl(_T("HOSA Song"));
 	coll->UseSeq(seq);
 	coll->AddInstrSet(instrset);
 	coll->AddSampColl(sampcoll);
-	if (!coll->Load())
-	{
+	if (!coll->Load()) {
 		delete coll;
 	}
 
