@@ -246,6 +246,8 @@
     <ClCompile Include="main\formats\MoriSnesSeq.cpp" />
     <ClCompile Include="main\formats\NamcoSnesScanner.cpp" />
     <ClCompile Include="main\formats\NamcoSnesSeq.cpp" />
+    <ClCompile Include="main\formats\NeverlandSnesScanner.cpp" />
+    <ClCompile Include="main\formats\NeverlandSnesSeq.cpp" />
     <ClCompile Include="main\formats\NinSnesInstr.cpp" />
     <ClCompile Include="main\formats\PandoraBoxSnesInstr.cpp" />
     <ClCompile Include="main\formats\PandoraBoxSnesScanner.cpp" />
@@ -432,6 +434,9 @@
     <ClInclude Include="main\formats\NamcoSnesFormat.h" />
     <ClInclude Include="main\formats\NamcoSnesScanner.h" />
     <ClInclude Include="main\formats\NamcoSnesSeq.h" />
+    <ClInclude Include="main\formats\NeverlandSnesFormat.h" />
+    <ClInclude Include="main\formats\NeverlandSnesScanner.h" />
+    <ClInclude Include="main\formats\NeverlandSnesSeq.h" />
     <ClInclude Include="main\formats\NinSnesInstr.h" />
     <ClInclude Include="main\formats\PandoraBoxSnesFormat.h" />
     <ClInclude Include="main\formats\PandoraBoxSnesInstr.h" />
