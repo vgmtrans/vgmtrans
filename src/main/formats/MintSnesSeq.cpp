@@ -499,6 +499,10 @@ bool MintSnesTrack::ReadEvent(void)
 		spcCallStack[spcCallStackPtr++] = (curOffset >> 8) & 0xff;
 
 		curOffset = dest;
+
+		// TODO: update track address if necessary
+		// example: Lennus 2 - Staff Roll $3d47
+
 		break;
 	}
 
@@ -683,6 +687,8 @@ bool MintSnesTrack::ReadEvent(void)
 		break;
 	}
 
+	assert(curOffset >= dwOffset);
+
 	//wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
 	//OutputDebugString(ssTrace.str().c_str());
@@ -784,6 +790,13 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 			}
 
 			statusByte = GetByte(curOffset++);
+
+			// workaround: handle statusByte < 0x80 in some sequences (64 64 64 64 ...)
+			// example: Lennus 2 - Title ($74f5)
+			// example: Shin SD Sengokuden: Daishougun R - Dark Army Corps ($c9be)
+			if (statusByte < 0x80) {
+				statusByte = 0x80 | (statusByte & 0x1f);
+			}
 		}
 
 		MintSnesSeqEventType eventType = (MintSnesSeqEventType)0;
@@ -794,6 +807,44 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 
 		switch (eventType)
 		{
+		case EVENT_UNKNOWN0:
+		{
+			break;
+		}
+
+		case EVENT_UNKNOWN1:
+		{
+			curOffset++;
+			break;
+		}
+
+		case EVENT_UNKNOWN2:
+		{
+			curOffset += 2;
+			break;
+		}
+
+		case EVENT_UNKNOWN3:
+		{
+			curOffset += 3;
+			break;
+		}
+
+		case EVENT_UNKNOWN4:
+		{
+			curOffset += 4;
+			break;
+		}
+
+		case EVENT_NOTE:
+		case EVENT_NOTE_WITH_PARAM:
+		{
+			if (eventType == EVENT_NOTE_WITH_PARAM) {
+				curOffset++;
+			}
+			break;
+		}
+
 		case EVENT_PAN:
 		{
 			int8_t newPan = GetByte(curOffset++);

@@ -66,6 +66,11 @@ void MintSnesScanner::SearchForMintSnesFromARAM(RawFile* file)
 		return;
 	}
 
+	// TODO: detect engine version
+	version = MINTSNES_STANDARD;
+
+	// Example: Shien The Blade Chaser (Shien's Revenge)
+
 	// TODO: guess song index
 	int8_t guessedSongIndex = -1;
 	if (addrSongList + 2 <= 0x10000) {
