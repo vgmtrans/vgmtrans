@@ -1,18 +1,18 @@
 #include "stdafx.h"
-#include "MintSnesSeq.h"
-#include "MintSnesFormat.h"
+#include "MoriSnesSeq.h"
+#include "MoriSnesFormat.h"
 #include "ScaleConversion.h"
 
-DECLARE_FORMAT(MintSnes);
+DECLARE_FORMAT(MoriSnes);
 
 //  ***********
-//  MintSnesSeq
+//  MoriSnesSeq
 //  ***********
 #define MAX_TRACKS  10
 #define SEQ_PPQN    48
 
-MintSnesSeq::MintSnesSeq(RawFile* file, MintSnesVersion ver, uint32_t seqdataOffset, std::wstring newName)
-	: VGMSeq(MintSnesFormat::name, file, seqdataOffset, 0, newName),
+MoriSnesSeq::MoriSnesSeq(RawFile* file, MoriSnesVersion ver, uint32_t seqdataOffset, std::wstring newName)
+	: VGMSeq(MoriSnesFormat::name, file, seqdataOffset, 0, newName),
 	version(ver)
 {
 	bLoadTickByTick = true;
@@ -25,11 +25,11 @@ MintSnesSeq::MintSnesSeq(RawFile* file, MintSnesVersion ver, uint32_t seqdataOff
 	LoadEventMap();
 }
 
-MintSnesSeq::~MintSnesSeq(void)
+MoriSnesSeq::~MoriSnesSeq(void)
 {
 }
 
-void MintSnesSeq::ResetVars(void)
+void MoriSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
 
@@ -40,7 +40,7 @@ void MintSnesSeq::ResetVars(void)
 	InstrumentHints.clear();
 }
 
-bool MintSnesSeq::GetHeaderInfo(void)
+bool MoriSnesSeq::GetHeaderInfo(void)
 {
 	SetPPQN(SEQ_PPQN);
 
@@ -93,18 +93,18 @@ bool MintSnesSeq::GetHeaderInfo(void)
 	return true;
 }
 
-bool MintSnesSeq::GetTrackPointers(void)
+bool MoriSnesSeq::GetTrackPointers(void)
 {
 	for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
 		if (TrackStartAddress[trackIndex] != 0) {
-			MintSnesTrack* track = new MintSnesTrack(this, TrackStartAddress[trackIndex]);
+			MoriSnesTrack* track = new MoriSnesTrack(this, TrackStartAddress[trackIndex]);
 			aTracks.push_back(track);
 		}
 	}
 	return true;
 }
 
-void MintSnesSeq::LoadEventMap()
+void MoriSnesSeq::LoadEventMap()
 {
 	int statusByte;
 
@@ -161,7 +161,7 @@ void MintSnesSeq::LoadEventMap()
 	EventMap[0xe6] = EVENT_TIMEBASE;
 }
 
-double MintSnesSeq::GetTempoInBPM(uint8_t tempo, bool fastTempo)
+double MoriSnesSeq::GetTempoInBPM(uint8_t tempo, bool fastTempo)
 {
 	if (tempo != 0)
 	{
@@ -174,10 +174,10 @@ double MintSnesSeq::GetTempoInBPM(uint8_t tempo, bool fastTempo)
 }
 
 //  ***************
-//  MintSnesTrack
+//  MoriSnesTrack
 //  ***************
 
-MintSnesTrack::MintSnesTrack(MintSnesSeq* parentFile, long offset, long length)
+MoriSnesTrack::MoriSnesTrack(MoriSnesSeq* parentFile, long offset, long length)
 	: SeqTrack(parentFile, offset, length)
 {
 	ResetVars();
@@ -185,7 +185,7 @@ MintSnesTrack::MintSnesTrack(MintSnesSeq* parentFile, long offset, long length)
 	bWriteGenericEventAsTextEvent = false;
 }
 
-void MintSnesTrack::ResetVars(void)
+void MoriSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
 
@@ -201,9 +201,9 @@ void MintSnesTrack::ResetVars(void)
 }
 
 
-bool MintSnesTrack::ReadEvent(void)
+bool MoriSnesTrack::ReadEvent(void)
 {
-	MintSnesSeq* parentSeq = (MintSnesSeq*)this->parentSeq;
+	MoriSnesSeq* parentSeq = (MoriSnesSeq*)this->parentSeq;
 
 	uint32_t beginOffset = curOffset;
 	if (curOffset >= 0x10000) {
@@ -249,8 +249,8 @@ bool MintSnesTrack::ReadEvent(void)
 		statusByte = GetByte(curOffset++);
 	}
 
-	MintSnesSeqEventType eventType = (MintSnesSeqEventType)0;
-	std::map<uint8_t, MintSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+	MoriSnesSeqEventType eventType = (MoriSnesSeqEventType)0;
+	std::map<uint8_t, MoriSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
 	if (pEventType != parentSeq->EventMap.end()) {
 		eventType = pEventType->second;
 	}
@@ -488,7 +488,7 @@ bool MintSnesTrack::ReadEvent(void)
 		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
-		if (spcCallStackPtr + 2 > MINTSNES_CALLSTACK_SIZE) {
+		if (spcCallStackPtr + 2 > MORISNES_CALLSTACK_SIZE) {
 			// stack overflow
 			bContinue = false;
 			break;
@@ -527,7 +527,7 @@ bool MintSnesTrack::ReadEvent(void)
 		desc << L"Loop Count: " << (int)count;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
-		if (spcCallStackPtr + 3 > MINTSNES_CALLSTACK_SIZE) {
+		if (spcCallStackPtr + 3 > MORISNES_CALLSTACK_SIZE) {
 			// stack overflow
 			bContinue = false;
 			break;
@@ -682,7 +682,7 @@ bool MintSnesTrack::ReadEvent(void)
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
 		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
-		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"MintSnesSeq")));
+		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"MoriSnesSeq")));
 		bContinue = false;
 		break;
 	}
@@ -701,9 +701,9 @@ bool MintSnesTrack::ReadEvent(void)
 	return bContinue;
 }
 
-void MintSnesTrack::ParseInstrument(uint16_t instrAddress, uint8_t instrNum)
+void MoriSnesTrack::ParseInstrument(uint16_t instrAddress, uint8_t instrNum)
 {
-	MintSnesSeq* parentSeq = (MintSnesSeq*)this->parentSeq;
+	MoriSnesSeq* parentSeq = (MoriSnesSeq*)this->parentSeq;
 
 	uint16_t curOffset = instrAddress;
 
@@ -730,12 +730,12 @@ void MintSnesTrack::ParseInstrument(uint16_t instrAddress, uint8_t instrNum)
 	}
 }
 
-void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion, uint8_t percNoteKey)
+void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion, uint8_t percNoteKey)
 {
-	MintSnesSeq* parentSeq = (MintSnesSeq*)this->parentSeq;
+	MoriSnesSeq* parentSeq = (MoriSnesSeq*)this->parentSeq;
 	uint16_t instrAddress = parentSeq->InstrumentAddresses[instrNum];
 
-	MintSnesInstrHint* instrHint;
+	MoriSnesInstrHint* instrHint;
 	if (!percussion) {
 		instrHint = &parentSeq->InstrumentHints[instrAddress].instrHint;
 	}
@@ -751,7 +751,7 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 
 	uint8_t instrDeltaTime = 0;
 	uint8_t instrCallStackPtr = 0;
-	uint8_t instrCallStack[MINTSNES_CALLSTACK_SIZE];
+	uint8_t instrCallStack[MORISNES_CALLSTACK_SIZE];
 
 	while (bContinue) {
 		uint16_t beginOffset = curOffset;
@@ -799,8 +799,8 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 			}
 		}
 
-		MintSnesSeqEventType eventType = (MintSnesSeqEventType)0;
-		std::map<uint8_t, MintSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+		MoriSnesSeqEventType eventType = (MoriSnesSeqEventType)0;
+		std::map<uint8_t, MoriSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
 		if (pEventType != parentSeq->EventMap.end()) {
 			eventType = pEventType->second;
 		}
@@ -885,7 +885,7 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 			uint16_t dest = GetShort(curOffset); curOffset += 2;
 			dest += curOffset; // relative offset to address
 
-			if (instrCallStackPtr + 2 > MINTSNES_CALLSTACK_SIZE) {
+			if (instrCallStackPtr + 2 > MORISNES_CALLSTACK_SIZE) {
 				// stack overflow
 				bContinue = false;
 				break;
@@ -916,7 +916,7 @@ void MintSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 		{
 			uint8_t count = GetByte(curOffset++);
 
-			if (instrCallStackPtr + 3 > MINTSNES_CALLSTACK_SIZE) {
+			if (instrCallStackPtr + 3 > MORISNES_CALLSTACK_SIZE) {
 				// stack overflow
 				bContinue = false;
 				break;

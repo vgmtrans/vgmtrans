@@ -1,12 +1,12 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
-#include "MintSnesFormat.h"
-#include "MintSnesInstr.h"
+#include "MoriSnesFormat.h"
+#include "MoriSnesInstr.h"
 
-#define MINTSNES_CALLSTACK_SIZE 10
+#define MORISNES_CALLSTACK_SIZE 10
 
-enum MintSnesSeqEventType
+enum MoriSnesSeqEventType
 {
 	EVENT_UNKNOWN0 = 1, //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
 	EVENT_UNKNOWN1,
@@ -47,12 +47,12 @@ enum MintSnesSeqEventType
 	EVENT_TIMEBASE,
 };
 
-class MintSnesSeq
+class MoriSnesSeq
 	: public VGMSeq
 {
 public:
-	MintSnesSeq(RawFile* file, MintSnesVersion ver, uint32_t seqdataOffset, std::wstring newName = L"Mint SNES Seq");
-	virtual ~MintSnesSeq(void);
+	MoriSnesSeq(RawFile* file, MoriSnesVersion ver, uint32_t seqdataOffset, std::wstring newName = L"Mint SNES Seq");
+	virtual ~MoriSnesSeq(void);
 
 	virtual bool GetHeaderInfo(void);
 	virtual bool GetTrackPointers(void);
@@ -60,12 +60,12 @@ public:
 
 	double GetTempoInBPM(uint8_t tempo, bool fastTempo);
 
-	MintSnesVersion version;
-	std::map<uint8_t, MintSnesSeqEventType> EventMap;
+	MoriSnesVersion version;
+	std::map<uint8_t, MoriSnesSeqEventType> EventMap;
 
 	uint16_t TrackStartAddress[10];
 	std::vector<uint16_t> InstrumentAddresses;
-	std::map<uint16_t, MintSnesInstrHintDir> InstrumentHints;
+	std::map<uint16_t, MoriSnesInstrHintDir> InstrumentHints;
 
 	uint8_t spcTempo;
 	bool fastTempo;
@@ -74,11 +74,11 @@ private:
 	void LoadEventMap(void);
 };
 
-class MintSnesTrack
+class MoriSnesTrack
 	: public SeqTrack
 {
 public:
-	MintSnesTrack(MintSnesSeq* parentFile, long offset = 0, long length = 0);
+	MoriSnesTrack(MoriSnesSeq* parentFile, long offset = 0, long length = 0);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
 
@@ -96,6 +96,6 @@ private:
 	int8_t spcTranspose;
 	uint8_t spcTuning;
 
-	uint8_t spcCallStack[MINTSNES_CALLSTACK_SIZE]; // shared by multiple commands
+	uint8_t spcCallStack[MORISNES_CALLSTACK_SIZE]; // shared by multiple commands
 	uint8_t spcCallStackPtr;
 };

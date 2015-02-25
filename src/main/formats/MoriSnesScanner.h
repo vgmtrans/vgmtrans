@@ -2,23 +2,23 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum MintSnesVersion; // see MintSnesFormat.h
+enum MoriSnesVersion; // see MoriSnesFormat.h
 
-class MintSnesScanner :
+class MoriSnesScanner :
 	public VGMScanner
 {
 public:
-	MintSnesScanner(void)
+	MoriSnesScanner(void)
 	{
 		USE_EXTENSION(L"spc");
 	}
-	virtual ~MintSnesScanner(void)
+	virtual ~MoriSnesScanner(void)
 	{
 	}
 
 	virtual void Scan(RawFile* file, void* info = 0);
-	void SearchForMintSnesFromARAM(RawFile* file);
-	void SearchForMintSnesFromROM(RawFile* file);
+	void SearchForMoriSnesFromARAM(RawFile* file);
+	void SearchForMoriSnesFromROM(RawFile* file);
 
 private:
 	static BytePattern ptnLoadSeq;

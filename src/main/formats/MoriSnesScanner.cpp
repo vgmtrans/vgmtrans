@@ -1,6 +1,6 @@
 #include "stdafx.h"
-#include "MintSnesScanner.h"
-#include "MintSnesSeq.h"
+#include "MoriSnesScanner.h"
+#include "MoriSnesSeq.h"
 #include "SNESDSP.h"
 
 //; Gokinjo Boukentai SPC
@@ -16,7 +16,7 @@
 //0c4e: 68 ff     cmp   a,#$ff
 //0c50: d0 14     bne   $0c66
 //0c52: 6f        ret
-BytePattern MintSnesScanner::ptnLoadSeq(
+BytePattern MoriSnesScanner::ptnLoadSeq(
 	"\x1c\xfd\xf6\xfe\x11\xc4\x04\xf6"
 	"\xff\x11\xc4\x05\x8d\x00\xf7\x04"
 	"\x10\x05\x68\xff\xd0\x14\x6f"
@@ -30,30 +30,30 @@ BytePattern MintSnesScanner::ptnLoadSeq(
 //; Gokinjo Bouken Tai
 //02f1: 8f 11 f3  mov   $f3,#$11
 //02f4: 8f 6c f2  mov   $f2,#$6c
-BytePattern MintSnesScanner::ptnSetDIR(
+BytePattern MoriSnesScanner::ptnSetDIR(
 	"\x8f\x11\xf3\x8f\x6c\xf2"
 	,
 	"x?xxxx"
 	,
 	6);
 
-void MintSnesScanner::Scan(RawFile* file, void* info)
+void MoriSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
 	if (nFileLength == 0x10000)
 	{
-		SearchForMintSnesFromARAM(file);
+		SearchForMoriSnesFromARAM(file);
 	}
 	else
 	{
-		SearchForMintSnesFromROM(file);
+		SearchForMoriSnesFromROM(file);
 	}
 	return;
 }
 
-void MintSnesScanner::SearchForMintSnesFromARAM(RawFile* file)
+void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile* file)
 {
-	MintSnesVersion version = MINTSNES_NONE;
+	MoriSnesVersion version = MORISNES_NONE;
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// scan for song list table
@@ -67,7 +67,7 @@ void MintSnesScanner::SearchForMintSnesFromARAM(RawFile* file)
 	}
 
 	// TODO: detect engine version
-	version = MINTSNES_STANDARD;
+	version = MORISNES_STANDARD;
 
 	// Example: Shien The Blade Chaser (Shien's Revenge)
 
@@ -88,14 +88,14 @@ void MintSnesScanner::SearchForMintSnesFromARAM(RawFile* file)
 	if (addrSongHeaderPtr + 2 <= 0x10000) {
 		uint16_t addrSongHeader = file->GetShort(addrSongHeaderPtr);
 
-		MintSnesSeq* newSeq = new MintSnesSeq(file, version, addrSongHeader, name);
+		MoriSnesSeq* newSeq = new MoriSnesSeq(file, version, addrSongHeader, name);
 		if (!newSeq->LoadVGMFile()) {
 			delete newSeq;
 			return;
 		}
 
 		if (spcDirAddr != 0) {
-			MintSnesInstrSet * newInstrSet = new MintSnesInstrSet(file, version, spcDirAddr, newSeq->InstrumentAddresses, newSeq->InstrumentHints);
+			MoriSnesInstrSet * newInstrSet = new MoriSnesInstrSet(file, version, spcDirAddr, newSeq->InstrumentAddresses, newSeq->InstrumentHints);
 			if (!newInstrSet->LoadVGMFile())
 			{
 				delete newInstrSet;
@@ -105,6 +105,6 @@ void MintSnesScanner::SearchForMintSnesFromARAM(RawFile* file)
 	}
 }
 
-void MintSnesScanner::SearchForMintSnesFromROM(RawFile* file)
+void MoriSnesScanner::SearchForMoriSnesFromROM(RawFile* file)
 {
 }

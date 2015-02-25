@@ -1,31 +1,31 @@
 #include "stdafx.h"
-#include "MintSnesInstr.h"
+#include "MoriSnesInstr.h"
 #include "Format.h"
 #include "SNESDSP.h"
-#include "MintSnesFormat.h"
+#include "MoriSnesFormat.h"
 
 // ****************
-// MintSnesInstrSet
+// MoriSnesInstrSet
 // ****************
 
-MintSnesInstrSet::MintSnesInstrSet(RawFile* file, MintSnesVersion ver, uint32_t spcDirAddr, std::vector<uint16_t> instrumentAddresses, std::map<uint16_t, MintSnesInstrHintDir> instrumentHints, const std::wstring & name) :
-	VGMInstrSet(MintSnesFormat::name, file, 0, 0, name), version(ver),
+MoriSnesInstrSet::MoriSnesInstrSet(RawFile* file, MoriSnesVersion ver, uint32_t spcDirAddr, std::vector<uint16_t> instrumentAddresses, std::map<uint16_t, MoriSnesInstrHintDir> instrumentHints, const std::wstring & name) :
+	VGMInstrSet(MoriSnesFormat::name, file, 0, 0, name), version(ver),
 	spcDirAddr(spcDirAddr),
 	instrumentAddresses(instrumentAddresses),
 	instrumentHints(instrumentHints)
 {
 }
 
-MintSnesInstrSet::~MintSnesInstrSet()
+MoriSnesInstrSet::~MoriSnesInstrSet()
 {
 }
 
-bool MintSnesInstrSet::GetHeaderInfo()
+bool MoriSnesInstrSet::GetHeaderInfo()
 {
 	return true;
 }
 
-bool MintSnesInstrSet::GetInstrPointers()
+bool MoriSnesInstrSet::GetInstrPointers()
 {
 	usedSRCNs.clear();
 
@@ -42,7 +42,7 @@ bool MintSnesInstrSet::GetInstrPointers()
 		uint16_t instrStartAddress = instrAddress;
 		uint16_t instrEndAddress = instrAddress;
 		if (!instrumentHints[instrAddress].percussion) {
-			MintSnesInstrHint* instrHint = &instrumentHints[instrAddress].instrHint;
+			MoriSnesInstrHint* instrHint = &instrumentHints[instrAddress].instrHint;
 			if (instrHint->startAddress < instrStartAddress) {
 				instrStartAddress = instrHint->startAddress;
 			}
@@ -52,7 +52,7 @@ bool MintSnesInstrSet::GetInstrPointers()
 		}
 		else {
 			for (uint8_t percNoteKey = 0; percNoteKey < instrumentHints[instrAddress].percHints.size(); percNoteKey++) {
-				MintSnesInstrHint* instrHint = &instrumentHints[instrAddress].percHints[percNoteKey];
+				MoriSnesInstrHint* instrHint = &instrumentHints[instrAddress].percHints[percNoteKey];
 				if (instrHint->startAddress < instrStartAddress) {
 					instrStartAddress = instrHint->startAddress;
 				}
@@ -79,7 +79,7 @@ bool MintSnesInstrSet::GetInstrPointers()
 		uint16_t instrAddress = instrumentAddresses[instrNum];
 
 		if (!instrumentHints[instrAddress].percussion) {
-			MintSnesInstrHint* instrHint = &instrumentHints[instrAddress].instrHint;
+			MoriSnesInstrHint* instrHint = &instrumentHints[instrAddress].instrHint;
 
 			uint16_t rgnAddress = instrHint->rgnAddress;
 			if (rgnAddress == 0 || rgnAddress + 7 > 0x10000) {
@@ -95,7 +95,7 @@ bool MintSnesInstrSet::GetInstrPointers()
 		}
 		else {
 			for (uint8_t percNoteKey = 0; percNoteKey < instrumentHints[instrAddress].percHints.size(); percNoteKey++) {
-				MintSnesInstrHint* instrHint = &instrumentHints[instrAddress].percHints[percNoteKey];
+				MoriSnesInstrHint* instrHint = &instrumentHints[instrAddress].percHints[percNoteKey];
 
 				uint16_t rgnAddress = instrHint->rgnAddress;
 				if (rgnAddress == 0 || rgnAddress + 7 > 0x10000) {
@@ -113,7 +113,7 @@ bool MintSnesInstrSet::GetInstrPointers()
 
 		std::wostringstream instrName;
 		instrName << L"Instrument " << instrNum;
-		MintSnesInstr * newInstr = new MintSnesInstr(this, version, instrNum, spcDirAddr, instrumentHints[instrAddress], instrName.str());
+		MoriSnesInstr * newInstr = new MoriSnesInstr(this, version, instrNum, spcDirAddr, instrumentHints[instrAddress], instrName.str());
 		aInstrs.push_back(newInstr);
 	}
 
@@ -123,7 +123,7 @@ bool MintSnesInstrSet::GetInstrPointers()
 	}
 
 	std::sort(usedSRCNs.begin(), usedSRCNs.end());
-	SNESSampColl * newSampColl = new SNESSampColl(MintSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+	SNESSampColl * newSampColl = new SNESSampColl(MoriSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
 	if (!newSampColl->LoadVGMFile())
 	{
 		delete newSampColl;
@@ -134,26 +134,26 @@ bool MintSnesInstrSet::GetInstrPointers()
 }
 
 // *************
-// MintSnesInstr
+// MoriSnesInstr
 // *************
 
-MintSnesInstr::MintSnesInstr(VGMInstrSet* instrSet, MintSnesVersion ver, uint8_t instrNum, uint32_t spcDirAddr, const MintSnesInstrHintDir& instrHintDir, const std::wstring& name) :
+MoriSnesInstr::MoriSnesInstr(VGMInstrSet* instrSet, MoriSnesVersion ver, uint8_t instrNum, uint32_t spcDirAddr, const MoriSnesInstrHintDir& instrHintDir, const std::wstring& name) :
 	VGMInstr(instrSet, instrHintDir.startAddress, instrHintDir.size, 0, instrNum, name), version(ver),
 	spcDirAddr(spcDirAddr),
 	instrHintDir(instrHintDir)
 {
 }
 
-MintSnesInstr::~MintSnesInstr()
+MoriSnesInstr::~MoriSnesInstr()
 {
 }
 
-bool MintSnesInstr::LoadInstr()
+bool MoriSnesInstr::LoadInstr()
 {
 	AddSimpleItem(dwOffset, 1, L"Melody/Percussion");
 
 	if (!instrHintDir.percussion) {
-		MintSnesInstrHint* instrHint = &instrHintDir.instrHint;
+		MoriSnesInstrHint* instrHint = &instrHintDir.instrHint;
 		uint8_t srcn = GetByte(instrHint->rgnAddress);
 
 		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
@@ -164,13 +164,13 @@ bool MintSnesInstr::LoadInstr()
 		AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, L"Envelope Sequence");
 
 		uint16_t addrSampStart = GetShort(offDirEnt);
-		MintSnesRgn * rgn = new MintSnesRgn(this, version, spcDirAddr, *instrHint);
+		MoriSnesRgn * rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint);
 		rgn->sampOffset = addrSampStart - spcDirAddr;
 		aRgns.push_back(rgn);
 	}
 	else {
 		for (uint8_t percNoteKey = 0; percNoteKey < instrHintDir.percHints.size(); percNoteKey++) {
-			MintSnesInstrHint* instrHint = &instrHintDir.percHints[percNoteKey];
+			MoriSnesInstrHint* instrHint = &instrHintDir.percHints[percNoteKey];
 			uint8_t srcn = GetByte(instrHint->rgnAddress);
 
 			uint32_t offDirEnt = spcDirAddr + (srcn * 4);
@@ -187,7 +187,7 @@ bool MintSnesInstr::LoadInstr()
 			AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, seqName.str().c_str());
 
 			uint16_t addrSampStart = GetShort(offDirEnt);
-			MintSnesRgn * rgn = new MintSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);
+			MoriSnesRgn * rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);
 			rgn->sampOffset = addrSampStart - spcDirAddr;
 			aRgns.push_back(rgn);
 		}
@@ -197,10 +197,10 @@ bool MintSnesInstr::LoadInstr()
 }
 
 // ***********
-// MintSnesRgn
+// MoriSnesRgn
 // ***********
 
-MintSnesRgn::MintSnesRgn(MintSnesInstr* instr, MintSnesVersion ver, uint32_t spcDirAddr, const MintSnesInstrHint& instrHint, int8_t percNoteKey) :
+MoriSnesRgn::MoriSnesRgn(MoriSnesInstr* instr, MoriSnesVersion ver, uint32_t spcDirAddr, const MoriSnesInstrHint& instrHint, int8_t percNoteKey) :
 	VGMRgn(instr, instrHint.rgnAddress, 7),
 	version(ver)
 {
@@ -256,11 +256,11 @@ MintSnesRgn::MintSnesRgn(MintSnesInstr* instr, MintSnesVersion ver, uint32_t spc
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
-MintSnesRgn::~MintSnesRgn()
+MoriSnesRgn::~MoriSnesRgn()
 {
 }
 
-bool MintSnesRgn::LoadRgn()
+bool MoriSnesRgn::LoadRgn()
 {
 	return true;
 }
