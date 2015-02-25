@@ -232,6 +232,12 @@
     <Filter Include="Source Files\formats\neverlandsnes">
       <UniqueIdentifier>{d5d93f14-1b60-404d-8cbe-9ad1dbdd0fe6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\imaxsnes">
+      <UniqueIdentifier>{a9d44b18-73f2-40b1-98db-61a26dccb3fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\imaxsnes">
+      <UniqueIdentifier>{d573af0f-2138-4232-9a7d-6f9f129b2009}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ui\windows\aboutdlg.cpp">
@@ -746,6 +752,12 @@
     </ClCompile>
     <ClCompile Include="main\formats\NeverlandSnesSeq.cpp">
       <Filter>Source Files\formats\neverlandsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\IMaxSnesScanner.cpp">
+      <Filter>Source Files\formats\imaxsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\IMaxSnesSeq.cpp">
+      <Filter>Source Files\formats\imaxsnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1354,6 +1366,15 @@
     </ClInclude>
     <ClInclude Include="main\formats\NeverlandSnesSeq.h">
       <Filter>Header Files\formats\neverlandsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\IMaxSnesFormat.h">
+      <Filter>Header Files\formats\imaxsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\IMaxSnesScanner.h">
+      <Filter>Header Files\formats\imaxsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\IMaxSnesSeq.h">
+      <Filter>Header Files\formats\imaxsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
