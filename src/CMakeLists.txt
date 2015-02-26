@@ -22,6 +22,7 @@ set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set ( CMAKE_OSX_ARCHITECTURES "x86_64;" )
+#set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libstdc++ -g3 -Wall -O0" )
 set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libc++ -g3 -Wall -O0" )
 #find_package(Qt5 COMPONENTS Widgets Declarative)
 
@@ -31,6 +32,7 @@ include_directories(
     lib/minizip
     lib/tinyxml/src
     lib/fluidsynth/include
+    lib/fluidsynth/mem_sfloader
     main
     main/formats
     main/loaders
@@ -155,6 +157,10 @@ set(SOURCE_FILES
     ui/qt/RawFileListView.cpp
     ui/qt/VGMCollListView.cpp
     ui/qt/MusicPlayer.cpp
+
+    lib/fluidsynth/mem_sfloader/mem_sfloader.c
+    #lib/fluidsynth/mem_sfloader/mem_sfloader2.c
+    #lib/fluidsynth/mem_sfloader/fluid_list.c
 
     ui/qt/mainwindow.h
     ui/qt/droparea.h
@@ -300,6 +306,7 @@ set(SOURCE_FILES
     lib/fluidsynth/include/fluidsynth/version.h
     lib/fluidsynth/include/fluidsynth/voice.h
     lib/fluidsynth/include/fluidsynth.h
+    lib/fluidsynth/mem_sfloader/mem_sfloader.h
     lib/minizip/crypt.h
     lib/minizip/ioapi.h
     lib/minizip/mztools.h
@@ -346,6 +353,11 @@ include_directories(${READLINE_INCLUDE_DIRS})
 #set(LIBS ${LIBS} ${GLIB_LIBRARIES})
 target_link_libraries(vgmtrans ${READLINE_LIBRARIES})
 
+find_package (FLUIDSYNTH REQUIRED)
+include_directories(${FLUIDSYNTH_INCLUDE_DIRS})
+#set(LIBS ${LIBS} ${GLIB_LIBRARIES})
+target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
+
 IF (APPLE)
    FIND_LIBRARY(COREMIDI_LIBRARY CoreMIDI)
    FIND_LIBRARY(COREAUDIO_LIBRARY CoreAudio)
@@ -366,4 +378,5 @@ add_definitions(-DTIXML_USE_STL)
 
 #find_library (fluidsynth PATHS lib/fluidsynth/lib)
 #link_directories(lib/fluidsynth/lib)
-target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/fluidsynth/lib/libfluidsynth.a)
+
+#target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/fluidsynth/lib/libfluidsynth.a)

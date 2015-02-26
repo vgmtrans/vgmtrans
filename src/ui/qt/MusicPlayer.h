@@ -7,6 +7,8 @@
 #ifndef __MusicPlayer_H_
 #define __MusicPlayer_H_
 
+void bloggityBlog2();
+
 class MusicPlayer {
 
 private:
@@ -24,7 +26,7 @@ public:
     }
 
     void Shutdown();
-    void LoadSF2(const char *filename);
+    void LoadSF2(const void* data);
     void PlayMidi(const char *midiFile);
     void StopMidi();
 
