@@ -937,7 +937,7 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t newProgNum = GetByte(curOffset++);
 		if (parentSeq->version != NINSNES_HUMAN) {
 			if (newProgNum >= 0x80) {
-				// standard engine does nothing special, but Star Fox does
+				// See Star Fox sequence for example, this is necessary
 				newProgNum = (newProgNum - parentSeq->STATUS_PERCUSSION_NOTE_MIN) + parentSeq->spcPercussionBase;
 			}
 		}
