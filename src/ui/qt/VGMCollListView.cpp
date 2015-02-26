@@ -75,17 +75,18 @@ void VGMCollListView::keyPressEvent(QKeyEvent* e)
         VGMColl* coll = qtVGMRoot.vVGMColl[list[0].row()];
         VGMSeq* seq = coll->GetSeq();
         SF2File* sf2 = coll->CreateSF2File();
+        MidiFile* midi = seq->ConvertToMidi();
 
-        seq->SaveAsMidi(L"midi.mid");
+        std::vector<uint8_t> midiBuf;
+        midi->WriteMidiToBuffer(midiBuf);
+
         const void* rawSF2 = sf2->SaveToMem();
-//        sf2->SaveSF2File(L"sf2file.sf2");
 
         qDebug() << "Gonna play us some music";
         MusicPlayer& musicPlayer = MusicPlayer::getInstance();
 
         musicPlayer.LoadSF2(rawSF2);//"dos.sf2");
-        musicPlayer.PlayMidi("dos.mid");
-
+        musicPlayer.PlayMidi(&midiBuf[0], midiBuf.size());
 
     }
 }
