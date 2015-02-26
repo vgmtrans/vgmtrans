@@ -20,6 +20,7 @@ public:
 
 private:
 	static BytePattern ptnBranchForVcmd;
+	static BytePattern ptnBranchForVcmdReadahead;
 	static BytePattern ptnJumpToVcmd;
 	static BytePattern ptnJumpToVcmdSMW;
 	static BytePattern ptnReadVcmdLengthSMW;

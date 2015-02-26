@@ -20,6 +20,24 @@ BytePattern NinSnesScanner::ptnBranchForVcmd(
 	9);
 
 //; Yoshi's Island SPC
+//0c91: 68 ef     cmp   a,#$ef
+//0c93: f0 29     beq   $0cbe
+//0c95: 68 e0     cmp   a,#$e0
+//0c97: 90 30     bcc   $0cc9             ; next note (key-off the current note)
+//0c99: 6d        push  y
+//0c9a: fd        mov   y,a
+//0c9b: ae        pop   a
+//0c9c: 96 b2 0a  adc   a,$0ab2+y         ; vcmd lengths ($0af6) (skip vcmd by using oplens table)
+BytePattern NinSnesScanner::ptnBranchForVcmdReadahead(
+	"\x68\xef\xf0\x29\x68\xe0\x90\x30"
+	"\x6d\xfd\xae\x96\xb2\x0a"
+	,
+	"x?x?x?x?"
+	"xxxx??"
+	,
+	14);
+
+//; Yoshi's Island SPC
 //; dispatch vcmd in A (e0-ff)
 //0895: 1c        asl   a                 ; e0-ff => c0-fe (8 bit)
 //0896: fd        mov   y,a
@@ -825,7 +843,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	// - Voice command length table
 
 	uint32_t ofsBranchForVcmd;
-	uint8_t firstVoiceCmd;
+	uint8_t firstVoiceCmd = 0;
 	uint16_t addrVoiceCmdAddressTable;
 	uint16_t addrVoiceCmdLengthTable;
 	// DERIVED VERSIONS
@@ -845,12 +863,20 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			return;
 		}
 	}
-	// STANDARD VERSION (this pattern search sometimes make a false-positive)
-	else if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd))
-	{
-		uint32_t ofsJumpToVcmd;
+	else {
+		// STANDARD VERSION
+		if (file->SearchBytePattern(ptnBranchForVcmdReadahead, ofsBranchForVcmd)) {
+			firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 5);
+		}
+		else if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd)) {
+			// this search often finds a wrong code, but some games still need it (for example, Human games)
+			firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 1);
+		}
+		else {
+			return;
+		}
 
-		firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 1);
+		uint32_t ofsJumpToVcmd;
 
 		// find a jump to address_table[cmd * 2]
 		if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd)) {
@@ -882,9 +908,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		else {
 			return;
 		}
-	}
-	else {
-		return;
 	}
 
 	// TRY TO GRAB NOTE VOLUME/DURATION TABLE
