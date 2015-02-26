@@ -440,12 +440,18 @@ SF2File::~SF2File(void)
 }
 
 
-bool SF2File::SaveSF2File(const wchar_t* filepath)
-{
+const void* SF2File::SaveToMem() {
 	uint32_t size = this->GetSize();
 	uint8_t* buf = new uint8_t[size];
 	this->Write(buf);
-	bool result = pRoot->UI_WriteBufferToFile(filepath, buf, size);
+	return buf;
+}
+
+bool SF2File::SaveSF2File(const wchar_t* filepath)
+{
+	uint32_t size = this->GetSize();
+	const void* buf = this->SaveToMem();
+	bool result = pRoot->UI_WriteBufferToFile(filepath, (uint8_t*)buf, size);
 	delete[] buf;
 	return result;
 }
