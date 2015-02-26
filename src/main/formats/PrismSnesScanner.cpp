@@ -1,6 +1,6 @@
 #include "stdafx.h"
-#include "IMaxSnesScanner.h"
-#include "IMaxSnesSeq.h"
+#include "PrismSnesScanner.h"
+#include "PrismSnesSeq.h"
 #include "SNESDSP.h"
 
 //; Dual Orb 2 SPC
@@ -14,7 +14,7 @@
 //; read header for each tracks
 //0a35: f7 06     mov   a,($06)+y
 //0a37: 30 d4     bmi   $0a0d             ; break if >= $80 (usually $ff)
-BytePattern IMaxSnesScanner::ptnLoadSeq(
+BytePattern PrismSnesScanner::ptnLoadSeq(
 	"\xf6\x00\x23\xc4\x06\xfc\xf6\x00"
 	"\x23\xc4\x07\x8d\x00\xf7\x06\x30"
 	"\xd4"
@@ -25,21 +25,21 @@ BytePattern IMaxSnesScanner::ptnLoadSeq(
 	,
 	17);
 
-void IMaxSnesScanner::Scan(RawFile* file, void* info)
+void PrismSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
 	if (nFileLength == 0x10000) {
-		SearchForIMaxSnesFromARAM(file);
+		SearchForPrismSnesFromARAM(file);
 	}
 	else {
-		SearchForIMaxSnesFromROM(file);
+		SearchForPrismSnesFromROM(file);
 	}
 	return;
 }
 
-void IMaxSnesScanner::SearchForIMaxSnesFromARAM (RawFile* file)
+void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 {
-	IMaxSnesVersion version = IMAXSNES_NONE;
+	PrismSnesVersion version = PRISMSNES_NONE;
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search song list
@@ -53,20 +53,20 @@ void IMaxSnesScanner::SearchForIMaxSnesFromARAM (RawFile* file)
 	}
 
 	// detect engine version
-	version = IMAXSNES_STANDARD;
+	version = PRISMSNES_STANDARD;
 
 	// TODO: guess song index
 	int8_t songIndex = 0;
 
 	uint32_t addrSeqHeaderPtr = addrSeqList + (songIndex * 2);
 	uint32_t addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
-	IMaxSnesSeq* newSeq = new IMaxSnesSeq(file, version, addrSeqHeader, name);
+	PrismSnesSeq* newSeq = new PrismSnesSeq(file, version, addrSeqHeader, name);
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
 		return;
 	}
 }
 
-void IMaxSnesScanner::SearchForIMaxSnesFromROM (RawFile* file)
+void PrismSnesScanner::SearchForPrismSnesFromROM (RawFile* file)
 {
 }

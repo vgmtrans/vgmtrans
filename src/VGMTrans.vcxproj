@@ -238,8 +238,8 @@
     <ClCompile Include="main\formats\HudsonSnesInstr.cpp" />
     <ClCompile Include="main\formats\HudsonSnesScanner.cpp" />
     <ClCompile Include="main\formats\HudsonSnesSeq.cpp" />
-    <ClCompile Include="main\formats\IMaxSnesScanner.cpp" />
-    <ClCompile Include="main\formats\IMaxSnesSeq.cpp" />
+    <ClCompile Include="main\formats\PrismSnesScanner.cpp" />
+    <ClCompile Include="main\formats\PrismSnesSeq.cpp" />
     <ClCompile Include="main\formats\KonamiSnesInstr.cpp" />
     <ClCompile Include="main\formats\KonamiSnesScanner.cpp" />
     <ClCompile Include="main\formats\KonamiSnesSeq.cpp" />
@@ -425,9 +425,9 @@
     <ClInclude Include="main\formats\HudsonSnesInstr.h" />
     <ClInclude Include="main\formats\HudsonSnesScanner.h" />
     <ClInclude Include="main\formats\HudsonSnesSeq.h" />
-    <ClInclude Include="main\formats\IMaxSnesFormat.h" />
-    <ClInclude Include="main\formats\IMaxSnesScanner.h" />
-    <ClInclude Include="main\formats\IMaxSnesSeq.h" />
+    <ClInclude Include="main\formats\PrismSnesFormat.h" />
+    <ClInclude Include="main\formats\PrismSnesScanner.h" />
+    <ClInclude Include="main\formats\PrismSnesSeq.h" />
     <ClInclude Include="main\formats\KonamiSnesFormat.h" />
     <ClInclude Include="main\formats\KonamiSnesInstr.h" />
     <ClInclude Include="main\formats\KonamiSnesScanner.h" />

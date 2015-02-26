@@ -2,21 +2,21 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-class IMaxSnesScanner :
+class PrismSnesScanner :
 	public VGMScanner
 {
 public:
-	IMaxSnesScanner(void)
+	PrismSnesScanner(void)
 	{
 		USE_EXTENSION(L"spc");
 	}
-	virtual ~IMaxSnesScanner(void)
+	virtual ~PrismSnesScanner(void)
 	{
 	}
 
 	virtual void Scan(RawFile* file, void* info = 0);
-	void SearchForIMaxSnesFromARAM (RawFile* file);
-	void SearchForIMaxSnesFromROM (RawFile* file);
+	void SearchForPrismSnesFromARAM (RawFile* file);
+	void SearchForPrismSnesFromROM (RawFile* file);
 
 private:
 	static BytePattern ptnLoadSeq;

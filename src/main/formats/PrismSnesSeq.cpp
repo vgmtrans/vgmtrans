@@ -1,18 +1,18 @@
 #include "stdafx.h"
-#include "IMaxSnesSeq.h"
-#include "IMaxSnesFormat.h"
+#include "PrismSnesSeq.h"
+#include "PrismSnesFormat.h"
 #include "ScaleConversion.h"
 
-DECLARE_FORMAT(IMaxSnes);
+DECLARE_FORMAT(PrismSnes);
 
-//  ***********
-//  IMaxSnesSeq
-//  ***********
+//  ************
+//  PrismSnesSeq
+//  ************
 #define MAX_TRACKS  16
 #define SEQ_PPQN    48
 
-IMaxSnesSeq::IMaxSnesSeq(RawFile* file, IMaxSnesVersion ver, uint32_t seqdataOffset, std::wstring newName)
-	: VGMSeq(IMaxSnesFormat::name, file, seqdataOffset, 0, newName), version(ver)
+PrismSnesSeq::PrismSnesSeq(RawFile* file, PrismSnesVersion ver, uint32_t seqdataOffset, std::wstring newName)
+	: VGMSeq(PrismSnesFormat::name, file, seqdataOffset, 0, newName), version(ver)
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
@@ -24,18 +24,18 @@ IMaxSnesSeq::IMaxSnesSeq(RawFile* file, IMaxSnesVersion ver, uint32_t seqdataOff
 	LoadEventMap();
 }
 
-IMaxSnesSeq::~IMaxSnesSeq(void)
+PrismSnesSeq::~PrismSnesSeq(void)
 {
 }
 
-void IMaxSnesSeq::ResetVars(void)
+void PrismSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
 
 	conditionSwitch = false;
 }
 
-bool IMaxSnesSeq::GetHeaderInfo(void)
+bool PrismSnesSeq::GetHeaderInfo(void)
 {
 	SetPPQN(SEQ_PPQN);
 
@@ -71,19 +71,19 @@ bool IMaxSnesSeq::GetHeaderInfo(void)
 		trackHeader->AddSimpleItem(curOffset, 2, L"Track Pointer");
 		curOffset += 2;
 
-		IMaxSnesTrack* track = new IMaxSnesTrack(this, addrTrackStart);
+		PrismSnesTrack* track = new PrismSnesTrack(this, addrTrackStart);
 		aTracks.push_back(track);
 	}
 
 	return true;
 }
 
-bool IMaxSnesSeq::GetTrackPointers(void)
+bool PrismSnesSeq::GetTrackPointers(void)
 {
 	return true;
 }
 
-void IMaxSnesSeq::LoadEventMap()
+void PrismSnesSeq::LoadEventMap()
 {
 	int statusByte;
 
@@ -162,11 +162,11 @@ void IMaxSnesSeq::LoadEventMap()
 }
 
 
-//  *************
-//  IMaxSnesTrack
-//  *************
+//  **************
+//  PrismSnesTrack
+//  **************
 
-IMaxSnesTrack::IMaxSnesTrack(IMaxSnesSeq* parentFile, long offset, long length)
+PrismSnesTrack::PrismSnesTrack(PrismSnesSeq* parentFile, long offset, long length)
 : SeqTrack(parentFile, offset, length)
 {
 	ResetVars();
@@ -174,7 +174,7 @@ IMaxSnesTrack::IMaxSnesTrack(IMaxSnesSeq* parentFile, long offset, long length)
 	bWriteGenericEventAsTextEvent = false;
 }
 
-void IMaxSnesTrack::ResetVars(void)
+void PrismSnesTrack::ResetVars(void)
 {
 	SeqTrack::ResetVars();
 
@@ -183,9 +183,9 @@ void IMaxSnesTrack::ResetVars(void)
 	subReturnAddr = 0;
 }
 
-bool IMaxSnesTrack::ReadEvent(void)
+bool PrismSnesTrack::ReadEvent(void)
 {
-	IMaxSnesSeq* parentSeq = (IMaxSnesSeq*)this->parentSeq;
+	PrismSnesSeq* parentSeq = (PrismSnesSeq*)this->parentSeq;
 
 	uint32_t beginOffset = curOffset;
 	if (curOffset >= 0x10000) {
@@ -197,8 +197,8 @@ bool IMaxSnesTrack::ReadEvent(void)
 
 	std::wstringstream desc;
 
-	IMaxSnesSeqEventType eventType = (IMaxSnesSeqEventType)0;
-	std::map<uint8_t, IMaxSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+	PrismSnesSeqEventType eventType = (PrismSnesSeqEventType)0;
+	std::map<uint8_t, PrismSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
 	if (pEventType != parentSeq->EventMap.end()) {
 		eventType = pEventType->second;
 	}
@@ -384,7 +384,7 @@ bool IMaxSnesTrack::ReadEvent(void)
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str());
-		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"IMaxSnesSeq")));
+		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"PrismSnesSeq")));
 		bContinue = false;
 		break;
 	}
