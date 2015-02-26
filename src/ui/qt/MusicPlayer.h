@@ -27,7 +27,7 @@ public:
 
     void Shutdown();
     void LoadSF2(const void* data);
-    void PlayMidi(const char *midiFile);
+    void PlayMidi(const void* data, size_t len);
     void StopMidi();
 
 

@@ -159,8 +159,7 @@ set(SOURCE_FILES
     ui/qt/MusicPlayer.cpp
 
     lib/fluidsynth/mem_sfloader/mem_sfloader.c
-    #lib/fluidsynth/mem_sfloader/mem_sfloader2.c
-    #lib/fluidsynth/mem_sfloader/fluid_list.c
+    lib/fluidsynth/mem_sfloader/vgmtrans_fluid_midi.c
 
     ui/qt/mainwindow.h
     ui/qt/droparea.h
@@ -307,6 +306,7 @@ set(SOURCE_FILES
     lib/fluidsynth/include/fluidsynth/voice.h
     lib/fluidsynth/include/fluidsynth.h
     lib/fluidsynth/mem_sfloader/mem_sfloader.h
+    lib/fluidsynth/mem_sfloader/vgmtrans_fluid_midi.h
     lib/minizip/crypt.h
     lib/minizip/ioapi.h
     lib/minizip/mztools.h

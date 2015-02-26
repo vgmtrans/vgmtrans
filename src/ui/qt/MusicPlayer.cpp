@@ -7,6 +7,7 @@
 #include "fluidsynth.h"
 extern "C" {
 #include "mem_sfloader.h"
+#include "vgmtrans_fluid_midi.h"
 }
 void bloggityBlog2() {
     printf("bloggityBlog2");
@@ -78,37 +79,23 @@ void MusicPlayer::LoadSF2(const void *data)
     this->sfont_id = fluid_synth_sfload(this->synth, (const char *)data, 0);
 }
 
-struct _fluid_track_t {
-    char* name;
-    int num;
-    fluid_midi_event_t *first;
-    fluid_midi_event_t *cur;
-    fluid_midi_event_t *last;
-    unsigned int ticks;
-};
-
 int midi_event_callback(void* data, fluid_midi_event_t* event)
 {
-//    int track_num = ((_fluid_track_t*)fluid_midi_event_get_track(event))->num;
-//    int chan = fluid_midi_event_get_channel(event);
-//    int new_chan = ((track_num / 15) * 16) + chan;
-//    fluid_midi_event_set_channel(event, new_chan);
+    int track_num = ((_fluid_track_t*)fluid_midi_event_get_track(event))->num;
+    int chan = fluid_midi_event_get_channel(event);
+    int new_chan = ((track_num / 15) * 16) + chan;
+    fluid_midi_event_set_channel(event, new_chan);
+
+    printf("track_num: %d  new_chan: %d\n");
 
     return fluid_synth_handle_midi_event(data, event);
 }
 
-void MusicPlayer::PlayMidi(const char *filename)
+void MusicPlayer::PlayMidi(const void* data, size_t len)
 {
-    //fluid_player_set_event_callback(player, event_callback);
     this->player = new_fluid_player(this->synth);
 
-    if (fluid_is_midifile(filename)) {
-        fluid_player_add(this->player, filename);
-    }
-
+    fluid_player_add_mem(this->player, data, len);
     fluid_player_set_playback_callback(this->player, &midi_event_callback, this->synth);
-
-
-
     fluid_player_play(this->player);
 }
