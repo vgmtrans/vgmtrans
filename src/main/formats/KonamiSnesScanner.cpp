@@ -5,18 +5,18 @@
 #include "SNESDSP.h"
 
 //; Ganbare Goemon 4
-//13d3: 8f 1e 06  mov   $06,#$1e
 //13d6: 8f 00 0a  mov   $0a,#$00
 //13d9: 8f 39 0b  mov   $0b,#$39          ; set header address $3900 to $0a/b
 //13dc: cd 00     mov   x,#$00
+//13de: d8 1c     mov   $1c,x
 BytePattern KonamiSnesScanner::ptnSetSongHeaderAddressGG4(
-	"\x8f\x1e\x06\x8f\x00\x0a\x8f\x39"
-	"\x0b\xcd\x00"
+	"\x8f\x00\x0a\x8f\x39\x0b\xcd\x00"
+	"\xd8\x1c"
 	,
-	"x?xx?xx?"
-	"xxx"
+	"x??x??xx"
+	"x?"
 	,
-	11);
+	10);
 
 //; Pop'n Twinbee SPC
 //0abd: c4 0c     mov   $0c,a
@@ -507,6 +507,10 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
+	// TODO: Unsupported games
+	// Tiny Toon Adventures: Buster Bus
+	// Batman Returns
+
 	// find a song header
 	UINT ofsSetSongHeaderAddress;
 	UINT ofsReadSongList;
@@ -515,7 +519,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	int8_t primarySongIndex;
 	uint8_t vcmdLenItemSize;
 	if (file->SearchBytePattern(ptnSetSongHeaderAddressGG4, ofsSetSongHeaderAddress)) {
-		addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 4) | (file->GetByte(ofsSetSongHeaderAddress + 7) << 8);
+		addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 1) | (file->GetByte(ofsSetSongHeaderAddress + 4) << 8);
 		vcmdLenItemSize = 2;
 		hasSongList = false;
 	}
