@@ -341,7 +341,8 @@ public:
 	//uint32_t GetSize(void);
 
 	//int WriteDLSToBuffer(vector<uint8_t> &buf);
-	bool SaveSF2File(const wchar_t* filepath);
+    const void* SaveToMem();
+    bool SaveSF2File(const wchar_t* filepath);
 
 public:
 	//vector<DLSInstr*> aInstrs;

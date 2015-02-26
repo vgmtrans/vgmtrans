@@ -3,6 +3,8 @@
 //
 
 #include <QEvent.h>
+#include <main/SF2File.h>
+#include <main/VGMSeq.h>
 #include "VGMCollListView.h"
 #include "QtVGMRoot.h"
 #include "VGMColl.h"
@@ -70,10 +72,20 @@ void VGMCollListView::keyPressEvent(QKeyEvent* e)
         if (list.size() == 0 || list[0].row() >= qtVGMRoot.vVGMColl.size())
             return;
 
+        VGMColl* coll = qtVGMRoot.vVGMColl[list[0].row()];
+        VGMSeq* seq = coll->GetSeq();
+        SF2File* sf2 = coll->CreateSF2File();
+
+        seq->SaveAsMidi(L"midi.mid");
+        const void* rawSF2 = sf2->SaveToMem();
+//        sf2->SaveSF2File(L"sf2file.sf2");
+
         qDebug() << "Gonna play us some music";
         MusicPlayer& musicPlayer = MusicPlayer::getInstance();
 
-        musicPlayer.LoadSF2("dos.sf2");
+        musicPlayer.LoadSF2(rawSF2);//"dos.sf2");
         musicPlayer.PlayMidi("dos.mid");
+
+
     }
 }
