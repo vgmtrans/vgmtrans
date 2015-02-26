@@ -8,7 +8,7 @@ DECLARE_FORMAT(IMaxSnes);
 //  ***********
 //  IMaxSnesSeq
 //  ***********
-#define MAX_TRACKS  8
+#define MAX_TRACKS  16
 #define SEQ_PPQN    48
 
 IMaxSnesSeq::IMaxSnesSeq(RawFile* file, IMaxSnesVersion ver, uint32_t seqdataOffset, std::wstring newName)
