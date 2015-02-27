@@ -329,8 +329,7 @@ bool PrismSnesTrack::ReadEvent(void)
 			AddTime(len);
 		}
 		else {
-			int8_t midiKey = 3 + key;
-			AddNoteByDur(beginOffset, curOffset - beginOffset, midiKey, vel, dur, L"Note");
+			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur, L"Note");
 			AddTime(len);
 		}
 		break;
@@ -517,6 +516,10 @@ bool PrismSnesTrack::ReadEvent(void)
 			uint8_t newPanTable[21];
 			GetBytes(panTableAddress, 21, newPanTable);
 			panTable.assign(std::begin(newPanTable), std::end(newPanTable));
+
+			if (!IsOffsetUsed(panTableAddress)) {
+				parentSeq->AddSimpleItem(panTableAddress, 21, L"Pan Table");
+			}
 		}
 
 		break;

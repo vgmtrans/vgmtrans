@@ -78,7 +78,7 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 	UINT ofsExecVCmd;
 	uint16_t addrVoiceCmdAddressTable;
 	if (file->SearchBytePattern(ptnExecVCmd, ofsExecVCmd)) {
-		addrVoiceCmdAddressTable = file->GetShort(ofsLoadSeq + 18);
+		addrVoiceCmdAddressTable = file->GetShort(ofsExecVCmd + 18);
 		if (addrVoiceCmdAddressTable + (2 * 0x40) > 0x10000) {
 			return;
 		}
