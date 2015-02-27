@@ -25,6 +25,29 @@ BytePattern PrismSnesScanner::ptnLoadSeq(
 	,
 	17);
 
+//; Dual Orb 2 SPC
+//0b5d: 8d 00     mov   y,#$00
+//0b5f: f7 26     mov   a,($26)+y         ; read vcmd
+//0b61: 10 1f     bpl   $0b82
+//0b63: 3a 26     incw  $26
+//0b65: 68 a0     cmp   a,#$a0
+//0b67: 90 08     bcc   $0b71
+//0b69: 80        setc
+//0b6a: a8 c0     sbc   a,#$c0            ; a0-b0 => crash
+//0b6c: 1c        asl   a
+//0b6d: 5d        mov   x,a
+//0b6e: 1f ff 0e  jmp   ($0eff+x)
+BytePattern PrismSnesScanner::ptnExecVCmd(
+	"\x8d\x00\xf7\x26\x10\x1f\x3a\x26"
+	"\x68\xa0\x90\x08\x80\xa8\xc0\x1c"
+	"\x5d\x1f\xff\x0e"
+	,
+	"xxx?x?x?"
+	"xxxxxxxx"
+	"xx??"
+	,
+	20);
+
 void PrismSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -52,8 +75,25 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 		return;
 	}
 
+	UINT ofsExecVCmd;
+	uint16_t addrVoiceCmdAddressTable;
+	if (file->SearchBytePattern(ptnExecVCmd, ofsExecVCmd)) {
+		addrVoiceCmdAddressTable = file->GetShort(ofsLoadSeq + 18);
+		if (addrVoiceCmdAddressTable + (2 * 0x40) > 0x10000) {
+			return;
+		}
+	}
+	else {
+		return;
+	}
+
 	// detect engine version
-	version = PRISMSNES_STANDARD;
+	if (file->GetShort(addrVoiceCmdAddressTable + 8) == file->GetShort(addrVoiceCmdAddressTable + 10)) {
+		version = PRISMSNES_DO;
+	}
+	else {
+		version = PRISMSNES_DO2;
+	}
 
 	// TODO: guess song index
 	int8_t songIndex = 0;
