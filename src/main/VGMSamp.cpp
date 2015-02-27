@@ -152,5 +152,5 @@ bool VGMSamp::SaveAsWav(const wchar_t* filepath)
 	
 	//DLSWave dlswave(1, channels, rate, rate*blockAlign, blockAlign, bps, bufSize, uncompSampBuf);
 	//dlswave.Write(waveBuf);
-	return pRoot->UI_WriteBufferToFile(filepath, &waveBuf[0], waveBuf.size());
+	return pRoot->UI_WriteBufferToFile(filepath, &waveBuf[0], (uint32_t)waveBuf.size());
 }

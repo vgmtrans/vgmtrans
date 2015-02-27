@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "HOSAScanner.h"
-#include "HOSA.h"
+#include "HOSASeq.h"
 #include "HOSAInstr.h"
 #include "PSXSPU.h"
 
@@ -17,24 +17,37 @@ HOSAScanner::~HOSAScanner(void)
 void HOSAScanner::Scan(RawFile* file, void* info)
 {
 	HOSASeq* seq = SearchForHOSASeq(file);
-	if (!seq)
-		return;
-	PSXSampColl* sampcoll = PSXSampColl::SearchForPSXADPCM(file, HOSAFormat::name);
-	if (!sampcoll)
-		return;
-	HOSAInstrSet* instrset = SearchForHOSAInstrSet(file, sampcoll);
-	if (!instrset)
-	{
-		pRoot->RemoveVGMFile(sampcoll);
+	if (seq == NULL) {
 		return;
 	}
-	sampcoll->UseInstrSet(instrset);
 
-	VGMColl* coll = new VGMColl(L"HOSA Song");
+	std::vector<PSXSampColl*> sampcolls = PSXSampColl::SearchForPSXADPCMs(file, HOSAFormat::name);
+
+	PSXSampColl* sampcoll = NULL;
+	HOSAInstrSet* instrset = NULL;
+	for (size_t i = 0; i < sampcolls.size(); i++) {
+		instrset = SearchForHOSAInstrSet(file, sampcolls[i]);
+		if (instrset != NULL) {
+			sampcoll = sampcolls[i];
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < sampcolls.size(); i++) {
+		if (sampcolls[i] != sampcoll) {
+			pRoot->RemoveVGMFile(sampcolls[i]);
+		}
+	}
+
+	if (instrset == NULL) {
+		return;
+	}
+
+	VGMColl* coll = new VGMColl(*seq->GetName());
 	coll->UseSeq(seq);
 	coll->AddInstrSet(instrset);
-	if (!coll->Load())
-	{
+	coll->AddSampColl(sampcoll);
+	if (!coll->Load()) {
 		delete coll;
 	}
 
@@ -43,6 +56,8 @@ void HOSAScanner::Scan(RawFile* file, void* info)
 
 HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 {
+	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+
 	uint32_t nFileLength = file->size();
 	for (uint32_t i=0; i+4<nFileLength; i++)
 	{
@@ -60,7 +75,7 @@ HOSASeq* HOSAScanner::SearchForHOSASeq (RawFile* file)
 		if (firstTrkPtr >= file->GetShort(i+0x54) && firstTrkPtr != 0x54)
 			continue;
 
-		HOSASeq* seq = new HOSASeq(file, i);
+		HOSASeq* seq = new HOSASeq(file, i, name);
 		if (!seq->LoadVGMFile())
 		{
 			delete seq;
@@ -80,7 +95,6 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 	size_t numSamples = sampcoll->samples.size();
 	if (numSamples < MIN_NUM_SAMPLES_COMPARE)
 	{
-		pRoot->RemoveVGMFile(sampcoll);
 		return NULL;
 	}
 
@@ -91,7 +105,7 @@ HOSAInstrSet* HOSAScanner::SearchForHOSAInstrSet (RawFile* file, PSXSampColl* sa
 	uint32_t nFileLength = file->size();
 	for (uint32_t i=0x20; i+0x14<nFileLength; i++)
 	{
-		if (RecursiveRgnCompare(file, i, 0, numSamples, 0, sampOffsets))
+		if (RecursiveRgnCompare(file, i, 0, (int)numSamples, 0, sampOffsets))
 		{
 			for (; i>=0x20; i-=4)
 			{

@@ -118,16 +118,16 @@ inline int RoundToZero(int val)
 template <class T> void PSXConvADSR(T* realADSR, unsigned short ADSR1, unsigned short ADSR2, bool bPS2)
 {
 	
-	uint8_t Am = (ADSR1 & 0x8000) > 0;	// if 1, then Exponential, else linear
+	uint8_t Am = (ADSR1 & 0x8000) >> 15;	// if 1, then Exponential, else linear
 	uint8_t Ar = (ADSR1 & 0x7F00) >> 8;
 	uint8_t Dr = (ADSR1 & 0x00F0) >> 4;
 	uint8_t Sl = ADSR1 & 0x000F;
-	uint8_t Rm = (ADSR2 & 0x0020) > 0;
+	uint8_t Rm = (ADSR2 & 0x0020) >> 5;
 	uint8_t Rr = ADSR2 & 0x001F;
 
 	// The following are unimplemented in conversion (because DLS does not support Sustain Rate)
-	uint8_t Sm = (ADSR2 & 0x8000) > 0;
-	uint8_t Sd = (ADSR2 & 0x4000) > 0;
+	uint8_t Sm = (ADSR2 & 0x8000) >> 15;
+	uint8_t Sd = (ADSR2 & 0x4000) >> 14;
 	uint8_t Sr = (ADSR2 >> 6) & 0x7F;
 
 	PSXConvADSR(realADSR, Am, Ar, Dr, Sl, Sm, Sd, Sr, Rm, Rr, bPS2);
@@ -139,27 +139,19 @@ template <class T> void PSXConvADSR(T* realADSR,
 									uint8_t Sm, uint8_t Sd, uint8_t Sr, uint8_t Rm, uint8_t Rr, bool bPS2)
 {
 	// Make sure all the ADSR values are within the valid ranges
-	if (((Am & 0xFE) != 0) ||
-		((Ar & 0x80) != 0) ||
-		((Dr & 0xF0) != 0) ||
-		((Sl & 0xF0) != 0) ||
-		((Rm & 0xFE) != 0) ||
-		((Rr & 0xE0) != 0) ||
-		((Sm & 0xFE) != 0) ||
-		((Sd & 0xFE) != 0) ||
-		((Sr & 0x80) != 0))
+	if (((Am & ~0x01) != 0) ||
+		((Ar & ~0x7F) != 0) ||
+		((Dr & ~0x0F) != 0) ||
+		((Sl & ~0x0F) != 0) ||
+		((Rm & ~0x01) != 0) ||
+		((Rr & ~0x1F) != 0) ||
+		((Sm & ~0x01) != 0) ||
+		((Sd & ~0x01) != 0) ||
+		((Sr & ~0x7F) != 0))
 	{
 		pRoot->AddLogItem(new LogItem(L"PSX ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
+		return;
 	}
-	Am &= 0x01;
-	Ar &= 0x7F;
-	Dr &= 0x0F;
-	Sl &= 0x0F;
-	Rm &= 0x01;
-	Rr &= 0x1F;
-	Sm &= 0x01;
-	Sd &= 0x01;
-	Sr &= 0x7F;
 
 	// PS1 games use 44k, PS2 uses 48k
 	double sampleRate = bPS2 ? 48000 : 44100;
@@ -367,6 +359,7 @@ public:
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 	static PSXSampColl* SearchForPSXADPCM (RawFile* file, const std::string& format);
+	static const std::vector<PSXSampColl*> SearchForPSXADPCMs (RawFile* file, const std::string& format);
 
 protected:
 	std::vector<SizeOffsetPair> vagLocations;

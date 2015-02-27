@@ -127,7 +127,7 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal)
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
 uint8_t ConvertPercentAmpToStdMidiVal(double percent)
 {
-	return round(127.0 * sqrt(percent));
+	return roundi(127.0 * sqrt(percent));
 }
 
 double ConvertPercentAmpToStdMidiScale(double percent)
@@ -144,8 +144,15 @@ double ConvertLogScaleValToAtten(double percent)
 }
 
 // Convert a percent of volume value to it's attenuation in decibels.
-//  ex: ConvertPercentVolToAttenDB(0.5) returns -(-6.02db) = half perceived loudness
+//  ex: ConvertPercentVolToAttenDB(0.5) returns -6.02db = half perceived loudness
 double ConvertPercentAmplitudeToAttenDB(double percent)
+{
+	return 20 * log10(percent);
+}
+
+// Convert a percent of volume value to it's attenuation in decibels.
+//  ex: ConvertPercentVolToAttenDB_SF2(0.5) returns -(-6.02db) = half perceived loudness
+double ConvertPercentAmplitudeToAttenDB_SF2(double percent)
 {
 	if (percent == 0)
 		return 100.0;		// assume 0 is -100.0db attenuation
@@ -190,7 +197,7 @@ uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal, double * ptr_vo
 // 0.1% units where -50% = left 0 = center 50% = right (shared by DLS and SF2)
 long ConvertPercentPanTo10thPercentUnits(double percentPan)
 {
-	return round(percentPan * 1000) - 500;
+	return roundi(percentPan * 1000) - 500;
 }
 
 // Convert a percen of linear volume/panpot value to GM2 compatible sin/cos scale.

@@ -383,3 +383,66 @@ HRESULT CMidiPort::KsProperty(GUID Set,ULONG Id,ULONG Flags,LPVOID pvPropertyDat
 }
 
 
+// Additional functions for VGMTrans ___________________________________________
+
+// Gets the port info one by one, and passes it to a callback function
+
+// User can make such a routine by using GetNumPorts and GetPortInfo.
+// However, it will be very slow, since IDirectMusic8::EnumPort sometimes take a few seconds to finish,
+// and those two functions call IDirectMusic8::EnumPort several times.
+
+void CMidiPort::EnumPort(MIDIPORTENUMPROC lpEnumFunc, LPVOID lParam)
+{
+	DMUS_PORTCAPS portinf;
+	DWORD dwIndex = 0, dwNum = 0;
+	HRESULT hr = DM_FAILED;
+	TCHAR strMembrFunc[] = _T("CMidiPort::GetNumPorts()");
+
+	// Checks member variables initialization
+
+	if (!m_pMusic8) throw CDMusicException(strMembrFunc, hr, __LINE__);
+
+	// Set to 0 the DMUS_PORTCAPS structure  
+
+	ZeroMemory(&portinf, sizeof(portinf));
+	portinf.dwSize = sizeof(DMUS_PORTCAPS);
+
+	// Call the DirectMusic8 member function to enumerate systems ports
+
+	while ((hr = m_pMusic8->EnumPort(dwIndex++, &portinf)) == S_OK)
+	{
+		if (portinf.dwClass == m_dwPortType)
+		{
+			INFOPORT stInfoPort;
+			LPINFOPORT lpInfoPort = &stInfoPort;
+
+			// Copy the GUID of DMUS_PORTCAP structure to an INFOPORT structure
+
+			ZeroMemory(lpInfoPort, sizeof(INFOPORT));
+			CopyMemory(&(lpInfoPort->guidSynthGUID), &portinf.guidPort, sizeof(GUID));
+
+#ifdef _UNICODE
+			_tcscpy(lpInfoPort->szPortDescription, portinf.wszDescription);
+#else
+			wcstombs(lpInfoPort->szPortDescription, portinf.wszDescription, DMUS_MAX_DESCRIPTION);
+#endif
+
+			lpInfoPort->dwClass = portinf.dwClass;
+			lpInfoPort->dwEffectFlags = portinf.dwEffectFlags;
+			lpInfoPort->dwFlags = portinf.dwFlags;
+			lpInfoPort->dwMemorySize = portinf.dwMemorySize;
+			lpInfoPort->dwMaxAudioChannels = portinf.dwMaxAudioChannels;
+			lpInfoPort->dwMaxChannelGroups = portinf.dwMaxChannelGroups;
+			lpInfoPort->dwMaxVoices = portinf.dwMaxVoices;
+			lpInfoPort->dwType = portinf.dwType;
+
+			if (lpEnumFunc(lpInfoPort, lParam) == FALSE) {
+				break;
+			}
+		}
+	}
+
+	if ((hr != S_FALSE) && (hr != S_OK)) throw CDMusicException(strMembrFunc, hr, __LINE__);
+
+	return;
+}

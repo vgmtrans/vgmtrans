@@ -8,6 +8,7 @@ double ConvertPercentAmpToStdMidiScale(double percent);
 long ConvertPercentToLogVolScale(long maxVal, double percent);
 double ConvertLogScaleValToAtten(double percent);
 double ConvertPercentAmplitudeToAttenDB(double percent);
+double ConvertPercentAmplitudeToAttenDB_SF2(double percent);
 
 double SecondsToTimecents(double secs);
 double ConvertPercentPanToStdMidiScale(double percent, double * ptr_volume_scale = NULL);

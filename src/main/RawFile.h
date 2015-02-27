@@ -19,7 +19,7 @@ class RawFile
 {
 public:
 	RawFile(void);
-	RawFile(const std::wstring name, uint32_t fileSize = 0, bool bCanRead = true);
+	RawFile(const std::wstring name, uint32_t fileSize = 0, bool bCanRead = true, const VGMTag tag = VGMTag());
 public:
 	virtual ~RawFile(void);
 
@@ -106,6 +106,7 @@ public:
 	//uint16_t GetShortBE(uint32_t nIndex);
 	//uint32_t GetWord(uint32_t nIndex);
 	//uint32_t GetWordBE(uint32_t nIndex);
+	bool MatchBytes(const uint8_t* pattern, uint32_t nIndex, size_t nCount);
 	bool MatchBytePattern(const BytePattern& pattern, uint32_t nIndex);
 	bool SearchBytePattern(const BytePattern& pattern, uint32_t& nMatchOffset, uint32_t nSearchOffset = 0, uint32_t nSearchSize = (uint32_t)-1);
 
@@ -142,5 +143,5 @@ class VirtFile : public RawFile
 {
 public:
 	VirtFile();
-	VirtFile(uint8_t* data, uint32_t fileSize, const std::wstring& name, const wchar_t* parRawFileFullPath = L"");
+	VirtFile(uint8_t* data, uint32_t fileSize, const std::wstring& name, const wchar_t* parRawFileFullPath = L"", const VGMTag tag = VGMTag());
 };

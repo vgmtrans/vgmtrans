@@ -326,10 +326,11 @@ void CRawFileListView::OnSaveAsRaw(UINT uCode, int nID, HWND hwndCtrl)
 
 void CRawFileListView::OnCloseFile(UINT uCode, int nID, HWND hwndCtrl)
 {
-	for (int i = GetNextItem(-1, LVNI_SELECTED); i != -1; i = GetNextItem(i, LVNI_SELECTED) )
+	int iItem;
+	while ((iItem = GetNextItem(-1, LVNI_SELECTED)) != -1)
 	{
 		LVITEM item;
-		item.iItem = i;
+		item.iItem = iItem;
 		item.iSubItem = 0;
 		item.mask = LVIF_PARAM;
 		GetItem(&item);

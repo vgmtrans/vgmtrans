@@ -120,8 +120,8 @@ bool AkaoColl::PreDLSMainCreation()
 	AkaoInstrSet* instrSet = (AkaoInstrSet*)instrsets[0];
 
 	AkaoSampColl* sampcoll = (AkaoSampColl*)sampcolls[0];
-	const uint32_t numArts = sampcoll->akArts.size();
-	const uint32_t origNumInstrs = instrSet->aInstrs.size();
+	const uint32_t numArts = (const uint32_t)sampcoll->akArts.size();
+	const uint32_t origNumInstrs = (const uint32_t)instrSet->aInstrs.size();
 	if (origNumInstrs + numArts > 0x7F)
 		numAddedInstrs = 0x7F - origNumInstrs;
 	else

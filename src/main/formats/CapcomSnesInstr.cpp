@@ -41,9 +41,11 @@ bool CapcomSnesInstrSet::GetInstrPointers()
 			continue;
 		}
 
-		if (!CapcomSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr))
-		{
+		if (!CapcomSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr, false)) {
 			break;
+		}
+		if (!CapcomSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr, true)) {
+			continue;
 		}
 
 		uint8_t srcn = GetByte(addrInstrHeader);
@@ -106,7 +108,7 @@ bool CapcomSnesInstr::LoadInstr()
 	return true;
 }
 
-bool CapcomSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint32_t spcDirAddr)
+bool CapcomSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample)
 {
 	if (addrInstrHeader + 6 > 0x10000)
 	{
@@ -125,16 +127,13 @@ bool CapcomSnesInstr::IsValidHeader(RawFile * file, uint32_t addrInstrHeader, ui
 	}
 
 	uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-	if (addrDIRentry + 4 > 0x10000)
-	{
+	if (!SNESSampColl::IsValidSampleDir(file, addrDIRentry, validateSample)) {
 		return false;
 	}
 
 	uint16_t srcAddr = file->GetShort(addrDIRentry);
 	uint16_t loopStartAddr = file->GetShort(addrDIRentry + 2);
-
-	if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0)
-	{
+	if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0) {
 		return false;
 	}
 
@@ -154,7 +153,7 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr* instr, uint32_t offset) :
 	uint8_t gain = GetByte(offset + 3);
 	int16_t pitch_scale = GetShortBE(offset + 4);
 
-	const double pitch_fixer = 1.0238 * (32768.0 / 32000.0); // 1.0238 <- pitch table vs. equal temperament
+	const double pitch_fixer = 4286.0 / 4096.0;
 	double fine_tuning;
 	double coarse_tuning;
 	fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);

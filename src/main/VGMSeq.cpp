@@ -16,7 +16,6 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
 : VGMFile(FILETYPE_SEQ, format, file, offset, length, name),
   //midi(this),
   midi(NULL),
-  voices(NULL),
   bMonophonicTracks(false),
   bReverb(false),
   bUseLinearAmplitudeScale(false),
@@ -26,26 +25,26 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   bAlwaysWriteInitialReverb(false),
   bAlwaysWriteInitialPitchBendRange(false),
   bAllowDiscontinuousTrackData(false),
-  bLoadTrackByTrack(false),
+  bLoadTickByTick(false),
   initialVol(100),					//GM standard (dls1 spec p16)
   initialExpression(127),			//''
   initialReverb(40),				//GM standard
   initialPitchBendRangeSemiTones(2), //GM standard.  Means +/- 2 semitones (4 total range)
-  initialPitchBendRangeCents(0)
+  initialPitchBendRangeCents(0),
+  nNumTracks(0),
+  time(0),
+  readMode(READMODE_ADD_TO_UI)
 {
-	voices = new SeqVoiceAllocator();
 	AddContainer<SeqTrack>(aTracks);
 }
 
 VGMSeq::~VGMSeq(void)
 {
-	delete voices;
 	DeleteVect<SeqTrack>(aTracks);
 }
 
 bool VGMSeq::Load()
 {
-	voices->Clear();
 	if (!LoadMain())
 		return false;
 
@@ -69,16 +68,13 @@ MidiFile* VGMSeq::ConvertToMidi()
 
 	MidiFile* newmidi = new MidiFile(this);
 	this->midi = newmidi;
-	this->voices->SetMidiFile(midi);
 	if (!LoadTracks(READMODE_CONVERT_TO_MIDI, stopTime))
 	{
 		delete midi;
 		this->midi = NULL;
-		this->voices->SetMidiFile(NULL);
 		return NULL;
 	}
 	this->midi = NULL;
-	this->voices->SetMidiFile(NULL);
 	return newmidi;
 }
 
@@ -93,15 +89,17 @@ MidiTrack* VGMSeq::GetFirstMidiTrack()
 //Load() - Function to load all the sequence data into the class
 bool VGMSeq::LoadMain()
 {
+	readMode = READMODE_ADD_TO_UI;
+
 	if (!GetHeaderInfo())
 		return false;
 	if (!GetTrackPointers())
 		return false;
-	nNumTracks = aTracks.size();
+	nNumTracks = (uint32_t)aTracks.size();
 	if (nNumTracks == 0)
 		return false;
 
-	if (!LoadTracks(READMODE_ADD_TO_UI))
+	if (!LoadTracks(readMode))
 		return false;
 
 	return true;
@@ -113,8 +111,9 @@ bool VGMSeq::PostLoad()
 	{
 		std::sort(aInstrumentsUsed.begin(), aInstrumentsUsed.end());
 
-		for (uint32_t i=0; i<aTracks.size(); i++)
-			sort(aTracks[i]->aEvents.begin(), aTracks[i]->aEvents.end(), ItemPtrOffsetCmp());
+		for (uint32_t i = 0; i < aTracks.size(); i++) {
+			std::sort(aTracks[i]->aEvents.begin(), aTracks[i]->aEvents.end(), ItemPtrOffsetCmp());
+		}
 	}
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
 	{
@@ -126,6 +125,8 @@ bool VGMSeq::PostLoad()
 
 bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 {
+	bool succeeded = true;
+
 	// set read mode
 	this->readMode = readMode;
 	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
@@ -137,10 +138,28 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 	ResetVars();
 	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
 	{
-		if (!aTracks[trackNum]->LoadTrackInit(trackNum))
+		if (!aTracks[trackNum]->LoadTrackInit(trackNum, NULL))
 			return false;
 	}
 
+	LoadTracksMain(stopTime);
+	if (readMode == READMODE_ADD_TO_UI)
+	{
+		SetGuessedLength();
+		if (unLength == 0) {
+			return false;
+		}
+	}
+
+	if (!PostLoad()) {
+		succeeded = false;
+	}
+
+	return succeeded;
+}
+
+void VGMSeq::LoadTracksMain(long stopTime)
+{
 	// determine the stop offsets
 	uint32_t* aStopOffset = new uint32_t[nNumTracks];
 	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
@@ -176,9 +195,8 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 
 	// load all tracks
 	bool succeeded = true;
-	if (!bLoadTrackByTrack)
+	if (bLoadTickByTick)
 	{
-		long time = 0;
 		while (HasActiveTracks())
 		{
 			// check time limit
@@ -190,7 +208,7 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 					pRoot->AddLogItem(new LogItem(itemName.c_str(), LOG_LEVEL_WARN, L"VGMSeq"));
 				}
 
-				InactiveAllTracks();
+				InactivateAllTracks();
 				break;
 			}
 
@@ -201,95 +219,46 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime)
 					continue;
 
 				// tick
-				if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum]))
-				{
-					succeeded = false;
-					break;
-				}
+				aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime);
 			}
 			time++;
+
+			if (readMode == READMODE_CONVERT_TO_MIDI)
+			{
+				for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
+				{
+					if (aTracks[trackNum]->pMidiTrack != NULL)
+					{
+						aTracks[trackNum]->pMidiTrack->SetDelta(time);
+					}
+				}
+			}
 
 			// check loop count
 			int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 : ConversionOptions::GetNumSequenceLoops();
 			if (GetForeverLoops() >= requiredLoops)
 			{
-				InactiveAllTracks();
+				InactivateAllTracks();
 				break;
 			}
 		}
 	}
 	else
 	{
+		uint32_t initialTime = time; // preserve current time for multi section sequence
+
 		// load track by track
 		for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
 		{
-			if (!aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum]))
-			{
-				succeeded = false;
-				break;
-			}
+			time = initialTime;
+
+			aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime);
 			aTracks[trackNum]->active = false;
 		}
 	}
 	delete[] aStopOffset;
 
-	if (succeeded)
-	{
-		// adjust container length
-		if (readMode == READMODE_ADD_TO_UI)
-		{
-			// track length
-			for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
-			{
-				if (aTracks[trackNum]->unLength == 0)			//if unLength has not been changed from default value of 0
-				{
-					if (!aTracks[trackNum]->aEvents.empty())
-					{
-						SeqEvent* lastTrkEvent = aTracks[trackNum]->aEvents.back();
-						aTracks[trackNum]->unLength = lastTrkEvent->dwOffset + lastTrkEvent->unLength - aTracks[trackNum]->dwOffset;
-					}
-				}
-			}
-
-			// sequence length
-			if (unLength == 0)
-			{
-				// a track can sometimes cover other ones (i.e. a track has a "hole" between the head and tail)
-				// it means that the tail of the last track is not always the tail of a sequence, even if they are sorted by start address
-				// therefore, check the length of each tracks
-
-				for (vector<SeqTrack*>::iterator itr = aTracks.begin(); itr != aTracks.end(); ++itr)
-				{
-					assert(dwOffset <= (*itr)->dwOffset);
-
-					uint32_t expectedLength = (*itr)->dwOffset + (*itr)->unLength - dwOffset;
-					if (unLength < expectedLength)
-					{
-						unLength = expectedLength;
-					}
-				}
-
-				// process header items as well
-				for (vector<VGMHeader*>::iterator itr = headers.begin(); itr != headers.end(); ++itr)
-				{
-					assert(dwOffset <= (*itr)->dwOffset);
-
-					uint32_t expectedLength = (*itr)->dwOffset + (*itr)->unLength - dwOffset;
-					if (unLength < expectedLength)
-					{
-						unLength = expectedLength;
-					}
-				}
-			}
-		}
-
-		if (!PostLoad())
-		{
-			succeeded = false;
-		}
-	}
-
-	return succeeded;
+	return;
 }
 
 bool VGMSeq::HasActiveTracks()
@@ -302,7 +271,7 @@ bool VGMSeq::HasActiveTracks()
 	return false;
 }
 
-void VGMSeq::InactiveAllTracks()
+void VGMSeq::InactivateAllTracks()
 {
 	for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++)
 	{
@@ -342,6 +311,8 @@ bool VGMSeq::GetTrackPointers(void)
 
 void VGMSeq::ResetVars(void)
 {
+	time = 0;
+
 	if (readMode == READMODE_ADD_TO_UI)
 	{
 		aInstrumentsUsed.clear();
@@ -383,9 +354,7 @@ bool VGMSeq::SaveAsMidi(const wchar_t* filepath)
 	MidiFile* midi = this->ConvertToMidi();
 	if (!midi)
 		return false;
-	this->voices->SetMidiFile(midi);
 	bool result = midi->SaveMidiFile(filepath);
 	delete midi;
-	this->voices->SetMidiFile(NULL);
 	return result;
 }

@@ -22,6 +22,7 @@
 	// When debugging, turn on the CRT's debugging facilities
 	// for checking for memory leaks
 	// (we call _CrtSetDbgFlag in _tWinMain)
+	#define _ATL_DISABLE_NOTHROW_NEW
 	#define _CRTDBG_MAP_ALLOC
 	#include <stdlib.h>
 	#include <crtdbg.h>

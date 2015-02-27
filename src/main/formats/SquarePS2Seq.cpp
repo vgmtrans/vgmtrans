@@ -95,7 +95,7 @@ bool BGMTrack::ReadEvent(void)
 		//rest_time += current_delta_time;
 		//if (nScanMode == MODE_SCAN)
 		//	AddBGMEvent("Loop Begin", ICON_STARTREP, aBGMTracks[cur_track]->pTreeItem, offsetAtDelta, j-offsetAtDelta, BG_CLR_CYAN);
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Begin", NULL, CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Begin", L"", CLR_LOOP);
 		break;
 
 	case 0x03 :			// Loop end
@@ -103,7 +103,7 @@ bool BGMTrack::ReadEvent(void)
 //		loop_counter++;
 		//if (loop_counter < num_loops)
 		//	j = loop_start;
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", NULL, CLR_LOOP);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", L"", CLR_LOOP);
 		break;
 
 	case 0x04 :			//end of track?
@@ -206,7 +206,7 @@ bool BGMTrack::ReadEvent(void)
 
 	case 0x3C :		//Sustain Pedal
 		value1 = GetByte(curOffset++);
-		AddSustainEvent(beginOffset, curOffset-beginOffset, (value1>0));
+		AddSustainEvent(beginOffset, curOffset-beginOffset, value1);
 		break;
 
 	case 0x40 :		//found in ffxi 208.bgm couple times
@@ -248,7 +248,7 @@ bool BGMTrack::ReadEvent(void)
 		break;
 
 	default :
-		AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", NULL, CLR_UNRECOGNIZED);
+		AddGenericEvent(beginOffset, curOffset-beginOffset, L"UNKNOWN", L"", CLR_UNRECOGNIZED);
 		break;
 
 	}

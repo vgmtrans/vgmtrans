@@ -7,7 +7,7 @@ class VGMSeqNoTrks :
 	public SeqTrack
 {
 public:
-	VGMSeqNoTrks(const std::string& format, RawFile* file, uint32_t offset);
+	VGMSeqNoTrks(const std::string& format, RawFile* file, uint32_t offset, std::wstring name = L"VGM Sequence");
 public:
 	virtual ~VGMSeqNoTrks(void);
 
@@ -45,7 +45,7 @@ public:
 	virtual bool LoadMain();				//Function to load all the information about the sequence
 	//virtual int GetHeaderInfo(void);
 //	virtual void AddTrack(SeqTrack* track);		//should be called for all tracks before LoadTracks.
-	virtual bool LoadEvents();
+	virtual bool LoadEvents(long stopTime = 1000000);
 	virtual MidiFile* ConvertToMidi();
 	virtual MidiTrack* GetFirstMidiTrack();
 	//virtual int ApplyTable(void);	//create and apply table handler object for sequence

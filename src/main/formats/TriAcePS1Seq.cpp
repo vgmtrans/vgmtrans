@@ -13,14 +13,13 @@ DECLARE_FORMAT(TriAcePS1);
 // TriAcePS1Seq
 // ************
 
-TriAcePS1Seq::TriAcePS1Seq(RawFile* file, uint32_t offset)
-: VGMSeq(TriAcePS1Format::name, file, offset)
+TriAcePS1Seq::TriAcePS1Seq(RawFile* file, uint32_t offset, const std::wstring& name)
+: VGMSeq(TriAcePS1Format::name, file, offset, 0, name)
 {
 	AddContainer<TriAcePS1ScorePattern>(aScorePatterns);
 	UseLinearAmplitudeScale();
 	UseReverb();
 	AlwaysWriteInitialPitchBendRange(12, 0);
-	bLoadTrackByTrack = true;
 }
 
 TriAcePS1Seq::~TriAcePS1Seq()
@@ -42,8 +41,6 @@ bool TriAcePS1Seq::GetHeaderInfo(void)
 	unLength = GetShort(dwOffset+2);
 	initialTempoBPM = GetByte(dwOffset+0xF);
 	bWriteInitialTempo = true;
-
-	name = L"TriAce Seq";
 	return true;
 }
 
@@ -79,7 +76,7 @@ TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset, long length
 {
 }
 
-bool TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset)
+void TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime)
 {
 	TriAcePS1Seq* seq = (TriAcePS1Seq*)parentSeq;
 	uint32_t scorePatternPtrOffset = dwOffset;
@@ -104,7 +101,7 @@ bool TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset)
 	}
 	AddEndOfTrack(scorePatternPtrOffset, 2);
 	unLength = scorePatternPtrOffset+2 - dwOffset;
-	return true;
+	return;
 }
 
 
@@ -135,12 +132,12 @@ bool TriAcePS1Track::ReadEvent(void)
 		else note_dur = impliedNoteDur;
 		if (!impliedVelocity) velocity = GetByte(curOffset++);
 		else velocity = impliedVelocity;
-		AddNoteByDur(beginOffset, curOffset-beginOffset, status_byte, velocity, note_dur);
+		AddNoteByDur_Extend(beginOffset, curOffset-beginOffset, status_byte, velocity, note_dur);
 	}
 	else switch (status_byte)
 	{
 		case 0x80 :
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Score Pattern End", NULL, CLR_TRACKEND);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Score Pattern End", L"", CLR_TRACKEND);
 			return false;
 
 		case 0x81 :			//unknown
@@ -216,7 +213,7 @@ bool TriAcePS1Track::ReadEvent(void)
 			{
 				event_dur = GetByte(curOffset++);
 				uint8_t val = GetByte(curOffset++);
-				AddSustainEvent(beginOffset, curOffset-beginOffset, (val>0));
+				AddSustainEvent(beginOffset, curOffset-beginOffset, val);
 			}
 			break;
 
@@ -229,12 +226,12 @@ bool TriAcePS1Track::ReadEvent(void)
 			break;
 
 		case 0x8D :			//Dal Segno: start point
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno: start point", NULL, CLR_UNKNOWN);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno: start point", L"", CLR_UNKNOWN);
 			break;
 
 		case 0x8E :			//Dal Segno: end point
 			curOffset++;
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno: end point", NULL, CLR_UNKNOWN);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Dal Segno: end point", L"", CLR_UNKNOWN);
 			break;
 
 		case 0x8F :			//rest
@@ -309,7 +306,7 @@ bool TriAcePS1Track::ReadEvent(void)
 		case 0x9E :			//imply note params
 			impliedNoteDur = GetByte(curOffset++);
 			impliedVelocity = GetByte(curOffset++);
-			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Imply Note Params", NULL, CLR_CHANGESTATE);
+			AddGenericEvent(beginOffset, curOffset-beginOffset, L"Imply Note Params", L"", CLR_CHANGESTATE);
 			break;
 
 		default :

@@ -68,13 +68,16 @@ void RareSnesInstrSet::ScanAvailableInstruments()
 	{
 		uint8_t srcn = GetByte(dwOffset + inst);
 
-		if (srcn == 0 && !firstZero)
-		{
-			continue;
-		}
 		if (srcn == 0)
 		{
-			firstZero = false;
+			if (firstZero)
+			{
+				firstZero = false;
+			}
+			else
+			{
+				continue;
+			}
 		}
 
 		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
@@ -87,15 +90,15 @@ void RareSnesInstrSet::ScanAvailableInstruments()
 			continue;
 		}
 
-		uint16_t addrSampStart = GetShort(offDirEnt);
-		uint16_t addrSampLoop = GetShort(offDirEnt + 2);
-		// valid loop?
-		if (addrSampStart > addrSampLoop)
+		if (!SNESSampColl::IsValidSampleDir(rawfile, offDirEnt, true))
 		{
 			continue;
 		}
+
+		uint16_t addrSampStart = GetShort(offDirEnt);
+		uint16_t addrSampLoop = GetShort(offDirEnt + 2);
 		// not in DIR table
-		if (addrSampStart < spcDirAddr + (128 * 4))
+		if (addrSampStart < spcDirAddr + (inst * 4))
 		{
 			continue;
 		}

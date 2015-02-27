@@ -10,7 +10,7 @@ class LogItem
 public:
 	LogItem();
 	LogItem(const wchar_t* text, LogLevel level, const wchar_t* source);
-	LogItem(std::wstring& text, LogLevel level, std::wstring& source);
+	LogItem(const std::wstring& text, LogLevel level, const std::wstring& source);
 	virtual ~LogItem();
 
 	std::wstring GetText() const;
