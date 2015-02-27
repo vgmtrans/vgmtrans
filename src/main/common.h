@@ -80,10 +80,33 @@ inline int CountBytesOfVal(uint8_t* buf, uint32_t numBytes, uint8_t val)
 	return count;
 }
 
- inline bool isEqual(float x, float y)
- {
-   return abs(x - y) <= F_EPSILON * abs(x);
- }
+inline bool isEqual(float x, float y)
+{
+	//const double epsilon = 0.00001/* some small number such as 1e-5 */;
+	return std::abs(x - y) <= F_EPSILON * std::abs(x);
+	// see Knuth section 4.2.2 pages 217-218
+} 
+
+inline int roundi(double x)
+{
+	return (x > 0) ? (int)(x + 0.5) : (int)(x - 0.5);
+}
+
+inline uint8_t pow7bit(uint8_t x, double y)
+{
+	if (x > 127) {
+		x = 127;
+	}
+	return roundi(pow(x / 127.0, y) * 127.0);
+}
+
+inline uint8_t sqrt7bit(uint8_t x)
+{
+	if (x > 127) {
+		x = 127;
+	}
+	return roundi(sqrt(x / 127.0) * 127.0);
+}
 
 struct SizeOffsetPair
 {

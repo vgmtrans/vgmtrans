@@ -112,7 +112,7 @@ public:
 	double GetTempoInBPM (uint8_t tempo, uint8_t timerFreq);
 
 private:
-	void LoadEventMap(RareSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 
@@ -121,13 +121,12 @@ class RareSnesTrack
 {
 public:
 	RareSnesTrack(RareSnesSeq* parentFile, long offset = 0, long length = 0);
-	virtual bool LoadTrackInit(uint32_t trackNum);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
 	virtual void OnTickBegin(void);
 	virtual void OnTickEnd(void);
 
-	void AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR, const wchar_t* sEventName = L"Volume L/R");
+	void AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR, const std::wstring& sEventName = L"Volume L/R");
 	void AddVolLRNoItem(int8_t spcVolL, int8_t spcVolR);
 
 private:

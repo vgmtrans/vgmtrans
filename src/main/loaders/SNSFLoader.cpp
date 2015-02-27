@@ -43,7 +43,7 @@ PostLoadCommand SNSFLoader::Apply(RawFile* file)
 			//pRoot->UI_WriteBufferToFile(L"uncomp.smc", exebuf, exebufsize);
 
 			wstring str = file->GetFileName();
-			pRoot->CreateVirtFile(exebuf, exebufsize, str.data());
+			pRoot->CreateVirtFile(exebuf, (uint32_t)exebufsize, str.data(), L"", file->tag);
 			return DELETE_IT;
 		}
 	}
@@ -102,6 +102,20 @@ const wchar_t* SNSFLoader::psf_read_exe(
 
 	if (!psf.ReadExe(exebuffer + snsfRomStart, snsfRomSize, 0x08))
 		return L"Decompression failed";
+
+	// set tags to RawFile
+	if (psf.tags.count("title") != 0) {
+		file->tag.title = string2wstring(psf.tags["title"]);
+	}
+	if (psf.tags.count("artist") != 0) {
+		file->tag.artist = string2wstring(psf.tags["artist"]);
+	}
+	if (psf.tags.count("game") != 0) {
+		file->tag.album = string2wstring(psf.tags["game"]);
+	}
+	if (psf.tags.count("comment") != 0) {
+		file->tag.comment = string2wstring(psf.tags["comment"]);
+	}
 
 	return NULL;
 }

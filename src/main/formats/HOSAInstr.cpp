@@ -49,7 +49,7 @@ bool HOSAInstrSet::GetHeaderInfo()
 	wdsHeader->AddSimpleItem(dwOffset+8,sizeof(uint32_t),L"Number of Instruments");
 
 	//波形objectの生成
-	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800);
+//	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800); // moved to HOSAScanner
 //	sampColl->Load();				//VGMInstrSet::Load()関数内でやっている。
 //	sampColl->UseInstrSet(this);	//"WD.cpp"では、同様の事をやっている。
 
@@ -99,8 +99,9 @@ HOSAInstr::HOSAInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t length, ui
 //--------------------------------------------------------------
 bool HOSAInstr::LoadInstr()
 {
-
-//	HOSAInstrSet*	_parInstrSet	=	(HOSAInstrSet*)parInstrSet;
+	if (dwOffset + sizeof(InstrInfo) > vgmfile->GetEndOffset()) {
+		return false;
+	}
 
 	// Get the instr data
 	GetBytes(dwOffset, sizeof(InstrInfo), &instrinfo);
@@ -148,7 +149,7 @@ bool HOSAInstr::LoadInstr()
 		uint8_t Sr = ((rgninfo->ADSR_vals >> 8) & 0xFF) >> 1;
 		uint8_t Rr = (rgninfo->ADSR_vals >> 4) & 0x1F;
 		uint8_t Sl = rgninfo->ADSR_vals & 0xF;
-		uint8_t Am = ((rgninfo->ADSR_Am & 0xF) ^ 5) < 1;			//Not sure what other role this nibble plays, if any.
+		uint8_t Am = (((rgninfo->ADSR_Am & 0xF) ^ 5) < 1) ? 1 : 0;	//Not sure what other role this nibble plays, if any.
 		PSXConvADSR(rgn, Am, Ar, Dr, Sl, 1, 1, Sr, 1, Rr, false);
 
 

@@ -44,7 +44,7 @@ bool AkaoInstrSet::GetInstrPointers()
 // *********
 
 AkaoInstr::AkaoInstr(AkaoInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-				  uint32_t theInstrNum, const wchar_t* name)
+	uint32_t theInstrNum, const std::wstring& name)
  : 	VGMInstr(instrSet, offset, length, theBank, theInstrNum, name)
 {
 	bDrumKit = false;
@@ -123,12 +123,12 @@ bool AkaoDrumKit::LoadInstr()
 // AkaoRgn
 // *******
 AkaoRgn::AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, 
-		uint8_t artIDNum, const wchar_t* name)
+	uint8_t artIDNum, const std::wstring& name)
 		: VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0), artNum(artIDNum)
 {
 }
 
-AkaoRgn::AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, const wchar_t* name)
+AkaoRgn::AkaoRgn(VGMInstr* instr, uint32_t offset, uint32_t length, const std::wstring& name)
 : VGMRgn(instr, offset, length, name)
 {
 }
@@ -284,7 +284,7 @@ bool AkaoSampColl::GetSampleInfo()
 
 	//sample_section_offset = SampleSetSize - sample_section_size;
 
-	sample_section_offset = arts_offset + akArts.size() * 0x10;
+	sample_section_offset = arts_offset + (uint32_t)(akArts.size() * 0x10);
 	if (sample_section_offset + sample_section_size > rawfile->size())//pDoc->GetDocumentLength())	//if the official total file size is greater than the file size of the document
 		sample_section_size = rawfile->size() - sample_section_offset;	//then shorten the sample section size to the actual end of the document
 	if (GetWord(sample_section_offset + sample_section_size - 0x10) == 0)		//check the last 10 bytes to make sure they aren't null, if they are, abbreviate things till there is no 0x10 block of null bytes
@@ -308,7 +308,9 @@ bool AkaoSampColl::GetSampleInfo()
 			//CAKSSSamp* newSample = new CAKSSSamp(this);
 			//aSamps.Add(newSample);
 			//newSample->SampVGMItem.dwOffset = j;
-			PSXSamp* samp =  new PSXSamp(this, j, 0, j, 0, 1, 16, 44100, L"Sample");
+			wostringstream name;
+			name << L"Sample " << samples.size();
+			PSXSamp* samp = new PSXSamp(this, j, 0, j, 0, 1, 16, 44100, name.str());
 		
 			//samp->SetLoopStatus(bLoops);
 			//samp->SetLoopOffset(loopOff);

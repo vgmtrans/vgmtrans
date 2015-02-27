@@ -20,13 +20,14 @@ RawFile::RawFile(void)
 	bufSize = (BUF_SIZE > fileSize) ? fileSize : BUF_SIZE;
 }
 
-RawFile::RawFile(const wstring name, uint32_t theFileSize, bool bCanRead)
+RawFile::RawFile(const wstring name, uint32_t theFileSize, bool bCanRead, const VGMTag tag)
 : fileSize(theFileSize), /*data(databuf),*/
   //filename(name),
   fullpath(name),
   parRawFileFullPath(L""),		//this should only be defined by VirtFile
   propreRatio(0.5),
   bCanFileRead(bCanRead),
+  tag(tag),
   processFlags(PF_USESCANNERS | PF_USELOADERS)
 {
 	filename = getFileNameFromPath(fullpath);
@@ -333,6 +334,25 @@ uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void* pBuffer)
 // attempts to match the data from a given offset against a given pattern.
 // If the requested data goes beyond the bounds of the file buffer, the buffer is updated.
 // If the requested size is greater than the buffer size, it always fails. (operation not supported)
+bool RawFile::MatchBytes(const uint8_t* pattern, uint32_t nIndex, size_t nCount)
+{
+	if ((nIndex + nCount) > fileSize)
+		return false;
+
+	if (nCount > buf.size)
+		return false; // not supported
+	else
+	{
+		if ((nIndex < buf.startOff) || (nIndex + nCount > buf.endOff))
+			UpdateBuffer(nIndex);
+
+		return (memcmp(buf.data + nIndex - buf.startOff, pattern, nCount) == 0);
+	}
+}
+
+// attempts to match the data from a given offset against a given pattern.
+// If the requested data goes beyond the bounds of the file buffer, the buffer is updated.
+// If the requested size is greater than the buffer size, it always fails. (operation not supported)
 bool RawFile::MatchBytePattern(const BytePattern& pattern, uint32_t nIndex)
 {
 	size_t nCount = pattern.length();
@@ -466,8 +486,8 @@ VirtFile::VirtFile()
 {
 }
 
-VirtFile::VirtFile(uint8_t* data, uint32_t fileSize, const wstring& name, const wchar_t* rawFileName)
-: RawFile(name, fileSize, false)
+VirtFile::VirtFile(uint8_t* data, uint32_t fileSize, const wstring& name, const wchar_t* rawFileName, const VGMTag tag)
+: RawFile(name, fileSize, false, tag)
 {
 	parRawFileFullPath = rawFileName;
 	buf.load(data, 0, fileSize);

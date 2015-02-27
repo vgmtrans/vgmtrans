@@ -55,8 +55,10 @@ bool VGMInstrSet::Load()
 	if (aInstrs.size() == 0)
 		return false;
 
-	if (unLength == 0)
-		unLength = aInstrs.back()->dwOffset + aInstrs.back()->unLength - dwOffset;
+	if (unLength == 0) {
+		//unLength = aInstrs.back()->dwOffset + aInstrs.back()->unLength - dwOffset;
+		SetGuessedLength();
+	}
 
 	if (sampColl != NULL)
 	{

@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "SegSatScanner.h"
-#include "SegSat.h"
+#include "SegSatSeq.h"
 
 #define SRCH_BUF_SIZE 0x20000
 

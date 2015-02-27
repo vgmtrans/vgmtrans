@@ -78,7 +78,7 @@ public:
 	double GetTempoInBPM (uint16_t tempo);
 
 private:
-	void LoadEventMap(CapcomSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 
@@ -87,7 +87,6 @@ class CapcomSnesTrack
 {
 public:
 	CapcomSnesTrack(CapcomSnesSeq* parentFile, long offset = 0, long length = 0);
-	virtual bool LoadTrackInit(uint32_t trackNum);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
 	virtual void OnTickBegin(void);
@@ -109,6 +108,9 @@ private:
 	uint8_t noteAttributes;
 	uint8_t durationRate;
 	//int8_t transpose;
+
+	bool lastNoteSlurred;
+	int8_t lastKey;
 
 	double GetTuningInSemitones(int8_t tuning);
 };

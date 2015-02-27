@@ -87,8 +87,12 @@ void CHexView::OnLButtonDown(UINT nFlags, CPoint point)
 			offset += (point.x - GetAsciiLeftEdge()) / CHAR_WIDTH;
 		}
 		VGMItem* selectedItem = NULL;
-		if (bClickedAnItem)
-			selectedItem = curFile->GetItemFromOffset(offset);
+		if (bClickedAnItem) {
+			selectedItem = curFile->GetItemFromOffset(offset, false);
+			if (selectedItem == NULL) {
+				selectedItem = curFile->GetItemFromOffset(offset, true);
+			}
+		}
 		parFrame->SelectItem(selectedItem);
 		curOffset = offset;
 	}
@@ -152,7 +156,7 @@ void CHexView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 		else if (curOffset >= endOffset)
 			curOffset = endOffset-1;
 
-		VGMItem* temp = curFile->GetItemFromOffset(curOffset);
+		VGMItem* temp = curFile->GetItemFromOffset(curOffset, false);
 		if (temp)
 		{
 			//winroot.SelectItem(temp);
@@ -747,7 +751,7 @@ void CHexView::SetupColor()
 	{
 		//if (offset+j > curFile->dwOffset+curFile->unLength)
 		//	break;
-		VGMItem* item = curFile->GetItemFromOffset(offset+j);
+		VGMItem* item = curFile->GetItemFromOffset(offset+j, false);
 		if (item)
 		{
 			ULONG itemSize = item->unLength;

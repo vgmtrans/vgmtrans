@@ -17,7 +17,7 @@ public:
 	} TrkInfo;
 
 
-	TriAcePS1Seq(RawFile* file, uint32_t offset);
+	TriAcePS1Seq(RawFile* file, uint32_t offset, const std::wstring& name = std::wstring(L"TriAce Seq"));
 	virtual ~TriAcePS1Seq(void);
 
 	virtual bool GetHeaderInfo(void);
@@ -47,7 +47,7 @@ class TriAcePS1Track
 public:
 	TriAcePS1Track(TriAcePS1Seq* parentSeq, long offset = 0, long length = 0);
 
-	virtual bool LoadTrackMainLoop(uint32_t stopOffset);
+	virtual void LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
 	uint32_t ReadScorePattern(uint32_t offset);
 	virtual bool IsOffsetUsed(uint32_t offset);
 	virtual void AddEvent(SeqEvent* pSeqEvent);

@@ -1,3 +1,4 @@
+#pragma once
 #ifdef __cplusplus
 
     #include <QDebug>
@@ -5,6 +6,8 @@
     #include <assert.h>
     #include <wchar.h>
     #include <cmath>
+    #include <math.h>
+    #include <algorithm>
     #include <limits.h>
     #include <stdio.h>
     #include <stdint.h>
@@ -20,6 +23,9 @@
     #include <iomanip>
     #include <wchar.h>
     #include <ctype.h>
+
+    using namespace std;
+
 #endif
 
 #define TIXML_USE_STL

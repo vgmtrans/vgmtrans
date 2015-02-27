@@ -90,7 +90,7 @@ bool Vab::GetInstrPointers()
 	for (uint32_t i = 0; i < 128; i++)
 	{
 		uint32_t offCurrProg = offProgs + (i * 16);
-		uint32_t offCurrToneAttrs = offToneAttrs + (aInstrs.size() * 32 * 16);
+		uint32_t offCurrToneAttrs = offToneAttrs + (uint32_t)(aInstrs.size() * 32 * 16);
 
 		if (offCurrToneAttrs + (32 * 16) > nEndOffset)
 		{
