@@ -6,7 +6,7 @@
 // VGMRgn
 // ******
 
-VGMRgn::VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length, const wchar_t* name)
+VGMRgn::VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length, const std::wstring& name)
 : VGMContainerItem(instr->parInstrSet, offset, length, name),
   parInstr(instr),
   keyLow(0),
@@ -31,7 +31,7 @@ VGMRgn::VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length, const wchar_t*
 }
 
 VGMRgn::VGMRgn(VGMInstr* instr, uint32_t offset, uint32_t length, uint8_t theKeyLow, uint8_t theKeyHigh,
-			   uint8_t theVelLow, uint8_t theVelHigh, int theSampNum, const wchar_t* name)
+	uint8_t theVelLow, uint8_t theVelHigh, int theSampNum, const std::wstring& name)
 : VGMContainerItem(instr->parInstrSet, offset, length, name),
   parInstr(instr),
   keyLow(theKeyLow),
@@ -112,7 +112,7 @@ void VGMRgn::SetADSR(long attackTime, uint16_t atkTransform, long decayTime, lon
 	release_time = releaseTime;
 }
 
-void VGMRgn::AddGeneralItem(uint32_t offset, uint32_t length, const wchar_t* name)
+void VGMRgn::AddGeneralItem(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_GENERIC, offset, length, name));
 }
@@ -187,7 +187,7 @@ void VGMRgn::AddSampNum(int sn, uint32_t offset, uint32_t length)
 // VGMRgnItem
 // **********
 
-VGMRgnItem::VGMRgnItem(VGMRgn* rgn, RgnItemType theType, uint32_t offset, uint32_t length, const wchar_t* name)
+VGMRgnItem::VGMRgnItem(VGMRgn* rgn, RgnItemType theType, uint32_t offset, uint32_t length, const std::wstring& name)
 : VGMItem(rgn->vgmfile, offset, length, name), type(theType)
 {
 }

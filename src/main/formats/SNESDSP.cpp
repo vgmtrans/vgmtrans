@@ -9,73 +9,146 @@
 // SNES Envelope
 // *************
 
-// Simulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
+// Emulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
 // return elapsed time in sample count, and final env value if requested.
-uint32_t GetSNESGAINEnvLength(uint8_t gain, int16_t env, int16_t env_to, int16_t * env_after)
+uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t * env_after_ptr, double * sf2_envelope_time_ptr)
 {
+	// check for illegal parameters
+	if (env_from < 0 || env_from > 0x7ff) {
+		return 0;
+	}
+
+	if (env_to < 0 || env_to > 0x7ff) {
+		return 0;
+	}
+
 	uint8_t mode = gain >> 5;
 	uint8_t rate = gain & 0x1f;
 	uint32_t tick = 0;
 
-	if (env < 0 || env > 0x7ff)
-	{
-		return 0;
-	}
-	if (env_to < 0 || env_to > 0x7ff)
-	{
-		return 0;
-	}
+	uint32_t tick_exp = 0;
+	int16_t env_exp_final = env_to;
 
-	if (mode < 4) // direct
-	{
+	int16_t env = env_from;
+	if (mode < 4) { // direct
 		env = gain * 0x10;
 		rate = 31;
 		tick = 0;
 	}
-	else if ( mode == 4 ) // 4: linear decrease
-	{
-		while (env > env_to)
-		{
+	else if ( mode == 4 ) { // 4: linear decrease
+		while (env > env_to) {
 			env -= 0x20;
 			if (env < 0)
 				env = 0;
 			tick++;
 		}
 	}
-	else if ( mode < 6 ) // 5: exponential decrease
-	{
-		while (env > env_to)
-		{
+	else if ( mode == 5 ) { // 5: exponential decrease
+		while (env > env_to) {
+			int16_t env_prev = env;
+
 			env--;
 			env -= env >> 8;
 			tick++;
+
+			if (env <= 255 && env_prev > 255) {
+				env_exp_final = env;
+			}
+
+			if (env > 255) {
+				tick_exp++;
+			}
 		}
 	}
-	else // 6,7: linear increase
-	{
-		int16_t env_prev = (env >= 0x20) ? env - 0x20 : 0; // obviously not true, but I guess it's not wrong in most cases.
+	else { // 6,7: linear increase
+		int16_t env_prev = (env >= 0x20) ? env - 0x20 : 0; // sloppy guess, but I guess it's not wrong in most cases.
 
-		while (env < env_to)
-		{
+		while (env < env_to) {
 			env += 0x20;
-			if ( mode > 6 && (unsigned) env_prev >= 0x600 )
-			{
+			if ( mode > 6 && (unsigned) env_prev >= 0x600 ) {
 				env += 0x8 - 0x20; // 7: two-slope linear increase
 			}
 			env_prev = env;
-			if (env > 0x7ff)
-			{
+			if (env > 0x7ff) {
 				env = 0x7ff;
 			}
 			tick++;
 		}
 	}
 
-	if (env_after != NULL)
-	{
-		*env_after = env;
+	uint32_t total_samples = tick * SDSP_COUNTER_RATES[rate];
+	if (env_after_ptr != NULL) {
+		*env_after_ptr = env;
 	}
-	return tick * SDSP_COUNTER_RATES[rate];
+
+	// calculate envelope time for soundfont use
+	if (sf2_envelope_time_ptr != NULL) {
+		double sf2_time;
+		if (mode < 4) { // direct
+			sf2_time = 0.0;
+		}
+		else if (mode == 4) { // 4: linear decrease
+			// not implemented yet
+			sf2_time = 0.0;
+		}
+		else if (mode == 5) { // 5: exponential decrease
+			// Exponential decrease mode is almost exponential.
+			// It will become to linear decrease when ENVX <= 255.
+			// Soundfont is always exponential, so this is a lossy conversion.
+
+			if (tick == 0) {
+				sf2_time = 0;
+			}
+			else {
+				if (env_from > 255) {
+					// exponential part
+					double decibelAtStart = ConvertPercentAmplitudeToAttenDB(env_from / 2047.0);
+					double decibelAtExpFinal = ConvertPercentAmplitudeToAttenDB(env_exp_final / 2047.0);
+					double timeAtExpFinal = (tick_exp * SDSP_COUNTER_RATES[rate]) / 32000.0;
+					sf2_time = timeAtExpFinal * (-100.0 / (decibelAtExpFinal - decibelAtStart));
+				}
+				else {
+					// linear part (very small volume)
+					// Measure the time to end volume and fit it to -100.0 dB scale.
+
+					if (env == 0 && tick == 1) {
+						sf2_time = SDSP_COUNTER_RATES[rate] / 32000.0;
+					}
+					else {
+						int16_t env_final = env;
+						uint32_t tick_total = tick;
+
+						// avoid -INF decibel
+						if (env_final == 0) {
+							env_final++;
+							tick_total--;
+						}
+
+						double decibelAtStart = ConvertPercentAmplitudeToAttenDB(env_from / 2047.0);
+						double decibelAtFinal = ConvertPercentAmplitudeToAttenDB(env_final / 2047.0);
+						double timeAtExpFinal = (tick_total * SDSP_COUNTER_RATES[rate]) / 32000.0;
+						sf2_time = timeAtExpFinal * (-100.0 / (decibelAtFinal - decibelAtStart));
+					}
+
+					// Alternate method:
+					// differentiate the logarithmic-decibel ENVX curve,
+					// then consider the slope of the line as envelope speed.
+					//double env_start = max(env_from, 1);
+					//double decibelDiff = ConvertPercentAmplitudeToAttenDB(env_start / 2047.0) - ConvertPercentAmplitudeToAttenDB((env_start + 1) / 2047.0);
+					//double timePerTick = SDSP_COUNTER_RATES[rate] / 32000.0;
+					//sf2_time = timePerTick * (-100.0 / decibelDiff);
+				}
+			}
+		}
+		else { // 6,7: linear increase
+			// not implemented yet
+			sf2_time = 0.0;
+		}
+
+		*sf2_envelope_time_ptr = sf2_time;
+	}
+
+	return total_samples;
 }
 
 // ************
@@ -133,35 +206,65 @@ void SNESSampColl::SetDefaultTargets(uint32_t maxNumSamps)
 
 bool SNESSampColl::GetSampleInfo()
 {
+	spcDirHeader = AddHeader(spcDirAddr, 0, L"Sample DIR");
 	for (std::vector<uint8_t>::iterator itr = this->targetSRCNs.begin(); itr != this->targetSRCNs.end(); ++itr)
 	{
 		uint8_t srcn = (*itr);
+		std::wostringstream name;
 
 		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-		if (offDirEnt + 4 > 0x10000)
-		{
+		if (!SNESSampColl::IsValidSampleDir(GetRawFile(), offDirEnt, true)) {
 			continue;
 		}
 
 		uint16_t addrSampStart = GetShort(offDirEnt);
 		uint16_t addrSampLoop = GetShort(offDirEnt + 2);
-		if (addrSampStart > addrSampLoop)
-		{
-			continue;
-		}
 
-		uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart);
-		if (length == 0)
-		{
-			continue;
-		}
+		bool loop;
+		uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart, loop);
 
-		std::wostringstream name;
+		name << L"SA " << srcn;
+		spcDirHeader->AddSimpleItem(offDirEnt, 2, name.str().c_str());
+
+		name.str(L"");
+		name << L"LSA " << srcn;
+		spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, name.str().c_str());
+
+		name.str(L"");
 		name << L"Sample " << srcn;
 		SNESSamp* samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length, addrSampLoop, name.str());
 		samples.push_back(samp);
 	}
+	spcDirHeader->SetGuessedLength();
 	return samples.size() != 0;
+}
+
+bool SNESSampColl::IsValidSampleDir(RawFile * file, uint32_t spcDirEntAddr, bool validateSample)
+{
+	if (spcDirEntAddr + 4 > 0x10000) {
+		return false;
+	}
+
+	uint16_t addrSampStart = file->GetShort(spcDirEntAddr);
+	uint16_t addrSampLoop = file->GetShort(spcDirEntAddr + 2);
+	if (addrSampLoop < addrSampStart || addrSampStart + 9 >= 0x10000) {
+		return false;
+	}
+
+	if (validateSample) {
+		bool loop;
+		uint32_t length = SNESSamp::GetSampleLength(file, addrSampStart, loop);
+		if (length == 0) {
+			return false;
+		}
+
+		uint16_t addrSampEnd = addrSampStart + length;
+		if (loop && addrSampLoop >= addrSampEnd) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 //  ********
@@ -179,17 +282,23 @@ SNESSamp::~SNESSamp()
 {
 }
 
-uint32_t SNESSamp::GetSampleLength(RawFile * file, uint32_t offset)
+uint32_t SNESSamp::GetSampleLength(RawFile * file, uint32_t offset, bool & loop)
 {
 	uint32_t currOffset = offset;
-	while (currOffset + 9 <= file->size())
+	while (true)
 	{
+		if (currOffset + 9 > file->size()) {
+			// address out of range, it's apparently corrupt
+			return 0;
+		}
+
 		uint8_t flag = file->GetByte(currOffset);
 		currOffset += 9;
 
 		// end?
 		if ((flag & 1) != 0)
 		{
+			loop = (flag & 2) != 0;
 			break;
 		}
 	}

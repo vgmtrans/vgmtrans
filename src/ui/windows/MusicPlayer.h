@@ -47,6 +47,8 @@ public:
 	void SetupReverb(VGMSeq* vgmseq);
 	void SetVolume(long vol);
 	void ResetMidi();
+	BOOL EnumPortsProc(LPINFOPORT lpInfoPort);
+	static BOOL CALLBACK EnumPortsCallback(LPINFOPORT lpInfoPort, LPVOID lpUserParam);
 	static DWORD CALLBACK ProcessSeqPlayback(VOID* lpParam);
 	static void CALLBACK CallbackTestFunc(UINT idEvent, void* pUserContext);
 	//DWORD ProcessSeqPlayback(PVOID pParam);

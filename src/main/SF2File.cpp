@@ -283,12 +283,15 @@ SF2File::SF2File(SynthFile* synthfile)
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
-			// Velocity range (if exists) this must be the next chunk
-			instGenList.sfGenOper = velRange;
-			instGenList.genAmount.ranges.byLo = (uint8_t)rgn->usVelLow;
-			instGenList.genAmount.ranges.byHi = (uint8_t)rgn->usVelHigh;
-			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
-			dataPtr += sizeof(sfInstGenList);
+			if (rgn->usVelHigh)	// 0 means 'not set', fixes TriAce instruments
+			{
+				// Velocity range (if exists) this must be the next chunk
+				instGenList.sfGenOper = velRange;
+				instGenList.genAmount.ranges.byLo = (uint8_t)rgn->usVelLow;
+				instGenList.genAmount.ranges.byHi = (uint8_t)rgn->usVelHigh;
+				memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+				dataPtr += sizeof(sfInstGenList);
+			}
 
 			// initialAttenuation
 			instGenList.sfGenOper = sampleModes;
@@ -316,13 +319,13 @@ SF2File::SF2File(SynthFile* synthfile)
 
 			// attackVolEnv
 			instGenList.sfGenOper = attackVolEnv;
-			instGenList.genAmount.shAmount = (rgn->art->attack_time == 0) ?  -32768 : round(SecondsToTimecents(rgn->art->attack_time));
+			instGenList.genAmount.shAmount = (rgn->art->attack_time == 0) ?  -32768 : roundi(SecondsToTimecents(rgn->art->attack_time));
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
 			// decayVolEnv
 			instGenList.sfGenOper = decayVolEnv;
-			instGenList.genAmount.shAmount = (rgn->art->decay_time == 0) ?  -32768 :  round(SecondsToTimecents(rgn->art->decay_time));
+			instGenList.genAmount.shAmount = (rgn->art->decay_time == 0) ?  -32768 :  roundi(SecondsToTimecents(rgn->art->decay_time));
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 
@@ -336,7 +339,7 @@ SF2File::SF2File(SynthFile* synthfile)
 
 			// releaseVolEnv
 			instGenList.sfGenOper = releaseVolEnv;
-			instGenList.genAmount.shAmount = (rgn->art->release_time == 0) ?  -32768 : round(SecondsToTimecents(rgn->art->release_time));
+			instGenList.genAmount.shAmount = (rgn->art->release_time == 0) ?  -32768 : roundi(SecondsToTimecents(rgn->art->release_time));
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
 

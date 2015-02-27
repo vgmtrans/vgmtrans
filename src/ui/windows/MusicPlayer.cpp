@@ -172,66 +172,34 @@ bool MusicPlayer::Init(HWND hWnd)
 
 void MusicPlayer::EnumPorts()
 {
-	INFOPORT Info;
-	DWORD dwNumOutPorts = COutPort.GetNumPorts();
-	//DWORD dwNumInPorts = CInPort.GetNumPorts();
-	//DWORD dwCountInPorts = 0;
-	BOOL bSelected = FALSE;
+	m_bSwSynth = FALSE;
 
-	// List all output ports
-	DWORD nPortCount;
-
-	for(nPortCount = 1; nPortCount<=dwNumOutPorts; nPortCount++)
-	{
-		COutPort.GetPortInfo(nPortCount,&Info);
-		//m_OutPortList.AddString(Info.szPortDescription);
-		//m_OutPortList.SetItemData(nPortCount - 1,Info.dwFlags);
-		if ((Info.dwFlags & DMUS_PC_DLS) && (Info.dwFlags & DMUS_PC_DLS2))
-		{
-			if (!bSelected) // Select the port
-			{	
-				//Info.dwMaxChannelGroups = 5;
-				COutPort.SetPortParams(Info.dwMaxVoices, Info.dwMaxAudioChannels, NUM_CHANNEL_GROUPS, Info.dwEffectFlags, 44100);
-				COutPort.ActivatePort(&Info);
-				bSelected = TRUE;
-			//	m_nOutPortSel = nPortCount - 1;
-			//	m_OutPortList.SetCurSel(m_nOutPortSel);
-				if ((Info.dwFlags & DMUS_PC_DLS) || (Info.dwFlags & DMUS_PC_DLS2))
-				{	
-					m_bSwSynth = TRUE; // It's working with a Sw. Synth.
-					PrepareSoftwareSynth();
-				}
-				else
-					m_bSwSynth = FALSE;
-			}
-		}
-				
-	}
-
-	bSelected = FALSE;
-
-	// List all input ports
-
-	//for(nPortCount = 1;nPortCount<=dwNumInPorts;nPortCount++)
-	//{
-	//	//CInPort.GetPortInfo(4,&Info);
-	//	CInPort.GetPortInfo(nPortCount,&Info);
-	//	if (Info.dwType != DMUS_PORT_KERNEL_MODE)
-	//	{
-	//		//m_InPortList.AddString(Info.szPortDescription);
-	//		//if (!bSelected) // Select the port
-	//		if (wcscmp(Info.szPortDescription,_T("EDIROL PCR-A 1 [Emulated]")) == 0)
-	//		{	
-	//			CInPort.ActivatePort(&Info);
-	//			bSelected = TRUE;
-	//			//m_nInPortSel = dwCountInPorts;
-	//			//m_InPortList.SetCurSel(m_nInPortSel);
-	//		}
-	//		dwCountInPorts++;
-	//	}
-	//}
+	COutPort.EnumPort(EnumPortsCallback, this);
 }	
 
+BOOL MusicPlayer::EnumPortsProc(LPINFOPORT lpInfoPort)
+{
+	if ((lpInfoPort->dwFlags & DMUS_PC_DLS) != 0 && (lpInfoPort->dwFlags & DMUS_PC_DLS2) != 0)
+	{
+		COutPort.SetPortParams(lpInfoPort->dwMaxVoices, lpInfoPort->dwMaxAudioChannels, NUM_CHANNEL_GROUPS, lpInfoPort->dwEffectFlags, 44100);
+		COutPort.ActivatePort(lpInfoPort);
+
+		m_bSwSynth = TRUE; // It's working with a Sw. Synth.
+		PrepareSoftwareSynth();
+
+		// finish port scan
+		return FALSE;
+	}
+
+	// process next port
+	return TRUE;
+}
+
+BOOL MusicPlayer::EnumPortsCallback(LPINFOPORT lpInfoPort, LPVOID lpUserParam)
+{
+	MusicPlayer* player = (MusicPlayer*)lpUserParam;
+	return player->EnumPortsProc(lpInfoPort);
+}
 
 void MusicPlayer::CloseDown()
 {
@@ -708,7 +676,6 @@ DWORD MusicPlayer::ProcessSeqPlayback(PVOID pParam)
 	vector<BYTE> msg;
 	for (UINT i=0; i<pvEvent.size() && musicplayer.bPlaying; i++)		//for every event in the MIDI
 	{
-		BYTE d = 0;
 		msg.clear();
 		MidiEvent* pEvent = pvEvent[i];
 		int channelGroup = pEvent->prntTrk->channelGroup;
@@ -731,33 +698,93 @@ DWORD MusicPlayer::ProcessSeqPlayback(PVOID pParam)
 			
 		}
 		prevTime = time;
-		if (msg.empty())
-			continue;
-		while (msg[0+d] & 0x80)
+
+		size_t d = 0;
+		while (d < msg.size() && msg[d] & 0x80)
+		{
 			d++;
-		if (msg.size() < (ULONG)(d+4))
-			msg.resize(d+4);
-		if (msg[1+d] == 0xFF && msg[2+d] == 0x51 && msg[3+d] == 0x03)			//if it's a tempo event
-		{
-			microsPerQuarter = (msg[4+d]<<16) + (msg[5+d]<<8) + msg[6+d];		//get the microseconds per quarter value
-			millisPerTick = ((double)microsPerQuarter/(double)ppqn) / (double)1000;
 		}
-		else if (msg[1+d] != 0xFF /*&& (msg[1]&0xF0) != 0xB0 /*&& (msg[1]&0xF0) != 0xC0*/)
+		d++;
+
+		if (d >= msg.size())
 		{
-			BYTE channel = msg[1+d] & 0x0F;
+			continue;
+		}
+
+		if (msg[d] < 0xF0)
+		{
+			if (msg.size() < (ULONG)(d + 3))
+			{
+				msg.resize(d + 3);
+			}
+
+			BYTE channel = msg[d] & 0x0F;
 			if (channel == 9)					//if it's trying to play on the drum track channel
 			{									//directmusic behaves oddly.  It expects the DLS to load a drum bank
-				msg[1+d] |= 0x0F;				//and will not play on this channel otherwise.  So change the channel to one that should be unique
+				msg[d] |= 0x0F;					//and will not play on this channel otherwise.  So change the channel to one that should be unique
 				channelGroup++;					//(we wouldn't be playing on the drum chan in the first place if the seq format supported > 16 tracks, most likely)
 			}
 			try
 			{
-				musicplayer.COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(msg[1+d],msg[2+d],msg[3+d]),channelGroup+1);
+				musicplayer.COutPort.SendMidiMsg(COutputPort::EncodeMidiMsg(msg[d], msg[1 + d], msg[2 + d]), channelGroup + 1);
 			}
 			catch(CDMusicException CDMusicEx)
 			{
 				OutputDebugString(CDMusicEx.GetErrorDescription());
-				pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
+			}
+		}
+		else if (msg[d] == 0xFF)
+		{
+			if (msg[1 + d] == 0x51 && msg[2 + d] == 0x03)			//if it's a tempo event
+			{
+				if (msg.size() < (ULONG)(d + 6))
+				{
+					msg.resize(d + 6);
+				}
+
+				microsPerQuarter = (msg[3 + d] << 16) + (msg[4 + d] << 8) + msg[5 + d];		//get the microseconds per quarter value
+				millisPerTick = ((double)microsPerQuarter / (double)ppqn) / (double)1000;
+			}
+		}
+		else if (msg[d] == 0xF0)
+		{
+			size_t sysex_size = 0;
+			size_t sysex_size_len = 0;
+			bool valid_sysex_size = false;
+			while (d + 1 + sysex_size_len < msg.size())
+			{
+				if (sysex_size_len > 4)
+				{
+					break;
+				}
+
+				uint8_t theByte = msg[d + 1 + sysex_size_len];
+				sysex_size <<= 7;
+				sysex_size |= theByte & 0x7f;
+				sysex_size_len++;
+
+				if ((theByte & 0x80) == 0) {
+					valid_sysex_size = true;
+					break;
+				}
+			}
+
+			if (!valid_sysex_size || d + 1 + sysex_size_len + sysex_size > msg.size())
+			{
+				continue;
+			}
+
+			std::vector<uint8_t> sysex_msg(1 + sysex_size);
+			sysex_msg[0] = msg[d]; // F0
+			std::copy(msg.begin() + (d + 1 + sysex_size_len), msg.end(), sysex_msg.begin() + 1);
+
+			try
+			{
+				musicplayer.COutPort.SendMidiMsg(&sysex_msg[0], sysex_msg.size(), channelGroup + 1);
+			}
+			catch (CDMusicException CDMusicEx)
+			{
+				OutputDebugString(CDMusicEx.GetErrorDescription());
 			}
 		}
 	}

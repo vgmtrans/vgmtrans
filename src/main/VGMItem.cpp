@@ -51,11 +51,34 @@ RawFile* VGMItem::GetRawFile()
 }
 
 
-VGMItem* VGMItem::GetItemFromOffset(uint32_t offset)
+bool VGMItem::IsItemAtOffset(uint32_t offset, bool includeContainer)
 {
-	if (IsItemAtOffset(offset))
+	if (GetItemFromOffset(offset, includeContainer) != NULL) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+VGMItem* VGMItem::GetItemFromOffset(uint32_t offset, bool includeContainer)
+{
+	if ((offset >= dwOffset) && (offset < dwOffset + unLength)) {
 		return this;
-	return NULL;
+	}
+	else {
+		return NULL;
+	}
+}
+
+uint32_t VGMItem::GuessLength(void)
+{
+	return unLength;
+}
+
+void VGMItem::SetGuessedLength(void)
+{
+	return;
 }
 
 void VGMItem::AddToUI(VGMItem* parent, void* UI_specific)
@@ -138,22 +161,65 @@ VGMContainerItem::~VGMContainerItem()
 	DeleteVect(localitems);
 }
 
-VGMItem* VGMContainerItem::GetItemFromOffset(uint32_t offset)
+VGMItem* VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContainer)
 {
-	if (IsItemAtOffset(offset))				//if the offset is within this item
+	for (uint32_t i = 0; i<containers.size(); i++)
 	{
-		for (uint32_t i=0; i<containers.size(); i++)
+		for (uint32_t j = 0; j<containers[i]->size(); j++)
 		{
-			for (uint32_t j=0; j<containers[i]->size(); j++)	
-			{
-				VGMItem* foundItem = (*containers[i])[j]->GetItemFromOffset(offset);
-				if (foundItem)
-					return foundItem;
+			VGMItem* foundItem = (*containers[i])[j]->GetItemFromOffset(offset, includeContainer);
+			if (foundItem)
+				return foundItem;
+		}
+	}
+
+	if (includeContainer && (offset >= dwOffset) && (offset < dwOffset + unLength)) {
+		return this;
+	}
+	else {
+		return NULL;
+	}
+}
+
+// Guess length of a container from its descendants
+uint32_t VGMContainerItem::GuessLength(void)
+{
+	uint32_t guessedLength = 0;
+
+	// Note: children items can sometimes overwrap each other
+	for (uint32_t i = 0; i < containers.size(); i++) {
+		for (uint32_t j = 0; j < containers[i]->size(); j++) {
+			VGMItem* item = (*containers[i])[j];
+
+			assert(dwOffset <= item->dwOffset);
+
+			uint32_t itemLength = item->unLength;
+			if (unLength == 0) {
+				itemLength = item->GuessLength();
+			}
+
+			uint32_t expectedLength = item->dwOffset + itemLength - dwOffset;
+			if (guessedLength < expectedLength) {
+				guessedLength = expectedLength;
 			}
 		}
-		return NULL; // this offset must be a "hole", so that it should return nothing
 	}
-	return NULL;
+
+	return guessedLength;
+}
+
+void VGMContainerItem::SetGuessedLength(void)
+{
+	for (uint32_t i = 0; i < containers.size(); i++) {
+		for (uint32_t j = 0; j < containers[i]->size(); j++) {
+			VGMItem* item = (*containers[i])[j];
+			item->SetGuessedLength();
+		}
+	}
+
+	if (unLength == 0) {
+		unLength = GuessLength();
+	}
 }
 
 void VGMContainerItem::AddToUI(VGMItem* parent, void* UI_specific)
@@ -166,7 +232,7 @@ void VGMContainerItem::AddToUI(VGMItem* parent, void* UI_specific)
 	}
 }
 
-VGMHeader* VGMContainerItem::AddHeader(uint32_t offset, uint32_t length, const wchar_t* name)
+VGMHeader* VGMContainerItem::AddHeader(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	VGMHeader* header = new VGMHeader(this, offset, length, name);
 	headers.push_back(header);
@@ -178,7 +244,7 @@ void VGMContainerItem::AddItem(VGMItem* item)
 	localitems.push_back(item);
 }
 
-void VGMContainerItem::AddSimpleItem(uint32_t offset, uint32_t length, const wchar_t *name)
+void VGMContainerItem::AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	localitems.push_back(new VGMItem(this->vgmfile, offset, length, name, CLR_HEADER));
 	//items.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_GENERIC, offset, length, name));
@@ -196,7 +262,7 @@ void VGMContainerItem::AddHeaderItem(VGMItem* item)
 	header->AddItem(item);
 }
 	
-void VGMContainerItem::AddSimpleHeaderItem(uint32_t offset, uint32_t length, const wchar_t* name)
+void VGMContainerItem::AddSimpleHeaderItem(uint32_t offset, uint32_t length, const std::wstring& name)
 {
 	header->AddSimpleItem(offset, length, name);
 }

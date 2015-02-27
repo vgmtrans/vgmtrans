@@ -16,8 +16,9 @@ enum KonamiSnesSeqEventType
 	EVENT_PERCUSSION_ON,
 	EVENT_PERCUSSION_OFF,
 	EVENT_GAIN,
+	EVENT_INSTANT_TUNING,
 	EVENT_REST,
-	EVENT_REST_WITH_DURATION,
+	EVENT_TIE,
 	EVENT_PAN,
 	EVENT_VIBRATO,
 	EVENT_RANDOM_PITCH,
@@ -34,9 +35,12 @@ enum KonamiSnesSeqEventType
 	EVENT_VOLUME,
 	EVENT_VOLUME_FADE,
 	EVENT_PORTAMENTO,
-	EVENT_PITCH_ENVELOPE,
+	EVENT_PITCH_ENVELOPE_V1,
+	EVENT_PITCH_ENVELOPE_V2,
 	EVENT_TUNING,
-	EVENT_PITCH_SLIDE,
+	EVENT_PITCH_SLIDE_V1,
+	EVENT_PITCH_SLIDE_V2,
+	EVENT_PITCH_SLIDE_V3,
 	EVENT_ECHO,
 	EVENT_ECHO_PARAM,
 	EVENT_LOOP_WITH_VOLTA_START,
@@ -66,13 +70,19 @@ public:
 	KonamiSnesVersion version;
 	std::map<uint8_t, KonamiSnesSeqEventType> EventMap;
 
-	static const uint8_t panTable[];
+	static const uint8_t PAN_VOLUME_LEFT_V1[];
+	static const uint8_t PAN_VOLUME_RIGHT_V1[];
+	static const uint8_t PAN_VOLUME_LEFT_V2[];
+	static const uint8_t PAN_VOLUME_RIGHT_V2[];
+	static const uint8_t PAN_TABLE[];
+
+	uint8_t NOTE_DUR_RATE_MAX;
 
 	double GetTempoInBPM ();
 	double GetTempoInBPM (uint8_t tempo);
 
 private:
-	void LoadEventMap(KonamiSnesSeq *pSeqFile);
+	void LoadEventMap(void);
 };
 
 
@@ -81,11 +91,8 @@ class KonamiSnesTrack
 {
 public:
 	KonamiSnesTrack(KonamiSnesSeq* parentFile, long offset = 0, long length = 0);
-	virtual bool LoadTrackInit(uint32_t trackNum);
 	virtual void ResetVars(void);
 	virtual bool ReadEvent(void);
-	virtual void OnTickBegin(void);
-	virtual void OnTickEnd(void);
 
 	uint8_t noteLength;
 	uint8_t noteDurationRate;
@@ -105,6 +112,8 @@ public:
 	bool voltaEndMeansPlayNextVolta;
 	bool percussion;
 	uint8_t instrument;
+	int8_t prevNoteKey;
+	bool prevNoteSlurred;
 
 private:
 	double GetTuningInSemitones(int8_t tuning);

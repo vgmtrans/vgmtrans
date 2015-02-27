@@ -2,20 +2,26 @@
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
+#include "NinSnesFormat.h"
 
 // ****************
 // NinSnesInstrSet
 // ****************
 
 class NinSnesInstrSet :
-	public VGMInstrSet
+		public VGMInstrSet
 {
 public:
-	NinSnesInstrSet(RawFile* file, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name = L"NinSnesInstrSet");
+	NinSnesInstrSet(RawFile* file, NinSnesVersion ver, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name = L"NinSnesInstrSet");
 	virtual ~NinSnesInstrSet(void);
 
 	virtual bool GetHeaderInfo();
 	virtual bool GetInstrPointers();
+
+	NinSnesVersion version;
+
+	uint16_t konamiTuningTableAddress;
+	uint8_t konamiTuningTableSize;
 
 protected:
 	uint32_t spcDirAddr;
@@ -27,15 +33,21 @@ protected:
 // *************
 
 class NinSnesInstr
-	: public VGMInstr
+		: public VGMInstr
 {
 public:
-	NinSnesInstr(VGMInstrSet* instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name = L"NinSnesInstr");
+	NinSnesInstr(VGMInstrSet* instrSet, NinSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name = L"NinSnesInstr");
 	virtual ~NinSnesInstr(void);
 
 	virtual bool LoadInstr();
 
-	static bool IsValidHeader(RawFile * file, uint32_t addrInstrHeader, uint32_t spcDirAddr);
+	static bool IsValidHeader(RawFile * file, NinSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
+	static uint32_t ExpectedSize(NinSnesVersion version);
+
+	NinSnesVersion version;
+
+	uint16_t konamiTuningTableAddress;
+	uint8_t konamiTuningTableSize;
 
 protected:
 	uint32_t spcDirAddr;
@@ -46,11 +58,13 @@ protected:
 // ***********
 
 class NinSnesRgn
-	: public VGMRgn
+		: public VGMRgn
 {
 public:
-	NinSnesRgn(NinSnesInstr* instr, uint32_t offset);
+	NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset, uint16_t konamiTuningTableAddress = 0, uint8_t konamiTuningTableSize = 0);
 	virtual ~NinSnesRgn(void);
 
 	virtual bool LoadRgn();
+
+	NinSnesVersion version;
 };

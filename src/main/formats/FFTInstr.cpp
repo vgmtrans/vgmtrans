@@ -126,42 +126,64 @@ WdsInstr::~WdsInstr(void)
 //--------------------------------------------------------------
 bool	WdsInstr::LoadInstr()
 {
-
-//	WdsRgn* rgn = new WdsRgn(this, dwOffset, sizeof(WdsAttr), instrNum, parInstrSet->sampColl);
-	//WdsRgn* rgn = new WdsRgn(this, dwOffset);
-	//if (!rgn->LoadRgn())
-	//	return false;
-	//aRgns.push_back(rgn);
-
-	////Object "VGMRgn"と"VGMSampColl"の関連付け？
-	//rgn->sampNum		= instrNum;					//Wave number.
-//	rgn->sampCollPtr	= parInstrSet->sampColl;	//NDS用？（InstSetに、SampCollが複数有るようなformat）
+	WdsInstrSet* parInstrSet = (WdsInstrSet*)this->parInstrSet;
 
 	GetBytes(dwOffset, sizeof(WdsRgnData), &rgndata);
 	VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
-	rgn->sampOffset =		rgndata.ptBody;
-	if (((WdsInstrSet*)parInstrSet)->version == WdsInstrSet::VERSION_WDS)
+	rgn->sampOffset = rgndata.ptBody;
+	if (parInstrSet->version == WdsInstrSet::VERSION_WDS) {
 		rgn->sampOffset *= 8;
+	}
 	//rgn->loop.loopStart =	rgndata.ptLoop;
-	rgn->unityKey =			0x3C - rgndata.iSemiToneTune;
-	//an iFineTune value of 256 should equal 100 cents, and linear scaling seems to do the trick.
+	rgn->unityKey = 0x3C - rgndata.iSemiToneTune;
+	// an iFineTune value of 256 should equal 100 cents, and linear scaling seems to do the trick.
 	// see the declaration of iFineTune for info on where to find the actual code and table for this in FFT
-	rgn->fineTune =			(short)((double)rgndata.iFineTune * (100.0/256.0));	
+	rgn->fineTune = (short)((double)rgndata.iFineTune * (100.0/256.0));	
 
-	PSXConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
-	aRgns.push_back(rgn);
+	rgn->AddGeneralItem(dwOffset + 0x00, sizeof(uint32_t), L"Sample Offset");
+	rgn->AddGeneralItem(dwOffset + 0x04, sizeof(uint16_t), L"Loop Offset");
+	rgn->AddGeneralItem(dwOffset + 0x06, sizeof(uint16_t), L"Pitch Fine Tune");
 
-	rgn->AddGeneralItem(dwOffset+0x00, sizeof(uint32_t), L"Sample Offset");
-	rgn->AddGeneralItem(dwOffset+0x04, sizeof(uint16_t), L"Loop Offset");
-	rgn->AddGeneralItem(dwOffset+0x06, sizeof(uint16_t), L"Pitch Fine Tune");
-	rgn->AddGeneralItem(dwOffset+0x08, sizeof(uint8_t), L"Attack Rate");
-	rgn->AddGeneralItem(dwOffset+0x09, sizeof(uint8_t), L"Decay Rate");
-	rgn->AddGeneralItem(dwOffset+0x0A, sizeof(uint8_t), L"Sustain Rate");
-	rgn->AddGeneralItem(dwOffset+0x0B, sizeof(uint8_t), L"Release Rate");
-	rgn->AddGeneralItem(dwOffset+0x0C, sizeof(uint8_t), L"Sustain Level");
-	rgn->AddGeneralItem(dwOffset+0x0D, sizeof(uint8_t), L"Attack Rate Mode?");
-	rgn->AddGeneralItem(dwOffset+0x0E, sizeof(uint8_t), L"unknown");
-	rgn->AddGeneralItem(dwOffset+0x0F, sizeof(uint8_t), L"unknown");
+	if (parInstrSet->version == WdsInstrSet::VERSION_WDS) {
+		uint32_t adsr_rate = GetWord(dwOffset + 0x08);
+		uint16_t adsr_mode = GetShort(dwOffset + 0x0c);
+
+		// Xenogears: function 0x8003e5bc
+		// These values will be set to SPU by function 0x8003e900
+		uint8_t Ar = adsr_rate & 0x7f;
+		uint8_t Dr = (adsr_rate >> 8) & 0x0f;
+		uint8_t Sl = (adsr_rate >> 12) & 0x0f;
+		uint8_t Sr = (adsr_rate >> 16) & 0x7f;
+		uint8_t Rr = (adsr_rate >> 24) & 0x1f;
+		uint8_t Am = adsr_mode & 0x07;
+		uint8_t Sm = (adsr_mode >> 4) & 0x07;
+		uint8_t Rm = (adsr_mode >> 8) & 0x07;
+
+		rgn->AddGeneralItem(dwOffset + 0x08, sizeof(uint8_t), L"ADSR Attack Rate");
+		rgn->AddGeneralItem(dwOffset + 0x09, sizeof(uint8_t), L"ADSR Decay Rate & Sustain Level");
+		rgn->AddGeneralItem(dwOffset + 0x0a, sizeof(uint8_t), L"ADSR Sustain Rate");
+		rgn->AddGeneralItem(dwOffset + 0x0b, sizeof(uint8_t), L"ADSR Release Rate");
+		rgn->AddGeneralItem(dwOffset + 0x0c, sizeof(uint8_t), L"ADSR Attack Mode & Sustain Mode / Direction");
+		rgn->AddGeneralItem(dwOffset + 0x0d, sizeof(uint8_t), L"ADSR Release Mode");
+		rgn->AddUnknown(dwOffset + 0x0e, sizeof(uint8_t));
+		rgn->AddUnknown(dwOffset + 0x0f, sizeof(uint8_t));
+
+		PSXConvADSR(rgn, Am >> 2, Ar, Dr, Sl, Sm >> 2, (Sm >> 1) & 1, Sr, Rm >> 2, Rr, false);
+		aRgns.push_back(rgn);
+	}
+	else if (parInstrSet->version == WdsInstrSet::VERSION_DWDS) {
+		PSXConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
+		aRgns.push_back(rgn);
+
+		rgn->AddGeneralItem(dwOffset + 0x08, sizeof(uint8_t), L"Attack Rate");
+		rgn->AddGeneralItem(dwOffset + 0x09, sizeof(uint8_t), L"Decay Rate");
+		rgn->AddGeneralItem(dwOffset + 0x0A, sizeof(uint8_t), L"Sustain Rate");
+		rgn->AddGeneralItem(dwOffset + 0x0B, sizeof(uint8_t), L"Release Rate");
+		rgn->AddGeneralItem(dwOffset + 0x0C, sizeof(uint8_t), L"Sustain Level");
+		rgn->AddGeneralItem(dwOffset + 0x0D, sizeof(uint8_t), L"Attack Rate Mode?");
+		rgn->AddUnknown(dwOffset + 0x0E, sizeof(uint8_t));
+		rgn->AddUnknown(dwOffset + 0x0F, sizeof(uint8_t));
+	}
 
 	return true;
 }

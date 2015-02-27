@@ -188,6 +188,27 @@ bool PSXSampColl::GetSampleInfo()
 // GENERIC FUNCTION USED FOR SCANNERS
 PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format)
 {
+	const std::vector<PSXSampColl*>& sampColls = SearchForPSXADPCMs(file, format);
+	if (sampColls.size() != 0) {
+		// pick up one of the SampColls
+		size_t bestSampleCount = 0;
+		PSXSampColl* bestSampColl = sampColls[0];
+		for (size_t i = 0; i < sampColls.size(); i++) {
+			if (sampColls[i]->samples.size() > bestSampleCount) {
+				bestSampleCount = sampColls[i]->samples.size();
+				bestSampColl = sampColls[i];
+			}
+		}
+		return bestSampColl;
+	}
+	else {
+		return NULL;
+	}
+}
+
+const std::vector<PSXSampColl*> PSXSampColl::SearchForPSXADPCMs (RawFile* file, const string& format)
+{
+	std::vector<PSXSampColl*> sampColls;
 	uint32_t nFileLength = file->size();
 	for (uint32_t i=0; i+16+NUM_CHUNKS_READAHEAD*16<nFileLength; i++)
 	{
@@ -248,13 +269,13 @@ PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format
 			if (!newSampColl->LoadVGMFile())
 			{
 				delete newSampColl;
-				return NULL;
+				continue;
 			}
-			return newSampColl;
-			//i += newSampColl->unLength-1;
+			sampColls.push_back(newSampColl);
+			i += newSampColl->unLength - 1;
 		}
 	}
-	return NULL;
+	return sampColls;
 }
 
 

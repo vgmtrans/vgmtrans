@@ -86,7 +86,7 @@ int midi_event_callback(void* data, fluid_midi_event_t* event)
     int new_chan = ((track_num / 15) * 16) + chan;
     fluid_midi_event_set_channel(event, new_chan);
 
-    printf("track_num: %d  new_chan: %d\n");
+    printf("track_num: %d  new_chan: %d\n", track_num, new_chan);
 
     return fluid_synth_handle_midi_event(data, event);
 }

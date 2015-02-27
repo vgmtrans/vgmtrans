@@ -428,9 +428,9 @@ protected:
 	virtual bool OnNewInstrSet(VGMInstrSet* instrset);
 	virtual bool OnNewSampColl(VGMSampColl* sampcoll);
 
-//	virtual bool OnCloseSeq(VGMSeq* seq);
-//	virtual bool OnCloseInstrSet(VGMInstrSet* instrset);
-//	virtual bool OnCloseSampColl(VGMSampColl* sampcoll);
+	virtual bool OnCloseSeq(VGMSeq* seq);
+	virtual bool OnCloseInstrSet(VGMInstrSet* instrset);
+	virtual bool OnCloseSampColl(VGMSampColl* sampcoll);
 
 	virtual void LookForMatch();
 	template <class T> T* GetLargestVGMFileInList(std::list<T*> theList);

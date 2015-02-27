@@ -21,7 +21,7 @@ LogItem::LogItem(const wchar_t* text, LogLevel level, const wchar_t* source) :
 {
 }
 
-LogItem::LogItem(std::wstring& text, LogLevel level, std::wstring& source) :
+LogItem::LogItem(const std::wstring& text, LogLevel level, const std::wstring& source) :
 	text(text),
 	time(DateTime::get_Now()),
 	level(level),

@@ -323,7 +323,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				DLSRgn* newRgn = newInstr->AddRgn();
 				newRgn->SetRanges(rgn->keyLow, rgn->keyHigh,
 					rgn->velLow, rgn->velHigh);
-				newRgn->SetWaveLinkInfo(0, 0, 1, realSampNum);
+				newRgn->SetWaveLinkInfo(0, 0, 1, (uint32_t)realSampNum);
 
 				if (realSampNum >= finalSamps.size())
 				{
@@ -398,8 +398,8 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				//if (rgn->attack_time < .001)
 				//	rgn->attack_time = .001;
 
-				long convAttack = (long)round(SecondsToTimecents(rgn->attack_time) * 65536);
-				long convDecay = (long)round(SecondsToTimecents(rgn->decay_time) * 65536);
+				long convAttack = (long)roundi(SecondsToTimecents(rgn->attack_time) * 65536);
+				long convDecay = (long)roundi(SecondsToTimecents(rgn->decay_time) * 65536);
 				long convSustainLev;
 				if (rgn->sustain_level == -1)
 					convSustainLev = 0x03e80000;		//sustain at full if no sustain level provided
@@ -412,7 +412,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 					int j = 0;
 				}
 
-				long convRelease = (long)round(SecondsToTimecents(rgn->release_time) * 65536);
+				long convRelease = (long)roundi(SecondsToTimecents(rgn->release_time) * 65536);
 
 				DLSArt* newArt = newRgn->AddArt();
 				newArt->AddPan(ConvertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
@@ -532,11 +532,15 @@ SynthFile* VGMColl::CreateSynthFile()
 
 
 				// Determine the sampCollNum (index into our finalSampColls vector)
-				unsigned int sampCollNum;
+				unsigned int sampCollNum = finalSampColls.size();
 				for (uint32_t i=0; i < finalSampColls.size(); i++)
 				{
 					if (finalSampColls[i] == sampColl)
 						sampCollNum = i;
+				}
+				if (sampCollNum == finalSampColls.size()) {
+					pRoot->AddLogItem(new LogItem(L"SampColl does not exist.", LOG_LEVEL_ERR, L"VGMColl"));
+					return NULL;
 				}
 				//   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
 				//   in the final DLS file.
@@ -546,7 +550,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				SynthRgn* newRgn = newInstr->AddRgn();
 				newRgn->SetRanges(rgn->keyLow, rgn->keyHigh,
 					rgn->velLow, rgn->velHigh);
-				newRgn->SetWaveLinkInfo(0, 0, 1, realSampNum);
+				newRgn->SetWaveLinkInfo(0, 0, 1, (uint32_t)realSampNum);
 
 				if (realSampNum >= finalSamps.size())
 				{
@@ -630,7 +634,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				if (rgn->sustain_level == -1)
 					sustainLevAttenDb = 0.0;
 				else
-					sustainLevAttenDb = ConvertPercentAmplitudeToAttenDB(rgn->sustain_level);
+					sustainLevAttenDb = ConvertPercentAmplitudeToAttenDB_SF2(rgn->sustain_level);
 
 				SynthArt* newArt = newRgn->AddArt();
 				newArt->AddPan(rgn->pan);

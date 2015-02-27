@@ -3,8 +3,6 @@
 #include "VGMSeq.h"
 #include "common.h"
 #include "Root.h"
-#include <math.h>
-#include <algorithm>
 
 using namespace std;
 
@@ -45,7 +43,7 @@ int MidiFile::GetMidiTrackIndex(MidiTrack * midiTrack)
 {
 	std::vector<MidiTrack *>::iterator it = std::find(aTracks.begin(), aTracks.end(), midiTrack);
 	if (it != aTracks.end()) {
-		return std::distance(aTracks.begin(), it);
+		return (int)std::distance(aTracks.begin(), it);
 	}
 	else {
 		return -1;
@@ -84,7 +82,7 @@ bool MidiFile::SaveMidiFile(const wchar_t* filepath)
 {
 	vector<uint8_t> midiBuf;
 	WriteMidiToBuffer(midiBuf);
-	return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], midiBuf.size());
+	return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], (uint32_t)midiBuf.size());
 }
 
 void MidiFile::WriteMidiToBuffer(vector<uint8_t> & buf)
@@ -141,7 +139,6 @@ MidiTrack::MidiTrack(MidiFile* theParentSeq, bool monophonic)
   bMonophonic(monophonic),
   DeltaTime(0),
   prevDurEvent(NULL),
-  prevDurNoteOff(NULL),
   prevKey(0),
   channelGroup(0),
   bHasEndOfTrack(false)
@@ -278,16 +275,82 @@ void MidiTrack::InsertNoteOff(uint8_t channel, int8_t key, uint32_t absTime)
 
 void MidiTrack::AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration)
 {
+	PurgePrevNoteOffs(GetDelta());
 	aEvents.push_back(new NoteEvent(this, channel, GetDelta(), true, key, vel));		//add note on
-	prevDurNoteOff = new NoteEvent(this, channel, GetDelta()+duration, false, key);
+	NoteEvent* prevDurNoteOff = new NoteEvent(this, channel, GetDelta() + duration, false, key);
+	prevDurNoteOffs.push_back(prevDurNoteOff);
 	aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
+}
+
+void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration)
+{
+	uint32_t CurDelta = GetDelta();
+	size_t nNumEvents = aEvents.size();
+	NoteEvent* ContNote;	// Continuted Note
+	
+	ContNote = NULL;
+	for (size_t curEvt = 0; curEvt < nNumEvents; curEvt++)
+	{
+		// Check for a event on this track with the following conditions:
+		//	1. Its Event Delta Time is > current Delta Time.
+		//	2. It's a Note Off event
+		//	3. Its key matches the key of the new note.
+		// If so, we're restarting an already played note. In the case of the TriAce driver that means,
+		// that we resume the note, so we need to move the NoteOff event.
+		
+		// Note: In previous TriAce drivers (like MegaDrive and SNES versions),
+		//       a Note gets extended by a Note On event at the tick where another note expires.
+		//       Valkyrie Profile: 225 Fragments of the Heart confirms, that this is NOT the case in the PS1 version.
+		if (aEvents[curEvt]->AbsTime > CurDelta && aEvents[curEvt]->GetEventType() == MIDIEVENT_NOTEON)
+		{
+			NoteEvent* NoteEvt = (NoteEvent*)aEvents[curEvt];
+			if (NoteEvt->key == key && ! NoteEvt->bNoteDown)
+			{
+				ContNote = NoteEvt;
+				break;
+			}
+		}
+	}
+	
+	if (ContNote == NULL)
+	{
+		PurgePrevNoteOffs(CurDelta);
+		aEvents.push_back(new NoteEvent(this, channel, CurDelta, true, key, vel));		//add note on
+		NoteEvent* prevDurNoteOff = new NoteEvent(this, channel, CurDelta + duration, false, key);
+		prevDurNoteOffs.push_back(prevDurNoteOff);
+		aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
+	}
+	else
+	{
+		ContNote->AbsTime = CurDelta + duration;	// fix DeltaTime of the already inserted NoteOff event
+	}
 }
 
 void MidiTrack::InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime)
 {
+	PurgePrevNoteOffs(max(GetDelta(), absTime));
 	aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));		//add note on
-	prevDurNoteOff = new NoteEvent(this, channel, absTime+duration, false, key);
+	NoteEvent* prevDurNoteOff = new NoteEvent(this, channel, absTime + duration, false, key);
+	prevDurNoteOffs.push_back(prevDurNoteOff);
 	aEvents.push_back(prevDurNoteOff);	//add note off at end of dur
+}
+
+void MidiTrack::PurgePrevNoteOffs()
+{
+	prevDurNoteOffs.clear();
+}
+
+void MidiTrack::PurgePrevNoteOffs(uint32_t absTime)
+{
+	auto it = prevDurNoteOffs.begin();
+	while (it != prevDurNoteOffs.end()) {
+		if ((*it)->AbsTime <= absTime) {
+			it = prevDurNoteOffs.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
 }
 
 /*void MidiTrack::AddVolMarker(uint8_t channel, uint8_t vol, int8_t priority)
@@ -301,6 +364,16 @@ void MidiTrack::InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, 
 	MidiEvent* newEvent = new VolMarkerEvent(this, channel, absTime, vol);
 	aEvents.push_back(newEvent);
 }*/
+
+void MidiTrack::AddControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), controllerNum, theDataByte));
+}
+
+void MidiTrack::InsertControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte, uint32_t absTime)
+{
+	aEvents.push_back(new ControllerEvent(this, channel, absTime, controllerNum, theDataByte));
+}
 
 void MidiTrack::AddVol(uint8_t channel, uint8_t vol)
 {
@@ -335,14 +408,14 @@ void MidiTrack::InsertExpression(uint8_t channel, uint8_t expression, uint32_t a
 	aEvents.push_back(new ExpressionEvent(this, channel, absTime, expression));
 }
 
-void MidiTrack::AddSustain(uint8_t channel, bool bOn)
+void MidiTrack::AddSustain(uint8_t channel, uint8_t depth)
 {
-	aEvents.push_back(new SustainEvent(this, channel, GetDelta(), bOn));
+	aEvents.push_back(new SustainEvent(this, channel, GetDelta(), depth));
 }
 
-void MidiTrack::InsertSustain(uint8_t channel, bool bOn, uint32_t absTime)
+void MidiTrack::InsertSustain(uint8_t channel, uint8_t depth, uint32_t absTime)
 {
-	aEvents.push_back(new SustainEvent(this, channel, absTime, bOn));
+	aEvents.push_back(new SustainEvent(this, channel, absTime, depth));
 }
 
 void MidiTrack::AddPortamento(uint8_t channel, bool bOn)
@@ -532,7 +605,7 @@ void MidiTrack::AddTempo(uint32_t microSeconds)
 
 void MidiTrack::AddTempoBPM(double BPM)
 {
-	uint32_t microSecs = (uint32_t)round((double)60000000/BPM);
+	uint32_t microSecs = (uint32_t)roundi((double)60000000/BPM);
 	aEvents.push_back(new TempoEvent(this, GetDelta(), microSecs));
 	//bAddedTempo = true;
 }
@@ -545,7 +618,7 @@ void MidiTrack::InsertTempo(uint32_t microSeconds, uint32_t absTime)
 
 void MidiTrack::InsertTempoBPM(double BPM, uint32_t absTime)
 {
-	uint32_t microSecs = (uint32_t)round((double)60000000/BPM);
+	uint32_t microSecs = (uint32_t)roundi((double)60000000/BPM);
 	aEvents.push_back(new TempoEvent(this, absTime, microSecs));
 	//bAddedTempo = true;
 }
@@ -575,32 +648,32 @@ void MidiTrack::InsertEndOfTrack(uint32_t absTime)
 	bHasEndOfTrack = true;
 }
 
-void MidiTrack::AddText(const wchar_t* wstr)
+void MidiTrack::AddText(const std::wstring& wstr)
 {
 	aEvents.push_back(new TextEvent(this, GetDelta(), wstr));
 }
 
-void MidiTrack::InsertText(const wchar_t* wstr, uint32_t absTime)
+void MidiTrack::InsertText(const std::wstring& wstr, uint32_t absTime)
 {
 	aEvents.push_back(new TextEvent(this, absTime, wstr));
 }
 
-void MidiTrack::AddSeqName(const wchar_t* wstr)
+void MidiTrack::AddSeqName(const std::wstring& wstr)
 {
 	aEvents.push_back(new SeqNameEvent(this, GetDelta(), wstr));
 }
 
-void MidiTrack::InsertSeqName(const wchar_t* wstr, uint32_t absTime)
+void MidiTrack::InsertSeqName(const std::wstring& wstr, uint32_t absTime)
 {
 	aEvents.push_back(new SeqNameEvent(this, absTime, wstr));
 }
 
-void MidiTrack::AddTrackName(const wchar_t* wstr)
+void MidiTrack::AddTrackName(const std::wstring& wstr)
 {
 	aEvents.push_back(new TrackNameEvent(this, GetDelta(), wstr));
 }
 
-void MidiTrack::InsertTrackName(const wchar_t* wstr, uint32_t absTime)
+void MidiTrack::InsertTrackName(const std::wstring& wstr, uint32_t absTime)
 {
 	aEvents.push_back(new TrackNameEvent(this, absTime, wstr));
 }
@@ -622,7 +695,7 @@ void MidiTrack::InsertGlobalTranspose(uint32_t absTime, int8_t semitones)
 
 
 
-void MidiTrack::AddMarker(uint8_t channel, string& markername, uint8_t databyte1, uint8_t databyte2, int8_t priority)
+void MidiTrack::AddMarker(uint8_t channel, const string& markername, uint8_t databyte1, uint8_t databyte2, int8_t priority)
 {
 	aEvents.push_back(new MarkerEvent(this, channel, GetDelta(), markername, databyte1, databyte2, priority));
 }
@@ -699,6 +772,27 @@ uint32_t MidiEvent::WriteMetaTextEvent(vector<uint8_t> & buf, uint32_t time, uin
 //{
 	//aEvents.push_back(MakeCopy());
 //}
+
+std::wstring MidiEvent::GetNoteName(int noteNumber)
+{
+	const wchar_t* noteNames[12] = { L"C", L"C#", L"D", L"D#", L"E", L"F", L"F#", L"G", L"G#", L"A", L"A#", L"B" };
+
+	int octave;
+	int key;
+	if (noteNumber >= 0) {
+		octave = noteNumber / 12;
+		key = noteNumber % 12;
+	}
+	else {
+		octave = -(-noteNumber / 12) - 1;
+		key = 12 - (-(noteNumber + 1) % 12) - 1;
+	}
+	octave--;
+
+	std::wstringstream name;
+	name << noteNames[key] << " " << octave;
+	return name.str();
+}
 
 
 bool MidiEvent::operator<(const MidiEvent &theMidiEvent) const
@@ -923,7 +1017,7 @@ uint32_t EndOfTrackEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 //  TextEvent
 //  *********
 
-TextEvent::TextEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const wchar_t* wstr)
+TextEvent::TextEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const std::wstring& wstr)
 : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr)
 {
 }
@@ -937,7 +1031,7 @@ uint32_t TextEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 //  SeqNameEvent
 //  ************
 
-SeqNameEvent::SeqNameEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const wchar_t* wstr)
+SeqNameEvent::SeqNameEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const std::wstring& wstr)
 : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr)
 {
 }
@@ -951,7 +1045,7 @@ uint32_t SeqNameEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 //  TrackNameEvent
 //  **************
 
-TrackNameEvent::TrackNameEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const wchar_t* wstr)
+TrackNameEvent::TrackNameEvent(MidiTrack* prntTrk, uint32_t absoluteTime, const std::wstring& wstr)
 : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr)
 {
 }

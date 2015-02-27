@@ -1,129 +1,173 @@
 #pragma once
-#include "VGMSeq.h"
+#include "VGMMultiSectionSeq.h"
 #include "SeqTrack.h"
-#include "Format.h"			//can replace this with NinSNES-specific format header file
 #include "NinSnesFormat.h"
 #include "NinSnesScanner.h"
 
-class NinSnesSection;
-class NinSnesTrack;
-
-enum 
+enum NinSnesSeqEventType
 {
-	EVENT_RET = 1,		//start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
-	EVENT_TIE,
-	EVENT_REST,
-	//EVENT_NOTE,
-	EVENT_PROGCHANGE,
-	EVENT_PAN,
-	EVENT_PANFADE,
-	EVENT_MASTVOL,
-	EVENT_MASTVOLFADE,
-	EVENT_TEMPO,
-	EVENT_TEMPOFADE,
-	EVENT_GLOBTRANSP,
-	EVENT_TRANSP,
-	EVENT_VOL,
-	EVENT_VOLFADE,
-	EVENT_GOSUB,
-	EVENT_SETPERCBASE,
-	EVENT_UNKNOWN0,
-	EVENT_UNKNOWN1, 
+	EVENT_UNKNOWN0 = 1, //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
+	EVENT_UNKNOWN1,
 	EVENT_UNKNOWN2,
 	EVENT_UNKNOWN3,
-	EVENT_LOOPBEGIN,
-	EVENT_LOOPEND
+	EVENT_UNKNOWN4,
+	EVENT_NOP,
+	EVENT_NOP1,
+	EVENT_END,
+	EVENT_NOTE_PARAM,
+	EVENT_NOTE,
+	EVENT_TIE,
+	EVENT_REST,
+	EVENT_PERCUSSION_NOTE,
+	EVENT_PROGCHANGE,
+	EVENT_PAN,
+	EVENT_PAN_FADE,
+	EVENT_VIBRATO_ON,
+	EVENT_VIBRATO_OFF,
+	EVENT_MASTER_VOLUME,
+	EVENT_MASTER_VOLUME_FADE,
+	EVENT_TEMPO,
+	EVENT_TEMPO_FADE,
+	EVENT_GLOBAL_TRANSPOSE,
+	EVENT_TRANSPOSE,
+	EVENT_TREMOLO_ON,
+	EVENT_TREMOLO_OFF,
+	EVENT_VOLUME,
+	EVENT_VOLUME_FADE,
+	EVENT_CALL,
+	EVENT_VIBRATO_FADE,
+	EVENT_PITCH_ENVELOPE_TO,
+	EVENT_PITCH_ENVELOPE_FROM,
+	EVENT_PITCH_ENVELOPE_OFF,
+	EVENT_TUNING,
+	EVENT_ECHO_ON,
+	EVENT_ECHO_OFF,
+	EVENT_ECHO_PARAM,
+	EVENT_ECHO_VOLUME_FADE,
+	EVENT_PITCH_SLIDE,
+	EVENT_PERCCUSION_PATCH_BASE,
+
+	// Nintendo RD2:
+			EVENT_RD2_PROGCHANGE_AND_ADSR,
+
+	// Konami:
+			EVENT_KONAMI_LOOP_START,
+	EVENT_KONAMI_LOOP_END,
+	EVENT_KONAMI_ADSR_AND_GAIN,
+
+	// Lemmings:
+			EVENT_LEMMINGS_NOTE_PARAM,
+
+	// Intelligent Systems:
+	// Fire Emblem 3 & 4:
+			EVENT_INTELLI_NOTE_PARAM,
+	EVENT_INTELLI_JUMP_SHORT,
+	EVENT_INTELLI_FE3_UNKNOWN_EVENT_F5,
+	EVENT_INTELLI_FE3_UNKNOWN_EVENT_F9,
+	EVENT_INTELLI_FE3_UNKNOWN_EVENT_FA,
+	EVENT_INTELLI_FE4_UNKNOWN_EVENT_FC,
+	EVENT_INTELLI_FE4_UNKNOWN_EVENT_FD,
 };
 
-const uint8_t voltbl[16] = { 0x19, 0x32, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98,
-					 0xa5, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc };
-
-const uint8_t durpcttbl[8] = { 0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xfc };
-
-const uint8_t pantbl[0x15] = { 0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
-							0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
-							0x7a, 0x7c, 0x7d, 0x7e, 0x7f };
-
-
-class NinSnesSeq :
-	public VGMSeq
+class NinSnesTrackSharedData
 {
 public:
-	NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint32_t length = 0, std::wstring theName = L"NinSnes Seq");
+	NinSnesTrackSharedData();
+
+	virtual void ResetVars(void);
+
+	uint8_t spcNoteDuration;
+	uint8_t spcNoteDurRate;
+	uint8_t spcNoteVolume;
+	int8_t spcTranspose;
+	uint16_t loopReturnAddress;
+	uint16_t loopStartAddress;
+	uint8_t loopCount;
+
+	// Konami:
+	uint16_t konamiLoopStart;
+	uint8_t konamiLoopCount;
+
+	// Intelligent Systems:
+	uint8_t intelliFE3NoteFlags;
+};
+
+class NinSnesSeq :
+		public VGMMultiSectionSeq
+{
+public:
+	NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint8_t percussion_base = 0, const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(), const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(), std::wstring theName = L"NinSnes Seq");
 	virtual ~NinSnesSeq();
 
-	virtual bool LoadMain();
-	bool GetSectionPointers();
-	bool LoadAllSections();
-	void LoadDefaultEventMap(NinSnesSeq *pSeqFile);
+	virtual bool GetHeaderInfo();
+	virtual void ResetVars();
+	virtual bool ReadEvent(long stopTime);
 
-public:
+	double GetTempoInBPM();
+	double GetTempoInBPM(uint8_t tempo);
+
+	uint16_t ConvertToAPUAddress(uint16_t offset);
+	uint16_t GetShortAddress(uint32_t offset);
+
 	NinSnesVersion version;
+	uint8_t STATUS_END;
+	uint8_t STATUS_NOTE_MIN;
+	uint8_t STATUS_NOTE_MAX;
+	uint8_t STATUS_PERCUSSION_NOTE_MIN;
+	uint8_t STATUS_PERCUSSION_NOTE_MAX;
+	std::map<uint8_t, NinSnesSeqEventType> EventMap;
 
-	std::vector<uint16_t> sectPlayList;
-	uint16_t playListRptPtr;
+	NinSnesTrackSharedData sharedTrackData[8];
 
-	std::vector<NinSnesSection*> aSections;
-	std::map<uint16_t, NinSnesSection*> sectionMap;
+	std::vector<uint8_t> volumeTable;
+	std::vector<uint8_t> durRateTable;
+	std::vector<uint8_t> panTable;
 
-	uint32_t curDelta;
-	uint8_t META_CUTOFF;
-	uint8_t NOTEREST_CUTOFF;
-	uint8_t NOTE_CUTOFF;
-	std::map<uint8_t, int> EventMap;
-	std::map<uint8_t, uint8_t> DrumMap;
-	uint8_t percbase;
-	uint8_t mvol;
+	uint8_t spcPercussionBase;
+	uint8_t sectionRepeatCount;
+
+	// Konami:
+	uint16_t konamiBaseAddress;
+
+	// Intelligent Systems:
+	std::vector<uint8_t> intelliDurVolTable;
+
+protected:
+	VGMHeader* header;
+
+private:
+	void LoadEventMap(void);
+
+	uint8_t spcPercussionBaseInit;
 };
 
 class NinSnesSection
-	: public VGMContainerItem
+		: public VGMSeqSection
 {
 public:
-	NinSnesSection(NinSnesSeq* parentSeq, uint32_t offset);
-	~NinSnesSection();
-	bool GetHeaderInfo(uint16_t headerOffset);
-	int LoadSection(int startTime);
+	NinSnesSection(NinSnesSeq* parentFile, long offset = 0, long length = 0);
 
-public:
-	ReadMode readMode;
-	//uint32_t endTime;
-	//uint32_t totalTime;
-	
-	//uint32_t endTime;		//when the end of Section event is hit, the absolute time is stored here.  This method assumes the end of section occurs on first track
-	uint32_t hdrOffset;
-	std::vector<uint16_t> trackOffsets;
-	std::vector<SeqTrack*> aSectTracks;
-	std::vector<SeqTrack*> aSongTracks;
+	virtual bool GetTrackPointers();
+
+	uint16_t ConvertToAPUAddress(uint16_t offset);
+	uint16_t GetShortAddress(uint32_t offset);
 };
 
-
 class NinSnesTrack
-	: public SeqTrack
+		: public SeqTrack
 {
 public:
-	NinSnesTrack(NinSnesSection* parentSect, uint32_t offset, int trackNumber);
-	NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset, int trackNumber);
-	bool ReadEvent(uint32_t totalTime);
-	void AddTime(uint32_t AddDelta);
-	void SetTime(uint32_t NewDelta);
-	void SubtractTime(uint32_t SubtractDelta);
-	void SetPercBase(uint8_t newBase);
-	uint8_t GetPercBase();
+	NinSnesTrack(NinSnesSection* parentSection, long offset = 0, long length = 0, const std::wstring& theName = L"NinSnes Track");
 
-public:
-	NinSnesSection* prntSect;
-	size_t beginEventIndex;
-	size_t endEventIndex;
-	int trackNum;
-	uint32_t nextEventTime;
+	virtual void ResetVars(void);
+	virtual bool ReadEvent(void);
 
-	uint32_t notedur;
-	uint32_t durpct;
+	uint16_t ConvertToAPUAddress(uint16_t offset);
+	uint16_t GetShortAddress(uint32_t offset);
+	void GetVolumeBalance(uint16_t pan, double & volumeLeft, double & volumeRight);
+	uint8_t ReadPanTable(uint16_t pan);
 
-	uint32_t substart;
-	uint32_t subret;
-    uint8_t subcount;
-	uint16_t loopdest;
-	uint8_t loopcount;
+	NinSnesSection* parentSection;
+	NinSnesTrackSharedData* shared;
+	bool available;
 };

@@ -116,15 +116,10 @@ public:
 	friend bool operator>= (VGMItem &item1, VGMItem &item2);
 
 public:
-	//inline bool IsItemAtOffset(uint32_t offset);
-	inline bool IsItemAtOffset(uint32_t offset)
-	{
-		if ((offset >= dwOffset) && (offset < dwOffset+unLength))
-			return true;
-		else
-			return false;
-	}
-	virtual VGMItem* GetItemFromOffset(uint32_t offset);
+	virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
+	virtual uint32_t GuessLength(void);
+	virtual void SetGuessedLength(void);
 
 	RawFile* GetRawFile();
 
@@ -172,18 +167,20 @@ public:
 	VGMContainerItem();
 	VGMContainerItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength = 0, const std::wstring theName = L"", uint8_t color = CLR_HEADER);
 	virtual ~VGMContainerItem(void);
-	virtual VGMItem* GetItemFromOffset(uint32_t offset);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
+	virtual uint32_t GuessLength(void);
+	virtual void SetGuessedLength(void);
 	virtual void AddToUI(VGMItem* parent, void* UI_specific);
 	virtual bool IsContainerItem() { return true; }
 
-	VGMHeader* AddHeader(uint32_t offset, uint32_t length, const wchar_t* name = L"Header");
+	VGMHeader* AddHeader(uint32_t offset, uint32_t length, const std::wstring& name = L"Header");
 
 	void AddItem(VGMItem* item);
-	void AddSimpleItem(uint32_t offset, uint32_t length, const wchar_t *theName);
+	void AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring& theName);
 	void AddUnknownItem(uint32_t offset, uint32_t length);
 
 	//void AddHeaderItem(VGMItem* item);
-	//void AddSimpleHeaderItem(uint32_t offset, uint32_t length, const wchar_t* name);
+	//void AddSimpleHeaderItem(uint32_t offset, uint32_t length, const std::wstring& name);
 	
 
 	template <class T> void AddContainer(std::vector<T*>& container)
@@ -192,7 +189,7 @@ public:
 	}
 	template <class T> bool RemoveContainer(std::vector<T*>& container)
 	{
-		std::vector<std::vector<VGMItem*>*>::iterator iter = find(containers.begin(),
+		std::vector<std::vector<VGMItem*>*>::iterator iter = std::find(containers.begin(),
 			containers.end(), (std::vector<VGMItem*>*)&container);
 		if (iter != containers.end())
 		{

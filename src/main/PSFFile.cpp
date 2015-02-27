@@ -253,7 +253,7 @@ bool PSFFile::ReadExeDataSeg(DataSeg*& seg, size_t len, size_t stripLen) const
 	}
 
 	size_t actualSize = destlen;
-	newSeg->load(buf, 0, actualSize);
+	newSeg->load(buf, 0, (uint32_t)actualSize);
 	seg = newSeg;
 	return true;
 }
@@ -291,7 +291,7 @@ bool PSFFile::Decompress(size_t decompressed_size)
 	}
 	size_t actualSize = destlen;
 
-	exeData->load(buf, 0, actualSize);
+	exeData->load(buf, 0, (uint32_t)actualSize);
 	decompressed = true;
 	return true;
 }

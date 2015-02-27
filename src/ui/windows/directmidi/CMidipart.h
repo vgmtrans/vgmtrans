@@ -244,7 +244,9 @@ namespace directmidi
 		HRESULT ActivateMasterClock(LPCLOCKINFO ClockInfo);	// Activate clock
 		IReferenceClock* GetReferenceClock(); // Returns the IReferenceClock Interface
 	};
-	
+
+	typedef BOOL (CALLBACK* MIDIPORTENUMPROC)(LPINFOPORT, LPVOID);
+
 	class CMidiPort
 	{
 		DWORD					   m_dwPortType;
@@ -266,6 +268,9 @@ namespace directmidi
 		HRESULT KsProperty(GUID Set,ULONG Id,ULONG Flags,LPVOID pvPropertyData,ULONG ulDataLength,PULONG pulBytesReturned);
 		HRESULT SetBuffer(DWORD dwBufferSize);
 		HRESULT RemoveBuffer();
+
+		// Additional functions
+		void EnumPort(MIDIPORTENUMPROC lpEnumFunc, LPVOID lParam);
 	};
 
 	// Receiver class

@@ -1,19 +1,30 @@
 VGMTrans - Video Game Music Translator
 ======================================
 
-VGMTrans converts a music files used in console video games into standard midi and dls files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
+VGMTrans converts a music files used in console video games into standard midi and dls/sf2 files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
 
 - Sony's PS2 sequence and instrument formats (.bq, .hd, .bd)
 - Squaresoft's PS2 sequence and instrument formats (.bgm, .wd)
 - Nintendo's Nintendo DS sequence and instrument formats (SDAT)
 - Late versions of Squaresoft's PS1 format known as AKAO - sequences and instruments
 - Sony's PS1 sequence and instrument formats (.seq, .vab)
+- Heartbeat's PS1 sequence format used in PS1 Dragon Quest games (.seqq)
 - Capcom's QSound sequence and instrument formats used in CPS1/CPS2 arcade games
-- Squaresoft's PS1 format  used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
+- Squaresoft's PS1 format used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
 - Nintendo's Gameboy Advance sequence format
-- Rare's SNES sequence and instrument format (.spc)
+- Nintendo's SNES sequence and instrument format known as N-SPC (.spc)
+- Squaresoft's SNES sequence and instrument format (AKAO/SUZUKI) (.spc)
 - Capcom's SNES sequence and instrument format (.spc)
 - Konami's SNES sequence and instrument format (.spc)
+- Hudson's SNES sequence and instrument format (.spc)
+- Rare's SNES sequence and instrument format (.spc)
+- Heartbeat's SNES sequence and instrument format used in SNES Dragon Quest VI and III (.spc)
+- Akihiko Mori's SNES sequence and instrument format (.spc)
+- Graphic Research's SNES sequence and instrument format (.spc)
+- Compile's SNES sequence format (.spc)
+- Chunsoft's SNES sequence format (.spc)
+- Namco's SNES sequence format (.spc)
+- Pandora Box's SNES sequence format (.spc)
 
 The source code includes preliminary work on additional formats. 
 
@@ -34,12 +45,12 @@ How to compile it
 Please read VGMTrans wiki page:
 <https://github.com/vgmtrans/vgmtrans/wiki/Build-Instructions>
 
-Contributers
+Contributors
 ------------
 
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
-- Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAacePS1 format and such.
+- Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
 
 ### Special Thanks
 
