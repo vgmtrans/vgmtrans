@@ -255,7 +255,7 @@ void SeqTrack::AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur
 
 bool SeqTrack::IsOffsetUsed(uint32_t offset)
 {
-	return IsItemAtOffset(offset, false);
+	return parentSeq->IsItemAtOffset(offset, false, true);
 }
 
 
