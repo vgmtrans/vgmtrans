@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "MyCoCreateInstance.h"
 
 HRESULT __stdcall MyCoCreateInstance(

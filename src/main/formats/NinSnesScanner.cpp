@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanner.h"
 #include "NinSnesInstr.h"

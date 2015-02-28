@@ -7,7 +7,7 @@
 //
 // Copyright (c) Microsoft Corp. All rights reserved.
 //-----------------------------------------------------------------------------
-#include "stdafx.h"
+#include "pch.h"
 #ifndef STRICT
 #define STRICT
 #endif
