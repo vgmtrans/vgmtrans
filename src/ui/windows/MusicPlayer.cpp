@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "MusicPlayer.h"
 #include "osdepend.h"
 #include "VGMSeq.h"

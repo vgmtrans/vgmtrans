@@ -104,7 +104,7 @@ Date format: Day-month-year
 	29. 3D audio positioning
 
 */
-#include "stdafx.h"
+#include "pch.h"
 #include "CMidiPart.h"
 #include "CAudioPart.h"
 #include <atlbase.h>
