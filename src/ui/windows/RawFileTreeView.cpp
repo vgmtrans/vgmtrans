@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "resource.h"
 #include "RawFileTreeView.h"
 #include "mainfrm.h"
