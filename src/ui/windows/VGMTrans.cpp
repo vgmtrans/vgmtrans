@@ -1,7 +1,7 @@
 // VGMTrans.cpp : main source file for VGMTrans.exe
 //
 
-#include "stdafx.h"
+#include "pch.h"
 
 //#include <vld.h>
 

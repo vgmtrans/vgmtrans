@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "FileFrame.h"
 #include "mainfrm.h"
 #include "VGMFile.h"

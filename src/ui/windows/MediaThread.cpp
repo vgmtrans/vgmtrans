@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "MediaThread.h"
 
 typedef DECLSPEC_IMPORT UINT (WINAPI* LPTIMEBEGINPERIOD)( UINT uPeriod );
