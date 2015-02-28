@@ -88,7 +88,10 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 	}
 
 	// detect engine version
-	if (file->GetShort(addrVoiceCmdAddressTable + 8) == file->GetShort(addrVoiceCmdAddressTable + 10)) {
+	if (file->GetShort(addrVoiceCmdAddressTable) == file->GetShort(addrVoiceCmdAddressTable + 32)) {
+		version = PRISMSNES_CGV;
+	}
+	else if (file->GetShort(addrVoiceCmdAddressTable) == file->GetShort(addrVoiceCmdAddressTable + 10)) {
 		version = PRISMSNES_DO;
 	}
 	else {

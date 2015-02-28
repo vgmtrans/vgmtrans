@@ -33,6 +33,9 @@ PrismSnesSeq::PrismSnesSeq(RawFile* file, PrismSnesVersion ver, uint32_t seqdata
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
 
+	bWriteInitialTempo = true;
+	tempoBPM = GetTempoInBPM(0x82);
+
 	LoadEventMap();
 }
 
@@ -107,33 +110,22 @@ void PrismSnesSeq::LoadEventMap()
 		EventMap[statusByte] = EVENT_NOISE_NOTE;
 	}
 
-	if (version == PRISMSNES_DO) {
-		EventMap[0xc0] = EVENT_CONDITIONAL_JUMP;
-		EventMap[0xc1] = EventMap[0xc0];
-		EventMap[0xc2] = EventMap[0xc0];
-		EventMap[0xc3] = EventMap[0xc0];
-		EventMap[0xc4] = EventMap[0xc0];
-		EventMap[0xc5] = EventMap[0xc0];
-		EventMap[0xc6] = EVENT_CONDITION;
-	}
-	else {
-		EventMap[0xc0] = EVENT_TEMPO;
-		EventMap[0xc1] = EVENT_TEMPO;
-		EventMap[0xc2] = EVENT_TEMPO;
-		EventMap[0xc3] = EVENT_TEMPO;
-		EventMap[0xc4] = EVENT_TEMPO;
-		EventMap[0xc5] = EVENT_CONDITIONAL_JUMP;
-		EventMap[0xc6] = EVENT_CONDITION;
-	}
+	EventMap[0xc0] = EVENT_TEMPO;
+	EventMap[0xc1] = EVENT_TEMPO;
+	EventMap[0xc2] = EVENT_TEMPO;
+	EventMap[0xc3] = EVENT_TEMPO;
+	EventMap[0xc4] = EVENT_TEMPO;
+	EventMap[0xc5] = EVENT_CONDITIONAL_JUMP;
+	EventMap[0xc6] = EVENT_CONDITION;
 	EventMap[0xc7] = EVENT_UNKNOWN1;
 	EventMap[0xc8] = EVENT_UNKNOWN2;
 	EventMap[0xc9] = EVENT_UNKNOWN2;
 	EventMap[0xca] = EVENT_RESTORE_ECHO_PARAM;
 	EventMap[0xcb] = EVENT_SAVE_ECHO_PARAM;
 	EventMap[0xcc] = EVENT_UNKNOWN1;
-	EventMap[0xcd] = EVENT_UNKNOWN0;
-	EventMap[0xce] = EVENT_UNKNOWN0;
-	EventMap[0xcf] = EVENT_UNKNOWN2;
+	EventMap[0xcd] = EVENT_SLUR_OFF;
+	EventMap[0xce] = EVENT_SLUR_ON;
+	EventMap[0xcf] = EVENT_VOLUME_ENVELOPE;
 	EventMap[0xd0] = EVENT_DEFAULT_PAN_TABLE_1;
 	EventMap[0xd1] = EVENT_DEFAULT_PAN_TABLE_2;
 	EventMap[0xd2] = EVENT_UNKNOWN0;
@@ -159,19 +151,19 @@ void PrismSnesSeq::LoadEventMap()
 	EventMap[0xe6] = EVENT_VIBRATO_OFF;
 	EventMap[0xe7] = EVENT_VIBRATO;
 	EventMap[0xe8] = EVENT_UNKNOWN1;
-	EventMap[0xe9] = EVENT_UNKNOWN_EVENT_E9;
+	EventMap[0xe9] = EVENT_PITCH_SLIDE;
 	EventMap[0xea] = EVENT_VOLUME_REL;
 	EventMap[0xeb] = EVENT_PAN;
 	EventMap[0xec] = EVENT_VOLUME;
 	EventMap[0xed] = EVENT_UNKNOWN_EVENT_ED;
-	EventMap[0xee] = EVENT_TIE;
-	EventMap[0xef] = EVENT_GAIN_ENVELOPE_TIE;
+	EventMap[0xee] = EVENT_REST;
+	EventMap[0xef] = EVENT_GAIN_ENVELOPE_REST;
 	EventMap[0xf0] = EVENT_GAIN_ENVELOPE_DECAY_TIME;
 	EventMap[0xf1] = EVENT_MANUAL_DURATION_OFF;
 	EventMap[0xf2] = EVENT_MANUAL_DURATION_ON;
 	EventMap[0xf3] = EVENT_AUTO_DURATION_THRESHOLD;
-	EventMap[0xf4] = EVENT_UNKNOWN_EVENT_F4;
-	EventMap[0xf5] = EVENT_UNKNOWN0;
+	EventMap[0xf4] = EVENT_TIE_WITH_DUR;
+	EventMap[0xf5] = EVENT_TIE;
 	EventMap[0xf6] = EVENT_GAIN_ENVELOPE_SUSTAIN;
 	EventMap[0xf7] = EVENT_ECHO_VOLUME_ENVELOPE;
 	EventMap[0xf8] = EVENT_ECHO_VOLUME;
@@ -182,6 +174,33 @@ void PrismSnesSeq::LoadEventMap()
 	EventMap[0xfd] = EVENT_GAIN_ENVELOPE_DECAY;
 	EventMap[0xfe] = EVENT_INSTRUMENT;
 	EventMap[0xff] = EVENT_END;
+
+	if (version == PRISMSNES_CGV) {
+		EventMap[0xc0] = EventMap[0xd0];
+		EventMap[0xc1] = EventMap[0xd0];
+		EventMap[0xc2] = EventMap[0xd0];
+		EventMap[0xc3] = EventMap[0xd0];
+		EventMap[0xc4] = EventMap[0xd0];
+		EventMap[0xc5] = EventMap[0xd0];
+		EventMap[0xc6] = EventMap[0xd0];
+		EventMap[0xc7] = EventMap[0xd0];
+		EventMap[0xc8] = EventMap[0xd0];
+		EventMap[0xc9] = EventMap[0xd0];
+		EventMap[0xca] = EventMap[0xd0];
+		EventMap[0xcb] = EventMap[0xd0];
+		EventMap[0xcc] = EventMap[0xd0];
+		EventMap[0xcd] = EventMap[0xd0];
+		EventMap[0xce] = EventMap[0xd0];
+		EventMap[0xcf] = EventMap[0xd0];
+		EventMap[0xdb] = EVENT_UNKNOWN2;
+	}
+	else if (version == PRISMSNES_DO) {
+		EventMap[0xc0] = EventMap[0xc5];
+		EventMap[0xc1] = EventMap[0xc5];
+		EventMap[0xc2] = EventMap[0xc5];
+		EventMap[0xc3] = EventMap[0xc5];
+		EventMap[0xc4] = EventMap[0xc5];
+	}
 }
 
 double PrismSnesSeq::GetTempoInBPM(uint8_t tempo)
@@ -214,7 +233,10 @@ void PrismSnesTrack::ResetVars(void)
 
 	vel = 100;
 	defaultLength = 0;
+	slur = false;
 	manualDuration = false;
+	prevNoteSlurred = false;
+	prevNoteKey = -1;
 	spcVolume = 0;
 	loopCount = 0;
 	loopCountAlt = 0;
@@ -324,21 +346,37 @@ bool PrismSnesTrack::ReadEvent(void)
 
 		uint8_t dur = GetDuration(curOffset, len, durDelta);
 
-		if (eventType == EVENT_NOISE_NOTE) {
-			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur, L"Noise Note");
-			AddTime(len);
+		if (slur) {
+			prevNoteSlurred = true;
+		}
+
+		if (prevNoteSlurred && key == prevNoteKey) {
+			MakePrevDurNoteEnd(GetTime() + dur);
+			desc << L"Abs Key: " << key << L" (" << MidiEvent::GetNoteName(key) << L"  Velocity: " << vel << L"  Duration: " << dur;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note (Tied)", desc.str(), CLR_DURNOTE, ICON_NOTE);
 		}
 		else {
-			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur, L"Note");
-			AddTime(len);
+			if (eventType == EVENT_NOISE_NOTE) {
+				AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur, L"Noise Note");
+			}
+			else {
+				AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur, L"Note");
+			}
 		}
+		AddTime(len);
+
+		prevNoteKey = key;
+		prevNoteSlurred = false;
 		break;
 	}
 
-	case EVENT_UNKNOWN_EVENT_E9:
+	case EVENT_PITCH_SLIDE:
 	{
-		uint8_t arg1 = GetByte(curOffset++);
-		uint8_t arg2 = GetByte(curOffset++);
+		uint8_t noteFrom = GetByte(curOffset++);
+		uint8_t noteTo = GetByte(curOffset++);
+
+		uint8_t noteNumberFrom = noteFrom & 0x7f;
+		uint8_t noteNumberTo = noteTo & 0x7f;
 
 		uint8_t len;
 		if (!ReadDeltaTime(curOffset, len)) {
@@ -352,13 +390,17 @@ bool PrismSnesTrack::ReadEvent(void)
 
 		uint8_t dur = GetDuration(curOffset, len, durDelta);
 
-		desc << L"Arg1: " << arg1 << L"  Arg2: " << arg2 << L"  Length: " << len << L"  Duration: " << dur;
-		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+		desc << L"Note Number (From): " << noteNumberFrom << L" (" << ((noteFrom & 0x80) != 0 ? L"Noise" : MidiEvent::GetNoteName(noteNumberFrom)) << L")" <<
+			L"  Note Number (To): " << noteNumberTo << L" (" << ((noteTo & 0x80) != 0 ? L"Noise" : MidiEvent::GetNoteName(noteNumberTo)) << L")" <<
+			L"  Length: " << len << L"  Duration: " << dur;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
+
+		AddNoteByDurNoItem(noteNumberFrom, vel, dur);
 		AddTime(len);
 		break;
 	}
 
-	case EVENT_UNKNOWN_EVENT_F4:
+	case EVENT_TIE_WITH_DUR:
 	{
 		uint8_t len;
 		if (!ReadDeltaTime(curOffset, len)) {
@@ -373,8 +415,16 @@ bool PrismSnesTrack::ReadEvent(void)
 		uint8_t dur = GetDuration(curOffset, len, durDelta);
 
 		desc << L"Length: " << len << L"  Duration: " << dur;
-		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie with Duration", desc.str(), CLR_TIE, ICON_NOTE);
+		MakePrevDurNoteEnd(GetTime() + dur);
 		AddTime(len);
+		break;
+	}
+
+	case EVENT_TIE:
+	{
+		prevNoteSlurred = true;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str(), CLR_TIE, ICON_NOTE);
 		break;
 	}
 
@@ -387,16 +437,15 @@ bool PrismSnesTrack::ReadEvent(void)
 		break;
 	}
 
-	case EVENT_TIE:
+	case EVENT_REST:
 	{
 		uint8_t len;
 		if (!ReadDeltaTime(curOffset, len)) {
 			return false;
 		}
 
-		// TODO: tie
 		desc << L"Duration: " << len;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie?", desc.str(), CLR_TIE, ICON_NOTE);
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Rest", desc.str(), CLR_REST, ICON_REST);
 		AddTime(len);
 		break;
 	}
@@ -436,6 +485,28 @@ bool PrismSnesTrack::ReadEvent(void)
 	case EVENT_SAVE_ECHO_PARAM:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Save Echo Param", desc.str(), CLR_REVERB, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_SLUR_OFF:
+	{
+		slur = false;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur Off", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_SLUR_ON:
+	{
+		slur = true;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_VOLUME_ENVELOPE:
+	{
+		uint16_t envelopeAddress = GetShort(curOffset); curOffset += 2;
+		desc << L"Envelope: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << envelopeAddress;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume Envelope", desc.str(), CLR_VOLUME, ICON_CONTROL);
 		break;
 	}
 
@@ -744,18 +815,19 @@ bool PrismSnesTrack::ReadEvent(void)
 		break;
 	}
 
-	case EVENT_GAIN_ENVELOPE_TIE:
+	case EVENT_GAIN_ENVELOPE_REST:
 	{
 		uint16_t envelopeAddress = GetShort(curOffset); curOffset += 2;
 		desc << L"Envelope: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << envelopeAddress;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"GAIN Envelope (Tie)", desc.str(), CLR_ADSR, ICON_CONTROL);
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"GAIN Envelope (Rest)", desc.str(), CLR_ADSR, ICON_CONTROL);
 		break;
 	}
 
 	case EVENT_GAIN_ENVELOPE_DECAY_TIME:
 	{
 		uint8_t dur = GetByte(curOffset++);
-		desc << L"Duration: Full-Length - " << dur;
+		uint8_t gain = GetByte(curOffset++);
+		desc << L"Duration: Full-Length - " << dur << L"  GAIN: $" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << gain;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"GAIN Envelope Decay Time", desc.str(), CLR_ADSR, ICON_CONTROL);
 		break;
 	}

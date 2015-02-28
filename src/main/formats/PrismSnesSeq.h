@@ -11,9 +11,10 @@ enum PrismSnesSeqEventType
 	EVENT_UNKNOWN2,
 	EVENT_UNKNOWN3,
 	EVENT_UNKNOWN4,
-	EVENT_UNKNOWN_EVENT_E9,
+	EVENT_PITCH_SLIDE,
 	EVENT_UNKNOWN_EVENT_ED,
-	EVENT_UNKNOWN_EVENT_F4,
+	EVENT_TIE_WITH_DUR,
+	EVENT_TIE,
 	EVENT_NOP2,
 	EVENT_NOTE,
 	EVENT_NOISE_NOTE,
@@ -22,6 +23,9 @@ enum PrismSnesSeqEventType
 	EVENT_CONDITION,
 	EVENT_RESTORE_ECHO_PARAM,
 	EVENT_SAVE_ECHO_PARAM,
+	EVENT_SLUR_OFF,
+	EVENT_SLUR_ON,
+	EVENT_VOLUME_ENVELOPE,
 	EVENT_DEFAULT_PAN_TABLE_1,
 	EVENT_DEFAULT_PAN_TABLE_2,
 	EVENT_INC_APU_PORT_3,
@@ -47,8 +51,8 @@ enum PrismSnesSeqEventType
 	EVENT_VOLUME_REL,
 	EVENT_PAN,
 	EVENT_VOLUME,
-	EVENT_TIE,
-	EVENT_GAIN_ENVELOPE_TIE,
+	EVENT_REST,
+	EVENT_GAIN_ENVELOPE_REST,
 	EVENT_GAIN_ENVELOPE_DECAY_TIME,
 	EVENT_MANUAL_DURATION_OFF,
 	EVENT_MANUAL_DURATION_ON,
@@ -103,7 +107,10 @@ public:
 
 private:
 	uint8_t defaultLength;
-	bool manualDuration;
+	bool slur; // bit $01
+	bool manualDuration; // bit $10
+	bool prevNoteSlurred; // bit $20
+	int8_t 	prevNoteKey;
 	uint8_t autoDurationThreshold;
 	uint8_t spcVolume;
 	uint8_t loopCount;
