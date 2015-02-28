@@ -83,6 +83,9 @@ public:
 	PrismSnesVersion version;
 	std::map<uint8_t, PrismSnesSeqEventType> EventMap;
 
+	VGMHeader* envContainer;
+	void DemandEnvelopeContainer(uint32_t offset);
+
 	static const uint8_t PAN_TABLE_1[21];
 	static const uint8_t PAN_TABLE_2[21];
 
@@ -120,4 +123,10 @@ private:
 	bool ReadDeltaTime(uint32_t& curOffset, uint8_t& len);
 	bool ReadDuration(uint32_t& curOffset, uint8_t len, uint8_t& durDelta);
 	uint8_t GetDuration(uint32_t curOffset, uint8_t len, uint8_t durDelta);
+
+	void AddVolumeEnvelope(uint16_t envelopeAddress);
+	void AddPanEnvelope(uint16_t envelopeAddress);
+	void AddEchoVolumeEnvelope(uint16_t envelopeAddress);
+	void AddGAINEnvelope(uint16_t envelopeAddress);
+	void AddPanTable(uint16_t panTableAddress);
 };
