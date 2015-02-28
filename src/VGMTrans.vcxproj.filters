@@ -585,9 +585,6 @@
     <ClCompile Include="ui\windows\MyCoCreateInstance.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="main\stdafx.cpp">
-      <Filter>Source Files\main</Filter>
-    </ClCompile>
     <ClCompile Include="main\formats\SNESDSP.cpp">
       <Filter>Source Files\formats</Filter>
     </ClCompile>
@@ -734,6 +731,9 @@
     </ClCompile>
     <ClCompile Include="main\formats\MoriSnesSeq.cpp">
       <Filter>Source Files\formats\morisnes</Filter>
+    </ClCompile>
+    <ClCompile Include="ui\windows\stdafx.cpp">
+      <Filter>Source Files\windows</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1139,9 +1139,6 @@
     <ClInclude Include="ui\windows\MyCoCreateInstance.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="main\stdafx.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
     <ClInclude Include="main\formats\SNESDSP.h">
       <Filter>Header Files\formats</Filter>
     </ClInclude>
@@ -1333,6 +1330,15 @@
     </ClInclude>
     <ClInclude Include="main\formats\MoriSnesSeq.h">
       <Filter>Header Files\formats\morisnes</Filter>
+    </ClInclude>
+    <ClInclude Include="ui\windows\stdafx.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="main\pch.h">
+      <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="portable.h">
+      <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
