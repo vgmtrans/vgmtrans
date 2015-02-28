@@ -282,6 +282,7 @@ set(SOURCE_FILES
     main/MidiFile.h
     main/Options.cpp
     main/Options.h
+    main/pch.h
     main/PSFFile.cpp
     main/PSFFile.h
     main/RawFile.cpp
@@ -389,15 +390,12 @@ set(SOURCE_FILES
     ui/qt/mainwindow.h
     ui/qt/droparea.h
     ui/qt/dropsitewindow.h
-    ui/qt/pch.h
     ui/qt/osdepend.h
     ui/qt/QtVGMRoot.h
     ui/qt/VGMFileListView.h
     ui/qt/RawFileListView.h
     ui/qt/VGMCollListView.h
     ui/qt/MusicPlayer.h
-
-    ui/qt/pch.h
 )
 
 
