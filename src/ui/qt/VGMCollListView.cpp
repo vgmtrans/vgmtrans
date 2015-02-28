@@ -2,6 +2,7 @@
 // Created by Mike on 8/31/14.
 //
 
+#include <QDebug.h>
 #include <QEvent.h>
 #include <main/SF2File.h>
 #include <main/VGMSeq.h>
