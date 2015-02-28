@@ -49,11 +49,14 @@ MusicPlayer::MusicPlayer()
     /* Create the audio driver. The synthesizer starts playing as soon
      as the driver is created. */
     this->adriver = new_fluid_audio_driver(this->settings, this->synth);
+
+    this->player = new_fluid_player(this->synth);
 }
 
 void MusicPlayer::Shutdown()
 {
     delete_fluid_audio_driver(this->adriver);
+    delete_fluid_player(this->player);
     delete_fluid_synth(this->synth);
     delete_fluid_settings(this->settings);
 }
@@ -69,6 +72,8 @@ void MusicPlayer::Shutdown()
 
 void MusicPlayer::LoadSF2(const void *data)
 {
+//    fluid_player_stop(this->player);
+
 //    const char* filename = [[[NSBundle mainBundle] pathForResource:sf2file ofType:@"sf2"] UTF8String];
     if (this->sfont_id > 0 && fluid_synth_sfunload(this->synth, this->sfont_id, true) != 0) {
         printf("Error unloading soundfont");
@@ -91,9 +96,15 @@ int midi_event_callback(void* data, fluid_midi_event_t* event)
     return fluid_synth_handle_midi_event(data, event);
 }
 
+void MusicPlayer::StopMidi() {
+    fluid_player_stop(this->player);
+}
+
 void MusicPlayer::PlayMidi(const void* data, size_t len)
 {
-    this->player = new_fluid_player(this->synth);
+//    fluid_player_reset(this->player);
+//    fluid_player_stop(this->player);
+//    this->player = new_fluid_player(this->synth);
 
     fluid_player_add_mem(this->player, data, len);
     fluid_player_set_playback_callback(this->player, &midi_event_callback, this->synth);
