@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "HexView.h"
 #include "ItemTreeView.h"
 #include "HexViewFrame.h"
