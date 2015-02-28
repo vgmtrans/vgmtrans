@@ -85,8 +85,12 @@ void VGMCollListView::keyPressEvent(QKeyEvent* e)
         qDebug() << "Gonna play us some music";
         MusicPlayer& musicPlayer = MusicPlayer::getInstance();
 
+        musicPlayer.StopMidi();
         musicPlayer.LoadSF2(rawSF2);//"dos.sf2");
         musicPlayer.PlayMidi(&midiBuf[0], midiBuf.size());
 
+        delete[] rawSF2;
+        delete sf2;
+        delete midi;
     }
 }
