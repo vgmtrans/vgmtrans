@@ -742,12 +742,11 @@ uint32_t MidiEvent::WriteSysexEvent(vector<uint8_t> & buf, uint32_t time, uint8_
 {
 	WriteVarLength(buf, AbsTime-time);
 	buf.push_back(0xF0);
-	WriteVarLength(buf, (uint32_t)(dataSize + 1));
+	WriteVarLength(buf, (uint32_t)dataSize);
 	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++)
 	{
 		buf.push_back(data[dataIndex]);
 	}
-	buf.push_back(0xF7);
 	return AbsTime;
 }
 
@@ -900,8 +899,8 @@ MastVolEvent::MastVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absolut
 
 uint32_t MastVolEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 {
-	uint8_t data[6] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, mastVol & 0x7F };
-	return WriteSysexEvent(buf, time, data, 6);
+	uint8_t data[7] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, mastVol & 0x7F, 0x7F };
+	return WriteSysexEvent(buf, time, data, 7);
 }
 
 //  ***************
