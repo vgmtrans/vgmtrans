@@ -61,12 +61,25 @@ enum NinSnesSeqEventType
 	// Intelligent Systems:
 	// Fire Emblem 3 & 4:
 	EVENT_INTELLI_NOTE_PARAM,
+	EVENT_INTELLI_ECHO_ON,
+	EVENT_INTELLI_ECHO_OFF,
+	EVENT_INTELLI_LEGATO_ON,
+	EVENT_INTELLI_LEGATO_OFF,
+	EVENT_INTELLI_JUMP_SHORT_CONDITIONAL,
 	EVENT_INTELLI_JUMP_SHORT,
-	EVENT_INTELLI_FE3_UNKNOWN_EVENT_F5,
-	EVENT_INTELLI_FE3_UNKNOWN_EVENT_F9,
-	EVENT_INTELLI_FE3_UNKNOWN_EVENT_FA,
-	EVENT_INTELLI_FE4_UNKNOWN_EVENT_FC,
-	EVENT_INTELLI_FE4_UNKNOWN_EVENT_FD,
+	EVENT_INTELLI_FE3_EVENT_F5,
+	EVENT_INTELLI_WRITE_APU_PORT,
+	EVENT_INTELLI_FE3_EVENT_F9,
+	EVENT_INTELLI_DEFINE_VOICE_PARAM,
+	EVENT_INTELLI_LOAD_VOICE_PARAM,
+	EVENT_INTELLI_ADSR,
+	EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE,
+	EVENT_INTELLI_GAIN_SUSTAIN_TIME,
+	EVENT_INTELLI_GAIN,
+	EVENT_INTELLI_GAIN_PRESERVE,
+	EVENT_INTELLI_FE4_EVENT_FC,
+	EVENT_INTELLI_TA_SUBEVENT,
+	EVENT_INTELLI_FE4_SUBEVENT,
 };
 
 class NinSnesTrackSharedData
@@ -89,7 +102,8 @@ public:
 	uint8_t konamiLoopCount;
 
 	// Intelligent Systems:
-	uint8_t intelliFE3NoteFlags;
+	bool intelliUseCustomNoteParam;
+	bool intelliUseCustomPercTable;
 };
 
 class NinSnesSeq :
@@ -131,6 +145,8 @@ public:
 
 	// Intelligent Systems:
 	std::vector<uint8_t> intelliDurVolTable;
+	uint16_t intelliVoiceParamTable;
+	uint8_t intelliVoiceParamTableSize;
 
 protected:
 	VGMHeader* header;
@@ -166,6 +182,7 @@ public:
 	uint16_t GetShortAddress(uint32_t offset);
 	void GetVolumeBalance(uint16_t pan, double & volumeLeft, double & volumeRight);
 	uint8_t ReadPanTable(uint16_t pan);
+	int8_t CalcPanValue(uint8_t pan, double & volumeScale, bool & reverseLeft, bool & reverseRight);
 
 	NinSnesSection* parentSection;
 	NinSnesTrackSharedData* shared;
