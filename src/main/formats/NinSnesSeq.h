@@ -100,10 +100,6 @@ public:
 	// Konami:
 	uint16_t konamiLoopStart;
 	uint8_t konamiLoopCount;
-
-	// Intelligent Systems:
-	bool intelliUseCustomNoteParam;
-	bool intelliUseCustomPercTable;
 };
 
 class NinSnesSeq :
@@ -145,6 +141,8 @@ public:
 
 	// Intelligent Systems:
 	std::vector<uint8_t> intelliDurVolTable;
+	bool intelliUseCustomNoteParam;
+	bool intelliUseCustomPercTable;
 	uint16_t intelliVoiceParamTable;
 	uint8_t intelliVoiceParamTableSize;
 

@@ -43,6 +43,9 @@ void NinSnesSeq::ResetVars()
 	spcPercussionBase = spcPercussionBaseInit;
 	sectionRepeatCount = 0;
 
+	// Intelligent Systems:
+	intelliUseCustomNoteParam = false;
+	intelliUseCustomPercTable = false;
 	intelliVoiceParamTable = 0;
 	intelliVoiceParamTableSize = 0;
 
@@ -771,10 +774,6 @@ void NinSnesTrackSharedData::ResetVars(void)
 	// Konami:
 	konamiLoopStart = 0;
 	konamiLoopCount = 0;
-
-	// Intelligent Systems:
-	intelliUseCustomNoteParam = false;
-	intelliUseCustomPercTable = false;
 }
 
 //  ************
@@ -1376,7 +1375,7 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_INTELLI_NOTE_PARAM:
 	{
-		if (parentSeq->version != NINSNES_INTELLI_FE4 && !shared->intelliUseCustomNoteParam) {
+		if (parentSeq->version != NINSNES_INTELLI_FE4 && !parentSeq->intelliUseCustomNoteParam) {
 			goto OnEventNoteParam;
 		}
 
@@ -1463,18 +1462,18 @@ bool NinSnesTrack::ReadEvent(void)
 		}
 		else {
 			// set/clear bitflag in $ca
-			uint8_t bit = 1 << (param & 7);
-			bool bitValue = (param & 8) != 0;
+			uint8_t bit = param & 7;
+			bool bitValue = (param & 8) == 0;
 
 			desc << L"Status: " << (bitValue ? L"On" : L"Off");
 			switch (bit) {
 			case 0:
-				shared->intelliUseCustomPercTable = bitValue;
+				parentSeq->intelliUseCustomPercTable = bitValue;
 				AddGenericEvent(beginOffset, curOffset - beginOffset, L"Use Custom Percussion Table", desc.str(), CLR_CHANGESTATE);
 				break;
 
 			case 7:
-				shared->intelliUseCustomNoteParam = bitValue;
+				parentSeq->intelliUseCustomNoteParam = bitValue;
 				AddGenericEvent(beginOffset, curOffset - beginOffset, L"Use Custom Note Param", desc.str(), CLR_CHANGESTATE);
 				break;
 
@@ -1665,7 +1664,7 @@ bool NinSnesTrack::ReadEvent(void)
 			desc << L"Status: " << (bitValue ? L"On" : L"Off");
 
 			if ((param & 0x40) != 0) {
-				shared->intelliUseCustomPercTable = bitValue;
+				parentSeq->intelliUseCustomPercTable = bitValue;
 				AddGenericEvent(beginOffset, curOffset - beginOffset, L"Use Custom Percussion Table", desc.str(), CLR_CHANGESTATE);
 			}
 			else {
