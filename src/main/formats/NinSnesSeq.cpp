@@ -538,7 +538,7 @@ void NinSnesSeq::LoadEventMap()
 		EventMap[0xf6] = EVENT_INTELLI_ECHO_OFF;
 		EventMap[0xf7] = EVENT_INTELLI_GAIN;
 		EventMap[0xf8] = EventMap[0xf7];
-		EventMap[0xf9] = EVENT_INTELLI_GAIN_PRESERVE;
+		EventMap[0xf9] = EVENT_UNKNOWN0;
 		EventMap[0xfa] = EVENT_INTELLI_DEFINE_VOICE_PARAM;
 		EventMap[0xfb] = EVENT_INTELLI_LOAD_VOICE_PARAM;
 		EventMap[0xfc] = EVENT_INTELLI_FE4_EVENT_FC;
@@ -1624,16 +1624,6 @@ bool NinSnesTrack::ReadEvent(void)
 		uint8_t gain = GetByte(curOffset++);
 		desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << L"  GAIN: $" << gain;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"GAIN (Release Rate)", desc.str(), CLR_ADSR, ICON_CONTROL);
-		break;
-	}
-
-	case EVENT_INTELLI_GAIN_PRESERVE:
-	{
-		// This event saves the GAIN value and write it later,
-		// do not know when it is actually used...
-		uint8_t gain = GetByte(curOffset++);
-		desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << L"  GAIN: $" << gain;
-		AddUnknown(beginOffset, curOffset - beginOffset, L"GAIN (Unknown Purpose)", desc.str());
 		break;
 	}
 
