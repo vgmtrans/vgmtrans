@@ -341,14 +341,14 @@ void VGMSeq::AddInstrumentRef(uint32_t progNum)
 
 bool VGMSeq::OnSaveAsMidi(void)
 {
-	wstring filepath = pRoot->UI_GetSaveFilePath(name.c_str(), L"mid");
+	wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"mid");
 	if (filepath.length() != 0)
-		return SaveAsMidi(filepath.c_str());
+		return SaveAsMidi(filepath);
 	return false;
 }
 
 
-bool VGMSeq::SaveAsMidi(const wchar_t* filepath)
+bool VGMSeq::SaveAsMidi(const std::wstring & filepath)
 {
 	MidiFile* midi = this->ConvertToMidi();
 	if (!midi)

@@ -56,7 +56,7 @@ public:
 	inline void SetLoopLengthMeasure(LoopMeasure measure) { loop.loopLengthMeasure = measure; }
 
 	bool OnSaveAsWav();
-	bool SaveAsWav(const wchar_t* filepath);
+	bool SaveAsWav(const std::wstring & filepath);
 
 public:
 	WAVE_TYPE waveType;

@@ -52,7 +52,7 @@ public:
 	  initialPitchBendRangeCents = cents; }
 
 	bool OnSaveAsMidi(void);
-	virtual bool SaveAsMidi(const wchar_t* filepath);
+	virtual bool SaveAsMidi(const std::wstring & filepath);
 
 	virtual bool HasActiveTracks();
 	virtual void InactivateAllTracks();

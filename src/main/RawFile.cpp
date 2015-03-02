@@ -455,13 +455,13 @@ void RawFile::UpdateBuffer(uint32_t index)
 
 bool RawFile::OnSaveAsRaw()
 {
-	wstring filepath = pRoot->UI_GetSaveFilePath(filename.c_str());
+	wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(filename));
 	if (filepath.length() != 0)
 	{
 		bool result;
 		uint8_t* buf = new uint8_t[fileSize];		//create a buffer the size of the file
 		GetBytes(0, fileSize, buf);
-		result = pRoot->UI_WriteBufferToFile(filepath.c_str(), buf, fileSize);
+		result = pRoot->UI_WriteBufferToFile(filepath, buf, fileSize);
 		delete[] buf;
 		return result;
 	}

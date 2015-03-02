@@ -38,6 +38,8 @@ template < class T >
 
 uint32_t StringToHex( const std::string& str );
 
+std::wstring ConvertToSafeFileName(const std::wstring & str);
+
 inline std::string wstring2string(std::wstring& wstr)
 {
 	char *mbs = new char[wstr.length() * MB_CUR_MAX + 1];

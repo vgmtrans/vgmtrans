@@ -188,7 +188,7 @@ public:
 	uint32_t GetPPQN();
 	void WriteMidiToBuffer(std::vector<uint8_t> & buf);
 	void Sort(void);
-	bool SaveMidiFile(const wchar_t* filepath);
+	bool SaveMidiFile(const std::wstring & filepath);
 
 protected:
 	//bool bAddedTempo;

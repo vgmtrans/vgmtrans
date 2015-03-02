@@ -446,7 +446,7 @@ SF2File::~SF2File(void)
 }
 
 
-bool SF2File::SaveSF2File(const wchar_t* filepath)
+bool SF2File::SaveSF2File(const std::wstring & filepath)
 {
 	uint32_t size = this->GetSize();
 	uint8_t* buf = new uint8_t[size];

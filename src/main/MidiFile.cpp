@@ -80,7 +80,7 @@ void MidiFile::Sort(void)
 }
 
 
-bool MidiFile::SaveMidiFile(const wchar_t* filepath)
+bool MidiFile::SaveMidiFile(const std::wstring & filepath)
 {
 	vector<uint8_t> midiBuf;
 	WriteMidiToBuffer(midiBuf);

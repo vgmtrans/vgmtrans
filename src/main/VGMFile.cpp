@@ -50,13 +50,13 @@ bool VGMFile::OnClose()
 
 bool VGMFile::OnSaveAsRaw()
 {
-	wstring filepath = pRoot->UI_GetSaveFilePath(name.c_str());
+	wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name));
 	if (filepath.length() != 0)
 	{
 		bool result;
 		uint8_t* buf = new uint8_t[unLength];		//create a buffer the size of the file
 		GetBytes(dwOffset, unLength, buf);
-		result = pRoot->UI_WriteBufferToFile(filepath.c_str(), buf, unLength);
+		result = pRoot->UI_WriteBufferToFile(filepath, buf, unLength);
 		delete[] buf;
 		return result;
 	}
