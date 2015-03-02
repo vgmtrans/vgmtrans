@@ -416,6 +416,8 @@ BytePattern NinSnesScanner::ptnDispatchNoteFE3(
 	28);
 
 //; Fire Emblem 4 SPC
+//092f: 01        tcall 0                 ;   read next byte
+//0930: 30 13     bmi   $0945             ;   if note note then
 //0932: 68 40     cmp   a,#$40
 //0934: 28 3f     and   a,#$3f
 //0936: fd        mov   y,a
@@ -425,15 +427,15 @@ BytePattern NinSnesScanner::ptnDispatchNoteFE3(
 //093f: 2f ee     bra   $092f             ;   check more bytes
 //0941: d5 20 02  mov   $0220+x,a         ;   40-7f - set vel
 BytePattern NinSnesScanner::ptnDispatchNoteFE4(
-	"\x68\x40\x28\x3f\xfd\xf6\x38\x10"
-	"\xb0\x05\xd5\x11\x02\x2f\xee\xd5"
-	"\x20\x02"
+	"\x01\x30\x13\x68\x40\x28\x3f\xfd"
+	"\xf6\x38\x10\xb0\x05\xd5\x11\x02"
+	"\x2f\xee\xd5\x20\x02"
 	,
-	"xxxxxx??"
-	"xxx??x?x"
-	"??"
+	"xx?xxxxx"
+	"x??xxx??"
+	"x?x??"
 	,
-	18);
+	21);
 
 //; Super Metroid (developed by Nintendo RD1)
 //; vcmd fa - set perc patch base
@@ -992,17 +994,22 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 				if (file->SearchBytePattern(ptnIntelliVCmdFA, ofsIntelliVCmdFA)) {
 					// Intelligent Systems
 					if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
-						if (firstVoiceCmd == 0xd6) {
+						const uint8_t INTELLI_FE3_VCMD_LEN_TABLE[40] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x02, 0x02 };
+						if (firstVoiceCmd == 0xd6 && file->MatchBytes(INTELLI_FE3_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(INTELLI_FE3_VCMD_LEN_TABLE))) {
 							version = NINSNES_INTELLI_FE3;
 						}
 					}
 					else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
-						if (firstVoiceCmd == 0xda) {
+						const uint8_t INTELLI_FE4_VCMD_LEN_TABLE[36] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01 };
+						if (firstVoiceCmd == 0xda && file->MatchBytes(INTELLI_FE4_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(INTELLI_FE4_VCMD_LEN_TABLE))) {
 							version = NINSNES_INTELLI_FE4;
 						}
 					}
 					else {
-						version = NINSNES_UNKNOWN; // TODO: Tetris Attack
+						const uint8_t INTELLI_TA_VCMD_LEN_TABLE[36] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x02, 0x00, 0x01, 0x01, 0x01, 0x01 };
+						if (firstVoiceCmd == 0xda && file->MatchBytes(INTELLI_TA_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(INTELLI_TA_VCMD_LEN_TABLE))) {
+							version = NINSNES_INTELLI_TA;
+						}
 					}
 				}
 			}

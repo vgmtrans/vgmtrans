@@ -1651,14 +1651,30 @@ bool NinSnesTrack::ReadEvent(void)
 			// set/clear bitflag in $ca
 			uint8_t param = GetByte(curOffset++);
 			bool bitValue = (type == 0x01);
-			desc << L"Status: " << (bitValue ? L"On" : L"Off");
 
+			if ((param & 0x80) != 0) {
+				parentSeq->intelliUseCustomNoteParam = bitValue;
+			}
 			if ((param & 0x40) != 0) {
 				parentSeq->intelliUseCustomPercTable = bitValue;
+			}
+
+			if (param == 0x80) {
+				desc << L"Status: " << (bitValue ? L"On" : L"Off");
+				AddGenericEvent(beginOffset, curOffset - beginOffset, L"Use Custom Note Param", desc.str(), CLR_CHANGESTATE);
+			}
+			else if (param == 0x40) {
+				desc << L"Status: " << (bitValue ? L"On" : L"Off");
 				AddGenericEvent(beginOffset, curOffset - beginOffset, L"Use Custom Percussion Table", desc.str(), CLR_CHANGESTATE);
 			}
 			else {
-				AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+				desc << L"Value: $" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << param;
+				if (type == 0x01) {
+					AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Flags On", desc.str(), CLR_CHANGESTATE);
+				}
+				else {
+					AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Flags Off", desc.str(), CLR_CHANGESTATE);
+				}
 			}
 
 			break;
