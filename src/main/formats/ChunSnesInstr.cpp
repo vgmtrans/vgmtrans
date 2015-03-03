@@ -154,15 +154,39 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr* instr, ChunSnesVersion ver, uint8_t srcn
 	AddSimpleItem(dwOffset + 2, 1, L"ADSR(1)");
 	AddSimpleItem(dwOffset + 3, 1, L"ADSR(2)");
 	AddSimpleItem(dwOffset + 4, 1, L"GAIN");
-	AddUnknown(dwOffset + 5, 1);
-	AddUnknown(dwOffset + 6, 1);
+	AddSimpleItem(dwOffset + 5, 2, L"Tuning");
 	AddUnknown(dwOffset + 7, 1);
 
 	uint8_t adsr1 = GetByte(dwOffset + 2);
 	uint8_t adsr2 = GetByte(dwOffset + 3);
 	uint8_t gain = GetByte(dwOffset + 4);
+	int16_t pitch_scale = GetShortBE(dwOffset + 5);
+
+	const double pitch_fixer = (version == CHUNSNES_SUMMER) ? (4096.0 / 4208.0) : (8192.0 / 8410.0);
+	double fine_tuning;
+	double coarse_tuning;
+	fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
+
+	// normalize
+	if (fine_tuning >= 0.5)
+	{
+		coarse_tuning += 1.0;
+		fine_tuning -= 1.0;
+	}
+	else if (fine_tuning <= -0.5)
+	{
+		coarse_tuning -= 1.0;
+		fine_tuning += 1.0;
+	}
 
 	sampNum = srcn;
+	if (version == CHUNSNES_SUMMER) {
+		unityKey = 95 - (int)coarse_tuning;
+	}
+	else {
+		unityKey = 119 - (int)coarse_tuning;
+	}
+	fineTune = (int16_t)(fine_tuning * 100.0);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 

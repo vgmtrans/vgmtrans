@@ -379,7 +379,7 @@ bool ChunSnesTrack::ReadEvent(void)
 
 	case EVENT_ADSR_RR:
 	{
-		uint8_t release_sr = GetByte(curOffset++) & 15;
+		uint8_t release_sr = GetByte(curOffset++) & 31;
 		desc << L"SR (Release): " << (int)release_sr;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Release Rate", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
 		break;
@@ -389,7 +389,7 @@ bool ChunSnesTrack::ReadEvent(void)
 	{
 		uint8_t adsr1 = GetByte(curOffset++);
 		uint8_t adsr2 = GetByte(curOffset++);
-		uint8_t release_sr = GetByte(curOffset++) & 15;
+		uint8_t release_sr = GetByte(curOffset++) & 31;
 
 		uint8_t ar = adsr1 & 0x0f;
 		uint8_t dr = (adsr1 & 0x70) >> 4;
