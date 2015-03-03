@@ -287,7 +287,7 @@ bool ChunSnesTrack::ReadEvent(void)
 		}
 
 		bool rest = (noteIndex == 0x00);
-		bool slur = (noteIndex == 0x4f);
+		bool tie = (noteIndex == 0x4f);
 		uint8_t key = noteIndex - 1;
 
 		// formula for duration is:
@@ -301,7 +301,7 @@ bool ChunSnesTrack::ReadEvent(void)
 		}
 		else if (noteDurationRate == 0) {
 			dur = noteLength;
-			slur = true;
+			//slur = true;
 		}
 		else {
 			dur = noteLength * (noteDurationRate + 1) / 256;
@@ -310,7 +310,7 @@ bool ChunSnesTrack::ReadEvent(void)
 		if (rest) {
 			AddRest(beginOffset, curOffset - beginOffset, noteLength);
 		}
-		else if (slur) {
+		else if (tie) {
 			// TODO: tie
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie/Slur", desc.str().c_str(), CLR_TIE, ICON_NOTE);
 			AddTime(noteLength);
@@ -319,6 +319,8 @@ bool ChunSnesTrack::ReadEvent(void)
 			AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
 			AddTime(noteLength);
 		}
+
+		break;
 	}
 
 	case EVENT_DURATION_FROM_TABLE: // a0..b5
@@ -627,6 +629,7 @@ bool ChunSnesTrack::ReadEvent(void)
 	{
 		AddEndOfTrack(beginOffset, curOffset - beginOffset);
 		bContinue = false;
+		break;
 	}
 
 	default:
