@@ -619,7 +619,7 @@ bool ChunSnesTrack::ReadEvent(void)
 		int8_t semitones = GetByte(curOffset++);
 		uint8_t length = GetByte(curOffset++);
 		desc << L"Key: " << (semitones > 0 ? L"+" : L"") << (int)semitones << L" semitones" << L"  Length: " << (int)length;
-		AddGenericEvent(beginOffset, curOffset - beginOffset, L"", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
 		break;
 	}
 
