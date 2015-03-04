@@ -188,6 +188,10 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr* instr, ChunSnesVersion ver, uint8_t srcn
 	}
 	fineTune = (int16_t)(fine_tuning * 100.0);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
+
+	// use ADSR sustain for release rate
+	uint8_t sr_release = 0x19; // default release rate
+	ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, NULL, NULL, NULL, &this->release_time, NULL);
 }
 
 ChunSnesRgn::~ChunSnesRgn()
