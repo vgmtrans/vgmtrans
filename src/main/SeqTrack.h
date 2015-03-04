@@ -40,8 +40,8 @@ public:
 
 protected:
 	virtual void AddEvent(SeqEvent* pSeqEvent);
-	void AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t& prevVal, uint8_t targVal, 
-		void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t));
+	void AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t& prevVal, uint8_t targVal,
+		uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t));
 public:
 	void AddGenericEvent(uint32_t offset, uint32_t length, const std::wstring& sEventName, const std::wstring& sEventDesc, uint8_t color, Icon icon = ICON_BINARY);
 	void AddSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::wstring& sEventName = L"Set Octave");

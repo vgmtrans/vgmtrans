@@ -522,7 +522,6 @@ bool ChunSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		desc << L"Master Volume: " << (int)mastVol << L"  Fade Length: " << (int)fadeLength;
 
-		// TODO: fade in real curve
 		uint8_t midiMastVol = min(mastVol, 0x7f);
 		AddMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, midiMastVol);
 		break;
@@ -534,7 +533,6 @@ bool ChunSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		desc << L"Expression: " << (int)vol << L"  Fade Length: " << (int)fadeLength;
 
-		// TODO: fade in real curve
 		AddExpressionSlide(beginOffset, curOffset - beginOffset, fadeLength, vol >> 1);
 		break;
 	}

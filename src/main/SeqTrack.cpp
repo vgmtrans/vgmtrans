@@ -228,25 +228,30 @@ uint32_t SeqTrack::ReadVarLen(uint32_t& offset)
 }
 
 void SeqTrack::AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t& prevVal, uint8_t targVal, 
-								  void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t))
+	uint8_t(*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t))
 {
 	if (readMode != READMODE_CONVERT_TO_MIDI)
 		return;
 
-	double valInc = (double)((double)(targVal-prevVal)/(double)dur);
+	double valInc = (double)((double)(targVal - prevVal) / (double)dur);
 	int8_t newVal = -1;
-	for (unsigned int i=0; i<dur; i++)
-	{
+	for (unsigned int i = 0; i < dur; i++) {
 		int8_t prevValInSlide = newVal;
-		newVal=roundi(prevVal+(valInc*(i+1)));
+
+		newVal = roundi(prevVal + (valInc * (i + 1)));
+		if (newVal < 0) {
+			newVal = 0;
+		}
+		if (newVal > 127) {
+			newVal = 127;
+		}
+		if (scalerFunc != NULL) {
+			newVal = scalerFunc(newVal);
+		}
+
 		//only create an event if the pan value has changed since the last iteration
-		if (prevValInSlide != newVal)
-		{
-			if (newVal < 0)
-				newVal = 0;
-			if (newVal > 0x7F)
-				newVal = 0x7F;
-			(pMidiTrack->*insertFunc)(channel, newVal, GetTime()+i);
+		if (prevValInSlide != newVal) {
+			(pMidiTrack->*insertFunc)(channel, newVal, GetTime() + i);
 		}
 	}
 	prevVal = targVal;
@@ -659,7 +664,7 @@ void SeqTrack::AddVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new VolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		AddControllerSlide(offset, length, dur, vol, targVol, &MidiTrack::InsertVol);
+		AddControllerSlide(offset, length, dur, vol, targVol, parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : NULL, &MidiTrack::InsertVol);
 }
 
 void SeqTrack::InsertVol(uint32_t offset, uint32_t length, uint8_t newVol, uint32_t absTime, const std::wstring& sEventName)
@@ -700,7 +705,7 @@ void SeqTrack::AddExpressionSlide(uint32_t offset, uint32_t length, uint32_t dur
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new ExpressionSlideSeqEvent(this, targExpr, dur, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		AddControllerSlide(offset, length, dur, expression, targExpr, &MidiTrack::InsertExpression);
+		AddControllerSlide(offset, length, dur, expression, targExpr, parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : NULL, &MidiTrack::InsertExpression);
 }
 
 void SeqTrack::InsertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const std::wstring& sEventName)
@@ -742,7 +747,7 @@ void SeqTrack::AddMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, u
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new MastVolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		AddControllerSlide(offset, length, dur, mastVol, targVol, &MidiTrack::InsertMasterVol);
+		AddControllerSlide(offset, length, dur, mastVol, targVol, parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : NULL, &MidiTrack::InsertMasterVol);
 }
 
 void SeqTrack::AddPan(uint32_t offset, uint32_t length, uint8_t pan, const std::wstring& sEventName)
@@ -766,7 +771,7 @@ void SeqTrack::AddPanSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8
 	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
 		AddEvent(new PanSlideSeqEvent(this, targPan, dur, offset, length, sEventName));
 	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		AddControllerSlide(offset, length, dur, prevPan, targPan, &MidiTrack::InsertPan);
+		AddControllerSlide(offset, length, dur, prevPan, targPan, NULL, &MidiTrack::InsertPan);
 }
 
 
