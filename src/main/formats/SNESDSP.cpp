@@ -151,6 +151,95 @@ uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t
 	return total_samples;
 }
 
+// See Anomie's S-DSP document for technical details
+// http://www.romhacking.net/documents/191/
+void ConvertSNESADSR(uint8_t adsr1, uint8_t adsr2, uint8_t gain, double * ptr_attack_time, double * ptr_decay_time, double * ptr_sustain_level, double * ptr_sustain_time, double * ptr_release_time)
+{
+	bool adsr_enabled = (adsr1 & 0x80) != 0;
+
+	double attack_time;
+	double decay_time;
+	double sustain_level;
+	double sustain_time;
+	double release_time;
+
+	int16_t env;
+	int16_t env_after;
+	uint32_t samples;
+
+	if (adsr_enabled) {
+		// ADSR mode
+		uint8_t ar = adsr1 & 0x0f;
+		uint8_t dr = (adsr1 & 0x70) >> 4;
+		uint8_t sl = (adsr2 & 0xe0) >> 5;
+		uint8_t sr = adsr2 & 0x1f;
+
+		// attack
+		if (ar < 15) {
+			attack_time = SDSP_COUNTER_RATES[ar * 2 + 1] * 64 / 32000.0;
+		}
+		else {
+			attack_time = 2 / 32000.0;
+		}
+		env = 0x7FF;
+
+		// decay
+		int16_t env_sustain_start = env;
+		if (sl == 7) {
+			// no decay
+			decay_time = 0;
+		}
+		else {
+			uint8_t dr_rate = 0x10 | (dr << 1);
+			EmulateSDSPGAIN(0xa0 | dr_rate, env, (sl << 8) | 0xff, &env_after, &decay_time); // exponential decrease
+			env_sustain_start = env_after;
+			env = env_after;
+		}
+
+		// sustain
+		sustain_level = (sl + 1) / 8.0;
+		if (sr == 0) {
+			sustain_time = -1; // infinite
+		}
+		else {
+			EmulateSDSPGAIN(0xa0 | sr, env, 0, &env_after, &sustain_time); // exponential decrease
+		}
+
+		// release
+		// decrease envelope by 8 for every sample
+		samples = (env_sustain_start + 7) / 8;
+		release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+	}
+	else {
+		// TODO: GAIN mode
+		ptr_attack_time = NULL;
+		ptr_decay_time = NULL;
+		ptr_sustain_level = NULL;
+		ptr_sustain_time = NULL;
+		ptr_release_time = NULL;
+	}
+
+	if (ptr_attack_time != NULL) {
+		*ptr_attack_time = attack_time;
+	}
+
+	if (ptr_decay_time != NULL) {
+		*ptr_decay_time = decay_time;
+	}
+
+	if (ptr_sustain_level != NULL) {
+		*ptr_sustain_level = sustain_level;
+	}
+
+	if (ptr_sustain_time != NULL) {
+		*ptr_sustain_time = sustain_time;
+	}
+
+	if (ptr_release_time != NULL) {
+		*ptr_release_time = release_time;
+	}
+}
+
 // ************
 // SNESSampColl
 // ************

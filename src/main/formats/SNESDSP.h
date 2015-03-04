@@ -43,62 +43,20 @@ static unsigned const SDSP_COUNTER_RATES [32] =
 // Emulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
 // return elapsed time in sample count, and final env value if requested.
 uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t * env_after_ptr, double * sf2_envelope_time_ptr);
+void ConvertSNESADSR(uint8_t adsr1, uint8_t adsr2, uint8_t gain, double * ptr_attack_time, double * ptr_decay_time, double * ptr_sustain_level, double * ptr_sustain_time, double * ptr_release_time);
 
-// See Anomie's S-DSP document for technical details
-// http://www.romhacking.net/documents/191/
-//
-// Also, see ScaleConversion.h to know linear-logarithmic conversion approach
 template <class T> void SNESConvADSR(T* rgn, uint8_t adsr1, uint8_t adsr2, uint8_t gain)
 {
 	bool adsr_enabled = (adsr1 & 0x80) != 0;
 
-	int16_t env;
-	int16_t env_after;
-	uint32_t samples;
-
 	if (adsr_enabled) {
 		// ADSR mode
-
 		uint8_t ar = adsr1 & 0x0f;
 		uint8_t dr = (adsr1 & 0x70) >> 4;
 		uint8_t sl = (adsr2 & 0xe0) >> 5;
 		uint8_t sr = adsr2 & 0x1f;
 
-		// attack
-		if (ar < 15) {
-			rgn->attack_time = SDSP_COUNTER_RATES[ar * 2 + 1] * 64 / 32000.0;
-		}
-		else {
-			rgn->attack_time = 2 / 32000.0;
-		}
-		env = 0x7FF;
-
-		// decay
-		int16_t env_sustain_start = env;
-		if (sl == 7) {
-			// no decay
-			rgn->decay_time = 0;
-		}
-		else {
-			uint8_t dr_rate = 0x10 | (dr << 1);
-			EmulateSDSPGAIN(0xa0 | dr_rate, env, (sl << 8) | 0xff, &env_after, &rgn->decay_time); // exponential decrease
-			env_sustain_start = env_after;
-			env = env_after;
-		}
-
-		// sustain
-		rgn->sustain_level = (sl + 1) / 8.0;
-		if (sr == 0) {
-			rgn->sustain_time = -1; // infinite
-		}
-		else {
-			EmulateSDSPGAIN(0xa0 | sr, env, 0, &env_after, &rgn->sustain_time); // exponential decrease
-		}
-
-		// release
-		// decrease envelope by 8 for every sample
-		samples = (env_sustain_start + 7) / 8;
-		rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+		ConvertSNESADSR(adsr1, adsr2, gain, &rgn->attack_time, &rgn->decay_time, &rgn->sustain_level, &rgn->sustain_time, &rgn->release_time);
 
 		// Merge decay and sustain into a single envelope, since DLS does not have sustain rate.
 		if (sl == 7) {
