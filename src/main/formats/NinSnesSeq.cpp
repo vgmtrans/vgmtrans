@@ -1789,6 +1789,10 @@ void NinSnesTrack::GetVolumeBalance(uint16_t pan, double & volumeLeft, double & 
 		// actual engine divides pan by 256, though pan value is 7-bit
 		volumeLeft = ReadPanTable((panMaxIndex << 8) - pan) / 128.0;
 		volumeRight = ReadPanTable(pan) / 128.0;
+
+		if (parentSeq->version == NINSNES_EARLIER) {
+			std::swap(volumeLeft, volumeRight);
+		}
 	}
 }
 
