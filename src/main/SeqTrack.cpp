@@ -169,8 +169,8 @@ void SeqTrack::AddInitialMidiEvents(int trackNum)
 	if (trackNum == 0) {
 		pMidiTrack->AddGMReset();
 		pMidiTrack->AddGM2Reset();
-		if (parentSeq->bWriteInitialTempo)
-			pMidiTrack->AddTempoBPM(parentSeq->tempoBPM);
+		if (parentSeq->bAlwaysWriteInitialTempo)
+			pMidiTrack->AddTempoBPM(parentSeq->initialTempoBPM);
 	}
 	if (parentSeq->bAlwaysWriteInitialVol)
 		AddVolNoItem(parentSeq->initialVol);

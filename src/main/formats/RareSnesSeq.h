@@ -107,8 +107,6 @@ public:
 	int8_t presetVolR[5];                           // volume preset R
 	uint16_t presetADSR[5];                       // ADSR preset
 
-	double GetTempoInBPM ();
-	double GetTempoInBPM (uint8_t tempo);
 	double GetTempoInBPM (uint8_t tempo, uint8_t timerFreq);
 
 private:

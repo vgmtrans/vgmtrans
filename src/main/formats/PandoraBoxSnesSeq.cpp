@@ -37,8 +37,7 @@ void PandoraBoxSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
 
-	bWriteInitialTempo = true;
-	tempoBPM = GetByte(dwOffset + 6);
+	AlwaysWriteInitialTempo(GetByte(dwOffset + 6));
 }
 
 bool PandoraBoxSnesSeq::GetHeaderInfo(void)

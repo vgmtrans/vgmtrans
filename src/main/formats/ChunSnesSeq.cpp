@@ -36,7 +36,6 @@ void ChunSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
 
-	tempoBPM = GetTempoInBPM(initialTempo);
 	conditionVar = 0;
 }
 
@@ -52,9 +51,7 @@ bool ChunSnesSeq::GetHeaderInfo(void)
 
 	header->AddTempo(curOffset, 1);
 	initialTempo = GetByte(curOffset++);
-
-	bWriteInitialTempo = true;
-	tempoBPM = GetTempoInBPM(initialTempo);
+	AlwaysWriteInitialTempo(GetTempoInBPM(initialTempo));
 
 	header->AddSimpleItem(curOffset, 1, L"Number of Tracks");
 	nNumTracks = GetByte(curOffset++);

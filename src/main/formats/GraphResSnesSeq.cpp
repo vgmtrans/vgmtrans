@@ -18,8 +18,7 @@ GraphResSnesSeq::GraphResSnesSeq(RawFile* file, GraphResSnesVersion ver, uint32_
 	bAllowDiscontinuousTrackData = true;
 	bUseLinearAmplitudeScale = true;
 
-	bWriteInitialTempo = true;
-	tempoBPM = 60000000.0 / ((125 * 0x85) * SEQ_PPQN); // good ol' frame-based sequence!
+	AlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * SEQ_PPQN)); // good ol' frame-based sequence!
 
 	UseReverb();
 	AlwaysWriteInitialReverb(0);

@@ -50,6 +50,7 @@ public:
 	void AlwaysWriteInitialPitchBendRange(uint8_t semitones, uint8_t cents) 
 	{ bAlwaysWriteInitialPitchBendRange = true; initialPitchBendRangeSemiTones = semitones;
 	  initialPitchBendRangeCents = cents; }
+	void AlwaysWriteInitialTempo(double tempoBPM) { bAlwaysWriteInitialTempo = true; initialTempoBPM = tempoBPM; }
 
 	bool OnSaveAsMidi(void);
 	virtual bool SaveAsMidi(const std::wstring & filepath);
@@ -77,7 +78,7 @@ public:
 								//which is important when drivers allow things like global transposition events mid note
 	bool bUseLinearAmplitudeScale;  //This will cause all all velocity, volume, and expression events to be
 									//automatically converted from a linear scale to MIDI's logarithmic scale
-	bool bWriteInitialTempo;
+	bool bAlwaysWriteInitialTempo;
 	bool bAlwaysWriteInitialVol;
 	bool bAlwaysWriteInitialExpression;
 	bool bAlwaysWriteInitialReverb;
@@ -99,6 +100,7 @@ public:
 	uint8_t initialExpression;
 	uint8_t initialReverb;
 	uint8_t initialPitchBendRangeSemiTones, initialPitchBendRangeCents;
+	double initialTempoBPM;
 
 	bool bReverb;
 	float reverbTime;

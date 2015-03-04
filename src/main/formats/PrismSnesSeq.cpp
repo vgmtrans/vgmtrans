@@ -35,9 +35,7 @@ PrismSnesSeq::PrismSnesSeq(RawFile* file, PrismSnesVersion ver, uint32_t seqdata
 
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
-
-	bWriteInitialTempo = true;
-	tempoBPM = GetTempoInBPM(0x82);
+	AlwaysWriteInitialTempo(GetTempoInBPM(0x82));
 
 	LoadEventMap();
 }

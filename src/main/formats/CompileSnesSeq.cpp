@@ -32,7 +32,6 @@ CompileSnesSeq::CompileSnesSeq(RawFile* file, CompileSnesVersion ver, uint32_t s
 
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
-	bWriteInitialTempo = true;
 
 	LoadEventMap();
 }
@@ -44,10 +43,6 @@ CompileSnesSeq::~CompileSnesSeq(void)
 void CompileSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
-
-	if (aTracks.size() != 0) {
-		tempoBPM = GetTempoInBPM(((CompileSnesTrack*)aTracks[0])->spcInitialTempo);
-	}
 }
 
 bool CompileSnesSeq::GetHeaderInfo(void)
@@ -102,6 +97,10 @@ bool CompileSnesSeq::GetTrackPointers(void)
 		track->spcInitialSRCN = GetByte(curOffset + 10);
 		track->spcInitialPan = (int8_t)GetByte(curOffset + 12);
 		aTracks.push_back(track);
+
+		if (trackIndex == 0) {
+			AlwaysWriteInitialTempo(track->spcInitialTempo);
+		}
 
 		curOffset += 14;
 	}

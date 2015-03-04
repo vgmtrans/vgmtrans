@@ -40,7 +40,6 @@ RareSnesSeq::RareSnesSeq(RawFile* file, RareSnesVersion ver, uint32_t seqdataOff
 
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
-	bWriteInitialTempo = true;
 
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
@@ -67,7 +66,8 @@ void RareSnesSeq::ResetVars(void)
 		break;
 	}
 	tempo = initialTempo;
-	tempoBPM = GetTempoInBPM();
+	tempoBPM = GetTempoInBPM(tempo, timerFreq);
+	AlwaysWriteInitialTempo(tempoBPM);
 }
 
 bool RareSnesSeq::GetHeaderInfo(void)
@@ -238,16 +238,6 @@ void RareSnesSeq::LoadEventMap()
 		//EventMap[0x31] = EVENT_RESET;
 		break;
 	}
-}
-
-double RareSnesSeq::GetTempoInBPM ()
-{
-	return GetTempoInBPM(tempo, timerFreq);
-}
-
-double RareSnesSeq::GetTempoInBPM (uint8_t tempo)
-{
-	return GetTempoInBPM(tempo, timerFreq);
 }
 
 double RareSnesSeq::GetTempoInBPM (uint8_t tempo, uint8_t timerFreq)
@@ -647,7 +637,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			uint8_t newTempo = GetByte(curOffset++);
 			parentSeq->tempo = newTempo;
-			AddTempoBPM(beginOffset, curOffset-beginOffset, parentSeq->GetTempoInBPM());
+			AddTempoBPM(beginOffset, curOffset-beginOffset, parentSeq->GetTempoInBPM(parentSeq->tempo, parentSeq->timerFreq));
 			break;
 		}
 
@@ -655,7 +645,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t deltaTempo = (int8_t) GetByte(curOffset++);
 			parentSeq->tempo = (parentSeq->tempo + deltaTempo) & 0xff;
-			AddTempoBPM(beginOffset, curOffset-beginOffset, parentSeq->GetTempoInBPM(), L"Tempo Add");
+			AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(parentSeq->tempo, parentSeq->timerFreq), L"Tempo Add");
 			break;
 		}
 
@@ -963,7 +953,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			uint8_t newFreq = GetByte(curOffset++);
 			parentSeq->timerFreq = newFreq;
-			AddTempoBPM(beginOffset, curOffset-beginOffset, parentSeq->GetTempoInBPM(), L"Timer Frequency");
+			AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(parentSeq->tempo, parentSeq->timerFreq), L"Timer Frequency");
 			break;
 		}
 

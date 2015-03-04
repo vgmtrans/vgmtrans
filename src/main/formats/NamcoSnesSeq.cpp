@@ -18,8 +18,7 @@ NamcoSnesSeq::NamcoSnesSeq(RawFile* file, NamcoSnesVersion ver, uint32_t seqdata
 	bAllowDiscontinuousTrackData = true;
 	bUseLinearAmplitudeScale = true;
 
-	bWriteInitialTempo = true;
-	tempoBPM = 60000000.0 / (SEQ_PPQN * (125 * 0x86));
+	AlwaysWriteInitialTempo(60000000.0 / (SEQ_PPQN * (125 * 0x86)));
 
 	UseReverb();
 
