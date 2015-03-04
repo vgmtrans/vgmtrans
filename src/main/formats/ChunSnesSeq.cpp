@@ -15,7 +15,8 @@ DECLARE_FORMAT(ChunSnes);
 ChunSnesSeq::ChunSnesSeq(RawFile* file, ChunSnesVersion ver, ChunSnesMinorVersion minorVer, uint32_t seqdataOffset, std::wstring newName)
 	: VGMSeq(ChunSnesFormat::name, file, seqdataOffset, 0, newName),
 	version(ver),
-	minorVersion(minorVer)
+	minorVersion(minorVer),
+	initialTempo(0)
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
@@ -34,6 +35,8 @@ ChunSnesSeq::~ChunSnesSeq(void)
 void ChunSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
+
+	tempoBPM = GetTempoInBPM(initialTempo);
 }
 
 bool ChunSnesSeq::GetHeaderInfo(void)
@@ -464,8 +467,8 @@ bool ChunSnesTrack::ReadEvent(void)
 	case EVENT_CONDITIONAL_JUMP:
 	{
 		int16_t destOffset = GetShort(curOffset); curOffset += 2;
-		uint16_t dest = curOffset + destOffset;
 		uint8_t condValue = GetByte(curOffset++);
+		uint16_t dest = curOffset + destOffset;
 		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Conditional Jump", desc.str(), CLR_MISC);
 
