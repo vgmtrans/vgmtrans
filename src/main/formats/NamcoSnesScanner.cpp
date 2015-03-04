@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "NamcoSnesScanner.h"
+#include "NamcoSnesInstr.h"
 #include "NamcoSnesSeq.h"
 #include "SNESDSP.h"
 
@@ -56,6 +57,56 @@ BytePattern NamcoSnesScanner::ptnStartSong(
 	"xxx?x??"
 	,
 	23);
+
+//; Wagan Paradise SPC
+//0d6d: f8 df     mov   x,$df
+//0d6f: f5 00 02  mov   a,$0200+x         ; SRCN index
+//0d72: 1c        asl   a
+//0d73: 60        clrc
+//0d74: 88 e0     adc   a,#$e0
+//0d76: c4 3c     mov   $3c,a
+//0d78: e8 11     mov   a,#$11
+//0d7a: 88 00     adc   a,#$00
+//0d7c: c4 3d     mov   $3d,a             ; $3c/d = $11e0 + (srcn * 2)
+//0d7e: 8d 00     mov   y,#$00
+//0d80: f7 3c     mov   a,($3c)+y
+//0d82: c4 3e     mov   $3e,a
+//0d84: fc        inc   y
+//0d85: f7 3c     mov   a,($3c)+y
+//0d87: c4 3d     mov   $3d,a             ; read per-instrument tuning
+BytePattern NamcoSnesScanner::ptnLoadInstrTuning(
+	"\xf8\xdf\xf5\x00\x02\x1c\x60\x88"
+	"\xe0\xc4\x3c\xe8\x11\x88\x00\xc4"
+	"\x3d\x8d\x00\xf7\x3c\xc4\x3e\xfc"
+	"\xf7\x3c\xc4\x3d"
+	,
+	"x?x??xxx"
+	"?x?x?x?x"
+	"?xxx?x?x"
+	"x?x?"
+	,
+	28);
+
+//; Wagan Paradise SPC
+//056c: cd 00     mov   x,#$00
+//056e: f5 d3 09  mov   a,$09d3+x
+//0571: fd        mov   y,a
+//0572: 3d        inc   x
+//0573: f5 d3 09  mov   a,$09d3+x
+//0576: 3f f7 09  call  $09f7             ; reset DSP
+//0579: 3d        inc   x
+//057a: c8 18     cmp   x,#$18
+//057c: d0 f0     bne   $056e
+BytePattern NamcoSnesScanner::ptnDspRegInit(
+	"\xcd\x00\xf5\xd3\x09\xfd\x3d\xf5"
+	"\xd3\x09\x3f\xf7\x09\x3d\xc8\x18"
+	"\xd0\xf0"
+	,
+	"xxx??xxx"
+	"??x??xx?"
+	"xx"
+	,
+	18);
 
 void NamcoSnesScanner::Scan(RawFile* file, void* info)
 {
@@ -121,8 +172,60 @@ void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile* file)
 		delete newSeq;
 		return;
 	}
+
+	UINT ofsLoadInstrTuning;
+	uint16_t addrTuningTable;
+	if (file->SearchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
+		addrTuningTable = file->GetByte(ofsLoadInstrTuning + 8) | (file->GetByte(ofsLoadInstrTuning + 12) << 8);
+	}
+	else {
+		return;
+	}
+
+	std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
+	if (dspRegMap.count(0x5d) == 0) {
+		return;
+	}
+	uint16_t spcDirAddr = dspRegMap[0x5d] << 8;
+
+	NamcoSnesInstrSet * newInstrSet = new NamcoSnesInstrSet(file, version, spcDirAddr, addrTuningTable);
+	if (!newInstrSet->LoadVGMFile()) {
+		delete newInstrSet;
+		return;
+	}
 }
 
 void NamcoSnesScanner::SearchForNamcoSnesFromROM(RawFile* file)
 {
+}
+
+std::map<uint8_t, uint8_t> NamcoSnesScanner::GetInitDspRegMap(RawFile* file)
+{
+	std::map<uint8_t, uint8_t> dspRegMap;
+
+	// find a code block which initializes dsp registers
+	UINT ofsDspRegInit;
+	uint8_t dspRegCount;
+	uint16_t addrDspRegValueList;
+	if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInit)) {
+		dspRegCount = file->GetByte(ofsDspRegInit + 15) / 2;
+		addrDspRegValueList = file->GetShort(ofsDspRegInit + 3);
+	}
+	else {
+		return dspRegMap;
+	}
+
+	// check address range
+	if (addrDspRegValueList + (dspRegCount * 2) > 0x10000) {
+		return dspRegMap;
+	}
+
+	// store dsp reg/value pairs to map
+	for (uint8_t regIndex = 0; regIndex < dspRegCount; regIndex++) {
+		uint8_t dspReg = file->GetByte(addrDspRegValueList + (regIndex * 2));
+		uint8_t dspValue = file->GetByte(addrDspRegValueList + (regIndex * 2) + 1);
+		dspRegMap[dspReg] = dspValue;
+	}
+
+	return dspRegMap;
 }
