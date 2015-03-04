@@ -437,6 +437,27 @@ BytePattern NinSnesScanner::ptnDispatchNoteFE4(
 	,
 	21);
 
+//; Kirby Super Star SPC
+//0e03: 3f 16 0e  call  $0e16
+//0e06: d4 d0     mov   $d0+x,a           ; VOL(L)
+//0e08: 8d 14     mov   y,#$14
+//0e0a: e8 00     mov   a,#$00
+//0e0c: 9a 1c     subw  ya,$1c
+//0e0e: da 1c     movw  $1c,ya
+//0e10: 3f 16 0e  call  $0e16
+//0e13: d4 d1     mov   $d1+x,a           ; VOL(R)
+//0e15: 6f        ret
+BytePattern NinSnesScanner::ptnWriteVolumeKSS(
+	"\x3f\x16\x0e\xd4\xd0\x8d\x14\xe8"
+	"\x00\x9a\x1c\xda\x1c\x3f\x16\x0e"
+	"\xd4\xd1\x6f"
+	,
+	"x??x?xxx"
+	"xx?x?x??"
+	"x?x"
+	,
+	19);
+
 //; Super Metroid (developed by Nintendo RD1)
 //; vcmd fa - set perc patch base
 //1af1: c4 5f     mov   $5f,a
@@ -970,7 +991,13 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
 			if (firstVoiceCmd == 0xe0 && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
 				if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
-					version = NINSNES_STANDARD;
+					UINT ofsWriteVolume;
+					if (file->SearchBytePattern(ptnWriteVolumeKSS, ofsWriteVolume)) {
+						version = NINSNES_HAL;
+					}
+					else {
+						version = NINSNES_STANDARD;
+					}
 				}
 				else {
 					// compatible design, but customized anyway
