@@ -106,8 +106,14 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM (RawFile* file)
 	}
 
 	uint16_t spcDirAddr = file->GetByte(addrEngineHeader + 0x0e) << 8;
+
 	uint16_t addrTuningTable = file->GetShort(addrEngineHeader + 0x12);
-	CompileSnesInstrSet * newInstrSet = new CompileSnesInstrSet(file, version, addrTuningTable, spcDirAddr);
+	uint16_t addrPitchTablePtrs = 0;
+	if (version != COMPILESNES_ALESTE && version != COMPILESNES_JAKICRUSH) {
+		addrPitchTablePtrs = file->GetShort(addrEngineHeader + 0x16);
+	}
+
+	CompileSnesInstrSet * newInstrSet = new CompileSnesInstrSet(file, version, addrTuningTable, addrPitchTablePtrs, spcDirAddr);
 	if (!newInstrSet->LoadVGMFile()) {
 		delete newInstrSet;
 		return;
