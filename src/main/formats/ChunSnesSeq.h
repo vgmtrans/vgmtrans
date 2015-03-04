@@ -75,6 +75,7 @@ public:
 	std::map<uint8_t, ChunSnesSeqPresetType> PresetMap;
 
 	uint8_t initialTempo;
+	uint8_t conditionVar;
 
 private:
 	void LoadEventMap(void);
@@ -107,5 +108,4 @@ public:
 	uint8_t loopCountAlt;
 	uint8_t subNestLevel;
 	uint16_t subReturnAddr[CHUNSNES_SUBLEVEL_MAX];
-	uint8_t conditionVar;
 };

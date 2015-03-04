@@ -37,6 +37,7 @@ void ChunSnesSeq::ResetVars(void)
 	VGMSeq::ResetVars();
 
 	tempoBPM = GetTempoInBPM(initialTempo);
+	conditionVar = 0;
 }
 
 bool ChunSnesSeq::GetHeaderInfo(void)
@@ -101,18 +102,19 @@ void ChunSnesSeq::LoadEventMap()
 	}
 
 	if (version == CHUNSNES_SUMMER) {
-		//for (statusByte = 0xa0; statusByte <= 0xdc; statusByte++) {
-		//	EventMap[statusByte] = EVENT_NOP;
-		//}
+		for (statusByte = 0xa0; statusByte <= 0xdc; statusByte++) {
+			EventMap[statusByte] = EVENT_NOP;
+		}
 	}
 	else {
 		for (statusByte = 0xa0; statusByte <= 0xb5; statusByte++) {
 			EventMap[statusByte] = EVENT_DURATION_FROM_TABLE;
 		}
 
-		//for (statusByte = 0xb6; statusByte <= 0xda; statusByte++) {
-		//	EventMap[statusByte] = EVENT_NOP;
-		//}
+		// appears in Bridal March at $7493
+		for (statusByte = 0xb6; statusByte <= 0xda; statusByte++) {
+			EventMap[statusByte] = EVENT_NOP;
+		}
 	}
 
 	EventMap[0xdd] = EVENT_ADSR_RELEASE_SR;
@@ -230,7 +232,6 @@ void ChunSnesTrack::ResetVars(void)
 	loopCount = 0;
 	loopCountAlt = 0;
 	subNestLevel = 0;
-	conditionVar = 0;
 }
 
 
@@ -472,13 +473,13 @@ bool ChunSnesTrack::ReadEvent(void)
 		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Conditional Jump", desc.str(), CLR_MISC);
 
-		if ((conditionVar & 0x7f) != condValue) {
+		if ((parentSeq->conditionVar & 0x7f) != condValue) {
 			// repeat again
 			curOffset = dest;
 		}
 		else {
 			// repeat end
-			conditionVar |= 0x80;
+			parentSeq->conditionVar |= 0x80;
 		}
 
 		break;
@@ -795,7 +796,7 @@ bool ChunSnesTrack::ReadEvent(void)
 		{
 		case PRESET_CONDITION:
 			desc << L"Value: " << presetIndex;
-			conditionVar = presetIndex; // luckily those preset starts from preset 0 :)
+			parentSeq->conditionVar = presetIndex; // luckily those preset starts from preset 0 :)
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Condition Value", desc.str(), CLR_CHANGESTATE);
 			break;
 
