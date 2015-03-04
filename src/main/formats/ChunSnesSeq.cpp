@@ -119,13 +119,13 @@ void ChunSnesSeq::LoadEventMap()
 
 	EventMap[0xdd] = EVENT_ADSR_RELEASE_SR;
 	EventMap[0xde] = EVENT_ADSR_AND_RELEASE_SR;
-	EventMap[0xdf] = EVENT_UNKNOWN1;
+	EventMap[0xdf] = EVENT_SURROUND;
 	EventMap[0xe0] = EVENT_CONDITIONAL_JUMP;
 	EventMap[0xe1] = EVENT_INC_COUNTER;
 	EventMap[0xe2] = EVENT_PITCH_ENVELOPE;
 	EventMap[0xe3] = EVENT_NOISE_ON;
 	EventMap[0xe4] = EVENT_NOISE_OFF;
-	EventMap[0xe5] = EVENT_UNKNOWN2;
+	EventMap[0xe5] = EVENT_MASTER_VOLUME_FADE;
 	EventMap[0xe6] = EVENT_EXPRESSION_FADE;
 	EventMap[0xe7] = EVENT_FULL_VOLUME_FADE;
 	EventMap[0xe8] = EVENT_PAN_FADE;
@@ -462,6 +462,16 @@ bool ChunSnesTrack::ReadEvent(void)
 
 		desc << L"AR: " << (int)ar << L"  DR: " << (int)dr << L"  SL: " << (int)sl << L"  SR: " << (int)sr << L"  SR (Release): " << (int)release_sr;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR & Release Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_SURROUND:
+	{
+		uint8_t param = GetByte(curOffset++);
+		bool invertLeft = (param & 1) != 0;
+		bool invertRight = (param & 2) != 0;
+		desc << L"Invert Left: " << (invertLeft ? L"On" : L"Off") << L"  Invert Right: " << (invertRight ? L"On" : L"Off");
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Surround", desc.str(), CLR_PAN, ICON_CONTROL);
 		break;
 	}
 
@@ -929,14 +939,17 @@ int8_t ChunSnesTrack::CalcPanValue(int8_t pan, double & volumeScale)
 
 double ChunSnesTrack::CalcTuningValue(int8_t tuning)
 {
-	if (tuning == 0x7f) {
-		return 100.0;
+	uint8_t absTuning = abs(tuning);
+	int8_t sign = (tuning >= 0) ? 1 : -1;
+
+	if (absTuning == 0x7f) {
+		return sign * 100.0;
 	}
 	else {
-		uint8_t absTuning = tuning << 1;
+		absTuning <<= 1;
 		if (absTuning >= 0x80) {
 			absTuning++; // +0.5 if abs(tuning) >= 0x40
 		}
-		return (absTuning / 256.0) * 100.0;
+		return sign * (absTuning / 256.0) * 100.0;
 	}
 }
