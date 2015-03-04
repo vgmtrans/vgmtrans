@@ -368,9 +368,13 @@ bool HeartBeatSnesTrack::ReadEvent(void)
 
 		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), 20);
 
-		uint8_t spcPan = HeartBeatSnesSeq::PAN_TABLE[panIndex];
-		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal(spcPan);
+		uint8_t volumeLeft = HeartBeatSnesSeq::PAN_TABLE[20 - panIndex];
+		uint8_t volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex];
 
+		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
+		uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
+
+		// TODO: apply volume scale
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
 		break;
 	}
@@ -382,10 +386,13 @@ bool HeartBeatSnesTrack::ReadEvent(void)
 
 		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), 20);
 
-		uint8_t spcPan = HeartBeatSnesSeq::PAN_TABLE[panIndex];
-		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal(spcPan);
+		uint8_t volumeLeft = HeartBeatSnesSeq::PAN_TABLE[20 - panIndex] / 128.0;
+		uint8_t volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex] / 128.0;
 
-		// TODO: fade in real curve
+		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
+		uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
+
+		// TODO: fade in real curve, apply volume scale
 		AddPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);
 		break;
 	}

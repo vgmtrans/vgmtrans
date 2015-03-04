@@ -920,19 +920,13 @@ int8_t ChunSnesTrack::CalcPanValue(int8_t pan, double & volumeScale)
 	double volumeRight;
 	GetVolumeBalance(pan, volumeLeft, volumeRight);
 
-	double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
-	double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan, &volumeScale);
-	// TODO: calculate correct volume scale
-	//volumeScale /= volumeLeft + volumeRight;
-	//volumeScale = min(max(volumeScale, 0.0), 1.0);
+	uint8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight);
 
-	int8_t midiPan;
-	if (midiScalePan == 0.0) {
-		midiPan = 0;
-	}
-	else {
-		midiPan = 1 + roundi(midiScalePan * 126.0);
-	}
+	// TODO: convert volume scale to (0.0..1.0)
+	double volumeLeftMidi;
+	double volumeRightMidi;
+	ConvertStdMidiPanToVolumeBalance(midiPan, volumeLeftMidi, volumeRightMidi);
+	volumeScale = (volumeLeft + volumeRight) / (volumeLeftMidi + volumeRightMidi);
 
 	return midiPan;
 }

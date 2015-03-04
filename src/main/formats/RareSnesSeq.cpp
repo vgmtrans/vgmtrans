@@ -299,28 +299,18 @@ double RareSnesTrack::GetTuningInSemitones(int8_t tuning)
 	return 12.0 * log((1024 + tuning) / 1024.0) / log(2.0);
 }
 
-void RareSnesTrack::CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, uint8_t& midiVol, uint8_t& midiPan)
+void RareSnesTrack::CalcVolPanFromVolLR(int8_t volL, int8_t volR, uint8_t& midiVol, uint8_t& midiPan)
 {
-	double volL = abs(volLByte) / 128.0;
-	double volR = abs(volRByte) / 128.0;
-	double vol;
-	double pan;
+	double volumeLeft = abs(volL) / 128.0;
+	double volumeRight = abs(volR) / 128.0;
 
-	// linear conversion
-	vol = (volL + volR) / 2;
-	pan = volR / (volL + volR);
+	double linearPan = volumeRight / (volumeLeft + volumeRight);
+	double volumeScale;
+	uint8_t midiPanTemp = ConvertLinearPercentPanValToStdMidiVal(linearPan, &volumeScale);
 
-	// make it GM2 compatible
-	ConvertPercentVolPanToStdMidiScale(vol, pan);
-
-	midiVol = (uint8_t)(vol * 127 + 0.5);
-	if (midiVol != 0)
-	{
-		midiPan = (uint8_t)(pan * 126 + 0.5);
-		if (midiPan != 0)
-		{
-			midiPan++;
-		}
+	midiVol = ConvertPercentAmpToStdMidiVal(volumeScale);
+	if (volL != 0 || volR != 0) {
+		midiPan = midiPanTemp;
 	}
 }
 

@@ -617,9 +617,6 @@ bool KonamiSnesTrack::ReadEvent(void)
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Per-Instrument Pan On", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
 		}
 		else {
-			uint8_t midiPan;
-			double midiScalePan;
-
 			uint8_t volumeLeft;
 			uint8_t volumeRight;
 			switch (parentSeq->version) {
@@ -650,14 +647,7 @@ bool KonamiSnesTrack::ReadEvent(void)
 			}
 
 			double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
-			midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
-
-			if (midiScalePan == 0.0) {
-				midiPan = 0;
-			}
-			else {
-				midiPan = 1 + roundi(midiScalePan * 126.0);
-			}
+			uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
 
 			// TODO: apply volume scale
 			AddPan(beginOffset, curOffset - beginOffset, midiPan);

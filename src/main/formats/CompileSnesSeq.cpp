@@ -225,8 +225,8 @@ void CompileSnesTrack::AddInitialMidiEvents(int trackNum)
 	double volumeScale;
 	AddProgramChangeNoItem(spcSRCN, true);
 	AddVolNoItem(Convert7bitPercentVolValToStdMidiVal(spcVolume / 2));
-	AddPanNoItem(Convert7bitPercentPanValToStdMidiVal((uint8_t)(spcPan + 0x80) / 2, &volumeScale));
-	AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
+	AddPanNoItem(Convert7bitLinearPercentPanValToStdMidiVal((uint8_t)(spcPan + 0x80) / 2, &volumeScale));
+	AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
 	AddReverbNoItem(0);
 }
 
@@ -544,8 +544,8 @@ bool CompileSnesTrack::ReadEvent(void)
 		spcPan = newPan;
 
 		double volumeScale;
-		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal((uint8_t)(newPan + 0x80) / 2, &volumeScale);
-		AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
+		uint8_t midiPan = Convert7bitLinearPercentPanValToStdMidiVal((uint8_t)(newPan + 0x80) / 2, &volumeScale);
+		AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
 		break;
 	}

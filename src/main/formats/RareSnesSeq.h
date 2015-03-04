@@ -147,5 +147,5 @@ private:
 	uint8_t altNoteByte2;                          // note number preset 2
 
 	double GetTuningInSemitones(int8_t tuning);
-	void CalcVolPanFromVolLR(int8_t volLByte, int8_t volRByte, uint8_t& midiVol, uint8_t& midiPan);
+	void CalcVolPanFromVolLR(int8_t volL, int8_t volR, uint8_t& midiVol, uint8_t& midiPan);
 };

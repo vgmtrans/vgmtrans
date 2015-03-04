@@ -369,18 +369,10 @@ bool PandoraBoxSnesTrack::ReadEvent(void)
 		newPan = min(newPan, 128);
 		double linearPan = newPan / 128.0;
 		double volumeScale;
-		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan, &volumeScale);
-
-		int8_t midiPan;
-		if (midiScalePan == 0.0) {
-			midiPan = 0;
-		}
-		else {
-			midiPan = 1 + roundi(midiScalePan * 126.0);
-		}
+		int8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan, &volumeScale);
 
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
-		AddExpressionNoItem(roundi(volumeScale * 127.0));
+		AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
 		break;
 	}
 

@@ -806,20 +806,11 @@ bool PrismSnesTrack::ReadEvent(void)
 
 		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
 		double volumeScale;
-		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan, &volumeScale);
-		volumeScale /= volumeLeft + volumeRight;
-		volumeScale = min(max(volumeScale, 0.0), 1.0);
-
-		int8_t midiPan;
-		if (midiScalePan == 0.0) {
-			midiPan = 0;
-		}
-		else {
-			midiPan = 1 + roundi(midiScalePan * 126.0);
-		}
+		// TODO: fix volume scale when L+R > 1.0?
+		int8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan, &volumeScale);
 
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
-		AddExpressionNoItem(roundi(sqrt(volumeScale) * 127.0));
+		AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
 		break;
 	}
 
