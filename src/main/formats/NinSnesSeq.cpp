@@ -1033,8 +1033,7 @@ bool NinSnesTrack::ReadEvent(void)
 		double volumeRight;
 		GetVolumeBalance(newPan << 8, volumeLeft, volumeRight);
 
-		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
-		uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
+		uint8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight);
 
 		// TODO: fade in real curve
 		// TODO: apply volume scale
@@ -1839,9 +1838,9 @@ int8_t NinSnesTrack::CalcPanValue(uint8_t pan, double & volumeScale, bool & reve
 	double volumeRight;
 	GetVolumeBalance(panIndex << 8, volumeLeft, volumeRight);
 
-	double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
 	// TODO: correct volume scale of TOSE sequence
-	int8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan, &volumeScale);
+	int8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
+	volumeScale = min(volumeScale, 1.0); // workaround
 
 	return midiPan;
 }

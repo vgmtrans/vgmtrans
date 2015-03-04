@@ -465,8 +465,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 			volumeRight = (15 + pan) / 15.0;
 		}
 
-		double linearPan = volumeRight / (volumeLeft + volumeRight);
-		uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
+		uint8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight);
 
 		// TODO: apply volume scale
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);

@@ -294,9 +294,8 @@ void RareSnesTrack::CalcVolPanFromVolLR(int8_t volL, int8_t volR, uint8_t& midiV
 	double volumeLeft = abs(volL) / 128.0;
 	double volumeRight = abs(volR) / 128.0;
 
-	double linearPan = volumeRight / (volumeLeft + volumeRight);
 	double volumeScale;
-	uint8_t midiPanTemp = ConvertLinearPercentPanValToStdMidiVal(linearPan, &volumeScale);
+	uint8_t midiPanTemp = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
 
 	midiVol = ConvertPercentAmpToStdMidiVal(volumeScale);
 	if (volL != 0 || volR != 0) {
