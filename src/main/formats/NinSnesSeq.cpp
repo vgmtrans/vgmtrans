@@ -1020,7 +1020,7 @@ bool NinSnesTrack::ReadEvent(void)
 		bool reverseRight;
 		int8_t midiPan = CalcPanValue(newPan, volumeScale, reverseLeft, reverseRight);
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
-		AddExpressionNoItem(roundi(sqrt(volumeScale) * 127.0));
+		AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
 		break;
 	}
 
@@ -1540,7 +1540,7 @@ bool NinSnesTrack::ReadEvent(void)
 			bool reverseRight;
 			int8_t midiPan = CalcPanValue(newPan, volumeScale, reverseLeft, reverseRight);
 			AddPanNoItem(midiPan);
-			AddExpressionNoItem(roundi(sqrt(volumeScale) * 127.0));
+			AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
 
 			switch (parentSeq->version) {
 			case NINSNES_INTELLI_FE3:

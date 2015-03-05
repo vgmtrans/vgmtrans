@@ -232,18 +232,20 @@ void ConvertStdMidiPanToVolumeBalance(uint8_t midiPan, double & percentLeft, dou
 // Convert L/R volume balance (0.0..1.0) to midi pan
 uint8_t ConvertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight, double * ptrVolumeScale)
 {
+	uint8_t midiPan;
 	if (percentRight == 0) {
-		return 0;
+		midiPan = 0;
 	}
 	else if (percentLeft == percentRight) {
-		return 64;
+		midiPan = 64;
 	}
 	else if (percentLeft == 0) {
-		return 127;
+		midiPan = 127;
 	}
-
-	double percentPan = percentRight / (percentLeft + percentRight);
-	uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(percentPan);
+	else {
+		double percentPan = percentRight / (percentLeft + percentRight);
+		midiPan = ConvertLinearPercentPanValToStdMidiVal(percentPan);
+	}
 
 	if (ptrVolumeScale != NULL) {
 		double volumeLeftMidi;
