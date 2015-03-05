@@ -209,7 +209,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr* instr, CompileSnesVersion ver, 
 	coarse_tuning += transpose;
 
 	// set final result
-	unityKey = theUnityKey + 12 - (int)(coarse_tuning);
+	unityKey = theUnityKey - 24 - (int)(coarse_tuning);
 	fineTune = (int16_t)(fine_tuning * 100.0);
 
 	uint8_t adsr1 = 0x8f;
