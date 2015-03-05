@@ -99,7 +99,7 @@ bool CompileSnesSeq::GetTrackPointers(void)
 		aTracks.push_back(track);
 
 		if (trackIndex == 0) {
-			AlwaysWriteInitialTempo(track->spcInitialTempo);
+			AlwaysWriteInitialTempo(GetTempoInBPM(track->spcInitialTempo));
 		}
 
 		curOffset += 14;
