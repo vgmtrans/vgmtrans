@@ -377,7 +377,7 @@ SFData *sfload_mem(const void* data);
  * Boston, MA 02110-1301, USA.
  */
 
-#include <glib.h>
+//#include <glib.h>
 
 
 /*-----------------------------------util.h----------------------------*/

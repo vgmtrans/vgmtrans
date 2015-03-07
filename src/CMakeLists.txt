@@ -23,7 +23,9 @@ set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set ( CMAKE_OSX_ARCHITECTURES "x86_64;" )
 #set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libstdc++ -g3 -Wall -O0" )
-set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libc++ -g3 -Wall -O0" )
+set ( CMAKE_CXX_FLAGS "-std=c++11 -w -g3 -Wall -O0" )
+#-Wl,-subsystem,windows
+#set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libc++ -g3 -Wall -O0" )
 #find_package(Qt5 COMPONENTS Widgets Declarative)
 
 
@@ -398,34 +400,84 @@ set(SOURCE_FILES
     ui/qt/MusicPlayer.h
 )
 
-
 qt5_add_resources(UI_RESOURCES ui/qt/resources/resources.qrc)
 
+# Set some Win32 Specific Settings
+#IF(WIN32)
+#SET(GUI_TYPE WIN32)
+#ENDIF(WIN32)
+# Set some Apple MacOS Specific settings
+#IF (APPLE)
+#SET(GUI_TYPE MACOSX_BUNDLE)
+#ENDIF (APPLE)
+
+#ADD_EXECUTABLE( MyApplication ${GUI_TYPE} ${PROJECT_SRCS} )
+
 add_executable(vgmtrans ${SOURCE_FILES} ${UI_RESOURCES})
+
 
 # The Qt5Widgets_LIBRARIES variable also includes QtGui and QtCore
 target_link_libraries(vgmtrans ${Qt5Widgets_LIBRARIES})
 
-find_package (ZLIB REQUIRED)
-if (ZLIB_FOUND)
-  include_directories(${ZLIB_INCLUDE_DIRS})
-  target_link_libraries (vgmtrans ${ZLIB_LIBRARIES})
-endif (ZLIB_FOUND)
+if (MSVC)
+    #set(ZLIB_INCLUDE_DIR "lib/zlib/include")
+    #set(ZLIB_LIBRARY "lib/zlib/lib/win32")
+    #FIND_PATH(ZLIB_INCLUDE_DIR zlib.h)
+    #FIND_PATH(ZLIB_LIBRARY zlibstat.lib)
 
-find_package(GLIB REQUIRED)
-include_directories(${GLIB_INCLUDE_DIRS})
-#set(LIBS ${LIBS} ${GLIB_LIBRARIES})
-target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
+    set(WIN_LIBS
 
-find_package(READLINE REQUIRED)
-include_directories(${READLINE_INCLUDE_DIRS})
-#set(LIBS ${LIBS} ${GLIB_LIBRARIES})
-target_link_libraries(vgmtrans ${READLINE_LIBRARIES})
+        ${CMAKE_SOURCE_DIR}/lib/zlib/lib/win32/zlibstat.lib
+        ${CMAKE_SOURCE_DIR}/lib/fluidsynth/lib/win32/libfluidsynthstat.lib
+        ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/glib-2.0.lib
+        ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/gthread-2.0.lib
+        winmm.lib
+        ws2_32.lib
+        dsound.lib
+    )
+    #target_link_libraries(vgmtrans ${WIN_LIBS})
 
-find_package (FLUIDSYNTH REQUIRED)
-include_directories(${FLUIDSYNTH_INCLUDE_DIRS})
-#set(LIBS ${LIBS} ${GLIB_LIBRARIES})
-target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
+    target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/zlib/lib/win32/zlibstat.lib)
+    target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/fluidsynth/lib/win32/libfluidsynthstat.lib)
+    target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/glib-2.0.lib)
+	target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/gthread-2.0.lib)
+    target_link_libraries(vgmtrans winmm.lib)
+    target_link_libraries(vgmtrans ws2_32.lib)
+    target_link_libraries(vgmtrans dsound.lib)
+
+	#LIST(APPEND SOURCE_FILES )
+	#set(ADDITIONAL_WIN_SOURCE_FILES
+	#	lib/glib/include/glibconfig.h
+	#	lib/glib/include/glib/gmacros.h
+	#	lib/glib/include/glib/gtypes.h
+	#)
+
+    add_definitions(-DVGMTRANS_FOR_QT -DZLIB_WINAPI)
+
+else (MSVC)
+    find_package (ZLIB REQUIRED)
+    if (ZLIB_FOUND)
+      include_directories(${ZLIB_INCLUDE_DIRS})
+      target_link_libraries (vgmtrans ${ZLIB_LIBRARIES})
+    endif (ZLIB_FOUND)
+
+    find_package(GLIB REQUIRED)
+    include_directories(${GLIB_INCLUDE_DIRS})
+    #set(LIBS ${LIBS} ${GLIB_LIBRARIES})
+    target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
+
+    find_package(READLINE REQUIRED)
+    include_directories(${READLINE_INCLUDE_DIRS})
+    #set(LIBS ${LIBS} ${GLIB_LIBRARIES})
+    target_link_libraries(vgmtrans ${READLINE_LIBRARIES})
+
+    find_package (FLUIDSYNTH REQUIRED)
+    include_directories(${FLUIDSYNTH_INCLUDE_DIRS})
+    #set(LIBS ${LIBS} ${GLIB_LIBRARIES})
+    target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
+
+	add_definitions(-DIOAPI_NO_64)
+endif (MSVC)
 
 IF (APPLE)
    FIND_LIBRARY(COREMIDI_LIBRARY CoreMIDI)
@@ -443,7 +495,6 @@ IF (APPLE)
 ENDIF (APPLE)
 
 add_definitions(-DTIXML_USE_STL)
-
 
 #find_library (fluidsynth PATHS lib/fluidsynth/lib)
 #link_directories(lib/fluidsynth/lib)

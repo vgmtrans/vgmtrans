@@ -9,9 +9,6 @@ extern "C" {
 #include "mem_sfloader.h"
 #include "vgmtrans_fluid_midi.h"
 }
-void bloggityBlog2() {
-    printf("bloggityBlog2");
-}
 
 MusicPlayer::MusicPlayer()
 {
@@ -50,7 +47,7 @@ MusicPlayer::MusicPlayer()
      as the driver is created. */
     this->adriver = new_fluid_audio_driver(this->settings, this->synth);
 
-    this->player = new_fluid_player(this->synth);
+    this->player = new_vgmtrans_fluid_player(this->synth);
 }
 
 void MusicPlayer::Shutdown()
@@ -86,14 +83,13 @@ void MusicPlayer::LoadSF2(const void *data)
 
 int midi_event_callback(void* data, fluid_midi_event_t* event)
 {
-    int track_num = ((_fluid_track_t*)fluid_midi_event_get_track(event))->num;
+
+	int track_num = (vgmtrans_fluid_midi_event_get_track((vgmtrans_fluid_midi_event_t*)event))->num;
     int chan = fluid_midi_event_get_channel(event);
     int new_chan = ((track_num / 15) * 16) + chan;
     fluid_midi_event_set_channel(event, new_chan);
 
-    printf("track_num: %d  new_chan: %d\n", track_num, new_chan);
-
-    return fluid_synth_handle_midi_event(data, event);
+	return fluid_synth_handle_midi_event(data, event);
 }
 
 void MusicPlayer::StopMidi() {
@@ -106,7 +102,8 @@ void MusicPlayer::PlayMidi(const void* data, size_t len)
 //    fluid_player_stop(this->player);
 //    this->player = new_fluid_player(this->synth);
 
-    fluid_player_add_mem(this->player, data, len);
-    fluid_player_set_playback_callback(this->player, &midi_event_callback, this->synth);
-    fluid_player_play(this->player);
+	if (FLUID_OK == fluid_player_add_mem(this->player, data, len)) {
+		fluid_player_set_playback_callback(this->player, &midi_event_callback, this->synth);
+		vgmtrans_fluid_player_play(this->player);
+	}
 }

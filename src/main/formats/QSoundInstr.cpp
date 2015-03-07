@@ -145,7 +145,9 @@ bool QSoundInstrSet::GetInstrPointers()
 		for (uint32_t bank = 0; bank < num_instr_banks; bank++)
 			for (uint32_t i=0; i<256; i++)
 			{
-                std::wstring name = L"Instrument + " + std::to_wstring(bank*256 + i);
+				std::wostringstream ss;
+				ss << L"Instrument " << bank*256 << i;
+				wstring name = ss.str();
 				aInstrs.push_back(new QSoundInstr(this, dwOffset+i*8+(bank*256*8), 8, (bank*2)+(i/128), i%128, name));
 			}
 	}
@@ -173,7 +175,9 @@ bool QSoundInstrSet::GetInstrPointers()
 			{
 				if (GetShort(j) == 0 && GetByte(j+2) == 0 && i != 0)
 					break;
-                std::wstring name = L"Instrument " + std::to_wstring(totalInstrs + k);
+				std::wostringstream ss;
+				ss << L"Instrument " << totalInstrs << k;
+				wstring name = ss.str();
 				aInstrs.push_back(new QSoundInstr(this, j, instr_info_length, (i*2) + (k / 128), (k % 128), name));
 			}
 			totalInstrs += k;

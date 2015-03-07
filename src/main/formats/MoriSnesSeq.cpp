@@ -990,11 +990,11 @@ void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 		}
 
 		default:
-#ifdef _WIN32
-			std::wostringstream ssTrace;
-			ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
-			OutputDebugString(ssTrace.str().c_str());
-#endif
+//#ifdef _WIN32
+//			std::wostringstream ssTrace;
+//			ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
+//			OutputDebugString(ssTrace.str().c_str());
+//#endif
 
 			bContinue = false;
 			break;
