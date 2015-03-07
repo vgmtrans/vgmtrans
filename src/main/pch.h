@@ -1,4 +1,4 @@
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(VGMTRANS_FOR_QT)
 #include "stdafx.h"
 #endif
 
@@ -16,6 +16,7 @@
 #include <list>
 #include <map>
 #include <string>
+#include <cstring>
 #include <sstream>
 #include <iterator>
 #include <iostream>

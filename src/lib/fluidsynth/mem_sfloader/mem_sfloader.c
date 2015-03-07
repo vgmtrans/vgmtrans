@@ -25,12 +25,48 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include "mem_sfloader.h"
 
 //#include "sfont.h"
 /* Todo: Get rid of that 'include' */
-#include "fluid_sys.h"
+//#include "fluid_sys.h"
 
+
+//***************************************************************
+// Some definitions and macros taken out of fluid_sys and glib
+
+#define IS_BIG_ENDIAN (*(uint16_t *)"\0\xff" < 0x100)
+#define FLUID_IS_BIG_ENDIAN IS_BIG_ENDIAN
+
+#ifndef	FALSE
+#define	FALSE	(0)
+#endif
+
+#ifndef	TRUE
+#define	TRUE	(!FALSE)
+#endif
+
+typedef int16_t gint16;
+typedef int32_t gint32;
+typedef uint32_t guint32;
+
+#if !(defined (G_STMT_START) && defined (G_STMT_END))
+#define G_STMT_START  do
+#define G_STMT_END    while (0)
+#endif
+
+#define GINT16_TO_LE(val)	((gint16) (val))
+#define GINT32_TO_LE(val)	((gint32) (val))
+#define GUINT32_TO_LE(val)	((guint32) (val))
+
+#define GINT16_FROM_LE(val)	(GINT16_TO_LE (val))
+#define GINT32_FROM_LE(val)	(GINT32_TO_LE (val))
+#define GUINT32_FROM_LE(val)	(GUINT32_TO_LE (val))
+
+//#define GPOINTER_TO_INT(p)	((gint)  (glong) (p))
+//#define GINT_TO_POINTER(i)	((gpointer) (glong) (i))
 
 /***************************************************************
 *
@@ -235,7 +271,7 @@ typedef struct _cached_sampledata_t {
 } cached_sampledata_t;
 
 static cached_sampledata_t* all_cached_sampledata = NULL;
-static fluid_mutex_t cached_sampledata_mutex = FLUID_MUTEX_INIT;
+//static fluid_mutex_t cached_sampledata_mutex = FLUID_MUTEX_INIT;
 
 static int get_file_modification_time(char *filename, time_t *modification_time)
 {
@@ -262,7 +298,7 @@ static int cached_sampledata_load(const void ** data, unsigned int samplepos,
     cached_sampledata_t* cached_sampledata = NULL;
     time_t modification_time;
 
-    fluid_mutex_lock(cached_sampledata_mutex);
+//    fluid_mutex_lock(cached_sampledata_mutex);
 
 //    if (get_file_modification_time(filename, &modification_time) == FLUID_FAILED) {
 //        FLUID_LOG(FLUID_WARN, "Unable to read modificaton time of soundfont file.");
@@ -330,9 +366,9 @@ static int cached_sampledata_load(const void ** data, unsigned int samplepos,
        probably means that the user doesn't have to required permission.  */
     cached_sampledata->mlock = 0;
     if (try_mlock) {
-        if (fluid_mlock(loaded_sampledata, samplesize) != 0)
-            FLUID_LOG(FLUID_WARN, "Failed to pin the sample data to RAM; swapping is possible.");
-        else
+//        if (fluid_mlock(loaded_sampledata, samplesize) != 0)
+//            FLUID_LOG(FLUID_WARN, "Failed to pin the sample data to RAM; swapping is possible.");
+//        else
             cached_sampledata->mlock = try_mlock;
     }
 
@@ -368,7 +404,7 @@ static int cached_sampledata_load(const void ** data, unsigned int samplepos,
 
 
     success_exit:
-    fluid_mutex_unlock(cached_sampledata_mutex);
+//    fluid_mutex_unlock(cached_sampledata_mutex);
     *sampledata = loaded_sampledata;
     return OK;
 
@@ -387,7 +423,7 @@ static int cached_sampledata_load(const void ** data, unsigned int samplepos,
         FLUID_FREE(cached_sampledata);
     }
 
-    fluid_mutex_unlock(cached_sampledata_mutex);
+//    fluid_mutex_unlock(cached_sampledata_mutex);
     *sampledata = NULL;
     return FLUID_FAILED;
 }
@@ -397,7 +433,7 @@ static int cached_sampledata_unload(const short *sampledata)
     cached_sampledata_t* prev = NULL;
     cached_sampledata_t* cached_sampledata;
 
-    fluid_mutex_lock(cached_sampledata_mutex);
+//    fluid_mutex_lock(cached_sampledata_mutex);
     cached_sampledata = all_cached_sampledata;
 
     while (cached_sampledata != NULL) {
@@ -406,8 +442,8 @@ static int cached_sampledata_unload(const short *sampledata)
             cached_sampledata->num_references--;
 
             if (cached_sampledata->num_references == 0) {
-                if (cached_sampledata->mlock)
-                    fluid_munlock(cached_sampledata->sampledata, cached_sampledata->samplesize);
+//                if (cached_sampledata->mlock)
+//                    fluid_munlock(cached_sampledata->sampledata, cached_sampledata->samplesize);
                 FLUID_FREE((short*) cached_sampledata->sampledata);
                 FLUID_FREE(cached_sampledata->filename);
 
@@ -431,11 +467,11 @@ static int cached_sampledata_unload(const short *sampledata)
     goto error_exit;
 
     success_exit:
-    fluid_mutex_unlock(cached_sampledata_mutex);
+//    fluid_mutex_unlock(cached_sampledata_mutex);
     return OK;
 
     error_exit:
-    fluid_mutex_unlock(cached_sampledata_mutex);
+//    fluid_mutex_unlock(cached_sampledata_mutex);
     return FLUID_FAILED;
 }
 
@@ -1882,7 +1918,7 @@ sample_import_sfont(fluid_sample_t* sample, SFSample* sfsample, memsfont_t* sfon
    equivalent to the matching ID list in memory regardless of LE/BE machine
 */
 
-#if IS_BIG_ENDIAN
+#if defined(__BYTE_ORDER__)&&(__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 
 #define READCHUNK(var,fd)	G_STMT_START {		\
 	if (!mem_safe_fread(var, 8, data))			\
@@ -2605,7 +2641,7 @@ mem_load_pgen (int size, SFData * sf, const void ** data)
                 {		/* inst is last gen */
                     level = 3;
                     READW (genval.uword, data);
-                    ((SFZone *) (p2->data))->instsamp = GINT_TO_POINTER (genval.uword + 1);
+                    ((SFZone *) (p2->data))->instsamp = (void *)(genval.uword + 1);
                     break;	/* break out of generator loop */
                 }
                 else
@@ -2955,7 +2991,7 @@ mem_load_igen (int size, SFData * sf, const void ** data)
                 {		/* sample is last gen */
                     level = 3;
                     READW (genval.uword, data);
-                    ((SFZone *) (p2->data))->instsamp = GINT_TO_POINTER (genval.uword + 1);
+                    ((SFZone *) (p2->data))->instsamp = (void *) (genval.uword + 1);
                     break;	/* break out of generator loop */
                 }
                 else
@@ -3115,7 +3151,7 @@ mem_fixup_pgen (SFData * sf)
         while (p2)
         {			/* traverse this preset's zones */
             z = (SFZone *) (p2->data);
-            if ((i = GPOINTER_TO_INT (z->instsamp)))
+            if ((i = (int) (z->instsamp)))
             {			/* load instrument # */
                 p3 = fluid_list_nth (sf->inst, i - 1);
                 if (!p3)
@@ -3150,7 +3186,7 @@ mem_fixup_igen (SFData * sf)
         while (p2)
         {			/* traverse instrument's zones */
             z = (SFZone *) (p2->data);
-            if ((i = GPOINTER_TO_INT (z->instsamp)))
+            if ((i = (int) (z->instsamp)))
             {			/* load sample # */
                 p3 = fluid_list_nth (sf->sample, i - 1);
                 if (!p3)

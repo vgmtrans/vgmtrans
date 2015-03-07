@@ -9,7 +9,7 @@
 #include "VGMCollListView.h"
 #include "QtVGMRoot.h"
 #include "VGMColl.h"
-#import "MusicPlayer.h"
+#include "MusicPlayer.h"
 
 const int cellWidth = 200;
 const int cellHeight = 20;

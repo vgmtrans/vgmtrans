@@ -336,7 +336,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 	{
 		int8_t newVolL = GetByte(curOffset++);
 		int8_t newVolR = GetByte(curOffset++);
-		int8_t newVol = min(abs(newVolL) + abs(newVolR), 255) / 2; // workaround: convert to mono
+		int8_t newVol = min(abs((int)newVolL) + abs((int)newVolR), 255) / 2; // workaround: convert to mono
 		AddMasterVol(beginOffset, curOffset - beginOffset, newVol, L"Master Volume L/R");
 		break;
 	}
@@ -440,7 +440,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 	case EVENT_VOLUME:
 	{
 		int8_t newVol = GetByte(curOffset++);
-		AddVol(beginOffset, curOffset - beginOffset, min(abs(newVol), 127));
+		AddVol(beginOffset, curOffset - beginOffset, min(abs((int)newVol), 127));
 		break;
 	}
 

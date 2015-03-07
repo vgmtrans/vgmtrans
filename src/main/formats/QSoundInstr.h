@@ -5,7 +5,7 @@
 
 class QSoundInstr;
 
-extern enum QSoundVer : uint8_t;
+enum QSoundVer : uint8_t;
 
 typedef struct _qs_qs_prog_info_ver_101 {	// ex: Punisher
 	uint8_t sample_index;

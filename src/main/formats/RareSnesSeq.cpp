@@ -721,7 +721,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			int8_t newVol = min(abs(newVolL) + abs(newVolR), 255) / 2; // workaround: convert to mono
+			int8_t newVol = min(abs((int)newVolL) + abs((int)newVolR), 255) / 2; // workaround: convert to mono
 			AddMasterVol(beginOffset, curOffset-beginOffset, newVol, L"Master Volume L/R");
 			break;
 		}
@@ -768,7 +768,7 @@ bool RareSnesTrack::ReadEvent(void)
 			uint8_t newFeedback = GetByte(curOffset++);
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			parentSeq->midiReverb = min(abs(newVolL) + abs(newVolR), 255) / 2;
+			parentSeq->midiReverb = min(abs((int)newVolL) + abs((int)newVolR), 255) / 2;
 			// TODO: update MIDI reverb value for each tracks?
 
 			desc << L"Feedback: " << (int)newFeedback << L"  Volume: " << (int)newVolL << L", " << (int)newVolR;
