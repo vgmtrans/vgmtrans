@@ -21,4 +21,7 @@ public:
 private:
 	static BytePattern ptnLoadSeq;
 	static BytePattern ptnExecVCmd;
+	static BytePattern ptnSetDSPd;
+	static BytePattern ptnLoadInstr;
+	static BytePattern ptnLoadInstrTuning;
 };

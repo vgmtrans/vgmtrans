@@ -762,6 +762,9 @@
     <ClCompile Include="main\formats\NamcoSnesInstr.cpp">
       <Filter>Source Files\formats\namcosnes</Filter>
     </ClCompile>
+    <ClCompile Include="main\formats\PrismSnesInstr.cpp">
+      <Filter>Source Files\formats\prismsnes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ui\windows\aboutdlg.h">
@@ -1381,6 +1384,9 @@
     </ClInclude>
     <ClInclude Include="main\formats\NamcoSnesInstr.h">
       <Filter>Header Files\formats\namcosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PrismSnesInstr.h">
+      <Filter>Header Files\formats\prismsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
