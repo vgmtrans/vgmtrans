@@ -480,7 +480,7 @@ bool ChunSnesTrack::ReadEvent(void)
 		desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Conditional Jump", desc.str(), CLR_MISC);
 
-		if ((parentSeq->conditionVar & 0x7f) != condValue) {
+		if ((parentSeq->conditionVar & 0x7f) == condValue) {
 			// repeat again
 			curOffset = dest;
 		}
