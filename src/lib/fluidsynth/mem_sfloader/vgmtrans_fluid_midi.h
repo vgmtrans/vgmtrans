@@ -38,8 +38,8 @@
 
  The changes made to the fluid_player solve this. I have:
 
- 1) added a "track" ptr property to the _fluid_midi_event_t struct.
- 2) added a "num" property to _fluid_track_t.
+ 1) added a "track" ptr property to the _vgmtrans_fluid_midi_event_t struct.
+ 2) added a "num" property to _vgmtrans_fluid_track_t.
  3) added a fluid_midi_event_get_track(fluid_midi_event_t* evt) function
  4) added
 
@@ -55,11 +55,23 @@
 
 #include <stdlib.h>
 #include <string.h>
+//#include <glibconfig.h>
 #include "fluidsynth_priv.h"
-#include "fluid_sys.h"
+//#include "fluid_sys.h"
 #include "fluid_list.h"
 
-typedef struct _fluid_midi_event_t vgmtrans_fluid_midi_event_t;          /**< MIDI event */
+//*************************************
+// Definitions taken out of fluid_sys.h
+
+typedef int (*fluid_timer_callback_t)(void* data, unsigned int msec);
+
+typedef struct _fluid_timer_t fluid_timer_t;
+
+fluid_timer_t* new_fluid_timer(int msec, fluid_timer_callback_t callback,
+        void* data, int new_thread, int auto_destroy,
+        int high_priority);
+
+typedef struct _vgmtrans_fluid_midi_event_t vgmtrans_fluid_midi_event_t;          /**< MIDI event */
 
 typedef struct _fluid_midi_parser_t fluid_midi_parser_t;
 
@@ -67,6 +79,8 @@ fluid_midi_parser_t* new_fluid_midi_parser(void);
 int delete_fluid_midi_parser(fluid_midi_parser_t* parser);
 vgmtrans_fluid_midi_event_t* fluid_midi_parser_parse(fluid_midi_parser_t* parser, unsigned char c);
 
+#define TRUE (1)
+#define FALSE (0)
 
 /***************************************************************
 *
@@ -259,7 +273,7 @@ enum fluid_driver_status
  * vgmtrans_fluid_midi_event_t
  */
 
-struct _fluid_midi_event_t {
+struct _vgmtrans_fluid_midi_event_t {
     vgmtrans_fluid_midi_event_t* next; /* Link to next event */
     void *paramptr;           /* Pointer parameter (for SYSEX data), size is stored to param1, param2 indicates if pointer should be freed (dynamic if TRUE) */
     unsigned int dtime;       /* Delay (ticks) between this and previous event. midi tracks. */
@@ -272,34 +286,34 @@ struct _fluid_midi_event_t {
 
 
 /*
- * fluid_track_t
+ * vgmtrans_fluid_track_t
  */
-struct _fluid_track_t {
+struct _vgmtrans_fluid_track_t {
     char* name;
+    int num;
     vgmtrans_fluid_midi_event_t *first;
     vgmtrans_fluid_midi_event_t *cur;
     vgmtrans_fluid_midi_event_t *last;
     unsigned int ticks;
-    int num;
 };
 
-typedef struct _fluid_track_t fluid_track_t;
+typedef struct _vgmtrans_fluid_track_t vgmtrans_fluid_track_t;
 
-void *fluid_midi_event_get_track(fluid_midi_event_t* evt);
+vgmtrans_fluid_track_t *vgmtrans_fluid_midi_event_get_track(vgmtrans_fluid_midi_event_t* evt);
 
-fluid_track_t* new_fluid_track(int num);
-int delete_fluid_track(fluid_track_t* track);
-int fluid_track_set_name(fluid_track_t* track, char* name);
-char* fluid_track_get_name(fluid_track_t* track);
-int fluid_track_add_event(fluid_track_t* track, vgmtrans_fluid_midi_event_t* evt);
-vgmtrans_fluid_midi_event_t* fluid_track_first_event(fluid_track_t* track);
-vgmtrans_fluid_midi_event_t* fluid_track_next_event(fluid_track_t* track);
-int fluid_track_get_duration(fluid_track_t* track);
-int fluid_track_reset(fluid_track_t* track);
+vgmtrans_fluid_track_t * vgmtrans_new_fluid_track(int num);
+int delete_fluid_track(vgmtrans_fluid_track_t * track);
+int fluid_track_set_name(vgmtrans_fluid_track_t * track, char* name);
+char* fluid_track_get_name(vgmtrans_fluid_track_t * track);
+int fluid_track_add_event(vgmtrans_fluid_track_t * track, vgmtrans_fluid_midi_event_t* evt);
+vgmtrans_fluid_midi_event_t* fluid_track_first_event(vgmtrans_fluid_track_t * track);
+vgmtrans_fluid_midi_event_t* fluid_track_next_event(vgmtrans_fluid_track_t * track);
+int fluid_track_get_duration(vgmtrans_fluid_track_t * track);
+//int vgmtrans_fluid_track_reset(vgmtrans_fluid_track_t *track);
 
-int fluid_track_send_events(fluid_track_t* track,
-        fluid_synth_t* synth,
-        fluid_player_t* player,
+int fluid_track_send_events(vgmtrans_fluid_track_t *track,
+        fluid_synth_t *synth,
+        fluid_player_t *player,
         unsigned int ticks);
 
 #define fluid_track_eot(track)  ((track)->cur == NULL)
@@ -324,7 +338,7 @@ typedef struct
 struct _fluid_player_t {
     int status;
     int ntracks;
-    fluid_track_t *track[MAX_NUMBER_OF_TRACKS];
+    vgmtrans_fluid_track_t *track[MAX_NUMBER_OF_TRACKS];
     fluid_synth_t* synth;
     fluid_timer_t* system_timer;
     fluid_sample_timer_t* sample_timer;
@@ -350,12 +364,16 @@ struct _fluid_player_t {
 };
 
 fluid_player_t *new_vgmtrans_fluid_player(fluid_synth_t *synth);
-int fluid_player_add_track(fluid_player_t* player, fluid_track_t* track);
-int fluid_player_callback(void* data, unsigned int msec);
+int delete_vgmtrans_fluid_player(fluid_player_t *player);
+
+int fluid_player_add_track(fluid_player_t* player, vgmtrans_fluid_track_t * track);
+int vgmtrans_fluid_player_callback(void *data, unsigned int msec);
+int vgmtrans_fluid_player_play(fluid_player_t *player);
+
 int fluid_player_count_tracks(fluid_player_t* player);
-fluid_track_t* fluid_player_get_track(fluid_player_t* player, int i);
+vgmtrans_fluid_track_t * fluid_player_get_track(fluid_player_t* player, int i);
 int fluid_player_reset(fluid_player_t* player);
-int fluid_player_load(fluid_player_t* player, fluid_playlist_item *item);
+int vgmtrans_fluid_player_load(fluid_player_t *player, fluid_playlist_item *item);
 
 void fluid_player_settings(fluid_settings_t* settings);
 
@@ -385,22 +403,23 @@ typedef struct {
     int dtime;
 } fluid_midi_file;
 
-fluid_midi_file* new_fluid_midi_file(const char* buffer, size_t length);
-void delete_fluid_midi_file(fluid_midi_file* mf);
-int fluid_midi_file_read_mthd(fluid_midi_file* midifile);
-int fluid_midi_file_load_tracks(fluid_midi_file* midifile, fluid_player_t* player);
-int fluid_midi_file_read_track(fluid_midi_file* mf, fluid_player_t* player, int num);
-int fluid_midi_file_read_event(fluid_midi_file* mf, fluid_track_t* track);
-int fluid_midi_file_read_varlen(fluid_midi_file* mf);
-int fluid_midi_file_getc(fluid_midi_file* mf);
-int fluid_midi_file_push(fluid_midi_file* mf, int c);
-int fluid_midi_file_read(fluid_midi_file* mf, void* buf, int len);
-int fluid_midi_file_skip(fluid_midi_file* mf, int len);
-int fluid_midi_file_eof(fluid_midi_file* mf);
-int fluid_midi_file_read_tracklen(fluid_midi_file* mf);
-int fluid_midi_file_eot(fluid_midi_file* mf);
-int fluid_midi_file_get_division(fluid_midi_file* midifile);
+fluid_midi_file*vgmtrans_new_fluid_midi_file(const char *buffer, size_t length);
+void vgmtrans_delete_fluid_midi_file(fluid_midi_file *mf);
+int vgmtrans_fluid_midi_file_read_mthd(fluid_midi_file *midifile);
+int vgmtrans_fluid_midi_file_load_tracks(fluid_midi_file *midifile, fluid_player_t *player);
+int vgmtrans_fluid_midi_file_read_track(fluid_midi_file *mf, fluid_player_t *player, int num);
+int vgmtrans_fluid_midi_file_read_event(fluid_midi_file *mf, vgmtrans_fluid_track_t *track);
+int vgmtrans_fluid_midi_file_read_varlen(fluid_midi_file *mf);
+int vgmtrans_fluid_midi_file_getc(fluid_midi_file *mf);
+int vgmtrans_fluid_midi_file_push(fluid_midi_file *mf, int c);
+int vgmtrans_fluid_midi_file_read(fluid_midi_file *mf, void *buf, int len);
+int vgmtrans_fluid_midi_file_skip(fluid_midi_file *mf, int len);
+int vgmtrans_fluid_midi_file_eof(fluid_midi_file *mf);
+int vgmtrans_fluid_midi_file_read_tracklen(fluid_midi_file *mf);
+int vgmtrans_fluid_midi_file_eot(fluid_midi_file *mf);
+int vgmtrans_fluid_midi_file_get_division(fluid_midi_file *midifile);
 
+fluid_midi_event_t *vgmtrans_new_fluid_midi_event ();
 
 #define FLUID_MIDI_PARSER_MAX_DATA_SIZE 1024    /**< Maximum size of MIDI parameters/data (largest is SYSEX data) */
 

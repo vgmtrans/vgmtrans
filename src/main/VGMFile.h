@@ -4,7 +4,7 @@
 #include "RawFile.h"
 #include "Menu.h"
 
-extern enum FmtID : unsigned int;
+enum FmtID : unsigned int;
 class VGMColl;
 class Format;
 
