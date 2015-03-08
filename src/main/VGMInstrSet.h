@@ -43,8 +43,8 @@ public:
 
 	bool OnSaveAsDLS(void);
 	bool OnSaveAsSF2(void);
-	virtual bool SaveAsDLS(const wchar_t* filepath);
-	virtual bool SaveAsSF2(const wchar_t* filepath);
+	virtual bool SaveAsDLS(const std::wstring & filepath);
+	virtual bool SaveAsSF2(const std::wstring & filepath);
 
 public:
 	std::vector<VGMInstr*> aInstrs;

@@ -114,16 +114,6 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal)
 	return ConvertPercentAmpToStdMidiVal(percentVal / 127.0);
 }
 
-// returns the attenuation in decibel units in the scale provided by maxVal;
-//long ConvertPercentToLogVolScale(long maxVal, double percent)
-//{
-//	//double origAttenInDB = 20*log10(percent);
-//	//negate (because we were given a percent value:  20*log10(127/64) = -20*log10(64/127)
-//	//origAttenInDB = -origAttenInDB;
-//	double origAttenInDB = ConvertPercentVolToAttenDB(percent);
-//	return maxVal*pow(10.0,-0.025*origAttenInDB);
-//}
-
 // Takes a percentage amplitude value - that is one using a -20*log10(percent) scale for db attenuation
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
 uint8_t ConvertPercentAmpToStdMidiVal(double percent)
@@ -131,17 +121,12 @@ uint8_t ConvertPercentAmpToStdMidiVal(double percent)
 	return roundi(127.0 * sqrt(percent));
 }
 
-double ConvertPercentAmpToStdMidiScale(double percent)
-{
-	return sqrt(percent);
-}
-
 double ConvertLogScaleValToAtten(double percent)
 {
 	if (percent == 0)
 		return 100.0;		// assume 0 is -100.0db attenuation
-	double atten = 20*log10(percent)*2;
-	return fmin(-atten, 100.0);
+	double atten = 20 * log10(percent) * 2;
+	return min(-atten, 100.0);
 }
 
 // Convert a percent of volume value to it's attenuation in decibels.
@@ -157,41 +142,124 @@ double ConvertPercentAmplitudeToAttenDB_SF2(double percent)
 {
 	if (percent == 0)
 		return 100.0;		// assume 0 is -100.0db attenuation
-	double atten = 20*log10(percent);
-	return fmin(-atten, 100.0);
+	double atten = 20 * log10(percent);
+	return min(-atten, 100.0);
 }
 
 double SecondsToTimecents(double secs)
 {
-	return log(secs)/log((double)2) * 1200;
+	return log(secs) / log((double)2) * 1200;
 }
 
-// Takes a percentage pan value (linear volume curve)
-// and converts it to a standard midi curve (sin/cos curve)
-double ConvertPercentPanToStdMidiScale(double percent, double * ptr_volume_scale)
+// Convert percent pan to midi pan (with no scale conversion)
+uint8_t ConvertPercentPanValToStdMidiVal(double percent)
 {
-	double panPI2 = atan2(percent, 1.0 - percent);
-	if (ptr_volume_scale != NULL)
-	{
-		*ptr_volume_scale = 1.0 / (cos(panPI2) + sin(panPI2)); // <= 1.0
+	uint8_t midiPan = roundi(percent * 126.0);
+	if (midiPan != 0) {
+		midiPan++;
 	}
-	return panPI2 / M_PI_2;
+	return midiPan;
 }
 
-uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal, double * ptr_volume_scale)
+// Convert linear percent pan to midi pan (with scale conversion)
+uint8_t ConvertLinearPercentPanValToStdMidiVal(double percent, double * ptrVolumeScale)
 {
-	if (percentVal == 0)
-	{
-		if (ptr_volume_scale != NULL)
-		{
-			*ptr_volume_scale = 1.0;
-		}
-		return 0;
+	uint8_t midiPan;
+	double volumeScale;
+
+	if (percent == 0) {
+		midiPan = 0;
+		volumeScale = 1.0;
 	}
-	else
-	{
-		return (uint8_t) (ConvertPercentPanToStdMidiScale((percentVal - 1) / 126.0, ptr_volume_scale) * 126 + 1);
+	else if (percent == 0.5) {
+		midiPan = 64;
+		volumeScale = 1.0 / sqrt(3);
 	}
+	else if (percent == 1.0) {
+		midiPan = 127;
+		volumeScale = 1.0;
+	}
+	else {
+		double percentArcPan = atan2(percent, 1.0 - percent);
+		midiPan = ConvertPercentPanValToStdMidiVal(percentArcPan / M_PI_2);
+
+		double percentLeft;
+		double percentRight;
+		ConvertStdMidiPanToVolumeBalance(midiPan, percentLeft, percentRight);
+		volumeScale = 1.0 / (percentLeft + percentRight); // <= 1.0
+	}
+
+	if (ptrVolumeScale != NULL) {
+		*ptrVolumeScale = volumeScale;
+	}
+	return midiPan;
+}
+
+uint8_t Convert7bitLinearPercentPanValToStdMidiVal(uint8_t percentVal, double * ptrVolumeScale)
+{
+	// how to calculate volume balance from 7 bit pan depends on each music engines
+	// the method below is one of the common method, but it's not always correct
+	if (percentVal == 127) {
+		percentVal++;
+	}
+	return ConvertLinearPercentPanValToStdMidiVal(percentVal / 128.0, ptrVolumeScale);
+}
+
+// Convert midi pan to L/R volume balance
+void ConvertStdMidiPanToVolumeBalance(uint8_t midiPan, double & percentLeft, double & percentRight)
+{
+	if (midiPan == 0 || midiPan == 1) {
+		// left
+		percentLeft = 1.0;
+		percentRight = 0.0;
+		return;
+	}
+	else if (midiPan == 64) {
+		// center
+		percentLeft = percentRight = sqrt(3) / 2;
+		return;
+	}
+	else if (midiPan == 127) {
+		// right
+		percentLeft = 0.0;
+		percentRight = 1.0;
+		return;
+	}
+
+	double percentPan = (midiPan - 1) / 126.0;
+	percentLeft = cos(M_PI_2 * percentPan);
+	percentRight = sin(M_PI_2 * percentPan);
+	return;
+}
+
+// Convert L/R volume balance (0.0..1.0) to midi pan
+uint8_t ConvertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight, double * ptrVolumeScale)
+{
+	uint8_t midiPan;
+	if (percentRight == 0) {
+		midiPan = 0;
+	}
+	else if (percentLeft == percentRight) {
+		midiPan = 64;
+	}
+	else if (percentLeft == 0) {
+		midiPan = 127;
+	}
+	else {
+		double percentPan = percentRight / (percentLeft + percentRight);
+		midiPan = ConvertLinearPercentPanValToStdMidiVal(percentPan);
+	}
+
+	if (ptrVolumeScale != NULL) {
+		double volumeLeftMidi;
+		double volumeRightMidi;
+		ConvertStdMidiPanToVolumeBalance(midiPan, volumeLeftMidi, volumeRightMidi);
+
+		// note that it can be more than 1.0
+		*ptrVolumeScale = (percentLeft + percentRight) / (volumeLeftMidi + volumeRightMidi);
+	}
+
+	return midiPan;
 }
 
 // Convert a pan value where 0 = left 0.5 = center and 1 = right to
@@ -199,16 +267,4 @@ uint8_t Convert7bitPercentPanValToStdMidiVal(uint8_t percentVal, double * ptr_vo
 long ConvertPercentPanTo10thPercentUnits(double percentPan)
 {
 	return roundi(percentPan * 1000) - 500;
-}
-
-// Convert a percen of linear volume/panpot value to GM2 compatible sin/cos scale.
-//  panpot: 0.0 = left, 0.5 = center, 1.0 = right
-void ConvertPercentVolPanToStdMidiScale(double& vol, double& pan)
-{
-	if (vol != 0)
-	{
-		double panPI2 = atan2(pan, 1.0 - pan);
-		vol = sqrt(vol / (cos(panPI2) + sin(panPI2)));
-		pan = panPI2 / M_PI_2;
-	}
 }

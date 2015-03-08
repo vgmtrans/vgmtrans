@@ -20,8 +20,7 @@ GraphResSnesSeq::GraphResSnesSeq(RawFile* file, GraphResSnesVersion ver, uint32_
 	bAllowDiscontinuousTrackData = true;
 	bUseLinearAmplitudeScale = true;
 
-	bWriteInitialTempo = true;
-	tempoBPM = 60000000.0 / ((125 * 0x85) * SEQ_PPQN); // good ol' frame-based sequence!
+	AlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * SEQ_PPQN)); // good ol' frame-based sequence!
 
 	UseReverb();
 	AlwaysWriteInitialReverb(0);
@@ -468,16 +467,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 			volumeRight = (15 + pan) / 15.0;
 		}
 
-		double linearPan = volumeRight / (volumeLeft + volumeRight);
-		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
-
-		int8_t midiPan;
-		if (midiScalePan == 0.0) {
-			midiPan = 0;
-		}
-		else {
-			midiPan = 1 + roundi(midiScalePan * 126.0);
-		}
+		uint8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight);
 
 		// TODO: apply volume scale
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);

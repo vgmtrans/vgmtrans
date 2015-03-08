@@ -744,7 +744,11 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_PAN:
 	{
 		uint8_t pan = GetByte(curOffset++) << (parentSeq->PAN_8BIT ? 0 : 1);
-		AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
+
+		uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(pan / 255.0);
+
+		// TODO: apply volume scale
+		AddPan(beginOffset, curOffset - beginOffset, midiPan);
 		break;
 	}
 
@@ -759,12 +763,15 @@ bool AkaoSnesTrack::ReadEvent(void)
 		}
 		uint8_t pan = GetByte(curOffset++) << (parentSeq->PAN_8BIT ? 0 : 1);
 
+		uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(pan / 255.0);
+
+		// TODO: apply volume scale
 		if (fadeLength != 0) {
 			desc << L"Fade Length: " << (int)fadeLength << L"  Pan: " << (int)pan;
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan Fade", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
 		}
 		else {
-			AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
+			AddPan(beginOffset, curOffset - beginOffset, midiPan);
 		}
 		break;
 	}

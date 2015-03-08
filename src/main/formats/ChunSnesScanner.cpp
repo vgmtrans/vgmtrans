@@ -532,23 +532,43 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 	uint16_t addrInstrSetTable;
 	uint16_t addrSampNumTable;
 	uint16_t addrSampleTable;
+	uint8_t songSlotIndex;
+	uint8_t instrSetIndex;
 	if (file->SearchBytePattern(ptnProgChangeVCmdSummer, ofsProgChangeVCmd)) {
 		addrInstrSetTable = file->GetByte(ofsProgChangeVCmd + 14) | (file->GetByte(ofsProgChangeVCmd + 17) << 8);
 		addrSampNumTable = file->GetShort(ofsProgChangeVCmd + 47);
 		addrSampleTable = file->GetByte(ofsProgChangeVCmd + 67) | (file->GetByte(ofsProgChangeVCmd + 70) << 8);
+
+		uint16_t addrTrackSlotLookupPtr = file->GetShort(ofsProgChangeVCmd + 5);
+		songSlotIndex = file->GetByte(addrTrackSlotLookupPtr);
+		if (songSlotIndex == 0xff) {
+			songSlotIndex = 0;
+		}
+
+		uint16_t addrInstrSetLookupPtr = file->GetShort(ofsProgChangeVCmd + 9);
+		instrSetIndex = file->GetByte(addrInstrSetLookupPtr + songSlotIndex);
 	}
 	else if (file->SearchBytePattern(ptnProgChangeVCmdWinter, ofsProgChangeVCmd)) {
 		uint16_t addrInstrumentTablePtr = file->GetShort(ofsProgChangeVCmd + 14);
 		addrInstrSetTable = file->GetShort(addrInstrumentTablePtr);
 		addrSampNumTable = file->GetShort(ofsProgChangeVCmd + 58);
 		addrSampleTable = file->GetByte(ofsProgChangeVCmd + 97) | (file->GetByte(ofsProgChangeVCmd + 100) << 8);
+
+		uint16_t addrTrackSlotLookupPtr = file->GetShort(ofsProgChangeVCmd + 5);
+		songSlotIndex = file->GetByte(addrTrackSlotLookupPtr);
+		if (songSlotIndex == 0xff) {
+			songSlotIndex = 0;
+		}
+
+		uint16_t addrInstrSetLookupPtr = file->GetShort(ofsProgChangeVCmd + 9);
+		instrSetIndex = file->GetByte(addrInstrSetLookupPtr + songSlotIndex);
 	}
 	else {
 		return;
 	}
 
 	uint32_t addrInstrSet = addrInstrSetTable;
-	for (uint8_t i = 0; i < songIndex; i++) {
+	for (uint8_t i = 0; i < instrSetIndex; i++) {
 		if (addrInstrSet + 2 > 0x10000) {
 			return;
 		}

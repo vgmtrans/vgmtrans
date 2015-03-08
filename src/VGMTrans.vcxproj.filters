@@ -226,6 +226,18 @@
     <Filter Include="Source Files\formats\morisnes">
       <UniqueIdentifier>{fcb61a35-8942-4644-8123-2bbbb267fc04}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\neverlandsnes">
+      <UniqueIdentifier>{696456e7-c1ec-412a-9b31-4c063313fd8d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\neverlandsnes">
+      <UniqueIdentifier>{d5d93f14-1b60-404d-8cbe-9ad1dbdd0fe6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\prismsnes">
+      <UniqueIdentifier>{d573af0f-2138-4232-9a7d-6f9f129b2009}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\prismsnes">
+      <UniqueIdentifier>{a9d44b18-73f2-40b1-98db-61a26dccb3fa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ui\windows\aboutdlg.cpp">
@@ -731,6 +743,24 @@
     </ClCompile>
     <ClCompile Include="main\formats\MoriSnesSeq.cpp">
       <Filter>Source Files\formats\morisnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\NeverlandSnesScanner.cpp">
+      <Filter>Source Files\formats\neverlandsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\NeverlandSnesSeq.cpp">
+      <Filter>Source Files\formats\neverlandsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\PrismSnesScanner.cpp">
+      <Filter>Source Files\formats\prismsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\PrismSnesSeq.cpp">
+      <Filter>Source Files\formats\prismsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\NamcoSnesInstr.cpp">
+      <Filter>Source Files\formats\namcosnes</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\PrismSnesInstr.cpp">
+      <Filter>Source Files\formats\prismsnes</Filter>
     </ClCompile>
     <ClCompile Include="ui\windows\stdafx.cpp">
       <Filter>Source Files\windows</Filter>
@@ -1330,6 +1360,30 @@
     </ClInclude>
     <ClInclude Include="main\formats\MoriSnesSeq.h">
       <Filter>Header Files\formats\morisnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\NeverlandSnesFormat.h">
+      <Filter>Header Files\formats\neverlandsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\NeverlandSnesScanner.h">
+      <Filter>Header Files\formats\neverlandsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\NeverlandSnesSeq.h">
+      <Filter>Header Files\formats\neverlandsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PrismSnesFormat.h">
+      <Filter>Header Files\formats\prismsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PrismSnesScanner.h">
+      <Filter>Header Files\formats\prismsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PrismSnesSeq.h">
+      <Filter>Header Files\formats\prismsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\NamcoSnesInstr.h">
+      <Filter>Header Files\formats\namcosnes</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\PrismSnesInstr.h">
+      <Filter>Header Files\formats\prismsnes</Filter>
     </ClInclude>
     <ClInclude Include="ui\windows\stdafx.h">
       <Filter>Header Files\windows</Filter>

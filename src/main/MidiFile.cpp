@@ -78,7 +78,7 @@ void MidiFile::Sort(void)
 }
 
 
-bool MidiFile::SaveMidiFile(const wchar_t* filepath)
+bool MidiFile::SaveMidiFile(const std::wstring & filepath)
 {
 	vector<uint8_t> midiBuf;
 	WriteMidiToBuffer(midiBuf);
@@ -438,6 +438,16 @@ void MidiTrack::InsertPortamentoTime(uint8_t channel, uint8_t time, uint32_t abs
 	aEvents.push_back(new PortamentoTimeEvent(this, channel, absTime, time));
 }
 
+void MidiTrack::AddMono(uint8_t channel)
+{
+	aEvents.push_back(new MonoEvent(this, channel, GetDelta()));
+}
+
+void MidiTrack::InsertMono(uint8_t channel, uint32_t absTime)
+{
+	aEvents.push_back(new MonoEvent(this, channel, absTime));
+}
+
 void MidiTrack::AddPan(uint8_t channel, uint8_t pan)
 {
 	aEvents.push_back(new PanEvent(this, channel, GetDelta(), pan));
@@ -740,12 +750,11 @@ uint32_t MidiEvent::WriteSysexEvent(vector<uint8_t> & buf, uint32_t time, uint8_
 {
 	WriteVarLength(buf, AbsTime-time);
 	buf.push_back(0xF0);
-	WriteVarLength(buf, (uint32_t)(dataSize + 1));
+	WriteVarLength(buf, (uint32_t)dataSize);
 	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++)
 	{
 		buf.push_back(data[dataIndex]);
 	}
-	buf.push_back(0xF7);
 	return AbsTime;
 }
 
@@ -898,8 +907,8 @@ MastVolEvent::MastVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absolut
 
 uint32_t MastVolEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 {
-	uint8_t data[6] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, (uint8_t)(mastVol & 0x7F) };
-	return WriteSysexEvent(buf, time, data, 6);
+	uint8_t data[7] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, (uint8_t)(mastVol & 0x7F), 0xF7 };
+	return WriteSysexEvent(buf, time, data, 7);
 }
 
 //  ***************

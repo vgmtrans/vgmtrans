@@ -656,17 +656,17 @@ bool VGMColl::OnSaveAllDLS()
 	if (dirpath.length() != 0)
 	{
 		DLSFile dlsfile;
-		wstring filepath = dirpath + L"\\" + this->name + L".dls";
+		wstring filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".dls";
 		if (CreateDLSFile(dlsfile))
 		{
-			if (!dlsfile.SaveDLSFile(filepath.c_str()))
+			if (!dlsfile.SaveDLSFile(filepath))
 				Alert(L"Failed to save DLS file.");
 		}
 		else
 			Alert(L"Failed to save DLS file.");
 
-		filepath = dirpath + L"\\" + this->name + L".mid";
-		if (!this->seq->SaveAsMidi(filepath.c_str()))
+		filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
+		if (!this->seq->SaveAsMidi(filepath))
 			Alert(L"Failed to save MIDI file.");
 	}
 	return true;
@@ -677,19 +677,19 @@ bool VGMColl::OnSaveAllSF2()
 	wstring dirpath = pRoot->UI_GetSaveDirPath();
 	if (dirpath.length() != 0)
 	{
-		wstring filepath = dirpath + L"\\" + this->name + L".sf2";
+		wstring filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".sf2";
 		SF2File* sf2file = CreateSF2File();
 		if (sf2file != NULL)
 		{	
-			if (!sf2file->SaveSF2File(filepath.c_str()))
+			if (!sf2file->SaveSF2File(filepath))
 				Alert(L"Failed to save SF2 file.");
 			delete sf2file;
 		}
 		else
 			Alert(L"Failed to save SF2 file.");
 
-		filepath = dirpath + L"\\" + this->name + L".mid";
-		if (!this->seq->SaveAsMidi(filepath.c_str()))
+		filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
+		if (!this->seq->SaveAsMidi(filepath))
 			Alert(L"Failed to save MIDI file.");
 	}
 	return true;

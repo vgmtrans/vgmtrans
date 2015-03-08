@@ -17,11 +17,19 @@ enum ChunSnesSeqEventType
 	EVENT_DURATION_FROM_TABLE,
 	EVENT_LOOP_BREAK_ALT,
 	EVENT_LOOP_AGAIN_ALT,
-	EVENT_ADSR_RR,
-	EVENT_ADSR_AND_RR,
-	EVENT_CPU_CONTROLED_JUMP,
+	EVENT_ADSR_RELEASE_SR,
+	EVENT_ADSR_AND_RELEASE_SR,
+	EVENT_SURROUND,
+	EVENT_CONDITIONAL_JUMP,
+	EVENT_INC_COUNTER,
+	EVENT_PITCH_ENVELOPE,
+	EVENT_NOISE_ON,
+	EVENT_NOISE_OFF,
+	EVENT_MASTER_VOLUME_FADE,
 	EVENT_EXPRESSION_FADE,
 	EVENT_PAN_FADE,
+	EVENT_TUNING,
+	EVENT_FULL_VOLUME_FADE,
 	EVENT_GOTO,
 	EVENT_TEMPO,
 	EVENT_DURATION_RATE,
@@ -38,7 +46,15 @@ enum ChunSnesSeqEventType
 	EVENT_RET,
 	EVENT_TRANSPOSE,
 	EVENT_PITCH_SLIDE,
+	EVENT_ECHO_ON,
+	EVENT_ECHO_OFF,
+	EVENT_LOAD_PRESET,
 	EVENT_END,
+};
+
+enum ChunSnesSeqPresetType
+{
+	PRESET_CONDITION = 1, //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
 };
 
 class ChunSnesSeq
@@ -57,8 +73,10 @@ public:
 	ChunSnesVersion version;
 	ChunSnesMinorVersion minorVersion;
 	std::map<uint8_t, ChunSnesSeqEventType> EventMap;
+	std::map<uint8_t, ChunSnesSeqPresetType> PresetMap;
 
 	uint8_t initialTempo;
+	uint8_t conditionVar;
 
 private:
 	void LoadEventMap(void);
@@ -74,8 +92,14 @@ public:
 	virtual bool ReadEvent(void);
 
 	void SyncNoteLengthWithPriorTrack(void);
+	uint8_t Multiply8bit(uint8_t multiplicand, uint8_t multiplier);
+	void GetVolumeBalance(int8_t pan, double & volumeLeft, double & volumeRight);
+	int8_t CalcPanValue(int8_t pan, double & volumeScale);
+	double CalcTuningValue(int8_t tuning);
 
 	uint8_t index;
+	int8_t prevNoteKey;
+	bool prevNoteSlurred;
 
 	uint8_t noteLength;
 	uint8_t noteDurationRate;

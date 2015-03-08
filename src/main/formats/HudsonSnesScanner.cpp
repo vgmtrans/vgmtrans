@@ -69,6 +69,34 @@ BytePattern HudsonSnesScanner::ptnGetSeqTableAddrV1V2(
 	35);
 
 //; Super Bomberman 2 SPC
+//1193: e8 00     mov   a,#$00
+//1195: d4 88     mov   $88+x,a
+//1197: d4 90     mov   $90+x,a
+//1199: d5 32 01  mov   $0132+x,a
+//119c: 4b 00     lsr   $00
+//119e: 90 4f     bcc   $11ef
+//11a0: fc        inc   y
+//11a1: f7 03     mov   a,($03)+y         ; seq start address (lo)
+//11a3: d5 01 02  mov   $0201+x,a
+//11a6: d5 52 02  mov   $0252+x,a
+//11a9: fc        inc   y
+//11aa: f7 03     mov   a,($03)+y         ; seq start address (hi)
+//11ac: d5 09 02  mov   $0209+x,a
+//11af: d5 5a 02  mov   $025a+x,a         ; default global loop point = song start
+BytePattern HudsonSnesScanner::ptnLoadTrackAddress(
+	"\xe8\x00\xd4\x88\xd4\x90\xd5\x32"
+	"\x01\x4b\x00\x90\x4f\xfc\xf7\x03"
+	"\xd5\x01\x02\xd5\x52\x02\xfc\xf7"
+	"\x03\xd5\x09\x02\xd5\x5a\x02"
+	,
+	"xxx?x?x?"
+	"?x?x?xx?"
+	"x??x??xx"
+	"?x??x??"
+	,
+	31);
+
+//; Super Bomberman 2 SPC
 //0bf8: e4 4b     mov   a,$4b
 //0bfa: 8d 5d     mov   y,#$5d
 //0bfc: 4f 0c     pcall $0c
@@ -106,8 +134,6 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 
 	// TODO: fix "An American Tail: Fievel Goes West"
 
-	// TODO: guess song index (Super Bomberman 2 etc.)
-
 	// search song list and detect engine version
 	uint32_t ofsGetSeqTableAddr;
 	uint16_t addrEngineHeader;
@@ -125,11 +151,30 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 			return;
 		}
 
-		addrSongList = file->GetShort(addrEngineHeader);
+		uint16_t addrSongListTable = file->GetShort(addrEngineHeader);
+		if (addrSongListTable + 2 > 0x10000) {
+			return;
+		}
+
+		addrSongList = file->GetShort(addrSongListTable);
+		if (addrSongList + 2 > 0x10000 || addrSongList == 0) {
+			// apparently it's not loaded yet
+			return;
+		}
 	}
 	else if (file->SearchBytePattern(ptnGetSeqTableAddrV0, ofsGetSeqTableAddr)) {
 		uint8_t addrSongListPtr = file->GetByte(ofsGetSeqTableAddr + 4);
-		addrSongList = file->GetShort(addrSongListPtr);
+		uint16_t addrSongListTable = file->GetShort(addrSongListPtr);
+		if (addrSongListTable + 2 > 0x10000) {
+			return;
+		}
+
+		addrSongList = file->GetShort(addrSongListTable);
+		if (addrSongList + 2 > 0x10000 || addrSongList == 0) {
+			// apparently it's not loaded yet
+			return;
+		}
+
 		addrEngineHeader = 0; // N/A
 		version = HUDSONSNES_V0;
 	}
@@ -137,56 +182,102 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	// load song(s)
-	for (int songIndex = 0; songIndex < 1; songIndex++) {
+	// guess song count
+	uint8_t songListLength = 1;
+	uint16_t addrSongListCutoff = 0xffff;
+	for (uint8_t songIndex = 0; songIndex <= 0x7f; songIndex++) {
 		uint32_t ofsSongPtr = addrSongList + songIndex * 2;
 
-		// address range check
-		if (ofsSongPtr > 0x10000) {
+		if (ofsSongPtr + 2 > 0x10000) {
 			break;
 		}
 
-		// get song pointer
+		if (ofsSongPtr >= addrSongListCutoff) {
+			break;
+		}
+
 		uint16_t addrSongPtr = file->GetShort(ofsSongPtr);
-		if (addrSongPtr + 2 > 0x10000) {
-			break;
+		if (addrSongPtr < addrSongListCutoff) {
+			addrSongListCutoff = addrSongPtr;
 		}
 
-		// get header address
-		uint16_t addrSeqHeader = file->GetShort(addrSongPtr);
-		HudsonSnesSeq* newSeq = new HudsonSnesSeq(file, version, addrSeqHeader, name);
-		if (!newSeq->LoadVGMFile()) {
-			delete newSeq;
-			break;
+		songListLength = songIndex + 1;
+	}
+
+	// search loop address for song index search:
+	// Hudson's sequence is a self-contained format.
+	// Each sequences must not be crossover each other.
+	// Here we load the global loop address of current song,
+	// and search a sequence contains that address.
+	UINT ofsLoadTrackAddress;
+	uint16_t addrCurrentLoopPoint;
+	if (file->SearchBytePattern(ptnLoadTrackAddress, ofsLoadTrackAddress)) {
+		uint16_t addrCurrentLoopPointPtrLo = file->GetShort(ofsLoadTrackAddress + 20);
+		uint16_t addrCurrentLoopPointPtrHi = file->GetShort(ofsLoadTrackAddress + 29);
+
+		addrCurrentLoopPoint = file->GetByte(addrCurrentLoopPointPtrLo) | (file->GetByte(addrCurrentLoopPointPtrHi) << 8);
+	}
+	else {
+		return;
+	}
+
+	// guess song index
+	int8_t songIndexCandidate = 0;
+	if (addrCurrentLoopPoint != 0 && addrCurrentLoopPoint != 0xffff) {
+		uint16_t bestLoopPointDistance = 0xffff;
+		for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
+			UINT ofsSongPtr = addrSongList + songIndex * 2;
+			uint16_t addrSongPtr = file->GetShort(ofsSongPtr);
+
+			if (addrSongPtr > addrCurrentLoopPoint) {
+				continue;
+			}
+
+			uint16_t loopPointDistance = addrCurrentLoopPoint - addrSongPtr;
+			if (loopPointDistance < bestLoopPointDistance) {
+				bestLoopPointDistance = loopPointDistance;
+				songIndexCandidate = songIndex;
+			}
 		}
+	}
 
-		// load instrument set if available
-		if (newSeq->InstrumentTableSize != 0) {
-			uint16_t spcDirAddr;
-			uint16_t addrSampTuningTable;
-			if (version == HUDSONSNES_V0) {
-				uint32_t ofsLoadDIR;
-				if (file->SearchBytePattern(ptnLoadDIRV0, ofsLoadDIR)) {
-					uint8_t addrDIRPtr = file->GetByte(ofsLoadDIR + 1);
-					spcDirAddr = file->GetByte(0x100 + addrDIRPtr) << 8;
+	int8_t guessedSongIndex = songIndexCandidate;
 
-					uint16_t addrSampRegionPtr = file->GetShort(ofsGetSeqTableAddr + 30);
-					addrSampTuningTable = (file->GetByte(addrSampRegionPtr) + 1) << 8;
-				}
-				else {
-					return;
-				}
+	// load song
+	uint16_t addrSeqHeaderPtr = addrSongList + guessedSongIndex * 2;
+	uint16_t addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
+	HudsonSnesSeq* newSeq = new HudsonSnesSeq(file, version, addrSeqHeader, name);
+	if (!newSeq->LoadVGMFile()) {
+		delete newSeq;
+		return;
+	}
+
+	// load instrument set if available
+	if (newSeq->InstrumentTableSize != 0) {
+		uint16_t spcDirAddr;
+		uint16_t addrSampTuningTable;
+		if (version == HUDSONSNES_V0) {
+			UINT ofsLoadDIR;
+			if (file->SearchBytePattern(ptnLoadDIRV0, ofsLoadDIR)) {
+				uint8_t addrDIRPtr = file->GetByte(ofsLoadDIR + 1);
+				spcDirAddr = file->GetByte(0x100 + addrDIRPtr) << 8;
+
+				uint16_t addrSampRegionPtr = file->GetShort(ofsGetSeqTableAddr + 30);
+				addrSampTuningTable = (file->GetByte(addrSampRegionPtr) + 1) << 8;
 			}
-			else { // HUDSONSNES_V1, HUDSONSNES_V2
-				spcDirAddr = file->GetByte(addrEngineHeader + 6) << 8;
-				addrSampTuningTable = file->GetShort(addrEngineHeader + 4);
-			}
-
-			HudsonSnesInstrSet * newInstrSet = new HudsonSnesInstrSet(file, version, newSeq->InstrumentTableAddress, newSeq->InstrumentTableSize, spcDirAddr, addrSampTuningTable, name);
-			if (!newInstrSet->LoadVGMFile()) {
-				delete newInstrSet;
+			else {
 				return;
 			}
+		}
+		else { // HUDSONSNES_V1, HUDSONSNES_V2
+			spcDirAddr = file->GetByte(addrEngineHeader + 6) << 8;
+			addrSampTuningTable = file->GetShort(addrEngineHeader + 4);
+		}
+
+		HudsonSnesInstrSet * newInstrSet = new HudsonSnesInstrSet(file, version, newSeq->InstrumentTableAddress, newSeq->InstrumentTableSize, spcDirAddr, addrSampTuningTable, name);
+		if (!newInstrSet->LoadVGMFile()) {
+			delete newInstrSet;
+			return;
 		}
 	}
 }

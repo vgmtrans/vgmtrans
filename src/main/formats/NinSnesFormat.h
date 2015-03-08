@@ -24,9 +24,11 @@ enum NinSnesVersion
 	// derived formats
 			NINSNES_RD1,                // Nintendo RD1 (e.g. Super Metroid, Earthbound)
 	NINSNES_RD2,                // Nintendo RD2 (e.g. Marvelous)
+	NINSNES_HAL,                // HAL Laboratory games (e.g. Kirby series)
 	NINSNES_KONAMI,             // Old Konami games (e.g. Gradius III, Castlevania IV, Legend of the Mystical Ninja)
 	NINSNES_LEMMINGS,           // Lemmings
 	NINSNES_INTELLI_FE3,        // Fire Emblem 3
+	NINSNES_INTELLI_TA,         // Tetris Attack
 	NINSNES_INTELLI_FE4,        // Fire Emblem 4
 	NINSNES_HUMAN,              // Human games (e.g. Clock Tower, Firemen, Septentrion)
 	NINSNES_TOSE,               // TOSE games (e.g. Yoshi's Safari, Dragon Ball Z: Super Butouden 2)

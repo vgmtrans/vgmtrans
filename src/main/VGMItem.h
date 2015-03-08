@@ -116,8 +116,8 @@ public:
 	friend bool operator>= (VGMItem &item1, VGMItem &item2);
 
 public:
-	virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true);
-	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
+	virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
 	virtual uint32_t GuessLength(void);
 	virtual void SetGuessedLength(void);
 
@@ -167,7 +167,7 @@ public:
 	VGMContainerItem();
 	VGMContainerItem(VGMFile* thevgmfile, uint32_t theOffset, uint32_t theLength = 0, const std::wstring theName = L"", uint8_t color = CLR_HEADER);
 	virtual ~VGMContainerItem(void);
-	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true);
+	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
 	virtual uint32_t GuessLength(void);
 	virtual void SetGuessedLength(void);
 	virtual void AddToUI(VGMItem* parent, void* UI_specific);

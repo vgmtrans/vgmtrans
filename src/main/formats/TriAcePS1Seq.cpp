@@ -39,8 +39,7 @@ bool TriAcePS1Seq::GetHeaderInfo(void)
 	header->AddSimpleItem(dwOffset+0x10, 2, L"Time Signature");
 
 	unLength = GetShort(dwOffset+2);
-	initialTempoBPM = GetByte(dwOffset+0xF);
-	bWriteInitialTempo = true;
+	AlwaysWriteInitialTempo(GetByte(dwOffset+0xF));
 	return true;
 }
 
@@ -63,8 +62,6 @@ bool TriAcePS1Seq::GetTrackPointers(void)
 void TriAcePS1Seq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
-
-	tempoBPM = initialTempoBPM;
 }
 
 // **************
@@ -329,6 +326,14 @@ bool TriAcePS1Track::IsOffsetUsed(uint32_t offset)
 void TriAcePS1Track::AddEvent(SeqEvent* pSeqEvent)
 {
 	TriAcePS1ScorePattern* pattern = ((TriAcePS1Seq*)parentSeq)->curScorePattern;
-	if (pattern)
-		pattern->AddItem(pSeqEvent);
+	if (pattern == NULL) {
+		// it must be already added, reject it
+		delete pSeqEvent;
+		return;
+	}
+
+	if (readMode != READMODE_ADD_TO_UI)
+		return;
+
+	pattern->AddItem(pSeqEvent);
 }

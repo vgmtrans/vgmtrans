@@ -667,6 +667,8 @@ bool SuzukiSnesTrack::ReadEvent(void)
 		// For right pan, the engine will do the opposite.
 		// For center pan, it will not decrease any volumes.
 		uint8_t pan = GetByte(curOffset++);
+
+		// TODO: correct midi pan value, apply volume scale
 		AddPan(beginOffset, curOffset - beginOffset, pan >> 1);
 		break;
 	}
@@ -676,6 +678,8 @@ bool SuzukiSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		uint8_t pan = GetByte(curOffset++);
 		desc << L"Fade Length: " << (int)fadeLength << L"  Pan: " << (int)(pan >> 1);
+
+		// TODO: correct midi pan value, apply volume scale, do pan slide
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan Fade", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
 		break;
 	}
