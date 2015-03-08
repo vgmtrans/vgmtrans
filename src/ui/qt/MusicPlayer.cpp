@@ -34,7 +34,6 @@ MusicPlayer::MusicPlayer()
     if (loader == NULL) {
         FLUID_LOG(FLUID_WARN, "Failed to create the default SoundFont loader");
     } else {
-        printf("ADDING MEMSFLOADER");
         fluid_synth_add_sfloader(synth, loader);
     }
 
