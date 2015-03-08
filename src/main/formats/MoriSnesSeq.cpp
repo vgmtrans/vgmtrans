@@ -687,7 +687,7 @@ bool MoriSnesTrack::ReadEvent(void)
 		break;
 	}
 
-	assert(curOffset >= dwOffset);
+	//assert(curOffset >= dwOffset);
 
 	//wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;

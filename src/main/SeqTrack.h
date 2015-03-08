@@ -39,10 +39,14 @@ public:
 
 	uint32_t dwStartOffset;
 
+	std::unordered_set<uint32_t> VisitedAddresses;
+	uint32_t VisitedAddressMax;
+
 protected:
+	virtual void OnEvent(uint32_t offset, uint32_t length);
 	virtual void AddEvent(SeqEvent* pSeqEvent);
-	void AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t& prevVal, uint8_t targVal, 
-		void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t));
+	void AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t& prevVal, uint8_t targVal,
+		uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t));
 public:
 	void AddGenericEvent(uint32_t offset, uint32_t length, const std::wstring& sEventName, const std::wstring& sEventDesc, uint8_t color, Icon icon = ICON_BINARY);
 	void AddSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::wstring& sEventName = L"Set Octave");
@@ -95,6 +99,7 @@ public:
 	void InsertPan(uint32_t offset, uint32_t length, uint8_t pan, uint32_t absTime, const std::wstring& sEventName = L"Pan");
 	void AddReverb(uint32_t offset, uint32_t length, uint8_t reverb, const std::wstring& sEventName = L"Reverb");
 	void AddReverbNoItem(uint8_t reverb);
+	void AddMonoNoItem();
 	void InsertReverb(uint32_t offset, uint32_t length, uint8_t reverb, uint32_t absTime, const std::wstring& sEventName = L"Reverb");
 	void AddPitchBend(uint32_t offset, uint32_t length, int16_t bend, const std::wstring& sEventName = L"Pitch Bend");
 	void AddPitchBendRange(uint32_t offset, uint32_t length, uint8_t semitones, uint8_t cents = 0, const std::wstring& sEventName = L"Pitch Bend Range");

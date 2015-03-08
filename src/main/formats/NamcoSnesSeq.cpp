@@ -18,8 +18,7 @@ NamcoSnesSeq::NamcoSnesSeq(RawFile* file, NamcoSnesVersion ver, uint32_t seqdata
 	bAllowDiscontinuousTrackData = true;
 	bUseLinearAmplitudeScale = true;
 
-	bWriteInitialTempo = true;
-	tempoBPM = 60000000.0 / (SEQ_PPQN * (125 * 0x86));
+	AlwaysWriteInitialTempo(60000000.0 / (SEQ_PPQN * (125 * 0x86)));
 
 	UseReverb();
 
@@ -534,15 +533,7 @@ bool NamcoSnesSeq::ReadEvent(void)
 
 						// TODO: apply volume scale
 						double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
-						double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan);
-
-						uint8_t midiPan;
-						if (midiScalePan == 0.0) {
-							midiPan = 0;
-						}
-						else {
-							midiPan = 1 + roundi(midiScalePan * 126.0);
-						}
+						uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
 
 						AddPanNoItem(midiPan);
 						break;

@@ -37,8 +37,7 @@ void PandoraBoxSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
 
-	bWriteInitialTempo = true;
-	tempoBPM = GetByte(dwOffset + 6);
+	AlwaysWriteInitialTempo(GetByte(dwOffset + 6));
 }
 
 bool PandoraBoxSnesSeq::GetHeaderInfo(void)
@@ -369,18 +368,10 @@ bool PandoraBoxSnesTrack::ReadEvent(void)
 		newPan = min(newPan, (uint8_t)128);
 		double linearPan = newPan / 128.0;
 		double volumeScale;
-		double midiScalePan = ConvertPercentPanToStdMidiScale(linearPan, &volumeScale);
-
-		int8_t midiPan;
-		if (midiScalePan == 0.0) {
-			midiPan = 0;
-		}
-		else {
-			midiPan = 1 + roundi(midiScalePan * 126.0);
-		}
+		int8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan, &volumeScale);
 
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
-		AddExpressionNoItem(roundi(volumeScale * 127.0));
+		AddExpressionNoItem(roundi(127.0 * volumeScale));
 		break;
 	}
 

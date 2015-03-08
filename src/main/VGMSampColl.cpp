@@ -112,10 +112,10 @@ bool VGMSampColl::OnSaveAllAsWav()
 	wstring dirpath = pRoot->UI_GetSaveDirPath();
 	if (dirpath.length() != 0)
 	{
-		for (uint32_t i=0; i<samples.size(); i++)
+		for (uint32_t i = 0; i < samples.size(); i++)
 		{
-			wstring filepath = dirpath + L"\\" + samples[i]->sampName + L".wav";
-			samples[i]->SaveAsWav(filepath.c_str());
+			wstring filepath = dirpath + L"\\" + ConvertToSafeFileName(samples[i]->sampName) + L".wav";
+			samples[i]->SaveAsWav(filepath);
 		}
 		return true;
 	}

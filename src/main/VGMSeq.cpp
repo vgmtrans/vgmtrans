@@ -19,11 +19,12 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   bMonophonicTracks(false),
   bReverb(false),
   bUseLinearAmplitudeScale(false),
-  bWriteInitialTempo(false),
+  bAlwaysWriteInitialTempo(false),
   bAlwaysWriteInitialVol(false),
   bAlwaysWriteInitialExpression(false),
   bAlwaysWriteInitialReverb(false),
   bAlwaysWriteInitialPitchBendRange(false),
+  bAlwaysWriteInitialMono(false),
   bAllowDiscontinuousTrackData(false),
   bLoadTickByTick(false),
   initialVol(100),					//GM standard (dls1 spec p16)
@@ -31,6 +32,7 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
   initialReverb(40),				//GM standard
   initialPitchBendRangeSemiTones(2), //GM standard.  Means +/- 2 semitones (4 total range)
   initialPitchBendRangeCents(0),
+  initialTempoBPM(120),
   nNumTracks(0),
   time(0),
   readMode(READMODE_ADD_TO_UI)
@@ -312,6 +314,7 @@ bool VGMSeq::GetTrackPointers(void)
 void VGMSeq::ResetVars(void)
 {
 	time = 0;
+	tempoBPM = initialTempoBPM;
 
 	if (readMode == READMODE_ADD_TO_UI)
 	{
@@ -342,14 +345,14 @@ void VGMSeq::AddInstrumentRef(uint32_t progNum)
 
 bool VGMSeq::OnSaveAsMidi(void)
 {
-	wstring filepath = pRoot->UI_GetSaveFilePath(name.c_str(), L"mid");
+	wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"mid");
 	if (filepath.length() != 0)
-		return SaveAsMidi(filepath.c_str());
+		return SaveAsMidi(filepath);
 	return false;
 }
 
 
-bool VGMSeq::SaveAsMidi(const wchar_t* filepath)
+bool VGMSeq::SaveAsMidi(const std::wstring & filepath)
 {
 	MidiFile* midi = this->ConvertToMidi();
 	if (!midi)

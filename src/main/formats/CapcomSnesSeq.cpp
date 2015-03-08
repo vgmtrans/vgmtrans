@@ -36,13 +36,11 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile* file, CapcomSnesVersion ver, uint32_t seqd
 
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
-
-	double volumeScale;
-	ConvertPercentPanToStdMidiScale(0.5, &volumeScale);
+	bUseLinearAmplitudeScale = true;
 
 	UseReverb();
-	AlwaysWriteInitialExpression((int)(sqrt(volumeScale) * 127.0 + 0.5));
 	AlwaysWriteInitialReverb(0);
+	bAlwaysWriteInitialMono = true;
 
 	LoadEventMap();
 }
@@ -469,8 +467,8 @@ bool CapcomSnesTrack::ReadEvent(void)
 		case EVENT_VOLUME:
 		{
 			uint8_t newVolume = GetByte(curOffset++);
-			uint8_t midiVolume;
 
+			uint8_t midiVolume;
 			if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST)
 			{
 				// linear volume
@@ -483,9 +481,8 @@ bool CapcomSnesTrack::ReadEvent(void)
 				uint8_t volRate = (newVolume * 16) & 0xff;
 				midiVolume = CapcomSnesSeq::volTable[volIndex] + ((CapcomSnesSeq::volTable[volIndex + 1] - CapcomSnesSeq::volTable[volIndex]) * volRate / 256);
 			}
-			midiVolume = Convert7bitPercentVolValToStdMidiVal(midiVolume >> 1);
 
-			AddVol(beginOffset, curOffset-beginOffset, newVolume);
+			AddVol(beginOffset, curOffset - beginOffset, midiVolume);
 			break;
 		}
 
@@ -659,33 +656,32 @@ bool CapcomSnesTrack::ReadEvent(void)
 		case EVENT_PAN:
 		{
 			uint8_t newPan = GetByte(curOffset++) + 0x80; // signed -> unsigned
-			uint8_t midiPan;
 			double volumeScale;
 
+			uint8_t panIn7bit;
 			if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST)
 			{
-				midiPan = newPan >> 1;
+				panIn7bit = newPan >> 1;
 			}
 			else
 			{
 				// use pan table (with linear interpolation)
 				uint8_t panIndex = (newPan * 20) >> 8;
 				uint8_t panRate = (newPan * 20) & 0xff;
-				midiPan = CapcomSnesSeq::panTable[panIndex] + ((CapcomSnesSeq::panTable[panIndex + 1] - CapcomSnesSeq::panTable[panIndex]) * panRate >> 8);
-
+				panIn7bit = CapcomSnesSeq::panTable[panIndex] + ((CapcomSnesSeq::panTable[panIndex + 1] - CapcomSnesSeq::panTable[panIndex]) * panRate >> 8);
 			}
-			midiPan = Convert7bitPercentPanValToStdMidiVal(midiPan, &volumeScale);
+			uint8_t midiPan = Convert7bitLinearPercentPanValToStdMidiVal(panIn7bit, &volumeScale);
 
 			AddPan(beginOffset, curOffset-beginOffset, midiPan);
-			AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
+			AddExpressionNoItem(roundi(127.0 * volumeScale));
 			break;
 		}
 
 		case EVENT_MASTER_VOLUME:
 		{
 			uint8_t newVolume = GetByte(curOffset++);
-			uint8_t midiVolume;
 
+			uint8_t midiVolume;
 			if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST)
 			{
 				// linear volume
@@ -698,9 +694,8 @@ bool CapcomSnesTrack::ReadEvent(void)
 				uint8_t volRate = (newVolume * 16) & 0xff;
 				midiVolume = CapcomSnesSeq::volTable[volIndex] + ((CapcomSnesSeq::volTable[volIndex + 1] - CapcomSnesSeq::volTable[volIndex]) * volRate / 256);
 			}
-			midiVolume = Convert7bitPercentVolValToStdMidiVal(midiVolume >> 1);
 
-			AddMasterVol(beginOffset, curOffset-beginOffset, newVolume);
+			AddMasterVol(beginOffset, curOffset - beginOffset, midiVolume);
 			break;
 		}
 

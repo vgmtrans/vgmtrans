@@ -117,6 +117,7 @@ SF2File::SF2File(SynthFile* synthfile)
 	// pbag chunk
 	//***********
 	Chunk* pbagCk = new Chunk("pbag");
+	const size_t ITEMS_IN_PGEN = 1;
 	pbagCk->size = (uint32_t)((numInstrs+1) * sizeof(sfPresetBag));
 	pbagCk->data = new uint8_t[pbagCk->size];
 	for (size_t i = 0; i < numInstrs; i++)
@@ -125,7 +126,7 @@ SF2File::SF2File(SynthFile* synthfile)
 		
 		sfPresetBag presetBag;
 		memset(&presetBag, 0, sizeof(sfPresetBag));
-		presetBag.wGenNdx = (uint16_t)(i*2);
+		presetBag.wGenNdx = (uint16_t)(i*ITEMS_IN_PGEN);
 		presetBag.wModNdx = 0;
 
 		memcpy(pbagCk->data + (i*sizeof(sfPresetBag)), &presetBag, sizeof(sfPresetBag));
@@ -157,7 +158,7 @@ SF2File::SF2File(SynthFile* synthfile)
 	//***********
 	Chunk* pgenCk = new Chunk("pgen");
 	//pgenCk->size = (synthfile->vInstrs.size()+1) * sizeof(sfGenList);
-	pgenCk->size = (uint32_t)((synthfile->vInstrs.size() * sizeof(sfGenList) * 2) + sizeof(sfGenList));
+	pgenCk->size = (uint32_t)((synthfile->vInstrs.size() * sizeof(sfGenList) * ITEMS_IN_PGEN) + sizeof(sfGenList));
 	pgenCk->data = new uint8_t[pgenCk->size];
 	uint32_t dataPtr = 0;
 	for (size_t i = 0; i < numInstrs; i++)
@@ -168,10 +169,10 @@ SF2File::SF2File(SynthFile* synthfile)
 		memset(&genList, 0, sizeof(sfGenList));
 		
 		// reverbEffectsSend
-		genList.sfGenOper = reverbEffectsSend;
-		genList.genAmount.shAmount= 700;
-		memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
-		dataPtr += sizeof(sfGenList);
+		//genList.sfGenOper = reverbEffectsSend;
+		//genList.genAmount.shAmount= 700;
+		//memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
+		//dataPtr += sizeof(sfGenList);
 
 		genList.sfGenOper = instrument;
 		genList.genAmount.wAmount = (uint16_t)i;
@@ -442,7 +443,6 @@ SF2File::~SF2File(void)
 	//DeleteVect(aWaves);
 }
 
-
 const void* SF2File::SaveToMem() {
 	uint32_t size = this->GetSize();
 	uint8_t* buf = new uint8_t[size];
@@ -450,7 +450,7 @@ const void* SF2File::SaveToMem() {
 	return buf;
 }
 
-bool SF2File::SaveSF2File(const wchar_t* filepath)
+bool SF2File::SaveSF2File(const std::wstring & filepath)
 {
 	uint32_t size = this->GetSize();
 	const void* buf = this->SaveToMem();

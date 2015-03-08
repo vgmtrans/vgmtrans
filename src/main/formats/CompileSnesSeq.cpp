@@ -32,7 +32,6 @@ CompileSnesSeq::CompileSnesSeq(RawFile* file, CompileSnesVersion ver, uint32_t s
 
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
-	bWriteInitialTempo = true;
 
 	LoadEventMap();
 }
@@ -44,10 +43,6 @@ CompileSnesSeq::~CompileSnesSeq(void)
 void CompileSnesSeq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
-
-	if (aTracks.size() != 0) {
-		tempoBPM = GetTempoInBPM(((CompileSnesTrack*)aTracks[0])->spcInitialTempo);
-	}
 }
 
 bool CompileSnesSeq::GetHeaderInfo(void)
@@ -102,6 +97,10 @@ bool CompileSnesSeq::GetTrackPointers(void)
 		track->spcInitialSRCN = GetByte(curOffset + 10);
 		track->spcInitialPan = (int8_t)GetByte(curOffset + 12);
 		aTracks.push_back(track);
+
+		if (trackIndex == 0) {
+			AlwaysWriteInitialTempo(GetTempoInBPM(track->spcInitialTempo));
+		}
 
 		curOffset += 14;
 	}
@@ -225,8 +224,8 @@ void CompileSnesTrack::AddInitialMidiEvents(int trackNum)
 	double volumeScale;
 	AddProgramChangeNoItem(spcSRCN, true);
 	AddVolNoItem(Convert7bitPercentVolValToStdMidiVal(spcVolume / 2));
-	AddPanNoItem(Convert7bitPercentPanValToStdMidiVal((uint8_t)(spcPan + 0x80) / 2, &volumeScale));
-	AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
+	AddPanNoItem(Convert7bitLinearPercentPanValToStdMidiVal((uint8_t)(spcPan + 0x80) / 2, &volumeScale));
+	AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
 	AddReverbNoItem(0);
 }
 
@@ -544,8 +543,8 @@ bool CompileSnesTrack::ReadEvent(void)
 		spcPan = newPan;
 
 		double volumeScale;
-		uint8_t midiPan = Convert7bitPercentPanValToStdMidiVal((uint8_t)(newPan + 0x80) / 2, &volumeScale);
-		AddExpressionNoItem((int)(sqrt(volumeScale) * 127.0 + 0.5));
+		uint8_t midiPan = Convert7bitLinearPercentPanValToStdMidiVal((uint8_t)(newPan + 0x80) / 2, &volumeScale);
+		AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
 		break;
 	}
