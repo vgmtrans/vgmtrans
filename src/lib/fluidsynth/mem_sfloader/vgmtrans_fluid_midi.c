@@ -343,7 +343,6 @@ vgmtrans_fluid_midi_file_read_track(fluid_midi_file *mf, fluid_player_t *player,
                 vgmtrans_fluid_midi_file_skip(mf, mf->tracklen - mf->trackpos);
 
             fluid_player_add_track(player, track);
-            printf("ADDED the track: %X. track->num: %d\n", track, track->num);
 
         } else {
             found_track = 0;
