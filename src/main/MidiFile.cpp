@@ -909,7 +909,7 @@ MastVolEvent::MastVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absolut
 
 uint32_t MastVolEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 {
-	uint8_t data[7] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, mastVol & 0x7F, 0x7F };
+	uint8_t data[7] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, mastVol & 0x7F, 0xF7 };
 	return WriteSysexEvent(buf, time, data, 7);
 }
 
