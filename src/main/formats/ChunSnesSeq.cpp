@@ -530,7 +530,7 @@ bool ChunSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		desc << L"Master Volume: " << (int)mastVol << L"  Fade Length: " << (int)fadeLength;
 
-		uint8_t midiMastVol = min(mastVol, 0x7f);
+		uint8_t midiMastVol = min(mastVol, (uint8_t)0x7f);
 		AddMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, midiMastVol);
 		break;
 	}

@@ -173,7 +173,7 @@ void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	UINT ofsLoadInstrTuning;
+	uint32_t ofsLoadInstrTuning;
 	uint16_t addrTuningTable;
 	if (file->SearchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
 		addrTuningTable = file->GetByte(ofsLoadInstrTuning + 8) | (file->GetByte(ofsLoadInstrTuning + 12) << 8);
@@ -204,7 +204,7 @@ std::map<uint8_t, uint8_t> NamcoSnesScanner::GetInitDspRegMap(RawFile* file)
 	std::map<uint8_t, uint8_t> dspRegMap;
 
 	// find a code block which initializes dsp registers
-	UINT ofsDspRegInit;
+	uint32_t ofsDspRegInit;
 	uint8_t dspRegCount;
 	uint16_t addrDspRegValueList;
 	if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInit)) {

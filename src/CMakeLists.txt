@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.4)
-project(VGMTrans CXX)
+project(VGMTrans)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -150,6 +150,8 @@ set(SOURCE_FILES
     main/formats/MP2kSeq.cpp
     main/formats/MP2kSeq.h
     main/formats/NamcoSnesFormat.h
+    main/formats/NamcoSnesInstr.cpp
+    main/formats/NamcoSnesInstr.h
     main/formats/NamcoSnesScanner.cpp
     main/formats/NamcoSnesScanner.h
     main/formats/NamcoSnesSeq.cpp
@@ -161,6 +163,18 @@ set(SOURCE_FILES
     main/formats/NDSScanner.h
     main/formats/NDSSeq.cpp
     main/formats/NDSSeq.h
+    main/formats/NeverlandSnesFormat.h
+    main/formats/NeverlandSnesScanner.cpp
+    main/formats/NeverlandSnesScanner.h
+    main/formats/NeverlandSnesSeq.cpp
+    main/formats/NeverlandSnesSeq.h
+    main/formats/NinSnesFormat.h
+    main/formats/NinSnesInstr.cpp
+    main/formats/NinSnesInstr.h
+    main/formats/NinSnesScanner.cpp
+    main/formats/NinSnesScanner.h
+    main/formats/NinSnesSeq.cpp
+    main/formats/NinSnesSeq.h
     main/formats/OrgFormat.h
     main/formats/OrgScanner.cpp
     main/formats/OrgScanner.h
@@ -173,6 +187,13 @@ set(SOURCE_FILES
     main/formats/PandoraBoxSnesScanner.h
     main/formats/PandoraBoxSnesSeq.cpp
     main/formats/PandoraBoxSnesSeq.h
+    main/formats/PrismSnesFormat.h
+    main/formats/PrismSnesInstr.cpp
+    main/formats/PrismSnesInstr.h
+    main/formats/PrismSnesScanner.cpp
+    main/formats/PrismSnesScanner.h
+    main/formats/PrismSnesSeq.cpp
+    main/formats/PrismSnesSeq.h
     main/formats/PS1Format.h
     main/formats/PS1Seq.cpp
     main/formats/PS1Seq.h
@@ -440,7 +461,7 @@ if (MSVC)
     target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/zlib/lib/win32/zlibstat.lib)
     target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/fluidsynth/lib/win32/libfluidsynthstat.lib)
     target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/glib-2.0.lib)
-	target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/gthread-2.0.lib)
+    target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/gthread-2.0.lib)
     target_link_libraries(vgmtrans winmm.lib)
     target_link_libraries(vgmtrans ws2_32.lib)
     target_link_libraries(vgmtrans dsound.lib)

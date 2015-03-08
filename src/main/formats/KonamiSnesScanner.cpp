@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "KonamiSnesScanner.h"
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesInstr.h"
@@ -512,8 +512,8 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	// Batman Returns
 
 	// find a song header
-	UINT ofsSetSongHeaderAddress;
-	UINT ofsReadSongList;
+	uint32_t ofsSetSongHeaderAddress;
+	uint32_t ofsReadSongList;
 	uint16_t addrSongHeader;
 	uint16_t addrSongList;
 	int8_t primarySongIndex;
@@ -546,7 +546,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	}
 
 	// find the vcmd length table
-	UINT ofsJumpToVcmd;
+	uint32_t ofsJumpToVcmd;
 	uint16_t addrVcmdLengthTable;
 	uint8_t vcmd6XCountInList;
 	if (file->SearchBytePattern(ptnJumpToVcmdGG4, ofsJumpToVcmd)) {
@@ -561,7 +561,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	else if (file->SearchBytePattern(ptnJumpToVcmdCNTR3, ofsJumpToVcmd)) {
 		addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
 
-		UINT ofsBranchForVcmd6x;
+		uint32_t ofsBranchForVcmd6x;
 		if (file->SearchBytePattern(ptnBranchForVcmd6xCNTR3, ofsBranchForVcmd6x)) {
 			// vcmd 60-64 is in the list
 			vcmd6XCountInList = 5;
@@ -636,7 +636,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	}
 
 	// scan for DIR address
-	UINT ofsSetDIR;
+	uint32_t ofsSetDIR;
 	uint16_t spcDirAddr;
 	std::map<std::wstring, std::vector<uint8_t>>::iterator itrDSP;
 	if (file->SearchBytePattern(ptnSetDIRGG4, ofsSetDIR)) {
@@ -654,7 +654,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 	}
 
 	// scan for instrument table
-	UINT ofsLoadInstr;
+	uint32_t ofsLoadInstr;
 	uint16_t addrCommonInstrTable;
 	uint16_t addrBankedInstrTable;
 	uint8_t firstBankedInstr;
@@ -668,7 +668,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
 
 		// scan for percussive instrument table
-		UINT ofsLoadPercInstr;
+		uint32_t ofsLoadPercInstr;
 		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
 			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
 		}
@@ -685,7 +685,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
 
 		// scan for percussive instrument table
-		UINT ofsLoadPercInstr;
+		uint32_t ofsLoadPercInstr;
 		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
 			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
 		}
@@ -702,7 +702,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
 		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
 
 		// scan for percussive instrument table
-		UINT ofsLoadPercInstr;
+		uint32_t ofsLoadPercInstr;
 		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
 			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
 		}
