@@ -164,7 +164,7 @@ HeartBeatSnesRgn::HeartBeatSnesRgn(HeartBeatSnesInstr* instr, HeartBeatSnesVersi
 	// so here I put a random value commonly used
 	// TODO: obtain proper release rate from sequence
 	uint8_t sr_release = 0x1c;
-	ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, NULL, NULL, NULL, &this->release_time, NULL);
+	ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, NULL, NULL, NULL, &this->release_time, NULL);
 }
 
 HeartBeatSnesRgn::~HeartBeatSnesRgn()

@@ -43,7 +43,7 @@ static unsigned const SDSP_COUNTER_RATES [32] =
 // Emulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
 // return elapsed time in sample count, and final env value if requested.
 uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t * env_after_ptr, double * sf2_envelope_time_ptr);
-void ConvertSNESADSR(uint8_t adsr1, uint8_t adsr2, uint8_t gain, double * ptr_attack_time, double * ptr_decay_time, double * ptr_sustain_level, double * ptr_sustain_time, double * ptr_release_time);
+void ConvertSNESADSR(uint8_t adsr1, uint8_t adsr2, uint8_t gain, uint16_t env_from, double * ptr_attack_time, double * ptr_decay_time, double * ptr_sustain_level, double * ptr_sustain_time, double * ptr_release_time);
 
 template <class T> void SNESConvADSR(T* rgn, uint8_t adsr1, uint8_t adsr2, uint8_t gain)
 {
@@ -56,7 +56,7 @@ template <class T> void SNESConvADSR(T* rgn, uint8_t adsr1, uint8_t adsr2, uint8
 		uint8_t sl = (adsr2 & 0xe0) >> 5;
 		uint8_t sr = adsr2 & 0x1f;
 
-		ConvertSNESADSR(adsr1, adsr2, gain, &rgn->attack_time, &rgn->decay_time, &rgn->sustain_level, &rgn->sustain_time, &rgn->release_time);
+		ConvertSNESADSR(adsr1, adsr2, gain, 0x7ff, &rgn->attack_time, &rgn->decay_time, &rgn->sustain_level, &rgn->sustain_time, &rgn->release_time);
 
 		// Merge decay and sustain into a single envelope, since DLS does not have sustain rate.
 		if (sl == 7) {

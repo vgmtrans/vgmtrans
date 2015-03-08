@@ -61,7 +61,7 @@ uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t
 		}
 	}
 	else { // 6,7: linear increase
-		int16_t env_prev = (env >= 0x20) ? env - 0x20 : 0; // sloppy guess, but I guess it's not wrong in most cases.
+		int16_t env_prev = (env >= 0x20) ? env - 0x20 : 0; // guess previous value
 
 		while (env < env_to) {
 			env += 0x20;
@@ -88,8 +88,8 @@ uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t
 			sf2_time = 0.0;
 		}
 		else if (mode == 4) { // 4: linear decrease
-			// not implemented yet
-			sf2_time = 0.0;
+			uint32_t total_samples_full = (0x800 / 0x20) * SDSP_COUNTER_RATES[rate];
+			sf2_time = LinAmpDecayTimeToLinDBDecayTime(total_samples_full / 32000.0, 0x800);
 		}
 		else if (mode == 5) { // 5: exponential decrease
 			// Exponential decrease mode is almost exponential.
@@ -141,8 +141,9 @@ uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t
 			}
 		}
 		else { // 6,7: linear increase
-			// not implemented yet
-			sf2_time = 0.0;
+			// 7: two-slope linear increase is unable to convert the SF2 time
+			uint32_t total_samples_full = (0x800 / 0x20) * SDSP_COUNTER_RATES[rate];
+			sf2_time = total_samples_full / 32000.0; // linear attack time from 0 to full
 		}
 
 		*sf2_envelope_time_ptr = sf2_time;
@@ -153,7 +154,7 @@ uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t
 
 // See Anomie's S-DSP document for technical details
 // http://www.romhacking.net/documents/191/
-void ConvertSNESADSR(uint8_t adsr1, uint8_t adsr2, uint8_t gain, double * ptr_attack_time, double * ptr_decay_time, double * ptr_sustain_level, double * ptr_sustain_time, double * ptr_release_time)
+void ConvertSNESADSR(uint8_t adsr1, uint8_t adsr2, uint8_t gain, uint16_t env_from, double * ptr_attack_time, double * ptr_decay_time, double * ptr_sustain_level, double * ptr_sustain_time, double * ptr_release_time)
 {
 	bool adsr_enabled = (adsr1 & 0x80) != 0;
 
@@ -162,6 +163,12 @@ void ConvertSNESADSR(uint8_t adsr1, uint8_t adsr2, uint8_t gain, double * ptr_at
 	double sustain_level;
 	double sustain_time;
 	double release_time;
+
+	bool have_attack_time = false;
+	bool have_decay_time = false;
+	bool have_sustain_level = false;
+	bool have_sustain_time = false;
+	bool have_release_time = false;
 
 	int16_t env;
 	int16_t env_after;
@@ -209,33 +216,87 @@ void ConvertSNESADSR(uint8_t adsr1, uint8_t adsr2, uint8_t gain, double * ptr_at
 		// decrease envelope by 8 for every sample
 		samples = (env_sustain_start + 7) / 8;
 		release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+
+		have_attack_time = true;
+		have_decay_time = true;
+		have_sustain_level = true;
+		have_sustain_time = true;
+		have_release_time = true;
 	}
 	else {
-		// TODO: GAIN mode
-		ptr_attack_time = NULL;
-		ptr_decay_time = NULL;
-		ptr_sustain_level = NULL;
-		ptr_sustain_time = NULL;
-		ptr_release_time = NULL;
+		uint8_t mode = gain >> 5;
+
+		if (mode < 4) { // direct
+			attack_time = 0;
+			decay_time = -1;
+			sustain_level = (gain & 0x7f) / 128.0;
+			sustain_time = -1;
+
+			// release
+			// decrease envelope by 8 for every sample
+			samples = (env_from + 7) / 8;
+			release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+
+			have_attack_time = true;
+			have_decay_time = true;
+			have_sustain_level = true;
+			have_sustain_time = true;
+			have_release_time = true;
+		}
+		else {
+			env = env_from;
+			int16_t env_to = (mode >= 6) ? 0x7ff : 0;
+			double sf2_env_time;
+			EmulateSDSPGAIN(gain, env, env_to, &env_after, &sf2_env_time);
+
+			if (mode >= 6) {
+				attack_time = sf2_env_time;
+				decay_time = -1;
+				sustain_level = 1.0;
+				sustain_time = -1;
+
+				// release
+				// decrease envelope by 8 for every sample
+				samples = (env_to + 7) / 8;
+				release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+			}
+			else {
+				attack_time = 0.0;
+				decay_time = sf2_env_time;
+				sustain_level = 0;
+				sustain_time = 0;
+
+				// release
+				// decrease envelope by 8 for every sample
+				samples = (env_from + 7) / 8;
+				release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+			}
+
+			have_attack_time = true;
+			have_decay_time = true;
+			have_sustain_level = true;
+			have_sustain_time = true;
+			have_release_time = true;
+		}
 	}
 
-	if (ptr_attack_time != NULL) {
+	if (ptr_attack_time != NULL && have_attack_time) {
 		*ptr_attack_time = attack_time;
 	}
 
-	if (ptr_decay_time != NULL) {
+	if (ptr_decay_time != NULL && have_decay_time) {
 		*ptr_decay_time = decay_time;
 	}
 
-	if (ptr_sustain_level != NULL) {
+	if (ptr_sustain_level != NULL && have_sustain_level) {
 		*ptr_sustain_level = sustain_level;
 	}
 
-	if (ptr_sustain_time != NULL) {
+	if (ptr_sustain_time != NULL && have_sustain_time) {
 		*ptr_sustain_time = sustain_time;
 	}
 
-	if (ptr_release_time != NULL) {
+	if (ptr_release_time != NULL && have_release_time) {
 		*ptr_release_time = release_time;
 	}
 }

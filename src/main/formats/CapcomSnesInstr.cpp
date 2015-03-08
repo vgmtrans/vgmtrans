@@ -177,6 +177,9 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr* instr, uint32_t offset) :
 	AddUnityKey(96 - (int)(coarse_tuning), offset + 4, 1);
 	AddFineTune((int16_t)(fine_tuning * 100.0), offset + 5, 1);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
+
+	uint8_t sl = (adsr2 >> 5);
+	EmulateSDSPGAIN(gain, (sl << 8) | 0xff, 0, NULL, &release_time);
 }
 
 CapcomSnesRgn::~CapcomSnesRgn()
