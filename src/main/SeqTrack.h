@@ -38,7 +38,11 @@ public:
 
 	uint32_t dwStartOffset;
 
+	std::unordered_set<uint32_t> VisitedAddresses;
+	uint32_t VisitedAddressMax;
+
 protected:
+	virtual void OnEvent(uint32_t offset, uint32_t length);
 	virtual void AddEvent(SeqEvent* pSeqEvent);
 	void AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t& prevVal, uint8_t targVal,
 		uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t));
