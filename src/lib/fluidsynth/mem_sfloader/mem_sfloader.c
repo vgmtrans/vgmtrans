@@ -103,8 +103,6 @@ fluid_sfont_t* memsfloader_load(fluid_sfloader_t* loader, const char* filename)
     memsfont_t* memsfont;
     fluid_sfont_t* sfont;
 
-    printf("CALLED MEMSFLOADER_LOAD");
-
     const void* data = (const void*)filename;
 
     memsfont = new_memsfont(loader->data);
@@ -619,7 +617,6 @@ int memsfont_load(memsfont_t* sfont, const void* data)
     sfont->samplepos = sfdata->samplepos;
     sfont->samplesize = sfdata->samplesize;
 
-    printf("LOADING SAMPLE DATA... RUH ROH");
     /* load sample data in one block */
     if (memsfont_load_sampledata(sfont, data) != OK)
         goto err_exit;
