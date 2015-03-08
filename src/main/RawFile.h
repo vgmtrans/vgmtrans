@@ -1,7 +1,4 @@
 #pragma once
-
-#include "pch.h"
-
 #include "common.h"
 #include "DataSeg.h"
 #include "BytePattern.h"

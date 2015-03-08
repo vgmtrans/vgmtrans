@@ -24,29 +24,24 @@
  The original fluid_player works nicely except that it doesn't tell us what track number
  an event belong to, which is required information for VGMTrans to play back sequences correctly.
  Standard MIDI files have a 16 channel limit, but many sequence formats VGMTrans can convert
- support more than 16 channels (and 16 note polyphony). To work around this, we
+ support more than 16 channels (and more than 16 note polyphony). To work around this, we
 
- 1) need a synth that supports more than 16 channels and simultaneous voices, and
+ 1) need a synth that supports more than 16 channels and simultaneous voices
  2) need to be able to assign new channels to events beyond the SMF 16 limit, using the track number
     to ensure uniqueness (note that this assumes a track will only contain events for a single channel,
     a safe assumption for VGMTrans formats).
 
- Fluidsynth has #1 covered. For #2, we can use fluid_player's event callback system to
- receive events as they occur, and can even reassign their channel number (and with fluidsynth, you
- can just assign events channels > 16). However, there is no way in the original fluid_player to
- know what track number an event belongs to.
+ Fluidsynth has #1 covered. A midi event in fluidsynth can have channels > 16. There's also a setting for
+ supported polyphony count.
 
- The changes made to the fluid_player solve this. I have:
+ For #2, we can use fluid_player's event callback system to receive events as they occur and reassign their
+ channel. However, there is no way in the original fluid_player to know what track number an event belongs to,
+ so no context to determine the new channel to assign.
 
- 1) added a "track" ptr property to the _vgmtrans_fluid_midi_event_t struct.
- 2) added a "num" property to _vgmtrans_fluid_track_t.
- 3) added a fluid_midi_event_get_track(fluid_midi_event_t* evt) function
- 4) added
+ The changes in this version of the player solve this with the following:
 
-
- For the sake of compataibility with VGMTrans, The following changes have been made:
-1)
-
+ 1) an added a "track" ptr property in the _vgmtrans_fluid_midi_event_t struct.
+ 2) an added a fluid_midi_event_get_track(fluid_midi_event_t* evt) function
 
  */
 
@@ -55,9 +50,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-//#include <glibconfig.h>
 #include "fluidsynth_priv.h"
-//#include "fluid_sys.h"
 #include "fluid_list.h"
 
 //*************************************
@@ -286,9 +279,9 @@ struct _vgmtrans_fluid_midi_event_t {
 
 
 /*
- * vgmtrans_fluid_track_t
+ * fluid_track_t
  */
-struct _vgmtrans_fluid_track_t {
+struct _fluid_track_t {
     char* name;
     int num;
     vgmtrans_fluid_midi_event_t *first;
@@ -297,21 +290,21 @@ struct _vgmtrans_fluid_track_t {
     unsigned int ticks;
 };
 
-typedef struct _vgmtrans_fluid_track_t vgmtrans_fluid_track_t;
+typedef struct _fluid_track_t fluid_track_t;
 
-vgmtrans_fluid_track_t *vgmtrans_fluid_midi_event_get_track(vgmtrans_fluid_midi_event_t* evt);
+fluid_track_t *vgmtrans_fluid_midi_event_get_track(vgmtrans_fluid_midi_event_t* evt);
 
-vgmtrans_fluid_track_t * vgmtrans_new_fluid_track(int num);
-int delete_fluid_track(vgmtrans_fluid_track_t * track);
-int fluid_track_set_name(vgmtrans_fluid_track_t * track, char* name);
-char* fluid_track_get_name(vgmtrans_fluid_track_t * track);
-int fluid_track_add_event(vgmtrans_fluid_track_t * track, vgmtrans_fluid_midi_event_t* evt);
-vgmtrans_fluid_midi_event_t* fluid_track_first_event(vgmtrans_fluid_track_t * track);
-vgmtrans_fluid_midi_event_t* fluid_track_next_event(vgmtrans_fluid_track_t * track);
-int fluid_track_get_duration(vgmtrans_fluid_track_t * track);
-//int vgmtrans_fluid_track_reset(vgmtrans_fluid_track_t *track);
+fluid_track_t * new_fluid_track(int num);
+int delete_fluid_track(fluid_track_t * track);
+int fluid_track_set_name(fluid_track_t * track, char* name);
+char* fluid_track_get_name(fluid_track_t * track);
+int fluid_track_add_event(fluid_track_t * track, vgmtrans_fluid_midi_event_t* evt);
+vgmtrans_fluid_midi_event_t* fluid_track_first_event(fluid_track_t * track);
+vgmtrans_fluid_midi_event_t* fluid_track_next_event(fluid_track_t * track);
+int fluid_track_get_duration(fluid_track_t * track);
+int fluid_track_reset(fluid_track_t *track);
 
-int fluid_track_send_events(vgmtrans_fluid_track_t *track,
+int fluid_track_send_events(fluid_track_t *track,
         fluid_synth_t *synth,
         fluid_player_t *player,
         unsigned int ticks);
@@ -338,7 +331,7 @@ typedef struct
 struct _fluid_player_t {
     int status;
     int ntracks;
-    vgmtrans_fluid_track_t *track[MAX_NUMBER_OF_TRACKS];
+    fluid_track_t *track[MAX_NUMBER_OF_TRACKS];
     fluid_synth_t* synth;
     fluid_timer_t* system_timer;
     fluid_sample_timer_t* sample_timer;
@@ -364,17 +357,14 @@ struct _fluid_player_t {
 };
 
 fluid_player_t *new_vgmtrans_fluid_player(fluid_synth_t *synth);
-int delete_vgmtrans_fluid_player(fluid_player_t *player);
 
-int fluid_player_add_track(fluid_player_t* player, vgmtrans_fluid_track_t * track);
+int fluid_player_add_track(fluid_player_t* player, fluid_track_t * track);
 int vgmtrans_fluid_player_callback(void *data, unsigned int msec);
 int vgmtrans_fluid_player_play(fluid_player_t *player);
-
 int fluid_player_count_tracks(fluid_player_t* player);
-vgmtrans_fluid_track_t * fluid_player_get_track(fluid_player_t* player, int i);
+fluid_track_t * fluid_player_get_track(fluid_player_t* player, int i);
 int fluid_player_reset(fluid_player_t* player);
 int vgmtrans_fluid_player_load(fluid_player_t *player, fluid_playlist_item *item);
-
 void fluid_player_settings(fluid_settings_t* settings);
 
 
@@ -408,7 +398,7 @@ void vgmtrans_delete_fluid_midi_file(fluid_midi_file *mf);
 int vgmtrans_fluid_midi_file_read_mthd(fluid_midi_file *midifile);
 int vgmtrans_fluid_midi_file_load_tracks(fluid_midi_file *midifile, fluid_player_t *player);
 int vgmtrans_fluid_midi_file_read_track(fluid_midi_file *mf, fluid_player_t *player, int num);
-int vgmtrans_fluid_midi_file_read_event(fluid_midi_file *mf, vgmtrans_fluid_track_t *track);
+int vgmtrans_fluid_midi_file_read_event(fluid_midi_file *mf, fluid_track_t *track);
 int vgmtrans_fluid_midi_file_read_varlen(fluid_midi_file *mf);
 int vgmtrans_fluid_midi_file_getc(fluid_midi_file *mf);
 int vgmtrans_fluid_midi_file_push(fluid_midi_file *mf, int c);
