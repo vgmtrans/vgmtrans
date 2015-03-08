@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanner.h"
 #include "NinSnesInstr.h"
@@ -830,7 +830,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		}
 	}
 	else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
-		byte addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
+		uint8_t addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
 
 		//; Yoshi's Safari SPC
 		//0886: 8f 00 48  mov   $48,#$00
@@ -846,7 +846,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			,
 			6);
 
-		UINT ofsInitSongListPtr;
+		uint32_t ofsInitSongListPtr;
 		if (file->SearchBytePattern(ptnInitSongListPtrYSFR, ofsInitSongListPtr)) {
 			addrSongList = file->GetByte(ofsInitSongListPtr + 1) | (file->GetByte(ofsInitSongListPtr + 4) << 8);
 		}
@@ -934,7 +934,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	}
 
 	// TRY TO GRAB NOTE VOLUME/DURATION TABLE
-	UINT ofsDispatchNote = 0;
+	uint32_t ofsDispatchNote = 0;
 	uint16_t addrDurRateTable = 0;
 	uint16_t addrVolumeTable = 0;
 	std::vector<uint8_t> durRateTable;
@@ -991,7 +991,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
 			if (firstVoiceCmd == 0xe0 && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
 				if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
-					UINT ofsWriteVolume;
+					uint32_t ofsWriteVolume;
 					if (file->SearchBytePattern(ptnWriteVolumeKSS, ofsWriteVolume)) {
 						version = NINSNES_HAL;
 					}
@@ -1003,8 +1003,8 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 					// compatible design, but customized anyway
 					version = NINSNES_STANDARD;
 
-					UINT ofsRD1VCmd_FA_FE;
-					UINT ofsRD2VCmdInstrADSR;
+					uint32_t ofsRD1VCmd_FA_FE;
+					uint32_t ofsRD2VCmdInstrADSR;
 					if (file->SearchBytePattern(ptnRD1VCmd_FA_FE, ofsRD1VCmd_FA_FE)) {
 						version = NINSNES_RD1;
 					}
@@ -1017,7 +1017,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			else {
 				version = NINSNES_UNKNOWN;
 
-				UINT ofsIntelliVCmdFA;
+				uint32_t ofsIntelliVCmdFA;
 				if (file->SearchBytePattern(ptnIntelliVCmdFA, ofsIntelliVCmdFA)) {
 					// Intelligent Systems
 					if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
@@ -1050,7 +1050,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	uint16_t addrSectionListCutoff = 0xffff;
 	// skip index 0, it's not a part of table in most games
 	for (uint8_t songIndex = 1; songIndex <= 0x7f; songIndex++) {
-		UINT addrSectionListPtr = addrSongList + songIndex * 2;
+		uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
 		if (addrSectionListPtr >= addrSectionListCutoff) {
 			break;
 		}
@@ -1119,7 +1119,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		uint8_t songIndexCandidate = 0xff;
 
 		for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
-			UINT addrSectionListPtr = addrSongList + songIndex * 2;
+			uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
 			if (addrSectionListPtr == 0 || addrSectionListPtr == 0xffff) {
 				continue;
 			}
@@ -1189,8 +1189,8 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	}
 
 	// scan for instrument table
-	UINT ofsLoadInstrTableAddressASM;
-	UINT addrInstrTable;
+	uint32_t ofsLoadInstrTableAddressASM;
+	uint32_t addrInstrTable;
 	uint16_t spcDirAddr = 0;
 	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
 		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
@@ -1225,7 +1225,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 	// scan for DIR address
 	if (spcDirAddr == 0) {
-		UINT ofsSetDIR;
+		uint32_t ofsSetDIR;
 		if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
 			spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
 		}
@@ -1247,7 +1247,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	uint16_t konamiTuningTableAddress = 0;
 	uint8_t konamiTuningTableSize = 0;
 	if (version == NINSNES_KONAMI) {
-		UINT ofsInstrVCmd;
+		uint32_t ofsInstrVCmd;
 		if (file->SearchBytePattern(ptnInstrVCmdGD3, ofsInstrVCmd)) {
 			uint16_t konamiAddrTuningTableLow = file->GetShort(ofsInstrVCmd + 10);
 			uint16_t konamiAddrTuningTableHigh = file->GetShort(ofsInstrVCmd + 14);

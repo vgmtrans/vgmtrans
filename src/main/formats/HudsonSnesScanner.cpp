@@ -209,7 +209,7 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 	// Each sequences must not be crossover each other.
 	// Here we load the global loop address of current song,
 	// and search a sequence contains that address.
-	UINT ofsLoadTrackAddress;
+	uint32_t ofsLoadTrackAddress;
 	uint16_t addrCurrentLoopPoint;
 	if (file->SearchBytePattern(ptnLoadTrackAddress, ofsLoadTrackAddress)) {
 		uint16_t addrCurrentLoopPointPtrLo = file->GetShort(ofsLoadTrackAddress + 20);
@@ -226,7 +226,7 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 	if (addrCurrentLoopPoint != 0 && addrCurrentLoopPoint != 0xffff) {
 		uint16_t bestLoopPointDistance = 0xffff;
 		for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
-			UINT ofsSongPtr = addrSongList + songIndex * 2;
+			uint32_t ofsSongPtr = addrSongList + songIndex * 2;
 			uint16_t addrSongPtr = file->GetShort(ofsSongPtr);
 
 			if (addrSongPtr > addrCurrentLoopPoint) {
@@ -257,7 +257,7 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
 		uint16_t spcDirAddr;
 		uint16_t addrSampTuningTable;
 		if (version == HUDSONSNES_V0) {
-			UINT ofsLoadDIR;
+			uint32_t ofsLoadDIR;
 			if (file->SearchBytePattern(ptnLoadDIRV0, ofsLoadDIR)) {
 				uint8_t addrDIRPtr = file->GetByte(ofsLoadDIR + 1);
 				spcDirAddr = file->GetByte(0x100 + addrDIRPtr) << 8;

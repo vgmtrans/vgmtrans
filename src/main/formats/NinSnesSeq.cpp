@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "NinSnesSeq.h"
 #include "NinSnesFormat.h"
 #include "SeqEvent.h"
@@ -731,7 +731,7 @@ bool NinSnesSection::GetTrackPointers()
 		aTracks.push_back(track);
 
 		wchar_t name[32];
-		wsprintf(name, L"Track Pointer #%d", trackIndex + 1);
+		swprintf(name, 32, L"Track Pointer #%d", trackIndex + 1);
 
 		header->AddSimpleItem(curOffset, 2, name);
 		curOffset += 2;
@@ -963,7 +963,7 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
 		uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-		duration = min(max(duration, 1), shared->spcNoteDuration - 2);
+		duration = min(max(duration, (uint8_t)1), (uint8_t)(shared->spcNoteDuration - 2));
 
 		// Note: Konami engine can have volume=0
 		AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Note");
@@ -974,7 +974,7 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_TIE:
 	{
 		uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-		duration = min(max(duration, 1), shared->spcNoteDuration - 2);
+		duration = min(max(duration, (uint8_t)1), (uint8_t)(shared->spcNoteDuration - 2));
 		desc << L"Duration: " << (int)duration;
 		MakePrevDurNoteEnd(GetTime() + duration);
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE);
@@ -990,7 +990,7 @@ bool NinSnesTrack::ReadEvent(void)
 	{
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN; // + percussion base
 		uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-		duration = min(max(duration, 1), shared->spcNoteDuration - 2);
+		duration = min(max(duration, (uint8_t)1), (uint8_t)(shared->spcNoteDuration - 2));
 
 		// Note: Konami engine can have volume=0
 		AddPercNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Percussion Note");
