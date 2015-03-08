@@ -26,7 +26,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <stdint.h>
 #include "mem_sfloader.h"
 
 //#include "sfont.h"
