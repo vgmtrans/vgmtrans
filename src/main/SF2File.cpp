@@ -117,7 +117,7 @@ SF2File::SF2File(SynthFile* synthfile)
 	// pbag chunk
 	//***********
 	Chunk* pbagCk = new Chunk("pbag");
-	const size_t ITEMS_IN_PGEN = 1;
+	const size_t ITEMS_IN_PGEN = 2;
 	pbagCk->size = (uint32_t)((numInstrs+1) * sizeof(sfPresetBag));
 	pbagCk->data = new uint8_t[pbagCk->size];
 	for (size_t i = 0; i < numInstrs; i++)
@@ -134,7 +134,7 @@ SF2File::SF2File(SynthFile* synthfile)
 	//  add terminal sfPresetBag
 	sfPresetBag presetBag;
 	memset(&presetBag, 0, sizeof(sfPresetBag));
-	presetBag.wGenNdx = (uint16_t)(numInstrs*2);
+	presetBag.wGenNdx = (uint16_t)(numInstrs * ITEMS_IN_PGEN);
 	memcpy(pbagCk->data + (numInstrs*sizeof(sfPresetBag)), &presetBag, sizeof(sfPresetBag));
 	pdtaCk->AddChildChunk(pbagCk);
 
@@ -169,10 +169,10 @@ SF2File::SF2File(SynthFile* synthfile)
 		memset(&genList, 0, sizeof(sfGenList));
 		
 		// reverbEffectsSend
-		//genList.sfGenOper = reverbEffectsSend;
-		//genList.genAmount.shAmount= 700;
-		//memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
-		//dataPtr += sizeof(sfGenList);
+		genList.sfGenOper = reverbEffectsSend;
+		genList.genAmount.shAmount= 700;
+		memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
+		dataPtr += sizeof(sfGenList);
 
 		genList.sfGenOper = instrument;
 		genList.genAmount.wAmount = (uint16_t)i;
@@ -442,6 +442,7 @@ SF2File::~SF2File(void)
 	//DeleteVect(aInstrs);
 	//DeleteVect(aWaves);
 }
+
 
 const void* SF2File::SaveToMem() {
 	uint32_t size = this->GetSize();
