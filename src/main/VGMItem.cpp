@@ -167,9 +167,13 @@ VGMItem* VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContai
 	{
 		for (uint32_t j = 0; j<containers[i]->size(); j++)
 		{
-			VGMItem* foundItem = (*containers[i])[j]->GetItemFromOffset(offset, includeContainer, matchStartOffset);
-			if (foundItem)
-				return foundItem;
+			VGMItem * theItem = (*containers[i])[j];
+			if (theItem->unLength == 0 || (offset >= theItem->dwOffset && offset < theItem->dwOffset + theItem->unLength))
+			{
+				VGMItem* foundItem = theItem->GetItemFromOffset(offset, includeContainer, matchStartOffset);
+				if (foundItem)
+					return foundItem;
+			}
 		}
 	}
 
