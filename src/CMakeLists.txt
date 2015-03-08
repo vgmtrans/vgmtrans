@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.4)
-project(vgmtrans)
+project(VGMTrans CXX)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 # Tell CMake to run moc when necessary:
 set(CMAKE_AUTOMOC ON)
@@ -462,18 +462,9 @@ else (MSVC)
     endif (ZLIB_FOUND)
 
     find_package(GLIB REQUIRED)
-    include_directories(${GLIB_INCLUDE_DIRS})
-    #set(LIBS ${LIBS} ${GLIB_LIBRARIES})
     target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
 
-    find_package(READLINE REQUIRED)
-    include_directories(${READLINE_INCLUDE_DIRS})
-    #set(LIBS ${LIBS} ${GLIB_LIBRARIES})
-    target_link_libraries(vgmtrans ${READLINE_LIBRARIES})
-
-    find_package (FLUIDSYNTH REQUIRED)
-    include_directories(${FLUIDSYNTH_INCLUDE_DIRS})
-    #set(LIBS ${LIBS} ${GLIB_LIBRARIES})
+    find_package (FluidSynth REQUIRED)
     target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
 
 	add_definitions(-DIOAPI_NO_64)

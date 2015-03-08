@@ -1,5 +1,5 @@
 #pragma once
-#include "scanner.h"
+#include "Scanner.h"
 
 class OrgScanner :
 	public VGMScanner

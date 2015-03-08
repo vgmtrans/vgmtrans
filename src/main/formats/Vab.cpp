@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Vab.h"
 #include "Format.h"			//include PS1-specific format header file when it is ready
-#include "PSXSpu.h"
+#include "PSXSPU.h"
 #include "PS1Format.h"
 
 using namespace std;
