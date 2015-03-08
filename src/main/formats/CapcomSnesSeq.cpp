@@ -37,11 +37,7 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile* file, CapcomSnesVersion ver, uint32_t seqd
 	bAllowDiscontinuousTrackData = true;
 	bUseLinearAmplitudeScale = true;
 
-	double volumeScale;
-	ConvertLinearPercentPanValToStdMidiVal(0.5, &volumeScale);
-
 	UseReverb();
-	AlwaysWriteInitialExpression(roundi(127.0 * volumeScale));
 	AlwaysWriteInitialReverb(0);
 	bAlwaysWriteInitialMono = true;
 
