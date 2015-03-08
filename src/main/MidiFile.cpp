@@ -440,6 +440,16 @@ void MidiTrack::InsertPortamentoTime(uint8_t channel, uint8_t time, uint32_t abs
 	aEvents.push_back(new PortamentoTimeEvent(this, channel, absTime, time));
 }
 
+void MidiTrack::AddMono(uint8_t channel)
+{
+	aEvents.push_back(new MonoEvent(this, channel, GetDelta()));
+}
+
+void MidiTrack::InsertMono(uint8_t channel, uint32_t absTime)
+{
+	aEvents.push_back(new MonoEvent(this, channel, absTime));
+}
+
 void MidiTrack::AddPan(uint8_t channel, uint8_t pan)
 {
 	aEvents.push_back(new PanEvent(this, channel, GetDelta(), pan));

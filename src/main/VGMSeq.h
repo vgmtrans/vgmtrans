@@ -83,6 +83,7 @@ public:
 	bool bAlwaysWriteInitialExpression;
 	bool bAlwaysWriteInitialReverb;
 	bool bAlwaysWriteInitialPitchBendRange;
+	bool bAlwaysWriteInitialMono;
 	bool bAllowDiscontinuousTrackData;
 
 	// True if each tracks in a sequence needs to be loaded simultaneously in tick by tick, as the real music player does.

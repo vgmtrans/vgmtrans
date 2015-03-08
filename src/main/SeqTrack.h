@@ -98,6 +98,7 @@ public:
 	void InsertPan(uint32_t offset, uint32_t length, uint8_t pan, uint32_t absTime, const std::wstring& sEventName = L"Pan");
 	void AddReverb(uint32_t offset, uint32_t length, uint8_t reverb, const std::wstring& sEventName = L"Reverb");
 	void AddReverbNoItem(uint8_t reverb);
+	void AddMonoNoItem();
 	void InsertReverb(uint32_t offset, uint32_t length, uint8_t reverb, uint32_t absTime, const std::wstring& sEventName = L"Reverb");
 	void AddPitchBend(uint32_t offset, uint32_t length, int16_t bend, const std::wstring& sEventName = L"Pitch Bend");
 	void AddPitchBendRange(uint32_t offset, uint32_t length, uint8_t semitones, uint8_t cents = 0, const std::wstring& sEventName = L"Pitch Bend Range");

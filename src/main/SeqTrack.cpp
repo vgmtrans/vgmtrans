@@ -184,6 +184,8 @@ void SeqTrack::AddInitialMidiEvents(int trackNum)
 		AddReverbNoItem(parentSeq->initialReverb);
 	if (parentSeq->bAlwaysWriteInitialPitchBendRange)
 		AddPitchBendRangeNoItem(parentSeq->initialPitchBendRangeSemiTones, parentSeq->initialPitchBendRangeCents);
+	if (parentSeq->bAlwaysWriteInitialMono)
+		AddMonoNoItem();
 }
 
 uint32_t SeqTrack::GetTime()
@@ -866,6 +868,14 @@ void SeqTrack::AddReverbNoItem(uint8_t reverb)
 		pMidiTrack->AddReverb(channel, reverb);
 	}
 	prevReverb = reverb;
+}
+
+void SeqTrack::AddMonoNoItem()
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI)
+	{
+		pMidiTrack->AddMono(channel);
+	}
 }
 
 void SeqTrack::InsertReverb(uint32_t offset, uint32_t length, uint8_t reverb, uint32_t absTime, const std::wstring& sEventName)

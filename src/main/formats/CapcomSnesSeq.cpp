@@ -43,6 +43,7 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile* file, CapcomSnesVersion ver, uint32_t seqd
 	UseReverb();
 	AlwaysWriteInitialExpression(ConvertPercentAmpToStdMidiVal(volumeScale));
 	AlwaysWriteInitialReverb(0);
+	bAlwaysWriteInitialMono = true;
 
 	LoadEventMap();
 }

@@ -46,6 +46,7 @@ typedef enum
 	MIDIEVENT_SUSTAIN,
 	MIDIEVENT_PORTAMENTO,
 	MIDIEVENT_PORTAMENTOTIME,
+	MIDIEVENT_MONO,
 	MIDIEVENT_LFO,
 	MIDIEVENT_VIBRATO,
 	MIDIEVENT_ENDOFTRACK,
@@ -104,6 +105,8 @@ public:
 	void InsertPortamento(uint8_t channel, bool bOn, uint32_t absTime);
 	void AddPortamentoTime(uint8_t channel, uint8_t time);
 	void InsertPortamentoTime(uint8_t channel, uint8_t time, uint32_t absTime);
+	void AddMono(uint8_t channel);
+	void InsertMono(uint8_t channel, uint32_t absTime);
 
 	void AddPitchBend(uint8_t channel, int16_t bend);
 	void InsertPitchBend(uint8_t channel, short bend, uint32_t absTime);
@@ -431,6 +434,16 @@ public:
 
 	uint8_t expression;
 };*/
+
+class MonoEvent
+	: public ControllerEvent
+{
+public:
+	MonoEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime)
+		: ControllerEvent(prntTrk, channel, absoluteTime, 126, 127, PRIORITY_MIDDLE)
+	{}
+	virtual MidiEventType GetEventType() { return MIDIEVENT_MONO; }
+};
 
 class ProgChangeEvent
 	: public MidiEvent
