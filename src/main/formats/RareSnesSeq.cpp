@@ -296,6 +296,7 @@ void RareSnesTrack::CalcVolPanFromVolLR(int8_t volL, int8_t volR, uint8_t& midiV
 
 	double volumeScale;
 	uint8_t midiPanTemp = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
+	volumeScale *= sqrt(3) / 2.0; // limit to <= 1.0
 
 	midiVol = ConvertPercentAmpToStdMidiVal(volumeScale);
 	if (volL != 0 || volR != 0) {
@@ -721,8 +722,8 @@ bool RareSnesTrack::ReadEvent(void)
 			//AddTranspose(beginOffset, curOffset-beginOffset, 0, L"Transpose (Abs)");
 
 			// add event without MIDI event
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new TransposeSeqEvent(this, newTransp, beginOffset, curOffset-beginOffset, L"Transpose (Abs)"));
+			desc << L"Transpose: " << newTransp;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Transpose", desc.str(), CLR_TRANSPOSE, ICON_CONTROL);
 
 			cKeyCorrection = SEQ_KEYOFS;
 			break;
@@ -735,8 +736,8 @@ bool RareSnesTrack::ReadEvent(void)
 			//AddTranspose(beginOffset, curOffset-beginOffset, spcTransposeAbs - spcTranspose, L"Transpose (Rel)");
 
 			// add event without MIDI event
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new TransposeSeqEvent(this, deltaTransp, beginOffset, curOffset-beginOffset, L"Transpose (Rel)"));
+			desc << L"Transpose: " << deltaTransp;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Transpose (Relative)", desc.str(), CLR_TRANSPOSE, ICON_CONTROL);
 
 			cKeyCorrection += deltaTransp;
 			break;
@@ -837,16 +838,22 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint8_t adsr1 = GetByte(curOffset++);
+			uint8_t adsr2 = GetByte(curOffset++);
+
+			uint8_t ar = adsr1 & 0x0f;
+			uint8_t dr = (adsr1 & 0x70) >> 4;
+			uint8_t sl = (adsr2 & 0xe0) >> 5;
+			uint8_t sr = adsr2 & 0x1f;
 
 			parentSeq->presetVolL[0] = newVolL;
 			parentSeq->presetVolR[0] = newVolR;
-			parentSeq->presetADSR[0] = newADSR;
+			parentSeq->presetADSR[0] = (adsr1 << 8) | adsr2;
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 1"));
+			desc << L"Left Volume: " << newVolL << L"  Right Volume: " << newVolR << L"  AR: " << (int)ar << L"  DR: " << (int)dr << L"  SL: " << (int)sl << L"  SR: " << (int)sr;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Vol/ADSR Preset 1", desc.str(), CLR_VOLUME, ICON_CONTROL);
 			break;
 		}
 
@@ -854,16 +861,22 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint8_t adsr1 = GetByte(curOffset++);
+			uint8_t adsr2 = GetByte(curOffset++);
+
+			uint8_t ar = adsr1 & 0x0f;
+			uint8_t dr = (adsr1 & 0x70) >> 4;
+			uint8_t sl = (adsr2 & 0xe0) >> 5;
+			uint8_t sr = adsr2 & 0x1f;
 
 			parentSeq->presetVolL[1] = newVolL;
 			parentSeq->presetVolR[1] = newVolR;
-			parentSeq->presetADSR[1] = newADSR;
+			parentSeq->presetADSR[1] = (adsr1 << 8) | adsr2;
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 2"));
+			desc << L"Left Volume: " << newVolL << L"  Right Volume: " << newVolR << L"  AR: " << (int)ar << L"  DR: " << (int)dr << L"  SL: " << (int)sl << L"  SR: " << (int)sr;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Vol/ADSR Preset 2", desc.str(), CLR_VOLUME, ICON_CONTROL);
 			break;
 		}
 
@@ -871,16 +884,22 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint8_t adsr1 = GetByte(curOffset++);
+			uint8_t adsr2 = GetByte(curOffset++);
+
+			uint8_t ar = adsr1 & 0x0f;
+			uint8_t dr = (adsr1 & 0x70) >> 4;
+			uint8_t sl = (adsr2 & 0xe0) >> 5;
+			uint8_t sr = adsr2 & 0x1f;
 
 			parentSeq->presetVolL[2] = newVolL;
 			parentSeq->presetVolR[2] = newVolR;
-			parentSeq->presetADSR[2] = newADSR;
+			parentSeq->presetADSR[2] = (adsr1 << 8) | adsr2;
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 3"));
+			desc << L"Left Volume: " << newVolL << L"  Right Volume: " << newVolR << L"  AR: " << (int)ar << L"  DR: " << (int)dr << L"  SL: " << (int)sl << L"  SR: " << (int)sr;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Vol/ADSR Preset 3", desc.str(), CLR_VOLUME, ICON_CONTROL);
 			break;
 		}
 
@@ -888,16 +907,22 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint8_t adsr1 = GetByte(curOffset++);
+			uint8_t adsr2 = GetByte(curOffset++);
+
+			uint8_t ar = adsr1 & 0x0f;
+			uint8_t dr = (adsr1 & 0x70) >> 4;
+			uint8_t sl = (adsr2 & 0xe0) >> 5;
+			uint8_t sr = adsr2 & 0x1f;
 
 			parentSeq->presetVolL[3] = newVolL;
 			parentSeq->presetVolR[3] = newVolR;
-			parentSeq->presetADSR[3] = newADSR;
+			parentSeq->presetADSR[3] = (adsr1 << 8) | adsr2;
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 4"));
+			desc << L"Left Volume: " << newVolL << L"  Right Volume: " << newVolR << L"  AR: " << (int)ar << L"  DR: " << (int)dr << L"  SL: " << (int)sl << L"  SR: " << (int)sr;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Vol/ADSR Preset 4", desc.str(), CLR_VOLUME, ICON_CONTROL);
 			break;
 		}
 
@@ -905,16 +930,22 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			uint16_t newADSR = GetShortBE(curOffset); curOffset += 2;
+			uint8_t adsr1 = GetByte(curOffset++);
+			uint8_t adsr2 = GetByte(curOffset++);
+
+			uint8_t ar = adsr1 & 0x0f;
+			uint8_t dr = (adsr1 & 0x70) >> 4;
+			uint8_t sl = (adsr2 & 0xe0) >> 5;
+			uint8_t sr = adsr2 & 0x1f;
 
 			parentSeq->presetVolL[4] = newVolL;
 			parentSeq->presetVolR[4] = newVolR;
-			parentSeq->presetADSR[4] = newADSR;
+			parentSeq->presetADSR[4] = (adsr1 << 8) | adsr2;
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Vol/ADSR Preset 5"));
+			desc << L"Left Volume: " << newVolL << L"  Right Volume: " << newVolR << L"  AR: " << (int)ar << L"  DR: " << (int)dr << L"  SL: " << (int)sl << L"  SR: " << (int)sr;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Vol/ADSR Preset 5", desc.str(), CLR_VOLUME, ICON_CONTROL);
 			break;
 		}
 
@@ -1050,8 +1081,8 @@ bool RareSnesTrack::ReadEvent(void)
 
 			// add event without MIDI events
 			CalcVolPanFromVolLR(parentSeq->presetVolL[0], parentSeq->presetVolR[0], newMidiVol, newMidiPan);
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new VolSeqEvent(this, newMidiVol, beginOffset, curOffset-beginOffset, L"Set Volume Preset"));
+			desc << L"Left Volume 1: " << newVolL1 << L"  Right Volume 1: " << newVolR1 << L"  Left Volume 2: " << newVolL2 << L"  Right Volume 2: " << newVolR2;
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Volume Preset", desc.str(), CLR_VOLUME, ICON_CONTROL);
 			break;
 		}
 
@@ -1068,8 +1099,7 @@ bool RareSnesTrack::ReadEvent(void)
 			break;
 
 		case EVENT_LFOOFF:
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(beginOffset))
-				AddEvent(new ModulationSeqEvent(this, 0, beginOffset, curOffset-beginOffset, L"Pitch Slide/Vibrato/Tremolo Off"));
+			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide/Vibrato/Tremolo Off", desc.str(), CLR_CHANGESTATE, ICON_CONTROL);
 			break;
 
 		default:
@@ -1102,8 +1132,9 @@ void RareSnesTrack::AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, i
 	uint8_t newMidiPan;
 	CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
 
-	if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(offset))
-		AddEvent(new VolSeqEvent(this, newMidiVol, offset, length, sEventName));
+	std::wostringstream desc;
+	desc << L"Left Volume: " << spcVolL << L"  Right Volume: " << spcVolR;
+	AddGenericEvent(offset, length, sEventName, desc.str(), CLR_VOLUME, ICON_CONTROL);
 
 	// add MIDI events only if updated
 	if (newMidiVol != vol)
