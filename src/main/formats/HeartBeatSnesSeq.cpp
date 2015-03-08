@@ -386,8 +386,8 @@ bool HeartBeatSnesTrack::ReadEvent(void)
 
 		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), 20);
 
-		uint8_t volumeLeft = HeartBeatSnesSeq::PAN_TABLE[20 - panIndex] / 128.0;
-		uint8_t volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex] / 128.0;
+		double volumeLeft = HeartBeatSnesSeq::PAN_TABLE[20 - panIndex] / 128.0;
+		double volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex] / 128.0;
 
 		double linearPan = (double)volumeRight / (volumeLeft + volumeRight);
 		uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
