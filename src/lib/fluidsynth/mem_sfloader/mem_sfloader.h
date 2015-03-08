@@ -24,6 +24,7 @@
 #ifndef _FLUID_memsfont_H
 #define _FLUID_memsfont_H
 
+#include <stdint.h>
 
 #include "fluidsynth.h"
 #include "fluidsynth_priv.h"
