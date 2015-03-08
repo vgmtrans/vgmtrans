@@ -41,7 +41,7 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile* file, CapcomSnesVersion ver, uint32_t seqd
 	ConvertLinearPercentPanValToStdMidiVal(0.5, &volumeScale);
 
 	UseReverb();
-	AlwaysWriteInitialExpression(ConvertPercentAmpToStdMidiVal(volumeScale));
+	AlwaysWriteInitialExpression(roundi(127.0 * volumeScale));
 	AlwaysWriteInitialReverb(0);
 	bAlwaysWriteInitialMono = true;
 
@@ -676,7 +676,7 @@ bool CapcomSnesTrack::ReadEvent(void)
 			uint8_t midiPan = Convert7bitLinearPercentPanValToStdMidiVal(panIn7bit, &volumeScale);
 
 			AddPan(beginOffset, curOffset-beginOffset, midiPan);
-			AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
+			AddExpressionNoItem(roundi(127.0 * volumeScale));
 			break;
 		}
 

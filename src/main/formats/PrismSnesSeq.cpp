@@ -808,7 +808,7 @@ bool PrismSnesTrack::ReadEvent(void)
 		volumeScale = min(volumeScale, 1.0); // workaround
 
 		AddPan(beginOffset, curOffset - beginOffset, midiPan);
-		AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
+		AddExpressionNoItem(roundi(127.0 * volumeScale));
 		break;
 	}
 
