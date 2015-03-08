@@ -63,13 +63,13 @@ void VGMSamp::ConvertToStdWave(uint8_t* buf)
 
 bool VGMSamp::OnSaveAsWav()
 {
-	wstring filepath = pRoot->UI_GetSaveFilePath(name, L"wav");
+	wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"wav");
 	if (filepath.length() != 0)
-		return SaveAsWav(filepath.c_str());
+		return SaveAsWav(filepath);
 	return false;
 }
 
-bool VGMSamp::SaveAsWav(const wchar_t* filepath)
+bool VGMSamp::SaveAsWav(const std::wstring & filepath)
 {
 //	vector<uint8_t> midiBuf;
 //	WriteMidiToBuffer(midiBuf);

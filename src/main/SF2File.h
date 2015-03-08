@@ -342,7 +342,7 @@ public:
 
 	//int WriteDLSToBuffer(vector<uint8_t> &buf);
     const void* SaveToMem();
-    bool SaveSF2File(const wchar_t* filepath);
+    bool SaveSF2File(const std::wstring & filepath);
 
 public:
 	//vector<DLSInstr*> aInstrs;

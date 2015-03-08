@@ -53,8 +53,8 @@ bool VGMSeqNoTrks::LoadMain()
 bool VGMSeqNoTrks::LoadEvents(long stopTime)
 {
 	ResetVars();
-	if (bWriteInitialTempo)
-		AddTempoBPMNoItem(tempoBPM);
+	if (bAlwaysWriteInitialTempo)
+		AddTempoBPMNoItem(initialTempoBPM);
 	if (bAlwaysWriteInitialVol)
 		for (int i = 0; i<16; i++) { channel = i; AddVolNoItem(initialVol); }
 	if (bAlwaysWriteInitialExpression)

@@ -93,6 +93,7 @@ extern bool g_bXPOrLater;
 #include <list>
 #include <map>
 #include <hash_map>
+#include <unordered_set>
 #include <string>
 #include <sstream>
 #include <iterator>

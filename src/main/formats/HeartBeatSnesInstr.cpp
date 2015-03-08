@@ -158,6 +158,13 @@ HeartBeatSnesRgn::HeartBeatSnesRgn(HeartBeatSnesInstr* instr, HeartBeatSnesVersi
 	AddUnityKey(72 - (int)(coarse_tuning), offset + 4, 1);
 	AddFineTune((int16_t)(fine_tuning * 100.0), offset + 5, 1);
 	SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
+
+	// use ADSR sustain for release rate
+	// actual music engine sets sustain rate to release rate, it's useless,
+	// so here I put a random value commonly used
+	// TODO: obtain proper release rate from sequence
+	uint8_t sr_release = 0x1c;
+	ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, NULL, NULL, NULL, &this->release_time, NULL);
 }
 
 HeartBeatSnesRgn::~HeartBeatSnesRgn()

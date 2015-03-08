@@ -48,25 +48,37 @@ enum NinSnesSeqEventType
 	EVENT_PERCCUSION_PATCH_BASE,
 
 	// Nintendo RD2:
-			EVENT_RD2_PROGCHANGE_AND_ADSR,
+	EVENT_RD2_PROGCHANGE_AND_ADSR,
 
 	// Konami:
-			EVENT_KONAMI_LOOP_START,
+	EVENT_KONAMI_LOOP_START,
 	EVENT_KONAMI_LOOP_END,
 	EVENT_KONAMI_ADSR_AND_GAIN,
 
 	// Lemmings:
-			EVENT_LEMMINGS_NOTE_PARAM,
+	EVENT_LEMMINGS_NOTE_PARAM,
 
 	// Intelligent Systems:
 	// Fire Emblem 3 & 4:
-			EVENT_INTELLI_NOTE_PARAM,
+	EVENT_INTELLI_NOTE_PARAM,
+	EVENT_INTELLI_ECHO_ON,
+	EVENT_INTELLI_ECHO_OFF,
+	EVENT_INTELLI_LEGATO_ON,
+	EVENT_INTELLI_LEGATO_OFF,
+	EVENT_INTELLI_JUMP_SHORT_CONDITIONAL,
 	EVENT_INTELLI_JUMP_SHORT,
-	EVENT_INTELLI_FE3_UNKNOWN_EVENT_F5,
-	EVENT_INTELLI_FE3_UNKNOWN_EVENT_F9,
-	EVENT_INTELLI_FE3_UNKNOWN_EVENT_FA,
-	EVENT_INTELLI_FE4_UNKNOWN_EVENT_FC,
-	EVENT_INTELLI_FE4_UNKNOWN_EVENT_FD,
+	EVENT_INTELLI_FE3_EVENT_F5,
+	EVENT_INTELLI_WRITE_APU_PORT,
+	EVENT_INTELLI_FE3_EVENT_F9,
+	EVENT_INTELLI_DEFINE_VOICE_PARAM,
+	EVENT_INTELLI_LOAD_VOICE_PARAM,
+	EVENT_INTELLI_ADSR,
+	EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE,
+	EVENT_INTELLI_GAIN_SUSTAIN_TIME,
+	EVENT_INTELLI_GAIN,
+	EVENT_INTELLI_FE4_EVENT_FC,
+	EVENT_INTELLI_TA_SUBEVENT,
+	EVENT_INTELLI_FE4_SUBEVENT,
 };
 
 class NinSnesTrackSharedData
@@ -87,13 +99,10 @@ public:
 	// Konami:
 	uint16_t konamiLoopStart;
 	uint8_t konamiLoopCount;
-
-	// Intelligent Systems:
-	uint8_t intelliFE3NoteFlags;
 };
 
 class NinSnesSeq :
-		public VGMMultiSectionSeq
+	public VGMMultiSectionSeq
 {
 public:
 	NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint8_t percussion_base = 0, const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(), const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(), std::wstring theName = L"NinSnes Seq");
@@ -131,6 +140,10 @@ public:
 
 	// Intelligent Systems:
 	std::vector<uint8_t> intelliDurVolTable;
+	bool intelliUseCustomNoteParam;
+	bool intelliUseCustomPercTable;
+	uint16_t intelliVoiceParamTable;
+	uint8_t intelliVoiceParamTableSize;
 
 protected:
 	VGMHeader* header;
@@ -142,7 +155,7 @@ private:
 };
 
 class NinSnesSection
-		: public VGMSeqSection
+	: public VGMSeqSection
 {
 public:
 	NinSnesSection(NinSnesSeq* parentFile, long offset = 0, long length = 0);
@@ -154,7 +167,7 @@ public:
 };
 
 class NinSnesTrack
-		: public SeqTrack
+	: public SeqTrack
 {
 public:
 	NinSnesTrack(NinSnesSection* parentSection, long offset = 0, long length = 0, const std::wstring& theName = L"NinSnes Track");
@@ -166,6 +179,7 @@ public:
 	uint16_t GetShortAddress(uint32_t offset);
 	void GetVolumeBalance(uint16_t pan, double & volumeLeft, double & volumeRight);
 	uint8_t ReadPanTable(uint16_t pan);
+	int8_t CalcPanValue(uint8_t pan, double & volumeScale, bool & reverseLeft, bool & reverseRight);
 
 	NinSnesSection* parentSection;
 	NinSnesTrackSharedData* shared;

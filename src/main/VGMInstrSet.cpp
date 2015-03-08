@@ -102,7 +102,7 @@ bool VGMInstrSet::LoadInstrs()
 
 bool VGMInstrSet::OnSaveAsDLS(void)
 {
-	wstring filepath = pRoot->UI_GetSaveFilePath(name.c_str(), L"dls");
+	wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"dls");
 	if (filepath.length() != 0)
 	{	
 		return SaveAsDLS(filepath.c_str());
@@ -112,16 +112,16 @@ bool VGMInstrSet::OnSaveAsDLS(void)
 
 bool VGMInstrSet::OnSaveAsSF2(void)
 {
-	wstring filepath = pRoot->UI_GetSaveFilePath(name.c_str(), L"sf2");
+	wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"sf2");
 	if (filepath.length() != 0)
 	{	
-		return SaveAsSF2(filepath.c_str());
+		return SaveAsSF2(filepath);
 	}
 	return false;
 }
 
 
-bool VGMInstrSet::SaveAsDLS(const wchar_t* filepath)
+bool VGMInstrSet::SaveAsDLS(const std::wstring & filepath)
 {
 	DLSFile dlsfile;
 	bool dlsCreationSucceeded = false;
@@ -141,7 +141,7 @@ bool VGMInstrSet::SaveAsDLS(const wchar_t* filepath)
 	return false;
 }
 
-bool VGMInstrSet::SaveAsSF2(const wchar_t* filepath)
+bool VGMInstrSet::SaveAsSF2(const std::wstring & filepath)
 {
 	SF2File* sf2file = NULL;
 //	if (sampColl)

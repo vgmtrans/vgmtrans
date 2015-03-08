@@ -265,10 +265,6 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset,
 
 		AddSimpleItem(offset + 4, 2, L"Tuning (Unused)");
 	}
-	else if (version == NINSNES_INTELLI_FE4) {
-		AddUnityKey(108 - (int)(coarse_tuning), offset + 4, 1);
-		AddFineTune((int16_t)(fine_tuning * 100.0), offset + 5, 1);
-	}
 	else {
 		AddUnityKey(96 - (int)(coarse_tuning), offset + 4, 1);
 		AddFineTune((int16_t)(fine_tuning * 100.0), offset + 5, 1);
