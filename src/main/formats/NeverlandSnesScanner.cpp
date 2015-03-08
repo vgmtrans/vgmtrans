@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "NeverlandSnesFormat.h"
 #include "NeverlandSnesScanner.h"
 #include "NeverlandSnesSeq.h"
@@ -70,7 +70,7 @@ void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM (RawFile* file)
 	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
-	UINT ofsLoadSong;
+	uint32_t ofsLoadSong;
 	uint16_t addrSeqHeader;
 	if (file->SearchBytePattern(ptnLoadSongS2C, ofsLoadSong)) {
 		addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;

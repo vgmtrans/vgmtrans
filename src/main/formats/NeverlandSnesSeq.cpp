@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "NeverlandSnesSeq.h"
 #include "NeverlandSnesFormat.h"
 #include "ScaleConversion.h"
@@ -66,7 +66,8 @@ bool NeverlandSnesSeq::GetHeaderInfo(void)
 	}
 	// set name to the sequence
 	if (rawName[0] != ('\0')) {
-		name = string2wstring(std::string(rawName));
+		std::string nameStr = std::string(rawName);
+		name = string2wstring(nameStr);
 	}
 	else {
 		name = L"NeverlandSnesSeq";

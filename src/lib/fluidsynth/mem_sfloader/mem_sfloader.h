@@ -397,9 +397,9 @@ enum {
 #define ErrnoEnd    ErrWrite
 
 int mem_gerr(int ev, char *fmt, ...);
-int safe_fread(void *buf, int count, FILE *fd);
-int safe_fwrite(void *buf, int count, FILE *fd);
-int safe_fseek(FILE *fd, long ofs, int whence);
+int mem_safe_fread (void *buf, int count, uint8_t ** data);
+//int mem_safe_fwrite(void *buf, int count, FILE *fd);
+int mem_safe_fseek (uint8_t ** data, long ofs, int whence);
 
 
 /********************************************************************************/
