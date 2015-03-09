@@ -283,8 +283,8 @@ bool QSoundSeq::PostLoad()
 					if (marker->name == "vibrato")
 					{
 						vibrato = vibrato_depth_table[marker->databyte1] * (100/256.0);
-						//pitchbendRange = max(200, (vibrato + 50));		//50 cents to allow for pitchbend values, which range -50/+50
-						pitchbendRange = std::max<int>(200, ceil((vibrato+50)/100.0)*100);	//+50 cents to allow for pitchbend values, which range -50/+50
+						//pitchbendRange = max(200, (int)(vibrato + 50));		//50 cents to allow for pitchbend values, which range -50/+50
+						pitchbendRange = std::max<int>(200, (int)ceil((vibrato+50)/100.0)*100);	//+50 cents to allow for pitchbend values, which range -50/+50
 						track->InsertPitchBendRange(channel, pitchbendRange/100, pitchbendRange%100, curTicks);
 						
 						lfoCents = (short)((effectiveLfoVal / (double)0x1000000) * vibrato);
