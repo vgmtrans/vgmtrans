@@ -1,6 +1,6 @@
 #pragma once
-#include "../VGMSeq.h"
-#include "../SeqTrack.h"
+#include "VGMSeq.h"
+#include "SeqTrack.h"
 #include "QSoundFormat.h"
 
 enum QSoundVer : uint8_t;

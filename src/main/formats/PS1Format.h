@@ -1,8 +1,8 @@
 #pragma once
-#include "../Format.h"
-#include "../Root.h"
-#include "../Matcher.h"
-#include "../VGMColl.h"
+#include "Format.h"
+#include "Root.h"
+#include "Matcher.h"
+#include "VGMColl.h"
 #include "PS1Seq.h"
 #include "Vab.h"
 #include "PS1SeqScanner.h"

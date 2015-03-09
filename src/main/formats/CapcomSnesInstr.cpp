@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "CapcomSnesInstr.h"
-#include "../Format.h"
+#include "Format.h"
 #include "SNESDSP.h"
 #include "CapcomSnesFormat.h"
 

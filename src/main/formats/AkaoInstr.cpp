@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "AkaoInstr.h"
-#include "../VGMSamp.h"
+#include "VGMSamp.h"
 #include "PSXSPU.h"
 
 using namespace std;

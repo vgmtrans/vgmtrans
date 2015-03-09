@@ -4,8 +4,8 @@
 
 #include "pch.h"
 #include "PSXSPU.h"
-#include "../DLSFile.h"
-#include "../RawFile.h"
+#include "DLSFile.h"
+#include "RawFile.h"
 #include "PS1Format.h"
 
 using namespace std;

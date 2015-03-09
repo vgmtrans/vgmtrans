@@ -1,9 +1,9 @@
 #pragma once
-#include "../Format.h"
-#include "../Root.h"
+#include "Format.h"
+#include "Root.h"
 #include "SquarePS2Scanner.h"
-#include "../Matcher.h"
-#include "../VGMColl.h"
+#include "Matcher.h"
+#include "VGMColl.h"
 
 // ***************
 // SquarePS2Format

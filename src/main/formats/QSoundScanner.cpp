@@ -2,7 +2,7 @@
 #include "QSoundScanner.h"
 #include "QSoundSeq.h"
 #include "QSoundInstr.h"
-#include "../loaders/MAMELoader.h"
+#include "loaders/MAMELoader.h"
 #include "common.h"
 
 using namespace std;

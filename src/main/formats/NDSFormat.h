@@ -1,8 +1,8 @@
 #pragma once
-#include "../Format.h"
-#include "../Root.h"
+#include "Format.h"
+#include "Root.h"
 #include "NDSScanner.h"
-#include "../VGMColl.h"
+#include "VGMColl.h"
 
 // *********
 // NDSFormat

@@ -1,5 +1,5 @@
 #pragma once
-#include "../Scanner.h"
+#include "Scanner.h"
 
 class QSoundInstrSet;
 class QSoundSampColl;

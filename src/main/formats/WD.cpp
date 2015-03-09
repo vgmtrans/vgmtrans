@@ -2,7 +2,7 @@
 #include "WD.h"
 #include "SquarePS2Format.h"
 #include "PSXSPU.h"
-#include "../ScaleConversion.h"
+#include "ScaleConversion.h"
 
 using namespace std;
 

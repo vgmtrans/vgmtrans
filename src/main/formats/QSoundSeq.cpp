@@ -2,8 +2,8 @@
 #include "QSoundSeq.h"
 #include "QSoundInstr.h"
 #include "QSoundFormat.h"
-#include "../ScaleConversion.h"
-#include "../SeqEvent.h"
+#include "ScaleConversion.h"
+#include "SeqEvent.h"
 
 DECLARE_FORMAT(QSound);
 
