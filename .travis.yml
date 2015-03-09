@@ -5,9 +5,9 @@ language: cpp
 compiler:
   - gcc
 
-branches:
-  only:
-    - qt
+#branches:
+#  only:
+#    - qt
 
 before_install:
   - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
