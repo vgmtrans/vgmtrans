@@ -1,4 +1,5 @@
-#include "stdafx.h"
+#include "pch.h"
+
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "VGMSeq.h"
@@ -217,7 +218,7 @@ void SeqTrack::AddTime(uint32_t AddDelta)
 uint32_t SeqTrack::ReadVarLen(uint32_t& offset)
 {
 	register uint32_t value;
-	register UCHAR c;
+	register uint8_t c;
 
 	if (IsValidOffset(offset) && (value = GetByte(offset++)) & 0x80)
 	{
@@ -1289,7 +1290,7 @@ void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semit
 	//pMidiTrack->(channel, transpose);
 }
 
-void SeqTrack::AddMarker(uint32_t offset, uint32_t length, string& markername, uint8_t databyte1, uint8_t databyte2,
+void SeqTrack::AddMarker(uint32_t offset, uint32_t length, const string& markername, uint8_t databyte1, uint8_t databyte2,
 	const std::wstring& sEventName, int8_t priority, uint8_t color)
 {
 	OnEvent(offset, length);

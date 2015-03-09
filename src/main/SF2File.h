@@ -171,7 +171,7 @@ struct sfVersionTag
 
 struct sfPresetHeader
 {
-	CHAR achPresetName[20];
+	char achPresetName[20];
 	uint16_t wPreset;
 	uint16_t wBank;
 	uint16_t wPresetBagNdx;
@@ -231,7 +231,7 @@ struct sfInstGenList
 
 struct sfInst
 {
-	CHAR achInstName[20];
+	char achInstName[20];
 	uint16_t wInstBagNdx;
 };
 
@@ -255,14 +255,14 @@ typedef enum : uint16_t
 
 struct sfSample
 {
-	CHAR achSampleName[20];
+	char achSampleName[20];
 	uint32_t dwStart;
 	uint32_t dwEnd;
 	uint32_t dwStartloop;
 	uint32_t dwEndloop;
 	uint32_t dwSampleRate;
 	uint8_t byOriginalKey;
-	CHAR chCorrection;
+	char chCorrection;
 	uint16_t wSampleLink;
 	SFSampleLink sfSampleType;
 };
@@ -341,7 +341,8 @@ public:
 	//uint32_t GetSize(void);
 
 	//int WriteDLSToBuffer(vector<uint8_t> &buf);
-	bool SaveSF2File(const std::wstring & filepath);
+    const void* SaveToMem();
+    bool SaveSF2File(const std::wstring & filepath);
 
 public:
 	//vector<DLSInstr*> aInstrs;

@@ -1,8 +1,7 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "KonamiGXScanner.h"
 #include "KonamiGXSeq.h"
 #include "MAMELoader.h"
-#include "common.h"
 
 void KonamiGXScanner::Scan(RawFile* file, void* info)
 {

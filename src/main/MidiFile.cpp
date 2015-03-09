@@ -1,10 +1,8 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "MidiFile.h"
 #include "VGMSeq.h"
 #include "common.h"
 #include "Root.h"
-#include <math.h>
-#include <algorithm>
 
 using namespace std;
 
@@ -707,7 +705,7 @@ void MidiTrack::InsertGlobalTranspose(uint32_t absTime, int8_t semitones)
 
 
 
-void MidiTrack::AddMarker(uint8_t channel, string& markername, uint8_t databyte1, uint8_t databyte2, int8_t priority)
+void MidiTrack::AddMarker(uint8_t channel, const string& markername, uint8_t databyte1, uint8_t databyte2, int8_t priority)
 {
 	aEvents.push_back(new MarkerEvent(this, channel, GetDelta(), markername, databyte1, databyte2, priority));
 }
@@ -909,7 +907,7 @@ MastVolEvent::MastVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absolut
 
 uint32_t MastVolEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)
 {
-	uint8_t data[7] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, mastVol & 0x7F, 0xF7 };
+	uint8_t data[7] = { 0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, (uint8_t)(mastVol & 0x7F), 0xF7 };
 	return WriteSysexEvent(buf, time, data, 7);
 }
 

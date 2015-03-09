@@ -15,7 +15,7 @@ USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
 
-enum SuzukiSnesVersion
+enum SuzukiSnesVersion : uint8_t
 {
 	SUZUKISNES_NONE = 0,              // Unknown Version
 	SUZUKISNES_SD3,                   // Seiken Densetsu 3

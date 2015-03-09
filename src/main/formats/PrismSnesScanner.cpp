@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "PrismSnesScanner.h"
 #include "PrismSnesInstr.h"
 #include "PrismSnesSeq.h"
@@ -133,7 +133,7 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search song list
-	UINT ofsLoadSeq;
+	uint32_t ofsLoadSeq;
 	uint16_t addrSeqList;
 	if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
 		addrSeqList = file->GetShort(ofsLoadSeq + 1);
@@ -142,7 +142,7 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 		return;
 	}
 
-	UINT ofsExecVCmd;
+	uint32_t ofsExecVCmd;
 	uint16_t addrVoiceCmdAddressTable;
 	if (file->SearchBytePattern(ptnExecVCmd, ofsExecVCmd)) {
 		addrVoiceCmdAddressTable = file->GetShort(ofsExecVCmd + 18);
@@ -176,7 +176,7 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 		return;
 	}
 
-	UINT ofsSetDSPd;
+	uint32_t ofsSetDSPd;
 	uint16_t spcDirAddr;
 	if (file->SearchBytePattern(ptnSetDSPd, ofsSetDSPd)) {
 		uint16_t addrDspRegTabled = file->GetByte(ofsSetDSPd + 3) | (file->GetByte(ofsSetDSPd + 1) << 8);
@@ -189,7 +189,7 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 		return;
 	}
 
-	UINT ofsLoadInstr;
+	uint32_t ofsLoadInstr;
 	uint16_t addrADSR1Table;
 	uint16_t addrADSR2Table;
 	if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
@@ -200,7 +200,7 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM (RawFile* file)
 		return;
 	}
 
-	UINT ofsLoadInstrTuning;
+	uint32_t ofsLoadInstrTuning;
 	uint16_t adsrTuningTableHigh;
 	uint16_t adsrTuningTableLow;
 	if (file->SearchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {

@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "Format.h"
 #include "Matcher.h"
 #include "VGMColl.h"

@@ -2,7 +2,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum AkaoSnesVersion; // see AkaoSnesFormat.h
+enum AkaoSnesVersion : uint8_t; // see AkaoSnesFormat.h
 
 class AkaoSnesScanner :
 	public VGMScanner

@@ -4,7 +4,7 @@
 #include "VGMSamp.h"
 #include "VGMItem.h"
 #include "ScaleConversion.h"
-#include <math.h>
+#include "Root.h"
 
 // All of the ADSR calculations herein (except where inaccurate) are derived from Neill Corlett's work in
 // reverse-engineering the Playstation 1/2 SPU unit.
@@ -192,7 +192,7 @@ template <class T> void PSXConvADSR(T* realADSR,
 			samples = 0x60000000 / rate;
 			remainder = 0x60000000 % rate;
 			rate = RateTable[RoundToZero( (Ar^0x7F)-0x18 ) + 32];
-			samples += ceil(max(0, 0x1FFFFFFF-remainder) / (double)rate);
+			samples += ceil(fmax(0, 0x1FFFFFFF-remainder) / (double)rate);
 		}
 		timeInSecs = samples / sampleRate;
 		realADSR->attack_time = timeInSecs;
@@ -359,7 +359,7 @@ public:
 
 	virtual bool GetSampleInfo();		//retrieve sample info, including pointers to data, # channels, rate, etc.
 	static PSXSampColl* SearchForPSXADPCM (RawFile* file, const std::string& format);
-	static std::vector<PSXSampColl*> SearchForPSXADPCMs (RawFile* file, const std::string& format);
+	static const std::vector<PSXSampColl*> SearchForPSXADPCMs (RawFile* file, const std::string& format);
 
 protected:
 	std::vector<SizeOffsetPair> vagLocations;
@@ -396,5 +396,5 @@ public:
 	//bool bUseADPCMLoopInfoOnConversion;
 	uint32_t dwCompSize;
 	uint32_t dwUncompSize;
-	BOOL bLoops;
+	bool bLoops;
 };

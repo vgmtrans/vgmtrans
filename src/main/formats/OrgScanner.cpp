@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "OrgScanner.h"
 #include "OrgSeq.h"
 

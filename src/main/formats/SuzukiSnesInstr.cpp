@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "SuzukiSnesInstr.h"
 #include "Format.h"
 #include "SNESDSP.h"

@@ -1,8 +1,7 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "AkaoInstr.h"
 #include "VGMSamp.h"
 #include "PSXSPU.h"
-#include "ScaleConversion.h"
 
 using namespace std;
 
@@ -242,7 +241,7 @@ bool AkaoSampColl::GetHeaderInfo()
 	arts_offset = 0x40 + dwOffset;
 
 	if (nNumArts > 300 || nNumArts == 0)
-		return FALSE;
+		return false;
 
 	return true;
 }

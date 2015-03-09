@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 #include "ScaleConversion.h"

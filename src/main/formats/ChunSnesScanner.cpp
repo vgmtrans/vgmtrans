@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "ChunSnesScanner.h"
 #include "ChunSnesSeq.h"
 #include "ChunSnesInstr.h"
@@ -405,7 +405,7 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search song list and detect engine version
-	UINT ofsLoadSeq;
+	uint32_t ofsLoadSeq;
 	uint16_t addrSongList;
 	if (file->SearchBytePattern(ptnLoadSeqWinterV3, ofsLoadSeq)) {
 		addrSongList = file->GetByte(ofsLoadSeq + 8) | (file->GetByte(ofsLoadSeq + 11) << 8);
@@ -445,7 +445,7 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 
 	// guess song index
 	int8_t songIndex = -1;
-	UINT ofsSaveSongIndex;
+	uint32_t ofsSaveSongIndex;
 	if (file->SearchBytePattern(ptnSaveSongIndexSummerV2, ofsSaveSongIndex)) {
 		uint16_t addrSongIndexArray = file->GetShort(ofsSaveSongIndex + 6);
 		uint16_t addrSongSlotIndex = file->GetShort(ofsSaveSongIndex + 9);
@@ -519,7 +519,7 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	UINT ofsDSPInitTable;
+	uint32_t ofsDSPInitTable;
 	uint16_t spcDirAddr;
 	if (file->SearchBytePattern(ptnDSPInitTable, ofsDSPInitTable)) {
 		spcDirAddr = file->GetByte(ofsDSPInitTable + 29) << 8;
@@ -528,7 +528,7 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	UINT ofsProgChangeVCmd;
+	uint32_t ofsProgChangeVCmd;
 	uint16_t addrInstrSetTable;
 	uint16_t addrSampNumTable;
 	uint16_t addrSampleTable;

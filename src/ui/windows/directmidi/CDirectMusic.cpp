@@ -105,7 +105,7 @@ Date format: Day-month-year
 	
 
 */
-#include "stdafx.h"
+#include "pch.h"
 #include "CMidiPart.h"
 #include "MyCoCreateInstance.h"
 

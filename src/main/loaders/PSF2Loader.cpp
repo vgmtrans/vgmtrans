@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "PSF2Loader.h"
 #include "Root.h"
 #include "RawFile.h"

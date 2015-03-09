@@ -571,7 +571,7 @@ class MarkerSeqEvent :
 	public SeqEvent
 {
 public:
-	MarkerSeqEvent(SeqTrack* pTrack, std::string& markername, uint8_t databyte1, uint8_t databyte2, uint32_t offset = 0, uint32_t length = 0,
+	MarkerSeqEvent(SeqTrack* pTrack, const std::string& markername, uint8_t databyte1, uint8_t databyte2, uint32_t offset = 0, uint32_t length = 0,
 		const std::wstring& name = L"", uint8_t color = CLR_MARKER)
 	: SeqEvent(pTrack, offset, length, name, color), databyte1(databyte1), databyte2(databyte2)
 	{}

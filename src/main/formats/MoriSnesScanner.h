@@ -2,7 +2,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum MoriSnesVersion; // see MoriSnesFormat.h
+enum MoriSnesVersion : uint8_t; // see MoriSnesFormat.h
 
 class MoriSnesScanner :
 	public VGMScanner

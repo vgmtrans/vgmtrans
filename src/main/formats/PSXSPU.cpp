@@ -2,7 +2,7 @@
 // Most of the code below is based on his work.
 // Also, thanks to Antires for his ADPCM decompression routine.
 
-#include "stdafx.h"
+#include "pch.h"
 #include "PSXSPU.h"
 #include "DLSFile.h"
 #include "RawFile.h"
@@ -188,7 +188,7 @@ bool PSXSampColl::GetSampleInfo()
 // GENERIC FUNCTION USED FOR SCANNERS
 PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format)
 {
-	std::vector<PSXSampColl*>& sampColls = SearchForPSXADPCMs(file, format);
+	const std::vector<PSXSampColl*>& sampColls = SearchForPSXADPCMs(file, format);
 	if (sampColls.size() != 0) {
 		// pick up one of the SampColls
 		size_t bestSampleCount = 0;
@@ -206,7 +206,7 @@ PSXSampColl* PSXSampColl::SearchForPSXADPCM (RawFile* file, const string& format
 	}
 }
 
-std::vector<PSXSampColl*> PSXSampColl::SearchForPSXADPCMs (RawFile* file, const string& format)
+const std::vector<PSXSampColl*> PSXSampColl::SearchForPSXADPCMs (RawFile* file, const string& format)
 {
 	std::vector<PSXSampColl*> sampColls;
 	uint32_t nFileLength = file->size();
@@ -336,16 +336,14 @@ void PSXSamp::ConvertToStdWave(uint8_t* buf)
 	{
 		if (dwOffset + k + 16 > vgmfile->GetEndOffset())
 		{
-			wchar_t log[512];
-			wsprintf(log,  L"\"%s\" unexpected EOF.", name.c_str());
-			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"PSXSamp"));
+            std::wstring log = L"\"" + name + L"\" unexpected EOF.";
+			pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, L"PSXSamp"));
 			break;
 		}
 		else if (!addrOutOfVirtFile && k + 16 > unLength)
 		{
-			wchar_t log[512];
-			wsprintf(log,  L"\"%s\" unexpected end of PSXSamp.", name.c_str());
-			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"PSXSamp"));
+            std::wstring log = L"\"" + name + L"\" unexpected end of PSXSamp.";
+			pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, L"PSXSamp"));
 			addrOutOfVirtFile = true;
 		}
 

@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "common.h"
 
 std::wstring StringToUpper(std::wstring myString)
@@ -60,12 +60,12 @@ wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile)
 #if PSS_STYLE==1
 	tp1=((wchar_t *)wcsrchr (f,'/'));
 #else
-	tp1=((wchar_t *)wcsrchr (f,'\\'));
+	tp1=((wchar_t *)std::wcsrchr (f,'\\'));
 #if PSS_STYLE!=3
 	{
 		wchar_t *tp3;
 
-		tp3=((wchar_t *)wcsrchr (f,'/'));
+		tp3=((wchar_t *)std::wcsrchr (f,'/'));
 		if(tp1<tp3) tp1=tp3;
 	}
 #endif

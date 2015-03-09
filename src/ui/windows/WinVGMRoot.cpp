@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "WinVGMRoot.h"
 #include "VGMFileTreeView.h"
 #include "VGMFileListView.h"

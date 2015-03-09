@@ -2,7 +2,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum CompileSnesVersion; // see CompileSnesFormat.h
+enum CompileSnesVersion: uint8_t; // see CompileSnesFormat.h
 
 class CompileSnesScanner :
 	public VGMScanner

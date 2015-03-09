@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-typedef enum EventColors {
+enum EventColors {
 	CLR_UNKNOWN,
 	CLR_UNRECOGNIZED,
 	CLR_HEADER,
@@ -131,7 +131,7 @@ public:
 	virtual std::wstring GetDescription() { return name; }
 	virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
 	virtual Icon GetIcon() { return ICON_BINARY;/*ICON_UNKNOWN*/ }
-	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
+	virtual void AddToUI(VGMItem* parent, void* UI_specific);
 	virtual bool IsContainerItem() { return false; }
 
 	//bool AddHeader(uint32_t offset, uint32_t length, const wchar_t* name = L"Header");
@@ -170,7 +170,7 @@ public:
 	virtual VGMItem* GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
 	virtual uint32_t GuessLength(void);
 	virtual void SetGuessedLength(void);
-	virtual void AddToUI(VGMItem* parent, VOID* UI_specific);
+	virtual void AddToUI(VGMItem* parent, void* UI_specific);
 	virtual bool IsContainerItem() { return true; }
 
 	VGMHeader* AddHeader(uint32_t offset, uint32_t length, const std::wstring& name = L"Header");

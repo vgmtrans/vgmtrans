@@ -2,7 +2,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum HudsonSnesVersion; // see HudsonSnesFormat.h
+enum HudsonSnesVersion : uint8_t; // see HudsonSnesFormat.h
 
 class HudsonSnesScanner :
 	public VGMScanner

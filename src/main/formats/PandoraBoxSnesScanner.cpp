@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "PandoraBoxSnesScanner.h"
 #include "PandoraBoxSnesSeq.h"
 #include "PandoraBoxSnesInstr.h"
@@ -97,7 +97,7 @@ void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM (RawFile* file)
 	PandoraBoxSnesVersion version = PANDORABOXSNES_NONE;
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	UINT ofsLoadSeq;
+	uint32_t ofsLoadSeq;
 	uint16_t addrSeqHeader;
 	if (file->SearchBytePattern(ptnLoadSeqTSP, ofsLoadSeq)) {
 		uint8_t addrSeqHeaderPtr = file->GetByte(ofsLoadSeq + 7);
@@ -121,7 +121,7 @@ void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM (RawFile* file)
 
 	// scan for DIR address
 	uint16_t spcDirAddr;
-	UINT ofsSetDIR;
+	uint32_t ofsSetDIR;
 	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
 		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
 	}
@@ -130,7 +130,7 @@ void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM (RawFile* file)
 	}
 
 	// scan for instrument table
-	UINT ofsLoadSRCN;
+	uint32_t ofsLoadSRCN;
 	uint16_t addrLocalInstrTable;
 	uint16_t addrGlobalInstrTable;
 	uint8_t globalInstrumentCount;

@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "KonamiGXSeq.h"
 #include "KonamiGXFormat.h"
 
@@ -135,8 +135,8 @@ bool KonamiGXTrack::ReadEvent(void)
 			newdur = 1;
 		AddNoteByDur(beginOffset, curOffset-beginOffset, note, vel, newdur);
 		AddTime(delta);
-		if (newdur > delta)
-			ATLTRACE("newdur > delta.  %X > %X.  occurring at %X\n", newdur, delta, beginOffset);
+//		if (newdur > delta)
+//			ATLTRACE("newdur > delta.  %X > %X.  occurring at %X\n", newdur, delta, beginOffset);
 		//AddDelta(dur);
 	}
 	else switch (status_byte)

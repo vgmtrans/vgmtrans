@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "AkaoSnesScanner.h"
 #include "AkaoSnesInstr.h"
 #include "AkaoSnesSeq.h"
@@ -315,7 +315,7 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search for note length table
-	UINT ofsReadNoteLength;
+	uint32_t ofsReadNoteLength;
 	uint16_t addrNoteLengthTable;
 	AkaoSnesVersion verReadNoteLength = AKAOSNES_NONE;
 	if (file->SearchBytePattern(ptnReadNoteLengthV4, ofsReadNoteLength)) {
@@ -335,7 +335,7 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 	}
 
 	// search for vcmd address/length table
-	UINT ofsVCmdExec;
+	uint32_t ofsVCmdExec;
 	uint8_t firstVCmd;
 	uint16_t addrVCmdAddressTable;
 	uint16_t addrVCmdLengthTable;
@@ -354,7 +354,7 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 	}
 
 	// search for sequence header and some major format type differences
-	UINT ofsReadSeqHeader;
+	uint32_t ofsReadSeqHeader;
 	uint16_t addrSeqHeader;
 	uint16_t addrAPURelocBase;
 	bool relocatable;
@@ -472,7 +472,7 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	UINT ofsLoadDIR;
+	uint32_t ofsLoadDIR;
 	uint16_t spcDirAddr;
 	if (file->SearchBytePattern(ptnLoadDIRV1, ofsLoadDIR)) {
 		spcDirAddr = file->GetByte(ofsLoadDIR + 1) << 8;
@@ -484,7 +484,7 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	UINT ofsLoadInstr;
+	uint32_t ofsLoadInstr;
 	uint16_t addrTuningTable;
 	uint16_t addrADSRTable;
 	if (version == AKAOSNES_V1 && file->SearchBytePattern(ptnLoadInstrV1, ofsLoadInstr)) {

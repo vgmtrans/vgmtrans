@@ -18,8 +18,8 @@ public:
 	virtual uint32_t GetID() {return assocHOSA_ID;}
 
 protected:
-	unsigned short seqID;
-	unsigned short assocHOSA_ID;
+	uint16_t seqID;
+	uint16_t assocHOSA_ID;
 };
 
 
@@ -36,20 +36,20 @@ public:
 //	virtual		void	SetChannel(int trackNum);
 	virtual		bool	ReadEvent(void);
 				void	ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable);
-	unsigned	int		DecodeVariable();	//Decode of 可変長
+	uint32_t			DecodeVariable();	//Decode of 可変長
 
 public:
-	unsigned 	int		iDeltaTimeCom;		//Default delta time for Command
-	unsigned 	int		iDeltaTimeNote;		//Default delta time for Note
-	unsigned 	int		iLengthTimeNote;	//Default length for Note
+	uint32_t			iDeltaTimeCom;		//Default delta time for Command
+	uint32_t			iDeltaTimeNote;		//Default delta time for Note
+	uint32_t			iLengthTimeNote;	//Default length for Note
 //	unsigned 	int		iDeltaTimeCounter;	//Counter of delta time for note/command.
 //	vector<char>			listNote;		//Key On Note
 //	vector<unsigned  int>	listLength;		//
-				char	cVelocity;			//Default velocity
-				char	cNoteNum;			//Default Note Number
-	unsigned	char	cTempo;				//Tempo
-	unsigned	char	cInstrument;		//
-	unsigned	char	cVolume;			//
-	unsigned	char	cPanpot;			//
-	unsigned	char	cExpression;		//
+	int8_t				cVelocity;			//Default velocity
+	int8_t				cNoteNum;			//Default Note Number
+	uint8_t				cTempo;				//Tempo
+	uint8_t				cInstrument;		//
+	uint8_t				cVolume;			//
+	uint8_t				cPanpot;			//
+	uint8_t				cExpression;		//
 };

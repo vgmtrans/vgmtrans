@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "RareSnesSeq.h"
 #include "RareSnesFormat.h"
 #include "ScaleConversion.h"
@@ -358,7 +358,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			//wostringstream ssTrace;
 			//ssTrace << L"Rest: " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << std::endl;
-			//OutputDebugString(ssTrace.str().c_str());
+			//LogDebug(ssTrace.str().c_str());
 
 			AddRest(beginOffset, curOffset-beginOffset, dur);
 		}
@@ -386,7 +386,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 			//wostringstream ssTrace;
 			//ssTrace << L"Note: " << key << L" " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << L" P=" << spcNotePitch << std::endl;
-			//OutputDebugString(ssTrace.str().c_str());
+			//LogDebug(ssTrace.str().c_str());
 
 			uint8_t vel = 127;
 			AddNoteByDur(beginOffset, curOffset - beginOffset, key + instrTuningDelta, vel, dur);
@@ -701,7 +701,7 @@ bool RareSnesTrack::ReadEvent(void)
 		{
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			int8_t newVol = min(abs(newVolL) + abs(newVolR), 255) / 2; // workaround: convert to mono
+			int8_t newVol = min(abs((int)newVolL) + abs((int)newVolR), 255) / 2; // workaround: convert to mono
 			AddMasterVol(beginOffset, curOffset-beginOffset, newVol, L"Master Volume L/R");
 			break;
 		}
@@ -748,7 +748,7 @@ bool RareSnesTrack::ReadEvent(void)
 			uint8_t newFeedback = GetByte(curOffset++);
 			int8_t newVolL = (int8_t) GetByte(curOffset++);
 			int8_t newVolR = (int8_t) GetByte(curOffset++);
-			parentSeq->midiReverb = min(abs(newVolL) + abs(newVolR), 255) / 2;
+			parentSeq->midiReverb = min(abs((int)newVolL) + abs((int)newVolR), 255) / 2;
 			// TODO: update MIDI reverb value for each tracks?
 
 			desc << L"Feedback: " << (int)newFeedback << L"  Volume: " << (int)newVolL << L", " << (int)newVolR;
@@ -1105,7 +1105,7 @@ bool RareSnesTrack::ReadEvent(void)
 		default:
 			desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
 			AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-			pRoot->AddLogItem(new LogItem(wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, wstring(L"RareSnesSeq")));
+			pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(), LOG_LEVEL_ERR, L"RareSnesSeq"));
 			bContinue = false;
 			break;
 		}
@@ -1113,7 +1113,7 @@ bool RareSnesTrack::ReadEvent(void)
 
 	//wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
-	//OutputDebugString(ssTrace.str().c_str());
+	//LogDebug(ssTrace.str().c_str());
 
 	return bContinue;
 }

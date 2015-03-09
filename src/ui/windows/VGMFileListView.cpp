@@ -1,7 +1,7 @@
 // WTLCabViewView.cpp : implementation of the CWTLCabViewView class
 /////////////////////////////////////////////////////////////////////////////
 
-#include "stdafx.h"
+#include "pch.h"
 #include "resource.h"
 #include "VGMFileListView.h"
 #include "DragDropSource.h"

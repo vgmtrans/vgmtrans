@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "SonyPS2Scanner.h"
 #include "SonyPS2Seq.h"
 #include "SonyPS2InstrSet.h"

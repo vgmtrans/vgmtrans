@@ -2,7 +2,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum SuzukiSnesVersion; // see SuzukiSnesFormat.h
+enum SuzukiSnesVersion : uint8_t; // see SuzukiSnesFormat.h
 
 class SuzukiSnesScanner :
 	public VGMScanner

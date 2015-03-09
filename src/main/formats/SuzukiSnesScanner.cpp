@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "SuzukiSnesScanner.h"
 #include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
@@ -160,7 +160,7 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search for note length table
-	UINT ofsSongLoad;
+	uint32_t ofsSongLoad;
 	uint16_t addrSeqHeader;
 	if (file->SearchBytePattern(ptnLoadSongSD3, ofsSongLoad)) {
 		addrSeqHeader = file->GetShort(ofsSongLoad + 16);
@@ -175,7 +175,7 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile* file)
 	}
 
 	// search for vcmd length table
-	UINT ofsExecVCmd;
+	uint32_t ofsExecVCmd;
 	uint16_t addrVCmdLengthTable;
 	if (file->SearchBytePattern(ptnExecVCmdBL, ofsExecVCmd)) {
 		addrVCmdLengthTable = file->GetShort(ofsExecVCmd + 6);
@@ -197,7 +197,7 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	UINT ofsLoadDIR;
+	uint32_t ofsLoadDIR;
 	uint16_t spcDirAddr;
 	if (file->SearchBytePattern(ptnLoadDIR, ofsLoadDIR)) {
 		spcDirAddr = file->GetByte(ofsLoadDIR + 4) << 8;
@@ -206,7 +206,7 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	UINT ofsLoadInstr;
+	uint32_t ofsLoadInstr;
 	uint16_t addrSRCNTable;
 	uint16_t addrVolumeTable;
 	uint16_t addrTuningTable;

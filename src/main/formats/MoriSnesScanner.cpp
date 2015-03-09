@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "MoriSnesScanner.h"
 #include "MoriSnesSeq.h"
 #include "SNESDSP.h"
@@ -57,7 +57,7 @@ void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// scan for song list table
-	UINT ofsLoadSeq;
+	uint32_t ofsLoadSeq;
 	uint16_t addrSongList;
 	if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
 		addrSongList = file->GetShort(ofsLoadSeq + 3);
@@ -78,13 +78,13 @@ void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile* file)
 	}
 
 	// scan DIR address
-	UINT ofsSetDIR;
+	uint32_t ofsSetDIR;
 	uint16_t spcDirAddr = 0;
 	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
 		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
 	}
 
-	UINT addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
+	uint32_t addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
 	if (addrSongHeaderPtr + 2 <= 0x10000) {
 		uint16_t addrSongHeader = file->GetShort(addrSongHeaderPtr);
 

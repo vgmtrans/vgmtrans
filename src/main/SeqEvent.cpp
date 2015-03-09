@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "SeqEvent.h"
 #include "SeqTrack.h"
 

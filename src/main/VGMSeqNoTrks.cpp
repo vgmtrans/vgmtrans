@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "VGMSeqNoTrks.h"
 #include "SeqEvent.h"
 #include "Root.h"
@@ -10,7 +10,7 @@ VGMSeqNoTrks::VGMSeqNoTrks(const string& format, RawFile* file, uint32_t offset,
   SeqTrack(this)
 {
 	ResetVars();
-	AddContainer<SeqEvent>(aEvents);
+    VGMSeq::AddContainer<SeqEvent>(aEvents);
 }
 
 VGMSeqNoTrks::~VGMSeqNoTrks(void)
@@ -89,7 +89,7 @@ MidiFile* VGMSeqNoTrks::ConvertToMidi()
 	this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_FIND_DELTA_LENGTH;
 
 	if (!LoadEvents())
-		return false;
+		return NULL;
 	if (!PostLoad())
 		return NULL;
 

@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "QSoundScanner.h"
 #include "QSoundSeq.h"
 #include "QSoundInstr.h"
@@ -148,7 +148,8 @@ void QSoundScanner::Scan(RawFile* file, void* info)
 		VGMColl* coll = new VGMColl(name.str());
 		name.str(L"");
 		name << gameentry->name.c_str() << L" seq " << k/4;
-		QSoundSeq* newSeq = new QSoundSeq(programFile, seqPointer, ver, name.str());
+		wstring seqName = name.str();
+		QSoundSeq* newSeq = new QSoundSeq(programFile, seqPointer, ver, seqName);
 		if (newSeq->LoadVGMFile())
 		{
 			coll->UseSeq(newSeq);

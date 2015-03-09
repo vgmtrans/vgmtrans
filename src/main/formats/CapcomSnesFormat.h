@@ -15,7 +15,7 @@ BEGIN_FORMAT(CapcomSnes)
 END_FORMAT()
 
 
-enum CapcomSnesVersion
+enum CapcomSnesVersion : uint8_t
 {
 	CAPCOMSNES_NONE = 0,                            // Unknown Version
 	CAPCOMSNES_V1_BGM_IN_LIST,                      // U.N. Squadron, Super Ghouls 'N Ghosts, etc.
