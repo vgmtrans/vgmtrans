@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "../VGMSamp.h"
-#include "../VGMRgn.h"
-#include "../ScaleConversion.h"
+#include "VGMSamp.h"
+#include "VGMRgn.h"
+#include "ScaleConversion.h"
 #include "QSoundInstr.h"
 #include "QSoundFormat.h"
 

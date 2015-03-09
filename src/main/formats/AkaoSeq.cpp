@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
-#include "../ScaleConversion.h"
+#include "ScaleConversion.h"
 
 DECLARE_FORMAT(Akao);
 
