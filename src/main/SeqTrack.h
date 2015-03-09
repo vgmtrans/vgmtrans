@@ -1,11 +1,12 @@
 #pragma once
 #include "VGMItem.h"
+#include "VGMSeq.h"
 
 class VGMSeq;
 class SeqEvent;
 class MidiTrack;
 
-extern enum ReadMode;
+enum ReadMode : uint8_t;
 
 class SeqTrack :
 	public VGMContainerItem
@@ -144,7 +145,7 @@ public:
 	bool AddEndOfTrackNoItem();
 
 	void AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::wstring& sEventName = L"Global Transpose");
-	void AddMarker(uint32_t offset, uint32_t length, std::string& markername, uint8_t databyte1, uint8_t databyte2, const std::wstring& sEventName, int8_t priority = 0, uint8_t color = CLR_MISC);
+	void AddMarker(uint32_t offset, uint32_t length, const std::string& markername, uint8_t databyte1, uint8_t databyte2, const std::wstring& sEventName, int8_t priority = 0, uint8_t color = CLR_MISC);
 
 	bool AddLoopForever(uint32_t offset, uint32_t length, const std::wstring& sEventName = L"Loop Forever");
 

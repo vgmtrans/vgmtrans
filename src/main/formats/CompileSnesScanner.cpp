@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "CompileSnesScanner.h"
 #include "CompileSnesInstr.h"
 #include "CompileSnesSeq.h"
@@ -53,7 +53,7 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM (RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
 	// scan for table pointer initialize code
-	UINT ofsSetSongListAddress;
+	uint32_t ofsSetSongListAddress;
 	if (!file->SearchBytePattern(ptnSetSongListAddress, ofsSetSongListAddress)) {
 		return;
 	}
@@ -92,7 +92,7 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM (RawFile* file)
 		guessedSongIndex = 1;
 	}
 
-	UINT addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
+	uint32_t addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
 	if (addrSongHeaderPtr + 2 <= 0x10000) {
 		uint16_t addrSongHeader = file->GetShort(addrSongHeaderPtr);
 		uint8_t numTracks = file->GetByte(addrSongHeader);

@@ -3,7 +3,7 @@
 #include "SeqTrack.h"
 #include "QSoundFormat.h"
 
-extern enum QSoundVer;
+enum QSoundVer : uint8_t;
 
 class QSoundSeq :
 	public VGMSeq

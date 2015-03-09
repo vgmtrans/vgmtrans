@@ -1,0 +1,13 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource>
+    <file>images/file-32.png</file>
+    <file>images/audio_file-32.png</file>
+    <file>images/audio_wave-32.png</file>
+    <file>images/music_transcripts-32.png</file>
+    <file>images/note_music-32.png</file>
+    <file>images/bugle-32.png</file>
+    <file>images/piano-32.png</file>
+    <file>images/treble_clef-32.png</file>
+    <file>images/music_folder-32.png</file>
+</qresource>
+</RCC>

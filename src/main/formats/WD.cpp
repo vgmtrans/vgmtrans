@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "WD.h"
 #include "SquarePS2Format.h"
 #include "PSXSPU.h"
@@ -100,7 +100,7 @@ bool WDInstr::LoadInstr()
 	wostringstream	strStr;
 	uint32_t j=0;
 	long startAddress = 0;
-	BOOL notSampleStart = false;
+	bool notSampleStart = false;
 
 	//Read region data 
 	
@@ -216,7 +216,7 @@ bool WDInstr::LoadInstr()
 		else
 			aRgns[k]->velLow = aRgns[k-1]->velHigh+1;
 	}
-	return TRUE;
+	return true;
 }
 
 

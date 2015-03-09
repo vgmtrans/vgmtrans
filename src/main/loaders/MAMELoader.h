@@ -11,6 +11,8 @@ enum LoadMethod {
 	LM_DEINTERLACE
 };
 
+using namespace std;
+
 typedef struct _MAMERomGroupEntry
 {
 	_MAMERomGroupEntry() : file(NULL) {}

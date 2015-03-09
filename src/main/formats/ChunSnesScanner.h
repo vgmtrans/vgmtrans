@@ -2,7 +2,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum ChunSnesVersion; // see ChunSnesFormat.h
+enum ChunSnesVersion : uint8_t; // see ChunSnesFormat.h
 
 class ChunSnesScanner :
 	public VGMScanner

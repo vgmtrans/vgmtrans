@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "PSFFile.h"
 #include "GSFLoader.h"
 #include "Root.h"
@@ -35,7 +35,7 @@ PostLoadCommand GSFLoader::Apply(RawFile* file)
 
 			complaint = psf_read_exe(file, exebuf, exebufsize);
 			if(complaint) 
-			{ 
+			{
 				Alert(complaint);
 				delete[] exebuf;
 				return KEEP_IT; 
@@ -139,7 +139,7 @@ const wchar_t* GSFLoader::load_psf_libs(PSFFile& psf, RawFile* file, unsigned ch
 		if (itLibTag == psf.tags.end())
 			break;
 
-		wchar_t tempfn[_MAX_PATH] = { 0 };
+		wchar_t tempfn[PATH_MAX] = { 0 };
 		mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
 
 		wchar_t *fullPath;

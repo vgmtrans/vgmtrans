@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "Root.h"

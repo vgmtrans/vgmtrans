@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "PS1Seq.h"
 #include "PS1Format.h"
 

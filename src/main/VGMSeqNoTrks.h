@@ -1,6 +1,6 @@
 #pragma once
 #include "VGMSeq.h"
-#include "SeqTrack.H"
+#include "SeqTrack.h"
 
 class VGMSeqNoTrks :
 	public VGMSeq,

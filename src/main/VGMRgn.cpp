@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "VGMRgn.h"
 #include "VGMInstrSet.h"
 

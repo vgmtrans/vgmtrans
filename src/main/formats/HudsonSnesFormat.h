@@ -14,7 +14,7 @@ USING_SCANNER(HudsonSnesScanner)
 USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-enum HudsonSnesVersion
+enum HudsonSnesVersion : uint8_t
 {
 	HUDSONSNES_NONE = 0,              // Unknown Version
 	// Earlier Version:

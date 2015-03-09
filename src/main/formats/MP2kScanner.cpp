@@ -7,7 +7,7 @@
  * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "MP2kScanner.h"
 #include "MP2kSeq.h"
 

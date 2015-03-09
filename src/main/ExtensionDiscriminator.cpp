@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "ExtensionDiscriminator.h"
 
 //static ExtensionDiscriminator theExtensionDiscriminator;

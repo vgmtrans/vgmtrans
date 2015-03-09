@@ -83,7 +83,7 @@
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)lib\yaml-cpp\include;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)lib\yaml-cpp\include;$(ProjectDir)ui\windows;$(IncludePath)</IncludePath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)lib\yaml-cpp\include;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(ProjectDir)lib\zlib\lib\win32;$(ProjectDir)lib\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(ProjectDir)lib\zlib\lib\x64;$(ProjectDir)lib\yaml-cpp\lib\x64;$(LibraryPath)</LibraryPath>
@@ -109,6 +109,8 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -158,14 +160,15 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <AdditionalIncludeDirectories>./main;./main/loaders;./main/formats;./ui/windows;./ui/windows/include;./ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;UNICODE;STRICT;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>Create</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -294,11 +297,9 @@
     <ClCompile Include="ui\windows\RawFileListView.cpp" />
     <ClCompile Include="ui\windows\RawFileTreeView.cpp" />
     <ClCompile Include="ui\windows\ScanDlg.cpp" />
-    <ClCompile Include="main\stdafx.cpp">
+    <ClCompile Include="ui\windows\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ui\windows\VGMCollListView.cpp" />
     <ClCompile Include="ui\windows\VGMFileListView.cpp" />
@@ -392,7 +393,9 @@
     <ClCompile Include="main\VGMSamp.cpp" />
     <ClCompile Include="main\VGMSampColl.cpp" />
     <ClCompile Include="main\VGMSeq.cpp" />
-    <ClCompile Include="main\VGMSeqNoTrks.cpp" />
+    <ClCompile Include="main\VGMSeqNoTrks.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main\BytePattern.h" />
@@ -464,6 +467,7 @@
     <ClInclude Include="main\Options.h" />
     <ClInclude Include="main\loaders\KabukiDecrypt.h" />
     <ClInclude Include="main\formats\OrgFormat.h" />
+    <ClInclude Include="main\pch.h" />
     <ClInclude Include="main\PSFFile.h" />
     <ClInclude Include="main\formats\RareSnesFormat.h" />
     <ClInclude Include="main\formats\RareSnesScanner.h" />
@@ -478,6 +482,7 @@
     <ClInclude Include="main\VGMMultiSectionSeq.h" />
     <ClInclude Include="main\VGMSeqSection.h" />
     <ClInclude Include="main\VGMTag.h" />
+    <ClInclude Include="portable.h" />
     <ClInclude Include="ui\windows\aboutdlg.h" />
     <ClInclude Include="ui\windows\BmpBtn.h" />
     <ClInclude Include="ui\windows\CollDialog.h" />
@@ -497,8 +502,8 @@
     <ClInclude Include="ui\windows\RawFileTreeView.h" />
     <ClInclude Include="ui\windows\resource.h" />
     <ClInclude Include="ui\windows\ScanDlg.h" />
-    <ClInclude Include="main\stdafx.h" />
     <ClInclude Include="ui\windows\include\TabbedMDISave.h" />
+    <ClInclude Include="ui\windows\stdafx.h" />
     <ClInclude Include="ui\windows\VGMCollListView.h" />
     <ClInclude Include="ui\windows\VGMFileListView.h" />
     <ClInclude Include="ui\windows\VGMTransTabCtrl.h" />

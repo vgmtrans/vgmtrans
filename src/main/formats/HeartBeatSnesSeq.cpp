@@ -1,7 +1,9 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "HeartBeatSnesSeq.h"
 #include "HeartBeatSnesFormat.h"
 #include "ScaleConversion.h"
+
+using namespace std;
 
 DECLARE_FORMAT(HeartBeatSnes);
 
@@ -366,7 +368,7 @@ bool HeartBeatSnesTrack::ReadEvent(void)
 	{
 		uint8_t newPan = GetByte(curOffset++);
 
-		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), 20);
+		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), (unsigned)20);
 
 		uint8_t volumeLeft = HeartBeatSnesSeq::PAN_TABLE[20 - panIndex];
 		uint8_t volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex];
@@ -384,7 +386,7 @@ bool HeartBeatSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		uint8_t newPan = GetByte(curOffset++);
 
-		uint8_t panIndex = (uint8_t)min((unsigned)(newPan & 0x1f), 20);
+		uint8_t panIndex = (uint8_t)min<uint8_t>((unsigned)(newPan & 0x1f), (unsigned)20);
 
 		double volumeLeft = HeartBeatSnesSeq::PAN_TABLE[20 - panIndex] / 128.0;
 		double volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex] / 128.0;
@@ -794,7 +796,7 @@ bool HeartBeatSnesTrack::ReadEvent(void)
 		default:
 			desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)subStatusByte;
 			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
-			pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"HudsonSnesSeq")));
+			pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(), LOG_LEVEL_ERR, L"HudsonSnesSeq"));
 			bContinue = false;
 			break;
 		}
@@ -805,7 +807,7 @@ bool HeartBeatSnesTrack::ReadEvent(void)
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
 		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
-		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"HeartBeatSnesSeq")));
+		pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(), LOG_LEVEL_ERR, L"HeartBeatSnesSeq"));
 		bContinue = false;
 		break;
 	}

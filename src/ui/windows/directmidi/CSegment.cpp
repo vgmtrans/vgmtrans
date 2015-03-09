@@ -105,7 +105,7 @@ Date format: Day-month-year
 
 
 */
-#include "stdafx.h"
+#include "pch.h"
 #include "CAudioPart.h"
 #include "CMidiPart.h"
 #include <algorithm>

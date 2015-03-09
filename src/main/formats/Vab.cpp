@@ -1,7 +1,7 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "Vab.h"
 #include "Format.h"			//include PS1-specific format header file when it is ready
-#include "PSXSpu.h"
+#include "PSXSPU.h"
 #include "PS1Format.h"
 
 using namespace std;
@@ -101,7 +101,7 @@ bool Vab::GetInstrPointers()
 		if (numTones > 32)
 		{
 			wchar_t log[512];
-			wsprintf(log,  L"Too many tones (%u) in Program #%u.", numTones, i);
+			swprintf(log, 512,  L"Too many tones (%u) in Program #%u.", numTones, i);
 			pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
 		}
 		else if (numTones != 0)
@@ -154,7 +154,7 @@ bool Vab::GetInstrPointers()
 				vagSize = GetShort(offVAGOffsets + (i + 1) * 2) * 8;
 			}
 
-			wsprintf(name,  L"VAG Size /8 #%u", i + 1);
+			swprintf(name, 256,  L"VAG Size /8 #%u", i + 1);
 			vagOffsetHdr->AddSimpleItem(offVAGOffsets + (i + 1) * 2, 2, name);
 
 			if (vagOffset + vagSize <= nEndOffset)
@@ -165,7 +165,7 @@ bool Vab::GetInstrPointers()
 			else
 			{
 				wchar_t log[512];
-				wsprintf(log,  L"VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i + 1, vagOffset, vagSize);
+				swprintf(log, 512,  L"VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i + 1, vagOffset, vagSize);
 				pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
 			}
 		}
@@ -226,7 +226,7 @@ bool VabInstr::LoadInstr()
 		}
 		aRgns.push_back(rgn);
 	}
-	return TRUE;
+	return true;
 }
 
 

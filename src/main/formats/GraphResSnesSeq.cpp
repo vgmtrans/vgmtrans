@@ -1,7 +1,9 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "GraphResSnesSeq.h"
 #include "GraphResSnesFormat.h"
 #include "ScaleConversion.h"
+
+using namespace std;
 
 DECLARE_FORMAT(GraphResSnes);
 
@@ -257,7 +259,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 			len = defaultNoteLength;
 		}
 
-		uint8_t durRate = max(durationRate, 8); // rate > 8 will cause unexpected result
+		uint8_t durRate = max(durationRate, (uint8_t)8); // rate > 8 will cause unexpected result
 		uint8_t dur = max(min(len * durRate / 8, len - 1), 1);
 
 		if (key == 7) {
@@ -333,7 +335,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 	{
 		int8_t newVolL = GetByte(curOffset++);
 		int8_t newVolR = GetByte(curOffset++);
-		int8_t newVol = min(abs(newVolL) + abs(newVolR), 255) / 2; // workaround: convert to mono
+		int8_t newVol = min(abs((int)newVolL) + abs((int)newVolR), 255) / 2; // workaround: convert to mono
 		AddMasterVol(beginOffset, curOffset - beginOffset, newVol, L"Master Volume L/R");
 		break;
 	}
@@ -437,7 +439,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 	case EVENT_VOLUME:
 	{
 		int8_t newVol = GetByte(curOffset++);
-		AddVol(beginOffset, curOffset - beginOffset, min(abs(newVol), 127));
+		AddVol(beginOffset, curOffset - beginOffset, min(abs((int)newVol), 127));
 		break;
 	}
 
@@ -452,7 +454,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 	case EVENT_PAN:
 	{
 		spcPan = GetByte(curOffset++);
-		int8_t pan = min(max(spcPan, -15), 15);
+		int8_t pan = min(max(spcPan, (int8_t)-15), (int8_t)15);
 
 		double volumeLeft;
 		double volumeRight;
@@ -564,7 +566,7 @@ bool GraphResSnesTrack::ReadEvent(void)
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str());
-		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"GraphResSnesSeq")));
+		pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(), LOG_LEVEL_ERR, L"GraphResSnesSeq"));
 		bContinue = false;
 		break;
 	}

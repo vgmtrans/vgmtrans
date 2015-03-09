@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "TriAcePS1InstrSet.h"
 #include "TriAcePS1Format.h"
 #include "VGMRgn.h"

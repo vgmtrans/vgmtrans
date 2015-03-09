@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "ChunSnesSeq.h"
 #include "ChunSnesFormat.h"
 #include "ScaleConversion.h"
@@ -530,7 +530,7 @@ bool ChunSnesTrack::ReadEvent(void)
 		uint8_t fadeLength = GetByte(curOffset++);
 		desc << L"Master Volume: " << (int)mastVol << L"  Fade Length: " << (int)fadeLength;
 
-		uint8_t midiMastVol = min(mastVol, 0x7f);
+		uint8_t midiMastVol = min(mastVol, (uint8_t)0x7f);
 		AddMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, midiMastVol);
 		break;
 	}
@@ -834,8 +834,8 @@ bool ChunSnesTrack::ReadEvent(void)
 
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
-		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
-		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"ChunSnesSeq")));
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+		pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(), LOG_LEVEL_ERR, L"ChunSnesSeq"));
 		bContinue = false;
 		break;
 	}
@@ -882,7 +882,7 @@ void ChunSnesTrack::GetVolumeBalance(int8_t pan, double & volumeLeft, double & v
 		volumeRight = 1.0;
 	}
 	else {
-		uint8_t volumeRateByte = 255 - (min(abs(pan), 127) * 2 + 1);
+		uint8_t volumeRateByte = 255 - (min((int8_t)abs(pan), (int8_t)127) * 2 + 1);
 
 		// approx (volumeRateByte + 1) / 256
 		double volumeRate;

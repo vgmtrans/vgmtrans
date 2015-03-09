@@ -1,5 +1,4 @@
-#include "stdafx.h"
-#include <math.h>
+#include "pch.h"
 #include "AkaoFormat.h"
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"

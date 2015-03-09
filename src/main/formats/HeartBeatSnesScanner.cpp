@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "HeartBeatSnesScanner.h"
 #include "HeartBeatSnesSeq.h"
 #include "HeartBeatSnesInstr.h"
@@ -114,7 +114,7 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search song list
-	UINT ofsReadSongList;
+	uint32_t ofsReadSongList;
 	uint16_t addrSongListLo;
 	uint16_t addrSongListHi;
 	int8_t maxSongIndex;
@@ -137,7 +137,7 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 		return;
 	}
 
-	UINT ofsSaveSeqHeaderAddress;
+	uint32_t ofsSaveSeqHeaderAddress;
 	uint8_t addrSeqHeaderPtr;
 	if (file->SearchBytePattern(ptnSaveSeqHeaderAddress, ofsSaveSeqHeaderAddress)) {
 		addrSeqHeaderPtr = file->GetByte(ofsSaveSeqHeaderAddress + 10);
@@ -166,14 +166,14 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile* file)
 	}
 
 	// search DIR address
-	UINT ofsSetDIR;
+	uint32_t ofsSetDIR;
 	uint16_t spcDirAddr = 0;
 	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
 		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
 	}
 
 	// search SRCN lookup table
-	UINT ofsLoadSRCN;
+	uint32_t ofsLoadSRCN;
 	uint16_t addrSRCNTable = 0;
 	if (file->SearchBytePattern(ptnLoadSRCN, ofsLoadSRCN)) {
 		addrSRCNTable = file->GetShort(ofsLoadSRCN + 31);

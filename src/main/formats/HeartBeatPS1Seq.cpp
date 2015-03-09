@@ -1,14 +1,14 @@
 // If you want to convert it without losing any events,
 // check seqq2mid tool created by loveemu <https://code.google.com/p/loveemu/>
 
-#include "stdafx.h"
+#include "pch.h"
 #include "HeartBeatPS1Seq.h"
 #include "HeartBeatPS1Format.h"
 
 DECLARE_FORMAT(HeartBeatPS1)
 
 HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile* file, uint32_t offset)
-: VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset)
+		: VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset)
 {
 	UseReverb();
 	//bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
@@ -426,7 +426,7 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 		}
 		break;
 
-	case 0xF0 : 
+	case 0xF0 :
 		{
 			if (status_byte == 0xFF)
 			{

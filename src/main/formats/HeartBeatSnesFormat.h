@@ -14,7 +14,7 @@ USING_SCANNER(HeartBeatSnesScanner)
 USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-enum HeartBeatSnesVersion
+enum HeartBeatSnesVersion : uint8_t
 {
 	HEARTBEATSNES_NONE = 0,              // Unknown Version
 	HEARTBEATSNES_STANDARD,              // Dragon Quest 6 and 3

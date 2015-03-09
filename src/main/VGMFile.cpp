@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 
 #include "common.h"
 #include "Root.h"
@@ -28,7 +28,7 @@ VGMFile::~VGMFile(void)
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add
 // this as an item because we do not want the VGMFile to be itself an item in the Item View
-void VGMFile::AddToUI(VGMItem* parent, VOID* UI_specific)
+void VGMFile::AddToUI(VGMItem* parent, void* UI_specific)
 {
 	for (uint32_t i=0; i<containers.size(); i++)
 	{

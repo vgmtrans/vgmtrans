@@ -1,7 +1,6 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "NDSInstrSet.h"
 #include "VGMRgn.h"
-#include "math.h"
 
 using namespace std;
 

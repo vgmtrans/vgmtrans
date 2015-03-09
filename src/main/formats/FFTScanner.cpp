@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "FFTScanner.h"
 #include "FFTSeq.h"
 #include "FFTInstr.h"
