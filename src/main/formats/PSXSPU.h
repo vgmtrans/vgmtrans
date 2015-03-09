@@ -1,10 +1,10 @@
 #pragma once
-#include "../VGMInstrSet.h"
-#include "../VGMSampColl.h"
-#include "../VGMSamp.h"
-#include "../VGMItem.h"
-#include "../ScaleConversion.h"
-#include "../Root.h"
+#include "VGMInstrSet.h"
+#include "VGMSampColl.h"
+#include "VGMSamp.h"
+#include "VGMItem.h"
+#include "ScaleConversion.h"
+#include "Root.h"
 
 // All of the ADSR calculations herein (except where inaccurate) are derived from Neill Corlett's work in
 // reverse-engineering the Playstation 1/2 SPU unit.

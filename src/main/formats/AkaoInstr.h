@@ -1,9 +1,9 @@
 #pragma once
-#include "../VGMInstrSet.h"
-#include "../VGMSampColl.h"
-#include "../VGMRgn.h"
+#include "VGMInstrSet.h"
+#include "VGMSampColl.h"
+#include "VGMRgn.h"
 #include "AkaoFormat.h"
-#include "../Matcher.h"
+#include "Matcher.h"
 
 // ************
 // AkaoInstrSet

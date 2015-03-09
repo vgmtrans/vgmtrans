@@ -2,7 +2,7 @@
 #include "AkaoFormat.h"
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
-#include "../VGMColl.h"
+#include "VGMColl.h"
 #include "PSXSPU.h"
 
 using namespace std;

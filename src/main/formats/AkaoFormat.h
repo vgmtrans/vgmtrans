@@ -1,8 +1,8 @@
 #pragma once
-#include "../Format.h"
+#include "Format.h"
 #include "AkaoScanner.h"
-#include "../VGMColl.h"
-#include "../Matcher.h"
+#include "VGMColl.h"
+#include "Matcher.h"
 
 class AkaoInstrSet;
 
