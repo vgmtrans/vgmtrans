@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "PrismSnesSeq.h"
 #include "PrismSnesFormat.h"
 #include "ScaleConversion.h"

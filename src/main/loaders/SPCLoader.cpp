@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "SPCLoader.h"
 #include "Root.h"
 
@@ -36,21 +36,25 @@ PostLoadCommand SPCLoader::Apply(RawFile* file)
 
 		file->GetBytes(0x2e, 32, s);
 		s[32] = '\0';
-		spcFile->tag.title = string2wstring(std::string(s));
+		std::string s_str = s;
+		spcFile->tag.title = string2wstring(s_str);
 
 		file->GetBytes(0x4e, 32, s);
 		s[32] = '\0';
-		spcFile->tag.album = string2wstring(std::string(s));
+		s_str = s;
+		spcFile->tag.album = string2wstring(s_str);
 
 		file->GetBytes(0x7e, 32, s);
 		s[32] = '\0';
-		spcFile->tag.comment = string2wstring(std::string(s));
+		s_str = s;
+		spcFile->tag.comment = string2wstring(s_str);
 
 		if (file->GetByte(0xd2) < 0x30) {
 			// binary format
 			file->GetBytes(0xb0, 32, s);
 			s[32] = '\0';
-			spcFile->tag.artist = string2wstring(std::string(s));
+			s_str = s;
+			spcFile->tag.artist = string2wstring(s_str);
 
 			spcFile->tag.length = (double) (file->GetWord(0xa9) & 0xffffff);
 		}
@@ -58,7 +62,8 @@ PostLoadCommand SPCLoader::Apply(RawFile* file)
 			// text format
 			file->GetBytes(0xb1, 32, s);
 			s[32] = '\0';
-			spcFile->tag.artist = string2wstring(std::string(s));
+			s_str = s;
+			spcFile->tag.artist = string2wstring(s_str);
 
 			file->GetBytes(0xa9, 3, s);
 			s[3] = '\0';
@@ -70,9 +75,9 @@ PostLoadCommand SPCLoader::Apply(RawFile* file)
 	if (file->size() >= 0x10208) {
 		char xid6_signature[4] = { 0 };
 		file->GetBytes(0x10200, 4, xid6_signature);
-		UINT xid6_end_offset = 0x10208 + file->GetWord(0x10204);
+		uint32_t xid6_end_offset = 0x10208 + file->GetWord(0x10204);
 		if (memcmp(xid6_signature, "xid6", 4) == 0 && file->size() >= xid6_end_offset) {
-			UINT xid6_offset = 0x10208;
+			uint32_t xid6_offset = 0x10208;
 			while (xid6_offset + 4 < xid6_end_offset)
 			{
 				uint8_t xid6_id = file->GetByte(xid6_offset);
@@ -102,7 +107,8 @@ PostLoadCommand SPCLoader::Apply(RawFile* file)
 				case 1:
 				{
 					// String (data contains null character)
-					std::wstring xid6_string = string2wstring(std::string((char*)(file->buf.data + xid6_offset + 4), xid6_length - 1));
+					std::string s_str = std::string((char*)(file->buf.data + xid6_offset + 4), xid6_length - 1);
+					std::wstring xid6_string = string2wstring(s_str);
 					switch (xid6_id) {
 					case 1:
 						// Song name

@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "FFTFormat.h"
 #include "FFTInstr.h"
 #include "Vab.h"
@@ -185,5 +185,5 @@ bool	WdsInstr::LoadInstr()
 		rgn->AddUnknown(dwOffset + 0x0F, sizeof(uint8_t));
 	}
 
-	return TRUE;
+	return true;
 }

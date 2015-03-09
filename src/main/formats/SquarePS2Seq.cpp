@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "SquarePS2Seq.h"
 #include "SquarePS2Format.h"
 #include "ScaleConversion.h"

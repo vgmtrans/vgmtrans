@@ -17,7 +17,7 @@ END_FORMAT()
 
 // AKAO SNES is used by a lot of games, but they have minor differences each other.
 // Here I classify them into 4 versions roughly, and try to handle game-specific differences by minor version code.
-enum AkaoSnesVersion
+enum AkaoSnesVersion : uint8_t
 {
 	AKAOSNES_NONE = 0,              // Unknown Version
 	AKAOSNES_V1,                    // Final Fantasy 4
@@ -26,7 +26,7 @@ enum AkaoSnesVersion
 	AKAOSNES_V4,                    // Romancing SaGa 2, Final Fantasy 6, etc.
 };
 
-enum AkaoSnesMinorVersion {
+enum AkaoSnesMinorVersion : uint8_t {
 	AKAOSNES_NOMINORVERSION = 0,    // Unknown Minor Version
 	AKAOSNES_V1_FF4,                // Final Fantasy 4
 	AKAOSNES_V2_RS1,                // Romancing SaGa

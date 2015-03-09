@@ -1,9 +1,10 @@
-#include "stdafx.h"
+#include "pch.h"
 
 #include "RawFile.h"
 #include "common.h"
 #include "VGMFile.h"
 #include "Root.h"
+#include "osdepend.h"
 
 using namespace std;
 
@@ -61,15 +62,15 @@ bool RawFile::open(const wstring& theFileName)
 {
 #if _MSC_VER < 1400			//if we're not using VC8, and the new STL that supports widechar filenames in ofstream...
 
-	char newpath[_MAX_PATH];
-	wcstombs(newpath, theFileName, _MAX_PATH);
+	char newpath[PATH_MAX];
+	wcstombs(newpath, theFileName.c_str(), PATH_MAX);
 	file.open(newpath,  ios::in | ios::binary);
 #else
 	file.open(theFileName,  ios::in | ios::binary);
 #endif
 	if (!file.is_open())
 	{
-		Alert(L"File %s could not be opened", theFileName);
+		Alert(L"File %s could not be opened", theFileName.c_str());
 		return false;
 	}
 
@@ -136,7 +137,7 @@ wstring RawFile::getExtFromPath(const wstring& s)
 	{
 		return(s.substr(i+1, s.length( ) - i));
 	}
-	return(_T(""));
+	return(L"");
 }
 
 wstring RawFile::removeExtFromPath(const wstring& s)
@@ -198,7 +199,7 @@ void RawFile::RemoveContainedVGMFile(VGMFile* vgmfile)
 	if (iter != containedVGMFiles.end())
 		containedVGMFiles.erase(iter);
 	else
-		OutputDebugString(L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles.");
+		LogDebug(L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles.");
 	if (containedVGMFiles.size() == 0)
 		pRoot->CloseRawFile(this);
 }

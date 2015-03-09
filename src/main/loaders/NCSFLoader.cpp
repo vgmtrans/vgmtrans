@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "PSFFile.h"
 #include "NCSFLoader.h"
 #include "Root.h"
@@ -135,7 +135,7 @@ const wchar_t* NCSFLoader::load_psf_libs(PSFFile& psf, RawFile* file, unsigned c
 		if (itLibTag == psf.tags.end())
 			break;
 
-		wchar_t tempfn[_MAX_PATH] = { 0 };
+		wchar_t tempfn[PATH_MAX] = { 0 };
 		mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
 
 		wchar_t *fullPath;

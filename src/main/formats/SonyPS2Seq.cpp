@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "SonyPS2Seq.h"
 #include "SonyPS2Format.h"
 #include "ScaleConversion.h"

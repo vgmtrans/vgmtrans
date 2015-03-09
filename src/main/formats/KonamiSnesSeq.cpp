@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesFormat.h"
 #include "ScaleConversion.h"
@@ -634,14 +634,14 @@ bool KonamiSnesTrack::ReadEvent(void)
 					PAN_VOLUME_RIGHT = parentSeq->PAN_VOLUME_RIGHT_V2;
 				}
 
-				newPan = min(newPan, 20);
+				newPan = min(newPan, (uint8_t)20);
 				volumeLeft = PAN_VOLUME_LEFT[newPan];
 				volumeRight = PAN_VOLUME_RIGHT[newPan];
 				break;
 			}
 
 			default:
-				newPan = min(newPan, 40);
+				newPan = min(newPan, (uint8_t)40);
 				volumeLeft = KonamiSnesSeq::PAN_TABLE[40 - newPan];
 				volumeRight = KonamiSnesSeq::PAN_TABLE[newPan];
 			}
@@ -1051,14 +1051,14 @@ bool KonamiSnesTrack::ReadEvent(void)
 	default:
 		desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int)statusByte;
 		AddUnknown(beginOffset, curOffset-beginOffset, L"Unknown Event", desc.str().c_str());
-		pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(), LOG_LEVEL_ERR, std::wstring(L"KonamiSnesSeq")));
+		pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(), LOG_LEVEL_ERR, L"KonamiSnesSeq"));
 		bContinue = false;
 		break;
 	}
 
 	//std::wostringstream ssTrace;
 	//ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
-	//OutputDebugString(ssTrace.str().c_str());
+	//LogDebug(ssTrace.str().c_str());
 
 	return bContinue;
 }

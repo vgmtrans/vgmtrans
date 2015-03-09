@@ -1,6 +1,7 @@
 #if !defined(COMMON_H)
 #define COMMON_H
 
+#include "pch.h"
 #include "osdepend.h"
 #include "helper.h"
 

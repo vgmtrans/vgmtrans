@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "VGMItem.h"
 #include "RawFile.h"
 #include "VGMFile.h"
@@ -81,7 +81,7 @@ void VGMItem::SetGuessedLength(void)
 	return;
 }
 
-void VGMItem::AddToUI(VGMItem* parent, VOID* UI_specific)
+void VGMItem::AddToUI(VGMItem* parent, void* UI_specific)
 {
 	pRoot->UI_AddItem(this, parent, name, UI_specific);
 }
@@ -226,7 +226,7 @@ void VGMContainerItem::SetGuessedLength(void)
 	}
 }
 
-void VGMContainerItem::AddToUI(VGMItem* parent, VOID* UI_specific)
+void VGMContainerItem::AddToUI(VGMItem* parent, void* UI_specific)
 {
 	VGMItem::AddToUI(parent, UI_specific);
 	for (uint32_t i=0; i<containers.size(); i++)

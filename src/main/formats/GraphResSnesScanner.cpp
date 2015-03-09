@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "GraphResSnesScanner.h"
 #include "GraphResSnesSeq.h"
 #include "GraphResSnesInstr.h"
@@ -69,7 +69,7 @@ void GraphResSnesScanner::SearchForGraphResSnesFromARAM (RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search song header
-	UINT ofsLoadSeq;
+	uint32_t ofsLoadSeq;
 	uint16_t addrSeqHeader;
 	if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
 		addrSeqHeader = file->GetByte(ofsLoadSeq + 4) | (file->GetByte(ofsLoadSeq + 8) << 8);
@@ -111,8 +111,8 @@ std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(RawFile* file)
 	std::map<uint8_t, uint8_t> dspRegMap;
 
 	// find a code block which initializes dsp registers
-	UINT ofsDspRegInitASM;
-	UINT addrDspRegList;
+	uint32_t ofsDspRegInitASM;
+	uint32_t addrDspRegList;
 	if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM)) {
 		addrDspRegList = file->GetShort(ofsDspRegInitASM + 7);
 	}

@@ -15,7 +15,7 @@ BEGIN_FORMAT(KonamiSnes)
 END_FORMAT()
 
 
-enum KonamiSnesVersion
+enum KonamiSnesVersion : uint8_t
 {
 	KONAMISNES_NONE = 0,        // Unknown Version
 	KONAMISNES_V1,              // Contra 3, etc.

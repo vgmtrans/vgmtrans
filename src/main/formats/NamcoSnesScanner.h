@@ -2,7 +2,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum NamcoSnesVersion; // see NamcoSnesFormat.h
+enum NamcoSnesVersion : uint8_t; // see NamcoSnesFormat.h
 
 class NamcoSnesScanner :
 	public VGMScanner

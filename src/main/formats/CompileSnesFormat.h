@@ -15,7 +15,7 @@ BEGIN_FORMAT(CompileSnes)
 END_FORMAT()
 
 
-enum CompileSnesVersion
+enum CompileSnesVersion : uint8_t
 {
 	COMPILESNES_NONE = 0,       // Unknown Version
 	COMPILESNES_ALESTE,         // Super Aleste (Space Megaforce)

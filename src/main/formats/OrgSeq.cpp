@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "OrgSeq.h"
 
 DECLARE_FORMAT(Org);

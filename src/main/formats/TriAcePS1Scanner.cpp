@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "TriAcePS1Scanner.h"
 #include "TriAcePS1Seq.h"
 #include "TriAcePS1InstrSet.h"

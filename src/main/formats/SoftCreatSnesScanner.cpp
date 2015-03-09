@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "SoftCreatSnesScanner.h"
 #include "SoftCreatSnesSeq.h"
 #include "SNESDSP.h"
@@ -71,7 +71,7 @@ void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM (RawFile* file)
 	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// search song list
-	UINT ofsLoadSeq;
+	uint32_t ofsLoadSeq;
 	uint16_t addrSeqList;
 	uint8_t songIndexMax;
 	uint8_t headerAlignSize;
@@ -95,7 +95,7 @@ void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM (RawFile* file)
 	}
 
 	// search vcmd address table for version check
-	UINT ofsVCmdExec;
+	uint32_t ofsVCmdExec;
 	uint8_t VCMD_CUTOFF;
 	uint16_t addrVCmdAddressTable;
 	if (file->SearchBytePattern(ptnVCmdExec, ofsVCmdExec)) {

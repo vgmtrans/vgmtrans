@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
@@ -328,7 +328,7 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 				if (realSampNum >= finalSamps.size())
 				{
 					wchar_t log[256];
-					wsprintf(log, L"Sample %u does not exist.", realSampNum);
+					swprintf(log, 256, L"Sample %u does not exist.", realSampNum);
 					pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
 					realSampNum = finalSamps.size() - 1;
 				}
@@ -539,9 +539,7 @@ SynthFile* VGMColl::CreateSynthFile()
 						sampCollNum = i;
 				}
 				if (sampCollNum == finalSampColls.size()) {
-					wchar_t log[256];
-					wsprintf(log, L"SampColl does not exist.");
-					pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
+					pRoot->AddLogItem(new LogItem(L"SampColl does not exist.", LOG_LEVEL_ERR, L"VGMColl"));
 					return NULL;
 				}
 				//   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
@@ -557,7 +555,7 @@ SynthFile* VGMColl::CreateSynthFile()
 				if (realSampNum >= finalSamps.size())
 				{
 					wchar_t log[256];
-					wsprintf(log, L"Sample %u does not exist.", realSampNum);
+					swprintf(log, 256, L"Sample %u does not exist.", realSampNum);
 					pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
 					realSampNum = finalSamps.size() - 1;
 				}

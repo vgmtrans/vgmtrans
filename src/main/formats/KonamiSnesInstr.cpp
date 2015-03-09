@@ -1,8 +1,10 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "KonamiSnesInstr.h"
 #include "Format.h"
 #include "SNESDSP.h"
 #include "KonamiSnesFormat.h"
+
+using namespace std;
 
 // ******************
 // KonamiSnesInstrSet

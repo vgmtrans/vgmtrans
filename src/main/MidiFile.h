@@ -156,7 +156,7 @@ public:
 	// SPECIAL EVENTS
 	//void AddTranspose(int8_t semitones);
 	void InsertGlobalTranspose(uint32_t absTime, int8_t semitones);
-	void AddMarker(uint8_t channel, std::string& markername, uint8_t databyte1, uint8_t databyte2, int8_t priority = PRIORITY_MIDDLE);
+	void AddMarker(uint8_t channel, const std::string& markername, uint8_t databyte1, uint8_t databyte2, int8_t priority = PRIORITY_MIDDLE);
 
 public:
 	MidiFile* parentSeq;
@@ -555,7 +555,7 @@ class MarkerEvent
 	: public MidiEvent
 {
 public:
-	MarkerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, std::string& name, uint8_t databyte1, uint8_t databyte2, int8_t thePriority = PRIORITY_MIDDLE)
+	MarkerEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, const std::string& name, uint8_t databyte1, uint8_t databyte2, int8_t thePriority = PRIORITY_MIDDLE)
 		: MidiEvent(prntTrk, absoluteTime, channel, thePriority), name(name), databyte1(databyte1), databyte2(databyte2)
 	{}
 	virtual MidiEventType GetEventType() { return MIDIEVENT_MARKER; }

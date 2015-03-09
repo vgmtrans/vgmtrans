@@ -1,5 +1,5 @@
 #pragma once
-#include "scanner.h"
+#include "Scanner.h"
 #include "PS1Seq.h"
 #include "Vab.h"
 

@@ -1,5 +1,4 @@
 #pragma once
-//#include "Root.h"
 
 class VGMColl;
 class VGMScanner;
@@ -74,7 +73,7 @@ public:
 	//virtual uint32_t GetFormatID() = 0;
 	virtual VGMScanner* NewScanner() {return NULL;}
 			VGMScanner& GetScanner() {return *scanner;}
-	virtual Matcher* NewMatcher() {return NULL;}
+    virtual Matcher* NewMatcher() {return NULL;}
 	virtual VGMColl* NewCollection();
 	virtual bool OnNewFile(VGMFile* file);
 	virtual bool OnCloseFile(VGMFile* file);

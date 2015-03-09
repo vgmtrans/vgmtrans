@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMInstrSet.h"

@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "HOSAInstr.h"
 #include "HOSAFormat.h"
 #include "VGMRgn.h"

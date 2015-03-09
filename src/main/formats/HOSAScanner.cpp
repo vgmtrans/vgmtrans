@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "HOSAScanner.h"
 #include "HOSASeq.h"
 #include "HOSAInstr.h"

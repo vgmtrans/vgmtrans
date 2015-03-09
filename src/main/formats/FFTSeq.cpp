@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "FFTSeq.h"
 #include "FFTFormat.h"
 
@@ -42,7 +42,7 @@ bool FFTSeq::GetHeaderInfo(void)
 	int titleLength = ptPercussionTbl-ptSongTitle;
 	char* songtitle = new char[titleLength];
 	GetBytes(dwOffset+ptSongTitle, titleLength, songtitle);
-	this->name = string2wstring(string(songtitle));
+	this->name = std::wstring(songtitle, songtitle+titleLength);
 	delete[] songtitle;
 
 	//wostringstream songnameStream;

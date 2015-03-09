@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "NDSSeq.h"
 #include "NDSFormat.h"
 
@@ -50,7 +50,7 @@ bool NDSSeq::GetTrackPointers(void)
 		while (b == 0x80)
 		{
 			register uint32_t value;
-			register UCHAR c;
+			register uint8_t c;
 			uint32_t beginOffset = offset;
 			offset++;
 			if ( (value = GetByte(offset++)) & 0x80 )
