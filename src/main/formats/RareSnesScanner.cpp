@@ -119,9 +119,9 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 {
 	RareSnesVersion version = RARESNES_NONE;
 	uint32_t ofsSongLoadASM;
-    uint32_t ofsVCmdExecASM;
-    uint32_t addrSeqHeader;
-    uint32_t addrVCmdTable;
+	uint32_t ofsVCmdExecASM;
+	uint32_t addrSeqHeader;
+	uint32_t addrVCmdTable;
 	wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
 	// find a sequence
@@ -178,24 +178,24 @@ void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
 	}
 
 	// Rare engine has a instrument # <--> SRCN # table, find it
-    uint32_t ofsReadSRCNASM;
+	uint32_t ofsReadSRCNASM;
 	if (!file->SearchBytePattern(ptnReadSRCNTable, ofsReadSRCNASM))
 	{
 		return;
 	}
-    uint32_t addrSRCNTable = file->GetShort(ofsReadSRCNASM + 5);
+	uint32_t addrSRCNTable = file->GetShort(ofsReadSRCNASM + 5);
 	if (addrSRCNTable + 0x100 > 0x10000)
 	{
 		return;
 	}
 
 	// find DIR address
-    uint32_t ofsSetDIRASM;
+	uint32_t ofsSetDIRASM;
 	if (!file->SearchBytePattern(ptnLoadDIR, ofsSetDIRASM))
 	{
 		return;
 	}
-    uint32_t spcDirAddr = file->GetByte(ofsSetDIRASM + 4) << 8;
+	uint32_t spcDirAddr = file->GetByte(ofsSetDIRASM + 4) << 8;
 
 	// scan SRCN table
 	RareSnesInstrSet * newInstrSet = new RareSnesInstrSet(file, addrSRCNTable, spcDirAddr, newSeq->instrUnityKeyHints, newSeq->instrPitchHints, newSeq->instrADSRHints);

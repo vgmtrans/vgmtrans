@@ -36,7 +36,7 @@ PostLoadCommand GSFLoader::Apply(RawFile* file)
 			complaint = psf_read_exe(file, exebuf, exebufsize);
 			if(complaint) 
 			{
-                Alert(complaint);
+				Alert(complaint);
 				delete[] exebuf;
 				return KEEP_IT; 
 			}

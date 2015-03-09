@@ -220,7 +220,7 @@ TriAcePS1Seq* TriAcePS1Scanner::TriAceSLZDecompress(RawFile* file, uint32_t cfOf
 		}
 	}
 	if (ufOff > ufSize)
-        Alert(L"ufOff > ufSize!");
+		Alert(L"ufOff > ufSize!");
 
 	//If we had to use DEFAULT_UFSIZE because the uncompressed file size was not given (Valkyrie Profile),
 	//then create a new buffer of the correct size now that we know it, and delete the old one.
