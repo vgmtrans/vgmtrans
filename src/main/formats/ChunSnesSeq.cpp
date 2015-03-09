@@ -882,7 +882,7 @@ void ChunSnesTrack::GetVolumeBalance(int8_t pan, double & volumeLeft, double & v
 		volumeRight = 1.0;
 	}
 	else {
-		uint8_t volumeRateByte = 255 - (min(abs(pan), 127) * 2 + 1);
+		uint8_t volumeRateByte = 255 - (min((int8_t)abs(pan), (int8_t)127) * 2 + 1);
 
 		// approx (volumeRateByte + 1) / 256
 		double volumeRate;
