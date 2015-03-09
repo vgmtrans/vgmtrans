@@ -441,6 +441,9 @@ add_executable(vgmtrans ${SOURCE_FILES} ${UI_RESOURCES})
 # The Qt5Widgets_LIBRARIES variable also includes QtGui and QtCore
 target_link_libraries(vgmtrans ${Qt5Widgets_LIBRARIES})
 
+QT5_USE_MODULES(vgmtrans Widgets Core)
+
+
 if (MSVC)
     #set(ZLIB_INCLUDE_DIR "lib/zlib/include")
     #set(ZLIB_LIBRARY "lib/zlib/lib/win32")
