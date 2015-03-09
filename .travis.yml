@@ -4,23 +4,20 @@ language: cpp
 
 compiler:
   - gcc
-  - clang
 
 branches:
   only:
     - qt
 
 before_install:
-  - g++ --version
   - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
   - sudo add-apt-repository -y ppa:ubuntu-sdk-team/ppa
   - sudo apt-get update -qq
-  - sudo apt-get install -qq gcc-4.8 g++-4.8
+  - sudo apt-get install -qq gcc-4.9 g++-4.9
   - sudo apt-get install -qq qtdeclarative5-dev
   - sudo apt-get install -qq cmake libglib2.0-dev libfluidsynth-dev
-# We want to compile with g++ 4.8 when rather than the default g++
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 90
-  - g++ --version
+# We want to compile with g++ 4.9 when rather than the default g++
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 90
 
 before_script:
   - cd src/
