@@ -36,24 +36,24 @@ PostLoadCommand SPCLoader::Apply(RawFile* file)
 
 		file->GetBytes(0x2e, 32, s);
 		s[32] = '\0';
-        std::string s_str = s;
+		std::string s_str = s;
 		spcFile->tag.title = string2wstring(s_str);
 
 		file->GetBytes(0x4e, 32, s);
 		s[32] = '\0';
-        s_str = s;
+		s_str = s;
 		spcFile->tag.album = string2wstring(s_str);
 
 		file->GetBytes(0x7e, 32, s);
 		s[32] = '\0';
-        s_str = s;
+		s_str = s;
 		spcFile->tag.comment = string2wstring(s_str);
 
 		if (file->GetByte(0xd2) < 0x30) {
 			// binary format
 			file->GetBytes(0xb0, 32, s);
 			s[32] = '\0';
-            s_str = s;
+			s_str = s;
 			spcFile->tag.artist = string2wstring(s_str);
 
 			spcFile->tag.length = (double) (file->GetWord(0xa9) & 0xffffff);
@@ -62,7 +62,7 @@ PostLoadCommand SPCLoader::Apply(RawFile* file)
 			// text format
 			file->GetBytes(0xb1, 32, s);
 			s[32] = '\0';
-            s_str = s;
+			s_str = s;
 			spcFile->tag.artist = string2wstring(s_str);
 
 			file->GetBytes(0xa9, 3, s);
@@ -107,7 +107,7 @@ PostLoadCommand SPCLoader::Apply(RawFile* file)
 				case 1:
 				{
 					// String (data contains null character)
-                    std::string s_str = std::string((char*)(file->buf.data + xid6_offset + 4), xid6_length - 1);
+					std::string s_str = std::string((char*)(file->buf.data + xid6_offset + 4), xid6_length - 1);
 					std::wstring xid6_string = string2wstring(s_str);
 					switch (xid6_id) {
 					case 1:

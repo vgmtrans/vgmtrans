@@ -9,7 +9,7 @@
 // ****************
 
 class NinSnesInstrSet :
-		public VGMInstrSet
+	public VGMInstrSet
 {
 public:
 	NinSnesInstrSet(RawFile* file, NinSnesVersion ver, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name = L"NinSnesInstrSet");
@@ -33,7 +33,7 @@ protected:
 // *************
 
 class NinSnesInstr
-		: public VGMInstr
+	: public VGMInstr
 {
 public:
 	NinSnesInstr(VGMInstrSet* instrSet, NinSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name = L"NinSnesInstr");
@@ -58,7 +58,7 @@ protected:
 // ***********
 
 class NinSnesRgn
-		: public VGMRgn
+	: public VGMRgn
 {
 public:
 	NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset, uint16_t konamiTuningTableAddress = 0, uint8_t konamiTuningTableSize = 0);

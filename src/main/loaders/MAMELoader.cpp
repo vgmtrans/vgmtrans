@@ -175,7 +175,7 @@ PostLoadCommand MAMELoader::Apply(RawFile* file)
 	if (file->GetExtension() != L"zip")
 		return KEEP_IT;
 
-    wstring fullfilename_w = file->GetFileName();
+	wstring fullfilename_w = file->GetFileName();
 	string fullfilename = wstring2string(fullfilename_w);
 	const char* endoffilename = strrchr(fullfilename.c_str(), '.');
 	char filename[10] = { 0 };

@@ -18,7 +18,7 @@ typedef struct _MAMERomGroupEntry
 	_MAMERomGroupEntry() : file(NULL) {}
 	template < class T > bool GetAttribute( const std::string& attrName, T* out )
 	{
-        string strValue = attributes[attrName];
+		string strValue = attributes[attrName];
 		if (strValue.empty())
 			return false;			//Attribute name does not exist.
 
