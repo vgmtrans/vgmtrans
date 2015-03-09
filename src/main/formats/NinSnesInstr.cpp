@@ -9,10 +9,10 @@
 // ****************
 
 NinSnesInstrSet::NinSnesInstrSet(RawFile* file, NinSnesVersion ver, uint32_t offset, uint32_t spcDirAddr, const std::wstring & name) :
-		VGMInstrSet(NinSnesFormat::name, file, offset, 0, name), version(ver),
-		spcDirAddr(spcDirAddr),
-		konamiTuningTableAddress(0),
-		konamiTuningTableSize(0)
+	VGMInstrSet(NinSnesFormat::name, file, offset, 0, name), version(ver),
+	spcDirAddr(spcDirAddr),
+	konamiTuningTableAddress(0),
+	konamiTuningTableSize(0)
 {
 }
 
@@ -45,7 +45,7 @@ bool NinSnesInstrSet::GetInstrPointers()
 		// skip blank slot (Kirby Super Star)
 		if (version != NINSNES_EARLIER) {
 			if (GetByte(addrInstrHeader) == 0xff && GetByte(addrInstrHeader + 1) == 0xff && GetByte(addrInstrHeader + 2) == 0xff &&
-					GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff && GetByte(addrInstrHeader + 5) == 0xff)
+				GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff && GetByte(addrInstrHeader + 5) == 0xff)
 			{
 				continue;
 			}
@@ -62,7 +62,7 @@ bool NinSnesInstrSet::GetInstrPointers()
 		uint16_t addrLoopStart = GetShort(offDirEnt + 2);
 
 		if (addrSampStart == 0x0000 && addrLoopStart == 0x0000 ||
-				addrSampStart == 0xffff && addrLoopStart == 0xffff) {
+			addrSampStart == 0xffff && addrLoopStart == 0xffff) {
 			// example: Lemmings - Stage Clear (00 00 00 00)
 			// example: Yoshi's Island - Bowser (ff ff ff ff)
 			continue;
@@ -114,10 +114,10 @@ bool NinSnesInstrSet::GetInstrPointers()
 // *************
 
 NinSnesInstr::NinSnesInstr(VGMInstrSet* instrSet, NinSnesVersion ver, uint32_t offset, uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr, const std::wstring& name) :
-		VGMInstr(instrSet, offset, NinSnesInstr::ExpectedSize(ver), theBank, theInstrNum, name), version(ver),
-		spcDirAddr(spcDirAddr),
-		konamiTuningTableAddress(0),
-		konamiTuningTableSize(0)
+	VGMInstr(instrSet, offset, NinSnesInstr::ExpectedSize(ver), theBank, theInstrNum, name), version(ver),
+	spcDirAddr(spcDirAddr),
+	konamiTuningTableAddress(0),
+	konamiTuningTableSize(0)
 {
 }
 
@@ -203,7 +203,7 @@ uint32_t NinSnesInstr::ExpectedSize(NinSnesVersion version)
 // ***********
 
 NinSnesRgn::NinSnesRgn(NinSnesInstr* instr, NinSnesVersion ver, uint32_t offset, uint16_t konamiTuningTableAddress, uint8_t konamiTuningTableSize) :
-		VGMRgn(instr, offset, NinSnesInstr::ExpectedSize(ver)), version(ver)
+	VGMRgn(instr, offset, NinSnesInstr::ExpectedSize(ver)), version(ver)
 {
 	uint8_t srcn = GetByte(offset);
 	uint8_t adsr1 = GetByte(offset + 1);

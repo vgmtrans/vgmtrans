@@ -59,6 +59,7 @@ inline void PushBackStringOnVector(std::vector<uint8_t> &theVector, std::string 
 
 template <class Tstring> inline Tstring FormatString(const Tstring fmt, ...)
 {
+	// TODO: either fix up this function or rewrite usages of it (probably preferable)
 	return fmt;
 //	va_list va;
 //	std::vector<typename Tstring::value_type> output(128);

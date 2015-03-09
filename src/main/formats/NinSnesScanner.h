@@ -3,7 +3,7 @@
 #include "BytePattern.h"
 
 class NinSnesScanner :
-		public VGMScanner
+	public VGMScanner
 {
 public:
 	NinSnesScanner(void)
