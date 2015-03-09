@@ -440,29 +440,29 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 
 				switch (metaNum)
 				{
-					case 0x51 :
-						AddTempo(beginOffset, curOffset+metaLen-beginOffset, (GetShortBE(curOffset) << 8) | GetByte(curOffset + 2));
-						curOffset += metaLen;
-						break;
+				case 0x51 :
+					AddTempo(beginOffset, curOffset+metaLen-beginOffset, (GetShortBE(curOffset) << 8) | GetByte(curOffset + 2));
+					curOffset += metaLen;
+					break;
 
-					case 0x58 :
-					{
-						uint8_t numer = GetByte(curOffset);
-						uint8_t denom = GetByte(curOffset + 1);
-						AddTimeSig(beginOffset, curOffset+metaLen-beginOffset, numer, 1<<denom, (uint8_t)GetPPQN());
-						curOffset += metaLen;
-						break;
-					}
+				case 0x58 :
+				{
+					uint8_t numer = GetByte(curOffset);
+					uint8_t denom = GetByte(curOffset + 1);
+					AddTimeSig(beginOffset, curOffset+metaLen-beginOffset, numer, 1<<denom, (uint8_t)GetPPQN());
+					curOffset += metaLen;
+					break;
+				}
 
-					case 0x2F : // apparently not used, but just in case.
-						AddEndOfTrack(beginOffset, curOffset+metaLen-beginOffset);
-						curOffset += metaLen;
-						return false;
+				case 0x2F : // apparently not used, but just in case.
+					AddEndOfTrack(beginOffset, curOffset+metaLen-beginOffset);
+					curOffset += metaLen;
+					return false;
 
-					default :
-						AddUnknown(beginOffset, curOffset+metaLen-beginOffset);
-						curOffset += metaLen;
-						break;
+				default :
+					AddUnknown(beginOffset, curOffset+metaLen-beginOffset);
+					curOffset += metaLen;
+					break;
 				}
 			}
 			else
