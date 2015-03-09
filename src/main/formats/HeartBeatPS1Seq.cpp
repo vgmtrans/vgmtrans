@@ -68,8 +68,8 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 	if (curOffset + 3 <= rawfile->size())
 	{
 		if (GetByte(curOffset) == 0xff &&
-				GetByte(curOffset + 1) == 0x2f &&
-				GetByte(curOffset + 2) == 0x00)
+			GetByte(curOffset + 1) == 0x2f &&
+			GetByte(curOffset + 2) == 0x00)
 		{
 			curOffset += 3;
 			AddEndOfTrack(beginOffset, curOffset-beginOffset);
@@ -337,17 +337,17 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 			case 98:
 				switch (value)
 				{
-					case 20 :
-						AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #20", L"", CLR_MISC);
-						break;
+				case 20 :
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #20", L"", CLR_MISC);
+					break;
 
-					case 30 :
-						AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #30", L"", CLR_MISC);
-						break;
+				case 30 :
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1 #30", L"", CLR_MISC);
+					break;
 
-					default:
-						AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1", L"", CLR_MISC);
-						break;
+				default:
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 1", L"", CLR_MISC);
+					break;
 				}
 
 				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
@@ -358,17 +358,17 @@ bool HeartBeatPS1Seq::ReadEvent(void)
 			case 99 :							//(0x63) nrpn msb
 				switch (value)
 				{
-					case 20 :
-						AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Start", L"", CLR_LOOP);
-						break;
+				case 20 :
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop Start", L"", CLR_LOOP);
+					break;
 
-					case 30 :
-						AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", L"", CLR_LOOP);
-						break;
+				case 30 :
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"Loop End", L"", CLR_LOOP);
+					break;
 
-					default:
-						AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 2", L"", CLR_MISC);
-						break;
+				default:
+					AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN 2", L"", CLR_MISC);
+					break;
 				}
 
 				if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
