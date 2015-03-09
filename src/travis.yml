@@ -1,0 +1,22 @@
+# Travis-CI configuration file for VGMTrans
+
+language: cpp
+
+compiler:
+  - gcc
+  - clang
+
+branches:
+  only:
+    - qt
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq cmake qtdeclarative5-dev libglib2.0-dev libfluidsynth-dev
+
+before_script:
+  - cd src/
+  
+script:
+  - cmake CMakeLists.txt
+  - make
