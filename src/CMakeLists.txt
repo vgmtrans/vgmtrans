@@ -22,10 +22,16 @@ set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set ( CMAKE_OSX_ARCHITECTURES "x86_64;" )
-#set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libstdc++ -g3 -Wall -O0" )
-set ( CMAKE_CXX_FLAGS "-std=c++11 -w -g3 -Wall -O0" )
-#-Wl,-subsystem,windows
-#set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libc++ -g3 -Wall -O0" )
+
+if(MSVC)
+  set(CMAKE_CXX_FLAGS "/EHsc")
+else()
+  #set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libstdc++ -g3 -Wall -O0" )
+  set ( CMAKE_CXX_FLAGS "-std=c++11 -w -g3 -Wall -O0" )
+  #-Wl,-subsystem,windows
+  #set ( CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libc++ -g3 -Wall -O0" )
+endif()
+
 #find_package(Qt5 COMPONENTS Widgets Declarative)
 
 
