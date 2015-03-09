@@ -30,8 +30,6 @@
 	#define new DEBUG_NEW
 #endif
 
-#define _USE_MATH_DEFINES
-
 
 
 
