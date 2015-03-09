@@ -1,4 +1,4 @@
-#include <QApplication.h>
+#include <QApplication>
 #include "dropsitewindow.h"
 #include "mainwindow.h"
 #include "QtVGMRoot.h"
