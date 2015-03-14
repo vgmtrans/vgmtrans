@@ -154,6 +154,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -176,10 +177,10 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <AdditionalIncludeDirectories>./main;./main/loaders;./main/formats;./ui/windows;./ui/windows/include;./ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;UNICODE;STRICT;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <PrecompiledHeader>Create</PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -217,6 +218,7 @@
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -316,6 +318,8 @@
     <ClCompile Include="ui\windows\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ui\windows\VGMCollListView.cpp" />
     <ClCompile Include="ui\windows\VGMFileListView.cpp" />
