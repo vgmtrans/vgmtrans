@@ -7,9 +7,11 @@
 
 DECLARE_FORMAT(HeartBeatPS1)
 
-HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile* file, uint32_t offset)
-		: VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset)
+HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile* file, uint32_t offset, uint32_t length, const std::wstring& name)
+	: VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset, name)
 {
+	this->length() = length;
+
 	UseReverb();
 	//bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
@@ -18,31 +20,58 @@ HeartBeatPS1Seq::~HeartBeatPS1Seq(void)
 {
 }
 
-
 bool HeartBeatPS1Seq::GetHeaderInfo(void)
 {
-	name() = L"HeartBeatPS1Seq";
+	uint32_t curOffset = offset();
 
-	if (offset() + 0x10 > rawfile->size())
-	{
+	uint32_t seq_size = GetWord(curOffset);
+	if (seq_size < 0x13) {
 		return false;
 	}
 
-	SetPPQN(GetShortBE(offset()+8));
+	curOffset += 0x0c;
+
+	// validate instrument header
+	uint32_t total_instr_size = 0;
+	for (uint8_t instrset_index = 0; instrset_index < 4; instrset_index++) {
+		uint32_t sampcoll_size = GetWord(curOffset);
+		uint32_t instrset_size = GetWord(curOffset + 0x04);
+
+		total_instr_size += sampcoll_size;
+		total_instr_size += instrset_size;
+
+		curOffset += 0x0c;
+	}
+
+	// check total file size
+	uint32_t total_size = HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size + seq_size;
+	if (total_size > 0x200000 || offset() + total_size > rawfile->size()) {
+		return false;
+	}
+
+	// set file length if not specified
+	if (length() == 0) {
+		length() = total_size;
+	}
+
+	// save sequence data offset
+	seqHeaderOffset = offset() + HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size;
+
+	SetPPQN(GetShortBE(seqHeaderOffset + 8));
 	nNumTracks = 16;
 
-	uint8_t numer = GetByte(offset()+0x0D);
-	uint8_t denom = GetByte(offset()+0x0E);
-	if (numer == 0 || numer > 32)				//sanity check
+	uint8_t numer = GetByte(seqHeaderOffset + 0x0D);
+	uint8_t denom = GetByte(seqHeaderOffset + 0x0E);
+	if (numer == 0 || numer > 32) {				//sanity check
 		return false;
+	}
 
-	uint8_t trackCount = GetByte(offset()+0x0F);
-	if (trackCount > 0 && trackCount <= 16)
-	{
+	uint8_t trackCount = GetByte(seqHeaderOffset + 0x0F);
+	if (trackCount > 0 && trackCount <= 16) {
 		nNumTracks = trackCount;
 	}
 
-	SetEventsOffset(offset() + 0x10);
+	SetEventsOffset(seqHeaderOffset + 0x10);
 
 	return true;
 }
@@ -51,12 +80,12 @@ void HeartBeatPS1Seq::ResetVars(void)
 {
 	VGMSeqNoTrks::ResetVars();
 
-	uint32_t initialTempo = (GetShortBE(offset()+10) << 8) | GetByte(offset()+10+2);
-	AddTempo(offset()+10, 3, initialTempo);
+	uint32_t initialTempo = (GetShortBE(seqHeaderOffset + 10) << 8) | GetByte(seqHeaderOffset + 10 + 2);
+	AddTempo(seqHeaderOffset + 10, 3, initialTempo);
 
-	uint8_t numer = GetByte(offset()+0x0D);
-	uint8_t denom = GetByte(offset()+0x0E);
-	AddTimeSig(offset()+0x0D, 2, numer, 1<<denom, (uint8_t)GetPPQN());
+	uint8_t numer = GetByte(seqHeaderOffset + 0x0D);
+	uint8_t denom = GetByte(seqHeaderOffset + 0x0E);
+	AddTimeSig(seqHeaderOffset + 0x0D, 2, numer, 1 << denom, (uint8_t)GetPPQN());
 }
 
 bool HeartBeatPS1Seq::ReadEvent(void)
