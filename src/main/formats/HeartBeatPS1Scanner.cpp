@@ -105,8 +105,14 @@ std::vector<VGMFile*> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile*
 
 			// check PSX-ADPCM content
 			if (sampcoll_size != 0) {
+				uint32_t sampLoopInfoOffset = offset + HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size + 1;
+				if (sampLoopInfoOffset >= file->size()) {
+					valid_instrset = false;
+					break;
+				}
+
 				// check unused bits of the first loop flag
-				uint8_t sampLoopInfo = file->GetByte(offset + HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size + 1);
+				uint8_t sampLoopInfo = file->GetByte(sampLoopInfoOffset);
 				if ((sampLoopInfo & 0xF8) != 0) {
 					valid_instrset = false;
 					break;
@@ -144,7 +150,7 @@ std::vector<VGMFile*> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile*
 		}
 
 		if (seq_size != 0) {
-			HeartBeatPS1Seq* newHeartBeatPS1Seq = new HeartBeatPS1Seq(file, offset, seq_size);
+			HeartBeatPS1Seq* newHeartBeatPS1Seq = new HeartBeatPS1Seq(file, offset, total_size);
 			if (newHeartBeatPS1Seq->LoadVGMFile()) {
 				loadedFiles.push_back(newHeartBeatPS1Seq);
 			}
