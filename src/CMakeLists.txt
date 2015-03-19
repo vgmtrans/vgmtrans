@@ -108,8 +108,8 @@ set(SOURCE_FILES
     main/formats/HeartBeatPS1Format.h
     main/formats/HeartBeatPS1Seq.cpp
     main/formats/HeartBeatPS1Seq.h
-    main/formats/HeartBeatPS1SeqScanner.cpp
-    main/formats/HeartBeatPS1SeqScanner.h
+    main/formats/HeartBeatPS1Scanner.cpp
+    main/formats/HeartBeatPS1Scanner.h
     main/formats/HeartBeatSnesFormat.h
     main/formats/HeartBeatSnesInstr.cpp
     main/formats/HeartBeatSnesInstr.h
