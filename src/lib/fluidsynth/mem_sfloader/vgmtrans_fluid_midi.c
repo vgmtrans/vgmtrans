@@ -802,46 +802,6 @@ vgmtrans_new_fluid_track(int num)
 *     fluid_player
 */
 
-/**
-* Create a new MIDI player.
-* @param synth Fluid synthesizer instance to create player for
-* @return New MIDI player instance or NULL on error (out of memory)
-*/
-fluid_player_t *
-new_vgmtrans_fluid_player(fluid_synth_t *synth)
-{
-    int i;
-    fluid_player_t *player;
-    player = FLUID_NEW(fluid_player_t);
-    if (player == NULL) {
-        FLUID_LOG(FLUID_ERR, "Out of memory");
-        return NULL;
-    }
-    player->status = FLUID_PLAYER_READY;
-    player->loop = 1;
-    player->ntracks = 0;
-    for (i = 0; i < MAX_NUMBER_OF_TRACKS; i++) {
-        player->track[i] = NULL;
-    }
-    player->synth = synth;
-    player->system_timer = NULL;
-    player->sample_timer = NULL;
-    player->playlist = NULL;
-    player->currentfile = NULL;
-    player->division = 0;
-    player->send_program_change = 1;
-    player->miditempo = 480000;
-    player->deltatime = 4.0;
-    player->cur_msec = 0;
-    player->cur_ticks = 0;
-    fluid_player_set_playback_callback(player, fluid_synth_handle_midi_event, synth);
-
-    player->use_system_timer = FALSE;
-    player->reset_synth_between_songs = TRUE;
-
-    return player;
-}
-
 /*
  * vgmtrans_fluid_player_load
  */
