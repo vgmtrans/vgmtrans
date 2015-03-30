@@ -7,8 +7,6 @@
 #ifndef __MusicPlayer_H_
 #define __MusicPlayer_H_
 
-void bloggityBlog2();
-
 class MusicPlayer {
 
 private:
@@ -32,10 +30,10 @@ public:
 
 
 private:
-    fluid_settings_t* settings;
-    fluid_synth_t* synth;
-    fluid_audio_driver_t* adriver;
-    fluid_player_t* player;
+    fluid_settings_t* settings = NULL;
+    fluid_synth_t* synth = NULL;
+    fluid_audio_driver_t* adriver = NULL;
+    fluid_player_t* player = NULL;
     int sfont_id;
 };
 

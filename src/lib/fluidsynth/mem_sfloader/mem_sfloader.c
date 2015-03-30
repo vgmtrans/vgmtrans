@@ -21,7 +21,7 @@
  * 02110-1301, USA
  */
 
-
+#include <pthread.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
@@ -67,6 +67,13 @@ typedef uint32_t guint32;
 //#define GPOINTER_TO_INT(p)	((gint)  (glong) (p))
 //#define GINT_TO_POINTER(i)	((gpointer) (glong) (i))
 
+/* Regular mutex */
+typedef pthread_mutex_t fluid_mutex_t;
+#define FLUID_MUTEX_INIT          PTHREAD_MUTEX_INITIALIZER
+#define fluid_mutex_destroy(_m)   pthread_mutex_free(&(_m))
+#define fluid_mutex_lock(_m)      pthread_mutex_lock(&(_m))
+#define fluid_mutex_unlock(_m)    pthread_mutex_unlock(&(_m))
+
 /***************************************************************
 *
 *                           SFONT LOADER
@@ -94,7 +101,7 @@ int delete_memsfloader(fluid_sfloader_t* loader)
     if (loader) {
         FLUID_FREE(loader);
     }
-    return OK;
+    return FLUID_OK;
 }
 
 fluid_sfont_t* memsfloader_load(fluid_sfloader_t* loader, const char* filename)
@@ -268,13 +275,13 @@ typedef struct _cached_sampledata_t {
 } cached_sampledata_t;
 
 static cached_sampledata_t* all_cached_sampledata = NULL;
-//static fluid_mutex_t cached_sampledata_mutex = FLUID_MUTEX_INIT;
+static fluid_mutex_t cached_sampledata_mutex = FLUID_MUTEX_INIT;
 
 static int get_file_modification_time(char *filename, time_t *modification_time)
 {
 #if defined(WIN32) || defined(__OS2__)
   *modification_time = 0;
-  return OK;
+  return FLUID_OK;
 #else
     struct stat buf;
 
@@ -283,7 +290,7 @@ static int get_file_modification_time(char *filename, time_t *modification_time)
     }
 
     *modification_time = buf.st_mtime;
-    return OK;
+    return FLUID_OK;
 #endif
 }
 
@@ -295,7 +302,7 @@ static int cached_sampledata_load(const void ** data, unsigned int samplepos,
     cached_sampledata_t* cached_sampledata = NULL;
     time_t modification_time;
 
-//    fluid_mutex_lock(cached_sampledata_mutex);
+    fluid_mutex_lock(cached_sampledata_mutex);
 
 //    if (get_file_modification_time(filename, &modification_time) == FLUID_FAILED) {
 //        FLUID_LOG(FLUID_WARN, "Unable to read modificaton time of soundfont file.");
@@ -362,12 +369,12 @@ static int cached_sampledata_load(const void ** data, unsigned int samplepos,
     /* Lock the memory to disable paging. It's okay if this fails. It
        probably means that the user doesn't have to required permission.  */
     cached_sampledata->mlock = 0;
-    if (try_mlock) {
+//    if (try_mlock) {
 //        if (fluid_mlock(loaded_sampledata, samplesize) != 0)
 //            FLUID_LOG(FLUID_WARN, "Failed to pin the sample data to RAM; swapping is possible.");
 //        else
-            cached_sampledata->mlock = try_mlock;
-    }
+//            cached_sampledata->mlock = try_mlock;
+//    }
 
     /* If this machine is big endian, the sample have to byte swapped  */
     if (FLUID_IS_BIG_ENDIAN) {
@@ -401,9 +408,9 @@ static int cached_sampledata_load(const void ** data, unsigned int samplepos,
 
 
     success_exit:
-//    fluid_mutex_unlock(cached_sampledata_mutex);
+    fluid_mutex_unlock(cached_sampledata_mutex);
     *sampledata = loaded_sampledata;
-    return OK;
+    return FLUID_OK;
 
     error_exit:
 //    if (fd != NULL) {
@@ -414,13 +421,13 @@ static int cached_sampledata_load(const void ** data, unsigned int samplepos,
     }
 
     if (cached_sampledata != NULL) {
-        if (cached_sampledata->filename != NULL) {
-            FLUID_FREE(cached_sampledata->filename);
-        }
+//        if (cached_sampledata->filename != NULL) {
+//            FLUID_FREE(cached_sampledata->filename);
+//        }
         FLUID_FREE(cached_sampledata);
     }
 
-//    fluid_mutex_unlock(cached_sampledata_mutex);
+    fluid_mutex_unlock(cached_sampledata_mutex);
     *sampledata = NULL;
     return FLUID_FAILED;
 }
@@ -430,7 +437,7 @@ static int cached_sampledata_unload(const short *sampledata)
     cached_sampledata_t* prev = NULL;
     cached_sampledata_t* cached_sampledata;
 
-//    fluid_mutex_lock(cached_sampledata_mutex);
+    fluid_mutex_lock(cached_sampledata_mutex);
     cached_sampledata = all_cached_sampledata;
 
     while (cached_sampledata != NULL) {
@@ -442,7 +449,7 @@ static int cached_sampledata_unload(const short *sampledata)
 //                if (cached_sampledata->mlock)
 //                    fluid_munlock(cached_sampledata->sampledata, cached_sampledata->samplesize);
                 FLUID_FREE((short*) cached_sampledata->sampledata);
-                FLUID_FREE(cached_sampledata->filename);
+//                FLUID_FREE(cached_sampledata->filename);
 
                 if (prev != NULL) {
                     prev->next = cached_sampledata->next;
@@ -464,11 +471,11 @@ static int cached_sampledata_unload(const short *sampledata)
     goto error_exit;
 
     success_exit:
-//    fluid_mutex_unlock(cached_sampledata_mutex);
-    return OK;
+    fluid_mutex_unlock(cached_sampledata_mutex);
+    return FLUID_OK;
 
     error_exit:
-//    fluid_mutex_unlock(cached_sampledata_mutex);
+    fluid_mutex_unlock(cached_sampledata_mutex);
     return FLUID_FAILED;
 }
 
@@ -573,7 +580,7 @@ int delete_memsfont(memsfont_t* sfont)
     }
 
     FLUID_FREE(sfont);
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -597,7 +604,7 @@ int memsfont_load(memsfont_t* sfont, const void* data)
     fluid_sample_t* sample;
     mempreset_t* preset;
 
-    sfont->filename = "SF2 Filename";//FLUID_MALLOC(1 + FLUID_STRLEN(file));
+//    sfont->filename = FLUID_MALLOC(1 + FLUID_STRLEN(file));
 //    if (sfont->filename == NULL) {
 //        FLUID_LOG(FLUID_ERR, "Out of memory");
 //        return FLUID_FAILED;
@@ -617,7 +624,7 @@ int memsfont_load(memsfont_t* sfont, const void* data)
     sfont->samplesize = sfdata->samplesize;
 
     /* load sample data in one block */
-    if (memsfont_load_sampledata(sfont, data) != OK)
+    if (memsfont_load_sampledata(sfont, data) != FLUID_OK)
         goto err_exit;
 
     /* Create all the sample headers */
@@ -628,7 +635,7 @@ int memsfont_load(memsfont_t* sfont, const void* data)
         sample = new_sample();
         if (sample == NULL) goto err_exit;
 
-        if (sample_import_sfont(sample, sfsample, sfont) != OK)
+        if (sample_import_sfont(sample, sfsample, sfont) != FLUID_OK)
             goto err_exit;
 
         /* Store reference to FluidSynth sample in SFSample for later IZone fixups */
@@ -646,7 +653,7 @@ int memsfont_load(memsfont_t* sfont, const void* data)
         preset = new_mempreset(sfont);
         if (preset == NULL) goto err_exit;
 
-        if (mempreset_import_sfont(preset, sfpreset, sfont) != OK)
+        if (mempreset_import_sfont(preset, sfpreset, sfont) != FLUID_OK)
             goto err_exit;
 
         memsfont_add_preset(sfont, preset);
@@ -654,7 +661,7 @@ int memsfont_load(memsfont_t* sfont, const void* data)
     }
     mem_sfont_close (sfdata);
 
-    return OK;
+    return FLUID_OK;
 
     err_exit:
     mem_sfont_close (sfdata);
@@ -668,7 +675,7 @@ int memsfont_load(memsfont_t* sfont, const void* data)
 int memsfont_add_sample(memsfont_t* sfont, fluid_sample_t* sample)
 {
     sfont->sample = fluid_list_append(sfont->sample, sample);
-    return OK;
+    return FLUID_OK;
 }
 
 /* memsfont_add_preset
@@ -695,7 +702,7 @@ int memsfont_add_preset(memsfont_t* sfont, mempreset_t* preset)
                     preset->next = cur;
                     prev->next = preset;
                 }
-                return OK;
+                return FLUID_OK;
             }
             prev = cur;
             cur = cur->next;
@@ -703,7 +710,7 @@ int memsfont_add_preset(memsfont_t* sfont, mempreset_t* preset)
         preset->next = NULL;
         prev->next = preset;
     }
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -785,10 +792,10 @@ new_mempreset(memsfont_t* sfont)
 int
 delete_mempreset(mempreset_t* preset)
 {
-    int err = OK;
+    int err = FLUID_OK;
     preset_zone_t* zone;
     if (preset->global_zone != NULL) {
-        if (delete_preset_zone(preset->global_zone) != OK) {
+        if (delete_preset_zone(preset->global_zone) != FLUID_OK) {
             err = FLUID_FAILED;
         }
         preset->global_zone = NULL;
@@ -796,7 +803,7 @@ delete_mempreset(mempreset_t* preset)
     zone = preset->zone;
     while (zone != NULL) {
         preset->zone = zone->next;
-        if (delete_preset_zone(zone) != OK) {
+        if (delete_preset_zone(zone) != FLUID_OK) {
             err = FLUID_FAILED;
         }
         zone = preset->zone;
@@ -1056,7 +1063,7 @@ mempreset_noteon(mempreset_t* preset, fluid_synth_t* synth, int chan, int key, i
         preset_zone = preset_zone_next(preset_zone);
     }
 
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1066,7 +1073,7 @@ int
 mempreset_set_global_zone(mempreset_t* preset, preset_zone_t* zone)
 {
     preset->global_zone = zone;
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1098,19 +1105,19 @@ mempreset_import_sfont(mempreset_t* preset,
         if (zone == NULL) {
             return FLUID_FAILED;
         }
-        if (preset_zone_import_sfont(zone, sfzone, sfont) != OK) {
+        if (preset_zone_import_sfont(zone, sfzone, sfont) != FLUID_OK) {
             delete_preset_zone(zone);
             return FLUID_FAILED;
         }
         if ((count == 0) && (preset_zone_get_inst(zone) == NULL)) {
             mempreset_set_global_zone(preset, zone);
-        } else if (mempreset_add_zone(preset, zone) != OK) {
+        } else if (mempreset_add_zone(preset, zone) != FLUID_OK) {
             return FLUID_FAILED;
         }
         p = fluid_list_next(p);
         count++;
     }
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1126,7 +1133,7 @@ mempreset_add_zone(mempreset_t* preset, preset_zone_t* zone)
         zone->next = preset->zone;
         preset->zone = zone;
     }
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1216,7 +1223,7 @@ delete_preset_zone(preset_zone_t* zone)
     if (zone->name) FLUID_FREE (zone->name);
     if (zone->inst) delete_inst (zone->inst);
     FLUID_FREE(zone);
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1253,7 +1260,7 @@ preset_zone_import_sfont(preset_zone_t* zone, SFZone *sfzone, memsfont_t* sfont)
             FLUID_LOG(FLUID_ERR, "Out of memory");
             return FLUID_FAILED;
         }
-        if (inst_import_sfont(zone->inst, (SFInst *) sfzone->instsamp->data, sfont) != OK) {
+        if (inst_import_sfont(zone->inst, (SFInst *) sfzone->instsamp->data, sfont) != FLUID_OK) {
             return FLUID_FAILED;
         }
     }
@@ -1388,7 +1395,7 @@ preset_zone_import_sfont(preset_zone_t* zone, SFZone *sfzone, memsfont_t* sfont)
         r = fluid_list_next(r);
     } /* foreach modulator */
 
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1441,9 +1448,9 @@ int
 delete_inst(inst_t* inst)
 {
     inst_zone_t* zone;
-    int err = OK;
+    int err = FLUID_OK;
     if (inst->global_zone != NULL) {
-        if (delete_inst_zone(inst->global_zone) != OK) {
+        if (delete_inst_zone(inst->global_zone) != FLUID_OK) {
             err = FLUID_FAILED;
         }
         inst->global_zone = NULL;
@@ -1451,7 +1458,7 @@ delete_inst(inst_t* inst)
     zone = inst->zone;
     while (zone != NULL) {
         inst->zone = zone->next;
-        if (delete_inst_zone(zone) != OK) {
+        if (delete_inst_zone(zone) != FLUID_OK) {
             err = FLUID_FAILED;
         }
         zone = inst->zone;
@@ -1467,7 +1474,7 @@ int
 inst_set_global_zone(inst_t* inst, inst_zone_t* zone)
 {
     inst->global_zone = zone;
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1500,7 +1507,7 @@ inst_import_sfont(inst_t* inst, SFInst *sfinst, memsfont_t* sfont)
             return FLUID_FAILED;
         }
 
-        if (inst_zone_import_sfont(zone, sfzone, sfont) != OK) {
+        if (inst_zone_import_sfont(zone, sfzone, sfont) != FLUID_OK) {
             delete_inst_zone(zone);
             return FLUID_FAILED;
         }
@@ -1508,14 +1515,14 @@ inst_import_sfont(inst_t* inst, SFInst *sfinst, memsfont_t* sfont)
         if ((count == 0) && (inst_zone_get_sample(zone) == NULL)) {
             inst_set_global_zone(inst, zone);
 
-        } else if (inst_add_zone(inst, zone) != OK) {
+        } else if (inst_add_zone(inst, zone) != FLUID_OK) {
             return FLUID_FAILED;
         }
 
         p = fluid_list_next(p);
         count++;
     }
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1531,7 +1538,7 @@ inst_add_zone(inst_t* inst, inst_zone_t* zone)
         zone->next = inst->zone;
         inst->zone = zone;
     }
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1610,7 +1617,7 @@ delete_inst_zone(inst_zone_t* zone)
 
     if (zone->name) FLUID_FREE (zone->name);
     FLUID_FREE(zone);
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1789,7 +1796,7 @@ inst_zone_import_sfont(inst_zone_t* zone, SFZone *sfzone, memsfont_t* sfont)
 
         r = fluid_list_next(r);
     } /* foreach modulator */
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1845,7 +1852,7 @@ int
 delete_sample(fluid_sample_t* sample)
 {
     FLUID_FREE(sample);
-    return OK;
+    return FLUID_OK;
 }
 
 /*
@@ -1891,7 +1898,7 @@ sample_import_sfont(fluid_sample_t* sample, SFSample* sfsample, memsfont_t* sfon
 /*        sample->loopend = sample->end - 8; */
 /*      } */
     }
-    return OK;
+    return FLUID_OK;
 }
 
 
