@@ -173,7 +173,7 @@ uint8_t ConvertLinearPercentPanValToStdMidiVal(double percent, double * ptrVolum
 	}
 	else if (percent == 0.5) {
 		midiPan = 64;
-		volumeScale = 1.0 / sqrt(3);
+		volumeScale = 1.0 / sqrt(2);
 	}
 	else if (percent == 1.0) {
 		midiPan = 127;
@@ -216,7 +216,7 @@ void ConvertStdMidiPanToVolumeBalance(uint8_t midiPan, double & percentLeft, dou
 	}
 	else if (midiPan == 64) {
 		// center
-		percentLeft = percentRight = sqrt(3) / 2;
+		percentLeft = percentRight = sqrt(2) / 2;
 		return;
 	}
 	else if (midiPan == 127) {
