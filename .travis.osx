@@ -1,0 +1,25 @@
+# Travis-CI configuration file for VGMTrans
+
+os:
+  - osx
+
+language:
+  - objective-c
+
+env:
+  - CMAKE_PREFIX_PATH="/usr/local/opt/qt5"
+
+before_install:
+  - brew update
+
+install:
+  - brew install qt5
+  - brew install fluidsynth
+
+before_script:
+  - cd src/
+  
+script:
+  - cmake CMakeLists.txt
+  - make
+
