@@ -429,18 +429,17 @@ set(SOURCE_FILES
 
 qt5_add_resources(UI_RESOURCES ui/qt/resources/resources.qrc)
 
-# Set some Win32 Specific Settings
-#IF(WIN32)
-#SET(GUI_TYPE WIN32)
-#ENDIF(WIN32)
-# Set some Apple MacOS Specific settings
-#IF (APPLE)
-#SET(GUI_TYPE MACOSX_BUNDLE)
-#ENDIF (APPLE)
+IF(WIN32)
+SET(GUI_TYPE WIN32)
+ENDIF(WIN32)
+
+IF (APPLE)
+SET(GUI_TYPE MACOSX_BUNDLE)
+ENDIF (APPLE)
 
 #ADD_EXECUTABLE( MyApplication ${GUI_TYPE} ${PROJECT_SRCS} )
 
-add_executable(vgmtrans ${SOURCE_FILES} ${UI_RESOURCES})
+add_executable(vgmtrans ${GUI_TYPE} ${SOURCE_FILES} ${UI_RESOURCES})
 
 
 # The Qt5Widgets_LIBRARIES variable also includes QtGui and QtCore
