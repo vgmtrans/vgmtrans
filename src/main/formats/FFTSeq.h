@@ -32,8 +32,8 @@ public:
 	//void OnSaveAsMidi(void);
 
 protected:
-	unsigned short seqID;
-	unsigned short assocWdsID;
+	uint16_t seqID;
+	uint16_t assocWdsID;
 };
 
 
