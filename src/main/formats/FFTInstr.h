@@ -22,19 +22,19 @@
 //--------------------------------------------------------------
 struct WdsHdr
 {
-	unsigned	long	sig;				//strings "wds "
-				long	unknown_0004;
-	unsigned	long	iFFT_InstrSetSize;	//size of entire instrset (header + instrs + samps)
+	uint32_t	sig;				//strings "wds "
+	int32_t		unknown_0004;
+	uint32_t	iFFT_InstrSetSize;	//size of entire instrset (header + instrs + samps)
 											//but FFT only, so we ignore it
-				long	unknown_000C;
-	unsigned	long	szHeader1;			//size of header???
-	unsigned	long	szSampColl;			//size of AD-PCM body (.VB) ???
-	unsigned	long	szHeader2;			//size of header???
-	unsigned	long	iNumInstrs;			//Quantity of instruments.
-	unsigned	long	iBank;				//Bank No.
-				long	unknown_0024;
-				long	unknown_0028;
-				long	unknown_002C;
+	int32_t		unknown_000C;
+	uint32_t	szHeader1;			//size of header???
+	uint32_t	szSampColl;			//size of AD-PCM body (.VB) ???
+	uint32_t	szHeader2;			//size of header???
+	uint32_t	iNumInstrs;			//Quantity of instruments.
+	uint32_t	iBank;				//Bank No.
+	int32_t		unknown_0024;
+	int32_t		unknown_0028;
+	int32_t		unknown_002C;
 };
 
 
@@ -48,20 +48,20 @@ struct WdsHdr
 //--------------------------------------------------------------
 struct WdsRgnData
 {
-	unsigned	long	ptBody;							//Offset address to AD-PCM 波形実体
-	unsigned	short	ptLoop;							//size?  loop?  unknown
-	unsigned	char	iFineTune;		// Pitch table is at 800290D8 in FFT.  See function at 80017424
+	uint32_t	ptBody;					//Offset address to AD-PCM 波形実体
+	uint16_t	ptLoop;					//size?  loop?  unknown
+	uint8_t		iFineTune;				// Pitch table is at 800290D8 in FFT.  See function at 80017424
 										//  takes $a0: uint16_t- MSB = semitone (note+semitone_tune),
 										//                  LSB = fine tune index
-				char	iSemiToneTune;	// Pitch tune in semitones (determines unitykey)
-	unsigned	char	Ar;				// & 0x7F attack rate
-	unsigned	char	Dr;				// & 0x0F decay rate
-	unsigned	char	Sr;				// & 0x7F sustain rate 
-	unsigned	char	Rr;				// & 0x1F release rate
-	unsigned	char	Sl;				// & 0x0F sustain level
-	unsigned	char	Am;				// & 0x01 attack rate linear (0)or exponential(1)  UNSURE
-	unsigned	char	unk_E;
-	unsigned	char	unk_F;
+	int8_t		iSemiToneTune;	// Pitch tune in semitones (determines unitykey)
+	uint8_t		Ar;				// & 0x7F attack rate
+	uint8_t		Dr;				// & 0x0F decay rate
+	uint8_t		Sr;				// & 0x7F sustain rate
+	uint8_t		Rr;				// & 0x1F release rate
+	uint8_t		Sl;				// & 0x0F sustain level
+	uint8_t		Am;				// & 0x01 attack rate linear (0)or exponential(1)  UNSURE
+	uint8_t		unk_E;
+	uint8_t		unk_F;
 };
 
 

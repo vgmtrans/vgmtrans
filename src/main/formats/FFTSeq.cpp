@@ -33,11 +33,11 @@ bool FFTSeq::GetHeaderInfo(void)
 //-----------------------------------------------------------
 					unLength		= GetShort(dwOffset+0x08);
 					nNumTracks		= GetByte(dwOffset+0x14);	//uint8_t (8bit)		GetWord() から修正
-	unsigned char	cNumPercussion	= GetByte(dwOffset+0x15);	//uint8_t (8bit)	Quantity of Percussion struct
+	uint8_t			cNumPercussion	= GetByte(dwOffset+0x15);	//uint8_t (8bit)	Quantity of Percussion struct
 //	unsigned char	cBankNum		= GetByte(dwOffset+0x16);
 					assocWdsID		= GetShort(dwOffset+0x16);	//uint16_t (16bit)	Default program bank No.
-	unsigned short	ptSongTitle		= GetShort(dwOffset+0x1E);	//uint16_t (16bit)	Pointer of music title (AscII strings)
-	unsigned short	ptPercussionTbl	= GetShort(dwOffset+0x20);	//uint16_t (16bit)	Pointer of Percussion struct
+	uint16_t		ptSongTitle		= GetShort(dwOffset+0x1E);	//uint16_t (16bit)	Pointer of music title (AscII strings)
+	uint16_t		ptPercussionTbl	= GetShort(dwOffset+0x20);	//uint16_t (16bit)	Pointer of Percussion struct
 
 	int titleLength = ptPercussionTbl-ptSongTitle;
 	char* songtitle = new char[titleLength];
@@ -145,7 +145,7 @@ bool FFTTrack::ReadEvent(void)
 		uint8_t			data_byte		= GetByte(curOffset++);
 		uint8_t			vel				= status_byte;							//Velocity
 		uint8_t			relative_key	= (data_byte / 19);						//Note
-		unsigned int	iDeltaTime		= delta_time_table[data_byte % 19];		//Delta Time
+		uint32_t		iDeltaTime		= delta_time_table[data_byte % 19];		//Delta Time
 
 		if(iDeltaTime==0)	
 			iDeltaTime	= GetByte(curOffset++);		//Delta time
