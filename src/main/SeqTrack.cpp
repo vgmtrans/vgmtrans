@@ -1301,7 +1301,7 @@ void SeqTrack::AddMarker(uint32_t offset, uint32_t length, const string& markern
 		pMidiTrack->AddMarker(channel, markername, databyte1, databyte2, priority);
 }
 
-// when in FIND_DELTA_LENGTH mode, returns true when we've hit the max number of loops defined in options
+// when in FIND_DELTA_LENGTH mode, returns true until we've hit the max number of loops defined in options
 bool SeqTrack::AddLoopForever(uint32_t offset, uint32_t length, const std::wstring& sEventName)
 {
 	OnEvent(offset, length);
