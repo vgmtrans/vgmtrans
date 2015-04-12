@@ -176,17 +176,25 @@ bool NDSTrack::ReadEvent(void)
 			curOffset += 3;
 
 			// Add an End Track if it exists afterward, for completeness sake
-			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(curOffset))
-			{
-				if (GetByte(curOffset) == 0xFF)
-					AddEndOfTrack(curOffset, 1);
+			if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(curOffset)) {
+				if (GetByte(curOffset) == 0xFF) {
+					AddGenericEvent(curOffset, 1, L"End of Track", L"", CLR_TRACKEND, ICON_TRACKEND);
+				}
+			}
+
+			// The event usually appears at last of the song, but there can be an exception.
+			// See Zelda The Spirit Tracks - SSEQ_0018 (overworld train theme)
+			bool bContinue = true;
+			if (IsOffsetUsed(jumpAddr)) {
+				bContinue = AddLoopForever(beginOffset, 4, L"Loop");
+			}
+			else {
+				AddGenericEvent(beginOffset, 4, L"Jump", L"", CLR_LOOPFOREVER);
 			}
 
 			curOffset = jumpAddr;
-			return this->AddLoopForever(beginOffset, 4, L"Loop");
+			return bContinue;
 		}
-		//curOffset += 4;
-		//AddGenericEvent(beginOffset, curOffset-beginOffset, L"Jump (with count)", BG_CLR_RED);
 		break;
 
 	case 0x95:
