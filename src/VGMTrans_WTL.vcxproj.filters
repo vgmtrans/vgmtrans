@@ -238,6 +238,12 @@
     <Filter Include="Header Files\formats\prismsnes">
       <UniqueIdentifier>{a9d44b18-73f2-40b1-98db-61a26dccb3fa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\tamsoftps1">
+      <UniqueIdentifier>{bad6b958-9b57-4069-b651-2a76c826c93a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\tamsoftps1">
+      <UniqueIdentifier>{1dad0218-02e2-4f15-b96d-241c77091932}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ui\windows\aboutdlg.cpp">
@@ -764,6 +770,15 @@
     </ClCompile>
     <ClCompile Include="main\formats\HeartBeatPS1Scanner.cpp">
       <Filter>Source Files\formats\heartbeatps1</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\TamSoftPS1Scanner.cpp">
+      <Filter>Source Files\formats\tamsoftps1</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\TamSoftPS1Seq.cpp">
+      <Filter>Source Files\formats\tamsoftps1</Filter>
+    </ClCompile>
+    <ClCompile Include="main\formats\TamSoftPS1Instr.cpp">
+      <Filter>Source Files\formats\tamsoftps1</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1393,6 +1408,18 @@
     </ClInclude>
     <ClInclude Include="main\formats\HeartBeatPS1Scanner.h">
       <Filter>Header Files\formats\heartbeatps1</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\TamSoftPS1Format.h">
+      <Filter>Header Files\formats\tamsoftps1</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\TamSoftPS1Scanner.h">
+      <Filter>Header Files\formats\tamsoftps1</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\TamSoftPS1Seq.h">
+      <Filter>Header Files\formats\tamsoftps1</Filter>
+    </ClInclude>
+    <ClInclude Include="main\formats\TamSoftPS1Instr.h">
+      <Filter>Header Files\formats\tamsoftps1</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
