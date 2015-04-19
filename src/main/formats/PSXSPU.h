@@ -385,6 +385,8 @@ public:
 	//void SetCompressedSize(uint32_t compSize);
 	//int UncompSample(int16_t* uncompBuf);
 	
+	static uint32_t GetSampleLength(RawFile * file, uint32_t offset, uint32_t endOffset, bool& loop);
+
 private:
 	void DecompVAGBlk(s16 *pSmp, VAGBlk *pVBlk, f32 *prev1, f32 *prev2);
 	
