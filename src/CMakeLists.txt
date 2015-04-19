@@ -252,6 +252,13 @@ set(SOURCE_FILES
     main/formats/SuzukiSnesScanner.h
     main/formats/SuzukiSnesSeq.cpp
     main/formats/SuzukiSnesSeq.h
+    main/formats/TamSoftPS1Instr.cpp
+    main/formats/TamSoftPS1Instr.h
+    main/formats/TamSoftPS1Format.h
+    main/formats/TamSoftPS1Scanner.cpp
+    main/formats/TamSoftPS1Scanner.h
+    main/formats/TamSoftPS1Seq.cpp
+    main/formats/TamSoftPS1Seq.h
     main/formats/TriAcePS1Format.h
     main/formats/TriAcePS1InstrSet.cpp
     main/formats/TriAcePS1InstrSet.h

@@ -410,6 +410,28 @@ int PSXSamp::UncompSample(int16_t* uncompBuf)
 	return TRUE;
 }*/
 
+uint32_t PSXSamp::GetSampleLength(RawFile * file, uint32_t offset, uint32_t endOffset, bool& loop)
+{
+	uint32_t curOffset = offset;
+	while (curOffset < endOffset) {
+		uint8_t keyFlagByte = file->GetByte(curOffset + 1);
+
+		curOffset += 16;
+
+		if ((keyFlagByte & 1) != 0) {
+			loop = (keyFlagByte & 2) != 0;
+			break;
+		}
+	}
+
+	if (curOffset <= endOffset) {
+		return curOffset - offset;
+	}
+	else {
+		// address out of range
+		return 0;
+	}
+}
 
 //This next function is taken from Antires's work
 void PSXSamp::DecompVAGBlk(s16 *pSmp, VAGBlk *pVBlk, f32 *prev1, f32 *prev2)

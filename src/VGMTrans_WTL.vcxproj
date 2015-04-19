@@ -282,6 +282,9 @@
     <ClCompile Include="main\formats\SoftCreatSnesScanner.cpp" />
     <ClCompile Include="main\formats\SoftCreatSnesSeq.cpp" />
     <ClCompile Include="main\formats\SuzukiSnesInstr.cpp" />
+    <ClCompile Include="main\formats\TamSoftPS1Instr.cpp" />
+    <ClCompile Include="main\formats\TamSoftPS1Scanner.cpp" />
+    <ClCompile Include="main\formats\TamSoftPS1Seq.cpp" />
     <ClCompile Include="main\loaders\GSFLoader.cpp" />
     <ClCompile Include="main\LogItem.cpp" />
     <ClCompile Include="main\loaders\NCSFLoader.cpp" />
@@ -480,6 +483,10 @@
     <ClInclude Include="main\formats\SoftCreatSnesScanner.h" />
     <ClInclude Include="main\formats\SoftCreatSnesSeq.h" />
     <ClInclude Include="main\formats\SuzukiSnesInstr.h" />
+    <ClInclude Include="main\formats\TamSoftPS1Format.h" />
+    <ClInclude Include="main\formats\TamSoftPS1Instr.h" />
+    <ClInclude Include="main\formats\TamSoftPS1Scanner.h" />
+    <ClInclude Include="main\formats\TamSoftPS1Seq.h" />
     <ClInclude Include="main\loaders\GSFLoader.h" />
     <ClInclude Include="main\LogItem.h" />
     <ClInclude Include="main\loaders\NCSFLoader.h" />

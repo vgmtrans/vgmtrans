@@ -29,6 +29,7 @@
 #include "SuzukiSnesFormat.h"
 #include "RareSnesFormat.h"
 #include "HeartBeatPS1Format.h"
+#include "TamSoftPS1Format.h"
 
 #include "PSF1Loader.h"
 #include "PSF2Loader.h"
@@ -72,6 +73,7 @@ bool VGMRoot::Init(void)
 	AddScanner("TriAcePS1");
 	AddScanner("MP2k");
 	AddScanner("HeartBeatPS1");
+	AddScanner("TamSoftPS1");
 	//AddScanner("Org");
 	//AddScanner("QSound");
 	//AddScanner("SegSat");
