@@ -268,3 +268,8 @@ long ConvertPercentPanTo10thPercentUnits(double percentPan)
 {
 	return roundi(percentPan * 1000) - 500;
 }
+
+double PitchScaleToCents(double scale)
+{
+	return 1200.0 * log(scale) / log(2.0);
+}
