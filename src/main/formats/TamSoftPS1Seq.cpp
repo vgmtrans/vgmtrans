@@ -242,9 +242,9 @@ bool TamSoftPS1Track::ReadEvent(void)
 
 		case 0xEA:
 		{
-			uint16_t a1 = GetShort(curOffset); curOffset += 2;
-			desc << L"Arg1: " << a1;
-			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event EA", desc.str());
+			uint16_t pitchScale = GetShort(curOffset); curOffset += 2;
+			double cents = PitchScaleToCents(pitchScale / 4096.0);
+			AddFineTuning(beginOffset, curOffset - beginOffset, cents);
 			break;
 		}
 
