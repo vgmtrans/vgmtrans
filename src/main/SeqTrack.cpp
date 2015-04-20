@@ -540,8 +540,14 @@ void SeqTrack::InsertNoteOff(uint32_t offset, uint32_t length, int8_t key, uint3
 
 	if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
 		AddEvent(new NoteOffSeqEvent(this, key, offset, length, sEventName));
-	else if (readMode == READMODE_CONVERT_TO_MIDI)
-		pMidiTrack->InsertNoteOff(channel, key+cKeyCorrection+transpose, absTime);
+	InsertNoteOffNoItem(key, absTime);
+}
+
+void SeqTrack::InsertNoteOffNoItem(int8_t key, uint32_t absTime)
+{
+	if (readMode == READMODE_CONVERT_TO_MIDI) {
+		pMidiTrack->InsertNoteOff(channel, key + cKeyCorrection + transpose, absTime);
+	}
 }
 
 void SeqTrack::AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::wstring& sEventName)

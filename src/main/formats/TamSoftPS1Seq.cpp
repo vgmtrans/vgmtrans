@@ -124,7 +124,7 @@ void TamSoftPS1Track::ResetVars(void)
 	SeqTrack::ResetVars();
 
 	vel = 100;
-	noteQueue.clear();
+	lastNoteKey = -1;
 }
 
 bool TamSoftPS1Track::ReadEvent(void)
@@ -151,10 +151,11 @@ bool TamSoftPS1Track::ReadEvent(void)
 		uint8_t key = statusByte & 0x7f;
 		desc << L"Key: " << key;
 
-		if (!noteQueue.empty()) {
+		if (lastNoteKey >= 0) {
 			FinalizeAllNotes();
 		}
-		noteQueue.push_back(key);
+		lastNoteKey = key;
+		lastNoteTime = GetTime();
 
 		AddNoteOn(beginOffset, curOffset - beginOffset, TAMSOFTPS1_KEY_OFFSET + key, vel);
 	}
@@ -314,9 +315,13 @@ bool TamSoftPS1Track::ReadEvent(void)
 
 void TamSoftPS1Track::FinalizeAllNotes()
 {
-	for (auto itr = noteQueue.begin(); itr != noteQueue.end(); ++itr) {
-		uint8_t key = *itr;
-		AddNoteOffNoItem(TAMSOFTPS1_KEY_OFFSET + key);
+	if (lastNoteTime != GetTime()) {
+		AddNoteOffNoItem(TAMSOFTPS1_KEY_OFFSET + lastNoteKey);
 	}
-	noteQueue.clear();
+	else {
+		// zero length note (Choro Q Wonderful! DEMO.TSQ)
+		// convert it to length=1 for safe
+		InsertNoteOffNoItem(TAMSOFTPS1_KEY_OFFSET + lastNoteKey, lastNoteTime + 1);
+	}
+	lastNoteKey = -1;
 }
