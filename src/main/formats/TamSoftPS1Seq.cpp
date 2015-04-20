@@ -23,6 +23,7 @@ TamSoftPS1Seq::TamSoftPS1Seq(RawFile* file, uint32_t offset, uint8_t theSong, co
 	AlwaysWriteInitialTempo(60.0 / (TSQ_PPQN / PSX_NTSC_FRAMERATE));
 
 	UseReverb();
+	AlwaysWriteInitialReverb(0);
 }
 
 TamSoftPS1Seq::~TamSoftPS1Seq(void)
@@ -32,6 +33,9 @@ TamSoftPS1Seq::~TamSoftPS1Seq(void)
 void TamSoftPS1Seq::ResetVars(void)
 {
 	VGMSeq::ResetVars();
+
+	// default reverb depth depends on each games, probably
+	reverbDepth = 0x4000;
 }
 
 bool TamSoftPS1Seq::GetHeaderInfo(void)
@@ -201,7 +205,7 @@ bool TamSoftPS1Track::ReadEvent(void)
 		{
 			int16_t pitch = GetShort(curOffset); curOffset += 2;
 			desc << L"Pitch: " << pitch;
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Bend?", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Pitch Bend?", desc.str());
 			break;
 		}
 
@@ -209,7 +213,7 @@ bool TamSoftPS1Track::ReadEvent(void)
 		{
 			int16_t pitch = GetShort(curOffset); curOffset += 2;
 			desc << L"Pitch: " << pitch;
-			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Bend?", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Pitch Bend?", desc.str());
 			break;
 		}
 
@@ -225,19 +229,21 @@ bool TamSoftPS1Track::ReadEvent(void)
 		{
 			uint8_t depth = GetByte(curOffset++);
 			desc << L"Reverb Depth: " << depth;
+			parentSeq->reverbDepth = depth << 8;
 			AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Depth", desc.str(), CLR_REVERB, ICON_CONTROL);
 			break;
 		}
 
 		case 0xE8:
 		{
-			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event E8", desc.str());
+			uint8_t midiReverb = roundi(fabs(parentSeq->reverbDepth / 32768.0) * 127.0);
+			AddReverb(beginOffset, curOffset - beginOffset, midiReverb, L"Reverb On");
 			break;
 		}
 
 		case 0xE9:
 		{
-			AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event E9", desc.str());
+			AddReverb(beginOffset, curOffset - beginOffset, 0, L"Reverb Off");
 			break;
 		}
 
