@@ -16,4 +16,6 @@ void ConvertStdMidiPanToVolumeBalance(uint8_t midiPan, double & percentLeft, dou
 uint8_t ConvertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight, double * ptrVolumeScale = NULL);
 long ConvertPercentPanTo10thPercentUnits(double percentPan);
 
+double PitchScaleToCents(double scale);
+
 #define DLS_DECIBEL_UNIT 65536		//DLS1 spec p25
