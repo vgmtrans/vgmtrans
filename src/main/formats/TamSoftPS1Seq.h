@@ -16,6 +16,8 @@ public:
 	virtual void ResetVars(void);
 
 public:
+	static const uint16_t TamSoftPS1Seq::PITCH_TABLE[73];
+
 	uint8_t song;
 	uint16_t type;
 	int16_t reverbDepth;
@@ -35,5 +37,6 @@ protected:
 	void FinalizeAllNotes();
 
 	uint32_t lastNoteTime;
+	uint16_t lastNotePitch;
 	int8_t lastNoteKey;
 };
