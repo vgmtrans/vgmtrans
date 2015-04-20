@@ -67,6 +67,7 @@ public:
 	void AddPercNoteOff(uint32_t offset, uint32_t length, int8_t key, const std::wstring& sEventName = L"Percussion Note Off");
 	void AddPercNoteOffNoItem(int8_t key);
 	void InsertNoteOff(uint32_t offset, uint32_t length, int8_t key, uint32_t absTime, const std::wstring& sEventName = L"Note Off");
+	void InsertNoteOffNoItem(int8_t key, uint32_t absTime);
 
 	void AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::wstring& sEventName = L"Note with Duration");
 	void AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);

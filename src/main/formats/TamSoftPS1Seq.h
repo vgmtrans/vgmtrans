@@ -33,5 +33,6 @@ public:
 protected:
 	void FinalizeAllNotes();
 
-	std::vector<uint8_t> noteQueue;
+	uint32_t lastNoteTime;
+	int8_t lastNoteKey;
 };
