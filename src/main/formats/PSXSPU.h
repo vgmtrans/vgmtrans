@@ -250,19 +250,27 @@ template <class T> void PSXConvADSR(T* realADSR,
 			}
 			else
 			{
-				for (l=0; envelope_level > 0; l++)		//DLS decay rate value is to -96db (silence) not the sustain level
+				l = 0;
+				while (envelope_level > 0)		//DLS decay rate value is to -96db (silence) not the sustain level
 				{
+					long envelope_level_diff;
+					long envelope_level_target;
+
 					switch ((envelope_level>>28)&0x7)
 					{
-					case 0: envelope_level -= RateTable[RoundToZero( (Sr^0x7F)-0x1B+0 ) +  32]; break;
-					case 1: envelope_level -= RateTable[RoundToZero( (Sr^0x7F)-0x1B+4 ) +  32]; break;
-					case 2: envelope_level -= RateTable[RoundToZero( (Sr^0x7F)-0x1B+6 ) +  32]; break;
-					case 3: envelope_level -= RateTable[RoundToZero( (Sr^0x7F)-0x1B+8 ) +  32]; break;
-					case 4: envelope_level -= RateTable[RoundToZero( (Sr^0x7F)-0x1B+9 ) +  32]; break;
-					case 5: envelope_level -= RateTable[RoundToZero( (Sr^0x7F)-0x1B+10) + 32]; break;
-					case 6: envelope_level -= RateTable[RoundToZero( (Sr^0x7F)-0x1B+11) + 32]; break;
-					case 7: envelope_level -= RateTable[RoundToZero( (Sr^0x7F)-0x1B+12) + 32]; break;
+					case 0: envelope_level_target = 0x00000000; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+0 ) +  32]; break;
+					case 1: envelope_level_target = 0x0fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+4 ) +  32]; break;
+					case 2: envelope_level_target = 0x1fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+6 ) +  32]; break;
+					case 3: envelope_level_target = 0x2fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+8 ) +  32]; break;
+					case 4: envelope_level_target = 0x3fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+9 ) +  32]; break;
+					case 5: envelope_level_target = 0x4fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+10) + 32]; break;
+					case 6: envelope_level_target = 0x5fffffff; envelope_level_diff = RateTable[RoundToZero((Sr ^ 0x7F) - 0x1B + 11) + 32]; break;
+					case 7: envelope_level_target = 0x6fffffff; envelope_level_diff = RateTable[RoundToZero((Sr ^ 0x7F) - 0x1B + 12) + 32]; break;
 					}
+
+					long steps = (envelope_level - envelope_level_target + (envelope_level_diff - 1)) / envelope_level_diff;
+					envelope_level -= (envelope_level_diff * steps);
+					l += steps;
 				}
 				samples = l;
 
