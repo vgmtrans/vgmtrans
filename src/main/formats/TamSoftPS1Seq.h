@@ -18,6 +18,7 @@ public:
 public:
 	uint8_t song;
 	uint16_t type;
+	int16_t reverbDepth;
 };
 
 
