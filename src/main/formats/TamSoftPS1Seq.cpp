@@ -13,6 +13,19 @@ DECLARE_FORMAT(TamSoftPS1);
 #define TSQ_SONG_TABLE_SIZE (4 * TAMSOFTPS1_MAX_SONGS)
 #define TSQ_HEADER_SIZE     (4 * TSQ_MAX_TRACKS)
 
+const uint16_t TamSoftPS1Seq::PITCH_TABLE[73] = {
+	0x0100, 0x010F, 0x011F, 0x0130, 0x0142, 0x0155, 0x016A, 0x017F,
+	0x0196, 0x01AE, 0x01C8, 0x01E3, 0x0200, 0x021E, 0x023E, 0x0260,
+	0x0285, 0x02AB, 0x02D4, 0x02FF, 0x032C, 0x035D, 0x0390, 0x03C6,
+	0x0400, 0x043C, 0x047D, 0x04C1, 0x050A, 0x0556, 0x05A8, 0x05FE,
+	0x0659, 0x06BA, 0x0720, 0x078D, 0x0800, 0x0879, 0x08FA, 0x0983,
+	0x0A14, 0x0AAD, 0x0B50, 0x0BFC, 0x0CB2, 0x0D74, 0x0E41, 0x0F1A,
+	0x1000, 0x10F3, 0x11F5, 0x1306, 0x1428, 0x155B, 0x16A0, 0x17F9,
+	0x1965, 0x1AE8, 0x1C82, 0x1E34, 0x2000, 0x21E7, 0x23EB, 0x260D,
+	0x2851, 0x2AB7, 0x2D41, 0x2FF2, 0x32CB, 0x35D1, 0x3904, 0x3C68,
+	0x3FFF,
+};
+
 TamSoftPS1Seq::TamSoftPS1Seq(RawFile* file, uint32_t offset, uint8_t theSong, const std::wstring & name)
 	: VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), type(0)
 {
@@ -147,6 +160,7 @@ bool TamSoftPS1Track::ReadEvent(void)
 	std::wstringstream desc;
 
 	if (statusByte >= 0x00 && statusByte <= 0x7f) {
+		// if status_byte == 0, it actually sets 0xffffffff to delta-time o_O
 		desc << L"Delta Time: " << statusByte;
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Delta Time", desc.str(), CLR_REST);
 		AddTime(statusByte);
@@ -160,6 +174,11 @@ bool TamSoftPS1Track::ReadEvent(void)
 		}
 		lastNoteKey = key;
 		lastNoteTime = GetTime();
+
+		lastNotePitch = 0;
+		if (key < countof(TamSoftPS1Seq::PITCH_TABLE)) {
+			lastNotePitch = TamSoftPS1Seq::PITCH_TABLE[key];
+		}
 
 		AddNoteOn(beginOffset, curOffset - beginOffset, TAMSOFTPS1_KEY_OFFSET + key, vel);
 	}
@@ -203,17 +222,33 @@ bool TamSoftPS1Track::ReadEvent(void)
 
 		case 0xE4:
 		{
-			int16_t pitch = GetShort(curOffset); curOffset += 2;
-			desc << L"Pitch: " << pitch;
-			AddUnknown(beginOffset, curOffset - beginOffset, L"Pitch Bend?", desc.str());
+			// pitch bend
+			uint16_t pitchRegValue = GetShort(curOffset); curOffset += 2;
+			desc << L"Pitch: " << pitchRegValue;
+
+			double cents = 0;
+			if (lastNoteKey >= 0) {
+				cents = PitchScaleToCents((double)pitchRegValue / lastNotePitch);
+				desc << L" (" << cents << L" cents)";
+			}
+
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Pitch Bend", desc.str());
 			break;
 		}
 
 		case 0xE5:
 		{
-			int16_t pitch = GetShort(curOffset); curOffset += 2;
-			desc << L"Pitch: " << pitch;
-			AddUnknown(beginOffset, curOffset - beginOffset, L"Pitch Bend?", desc.str());
+			// pitch bend that updates volume/ADSR registers too?
+			uint16_t pitchRegValue = GetShort(curOffset); curOffset += 2;
+			desc << L"Pitch: " << pitchRegValue;
+
+			double cents = 0;
+			if (lastNoteKey >= 0) {
+				cents = PitchScaleToCents((double)pitchRegValue / lastNotePitch);
+				desc << L" (" << cents << L" cents)";
+			}
+
+			AddUnknown(beginOffset, curOffset - beginOffset, L"Note By Pitch?", desc.str());
 			break;
 		}
 
