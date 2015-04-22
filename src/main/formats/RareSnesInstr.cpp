@@ -124,14 +124,35 @@ bool RareSnesInstrSet::GetHeaderInfo()
 
 bool RareSnesInstrSet::GetInstrPointers()
 {
+	// make a loopup table for duplicated instruments,
+	// to give them appropriate instrument metadata
+	// (it's a workaround for wrong instrument tuning)
+	std::map<uint16_t, uint8_t> addrToInstrLookups;
+	for (auto itr = instrUnityKeyHints.begin(); itr != instrUnityKeyHints.end(); ++itr)
+	{
+		uint8_t inst = (*itr).first;
+		uint8_t srcn = GetByte(dwOffset + inst);
+
+		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+		if (addrToInstrLookups.count(offDirEnt) == 0) {
+			addrToInstrLookups[offDirEnt] = inst;
+		}
+	}
+
 	for (std::vector<uint8_t>::iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr)
 	{
 		uint8_t inst = (*itr);
 		uint8_t srcn = GetByte(dwOffset + inst);
 
+		uint8_t inst_remapped = inst;
+		uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+		if (addrToInstrLookups.count(offDirEnt) != 0) {
+			inst_remapped = addrToInstrLookups[offDirEnt];
+		}
+
 		int8_t transpose = 0;
 		std::map<uint8_t, int8_t>::iterator itrKey;
-		itrKey = this->instrUnityKeyHints.find(inst);
+		itrKey = this->instrUnityKeyHints.find(inst_remapped);
 		if (itrKey != instrUnityKeyHints.end())
 		{
 			transpose = itrKey->second;
@@ -139,7 +160,7 @@ bool RareSnesInstrSet::GetInstrPointers()
 
 		int16_t pitch = 0;
 		std::map<uint8_t, int16_t>::iterator itrPitch;
-		itrPitch = this->instrPitchHints.find(inst);
+		itrPitch = this->instrPitchHints.find(inst_remapped);
 		if (itrPitch != instrPitchHints.end())
 		{
 			pitch = itrPitch->second;
@@ -147,7 +168,7 @@ bool RareSnesInstrSet::GetInstrPointers()
 
 		uint16_t adsr = 0x8FE0;
 		std::map<uint8_t, uint16_t>::iterator itrADSR;
-		itrADSR = this->instrADSRHints.find(inst);
+		itrADSR = this->instrADSRHints.find(inst_remapped);
 		if (itrADSR != instrADSRHints.end())
 		{
 			adsr = itrADSR->second;
