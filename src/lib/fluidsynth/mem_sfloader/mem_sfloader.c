@@ -63,17 +63,6 @@ typedef uint32_t guint32;
 #define GINT32_FROM_LE(val)	(GINT32_TO_LE (val))
 #define GUINT32_FROM_LE(val)	(GUINT32_TO_LE (val))
 
-//#define GPOINTER_TO_INT(p)	((gint)  (glong) (p))
-//#define GINT_TO_POINTER(i)	((gpointer) (glong) (i))
-
-/* Regular mutex */
-//typedef pthread_mutex_t fluid_mutex_t;
-//#define FLUID_MUTEX_INIT          PTHREAD_MUTEX_INITIALIZER
-//#define fluid_mutex_destroy(_m)   pthread_mutex_free(&(_m))
-//#define fluid_mutex_lock(_m)      pthread_mutex_lock(&(_m))
-//#define fluid_mutex_unlock(_m)    pthread_mutex_unlock(&(_m))
-
-
 /* Regular mutex */
 typedef GMutex fluid_mutex_t;
 #define FLUID_MUTEX_INIT          { 0 }
