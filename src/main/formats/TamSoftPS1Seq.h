@@ -16,7 +16,7 @@ public:
 	virtual void ResetVars(void);
 
 public:
-	static const uint16_t TamSoftPS1Seq::PITCH_TABLE[73];
+	static const uint16_t PITCH_TABLE[73];
 
 	uint8_t song;
 	uint16_t type;
