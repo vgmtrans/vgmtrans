@@ -176,7 +176,6 @@ public:
 };
 
 // Convenience macros
-#define countof(x) (sizeof(x)/sizeof((x)[0]))
 #define _S(x) (CString(LPCTSTR(x)))
 
 #if _ATL_VER < 0x0700
