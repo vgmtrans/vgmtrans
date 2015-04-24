@@ -1,5 +1,7 @@
 #pragma once
 
+#include "osdepend.h"
+
 void Alert(const wchar_t *fmt, ...)
 {
 
