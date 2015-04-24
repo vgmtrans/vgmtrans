@@ -31,6 +31,71 @@
 #include "fluid_list.h"
 
 
+/********************************************************************************/
+/********************************************************************************/
+/********************************************************************************/
+/********************************************************************************/
+/********************************************************************************/
+
+/*** minimal gthread.h stuff to link to fluidsynth's glib threading functions ***/
+
+#define g_thread_supported()     (1)
+
+#ifndef GLIB_VAR
+  #ifdef G_PLATFORM_WIN32
+    #ifdef GLIB_STATIC_COMPILATION
+      #define GLIB_VAR extern
+    #else /* !GLIB_STATIC_COMPILATION */
+      #ifdef GLIB_COMPILATION
+        #ifdef DLL_EXPORT
+          #define GLIB_VAR __declspec(dllexport)
+        #else /* !DLL_EXPORT */
+          #define GLIB_VAR extern
+        #endif /* !DLL_EXPORT */
+      #else /* !GLIB_COMPILATION */
+        #define GLIB_VAR extern __declspec(dllimport)
+      #endif /* !GLIB_COMPILATION */
+    #endif /* !GLIB_STATIC_COMPILATION */
+  #else /* !G_PLATFORM_WIN32 */
+    #define GLIB_VAR extern
+  #endif /* !G_PLATFORM_WIN32 */
+#endif /* GLIB_VAR */
+
+#define G_THREAD_UF(op, arglist)					\
+    (*g_thread_functions_for_glib_use . op) arglist
+#define G_THREAD_CF(op, fail, arg)					\
+    (g_thread_supported () ? G_THREAD_UF (op, arg) : (fail))
+
+#define g_mutex_lock(mutex)						\
+    G_THREAD_CF (mutex_lock,     (void)0, (mutex))
+#define g_mutex_trylock(mutex)						\
+    G_THREAD_CF (mutex_trylock,  TRUE,    (mutex))
+#define g_mutex_unlock(mutex)						\
+    G_THREAD_CF (mutex_unlock,   (void)0, (mutex))
+#define g_mutex_free(mutex)						\
+    G_THREAD_CF (mutex_free,     (void)0, (mutex))
+
+typedef union  _GMutex          GMutex;
+
+union _GMutex
+{
+	/*< private >*/
+	void* p;
+	uint32_t i[2];
+};
+
+typedef struct _GThreadFunctions GThreadFunctions;
+struct _GThreadFunctions
+{
+	GMutex*  (*mutex_new)     (void);
+	void(*mutex_lock)         (GMutex               *mutex);
+	int(*mutex_trylock)       (GMutex               *mutex);
+	void(*mutex_unlock)       (GMutex               *mutex);
+	void(*mutex_free)         (GMutex               *mutex);
+};
+
+
+GLIB_VAR GThreadFunctions       g_thread_functions_for_glib_use;
 
 /********************************************************************************/
 /********************************************************************************/
