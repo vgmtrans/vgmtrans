@@ -105,7 +105,7 @@ void MainWindow::dropEvent(QDropEvent *event)
         printf("%d", urlSize);
         QString text;
         for (int i = 0; i < urlList.size() && i < 32; ++i) {
-            QString url = urlList.at(i).path();
+            QString url = urlList.at(i).toLocalFile();
             wchar_t *str = qstringTowchar_t(url);
 //            qDebug() << text.length();
             qtVGMRoot.OpenRawFile(str);
