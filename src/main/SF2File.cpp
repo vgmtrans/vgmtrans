@@ -295,7 +295,7 @@ SF2File::SF2File(SynthFile* synthfile)
 			}
 
 			// initialAttenuation
-			instGenList.sfGenOper = sampleModes;
+			instGenList.sfGenOper = initialAttenuation;
 			instGenList.genAmount.shAmount= (int16_t)(rgn->sampinfo->attenuation * 10);
 			memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
 			dataPtr += sizeof(sfInstGenList);
