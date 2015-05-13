@@ -9,9 +9,11 @@ DECLARE_FORMAT(TamSoftPS1);
 //  TamSoftPS1Seq
 //  *************
 #define TSQ_PPQN            24
-#define TSQ_MAX_TRACKS      24
+#define TSQ_MAX_TRACKS_PS1  24
+#define TSQ_MAX_TRACKS_PS2  48
 #define TSQ_SONG_TABLE_SIZE (4 * TAMSOFTPS1_MAX_SONGS)
-#define TSQ_HEADER_SIZE     (4 * TSQ_MAX_TRACKS)
+#define TSQ_HEADER_SIZE_PS1 (4 * TSQ_MAX_TRACKS_PS1)
+#define TSQ_HEADER_SIZE_PS2 (4 * TSQ_MAX_TRACKS_PS2)
 
 const uint16_t TamSoftPS1Seq::PITCH_TABLE[73] = {
 	0x0100, 0x010F, 0x011F, 0x0130, 0x0142, 0x0155, 0x016A, 0x017F,
@@ -27,7 +29,7 @@ const uint16_t TamSoftPS1Seq::PITCH_TABLE[73] = {
 };
 
 TamSoftPS1Seq::TamSoftPS1Seq(RawFile* file, uint32_t offset, uint8_t theSong, const std::wstring & name)
-	: VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), type(0)
+	: VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), ps2(false), type(0)
 {
 	bLoadTickByTick = true;
 	bUseLinearAmplitudeScale = true;
@@ -79,8 +81,40 @@ bool TamSoftPS1Seq::GetHeaderInfo(void)
 
 		// ignore (corrupted) silence sequence
 		if (GetWord(dwHeaderOffset) != 0xfffff0) {
-			VGMHeader * seqHeader = AddHeader(dwHeaderOffset, TSQ_HEADER_SIZE);
-			for (uint8_t trackIndex = 0; trackIndex < TSQ_MAX_TRACKS; trackIndex++) {
+			uint32_t headerSize;
+			uint8_t maxTracks;
+
+			// PS2 version?
+			ps2 = false;
+			if (dwHeaderOffset + TSQ_HEADER_SIZE_PS2 <= vgmfile->GetEndOffset()) {
+				ps2 = true;
+				for (uint8_t trackIndex = 0; trackIndex < TSQ_MAX_TRACKS_PS2; trackIndex++) {
+					uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
+
+					uint8_t live = GetByte(dwTrackHeaderOffset);
+					uint32_t dwRelTrackOffset = GetShort(dwTrackHeaderOffset + 2);
+					if ((live & 0x7f) != 0 || ((live & 0x80) != 0 && dwRelTrackOffset < TSQ_HEADER_SIZE_PS2)) {
+						ps2 = false;
+						break;
+					}
+				}
+			}
+
+			if (ps2) {
+				headerSize = TSQ_HEADER_SIZE_PS2;
+				maxTracks = TSQ_MAX_TRACKS_PS2;
+			}
+			else {
+				headerSize = TSQ_HEADER_SIZE_PS1;
+				maxTracks = TSQ_MAX_TRACKS_PS1;
+			}
+
+			if (dwHeaderOffset + headerSize > vgmfile->GetEndOffset()) {
+				return false;
+			}
+
+			VGMHeader * seqHeader = AddHeader(dwHeaderOffset, headerSize);
+			for (uint8_t trackIndex = 0; trackIndex < maxTracks; trackIndex++) {
 				uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
 				std::wstringstream trackHeaderName;
