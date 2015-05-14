@@ -10,7 +10,29 @@ void TamSoftPS1Scanner::Scan(RawFile* file, void* info)
 	std::wstring extension(StringToLower(file->GetExtension()));
 
 	if (extension == L"tsq") {
-		for (uint8_t songIndex = 0; songIndex < TAMSOFTPS1_MAX_SONGS; songIndex++) {
+		uint8_t numSongs = 0;
+		uint32_t seqHeaderBoundaryOffset = 0xffffffff;
+		for (numSongs = 0; numSongs < 128; numSongs++) {
+			uint32_t dwSongItemOffset = numSongs * 4;
+			if (dwSongItemOffset >= seqHeaderBoundaryOffset) {
+				break;
+			}
+
+			uint32_t a32 = file->GetWord(dwSongItemOffset);
+			if (a32 == 0xfffff0) {
+				break;
+			}
+			if (a32 == 0) {
+				continue;
+			}
+
+			uint16_t seqHeaderRelOffset = file->GetWord(dwSongItemOffset + 2);
+			if (seqHeaderBoundaryOffset > seqHeaderRelOffset) {
+				seqHeaderBoundaryOffset = seqHeaderRelOffset;
+			}
+		}
+
+		for (uint8_t songIndex = 0; songIndex < numSongs; songIndex++) {
 			std::wstringstream seqname;
 			seqname << basename << L" (" << songIndex << L")";
 
