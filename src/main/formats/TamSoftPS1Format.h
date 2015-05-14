@@ -8,7 +8,6 @@
 // ****************
 // TamSoftPS1Format
 // ****************
-#define TAMSOFTPS1_MAX_SONGS    51
 #define TAMSOFTPS1_KEY_OFFSET   0
 
 BEGIN_FORMAT(TamSoftPS1)

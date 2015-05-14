@@ -11,7 +11,6 @@ DECLARE_FORMAT(TamSoftPS1);
 #define TSQ_PPQN            24
 #define TSQ_MAX_TRACKS_PS1  24
 #define TSQ_MAX_TRACKS_PS2  48
-#define TSQ_SONG_TABLE_SIZE (4 * TAMSOFTPS1_MAX_SONGS)
 #define TSQ_HEADER_SIZE_PS1 (4 * TSQ_MAX_TRACKS_PS1)
 #define TSQ_HEADER_SIZE_PS2 (4 * TSQ_MAX_TRACKS_PS2)
 
@@ -57,11 +56,11 @@ bool TamSoftPS1Seq::GetHeaderInfo(void)
 {
 	SetPPQN(TSQ_PPQN);
 
-	if (dwOffset + TSQ_SONG_TABLE_SIZE > vgmfile->GetEndOffset()) {
+	uint32_t dwSongItemOffset = dwOffset + 4 * song;
+	if (dwSongItemOffset + 4 > vgmfile->GetEndOffset()) {
 		return false;
 	}
 
-	uint32_t dwSongItemOffset = dwOffset + 4 * song;
 	type = GetShort(dwSongItemOffset);
 	uint16_t seqHeaderRelOffset = GetShort(dwSongItemOffset + 2);
 
@@ -71,7 +70,7 @@ bool TamSoftPS1Seq::GetHeaderInfo(void)
 	songTableItem->AddSimpleItem(dwSongItemOffset, 2, L"BGM/SFX");
 	songTableItem->AddSimpleItem(dwSongItemOffset + 2, 2, L"Header Offset");
 
-	if (seqHeaderRelOffset < TSQ_SONG_TABLE_SIZE) {
+	if (seqHeaderRelOffset < dwSongItemOffset + 4) {
 		return false;
 	}
 
