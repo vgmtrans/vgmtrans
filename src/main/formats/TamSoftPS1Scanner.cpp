@@ -45,8 +45,14 @@ void TamSoftPS1Scanner::Scan(RawFile* file, void* info)
 			}
 		}
 	}
-	else if (extension == L"tvb") {
-		TamSoftPS1InstrSet * newInstrSet = new TamSoftPS1InstrSet(file, 0, basename);
+	else if (extension == L"tvb" || extension == L"tvb2") {
+		bool ps2 = false;
+		if (extension == L"tvb2") {
+			// note: this is not a real extension
+			ps2 = true;
+		}
+
+		TamSoftPS1InstrSet * newInstrSet = new TamSoftPS1InstrSet(file, 0, ps2, basename);
 		if (newInstrSet->LoadVGMFile()) {
 			newInstrSet->unLength = file->size();
 		}
