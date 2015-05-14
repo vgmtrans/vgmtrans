@@ -8,8 +8,8 @@
 // TamSoftPS1InstrSet
 // ******************
 
-TamSoftPS1InstrSet::TamSoftPS1InstrSet(RawFile* file, uint32_t offset, const std::wstring & name) :
-	VGMInstrSet(TamSoftPS1Format::name, file, offset, 0, name)
+TamSoftPS1InstrSet::TamSoftPS1InstrSet(RawFile* file, uint32_t offset, bool ps2, const std::wstring & name) :
+	VGMInstrSet(TamSoftPS1Format::name, file, offset, 0, name), ps2(ps2)
 {
 }
 
@@ -79,9 +79,11 @@ TamSoftPS1Instr::~TamSoftPS1Instr()
 
 bool TamSoftPS1Instr::LoadInstr()
 {
+	TamSoftPS1InstrSet * parInstrSet = (TamSoftPS1InstrSet *)this->parInstrSet;
+
 	AddSimpleItem(dwOffset, 4, L"Sample Offset");
 
-	TamSoftPS1Rgn * rgn = new TamSoftPS1Rgn(this, dwOffset + 0x400);
+	TamSoftPS1Rgn * rgn = new TamSoftPS1Rgn(this, dwOffset + 0x400, parInstrSet->ps2);
 	rgn->sampNum = instrNum;
 	aRgns.push_back(rgn);
 	return true;
@@ -91,7 +93,7 @@ bool TamSoftPS1Instr::LoadInstr()
 // TamSoftPS1Rgn
 // *************
 
-TamSoftPS1Rgn::TamSoftPS1Rgn(TamSoftPS1Instr* instr, uint32_t offset) :
+TamSoftPS1Rgn::TamSoftPS1Rgn(TamSoftPS1Instr* instr, uint32_t offset, bool ps2) :
 	VGMRgn(instr, offset, 4)
 {
 	unityKey = TAMSOFTPS1_KEY_OFFSET + 48;
@@ -100,7 +102,12 @@ TamSoftPS1Rgn::TamSoftPS1Rgn(TamSoftPS1Instr* instr, uint32_t offset) :
 
 	uint16_t adsr1 = GetShort(offset);
 	uint16_t adsr2 = GetShort(offset + 2);
-	PSXConvADSR<TamSoftPS1Rgn>(this, adsr1, adsr2, false);
+	if (ps2) {
+		// Choro Q HG2 default ADSR (set by progInitWork)
+		adsr1 = 0x13FF;
+		adsr2 = 0x5FC5;
+	}
+	PSXConvADSR<TamSoftPS1Rgn>(this, adsr1, adsr2, ps2);
 }
 
 TamSoftPS1Rgn::~TamSoftPS1Rgn()

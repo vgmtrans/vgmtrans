@@ -12,11 +12,13 @@ class TamSoftPS1InstrSet :
 	public VGMInstrSet
 {
 public:
-	TamSoftPS1InstrSet(RawFile* file, uint32_t offset, const std::wstring & name = L"TamSoftPS1InstrSet");
+	TamSoftPS1InstrSet(RawFile* file, uint32_t offset, bool ps2, const std::wstring & name = L"TamSoftPS1InstrSet");
 	virtual ~TamSoftPS1InstrSet(void);
 
 	virtual bool GetHeaderInfo();
 	virtual bool GetInstrPointers();
+
+	bool ps2;
 };
 
 // ***************
@@ -45,7 +47,7 @@ class TamSoftPS1Rgn
 	: public VGMRgn
 {
 public:
-	TamSoftPS1Rgn(TamSoftPS1Instr* instr, uint32_t offset);
+	TamSoftPS1Rgn(TamSoftPS1Instr* instr, uint32_t offset, bool ps2);
 	virtual ~TamSoftPS1Rgn(void);
 
 	virtual bool LoadRgn();
