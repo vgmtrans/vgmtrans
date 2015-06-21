@@ -334,6 +334,8 @@ set(SOURCE_FILES
     main/SeqEvent.cpp
     main/SeqEvent.h
     main/SeqNote.h
+    main/SeqSlider.cpp
+    main/SeqSlider.h
     main/SeqTrack.cpp
     main/SeqTrack.h
     main/SF2File.cpp

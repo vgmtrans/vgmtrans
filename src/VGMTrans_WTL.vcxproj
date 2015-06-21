@@ -295,6 +295,7 @@
     <ClCompile Include="main\formats\RareSnesScanner.cpp" />
     <ClCompile Include="main\formats\RareSnesSeq.cpp" />
     <ClCompile Include="main\RiffFile.cpp" />
+    <ClCompile Include="main\SeqSlider.cpp" />
     <ClCompile Include="main\SF2File.cpp" />
     <ClCompile Include="main\loaders\SNSFLoader.cpp" />
     <ClCompile Include="main\SynthFile.cpp" />
@@ -502,6 +503,7 @@
     <ClInclude Include="main\formats\SegSatFormat.h" />
     <ClInclude Include="main\loaders\SNSFLoader.h" />
     <ClInclude Include="main\SeqNote.h" />
+    <ClInclude Include="main\SeqSlider.h" />
     <ClInclude Include="main\VGMMiscFile.h" />
     <ClInclude Include="main\RIFFFile.h" />
     <ClInclude Include="main\SF2File.h" />
