@@ -6,6 +6,7 @@
 
 class SeqTrack;
 class SeqEvent;
+class ISeqSlider;
 
 enum ReadMode : uint8_t
 {
@@ -107,6 +108,8 @@ public:
 
 	std::vector<SeqTrack*> aTracks;		//array of track pointers
 	std::vector<uint32_t> aInstrumentsUsed;
+
+	std::vector<ISeqSlider*> aSliders;
 };
 
 
