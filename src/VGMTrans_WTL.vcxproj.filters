@@ -780,6 +780,9 @@
     <ClCompile Include="main\formats\TamSoftPS1Instr.cpp">
       <Filter>Source Files\formats\tamsoftps1</Filter>
     </ClCompile>
+    <ClCompile Include="main\SeqSlider.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ui\windows\aboutdlg.h">
@@ -1420,6 +1423,9 @@
     </ClInclude>
     <ClInclude Include="main\formats\TamSoftPS1Instr.h">
       <Filter>Header Files\formats\tamsoftps1</Filter>
+    </ClInclude>
+    <ClInclude Include="main\SeqSlider.h">
+      <Filter>Header Files\main</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

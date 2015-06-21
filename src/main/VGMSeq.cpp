@@ -3,6 +3,7 @@
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
+#include "SeqSlider.h"
 #include "Options.h"
 #include "Root.h"
 #include <math.h>
@@ -43,6 +44,7 @@ VGMSeq::VGMSeq(const string& format, RawFile* file, uint32_t offset, uint32_t le
 VGMSeq::~VGMSeq(void)
 {
 	DeleteVect<SeqTrack>(aTracks);
+	DeleteVect<ISeqSlider>(aSliders);
 }
 
 bool VGMSeq::Load()
@@ -223,6 +225,26 @@ void VGMSeq::LoadTracksMain(long stopTime)
 				// tick
 				aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime);
 			}
+
+			// process sliders
+			auto itrSlider = aSliders.begin();
+			while (itrSlider != aSliders.end())
+			{
+				auto itrNextSlider = itrSlider + 1;
+
+				ISeqSlider * slider = *itrSlider;
+				if (slider->isStarted(time)) {
+					if (slider->isActive(time)) {
+						slider->write(time);
+					}
+					else {
+						itrNextSlider = aSliders.erase(itrSlider);
+					}
+				}
+
+				itrSlider = itrNextSlider;
+			}
+
 			time++;
 
 			if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -315,6 +337,8 @@ void VGMSeq::ResetVars(void)
 {
 	time = 0;
 	tempoBPM = initialTempoBPM;
+
+	DeleteVect<ISeqSlider>(aSliders);
 
 	if (readMode == READMODE_ADD_TO_UI)
 	{
