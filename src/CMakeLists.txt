@@ -333,7 +333,6 @@ set(SOURCE_FILES
     main/Scanner.h
     main/SeqEvent.cpp
     main/SeqEvent.h
-    main/SeqNote.h
     main/SeqSlider.cpp
     main/SeqSlider.h
     main/SeqTrack.cpp

@@ -1229,9 +1229,6 @@
     <ClInclude Include="main\formats\KonamiSnesInstr.h">
       <Filter>Header Files\formats\konamisnes</Filter>
     </ClInclude>
-    <ClInclude Include="main\SeqNote.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
     <ClInclude Include="main\VGMMultiSectionSeq.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
