@@ -502,7 +502,6 @@
     <ClInclude Include="main\formats\RareSnesSeq.h" />
     <ClInclude Include="main\formats\SegSatFormat.h" />
     <ClInclude Include="main\loaders\SNSFLoader.h" />
-    <ClInclude Include="main\SeqNote.h" />
     <ClInclude Include="main\SeqSlider.h" />
     <ClInclude Include="main\VGMMiscFile.h" />
     <ClInclude Include="main\RIFFFile.h" />
