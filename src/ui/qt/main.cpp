@@ -1,7 +1,18 @@
 #include <QApplication>
+#include <QtPlugin>
 #include "dropsitewindow.h"
 #include "mainwindow.h"
 #include "QtVGMRoot.h"
+
+#ifdef Q_OS_WINDOWS
+#include <Windows.h>
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+#endif
+
+#ifdef Q_OS_MAC
+Q_IMPORT_PLUGIN(QCocoaIntegrationPlugin)
+#endif
+
 
 //! [main() function]
 int main(int argc, char *argv[])
