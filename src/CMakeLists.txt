@@ -2,15 +2,23 @@ cmake_minimum_required(VERSION 2.8.11)
 project(VGMTrans)
 
 IF(APPLE)
-    set ( CMAKE_LIBRARY_ARCHITECTURE "x86_64-apple-darwin10" )
-    set ( CMAKE_OSX_ARCHITECTURES "x86_64;" )
+    SET(CMAKE_LIBRARY_ARCHITECTURE "x86_64-apple-darwin10")
+    SET(CMAKE_OSX_ARCHITECTURES "x86_64;")
+    SET(GUI_TYPE MACOSX_BUNDLE)
 ENDIF(APPLE)
+
+IF(WIN32)
+#    SET(CMAKE_LIBRARY_ARCHITECTURE "x86_64-w64-mingw32")
+    SET(CMAKE_LIBRARY_ARCHITECTURE "i686-w64-mingw32")
+    SET(GUI_TYPE WIN32)
+ENDIF(WIN32)
 
 #set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR})
 
 set(CMAKE_PREFIX_PATH
     ${CMAKE_PREFIX_PATH}
     "${CMAKE_SOURCE_DIR}/contrib/${CMAKE_LIBRARY_ARCHITECTURE}")
+message(STATUS "PREFIX PATH: " ${CMAKE_PREFIX_PATH})
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
@@ -51,6 +59,10 @@ include_directories(
     main/formats
     main/loaders
     ui/qt
+
+    "contrib/${CMAKE_LIBRARY_ARCHITECTURE}/include"
+    "contrib/${CMAKE_LIBRARY_ARCHITECTURE}/include/glib-2.0"
+    "contrib/${CMAKE_LIBRARY_ARCHITECTURE}/include/fluidsynth"
 )
 
 set(SOURCE_FILES
@@ -443,15 +455,11 @@ set(SOURCE_FILES
 
 qt5_add_resources(UI_RESOURCES ui/qt/resources/resources.qrc)
 
-IF(WIN32)
-SET(GUI_TYPE WIN32)
-ENDIF(WIN32)
-
-IF (APPLE)
-SET(GUI_TYPE MACOSX_BUNDLE)
-ENDIF (APPLE)
-
 add_executable(vgmtrans ${GUI_TYPE} ${SOURCE_FILES} ${UI_RESOURCES})
+
+SET_TARGET_PROPERTIES(vgmtrans PROPERTIES LINK_SEARCH_START_STATIC 1)
+SET_TARGET_PROPERTIES(vgmtrans PROPERTIES LINK_SEARCH_END_STATIC 1)
+
 
 # Use the Widgets module from Qt 5.
 target_link_libraries(vgmtrans Qt5::Widgets)
@@ -478,9 +486,6 @@ if (MSVC)
     target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/fluidsynth/lib/win32/libfluidsynthstat.lib)
     target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/glib-2.0.lib)
     target_link_libraries(vgmtrans ${CMAKE_SOURCE_DIR}/lib/glib/lib/win32/gthread-2.0.lib)
-    target_link_libraries(vgmtrans winmm.lib)
-    target_link_libraries(vgmtrans ws2_32.lib)
-    target_link_libraries(vgmtrans dsound.lib)
 
 	#LIST(APPEND SOURCE_FILES )
 	#set(ADDITIONAL_WIN_SOURCE_FILES
@@ -493,10 +498,19 @@ if (MSVC)
 
 else (MSVC)
     find_package (ZLIB REQUIRED)
+    message(STATUS "ZLIB INCLUDE DIR: " ${ZLIB_INCLUDE_DIR})
+    message(STATUS "ZLIB LIB DIR: " ${ZLIB_LIBRARY})
     if (ZLIB_FOUND)
       include_directories(${ZLIB_INCLUDE_DIRS})
       target_link_libraries (vgmtrans ${ZLIB_LIBRARIES})
     endif (ZLIB_FOUND)
+
+
+    find_package (FluidSynth REQUIRED)
+    target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
+
+    find_package(GLIB REQUIRED)
+    target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
 
     FIND_LIBRARY(INTL_LIBRARY NAMES intl)
     target_link_libraries(vgmtrans ${INTL_LIBRARY})
@@ -504,14 +518,22 @@ else (MSVC)
     FIND_LIBRARY(ICONV_LIBRARIES NAMES iconv)
     target_link_libraries(vgmtrans ${ICONV_LIBRARIES})
 
-    find_package(GLIB REQUIRED)
-    target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
-
-    find_package (FluidSynth REQUIRED)
-    target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
-
 	add_definitions(-DIOAPI_NO_64)
 endif (MSVC)
+
+IF (WIN32)
+    FIND_LIBRARY(QWINDOWS_LIBRARY qwindows)
+    TARGET_LINK_LIBRARIES(vgmtrans
+     ${QWINDOWS_LIBRARY}
+
+     imm32.lib
+     winmm.lib
+     ws2_32.lib
+     dsound.lib)
+
+    ADD_DEFINITIONS(-DFLUIDSYNTH_NOT_A_DLL -DG_OS_WIN32)
+
+ENDIF (WIN32)
 
 IF (APPLE)
    FIND_LIBRARY(IOKIT_LIBRARY IOKit)
