@@ -24,7 +24,7 @@ MusicPlayer::MusicPlayer()
     fluid_settings_setstr(this->settings, "synth.chorus.active", "no");
     fluid_settings_setstr(this->settings, "synth.midi-bank-select", "mma");
     fluid_settings_setint(this->settings, "synth.midi-channels", 48);
-    fluid_settings_setstr(this->settings, "player.timing-source", "system");
+//    fluid_settings_setstr(this->settings, "player.timing-source", "system");
 
     /* Create the synthesizer. */
     this->synth = new_fluid_synth(this->settings);
@@ -40,8 +40,9 @@ MusicPlayer::MusicPlayer()
     }
 
 
-    //    fluid_synth_set_reverb(synth, 0.5, 0.8, FLUID_REVERB_DEFAULT_WIDTH, 0.5);
-    fluid_synth_set_reverb(this->synth, 0.7, 0.8, 0.9, 0.4);
+//        fluid_synth_set_reverb(synth, 0.5, 0.8, FLUID_REVERB_DEFAULT_WIDTH, 0.5);
+        fluid_synth_set_reverb(synth, 0.5, 0.8, FLUID_REVERB_DEFAULT_WIDTH, 0.3);
+//    fluid_synth_set_reverb(this->synth, 0.7, 0.8, 0.9, 0.4);
     //fluid_synth_set_interp_method(synth, -1, FLUID_INTERP_NONE);
 
 //    this->player = new_vgmtrans_fluid_player(this->synth);

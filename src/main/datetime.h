@@ -573,7 +573,7 @@ public:
 
 	static DateTime get_Now ()
 	{
-#ifdef _WIN32
+#ifdef _ATL_VER
 		SYSTEMTIME stTime;
 		GetLocalTime(&stTime);
 		return DateTime(stTime.wYear, stTime.wMonth, stTime.wDay, stTime.wHour, stTime.wMinute, stTime.wSecond, stTime.wMilliseconds);
