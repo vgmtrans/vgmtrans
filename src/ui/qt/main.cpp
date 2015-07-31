@@ -4,8 +4,7 @@
 #include "mainwindow.h"
 #include "QtVGMRoot.h"
 
-#ifdef Q_OS_WINDOWS
-#include <Windows.h>
+#ifdef Q_OS_WIN
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 #endif
 
