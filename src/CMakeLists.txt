@@ -522,13 +522,13 @@ else (MSVC)
 endif (MSVC)
 
 IF (WIN32)
+    SET_PROPERTY(TARGET Qt5::Core APPEND PROPERTY INTERFACE_LINK_LIBRARIES ws2_32)
     FIND_LIBRARY(QWINDOWS_LIBRARY qwindows)
     TARGET_LINK_LIBRARIES(vgmtrans
      ${QWINDOWS_LIBRARY}
 
      imm32.lib
      winmm.lib
-     ws2_32.lib
      dsound.lib)
 
     ADD_DEFINITIONS(-DFLUIDSYNTH_NOT_A_DLL -DG_OS_WIN32)
