@@ -1,0 +1,314 @@
+#! /bin/sh
+# Copyright (C) 2003-2011 the VideoLAN team
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+
+#
+# Command line handling
+#
+usage()
+{
+	echo "Usage: $0 [--build=BUILD] [--host=HOST] [--prefix=PREFIX]"
+	echo "  --build=BUILD    configure for building on BUILD"
+	echo "  --host=HOST      cross-compile to build to run on HOST"
+	echo "  --prefix=PREFIX  install files in PREFIX"
+	echo "  --disable-FOO    configure to not build package FOO"
+	echo "  --enable-FOO     configure to build package FOO"
+	echo "  --disable-disc   configure to not build optical discs packages"
+	echo "  --disable-net    configure to not build networking packages"
+	echo "  --disable-sout   configure to not build stream output packages"
+	echo "  --enable-small   optimize libraries for size with slight speed decrease [DANGEROUS]"
+	echo "  --disable-gpl    configure to not build viral GPL code"
+	echo "  --disable-optim  disable optimization in libraries"
+}
+
+BUILD=
+HOST=
+PREFIX=
+PKGS_ENABLE=
+PKGS_DISABLE=
+BUILD_ENCODERS="1"
+BUILD_NETWORK="1"
+BUILD_DISCS="1"
+GPL="1"
+WITH_OPTIMIZATION="1"
+
+if test ! -f "../../contrib/src/main.mak"
+then
+	echo "$0 must be run from a subdirectory"
+	exit 1
+fi
+
+while test -n "$1"
+do
+	case "$1" in
+		--build=*)
+			BUILD="${1#--build=}"
+			;;
+		--help|-h)
+			usage
+			exit 0
+			;;
+		--host=*)
+			HOST="${1#--host=}"
+			;;
+		--prefix=*)
+			PREFIX="${1#--prefix=}"
+			;;
+		--disable-disc)
+			BUILD_DISCS=
+			;;
+		--disable-net)
+			BUILD_NETWORK=
+			;;
+		--disable-sout)
+			BUILD_ENCODERS=
+			;;
+		--disable-optim)
+			WITH_OPTIMIZATION=
+			;;
+		--enable-small)
+			ENABLE_SMALL=1
+			;;
+		--disable-gpl)
+			GPL=
+			;;
+		--disable-*)
+			PKGS_DISABLE="${PKGS_DISABLE} ${1#--disable-}"
+			;;
+		--enable-*)
+			PKGS_ENABLE="${PKGS_ENABLE} ${1#--enable-}"
+			;;
+		*)
+			echo "Unrecognized options $1"
+			usage
+			exit 1
+			;;
+	esac
+	shift
+done
+
+if test -z "$BUILD"
+then
+	echo -n "Guessing build system... "
+	BUILD="`${CC:-cc} -dumpmachine`"
+	if test -z "$BUILD"; then
+		echo "FAIL!"
+		exit 1
+	fi
+	echo "$BUILD"
+fi
+
+if test -z "$HOST"
+then
+	echo -n "Guessing host system...  "
+	HOST="$BUILD"
+	echo "$HOST"
+fi
+
+if test "$PREFIX"
+then
+	# strip trailing slash
+	PREFIX="${PREFIX%/}"
+fi
+
+#
+# Prepare files
+#
+echo "Creating configuration file... config.mak"
+exec 3>config.mak || exit $?
+cat >&3 << EOF
+# This file was automatically generated.
+# Any change will be overwritten if ../bootstrap is run again.
+BUILD := $BUILD
+HOST := $HOST
+PKGS_DISABLE := $PKGS_DISABLE
+PKGS_ENABLE := $PKGS_ENABLE
+EOF
+
+add_make()
+{
+	while test -n "$1"
+	do
+		echo "$1" >&3
+		shift
+	done
+}
+
+add_make_enabled()
+{
+	while test -n "$1"
+	do
+		add_make "$1 := 1"
+		shift
+	done
+}
+
+check_ios_sdk()
+{
+   if test -z "$SDKROOT"
+   then
+      SDKROOT=`xcode-select -print-path`/Platforms/iPhone${PLATFORM}.platform/Developer/SDKs/iPhone${PLATFORM}${SDK_VERSION}.sdk
+      echo "SDKROOT not specified, assuming $SDKROOT"
+   else
+      SDKROOT="$SDKROOT"
+      fi
+
+   if [ ! -d "${SDKROOT}" ]
+   then
+      echo "*** ${SDKROOT} does not exist, please install required SDK, or set SDKROOT manually. ***"
+      exit 1
+   fi
+   add_make "IOS_SDK=${SDKROOT}"
+}
+
+check_macosx_sdk()
+{
+   if [ -z "${OSX_VERSION}" ]
+   then
+      OSX_VERSION=`xcrun --show-sdk-version`
+      echo "OSX_VERSION not specified, assuming $OSX_VERSION"
+   fi
+   if test -z "$SDKROOT"
+   then
+      SDKROOT=`xcode-select -print-path`/Platforms/MacOSX.platform/Developer/SDKs/MacOSX$OSX_VERSION.sdk
+      echo "SDKROOT not specified, assuming $SDKROOT"
+   fi
+
+   if [ ! -d "${SDKROOT}" ]
+   then
+      SDKROOT_NOT_FOUND=`xcode-select -print-path`/Platforms/MacOSX.platform/Developer/SDKs/MacOSX$OSX_VERSION.sdk
+      SDKROOT=`xcode-select -print-path`/SDKs/MacOSX$OSX_VERSION.sdk
+      echo "SDKROOT not found at $SDKROOT_NOT_FOUND, trying $SDKROOT"
+   fi
+   if [ ! -d "${SDKROOT}" ]
+   then
+      SDKROOT_NOT_FOUND="$SDKROOT"
+      SDKROOT=`xcrun --show-sdk-path`
+      echo "SDKROOT not found at $SDKROOT_NOT_FOUND, trying $SDKROOT"
+   fi
+
+   if [ ! -d "${SDKROOT}" ]
+   then
+      echo "*** ${SDKROOT} does not exist, please install required SDK, or set SDKROOT manually. ***"
+      exit 1
+   fi
+
+   add_make "MACOSX_SDK=${SDKROOT}"
+   add_make "OSX_VERSION ?= ${OSX_VERSION}"
+}
+
+check_android_sdk()
+{
+	[ -z "${ANDROID_NDK}" ] && echo "You must set ANDROID_NDK environment variable" && exit 1
+	add_make "ANDROID_NDK := ${ANDROID_NDK}"
+	[ -z "${ANDROID_ABI}" ] && echo "You must set ANDROID_ABI environment variable" && exit 1
+	add_make "ANDROID_ABI := ${ANDROID_ABI}"
+	[ -z "${ANDROID_API}" ] && echo "You should set ANDROID_API environment variable (using default android-9)" && ANDROID_API := android-9
+	add_make "ANDROID_API := ${ANDROID_API}"
+	[ ${ANDROID_ABI} = "armeabi-v7a" ] && add_make_enabled "HAVE_NEON"
+	[ ${ANDROID_ABI} = "armeabi-v7a" ] && add_make_enabled "HAVE_ARMV7A"
+	[ ${ANDROID_ABI} = "arm64-v8a" ] && add_make_enabled "HAVE_NEON"
+	[ ${ANDROID_ABI} = "arm64-v8a" ] && add_make_enabled "HAVE_ARMV8A"
+	[ ${ANDROID_ABI} = "armeabi" -a -z "${NO_ARMV6}" ] && add_make_enabled "HAVE_ARMV6"
+}
+
+test -z "$PREFIX" || add_make "PREFIX := $PREFIX"
+test -z "$BUILD_DISCS" || add_make_enabled "BUILD_DISCS"
+test -z "$BUILD_ENCODERS" || add_make_enabled "BUILD_ENCODERS"
+test -z "$BUILD_NETWORK" || add_make_enabled "BUILD_NETWORK"
+test -z "$ENABLE_SMALL" || add_make_enabled "ENABLE_SMALL"
+test -z "$GPL" || add_make_enabled "GPL"
+test -z "$WITH_OPTIMIZATION" || add_make_enabled "WITH_OPTIMIZATION"
+
+#
+# Checks
+#
+OS="${HOST#*-}" # strip architecture
+case "${OS}" in
+	apple-darwin*)
+		if test -z "$BUILDFORIOS"
+		then
+			check_macosx_sdk
+			add_make_enabled "HAVE_MACOSX" "HAVE_DARWIN_OS" "HAVE_BSD"
+		else
+			check_ios_sdk
+			add_make_enabled "HAVE_IOS" "HAVE_DARWIN_OS" "HAVE_BSD" "HAVE_FPU"
+
+			case "${HOST}" in
+				*arm*)
+				add_make_enabled "HAVE_NEON" "HAVE_ARMV7A"
+				;;
+			esac;
+		fi
+		;;
+	*bsd*)
+		add_make_enabled "HAVE_BSD"
+		;;
+	*android*)
+		check_android_sdk
+		add_make_enabled "HAVE_LINUX" "HAVE_ANDROID"
+		case "${HOST}" in
+			*arm*)
+			add_make "PLATFORM_SHORT_ARCH := arm"
+			;;
+			*arm64*|*aarch64*)
+			add_make "PLATFORM_SHORT_ARCH := arm64"
+			;;
+			*i686*)
+			add_make "PLATFORM_SHORT_ARCH := x86"
+			;;
+			*x86_64*)
+			add_make "PLATFORM_SHORT_ARCH := x86_64"
+			;;
+			*mipsel*)
+			add_make "PLATFORM_SHORT_ARCH := mips"
+			;;
+		esac
+		;;
+	*linux*)
+		add_make_enabled "HAVE_LINUX"
+		;;
+	*mingw*)
+		add_make_enabled "HAVE_WIN32"
+		;;
+	*solaris*)
+		add_make_enabled "HAVE_SOLARIS"
+		;;
+esac
+
+#
+# Results output
+#
+test -e Makefile && unlink Makefile
+ln -sf ../../contrib/src/main.mak Makefile || exit $?
+cat << EOF
+Bootstrap completed.
+
+Run "make" to start compilation.
+
+Other targets:
+ * make install      same as "make"
+ * make prebuilt     fetch and install prebuilt binaries
+ * make list         list packages
+ * make fetch        fetch required source tarballs
+ * make fetch-all    fetch all source tarballs
+ * make distclean    clean everything and undo bootstrap
+ * make mostlyclean  clean everything except source tarballs
+ * make clean        clean everything
+ * make package      prepare prebuilt packages
+EOF
+
+mkdir -p ../../contrib/tarballs || exit $?
