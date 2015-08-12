@@ -1,0 +1,120 @@
+#!/bin/sh
+# Copyright © 2011 Rafaël Carré
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+
+export LC_ALL=
+NEEDED=
+
+if [ ! -f tools.mak ]
+then
+	echo "You must run me in ./extras/tools !"
+	exit 1
+fi
+
+check_tar() {
+if ! tar PcJ /dev/null >/dev/null 2>&1
+then
+    echo "tar doesn't support xz (J option)"
+    NEEDED="$NEEDED .tar .xz"
+fi
+}
+
+check_sed() {
+tmp="`pwd`/check_sed"
+trap "rm $tmp{,-e} 2>/dev/null" EXIT
+echo "test file for GNU sed" > $tmp
+if ! sed -i -e 's/sed//' $tmp >/dev/null 2>&1
+then
+    echo "sed doesn't do in-place editing (-i option)"
+    NEEDED="$NEEDED .sed"
+fi
+}
+
+check() {
+if ! $1 --version >/dev/null 2>&1 && ! $1 -version >/dev/null 2>&1
+then
+    echo "$1 not found"
+    NEEDED="$NEEDED .$1"
+else
+    # found, need to check version ?
+    [ -z "$2" ] && return # no
+    gotver=`$1 --version | head -1 | sed s/'.* '//`
+    gotmajor=`echo $gotver|cut -d. -f1`
+    gotminor=`echo $gotver|cut -d. -f2`
+    gotmicro=`echo $gotver|cut -d. -f3`
+    [ -z "$gotmicro" ] && gotmicro=0
+    needmajor=`echo $2|cut -d. -f1`
+    needminor=`echo $2|cut -d. -f2`
+    needmicro=`echo $2|cut -d. -f3`
+    [ -z "$needmicro" ] && needmicro=0
+    if [ "$needmajor" -gt "$gotmajor" \
+         -o "$needmajor" -eq "$gotmajor" -a "$needminor" -gt "$gotminor" \
+         -o "$needmajor" -eq "$gotmajor" -a "$needminor" -eq "$gotminor" -a "$needmicro" -gt "$gotmicro" ]
+    then
+        echo "$1 too old"
+        NEEDED="$NEEDED .$1"
+    fi
+fi
+}
+
+check autoconf 2.69
+check automake 1.14
+check m4 1.4.16
+check libtool 2.4
+check pkg-config
+check cmake 3.1.0
+check yasm
+check_tar
+check ragel
+check_sed
+check protoc 2.6.0
+check ant
+check xz
+
+[ -n "$NEEDED" ] && mkdir -p build/ && echo "To-be-built packages: `echo $NEEDED | sed 's/\.//g'`"
+
+CPUS=
+CC=
+CXX=
+case `uname` in
+    Linux)
+        CPUS=`grep -c ^processor /proc/cpuinfo`
+     ;;
+    Darwin)
+        CPUS=`sysctl hw.ncpu|cut -d: -f2`
+        gcc-4.2 --version >/dev/null 2>&1 && CC=CC=gcc-4.2
+        g++-4.2 --version >/dev/null 2>&1 && CXX=CXX=g++-4.2
+    ;;
+    SunOS)
+        CPUS=`/usr/bin/kstat -p :::state | grep 'on-line$' | wc -l | sed 's/ //g'`
+    ;;
+    *)
+        CPUS=1  # default
+     ;;
+esac
+
+
+cat > Makefile << EOF
+MAKEFLAGS += -j$CPUS
+$CC
+$CXX
+PREFIX=\$(abspath ./build)
+
+all: $NEEDED
+	@echo "You are ready to build VLC and its contribs"
+
+include tools.mak
+EOF
