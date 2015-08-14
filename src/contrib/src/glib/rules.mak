@@ -7,7 +7,7 @@ ifeq ($(call need_pkg,"glib-2.0 gthread-2.0"),)
 PKGS_FOUND += glib
 endif
 
-DEPS_glib = ffi $(DEPS_ffi)
+DEPS_glib = gettext ffi $(DEPS_ffi)
 
 $(TARBALLS)/glib-$(GLIB_MINOR_VERSION).tar.xz:
 	$(call download,$(GLIB_URL))

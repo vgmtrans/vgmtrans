@@ -32,8 +32,6 @@ endif
 FLUIDCONF := $(HOSTCONF) \
 	--disable-alsa-support \
 	--disable-aufile-support \
-	--disable-coreaudio \
-	--disable-coremidi \
 	--disable-dart \
 	--disable-dbus-support \
 	--disable-jack-support \
@@ -45,6 +43,12 @@ FLUIDCONF := $(HOSTCONF) \
   	--disable-portaudio-support \
 	--disable-pulse-support \
 	--without-readline
+
+ifndef HAVE_MACOSX
+	FLUIDCONF += \
+	--disable-coreaudio \
+	--disable-coremidi
+endif
 
 .fluid: fluidsynth
 	$(RECONF)
