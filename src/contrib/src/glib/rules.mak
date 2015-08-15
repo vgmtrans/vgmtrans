@@ -1,6 +1,6 @@
 # GLIB
-GLIB_VERSION := 2.45
-GLIB_MINOR_VERSION := 2.45.4
+GLIB_VERSION := 2.38
+GLIB_MINOR_VERSION := 2.38.2
 GLIB_URL := http://ftp.gnome.org/pub/gnome/sources/glib/$(GLIB_VERSION)/glib-$(GLIB_MINOR_VERSION).tar.xz
 
 ifeq ($(call need_pkg,"glib-2.0 gthread-2.0"),)
