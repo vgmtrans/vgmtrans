@@ -47,12 +47,14 @@ endif
 	#install -d $</plugins/accessible/libqtaccessiblewidgets.a "$(PREFIX)/lib/libqtaccessiblewidgets.a"
 	# INSTALLING HEADERS
 	for h in corelib gui widgets; do \
-		install -d "$(PREFIX)/include/qt5/src/$${h}" ; \
-		(cd $</src/$${h} && find . -type f -name '*.h' -exec install "{}" "$(PREFIX)/include/qt5/src/$${h}/{}" \;) ; \
+		install -d "$(PREFIX)/include/src/$${h}" ; \
+		(cd $</src/$${h} && find . -type f -name '*.h' -exec sh -c 'install -d "$(PREFIX)/include/src/$${0}/$$(dirname {})"; cp "{}" "$(PREFIX)/include/src/$${0}/{}"' $${h} \;) ; \
 	done
+	# (cd $</src/$${h} && find . -type f -name '*.h' -exec install -D "{}" "$(PREFIX)/include/src/$${h}/{}" \;) ; \
+
 	for h in Core Gui Widgets; do \
-		install -d "$(PREFIX)/include/Qt$${h}" ; \
-		(cd $</include/Qt$${h} && find . -maxdepth 1 -type f \( -name '*.h' -o -name 'Q*' \) -exec install -s "{}" "$(PREFIX)/include/Qt$${h}/{}" \;) ; \
+		install -d "$(PREFIX)/include/qt5/Qt$${h}" ; \
+		(cd $</include/Qt$${h} && find . -maxdepth 1 -type f \( -name '*.h' -o -name 'Q*' \) -exec install -s "{}" "$(PREFIX)/include/qt5/Qt$${h}/{}" \;) ; \
 	done
 	mkdir -p "$(PREFIX)/include/qt5/qpa"
 	echo "#include \"../src/gui/kernel/qplatformnativeinterface.h\"" > "$(PREFIX)/include/qt5/qpa/qplatformnativeinterface.h"
@@ -62,12 +64,33 @@ endif
 		do cat $(SRC)/qt/Qt5$${i}.pc.in | sed -e s/@@VERSION@@/$(QT_VERSION)/ | sed -e 's|@@PREFIX@@|$(PREFIX)|' > "$(PREFIX)/lib/pkgconfig/Qt5$${i}.pc"; \
 	done
 
-	# INSTALLING CMAKE FILES
 	install -d "$(PREFIX)/lib/cmake"
 	for cmake in Qt5 Qt5Core Qt5Gui Qt5Widgets; do \
 		install -d "$(PREFIX)/lib/cmake/$${cmake}" ; \
-		(cd $</lib/cmake/$${cmake} && find . -type f -name '*.cmake' -exec sh -c 'sed -e s/plugins\\/\$${PLUGIN_LOCATION}/lib/ "{}" > "$(PREFIX)/lib/cmake/$${0}/{}"' $${cmake} \;) ; \
+		(cd $</lib/cmake/$${cmake} && find . -type f -name '*.cmake' -exec sh -c 'sed -e s/plugins\\/\$${PLUGIN_LOCATION}/lib/ "{}" \
+		 | sed -e s/_qt5_corelib_extra_includes.*mkspecs/_qt5_corelib_extra_includes\ \"\$${_qt5Core_install_prefix}\\/lib\\/mkspecs/ \
+		 | sed -e s/install_prefix}\\/include/install_prefix}\\/include\\/qt5/g > "$(PREFIX)/lib/cmake/$${0}/{}"' $${cmake} \;) ; \
 	done
+
+	# INSTALLING CMAKE FILES
+	# install -d "$(PREFIX)/lib/cmake"
+	# for cmake in Qt5 Qt5Core Qt5Gui Qt5Widgets; do \
+	# 	install -d "$(PREFIX)/lib/cmake/$${cmake}" ; \
+	# 	(LIBPATH=$$(echo $(PREFIX) | sed -e 's/[\/&]/\\&/g') ; \
+	# 	 cd $</lib/cmake/$${cmake} && find . -type f -name '*.cmake' -exec sh -c 'sed -e s/plugins\\/\$${PLUGIN_LOCATION}/lib/ "{}" \
+	# 	 | sed -e s/install_prefix}\\/include/install_prefix}\\/include\\/qt5/g > "$(PREFIX)/lib/cmake/$${0}/{}"' $${cmake} $${LIBPATH} \;) ; \
+	# done
+
+	#echo "set(_qt5_corelib_extra_includes \"$(PREFIX)/lib/mkspecs\"" > "$(PREFIX)/include/qt5/qpa/qplatformnativeinterface.h"
+
+	#working but using absolute path
+	# | sed -e s/_qt5_corelib_extra_includes.*mkspecs/_qt5_corelib_extra_includes\ \"$${1}\\/lib\\/mkspecs/ \
+
+	# | sed -e s/install_prefix}\\/include/install_prefix}\\/include\\/qt5/g
+	# | sed -e s/_qt5_corelib_extra_includes.*mkspecs/_qt5_corelib_extra_includes\ \"\$${_qt5Core_install_prefix}\\/lib\\/mkspecs/
+
+	# INSTALLING MKSPECS FILES
+	cp -r $</mkspecs "$(PREFIX)/lib/mkspecs"
 
 	# BUILDING QT BUILD TOOLS
 ifdef HAVE_CROSS_COMPILE
