@@ -23,13 +23,15 @@ qt: qt-$(QT_VERSION).tar.xz .sum-qt
 
 ifdef HAVE_MACOSX
 QT_PLATFORM := -platform macx-clang
+EXTRA_CONFIG_OPTIONS := -sdk macosx10.10
 endif
 ifdef HAVE_WIN32
-QT_PLATFORM := -xplatform win32-g++ -device-option CROSS_COMPILE=$(HOST)-
+#QT_PLATFORM := -xplatform win32-g++ -device-option CROSS_COMPILE=$(HOST)-
+QT_PLATFORM := -platform win32-g++
 endif
 
 .qt: qt
-	cd $< && ./configure $(QT_PLATFORM) -static -release -no-sql-sqlite -no-gif -qt-libjpeg -no-openssl -no-opengl -opensource -confirm-license -sdk macosx10.10
+	cd $< && ./configure $(QT_PLATFORM) $(EXTRA_CONFIG_OPTIONS) -static -release -no-sql-sqlite -no-gif -qt-libjpeg -no-openssl -no-opengl -opensource -confirm-license
 	cd $< && $(MAKE) sub-src
 	# INSTALLING LIBRARIES
 	for lib in Widgets Gui Core; \

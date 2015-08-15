@@ -27,6 +27,11 @@ zlib: zlib-$(ZLIB_VERSION).tar.gz .sum-zlib
 	$(MOVE)
 
 .zlib: zlib
+ifdef HAVE_WIN32
+	#VGMTRANS: NORMAL MAKEFILE FAILS ON WIN32, NEED TO USE A DIFFERENT ONE
+	cd $< && $(MAKE) install -fwin32/Makefile.gcc LIBRARY_PATH="$(PREFIX)/lib" INCLUDE_PATH="$(PREFIX)/include" BINARY_PATH="$(PREFIX)/bin"
+else
 	cd $< && $(HOSTVARS) $(ZLIB_CONFIG_VARS) CFLAGS="$(CFLAGS) $(ZLIB_ECFLAGS)" ./configure --prefix=$(PREFIX) --static
 	cd $< && $(MAKE) install
+endif
 	touch $@
