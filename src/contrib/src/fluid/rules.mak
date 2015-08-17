@@ -24,6 +24,7 @@ fluidsynth: fluidsynth-$(FLUID_VERSION).tar.bz2 .sum-fluid
 ifdef HAVE_WIN32
 	#BUILDING FOR WINDOWS NOW DONCHA KNOW
 	$(APPLY) $(SRC)/fluid/fluid-static-win32.patch
+	$(APPLY) $(SRC)/fluid/vgmtrans-static-dsound-hinstance-win32.patch
 endif
 	# Remove symbolic links to /usr/share/aclocal
 	cd $(UNPACK_DIR)/m4/ && rm -f libtool.m4 lt*m4
