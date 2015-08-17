@@ -19,6 +19,7 @@ glib: glib-$(GLIB_MINOR_VERSION).tar.xz .sum-glib
 ifdef HAVE_WIN32
 	#VGMTRANS: REMOVING TESTS ON WINDOWS BECAUSE THEY TRIGGERED SEGFAULT IN MSYS2
 	$(APPLY) $(SRC)/glib/glib-notests-win32.patch
+	$(APPLY) $(SRC)/glib/vgmtrans-noDllMain-required-win32.patch
 endif
 	$(MOVE)
 
