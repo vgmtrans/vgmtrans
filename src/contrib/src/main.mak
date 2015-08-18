@@ -1,4 +1,5 @@
 # Main makefile for VLC 3rd party libraries ("contrib")
+# modified for VGMTrans
 # Copyright (C) 2003-2011 the VideoLAN team
 #
 # This file is under the same license as the vlc package.
@@ -19,12 +20,6 @@ export PATH
 PKGS_ALL := $(patsubst $(SRC)/%/rules.mak,%,$(wildcard $(SRC)/*/rules.mak))
 DATE := $(shell date +%Y%m%d)
 VPATH := $(TARBALLS)
-
-# Common download locations
-GNU := http://ftp.gnu.org/gnu
-SF := http://heanet.dl.sourceforge.net/sourceforge
-VIDEOLAN := http://downloads.videolan.org/pub/videolan
-CONTRIB_VIDEOLAN := http://downloads.videolan.org/pub/contrib
 
 #
 # Machine-dependent variables
@@ -390,12 +385,12 @@ distclean: clean
 	$(RM) config.mak
 	unlink Makefile
 
-PREBUILT_URL=ftp://ftp.videolan.org/pub/videolan/contrib/$(HOST)/vlc-contrib-$(HOST)-latest.tar.bz2
+PREBUILT_URL=https://github.com/vgmtrans/vgmtrans-files/raw/master/contrib/$(HOST)/vgmtrans-contrib-$(HOST)-latest.tar.bz2
 
-vlc-contrib-$(HOST)-latest.tar.bz2:
+vgmtrans-contrib-$(HOST)-latest.tar.bz2:
 	$(call download,$(PREBUILT_URL))
 
-prebuilt: vlc-contrib-$(HOST)-latest.tar.bz2
+prebuilt: vgmtrans-contrib-$(HOST)-latest.tar.bz2
 	-$(UNPACK)
 	$(RM) -r $(TOPDST)/$(HOST)
 	mv $(HOST) $(TOPDST)
@@ -415,7 +410,7 @@ package: install
 		cd share; rm -Rf man doc gtk-doc info lua projectM gettext; cd ..; \
 		rm -Rf man sbin etc lib/lua lib/sidplay
 	cd tmp/$(notdir $(PREFIX)) && $(abspath $(SRC))/change_prefix.sh $(PREFIX) @@CONTRIB_PREFIX@@
-	(cd tmp && tar c $(notdir $(PREFIX))/) | bzip2 -c > ../vlc-contrib-$(HOST)-$(DATE).tar.bz2
+	(cd tmp && tar c $(notdir $(PREFIX))/) | bzip2 -c > ../vgmtrans-contrib-$(HOST)-$(DATE).tar.bz2
 
 list:
 	@echo All packages:
