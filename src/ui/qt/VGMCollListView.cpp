@@ -4,8 +4,8 @@
 
 #include <qdebug.h>
 #include <qevent.h>
-#include <main/SF2File.h>
-#include <main/VGMSeq.h>
+#include "SF2File.h"
+#include "VGMSeq.h"
 #include "VGMCollListView.h"
 #include "QtVGMRoot.h"
 #include "VGMColl.h"
