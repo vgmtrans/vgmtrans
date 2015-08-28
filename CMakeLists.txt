@@ -48,8 +48,10 @@ include_directories(${INCLUDE_DIRS})
 
 add_executable(vgmtrans ${GUI_TYPE} ${SOURCE_FILES} ${UI_RESOURCES})
 
-SET_TARGET_PROPERTIES(vgmtrans PROPERTIES LINK_SEARCH_START_STATIC 1)
-SET_TARGET_PROPERTIES(vgmtrans PROPERTIES LINK_SEARCH_END_STATIC 1)
+IF (WIN32 OR APPLE)
+    SET_TARGET_PROPERTIES(vgmtrans PROPERTIES LINK_SEARCH_START_STATIC 1)
+    SET_TARGET_PROPERTIES(vgmtrans PROPERTIES LINK_SEARCH_END_STATIC 1)
+ENDIF (WIN32 OR APPLE)
 
 # Use the Widgets module from Qt 5.
 target_link_libraries(vgmtrans Qt5::Widgets)
@@ -60,15 +62,11 @@ if (ZLIB_FOUND)
   target_link_libraries (vgmtrans ${ZLIB_LIBRARIES})
 endif (ZLIB_FOUND)
 
-
 find_package (FluidSynth REQUIRED)
 target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
 
 find_package(GLIB REQUIRED)
 target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
-
-add_definitions(-DIOAPI_NO_64)
-add_definitions(-DTIXML_USE_STL)
 
 IF (WIN32 OR APPLE)
     FIND_LIBRARY(INTL_LIBRARY NAMES intl)
@@ -77,6 +75,9 @@ IF (WIN32 OR APPLE)
     FIND_LIBRARY(ICONV_LIBRARIES NAMES iconv)
     target_link_libraries(vgmtrans ${ICONV_LIBRARIES})
 ENDIF (WIN32 OR APPLE)
+
+add_definitions(-DIOAPI_NO_64)
+add_definitions(-DTIXML_USE_STL)
 
 IF (WIN32)
     SET_PROPERTY(TARGET Qt5::Core APPEND PROPERTY INTERFACE_LINK_LIBRARIES ws2_32)
