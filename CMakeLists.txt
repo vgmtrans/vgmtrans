@@ -42,12 +42,7 @@ add_subdirectory(src)
 add_subdirectory(lib)
 add_subdirectory(contrib)
 
-
-if(MSVC)
-  set(CMAKE_CXX_FLAGS "/EHsc")
-else()
-  set ( CMAKE_CXX_FLAGS "-std=c++11 -w -g3 -Wall -O0" )
-endif()
+set ( CMAKE_CXX_FLAGS "-std=c++11 -w -g3 -Wall -O0" )
 
 include_directories(${INCLUDE_DIRS})
 
