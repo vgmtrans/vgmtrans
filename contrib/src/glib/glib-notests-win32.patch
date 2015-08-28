@@ -1,0 +1,11 @@
+--- glib/Makefile.am.orig	2015-08-14 19:33:57.140300300 -0400
++++ glib/Makefile.am	2015-08-14 19:34:13.631209100 -0400
+@@ -6,7 +6,7 @@
+ 
+ ACLOCAL_AMFLAGS = -I m4macros ${ACLOCAL_FLAGS}
+ 
+-SUBDIRS = . m4macros glib gmodule gthread gobject gio po docs tests
++SUBDIRS = . m4macros glib gmodule gthread gobject gio po docs
+ DIST_SUBDIRS = $(SUBDIRS) build
+ 
+ bin_SCRIPTS = glib-gettextize

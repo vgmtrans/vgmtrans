@@ -1,0 +1,683 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8140E68D-B9D7-40F1-A633-FE484428FDB6}</ProjectGuid>
+    <RootNamespace>VGMTrans</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseOfAtl>Static</UseOfAtl>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseOfAtl>Static</UseOfAtl>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseOfAtl>Static</UseOfAtl>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseOfAtl>Static</UseOfAtl>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)lib\yaml-cpp\include;$(ProjectDir)src\ui\windows;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)lib\yaml-cpp\include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(ProjectDir)lib\zlib\lib\win32;$(ProjectDir)lib\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(ProjectDir)lib\zlib\lib\x64;$(ProjectDir)lib\yaml-cpp\lib\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)lib\yaml-cpp\include;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)lib\yaml-cpp\include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(ProjectDir)lib\zlib\lib\win32;$(ProjectDir)lib\yaml-cpp\lib\win32;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(ProjectDir)lib\zlib\lib\x64;$(ProjectDir)lib\yaml-cpp\lib\x64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)_WTL\</OutDir>
+    <IntDir>$(Configuration)_WTL\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)_WTL\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)_WTL\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)_WTL\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)_WTL\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)$(Configuration)_WTL\</OutDir>
+    <IntDir>$(Configuration)_WTL\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Midl>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TargetEnvironment>Win32</TargetEnvironment>
+      <TypeLibraryName>.\Debug/DockingDemo.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>./src/main;./src/main/loaders;./src/main/formats;./src/ui/windows;./src/ui/windows/include;./src/ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
+    </ClCompile>
+    <ResourceCompile />
+    <Link>
+      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL-mtd.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+    </Link>
+    <Manifest />
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TypeLibraryName>.\Debug/DockingDemo.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>./src/main;./src/main/loaders;./src/main/formats;./src/ui/windows;./src/ui/windows/include;./src/ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <ResourceCompile />
+    <Link>
+      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL-mtd.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+    </Link>
+    <Manifest />
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Midl>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TargetEnvironment>Win32</TargetEnvironment>
+      <TypeLibraryName>.\Release/DockingDemo.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <Optimization>Full</Optimization>
+      <AdditionalIncludeDirectories>./src/main;./src/main/loaders;./src/main/formats;./src/ui/windows;./src/ui/windows/include;./src/ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DisableSpecificWarnings>
+      </DisableSpecificWarnings>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <ResourceCompile />
+    <Link>
+      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Windows</SubSystem>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Manifest />
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TypeLibraryName>.\Release/DockingDemo.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <Optimization>Full</Optimization>
+      <AdditionalIncludeDirectories>./src/main;./src/main/loaders;./src/main/formats;./src/ui/windows;./src/ui/windows/include;./src/ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DisableSpecificWarnings>
+      </DisableSpecificWarnings>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <ResourceCompile />
+    <Link>
+      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;DxErr.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;libyaml-cppmt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Windows</SubSystem>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Manifest />
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main\BytePattern.cpp" />
+    <ClCompile Include="src\main\datetime.cpp" />
+    <ClCompile Include="src\main\formats\AkaoSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\AkaoSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\AkaoSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\CapcomSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\CapcomSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\CapcomSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\ChunSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\ChunSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\ChunSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\CompileSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\CompileSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\CompileSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\GraphResSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\GraphResSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\GraphResSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\HeartBeatPS1Seq.cpp" />
+    <ClCompile Include="src\main\formats\HeartBeatPS1Scanner.cpp" />
+    <ClCompile Include="src\main\formats\HeartBeatSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\HeartBeatSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\HeartBeatSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\HudsonSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\HudsonSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\HudsonSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\NamcoSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\PrismSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\PrismSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\PrismSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\KonamiSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\KonamiSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\KonamiSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\MoriSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\MoriSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\MoriSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\NamcoSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\NamcoSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\NeverlandSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\NeverlandSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\NinSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\PandoraBoxSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\PandoraBoxSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\PandoraBoxSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\RareSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\SNESDSP.cpp" />
+    <ClCompile Include="src\main\formats\SoftCreatSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\SoftCreatSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\SuzukiSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\TamSoftPS1Instr.cpp" />
+    <ClCompile Include="src\main\formats\TamSoftPS1Scanner.cpp" />
+    <ClCompile Include="src\main\formats\TamSoftPS1Seq.cpp" />
+    <ClCompile Include="src\main\loaders\GSFLoader.cpp" />
+    <ClCompile Include="src\main\LogItem.cpp" />
+    <ClCompile Include="src\main\loaders\NCSFLoader.cpp" />
+    <ClCompile Include="src\main\loaders\NDS2SFLoader.cpp" />
+    <ClCompile Include="src\main\Options.cpp" />
+    <ClCompile Include="src\main\loaders\KabukiDecrypt.cpp" />
+    <ClCompile Include="src\main\PSFFile.cpp" />
+    <ClCompile Include="src\main\formats\RareSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\RareSnesSeq.cpp" />
+    <ClCompile Include="src\main\RiffFile.cpp" />
+    <ClCompile Include="src\main\SeqSlider.cpp" />
+    <ClCompile Include="src\main\SF2File.cpp" />
+    <ClCompile Include="src\main\loaders\SNSFLoader.cpp" />
+    <ClCompile Include="src\main\SynthFile.cpp" />
+    <ClCompile Include="src\main\VGMMiscFile.cpp" />
+    <ClCompile Include="src\main\VGMMultiSectionSeq.cpp" />
+    <ClCompile Include="src\main\VGMSeqSection.cpp" />
+    <ClCompile Include="src\main\VGMTag.cpp" />
+    <ClCompile Include="src\ui\windows\aboutdlg.cpp" />
+    <ClCompile Include="src\ui\windows\CollDialog.cpp" />
+    <ClCompile Include="src\ui\windows\DragDropSource.cpp" />
+    <ClCompile Include="src\ui\windows\FileFrame.cpp" />
+    <ClCompile Include="src\ui\windows\HexView.cpp" />
+    <ClCompile Include="src\ui\windows\HexViewFrame.cpp" />
+    <ClCompile Include="src\ui\windows\ItemTreeView.cpp" />
+    <ClCompile Include="src\ui\windows\LogListView.cpp" />
+    <ClCompile Include="src\ui\windows\mainfrm.cpp" />
+    <ClCompile Include="src\ui\windows\MediaThread.cpp" />
+    <ClCompile Include="src\ui\windows\MusicPlayer.cpp" />
+    <ClCompile Include="src\ui\windows\MyCoCreateInstance.cpp" />
+    <ClCompile Include="src\ui\windows\osdepend.cpp" />
+    <ClCompile Include="src\ui\windows\RawFileListView.cpp" />
+    <ClCompile Include="src\ui\windows\RawFileTreeView.cpp" />
+    <ClCompile Include="src\ui\windows\ScanDlg.cpp" />
+    <ClCompile Include="src\ui\windows\stdafx.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\ui\windows\VGMCollListView.cpp" />
+    <ClCompile Include="src\ui\windows\VGMFileListView.cpp" />
+    <ClCompile Include="src\ui\windows\VGMTrans.cpp" />
+    <ClCompile Include="src\ui\windows\WinVGMRoot.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\C3DBuffer.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\C3DListener.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\C3DSegment.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CAPathPerformance.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CAudioPath.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CCollection.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CDirectMusic.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CDLSLoader.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CDMusicException.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CInputPort.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CInstrument.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CMasterClock.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CMidiPort.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\COutputPort.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CPerformance.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CPortPerformance.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CSampleInstrument.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\CSegment.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\Dmhelp.cpp" />
+    <ClCompile Include="src\ui\windows\directmidi\DSUTIL\DSUTIL.CPP" />
+    <ClCompile Include="src\ui\windows\directmidi\DSUTIL\DXUTIL.CPP" />
+    <ClCompile Include="src\main\loaders\MAMELoader.cpp" />
+    <ClCompile Include="src\main\loaders\PSF1Loader.cpp" />
+    <ClCompile Include="src\main\loaders\PSF2Loader.cpp" />
+    <ClCompile Include="src\main\loaders\SPCLoader.cpp" />
+    <ClCompile Include="src\main\formats\PSXSPU.cpp" />
+    <ClCompile Include="src\main\formats\PS1Seq.cpp" />
+    <ClCompile Include="src\main\formats\PS1SeqScanner.cpp" />
+    <ClCompile Include="src\main\formats\Vab.cpp" />
+    <ClCompile Include="src\main\formats\SquarePS2Scanner.cpp" />
+    <ClCompile Include="src\main\formats\SquarePS2Seq.cpp" />
+    <ClCompile Include="src\main\formats\WD.cpp" />
+    <ClCompile Include="src\main\formats\AkaoFormat.cpp" />
+    <ClCompile Include="src\main\formats\AkaoInstr.cpp" />
+    <ClCompile Include="src\main\formats\AkaoScanner.cpp" />
+    <ClCompile Include="src\main\formats\AkaoSeq.cpp" />
+    <ClCompile Include="src\main\formats\NDSInstrSet.cpp" />
+    <ClCompile Include="src\main\formats\NDSScanner.cpp" />
+    <ClCompile Include="src\main\formats\NDSSeq.cpp" />
+    <ClCompile Include="src\main\formats\FFTSeq.cpp" />
+    <ClCompile Include="src\main\formats\FFTInstr.cpp" />
+    <ClCompile Include="src\main\formats\FFTScanner.cpp" />
+    <ClCompile Include="src\main\formats\SuzukiSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\SuzukiSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\OrgScanner.cpp" />
+    <ClCompile Include="src\main\formats\OrgSeq.cpp" />
+    <ClCompile Include="src\main\formats\NinSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\NinSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\SegSatSeq.cpp" />
+    <ClCompile Include="src\main\formats\SegSatScanner.cpp" />
+    <ClCompile Include="src\main\formats\MP2kSeq.cpp" />
+    <ClCompile Include="src\main\formats\MP2kScanner.cpp" />
+    <ClCompile Include="src\main\formats\KonamiGXScanner.cpp" />
+    <ClCompile Include="src\main\formats\KonamiGXSeq.cpp" />
+    <ClCompile Include="src\main\formats\QSoundInstr.cpp" />
+    <ClCompile Include="src\main\formats\QSoundScanner.cpp" />
+    <ClCompile Include="src\main\formats\QSoundSeq.cpp" />
+    <ClCompile Include="src\main\formats\SonyPS2InstrSet.cpp" />
+    <ClCompile Include="src\main\formats\SonyPS2Scanner.cpp" />
+    <ClCompile Include="src\main\formats\SonyPS2Seq.cpp" />
+    <ClCompile Include="src\main\formats\HOSASeq.cpp" />
+    <ClCompile Include="src\main\formats\HOSAInstr.cpp" />
+    <ClCompile Include="src\main\formats\HOSAScanner.cpp" />
+    <ClCompile Include="src\main\formats\TriAcePS1InstrSet.cpp" />
+    <ClCompile Include="src\main\formats\TriAcePS1Scanner.cpp" />
+    <ClCompile Include="src\main\formats\TriAcePS1Seq.cpp" />
+    <ClCompile Include="src\main\common.cpp" />
+    <ClCompile Include="src\main\DataSeg.cpp" />
+    <ClCompile Include="src\main\DLSFile.cpp" />
+    <ClCompile Include="src\main\ExtensionDiscriminator.cpp" />
+    <ClCompile Include="src\main\Format.cpp" />
+    <ClCompile Include="src\main\Loader.cpp" />
+    <ClCompile Include="src\main\Matcher.cpp" />
+    <ClCompile Include="src\main\MidiFile.cpp" />
+    <ClCompile Include="src\main\RawFile.cpp" />
+    <ClCompile Include="src\main\Root.cpp" />
+    <ClCompile Include="src\main\ScaleConversion.cpp" />
+    <ClCompile Include="src\main\Scanner.cpp" />
+    <ClCompile Include="src\main\SeqEvent.cpp" />
+    <ClCompile Include="src\main\SeqTrack.cpp" />
+    <ClCompile Include="src\main\VGMColl.cpp" />
+    <ClCompile Include="src\main\VGMFile.cpp" />
+    <ClCompile Include="src\main\VGMInstrSet.cpp" />
+    <ClCompile Include="src\main\VGMItem.cpp" />
+    <ClCompile Include="src\main\VGMRgn.cpp" />
+    <ClCompile Include="src\main\VGMSamp.cpp" />
+    <ClCompile Include="src\main\VGMSampColl.cpp" />
+    <ClCompile Include="src\main\VGMSeq.cpp" />
+    <ClCompile Include="src\main\VGMSeqNoTrks.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\main\BytePattern.h" />
+    <ClInclude Include="src\main\datetime.h" />
+    <ClInclude Include="src\main\formats\AkaoSnesFormat.h" />
+    <ClInclude Include="src\main\formats\AkaoSnesInstr.h" />
+    <ClInclude Include="src\main\formats\AkaoSnesScanner.h" />
+    <ClInclude Include="src\main\formats\AkaoSnesSeq.h" />
+    <ClInclude Include="src\main\formats\CapcomSnesFormat.h" />
+    <ClInclude Include="src\main\formats\CapcomSnesInstr.h" />
+    <ClInclude Include="src\main\formats\CapcomSnesScanner.h" />
+    <ClInclude Include="src\main\formats\CapcomSnesSeq.h" />
+    <ClInclude Include="src\main\formats\ChunSnesFormat.h" />
+    <ClInclude Include="src\main\formats\ChunSnesInstr.h" />
+    <ClInclude Include="src\main\formats\ChunSnesScanner.h" />
+    <ClInclude Include="src\main\formats\ChunSnesSeq.h" />
+    <ClInclude Include="src\main\formats\CompileSnesFormat.h" />
+    <ClInclude Include="src\main\formats\CompileSnesInstr.h" />
+    <ClInclude Include="src\main\formats\CompileSnesScanner.h" />
+    <ClInclude Include="src\main\formats\CompileSnesSeq.h" />
+    <ClInclude Include="src\main\formats\GraphResSnesFormat.h" />
+    <ClInclude Include="src\main\formats\GraphResSnesInstr.h" />
+    <ClInclude Include="src\main\formats\GraphResSnesScanner.h" />
+    <ClInclude Include="src\main\formats\GraphResSnesSeq.h" />
+    <ClInclude Include="src\main\formats\HeartBeatPS1Seq.h" />
+    <ClInclude Include="src\main\formats\HeartBeatPS1Scanner.h" />
+    <ClInclude Include="src\main\formats\HeartBeatSnesFormat.h" />
+    <ClInclude Include="src\main\formats\HeartBeatSnesInstr.h" />
+    <ClInclude Include="src\main\formats\HeartBeatSnesScanner.h" />
+    <ClInclude Include="src\main\formats\HeartBeatSnesSeq.h" />
+    <ClInclude Include="src\main\formats\HudsonSnesFormat.h" />
+    <ClInclude Include="src\main\formats\HudsonSnesInstr.h" />
+    <ClInclude Include="src\main\formats\HudsonSnesScanner.h" />
+    <ClInclude Include="src\main\formats\HudsonSnesSeq.h" />
+    <ClInclude Include="src\main\formats\NamcoSnesInstr.h" />
+    <ClInclude Include="src\main\formats\PrismSnesFormat.h" />
+    <ClInclude Include="src\main\formats\PrismSnesInstr.h" />
+    <ClInclude Include="src\main\formats\PrismSnesScanner.h" />
+    <ClInclude Include="src\main\formats\PrismSnesSeq.h" />
+    <ClInclude Include="src\main\formats\KonamiSnesFormat.h" />
+    <ClInclude Include="src\main\formats\KonamiSnesInstr.h" />
+    <ClInclude Include="src\main\formats\KonamiSnesScanner.h" />
+    <ClInclude Include="src\main\formats\KonamiSnesSeq.h" />
+    <ClInclude Include="src\main\formats\MoriSnesFormat.h" />
+    <ClInclude Include="src\main\formats\MoriSnesInstr.h" />
+    <ClInclude Include="src\main\formats\MoriSnesScanner.h" />
+    <ClInclude Include="src\main\formats\MoriSnesSeq.h" />
+    <ClInclude Include="src\main\formats\NamcoSnesFormat.h" />
+    <ClInclude Include="src\main\formats\NamcoSnesScanner.h" />
+    <ClInclude Include="src\main\formats\NamcoSnesSeq.h" />
+    <ClInclude Include="src\main\formats\NeverlandSnesFormat.h" />
+    <ClInclude Include="src\main\formats\NeverlandSnesScanner.h" />
+    <ClInclude Include="src\main\formats\NeverlandSnesSeq.h" />
+    <ClInclude Include="src\main\formats\NinSnesInstr.h" />
+    <ClInclude Include="src\main\formats\PandoraBoxSnesFormat.h" />
+    <ClInclude Include="src\main\formats\PandoraBoxSnesInstr.h" />
+    <ClInclude Include="src\main\formats\PandoraBoxSnesScanner.h" />
+    <ClInclude Include="src\main\formats\PandoraBoxSnesSeq.h" />
+    <ClInclude Include="src\main\formats\RareSnesInstr.h" />
+    <ClInclude Include="src\main\formats\SNESDSP.h" />
+    <ClInclude Include="src\main\formats\SoftCreatSnesFormat.h" />
+    <ClInclude Include="src\main\formats\SoftCreatSnesScanner.h" />
+    <ClInclude Include="src\main\formats\SoftCreatSnesSeq.h" />
+    <ClInclude Include="src\main\formats\SuzukiSnesInstr.h" />
+    <ClInclude Include="src\main\formats\TamSoftPS1Format.h" />
+    <ClInclude Include="src\main\formats\TamSoftPS1Instr.h" />
+    <ClInclude Include="src\main\formats\TamSoftPS1Scanner.h" />
+    <ClInclude Include="src\main\formats\TamSoftPS1Seq.h" />
+    <ClInclude Include="src\main\loaders\GSFLoader.h" />
+    <ClInclude Include="src\main\LogItem.h" />
+    <ClInclude Include="src\main\loaders\NCSFLoader.h" />
+    <ClInclude Include="src\main\loaders\NDS2SFLoader.h" />
+    <ClInclude Include="src\main\Options.h" />
+    <ClInclude Include="src\main\loaders\KabukiDecrypt.h" />
+    <ClInclude Include="src\main\formats\OrgFormat.h" />
+    <ClInclude Include="src\main\pch.h" />
+    <ClInclude Include="src\main\PSFFile.h" />
+    <ClInclude Include="src\main\formats\RareSnesFormat.h" />
+    <ClInclude Include="src\main\formats\RareSnesScanner.h" />
+    <ClInclude Include="src\main\formats\RareSnesSeq.h" />
+    <ClInclude Include="src\main\formats\SegSatFormat.h" />
+    <ClInclude Include="src\main\loaders\SNSFLoader.h" />
+    <ClInclude Include="src\main\SeqSlider.h" />
+    <ClInclude Include="src\main\VGMMiscFile.h" />
+    <ClInclude Include="src\main\RIFFFile.h" />
+    <ClInclude Include="src\main\SF2File.h" />
+    <ClInclude Include="src\main\SynthFile.h" />
+    <ClInclude Include="src\main\VGMMultiSectionSeq.h" />
+    <ClInclude Include="src\main\VGMSeqSection.h" />
+    <ClInclude Include="src\main\VGMTag.h" />
+    <ClInclude Include="src\portable.h" />
+    <ClInclude Include="src\ui\windows\aboutdlg.h" />
+    <ClInclude Include="src\ui\windows\BmpBtn.h" />
+    <ClInclude Include="src\ui\windows\CollDialog.h" />
+    <ClInclude Include="src\ui\windows\DragDropSource.h" />
+    <ClInclude Include="src\ui\windows\DropFileHandler.h" />
+    <ClInclude Include="src\ui\windows\FileFrame.h" />
+    <ClInclude Include="src\ui\windows\HexView.h" />
+    <ClInclude Include="src\ui\windows\HexViewFrame.h" />
+    <ClInclude Include="src\ui\windows\ItemTreeView.h" />
+    <ClInclude Include="src\ui\windows\LogListView.h" />
+    <ClInclude Include="src\ui\windows\mainfrm.h" />
+    <ClInclude Include="src\ui\windows\MediaThread.h" />
+    <ClInclude Include="src\ui\windows\MusicPlayer.h" />
+    <ClInclude Include="src\ui\windows\MyCoCreateInstance.h" />
+    <ClInclude Include="src\ui\windows\MySplitter.h" />
+    <ClInclude Include="src\ui\windows\RawFileListView.h" />
+    <ClInclude Include="src\ui\windows\RawFileTreeView.h" />
+    <ClInclude Include="src\ui\windows\resource.h" />
+    <ClInclude Include="src\ui\windows\ScanDlg.h" />
+    <ClInclude Include="src\ui\windows\include\TabbedMDISave.h" />
+    <ClInclude Include="src\ui\windows\stdafx.h" />
+    <ClInclude Include="src\ui\windows\VGMCollListView.h" />
+    <ClInclude Include="src\ui\windows\VGMFileListView.h" />
+    <ClInclude Include="src\ui\windows\VGMTransTabCtrl.h" />
+    <ClInclude Include="src\ui\windows\VGMTransWindow.h" />
+    <ClInclude Include="src\ui\windows\WinVGMRoot.h" />
+    <ClInclude Include="src\ui\windows\include\atlgdix.h" />
+    <ClInclude Include="src\ui\windows\include\CustomTabCtrl.h" />
+    <ClInclude Include="src\ui\windows\include\DotNetTabCtrl.h" />
+    <ClInclude Include="src\ui\windows\include\ListViewNoFlicker.h" />
+    <ClInclude Include="src\ui\windows\include\PlainTextView.h" />
+    <ClInclude Include="src\ui\windows\include\TabbedDockingWindow.h" />
+    <ClInclude Include="src\ui\windows\include\TabbedFrame.h" />
+    <ClInclude Include="src\ui\windows\include\TabbedMDI.h" />
+    <ClInclude Include="src\ui\windows\directmidi\CAudioPart.h" />
+    <ClInclude Include="src\ui\windows\directmidi\CDirectBase.h" />
+    <ClInclude Include="src\ui\windows\directmidi\CDirectMidi.h" />
+    <ClInclude Include="src\ui\windows\directmidi\CMidipart.h" />
+    <ClInclude Include="src\ui\windows\directmidi\DSUTIL\DSUTIL.H" />
+    <ClInclude Include="src\ui\windows\directmidi\DSUTIL\DXUTIL.H" />
+    <ClInclude Include="src\main\formats\PSXSPU.h" />
+    <ClInclude Include="src\main\formats\FFTSeq.h" />
+    <ClInclude Include="src\main\formats\FFTFormat.h" />
+    <ClInclude Include="src\main\formats\FFTInstr.h" />
+    <ClInclude Include="src\main\formats\FFTScanner.h" />
+    <ClInclude Include="src\main\formats\MP2kSeq.h" />
+    <ClInclude Include="src\main\formats\MP2kFormat.h" />
+    <ClInclude Include="src\main\formats\MP2kScanner.h" />
+    <ClInclude Include="src\main\formats\AkaoFormat.h" />
+    <ClInclude Include="src\main\formats\AkaoInstr.h" />
+    <ClInclude Include="src\main\formats\AkaoScanner.h" />
+    <ClInclude Include="src\main\formats\AkaoSeq.h" />
+    <ClInclude Include="src\main\formats\SquarePS2Format.h" />
+    <ClInclude Include="src\main\formats\SquarePS2Scanner.h" />
+    <ClInclude Include="src\main\formats\SquarePS2Seq.h" />
+    <ClInclude Include="src\main\formats\WD.h" />
+    <ClInclude Include="src\main\formats\NDSFormat.h" />
+    <ClInclude Include="src\main\formats\NDSInstrSet.h" />
+    <ClInclude Include="src\main\formats\NDSScanner.h" />
+    <ClInclude Include="src\main\formats\NDSSeq.h" />
+    <ClInclude Include="src\main\formats\PS1Format.h" />
+    <ClInclude Include="src\main\formats\PS1Seq.h" />
+    <ClInclude Include="src\main\formats\PS1SeqScanner.h" />
+    <ClInclude Include="src\main\formats\Vab.h" />
+    <ClInclude Include="src\main\formats\OrgScanner.h" />
+    <ClInclude Include="src\main\formats\OrgSeq.h" />
+    <ClInclude Include="src\main\formats\NinSnesFormat.h" />
+    <ClInclude Include="src\main\formats\NinSnesScanner.h" />
+    <ClInclude Include="src\main\formats\NinSnesSeq.h" />
+    <ClInclude Include="src\main\formats\SuzukiSnesFormat.h" />
+    <ClInclude Include="src\main\formats\SuzukiSnesScanner.h" />
+    <ClInclude Include="src\main\formats\SuzukiSnesSeq.h" />
+    <ClInclude Include="src\main\formats\SegSatSeq.h" />
+    <ClInclude Include="src\main\formats\SegSatScanner.h" />
+    <ClInclude Include="src\main\formats\KonamiGXFormat.h" />
+    <ClInclude Include="src\main\formats\KonamiGXScanner.h" />
+    <ClInclude Include="src\main\formats\KonamiGXSeq.h" />
+    <ClInclude Include="src\main\formats\QSoundFormat.h" />
+    <ClInclude Include="src\main\formats\QSoundInstr.h" />
+    <ClInclude Include="src\main\formats\QSoundScanner.h" />
+    <ClInclude Include="src\main\formats\QSoundSeq.h" />
+    <ClInclude Include="src\main\formats\SonyPS2Format.h" />
+    <ClInclude Include="src\main\formats\SonyPS2InstrSet.h" />
+    <ClInclude Include="src\main\formats\SonyPS2Scanner.h" />
+    <ClInclude Include="src\main\formats\SonyPS2Seq.h" />
+    <ClInclude Include="src\main\formats\HOSASeq.h" />
+    <ClInclude Include="src\main\formats\HOSAFormat.h" />
+    <ClInclude Include="src\main\formats\HOSAInstr.h" />
+    <ClInclude Include="src\main\formats\HOSAScanner.h" />
+    <ClInclude Include="src\main\formats\TriAcePS1Format.h" />
+    <ClInclude Include="src\main\formats\TriAcePS1InstrSet.h" />
+    <ClInclude Include="src\main\formats\TriAcePS1Scanner.h" />
+    <ClInclude Include="src\main\formats\TriAcePS1Seq.h" />
+    <ClInclude Include="src\main\common.h" />
+    <ClInclude Include="src\main\DataSeg.h" />
+    <ClInclude Include="src\main\DLSFile.h" />
+    <ClInclude Include="src\main\ExtensionDiscriminator.h" />
+    <ClInclude Include="src\main\Format.h" />
+    <ClInclude Include="src\main\helper.h" />
+    <ClInclude Include="src\main\Loader.h" />
+    <ClInclude Include="src\main\Loop.h" />
+    <ClInclude Include="src\main\Matcher.h" />
+    <ClInclude Include="src\main\Menu.h" />
+    <ClInclude Include="src\main\MidiFile.h" />
+    <ClInclude Include="src\src\ui\windows\osdepend.h" />
+    <ClInclude Include="src\main\RawFile.h" />
+    <ClInclude Include="src\main\Root.h" />
+    <ClInclude Include="src\main\ScaleConversion.h" />
+    <ClInclude Include="src\main\Scanner.h" />
+    <ClInclude Include="src\main\SeqEvent.h" />
+    <ClInclude Include="src\main\SeqTrack.h" />
+    <ClInclude Include="src\main\VGMColl.h" />
+    <ClInclude Include="src\main\VGMFile.h" />
+    <ClInclude Include="src\main\VGMInstrSet.h" />
+    <ClInclude Include="src\main\VGMItem.h" />
+    <ClInclude Include="src\main\VGMRgn.h" />
+    <ClInclude Include="src\main\VGMSamp.h" />
+    <ClInclude Include="src\main\VGMSampColl.h" />
+    <ClInclude Include="src\main\VGMSeq.h" />
+    <ClInclude Include="src\main\VGMSeqNoTrks.h" />
+    <ClInclude Include="src\main\loaders\MAMELoader.h" />
+    <ClInclude Include="src\main\loaders\PSF1Loader.h" />
+    <ClInclude Include="src\main\loaders\PSF2Loader.h" />
+    <ClInclude Include="src\main\loaders\SPCLoader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\ui\windows\res\addcoll.ico" />
+    <None Include="src\ui\windows\res\mainframe.ico" />
+    <None Include="src\ui\windows\res\control.ico" />
+    <None Include="src\ui\windows\res\startrep.ico" />
+    <None Include="src\ui\windows\res\endrep.ico" />
+    <None Include="src\ui\windows\res\timesig.ico" />
+    <None Include="src\ui\windows\res\progchange.ico" />
+    <None Include="src\ui\windows\res\trackend.ico" />
+    <None Include="src\ui\windows\res\fileframe.ico" />
+    <None Include="src\ui\windows\res\folder_open.ico" />
+    <None Include="src\ui\windows\res\unknown.ico" />
+    <None Include="src\ui\windows\res\default.ico" />
+    <None Include="src\ui\windows\res\binary.ico" />
+    <None Include="src\ui\windows\res\instr.ico" />
+    <None Include="src\ui\windows\res\metroleft.ico" />
+    <None Include="src\ui\windows\res\metroright.ico" />
+    <None Include="src\ui\windows\res\TabIcons.bmp" />
+    <None Include="src\ui\windows\res\coll.ico" />
+    <None Include="src\ui\windows\res\note.ico" />
+    <None Include="src\ui\windows\res\instrset.ico" />
+    <None Include="src\ui\windows\res\rawfile.ico" />
+    <None Include="src\ui\windows\res\rest.ico" />
+    <None Include="src\ui\windows\res\seq.ico" />
+    <None Include="src\ui\windows\res\Toolbar.bmp" />
+    <None Include="src\ui\windows\res\track.ico" />
+    <None Include="src\ui\windows\res\samp.ico" />
+    <None Include="src\ui\windows\res\sampcoll.ico" />
+    <None Include="src\ui\windows\res\VGMTrans.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="src\ui\windows\VGMTrans.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="src\ui\windows\res\VGMTrans.exe.manifest" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+  <ProjectExtensions>
+    <VisualStudio>
+      <UserProperties RESOURCE_FILE="src\ui\windows\VGMTrans.rc" />
+    </VisualStudio>
+  </ProjectExtensions>
+</Project>
