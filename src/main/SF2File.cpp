@@ -96,7 +96,7 @@ SF2File::SF2File(SynthFile* synthfile)
 		
 		sfPresetHeader presetHdr;
 		memset(&presetHdr, 0, sizeof(sfPresetHeader));
-		memcpy(presetHdr.achPresetName, instr->name.c_str(), min(instr->name.length(), (unsigned long)20));
+		memcpy(presetHdr.achPresetName, instr->name.c_str(), min((unsigned long)instr->name.length(), (unsigned long)20));
 		presetHdr.wPreset =			(uint16_t)instr->ulInstrument;
 		presetHdr.wBank =			(uint16_t)instr->ulBank;
 		presetHdr.wPresetBagNdx =	(uint16_t)i;
@@ -199,7 +199,7 @@ SF2File::SF2File(SynthFile* synthfile)
 
 		sfInst inst;
 		memset(&inst, 0, sizeof(sfInst));
-		memcpy(inst.achInstName, instr->name.c_str(), min(instr->name.length(), (unsigned long)20));
+		memcpy(inst.achInstName, instr->name.c_str(), min((unsigned long)instr->name.length(), (unsigned long)20));
 		inst.wInstBagNdx = (uint16_t)rgnCounter;
 		rgnCounter += instr->vRgns.size();
 
@@ -389,7 +389,7 @@ SF2File::SF2File(SynthFile* synthfile)
 
 		sfSample samp;
 		memset(&samp, 0, sizeof(sfSample));
-		memcpy(samp.achSampleName, wave->name.c_str(), min(wave->name.length(), (unsigned long)20));
+		memcpy(samp.achSampleName, wave->name.c_str(), min((unsigned long)wave->name.length(), (unsigned long)20));
 		samp.dwStart = sampOffset;
 		samp.dwEnd = samp.dwStart + (wave->dataSize / sizeof(uint16_t));
 		sampOffset = samp.dwEnd + 46;		// plus the 46 padding samples required by sf2 spec
