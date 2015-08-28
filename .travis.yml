@@ -18,7 +18,7 @@ install:
   - if [ "$CXX" == "g++" ]; then sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 90; fi
   - sudo apt-get install qt54base
   - source /opt/qt54/bin/qt54-env.sh
-  - sudo apt-get install cmake libglib2.0-dev libfluidsynth-dev
+  - sudo apt-get install cmake libglib2.0-dev libfluidsynth-dev iconv
   
 script:
   - cmake CMakeLists.txt
