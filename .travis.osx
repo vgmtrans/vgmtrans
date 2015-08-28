@@ -15,9 +15,6 @@ before_install:
 install:
   - brew install qt5
   - brew install fluidsynth
-
-before_script:
-  - cd src/
   
 script:
   - cmake CMakeLists.txt
