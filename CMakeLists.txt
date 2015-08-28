@@ -72,15 +72,16 @@ target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
 find_package(GLIB REQUIRED)
 target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
 
-FIND_LIBRARY(INTL_LIBRARY NAMES intl)
-target_link_libraries(vgmtrans ${INTL_LIBRARY})
-
-FIND_LIBRARY(ICONV_LIBRARIES NAMES iconv)
-target_link_libraries(vgmtrans ${ICONV_LIBRARIES})
-
 add_definitions(-DIOAPI_NO_64)
 add_definitions(-DTIXML_USE_STL)
 
+IF (WIN32 OR APPLE)
+    FIND_LIBRARY(INTL_LIBRARY NAMES intl)
+    target_link_libraries(vgmtrans ${INTL_LIBRARY})
+
+    FIND_LIBRARY(ICONV_LIBRARIES NAMES iconv)
+    target_link_libraries(vgmtrans ${ICONV_LIBRARIES})
+ENDIF (WIN32 OR APPLE)
 
 IF (WIN32)
     SET_PROPERTY(TARGET Qt5::Core APPEND PROPERTY INTERFACE_LINK_LIBRARIES ws2_32)
