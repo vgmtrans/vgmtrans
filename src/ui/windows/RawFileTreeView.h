@@ -32,7 +32,7 @@ protected:
 	WTL::CImageList m_ImageList;
 	//int nIconFolderIndexNormal, nIconFolderIndexSelected;
 	int nIconIndexNormal, nIconIndexSelected;
-	std::hash_map<RawFile*, CTreeItem> items;//, hash<RawFile*>, equal_to> items;
+	std::unordered_map<RawFile*, CTreeItem> items;
 
 public:
 	DECLARE_WND_SUPERCLASS(NULL, CTreeViewCtrlEx::GetWndClassName())

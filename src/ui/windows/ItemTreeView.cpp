@@ -38,7 +38,7 @@ LRESULT CItemTreeView::OnDestroy(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lPar
 	BOOL bDestroy = m_ImageList.Destroy();
 	bDestroy; //avoid level 4 warning
 
-	//for (hash_map<VGMItem*, CTreeItem>::iterator iter = items.begin(); iter != items.end(); iter++)
+	//for (unordered_map<VGMItem*, CTreeItem>::iterator iter = items.begin(); iter != items.end(); iter++)
 	//	delete iter->first;
 	items.clear();
 
