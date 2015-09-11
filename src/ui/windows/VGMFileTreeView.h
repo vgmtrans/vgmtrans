@@ -31,7 +31,7 @@ protected:
 	WTL::CImageList m_ImageList;
 	int nIconFolderIndexNormal, nIconFolderIndexSelected;
 	int nIconIndexNormal, nIconIndexSelected;
-	hash_map<VGMFile*, CTreeItem> items;
+	unordered_map<VGMFile*, CTreeItem> items;
 
 public:
 	DECLARE_WND_SUPERCLASS(NULL, CTreeViewCtrlEx::GetWndClassName())

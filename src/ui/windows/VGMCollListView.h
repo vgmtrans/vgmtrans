@@ -88,7 +88,7 @@ protected:
     CComPtr<IImageList> m_TileIml;
 	//int nIconFolderIndexNormal, nIconFolderIndexSelected;
 	//int nIconIndexNormal, nIconIndexSelected;
-	//hash_map<VGMFile*, int> items;
+	//unordered_map<VGMFile*, int> items;
 	//VGMColl* selectedColl;
 
 	void InitImageLists();

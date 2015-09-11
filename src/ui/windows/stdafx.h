@@ -90,7 +90,7 @@ extern bool g_bXPOrLater;
 #include <vector>
 #include <list>
 #include <map>
-#include <hash_map>
+#include <unordered_map>
 #include <unordered_set>
 #include <string>
 #include <sstream>
