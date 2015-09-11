@@ -32,7 +32,7 @@ protected:
 	//int nIconFolderIndexNormal, nIconFolderIndexSelected;
 	//int nIconIndexNormal, nIconIndexSelected;
 	
-	//hash_map<VGMItem*, CTreeItem> items;
+	//unordered_map<VGMItem*, CTreeItem> items;
 	std::map<VGMItem*, CTreeItem> items;
 
 public:
