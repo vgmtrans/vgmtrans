@@ -244,6 +244,9 @@
     <Filter Include="Source Files\formats\tamsoftps1">
       <UniqueIdentifier>{1dad0218-02e2-4f15-b96d-241c77091932}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\windows\DxErr">
+      <UniqueIdentifier>{f60aad48-6a14-4c0d-a400-60b77e9a16af}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\ui\windows\aboutdlg.cpp">
@@ -783,6 +786,9 @@
     <ClCompile Include="src\main\SeqSlider.cpp">
       <Filter>Source Files\main</Filter>
     </ClCompile>
+    <ClCompile Include="lib\dxAug07\dxerr\dxerr.cpp">
+      <Filter>Source Files\windows\DxErr</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ui\windows\aboutdlg.h">
@@ -1193,9 +1199,6 @@
     <ClInclude Include="src\main\formats\RareSnesInstr.h">
       <Filter>Header Files\formats\raresnes</Filter>
     </ClInclude>
-    <ClInclude Include="src\ui\windows\osdepend.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
     <ClInclude Include="src\main\formats\HeartBeatPS1Seq.h">
       <Filter>Header Files\formats\heartbeatps1</Filter>
     </ClInclude>
@@ -1403,9 +1406,6 @@
     <ClInclude Include="src\main\pch.h">
       <Filter>Header Files\main</Filter>
     </ClInclude>
-    <ClInclude Include="portable.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
     <ClInclude Include="src\main\formats\HeartBeatPS1Scanner.h">
       <Filter>Header Files\formats\heartbeatps1</Filter>
     </ClInclude>
@@ -1423,6 +1423,12 @@
     </ClInclude>
     <ClInclude Include="src\main\SeqSlider.h">
       <Filter>Header Files\main</Filter>
+    </ClInclude>
+    <ClInclude Include="src\portable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\src\ui\windows\osdepend.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

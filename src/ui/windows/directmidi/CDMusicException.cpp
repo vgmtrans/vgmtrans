@@ -108,7 +108,7 @@ Date format: Day-month-year
 
 #include "pch.h"
 #include "CDirectMidi.h"
-#include <DxErr.h>
+#include "dxerr.h"
 
 using namespace directmidi;
 
@@ -136,6 +136,7 @@ void CDMusicException::CopyMsg(LPCTSTR strDefMsg,LPCTSTR strDescMsg)
 
 void CDMusicException::ObtainErrorString()
 {
+	WCHAR desc[1024];
 
 	switch(m_hrCode)
 	{
@@ -145,7 +146,8 @@ void CDMusicException::ObtainErrorString()
 			_T("\nsuch as an interface pointer, that it is not assigned"));
 			break;
 		default:
-			CopyMsg(DXGetErrorString(m_hrCode),DXGetErrorDescription(m_hrCode));
+			DXGetErrorDescription(m_hrCode, desc, countof(desc));
+			CopyMsg(DXGetErrorString(m_hrCode), desc);
 			break;
 	}
 }

@@ -13,8 +13,8 @@
 #endif
 #include <windows.h>
 #include <mmsystem.h>
-#include <DxErr.h>
 #include <dsound.h>
+#include "dxerr.h"
 #include "DSUtil.h"
 #include "DXUtil.h"
 
