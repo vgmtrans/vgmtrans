@@ -53,10 +53,6 @@ bool AkaoSnesInstrSet::GetInstrPointers()
 			break;
 		}
 
-		if (GetShort(ofsTuningEntry) == 0xffff) {
-			continue;
-		}
-
 		if (version != AKAOSNES_V1) {
 			uint32_t ofsADSREntry = addrADSRTable + srcn * 2;
 			if (ofsADSREntry + 2 > 0x10000) {
