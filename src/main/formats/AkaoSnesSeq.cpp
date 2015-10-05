@@ -466,7 +466,7 @@ void AkaoSnesSeq::LoadEventMap()
 			EventMap[0xf6] = EVENT_GOTO;
 			EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
 			EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
-			//EventMap[0xf9] = (AkaoSnesSeqEventType)0;
+			EventMap[0xf9] = EVENT_UNKNOWN1;
 			EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
 			EventMap[0xfb] = EVENT_PERC_ON;
 			EventMap[0xfc] = EVENT_PERC_OFF;
@@ -498,7 +498,7 @@ void AkaoSnesSeq::LoadEventMap()
 			EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
 			EventMap[0xfb] = EVENT_PERC_ON;
 			EventMap[0xfc] = EVENT_PERC_OFF;
-			//EventMap[0xfd] = (AkaoSnesSeqEventType)0;
+			EventMap[0xfd] = EVENT_PLAY_SFX;
 			EventMap[0xfe] = EVENT_END; // duplicated
 			EventMap[0xff] = EVENT_END; // duplicated
 		}
@@ -529,8 +529,8 @@ void AkaoSnesSeq::LoadEventMap()
 			EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
 			EventMap[0xfb] = EVENT_PERC_ON;
 			EventMap[0xfc] = EVENT_PERC_OFF;
-			//EventMap[0xfd] = (AkaoSnesSeqEventType)0;
-			//EventMap[0xfe] = (AkaoSnesSeqEventType)0;
+			EventMap[0xfd] = EVENT_UNKNOWN1;
+			EventMap[0xfe] = EVENT_UNKNOWN0;
 			EventMap[0xff] = EVENT_END; // duplicated
 		}
 	}
@@ -1155,6 +1155,15 @@ bool AkaoSnesTrack::ReadEvent(void)
 		desc << L"SFX: " << (int)sfxIndex;
 		AddUnknown(beginOffset, curOffset - beginOffset, L"Jump to SFX (HIWORD)", desc.str().c_str());
 		bContinue = false;
+		break;
+	}
+
+	case EVENT_PLAY_SFX:
+	{
+		// TODO: EVENT_PLAY_SFX
+		uint8_t arg1 = GetByte(curOffset++);
+		desc << L"Arg1: " << (int)arg1;
+		AddUnknown(beginOffset, curOffset - beginOffset, L"Play SFX", desc.str().c_str());
 		break;
 	}
 
