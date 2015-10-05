@@ -352,8 +352,8 @@ void AkaoSnesSeq::LoadEventMap()
 
 		// game-specific mappings
 		if (minorVersion == AKAOSNES_V3_SD2) {
-			//EventMap[0xfc] = (AkaoSnesSeqEventType)0;
-			//EventMap[0xfd] = (AkaoSnesSeqEventType)0;
+			EventMap[0xfc] = EVENT_LOOP_RESTART;
+			EventMap[0xfd] = EVENT_IGNORE_MASTER_VOLUME_BY_PROGNUM;
 			EventMap[0xfe] = EVENT_END;
 			EventMap[0xff] = EVENT_END;
 		}
@@ -580,6 +580,8 @@ void AkaoSnesTrack::ResetVars(void)
 	loopLevel = 0;
 	slur = false;
 	legato = false;
+
+	ignoreMasterVolumeProgNum = 0xff;
 }
 
 
@@ -1089,6 +1091,16 @@ bool AkaoSnesTrack::ReadEvent(void)
 		break;
 	}
 
+	case EVENT_LOOP_RESTART:
+	{
+		uint8_t prevLoopLevel = (loopLevel != 0 ? loopLevel : AKAOSNES_LOOP_LEVEL_MAX) - 1;
+
+		// reset loop count, but keep the nest level
+		loopIncCount[prevLoopLevel] = 0;
+
+		break;
+	}
+
 	case EVENT_SLUR_ON:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On (No Key Off/On)", desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
@@ -1348,6 +1360,14 @@ bool AkaoSnesTrack::ReadEvent(void)
 	case EVENT_IGNORE_MASTER_VOLUME:
 	{
 		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Ignore Master Volume", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
+		break;
+	}
+
+	case EVENT_IGNORE_MASTER_VOLUME_BY_PROGNUM:
+	{
+		ignoreMasterVolumeProgNum = GetByte(curOffset++);
+		desc << L"Program Number: " << (int)ignoreMasterVolumeProgNum;
+		AddGenericEvent(beginOffset, curOffset - beginOffset, L"Ignore Master Volume By Program Number", desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
 		break;
 	}
 
