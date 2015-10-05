@@ -82,6 +82,8 @@ enum AkaoSnesSeqEventType
 	EVENT_VOLUME_ALT,
 	EVENT_IGNORE_MASTER_VOLUME,
 	EVENT_IGNORE_MASTER_VOLUME_BROKEN,
+	EVENT_LOOP_RESTART,
+	EVENT_IGNORE_MASTER_VOLUME_BY_PROGNUM,
 };
 
 class AkaoSnesSeq
@@ -141,4 +143,6 @@ private:
 	uint8_t loopIncCount[AKAOSNES_LOOP_LEVEL_MAX];
 	uint8_t loopDecCount[AKAOSNES_LOOP_LEVEL_MAX];
 	uint16_t loopStart[AKAOSNES_LOOP_LEVEL_MAX];
+
+	uint8_t ignoreMasterVolumeProgNum;
 };
