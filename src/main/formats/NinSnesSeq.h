@@ -145,6 +145,9 @@ public:
 	uint16_t intelliVoiceParamTable;
 	uint8_t intelliVoiceParamTableSize;
 
+	// Quintet
+	uint8_t quintetBGMInstrBase;
+
 protected:
 	VGMHeader* header;
 
