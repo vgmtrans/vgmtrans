@@ -658,6 +658,41 @@ BytePattern NinSnesScanner::ptnSetDIRCTOW(
 	,
 	7);
 
+//; Actraiser SPC
+//; vcmd e0 - instrument
+//07df: d5 15 02  mov   $0215+x,a
+//07e2: eb 34     mov   y,$34
+//07e4: d0 0f     bne   $07f5
+//; BGM
+//07e6: fd        mov   y,a
+//07e7: 10 06     bpl   $07ef             ; if percussion note:
+//07e9: 80        setc
+//07ea: a8 ca     sbc   a,#$ca            ;   ca-dd => 00-15
+//07ec: 60        clrc
+//07ed: 84 5f     adc   a,$5f             ;   add perc patch base
+//07ef: 60        clrc
+//07f0: 85 ff 11  adc   a,$11ff           ; add patch offset for BGM (constant value = 12?)
+//07f3: 2f 09     bra   $07fe
+//; SFX
+//07f5: fd        mov   y,a
+//07f6: 10 06     bpl   $07fe             ; if percussion note:
+//07f8: 80        setc
+//07f9: a8 ca     sbc   a,#$ca            ;   ca-dd => 00-15
+//07fb: 60        clrc
+//07fc: 84 39     adc   a,$39             ; add perc patch base
+BytePattern NinSnesScanner::ptnInstrVCmdACTR(
+	"\xd5\x15\x02\xeb\x34\xd0\x0f\xfd"
+	"\x10\x06\x80\xa8\xca\x60\x84\x5f"
+	"\x60\x85\xff\x11\x2f\x09\xfd\x10"
+	"\x06\x80\xa8\xca\x60\x84\x39"
+	,
+	"x??x?x?x"
+	"x?xxxxx?"
+	"xx??x?xx"
+	"?xxxxx?"
+	,
+	31);
+
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
 	uint32_t nFileLength = file->size();
@@ -974,6 +1009,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	}
 
 	// CLASSIFY DERIVED VERSIONS (fix false-positive)
+	uint32_t ofsInstrVCmd = 0;
 	if (version == NINSNES_STANDARD)
 	{
 		if (konamiBaseAddress != 0xffff) {
@@ -992,8 +1028,12 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			if (firstVoiceCmd == 0xe0 && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
 				if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
 					uint32_t ofsWriteVolume;
+
 					if (file->SearchBytePattern(ptnWriteVolumeKSS, ofsWriteVolume)) {
 						version = NINSNES_HAL;
+					}
+					else if (file->SearchBytePattern(ptnInstrVCmdACTR, ofsInstrVCmd)) {
+						version = NINSNES_QUINTET_ACTR;
 					}
 					else {
 						version = NINSNES_STANDARD;
@@ -1041,6 +1081,13 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 				}
 			}
 		}
+	}
+
+	// Quintet: ACQUIRE INSTRUMENT BASE:
+	uint8_t quintetBGMInstrBase = 0;
+	if (version == NINSNES_QUINTET_ACTR) {
+		uint16_t addrBGMInstrBase = file->GetShort(ofsInstrVCmd + 18);
+		quintetBGMInstrBase = file->GetByte(addrBGMInstrBase);
 	}
 
 	// GUESS SONG COUNT
@@ -1178,6 +1225,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, 0, volumeTable, durRateTable, name);
 	newSeq->konamiBaseAddress = konamiBaseAddress;
+	newSeq->quintetBGMInstrBase = quintetBGMInstrBase;
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
 		return;
@@ -1247,7 +1295,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	uint16_t konamiTuningTableAddress = 0;
 	uint8_t konamiTuningTableSize = 0;
 	if (version == NINSNES_KONAMI) {
-		uint32_t ofsInstrVCmd;
 		if (file->SearchBytePattern(ptnInstrVCmdGD3, ofsInstrVCmd)) {
 			uint16_t konamiAddrTuningTableLow = file->GetShort(ofsInstrVCmd + 10);
 			uint16_t konamiAddrTuningTableHigh = file->GetShort(ofsInstrVCmd + 14);

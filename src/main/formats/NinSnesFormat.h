@@ -32,4 +32,6 @@ enum NinSnesVersion
 	NINSNES_INTELLI_FE4,        // Fire Emblem 4
 	NINSNES_HUMAN,              // Human games (e.g. Clock Tower, Firemen, Septentrion)
 	NINSNES_TOSE,               // TOSE games (e.g. Yoshi's Safari, Dragon Ball Z: Super Butouden 2)
+	NINSNES_QUINTET_ACTR,       // Actraiser
+	NINSNES_QUINTET_TS,         // Terranigma (Tenchi Souzou)
 };
