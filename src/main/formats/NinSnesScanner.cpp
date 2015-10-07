@@ -658,6 +658,17 @@ BytePattern NinSnesScanner::ptnSetDIRCTOW(
 	,
 	7);
 
+//; Terranigma SPC
+//0335: e8 0f     mov   a,#$0f
+//0337: 8d 5d     mov   y,#$5d
+//0339: 4f 1e     pcall $1e               ; set DIR to $0f00
+BytePattern NinSnesScanner::ptnSetDIRTS(
+	"\xe8\x0f\x8d\x5d\x4f\x1e"
+	,
+	"x?xxx?"
+	,
+	6);
+
 //; Actraiser SPC
 //; vcmd e0 - instrument
 //07df: d5 15 02  mov   $0215+x,a
@@ -839,6 +850,26 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		,
 		10);
 
+	//; Terranigma SPC
+	//0521: e5 fc 10  mov   a,$10fc
+	//0524: ec fd 10  mov   y,$10fd
+	//0527: da 23     movw  $23,ya            ; section list address from $10fc/d
+	//0529: 3a 23     incw  $23
+	//052b: 3a 23     incw  $23               ; skip first word
+	char ptnInitSectionPtrBytesTS[] =
+		"\xe5\xfc\x10\xec\xfd\x10\xda\x23"
+		"\x3a\x23\x3a\x23";
+	ptnInitSectionPtrBytesTS[7] = addrSectionPtr;
+	ptnInitSectionPtrBytesTS[9] = addrSectionPtr;
+	ptnInitSectionPtrBytesTS[11] = addrSectionPtr;
+	BytePattern ptnInitSectionPtrTS(
+		ptnInitSectionPtrBytesTS
+		,
+		"x??x??xx"
+		"xxxx"
+		,
+		12);
+
 	// END DYNAMIC PATTERN DEFINITIONS
 
 	// ACQUIRE SEQUENCE LIST ADDRESS:
@@ -863,6 +894,11 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			// Parodius Da! does not have base address
 			konamiBaseAddress = 0;
 		}
+	}
+	else if (file->SearchBytePattern(ptnInitSectionPtrTS, ofsInitSectionPtr)) {
+		uint16_t addrSongListPtr = file->GetShort(ofsInitSectionPtr + 1);
+		addrSongList = file->GetShort(addrSongListPtr);
+		version = NINSNES_QUINTET_TS;
 	}
 	else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
 		uint8_t addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
@@ -942,7 +978,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
 
 			// false-positive needs to be fixed in later classification
-			version = NINSNES_STANDARD;
+			if (version == NINSNES_NONE) {
+				version = NINSNES_STANDARD;
+			}
 		}
 		else if (file->SearchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
 			// search vcmd length table as well
@@ -1041,8 +1079,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 				}
 				else {
 					// compatible design, but customized anyway
-					version = NINSNES_STANDARD;
-
 					uint32_t ofsRD1VCmd_FA_FE;
 					uint32_t ofsRD2VCmdInstrADSR;
 					if (file->SearchBytePattern(ptnRD1VCmd_FA_FE, ofsRD1VCmd_FA_FE)) {
@@ -1051,6 +1087,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 					else if (file->SearchBytePattern(ptnRD2VCmdInstrADSR, ofsRD2VCmdInstrADSR)) {
 						// Marvelous
 						version = NINSNES_RD2;
+					}
+					else if (version != NINSNES_QUINTET_TS) {
+						version = NINSNES_STANDARD;
 					}
 				}
 			}
@@ -1286,6 +1325,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		// DERIVED VERSIONS
 		else if (file->SearchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
 			spcDirAddr = file->GetByte(ofsSetDIR + 3) << 8;
+		}
+		else if (file->SearchBytePattern(ptnSetDIRTS, ofsSetDIR)) {
+			spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
 		}
 		else {
 			return;
