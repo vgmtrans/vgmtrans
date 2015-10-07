@@ -21,7 +21,8 @@ NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesVersion ver, uint32_t offset, uint8
 	spcPercussionBaseInit(percussion_base),
 	konamiBaseAddress(0),
 	intelliVoiceParamTable(0),
-	intelliVoiceParamTableSize(0)
+	intelliVoiceParamTableSize(0),
+	quintetBGMInstrBase(0)
 {
 	bLoadTickByTick = true;
 	bAllowDiscontinuousTrackData = true;
@@ -989,6 +990,10 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_PERCUSSION_NOTE:
 	{
 		uint8_t noteNumber = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN; // + percussion base
+		if (parentSeq->version == NINSNES_QUINTET_ACTR) {
+			noteNumber += parentSeq->quintetBGMInstrBase;
+		}
+
 		uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
 		duration = min(max(duration, (uint8_t)1), (uint8_t)(shared->spcNoteDuration - 2));
 
@@ -1007,6 +1012,11 @@ bool NinSnesTrack::ReadEvent(void)
 				newProgNum = (newProgNum - parentSeq->STATUS_PERCUSSION_NOTE_MIN) + parentSeq->spcPercussionBase;
 			}
 		}
+
+		if (parentSeq->version == NINSNES_QUINTET_ACTR) {
+			newProgNum += parentSeq->quintetBGMInstrBase;
+		}
+
 		AddProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true);
 		break;
 	}
@@ -1770,7 +1780,7 @@ void NinSnesTrack::GetVolumeBalance(uint16_t pan, double & volumeLeft, double & 
 		}
 	}
 	else {
-		uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
+		uint8_t panMaxIndex = (uint8_t) (parentSeq->panTable.size() - 1);
 		if (panIndex > panMaxIndex) {
 			// unexpected behavior
 			pan = panMaxIndex << 8;
@@ -1801,7 +1811,7 @@ uint8_t NinSnesTrack::ReadPanTable(uint16_t pan)
 	uint8_t panIndex = pan >> 8;
 	uint8_t panFraction = pan & 0xff;
 
-	uint8_t panMaxIndex = parentSeq->panTable.size() - 1;
+	uint8_t panMaxIndex = (uint8_t) (parentSeq->panTable.size() - 1);
 	if (panIndex > panMaxIndex) {
 		// unexpected behavior
 		panIndex = panMaxIndex;

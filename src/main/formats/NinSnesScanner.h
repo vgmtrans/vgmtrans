@@ -52,4 +52,5 @@ private:
 	static BytePattern ptnLoadInstrTableAddressCTOW;
 	static BytePattern ptnLoadInstrTableAddressYSFR;
 	static BytePattern ptnSetDIRCTOW;
+	static BytePattern ptnInstrVCmdACTR;
 };
