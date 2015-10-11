@@ -70,12 +70,25 @@ const wchar_t* SNSFLoader::psf_read_exe(
   size_t& exebuffersize
 ) 
 {
+	uint32_t base_offset = 0;
+	bool base_set = false;
+	return psf_read_exe_sub(file, exebuffer, exebuffersize, base_offset, base_set);
+}
+
+const wchar_t* SNSFLoader::psf_read_exe_sub(
+  RawFile* file,
+  unsigned char*& exebuffer,
+  size_t& exebuffersize,
+  uint32_t& base_offset,
+  bool& base_set
+) 
+{
 	PSFFile psf;
 	if (!psf.Load(file))
 		return psf.GetError();
 
 	// search exclusively for _lib tag, and if found, perform a recursive load
-	const wchar_t* psflibError = load_psf_libs(psf, file, exebuffer, exebuffersize);
+	const wchar_t* psflibError = load_psf_libs(psf, file, exebuffer, exebuffersize, base_offset, base_set);
 	if (psflibError != NULL)
 		return psflibError;
 
@@ -86,6 +99,15 @@ const wchar_t* SNSFLoader::psf_read_exe(
 	uint32_t snsfRomStart = snsfExeHeadSeg->GetWord(0x00);
 	uint32_t snsfRomSize = snsfExeHeadSeg->GetWord(0x04);
 	delete snsfExeHeadSeg;
+
+	if (base_set) {
+		snsfRomStart += base_offset;
+	}
+	else {
+		base_offset = snsfRomStart;
+		base_set = true;
+	}
+
 	if (snsfRomStart + snsfRomSize > exebuffersize || (exebuffer == NULL && exebuffersize == 0))
 		return L"SNSF ROM section start and/or size values are likely corrupt.";
 
@@ -120,7 +142,7 @@ const wchar_t* SNSFLoader::psf_read_exe(
 	return NULL;
 }
 
-const wchar_t* SNSFLoader::load_psf_libs(PSFFile& psf, RawFile* file, unsigned char*& exebuffer, size_t& exebuffersize)
+const wchar_t* SNSFLoader::load_psf_libs(PSFFile& psf, RawFile* file, unsigned char*& exebuffer, size_t& exebuffersize, uint32_t& base_offset, bool& base_set)
 {
 	char libTagName[16];
 	int libIndex = 1;
@@ -145,7 +167,7 @@ const wchar_t* SNSFLoader::load_psf_libs(PSFFile& psf, RawFile* file, unsigned c
 		RawFile* newRawFile = new RawFile(fullPath);
 		const wchar_t* psflibError = NULL;
 		if (newRawFile->open(fullPath))
-			psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
+			psflibError = psf_read_exe_sub(newRawFile, exebuffer, exebuffersize, base_offset, base_set);
 		else
 			psflibError = L"Unable to open lib file.";
 		delete fullPath;
