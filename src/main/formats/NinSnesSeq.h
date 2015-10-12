@@ -79,6 +79,9 @@ enum NinSnesSeqEventType
 	EVENT_INTELLI_FE4_EVENT_FC,
 	EVENT_INTELLI_TA_SUBEVENT,
 	EVENT_INTELLI_FE4_SUBEVENT,
+
+	// Quintet:
+	EVENT_QUINTET_ADSR,
 };
 
 class NinSnesTrackSharedData
@@ -147,12 +150,14 @@ public:
 
 	// Quintet
 	uint8_t quintetBGMInstrBase;
+	uint16_t quintetAddrBGMInstrLookup;
 
 protected:
 	VGMHeader* header;
 
 private:
 	void LoadEventMap(void);
+	void LoadStandardVcmdMap(uint8_t statusByte);
 
 	uint8_t spcPercussionBaseInit;
 };

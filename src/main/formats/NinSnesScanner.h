@@ -54,4 +54,6 @@ private:
 	static BytePattern ptnSetDIRCTOW;
 	static BytePattern ptnSetDIRTS;
 	static BytePattern ptnInstrVCmdACTR;
+	static BytePattern ptnInstrVCmdACTR2;
+	static BytePattern ptnInstrVCmdTS;
 };
