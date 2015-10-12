@@ -341,31 +341,8 @@ void NinSnesSeq::LoadEventMap()
 
 	switch (version) {
 	case NINSNES_EARLIER:
-		EventMap[0xda] = EVENT_PROGCHANGE;
-		EventMap[0xdb] = EVENT_PAN;
-		EventMap[0xdc] = EVENT_PAN_FADE;
-		EventMap[0xdd] = EVENT_PITCH_SLIDE;
-		EventMap[0xde] = EVENT_VIBRATO_ON;
-		EventMap[0xdf] = EVENT_VIBRATO_OFF;
-		EventMap[0xe0] = EVENT_MASTER_VOLUME;
-		EventMap[0xe1] = EVENT_MASTER_VOLUME_FADE;
-		EventMap[0xe2] = EVENT_TEMPO;
-		EventMap[0xe3] = EVENT_TEMPO_FADE;
-		EventMap[0xe4] = EVENT_GLOBAL_TRANSPOSE;
-		EventMap[0xe5] = EVENT_TREMOLO_ON;
-		EventMap[0xe6] = EVENT_TREMOLO_OFF;
-		EventMap[0xe7] = EVENT_VOLUME;
-		EventMap[0xe8] = EVENT_VOLUME_FADE;
-		EventMap[0xe9] = EVENT_CALL;
-		EventMap[0xea] = EVENT_VIBRATO_FADE;
-		EventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
-		EventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
-		//EventMap[0xed] = EVENT_PITCH_ENVELOPE_OFF;
-		EventMap[0xee] = EVENT_TUNING;
-		EventMap[0xef] = EVENT_ECHO_ON;
-		EventMap[0xf0] = EVENT_ECHO_OFF;
-		EventMap[0xf1] = EVENT_ECHO_PARAM;
-		EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
+		LoadStandardVcmdMap(0xda);
+		EventMap[0xed] = (NinSnesSeqEventType)0; // unmap EVENT_PITCH_ENVELOPE_OFF
 
 		if (volumeTable.empty()) {
 			volumeTable.assign(std::begin(NINSNES_VOL_TABLE_EARLIER), std::end(NINSNES_VOL_TABLE_EARLIER));
@@ -387,33 +364,7 @@ void NinSnesSeq::LoadEventMap()
 		}
 
 		// standard vcmds
-		EventMap[0xd6] = EVENT_PROGCHANGE;
-		EventMap[0xd7] = EVENT_PAN;
-		EventMap[0xd8] = EVENT_PAN_FADE;
-		EventMap[0xd9] = EVENT_VIBRATO_ON;
-		EventMap[0xda] = EVENT_VIBRATO_OFF;
-		EventMap[0xdb] = EVENT_MASTER_VOLUME;
-		EventMap[0xdc] = EVENT_MASTER_VOLUME_FADE;
-		EventMap[0xdd] = EVENT_TEMPO;
-		EventMap[0xde] = EVENT_TEMPO_FADE;
-		EventMap[0xdf] = EVENT_GLOBAL_TRANSPOSE;
-		EventMap[0xe0] = EVENT_TRANSPOSE;
-		EventMap[0xe1] = EVENT_TREMOLO_ON;
-		EventMap[0xe2] = EVENT_TREMOLO_OFF;
-		EventMap[0xe3] = EVENT_VOLUME;
-		EventMap[0xe4] = EVENT_VOLUME_FADE;
-		EventMap[0xe5] = EVENT_CALL;
-		EventMap[0xe6] = EVENT_VIBRATO_FADE;
-		EventMap[0xe7] = EVENT_PITCH_ENVELOPE_TO;
-		EventMap[0xe8] = EVENT_PITCH_ENVELOPE_FROM;
-		EventMap[0xe9] = EVENT_PITCH_ENVELOPE_OFF;
-		EventMap[0xea] = EVENT_TUNING;
-		EventMap[0xeb] = EVENT_ECHO_ON;
-		EventMap[0xec] = EVENT_ECHO_OFF;
-		EventMap[0xed] = EVENT_ECHO_PARAM;
-		EventMap[0xee] = EVENT_ECHO_VOLUME_FADE;
-		EventMap[0xef] = EVENT_PITCH_SLIDE;
-		EventMap[0xf0] = EVENT_PERCCUSION_PATCH_BASE;
+		LoadStandardVcmdMap(0xd6);
 
 		EventMap[0xf1] = EVENT_INTELLI_ECHO_ON;
 		EventMap[0xf2] = EVENT_INTELLI_ECHO_OFF;
@@ -449,33 +400,7 @@ void NinSnesSeq::LoadEventMap()
 
 	case NINSNES_INTELLI_TA:
 		// standard vcmds
-		EventMap[0xda] = EVENT_PROGCHANGE;
-		EventMap[0xdb] = EVENT_PAN;
-		EventMap[0xdc] = EVENT_PAN_FADE;
-		EventMap[0xdd] = EVENT_VIBRATO_ON;
-		EventMap[0xde] = EVENT_VIBRATO_OFF;
-		EventMap[0xdf] = EVENT_MASTER_VOLUME;
-		EventMap[0xe0] = EVENT_MASTER_VOLUME_FADE;
-		EventMap[0xe1] = EVENT_TEMPO;
-		EventMap[0xe2] = EVENT_TEMPO_FADE;
-		EventMap[0xe3] = EVENT_GLOBAL_TRANSPOSE;
-		EventMap[0xe4] = EVENT_TRANSPOSE;
-		EventMap[0xe5] = EVENT_TREMOLO_ON;
-		EventMap[0xe6] = EVENT_TREMOLO_OFF;
-		EventMap[0xe7] = EVENT_VOLUME;
-		EventMap[0xe8] = EVENT_VOLUME_FADE;
-		EventMap[0xe9] = EVENT_CALL;
-		EventMap[0xea] = EVENT_VIBRATO_FADE;
-		EventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
-		EventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
-		EventMap[0xed] = EVENT_PITCH_ENVELOPE_OFF;
-		EventMap[0xee] = EVENT_TUNING;
-		EventMap[0xef] = EVENT_ECHO_ON;
-		EventMap[0xf0] = EVENT_ECHO_OFF;
-		EventMap[0xf1] = EVENT_ECHO_PARAM;
-		EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
-		EventMap[0xf3] = EVENT_PITCH_SLIDE;
-		EventMap[0xf4] = EVENT_PERCCUSION_PATCH_BASE;
+		LoadStandardVcmdMap(0xda);
 
 		EventMap[0xf5] = EVENT_INTELLI_ECHO_ON;
 		EventMap[0xf6] = EVENT_INTELLI_ECHO_OFF;
@@ -507,33 +432,7 @@ void NinSnesSeq::LoadEventMap()
 		}
 
 		// standard vcmds
-		EventMap[0xda] = EVENT_PROGCHANGE;
-		EventMap[0xdb] = EVENT_PAN;
-		EventMap[0xdc] = EVENT_PAN_FADE;
-		EventMap[0xdd] = EVENT_VIBRATO_ON;
-		EventMap[0xde] = EVENT_VIBRATO_OFF;
-		EventMap[0xdf] = EVENT_MASTER_VOLUME;
-		EventMap[0xe0] = EVENT_MASTER_VOLUME_FADE;
-		EventMap[0xe1] = EVENT_TEMPO;
-		EventMap[0xe2] = EVENT_TEMPO_FADE;
-		EventMap[0xe3] = EVENT_GLOBAL_TRANSPOSE;
-		EventMap[0xe4] = EVENT_TRANSPOSE;
-		EventMap[0xe5] = EVENT_TREMOLO_ON;
-		EventMap[0xe6] = EVENT_TREMOLO_OFF;
-		EventMap[0xe7] = EVENT_VOLUME;
-		EventMap[0xe8] = EVENT_VOLUME_FADE;
-		EventMap[0xe9] = EVENT_CALL;
-		EventMap[0xea] = EVENT_VIBRATO_FADE;
-		EventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
-		EventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
-		EventMap[0xed] = EVENT_PITCH_ENVELOPE_OFF;
-		EventMap[0xee] = EVENT_TUNING;
-		EventMap[0xef] = EVENT_ECHO_ON;
-		EventMap[0xf0] = EVENT_ECHO_OFF;
-		EventMap[0xf1] = EVENT_ECHO_PARAM;
-		EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
-		EventMap[0xf3] = EVENT_PITCH_SLIDE;
-		EventMap[0xf4] = EVENT_PERCCUSION_PATCH_BASE;
+		LoadStandardVcmdMap(0xda);
 
 		EventMap[0xf5] = EVENT_INTELLI_ECHO_ON;
 		EventMap[0xf6] = EVENT_INTELLI_ECHO_OFF;
@@ -556,33 +455,7 @@ void NinSnesSeq::LoadEventMap()
 		break;
 
 	default: // NINSNES_STANDARD compatible versions
-		EventMap[0xe0] = EVENT_PROGCHANGE;
-		EventMap[0xe1] = EVENT_PAN;
-		EventMap[0xe2] = EVENT_PAN_FADE;
-		EventMap[0xe3] = EVENT_VIBRATO_ON;
-		EventMap[0xe4] = EVENT_VIBRATO_OFF;
-		EventMap[0xe5] = EVENT_MASTER_VOLUME;
-		EventMap[0xe6] = EVENT_MASTER_VOLUME_FADE;
-		EventMap[0xe7] = EVENT_TEMPO;
-		EventMap[0xe8] = EVENT_TEMPO_FADE;
-		EventMap[0xe9] = EVENT_GLOBAL_TRANSPOSE;
-		EventMap[0xea] = EVENT_TRANSPOSE;
-		EventMap[0xeb] = EVENT_TREMOLO_ON;
-		EventMap[0xec] = EVENT_TREMOLO_OFF;
-		EventMap[0xed] = EVENT_VOLUME;
-		EventMap[0xee] = EVENT_VOLUME_FADE;
-		EventMap[0xef] = EVENT_CALL;
-		EventMap[0xf0] = EVENT_VIBRATO_FADE;
-		EventMap[0xf1] = EVENT_PITCH_ENVELOPE_TO;
-		EventMap[0xf2] = EVENT_PITCH_ENVELOPE_FROM;
-		EventMap[0xf3] = EVENT_PITCH_ENVELOPE_OFF;
-		EventMap[0xf4] = EVENT_TUNING;
-		EventMap[0xf5] = EVENT_ECHO_ON;
-		EventMap[0xf6] = EVENT_ECHO_OFF;
-		EventMap[0xf7] = EVENT_ECHO_PARAM;
-		EventMap[0xf8] = EVENT_ECHO_VOLUME_FADE;
-		EventMap[0xf9] = EVENT_PITCH_SLIDE;
-		EventMap[0xfa] = EVENT_PERCCUSION_PATCH_BASE;
+		LoadStandardVcmdMap(0xe0);
 
 		if (volumeTable.empty()) {
 			volumeTable.assign(std::begin(NINSNES_VOL_TABLE_STANDARD), std::end(NINSNES_VOL_TABLE_STANDARD));
@@ -609,6 +482,10 @@ void NinSnesSeq::LoadEventMap()
 	case NINSNES_RD2:
 		EventMap[0xfb] = EVENT_RD2_PROGCHANGE_AND_ADSR;
 		EventMap[0xfd] = EVENT_PROGCHANGE; // duplicated
+		break;
+
+	case NINSNES_HAL:
+		EventMap[0xfa] = EVENT_NOP1;
 		break;
 
 	case NINSNES_KONAMI:
@@ -649,7 +526,42 @@ void NinSnesSeq::LoadEventMap()
 	case NINSNES_TOSE:
 		panTable.clear();
 		break;
+
+	case NINSNES_QUINTET_IOG:
+	case NINSNES_QUINTET_TS:
+		EventMap[0xff] = EVENT_QUINTET_ADSR;
 	}
+}
+
+void NinSnesSeq::LoadStandardVcmdMap(uint8_t statusByte)
+{
+	EventMap[statusByte + 0x00] = EVENT_PROGCHANGE;
+	EventMap[statusByte + 0x01] = EVENT_PAN;
+	EventMap[statusByte + 0x02] = EVENT_PAN_FADE;
+	EventMap[statusByte + 0x03] = EVENT_VIBRATO_ON;
+	EventMap[statusByte + 0x04] = EVENT_VIBRATO_OFF;
+	EventMap[statusByte + 0x05] = EVENT_MASTER_VOLUME;
+	EventMap[statusByte + 0x06] = EVENT_MASTER_VOLUME_FADE;
+	EventMap[statusByte + 0x07] = EVENT_TEMPO;
+	EventMap[statusByte + 0x08] = EVENT_TEMPO_FADE;
+	EventMap[statusByte + 0x09] = EVENT_GLOBAL_TRANSPOSE;
+	EventMap[statusByte + 0x0a] = EVENT_TRANSPOSE;
+	EventMap[statusByte + 0x0b] = EVENT_TREMOLO_ON;
+	EventMap[statusByte + 0x0c] = EVENT_TREMOLO_OFF;
+	EventMap[statusByte + 0x0d] = EVENT_VOLUME;
+	EventMap[statusByte + 0x0e] = EVENT_VOLUME_FADE;
+	EventMap[statusByte + 0x0f] = EVENT_CALL;
+	EventMap[statusByte + 0x10] = EVENT_VIBRATO_FADE;
+	EventMap[statusByte + 0x11] = EVENT_PITCH_ENVELOPE_TO;
+	EventMap[statusByte + 0x12] = EVENT_PITCH_ENVELOPE_FROM;
+	EventMap[statusByte + 0x13] = EVENT_PITCH_ENVELOPE_OFF;
+	EventMap[statusByte + 0x14] = EVENT_TUNING;
+	EventMap[statusByte + 0x15] = EVENT_ECHO_ON;
+	EventMap[statusByte + 0x16] = EVENT_ECHO_OFF;
+	EventMap[statusByte + 0x17] = EVENT_ECHO_PARAM;
+	EventMap[statusByte + 0x18] = EVENT_ECHO_VOLUME_FADE;
+	EventMap[statusByte + 0x19] = EVENT_PITCH_SLIDE;
+	EventMap[statusByte + 0x1a] = EVENT_PERCCUSION_PATCH_BASE;
 }
 
 double NinSnesSeq::GetTempoInBPM(uint8_t tempo)
@@ -989,9 +901,15 @@ bool NinSnesTrack::ReadEvent(void)
 
 	case EVENT_PERCUSSION_NOTE:
 	{
-		uint8_t noteNumber = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN; // + percussion base
+		uint8_t noteNumber = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
+
+		noteNumber += parentSeq->spcPercussionBase;
+
 		if (parentSeq->version == NINSNES_QUINTET_ACTR) {
 			noteNumber += parentSeq->quintetBGMInstrBase;
+		}
+		else if (NinSnesFormat::IsQuintetVersion(parentSeq->version)) {
+			noteNumber = GetByte(parentSeq->quintetAddrBGMInstrLookup + noteNumber);
 		}
 
 		uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
@@ -1006,6 +924,7 @@ bool NinSnesTrack::ReadEvent(void)
 	case EVENT_PROGCHANGE:
 	{
 		uint8_t newProgNum = GetByte(curOffset++);
+
 		if (parentSeq->version != NINSNES_HUMAN) {
 			if (newProgNum >= 0x80) {
 				// See Star Fox sequence for example, this is necessary
@@ -1015,6 +934,9 @@ bool NinSnesTrack::ReadEvent(void)
 
 		if (parentSeq->version == NINSNES_QUINTET_ACTR) {
 			newProgNum += parentSeq->quintetBGMInstrBase;
+		}
+		else if (NinSnesFormat::IsQuintetVersion(parentSeq->version)) {
+			newProgNum = GetByte(parentSeq->quintetAddrBGMInstrLookup + newProgNum);
 		}
 
 		AddProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true);
@@ -1593,6 +1515,7 @@ bool NinSnesTrack::ReadEvent(void)
 	}
 
 	case EVENT_INTELLI_ADSR:
+	case EVENT_QUINTET_ADSR:
 	{
 		uint8_t adsr1 = GetByte(curOffset++);
 		uint8_t adsr2 = GetByte(curOffset++);
