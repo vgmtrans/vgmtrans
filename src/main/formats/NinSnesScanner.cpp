@@ -669,7 +669,7 @@ BytePattern NinSnesScanner::ptnSetDIRTS(
 	,
 	6);
 
-//; Actraiser SPC
+//; ActRaiser SPC
 //; vcmd e0 - instrument
 //07df: d5 15 02  mov   $0215+x,a
 //07e2: eb 34     mov   y,$34
@@ -703,6 +703,82 @@ BytePattern NinSnesScanner::ptnInstrVCmdACTR(
 	"?xxxxx?"
 	,
 	31);
+
+//; ActRaiser 2 SPC
+//; vcmd e0 - instrument
+//0891: d5 15 02  mov   $0215+x,a
+//0894: eb 34     mov   y,$34
+//0896: d0 11     bne   $08a9
+//; BGM
+//0898: fd        mov   y,a
+//0899: 10 06     bpl   $08a1             ; if percussion note:
+//089b: 80        setc
+//089c: a8 ca     sbc   a,#$ca            ;   ca-dd => 00-15
+//089e: 60        clrc
+//089f: 84 5f     adc   a,$5f             ;   add perc patch base
+//08a1: 4d        push  x
+//08a2: 5d        mov   x,a
+//08a3: f5 e0 0f  mov   a,$0fe0+x         ; get real instrument index from lookup table
+//08a6: ce        pop   x
+//08a7: 2f 09     bra   $08b2
+//; SFX
+//08a9: fd        mov   y,a
+//08aa: 10 06     bpl   $08b2
+//08ac: 80        setc
+//08ad: a8 ca     sbc   a,#$ca
+//08af: 60        clrc
+//08b0: 84 39     adc   a,$39
+BytePattern NinSnesScanner::ptnInstrVCmdACTR2(
+	"\xd5\x15\x02\xeb\x34\xd0\x11\xfd"
+	"\x10\x06\x80\xa8\xca\x60\x84\x5f"
+	"\x4d\x5d\xf5\xe0\x0f\xce\x2f\x09"
+	"\xfd\x10\x06\x80\xa8\xca\x60\x84"
+	"\x39"
+	,
+	"x??x?x?x"
+	"xxxxxxx?"
+	"xxx??xxx"
+	"xxxxxxxx"
+	"?"
+	,
+	33);
+
+//; vcmd e0 - set instrument
+//0a0b: d5 17 02  mov   $0217+x,a
+//0a0e: d0 12     bne   $0a22
+//; BGM
+//0a10: fd        mov   y,a
+//0a11: 10 07     bpl   $0a1a             ; if percussion note:
+//0a13: 80        setc
+//0a14: a8 ca     sbc   a,#$ca            ;   ca-dd => 00-15
+//0a16: 60        clrc
+//0a17: 95 00 ff  adc   a,$ff00+x         ;   add perc patch base
+//0a1a: 4d        push  x
+//0a1b: 5d        mov   x,a
+//0a1c: f5 ab ff  mov   a,$ffab+x         ; get real instrument index from lookup table
+//0a1f: ce        pop   x
+//0a20: 2f 0a     bra   $0a2c
+//; SFX
+//0a22: fd        mov   y,a
+//0a23: 10 07     bpl   $0a2c             ; if percussion note:
+//0a25: 80        setc
+//0a26: a8 ca     sbc   a,#$ca            ;   ca-dd => 00-15
+//0a28: 60        clrc
+//0a29: 95 00 ff  adc   a,$ff00+x         ; add perc patch base
+BytePattern NinSnesScanner::ptnInstrVCmdTS(
+	"\xd5\x17\x02\xd0\x12\xfd\x10\x07"
+	"\x80\xa8\xca\x60\x95\x00\xff\x4d"
+	"\x5d\xf5\xab\xff\xce\x2f\x0a\xfd"
+	"\x10\x07\x80\xa8\xca\x60\x95\x00"
+	"\xff"
+	,
+	"x??x?xxx"
+	"xxxxx??x"
+	"xx??xxxx"
+	"xxxxxxx?"
+	"?"
+	,
+	33);
 
 void NinSnesScanner::Scan(RawFile* file, void* info)
 {
@@ -898,7 +974,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	else if (file->SearchBytePattern(ptnInitSectionPtrTS, ofsInitSectionPtr)) {
 		uint16_t addrSongListPtr = file->GetShort(ofsInitSectionPtr + 1);
 		addrSongList = file->GetShort(addrSongListPtr);
-		version = NINSNES_QUINTET_TS;
 	}
 	else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
 		uint8_t addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
@@ -940,6 +1015,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	uint8_t firstVoiceCmd = 0;
 	uint16_t addrVoiceCmdAddressTable;
 	uint16_t addrVoiceCmdLengthTable;
+	uint8_t numOfVoiceCmd = 0;
 	// DERIVED VERSIONS
 	if (file->SearchBytePattern(ptnJumpToVcmdYSFR, ofsBranchForVcmd)) {
 		addrVoiceCmdAddressTable = file->GetShort(ofsBranchForVcmd + 9);
@@ -1004,6 +1080,11 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 		else {
 			return;
 		}
+	}
+
+	// DETERMINE THE NUMBER OF VCMDS
+	if (addrVoiceCmdAddressTable < addrVoiceCmdLengthTable) {
+		numOfVoiceCmd = (addrVoiceCmdLengthTable - addrVoiceCmdAddressTable) / 2;
 	}
 
 	// TRY TO GRAB NOTE VOLUME/DURATION TABLE
@@ -1073,6 +1154,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 					else if (file->SearchBytePattern(ptnInstrVCmdACTR, ofsInstrVCmd)) {
 						version = NINSNES_QUINTET_ACTR;
 					}
+					else if (file->SearchBytePattern(ptnInstrVCmdACTR2, ofsInstrVCmd)) {
+						version = NINSNES_QUINTET_ACTR2;
+					}
 					else {
 						version = NINSNES_STANDARD;
 					}
@@ -1088,8 +1172,11 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 						// Marvelous
 						version = NINSNES_RD2;
 					}
-					else if (version != NINSNES_QUINTET_TS) {
-						version = NINSNES_STANDARD;
+					else if (file->SearchBytePattern(ptnInstrVCmdACTR2, ofsInstrVCmd) && numOfVoiceCmd == 32 && file->GetByte(addrVoiceCmdLengthTable + 31) == 1) {
+						version = NINSNES_QUINTET_IOG;
+					}
+					else if (file->SearchBytePattern(ptnInstrVCmdTS, ofsInstrVCmd) && numOfVoiceCmd == 32 && file->GetByte(addrVoiceCmdLengthTable + 31) == 1) {
+						version = NINSNES_QUINTET_TS;
 					}
 				}
 			}
@@ -1124,9 +1211,23 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 
 	// Quintet: ACQUIRE INSTRUMENT BASE:
 	uint8_t quintetBGMInstrBase = 0;
-	if (version == NINSNES_QUINTET_ACTR) {
-		uint16_t addrBGMInstrBase = file->GetShort(ofsInstrVCmd + 18);
-		quintetBGMInstrBase = file->GetByte(addrBGMInstrBase);
+	uint16_t quintetAddrBGMInstrLookup = 0;
+	switch (version) {
+	case NINSNES_QUINTET_ACTR:
+		{
+			uint16_t addrBGMInstrBase = file->GetShort(ofsInstrVCmd + 18);
+			quintetBGMInstrBase = file->GetByte(addrBGMInstrBase);
+			break;
+		}
+
+	case NINSNES_QUINTET_ACTR2:
+	case NINSNES_QUINTET_IOG:
+		quintetAddrBGMInstrLookup = file->GetShort(ofsInstrVCmd + 19);
+		break;
+
+	case NINSNES_QUINTET_TS:
+		quintetAddrBGMInstrLookup = file->GetShort(ofsInstrVCmd + 18);
+		break;
 	}
 
 	// GUESS SONG COUNT
@@ -1265,6 +1366,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
 	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, 0, volumeTable, durRateTable, name);
 	newSeq->konamiBaseAddress = konamiBaseAddress;
 	newSeq->quintetBGMInstrBase = quintetBGMInstrBase;
+	newSeq->quintetAddrBGMInstrLookup = quintetAddrBGMInstrLookup;
 	if (!newSeq->LoadVGMFile()) {
 		delete newSeq;
 		return;

@@ -9,11 +9,6 @@
 // NinSnesFormat
 // *************
 
-BEGIN_FORMAT(NinSnes)
-	USING_SCANNER(NinSnesScanner)
-	USING_MATCHER(FilegroupMatcher)
-END_FORMAT()
-
 enum NinSnesVersion
 {
 	NINSNES_NONE = 0,           // Not Supported
@@ -21,7 +16,7 @@ enum NinSnesVersion
 	NINSNES_EARLIER,            // Eariler version (Super Mario World, Pilotwings)
 	NINSNES_STANDARD,           // Common version with voice commands $e0-fa (e.g. Yoshi Island)
 
-	// derived formats
+								// derived formats
 	NINSNES_RD1,                // Nintendo RD1 (e.g. Super Metroid, Earthbound)
 	NINSNES_RD2,                // Nintendo RD2 (e.g. Marvelous)
 	NINSNES_HAL,                // HAL Laboratory games (e.g. Kirby series)
@@ -32,6 +27,21 @@ enum NinSnesVersion
 	NINSNES_INTELLI_FE4,        // Fire Emblem 4
 	NINSNES_HUMAN,              // Human games (e.g. Clock Tower, Firemen, Septentrion)
 	NINSNES_TOSE,               // TOSE games (e.g. Yoshi's Safari, Dragon Ball Z: Super Butouden 2)
-	NINSNES_QUINTET_ACTR,       // Actraiser
+	NINSNES_QUINTET_ACTR,       // ActRaiser, Soul Blazer
+	NINSNES_QUINTET_ACTR2,      // ActRaiser 2
+	NINSNES_QUINTET_IOG,        // Illusion of Gaia, Robotrek
 	NINSNES_QUINTET_TS,         // Terranigma (Tenchi Souzou)
 };
+
+BEGIN_FORMAT(NinSnes)
+	USING_SCANNER(NinSnesScanner)
+	USING_MATCHER(FilegroupMatcher)
+
+	static inline bool IsQuintetVersion(NinSnesVersion version)
+	{
+		return version == NINSNES_QUINTET_ACTR ||
+			version == NINSNES_QUINTET_ACTR2 ||
+			version == NINSNES_QUINTET_IOG ||
+			version == NINSNES_QUINTET_TS;
+	}
+END_FORMAT()
