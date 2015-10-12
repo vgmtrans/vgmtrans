@@ -13,6 +13,45 @@
 
 #define SRCH_BUF_SIZE 0x20000
 
+typedef struct
+{
+	unsigned int polyphony           : 4;
+	unsigned int main_vol            : 4;
+	unsigned int sampling_rate_index : 4;
+	unsigned int dac_bits            : 4;
+}
+sound_engine_param_t;
+
+static sound_engine_param_t sound_engine_param(uint32_t data)
+{
+	sound_engine_param_t s;
+	s.polyphony = (data & 0x000F00) >> 8;
+	s.main_vol = (data & 0x00F000) >> 12;
+	s.sampling_rate_index = (data & 0x0F0000) >> 16;
+	s.dac_bits = 17-((data & 0xF00000) >> 20);
+	return s;
+}
+
+// Test if an area of ROM is eligible to be the base pointer
+static bool test_pointer_validity(RawFile * file, off_t offset, uint32_t inGBA_length)
+{
+	sound_engine_param_t params = sound_engine_param(file->GetWord(offset));
+
+	/* Compute (supposed ?) address of song table */
+	uint32_t song_tbl_adr = (file->GetWord(offset + 8) & 0x3FFFFFF) + 12 * file->GetWord(offset + 4);
+
+	/* Prevent illegal values for all fields */
+	return  params.main_vol != 0
+	     && params.polyphony <= 12
+	     && params.dac_bits >= 6
+	     && params.dac_bits <= 9
+	     && params.sampling_rate_index >= 1
+	     && params.sampling_rate_index <= 12
+	     && song_tbl_adr < inGBA_length
+	     && file->GetWord(offset + 4) < 256
+	     &&((file->GetWord(offset) & 0xff000000) == 0);
+}
+
 MP2kScanner::MP2kScanner(void)
 {
 //	USE_EXTENSION(L"gba")
@@ -24,32 +63,23 @@ MP2kScanner::~MP2kScanner(void)
 
 void MP2kScanner::Scan(RawFile* file, void* info)
 {
-	uint32_t mp2k_offset;
+	uint32_t sound_engine_adr;
 
 	// detect the engine
-	if (!Mp2kDetector(file, mp2k_offset))
-	{
-		return;
-	}
-
-	// check address range
-	if (mp2k_offset + 36 > file->size())
-	{
+	if (!Mp2kDetector(file, sound_engine_adr)) {
 		return;
 	}
 
 	// compute address of song table
-	uint32_t song_levels = file->GetWord(mp2k_offset + 28);	// Read # of song levels
-	uint32_t song_tbl_ptr = (file->GetWord(mp2k_offset + 32) & 0x1FFFFFF) + 12 * song_levels;
+	uint32_t song_levels = file->GetWord(sound_engine_adr + 4);	// Read # of song levels
+	uint32_t song_tbl_ptr = (file->GetWord(sound_engine_adr + 8) & 0x1FFFFFF) + 12 * song_levels;
 
 	// Ignores entries which are made of 0s at the start of the song table
 	// this fix was necessarily for the game Fire Emblem
 	uint32_t song_pointer;
-	while(true)
-	{
+	while(true) {
 		// check address range
-		if (song_tbl_ptr + 4 > file->size())
-		{
+		if (song_tbl_ptr + 4 > file->size()) {
 			return;
 		}
 
@@ -59,20 +89,17 @@ void MP2kScanner::Scan(RawFile* file, void* info)
 	}
 
 	unsigned int i = 0;
-	while(true)
-	{
+	while(true) {
 		uint32_t song_entry = song_tbl_ptr + (i * 8);
 		song_pointer = file->GetWord(song_entry) & 0x1FFFFFF;
 
 		// Stop as soon as we met with an invalid pointer
-		if(song_pointer == 0 || song_pointer >= file->size())
-		{
+		if(song_pointer == 0 || song_pointer >= file->size()) {
 			break;
 		}
 
 		MP2kSeq* NewMP2kSeq = new MP2kSeq(file, song_pointer);
-		if (!NewMP2kSeq->LoadVGMFile())
-		{
+		if (!NewMP2kSeq->LoadVGMFile()) {
 			delete NewMP2kSeq;
 		}
 
@@ -82,76 +109,163 @@ void MP2kScanner::Scan(RawFile* file, void* info)
 	return;
 }
 
-// Sappy sound engine detector (c) 2013 by Bregalad
+// Sappy sound engine detector (c) 2014 by Bregalad, loveemu
 bool MP2kScanner::Mp2kDetector(RawFile* file, uint32_t & mp2k_offset)
 {
-	/* Get the size of the input GBA file */
-	const uint32_t inGBA_length = file->size();
-
-	uint32_t data = 0, data_l1, dummy, offset = 0;
-	bool detected = false;
-
-	/* This loops try to look for particular opcodes in the whole ROM
-	   and this enables the program to detect the sound engine's location */
-
-	for(uint32_t i=0; i+36 < inGBA_length && !detected; i+=4)
+	const uint8_t CODESEG_SELECTSONG[0x1E] =
 	{
-		/* Shift history of read data */
-		data_l1 = data;
-		/* Read 32-bit value from input file (exit loop if end of file or read error) */
-		data = file->GetWord(i);
+		0x00, 0xB5, 0x00, 0x04, 0x07, 0x4A, 0x08, 0x49, 
+		0x40, 0x0B, 0x40, 0x18, 0x83, 0x88, 0x59, 0x00, 
+		0xC9, 0x18, 0x89, 0x00, 0x89, 0x18, 0x0A, 0x68, 
+		0x01, 0x68, 0x10, 0x1C, 0x00, 0xF0,
+	};
 
-		/* Look for a particular opcode sequence... */
-		if(data == 0x4700bc01 || data == 0x4700)
-		{
-			if(data_l1 == 0xbc70d1f1 || data_l1 == 0xbc01bcf0 || data_l1 == 0xbc70ddf0)
-			{
-				dummy = file->GetWord(i+12);
-				if(dummy == 0x4000100) ;//printf("Sound engine detected : Stereo version\n");
-				else if(dummy == 0x4000200) ;//printf("Sound engine detected : Pokemon stereo version\n");
-				else if(dummy == 0x40000e0) ;//printf("Sound engine detected : Mono version\n");
-				else continue;
+	const int M4A_MAIN_PATT_COUNT = 1;
+	const int M4A_MAIN_LEN = 2;
 
-				/* At this point, we PROBABLY detected the sound engine but it might
-				  still be a false positive... */
-				dummy = file->GetWord(i+24);
+	const uint8_t CODESEG_MAIN[M4A_MAIN_PATT_COUNT][M4A_MAIN_LEN] = {
+		{0x00, 0xB5}
+	};
 
-				/* Get engine's (supposed ?) main parameters */
-				unsigned int polyphony = (dummy & 0x000F00) >> 8;
-				unsigned int main_vol = (dummy & 0x00F000) >> 12;
-				unsigned int sampling_rate_index = (dummy & 0x0F0000) >> 16;
-				unsigned int dac_bits = 17-((dummy & 0xF00000) >> 20);
+	const int M4A_INIT_PATT_COUNT = 2;
+	const int M4A_INIT_LEN = 2;
 
-				dummy = file->GetWord(i+28);			//Read # of song levels
-				//printf("# of song levels : %d\n", dummy);
-				uint32_t ram_tbl_adr, song_tbl_adr;
-				ram_tbl_adr = file->GetWord(i+32);
-				/* Compute (supposed ?) address of song table */
-				song_tbl_adr = (ram_tbl_adr & 0x3FFFFFF) + 12 * dummy;
+	const off_t M4A_OFFSET_SONGTABLE = 40;
 
-				/* Prevent illegal values for all fields */
-				if(main_vol == 0 || polyphony > 12 || dac_bits < 6 || dac_bits > 9
-				|| sampling_rate_index < 1 || sampling_rate_index > 12 || song_tbl_adr >= inGBA_length || dummy >= 256)
-				{
+	off_t m4a_selectsong_offset = -1;
+	off_t m4a_main_offset = -1;
+
+	off_t m4a_selectsong_search_offset = 0;
+	while (m4a_selectsong_search_offset != -1) {
+		m4a_selectsong_offset = LooseSearch(file, CODESEG_SELECTSONG, sizeof(CODESEG_SELECTSONG), m4a_selectsong_search_offset, 1, 0);
+		if (m4a_selectsong_offset != -1) {
+			// obtain song table address
+			uint32_t m4a_songtable_address = file->GetWord(m4a_selectsong_offset + M4A_OFFSET_SONGTABLE);
+			if (!IsGBAROMAddress(m4a_songtable_address)) {
+				m4a_selectsong_search_offset = m4a_selectsong_offset + 1;
+				continue;
+			}
+			uint32_t m4a_songtable_offset_tmp = GBAAddressToOffset(m4a_songtable_address);
+			if (!IsValidOffset(m4a_songtable_offset_tmp + 4 - 1, file->size())) {
+				m4a_selectsong_search_offset = m4a_selectsong_offset + 1;
+				continue;
+			}
+
+			// song table must have more than one song
+			int validsongcount = 0;
+			for (int songindex = 0; validsongcount < 1; songindex++) {
+				uint32_t songaddroffset = m4a_songtable_offset_tmp + (songindex * 8);
+				if (!IsValidOffset(songaddroffset + 4 - 1, file->size())) {
+					break;
+				}
+
+				uint32_t songaddr = file->GetWord(songaddroffset);
+				if (songaddr == 0) {
 					continue;
 				}
 
-				//At this point we can be almost certain we detected the real thing.
-				//printf(
-				//	"Engine parameters :\n"
-				//	"Main Volume : %u Polyphony : %u channels, Dac : %u bits, Sampling rate : %s\n"
-				//	"Song table located at : 0x%x\n"
-				//, main_vol, polyphony, dac_bits, sr_lookup[sampling_rate_index], song_tbl_adr);
-
-				detected = true;
-				offset = i;
+				if (!IsGBAROMAddress(songaddr)) {
+					break;
+				}
+				if (!IsValidOffset(GBAAddressToOffset(songaddr) + 4 - 1, file->size())) {
+					break;
+				}
+				validsongcount++;
 			}
+			if (validsongcount < 1) {
+				m4a_selectsong_search_offset = m4a_selectsong_offset + 1;
+				continue;
+			}
+			break;
+		}
+		else {
+			m4a_selectsong_search_offset = -1;
+		}
+	}
+	if (m4a_selectsong_offset == -1) {
+		return false;
+	}
+
+	uint32_t m4a_main_offset_tmp = m4a_selectsong_offset;
+	if (!IsValidOffset(m4a_main_offset_tmp + M4A_MAIN_LEN - 1, file->size())) {
+		return false;
+	}
+	while (m4a_main_offset_tmp > 0 && m4a_main_offset_tmp > ((uint32_t) m4a_selectsong_offset - 0x20)) {
+		for (int mainpattern = 0; mainpattern < M4A_MAIN_PATT_COUNT; mainpattern++) {
+			if (file->MatchBytes(CODESEG_MAIN[mainpattern], m4a_main_offset_tmp, M4A_INIT_LEN)) {
+				m4a_main_offset = (long)m4a_main_offset_tmp;
+				break;
+			}
+		}
+		m4a_main_offset_tmp--;
+	}
+
+	// Test validity of engine offset with -16 and -32
+	bool valid_m16 = test_pointer_validity(file, m4a_main_offset - 16, file->size());	// For most games
+	bool valid_m32 = test_pointer_validity(file, m4a_main_offset - 32, file->size());	// For pokemon
+
+	// If neither is found there is an error
+	if(!valid_m16 && !valid_m32) {
+		// Only a partial sound engine was found
+		return false;
+	}
+	mp2k_offset = m4a_main_offset - (valid_m16 ? 16 : 32);
+	return true;
+}
+
+bool MP2kScanner::IsValidOffset(uint32_t offset, uint32_t romsize)
+{
+	return (offset < romsize);
+}
+
+bool MP2kScanner::IsGBAROMAddress(uint32_t address)
+{
+	uint8_t region = (address >> 24) & 0xFE;
+	return (region == 8);
+}
+
+uint32_t MP2kScanner::GBAAddressToOffset(uint32_t address)
+{
+	if (!IsGBAROMAddress(address)) {
+		fprintf(stderr, "Warning: the address $%08X is not ROM address\n", address);
+	}
+	return address & 0x01FFFFFF;
+}
+
+off_t MP2kScanner::LooseSearch(RawFile * file, const uint8_t * src, size_t srcsize, off_t file_offset,
+	size_t alignment, int diff_threshold)
+{
+	// alignment must be more than 0
+	if (alignment == 0) {
+		return -1;
+	}
+
+	// aligns the start offset
+	if (file_offset % alignment != 0) {
+		file_offset += alignment - (file_offset % alignment);
+	}
+
+	// do loose filemem search
+	for (size_t offset = file_offset; (offset + srcsize) <= file->size(); offset += alignment) {
+		int diff = 0;
+
+		for (size_t i = 0; i < srcsize; i++) {
+			// count how many bytes are different
+			if (file->GetByte(offset + i) != src[i]) {
+				diff++;
+			}
+
+			// if diffs exceeds threshold, quit the matching for the offset
+			if (diff > diff_threshold) {
+				break;
+			}
+		}
+
+		// if diffs is less or equal than threshold, it's matched
+		if (diff <= diff_threshold) {
+			return offset;
 		}
 	}
 
-	if (detected)
-	{
-		mp2k_offset = offset;
-	}
-	return detected;
+	return -1;
 }
