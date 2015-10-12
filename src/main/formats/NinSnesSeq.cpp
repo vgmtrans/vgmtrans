@@ -341,8 +341,31 @@ void NinSnesSeq::LoadEventMap()
 
 	switch (version) {
 	case NINSNES_EARLIER:
-		LoadStandardVcmdMap(0xda);
-		EventMap[0xed] = (NinSnesSeqEventType)0; // unmap EVENT_PITCH_ENVELOPE_OFF
+		EventMap[0xda] = EVENT_PROGCHANGE;
+		EventMap[0xdb] = EVENT_PAN;
+		EventMap[0xdc] = EVENT_PAN_FADE;
+		EventMap[0xdd] = EVENT_PITCH_SLIDE;
+		EventMap[0xde] = EVENT_VIBRATO_ON;
+		EventMap[0xdf] = EVENT_VIBRATO_OFF;
+		EventMap[0xe0] = EVENT_MASTER_VOLUME;
+		EventMap[0xe1] = EVENT_MASTER_VOLUME_FADE;
+		EventMap[0xe2] = EVENT_TEMPO;
+		EventMap[0xe3] = EVENT_TEMPO_FADE;
+		EventMap[0xe4] = EVENT_GLOBAL_TRANSPOSE;
+		EventMap[0xe5] = EVENT_TREMOLO_ON;
+		EventMap[0xe6] = EVENT_TREMOLO_OFF;
+		EventMap[0xe7] = EVENT_VOLUME;
+		EventMap[0xe8] = EVENT_VOLUME_FADE;
+		EventMap[0xe9] = EVENT_CALL;
+		EventMap[0xea] = EVENT_VIBRATO_FADE;
+		EventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
+		EventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
+		//EventMap[0xed] = EVENT_PITCH_ENVELOPE_OFF;
+		EventMap[0xee] = EVENT_TUNING;
+		EventMap[0xef] = EVENT_ECHO_ON;
+		EventMap[0xf0] = EVENT_ECHO_OFF;
+		EventMap[0xf1] = EVENT_ECHO_PARAM;
+		EventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
 
 		if (volumeTable.empty()) {
 			volumeTable.assign(std::begin(NINSNES_VOL_TABLE_EARLIER), std::end(NINSNES_VOL_TABLE_EARLIER));
