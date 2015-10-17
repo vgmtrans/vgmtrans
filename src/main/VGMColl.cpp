@@ -278,8 +278,9 @@ bool VGMColl::MainDLSCreation(DLSFile& dls)
 					}
 					if (!bFoundIt)
 					{
-						Alert(L"Could not match rgn with sampOffset %X to a sample with that offset.\n  (InstrSet %d, Instr %d, Rgn %d)",
-							rgn->sampOffset, inst, i, j);
+						std::wstring message = FormatString<wstring>(L"Could not match rgn with sampOffset %X to a sample with that offset.\n  (InstrSet %d, Instr %d, Rgn %d)",
+											  rgn->sampOffset, inst, i, j);
+						pRoot->AddLogItem(new LogItem(std::wstring(message.c_str()), LOG_LEVEL_ERR, L"VGMColl"));
 						realSampNum = 0;
 					}
 				}
@@ -521,8 +522,9 @@ SynthFile* VGMColl::CreateSynthFile()
 					}
 					if (!bFoundIt)
 					{
-						Alert(L"Could not match rgn with sampOffset %X to a sample with that offset.\n  (InstrSet %d, Instr %d, Rgn %d)",
-							rgn->sampOffset, inst, i, j);
+						std::wstring message = FormatString<wstring>(L"Could not match rgn with sampOffset %X to a sample with that offset.\n  (InstrSet %d, Instr %d, Rgn %d)",
+																	 rgn->sampOffset, inst, i, j);
+						pRoot->AddLogItem(new LogItem(std::wstring(message.c_str()), LOG_LEVEL_ERR, L"VGMColl"));
 						realSampNum = 0;
 					}
 				}
@@ -660,14 +662,14 @@ bool VGMColl::OnSaveAllDLS()
 		if (CreateDLSFile(dlsfile))
 		{
 			if (!dlsfile.SaveDLSFile(filepath))
-				Alert(L"Failed to save DLS file.");
+				pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
 		}
 		else
-			Alert(L"Failed to save DLS file.");
+			pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
 
 		filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
 		if (!this->seq->SaveAsMidi(filepath))
-			Alert(L"Failed to save MIDI file.");
+			pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
 	}
 	return true;
 }
@@ -682,15 +684,15 @@ bool VGMColl::OnSaveAllSF2()
 		if (sf2file != NULL)
 		{	
 			if (!sf2file->SaveSF2File(filepath))
-				Alert(L"Failed to save SF2 file.");
+				pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"), LOG_LEVEL_ERR, L"VGMColl"));
 			delete sf2file;
 		}
 		else
-			Alert(L"Failed to save SF2 file.");
+			pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"), LOG_LEVEL_ERR, L"VGMColl"));
 
 		filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
 		if (!this->seq->SaveAsMidi(filepath))
-			Alert(L"Failed to save MIDI file.");
+			pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
 	}
 	return true;
 }

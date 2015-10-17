@@ -33,8 +33,8 @@ PostLoadCommand PSF1Loader::Apply(RawFile* file)
 
 			complaint = psf_read_exe(file, exebuf, exebufsize);
 			if(complaint) 
-			{ 
-				Alert(complaint);
+			{
+				pRoot->AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"PSF1Loader"));
 				delete[] exebuf;
 				return KEEP_IT; 
 			}

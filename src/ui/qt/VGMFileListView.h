@@ -29,10 +29,15 @@ public slots:
 
 class VGMFileListView : public QListView
 {
+    Q_OBJECT
+
 public:
     VGMFileListView(QWidget *parent = 0);
 
     void keyPressEvent(QKeyEvent* e);
+//    void mouseDoubleClickEvent(QMouseEvent *event);
+public slots:
+    void doubleClickedSlot(QModelIndex);
 };
 
 

@@ -5,6 +5,8 @@
 #include <qsplitter.h>
 #include <qtreeview.h>
 #include <qlistview.h>
+#include <QMdiArea>
+#include "VGMFileView.h"
 
 class MainWindow : public QMainWindow
 {
@@ -13,6 +15,11 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = 0);
     ~MainWindow();
+
+    static MainWindow& getInstance() {
+        static MainWindow instance;
+        return instance;
+    }
 
 protected:
     QSplitter *vertSplitter;

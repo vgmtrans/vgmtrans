@@ -18,6 +18,10 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     qApp->setStyleSheet("QSplitter::handle{background-color: #B8B8B8;}");
+    QFile file(":/qss/default.qss");
+    file.open(QFile::ReadOnly);
+    QString styleSheet = QLatin1String(file.readAll());
+    qApp->setStyleSheet(styleSheet);
 
     qtVGMRoot.Init();
 

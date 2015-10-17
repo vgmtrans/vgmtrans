@@ -35,8 +35,8 @@ PostLoadCommand NDS2SFLoader::Apply(RawFile* file)
 
 			complaint = psf_read_exe(file, exebuf, exebufsize);
 			if(complaint) 
-			{ 
-				Alert(complaint);
+			{
+				pRoot->AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"NDS2SFLoader"));
 				delete[] exebuf;
 				return KEEP_IT; 
 			}

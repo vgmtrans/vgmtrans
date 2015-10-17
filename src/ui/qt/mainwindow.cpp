@@ -6,6 +6,7 @@
 #include "RawFileListView.h"
 #include "VGMFileListView.h"
 #include "VGMCollListView.h"
+#include "MdiArea.h"
 
 const int defaultWindowWidth = 800;
 const int defaultWindowHeight = 600;
@@ -13,14 +14,10 @@ const int defaultCollListHeight = 140;
 const int defaultFileListWidth = 200;
 const int splitterHandleWidth = 1;
 
-
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
+        : QMainWindow(parent)
 {
     setAcceptDrops(true);
-
-    QTextEdit *editor1 = new QTextEdit;
-    QTextEdit *editor2 = new QTextEdit;
 
     rawFileListView = new RawFileListView();
     vgmFileListView = new VGMFileListView();
@@ -40,7 +37,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     sizes = QList<int>({defaultFileListWidth, defaultWindowWidth - defaultFileListWidth});
     horzSplitter->addWidget(vertSplitterLeft);
-    horzSplitter->addWidget(editor1);
+    horzSplitter->addWidget(MdiArea::getInstance());
     horzSplitter->setStretchFactor(1, 1);
     horzSplitter->setSizes(sizes);
     horzSplitter->setHandleWidth(splitterHandleWidth);
@@ -53,14 +50,13 @@ MainWindow::MainWindow(QWidget *parent)
     vertSplitterLeft->addWidget(vgmFileListView);
     vertSplitterLeft->setHandleWidth(splitterHandleWidth);
 
-    this->setCentralWidget(vertSplitter);
-    this->resize(defaultWindowWidth, defaultWindowHeight);
-
-
+    setCentralWidget(vertSplitter);
+    resize(defaultWindowWidth, defaultWindowHeight);
 }
 
 MainWindow::~MainWindow()
 {
+
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event)

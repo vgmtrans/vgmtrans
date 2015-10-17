@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.11)
 project(VGMTrans)
 
+#SET(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
+
 IF(APPLE)
     SET(CMAKE_LIBRARY_ARCHITECTURE "x86_64-apple-darwin11")
     SET(CMAKE_OSX_ARCHITECTURES "x86_64;")
@@ -38,15 +40,58 @@ set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
 # Find the QtWidgets library
 find_package(Qt5Widgets REQUIRED)
 
-add_subdirectory(src)
-add_subdirectory(lib)
-add_subdirectory(contrib)
+#add_subdirectory(src)
+#add_subdirectory(lib)
+#add_subdirectory(contrib)
+
+FILE(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp" "${PROJECT_SOURCE_DIR}/src/main/*.h")
+FILE(GLOB UI_FILES "${PROJECT_SOURCE_DIR}/src/ui/qt/*.cpp" "${PROJECT_SOURCE_DIR}/src/ui/qt/*.h")
+FILE(GLOB_RECURSE LIB_FILES
+    "${PROJECT_SOURCE_DIR}/lib/fluidsynth/mem_sfloader/*.c" "${PROJECT_SOURCE_DIR}/lib/fluidsynth/mem_sfloader/*.h"
+    "${PROJECT_SOURCE_DIR}/lib/tinyxml/*.cpp" "${PROJECT_SOURCE_DIR}/lib/fluidsynth/*.h"
+    "${PROJECT_SOURCE_DIR}/lib/minizip/*.c" "${PROJECT_SOURCE_DIR}/lib/minizip/*.h"
+    )
+
+SET(INCLUDE_DIRS
+    ${PROJECT_SOURCE_DIR}/src/main
+    ${PROJECT_SOURCE_DIR}/src/main/formats
+    ${PROJECT_SOURCE_DIR}/src/main/loaders
+    ${PROJECT_SOURCE_DIR}/src/ui/qt
+    ${PROJECT_SOURCE_DIR}/contrib/include
+    ${PROJECT_SOURCE_DIR}/contrib/include/glib-2.0
+    ${PROJECT_SOURCE_DIR}/contrib/include/fluidsynth
+    ${PROJECT_SOURCE_DIR}/lib/zlib/include
+    ${PROJECT_SOURCE_DIR}/lib/tinyxml
+    ${PROJECT_SOURCE_DIR}/lib/fluidsynth/mem_sfloader
+
+)
+
+SET(RESOURCE_PATH "${PROJECT_SOURCE_DIR}/src/ui/qt/resources/resources.qrc")
+
+SOURCE_GROUP("ui" REGULAR_EXPRESSION .*src/ui/qt/.*)
+SOURCE_GROUP("main\\formats" REGULAR_EXPRESSION .*src/main/formats/.*)
+SOURCE_GROUP("main\\loaders" REGULAR_EXPRESSION .*src/main/loaders/.*)
+SOURCE_GROUP("main" REGULAR_EXPRESSION .*src/main/.*)
+SOURCE_GROUP("lib\\fluidsynth" REGULAR_EXPRESSION .*lib/fluidsynth/.*)
+SOURCE_GROUP("lib\\tinyxml" REGULAR_EXPRESSION .*lib/tinyxml/.*)
+SOURCE_GROUP("lib\\minizip" REGULAR_EXPRESSION .*lib/minizip/.*)
+
+
+
+
+#MESSAGE(STATUS "QT FILES" ${QT_FILES})
+#source_group("ui" FILES ${QT_FILES})
 
 set ( CMAKE_CXX_FLAGS "-std=c++11 -w -g3 -Wall -O0" )
 
 include_directories(${INCLUDE_DIRS})
 
-add_executable(vgmtrans ${GUI_TYPE} ${SOURCE_FILES} ${UI_RESOURCES})
+qt5_add_resources(UI_RESOURCES ${RESOURCE_PATH})
+
+add_executable(vgmtrans ${GUI_TYPE} ${MAIN_FILES} ${UI_FILES} ${LIB_FILES} ${UI_RESOURCES})
+
+#target_link_libraries(vgmtrans main)
+#target_link_libraries(vgmtrans ui)
 
 IF (WIN32 OR APPLE)
     SET_TARGET_PROPERTIES(vgmtrans PROPERTIES LINK_SEARCH_START_STATIC 1)

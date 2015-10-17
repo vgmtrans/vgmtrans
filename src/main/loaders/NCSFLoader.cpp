@@ -35,8 +35,8 @@ PostLoadCommand NCSFLoader::Apply(RawFile* file)
 
 			complaint = psf_read_exe(file, exebuf, exebufsize);
 			if(complaint) 
-			{ 
-				Alert(complaint);
+			{
+				pRoot->AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"NCSFLoader"));
 				delete[] exebuf;
 				return KEEP_IT; 
 			}
