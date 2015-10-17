@@ -224,8 +224,8 @@ bool VGMRoot::CloseRawFile(RawFile* targFile)
 	if (iter != vRawFile.end())
 		vRawFile.erase(iter);
 	else
-		LogDebug(L"Error: trying to delete a rawfile which cannot be found in vRawFile.");
-	
+		pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a rawfile which cannot be found in vRawFile."), LOG_LEVEL_DEBUG, L"Root"));
+
 	delete targFile;
 	return true;
 }
@@ -270,7 +270,7 @@ void VGMRoot::RemoveVGMFile(VGMFile* targFile, bool bRemoveFromRaw)
 	if (iter != vVGMFile.end())
 		vVGMFile.erase(iter);
 	else
-		LogDebug(L"Error: trying to delete a VGMFile which cannot be found in vVGMFile.");
+		pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a VGMFile which cannot be found in vVGMFile."), LOG_LEVEL_DEBUG, L"Root"));
 	if (bRemoveFromRaw)
 		targFile->rawfile->RemoveContainedVGMFile(targFile);
 	while (targFile->assocColls.size())
@@ -298,7 +298,7 @@ void VGMRoot::RemoveVGMColl(VGMColl* targColl)
 	if (iter != vVGMColl.end())
 		vVGMColl.erase(iter);
 	else
-		LogDebug(L"Error: trying to delete a VGMColl which cannot be found in vVGMColl.");
+		pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a VGMColl which cannot be found in vVGMColl."), LOG_LEVEL_DEBUG, L"Root"));
 	UI_RemoveVGMColl(targColl);
 	delete targColl;
 }

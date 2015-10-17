@@ -24,7 +24,7 @@ MusicPlayer::MusicPlayer()
     fluid_settings_setstr(this->settings, "synth.chorus.active", "no");
     fluid_settings_setstr(this->settings, "synth.midi-bank-select", "mma");
     fluid_settings_setint(this->settings, "synth.midi-channels", 48);
-//    fluid_settings_setstr(this->settings, "player.timing-source", "system");
+    fluid_settings_setstr(this->settings, "player.timing-source", "system");
 
     /* Create the synthesizer. */
     this->synth = new_fluid_synth(this->settings);

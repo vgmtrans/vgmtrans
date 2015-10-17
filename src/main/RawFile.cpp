@@ -70,7 +70,7 @@ bool RawFile::open(const wstring& theFileName)
 #endif
 	if (!file.is_open())
 	{
-		Alert(L"File %s could not be opened", theFileName.c_str());
+		pRoot->AddLogItem(new LogItem((std::wstring(L"File ") + theFileName.c_str() + L" could not be opened"), LOG_LEVEL_ERR, L"RawFile"));
 		return false;
 	}
 
@@ -199,7 +199,8 @@ void RawFile::RemoveContainedVGMFile(VGMFile* vgmfile)
 	if (iter != containedVGMFiles.end())
 		containedVGMFiles.erase(iter);
 	else
-		LogDebug(L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles.");
+		pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles."), LOG_LEVEL_DEBUG, L"RawFile"));
+
 	if (containedVGMFiles.size() == 0)
 		pRoot->CloseRawFile(this);
 }

@@ -3,10 +3,14 @@
 //
 
 #include <QKeyEvent>
+#include <QDebug>
 #include "VGMFileListView.h"
 #include "QtVGMRoot.h"
 #include "VGMFile.h"
 #include "VGMItem.h"
+#include "MdiArea.h"
+#include "VGMFileView.h"
+#include "Helpers.h"
 
 // ********************
 // VGMFileListViewModel
@@ -15,8 +19,8 @@
 VGMFileListViewModel::VGMFileListViewModel(QObject *parent)
         : QAbstractListModel(parent)
 {
-    QObject::connect(&qtVGMRoot, SIGNAL(UI_AddedVGMFile()), this, SLOT(changedVGMFiles()));
-    QObject::connect(&qtVGMRoot, SIGNAL(UI_RemovedVGMFile()), this, SLOT(changedVGMFiles()));
+    connect(&qtVGMRoot, SIGNAL(UI_AddedVGMFile()), this, SLOT(changedVGMFiles()));
+    connect(&qtVGMRoot, SIGNAL(UI_RemovedVGMFile()), this, SLOT(changedVGMFiles()));
 }
 
 int VGMFileListViewModel::rowCount ( const QModelIndex & parent) const
@@ -31,15 +35,7 @@ QVariant VGMFileListViewModel::data ( const QModelIndex & index, int role ) cons
     }
     else if (role == Qt::DecorationRole) {
         FileType filetype = qtVGMRoot.vVGMFile[index.row()]->GetFileType();
-        switch (filetype) {
-            case FILETYPE_SEQ:
-                return QIcon(":/images/music_transcripts-32.png");
-            case FILETYPE_INSTRSET:
-                return QIcon(":/images/piano-32.png");
-            case FILETYPE_SAMPCOLL:
-                return QIcon(":/images/audio_wave-32.png");
-        }
-        return QIcon(":/images/audio_file-32.png");
+        return iconForFileType(filetype);
     }
     return QVariant();
 }
@@ -61,6 +57,10 @@ VGMFileListView::VGMFileListView(QWidget *parent)
     this->setModel(vgmFileListViewModel);
     this->setSelectionMode(QAbstractItemView::ExtendedSelection);
     this->setSelectionRectVisible(true);
+
+
+//    connect(this, SIGNAL(clicked(QModelIndex)),this,SLOT(myItemSelected(QModelIndex)));
+    connect(this, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(doubleClickedSlot(QModelIndex)));
 }
 
 void VGMFileListView::keyPressEvent(QKeyEvent* e)
@@ -83,4 +83,17 @@ void VGMFileListView::keyPressEvent(QKeyEvent* e)
             qtVGMRoot.RemoveVGMFile(file);
         }
     }
+}
+
+void VGMFileListView::doubleClickedSlot(QModelIndex index)
+{
+    VGMFile *vgmFile = qtVGMRoot.vVGMFile[index.row()];
+    VGMFileView *vgmFileView = new VGMFileView(vgmFile);
+    QString vgmFileName = QString::fromStdWString(*vgmFile->GetName());
+    vgmFileView->setWindowTitle(vgmFileName);
+    vgmFileView->setWindowIcon(iconForFileType(vgmFile->GetFileType()));
+
+    MdiArea::getInstance()->addSubWindow(vgmFileView);
+
+    vgmFileView->show();
 }
