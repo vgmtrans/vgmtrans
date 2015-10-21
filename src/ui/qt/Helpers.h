@@ -6,5 +6,6 @@
 
 QIcon iconForFileType(FileType filetype);
 QColor colorForEventColor(uint8_t eventColor);
+QColor textColorForEventColor(uint8_t eventColor);
 
 #endif //VGMTRANS_HELPERS_H
