@@ -49,3 +49,12 @@ QColor colorForEventColor(uint8_t eventColor) {
     }
     return Qt::red;
 }
+
+QColor textColorForEventColor(uint8_t eventColor) {
+
+    switch (eventColor) {
+        case CLR_UNKNOWN:
+        case CLR_VOLUME:            return Qt::white;
+        default:                    return Qt::black;
+    }
+}

@@ -9,7 +9,7 @@ HexView::HexView(VGMFile *file, QWidget *parent)
         , vgmfile(file)
         , mLinesPerScreen(0)
 {
-    QFont courierFont = QFont("Courier New", 20);
+    QFont courierFont = QFont("Courier New", 14);
 //    courierFont.setPixelSize(20);
     setFont(courierFont);
     QFontMetrics metrics(font());
@@ -35,6 +35,8 @@ void HexView::paintEvent(QPaintEvent *event)
 
 //    bool didElide = false;
     int lineSpacing = fontMetrics.lineSpacing();
+    painter.setBackgroundMode(Qt::OpaqueMode);
+
 
     int y = 0;
 
@@ -50,9 +52,10 @@ void HexView::paintEvent(QPaintEvent *event)
     for (int line = firstLine; line < lastLine; ++line) {
 
         uint8_t b[16];
-
         uint32_t lineOffset = line * 16 + beginOffset;
-        drawLineColor(painter, fontMetrics, line);
+
+        if (lineOffset >= vgmfile->dwOffset + vgmfile->unLength)
+            break;
 
         uint8_t nCount = vgmfile->GetBytes (lineOffset, 16, b);
 
@@ -63,71 +66,26 @@ void HexView::paintEvent(QPaintEvent *event)
             hexPortion.append(QString("%1 ").arg(b[i], 2, 16, zeroChar));
         }
 
-        QString text = QString("%1    %2")
-                .arg((line * 16) + beginOffset, 8, 16, zeroChar)
-                .arg(hexPortion);
-//        QString text = mModel->textAt(line);
+        int charWidth = fontMetrics.averageCharWidth();
 
-//        text = text.left(horizontalScrollBar()->value());
+        painter.setBackground(Qt::white);
+        painter.setPen(Qt::black);
 
+        QString text = QString("%1    ")
+                .arg((line * 16) + beginOffset, 8, 16, zeroChar);
         painter.drawText(horzPadding, y + mLineBaseline, text);
+        for(int i=0; i<nCount; i++) {
+
+            VGMItem* item = vgmfile->GetItemFromOffset(lineOffset + i, false);
+            QColor color = item ? colorForEventColor(item->color) : Qt::white;
+            QColor textColor = item ? textColorForEventColor(item->color) : Qt::black;
+            painter.setBackground(color);
+            painter.setPen(textColor);
+
+            painter.drawText(horzPadding + ((12 + i*3) * charWidth), y + mLineBaseline, QString("%1 ").arg(b[i], 2, 16, zeroChar).toUpper());
+        }
 
         y += mLineHeight;
-    }
-
-
-//    QTextLayout textLayout("BLAH", painter.font());
-//    textLayout.beginLayout();
-//    forever {
-//        QTextLine line = textLayout.createLine();
-//
-//        if (!line.isValid())
-//            break;
-//
-//        line.setLineWidth(width());
-//        int nextLineY = y + lineSpacing;
-//
-//        if (height() >= nextLineY + lineSpacing) {
-//            line.draw(&painter, QPoint(0, y));
-//            y = nextLineY;
-//        } else {
-////            QString lastLine = content.mid(line.textStart());
-////            QString elidedLastLine = fontMetrics.elidedText(lastLine, Qt::ElideRight, width());
-////            painter.drawText(QPoint(0, y + fontMetrics.ascent()), elidedLastLine);
-////            line = textLayout.createLine();
-////            didElide = line.isValid();
-//            break;
-//        }
-//    }
-//    textLayout.endLayout();
-}
-
-void HexView::drawLineColor(QPainter &painter, QFontMetrics &fontMetrics, uint32_t line) {
-
-    uint32_t lineOffset = line * 16 + vgmfile->dwOffset;
-    int charWidth = fontMetrics.averageCharWidth();
-    int charHeight = fontMetrics.lineSpacing();
-    int scrollLine = verticalScrollBar()->value();
-
-    qDebug() << "charWidth: " << charWidth << "  Width of 0: " << fontMetrics.width('0');
-
-    int i = 0;
-    uint32_t offset = lineOffset;
-    while (i < 16) {
-        VGMItem* item = vgmfile->GetItemFromOffset(offset, false);
-        if (!item) {
-            offset++;
-            i++;
-            continue;
-        }
-        uint32_t itemLength = item->unLength;
-
-        QColor color = colorForEventColor(item->color);
-        QRect r = QRect(horzPadding-3 + charWidth * (12 + (i * 3)), (line - scrollLine) * charHeight, min(16 - i, (int)itemLength) * charWidth * 3, charHeight);
-        painter.fillRect(r, color);
-
-        offset += itemLength;
-        i += itemLength;
     }
 }
 
