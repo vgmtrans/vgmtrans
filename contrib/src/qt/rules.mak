@@ -23,7 +23,7 @@ qt: qt-$(QT_VERSION).tar.xz .sum-qt
 
 ifdef HAVE_MACOSX
 QT_PLATFORM := -platform macx-clang
-EXTRA_CONFIG_OPTIONS := -sdk macosx10.10
+EXTRA_CONFIG_OPTIONS := -sdk macosx10.11
 endif
 ifdef HAVE_WIN32
 #QT_PLATFORM := -xplatform win32-g++ -device-option CROSS_COMPILE=$(HOST)-

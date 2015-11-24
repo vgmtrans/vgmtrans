@@ -21,6 +21,10 @@ PKGS_ALL := $(patsubst $(SRC)/%/rules.mak,%,$(wildcard $(SRC)/*/rules.mak))
 DATE := $(shell date +%Y%m%d)
 VPATH := $(TARBALLS)
 
+# Common download locations
+GNU := http://ftp.gnu.org/gnu
+SF := http://heanet.dl.sourceforge.net/sourceforge
+
 #
 # Machine-dependent variables
 #
