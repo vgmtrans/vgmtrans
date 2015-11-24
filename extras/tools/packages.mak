@@ -29,7 +29,7 @@ PKGCFG_URL=$(SF)/pkgconfiglite/$(PKGCFG_VERSION)/pkg-config-lite-$(PKGCFG_VERSIO
 TAR_VERSION=1.26
 TAR_URL=$(GNU)/tar/tar-$(TAR_VERSION).tar.bz2
 
-XZ_VERSION=5.0.3
+XZ_VERSION=5.2.2
 XZ_URL=http://tukaani.org/xz/xz-$(XZ_VERSION).tar.bz2
 
 GAS_VERSION=72887b9
@@ -41,9 +41,8 @@ RAGEL_URL=http://www.colm.net/files/ragel/ragel-$(RAGEL_VERSION).tar.gz
 SED_VERSION=4.2.2
 SED_URL=$(GNU)/sed/sed-$(SED_VERSION).tar.bz2
 
-ANT_VERSION=1.9.5
+ANT_VERSION=1.9.6
 ANT_URL=$(APACHE)/ant/binaries/apache-ant-$(ANT_VERSION)-bin.tar.bz2
 
-PROTOBUF_VERSION := 2.6.0
-PROTOBUF_URL := https://protobuf.googlecode.com/svn/rc/protobuf-$(PROTOBUF_VERSION).tar.bz2
-
+PROTOBUF_VERSION := 2.6.1
+PROTOBUF_URL := https://github.com/google/protobuf/releases/download/v$(PROTOBUF_VERSION)/protobuf-$(PROTOBUF_VERSION).tar.bz2
