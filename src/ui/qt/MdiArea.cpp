@@ -1,5 +1,4 @@
 #include "MdiArea.h"
-#include "TabBarStyle.h"
 #include <QTabBar>
 #include <QAbstractButton>
 #include <QToolButton>
@@ -33,16 +32,16 @@ QMdiSubWindow* MdiArea::addSubWindow(QWidget *widget) {
     QTabBar *tabBar = getTabBar();
     QMdiSubWindow* newWindow = QMdiArea::addSubWindow(widget);
     auto index = tabBar->count()-1;
-    QPushButton *button = new QPushButton("X");
-    button->setFixedSize(32, tabBar->height());
+//    QPushButton *button = new QPushButton("X");
+//    button->setFixedSize(32, tabBar->height());
     tabBar->setTabToolTip(index, widget->windowTitle());
 //    QAbstractButton *button = getCloseButton();
 
-    connect(button, SIGNAL (clicked()), this, SLOT (closeButtonClicked()));
+//    connect(button, SIGNAL (clicked()), this, SLOT (closeButtonClicked()));
 
-    qDebug() << "button position is: " << button->pos();
-    button->setGeometry(0, 0, 20, 20);
-    tabBar->setTabButton(index, QTabBar::RightSide, button);
+//    qDebug() << "button position is: " << button->pos();
+//    button->setGeometry(0, 0, 20, 20);
+//    tabBar->setTabButton(index, QTabBar::RightSide, button);
     return newWindow;
 
 }

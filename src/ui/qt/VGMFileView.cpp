@@ -1,7 +1,10 @@
 #include "VGMFileView.h"
 #include "VGMFile.h"
+#include "HexView.h"
+#include "VGMFileTreeView.h"
 #include "MdiArea.h"
 #include "Helpers.h"
+
 
 const int splitterHandleWidth = 1;
 
@@ -9,8 +12,8 @@ const int splitterHandleWidth = 1;
 VGMFileView::VGMFileView(VGMFile *vgmFile)
         : QSplitter(Qt::Horizontal, 0)
 {
-    hexView = new HexView(vgmFile);
-    treeView = new QTreeView;
+    hexView = new HexView(vgmFile, this);
+    treeView = new VGMFileTreeView(vgmFile, this);
 
     this->addWidget(hexView);
     this->addWidget(treeView);
@@ -22,7 +25,8 @@ VGMFileView::VGMFileView(VGMFile *vgmFile)
 
 //    QList<int> sizes = QList<int>({100, 30});
 
-    this->setMinimumSize(400, 100);
+    this->setSizes(QList<int>() << 500 << 100);
+//    this->setMinimumSize(700, 100);
 
     this->setStretchFactor(1, 1);
 //    this->setSizes(sizes);

@@ -66,7 +66,9 @@ SET(INCLUDE_DIRS
 
 )
 
-SET(RESOURCE_PATH "${PROJECT_SOURCE_DIR}/src/ui/qt/resources/resources.qrc")
+SET(RESOURCE_PATH
+        "${PROJECT_SOURCE_DIR}/src/ui/qt/resources/resources.qrc"
+        "${PROJECT_SOURCE_DIR}/src/ui/qt/resources/qdarkstyle/style.qrc")
 
 SOURCE_GROUP("ui" REGULAR_EXPRESSION .*src/ui/qt/.*)
 SOURCE_GROUP("main\\formats" REGULAR_EXPRESSION .*src/main/formats/.*)

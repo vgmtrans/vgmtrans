@@ -16,8 +16,6 @@
 #    ${CMAKE_CURRENT_SOURCE_DIR}/qt/MdiArea.h
 #    ${CMAKE_CURRENT_SOURCE_DIR}/qt/VGMFileView.cpp
 #    ${CMAKE_CURRENT_SOURCE_DIR}/qt/Helpers.h
-#    ${CMAKE_CURRENT_SOURCE_DIR}/qt/TabBarStyle.cpp
-#    ${CMAKE_CURRENT_SOURCE_DIR}/qt/TabBarStyle.h
 #
 #    ${CMAKE_CURRENT_SOURCE_DIR}/qt/QtVGMRoot.cpp
 #    ${CMAKE_CURRENT_SOURCE_DIR}/qt/VGMFileListView.cpp
