@@ -3,10 +3,10 @@
 
 #include <QMainWindow>
 #include <qsplitter.h>
-#include <qtreeview.h>
-#include "HexView.h"
 
 class VGMFile;
+class HexView;
+class VGMFileTreeView;
 
 class VGMFileView : public QSplitter {
     Q_OBJECT
@@ -21,7 +21,7 @@ public:
 protected:
     QSplitter *horzSplitter;
     HexView *hexView;
-    QTreeView *treeView;
+    VGMFileTreeView *treeView;
 };
 
 

@@ -2,14 +2,14 @@
 #include "VGMFile.h"
 #include "Helpers.h"
 
-const int horzPadding = 10;
+const int horzPadding = 5;
 
 HexView::HexView(VGMFile *file, QWidget *parent)
         : QAbstractScrollArea(parent)
         , vgmfile(file)
         , mLinesPerScreen(0)
 {
-    QFont courierFont = QFont("Courier New", 14);
+    QFont courierFont = QFont("Courier New", 13, QFont::Bold);
 //    courierFont.setPixelSize(20);
     setFont(courierFont);
     QFontMetrics metrics(font());
@@ -68,11 +68,11 @@ void HexView::paintEvent(QPaintEvent *event)
 
         int charWidth = fontMetrics.averageCharWidth();
 
-        painter.setBackground(Qt::white);
-        painter.setPen(Qt::black);
+        painter.setBackground(QColor(43, 43, 43));
+        painter.setPen(QColor(169, 183, 198));
 
         QString text = QString("%1    ")
-                .arg((line * 16) + beginOffset, 8, 16, zeroChar);
+                .arg((line * 16) + beginOffset, 8, 16, zeroChar).toUpper();
         painter.drawText(horzPadding, y + mLineBaseline, text);
         for(int i=0; i<nCount; i++) {
 
@@ -82,7 +82,7 @@ void HexView::paintEvent(QPaintEvent *event)
             painter.setBackground(color);
             painter.setPen(textColor);
 
-            painter.drawText(horzPadding + ((12 + i*3) * charWidth), y + mLineBaseline, QString("%1 ").arg(b[i], 2, 16, zeroChar).toUpper());
+            painter.drawText(horzPadding + ((10 + i*3) * charWidth), y, 3 * charWidth, mLineHeight, Qt::AlignCenter, QString(" %1 ").arg(b[i], 2, 16, zeroChar).toUpper());
         }
 
         y += mLineHeight;
@@ -93,5 +93,4 @@ void HexView::resizeEvent(QResizeEvent *event)
 {
     mLinesPerScreen = viewport()->height() / mLineHeight + 1;
     QAbstractScrollArea::resizeEvent(event);
-    qDebug() << "lines per=" << mLinesPerScreen;
 }
