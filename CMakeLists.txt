@@ -6,6 +6,7 @@ project(VGMTrans)
 IF(APPLE)
     SET(CMAKE_LIBRARY_ARCHITECTURE "x86_64-apple-darwin11")
     SET(CMAKE_OSX_ARCHITECTURES "x86_64;")
+    SET(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
     SET(GUI_TYPE MACOSX_BUNDLE)
 ENDIF(APPLE)
 
@@ -40,10 +41,6 @@ set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
 # Find the QtWidgets library
 find_package(Qt5Widgets REQUIRED)
 
-#add_subdirectory(src)
-#add_subdirectory(lib)
-#add_subdirectory(contrib)
-
 FILE(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp" "${PROJECT_SOURCE_DIR}/src/main/*.h")
 FILE(GLOB UI_FILES "${PROJECT_SOURCE_DIR}/src/ui/qt/*.cpp" "${PROJECT_SOURCE_DIR}/src/ui/qt/*.h")
 FILE(GLOB_RECURSE LIB_FILES
@@ -57,9 +54,9 @@ SET(INCLUDE_DIRS
     ${PROJECT_SOURCE_DIR}/src/main/formats
     ${PROJECT_SOURCE_DIR}/src/main/loaders
     ${PROJECT_SOURCE_DIR}/src/ui/qt
-    ${PROJECT_SOURCE_DIR}/contrib/include
-    ${PROJECT_SOURCE_DIR}/contrib/include/glib-2.0
-    ${PROJECT_SOURCE_DIR}/contrib/include/fluidsynth
+    ${PROJECT_SOURCE_DIR}/contrib/${CMAKE_LIBRARY_ARCHITECTURE}/include
+    ${PROJECT_SOURCE_DIR}/contrib/${CMAKE_LIBRARY_ARCHITECTURE}/include/glib-2.0
+    ${PROJECT_SOURCE_DIR}/contrib/${CMAKE_LIBRARY_ARCHITECTURE}/include/fluidsynth
     ${PROJECT_SOURCE_DIR}/lib/zlib/include
     ${PROJECT_SOURCE_DIR}/lib/tinyxml
     ${PROJECT_SOURCE_DIR}/lib/fluidsynth/mem_sfloader

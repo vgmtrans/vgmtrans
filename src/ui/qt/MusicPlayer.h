@@ -2,7 +2,7 @@
 // Created by Mike on 8/31/14.
 //
 
-#include "fluidsynth.h"
+#include <fluidsynth.h>
 
 #ifndef __MusicPlayer_H_
 #define __MusicPlayer_H_
