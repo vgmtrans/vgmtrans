@@ -1,7 +1,7 @@
 # qt
 
-QT_VERSION = 5.4.2
-QT_URL := http://download.qt-project.org/official_releases/qt/5.4/$(QT_VERSION)/submodules/qtbase-opensource-src-$(QT_VERSION).tar.xz
+QT_VERSION = 5.5.1
+QT_URL := http://download.qt-project.org/official_releases/qt/5.5/$(QT_VERSION)/submodules/qtbase-opensource-src-$(QT_VERSION).tar.xz
 
 PKGS += qt
 

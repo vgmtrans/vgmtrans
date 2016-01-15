@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/vgmtrans/vgmtrans.svg?branch=master)](https://travis-ci.org/vgmtrans/vgmtrans)
+
 VGMTrans - Video Game Music Translator
 ======================================
 
