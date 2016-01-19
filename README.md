@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/vgmtrans/vgmtrans.svg?branch=master)](https://travis-ci.org/vgmtrans/vgmtrans)
+[![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/djsal74fdlue142s/branch/master?svg=true)](https://ci.appveyor.com/project/mikelow/vgmtrans)
 
 VGMTrans - Video Game Music Translator
 ======================================
