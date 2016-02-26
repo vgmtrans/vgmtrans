@@ -2,7 +2,6 @@
 #include "GraphResSnesScanner.h"
 #include "GraphResSnesSeq.h"
 #include "GraphResSnesInstr.h"
-#include "SNESDSP.h"
 
 //; Mickey no Tokyo Disneyland Daibouken SPC
 //0620: 3f 24 05  call  $0524
@@ -51,90 +50,86 @@ BytePattern GraphResSnesScanner::ptnDspRegInit(
 	,
 	18);
 
-void GraphResSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000) {
-		SearchForGraphResSnesFromARAM(file);
-	}
-	else {
-		SearchForGraphResSnesFromROM(file);
-	}
-	return;
+void GraphResSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForGraphResSnesFromARAM(file);
+  }
+  else {
+    SearchForGraphResSnesFromROM(file);
+  }
+  return;
 }
 
-void GraphResSnesScanner::SearchForGraphResSnesFromARAM (RawFile* file)
-{
-	GraphResSnesVersion version = GRAPHRESSNES_NONE;
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
+  GraphResSnesVersion version = GRAPHRESSNES_NONE;
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	// search song header
-	uint32_t ofsLoadSeq;
-	uint16_t addrSeqHeader;
-	if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-		addrSeqHeader = file->GetByte(ofsLoadSeq + 4) | (file->GetByte(ofsLoadSeq + 8) << 8);
-	}
-	else {
-		return;
-	}
+  // search song header
+  uint32_t ofsLoadSeq;
+  uint16_t addrSeqHeader;
+  if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
+    addrSeqHeader = file->GetByte(ofsLoadSeq + 4) | (file->GetByte(ofsLoadSeq + 8) << 8);
+  }
+  else {
+    return;
+  }
 
-	version = GRAPHRESSNES_STANDARD;
+  version = GRAPHRESSNES_STANDARD;
 
-	GraphResSnesSeq* newSeq = new GraphResSnesSeq(file, version, addrSeqHeader, name);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  GraphResSnesSeq *newSeq = new GraphResSnesSeq(file, version, addrSeqHeader, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	// get sample map address from DIR register value
-	std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
-	std::map<uint8_t, uint8_t>::iterator itSpcDIR = dspRegMap.find(0x5d);
-	if (itSpcDIR == dspRegMap.end()) {
-		return;
-	}
-	uint16_t spcDirAddr = itSpcDIR->second << 8;
+  // get sample map address from DIR register value
+  std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
+  std::map<uint8_t, uint8_t>::iterator itSpcDIR = dspRegMap.find(0x5d);
+  if (itSpcDIR == dspRegMap.end()) {
+    return;
+  }
+  uint16_t spcDirAddr = itSpcDIR->second << 8;
 
-	// scan SRCN table
-	GraphResSnesInstrSet * newInstrSet = new GraphResSnesInstrSet(file, version, spcDirAddr, newSeq->instrADSRHints);
-	if (!newInstrSet->LoadVGMFile()) {
-		delete newInstrSet;
-		return;
-	}
+  // scan SRCN table
+  GraphResSnesInstrSet *newInstrSet = new GraphResSnesInstrSet(file, version, spcDirAddr, newSeq->instrADSRHints);
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 }
 
-void GraphResSnesScanner::SearchForGraphResSnesFromROM (RawFile* file)
-{
+void GraphResSnesScanner::SearchForGraphResSnesFromROM(RawFile *file) {
 }
 
-std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(RawFile* file)
-{
-	std::map<uint8_t, uint8_t> dspRegMap;
+std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(RawFile *file) {
+  std::map<uint8_t, uint8_t> dspRegMap;
 
-	// find a code block which initializes dsp registers
-	uint32_t ofsDspRegInitASM;
-	uint32_t addrDspRegList;
-	if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM)) {
-		addrDspRegList = file->GetShort(ofsDspRegInitASM + 7);
-	}
-	else {
-		return dspRegMap;
-	}
+  // find a code block which initializes dsp registers
+  uint32_t ofsDspRegInitASM;
+  uint32_t addrDspRegList;
+  if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM)) {
+    addrDspRegList = file->GetShort(ofsDspRegInitASM + 7);
+  }
+  else {
+    return dspRegMap;
+  }
 
-	// store dsp reg/value pairs to map
-	uint16_t curOffset = addrDspRegList;
-	while (true) {
-		if (curOffset + 2 > 0x10000) {
-			break;
-		}
+  // store dsp reg/value pairs to map
+  uint16_t curOffset = addrDspRegList;
+  while (true) {
+    if (curOffset + 2 > 0x10000) {
+      break;
+    }
 
-		uint8_t dspReg = file->GetByte(curOffset++);
-		if (dspReg == 0xff) {
-			break;
-		}
+    uint8_t dspReg = file->GetByte(curOffset++);
+    if (dspReg == 0xff) {
+      break;
+    }
 
-		uint8_t dspValue = file->GetByte(curOffset++);
-		dspRegMap[dspReg] = dspValue;
-	}
+    uint8_t dspValue = file->GetByte(curOffset++);
+    dspRegMap[dspReg] = dspValue;
+  }
 
-	return dspRegMap;
+  return dspRegMap;
 }

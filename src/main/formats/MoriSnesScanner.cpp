@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "MoriSnesScanner.h"
 #include "MoriSnesSeq.h"
-#include "SNESDSP.h"
 
 //; Gokinjo Boukentai SPC
 //0c3c: 1c        asl   a                 ; song index in A
@@ -37,74 +36,69 @@ BytePattern MoriSnesScanner::ptnSetDIR(
 	,
 	6);
 
-void MoriSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000)
-	{
-		SearchForMoriSnesFromARAM(file);
-	}
-	else
-	{
-		SearchForMoriSnesFromROM(file);
-	}
-	return;
+void MoriSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForMoriSnesFromARAM(file);
+  }
+  else {
+    SearchForMoriSnesFromROM(file);
+  }
+  return;
 }
 
-void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile* file)
-{
-	MoriSnesVersion version = MORISNES_NONE;
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
+  MoriSnesVersion version = MORISNES_NONE;
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	// scan for song list table
-	uint32_t ofsLoadSeq;
-	uint16_t addrSongList;
-	if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-		addrSongList = file->GetShort(ofsLoadSeq + 3);
-	}
-	else {
-		return;
-	}
+  // scan for song list table
+  uint32_t ofsLoadSeq;
+  uint16_t addrSongList;
+  if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
+    addrSongList = file->GetShort(ofsLoadSeq + 3);
+  }
+  else {
+    return;
+  }
 
-	// TODO: detect engine version
-	version = MORISNES_STANDARD;
+  // TODO: detect engine version
+  version = MORISNES_STANDARD;
 
-	// Example: Shien The Blade Chaser (Shien's Revenge)
+  // Example: Shien The Blade Chaser (Shien's Revenge)
 
-	// TODO: guess song index
-	int8_t guessedSongIndex = -1;
-	if (addrSongList + 2 <= 0x10000) {
-		guessedSongIndex = 1;
-	}
+  // TODO: guess song index
+  int8_t guessedSongIndex = -1;
+  if (addrSongList + 2 <= 0x10000) {
+    guessedSongIndex = 1;
+  }
 
-	// scan DIR address
-	uint32_t ofsSetDIR;
-	uint16_t spcDirAddr = 0;
-	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
-		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-	}
+  // scan DIR address
+  uint32_t ofsSetDIR;
+  uint16_t spcDirAddr = 0;
+  if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+    spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+  }
 
-	uint32_t addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
-	if (addrSongHeaderPtr + 2 <= 0x10000) {
-		uint16_t addrSongHeader = file->GetShort(addrSongHeaderPtr);
+  uint32_t addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
+  if (addrSongHeaderPtr + 2 <= 0x10000) {
+    uint16_t addrSongHeader = file->GetShort(addrSongHeaderPtr);
 
-		MoriSnesSeq* newSeq = new MoriSnesSeq(file, version, addrSongHeader, name);
-		if (!newSeq->LoadVGMFile()) {
-			delete newSeq;
-			return;
-		}
+    MoriSnesSeq *newSeq = new MoriSnesSeq(file, version, addrSongHeader, name);
+    if (!newSeq->LoadVGMFile()) {
+      delete newSeq;
+      return;
+    }
 
-		if (spcDirAddr != 0) {
-			MoriSnesInstrSet * newInstrSet = new MoriSnesInstrSet(file, version, spcDirAddr, newSeq->InstrumentAddresses, newSeq->InstrumentHints);
-			if (!newInstrSet->LoadVGMFile())
-			{
-				delete newInstrSet;
-				return;
-			}
-		}
-	}
+    if (spcDirAddr != 0) {
+      MoriSnesInstrSet *newInstrSet =
+          new MoriSnesInstrSet(file, version, spcDirAddr, newSeq->InstrumentAddresses, newSeq->InstrumentHints);
+      if (!newInstrSet->LoadVGMFile()) {
+        delete newInstrSet;
+        return;
+      }
+    }
+  }
 }
 
-void MoriSnesScanner::SearchForMoriSnesFromROM(RawFile* file)
-{
+void MoriSnesScanner::SearchForMoriSnesFromROM(RawFile *file) {
 }

@@ -8,23 +8,27 @@
 // AkaoSnesInstrSet
 // ****************
 
-class AkaoSnesInstrSet :
-	public VGMInstrSet
-{
-public:
-	AkaoSnesInstrSet(RawFile* file, AkaoSnesVersion ver, uint32_t spcDirAddr, uint16_t addrTuningTable, uint16_t addrADSRTable, const std::wstring & name = L"AkaoSnesInstrSet");
-	virtual ~AkaoSnesInstrSet(void);
+class AkaoSnesInstrSet:
+    public VGMInstrSet {
+ public:
+  AkaoSnesInstrSet(RawFile *file,
+                   AkaoSnesVersion ver,
+                   uint32_t spcDirAddr,
+                   uint16_t addrTuningTable,
+                   uint16_t addrADSRTable,
+                   const std::wstring &name = L"AkaoSnesInstrSet");
+  virtual ~AkaoSnesInstrSet(void);
 
-	virtual bool GetHeaderInfo();
-	virtual bool GetInstrPointers();
+  virtual bool GetHeaderInfo();
+  virtual bool GetInstrPointers();
 
-	AkaoSnesVersion version;
+  AkaoSnesVersion version;
 
-protected:
-	uint32_t spcDirAddr;
-	uint16_t addrTuningTable;
-	uint16_t addrADSRTable;
-	std::vector<uint8_t> usedSRCNs;
+ protected:
+  uint32_t spcDirAddr;
+  uint16_t addrTuningTable;
+  uint16_t addrADSRTable;
+  std::vector<uint8_t> usedSRCNs;
 };
 
 // *************
@@ -32,20 +36,25 @@ protected:
 // *************
 
 class AkaoSnesInstr
-	: public VGMInstr
-{
-public:
-	AkaoSnesInstr(VGMInstrSet* instrSet, AkaoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t addrTuningTable, uint16_t addrADSRTable, const std::wstring& name = L"AkaoSnesInstr");
-	virtual ~AkaoSnesInstr(void);
+    : public VGMInstr {
+ public:
+  AkaoSnesInstr(VGMInstrSet *instrSet,
+                AkaoSnesVersion ver,
+                uint8_t srcn,
+                uint32_t spcDirAddr,
+                uint16_t addrTuningTable,
+                uint16_t addrADSRTable,
+                const std::wstring &name = L"AkaoSnesInstr");
+  virtual ~AkaoSnesInstr(void);
 
-	virtual bool LoadInstr();
+  virtual bool LoadInstr();
 
-	AkaoSnesVersion version;
+  AkaoSnesVersion version;
 
-protected:
-	uint32_t spcDirAddr;
-	uint16_t addrTuningTable;
-	uint16_t addrADSRTable;
+ protected:
+  uint32_t spcDirAddr;
+  uint16_t addrTuningTable;
+  uint16_t addrADSRTable;
 };
 
 // ***********
@@ -53,13 +62,17 @@ protected:
 // ***********
 
 class AkaoSnesRgn
-	: public VGMRgn
-{
-public:
-	AkaoSnesRgn(AkaoSnesInstr* instr, AkaoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t addrTuningTable, uint16_t addrADSRTable);
-	virtual ~AkaoSnesRgn(void);
+    : public VGMRgn {
+ public:
+  AkaoSnesRgn(AkaoSnesInstr *instr,
+              AkaoSnesVersion ver,
+              uint8_t srcn,
+              uint32_t spcDirAddr,
+              uint16_t addrTuningTable,
+              uint16_t addrADSRTable);
+  virtual ~AkaoSnesRgn(void);
 
-	virtual bool LoadRgn();
+  virtual bool LoadRgn();
 
-	AkaoSnesVersion version;
+  AkaoSnesVersion version;
 };

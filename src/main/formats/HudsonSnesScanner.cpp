@@ -2,7 +2,6 @@
 #include "HudsonSnesScanner.h"
 #include "HudsonSnesInstr.h"
 #include "HudsonSnesSeq.h"
-#include "SNESDSP.h"
 
 BytePattern HudsonSnesScanner::ptnNoteLenTable(
 	"\xc0\x60\x30\x18\x0c\x06\x03\x01"
@@ -107,181 +106,182 @@ BytePattern HudsonSnesScanner::ptnLoadDIRV0(
 	,
 	6);
 
-void HudsonSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000)
-	{
-		SearchForHudsonSnesFromARAM(file);
-	}
-	else
-	{
-		SearchForHudsonSnesFromROM(file);
-	}
-	return;
+void HudsonSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForHudsonSnesFromARAM(file);
+  }
+  else {
+    SearchForHudsonSnesFromROM(file);
+  }
+  return;
 }
 
-void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile* file)
-{
-	HudsonSnesVersion version = HUDSONSNES_NONE;
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile *file) {
+  HudsonSnesVersion version = HUDSONSNES_NONE;
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	// search for note length table
-	uint32_t ofsNoteLenTable;
-	if (!file->SearchBytePattern(ptnNoteLenTable, ofsNoteLenTable)) {
-		return;
-	}
+  // search for note length table
+  uint32_t ofsNoteLenTable;
+  if (!file->SearchBytePattern(ptnNoteLenTable, ofsNoteLenTable)) {
+    return;
+  }
 
-	// TODO: fix "An American Tail: Fievel Goes West"
+  // TODO: fix "An American Tail: Fievel Goes West"
 
-	// search song list and detect engine version
-	uint32_t ofsGetSeqTableAddr;
-	uint16_t addrEngineHeader;
-	uint16_t addrSongList;
-	if (file->SearchBytePattern(ptnGetSeqTableAddrV1V2, ofsGetSeqTableAddr)) {
-		addrEngineHeader = file->GetShort(ofsGetSeqTableAddr + 1);
+  // search song list and detect engine version
+  uint32_t ofsGetSeqTableAddr;
+  uint16_t addrEngineHeader;
+  uint16_t addrSongList;
+  if (file->SearchBytePattern(ptnGetSeqTableAddrV1V2, ofsGetSeqTableAddr)) {
+    addrEngineHeader = file->GetShort(ofsGetSeqTableAddr + 1);
 
-		if (addrEngineHeader == 0x07c2) {
-			version = HUDSONSNES_V1;
-		}
-		else if (addrEngineHeader == 0x0803) {
-			version = HUDSONSNES_V2;
-		}
-		else {
-			return;
-		}
+    if (addrEngineHeader == 0x07c2) {
+      version = HUDSONSNES_V1;
+    }
+    else if (addrEngineHeader == 0x0803) {
+      version = HUDSONSNES_V2;
+    }
+    else {
+      return;
+    }
 
-		uint16_t addrSongListTable = file->GetShort(addrEngineHeader);
-		if (addrSongListTable + 2 > 0x10000) {
-			return;
-		}
+    uint16_t addrSongListTable = file->GetShort(addrEngineHeader);
+    if (addrSongListTable + 2 > 0x10000) {
+      return;
+    }
 
-		addrSongList = file->GetShort(addrSongListTable);
-		if (addrSongList + 2 > 0x10000 || addrSongList == 0) {
-			// apparently it's not loaded yet
-			return;
-		}
-	}
-	else if (file->SearchBytePattern(ptnGetSeqTableAddrV0, ofsGetSeqTableAddr)) {
-		uint8_t addrSongListPtr = file->GetByte(ofsGetSeqTableAddr + 4);
-		uint16_t addrSongListTable = file->GetShort(addrSongListPtr);
-		if (addrSongListTable + 2 > 0x10000) {
-			return;
-		}
+    addrSongList = file->GetShort(addrSongListTable);
+    if (addrSongList + 2 > 0x10000 || addrSongList == 0) {
+      // apparently it's not loaded yet
+      return;
+    }
+  }
+  else if (file->SearchBytePattern(ptnGetSeqTableAddrV0, ofsGetSeqTableAddr)) {
+    uint8_t addrSongListPtr = file->GetByte(ofsGetSeqTableAddr + 4);
+    uint16_t addrSongListTable = file->GetShort(addrSongListPtr);
+    if (addrSongListTable + 2 > 0x10000) {
+      return;
+    }
 
-		addrSongList = file->GetShort(addrSongListTable);
-		if (addrSongList + 2 > 0x10000 || addrSongList == 0) {
-			// apparently it's not loaded yet
-			return;
-		}
+    addrSongList = file->GetShort(addrSongListTable);
+    if (addrSongList + 2 > 0x10000 || addrSongList == 0) {
+      // apparently it's not loaded yet
+      return;
+    }
 
-		addrEngineHeader = 0; // N/A
-		version = HUDSONSNES_V0;
-	}
-	else {
-		return;
-	}
+    addrEngineHeader = 0; // N/A
+    version = HUDSONSNES_V0;
+  }
+  else {
+    return;
+  }
 
-	// guess song count
-	uint8_t songListLength = 1;
-	uint16_t addrSongListCutoff = 0xffff;
-	for (uint8_t songIndex = 0; songIndex <= 0x7f; songIndex++) {
-		uint32_t ofsSongPtr = addrSongList + songIndex * 2;
+  // guess song count
+  uint8_t songListLength = 1;
+  uint16_t addrSongListCutoff = 0xffff;
+  for (uint8_t songIndex = 0; songIndex <= 0x7f; songIndex++) {
+    uint32_t ofsSongPtr = addrSongList + songIndex * 2;
 
-		if (ofsSongPtr + 2 > 0x10000) {
-			break;
-		}
+    if (ofsSongPtr + 2 > 0x10000) {
+      break;
+    }
 
-		if (ofsSongPtr >= addrSongListCutoff) {
-			break;
-		}
+    if (ofsSongPtr >= addrSongListCutoff) {
+      break;
+    }
 
-		uint16_t addrSongPtr = file->GetShort(ofsSongPtr);
-		if (addrSongPtr < addrSongListCutoff) {
-			addrSongListCutoff = addrSongPtr;
-		}
+    uint16_t addrSongPtr = file->GetShort(ofsSongPtr);
+    if (addrSongPtr < addrSongListCutoff) {
+      addrSongListCutoff = addrSongPtr;
+    }
 
-		songListLength = songIndex + 1;
-	}
+    songListLength = songIndex + 1;
+  }
 
-	// search loop address for song index search:
-	// Hudson's sequence is a self-contained format.
-	// Each sequences must not be crossover each other.
-	// Here we load the global loop address of current song,
-	// and search a sequence contains that address.
-	uint32_t ofsLoadTrackAddress;
-	uint16_t addrCurrentLoopPoint;
-	if (file->SearchBytePattern(ptnLoadTrackAddress, ofsLoadTrackAddress)) {
-		uint16_t addrCurrentLoopPointPtrLo = file->GetShort(ofsLoadTrackAddress + 20);
-		uint16_t addrCurrentLoopPointPtrHi = file->GetShort(ofsLoadTrackAddress + 29);
+  // search loop address for song index search:
+  // Hudson's sequence is a self-contained format.
+  // Each sequences must not be crossover each other.
+  // Here we load the global loop address of current song,
+  // and search a sequence contains that address.
+  uint32_t ofsLoadTrackAddress;
+  uint16_t addrCurrentLoopPoint;
+  if (file->SearchBytePattern(ptnLoadTrackAddress, ofsLoadTrackAddress)) {
+    uint16_t addrCurrentLoopPointPtrLo = file->GetShort(ofsLoadTrackAddress + 20);
+    uint16_t addrCurrentLoopPointPtrHi = file->GetShort(ofsLoadTrackAddress + 29);
 
-		addrCurrentLoopPoint = file->GetByte(addrCurrentLoopPointPtrLo) | (file->GetByte(addrCurrentLoopPointPtrHi) << 8);
-	}
-	else {
-		return;
-	}
+    addrCurrentLoopPoint = file->GetByte(addrCurrentLoopPointPtrLo) | (file->GetByte(addrCurrentLoopPointPtrHi) << 8);
+  }
+  else {
+    return;
+  }
 
-	// guess song index
-	int8_t songIndexCandidate = 0;
-	if (addrCurrentLoopPoint != 0 && addrCurrentLoopPoint != 0xffff) {
-		uint16_t bestLoopPointDistance = 0xffff;
-		for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
-			uint32_t ofsSongPtr = addrSongList + songIndex * 2;
-			uint16_t addrSongPtr = file->GetShort(ofsSongPtr);
+  // guess song index
+  int8_t songIndexCandidate = 0;
+  if (addrCurrentLoopPoint != 0 && addrCurrentLoopPoint != 0xffff) {
+    uint16_t bestLoopPointDistance = 0xffff;
+    for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
+      uint32_t ofsSongPtr = addrSongList + songIndex * 2;
+      uint16_t addrSongPtr = file->GetShort(ofsSongPtr);
 
-			if (addrSongPtr > addrCurrentLoopPoint) {
-				continue;
-			}
+      if (addrSongPtr > addrCurrentLoopPoint) {
+        continue;
+      }
 
-			uint16_t loopPointDistance = addrCurrentLoopPoint - addrSongPtr;
-			if (loopPointDistance < bestLoopPointDistance) {
-				bestLoopPointDistance = loopPointDistance;
-				songIndexCandidate = songIndex;
-			}
-		}
-	}
+      uint16_t loopPointDistance = addrCurrentLoopPoint - addrSongPtr;
+      if (loopPointDistance < bestLoopPointDistance) {
+        bestLoopPointDistance = loopPointDistance;
+        songIndexCandidate = songIndex;
+      }
+    }
+  }
 
-	int8_t guessedSongIndex = songIndexCandidate;
+  int8_t guessedSongIndex = songIndexCandidate;
 
-	// load song
-	uint16_t addrSeqHeaderPtr = addrSongList + guessedSongIndex * 2;
-	uint16_t addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
-	HudsonSnesSeq* newSeq = new HudsonSnesSeq(file, version, addrSeqHeader, name);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  // load song
+  uint16_t addrSeqHeaderPtr = addrSongList + guessedSongIndex * 2;
+  uint16_t addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
+  HudsonSnesSeq *newSeq = new HudsonSnesSeq(file, version, addrSeqHeader, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	// load instrument set if available
-	if (newSeq->InstrumentTableSize != 0) {
-		uint16_t spcDirAddr;
-		uint16_t addrSampTuningTable;
-		if (version == HUDSONSNES_V0) {
-			uint32_t ofsLoadDIR;
-			if (file->SearchBytePattern(ptnLoadDIRV0, ofsLoadDIR)) {
-				uint8_t addrDIRPtr = file->GetByte(ofsLoadDIR + 1);
-				spcDirAddr = file->GetByte(0x100 + addrDIRPtr) << 8;
+  // load instrument set if available
+  if (newSeq->InstrumentTableSize != 0) {
+    uint16_t spcDirAddr;
+    uint16_t addrSampTuningTable;
+    if (version == HUDSONSNES_V0) {
+      uint32_t ofsLoadDIR;
+      if (file->SearchBytePattern(ptnLoadDIRV0, ofsLoadDIR)) {
+        uint8_t addrDIRPtr = file->GetByte(ofsLoadDIR + 1);
+        spcDirAddr = file->GetByte(0x100 + addrDIRPtr) << 8;
 
-				uint16_t addrSampRegionPtr = file->GetShort(ofsGetSeqTableAddr + 30);
-				addrSampTuningTable = (file->GetByte(addrSampRegionPtr) + 1) << 8;
-			}
-			else {
-				return;
-			}
-		}
-		else { // HUDSONSNES_V1, HUDSONSNES_V2
-			spcDirAddr = file->GetByte(addrEngineHeader + 6) << 8;
-			addrSampTuningTable = file->GetShort(addrEngineHeader + 4);
-		}
+        uint16_t addrSampRegionPtr = file->GetShort(ofsGetSeqTableAddr + 30);
+        addrSampTuningTable = (file->GetByte(addrSampRegionPtr) + 1) << 8;
+      }
+      else {
+        return;
+      }
+    }
+    else { // HUDSONSNES_V1, HUDSONSNES_V2
+      spcDirAddr = file->GetByte(addrEngineHeader + 6) << 8;
+      addrSampTuningTable = file->GetShort(addrEngineHeader + 4);
+    }
 
-		HudsonSnesInstrSet * newInstrSet = new HudsonSnesInstrSet(file, version, newSeq->InstrumentTableAddress, newSeq->InstrumentTableSize, spcDirAddr, addrSampTuningTable, name);
-		if (!newInstrSet->LoadVGMFile()) {
-			delete newInstrSet;
-			return;
-		}
-	}
+    HudsonSnesInstrSet *newInstrSet = new HudsonSnesInstrSet(file,
+                                                             version,
+                                                             newSeq->InstrumentTableAddress,
+                                                             newSeq->InstrumentTableSize,
+                                                             spcDirAddr,
+                                                             addrSampTuningTable,
+                                                             name);
+    if (!newInstrSet->LoadVGMFile()) {
+      delete newInstrSet;
+      return;
+    }
+  }
 }
 
-void HudsonSnesScanner::SearchForHudsonSnesFromROM(RawFile* file)
-{
+void HudsonSnesScanner::SearchForHudsonSnesFromROM(RawFile *file) {
 }

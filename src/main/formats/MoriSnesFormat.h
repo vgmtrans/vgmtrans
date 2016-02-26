@@ -10,12 +10,11 @@
 // **************
 
 BEGIN_FORMAT(MoriSnes)
-USING_SCANNER(MoriSnesScanner)
-USING_MATCHER(FilegroupMatcher)
+  USING_SCANNER(MoriSnesScanner)
+  USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-enum MoriSnesVersion  : uint8_t
-{
-	MORISNES_NONE = 0,              // Unknown Version
-	MORISNES_STANDARD,              // Gokinjo Boukentai etc.
+enum MoriSnesVersion: uint8_t {
+  MORISNES_NONE = 0,              // Unknown Version
+  MORISNES_STANDARD,              // Gokinjo Boukentai etc.
 };

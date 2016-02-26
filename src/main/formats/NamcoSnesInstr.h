@@ -8,22 +8,25 @@
 // NamcoSnesInstrSet
 // *****************
 
-class NamcoSnesInstrSet :
-	public VGMInstrSet
-{
-public:
-	NamcoSnesInstrSet(RawFile* file, NamcoSnesVersion ver, uint32_t spcDirAddr, uint16_t addrTuningTable, const std::wstring & name = L"NamcoSnesInstrSet");
-	virtual ~NamcoSnesInstrSet(void);
+class NamcoSnesInstrSet:
+    public VGMInstrSet {
+ public:
+  NamcoSnesInstrSet(RawFile *file,
+                    NamcoSnesVersion ver,
+                    uint32_t spcDirAddr,
+                    uint16_t addrTuningTable,
+                    const std::wstring &name = L"NamcoSnesInstrSet");
+  virtual ~NamcoSnesInstrSet(void);
 
-	virtual bool GetHeaderInfo();
-	virtual bool GetInstrPointers();
+  virtual bool GetHeaderInfo();
+  virtual bool GetInstrPointers();
 
-	NamcoSnesVersion version;
+  NamcoSnesVersion version;
 
-protected:
-	uint32_t spcDirAddr;
-	uint16_t addrTuningTable;
-	std::vector<uint8_t> usedSRCNs;
+ protected:
+  uint32_t spcDirAddr;
+  uint16_t addrTuningTable;
+  std::vector<uint8_t> usedSRCNs;
 };
 
 // **************
@@ -31,19 +34,23 @@ protected:
 // **************
 
 class NamcoSnesInstr
-	: public VGMInstr
-{
-public:
-	NamcoSnesInstr(VGMInstrSet* instrSet, NamcoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t addrTuningEntry, const std::wstring& name = L"NamcoSnesInstr");
-	virtual ~NamcoSnesInstr(void);
+    : public VGMInstr {
+ public:
+  NamcoSnesInstr(VGMInstrSet *instrSet,
+                 NamcoSnesVersion ver,
+                 uint8_t srcn,
+                 uint32_t spcDirAddr,
+                 uint16_t addrTuningEntry,
+                 const std::wstring &name = L"NamcoSnesInstr");
+  virtual ~NamcoSnesInstr(void);
 
-	virtual bool LoadInstr();
+  virtual bool LoadInstr();
 
-	NamcoSnesVersion version;
+  NamcoSnesVersion version;
 
-protected:
-	uint32_t spcDirAddr;
-	uint16_t addrTuningEntry;
+ protected:
+  uint32_t spcDirAddr;
+  uint16_t addrTuningEntry;
 };
 
 // ************
@@ -51,13 +58,13 @@ protected:
 // ************
 
 class NamcoSnesRgn
-	: public VGMRgn
-{
-public:
-	NamcoSnesRgn(NamcoSnesInstr* instr, NamcoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t addrTuningEntry);
-	virtual ~NamcoSnesRgn(void);
+    : public VGMRgn {
+ public:
+  NamcoSnesRgn
+      (NamcoSnesInstr *instr, NamcoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t addrTuningEntry);
+  virtual ~NamcoSnesRgn(void);
 
-	virtual bool LoadRgn();
+  virtual bool LoadRgn();
 
-	NamcoSnesVersion version;
+  NamcoSnesVersion version;
 };

@@ -2,7 +2,6 @@
 #include "KonamiSnesScanner.h"
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesInstr.h"
-#include "SNESDSP.h"
 
 //; Ganbare Goemon 4
 //13d6: 8f 00 0a  mov   $0a,#$00
@@ -484,263 +483,264 @@ BytePattern KonamiSnesScanner::ptnLoadPercInstrGG4(
 	,
 	13);
 
-void KonamiSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000)
-	{
-		SearchForKonamiSnesFromARAM(file);
-	}
-	else
-	{
-		SearchForKonamiSnesFromROM(file);
-	}
-	return;
+void KonamiSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForKonamiSnesFromARAM(file);
+  }
+  else {
+    SearchForKonamiSnesFromROM(file);
+  }
+  return;
 }
 
-void KonamiSnesScanner::SearchForKonamiSnesFromARAM (RawFile* file)
-{
-	KonamiSnesVersion version = KONAMISNES_NONE;
+void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
+  KonamiSnesVersion version = KONAMISNES_NONE;
 
-	bool hasSongList;
+  bool hasSongList;
 
-	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
-	// TODO: Unsupported games
-	// Tiny Toon Adventures: Buster Bus
-	// Batman Returns
+  // TODO: Unsupported games
+  // Tiny Toon Adventures: Buster Bus
+  // Batman Returns
 
-	// find a song header
-	uint32_t ofsSetSongHeaderAddress;
-	uint32_t ofsReadSongList;
-	uint16_t addrSongHeader;
-	uint16_t addrSongList;
-	int8_t primarySongIndex;
-	uint8_t vcmdLenItemSize;
-	if (file->SearchBytePattern(ptnSetSongHeaderAddressGG4, ofsSetSongHeaderAddress)) {
-		addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 1) | (file->GetByte(ofsSetSongHeaderAddress + 4) << 8);
-		vcmdLenItemSize = 2;
-		hasSongList = false;
-	}
-	else if (file->SearchBytePattern(ptnReadSongListPNTB, ofsReadSongList)) {
-		addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
-		primarySongIndex = file->GetByte(ofsReadSongList + 31);
-		vcmdLenItemSize = 1;
-		hasSongList = true;
-	}
-	else if (file->SearchBytePattern(ptnReadSongListAXE, ofsReadSongList)) {
-		addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
-		primarySongIndex = file->GetByte(ofsReadSongList + 32);
-		vcmdLenItemSize = 2;
-		hasSongList = true;
-	}
-	else if (file->SearchBytePattern(ptnReadSongListCNTR3, ofsReadSongList)) {
-		addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
-		primarySongIndex = file->GetByte(ofsReadSongList + 32);
-		vcmdLenItemSize = 1;
-		hasSongList = true;
-	}
-	else {
-		return;
-	}
+  // find a song header
+  uint32_t ofsSetSongHeaderAddress;
+  uint32_t ofsReadSongList;
+  uint16_t addrSongHeader;
+  uint16_t addrSongList;
+  int8_t primarySongIndex;
+  uint8_t vcmdLenItemSize;
+  if (file->SearchBytePattern(ptnSetSongHeaderAddressGG4, ofsSetSongHeaderAddress)) {
+    addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 1) | (file->GetByte(ofsSetSongHeaderAddress + 4) << 8);
+    vcmdLenItemSize = 2;
+    hasSongList = false;
+  }
+  else if (file->SearchBytePattern(ptnReadSongListPNTB, ofsReadSongList)) {
+    addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
+    primarySongIndex = file->GetByte(ofsReadSongList + 31);
+    vcmdLenItemSize = 1;
+    hasSongList = true;
+  }
+  else if (file->SearchBytePattern(ptnReadSongListAXE, ofsReadSongList)) {
+    addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
+    primarySongIndex = file->GetByte(ofsReadSongList + 32);
+    vcmdLenItemSize = 2;
+    hasSongList = true;
+  }
+  else if (file->SearchBytePattern(ptnReadSongListCNTR3, ofsReadSongList)) {
+    addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
+    primarySongIndex = file->GetByte(ofsReadSongList + 32);
+    vcmdLenItemSize = 1;
+    hasSongList = true;
+  }
+  else {
+    return;
+  }
 
-	// find the vcmd length table
-	uint32_t ofsJumpToVcmd;
-	uint16_t addrVcmdLengthTable;
-	uint8_t vcmd6XCountInList;
-	if (file->SearchBytePattern(ptnJumpToVcmdGG4, ofsJumpToVcmd)) {
-		addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 11);
-		vcmd6XCountInList = 0;
+  // find the vcmd length table
+  uint32_t ofsJumpToVcmd;
+  uint16_t addrVcmdLengthTable;
+  uint8_t vcmd6XCountInList;
+  if (file->SearchBytePattern(ptnJumpToVcmdGG4, ofsJumpToVcmd)) {
+    addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 11);
+    vcmd6XCountInList = 0;
 
-		// check table length
-		if (addrVcmdLengthTable + vcmd6XCountInList + 0x20 >= 0x10000) {
-			return;
-		}
-	}
-	else if (file->SearchBytePattern(ptnJumpToVcmdCNTR3, ofsJumpToVcmd)) {
-		addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
+    // check table length
+    if (addrVcmdLengthTable + vcmd6XCountInList + 0x20 >= 0x10000) {
+      return;
+    }
+  }
+  else if (file->SearchBytePattern(ptnJumpToVcmdCNTR3, ofsJumpToVcmd)) {
+    addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
 
-		uint32_t ofsBranchForVcmd6x;
-		if (file->SearchBytePattern(ptnBranchForVcmd6xCNTR3, ofsBranchForVcmd6x)) {
-			// vcmd 60-64 is in the list
-			vcmd6XCountInList = 5;
-		}
-		else if (file->SearchBytePattern(ptnBranchForVcmd6xMDR2, ofsBranchForVcmd6x)) {
-			// vcmd 60-61 is in the list
-			vcmd6XCountInList = 2;
-		}
-		else {
-			return;
-		}
+    uint32_t ofsBranchForVcmd6x;
+    if (file->SearchBytePattern(ptnBranchForVcmd6xCNTR3, ofsBranchForVcmd6x)) {
+      // vcmd 60-64 is in the list
+      vcmd6XCountInList = 5;
+    }
+    else if (file->SearchBytePattern(ptnBranchForVcmd6xMDR2, ofsBranchForVcmd6x)) {
+      // vcmd 60-61 is in the list
+      vcmd6XCountInList = 2;
+    }
+    else {
+      return;
+    }
 
-		// check table length
-		if (addrVcmdLengthTable + (vcmd6XCountInList + 0x20) * vcmdLenItemSize >= 0x10000) {
-			return;
-		}
-	}
-	else {
-		return;
-	}
+    // check table length
+    if (addrVcmdLengthTable + (vcmd6XCountInList + 0x20) * vcmdLenItemSize >= 0x10000) {
+      return;
+    }
+  }
+  else {
+    return;
+  }
 
-	// detect revision by vcmd length
-	if (hasSongList) {
-		if (vcmd6XCountInList == 5) {
-			version = KONAMISNES_V1;
-		}
-		else if (vcmd6XCountInList == 2) {
-			version = KONAMISNES_V2;
-		}
-		else {
-			version = KONAMISNES_V3;
-		}
-	}
-	else {
-		assert(vcmd6XCountInList == 0);
-		if (file->GetByte(addrVcmdLengthTable + (0xed - 0xe0) * vcmdLenItemSize) == 3) {
-			version = KONAMISNES_V4;
-		}
-		else if (file->GetByte(addrVcmdLengthTable + (0xfc - 0xe0) * vcmdLenItemSize) == 2) {
-			version = KONAMISNES_V5;
-		}
-		else {
-			version = KONAMISNES_V6;
-		}
-	}
+  // detect revision by vcmd length
+  if (hasSongList) {
+    if (vcmd6XCountInList == 5) {
+      version = KONAMISNES_V1;
+    }
+    else if (vcmd6XCountInList == 2) {
+      version = KONAMISNES_V2;
+    }
+    else {
+      version = KONAMISNES_V3;
+    }
+  }
+  else {
+    assert(vcmd6XCountInList == 0);
+    if (file->GetByte(addrVcmdLengthTable + (0xed - 0xe0) * vcmdLenItemSize) == 3) {
+      version = KONAMISNES_V4;
+    }
+    else if (file->GetByte(addrVcmdLengthTable + (0xfc - 0xe0) * vcmdLenItemSize) == 2) {
+      version = KONAMISNES_V5;
+    }
+    else {
+      version = KONAMISNES_V6;
+    }
+  }
 
-	// load song(s)
-	if (hasSongList) {
-		// TODO: song index search
-		int8_t songIndex = primarySongIndex;
+  // load song(s)
+  if (hasSongList) {
+    // TODO: song index search
+    int8_t songIndex = primarySongIndex;
 
-		// skip null song
-		while (true) {
-			uint32_t addrSongHeaderPtr = addrSongList + songIndex * 5;
-			if (addrSongHeaderPtr + 5 > 0x10000) {
-				return;
-			}
+    // skip null song
+    while (true) {
+      uint32_t addrSongHeaderPtr = addrSongList + songIndex * 5;
+      if (addrSongHeaderPtr + 5 > 0x10000) {
+        return;
+      }
 
-			addrSongHeader = file->GetShort(addrSongHeaderPtr + 3);
-			if (addrSongHeader != 0) {
-				break;
-			}
+      addrSongHeader = file->GetShort(addrSongHeaderPtr + 3);
+      if (addrSongHeader != 0) {
+        break;
+      }
 
-			songIndex++;
-		}
-	}
+      songIndex++;
+    }
+  }
 
-	KonamiSnesSeq* newSeq = new KonamiSnesSeq(file, version, addrSongHeader, name);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  KonamiSnesSeq *newSeq = new KonamiSnesSeq(file, version, addrSongHeader, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	// scan for DIR address
-	uint32_t ofsSetDIR;
-	uint16_t spcDirAddr;
-	std::map<std::wstring, std::vector<uint8_t>>::iterator itrDSP;
-	if (file->SearchBytePattern(ptnSetDIRGG4, ofsSetDIR)) {
-		spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
-	}
-	else if (file->SearchBytePattern(ptnSetDIRCNTR3, ofsSetDIR)) {
-		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-	}
-	else if ((itrDSP = file->tag.binaries.find(L"dsp")) != file->tag.binaries.end()) {
-		// read DIR from SPC700 snapshot
-		spcDirAddr = itrDSP->second[0x5d] << 8;
-	}
-	else {
-		return;
-	}
+  // scan for DIR address
+  uint32_t ofsSetDIR;
+  uint16_t spcDirAddr;
+  std::map<std::wstring, std::vector<uint8_t>>::iterator itrDSP;
+  if (file->SearchBytePattern(ptnSetDIRGG4, ofsSetDIR)) {
+    spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
+  }
+  else if (file->SearchBytePattern(ptnSetDIRCNTR3, ofsSetDIR)) {
+    spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+  }
+  else if ((itrDSP = file->tag.binaries.find(L"dsp")) != file->tag.binaries.end()) {
+    // read DIR from SPC700 snapshot
+    spcDirAddr = itrDSP->second[0x5d] << 8;
+  }
+  else {
+    return;
+  }
 
-	// scan for instrument table
-	uint32_t ofsLoadInstr;
-	uint16_t addrCommonInstrTable;
-	uint16_t addrBankedInstrTable;
-	uint8_t firstBankedInstr;
-	uint16_t addrPercInstrTable;
-	if (file->SearchBytePattern(ptnLoadInstrJOP, ofsLoadInstr)) {
-		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 8) | (file->GetByte(ofsLoadInstr + 11) << 8);
-		firstBankedInstr = file->GetByte(ofsLoadInstr + 4);
+  // scan for instrument table
+  uint32_t ofsLoadInstr;
+  uint16_t addrCommonInstrTable;
+  uint16_t addrBankedInstrTable;
+  uint8_t firstBankedInstr;
+  uint16_t addrPercInstrTable;
+  if (file->SearchBytePattern(ptnLoadInstrJOP, ofsLoadInstr)) {
+    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 8) | (file->GetByte(ofsLoadInstr + 11) << 8);
+    firstBankedInstr = file->GetByte(ofsLoadInstr + 4);
 
-		uint16_t addrCurrentBank = file->GetShort(ofsLoadInstr + 23);
-		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 26);
-		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+    uint16_t addrCurrentBank = file->GetShort(ofsLoadInstr + 23);
+    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 26);
+    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
 
-		// scan for percussive instrument table
-		uint32_t ofsLoadPercInstr;
-		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
-			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
-		}
-		else {
-			return;
-		}
-	}
-	else if (file->SearchBytePattern(ptnLoadInstrGP, ofsLoadInstr)) {
-		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 14) | (file->GetByte(ofsLoadInstr + 17) << 8);
-		firstBankedInstr = file->GetByte(ofsLoadInstr + 10);
+    // scan for percussive instrument table
+    uint32_t ofsLoadPercInstr;
+    if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
+      addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+    }
+    else {
+      return;
+    }
+  }
+  else if (file->SearchBytePattern(ptnLoadInstrGP, ofsLoadInstr)) {
+    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 14) | (file->GetByte(ofsLoadInstr + 17) << 8);
+    firstBankedInstr = file->GetByte(ofsLoadInstr + 10);
 
-		uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 29);
-		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 31);
-		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+    uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 29);
+    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 31);
+    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
 
-		// scan for percussive instrument table
-		uint32_t ofsLoadPercInstr;
-		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
-			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
-		}
-		else {
-			return;
-		}
-	}
-	else if (file->SearchBytePattern(ptnLoadInstrGG4, ofsLoadInstr)) {
-		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 18) << 8);
-		firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
+    // scan for percussive instrument table
+    uint32_t ofsLoadPercInstr;
+    if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
+      addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+    }
+    else {
+      return;
+    }
+  }
+  else if (file->SearchBytePattern(ptnLoadInstrGG4, ofsLoadInstr)) {
+    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 18) << 8);
+    firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
 
-		uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 30);
-		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 32);
-		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+    uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 30);
+    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 32);
+    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
 
-		// scan for percussive instrument table
-		uint32_t ofsLoadPercInstr;
-		if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
-			addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
-		}
-		else {
-			return;
-		}
-	}
-	else if (file->SearchBytePattern(ptnLoadInstrPNTB, ofsLoadInstr)) {
-		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 12) | (file->GetByte(ofsLoadInstr + 15) << 8);
-		firstBankedInstr = file->GetByte(ofsLoadInstr + 8);
+    // scan for percussive instrument table
+    uint32_t ofsLoadPercInstr;
+    if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
+      addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+    }
+    else {
+      return;
+    }
+  }
+  else if (file->SearchBytePattern(ptnLoadInstrPNTB, ofsLoadInstr)) {
+    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 12) | (file->GetByte(ofsLoadInstr + 15) << 8);
+    firstBankedInstr = file->GetByte(ofsLoadInstr + 8);
 
-		uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 27);
-		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 29);
-		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+    uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 27);
+    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 29);
+    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
 
-		addrPercInstrTable = file->GetByte(ofsLoadInstr + 46) | (file->GetByte(ofsLoadInstr + 49) << 8);
-	}
-	else if (file->SearchBytePattern(ptnLoadInstrCNTR3, ofsLoadInstr)) {
-		addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 19) << 8);
-		firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
+    addrPercInstrTable = file->GetByte(ofsLoadInstr + 46) | (file->GetByte(ofsLoadInstr + 49) << 8);
+  }
+  else if (file->SearchBytePattern(ptnLoadInstrCNTR3, ofsLoadInstr)) {
+    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 19) << 8);
+    firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
 
-		uint16_t addrCurrentBank = file->GetShort(ofsLoadInstr + 32);
-		uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 37);
-		addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank) * 2);
+    uint16_t addrCurrentBank = file->GetShort(ofsLoadInstr + 32);
+    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 37);
+    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank) * 2);
 
-		addrPercInstrTable = file->GetByte(ofsLoadInstr + 59) | (file->GetByte(ofsLoadInstr + 63) << 8);
-	}
-	else {
-		return;
-	}
+    addrPercInstrTable = file->GetByte(ofsLoadInstr + 59) | (file->GetByte(ofsLoadInstr + 63) << 8);
+  }
+  else {
+    return;
+  }
 
-	KonamiSnesInstrSet * newInstrSet = new KonamiSnesInstrSet(file, version, addrCommonInstrTable, addrBankedInstrTable, firstBankedInstr, addrPercInstrTable, spcDirAddr);
-	if (!newInstrSet->LoadVGMFile()) {
-		delete newInstrSet;
-		return;
-	}
+  KonamiSnesInstrSet *newInstrSet = new KonamiSnesInstrSet(file,
+                                                           version,
+                                                           addrCommonInstrTable,
+                                                           addrBankedInstrTable,
+                                                           firstBankedInstr,
+                                                           addrPercInstrTable,
+                                                           spcDirAddr);
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 }
 
-void KonamiSnesScanner::SearchForKonamiSnesFromROM (RawFile* file)
-{
+void KonamiSnesScanner::SearchForKonamiSnesFromROM(RawFile *file) {
 }

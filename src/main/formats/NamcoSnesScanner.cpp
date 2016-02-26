@@ -2,7 +2,6 @@
 #include "NamcoSnesScanner.h"
 #include "NamcoSnesInstr.h"
 #include "NamcoSnesSeq.h"
-#include "SNESDSP.h"
 
 // Wagan Paradise SPC
 // 05cc: 68 60     cmp   a,#$60
@@ -108,124 +107,120 @@ BytePattern NamcoSnesScanner::ptnDspRegInit(
 	,
 	18);
 
-void NamcoSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000) {
-		SearchForNamcoSnesFromARAM(file);
-	}
-	else {
-		SearchForNamcoSnesFromROM(file);
-	}
-	return;
+void NamcoSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForNamcoSnesFromARAM(file);
+  }
+  else {
+    SearchForNamcoSnesFromROM(file);
+  }
+  return;
 }
 
-void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile* file)
-{
-	NamcoSnesVersion version = NAMCOSNES_NONE;
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
+  NamcoSnesVersion version = NAMCOSNES_NONE;
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	// search song list
-	uint32_t ofsReadSongList;
-	uint16_t addrSongList;
-	if (file->SearchBytePattern(ptnReadSongList, ofsReadSongList)) {
-		addrSongList = file->GetByte(ofsReadSongList + 5) | (file->GetByte(ofsReadSongList + 9) << 8);
-		version = NAMCOSNES_STANDARD;
-	}
-	else {
-		return;
-	}
+  // search song list
+  uint32_t ofsReadSongList;
+  uint16_t addrSongList;
+  if (file->SearchBytePattern(ptnReadSongList, ofsReadSongList)) {
+    addrSongList = file->GetByte(ofsReadSongList + 5) | (file->GetByte(ofsReadSongList + 9) << 8);
+    version = NAMCOSNES_STANDARD;
+  }
+  else {
+    return;
+  }
 
-	// search song start sequence
-	uint32_t ofsStartSong;
-	uint8_t addrSongIndexArray;
-	uint8_t addrSongSlotIndex;
-	if (file->SearchBytePattern(ptnStartSong, ofsStartSong)) {
-		addrSongIndexArray = file->GetByte(ofsStartSong + 11);
-		addrSongSlotIndex = file->GetByte(ofsStartSong + 15);
-	}
-	else {
-		return;
-	}
+  // search song start sequence
+  uint32_t ofsStartSong;
+  uint8_t addrSongIndexArray;
+  uint8_t addrSongSlotIndex;
+  if (file->SearchBytePattern(ptnStartSong, ofsStartSong)) {
+    addrSongIndexArray = file->GetByte(ofsStartSong + 11);
+    addrSongSlotIndex = file->GetByte(ofsStartSong + 15);
+  }
+  else {
+    return;
+  }
 
-	// determine song index
-	uint8_t songSlot = file->GetByte(addrSongSlotIndex); // 0..3
-	uint8_t songIndex = file->GetByte(addrSongIndexArray + songSlot);
-	uint16_t addrSeqHeader = addrSongList + (songIndex * 3);
-	if (addrSeqHeader + 3 < 0x10000) {
-		if (file->GetByte(addrSeqHeader) > 3 || (file->GetShort(addrSeqHeader + 1) & 0xff00) == 0) {
-			songIndex = 1;
-		}
-		addrSeqHeader = addrSongList + (songIndex * 3);
-	}
-	if (addrSeqHeader + 3 > 0x10000) {
-		return;
-	}
+  // determine song index
+  uint8_t songSlot = file->GetByte(addrSongSlotIndex); // 0..3
+  uint8_t songIndex = file->GetByte(addrSongIndexArray + songSlot);
+  uint16_t addrSeqHeader = addrSongList + (songIndex * 3);
+  if (addrSeqHeader + 3 < 0x10000) {
+    if (file->GetByte(addrSeqHeader) > 3 || (file->GetShort(addrSeqHeader + 1) & 0xff00) == 0) {
+      songIndex = 1;
+    }
+    addrSeqHeader = addrSongList + (songIndex * 3);
+  }
+  if (addrSeqHeader + 3 > 0x10000) {
+    return;
+  }
 
-	uint16_t addrEventStart = file->GetShort(addrSeqHeader + 1);
-	if (addrEventStart + 1 > 0x10000) {
-		return;
-	}
+  uint16_t addrEventStart = file->GetShort(addrSeqHeader + 1);
+  if (addrEventStart + 1 > 0x10000) {
+    return;
+  }
 
-	NamcoSnesSeq* newSeq = new NamcoSnesSeq(file, version, addrEventStart, name);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  NamcoSnesSeq *newSeq = new NamcoSnesSeq(file, version, addrEventStart, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	uint32_t ofsLoadInstrTuning;
-	uint16_t addrTuningTable;
-	if (file->SearchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
-		addrTuningTable = file->GetByte(ofsLoadInstrTuning + 8) | (file->GetByte(ofsLoadInstrTuning + 12) << 8);
-	}
-	else {
-		return;
-	}
+  uint32_t ofsLoadInstrTuning;
+  uint16_t addrTuningTable;
+  if (file->SearchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
+    addrTuningTable = file->GetByte(ofsLoadInstrTuning + 8) | (file->GetByte(ofsLoadInstrTuning + 12) << 8);
+  }
+  else {
+    return;
+  }
 
-	std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
-	if (dspRegMap.count(0x5d) == 0) {
-		return;
-	}
-	uint16_t spcDirAddr = dspRegMap[0x5d] << 8;
+  std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
+  if (dspRegMap.count(0x5d) == 0) {
+    return;
+  }
+  uint16_t spcDirAddr = dspRegMap[0x5d] << 8;
 
-	NamcoSnesInstrSet * newInstrSet = new NamcoSnesInstrSet(file, version, spcDirAddr, addrTuningTable);
-	if (!newInstrSet->LoadVGMFile()) {
-		delete newInstrSet;
-		return;
-	}
+  NamcoSnesInstrSet *newInstrSet = new NamcoSnesInstrSet(file, version, spcDirAddr, addrTuningTable);
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 }
 
-void NamcoSnesScanner::SearchForNamcoSnesFromROM(RawFile* file)
-{
+void NamcoSnesScanner::SearchForNamcoSnesFromROM(RawFile *file) {
 }
 
-std::map<uint8_t, uint8_t> NamcoSnesScanner::GetInitDspRegMap(RawFile* file)
-{
-	std::map<uint8_t, uint8_t> dspRegMap;
+std::map<uint8_t, uint8_t> NamcoSnesScanner::GetInitDspRegMap(RawFile *file) {
+  std::map<uint8_t, uint8_t> dspRegMap;
 
-	// find a code block which initializes dsp registers
-	uint32_t ofsDspRegInit;
-	uint8_t dspRegCount;
-	uint16_t addrDspRegValueList;
-	if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInit)) {
-		dspRegCount = file->GetByte(ofsDspRegInit + 15) / 2;
-		addrDspRegValueList = file->GetShort(ofsDspRegInit + 3);
-	}
-	else {
-		return dspRegMap;
-	}
+  // find a code block which initializes dsp registers
+  uint32_t ofsDspRegInit;
+  uint8_t dspRegCount;
+  uint16_t addrDspRegValueList;
+  if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInit)) {
+    dspRegCount = file->GetByte(ofsDspRegInit + 15) / 2;
+    addrDspRegValueList = file->GetShort(ofsDspRegInit + 3);
+  }
+  else {
+    return dspRegMap;
+  }
 
-	// check address range
-	if (addrDspRegValueList + (dspRegCount * 2) > 0x10000) {
-		return dspRegMap;
-	}
+  // check address range
+  if (addrDspRegValueList + (dspRegCount * 2) > 0x10000) {
+    return dspRegMap;
+  }
 
-	// store dsp reg/value pairs to map
-	for (uint8_t regIndex = 0; regIndex < dspRegCount; regIndex++) {
-		uint8_t dspReg = file->GetByte(addrDspRegValueList + (regIndex * 2));
-		uint8_t dspValue = file->GetByte(addrDspRegValueList + (regIndex * 2) + 1);
-		dspRegMap[dspReg] = dspValue;
-	}
+  // store dsp reg/value pairs to map
+  for (uint8_t regIndex = 0; regIndex < dspRegCount; regIndex++) {
+    uint8_t dspReg = file->GetByte(addrDspRegValueList + (regIndex * 2));
+    uint8_t dspValue = file->GetByte(addrDspRegValueList + (regIndex * 2) + 1);
+    dspRegMap[dspReg] = dspValue;
+  }
 
-	return dspRegMap;
+  return dspRegMap;
 }
