@@ -2,7 +2,6 @@
 #include "ChunSnesScanner.h"
 #include "ChunSnesSeq.h"
 #include "ChunSnesInstr.h"
-#include "SNESDSP.h"
 
 //; Otogirisou SPC
 //0eca: d5 1d 05  mov   $051d+x,a         ; $051D+X = A
@@ -384,212 +383,207 @@ BytePattern ChunSnesScanner::ptnProgChangeVCmdWinter(
 	,
 	106);
 
-void ChunSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000)
-	{
-		SearchForChunSnesFromARAM(file);
-	}
-	else
-	{
-		SearchForChunSnesFromROM(file);
-	}
-	return;
+void ChunSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForChunSnesFromARAM(file);
+  }
+  else {
+    SearchForChunSnesFromROM(file);
+  }
+  return;
 }
 
-void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile* file)
-{
-	ChunSnesVersion version = CHUNSNES_NONE;
-	ChunSnesMinorVersion minorVersion = CHUNSNES_NOMINORVERSION;
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile *file) {
+  ChunSnesVersion version = CHUNSNES_NONE;
+  ChunSnesMinorVersion minorVersion = CHUNSNES_NOMINORVERSION;
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	// search song list and detect engine version
-	uint32_t ofsLoadSeq;
-	uint16_t addrSongList;
-	if (file->SearchBytePattern(ptnLoadSeqWinterV3, ofsLoadSeq)) {
-		addrSongList = file->GetByte(ofsLoadSeq + 8) | (file->GetByte(ofsLoadSeq + 11) << 8);
-		version = CHUNSNES_WINTER;
-		minorVersion = CHUNSNES_WINTER_V3;
-	}
-	else if (file->SearchBytePattern(ptnLoadSeqWinterV1V2, ofsLoadSeq)) {
-		addrSongList = file->GetByte(ofsLoadSeq + 8) | (file->GetByte(ofsLoadSeq + 11) << 8);
-		version = CHUNSNES_WINTER;
-		minorVersion = CHUNSNES_WINTER_V1; // TODO: classify V1/V2
-	}
-	else if (file->SearchBytePattern(ptnLoadSeqSummerV2, ofsLoadSeq)) {
-		uint16_t addrSongListPtr = file->GetShort(ofsLoadSeq + 8);
-		if (addrSongListPtr + 2 > 0x10000) {
-			return;
-		}
+  // search song list and detect engine version
+  uint32_t ofsLoadSeq;
+  uint16_t addrSongList;
+  if (file->SearchBytePattern(ptnLoadSeqWinterV3, ofsLoadSeq)) {
+    addrSongList = file->GetByte(ofsLoadSeq + 8) | (file->GetByte(ofsLoadSeq + 11) << 8);
+    version = CHUNSNES_WINTER;
+    minorVersion = CHUNSNES_WINTER_V3;
+  }
+  else if (file->SearchBytePattern(ptnLoadSeqWinterV1V2, ofsLoadSeq)) {
+    addrSongList = file->GetByte(ofsLoadSeq + 8) | (file->GetByte(ofsLoadSeq + 11) << 8);
+    version = CHUNSNES_WINTER;
+    minorVersion = CHUNSNES_WINTER_V1; // TODO: classify V1/V2
+  }
+  else if (file->SearchBytePattern(ptnLoadSeqSummerV2, ofsLoadSeq)) {
+    uint16_t addrSongListPtr = file->GetShort(ofsLoadSeq + 8);
+    if (addrSongListPtr + 2 > 0x10000) {
+      return;
+    }
 
-		addrSongList = file->GetShort(addrSongListPtr);
-		version = CHUNSNES_SUMMER;
-		minorVersion = CHUNSNES_SUMMER_V2;
-	}
-	else {
-		return;
-	}
+    addrSongList = file->GetShort(addrSongListPtr);
+    version = CHUNSNES_SUMMER;
+    minorVersion = CHUNSNES_SUMMER_V2;
+  }
+  else {
+    return;
+  }
 
-	// summer/winter const definitions
-	uint8_t CHUNSNES_SEQENT_SIZE;
-	uint8_t CHUNSNES_SEQENT_OFFSET_OF_HEADER;
-	if (version == CHUNSNES_SUMMER) {
-		CHUNSNES_SEQENT_SIZE = 2;
-		CHUNSNES_SEQENT_OFFSET_OF_HEADER = 0;
-	}
-	else {
-		CHUNSNES_SEQENT_SIZE = 6;
-		CHUNSNES_SEQENT_OFFSET_OF_HEADER = 1;
-	}
+  // summer/winter const definitions
+  uint8_t CHUNSNES_SEQENT_SIZE;
+  uint8_t CHUNSNES_SEQENT_OFFSET_OF_HEADER;
+  if (version == CHUNSNES_SUMMER) {
+    CHUNSNES_SEQENT_SIZE = 2;
+    CHUNSNES_SEQENT_OFFSET_OF_HEADER = 0;
+  }
+  else {
+    CHUNSNES_SEQENT_SIZE = 6;
+    CHUNSNES_SEQENT_OFFSET_OF_HEADER = 1;
+  }
 
-	// guess song index
-	int8_t songIndex = -1;
-	uint32_t ofsSaveSongIndex;
-	if (file->SearchBytePattern(ptnSaveSongIndexSummerV2, ofsSaveSongIndex)) {
-		uint16_t addrSongIndexArray = file->GetShort(ofsSaveSongIndex + 6);
-		uint16_t addrSongSlotIndex = file->GetShort(ofsSaveSongIndex + 9);
-		uint8_t songSlotIndex = file->GetByte(addrSongSlotIndex);
-		songIndex = file->GetByte(addrSongIndexArray + songSlotIndex);
-	}
-	else {
-		// read voice stream pointer value of the first track
-		uint16_t addrCurrentPos = file->GetShort(0x0000);
-		uint16_t bestDistance = 0xffff;
+  // guess song index
+  int8_t songIndex = -1;
+  uint32_t ofsSaveSongIndex;
+  if (file->SearchBytePattern(ptnSaveSongIndexSummerV2, ofsSaveSongIndex)) {
+    uint16_t addrSongIndexArray = file->GetShort(ofsSaveSongIndex + 6);
+    uint16_t addrSongSlotIndex = file->GetShort(ofsSaveSongIndex + 9);
+    uint8_t songSlotIndex = file->GetByte(addrSongSlotIndex);
+    songIndex = file->GetByte(addrSongIndexArray + songSlotIndex);
+  }
+  else {
+    // read voice stream pointer value of the first track
+    uint16_t addrCurrentPos = file->GetShort(0x0000);
+    uint16_t bestDistance = 0xffff;
 
-		// search the nearest address
-		if (addrCurrentPos != 0) {
-			int8_t guessedSongIndex = -1;
+    // search the nearest address
+    if (addrCurrentPos != 0) {
+      int8_t guessedSongIndex = -1;
 
-			for (int8_t songIndexCandidate = 0; songIndexCandidate < 0x7f; songIndexCandidate++) {
-				uint16_t addrSeqEntry = addrSongList + (songIndexCandidate * CHUNSNES_SEQENT_SIZE);
-				if ((addrSeqEntry & 0xff00) == 0 || (addrSeqEntry & 0xff00) == 0xff00) {
-					continue;
-				}
+      for (int8_t songIndexCandidate = 0; songIndexCandidate < 0x7f; songIndexCandidate++) {
+        uint16_t addrSeqEntry = addrSongList + (songIndexCandidate * CHUNSNES_SEQENT_SIZE);
+        if ((addrSeqEntry & 0xff00) == 0 || (addrSeqEntry & 0xff00) == 0xff00) {
+          continue;
+        }
 
-				uint16_t addrSeqHeader = file->GetShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
-				if ((addrSeqHeader & 0xff00) == 0 || (addrSeqHeader & 0xff00) == 0xff00) {
-					continue;
-				}
+        uint16_t addrSeqHeader = file->GetShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
+        if ((addrSeqHeader & 0xff00) == 0 || (addrSeqHeader & 0xff00) == 0xff00) {
+          continue;
+        }
 
-				uint8_t nNumTracks = file->GetByte(addrSeqHeader + 1);
-				if (nNumTracks == 0 || nNumTracks > 8) {
-					continue;
-				}
+        uint8_t nNumTracks = file->GetByte(addrSeqHeader + 1);
+        if (nNumTracks == 0 || nNumTracks > 8) {
+          continue;
+        }
 
-				uint16_t ofsTrackStart = file->GetShort(addrSeqHeader + 2);
-				uint16_t addrTrackStart;
-				if (version == CHUNSNES_SUMMER) {
-					addrTrackStart = ofsTrackStart;
-				}
-				else {
-					addrTrackStart = addrSeqHeader + ofsTrackStart;
-				}
+        uint16_t ofsTrackStart = file->GetShort(addrSeqHeader + 2);
+        uint16_t addrTrackStart;
+        if (version == CHUNSNES_SUMMER) {
+          addrTrackStart = ofsTrackStart;
+        }
+        else {
+          addrTrackStart = addrSeqHeader + ofsTrackStart;
+        }
 
-				if (addrTrackStart > addrCurrentPos) {
-					continue;
-				}
+        if (addrTrackStart > addrCurrentPos) {
+          continue;
+        }
 
-				uint16_t distance = addrCurrentPos - addrTrackStart;
-				if (distance < bestDistance) {
-					bestDistance = distance;
-					guessedSongIndex = songIndexCandidate;
-				}
-			}
+        uint16_t distance = addrCurrentPos - addrTrackStart;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          guessedSongIndex = songIndexCandidate;
+        }
+      }
 
-			if (guessedSongIndex != -1) {
-				songIndex = guessedSongIndex;
-			}
-		}
-	}
+      if (guessedSongIndex != -1) {
+        songIndex = guessedSongIndex;
+      }
+    }
+  }
 
-	if (songIndex == -1) {
-		songIndex = 1;
-	}
+  if (songIndex == -1) {
+    songIndex = 1;
+  }
 
-	uint16_t addrSeqEntry = addrSongList + (songIndex * CHUNSNES_SEQENT_SIZE);
-	if (addrSeqEntry + CHUNSNES_SEQENT_SIZE > 0x10000) {
-		return;
-	}
+  uint16_t addrSeqEntry = addrSongList + (songIndex * CHUNSNES_SEQENT_SIZE);
+  if (addrSeqEntry + CHUNSNES_SEQENT_SIZE > 0x10000) {
+    return;
+  }
 
-	uint16_t addrSeqHeader = file->GetShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
-	ChunSnesSeq* newSeq = new ChunSnesSeq(file, version, minorVersion, addrSeqHeader, name);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  uint16_t addrSeqHeader = file->GetShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
+  ChunSnesSeq *newSeq = new ChunSnesSeq(file, version, minorVersion, addrSeqHeader, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	uint32_t ofsDSPInitTable;
-	uint16_t spcDirAddr;
-	if (file->SearchBytePattern(ptnDSPInitTable, ofsDSPInitTable)) {
-		spcDirAddr = file->GetByte(ofsDSPInitTable + 29) << 8;
-	}
-	else {
-		return;
-	}
+  uint32_t ofsDSPInitTable;
+  uint16_t spcDirAddr;
+  if (file->SearchBytePattern(ptnDSPInitTable, ofsDSPInitTable)) {
+    spcDirAddr = file->GetByte(ofsDSPInitTable + 29) << 8;
+  }
+  else {
+    return;
+  }
 
-	uint32_t ofsProgChangeVCmd;
-	uint16_t addrInstrSetTable;
-	uint16_t addrSampNumTable;
-	uint16_t addrSampleTable;
-	uint8_t songSlotIndex;
-	uint8_t instrSetIndex;
-	if (file->SearchBytePattern(ptnProgChangeVCmdSummer, ofsProgChangeVCmd)) {
-		addrInstrSetTable = file->GetByte(ofsProgChangeVCmd + 14) | (file->GetByte(ofsProgChangeVCmd + 17) << 8);
-		addrSampNumTable = file->GetShort(ofsProgChangeVCmd + 47);
-		addrSampleTable = file->GetByte(ofsProgChangeVCmd + 67) | (file->GetByte(ofsProgChangeVCmd + 70) << 8);
+  uint32_t ofsProgChangeVCmd;
+  uint16_t addrInstrSetTable;
+  uint16_t addrSampNumTable;
+  uint16_t addrSampleTable;
+  uint8_t songSlotIndex;
+  uint8_t instrSetIndex;
+  if (file->SearchBytePattern(ptnProgChangeVCmdSummer, ofsProgChangeVCmd)) {
+    addrInstrSetTable = file->GetByte(ofsProgChangeVCmd + 14) | (file->GetByte(ofsProgChangeVCmd + 17) << 8);
+    addrSampNumTable = file->GetShort(ofsProgChangeVCmd + 47);
+    addrSampleTable = file->GetByte(ofsProgChangeVCmd + 67) | (file->GetByte(ofsProgChangeVCmd + 70) << 8);
 
-		uint16_t addrTrackSlotLookupPtr = file->GetShort(ofsProgChangeVCmd + 5);
-		songSlotIndex = file->GetByte(addrTrackSlotLookupPtr);
-		if (songSlotIndex == 0xff) {
-			songSlotIndex = 0;
-		}
+    uint16_t addrTrackSlotLookupPtr = file->GetShort(ofsProgChangeVCmd + 5);
+    songSlotIndex = file->GetByte(addrTrackSlotLookupPtr);
+    if (songSlotIndex == 0xff) {
+      songSlotIndex = 0;
+    }
 
-		uint16_t addrInstrSetLookupPtr = file->GetShort(ofsProgChangeVCmd + 9);
-		instrSetIndex = file->GetByte(addrInstrSetLookupPtr + songSlotIndex);
-	}
-	else if (file->SearchBytePattern(ptnProgChangeVCmdWinter, ofsProgChangeVCmd)) {
-		uint16_t addrInstrumentTablePtr = file->GetShort(ofsProgChangeVCmd + 14);
-		addrInstrSetTable = file->GetShort(addrInstrumentTablePtr);
-		addrSampNumTable = file->GetShort(ofsProgChangeVCmd + 58);
-		addrSampleTable = file->GetByte(ofsProgChangeVCmd + 97) | (file->GetByte(ofsProgChangeVCmd + 100) << 8);
+    uint16_t addrInstrSetLookupPtr = file->GetShort(ofsProgChangeVCmd + 9);
+    instrSetIndex = file->GetByte(addrInstrSetLookupPtr + songSlotIndex);
+  }
+  else if (file->SearchBytePattern(ptnProgChangeVCmdWinter, ofsProgChangeVCmd)) {
+    uint16_t addrInstrumentTablePtr = file->GetShort(ofsProgChangeVCmd + 14);
+    addrInstrSetTable = file->GetShort(addrInstrumentTablePtr);
+    addrSampNumTable = file->GetShort(ofsProgChangeVCmd + 58);
+    addrSampleTable = file->GetByte(ofsProgChangeVCmd + 97) | (file->GetByte(ofsProgChangeVCmd + 100) << 8);
 
-		uint16_t addrTrackSlotLookupPtr = file->GetShort(ofsProgChangeVCmd + 5);
-		songSlotIndex = file->GetByte(addrTrackSlotLookupPtr);
-		if (songSlotIndex == 0xff) {
-			songSlotIndex = 0;
-		}
+    uint16_t addrTrackSlotLookupPtr = file->GetShort(ofsProgChangeVCmd + 5);
+    songSlotIndex = file->GetByte(addrTrackSlotLookupPtr);
+    if (songSlotIndex == 0xff) {
+      songSlotIndex = 0;
+    }
 
-		uint16_t addrInstrSetLookupPtr = file->GetShort(ofsProgChangeVCmd + 9);
-		instrSetIndex = file->GetByte(addrInstrSetLookupPtr + songSlotIndex);
-	}
-	else {
-		return;
-	}
+    uint16_t addrInstrSetLookupPtr = file->GetShort(ofsProgChangeVCmd + 9);
+    instrSetIndex = file->GetByte(addrInstrSetLookupPtr + songSlotIndex);
+  }
+  else {
+    return;
+  }
 
-	uint32_t addrInstrSet = addrInstrSetTable;
-	for (uint8_t i = 0; i < instrSetIndex; i++) {
-		if (addrInstrSet + 2 > 0x10000) {
-			return;
-		}
+  uint32_t addrInstrSet = addrInstrSetTable;
+  for (uint8_t i = 0; i < instrSetIndex; i++) {
+    if (addrInstrSet + 2 > 0x10000) {
+      return;
+    }
 
-		uint8_t nNumInstrs = file->GetByte(addrInstrSet);
-		if (version == CHUNSNES_SUMMER) {
-			addrInstrSet += 1;
-		}
-		else { // CHUNSNES_WINTER
-			addrInstrSet += 2;
-		}
-		addrInstrSet += nNumInstrs;
-	}
+    uint8_t nNumInstrs = file->GetByte(addrInstrSet);
+    if (version == CHUNSNES_SUMMER) {
+      addrInstrSet += 1;
+    }
+    else { // CHUNSNES_WINTER
+      addrInstrSet += 2;
+    }
+    addrInstrSet += nNumInstrs;
+  }
 
-	ChunSnesInstrSet * newInstrSet = new ChunSnesInstrSet(file, version, addrInstrSet, addrSampNumTable, addrSampleTable, spcDirAddr);
-	if (!newInstrSet->LoadVGMFile()) {
-		delete newInstrSet;
-		return;
-	}
+  ChunSnesInstrSet *newInstrSet = new ChunSnesInstrSet(file, version, addrInstrSet, addrSampNumTable, addrSampleTable, spcDirAddr);
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 }
 
-void ChunSnesScanner::SearchForChunSnesFromROM(RawFile* file)
-{
+void ChunSnesScanner::SearchForChunSnesFromROM(RawFile *file) {
 }

@@ -2,7 +2,6 @@
 #include "CapcomSnesScanner.h"
 #include "CapcomSnesSeq.h"
 #include "CapcomSnesInstr.h"
-#include "SNESDSP.h"
 
 using namespace std;
 
@@ -93,332 +92,284 @@ BytePattern CapcomSnesScanner::ptnLoadInstrTableAddress(
 	,
 	12);
 
-void CapcomSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000)
-	{
-		SearchForCapcomSnesFromARAM(file);
-	}
-	else
-	{
-		SearchForCapcomSnesFromROM(file);
-	}
-	return;
+void CapcomSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForCapcomSnesFromARAM(file);
+  }
+  else {
+    SearchForCapcomSnesFromROM(file);
+  }
+  return;
 }
 
-void CapcomSnesScanner::SearchForCapcomSnesFromARAM (RawFile* file)
-{
-	CapcomSnesVersion version = CAPCOMSNES_NONE;
+void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) {
+  CapcomSnesVersion version = CAPCOMSNES_NONE;
 
-	uint32_t ofsReadSongListASM;
-	uint32_t ofsReadBGMAddressASM;
-	uint32_t ofsLoadInstrTableAddressASM;
-	bool hasSongList;
-	bool bgmAtFixedAddress;
-	uint32_t addrSongList;
-	uint32_t addrBGMHeader;
-	uint32_t addrInstrTable;
+  uint32_t ofsReadSongListASM;
+  uint32_t ofsReadBGMAddressASM;
+  uint32_t ofsLoadInstrTableAddressASM;
+  bool hasSongList;
+  bool bgmAtFixedAddress;
+  uint32_t addrSongList;
+  uint32_t addrBGMHeader;
+  uint32_t addrInstrTable;
 
-	wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
-	wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
-	// find a song list
-	hasSongList = file->SearchBytePattern(ptnReadSongList, ofsReadSongListASM);
-	if (hasSongList)
-	{
-		addrSongList = min(file->GetShort(ofsReadSongListASM + 3), file->GetShort(ofsReadSongListASM + 8));
-	}
+  // find a song list
+  hasSongList = file->SearchBytePattern(ptnReadSongList, ofsReadSongListASM);
+  if (hasSongList) {
+    addrSongList = min(file->GetShort(ofsReadSongListASM + 3), file->GetShort(ofsReadSongListASM + 8));
+  }
 
-	// find BGM address
-	bgmAtFixedAddress = file->SearchBytePattern(ptnReadBGMAddress, ofsReadBGMAddressASM);
-	if (bgmAtFixedAddress)
-	{
-		addrBGMHeader = (file->GetByte(ofsReadBGMAddressASM + 5) << 8) | file->GetByte(ofsReadBGMAddressASM + 8);
-	}
+  // find BGM address
+  bgmAtFixedAddress = file->SearchBytePattern(ptnReadBGMAddress, ofsReadBGMAddressASM);
+  if (bgmAtFixedAddress) {
+    addrBGMHeader = (file->GetByte(ofsReadBGMAddressASM + 5) << 8) | file->GetByte(ofsReadBGMAddressASM + 8);
+  }
 
-	// guess engine version
-	if (hasSongList)
-	{
-		if (bgmAtFixedAddress)
-		{
-			version = CAPCOMSNES_V2_BGM_USUALLY_AT_FIXED_LOCATION;
+  // guess engine version
+  if (hasSongList) {
+    if (bgmAtFixedAddress) {
+      version = CAPCOMSNES_V2_BGM_USUALLY_AT_FIXED_LOCATION;
 
-			// Some games still use BGM/SFX list, apparently.
-			// - The Magical Quest Starring Mickey Mouse
-			// - Captain Commando
-			bool bgmHeaderCoversSongList = (addrBGMHeader <= addrSongList && addrBGMHeader + 17 > addrSongList);
-			if (bgmHeaderCoversSongList || !IsValidBGMHeader(file, addrBGMHeader))
-			{
-				bgmAtFixedAddress = false;
-			}
-		}
-		else
-		{
-			version = CAPCOMSNES_V1_BGM_IN_LIST;
-		}
-	}
-	else if (bgmAtFixedAddress)
-	{
-		version = CAPCOMSNES_V3_BGM_FIXED_LOCATION;
-	}
-	else
-	{
-		return;
-	}
+      // Some games still use BGM/SFX list, apparently.
+      // - The Magical Quest Starring Mickey Mouse
+      // - Captain Commando
+      bool bgmHeaderCoversSongList = (addrBGMHeader <= addrSongList && addrBGMHeader + 17 > addrSongList);
+      if (bgmHeaderCoversSongList || !IsValidBGMHeader(file, addrBGMHeader)) {
+        bgmAtFixedAddress = false;
+      }
+    }
+    else {
+      version = CAPCOMSNES_V1_BGM_IN_LIST;
+    }
+  }
+  else if (bgmAtFixedAddress) {
+    version = CAPCOMSNES_V3_BGM_FIXED_LOCATION;
+  }
+  else {
+    return;
+  }
 
-	// load a sequence from BGM region
-	if (bgmAtFixedAddress)
-	{
-		CapcomSnesSeq* newSeq = new CapcomSnesSeq(file, version, addrBGMHeader + 1, false, name);
-		if (!newSeq->LoadVGMFile())
-		{
-			delete newSeq;
-			return;
-		}
-	}
+  // load a sequence from BGM region
+  if (bgmAtFixedAddress) {
+    CapcomSnesSeq *newSeq = new CapcomSnesSeq(file, version, addrBGMHeader + 1, false, name);
+    if (!newSeq->LoadVGMFile()) {
+      delete newSeq;
+      return;
+    }
+  }
 
-	// load songs from list
-	if (hasSongList)
-	{
-		// guess current song number
-		int8_t guessedSongIndex = -1;
-		if (!bgmAtFixedAddress)
-		{
-			guessedSongIndex = GuessCurrentSongFromARAM(file, version, addrSongList);
-		}
+  // load songs from list
+  if (hasSongList) {
+    // guess current song number
+    int8_t guessedSongIndex = -1;
+    if (!bgmAtFixedAddress) {
+      guessedSongIndex = GuessCurrentSongFromARAM(file, version, addrSongList);
+    }
 
-		bool loadOnlyCurrentSong = true;
-		if (loadOnlyCurrentSong)
-		{
-			// load current song if possible
-			if (guessedSongIndex != -1)
-			{
-				uint16_t addrSongHeader = file->GetShortBE(addrSongList + guessedSongIndex * 2);
-				CapcomSnesSeq* newSeq = new CapcomSnesSeq(file, version, addrSongHeader, true, name);
-				if (!newSeq->LoadVGMFile())
-				{
-					delete newSeq;
-					return;
-				}
-			}
-		}
-		else
-		{
-			// load all songs in the list
-			int songListLength = GetLengthOfSongList(file, addrSongList);
-			for (int songIndex = 0; songIndex < songListLength; songIndex++)
-			{
-				uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
-				if (addrSongHeader == 0)
-				{
-					continue;
-				}
+    bool loadOnlyCurrentSong = true;
+    if (loadOnlyCurrentSong) {
+      // load current song if possible
+      if (guessedSongIndex != -1) {
+        uint16_t addrSongHeader = file->GetShortBE(addrSongList + guessedSongIndex * 2);
+        CapcomSnesSeq *newSeq = new CapcomSnesSeq(file, version, addrSongHeader, true, name);
+        if (!newSeq->LoadVGMFile()) {
+          delete newSeq;
+          return;
+        }
+      }
+    }
+    else {
+      // load all songs in the list
+      int songListLength = GetLengthOfSongList(file, addrSongList);
+      for (int songIndex = 0; songIndex < songListLength; songIndex++) {
+        uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
+        if (addrSongHeader == 0) {
+          continue;
+        }
 
-				CapcomSnesSeq* newSeq = new CapcomSnesSeq(file, version, addrSongHeader, true, (songIndex == guessedSongIndex) ? name : basefilename);
-				if (!newSeq->LoadVGMFile())
-				{
-					delete newSeq;
-					return;
-				}
-			}
-		}
-	}
+        CapcomSnesSeq *newSeq = new CapcomSnesSeq(file,
+                                                  version,
+                                                  addrSongHeader,
+                                                  true,
+                                                  (songIndex == guessedSongIndex) ? name : basefilename);
+        if (!newSeq->LoadVGMFile()) {
+          delete newSeq;
+          return;
+        }
+      }
+    }
+  }
 
-	// scan for instrument table
-	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM))
-	{
-		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
-	}
-	else
-	{
-		return;
-	}
+  // scan for instrument table
+  if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
+    addrInstrTable =
+        file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
+  }
+  else {
+    return;
+  }
 
-	// get sample map address from DIR register value
-	std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
-	std::map<uint8_t, uint8_t>::iterator itSpcDIR = dspRegMap.find(0x5d);
-	if (itSpcDIR == dspRegMap.end())
-	{
-		return;
-	}
-	uint8_t spcDIR = itSpcDIR->second;
+  // get sample map address from DIR register value
+  std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
+  std::map<uint8_t, uint8_t>::iterator itSpcDIR = dspRegMap.find(0x5d);
+  if (itSpcDIR == dspRegMap.end()) {
+    return;
+  }
+  uint8_t spcDIR = itSpcDIR->second;
 
-	CapcomSnesInstrSet * newInstrSet = new CapcomSnesInstrSet(file, addrInstrTable, spcDIR << 8);
-	if (!newInstrSet->LoadVGMFile())
-	{
-		delete newInstrSet;
-		return;
-	}
+  CapcomSnesInstrSet *newInstrSet = new CapcomSnesInstrSet(file, addrInstrTable, spcDIR << 8);
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 }
 
-void CapcomSnesScanner::SearchForCapcomSnesFromROM (RawFile* file)
-{
+void CapcomSnesScanner::SearchForCapcomSnesFromROM(RawFile *file) {
 }
 
-uint16_t CapcomSnesScanner::GetCurrentPlayAddressFromARAM (RawFile* file, CapcomSnesVersion version, uint8_t channel)
-{
-	uint16_t currentAddress;
-	if (version == CAPCOMSNES_V1_BGM_IN_LIST)
-	{
-		currentAddress = file->GetByte(0x00 + channel * 2 + 1) | (file->GetByte(0x10 + channel * 2 + 1) << 8);
-	}
-	else
-	{
-		currentAddress = file->GetByte(0x00 + channel) | (file->GetByte(0x08 + channel) << 8);
-	}
-	return currentAddress;
+uint16_t CapcomSnesScanner::GetCurrentPlayAddressFromARAM(RawFile *file, CapcomSnesVersion version, uint8_t channel) {
+  uint16_t currentAddress;
+  if (version == CAPCOMSNES_V1_BGM_IN_LIST) {
+    currentAddress = file->GetByte(0x00 + channel * 2 + 1) | (file->GetByte(0x10 + channel * 2 + 1) << 8);
+  }
+  else {
+    currentAddress = file->GetByte(0x00 + channel) | (file->GetByte(0x08 + channel) << 8);
+  }
+  return currentAddress;
 }
 
-int CapcomSnesScanner::GetLengthOfSongList (RawFile* file, uint16_t addrSongList)
-{
-	int length = 0;
+int CapcomSnesScanner::GetLengthOfSongList(RawFile *file, uint16_t addrSongList) {
+  int length = 0;
 
-	// do heuristic search for each songs
-	for (int8_t songIndex = 0; songIndex <= 0x7f; songIndex++)
-	{
-		// check the address range of song pointer
-		if (addrSongList + songIndex * 2 + 2 > 0x10000)
-		{
-			break;
-		}
+  // do heuristic search for each songs
+  for (int8_t songIndex = 0; songIndex <= 0x7f; songIndex++) {
+    // check the address range of song pointer
+    if (addrSongList + songIndex * 2 + 2 > 0x10000) {
+      break;
+    }
 
-		// get header address and validate it
-		uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
-		if (addrSongHeader == 0)
-		{
-			length++;
-			continue;
-		}
-		else if (!IsValidBGMHeader(file, addrSongHeader))
-		{
-			break;
-		}
+    // get header address and validate it
+    uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
+    if (addrSongHeader == 0) {
+      length++;
+      continue;
+    }
+    else if (!IsValidBGMHeader(file, addrSongHeader)) {
+      break;
+    }
 
-		length++;
-	}
+    length++;
+  }
 
-	return length;
+  return length;
 }
 
-int8_t CapcomSnesScanner::GuessCurrentSongFromARAM (RawFile* file, CapcomSnesVersion version, uint16_t addrSongList)
-{
-	int8_t guessedSongIndex = -1;
-	int guessBestScore = INT_MAX;
+int8_t CapcomSnesScanner::GuessCurrentSongFromARAM(RawFile *file, CapcomSnesVersion version, uint16_t addrSongList) {
+  int8_t guessedSongIndex = -1;
+  int guessBestScore = INT_MAX;
 
-	// do heuristic search for each songs
-	int songListLength = GetLengthOfSongList(file, addrSongList);
-	for (int songIndex = 0; songIndex < songListLength; songIndex++)
-	{
-		// get header address
-		uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
-		if (addrSongHeader == 0)
-		{
-			continue;
-		}
+  // do heuristic search for each songs
+  int songListLength = GetLengthOfSongList(file, addrSongList);
+  for (int songIndex = 0; songIndex < songListLength; songIndex++) {
+    // get header address
+    uint16_t addrSongHeader = file->GetShortBE(addrSongList + songIndex * 2);
+    if (addrSongHeader == 0) {
+      continue;
+    }
 
-		// read start address for each voices
-		int guessScore = 0;
-		int validTrackCount = 0;
-		for (int track = 0; track < 8; track++)
-		{
-			uint16_t addrScoreData = file->GetShortBE(addrSongHeader + 1 + track * 2);
-			uint16_t currentAddress = this->GetCurrentPlayAddressFromARAM(file, version, 7 - track);
+    // read start address for each voices
+    int guessScore = 0;
+    int validTrackCount = 0;
+    for (int track = 0; track < 8; track++) {
+      uint16_t addrScoreData = file->GetShortBE(addrSongHeader + 1 + track * 2);
+      uint16_t currentAddress = this->GetCurrentPlayAddressFromARAM(file, version, 7 - track);
 
-			// next if the voice is stopped, or not loaded yet
-			if (currentAddress == 0)
-			{
-				continue;
-			}
+      // next if the voice is stopped, or not loaded yet
+      if (currentAddress == 0) {
+        continue;
+      }
 
-			// current address must be greater than start address
-			if (addrScoreData > currentAddress)
-			{
-				validTrackCount = 0;
-				break;
-			}
+      // current address must be greater than start address
+      if (addrScoreData > currentAddress) {
+        validTrackCount = 0;
+        break;
+      }
 
-			// measure the distance
-			guessScore += (currentAddress - addrScoreData);
-			validTrackCount++;
-		}
+      // measure the distance
+      guessScore += (currentAddress - addrScoreData);
+      validTrackCount++;
+    }
 
-		// update search result if necessary
-		if (validTrackCount > 0)
-		{
-			// calculate the average score of all tracks
-			// (also, make it a fixed-point number)
-			guessScore = (guessScore * 16) / validTrackCount;
-			if (guessBestScore > guessScore)
-			{
-				guessBestScore = guessScore;
-				guessedSongIndex = songIndex;
-			}
-		}
-	}
+    // update search result if necessary
+    if (validTrackCount > 0) {
+      // calculate the average score of all tracks
+      // (also, make it a fixed-point number)
+      guessScore = (guessScore * 16) / validTrackCount;
+      if (guessBestScore > guessScore) {
+        guessBestScore = guessScore;
+        guessedSongIndex = songIndex;
+      }
+    }
+  }
 
-	return guessedSongIndex;
+  return guessedSongIndex;
 }
 
-bool CapcomSnesScanner::IsValidBGMHeader (RawFile* file, uint32_t addrSongHeader)
-{
-	if (addrSongHeader + 17 > 0x10000)
-	{
-		return false;
-	}
+bool CapcomSnesScanner::IsValidBGMHeader(RawFile *file, uint32_t addrSongHeader) {
+  if (addrSongHeader + 17 > 0x10000) {
+    return false;
+  }
 
-	for (int track = 0; track < 8; track++)
-	{
-		uint16_t addrScoreData = file->GetShortBE(addrSongHeader + 1 + track * 2);
-		if ((addrScoreData & 0xff00) == 0) {
-			return false;
-		}
-	}
+  for (int track = 0; track < 8; track++) {
+    uint16_t addrScoreData = file->GetShortBE(addrSongHeader + 1 + track * 2);
+    if ((addrScoreData & 0xff00) == 0) {
+      return false;
+    }
+  }
 
-	return true;
+  return true;
 }
 
-std::map<uint8_t, uint8_t> CapcomSnesScanner::GetInitDspRegMap (RawFile* file)
-{
-	std::map<uint8_t, uint8_t> dspRegMap;
+std::map<uint8_t, uint8_t> CapcomSnesScanner::GetInitDspRegMap(RawFile *file) {
+  std::map<uint8_t, uint8_t> dspRegMap;
 
-	uint32_t ofsDspRegInitASM;
-	uint32_t ofsDspRegInitOldVerASM;
-	uint32_t dspRegCount = 0;
-	uint32_t addrDspRegList;
-	uint32_t addrDspValueList;
+  uint32_t ofsDspRegInitASM;
+  uint32_t ofsDspRegInitOldVerASM;
+  uint32_t dspRegCount = 0;
+  uint32_t addrDspRegList;
+  uint32_t addrDspValueList;
 
-	// find a code block which initializes dsp registers
-	if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM))
-	{
-		dspRegCount = file->GetByte(ofsDspRegInitASM + 1);
-		addrDspRegList = file->GetShort(ofsDspRegInitASM + 3) + 1;
-		addrDspValueList = file->GetShort(ofsDspRegInitASM + 9) + 1;
-	}
-	else if (file->SearchBytePattern(ptnDspRegInitOldVer, ofsDspRegInitOldVerASM))
-	{
-		dspRegCount = file->GetByte(ofsDspRegInitOldVerASM + 12);
-		addrDspRegList = file->GetShort(ofsDspRegInitOldVerASM + 1);
-		addrDspValueList = file->GetShort(ofsDspRegInitOldVerASM + 5);
-	}
-	else
-	{
-		return dspRegMap;
-	}
-	
-	// check address range
-	if (addrDspRegList + dspRegCount > 0x10000 || addrDspValueList + dspRegCount > 0x10000)
-	{
-		return dspRegMap;
-	}
+  // find a code block which initializes dsp registers
+  if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM)) {
+    dspRegCount = file->GetByte(ofsDspRegInitASM + 1);
+    addrDspRegList = file->GetShort(ofsDspRegInitASM + 3) + 1;
+    addrDspValueList = file->GetShort(ofsDspRegInitASM + 9) + 1;
+  }
+  else if (file->SearchBytePattern(ptnDspRegInitOldVer, ofsDspRegInitOldVerASM)) {
+    dspRegCount = file->GetByte(ofsDspRegInitOldVerASM + 12);
+    addrDspRegList = file->GetShort(ofsDspRegInitOldVerASM + 1);
+    addrDspValueList = file->GetShort(ofsDspRegInitOldVerASM + 5);
+  }
+  else {
+    return dspRegMap;
+  }
 
-	// store dsp reg/value pairs to map
-	for (uint32_t regIndex = 0; regIndex < dspRegCount; regIndex++)
-	{
-		uint8_t dspReg = file->GetByte(addrDspRegList + regIndex);
-		uint8_t dspValue = file->GetByte(addrDspValueList + regIndex);
-		dspRegMap[dspReg] = dspValue;
-	}
+  // check address range
+  if (addrDspRegList + dspRegCount > 0x10000 || addrDspValueList + dspRegCount > 0x10000) {
+    return dspRegMap;
+  }
 
-	return dspRegMap;
+  // store dsp reg/value pairs to map
+  for (uint32_t regIndex = 0; regIndex < dspRegCount; regIndex++) {
+    uint8_t dspReg = file->GetByte(addrDspRegList + regIndex);
+    uint8_t dspValue = file->GetByte(addrDspValueList + regIndex);
+    dspRegMap[dspReg] = dspValue;
+  }
+
+  return dspRegMap;
 }

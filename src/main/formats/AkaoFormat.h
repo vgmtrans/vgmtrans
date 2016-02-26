@@ -12,20 +12,19 @@ class AkaoInstrSet;
 // AkaoColl
 // ********
 
-class AkaoColl :
-	public VGMColl
-{
-public:
-	AkaoColl(std::wstring name = L"Unnamed Collection") : VGMColl(name) {}
-	virtual ~AkaoColl() {}
+class AkaoColl:
+    public VGMColl {
+ public:
+  AkaoColl(std::wstring name = L"Unnamed Collection") : VGMColl(name) { }
+  virtual ~AkaoColl() { }
 
-	virtual bool LoadMain();
-	virtual bool PreDLSMainCreation();
-	virtual bool PostDLSMainCreation();
+  virtual bool LoadMain();
+  virtual bool PreDLSMainCreation();
+  virtual bool PostDLSMainCreation();
 
-public:
-	AkaoInstrSet* origInstrSet;
-	uint32_t numAddedInstrs;
+ public:
+  AkaoInstrSet *origInstrSet;
+  uint32_t numAddedInstrs;
 };
 
 // ***********
@@ -50,9 +49,9 @@ public:
 //	AkaoFormat(void) {}
 //	virtual ~AkaoFormat(void) {}
 BEGIN_FORMAT(Akao)
-	USING_SCANNER(AkaoScanner)
-	//USING_MATCHER_WITH_ARG(SimpleMatcher, true)
-	USING_MATCHER_WITH_ARG(GetIdMatcher, true)
-	USING_COLL(AkaoColl)
+  USING_SCANNER(AkaoScanner)
+  //USING_MATCHER_WITH_ARG(SimpleMatcher, true)
+  USING_MATCHER_WITH_ARG(GetIdMatcher, true)
+  USING_COLL(AkaoColl)
 END_FORMAT()
 //};

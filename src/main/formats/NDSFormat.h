@@ -9,7 +9,7 @@
 // *********
 
 BEGIN_FORMAT(NDS)
-	USING_SCANNER(NDSScanner)
+  USING_SCANNER(NDSScanner)
 END_FORMAT()
 
 
