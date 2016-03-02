@@ -6,6 +6,6 @@
 
 
 BEGIN_FORMAT(QSound)
-	USING_SCANNER(QSoundScanner)
+  USING_SCANNER(QSoundScanner)
 END_FORMAT()
 

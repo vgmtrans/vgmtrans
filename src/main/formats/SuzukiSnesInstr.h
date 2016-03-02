@@ -8,25 +8,31 @@
 // SuzukiSnesInstrSet
 // ******************
 
-class SuzukiSnesInstrSet :
-	public VGMInstrSet
-{
-public:
-	SuzukiSnesInstrSet(RawFile* file, SuzukiSnesVersion ver, uint32_t spcDirAddr, uint16_t addrSRCNTable, uint16_t addrVolumeTable, uint16_t addrADSRTable, uint16_t addrTuningTable, const std::wstring & name = L"SuzukiSnesInstrSet");
-	virtual ~SuzukiSnesInstrSet(void);
+class SuzukiSnesInstrSet:
+    public VGMInstrSet {
+ public:
+  SuzukiSnesInstrSet(RawFile *file,
+                     SuzukiSnesVersion ver,
+                     uint32_t spcDirAddr,
+                     uint16_t addrSRCNTable,
+                     uint16_t addrVolumeTable,
+                     uint16_t addrADSRTable,
+                     uint16_t addrTuningTable,
+                     const std::wstring &name = L"SuzukiSnesInstrSet");
+  virtual ~SuzukiSnesInstrSet(void);
 
-	virtual bool GetHeaderInfo();
-	virtual bool GetInstrPointers();
+  virtual bool GetHeaderInfo();
+  virtual bool GetInstrPointers();
 
-	SuzukiSnesVersion version;
+  SuzukiSnesVersion version;
 
-protected:
-	uint32_t spcDirAddr;
-	uint16_t addrSRCNTable;
-	uint16_t addrVolumeTable;
-	uint16_t addrTuningTable;
-	uint16_t addrADSRTable;
-	std::vector<uint8_t> usedSRCNs;
+ protected:
+  uint32_t spcDirAddr;
+  uint16_t addrSRCNTable;
+  uint16_t addrVolumeTable;
+  uint16_t addrTuningTable;
+  uint16_t addrADSRTable;
+  std::vector<uint8_t> usedSRCNs;
 };
 
 // *************
@@ -34,22 +40,29 @@ protected:
 // *************
 
 class SuzukiSnesInstr
-	: public VGMInstr
-{
-public:
-	SuzukiSnesInstr(VGMInstrSet* instrSet, SuzukiSnesVersion ver, uint8_t instrNum, uint32_t spcDirAddr, uint16_t addrSRCNTable, uint16_t addrVolumeTable, uint16_t addrADSRTable, uint16_t addrTuningTable, const std::wstring& name = L"SuzukiSnesInstr");
-	virtual ~SuzukiSnesInstr(void);
+    : public VGMInstr {
+ public:
+  SuzukiSnesInstr(VGMInstrSet *instrSet,
+                  SuzukiSnesVersion ver,
+                  uint8_t instrNum,
+                  uint32_t spcDirAddr,
+                  uint16_t addrSRCNTable,
+                  uint16_t addrVolumeTable,
+                  uint16_t addrADSRTable,
+                  uint16_t addrTuningTable,
+                  const std::wstring &name = L"SuzukiSnesInstr");
+  virtual ~SuzukiSnesInstr(void);
 
-	virtual bool LoadInstr();
+  virtual bool LoadInstr();
 
-	SuzukiSnesVersion version;
+  SuzukiSnesVersion version;
 
-protected:
-	uint32_t spcDirAddr;
-	uint16_t addrSRCNTable;
-	uint16_t addrVolumeTable;
-	uint16_t addrTuningTable;
-	uint16_t addrADSRTable;
+ protected:
+  uint32_t spcDirAddr;
+  uint16_t addrSRCNTable;
+  uint16_t addrVolumeTable;
+  uint16_t addrTuningTable;
+  uint16_t addrADSRTable;
 };
 
 // *************
@@ -57,13 +70,19 @@ protected:
 // *************
 
 class SuzukiSnesRgn
-	: public VGMRgn
-{
-public:
-	SuzukiSnesRgn(SuzukiSnesInstr* instr, SuzukiSnesVersion ver, uint8_t instrNum, uint32_t spcDirAddr, uint16_t addrSRCNTable, uint16_t addrVolumeTable, uint16_t addrADSRTable, uint16_t addrTuningTable);
-	virtual ~SuzukiSnesRgn(void);
+    : public VGMRgn {
+ public:
+  SuzukiSnesRgn(SuzukiSnesInstr *instr,
+                SuzukiSnesVersion ver,
+                uint8_t instrNum,
+                uint32_t spcDirAddr,
+                uint16_t addrSRCNTable,
+                uint16_t addrVolumeTable,
+                uint16_t addrADSRTable,
+                uint16_t addrTuningTable);
+  virtual ~SuzukiSnesRgn(void);
 
-	virtual bool LoadRgn();
+  virtual bool LoadRgn();
 
-	SuzukiSnesVersion version;
+  SuzukiSnesVersion version;
 };
