@@ -10,14 +10,13 @@
 // ***************
 
 BEGIN_FORMAT(PandoraBoxSnes)
-	USING_SCANNER(PandoraBoxSnesScanner)
-	USING_MATCHER(FilegroupMatcher)
+  USING_SCANNER(PandoraBoxSnesScanner)
+  USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
 
-enum PandoraBoxSnesVersion
-{
-	PANDORABOXSNES_NONE = 0,  // Unknown Version
-	PANDORABOXSNES_V1,        // Kishin Korinden Oni etc.
-	PANDORABOXSNES_V2,        // Traverse: Starlight and Prairie etc.
+enum PandoraBoxSnesVersion {
+  PANDORABOXSNES_NONE = 0,  // Unknown Version
+  PANDORABOXSNES_V1,        // Kishin Korinden Oni etc.
+  PANDORABOXSNES_V2,        // Traverse: Starlight and Prairie etc.
 };

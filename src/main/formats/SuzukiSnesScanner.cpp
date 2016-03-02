@@ -2,7 +2,6 @@
 #include "SuzukiSnesScanner.h"
 #include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
-#include "SNESDSP.h"
 
 //; Seiken Densetsu 3 SPC
 //038b: fa f5 5c  mov   ($5c),($f5)
@@ -140,95 +139,90 @@ BytePattern SuzukiSnesScanner::ptnLoadInstr(
 	,
 	41);
 
-void SuzukiSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000)
-	{
-		SearchForSuzukiSnesFromARAM(file);
-	}
-	else
-	{
-		SearchForSuzukiSnesFromROM(file);
-	}
-	return;
+void SuzukiSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForSuzukiSnesFromARAM(file);
+  }
+  else {
+    SearchForSuzukiSnesFromROM(file);
+  }
+  return;
 }
 
-void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile* file)
-{
-	SuzukiSnesVersion version = SUZUKISNES_NONE;
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
+  SuzukiSnesVersion version = SUZUKISNES_NONE;
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	// search for note length table
-	uint32_t ofsSongLoad;
-	uint16_t addrSeqHeader;
-	if (file->SearchBytePattern(ptnLoadSongSD3, ofsSongLoad)) {
-		addrSeqHeader = file->GetShort(ofsSongLoad + 16);
-		version = SUZUKISNES_SD3;
-	}
-	else if (file->SearchBytePattern(ptnLoadSongBL, ofsSongLoad)) {
-		addrSeqHeader = file->GetShort(ofsSongLoad + 17);
-		version = SUZUKISNES_BL;
-	}
-	else {
-		return;
-	}
+  // search for note length table
+  uint32_t ofsSongLoad;
+  uint16_t addrSeqHeader;
+  if (file->SearchBytePattern(ptnLoadSongSD3, ofsSongLoad)) {
+    addrSeqHeader = file->GetShort(ofsSongLoad + 16);
+    version = SUZUKISNES_SD3;
+  }
+  else if (file->SearchBytePattern(ptnLoadSongBL, ofsSongLoad)) {
+    addrSeqHeader = file->GetShort(ofsSongLoad + 17);
+    version = SUZUKISNES_BL;
+  }
+  else {
+    return;
+  }
 
-	// search for vcmd length table
-	uint32_t ofsExecVCmd;
-	uint16_t addrVCmdLengthTable;
-	if (file->SearchBytePattern(ptnExecVCmdBL, ofsExecVCmd)) {
-		addrVCmdLengthTable = file->GetShort(ofsExecVCmd + 6);
-		if (addrVCmdLengthTable + 60 > 0x10000) {
-			return;
-		}
+  // search for vcmd length table
+  uint32_t ofsExecVCmd;
+  uint16_t addrVCmdLengthTable;
+  if (file->SearchBytePattern(ptnExecVCmdBL, ofsExecVCmd)) {
+    addrVCmdLengthTable = file->GetShort(ofsExecVCmd + 6);
+    if (addrVCmdLengthTable + 60 > 0x10000) {
+      return;
+    }
 
-		// detect Super Mario RPG
-		uint8_t vcmdFCLength = file->GetByte(addrVCmdLengthTable + 56);
-		if (version == SUZUKISNES_BL && vcmdFCLength == 4) {
-			version = SUZUKISNES_SMR;
-		}
-	}
+    // detect Super Mario RPG
+    uint8_t vcmdFCLength = file->GetByte(addrVCmdLengthTable + 56);
+    if (version == SUZUKISNES_BL && vcmdFCLength == 4) {
+      version = SUZUKISNES_SMR;
+    }
+  }
 
-	// load sequence
-	SuzukiSnesSeq* newSeq = new SuzukiSnesSeq(file, version, addrSeqHeader, name);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  // load sequence
+  SuzukiSnesSeq *newSeq = new SuzukiSnesSeq(file, version, addrSeqHeader, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	uint32_t ofsLoadDIR;
-	uint16_t spcDirAddr;
-	if (file->SearchBytePattern(ptnLoadDIR, ofsLoadDIR)) {
-		spcDirAddr = file->GetByte(ofsLoadDIR + 4) << 8;
-	}
-	else {
-		return;
-	}
+  uint32_t ofsLoadDIR;
+  uint16_t spcDirAddr;
+  if (file->SearchBytePattern(ptnLoadDIR, ofsLoadDIR)) {
+    spcDirAddr = file->GetByte(ofsLoadDIR + 4) << 8;
+  }
+  else {
+    return;
+  }
 
-	uint32_t ofsLoadInstr;
-	uint16_t addrSRCNTable;
-	uint16_t addrVolumeTable;
-	uint16_t addrTuningTable;
-	uint16_t addrADSRTable;
-	if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
-		addrSRCNTable = file->GetShort(ofsLoadInstr + 5);
-		addrVolumeTable = file->GetShort(ofsLoadInstr + 10);
-		addrADSRTable = file->GetShort(ofsLoadInstr + 18);
-		addrTuningTable = file->GetShort(ofsLoadInstr + 30);
-	}
-	else {
-		return;
-	}
+  uint32_t ofsLoadInstr;
+  uint16_t addrSRCNTable;
+  uint16_t addrVolumeTable;
+  uint16_t addrTuningTable;
+  uint16_t addrADSRTable;
+  if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
+    addrSRCNTable = file->GetShort(ofsLoadInstr + 5);
+    addrVolumeTable = file->GetShort(ofsLoadInstr + 10);
+    addrADSRTable = file->GetShort(ofsLoadInstr + 18);
+    addrTuningTable = file->GetShort(ofsLoadInstr + 30);
+  }
+  else {
+    return;
+  }
 
-	SuzukiSnesInstrSet * newInstrSet = new SuzukiSnesInstrSet(file, version, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable, addrTuningTable);
-	if (!newInstrSet->LoadVGMFile())
-	{
-		delete newInstrSet;
-		return;
-	}
+  SuzukiSnesInstrSet *newInstrSet =
+      new SuzukiSnesInstrSet(file, version, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable, addrTuningTable);
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 }
 
-void SuzukiSnesScanner::SearchForSuzukiSnesFromROM(RawFile* file)
-{
+void SuzukiSnesScanner::SearchForSuzukiSnesFromROM(RawFile *file) {
 }

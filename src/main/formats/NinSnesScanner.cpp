@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "NinSnesFormat.h"
-#include "NinSnesScanner.h"
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
 
@@ -780,687 +779,702 @@ BytePattern NinSnesScanner::ptnInstrVCmdTS(
 	,
 	33);
 
-void NinSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000)
-	{
-		SearchForNinSnesFromARAM(file);
-	}
-	else
-	{
-		SearchForNinSnesFromROM(file);
-	}
-	return;
+void NinSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForNinSnesFromARAM(file);
+  }
+  else {
+    SearchForNinSnesFromROM(file);
+  }
+  return;
 }
 
-void NinSnesScanner::SearchForNinSnesFromARAM (RawFile* file)
-{
-	NinSnesVersion version = NINSNES_NONE;
+void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
+  NinSnesVersion version = NINSNES_NONE;
 
-	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
-	// get section pointer address
-	uint32_t ofsIncSectionPtr;
-	uint8_t addrSectionPtr;
-	uint16_t konamiBaseAddress = 0xffff;
-	if (file->SearchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr)) {
-		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
-	}
-	// DERIVED VERSIONS
-	else if (file->SearchBytePattern(ptnIncSectionPtrGD3, ofsIncSectionPtr)) {
-		uint8_t konamiBaseAddressPtr = file->GetByte(ofsIncSectionPtr + 16);
-		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
-		konamiBaseAddress = file->GetShort(konamiBaseAddressPtr);
-	}
-	else if (file->SearchBytePattern(ptnIncSectionPtrYSFR, ofsIncSectionPtr)) {
-		addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
-	}
-	else {
-		return;
-	}
+  // get section pointer address
+  uint32_t ofsIncSectionPtr;
+  uint8_t addrSectionPtr;
+  uint16_t konamiBaseAddress = 0xffff;
+  if (file->SearchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr)) {
+    addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
+  }
+    // DERIVED VERSIONS
+  else if (file->SearchBytePattern(ptnIncSectionPtrGD3, ofsIncSectionPtr)) {
+    uint8_t konamiBaseAddressPtr = file->GetByte(ofsIncSectionPtr + 16);
+    addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
+    konamiBaseAddress = file->GetShort(konamiBaseAddressPtr);
+  }
+  else if (file->SearchBytePattern(ptnIncSectionPtrYSFR, ofsIncSectionPtr)) {
+    addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
+  }
+  else {
+    return;
+  }
 
-	// BEGIN DYNAMIC PATTERN DEFINITIONS
+  // BEGIN DYNAMIC PATTERN DEFINITIONS
 
-	//; Kirby Super Star SPC
-	//; set initial value to section pointer
-	//08e4: f5 ff 38  mov   a,$38ff+x
-	//08e7: fd        mov   y,a
-	//08e8: f5 fe 38  mov   a,$38fe+x
-	//08eb: da 30     movw  $30,ya
-	char ptnInitSectionPtrBytes[] =
-		"\xf5\xff\x38\xfd\xf5\xfe\x38\xda"
-		"\x30";
-	ptnInitSectionPtrBytes[8] = addrSectionPtr;
-	BytePattern ptnInitSectionPtr(
-		ptnInitSectionPtrBytes
-		,
-		"x??xx??x"
-		"x"
-		,
-		9);
+  //; Kirby Super Star SPC
+  //; set initial value to section pointer
+  //08e4: f5 ff 38  mov   a,$38ff+x
+  //08e7: fd        mov   y,a
+  //08e8: f5 fe 38  mov   a,$38fe+x
+  //08eb: da 30     movw  $30,ya
+  char ptnInitSectionPtrBytes[] =
+    "\xf5\xff\x38\xfd\xf5\xfe\x38\xda"
+    "\x30";
+  ptnInitSectionPtrBytes[8] = addrSectionPtr;
+  BytePattern ptnInitSectionPtr(
+    ptnInitSectionPtrBytes
+    ,
+    "x??xx??x"
+    "x"
+    ,
+    9);
 
-	//; Yoshi's Island SPC
-	//; set initial value to section pointer
-	//06f0: 1c        asl   a
-	//06f1: 5d        mov   x,a
-	//06f2: f5 8f ff  mov   a,$ff8f+x
-	//06f5: fd        mov   y,a
-	//06f6: d0 03     bne   $06fb
-	//06f8: c4 04     mov   $04,a
-	//06fa: 6f        ret
-	//06fb: f5 8e ff  mov   a,$ff8e+x
-	//06fe: da 40     movw  $40,ya
-	char ptnInitSectionPtrBytesYI[] =
-		"\x1c\x5d\xf5\x8f\xff\xfd\xd0\x03"
-		"\xc4\x04\x6f\xf5\x8e\xff\xda\x40";
-	ptnInitSectionPtrBytesYI[15] = addrSectionPtr;
-	BytePattern ptnInitSectionPtrYI(
-		ptnInitSectionPtrBytesYI
-		,
-		"xxx??xxx"
-		"x?xx??xx"
-		,
-		16);
+  //; Yoshi's Island SPC
+  //; set initial value to section pointer
+  //06f0: 1c        asl   a
+  //06f1: 5d        mov   x,a
+  //06f2: f5 8f ff  mov   a,$ff8f+x
+  //06f5: fd        mov   y,a
+  //06f6: d0 03     bne   $06fb
+  //06f8: c4 04     mov   $04,a
+  //06fa: 6f        ret
+  //06fb: f5 8e ff  mov   a,$ff8e+x
+  //06fe: da 40     movw  $40,ya
+  char ptnInitSectionPtrBytesYI[] =
+    "\x1c\x5d\xf5\x8f\xff\xfd\xd0\x03"
+    "\xc4\x04\x6f\xf5\x8e\xff\xda\x40";
+  ptnInitSectionPtrBytesYI[15] = addrSectionPtr;
+  BytePattern ptnInitSectionPtrYI(
+    ptnInitSectionPtrBytesYI
+    ,
+    "xxx??xxx"
+    "x?xx??xx"
+    ,
+    16);
 
-	//; Super Mario World SPC
-	//; set initial value to section pointer
-	//0b5f: 1c        asl   a
-	//0b60: fd        mov   y,a
-	//0b61: f6 5e 13  mov   a,$135e+y
-	//0b64: c4 40     mov   $40,a
-	//0b66: f6 5f 13  mov   a,$135f+y
-	//0b69: c4 41     mov   $41,a
-	char ptnInitSectionPtrBytesSMW[] =
-		"\x1c\xfd\xf6\x5e\x13\xc4\x40\xf6"
-		"\x5f\x13\xc4\x41";
-	ptnInitSectionPtrBytesSMW[6] = addrSectionPtr;
-	ptnInitSectionPtrBytesSMW[11] = addrSectionPtr + 1;
-	BytePattern ptnInitSectionPtrSMW(
-		ptnInitSectionPtrBytesSMW
-		,
-		"xxx??xxx"
-		"??xx"
-		,
-		12);
+  //; Super Mario World SPC
+  //; set initial value to section pointer
+  //0b5f: 1c        asl   a
+  //0b60: fd        mov   y,a
+  //0b61: f6 5e 13  mov   a,$135e+y
+  //0b64: c4 40     mov   $40,a
+  //0b66: f6 5f 13  mov   a,$135f+y
+  //0b69: c4 41     mov   $41,a
+  char ptnInitSectionPtrBytesSMW[] =
+    "\x1c\xfd\xf6\x5e\x13\xc4\x40\xf6"
+    "\x5f\x13\xc4\x41";
+  ptnInitSectionPtrBytesSMW[6] = addrSectionPtr;
+  ptnInitSectionPtrBytesSMW[11] = addrSectionPtr + 1;
+  BytePattern ptnInitSectionPtrSMW(
+    ptnInitSectionPtrBytesSMW
+    ,
+    "xxx??xxx"
+    "??xx"
+    ,
+    12);
 
-	// DERIVED VERSIONS
+  // DERIVED VERSIONS
 
-	//; Gradius 3 SPC
-	//08b7: 5d        mov   x,a
-	//08b8: f5 fc 11  mov   a,$11fc+x
-	//08bb: f0 ee     beq   $08ab
-	//08bd: fd        mov   y,a
-	//08be: f5 fb 11  mov   a,$11fb+x
-	//08c1: da 40     movw  $40,ya            ; song metaindex ptr
-	char ptnInitSectionPtrBytesGD3[] =
-		"\x5d\xf5\xfc\x11\xf0\xee\xfd\xf5"
-		"\xfb\x11\xda\x40";
-	ptnInitSectionPtrBytesGD3[11] = addrSectionPtr;
-	BytePattern ptnInitSectionPtrGD3(
-		ptnInitSectionPtrBytesGD3
-		,
-		"xx??x?xx"
-		"??xx"
-		,
-		12);
+  //; Gradius 3 SPC
+  //08b7: 5d        mov   x,a
+  //08b8: f5 fc 11  mov   a,$11fc+x
+  //08bb: f0 ee     beq   $08ab
+  //08bd: fd        mov   y,a
+  //08be: f5 fb 11  mov   a,$11fb+x
+  //08c1: da 40     movw  $40,ya            ; song metaindex ptr
+  char ptnInitSectionPtrBytesGD3[] =
+      "\x5d\xf5\xfc\x11\xf0\xee\xfd\xf5"
+          "\xfb\x11\xda\x40";
+  ptnInitSectionPtrBytesGD3[11] = addrSectionPtr;
+  BytePattern ptnInitSectionPtrGD3(
+      ptnInitSectionPtrBytesGD3,
+      "xx??x?xx"
+          "??xx",
+      12);
 
-	//; Yoshi's Safari SPC
-	//1488: fd        mov   y,a
-	//1489: f7 48     mov   a,($48)+y
-	//148b: c4 4c     mov   $4c,a
-	//148d: fc        inc   y
-	//148e: f7 48     mov   a,($48)+y
-	//1490: c4 4d     mov   $4d,a
-	char ptnInitSectionPtrBytesYSFR[] =
-		"\xfd\xf7\x48\xc4\x4c\xfc\xf7\x48"
-		"\xc4\x4d";
-	ptnInitSectionPtrBytesYSFR[4] = addrSectionPtr;
-	ptnInitSectionPtrBytesYSFR[9] = addrSectionPtr + 1;
-	BytePattern ptnInitSectionPtrYSFR(
-		ptnInitSectionPtrBytesYSFR
-		,
-		"xx?xxxx?"
-		"xx"
-		,
-		10);
+  //; Yoshi's Safari SPC
+  //1488: fd        mov   y,a
+  //1489: f7 48     mov   a,($48)+y
+  //148b: c4 4c     mov   $4c,a
+  //148d: fc        inc   y
+  //148e: f7 48     mov   a,($48)+y
+  //1490: c4 4d     mov   $4d,a
+  char ptnInitSectionPtrBytesYSFR[] =
+    "\xfd\xf7\x48\xc4\x4c\xfc\xf7\x48"
+    "\xc4\x4d";
+  ptnInitSectionPtrBytesYSFR[4] = addrSectionPtr;
+  ptnInitSectionPtrBytesYSFR[9] = addrSectionPtr + 1;
+  BytePattern ptnInitSectionPtrYSFR(
+    ptnInitSectionPtrBytesYSFR
+    ,
+    "xx?xxxx?"
+    "xx"
+    ,
+    10);
 
-	//; Terranigma SPC
-	//0521: e5 fc 10  mov   a,$10fc
-	//0524: ec fd 10  mov   y,$10fd
-	//0527: da 23     movw  $23,ya            ; section list address from $10fc/d
-	//0529: 3a 23     incw  $23
-	//052b: 3a 23     incw  $23               ; skip first word
-	char ptnInitSectionPtrBytesTS[] =
-		"\xe5\xfc\x10\xec\xfd\x10\xda\x23"
-		"\x3a\x23\x3a\x23";
-	ptnInitSectionPtrBytesTS[7] = addrSectionPtr;
-	ptnInitSectionPtrBytesTS[9] = addrSectionPtr;
-	ptnInitSectionPtrBytesTS[11] = addrSectionPtr;
-	BytePattern ptnInitSectionPtrTS(
-		ptnInitSectionPtrBytesTS
-		,
-		"x??x??xx"
-		"xxxx"
-		,
-		12);
+  //; Terranigma SPC
+  //0521: e5 fc 10  mov   a,$10fc
+  //0524: ec fd 10  mov   y,$10fd
+  //0527: da 23     movw  $23,ya            ; section list address from $10fc/d
+  //0529: 3a 23     incw  $23
+  //052b: 3a 23     incw  $23               ; skip first word
+  char ptnInitSectionPtrBytesTS[] =
+    "\xe5\xfc\x10\xec\xfd\x10\xda\x23"
+    "\x3a\x23\x3a\x23";
+  ptnInitSectionPtrBytesTS[7] = addrSectionPtr;
+  ptnInitSectionPtrBytesTS[9] = addrSectionPtr;
+  ptnInitSectionPtrBytesTS[11] = addrSectionPtr;
+  BytePattern ptnInitSectionPtrTS(
+    ptnInitSectionPtrBytesTS
+    ,
+    "x??x??xx"
+    "xxxx"
+    ,
+    12);
 
-	// END DYNAMIC PATTERN DEFINITIONS
+  // END DYNAMIC PATTERN DEFINITIONS
 
-	// ACQUIRE SEQUENCE LIST ADDRESS:
-	// find the initialization code of the section pointer,
-	// and acquire the sequence list address
-	uint32_t ofsInitSectionPtr;
-	uint32_t addrSongList;
-	// STANDARD VERSIONS
-	if (file->SearchBytePattern(ptnInitSectionPtr, ofsInitSectionPtr)) {
-		addrSongList = file->GetShort(ofsInitSectionPtr + 5);
-	}
-	else if (file->SearchBytePattern(ptnInitSectionPtrYI, ofsInitSectionPtr)) {
-		addrSongList = file->GetShort(ofsInitSectionPtr + 12);
-	}
-	else if (file->SearchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr)) {
-		addrSongList = file->GetShort(ofsInitSectionPtr + 3);
-	}
-	// DERIVED VERSIONS
-	else if (file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr)) {
-		addrSongList = file->GetShort(ofsInitSectionPtr + 8);
-		if (konamiBaseAddress == 0xffff) {
-			// Parodius Da! does not have base address
-			konamiBaseAddress = 0;
-		}
-	}
-	else if (file->SearchBytePattern(ptnInitSectionPtrTS, ofsInitSectionPtr)) {
-		uint16_t addrSongListPtr = file->GetShort(ofsInitSectionPtr + 1);
-		addrSongList = file->GetShort(addrSongListPtr);
-	}
-	else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
-		uint8_t addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
+  // ACQUIRE SEQUENCE LIST ADDRESS:
+  // find the initialization code of the section pointer,
+  // and acquire the sequence list address
+  uint32_t ofsInitSectionPtr;
+  uint32_t addrSongList;
+  // STANDARD VERSIONS
+  if (file->SearchBytePattern(ptnInitSectionPtr, ofsInitSectionPtr)) {
+    addrSongList = file->GetShort(ofsInitSectionPtr + 5);
+  }
+  else if (file->SearchBytePattern(ptnInitSectionPtrYI, ofsInitSectionPtr)) {
+    addrSongList = file->GetShort(ofsInitSectionPtr + 12);
+  }
+  else if (file->SearchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr)) {
+    addrSongList = file->GetShort(ofsInitSectionPtr + 3);
+  }
+    // DERIVED VERSIONS
+  else if (file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr)) {
+    addrSongList = file->GetShort(ofsInitSectionPtr + 8);
+    if (konamiBaseAddress == 0xffff) {
+      // Parodius Da! does not have base address
+      konamiBaseAddress = 0;
+    }
+  }
+  else if (file->SearchBytePattern(ptnInitSectionPtrTS, ofsInitSectionPtr)) {
+    uint16_t addrSongListPtr = file->GetShort(ofsInitSectionPtr + 1);
+    addrSongList = file->GetShort(addrSongListPtr);
+  }
+  else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
+    uint8_t addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
 
-		//; Yoshi's Safari SPC
-		//0886: 8f 00 48  mov   $48,#$00
-		//0889: 8f 1e 49  mov   $49,#$1e
-		char ptnInitSongListPtrBytesYSFR[] =
-			"\x8f\x00\x48\x8f\x1e\x49";
-		ptnInitSongListPtrBytesYSFR[2] = addrSongListPtr;
-		ptnInitSongListPtrBytesYSFR[5] = addrSongListPtr + 1;
-		BytePattern ptnInitSongListPtrYSFR(
-			ptnInitSongListPtrBytesYSFR
-			,
-			"x?xx?x"
-			,
-			6);
+    //; Yoshi's Safari SPC
+    //0886: 8f 00 48  mov   $48,#$00
+    //0889: 8f 1e 49  mov   $49,#$1e
+    char ptnInitSongListPtrBytesYSFR[] =
+        "\x8f\x00\x48\x8f\x1e\x49";
+    ptnInitSongListPtrBytesYSFR[2] = addrSongListPtr;
+    ptnInitSongListPtrBytesYSFR[5] = addrSongListPtr + 1;
+    BytePattern ptnInitSongListPtrYSFR(
+        ptnInitSongListPtrBytesYSFR
+        ,
+        "x?xx?x"
+        ,
+        6);
 
-		uint32_t ofsInitSongListPtr;
-		if (file->SearchBytePattern(ptnInitSongListPtrYSFR, ofsInitSongListPtr)) {
-			addrSongList = file->GetByte(ofsInitSongListPtr + 1) | (file->GetByte(ofsInitSongListPtr + 4) << 8);
-		}
-	}
-	else {
-		return;
-	}
+    uint32_t ofsInitSongListPtr;
+    if (file->SearchBytePattern(ptnInitSongListPtrYSFR, ofsInitSongListPtr)) {
+      addrSongList = file->GetByte(ofsInitSongListPtr + 1) | (file->GetByte(ofsInitSongListPtr + 4) << 8);
+    }
+  }
+  else {
+    return;
+  }
 
-	// ACQUIRE VOICE COMMAND LIST & DETECT ENGINE VERSION
-	// (Minor classification for derived versions should come later as far as possible)
+  // ACQUIRE VOICE COMMAND LIST & DETECT ENGINE VERSION
+  // (Minor classification for derived versions should come later as far as possible)
 
-	// find a branch for voice command,
-	// and acquire the following info for standard engines.
-	// 
-	// - First voice command (usually $e0)
-	// - Voice command address table
-	// - Voice command length table
+  // find a branch for voice command,
+  // and acquire the following info for standard engines.
+  //
+  // - First voice command (usually $e0)
+  // - Voice command address table
+  // - Voice command length table
 
-	uint32_t ofsBranchForVcmd;
-	uint8_t firstVoiceCmd = 0;
-	uint16_t addrVoiceCmdAddressTable;
-	uint16_t addrVoiceCmdLengthTable;
-	uint8_t numOfVoiceCmd = 0;
-	// DERIVED VERSIONS
-	if (file->SearchBytePattern(ptnJumpToVcmdYSFR, ofsBranchForVcmd)) {
-		addrVoiceCmdAddressTable = file->GetShort(ofsBranchForVcmd + 9);
+  uint32_t ofsBranchForVcmd;
+  uint8_t firstVoiceCmd = 0;
+  uint16_t addrVoiceCmdAddressTable;
+  uint16_t addrVoiceCmdLengthTable;
+  uint8_t numOfVoiceCmd = 0;
+  // DERIVED VERSIONS
+  if (file->SearchBytePattern(ptnJumpToVcmdYSFR, ofsBranchForVcmd)) {
+    addrVoiceCmdAddressTable = file->GetShort(ofsBranchForVcmd + 9);
 
-		uint32_t ofsReadVcmdLength;
-		if (file->SearchBytePattern(ptnReadVcmdLengthYSFR, ofsReadVcmdLength)) {
-			firstVoiceCmd = file->GetByte(ofsReadVcmdLength + 2);
-			addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 7);
+    uint32_t ofsReadVcmdLength;
+    if (file->SearchBytePattern(ptnReadVcmdLengthYSFR, ofsReadVcmdLength)) {
+      firstVoiceCmd = file->GetByte(ofsReadVcmdLength + 2);
+      addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 7);
 
-			if (firstVoiceCmd == 0xe0) {
-				version = NINSNES_TOSE;
-			}
-		}
-		else {
-			return;
-		}
-	}
-	else {
-		// STANDARD VERSION
-		if (file->SearchBytePattern(ptnBranchForVcmdReadahead, ofsBranchForVcmd)) {
-			firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 5);
-		}
-		else if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd)) {
-			// this search often finds a wrong code, but some games still need it (for example, Human games)
-			firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 1);
-		}
-		else {
-			return;
-		}
+      if (firstVoiceCmd == 0xe0) {
+        version = NINSNES_TOSE;
+      }
+    }
+    else {
+      return;
+    }
+  }
+  else {
+    // STANDARD VERSION
+    if (file->SearchBytePattern(ptnBranchForVcmdReadahead, ofsBranchForVcmd)) {
+      firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 5);
+    }
+    else if (file->SearchBytePattern(ptnBranchForVcmd, ofsBranchForVcmd)) {
+      // this search often finds a wrong code, but some games still need it (for example, Human games)
+      firstVoiceCmd = file->GetByte(ofsBranchForVcmd + 1);
+    }
+    else {
+      return;
+    }
 
-		uint32_t ofsJumpToVcmd;
+    uint32_t ofsJumpToVcmd;
 
-		// find a jump to address_table[cmd * 2]
-		if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd)) {
-			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
-			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
+    // find a jump to address_table[cmd * 2]
+    if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd)) {
+      addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
+      addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
 
-			// false-positive needs to be fixed in later classification
-			if (version == NINSNES_NONE) {
-				version = NINSNES_STANDARD;
-			}
-		}
-		else if (file->SearchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
-			// search vcmd length table as well
-			uint32_t ofsReadVcmdLength;
-			if (file->SearchBytePattern(ptnReadVcmdLengthSMW, ofsReadVcmdLength)) {
-				addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 5) + ((firstVoiceCmd * 2) & 0xff);
-				addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 9) + firstVoiceCmd;
-				version = NINSNES_EARLIER;
-			}
-			else {
-				return;
-			}
-		}
-		// DERIVED VERSIONS
-		else if (file->SearchBytePattern(ptnJumpToVcmdCTOW, ofsJumpToVcmd)) {
-			// Human Games: Clock Tower, Firemen, S.O.S. (Septentrion)
-			addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 10);
-			addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
-			version = NINSNES_HUMAN;
-		}
-		else {
-			return;
-		}
-	}
+      // false-positive needs to be fixed in later classification
+      if (version == NINSNES_NONE) {
+        version = NINSNES_STANDARD;
+      }
+    }
+    else if (file->SearchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
+      // search vcmd length table as well
+      uint32_t ofsReadVcmdLength;
+      if (file->SearchBytePattern(ptnReadVcmdLengthSMW, ofsReadVcmdLength)) {
+        addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 5) + ((firstVoiceCmd * 2) & 0xff);
+        addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 9) + firstVoiceCmd;
+        version = NINSNES_EARLIER;
+      }
+      else {
+        return;
+      }
+    }
+      // DERIVED VERSIONS
+    else if (file->SearchBytePattern(ptnJumpToVcmdCTOW, ofsJumpToVcmd)) {
+      // Human Games: Clock Tower, Firemen, S.O.S. (Septentrion)
+      addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 10);
+      addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
+      version = NINSNES_HUMAN;
+    }
+    else {
+      return;
+    }
+  }
 
-	// DETERMINE THE NUMBER OF VCMDS
-	if (addrVoiceCmdAddressTable < addrVoiceCmdLengthTable) {
-		numOfVoiceCmd = (addrVoiceCmdLengthTable - addrVoiceCmdAddressTable) / 2;
-	}
+  // DETERMINE THE NUMBER OF VCMDS
+  if (addrVoiceCmdAddressTable < addrVoiceCmdLengthTable) {
+    numOfVoiceCmd = (addrVoiceCmdLengthTable - addrVoiceCmdAddressTable) / 2;
+  }
 
-	// TRY TO GRAB NOTE VOLUME/DURATION TABLE
-	uint32_t ofsDispatchNote = 0;
-	uint16_t addrDurRateTable = 0;
-	uint16_t addrVolumeTable = 0;
-	std::vector<uint8_t> durRateTable;
-	std::vector<uint8_t> volumeTable;
-	if (file->SearchBytePattern(ptnDispatchNoteYI, ofsDispatchNote)) {
-		addrDurRateTable = file->GetShort(ofsDispatchNote + 6);
-		for (uint8_t offset = 0; offset < 8; offset++) {
-			durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
-		}
+  // TRY TO GRAB NOTE VOLUME/DURATION TABLE
+  uint32_t ofsDispatchNote = 0;
+  uint16_t addrDurRateTable = 0;
+  uint16_t addrVolumeTable = 0;
+  std::vector<uint8_t> durRateTable;
+  std::vector<uint8_t> volumeTable;
+  if (file->SearchBytePattern(ptnDispatchNoteYI, ofsDispatchNote)) {
+    addrDurRateTable = file->GetShort(ofsDispatchNote + 6);
+    for (uint8_t offset = 0; offset < 8; offset++) {
+      durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
+    }
 
-		addrVolumeTable = file->GetShort(ofsDispatchNote + 16);
-		for (uint8_t offset = 0; offset < 16; offset++) {
-			volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
-		}
-	}
-	else if (file->SearchBytePattern(ptnDispatchNoteGD3, ofsDispatchNote)) {
-		addrDurRateTable = file->GetShort(ofsDispatchNote + 6);
-		for (uint8_t offset = 0; offset < 8; offset++) {
-			durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
-		}
+    addrVolumeTable = file->GetShort(ofsDispatchNote + 16);
+    for (uint8_t offset = 0; offset < 16; offset++) {
+      volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
+    }
+  }
+  else if (file->SearchBytePattern(ptnDispatchNoteGD3, ofsDispatchNote)) {
+    addrDurRateTable = file->GetShort(ofsDispatchNote + 6);
+    for (uint8_t offset = 0; offset < 8; offset++) {
+      durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
+    }
 
-		addrVolumeTable = file->GetShort(ofsDispatchNote + 16);
-		for (uint8_t offset = 0; offset < 16; offset++) {
-			volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
-		}
-	}
-	else if (file->SearchBytePattern(ptnDispatchNoteYSFR, ofsDispatchNote)) {
-		addrDurRateTable = file->GetShort(ofsDispatchNote + 16);
-		for (uint8_t offset = 0; offset < 8; offset++) {
-			durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
-		}
+    addrVolumeTable = file->GetShort(ofsDispatchNote + 16);
+    for (uint8_t offset = 0; offset < 16; offset++) {
+      volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
+    }
+  }
+  else if (file->SearchBytePattern(ptnDispatchNoteYSFR, ofsDispatchNote)) {
+    addrDurRateTable = file->GetShort(ofsDispatchNote + 16);
+    for (uint8_t offset = 0; offset < 8; offset++) {
+      durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
+    }
 
-		addrVolumeTable = file->GetShort(ofsDispatchNote + 4);
-		for (uint8_t offset = 0; offset < 16; offset++) {
-			volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
-		}
-	}
+    addrVolumeTable = file->GetShort(ofsDispatchNote + 4);
+    for (uint8_t offset = 0; offset < 16; offset++) {
+      volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
+    }
+  }
 
-	// CLASSIFY DERIVED VERSIONS (fix false-positive)
-	uint32_t ofsInstrVCmd = 0;
-	if (version == NINSNES_STANDARD)
-	{
-		if (konamiBaseAddress != 0xffff) {
-			version = NINSNES_KONAMI;
-		}
-		else if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
-			if (firstVoiceCmd == 0xe0) {
-				version = NINSNES_LEMMINGS;
-			}
-			else {
-				version = NINSNES_UNKNOWN;
-			}
-		}
-		else {
-			const uint8_t STD_VCMD_LEN_TABLE[27] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01 };
-			if (firstVoiceCmd == 0xe0 && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
-				if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
-					uint32_t ofsWriteVolume;
+  // CLASSIFY DERIVED VERSIONS (fix false-positive)
+  uint32_t ofsInstrVCmd = 0;
+  if (version == NINSNES_STANDARD) {
+    if (konamiBaseAddress != 0xffff) {
+      version = NINSNES_KONAMI;
+    }
+    else if (file->SearchBytePattern(ptnDispatchNoteLEM, ofsDispatchNote)) {
+      if (firstVoiceCmd == 0xe0) {
+        version = NINSNES_LEMMINGS;
+      }
+      else {
+        version = NINSNES_UNKNOWN;
+      }
+    }
+    else {
+      const uint8_t STD_VCMD_LEN_TABLE[27] =
+          {0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03,
+           0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01};
+      if (firstVoiceCmd == 0xe0
+          && file->MatchBytes(STD_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(STD_VCMD_LEN_TABLE))) {
+        if (addrVoiceCmdAddressTable + sizeof(STD_VCMD_LEN_TABLE) * 2 == addrVoiceCmdLengthTable) {
+          uint32_t ofsWriteVolume;
 
-					if (file->SearchBytePattern(ptnWriteVolumeKSS, ofsWriteVolume)) {
-						version = NINSNES_HAL;
-					}
-					else if (file->SearchBytePattern(ptnInstrVCmdACTR, ofsInstrVCmd)) {
-						version = NINSNES_QUINTET_ACTR;
-					}
-					else if (file->SearchBytePattern(ptnInstrVCmdACTR2, ofsInstrVCmd)) {
-						version = NINSNES_QUINTET_ACTR2;
-					}
-					else {
-						version = NINSNES_STANDARD;
-					}
-				}
-				else {
-					// compatible design, but customized anyway
-					uint32_t ofsRD1VCmd_FA_FE;
-					uint32_t ofsRD2VCmdInstrADSR;
-					if (file->SearchBytePattern(ptnRD1VCmd_FA_FE, ofsRD1VCmd_FA_FE)) {
-						version = NINSNES_RD1;
-					}
-					else if (file->SearchBytePattern(ptnRD2VCmdInstrADSR, ofsRD2VCmdInstrADSR)) {
-						// Marvelous
-						version = NINSNES_RD2;
-					}
-					else if (file->SearchBytePattern(ptnInstrVCmdACTR2, ofsInstrVCmd) && numOfVoiceCmd == 32 && file->GetByte(addrVoiceCmdLengthTable + 31) == 1) {
-						version = NINSNES_QUINTET_IOG;
-					}
-					else if (file->SearchBytePattern(ptnInstrVCmdTS, ofsInstrVCmd) && numOfVoiceCmd == 32 && file->GetByte(addrVoiceCmdLengthTable + 31) == 1) {
-						version = NINSNES_QUINTET_TS;
-					}
-				}
-			}
-			else {
-				version = NINSNES_UNKNOWN;
+          if (file->SearchBytePattern(ptnWriteVolumeKSS, ofsWriteVolume)) {
+            version = NINSNES_HAL;
+          }
+          else if (file->SearchBytePattern(ptnInstrVCmdACTR, ofsInstrVCmd)) {
+            version = NINSNES_QUINTET_ACTR;
+          }
+          else if (file->SearchBytePattern(ptnInstrVCmdACTR2, ofsInstrVCmd)) {
+            version = NINSNES_QUINTET_ACTR2;
+          }
+          else {
+            version = NINSNES_STANDARD;
+          }
+        }
+        else {
+          // compatible design, but customized anyway
+          uint32_t ofsRD1VCmd_FA_FE;
+          uint32_t ofsRD2VCmdInstrADSR;
+          if (file->SearchBytePattern(ptnRD1VCmd_FA_FE, ofsRD1VCmd_FA_FE)) {
+            version = NINSNES_RD1;
+          }
+          else if (file->SearchBytePattern(ptnRD2VCmdInstrADSR, ofsRD2VCmdInstrADSR)) {
+            // Marvelous
+            version = NINSNES_RD2;
+          }
+          else if (file->SearchBytePattern(ptnInstrVCmdACTR2, ofsInstrVCmd) && numOfVoiceCmd == 32
+              && file->GetByte(addrVoiceCmdLengthTable + 31) == 1) {
+            version = NINSNES_QUINTET_IOG;
+          }
+          else if (file->SearchBytePattern(ptnInstrVCmdTS, ofsInstrVCmd) && numOfVoiceCmd == 32
+              && file->GetByte(addrVoiceCmdLengthTable + 31) == 1) {
+            version = NINSNES_QUINTET_TS;
+          }
+        }
+      }
+      else {
+        version = NINSNES_UNKNOWN;
 
-				uint32_t ofsIntelliVCmdFA;
-				if (file->SearchBytePattern(ptnIntelliVCmdFA, ofsIntelliVCmdFA)) {
-					// Intelligent Systems
-					if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
-						const uint8_t INTELLI_FE3_VCMD_LEN_TABLE[40] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x02, 0x02 };
-						if (firstVoiceCmd == 0xd6 && file->MatchBytes(INTELLI_FE3_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(INTELLI_FE3_VCMD_LEN_TABLE))) {
-							version = NINSNES_INTELLI_FE3;
-						}
-					}
-					else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
-						const uint8_t INTELLI_FE4_VCMD_LEN_TABLE[36] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01 };
-						if (firstVoiceCmd == 0xda && file->MatchBytes(INTELLI_FE4_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(INTELLI_FE4_VCMD_LEN_TABLE))) {
-							version = NINSNES_INTELLI_FE4;
-						}
-					}
-					else {
-						const uint8_t INTELLI_TA_VCMD_LEN_TABLE[36] = { 0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x02, 0x00, 0x01, 0x01, 0x01, 0x01 };
-						if (firstVoiceCmd == 0xda && file->MatchBytes(INTELLI_TA_VCMD_LEN_TABLE, addrVoiceCmdLengthTable, sizeof(INTELLI_TA_VCMD_LEN_TABLE))) {
-							version = NINSNES_INTELLI_TA;
-						}
-					}
-				}
-			}
-		}
-	}
+        uint32_t ofsIntelliVCmdFA;
+        if (file->SearchBytePattern(ptnIntelliVCmdFA, ofsIntelliVCmdFA)) {
+          // Intelligent Systems
+          if (file->SearchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
+            const uint8_t INTELLI_FE3_VCMD_LEN_TABLE[40] =
+                {0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01,
+                 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01,
+                 0x01, 0x00, 0x01, 0x01, 0x02, 0x02};
+            if (firstVoiceCmd == 0xd6 && file->MatchBytes(INTELLI_FE3_VCMD_LEN_TABLE,
+                                                          addrVoiceCmdLengthTable,
+                                                          sizeof(INTELLI_FE3_VCMD_LEN_TABLE))) {
+              version = NINSNES_INTELLI_FE3;
+            }
+          }
+          else if (file->SearchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
+            const uint8_t INTELLI_FE4_VCMD_LEN_TABLE[36] =
+                {0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01,
+                 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x01, 0x00, 0x01, 0x01,
+                 0x01, 0x01};
+            if (firstVoiceCmd == 0xda && file->MatchBytes(INTELLI_FE4_VCMD_LEN_TABLE,
+                                                          addrVoiceCmdLengthTable,
+                                                          sizeof(INTELLI_FE4_VCMD_LEN_TABLE))) {
+              version = NINSNES_INTELLI_FE4;
+            }
+          }
+          else {
+            const uint8_t INTELLI_TA_VCMD_LEN_TABLE[36] =
+                {0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01,
+                 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x02, 0x00, 0x01, 0x01,
+                 0x01, 0x01};
+            if (firstVoiceCmd == 0xda && file->MatchBytes(INTELLI_TA_VCMD_LEN_TABLE,
+                                                          addrVoiceCmdLengthTable,
+                                                          sizeof(INTELLI_TA_VCMD_LEN_TABLE))) {
+              version = NINSNES_INTELLI_TA;
+            }
+          }
+        }
+      }
+    }
+  }
 
-	// Quintet: ACQUIRE INSTRUMENT BASE:
-	uint8_t quintetBGMInstrBase = 0;
-	uint16_t quintetAddrBGMInstrLookup = 0;
-	switch (version) {
-	case NINSNES_QUINTET_ACTR:
-		{
-			uint16_t addrBGMInstrBase = file->GetShort(ofsInstrVCmd + 18);
-			quintetBGMInstrBase = file->GetByte(addrBGMInstrBase);
-			break;
-		}
+  // Quintet: ACQUIRE INSTRUMENT BASE:
+  uint8_t quintetBGMInstrBase = 0;
+  uint16_t quintetAddrBGMInstrLookup = 0;
+  switch (version) {
+    case NINSNES_QUINTET_ACTR: {
+      uint16_t addrBGMInstrBase = file->GetShort(ofsInstrVCmd + 18);
+      quintetBGMInstrBase = file->GetByte(addrBGMInstrBase);
+      break;
+    }
 
-	case NINSNES_QUINTET_ACTR2:
-	case NINSNES_QUINTET_IOG:
-		quintetAddrBGMInstrLookup = file->GetShort(ofsInstrVCmd + 19);
-		break;
+    case NINSNES_QUINTET_ACTR2:
+    case NINSNES_QUINTET_IOG:
+      quintetAddrBGMInstrLookup = file->GetShort(ofsInstrVCmd + 19);
+      break;
 
-	case NINSNES_QUINTET_TS:
-		quintetAddrBGMInstrLookup = file->GetShort(ofsInstrVCmd + 18);
-		break;
-	}
+    case NINSNES_QUINTET_TS:
+      quintetAddrBGMInstrLookup = file->GetShort(ofsInstrVCmd + 18);
+      break;
+  }
 
-	// GUESS SONG COUNT
-	// Test Case: Star Fox, Kirby Super Star, Earthbound
-	// Note that the result sometimes exceeds the real length
-	uint8_t songListLength = 1;
-	uint16_t addrSectionListCutoff = 0xffff;
-	// skip index 0, it's not a part of table in most games
-	for (uint8_t songIndex = 1; songIndex <= 0x7f; songIndex++) {
-		uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
-		if (addrSectionListPtr >= addrSectionListCutoff) {
-			break;
-		}
+  // GUESS SONG COUNT
+  // Test Case: Star Fox, Kirby Super Star, Earthbound
+  // Note that the result sometimes exceeds the real length
+  uint8_t songListLength = 1;
+  uint16_t addrSectionListCutoff = 0xffff;
+  // skip index 0, it's not a part of table in most games
+  for (uint8_t songIndex = 1; songIndex <= 0x7f; songIndex++) {
+    uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
+    if (addrSectionListPtr >= addrSectionListCutoff) {
+      break;
+    }
 
-		uint16_t firstSectionPtr = file->GetShort(addrSectionListPtr);
-		if (version == NINSNES_KONAMI) {
-			firstSectionPtr += konamiBaseAddress;
-		}
-		if (firstSectionPtr == 0) {
-			continue;
-		}
-		if ((firstSectionPtr & 0xff00) == 0 || firstSectionPtr == 0xffff) {
-			break;
-		}
-		if (firstSectionPtr >= addrSectionListPtr) {
-			addrSectionListCutoff = min(addrSectionListCutoff, firstSectionPtr);
-		}
+    uint16_t firstSectionPtr = file->GetShort(addrSectionListPtr);
+    if (version == NINSNES_KONAMI) {
+      firstSectionPtr += konamiBaseAddress;
+    }
+    if (firstSectionPtr == 0) {
+      continue;
+    }
+    if ((firstSectionPtr & 0xff00) == 0 || firstSectionPtr == 0xffff) {
+      break;
+    }
+    if (firstSectionPtr >= addrSectionListPtr) {
+      addrSectionListCutoff = min(addrSectionListCutoff, firstSectionPtr);
+    }
 
-		uint16_t addrFirstSection = file->GetShort(firstSectionPtr);
-		if (addrFirstSection < 0x0100) {
-			// usually it does not appear
-			// probably it's broken
-			continue;
-		}
+    uint16_t addrFirstSection = file->GetShort(firstSectionPtr);
+    if (addrFirstSection < 0x0100) {
+      // usually it does not appear
+      // probably it's broken
+      continue;
+    }
 
-		if (version == NINSNES_KONAMI) {
-			addrFirstSection += konamiBaseAddress;
-		}
-		if (addrFirstSection + 16 > 0x10000) {
-			break;
-		}
+    if (version == NINSNES_KONAMI) {
+      addrFirstSection += konamiBaseAddress;
+    }
+    if (addrFirstSection + 16 > 0x10000) {
+      break;
+    }
 
-		bool hasIllegalTrack = false;
-		for (uint8_t trackIndex = 0; trackIndex < 8; trackIndex++) {
-			uint16_t addrTrackStart = file->GetShort(addrFirstSection + trackIndex * 2);
-			if (addrTrackStart != 0) {
-				if (addrTrackStart == 0xffff) {
-					hasIllegalTrack = true;
-					break;
-				}
+    bool hasIllegalTrack = false;
+    for (uint8_t trackIndex = 0; trackIndex < 8; trackIndex++) {
+      uint16_t addrTrackStart = file->GetShort(addrFirstSection + trackIndex * 2);
+      if (addrTrackStart != 0) {
+        if (addrTrackStart == 0xffff) {
+          hasIllegalTrack = true;
+          break;
+        }
 
-				if (version == NINSNES_KONAMI) {
-					addrTrackStart += konamiBaseAddress;
-				}
+        if (version == NINSNES_KONAMI) {
+          addrTrackStart += konamiBaseAddress;
+        }
 
-				if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
-					hasIllegalTrack = true;
-					break;
-				}
-			}
-		}
-		if (hasIllegalTrack) {
-			break;
-		}
+        if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
+          hasIllegalTrack = true;
+          break;
+        }
+      }
+    }
+    if (hasIllegalTrack) {
+      break;
+    }
 
-		songListLength = songIndex + 1;
-	}
+    songListLength = songIndex + 1;
+  }
 
-	// GUESS CURRENT SONG NUMBER
-	uint8_t guessedSongIndex = 0xff;
+  // GUESS CURRENT SONG NUMBER
+  uint8_t guessedSongIndex = 0xff;
 
-	// scan for a song that contains the current section
-	// (note that the section pointer points to the "next" section actually, in most cases)
-	uint16_t addrCurrentSection = file->GetShort(addrSectionPtr);
-	if (addrCurrentSection >= 0x0100 && addrCurrentSection < 0xfff0) {
-		uint8_t songIndexCandidate = 0xff;
+  // scan for a song that contains the current section
+  // (note that the section pointer points to the "next" section actually, in most cases)
+  uint16_t addrCurrentSection = file->GetShort(addrSectionPtr);
+  if (addrCurrentSection >= 0x0100 && addrCurrentSection < 0xfff0) {
+    uint8_t songIndexCandidate = 0xff;
 
-		for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
-			uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
-			if (addrSectionListPtr == 0 || addrSectionListPtr == 0xffff) {
-				continue;
-			}
+    for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
+      uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
+      if (addrSectionListPtr == 0 || addrSectionListPtr == 0xffff) {
+        continue;
+      }
 
-			uint16_t firstSectionPtr = file->GetShort(addrSectionListPtr);
-			if (version == NINSNES_KONAMI) {
-				firstSectionPtr += konamiBaseAddress;
-			}
-			if (firstSectionPtr > addrCurrentSection) {
-				continue;
-			}
+      uint16_t firstSectionPtr = file->GetShort(addrSectionListPtr);
+      if (version == NINSNES_KONAMI) {
+        firstSectionPtr += konamiBaseAddress;
+      }
+      if (firstSectionPtr > addrCurrentSection) {
+        continue;
+      }
 
-			uint16_t curAddress = firstSectionPtr;
-			if ((addrCurrentSection % 2) == (curAddress % 2)) {
-				uint8_t sectionCount = 0; // prevent overrun of illegal data
-				while (curAddress >= 0x0100 && curAddress < 0xfff0 && sectionCount < 32) {
-					uint16_t addrSection = file->GetShort(curAddress);
-					if (version == NINSNES_KONAMI) {
-						addrSection += konamiBaseAddress;
-					}
+      uint16_t curAddress = firstSectionPtr;
+      if ((addrCurrentSection % 2) == (curAddress % 2)) {
+        uint8_t sectionCount = 0; // prevent overrun of illegal data
+        while (curAddress >= 0x0100 && curAddress < 0xfff0 && sectionCount < 32) {
+          uint16_t addrSection = file->GetShort(curAddress);
+          if (version == NINSNES_KONAMI) {
+            addrSection += konamiBaseAddress;
+          }
 
-					if (curAddress == addrCurrentSection) {
-						songIndexCandidate = songIndex;
-						break;
-					}
+          if (curAddress == addrCurrentSection) {
+            songIndexCandidate = songIndex;
+            break;
+          }
 
-					if ((addrSection & 0xff00) == 0) {
-						// section list end / jump
-						break;
-					}
+          if ((addrSection & 0xff00) == 0) {
+            // section list end / jump
+            break;
+          }
 
-					curAddress += 2;
-					sectionCount++;
-				}
+          curAddress += 2;
+          sectionCount++;
+        }
 
-				if (songIndexCandidate != 0xff) {
-					break;
-				}
-			}
-		}
+        if (songIndexCandidate != 0xff) {
+          break;
+        }
+      }
+    }
 
-		if (songIndexCandidate != 0xff) {
-			guessedSongIndex = songIndexCandidate;
-		}
-	}
+    if (songIndexCandidate != 0xff) {
+      guessedSongIndex = songIndexCandidate;
+    }
+  }
 
-	if (guessedSongIndex == 0xff) {
-		return;
-	}
-	
-	// load the song
-	uint16_t addrSongStart = file->GetShort(addrSongList + guessedSongIndex * 2);
-	if (version == NINSNES_KONAMI) {
-		addrSongStart += konamiBaseAddress;
-	}
+  if (guessedSongIndex == 0xff) {
+    return;
+  }
 
-	NinSnesSeq* newSeq = new NinSnesSeq(file, version, addrSongStart, 0, volumeTable, durRateTable, name);
-	newSeq->konamiBaseAddress = konamiBaseAddress;
-	newSeq->quintetBGMInstrBase = quintetBGMInstrBase;
-	newSeq->quintetAddrBGMInstrLookup = quintetAddrBGMInstrLookup;
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  // load the song
+  uint16_t addrSongStart = file->GetShort(addrSongList + guessedSongIndex * 2);
+  if (version == NINSNES_KONAMI) {
+    addrSongStart += konamiBaseAddress;
+  }
 
-	// skip unknown instruments
-	if (version == NINSNES_UNKNOWN) {
-		return;
-	}
+  NinSnesSeq *newSeq = new NinSnesSeq(file, version, addrSongStart, 0, volumeTable, durRateTable, name);
+  newSeq->konamiBaseAddress = konamiBaseAddress;
+  newSeq->quintetBGMInstrBase = quintetBGMInstrBase;
+  newSeq->quintetAddrBGMInstrLookup = quintetAddrBGMInstrLookup;
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	// scan for instrument table
-	uint32_t ofsLoadInstrTableAddressASM;
-	uint32_t addrInstrTable;
-	uint16_t spcDirAddr = 0;
-	if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
-		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
-	}
-	else if (file->SearchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM)) {
-		addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 3) | (file->GetByte(ofsLoadInstrTableAddressASM + 6) << 8);
-	}
-	// DERIVED VERSIONS
-	else if (version == NINSNES_HUMAN) {
-		if (file->SearchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
-			addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
-		}
-		else if (file->SearchBytePattern(ptnLoadInstrTableAddressSOS, ofsLoadInstrTableAddressASM)) {
-			addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 1) | (file->GetByte(ofsLoadInstrTableAddressASM + 4) << 8);
-		}
-		else {
-			return;
-		}
-	}
-	else if (version == NINSNES_TOSE) {
-		if (file->SearchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
-			spcDirAddr = file->GetByte(ofsLoadInstrTableAddressASM + 3) << 8;
-			addrInstrTable = file->GetByte(ofsLoadInstrTableAddressASM + 10) | (file->GetByte(ofsLoadInstrTableAddressASM + 13) << 8);
-		}
-		else {
-			return;
-		}
-	}
-	else {
-		return;
-	}
+  // skip unknown instruments
+  if (version == NINSNES_UNKNOWN) {
+    return;
+  }
 
-	// scan for DIR address
-	if (spcDirAddr == 0) {
-		uint32_t ofsSetDIR;
-		if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
-			spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
-		}
-		else if (file->SearchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
-			spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-		}
-		else if (file->SearchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
-			spcDirAddr = file->GetByte(ofsSetDIR + 9) << 8;
-		}
-		// DERIVED VERSIONS
-		else if (file->SearchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
-			spcDirAddr = file->GetByte(ofsSetDIR + 3) << 8;
-		}
-		else if (file->SearchBytePattern(ptnSetDIRTS, ofsSetDIR)) {
-			spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-		}
-		else {
-			return;
-		}
-	}
+  // scan for instrument table
+  uint32_t ofsLoadInstrTableAddressASM;
+  uint32_t addrInstrTable;
+  uint16_t spcDirAddr = 0;
+  if (file->SearchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
+    addrInstrTable =
+        file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
+  }
+  else if (file->SearchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM)) {
+    addrInstrTable =
+        file->GetByte(ofsLoadInstrTableAddressASM + 3) | (file->GetByte(ofsLoadInstrTableAddressASM + 6) << 8);
+  }
+    // DERIVED VERSIONS
+  else if (version == NINSNES_HUMAN) {
+    if (file->SearchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
+      addrInstrTable =
+          file->GetByte(ofsLoadInstrTableAddressASM + 7) | (file->GetByte(ofsLoadInstrTableAddressASM + 10) << 8);
+    }
+    else if (file->SearchBytePattern(ptnLoadInstrTableAddressSOS, ofsLoadInstrTableAddressASM)) {
+      addrInstrTable =
+          file->GetByte(ofsLoadInstrTableAddressASM + 1) | (file->GetByte(ofsLoadInstrTableAddressASM + 4) << 8);
+    }
+    else {
+      return;
+    }
+  }
+  else if (version == NINSNES_TOSE) {
+    if (file->SearchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
+      spcDirAddr = file->GetByte(ofsLoadInstrTableAddressASM + 3) << 8;
+      addrInstrTable =
+          file->GetByte(ofsLoadInstrTableAddressASM + 10) | (file->GetByte(ofsLoadInstrTableAddressASM + 13) << 8);
+    }
+    else {
+      return;
+    }
+  }
+  else {
+    return;
+  }
 
-	uint16_t konamiTuningTableAddress = 0;
-	uint8_t konamiTuningTableSize = 0;
-	if (version == NINSNES_KONAMI) {
-		if (file->SearchBytePattern(ptnInstrVCmdGD3, ofsInstrVCmd)) {
-			uint16_t konamiAddrTuningTableLow = file->GetShort(ofsInstrVCmd + 10);
-			uint16_t konamiAddrTuningTableHigh = file->GetShort(ofsInstrVCmd + 14);
+  // scan for DIR address
+  if (spcDirAddr == 0) {
+    uint32_t ofsSetDIR;
+    if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+      spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
+    }
+    else if (file->SearchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
+      spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+    }
+    else if (file->SearchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
+      spcDirAddr = file->GetByte(ofsSetDIR + 9) << 8;
+    }
+      // DERIVED VERSIONS
+    else if (file->SearchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
+      spcDirAddr = file->GetByte(ofsSetDIR + 3) << 8;
+    }
+    else if (file->SearchBytePattern(ptnSetDIRTS, ofsSetDIR)) {
+      spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+    }
+    else {
+      return;
+    }
+  }
 
-			if (konamiAddrTuningTableHigh > konamiAddrTuningTableLow &&
-				konamiAddrTuningTableHigh - konamiAddrTuningTableLow <= 0x7f)
-			{
-				konamiTuningTableAddress = konamiAddrTuningTableLow;
-				konamiTuningTableSize = konamiAddrTuningTableHigh - konamiAddrTuningTableLow;
-			}
-		}
-	}
+  uint16_t konamiTuningTableAddress = 0;
+  uint8_t konamiTuningTableSize = 0;
+  if (version == NINSNES_KONAMI) {
+    if (file->SearchBytePattern(ptnInstrVCmdGD3, ofsInstrVCmd)) {
+      uint16_t konamiAddrTuningTableLow = file->GetShort(ofsInstrVCmd + 10);
+      uint16_t konamiAddrTuningTableHigh = file->GetShort(ofsInstrVCmd + 14);
 
-	NinSnesInstrSet * newInstrSet = new NinSnesInstrSet(file, version, addrInstrTable, spcDirAddr);
-	newInstrSet->konamiTuningTableAddress = konamiTuningTableAddress;
-	newInstrSet->konamiTuningTableSize = konamiTuningTableSize;
-	if (!newInstrSet->LoadVGMFile()) {
-		delete newInstrSet;
-		return;
-	}
+      if (konamiAddrTuningTableHigh > konamiAddrTuningTableLow &&
+          konamiAddrTuningTableHigh - konamiAddrTuningTableLow <= 0x7f) {
+        konamiTuningTableAddress = konamiAddrTuningTableLow;
+        konamiTuningTableSize = konamiAddrTuningTableHigh - konamiAddrTuningTableLow;
+      }
+    }
+  }
+
+  NinSnesInstrSet *newInstrSet = new NinSnesInstrSet(file, version, addrInstrTable, spcDirAddr);
+  newInstrSet->konamiTuningTableAddress = konamiTuningTableAddress;
+  newInstrSet->konamiTuningTableSize = konamiTuningTableSize;
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 }
 
-void NinSnesScanner::SearchForNinSnesFromROM (RawFile* file)
-{
+void NinSnesScanner::SearchForNinSnesFromROM(RawFile *file) {
 }

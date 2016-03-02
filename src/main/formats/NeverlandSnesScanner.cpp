@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "NeverlandSnesFormat.h"
-#include "NeverlandSnesScanner.h"
 #include "NeverlandSnesSeq.h"
 
 //; Lufia SPC
@@ -51,46 +50,43 @@ BytePattern NeverlandSnesScanner::ptnLoadSongS2C(
 	,
 	22);
 
-void NeverlandSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000) {
-		SearchForNeverlandSnesFromARAM(file);
-	}
-	else {
-		SearchForNeverlandSnesFromROM(file);
-	}
-	return;
+void NeverlandSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForNeverlandSnesFromARAM(file);
+  }
+  else {
+    SearchForNeverlandSnesFromROM(file);
+  }
+  return;
 }
 
-void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM (RawFile* file)
-{
-	NeverlandSnesVersion version = NEVERLANDSNES_NONE;
+void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM(RawFile *file) {
+  NeverlandSnesVersion version = NEVERLANDSNES_NONE;
 
-	std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
-	uint32_t ofsLoadSong;
-	uint16_t addrSeqHeader;
-	if (file->SearchBytePattern(ptnLoadSongS2C, ofsLoadSong)) {
-		addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;
-		version = NEVERLANDSNES_S2C;
-	}
-	else if (file->SearchBytePattern(ptnLoadSongSFC, ofsLoadSong)) {
-		addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;
-		version = NEVERLANDSNES_SFC;
-	}
-	else {
-		return;
-	}
+  uint32_t ofsLoadSong;
+  uint16_t addrSeqHeader;
+  if (file->SearchBytePattern(ptnLoadSongS2C, ofsLoadSong)) {
+    addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;
+    version = NEVERLANDSNES_S2C;
+  }
+  else if (file->SearchBytePattern(ptnLoadSongSFC, ofsLoadSong)) {
+    addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;
+    version = NEVERLANDSNES_SFC;
+  }
+  else {
+    return;
+  }
 
-	NeverlandSnesSeq* newSeq = new NeverlandSnesSeq(file, version, addrSeqHeader);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  NeverlandSnesSeq *newSeq = new NeverlandSnesSeq(file, version, addrSeqHeader);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 }
 
-void NeverlandSnesScanner::SearchForNeverlandSnesFromROM (RawFile* file)
-{
+void NeverlandSnesScanner::SearchForNeverlandSnesFromROM(RawFile *file) {
 }

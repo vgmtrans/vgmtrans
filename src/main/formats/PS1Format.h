@@ -12,9 +12,9 @@
 // *********
 
 BEGIN_FORMAT(PS1)
-	USING_SCANNER(PS1SeqScanner)
-	//USING_MATCHER_WITH_ARG(SimpleMatcher, true)
-	USING_MATCHER(FilegroupMatcher)
+  USING_SCANNER(PS1SeqScanner)
+  //USING_MATCHER_WITH_ARG(SimpleMatcher, true)
+  USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
 

@@ -101,141 +101,122 @@ BytePattern RareSnesScanner::ptnVCmdExecDKC2(
 	,
 	12);
 
-void RareSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000)
-	{
-		SearchForRareSnesFromARAM(file);
-	}
-	else
-	{
-		SearchForRareSnesFromROM(file);
-	}
-	return;
+void RareSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForRareSnesFromARAM(file);
+  }
+  else {
+    SearchForRareSnesFromROM(file);
+  }
+  return;
 }
 
-void RareSnesScanner::SearchForRareSnesFromARAM (RawFile* file)
-{
-	RareSnesVersion version = RARESNES_NONE;
-	uint32_t ofsSongLoadASM;
-	uint32_t ofsVCmdExecASM;
-	uint32_t addrSeqHeader;
-	uint32_t addrVCmdTable;
-	wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
+  RareSnesVersion version = RARESNES_NONE;
+  uint32_t ofsSongLoadASM;
+  uint32_t ofsVCmdExecASM;
+  uint32_t addrSeqHeader;
+  uint32_t addrVCmdTable;
+  wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	// find a sequence
-	if (file->SearchBytePattern(ptnSongLoadDKC2, ofsSongLoadASM))
-	{
-		addrSeqHeader = file->GetShort(file->GetByte(ofsSongLoadASM + 8));
-	}
-	else if (file->SearchBytePattern(ptnSongLoadDKC, ofsSongLoadASM) &&
-		file->GetShort(ofsSongLoadASM + 13) == file->GetShort(ofsSongLoadASM + 8) + 1)
-	{
-		addrSeqHeader = file->GetShort(ofsSongLoadASM + 8);
-	}
-	else
-	{
-		return;
-	}
+  // find a sequence
+  if (file->SearchBytePattern(ptnSongLoadDKC2, ofsSongLoadASM)) {
+    addrSeqHeader = file->GetShort(file->GetByte(ofsSongLoadASM + 8));
+  }
+  else if (file->SearchBytePattern(ptnSongLoadDKC, ofsSongLoadASM) &&
+      file->GetShort(ofsSongLoadASM + 13) == file->GetShort(ofsSongLoadASM + 8) + 1) {
+    addrSeqHeader = file->GetShort(ofsSongLoadASM + 8);
+  }
+  else {
+    return;
+  }
 
-	// guess engine version
-	if (file->SearchBytePattern(ptnVCmdExecDKC2, ofsVCmdExecASM))
-	{
-		addrVCmdTable = file->GetShort(ofsVCmdExecASM + 10);
-		if (file->GetShort(addrVCmdTable + (0x0c * 2)) != 0)
-		{
-			if (file->GetShort(addrVCmdTable + (0x11 * 2)) != 0)
-			{
-				version = RARESNES_WNRN;
-			}
-			else
-			{
-				version = RARESNES_DKC2;
-			}
-		}
-		else
-		{
-			version = RARESNES_KI;
-		}
-	}
-	else if (file->SearchBytePattern(ptnVCmdExecDKC, ofsVCmdExecASM))
-	{
-		addrVCmdTable = file->GetShort(ofsVCmdExecASM + 12);
-		version = RARESNES_DKC;
-	}
-	else
-	{
-		return;
-	}
+  // guess engine version
+  if (file->SearchBytePattern(ptnVCmdExecDKC2, ofsVCmdExecASM)) {
+    addrVCmdTable = file->GetShort(ofsVCmdExecASM + 10);
+    if (file->GetShort(addrVCmdTable + (0x0c * 2)) != 0) {
+      if (file->GetShort(addrVCmdTable + (0x11 * 2)) != 0) {
+        version = RARESNES_WNRN;
+      }
+      else {
+        version = RARESNES_DKC2;
+      }
+    }
+    else {
+      version = RARESNES_KI;
+    }
+  }
+  else if (file->SearchBytePattern(ptnVCmdExecDKC, ofsVCmdExecASM)) {
+    addrVCmdTable = file->GetShort(ofsVCmdExecASM + 12);
+    version = RARESNES_DKC;
+  }
+  else {
+    return;
+  }
 
-	// load sequence
-	RareSnesSeq* newSeq = new RareSnesSeq(file, version, addrSeqHeader, name);
-	if (!newSeq->LoadVGMFile())
-	{
-		delete newSeq;
-		return;
-	}
+  // load sequence
+  RareSnesSeq *newSeq = new RareSnesSeq(file, version, addrSeqHeader, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	// Rare engine has a instrument # <--> SRCN # table, find it
-	uint32_t ofsReadSRCNASM;
-	if (!file->SearchBytePattern(ptnReadSRCNTable, ofsReadSRCNASM))
-	{
-		return;
-	}
-	uint32_t addrSRCNTable = file->GetShort(ofsReadSRCNASM + 5);
-	if (addrSRCNTable + 0x100 > 0x10000)
-	{
-		return;
-	}
+  // Rare engine has a instrument # <--> SRCN # table, find it
+  uint32_t ofsReadSRCNASM;
+  if (!file->SearchBytePattern(ptnReadSRCNTable, ofsReadSRCNASM)) {
+    return;
+  }
+  uint32_t addrSRCNTable = file->GetShort(ofsReadSRCNASM + 5);
+  if (addrSRCNTable + 0x100 > 0x10000) {
+    return;
+  }
 
-	// find DIR address
-	uint32_t ofsSetDIRASM;
-	if (!file->SearchBytePattern(ptnLoadDIR, ofsSetDIRASM))
-	{
-		return;
-	}
-	uint32_t spcDirAddr = file->GetByte(ofsSetDIRASM + 4) << 8;
+  // find DIR address
+  uint32_t ofsSetDIRASM;
+  if (!file->SearchBytePattern(ptnLoadDIR, ofsSetDIRASM)) {
+    return;
+  }
+  uint32_t spcDirAddr = file->GetByte(ofsSetDIRASM + 4) << 8;
 
-	// scan SRCN table
-	RareSnesInstrSet * newInstrSet = new RareSnesInstrSet(file, addrSRCNTable, spcDirAddr, newSeq->instrUnityKeyHints, newSeq->instrPitchHints, newSeq->instrADSRHints);
-	if (!newInstrSet->LoadVGMFile())
-	{
-		delete newInstrSet;
-		return;
-	}
+  // scan SRCN table
+  RareSnesInstrSet *newInstrSet = new RareSnesInstrSet(file,
+                                                       addrSRCNTable,
+                                                       spcDirAddr,
+                                                       newSeq->instrUnityKeyHints,
+                                                       newSeq->instrPitchHints,
+                                                       newSeq->instrADSRHints);
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 
-	// get SRCN # range
-	uint8_t maxSRCN = 0;
-	std::vector<uint8_t> usedSRCNs;
-	const std::vector<uint8_t>& availInstruments = newInstrSet->GetAvailableInstruments();
-	for (std::vector<uint8_t>::const_iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr)
-	{
-		uint8_t inst = (*itr);
-		uint8_t srcn = file->GetByte(addrSRCNTable + inst);
+  // get SRCN # range
+  uint8_t maxSRCN = 0;
+  std::vector<uint8_t> usedSRCNs;
+  const std::vector<uint8_t> &availInstruments = newInstrSet->GetAvailableInstruments();
+  for (std::vector<uint8_t>::const_iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr) {
+    uint8_t inst = (*itr);
+    uint8_t srcn = file->GetByte(addrSRCNTable + inst);
 
-		if (maxSRCN < srcn)
-		{
-			maxSRCN = srcn;
-		}
+    if (maxSRCN < srcn) {
+      maxSRCN = srcn;
+    }
 
-		std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
-		if (itrSRCN == usedSRCNs.end())
-		{
-			usedSRCNs.push_back(srcn);
-		}
-	}
-	std::sort(usedSRCNs.begin(), usedSRCNs.end());
+    std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+    if (itrSRCN == usedSRCNs.end()) {
+      usedSRCNs.push_back(srcn);
+    }
+  }
+  std::sort(usedSRCNs.begin(), usedSRCNs.end());
 
-	// load BRR samples
-	SNESSampColl * newSampColl = new SNESSampColl(RareSnesFormat::name, file, spcDirAddr, usedSRCNs);
-	if (!newSampColl->LoadVGMFile())
-	{
-		delete newSampColl;
-		return;
-	}
+  // load BRR samples
+  SNESSampColl *newSampColl = new SNESSampColl(RareSnesFormat::name, file, spcDirAddr, usedSRCNs);
+  if (!newSampColl->LoadVGMFile()) {
+    delete newSampColl;
+    return;
+  }
 }
 
-void RareSnesScanner::SearchForRareSnesFromROM (RawFile* file)
-{
+void RareSnesScanner::SearchForRareSnesFromROM(RawFile *file) {
 }

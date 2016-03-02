@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "SoftCreatSnesScanner.h"
 #include "SoftCreatSnesSeq.h"
-#include "SNESDSP.h"
 
 //; Plok!
 //0589: 7d        mov   a,x
@@ -53,96 +52,93 @@ BytePattern SoftCreatSnesScanner::ptnVCmdExec(
 	,
 	20);
 
-void SoftCreatSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000) {
-		SearchForSoftCreatSnesFromARAM(file);
-	}
-	else {
-		SearchForSoftCreatSnesFromROM(file);
-	}
-	return;
+void SoftCreatSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForSoftCreatSnesFromARAM(file);
+  }
+  else {
+    SearchForSoftCreatSnesFromROM(file);
+  }
+  return;
 }
 
-void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM (RawFile* file)
-{
-	SoftCreatSnesVersion version = SOFTCREATSNES_NONE;
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
+  SoftCreatSnesVersion version = SOFTCREATSNES_NONE;
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	// search song list
-	uint32_t ofsLoadSeq;
-	uint16_t addrSeqList;
-	uint8_t songIndexMax;
-	uint8_t headerAlignSize;
-	if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-		addrSeqList = file->GetShort(ofsLoadSeq + 16);
+  // search song list
+  uint32_t ofsLoadSeq;
+  uint16_t addrSeqList;
+  uint8_t songIndexMax;
+  uint8_t headerAlignSize;
+  if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
+    addrSeqList = file->GetShort(ofsLoadSeq + 16);
 
-		songIndexMax = file->GetByte(ofsLoadSeq + 2);
-		if (songIndexMax == 0) {
-			return;
-		}
+    songIndexMax = file->GetByte(ofsLoadSeq + 2);
+    if (songIndexMax == 0) {
+      return;
+    }
 
-		uint16_t addrStartLow = file->GetByte(ofsLoadSeq + 16);
-		uint16_t addrStartHigh = file->GetByte(ofsLoadSeq + 9);
-		if (addrStartLow > addrStartHigh || addrStartHigh - addrStartLow > songIndexMax) {
-			return;
-		}
-		headerAlignSize = addrStartHigh - addrStartLow;
-	}
-	else {
-		return;
-	}
+    uint16_t addrStartLow = file->GetByte(ofsLoadSeq + 16);
+    uint16_t addrStartHigh = file->GetByte(ofsLoadSeq + 9);
+    if (addrStartLow > addrStartHigh || addrStartHigh - addrStartLow > songIndexMax) {
+      return;
+    }
+    headerAlignSize = addrStartHigh - addrStartLow;
+  }
+  else {
+    return;
+  }
 
-	// search vcmd address table for version check
-	uint32_t ofsVCmdExec;
-	uint8_t VCMD_CUTOFF;
-	uint16_t addrVCmdAddressTable;
-	if (file->SearchBytePattern(ptnVCmdExec, ofsVCmdExec)) {
-		VCMD_CUTOFF = file->GetByte(ofsVCmdExec + 6);
-		addrVCmdAddressTable = file->GetByte(ofsVCmdExec + 16);
-	}
-	else {
-		return;
-	}
+  // search vcmd address table for version check
+  uint32_t ofsVCmdExec;
+  uint8_t VCMD_CUTOFF;
+  uint16_t addrVCmdAddressTable;
+  if (file->SearchBytePattern(ptnVCmdExec, ofsVCmdExec)) {
+    VCMD_CUTOFF = file->GetByte(ofsVCmdExec + 6);
+    addrVCmdAddressTable = file->GetByte(ofsVCmdExec + 16);
+  }
+  else {
+    return;
+  }
 
-	switch (VCMD_CUTOFF) {
-	case 0xb8:
-		version = SOFTCREATSNES_V1;
-		break;
+  switch (VCMD_CUTOFF) {
+    case 0xb8:
+      version = SOFTCREATSNES_V1;
+      break;
 
-	case 0xba:
-		version = SOFTCREATSNES_V2;
-		break;
+    case 0xba:
+      version = SOFTCREATSNES_V2;
+      break;
 
-	case 0xbd:
-		version = SOFTCREATSNES_V3;
-		break;
+    case 0xbd:
+      version = SOFTCREATSNES_V3;
+      break;
 
-	case 0xc7:
-		version = SOFTCREATSNES_V4;
-		break;
+    case 0xc7:
+      version = SOFTCREATSNES_V4;
+      break;
 
-	case 0xc3:
-		version = SOFTCREATSNES_V5;
-		break;
+    case 0xc3:
+      version = SOFTCREATSNES_V5;
+      break;
 
-	default:
-		version = SOFTCREATSNES_NONE;
-		break;
-	}
+    default:
+      version = SOFTCREATSNES_NONE;
+      break;
+  }
 
-	// TODO: guess song index
-	int8_t songIndex = 1;
+  // TODO: guess song index
+  int8_t songIndex = 1;
 
-	uint32_t addrSeqHeader = addrSeqList + songIndex;
-	SoftCreatSnesSeq* newSeq = new SoftCreatSnesSeq(file, version, addrSeqHeader, headerAlignSize, name);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  uint32_t addrSeqHeader = addrSeqList + songIndex;
+  SoftCreatSnesSeq *newSeq = new SoftCreatSnesSeq(file, version, addrSeqHeader, headerAlignSize, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 }
 
-void SoftCreatSnesScanner::SearchForSoftCreatSnesFromROM (RawFile* file)
-{
+void SoftCreatSnesScanner::SearchForSoftCreatSnesFromROM(RawFile *file) {
 }

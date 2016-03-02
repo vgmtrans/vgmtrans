@@ -2,7 +2,6 @@
 #include "PandoraBoxSnesScanner.h"
 #include "PandoraBoxSnesSeq.h"
 #include "PandoraBoxSnesInstr.h"
-#include "SNESDSP.h"
 
 // ; Kishin Kourinden Oni SPC
 // f91d: 8d 10     mov   y,#$10
@@ -80,83 +79,86 @@ BytePattern PandoraBoxSnesScanner::ptnLoadSRCN(
 	,
 	22);
 
-void PandoraBoxSnesScanner::Scan(RawFile* file, void* info)
-{
-	uint32_t nFileLength = file->size();
-	if (nFileLength == 0x10000) {
-		SearchForPandoraBoxSnesFromARAM(file);
-	}
-	else {
-		SearchForPandoraBoxSnesFromROM(file);
-	}
-	return;
+void PandoraBoxSnesScanner::Scan(RawFile *file, void *info) {
+  uint32_t nFileLength = file->size();
+  if (nFileLength == 0x10000) {
+    SearchForPandoraBoxSnesFromARAM(file);
+  }
+  else {
+    SearchForPandoraBoxSnesFromROM(file);
+  }
+  return;
 }
 
-void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM (RawFile* file)
-{
-	PandoraBoxSnesVersion version = PANDORABOXSNES_NONE;
-	std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM(RawFile *file) {
+  PandoraBoxSnesVersion version = PANDORABOXSNES_NONE;
+  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
-	uint32_t ofsLoadSeq;
-	uint16_t addrSeqHeader;
-	if (file->SearchBytePattern(ptnLoadSeqTSP, ofsLoadSeq)) {
-		uint8_t addrSeqHeaderPtr = file->GetByte(ofsLoadSeq + 7);
-		addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
-		version = PANDORABOXSNES_V2;
-	}
-	else if (file->SearchBytePattern(ptnLoadSeqKKO, ofsLoadSeq)) {
-		uint8_t addrSeqHeaderPtr = file->GetByte(ofsLoadSeq + 4);
-		addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
-		version = PANDORABOXSNES_V1;
-	}
-	else {
-		return;
-	}
+  uint32_t ofsLoadSeq;
+  uint16_t addrSeqHeader;
+  if (file->SearchBytePattern(ptnLoadSeqTSP, ofsLoadSeq)) {
+    uint8_t addrSeqHeaderPtr = file->GetByte(ofsLoadSeq + 7);
+    addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
+    version = PANDORABOXSNES_V2;
+  }
+  else if (file->SearchBytePattern(ptnLoadSeqKKO, ofsLoadSeq)) {
+    uint8_t addrSeqHeaderPtr = file->GetByte(ofsLoadSeq + 4);
+    addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
+    version = PANDORABOXSNES_V1;
+  }
+  else {
+    return;
+  }
 
-	PandoraBoxSnesSeq* newSeq = new PandoraBoxSnesSeq(file, version, addrSeqHeader, name);
-	if (!newSeq->LoadVGMFile()) {
-		delete newSeq;
-		return;
-	}
+  PandoraBoxSnesSeq *newSeq = new PandoraBoxSnesSeq(file, version, addrSeqHeader, name);
+  if (!newSeq->LoadVGMFile()) {
+    delete newSeq;
+    return;
+  }
 
-	// scan for DIR address
-	uint16_t spcDirAddr;
-	uint32_t ofsSetDIR;
-	if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
-		spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-	}
-	else {
-		return;
-	}
+  // scan for DIR address
+  uint16_t spcDirAddr;
+  uint32_t ofsSetDIR;
+  if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
+    spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+  }
+  else {
+    return;
+  }
 
-	// scan for instrument table
-	uint32_t ofsLoadSRCN;
-	uint16_t addrLocalInstrTable;
-	uint16_t addrGlobalInstrTable;
-	uint8_t globalInstrumentCount;
-	if (file->SearchBytePattern(ptnLoadSRCN, ofsLoadSRCN)) {
-		uint8_t ofsLocalInstrTable = file->GetByte(addrSeqHeader + 12);
-		if (addrSeqHeader + ofsLocalInstrTable >= 0x10000) {
-			return;
-		}
-		addrLocalInstrTable = addrSeqHeader + ofsLocalInstrTable;
+  // scan for instrument table
+  uint32_t ofsLoadSRCN;
+  uint16_t addrLocalInstrTable;
+  uint16_t addrGlobalInstrTable;
+  uint8_t globalInstrumentCount;
+  if (file->SearchBytePattern(ptnLoadSRCN, ofsLoadSRCN)) {
+    uint8_t ofsLocalInstrTable = file->GetByte(addrSeqHeader + 12);
+    if (addrSeqHeader + ofsLocalInstrTable >= 0x10000) {
+      return;
+    }
+    addrLocalInstrTable = addrSeqHeader + ofsLocalInstrTable;
 
-		addrGlobalInstrTable = file->GetShort(ofsLoadSRCN + 14) + 1;
+    addrGlobalInstrTable = file->GetShort(ofsLoadSRCN + 14) + 1;
 
-		uint16_t availInstrCountPtr = file->GetShort(ofsLoadSRCN + 9);
-		globalInstrumentCount = file->GetByte(availInstrCountPtr);
-	}
-	else {
-		return;
-	}
+    uint16_t availInstrCountPtr = file->GetShort(ofsLoadSRCN + 9);
+    globalInstrumentCount = file->GetByte(availInstrCountPtr);
+  }
+  else {
+    return;
+  }
 
-	PandoraBoxSnesInstrSet * newInstrSet = new PandoraBoxSnesInstrSet(file, version, spcDirAddr, addrLocalInstrTable, addrGlobalInstrTable, globalInstrumentCount, newSeq->instrADSRHints);
-	if (!newInstrSet->LoadVGMFile()) {
-		delete newInstrSet;
-		return;
-	}
+  PandoraBoxSnesInstrSet *newInstrSet = new PandoraBoxSnesInstrSet(file,
+                                                                   version,
+                                                                   spcDirAddr,
+                                                                   addrLocalInstrTable,
+                                                                   addrGlobalInstrTable,
+                                                                   globalInstrumentCount,
+                                                                   newSeq->instrADSRHints);
+  if (!newInstrSet->LoadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
 }
 
-void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromROM (RawFile* file)
-{
+void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromROM(RawFile *file) {
 }
