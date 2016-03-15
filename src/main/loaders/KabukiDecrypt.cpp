@@ -99,61 +99,63 @@ Slam Masters                             54321076  65432107    3131     19
 ***************************************************************************/
 
 
-int KabukiDecrypter::bitswap1(int src,int key,int select)
-{
-	if (select & (1 << ((key >> 0) & 7)))
-		src = (src & 0xfc) | ((src & 0x01) << 1) | ((src & 0x02) >> 1);
-	if (select & (1 << ((key >> 4) & 7)))
-		src = (src & 0xf3) | ((src & 0x04) << 1) | ((src & 0x08) >> 1);
-	if (select & (1 << ((key >> 8) & 7)))
-		src = (src & 0xcf) | ((src & 0x10) << 1) | ((src & 0x20) >> 1);
-	if (select & (1 << ((key >>12) & 7)))
-		src = (src & 0x3f) | ((src & 0x40) << 1) | ((src & 0x80) >> 1);
+int KabukiDecrypter::bitswap1(int src, int key, int select) {
+  if (select & (1 << ((key >> 0) & 7)))
+    src = (src & 0xfc) | ((src & 0x01) << 1) | ((src & 0x02) >> 1);
+  if (select & (1 << ((key >> 4) & 7)))
+    src = (src & 0xf3) | ((src & 0x04) << 1) | ((src & 0x08) >> 1);
+  if (select & (1 << ((key >> 8) & 7)))
+    src = (src & 0xcf) | ((src & 0x10) << 1) | ((src & 0x20) >> 1);
+  if (select & (1 << ((key >> 12) & 7)))
+    src = (src & 0x3f) | ((src & 0x40) << 1) | ((src & 0x80) >> 1);
 
-	return src;
+  return src;
 }
 
-int KabukiDecrypter::bitswap2(int src,int key,int select)
-{
-	if (select & (1 << ((key >>12) & 7)))
-		src = (src & 0xfc) | ((src & 0x01) << 1) | ((src & 0x02) >> 1);
-	if (select & (1 << ((key >> 8) & 7)))
-		src = (src & 0xf3) | ((src & 0x04) << 1) | ((src & 0x08) >> 1);
-	if (select & (1 << ((key >> 4) & 7)))
-		src = (src & 0xcf) | ((src & 0x10) << 1) | ((src & 0x20) >> 1);
-	if (select & (1 << ((key >> 0) & 7)))
-		src = (src & 0x3f) | ((src & 0x40) << 1) | ((src & 0x80) >> 1);
+int KabukiDecrypter::bitswap2(int src, int key, int select) {
+  if (select & (1 << ((key >> 12) & 7)))
+    src = (src & 0xfc) | ((src & 0x01) << 1) | ((src & 0x02) >> 1);
+  if (select & (1 << ((key >> 8) & 7)))
+    src = (src & 0xf3) | ((src & 0x04) << 1) | ((src & 0x08) >> 1);
+  if (select & (1 << ((key >> 4) & 7)))
+    src = (src & 0xcf) | ((src & 0x10) << 1) | ((src & 0x20) >> 1);
+  if (select & (1 << ((key >> 0) & 7)))
+    src = (src & 0x3f) | ((src & 0x40) << 1) | ((src & 0x80) >> 1);
 
-	return src;
+  return src;
 }
 
-int KabukiDecrypter::bytedecode(int src,int swap_key1,int swap_key2,int xor_key,int select)
-{
-	src = KabukiDecrypter::bitswap1(src,swap_key1 & 0xffff,select & 0xff);
-	src = ((src & 0x7f) << 1) | ((src & 0x80) >> 7);
-	src = KabukiDecrypter::bitswap2(src,swap_key1 >> 16,select & 0xff);
-	src ^= xor_key;
-	src = ((src & 0x7f) << 1) | ((src & 0x80) >> 7);
-	src = bitswap2(src,swap_key2 & 0xffff,select >> 8);
-	src = ((src & 0x7f) << 1) | ((src & 0x80) >> 7);
-	src = bitswap1(src,swap_key2 >> 16,select >> 8);
-	return src;
+int KabukiDecrypter::bytedecode(int src, int swap_key1, int swap_key2, int xor_key, int select) {
+  src = KabukiDecrypter::bitswap1(src, swap_key1 & 0xffff, select & 0xff);
+  src = ((src & 0x7f) << 1) | ((src & 0x80) >> 7);
+  src = KabukiDecrypter::bitswap2(src, swap_key1 >> 16, select & 0xff);
+  src ^= xor_key;
+  src = ((src & 0x7f) << 1) | ((src & 0x80) >> 7);
+  src = bitswap2(src, swap_key2 & 0xffff, select >> 8);
+  src = ((src & 0x7f) << 1) | ((src & 0x80) >> 7);
+  src = bitswap1(src, swap_key2 >> 16, select >> 8);
+  return src;
 }
 
-void KabukiDecrypter::kabuki_decode(uint8_t *src,uint8_t *dest_op,uint8_t *dest_data,
-		int base_addr,int length,int swap_key1,int swap_key2,int addr_key,int xor_key)
-{
-	int A;
-	int select;
+void KabukiDecrypter::kabuki_decode(uint8_t *src,
+                                    uint8_t *dest_op,
+                                    uint8_t *dest_data,
+                                    int base_addr,
+                                    int length,
+                                    int swap_key1,
+                                    int swap_key2,
+                                    int addr_key,
+                                    int xor_key) {
+  int A;
+  int select;
 
-	for (A = 0;A < length;A++)
-	{
-		/* decode opcodes */
-		select = (A + base_addr) + addr_key;
-		dest_op[A] = bytedecode(src[A],swap_key1,swap_key2,xor_key,select);
+  for (A = 0; A < length; A++) {
+    /* decode opcodes */
+    select = (A + base_addr) + addr_key;
+    dest_op[A] = bytedecode(src[A], swap_key1, swap_key2, xor_key, select);
 
-		/* decode data */
-		select = ((A + base_addr) ^ 0x1fc0) + addr_key + 1;
-		dest_data[A] = bytedecode(src[A],swap_key1,swap_key2,xor_key,select);
-	}
+    /* decode data */
+    select = ((A + base_addr) ^ 0x1fc0) + addr_key + 1;
+    dest_data[A] = bytedecode(src[A], swap_key1, swap_key2, xor_key, select);
+  }
 }

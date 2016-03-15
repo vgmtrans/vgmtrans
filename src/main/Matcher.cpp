@@ -1,47 +1,37 @@
 #include "pch.h"
 #include "Matcher.h"
-#include "VGMColl.h"
-#include "VGMSeq.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 
 using namespace std;
 
-Matcher::Matcher(Format* format)
-{
-	fmt = format;
+Matcher::Matcher(Format *format) {
+  fmt = format;
 }
 
-Matcher::~Matcher(void)
-{
+Matcher::~Matcher(void) {
 }
 
-bool Matcher::OnNewFile(VGMFile* file)
-{
-	switch (file->GetFileType())
-	{
-	case FILETYPE_SEQ:
-		return OnNewSeq((VGMSeq*)file);
-	case FILETYPE_INSTRSET:
-		return OnNewInstrSet((VGMInstrSet*)file);
-	case FILETYPE_SAMPCOLL:
-		return OnNewSampColl((VGMSampColl*)file);
-	}
-	return false;
+bool Matcher::OnNewFile(VGMFile *file) {
+  switch (file->GetFileType()) {
+    case FILETYPE_SEQ:
+      return OnNewSeq((VGMSeq *) file);
+    case FILETYPE_INSTRSET:
+      return OnNewInstrSet((VGMInstrSet *) file);
+    case FILETYPE_SAMPCOLL:
+      return OnNewSampColl((VGMSampColl *) file);
+  }
+  return false;
 }
 
-bool Matcher::OnCloseFile(VGMFile* file)
-{
-	switch (file->GetFileType())
-	{
-	case FILETYPE_SEQ:
-		return OnCloseSeq((VGMSeq*)file);
-	case FILETYPE_INSTRSET:
-		return OnCloseInstrSet((VGMInstrSet*)file);
-	case FILETYPE_SAMPCOLL:
-		return OnCloseSampColl((VGMSampColl*)file);
-	}
-	return false;
+bool Matcher::OnCloseFile(VGMFile *file) {
+  switch (file->GetFileType()) {
+    case FILETYPE_SEQ:
+      return OnCloseSeq((VGMSeq *) file);
+    case FILETYPE_INSTRSET:
+      return OnCloseInstrSet((VGMInstrSet *) file);
+    case FILETYPE_SAMPCOLL:
+      return OnCloseSampColl((VGMSampColl *) file);
+  }
+  return false;
 }
 
 
@@ -231,140 +221,99 @@ AddItem(ITEM_TYPE type, uint32_t id)
 // ****************
 
 
-FilegroupMatcher::FilegroupMatcher(Format* format)
-: Matcher(format)
-{
+FilegroupMatcher::FilegroupMatcher(Format *format)
+    : Matcher(format) {
 }
 
-bool FilegroupMatcher::OnNewSeq(VGMSeq* seq)
-{
-	seqs.push_back(seq);
-	LookForMatch();
-	return true;
+bool FilegroupMatcher::OnNewSeq(VGMSeq *seq) {
+  seqs.push_back(seq);
+  LookForMatch();
+  return true;
 }
 
-bool FilegroupMatcher::OnNewInstrSet(VGMInstrSet* instrset)
-{
-	instrsets.push_back(instrset);
-	LookForMatch();
-	return true;
+bool FilegroupMatcher::OnNewInstrSet(VGMInstrSet *instrset) {
+  instrsets.push_back(instrset);
+  LookForMatch();
+  return true;
 }
 
-bool FilegroupMatcher::OnNewSampColl(VGMSampColl* sampcoll)
-{
-	//if (instrsets.size() == 1)
-	//{
-	//	instrsets.front()->sampColl = sampcoll;
-	//}
-	sampcolls.push_back(sampcoll);
-	LookForMatch();
-	return true;
+bool FilegroupMatcher::OnNewSampColl(VGMSampColl *sampcoll) {
+
+  sampcolls.push_back(sampcoll);
+  LookForMatch();
+  return true;
 }
 
-bool FilegroupMatcher::OnCloseSeq(VGMSeq* seq)
-{
-	std::list<VGMSeq*>::iterator iterator = std::find(seqs.begin(), seqs.end(), seq);
-	if (iterator != seqs.end()) {
-		seqs.erase(iterator);
-	}
-	return true;
+bool FilegroupMatcher::OnCloseSeq(VGMSeq *seq) {
+  std::list<VGMSeq *>::iterator iterator = std::find(seqs.begin(), seqs.end(), seq);
+  if (iterator != seqs.end()) {
+    seqs.erase(iterator);
+  }
+  return true;
 }
 
-bool FilegroupMatcher::OnCloseInstrSet(VGMInstrSet* instrset)
-{
-	std::list<VGMInstrSet*>::iterator iterator = std::find(instrsets.begin(), instrsets.end(), instrset);
-	if (iterator != instrsets.end()) {
-		instrsets.erase(iterator);
-	}
-	return true;
+bool FilegroupMatcher::OnCloseInstrSet(VGMInstrSet *instrset) {
+  std::list<VGMInstrSet *>::iterator iterator = std::find(instrsets.begin(), instrsets.end(), instrset);
+  if (iterator != instrsets.end()) {
+    instrsets.erase(iterator);
+  }
+  return true;
 }
 
-bool FilegroupMatcher::OnCloseSampColl(VGMSampColl* sampcoll)
-{
-	std::list<VGMSampColl*>::iterator iterator = std::find(sampcolls.begin(), sampcolls.end(), sampcoll);
-	if (iterator != sampcolls.end()) {
-		sampcolls.erase(iterator);
-	}
-	return true;
+bool FilegroupMatcher::OnCloseSampColl(VGMSampColl *sampcoll) {
+  std::list<VGMSampColl *>::iterator iterator = std::find(sampcolls.begin(), sampcolls.end(), sampcoll);
+  if (iterator != sampcolls.end()) {
+    sampcolls.erase(iterator);
+  }
+  return true;
 }
 
 
+void FilegroupMatcher::LookForMatch() {
 
-void FilegroupMatcher::LookForMatch()
-{
-	//if (seqs.size() >= 1 && instrsets.size() >= 1 && sampcolls.size() >= 1)
-	//{
-	//	VGMSeq* seq = GetLargestVGMFileInList<VGMSeq>(seqs);
-	//	VGMInstrSet* instrset = GetLargestVGMFileInList<VGMInstrSet>(instrsets);
-	//	VGMSampColl* sampcoll = GetLargestVGMFileInList<VGMSampColl>(sampcolls);
-	//	
-
-	//	VGMColl* coll = fmt->NewCollection();
-	//	coll->SetName(seq->GetName());
-	//	coll->UseSeq(seq);
-	//	coll->AddInstrSet(instrset);
-	//	coll->AddSampColl(sampcoll);
-	//	coll->Load(); // needs error check
-
-	//}
-	if (instrsets.size() == 1 && sampcolls.size() == 1)
-	{
-		if (seqs.size() >= 1)
-		{
-			for (list<VGMSeq*>::iterator iter = seqs.begin(); iter != seqs.end(); iter++)
-			{
-				VGMSeq* seq = *iter;
-				VGMInstrSet* instrset = instrsets.front();
-				VGMSampColl* sampcoll = sampcolls.front();
-				VGMColl* coll = fmt->NewCollection();
-				coll->SetName(seq->GetName());
-				coll->UseSeq(seq);
-				coll->AddInstrSet(instrset);
-				coll->AddSampColl(sampcoll);
-				if (!coll->Load())
-				{
-					delete coll;
-				}
-			}
-		}
-		else
-		{
-			VGMInstrSet* instrset = instrsets.front();
-			VGMSampColl* sampcoll = sampcolls.front();
-			VGMColl* coll = fmt->NewCollection();
-			coll->SetName(instrset->GetName());
-			coll->UseSeq(NULL);
-			coll->AddInstrSet(instrset);
-			coll->AddSampColl(sampcoll);
-			if (!coll->Load())
-			{
-				delete coll;
-			}
-		}
-		seqs.clear();
-		instrsets.clear();
-		sampcolls.clear();
-	}
-	/*else if (seqs.size() > 1 || instrsets.size() > 1 || sampcolls.size() > 1)
-	{
-		seqs.clear();
-		instrsets.clear();
-		sampcolls.clear();
-	}*/
-
+  if (instrsets.size() == 1 && sampcolls.size() == 1) {
+    if (seqs.size() >= 1) {
+      for (list<VGMSeq *>::iterator iter = seqs.begin(); iter != seqs.end(); iter++) {
+        VGMSeq *seq = *iter;
+        VGMInstrSet *instrset = instrsets.front();
+        VGMSampColl *sampcoll = sampcolls.front();
+        VGMColl *coll = fmt->NewCollection();
+        coll->SetName(seq->GetName());
+        coll->UseSeq(seq);
+        coll->AddInstrSet(instrset);
+        coll->AddSampColl(sampcoll);
+        if (!coll->Load()) {
+          delete coll;
+        }
+      }
+    }
+    else {
+      VGMInstrSet *instrset = instrsets.front();
+      VGMSampColl *sampcoll = sampcolls.front();
+      VGMColl *coll = fmt->NewCollection();
+      coll->SetName(instrset->GetName());
+      coll->UseSeq(NULL);
+      coll->AddInstrSet(instrset);
+      coll->AddSampColl(sampcoll);
+      if (!coll->Load()) {
+        delete coll;
+      }
+    }
+    seqs.clear();
+    instrsets.clear();
+    sampcolls.clear();
+  }
 }
 
-template <class T> T* FilegroupMatcher::GetLargestVGMFileInList(list<T*> theList)
-{
-	uint32_t s = 0;
-	T* curWinner = NULL;
-	for (typename list<T*>::iterator iter = theList.begin(); iter != theList.end(); iter++)
-	{
-		if ((*iter)->unLength > s)
-		{
-			s = (*iter)->unLength;
-			curWinner = *iter;
-		}
-	}
-	return curWinner;
+template<class T>
+T *FilegroupMatcher::GetLargestVGMFileInList(list<T *> theList) {
+  uint32_t s = 0;
+  T *curWinner = NULL;
+  for (typename list<T *>::iterator iter = theList.begin(); iter != theList.end(); iter++) {
+    if ((*iter)->unLength > s) {
+      s = (*iter)->unLength;
+      curWinner = *iter;
+    }
+  }
+  return curWinner;
 }
