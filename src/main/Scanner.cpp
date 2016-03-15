@@ -1,28 +1,21 @@
-#include "pch.h"
-
-#include "common.h"
 #include "Scanner.h"
 #include "Root.h"
 
-VGMScanner::VGMScanner()
-{
+VGMScanner::VGMScanner() {
 }
 
-VGMScanner::~VGMScanner(void)
-{
+VGMScanner::~VGMScanner(void) {
 }
 
-bool VGMScanner::Init()
-{
-	//if (!UseExtension())
-	//	return false;
-	return true;
+bool VGMScanner::Init() {
+  //if (!UseExtension())
+  //	return false;
+  return true;
 }
 
-void VGMScanner::InitiateScan(RawFile* file, void* offset)
-{
-	pRoot->UI_SetScanInfo();
-	this->Scan(file, offset);
+void VGMScanner::InitiateScan(RawFile *file, void *offset) {
+  pRoot->UI_SetScanInfo();
+  this->Scan(file, offset);
 }
 
 

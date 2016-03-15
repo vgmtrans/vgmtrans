@@ -36,18 +36,15 @@
 
 // Any compiler claiming C++11 supports, Visual C++ 2015 and Clang version supporting constexp
 #if __cplusplus >= 201103L || _MSC_VER >= 1900 // C++ 11 implementation
-	template <typename T, std::size_t N>
-	constexpr std::size_t countof(T const (&)[N]) noexcept
-	{
-		return N;
-	}
+template<typename T, std::size_t N>
+constexpr std::size_t countof(T const (&)[N]) noexcept {
+  return N;
+}
 
 #elif _MSC_VER // Visual C++ fallback
-	#define countof(arr) _countof(arr)
-
+  #define countof(arr) _countof(arr)
 #else
-	#define countof(arr) sizeof(arr) / sizeof(arr[0])
-
+  #define countof(arr) sizeof(arr) / sizeof(arr[0])
 #endif
 
 using namespace std;

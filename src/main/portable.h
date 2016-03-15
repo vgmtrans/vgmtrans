@@ -5,7 +5,7 @@
 #include <windows.h>
 
 enum {
-	PATH_MAX = MAX_PATH
+    PATH_MAX = MAX_PATH
 };
 
 #endif
