@@ -1,3 +1,5 @@
+#include "pch.h"
+
 #include "Loader.h"
 
 VGMLoader::VGMLoader(void) {
