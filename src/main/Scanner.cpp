@@ -1,3 +1,5 @@
+#include "pch.h"
+
 #include "Scanner.h"
 #include "Root.h"
 
