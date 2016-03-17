@@ -1,13 +1,10 @@
 #include "MdiArea.h"
 #include <QTabBar>
 #include <QAbstractButton>
-#include <QToolButton>
-#include <QPushButton>
 //#include <QStyleOptionTab>
 //#include <QStyle>
 #include <QDebug>
 #include <QApplication>
-#include <QFile>
 
 MdiArea::MdiArea(QWidget *parent)
         : QMdiArea(parent)
