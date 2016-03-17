@@ -7,7 +7,6 @@
 #include "VGMFileListView.h"
 #include "QtVGMRoot.h"
 #include "VGMFile.h"
-#include "VGMItem.h"
 #include "MdiArea.h"
 #include "VGMFileView.h"
 #include "Helpers.h"

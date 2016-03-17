@@ -5,7 +5,6 @@
 #include <QKeyEvent>
 #include <QStandardItem>
 #include "RawFileListView.h"
-#include "QtVGMRoot.h"
 
 
 // ********************

@@ -9,15 +9,18 @@
 
 class RawFile;
 
-class VGMMiscFile :
-	public VGMFile
-{
-public:
-	VGMMiscFile(const std::string& format, RawFile* file, uint32_t offset, uint32_t length = 0, std::wstring name = L"VGMMiscFile");
+class VGMMiscFile:
+    public VGMFile {
+ public:
+  VGMMiscFile(const std::string &format,
+              RawFile *file,
+              uint32_t offset,
+              uint32_t length = 0,
+              std::wstring name = L"VGMMiscFile");
 
-	virtual FileType GetFileType() { return FILETYPE_MISC; }
+  virtual FileType GetFileType() { return FILETYPE_MISC; }
 
-	virtual bool LoadMain();
-	virtual bool Load();
+  virtual bool LoadMain();
+  virtual bool Load();
 };
 
