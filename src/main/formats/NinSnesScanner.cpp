@@ -248,6 +248,36 @@ BytePattern NinSnesScanner::ptnIncSectionPtrYSFR(
 	,
 	22);
 
+//; Heracles no Eiko 4 SPC
+//09b4: 6d        push  y
+//09b5: c4 8c     mov   $8c,a
+//09b7: 8f 20 8d  mov   $8d,#$20          ; #$2000
+//09ba: 60        clrc
+//09bb: 84 8c     adc   a,$8c
+//09bd: c4 8c     mov   $8c,a
+//09bf: e8 00     mov   a,#$00
+//09c1: 84 8d     adc   a,$8d
+//09c3: c4 8d     mov   $8d,a
+//09c5: 8d 00     mov   y,#$00
+//09c7: f7 8c     mov   a,($8c)+y
+//09c9: fc        inc   y
+//09ca: c5 2b 05  mov   $052b,a
+//09cd: f7 8c     mov   a,($8c)+y
+//09cf: c5 2c 05  mov   $052c,a
+//09d2: ee        pop   y
+BytePattern NinSnesScanner::ptnInitSectionPtrHE4(
+	"\x6d\xc4\x8c\x8f\x20\x8d\x60\x84"
+	"\x8c\xc4\x8c\xe8\x00\x84\x8d\xc4"
+	"\x8d\x8d\x00\xf7\x8c\xfc\xc5\x2b"
+	"\x05\xf7\x8c\xc5\x2c\x05\xee"
+	,
+	"xx?x??xx"
+	"?x?xxx?x"
+	"?xxx?xx?"
+	"?x?x??x"
+	,
+	31);
+
 //; Clock Tower SPC
 // 07cc: 80        setc
 // 07cd: a8 e0     sbc   a,#$e0
@@ -967,6 +997,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
   else if (file->SearchBytePattern(ptnInitSectionPtrTS, ofsInitSectionPtr)) {
     uint16_t addrSongListPtr = file->GetShort(ofsInitSectionPtr + 1);
     addrSongList = file->GetShort(addrSongListPtr);
+  }
+  else if (file->SearchBytePattern(ptnInitSectionPtrHE4, ofsInitSectionPtr)) {
+    addrSongList = file->GetByte(ofsInitSectionPtr + 4) << 8;
   }
   else if (file->SearchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
     uint8_t addrSongListPtr = file->GetByte(ofsInitSectionPtr + 2);
