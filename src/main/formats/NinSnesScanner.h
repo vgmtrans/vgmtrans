@@ -32,6 +32,7 @@ class NinSnesScanner:
   // PATTERNS FOR DERIVED VERSIONS
   static BytePattern ptnIncSectionPtrGD3;
   static BytePattern ptnIncSectionPtrYSFR;
+  static BytePattern ptnInitSectionPtrHE4;
   static BytePattern ptnJumpToVcmdCTOW;
   static BytePattern ptnJumpToVcmdYSFR;
   static BytePattern ptnReadVcmdLengthYSFR;
