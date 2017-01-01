@@ -258,6 +258,11 @@
     </Filter>
     <Filter Include="Header Files\formats\konamips1">
       <UniqueIdentifier>{38d11b15-8e84-4ce6-bf22-a9bf11c40fc5}</UniqueIdentifier>
+    <Filter Include="Source Files\formats\rsar">
+      <UniqueIdentifier>{97a0567d-3d55-4f8a-b33f-f133e474faf6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\rsar">
+      <UniqueIdentifier>{421ed46d-2c16-4746-9bca-ea6899534bdb}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -815,6 +820,14 @@
     </ClCompile>
     <ClCompile Include="src\main\formats\KonamiPS1Seq.cpp">
       <Filter>Source Files\formats\konamips1</Filter>
+    <ClCompile Include="src\main\formats\RSARScanner.cpp">
+      <Filter>Source Files\formats\rsar</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\RSARSeq.cpp">
+      <Filter>Source Files\formats\rsar</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\RSARInstrSet.cpp">
+      <Filter>Source Files\formats\rsar</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1477,6 +1490,17 @@
     </ClInclude>
     <ClInclude Include="src\main\formats\KonamiPS1Seq.h">
       <Filter>Header Files\formats\konamips1</Filter>
+    <ClInclude Include="src\main\formats\RSARFormat.h">
+      <Filter>Header Files\formats\rsar</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\RSARScanner.h">
+      <Filter>Header Files\formats\rsar</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\RSARSeq.h">
+      <Filter>Header Files\formats\rsar</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\RSARInstrSet.h">
+      <Filter>Header Files\formats\rsar</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

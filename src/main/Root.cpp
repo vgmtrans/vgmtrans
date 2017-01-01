@@ -50,6 +50,7 @@ bool VGMRoot::Init(void) {
   AddScanner("HeartBeatPS1");
   AddScanner("TamSoftPS1");
   AddScanner("KonamiPS1");
+  AddScanner("RSAR");
   //AddScanner("Org");
   //AddScanner("QSound");
   //AddScanner("SegSat");
