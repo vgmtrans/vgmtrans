@@ -279,6 +279,7 @@
     <ClCompile Include="src\main\formats\PandoraBoxSnesScanner.cpp" />
     <ClCompile Include="src\main\formats\PandoraBoxSnesSeq.cpp" />
     <ClCompile Include="src\main\formats\RareSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\RSARScanner.cpp" />
     <ClCompile Include="src\main\formats\SNESDSP.cpp" />
     <ClCompile Include="src\main\formats\SoftCreatSnesScanner.cpp" />
     <ClCompile Include="src\main\formats\SoftCreatSnesSeq.cpp" />
@@ -480,6 +481,8 @@
     <ClInclude Include="src\main\formats\PandoraBoxSnesScanner.h" />
     <ClInclude Include="src\main\formats\PandoraBoxSnesSeq.h" />
     <ClInclude Include="src\main\formats\RareSnesInstr.h" />
+    <ClInclude Include="src\main\formats\RSARFormat.h" />
+    <ClInclude Include="src\main\formats\RSARScanner.h" />
     <ClInclude Include="src\main\formats\SNESDSP.h" />
     <ClInclude Include="src\main\formats\SoftCreatSnesFormat.h" />
     <ClInclude Include="src\main\formats\SoftCreatSnesScanner.h" />

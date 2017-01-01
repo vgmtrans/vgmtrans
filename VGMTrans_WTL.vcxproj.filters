@@ -247,6 +247,12 @@
     <Filter Include="Source Files\windows\DxErr">
       <UniqueIdentifier>{f60aad48-6a14-4c0d-a400-60b77e9a16af}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\formats\rsar">
+      <UniqueIdentifier>{97a0567d-3d55-4f8a-b33f-f133e474faf6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\rsar">
+      <UniqueIdentifier>{421ed46d-2c16-4746-9bca-ea6899534bdb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\ui\windows\aboutdlg.cpp">
@@ -788,6 +794,9 @@
     </ClCompile>
     <ClCompile Include="lib\dxAug07\dxerr\dxerr.cpp">
       <Filter>Source Files\windows\DxErr</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\RSARScanner.cpp">
+      <Filter>Source Files\formats\rsar</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1429,6 +1438,12 @@
     </ClInclude>
     <ClInclude Include="src\src\ui\windows\osdepend.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\RSARFormat.h">
+      <Filter>Header Files\formats\rsar</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\RSARScanner.h">
+      <Filter>Header Files\formats\rsar</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
