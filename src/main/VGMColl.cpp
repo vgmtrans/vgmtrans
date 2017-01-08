@@ -161,6 +161,12 @@ SF2File *VGMColl::CreateSF2File() {
   return sf2file;
 }
 
+static std::string wstring_to_string(std::wstring str) {
+	char buf[256] = {};
+	wcstombs(buf, str.c_str(), sizeof(buf));
+	return std::string(buf);
+}
+
 bool VGMColl::MainDLSCreation(DLSFile &dls) {
   vector<VGMSamp *> finalSamps;
   //we have to collect the finalSampColls in case sampcolls is empty but there are multiple instrSets with
@@ -195,9 +201,8 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
     for (size_t i = 0; i < nInstrs; i++) {
       VGMInstr *vgminstr = set->aInstrs[i];
       size_t nRgns = vgminstr->aRgns.size();
-      if (nRgns == 0)                                //do not write an instrument if it has no regions
-        continue;
-      DLSInstr *newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum);
+	  std::string name = wstring_to_string(vgminstr->name);
+      DLSInstr *newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum, name);
       for (uint32_t j = 0; j < nRgns; j++) {
         VGMRgn *rgn = vgminstr->aRgns[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
