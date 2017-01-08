@@ -69,22 +69,19 @@ bool NDSInstr::LoadInstr() {
       break;
     }
 
-    case 0x02:        //used in Mr. Driller "BANK_BGM" for some reason
-    case 0x03:
-    case 0x04:
-    case 0x05:
+    case 0x02: {
+      /* PGM Tone */
+      uint8_t dutyCycle = GetByte(dwOffset) & 0x07;
+      std::wstring dutyCycles[8] = {
+        L"12.5%", L"25%", L"37.5%", L"50%", L"62.5%", L"75%", L"87.5%", L"0%"
+      };
+      name = L"NES Sq (" + dutyCycles[dutyCycle] + L")";
+      unLength = 10;
       break;
-
-    case 0x06:
-    case 0x07:
-    case 0x08:
-    case 0x09:
-    case 0x0A:
-    case 0x0B:
-    case 0x0C:
-    case 0x0D:
-    case 0x0E:
-    case 0x0F:
+    }
+    case 0x03:
+      name = L"NES Noise";
+      unLength = 10;
       break;
 
     //drumset
