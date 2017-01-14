@@ -242,7 +242,7 @@ void WinVGMRoot::UI_AddItemSet(VGMFile* vgmfile, vector<ItemSet>* vItemSets)
 
 wstring WinVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const wstring& extension)
 {
-	CFileDialog dlgFile(FALSE, extension.c_str(), suggestedFilename.c_str(), OFN_HIDEREADONLY | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_EXPLORER);
+	CFileDialog dlgFile(TRUE, extension.c_str(), suggestedFilename.c_str(), OFN_HIDEREADONLY | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_EXPLORER);
 
 	if (dlgFile.DoModal() != IDOK)
 		return L"";
