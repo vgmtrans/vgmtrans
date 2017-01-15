@@ -389,6 +389,8 @@ bool NDSTrack::ReadEvent(void) {
 
       case 0xFD:
         AddGenericEvent(beginOffset, curOffset - beginOffset, L"Return", L"", CLR_LOOP);
+        if (IsOffsetUsed(loopReturnOffset))
+          return false;
         curOffset = loopReturnOffset;
         break;
 
