@@ -51,6 +51,7 @@ bool VGMRoot::Init(void) {
   AddScanner("TamSoftPS1");
   AddScanner("KonamiPS1");
   AddScanner("RSAR");
+  AddScanner("JaiSeq");
   //AddScanner("Org");
   //AddScanner("QSound");
   //AddScanner("SegSat");
