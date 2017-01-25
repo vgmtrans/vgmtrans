@@ -1,3 +1,4 @@
+
 #include "pch.h"
 #include "common.h"
 #include "RawFile.h"
@@ -21,38 +22,47 @@ DECLARE_FORMAT(JaiSeq);
 /* Names from JASystem::TSeqParser from framework.map in The Wind Waker. */
 enum MML {
   /* wait with u8 arg */
-  MML_WAIT_8 = 0x80,
+  MML_WAIT_8          = 0x80,
   /* wait with u16 arg */
-  MML_WAIT_16 = 0x88,
+  MML_WAIT_16         = 0x88,
   /* wait with variable-length arg */
-  MML_WAIT_VAR = 0xF0,
+  MML_WAIT_VAR        = 0xF0,
 
   /* Perf is hard to enum, but here goes: */
-  MML_PERF_U8_NODUR = 0x94,
-  MML_PERF_U8_DUR_U8 = 0x96,
-  MML_PERF_U8_DUR_U16 = 0x97,
-  MML_PERF_S8_NODUR = 0x98,
-  MML_PERF_S8_DUR_U8 = 0x9A,
-  MML_PERF_S8_DUR_U16 = 0x9B,
-  MML_PERF_S16_NODUR = 0x9C,
-  MML_PERF_S16_DUR_U8 = 0x9E,
+  MML_PERF_U8_NODUR    = 0x94,
+  MML_PERF_U8_DUR_U8   = 0x96,
+  MML_PERF_U8_DUR_U16  = 0x97,
+  MML_PERF_S8_NODUR    = 0x98,
+  MML_PERF_S8_DUR_U8   = 0x9A,
+  MML_PERF_S8_DUR_U16  = 0x9B,
+  MML_PERF_S16_NODUR   = 0x9C,
+  MML_PERF_S16_DUR_U8  = 0x9E,
   MML_PERF_S16_DUR_U16 = 0x9F,
 
-  MML_PARAM_SET_8 = 0xA4,
-  MML_PARAM_SET_16 = 0xAC,
+  MML_PARAM_SET_8     = 0xA4,
+  MML_PARAM_SET_16    = 0xAC,
 
-  MML_OPEN_TRACK = 0xC1,
+  MML_OPEN_TRACK      = 0xC1,
   /* open sibling track, seems unused */
   MML_OPEN_TRACK_BROS = 0xC2,
-  MML_CALL = 0xC3,
-  MML_CALL_COND = 0xC4,
-  MML_RET = 0xC5,
-  MML_RET_COND = 0xC6,
-  MML_JUMP = 0xC7,
-  MML_JUMP_COND = 0xC8,
-  MML_TIME_BASE = 0xFD,
-  MML_TEMPO = 0xFE,
-  MML_FIN = 0xFF,
+  MML_CALL            = 0xC3,
+  MML_CALL_COND       = 0xC4,
+  MML_RET             = 0xC5,
+  MML_RET_COND        = 0xC6,
+  MML_JUMP            = 0xC7,
+  MML_JUMP_COND       = 0xC8,
+  MML_TIME_BASE       = 0xFD,
+  MML_TEMPO           = 0xFE,
+  MML_FIN             = 0xFF,
+
+  /* "Improved" JaiSeq from TP / SMG / SMG2 seems to use this instead */
+  MML2_SET_PERF_8     = 0xB8,
+  MML2_SET_PERF_16    = 0xB9,
+  /* Set "articulation"? Used for setting timebase. */
+  MML2_SET_ARTIC = 0xD8,
+  MML2_TEMPO = 0xE0,
+  MML2_SET_BANK       = 0xE2,
+  MML2_SET_PROG       = 0xE3,
 };
 
 class JaiSeqTrack : public SeqTrack {
@@ -94,6 +104,7 @@ private:
   enum PerfType {
     MML_VOLUME = 0,
     MML_PITCH = 1,
+    MML_REVERB = 2,
     MML_PAN = 3,
   };
 
@@ -108,7 +119,7 @@ private:
     }
     else if (type == MML_PAN) {
       /* MIDI pan is between 0 and 7F, with 3F being the center. */
-      uint8_t midValue = (uint8_t)((value * 0x3F) + 0x3F);
+      uint8_t midValue = (uint8_t)(value * 0x7F);
       if (duration == 0)
         AddPan(beginOffset, curOffset - beginOffset, midValue);
       else
@@ -116,7 +127,7 @@ private:
     }
     else if (type == MML_PITCH) {
       /* MIDI pitch is between 0 and 7FFF */
-      uint16_t midValue = (uint16_t)(value * 0x7FFF);
+      uint16_t midValue = (uint16_t)(value * 0x7FFF) * 4;
       if (duration == 0)
         AddPitchBend(beginOffset, curOffset - beginOffset, midValue);
       else
@@ -301,31 +312,15 @@ private:
         break;
       }
 
-      case 0xE0:
-        curOffset += 2;
-        AddUnknown(beginOffset, curOffset - beginOffset, L"Unset Dynamic");
-        break;
-      case 0xE1:
-        curOffset += 1;
-        AddUnknown(beginOffset, curOffset - beginOffset, L"Clear Dynamic");
-        break;
-      case 0xE2:
-      case 0xE3:
       case 0xF4: /* VibPitch */
         curOffset += 1;
         AddUnknown(beginOffset, curOffset - beginOffset);
         break;
-      case 0xB8:
       case 0xCB:
       case 0xE6: /* Vibrato */
       case 0xE7: /* SyncGPU */
       case 0xF9:
         curOffset += 2;
-        AddUnknown(beginOffset, curOffset - beginOffset);
-        break;
-      case 0xB9:
-      case 0xD8:
-        curOffset += 3;
         AddUnknown(beginOffset, curOffset - beginOffset);
         break;
       case MML_TEMPO: {
@@ -344,6 +339,53 @@ private:
       case MML_FIN:
         AddEndOfTrack(beginOffset, curOffset - beginOffset);
         return false;
+
+      case MML2_SET_BANK: {
+        uint8_t bank = GetByte(curOffset++);
+        AddBankSelectNoItem(bank);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Bank Select", L"MML2_SET_BANK", CLR_PROGCHANGE);
+        break;
+      }
+      case MML2_SET_PROG: {
+        uint8_t prog = GetByte(curOffset++);
+        AddProgramChange(beginOffset, curOffset - beginOffset, prog);
+        break;
+      }
+      case MML2_SET_PERF_8: {
+        uint8_t type = GetByte(curOffset++);
+        int8_t value = (int8_t)GetByte(curOffset++);
+        if (type == MML_VOLUME)
+          SetPerf(beginOffset, type, value, 0);
+        else
+          SetPerf(beginOffset, type, value, 0);
+        break;
+      }
+      case MML2_SET_PERF_16: {
+        uint8_t type = GetByte(curOffset++);
+        int16_t value = (int16_t)GetShortBE(curOffset);
+        curOffset += 2;
+        SetPerf(beginOffset, type, value, 0);
+        break;
+      }
+      case MML2_SET_ARTIC: {
+        uint8_t type = GetByte(curOffset++);
+        if (type == 0x62) {
+          uint16_t ppqn = GetShortBE(curOffset);
+          curOffset += 2;
+          parentSeq->SetPPQN(ppqn);
+        }
+        else {
+          curOffset += 2;
+        }
+        break;
+      }
+      case MML2_TEMPO: {
+        uint16_t bpm = GetShortBE(curOffset);
+        curOffset += 2;
+        AddTempoBPM(beginOffset, curOffset - beginOffset, bpm);
+        break;
+      }
+
       default:
         AddUnknown(beginOffset, curOffset - beginOffset);
         return false;
