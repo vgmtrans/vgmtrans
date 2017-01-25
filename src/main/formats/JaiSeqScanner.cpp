@@ -436,7 +436,432 @@ private:
   }
 };
 
+static bool MatchMagic(RawFile *file, uint32_t offs, const char *magic) {
+  char buf[16];
+  assert(sizeof(buf) >= strlen(magic));
+  file->GetBytes(offs, (uint32_t) strlen(magic), buf);
+  return memcmp(buf, magic, strlen(magic)) == 0;
+}
+
+class JaiSeqSamp : public VGMSamp {
+public:
+  uint8_t unityKey;
+
+  JaiSeqSamp(VGMSampColl *sampColl, uint32_t offset, RawFile *waFile_) :
+    VGMSamp(sampColl, offset, 0x2C, 0, 0), waFile(waFile_) {
+    Load();
+  }
+
+private:
+  RawFile *waFile;
+  uint32_t waOffset, waSize;
+
+  uint32_t DspAddressToSamples(uint32_t dspAddr) {
+    return (dspAddr / 9) * 16;
+  }
+
+  const uint16_t coef[16][2] = {
+    { 0x0000, 0x0000 },
+    { 0x0800, 0x0000 },
+    { 0x0000, 0x0800 },
+    { 0x0400, 0x0400 },
+    { 0x1000, 0xF800 },
+    { 0x0E00, 0xFA00 },
+    { 0x0C00, 0xFC00 },
+    { 0x1200, 0xF600 },
+    { 0x1068, 0xF738 },
+    { 0x12C0, 0xF704 },
+    { 0x1400, 0xF400 },
+    { 0x0800, 0xF800 },
+    { 0x0400, 0xFC00 },
+    { 0xFC00, 0x0400 },
+    { 0xFC00, 0x0000 },
+    { 0xF800, 0x0000 },
+  };
+
+  static int16_t Clamp16(int32_t sample) {
+    if (sample > 0x7FFF) return  0x7FFF;
+    if (sample < -0x8000) return -0x8000;
+    return sample;
+  }
+
+  virtual void ConvertToStdWave(uint8_t *buf) override {
+    int16_t hist1 = 0, hist2 = 0;
+
+    uint32_t samplesDone = 0;
+    uint32_t numSamples = DspAddressToSamples(waSize);
+
+    uint32_t srcOffs = waOffset;
+    uint32_t dstOffs = 0;
+
+    /* Go over and convert each frame of 14 samples. */
+    while (samplesDone < numSamples) {
+      /* Each frame is 9 bytes -- a one-byte header, and then 8 bytes
+       * of samples. Each sample is 4 bits, so we have 16 samples per frame. */
+      uint8_t frameHeader = waFile->GetByte(srcOffs++);
+
+      int32_t scale = 1 << (frameHeader >> 4);
+      uint8_t coefIdx = (frameHeader & 0x0F);
+      int16_t coef1 = (int16_t)coef[coefIdx][0], coef2 = (int16_t)coef[coefIdx][1];
+
+      for (int i = 0; i < 16; i++) {
+        /* Pull out the correct byte and nibble. */
+        uint8_t byte = waFile->GetByte(srcOffs + (i >> 1));
+        uint8_t unsignedNibble = (i & 1) ? (byte & 0x0F) : (byte >> 4);
+
+        /* Sign extend. */
+        int8_t signedNibble = ((int8_t)(unsignedNibble << 4)) >> 4;
+
+        /* Decode. */
+        int16_t sample = Clamp16((((signedNibble * scale) << 11) + (coef1*hist1 + coef2*hist2)) >> 11);
+        ((int16_t *)buf)[dstOffs] = sample;
+        dstOffs++;
+
+        hist2 = hist1;
+        hist1 = sample;
+
+        samplesDone++;
+        if (samplesDone >= numSamples)
+          break;
+      }
+
+      srcOffs += 8;
+    }
+  }
+
+  void Load() {
+    /* Samples are always ADPCM data, as far as I can tell... */
+    SetWaveType(WT_PCM16);
+    SetBPS(16);
+
+    /* Always mono too... */
+    SetNumChannels(1);
+
+    /* unknown */
+    unityKey = GetByte(dwOffset + 0x02);
+    SetRate(GetShortBE(dwOffset + 0x05) / 2);
+    /* unknown */
+
+    waOffset = GetWordBE(dwOffset + 0x08);
+    waSize = GetWordBE(dwOffset + 0x0C);
+
+    uint32_t nSamples = DspAddressToSamples(waSize);
+    ulUncompressedSize = nSamples * 2;
+
+    uint32_t loopFlag = GetWordBE(dwOffset + 0x10);
+    uint32_t loopStart = GetWordBE(dwOffset + 0x14);
+    uint32_t loopEnd = GetWordBE(dwOffset + 0x18);
+
+    bool loop = loopFlag == 0xFFFFFFFF;
+    SetLoopStatus(loop);
+    if (loop) {
+      SetLoopStartMeasure(LM_SAMPLES);
+      SetLoopLengthMeasure(LM_SAMPLES);
+      SetLoopOffset(loopStart);
+      SetLoopLength(loopEnd - loopStart);
+    }
+  }
+};
+
+class JaiSeqSampCollWSYS : public VGMSampColl {
+public:
+  JaiSeqSampCollWSYS(RawFile *file, uint32_t offset, uint32_t length,
+    std::wstring name = L"WSYS Sample Collection")
+    : VGMSampColl(JaiSeqFormat::name, file, offset, length, name) {}
+private:
+
+  virtual bool GetSampleInfo() override {
+    if (!MatchMagic(rawfile, dwOffset, "WSYS"))
+      return false;
+
+    unLength = GetWordBE(dwOffset + 0x04);
+
+    uint32_t winfBase = dwOffset + GetWordBE(dwOffset + 0x10);
+    if (!MatchMagic(rawfile, winfBase, "WINF"))
+      return false;
+
+    /* First up, load up our AW files. */
+    struct AwFile { RawFile *file; uint32_t offset; };
+    std::vector<AwFile> awFiles;
+    uint32_t awCount = GetWordBE(winfBase + 0x04);
+    uint32_t awTableIdx = winfBase + 0x08;
+    for (uint32_t i = 0; i < awCount; i++) {
+      uint32_t awTableBase = dwOffset + GetWordBE(winfBase + 0x08);
+      char awFilename[0x71] = {};
+      GetBytes(awTableBase, 0x70, awFilename);
+
+      wchar_t tempfn[PATH_MAX] = { 0 };
+      mbstowcs(tempfn, awFilename, sizeof(awFilename));
+
+      wchar_t *fullPath;
+      fullPath = GetFileWithBase(rawfile->GetFullPath(), tempfn);
+      RawFile *rawFile = new RawFile(fullPath);
+      if (!rawFile->open(fullPath))
+        return false;
+      /* XXX: Leaks if above fails. */
+      delete fullPath;
+
+      AwFile file = { rawFile, awTableBase };
+      awFiles.push_back(file);
+    }
+
+    uint32_t wbctBase = dwOffset + GetWordBE(dwOffset + 0x14);
+    if (!MatchMagic(rawfile, wbctBase, "WBCT"))
+      return false;
+
+    uint32_t scneBase = dwOffset + GetWordBE(wbctBase + 0x0C);
+    if (!MatchMagic(rawfile, scneBase, "SCNE"))
+      return false;
+
+    uint32_t c_dfBase = dwOffset + GetWordBE(scneBase + 0x0C);
+    if (!MatchMagic(rawfile, c_dfBase, "C-DF"))
+      return false;
+
+    /* XXX: In the future, we should handle WSYS archives that reference
+     * more than one AW file. That would require reading the C-DF section
+     * to know which sample corresponds to which WA file. */
+
+    uint32_t c_dfCount = GetWordBE(c_dfBase + 0x04);
+    uint32_t c_dfTableIndex = c_dfBase + 0x08;
+    for (uint32_t i = 0; i < c_dfCount; i++) {
+      uint32_t awFileIdx = GetShortBE(c_dfTableIndex + 0x00);
+      uint32_t sampIdx = GetShortBE(c_dfTableIndex + 0x02);
+
+      AwFile awFile = awFiles[awFileIdx];
+      uint32_t waveTableIdx = awFile.offset + 0x74 + (i * 0x04);
+      uint32_t waveBase = dwOffset + GetWordBE(waveTableIdx);
+
+      VGMSamp *samp = new JaiSeqSamp(this, waveBase, awFile.file);
+      wchar_t name[32] = {};
+      swprintf(name, sizeof(name) / sizeof(*name), L"Sample_%04d", i);
+      samp->name = name;
+      samples.push_back(samp);
+      c_dfTableIndex += 0x04;
+    }
+
+    return true;
+  }
+};
+
+class JaiSeqInstrBNK : public VGMInstr {
+public:
+  uint32_t osctBase;
+  uint32_t envtBase;
+
+  JaiSeqInstrBNK(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theInstrNum, uint32_t osctBase_, uint32_t envtBase_, uint32_t theBank = 0)
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum), osctBase(osctBase_), envtBase(envtBase_) {}
+
+  virtual bool LoadInstr() override {
+    char buf[4];
+    GetBytes(dwOffset, sizeof(buf), buf);
+
+    if (memcmp(buf, "Inst", sizeof(buf)) == 0) {
+      /* "Normal" instrument */
+
+      uint32_t osctCount = GetWordBE(osctBase + 0x08);
+
+      uint32_t osciIndex = GetWordBE(dwOffset + 0x08);
+      assert(osciIndex < osctCount);
+      uint32_t envpOffs = GetWordBE(osctBase + 0x08 + (osciIndex * 0x1C) + 0x10);
+      uint32_t envpBase = envtBase + envpOffs;
+      uint32_t attack = GetWordBE(envpBase + 0x00);
+      uint32_t release = GetWordBE(envpBase + 0x08);
+
+      uint32_t numRegions = GetWordBE(dwOffset + 0x10);
+      uint32_t regionTableIdx = dwOffset + 0x14;
+      uint32_t keyLow = 0;
+      for (uint32_t i = 0; i < numRegions; i++) {
+        uint8_t keyHigh = GetByte(regionTableIdx);
+        regionTableIdx += 0x04;
+        /* This is probably velocity regions... */
+        uint32_t numSamples = GetWordBE(regionTableIdx);
+        uint32_t sampleNum;
+        VGMRgn *rgn;
+        JaiSeqSamp *samp;
+
+        regionTableIdx += 0x04;
+        if (numSamples == 0x00)
+          goto next;
+
+        assert(numSamples == 0x01);
+
+        regionTableIdx += 0x04; /* unknown */
+        regionTableIdx += 0x02; /* unknown as well */
+        sampleNum = GetShortBE(regionTableIdx);
+        regionTableIdx += 0x02;
+        regionTableIdx += 0x04; /* unknown */
+        regionTableIdx += 0x04; /* frequency multiplier */
+
+        rgn = AddRgn(regionTableIdx, 0x18, sampleNum, keyLow, keyHigh);
+        samp = (JaiSeqSamp *)parInstrSet->sampColl->samples[sampleNum];
+        rgn->SetUnityKey(samp->unityKey);
+
+        /* Fake ADSR for now. */
+        rgn->attack_time = ((double)attack) / 0x3FFF;
+        rgn->release_time = ((double)release) / 0x0C;
+      next:
+        keyLow = keyHigh + 1;
+      }
+    }
+    else if (memcmp(buf, "Perc", sizeof(buf)) == 0) {
+      uint32_t numSamples = GetWordBE(dwOffset + 0x04);
+      uint32_t sampTableIdx = dwOffset + 0x08;
+      for (uint32_t i = 0; i < numSamples; i++) {
+        uint32_t pmapOffs = GetWordBE(sampTableIdx);
+        sampTableIdx += 0x04;
+        if (pmapOffs == 0)
+          continue;
+        uint32_t pmapBase = parInstrSet->dwOffset + pmapOffs;
+        if (!MatchMagic(vgmfile->rawfile, pmapBase, "Pmap"))
+          return false;
+        pmapBase += 0x04;
+        pmapBase += 0x04; /* unknown */
+        pmapBase += 0x04; /* frequency multiplier */
+        uint8_t pan = GetByte(pmapBase);
+        pmapBase += 0x10; /* unknown */
+        uint32_t sampleNum = GetWordBE(pmapBase) & 0xFFFF;
+        pmapBase += 0x04;
+
+        VGMRgn *rgn = AddRgn(sampTableIdx, 0x04, sampleNum, i, i);
+        JaiSeqSamp *samp = (JaiSeqSamp *)parInstrSet->sampColl->samples[sampleNum];
+        rgn->SetUnityKey(i);
+        rgn->SetPan(pan);
+      }
+    }
+
+    return true;
+  }
+};
+
+class JaiSeqInstrSetBNK : public VGMInstrSet {
+public:
+  uint32_t index;
+  uint32_t osctBase;
+  uint32_t envtBase;
+
+  JaiSeqInstrSetBNK(RawFile *file,
+    uint32_t offset,
+    uint32_t length,
+    VGMSampColl *sampColl,
+    std::wstring name = L"JaiSeq Instrument Bank") : VGMInstrSet(JaiSeqFormat::name, file, offset, length, name, sampColl) {}
+
+private:
+
+  uint32_t FindChunk(char *magic) {
+    uint32_t searchBase = dwOffset + 0x20;
+    while (true) {
+      if (MatchMagic(rawfile, searchBase, magic))
+        return searchBase;
+      searchBase += GetWordBE(searchBase + 0x04) + 8;
+      /* Align to next 4 */
+      searchBase = (searchBase + 0x03) & ~0x03;
+    }
+    return 0;
+  }
+
+  virtual bool GetInstrPointers() override {
+    if (!MatchMagic(rawfile, dwOffset, "IBNK"))
+      return false;
+
+    unLength = GetWordBE(dwOffset + 0x04);
+    index = GetWordBE(dwOffset + 0x08);
+
+    wchar_t buf[64] = {};
+    swprintf(buf, sizeof(buf) / sizeof(*buf), L"Bank_%02d", index);
+    name = buf;
+
+    osctBase = FindChunk("OSCT");
+    /* Skip past chunk, size, length */
+    osctBase += 0x0C;
+
+    envtBase = FindChunk("ENVT");
+    /* Skip past chunk */
+    envtBase += 0x04;
+
+    /* We should have found LIST */
+    uint32_t listBase = FindChunk("LIST") + 0x08;
+    uint32_t nInstr = GetWordBE(listBase);
+    uint32_t listIdx = listBase + 0x04;
+    for (uint32_t i = 0; i < nInstr; i++) {
+      uint32_t instrOffs = dwOffset + GetWordBE(listIdx);
+      aInstrs.push_back(new JaiSeqInstrBNK(this, instrOffs, 0, i, osctBase, envtBase));
+      listIdx += 0x04;
+    }
+
+    return true;
+  }
+};
+
+/* Handle the BAA (Binary Audio Archive?) format from Twilight Princess,
+ * Super Mario Galaxy, and Super Mario Galaxy 2. */
+static bool LoadBAA(RawFile *file) {
+  if (!MatchMagic(file, 0, "AA_<"))
+    return false;
+
+  uint32_t offset = 0x04;
+
+  std::map<uint32_t, VGMSampColl *> wsys;
+  std::map<uint32_t, VGMInstrSet *> bnk;
+
+  while (true) {
+    char buf[4];
+    file->GetBytes(offset, sizeof(buf), buf);
+    offset += sizeof(buf);
+
+    /* End of archive. */
+    if (memcmp(buf, ">_AA", sizeof(buf)) == 0) {
+      break;
+    }
+    else if (memcmp(buf, "bst ", sizeof(buf)) == 0) {
+      offset += 0x04; /* start */
+      offset += 0x04; /* length */
+    }
+    else if (memcmp(buf, "bstn", sizeof(buf)) == 0) {
+      offset += 0x04; /* start */
+      offset += 0x04; /* length */
+    }
+    else if (memcmp(buf, "bsc ", sizeof(buf)) == 0) {
+      offset += 0x04; /* start */
+      offset += 0x04; /* length */
+    }
+    else if (memcmp(buf, "ws  ", sizeof(buf)) == 0) {
+      uint32_t wsysIdx = file->GetWordBE(offset);
+      offset += 0x04;
+      uint32_t start = file->GetWordBE(offset);
+      offset += 0x04;
+      offset += 0x04; /* flag */
+      VGMSampColl *sampColl = new JaiSeqSampCollWSYS(file, start, 0);
+      if (!sampColl->LoadVGMFile())
+        continue;
+      wsys[wsysIdx] = sampColl;
+    }
+    else if (memcmp(buf, "bnk ", sizeof(buf)) == 0) {
+      uint32_t wsysIdx = file->GetWordBE(offset);
+      offset += 0x04;
+      uint32_t start = file->GetWordBE(offset);
+      offset += 0x04;
+      VGMSampColl *sampColl = wsys[wsysIdx];
+      if (sampColl == nullptr)
+        continue;
+      JaiSeqInstrSetBNK *instrSet = new JaiSeqInstrSetBNK(file, start, 0, sampColl);
+      if (!instrSet->LoadVGMFile())
+        continue;
+      bnk[instrSet->index] = instrSet;
+
+      VGMColl *coll = new VGMColl(*instrSet->GetName());
+      coll->AddInstrSet(instrSet);
+      coll->AddSampColl(sampColl);
+      coll->Load();
+    }
+    else {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void JaiSeqScanner::Scan(RawFile *file, void *info) {
-  JaiSeqSeq *seq = new JaiSeqSeq(file, 0, 0);
-  seq->Load();
+  JaiSeqSeq *seq = new JaiSeqSeq(file, 0, 0); seq->Load();
+  // LoadBAA(file);
 }
