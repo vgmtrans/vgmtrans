@@ -70,13 +70,19 @@ bool NDSInstr::LoadInstr() {
     }
 
     case 0x02: {
-      /* PGM Tone */
+      /* PSG Tone */
       uint8_t dutyCycle = GetByte(dwOffset) & 0x07;
       std::wstring dutyCycles[8] = {
         L"12.5%", L"25%", L"37.5%", L"50%", L"62.5%", L"75%", L"87.5%", L"0%"
       };
-      name = L"NES Sq (" + dutyCycles[dutyCycle] + L")";
+      name = L"PSG Sq (" + dutyCycles[dutyCycle] + L")";
       unLength = 10;
+      VGMRgn *rgn = AddRgn(dwOffset, 10, dutyCycle);
+      /* XXX: This is disgusting. Rely on the PSG sample coll being the first one. */
+      rgn->sampCollPtr = nullptr;
+      GetArticData(rgn, dwOffset + 4);
+      /* A3 */
+      rgn->SetUnityKey(45);
       break;
     }
     case 0x03:
