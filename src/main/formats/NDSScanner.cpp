@@ -27,6 +27,85 @@ void NDSScanner::SearchForSDAT(RawFile *file) {
 }
 
 
+class PSGDutySamp : public VGMSamp {
+public:
+  PSGDutySamp(VGMSampColl *sampColl, uint8_t dutyCycle_) : VGMSamp(sampColl), dutyCycle(dutyCycle_) {
+    Load();
+  }
+private:
+  uint8_t dutyCycle;
+  void Load() {
+    SetRate(44100);
+    SetNumChannels(1);
+    SetWaveType(WT_PCM16);
+    SetBPS(16);
+    SetLoopStatus(true);
+    
+    wchar_t sampleName[16];
+    swprintf(sampleName, sizeof(sampleName) / sizeof(*sampleName), L"Duty_%02d", dutyCycle);
+    sampName = sampleName;
+
+    /* We generate 1 second of audio. */
+    const int numSamples = rate;
+    ulUncompressedSize = numSamples * (bps / 8) * channels;
+
+    SetLoopStartMeasure(LM_SAMPLES);
+    SetLoopOffset(0);
+    SetLoopLengthMeasure(LM_SAMPLES);
+    SetLoopLength(numSamples);
+  }
+
+  virtual void ConvertToStdWave(uint8_t *buf_) override {
+    int16_t *buf = (int16_t *)buf_;
+
+    /* The duty cycle tells us the number of cycles that are high.
+     * We always start the cycle on the low position. */
+    uint8_t numHigh = (dutyCycle + 1) % 8;
+    uint8_t numLow = 8 - numHigh;
+
+    const int numSamples = rate;
+
+    /* DutyPSG has a unity key of A4: 440Hz */
+    const double frequency = 440;
+
+    const double dt = 1.0 / rate;
+    const double cycleWidth = 1.0 / frequency;
+
+    uint8_t dutyPos = 0;
+    int16_t sample = 0;
+    double time = 0;
+    bool generate = true;
+
+    for (int i = 0; i < numSamples; i++) {
+      time += dt;
+      if (time >= cycleWidth) {
+        generate = true;
+        time -= cycleWidth;
+      }
+
+      if (generate) {
+        sample = (dutyPos < numLow) ? -0x7FFF : 0x7FFF;
+        dutyPos = (dutyPos + 1) % 8;
+        generate = false;
+      }
+
+      buf[i] = sample;
+    }
+  }
+};
+
+class PSGSampColl : public VGMSampColl {
+public:
+  PSGSampColl(RawFile *file) : VGMSampColl(NDSFormat::name, file, 0, 0, L"PSG Samples") {}
+private:
+  virtual bool GetSampleInfo() {
+    for (uint8_t i = 0; i < 8; i++)
+      samples.push_back(new PSGDutySamp(this, i));
+    return true;
+  }
+};
+
+
 // The following is pretty god-awful messy.  I should have created structs for the different
 // blocks and loading the entire blocks at a time.  
 uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
@@ -191,6 +270,9 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
     }
   }
 
+  VGMSampColl *psgSampColl = new PSGSampColl(file);
+  psgSampColl->LoadVGMFile();
+
   {
     vector<uint16_t> vUniqueBanks = vector<uint16_t>(seqFileBnks);
     sort(vUniqueBanks.begin(), vUniqueBanks.end());
@@ -256,6 +338,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
         }
       }
       NDSInstrSet *instrset = BNKs[bnkIndex].second;
+      coll->AddSampColl(psgSampColl);
       coll->AddInstrSet(BNKs[bnkIndex].second);
       for (int j = 0; j < 4; j++) {
         short WAnum = bnkWAs[seqFileBnks[i]][j];
