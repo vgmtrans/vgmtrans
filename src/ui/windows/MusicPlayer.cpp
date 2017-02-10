@@ -281,7 +281,6 @@ void MusicPlayer::PrepareSoftwareSynth()
 void MusicPlayer::ChangeDLS(DLSFile* dlsfile)
 {
 	DWORD dwIndex = 0;
-	INSTRUMENTINFO InstInfo;
 	CString strInst;
 
 	//unload the previous DLS file
@@ -305,13 +304,12 @@ void MusicPlayer::ChangeDLS(DLSFile* dlsfile)
 	DWORD nInstrs = (DWORD)dlsfile->aInstrs.size();
 	for (DWORD dwIndex=0; dwIndex < nInstrs /*&& dwIndex < 0x50*/; dwIndex++)
 	{
-		Collection.EnumInstrument(dwIndex,&InstInfo);
 		vpInstruments.push_back(new CInstrument());
 		CInstrument& newInstrument = *vpInstruments.back();
-		//Collection.EnumInstrument(instrNum,&InstInfo);
-		Collection.GetInstrument(newInstrument,&InstInfo);
+
 		try {
-			newInstrument.SetPatch(/*dwIndex*/InstInfo.dwPatchInCollection);
+			Collection.GetInstrument(newInstrument, dwIndex);
+			newInstrument.SetPatch(newInstrument.m_dwPatchInCollection);
 		}
 		catch (CDMusicException CDMusicEx)
 		{
