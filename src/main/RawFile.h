@@ -89,6 +89,7 @@ class RawFile {
 
   uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer);
   bool MatchBytes(const uint8_t *pattern, uint32_t nIndex, size_t nCount);
+  bool MatchBytes(const char *pattern, uint32_t nIndex);
   bool MatchBytePattern(const BytePattern &pattern, uint32_t nIndex);
   bool SearchBytePattern(const BytePattern &pattern,
                          uint32_t &nMatchOffset,

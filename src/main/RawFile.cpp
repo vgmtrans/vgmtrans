@@ -202,6 +202,10 @@ bool RawFile::MatchBytes(const uint8_t *pattern, uint32_t nIndex, size_t nCount)
   }
 }
 
+bool RawFile::MatchBytes(const char *pattern, uint32_t nIndex) {
+  return MatchBytes((const uint8_t *)pattern, nIndex, strlen(pattern));
+}
+
 // attempts to match the data from a given offset against a given pattern.
 // If the requested data goes beyond the bounds of the file buffer, the buffer is updated.
 // If the requested size is greater than the buffer size, it always fails. (operation not supported)
