@@ -69,7 +69,7 @@ void VGMRgn::SetUnityKey(uint8_t theUnityKey) {
   unityKey = theUnityKey;
 }
 
-void VGMRgn::SetSampNum(uint8_t sampNumber) {
+void VGMRgn::SetSampNum(int sampNumber) {
   sampNum = sampNumber;
 }
 

@@ -25,7 +25,7 @@ class VGMRgn:
   //VGMSamp* AddSamp(void);
   void SetRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
   void SetUnityKey(uint8_t unityNote);
-  void SetSampNum(uint8_t sampNumber);
+  void SetSampNum(int sampNumber);
   void SetLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength);
   void SetADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
                uint16_t rls_transform, long release_time);
