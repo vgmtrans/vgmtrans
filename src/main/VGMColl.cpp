@@ -195,9 +195,8 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
     for (size_t i = 0; i < nInstrs; i++) {
       VGMInstr *vgminstr = set->aInstrs[i];
       size_t nRgns = vgminstr->aRgns.size();
-      if (nRgns == 0)                                //do not write an instrument if it has no regions
-        continue;
-      DLSInstr *newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum);
+      std::string name = wstring2string(vgminstr->name);
+      DLSInstr *newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum, name);
       for (uint32_t j = 0; j < nRgns; j++) {
         VGMRgn *rgn = vgminstr->aRgns[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
