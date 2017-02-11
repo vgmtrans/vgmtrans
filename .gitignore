@@ -18,14 +18,18 @@
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
+[Dd]ebug_WTL/
 [Rr]elease/
 [Rr]eleases/
+[Rr]elease_WTL/
 x64/
 x86/
 build/
 bld/
 [Bb]in/
 [Oo]bj/
+*.VC.opendb
+*.VC.db
 
 # Roslyn cache directories
 *.ide/
