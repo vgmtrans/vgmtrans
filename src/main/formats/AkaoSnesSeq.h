@@ -142,6 +142,8 @@ class AkaoSnesTrack
   uint8_t onetimeDuration;
   bool slur;
   bool legato;
+  bool percussion;
+  uint8_t nonPercussionProgram;
 
   uint8_t loopLevel;
   uint8_t loopIncCount[AKAOSNES_LOOP_LEVEL_MAX];
