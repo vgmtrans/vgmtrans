@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "AkaoSnesSeq.h"
+#include "AkaoSnesInstr.h"
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(AkaoSnes);
@@ -574,6 +575,8 @@ void AkaoSnesTrack::ResetVars(void) {
   loopLevel = 0;
   slur = false;
   legato = false;
+  percussion = false;
+  nonPercussionProgram = 0;
 
   ignoreMasterVolumeProgNum = 0xff;
 }
@@ -671,9 +674,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
       if (noteIndex < 12) {
         uint8_t note = octave * 12 + noteIndex;
 
-        // TODO: percussion note
+        AddNoteByDur(beginOffset, curOffset - beginOffset, percussion ? (noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS) : note, vel, dur);
 
-        AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
         AddTime(len);
       }
       else if (noteIndex == parentSeq->STATUS_NOTEINDEX_TIE) {
@@ -1013,6 +1015,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PROGCHANGE: {
       uint8_t newProg = GetByte(curOffset++);
       AddProgramChange(beginOffset, curOffset - beginOffset, newProg);
+      nonPercussionProgram = newProg;
       break;
     }
 
@@ -1460,6 +1463,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
+      percussion = true;
+      AddProgramChangeNoItem(AkaoSnesInstrSet::DRUMKIT_PROGRAM, true);
       break;
     }
 
@@ -1470,6 +1475,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
+      percussion = false;
+      AddProgramChangeNoItem(nonPercussionProgram, true);
       break;
     }
 

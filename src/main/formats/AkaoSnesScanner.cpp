@@ -291,6 +291,29 @@ BytePattern AkaoSnesScanner::ptnLoadInstrV3(
     ,
     26);
 
+//; Chrono Trigger SPC
+//0722: 8d 03     mov   y,#$03            ; Table entry size
+//0724: cf        mul   ya                ; Calculate table offset
+//0725: fd        mov   y,a
+//0726: f6 22 f1  mov   a,$f122+y         ; Read pan value
+//0729: 30 04     bmi   $072f
+//072b: 1c        asl   a
+//072c: d5 81 f2  mov   $f281+x,a
+//072f: f6 21 f1  mov   a,$f121+y         ; Read percussion note/pitch value
+//0732: c4 a5     mov   $a5,a
+//0734: f6 20 f1  mov   a,$f120+y         ; Read percussion instrument index
+//0737: 3f cf 1a  call  $1acf
+BytePattern AkaoSnesScanner::ptnReadPercussionTableV4(
+  "\x8d\x03\xcf\xfd\xf6\x22\xf1\x30"
+  "\x04\x1c\xd5\x81\xf2\xf6\x21\xf1"
+  "\xc4\xa5\xf6\x20\xf1\x3f\xcf\x1a"
+  ,
+  "xxxxx??x"
+  "xxx??x??"
+  "x?x??x??"
+  ,
+  24);
+
 void AkaoSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
@@ -520,6 +543,7 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
   uint32_t ofsLoadInstr;
   uint16_t addrTuningTable;
   uint16_t addrADSRTable;
+  uint16_t addrPercussionTable;
   if (version == AKAOSNES_V1 && file->SearchBytePattern(ptnLoadInstrV1, ofsLoadInstr)) {
     addrTuningTable = file->GetShort(ofsLoadInstr + 5);
     addrADSRTable = 0; // N/A
@@ -536,7 +560,17 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
     return;
   }
 
-  AkaoSnesInstrSet *newInstrSet = new AkaoSnesInstrSet(file, version, spcDirAddr, addrTuningTable, addrADSRTable);
+  uint32_t ofsReadPercussionTable;
+  if (file->SearchBytePattern(ptnReadPercussionTableV4, ofsReadPercussionTable))
+  {
+    addrPercussionTable = file->GetShort(ofsReadPercussionTable + 19);
+  }
+  else
+  {
+    addrPercussionTable = 0;
+  }
+
+  AkaoSnesInstrSet *newInstrSet = new AkaoSnesInstrSet(file, version, spcDirAddr, addrTuningTable, addrADSRTable, addrPercussionTable);
   if (!newInstrSet->LoadVGMFile()) {
     delete newInstrSet;
     return;
