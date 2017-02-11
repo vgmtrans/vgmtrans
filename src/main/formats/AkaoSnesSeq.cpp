@@ -674,7 +674,12 @@ bool AkaoSnesTrack::ReadEvent(void) {
       if (noteIndex < 12) {
         uint8_t note = octave * 12 + noteIndex;
 
-        AddNoteByDur(beginOffset, curOffset - beginOffset, percussion ? (noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS) : note, vel, dur);
+        if (percussion) {
+          AddNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, vel, dur, L"Percussion Note with Duration");
+        }
+        else {
+          AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
+        }
 
         AddTime(len);
       }
