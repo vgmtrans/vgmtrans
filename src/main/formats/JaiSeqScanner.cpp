@@ -17,7 +17,9 @@
 #include <string>
 #include <stack>
 
-DECLARE_FORMAT(JaiSeq);
+DECLARE_FORMAT(JaiSeqBMS);
+DECLARE_FORMAT(JaiSeqAAF);
+DECLARE_FORMAT(JaiSeqBAA);
 
 /* Names from JASystem::TSeqParser from framework.map in The Wind Waker. */
 enum MML {
@@ -95,9 +97,10 @@ private:
   void SetParam(uint32_t beginOffset, uint8_t param, uint16_t value) {
     if (param == MML_PROG)
       AddProgramChange(beginOffset, curOffset - beginOffset, value);
-    else if (param == MML_BANK)
+    else if (param == MML_BANK) {
+      AddBankSelectNoItem(value);
       AddUnknown(beginOffset, curOffset - beginOffset, L"Bank Select");
-    else
+    } else
       AddUnknown(beginOffset, curOffset - beginOffset);
   }
 
@@ -399,7 +402,7 @@ private:
 class JaiSeqSeq : public VGMSeq {
 public:
   JaiSeqSeq(RawFile *file, uint32_t offset, uint32_t length) :
-    VGMSeq(JaiSeqFormat::name, file, offset, length) {
+    VGMSeq(JaiSeqBMSFormat::name, file, offset, length) {
     bAllowDiscontinuousTrackData = true;
   }
 
@@ -445,8 +448,6 @@ static bool MatchMagic(RawFile *file, uint32_t offs, const char *magic) {
 
 class JaiSeqSamp : public VGMSamp {
 public:
-  uint8_t unityKey;
-
   JaiSeqSamp(VGMSampColl *sampColl, uint32_t offset, RawFile *waFile_) :
     VGMSamp(sampColl, offset, 0x2C, 0, 0), waFile(waFile_) {
     Load();
@@ -538,6 +539,7 @@ private:
     SetNumChannels(1);
 
     /* unknown */
+    
     unityKey = GetByte(dwOffset + 0x02);
     SetRate(GetShortBE(dwOffset + 0x05) / 2);
     /* unknown */
@@ -567,7 +569,7 @@ class JaiSeqSampCollWSYS : public VGMSampColl {
 public:
   JaiSeqSampCollWSYS(RawFile *file, uint32_t offset, uint32_t length,
     std::wstring name = L"WSYS Sample Collection")
-    : VGMSampColl(JaiSeqFormat::name, file, offset, length, name) {}
+    : VGMSampColl(JaiSeqAAFFormat::name, file, offset, length, name) {}
 private:
 
   virtual bool GetSampleInfo() override {
@@ -677,7 +679,6 @@ public:
         uint32_t numSamples = GetWordBE(regionTableIdx);
         uint32_t sampleNum;
         VGMRgn *rgn;
-        JaiSeqSamp *samp;
 
         regionTableIdx += 0x04;
         if (numSamples == 0x00)
@@ -693,8 +694,6 @@ public:
         regionTableIdx += 0x04; /* frequency multiplier */
 
         rgn = AddRgn(regionTableIdx, 0x18, sampleNum, keyLow, keyHigh);
-        samp = (JaiSeqSamp *)parInstrSet->sampColl->samples[sampleNum];
-        rgn->SetUnityKey(samp->unityKey);
 
         /* Fake ADSR for now. */
         rgn->attack_time = ((double)attack) / 0x3FFF;
@@ -743,7 +742,7 @@ public:
     uint32_t offset,
     uint32_t length,
     VGMSampColl *sampColl,
-    std::wstring name = L"JaiSeq Instrument Bank") : VGMInstrSet(JaiSeqFormat::name, file, offset, length, name, sampColl) {}
+    std::wstring name = L"JaiSeq Instrument Bank") : VGMInstrSet(JaiSeqBAAFormat::name, file, offset, length, name, sampColl) {}
 
 private:
 
@@ -861,7 +860,182 @@ static bool LoadBAA(RawFile *file) {
   return true;
 }
 
-void JaiSeqScanner::Scan(RawFile *file, void *info) {
+static double FrequencyRatioToCents(double freqRatio) {
+  return round(1000000 * 1200 * log2(freqRatio)) / 1000000.0;
+}
+
+class JaiSeqInstrAAF : public VGMInstr {
+public:
+  JaiSeqInstrAAF(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theInstrNum, uint32_t theBank = 0)
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum) {}
+
+private:
+  virtual bool LoadInstr() override {
+    if (!MatchMagic(vgmfile->rawfile, dwOffset, "INST"))
+      return false;
+
+    uint32_t keyRgnCount = GetWordBE(dwOffset + 0x28);
+    uint32_t keyRgnIdx = dwOffset + 0x2C;
+    uint8_t keyLow = 0;
+    for (uint32_t i = 0; i < keyRgnCount; i++) {
+      uint32_t keyRgnBase = parInstrSet->dwOffset + GetWordBE(keyRgnIdx);
+      keyRgnIdx += 0x04;
+
+      uint8_t keyHigh = GetByte(keyRgnBase);
+
+      uint32_t velRgnCount = GetWordBE(keyRgnBase + 0x04);
+      uint32_t velRgnIdx = keyRgnBase + 0x08;
+      uint8_t velLow = 0;
+      for (uint32_t j = 0; j < velRgnCount; j++) {
+        uint32_t velRgnBase = parInstrSet->dwOffset + GetWordBE(velRgnIdx);
+        uint8_t velHigh = GetByte(velRgnBase);
+
+        /* 0x04 is some sort of bank identifier? Doesn't seem to match the WSYS ID... */
+        uint32_t sampleNum = GetShortBE(velRgnBase + 0x06);
+        /* 0x08 = unknown float */
+        uint32_t freqMultBits = GetWordBE(velRgnBase + 0x0C);
+        float freqMult = *((float *) &freqMultBits);
+
+        VGMRgn *rgn = AddRgn(keyRgnBase, 0, sampleNum, keyLow, keyHigh, velLow, velHigh);
+        rgn->SetFineTune(FrequencyRatioToCents(freqMult));
+        velLow = velHigh + 1;
+        velRgnIdx += 0x04;
+      }
+
+      keyLow = keyHigh + 1;
+    }
+  }
+};
+
+class JaiSeqInstrSetAAF : public VGMInstrSet {
+public:
+  uint32_t wsysId;
+  uint32_t bnkId;
+
+  JaiSeqInstrSetAAF(RawFile *file,
+    uint32_t offset,
+    uint32_t length,
+    uint32_t wsysId_,
+    VGMSampColl *sampColl = nullptr,
+    std::wstring name = L"JaiSeq AAF Instrument Bank") :
+      VGMInstrSet(JaiSeqAAFFormat::name, file, offset, length, name, sampColl), wsysId(wsysId_) {}
+
+private:
+  virtual bool GetInstrPointers() override {
+    if (!MatchMagic(rawfile, dwOffset, "IBNK"))
+      return false;
+
+    unLength = GetWordBE(dwOffset + 0x04);
+    bnkId = GetWordBE(dwOffset + 0x08);
+
+    wchar_t buf[64] = {};
+    swprintf(buf, sizeof(buf) / sizeof(*buf), L"Bank_%04x", bnkId);
+    name = buf;
+
+    uint32_t bankOffs = dwOffset + 0x20;
+    if (!MatchMagic(rawfile, bankOffs, "BANK"))
+      return false;
+
+    uint32_t listIdx = bankOffs + 0x04;
+    uint32_t instrNum = 0;
+    while (true) {
+      uint32_t instrOffs = GetWordBE(listIdx);
+      if (instrOffs == 0x00)
+        break;
+      uint32_t instrBase = dwOffset + instrOffs;
+      aInstrs.push_back(new JaiSeqInstrAAF(this, instrBase, 0, instrNum++));
+      listIdx += 0x04;
+    }
+
+    return true;
+  }
+
+};
+
+/* Handle the AAF (Audio Archive File?) format from Wind Waker. */
+static bool LoadAAF(RawFile *file) {
+  uint32_t offset = 0x00;
+
+  std::vector<VGMSampColl *> wsys;
+  std::map<uint32_t, VGMInstrSet *> bnk;
+
+  while (true) {
+    uint32_t chunkType = file->GetWordBE(offset);
+    offset += 0x04;
+
+    switch (chunkType) {
+    case 0x00:
+      /* End of archive. */
+      goto end;
+    case 0x01:
+    case 0x05:
+    case 0x06:
+    case 0x07:
+      while (true) {
+        uint32_t start = file->GetWordBE(offset);
+        offset += 0x04;
+        if (start == 0x00)
+          break;
+        offset += 0x04; /* size */
+      }
+      break;
+    case 0x02: {
+      /* bnk */
+      while (true) {
+        uint32_t start = file->GetWordBE(offset);
+        offset += 0x04;
+        if (start == 0x00)
+          break;
+        offset += 0x04; /* size */
+        uint32_t wsysId = file->GetWordBE(offset);
+        offset += 0x04;
+        JaiSeqInstrSetAAF *instrSet = new JaiSeqInstrSetAAF(file, start, 0, wsysId);
+        instrSet->LoadVGMFile();
+        bnk[instrSet->bnkId] = instrSet;
+      }
+      break;
+    }
+    case 0x03: {
+      /* wsys */
+      while (true) {
+        uint32_t start = file->GetWordBE(offset);
+        offset += 0x04;
+        if (start == 0x00)
+          break;
+        offset += 0x04; /* size */
+        offset += 0x04; /* flag */
+        JaiSeqSampCollWSYS *sampColl = new JaiSeqSampCollWSYS(file, start, 0);
+        sampColl->LoadVGMFile();
+        wsys.push_back(sampColl);
+      }
+      break;
+    }
+    }
+  }
+
+end:
+
+  for (auto const &pair : bnk) {
+    VGMInstrSet *instrSet = pair.second;
+
+    VGMSampColl *sampColl = wsys[((JaiSeqInstrSetAAF *)instrSet)->wsysId];
+    VGMColl *coll = new VGMColl(*instrSet->GetName());
+    coll->AddInstrSet(instrSet);
+    coll->AddSampColl(sampColl);
+    coll->Load();
+  }
+
+  return true;
+}
+
+void JaiSeqBMSScanner::Scan(RawFile *file, void *info) {
   JaiSeqSeq *seq = new JaiSeqSeq(file, 0, 0); seq->Load();
-  // LoadBAA(file);
+}
+
+void JaiSeqAAFScanner::Scan(RawFile *file, void *info) {
+  LoadAAF(file);
+}
+
+void JaiSeqBAAScanner::Scan(RawFile *file, void *info) {
+  LoadBAA(file);
 }

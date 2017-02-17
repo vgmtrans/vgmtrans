@@ -1,14 +1,38 @@
 #pragma once
 #include "Scanner.h"
 
-class JaiSeqScanner :
-	public VGMScanner {
+class JaiSeqBMSScanner :
+  public VGMScanner {
 public:
-	JaiSeqScanner(void) {
-		USE_EXTENSION(L"bms")
-	}
-	virtual ~JaiSeqScanner(void) {
-	}
+  JaiSeqBMSScanner(void) {
+    USE_EXTENSION(L"bms")
+  }
+  virtual ~JaiSeqBMSScanner(void) {
+  }
 
-	virtual void Scan(RawFile *file, void *info = 0);
+  virtual void Scan(RawFile *file, void *info = 0);
+};
+
+class JaiSeqAAFScanner :
+  public VGMScanner {
+public:
+  JaiSeqAAFScanner(void) {
+    USE_EXTENSION(L"aaf")
+  }
+  virtual ~JaiSeqAAFScanner(void) {
+  }
+
+  virtual void Scan(RawFile *file, void *info = 0);
+};
+
+class JaiSeqBAAScanner :
+  public VGMScanner {
+public:
+  JaiSeqBAAScanner(void) {
+    USE_EXTENSION(L"baa")
+  }
+  virtual ~JaiSeqBAAScanner(void) {
+  }
+
+  virtual void Scan(RawFile *file, void *info = 0);
 };
