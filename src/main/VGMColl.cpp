@@ -137,9 +137,9 @@ void VGMColl::UnpackSampColl(SynthFile &synthfile, VGMSampColl *sampColl, vector
       sampInfo->SetLoopInfo(samp->loop, samp);
 
     double attenuation = (samp->volume != -1) ? ConvertLogScaleValToAtten(samp->volume) : 0;
-    uint8_t unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
+    // uint8_t unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
     short fineTune = samp->fineTune;
-    sampInfo->SetPitchInfo(unityKey, fineTune, attenuation);
+    sampInfo->SetPitchInfo(0x3C, fineTune, attenuation);
   }
 }
 
