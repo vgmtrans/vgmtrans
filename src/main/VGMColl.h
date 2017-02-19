@@ -17,6 +17,7 @@ class VGMColl
   BEGIN_MENU(VGMColl)
       MENU_ITEM(VGMColl, OnSaveAllDLS, L"Save as MIDI and DLS.")
       MENU_ITEM(VGMColl, OnSaveAllSF2, L"Save as MIDI and SoundFont 2.")
+      MENU_ITEM(VGMColl, OnSaveAllBoth, L"Save as MIDI, DLS, SF2.")
       //MENU_ITEM(VGMFile, OnSaveAllAsRaw, L"Save all as original format")
   END_MENU()
 
@@ -42,6 +43,7 @@ class VGMColl
 
   bool OnSaveAllDLS();
   bool OnSaveAllSF2();
+  bool OnSaveAllBoth();
 
   VGMSeq *seq;
   std::vector<VGMInstrSet *> instrsets;
