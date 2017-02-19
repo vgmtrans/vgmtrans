@@ -32,4 +32,5 @@ class AkaoSnesScanner:
   static BytePattern ptnLoadInstrV1;
   static BytePattern ptnLoadInstrV2;
   static BytePattern ptnLoadInstrV3;
+  static BytePattern ptnReadPercussionTableV4;
 };
