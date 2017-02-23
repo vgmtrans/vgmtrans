@@ -664,41 +664,54 @@ public:
 
       uint32_t osciIndex = GetWordBE(dwOffset + 0x08);
       assert(osciIndex < osctCount);
-      uint32_t envpOffs = GetWordBE(osctBase + 0x08 + (osciIndex * 0x1C) + 0x10);
-      uint32_t envpBase = envtBase + envpOffs;
-      uint32_t attack = GetWordBE(envpBase + 0x00);
-      uint32_t release = GetWordBE(envpBase + 0x08);
+      uint32_t envpOffs = GetWordBE(osctBase + 0x0C + (osciIndex * 0x1C) + 0x10);
+      uint32_t envpBase = envtBase + 0x08 + envpOffs;
+      uint16_t attack  = GetShortBE(envpBase + 0x00);
+      uint16_t decay   = GetShortBE(envpBase + 0x02);
+      uint16_t sustain = GetShortBE(envpBase + 0x04);
+      uint16_t release = GetShortBE(envpBase + 0x06);
 
-      uint32_t numRegions = GetWordBE(dwOffset + 0x10);
-      uint32_t regionTableIdx = dwOffset + 0x14;
-      uint32_t keyLow = 0;
-      for (uint32_t i = 0; i < numRegions; i++) {
+      uint32_t instIdx = dwOffset + 0x0C;
+      if (GetWordBE(instIdx) == 0x02)
+        instIdx += 0x08;
+      else if (GetWordBE(instIdx) != 0)
+        instIdx += 0x04;
+      instIdx += 0x04;
+
+      uint32_t keyRgnCount = GetWordBE(instIdx + 0x00);
+      uint32_t regionTableIdx = instIdx + 0x04;
+      uint8_t keyLow = 0;
+      for (uint32_t i = 0; i < keyRgnCount; i++) {
         uint8_t keyHigh = GetByte(regionTableIdx);
         regionTableIdx += 0x04;
-        /* This is probably velocity regions... */
-        uint32_t numSamples = GetWordBE(regionTableIdx);
-        uint32_t sampleNum;
-        VGMRgn *rgn;
 
+        uint32_t velRgnCount = GetWordBE(regionTableIdx);
         regionTableIdx += 0x04;
-        if (numSamples == 0x00)
-          goto next;
 
-        assert(numSamples == 0x01);
+        uint8_t velLow = 0;
+        for (uint32_t j = 0; j < velRgnCount; j++) {
+          uint8_t velHigh = GetByte(regionTableIdx);
+          uint32_t regStart = regionTableIdx;
+          regionTableIdx += 0x04;
 
-        regionTableIdx += 0x04; /* unknown */
-        regionTableIdx += 0x02; /* unknown as well */
-        sampleNum = GetShortBE(regionTableIdx);
-        regionTableIdx += 0x02;
-        regionTableIdx += 0x04; /* unknown */
-        regionTableIdx += 0x04; /* frequency multiplier */
+          uint32_t sampleNum;
+          VGMRgn *rgn;
 
-        rgn = AddRgn(regionTableIdx, 0x18, sampleNum, keyLow, keyHigh);
+          regionTableIdx += 0x02; /* unknown */
+          sampleNum = GetShortBE(regionTableIdx);
+          regionTableIdx += 0x02;
+          regionTableIdx += 0x04; /* unknown */
+          regionTableIdx += 0x04; /* frequency multiplier */
 
-        /* Fake ADSR for now. */
-        rgn->attack_time = ((double)attack) / 0x3FFF;
-        rgn->release_time = ((double)release) / 0x0C;
-      next:
+          rgn = AddRgn(regStart, regionTableIdx - regStart, sampleNum, keyLow, keyHigh, velLow, velHigh);
+
+          /* Fake ADSR for now. */
+          rgn->attack_time = 0.0;
+          rgn->release_time = 0.2;
+
+          velLow = velHigh + 1;
+        }
+
         keyLow = keyHigh + 1;
       }
     }
@@ -770,12 +783,7 @@ private:
     name = buf;
 
     osctBase = FindChunk("OSCT");
-    /* Skip past chunk, size, length */
-    osctBase += 0x0C;
-
     envtBase = FindChunk("ENVT");
-    /* Skip past chunk */
-    envtBase += 0x04;
 
     /* We should have found LIST */
     uint32_t listBase = FindChunk("LIST") + 0x08;
@@ -871,39 +879,73 @@ public:
 
 private:
   virtual bool LoadInstr() override {
-    if (!MatchMagic(vgmfile->rawfile, dwOffset, "INST"))
-      return false;
+    if (MatchMagic(vgmfile->rawfile, dwOffset, "INST")) {
+      uint32_t keyRgnCount = GetWordBE(dwOffset + 0x28);
+      uint32_t keyRgnIdx = dwOffset + 0x2C;
+      uint8_t keyLow = 0;
+      for (uint32_t i = 0; i < keyRgnCount; i++) {
+        uint32_t keyRgnBase = parInstrSet->dwOffset + GetWordBE(keyRgnIdx);
+        keyRgnIdx += 0x04;
 
-    uint32_t keyRgnCount = GetWordBE(dwOffset + 0x28);
-    uint32_t keyRgnIdx = dwOffset + 0x2C;
-    uint8_t keyLow = 0;
-    for (uint32_t i = 0; i < keyRgnCount; i++) {
-      uint32_t keyRgnBase = parInstrSet->dwOffset + GetWordBE(keyRgnIdx);
-      keyRgnIdx += 0x04;
+        uint8_t keyHigh = GetByte(keyRgnBase);
 
-      uint8_t keyHigh = GetByte(keyRgnBase);
+        uint32_t velRgnCount = GetWordBE(keyRgnBase + 0x04);
+        uint32_t velRgnIdx = keyRgnBase + 0x08;
+        uint8_t velLow = 0;
+        for (uint32_t j = 0; j < velRgnCount; j++) {
+          uint32_t velRgnBase = parInstrSet->dwOffset + GetWordBE(velRgnIdx);
+          uint8_t velHigh = GetByte(velRgnBase);
 
-      uint32_t velRgnCount = GetWordBE(keyRgnBase + 0x04);
-      uint32_t velRgnIdx = keyRgnBase + 0x08;
-      uint8_t velLow = 0;
-      for (uint32_t j = 0; j < velRgnCount; j++) {
-        uint32_t velRgnBase = parInstrSet->dwOffset + GetWordBE(velRgnIdx);
-        uint8_t velHigh = GetByte(velRgnBase);
+          /* 0x04 is some sort of bank identifier? Doesn't seem to match the WSYS ID... */
+          uint32_t sampleNum = GetShortBE(velRgnBase + 0x06);
+          /* 0x08 = unknown float */
+          uint32_t freqMultBits = GetWordBE(velRgnBase + 0x0C);
+          float freqMult = *((float *)&freqMultBits);
 
-        /* 0x04 is some sort of bank identifier? Doesn't seem to match the WSYS ID... */
-        uint32_t sampleNum = GetShortBE(velRgnBase + 0x06);
-        /* 0x08 = unknown float */
-        uint32_t freqMultBits = GetWordBE(velRgnBase + 0x0C);
-        float freqMult = *((float *) &freqMultBits);
+          VGMRgn *rgn = AddRgn(keyRgnBase, 0, sampleNum, keyLow, keyHigh, velLow, velHigh);
+          rgn->SetFineTune(FrequencyRatioToCents(freqMult));
+          velLow = velHigh + 1;
+          velRgnIdx += 0x04;
+        }
 
-        VGMRgn *rgn = AddRgn(keyRgnBase, 0, sampleNum, keyLow, keyHigh, velLow, velHigh);
-        rgn->SetFineTune(FrequencyRatioToCents(freqMult));
-        velLow = velHigh + 1;
-        velRgnIdx += 0x04;
+        keyLow = keyHigh + 1;
       }
+      return true;
+    } else if (MatchMagic(vgmfile->rawfile, dwOffset, "PER2")) {
+      uint32_t keyRgnIdx = dwOffset + 0x88;
+      for (uint32_t i = 0; i < 100; i++) {
+        uint32_t keyRgnOffs = GetWordBE(keyRgnIdx);
+        keyRgnIdx += 0x04;
+        if (keyRgnOffs == 0)
+          continue;
 
-      keyLow = keyHigh + 1;
+        uint32_t keyRgnBase = parInstrSet->dwOffset + keyRgnOffs;
+        uint32_t keyRgnFreqMultBits = GetWordBE(keyRgnBase + 0x04);
+        float keyRgnFreqMult = *((float *)&keyRgnFreqMultBits);
+
+        uint32_t velRgnCount = GetWordBE(keyRgnBase + 0x10);
+        uint32_t velRgnIdx = keyRgnBase + 0x14;
+        uint8_t velLow = 0;
+        for (uint32_t j = 0; j < velRgnCount; j++) {
+          uint32_t velRgnBase = parInstrSet->dwOffset + GetWordBE(velRgnIdx);
+          uint8_t velHigh = GetByte(velRgnBase);
+
+          /* 0x04 is some sort of bank identifier? Doesn't seem to match the WSYS ID... */
+          uint32_t sampleNum = GetShortBE(velRgnBase + 0x06);
+          /* 0x08 = unknown float */
+          uint32_t velRgnFreqMultBits = GetWordBE(velRgnBase + 0x0C);
+          float velRgnFreqMult = *((float *)&velRgnFreqMultBits);
+
+          VGMRgn *rgn = AddRgn(keyRgnBase, 0, sampleNum, i, i, velLow, velHigh);
+          rgn->SetFineTune(FrequencyRatioToCents(velRgnFreqMult * keyRgnFreqMult));
+          rgn->SetUnityKey(i);
+          velLow = velHigh + 1;
+          velRgnIdx += 0x04;
+        }
+      }
+      return true;
     }
+    return false;
   }
 };
 
@@ -937,14 +979,13 @@ private:
       return false;
 
     uint32_t listIdx = bankOffs + 0x04;
-    uint32_t instrNum = 0;
-    while (true) {
+    for (uint32_t instrNum = 0; instrNum < 245; instrNum++) {
       uint32_t instrOffs = GetWordBE(listIdx);
-      if (instrOffs == 0x00)
-        break;
-      uint32_t instrBase = dwOffset + instrOffs;
-      aInstrs.push_back(new JaiSeqInstrAAF(this, instrBase, 0, instrNum++));
       listIdx += 0x04;
+      if (instrOffs == 0x00)
+        continue;
+      uint32_t instrBase = dwOffset + instrOffs;
+      aInstrs.push_back(new JaiSeqInstrAAF(this, instrBase, 0, instrNum & 0x7F));
     }
 
     return true;
