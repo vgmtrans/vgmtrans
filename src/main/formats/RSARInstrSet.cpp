@@ -364,6 +364,10 @@ void RBNKSamp::ConvertPCM8Channel(ChannelParam *param, uint8_t *buf, int channel
   uint32_t srcOffs = dataOff + param->dataOffset;
   uint32_t numSamples = DspAddressToSamples(dataLength);
   GetBytes(srcOffs, numSamples, buf);
+
+  /* PCM8 is signed */
+  for (uint32_t i = 0; i < numSamples; i++)
+    buf[i] ^= 0x80;
 }
 
 void RBNKSamp::ConvertPCM16Channel(ChannelParam *param, uint8_t *buf, int channelSpacing) {
