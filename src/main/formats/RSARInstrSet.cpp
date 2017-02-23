@@ -449,6 +449,8 @@ bool RSARSampCollRWAR::GetHeaderInfo() {
   if (!rawfile->MatchBytes("RWAR\xFE\xFF\x01", dwOffset))
     return false;
 
+  unLength = GetWordBE(dwOffset + 0x08);
+
   return true;
 }
 
