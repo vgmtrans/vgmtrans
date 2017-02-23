@@ -258,22 +258,37 @@ void RSARScanner::Scan(RawFile *file, void *info) {
   if (!rsar.Parse())
     return;
 
+  /* Load all the sample collections. */
+  std::map<uint32_t, VGMSampColl *> sampCollsByAddr;
+
+  for (size_t i = 0; i < rsar.rbnks.size(); i++) {
+    RSAR::RBNK *rbnk = &rsar.rbnks[i];
+    uint32_t sampCollKey = rbnk->wave.offset + rbnk->waveDataOffset;
+    if (sampCollsByAddr.count(sampCollKey) > 0)
+      continue;
+
+    VGMSampColl *sampColl = LoadBankSampColl(file, rbnk);
+    sampColl->LoadVGMFile();
+    sampCollsByAddr[sampCollKey] = sampColl;
+  }
+
   /* Load all the banks. */
   std::vector<VGMSampColl *> sampColls;
   std::vector<VGMInstrSet *> instrSets;
   for (size_t i = 0; i < rsar.rbnks.size(); i++) {
     RSAR::RBNK *rbnk = &rsar.rbnks[i];
-    VGMSampColl *sampColl = LoadBankSampColl(file, rbnk);
-    sampColl->LoadVGMFile();
-    sampColls.push_back(sampColl);
 
     VGMInstrSet *instrSet = new RSARInstrSet(file, rbnk->instr.offset, rbnk->instr.size, string2wstring(rbnk->name));
     instrSet->LoadVGMFile();
     instrSets.push_back(instrSet);
+
+    uint32_t sampCollKey = rbnk->wave.offset + rbnk->waveDataOffset;
+    sampColls.push_back(sampCollsByAddr[sampCollKey]);
   }
 
   for (size_t i = 0; i < rsar.rseqs.size(); i++) {
     RSAR::RSEQ *rseq = &rsar.rseqs[i];
+
     VGMSeq *seq = new RSARSeq(file, rseq->rseqOffset, rseq->dataOffset, 0, string2wstring(rseq->name));
     seq->LoadVGMFile();
 
