@@ -269,9 +269,14 @@ bool RSARTrack::ReadEvent() {
       curOffset += 2;
       AddUnknown(beginOffset, curOffset - beginOffset, L"Sweep Pitch");
       break;
+    case MML_LPF_CUTOFF:
+      curOffset++;
+      AddUnknown(beginOffset, curOffset - beginOffset, L"LPF Cutoff");
+      break;
     case MML_FXSEND_A:
     case MML_FXSEND_B:
     case MML_FXSEND_C:
+    case MML_MAINSEND:
       curOffset++;
       AddUnknown(beginOffset, curOffset - beginOffset, L"FXSEND");
       break;
