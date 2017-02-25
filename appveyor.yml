@@ -1,0 +1,34 @@
+# Static build version - changing the version dynamically means you can't
+# just click from github to see how things are progressing until the build has
+# finished, which could be a bit annoying.
+version: 1.{build}-{branch}
+
+environment:
+  matrix:
+  - platform: Win32
+    target: Release
+    visualstudio_string: vs2015
+
+init:
+# Use CRLF line endings on Windows so users can just use Notepad.
+  - git config --global core.autocrlf true
+
+build_script:
+  - msbuild buildbot.xml /m /t:%target% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+
+after_build:
+  - ps: $env:gitrev = git describe --tags
+  - ps: $env:my_version = "$env:gitrev-$env:appveyor_repo_branch-$env:appveyor_build_number"
+  - set package_name=vgmtrans-%my_version%-%visualstudio_string%-%platform%-%target%
+  - copy %target%_WTL\VGMTrans_WTL.exe bin\vgmtrans.exe
+  - mkdir vgmtrans
+  - move bin vgmtrans
+  - move LICENSE.txt vgmtrans
+  - move README.md vgmtrans
+  - 7z a -mx9 %package_name%.7z vgmtrans
+
+test: off
+
+artifacts:
+  - path: $(package_name).7z
+    name: $(visualstudio_string)-$(target)
