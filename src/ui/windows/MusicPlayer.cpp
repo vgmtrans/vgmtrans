@@ -295,7 +295,7 @@ void MusicPlayer::ChangeDLS(DLSFile* dlsfile)
 	//Load in the new guy
 	vector<BYTE> dlsBuf;
 	dlsBuf.reserve(dlsfile->GetSize());
-	dlsfile->WriteDLSToBuffer(dlsBuf);
+	dlsfile->WriteDLSToBuffer(dlsBuf, true);
 	
 	HRESULT result = DLSLoader.LoadDLSFromMem(&dlsBuf[0], dlsfile->GetSize(), Collection);	// Loads the standard GM set
 	//DLSLoader.LoadDLS(_T("TEST.dls"),Collection);	// Loads the standard GM set
