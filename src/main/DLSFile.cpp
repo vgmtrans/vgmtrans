@@ -88,7 +88,7 @@ uint32_t DLSFile::GetSize(void) {
 }
 
 
-int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
+int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf, bool mono) {
   uint32_t theDWORD;
 
   PushTypeOnVectBE<uint32_t>(buf, 0x52494646);            //"RIFF"
@@ -123,7 +123,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
     theDWORD += aWaves[i]->GetSize();                   //each "wave" list
   WriteLIST(buf, 0x7776706C, theDWORD);                 //Write the "wvpl" LIST
   for (uint32_t i = 0; i < aWaves.size(); i++)
-    aWaves[i]->Write(buf);                              //Write each "wave" list
+    aWaves[i]->Write(buf, mono);                        //Write each "wave" list
 
   theDWORD = 12 + (uint32_t) name.size();               //"INFO" + "INAM" + size + the string size
   WriteLIST(buf, 0x494E464F, theDWORD);                 //write the "INFO" list
@@ -463,14 +463,39 @@ uint32_t DLSWave::GetSize() {
   return size;
 }
 
-void DLSWave::Write(vector<uint8_t> &buf) {
+void DLSWave::GetChannelData(vector<uint8_t> &buf, uint8_t whichChannel) {
+  uint32_t chSize = dataSize / wChannels;
+  PushTypeOnVect<uint32_t>(buf, chSize);
+
+  uint8_t bytesPerSample = wBitsPerSample / 8;
+  uint8_t skip = wChannels * bytesPerSample;
+  for (uint32_t i = whichChannel * bytesPerSample; i < dataSize; i += skip) {
+    buf.insert(buf.end(), &data[i], &data[i + bytesPerSample]);
+  }
+}
+
+void DLSWave::WriteSample(vector<uint8_t> &buf, bool mono) {
+  if (false && (wChannels != 1 && mono)) {
+    // Just get the left sample.
+    GetChannelData(buf, 0);
+  } else {
+    PushTypeOnVect<uint32_t>(buf, dataSize);                //size: this is the ACTUAL size, not the even-aligned size
+    if (dataSize % 2)
+      buf.push_back(0);
+    buf.insert(buf.end(), data, data + dataSize);           //Write the sample
+  }
+}
+
+void DLSWave::Write(vector<uint8_t> &buf, bool mono) {
+  mono = false;
   uint32_t theDWORD;
+  uint16_t numChannels = mono ? 1 : wChannels;
 
   RiffFile::WriteLIST(buf, 0x77617665, GetSize() - 8);    //write "wave" list
   PushTypeOnVectBE<uint32_t>(buf, 0x666D7420);            //"fmt "
   PushTypeOnVect<uint32_t>(buf, 18);                      //size
   PushTypeOnVect<uint16_t>(buf, wFormatTag);              //wFormatTag
-  PushTypeOnVect<uint16_t>(buf, wChannels);               //wChannels
+  PushTypeOnVect<uint16_t>(buf, numChannels);             //wChannels
   PushTypeOnVect<uint32_t>(buf, dwSamplesPerSec);         //dwSamplesPerSec
   PushTypeOnVect<uint32_t>(buf, dwAveBytesPerSec);        //dwAveBytesPerSec
   PushTypeOnVect<uint16_t>(buf, wBlockAlign);             //wBlockAlign
@@ -482,10 +507,7 @@ void DLSWave::Write(vector<uint8_t> &buf) {
     Wsmp->Write(buf);                                     //write the "wsmp" chunk
 
   PushTypeOnVectBE<uint32_t>(buf, 0x64617461);            //"data"
-  PushTypeOnVect<uint32_t>(buf, dataSize);                //size: this is the ACTUAL size, not the even-aligned size
-  buf.insert(buf.end(), data, data + dataSize);           //Write the sample
-  if (dataSize % 2)
-    buf.push_back(0);
+  WriteSample(buf, mono);
   theDWORD = 12 + (uint32_t) name.size();                 //"INFO" + "INAM" + size + the string size
   RiffFile::WriteLIST(buf, 0x494E464F, theDWORD);         //write the "INFO" list
   PushTypeOnVectBE<uint32_t>(buf, 0x494E414D);            //"INAM"

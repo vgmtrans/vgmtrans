@@ -90,7 +90,7 @@ class DLSFile: public RiffFile {
 
   uint32_t GetSize(void);
 
-  int WriteDLSToBuffer(std::vector<uint8_t> &buf);
+  int WriteDLSToBuffer(std::vector<uint8_t> &buf, bool mono = false);
   bool SaveDLSFile(const std::wstring &filepath);
 
  public:
@@ -266,7 +266,7 @@ class DLSWave {
       return dataSize;
   }
   uint32_t GetSize(void);
-  void Write(std::vector<uint8_t> &buf);
+  void Write(std::vector<uint8_t> &buf, bool mono);
 
  private:
   DLSWsmp *Wsmp;
@@ -282,5 +282,8 @@ class DLSWave {
   unsigned char *data;
 
   std::string name;
+
+  void GetChannelData(std::vector<uint8_t> &buf, uint8_t whichChannel);
+  void WriteSample(vector<uint8_t> &buf, bool mono);
 };
 
