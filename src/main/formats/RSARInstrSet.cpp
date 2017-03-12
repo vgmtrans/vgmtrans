@@ -98,6 +98,8 @@ static void SetupEnvelope(VGMRgn *rgn, uint8_t attack, uint8_t decay, uint8_t su
 }
 
 bool RBNKInstr::LoadInstr() {
+  AddHeader(dwOffset + 0x00, 8, L"Key Regions Table Header");
+
   std::vector<Region> keyRegions = EnumerateRegionTable(dwOffset);
 
   for (uint32_t i = 0; i < keyRegions.size(); i++) {
@@ -166,38 +168,48 @@ std::vector<RBNKInstr::Region> RBNKInstr::EnumerateRegionTable(uint32_t refOffse
 
 void RBNKInstr::LoadRgn(VGMRgn *rgn) {
   uint32_t rgnBase = rgn->dwOffset;
+
   uint32_t waveIndex = GetWordBE(rgnBase + 0x00);
-  rgn->SetSampNum(waveIndex);
+  rgn->AddSampNum(waveIndex, rgnBase + 0x00, 4);
 
   uint8_t a = GetByte(rgnBase + 0x04);
   uint8_t d = GetByte(rgnBase + 0x05);
   uint8_t s = GetByte(rgnBase + 0x06);
   uint8_t r = GetByte(rgnBase + 0x07);
+  rgn->AddSimpleItem(rgnBase + 0x04, 1, L"Attack");
+  rgn->AddSimpleItem(rgnBase + 0x05, 1, L"Decay");
+  rgn->AddSimpleItem(rgnBase + 0x06, 1, L"Sustain");
+  rgn->AddSimpleItem(rgnBase + 0x07, 1, L"Release");
 
-  /* XXX: This doesn't seem to work. Figure this out later. */
   SetupEnvelope(rgn, a, d, s, r);
 
-  /* hold */
+  rgn->AddSimpleItem(rgnBase + 0x08, 1, L"Hold");
   uint8_t waveDataLocationType = GetByte(rgnBase + 0x09);
+  rgn->AddSimpleItem(rgnBase + 0x09, 1, L"Wave Data Location Type");
   assert(waveDataLocationType == 0x00 && "We only support INDEX wave data for now.");
 
-  /* noteOffType */
-  /* alternateAssign */
-  rgn->SetUnityKey(GetByte(rgnBase + 0x0C));
+  rgn->AddSimpleItem(rgnBase + 0x0A, 1, L"Note Off Type");
+  rgn->AddSimpleItem(rgnBase + 0x0B, 1, L"Alternate Assign");
+  rgn->AddUnityKey(GetByte(rgnBase + 0x0C), rgnBase + 0x0C);
 
   /* XXX: How do I transcribe volume? */
-  /* rgn->SetVolume(GetByte(rgnBase + 0x0D)); */
+  rgn->AddVolume(GetByte(rgnBase + 0x0D) / 127.0, rgnBase + 0x0D);
 
-  rgn->SetPan(GetByte(rgnBase + 0x0E));
-  /* padding */
-  /* f32 tune */
-  /* lfo table */
-  /* graph env table */
-  /* randomizer table */
+  rgn->AddPan(GetByte(rgnBase + 0x0E), rgnBase + 0x0E);
+  rgn->AddSimpleItem(rgnBase + 0x0F, 1, L"Padding");
+  rgn->AddSimpleItem(rgnBase + 0x10, 4, L"Frequency multiplier");
+  rgn->AddSimpleItem(rgnBase + 0x14, 8, L"LFO Table");
+  rgn->AddSimpleItem(rgnBase + 0x1C, 8, L"Graph Env Table");
+  rgn->AddSimpleItem(rgnBase + 0x24, 8, L"Randomizer Table");
+  rgn->AddSimpleItem(rgnBase + 0x2C, 4, L"Reserved");
 }
 
 bool RSARInstrSet::GetInstrPointers() {
+  VGMHeader *header = AddHeader(dwOffset, 0);
+
   uint32_t instTableCount = GetWordBE(dwOffset + 0x00);
+  header->AddSimpleItem(dwOffset + 0x00, 4, L"Instrument Count");
+
   uint32_t instTableIdx = dwOffset + 0x04;
   for (uint32_t i = 0; i < instTableCount; i++) {
     /* Some RBNK files have NULL offsets here. Don't crash in that case. */
