@@ -1,5 +1,5 @@
 #pragma once
-#include "Root.h"
+#include "main/Core.h"
 #include "Format.h"
 
 #include "VGMSeq.h"
@@ -12,7 +12,7 @@
 	public:																					\
 	virtual void Announce()																	\
 	{																						\
-		Format* format = pRoot->GetFormat(fmt_id);											\
+		Format* format = core.GetFormat(fmt_id);											\
 		SimpleMatcher* matcher = (SimpleMatcher*)format->matcher;							\
 		vector<VGMFile*>* files = matcher->AddMatchItem(this, id_var);						\
 		if (files)																			\
@@ -137,7 +137,7 @@ class SimpleMatcher:
           OnCloseSampColl(matchingSampColl);
           return false;
         }
-        //pRoot->AddVGMFile(matchingSampColl);
+        //core.AddVGMFile(matchingSampColl);
       }
     }
 
@@ -199,7 +199,7 @@ class SimpleMatcher:
             OnCloseSampColl(sampcoll);
             return false;
           }
-          //pRoot->AddVGMFile(sampcoll);
+          //core.AddVGMFile(sampcoll);
         }
       }
 

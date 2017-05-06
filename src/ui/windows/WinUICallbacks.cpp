@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "WinVGMRoot.h"
+#include "WinUICallbacks.h"
 #include "VGMFileTreeView.h"
 #include "VGMFileListView.h"
 #include "VGMCollListView.h"
@@ -13,20 +13,20 @@
 
 using namespace std;
 
-WinVGMRoot winroot;
+WinUICallbacks winroot;
 
 extern HANDLE killProgramSem;
 
-WinVGMRoot::WinVGMRoot(void)
+WinUICallbacks::WinUICallbacks(void)
 : selectedItem(NULL), selectedColl(NULL), loadedColl(NULL), bClosingVGMFile(false), bExiting(false)
 {
 }
 
-WinVGMRoot::~WinVGMRoot(void)
+WinUICallbacks::~WinUICallbacks(void)
 {
 }
 
-void WinVGMRoot::SelectItem(VGMItem* item)
+void WinUICallbacks::SelectItem(VGMItem* item)
 {
 	if (bClosingVGMFile)//AreWeExiting())
 		return;
@@ -44,7 +44,7 @@ void WinVGMRoot::SelectItem(VGMItem* item)
 	pMainFrame->SelectItem(item);
 }
 
-void WinVGMRoot::SelectColl(VGMColl* coll)
+void WinUICallbacks::SelectColl(VGMColl* coll)
 {
 	if (bClosingVGMFile)
 		return;
@@ -54,7 +54,7 @@ void WinVGMRoot::SelectColl(VGMColl* coll)
 }
 
 
-void WinVGMRoot::Play(void)
+void WinUICallbacks::Play(void)
 {
 	if (pMainFrame->UIGetState(ID_PLAY) ==  CMainFrame::UPDUI_DISABLED)	//if the play button is disabled, return
 		return;
@@ -85,7 +85,7 @@ void WinVGMRoot::Play(void)
 	pMainFrame->UIEnable(ID_PAUSE, 1);
 }
 
-void WinVGMRoot::Pause(void)
+void WinUICallbacks::Pause(void)
 {
 //	if (pMainFrame->UIGetState(ID_STOP) ==  CMainFrame::UPDUI_DISABLED)	//if the stop button is disabled, return
 //		return;
@@ -93,7 +93,7 @@ void WinVGMRoot::Pause(void)
 //	pMainFrame->UIEnable(ID_STOP, 0);
 }
 
-void WinVGMRoot::Stop(void)
+void WinUICallbacks::Stop(void)
 {
 	if (pMainFrame->UIGetState(ID_STOP) ==  CMainFrame::UPDUI_DISABLED)	//if the stop button is disabled, return
 		return;
@@ -102,21 +102,7 @@ void WinVGMRoot::Stop(void)
 	pMainFrame->UIEnable(ID_PAUSE, 0);
 }
 
-
-
-
-//void WinVGMRoot::SetWndPtrs(CMainFrame* mainFrm)
-//{
-//	pFileTreeView = &mainFrm->m_RawFileTreeView;
-//	pVGMFilesView = &mainFrm->m_VGMFilesView;
-//}
-
-void WinVGMRoot::UI_SetRootPtr(VGMRoot** theRoot)
-{
-	*theRoot = &winroot;
-}
-
-void WinVGMRoot::UI_PreExit()
+void WinUICallbacks::UI_PreExit()
 {
 	bExiting = true;
 
@@ -124,81 +110,56 @@ void WinVGMRoot::UI_PreExit()
 	WaitForSingleObject(killProgramSem, INFINITE);
 }
 
-void WinVGMRoot::UI_Exit()
+void WinUICallbacks::UI_Exit()
 {
 	pMainFrame->CloseUpShop();		//this occurs after Reset() is called in Root:Exit().  We can't be deleting items from our
 									//interface after the interface has closed down.  we must do that before
 }
 
-void WinVGMRoot::UI_AddRawFile(RawFile* newFile)
+void WinUICallbacks::UI_AddRawFile(RawFile* newFile)
 {
 	rawFileListView.AddFile(newFile);
 }
 
-void WinVGMRoot::UI_CloseRawFile(RawFile* targFile)
+void WinUICallbacks::UI_CloseRawFile(RawFile* targFile)
 {
 	rawFileListView.RemoveFile(targFile);
 }
 
-void WinVGMRoot::UI_OnBeginScan()
+void WinUICallbacks::UI_OnBeginScan()
 {
 	scanDlg = new CScanDlg();
 	scanDlg->Create(pMainFrame->m_hWnd);
 	scanDlg->ShowWindow(SW_SHOW);
 }
 
-void WinVGMRoot::UI_SetScanInfo()
-{
-}
-
-void WinVGMRoot::UI_OnEndScan()
+void WinUICallbacks::UI_OnEndScan()
 {
 	scanDlg->SendMessage(WM_CLOSE);
 }
 
-void WinVGMRoot::UI_AddVGMFile(VGMFile* theFile)
+void WinUICallbacks::UI_AddVGMFile(VGMFile* theFile)
 {
-	pMainFrame->OnAddVGMFile(theFile);
-	VGMRoot::UI_AddVGMFile(theFile);
+	theVGMFileListView.AddFile(theFile);
 }
 
-void WinVGMRoot::UI_AddVGMSeq(VGMSeq* theSeq)
-{
-	theVGMFileListView.AddFile((VGMFile*)theSeq);
-}
-
-void WinVGMRoot::UI_AddVGMInstrSet(VGMInstrSet* theInstrSet)
-{
-	theVGMFileListView.AddFile((VGMFile*)theInstrSet);
-}
-
-void WinVGMRoot::UI_AddVGMSampColl(VGMSampColl* theSampColl)
-{
-	theVGMFileListView.AddFile((VGMFile*)theSampColl);
-}
-
-void WinVGMRoot::UI_AddVGMMisc(VGMMiscFile* theMiscFile)
-{
-	theVGMFileListView.AddFile((VGMFile*)theMiscFile);
-}
-
-void WinVGMRoot::UI_AddVGMColl(VGMColl* theColl)
+void WinUICallbacks::UI_AddVGMColl(VGMColl* theColl)
 {
 	theVGMCollListView.AddColl(theColl);
 }
 
-void WinVGMRoot::UI_AddLogItem(LogItem* theLog)
+void WinUICallbacks::UI_AddLogItem(LogItem* theLog)
 {
 	theLogListView.AddLogItem(theLog);
 }
 
-void WinVGMRoot::UI_RemoveVGMFile(VGMFile* targFile)
+void WinUICallbacks::UI_RemoveVGMFile(VGMFile* targFile)
 {
 	pMainFrame->OnRemoveVGMFile(targFile);
 	theVGMFileListView.RemoveFile(targFile);
 }
 
-void WinVGMRoot::UI_RemoveVGMColl(VGMColl* targColl)
+void WinUICallbacks::UI_RemoveVGMColl(VGMColl* targColl)
 {
 	if (targColl == loadedColl)		//then we might be playing the collection up for removal
 	{
@@ -216,31 +177,31 @@ void WinVGMRoot::UI_RemoveVGMColl(VGMColl* targColl)
 	theVGMCollListView.RemoveColl(targColl);
 }
 
-void WinVGMRoot::UI_BeginRemoveVGMFiles()
+void WinUICallbacks::UI_BeginRemoveVGMFiles()
 {
 	theVGMFileListView.ShowWindow(false);
 	bClosingVGMFile = true;
 }
 
-void WinVGMRoot::UI_EndRemoveVGMFiles()
+void WinUICallbacks::UI_EndRemoveVGMFiles()
 {
 	theVGMFileListView.ShowWindow(true);
 	bClosingVGMFile = false;
 }
 
-void WinVGMRoot::UI_AddItem(VGMItem* item, VGMItem* parent, const wstring& itemName, VOID* UI_specific)
+void WinUICallbacks::UI_AddItem(VGMItem* item, VGMItem* parent, const wstring& itemName, VOID* UI_specific)
 {
 	CItemTreeView* itemView = (CItemTreeView*)UI_specific;
 	itemView->AddItem(item, parent, itemName);
 //	pMainFrame->itemViewMap[vgmfile]->AddItem(vgmfile, item, parent, itemName);
 }
 
-void WinVGMRoot::UI_AddItemSet(VGMFile* vgmfile, vector<ItemSet>* vItemSets)
+void WinUICallbacks::UI_AddItemSet(VGMFile* vgmfile, vector<ItemSet>* vItemSets)
 {
 //	pMainFrame->itemViewMap[vgmfile]->AddItemSet(vgmfile, vItemSets);
 }
 
-wstring WinVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const wstring& extension)
+wstring WinUICallbacks::UI_GetOpenFilePath(const wstring& suggestedFilename, const wstring& extension)
 {
 	CFileDialog dlgFile(TRUE, extension.c_str(), suggestedFilename.c_str(), OFN_HIDEREADONLY | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_EXPLORER);
 
@@ -252,7 +213,7 @@ wstring WinVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const w
 	return dlgFile.m_szFileName;
 }
 
-wstring WinVGMRoot::UI_GetSaveFilePath(const wstring& suggestedFilename, const wstring& extension)
+wstring WinUICallbacks::UI_GetSaveFilePath(const wstring& suggestedFilename, const wstring& extension)
 {
 	CFileDialog dlgFile(FALSE, extension.c_str(), suggestedFilename.c_str(), OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_EXPLORER);
 
@@ -265,7 +226,7 @@ wstring WinVGMRoot::UI_GetSaveFilePath(const wstring& suggestedFilename, const w
 }
 
 
-wstring WinVGMRoot::UI_GetSaveDirPath(const wstring& suggestedDir)
+wstring WinUICallbacks::UI_GetSaveDirPath(const wstring& suggestedDir)
 {
 	wstring myStr;
 	GetFolder(myStr, L"Save to Folder");
@@ -278,7 +239,7 @@ wstring WinVGMRoot::UI_GetSaveDirPath(const wstring& suggestedDir)
 //bool UI_WriteBufferToFile(string filename, unsigned char* buf, unsigned long size)
 //{
 //	
-bool WinVGMRoot::GetFolder(std::wstring& folderpath, const wstring& szCaption, HWND hOwner)
+bool WinUICallbacks::GetFolder(std::wstring& folderpath, const wstring& szCaption, HWND hOwner)
 {
 	bool retVal = false;
 

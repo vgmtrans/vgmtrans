@@ -380,7 +380,7 @@ int8_t SonyPS2Instr::ConvertPanVal(uint8_t panVal) {
 SonyPS2SampColl::SonyPS2SampColl(RawFile *rawfile, uint32_t offset, uint32_t length)
     : VGMSampColl(SonyPS2Format::name, rawfile, offset, length) {
   this->LoadOnInstrMatch();
-  pRoot->AddVGMFile(this);
+  core.AddVGMFile(this);
 }
 
 bool SonyPS2SampColl::GetSampleInfo() {

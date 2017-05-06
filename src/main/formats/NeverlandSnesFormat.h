@@ -1,6 +1,6 @@
 #pragma once
 #include "Format.h"
-#include "Root.h"
+#include "main/Core.h"
 #include "NeverlandSnesScanner.h"
 #include "Matcher.h"
 #include "VGMColl.h"

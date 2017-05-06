@@ -1,0 +1,67 @@
+
+QWidget:focus, QMenuBar:focus
+{
+    border: 0px solid black;
+}
+
+QAbstractScrollArea
+{
+    border-radius: 0px;
+    border: 0px solid black;
+}
+
+QListView {
+    border-radius: 0px;
+    border: 0px solid black;
+}
+
+QSplitter::handle {
+    border: 0px solid black;
+    background-color: #181717;
+}
+
+QSplitter::handle:hover {
+    background-color: #787876;
+    border: 0px solid black;
+}
+
+QSplitter::handle:horizontal {
+    width: 1px;
+}
+
+QSplitter::handle:vertical {
+    height: 1px;
+}
+
+/* TOP TABS */
+QTabBar::tab:top {
+    color: #b1b1b1;
+    border: 1px solid #181717;
+    border-left: 0px solid black;
+    background-color: #484646;
+    padding: 3px 11px 3px 11px;
+    border-radius: 0px;
+}
+
+QTabBar::tab:top:!selected
+{
+    color: #b1b1b1;
+    border: 1px solid #181717;
+    border-left: 0px solid black;
+    background-color: #302F2F;
+    padding: 3px 11px 3px 11px;
+    border-radius: 0px;
+}
+
+QScrollBar:vertical
+{
+    /*padding: 2px 2px 2px 2px;*/
+    border: 0px solid white;
+    /*margin: 15px 0px 15px 0px;*/
+    /*background-color: transparent;*/
+}
+
+/*QWidget
+{
+    background-color: green;
+}*/

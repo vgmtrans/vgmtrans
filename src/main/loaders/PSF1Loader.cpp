@@ -1,7 +1,8 @@
 #include "pch.h"
 #include "PSFFile.h"
 #include "PSF1Loader.h"
-#include "Root.h"
+#include "main/Core.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -27,11 +28,11 @@ PostLoadCommand PSF1Loader::Apply(RawFile *file) {
 
       complaint = psf_read_exe(file, exebuf, exebufsize);
       if (complaint) {
-        pRoot->AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"PSF1Loader"));
+        core.AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"PSF1Loader"));
         delete[] exebuf;
         return KEEP_IT;
       }
-      //pRoot->UI_WriteBufferToFile(L"uncomp.raw", exebuf, 0x200000);
+      //core.UI_WriteBufferToFile(L"uncomp.raw", exebuf, 0x200000);
 
       //uint8_t* cutbuf = new uint8_t[exeRealSize];
       //memcpy(cutbuf, exebuf, exeRealSize);
@@ -49,7 +50,7 @@ PostLoadCommand PSF1Loader::Apply(RawFile *file) {
       //
       //memcpy(exebuf, GetPSXMainMemBuf(), 0x200000);
 
-      //pRoot->UI_WriteBufferToFile(L"dump.raw", exebuf, 0x200000);
+      //core.UI_WriteBufferToFile(L"dump.raw", exebuf, 0x200000);
 
       ////EmulatePSX(cutbuf
 
@@ -58,8 +59,8 @@ PostLoadCommand PSF1Loader::Apply(RawFile *file) {
       //str.erase(pos);
       //str.append(L" MemDump");
 
-      //pRoot->CreateVirtFile(str.data(), exebuf, 0x200000);
-      pRoot->CreateVirtFile(exebuf, exebufsize, str.data(), L"", file->tag);
+      //core.CreateVirtFile(str.data(), exebuf, 0x200000);
+      core.CreateVirtFile(exebuf, exebufsize, str.data(), L"", file->tag);
       return DELETE_IT;
     }
   }

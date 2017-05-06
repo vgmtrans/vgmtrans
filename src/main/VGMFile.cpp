@@ -1,7 +1,8 @@
 #include "pch.h"
 
 #include "common.h"
-#include "Root.h"
+#include "main/Core.h"
+#include "main/LogItem.h"
 #include "VGMFile.h"
 #include "Format.h"
 
@@ -39,17 +40,17 @@ void VGMFile::AddToUI(VGMItem *parent, void *UI_specific) {
 }
 
 bool VGMFile::OnClose() {
-  pRoot->RemoveVGMFile(this);
+  core.RemoveVGMFile(this);
   return true;
 }
 
 bool VGMFile::OnSaveAsRaw() {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name));
+  wstring filepath = core.GetSaveFilePath(ConvertToSafeFileName(name));
   if (filepath.length() != 0) {
     bool result;
     uint8_t *buf = new uint8_t[unLength];        //create a buffer the size of the file
     GetBytes(dwOffset, unLength, buf);
-    result = pRoot->UI_WriteBufferToFile(filepath, buf, unLength);
+    result = core.WriteBufferToFile(filepath, buf, unLength);
     delete[] buf;
     return result;
   }
@@ -57,7 +58,7 @@ bool VGMFile::OnSaveAsRaw() {
 }
 
 bool VGMFile::OnSaveAllAsRaw() {
-  return pRoot->SaveAllAsRaw();
+  return core.SaveAllAsRaw();
 }
 
 bool VGMFile::LoadVGMFile() {
@@ -68,7 +69,7 @@ bool VGMFile::LoadVGMFile() {
   if (fmt)
     fmt->OnNewFile(this);
 
-  pRoot->AddLogItem(new LogItem(wstring(L"Loaded \"" + name + L"\" successfully.").c_str(),
+  core.AddLogItem(new LogItem(wstring(L"Loaded \"" + name + L"\" successfully.").c_str(),
                                 LOG_LEVEL_INFO,
                                 L"VGMFile"));
   return val;

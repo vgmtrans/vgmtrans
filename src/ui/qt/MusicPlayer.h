@@ -24,9 +24,10 @@ public:
     }
 
     void Shutdown();
-    void LoadSF2(const void* data);
-    void PlayMidi(const void* data, size_t len);
-    void StopMidi();
+    void LoadSF2(const void* sf2Data);
+    void Play(const void *midiData, size_t len);
+    void Pause();
+    void Stop();
 
 
 private:

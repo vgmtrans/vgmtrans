@@ -3,7 +3,7 @@
 #include "VGMInstrSet.h"
 #include "SynthFile.h"
 #include "ScaleConversion.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -441,7 +441,7 @@ const void *SF2File::SaveToMem() {
 bool SF2File::SaveSF2File(const std::wstring &filepath) {
   uint32_t size = this->GetSize();
   const void *buf = this->SaveToMem();
-  bool result = pRoot->UI_WriteBufferToFile(filepath, (uint8_t *) buf, size);
+  bool result = core.WriteBufferToFile(filepath, (uint8_t *) buf, size);
   delete[] buf;
   return result;
 }

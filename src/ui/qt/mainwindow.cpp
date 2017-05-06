@@ -1,122 +1,195 @@
 #include <qtextedit.h>
 #include <QDragEnterEvent>
 #include <QMimeData>
-#include "mainwindow.h"
-#include "QtVGMRoot.h"
+#include <QDir>
+#include <QFileDialog>
+#include <QBoxLayout>
+#include <QLabel>
+#include <QFontDatabase>
+
+#include <QDebug>
+
+#include "MainWindow.h"
+#include "Core.h"
+#include "MenuBar.h"
+#include "ToolBar.h"
 #include "RawFileListView.h"
 #include "VGMFileListView.h"
 #include "VGMCollListView.h"
+#include "HeaderContainer.h"
 #include "MdiArea.h"
+#include "MusicPlayer.h"
+
+#include "VGMColl.h"
+#include "VGMSeq.h"
+#include "SF2File.h"
+#include "MidiFile.h"
 
 const int defaultWindowWidth = 800;
 const int defaultWindowHeight = 600;
 const int defaultCollListHeight = 140;
 const int defaultFileListWidth = 200;
-const int splitterHandleWidth = 1;
 
 MainWindow::MainWindow(QWidget *parent)
         : QMainWindow(parent)
 {
-    setAcceptDrops(true);
+  setWindowTitle("VGMTrans");
+  setUnifiedTitleAndToolBarOnMac(true);
+  setAcceptDrops(true);
 
-    rawFileListView = new RawFileListView();
-    vgmFileListView = new VGMFileListView();
-    vgmCollListView = new VGMCollListView();
+  CreateComponents();
+  SetupSplitters();
 
-    vertSplitter = new QSplitter(Qt::Vertical, this);
-    horzSplitter = new QSplitter(Qt::Horizontal, vertSplitter);
-    vertSplitterLeft = new QSplitter(Qt::Vertical, horzSplitter);
+  ConnectMenuBar();
+  ConnectToolBar();
 
-    QList<int> sizes({defaultWindowHeight - defaultCollListHeight, defaultCollListHeight});
-    vertSplitter->addWidget(horzSplitter);
-    vertSplitter->addWidget(vgmCollListView);
-    vertSplitter->setStretchFactor(0, 1);
-    vertSplitter->setSizes(sizes);
-    vertSplitter->setHandleWidth(splitterHandleWidth);
-//    vertSplitter->setOpaqueResize(false);
-
-    sizes = QList<int>({defaultFileListWidth, defaultWindowWidth - defaultFileListWidth});
-    horzSplitter->addWidget(vertSplitterLeft);
-    horzSplitter->addWidget(MdiArea::getInstance());
-    horzSplitter->setStretchFactor(1, 1);
-    horzSplitter->setSizes(sizes);
-    horzSplitter->setHandleWidth(splitterHandleWidth);
-    horzSplitter->setMinimumSize(100, 100);
-    horzSplitter->setMaximumSize(500, 0);
-    horzSplitter->setCollapsible(0, false);
-    horzSplitter->setCollapsible(1, false);
-
-    vertSplitterLeft->addWidget(rawFileListView);
-    vertSplitterLeft->addWidget(vgmFileListView);
-    vertSplitterLeft->setHandleWidth(splitterHandleWidth);
-
-    setCentralWidget(vertSplitter);
-    resize(defaultWindowWidth, defaultWindowHeight);
+  resize(defaultWindowWidth, defaultWindowHeight);
 }
 
-MainWindow::~MainWindow()
+void MainWindow::CreateComponents()
 {
+  menuBar = new MenuBar(this);
+  toolBar = new ToolBar(this);
+  rawFileListView = new RawFileListView();
+  vgmFileListView = new VGMFileListView();
+  vgmCollListView = new VGMCollListView();
+  rawFileListContainer = new HeaderContainer(rawFileListView, "Imported Files");
+  vgmFileListContainer = new HeaderContainer(vgmFileListView, "Detected VGM Files");
 
+
+  vertSplitter = new QSplitter(Qt::Vertical, this);
+  horzSplitter = new QSplitter(Qt::Horizontal, vertSplitter);
+  vertSplitterLeft = new QSplitter(Qt::Vertical, horzSplitter);
+}
+
+void MainWindow::SetupSplitters()
+{
+  QList<int> sizes({defaultWindowHeight - defaultCollListHeight, defaultCollListHeight});
+  vertSplitter->addWidget(horzSplitter);
+  vertSplitter->addWidget(vgmCollListView);
+  vertSplitter->setStretchFactor(0, 1);
+  vertSplitter->setSizes(sizes);
+
+  sizes = QList<int>({defaultFileListWidth, defaultWindowWidth - defaultFileListWidth});
+  horzSplitter->addWidget(vertSplitterLeft);
+  horzSplitter->addWidget(MdiArea::getInstance());
+  horzSplitter->setStretchFactor(1, 1);
+  horzSplitter->setSizes(sizes);
+  horzSplitter->setMinimumSize(100, 100);
+  horzSplitter->setMaximumSize(500, 0);
+  horzSplitter->setCollapsible(0, false);
+  horzSplitter->setCollapsible(1, false);
+
+  vertSplitterLeft->addWidget(rawFileListContainer);
+  vertSplitterLeft->addWidget(vgmFileListContainer);
+
+  setCentralWidget(vertSplitter);
+}
+
+void MainWindow::ConnectMenuBar()
+{
+  setMenuBar(menuBar);
+
+  //File
+  connect(menuBar, &MenuBar::Open, this, &MainWindow::Open);
+  connect(menuBar, &MenuBar::Exit, this, &MainWindow::Exit);
+}
+
+void MainWindow::ConnectToolBar()
+{
+  addToolBar(toolBar);
+  connect(toolBar, &ToolBar::OpenPressed, this, &MainWindow::Open);
+  connect(toolBar, &ToolBar::PlayPressed, this, &MainWindow::Play);
+  connect(toolBar, &ToolBar::PausePressed, this, &MainWindow::Pause);
+  connect(toolBar, &ToolBar::StopPressed, this, &MainWindow::Stop);
+}
+
+void MainWindow::Open()
+{
+  QString file = QFileDialog::getOpenFileName(
+      this, tr("Select a File"), QDir::currentPath(),
+      tr("All Files (*)"));
+  if (!file.isEmpty())
+    core.OpenRawFile(file.toStdWString());
+}
+
+void MainWindow::Exit()
+{
+  core.Exit();
+  this->close();
+}
+
+void MainWindow::Play()
+{
+  QModelIndexList list = vgmCollListView->selectionModel()->selectedIndexes();
+  if (list.size() == 0 || list[0].row() >= core.vVGMColl.size())
+    return;
+
+  VGMColl* coll = core.vVGMColl[list[0].row()];
+  VGMSeq* seq = coll->GetSeq();
+  SF2File* sf2 = coll->CreateSF2File();
+  MidiFile* midi = seq->ConvertToMidi();
+
+  std::vector<uint8_t> midiBuf;
+  midi->WriteMidiToBuffer(midiBuf);
+
+  const void* rawSF2 = sf2->SaveToMem();
+
+  MusicPlayer& musicPlayer = MusicPlayer::getInstance();
+
+  musicPlayer.Stop();
+  musicPlayer.LoadSF2(rawSF2);
+  musicPlayer.Play(&midiBuf[0], midiBuf.size());
+
+  delete[] rawSF2;
+  delete sf2;
+  delete midi;
+}
+
+void MainWindow::Pause()
+{
+  MusicPlayer& musicPlayer = MusicPlayer::getInstance();
+  musicPlayer.Pause();
+}
+
+void MainWindow::Stop()
+{
+  MusicPlayer& musicPlayer = MusicPlayer::getInstance();
+  musicPlayer.Stop();
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event)
 {
-    event->acceptProposedAction();
+  event->acceptProposedAction();
 }
 
 void MainWindow::dragMoveEvent(QDragMoveEvent* event)
 {
-    event->acceptProposedAction();
+  event->acceptProposedAction();
 }
 
-wchar_t* qstringTowchar_t(QString text){
-//    qDebug()<<text.length();
-    wchar_t* c_Text = new wchar_t[text.length() + 1];
-    text.toWCharArray(c_Text);
 
-    c_Text[text.length()] = 0; //Add this line should work as you expected
-    return c_Text;
-}
 
 void MainWindow::dropEvent(QDropEvent *event)
 {
+  const QMimeData *mimeData = event->mimeData();
 
-    const QMimeData *mimeData = event->mimeData();
+  if (mimeData->hasText()) {
+      std::string utf8_text = mimeData->text().toUtf8().constData();
+      printf(utf8_text.c_str());
+  }
+  if (mimeData->hasUrls()) {
+      QList<QUrl> urlList = mimeData->urls();
+      int urlSize = urlList.size();
+      printf("%d", urlSize);
+      QString text;
+      for (int i = 0; i < urlList.size(); ++i) {
+          QString url = urlList.at(i).toLocalFile();
+          core.OpenRawFile(url.toStdWString());
+      }
+      printf(text.toUtf8().constData());
+  }
 
-//    if (mimeData->hasImage()) {
-//        setPixmap(qvariant_cast<QPixmap>(mimeData->imageData()));
-//    } else if (mimeData->hasHtml()) {
-//        setText(mimeData->html());
-//        setTextFormat(Qt::RichText);
-//    } else
-    if (mimeData->hasText()) {
-        std::string utf8_text = mimeData->text().toUtf8().constData();
-        printf(utf8_text.c_str());
-//        setText(mimeData->text());
-//        setTextFormat(Qt::PlainText);
-    }
-    if (mimeData->hasUrls()) {
-        QList<QUrl> urlList = mimeData->urls();
-        int urlSize = urlList.size();
-        printf("%d", urlSize);
-        QString text;
-        for (int i = 0; i < urlList.size() && i < 32; ++i) {
-            QString url = urlList.at(i).toLocalFile();
-            wchar_t *str = qstringTowchar_t(url);
-//            qDebug() << text.length();
-            qtVGMRoot.OpenRawFile(str);
-//            text += url + QString("\n");
-        }
-        printf(text.toUtf8().constData());
-//        qtVGMRoot.OpenRawFile(urlList)
-//        setText(text);
-    } else {
-//        setText(tr("Cannot display data"));
-    }
-//! [dropEvent() function part2]
-
-//! [dropEvent() function part3]
-    setBackgroundRole(QPalette::Dark);
-    event->acceptProposedAction();
-
+  setBackgroundRole(QPalette::Dark);
+  event->acceptProposedAction();
 }

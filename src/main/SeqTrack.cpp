@@ -4,7 +4,7 @@
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
 #include "Options.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 

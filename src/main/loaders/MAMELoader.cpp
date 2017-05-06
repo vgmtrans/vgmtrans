@@ -1,9 +1,11 @@
 #include "pch.h"
 #include "tinyxml.h"
 #include "MAMELoader.h"
-#include "Root.h"
+#include "main/Core.h"
+#include "main/Scanner.h"
 #include "Format.h"
 #include "KabukiDecrypt.h"
+#include "CPS3Decrypt.h"
 
 using namespace std;
 
@@ -70,7 +72,7 @@ int MAMELoader::LoadXML() {
 
 MAMEGameEntry *MAMELoader::LoadGameEntry(TiXmlElement *gameElmt) {
   MAMEGameEntry *gameentry = new MAMEGameEntry;
-  string gamename, fmtVersionStr;
+  string gamename;
 
   if (gameElmt->QueryValueAttribute("name", &gameentry->name) != TIXML_SUCCESS) {
     delete gameentry;
@@ -80,16 +82,15 @@ MAMEGameEntry *MAMELoader::LoadGameEntry(TiXmlElement *gameElmt) {
     delete gameentry;
     return NULL;
   }
-  if (gameElmt->QueryValueAttribute("fmt_version", &fmtVersionStr) != TIXML_SUCCESS) {
-    gameentry->fmt_version = 0;
+  if (gameElmt->QueryValueAttribute("fmt_version", &gameentry->fmt_version_str) != TIXML_SUCCESS) {
     gameentry->fmt_version_str = "";
   }
-  else {
-    FromString(fmtVersionStr, &gameentry->fmt_version);
-    gameentry->fmt_version_str = fmtVersionStr;
-    //stringstream convert ( fmtVersionStr );
+//  else {
+//    FromString(fmtVersionStr, &gameentry->fmt_version);
+//    gameentry->fmt_version_str = fmtVersionStr;
+//    stringstream convert ( fmtVersionStr );
     //convert >> std::setprecision(2) >> gameentry->fmt_version;		//read seq_table as hexadecimal value
-  }
+//  }
 
   // Load rom groups
   for (TiXmlElement *romgroupElmt = gameElmt->FirstChildElement(); romgroupElmt != 0;
@@ -197,7 +198,7 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
   for (list<MAMERomGroupEntry>::iterator it = gameentry->romgroupentries.begin();
        it != gameentry->romgroupentries.end(); it++) {
     if (it->file != NULL)
-      pRoot->SetupNewRawFile(it->file);
+      core.SetupNewRawFile(it->file);
   }
 
   ret = unzClose(cur_file);
@@ -302,6 +303,7 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
           !entry->GetHexAttribute("kabuki_swap_key2", &swap_key2) ||
           !entry->GetHexAttribute("kabuki_addr_key", &addr_key) ||
           !entry->GetHexAttribute("kabuki_xor_key", &xor_key)) {
+
         delete[] destFile;
         return 0;
       }
@@ -315,15 +317,26 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
                                      swap_key2,
                                      addr_key,
                                      xor_key);
-      //pRoot->UI_WriteBufferToFile(L"opcodesdump", decrypt, destFileSize);
+      //core.UI_WriteBufferToFile(L"opcodesdump", decrypt, destFileSize);
       delete[] decrypt;
+    }
+    else if (entry->encryption == "cps3") {
+      uint32_t key1, key2;
+      if (!entry->GetHexAttribute("key1", &key1) ||
+          !entry->GetHexAttribute("key2", &key2)) {
+
+        delete[] destFile;
+        return 0;
+      }
+      CPS3Decrypt::cps3_decode((uint32_t*) destFile, (uint32_t*) destFile, key1, key2, destFileSize);
+//      core.WriteBufferToFile(L"cps3dump_decrypted", destFile, destFileSize);
     }
   }
 
   //static int num = 0;
   //wostringstream	fn;
   //fn << L"romgroup " << num++;
-  //pRoot->UI_WriteBufferToFile(fn.str().c_str(), destFile, destFileSize);
+  //core.UI_WriteBufferToFile(fn.str().c_str(), destFile, destFileSize);
   wostringstream strstream;
   strstream << L"romgroup  - " << entry->type.c_str();
   VirtFile *newVirtFile = new VirtFile(destFile, destFileSize, strstream.str());

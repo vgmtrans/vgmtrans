@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "NamcoSnesSeq.h"
 #include "ScaleConversion.h"
+#include "main/LogItem.h"
 
 DECLARE_FORMAT(NamcoSnes);
 
@@ -569,7 +570,7 @@ bool NamcoSnesSeq::ReadEvent(void) {
     default:
       desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
       AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
+      core.AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
                                     LOG_LEVEL_ERR,
                                     L"NamcoSnesSeq"));
       bContinue = false;

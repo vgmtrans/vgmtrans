@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -58,7 +58,7 @@ void VGMSamp::ConvertToStdWave(uint8_t *buf) {
 }
 
 bool VGMSamp::OnSaveAsWav() {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"wav");
+  wstring filepath = core.GetSaveFilePath(ConvertToSafeFileName(name), L"wav");
   if (filepath.length() != 0)
     return SaveAsWav(filepath);
   return false;
@@ -141,5 +141,5 @@ bool VGMSamp::SaveAsWav(const std::wstring &filepath) {
     PushTypeOnVect<uint32_t>(waveBuf, 0);                    //playcount
   }
 
-  return pRoot->UI_WriteBufferToFile(filepath, &waveBuf[0], (uint32_t) waveBuf.size());
+  return core.WriteBufferToFile(filepath, &waveBuf[0], (uint32_t) waveBuf.size());
 }

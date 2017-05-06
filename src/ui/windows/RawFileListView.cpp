@@ -3,7 +3,7 @@
 #include "RawFileListView.h"
 #include "mainfrm.h"
 #include "HexView.h"
-#include "Root.h"
+#include "main/Core.h"
 #include "BmpBtn.h"
 
 
@@ -196,7 +196,7 @@ void CRawFileListView::OnKeyDown(TCHAR nChar, UINT repeats, UINT code)
 
 //LRESULT CRawFileListView::OnCloseButton(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
 //{
-//	pRoot->CloseRawFile((RawFile*)IDtoTreeItem[wID].GetData());		//if WTL had FromHandle() (to get an object from HWND) there'd be no need for this map<> shit.  but, alas
+//	core.CloseRawFile((RawFile*)IDtoTreeItem[wID].GetData());		//if WTL had FromHandle() (to get an object from HWND) there'd be no need for this map<> shit.  but, alas
 //	bHandled = false;
 //	return 0;
 //}
@@ -334,6 +334,6 @@ void CRawFileListView::OnCloseFile(UINT uCode, int nID, HWND hwndCtrl)
 		item.iSubItem = 0;
 		item.mask = LVIF_PARAM;
 		GetItem(&item);
-		pRoot->CloseRawFile((RawFile*)item.lParam);
+		core.CloseRawFile((RawFile*)item.lParam);
 	}
 }

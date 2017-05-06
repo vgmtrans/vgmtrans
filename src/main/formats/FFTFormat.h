@@ -1,6 +1,6 @@
 #pragma once
 #include "Format.h"
-#include "Root.h"
+#include "main/Core.h"
 #include "VGMColl.h"
 #include "Matcher.h"
 #include "FFTScanner.h"

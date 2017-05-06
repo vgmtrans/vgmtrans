@@ -6,12 +6,12 @@
 #include "pch.h"
 #include "resource.h"
 
-#include "Root.h"
+#include "main/Core.h"
 
 #include "aboutdlg.h"
 #include "MainFrm.h"
 
-#include "WinVGMRoot.h"
+#include "WinUICallbacks.h"
 
 #include "PlainTextView.h"
 #include "RawFileListView.h"
@@ -224,19 +224,6 @@ LRESULT CMainFrame::OnClose(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/,
 
 void CMainFrame::CloseUpShop()
 {
-	//bool bSafeToClose = m_tabbedClient.SaveAllModified(true, true);
-	//bool bSafeToClose = true;
-	//if(!bSafeToClose)
-	//{
-	//	// Someone "cancelled".  Don't let DefWindowProc, or
-	//	// anyone else have WM_CLOSE (the one sent to main frame)
-	//	bHandled = TRUE;
-	//	return 0;
-	//}
-	
-	//WaitForSingleObject(m_hEventDead, INFINITE);
-	//WaitForSingleObject(m_hThread, INFINITE);
-
 	this->UninitializeDefaultPanes();
 
 	m_tabbedClient.UnsubclassWindow();
@@ -341,9 +328,9 @@ LRESULT CMainFrame::OnInitialize(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lPar
 
 LRESULT CMainFrame::OnFileOpen(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
-	std::wstring filename = pRoot->UI_GetOpenFilePath();
+	std::wstring filename = core.UI_GetOpenFilePath();
 	if (!filename.empty()) {
-		pRoot->OpenRawFile(filename);
+		core.OpenRawFile(filename);
 	}
 	return 0;
 }
@@ -874,16 +861,6 @@ HWND CMainFrame::CreateLogListViewPane(CLogListView& view, LPCTSTR sName, HICON 
 	}
 
 	return hWndPane;
-}
-
-void CMainFrame::OnAddVGMFile(VGMFile* vgmfile)
-{
-	//CItemTreeView* newItemView = new CItemTreeView();
-	//itemViewMap[vgmfile] = newItemView;
-	//newItemView->Create(hwndItemTreePane, rcDefault, NULL, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_HSCROLL | WS_VSCROLL | WS_EX_CLIENTEDGE | TVS_SHOWSELALWAYS | TVS_HASBUTTONS);
-	//hwndToItemTreeView[newItemView->m_hWnd] = newItemView;
-
-	//m_ItemView.SetIcon(hIcon, ICON_SMALL);
 }
 
 void CMainFrame::OnRemoveVGMFile(VGMFile* vgmfile)

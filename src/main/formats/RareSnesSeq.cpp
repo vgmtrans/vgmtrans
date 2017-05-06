@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "RareSnesSeq.h"
 #include "ScaleConversion.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -497,7 +498,7 @@ bool RareSnesTrack::ReadEvent(void) {
                         ICON_STARTREP);
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
-          pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
+          core.AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
           bContinue = false;
           break;
         }
@@ -523,7 +524,7 @@ bool RareSnesTrack::ReadEvent(void) {
                         ICON_STARTREP);
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
-          pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
+          core.AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
           bContinue = false;
           break;
         }
@@ -545,7 +546,7 @@ bool RareSnesTrack::ReadEvent(void) {
                         ICON_ENDREP);
 
         if (rptNestLevel == 0) {
-          pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
+          core.AddLogItem(new LogItem(L"Subroutine nest level overflow\n", LOG_LEVEL_ERR, L"RareSnesSeq"));
           bContinue = false;
           break;
         }
@@ -1227,7 +1228,7 @@ bool RareSnesTrack::ReadEvent(void) {
       default:
         desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
         AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
-        pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
+        core.AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
                                       LOG_LEVEL_ERR,
                                       L"RareSnesSeq"));
         bContinue = false;

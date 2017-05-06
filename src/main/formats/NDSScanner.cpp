@@ -3,6 +3,7 @@
 #include "NDSScanner.h"
 #include "NDSSeq.h"
 #include "NDSInstrSet.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -181,7 +182,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       uint32_t fileSize = file->GetWord(offset);
       NDSWaveArch *NewNDSwa = new NDSWaveArch(file, pWAFatData, fileSize, waNames[i]);
       if (!NewNDSwa->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSWaveArch at 0x%08x\n",
+        core.AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSWaveArch at 0x%08x\n",
                                                             pWAFatData).c_str(), LOG_LEVEL_ERR, L"NDSScanner"));
         WAs.push_back(NULL);
         delete NewNDSwa;
@@ -219,7 +220,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
           NewNDSInstrSet->sampCollWAList.push_back(NULL);
       }
       if (!NewNDSInstrSet->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSInstrSet at 0x%08x\n",
+        core.AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSInstrSet at 0x%08x\n",
                                                             pBnkFatData).c_str(), LOG_LEVEL_ERR, L"NDSScanner"));
       }
       pair<uint16_t, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
@@ -241,7 +242,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       uint32_t fileSize = file->GetWord(offset);
       NDSSeq *NewNDSSeq = new NDSSeq(file, pSeqFatData, fileSize, seqNames[i]);
       if (!NewNDSSeq->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSSeq at 0x%08x\n", pSeqFatData).c_str(),
+        core.AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSSeq at 0x%08x\n", pSeqFatData).c_str(),
                                       LOG_LEVEL_ERR,
                                       L"NDSScanner"));
       }

@@ -3,6 +3,7 @@
 #include "Format.h"			//include PS1-specific format header file when it is ready
 #include "PSXSPU.h"
 #include "PS1Format.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -95,7 +96,7 @@ bool Vab::GetInstrPointers() {
     if (numTonesPerInstr > 32) {
       wchar_t log[512];
       swprintf(log, 512, L"Too many tones (%u) in Program #%u.", numTonesPerInstr, progIndex);
-      pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
+      core.AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
     }
     else if (numTonesPerInstr != 0) {
       VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex);
@@ -154,7 +155,7 @@ bool Vab::GetInstrPointers() {
       else {
         wchar_t log[512];
         swprintf(log, 512, L"VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i + 1, vagOffset, vagSize);
-        pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
+        core.AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
       }
     }
     unLength = (offVAGOffsets + 2 * 256) - dwOffset;
@@ -165,7 +166,7 @@ bool Vab::GetInstrPointers() {
       // load samples as well
       PSXSampColl *newSampColl = new PSXSampColl(format, this, offVAGs, totalVAGSize, vagLocations);
       if (newSampColl->LoadVGMFile()) {
-        pRoot->AddVGMFile(newSampColl);
+        core.AddVGMFile(newSampColl);
         //this->sampColl = newSampColl;
       }
       else {

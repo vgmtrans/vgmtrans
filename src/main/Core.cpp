@@ -1,9 +1,11 @@
 #include "pch.h"
 
 #include "common.h"
-#include "Root.h"
+#include "Core.h"
+#include "UICallbacks.h"
 #include "VGMFile.h"
 #include "VGMColl.h"
+#include "LogItem.h"
 
 #include "Format.h"
 #include "AkaoFormat.h"
@@ -18,25 +20,14 @@
 #include "SPCLoader.h"
 #include "MAMELoader.h"
 
-using namespace std;
 
-VGMRoot *pRoot;
+Core core;
 
-VGMRoot::VGMRoot(void) {
-}
+Core::Core() { }
 
-VGMRoot::~VGMRoot(void) {
-  DeleteVect<VGMLoader>(vLoader);
-  //DeleteVect<VGMScanner>(vScanner);
-  DeleteVect<RawFile>(vRawFile);
-  DeleteVect<VGMFile>(vVGMFile);
-  DeleteVect<LogItem>(vLogItem);
-}
-
-// initializes the VGMRoot class by pushing every VGMScanner and
-// VGMLoader onto the vectors.
-bool VGMRoot::Init(void) {
-  UI_SetRootPtr(&pRoot);
+bool Core::Init(UICallbacks *root) {
+  ui = root;
+//  UI_SetRootPtr(&pRoot);
 
   AddScanner("NDS");
   AddScanner("Akao");
@@ -51,7 +42,7 @@ bool VGMRoot::Init(void) {
   AddScanner("TamSoftPS1");
   AddScanner("KonamiPS1");
   //AddScanner("Org");
-  //AddScanner("QSound");
+//  AddScanner("QSound");
   //AddScanner("SegSat");
   //AddScanner("TaitoF3");
 
@@ -61,7 +52,6 @@ bool VGMRoot::Init(void) {
   //AddScanner("CapcomSnes");
   //AddScanner("RareSnes");
 
-  //load all the... loaders
   AddLoader<PSF1Loader>();
   AddLoader<PSF2Loader>();
   AddLoader<GSFLoader>();
@@ -74,7 +64,7 @@ bool VGMRoot::Init(void) {
   return true;
 }
 
-void VGMRoot::AddScanner(const string &formatname) {
+void Core::AddScanner(const string &formatname) {
   Format *fmt = Format::GetFormatFromName(formatname);
   if (!fmt)
     return;
@@ -84,20 +74,19 @@ void VGMRoot::AddScanner(const string &formatname) {
   vScanner.push_back(&scanner);
 }
 
+void Core::Exit(void) {
+  ui->UI_PreExit();
 
-void VGMRoot::Exit(void) {
-  UI_PreExit();
-  Reset();
-  UI_Exit();
-}
-
-void VGMRoot::Reset(void) {
-  //Close all RawFiles
+  DeleteVect<VGMLoader>(vLoader);
+  //DeleteVect<VGMScanner>(vScanner);
   DeleteVect<RawFile>(vRawFile);
+  DeleteVect<VGMFile>(vVGMFile);
+  DeleteVect<LogItem>(vLogItem);
+
+  ui->UI_Exit();
 }
 
-// opens up a file from the filesystem and scans it for known formats
-bool VGMRoot::OpenRawFile(const wstring &filename) {
+bool Core::OpenRawFile(const wstring &filename) {
   RawFile *newRawFile = new RawFile(filename);
   if (!newRawFile->open(filename)) {
     delete newRawFile;
@@ -108,14 +97,13 @@ bool VGMRoot::OpenRawFile(const wstring &filename) {
   return SetupNewRawFile(newRawFile);
 }
 
-// creates a virtual file, a RawFile that was data was created manually,
-// not actually opened from the filesystem.  Used, for example, when decompressing
-// the contents of PSF2 files
-bool VGMRoot::CreateVirtFile(uint8_t *databuf,
-                             uint32_t fileSize,
-                             const wstring &filename,
-                             const wstring &parRawFileFullPath,
-                             const VGMTag tag) {
+// Creates a VirtFile, a RawFile created in memory, not actually opened from the filesystem.
+// Used when decompressing the contents of PSF2 files, for example
+bool Core::CreateVirtFile(uint8_t *databuf,
+                            uint32_t fileSize,
+                            const wstring &filename,
+                            const wstring &parRawFileFullPath,
+                            const VGMTag tag) {
   assert(fileSize != 0);
 
   VirtFile *newVirtFile = new VirtFile(databuf, fileSize, filename.c_str(), parRawFileFullPath.c_str(), tag);
@@ -131,9 +119,8 @@ bool VGMRoot::CreateVirtFile(uint8_t *databuf,
   return true;
 }
 
-// called by OpenRawFile.  Applies all of the loaders and scanners
-// to the RawFile
-bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
+// called by OpenRawFile.  Applies all of the loaders and scanners to the RawFile
+bool Core::SetupNewRawFile(RawFile *newRawFile) {
   newRawFile->SetProPreRatio((float) 0.80);
 
   if (newRawFile->processFlags & PF_USELOADERS)
@@ -167,37 +154,38 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
   }
   newRawFile->SetProPreRatio(0.5);
   vRawFile.push_back(newRawFile);
-  UI_AddRawFile(newRawFile);
+  ui->UI_AddRawFile(newRawFile);
   return true;
 }
 
-// Name says it all.
-bool VGMRoot::CloseRawFile(RawFile *targFile) {
+bool Core::CloseRawFile(RawFile *targFile) {
+
   if (targFile == NULL)
     return false;
   vector<RawFile *>::iterator iter = find(vRawFile.begin(), vRawFile.end(), targFile);
   if (iter != vRawFile.end())
     vRawFile.erase(iter);
   else
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a rawfile which cannot be found in vRawFile."),
+    AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a rawfile which cannot be found in vRawFile."),
                                   LOG_LEVEL_DEBUG,
                                   L"Root"));
-
+  ui->UI_BeginRemoveVGMFiles();
   delete targFile;
+  ui->UI_EndRemoveVGMFiles();
+
   return true;
 }
 
 // Adds a a VGMFile to the interface.  The UI_AddVGMFile function will handle the
 // interface-specific stuff
-void VGMRoot::AddVGMFile(VGMFile *theFile) {
+void Core::AddVGMFile(VGMFile *theFile) {
   theFile->GetRawFile()->AddContainedVGMFile(theFile);
   vVGMFile.push_back(theFile);
-  UI_AddVGMFile(theFile);
+
+  ui->UI_AddVGMFile(theFile);
 }
 
-// Removes a VGMFile from the interface.  The UI_RemoveVGMFile will handle the
-// interface-specific stuff
-void VGMRoot::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
+void Core::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
   Format *fmt = targFile->GetFormat();
@@ -208,7 +196,7 @@ void VGMRoot::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
   if (iter != vVGMFile.end())
     vVGMFile.erase(iter);
   else
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a VGMFile which cannot be found in vVGMFile."),
+    AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a VGMFile which cannot be found in vVGMFile."),
                                   LOG_LEVEL_DEBUG,
                                   L"Root"));
   if (bRemoveFromRaw)
@@ -216,56 +204,48 @@ void VGMRoot::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
   while (targFile->assocColls.size())
     RemoveVGMColl(targFile->assocColls.back());
 
-
-  UI_RemoveVGMFile(targFile);
+  ui->UI_RemoveVGMFile(targFile);
   delete targFile;
 }
 
-
-void VGMRoot::AddVGMColl(VGMColl *theColl) {
+void Core::AddVGMColl(VGMColl *theColl) {
   vVGMColl.push_back(theColl);
-  UI_AddVGMColl(theColl);
+  ui->UI_AddVGMColl(theColl);
 }
 
-
-void VGMRoot::RemoveVGMColl(VGMColl *targColl) {
+void Core::RemoveVGMColl(VGMColl *targColl) {
   targColl->RemoveFileAssocs();
   vector<VGMColl *>::iterator iter = find(vVGMColl.begin(), vVGMColl.end(), targColl);
   if (iter != vVGMColl.end())
     vVGMColl.erase(iter);
   else
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a VGMColl which cannot be found in vVGMColl."),
+    AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a VGMColl which cannot be found in vVGMColl."),
                                   LOG_LEVEL_DEBUG,
                                   L"Root"));
-  UI_RemoveVGMColl(targColl);
+  ui->UI_RemoveVGMColl(targColl);
   delete targColl;
 }
 
-
-// This virtual function is called whenever a VGMFile is added to the interface.
-// By default, it simply sorts out what type of file was added and then calls a more
-// specific virtual function for the file type.  It is virtual in case a user-interface
-// wants do something universally whenever any type of VGMFiles is added.
-void VGMRoot::UI_AddVGMFile(VGMFile *theFile) {
-  switch (theFile->GetFileType()) {
-    case FILETYPE_SEQ:
-      UI_AddVGMSeq((VGMSeq *) theFile);
-      break;
-    case FILETYPE_INSTRSET:
-      UI_AddVGMInstrSet((VGMInstrSet *) theFile);
-      break;
-    case FILETYPE_SAMPCOLL:
-      UI_AddVGMSampColl((VGMSampColl *) theFile);
-      break;
-    case FILETYPE_MISC:
-      UI_AddVGMMisc((VGMMiscFile *) theFile);
-      break;
+bool Core::SaveAllAsRaw() {
+  wstring dirpath = ui->UI_GetSaveDirPath();\
+    if (dirpath.length() != 0) {
+    for (uint32_t i = 0; i < vVGMFile.size(); i++) {
+      bool result;
+      VGMFile *file = vVGMFile[i];
+      wstring filepath = dirpath + L"\\" + file->GetName()->c_str();
+      uint8_t *buf = new uint8_t[file->unLength];        //create a buffer the size of the file
+      file->GetBytes(file->dwOffset, file->unLength, buf);
+      result = WriteBufferToFile(filepath.c_str(), buf, file->unLength);
+      delete[] buf;
+    }
+    return true;
   }
+  return false;
 }
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32_t size) {
+bool Core::WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32_t size) {
 #if _MSC_VER < 1400            //if we're not using VC8, and the new STL that supports widechar filenames in ofstream...
   char newpath[PATH_MAX];
   wcstombs(newpath, filepath.c_str(), PATH_MAX);
@@ -282,27 +262,26 @@ bool VGMRoot::UI_WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32
 
 }
 
-
-bool VGMRoot::SaveAllAsRaw() {
-  wstring dirpath = UI_GetSaveDirPath();\
-    if (dirpath.length() != 0) {
-    for (uint32_t i = 0; i < vVGMFile.size(); i++) {
-      bool result;
-      VGMFile *file = vVGMFile[i];
-      wstring filepath = dirpath + L"\\" + file->GetName()->c_str();
-      uint8_t *buf = new uint8_t[file->unLength];        //create a buffer the size of the file
-      file->GetBytes(file->dwOffset, file->unLength, buf);
-      result = UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);
-      delete[] buf;
-    }
-    return true;
-  }
-  return false;
-}
-
 // Adds a log item to the interface.  The UI_AddLog function will handle the
 // interface-specific stuff
-void VGMRoot::AddLogItem(LogItem *theLog) {
+void Core::AddLogItem(LogItem *theLog) {
   vLogItem.push_back(theLog);
-  UI_AddLogItem(theLog);
+  ui->UI_AddLogItem(theLog);
+}
+
+void Core::AddItem(VGMItem *item, VGMItem *parent, const std::wstring &itemName, void *UI_specific) {
+  ui->UI_AddItem(item, parent, itemName, UI_specific);
+}
+
+
+std::wstring Core::GetOpenFilePath(const std::wstring &suggestedFilename, const std::wstring &extension) {
+  return ui->UI_GetOpenFilePath(suggestedFilename, extension);
+}
+
+std::wstring Core::GetSaveFilePath(const std::wstring &suggestedFilename, const std::wstring &extension) {
+  return ui->UI_GetSaveFilePath(suggestedFilename, extension);
+}
+
+std::wstring Core::GetSaveDirPath(const std::wstring &suggestedDir) {
+  return ui->UI_GetSaveDirPath(suggestedDir);
 }

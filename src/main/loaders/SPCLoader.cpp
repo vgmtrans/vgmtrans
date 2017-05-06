@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "SPCLoader.h"
-#include "Root.h"
+#include "main/Core.h"
 
 SPCLoader::SPCLoader(void) {
 }
@@ -142,7 +142,7 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
   }
 
   // Load SPC after parsing tag
-  if (!pRoot->SetupNewRawFile(spcFile)) {
+  if (!core.SetupNewRawFile(spcFile)) {
     delete spcFile;
     return KEEP_IT;
   }

@@ -1,7 +1,7 @@
 #pragma once
 #include "Format.h"
 #include "Matcher.h"
-#include "Root.h"
+#include "main/Core.h"
 #include "SuzukiSnesScanner.h"
 
 

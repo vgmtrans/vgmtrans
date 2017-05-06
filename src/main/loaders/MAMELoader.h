@@ -40,7 +40,6 @@ typedef struct _MAMEGameEntry {
 
   std::string name;
   std::string format;
-  float fmt_version;
   std::string fmt_version_str;
   //map<const std::string, const std::string> attributes;
   std::list<MAMERomGroupEntry> romgroupentries;

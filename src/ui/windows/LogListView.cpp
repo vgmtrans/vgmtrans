@@ -4,7 +4,7 @@
 #include "pch.h"
 #include "resource.h"
 #include "LogListView.h"
-#include "WinVGMRoot.h"
+#include "WinUICallbacks.h"
 #include "mainfrm.h"
 
 CLogListView theLogListView;

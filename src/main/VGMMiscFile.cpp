@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "VGMMiscFile.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -25,6 +25,6 @@ bool VGMMiscFile::Load() {
 
   LoadLocalData();
   UseLocalData();
-  pRoot->AddVGMFile(this);
+  core.AddVGMFile(this);
   return true;
 }

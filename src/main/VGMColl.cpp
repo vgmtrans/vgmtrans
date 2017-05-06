@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "VGMColl.h"
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
@@ -6,7 +7,8 @@
 #include "VGMSamp.h"
 #include "VGMRgn.h"
 #include "ScaleConversion.h"
-#include "Root.h"
+#include "main/LogItem.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -77,7 +79,7 @@ void VGMColl::AddMiscFile(VGMFile *theMiscFile) {
 bool VGMColl::Load() {
   if (!LoadMain())
     return false;
-  pRoot->AddVGMColl(this);
+  core.AddVGMColl(this);
   return true;
 }
 
@@ -232,7 +234,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
           }
           if (!bFoundIt) {
             std::wstring message = FormatString<wstring>(L"Could not match rgn with sampOffset %X to a sample with that offset.\n  (InstrSet %d, Instr %d, Rgn %d)", rgn->sampOffset, inst, i, j);
-            pRoot->AddLogItem(new LogItem(std::wstring(message.c_str()), LOG_LEVEL_ERR, L"VGMColl"));
+            core.AddLogItem(new LogItem(std::wstring(message.c_str()), LOG_LEVEL_ERR, L"VGMColl"));
             realSampNum = 0;
           }
         }
@@ -280,7 +282,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
         if (realSampNum >= finalSamps.size()) {
           wchar_t log[256];
           swprintf(log, 256, L"Sample %u does not exist.", realSampNum);
-          pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
+          core.AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
           realSampNum = finalSamps.size() - 1;
         }
 
@@ -439,7 +441,7 @@ SynthFile *VGMColl::CreateSynthFile() {
           }
           if (!bFoundIt) {
             std::wstring message = FormatString<wstring>(L"Could not match rgn with sampOffset %X to a sample with that offset.\n  (InstrSet %d, Instr %d, Rgn %d)", rgn->sampOffset, inst, i, j);
-            pRoot->AddLogItem(new LogItem(std::wstring(message.c_str()), LOG_LEVEL_ERR, L"VGMColl"));
+            core.AddLogItem(new LogItem(std::wstring(message.c_str()), LOG_LEVEL_ERR, L"VGMColl"));
             realSampNum = 0;
           }
         }
@@ -455,7 +457,7 @@ SynthFile *VGMColl::CreateSynthFile() {
             sampCollNum = i;
         }
         if (sampCollNum == finalSampColls.size()) {
-          pRoot->AddLogItem(new LogItem(L"SampColl does not exist.", LOG_LEVEL_ERR, L"VGMColl"));
+          core.AddLogItem(new LogItem(L"SampColl does not exist.", LOG_LEVEL_ERR, L"VGMColl"));
           return NULL;
         }
         //   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
@@ -471,7 +473,7 @@ SynthFile *VGMColl::CreateSynthFile() {
         if (realSampNum >= finalSamps.size()) {
           wchar_t log[256];
           swprintf(log, 256, L"Sample %u does not exist.", realSampNum);
-          pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
+          core.AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
           realSampNum = finalSamps.size() - 1;
         }
 
@@ -552,43 +554,43 @@ SynthFile *VGMColl::CreateSynthFile() {
 
 
 bool VGMColl::OnSaveAllDLS() {
-  wstring dirpath = pRoot->UI_GetSaveDirPath();
+  wstring dirpath = core.GetSaveDirPath();
   if (dirpath.length() != 0) {
     DLSFile dlsfile;
     wstring filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".dls";
     if (CreateDLSFile(dlsfile)) {
       if (!dlsfile.SaveDLSFile(filepath))
-        pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
+        core.AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
     }
     else
-      pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
+      core.AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
 
     if (this->seq != nullptr) {
       filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
       if (!this->seq->SaveAsMidi(filepath))
-        pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
+        core.AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
     }
   }
   return true;
 }
 
 bool VGMColl::OnSaveAllSF2() {
-  wstring dirpath = pRoot->UI_GetSaveDirPath();
+  wstring dirpath = core.GetSaveDirPath();
   if (dirpath.length() != 0) {
     wstring filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".sf2";
     SF2File *sf2file = CreateSF2File();
     if (sf2file != NULL) {
       if (!sf2file->SaveSF2File(filepath))
-        pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"), LOG_LEVEL_ERR, L"VGMColl"));
+        core.AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"), LOG_LEVEL_ERR, L"VGMColl"));
       delete sf2file;
     }
     else
-      pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"), LOG_LEVEL_ERR, L"VGMColl"));
+      core.AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"), LOG_LEVEL_ERR, L"VGMColl"));
 
     if (this->seq != nullptr) {
       filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
       if (!this->seq->SaveAsMidi(filepath))
-        pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
+        core.AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
     }
   }
   return true;

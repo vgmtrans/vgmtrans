@@ -2,7 +2,7 @@
 #include "HexView.h"
 #include "ItemTreeView.h"
 #include "HexViewFrame.h"
-#include "WinVGMRoot.h"
+#include "WinUICallbacks.h"
 #include "SeqEvent.h"
 //#include "VGMSeq.h"
 #include <zlib.h>

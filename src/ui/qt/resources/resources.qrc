@@ -11,5 +11,6 @@
     <file>images/treble_clef-32.png</file>
     <file>images/music_folder-32.png</file>
     <file>qss/default.qss</file>
+    <file>vgmtransstyle/style.qss</file>
 </qresource>
 </RCC>

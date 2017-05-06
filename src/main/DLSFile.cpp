@@ -2,7 +2,7 @@
 #include "DLSFile.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -139,7 +139,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
 bool DLSFile::SaveDLSFile(const std::wstring &filepath) {
   vector<uint8_t> dlsBuf;
   WriteDLSToBuffer(dlsBuf);
-  return pRoot->UI_WriteBufferToFile(filepath, &dlsBuf[0], (uint32_t) dlsBuf.size());
+  return core.WriteBufferToFile(filepath, &dlsBuf[0], (uint32_t) dlsBuf.size());
 }
 
 

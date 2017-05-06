@@ -3,6 +3,7 @@
 #include "TriAcePS1Seq.h"
 #include "TriAcePS1InstrSet.h"
 #include "VGMColl.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -199,7 +200,7 @@ TriAcePS1Seq *TriAcePS1Scanner::TriAceSLZDecompress(RawFile *file, uint32_t cfOf
     }
   }
   if (ufOff > ufSize)
-    pRoot->AddLogItem(new LogItem(std::wstring(L"ufOff > ufSize"), LOG_LEVEL_ERR, L"SNSFFile"));
+    core.AddLogItem(new LogItem(std::wstring(L"ufOff > ufSize"), LOG_LEVEL_ERR, L"SNSFFile"));
 
   //If we had to use DEFAULT_UFSIZE because the uncompressed file size was not given (Valkyrie Profile),
   //then create a new buffer of the correct size now that we know it, and delete the old one.
@@ -209,7 +210,7 @@ TriAcePS1Seq *TriAcePS1Scanner::TriAceSLZDecompress(RawFile *file, uint32_t cfOf
     delete[] uf;
     uf = newUF;
   }
-  //pRoot->UI_WriteBufferToFile(L"uncomp.raw", uf, ufOff);
+  //core.UI_WriteBufferToFile(L"uncomp.raw", uf, ufOff);
 
   //Create the new virtual file, and analyze the sequence
   std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
@@ -223,7 +224,7 @@ TriAcePS1Seq *TriAcePS1Scanner::TriAceSLZDecompress(RawFile *file, uint32_t cfOf
 
   newVirtFile->DontUseLoaders();
   newVirtFile->DontUseScanners();
-  pRoot->SetupNewRawFile(newVirtFile);
+  core.SetupNewRawFile(newVirtFile);
 
   if (bLoadSucceed)
     return newSeq;

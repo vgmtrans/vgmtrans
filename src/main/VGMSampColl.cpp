@@ -2,7 +2,7 @@
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMInstrSet.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -70,7 +70,7 @@ bool VGMSampColl::Load() {
 
   UseRawFileData();
   if (!parInstrSet)
-    pRoot->AddVGMFile(this);
+    core.AddVGMFile(this);
   bLoaded = true;
   return true;
 }
@@ -93,7 +93,7 @@ VGMSamp *VGMSampColl::AddSamp(uint32_t offset, uint32_t length, uint32_t dataOff
 }
 
 bool VGMSampColl::OnSaveAllAsWav() {
-  wstring dirpath = pRoot->UI_GetSaveDirPath();
+  wstring dirpath = core.GetSaveDirPath();
   if (dirpath.length() != 0) {
     for (uint32_t i = 0; i < samples.size(); i++) {
       wstring filepath = dirpath + L"\\" + ConvertToSafeFileName(samples[i]->sampName) + L".wav";

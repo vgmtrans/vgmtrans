@@ -1,7 +1,8 @@
 #include "pch.h"
 #include "PSFFile.h"
 #include "NDS2SFLoader.h"
-#include "Root.h"
+#include "main/Core.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -29,14 +30,14 @@ PostLoadCommand NDS2SFLoader::Apply(RawFile *file) {
 
       complaint = psf_read_exe(file, exebuf, exebufsize);
       if (complaint) {
-        pRoot->AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"NDS2SFLoader"));
+        core.AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"NDS2SFLoader"));
         delete[] exebuf;
         return KEEP_IT;
       }
-      //pRoot->UI_WriteBufferToFile(L"uncomp.nds", exebuf, exebufsize);
+      //core.UI_WriteBufferToFile(L"uncomp.nds", exebuf, exebufsize);
 
       wstring str = file->GetFileName();
-      pRoot->CreateVirtFile(exebuf, (uint32_t) exebufsize, str.data(), L"", file->tag);
+      core.CreateVirtFile(exebuf, (uint32_t) exebufsize, str.data(), L"", file->tag);
       return DELETE_IT;
     }
   }

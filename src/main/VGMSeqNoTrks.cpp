@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "VGMSeqNoTrks.h"
 #include "SeqEvent.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 

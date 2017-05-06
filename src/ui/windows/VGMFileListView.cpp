@@ -5,7 +5,7 @@
 #include "resource.h"
 #include "VGMFileListView.h"
 #include "DragDropSource.h"
-#include "WinVGMRoot.h"
+#include "WinUICallbacks.h"
 #include "mainfrm.h"
 
 using namespace std;
@@ -924,6 +924,6 @@ void CVGMFileListView::OnCloseFile(UINT uCode, int nID, HWND hwndCtrl)
 		item.iSubItem = 0;
 		item.mask = LVIF_PARAM;
 		GetItem(&item);
-		pRoot->RemoveVGMFile((VGMFile*)item.lParam);
+		core.RemoveVGMFile((VGMFile*)item.lParam);
 	}
 }

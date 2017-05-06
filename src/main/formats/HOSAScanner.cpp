@@ -32,7 +32,7 @@ void HOSAScanner::Scan(RawFile *file, void *info) {
 
   for (size_t i = 0; i < sampcolls.size(); i++) {
     if (sampcolls[i] != sampcoll) {
-      pRoot->RemoveVGMFile(sampcolls[i]);
+      core.RemoveVGMFile(sampcolls[i]);
     }
   }
 

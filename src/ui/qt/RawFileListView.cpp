@@ -1,10 +1,9 @@
-//
-// Created by Mike on 8/31/14.
-//
-
 #include <QKeyEvent>
 #include <QStandardItem>
 #include "RawFileListView.h"
+#include "main/RawFile.h"
+#include "main/Core.h"
+#include "ui/qt/QtUICallbacks.h"
 
 
 // ********************
@@ -14,19 +13,19 @@
 RawFileListViewModel::RawFileListViewModel(QObject *parent)
     : QAbstractListModel(parent)
 {
-    QObject::connect(&qtVGMRoot, SIGNAL(UI_AddedRawFile()), this, SLOT(changedRawFiles()));
-    QObject::connect(&qtVGMRoot, SIGNAL(UI_RemovedRawFile()), this, SLOT(changedRawFiles()));
+    QObject::connect(&qtUICallbacks, SIGNAL(UI_AddedRawFile()), this, SLOT(changedRawFiles()));
+    QObject::connect(&qtUICallbacks, SIGNAL(UI_RemovedRawFile()), this, SLOT(changedRawFiles()));
 }
 
 int RawFileListViewModel::rowCount ( const QModelIndex & parent) const
 {
-    return qtVGMRoot.vRawFile.size();
+    return core.vRawFile.size();
 }
 
 QVariant RawFileListViewModel::data ( const QModelIndex & index, int role ) const
 {
     if (role == Qt::DisplayRole) {
-        const wchar_t *filename = qtVGMRoot.vRawFile[index.row()]->GetFileName();
+        const wchar_t *filename = core.vRawFile[index.row()]->GetFileName();
         return QString::fromWCharArray(filename);
     }
     else if (role == Qt::DecorationRole) {
@@ -53,6 +52,8 @@ void RawFileListViewModel::changedRawFiles()
 RawFileListView::RawFileListView(QWidget *parent)
         : QListView(parent)
 {
+    setAttribute(Qt::WA_MacShowFocusRect, 0);
+
     RawFileListViewModel *rawFileListViewModel = new RawFileListViewModel(this);
     this->setModel(rawFileListViewModel);
     this->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -71,14 +72,16 @@ void RawFileListView::keyPressEvent(QKeyEvent* e)
 
         QList<RawFile*> filesToClose;
         foreach(const QModelIndex &index, list) {
-            if (index.row() < qtVGMRoot.vRawFile.size())
-                filesToClose.append(qtVGMRoot.vRawFile[index.row()]);
+            if (index.row() < core.vRawFile.size())
+                filesToClose.append(core.vRawFile[index.row()]);
         }
 
 
         foreach(RawFile *file, filesToClose) {
             printf("In Loop");
-            qtVGMRoot.CloseRawFile(file);
+            core.CloseRawFile(file);
         }
     }
+    else
+        QListView::keyPressEvent(e);
 }

@@ -2,38 +2,54 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <qsplitter.h>
-#include <qtreeview.h>
-#include <qlistview.h>
+#include <QSplitter.h>
+#include <QTreeView.h>
+#include <QListView.h>
 #include <QMdiArea>
-#include "VGMFileView.h"
 
-class MainWindow : public QMainWindow
+#include "ui/qt/VGMFileView.h"
+
+class MenuBar;
+class ToolBar;
+class HeaderContainer;
+
+class MainWindow final : public QMainWindow
 {
-    Q_OBJECT
+  Q_OBJECT
 
-public:
-    MainWindow(QWidget *parent = 0);
-    ~MainWindow();
+ public:
+  explicit MainWindow(QWidget *parent = 0);
 
-    static MainWindow& getInstance() {
-        static MainWindow instance;
-        return instance;
-    }
+ private slots:
+  void Open();
+  void Exit();
 
-protected:
-    QSplitter *vertSplitter;
-    QSplitter *horzSplitter;
-    QSplitter *vertSplitterLeft;
-    QListView *rawFileListView;
-    QListView *vgmFileListView;
-    QListView *vgmCollListView;
-    QListView *collListView;
+  void Play();
+  void Pause();
+  void Stop();
 
-protected:
-    void dragEnterEvent(QDragEnterEvent *event);
-    void dragMoveEvent(QDragMoveEvent* event);
-    void dropEvent(QDropEvent *event);
+
+ private:
+  void CreateComponents();
+  void SetupSplitters();
+  void ConnectMenuBar();
+  void ConnectToolBar();
+
+  MenuBar* menuBar;
+  ToolBar* toolBar;
+  QSplitter* vertSplitter;
+  QSplitter* horzSplitter;
+  QSplitter* vertSplitterLeft;
+  QListView* rawFileListView;
+  QListView* vgmFileListView;
+  QListView* vgmCollListView;
+  QListView* collListView;
+  HeaderContainer* vgmFileListContainer;
+  HeaderContainer* rawFileListContainer;
+
+  void dragEnterEvent(QDragEnterEvent *event);
+  void dragMoveEvent(QDragMoveEvent* event);
+  void dropEvent(QDropEvent *event);
 };
 
 #endif // MAINWINDOW_H

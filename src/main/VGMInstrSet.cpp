@@ -3,7 +3,8 @@
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "VGMColl.h"
-#include "Root.h"
+#include "main/LogItem.h"
+#include "main/Core.h"
 
 DECLARE_MENU(VGMInstrSet)
 
@@ -59,13 +60,13 @@ bool VGMInstrSet::Load() {
 
   if (sampColl != NULL) {
     if (!sampColl->Load()) {
-      pRoot->AddLogItem(new LogItem(L"Failed to load VGMSampColl.", LOG_LEVEL_ERR, L"VGMInstrSet"));
+      core.AddLogItem(new LogItem(L"Failed to load VGMSampColl.", LOG_LEVEL_ERR, L"VGMInstrSet"));
     }
   }
 
   LoadLocalData();
   UseLocalData();
-  pRoot->AddVGMFile(this);
+  core.AddVGMFile(this);
   return true;
 }
 
@@ -89,7 +90,7 @@ bool VGMInstrSet::LoadInstrs() {
 
 
 bool VGMInstrSet::OnSaveAsDLS(void) {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"dls");
+  wstring filepath = core.GetSaveFilePath(ConvertToSafeFileName(name), L"dls");
   if (filepath.length() != 0) {
     return SaveAsDLS(filepath.c_str());
   }
@@ -97,7 +98,7 @@ bool VGMInstrSet::OnSaveAsDLS(void) {
 }
 
 bool VGMInstrSet::OnSaveAsSF2(void) {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"sf2");
+  wstring filepath = core.GetSaveFilePath(ConvertToSafeFileName(name), L"sf2");
   if (filepath.length() != 0) {
     return SaveAsSF2(filepath);
   }

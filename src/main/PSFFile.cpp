@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #include <zlib.h>
-#include "Root.h"
+#include "main/Core.h"
 #include "PSFFile.h"
 
 using namespace std;

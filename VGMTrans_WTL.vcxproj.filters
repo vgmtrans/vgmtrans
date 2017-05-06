@@ -432,10 +432,10 @@
     <ClCompile Include="src\main\formats\QSoundInstr.cpp">
       <Filter>Source Files\formats\qsound</Filter>
     </ClCompile>
-    <ClCompile Include="src\main\formats\QSoundScanner.cpp">
+    <ClCompile Include="src\main\formats\CPSScanner.cpp">
       <Filter>Source Files\formats\qsound</Filter>
     </ClCompile>
-    <ClCompile Include="src\main\formats\QSoundSeq.cpp">
+    <ClCompile Include="src\main\formats\CPSSeq.cpp">
       <Filter>Source Files\formats\qsound</Filter>
     </ClCompile>
     <ClCompile Include="src\main\formats\SonyPS2InstrSet.cpp">
@@ -597,7 +597,7 @@
     <ClCompile Include="src\ui\windows\VGMCollListView.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="src\ui\windows\WinVGMRoot.cpp">
+    <ClCompile Include="src\ui\windows\WinUICallbacks.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
     <ClCompile Include="src\main\PSFFile.cpp">
@@ -989,10 +989,10 @@
     <ClInclude Include="src\main\formats\QSoundInstr.h">
       <Filter>Header Files\formats\qsound</Filter>
     </ClInclude>
-    <ClInclude Include="src\main\formats\QSoundScanner.h">
+    <ClInclude Include="src\main\formats\CPSScanner.h">
       <Filter>Header Files\formats\qsound</Filter>
     </ClInclude>
-    <ClInclude Include="src\main\formats\QSoundSeq.h">
+    <ClInclude Include="src\main\formats\CPSSeq.h">
       <Filter>Header Files\formats\qsound</Filter>
     </ClInclude>
     <ClInclude Include="src\main\formats\SonyPS2Format.h">
@@ -1199,7 +1199,7 @@
     <ClInclude Include="src\ui\windows\VGMTransWindow.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="src\ui\windows\WinVGMRoot.h">
+    <ClInclude Include="src\ui\windows\WinUICallbacks.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="src\main\PSFFile.h">

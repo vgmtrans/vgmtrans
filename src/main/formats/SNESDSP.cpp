@@ -2,7 +2,8 @@
 
 #include "pch.h"
 #include "SNESDSP.h"
-#include "Root.h"
+#include "main/LogItem.h"
+#include "main/Core.h"
 
 // *************
 // SNES Envelope
@@ -466,7 +467,7 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
     if (dwOffset + k + 9 > GetRawFile()->size()) {
       wchar_t log[512];
       swprintf(log, 512, L"\"%s\" unexpected EOF.", name.c_str());
-      pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"SNESSamp"));
+      core.AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"SNESSamp"));
       break;
     }
 

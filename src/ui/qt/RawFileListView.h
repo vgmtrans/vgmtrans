@@ -1,11 +1,5 @@
-//
-// Created by Mike on 8/31/14.
-//
-
-
 #include <QAbstractListModel>
 #include <QListView>
-#include "QtVGMRoot.h"
 
 #ifndef __RawFileListView_H_
 #define __RawFileListView_H_

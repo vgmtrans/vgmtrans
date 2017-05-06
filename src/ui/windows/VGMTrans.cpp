@@ -10,7 +10,7 @@
 #include "aboutdlg.h"
 #include "MainFrm.h"
 #include "MediaThread.h"
-#include "Root.h"
+#include "main/Core.h"
 
 CAppModule _Module;
 bool g_bXPOrLater;
@@ -45,7 +45,7 @@ int Run(LPTSTR lpstrCmdLine, int nCmdShow = SW_SHOWDEFAULT)
 
 	for (int argi = 1; argi < argc; argi++)
 	{
-		pRoot->OpenRawFile(argv[argi]);
+		core.OpenRawFile(argv[argi]);
 	}
 
 	int nRet = theLoop.Run();

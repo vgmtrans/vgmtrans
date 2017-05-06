@@ -2,6 +2,7 @@
 #include "NinSnesSeq.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
+#include "main/LogItem.h"
 
 DECLARE_FORMAT(NinSnes);
 
@@ -221,7 +222,7 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
     if (section == NULL) {
       section = new NinSnesSection(this, sectionAddress);
       if (!section->Load()) {
-        pRoot->AddLogItem(new LogItem(L"Failed to load section\n", LOG_LEVEL_ERR, L"NinSnesSeq"));
+        core.AddLogItem(new LogItem(L"Failed to load section\n", LOG_LEVEL_ERR, L"NinSnesSeq"));
         return false;
       }
       AddSection(section);
@@ -1750,7 +1751,7 @@ bool NinSnesTrack::ReadEvent(void) {
     default:
       desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
       AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(),
+      core.AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(),
                                     LOG_LEVEL_ERR,
                                     std::wstring(L"AkaoSnesSeq")));
       bContinue = false;

@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CapcomSnesSeq.h"
 #include "ScaleConversion.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -261,7 +262,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
       else {
         // error: note length is not a byte value.
         len = 0;
-        pRoot->AddLogItem(new LogItem(L"Note length overflow\n", LOG_LEVEL_WARN, L"CapcomSnesSeq"));
+        core.AddLogItem(new LogItem(L"Note length overflow\n", LOG_LEVEL_WARN, L"CapcomSnesSeq"));
       }
       setNoteDotted(false);
     }
@@ -704,7 +705,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
       default:
         desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
         AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
-        pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
+        core.AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
                                       LOG_LEVEL_ERR,
                                       L"CapcomSnesSeq"));
         bContinue = false;

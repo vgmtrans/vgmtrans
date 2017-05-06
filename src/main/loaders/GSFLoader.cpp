@@ -1,7 +1,8 @@
 #include "pch.h"
 #include "PSFFile.h"
 #include "GSFLoader.h"
-#include "Root.h"
+#include "main/Core.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -29,14 +30,14 @@ PostLoadCommand GSFLoader::Apply(RawFile *file) {
 
       complaint = psf_read_exe(file, exebuf, exebufsize);
       if (complaint) {
-        pRoot->AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"GSFLoader"));
+        core.AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"GSFLoader"));
         delete[] exebuf;
         return KEEP_IT;
       }
-      //pRoot->UI_WriteBufferToFile(L"uncomp.gba", exebuf, exebufsize);
+      //core.UI_WriteBufferToFile(L"uncomp.gba", exebuf, exebufsize);
 
       wstring str = file->GetFileName();
-      pRoot->CreateVirtFile(exebuf, (uint32_t) exebufsize, str.data(), L"", file->tag);
+      core.CreateVirtFile(exebuf, (uint32_t) exebufsize, str.data(), L"", file->tag);
       return DELETE_IT;
     }
   }

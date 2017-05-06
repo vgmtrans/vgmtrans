@@ -4,12 +4,8 @@
 
 using namespace std;
 
-// INTR_FREQUENCY is the interval in seconds between updates to the vol for articulation.
-// In the original software, this is done via a hardware interrupt timer.
-// After calculating the number of volume updates that will be made for the articulation values, 
-// a calculation found through reverse-engineering the music driver code,  we can multiply the count by
-// this frequency to find the duration of the articulation phases with exact accuracy.
-#define INTR_FREQUENCY (1.0/192.0)//0.005210332809750868
+// The interrupt frequency also serves as the frequency of updates to the vol for articulation.
+#define INTR_FREQUENCY (1.0/192.0)
 
 
 // ***********

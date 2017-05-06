@@ -89,7 +89,7 @@ builddir=`pwd`
 
 info "Building in \"$builddir\""
 
-TRIPLET=$ARCH-apple-darwin11
+TRIPLET=$ARCH-apple-darwin12
 
 export CC="xcrun clang"
 export CXX="xcrun clang++"

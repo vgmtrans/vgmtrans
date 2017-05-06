@@ -4,7 +4,8 @@
 #include "VGMSamp.h"
 #include "VGMItem.h"
 #include "ScaleConversion.h"
-#include "Root.h"
+#include "main/LogItem.h"
+#include "main/Core.h"
 
 // All of the ADSR calculations herein (except where inaccurate) are derived from Neill Corlett's work in
 // reverse-engineering the Playstation 1/2 SPU unit.
@@ -151,7 +152,7 @@ void PSXConvADSR(T *realADSR,
       ((Sm & ~0x01) != 0) ||
       ((Sd & ~0x01) != 0) ||
       ((Sr & ~0x7F) != 0)) {
-    pRoot->AddLogItem(new LogItem(L"PSX ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
+    core.AddLogItem(new LogItem(L"PSX ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
     return;
   }
 

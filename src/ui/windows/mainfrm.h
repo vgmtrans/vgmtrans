@@ -57,7 +57,7 @@ class CMainFrame :
 	public CIdleHandler
 //	public CGameHandler
 {
-	friend class WinVGMRoot;
+	friend class WinUICallbacks;
 
 public:
 	CMainFrame();

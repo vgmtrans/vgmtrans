@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.11)
 project(VGMTrans)
 
 if(APPLE)
-    set(CMAKE_LIBRARY_ARCHITECTURE "x86_64-apple-darwin11")
+    set(CMAKE_LIBRARY_ARCHITECTURE "x86_64-apple-darwin12")
     set(CMAKE_OSX_ARCHITECTURES "x86_64;")
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
     set(GUI_TYPE MACOSX_BUNDLE)
@@ -34,6 +34,7 @@ file(GLOB_RECURSE LIB_FILES
         )
 
 set(INCLUDE_DIRS
+        ${PROJECT_SOURCE_DIR}/src
         ${PROJECT_SOURCE_DIR}/src/main
         ${PROJECT_SOURCE_DIR}/src/main/formats
         ${PROJECT_SOURCE_DIR}/src/main/loaders
@@ -73,37 +74,37 @@ find_package(Qt5Widgets REQUIRED)
 
 qt5_add_resources(UI_RESOURCES ${RESOURCE_PATH})
 
-add_executable(vgmtrans ${GUI_TYPE} ${MAIN_FILES} ${UI_FILES} ${LIB_FILES} ${UI_RESOURCES})
+add_executable(VGMTrans ${GUI_TYPE} ${MAIN_FILES} ${UI_FILES} ${LIB_FILES} ${UI_RESOURCES})
 
 # Use the Widgets module from Qt 5.
-target_link_libraries(vgmtrans Qt5::Core Qt5::Widgets)
+target_link_libraries(VGMTrans Qt5::Core Qt5::Widgets)
 
 if (WIN32 OR APPLE)
-    set_target_properties(vgmtrans PROPERTIES LINK_SEARCH_START_STATIC 1)
-    set_target_properties(vgmtrans PROPERTIES LINK_SEARCH_END_STATIC 1)
+    set_target_properties(VGMTrans PROPERTIES LINK_SEARCH_START_STATIC 1)
+    set_target_properties(VGMTrans PROPERTIES LINK_SEARCH_END_STATIC 1)
 endif (WIN32 OR APPLE)
 
 find_package (ZLIB REQUIRED)
 if (ZLIB_FOUND)
     include_directories(${ZLIB_INCLUDE_DIRS})
-    target_link_libraries (vgmtrans ${ZLIB_LIBRARIES})
+    target_link_libraries (VGMTrans ${ZLIB_LIBRARIES})
 endif (ZLIB_FOUND)
 
 find_package (FluidSynth REQUIRED)
-target_link_libraries(vgmtrans ${FLUIDSYNTH_LIBRARIES})
+target_link_libraries(VGMTrans ${FLUIDSYNTH_LIBRARIES})
 
 find_package(GLIB REQUIRED)
-target_link_libraries(vgmtrans ${GLIB_LIBRARIES})
+target_link_libraries(VGMTrans ${GLIB_LIBRARIES})
 
 if (WIN32 OR APPLE)
-    find_library(QTPCRE_LIBRARY qtpcre)
-    target_link_libraries(vgmtrans ${QTPCRE_LIBRARY})
+#    find_library(QTPCRE_LIBRARY qtpcre)
+#    target_link_libraries(VGMTrans ${QTPCRE_LIBRARY})
 
     find_library(INTL_LIBRARY NAMES intl)
-    target_link_libraries(vgmtrans ${INTL_LIBRARY})
+    target_link_libraries(VGMTrans ${INTL_LIBRARY})
 
     find_library(ICONV_LIBRARIES NAMES iconv)
-    target_link_libraries(vgmtrans ${ICONV_LIBRARIES})
+    target_link_libraries(VGMTrans ${ICONV_LIBRARIES})
 endif (WIN32 OR APPLE)
 
 add_definitions(-DIOAPI_NO_64)
@@ -112,7 +113,7 @@ add_definitions(-DTIXML_USE_STL)
 if (WIN32)
     set_property(TARGET Qt5::Core APPEND PROPERTY INTERFACE_LINK_LIBRARIES ws2_32)
     find_library(QWINDOWS_LIBRARY qwindows)
-    target_link_libraries(vgmtrans
+    target_link_libraries(VGMTrans
             ${QWINDOWS_LIBRARY}
 
             imm32.lib
@@ -134,11 +135,23 @@ if (APPLE)
     find_library(CORESERVICES_LIBRARY CoreServices)
 
     find_library(QCOCOA_LIBRARY qcocoa)
-    find_library(QT5PLATFORMSUPPORT_LIBRARY Qt5PlatformSupport)
+#    find_library(QT5PLATFORMSUPPORT_LIBRARY Qt5PlatformSupport)
+
+    find_library(QT5_GRAPHICSSUPPORT_LIBRARY Qt5GraphicsSupport)
+    find_library(QT5_CLIPBOARDSUPPORT_LIBRARY Qt5ClipboardSupport)
+    find_library(QT5_FONTDATABASESUPPORT_LIBRARY Qt5FontDatabaseSupport)
+    find_library(QT5_THEMESUPPORT_LIBRARY Qt5ThemeSupport)
+    find_library(QT5_ACCESSIBILITYSUPPORT_LIBRARY Qt5AccessibilitySupport)
+    find_library(QTLIBPNG_LIBRARY qtlibpng)
+    find_library(QTFREETYPE_LIBRARY qtfreetype)
+    find_library(QTHARFBUZZ_LIBRARY qtharfbuzz)
+    find_library(QTPCRE_LIBRARY qtpcre)
+
+
     find_library(QT5PRINTSUPPORT_LIBRARY Qt5PrintSupport)
     find_library(CUPS_LIBRARY cups)
 
-    target_link_libraries(vgmtrans
+    target_link_libraries(VGMTrans
             ${QCOCOA_LIBRARY}
             ${APPKIT_LIBRARY}
             ${CARBON_LIBRARY}
@@ -148,7 +161,17 @@ if (APPLE)
             ${COREFOUNDATION_LIBRARY}
             ${CORESERVICES_LIBRARY}
 
-            ${QT5PLATFORMSUPPORT_LIBRARY}
+            ${QT5_GRAPHICSSUPPORT_LIBRARY}
+            ${QT5_CLIPBOARDSUPPORT_LIBRARY}
+            ${QT5_FONTDATABASESUPPORT_LIBRARY}
+            ${QT5_THEMESUPPORT_LIBRARY}
+            ${QT5_ACCESSIBILITYSUPPORT_LIBRARY}
+            ${QTLIBPNG_LIBRARY}
+            ${QTFREETYPE_LIBRARY}
+            ${QTHARFBUZZ_LIBRARY}
+            ${QTPCRE_LIBRARY}
+
+            #${QT5PLATFORMSUPPORT_LIBRARY}
             ${QT5PRINTSUPPORT_LIBRARY}
             ${CUPS_LIBRARY}
             ${IOKIT_LIBRARY}

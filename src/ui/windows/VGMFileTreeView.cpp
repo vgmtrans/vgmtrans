@@ -4,7 +4,7 @@
 #include "VGMFileTreeView.h"
 #include "ItemTreeView.h"
 //#include "MainFrm.h"
-#include "WinVGMRoot.h"
+#include "WinUICallbacks.h"
 
 CVGMFileTreeView VGMFilesView;
 

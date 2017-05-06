@@ -1,6 +1,6 @@
 #pragma once
 #include "Format.h"
-#include "Root.h"
+#include "main/Core.h"
 #include "SonyPS2Scanner.h"
 #include "Matcher.h"
 #include "VGMColl.h"

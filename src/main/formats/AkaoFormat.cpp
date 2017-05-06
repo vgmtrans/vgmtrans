@@ -3,6 +3,7 @@
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 #include "PSXSPU.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -46,14 +47,14 @@ bool AkaoColl::LoadMain() {
 
       if (!((rgn->artNum - sampcoll->starting_art_id) >= 0 &&
           rgn->artNum - sampcoll->starting_art_id < 200)) {
-        pRoot->AddLogItem(new LogItem(std::wstring(L"Articualation reference does not exist in the samp collection"),
+        core.AddLogItem(new LogItem(std::wstring(L"Articualation reference does not exist in the samp collection"),
                                       LOG_LEVEL_ERR,
                                       L"AkaoColl"));
         art = &sampcoll->akArts.front();
       }
 
       if (rgn->artNum - sampcoll->starting_art_id >= sampcoll->akArts.size()) {
-        pRoot->AddLogItem(new LogItem(std::wstring(L"referencing an articulation that was not loaded"),
+        core.AddLogItem(new LogItem(std::wstring(L"referencing an articulation that was not loaded"),
                                       LOG_LEVEL_ERR,
                                       L"AkaoColl"));
         art = &sampcoll->akArts.back();

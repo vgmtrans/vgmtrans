@@ -1,7 +1,6 @@
 #include "pch.h"
 
 #include "Scanner.h"
-#include "Root.h"
 
 VGMScanner::VGMScanner() {
 }
@@ -16,7 +15,6 @@ bool VGMScanner::Init() {
 }
 
 void VGMScanner::InitiateScan(RawFile *file, void *offset) {
-  pRoot->UI_SetScanInfo();
   this->Scan(file, offset);
 }
 

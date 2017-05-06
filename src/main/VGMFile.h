@@ -17,7 +17,7 @@ enum FileType { FILETYPE_UNDEFINED, FILETYPE_SEQ, FILETYPE_INSTRSET, FILETYPE_SA
 	public:														\
 	virtual Format* GetFormat()									\
 	{															\
-		return pRoot->GetFormat(fmt_id);						\
+		return core.GetFormat(fmt_id);						\
 	}
 */
 

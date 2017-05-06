@@ -334,7 +334,7 @@
     <ClCompile Include="src\ui\windows\VGMCollListView.cpp" />
     <ClCompile Include="src\ui\windows\VGMFileListView.cpp" />
     <ClCompile Include="src\ui\windows\VGMTrans.cpp" />
-    <ClCompile Include="src\ui\windows\WinVGMRoot.cpp" />
+    <ClCompile Include="src\ui\windows\WinUICallbacks.cpp" />
     <ClCompile Include="src\ui\windows\directmidi\C3DBuffer.cpp" />
     <ClCompile Include="src\ui\windows\directmidi\C3DListener.cpp" />
     <ClCompile Include="src\ui\windows\directmidi\C3DSegment.cpp" />
@@ -390,8 +390,8 @@
     <ClCompile Include="src\main\formats\KonamiGXScanner.cpp" />
     <ClCompile Include="src\main\formats\KonamiGXSeq.cpp" />
     <ClCompile Include="src\main\formats\QSoundInstr.cpp" />
-    <ClCompile Include="src\main\formats\QSoundScanner.cpp" />
-    <ClCompile Include="src\main\formats\QSoundSeq.cpp" />
+    <ClCompile Include="src\main\formats\CPSScanner.cpp" />
+    <ClCompile Include="src\main\formats\CPSSeq.cpp" />
     <ClCompile Include="src\main\formats\SonyPS2InstrSet.cpp" />
     <ClCompile Include="src\main\formats\SonyPS2Scanner.cpp" />
     <ClCompile Include="src\main\formats\SonyPS2Seq.cpp" />
@@ -549,7 +549,7 @@
     <ClInclude Include="src\ui\windows\VGMFileListView.h" />
     <ClInclude Include="src\ui\windows\VGMTransTabCtrl.h" />
     <ClInclude Include="src\ui\windows\VGMTransWindow.h" />
-    <ClInclude Include="src\ui\windows\WinVGMRoot.h" />
+    <ClInclude Include="src\ui\windows\WinUICallbacks.h" />
     <ClInclude Include="src\ui\windows\include\atlgdix.h" />
     <ClInclude Include="src\ui\windows\include\CustomTabCtrl.h" />
     <ClInclude Include="src\ui\windows\include\DotNetTabCtrl.h" />
@@ -603,8 +603,8 @@
     <ClInclude Include="src\main\formats\KonamiGXSeq.h" />
     <ClInclude Include="src\main\formats\QSoundFormat.h" />
     <ClInclude Include="src\main\formats\QSoundInstr.h" />
-    <ClInclude Include="src\main\formats\QSoundScanner.h" />
-    <ClInclude Include="src\main\formats\QSoundSeq.h" />
+    <ClInclude Include="src\main\formats\CPSScanner.h" />
+    <ClInclude Include="src\main\formats\CPSSeq.h" />
     <ClInclude Include="src\main\formats\SonyPS2Format.h" />
     <ClInclude Include="src\main\formats\SonyPS2InstrSet.h" />
     <ClInclude Include="src\main\formats\SonyPS2Scanner.h" />

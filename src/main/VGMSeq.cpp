@@ -5,7 +5,8 @@
 #include "SeqEvent.h"
 #include "SeqSlider.h"
 #include "Options.h"
-#include "Root.h"
+#include "main/LogItem.h"
+#include "main/Core.h"
 
 
 DECLARE_MENU(VGMSeq)
@@ -49,7 +50,7 @@ bool VGMSeq::Load() {
 
   //LoadLocalData();
   //UseLocalData();
-  pRoot->AddVGMFile(this);
+  core.AddVGMFile(this);
   return true;
 }
 
@@ -180,7 +181,7 @@ void VGMSeq::LoadTracksMain(long stopTime) {
       if (time >= stopTime) {
         if (readMode == READMODE_ADD_TO_UI) {
           wstring itemName = *this->GetName() + L" - Abort loading tracks by time limit.";
-          pRoot->AddLogItem(new LogItem(itemName.c_str(), LOG_LEVEL_WARN, L"VGMSeq"));
+          core.AddLogItem(new LogItem(itemName.c_str(), LOG_LEVEL_WARN, L"VGMSeq"));
         }
 
         InactivateAllTracks();
@@ -317,7 +318,7 @@ void VGMSeq::AddInstrumentRef(uint32_t progNum) {
 }
 
 bool VGMSeq::OnSaveAsMidi(void) {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"mid");
+  wstring filepath = core.GetSaveFilePath(ConvertToSafeFileName(name), L"mid");
   if (filepath.length() != 0)
     return SaveAsMidi(filepath);
   return false;

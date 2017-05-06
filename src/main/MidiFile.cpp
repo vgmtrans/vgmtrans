@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "MidiFile.h"
 #include "VGMSeq.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -69,7 +69,7 @@ void MidiFile::Sort(void) {
 bool MidiFile::SaveMidiFile(const std::wstring &filepath) {
   vector<uint8_t> midiBuf;
   WriteMidiToBuffer(midiBuf);
-  return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], (uint32_t) midiBuf.size());
+  return core.WriteBufferToFile(filepath, &midiBuf[0], (uint32_t) midiBuf.size());
 }
 
 void MidiFile::WriteMidiToBuffer(vector<uint8_t> &buf) {
@@ -406,6 +406,8 @@ void MidiTrack::InsertPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, semitones, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, cents, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 127, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 127, PRIORITY_HIGHER - 1));
 }
 
 void MidiTrack::AddFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb) {
@@ -417,6 +419,8 @@ void MidiTrack::InsertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 1, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 127, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 127, PRIORITY_HIGHER - 1));
 }
 
 void MidiTrack::AddFineTuning(uint8_t channel, double cents) {
@@ -438,6 +442,8 @@ void MidiTrack::InsertCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb, ui
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 2, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 127, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 127, PRIORITY_HIGHER - 1));
 }
 
 void MidiTrack::AddCoarseTuning(uint8_t channel, double semitones) {
@@ -459,6 +465,8 @@ void MidiTrack::InsertModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 5, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 127, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 127, PRIORITY_HIGHER - 1));
 }
 
 void MidiTrack::AddModulationDepthRange(uint8_t channel, double semitones) {

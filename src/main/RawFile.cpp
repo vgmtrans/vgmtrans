@@ -1,8 +1,9 @@
 #include "pch.h"
 
-#include "RawFile.h"
-#include "VGMFile.h"
-#include "Root.h"
+#include "main/RawFile.h"
+#include "main/VGMFile.h"
+#include "main/LogItem.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -31,15 +32,11 @@ RawFile::RawFile(const wstring name, uint32_t theFileSize, bool bCanRead, const 
 
 
 RawFile::~RawFile(void) {
-  pRoot->UI_BeginRemoveVGMFiles();
   size_t size = containedVGMFiles.size();
   for (size_t i = 0; i < size; i++) {
-    pRoot->RemoveVGMFile(containedVGMFiles.front(), false);
+    core.RemoveVGMFile(containedVGMFiles.front(), false);
     containedVGMFiles.erase(containedVGMFiles.begin());
   }
-
-  pRoot->UI_EndRemoveVGMFiles();
-  pRoot->UI_CloseRawFile(this);
 }
 
 // opens a file using the standard c++ file i/o routines
@@ -53,7 +50,7 @@ bool RawFile::open(const wstring &theFileName) {
   file.open(theFileName,  ios::in | ios::binary);
 #endif
   if (!file.is_open()) {
-    pRoot->AddLogItem(new LogItem((std::wstring(L"File ") + theFileName.c_str() + L" could not be opened"),
+    core.AddLogItem(new LogItem((std::wstring(L"File ") + theFileName.c_str() + L" could not be opened"),
                                   LOG_LEVEL_ERR,
                                   L"RawFile"));
     return false;
@@ -150,13 +147,13 @@ void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
   if (iter != containedVGMFiles.end())
     containedVGMFiles.erase(iter);
   else
-    pRoot->AddLogItem(new LogItem(std::wstring(
+    core.AddLogItem(new LogItem(std::wstring(
         L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles."),
                                   LOG_LEVEL_DEBUG,
                                   L"RawFile"));
 
   if (containedVGMFiles.size() == 0)
-    pRoot->CloseRawFile(this);
+    core.CloseRawFile(this);
 }
 
 // read data directly from the file
@@ -285,12 +282,12 @@ void RawFile::UpdateBuffer(uint32_t index) {
 }
 
 bool RawFile::OnSaveAsRaw() {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(filename));
+  wstring filepath = core.GetSaveFilePath(ConvertToSafeFileName(filename));
   if (filepath.length() != 0) {
     bool result;
     uint8_t *buf = new uint8_t[fileSize];        //create a buffer the size of the file
     GetBytes(0, fileSize, buf);
-    result = pRoot->UI_WriteBufferToFile(filepath, buf, fileSize);
+    result = core.WriteBufferToFile(filepath, buf, fileSize);
     delete[] buf;
     return result;
   }

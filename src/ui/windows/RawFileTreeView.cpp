@@ -3,7 +3,7 @@
 #include "RawFileTreeView.h"
 #include "mainfrm.h"
 #include "HexView.h"
-#include "Root.h"
+#include "main/Core.h"
 #include "BmpBtn.h"
 
 using namespace std;
@@ -225,7 +225,7 @@ void CRawFileTreeView::OnKeyDown(TCHAR nChar, UINT repeats, UINT code)
 
 LRESULT CRawFileTreeView::OnCloseButton(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
 {
-	pRoot->CloseRawFile((RawFile*)IDtoTreeItem[wID].GetData());		//if WTL had FromHandle() (to get an object from HWND) there'd be no need for this map<> shit.  but, alas
+	core.CloseRawFile((RawFile*)IDtoTreeItem[wID].GetData());		//if WTL had FromHandle() (to get an object from HWND) there'd be no need for this map<> shit.  but, alas
 	bHandled = false;
 	return 0;
 }
@@ -372,5 +372,5 @@ void CRawFileTreeView::OnCloseFile(UINT uCode, int nID, HWND hwndCtrl)
 {
 	CTreeItem blah = GetSelectedItem();
 	RawFile* blah2 = (RawFile*)blah.GetData();
-	pRoot->CloseRawFile((RawFile*)GetSelectedItem().GetData());
+	core.CloseRawFile((RawFile*)GetSelectedItem().GetData());
 }

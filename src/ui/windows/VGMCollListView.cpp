@@ -5,7 +5,7 @@
 #include "resource.h"
 #include "VGMCollListView.h"
 #include "DragDropSource.h"
-#include "WinVGMRoot.h"
+#include "WinUICallbacks.h"
 #include "CollDialog.h"
 
 CVGMCollListView theVGMCollListView;

@@ -1,15 +1,16 @@
 #include "pch.h"
-#include "QSoundScanner.h"
-#include "QSoundSeq.h"
-#include "QSoundInstr.h"
+#include "CPSScanner.h"
+#include "CPSSeq.h"
+#include "CPSInstr.h"
 #include "MAMELoader.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
 //#define PROG_INFO_TABLE_OFFSET 0x7000
 //#define qs_samp_info_TABLE_OFFSET 0x8000
 
-void QSoundScanner::Scan(RawFile *file, void *info) {
+void CPSScanner::Scan(RawFile *file, void *info) {
   MAMEGameEntry *gameentry = (MAMEGameEntry *) info;
   MAMERomGroupEntry *seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
   MAMERomGroupEntry *sampsRomGroupEntry = gameentry->GetRomGroupOfType("qsound");
@@ -23,7 +24,6 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
   uint32_t artic_table_offset = 0;
   uint32_t artic_table_length = 0x800;
   uint32_t num_instr_banks;
-  uint32_t instr_tables_end = 0;
   if (!seqRomGroupEntry->file || !sampsRomGroupEntry->file ||
       !seqRomGroupEntry->GetHexAttribute("seq_table", &seq_table_offset) ||
       !seqRomGroupEntry->GetHexAttribute("samp_table", &samp_table_offset) ||
@@ -31,28 +31,36 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
     return;
   seqRomGroupEntry->GetHexAttribute("samp_table_length", &samp_table_length);
 
-  QSoundVer ver = GetVersionEnum(gameentry->fmt_version_str);
-  if (ver == VER_UNDEFINED) {
+  CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
+  if (fmt_ver == VER_UNDEFINED) {
     wstring alert = L"XML entry uses an undefined QSound version: " + string2wstring(gameentry->fmt_version_str);
-    pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, L"PSF2Loader"));
+    core.AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, L"CPSScanner"));
     return;
   }
 
-  if (ver < VER_116B) {
-    if (!seqRomGroupEntry->GetHexAttribute("instr_table", &instr_table_offset))
-      return;
+  switch (fmt_ver) {
+    case VER_100 ... VER_115:
+      if (!seqRomGroupEntry->GetHexAttribute("instr_table", &instr_table_offset))
+        return;
+      break;
+    case VER_201B:
+    case VER_CPS3:
+      if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
+        return;
+      break;
+    case VER_116B ... VER_180:
+    case VER_210:
+      if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
+        return;
+      if (fmt_ver >= VER_130 && !seqRomGroupEntry->GetHexAttribute("artic_table", &artic_table_offset))
+        return;
+      break;
   }
-  else if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
-    return;
-  if (ver >= VER_130 &&
-      !seqRomGroupEntry->GetHexAttribute("artic_table", &artic_table_offset))
-    return;
 
-
-  QSoundInstrSet *instrset = 0;
-  QSoundSampColl *sampcoll = 0;
-  QSoundSampleInfoTable *sampInfoTable = 0;
-  QSoundArticTable *articTable = 0;
+  CPSInstrSet *instrset = 0;
+  CPSSampColl *sampcoll = 0;
+  CPSSampleInfoTable *sampInfoTable = 0;
+  CPSArticTable *articTable = 0;
 
   wstring artic_table_name;
   wstring instrset_name;
@@ -79,25 +87,29 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
 
   RawFile *programFile = seqRomGroupEntry->file;
   RawFile *samplesFile = sampsRomGroupEntry->file;
-  uint32_t nProgramFileLength = programFile->size();
 
   // LOAD INSTRUMENTS AND SAMPLES
 
   //fix because Vampire Savior sample table bleeds into artic table and no way to detect this
   if (!samp_table_length && (artic_table_offset > samp_table_offset))
     samp_table_length = artic_table_offset - samp_table_offset;
-  sampInfoTable = new QSoundSampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+  if (fmt_ver < VER_CPS3) {
+    sampInfoTable = new CPS2SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+  }
+  else {
+    sampInfoTable = new CPS3SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+  }
   sampInfoTable->LoadVGMFile();
   if (artic_table_offset) {
-    articTable = new QSoundArticTable(programFile, artic_table_name, artic_table_offset, artic_table_length);
+    articTable = new CPSArticTable(programFile, artic_table_name, artic_table_offset, artic_table_length);
     if (!articTable->LoadVGMFile()) {
       delete articTable;
       articTable = NULL;
     }
   }
 
-  instrset = new QSoundInstrSet(programFile,
-                                ver,
+  instrset = new CPSInstrSet(programFile,
+                                fmt_ver,
                                 instr_table_offset,
                                 num_instr_banks,
                                 sampInfoTable,
@@ -107,7 +119,7 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
     delete instrset;
     instrset = NULL;
   }
-  sampcoll = new QSoundSampColl(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
+  sampcoll = new CPSSampColl(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
   if (!sampcoll->LoadVGMFile()) {
     delete sampcoll;
     sampcoll = NULL;
@@ -121,21 +133,35 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
   uint32_t seqPointer = 0;
   while (seqPointer == 0)
     seqPointer = programFile->GetWordBE(seq_table_offset + (k++ * 4)) & 0x0FFFFF;
-  seq_table_length = seqPointer - seq_table_offset;
+  if (fmt_ver == VER_CPS3) {
+    seq_table_length = seqPointer - 8;
+  }
+  else {
+    seq_table_length = seqPointer - seq_table_offset;
+  }
 
   // Add SeqTable as Miscfile
-  VGMMiscFile *seqTable =
-      new VGMMiscFile(QSoundFormat::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
+  VGMMiscFile *seqTable = new VGMMiscFile(CPSFormat::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
   if (!seqTable->LoadVGMFile()) {
     delete seqTable;
     seqTable = NULL;
   }
 
+  //HACK
+  //k < 0x58 &&
   for (k = 0; (seq_table_length == 0 || k < seq_table_length); k += 4) {
-    // & 0x0FFFFF because SSF2 sets 0x100000 for some reason
-    seqPointer = programFile->GetWordBE(seq_table_offset + k) & 0x0FFFFF;
-    if (seqPointer == 0)
+
+    if (programFile->GetWordBE(seq_table_offset + k) == 0)
       continue;
+
+    if (fmt_ver == VER_CPS3) {
+      seqPointer = programFile->GetWordBE(seq_table_offset + k) + seq_table_offset - 8;
+    }
+    else {
+      // & 0x0FFFFF because SSF2 sets 0x100000 for some reason
+      seqPointer = programFile->GetWordBE(seq_table_offset + k) & 0x0FFFFF;
+    }
+
     seqTable->AddSimpleItem(seq_table_offset + k, 4, L"Sequence Pointer");
 
     name.str(L"");
@@ -144,7 +170,7 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
     name.str(L"");
     name << gameentry->name.c_str() << L" seq " << k / 4;
     wstring seqName = name.str();
-    QSoundSeq *newSeq = new QSoundSeq(programFile, seqPointer, ver, seqName);
+    CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
     if (newSeq->LoadVGMFile()) {
       coll->UseSeq(newSeq);
       coll->AddInstrSet(instrset);
@@ -165,7 +191,7 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
   return;
 }
 
-QSoundVer QSoundScanner::GetVersionEnum(string &versionStr) {
+CPSFormatVer CPSScanner::GetVersionEnum(string &versionStr) {
   if (versionStr == "1.00") return VER_100;
   if (versionStr == "1.01") return VER_101;
   if (versionStr == "1.03") return VER_103;
@@ -176,7 +202,6 @@ QSoundVer QSoundScanner::GetVersionEnum(string &versionStr) {
   if (versionStr == "1.06b") return VER_106B;
   if (versionStr == "1.15c") return VER_115C;
   if (versionStr == "1.15") return VER_115;
-  if (versionStr == "2.01b") return VER_201B;
   if (versionStr == "1.16b") return VER_116B;
   if (versionStr == "1.16") return VER_116;
   if (versionStr == "1.30") return VER_130;
@@ -184,5 +209,8 @@ QSoundVer QSoundScanner::GetVersionEnum(string &versionStr) {
   if (versionStr == "1.40") return VER_140;
   if (versionStr == "1.71") return VER_171;
   if (versionStr == "1.80") return VER_180;
+  if (versionStr == "2.01b") return VER_201B;
+  if (versionStr == "2.10") return VER_210;
+  if (versionStr == "CPS3") return VER_CPS3;
   return VER_UNDEFINED;
 }

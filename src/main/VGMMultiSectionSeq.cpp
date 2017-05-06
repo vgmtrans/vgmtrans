@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "common.h"
-#include "Root.h"
+#include "main/Core.h"
 #include "Options.h"
 #include "VGMMultiSectionSeq.h"
 

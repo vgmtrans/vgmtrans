@@ -2,7 +2,7 @@
 #include "VGMItem.h"
 #include "RawFile.h"
 #include "VGMFile.h"
-#include "Root.h"
+#include "main/Core.h"
 
 using namespace std;
 
@@ -70,7 +70,7 @@ void VGMItem::SetGuessedLength(void) {
 }
 
 void VGMItem::AddToUI(VGMItem *parent, void *UI_specific) {
-  pRoot->UI_AddItem(this, parent, name, UI_specific);
+  core.AddItem(this, parent, name, UI_specific);
 }
 
 uint32_t VGMItem::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
@@ -156,7 +156,7 @@ VGMItem *VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContai
 uint32_t VGMContainerItem::GuessLength(void) {
   uint32_t guessedLength = 0;
 
-  // Note: children items can sometimes overwrap each other
+  // Note: children items can sometimes overlap each other
   for (uint32_t i = 0; i < containers.size(); i++) {
     for (uint32_t j = 0; j < containers[i]->size(); j++) {
       VGMItem *item = (*containers[i])[j];

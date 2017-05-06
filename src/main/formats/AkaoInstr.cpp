@@ -2,6 +2,7 @@
 #include "AkaoInstr.h"
 #include "VGMSamp.h"
 #include "PSXSPU.h"
+#include "main/LogItem.h"
 
 using namespace std;
 
@@ -64,7 +65,7 @@ bool AkaoInstr::LoadInstr() {
   if (aRgns.size() != 0)
     unLength = aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
   else
-    pRoot->AddLogItem(new LogItem(L"Instrument has no regions.", LOG_LEVEL_WARN, L"AkaoInstr"));
+    core.AddLogItem(new LogItem(L"Instrument has no regions.", LOG_LEVEL_WARN, L"AkaoInstr"));
   return true;
 }
 
@@ -110,7 +111,7 @@ bool AkaoDrumKit::LoadInstr() {
   if (aRgns.size() != 0)
     unLength = aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
   else
-    pRoot->AddLogItem(new LogItem(L"Instrument has no regions.", LOG_LEVEL_WARN, L"AkaoInstr"));
+    core.AddLogItem(new LogItem(L"Instrument has no regions.", LOG_LEVEL_WARN, L"AkaoInstr"));
   return true;
 }
 

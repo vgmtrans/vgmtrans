@@ -1,15 +1,13 @@
-//
-// Created by Mike on 8/31/14.
-//
-
 #include <QKeyEvent>
 #include <QDebug>
+#include <QScrollBar>
 #include "VGMFileListView.h"
-#include "QtVGMRoot.h"
+#include "QtUICallbacks.h"
 #include "VGMFile.h"
 #include "MdiArea.h"
 #include "VGMFileView.h"
 #include "Helpers.h"
+#include "main/Core.h"
 
 // ********************
 // VGMFileListViewModel
@@ -18,22 +16,22 @@
 VGMFileListViewModel::VGMFileListViewModel(QObject *parent)
         : QAbstractListModel(parent)
 {
-    connect(&qtVGMRoot, SIGNAL(UI_AddedVGMFile()), this, SLOT(changedVGMFiles()));
-    connect(&qtVGMRoot, SIGNAL(UI_RemovedVGMFile()), this, SLOT(changedVGMFiles()));
+    connect(&qtUICallbacks, SIGNAL(UI_AddedVGMFile()), this, SLOT(changedVGMFiles()));
+    connect(&qtUICallbacks, SIGNAL(UI_RemovedVGMFile()), this, SLOT(changedVGMFiles()));
 }
 
 int VGMFileListViewModel::rowCount ( const QModelIndex & parent) const
 {
-    return qtVGMRoot.vVGMFile.size();
+    return core.vVGMFile.size();
 }
 
 QVariant VGMFileListViewModel::data ( const QModelIndex & index, int role ) const
 {
     if (role == Qt::DisplayRole) {
-        return QString::fromStdWString(*qtVGMRoot.vVGMFile[index.row()]->GetName());
+        return QString::fromStdWString(*core.vVGMFile[index.row()]->GetName());
     }
     else if (role == Qt::DecorationRole) {
-        FileType filetype = qtVGMRoot.vVGMFile[index.row()]->GetFileType();
+        FileType filetype = core.vVGMFile[index.row()]->GetFileType();
         return iconForFileType(filetype);
     }
     return QVariant();
@@ -52,6 +50,8 @@ void VGMFileListViewModel::changedVGMFiles()
 VGMFileListView::VGMFileListView(QWidget *parent)
         : QListView(parent)
 {
+    setAttribute(Qt::WA_MacShowFocusRect, 0);
+
     VGMFileListViewModel *vgmFileListViewModel = new VGMFileListViewModel(this);
     this->setModel(vgmFileListViewModel);
     this->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -64,6 +64,17 @@ VGMFileListView::VGMFileListView(QWidget *parent)
 
 void VGMFileListView::keyPressEvent(QKeyEvent* e)
 {
+  QScrollBar* vertScrollBar = this->verticalScrollBar();
+  QWidget* parentWidget = vertScrollBar->parentWidget();
+
+// set black background
+//  vertScrollBar->setStyleSheet("QScrollBar { background-color: rgba(255, 255, 255, 10); }");
+//  parentWidget->setStyleSheet("QWidget { background-color: transparent; }");
+
+
+  qDebug() << parentWidget;
+  qDebug() << parentWidget->parentWidget();
+
     // On Backspace or Delete keypress, remove all selected files
     if( e->key() == Qt::Key_Delete || e->key() == Qt::Key_Backspace )
     {
@@ -74,19 +85,21 @@ void VGMFileListView::keyPressEvent(QKeyEvent* e)
 
         QList<VGMFile*> filesToClose;
         foreach(const QModelIndex &index, list) {
-            if (index.row() < qtVGMRoot.vVGMFile.size())
-                filesToClose.append(qtVGMRoot.vVGMFile[index.row()]);
+            if (index.row() < core.vVGMFile.size())
+                filesToClose.append(core.vVGMFile[index.row()]);
         }
 
         foreach(VGMFile *file, filesToClose) {
-            qtVGMRoot.RemoveVGMFile(file);
+            core.RemoveVGMFile(file);
         }
     }
+    else
+        QListView::keyPressEvent(e);
 }
 
 void VGMFileListView::doubleClickedSlot(QModelIndex index)
 {
-    VGMFile *vgmFile = qtVGMRoot.vVGMFile[index.row()];
+    VGMFile *vgmFile = core.vVGMFile[index.row()];
     VGMFileView *vgmFileView = new VGMFileView(vgmFile);
     QString vgmFileName = QString::fromStdWString(*vgmFile->GetName());
     vgmFileView->setWindowTitle(vgmFileName);

@@ -4,7 +4,8 @@
 #include "VGMSeq.h"
 #include "DLSFile.h"
 #include "LogItem.h"
-#include "Root.h"
+#include "Core.h"
+#include "LogItem.h"
 
 #include "MainFrm.h"
 
@@ -504,7 +505,7 @@ void MusicPlayer::ReleaseAllKeys()
 		} catch (CDMusicException CDMusicEx)
 		{
 			OutputDebugString(CDMusicEx.GetErrorDescription());
-			pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
+			core.AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 		}
 	}
 }
@@ -520,7 +521,7 @@ void MusicPlayer::SetWriteLatency(DWORD dwLatency)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
-		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
+		core.AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 	}
 }
 
@@ -535,7 +536,7 @@ void MusicPlayer::SetWritePeriod(DWORD dwPeriod)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
-		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
+		core.AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 	}
 }
 
@@ -558,7 +559,7 @@ void MusicPlayer::SetupReverb(VGMSeq* vgmseq)
 		catch (CDMusicException CDMusicEx)
 		{
 			OutputDebugString(CDMusicEx.GetErrorDescription());
-			pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
+			core.AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 		}
 		COutPort.SetEffect(SET_REVERB /*| SET_CHORUS*/);	// Activate effects
 	}
@@ -580,7 +581,7 @@ void MusicPlayer::SetVolume(long vol)
 	catch (CDMusicException CDMusicEx)
 	{
 		OutputDebugString(CDMusicEx.GetErrorDescription());
-		pRoot->AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
+		core.AddLogItem(new LogItem(CDMusicEx.GetErrorDescription(), LOG_LEVEL_WARN, L"MusicPlayer"));
 	}
 }
 

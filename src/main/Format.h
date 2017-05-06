@@ -47,7 +47,7 @@ public:                                        \
 /*#define SIMPLE_INIT()					\
 	virtual int Init(void)					\
 	{										\
-		pRoot->AddScanner(NewScanner());	\
+		core.AddScanner(NewScanner());	\
 		matcher = NewMatcher(this);			\
 		return true;						\
 	}*/

@@ -57,7 +57,7 @@ void MusicPlayer::Shutdown()
     delete_fluid_settings(this->settings);
 }
 
-void MusicPlayer::LoadSF2(const void *data)
+void MusicPlayer::LoadSF2(const void *sf2Data)
 {
     if (this->sfont_id > 0 && fluid_synth_sfunload(this->synth, this->sfont_id, true) != 0) {
         printf("Error unloading soundfont");
@@ -65,7 +65,7 @@ void MusicPlayer::LoadSF2(const void *data)
 
     // Our memory sfont loader will treat the filename param as a pointer to the sf2 in memory.
     // No other choice short of changing the fluidsynth code.
-    this->sfont_id = fluid_synth_sfload(this->synth, (const char *)data, 0);
+    this->sfont_id = fluid_synth_sfload(this->synth, (const char *)sf2Data, 0);
 }
 
 int midi_event_callback(void* data, fluid_midi_event_t* event)
@@ -79,8 +79,30 @@ int midi_event_callback(void* data, fluid_midi_event_t* event)
 	return fluid_synth_handle_midi_event(data, event);
 }
 
-void MusicPlayer::StopMidi() {
-    
+void MusicPlayer::Play(const void *midiData, size_t len)
+{
+    this->player = new_fluid_player(this->synth);
+    this->adriver = new_fluid_audio_driver(this->settings, this->synth);
+
+    if (FLUID_OK == fluid_player_add_mem(this->player, midiData, len)) {
+		fluid_player_set_playback_callback(this->player, &midi_event_callback, this->synth);
+        vgmtrans_fluid_player_play(this->player);
+	}
+}
+
+void MusicPlayer::Pause() {
+
+    if (!this->player || !this->adriver)
+        return;
+
+    if (fluid_player_get_status(this->player) == FLUID_PLAYER_PLAYING)
+        fluid_player_stop(this->player);
+    else
+        fluid_player_play(this->player);
+}
+
+void MusicPlayer::Stop() {
+
     if (this->player) {
         fluid_player_stop(this->player);
         delete_fluid_player(this->player);
@@ -88,15 +110,4 @@ void MusicPlayer::StopMidi() {
     if (this->adriver) {
         delete_fluid_audio_driver(this->adriver);
     }
-}
-
-void MusicPlayer::PlayMidi(const void* data, size_t len)
-{
-    this->player = new_fluid_player(this->synth);
-    this->adriver = new_fluid_audio_driver(this->settings, this->synth);
-
-    if (FLUID_OK == fluid_player_add_mem(this->player, data, len)) {
-		fluid_player_set_playback_callback(this->player, &midi_event_callback, this->synth);
-        vgmtrans_fluid_player_play(this->player);
-	}
 }

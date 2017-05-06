@@ -5,7 +5,7 @@
 #include "mainfrm.h"
 #include "VGMFileTreeView.h"
 #include "ItemTreeView.h"
-#include "WinVGMRoot.h"
+#include "WinUICallbacks.h"
 
 using namespace std;
 
