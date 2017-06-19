@@ -120,7 +120,7 @@ uint8_t ConvertPercentAmpToStdMidiVal(double percent) {
 double ConvertLogScaleValToAtten(double percent) {
   if (percent == 0)
     return 100.0;        // assume 0 is -100.0db attenuation
-  double atten = 20 * log10(percent) * 2;
+  double atten = 20 * log10(percent);
   return min(-atten, 100.0);
 }
 
