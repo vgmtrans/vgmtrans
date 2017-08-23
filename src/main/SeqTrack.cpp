@@ -109,6 +109,7 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
       }
 
       if (!ReadEvent()) {
+        deltaLength = GetTime();
         active = false;
         break;
       }
