@@ -683,6 +683,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
 
     case EVENT_QUANTIZE: {
       uint8_t newQuantize = GetByte(curOffset++);
+	  spcNoteQuantize = newQuantize;
       if (newQuantize <= 8) {
         desc << L"Length: " << (int) newQuantize << L"/8";
       }
