@@ -249,6 +249,9 @@
     <ClCompile Include="src\main\formats\CompileSnesInstr.cpp" />
     <ClCompile Include="src\main\formats\CompileSnesScanner.cpp" />
     <ClCompile Include="src\main\formats\CompileSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\FalcomSnesInstr.cpp" />
+    <ClCompile Include="src\main\formats\FalcomSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\FalcomSnesSeq.cpp" />
     <ClCompile Include="src\main\formats\GraphResSnesInstr.cpp" />
     <ClCompile Include="src\main\formats\GraphResSnesScanner.cpp" />
     <ClCompile Include="src\main\formats\GraphResSnesSeq.cpp" />
@@ -441,6 +444,10 @@
     <ClInclude Include="src\main\formats\CompileSnesInstr.h" />
     <ClInclude Include="src\main\formats\CompileSnesScanner.h" />
     <ClInclude Include="src\main\formats\CompileSnesSeq.h" />
+    <ClInclude Include="src\main\formats\FalcomSnesFormat.h" />
+    <ClInclude Include="src\main\formats\FalcomSnesInstr.h" />
+    <ClInclude Include="src\main\formats\FalcomSnesScanner.h" />
+    <ClInclude Include="src\main\formats\FalcomSnesSeq.h" />
     <ClInclude Include="src\main\formats\GraphResSnesFormat.h" />
     <ClInclude Include="src\main\formats\GraphResSnesInstr.h" />
     <ClInclude Include="src\main\formats\GraphResSnesScanner.h" />
