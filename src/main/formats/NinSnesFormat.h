@@ -30,6 +30,7 @@ enum NinSnesVersion {
   NINSNES_QUINTET_ACTR2,      // ActRaiser 2
   NINSNES_QUINTET_IOG,        // Illusion of Gaia, Robotrek
   NINSNES_QUINTET_TS,         // Terranigma (Tenchi Souzou)
+  NINSNES_FALCOM_YS4,         // Ys IV
 };
 
 BEGIN_FORMAT(NinSnes)

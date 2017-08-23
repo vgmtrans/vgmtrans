@@ -156,7 +156,10 @@ class NinSnesSeq:
   uint8_t quintetBGMInstrBase;
   uint16_t quintetAddrBGMInstrLookup;
 
- protected:
+  // Falcom:
+  uint16_t falcomBaseOffset;
+
+protected:
   VGMHeader *header;
 
  private:
