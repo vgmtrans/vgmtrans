@@ -27,7 +27,8 @@ NinSnesSeq::NinSnesSeq(RawFile *file,
       konamiBaseAddress(0),
       intelliVoiceParamTable(0),
       intelliVoiceParamTableSize(0),
-      quintetBGMInstrBase(0) {
+      quintetBGMInstrBase(0),
+      falcomBaseOffset(0) {
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
 
@@ -601,6 +602,9 @@ double NinSnesSeq::GetTempoInBPM(uint8_t tempo) {
 uint16_t NinSnesSeq::ConvertToAPUAddress(uint16_t offset) {
   if (version == NINSNES_KONAMI) {
     return konamiBaseAddress + offset;
+  }
+  else if (version == NINSNES_FALCOM_YS4) {
+    return falcomBaseOffset + offset;
   }
   else {
     return offset;
