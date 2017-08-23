@@ -247,6 +247,12 @@
     <Filter Include="Source Files\windows\DxErr">
       <UniqueIdentifier>{f60aad48-6a14-4c0d-a400-60b77e9a16af}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\formats\falcomsnes">
+      <UniqueIdentifier>{1d0be765-4a5d-42e0-98ec-1dc4722042a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\falcomsnes">
+      <UniqueIdentifier>{da100128-8159-4652-be41-16e738e2aea4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\ui\windows\aboutdlg.cpp">
@@ -788,6 +794,15 @@
     </ClCompile>
     <ClCompile Include="lib\dxAug07\dxerr\dxerr.cpp">
       <Filter>Source Files\windows\DxErr</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\FalcomSnesInstr.cpp">
+      <Filter>Source Files\formats\falcomsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\FalcomSnesScanner.cpp">
+      <Filter>Source Files\formats\falcomsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\FalcomSnesSeq.cpp">
+      <Filter>Source Files\formats\falcomsnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1429,6 +1444,18 @@
     </ClInclude>
     <ClInclude Include="src\src\ui\windows\osdepend.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\FalcomSnesSeq.h">
+      <Filter>Header Files\formats\falcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\FalcomSnesScanner.h">
+      <Filter>Header Files\formats\falcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\FalcomSnesInstr.h">
+      <Filter>Header Files\formats\falcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\FalcomSnesFormat.h">
+      <Filter>Header Files\formats\falcomsnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
