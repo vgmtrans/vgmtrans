@@ -1217,7 +1217,7 @@ bool NinSnesTrack::ReadEvent(void) {
       uint8_t spcFIR = GetByte(curOffset++);
 
       desc << L"Delay: " << (int) spcEDL << L"  Feedback: " << (int) spcEFB << L"  FIR: " << (int) spcFIR;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Param", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
