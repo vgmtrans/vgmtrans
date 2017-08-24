@@ -62,6 +62,7 @@ enum HudsonSnesSeqSubEventType {
   SUBEVENT_PERC_ON,
   SUBEVENT_PERC_OFF,
   SUBEVENT_VIBRATO_TYPE,
+  SUBEVENT_NOTE_VEL_OFF,
   SUBEVENT_MOV_IMM,
   SUBEVENT_MOV,
   SUBEVENT_CMP_IMM,
@@ -90,7 +91,7 @@ enum HudsonSnesSeqHeaderEventType {
   HEADER_EVENT_05,
   HEADER_EVENT_06,
   HEADER_EVENT_ECHO_PARAM,
-  HEADER_EVENT_08,
+  HEADER_EVENT_NOTE_VELOCITY,
   HEADER_EVENT_09,
 };
 
@@ -118,6 +119,9 @@ class HudsonSnesSeq
   uint8_t InstrumentTableSize;
   uint16_t PercussionTableAddress;
   uint8_t PercussionTableSize;
+
+  bool NoteEventHasVelocity;
+  bool DisableNoteVelocity;
 
   uint8_t UserRAM[HUDSONSNES_USERRAM_SIZE];
   uint8_t UserCmpReg;
