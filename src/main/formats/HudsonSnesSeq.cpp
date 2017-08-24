@@ -257,12 +257,22 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
         VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Echo Param");
         aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
 
-        aHeader->AddUnknownItem(curOffset, 1);
-        uint8_t arg1 = GetByte(curOffset++);
+        aHeader->AddSimpleItem(curOffset, 1, L"Use Default Echo");
+        uint8_t useDefaultEcho = GetByte(curOffset++);
 
-        if (arg1 == 0) {
-          aHeader->AddUnknownItem(curOffset, 6);
-          curOffset += 6;
+        if (useDefaultEcho == 0) {
+          aHeader->AddSimpleItem(curOffset, 1, L"EVOL(L)");
+          curOffset++;
+          aHeader->AddSimpleItem(curOffset, 1, L"EVOL(R)");
+          curOffset++;
+          aHeader->AddSimpleItem(curOffset, 1, L"EDL");
+          curOffset++;
+          aHeader->AddSimpleItem(curOffset, 1, L"EFB");
+          curOffset++;
+		  aHeader->AddSimpleItem(curOffset, 1, L"FIR");
+          curOffset++;
+          aHeader->AddSimpleItem(curOffset, 1, L"EON");
+          curOffset++;
         }
 
         aHeader->unLength = curOffset - beginOffset;
