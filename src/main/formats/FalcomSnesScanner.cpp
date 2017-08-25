@@ -89,7 +89,7 @@ void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
   if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
     uint8_t addrSeqHeaderPtr = file->GetByte(ofsLoadSeq + 3);
     addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
-    version = FALCOMSNES_V1;
+    version = FALCOMSNES_YS5;
   }
   else {
     return;
