@@ -522,7 +522,7 @@ void SeqTrack::AddNoteByDur(uint32_t offset,
   OnEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
-    AddEvent(new DurNoteSeqEvent(this, key, vel, dur, offset, length, sEventName));
+    AddEvent(new DurNoteSeqEvent(this, key + cKeyCorrection, vel, dur, offset, length, sEventName));
   AddNoteByDurNoItem(key, vel, dur);
 }
 
