@@ -81,7 +81,8 @@ enum NinSnesSeqEventType {
   EVENT_INTELLI_FE4_SUBEVENT,
 
   // Quintet:
-      EVENT_QUINTET_ADSR,
+  EVENT_QUINTET_TUNING,
+  EVENT_QUINTET_ADSR,
 };
 
 class NinSnesTrackSharedData {
