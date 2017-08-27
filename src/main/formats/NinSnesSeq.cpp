@@ -1575,12 +1575,23 @@ bool NinSnesTrack::ReadEvent(void) {
       break;
     }
 
-    case EVENT_INTELLI_ADSR:
-    case EVENT_QUINTET_ADSR: {
+    case EVENT_INTELLI_ADSR: {
       uint8_t adsr1 = GetByte(curOffset++);
       uint8_t adsr2 = GetByte(curOffset++);
       desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << L"ADSR(1): $" << adsr1
           << L"  ADSR(2): $" << adsr2;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_QUINTET_ADSR: {
+      uint8_t adsr1 = GetByte(curOffset++);
+      uint8_t sustain_rate = GetByte(curOffset++);
+      uint8_t sustain_level = GetByte(curOffset++);
+	  uint8_t adsr2 = (sustain_level << 5) | sustain_rate;
+      desc << L"ADSR(1): $" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << adsr1
+          << L"  Sustain Rate: " << std::dec << sustain_rate << L"  Sustain Level: " << sustain_level
+          << L"  (ADSR(2): $" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << adsr2 << L")";
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
