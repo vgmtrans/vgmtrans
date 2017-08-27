@@ -556,7 +556,9 @@ void NinSnesSeq::LoadEventMap() {
 
     case NINSNES_QUINTET_IOG:
     case NINSNES_QUINTET_TS:
+      EventMap[0xf4] = EVENT_QUINTET_TUNING;
       EventMap[0xff] = EVENT_QUINTET_ADSR;
+	  break;
   }
 }
 
@@ -1181,6 +1183,16 @@ bool NinSnesTrack::ReadEvent(void) {
     case EVENT_TUNING: {
       uint8_t newTuning = GetByte(curOffset++);
       AddFineTuning(beginOffset, curOffset - beginOffset, (newTuning / 256.0) * 100.0);
+      break;
+    }
+
+    case EVENT_QUINTET_TUNING: {
+      // TODO: Correct fine tuning on Quintet games
+      // In Quintet games (at least in Terranigma), the fine tuning command overwrites the fractional part of instrument tuning.
+      // In other words, we cannot calculate the tuning amount without reading the instrument table.
+      uint8_t newTuning = GetByte(curOffset++);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Fine Tuning", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+      AddFineTuningNoItem((newTuning / 256.0) * 61.8); // obviously not correct, but better than nothing?
       break;
     }
 
