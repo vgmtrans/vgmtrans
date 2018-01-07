@@ -89,6 +89,7 @@ NDSTrack::NDSTrack(NDSSeq *parentFile, uint32_t offset, uint32_t length)
 void NDSTrack::ResetVars() {
   jumpCount = 0;
   loopReturnOffset = 0;
+  hasLoopReturnOffset = false;
   SeqTrack::ResetVars();
 }
 
@@ -151,6 +152,7 @@ bool NDSTrack::ReadEvent(void) {
       }
 
       case 0x95:
+        hasLoopReturnOffset = true;
         loopReturnOffset = curOffset + 3;
         AddGenericEvent(beginOffset, curOffset + 3 - beginOffset, L"Call", L"", CLR_LOOP);
         curOffset = GetByte(curOffset) + (GetByte(curOffset + 1) << 8)
@@ -387,10 +389,19 @@ bool NDSTrack::ReadEvent(void) {
         AddUnknown(beginOffset, curOffset - beginOffset, L"Loop End");
         break;
 
-      case 0xFD:
+      case 0xFD: {
+        // This event usually does not cause an infinite loop.
+        // However, a complicated sequence with a ton of conditional events, it sometimes confuses the parser and causes an infinite loop.
+        // See Animal Crossing: Wild World - SSEQ_270
+        bool bContinue = true;
+        if (!hasLoopReturnOffset || IsOffsetUsed(loopReturnOffset)) {
+          bContinue = false;
+        }
+
         AddGenericEvent(beginOffset, curOffset - beginOffset, L"Return", L"", CLR_LOOP);
         curOffset = loopReturnOffset;
-        break;
+        return bContinue;
+	  }
 
       // [loveemu] allocate track, however should not handle in this function
       case 0xFE:
