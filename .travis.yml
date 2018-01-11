@@ -1,25 +1,66 @@
 # Travis-CI configuration file for VGMTrans
-
+sudo: required
+dist: trusty
 language: cpp
 
-compiler:
-  - gcc
-  - clang
-
-before_install:
-  - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-  - sudo add-apt-repository -y ppa:beineri/opt-qt551
-  - sudo add-apt-repository -y ppa:ubuntu-sdk-team/ppa
-  - sudo add-apt-repository -y ppa:kalakris/cmake
-  - sudo apt-get update -qq
+matrix:
+  include:
+    # GCC8
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - gcc-7
+            - g++-7
+            - libglib2.0-dev
+            - libfluidsynth-dev
+      env: CC='gcc-7' CXX='g++-7'
+      before_install:
+        - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa
+        - sudo apt-get update -qq
+        - sudo apt-get install qtbase5-dev
+    # LLVM5
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-5.0
+          packages:
+            - clang-5.0
+            - libglib2.0-dev
+            - libfluidsynth-dev
+      env: CC='clang-5.0' CXX='clang++-5.0'
+      before_install:
+        - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa
+        - sudo apt-get update -qq
+        - sudo apt-get install qtbase5-dev
+    # xcode7.3, currently stubbed
+#    - os: osx
+#      before_install:
+#        - brew upgrade qt || brew install qt
+#        - brew upgrade fluid-synth || brew install fluid-synth
 
 install:
-  - if [ "$CXX" == "g++" ]; then sudo apt-get install gcc-4.9 g++-4.9; fi
-  - if [ "$CXX" == "g++" ]; then sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 90; fi
-  - sudo apt-get install qt55base
-  - source /opt/qt55/bin/qt55-env.sh
-  - sudo apt-get install cmake libglib2.0-dev libfluidsynth-dev
-  
+  # We need CMake >= 3.5.0
+  - |
+    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
+      CMAKE_URL="https://cmake.org/files/v3.5/cmake-3.5.2-Linux-x86_64.tar.gz"
+      mkdir cmake-bin && travis_retry wget --no-check-certificate --quiet -O - ${CMAKE_URL} | tar --strip-components=1 -xz -C cmake-bin
+      export PATH=${TRAVIS_BUILD_DIR}/cmake-bin/bin:${PATH}
+    else
+      # For good measure, since Travis includes 3.6.2 anyway
+      brew upgrade cmake || brew install cmake
+    fi
+
 script:
-  - cmake CMakeLists.txt
+  - mkdir build
+  - cd build
+  - cmake ..
   - make
+
+branches:
+  only:
+    - master
