@@ -61,6 +61,6 @@ script:
   - cmake ..
   - make
 
-branches:
-  only:
-    - master
+#branches:
+#  only:
+#    - master
