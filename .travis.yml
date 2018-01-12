@@ -21,6 +21,7 @@ matrix:
         - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa
         - sudo apt-get update -qq
         - sudo apt-get install qtbase5-dev
+        - eval "${MATRIX_EVAL}"
     # LLVM5
     - os: linux
       compiler: clang
