@@ -33,7 +33,7 @@ matrix:
         - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa
         - sudo apt-get update -qq
         - sudo apt-get install qtbase5-dev
-    # xcode7.3, currently stubbed
+    # xcode7.3
 #    - os: osx
 #      before_install:
 #        - brew upgrade qt || brew install qt
@@ -44,7 +44,3 @@ script:
   - cd build
   - cmake ..
   - make
-
-#branches:
-#  only:
-#    - master
