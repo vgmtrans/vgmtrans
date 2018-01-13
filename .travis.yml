@@ -1,25 +1,47 @@
 # Travis-CI configuration file for VGMTrans
-
+sudo: required
+dist: trusty
 language: cpp
 
-compiler:
-  - gcc
-  - clang
+matrix:
+  include:
+    # GCC7
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+            - libglib2.0-dev
+            - libfluidsynth-dev
+      env:
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+      before_install:
+        - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa
+        - sudo apt-get update -qq
+        - sudo apt-get install qtbase5-dev
+        - eval "${MATRIX_EVAL}"
+    # LLVM5
+    - os: linux
+      compiler: clang
+      addons:
+        apt:
+          packages:
+            - libglib2.0-dev
+            - libfluidsynth-dev
+      before_install:
+        - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa
+        - sudo apt-get update -qq
+        - sudo apt-get install qtbase5-dev
+    # xcode7.3
+#    - os: osx
+#      before_install:
+#        - brew upgrade qt || brew install qt
+#        - brew upgrade fluid-synth || brew install fluid-synth
 
-before_install:
-  - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-  - sudo add-apt-repository -y ppa:beineri/opt-qt551
-  - sudo add-apt-repository -y ppa:ubuntu-sdk-team/ppa
-  - sudo add-apt-repository -y ppa:kalakris/cmake
-  - sudo apt-get update -qq
-
-install:
-  - if [ "$CXX" == "g++" ]; then sudo apt-get install gcc-4.9 g++-4.9; fi
-  - if [ "$CXX" == "g++" ]; then sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 90; fi
-  - sudo apt-get install qt55base
-  - source /opt/qt55/bin/qt55-env.sh
-  - sudo apt-get install cmake libglib2.0-dev libfluidsynth-dev
-  
 script:
-  - cmake CMakeLists.txt
+  - mkdir build
+  - cd build
+  - cmake ..
   - make
