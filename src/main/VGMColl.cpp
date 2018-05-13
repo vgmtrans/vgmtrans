@@ -563,9 +563,11 @@ bool VGMColl::OnSaveAllDLS() {
     else
       pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
 
-    filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
-    if (!this->seq->SaveAsMidi(filepath))
-      pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
+    if (this->seq != nullptr) {
+      filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
+      if (!this->seq->SaveAsMidi(filepath))
+        pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
+    }
   }
   return true;
 }
@@ -583,9 +585,11 @@ bool VGMColl::OnSaveAllSF2() {
     else
       pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"), LOG_LEVEL_ERR, L"VGMColl"));
 
-    filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
-    if (!this->seq->SaveAsMidi(filepath))
-      pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
+    if (this->seq != nullptr) {
+      filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
+      if (!this->seq->SaveAsMidi(filepath))
+        pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
+    }
   }
   return true;
 }
