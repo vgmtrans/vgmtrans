@@ -253,6 +253,12 @@
     <Filter Include="Header Files\formats\falcomsnes">
       <UniqueIdentifier>{da100128-8159-4652-be41-16e738e2aea4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\formats\konamips1">
+      <UniqueIdentifier>{f01dfa68-eca7-4990-ad12-3374027fee94}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\konamips1">
+      <UniqueIdentifier>{38d11b15-8e84-4ce6-bf22-a9bf11c40fc5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\ui\windows\aboutdlg.cpp">
@@ -803,6 +809,12 @@
     </ClCompile>
     <ClCompile Include="src\main\formats\FalcomSnesSeq.cpp">
       <Filter>Source Files\formats\falcomsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\KonamiPS1Scanner.cpp">
+      <Filter>Source Files\formats\konamips1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\KonamiPS1Seq.cpp">
+      <Filter>Source Files\formats\konamips1</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1456,6 +1468,15 @@
     </ClInclude>
     <ClInclude Include="src\main\formats\FalcomSnesFormat.h">
       <Filter>Header Files\formats\falcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\KonamiPS1Format.h">
+      <Filter>Header Files\formats\konamips1</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\KonamiPS1Scanner.h">
+      <Filter>Header Files\formats\konamips1</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\KonamiPS1Seq.h">
+      <Filter>Header Files\formats\konamips1</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
