@@ -210,7 +210,16 @@ bool KonamiPS1Track::ReadEvent(void) {
             break;
 
         case 71: {
-            uint8_t bpm = static_cast<uint8_t>(std::min<unsigned int>(10 + paramByte * 2, 255));
+            // Nisto:
+            // There may be issues in calculating accurate tempos for other games that use sequence command 0xC7 to set the tempo,
+            // as this command appears to be using a (console-specific?) calculation to compensate for some kind of timing delay(?)
+            // Both Silent Hill and Suikoden 2 multiplies the tempo parameter by 2 and adds 2 (e.g. (29 * 2) + 2 = 60).
+            // However, using this equation (even for Silent Hill or Suikoden 2 themselves), the tempo will still sound off
+            // when converted to a standard MIDI and played back on any modern PC.
+            //
+            // In the KCET driver for Silent Hill 2 (PlayStation 2), the equation was changed to ((x * 2) + 10),
+            // which appears to give a more accurate real-world tempo, so I've decided to use it universally.
+            uint8_t bpm = static_cast<uint8_t>(std::min<unsigned int>(paramByte * 2 + 10, 255));
             AddTempoBPM(beginOffset, curOffset - beginOffset, bpm, L"Tempo (10-255 BPM, divisible by two)");
             break;
         }
