@@ -7,6 +7,10 @@
 class KonamiPS1Seq : public VGMSeq {
 public:
     static constexpr uint32_t kHeaderSize = 16;
+    static constexpr uint32_t kOffsetToFileSize = 4;
+    static constexpr uint32_t kOffsetToTimebase = 8;
+    static constexpr uint32_t kOffsetToTrackCount = 0x0c;
+    static constexpr uint32_t kOffsetToTrackSizes = 0x10;
 
     KonamiPS1Seq(RawFile *file, uint32_t offset, const std::wstring &name = L"KonamiPS1Seq");
 
@@ -18,7 +22,10 @@ public:
     virtual void ResetVars(void);
 
     static bool IsKDT1Seq(RawFile *file, uint32_t offset);
-    static uint32_t GetKDT1FileSize(RawFile *file, uint32_t offset);
+
+    static uint32_t GetKDT1FileSize(RawFile *file, uint32_t offset) {
+        return kHeaderSize + file->GetWord(offset + kOffsetToFileSize);
+    }
 };
 
 class KonamiPS1Track : public SeqTrack {
@@ -27,4 +34,7 @@ public:
 
     virtual void ResetVars(void);
     virtual bool ReadEvent(void);
+
+private:
+    bool skipDeltaTime;
 };

@@ -13,3 +13,5 @@ BEGIN_FORMAT(KonamiPS1)
   USING_SCANNER(KonamiPS1Scanner)
   USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
+
+// [TODO] Use a matcher which can associate VAB properly.
