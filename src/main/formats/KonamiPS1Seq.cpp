@@ -225,7 +225,7 @@ bool KonamiPS1Track::ReadEvent(void) {
         }
 
         case 72:
-            AddPitchBend(beginOffset, curOffset - beginOffset, int16_t{paramByte << 7} - 8192);
+            AddPitchBend(beginOffset, curOffset - beginOffset, static_cast<int16_t>(paramByte << 7) - 8192);
             break;
 
         case 73:
