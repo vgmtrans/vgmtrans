@@ -60,9 +60,15 @@ bool Vab::GetInstrPointers() {
   VGMHeader *toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, L"Tone Attributes Table");
 
   if (numPrograms > 128) {
+    std::wstringstream message;
+    message << L"Too many programs (" << numPrograms << L")  Offset: 0x" << std::hex << dwOffset;
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB"));
     return false;
   }
   if (numVAGs > 255) {
+    std::wstringstream message;
+    message << L"Too many VAGs (" << numVAGs << L")  Offset: 0x" << std::hex << dwOffset;
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB"));
     return false;
   }
 
@@ -244,8 +250,12 @@ bool VabRgn::LoadRgn() {
   if ((int) sampNum < 0)
     sampNum = 0;
 
-  if (keyLow > keyHigh)
+  if (keyLow > keyHigh) {
+    std::wstringstream message;
+    message << L"Low Key (" << keyLow << L") is higher than High Key (" << keyHigh << L")  Offset: 0x" << std::hex << dwOffset;
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB (VabRgn)"));
     return false;
+  }
 
 
   // gocha: AFAIK, the valid range of pitch is 0-127. It must not be negative.
