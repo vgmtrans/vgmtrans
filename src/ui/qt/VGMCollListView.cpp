@@ -9,7 +9,6 @@
 #include "VGMCollListView.h"
 #include "QtVGMRoot.h"
 #include "VGMColl.h"
-#include "MusicPlayer.h"
 
 const int cellWidth = 200;
 const int cellHeight = 20;
@@ -83,15 +82,6 @@ void VGMCollListView::keyPressEvent(QKeyEvent* e)
 
         const void* rawSF2 = sf2->SaveToMem();
 
-        qDebug() << "Gonna play us some music";
-        MusicPlayer& musicPlayer = MusicPlayer::getInstance();
-
-        musicPlayer.StopMidi();
-        musicPlayer.LoadSF2(rawSF2);
-        musicPlayer.PlayMidi(&midiBuf[0], midiBuf.size());
-
-        delete[] rawSF2;
-        delete sf2;
-        delete midi;
+        
     }
 }
