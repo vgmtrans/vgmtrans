@@ -108,7 +108,7 @@ set(RESOURCE_PATH
 )
 qt5_add_resources(UI_RESOURCES ${RESOURCE_PATH})
 
-#find_package(ZLIB)
+find_package(ZLIB)
 if(ZLIB_FOUND)
   message(STATUS "Will use system zlib ${ZLIB_VERSION_STRING}")
 else()
