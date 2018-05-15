@@ -83,12 +83,12 @@
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)src\ui\windows;$(IncludePath)</IncludePath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib;$(ProjectDir)src\ui\windows;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(ProjectDir)lib\zlib\lib\win32;$(LibraryPath)</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(ProjectDir)lib\zlib\lib\x64;$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(IncludePath)</IncludePath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(ProjectDir)lib\zlib\lib\win32;$(LibraryPath)</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(ProjectDir)lib\zlib\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
