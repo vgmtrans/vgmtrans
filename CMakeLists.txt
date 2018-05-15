@@ -9,8 +9,6 @@ project(vgmtrans)
 # Compilers and platform-specific settings
 ####
 
-# Libraries we have to link against
-set(LIBS)
 # We use C++14...
 set(CMAKE_CXX_STANDARD 14)
 
@@ -31,8 +29,13 @@ if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
   add_compile_options(/permissive-)
   add_compile_options(/Zc:inline)
   add_compile_options(/Zc:throwingNew)
+  add_compile_options(/Zc:strictStrings-)
   add_compile_options(/volatile:iso)
-  add_compile_options("/MP")
+  add_compile_options(/MP)
+  
+  add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
+  add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE)
+  add_definitions(-DVGMTRANS_FOR_QT)
 
   string(APPEND CMAKE_EXE_LINKER_FLAGS "/NXCOMPAT")
 else()
@@ -94,7 +97,6 @@ source_group("main\\formats" REGULAR_EXPRESSION .*src/main/formats/.*)
 source_group("main\\loaders" REGULAR_EXPRESSION .*src/main/loaders/.*)
 source_group("main" REGULAR_EXPRESSION .*src/main/.*)
 
-#set(CMAKE_INCLUDE_CURRENT_DIR ON)
 include_directories(${INCLUDE_DIRS})
 
 find_package(Qt5 REQUIRED COMPONENTS Gui Widgets)
@@ -115,6 +117,10 @@ else()
   message(STATUS "zlib not found, using static")
   add_subdirectory(lib/zlib)
 endif()
+
+# If the system has zlib, then it also has minizip
+# and it most cases, the latter needs BZip2
+find_package(BZip2)
 
 message(STATUS "Using static TinyXML")
 add_subdirectory(lib/tinyxml)
@@ -148,3 +154,12 @@ PRIVATE
   ZLIB::ZLIB
   tinyxml_static
 )
+
+if(BZIP2_FOUND)
+  message(STATUS "Assuming system minizip needs BZIP2")
+  target_link_libraries(vgmtrans
+  PRIVATE
+    BZip2::BZip2
+  )  
+endif()
+
