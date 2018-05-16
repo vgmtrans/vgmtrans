@@ -113,14 +113,17 @@ qt5_add_resources(UI_RESOURCES ${RESOURCE_PATH})
 find_package(ZLIB)
 if(ZLIB_FOUND)
   message(STATUS "Will use system zlib ${ZLIB_VERSION_STRING}")
+  find_package(MINIZIP)
+  if(MINIZIP_FOUND)
+    message(STATUS "Will use system minizip")
+  else()
+    message(STATUS "Will use static minizip")
+	add_subdirectory(lib/zlib/minizip)
+  endif()
 else()
-  message(STATUS "zlib not found, using static")
+  message(STATUS "Using static zlib and minizip")
   add_subdirectory(lib/zlib)
 endif()
-
-# If the system has zlib, then it also has minizip
-# and it most cases, the latter needs BZip2
-find_package(BZip2)
 
 message(STATUS "Using static TinyXML")
 add_subdirectory(lib/tinyxml)
@@ -155,11 +158,15 @@ PRIVATE
   tinyxml_static
 )
 
-if(BZIP2_FOUND)
-  message(STATUS "Assuming system minizip needs BZIP2")
-  target_link_libraries(vgmtrans
-  PRIVATE
-    BZip2::BZip2
-  )  
+# We can't know for sure if the system minizip
+# was compiled with BZip2 support
+if(MINIZIP_FOUND)
+  find_package(BZip2)
+  if(BZIP2_FOUND)
+    message(STATUS "Assuming system minizip needs Bzip2")
+    target_link_libraries(vgmtrans
+      PRIVATE
+      BZip2::BZip2
+    )  
+  endif()
 endif()
-
