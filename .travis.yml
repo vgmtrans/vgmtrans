@@ -13,27 +13,29 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - g++-7
-            - libglib2.0-dev
-            - libfluidsynth-dev
       env:
         - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
       before_install:
         - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa
         - sudo apt-get update -qq
         - sudo apt-get install qtbase5-dev
+        # minizip unavailable on trusty
+        - sudo bash -c "echo -e '\n deb http://archive.ubuntu.com/ubuntu xenial main universe' >> '/etc/apt/sources.list.d/ubuntu-xenial-main.list'"
+        - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 3B4FE6ACC0B21F32
+        - sudo apt-get update -qq
+        - sudo apt-get install -y -q -t xenial libminizip-dev
         - eval "${MATRIX_EVAL}"
     # LLVM5
     - os: linux
       compiler: clang
-      addons:
-        apt:
-          packages:
-            - libglib2.0-dev
-            - libfluidsynth-dev
       before_install:
         - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa
         - sudo apt-get update -qq
         - sudo apt-get install qtbase5-dev
+        - sudo bash -c "echo -e '\n deb http://archive.ubuntu.com/ubuntu xenial main universe' >> '/etc/apt/sources.list.d/ubuntu-xenial-main.list'"
+        - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 3B4FE6ACC0B21F32
+        - sudo apt-get update -qq
+        - sudo apt-get install -y -q -t xenial libminizip-dev
     # xcode7.3
 #    - os: osx
 #      before_install:
