@@ -37,7 +37,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
   add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE)
   add_definitions(-DVGMTRANS_FOR_QT)
 
-  string(APPEND CMAKE_EXE_LINKER_FLAGS "/NXCOMPAT")
+  string(APPEND CMAKE_EXE_LINKER_FLAGS " /NXCOMPAT")
 else()
   set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wtype-limits \
   -Wsign-compare -Wuninitialized")
@@ -63,8 +63,10 @@ if(APPLE)
 endif()
 
 if(WIN32)
-  set(CMAKE_LIBRARY_ARCHITECTURE "x86_64-w64-mingw32")
-  string(APPEND CMAKE_EXE_LINKER_FLAGS "-static")
+  if(MSYS OR MINGW)
+    set(CMAKE_LIBRARY_ARCHITECTURE "x86_64-w64-mingw32")
+    string(APPEND CMAKE_EXE_LINKER_FLAGS "-static")
+  endif()
   set(GUI_TYPE WIN32)
 endif()
 
