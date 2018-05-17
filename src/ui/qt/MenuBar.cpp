@@ -12,10 +12,13 @@ MenuBar::MenuBar(QWidget* parent) : QMenuBar(parent) {
 
 void MenuBar::AppendFileMenu() {
   QMenu* file_dropdown = addMenu(tr("File"));
-  menu_open_file = file_dropdown->addAction(tr("Open"), this, &MenuBar::OpenFile, QKeySequence(QStringLiteral("Ctrl+O")));
-  
+  menu_open_file = file_dropdown->addAction(tr("Open"));
+  menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
+  connect(menu_open_file, &QAction::triggered, this, &MenuBar::OpenFile);
+
   file_dropdown->addSeparator();
 
-  menu_app_exit = file_dropdown->addAction(tr("Exit"), this, &MenuBar::Exit, QKeySequence(QStringLiteral("Alt+F4")));
-
+  menu_app_exit = file_dropdown->addAction(tr("Exit"));
+  menu_app_exit->setShortcut(QKeySequence(QStringLiteral("Alt+F4")));
+  connect(menu_app_exit, &QAction::triggered, this, &MenuBar::Exit);
 }
