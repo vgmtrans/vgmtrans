@@ -7,6 +7,8 @@
 #include <QMainWindow>
 #include <QSplitter>
 #include <QStackedWidget>
+#include <QDropEvent>
+#include <QDragEnterEvent>
 
 #include "MenuBar.h"
 #include "RawFileListView.h"
@@ -29,6 +31,9 @@ private:
   void RouteMenuSignals();
 
   void OpenFile();
+
+  void dragEnterEvent(QDragEnterEvent* event) override;
+  void dropEvent(QDropEvent* event) override;
 
   MenuBar* ui_menu_bar;
   RawFileListView* ui_rawfiles_list;

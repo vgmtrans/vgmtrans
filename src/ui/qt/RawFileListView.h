@@ -32,7 +32,7 @@ public:
   explicit RawFileListView(QWidget *parent = nullptr);
 
 private:
-  void keyPressEvent(QKeyEvent* input);
+  void keyPressEvent(QKeyEvent* input) override;
 
   RawFileListViewModel *rawFileListViewModel;
 

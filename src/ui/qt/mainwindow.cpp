@@ -4,6 +4,8 @@
 * refer to the included LICENSE.txt file
 */
 
+#include <QFileInfo>
+#include <QMimeData>
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
 
@@ -47,4 +49,21 @@ void MainWindow::RouteMenuSignals() {
 
 void MainWindow::OpenFile() {
   qtVGMRoot.OpenRawFile(qtVGMRoot.UI_GetOpenFilePath());
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
+  event->acceptProposedAction();
+}
+
+void MainWindow::dropEvent(QDropEvent* event) {
+  const auto& files = event->mimeData()->urls();
+
+  if(files.isEmpty())
+    return;
+
+  for (const auto& file : files) {
+    // Leave sanity checks to the backend
+    qtVGMRoot.OpenRawFile(
+      QFileInfo(file.toLocalFile()).filePath().toStdWString());
+  }
 }
