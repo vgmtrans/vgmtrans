@@ -5,7 +5,7 @@
 */
 
 #include <QMenu>
-#include <QMenubar>
+#include <QMenuBar>
 
 #ifndef MENUBAR_H
 #define MENUBAR_H
