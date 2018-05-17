@@ -1,39 +1,41 @@
-//
-// Created by Mike on 8/31/14.
-//
-
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
 
 #include <QAbstractListModel>
 #include <QListView>
 #include "QtVGMRoot.h"
 
-#ifndef __RawFileListView_H_
-#define __RawFileListView_H_
+#ifndef RAWFILELISTVIEW_H
+#define RAWFILELISTVIEW_H
 
-
-class RawFileListViewModel : public QAbstractListModel
-{
+class RawFileListViewModel : public QAbstractListModel {
     Q_OBJECT
 
 public:
-    RawFileListViewModel(QObject *parent = 0);
+  RawFileListViewModel(QObject *parent = nullptr);
 
-    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
-    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+  int rowCount(const QModelIndex & parent = QModelIndex()) const;
+  QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const;
 
 public slots:
     void changedRawFiles();
+
 };
 
+class RawFileListView : public QListView {
+  Q_OBJECT
 
-
-class RawFileListView : public QListView
-{
 public:
-    RawFileListView(QWidget *parent = 0);
+  explicit RawFileListView(QWidget *parent = nullptr);
 
-    void keyPressEvent(QKeyEvent* e);
+private:
+  void keyPressEvent(QKeyEvent* input);
+
+  RawFileListViewModel *rawFileListViewModel;
+
 };
 
-#endif //__RawFileListView_H_
+#endif // RAWFILELISTVIEW_H

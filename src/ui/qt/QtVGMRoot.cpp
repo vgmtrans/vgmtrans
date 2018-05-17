@@ -1,35 +1,16 @@
-//
-// Created by Mike on 8/30/14.
-//
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
 
+#include <QApplication>
+#include <QDir>
+#include <QFileDialog>
+#include <QString>
 #include "QtVGMRoot.h"
 
 QtVGMRoot qtVGMRoot;
-
-QtVGMRoot::QtVGMRoot(void)
-{
-
-}
-
-QtVGMRoot::~QtVGMRoot(void)
-{
-
-}
-
-//void QtVGMRoot::Play(void)
-//{
-//
-//}
-//
-//void QtVGMRoot::Pause(void)
-//{
-//
-//}
-//
-//void QtVGMRoot::Stop(void)
-//{
-//
-//}
 
 void QtVGMRoot::UI_SetRootPtr(VGMRoot** theRoot)
 {
@@ -112,8 +93,8 @@ void QtVGMRoot::UI_AddItemSet(VGMFile* file, std::vector<ItemSet>* itemset)
 
 std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring& suggestedFilename, const std::wstring& extension)
 {
-    std::wstring path = L"Placeholder";
-    return path;
+  return QFileDialog::getOpenFileName(QApplication::activeWindow(), tr("Select a file"),
+                                      QDir::currentPath(), tr("All files (*)")).toStdWString();
 }
 
 std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension)

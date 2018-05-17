@@ -1,6 +1,9 @@
-//
-// Created by Mike on 8/30/14.
-//
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
+
 #pragma once
 
 #include <QObject>
@@ -12,9 +15,6 @@ class QtVGMRoot
     Q_OBJECT
 
 public:
-    QtVGMRoot(void);
-    virtual ~QtVGMRoot(void);
-
     virtual void UI_SetRootPtr(VGMRoot** theRoot);
     virtual void UI_PreExit();
     virtual void UI_Exit();

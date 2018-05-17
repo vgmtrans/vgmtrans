@@ -1,41 +1,43 @@
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
+
+#include <QMainWindow>
+#include <QSplitter>
+#include <QStackedWidget>
+
+#include "MenuBar.h"
+#include "RawFileListView.h"
+#include "VGMFileListView.h"
+#include "VGMCollListView.h"
+#include "MdiArea.h"
+
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QMainWindow>
-#include <qsplitter.h>
-#include <qtreeview.h>
-#include <qlistview.h>
-#include <QMdiArea>
-#include "VGMFileView.h"
-
-class MainWindow : public QMainWindow
-{
-    Q_OBJECT
+class MainWindow : public QMainWindow {
+  Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = 0);
-    ~MainWindow();
+  explicit MainWindow();
+  ~MainWindow() = default;
 
-    static MainWindow& getInstance() {
-        static MainWindow instance;
-        return instance;
-    }
+private:
+  void CreateElements();
+  void RouteMenuSignals();
 
-protected:
-    QSplitter *vertSplitter;
-    QSplitter *horzSplitter;
-    QSplitter *vertSplitterLeft;
-    QListView *rawFileListView;
-    QListView *vgmFileListView;
-    QListView *vgmCollListView;
-    QListView *collListView;
+  void OpenFile();
 
-protected:
-    void dragEnterEvent(QDragEnterEvent *event);
-    void dragMoveEvent(QDragMoveEvent* event);
-    void dropEvent(QDropEvent *event);
+  MenuBar* ui_menu_bar;
+  RawFileListView* ui_rawfiles_list;
+  VGMFileListView* ui_vgmfiles_list;
+  VGMCollListView* ui_colls_list;
+
+  QSplitter* vertical_splitter;
+  QSplitter* horizontal_splitter;
+  QSplitter* vertical_splitter_left;
 };
 
-#endif // MAINWINDOW_H
-
-
+#endif // !MAINWINDOW_H
