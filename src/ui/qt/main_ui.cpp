@@ -5,7 +5,6 @@
 */
 
 #include <QApplication>
-#include "dropsitewindow.h"
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 
