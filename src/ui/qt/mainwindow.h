@@ -28,7 +28,7 @@ public:
 
 private:
   void CreateElements();
-  void RouteMenuSignals();
+  void RouteSignals();
 
   void OpenFile();
 
@@ -39,6 +39,7 @@ private:
   RawFileListView* ui_rawfiles_list;
   VGMFileListView* ui_vgmfiles_list;
   VGMCollListView* ui_colls_list;
+  MdiArea* ui_tabs_area;
 
   QSplitter* vertical_splitter;
   QSplitter* horizontal_splitter;

@@ -15,7 +15,7 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
   setAcceptDrops(true);
 
   CreateElements();
-  RouteMenuSignals();
+  RouteSignals();
 }
 
 void MainWindow::CreateElements() {
@@ -23,6 +23,7 @@ void MainWindow::CreateElements() {
   ui_rawfiles_list = new RawFileListView();
   ui_vgmfiles_list = new VGMFileListView();
   ui_colls_list = new VGMCollListView();
+  ui_tabs_area = new MdiArea();
 
   vertical_splitter = new QSplitter(Qt::Vertical, this);
   horizontal_splitter = new QSplitter(Qt::Horizontal, vertical_splitter);
@@ -31,7 +32,7 @@ void MainWindow::CreateElements() {
   vertical_splitter->addWidget(ui_colls_list);
   vertical_splitter->setHandleWidth(1);
 
-  horizontal_splitter->addWidget(MdiArea::getInstance());
+  horizontal_splitter->addWidget(ui_tabs_area);
   horizontal_splitter->setHandleWidth(1);
 
   vertical_splitter_left->addWidget(ui_rawfiles_list);
@@ -41,10 +42,12 @@ void MainWindow::CreateElements() {
   setCentralWidget(vertical_splitter);
 }
 
-void MainWindow::RouteMenuSignals() {
+void MainWindow::RouteSignals() {
   setMenuBar(ui_menu_bar);
   connect(ui_menu_bar, &MenuBar::OpenFile, this, &MainWindow::OpenFile);
   connect(ui_menu_bar, &MenuBar::Exit, this, &MainWindow::close);
+
+  connect(ui_vgmfiles_list, &VGMFileListView::AddMdiTab, ui_tabs_area, &MdiArea::addSubWindow);
 }
 
 void MainWindow::OpenFile() {

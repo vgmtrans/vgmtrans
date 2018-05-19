@@ -1,14 +1,14 @@
-//
-// Created by Mike on 8/31/14.
-//
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
 
 #include <QKeyEvent>
-#include <QDebug>
 #include "VGMFileListView.h"
 #include "QtVGMRoot.h"
 #include "VGMFile.h"
 #include "MdiArea.h"
-#include "VGMFileView.h"
 #include "Helpers.h"
 
 // ********************
@@ -22,12 +22,12 @@ VGMFileListViewModel::VGMFileListViewModel(QObject *parent)
     connect(&qtVGMRoot, SIGNAL(UI_RemovedVGMFile()), this, SLOT(changedVGMFiles()));
 }
 
-int VGMFileListViewModel::rowCount ( const QModelIndex & parent) const
+int VGMFileListViewModel::rowCount (const QModelIndex & parent) const
 {
     return qtVGMRoot.vVGMFile.size();
 }
 
-QVariant VGMFileListViewModel::data ( const QModelIndex & index, int role ) const
+QVariant VGMFileListViewModel::data (const QModelIndex & index, int role) const
 {
     if (role == Qt::DisplayRole) {
         return QString::fromStdWString(*qtVGMRoot.vVGMFile[index.row()]->GetName());
@@ -57,42 +57,45 @@ VGMFileListView::VGMFileListView(QWidget *parent)
     this->setSelectionMode(QAbstractItemView::ExtendedSelection);
     this->setSelectionRectVisible(true);
 
-
-//    connect(this, SIGNAL(clicked(QModelIndex)),this,SLOT(myItemSelected(QModelIndex)));
-    connect(this, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(doubleClickedSlot(QModelIndex)));
+    connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::doubleClickedSlot);
 }
 
-void VGMFileListView::keyPressEvent(QKeyEvent* e)
+void VGMFileListView::keyPressEvent(QKeyEvent* input)
 {
-    // On Backspace or Delete keypress, remove all selected files
-    if( e->key() == Qt::Key_Delete || e->key() == Qt::Key_Backspace )
+  switch(input->key()) {
+    case Qt::Key_Delete:
+    case Qt::Key_Backspace:
     {
-        QModelIndexList list = this->selectionModel()->selectedIndexes();
+      QModelIndexList list = this->selectionModel()->selectedIndexes();
 
-        if (list.isEmpty())
-            return;
+      if(list.isEmpty())
+        return;
 
-        QList<VGMFile*> filesToClose;
-        foreach(const QModelIndex &index, list) {
-            if (index.row() < qtVGMRoot.vVGMFile.size())
-                filesToClose.append(qtVGMRoot.vVGMFile[index.row()]);
-        }
+      QList<VGMFile*> filesToClose;
+      foreach(const QModelIndex &index, list) {
+        if(index.row() < qtVGMRoot.vVGMFile.size())
+          filesToClose.append(qtVGMRoot.vVGMFile[index.row()]);
+      }
 
-        foreach(VGMFile *file, filesToClose) {
-            qtVGMRoot.RemoveVGMFile(file);
-        }
+      foreach(VGMFile *file, filesToClose) {
+        qtVGMRoot.RemoveVGMFile(file);
+      }
+
+      return;
     }
+  }
 }
 
 void VGMFileListView::doubleClickedSlot(QModelIndex index)
 {
-    VGMFile *vgmFile = qtVGMRoot.vVGMFile[index.row()];
-    VGMFileView *vgmFileView = new VGMFileView(vgmFile);
-    QString vgmFileName = QString::fromStdWString(*vgmFile->GetName());
-    vgmFileView->setWindowTitle(vgmFileName);
-    vgmFileView->setWindowIcon(iconForFileType(vgmFile->GetFileType()));
+  VGMFile *vgmFile = qtVGMRoot.vVGMFile[index.row()];
+  VGMFileView *vgmFileView = new VGMFileView(vgmFile);
+  QString vgmFileName = QString::fromStdWString(*vgmFile->GetName());
 
-    MdiArea::getInstance()->addSubWindow(vgmFileView);
+  vgmFileView->setWindowTitle(vgmFileName);
+  vgmFileView->setWindowIcon(iconForFileType(vgmFile->GetFileType()));
+  vgmFileView->setAttribute(Qt::WA_DeleteOnClose);
 
-    vgmFileView->show();
+  AddMdiTab(vgmFileView, Qt::SubWindow);
+  vgmFileView->show();
 }

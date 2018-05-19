@@ -1,10 +1,14 @@
-//
-// Created by Mike on 8/31/14.
-//
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
 
 #include <QAbstractListModel>
 #include <QEvent>
 #include <QListView>
+
+#include "VGMFileView.h"
 
 #ifndef __VGMFileListView_H_
 #define __VGMFileListView_H_
@@ -15,29 +19,28 @@ class VGMFileListViewModel : public QAbstractListModel
     Q_OBJECT
 
 public:
-    VGMFileListViewModel(QObject *parent = 0);
-
-    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
-
-    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
+    VGMFileListViewModel(QObject *parent = nullptr);
+    int rowCount (const QModelIndex & parent = QModelIndex()) const;
+    QVariant data (const QModelIndex & index, int role = Qt::DisplayRole) const;
 
 public slots:
     void changedVGMFiles();
+
 };
-
-
 
 class VGMFileListView : public QListView
 {
     Q_OBJECT
 
 public:
-    VGMFileListView(QWidget *parent = 0);
+    VGMFileListView(QWidget *parent = nullptr);
+    void keyPressEvent(QKeyEvent* input);
 
-    void keyPressEvent(QKeyEvent* e);
-//    void mouseDoubleClickEvent(QMouseEvent *event);
 public slots:
     void doubleClickedSlot(QModelIndex);
+
+signals:
+    void AddMdiTab(QWidget* vgm_file, Qt::WindowFlags flags);
 };
 
 
