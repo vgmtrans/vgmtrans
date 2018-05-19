@@ -1,3 +1,9 @@
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
+
 #ifndef VGMTRANS_HEXVIEW_H
 #define VGMTRANS_HEXVIEW_H
 
@@ -9,23 +15,19 @@ class HexView : public QAbstractScrollArea {
     Q_OBJECT
 
 public:
-    HexView(VGMFile *vgmfile, QWidget *parent = 0);
-    ~HexView();
+    explicit HexView(VGMFile *vgmfile, QWidget *parent = nullptr);
+    ~HexView() = default;
 
 private:
-    VGMFile *vgmfile;
-    int mLineHeight;
-    int mLinesPerScreen;
-    int mLineBaseline;
-
-    void drawLineColor(QPainter &painter, QFontMetrics &fontMetrics, uint32_t line);
-
-
+    VGMFile *ui_hexview_vgmfile;
+    int hexview_line_height;
+    int hexview_line_ascent;
+    int hexview_lines_per_screen = 0;
+    
 protected:
-    void paintEvent(QPaintEvent *event) Q_DECL_OVERRIDE;
-    void resizeEvent(QResizeEvent *event);
+    void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 };
-
 
 #endif //VGMTRANS_HEXVIEW_H
