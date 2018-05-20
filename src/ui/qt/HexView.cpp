@@ -16,7 +16,7 @@ HexView::HexView(VGMFile *vgmfile, QWidget *parent)
   // Use whatever monospace font the system can offer
   QFont font("Monospace");
   font.setStyleHint(QFont::Monospace);
-  font.setPointSize(11); // 12pt
+  font.setPointSize(11); // 11pt
   setFont(font);
   
   QFontMetrics metrics(font);
@@ -24,7 +24,7 @@ HexView::HexView(VGMFile *vgmfile, QWidget *parent)
   hexview_line_ascent = metrics.ascent();
 
   QSize viewport_size = viewport()->size();
-  verticalScrollBar()->setRange(0, vgmfile->unLength / 16 - 1);
+  verticalScrollBar()->setRange(0, (vgmfile->unLength / 16) - 1);
   verticalScrollBar()->setPageStep(viewport_size.height() / hexview_line_height);
   verticalScrollBar()->setSingleStep(1);
 }
@@ -32,6 +32,8 @@ HexView::HexView(VGMFile *vgmfile, QWidget *parent)
 void HexView::paintEvent(QPaintEvent *event) {
 
     QPainter painter(viewport());
+    painter.setBackground(palette().color(QPalette::Base));
+    painter.setPen(palette().color(QPalette::WindowText));
 
     int y = 5;
     int hexview_firstline = verticalScrollBar()->value();
@@ -40,6 +42,13 @@ void HexView::paintEvent(QPaintEvent *event) {
   
     const auto begin_offset = ui_hexview_vgmfile->dwOffset;
     const int hexview_font_width = painter.fontMetrics().averageCharWidth();
+
+    painter.drawText(hor_padding, y + hexview_line_ascent, tr("Offset (h)"));
+    for(int i = 0; i < 16; i++) {
+      painter.drawText(hor_padding + ((10 + 3 * i) * hexview_font_width), y, 3 * hexview_font_width,
+                       hexview_line_height, Qt::AlignCenter, QString(i).toLatin1().toHex());
+    }
+    y += hexview_line_height;
 
     for (int line = hexview_firstline; line < lastLine; ++line) {
 
@@ -52,6 +61,7 @@ void HexView::paintEvent(QPaintEvent *event) {
         // Make sure the colors are neutral and print out the address
         painter.setBackground(palette().color(QPalette::Base));
         painter.setPen(palette().color(QPalette::WindowText));
+
         QString hexview_address = QString("%1    ")
                 .arg((line * 16) + begin_offset, 8, 16, null_char).toUpper();
         painter.drawText(hor_padding, y + hexview_line_ascent, hexview_address);
