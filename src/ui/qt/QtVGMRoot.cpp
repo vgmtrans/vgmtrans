@@ -5,7 +5,7 @@
 */
 
 #include <QApplication>
-#include <QDir>
+#include <QStandardPaths>
 #include <QFileDialog>
 #include <QString>
 #include "QtVGMRoot.h"
@@ -94,7 +94,7 @@ void QtVGMRoot::UI_AddItemSet(VGMFile* file, std::vector<ItemSet>* itemset)
 std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring& suggestedFilename, const std::wstring& extension)
 {
   return QFileDialog::getOpenFileName(QApplication::activeWindow(), tr("Select a file"),
-                                      QDir::currentPath(), tr("All files (*)")).toStdWString();
+                                      QStandardPaths::writableLocation(QStandardPaths::MusicLocation), tr("All files (*)")).toStdWString();
 }
 
 std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension)
