@@ -49,7 +49,6 @@ VGMFileListView::VGMFileListView(QWidget *parent)
     VGMFileListViewModel *vgmFileListViewModel = new VGMFileListViewModel(this);
     this->setModel(vgmFileListViewModel);
     this->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    this->setSelectionRectVisible(true);
     this->setContextMenuPolicy(Qt::CustomContextMenu);
 
     connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::ItemMenu);
@@ -58,7 +57,8 @@ VGMFileListView::VGMFileListView(QWidget *parent)
 
 /*
 * Definitely not the prettiest way to do it, but
-* it's all we can do with the current backend functions
+* it's all we can do with the current backend functions.
+* Identical implementation for VGMCollListView
 */
 void VGMFileListView::ItemMenu(const QPoint &pos) {
   QPoint absolute_position = mapToGlobal(pos);
@@ -83,7 +83,8 @@ void VGMFileListView::ItemMenu(const QPoint &pos) {
     }
     action_index++;
   }
-  
+
+  vgmfile_menu->deleteLater();
 }
 
 void VGMFileListView::keyPressEvent(QKeyEvent* input)

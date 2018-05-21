@@ -1,27 +1,27 @@
-//
-// Created by Mike on 8/31/14.
-//
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
 
-#include <qdebug.h>
-#include <qevent.h>
-#include "SF2File.h"
-#include "VGMSeq.h"
+#include <QEvent>
+#include <QMenu>
 #include "VGMCollListView.h"
 #include "QtVGMRoot.h"
 #include "VGMColl.h"
 
+//FIXME: Remove arbitrary values
 const int cellWidth = 200;
 const int cellHeight = 20;
 
-// ********************
-// VGMCollListViewModel
-// ********************
-
+/*
+ * VGMCollListViewModel
+ */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent)
         : QAbstractListModel(parent)
 {
-    QObject::connect(&qtVGMRoot, SIGNAL(UI_AddedVGMColl()), this, SLOT(changedVGMColls()));
-    QObject::connect(&qtVGMRoot, SIGNAL(UI_RemovedVGMColl()), this, SLOT(changedVGMColls()));
+  connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMColl, [=]() { dataChanged(index(0, 0), index(0, 0)); });
+  connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedVGMColl, [=]() { dataChanged(index(0, 0), index(0, 0)); });
 }
 
 int VGMCollListViewModel::rowCount ( const QModelIndex & parent) const
@@ -40,15 +40,9 @@ QVariant VGMCollListViewModel::data ( const QModelIndex & index, int role ) cons
     return QVariant();
 }
 
-void VGMCollListViewModel::changedVGMColls()
-{
-    emit dataChanged(index(0, 0), index(0, 0));
-}
-
-
-// ***************
-// VGMCollListView
-// ***************
+/*
+* VGMCollListView
+*/
 
 VGMCollListView::VGMCollListView(QWidget *parent)
         : QListView(parent)
@@ -58,30 +52,34 @@ VGMCollListView::VGMCollListView(QWidget *parent)
     this->setSelectionMode(QAbstractItemView::SingleSelection);
     this->setGridSize(QSize(cellWidth, cellHeight));
     this->setWrapping(true);
-//    this->setViewMode(QListView::IconMode);
-//    this->setFlow(QListView::LeftToRight);
-//    this->setSelectionRectVisible(true);
+    this->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollListView::CollMenu);
 }
 
-void VGMCollListView::keyPressEvent(QKeyEvent* e)
-{
-    // On a spacebar key press, play the selected collection
-    if( e->key() == Qt::Key_Space)
-    {
-        QModelIndexList list = this->selectionModel()->selectedIndexes();
-        if (list.size() == 0 || list[0].row() >= qtVGMRoot.vVGMColl.size())
-            return;
+void VGMCollListView::CollMenu(const QPoint &pos) {
+  QPoint absolute_position = mapToGlobal(pos);
 
-        VGMColl* coll = qtVGMRoot.vVGMColl[list[0].row()];
-        VGMSeq* seq = coll->GetSeq();
-        SF2File* sf2 = coll->CreateSF2File();
-        MidiFile* midi = seq->ConvertToMidi();
+  VGMColl *pointed_coll = qtVGMRoot.vVGMColl[indexAt(pos).row()];
+  if(pointed_coll == nullptr) {
+    return;
+  }
 
-        std::vector<uint8_t> midiBuf;
-        midi->WriteMidiToBuffer(midiBuf);
+  QMenu *vgmcoll_menu = new QMenu();
+  std::vector<const wchar_t*>* menu_item_names = pointed_coll->GetMenuItemNames();
+  for(auto &menu_item : *menu_item_names) {
+    vgmcoll_menu->addAction(QString::fromStdWString(menu_item));
+  }
 
-        const void* rawSF2 = sf2->SaveToMem();
-
-        
+  QAction *performed_action = vgmcoll_menu->exec(absolute_position);
+  int action_index = 0;
+  for(auto &action : vgmcoll_menu->actions()) {
+    if(performed_action == action) {
+      pointed_coll->CallMenuItem(pointed_coll, action_index);
+      break;
     }
+    action_index++;
+  }
+
+  vgmcoll_menu->deleteLater();
 }

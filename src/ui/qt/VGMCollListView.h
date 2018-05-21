@@ -1,6 +1,8 @@
-//
-// Created by Mike on 8/31/14.
-//
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
 
 #include <QAbstractListModel>
 #include <QListView>
@@ -14,25 +16,19 @@ class VGMCollListViewModel : public QAbstractListModel
     Q_OBJECT
 
 public:
-    VGMCollListViewModel(QObject *parent = 0);
+    VGMCollListViewModel(QObject *parent = nullptr);
+    int rowCount(const QModelIndex & parent = QModelIndex()) const;
+    QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const;
 
-    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
-
-    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
-
-public slots:
-    void changedVGMColls();
 };
-
-
 
 class VGMCollListView : public QListView
 {
 public:
-    VGMCollListView(QWidget *parent = 0);
+    VGMCollListView(QWidget *parent = nullptr);
 
-    void keyPressEvent(QKeyEvent* e);
+private:
+  void CollMenu(const QPoint &pos);
 };
-
 
 #endif //__VGMCollListViewModel_H_
