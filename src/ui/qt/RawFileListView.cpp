@@ -5,17 +5,18 @@
 */
 
 #include <QKeyEvent>
-#include <QStandardItem>
+#include <QMenu>
 #include "RawFileListView.h"
+#include "RawFile.h"
 
 /*
 * RawFileListViewModel
 */
 
 RawFileListViewModel::RawFileListViewModel(QObject *parent)
-    : QAbstractListModel(parent) {
-    QObject::connect(&qtVGMRoot, SIGNAL(UI_AddedRawFile()), this, SLOT(changedRawFiles()));
-    QObject::connect(&qtVGMRoot, SIGNAL(UI_RemovedRawFile()), this, SLOT(changedRawFiles()));
+  : QAbstractListModel(parent) {
+  connect(&qtVGMRoot, &QtVGMRoot::UI_AddedRawFile, [=]() { dataChanged(index(0, 0), index(0, 0)); });
+  connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedRawFile, [=]() { dataChanged(index(0, 0), index(0, 0)); });
 }
 
 int RawFileListViewModel::rowCount (const QModelIndex & parent) const {
@@ -33,10 +34,6 @@ QVariant RawFileListViewModel::data (const QModelIndex & index, int role ) const
   return QVariant();
 }
 
-void RawFileListViewModel::changedRawFiles() {
-    emit dataChanged(index(0, 0), index(0, 0));
-}
-
 /*
  * RawFileListView
  */
@@ -47,6 +44,24 @@ RawFileListView::RawFileListView(QWidget *parent)
     this->setModel(rawFileListViewModel);
     this->setSelectionMode(QAbstractItemView::ExtendedSelection);
     this->setSelectionRectVisible(true);
+    this->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    connect(this, &QAbstractItemView::customContextMenuRequested, this, &RawFileListView::RawFilesMenu);
+}
+
+/*
+* This is different from the other context menus,
+* since the only possible action on a RawFile is removing it
+*/
+void RawFileListView::RawFilesMenu(const QPoint &pos) {
+  if(!indexAt(pos).isValid())
+    return;
+
+  QMenu *rawfiles_menu = new QMenu();
+  rawfiles_menu->addAction("Remove", this, &RawFileListView::DeleteRawFiles);
+  rawfiles_menu->exec(mapToGlobal(pos));
+  
+  rawfiles_menu->deleteLater();
 }
 
 void RawFileListView::keyPressEvent(QKeyEvent * input) {
@@ -55,23 +70,27 @@ void RawFileListView::keyPressEvent(QKeyEvent * input) {
     case Qt::Key_Delete:
     case Qt::Key_Backspace:
     {
-      QModelIndexList list = this->selectionModel()->selectedIndexes();
-
-      if(list.isEmpty())
-        return;
-
-      QList<RawFile*> filesToClose;
-      foreach(const QModelIndex &index, list) {
-        if(index.row() < qtVGMRoot.vRawFile.size())
-          filesToClose.append(qtVGMRoot.vRawFile[index.row()]);
-      }
-
-      foreach(RawFile *file, filesToClose) {
-        qtVGMRoot.CloseRawFile(file);
-      }
-
-      return;
+      DeleteRawFiles();
     }
   }
 
+}
+
+void RawFileListView::DeleteRawFiles(){
+  QModelIndexList list = this->selectionModel()->selectedIndexes();
+
+  if(list.isEmpty())
+    return;
+
+  QList<RawFile*> filesToClose;
+  foreach(const QModelIndex &index, list) {
+    if(index.row() < qtVGMRoot.vRawFile.size())
+      filesToClose.append(qtVGMRoot.vRawFile[index.row()]);
+  }
+
+  foreach(RawFile *file, filesToClose) {
+    qtVGMRoot.CloseRawFile(file);
+  }
+
+  return;
 }

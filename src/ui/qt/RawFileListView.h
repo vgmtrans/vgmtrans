@@ -16,13 +16,8 @@ class RawFileListViewModel : public QAbstractListModel {
 
 public:
   RawFileListViewModel(QObject *parent = nullptr);
-
   int rowCount(const QModelIndex & parent = QModelIndex()) const;
   QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const;
-
-public slots:
-    void changedRawFiles();
-
 };
 
 class RawFileListView : public QListView {
@@ -32,7 +27,9 @@ public:
   explicit RawFileListView(QWidget *parent = nullptr);
 
 private:
-  void keyPressEvent(QKeyEvent* input) override;
+  void keyPressEvent(QKeyEvent *input) override;
+  void RawFilesMenu(const QPoint &pos);
+  void DeleteRawFiles();
 
   RawFileListViewModel *rawFileListViewModel;
 
