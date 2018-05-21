@@ -17,10 +17,13 @@ IconBar::IconBar(QWidget *parent) : QToolBar(parent) {
 }
 
 void IconBar::SetupActions() {
-  iconbar_open = addAction(tr("Open"), this, &IconBar::OpenPressed);
+  iconbar_open = addAction(tr("Open"));
+  connect(iconbar_open, &QAction::triggered, this, &IconBar::OpenPressed);
   addSeparator();
-  iconbar_play = addAction(tr("Play"), this, &IconBar::PlayToggle);
-  iconbar_stop = addAction(tr("Stop"), this, &IconBar::StopPressed);
+  iconbar_play = addAction(tr("Play"));
+  connect(iconbar_open, &QAction::triggered, this, &IconBar::PlayToggle);
+  iconbar_stop = addAction(tr("Stop"));
+  connect(iconbar_open, &QAction::triggered, this, &IconBar::StopPressed);
 }
 
 void IconBar::SetupIcons() {
