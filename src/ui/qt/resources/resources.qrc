@@ -10,6 +10,10 @@
     <file>images/piano-32.png</file>
     <file>images/treble_clef-32.png</file>
     <file>images/music_folder-32.png</file>
+    <file>images/play-32.png</file>
+    <file>images/pause-32.png</file>
+    <file>images/stop-32.png</file>
+    <file>images/open-32.png</file>
     <file>qss/default.qss</file>
 </qresource>
 </RCC>

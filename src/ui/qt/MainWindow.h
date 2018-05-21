@@ -4,6 +4,9 @@
 * refer to the included LICENSE.txt file
 */
 
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
 #include <QMainWindow>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -15,9 +18,7 @@
 #include "VGMFileListView.h"
 #include "VGMCollListView.h"
 #include "MdiArea.h"
-
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#include "IconBar.h"
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -39,6 +40,7 @@ private:
   RawFileListView* ui_rawfiles_list;
   VGMFileListView* ui_vgmfiles_list;
   VGMCollListView* ui_colls_list;
+  IconBar* ui_iconbar;
   MdiArea* ui_tabs_area;
 
   QSplitter* vertical_splitter;
