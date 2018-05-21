@@ -4,10 +4,13 @@
 * refer to the included LICENSE.txt file
 */
 
+#include <QApplication>
+#include <QMessageBox>
 #include "MenuBar.h"
 
 MenuBar::MenuBar(QWidget* parent) : QMenuBar(parent) {
   AppendFileMenu();
+  AppendInfoMenu();
 }
 
 void MenuBar::AppendFileMenu() {
@@ -21,4 +24,12 @@ void MenuBar::AppendFileMenu() {
   menu_app_exit = file_dropdown->addAction(tr("Exit"));
   menu_app_exit->setShortcut(QKeySequence(QStringLiteral("Alt+F4")));
   connect(menu_app_exit, &QAction::triggered, this, &MenuBar::Exit);
+}
+
+void MenuBar::AppendInfoMenu() {
+  QMenu* info_dropdown = addMenu(tr("Help"));
+  menu_about_dlg = info_dropdown->addAction(tr("About VGMTrans"));
+  connect(menu_about_dlg, &QAction::triggered, [=] {
+    QMessageBox::about(QApplication::activeWindow(), "About VGMTrans", "Copyright (c) 2018 - The VGMTrans Team");
+  });
 }

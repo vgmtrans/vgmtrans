@@ -23,10 +23,14 @@ signals:
 
 private:
   void AppendFileMenu();
+  void AppendInfoMenu();
 
   // File actions
   QAction* menu_open_file;
   QAction* menu_app_exit;
+
+  // Info actions
+  QAction* menu_about_dlg;
 
 };
 
