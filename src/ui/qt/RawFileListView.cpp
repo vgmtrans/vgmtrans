@@ -41,10 +41,11 @@ QVariant RawFileListViewModel::data (const QModelIndex & index, int role ) const
 RawFileListView::RawFileListView(QWidget *parent)
         : QListView(parent) {
     rawFileListViewModel = new RawFileListViewModel(this);
-    this->setModel(rawFileListViewModel);
-    this->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    this->setSelectionRectVisible(true);
-    this->setContextMenuPolicy(Qt::CustomContextMenu);
+    setModel(rawFileListViewModel);
+    setSelectionMode(QAbstractItemView::ExtendedSelection);
+    setSelectionRectVisible(true);
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    setIconSize(QSize(16, 16));
 
     connect(this, &QAbstractItemView::customContextMenuRequested, this, &RawFileListView::RawFilesMenu);
 }
@@ -58,7 +59,8 @@ void RawFileListView::RawFilesMenu(const QPoint &pos) {
     return;
 
   QMenu *rawfiles_menu = new QMenu();
-  rawfiles_menu->addAction("Remove", this, &RawFileListView::DeleteRawFiles);
+  QAction *rawfile_remove = rawfiles_menu->addAction("Remove");
+  connect(rawfile_remove, &QAction::triggered, this, &RawFileListView::DeleteRawFiles);
   rawfiles_menu->exec(mapToGlobal(pos));
   
   rawfiles_menu->deleteLater();
@@ -77,7 +79,7 @@ void RawFileListView::keyPressEvent(QKeyEvent * input) {
 }
 
 void RawFileListView::DeleteRawFiles(){
-  QModelIndexList list = this->selectionModel()->selectedIndexes();
+  QModelIndexList list = selectionModel()->selectedIndexes();
 
   if(list.isEmpty())
     return;

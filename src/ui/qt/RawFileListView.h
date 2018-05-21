@@ -4,12 +4,12 @@
 * refer to the included LICENSE.txt file
 */
 
+#ifndef RAWFILELISTVIEW_H
+#define RAWFILELISTVIEW_H
+
 #include <QAbstractListModel>
 #include <QListView>
 #include "QtVGMRoot.h"
-
-#ifndef RAWFILELISTVIEW_H
-#define RAWFILELISTVIEW_H
 
 class RawFileListViewModel : public QAbstractListModel {
     Q_OBJECT
