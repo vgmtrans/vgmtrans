@@ -5,6 +5,7 @@
 */
 
 #include <QKeyEvent>
+#include <QMenu>
 #include "VGMFileListView.h"
 #include "QtVGMRoot.h"
 #include "VGMFile.h"
@@ -16,10 +17,9 @@
 // ********************
 
 VGMFileListViewModel::VGMFileListViewModel(QObject *parent)
-        : QAbstractListModel(parent)
-{
-    connect(&qtVGMRoot, SIGNAL(UI_AddedVGMFile()), this, SLOT(changedVGMFiles()));
-    connect(&qtVGMRoot, SIGNAL(UI_RemovedVGMFile()), this, SLOT(changedVGMFiles()));
+        : QAbstractListModel(parent) {
+  connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMFile, [=]() { dataChanged(index(0, 0), index(0, 0)); });
+  connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedVGMFile, [=]() { dataChanged(index(0, 0), index(0, 0)); });
 }
 
 int VGMFileListViewModel::rowCount (const QModelIndex & parent) const
@@ -39,12 +39,6 @@ QVariant VGMFileListViewModel::data (const QModelIndex & index, int role) const
     return QVariant();
 }
 
-void VGMFileListViewModel::changedVGMFiles()
-{
-    emit dataChanged(index(0, 0), index(0, 0));
-}
-
-
 // ***************
 // VGMFileListView
 // ***************
@@ -56,8 +50,40 @@ VGMFileListView::VGMFileListView(QWidget *parent)
     this->setModel(vgmFileListViewModel);
     this->setSelectionMode(QAbstractItemView::ExtendedSelection);
     this->setSelectionRectVisible(true);
+    this->setContextMenuPolicy(Qt::CustomContextMenu);
 
+    connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::ItemMenu);
     connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::doubleClickedSlot);
+}
+
+/*
+* Definitely not the prettiest way to do it, but
+* it's all we can do with the current backend functions
+*/
+void VGMFileListView::ItemMenu(const QPoint &pos) {
+  QPoint absolute_position = mapToGlobal(pos);
+
+  VGMFile *pointed_vgmfile = qtVGMRoot.vVGMFile[indexAt(pos).row()];
+  if(pointed_vgmfile == nullptr) {
+    return;
+  }
+
+  QMenu *vgmfile_menu = new QMenu();
+  std::vector<const wchar_t*>* menu_item_names = pointed_vgmfile->GetMenuItemNames();
+  for(auto &menu_item : *menu_item_names) {
+    vgmfile_menu->addAction(QString::fromStdWString(menu_item));
+  }
+  
+  QAction *performed_action = vgmfile_menu->exec(absolute_position);
+  int action_index = 0;
+  for(auto &action : vgmfile_menu->actions()) {
+    if(performed_action == action) {
+      pointed_vgmfile->CallMenuItem(pointed_vgmfile, action_index);
+      break;
+    }
+    action_index++;
+  }
+  
 }
 
 void VGMFileListView::keyPressEvent(QKeyEvent* input)

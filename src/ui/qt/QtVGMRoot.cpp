@@ -93,18 +93,18 @@ void QtVGMRoot::UI_AddItemSet(VGMFile* file, std::vector<ItemSet>* itemset)
 
 std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring& suggestedFilename, const std::wstring& extension)
 {
-  return QFileDialog::getOpenFileName(QApplication::activeWindow(), tr("Select a file"),
+  return QFileDialog::getOpenFileName(QApplication::activeWindow(), tr("Select a file..."),
                                       QStandardPaths::writableLocation(QStandardPaths::MusicLocation), tr("All files (*)")).toStdWString();
 }
 
 std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension)
 {
-    std::wstring path = L"Placeholder";
-    return path;
+  return QFileDialog::getSaveFileName(QApplication::activeWindow(), tr("Save file..."),
+                                      QStandardPaths::writableLocation(QStandardPaths::MusicLocation), tr("All files (*)")).toStdWString();
 }
 
 std::wstring QtVGMRoot::UI_GetSaveDirPath(const std::wstring& suggestedDir)
 {
-    std::wstring path = L"Placeholder";
-    return path;
+  return QFileDialog::getExistingDirectory(QApplication::activeWindow(), tr("Save file..."),
+                                           QStandardPaths::writableLocation(QStandardPaths::MusicLocation), QFileDialog::ShowDirsOnly).toStdWString();
 }

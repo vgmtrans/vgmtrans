@@ -23,9 +23,6 @@ public:
     int rowCount (const QModelIndex & parent = QModelIndex()) const;
     QVariant data (const QModelIndex & index, int role = Qt::DisplayRole) const;
 
-public slots:
-    void changedVGMFiles();
-
 };
 
 class VGMFileListView : public QListView
@@ -41,6 +38,10 @@ public slots:
 
 signals:
     void AddMdiTab(QWidget* vgm_file, Qt::WindowFlags flags);
+
+private:
+  void ItemMenu(const QPoint &pos);
+
 };
 
 
