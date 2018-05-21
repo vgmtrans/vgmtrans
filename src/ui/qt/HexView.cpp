@@ -85,7 +85,7 @@ void HexView::paintEvent(QPaintEvent *event) {
 
           painter.setPen(text_color);
           painter.drawText(hexview_item, Qt::AlignCenter,
-                          QString(buffer.at(i)).toLatin1().toHex());
+                           QString("%1").arg((unsigned char)buffer.at(i), 2, 16, QChar('0')).toUpper());
         }
 
         y += hexview_line_height;
