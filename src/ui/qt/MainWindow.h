@@ -19,6 +19,7 @@
 #include "VGMCollListView.h"
 #include "MdiArea.h"
 #include "IconBar.h"
+#include "Logger.h"
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -42,6 +43,7 @@ private:
   VGMCollListView* ui_colls_list;
   IconBar* ui_iconbar;
   MdiArea* ui_tabs_area;
+  Logger* ui_logger;
 
   QSplitter* vertical_splitter;
   QSplitter* horizontal_splitter;

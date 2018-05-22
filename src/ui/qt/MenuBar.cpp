@@ -7,9 +7,11 @@
 #include <QApplication>
 #include <QMessageBox>
 #include "MenuBar.h"
+#include "Logger.h"
 
 MenuBar::MenuBar(QWidget* parent) : QMenuBar(parent) {
   AppendFileMenu();
+  AppendOptionsMenu();
   AppendInfoMenu();
 }
 
@@ -24,6 +26,13 @@ void MenuBar::AppendFileMenu() {
   menu_app_exit = file_dropdown->addAction(tr("Exit"));
   menu_app_exit->setShortcut(QKeySequence(QStringLiteral("Alt+F4")));
   connect(menu_app_exit, &QAction::triggered, this, &MenuBar::Exit);
+}
+
+void MenuBar::AppendOptionsMenu() {
+  QMenu* options_dropdown = addMenu(tr("Options"));
+  menu_toggle_logger = options_dropdown->addAction(tr("Show logger"));
+  menu_toggle_logger->setCheckable(true);
+  connect(menu_toggle_logger, &QAction::triggered, this, &MenuBar::LoggerToggled);
 }
 
 void MenuBar::AppendInfoMenu() {

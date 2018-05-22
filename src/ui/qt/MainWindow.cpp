@@ -6,7 +6,7 @@
 
 #include <QFileInfo>
 #include <QMimeData>
-#include <QLabel>
+#include <QVBoxLayout>
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
 
@@ -23,10 +23,12 @@ void MainWindow::CreateElements() {
   ui_menu_bar = new MenuBar(this);
   ui_iconbar = new IconBar(this);
   addToolBar(ui_iconbar);
+
   ui_rawfiles_list = new RawFileListView(this);
   ui_vgmfiles_list = new VGMFileListView(this);
   ui_colls_list = new VGMCollListView(this);
   ui_tabs_area = new MdiArea(this);
+  ui_logger = new Logger(this);
 
   vertical_splitter = new QSplitter(Qt::Vertical, this);
   horizontal_splitter = new QSplitter(Qt::Horizontal, vertical_splitter);
@@ -50,7 +52,14 @@ void MainWindow::RouteSignals() {
   connect(ui_menu_bar, &MenuBar::OpenFile, this, &MainWindow::OpenFile);
   connect(ui_menu_bar, &MenuBar::Exit, this, &MainWindow::close);
   connect(ui_iconbar, &IconBar::OpenPressed, this, &MainWindow::OpenFile);
+  
   connect(ui_vgmfiles_list, &VGMFileListView::AddMdiTab, ui_tabs_area, &MdiArea::addSubWindow);
+  
+  connect(ui_menu_bar, &MenuBar::LoggerToggled, [=] {
+    ui_logger->setHidden(!ui_menu_bar->IsLoggerToggled());
+  });
+
+  connect(&qtVGMRoot, &QtVGMRoot::UI_AddLogItem, ui_logger, &Logger::LogMessage);
 }
 
 void MainWindow::OpenFile() {
