@@ -20,6 +20,9 @@ public:
   explicit Logger(QWidget* parent = nullptr);
   void LogMessage(LogItem *message);
 
+signals:
+  void closeEvent(QCloseEvent*) override;
+
 private:
   void CreateElements();
   QWidget *logger_wrapper;

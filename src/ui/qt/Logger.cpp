@@ -14,7 +14,6 @@ Logger::Logger(QWidget* parent) : QDockWidget(parent) {
 
   CreateElements();
 
-  setFloating(true);
   setHidden(true);
 }
 

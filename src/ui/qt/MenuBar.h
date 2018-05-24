@@ -17,6 +17,7 @@ public:
   explicit MenuBar(QWidget* parent = nullptr);
   ~MenuBar() = default;
   inline bool IsLoggerToggled() { return menu_toggle_logger->isChecked(); };
+  inline void SetLoggerHidden() { menu_toggle_logger->setChecked(false); };
 
 signals:
   void OpenFile();

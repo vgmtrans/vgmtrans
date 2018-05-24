@@ -28,7 +28,9 @@ void MainWindow::CreateElements() {
   ui_vgmfiles_list = new VGMFileListView(this);
   ui_colls_list = new VGMCollListView(this);
   ui_tabs_area = new MdiArea(this);
+  
   ui_logger = new Logger(this);
+  addDockWidget(Qt::BottomDockWidgetArea, ui_logger);
 
   vertical_splitter = new QSplitter(Qt::Vertical, this);
   horizontal_splitter = new QSplitter(Qt::Horizontal, vertical_splitter);
@@ -57,6 +59,9 @@ void MainWindow::RouteSignals() {
   
   connect(ui_menu_bar, &MenuBar::LoggerToggled, [=] {
     ui_logger->setHidden(!ui_menu_bar->IsLoggerToggled());
+  });
+  connect(ui_logger, &Logger::closeEvent, [=] {
+    ui_menu_bar->SetLoggerHidden();
   });
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddLogItem, ui_logger, &Logger::LogMessage);
