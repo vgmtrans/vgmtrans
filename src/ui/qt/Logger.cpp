@@ -37,10 +37,13 @@ void Logger::LogMessage(LogItem *message) {
   switch(message->GetLogLevel()) {
     case LOG_LEVEL_ERR:
       color = "red";
+      break;
     case LOG_LEVEL_WARN:
       color = "yellow";
+      break;
     case LOG_LEVEL_INFO:
       color = "darkgrey";
+      break;
     case LOG_LEVEL_DEBUG:
       break;
   }
