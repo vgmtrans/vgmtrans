@@ -10,6 +10,8 @@
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
 
+#include "VGMFile.h"
+
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
   setUnifiedTitleAndToolBarOnMac(true);
@@ -17,12 +19,21 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 
   CreateElements();
   RouteSignals();
+
+  ui_statusbar->showMessage("Ready", 3000);
 }
 
 void MainWindow::CreateElements() {
   ui_menu_bar = new MenuBar(this);
   ui_iconbar = new IconBar(this);
   addToolBar(ui_iconbar);
+  
+  ui_statusbar = new QStatusBar(this);
+  ui_statusbar_offset = new QLabel();
+  ui_statusbar_length = new QLabel();
+  ui_statusbar->addPermanentWidget(ui_statusbar_offset);
+  ui_statusbar->addPermanentWidget(ui_statusbar_length);
+  setStatusBar(ui_statusbar);
 
   ui_rawfiles_list = new RawFileListView(this);
   ui_vgmfiles_list = new VGMFileListView(this);
@@ -65,6 +76,15 @@ void MainWindow::RouteSignals() {
   });
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddLogItem, ui_logger, &Logger::LogMessage);
+
+  connect(ui_vgmfiles_list, &VGMCollListView::clicked, [=] {
+    if(!ui_vgmfiles_list->currentIndex().isValid())
+      return;
+
+    VGMFile *clicked_item = qtVGMRoot.vVGMFile[ui_vgmfiles_list->currentIndex().row()];
+    ui_statusbar_offset->setText("Offset: " + QString::number(clicked_item->dwOffset, 16).toUpper());
+    ui_statusbar_length->setText("Length: " + QString::number(clicked_item->size(), 16).toUpper());
+  });
 }
 
 void MainWindow::OpenFile() {

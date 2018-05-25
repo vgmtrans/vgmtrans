@@ -12,6 +12,8 @@
 #include <QStackedWidget>
 #include <QDropEvent>
 #include <QDragEnterEvent>
+#include <QStatusBar>
+#include <QLabel>
 
 #include "MenuBar.h"
 #include "RawFileListView.h"
@@ -44,6 +46,10 @@ private:
   IconBar* ui_iconbar;
   MdiArea* ui_tabs_area;
   Logger* ui_logger;
+
+  QStatusBar* ui_statusbar;
+  QLabel* ui_statusbar_offset;
+  QLabel* ui_statusbar_length;
 
   QSplitter* vertical_splitter;
   QSplitter* horizontal_splitter;
