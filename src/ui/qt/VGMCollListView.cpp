@@ -10,10 +10,6 @@
 #include "QtVGMRoot.h"
 #include "VGMColl.h"
 
-//FIXME: Remove arbitrary values
-const int cellWidth = 200;
-const int cellHeight = 20;
-
 /*
  * VGMCollListViewModel
  */
@@ -48,11 +44,12 @@ VGMCollListView::VGMCollListView(QWidget *parent)
         : QListView(parent)
 {
     VGMCollListViewModel *vgmCollListViewModel = new VGMCollListViewModel(this);
-    this->setModel(vgmCollListViewModel);
-    this->setSelectionMode(QAbstractItemView::SingleSelection);
-    this->setGridSize(QSize(cellWidth, cellHeight));
-    this->setWrapping(true);
-    this->setContextMenuPolicy(Qt::CustomContextMenu);
+    setModel(vgmCollListViewModel);
+    setSelectionMode(QAbstractItemView::SingleSelection);
+    setResizeMode(QListView::Adjust);
+    setWrapping(true);
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    setIconSize(QSize(16, 16));
 
     connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollListView::CollMenu);
 }

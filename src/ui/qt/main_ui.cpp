@@ -5,6 +5,7 @@
 */
 
 #include <QApplication>
+#include <QTextStream>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 
@@ -18,13 +19,10 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setApplicationName(QStringLiteral("vgmtrans"));
 
   QApplication app(argc, argv);
-
-  /*qApp->setStyleSheet("QSplitter::handle{background-color: #B8B8B8;}");
-    QFile file(":/qdarkstyle/style.qss");
-    file.open(QFile::ReadOnly);
-    QString styleSheet = QLatin1String(file.readAll());
-    qApp->setStyleSheet(styleSheet);
-    */
+  QFile f(":qdarkstyle/style.qss");
+  f.open(QFile::ReadOnly | QFile::Text);
+  QTextStream ts(&f);
+  app.setStyleSheet(ts.readAll());
     
   qtVGMRoot.Init();
   MainWindow window;

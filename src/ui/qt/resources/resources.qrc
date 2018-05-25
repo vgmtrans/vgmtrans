@@ -14,6 +14,5 @@
     <file>images/pause-32.png</file>
     <file>images/stop-32.png</file>
     <file>images/open-32.png</file>
-    <file>qss/default.qss</file>
 </qresource>
 </RCC>
