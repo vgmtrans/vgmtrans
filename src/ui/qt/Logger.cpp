@@ -9,7 +9,7 @@
 #include "Logger.h"
 
 Logger::Logger(QWidget* parent) : QDockWidget(parent) {
-  setWindowTitle(tr("Log"));
+  setWindowTitle("Log");
   setAllowedAreas(Qt::AllDockWidgetAreas);
 
   CreateElements();

@@ -39,11 +39,11 @@ void HexView::paintEvent(QPaintEvent *event) {
     int hexview_firstline = verticalScrollBar()->value();
     int lastLine = hexview_firstline + hexview_lines_per_screen;
     QChar null_char = QChar('0');
-  
+
     const auto begin_offset = ui_hexview_vgmfile->dwOffset;
     const int hexview_font_width = painter.fontMetrics().averageCharWidth();
 
-    painter.drawText(hor_padding, y + hexview_line_ascent, tr("Offset (h)"));
+    painter.drawText(hor_padding, y + hexview_line_ascent, "Offset (h)");
     for(int i = 0; i < 16; i++) {
       painter.drawText(hor_padding + ((10 + 3 * i) * hexview_font_width), y, 3 * hexview_font_width,
                        hexview_line_height, Qt::AlignCenter, QString(i).toLatin1().toHex());
