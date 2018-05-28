@@ -88,7 +88,10 @@ void MainWindow::RouteSignals() {
 }
 
 void MainWindow::OpenFile() {
-  qtVGMRoot.OpenRawFile(qtVGMRoot.UI_GetOpenFilePath());
+  auto filename = qtVGMRoot.UI_GetOpenFilePath();
+  
+  if(!filename.empty())
+    qtVGMRoot.OpenRawFile(filename);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
