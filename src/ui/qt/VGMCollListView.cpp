@@ -31,7 +31,7 @@ QVariant VGMCollListViewModel::data ( const QModelIndex & index, int role ) cons
         return QString::fromStdWString(*qtVGMRoot.vVGMColl[index.row()]->GetName());
     }
     else if (role == Qt::DecorationRole) {
-        return QIcon(":/images/music_folder-32.png");
+        return QIcon(":/images/collection-32.png");
     }
     return QVariant();
 }

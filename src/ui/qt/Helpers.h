@@ -1,3 +1,9 @@
+/*
+* VGMTrans (c) 2018
+* Licensed under the zlib license,
+* refer to the included LICENSE.txt file
+*/
+
 #ifndef VGMTRANS_HELPERS_H
 #define VGMTRANS_HELPERS_H
 
