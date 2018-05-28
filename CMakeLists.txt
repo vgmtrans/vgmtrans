@@ -26,6 +26,7 @@ endif()
 
 # Set platform-specific flags
 if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+
   add_compile_options(/permissive-)
   add_compile_options(/Zc:inline)
   add_compile_options(/Zc:throwingNew)
@@ -73,6 +74,7 @@ endif()
 # IDE support
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# CMake utils
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
     ${CMAKE_SOURCE_DIR}/cmake)
 
@@ -103,7 +105,7 @@ include_directories(${INCLUDE_DIRS})
 
 find_package(Qt5 REQUIRED COMPONENTS Gui Widgets)
 set_property(TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_FEATURES "")
-message(STATUS "Will use system Qt ${Qt5Core_VERSION}")
+message(STATUS "Using use system Qt ${Qt5Core_VERSION}")
 
 set(CMAKE_AUTOMOC ON)
 set(RESOURCE_PATH
@@ -113,15 +115,9 @@ set(RESOURCE_PATH
 qt5_add_resources(UI_RESOURCES ${RESOURCE_PATH})
 
 find_package(ZLIB)
-if(ZLIB_FOUND)
-  message(STATUS "Will use system zlib ${ZLIB_VERSION_STRING}")
-  find_package(MINIZIP)
-  if(MINIZIP_FOUND)
-    message(STATUS "Will use system minizip")
-  else()
-    message(STATUS "Will use static minizip")
-	add_subdirectory(lib/zlib/minizip)
-  endif()
+find_package(MINIZIP)
+if(ZLIB_FOUND AND MINIZIP_FOUND)
+  message(STATUS "Using system zlib ${ZLIB_VERSION_STRING} and minizip")
 else()
   message(STATUS "Using static zlib and minizip")
   add_subdirectory(lib/zlib)
@@ -129,7 +125,6 @@ endif()
 
 message(STATUS "Using static TinyXML")
 add_subdirectory(lib/tinyxml)
-
 add_definitions(-DTIXML_USE_STL)
 
 ##################################
