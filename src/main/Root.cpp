@@ -289,7 +289,7 @@ bool VGMRoot::SaveAllAsRaw() {
     for (uint32_t i = 0; i < vVGMFile.size(); i++) {
       bool result;
       VGMFile *file = vVGMFile[i];
-      wstring filepath = dirpath + L"\\" + file->GetName()->c_str();
+      wstring filepath = dirpath + L"/" + file->GetName()->c_str();
       uint8_t *buf = new uint8_t[file->unLength];        //create a buffer the size of the file
       file->GetBytes(file->dwOffset, file->unLength, buf);
       result = UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);

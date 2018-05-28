@@ -555,7 +555,7 @@ bool VGMColl::OnSaveAllDLS() {
   wstring dirpath = pRoot->UI_GetSaveDirPath();
   if (dirpath.length() != 0) {
     DLSFile dlsfile;
-    wstring filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".dls";
+    wstring filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".dls";
     if (CreateDLSFile(dlsfile)) {
       if (!dlsfile.SaveDLSFile(filepath))
         pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
@@ -564,7 +564,7 @@ bool VGMColl::OnSaveAllDLS() {
       pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"), LOG_LEVEL_ERR, L"VGMColl"));
 
     if (this->seq != nullptr) {
-      filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
+      filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".mid";
       if (!this->seq->SaveAsMidi(filepath))
         pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
     }
@@ -575,7 +575,7 @@ bool VGMColl::OnSaveAllDLS() {
 bool VGMColl::OnSaveAllSF2() {
   wstring dirpath = pRoot->UI_GetSaveDirPath();
   if (dirpath.length() != 0) {
-    wstring filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".sf2";
+    wstring filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".sf2";
     SF2File *sf2file = CreateSF2File();
     if (sf2file != NULL) {
       if (!sf2file->SaveSF2File(filepath))
@@ -586,7 +586,7 @@ bool VGMColl::OnSaveAllSF2() {
       pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"), LOG_LEVEL_ERR, L"VGMColl"));
 
     if (this->seq != nullptr) {
-      filepath = dirpath + L"\\" + ConvertToSafeFileName(this->name) + L".mid";
+      filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".mid";
       if (!this->seq->SaveAsMidi(filepath))
         pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
     }
