@@ -47,9 +47,10 @@ VGMFileListView::VGMFileListView(QWidget *parent)
         : QListView(parent)
 {
     VGMFileListViewModel *vgmFileListViewModel = new VGMFileListViewModel(this);
-    this->setModel(vgmFileListViewModel);
-    this->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    this->setContextMenuPolicy(Qt::CustomContextMenu);
+    setModel(vgmFileListViewModel);
+    setSelectionMode(QAbstractItemView::ExtendedSelection);
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    setIconSize(QSize(16, 16));
 
     connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::ItemMenu);
     connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::doubleClickedSlot);
@@ -93,7 +94,7 @@ void VGMFileListView::keyPressEvent(QKeyEvent* input)
     case Qt::Key_Delete:
     case Qt::Key_Backspace:
     {
-      QModelIndexList list = this->selectionModel()->selectedIndexes();
+      QModelIndexList list = selectionModel()->selectedIndexes();
 
       if(list.isEmpty())
         return;

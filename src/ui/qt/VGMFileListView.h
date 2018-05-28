@@ -4,14 +4,14 @@
 * refer to the included LICENSE.txt file
 */
 
+#ifndef __VGMFileListView_H_
+#define __VGMFileListView_H_
+
 #include <QAbstractListModel>
 #include <QEvent>
 #include <QListView>
 
 #include "VGMFileView.h"
-
-#ifndef __VGMFileListView_H_
-#define __VGMFileListView_H_
 
 
 class VGMFileListViewModel : public QAbstractListModel
