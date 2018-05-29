@@ -70,10 +70,13 @@ void RawFileListView::keyPressEvent(QKeyEvent * input) {
   // On Backspace or Delete keypress, remove all selected files
   switch(input->key()) {
     case Qt::Key_Delete:
-    case Qt::Key_Backspace:
-    {
+    case Qt::Key_Backspace: {
       DeleteRawFiles();
     }
+
+    // Pass the event back to the base class, needed for keyboard navigation
+    default:
+      QListView::keyPressEvent(input);
   }
 
 }

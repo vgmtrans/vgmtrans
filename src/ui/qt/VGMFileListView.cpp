@@ -92,8 +92,7 @@ void VGMFileListView::keyPressEvent(QKeyEvent* input)
 {
   switch(input->key()) {
     case Qt::Key_Delete:
-    case Qt::Key_Backspace:
-    {
+    case Qt::Key_Backspace: {
       QModelIndexList list = selectionModel()->selectedIndexes();
 
       if(list.isEmpty())
@@ -111,6 +110,10 @@ void VGMFileListView::keyPressEvent(QKeyEvent* input)
 
       return;
     }
+
+    // Pass the event back to the base class, needed for keyboard navigation
+    default:
+      QListView::keyPressEvent(input);
   }
 }
 
@@ -125,5 +128,6 @@ void VGMFileListView::doubleClickedSlot(QModelIndex index)
   vgmFileView->setAttribute(Qt::WA_DeleteOnClose);
 
   AddMdiTab(vgmFileView, Qt::SubWindow);
+
   vgmFileView->show();
 }
