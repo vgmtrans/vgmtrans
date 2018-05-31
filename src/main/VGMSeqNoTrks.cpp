@@ -44,6 +44,8 @@ bool VGMSeqNoTrks::LoadMain() {
 }
 
 bool VGMSeqNoTrks::LoadEvents(long stopTime) {
+
+  ResetVisitedAddresses();
   ResetVars();
   if (bAlwaysWriteInitialTempo)
     AddTempoBPMNoItem(initialTempoBPM);
@@ -146,5 +148,13 @@ void VGMSeqNoTrks::AddTime(uint32_t delta) {
   if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
     for (uint32_t i = 0; i < midiTracks.size(); i++)
       midiTracks[i]->AddDelta(delta);
+  }
+}
+
+void VGMSeqNoTrks::SetTime(uint32_t delta) {
+  VGMSeq::time = delta;
+  if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
+    for (uint32_t i = 0; i < midiTracks.size(); i++)
+      midiTracks[i]->SetDelta(delta);
   }
 }

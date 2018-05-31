@@ -328,6 +328,7 @@ void DLSArt::Write(vector<uint8_t> &buf) {
 
 void DLSArt::AddADSR(long attack_time,
                      uint16_t atk_transform,
+                     long hold_time,
                      long decay_time,
                      long sustain_lev,
                      long release_time,
@@ -338,6 +339,12 @@ void DLSArt::AddADSR(long attack_time,
                                          CONN_DST_EG1_ATTACKTIME,
                                          atk_transform,
                                          attack_time));
+  aConnBlocks.insert(aConnBlocks.end(),
+                     new ConnectionBlock(CONN_SRC_NONE,
+                                         CONN_SRC_NONE,
+                                         CONN_DST_EG1_HOLDTIME,
+                                         CONN_TRN_NONE,
+                                         hold_time));
   aConnBlocks.insert(aConnBlocks.end(),
                      new ConnectionBlock(CONN_SRC_NONE,
                                          CONN_SRC_NONE,

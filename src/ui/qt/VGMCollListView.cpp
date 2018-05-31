@@ -5,6 +5,7 @@
 #include <qdebug.h>
 #include <qevent.h>
 #include "SF2File.h"
+#include "DLSFile.h"
 #include "VGMSeq.h"
 #include "VGMCollListView.h"
 #include "QtUICallbacks.h"
@@ -22,29 +23,29 @@ const int cellHeight = 20;
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent)
         : QAbstractListModel(parent)
 {
-    QObject::connect(&qtUICallbacks, SIGNAL(UI_AddedVGMColl()), this, SLOT(changedVGMColls()));
-    QObject::connect(&qtUICallbacks, SIGNAL(UI_RemovedVGMColl()), this, SLOT(changedVGMColls()));
+  QObject::connect(&qtUICallbacks, SIGNAL(UI_AddedVGMColl()), this, SLOT(changedVGMColls()));
+  QObject::connect(&qtUICallbacks, SIGNAL(UI_RemovedVGMColl()), this, SLOT(changedVGMColls()));
 }
 
 int VGMCollListViewModel::rowCount ( const QModelIndex & parent) const
 {
-    return core.vVGMColl.size();
+  return core.vVGMColl.size();
 }
 
 QVariant VGMCollListViewModel::data ( const QModelIndex & index, int role ) const
 {
-    if (role == Qt::DisplayRole) {
-        return QString::fromStdWString(*core.vVGMColl[index.row()]->GetName());
-    }
-    else if (role == Qt::DecorationRole) {
-        return QIcon(":/images/music_folder-32.png");
-    }
-    return QVariant();
+  if (role == Qt::DisplayRole) {
+    return QString::fromStdWString(*core.vVGMColl[index.row()]->GetName());
+  }
+  else if (role == Qt::DecorationRole) {
+    return QIcon(":/images/music_folder-32.png");
+  }
+  return QVariant();
 }
 
 void VGMCollListViewModel::changedVGMColls()
 {
-    emit dataChanged(index(0, 0), index(0, 0));
+  emit dataChanged(index(0, 0), index(0, 0));
 }
 
 
@@ -55,50 +56,83 @@ void VGMCollListViewModel::changedVGMColls()
 VGMCollListView::VGMCollListView(QWidget *parent)
         : QListView(parent)
 {
-    setAttribute(Qt::WA_MacShowFocusRect, 0);
+  setAttribute(Qt::WA_MacShowFocusRect, 0);
 
-    VGMCollListViewModel *vgmCollListViewModel = new VGMCollListViewModel(this);
-    setModel(vgmCollListViewModel);
-    setSelectionMode(QAbstractItemView::SingleSelection);
-    setGridSize(QSize(cellWidth, cellHeight));
-    setWrapping(true);
+  VGMCollListViewModel *vgmCollListViewModel = new VGMCollListViewModel(this);
+  setModel(vgmCollListViewModel);
+  setSelectionMode(QAbstractItemView::SingleSelection);
+  setGridSize(QSize(cellWidth, cellHeight));
+  setWrapping(true);
 //    this->setViewMode(QListView::IconMode);
 //    this->setFlow(QListView::LeftToRight);
 //    this->setSelectionRectVisible(true);
 }
 
+void VGMCollListView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
+
+
+}
+
+
 void VGMCollListView::keyPressEvent(QKeyEvent* e)
 {
-    // On a spacebar key press, play the selected collection
-    if( e->key() == Qt::Key_Space)
-    {
-        QModelIndexList list = this->selectionModel()->selectedIndexes();
-        if (list.size() == 0 || list[0].row() >= core.vVGMColl.size())
-            return;
+  // On a spacebar key press, play the selected collection
+  if( e->key() == Qt::Key_Space)
+  {
+    QModelIndexList list = this->selectionModel()->selectedIndexes();
+    if (list.size() == 0 || list[0].row() >= core.vVGMColl.size())
+      return;
 
-        VGMColl* coll = core.vVGMColl[list[0].row()];
-        VGMSeq* seq = coll->GetSeq();
-        SF2File* sf2 = coll->CreateSF2File();
-        MidiFile* midi = seq->ConvertToMidi();
+    VGMColl* coll = core.vVGMColl[list[0].row()];
+    VGMSeq* seq = coll->GetSeq();
+    SF2File* sf2 = coll->CreateSF2File();
+    MidiFile* midi = seq->ConvertToMidi();
 
-        midi->SaveMidiFile(L"test.mid");
+    std::vector<uint8_t> midiBuf;
+    midi->WriteMidiToBuffer(midiBuf);
 
-        std::vector<uint8_t> midiBuf;
-        midi->WriteMidiToBuffer(midiBuf);
+    const void* rawSF2 = sf2->SaveToMem();
 
-        const void* rawSF2 = sf2->SaveToMem();
+    qDebug() << "Gonna play us some music";
+    MusicPlayer& musicPlayer = MusicPlayer::getInstance();
 
-        qDebug() << "Gonna play us some music";
-        MusicPlayer& musicPlayer = MusicPlayer::getInstance();
+    musicPlayer.Stop();
+    musicPlayer.LoadSF2(rawSF2);
+    musicPlayer.Play(&midiBuf[0], midiBuf.size());
 
-        musicPlayer.Stop();
-        musicPlayer.LoadSF2(rawSF2);
-        musicPlayer.Play(&midiBuf[0], midiBuf.size());
+    delete[] rawSF2;
+    delete sf2;
+    delete midi;
+  }
+  else if (e->key() == Qt::Key_S) {
+    QModelIndexList list = this->selectionModel()->selectedIndexes();
+    if (list.size() == 0 || list[0].row() >= core.vVGMColl.size())
+      return;
 
-        delete[] rawSF2;
-        delete sf2;
-        delete midi;
-    }
-    else
-        QListView::keyPressEvent(e);
+    VGMColl* coll = core.vVGMColl[list[0].row()];
+    VGMSeq* seq = coll->GetSeq();
+    SF2File* sf2 = coll->CreateSF2File();
+    DLSFile dls;
+    coll->CreateDLSFile(dls);
+    MidiFile* midi = seq->ConvertToMidi();
+
+    wstring filename = *coll->GetName() + L".mid";
+    midi->SaveMidiFile(filename);
+    filename = *coll->GetName() + L".sf2";
+    sf2->SaveSF2File(filename);
+    filename = *coll->GetName() + L".dls";
+    dls.SaveDLSFile(filename);
+
+  }
+  else
+    QListView::keyPressEvent(e);
+}
+
+
+void VGMCollListView::resizeEvent(QResizeEvent *event)
+{
+  QListView::resizeEvent(event);
+
+  this->doItemsLayout();
+
 }

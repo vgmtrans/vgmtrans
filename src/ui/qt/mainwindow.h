@@ -1,5 +1,4 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#pragma once
 
 #include <QMainWindow>
 #include <QSplitter.h>
@@ -12,10 +11,12 @@
 class MenuBar;
 class ToolBar;
 class HeaderContainer;
+class VGMCollSplitter;
+
 
 class MainWindow final : public QMainWindow
 {
-  Q_OBJECT
+ Q_OBJECT
 
  public:
   explicit MainWindow(QWidget *parent = 0);
@@ -43,7 +44,7 @@ class MainWindow final : public QMainWindow
   QListView* rawFileListView;
   QListView* vgmFileListView;
   QListView* vgmCollListView;
-  QListView* collListView;
+  VGMCollSplitter* collSplitter;
   HeaderContainer* vgmFileListContainer;
   HeaderContainer* rawFileListContainer;
 
@@ -52,6 +53,5 @@ class MainWindow final : public QMainWindow
   void dropEvent(QDropEvent *event);
 };
 
-#endif // MAINWINDOW_H
 
 

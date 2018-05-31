@@ -278,21 +278,36 @@ bool CPSTrackV1::ReadEvent(void) {
           curOffset++;
         }
 
-        short jump;
-        if ((GetByte(curOffset) & 0x80) == 0)
-          jump = -GetByte(curOffset++);
-        else {
+        uint32_t jump;
+        if (((CPSSeq *) parentSeq)->fmt_version <= VER_CPS1_425) {
           jump = GetShortBE(curOffset);
           curOffset += 2;
+
+          // sf2ce seq 0x84 seems to have a bug at D618
+          // where it jumps to offset 0. verified with mame debugger.
+          if (jump == 0) {
+            return false;
+          }
         }
+        else {
+          if ((GetByte(curOffset) & 0x80) == 0)
+            jump = curOffset - GetByte(curOffset++);
+          else {
+            jump = curOffset + 2 + (int16_t)GetShortBE(curOffset);
+            curOffset += 2;
+          }
+        }
+
         AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop", L"", CLR_LOOP);
 
         if (loop[loopNum] == 0) {
           bInLoop = false;
           loopOffset[loopNum] = 0;
         }
-        else
-          curOffset += jump;
+        else {
+          printf("%X JUMPING TO %X\n", curOffset, jump);
+          curOffset = jump;
+        }
         break;
 
       case 0x12 :
@@ -317,9 +332,17 @@ bool CPSTrackV1::ReadEvent(void) {
           noteState &= 0x97;
           noteState |= GetByte(curOffset++);
           {
-            short jump = (GetByte(curOffset++) << 8) + GetByte(curOffset++);
+            uint16_t jump = GetShortBE(curOffset);
+            curOffset += 2;
             AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Break", L"", CLR_LOOP);
-            curOffset += jump;
+
+            printf("%X LOOP BREAK JUMPING TO %X\n", curOffset, jump);
+            if (((CPSSeq *) parentSeq)->fmt_version <= VER_CPS1_425) {
+              curOffset = jump;
+            }
+            else {
+              curOffset += (int16_t)jump;
+            }
           }
         }
         else
@@ -328,11 +351,21 @@ bool CPSTrackV1::ReadEvent(void) {
 
       // Loop Always
       case 0x16 : {
-        short jump = (GetByte(curOffset++) << 8) + GetByte(curOffset++);
+
+        uint32_t jump;
+        if (((CPSSeq *) parentSeq)->fmt_version <= VER_CPS1_425) {
+          jump = GetShortBE(curOffset);
+        }
+        else {
+          jump = curOffset + 2 + (short)GetShortBE(curOffset);
+        }
+
+        printf("%X LOOP ALWAYS JUMPING TO %X\n", curOffset, jump);
+//        curOffset += 2;
         bool bResult = AddLoopForever(beginOffset, 3);
-        curOffset += jump;
+        curOffset = jump;
+
         return bResult;
-        break;
       }
 
       case 0x17 :

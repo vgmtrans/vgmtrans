@@ -11,7 +11,7 @@ using namespace std;
 //  **********************************************************************************
 
 SynthFile::SynthFile(string synth_name)
-    : name(synth_name) {
+    : name(synth_name), useReverb(false) {
 
 }
 
@@ -141,10 +141,11 @@ SynthArt::~SynthArt() {
   //DeleteVect(vConnBlocks);
 }
 
-void SynthArt::AddADSR(double attack, Transform atk_transform, double decay, double sustain_level,
+void SynthArt::AddADSR(double attack, Transform atk_transform, double hold, double decay, double sustain_level,
                        double sustain, double release, Transform rls_transform) {
   this->attack_time = attack;
   this->attack_transform = atk_transform;
+  this->hold_time = hold;
   this->decay_time = decay;
   this->sustain_lev = sustain_level;
   this->sustain_time = sustain;

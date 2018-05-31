@@ -116,6 +116,15 @@ bool CPS2SampleInfoTable::LoadMain() {
     info.loop_offset =  (bank << 16) | loop_offset;
     info.end_addr =  (uint32_t)end_addr + ((end_addr == 0) ? (bank + 1) << 16 : bank << 16);
     info.unity_key = unity_key;
+
+    // D&D SOM has a sample with end_addr < start addr at index 290.
+    if (info.start_addr > info.end_addr) {
+      info.end_addr = info.start_addr;
+    }
+    if (info.loop_offset < info.start_addr ||
+        info.loop_offset > info.end_addr) {
+      info.loop_offset = info.end_addr;
+    }
   }
 
   return true;
@@ -241,18 +250,23 @@ bool CPSInstrSet::GetInstrPointers() {
           // For each bank, iterate over all instr ptrs and create instruments
           uint32_t instrPtrTableEnd = GetShortBE(bankOff) + bankOff;
           uint8_t instrNum = 0;
-          for (uint32_t instrPtrOff = bankOff; instrPtrOff < instrPtrTableEnd && GetShort(instrPtrOff) != 0; instrPtrOff += 2) {
-
-            uint32_t instrPtr = GetShortBE(instrPtrOff) + bankOff;
+//          for (uint32_t instrPtrOff = bankOff; instrPtrOff < instrPtrTableEnd && GetShort(instrPtrOff) != 0; instrPtrOff += 2) {
+          for (uint8_t j = 0; j < 128; j++) {
+            uint16_t instrPtrOffset = GetShortBE(bankOff + (j*2));
+            uint32_t instrPtr = instrPtrOffset + bankOff;
+            if (instrPtrOffset == 0) {
+              continue;
+            }
 
             std::wostringstream ss;
-            ss << L"Instrument " << totalInstrs << instrNum;
+            ss << L"Instrument " << j << " bank " << bank;
             wstring name = ss.str();
-            aInstrs.push_back(new CPSInstr(this, instrPtr, 0, (uint32_t)(bank * 2) + (instrNum / 128), (uint32_t)(instrNum % 128), name));
+//            aInstrs.push_back(new CPSInstr(this, instrPtr, 0, (uint32_t)(bank * 2) + (i / 128), (uint32_t)(instrNum % 128), name));
+            aInstrs.push_back(new CPSInstr(this, instrPtr, 0, bank*2, j, name));
 
             instrNum++;
           }
-          totalInstrs += instrNum;
+//          totalInstrs += 128;//instrNum;
 
         continue;
       }
@@ -526,8 +540,8 @@ bool CPSSampColl::GetSampleInfo() {
       newSamp->SetLoopStatus(true);
       newSamp->SetLoopOffset(relativeLoopOffset);
       newSamp->SetLoopLength(sampLength - relativeLoopOffset);
-      newSamp->unityKey = sampInfo.unity_key;
     }
+    newSamp->unityKey = sampInfo.unity_key;
   }
   return true;
 }

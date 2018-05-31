@@ -7,6 +7,9 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent)
 {
     this->setModel(&model);
 
+    setAttribute(Qt::WA_MacShowFocusRect, 0);
+
+
 }
 
 VGMFileTreeView::~VGMFileTreeView()

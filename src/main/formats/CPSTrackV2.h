@@ -47,6 +47,7 @@ enum CPSv2SeqEventType {
   EVENT_E5,
   EVENT_E6,
   EVENT_E7,
+  EVENT_E8,
   FF_END = 0XFF,
 };
 

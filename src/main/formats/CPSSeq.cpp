@@ -35,15 +35,17 @@ bool CPSSeq::GetHeaderInfo(void) {
 
 
 bool CPSSeq::GetTrackPointers(void) {
-  // Hack for D&D Shadow over Mystara...
-  if (GetByte(dwOffset) == 0x92)
+  // CPS1 games sometimes have this set. Suggests 4 byte seq.
+  // Oddly, some tracks have first byte set to 0x92 in D&D Shadow Over Mystara
+  if ((GetByte(dwOffset) & 0x80) > 0)
     return false;
 
   this->AddHeader(dwOffset, 1, L"Sequence Flags");
   VGMHeader *header = this->AddHeader(dwOffset + 1, GetShortBE(dwOffset + 1) - 1, L"Track Pointers");
 
+  const int maxTracks = fmt_version <= VER_CPS1_502 ? 12 : 16;
 
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < maxTracks; i++) {
     uint32_t offset = GetShortBE(dwOffset + 1 + i * 2);
     if (offset == 0) {
       header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, L"No Track");
@@ -55,6 +57,9 @@ bool CPSSeq::GetTrackPointers(void) {
     SeqTrack *newTrack;
 
     switch (fmt_version) {
+      case VER_CPS1_200 ... VER_CPS1_425:
+        newTrack = new CPSTrackV1(this, offset);
+        break;
       case VER_201B ... VER_CPS3:
         newTrack = new CPSTrackV2(this, offset + dwOffset);
         break;

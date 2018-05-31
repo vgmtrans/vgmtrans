@@ -13,8 +13,8 @@ enum LoadMethod {
 
 using namespace std;
 
-typedef struct _MAMERomGroupEntry {
-  _MAMERomGroupEntry() : file(NULL) { }
+struct MAMERomGroup {
+  MAMERomGroup() : file(NULL) { }
   template<class T>
   bool GetAttribute(const std::string &attrName, T *out) {
     string strValue = attributes[attrName];
@@ -32,20 +32,20 @@ typedef struct _MAMERomGroupEntry {
   std::map<const std::string, std::string> attributes;
   std::list<std::string> roms;
   VirtFile *file;
-} MAMERomGroupEntry;
+};
 
-typedef struct _MAMEGameEntry {
-  _MAMEGameEntry() { }
-  MAMERomGroupEntry *GetRomGroupOfType(const std::string &strType);
+struct MAMEGame {
+  MAMEGame() { }
+  MAMERomGroup *GetRomGroupOfType(const std::string &strType);
 
   std::string name;
   std::string format;
   std::string fmt_version_str;
   //map<const std::string, const std::string> attributes;
-  std::list<MAMERomGroupEntry> romgroupentries;
-} MAMEGameEntry;
+  std::list<MAMERomGroup> romgroupentries;
+};
 
-typedef std::map<std::string, MAMEGameEntry *> GameMap;
+typedef std::map<std::string, MAMEGame *> GameMap;
 
 
 class MAMELoader:
@@ -55,12 +55,12 @@ class MAMELoader:
   ~MAMELoader();
   virtual PostLoadCommand Apply(RawFile *theFile);
  private:
-  VirtFile *LoadRomGroup(MAMERomGroupEntry *romgroupentry, const std::string &format, unzFile &cur_file);
+  VirtFile *LoadRomGroup(MAMERomGroup *romgroupentry, const std::string &format, unzFile &cur_file);
   void DeleteBuffers(std::list<std::pair<uint8_t *, uint32_t>> &buffers);
  private:
   int LoadXML();
-  MAMEGameEntry *LoadGameEntry(TiXmlElement *gameElmt);
-  int LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGameEntry *gameentry);
+  MAMEGame *LoadGameEntry(TiXmlElement *gameElmt);
+  int LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentry);
 
  private:
   GameMap gamemap;

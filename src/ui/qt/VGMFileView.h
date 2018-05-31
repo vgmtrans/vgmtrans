@@ -1,5 +1,4 @@
-#ifndef VGMTRANS_BREAKDOWNVIEW_H
-#define VGMTRANS_BREAKDOWNVIEW_H
+#pragma once
 
 #include <QMainWindow>
 #include <qsplitter.h>
@@ -19,10 +18,6 @@ public:
 
 
 protected:
-    QSplitter *horzSplitter;
     HexView *hexView;
     VGMFileTreeView *treeView;
 };
-
-
-#endif //VGMTRANS_BREAKDOWNVIEW_H

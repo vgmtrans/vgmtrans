@@ -15,7 +15,7 @@
 #include "ToolBar.h"
 #include "RawFileListView.h"
 #include "VGMFileListView.h"
-#include "VGMCollListView.h"
+#include "VGMCollSplitter.h"
 #include "HeaderContainer.h"
 #include "MdiArea.h"
 #include "MusicPlayer.h"
@@ -31,7 +31,7 @@ const int defaultCollListHeight = 140;
 const int defaultFileListWidth = 200;
 
 MainWindow::MainWindow(QWidget *parent)
-        : QMainWindow(parent)
+    : QMainWindow(parent)
 {
   setWindowTitle("VGMTrans");
   setUnifiedTitleAndToolBarOnMac(true);
@@ -52,10 +52,9 @@ void MainWindow::CreateComponents()
   toolBar = new ToolBar(this);
   rawFileListView = new RawFileListView();
   vgmFileListView = new VGMFileListView();
-  vgmCollListView = new VGMCollListView();
+  collSplitter = new VGMCollSplitter(Qt::Horizontal, this);
   rawFileListContainer = new HeaderContainer(rawFileListView, "Imported Files");
   vgmFileListContainer = new HeaderContainer(vgmFileListView, "Detected VGM Files");
-
 
   vertSplitter = new QSplitter(Qt::Vertical, this);
   horzSplitter = new QSplitter(Qt::Horizontal, vertSplitter);
@@ -66,7 +65,7 @@ void MainWindow::SetupSplitters()
 {
   QList<int> sizes({defaultWindowHeight - defaultCollListHeight, defaultCollListHeight});
   vertSplitter->addWidget(horzSplitter);
-  vertSplitter->addWidget(vgmCollListView);
+  vertSplitter->addWidget(collSplitter);
   vertSplitter->setStretchFactor(0, 1);
   vertSplitter->setSizes(sizes);
 
@@ -175,19 +174,19 @@ void MainWindow::dropEvent(QDropEvent *event)
   const QMimeData *mimeData = event->mimeData();
 
   if (mimeData->hasText()) {
-      std::string utf8_text = mimeData->text().toUtf8().constData();
-      printf(utf8_text.c_str());
+    std::string utf8_text = mimeData->text().toUtf8().constData();
+    printf(utf8_text.c_str());
   }
   if (mimeData->hasUrls()) {
-      QList<QUrl> urlList = mimeData->urls();
-      int urlSize = urlList.size();
-      printf("%d", urlSize);
-      QString text;
-      for (int i = 0; i < urlList.size(); ++i) {
-          QString url = urlList.at(i).toLocalFile();
-          core.OpenRawFile(url.toStdWString());
-      }
-      printf(text.toUtf8().constData());
+    QList<QUrl> urlList = mimeData->urls();
+    int urlSize = urlList.size();
+    printf("%d", urlSize);
+    QString text;
+    for (int i = 0; i < urlList.size(); ++i) {
+      QString url = urlList.at(i).toLocalFile();
+      core.OpenRawFile(url.toStdWString());
+    }
+    printf(text.toUtf8().constData());
   }
 
   setBackgroundRole(QPalette::Dark);

@@ -239,6 +239,7 @@ void VGMSeq::LoadTracksMain(long stopTime) {
     // load track by track
     for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
       time = initialTime;
+//      printf("LOADING TRACK %d at %X\n", trackNum, aTracks[trackNum]->dwOffset);
 
       aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime);
       aTracks[trackNum]->active = false;

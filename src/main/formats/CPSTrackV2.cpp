@@ -305,9 +305,15 @@ bool CPSTrackV2::ReadEvent(void) {
       AddUnknown(beginOffset, curOffset-beginOffset);
       break;
 
-      // NEW IN CPS3 (maybe sfiii2 specifically)
+    // NEW IN CPS3 (maybe sfiii2 specifically)
     case EVENT_E7:
       curOffset++;
+      AddUnknown(beginOffset, curOffset-beginOffset);
+      break;
+
+    // NEW IN CPS3 (maybe sfiii3 specifically)
+    case EVENT_E8:
+      curOffset += 2;
       AddUnknown(beginOffset, curOffset-beginOffset);
       break;
 

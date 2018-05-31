@@ -37,6 +37,7 @@ class SynthFile {
  public:
   std::vector<SynthInstr *> vInstrs;
   std::vector<SynthWave *> vWaves;
+  bool useReverb;
   std::string name;
 };
 
@@ -98,13 +99,14 @@ class SynthArt {
   //SynthArt(uint16_t source, uint16_t control, uint16_t destination, uint16_t transform);
   ~SynthArt(void);
 
-  void AddADSR(double attack, Transform atk_transform, double decay, double sustain_lev,
+  void AddADSR(double attack, Transform atk_transform, double hold, double decay, double sustain_lev,
                double sustain_time, double release_time, Transform rls_transform);
   void AddPan(double pan);
 
   double pan;                // -100% = left channel 100% = right channel 0 = 50/50
 
   double attack_time;        // rate expressed as seconds from 0 to 100% level
+  double hold_time;
   double decay_time;        // rate expressed as seconds from 100% to 0% level, even though the sustain level isn't necessarily 0%
   double sustain_lev;        // db of attenuation at sustain level
   double sustain_time;    // this is part of the PSX envelope (and can actually be positive), but is not in DLS or SF2.  from 100 to 0, like release

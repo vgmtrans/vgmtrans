@@ -84,7 +84,7 @@ struct qs_samp_info_cps3 {
   uint32_t unity_key;
 
 //  virtual uint32_t startAddr() override { return htonl(start_addr); }
-//  virtual uint32_t loopOffset() override { return htonl(loop_offset); }
+//  virtual uint32_t loopOffset() override { return htonl(loop_addr); }
 //  virtual uint32_t endAddr() override { return htonl(end_addr); }
 //  virtual uint8_t unityKey() override { return htonl(unity_key); }
 };
@@ -113,9 +113,9 @@ struct qs_samp_info {
   }
 };
 
-// The QSound interrupt clock is set to 251hz in mame.  But the main sound
+// The QSound interrupt clock is set to 250hz in mame.  But the main sound
 // code runs only every 4th tick. (see the "and 3" instruction at 0xF9 in sfa2 code)
-#define QSOUND_TICK_FREQ (1/(251/4.0))
+#define QSOUND_TICK_FREQ (1/(250/4.0))
 
 
 // the tables below are taken from sfa2

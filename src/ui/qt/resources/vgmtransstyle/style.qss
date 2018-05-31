@@ -61,6 +61,14 @@ QScrollBar:vertical
     /*background-color: transparent;*/
 }
 
+QScrollBar::handle:vertical {
+    min-height: 40px;
+}
+
+QScrollBar::handle:horizontal {
+    min-width: 40px;
+}
+
 /*QWidget
 {
     background-color: green;

@@ -7,13 +7,26 @@
 
 using namespace std;
 
-//#define PROG_INFO_TABLE_OFFSET 0x7000
-//#define qs_samp_info_TABLE_OFFSET 0x8000
-
 void CPSScanner::Scan(RawFile *file, void *info) {
-  MAMEGameEntry *gameentry = (MAMEGameEntry *) info;
-  MAMERomGroupEntry *seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
-  MAMERomGroupEntry *sampsRomGroupEntry = gameentry->GetRomGroupOfType("qsound");
+  MAMEGame *gameentry = (MAMEGame *) info;
+  CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
+
+  if (fmt_ver == VER_UNDEFINED) {
+    wstring alert = L"XML entry uses an undefined QSound version: " + string2wstring(gameentry->fmt_version_str);
+    core.AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, L"CPSScanner"));
+    return;
+  }
+
+  switch (fmt_ver) {
+    case VER_CPS1_200 ... VER_CPS1_502:
+      LoadCPS1(gameentry);
+      return;
+    default:
+      break;
+  }
+
+  MAMERomGroup *seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
+  MAMERomGroup *sampsRomGroupEntry = gameentry->GetRomGroupOfType("qsound");
   if (!seqRomGroupEntry || !sampsRomGroupEntry)
     return;
   uint32_t seq_table_offset;
@@ -30,13 +43,6 @@ void CPSScanner::Scan(RawFile *file, void *info) {
       !seqRomGroupEntry->GetAttribute("num_instr_banks", &num_instr_banks))
     return;
   seqRomGroupEntry->GetHexAttribute("samp_table_length", &samp_table_length);
-
-  CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
-  if (fmt_ver == VER_UNDEFINED) {
-    wstring alert = L"XML entry uses an undefined QSound version: " + string2wstring(gameentry->fmt_version_str);
-    core.AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, L"CPSScanner"));
-    return;
-  }
 
   switch (fmt_ver) {
     case VER_100 ... VER_115:
@@ -191,7 +197,91 @@ void CPSScanner::Scan(RawFile *file, void *info) {
   return;
 }
 
+void CPSScanner::LoadCPS1(MAMEGame *gameentry) {
+
+  CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
+
+  MAMERomGroup *seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
+  if (!seqRomGroupEntry)
+    return;
+  uint32_t seq_table_offset;
+  uint32_t seq_table_length;
+  if (!seqRomGroupEntry->file ||
+      !seqRomGroupEntry->GetHexAttribute("seq_table", &seq_table_offset))
+    return;
+
+  if (fmt_ver == VER_UNDEFINED) {
+    wstring alert = L"XML entry uses an undefined QSound version: " + string2wstring(gameentry->fmt_version_str);
+    core.AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, L"CPSScanner"));
+    return;
+  }
+
+  RawFile *programFile = seqRomGroupEntry->file;
+
+  wstring seq_table_name;
+  wostringstream name;
+
+  name.str(L"");
+  name << gameentry->name.c_str() << L" sequence pointer table";
+  seq_table_name = name.str();
+
+  uint8_t ptrsStart;
+  const uint8_t ptrSize = 2;
+
+  switch (fmt_ver) {
+    case VER_CPS1_500: ptrsStart = 2; break;
+    case VER_CPS1_200ff: ptrsStart = 3; break;
+    default: ptrsStart = 4;
+  }
+
+  switch (fmt_ver) {
+    case VER_CPS1_200 ... VER_CPS1_500:
+      seq_table_length = (uint32_t) (programFile->GetByte(seq_table_offset) * 2) + ptrsStart;
+      break;
+    case VER_CPS1_502:
+      seq_table_length = (uint32_t) (programFile->GetShortBE(seq_table_offset) * 2) + ptrsStart;
+      break;
+  }
+
+  unsigned int k = 0;
+  uint32_t seqPointer = 0;
+
+  // Add SeqTable as Miscfile
+  VGMMiscFile *seqTable = new VGMMiscFile(CPSFormat::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
+  if (!seqTable->LoadVGMFile()) {
+    delete seqTable;
+    seqTable = NULL;
+  }
+
+
+  for (k = ptrsStart; (seq_table_length == 0 || k < seq_table_length); k += ptrSize) {
+
+    seqPointer = programFile->GetShortBE(seq_table_offset + k);
+
+    if (seqPointer == 0) {
+      continue;
+    }
+
+    seqTable->AddSimpleItem(seq_table_offset + k, ptrSize, L"Sequence Pointer");
+
+    name.str(L"");
+    name << gameentry->name.c_str() << L" seq " << (k-ptrsStart) / ptrSize;
+    wstring seqName = name.str();
+    CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
+//    printf("LOADING SEQ at %X\n", seqPointer);
+    if (!newSeq->LoadVGMFile()) {
+      delete newSeq;
+    }
+  }
+}
+
 CPSFormatVer CPSScanner::GetVersionEnum(string &versionStr) {
+  if (versionStr == "CPS1_2.00") return VER_CPS1_200;
+  if (versionStr == "CPS1_2.00ff") return VER_CPS1_200ff;
+  if (versionStr == "CPS1_3.50") return VER_CPS1_350;
+  if (versionStr == "CPS1_4.25") return VER_CPS1_425;
+  if (versionStr == "CPS1_5.00") return VER_CPS1_500;
+  if (versionStr == "CPS1_5.02") return VER_CPS1_502;
   if (versionStr == "1.00") return VER_100;
   if (versionStr == "1.01") return VER_101;
   if (versionStr == "1.03") return VER_103;

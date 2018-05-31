@@ -9,6 +9,7 @@
 #include "ScaleConversion.h"
 #include "main/LogItem.h"
 #include "main/Core.h"
+#include "common.h"
 
 using namespace std;
 
@@ -338,6 +339,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
           realAttenuation = (long) (-(ConvertLogScaleValToAtten(rgn->volume) * DLS_DECIBEL_UNIT * 10));
 
         long convAttack = (long) roundi(SecondsToTimecents(rgn->attack_time) * 65536);
+        long convHold = (long) roundi(SecondsToTimecents(rgn->hold_time) * 65536);
         long convDecay = (long) roundi(SecondsToTimecents(rgn->decay_time) * 65536);
         long convSustainLev;
         if (rgn->sustain_level == -1)
@@ -352,7 +354,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
 
         DLSArt *newArt = newRgn->AddArt();
         newArt->AddPan(ConvertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
-        newArt->AddADSR(convAttack, 0, convDecay, convSustainLev, convRelease, 0);
+        newArt->AddADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
 
         newWsmp->SetPitchInfo(realUnityKey, realFineTune, realAttenuation);
       }
@@ -363,7 +365,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
 
 
 SynthFile *VGMColl::CreateSynthFile() {
-  SynthFile *synthfile = new SynthFile("SynthFile"/**this->instrsets[0]->GetName()*/);
+  SynthFile *synthfile = new SynthFile(wstring2string(*GetName()));
 
 
   vector<VGMSamp *> finalSamps;
@@ -542,7 +544,7 @@ SynthFile *VGMColl::CreateSynthFile() {
 
         SynthArt *newArt = newRgn->AddArt();
         newArt->AddPan(rgn->pan);
-        newArt->AddADSR(rgn->attack_time, (Transform) rgn->attack_transform, rgn->decay_time,
+        newArt->AddADSR(rgn->attack_time, (Transform) rgn->attack_transform, rgn->hold_time, rgn->decay_time,
                         sustainLevAttenDb, rgn->sustain_time, rgn->release_time, (Transform) rgn->release_transform);
 
         sampInfo->SetPitchInfo(realUnityKey, realFineTune, attenuation);

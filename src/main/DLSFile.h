@@ -47,6 +47,7 @@ class VGMSamp;
 #define CONN_DST_EG1_RESERVED      0x0208
 #define CONN_DST_EG1_RELEASETIME   0x0209
 #define CONN_DST_EG1_SUSTAINLEVEL  0x020a
+#define CONN_DST_EG1_HOLDTIME      0x020c
 
 /* EG2 Destinations */
 #define CONN_DST_EG2_ATTACKTIME    0x030a
@@ -181,6 +182,7 @@ class DLSArt {
 
   void AddADSR(long attack_time,
                uint16_t atk_transform,
+               long hold_time,
                long decay_time,
                long sustain_lev,
                long release_time,

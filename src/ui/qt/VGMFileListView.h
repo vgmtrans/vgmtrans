@@ -1,14 +1,8 @@
-//
-// Created by Mike on 8/31/14.
-//
+#pragma once
 
 #include <QAbstractListModel>
 #include <QEvent>
 #include <QListView>
-
-#ifndef __VGMFileListView_H_
-#define __VGMFileListView_H_
-
 
 class VGMFileListViewModel : public QAbstractListModel
 {
@@ -40,5 +34,3 @@ public slots:
     void doubleClickedSlot(QModelIndex);
 };
 
-
-#endif //__VGMFileListView_H_

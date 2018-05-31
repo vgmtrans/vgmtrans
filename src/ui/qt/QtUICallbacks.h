@@ -19,6 +19,8 @@ public:
   void UI_AddedVGMColl();
   void UI_RemovedVGMColl();
 
+  void UI_SelectedVGMColl();
+
  private:
   virtual void UI_PreExit();
   virtual void UI_Exit();

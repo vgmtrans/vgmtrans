@@ -47,16 +47,19 @@ void SeqTrack::ResetVars() {
   cKeyCorrection = 0;
 }
 
+void SeqTrack::ResetVisitedAddresses() {
+  VisitedAddresses.clear();
+  VisitedAddresses.reserve(8192);
+  VisitedAddressMax = 0;
+}
+
 
 bool SeqTrack::ReadEvent(void) {
   return false;        //by default, don't add any events, just stop immediately.
 }
 
 bool SeqTrack::LoadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
-  VisitedAddresses.clear();
-  VisitedAddresses.reserve(8192);
-  VisitedAddressMax = 0;
-
+  ResetVisitedAddresses();
   ResetVars();
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (preparedMidiTrack != NULL) {
@@ -904,6 +907,12 @@ void SeqTrack::AddPitchBend(uint32_t offset, uint32_t length, int16_t bend, cons
     AddEvent(new PitchBendSeqEvent(this, bend, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
     pMidiTrack->AddPitchBend(channel, bend);
+}
+
+void SeqTrack::AddPitchBendNoItem(uint16_t bend) {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    pMidiTrack->AddPitchBend(channel, bend);
+  }
 }
 
 void SeqTrack::AddPitchBendRange(uint32_t offset,

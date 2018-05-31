@@ -1,12 +1,7 @@
-//
-// Created by Mike on 8/31/14.
-//
+#pragma once
 
 #include <QAbstractListModel>
 #include <QListView>
-
-#ifndef __VGMCollListViewModel_H_
-#define __VGMCollListViewModel_H_
 
 
 class VGMCollListViewModel : public QAbstractListModel
@@ -29,10 +24,12 @@ public slots:
 class VGMCollListView : public QListView
 {
 public:
-    VGMCollListView(QWidget *parent = 0);
+  VGMCollListView(QWidget *parent = 0);
 
-    void keyPressEvent(QKeyEvent* e);
+  void keyPressEvent(QKeyEvent* e);
+  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
+
+ protected:
+  void resizeEvent(QResizeEvent *event);
+
 };
-
-
-#endif //__VGMCollListViewModel_H_

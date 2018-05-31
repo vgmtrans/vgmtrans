@@ -1,5 +1,10 @@
 <?xml version="1.0" ?>
 <romlist ver="1">
+    <game name="1941" format="CPS" fmt_version="CPS1_2.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1000" >
+            <rom>41_9.12b</rom>
+        </romgroup>
+    </game>
     <game name="1944" format="CPS" fmt_version="1.80">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="9" samp_table="0x6000" artic_table="0x8000">
             <rom>nff.01</rom>
@@ -16,6 +21,11 @@
         <romgroup type="qsound"  load_method="append_swap16">
             <rom>19x.11m</rom>
             <rom>19x.12m</rom>
+        </romgroup>
+    </game>
+    <game name="3wonders" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>rt_9.12b</rom>
         </romgroup>
     </game>
     <game name="armwar" format="CPS" fmt_version="1.05a">
@@ -47,6 +57,24 @@
             <rom>btc.12m</rom>
         </romgroup>
     </game>
+    <game name="burnforc" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>bu1_snd0.bin</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>bu_voi-1.bin</rom>
+        </romgroup>
+    </game>
+    <game name="cawing" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>ca_9.12b</rom>
+        </romgroup>
+    </game>
+    <game name="captcomm" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>cc_09.11a</rom>
+        </romgroup>
+    </game>
     <game name="choko" format="CPS" fmt_version="1.80">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="2" samp_table="0x3D95" artic_table="0x40BD">
             <rom>tko.01</rom>
@@ -71,6 +99,11 @@
             <rom>csc.58</rom>
         </romgroup>
     </game>
+    <game name="cworld2j" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>q5_23.13b</rom>
+        </romgroup>
+    </game>
     <game name="cybots" format="CPS" fmt_version="1.05a">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000" samp_table_length="0x868">
             <rom>cyb.01</rom>
@@ -79,6 +112,17 @@
         <romgroup type="qsound"  load_method="append_swap16">
             <rom>cyb.11m</rom>
             <rom>cyb.12m</rom>
+        </romgroup>
+    </game>
+    <game name="cybsled" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>cy1-snd0.8j</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>cy1-voi0.12b</rom>
+            <rom>cy1-voi1.12c</rom>
+            <rom>cy1-voi2.12d</rom>
+            <rom>cy1-voi3.12e</rom>
         </romgroup>
     </game>
     <game name="ddsom" format="CPS" fmt_version="1.15">
@@ -121,6 +165,24 @@
             <rom>cd-q4.4k</rom>
         </romgroup>
     </game>
+    <game name="dirtfoxj" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x10000" c140_bank="0x4000">
+            <rom>df1_snd0.bin</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>df1_voi1.bin</rom>
+        </romgroup>
+    </game>
+    <game name="dsaber" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>snd0.bin</rom>
+            <rom>snd1.bin</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>voi1.bin</rom>
+            <rom>voi2.bin</rom>
+        </romgroup>
+    </game>
     <game name="dstlk" format="CPS" fmt_version="1.05">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" seq_table_length="0xAC4" instr_table="0x7000" num_instr_banks="1" samp_table="0x8000">
             <rom>vam.01</rom>
@@ -144,6 +206,11 @@
         <romgroup type="audiocpu" load_method="deinterlace">
             <rom>e02-13.32</rom>
             <rom>e02-14.33</rom>
+        </romgroup>
+    </game>
+    <game name="ffight" format="CPS" fmt_version="CPS1_2.00ff">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1000">
+            <rom>ff_09.12b</rom>
         </romgroup>
     </game>
     <game name="gigawing" format="CPS" fmt_version="1.40">
@@ -173,6 +240,21 @@
             <rom>maj5_b.simm5</rom>
         </romgroup>
     </game>
+    <game name="kenseim" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>knm_09.12a</rom>
+        </romgroup>
+    </game>
+    <game name="knights" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>kr_09.11a</rom>
+        </romgroup>
+    </game>
+    <game name="kod" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>kd_9.12a</rom>
+        </romgroup>
+    </game>
     <game name="mmatrix" format="CPS" fmt_version="1.80">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="9" samp_table="0x6000" samp_table_length="0x828" artic_table="0x8000">
             <rom>mmx.01</rom>
@@ -181,7 +263,12 @@
             <rom>mmx.11m</rom>
             <rom>mmx.12m</rom>
         </romgroup>
-    </game>	
+    </game>
+    <game name="megaman" format="CPS" fmt_version="CPS1_5.02">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1C80" >
+            <rom>rcm_09.11a</rom>
+        </romgroup>
+    </game>
     <game name="megaman2" format="CPS" fmt_version="1.15c">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x4000" num_instr_banks="2" samp_table="0x5000">
             <rom>rm2.01a</rom>
@@ -190,6 +277,20 @@
         <romgroup type="qsound"  load_method="append_swap16">
             <rom>rm2.11m</rom>
             <rom>rm2.12m</rom>
+        </romgroup>
+    </game>
+    <game name="mercs" format="CPS" fmt_version="CPS1_2.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1000">
+            <rom>so2_09.12b</rom>
+        </romgroup>
+    </game>
+    <game name="metlhawk" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>mh1s0.7j</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>mhvoi-1.bin</rom>
+            <rom>mhvoi-2.bin</rom>
         </romgroup>
     </game>
     <game name="mmancp2u" format="CPS" fmt_version="1.05a">
@@ -236,6 +337,16 @@
             <rom>mvs.12m</rom>
         </romgroup>
     </game>
+    <game name="msword" format="CPS" fmt_version="CPS1_3.50">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1000" >
+            <rom>ms_09.12b</rom>
+        </romgroup>
+    </game>
+    <game name="mtwins" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>ch_09.12b</rom>
+        </romgroup>
+    </game>
     <game name="mvsc" format="CPS" fmt_version="1.30">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3B04" num_instr_banks="16" samp_table="0x5000" artic_table="0x8000">
             <rom>mvc.01</rom>
@@ -246,6 +357,11 @@
             <rom>mvc.12m</rom>
         </romgroup>
     </game>
+    <game name="nemo" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>nme_09.12b</rom>
+        </romgroup>
+    </game>
     <game name="nwarr" format="CPS" fmt_version="1.05a">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000" samp_table_length="0x8E8">
             <rom>vph.01</rom>
@@ -254,6 +370,21 @@
         <romgroup type="qsound"  load_method="append_swap16">
             <rom>vph.11m</rom>
             <rom>vph.12m</rom>
+        </romgroup>
+    </game>
+    <game name="pang3" format="CPS" fmt_version="CPS1_5.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1C80" >
+            <rom>pa3_11.11f</rom>
+        </romgroup>
+    </game>
+    <game name="phelios" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>ps2_snd0.snd0</rom>
+        </romgroup>
+    </game>
+    <game name="pnickj" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>pnij_17.13b</rom>
         </romgroup>
     </game>
     <game name="progear" format="CPS" fmt_version="1.80">
@@ -287,6 +418,16 @@
             <rom>pl2-simm.05b</rom>
         </romgroup>
     </game>
+    <game name="qad" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>qd_23.13b</rom>
+        </romgroup>
+    </game>
+    <game name="qtono2j" format="CPS" fmt_version="CPS1_5.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x13C0" >
+            <rom>tn2j_09.12a</rom>
+        </romgroup>
+    </game>
     <game name="salmndr2" format="KonamiGX">
         <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x6B04">
             <rom>521-a04.9c</rom>
@@ -314,6 +455,21 @@
         <romgroup type="qsound"  load_method="append_swap16">
             <rom>smb.11m</rom>
             <rom>smb.12m</rom>
+        </romgroup>
+    </game>
+    <game name="sf2" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>sf2_9.12a</rom>
+        </romgroup>
+    </game>
+    <game name="sf2ce" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>s92_09.11a</rom>
+        </romgroup>
+    </game>
+    <game name="sf2hf" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>s92_09.11a</rom>
         </romgroup>
     </game>
     <game name="sfa" format="CPS" fmt_version="1.05a">
@@ -378,6 +534,18 @@
         <romgroup type="qsound"  load_method="deinterlace">∂
             <rom>sfiii2-simm3.0</rom>
             <rom>sfiii2-simm3.1</rom>
+        </romgroup>
+    </game>
+    <game name="sfiii3n" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0xa55432b4" key2="0x0c129981" seq_table="0x78f008" samp_table="0x78C000" samp_table_length="0x2DD0" instr_table_ptrs="0x788000" num_instr_banks="4">
+            <rom>sfiii3-simm1.0</rom>
+            <rom>sfiii3-simm1.1</rom>
+            <rom>sfiii3-simm1.2</rom>
+            <rom>sfiii3-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">∂
+            <rom>sfiii3-simm3.0</rom>
+            <rom>sfiii3-simm3.1</rom>
         </romgroup>
     </game>
     <game name="jojon" format="CPS" fmt_version="CPS3">
@@ -497,7 +665,24 @@
             <rom>ts2-01m.3b</rom>
         </romgroup>
     </game>
-
+    <game name="valkyrie" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>wd1snd0.bin</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>wd1voi1.bin</rom>
+            <rom>wd1voi1.bin</rom>
+            <rom>wd1voi2.bin</rom>
+            <rom>wd1voi2.bin</rom>
+            <rom>wd1voi2.bin</rom>
+            <rom>wd1voi2.bin</rom>
+        </romgroup>
+    </game>
+    <game name="varth" format="CPS" fmt_version="CPS1_4.25">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
+            <rom>va_09.12b</rom>
+        </romgroup>
+    </game>
     <game name="vhunt2" format="CPS" fmt_version="1.30">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3B04" num_instr_banks="8" samp_table="0x46E0" artic_table="0x59A8">
             <rom>vh2.01</rom>

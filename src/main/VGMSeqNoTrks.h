@@ -37,6 +37,7 @@ class VGMSeqNoTrks:
   }
 
   virtual void AddTime(uint32_t delta);
+  virtual void SetTime(uint32_t delta);
 
   void SetCurTrack(uint32_t trackNum);
   void TryExpandMidiTracks(uint32_t numTracks);
