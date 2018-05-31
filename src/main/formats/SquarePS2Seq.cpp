@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "SquarePS2Seq.h"
+#include "main/LogItem.h"
 
 DECLARE_FORMAT(SquarePS2);
 
@@ -77,7 +78,7 @@ bool BGMTrack::ReadEvent(void) {
     if (readMode== ReadMode::READMODE_ADD_TO_UI) {
       std::wostringstream message;
 	  message << *vgmfile->GetName() << L": Address out of range. Conversion aborted.";
-      pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, L"SquarePS2Seq"));
+      core.AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, L"SquarePS2Seq"));
     }
     return false;
   }
