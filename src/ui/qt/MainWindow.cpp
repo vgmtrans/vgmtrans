@@ -16,6 +16,7 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
   setUnifiedTitleAndToolBarOnMac(true);
   setAcceptDrops(true);
+  setContextMenuPolicy(Qt::NoContextMenu);
 
   CreateElements();
   RouteSignals();
