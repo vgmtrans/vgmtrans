@@ -31,7 +31,6 @@ class VGMFileListView : public QListView
 
 public:
     VGMFileListView(QWidget *parent = nullptr);
-    void keyPressEvent(QKeyEvent* input);
 
 public slots:
     void doubleClickedSlot(QModelIndex);
@@ -40,8 +39,9 @@ signals:
     void AddMdiTab(QWidget* vgm_file, Qt::WindowFlags flags);
 
 private:
+  void keyPressEvent(QKeyEvent* input);
   void ItemMenu(const QPoint &pos);
-
+  
 };
 
 

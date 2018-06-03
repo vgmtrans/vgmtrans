@@ -55,9 +55,11 @@ VGMCollListView::VGMCollListView(QWidget *parent)
 }
 
 void VGMCollListView::CollMenu(const QPoint &pos) {
-  QPoint absolute_position = mapToGlobal(pos);
+  auto element = indexAt(pos);
+  if(!element.isValid())
+    return;
 
-  VGMColl *pointed_coll = qtVGMRoot.vVGMColl[indexAt(pos).row()];
+  VGMColl *pointed_coll = qtVGMRoot.vVGMColl[element.row()];
   if(pointed_coll == nullptr) {
     return;
   }
@@ -68,7 +70,7 @@ void VGMCollListView::CollMenu(const QPoint &pos) {
     vgmcoll_menu->addAction(QString::fromStdWString(menu_item));
   }
 
-  QAction *performed_action = vgmcoll_menu->exec(absolute_position);
+  QAction *performed_action = vgmcoll_menu->exec(mapToGlobal(pos));
   int action_index = 0;
   for(auto &action : vgmcoll_menu->actions()) {
     if(performed_action == action) {

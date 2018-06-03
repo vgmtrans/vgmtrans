@@ -62,9 +62,11 @@ VGMFileListView::VGMFileListView(QWidget *parent)
 * Identical implementation for VGMCollListView
 */
 void VGMFileListView::ItemMenu(const QPoint &pos) {
-  QPoint absolute_position = mapToGlobal(pos);
+  auto element = indexAt(pos);
+  if(!element.isValid())
+    return;
 
-  VGMFile *pointed_vgmfile = qtVGMRoot.vVGMFile[indexAt(pos).row()];
+  VGMFile *pointed_vgmfile = qtVGMRoot.vVGMFile[element.row()];
   if(pointed_vgmfile == nullptr) {
     return;
   }
@@ -75,7 +77,7 @@ void VGMFileListView::ItemMenu(const QPoint &pos) {
     vgmfile_menu->addAction(QString::fromStdWString(menu_item));
   }
   
-  QAction *performed_action = vgmfile_menu->exec(absolute_position);
+  QAction *performed_action = vgmfile_menu->exec(mapToGlobal(pos));
   int action_index = 0;
   for(auto &action : vgmfile_menu->actions()) {
     if(performed_action == action) {
