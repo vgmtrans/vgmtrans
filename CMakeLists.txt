@@ -71,12 +71,15 @@ if(WIN32)
   set(GUI_TYPE WIN32)
 endif()
 
-# IDE support
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
 # CMake utils
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
     ${CMAKE_SOURCE_DIR}/cmake)
+
+# IDE support
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# Set final build directory
+set(destdir ${CMAKE_SOURCE_DIR}/bin CACHE PATH "destdir")
 
 ##################################
 # Dependency management
@@ -166,4 +169,24 @@ if(MINIZIP_FOUND)
       BZip2::BZip2
     )  
   endif()
+endif()
+
+# Create an application bundle for OS X
+if(APPLE)
+  include(BundleUtilities)
+  set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app)
+
+  set_target_properties(vgmtrans PROPERTIES
+    MACOSX_BUNDLE true
+    OUTPUT_NAME VGMTrans)
+
+  get_target_property(cocoa Qt5::QCocoaIntegrationPlugin LOCATION)
+  target_sources(vgmtrans PRIVATE "${cocoa}")
+  set_source_files_properties("${cocoa}" PROPERTIES MACOSX_PACKAGE_LOCATION MacOS/platforms)
+
+  get_target_property(macstyle Qt5::QMacStylePlugin LOCATION)
+  target_sources(macstyle PRIVATE "${macstyle}")
+  set_source_files_properties("${macstyle}" PROPERTIES MACOSX_PACKAGE_LOCATION MacOS/styles)
+else()
+  install(TARGETS vgmtrans RUNTIME DESTINATION ${destdir})
 endif()
