@@ -106,6 +106,13 @@ source_group("main" REGULAR_EXPRESSION .*src/main/.*)
 
 include_directories(${INCLUDE_DIRS})
 
+if(APPLE AND EXISTS /usr/local/opt/qt5)
+  # Homebrew installs Qt5 (up to at least 5.9.1) in
+  # /usr/local/qt5, ensure it can be found by CMake since
+  # it is not in the default /usr/local prefix.
+  list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/qt5")
+endif()
+
 find_package(Qt5 REQUIRED COMPONENTS Gui Widgets)
 set_property(TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_FEATURES "")
 message(STATUS "Using use system Qt ${Qt5Core_VERSION}")
@@ -185,7 +192,7 @@ if(APPLE)
   set_source_files_properties("${cocoa}" PROPERTIES MACOSX_PACKAGE_LOCATION MacOS/platforms)
 
   get_target_property(macstyle Qt5::QMacStylePlugin LOCATION)
-  target_sources(macstyle PRIVATE "${macstyle}")
+  target_sources(vgmtrans PRIVATE "${macstyle}")
   set_source_files_properties("${macstyle}" PROPERTIES MACOSX_PACKAGE_LOCATION MacOS/styles)
 else()
   install(TARGETS vgmtrans RUNTIME DESTINATION ${destdir})

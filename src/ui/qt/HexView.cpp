@@ -14,9 +14,9 @@ HexView::HexView(VGMFile *vgmfile, QWidget *parent)
   : QAbstractScrollArea(parent), ui_hexview_vgmfile(vgmfile) {
 
   // Use whatever monospace font the system can offer
-  QFont font("Monospace");
-  font.setStyleHint(QFont::Monospace);
-  font.setPointSize(11); // 11pt
+  QFont font("Courier");
+  font.setStyleHint(QFont::TypeWriter);
+  font.setPointSize(12);
   setFont(font);
   
   QFontMetrics metrics(font);
