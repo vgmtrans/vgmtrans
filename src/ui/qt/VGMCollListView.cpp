@@ -56,29 +56,43 @@ VGMCollListView::VGMCollListView(QWidget *parent)
 
 void VGMCollListView::CollMenu(const QPoint &pos) {
   auto element = indexAt(pos);
-  if(!element.isValid())
-    return;
-
-  VGMColl *pointed_coll = qtVGMRoot.vVGMColl[element.row()];
-  if(pointed_coll == nullptr) {
-    return;
-  }
-
-  QMenu *vgmcoll_menu = new QMenu();
-  std::vector<const wchar_t*>* menu_item_names = pointed_coll->GetMenuItemNames();
-  for(auto &menu_item : *menu_item_names) {
-    vgmcoll_menu->addAction(QString::fromStdWString(menu_item));
-  }
-
-  QAction *performed_action = vgmcoll_menu->exec(mapToGlobal(pos));
-  int action_index = 0;
-  for(auto &action : vgmcoll_menu->actions()) {
-    if(performed_action == action) {
-      pointed_coll->CallMenuItem(pointed_coll, action_index);
-      break;
+  if(element.isValid()) {
+    VGMColl *pointed_coll = qtVGMRoot.vVGMColl[element.row()];
+    if(pointed_coll == nullptr) {
+      return;
     }
-    action_index++;
-  }
 
-  vgmcoll_menu->deleteLater();
+    QMenu *vgmcoll_menu = new QMenu();
+    std::vector<const wchar_t*>* menu_item_names = pointed_coll->GetMenuItemNames();
+    for(auto &menu_item : *menu_item_names) {
+      vgmcoll_menu->addAction(QString::fromStdWString(menu_item));
+    }
+
+    QAction *performed_action = vgmcoll_menu->exec(mapToGlobal(pos));
+    int action_index = 0;
+    for(auto &action : vgmcoll_menu->actions()) {
+      if(performed_action == action) {
+        pointed_coll->CallMenuItem(pointed_coll, action_index);
+        break;
+      }
+      action_index++;
+    }
+
+    vgmcoll_menu->deleteLater();
+  
+  } else if(qtVGMRoot.vVGMColl.size() > 0) {
+      QMenu *vgmcoll_menu = new QMenu();
+      auto export_all = vgmcoll_menu->addAction("Export all as MIDI, SF2 and DLS");
+      if(vgmcoll_menu->exec(mapToGlobal(pos)) == export_all) {
+        auto save_path = qtVGMRoot.UI_GetSaveDirPath();
+        for(auto &coll : qtVGMRoot.vVGMColl) {
+          coll->SetDefaultSavePath(save_path);
+          coll->OnSaveAll();
+        }
+      }
+
+      vgmcoll_menu->deleteLater();
+  } else {
+    return;
+  }
 }
