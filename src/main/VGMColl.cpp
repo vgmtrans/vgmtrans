@@ -580,6 +580,8 @@ bool VGMColl::OnSaveAll() {
       pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
   }
 
+  dirpath.clear();
+
   return true;
 }
 
@@ -613,6 +615,8 @@ bool VGMColl::OnSaveAllDLS() {
       pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
   }
 
+  dirpath.clear();
+
   return true;
 }
 
@@ -637,5 +641,7 @@ bool VGMColl::OnSaveAllSF2() {
       pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"), LOG_LEVEL_ERR, L"VGMColl"));
   }
   
+  dirpath.clear();
+
   return true;
 }
