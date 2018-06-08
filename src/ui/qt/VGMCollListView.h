@@ -8,6 +8,7 @@
 #define __VGMCollListViewModel_H_
 
 #include <QAbstractListModel>
+#include <QItemDelegate>
 #include <QListView>
 
 class VGMCollListViewModel : public QAbstractListModel {
@@ -17,6 +18,19 @@ public:
   VGMCollListViewModel(QObject *parent = nullptr);
   int rowCount(const QModelIndex & parent = QModelIndex()) const;
   QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const;
+  Qt::ItemFlags flags(const QModelIndex &index) const;
+
+};
+
+class VGMCollNameEditor : public QItemDelegate {
+  Q_OBJECT
+
+protected:
+  QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
+                        const QModelIndex &index) const;
+  void setEditorData(QWidget *editor, const QModelIndex &index) const;
+  void setModelData(QWidget *editor, QAbstractItemModel *model,
+                    const QModelIndex &index) const;
 
 };
 
