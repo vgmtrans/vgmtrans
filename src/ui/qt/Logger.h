@@ -1,11 +1,10 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#ifndef LOGGER_H
-#define LOGGER_H
+#pragma once
 
 #include <QDockWidget>
 #include <QTextEdit>
@@ -17,16 +16,14 @@ class Logger : public QDockWidget {
   Q_OBJECT
 
 public:
-  explicit Logger(QWidget* parent = nullptr);
+  explicit Logger(QWidget *parent = nullptr);
   void LogMessage(LogItem *message);
 
 signals:
-  void closeEvent(QCloseEvent*) override;
+  void closeEvent(QCloseEvent *) override;
 
 private:
   void CreateElements();
   QWidget *logger_wrapper;
   QTextEdit *logger_textarea;
 };
-
-#endif

@@ -1,11 +1,10 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#ifndef ICONBAR_H
-#define ICONBAR_H
+#pragma once
 
 #include <QAction>
 #include <QToolBar>
@@ -33,5 +32,3 @@ private:
   QAction *iconbar_play;
   QAction *iconbar_stop;
 };
-
-#endif

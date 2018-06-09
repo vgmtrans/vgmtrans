@@ -1,22 +1,23 @@
-#ifndef VGMTRANS_VGMFILETREEVIEW_H
-#define VGMTRANS_VGMFILETREEVIEW_H
+/*
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#include <qtreeview.h>
+#pragma once
+
+#include <QTreeView>
 #include "VGMFileItemModel.h"
 
 class VGMFile;
 
 class VGMFileTreeView : public QTreeView {
-    Q_OBJECT
-
-private:
-    VGMFile *vgmfile;
-    VGMFileItemModel model;
+  Q_OBJECT
 
 public:
-    VGMFileTreeView(VGMFile *vgmfile, QWidget *parent = 0);
-    ~VGMFileTreeView();
+  VGMFileTreeView(VGMFile *vgmfile, QWidget *parent = nullptr);
+
+private:
+  VGMFile *vgmfile;
+  VGMFileItemModel model;
 };
-
-
-#endif //VGMTRANS_VGMFILETREEVIEW_H

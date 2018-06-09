@@ -1,23 +1,21 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#ifndef RAWFILELISTVIEW_H
-#define RAWFILELISTVIEW_H
-
+#pragma once
 #include <QAbstractListModel>
 #include <QListView>
 #include "QtVGMRoot.h"
 
 class RawFileListViewModel : public QAbstractListModel {
-    Q_OBJECT
+  Q_OBJECT
 
 public:
   RawFileListViewModel(QObject *parent = nullptr);
-  int rowCount(const QModelIndex & parent = QModelIndex()) const;
-  QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const;
+  int rowCount(const QModelIndex &parent = QModelIndex()) const;
+  QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
 };
 
 class RawFileListView : public QListView {
@@ -32,7 +30,4 @@ private:
   void DeleteRawFiles();
 
   RawFileListViewModel *rawFileListViewModel;
-
 };
-
-#endif // RAWFILELISTVIEW_H

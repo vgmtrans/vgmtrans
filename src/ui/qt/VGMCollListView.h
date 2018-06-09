@@ -1,12 +1,10 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#ifndef __VGMCollListViewModel_H_
-#define __VGMCollListViewModel_H_
-
+#pragma once
 #include <QAbstractListModel>
 #include <QItemDelegate>
 #include <QListView>
@@ -16,10 +14,9 @@ class VGMCollListViewModel : public QAbstractListModel {
 
 public:
   VGMCollListViewModel(QObject *parent = nullptr);
-  int rowCount(const QModelIndex & parent = QModelIndex()) const;
-  QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const;
+  int rowCount(const QModelIndex &parent = QModelIndex()) const;
+  QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
   Qt::ItemFlags flags(const QModelIndex &index) const;
-
 };
 
 class VGMCollNameEditor : public QItemDelegate {
@@ -29,9 +26,7 @@ protected:
   QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
                         const QModelIndex &index) const;
   void setEditorData(QWidget *editor, const QModelIndex &index) const;
-  void setModelData(QWidget *editor, QAbstractItemModel *model,
-                    const QModelIndex &index) const;
-
+  void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
 };
 
 class VGMCollListView : public QListView {
@@ -41,5 +36,3 @@ public:
 private:
   void CollMenu(const QPoint &pos);
 };
-
-#endif //__VGMCollListViewModel_H_

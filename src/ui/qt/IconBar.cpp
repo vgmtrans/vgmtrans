@@ -1,8 +1,8 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
 #include <QToolBar>
 #include "IconBar.h"
@@ -34,11 +34,10 @@ void IconBar::SetupIcons() {
 }
 
 void IconBar::OnPlayerStatusChange(const bool playing) {
-  if(playing) {
+  if (playing) {
     iconbar_play->setIcon(QIcon(":/images/pause-32.png"));
     iconbar_stop->setEnabled(true);
-  }
-  else {
+  } else {
     iconbar_open->setIcon(QIcon(":/images/open-32.png"));
     iconbar_stop->setDisabled(true);
   }

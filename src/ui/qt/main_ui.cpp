@@ -1,8 +1,8 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license, 
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
 #include <QApplication>
 #include <QTextStream>
@@ -10,10 +10,9 @@
 #include "QtVGMRoot.h"
 
 int main(int argc, char *argv[]) {
-  
-  #if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-  #endif
+#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
+  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+#endif
 
   QCoreApplication::setOrganizationName(QStringLiteral("VGMTrans"));
   QCoreApplication::setApplicationName(QStringLiteral("vgmtrans"));
@@ -23,7 +22,7 @@ int main(int argc, char *argv[]) {
   f.open(QFile::ReadOnly | QFile::Text);
   QTextStream ts(&f);
   app.setStyleSheet(ts.readAll());
-    
+
   qtVGMRoot.Init();
   MainWindow window;
   window.show();

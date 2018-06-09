@@ -1,28 +1,21 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#ifndef VGMTRANS_MDIAREA_H
-#define VGMTRANS_MDIAREA_H
-
+#pragma once
 #include <QMdiArea>
 
 class QAbstractButton;
 
 class MdiArea : public QMdiArea {
-    Q_OBJECT
+  Q_OBJECT
 
 public:
-    explicit MdiArea(QWidget *parent = nullptr);
-    ~MdiArea() = default; // temporary
+  explicit MdiArea(QWidget *parent = nullptr);
 
-   
 protected:
-    QTabBar *getTabBar();
-    QAbstractButton *getCloseButton();
-
+  QTabBar *getTabBar();
+  QAbstractButton *getCloseButton();
 };
-
-#endif //VGMTRANS_MDIAREA_H

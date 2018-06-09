@@ -1,7 +1,3 @@
-#ifndef OSDEPEND_H
-#define OSDEPEND_H
-
+#pragma once
 void Alert(const wchar_t *fmt, ...);
 void LogDebug(const wchar_t *fmt, ...);
-
-#endif // OSDEPEND_H

@@ -1,11 +1,10 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#pragma once
 
 #include <QMainWindow>
 #include <QSplitter>
@@ -28,7 +27,6 @@ class MainWindow : public QMainWindow {
 
 public:
   explicit MainWindow();
-  ~MainWindow() = default;
 
 private:
   void CreateElements();
@@ -55,5 +53,3 @@ private:
   QSplitter* horizontal_splitter;
   QSplitter* vertical_splitter_left;
 };
-
-#endif // !MAINWINDOW_H

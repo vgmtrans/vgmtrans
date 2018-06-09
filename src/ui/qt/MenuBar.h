@@ -1,12 +1,10 @@
 /*
-* VGMTrans (c) 2018
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2018
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#ifndef MENUBAR_H
-#define MENUBAR_H
-
+#pragma once
 #include <QMenu>
 #include <QMenuBar>
 
@@ -15,7 +13,7 @@ class MenuBar : public QMenuBar {
 
 public:
   explicit MenuBar(QWidget* parent = nullptr);
-  ~MenuBar() = default;
+
   inline bool IsLoggerToggled() { return menu_toggle_logger->isChecked(); };
   inline void SetLoggerHidden() { menu_toggle_logger->setChecked(false); };
 
@@ -39,5 +37,3 @@ private:
   // Options actions
   QAction* menu_toggle_logger;
 };
-
-#endif // !MAINWINDOW_H

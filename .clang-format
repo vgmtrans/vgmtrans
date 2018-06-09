@@ -38,4 +38,3 @@ SpacesInContainerLiterals: true
 Standard:        Cpp11
 TabWidth:        2
 UseTab:          Never
----
