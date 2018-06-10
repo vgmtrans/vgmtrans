@@ -120,7 +120,6 @@ message(STATUS "Using use system Qt ${Qt5Core_VERSION}")
 set(CMAKE_AUTOMOC ON)
 set(RESOURCE_PATH
   "${PROJECT_SOURCE_DIR}/src/ui/qt/resources/resources.qrc"
-  "${PROJECT_SOURCE_DIR}/src/ui/qt/resources/qdarkstyle/style.qrc"
 )
 qt5_add_resources(UI_RESOURCES ${RESOURCE_PATH})
 
