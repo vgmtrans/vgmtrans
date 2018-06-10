@@ -9,6 +9,7 @@
 #include <QVBoxLayout>
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
+#include "HeaderContainer.h"
 
 #include "VGMFile.h"
 
@@ -37,9 +38,18 @@ void MainWindow::CreateElements() {
   ui_statusbar->addPermanentWidget(ui_statusbar_length);
   setStatusBar(ui_statusbar);
 
-  ui_rawfiles_list = new RawFileListView(this);
-  ui_vgmfiles_list = new VGMFileListView(this);
-  ui_colls_list = new VGMCollListView(this);
+  ui_rawfiles_list = new RawFileListView();
+  HeaderContainer* ui_rawfiles_list_container =
+      new HeaderContainer(ui_rawfiles_list, QStringLiteral("Imported Files"));
+
+  ui_vgmfiles_list = new VGMFileListView();
+  HeaderContainer* ui_vgmfiles_list_container =
+      new HeaderContainer(ui_vgmfiles_list, QStringLiteral("Detected files"));
+
+  ui_colls_list = new VGMCollListView();
+  HeaderContainer* ui_colls_list_container =
+      new HeaderContainer(ui_colls_list, QStringLiteral("Detected collections"));
+
   ui_tabs_area = new MdiArea(this);
 
   ui_logger = new Logger(this);
@@ -49,14 +59,14 @@ void MainWindow::CreateElements() {
   horizontal_splitter = new QSplitter(Qt::Horizontal, vertical_splitter);
   vertical_splitter_left = new QSplitter(Qt::Vertical, horizontal_splitter);
 
-  vertical_splitter->addWidget(ui_colls_list);
+  vertical_splitter->addWidget(ui_colls_list_container);
   vertical_splitter->setHandleWidth(1);
 
   horizontal_splitter->addWidget(ui_tabs_area);
   horizontal_splitter->setHandleWidth(1);
 
-  vertical_splitter_left->addWidget(ui_rawfiles_list);
-  vertical_splitter_left->addWidget(ui_vgmfiles_list);
+  vertical_splitter_left->addWidget(ui_rawfiles_list_container);
+  vertical_splitter_left->addWidget(ui_vgmfiles_list_container);
   vertical_splitter_left->setHandleWidth(1);
 
   setCentralWidget(vertical_splitter);
