@@ -27,6 +27,7 @@ void Logger::CreateElements() {
   QGridLayout *logger_layout = new QGridLayout;
   logger_layout->addWidget(logger_textarea);
   logger_wrapper->setLayout(logger_layout);
+  logger_layout->setMargin(0);
 
   setWidget(logger_wrapper);
 };
