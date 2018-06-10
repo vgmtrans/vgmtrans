@@ -95,13 +95,9 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
       if (list.isEmpty())
         return;
 
-      QList<VGMFile *> filesToClose;
-      foreach (const QModelIndex &index, list) {
-        if (index.row() < qtVGMRoot.vVGMFile.size())
-          filesToClose.append(qtVGMRoot.vVGMFile[index.row()]);
+      for (auto &index : list) {
+        qtVGMRoot.RemoveVGMFile(qtVGMRoot.vVGMFile[index.row()]);
       }
-
-      foreach (VGMFile *file, filesToClose) { qtVGMRoot.RemoveVGMFile(file); }
 
       return;
     }
@@ -112,16 +108,37 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
   }
 }
 
+void VGMFileListView::RemoveVGMFileItem(VGMFile *file) {
+  auto it = open_views.find(file);
+  if (it != open_views.end()) {
+    VGMFileView *file_view = it->second;
+    RemoveMdiTab(file_view);
+    open_views.erase(file);
+  }
+
+  qtVGMRoot.UI_RemovedVGMFile();
+}
+
 void VGMFileListView::doubleClickedSlot(QModelIndex index) {
-  VGMFile *vgmFile = qtVGMRoot.vVGMFile[index.row()];
-  VGMFileView *vgmFileView = new VGMFileView(vgmFile);
-  QString vgmFileName = QString::fromStdWString(*vgmFile->GetName());
+  VGMFile *vgmfile = qtVGMRoot.vVGMFile[index.row()];
+  auto it = open_views.find(vgmfile);
+  // Check if a fileview for this vgmfile already exists
+  if (it != open_views.end()) {
+    // If it does, let's focus it
+    VGMFileView *vgmfile_view = it->second;
+    vgmfile_view->setFocus();
+  } else {
+    // If it doesn't, let's make one
+    VGMFileView *vgmfile_view = new VGMFileView(vgmfile);
+    QString vgmFileName = QString::fromStdWString(*vgmfile->GetName());
 
-  vgmFileView->setWindowTitle(vgmFileName);
-  vgmFileView->setWindowIcon(iconForFileType(vgmFile->GetFileType()));
-  vgmFileView->setAttribute(Qt::WA_DeleteOnClose);
+    vgmfile_view->setWindowTitle(vgmFileName);
+    vgmfile_view->setWindowIcon(iconForFileType(vgmfile->GetFileType()));
+    vgmfile_view->setAttribute(Qt::WA_DeleteOnClose);
 
-  AddMdiTab(vgmFileView, Qt::SubWindow);
+    AddMdiTab(vgmfile_view, Qt::SubWindow);
+    open_views.insert(std::make_pair(vgmfile, vgmfile_view));
 
-  vgmFileView->show();
+    vgmfile_view->show();
+  }
 }

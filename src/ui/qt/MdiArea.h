@@ -6,6 +6,7 @@
 
 #pragma once
 #include <QMdiArea>
+#include "VGMFileView.h"
 
 class QAbstractButton;
 
@@ -14,6 +15,9 @@ class MdiArea : public QMdiArea {
 
 public:
   explicit MdiArea(QWidget *parent = nullptr);
+
+public slots:
+  void RemoveTab(VGMFileView *file_view);
 
 protected:
   QTabBar *getTabBar();

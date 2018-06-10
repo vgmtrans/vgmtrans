@@ -16,16 +16,15 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setTabsMovable(true);
   setTabsClosable(true);
 
-  QTabBar *tabBar = getTabBar();
-  if (tabBar) {
-    tabBar->setExpanding(false);
-    tabBar->setUsesScrollButtons(true);
+  QTabBar *tab_bar = findChild<QTabBar *>();
+  if (tab_bar) {
+    tab_bar->setExpanding(false);
+    tab_bar->setUsesScrollButtons(true);
   }
 }
 
-QTabBar *MdiArea::getTabBar() {
-  QList<QTabBar *> tabBarList = findChildren<QTabBar *>();
-  QTabBar *tabBar = tabBarList.at(0);
-
-  return tabBarList.at(0);
+void MdiArea::RemoveTab(VGMFileView *file_view) {
+  auto *file_view_tab = file_view->parentWidget();
+  file_view_tab->close();
+  removeSubWindow(file_view_tab);
 }

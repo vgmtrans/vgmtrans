@@ -59,10 +59,6 @@ void QtVGMRoot::UI_AddVGMColl(VGMColl* theColl) {
   this->UI_AddedVGMColl();
 }
 
-void QtVGMRoot::UI_RemoveVGMFile(VGMFile* targFile) {
-  this->UI_RemovedVGMFile();
-}
-
 void QtVGMRoot::UI_RemoveVGMColl(VGMColl* targColl) {
   this->UI_RemovedVGMColl();
 }

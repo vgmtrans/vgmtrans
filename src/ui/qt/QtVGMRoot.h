@@ -28,7 +28,6 @@ public:
   virtual void UI_AddVGMSampColl(VGMSampColl* theSampColl);
   virtual void UI_AddVGMMisc(VGMMiscFile* theMiscFile);
   virtual void UI_AddVGMColl(VGMColl* theColl);
-  virtual void UI_RemoveVGMFile(VGMFile* targFile);
   virtual void UI_RemoveVGMColl(VGMColl* targColl);
   virtual void UI_BeginRemoveVGMFiles();
   virtual void UI_EndRemoveVGMFiles();
@@ -49,6 +48,7 @@ signals:
   void UI_AddedVGMColl();
   void UI_RemovedVGMColl();
   void UI_AddLogItem(LogItem* theLog);
+  void UI_RemoveVGMFile(VGMFile* targFile);
 };
 
 extern QtVGMRoot qtVGMRoot;

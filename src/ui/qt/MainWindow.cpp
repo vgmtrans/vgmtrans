@@ -26,6 +26,7 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 
 void MainWindow::CreateElements() {
   ui_menu_bar = new MenuBar(this);
+  setMenuBar(ui_menu_bar);
   ui_iconbar = new IconBar(this);
   addToolBar(ui_iconbar);
 
@@ -62,18 +63,20 @@ void MainWindow::CreateElements() {
 }
 
 void MainWindow::RouteSignals() {
-  setMenuBar(ui_menu_bar);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_AddLogItem, ui_logger, &Logger::LogMessage);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, ui_vgmfiles_list,
+          &VGMFileListView::RemoveVGMFileItem);
+
   connect(ui_menu_bar, &MenuBar::OpenFile, this, &MainWindow::OpenFile);
   connect(ui_menu_bar, &MenuBar::Exit, this, &MainWindow::close);
   connect(ui_iconbar, &IconBar::OpenPressed, this, &MainWindow::OpenFile);
 
   connect(ui_vgmfiles_list, &VGMFileListView::AddMdiTab, ui_tabs_area, &MdiArea::addSubWindow);
+  connect(ui_vgmfiles_list, &VGMFileListView::RemoveMdiTab, ui_tabs_area, &MdiArea::RemoveTab);
 
   connect(ui_menu_bar, &MenuBar::LoggerToggled,
           [=] { ui_logger->setHidden(!ui_menu_bar->IsLoggerToggled()); });
   connect(ui_logger, &Logger::closeEvent, [=] { ui_menu_bar->SetLoggerHidden(); });
-
-  connect(&qtVGMRoot, &QtVGMRoot::UI_AddLogItem, ui_logger, &Logger::LogMessage);
 
   connect(ui_vgmfiles_list, &VGMCollListView::clicked, [=] {
     if (!ui_vgmfiles_list->currentIndex().isValid())

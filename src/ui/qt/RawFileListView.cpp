@@ -87,13 +87,9 @@ void RawFileListView::DeleteRawFiles() {
   if (list.isEmpty())
     return;
 
-  QList<RawFile *> filesToClose;
-  foreach (const QModelIndex &index, list) {
-    if (index.row() < qtVGMRoot.vRawFile.size())
-      filesToClose.append(qtVGMRoot.vRawFile[index.row()]);
+  for (auto &index : list) {
+    qtVGMRoot.CloseRawFile(qtVGMRoot.vRawFile[index.row()]);
   }
-
-  foreach (RawFile *file, filesToClose) { qtVGMRoot.CloseRawFile(file); }
 
   return;
 }
