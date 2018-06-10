@@ -94,7 +94,7 @@ void HexView::resizeEvent(QResizeEvent *event) {
   hexview_lines_per_screen = viewport()->height() / hexview_line_height + 1;
 
   const auto lines_count = this->viewport()->size().height() / hexview_line_height;
-  verticalScrollBar()->setRange(0, ((ui_hexview_vgmfile->unLength + 16) / 16) - lines_count);
+  verticalScrollBar()->setRange(0, ((ui_hexview_vgmfile->unLength + 32) / 16) - lines_count);
 
   QAbstractScrollArea::resizeEvent(event);
 }
