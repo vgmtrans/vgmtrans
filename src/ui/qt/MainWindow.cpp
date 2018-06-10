@@ -93,9 +93,9 @@ void MainWindow::RouteSignals() {
       return;
 
     VGMFile* clicked_item = qtVGMRoot.vVGMFile[ui_vgmfiles_list->currentIndex().row()];
-    ui_statusbar_offset->setText("Offset: " +
+    ui_statusbar_offset->setText("Offset: 0x" +
                                  QString::number(clicked_item->dwOffset, 16).toUpper());
-    ui_statusbar_length->setText("Length: " + QString::number(clicked_item->size(), 16).toUpper());
+    ui_statusbar_length->setText("Length: 0x" + QString::number(clicked_item->size(), 16).toUpper());
   });
 }
 
