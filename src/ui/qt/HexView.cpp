@@ -23,9 +23,10 @@ HexView::HexView(VGMFile *vgmfile, QWidget *parent)
   hexview_line_ascent = metrics.ascent();
 
   QSize viewport_size = viewport()->size();
-  verticalScrollBar()->setRange(0, (vgmfile->unLength / 16) - 1);
   verticalScrollBar()->setPageStep(viewport_size.height() / hexview_line_height);
   verticalScrollBar()->setSingleStep(1);
+
+  setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContentsOnFirstShow);
 }
 
 void HexView::paintEvent(QPaintEvent *event) {
@@ -91,5 +92,9 @@ void HexView::paintEvent(QPaintEvent *event) {
 
 void HexView::resizeEvent(QResizeEvent *event) {
   hexview_lines_per_screen = viewport()->height() / hexview_line_height + 1;
+
+  const auto lines_count = this->viewport()->size().height() / hexview_line_height;
+  verticalScrollBar()->setRange(0, ((ui_hexview_vgmfile->unLength + 16) / 16) - lines_count);
+
   QAbstractScrollArea::resizeEvent(event);
 }
