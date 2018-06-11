@@ -46,12 +46,6 @@ Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
  * VGMCollNameEditor
  */
 
-QWidget *VGMCollNameEditor::createEditor(QWidget *parent, const QStyleOptionViewItem &option,
-                                         const QModelIndex &) const {
-  QLineEdit *editor = new QLineEdit(parent);
-  return editor;
-}
-
 void VGMCollNameEditor::setEditorData(QWidget *editor, const QModelIndex &index) const {
   QString orig_name = index.model()->data(index, Qt::EditRole).toString();
   QLineEdit *line_edit = static_cast<QLineEdit *>(editor);

@@ -11,7 +11,6 @@
 
 MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setViewMode(QMdiArea::TabbedView);
-  setTabShape(QTabWidget::Triangular);
   setDocumentMode(true);
   setTabsMovable(true);
   setTabsClosable(true);

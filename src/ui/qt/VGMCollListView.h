@@ -6,7 +6,7 @@
 
 #pragma once
 #include <QAbstractListModel>
-#include <QItemDelegate>
+#include <QStyledItemDelegate>
 #include <QListView>
 
 class VGMCollListViewModel : public QAbstractListModel {
@@ -19,12 +19,10 @@ public:
   Qt::ItemFlags flags(const QModelIndex &index) const;
 };
 
-class VGMCollNameEditor : public QItemDelegate {
+class VGMCollNameEditor : public QStyledItemDelegate {
   Q_OBJECT
 
 protected:
-  QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
-                        const QModelIndex &index) const;
   void setEditorData(QWidget *editor, const QModelIndex &index) const;
   void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
 };
