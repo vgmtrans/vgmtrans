@@ -31,4 +31,9 @@ private:
   QAction *iconbar_open;
   QAction *iconbar_play;
   QAction *iconbar_stop;
+
+  QIcon iconopen;
+  QIcon iconplay;
+  QIcon iconpause;
+  QIcon iconstop;
 };

@@ -5,6 +5,18 @@
  */
 
 #include "Helpers.h"
+#include <QPixmap>
+#include <QBitmap>
+
+QIcon MakeIconFromPath(QString path, QColor color) {
+  QPixmap icon_pixmap;
+  icon_pixmap.convertFromImage(QImage(path));
+  auto mask = icon_pixmap.createHeuristicMask(true);
+  icon_pixmap.fill(color);
+  icon_pixmap.setMask(mask);
+
+  return QIcon(icon_pixmap);
+}
 
 QIcon iconForFileType(FileType filetype) {
   switch (filetype) {
