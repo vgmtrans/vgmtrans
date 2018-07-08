@@ -13,12 +13,6 @@ extern "C" {
   #include <fluidsynth.h>
 }
 
-void* pl_open(const char* file);
-int pl_read(void *buf, int count, void *handle);
-int pl_seek(void *handle, long offset, int origin);
-int pl_close(void *handle);
-long pl_tell(void *handle);
-
 class MusicPlayer : public QObject {
   Q_OBJECT
 
