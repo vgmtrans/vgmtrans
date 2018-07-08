@@ -18,7 +18,7 @@ matrix:
       before_install:
         - sudo add-apt-repository --yes ppa:hedges/qt5.5
         - sudo apt-get update -qq
-        - sudo apt-get install qt55base
+        - sudo apt-get install qt55base libfluidsynth-dev
         # minizip unavailable on trusty
         - sudo bash -c "echo -e '\n deb http://archive.ubuntu.com/ubuntu xenial main universe' >> '/etc/apt/sources.list.d/ubuntu-xenial-main.list'"
         - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 3B4FE6ACC0B21F32
@@ -31,12 +31,15 @@ matrix:
       before_install:
         - sudo add-apt-repository --yes ppa:hedges/qt5.5
         - sudo apt-get update -qq
-        - sudo apt-get install qt55base
+        - sudo apt-get install qt55base libfluidsynth-dev
         - sudo bash -c "echo -e '\n deb http://archive.ubuntu.com/ubuntu xenial main universe' >> '/etc/apt/sources.list.d/ubuntu-xenial-main.list'"
         - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 3B4FE6ACC0B21F32
         - sudo apt-get update -qq
         - sudo apt-get install -y -q -t xenial libminizip-dev
-    # xcode7.3
+# VGMTrans officially supports OS X, but Travis runners
+# take too long to start and/or seem to timeout,
+# so this will be disabled until the situation gets better
+#    # xcode7.3
 #    - os: osx
 #      before_install:
 #        - brew upgrade qt || brew install qt
