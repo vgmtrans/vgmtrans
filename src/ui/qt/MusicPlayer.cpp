@@ -72,11 +72,10 @@ bool MusicPlayer::SynthPlaying() {
   return false;
 }
 
-//TODO: Check on leaks.
-bool MusicPlayer::LoadCollection(VGMColl *coll) {
+void MusicPlayer::LoadCollection(VGMColl *coll) {
 
   if(active_coll == coll) {
-    return true; // Already loaded
+    return; // Already loaded
   }
 
   VGMSeq *seq = coll->GetSeq();
@@ -99,7 +98,13 @@ bool MusicPlayer::LoadCollection(VGMColl *coll) {
   adriver = new_fluid_audio_driver(settings, synth);
   if(fluid_player_add_mem(player, &midi_buf.at(0), midi_buf.size()) == FLUID_OK) {
     active_coll = coll;
-    return true; //TODO: Error
   }
 
+  delete sf2;
+  delete seq;
+  delete midi;
+
+  return;
+
 }
+
