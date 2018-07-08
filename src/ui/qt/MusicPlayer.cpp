@@ -13,7 +13,9 @@ MusicPlayer::MusicPlayer() {
   /* Create the settings. */
   settings = new_fluid_settings();
 
-  fluid_sfloader_t* loader;
+// Lines commented out are for temporary
+// fluidsynth 1.0 compatibility
+//  fluid_sfloader_t* loader;
 
   fluid_settings_setstr(settings, "synth.reverb.active", "yes");
   fluid_settings_setstr(settings, "synth.chorus.active", "no");
@@ -27,9 +29,8 @@ MusicPlayer::MusicPlayer() {
 #endif
 
   synth = new_fluid_synth(settings);
-  loader = new_fluid_defsfloader(settings);
-
-  fluid_synth_add_sfloader(synth, loader);
+//  loader = new_fluid_defsfloader(settings);
+//  fluid_synth_add_sfloader(synth, loader);
 }
 
 MusicPlayer& MusicPlayer::Instance() {
@@ -99,10 +100,6 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
   if(fluid_player_add_mem(player, &midi_buf.at(0), midi_buf.size()) == FLUID_OK) {
     active_coll = coll;
   }
-
-  delete sf2;
-  delete seq;
-  delete midi;
 
   return;
 
