@@ -8,6 +8,7 @@
 #include <QAbstractListModel>
 #include <QStyledItemDelegate>
 #include <QListView>
+#include <QKeyEvent>
 
 class VGMCollListViewModel : public QAbstractListModel {
   Q_OBJECT
@@ -28,9 +29,16 @@ protected:
 };
 
 class VGMCollListView : public QListView {
+  Q_OBJECT
+
 public:
   VGMCollListView(QWidget *parent = nullptr);
 
+public slots:
+  void HandlePlaybackRequest();
+  void HandleStopRequest();
+
 private:
   void CollMenu(const QPoint &pos);
+  void keyPressEvent(QKeyEvent* e) override;
 };

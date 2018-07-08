@@ -27,9 +27,9 @@ void IconBar::SetupActions() {
   addSeparator();
 
   iconbar_play = addAction("Play");
-  connect(iconbar_open, &QAction::triggered, this, &IconBar::PlayToggle);
+  connect(iconbar_play, &QAction::triggered, this, &IconBar::PlayToggle);
   iconbar_stop = addAction("Stop");
-  connect(iconbar_open, &QAction::triggered, this, &IconBar::StopPressed);
+  connect(iconbar_stop, &QAction::triggered, this, &IconBar::StopPressed);
 }
 
 void IconBar::SetupIcons() {
@@ -45,7 +45,7 @@ void IconBar::SetupIcons() {
   iconbar_stop->setDisabled(true);
 }
 
-void IconBar::OnPlayerStatusChange(const bool playing) {
+void IconBar::OnPlayerStatusChange(bool playing) {
   if (playing) {
     iconbar_play->setIcon(iconpause);
     iconbar_stop->setEnabled(true);

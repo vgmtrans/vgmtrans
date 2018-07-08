@@ -19,14 +19,14 @@ public:
 signals:
   void OpenPressed();
   void PlayToggle();
-  void PausePressed();
   void StopPressed();
+
+public slots:
+  void OnPlayerStatusChange(bool playing);
 
 private:
   void SetupActions();
   void SetupIcons();
-
-  void OnPlayerStatusChange(const bool playing);
 
   QAction *iconbar_open;
   QAction *iconbar_play;

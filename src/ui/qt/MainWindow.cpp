@@ -10,6 +10,7 @@
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
 #include "HeaderContainer.h"
+#include "MusicPlayer.h"
 
 #include "VGMFile.h"
 
@@ -80,6 +81,10 @@ void MainWindow::RouteSignals() {
   connect(ui_menu_bar, &MenuBar::OpenFile, this, &MainWindow::OpenFile);
   connect(ui_menu_bar, &MenuBar::Exit, this, &MainWindow::close);
   connect(ui_iconbar, &IconBar::OpenPressed, this, &MainWindow::OpenFile);
+  connect(ui_iconbar, &IconBar::PlayToggle, ui_colls_list, &VGMCollListView::HandlePlaybackRequest);
+  connect(ui_iconbar, &IconBar::StopPressed, ui_colls_list, &VGMCollListView::HandleStopRequest);
+
+  connect(&MusicPlayer::Instance(), &MusicPlayer::StatusChange, ui_iconbar, &IconBar::OnPlayerStatusChange);
 
   connect(ui_vgmfiles_list, &VGMFileListView::AddMdiTab, ui_tabs_area, &MdiArea::addSubWindow);
   connect(ui_vgmfiles_list, &VGMFileListView::RemoveMdiTab, ui_tabs_area, &MdiArea::RemoveTab);

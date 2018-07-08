@@ -10,6 +10,7 @@
 #include "VGMCollListView.h"
 #include "QtVGMRoot.h"
 #include "VGMColl.h"
+#include "MusicPlayer.h"
 
 /*
  * VGMCollListViewModel
@@ -118,3 +119,36 @@ void VGMCollListView::CollMenu(const QPoint &pos) {
 
   return;
 }
+
+void VGMCollListView::keyPressEvent(QKeyEvent* e) {
+  switch(e->key()) {
+    case Qt::Key_Space: {
+      HandlePlaybackRequest();
+      break;
+    }
+
+    case Qt::Key_Escape : {
+      HandleStopRequest();
+      break;
+    }
+
+    default:
+      QListView::keyPressEvent(e);
+  }
+}
+
+void VGMCollListView::HandlePlaybackRequest() {
+  QModelIndexList list = selectionModel()->selectedIndexes();
+  if (list.size() == 0 || list[0].row() >= qtVGMRoot.vVGMColl.size())
+    return;
+
+  MusicPlayer& player = MusicPlayer::Instance();
+  player.LoadCollection(qtVGMRoot.vVGMColl[list[0].row()]);
+  player.Toggle();
+}
+
+void VGMCollListView::HandleStopRequest() {
+  MusicPlayer& player = MusicPlayer::Instance();
+  player.Stop();
+}
+

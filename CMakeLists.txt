@@ -26,14 +26,13 @@ endif()
 
 # Set platform-specific flags
 if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
-
   add_compile_options(/permissive-)
   add_compile_options(/Zc:inline)
   add_compile_options(/Zc:throwingNew)
   add_compile_options(/Zc:strictStrings-)
   add_compile_options(/volatile:iso)
   add_compile_options(/MP)
-  
+
   add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
   add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE)
   add_definitions(-DVGMTRANS_FOR_QT)
@@ -132,6 +131,13 @@ else()
   add_subdirectory(lib/zlib)
 endif()
 
+find_package(FLUIDSYNTH)
+if(FLUIDSYNTH_FOUND)
+  message(STATUS "Using system fluidsynth")
+else()
+  message(ERROR "Please install fluidsynth - static subtree not yet supported")
+endif()
+
 message(STATUS "Using static TinyXML")
 add_subdirectory(lib/tinyxml)
 add_definitions(-DTIXML_USE_STL)
@@ -161,6 +167,7 @@ PRIVATE
   Qt5::Widgets
   minizip
   ZLIB::ZLIB
+  fluidsynth
   tinyxml_static
 )
 
@@ -173,7 +180,7 @@ if(MINIZIP_FOUND)
     target_link_libraries(vgmtrans
       PRIVATE
       BZip2::BZip2
-    )  
+    )
   endif()
 endif()
 
