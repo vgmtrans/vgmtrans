@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "WinVGMRoot.h"
+#include "osdepend.h"
 #include "VGMFileTreeView.h"
 #include "VGMFileListView.h"
 #include "VGMCollListView.h"
