@@ -184,10 +184,22 @@ if(MINIZIP_FOUND)
   endif()
 endif()
 
+if(WIN32)
+target_link_libraries(vgmtrans
+PRIVATE
+  Qt5::QWindowsIntegrationPlugin
+)
+endif()
+
 # Create an application bundle for OS X
 if(APPLE)
   include(BundleUtilities)
   set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app)
+
+  target_link_libraries(vgmtrans
+  PRIVATE
+    Qt5::QCocoaIntegrationPlugin
+  )
 
   set_target_properties(vgmtrans PROPERTIES
     MACOSX_BUNDLE true

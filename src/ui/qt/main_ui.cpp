@@ -5,9 +5,13 @@
  */
 
 #include <QApplication>
-#include <QTextStream>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
+
+#ifdef Q_OS_WIN
+#include <QtPlugin>
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+#endif
 
 int main(int argc, char *argv[]) {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)

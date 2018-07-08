@@ -91,7 +91,7 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
   std::wstring temp_sf2 = dir.path().toStdWString() + L"/" + L"temp";
   sf2->SaveSF2File(temp_sf2);
 
-  char temp2[temp_sf2.length()+1] = "";
+  char temp2[temp_sf2.length()+1];
   std::wcstombs(temp2, temp_sf2.c_str(), sizeof temp2);
   sfont_id = fluid_synth_sfload(synth, temp2, 0);
 
