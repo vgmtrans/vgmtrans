@@ -6,16 +6,16 @@
 
 #include "MusicPlayer.h"
 #include "VGMSeq.h"
-#include "SF2File.h"
 #include <QTemporaryDir>
+
+SF2File* SF2Wrapper::sf2_obj_ = nullptr;
+long SF2Wrapper::index_ = 0;
 
 MusicPlayer::MusicPlayer() {
   /* Create the settings. */
   settings = new_fluid_settings();
 
-// Lines commented out are for temporary
-// fluidsynth 1.0 compatibility
-//  fluid_sfloader_t* loader;
+  fluid_sfloader_t* loader;
 
   fluid_settings_setstr(settings, "synth.reverb.active", "yes");
   fluid_settings_setstr(settings, "synth.chorus.active", "no");
@@ -29,8 +29,18 @@ MusicPlayer::MusicPlayer() {
 #endif
 
   synth = new_fluid_synth(settings);
-//  loader = new_fluid_defsfloader(settings);
-//  fluid_synth_add_sfloader(synth, loader);
+  loader = new_fluid_defsfloader(settings);
+
+  fluid_sfloader_set_callbacks(
+    loader,
+    &SF2Wrapper::sf_open,
+    &SF2Wrapper::sf_read,
+    &SF2Wrapper::sf_seek,
+    &SF2Wrapper::sf_tell,
+    &SF2Wrapper::sf_close
+  );
+
+  fluid_synth_add_sfloader(synth, loader);
 }
 
 MusicPlayer& MusicPlayer::Instance() {
@@ -39,10 +49,10 @@ MusicPlayer& MusicPlayer::Instance() {
 }
 
 void MusicPlayer::Toggle() {
-  if(player && !SynthPlaying()) {
-    fluid_player_play(player);
-  } else {
+  if(SynthPlaying()) {
     fluid_player_stop(player);
+  } else {
+    fluid_player_play(player);
   }
 
   emit StatusChange(SynthPlaying());
@@ -80,20 +90,18 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
   }
 
   VGMSeq *seq = coll->GetSeq();
-  SF2File *sf2 = coll->CreateSF2File();
-  MidiFile *midi = seq->ConvertToMidi();
 
+  SF2File *sf2 = coll->CreateSF2File();
+  SF2Wrapper::SetSF2(*sf2);
+
+  char abused_filename[64];
+  const void *sf2_buf = sf2->SaveToMem();
+  sprintf(abused_filename, "&%p", sf2_buf);
+  sfont_id = fluid_synth_sfload(synth, abused_filename, 0);
+
+  MidiFile *midi = seq->ConvertToMidi();
   std::vector<uint8_t> midi_buf;
   midi->WriteMidiToBuffer(midi_buf);
-
-  //FIXME: Load SF2 from memory (requires fluidsynth 2.0)
-  QTemporaryDir dir;
-  std::wstring temp_sf2 = dir.path().toStdWString() + L"/" + L"temp";
-  sf2->SaveSF2File(temp_sf2);
-
-  char temp2[temp_sf2.length()+1];
-  std::wcstombs(temp2, temp_sf2.c_str(), sizeof temp2);
-  sfont_id = fluid_synth_sfload(synth, temp2, 0);
 
   Stop();
 
