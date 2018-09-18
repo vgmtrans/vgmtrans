@@ -95,6 +95,8 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
   std::wcstombs(temp2, temp_sf2.c_str(), sizeof temp2);
   sfont_id = fluid_synth_sfload(synth, temp2, 0);
 
+  Stop();
+
   player = new_fluid_player(synth);
   adriver = new_fluid_audio_driver(settings, synth);
   if(fluid_player_add_mem(player, &midi_buf.at(0), midi_buf.size()) == FLUID_OK) {
@@ -104,4 +106,3 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
   return;
 
 }
-
