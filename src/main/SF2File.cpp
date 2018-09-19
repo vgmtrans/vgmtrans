@@ -166,7 +166,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
     // reverbEffectsSend
     genList.sfGenOper = reverbEffectsSend;
-    genList.genAmount.shAmount = 700;
+    genList.genAmount.shAmount = 250;
     memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
     dataPtr += sizeof(sfGenList);
 
