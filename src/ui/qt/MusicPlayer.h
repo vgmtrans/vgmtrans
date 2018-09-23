@@ -42,7 +42,7 @@ private:
   int sfont_id;
   VGMColl* active_coll = nullptr;
 
-  MusicPlayer();
+    explicit MusicPlayer();
 
 };
 
