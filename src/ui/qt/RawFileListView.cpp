@@ -91,5 +91,4 @@ void RawFileListView::DeleteRawFiles() {
     qtVGMRoot.CloseRawFile(qtVGMRoot.vRawFile[index.row()]);
   }
 
-  return;
 }

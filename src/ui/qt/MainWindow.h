@@ -16,7 +16,7 @@
 
 #include "MenuBar.h"
 #include "RawFileListView.h"
-#include "VGMFileListView.h"
+#include "VGMFilesList.h"
 #include "VGMCollListView.h"
 #include "MdiArea.h"
 #include "IconBar.h"
@@ -39,10 +39,9 @@ private:
 
   MenuBar* ui_menu_bar;
   RawFileListView* ui_rawfiles_list;
-  VGMFileListView* ui_vgmfiles_list;
+  VGMFilesList* ui_vgmfiles_list;
   VGMCollListView* ui_colls_list;
   IconBar* ui_iconbar;
-  MdiArea* ui_tabs_area;
   Logger* ui_logger;
 
   QStatusBar* ui_statusbar;

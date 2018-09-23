@@ -11,16 +11,20 @@
 #include "MdiArea.h"
 #include "Helpers.h"
 
-VGMFileView::VGMFileView(VGMFile *vgmFile) : QSplitter(Qt::Horizontal, nullptr) {
-  filetab_hexview = new HexView(vgmFile, this);
-  filetab_treeview = new VGMFileTreeView(vgmFile, this);
+VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
+  internal_vgmfile_ = vgmfile;
 
-  // FIXME: fixed sizes are meh
-  setSizes(QList<int>() << 850 << 100);
-  setStretchFactor(1, 1);
-  setHandleWidth(1);
+  filetab_splitter_ = new QSplitter(Qt::Horizontal, this);
+  filetab_hexview_ = new HexView(internal_vgmfile_, filetab_splitter_);
+  filetab_treeview_ = new VGMFileTreeView(internal_vgmfile_, filetab_splitter_);
+  filetab_splitter_->setSizes(QList<int>() << 850 << 100);
 
-  QString vgmFileName = QString::fromStdWString(*vgmFile->GetName());
-  setWindowTitle(vgmFileName);
-  setWindowIcon(iconForFileType(vgmFile->GetFileType()));
+  setWindowTitle(QString::fromStdWString(*internal_vgmfile_->GetName()));
+  setWindowIcon(iconForFileType(internal_vgmfile_->GetFileType()));
+
+  setWidget(filetab_splitter_);
+}
+
+void VGMFileView::closeEvent(QCloseEvent *closeEvent) {
+  MdiArea::Instance().RemoveView(internal_vgmfile_);
 }

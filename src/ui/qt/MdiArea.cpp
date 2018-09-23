@@ -5,9 +5,10 @@
  */
 
 #include "MdiArea.h"
+
 #include <QTabBar>
-#include <QAbstractButton>
-#include <QApplication>
+
+#include "Helpers.h"
 
 MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setViewMode(QMdiArea::TabbedView);
@@ -22,8 +23,40 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   }
 }
 
-void MdiArea::RemoveTab(VGMFileView *file_view) {
-  auto *file_view_tab = file_view->parentWidget();
-  file_view_tab->close();
-  removeSubWindow(file_view_tab);
+MdiArea &MdiArea::Instance() {
+  static MdiArea mdi_area;
+  return mdi_area;
+}
+
+void MdiArea::NewView(VGMFile *file) {
+  auto it = registered_views_.find(file);
+  // Check if a fileview for this vgmfile already exists
+  if (it != registered_views_.end()) {
+    // If it does, let's focus it
+    auto *vgmfile_view = it->second;
+    vgmfile_view->setFocus();
+  } else {
+    // No VGMFileView could be found, we have to make one
+    auto *vgmfile_view = new VGMFileView(file);
+    auto tab = addSubWindow(vgmfile_view, Qt::SubWindow);
+    tab->show();
+
+    registered_views_.insert(std::make_pair(file, tab));
+  }
+}
+
+void MdiArea::RemoveView(VGMFile *file) {
+  // Let's check if we have a VGMFileView to remove
+  auto it = registered_views_.find(file);
+  if (it != registered_views_.end()) {
+    // Sanity check
+    if (it->second) {
+      // Close the tab and remove it
+      removeSubWindow(it->second);
+      // Schedule deletion of the VGMFileView
+      it->second->deleteLater();
+    }
+    // Get rid of the saved pointers
+    registered_views_.erase(it);
+  }
 }

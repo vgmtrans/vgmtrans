@@ -5,21 +5,31 @@
  */
 
 #pragma once
-#include <QMdiArea>
-#include "VGMFileView.h"
 
-class QAbstractButton;
+#include <unordered_map>
+
+#include <QMdiArea>
+#include <QMdiSubWindow>
+
+#include "VGMFileView.h"
+#include "VGMFileView.h"
+#include "VGMFile.h"
 
 class MdiArea : public QMdiArea {
   Q_OBJECT
 
 public:
-  explicit MdiArea(QWidget *parent = nullptr);
+  MdiArea(const MdiArea&) = delete;
+  MdiArea& operator=(const MdiArea&) = delete;
+  MdiArea(MdiArea&&) = delete;
+  MdiArea& operator=(MdiArea&&) = delete;
 
-public slots:
-  void RemoveTab(VGMFileView *file_view);
+  static MdiArea& Instance();
 
-protected:
-  QTabBar *getTabBar();
-  QAbstractButton *getCloseButton();
+  void NewView(VGMFile* file);
+  void RemoveView(VGMFile* file);
+
+private:
+  std::unordered_map<VGMFile*, QMdiSubWindow*> registered_views_;
+  explicit MdiArea(QWidget* parent = nullptr);
 };

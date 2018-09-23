@@ -43,15 +43,13 @@ void MainWindow::CreateElements() {
   HeaderContainer* ui_rawfiles_list_container =
       new HeaderContainer(ui_rawfiles_list, QStringLiteral("Imported Files"));
 
-  ui_vgmfiles_list = new VGMFileListView();
+  ui_vgmfiles_list = new VGMFilesList();
   HeaderContainer* ui_vgmfiles_list_container =
       new HeaderContainer(ui_vgmfiles_list, QStringLiteral("Detected files"));
 
   ui_colls_list = new VGMCollListView();
   HeaderContainer* ui_colls_list_container =
       new HeaderContainer(ui_colls_list, QStringLiteral("Detected collections"));
-
-  ui_tabs_area = new MdiArea(this);
 
   ui_logger = new Logger(this);
   addDockWidget(Qt::BottomDockWidgetArea, ui_logger);
@@ -63,7 +61,7 @@ void MainWindow::CreateElements() {
   vertical_splitter->addWidget(ui_colls_list_container);
   vertical_splitter->setHandleWidth(1);
 
-  horizontal_splitter->addWidget(ui_tabs_area);
+  horizontal_splitter->addWidget(&MdiArea::Instance());
   horizontal_splitter->setHandleWidth(1);
 
   vertical_splitter_left->addWidget(ui_rawfiles_list_container);
@@ -75,8 +73,6 @@ void MainWindow::CreateElements() {
 
 void MainWindow::RouteSignals() {
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddLogItem, ui_logger, &Logger::LogMessage);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, ui_vgmfiles_list,
-          &VGMFileListView::RemoveVGMFileItem);
 
   connect(ui_menu_bar, &MenuBar::OpenFile, this, &MainWindow::OpenFile);
   connect(ui_menu_bar, &MenuBar::Exit, this, &MainWindow::close);
@@ -84,10 +80,8 @@ void MainWindow::RouteSignals() {
   connect(ui_iconbar, &IconBar::PlayToggle, ui_colls_list, &VGMCollListView::HandlePlaybackRequest);
   connect(ui_iconbar, &IconBar::StopPressed, ui_colls_list, &VGMCollListView::HandleStopRequest);
 
-  connect(&MusicPlayer::Instance(), &MusicPlayer::StatusChange, ui_iconbar, &IconBar::OnPlayerStatusChange);
-
-  connect(ui_vgmfiles_list, &VGMFileListView::AddMdiTab, ui_tabs_area, &MdiArea::addSubWindow);
-  connect(ui_vgmfiles_list, &VGMFileListView::RemoveMdiTab, ui_tabs_area, &MdiArea::RemoveTab);
+  connect(&MusicPlayer::Instance(), &MusicPlayer::StatusChange, ui_iconbar,
+          &IconBar::OnPlayerStatusChange);
 
   connect(ui_menu_bar, &MenuBar::LoggerToggled,
           [=] { ui_logger->setHidden(!ui_menu_bar->IsLoggerToggled()); });
@@ -100,7 +94,8 @@ void MainWindow::RouteSignals() {
     VGMFile* clicked_item = qtVGMRoot.vVGMFile[ui_vgmfiles_list->currentIndex().row()];
     ui_statusbar_offset->setText("Offset: 0x" +
                                  QString::number(clicked_item->dwOffset, 16).toUpper());
-    ui_statusbar_length->setText("Length: 0x" + QString::number(clicked_item->size(), 16).toUpper());
+    ui_statusbar_length->setText("Length: 0x" +
+                                 QString::number(clicked_item->size(), 16).toUpper());
   });
 }
 

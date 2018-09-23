@@ -7,18 +7,26 @@
 #pragma once
 
 #include <QSplitter>
+#include <QMdiSubWindow>
+#include <QCloseEvent>
+#include <QGridLayout>
 
 class VGMFile;
 class HexView;
 class VGMFileTreeView;
 
-class VGMFileView : public QSplitter {
+class VGMFileView : public QMdiSubWindow {
   Q_OBJECT
 
 public:
-  explicit VGMFileView(VGMFile *vgmFile);
+  explicit VGMFileView(VGMFile *vgmfile);
 
 protected:
-  HexView *filetab_hexview;
-  VGMFileTreeView *filetab_treeview;
+  QSplitter *filetab_splitter_;
+  HexView *filetab_hexview_;
+  VGMFileTreeView *filetab_treeview_;
+  VGMFile *internal_vgmfile_;
+
+private:
+  void closeEvent(QCloseEvent *closeEvent) override;
 };
