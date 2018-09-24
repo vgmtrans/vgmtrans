@@ -18,7 +18,7 @@
 
 VGMFilesListModel::VGMFilesListModel(QObject *parent) : QAbstractTableModel(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMFile, this, &VGMFilesListModel::AddVGMFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedRawFile, this, &VGMFilesListModel::RemoveVGMFile);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedVGMFile, this, &VGMFilesListModel::RemoveVGMFile);
 }
 
 QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
@@ -66,7 +66,7 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
 }
 
 QVariant VGMFilesListModel::headerData(int column, Qt::Orientation orientation, int role) const {
-  if (role != Qt::DisplayRole)
+  if (orientation == Qt::Vertical || role != Qt::DisplayRole)
     return QVariant();
 
   switch (column) {
@@ -87,20 +87,28 @@ QVariant VGMFilesListModel::headerData(int column, Qt::Orientation orientation, 
 }
 
 int VGMFilesListModel::rowCount(const QModelIndex &parent) const {
+  if (parent.isValid())
+    return 0;
+
   return static_cast<int>(qtVGMRoot.vVGMFile.size());
 }
 
 int VGMFilesListModel::columnCount(const QModelIndex &parent) const {
+  if (parent.isValid())
+    return 0;
+
   return 3;
 }
 
 void VGMFilesListModel::AddVGMFile() {
-  beginInsertRows(QModelIndex(), qtVGMRoot.vVGMFile.size(), qtVGMRoot.vVGMFile.size());
+  int position = static_cast<int>(qtVGMRoot.vVGMFile.size()) - 1;
+  beginInsertRows(QModelIndex(), position, position);
   endInsertRows();
 }
 
 void VGMFilesListModel::RemoveVGMFile() {
-  beginRemoveRows(QModelIndex(), qtVGMRoot.vVGMFile.size(), qtVGMRoot.vVGMFile.size());
+  int position = static_cast<int>(qtVGMRoot.vVGMFile.size()) - 1;
+  beginRemoveRows(QModelIndex(), position, position);
   endRemoveRows();
 }
 
@@ -117,8 +125,10 @@ VGMFilesList::VGMFilesList(QWidget *parent) : QTableView(parent) {
   setContextMenuPolicy(Qt::CustomContextMenu);
   setWordWrap(false);
 
+  auto *proxy_model = new QSortFilterProxyModel(this);
   view_model = new VGMFilesListModel();
-  setModel(view_model);
+  proxy_model->setSourceModel(view_model);
+  setModel(proxy_model);
 
   verticalHeader()->hide();
   auto header_hor = horizontalHeader();

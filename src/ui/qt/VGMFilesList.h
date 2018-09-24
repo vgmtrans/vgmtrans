@@ -9,6 +9,7 @@
 #include <QTableView>
 #include <QAbstractTableModel>
 #include <QKeyEvent>
+#include <QSortFilterProxyModel>
 
 #include "VGMFile.h"
 
