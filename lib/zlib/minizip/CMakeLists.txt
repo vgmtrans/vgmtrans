@@ -27,6 +27,8 @@ set(MINIZIP_SRCS
   zip.c
 )
 
+# Don't really know any better way...
+include_directories(..)
 add_library(minizip STATIC ${MINIZIP_SRCS} ${MINIZIP_PUBLIC_HDRS})
 
 target_include_directories(minizip
