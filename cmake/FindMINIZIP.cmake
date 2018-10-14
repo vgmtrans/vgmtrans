@@ -1,30 +1,28 @@
-# - Find minizip
-# Find the native MINIZIP includes and library
-#
-#  MINIZIP_INCLUDE_DIR - where to find minizip.h, etc.
-#  MINIZIP_LIBRARIES   - List of libraries when using minizip.
-#  MINIZIP_FOUND       - True if minizip found.
+# VGMTrans (c) 2018
+# Licensed under the zlib license
+# Check the included LICENSE.txt for details
+# #
+# FindMINIZIP.cmake
+# Locate MiniZip headers and libraries
+#  MINIZIP_INCLUDE_DIR - Path to the MiniZip headers
+#  MINIZIP_LIBRARIES   - Path to the MiniZip libraries
+#  MINIZIP_FOUND       - The system has Minizip
 
+find_path(MINIZIP_INCLUDE_DIR
+        NAMES unzip.h
+        PATH_SUFFIXES minizip
+)
 
-IF (MINIZIP_INCLUDE_DIR)
-  # Already in cache, be silent
-  SET(MINIZIP_FIND_QUIETLY TRUE)
-ENDIF (MINIZIP_INCLUDE_DIR)
+find_library(MINIZIP_LIBRARIES
+        NAMES minizip
+)
 
-FIND_PATH(MINIZIP_INCLUDE_DIR zip.h PATH_SUFFIXES minizip)
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(MiniZip
+        FOUND_VAR MINIZIP_FOUND
+        REQUIRED_VARS MINIZIP_LIBRARIES MINIZIP_INCLUDE_DIR
+)
 
-SET(MINIZIP_NAMES minizip)
-FIND_LIBRARY(MINIZIP_LIBRARY NAMES ${MINIZIP_NAMES} )
-
-# handle the QUIETLY and REQUIRED arguments and set MINIZIP_FOUND to TRUE if 
-# all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(MiniZip DEFAULT_MSG MINIZIP_LIBRARY MINIZIP_INCLUDE_DIR)
-
-IF(MINIZIP_FOUND)
-  SET( MINIZIP_LIBRARIES ${MINIZIP_LIBRARY} )
-ELSE(MINIZIP_FOUND)
-  SET( MINIZIP_LIBRARIES )
-ENDIF(MINIZIP_FOUND)
-
-MARK_AS_ADVANCED( MINIZIP_LIBRARY MINIZIP_INCLUDE_DIR )
+mark_as_advanced(
+        MINIZIP_LIBRARIES MINIZIP_INCLUDE_DIR
+)

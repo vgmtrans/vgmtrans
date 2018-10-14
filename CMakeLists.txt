@@ -56,9 +56,10 @@ else()
 endif()
 
 # Dependencies needed for the backend #
+
 find_package(ZLIB) # Needed for psf decompression
 if(ZLIB_FOUND)
-    message(STATUS "Using system Zlib")
+    message(STATUS "Using system Zlib ${ZLIB_VERSION_STRING}")
 else()
     message(STATUS "Using static Zlib fallback")
     add_subdirectory(lib/zlib)
@@ -72,12 +73,23 @@ else()
     add_subdirectory(lib/zlib/minizip)
 endif()
 
-message(STATUS "Using static TinyXML fallback") # Needed for the MAME loader
-add_subdirectory(lib/tinyxml)
+find_package(TINYXML)
+if(TINYXML_FOUND)
+    message(STATUS "Using system TinyXML")
+else()
+    message(STATUS "Using static TinyXML fallback") # Needed for the MAME loader
+    add_subdirectory(lib/tinyxml)
+endif()
 add_definitions(-DTIXML_USE_STL)
 
+# Qt frontend dependencies #
+
 find_package(Qt5 REQUIRED COMPONENTS Gui Widgets)
-message(STATUS "Using Qt ${Qt5Core_VERSION}")
+if(Qt5Core_FOUND)
+    message(STATUS "Using system Qt ${Qt5Core_VERSION}")
+else()
+    message(FATAL_ERROR "Please install Qt5! Static fallback not available")
+endif()
 
 set(CMAKE_AUTOMOC ON)
 set(RESOURCE_PATH
@@ -86,6 +98,12 @@ set(RESOURCE_PATH
 qt5_add_resources(UI_RESOURCES ${RESOURCE_PATH})
 
 find_package(FLUIDSYNTH REQUIRED)
+if(FLUIDSYNTH_FOUND)
+    message(STATUS "Using system FluidSynth ${FLUIDSYNTH_VERSION_STRING}")
+else()
+    message(FATAL_ERROR "Please install FluidSynth! Static fallback not available")
+endif()
+
 
 # Targets #
 
