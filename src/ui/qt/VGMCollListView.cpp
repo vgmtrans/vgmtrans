@@ -40,7 +40,7 @@ Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
   if (!index.isValid())
     return Qt::ItemIsEnabled;
 
-  return QAbstractItemModel::flags(index) | Qt::ItemIsEditable;
+  return QAbstractListModel::flags(index) | Qt::ItemIsEditable;
 }
 
 /*
@@ -49,13 +49,13 @@ Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
 
 void VGMCollNameEditor::setEditorData(QWidget *editor, const QModelIndex &index) const {
   QString orig_name = index.model()->data(index, Qt::EditRole).toString();
-  QLineEdit *line_edit = static_cast<QLineEdit *>(editor);
+  QLineEdit *line_edit = dynamic_cast<QLineEdit *>(editor);
   line_edit->setText(orig_name);
 }
 
 void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
                                      const QModelIndex &index) const {
-  QLineEdit *line_edit = static_cast<QLineEdit *>(editor);
+  QLineEdit *line_edit = dynamic_cast<QLineEdit *>(editor);
   auto new_name = line_edit->text().toStdWString();
   qtVGMRoot.vVGMColl[index.row()]->SetName(&new_name);
   model->dataChanged(index, index);
@@ -109,15 +109,15 @@ void VGMCollListView::CollMenu(const QPoint &pos) {
 
     if (vgmcoll_menu->exec(mapToGlobal(pos)) == export_all) {
       auto save_path = qtVGMRoot.UI_GetSaveDirPath();
-      for (auto &coll : qtVGMRoot.vVGMColl) {
-        coll->SetDefaultSavePath(save_path);
-        coll->OnSaveAll();
+      if(!save_path.empty()) {
+        for (auto &coll : qtVGMRoot.vVGMColl) {
+          coll->SetDefaultSavePath(save_path);
+          coll->OnSaveAll();
+        }
       }
     }
     vgmcoll_menu->deleteLater();
   }
-
-  return;
 }
 
 void VGMCollListView::keyPressEvent(QKeyEvent* e) {
@@ -139,7 +139,7 @@ void VGMCollListView::keyPressEvent(QKeyEvent* e) {
 
 void VGMCollListView::HandlePlaybackRequest() {
   QModelIndexList list = selectionModel()->selectedIndexes();
-  if (list.size() == 0 || list[0].row() >= qtVGMRoot.vVGMColl.size())
+  if (list.empty() || list[0].row() >= qtVGMRoot.vVGMColl.size())
     return;
 
   MusicPlayer& player = MusicPlayer::Instance();
@@ -151,4 +151,3 @@ void VGMCollListView::HandleStopRequest() {
   MusicPlayer& player = MusicPlayer::Instance();
   player.Stop();
 }
-
