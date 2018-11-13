@@ -51,11 +51,9 @@ void MdiArea::RemoveView(VGMFile *file) {
   if (it != registered_views_.end()) {
     // Sanity check
     if (it->second) {
-      // Close the tab
+      // Close the tab (automatically deletes it)
       // Workaround for QTBUG-5446 (removeMdiSubWindow would be a better option)
       it->second->close();
-      // Schedule its deletion
-      it->second->deleteLater();
     }
     // Get rid of the saved pointers
     registered_views_.erase(it);

@@ -21,6 +21,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
 
   setWindowTitle(QString::fromStdWString(*internal_vgmfile_->GetName()));
   setWindowIcon(iconForFileType(internal_vgmfile_->GetFileType()));
+  setAttribute(Qt::WA_DeleteOnClose);
 
   setWidget(filetab_splitter_);
 }
