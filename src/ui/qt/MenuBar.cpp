@@ -39,7 +39,8 @@ void MenuBar::AppendInfoMenu() {
   QMenu* info_dropdown = addMenu("Help");
   menu_about_dlg = info_dropdown->addAction("About VGMTrans");
   connect(menu_about_dlg, &QAction::triggered, [=] {
-    QMessageBox::about(QApplication::activeWindow(), "About VGMTrans",
-                       "Copyright (c) 2018 - The VGMTrans Team");
+    QMessageBox::about(QApplication::activeWindow(),
+                       "About VGMTrans",
+                       "Copyright (c) 2002-2018 - The VGMTrans Team, released under the Zlib license.");
   });
 }

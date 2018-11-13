@@ -11,5 +11,6 @@
   <file>images/sample-set-32.png</file>
   <file>images/sequence-32.png</file>
   <file>images/stop-32.png</file>
+  <file>images/logo.png</file>
 </qresource>
 </RCC>
