@@ -42,9 +42,13 @@ private:
   int sfont_id;
   VGMColl* active_coll = nullptr;
 
-    explicit MusicPlayer();
+  explicit MusicPlayer();
 
 };
+
+/* Not the most elegant way, but it's better than
+   messing with the build system */
+#if FLUIDSYNTH_VERSION_MAJOR >= 2
 
 /*
  * This class represents a static wrapper to get around
@@ -119,3 +123,5 @@ private:
   static long index_;
 
 };
+
+#endif

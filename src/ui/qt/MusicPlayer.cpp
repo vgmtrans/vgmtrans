@@ -8,14 +8,14 @@
 #include "VGMSeq.h"
 #include <QTemporaryDir>
 
-SF2File *SF2Wrapper::sf2_obj_ = nullptr;
-long SF2Wrapper::index_ = 0;
+#if FLUIDSYNTH_VERSION_MAJOR >= 2
+  SF2File *SF2Wrapper::sf2_obj_ = nullptr;
+  long SF2Wrapper::index_ = 0;
+#endif
 
 MusicPlayer::MusicPlayer() {
   /* Create the settings. */
   settings = new_fluid_settings();
-
-  fluid_sfloader_t *loader;
 
   fluid_settings_setstr(settings, "synth.reverb.active", "yes");
   fluid_settings_setstr(settings, "synth.chorus.active", "no");
@@ -29,12 +29,15 @@ MusicPlayer::MusicPlayer() {
 #endif
 
   synth = new_fluid_synth(settings);
-  loader = new_fluid_defsfloader(settings);
+/* Let's keep backwards-compatibility */
+#if FLUIDSYNTH_VERSION_MAJOR >= 2
+  fluid_sfloader_t *loader = new_fluid_defsfloader(settings);
 
   fluid_sfloader_set_callbacks(loader, &SF2Wrapper::sf_open, &SF2Wrapper::sf_read,
                                &SF2Wrapper::sf_seek, &SF2Wrapper::sf_tell, &SF2Wrapper::sf_close);
 
   fluid_synth_add_sfloader(synth, loader);
+#endif
 }
 
 MusicPlayer &MusicPlayer::Instance() {
@@ -95,11 +98,21 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
   if (!sf2) {
     return;
   }
+
+#if FLUIDSYNTH_VERSION_MAJOR >= 2
   SF2Wrapper::SetSF2(*sf2);
 
   char abused_filename[64];
   const void *sf2_buf = sf2->SaveToMem();
   sprintf(abused_filename, "&%p", sf2_buf);
+#else
+  QTemporaryDir dir;
+  std::wstring temp_sf2 = dir.path().toStdWString() + L"/" + L"temp";
+  sf2->SaveSF2File(temp_sf2);
+  char abused_filename[temp_sf2.length()+1];
+  std::wcstombs(abused_filename, temp_sf2.c_str(), sizeof abused_filename);
+#endif
+
   sfont_id = fluid_synth_sfload(synth, abused_filename, 0);
 
   MidiFile *midi = seq->ConvertToMidi();
