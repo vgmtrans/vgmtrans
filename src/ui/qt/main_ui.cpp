@@ -20,7 +20,6 @@ int main(int argc, char *argv[]) {
 
   qtVGMRoot.Init();
   MainWindow window;
-  window.setWindowIcon(QIcon(":/images/logo.png"));
   window.show();
 
   return app.exec();

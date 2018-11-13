@@ -7,6 +7,9 @@
 #include <QFileInfo>
 #include <QMimeData>
 #include <QVBoxLayout>
+#include <QStandardPaths>
+#include <QFileDialog>
+
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
 #include "HeaderContainer.h"
@@ -16,6 +19,8 @@
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
+  setWindowIcon(QIcon(":/images/logo.png"));
+
   setUnifiedTitleAndToolBarOnMac(true);
   setAcceptDrops(true);
   setContextMenuPolicy(Qt::NoContextMenu);
@@ -100,10 +105,14 @@ void MainWindow::RouteSignals() {
 }
 
 void MainWindow::OpenFile() {
-  auto filename = qtVGMRoot.UI_GetOpenFilePath();
+  auto filenames = QFileDialog::getOpenFileNames(this, "Select a file...",
+                   QStandardPaths::writableLocation(QStandardPaths::MusicLocation), "All files (*)");
 
-  if (!filename.empty())
-    qtVGMRoot.OpenRawFile(filename);
+  if (filenames.isEmpty())
+    return;
+
+  for(QString &filename : filenames)  
+    qtVGMRoot.OpenRawFile(filename.toStdWString());
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
