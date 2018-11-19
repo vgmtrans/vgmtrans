@@ -88,7 +88,7 @@ void CVGMCollListView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 }
 
 void CVGMCollListView::OnDoubleClick(UINT nFlags, CPoint point) {
-  winroot.Play();
+    winroot.Play();
 }
 
 

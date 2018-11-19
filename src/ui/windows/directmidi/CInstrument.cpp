@@ -144,18 +144,18 @@ HRESULT CInstrument::SetPatch(DWORD dwdstPatchMidi)
 	HRESULT hr = DM_FAILED;
 	TCHAR strMembrFunc [] = _T("CInstrument::SetPach()");
 
-  try {
-    if (m_pInstrument)
-    {
-      if (FAILED(hr = m_pInstrument->SetPatch(dwdstPatchMidi)))
-        throw CDMusicException(strMembrFunc, hr, __LINE__);
-      m_dwPatchInMidi = dwdstPatchMidi;
-    }
-    else throw CDMusicException(strMembrFunc, hr, __LINE__);
-  }
-  catch (...) {
-    return S_FALSE;
-  }
+	try {
+		if (m_pInstrument)
+		{
+			if (FAILED(hr = m_pInstrument->SetPatch(dwdstPatchMidi)))
+				throw CDMusicException(strMembrFunc, hr, __LINE__);
+			m_dwPatchInMidi = dwdstPatchMidi;
+		}
+		else throw CDMusicException(strMembrFunc, hr, __LINE__);
+	}
+	catch (...) {
+		return S_FALSE;
+	}
 	return S_OK;
 }	
 
