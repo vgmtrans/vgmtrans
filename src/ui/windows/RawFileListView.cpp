@@ -337,3 +337,16 @@ void CRawFileListView::OnCloseFile(UINT uCode, int nID, HWND hwndCtrl)
 		pRoot->CloseRawFile((RawFile*)item.lParam);
 	}
 }
+
+void CRawFileListView::OnCloseAllFiles(UINT uCode, int nID, HWND hwndCtrl) {
+	int iItem;
+	while ((iItem = GetNextItem(-1, LVNI_ALL)) != -1)
+	{
+		LVITEM item;
+		item.iItem = iItem;
+		item.iSubItem = 0;
+		item.mask = LVIF_PARAM;
+		GetItem(&item);
+		pRoot->CloseRawFile((RawFile*)item.lParam);
+	}
+}

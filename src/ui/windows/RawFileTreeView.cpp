@@ -216,7 +216,10 @@ void CRawFileTreeView::OnKeyDown(TCHAR nChar, UINT repeats, UINT code)
 	switch (nChar)
 	{
 	case VK_DELETE:
-		OnCloseFile(0, 0, 0);
+    if (GetAsyncKeyState(VK_CONTROL))
+      SendMessage(TVM_DELETEITEM, 0, (int)TVI_ROOT);
+    else
+		  OnCloseFile(0, 0, 0);
 		//SendMessage(IDC_CLOSEFILE, 0, 0);
 		break;
 	}
