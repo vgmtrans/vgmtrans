@@ -39,6 +39,7 @@ public:
 		MSG_WM_DESTROY(OnDestroy)
 		MSG_WM_CHAR(OnChar)
 		MSG_WM_CONTEXTMENU(OnContextMenu)
+    MSG_WM_LBUTTONDBLCLK(OnDoubleClick)
 		//MSG_WM_LBUTTONDBLCLK(OnLButtonDblClk)
 		//REFLECTED_NOTIFY_CODE_HANDLER_EX(LVN_COLUMNCLICK, OnColumnClick)
 		//REFLECTED_NOTIFY_CODE_HANDLER(LVN_ITEMACTIVATE, OnLvnItemActivate)
@@ -54,7 +55,8 @@ public:
 
 	LRESULT OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	void OnDestroy(void);
-	void OnChar(UINT nChar, UINT nRepCnt, UINT nFlags);
+  void OnChar(UINT nChar, UINT nRepCnt, UINT nFlags);
+  void OnDoubleClick(UINT nFlags, CPoint point);
 	LRESULT OnContextMenu(HWND hwndCtrl, CPoint ptClick );
 	//void OnLButtonDblClk(UINT nFlags, CPoint point);
 

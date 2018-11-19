@@ -11,6 +11,9 @@ AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset)
   UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   bUsesIndividualArts = false;
   UseReverb();
+  name.clear();
+  name.append(file->GetFileName());
+  name.append(L"[akao]");
 }
 
 AkaoSeq::~AkaoSeq(void) {
@@ -44,7 +47,9 @@ bool AkaoSeq::GetHeaderInfo(void) {
     return false;
   }
 
-  name = L"Akao Seq";
+  //if(name)
+    //name = L"Akao Seq3";
+  //this->SetNa
 
   VGMHeader *hdr = AddHeader(dwOffset, 0x40);
   hdr->AddSig(dwOffset, 4);

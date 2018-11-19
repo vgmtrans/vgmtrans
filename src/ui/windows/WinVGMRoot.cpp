@@ -73,7 +73,14 @@ void WinVGMRoot::Play(void)
 				Alert(L"Unable to create DLS. It is likely corrupted.");
 				return;
 			}
-			musicplayer.ChangeDLS(&dls);
+      try {
+        musicplayer.ChangeDLS(&dls);
+      }
+      catch (...) {
+        Alert(L"Failed to ChangeDLS(). Please retry.");
+        Stop();
+        return;
+      }
 			loadedColl = selectedColl;
 		}
 		musicplayer.Play((VGMItem*)seq, 0);

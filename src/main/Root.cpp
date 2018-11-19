@@ -155,8 +155,14 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
     }
     else {
       //otherwise, use every scanner
-      for (uint32_t i = 0; i < vScanner.size(); i++)
-        vScanner[i]->Scan(newRawFile);
+      for (uint32_t i = 0; i < vScanner.size(); i++) {
+        try {
+          vScanner[i]->Scan(newRawFile);
+        }
+        catch (...) {
+          return false;
+        }
+      }
     }
   }
   //this->UI_OnEndScan();

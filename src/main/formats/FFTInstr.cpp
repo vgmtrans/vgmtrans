@@ -77,7 +77,7 @@ bool WdsInstrSet::GetHeaderInfo() {
 //	Memo:
 //		VGMInstrSet::Load()関数から呼ばれる
 //==============================================================
-bool    WdsInstrSet::GetInstrPointers() {
+bool WdsInstrSet::GetInstrPointers() {
 
   uint32_t iOffset = dwOffset + sizeof(WdsHdr);    //pointer of attribute table
 
