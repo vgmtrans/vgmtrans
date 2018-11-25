@@ -36,6 +36,7 @@ void MainWindow::CreateElements() {
   setMenuBar(ui_menu_bar);
   ui_iconbar = new IconBar(this);
   addToolBar(ui_iconbar);
+  ui_mdiarea = MdiArea::Init();
 
   ui_statusbar = new QStatusBar(this);
   ui_statusbar_offset = new QLabel();
@@ -66,7 +67,7 @@ void MainWindow::CreateElements() {
   vertical_splitter->addWidget(ui_colls_list_container);
   vertical_splitter->setHandleWidth(1);
 
-  horizontal_splitter->addWidget(&MdiArea::Instance());
+  horizontal_splitter->addWidget(ui_mdiarea);
   horizontal_splitter->setHandleWidth(1);
 
   vertical_splitter_left->addWidget(ui_rawfiles_list_container);

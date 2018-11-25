@@ -23,8 +23,9 @@ public:
   MdiArea& operator=(const MdiArea&) = delete;
   MdiArea(MdiArea&&) = delete;
   MdiArea& operator=(MdiArea&&) = delete;
-  
-  static MdiArea& Instance();
+
+  static MdiArea* Init();
+  static MdiArea* Instance();
 
   void NewView(VGMFile* file);
   void RemoveView(VGMFile* file);

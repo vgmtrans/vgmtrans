@@ -193,10 +193,10 @@ void VGMFilesList::keyPressEvent(QKeyEvent *input) {
 }
 
 void VGMFilesList::RemoveVGMFile(VGMFile *file) {
-  MdiArea::Instance().RemoveView(file);
+  MdiArea::Instance()->RemoveView(file);
   view_model->RemoveVGMFile();
 }
 
 void VGMFilesList::RequestVGMFileView(QModelIndex index) {
-  MdiArea::Instance().NewView(qtVGMRoot.vVGMFile[index.row()]);
+  MdiArea::Instance()->NewView(qtVGMRoot.vVGMFile[index.row()]);
 }

@@ -43,6 +43,7 @@ private:
   VGMCollListView* ui_colls_list;
   IconBar* ui_iconbar;
   Logger* ui_logger;
+  MdiArea* ui_mdiarea;
 
   QStatusBar* ui_statusbar;
   QLabel* ui_statusbar_offset;

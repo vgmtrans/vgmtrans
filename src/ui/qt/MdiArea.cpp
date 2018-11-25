@@ -23,11 +23,6 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   }
 }
 
-MdiArea &MdiArea::Instance() {
-  static MdiArea mdi_area;
-  return mdi_area;
-}
-
 void MdiArea::NewView(VGMFile *file) {
   auto it = registered_views_.find(file);
   // Check if a fileview for this vgmfile already exists
@@ -58,4 +53,15 @@ void MdiArea::RemoveView(VGMFile *file) {
     // Get rid of the saved pointers
     registered_views_.erase(it);
   }
+}
+
+static MdiArea* mdi_area_;
+
+MdiArea* MdiArea::Init() {
+  mdi_area_ = new MdiArea();
+  return mdi_area_;
+}
+
+MdiArea* MdiArea::Instance() {
+  return mdi_area_;
 }

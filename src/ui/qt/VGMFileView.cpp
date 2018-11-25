@@ -27,5 +27,5 @@ VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
 }
 
 void VGMFileView::closeEvent(QCloseEvent *closeEvent) {
-  MdiArea::Instance().RemoveView(internal_vgmfile_);
+  MdiArea::Instance()->RemoveView(internal_vgmfile_);
 }
