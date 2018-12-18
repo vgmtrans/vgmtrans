@@ -51,7 +51,7 @@ void MdiArea::RemoveView(VGMFile *file) {
       it->second->close();
     }
     // Get rid of the saved pointers
-    registered_views_.erase(it);
+    registered_views_.erase(file);
   }
 }
 
