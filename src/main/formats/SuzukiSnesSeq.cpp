@@ -292,9 +292,11 @@ bool SuzukiSnesTrack::ReadEvent(void) {
       uint8_t durIndex = statusByte / 14;
       uint8_t noteIndex = statusByte % 14;
 
-      uint8_t dur;
+      uint32_t dur;
       if (durIndex == 13) {
         dur = GetByte(curOffset++);
+        if (parentSeq->version == SUZUKISNES_SD3)
+          dur++;
       }
       else {
         dur = SuzukiSnesSeq::NOTE_DUR_TABLE[durIndex];
