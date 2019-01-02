@@ -124,7 +124,7 @@ VGMFilesList::VGMFilesList(QWidget *parent) : QTableView(parent) {
   setSortingEnabled(true);
   setContextMenuPolicy(Qt::CustomContextMenu);
   setWordWrap(false);
-
+  
   auto *proxy_model = new QSortFilterProxyModel(this);
   view_model = new VGMFilesListModel();
   proxy_model->setSourceModel(view_model);
@@ -174,12 +174,12 @@ void VGMFilesList::keyPressEvent(QKeyEvent *input) {
   switch (input->key()) {
     case Qt::Key_Delete:
     case Qt::Key_Backspace: {
-      QModelIndexList list = selectionModel()->selectedRows();
 
-      if (list.isEmpty())
+      if(!selectionModel()->hasSelection())
         return;
 
-      for (auto &index : list) {
+      QModelIndexList list = selectionModel()->selectedRows();
+      for(auto &index : list) {
         qtVGMRoot.RemoveVGMFile(qtVGMRoot.vVGMFile[index.row()]);
       }
 
