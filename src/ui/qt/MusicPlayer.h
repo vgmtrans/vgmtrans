@@ -26,6 +26,8 @@ public:
 
   static MusicPlayer& Instance();
 
+  ~MusicPlayer();
+
   bool SynthPlaying();
   void LoadCollection(VGMColl* coll);
   void Toggle();

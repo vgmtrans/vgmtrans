@@ -40,6 +40,10 @@ MusicPlayer::MusicPlayer() {
 #endif
 }
 
+MusicPlayer::~MusicPlayer() {
+  Stop();
+}
+
 MusicPlayer &MusicPlayer::Instance() {
   static MusicPlayer gui_player;
   return gui_player;
@@ -86,7 +90,7 @@ bool MusicPlayer::SynthPlaying() {
 
 void MusicPlayer::LoadCollection(VGMColl *coll) {
   if (active_coll == coll) {
-    return;  // Already loaded
+    return;
   }
 
   VGMSeq *seq = coll->GetSeq();
