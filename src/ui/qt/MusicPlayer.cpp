@@ -10,6 +10,7 @@
 
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
   SF2File *SF2Wrapper::sf2_obj_ = nullptr;
+  void *SF2Wrapper::old_sf2_buf_ = nullptr;
   long SF2Wrapper::index_ = 0;
 #endif
 
@@ -130,4 +131,8 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
   if (fluid_player_add_mem(player, &midi_buf.at(0), midi_buf.size()) == FLUID_OK) {
     active_coll = coll;
   }
+
+  /* SF2File and sf2_buf are deleted once not needed anymore,
+  midi_buf will just go out of scope (fluidsynth copies it) */
+  delete midi;
 }

@@ -63,23 +63,35 @@ class SF2Wrapper {
 
 public:
   static void SetSF2(SF2File& obj) {
+    if(sf2_obj_) {
+      delete sf2_obj_;
+    }
+    
+    if(old_sf2_buf_) {
+      delete static_cast<char*>(old_sf2_buf_);
+      old_sf2_buf_ = nullptr;
+    }
+
     sf2_obj_ = &obj;
     index_ = 0;
   }
 
   static void* sf_open(const char* filename) {
-    void *p;
+    void *sf2_buf;
 
     if(filename[0] != '&') {
         return nullptr;
     }
 
-    sscanf(filename, "&%p", &p);
+    sscanf(filename, "&%p", &sf2_buf);
 
-    return p;
+    old_sf2_buf_ = sf2_buf;
+
+    return sf2_buf;
   }
 
   static int sf_read(void *buf, int count, void *handle) {
+
     char *newhandle = (char *) handle;
     newhandle += index_;
 
@@ -118,10 +130,19 @@ public:
 
   static long sf_tell(void *) { return index_; }
 
-  static int sf_close(void *) { return FLUID_OK; }
+  /* Guaranteed to be called only on a SF2 buf */
+  static int sf_close(void *file) {
+    if(file == old_sf2_buf_ && old_sf2_buf_ != nullptr) {
+      delete static_cast<char*>(old_sf2_buf_);
+      old_sf2_buf_ = nullptr;
+    }
+
+    return FLUID_OK; 
+  }
 
 private:
   static SF2File* sf2_obj_;
+  static void* old_sf2_buf_;
   static long index_;
 
 };
