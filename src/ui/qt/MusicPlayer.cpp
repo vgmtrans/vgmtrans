@@ -18,8 +18,13 @@ MusicPlayer::MusicPlayer() {
   /* Create the settings. */
   settings = new_fluid_settings();
 
+#if FLUIDSYNTH_VERSION_MAJOR >= 2
+  fluid_settings_setint(settings, "synth.reverb.active", 1);
+  fluid_settings_setint(settings, "synth.chorus.active", 0);
+#else
   fluid_settings_setstr(settings, "synth.reverb.active", "yes");
   fluid_settings_setstr(settings, "synth.chorus.active", "no");
+#endif
   fluid_settings_setstr(settings, "synth.midi-bank-select", "mma");
   fluid_settings_setint(settings, "synth.midi-channels", 48);
   fluid_settings_setstr(settings, "player.timing-source", "system");
