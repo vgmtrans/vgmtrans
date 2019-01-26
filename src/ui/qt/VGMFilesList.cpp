@@ -125,10 +125,10 @@ VGMFilesList::VGMFilesList(QWidget *parent) : QTableView(parent) {
   setContextMenuPolicy(Qt::CustomContextMenu);
   setWordWrap(false);
   
-  auto *proxy_model = new QSortFilterProxyModel(this);
+  //auto *proxy_model = new QSortFilterProxyModel(this);
   view_model = new VGMFilesListModel();
-  proxy_model->setSourceModel(view_model);
-  setModel(proxy_model);
+  //proxy_model->setSourceModel(view_model);
+  setModel(view_model);
 
   verticalHeader()->hide();
   auto header_hor = horizontalHeader();
