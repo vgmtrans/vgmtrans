@@ -1,11 +1,13 @@
-[![Build Status](https://travis-ci.org/vgmtrans/vgmtrans.svg?branch=master)](https://travis-ci.org/vgmtrans/vgmtrans)
-[![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/djsal74fdlue142s/branch/master?svg=true)](https://ci.appveyor.com/project/mikelow/vgmtrans)
+# VGMTrans - Video Game Music Translator
+---
+[![Build Status](https://travis-ci.org/vgmtrans/vgmtrans.svg?branch=refactor)](https://travis-ci.org/vgmtrans/vgmtrans) [![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/djsal74fdlue142s/branch/refactor?svg=true)](https://ci.appveyor.com/project/mikelow/vgmtrans)
 
-VGMTrans - Video Game Music Translator
-======================================
+*This branch is experimental and aims to modernize and clean the codebase. Don't use this unless you know what you are doing.*
 
-VGMTrans converts a music files used in console video games into standard midi and dls/sf2 files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
+VGMTrans converts music files used in console videogames into standard MIDI and soundfonts.
+It also plays these files in-program.
 
+The following formats are supported with varying degrees of accuracy:
 - Sony's PS2 sequence and instrument formats (.bq, .hd, .bd)
 - Squaresoft's PS2 sequence and instrument formats (.bgm, .wd)
 - Nintendo's Nintendo DS sequence and instrument formats (SDAT)
@@ -36,20 +38,6 @@ The source code includes preliminary work on additional formats.
 
 This software is released under the zlib/libpng License. See LICENSE.txt.
 
-How to use it
--------------
-
-To load a file, drag and drop the file into the application window.  The program will scan any file for contained music files. It knows how to unpack psf, psf2 and certain zipped mame rom sets as specified in the mame_roms.xml file, though this last feature is fairly undeveloped.  For example, drag on an NDS rom file and it will detect SDAT files and their contents.
-
-Once loaded, double-clicking a file listed under "Detected Music Files" will bring up a color-coded hexadecimal display of the file with a break-down of each format element.  Click the hexadecimal to highlight an element and see more information.  Right click a detected file to bring up save options.  To remove files from the "Detected Music Files" or "Scanned Files" list, highlight the files and press the delete key.
-
-The "Collections" window displays file groupings that the software was able to infer.  A sequence file will be paired with one or more instrument sets and/or sample collections. A collection can be played by highlighting it and pressing the play button or spacebar.
-
-How to compile it
------------------
-
-Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for information on how to compile the two flavors of VGMTrans. 
-
 Contributors
 ------------
 
@@ -64,7 +52,5 @@ Contributors
 
 Contact
 -------
-
 If you enjoy the software, or have any questions please contact the development team.
-
 <https://github.com/vgmtrans/vgmtrans>
