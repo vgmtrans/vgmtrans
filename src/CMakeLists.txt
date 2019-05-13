@@ -1,5 +1,5 @@
 add_subdirectory(main)
 if(ENABLE_UI_QT)
     message(STATUS "Building UI (Qt)")
-    add_subdirectory(ui/qt)
+    add_subdirectory(vgmtrans-qt)
 endif()
