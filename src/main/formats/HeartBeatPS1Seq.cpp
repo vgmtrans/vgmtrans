@@ -1,4 +1,9 @@
-// If you want to convert it without losing any events,
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ // If you want to convert it without losing any events,
 // check seqq2mid tool created by loveemu <https://code.google.com/p/loveemu/>
 
 #include "pch.h"

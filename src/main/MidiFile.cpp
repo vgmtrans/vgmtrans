@@ -1,4 +1,9 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ #include "pch.h"
 #include "MidiFile.h"
 #include "VGMSeq.h"
 #include "Root.h"

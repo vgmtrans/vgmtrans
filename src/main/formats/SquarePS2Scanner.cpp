@@ -1,4 +1,9 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ #include "pch.h"
 #include "SquarePS2Scanner.h"
 #include "SquarePS2Seq.h"
 #include "WD.h"

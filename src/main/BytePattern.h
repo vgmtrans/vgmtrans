@@ -1,4 +1,9 @@
-// Byte pattern class for flexible byte sequence search
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ // Byte pattern class for flexible byte sequence search
 // Heavily inspired by SigScan at GameDeception.net
 
 #ifndef BYTEPATTERN_H

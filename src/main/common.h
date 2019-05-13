@@ -1,4 +1,9 @@
-#if !defined(COMMON_H)
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ #if !defined(COMMON_H)
 #define COMMON_H
 
 #include "pch.h"

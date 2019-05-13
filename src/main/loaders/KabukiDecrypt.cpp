@@ -1,4 +1,9 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ #include "pch.h"
 #include "KabukiDecrypt.h"
 
 // The following is taken directly from the MAME source code in kabuki.c

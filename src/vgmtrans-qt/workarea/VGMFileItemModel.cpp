@@ -1,4 +1,9 @@
-#include <QDebug>
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ #include <QDebug>
 #include "VGMFileItemModel.h"
 #include "VGMFile.h"
 #include <QIcon>

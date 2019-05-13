@@ -1,4 +1,9 @@
-// The following sequence analysis code is based on the work of Sound Tester 774 from 2ch.net,
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ // The following sequence analysis code is based on the work of Sound Tester 774 from 2ch.net,
 // author of so2mml. The code is based on his write-up of the format specifications.  Many thanks to him.
 
 #include "pch.h"

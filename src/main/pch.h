@@ -1,4 +1,9 @@
-#if defined(_MSC_VER) && !defined(VGMTRANS_FOR_QT)
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ #if defined(_MSC_VER) && !defined(VGMTRANS_FOR_QT)
 #include "stdafx.h"
 #endif
 

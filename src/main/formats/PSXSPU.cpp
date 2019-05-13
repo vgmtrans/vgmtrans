@@ -1,4 +1,9 @@
-// Many thanks to Neill Corlett for his work in analyzing the playstation SPU.
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ // Many thanks to Neill Corlett for his work in analyzing the playstation SPU.
 // Most of the code below is based on his work.
 // Also, thanks to Antires for his ADPCM decompression routine.
 

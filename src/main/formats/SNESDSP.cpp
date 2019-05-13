@@ -1,4 +1,9 @@
-// Many thanks to bsnes and snes9x.
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+ // Many thanks to bsnes and snes9x.
 
 #include "pch.h"
 #include "SNESDSP.h"
