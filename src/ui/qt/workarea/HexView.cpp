@@ -6,7 +6,7 @@
 
 #include "HexView.h"
 #include "VGMFile.h"
-#include "Helpers.h"
+#include "../util/Helpers.h"
 
 constexpr int hor_padding = 5;
 

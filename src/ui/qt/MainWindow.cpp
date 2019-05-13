@@ -12,8 +12,8 @@
 
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
-#include "HeaderContainer.h"
 #include "MusicPlayer.h"
+#include "util/HeaderContainer.h"
 
 #include "VGMFile.h"
 

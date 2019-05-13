@@ -7,9 +7,9 @@
 #include <QHeaderView>
 #include <QMenu>
 
-#include "Helpers.h"
+#include "../util/Helpers.h"
+#include "../QtVGMRoot.h"
 #include "VGMFilesList.h"
-#include "QtVGMRoot.h"
 #include "MdiArea.h"
 
 /*

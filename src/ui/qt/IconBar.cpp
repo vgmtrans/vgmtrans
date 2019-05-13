@@ -6,7 +6,7 @@
 
 #include <QToolBar>
 
-#include "Helpers.h"
+#include "util/Helpers.h"
 #include "IconBar.h"
 
 auto constexpr icons_size = QSize(16, 16);

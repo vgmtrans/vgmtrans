@@ -15,10 +15,10 @@
 #include <QLabel>
 
 #include "MenuBar.h"
-#include "RawFileListView.h"
-#include "VGMFilesList.h"
-#include "VGMCollListView.h"
-#include "MdiArea.h"
+#include "workarea/RawFileListView.h"
+#include "workarea/VGMFilesList.h"
+#include "workarea/VGMCollListView.h"
+#include "workarea/MdiArea.h"
 #include "IconBar.h"
 #include "Logger.h"
 

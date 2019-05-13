@@ -3,15 +3,30 @@ message(STATUS "Using Qt version ${Qt5Core_VERSION}")
 
 set_property(TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_FEATURES "")
 set(CMAKE_AUTOMOC ON)
-qt5_add_resources(UI_RESOURCES "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
+qt5_add_resources(UI_RESOURCES
+                  "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
 
 add_executable(vgmtrans
-               HeaderContainer.cpp
-               HeaderContainer.h
-               Helpers.cpp
-               Helpers.h
-               HexView.cpp
-               HexView.h
+               util/HeaderContainer.cpp
+               util/HeaderContainer.h
+               util/Helpers.cpp
+               util/Helpers.h
+               workarea/HexView.cpp
+               workarea/HexView.h
+               workarea/MdiArea.cpp
+               workarea/MdiArea.h
+               workarea/RawFileListView.cpp
+               workarea/RawFileListView.h
+               workarea/VGMCollListView.cpp
+               workarea/VGMCollListView.h
+               workarea/VGMFileItemModel.cpp
+               workarea/VGMFileItemModel.h
+               workarea/VGMFilesList.cpp
+               workarea/VGMFilesList.h
+               workarea/VGMFileTreeView.cpp
+               workarea/VGMFileTreeView.h
+               workarea/VGMFileView.cpp
+               workarea/VGMFileView.h
                IconBar.cpp
                IconBar.h
                Logger.cpp
@@ -19,29 +34,18 @@ add_executable(vgmtrans
                main_ui.cpp
                MainWindow.cpp
                MainWindow.h
-               MdiArea.cpp
-               MdiArea.h
                MenuBar.cpp
                MenuBar.h
                MusicPlayer.cpp
                MusicPlayer.h
                QtVGMRoot.cpp
                QtVGMRoot.h
-               RawFileListView.cpp
-               RawFileListView.h
-               VGMCollListView.cpp
-               VGMCollListView.h
-               VGMFileItemModel.cpp
-               VGMFileItemModel.h
-               VGMFilesList.cpp
-               VGMFilesList.h
-               VGMFileTreeView.cpp
-               VGMFileTreeView.h
-               VGMFileView.cpp
-               VGMFileView.h
                ${UI_RESOURCES})
 
-target_include_directories(vgmtrans PRIVATE .)
+target_include_directories(vgmtrans
+                           PRIVATE ${CMAKE_CURRRENT_LIST_DIR}
+                                   ${CMAKE_CURRRENT_LIST_DIR}/util
+                                   ${CMAKE_CURRRENT_LIST_DIR}/workarea)
 
 target_link_libraries(vgmtrans
                       PRIVATE g_options

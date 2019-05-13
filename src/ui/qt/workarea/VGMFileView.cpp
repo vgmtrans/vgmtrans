@@ -9,7 +9,7 @@
 #include "HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
-#include "Helpers.h"
+#include "../util/Helpers.h"
 
 VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
   internal_vgmfile_ = vgmfile;

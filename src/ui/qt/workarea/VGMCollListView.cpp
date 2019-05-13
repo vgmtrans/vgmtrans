@@ -8,9 +8,9 @@
 #include <QMenu>
 #include <QLineEdit>
 #include "VGMCollListView.h"
-#include "QtVGMRoot.h"
+#include "../QtVGMRoot.h"
 #include "VGMColl.h"
-#include "MusicPlayer.h"
+#include "../MusicPlayer.h"
 
 /*
  * VGMCollListViewModel

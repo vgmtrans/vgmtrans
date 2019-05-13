@@ -8,7 +8,7 @@
 
 #include <QTabBar>
 
-#include "Helpers.h"
+#include "../util/Helpers.h"
 
 MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setViewMode(QMdiArea::TabbedView);

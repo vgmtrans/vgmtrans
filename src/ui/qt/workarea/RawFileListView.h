@@ -7,7 +7,7 @@
 #pragma once
 #include <QAbstractTableModel>
 #include <QTableView>
-#include "QtVGMRoot.h"
+#include "../QtVGMRoot.h"
 
 class RawFileListViewModel : public QAbstractTableModel {
   Q_OBJECT
