@@ -597,7 +597,7 @@ MidiEvent::~MidiEvent(void) {
 }
 
 void MidiEvent::WriteVarLength(vector<uint8_t> &buf, uint32_t value) {
-  register unsigned long buffer;
+  unsigned long buffer;
   buffer = value & 0x7F;
 
   while ((value >>= 7)) {
