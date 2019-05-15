@@ -21,7 +21,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 #
 
 option(ENABLE_ASAN "Enable address sanitizer" OFF)
-option(ENABLE_TESTING "Enable unit testing" OFF)
+option(ENABLE_TESTING "Enable unit testing" ON)
 option(ENABLE_UI_QT "Build the UI (Qt)" ON)
 
 #
@@ -101,5 +101,6 @@ add_definitions(-DVGMTRANS_FOR_QT) #TFIXME: remove
 add_subdirectory(src)
 if(ENABLE_TESTING)
   enable_testing()
+  add_subdirectory(externals/catch)
   add_subdirectory(tests)
 endif()
