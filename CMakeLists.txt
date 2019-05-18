@@ -86,14 +86,6 @@ add_subdirectory(externals/minizip EXCLUDE_FROM_ALL)
 # Include our own because of ifdef hacks
 add_subdirectory(externals/tinyxml EXCLUDE_FROM_ALL)
 
-#TODO: Make optional: no fluidsynth, no playback support.
-find_package(FLUIDSYNTH)
-if(FLUIDSYNTH_FOUND)
-    message(STATUS "Using system FluidSynth ${FLUIDSYNTH_VERSION_STRING}")
-else()
-    message(FATAL_ERROR "Please install FluidSynth! Bundled version not available")
-endif()
-
 #
 # Targets
 #

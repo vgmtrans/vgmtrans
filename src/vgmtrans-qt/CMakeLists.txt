@@ -1,3 +1,11 @@
+#TODO: Make optional: no fluidsynth, no playback support.
+find_package(FLUIDSYNTH)
+if(FLUIDSYNTH_FOUND)
+    message(STATUS "Using system FluidSynth ${FLUIDSYNTH_VERSION_STRING}")
+else()
+    message(FATAL_ERROR "Please install FluidSynth! Bundled version not available")
+endif()
+
 find_package(Qt5 5.9 REQUIRED COMPONENTS Gui Widgets)
 message(STATUS "Using Qt version ${Qt5Core_VERSION}")
 
