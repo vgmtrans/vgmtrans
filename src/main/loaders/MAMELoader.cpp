@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include <tinyxml.h>
 #include "MAMELoader.h"
 #include "Root.h"
@@ -326,10 +351,9 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
   }
 
   //static int num = 0;
-  //wostringstream	fn;
   //fn << L"romgroup " << num++;
   //pRoot->UI_WriteBufferToFile(fn.str().c_str(), destFile, destFileSize);
-  wostringstream strstream;
+ std::wostringstream strstream;
   strstream << L"romgroup  - " << entry->type.c_str();
   VirtFile *newVirtFile = new VirtFile(destFile, destFileSize, strstream.str());
   newVirtFile->DontUseLoaders();

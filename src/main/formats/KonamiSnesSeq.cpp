@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "KonamiSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -422,7 +447,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
       vel = GetByte(curOffset++);
       bool hasNoteDuration = ((vel & 0x80) == 0);
       if (hasNoteDuration) {
-        noteDurationRate = min(vel, parentSeq->NOTE_DUR_RATE_MAX);
+        noteDurationRate = std::min(vel, parentSeq->NOTE_DUR_RATE_MAX);
         vel = GetByte(curOffset++);
       }
       vel &= 0x7f;
@@ -511,7 +536,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
     case EVENT_TIE: {
       noteLength = GetByte(curOffset++);
       noteDurationRate = GetByte(curOffset++);
-      noteDurationRate = min(noteDurationRate, parentSeq->NOTE_DUR_RATE_MAX);
+      noteDurationRate = std::min(noteDurationRate, parentSeq->NOTE_DUR_RATE_MAX);
       if (prevNoteSlurred) {
         uint8_t dur = noteLength;
         if (noteDurationRate < parentSeq->NOTE_DUR_RATE_MAX) {
@@ -611,14 +636,14 @@ bool KonamiSnesTrack::ReadEvent(void) {
               PAN_VOLUME_RIGHT = parentSeq->PAN_VOLUME_RIGHT_V2;
             }
 
-            newPan = min(newPan, (uint8_t) 20);
+            newPan = std::min(newPan, (uint8_t) 20);
             volumeLeft = PAN_VOLUME_LEFT[newPan];
             volumeRight = PAN_VOLUME_RIGHT[newPan];
             break;
           }
 
           default:
-            newPan = min(newPan, (uint8_t) 40);
+            newPan = std::min(newPan, (uint8_t) 40);
             volumeLeft = KonamiSnesSeq::PAN_TABLE[40 - newPan];
             volumeRight = KonamiSnesSeq::PAN_TABLE[newPan];
         }
@@ -1099,7 +1124,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
       break;
   }
 
-  //std::wostringstream ssTrace;
+  ///
   //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
   //LogDebug(ssTrace.str().c_str());
 

@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 
 #include "SeqTrack.h"
 #include "SeqEvent.h"
@@ -154,7 +179,7 @@ void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum) {
 void SeqTrack::AddInitialMidiEvents(int trackNum) {
   if (trackNum == 0)
     pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
-  wostringstream ssTrackName;
+ std::wostringstream ssTrackName;
   ssTrackName << L"Track: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << dwStartOffset
       << std::endl;
   pMidiTrack->AddTrackName(ssTrackName.str().c_str());

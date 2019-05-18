@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "MidiFile.h"
 #include "VGMSeq.h"
 #include "Root.h"
@@ -260,7 +285,7 @@ void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uin
 }
 
 void MidiTrack::InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime) {
-  PurgePrevNoteOffs(max(GetDelta(), absTime));
+  PurgePrevNoteOffs(std::max(GetDelta(), absTime));
   aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));        //add note on
   NoteEvent *prevDurNoteOff = new NoteEvent(this, channel, absTime + duration, false, key);
   prevDurNoteOffs.push_back(prevDurNoteOff);
@@ -429,8 +454,8 @@ void MidiTrack::AddFineTuning(uint8_t channel, double cents) {
 }
 
 void MidiTrack::InsertFineTuning(uint8_t channel, double cents, uint32_t absTime) {
-  double semitones = max(-1.0, min(1.0, cents / 100.0));
-  int16_t midiTuning = min((int) (8192 * semitones + 0.5), 8191) + 8192;
+  double semitones = std::max(-1.0, std::min(1.0, cents / 100.0));
+  int16_t midiTuning = std::min((int) (8192 * semitones + 0.5), 8191) + 8192;
   InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
@@ -450,8 +475,8 @@ void MidiTrack::AddCoarseTuning(uint8_t channel, double semitones) {
 }
 
 void MidiTrack::InsertCoarseTuning(uint8_t channel, double semitones, uint32_t absTime) {
-  semitones = max(-64.0, min(64.0, semitones));
-  int16_t midiTuning = min((int) (128 * semitones + 0.5), 8191) + 8192;
+  semitones = std::max(-64.0, std::min(64.0, semitones));
+  int16_t midiTuning = std::min((int) (128 * semitones + 0.5), 8191) + 8192;
   InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
@@ -471,8 +496,8 @@ void MidiTrack::AddModulationDepthRange(uint8_t channel, double semitones) {
 }
 
 void MidiTrack::InsertModulationDepthRange(uint8_t channel, double semitones, uint32_t absTime) {
-  semitones = max(-64.0, min(64.0, semitones));
-  int16_t midiTuning = min((int) (128 * semitones + 0.5), 8191) + 8192;
+  semitones = std::max(-64.0, std::min(64.0, semitones));
+  int16_t midiTuning = std::min((int) (128 * semitones + 0.5), 8191) + 8192;
   InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 

@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "KonamiGXSeq.h"
 
 DECLARE_FORMAT(KonamiGX);
@@ -27,7 +52,7 @@ bool KonamiGXSeq::GetHeaderInfo(void) {
   //nNumTracks = GetByte(dwOffset+8);
   SetPPQN(0x30);
 
-  wostringstream theName;
+ std::wostringstream theName;
   theName << L"Konami GX Seq";
   name = theName.str();
   return true;

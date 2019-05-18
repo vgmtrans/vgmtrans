@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 
 #include "common.h"
 #include "ScaleConversion.h"
@@ -119,14 +144,14 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal) {
 // Takes a percentage amplitude value - that is one using a -20*log10(percent) scale for db attenuation
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
 uint8_t ConvertPercentAmpToStdMidiVal(double percent) {
-  return roundi(127.0 * sqrt(percent));
+  return std::round(127.0 * sqrt(percent));
 }
 
 double ConvertLogScaleValToAtten(double percent) {
   if (percent == 0)
     return 100.0;        // assume 0 is -100.0db attenuation
   double atten = 20 * log10(percent) * 2;
-  return min(-atten, 100.0);
+  return std::min(-atten, 100.0);
 }
 
 // Convert a percent of volume value to it's attenuation in decibels.
@@ -141,7 +166,7 @@ double ConvertPercentAmplitudeToAttenDB_SF2(double percent) {
   if (percent == 0)
     return 100.0;        // assume 0 is -100.0db attenuation
   double atten = 20 * log10(percent);
-  return min(-atten, 100.0);
+  return std::min(-atten, 100.0);
 }
 
 double SecondsToTimecents(double secs) {
@@ -150,7 +175,7 @@ double SecondsToTimecents(double secs) {
 
 // Convert percent pan to midi pan (with no scale conversion)
 uint8_t ConvertPercentPanValToStdMidiVal(double percent) {
-  uint8_t midiPan = roundi(percent * 126.0);
+  uint8_t midiPan = std::round(percent * 126.0);
   if (midiPan != 0) {
     midiPan++;
   }
@@ -257,7 +282,7 @@ uint8_t ConvertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight
 // Convert a pan value where 0 = left 0.5 = center and 1 = right to
 // 0.1% units where -50% = left 0 = center 50% = right (shared by DLS and SF2)
 long ConvertPercentPanTo10thPercentUnits(double percentPan) {
-  return roundi(percentPan * 1000) - 500;
+  return std::round(percentPan * 1000) - 500;
 }
 
 double PitchScaleToCents(double scale) {

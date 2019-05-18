@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "HeartBeatSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -303,7 +328,7 @@ bool HeartBeatSnesTrack::ReadEvent(void) {
         dur = spcNoteDuration;
       }
       else {
-        dur = max((spcNoteDuration * spcNoteDurRate) >> 8, 0);
+        dur = std::max((spcNoteDuration * spcNoteDurRate) >> 8, 0);
         dur = (dur > 2) ? dur - 1 : 1;
       }
 
@@ -319,7 +344,7 @@ bool HeartBeatSnesTrack::ReadEvent(void) {
         dur = spcNoteDuration;
       }
       else {
-        dur = max((spcNoteDuration * spcNoteDurRate) >> 8, 0);
+        dur = std::max((spcNoteDuration * spcNoteDurRate) >> 8, 0);
         dur = (dur > 2) ? dur - 1 : 1;
       }
 
@@ -366,7 +391,7 @@ bool HeartBeatSnesTrack::ReadEvent(void) {
     case EVENT_PAN: {
       uint8_t newPan = GetByte(curOffset++);
 
-      uint8_t panIndex = (uint8_t) min((unsigned) (newPan & 0x1f), (unsigned) 20);
+      uint8_t panIndex = (uint8_t) std::min((unsigned) (newPan & 0x1f), (unsigned) 20);
 
       uint8_t volumeLeft = HeartBeatSnesSeq::PAN_TABLE[20 - panIndex];
       uint8_t volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex];
@@ -886,7 +911,6 @@ bool HeartBeatSnesTrack::ReadEvent(void) {
       break;
   }
 
-  //wostringstream ssTrace;
   //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 

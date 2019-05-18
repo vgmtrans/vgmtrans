@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
 #include "AkaoSnesInstr.h"
 #include "SNESDSP.h"
 
@@ -320,7 +320,7 @@ bool AkaoSnesDrumKitRgn::InitializePercussionRegion(uint8_t percussionIndex,
                                                        uint16_t addrADSRTable,
                                                        uint16_t addrDrumKitTable)
 {
-  wostringstream newName;
+ std::wostringstream newName;
   
   newName << L"Drum " << percussionIndex;
   name = newName.str();

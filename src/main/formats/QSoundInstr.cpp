@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "VGMSamp.h"
 #include "VGMRgn.h"
 #include "ScaleConversion.h"
@@ -37,7 +62,7 @@ bool QSoundArticTable::LoadMain() {
       continue;
 
 
-    wostringstream name;
+   std::wostringstream name;
     name << L"Articulation " << i;
     VGMContainerItem *containerItem = new VGMContainerItem(this, off, sizeof(qs_samp_info), name.str());
     containerItem->AddSimpleItem(off, 1, L"Attack Rate");
@@ -81,7 +106,7 @@ bool QSoundSampleInfoTable::LoadMain() {
     test1 = GetWord(off + 8);
     test2 = GetWord(off + 12);
 
-    wostringstream name;
+   std::wostringstream name;
     name << L"Sample Info " << i;
     VGMContainerItem *containerItem = new VGMContainerItem(this, off, sizeof(qs_samp_info), name.str());
     containerItem->AddSimpleItem(off, 1, L"Bank");
@@ -353,7 +378,7 @@ bool QSoundSampColl::GetHeaderInfo() {
 bool QSoundSampColl::GetSampleInfo() {
   uint32_t numSamples = instrset->sampInfoTable->numSamples;
   for (uint32_t i = 0; i < numSamples; i++) {
-    wostringstream name;
+   std::wostringstream name;
     name << L"Sample " << i;
 
     qs_samp_info *sampInfo = &sampInfoTable->infos[i];

@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "WD.h"
 #include "SquarePS2Format.h"
 #include "PSXSPU.h"
@@ -37,7 +62,7 @@ bool WDInstrSet::GetHeaderInfo() {
   if (dwSampSectSize < 0x40)    //Some songs in the Bouncer have bizarre values here
     dwSampSectSize = 0;
 
-  wostringstream theName;
+ std::wostringstream theName;
   theName << L"WD " << id;
   name = theName.str();
 
@@ -67,7 +92,7 @@ bool WDInstrSet::GetInstrPointers() {
       instrLength = GetWord(j + ((i + 1) * 4)) - GetWord(j + (i * 4));
     else
       instrLength = sampColl->dwOffset - (GetWord(j + (i * 4)) + dwOffset);
-    wostringstream name;
+   std::wostringstream name;
     name << L"Instrument " << i;
     WDInstr *newWDInstr = new WDInstr(this, dwOffset + GetWord(j + (i * 4)), instrLength, 0, i, name.str());//strStr);
     aInstrs.push_back(newWDInstr);
@@ -95,7 +120,7 @@ WDInstr::~WDInstr(void) {
 
 
 bool WDInstr::LoadInstr() {
-  wostringstream strStr;
+ std::wostringstream strStr;
   uint32_t j = 0;
   long startAddress = 0;
   bool notSampleStart = false;

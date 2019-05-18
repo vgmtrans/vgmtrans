@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "MoriSnesSeq.h"
 
 DECLARE_FORMAT(MoriSnes);
@@ -386,7 +411,7 @@ bool MoriSnesTrack::ReadEvent(void) {
           newPan = 32;
         }
 
-        uint8_t midiPan = min(newPan * 4, 127);
+        uint8_t midiPan = std::min(newPan * 4, 127);
         AddPan(beginOffset, curOffset - beginOffset, midiPan);
       }
       else {
@@ -633,7 +658,7 @@ bool MoriSnesTrack::ReadEvent(void) {
     case EVENT_VOLUME_REL: {
       int8_t delta = GetByte(curOffset++);
 
-      int newVolume = min(max(spcVolume + delta, 0), 0xff);
+      int newVolume = std::min(std::max(spcVolume + delta, 0), 0xff);
       spcVolume += newVolume;
 
       AddVol(beginOffset, curOffset - beginOffset, spcVolume / 2, L"Volume (Relative)");
@@ -670,7 +695,7 @@ bool MoriSnesTrack::ReadEvent(void) {
 
   //assert(curOffset >= dwOffset);
 
-  //wostringstream ssTrace;
+  //
   //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 

@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "FalcomSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -408,7 +433,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
 
       // actual engine does not limit value here,
       // but the volume value must not be greater than 127
-      uint8_t midiVolume = min(newVolume, (uint8_t)127);
+      uint8_t midiVolume = std::min(newVolume, (uint8_t)127);
       AddVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
     }
@@ -421,7 +446,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, desc.str(), L"", CLR_VOLUME, ICON_CONTROL);
 
       // add MIDI events only if updated
-      uint8_t newVolume = (uint8_t)max((int8_t)spcVolume - amount, 0);
+      uint8_t newVolume = (uint8_t)std::max((int8_t)spcVolume - amount, 0);
       if (newVolume != spcVolume) {
         spcVolume = newVolume;
         AddVolNoItem(spcVolume);
@@ -437,7 +462,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, desc.str(), L"", CLR_VOLUME, ICON_CONTROL);
 
       // add MIDI events only if updated
-      uint8_t newVolume = (uint8_t)min(spcVolume + amount, 0x7f);
+      uint8_t newVolume = (uint8_t)std::min(spcVolume + amount, 0x7f);
       if (newVolume != spcVolume) {
         spcVolume = newVolume;
         AddVolNoItem(spcVolume);
@@ -463,7 +488,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, desc.str(), L"", CLR_PAN, ICON_CONTROL);
 
       // add MIDI events only if updated
-      uint8_t newPan = (uint8_t)max((int8_t)spcPan - amount, 0);
+      uint8_t newPan = (uint8_t)std::max((int8_t)spcPan - amount, 0);
       if (newPan != spcPan) {
         spcPan = newPan;
 
@@ -482,7 +507,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, desc.str(), L"", CLR_PAN, ICON_CONTROL);
 
       // add MIDI events only if updated
-      uint8_t newPan = (uint8_t)min(spcPan + amount, 0x7f);
+      uint8_t newPan = (uint8_t)std::min(spcPan + amount, 0x7f);
       if (newPan != spcPan) {
         spcPan = newPan;
 
@@ -712,7 +737,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       break;
   }
 
-  //std::wostringstream ssTrace;
+  ///
   //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 

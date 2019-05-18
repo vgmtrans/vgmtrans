@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "ChunSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -514,7 +539,7 @@ bool ChunSnesTrack::ReadEvent(void) {
       uint8_t fadeLength = GetByte(curOffset++);
       desc << L"Master Volume: " << (int) mastVol << L"  Fade Length: " << (int) fadeLength;
 
-      uint8_t midiMastVol = min(mastVol, (uint8_t) 0x7f);
+      uint8_t midiMastVol = std::min(mastVol, (uint8_t) 0x7f);
       AddMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, midiMastVol);
       break;
     }
@@ -807,7 +832,7 @@ bool ChunSnesTrack::ReadEvent(void) {
       break;
   }
 
-  //std::wostringstream ssTrace;
+  ///
   //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
@@ -846,7 +871,7 @@ void ChunSnesTrack::GetVolumeBalance(int8_t pan, double &volumeLeft, double &vol
     volumeRight = 1.0;
   }
   else {
-    uint8_t volumeRateByte = 255 - (min((int8_t) abs(pan), (int8_t) 127) * 2 + 1);
+    uint8_t volumeRateByte = 255 - (std::min((int8_t) abs(pan), (int8_t) 127) * 2 + 1);
 
     // approx (volumeRateByte + 1) / 256
     double volumeRate;

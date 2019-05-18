@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "NDSInstrSet.h"
 #include "VGMRgn.h"
 
@@ -282,7 +307,7 @@ bool NDSWaveArch::GetSampleInfo() {
       dataLength = loopOff + nonLoopLength;
     }
 
-    wostringstream name;
+   std::wostringstream name;
     name << L"Sample " << (float) samples.size();
     NDSSamp *samp = new NDSSamp(this, pSample, dataStart + dataLength - pSample, dataStart,
                                 dataLength, nChannels, bps, rate, waveType, name.str());

@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 
 #include <zlib.h>
 #include "Root.h"
@@ -327,7 +352,7 @@ int PSFFile::myuncompress(
   if ((uLong) stream.avail_out != *destLen) return Z_BUF_ERROR;
 
   if (stripLen != 0) {
-    stripAvailLen = min(stripLen, (uLong) stripBufSize);
+    stripAvailLen = std::min(stripLen, (uLong) stripBufSize);
     stream.next_out = (z_const Bytef *) stripBuf;
     stream.avail_out = (uInt) stripAvailLen;
   }
@@ -343,7 +368,7 @@ int PSFFile::myuncompress(
     if (err == Z_OK && strippedLen + stripAvailLen < stripLen) {
       // try stripping more bytes
       strippedLen += stripAvailLen;
-      stripAvailLen = min(stripLen - strippedLen, (uLong) stripBufSize);
+      stripAvailLen = std::min(stripLen - strippedLen, (uLong) stripBufSize);
       stream.next_out = (z_const Bytef *) stripBuf;
       stream.avail_out = (uInt) stripAvailLen;
     }

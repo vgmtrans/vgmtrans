@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -36,7 +61,7 @@ VGMInstrSet::~VGMInstrSet() {
 
 VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
                                 unsigned long instrNum, const wstring &instrName) {
-  wostringstream name;
+ std::wostringstream name;
   if (instrName == L"")
     name << L"Instrument " << aInstrs.size();
   else

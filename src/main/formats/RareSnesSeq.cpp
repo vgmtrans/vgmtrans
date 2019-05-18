@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "RareSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -316,7 +341,7 @@ bool RareSnesTrack::ReadEvent(void) {
     }
 
     uint8_t key = noteByte - 0x81;
-    uint8_t spcKey = min(max(noteByte - 0x80 + 36 + spcTranspose, 0), 0x7f);
+    uint8_t spcKey = std::min(std::max(noteByte - 0x80 + 36 + spcTranspose, 0), 0x7f);
 
     uint16_t dur;
     if (defNoteDur != 0) {
@@ -333,7 +358,7 @@ bool RareSnesTrack::ReadEvent(void) {
     }
 
     if (noteByte == 0x80) {
-      //wostringstream ssTrace;
+      //
       //ssTrace << L"Rest: " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << std::endl;
       //LogDebug(ssTrace.str().c_str());
 
@@ -358,7 +383,7 @@ bool RareSnesTrack::ReadEvent(void) {
       spcNotePitch = RareSnesSeq::NOTE_PITCH_TABLE[spcKey];
       spcNotePitch = (spcNotePitch * (1024 + spcTuning) + (spcTuning < 0 ? 1023 : 0)) / 1024;
 
-      //wostringstream ssTrace;
+      //
       //ssTrace << L"Note: " << key << L" " << dur << L" " << defNoteDur << L" " << (useLongDur ? L"L" : L"S") << L" P=" << spcNotePitch << std::endl;
       //LogDebug(ssTrace.str().c_str());
 
@@ -719,7 +744,7 @@ bool RareSnesTrack::ReadEvent(void) {
       case EVENT_MASTVOLLR: {
         int8_t newVolL = (int8_t) GetByte(curOffset++);
         int8_t newVolR = (int8_t) GetByte(curOffset++);
-        int8_t newVol = min(abs((int) newVolL) + abs((int) newVolR), 255) / 2; // workaround: convert to mono
+        int8_t newVol = std::min(abs((int) newVolL) + abs((int) newVolR), 255) / 2; // workaround: convert to mono
         AddMasterVol(beginOffset, curOffset - beginOffset, newVol, L"Master Volume L/R");
         break;
       }
@@ -774,7 +799,7 @@ bool RareSnesTrack::ReadEvent(void) {
         uint8_t newFeedback = GetByte(curOffset++);
         int8_t newVolL = (int8_t) GetByte(curOffset++);
         int8_t newVolR = (int8_t) GetByte(curOffset++);
-        parentSeq->midiReverb = min(abs((int) newVolL) + abs((int) newVolR), 255) / 2;
+        parentSeq->midiReverb = std::min(abs((int) newVolL) + abs((int) newVolR), 255) / 2;
         // TODO: update MIDI reverb value for each tracks?
 
         desc << L"Feedback: " << (int) newFeedback << L"  Volume: " << (int) newVolL << L", " << (int) newVolR;
@@ -1240,7 +1265,7 @@ bool RareSnesTrack::ReadEvent(void) {
     }
   }
 
-  //wostringstream ssTrace;
+  //
   //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
   //LogDebug(ssTrace.str().c_str());
 

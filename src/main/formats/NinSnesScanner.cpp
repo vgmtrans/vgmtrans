@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "NinSnesFormat.h"
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
@@ -1449,7 +1474,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
       break;
     }
     if (firstSectionPtr >= addrSectionListPtr) {
-      addrSectionListCutoff = min(addrSectionListCutoff, firstSectionPtr);
+      addrSectionListCutoff = std::min(addrSectionListCutoff, firstSectionPtr);
     }
 
     uint16_t addrFirstSection = file->GetShort(firstSectionPtr);

@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "SquarePS2Seq.h"
 
 DECLARE_FORMAT(SquarePS2);
@@ -39,7 +64,7 @@ bool BGMSeq::GetHeaderInfo(void) {
   SetPPQN(GetShort(dwOffset + 0xE));
   unLength = GetWord(dwOffset + 0x10);
 
-  wostringstream theName;
+ std::wostringstream theName;
   theName << L"BGM " << seqID;
   if (seqID != assocWDID)
     theName << L"using WD " << assocWDID;

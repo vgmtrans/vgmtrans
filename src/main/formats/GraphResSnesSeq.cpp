@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "GraphResSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -249,8 +274,8 @@ bool GraphResSnesTrack::ReadEvent(void) {
         len = defaultNoteLength;
       }
 
-      uint8_t durRate = max(durationRate, (uint8_t) 8); // rate > 8 will cause unexpected result
-      uint8_t dur = max(min(len * durRate / 8, len - 1), 1);
+      uint8_t durRate = std::max(durationRate, (uint8_t) 8); // rate > 8 will cause unexpected result
+      uint8_t dur = std::max(std::min(len * durRate / 8, len - 1), 1);
 
       if (key == 7) {
         AddRest(beginOffset, curOffset - beginOffset, len);
@@ -326,7 +351,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
     case EVENT_MASTER_VOLUME: {
       int8_t newVolL = GetByte(curOffset++);
       int8_t newVolR = GetByte(curOffset++);
-      int8_t newVol = min(abs((int) newVolL) + abs((int) newVolR), 255) / 2; // workaround: convert to mono
+      int8_t newVol = std::min(abs((int) newVolL) + abs((int) newVolR), 255) / 2; // workaround: convert to mono
       AddMasterVol(beginOffset, curOffset - beginOffset, newVol, L"Master Volume L/R");
       break;
     }
@@ -424,7 +449,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
 
     case EVENT_VOLUME: {
       int8_t newVol = GetByte(curOffset++);
-      AddVol(beginOffset, curOffset - beginOffset, min(abs((int) newVol), 127));
+      AddVol(beginOffset, curOffset - beginOffset, std::min(abs((int) newVol), 127));
       break;
     }
 
@@ -442,7 +467,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
 
     case EVENT_PAN: {
       spcPan = GetByte(curOffset++);
-      int8_t pan = min(max(spcPan, (int8_t) -15), (int8_t) 15);
+      int8_t pan = std::min(std::max(spcPan, (int8_t) -15), (int8_t) 15);
 
       double volumeLeft;
       double volumeRight;
@@ -558,7 +583,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
       break;
   }
 
-  //std::wostringstream ssTrace;
+  ///
   //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 

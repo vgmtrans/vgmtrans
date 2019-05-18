@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "SonyPS2InstrSet.h"
 #include "PSXSPU.h"
 
@@ -412,7 +437,7 @@ bool SonyPS2SampColl::GetSampleInfo() {
 
     uint16_t sampleRate = vagInfoParam.vagSampleRate;
 
-    wostringstream name;
+   std::wostringstream name;
     name << L"Sample " << samples.size();
     PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, sampleRate, name.str(), true);
     samples.push_back(samp);

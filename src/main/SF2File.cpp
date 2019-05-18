@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "SF2File.h"
 #include "VGMInstrSet.h"
 #include "SynthFile.h"
@@ -88,7 +113,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
     sfPresetHeader presetHdr;
     memset(&presetHdr, 0, sizeof(sfPresetHeader));
-    memcpy(presetHdr.achPresetName, instr->name.c_str(), min((unsigned long) instr->name.length(), (unsigned long) 20));
+    memcpy(presetHdr.achPresetName, instr->name.c_str(), std::min((unsigned long) instr->name.length(), (unsigned long) 20));
     presetHdr.wPreset = (uint16_t) instr->ulInstrument;
 
     // Despite being a 16-bit value, SF2 only supports banks up to 127. Since
@@ -199,7 +224,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
     sfInst inst;
     memset(&inst, 0, sizeof(sfInst));
-    memcpy(inst.achInstName, instr->name.c_str(), min((unsigned long) instr->name.length(), (unsigned long) 20));
+    memcpy(inst.achInstName, instr->name.c_str(), std::min((unsigned long) instr->name.length(), (unsigned long) 20));
     inst.wInstBagNdx = (uint16_t) rgnCounter;
     rgnCounter += instr->vRgns.size();
 
@@ -387,7 +412,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
     sfSample samp;
     memset(&samp, 0, sizeof(sfSample));
-    memcpy(samp.achSampleName, wave->name.c_str(), min((unsigned long) wave->name.length(), (unsigned long) 20));
+    memcpy(samp.achSampleName, wave->name.c_str(), std::min((unsigned long) wave->name.length(), (unsigned long) 20));
     samp.dwStart = sampOffset;
     samp.dwEnd = samp.dwStart + (wave->dataSize / sizeof(uint16_t));
     sampOffset = samp.dwEnd + 46;        // plus the 46 padding samples required by sf2 spec

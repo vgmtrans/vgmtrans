@@ -5,7 +5,32 @@
  */
  // Many thanks to bsnes and snes9x.
 
-#include "pch.h"
+
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "SNESDSP.h"
 #include "Root.h"
 
@@ -140,7 +165,7 @@ uint32_t EmulateSDSPGAIN(uint8_t gain,
           // Alternate method:
           // differentiate the logarithmic-decibel ENVX curve,
           // then consider the slope of the line as envelope speed.
-          //double env_start = max(env_from, 1);
+          //double env_start = std::maxenv_from, 1);
           //double decibelDiff = ConvertPercentAmplitudeToAttenDB(env_start / 2047.0) - ConvertPercentAmplitudeToAttenDB((env_start + 1) / 2047.0);
           //double timePerTick = SDSP_COUNTER_RATES[rate] / 32000.0;
           //sf2_time = timePerTick * (-100.0 / decibelDiff);

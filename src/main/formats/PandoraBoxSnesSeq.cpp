@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "PandoraBoxSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -349,7 +374,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
     case EVENT_PAN: {
       uint8_t newPan = GetByte(curOffset++);
 
-      newPan = min(newPan, (uint8_t) 128);
+      newPan = std::min(newPan, (uint8_t) 128);
       double linearPan = newPan / 128.0;
       double volumeScale;
       int8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan, &volumeScale);
@@ -586,7 +611,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
       break;
   }
 
-  //std::wostringstream ssTrace;
+  ///
   //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
@@ -609,7 +634,7 @@ uint8_t PandoraBoxSnesTrack::GetVolume(uint8_t volumeIndex) {
 
   // actual engine does not limit value,
   // but it probably does not expect value more than $7f
-  volume = min(volume, (uint8_t) 0x7f);
+  volume = std::min(volume, (uint8_t) 0x7f);
 
   return volume;
 }

@@ -6,7 +6,32 @@
  // The following sequence analysis code is based on the work of Sound Tester 774 from 2ch.net,
 // author of so2mml. The code is based on his write-up of the format specifications.  Many thanks to him.
 
-#include "pch.h"
+
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "TriAcePS1Seq.h"
 #include "SeqEvent.h"
 

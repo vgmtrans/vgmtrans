@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "QSoundScanner.h"
 #include "QSoundSeq.h"
 #include "QSoundInstr.h"
@@ -65,7 +90,7 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
   wstring sampcoll_name;
   wstring seq_table_name;
 
-  wostringstream name;
+ std::wostringstream name;
   name << gameentry->name.c_str() << L" articulation table";
   artic_table_name = name.str();
   name.str(L"");

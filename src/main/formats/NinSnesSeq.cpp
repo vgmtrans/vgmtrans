@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "NinSnesSeq.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
@@ -892,7 +917,7 @@ bool NinSnesTrack::ReadEvent(void) {
     case EVENT_NOTE: {
       uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = min(max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
+      duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
 
       // Note: Konami engine can have volume=0
       AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, L"Note");
@@ -902,7 +927,7 @@ bool NinSnesTrack::ReadEvent(void) {
 
     case EVENT_TIE: {
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = min(max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
+      duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
       desc << L"Duration: " << (int) duration;
       MakePrevDurNoteEnd(GetTime() + duration);
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE);
@@ -927,7 +952,7 @@ bool NinSnesTrack::ReadEvent(void) {
       }
 
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = min(max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
+      duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
 
       // Note: Konami engine can have volume=0
       AddPercNoteByDur(beginOffset,
@@ -1793,13 +1818,13 @@ void NinSnesTrack::GetVolumeBalance(uint16_t pan, double &volumeLeft, double &vo
   if (parentSeq->version == NINSNES_TOSE) {
     if (panIndex <= 10) {
       // pan right, decrease left volume
-      volumeLeft = (255 - 25 * max(10 - panIndex, 0)) / 256.0;
+      volumeLeft = (255 - 25 * std::max(10 - panIndex, 0)) / 256.0;
       volumeRight = 1.0;
     }
     else {
       // pan left, decrease right volume
       volumeLeft = 1.0;
-      volumeRight = (255 - 25 * max(panIndex - 10, 0)) / 256.0;
+      volumeRight = (255 - 25 * std::max(panIndex - 10, 0)) / 256.0;
     }
   }
   else {
@@ -1871,7 +1896,7 @@ int8_t NinSnesTrack::CalcPanValue(uint8_t pan, double &volumeScale, bool &revers
 
   // TODO: correct volume scale of TOSE sequence
   int8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
-  volumeScale = min(volumeScale, 1.0); // workaround
+  volumeScale = std::min(volumeScale, 1.0); // workaround
 
   return midiPan;
 }

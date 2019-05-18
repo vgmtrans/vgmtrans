@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "AkaoInstr.h"
 #include "VGMSamp.h"
 #include "PSXSPU.h"
@@ -301,7 +326,7 @@ bool AkaoSampColl::GetSampleInfo() {
 
     //if we found a chunk of 00 bytes 16 bytes in size or greater, then we found the beginning a new sample
     if (i >= 16) {
-      wostringstream name;
+     std::wostringstream name;
       name << L"Sample " << samples.size();
       PSXSamp *samp = new PSXSamp(this, j, 0, j, 0, 1, 16, 44100, name.str());
 

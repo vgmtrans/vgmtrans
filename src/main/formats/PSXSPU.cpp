@@ -7,7 +7,32 @@
 // Most of the code below is based on his work.
 // Also, thanks to Antires for his ADPCM decompression routine.
 
-#include "pch.h"
+
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "PSXSPU.h"
 #include "PS1Format.h"
 
@@ -119,7 +144,7 @@ bool PSXSampColl::GetSampleInfo() {
           i += 16;
         }
 
-        wostringstream name;
+       std::wostringstream name;
         name << L"Sample " << samples.size();
         PSXSamp *samp = new PSXSamp(this,
                                     beginOffset,
@@ -156,7 +181,7 @@ bool PSXSampColl::GetSampleInfo() {
         offSampEnd += 16;
       } while (!lastBlock);
 
-      wostringstream name;
+     std::wostringstream name;
       name << L"Sample " << sampleIndex;
       PSXSamp *samp = new PSXSamp(this,
                                   dwOffset + it->offset,

@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "QSoundSeq.h"
 #include "QSoundInstr.h"
 #include "ScaleConversion.h"
@@ -261,7 +286,7 @@ bool QSoundSeq::PostLoad() {
           MarkerEvent *marker = (MarkerEvent *) event;
           if (marker->name == "vibrato") {
             vibrato = vibrato_depth_table[marker->databyte1] * (100 / 256.0);
-            //pitchbendRange = max(200, (int)(vibrato + 50));		//50 cents to allow for pitchbend values, which range -50/+50
+            //pitchbendRange = std::max200, (int)(vibrato + 50));		//50 cents to allow for pitchbend values, which range -50/+50
             pitchbendRange = std::max<int>(200,
                                            (int) ceil((vibrato + 50) / 100.0)
                                                * 100);    //+50 cents to allow for pitchbend values, which range -50/+50

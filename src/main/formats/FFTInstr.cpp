@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "FFTFormat.h"
 #include "FFTInstr.h"
 #include "VGMSamp.h"
@@ -48,7 +73,7 @@ bool WdsInstrSet::GetHeaderInfo() {
     version = VERSION_WDS;
 
   //バイナリエディタ表示用
-  wostringstream theName;
+ std::wostringstream theName;
   theName << L"wds " << id;
   name = theName.str();
 

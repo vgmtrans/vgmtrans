@@ -3,7 +3,32 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "pch.h"
+ 
+
+#include <cassert>
+#include <cwchar>
+#include <cmath>
+#include <algorithm>
+#include <climits>
+#include <stdio.h>
+#include <cstdint>
+
+#include <fstream>
+#include <vector>
+#include <list>
+#include <map>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <unordered_set>
+#include <iterator>
+#include <iostream>
+#include <iomanip>
+#include <ctype.h>
+#include "portable.h"
+#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
+
 #include "common.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
@@ -67,7 +92,7 @@ MidiFile *VGMSeq::ConvertToMidi() {
   // Find the greatest length of all tracks to use as stop point for every track
   long stopTime = -1;
   for (size_t i = 0; i < numTracks; i++)
-    stopTime = max(stopTime, aTracks[i]->deltaLength);
+    stopTime = std::max(stopTime, aTracks[i]->deltaLength);
 
   MidiFile *newmidi = new MidiFile(this);
   this->midi = newmidi;
