@@ -97,7 +97,6 @@ endif()
 #
 # Targets
 #
-add_definitions(-DVGMTRANS_FOR_QT) #TFIXME: remove
 add_subdirectory(src)
 if(ENABLE_TESTING)
   enable_testing()

@@ -49,7 +49,7 @@ constexpr std::size_t countof(T const (&)[N]) noexcept {
 #elif _MSC_VER // Visual C++ fallback
   #define countof(arr) _countof(arr)
 #else
-  #define countof(arr) sizeof(arr) / sizeof(arr[0])
+  
 #endif
 
 using namespace std;

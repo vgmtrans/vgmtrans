@@ -5,38 +5,13 @@
  */
  
 
-#include <cassert>
-#include <cwchar>
-#include <cmath>
-#include <algorithm>
-#include <climits>
-#include <stdio.h>
-#include <cstdint>
-
-#include <fstream>
-#include <vector>
-#include <list>
-#include <map>
-#include <string>
-#include <cstring>
-#include <sstream>
-#include <unordered_set>
-#include <iterator>
-#include <iostream>
-#include <iomanip>
-#include <ctype.h>
-#include "portable.h"
-#define countof(arr) sizeof(arr) / sizeof(arr[0])
 
 
 
-#include "common.h"
-#include "Root.h"
-#include "VGMFile.h"
+
+
 #include "VGMColl.h"
 
-#include "Format.h"
-#include "AkaoFormat.h"
 #include "PS1Format.h"
 
 #include "PSF1Loader.h"

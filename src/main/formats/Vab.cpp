@@ -5,32 +5,11 @@
  */
  
 
-#include <cassert>
-#include <cwchar>
-#include <cmath>
-#include <algorithm>
-#include <climits>
-#include <stdio.h>
-#include <cstdint>
 
-#include <fstream>
-#include <vector>
-#include <list>
-#include <map>
-#include <string>
-#include <cstring>
-#include <sstream>
-#include <unordered_set>
-#include <iterator>
-#include <iostream>
-#include <iomanip>
-#include <ctype.h>
-#include "portable.h"
-#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
 
 
 #include "Vab.h"
-#include "Format.h"			//include PS1-specific format header file when it is ready
 #include "PSXSPU.h"
 #include "PS1Format.h"
 

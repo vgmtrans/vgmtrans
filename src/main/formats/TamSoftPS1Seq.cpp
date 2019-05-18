@@ -5,28 +5,9 @@
  */
  
 
-#include <cassert>
-#include <cwchar>
-#include <cmath>
-#include <algorithm>
-#include <climits>
-#include <stdio.h>
-#include <cstdint>
 
-#include <fstream>
-#include <vector>
-#include <list>
-#include <map>
-#include <string>
-#include <cstring>
-#include <sstream>
-#include <unordered_set>
-#include <iterator>
-#include <iostream>
 #include <iomanip>
-#include <ctype.h>
-#include "portable.h"
-#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
 
 
 #include "ScaleConversion.h"
@@ -230,7 +211,7 @@ bool TamSoftPS1Track::ReadEvent(void) {
     lastNoteTime = GetTime();
 
     lastNotePitch = 0;
-    if (key < countof(TamSoftPS1Seq::PITCH_TABLE)) {
+    if (key < 73) {
       lastNotePitch = TamSoftPS1Seq::PITCH_TABLE[key];
     }
 

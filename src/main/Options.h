@@ -27,7 +27,7 @@
 #include <iomanip>
 #include <ctype.h>
 #include "portable.h"
-#define countof(arr) sizeof(arr) / sizeof(arr[0])
+
 
 
 
