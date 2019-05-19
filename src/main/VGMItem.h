@@ -3,8 +3,9 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 
+#include <algorithm>
 #include "common.h"
 
 enum EventColors {
@@ -188,9 +189,7 @@ class VGMContainerItem
   }
   template<class T>
   bool RemoveContainer(std::vector<T *> &container) {
-    std::vector<std::vector<VGMItem *> *>::iterator iter = std::find(containers.begin(),
-                                                                     containers.end(),
-                                                                     (std::vector<VGMItem *> *) &container);
+    auto iter = std::find(containers.begin(), containers.end(), reinterpret_cast<std::vector<VGMItem *> *>(&container));
     if (iter != containers.end()) {
       containers.erase(iter);
       return true;

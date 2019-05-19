@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
  #pragma once
+
+#include <unordered_set>
 #include "VGMItem.h"
 #include "VGMSeq.h"
 

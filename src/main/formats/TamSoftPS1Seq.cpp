@@ -299,7 +299,7 @@ bool TamSoftPS1Track::ReadEvent(void) {
       }
 
       case 0xE8: {
-        uint8_t midiReverb = roundi(fabs(parentSeq->reverbDepth / 32768.0) * 127.0);
+        uint8_t midiReverb = std::round(fabs(parentSeq->reverbDepth / 32768.0) * 127.0);
         AddReverb(beginOffset, curOffset - beginOffset, midiReverb, L"Reverb On");
         break;
       }

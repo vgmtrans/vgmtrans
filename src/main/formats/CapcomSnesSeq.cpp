@@ -643,7 +643,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
         uint8_t midiPan = Convert7bitLinearPercentPanValToStdMidiVal(panIn7bit, &volumeScale);
 
         AddPan(beginOffset, curOffset - beginOffset, midiPan);
-        AddExpressionNoItem(roundi(127.0 * volumeScale));
+        AddExpressionNoItem(std::round(127.0 * volumeScale));
         break;
       }
 

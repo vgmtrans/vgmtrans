@@ -345,8 +345,8 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
         else
           realAttenuation = (long) (-(ConvertLogScaleValToAtten(rgn->volume) * DLS_DECIBEL_UNIT * 10));
 
-        long convAttack = (long) roundi(SecondsToTimecents(rgn->attack_time) * 65536);
-        long convDecay = (long) roundi(SecondsToTimecents(rgn->decay_time) * 65536);
+        long convAttack = (long) std::round(SecondsToTimecents(rgn->attack_time) * 65536);
+        long convDecay = (long) std::round(SecondsToTimecents(rgn->decay_time) * 65536);
         long convSustainLev;
         if (rgn->sustain_level == -1)
           convSustainLev = 0x03e80000;        //sustain at full if no sustain level provided
@@ -356,7 +356,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
           convSustainLev = (long) (((96.0 - attenInDB) / 96.0) * 0x03e80000);
         }
 
-        long convRelease = (long) roundi(SecondsToTimecents(rgn->release_time) * 65536);
+        long convRelease = (long) std::round(SecondsToTimecents(rgn->release_time) * 65536);
 
         DLSArt *newArt = newRgn->AddArt();
         newArt->AddPan(ConvertPercentPanTo10thPercentUnits(rgn->pan) * 65536);

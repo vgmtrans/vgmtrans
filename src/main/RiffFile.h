@@ -5,8 +5,8 @@
  */
  #pragma once
 
+#include <cstring>
 #include "common.h"
-
 
 //////////////////////////////////////////////
 // Chunk		- Riff format chunk

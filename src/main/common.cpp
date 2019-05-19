@@ -10,6 +10,7 @@
 
 
 #include "common.h"
+#include <cstring>
 
 std::wstring StringToUpper(std::wstring myString) {
   const size_t length = myString.length();

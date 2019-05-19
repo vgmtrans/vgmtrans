@@ -4,11 +4,6 @@
  * refer to the included LICENSE.txt file
  */
  
-
-
-
-
-
 #include "VGMSeq.h"
 #include "Root.h"
 
@@ -503,7 +498,7 @@ void MidiTrack::AddTempo(uint32_t microSeconds) {
 }
 
 void MidiTrack::AddTempoBPM(double BPM) {
-  uint32_t microSecs = (uint32_t) roundi((double) 60000000 / BPM);
+  uint32_t microSecs = (uint32_t) std::round((double) 60000000 / BPM);
   aEvents.push_back(new TempoEvent(this, GetDelta(), microSecs));
   //bAddedTempo = true;
 }
@@ -514,7 +509,7 @@ void MidiTrack::InsertTempo(uint32_t microSeconds, uint32_t absTime) {
 }
 
 void MidiTrack::InsertTempoBPM(double BPM, uint32_t absTime) {
-  uint32_t microSecs = (uint32_t) roundi((double) 60000000 / BPM);
+  uint32_t microSecs = (uint32_t) std::round((double) 60000000 / BPM);
   aEvents.push_back(new TempoEvent(this, absTime, microSecs));
   //bAddedTempo = true;
 }

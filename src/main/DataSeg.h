@@ -3,56 +3,28 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
 
-
-
-#include <cassert>
-#include <cwchar>
-#include <cmath>
-#include <algorithm>
-#include <climits>
-#include <stdio.h>
-#include <cstdint>
-
-#include <fstream>
-#include <vector>
-#include <list>
-#include <map>
-#include <string>
-#include <cstring>
-#include <sstream>
-#include <unordered_set>
-#include <iterator>
-#include <iostream>
-#include <iomanip>
-#include <ctype.h>
-#include "portable.h"
-
-
-
-#include <deque>
+#pragma once
 
 //DataSeg is a very simple class for allocating a block of data with a
 //variable reference point for indexing.  Some formats use
 //absolute offset references (the Nintendo SNES seq format, for example)
+
+#include <cstdint>
+#include <cassert>
+#include <cstring>
 
 class DataSeg {
  public:
   DataSeg(void);
   ~DataSeg(void);
 
-  inline uint8_t &operator[](uint32_t offset) {
-    assert(offset >= startOff && (offset < (startOff + size)));
-    return data[offset - startOff];
-  }
-
- public:
   void reposition(uint32_t newBegin);
   void load(uint8_t *buf, uint32_t startVirtAddr, uint32_t theSize);
   void alloc(uint32_t theSize);
   void clear();
 
+  uint8_t &operator[](uint32_t offset);
 
   inline void GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
     assert((nIndex >= startOff) && (nIndex + nCount <= endOff));

@@ -783,7 +783,7 @@ bool PrismSnesTrack::ReadEvent(void) {
       volumeScale = std::min(volumeScale, 1.0); // workaround
 
       AddPan(beginOffset, curOffset - beginOffset, midiPan);
-      AddExpressionNoItem(roundi(127.0 * volumeScale));
+      AddExpressionNoItem(std::round(127.0 * volumeScale));
       break;
     }
 

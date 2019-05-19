@@ -55,8 +55,8 @@ RawFile::~RawFile(void) {
 bool RawFile::open(const wstring &theFileName) {
 #if _MSC_VER < 1400            //if we're not using VC8, and the new STL that supports widechar filenames in ofstream...
 
-  char newpath[PATH_MAX];
-  wcstombs(newpath, theFileName.c_str(), PATH_MAX);
+  char newpath[256];
+  wcstombs(newpath, theFileName.c_str(), 256);
   file.open(newpath, ios::in | ios::binary);
 #else
   file.open(theFileName,  ios::in | ios::binary);
@@ -252,7 +252,7 @@ bool RawFile::SearchBytePattern(const BytePattern &pattern,
   return false;
 }
 
-// Given a requested offset, fills the buffer with data surrounding that offset.  The ratio
+// Given a requested offset, fills the buffer with data surstd::roundng that offset.  The ratio
 // of how much data is read before and after the offset is determined by the ProPre ratio (explained above).
 void RawFile::UpdateBuffer(uint32_t index) {
   uint32_t beginOffset = 0;

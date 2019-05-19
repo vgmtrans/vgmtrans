@@ -349,7 +349,7 @@ bool RareSnesTrack::ReadEvent(void) {
       int8_t instrTuningDelta = 0;
       if (parentSeq->instrUnityKeyHints.find(spcInstr) == parentSeq->instrUnityKeyHints.end()) {
         parentSeq->instrUnityKeyHints[spcInstr] = spcTransposeAbs;
-        parentSeq->instrPitchHints[spcInstr] = (int16_t) roundi(GetTuningInSemitones(spcTuning) * 100.0);
+        parentSeq->instrPitchHints[spcInstr] = (int16_t) std::round(GetTuningInSemitones(spcTuning) * 100.0);
       }
       else {
         // check difference between preserved tuning and current tuning

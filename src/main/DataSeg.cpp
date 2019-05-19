@@ -4,13 +4,7 @@
  * refer to the included LICENSE.txt file
  */
  
-
-
-
-
-
 #include "DataSeg.h"
-
 
 DataSeg::DataSeg(void)
     : startOff(0), size(0), endOff(0), bAlloced(false) {
@@ -66,3 +60,8 @@ void DataSeg::clear() {
   endOff = 0;
   bAlloced = false;
 }
+
+  uint8_t &DataSeg::operator[](uint32_t offset) {
+    assert(offset >= startOff && (offset < (startOff + size)));
+    return data[offset - startOff];
+  }

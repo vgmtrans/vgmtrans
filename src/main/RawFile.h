@@ -4,6 +4,9 @@
  * refer to the included LICENSE.txt file
  */
  #pragma once
+
+#include <fstream>
+
 #include "common.h"
 #include "DataSeg.h"
 #include "BytePattern.h"

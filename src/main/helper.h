@@ -3,7 +3,11 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+
+#pragma once
+#include <vector>
+#include <map>
+#include <list>
 
 template<class T>
 void DeleteVect(std::vector<T *> &theArray) {

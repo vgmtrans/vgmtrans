@@ -4,16 +4,13 @@
  * refer to the included LICENSE.txt file
  */
  
+#include "VGMSeq.h"
 
-
-
-
-
+#include <climits>
 #include "SeqEvent.h"
 #include "SeqSlider.h"
 #include "Options.h"
 #include "Root.h"
-
 
 DECLARE_MENU(VGMSeq)
 

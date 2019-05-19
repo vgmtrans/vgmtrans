@@ -3,34 +3,16 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #if !defined(COMMON_H)
-#define COMMON_H
 
+#pragma once
 
-
-#include <cassert>
-#include <cwchar>
-#include <cmath>
-#include <algorithm>
-#include <climits>
-#include <stdio.h>
-#include <cstdint>
-
-#include <fstream>
-#include <vector>
-#include <list>
-#include <map>
 #include <string>
-#include <cstring>
 #include <sstream>
-#include <unordered_set>
-#include <iterator>
-#include <iostream>
+#include <cassert>
+#include <cmath>
+#include <cstring>
 #include <iomanip>
-#include <ctype.h>
-#include "portable.h"
-
-
+#include <climits>
 
 #include "helper.h"
 
@@ -85,20 +67,6 @@ inline std::wstring string2wstring(std::string &str) {
   return wstr;
 }
 
-//std::string WstringToString(std::wstring& wstr)
-//{
-//	std::stringstream stream;
-//	stream << wstr;
-//	return stream.str();
-//}
-//
-//std::wstring StringToWstring(std::string& str)
-//{
-//	std::wostringstream stream;
-//	stream << str;
-//	return stream.str();
-//}
-
 inline int CountBytesOfVal(uint8_t *buf, uint32_t numBytes, uint8_t val) {
   int count = 0;
   for (uint32_t i = 0; i < numBytes; i++)
@@ -111,24 +79,6 @@ inline bool isEqual(float x, float y) {
   //const double epsilon = 0.00001/* some small number such as 1e-5 */;
   return std::abs(x - y) <= F_EPSILON * std::abs(x);
   // see Knuth section 4.2.2 pages 217-218
-}
-
-inline int roundi(double x) {
-  return (x > 0) ? (int) (x + 0.5) : (int) (x - 0.5);
-}
-
-inline uint8_t pow7bit(uint8_t x, double y) {
-  if (x > 127) {
-    x = 127;
-  }
-  return roundi(pow(x / 127.0, y) * 127.0);
-}
-
-inline uint8_t sqrt7bit(uint8_t x) {
-  if (x > 127) {
-    x = 127;
-  }
-  return roundi(sqrt(x / 127.0) * 127.0);
 }
 
 struct SizeOffsetPair {
@@ -147,5 +97,3 @@ struct SizeOffsetPair {
 };
 
 wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
-
-#endif // !defined(COMMON_H)

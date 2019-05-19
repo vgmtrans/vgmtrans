@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
  #pragma once
+ 
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
