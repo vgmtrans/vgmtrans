@@ -6,7 +6,7 @@ services:
 before_install:
   - docker pull vgmtrans/vgmtrans-deps:tests_env
   - docker run -itd --name build vgmtrans/vgmtrans-deps:tests_env
-  - docker exec build git clone --single-branch --branch refactor https://github.com/vgmtrans/vgmtrans /repo
+  - docker exec build git clone --single-branch --branch refactor https://github.com/sykhro/vgmtrans /repo
 
 script:
   - docker exec build cmake -DENABLE_UI_QT=OFF -H/repo -B/build
