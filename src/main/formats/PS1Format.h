@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Format.h"
 #include "Root.h"
 #include "Matcher.h"
@@ -17,10 +17,7 @@
 // *********
 
 BEGIN_FORMAT(PS1)
-  USING_SCANNER(PS1SeqScanner)
-  //USING_MATCHER_WITH_ARG(SimpleMatcher, true)
-  USING_MATCHER(FilegroupMatcher)
+USING_SCANNER(PS1SeqScanner)
+// USING_MATCHER_WITH_ARG(SimpleMatcher, true)
+USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
-
-
-

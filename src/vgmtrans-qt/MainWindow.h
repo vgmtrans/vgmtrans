@@ -23,33 +23,33 @@
 #include "Logger.h"
 
 class MainWindow : public QMainWindow {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  explicit MainWindow();
+   public:
+    explicit MainWindow();
 
-private:
-  void CreateElements();
-  void RouteSignals();
+   private:
+    void CreateElements();
+    void RouteSignals();
 
-  void OpenFile();
+    void OpenFile();
 
-  void dragEnterEvent(QDragEnterEvent* event) override;
-  void dropEvent(QDropEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
 
-  MenuBar* ui_menu_bar;
-  RawFileListView* ui_rawfiles_list;
-  VGMFilesList* ui_vgmfiles_list;
-  VGMCollListView* ui_colls_list;
-  IconBar* ui_iconbar;
-  Logger* ui_logger;
-  MdiArea* ui_mdiarea;
+    MenuBar *ui_menu_bar;
+    RawFileListView *ui_rawfiles_list;
+    VGMFilesList *ui_vgmfiles_list;
+    VGMCollListView *ui_colls_list;
+    IconBar *ui_iconbar;
+    Logger *ui_logger;
+    MdiArea *ui_mdiarea;
 
-  QStatusBar* ui_statusbar;
-  QLabel* ui_statusbar_offset;
-  QLabel* ui_statusbar_length;
+    QStatusBar *ui_statusbar;
+    QLabel *ui_statusbar_offset;
+    QLabel *ui_statusbar_length;
 
-  QSplitter* vertical_splitter;
-  QSplitter* horizontal_splitter;
-  QSplitter* vertical_splitter_left;
+    QSplitter *vertical_splitter;
+    QSplitter *horizontal_splitter;
+    QSplitter *vertical_splitter_left;
 };

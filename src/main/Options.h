@@ -6,15 +6,17 @@
 
 #pragma once
 
-class ConversionOptions // static class
+class ConversionOptions  // static class
 {
- public:
-  ConversionOptions() { }
-  virtual ~ConversionOptions() { }
+   public:
+    ConversionOptions() {}
+    virtual ~ConversionOptions() {}
 
-  static void SetNumSequenceLoops(int numLoops) { ConversionOptions::numSequenceLoops = numLoops; }
-  static int GetNumSequenceLoops() { return ConversionOptions::numSequenceLoops; }
+    static void SetNumSequenceLoops(int numLoops) {
+        ConversionOptions::numSequenceLoops = numLoops;
+    }
+    static int GetNumSequenceLoops() { return ConversionOptions::numSequenceLoops; }
 
- private:
-  static int numSequenceLoops;
+   private:
+    static int numSequenceLoops;
 };

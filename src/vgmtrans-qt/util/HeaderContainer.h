@@ -11,12 +11,12 @@
 #include <QLabel>
 
 class HeaderContainer : public QWidget {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  explicit HeaderContainer(QWidget *content, const QString title, QObject *parent = nullptr);
+   public:
+    explicit HeaderContainer(QWidget *content, const QString title, QObject *parent = nullptr);
 
-private:
-  QVBoxLayout *layout;
-  QLabel *header;
+   private:
+    QVBoxLayout *layout;
+    QLabel *header;
 };

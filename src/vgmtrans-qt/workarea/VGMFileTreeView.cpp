@@ -3,9 +3,9 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #include "VGMFileTreeView.h"
+#include "VGMFileTreeView.h"
 
 VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent)
     : QTreeView(parent), vgmfile(file), model(file) {
-  this->setModel(&model);
+    this->setModel(&model);
 }

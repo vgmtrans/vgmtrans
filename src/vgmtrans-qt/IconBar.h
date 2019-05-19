@@ -11,29 +11,29 @@
 #include <QIcon>
 
 class IconBar : public QToolBar {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  explicit IconBar(QWidget *parent = nullptr);
+   public:
+    explicit IconBar(QWidget *parent = nullptr);
 
-signals:
-  void OpenPressed();
-  void PlayToggle();
-  void StopPressed();
+   signals:
+    void OpenPressed();
+    void PlayToggle();
+    void StopPressed();
 
-public slots:
-  void OnPlayerStatusChange(bool playing);
+   public slots:
+    void OnPlayerStatusChange(bool playing);
 
-private:
-  void SetupActions();
-  void SetupIcons();
+   private:
+    void SetupActions();
+    void SetupIcons();
 
-  QAction *iconbar_open;
-  QAction *iconbar_play;
-  QAction *iconbar_stop;
+    QAction *iconbar_open;
+    QAction *iconbar_play;
+    QAction *iconbar_stop;
 
-  QIcon iconopen;
-  QIcon iconplay;
-  QIcon iconpause;
-  QIcon iconstop;
+    QIcon iconopen;
+    QIcon iconplay;
+    QIcon iconpause;
+    QIcon iconstop;
 };

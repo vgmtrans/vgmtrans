@@ -3,24 +3,23 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 
 #include "common.h"
 
 class VGMScanner;
 
 class ExtensionDiscriminator {
- public:
-  ExtensionDiscriminator(void);
-  ~ExtensionDiscriminator(void);
+   public:
+    ExtensionDiscriminator(void);
+    ~ExtensionDiscriminator(void);
 
-  int AddExtensionScannerAssoc(std::wstring extension, VGMScanner *);
-  std::list<VGMScanner *> *GetScannerList(std::wstring extension);
+    int AddExtensionScannerAssoc(std::wstring extension, VGMScanner *);
+    std::list<VGMScanner *> *GetScannerList(std::wstring extension);
 
-  std::map<std::wstring, std::list<VGMScanner *> > mScannerExt;
-  static ExtensionDiscriminator &instance() {
-    static ExtensionDiscriminator instance;
-    return instance;
-  }
+    std::map<std::wstring, std::list<VGMScanner *>> mScannerExt;
+    static ExtensionDiscriminator &instance() {
+        static ExtensionDiscriminator instance;
+        return instance;
+    }
 };
-

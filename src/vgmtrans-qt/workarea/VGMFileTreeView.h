@@ -12,12 +12,12 @@
 class VGMFile;
 
 class VGMFileTreeView : public QTreeView {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  VGMFileTreeView(VGMFile *vgmfile, QWidget *parent = nullptr);
+   public:
+    VGMFileTreeView(VGMFile *vgmfile, QWidget *parent = nullptr);
 
-private:
-  VGMFile *vgmfile;
-  VGMFileItemModel model;
+   private:
+    VGMFile *vgmfile;
+    VGMFileItemModel model;
 };

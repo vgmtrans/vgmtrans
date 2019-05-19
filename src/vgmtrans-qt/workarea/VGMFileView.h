@@ -16,17 +16,17 @@ class HexView;
 class VGMFileTreeView;
 
 class VGMFileView : public QMdiSubWindow {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  explicit VGMFileView(VGMFile *vgmfile);
+   public:
+    explicit VGMFileView(VGMFile *vgmfile);
 
-protected:
-  QSplitter *filetab_splitter_;
-  HexView *filetab_hexview_;
-  VGMFileTreeView *filetab_treeview_;
-  VGMFile *internal_vgmfile_;
+   protected:
+    QSplitter *filetab_splitter_;
+    HexView *filetab_hexview_;
+    VGMFileTreeView *filetab_treeview_;
+    VGMFile *internal_vgmfile_;
 
-private:
-  void closeEvent(QCloseEvent *closeEvent) override;
+   private:
+    void closeEvent(QCloseEvent *closeEvent) override;
 };

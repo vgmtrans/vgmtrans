@@ -16,21 +16,21 @@
 #include "VGMFile.h"
 
 class MdiArea : public QMdiArea {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  MdiArea(const MdiArea&) = delete;
-  MdiArea& operator=(const MdiArea&) = delete;
-  MdiArea(MdiArea&&) = delete;
-  MdiArea& operator=(MdiArea&&) = delete;
+   public:
+    MdiArea(const MdiArea &) = delete;
+    MdiArea &operator=(const MdiArea &) = delete;
+    MdiArea(MdiArea &&) = delete;
+    MdiArea &operator=(MdiArea &&) = delete;
 
-  static MdiArea* Init();
-  static MdiArea* Instance();
+    static MdiArea *Init();
+    static MdiArea *Instance();
 
-  void NewView(VGMFile* file);
-  void RemoveView(VGMFile* file);
+    void NewView(VGMFile *file);
+    void RemoveView(VGMFile *file);
 
-private:
-  std::unordered_map<VGMFile*, QMdiSubWindow*> registered_views_;
-  MdiArea(QWidget* parent = nullptr);
+   private:
+    std::unordered_map<VGMFile *, QMdiSubWindow *> registered_views_;
+    MdiArea(QWidget *parent = nullptr);
 };

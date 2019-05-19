@@ -3,15 +3,15 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Scanner.h"
 
-class SegSatScanner:
-    public VGMScanner {
- public:
-  SegSatScanner(void);
- public:
-  virtual ~SegSatScanner(void);
+class SegSatScanner : public VGMScanner {
+   public:
+    SegSatScanner(void);
 
-  virtual void Scan(RawFile *file, void *info = 0);
+   public:
+    virtual ~SegSatScanner(void);
+
+    virtual void Scan(RawFile *file, void *info = 0);
 };

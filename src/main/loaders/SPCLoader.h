@@ -3,15 +3,15 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Loader.h"
 
-class SPCLoader:
-    public VGMLoader {
- public:
-  SPCLoader(void);
- public:
-  virtual ~SPCLoader(void);
+class SPCLoader : public VGMLoader {
+   public:
+    SPCLoader(void);
 
-  virtual PostLoadCommand Apply(RawFile *theFile);
+   public:
+    virtual ~SPCLoader(void);
+
+    virtual PostLoadCommand Apply(RawFile *theFile);
 };

@@ -3,11 +3,6 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- 
-
-
-
-
 
 #include "KonamiPS1Seq.h"
 
@@ -16,7 +11,9 @@ void KonamiPS1Scanner::Scan(RawFile *file, void *info) {
     int numSeqFiles = 0;
     while (offset < file->size()) {
         if (KonamiPS1Seq::IsKDT1Seq(file, offset)) {
-            std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+            std::wstring name = file->tag.HasTitle()
+                                    ? file->tag.title
+                                    : RawFile::removeExtFromPath(file->GetFileName());
             if (numSeqFiles >= 1) {
                 std::wstringstream postfix;
                 postfix << L" (" << (numSeqFiles + 1) << L")";
@@ -28,8 +25,7 @@ void KonamiPS1Scanner::Scan(RawFile *file, void *info) {
                 offset += newSeq->unLength;
                 numSeqFiles++;
                 continue;
-            }
-            else {
+            } else {
                 delete newSeq;
             }
         }

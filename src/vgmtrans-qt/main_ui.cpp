@@ -10,17 +10,17 @@
 
 int main(int argc, char *argv[]) {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
-  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 #endif
 
-  QCoreApplication::setOrganizationName(QStringLiteral("VGMTrans"));
-  QCoreApplication::setApplicationName(QStringLiteral("VGMTrans"));
+    QCoreApplication::setOrganizationName(QStringLiteral("VGMTrans"));
+    QCoreApplication::setApplicationName(QStringLiteral("VGMTrans"));
 
-  QApplication app(argc, argv);
+    QApplication app(argc, argv);
 
-  qtVGMRoot.Init();
-  MainWindow window;
-  window.show();
+    qtVGMRoot.Init();
+    MainWindow window;
+    window.show();
 
-  return app.exec();
+    return app.exec();
 }

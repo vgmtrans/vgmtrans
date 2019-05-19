@@ -3,26 +3,24 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Format.h"
 #include "Matcher.h"
 #include "Root.h"
 #include "SuzukiSnesScanner.h"
-
 
 // **************
 // SuzukiSnesFormat
 // **************
 
 BEGIN_FORMAT(SuzukiSnes)
-  USING_SCANNER(SuzukiSnesScanner)
-  USING_MATCHER(FilegroupMatcher)
+USING_SCANNER(SuzukiSnesScanner)
+USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-
-enum SuzukiSnesVersion: uint8_t {
-  SUZUKISNES_NONE = 0,              // Unknown Version
-  SUZUKISNES_SD3,                   // Seiken Densetsu 3
-  SUZUKISNES_BL,                    // Bahamut Lagoon
-  SUZUKISNES_SMR,                   // Super Mario RPG (mostly identical to Bahamut Lagoon)
+enum SuzukiSnesVersion : uint8_t {
+    SUZUKISNES_NONE = 0,  // Unknown Version
+    SUZUKISNES_SD3,       // Seiken Densetsu 3
+    SUZUKISNES_BL,        // Bahamut Lagoon
+    SUZUKISNES_SMR,       // Super Mario RPG (mostly identical to Bahamut Lagoon)
 };

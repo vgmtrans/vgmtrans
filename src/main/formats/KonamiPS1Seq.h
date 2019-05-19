@@ -3,14 +3,14 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "KonamiPS1Format.h"
 
 class KonamiPS1Seq : public VGMSeq {
-public:
+   public:
     static constexpr uint32_t kHeaderSize = 16;
     static constexpr uint32_t kOffsetToFileSize = 4;
     static constexpr uint32_t kOffsetToTimebase = 8;
@@ -19,8 +19,7 @@ public:
 
     KonamiPS1Seq(RawFile *file, uint32_t offset, const std::wstring &name = L"KonamiPS1Seq");
 
-    virtual ~KonamiPS1Seq() {
-    }
+    virtual ~KonamiPS1Seq() {}
 
     virtual bool GetHeaderInfo(void);
     virtual bool GetTrackPointers(void);
@@ -34,12 +33,12 @@ public:
 };
 
 class KonamiPS1Track : public SeqTrack {
-public:
+   public:
     KonamiPS1Track(KonamiPS1Seq *parentSeq, uint32_t offset, uint32_t length);
 
     virtual void ResetVars(void);
     virtual bool ReadEvent(void);
 
-private:
+   private:
     bool skipDeltaTime;
 };

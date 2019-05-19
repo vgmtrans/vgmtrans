@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Format.h"
 #include "Root.h"
 #include "NDSScanner.h"
@@ -14,7 +14,5 @@
 // *********
 
 BEGIN_FORMAT(NDS)
-  USING_SCANNER(NDSScanner)
+USING_SCANNER(NDSScanner)
 END_FORMAT()
-
-

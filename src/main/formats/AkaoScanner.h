@@ -3,15 +3,15 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Scanner.h"
 
-class AkaoScanner:
-    public VGMScanner {
- public:
-  AkaoScanner(void);
- public:
-  virtual ~AkaoScanner(void);
+class AkaoScanner : public VGMScanner {
+   public:
+    AkaoScanner(void);
 
-  virtual void Scan(RawFile *file, void *info = 0);
+   public:
+    virtual ~AkaoScanner(void);
+
+    virtual void Scan(RawFile *file, void *info = 0);
 };

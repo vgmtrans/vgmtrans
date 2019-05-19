@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -13,82 +13,64 @@
 // PrismSnesInstrSet
 // *****************
 
-class PrismSnesInstrSet:
-    public VGMInstrSet {
- public:
-  PrismSnesInstrSet(RawFile *file,
-                    PrismSnesVersion ver,
-                    uint32_t spcDirAddr,
-                    uint16_t addrADSR1Table,
-                    uint16_t addrADSR2Table,
-                    uint16_t addrTuningTableHigh,
-                    uint16_t addrTuningTableLow,
-                    const std::wstring &name = L"PrismSnesInstrSet");
-  virtual ~PrismSnesInstrSet(void);
+class PrismSnesInstrSet : public VGMInstrSet {
+   public:
+    PrismSnesInstrSet(RawFile *file, PrismSnesVersion ver, uint32_t spcDirAddr,
+                      uint16_t addrADSR1Table, uint16_t addrADSR2Table,
+                      uint16_t addrTuningTableHigh, uint16_t addrTuningTableLow,
+                      const std::wstring &name = L"PrismSnesInstrSet");
+    virtual ~PrismSnesInstrSet(void);
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+    virtual bool GetHeaderInfo();
+    virtual bool GetInstrPointers();
 
-  PrismSnesVersion version;
+    PrismSnesVersion version;
 
- protected:
-  uint32_t spcDirAddr;
-  uint16_t addrADSR1Table;
-  uint16_t addrADSR2Table;
-  uint16_t addrTuningTableHigh;
-  uint16_t addrTuningTableLow;
-  std::vector<uint8_t> usedSRCNs;
+   protected:
+    uint32_t spcDirAddr;
+    uint16_t addrADSR1Table;
+    uint16_t addrADSR2Table;
+    uint16_t addrTuningTableHigh;
+    uint16_t addrTuningTableLow;
+    std::vector<uint8_t> usedSRCNs;
 };
 
 // **************
 // PrismSnesInstr
 // **************
 
-class PrismSnesInstr
-    : public VGMInstr {
- public:
-  PrismSnesInstr(VGMInstrSet *instrSet,
-                 PrismSnesVersion ver,
-                 uint8_t srcn,
-                 uint32_t spcDirAddr,
-                 uint16_t addrADSR1Entry,
-                 uint16_t addrADSR2Entry,
-                 uint16_t addrTuningEntryHigh,
-                 uint16_t addrTuningEntryLow,
-                 const std::wstring &name = L"PrismSnesInstr");
-  virtual ~PrismSnesInstr(void);
+class PrismSnesInstr : public VGMInstr {
+   public:
+    PrismSnesInstr(VGMInstrSet *instrSet, PrismSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr,
+                   uint16_t addrADSR1Entry, uint16_t addrADSR2Entry, uint16_t addrTuningEntryHigh,
+                   uint16_t addrTuningEntryLow, const std::wstring &name = L"PrismSnesInstr");
+    virtual ~PrismSnesInstr(void);
 
-  virtual bool LoadInstr();
+    virtual bool LoadInstr();
 
-  PrismSnesVersion version;
+    PrismSnesVersion version;
 
- protected:
-  uint8_t srcn;
-  uint32_t spcDirAddr;
-  uint16_t addrADSR1Entry;
-  uint16_t addrADSR2Entry;
-  uint16_t addrTuningEntryHigh;
-  uint16_t addrTuningEntryLow;
+   protected:
+    uint8_t srcn;
+    uint32_t spcDirAddr;
+    uint16_t addrADSR1Entry;
+    uint16_t addrADSR2Entry;
+    uint16_t addrTuningEntryHigh;
+    uint16_t addrTuningEntryLow;
 };
 
 // ************
 // PrismSnesRgn
 // ************
 
-class PrismSnesRgn
-    : public VGMRgn {
- public:
-  PrismSnesRgn(PrismSnesInstr *instr,
-               PrismSnesVersion ver,
-               uint8_t srcn,
-               uint32_t spcDirAddr,
-               uint16_t addrADSR1Entry,
-               uint16_t addrADSR2Entry,
-               uint16_t addrTuningEntryHigh,
-               uint16_t addrTuningEntryLow);
-  virtual ~PrismSnesRgn(void);
+class PrismSnesRgn : public VGMRgn {
+   public:
+    PrismSnesRgn(PrismSnesInstr *instr, PrismSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr,
+                 uint16_t addrADSR1Entry, uint16_t addrADSR2Entry, uint16_t addrTuningEntryHigh,
+                 uint16_t addrTuningEntryLow);
+    virtual ~PrismSnesRgn(void);
 
-  virtual bool LoadRgn();
+    virtual bool LoadRgn();
 
-  PrismSnesVersion version;
+    PrismSnesVersion version;
 };

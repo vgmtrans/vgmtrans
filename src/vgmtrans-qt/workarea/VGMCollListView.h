@@ -11,34 +11,34 @@
 #include <QKeyEvent>
 
 class VGMCollListViewModel : public QAbstractListModel {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  VGMCollListViewModel(QObject *parent = nullptr);
-  int rowCount(const QModelIndex &parent = QModelIndex()) const;
-  QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
-  Qt::ItemFlags flags(const QModelIndex &index) const;
+   public:
+    VGMCollListViewModel(QObject *parent = nullptr);
+    int rowCount(const QModelIndex &parent = QModelIndex()) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+    Qt::ItemFlags flags(const QModelIndex &index) const;
 };
 
 class VGMCollNameEditor : public QStyledItemDelegate {
-  Q_OBJECT
+    Q_OBJECT
 
-protected:
-  void setEditorData(QWidget *editor, const QModelIndex &index) const;
-  void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
+   protected:
+    void setEditorData(QWidget *editor, const QModelIndex &index) const;
+    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
 };
 
 class VGMCollListView : public QListView {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  VGMCollListView(QWidget *parent = nullptr);
+   public:
+    VGMCollListView(QWidget *parent = nullptr);
 
-public slots:
-  void HandlePlaybackRequest();
-  void HandleStopRequest();
+   public slots:
+    void HandlePlaybackRequest();
+    void HandleStopRequest();
 
-private:
-  void CollMenu(const QPoint &pos);
-  void keyPressEvent(QKeyEvent* e) override;
+   private:
+    void CollMenu(const QPoint &pos);
+    void keyPressEvent(QKeyEvent *e) override;
 };

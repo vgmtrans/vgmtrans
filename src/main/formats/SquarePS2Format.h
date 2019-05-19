@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Format.h"
 #include "Root.h"
 #include "SquarePS2Scanner.h"
@@ -15,9 +15,7 @@
 // ***************
 
 BEGIN_FORMAT(SquarePS2)
-  USING_SCANNER(SquarePS2Scanner)
-  USING_MATCHER(GetIdMatcher)
-  //USING_MATCHER(SimpleMatcher)
+USING_SCANNER(SquarePS2Scanner)
+USING_MATCHER(GetIdMatcher)
+// USING_MATCHER(SimpleMatcher)
 END_FORMAT()
-
-

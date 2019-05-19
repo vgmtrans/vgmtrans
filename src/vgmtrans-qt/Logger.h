@@ -13,17 +13,17 @@
 #include "LogItem.h"
 
 class Logger : public QDockWidget {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  explicit Logger(QWidget *parent = nullptr);
-  void LogMessage(LogItem *message);
+   public:
+    explicit Logger(QWidget *parent = nullptr);
+    void LogMessage(LogItem *message);
 
-signals:
-  void closeEvent(QCloseEvent *) override;
+   signals:
+    void closeEvent(QCloseEvent *) override;
 
-private:
-  void CreateElements();
-  QWidget *logger_wrapper;
-  QTextEdit *logger_textarea;
+   private:
+    void CreateElements();
+    QWidget *logger_wrapper;
+    QTextEdit *logger_textarea;
 };

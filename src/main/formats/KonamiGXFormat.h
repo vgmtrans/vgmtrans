@@ -3,14 +3,12 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Format.h"
 #include "Root.h"
 #include "VGMColl.h"
 #include "KonamiGXScanner.h"
 
-
 BEGIN_FORMAT(KonamiGX)
-  USING_SCANNER(KonamiGXScanner)
+USING_SCANNER(KonamiGXScanner)
 END_FORMAT()
-

@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
- #pragma once
+#pragma once
 #include "Format.h"
 #include "Root.h"
 #include "HeartBeatPS1Seq.h"
@@ -19,10 +19,7 @@
 // ******************
 
 BEGIN_FORMAT(HeartBeatPS1)
-  USING_SCANNER(HeartBeatPS1Scanner)
-  //USING_MATCHER_WITH_ARG(SimpleMatcher, true)
-  USING_MATCHER(FilegroupMatcher)
+USING_SCANNER(HeartBeatPS1Scanner)
+// USING_MATCHER_WITH_ARG(SimpleMatcher, true)
+USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
-
-
-
