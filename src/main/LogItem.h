@@ -6,7 +6,7 @@
 #pragma once
 
 #include <string>
-#include "datetime.h"
+#include <chrono>
 
 enum LogLevel { LOG_LEVEL_ERR, LOG_LEVEL_WARN, LOG_LEVEL_INFO, LOG_LEVEL_DEBUG };
 
@@ -19,7 +19,7 @@ class LogItem {
 
     std::wstring GetText() const;
     const wchar_t *GetCText() const;
-    DateTime GetTime() const;
+    std::time_t GetTime() const;
     LogLevel GetLogLevel() const;
     std::wstring GetSource() const;
     const wchar_t *GetCSource() const;
@@ -27,6 +27,6 @@ class LogItem {
    protected:
     std::wstring text;
     std::wstring source;
-    DateTime time;
+    std::chrono::system_clock::time_point time;
     LogLevel level;
 };

@@ -6,16 +6,16 @@
 
 #include "LogItem.h"
 
-LogItem::LogItem() : text(), time(DateTime::get_Now()), level(LOG_LEVEL_ERR), source() {}
+LogItem::LogItem() : text(), time(std::chrono::system_clock::now()), level(LOG_LEVEL_ERR), source() {}
 
 LogItem::LogItem(const wchar_t *text, LogLevel level, const wchar_t *source)
     : text(text ? text : L""),
-      time(DateTime::get_Now()),
+      time(std::chrono::system_clock::now()),
       level(level),
       source(source ? source : L"") {}
 
 LogItem::LogItem(const std::wstring &text, LogLevel level, const std::wstring &source)
-    : text(text), time(DateTime::get_Now()), level(level), source(source) {}
+    : text(text),  time(std::chrono::system_clock::now()), level(level), source(source) {}
 
 LogItem::~LogItem() {}
 
@@ -27,16 +27,16 @@ const wchar_t *LogItem::GetCText() const {
     return text.c_str();
 }
 
-DateTime LogItem::GetTime() const {
-    return time;
-}
-
 LogLevel LogItem::GetLogLevel() const {
     return level;
 }
 
 std::wstring LogItem::GetSource() const {
     return std::wstring(source);
+}
+
+std::time_t LogItem::GetTime() const {
+    return std::chrono::system_clock::to_time_t(time);
 }
 
 const wchar_t *LogItem::GetCSource() const {
