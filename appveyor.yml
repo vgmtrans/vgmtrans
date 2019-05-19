@@ -1,0 +1,15 @@
+image:
+  - Visual Studio 2017
+clone_folder: c:\projects\source
+build_script:
+- cmd: >-
+    mkdir build
+
+    cd build
+
+    cmake c:\projects\source -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_UI_QT=OFF
+
+    cmake --build . --config "Release"
+
+test_script:
+- cmd: ctest -C Release
