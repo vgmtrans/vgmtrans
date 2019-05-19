@@ -6,6 +6,7 @@
 
 #include <QGridLayout>
 #include <QString>
+#include <QDateTime>
 #include "Logger.h"
 
 Logger::Logger(QWidget *parent) : QDockWidget(parent) {
@@ -49,8 +50,8 @@ void Logger::LogMessage(LogItem *message) {
     }
 
     logger_textarea->append(
-        QStringLiteral("%1 <font color=%2>%3</font>")
-            .arg(QString::fromStdString(message->GetTime().ToString()),
+        QStringLiteral("[%1] <font color=%2>%3</font>")
+            .arg(QDateTime::fromTime_t(message->GetTime()).toString("hh:mm:ss:zzz"),
                  QString::fromStdString(color),
                  QString::fromStdWString(message->GetSource() + L": " + message->GetText())));
 }
