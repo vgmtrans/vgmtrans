@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "zlib.h"
+#include <zlib.h>
 
 #ifdef __GNUC__
 #  define ZIP_UNUSED __attribute__((__unused__))

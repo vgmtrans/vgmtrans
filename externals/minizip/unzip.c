@@ -24,7 +24,7 @@
 #include <limits.h>
 #include <errno.h>
 
-#include "zlib.h"
+#include <zlib.h>
 #include "unzip.h"
 
 #ifdef HAVE_AES
