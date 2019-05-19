@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include <QObject>
 #include <cstring>
-#include "VGMColl.h"
-#include "SF2File.h"
+#include <QObject>
+#include <VGMColl.h>
+#include <SF2File.h>
 
 extern "C" {
 #include <fluidsynth.h>
@@ -25,7 +25,6 @@ class MusicPlayer : public QObject {
     MusicPlayer &operator=(MusicPlayer &&) = delete;
 
     static MusicPlayer &Instance();
-
     ~MusicPlayer();
 
     bool SynthPlaying();
@@ -33,10 +32,35 @@ class MusicPlayer : public QObject {
     void Toggle();
     void Stop();
 
+    const char *defaultAudioDriver() {
+        char *def_driver;
+        fluid_settings_getstr_default(settings, "audio.driver", &def_driver);
+
+        return def_driver;
+    }
+    const std::vector<const char *> audioDrivers() const {
+        std::vector<const char *> drivers_buf;
+        fluid_settings_foreach_option(settings, "audio.driver", &drivers_buf,
+            [](void *data, const char *, const char *option) {
+                auto drivers = reinterpret_cast<std::vector<const char *> *>(data);
+                drivers->push_back(option);
+            }
+        );
+
+        return drivers_buf;
+    }
+
+    void updateSetting(const char *setting, int value);
+    void updateSetting(const char *setting, const char *value);
+    bool checkSetting(const char *setting, const char *value);
+    
    signals:
     void StatusChange(bool playing);
 
    private:
+    void makeSettings();
+    void makeSynth();
+
     fluid_settings_t *settings = nullptr;
     fluid_synth_t *synth = nullptr;
     fluid_audio_driver_t *adriver = nullptr;
@@ -44,11 +68,11 @@ class MusicPlayer : public QObject {
     int sfont_id;
     VGMColl *active_coll = nullptr;
 
+    inline static std::vector<const char *> m_drivers;
+
     explicit MusicPlayer();
 };
 
-/* Not the most elegant way, but it's better than
-   messing with the build system */
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
 
 /*
@@ -99,7 +123,7 @@ class SF2Wrapper {
         return FLUID_OK;
     }
 
-    static int sf_seek(void *handle, long offset, int origin) {
+    static int sf_seek(void * /* handle */, long offset, int origin) {
         switch (origin) {
             case SEEK_CUR: {
                 index_ += offset;
@@ -138,9 +162,9 @@ class SF2Wrapper {
     }
 
    private:
-    static SF2File *sf2_obj_;
-    static void *old_sf2_buf_;
-    static long index_;
+    inline static SF2File *sf2_obj_ = nullptr;
+    inline static void *old_sf2_buf_ = nullptr;
+    inline static long index_ = 0;
 };
 
 #endif

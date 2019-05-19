@@ -5,18 +5,34 @@
  */
 
 #include "MusicPlayer.h"
-#include "VGMSeq.h"
-#include <QTemporaryDir>
 
-#if FLUIDSYNTH_VERSION_MAJOR >= 2
-SF2File *SF2Wrapper::sf2_obj_ = nullptr;
-void *SF2Wrapper::old_sf2_buf_ = nullptr;
-long SF2Wrapper::index_ = 0;
-#endif
+#include <QTemporaryDir>
+#include <VGMSeq.h>
 
 MusicPlayer::MusicPlayer() {
-    /* Create the settings. */
-    settings = new_fluid_settings();
+    makeSettings();
+    makeSynth();
+}
+
+
+MusicPlayer::~MusicPlayer() {
+    Stop();
+}
+
+MusicPlayer &MusicPlayer::Instance() {
+    static MusicPlayer gui_player;
+    return gui_player;
+}
+
+void MusicPlayer::makeSettings() {
+    /* Create settings if needed */
+    if(!settings) {
+        settings = new_fluid_settings();
+        /* Default to Pulseaudio on Linux */
+        #ifdef __linux__
+            fluid_settings_setstr(settings, "audio.driver", "pulseaudio");
+        #endif
+    }
 
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
     fluid_settings_setint(settings, "synth.reverb.active", 1);
@@ -28,14 +44,17 @@ MusicPlayer::MusicPlayer() {
     fluid_settings_setstr(settings, "synth.midi-bank-select", "mma");
     fluid_settings_setint(settings, "synth.midi-channels", 48);
     fluid_settings_setstr(settings, "player.timing-source", "system");
+}
 
-/* Default to Pulseaudio on Linux */
-#ifdef __linux__
-    fluid_settings_setstr(settings, "audio.driver", "pulseaudio");
-#endif
+void MusicPlayer::makeSynth() {
+    if(synth) {
+        Stop();
+        delete synth;
+    }
 
     synth = new_fluid_synth(settings);
-/* Let's keep backwards-compatibility */
+
+/* FluidSynth < 2 doesn't support reading SF2 from RAM */
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
     fluid_sfloader_t *loader = new_fluid_defsfloader(settings);
 
@@ -46,13 +65,18 @@ MusicPlayer::MusicPlayer() {
 #endif
 }
 
-MusicPlayer::~MusicPlayer() {
-    Stop();
+void MusicPlayer::updateSetting(const char *setting, int value) {
+    fluid_settings_setint(settings, setting, value);
+    makeSynth();
 }
 
-MusicPlayer &MusicPlayer::Instance() {
-    static MusicPlayer gui_player;
-    return gui_player;
+void MusicPlayer::updateSetting(const char *setting, const char *value) {
+    fluid_settings_setstr(settings, setting, value);
+    makeSynth();
+}
+
+bool MusicPlayer::checkSetting(const char *setting, const char *value) {
+    return !!fluid_settings_str_equal(settings, setting, value);
 }
 
 void MusicPlayer::Toggle() {

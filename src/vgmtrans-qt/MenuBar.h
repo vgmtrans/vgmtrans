@@ -36,4 +36,5 @@ class MenuBar : public QMenuBar {
 
     // Options actions
     QAction *menu_toggle_logger;
+    QActionGroup *menu_drivers;
 };

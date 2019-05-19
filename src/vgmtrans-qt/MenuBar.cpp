@@ -8,6 +8,7 @@
 #include <QMessageBox>
 #include "MenuBar.h"
 #include "Logger.h"
+#include "MusicPlayer.h"
 
 MenuBar::MenuBar(QWidget *parent) : QMenuBar(parent) {
     AppendFileMenu();
@@ -30,6 +31,25 @@ void MenuBar::AppendFileMenu() {
 
 void MenuBar::AppendOptionsMenu() {
     QMenu *options_dropdown = addMenu("Options");
+    auto audio_backend = options_dropdown->addMenu("Player audio backend");
+    menu_drivers = new QActionGroup(this);
+
+    for(auto driver : MusicPlayer::Instance().audioDrivers()) {
+        auto driveropt = audio_backend->addAction(QString(driver));
+        menu_drivers->addAction(driveropt);
+
+        driveropt->setCheckable(true);
+        if(MusicPlayer::Instance().checkSetting("audio.driver", driver)) {
+            driveropt->setChecked(true);
+            auto font = driveropt->font();
+            font.setBold(true);
+            driveropt->setFont(font);
+        }
+    }
+    connect(menu_drivers, &QActionGroup::triggered, [=](QAction *driver) {
+        MusicPlayer::Instance().updateSetting("audio.driver", driver->text().toStdString().c_str());
+    });
+
     menu_toggle_logger = options_dropdown->addAction("Show logger");
     menu_toggle_logger->setCheckable(true);
     connect(menu_toggle_logger, &QAction::triggered, this, &MenuBar::LoggerToggled);
