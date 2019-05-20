@@ -86,6 +86,9 @@ add_subdirectory(externals/minizip EXCLUDE_FROM_ALL)
 # Include our own because of ifdef hacks
 add_subdirectory(externals/tinyxml EXCLUDE_FROM_ALL)
 
+# Use our own to ensure compatibility
+add_subdirectory(externals/fmt EXCLUDE_FROM_ALL)
+
 #
 # Targets
 #
