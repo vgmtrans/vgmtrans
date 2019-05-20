@@ -20,6 +20,7 @@ The coding style is self-documented in `.clang-format`
   - Staic variable begin with `s_`
   - Globals begin with `g_`
   - Everything else should be camel case
+  - Use exact-size types when handling raw data (find their aliases in `main/common.h`)
 
 ### Classes and data
   - The class layout should be: `public, protected, private`
