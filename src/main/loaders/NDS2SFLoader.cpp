@@ -24,15 +24,14 @@ PostLoadCommand NDS2SFLoader::Apply(RawFile *file) {
     if (memcmp(sig, "PSF", 3) == 0) {
         uint8_t version = sig[3];
         if (version == NDS2SF_VERSION) {
-            const wchar_t *complaint;
+            std::wstring complaint;
             size_t exebufsize = NDS2SF_MAX_ROM_SIZE;
             uint8_t *exebuf = NULL;
             // memset(exebuf, 0, exebufsize);
 
-            complaint = psf_read_exe(file, exebuf, exebufsize);
-            if (complaint) {
-                pRoot->AddLogItem(
-                    new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"NDS2SFLoader"));
+            complaint = std::wstring{psf_read_exe(file, exebuf, exebufsize)};
+            if (!complaint.empty()) {
+                L_ERROR("{}", wstring2string(complaint));
                 delete[] exebuf;
                 return KEEP_IT;
             }

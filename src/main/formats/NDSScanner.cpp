@@ -183,10 +183,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
             uint32_t fileSize = file->GetWord(offset);
             NDSWaveArch *NewNDSwa = new NDSWaveArch(file, pWAFatData, fileSize, waNames[i]);
             if (!NewNDSwa->LoadVGMFile()) {
-                pRoot->AddLogItem(new LogItem(
-                    FormatString<wstring>(L"Failed to load NDSWaveArch at 0x%08x\n", pWAFatData)
-                        .c_str(),
-                    LOG_LEVEL_ERR, L"NDSScanner"));
+                L_ERROR("Failed to load NDSWaveArch at {:#X}", pWAFatData);
                 WAs.push_back(NULL);
                 delete NewNDSwa;
                 continue;
@@ -225,10 +222,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
                     NewNDSInstrSet->sampCollWAList.push_back(NULL);
             }
             if (!NewNDSInstrSet->LoadVGMFile()) {
-                pRoot->AddLogItem(new LogItem(
-                    FormatString<wstring>(L"Failed to load NDSInstrSet at 0x%08x\n", pBnkFatData)
-                        .c_str(),
-                    LOG_LEVEL_ERR, L"NDSScanner"));
+                L_ERROR("Failed to load NDSInstrSet at {:#X}", pBnkFatData);
             }
             pair<uint16_t, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
             BNKs.push_back(theBank);
@@ -249,10 +243,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
             uint32_t fileSize = file->GetWord(offset);
             NDSSeq *NewNDSSeq = new NDSSeq(file, pSeqFatData, fileSize, seqNames[i]);
             if (!NewNDSSeq->LoadVGMFile()) {
-                pRoot->AddLogItem(new LogItem(
-                    FormatString<wstring>(L"Failed to load NDSSeq at 0x%08x\n", pSeqFatData)
-                        .c_str(),
-                    LOG_LEVEL_ERR, L"NDSScanner"));
+                L_ERROR("Failed to load NDSSeq at {:#X}", pSeqFatData);
             }
 
             VGMColl *coll = new VGMColl(seqNames[i]);

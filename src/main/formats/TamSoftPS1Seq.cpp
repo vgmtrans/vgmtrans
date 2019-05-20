@@ -360,8 +360,8 @@ bool TamSoftPS1Track::ReadEvent(void) {
                 desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
                      << std::uppercase << (int)statusByte;
                 AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
-                pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(),
-                                              LOG_LEVEL_ERR, std::wstring(L"TamSoftPS1Seq")));
+                L_ERROR("Unknown event {:#X}", statusByte);
+
                 bContinue = false;
                 break;
         }

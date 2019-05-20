@@ -51,16 +51,12 @@ bool AkaoColl::LoadMain() {
 
             if (!((rgn->artNum - sampcoll->starting_art_id) >= 0 &&
                   rgn->artNum - sampcoll->starting_art_id < 200)) {
-                pRoot->AddLogItem(new LogItem(
-                    std::wstring(L"Articualation reference does not exist in the samp collection"),
-                    LOG_LEVEL_ERR, L"AkaoColl"));
+                L_ERROR("Articulation #{} does not exist in the samp collection", rgn->artNum);
                 art = &sampcoll->akArts.front();
             }
 
             if (rgn->artNum - sampcoll->starting_art_id >= sampcoll->akArts.size()) {
-                pRoot->AddLogItem(
-                    new LogItem(std::wstring(L"referencing an articulation that was not loaded"),
-                                LOG_LEVEL_ERR, L"AkaoColl"));
+                L_ERROR("Articulation #{} referenced but not loaded", rgn->artNum);
                 art = &sampcoll->akArts.back();
             } else
                 art = &sampcoll->akArts[rgn->artNum - sampcoll->starting_art_id];

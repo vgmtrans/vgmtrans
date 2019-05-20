@@ -180,8 +180,7 @@ void VGMSeq::LoadTracksMain(long stopTime) {
             // check time limit
             if (time >= stopTime) {
                 if (readMode == READMODE_ADD_TO_UI) {
-                    wstring itemName = *this->GetName() + L" - Abort loading tracks by time limit.";
-                    pRoot->AddLogItem(new LogItem(itemName.c_str(), LOG_LEVEL_WARN, L"VGMSeq"));
+                    L_WARN("Loading timed out");
                 }
 
                 InactivateAllTracks();

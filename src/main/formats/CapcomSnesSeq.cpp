@@ -255,8 +255,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
             } else {
                 // error: note length is not a byte value.
                 len = 0;
-                pRoot->AddLogItem(
-                    new LogItem(L"Note length overflow\n", LOG_LEVEL_WARN, L"CapcomSnesSeq"));
+                L_WARN("Detected note length overflow");
             }
             setNoteDotted(false);
         } else if (isNoteTriplet()) {
@@ -713,9 +712,8 @@ bool CapcomSnesTrack::ReadEvent(void) {
                      << std::uppercase << (int)statusByte;
                 AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
                            desc.str().c_str());
-                pRoot->AddLogItem(
-                    new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
-                                LOG_LEVEL_ERR, L"CapcomSnesSeq"));
+                L_ERROR("Unknown event {:#X}", statusByte);
+
                 bContinue = false;
                 break;
         }

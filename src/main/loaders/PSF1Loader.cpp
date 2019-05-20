@@ -21,16 +21,16 @@ PostLoadCommand PSF1Loader::Apply(RawFile *file) {
     if (memcmp(sig, "PSF", 3) == 0) {
         uint8_t version = sig[3];
         if (version == 0x01) {
-            const wchar_t *complaint;
             const size_t exebufsize = 0x200000;
             // uint32_t exeRealSize;
             uint8_t *exebuf = new uint8_t[exebufsize];
             memset(exebuf, 0, exebufsize);
 
-            complaint = psf_read_exe(file, exebuf, exebufsize);
-            if (complaint) {
-                pRoot->AddLogItem(
-                    new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"PSF1Loader"));
+            std::wstring complaint;
+
+            complaint = std::wstring{psf_read_exe(file, exebuf, exebufsize)};
+            if (!complaint.empty()) {
+                L_ERROR("{}", wstring2string(complaint));
                 delete[] exebuf;
                 return KEEP_IT;
             }

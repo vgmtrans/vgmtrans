@@ -282,12 +282,10 @@ void PSXSamp::ConvertToStdWave(uint8_t *buf) {
     for (uint32_t k = 0; k < dataLength; k += 0x10)  // for every adpcm chunk
     {
         if (dwOffset + k + 16 > vgmfile->GetEndOffset()) {
-            std::wstring log = L"\"" + name + L"\" unexpected EOF.";
-            pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, L"PSXSamp"));
+            L_WARN("Unexpected EOF ({})", wstring2string(name));
             break;
         } else if (!addrOutOfVirtFile && k + 16 > unLength) {
-            std::wstring log = L"\"" + name + L"\" unexpected end of PSXSamp.";
-            pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, L"PSXSamp"));
+            L_WARN("Unexpected end of PSXSamp ({})", wstring2string(name));
             addrOutOfVirtFile = true;
         }
 

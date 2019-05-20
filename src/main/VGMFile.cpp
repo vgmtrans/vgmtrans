@@ -64,8 +64,7 @@ bool VGMFile::LoadVGMFile() {
     if (fmt)
         fmt->OnNewFile(this);
 
-    pRoot->AddLogItem(new LogItem(wstring(L"Loaded \"" + name + L"\" successfully.").c_str(),
-                                  LOG_LEVEL_INFO, L"VGMFile"));
+    L_INFO("Loaded file '{}'", wstring2string(name));
     return val;
 }
 

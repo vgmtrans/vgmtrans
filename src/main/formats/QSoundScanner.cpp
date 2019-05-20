@@ -37,9 +37,8 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
 
     QSoundVer ver = GetVersionEnum(gameentry->fmt_version_str);
     if (ver == VER_UNDEFINED) {
-        wstring alert = L"XML entry uses an undefined QSound version: " +
-                        string2wstring(gameentry->fmt_version_str);
-        pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, L"PSF2Loader"));
+        L_ERROR("Unknown QSound version '{}'", gameentry->fmt_version_str);
+
         return;
     }
 

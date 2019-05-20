@@ -61,16 +61,11 @@ bool Vab::GetInstrPointers() {
     VGMHeader *toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, L"Tone Attributes Table");
 
     if (numPrograms > 128) {
-        std::wstringstream message;
-        message << L"Too many programs (" << numPrograms << L")  Offset: 0x" << std::hex
-                << dwOffset;
-        pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB"));
+        L_ERROR("Too many programs ({:#X}), offset {:#X}", numPrograms, dwOffset);
         return false;
     }
     if (numVAGs > 255) {
-        std::wstringstream message;
-        message << L"Too many VAGs (" << numVAGs << L")  Offset: 0x" << std::hex << dwOffset;
-        pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB"));
+        L_ERROR("Too many VAGs ({:#X}), offset {:#X}", numVAGs, dwOffset);
         return false;
     }
 
@@ -94,9 +89,7 @@ bool Vab::GetInstrPointers() {
 
         uint8_t numTonesPerInstr = GetByte(offCurrProg);
         if (numTonesPerInstr > 32) {
-            wchar_t log[512];
-            swprintf(log, 512, L"Too many tones (%u) in Program #%u.", numTonesPerInstr, progIndex);
-            pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
+            L_WARN("Program {:#X} contains too many tones ({})", progIndex, numTonesPerInstr);
         } else if (numTonesPerInstr != 0) {
             VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex);
             aInstrs.push_back(newInstr);
@@ -150,10 +143,8 @@ bool Vab::GetInstrPointers() {
                 vagLocations.push_back(SizeOffsetPair(vagOffset, vagSize));
                 totalVAGSize += vagSize;
             } else {
-                wchar_t log[512];
-                swprintf(log, 512, L"VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i + 1,
-                         vagOffset, vagSize);
-                pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
+                L_WARN("VAG #{} at {:#X} with size {:#X}) is invalid", i+1, vagOffset, vagSize);
+
             }
         }
         unLength = (offVAGOffsets + 2 * 256) - dwOffset;
@@ -240,10 +231,7 @@ bool VabRgn::LoadRgn() {
         sampNum = 0;
 
     if (keyLow > keyHigh) {
-        std::wstringstream message;
-        message << L"Low Key (" << keyLow << L") is higher than High Key (" << keyHigh
-                << L")  Offset: 0x" << std::hex << dwOffset;
-        pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB (VabRgn)"));
+        L_ERROR("Low key higher than high key {} > {} (at {:#X})", keyLow, keyHigh, dwOffset);
         return false;
     }
 

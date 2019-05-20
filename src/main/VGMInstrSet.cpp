@@ -61,8 +61,7 @@ bool VGMInstrSet::Load() {
 
     if (sampColl != NULL) {
         if (!sampColl->Load()) {
-            pRoot->AddLogItem(
-                new LogItem(L"Failed to load VGMSampColl.", LOG_LEVEL_ERR, L"VGMInstrSet"));
+            L_WARN("Failed to load VGMSampColl");
         }
     }
 

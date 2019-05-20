@@ -494,8 +494,7 @@ bool RareSnesTrack::ReadEvent(void) {
                                 desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
                 if (rptNestLevel == RARESNES_RPTNESTMAX) {
-                    pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n",
-                                                  LOG_LEVEL_ERR, L"RareSnesSeq"));
+                    L_ERROR("Subroutine nest level overflow");
                     bContinue = false;
                     break;
                 }
@@ -518,8 +517,8 @@ bool RareSnesTrack::ReadEvent(void) {
                                 desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
                 if (rptNestLevel == RARESNES_RPTNESTMAX) {
-                    pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n",
-                                                  LOG_LEVEL_ERR, L"RareSnesSeq"));
+                    L_ERROR("Subroutine nest level overflow");
+
                     bContinue = false;
                     break;
                 }
@@ -537,8 +536,8 @@ bool RareSnesTrack::ReadEvent(void) {
                                 desc.str().c_str(), CLR_TRACKEND, ICON_ENDREP);
 
                 if (rptNestLevel == 0) {
-                    pRoot->AddLogItem(new LogItem(L"Subroutine nest level overflow\n",
-                                                  LOG_LEVEL_ERR, L"RareSnesSeq"));
+                    L_ERROR("Subroutine nest level overflow");
+
                     bContinue = false;
                     break;
                 }
@@ -1117,9 +1116,8 @@ bool RareSnesTrack::ReadEvent(void) {
                      << std::uppercase << (int)statusByte;
                 AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
                            desc.str().c_str());
-                pRoot->AddLogItem(
-                    new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
-                                LOG_LEVEL_ERR, L"RareSnesSeq"));
+                L_ERROR("Unknown event {:#X}", statusByte);
+
                 bContinue = false;
                 break;
         }

@@ -56,9 +56,7 @@ bool RawFile::open(const wstring &theFileName) {
     file.open(theFileName, ios::in | ios::binary);
 #endif
     if (!file.is_open()) {
-        pRoot->AddLogItem(
-            new LogItem((std::wstring(L"File ") + theFileName.c_str() + L" could not be opened"),
-                        LOG_LEVEL_ERR, L"RawFile"));
+        L_ERROR("The file '{}' could not be opened", newpath);
         return false;
     }
 
@@ -155,10 +153,7 @@ void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
     if (iter != containedVGMFiles.end())
         containedVGMFiles.erase(iter);
     else
-        pRoot->AddLogItem(new LogItem(
-            std::wstring(
-                L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles."),
-            LOG_LEVEL_DEBUG, L"RawFile"));
+        L_WARN("Requested deletion for VGMFile '{}' but it was not found", wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
 
     if (containedVGMFiles.size() == 0)
         pRoot->CloseRawFile(this);

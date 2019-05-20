@@ -75,9 +75,7 @@ bool BGMTrack::ReadEvent(void) {
     // address range check for safety
     if (!vgmfile->IsValidOffset(curOffset)) {
         if (readMode == ReadMode::READMODE_ADD_TO_UI) {
-            std::wostringstream message;
-            message << *vgmfile->GetName() << L": Address out of range. Conversion aborted.";
-            pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, L"SquarePS2Seq"));
+            L_ERROR("Address out of range. Conversion will be aborted ({})", wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
         }
         return false;
     }

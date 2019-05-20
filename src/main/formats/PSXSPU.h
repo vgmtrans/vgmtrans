@@ -29,24 +29,6 @@ typedef unsigned char b8;
 typedef char b8;
 #endif
 
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-#if defined _MSC_VER || defined __BORLANDC__
-typedef unsigned __int64 u64;
-#else
-typedef unsigned long long int u64;
-#endif
-
-typedef char s8;
-typedef short s16;
-typedef int s32;
-#if defined _MSC_VER || defined __BORLANDC__
-typedef __int64 s64;
-#else
-typedef long long int s64;
-#endif
-
 typedef float f32;
 typedef double f64;
 typedef long double f80;
@@ -145,7 +127,11 @@ void PSXConvADSR(T *realADSR, uint8_t Am, uint8_t Ar, uint8_t Dr, uint8_t Sl, ui
     if (((Am & ~0x01) != 0) || ((Ar & ~0x7F) != 0) || ((Dr & ~0x0F) != 0) || ((Sl & ~0x0F) != 0) ||
         ((Rm & ~0x01) != 0) || ((Rr & ~0x1F) != 0) || ((Sm & ~0x01) != 0) || ((Sd & ~0x01) != 0) ||
         ((Sr & ~0x7F) != 0)) {
-        pRoot->AddLogItem(new LogItem(L"PSX ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
+        L_ERROR("ADSR parameter(s) out of range"
+            "({:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X})",
+            Am, Ar, Dr, Sl, Rm, Rr, Sm, Sd, Sr
+        );
+
         return;
     }
 
