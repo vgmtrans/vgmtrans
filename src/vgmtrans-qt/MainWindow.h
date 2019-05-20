@@ -37,17 +37,17 @@ class MainWindow : public QMainWindow {
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
-    MenuBar *ui_menu_bar;
-    RawFileListView *ui_rawfiles_list;
-    VGMFilesList *ui_vgmfiles_list;
-    VGMCollListView *ui_colls_list;
-    IconBar *ui_iconbar;
-    Logger *ui_logger;
-    MdiArea *ui_mdiarea;
+    MenuBar *m_menu_bar;
+    RawFileListView *m_rawfiles_list;
+    VGMFilesList *m_vgmfiles_list;
+    VGMCollListView *m_colls_list;
+    IconBar *m_iconbar;
+    Logger *m_logger;
+    MdiArea *m_mdiarea;
 
-    QStatusBar *ui_statusbar;
-    QLabel *ui_statusbar_offset;
-    QLabel *ui_statusbar_length;
+    QStatusBar *m_statusbar;
+    QLabel *m_statusbar_offset;
+    QLabel *m_statusbar_length;
 
     QSplitter *vertical_splitter;
     QSplitter *horizontal_splitter;
