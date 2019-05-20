@@ -1210,12 +1210,20 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
 
     // find a jump to address_table[cmd * 2]
     if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd)) {
-      addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
-      addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
+      // DERIVED VERSIONS
+      if (file->SearchBytePattern(ptnJumpToVcmdCTOW, ofsJumpToVcmd)) {
+        // Human Games: Clock Tower, Firemen, S.O.S. (Septentrion)
+        addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 10);
+        addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
+        version = NINSNES_HUMAN;
+      } else {
+        addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
+        addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
 
-      // false-positive needs to be fixed in later classification
-      if (version == NINSNES_NONE) {
-        version = NINSNES_STANDARD;
+        // false-positive needs to be fixed in later classification
+        if (version == NINSNES_NONE) {
+          version = NINSNES_STANDARD;
+        }
       }
     }
     else if (file->SearchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
@@ -1229,13 +1237,6 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
       else {
         return;
       }
-    }
-      // DERIVED VERSIONS
-    else if (file->SearchBytePattern(ptnJumpToVcmdCTOW, ofsJumpToVcmd)) {
-      // Human Games: Clock Tower, Firemen, S.O.S. (Septentrion)
-      addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 10);
-      addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
-      version = NINSNES_HUMAN;
     }
     else {
       return;
