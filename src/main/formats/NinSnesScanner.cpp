@@ -48,17 +48,16 @@ BytePattern NinSnesScanner::ptnBranchForVcmdReadahead(
 //08a0: 5c        lsr   a
 //08a1: fd        mov   y,a
 //08a2: f6 32 0b  mov   a,$0b32+y         ; vcmd length
-//08a5: f0 08     beq   $08af             ; if non zero
+//
+// Variations: Bubsy in Claws Encounters of the Furred Kind
 BytePattern NinSnesScanner::ptnJumpToVcmd(
 	"\x1c\xfd\xf6\x9d\x0a\x2d\xf6\x9c"
 	"\x0a\x2d\xdd\x5c\xfd\xf6\x32\x0b"
-	"\xf0\x08"
 	,
 	"xxx??xx?"
 	"?xxxxx??"
-	"x?"
 	,
-	18);
+	16);
 
 //; Super Mario World SPC
 //; dispatch vcmd in A (da-f2)
@@ -190,7 +189,7 @@ BytePattern NinSnesScanner::ptnSetDIRYI(
 
 //; Super Mario World SPC
 //; default values for DSP regs
-//1295: db $7f,$7f,$00,$00,$2f,$60,$00,$00,$00,$80,$60,$02 
+//1295: db $7f,$7f,$00,$00,$2f,$60,$00,$00,$00,$80,$60,$02
 //12a1: db $0c,$1c,$2c,$3c,$6c,$0d,$2d,$3d,$4d,$5d,$6d,$7d
 BytePattern NinSnesScanner::ptnSetDIRSMW(
 	"\x7f\x7f\x00\x00\x2f\x60\x00\x00\x00\x80\x60\x02"
