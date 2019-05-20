@@ -128,7 +128,7 @@ void PSXConvADSR(T *realADSR, uint8_t Am, uint8_t Ar, uint8_t Dr, uint8_t Sl, ui
         ((Rm & ~0x01) != 0) || ((Rr & ~0x1F) != 0) || ((Sm & ~0x01) != 0) || ((Sd & ~0x01) != 0) ||
         ((Sr & ~0x7F) != 0)) {
         L_ERROR("ADSR parameter(s) out of range"
-            "({:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X})",
+            "({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
             Am, Ar, Dr, Sl, Rm, Rr, Sm, Sd, Sr
         );
 

@@ -61,11 +61,11 @@ bool Vab::GetInstrPointers() {
     VGMHeader *toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, L"Tone Attributes Table");
 
     if (numPrograms > 128) {
-        L_ERROR("Too many programs ({:#X}), offset {:#X}", numPrograms, dwOffset);
+        L_ERROR("Too many programs ({:#x}), offset {:#x}", numPrograms, dwOffset);
         return false;
     }
     if (numVAGs > 255) {
-        L_ERROR("Too many VAGs ({:#X}), offset {:#X}", numVAGs, dwOffset);
+        L_ERROR("Too many VAGs ({:#x}), offset {:#x}", numVAGs, dwOffset);
         return false;
     }
 
@@ -89,7 +89,7 @@ bool Vab::GetInstrPointers() {
 
         uint8_t numTonesPerInstr = GetByte(offCurrProg);
         if (numTonesPerInstr > 32) {
-            L_WARN("Program {:#X} contains too many tones ({})", progIndex, numTonesPerInstr);
+            L_WARN("Program {:#x} contains too many tones ({})", progIndex, numTonesPerInstr);
         } else if (numTonesPerInstr != 0) {
             VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex);
             aInstrs.push_back(newInstr);
@@ -143,7 +143,7 @@ bool Vab::GetInstrPointers() {
                 vagLocations.push_back(SizeOffsetPair(vagOffset, vagSize));
                 totalVAGSize += vagSize;
             } else {
-                L_WARN("VAG #{} at {:#X} with size {:#X}) is invalid", i+1, vagOffset, vagSize);
+                L_WARN("VAG #{} at {:#x} with size {:#x}) is invalid", i+1, vagOffset, vagSize);
 
             }
         }
@@ -231,7 +231,7 @@ bool VabRgn::LoadRgn() {
         sampNum = 0;
 
     if (keyLow > keyHigh) {
-        L_ERROR("Low key higher than high key {} > {} (at {:#X})", keyLow, keyHigh, dwOffset);
+        L_ERROR("Low key higher than high key {} > {} (at {:#x})", keyLow, keyHigh, dwOffset);
         return false;
     }
 

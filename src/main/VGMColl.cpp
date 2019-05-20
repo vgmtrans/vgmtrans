@@ -238,7 +238,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
                         }
                     }
                     if (!bFoundIt) {
-                        L_ERROR("Failed matching region to a sample with offset {:#X} (Instrset {}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
+                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset {}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
                         realSampNum = 0;
                     }
                 }
@@ -446,7 +446,7 @@ SynthFile *VGMColl::CreateSynthFile() {
                         }
                     }
                     if (!bFoundIt) {
-                        L_ERROR("Failed matching region to a sample with offset {:#X} (Instrset {}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
+                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset {}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
                         realSampNum = 0;
                     }
                 }

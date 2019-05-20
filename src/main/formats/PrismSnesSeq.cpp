@@ -955,7 +955,7 @@ bool PrismSnesTrack::ReadEvent(void) {
             desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
             AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
-            L_ERROR("Unknown event {:#X}", statusByte);
+            L_ERROR("Unknown event {:#x}", statusByte);
 
             bContinue = false;
             break;

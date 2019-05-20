@@ -1116,7 +1116,7 @@ bool RareSnesTrack::ReadEvent(void) {
                      << std::uppercase << (int)statusByte;
                 AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
                            desc.str().c_str());
-                L_ERROR("Unknown event {:#X}", statusByte);
+                L_ERROR("Unknown event {:#x}", statusByte);
 
                 bContinue = false;
                 break;
