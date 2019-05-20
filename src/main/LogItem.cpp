@@ -6,7 +6,7 @@
 
 #include "LogItem.h"
 
-LogItem::LogItem() : text(), time(std::chrono::system_clock::now()), level(LOG_LEVEL_ERR), source() {}
+LogItem::LogItem() : text(), time(std::chrono::system_clock::now()), level(LogLevel::ERROR), source() {}
 
 LogItem::LogItem(const wchar_t *text, LogLevel level, const wchar_t *source)
     : text(text ? text : L""),
