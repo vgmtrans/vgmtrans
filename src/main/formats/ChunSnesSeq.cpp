@@ -812,7 +812,7 @@ bool ChunSnesTrack::ReadEvent(void) {
                  << (int)statusByte;
             AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
             L_ERROR("Unknown event {:#x}", statusByte);
-            
+
             bContinue = false;
             break;
     }

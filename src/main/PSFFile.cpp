@@ -205,6 +205,17 @@ bool PSFFile::ReadExe(uint8_t *buf, size_t len, size_t stripLen) const {
     return true;
 }
 
+std::optional<DataBlock> PSFFile::ReadExeDataBlock(size_t len, size_t striplen) const {
+    uLong dest_len = len;
+    uint8_t *buf = new uint8_t[len];
+    int zret = myuncompress(buf, &dest_len, exeCompData->data, exeCompData->size, striplen);
+    if (zret != Z_OK) {
+        return std::nullopt;
+    }
+
+    return DataBlock{buf, 0, len};
+}
+
 bool PSFFile::ReadExeDataSeg(DataSeg *&seg, size_t len, size_t stripLen) const {
     DataSeg *newSeg = new DataSeg();
     if (len == 0) {

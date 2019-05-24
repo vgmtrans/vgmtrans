@@ -29,7 +29,9 @@ PostLoadCommand NDS2SFLoader::Apply(RawFile *file) {
             uint8_t *exebuf = NULL;
             // memset(exebuf, 0, exebufsize);
 
-            complaint = std::wstring{psf_read_exe(file, exebuf, exebufsize)};
+            auto result = psf_read_exe(file, exebuf, exebufsize);
+            if (result)
+                complaint = std::wstring(result);
             if (!complaint.empty()) {
                 L_ERROR("{}", wstring2string(complaint));
                 delete[] exebuf;
@@ -66,13 +68,13 @@ const wchar_t *NDS2SFLoader::psf_read_exe(RawFile *file, unsigned char *&exebuff
     if (psflibError != NULL)
         return psflibError;
 
-    DataSeg *nds2sfExeHeadSeg;
-    if (!psf.ReadExeDataSeg(nds2sfExeHeadSeg, 0x08, 0))
+    auto nds2sfExeHeadSeg = psf.ReadExeDataBlock(0x08, 0);
+    if (nds2sfExeHeadSeg == std::nullopt)
         return psf.GetError();
 
-    uint32_t nds2sfRomStart = nds2sfExeHeadSeg->GetWord(0x00);
-    uint32_t nds2sfRomSize = nds2sfExeHeadSeg->GetWord(0x04);
-    delete nds2sfExeHeadSeg;
+    uint32_t nds2sfRomStart = nds2sfExeHeadSeg.value().GetWord(0x00);
+    uint32_t nds2sfRomSize = nds2sfExeHeadSeg.value().GetWord(0x04);
+
     if (nds2sfRomStart + nds2sfRomSize > exebuffersize || (exebuffer == NULL && exebuffersize == 0))
         return L"2SF ROM section start and/or size values are likely corrupt.";
 

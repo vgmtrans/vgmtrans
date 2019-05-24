@@ -32,7 +32,8 @@ bool PSXSampColl::GetSampleInfo() {
     if (vagLocations.size() == 0) {
         // We scan through the sample section, and determine the offsets and size of each sample
         // We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning
-        // of a sample, and they will never be found at any other point within the adpcm sample data.
+        // of a sample, and they will never be found at any other point within the adpcm sample
+        // data.
 
         uint32_t nEndOffset = dwOffset + unLength;
         if (unLength == 0)

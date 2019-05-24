@@ -14,7 +14,6 @@ MusicPlayer::MusicPlayer() {
     makeSynth();
 }
 
-
 MusicPlayer::~MusicPlayer() {
     Stop();
 }
@@ -26,12 +25,12 @@ MusicPlayer &MusicPlayer::Instance() {
 
 void MusicPlayer::makeSettings() {
     /* Create settings if needed */
-    if(!settings) {
+    if (!settings) {
         settings = new_fluid_settings();
-        /* Default to Pulseaudio on Linux */
-        #ifdef __linux__
-            fluid_settings_setstr(settings, "audio.driver", "pulseaudio");
-        #endif
+/* Default to Pulseaudio on Linux */
+#ifdef __linux__
+        fluid_settings_setstr(settings, "audio.driver", "pulseaudio");
+#endif
     }
 
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
@@ -47,7 +46,7 @@ void MusicPlayer::makeSettings() {
 }
 
 void MusicPlayer::makeSynth() {
-    if(synth) {
+    if (synth) {
         Stop();
         delete synth;
     }

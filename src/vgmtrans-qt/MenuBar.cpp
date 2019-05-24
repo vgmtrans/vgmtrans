@@ -34,12 +34,12 @@ void MenuBar::AppendOptionsMenu() {
     auto audio_backend = options_dropdown->addMenu("Player audio backend");
     menu_drivers = new QActionGroup(this);
 
-    for(auto driver : MusicPlayer::Instance().audioDrivers()) {
+    for (auto driver : MusicPlayer::Instance().audioDrivers()) {
         auto driveropt = audio_backend->addAction(QString(driver));
         menu_drivers->addAction(driveropt);
 
         driveropt->setCheckable(true);
-        if(MusicPlayer::Instance().checkSetting("audio.driver", driver)) {
+        if (MusicPlayer::Instance().checkSetting("audio.driver", driver)) {
             driveropt->setChecked(true);
             auto font = driveropt->font();
             font.setBold(true);

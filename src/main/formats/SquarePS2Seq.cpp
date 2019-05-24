@@ -75,7 +75,8 @@ bool BGMTrack::ReadEvent(void) {
     // address range check for safety
     if (!vgmfile->IsValidOffset(curOffset)) {
         if (readMode == ReadMode::READMODE_ADD_TO_UI) {
-            L_ERROR("Address out of range. Conversion will be aborted ({})", wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
+            L_ERROR("Address out of range. Conversion will be aborted ({})",
+                    wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
         }
         return false;
     }
@@ -94,7 +95,7 @@ bool BGMTrack::ReadEvent(void) {
             // rest_time += current_delta_time;
             // if (nScanMode == MODE_SCAN)
             //	AddBGMEvent("Loop Begin", ICON_STARTREP, aBGMTracks[cur_track]->pTreeItem,
-            //offsetAtDelta, j-offsetAtDelta, BG_CLR_CYAN);
+            // offsetAtDelta, j-offsetAtDelta, BG_CLR_CYAN);
             AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Begin", L"", CLR_LOOP);
             break;
 

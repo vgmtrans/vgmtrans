@@ -22,8 +22,10 @@ using namespace std;
 // void AlignName(string &name)
 //{
 //	name += (char)0x00;
-//	if (name.size() % 2)						//if the size of the name string is
-//odd 		name += (char)0x00;						//add another null byte
+//	if (name.size() % 2)						//if the size of the name
+//string is
+// odd 		name += (char)0x00;						//add another null
+// byte
 //}
 
 //  *******
@@ -90,7 +92,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
     PushTypeOnVect<uint32_t>(buf, 4);                         // size
     PushTypeOnVect<uint32_t>(buf, (uint32_t)aInstrs.size());  // cInstruments - number of
                                                               // instruments
-    theDWORD = 4;  // account for 4 "lins" bytes
+    theDWORD = 4;                                             // account for 4 "lins" bytes
     for (uint32_t i = 0; i < aInstrs.size(); i++)
         theDWORD += aInstrs[i]->GetSize();  // each "ins " list
     WriteLIST(buf, 0x6C696E73, theDWORD);   // Write the "lins" LIST

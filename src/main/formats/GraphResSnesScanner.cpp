@@ -14,9 +14,9 @@
 // 0627: e8 12     mov   a,#$12
 // 0629: c4 0e     mov   $0e,a             ; song header at $1200
 // 062b: e5 01 12  mov   a,$1201           ; $1201/2: first track address (ROM address, not APU RAM
-// address) 062e: 80        setc 062f: a8 18     sbc   a,#$18 0631: c4 0f     mov   $0f,a 0633: e5 02
-// 12  mov   a,$1202 0636: a8 00     sbc   a,#$00 0638: c4 10     mov   $10,a             ; $0f/10 =
-// first track address - 24 header bytes
+// address) 062e: 80        setc 062f: a8 18     sbc   a,#$18 0631: c4 0f     mov   $0f,a 0633: e5
+// 02 12  mov   a,$1202 0636: a8 00     sbc   a,#$00 0638: c4 10     mov   $10,a             ;
+// $0f/10 = first track address - 24 header bytes
 BytePattern GraphResSnesScanner::ptnLoadSeq("\x3f\x24\x05\xe8\x00\xc4\x0d\xe8"
                                             "\x12\xc4\x0e\xe5\x01\x12\x80\xa8"
                                             "\x18\xc4\x0f\xe5\x02\x12\xa8\x00"

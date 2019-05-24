@@ -68,6 +68,7 @@ bool RawFile::open(const wstring &theFileName) {
 
     bufSize = (BUF_SIZE > fileSize) ? fileSize : BUF_SIZE;
     buf.alloc(bufSize);
+    m_data = std::make_unique<DataBlock>(0, bufSize);
     return true;
 }
 
@@ -153,7 +154,8 @@ void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
     if (iter != containedVGMFiles.end())
         containedVGMFiles.erase(iter);
     else
-        L_WARN("Requested deletion for VGMFile '{}' but it was not found", wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
+        L_WARN("Requested deletion for VGMFile '{}' but it was not found",
+               wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
 
     if (containedVGMFiles.size() == 0)
         pRoot->CloseRawFile(this);
@@ -175,13 +177,13 @@ uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
     if ((nIndex + nCount) > fileSize)
         nCount = fileSize - nIndex;
 
-    if (nCount > buf.size)
+    if (nCount > m_data->size())
         FileRead(pBuffer, nIndex, nCount);
     else {
-        if ((nIndex < buf.startOff) || (nIndex + nCount > buf.endOff))
+        if ((nIndex < m_data->beginOffset()) || (nIndex + nCount > m_data->endOffset()))
             UpdateBuffer(nIndex);
 
-        memcpy(pBuffer, buf.data + nIndex - buf.startOff, nCount);
+        memcpy(pBuffer, m_data->data() + nIndex - m_data->beginOffset(), nCount);
     }
     return nCount;
 }
@@ -193,13 +195,13 @@ bool RawFile::MatchBytes(const uint8_t *pattern, uint32_t nIndex, size_t nCount)
     if ((nIndex + nCount) > fileSize)
         return false;
 
-    if (nCount > buf.size)
+    if (nCount > m_data->size())
         return false;  // not supported
     else {
-        if ((nIndex < buf.startOff) || (nIndex + nCount > buf.endOff))
+        if ((nIndex < m_data->beginOffset()) || (nIndex + nCount > m_data->endOffset()))
             UpdateBuffer(nIndex);
 
-        return (memcmp(buf.data + nIndex - buf.startOff, pattern, nCount) == 0);
+        return (memcmp(m_data->data() + nIndex - m_data->beginOffset(), pattern, nCount) == 0);
     }
 }
 
@@ -212,13 +214,13 @@ bool RawFile::MatchBytePattern(const BytePattern &pattern, uint32_t nIndex) {
     if ((nIndex + nCount) > fileSize)
         return false;
 
-    if (nCount > buf.size)
+    if (nCount > m_data->size())
         return false;  // not supported
     else {
-        if ((nIndex < buf.startOff) || (nIndex + nCount > buf.endOff))
+        if ((nIndex < m_data->beginOffset()) || (nIndex + nCount > m_data->endOffset()))
             UpdateBuffer(nIndex);
 
-        return pattern.match(buf.data + nIndex - buf.startOff, nCount);
+        return pattern.match(m_data->data() + nIndex - m_data->beginOffset(), nCount);
     }
 }
 
@@ -255,8 +257,8 @@ void RawFile::UpdateBuffer(uint32_t index) {
     if (!buf.bAlloced)
         buf.alloc(bufSize);
 
-    uint32_t proBytes = (uint32_t)(buf.size * propreRatio);
-    uint32_t preBytes = buf.size - proBytes;
+    uint32_t proBytes = (uint32_t)(m_data->size() * propreRatio);
+    uint32_t preBytes = m_data->size() - proBytes;
     if (proBytes + index > fileSize) {
         preBytes += (proBytes + index) - fileSize;
         proBytes = fileSize - index;  // make it go just to the end of the file;
@@ -267,18 +269,19 @@ void RawFile::UpdateBuffer(uint32_t index) {
     beginOffset = index - preBytes;
     endOffset = index + proBytes;
 
-    if (beginOffset >= buf.startOff && beginOffset < buf.endOff) {
-        uint32_t prevEndOff = buf.endOff;
-        buf.reposition(beginOffset);
-        FileRead(buf.data + prevEndOff - buf.startOff, prevEndOff, endOffset - prevEndOff);
-    } else if (endOffset >= buf.startOff && endOffset < buf.endOff) {
-        uint32_t prevStartOff = buf.startOff;
-        buf.reposition(beginOffset);
-        FileRead(buf.data, beginOffset, prevStartOff - beginOffset);
+    if (beginOffset >= m_data->beginOffset() && beginOffset < m_data->endOffset()) {
+        uint32_t prevEndOff = m_data->endOffset();
+        m_data->relocate(beginOffset);
+        FileRead(m_data->data() + prevEndOff - m_data->beginOffset(), prevEndOff,
+                 endOffset - prevEndOff);
+    } else if (endOffset >= m_data->beginOffset() && endOffset < m_data->endOffset()) {
+        uint32_t prevStartOff = m_data->beginOffset();
+        m_data->relocate(beginOffset);
+        FileRead(m_data->data(), beginOffset, prevStartOff - beginOffset);
     } else {
-        FileRead(buf.data, beginOffset, buf.size);
-        buf.startOff = beginOffset;
-        buf.endOff = beginOffset + buf.size;
+        FileRead(m_data->data(), beginOffset, m_data->size());
+        m_data->setBeginOffset(beginOffset);
+        m_data->setEndOffset(beginOffset + m_data->size());
     }
 }
 
@@ -305,6 +308,6 @@ VirtFile::VirtFile(uint8_t *data, uint32_t fileSize, const wstring &name,
                    const wchar_t *rawFileName, const VGMTag tag)
     : RawFile(name, fileSize, false, tag) {
     parRawFileFullPath = rawFileName;
-    buf.load(data, 0, fileSize);
+    m_data = std::make_unique<DataBlock>(data, 0, fileSize);
     // buf.insert_back(data, fileSize);
 }

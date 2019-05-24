@@ -41,11 +41,11 @@ class MusicPlayer : public QObject {
     const std::vector<const char *> audioDrivers() const {
         std::vector<const char *> drivers_buf;
         fluid_settings_foreach_option(settings, "audio.driver", &drivers_buf,
-            [](void *data, const char *, const char *option) {
-                auto drivers = reinterpret_cast<std::vector<const char *> *>(data);
-                drivers->push_back(option);
-            }
-        );
+                                      [](void *data, const char *, const char *option) {
+                                          auto drivers =
+                                              reinterpret_cast<std::vector<const char *> *>(data);
+                                          drivers->push_back(option);
+                                      });
 
         return drivers_buf;
     }
@@ -53,7 +53,7 @@ class MusicPlayer : public QObject {
     void updateSetting(const char *setting, int value);
     void updateSetting(const char *setting, const char *value);
     bool checkSetting(const char *setting, const char *value);
-    
+
    signals:
     void StatusChange(bool playing);
 

@@ -200,8 +200,8 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
             DLSInstr *newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum, name);
             for (uint32_t j = 0; j < nRgns; j++) {
                 VGMRgn *rgn = vgminstr->aRgns[j];
-                //				if (rgn->sampNum+1 > sampColl->samples.size())	//does
-                //thereferenced sample exist? 					continue;
+                //				if (rgn->sampNum+1 > sampColl->samples.size())
+                ////does thereferenced sample exist? 					continue;
 
                 // Determine the SampColl associated with this rgn.  If there's an explicit pointer
                 // to it, use that.
@@ -238,7 +238,9 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
                         }
                     }
                     if (!bFoundIt) {
-                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset {}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
+                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset "
+                                "{}, Instr {}, Region {})",
+                                rgn->sampOffset, inst, i, j);
                         realSampNum = 0;
                     }
                 }
@@ -270,11 +272,13 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
                 //	}
                 //}
                 // if (rgn->sampCollNum != -1)		//if a sampCollNum is defined
-                //{									//then sampNum represents
-                //the sample number in the specific sample collection 	for (int k=0; k <
-                //rgn->sampCollNum; k++) 		realSampNum += finalSampColls[k]->samples.size();
+                //{									//then
+                //sampNum represents
+                // the sample number in the specific sample collection 	for (int k=0; k <
+                // rgn->sampCollNum; k++) 		realSampNum +=
+                // finalSampColls[k]->samples.size();
                 ////so now we add all previous sample collection samples to the value to get the
-                //real (absolute) sampNum
+                // real (absolute) sampNum
                 //}
 
                 DLSRgn *newRgn = newInstr->AddRgn();
@@ -408,8 +412,8 @@ SynthFile *VGMColl::CreateSynthFile() {
             SynthInstr *newInstr = synthfile->AddInstr(vgminstr->bank, vgminstr->instrNum);
             for (uint32_t j = 0; j < nRgns; j++) {
                 VGMRgn *rgn = vgminstr->aRgns[j];
-                //				if (rgn->sampNum+1 > sampColl->samples.size())	//does
-                //thereferenced sample exist? 					continue;
+                //				if (rgn->sampNum+1 > sampColl->samples.size())
+                ////does thereferenced sample exist? 					continue;
 
                 // Determine the SampColl associated with this rgn.  If there's an explicit pointer
                 // to it, use that.
@@ -446,7 +450,9 @@ SynthFile *VGMColl::CreateSynthFile() {
                         }
                     }
                     if (!bFoundIt) {
-                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset {}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
+                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset "
+                                "{}, Instr {}, Region {})",
+                                rgn->sampOffset, inst, i, j);
                         realSampNum = 0;
                     }
                 }
@@ -608,7 +614,7 @@ bool VGMColl::OnSaveAllDLS() {
     filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".dls";
     if (CreateDLSFile(dlsfile)) {
         if (!dlsfile.SaveDLSFile(filepath))
-             L_ERROR("Failed to save DLS file");
+            L_ERROR("Failed to save DLS file");
     } else {
         L_ERROR("Failed creating DLS instance");
     }

@@ -61,8 +61,9 @@ bool FFTSeq::GetHeaderInfo(void) {
     VGMHeader *titleHdr = AddHeader(dwOffset + ptSongTitle, titleLength, L"Song Name");
 
     //	if(cNumPercussion!=0){
-    ////これ、やっぱ、いらない。 		hdr->AddSimpleItem(dwOffset+ptPercussionTbl, cNumPercussion*5,
-    //L"Drumkit Struct");
+    ////これ、やっぱ、いらない。 		hdr->AddSimpleItem(dwOffset+ptPercussionTbl,
+    /// cNumPercussion*5,
+    // L"Drumkit Struct");
     //	}
     //-----------------------------------------------------------
 
@@ -116,7 +117,8 @@ void FFTTrack::ResetVars() {
 //--------------------------------------------------
 // Revisions:
 //	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "内蔵音源をMIDI変換するスレ(in
-//http://www.2ch.net)" 						Add un-known command(op-code).
+// http://www.2ch.net)" 						Add un-known
+// command(op-code).
 //--------------------------------------------------
 bool FFTTrack::ReadEvent(void) {
     uint32_t beginOffset = curOffset;

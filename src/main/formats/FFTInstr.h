@@ -109,8 +109,8 @@ class WdsInstr : public VGMInstr {
     virtual ~WdsInstr(void);
 
     virtual bool LoadInstr();  // Object "WdsRgn"の生成、
-    //"WdsRgn->LoadRgn()"の呼び出し
-    // member "aRgns" へオブジェクトのポインタを登録
+                               //"WdsRgn->LoadRgn()"の呼び出し
+                               // member "aRgns" へオブジェクトのポインタを登録
 
    public:
     WdsRgnData rgndata;

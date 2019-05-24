@@ -15,7 +15,7 @@ HexView::HexView(VGMFile *vgmfile, QWidget *parent)
     // Use whatever monospace font the system can offer
     QFont font("Courier");
     font.setStyleHint(QFont::TypeWriter);
-    font.setPointSize(12);
+    font.setPointSize(11);
     setFont(font);
 
     QFontMetrics metrics(font);

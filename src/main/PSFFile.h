@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include "DataSeg.h"
 #include "RawFile.h"
+#include <optional>
+#include "DataBlock.h"
 
 class PSFFile {
    public:
@@ -18,6 +20,7 @@ class PSFFile {
 
     bool Load(RawFile *file);
     bool ReadExe(uint8_t *buf, size_t len, size_t stripLen) const;
+    std::optional<DataBlock> ReadExeDataBlock(size_t len, size_t striplen) const;
     bool ReadExeDataSeg(DataSeg *&seg, size_t len, size_t stripLen) const;
     bool Decompress(size_t decompressed_size);
     bool IsDecompressed(void) const;

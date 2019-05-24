@@ -15,20 +15,16 @@
 
 #include <LogManager.h>
 
-Logger::Logger(QWidget *parent) : QDockWidget("Log", parent)
-{
+Logger::Logger(QWidget *parent) : QDockWidget("Log", parent) {
     setAllowedAreas(Qt::AllDockWidgetAreas);
 
     CreateElements();
     ConnectElements();
 }
 
-Logger::~Logger()
-{
-}
+Logger::~Logger() {}
 
-void Logger::CreateElements()
-{
+void Logger::CreateElements() {
     logger_wrapper = new QWidget;
 
     logger_textarea = new QTextEdit(logger_wrapper);
@@ -42,11 +38,12 @@ void Logger::CreateElements()
 
     logger_filter = new QComboBox(logger_wrapper);
     logger_filter->setEditable(false);
-    logger_filter->addItems({ "Errors", "Errors, warnings", "Errors, warnings, information", "Complete debug information" });
+    logger_filter->addItems({"Errors", "Errors, warnings", "Errors, warnings, information",
+                             "Complete debug information"});
     logger_filter->setCurrentIndex(static_cast<int>(logLevel()));
 
     logger_clear = new QPushButton("Clear", logger_wrapper);
-    logger_save  = new QPushButton("Export log", logger_wrapper);
+    logger_save = new QPushButton("Export log", logger_wrapper);
 
     QGridLayout *logger_layout = new QGridLayout;
     logger_layout->addWidget(logger_filter, 0, 0);
@@ -59,19 +56,22 @@ void Logger::CreateElements()
     setWidget(logger_wrapper);
 };
 
-void Logger::ConnectElements()
-{
+void Logger::ConnectElements() {
     connect(logger_clear, &QPushButton::pressed, logger_textarea, &QTextEdit::clear);
-    connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged), [=](int level) { setLogLevel(static_cast<LogLevel>(level)); });
+    connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            [=](int level) { setLogLevel(static_cast<LogLevel>(level)); });
     connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
 }
 
-void Logger::exportLog()
-{
-    if (logger_textarea->toPlainText().isEmpty()) { return; }
+void Logger::exportLog() {
+    if (logger_textarea->toPlainText().isEmpty()) {
+        return;
+    }
 
     auto path = QFileDialog::getSaveFileName(this, "Export log");
-    if (path.isEmpty()) { return; }
+    if (path.isEmpty()) {
+        return;
+    }
 
     QSaveFile log(path);
     log.open(QIODevice::WriteOnly);
@@ -82,16 +82,15 @@ void Logger::exportLog()
     log.commit();
 }
 
-bool Logger::Push(const Entry &e)
-{
+bool Logger::Push(const Entry &e) {
+    if (e.level > m_level) {
+        return false;
+    }
 
-    if (e.level > m_level) { return false; }
-
-    const char *log_colors[] = { "red", "yellow", "darkgrey", "white" };
+    const char *log_colors[] = {"red", "yellow", "darkgrey", "white"};
 
     logger_textarea->append(QStringLiteral("<font color=%3>[%1:%2] %4</font>")
-                                .arg(QString::fromStdString(e.file),
-                                     QString::number(e.line),
+                                .arg(QString::fromStdString(e.file), QString::number(e.line),
                                      QString(log_colors[static_cast<int>(e.level)]),
                                      QString::fromStdString(e.message)));
 

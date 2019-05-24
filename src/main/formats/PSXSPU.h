@@ -128,9 +128,8 @@ void PSXConvADSR(T *realADSR, uint8_t Am, uint8_t Ar, uint8_t Dr, uint8_t Sl, ui
         ((Rm & ~0x01) != 0) || ((Rr & ~0x1F) != 0) || ((Sm & ~0x01) != 0) || ((Sd & ~0x01) != 0) ||
         ((Sr & ~0x7F) != 0)) {
         L_ERROR("ADSR parameter(s) out of range"
-            "({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
-            Am, Ar, Dr, Sl, Rm, Rr, Sm, Sd, Sr
-        );
+                "({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
+                Am, Ar, Dr, Sl, Rm, Rr, Sm, Sd, Sr);
 
         return;
     }
@@ -365,9 +364,10 @@ void PSXConvADSR(T *realADSR, uint8_t Am, uint8_t Ar, uint8_t Dr, uint8_t Sl, ui
     timeInSecs = samples / sampleRate;
 
     // theRate = timeInSecs / sustain_envelope_level;
-    // timeInSecs = 0x7FFFFFFF * theRate;	//the release time value is more like a rate.  It is the
-    // time from max value to 0, not from sustain level. if (Rm == 0) // if it's linear 	timeInSecs *=
-    //LINEAR_RELEASE_COMPENSATION;
+    // timeInSecs = 0x7FFFFFFF * theRate;	//the release time value is more like a rate.  It is
+    // the time from max value to 0, not from sustain level. if (Rm == 0) // if it's linear
+    // timeInSecs *=
+    // LINEAR_RELEASE_COMPENSATION;
 
     realADSR->release_time =
         /*Rm ? timeInSecs : */ LinAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);

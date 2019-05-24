@@ -253,7 +253,7 @@ bool QSoundSeq::PostLoad() {
                         pitchbendRange = std::max<int>(200,
                                                        (int)ceil((vibrato + 50) / 100.0) *
                                                            100);  //+50 cents to allow for pitchbend
-                                                                  //values, which range -50/+50
+                                                                  // values, which range -50/+50
                         track->InsertPitchBendRange(channel, pitchbendRange / 100,
                                                     pitchbendRange % 100, curTicks);
 
