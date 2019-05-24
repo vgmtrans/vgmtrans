@@ -26,8 +26,30 @@ QIcon iconForFileType(FileType filetype) {
             return QIcon(":/images/instrument-set-32.png");
         case FILETYPE_SAMPCOLL:
             return QIcon(":/images/sample-set-32.png");
+        default:
+            break;
     }
 
+    return QIcon(":/images/generic-audio-32.png");
+}
+
+QIcon iconForItemType(VGMItem::Icon type) {
+    switch(type) {
+        case VGMItem::ICON_NOTE:
+            return QIcon(":/images/note_music-32.png");
+        case VGMItem::ICON_SEQ:
+            return QIcon(":/images/sequence-32.png");
+        case VGMItem::ICON_SAMPCOLL:
+            return QIcon(":/images/sample-set-32.png");
+        case VGMItem::ICON_INSTRSET:
+            return QIcon(":/images/instrument-set-32.png");
+        case VGMItem::ICON_TRACK:
+            return QIcon(":/images/generic-audio-32.png");
+        case VGMItem::ICON_INSTR:
+            return QIcon(":/images/instr-32.png");
+        default:
+            break;
+    }
     return QIcon(":/images/generic-audio-32.png");
 }
 

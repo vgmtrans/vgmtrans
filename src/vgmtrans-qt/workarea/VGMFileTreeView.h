@@ -41,5 +41,4 @@ class VGMFileTreeView : public QTreeWidget {
    private:
     VGMFile *vgmfile;
     std::map<VGMItem *, VGMTreeItem *> m_parents;
-    // VGMFileItemModel model;
 };
