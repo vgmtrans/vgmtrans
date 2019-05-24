@@ -17,12 +17,18 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent)
     file->AddToUI(nullptr, nullptr);
 }
 
-void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &, void *) {
+void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name, void *) {
     auto *treeItem = new VGMTreeItem(QString::fromStdWString(item->name), item, nullptr, parent);
     treeItem->setText(0, QString::fromStdWString(item->name));
 
     if (parent) {
-        m_parents[parent]->addChild(treeItem);
+        auto item_app = m_parents[parent];
+        if(item_app) {
+            m_parents[parent]->addChild(treeItem);
+        } else {
+            /* We have this, sometimes */
+            addTopLevelItem(treeItem);
+        }
     } else {
         addTopLevelItem(treeItem);
         m_parents[item] = treeItem;
