@@ -31,8 +31,6 @@ class QtVGMRoot : public QObject, public VGMRoot {
     virtual void UI_RemoveVGMColl(VGMColl *targColl);
     virtual void UI_BeginRemoveVGMFiles();
     virtual void UI_EndRemoveVGMFiles();
-    virtual void UI_AddItem(VGMItem *item, VGMItem *parent, const std::wstring &itemName,
-                            void *UI_specific);
     virtual void UI_AddItemSet(VGMFile *file, std::vector<ItemSet> *itemset);
     virtual std::wstring UI_GetOpenFilePath(const std::wstring &suggestedFilename = L"",
                                             const std::wstring &extension = L"");
@@ -49,6 +47,7 @@ class QtVGMRoot : public QObject, public VGMRoot {
     void UI_RemovedVGMColl();
     void UI_AddLogItem(LogItem *theLog);
     void UI_RemoveVGMFile(VGMFile *targFile);
+    void UI_AddItem(VGMItem *item, VGMItem *parent, const std::wstring &itemName, void *UI_specific);
 };
 
 extern QtVGMRoot qtVGMRoot;

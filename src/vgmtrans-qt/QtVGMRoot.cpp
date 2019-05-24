@@ -58,9 +58,6 @@ void QtVGMRoot::UI_BeginRemoveVGMFiles() {}
 
 void QtVGMRoot::UI_EndRemoveVGMFiles() {}
 
-void QtVGMRoot::UI_AddItem(VGMItem *item, VGMItem *parent, const std::wstring &itemName,
-                           void *UI_specific) {}
-
 void QtVGMRoot::UI_AddItemSet(VGMFile *file, std::vector<ItemSet> *itemset) {}
 
 std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring &suggestedFilename,

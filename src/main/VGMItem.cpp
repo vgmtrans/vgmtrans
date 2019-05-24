@@ -184,7 +184,7 @@ void VGMContainerItem::SetGuessedLength(void) {
 }
 
 void VGMContainerItem::AddToUI(VGMItem *parent, void *UI_specific) {
-    VGMItem::AddToUI(parent, UI_specific);
+    VGMItem::AddToUI(nullptr, UI_specific);
     for (uint32_t i = 0; i < containers.size(); i++) {
         for (uint32_t j = 0; j < containers[i]->size(); j++)
             (*containers[i])[j]->AddToUI(this, UI_specific);
