@@ -56,7 +56,11 @@ class Sink {
     void setLogLevel(LogLevel newlevel) { m_level = newlevel; }
 
    protected:
+#ifndef NDEBUG
+    LogLevel m_level = LogLevel::DEBUG;
+#else
     LogLevel m_level = LogLevel::WARNING;
+#endif
     bool m_enabled = true;
 };
 
