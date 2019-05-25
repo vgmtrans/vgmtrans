@@ -21,6 +21,7 @@ class MenuBar : public QMenuBar {
     void OpenFile();
     void Exit();
     void LoggerToggled();
+    void ShowAbout();
 
    private:
     void AppendFileMenu();

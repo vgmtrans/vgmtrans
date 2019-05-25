@@ -15,6 +15,7 @@
 #include "MusicPlayer.h"
 #include "util/HeaderContainer.h"
 
+#include "About.h"
 #include "VGMFile.h"
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
@@ -81,6 +82,11 @@ void MainWindow::CreateElements() {
 void MainWindow::RouteSignals() {
     connect(m_menu_bar, &MenuBar::OpenFile, this, &MainWindow::OpenFile);
     connect(m_menu_bar, &MenuBar::Exit, this, &MainWindow::close);
+    connect(m_menu_bar, &MenuBar::ShowAbout, [=]() {
+        About about(this);
+        about.exec();
+    });
+
     connect(m_iconbar, &IconBar::OpenPressed, this, &MainWindow::OpenFile);
     connect(m_iconbar, &IconBar::PlayToggle, m_colls_list, &VGMCollListView::HandlePlaybackRequest);
     connect(m_iconbar, &IconBar::StopPressed, m_colls_list, &VGMCollListView::HandleStopRequest);

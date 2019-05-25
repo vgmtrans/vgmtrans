@@ -10,7 +10,7 @@
 #include <QTreeWidgetItem>
 #include <QObject>
 
-#include <map>
+#include <unordered_map>
 //#include "VGMFileItemModel.h"
 
 class VGMFile;
@@ -18,7 +18,7 @@ class VGMItem;
 
 class VGMTreeItem : public QTreeWidgetItem {
    public:
-    VGMTreeItem(QString name, VGMItem *item, QTreeWidget *parent = nullptr,
+    VGMTreeItem(const QString &name, VGMItem *item, QTreeWidget *parent = nullptr,
                 VGMItem *item_parent = nullptr)
         : QTreeWidgetItem(parent, 1001), m_name(name), m_item(item), m_parent(item_parent){};
     auto item_parent() { return m_parent; }
@@ -40,5 +40,5 @@ class VGMFileTreeView : public QTreeWidget {
 
    private:
     VGMFile *vgmfile;
-    std::map<VGMItem *, VGMTreeItem *> m_parents;
+    std::unordered_map<VGMItem *, VGMTreeItem *> m_parents;
 };

@@ -13,7 +13,7 @@
 QIcon MakeIconFromPath(QString path, QColor color = QColor(0x547aa5));
 
 QIcon iconForFileType(FileType filetype);
-QIcon iconForItemType(VGMItem::Icon type);
+const QIcon &iconForItemType(VGMItem::Icon type);
 
 QColor colorForEventColor(uint8_t eventColor);
 QColor textColorForEventColor(uint8_t eventColor);

@@ -35,6 +35,8 @@ add_executable(vgmtrans
                workarea/VGMFileTreeView.h
                workarea/VGMFileView.cpp
                workarea/VGMFileView.h
+               About.cpp
+               About.h
                IconBar.cpp
                IconBar.h
                Logger.cpp
@@ -51,9 +53,9 @@ add_executable(vgmtrans
                ${UI_RESOURCES})
 
 target_include_directories(vgmtrans
-                           PRIVATE ${CMAKE_CURRRENT_LIST_DIR}
-                                   ${CMAKE_CURRRENT_LIST_DIR}/util
-                                   ${CMAKE_CURRRENT_LIST_DIR}/workarea)
+                           PRIVATE .
+                                   ./util
+                                   ./workarea)
 
 target_link_libraries(vgmtrans
                       PRIVATE g_options

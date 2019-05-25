@@ -19,18 +19,26 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent)
 }
 
 void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name, void *) {
-    auto *treeItem = new VGMTreeItem(QString::fromStdWString(item->name), item, nullptr, parent);
-    treeItem->setText(0, QString::fromStdWString(item->name));
+    auto item_name = QString::fromStdWString(item->name);
+    auto *treeItem = new VGMTreeItem(item_name, item, nullptr, parent);
+    treeItem->setText(0, item_name);
     treeItem->setIcon(0, iconForItemType(item->GetIcon()));
 
+    static VGMTreeItem *parent_cache = nullptr;
+
     if (parent) {
-        auto item_app = m_parents[parent];
-        if(item_app) {
-            m_parents[parent]->addChild(treeItem);
-        } else {
-            /* We have this, sometimes */
-            addTopLevelItem(treeItem);
-        }
+            if(parent_cache && parent_cache->item_parent() == parent) {
+                parent_cache->addChild(treeItem);
+            } else {
+                auto *item_app = m_parents[parent];
+                if (item_app) {
+                    item_app->addChild(treeItem);
+                    parent_cache = item_app;
+                } else {
+                    /* We have this, sometimes */
+                    addTopLevelItem(treeItem);
+                }
+            }
     } else {
         addTopLevelItem(treeItem);
         m_parents[item] = treeItem;

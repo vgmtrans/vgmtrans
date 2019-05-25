@@ -33,24 +33,44 @@ QIcon iconForFileType(FileType filetype) {
     return QIcon(":/images/generic-audio-32.png");
 }
 
-QIcon iconForItemType(VGMItem::Icon type) {
-    switch(type) {
-        case VGMItem::ICON_NOTE:
-            return QIcon(":/images/note_music-32.png");
-        case VGMItem::ICON_SEQ:
-            return QIcon(":/images/sequence-32.png");
-        case VGMItem::ICON_SAMPCOLL:
-            return QIcon(":/images/sample-set-32.png");
-        case VGMItem::ICON_INSTRSET:
-            return QIcon(":/images/instrument-set-32.png");
-        case VGMItem::ICON_TRACK:
-            return QIcon(":/images/generic-audio-32.png");
-        case VGMItem::ICON_INSTR:
-            return QIcon(":/images/instr-32.png");
+
+const QIcon &iconForItemType(VGMItem::Icon type) {
+    switch (type) {
+        case VGMItem::ICON_NOTE: {
+            static QIcon i_gen{":/images/note_music-32.png"};
+            return i_gen;
+        }
+
+        case VGMItem::ICON_SEQ:{
+            static QIcon i_gen{":/images/sequence-32.png"};
+            return i_gen;
+            }
+
+        case VGMItem::ICON_SAMPCOLL: {
+            static QIcon i_gen{":/images/sample-set-32.png"};
+            return i_gen;
+        }
+
+        case VGMItem::ICON_INSTRSET: {
+            static QIcon i_gen{":/images/instrument-set-32.png"};
+            return i_gen;    
+        }
+
+        case VGMItem::ICON_TRACK: {
+            static QIcon i_gen{":/images/generic-audio-32.png"};
+            return i_gen;            
+        }
+
+        case VGMItem::ICON_INSTR: {
+            static QIcon i_gen{":/images/instr-32.png"};
+            return i_gen;            
+        }
         default:
             break;
     }
-    return QIcon(":/images/generic-audio-32.png");
+
+    static auto i_gen = QIcon(":/images/generic-audio-32.png");
+    return i_gen;
 }
 
 QColor colorForEventColor(uint8_t eventColor) {
