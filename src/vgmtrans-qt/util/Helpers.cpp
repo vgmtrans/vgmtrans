@@ -9,8 +9,8 @@
 #include <QBitmap>
 
 QIcon MakeIconFromPath(QString path, QColor color) {
-    QPixmap icon_pixmap;
-    icon_pixmap.convertFromImage(QImage(path));
+    QPixmap icon_pixmap{path};
+
     auto mask = icon_pixmap.createHeuristicMask(true);
     icon_pixmap.fill(color);
     icon_pixmap.setMask(mask);
@@ -18,19 +18,29 @@ QIcon MakeIconFromPath(QString path, QColor color) {
     return QIcon(icon_pixmap);
 }
 
-QIcon iconForFileType(FileType filetype) {
+const QIcon &iconForFileType(FileType filetype) {
     switch (filetype) {
-        case FILETYPE_SEQ:
-            return QIcon(":/images/sequence-32.png");
-        case FILETYPE_INSTRSET:
-            return QIcon(":/images/instrument-set-32.png");
-        case FILETYPE_SAMPCOLL:
-            return QIcon(":/images/sample-set-32.png");
+        case FILETYPE_SEQ: {
+            static QIcon i_gen{":/images/sequence-32.png"};
+            return i_gen;
+        }
+        
+        case FILETYPE_INSTRSET:{
+            static QIcon i_gen{":/images/instrument-set-32.png"};
+            return i_gen;
+        }
+        
+        case FILETYPE_SAMPCOLL:{
+            static QIcon i_gen{":/images/sample-set-32.png"};
+            return i_gen;
+        }
+
         default:
             break;
     }
 
-    return QIcon(":/images/generic-audio-32.png");
+    static QIcon i_gen{":/images/generic-audio-32.png"};
+    return i_gen;
 }
 
 
