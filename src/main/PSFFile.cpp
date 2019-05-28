@@ -6,6 +6,8 @@
 
 #include "PSFFile.h"
 
+#include <algorithm>
+
 using namespace std;
 
 #define PSF_TAG_SIG "[TAG]"
