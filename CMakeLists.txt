@@ -9,9 +9,9 @@ add_library(g_warnings INTERFACE)
 
 # Default to Release if build type wasn't specified
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release"
-      CACHE STRING "Build type (Release/Debug/RelWithDebInfo/MinSizeRel)"
-      FORCE)
+  set(CMAKE_BUILD_TYPE
+      "Release"
+      CACHE STRING "Build type (Release/Debug/RelWithDebInfo/MinSizeRel)" FORCE)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
@@ -38,7 +38,12 @@ endif()
 target_compile_features(g_options INTERFACE cxx_std_17)
 
 if(MSVC)
-  target_compile_options(g_warnings INTERFACE /W4 /WX "/permissive- -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE /Zc:strictStrings-")
+  target_compile_options(
+    g_warnings
+    INTERFACE
+      /W4 /WX
+      "/permissive- -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS /Zc:strictStrings-"
+    )
 else()
   if(ENABLE_ASAN)
     target_compile_options(g_options INTERFACE -fsanitize=address)
@@ -47,7 +52,7 @@ else()
 
   target_compile_options(g_warnings
                          INTERFACE -Wall
-                                   #-Werror someday
+                                   # -Werror someday
                                    -Wextra
                                    -Wshadow
                                    -Wunused
