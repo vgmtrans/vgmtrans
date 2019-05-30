@@ -46,15 +46,9 @@ RawFile::~RawFile(void) {
 
 // opens a file using the standard c++ file i/o routines
 bool RawFile::open(const wstring &theFileName) {
-#if _MSC_VER < 1400  // if we're not using VC8, and the new STL that supports widechar filenames in
-                     // ofstream...
-
     char newpath[256];
     wcstombs(newpath, theFileName.c_str(), 256);
     file.open(newpath, ios::in | ios::binary);
-#else
-    file.open(theFileName, ios::in | ios::binary);
-#endif
     if (!file.is_open()) {
         L_ERROR("The file '{}' could not be opened", newpath);
         return false;

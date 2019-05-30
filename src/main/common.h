@@ -13,6 +13,7 @@
 #include <cstring>
 #include <iomanip>
 #include <climits>
+#include <algorithm>
 
 #include "helper.h"
 

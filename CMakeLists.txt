@@ -41,8 +41,11 @@ if(MSVC)
   target_compile_options(
     g_warnings
     INTERFACE
-      /W4 /WX
-      "/permissive- -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS /Zc:strictStrings-"
+	#/W4 /WX someday
+      /W3
+      "/permissive-"
+	-DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS
+	/Zc:strictStrings-
     )
 else()
   if(ENABLE_ASAN)

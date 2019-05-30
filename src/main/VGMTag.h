@@ -3,6 +3,11 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+
+#include <string>
+#include <map>
+#include <vector>
+
 #pragma once
 
 class VGMTag {
