@@ -287,10 +287,3 @@ bool VGMRoot::SaveAllAsRaw() {
     }
     return false;
 }
-
-// Adds a log item to the interface.  The UI_AddLog function will handle the
-// interface-specific stuff
-void VGMRoot::AddLogItem(LogItem *theLog) {
-    vLogItem.push_back(theLog);
-    UI_AddLogItem(theLog);
-}

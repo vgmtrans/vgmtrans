@@ -8,7 +8,8 @@
 #include "common.h"
 #include "Loader.h"
 #include "Scanner.h"
-#include "LogItem.h"
+
+#include "LogManager.h"
 
 class VGMColl;
 class VGMFile;
@@ -39,7 +40,6 @@ class VGMRoot {
     void RemoveVGMFile(VGMFile *theFile, bool bRemoveFromRaw = true);
     void AddVGMColl(VGMColl *theColl);
     void RemoveVGMColl(VGMColl *theFile);
-    void AddLogItem(LogItem *theLog);
     void AddScanner(const std::string &formatname);
 
     template <class T>
@@ -62,7 +62,6 @@ class VGMRoot {
     virtual void UI_AddVGMSampColl(VGMSampColl *theSampColl) {}
     virtual void UI_AddVGMMisc(VGMMiscFile *theMiscFile) {}
     virtual void UI_AddVGMColl(VGMColl *theColl) {}
-    virtual void UI_AddLogItem(LogItem *theLog) {}
     virtual void UI_RemoveVGMFile(VGMFile *theFile) {}
     virtual void UI_BeginRemoveVGMFiles() {}
     virtual void UI_EndRemoveVGMFiles() {}

@@ -45,7 +45,6 @@ class QtVGMRoot : public QObject, public VGMRoot {
     void UI_RemovedVGMFile();
     void UI_AddedVGMColl();
     void UI_RemovedVGMColl();
-    void UI_AddLogItem(LogItem *theLog);
     void UI_RemoveVGMFile(VGMFile *targFile);
     void UI_AddItem(VGMItem *item, VGMItem *parent, const std::wstring &itemName,
                     void *UI_specific);

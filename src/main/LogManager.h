@@ -13,10 +13,10 @@
 
 #include "common.h"
 
-#define L_ERROR(...) LogManager::instance().Log(LogLevel::ERROR, __FILE__, __LINE__, __VA_ARGS__)
-#define L_WARN(...) LogManager::instance().Log(LogLevel::WARNING, __FILE__, __LINE__, __VA_ARGS__)
-#define L_INFO(...) LogManager::instance().Log(LogLevel::INFO, __FILE__, __LINE__, __VA_ARGS__)
-#define L_DEBUG(...) LogManager::instance().Log(LogLevel::DEBUG, __FILE__, __LINE__, __VA_ARGS__)
+#define L_ERROR(...) LogManager::instance().Log(LogLevel::Error, __FILE__, __LINE__, __VA_ARGS__)
+#define L_WARN(...) LogManager::instance().Log(LogLevel::Warning, __FILE__, __LINE__, __VA_ARGS__)
+#define L_INFO(...) LogManager::instance().Log(LogLevel::Info, __FILE__, __LINE__, __VA_ARGS__)
+#define L_DEBUG(...) LogManager::instance().Log(LogLevel::Debug, __FILE__, __LINE__, __VA_ARGS__)
 
 /**
  * @brief Levels of severity
@@ -24,7 +24,7 @@
  * Used in log messages to indicate
  * the severity of the information presented.
  */
-enum class LogLevel : int { ERROR = 0, WARNING, INFO, DEBUG };
+enum class LogLevel : int { Error = 0, Warning, Info, Debug };
 
 /**
  * @brief Log entry
@@ -57,9 +57,9 @@ class Sink {
 
    protected:
 #ifndef NDEBUG
-    LogLevel m_level = LogLevel::DEBUG;
+    LogLevel m_level = LogLevel::Debug;
 #else
-    LogLevel m_level = LogLevel::WARNING;
+    LogLevel m_level = LogLevel::Warning;
 #endif
     bool m_enabled = true;
 };
