@@ -14,6 +14,8 @@ if(NOT CMAKE_BUILD_TYPE)
       CACHE STRING "Build type (Release/Debug/RelWithDebInfo/MinSizeRel)" FORCE)
 endif()
 
+message(STATUS "Will build in ${CMAKE_BUILD_TYPE} mode")
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 #

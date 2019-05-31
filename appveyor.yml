@@ -1,15 +1,48 @@
 image:
-  - Visual Studio 2017
+  - Visual Studio 2019
 clone_folder: c:\projects\source
+
+install:
+  # Not guaranteed to work at the moment
+  - set Qt5_DIR = C:\Qt\5.12.2\msvc2017_64
+  - mkdir C:\projects\deps
+  - cd C:\projects\deps
+  - set NINJA_URL="https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip"
+  - appveyor DownloadFile %NINJA_URL% -FileName ninja.zip
+  - 7z x ninja.zip -oC:\projects\deps\ninja > nul
+  - set PATH=C:\projects\deps\ninja;%Qt5_DIR%\bin;%PATH%
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - git submodule update --init --recursive
+
+before_build:
+- call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
+- cd c:\
+
 build_script:
 - cmd: >-
     mkdir build
 
     cd build
 
-    cmake c:\projects\source -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_UI_QT=OFF
+    cmake c:\projects\source -GNinja -DCMAKE_BUILD_TYPE:STRING=Release
 
     cmake --build . --config "Release"
 
 test_script:
-- cmd: ctest -C Release
+  - cmd: ctest -C Release
+
+after_build:
+  - mkdir deploy
+  - copy src\vgmtrans-qt\vgmtrans.exe deploy\vgmtrans.exe
+  - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\fluidsynth2-msvc2017-x64\*.dll deploy\
+  # Someday windeployqt --release --no-translations --no-angle --no-opengl-sw deploy\vgmtrans.exe
+  - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\bin\Qt5Core.dll deploy\
+  - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\bin\Qt5Gui.dll deploy\
+  - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\bin\Qt5Widgets.dll deploy\
+  - mkdir deploy\qtdata
+  - xcopy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\plugins deploy\qtdata /s /e /h
+  - ps: Set-Content -Value "[Paths]`nPlugins = ./qtdata" -Path deploy\qt.conf
+  - 7z a %APPVEYOR_BUILD_FOLDER%\vgmtrans-qt-win_x64.zip .\deploy\*
+
+artifacts:
+  - path: vgmtrans-qt-win_x64.zip

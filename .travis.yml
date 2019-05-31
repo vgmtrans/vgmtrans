@@ -1,5 +1,8 @@
 language: cpp
 
+git:
+  submodules: false
+
 services:
   - docker
 
