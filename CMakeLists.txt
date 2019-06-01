@@ -40,15 +40,15 @@ endif()
 target_compile_features(g_options INTERFACE cxx_std_17)
 
 if(MSVC)
-  target_compile_options(
-    g_warnings
-    INTERFACE
-	#/W4 /WX someday
-      /W3
-      "/permissive-"
-	-DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS
-	/Zc:strictStrings-
-    )
+  target_compile_options(g_warnings
+                         INTERFACE # /W4 /WX someday
+                                   /W3
+                                   "/permissive-"
+                                   -DNOMINMAX
+                                   -D_CRT_SECURE_NO_DEPRECATE
+                                   -D_CRT_NONSTDC_NO_DEPRECATE
+                                   -D_CRT_SECURE_NO_WARNINGS
+                                   /Zc:strictStrings-)
 else()
   if(ENABLE_ASAN)
     target_compile_options(g_options INTERFACE -fsanitize=address)
