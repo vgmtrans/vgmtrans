@@ -78,7 +78,7 @@ bool QHexView::event(QEvent *e)
 
         if(m_renderer->hitTest(helpevent->pos(), &position, this->firstVisibleLine()))
         {
-            QString comments = m_document->metadata()->comments(position.line);
+            QString comments = m_document->metadata()->comments(position.line, position.column);
 
             if(!comments.isEmpty())
                 QToolTip::showText(helpevent->globalPos(), comments, this);

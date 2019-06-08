@@ -31,6 +31,33 @@ QString QHexMetadata::comments(int line) const
     return s;
 }
 
+QString QHexMetadata::comments(int line, int col) const
+{
+    if(!this->hasMetadata(line))
+        return QString();
+
+    QString s;
+
+    const auto& linemetadata = this->get(line);
+
+    int count = 0;
+    for(auto& mi : linemetadata)
+    {
+        if(count != col) {
+            count++;
+            continue;
+        }
+
+        if(mi.comment.isEmpty())
+            break;
+
+        s += mi.comment;
+        break;
+    }
+
+    return s;
+}
+
 bool QHexMetadata::hasMetadata(int line) const { return m_metadata.contains(line); }
 
 void QHexMetadata::clear(int line)
