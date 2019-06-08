@@ -389,7 +389,7 @@ void QHexRenderer::drawAddress(QPainter* painter, const QPalette& palette, const
     painter->save();
     painter->setPen(palette.color(QPalette::Highlight));
 
-    painter->drawText(addressrect, Qt::AlignHCenter | Qt::AlignVCenter, QString("%1").arg(line * HEX_LINE_LENGTH,
+    painter->drawText(addressrect, Qt::AlignHCenter | Qt::AlignVCenter, QString("%1").arg(line * HEX_LINE_LENGTH + m_document->baseAddress(),
                                                                                           this->getAddressWidth(), 16,
                                                                                           QLatin1Char('0')).toUpper());
     painter->restore();
