@@ -12,9 +12,12 @@
 #include <QGridLayout>
 
 class VGMFile;
+
 class QHexView;
-class VGMFileTreeView;
 class QBuffer;
+class QTreeWidgetItem;
+
+class VGMFileTreeView;
 
 class VGMFileView : public QMdiSubWindow {
     Q_OBJECT
@@ -25,6 +28,7 @@ class VGMFileView : public QMdiSubWindow {
    private:
     void closeEvent(QCloseEvent *closeEvent) override;
     void markEvents();
+    void highlightItem(QTreeWidgetItem *item, int col);
 
     QSplitter *m_splitter;
     QHexView *m_hexview;

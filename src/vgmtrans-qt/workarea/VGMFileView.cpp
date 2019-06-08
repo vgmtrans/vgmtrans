@@ -9,15 +9,14 @@
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
 
-#include <QHBoxLayout>
+#include <QTreeWidgetItem>
+#include <QBuffer>
 
 #include "QHexView/qhexview.h"
 #include "QHexView/document/buffer/qmemoryrefbuffer.h"
 #include "QHexView/document/qhexmetadata.h"
 
 #include "../util/Helpers.h"
-
-#include <QBuffer>
 
 VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
     m_vgmfile = vgmfile;
@@ -33,6 +32,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
     }
     m_buffer->open(QIODevice::ReadOnly);
     m_hexview =  new QHexView(m_splitter);
+
     auto doc = QHexDocument::fromDevice<QMemoryRefBuffer>(m_buffer);
     doc->setBaseAddress(vgmfile->dwOffset);
     m_hexview->setDocument(doc);
@@ -60,19 +60,25 @@ void VGMFileView::markEvents() {
             auto line = std::floor((item->dwOffset - base_offset) / 16);
             auto col = (item->dwOffset - base_offset) % 16;
             auto item_len = item->unLength;
+            auto desc = QString::fromStdWString(item->GetDescription());
             while (col + item_len > 16) {
                 auto part_len = 16 - col;
-                overlay->color(line, col, part_len, textColorForEventColor(item->color), colorForEventColor(item->color));
+                overlay->metadata(line, col, part_len, textColorForEventColor(item->color), colorForEventColor(item->color), desc);
                 line++;
                 col = 0;
                 item_len -= part_len;
             }
-            overlay->color(line, col, item_len, textColorForEventColor(item->color), colorForEventColor(item->color));
+            overlay->metadata(line, col, item_len, textColorForEventColor(item->color), colorForEventColor(item->color), desc);
             i += item->unLength;
         } else {
             i++;
         }
     }
+}
+
+void VGMFileView::highlightItem(QTreeWidgetItem *item, int) {
+    auto vgmitem = static_cast<VGMTreeItem*>(item);
+
 }
 
 void VGMFileView::closeEvent(QCloseEvent *) {
