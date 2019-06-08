@@ -45,6 +45,8 @@ elseif(APPLE)
   set(GUI_TYPE MACOSX_BUNDLE)
 endif()
 
+add_subdirectory(workarea/QHexView)
+
 add_executable(vgmtrans
                ${GUI_TYPE}
                ${UI_RESOURCES}
@@ -67,8 +69,6 @@ add_executable(vgmtrans
                util/HeaderContainer.h
                util/Helpers.cpp
                util/Helpers.h
-               workarea/HexView.cpp
-               workarea/HexView.h
                workarea/MdiArea.cpp
                workarea/MdiArea.h
                workarea/RawFileListView.cpp
@@ -82,7 +82,9 @@ add_executable(vgmtrans
                workarea/VGMFileView.cpp
                workarea/VGMFileView.h
                workarea/VGMFilesList.cpp
-               workarea/VGMFilesList.h)
+               workarea/VGMFilesList.h
+               ${QHEXVIEW_SOURCES}
+               ${QHEXVIEW_HEADERS})
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
@@ -92,5 +94,3 @@ target_link_libraries(vgmtrans
                               vgmcore
                               Qt5::Widgets
                               fluidsynth)
-
-target_compile_definitions(vgmtrans PRIVATE QT_USE_QSTRINGBUILDER)

@@ -140,6 +140,14 @@ class VGMFile : public VGMContainerItem {
             return data.size;
     }
 
+    inline uint8_t *rawData() {
+        if(bUsingRawFile) {
+            return data.data;
+        } else {
+            return nullptr;
+        }
+    }
+
    protected:
     DataSeg data, col;
     FileType file_type;

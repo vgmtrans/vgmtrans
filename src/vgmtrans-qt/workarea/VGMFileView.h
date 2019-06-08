@@ -12,8 +12,9 @@
 #include <QGridLayout>
 
 class VGMFile;
-class HexView;
+class QHexView;
 class VGMFileTreeView;
+class QBuffer;
 
 class VGMFileView : public QMdiSubWindow {
     Q_OBJECT
@@ -21,12 +22,14 @@ class VGMFileView : public QMdiSubWindow {
    public:
     explicit VGMFileView(VGMFile *vgmfile);
 
-   protected:
-    QSplitter *filetab_splitter_;
-    HexView *filetab_hexview_;
-    VGMFileTreeView *filetab_treeview_;
-    VGMFile *internal_vgmfile_;
-
    private:
     void closeEvent(QCloseEvent *closeEvent) override;
+    void markEvents();
+
+    QSplitter *m_splitter;
+    QHexView *m_hexview;
+    VGMFileTreeView *m_treeview;
+    VGMFile *m_vgmfile;
+    QBuffer *m_buffer;
+
 };
