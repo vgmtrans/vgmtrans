@@ -1,7 +1,7 @@
 #ifndef QHEXMETADATA_H
 #define QHEXMETADATA_H
 
-#include <QLinkedList>
+#include <QVector>
 #include <QObject>
 #include <QColor>
 #include <QHash>
@@ -13,7 +13,7 @@ struct QHexMetadataItem
     QString comment;
 };
 
-typedef QLinkedList<QHexMetadataItem> QHexLineMetadata;
+typedef QVector<QHexMetadataItem> QHexLineMetadata;
 
 class QHexMetadata : public QObject
 {
