@@ -34,6 +34,7 @@ test_script:
 after_build:
   - mkdir deploy
   - copy src\vgmtrans-qt\vgmtrans.exe deploy\vgmtrans.exe
+  - copy %APPVEYOR_BUILD_FOLDER%\bin\mame_roms.xml deploy\
   - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\fluidsynth2-msvc2017-x64\*.dll deploy\
   # Someday windeployqt --release --no-translations --no-angle --no-opengl-sw deploy\vgmtrans.exe
   - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\bin\Qt5Core.dll deploy\
