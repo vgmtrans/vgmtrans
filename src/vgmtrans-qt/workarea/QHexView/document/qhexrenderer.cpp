@@ -268,9 +268,6 @@ void QHexRenderer::applyMetadata(QTextCursor &textcursor, int line, int factor) 
         if(mi.foreground.isValid())
             charformat.setForeground(mi.foreground);
 
-        if(!mi.comment.isEmpty())
-            charformat.setUnderlineStyle(QTextCharFormat::SingleUnderline);
-
         textcursor.setPosition(mi.start * factor);
         textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, (mi.length * factor) - (factor > 1 ? 1 : 0));
         textcursor.setCharFormat(charformat);
@@ -337,11 +334,7 @@ void QHexRenderer::applyCursorAscii(QTextCursor &textcursor, int line) const
         else
             charformat.setBackground(palette.color(QPalette::WindowText).lighter(250));
     }
-    else
-    {
-        charformat.setUnderlineStyle(QTextCharFormat::UnderlineStyle::SingleUnderline);
-    }
-
+    
     textcursor.setCharFormat(charformat);
 }
 
@@ -375,8 +368,6 @@ void QHexRenderer::applyCursorHex(QTextCursor &textcursor, int line) const
         else
             charformat.setBackground(palette.color(QPalette::WindowText).lighter(250));
     }
-    else
-        charformat.setUnderlineStyle(QTextCharFormat::UnderlineStyle::SingleUnderline);
 
     textcursor.setCharFormat(charformat);
 }
