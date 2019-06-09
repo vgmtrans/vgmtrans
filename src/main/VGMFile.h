@@ -141,11 +141,7 @@ class VGMFile : public VGMContainerItem {
     }
 
     inline uint8_t *rawData() {
-        if(bUsingRawFile) {
-            return data.data;
-        } else {
-            return nullptr;
-        }
+        return data.data;
     }
 
    protected:
