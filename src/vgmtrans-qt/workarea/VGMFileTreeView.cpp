@@ -14,8 +14,11 @@
 VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent)
     : QTreeWidget(parent), vgmfile(file) {
     setHeaderLabel("File structure");
+
+    /* Not pretty, but there's no alternative for now */
     connect(&qtVGMRoot, &QtVGMRoot::UI_AddItem, this, &VGMFileTreeView::addVGMItem);
     file->AddToUI(nullptr, nullptr);
+    disconnect(&qtVGMRoot, &QtVGMRoot::UI_AddItem, this, &VGMFileTreeView::addVGMItem);
 }
 
 void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name, void *) {
