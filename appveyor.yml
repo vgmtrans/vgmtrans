@@ -1,6 +1,7 @@
 image:
   - Visual Studio 2019
 clone_folder: c:\projects\source
+skip_tags: true
 
 install:
   # Not guaranteed to work at the moment

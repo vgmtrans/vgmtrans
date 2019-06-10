@@ -14,8 +14,8 @@ before_install:
   - sudo apt-get update -qq
 
 install:
-  - sudo apt-get -y install g++-9 qt511base libfluidsynth-dev libgl1-mesa-dev ninja-build
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 90
+  - sudo apt-get -y install g++-8 qt511base libfluidsynth-dev libgl1-mesa-dev ninja-build
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
   - source /opt/qt*/bin/qt*-env.sh
 
 script:
@@ -35,5 +35,5 @@ script:
 
 after_success:
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
-  - bash upload.sh VGMTrans*.AppImage*
+  - bash upload.sh VGMTrans*.AppImage
   
