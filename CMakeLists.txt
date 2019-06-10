@@ -40,31 +40,35 @@ endif()
 target_compile_features(g_options INTERFACE cxx_std_17)
 
 if(MSVC)
-  target_compile_options(g_warnings
-                         INTERFACE # /W4 /WX someday
-                                   /W3
-                                   "/permissive-"
+  target_compile_options(g_options
+                         INTERFACE /Zc:strictStrings-
                                    -DNOMINMAX
                                    -D_CRT_SECURE_NO_DEPRECATE
                                    -D_CRT_NONSTDC_NO_DEPRECATE
-                                   -D_CRT_SECURE_NO_WARNINGS
-                                   /Zc:strictStrings-)
+                                   -D_CRT_SECURE_NO_WARNINGS)
+  if(NOT ${CMAKE_BUILD_TYPE} MATCHES "Release")
+    target_compile_options(g_warnings
+                           INTERFACE # /W4 /WX someday
+                                     /W3 "/permissive-")
+  endif()
 else()
   if(ENABLE_ASAN)
     target_compile_options(g_options INTERFACE -fsanitize=address)
     target_link_libraries(g_options INTERFACE -fsanitize=address)
   endif()
 
-  target_compile_options(g_warnings
-                         INTERFACE -Wall
-                                   # -Werror someday
-                                   -Wextra
-                                   -Wshadow
-                                   -Wunused
-                                   -Wold-style-cast
-                                   -Woverloaded-virtual
-                                   -Wcast-align
-                                   -Wnull-dereference)
+  if(NOT ${CMAKE_BUILD_TYPE} MATCHES "Release")
+    target_compile_options(g_warnings
+                           INTERFACE -Wall
+                                     # -Werror someday
+                                     -Wextra
+                                     -Wshadow
+                                     -Wunused
+                                     -Wold-style-cast
+                                     -Woverloaded-virtual
+                                     -Wcast-align
+                                     -Wnull-dereference)
+  endif()
 
   # Make sure we have the c++17 filesystem library
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -82,13 +86,7 @@ endif()
 # Dependencies
 #
 
-find_package(ZLIB)
-if(ZLIB_FOUND)
-  message(STATUS "Using system zlib")
-else()
-  message(STATUS "zlib was not found in the system, using bundled version")
-  add_subdirectory(externals/zlib EXCLUDE_FROM_ALL)
-endif()
+add_subdirectory(externals/zlib EXCLUDE_FROM_ALL)
 
 # Include our own because it's a tiny subset of minizip
 add_subdirectory(externals/minizip EXCLUDE_FROM_ALL)

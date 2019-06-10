@@ -12,13 +12,12 @@ else()
         "${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2017-x64/fluidsynth.lib"
       )
 
-      target_include_directories(
+    target_include_directories(
       fluidsynth
       INTERFACE
-        ${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2017-x64/include
-      )
+        ${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2017-x64/include)
 
-      message(STATUS "Using FluidSynth fallback from Windows externals")
+    message(STATUS "Using FluidSynth fallback from Windows externals")
   else()
     message(
       FATAL_ERROR "Please install FluidSynth! Bundled version not available")
@@ -49,6 +48,8 @@ add_subdirectory(workarea/QHexView)
 
 add_executable(vgmtrans
                ${GUI_TYPE}
+               ${QHEXVIEW_HEADERS}
+               ${QHEXVIEW_SOURCES}
                ${UI_RESOURCES}
                About.cpp
                About.h
@@ -82,15 +83,10 @@ add_executable(vgmtrans
                workarea/VGMFileView.cpp
                workarea/VGMFileView.h
                workarea/VGMFilesList.cpp
-               workarea/VGMFilesList.h
-               ${QHEXVIEW_SOURCES}
-               ${QHEXVIEW_HEADERS})
+               workarea/VGMFilesList.h)
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
-target_link_libraries(vgmtrans
-                      PRIVATE g_options
-                              g_warnings
-                              vgmcore
-                              Qt5::Widgets
-                              fluidsynth)
+target_link_libraries(vgmtrans PRIVATE vgmcore Qt5::Widgets fluidsynth)
+
+install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})

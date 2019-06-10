@@ -3,14 +3,37 @@ language: cpp
 git:
   submodules: false
 
-services:
-  - docker
+language: cpp
+compiler: gcc
+sudo: require
+dist: xenial
 
 before_install:
-  - docker pull vgmtrans/vgmtrans-deps:tests_env
-  - docker run -itd --name build vgmtrans/vgmtrans-deps:tests_env
-  - docker exec build git clone --single-branch --branch refactor https://github.com/sykhro/vgmtrans /repo
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo add-apt-repository ppa:beineri/opt-qt-5.11.1-xenial -y
+  - sudo apt-get update -qq
+
+install:
+  - sudo apt-get -y install g++-9 qt511base libfluidsynth-dev libgl1-mesa-dev ninja-build
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 90
+  - source /opt/qt*/bin/qt*-env.sh
 
 script:
-  - docker exec build cmake -DENABLE_UI_QT=OFF -H/repo -B/build
-  - docker exec build cmake --build /build --target tests
+  -   if [ ! -z $TRAVIS_BRANCH ] && [ "$TRAVIS_BRANCH" != "master" ] ; then
+        export UPLOADTOOL_SUFFIX=$TRAVIS_BRANCH;
+      fi
+  - mkdir build && cd build
+  - cmake -DCMAKE_BUILD_TYPE=Release  -DENABLE_TESTING=0 -DCMAKE_INSTALL_PREFIX=/usr/bin -GNinja ..
+  - DESTDIR=appdir ninja -j$(nproc) install ; find appdir/
+  - wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
+  - chmod a+x linuxdeployqt-continuous-x86_64.AppImage
+  - mkdir -p appdir/usr/share
+  - cp ../bin/vgmtrans.desktop appdir/usr/share
+  - cp ../bin/mame_roms.xml appdir/usr/bin
+  - cp ../src/vgmtrans-qt/resources/images/logo.png appdir/usr/share/default.png
+  - ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage
+
+after_success:
+  - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
+  - bash upload.sh VGMTrans*.AppImage*
+  
