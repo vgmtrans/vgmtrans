@@ -43,7 +43,19 @@ after_build:
   - mkdir deploy\qtdata
   - xcopy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\plugins deploy\qtdata /s /e /h
   - ps: Set-Content -Value "[Paths]`nPlugins = ./qtdata" -Path deploy\qt.conf
-  - 7z a %APPVEYOR_BUILD_FOLDER%\vgmtrans-qt-win_x64.zip .\deploy\*
+  - 7z a %APPVEYOR_BUILD_FOLDER%\vgmtrans-qt-win_x64-dyn.zip .\deploy\*
 
 artifacts:
-  - path: vgmtrans-qt-win_x64.zip
+  - path: vgmtrans-qt-win_x64-dyn.zip
+
+deploy:
+  tag: continuous-$(APPVEYOR_REPO_BRANCH)
+  release: Continuous build ($(APPVEYOR_REPO_BRANCH))
+  description: 'Precompiled VGMTrans-Qt binaries'
+  provider: GitHub
+  auth_token:
+    secure: KYZwviB+62BKdGabNbACZB3zWyfBT8euilehsYRtXKxCY27vlLWOetU+WIxV3bdD
+  artifact: vgmtrans-qt-win_x64-dyn.zip
+  draft: false
+  prerelease: true
+  force_update: true
