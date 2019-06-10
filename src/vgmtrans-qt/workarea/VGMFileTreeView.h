@@ -11,10 +11,9 @@
 #include <QObject>
 
 #include <unordered_map>
-//#include "VGMFileItemModel.h"
+#include <VGMFile.h>
 
 class VGMFile;
-class VGMItem;
 
 class VGMTreeItem : public QTreeWidgetItem {
    public:
@@ -22,6 +21,7 @@ class VGMTreeItem : public QTreeWidgetItem {
                 VGMItem *item_parent = nullptr)
         : QTreeWidgetItem(parent, 1001), m_name(name), m_item(item), m_parent(item_parent){};
     auto item_parent() { return m_parent; }
+    auto item_offset() { return m_item->dwOffset; }
 
    private:
     QString m_name;

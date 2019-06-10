@@ -102,6 +102,16 @@ void QHexView::scrollContentsBy(int dx, int dy)
     QAbstractScrollArea::scrollContentsBy(dx, dy);
 }
 
+void QHexView::moveTo(int offset) {
+
+    m_blinktimer->stop();
+    m_renderer->enableCursor();
+
+    m_document->cursor()->selectOffset(offset, 1);
+
+    m_blinktimer->start();
+}
+
 void QHexView::keyPressEvent(QKeyEvent *e)
 {
     if(!m_renderer || !m_document)

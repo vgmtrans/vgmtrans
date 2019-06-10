@@ -17,6 +17,7 @@ class QHexView : public QAbstractScrollArea
         QHexDocument* document();
         void setDocument(QHexDocument* document);
         void setReadOnly(bool b);
+        void moveTo(int offset);
 
     protected:
         virtual bool event(QEvent* e);

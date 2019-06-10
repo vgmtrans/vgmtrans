@@ -46,6 +46,13 @@ VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
     setWindowIcon(iconForFileType(m_vgmfile->GetFileType()));
     setAttribute(Qt::WA_DeleteOnClose);
 
+    connect(m_treeview, &VGMFileTreeView::itemClicked, [=](QTreeWidgetItem *item, int) {
+        auto vgmitem = reinterpret_cast<VGMTreeItem*>(item);
+        auto offset = vgmitem->item_offset() - vgmfile->dwOffset;
+
+        m_hexview->moveTo(offset);
+    });
+
     setWidget(m_splitter);
 }
 
