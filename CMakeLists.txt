@@ -1,6 +1,6 @@
 # VGMTrans (c) 2002-2019 Licensed under the zlib license Check the included
 # LICENSE.txt for details
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12) # For object library liinking
 
 project(VGMTrans VERSION 0.1 LANGUAGES CXX)
 

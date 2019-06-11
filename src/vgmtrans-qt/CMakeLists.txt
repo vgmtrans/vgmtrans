@@ -94,10 +94,9 @@ add_executable(vgmtrans
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
-target_link_libraries(vgmtrans PRIVATE vgmcore Qt5::Widgets fluidsynth)
+target_link_libraries(vgmtrans PRIVATE g_options g_warnings vgmcore Qt5::Widgets fluidsynth)
 
 if(APPLE)
-  include(BundleUtilities)
   set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app)
 
   set_target_properties(vgmtrans PROPERTIES
