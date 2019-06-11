@@ -8,31 +8,43 @@ compiler: gcc
 sudo: require
 dist: xenial
 
-before_install:
-  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-  - sudo add-apt-repository ppa:beineri/opt-qt-5.11.1-xenial -y
-  - sudo apt-get update -qq
-
-install:
-  - sudo apt-get -y install g++-8 qt511base libfluidsynth-dev libgl1-mesa-dev ninja-build
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
-  - source /opt/qt*/bin/qt*-env.sh
+matrix:
+  include:
+    - os: linux
+      before_install:
+        - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        - sudo add-apt-repository ppa:beineri/opt-qt-5.11.1-xenial -y
+        - sudo apt-get update -qq
+        - sudo apt-get -y install g++-8 qt511base libfluidsynth-dev libgl1-mesa-dev ninja-build        
+        - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
+        - source /opt/qt*/bin/qt*-env.sh
+    - os: osx
+      before_install:
+        - brew upgrade qt || brew install qt
+        - brew upgrade fluid-synth || brew install fluid-synth
+        - brew upgrade ninja || brew install ninja
 
 script:
-  -   if [ ! -z $TRAVIS_BRANCH ] && [ "$TRAVIS_BRANCH" != "master" ] ; then
-        export UPLOADTOOL_SUFFIX=$TRAVIS_BRANCH;
-      fi
+  - if [ ! -z $TRAVIS_BRANCH ] && [ "$TRAVIS_BRANCH" != "master" ] ; then
+      export UPLOADTOOL_SUFFIX=$TRAVIS_BRANCH;
+    fi
   - mkdir build && cd build
-  - cmake -DCMAKE_BUILD_TYPE=Release  -DENABLE_TESTING=0 -DCMAKE_INSTALL_PREFIX=/usr/bin -GNinja ..
-  - DESTDIR=appdir ninja -j$(nproc) install ; find appdir/
-  - wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
-  - chmod a+x linuxdeployqt-continuous-x86_64.AppImage
-  - mkdir -p appdir/usr/share
-  - cp ../bin/vgmtrans.desktop appdir/usr/share
-  - cp ../bin/mame_roms.xml appdir/usr/bin
-  - cp ../src/vgmtrans-qt/resources/images/logo.png appdir/usr/share/default.png
-  - ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage
-
+  - if [ $TRAVIS_OS_NAME = linux ]; then
+      cmake -DCMAKE_BUILD_TYPE=Release  -DENABLE_TESTING=0 -DCMAKE_INSTALL_PREFIX=/usr/bin -GNinja .. ;
+      DESTDIR=appdir ninja -j$(nproc) install ; find appdir/ ;
+      wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage" ;
+      chmod a+x linuxdeployqt-continuous-x86_64.AppImage ;
+      mkdir -p appdir/usr/share ;
+      cp ../bin/vgmtrans.desktop appdir/usr/share ;
+      cp ../bin/mame_roms.xml appdir/usr/bin ;
+      cp ../src/vgmtrans-qt/resources/images/logo.png appdir/usr/share/default.png ;
+      ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage ;
+    fi
+  - if [ $TRAVIS_OS_NAME = osx ]; then
+      cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
+      ninja -j$(nproc) ;
+      macdeployqt src/vgmtrans-qt/VGMTrans.app ;
+    fi
 after_success:
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
   - bash upload.sh VGMTrans*.AppImage

@@ -24,6 +24,13 @@ else()
   endif()
 endif()
 
+if(APPLE AND EXISTS /usr/local/opt/qt5)
+  # Homebrew installs Qt5 (up to at least 5.9.1) in
+  # /usr/local/qt5, ensure it can be found by CMake since
+  # it is not in the default /usr/local prefix.
+  list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/qt5")
+endif()
+
 if(NOT Qt5_DIR AND MSVC)
   set(Qt5_DIR
       "${CMAKE_SOURCE_DIR}/externals/win-deps/qt5-msvc2017-x64/lib/cmake/Qt5")
@@ -89,4 +96,14 @@ target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
 target_link_libraries(vgmtrans PRIVATE vgmcore Qt5::Widgets fluidsynth)
 
-install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})
+if(APPLE)
+  include(BundleUtilities)
+  set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app)
+
+  set_target_properties(vgmtrans PROPERTIES
+    MACOSX_BUNDLE true
+    OUTPUT_NAME VGMTrans)
+else()
+  install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})
+endif()
+
