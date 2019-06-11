@@ -22,6 +22,7 @@ matrix:
     - os: osx
       osx_image: xcode10
       before_install:
+        - brew install llvm
         - brew upgrade cmake || brew install cmake
         - brew upgrade qt || brew install qt
         - brew upgrade fluid-synth || brew install fluid-synth
@@ -46,8 +47,10 @@ script:
       ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage ;
     fi
   - if [ $TRAVIS_OS_NAME = osx ]; then
+      export CC=clang ;
+      export CXX=clang++ ;
       cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
-      ninja ;
+      ninja -j$(sysctl -n hw.physicalcpu) ;
       /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app ;
     fi
 
