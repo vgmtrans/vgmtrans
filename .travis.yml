@@ -50,7 +50,9 @@ script:
   - if [ $TRAVIS_OS_NAME = osx ]; then
       CC=gcc-9 CXX=g++-9 cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
       ninja -j$(sysctl -n hw.physicalcpu) ;
-      /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app ;
+      /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app -dmg -always-overwrite ;
+      zip -vr VGMTrans-x64-osx.zip src/vgmtrans-qt/VGMTrans.app -x "*.DS_Store"
+      find . ;
     fi
 
 after_success:
@@ -59,6 +61,7 @@ after_success:
       bash upload.sh VGMTrans*.AppImage ;
     fi
   - if [ $TRAVIS_OS_NAME = osx ]; then
-      bash upload.sh VGMTrans*.app ;
+      bash upload.sh src/vgmtrans-qt/VGMTrans*.dmg || echo fail;
+      bash upload.sh VGMTrans-x64-osx.zip ;
     fi
   
