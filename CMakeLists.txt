@@ -2,6 +2,10 @@
 # LICENSE.txt for details
 cmake_minimum_required(VERSION 3.12) # For object library liinking
 
+# People still use Yosemite
+set(CMAKE_OSX_ARCHITECTURES "x86_64")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.10.0" CACHE STRING "Minimum OSX version" FORCE)
+
 project(VGMTrans VERSION 0.1 LANGUAGES CXX)
 
 add_library(g_options INTERFACE)

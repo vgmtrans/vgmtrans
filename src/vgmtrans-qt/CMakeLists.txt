@@ -106,6 +106,7 @@ if(APPLE)
 
   set_target_properties(vgmtrans PROPERTIES
     MACOSX_BUNDLE true
+    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/bin/Info.plist.in
     OUTPUT_NAME VGMTrans)
 else()
   install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})

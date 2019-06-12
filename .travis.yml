@@ -22,8 +22,7 @@ matrix:
     - os: osx
       osx_image: xcode10.2
       before_install:
-        - brew link --overwrite gcc
-        - brew upgrade gcc
+        - brew upgrade gcc || brew install gcc
         - brew upgrade cmake || brew install cmake
         - brew upgrade qt || brew install qt
         - brew upgrade fluid-synth || brew install fluid-synth
@@ -51,8 +50,10 @@ script:
       CC=gcc-9 CXX=g++-9 cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
       ninja -j$(sysctl -n hw.physicalcpu) ;
       /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app -dmg -always-overwrite ;
-      zip -vr VGMTrans-x64-osx.zip src/vgmtrans-qt/VGMTrans.app -x "*.DS_Store"
-      find . ;
+      cd src/vgmtrans-qt/ ;
+      zip -vr ../../VGMTrans-x64-osx.zip VGMTrans.app -x "*.DS_Store" ;
+      mv VGMTrans.dmg ../../VGMTrans-x64-osx.dmg ;
+      cd ../.. ;
     fi
 
 after_success:
@@ -61,7 +62,11 @@ after_success:
       bash upload.sh VGMTrans*.AppImage ;
     fi
   - if [ $TRAVIS_OS_NAME = osx ]; then
-      bash upload.sh src/vgmtrans-qt/VGMTrans*.dmg || echo fail;
+      bash upload.sh VGMTrans-x64-osx.dmg ;
       bash upload.sh VGMTrans-x64-osx.zip ;
     fi
-  
+
+branches:
+  except:
+    # Do not build tags that we create when we upload to GitHub Releases
+    - /^(?i:continuous)$/
