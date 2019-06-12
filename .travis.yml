@@ -20,9 +20,10 @@ matrix:
         - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
         - source /opt/qt*/bin/qt*-env.sh
     - os: osx
-      osx_image: xcode10
+      osx_image: xcode10.2
       before_install:
-        - brew install llvm
+        - brew link --overwrite gcc
+        - brew upgrade gcc
         - brew upgrade cmake || brew install cmake
         - brew upgrade qt || brew install qt
         - brew upgrade fluid-synth || brew install fluid-synth
@@ -47,9 +48,7 @@ script:
       ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage ;
     fi
   - if [ $TRAVIS_OS_NAME = osx ]; then
-      export CC=clang ;
-      export CXX=clang++ ;
-      cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
+      CC=gcc-9 CXX=g++-9 cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
       ninja -j$(sysctl -n hw.physicalcpu) ;
       /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app ;
     fi

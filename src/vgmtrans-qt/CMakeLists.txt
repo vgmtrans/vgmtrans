@@ -1,3 +1,8 @@
+if(APPLE AND EXISTS /usr/local/lib/)
+  # Generic Homebrew include path
+  list(APPEND CMAKE_PREFIX_PATH "/usr/local/include")
+endif()
+
 # TODO: Make optional: no fluidsynth, no playback support.
 find_package(FLUIDSYNTH)
 if(FLUIDSYNTH_FOUND)
