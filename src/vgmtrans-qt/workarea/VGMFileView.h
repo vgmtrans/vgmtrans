@@ -35,5 +35,4 @@ class VGMFileView : public QMdiSubWindow {
     VGMFileTreeView *m_treeview;
     VGMFile *m_vgmfile;
     QBuffer *m_buffer;
-
 };

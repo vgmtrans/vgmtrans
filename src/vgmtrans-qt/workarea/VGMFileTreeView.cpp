@@ -30,18 +30,18 @@ void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstr
     static VGMTreeItem *parent_cache = nullptr;
 
     if (parent) {
-            if(parent_cache && parent_cache->item_parent() == parent) {
-                parent_cache->addChild(treeItem);
+        if (parent_cache && parent_cache->item_parent() == parent) {
+            parent_cache->addChild(treeItem);
+        } else {
+            auto *item_app = m_parents[parent];
+            if (item_app) {
+                item_app->addChild(treeItem);
+                parent_cache = item_app;
             } else {
-                auto *item_app = m_parents[parent];
-                if (item_app) {
-                    item_app->addChild(treeItem);
-                    parent_cache = item_app;
-                } else {
-                    /* We have this, sometimes */
-                    addTopLevelItem(treeItem);
-                }
+                /* We have this, sometimes */
+                addTopLevelItem(treeItem);
             }
+        }
     } else {
         addTopLevelItem(treeItem);
         m_parents[item] = treeItem;

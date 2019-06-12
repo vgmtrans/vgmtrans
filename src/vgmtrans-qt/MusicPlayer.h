@@ -34,22 +34,22 @@ class MusicPlayer : public QObject {
 
     const char *defaultAudioDriver() {
         char *def_driver;
-        #if FLUIDSYNTH_VERSION_MAJOR >= 2
+#if FLUIDSYNTH_VERSION_MAJOR >= 2
         fluid_settings_getstr_default(settings, "audio.driver", &def_driver);
-        #else
+#else
         def_driver = fluid_settings_getstr_default(settings, "audio.driver");
-        #endif
-        
+#endif
+
         return def_driver;
     }
     const std::vector<const char *> audioDrivers() const {
         std::vector<const char *> drivers_buf;
         fluid_settings_foreach_option(settings, "audio.driver", &drivers_buf,
-        #if FLUIDSYNTH_VERSION_MAJOR >= 2
+#if FLUIDSYNTH_VERSION_MAJOR >= 2
                                       [](void *data, const char *, const char *option) {
-        #else
+#else
                                       [](void *data, char *, char *option) {
-        #endif
+#endif
                                           auto drivers =
                                               reinterpret_cast<std::vector<const char *> *>(data);
                                           drivers->push_back(option);
