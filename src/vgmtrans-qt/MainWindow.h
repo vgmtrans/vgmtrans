@@ -17,6 +17,7 @@
 #include "MenuBar.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFilesList.h"
+#include "workarea/VGMCollView.h"
 #include "workarea/VGMCollListView.h"
 #include "workarea/MdiArea.h"
 #include "IconBar.h"
@@ -41,6 +42,7 @@ class MainWindow : public QMainWindow {
     RawFileListView *m_rawfiles_list;
     VGMFilesList *m_vgmfiles_list;
     VGMCollListView *m_colls_list;
+    VGMCollView *m_coll_view;
     IconBar *m_iconbar;
     Logger *m_logger;
     MdiArea *m_mdiarea;

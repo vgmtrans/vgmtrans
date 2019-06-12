@@ -9,6 +9,7 @@
 #include <QVBoxLayout>
 #include <QStandardPaths>
 #include <QFileDialog>
+#include <QGridLayout>
 
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
@@ -58,6 +59,16 @@ void MainWindow::CreateElements() {
     HeaderContainer *m_colls_list_container =
         new HeaderContainer(m_colls_list, QStringLiteral("Detected collections"));
 
+    m_coll_view = new VGMCollView(m_colls_list->selectionModel());
+    HeaderContainer *m_coll_view_container =
+        new HeaderContainer(m_coll_view, QStringLiteral("Selected collection"));
+
+    auto coll_wrapper = new QWidget();
+    auto coll_layout = new QGridLayout();
+    coll_layout->addWidget(m_colls_list_container, 0, 0, 1, 1);
+    coll_layout->addWidget(m_coll_view_container, 0, 1, 1, 3);
+    coll_wrapper->setLayout(coll_layout);
+
     m_logger = new Logger(this);
     LogManager::instance().addSink(m_logger);
     addDockWidget(Qt::BottomDockWidgetArea, m_logger);
@@ -66,7 +77,7 @@ void MainWindow::CreateElements() {
     horizontal_splitter = new QSplitter(Qt::Horizontal, vertical_splitter);
     vertical_splitter_left = new QSplitter(Qt::Vertical, horizontal_splitter);
 
-    vertical_splitter->addWidget(m_colls_list_container);
+    vertical_splitter->addWidget(coll_wrapper);
     vertical_splitter->setHandleWidth(1);
 
     horizontal_splitter->addWidget(m_mdiarea);
