@@ -46,7 +46,7 @@ after_build:
   - ps: |
         Set-Content -Value "[Paths]`nPlugins = ./qtdata" -Path deploy\qt.conf
         $env:APPVEYOR_REPO_COMMIT_SHORT = (${env:APPVEYOR_REPO_COMMIT}).Substring(0, 7)
-        $env:ARTIFACT_NAME = "VGMTrans-$env:APPVEYOR_REPO_COMMIT_SHORT-win-x86_64.zip"
+        $env:ARTIFACT_NAME = "VGMTrans-$env:APPVEYOR_REPO_COMMIT_SHORT-x86_64-win.zip"
         7z a "$env:APPVEYOR_BUILD_FOLDER\$env:ARTIFACT_NAME" .\deploy\*
 
 artifacts:
