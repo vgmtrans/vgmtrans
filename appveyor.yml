@@ -35,7 +35,7 @@ test_script:
 after_build:
   - mkdir deploy
   - copy src\vgmtrans-qt\vgmtrans.exe deploy\vgmtrans.exe
-  - copy %APPVEYOR_BUILD_FOLDER%\bin\mame_roms.xml deploy\
+  - copy %APPVEYOR_BUILD_FOLDER%\data\mame_roms.xml deploy\
   - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\fluidsynth2-msvc2017-x64\*.dll deploy\
   # Someday windeployqt --release --no-translations --no-angle --no-opengl-sw deploy\vgmtrans.exe
   - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\bin\Qt5Core.dll deploy\
@@ -43,20 +43,23 @@ after_build:
   - copy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\bin\Qt5Widgets.dll deploy\
   - mkdir deploy\qtdata
   - xcopy %APPVEYOR_BUILD_FOLDER%\externals\win-deps\qt5-msvc2017-x64\plugins deploy\qtdata /s /e /h
-  - ps: Set-Content -Value "[Paths]`nPlugins = ./qtdata" -Path deploy\qt.conf
-  - 7z a %APPVEYOR_BUILD_FOLDER%\vgmtrans-qt-win_x64-dyn.zip .\deploy\*
+  - ps: |
+        Set-Content -Value "[Paths]`nPlugins = ./qtdata" -Path deploy\qt.conf
+        $env:APPVEYOR_REPO_COMMIT_SHORT = (${env:APPVEYOR_REPO_COMMIT}).Substring(0, 7)
+        $env:ARTIFACT_NAME = "VGMTrans-$env:APPVEYOR_REPO_COMMIT_SHORT-win-x86_64.zip"
+        7z a "$env:APPVEYOR_BUILD_FOLDER\$env:ARTIFACT_NAME" .\deploy\*
 
 artifacts:
-  - path: vgmtrans-qt-win_x64-dyn.zip
+  - path: $(ARTIFACT_NAME)
 
 deploy:
   tag: continuous-$(APPVEYOR_REPO_BRANCH)
   release: Continuous build ($(APPVEYOR_REPO_BRANCH))
-  description: 'Precompiled VGMTrans-Qt binaries for Windows, Linux (AppImage) and OSX (Yosemite or newer)'
+  description: 'Precompiled VGMTrans-Qt binaries for Windows, Linux (AppImage) and OS X (Sierra or newer)'
   provider: GitHub
   auth_token:
     secure: KYZwviB+62BKdGabNbACZB3zWyfBT8euilehsYRtXKxCY27vlLWOetU+WIxV3bdD
-  artifact: vgmtrans-qt-win_x64-dyn.zip
+  artifact: $(ARTIFACT_NAME)
   draft: false
   prerelease: true
   force_update: true

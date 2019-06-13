@@ -30,9 +30,8 @@ else()
 endif()
 
 if(APPLE AND EXISTS /usr/local/opt/qt5)
-  # Homebrew installs Qt5 (up to at least 5.9.1) in
-  # /usr/local/qt5, ensure it can be found by CMake since
-  # it is not in the default /usr/local prefix.
+  # Homebrew installs Qt5 (up to at least 5.9.1) in /usr/local/qt5, ensure it
+  # can be found by CMake since it is not in the default /usr/local prefix.
   list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/qt5")
 endif()
 
@@ -86,10 +85,10 @@ add_executable(vgmtrans
                workarea/MdiArea.h
                workarea/RawFileListView.cpp
                workarea/RawFileListView.h
-               workarea/VGMCollView.cpp
-               workarea/VGMCollView.h
                workarea/VGMCollListView.cpp
                workarea/VGMCollListView.h
+               workarea/VGMCollView.cpp
+               workarea/VGMCollView.h
                workarea/VGMFileTreeView.cpp
                workarea/VGMFileTreeView.h
                workarea/VGMFileView.cpp
@@ -99,16 +98,31 @@ add_executable(vgmtrans
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
-target_link_libraries(vgmtrans PRIVATE g_options g_warnings vgmcore Qt5::Widgets fluidsynth)
+target_link_libraries(vgmtrans
+                      PRIVATE g_options
+                              g_warnings
+                              vgmcore
+                              Qt5::Widgets
+                              fluidsynth)
 
 if(APPLE)
   set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app)
 
-  set_target_properties(vgmtrans PROPERTIES
-    MACOSX_BUNDLE true
-    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/bin/Info.plist.in
-    OUTPUT_NAME VGMTrans)
+  set_target_properties(vgmtrans
+                        PROPERTIES MACOSX_BUNDLE
+                                   true
+                                   MACOSX_BUNDLE_INFO_PLIST
+                                   ${CMAKE_SOURCE_DIR}/data/Info.plist.in
+                                   OUTPUT_NAME
+                                   VGMTrans)
+
+  target_sources(vgmtrans PRIVATE "${CMAKE_SOURCE_DIR}/data/VGMTrans.icns")
+  set_source_files_properties("${CMAKE_SOURCE_DIR}/data/VGMTrans.icns"
+                              PROPERTIES
+                              MACOSX_PACKAGE_LOCATION
+                              Resources)
+elseif(WIN32)
+  target_sources(vgmtrans PRIVATE "${CMAKE_SOURCE_DIR}/data/VGMTrans.rc")
 else()
   install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})
 endif()
-

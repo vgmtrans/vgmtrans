@@ -3,6 +3,8 @@ language: cpp
 git:
   submodules: false
 
+if: tag IS blank
+
 language: cpp
 compiler: gcc
 sudo: require
@@ -24,9 +26,10 @@ matrix:
       before_install:
         - brew upgrade gcc || brew install gcc
         - brew upgrade cmake || brew install cmake
-        - brew upgrade qt || brew install qt
-        - brew upgrade fluid-synth || brew install fluid-synth
         - brew upgrade ninja || brew install ninja
+        - brew upgrade fluid-synth || brew install fluid-synth
+        # This image contains Qt5.12, and we're fine with that for now
+        #- brew upgrade qt || brew install qt
 
 script:
   - cmake --version
@@ -41,18 +44,19 @@ script:
       wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage" ;
       chmod a+x linuxdeployqt-continuous-x86_64.AppImage ;
       mkdir -p appdir/usr/share ;
-      cp ../bin/vgmtrans.desktop appdir/usr/share ;
-      cp ../bin/mame_roms.xml appdir/usr/bin ;
+      cp ../data/vgmtrans.desktop appdir/usr/share ;
+      cp ../data/mame_roms.xml appdir/usr/bin ;
       cp ../src/vgmtrans-qt/resources/images/logo.png appdir/usr/share/default.png ;
       ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage ;
     fi
   - if [ $TRAVIS_OS_NAME = osx ]; then
       CC=gcc-9 CXX=g++-9 cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
       ninja -j$(sysctl -n hw.physicalcpu) ;
+      cp ../data/mame_roms.xml src/vgmtrans-qt/VGMTrans.app/Contents/MacOS/ ;
       /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app -dmg -always-overwrite ;
       cd src/vgmtrans-qt/ ;
-      zip -vr ../../VGMTrans-x64-osx.zip VGMTrans.app -x "*.DS_Store" ;
-      mv VGMTrans.dmg ../../VGMTrans-x64-osx.dmg ;
+      zip -vr ../../VGMTrans-$(git rev-parse --short HEAD)-x86_64-osx.zip VGMTrans.app -x "*.DS_Store" ;
+      mv VGMTrans.dmg ../../VGMTrans-$(git rev-parse --short HEAD)-x86_64-osx.dmg ;
       cd ../.. ;
     fi
 
@@ -62,11 +66,6 @@ after_success:
       bash upload.sh VGMTrans*.AppImage ;
     fi
   - if [ $TRAVIS_OS_NAME = osx ]; then
-      bash upload.sh VGMTrans-x64-osx.dmg ;
-      bash upload.sh VGMTrans-x64-osx.zip ;
+      bash upload.sh VGMTrans*.dmg ;
+      bash upload.sh VGMTrans*.zip ;
     fi
-
-branches:
-  except:
-    # Do not build tags that we create when we upload to GitHub Releases
-    - /^(?i:continuous)$/
