@@ -1,5 +1,7 @@
 #include "qmemoryrefbuffer.h"
 
+#include <QObject> 
+
 QMemoryRefBuffer::QMemoryRefBuffer(QObject *parent): QHexBuffer(parent) { }
 int QMemoryRefBuffer::length() const { return m_buffer->size(); }
 void QMemoryRefBuffer::insert(int, const QByteArray &) { /* Insertion unsupported */ }
@@ -11,7 +13,7 @@ QByteArray QMemoryRefBuffer::read(int offset, int length)
     return m_buffer->read(length);
 }
 
-void QMemoryRefBuffer::read(QIODevice *device) { m_buffer = dynamic_cast<QBuffer*>(device); }
+void QMemoryRefBuffer::read(QIODevice *device) { m_buffer = qobject_cast<QBuffer*>(device); }
 
 void QMemoryRefBuffer::write(QIODevice *device)
 {

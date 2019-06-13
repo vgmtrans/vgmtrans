@@ -7,6 +7,7 @@
 #include <QEvent>
 #include <QMenu>
 #include <QLineEdit>
+#include <QObject>
 #include "VGMCollListView.h"
 #include "../QtVGMRoot.h"
 #include "VGMColl.h"
@@ -49,13 +50,13 @@ Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
 
 void VGMCollNameEditor::setEditorData(QWidget *editor, const QModelIndex &index) const {
     QString orig_name = index.model()->data(index, Qt::EditRole).toString();
-    QLineEdit *line_edit = dynamic_cast<QLineEdit *>(editor);
+    QLineEdit *line_edit = qobject_cast<QLineEdit *>(editor);
     line_edit->setText(orig_name);
 }
 
 void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
                                      const QModelIndex &index) const {
-    QLineEdit *line_edit = dynamic_cast<QLineEdit *>(editor);
+    QLineEdit *line_edit = qobject_cast<QLineEdit *>(editor);
     auto new_name = line_edit->text().toStdWString();
     qtVGMRoot.vVGMColl[index.row()]->SetName(&new_name);
     model->dataChanged(index, index);
