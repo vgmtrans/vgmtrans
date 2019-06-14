@@ -1,8 +1,10 @@
 # VGMTrans - Video Game Music Translator
----
-[![Build Status](https://travis-ci.org/vgmtrans/vgmtrans.svg?branch=refactor)](https://travis-ci.org/vgmtrans/vgmtrans) [![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/djsal74fdlue142s/branch/refactor?svg=true)](https://ci.appveyor.com/project/mikelow/vgmtrans)
 
-*This branch is experimental and aims to modernize and clean the codebase. Don't use this unless you know what you are doing.*
+[![Build Status](https://travis-ci.org/sykhro/vgmtrans-qt.svg?branch=refactor)](https://travis-ci.org/sykhro/vgmtrans-qt) [![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/github/sykhro/vgmtrans-qt?branch=refactor&svg=true)](https://ci.appveyor.com/project/sykhro/vgmtrans-qt)
+
+# Notice
+This is an experimental friendly fork of VGMTrans that aims to modernize and clean the codebase.
+If you encounter a bug, report it here and not upstream.
 
 VGMTrans converts music files used in console videogames into standard MIDI and soundfonts.
 It also plays these files in-program.
@@ -44,6 +46,7 @@ Contributors
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
 - Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
+- sykkro: General maintenance work, ported the tool to Qt.
 
 ### Special Thanks
 
