@@ -28,7 +28,6 @@ VGMRoot::~VGMRoot(void) {
     // DeleteVect<VGMScanner>(vScanner);
     DeleteVect<RawFile>(vRawFile);
     DeleteVect<VGMFile>(vVGMFile);
-    DeleteVect<LogItem>(vLogItem);
 }
 
 // initializes the VGMRoot class by pushing every VGMScanner and

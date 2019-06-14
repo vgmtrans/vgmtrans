@@ -18,7 +18,7 @@ class VGMSeq;
 class VGMInstrSet;
 class VGMSampColl;
 class VGMMiscFile;
-class LogItem;
+
 FORWARD_DECLARE_TYPEDEF_STRUCT(ItemSet);
 
 class VGMRoot {
@@ -84,7 +84,6 @@ class VGMRoot {
     std::vector<RawFile *> vRawFile;
     std::vector<VGMFile *> vVGMFile;
     std::vector<VGMColl *> vVGMColl;
-    std::vector<LogItem *> vLogItem;
 
     std::vector<VGMLoader *> vLoader;
     std::vector<VGMScanner *> vScanner;
