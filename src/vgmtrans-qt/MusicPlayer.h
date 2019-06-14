@@ -93,17 +93,17 @@ class MusicPlayer : public QObject {
 class SF2Wrapper {
    public:
     static void SetSF2(SF2File &obj) {
-        if (sf2_obj_) {
-            delete sf2_obj_;
+        if (m_sf2_obj) {
+            delete m_sf2_obj;
         }
 
-        if (old_sf2_buf_) {
-            delete static_cast<char *>(old_sf2_buf_);
-            old_sf2_buf_ = nullptr;
+        if (m_old_sf2_buf) {
+            delete static_cast<char *>(m_old_sf2_buf);
+            m_old_sf2_buf = nullptr;
         }
 
-        sf2_obj_ = &obj;
-        index_ = 0;
+        m_sf2_obj = &obj;
+        m_index = 0;
     }
 
     static void *sf_open(const char *filename) {
@@ -115,18 +115,18 @@ class SF2Wrapper {
 
         sscanf(filename, "&%p", &sf2_buf);
 
-        old_sf2_buf_ = sf2_buf;
+        m_old_sf2_buf = sf2_buf;
 
         return sf2_buf;
     }
 
     static int sf_read(void *buf, int count, void *handle) {
         char *newhandle = (char *)handle;
-        newhandle += index_;
+        newhandle += m_index;
 
         memcpy(buf, newhandle, count);
 
-        index_ += count;
+        m_index += count;
 
         return FLUID_OK;
     }
@@ -134,22 +134,22 @@ class SF2Wrapper {
     static int sf_seek(void * /* handle */, long offset, int origin) {
         switch (origin) {
             case SEEK_CUR: {
-                index_ += offset;
+                m_index += offset;
                 break;
             }
 
             case SEEK_SET: {
-                index_ = offset;
+                m_index = offset;
                 break;
             }
 
             case SEEK_END: {
-                index_ = sf2_obj_->GetSize();
+                m_index = m_sf2_obj->GetSize();
                 break;
             }
 
             default: {
-                index_ = offset + origin;
+                m_index = offset + origin;
                 break;
             }
         }
@@ -157,22 +157,22 @@ class SF2Wrapper {
         return FLUID_OK;
     }
 
-    static long sf_tell(void *) { return index_; }
+    static long sf_tell(void *) { return m_index; }
 
     /* Guaranteed to be called only on a SF2 buf */
     static int sf_close(void *file) {
-        if (file == old_sf2_buf_ && old_sf2_buf_ != nullptr) {
-            delete static_cast<char *>(old_sf2_buf_);
-            old_sf2_buf_ = nullptr;
+        if (file == m_old_sf2_buf && m_old_sf2_buf != nullptr) {
+            delete static_cast<char *>(m_old_sf2_buf);
+            m_old_sf2_buf = nullptr;
         }
 
         return FLUID_OK;
     }
 
    private:
-    inline static SF2File *sf2_obj_ = nullptr;
-    inline static void *old_sf2_buf_ = nullptr;
-    inline static long index_ = 0;
+    inline static SF2File *m_sf2_obj = nullptr;
+    inline static void *m_old_sf2_buf = nullptr;
+    inline static long m_index = 0;
 };
 
 #endif
