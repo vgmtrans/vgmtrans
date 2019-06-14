@@ -48,7 +48,7 @@ void MusicPlayer::makeSettings() {
 void MusicPlayer::makeSynth() {
     if (synth) {
         Stop();
-        delete synth;
+        delete_fluid_synth(synth);
     }
 
     synth = new_fluid_synth(settings);
