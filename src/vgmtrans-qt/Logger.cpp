@@ -22,7 +22,9 @@ Logger::Logger(QWidget *parent) : QDockWidget("Log", parent) {
     ConnectElements();
 }
 
-Logger::~Logger() {}
+Logger::~Logger() {
+    LogManager::instance().removeSink(this);
+}
 
 void Logger::CreateElements() {
     logger_wrapper = new QWidget;

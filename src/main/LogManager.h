@@ -94,7 +94,19 @@ class LogManager {
      *
      * @param s The sink to be added
      */
-    void addSink(Sink *s) { m_sinks.emplace_back(s); };
+    void addSink(Sink *s) { m_sinks.emplace_back(s); }
+
+    /**
+     * @brief Registers a new log sink
+     *
+     * @param s The sink to be added
+     */
+    void removeSink(Sink *s) {
+        auto it = std::find(m_sinks.begin(), m_sinks.end(), s);
+        if(it != m_sinks.end()) {
+            m_sinks.erase(it);
+        }
+    }
 
    private:
     LogManager() = default;
