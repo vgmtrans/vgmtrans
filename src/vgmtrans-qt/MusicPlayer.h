@@ -98,7 +98,7 @@ class SF2Wrapper {
         }
 
         if (m_old_sf2_buf) {
-            delete static_cast<char *>(m_old_sf2_buf);
+            delete[] static_cast<char *>(m_old_sf2_buf);
             m_old_sf2_buf = nullptr;
         }
 
@@ -162,7 +162,7 @@ class SF2Wrapper {
     /* Guaranteed to be called only on a SF2 buf */
     static int sf_close(void *file) {
         if (file == m_old_sf2_buf && m_old_sf2_buf != nullptr) {
-            delete static_cast<char *>(m_old_sf2_buf);
+            delete[] static_cast<char *>(m_old_sf2_buf);
             m_old_sf2_buf = nullptr;
         }
 
