@@ -11,9 +11,9 @@ VGMTrans-qt is an experimental friendly fork of VGMTrans that aims to modernize 
 Format support is the same as upstream, but VGMTrans-qt is available cross-platform.
 
 The latest build is always available for Linux (AppImage), OSX and Windows [here](https://github.com/sykhro/vgmtrans-qt/releases/tag/continuous-refactor).
-Compiling instruuctions are available [in the wiki](https://github.com/sykhro/vgmtrans-qt/wiki/Building).
+Compiling instructions are available [in the wiki](https://github.com/sykhro/vgmtrans-qt/wiki/Building).
 
-This software is released under the zlib/libpng License. See LICENSE.txt11 for details.
+This software is released under the zlib/libpng License. See LICENSE.txt for details.
 
 Contributors
 ------------
@@ -21,7 +21,7 @@ Contributors
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
 - Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
-- sykkro: General maintenance work, ported the tool to Qt.
+- sykhro: General maintenance work, ported the tool to Qt.
 
 ### Special Thanks
 
