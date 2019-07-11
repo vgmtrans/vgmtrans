@@ -20,13 +20,15 @@ class VGMTreeItem : public QTreeWidgetItem {
     VGMTreeItem(const QString &name, VGMItem *item, QTreeWidget *parent = nullptr,
                 VGMItem *item_parent = nullptr)
         : QTreeWidgetItem(parent, 1001), m_name(name), m_item(item), m_parent(item_parent){};
-    auto item_parent() { return m_parent; }
-    auto item_offset() { return m_item->dwOffset; }
+    ~VGMTreeItem() = default;
+
+    [[nodiscard]] inline auto item_parent() noexcept { return m_parent; }
+    [[nodiscard]] inline auto item_offset() noexcept { return m_item->dwOffset; }
 
    private:
     QString m_name;
-    VGMItem *m_item;
-    VGMItem *m_parent;
+    VGMItem *m_item = nullptr;
+    VGMItem *m_parent = nullptr;
 };
 
 class VGMFileTreeView : public QTreeWidget {
@@ -34,11 +36,14 @@ class VGMFileTreeView : public QTreeWidget {
 
    public:
     VGMFileTreeView(VGMFile *vgmfile, QWidget *parent = nullptr);
+    ~VGMFileTreeView() = default;
 
    public slots:
     void addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &, void *);
 
    private:
     VGMFile *vgmfile;
-    std::unordered_map<VGMItem *, VGMTreeItem *> m_parents;
+    std::unordered_map<VGMItem *, std::unique_ptr<VGMTreeItem>> m_parents;
+
+    VGMTreeItem *parent_cache = nullptr;
 };
