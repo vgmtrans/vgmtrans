@@ -36,10 +36,11 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
 }
 
 void VGMCollViewModel::handleNewCollSelected(QModelIndex modelIndex) {
-    if (!modelIndex.isValid()) {
+    if (!modelIndex.isValid() || qtVGMRoot.vVGMColl.empty() || qtVGMRoot.vVGMColl.size() < modelIndex.row()) {
         m_coll = nullptr;
+    } else {
+        m_coll = qtVGMRoot.vVGMColl[modelIndex.row()];
     }
-    m_coll = qtVGMRoot.vVGMColl[modelIndex.row()];
 
     emit dataChanged(index(0, 0), index(0, 0));
 }
@@ -82,5 +83,5 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 }
 
 void VGMCollView::doubleClickedSlot(QModelIndex index) {
-    MdiArea::Instance()->NewView(static_cast<VGMCollViewModel *>(model())->fileFromIndex(index));
+    MdiArea::Instance()->NewView(qobject_cast<VGMCollViewModel *>(model())->fileFromIndex(index));
 }

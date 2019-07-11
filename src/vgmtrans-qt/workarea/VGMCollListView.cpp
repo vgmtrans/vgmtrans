@@ -67,7 +67,8 @@ void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
  */
 
 VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
-    setModel(new VGMCollListViewModel);
+    auto model = new VGMCollListViewModel;
+    setModel(model);
     setItemDelegate(new VGMCollNameEditor);
 
     setContextMenuPolicy(Qt::CustomContextMenu);
@@ -78,6 +79,14 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     setWrapping(true);
 
     connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollListView::CollMenu);
+    connect(model, &VGMCollListViewModel::dataChanged,
+        [=]() {
+            if(!selectedIndexes().empty()) {
+                selectionModel()->currentChanged(selectedIndexes().front(), {});
+            } else {
+                selectionModel()->currentChanged({}, {});
+            }
+        });
 }
 
 void VGMCollListView::CollMenu(const QPoint &pos) {
