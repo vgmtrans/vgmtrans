@@ -38,12 +38,21 @@ bool NinSnesInstrSet::GetInstrPointers() {
       return false;
     }
 
-    // skip blank slot (Kirby Super Star)
+    // skip blank slot
     if (version != NINSNES_EARLIER) {
+      // Kirby Super Star
       if (GetByte(addrInstrHeader) == 0xff && GetByte(addrInstrHeader + 1) == 0xff
-          && GetByte(addrInstrHeader + 2) == 0xff &&
-          GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff
-          && GetByte(addrInstrHeader + 5) == 0xff) {
+        && GetByte(addrInstrHeader + 2) == 0xff &&
+        GetByte(addrInstrHeader + 3) == 0xff && GetByte(addrInstrHeader + 4) == 0xff
+        && GetByte(addrInstrHeader + 5) == 0xff) {
+        continue;
+      }
+
+      // Bubsy in Claws Encounters of the Furred Kind
+      if (GetByte(addrInstrHeader) == 0 && GetByte(addrInstrHeader + 1) == 0
+        && GetByte(addrInstrHeader + 2) == 0 &&
+        GetByte(addrInstrHeader + 3) == 0 && GetByte(addrInstrHeader + 4) == 0
+        && GetByte(addrInstrHeader + 5) == 0) {
         continue;
       }
     }

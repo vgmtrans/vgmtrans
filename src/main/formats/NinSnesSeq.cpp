@@ -27,7 +27,8 @@ NinSnesSeq::NinSnesSeq(RawFile *file,
       konamiBaseAddress(0),
       intelliVoiceParamTable(0),
       intelliVoiceParamTableSize(0),
-      quintetBGMInstrBase(0) {
+      quintetBGMInstrBase(0),
+      falcomBaseOffset(0) {
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
 
@@ -555,7 +556,9 @@ void NinSnesSeq::LoadEventMap() {
 
     case NINSNES_QUINTET_IOG:
     case NINSNES_QUINTET_TS:
+      EventMap[0xf4] = EVENT_QUINTET_TUNING;
       EventMap[0xff] = EVENT_QUINTET_ADSR;
+	  break;
   }
 }
 
@@ -601,6 +604,9 @@ double NinSnesSeq::GetTempoInBPM(uint8_t tempo) {
 uint16_t NinSnesSeq::ConvertToAPUAddress(uint16_t offset) {
   if (version == NINSNES_KONAMI) {
     return konamiBaseAddress + offset;
+  }
+  else if (version == NINSNES_FALCOM_YS4) {
+    return falcomBaseOffset + offset;
   }
   else {
     return offset;
@@ -1180,6 +1186,16 @@ bool NinSnesTrack::ReadEvent(void) {
       break;
     }
 
+    case EVENT_QUINTET_TUNING: {
+      // TODO: Correct fine tuning on Quintet games
+      // In Quintet games (at least in Terranigma), the fine tuning command overwrites the fractional part of instrument tuning.
+      // In other words, we cannot calculate the tuning amount without reading the instrument table.
+      uint8_t newTuning = GetByte(curOffset++);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Fine Tuning", desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+      AddFineTuningNoItem((newTuning / 256.0) * 61.8); // obviously not correct, but better than nothing?
+      break;
+    }
+
     case EVENT_ECHO_ON: {
       uint8_t spcEON = GetByte(curOffset++);
       uint8_t spcEVOL_L = GetByte(curOffset++);
@@ -1213,7 +1229,7 @@ bool NinSnesTrack::ReadEvent(void) {
       uint8_t spcFIR = GetByte(curOffset++);
 
       desc << L"Delay: " << (int) spcEDL << L"  Feedback: " << (int) spcEFB << L"  FIR: " << (int) spcFIR;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Param", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
@@ -1571,12 +1587,23 @@ bool NinSnesTrack::ReadEvent(void) {
       break;
     }
 
-    case EVENT_INTELLI_ADSR:
-    case EVENT_QUINTET_ADSR: {
+    case EVENT_INTELLI_ADSR: {
       uint8_t adsr1 = GetByte(curOffset++);
       uint8_t adsr2 = GetByte(curOffset++);
       desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << L"ADSR(1): $" << adsr1
           << L"  ADSR(2): $" << adsr2;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_QUINTET_ADSR: {
+      uint8_t adsr1 = GetByte(curOffset++);
+      uint8_t sustain_rate = GetByte(curOffset++);
+      uint8_t sustain_level = GetByte(curOffset++);
+	  uint8_t adsr2 = (sustain_level << 5) | sustain_rate;
+      desc << L"ADSR(1): $" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << adsr1
+          << L"  Sustain Rate: " << std::dec << sustain_rate << L"  Sustain Level: " << sustain_level
+          << L"  (ADSR(2): $" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << adsr2 << L")";
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }

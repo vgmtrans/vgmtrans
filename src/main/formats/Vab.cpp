@@ -52,6 +52,7 @@ bool Vab::GetInstrPointers() {
   uint32_t offToneAttrs = offProgs + (16 * 128);
 
   uint16_t numPrograms = GetShort(dwOffset + 0x12);
+  uint16_t numTones = GetShort(dwOffset + 0x14);
   uint16_t numVAGs = GetShort(dwOffset + 0x16);
 
   uint32_t offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
@@ -60,31 +61,44 @@ bool Vab::GetInstrPointers() {
   VGMHeader *toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, L"Tone Attributes Table");
 
   if (numPrograms > 128) {
+    std::wstringstream message;
+    message << L"Too many programs (" << numPrograms << L")  Offset: 0x" << std::hex << dwOffset;
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB"));
     return false;
   }
   if (numVAGs > 255) {
+    std::wstringstream message;
+    message << L"Too many VAGs (" << numVAGs << L")  Offset: 0x" << std::hex << dwOffset;
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB"));
     return false;
   }
 
-  // Scan all 128 entries regardless of header info.
-  // There could be null instruments that has no tones.
-  // See Clock Tower PSF for example of null instrument.
-  for (uint32_t i = 0; i < 128; i++) {
-    uint32_t offCurrProg = offProgs + (i * 16);
+  // Load each instruments.
+  //
+  // Rule 1. Valid instrument pointers are not always sequentially located from 0 to (numProgs - 1).
+  // Number of tones can be 0. That's an empty instrument. We need to ignore it.
+  // See Clock Tower PSF for example.
+  //
+  // Rule 2. Do not load programs more than number of programs. Even if a program table value is provided.
+  // Otherwise an out-of-order access can be caused in Tone Attributes Table.
+  // See the swimming event BGM of Aitakute... ~your smiles in my heart~ for example. (github issue #115)
+  uint32_t numProgramsLoaded = 0;
+  for (uint32_t progIndex = 0; progIndex < 128 && numProgramsLoaded < numPrograms; progIndex++) {
+    uint32_t offCurrProg = offProgs + (progIndex * 16);
     uint32_t offCurrToneAttrs = offToneAttrs + (uint32_t) (aInstrs.size() * 32 * 16);
 
     if (offCurrToneAttrs + (32 * 16) > nEndOffset) {
       break;
     }
 
-    uint8_t numTones = GetByte(offCurrProg);
-    if (numTones > 32) {
+    uint8_t numTonesPerInstr = GetByte(offCurrProg);
+    if (numTonesPerInstr > 32) {
       wchar_t log[512];
-      swprintf(log, 512, L"Too many tones (%u) in Program #%u.", numTones, i);
+      swprintf(log, 512, L"Too many tones (%u) in Program #%u.", numTonesPerInstr, progIndex);
       pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
     }
-    else if (numTones != 0) {
-      VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, i);
+    else if (numTonesPerInstr != 0) {
+      VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex);
       aInstrs.push_back(newInstr);
       GetBytes(offCurrProg, 0x10, &newInstr->attr);
 
@@ -102,6 +116,8 @@ bool Vab::GetInstrPointers() {
       newInstr->masterVol = GetByte(offCurrProg + 0x01);
 
       toneAttrsHdr->unLength = offCurrToneAttrs + (32 * 16) - offToneAttrs;
+
+      numProgramsLoaded++;
     }
   }
 
@@ -244,8 +260,12 @@ bool VabRgn::LoadRgn() {
   if ((int) sampNum < 0)
     sampNum = 0;
 
-  if (keyLow > keyHigh)
+  if (keyLow > keyHigh) {
+    std::wstringstream message;
+    message << L"Low Key (" << keyLow << L") is higher than High Key (" << keyHigh << L")  Offset: 0x" << std::hex << dwOffset;
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VAB (VabRgn)"));
     return false;
+  }
 
 
   // gocha: AFAIK, the valid range of pitch is 0-127. It must not be negative.

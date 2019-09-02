@@ -50,6 +50,7 @@ bool AkaoSeq::GetHeaderInfo(void) {
   hdr->AddSig(dwOffset, 4);
   hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
   hdr->AddSimpleItem(dwOffset + 0x6, 2, L"Size");
+  hdr->AddSimpleItem(dwOffset + 0x8, 1, L"Reverb Type");
   hdr->AddSimpleItem(dwOffset + 0x14, 2, L"Associated Sample Set ID");
   hdr->AddSimpleItem(dwOffset + 0x20, 4, L"Number of Tracks (# of true bits)");
   hdr->AddSimpleItem(dwOffset + 0x30, 4, L"Instrument Data Pointer");
@@ -693,7 +694,8 @@ bool AkaoTrack::ReadEvent(void) {
             uint8_t denom = 4;
             curOffset++;//(192 / GetByte(curOffset++));
             uint8_t numer = GetByte(curOffset++);
-            //AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, parentSeq->GetPPQN());
+            //AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, parentSeq->GetPPQN()); // why it's disabled?
+            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Time Signature", L"", CLR_TIMESIG, ICON_TIMESIG);
             break;
           }
 

@@ -81,7 +81,8 @@ enum NinSnesSeqEventType {
   EVENT_INTELLI_FE4_SUBEVENT,
 
   // Quintet:
-      EVENT_QUINTET_ADSR,
+  EVENT_QUINTET_TUNING,
+  EVENT_QUINTET_ADSR,
 };
 
 class NinSnesTrackSharedData {
@@ -156,7 +157,10 @@ class NinSnesSeq:
   uint8_t quintetBGMInstrBase;
   uint16_t quintetAddrBGMInstrLookup;
 
- protected:
+  // Falcom:
+  uint16_t falcomBaseOffset;
+
+protected:
   VGMHeader *header;
 
  private:

@@ -15,6 +15,7 @@ VGMTrans converts a music files used in console video games into standard midi a
 - Tamsoft's PS1 sequence and instrument formats (.tsq, .tvb)
 - Capcom's QSound sequence and instrument formats used in CPS1/CPS2 arcade games
 - Squaresoft's PS1 format used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
+- Konami's PS1 sequence format known as KDT1
 - Nintendo's Gameboy Advance sequence format
 - Nintendo's SNES sequence and instrument format known as N-SPC (.spc)
 - Squaresoft's SNES sequence and instrument format (AKAO/SUZUKI) (.spc)
@@ -38,7 +39,7 @@ This software is released under the zlib/libpng License. See LICENSE.txt.
 How to use it
 -------------
 
-To load a file, drag and drop the file into the application window.  The program will scan any file for contained music files.  It knows how to unpack psf, psf2 and certain zipped mame rom sets as specified in the mame_roms.xml file, though this last feature is fairly undeveloped.  For example, drag on an NDS rom file and it will detect SDAT files and their contents.
+To load a file, drag and drop the file into the application window.  The program will scan any file for contained music files. It knows how to unpack psf, psf2 and certain zipped mame rom sets as specified in the mame_roms.xml file, though this last feature is fairly undeveloped.  For example, drag on an NDS rom file and it will detect SDAT files and their contents.
 
 Once loaded, double-clicking a file listed under "Detected Music Files" will bring up a color-coded hexadecimal display of the file with a break-down of each format element.  Click the hexadecimal to highlight an element and see more information.  Right click a detected file to bring up save options.  To remove files from the "Detected Music Files" or "Scanned Files" list, highlight the files and press the delete key.
 
@@ -47,8 +48,7 @@ The "Collections" window displays file groupings that the software was able to i
 How to compile it
 -----------------
 
-Please read VGMTrans wiki page:
-<https://github.com/vgmtrans/vgmtrans/wiki/Build-Instructions>
+Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for information on how to compile the two flavors of VGMTrans. 
 
 Contributors
 ------------
@@ -60,6 +60,7 @@ Contributors
 ### Special Thanks
 
 - Bregalad: Author of [GBAMusRiper](http://www.romhacking.net/utilities/881/), great reference of MP2k interpretation.
+- Nisto: Author of [kdt-tool](https://github.com/Nisto/kdt-tool), thank you for your approval of porting to VGMTrans.
 
 Contact
 -------

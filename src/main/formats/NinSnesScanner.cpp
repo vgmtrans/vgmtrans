@@ -48,17 +48,16 @@ BytePattern NinSnesScanner::ptnBranchForVcmdReadahead(
 //08a0: 5c        lsr   a
 //08a1: fd        mov   y,a
 //08a2: f6 32 0b  mov   a,$0b32+y         ; vcmd length
-//08a5: f0 08     beq   $08af             ; if non zero
+//
+// Variations: Bubsy in Claws Encounters of the Furred Kind
 BytePattern NinSnesScanner::ptnJumpToVcmd(
 	"\x1c\xfd\xf6\x9d\x0a\x2d\xf6\x9c"
 	"\x0a\x2d\xdd\x5c\xfd\xf6\x32\x0b"
-	"\xf0\x08"
 	,
 	"xxx??xx?"
 	"?xxxxx??"
-	"x?"
 	,
-	18);
+	16);
 
 //; Super Mario World SPC
 //; dispatch vcmd in A (da-f2)
@@ -190,7 +189,7 @@ BytePattern NinSnesScanner::ptnSetDIRYI(
 
 //; Super Mario World SPC
 //; default values for DSP regs
-//1295: db $7f,$7f,$00,$00,$2f,$60,$00,$00,$00,$80,$60,$02 
+//1295: db $7f,$7f,$00,$00,$2f,$60,$00,$00,$00,$80,$60,$02
 //12a1: db $0c,$1c,$2c,$3c,$6c,$0d,$2d,$3d,$4d,$5d,$6d,$7d
 BytePattern NinSnesScanner::ptnSetDIRSMW(
 	"\x7f\x7f\x00\x00\x2f\x60\x00\x00\x00\x80\x60\x02"
@@ -247,6 +246,29 @@ BytePattern NinSnesScanner::ptnIncSectionPtrYSFR(
 	"x?xxx?"
 	,
 	22);
+
+//; Ys IV - Mask of the Sun SPC
+//1236: 8d 00     mov   y,#$00
+//1238: f7 35     mov   a,($35)+y
+//123a: 0d        push  psw
+//123b: 3a 35     incw  $35
+//123d: 2d        push  a
+//123e: f7 35     mov   a,($35)+y
+//1240: 3a 35     incw  $35
+//1242: fd        mov   y,a
+//1243: ae        pop   a                 ; read section word into YA
+//1244: f0 27     beq   $126d             ; branch if $00xx
+//1246: 7a 17     addw  ya,$17            ; convert to real address
+BytePattern NinSnesScanner::ptnIncSectionPtrYs4(
+	"\x8d\x00\xf7\x35\x0d\x3a\x35\x2d"
+	"\xf7\x35\x3a\x35\xfd\xae\xf0\x27"
+	"\x7a\x17"
+	,
+	"xxx?xx?x"
+	"x?x?xxx?"
+	"x?"
+	,
+	18);
 
 //; Heracles no Eiko 4 SPC
 //09b4: 6d        push  y
@@ -322,6 +344,25 @@ BytePattern NinSnesScanner::ptnJumpToVcmdYSFR(
 	,
 	13);
 
+//; Ys IV - Mask of the Sun SPC
+//0bd8: 80        setc
+//0bd9: a8 e0     sbc   a,#$e0
+//0bdb: 1c        asl   a
+//0bdc: fd        mov   y,a
+//0bdd: f6 47 06  mov   a,$0647+y
+//0be0: 2d        push  a
+//0be1: f6 46 06  mov   a,$0646+y
+//0be4: 2d        push  a
+//0be5: 6f        ret
+BytePattern NinSnesScanner::ptnJumpToVcmdYs4(
+	"\x80\xa8\xe0\x1c\xfd\xf6\x47\x06"
+	"\x2d\xf6\x46\x06\x2d\x6f"
+	,
+	"xx?xxx??"
+	"xx??xx"
+	,
+	14);
+
 //; Yoshi's Safari SPC
 //0b2a: 80        setc
 //0b2b: a8 e0     sbc   a,#$e0
@@ -336,6 +377,23 @@ BytePattern NinSnesScanner::ptnReadVcmdLengthYSFR(
 	"?"
 	,
 	9);
+
+//; Ys IV - Mask of the Sun SPC
+//0cdc: 68 e0     cmp   a,#$e0
+//0cde: 90 0e     bcc   $0cee
+//0ce0: 6d        push  y
+//0ce1: fd        mov   y,a
+//0ce2: ae        pop   a
+//0ce3: 80        setc
+//0ce4: 96 17 0c  adc   a,$0c17+y
+BytePattern NinSnesScanner::ptnReadVcmdLengthYs4(
+	"\x68\xe0\x90\x0e\x6d\xfd\xae\x80"
+	"\x96\x17\x0c"
+	,
+	"x?x?xxxx"
+	"x??"
+	,
+	11);
 
 //; Gradius 3 SPC
 //09fe: 2d        push  a
@@ -465,6 +523,29 @@ BytePattern NinSnesScanner::ptnDispatchNoteFE4(
 	"x?x??"
 	,
 	21);
+
+//; Ys IV - Mask of the Sun SPC
+//0bbd: 2d        push  a
+//0bbe: 9f        xcn   a
+//0bbf: 28 07     and   a,#$07
+//0bc1: fd        mov   y,a
+//0bc2: f6 c9 17  mov   a,$17c9+y
+//0bc5: d4 76     mov   $76+x,a
+//0bc7: ae        pop   a
+//0bc8: 28 0f     and   a,#$0f
+//0bca: fd        mov   y,a
+//0bcb: f6 d1 17  mov   a,$17d1+y
+//0bce: d5 1a 03  mov   $031a+x,a
+BytePattern NinSnesScanner::ptnDispatchNoteYs4(
+	"\x2d\x9f\x28\x07\xfd\xf6\xc9\x17"
+	"\xd4\x76\xae\x28\x0f\xfd\xf6\xd1"
+	"\x17\xd5\x1a\x03"
+	,
+	"xxxxxx??"
+	"x?xxxxx?"
+	"?x??"
+	,
+	20);
 
 //; Kirby Super Star SPC
 //0e03: 3f 16 0e  call  $0e16
@@ -830,6 +911,8 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
   uint32_t ofsIncSectionPtr;
   uint8_t addrSectionPtr;
   uint16_t konamiBaseAddress = 0xffff;
+  uint16_t falcomBaseAddress = 0xffff;
+  uint16_t falcomBaseOffset = 0;
   if (file->SearchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr)) {
     addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
   }
@@ -840,7 +923,10 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
     konamiBaseAddress = file->GetShort(konamiBaseAddressPtr);
   }
   else if (file->SearchBytePattern(ptnIncSectionPtrYSFR, ofsIncSectionPtr)) {
-    addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
+	  addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
+  }
+  else if (file->SearchBytePattern(ptnIncSectionPtrYs4, ofsIncSectionPtr)) {
+	  addrSectionPtr = file->GetByte(ofsIncSectionPtr + 3);
   }
   else {
     return;
@@ -969,6 +1055,32 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
     ,
     12);
 
+  //; Ys IV - Mask of the Sun SPC
+  //11f8: f5 b9 06  mov   a,$06b9+x
+  //11fb: fd        mov   y,a
+  //11fc: f5 b8 06  mov   a,$06b8+x
+  //11ff: da 35     movw  $35,ya            ; load section playlist ptr
+  //1201: 2d        push  a
+  //1202: dd        mov   a,y
+  //1203: 80        setc
+  //1204: a8 d0     sbc   a,#$d0            ; address to offset (decrease $d000)
+  //1206: fd        mov   y,a
+  //1207: ae        pop   a
+  //1208: da 17     movw  $17,ya            ; save the offset
+  char ptnInitSectionPtrBytesYs4[] =
+    "\xf5\xb9\x06\xfd\xf5\xb8\x06\xda"
+    "\x35\x2d\xdd\x80\xa8\xd0\xfd\xae"
+    "\xda\x17";
+  ptnInitSectionPtrBytesYs4[8] = addrSectionPtr;
+  BytePattern ptnInitSectionPtrYs4(
+    ptnInitSectionPtrBytesYs4
+    ,
+    "x??xx??x"
+    "xxxxx?xx"
+    "xx"
+    ,
+    18);
+
   // END DYNAMIC PATTERN DEFINITIONS
 
   // ACQUIRE SEQUENCE LIST ADDRESS:
@@ -978,7 +1090,17 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
   uint32_t addrSongList;
   // STANDARD VERSIONS
   if (file->SearchBytePattern(ptnInitSectionPtr, ofsInitSectionPtr)) {
-    addrSongList = file->GetShort(ofsInitSectionPtr + 5);
+    // DERIVED VERSIONS (prevent false-positive)
+    if (file->SearchBytePattern(ptnInitSectionPtrYs4, ofsInitSectionPtr)) {
+      // Ys IV - Mask of the Sun
+      addrSongList = file->GetShort(ofsInitSectionPtr + 5);
+      falcomBaseAddress = file->GetByte(ofsInitSectionPtr + 13) << 8;
+      version = NINSNES_FALCOM_YS4;
+    }
+    else {
+      // STANDARD VERSION
+      addrSongList = file->GetShort(ofsInitSectionPtr + 5);
+	}
   }
   else if (file->SearchBytePattern(ptnInitSectionPtrYI, ofsInitSectionPtr)) {
     addrSongList = file->GetShort(ofsInitSectionPtr + 12);
@@ -986,7 +1108,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
   else if (file->SearchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr)) {
     addrSongList = file->GetShort(ofsInitSectionPtr + 3);
   }
-    // DERIVED VERSIONS
+  // DERIVED VERSIONS
   else if (file->SearchBytePattern(ptnInitSectionPtrGD3, ofsInitSectionPtr)) {
     addrSongList = file->GetShort(ofsInitSectionPtr + 8);
     if (konamiBaseAddress == 0xffff) {
@@ -1059,6 +1181,18 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
       return;
     }
   }
+  else if (file->SearchBytePattern(ptnJumpToVcmdYs4, ofsBranchForVcmd)) {
+	  addrVoiceCmdAddressTable = file->GetShort(ofsBranchForVcmd + 10);
+
+	  uint32_t ofsReadVcmdLength;
+	  if (file->SearchBytePattern(ptnReadVcmdLengthYs4, ofsReadVcmdLength)) {
+		  firstVoiceCmd = file->GetByte(ofsReadVcmdLength + 1);
+		  addrVoiceCmdLengthTable = file->GetShort(ofsReadVcmdLength + 9) + firstVoiceCmd;
+	  }
+	  else {
+		  return;
+	  }
+  }
   else {
     // STANDARD VERSION
     if (file->SearchBytePattern(ptnBranchForVcmdReadahead, ofsBranchForVcmd)) {
@@ -1076,12 +1210,20 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
 
     // find a jump to address_table[cmd * 2]
     if (file->SearchBytePattern(ptnJumpToVcmd, ofsJumpToVcmd)) {
-      addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
-      addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
+      // DERIVED VERSIONS
+      if (file->SearchBytePattern(ptnJumpToVcmdCTOW, ofsJumpToVcmd)) {
+        // Human Games: Clock Tower, Firemen, S.O.S. (Septentrion)
+        addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 10);
+        addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
+        version = NINSNES_HUMAN;
+      } else {
+        addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 7) + ((firstVoiceCmd * 2) & 0xff);
+        addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 14) + (firstVoiceCmd & 0x7f);
 
-      // false-positive needs to be fixed in later classification
-      if (version == NINSNES_NONE) {
-        version = NINSNES_STANDARD;
+        // false-positive needs to be fixed in later classification
+        if (version == NINSNES_NONE) {
+          version = NINSNES_STANDARD;
+        }
       }
     }
     else if (file->SearchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
@@ -1096,20 +1238,14 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
         return;
       }
     }
-      // DERIVED VERSIONS
-    else if (file->SearchBytePattern(ptnJumpToVcmdCTOW, ofsJumpToVcmd)) {
-      // Human Games: Clock Tower, Firemen, S.O.S. (Septentrion)
-      addrVoiceCmdAddressTable = file->GetShort(ofsJumpToVcmd + 10);
-      addrVoiceCmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
-      version = NINSNES_HUMAN;
-    }
     else {
       return;
     }
   }
 
   // DETERMINE THE NUMBER OF VCMDS
-  if (addrVoiceCmdAddressTable < addrVoiceCmdLengthTable) {
+  if (addrVoiceCmdAddressTable < addrVoiceCmdLengthTable &&
+	  addrVoiceCmdAddressTable + (0x100 - firstVoiceCmd) * 2 >= addrVoiceCmdLengthTable) {
     numOfVoiceCmd = (addrVoiceCmdLengthTable - addrVoiceCmdAddressTable) / 2;
   }
 
@@ -1148,6 +1284,17 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
     }
 
     addrVolumeTable = file->GetShort(ofsDispatchNote + 4);
+    for (uint8_t offset = 0; offset < 16; offset++) {
+      volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
+    }
+  }
+  else if (file->SearchBytePattern(ptnDispatchNoteYs4, ofsDispatchNote)) {
+    addrDurRateTable = file->GetShort(ofsDispatchNote + 6);
+    for (uint8_t offset = 0; offset < 8; offset++) {
+      durRateTable.push_back(file->GetByte(addrDurRateTable + offset));
+    }
+
+    addrVolumeTable = file->GetShort(ofsDispatchNote + 15);
     for (uint8_t offset = 0; offset < 16; offset++) {
       volumeTable.push_back(file->GetByte(addrVolumeTable + offset));
     }
@@ -1310,6 +1457,10 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
     if (version == NINSNES_KONAMI) {
       addrFirstSection += konamiBaseAddress;
     }
+    else if (version == NINSNES_FALCOM_YS4) {
+      falcomBaseOffset = firstSectionPtr - falcomBaseAddress;
+      addrFirstSection += falcomBaseOffset;
+    }
     if (addrFirstSection + 16 > 0x10000) {
       break;
     }
@@ -1325,6 +1476,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
 
         if (version == NINSNES_KONAMI) {
           addrTrackStart += konamiBaseAddress;
+        }
+        else if (version == NINSNES_FALCOM_YS4) {
+          addrTrackStart += falcomBaseOffset;
         }
 
         if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
@@ -1359,6 +1513,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
       if (version == NINSNES_KONAMI) {
         firstSectionPtr += konamiBaseAddress;
       }
+      else if (version == NINSNES_FALCOM_YS4) {
+        falcomBaseOffset = firstSectionPtr - falcomBaseAddress;
+      }
       if (firstSectionPtr > addrCurrentSection) {
         continue;
       }
@@ -1370,6 +1527,9 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
           uint16_t addrSection = file->GetShort(curAddress);
           if (version == NINSNES_KONAMI) {
             addrSection += konamiBaseAddress;
+          }
+          else if (version == NINSNES_FALCOM_YS4) {
+            addrSection += falcomBaseOffset;
           }
 
           if (curAddress == addrCurrentSection) {
@@ -1411,6 +1571,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
   newSeq->konamiBaseAddress = konamiBaseAddress;
   newSeq->quintetBGMInstrBase = quintetBGMInstrBase;
   newSeq->quintetAddrBGMInstrLookup = quintetAddrBGMInstrLookup;
+  newSeq->falcomBaseOffset = falcomBaseOffset;
   if (!newSeq->LoadVGMFile()) {
     delete newSeq;
     return;

@@ -72,6 +72,16 @@ bool BGMTrack::ReadEvent(void) {
   uint32_t beginOffset = curOffset;
   AddTime(ReadVarLen(curOffset));
 
+  // address range check for safety
+  if (!vgmfile->IsValidOffset(curOffset)) {
+    if (readMode== ReadMode::READMODE_ADD_TO_UI) {
+      std::wostringstream message;
+	  message << *vgmfile->GetName() << L": Address out of range. Conversion aborted.";
+      pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, L"SquarePS2Seq"));
+    }
+    return false;
+  }
+
   uint8_t status_byte = GetByte(curOffset++);
 
   switch (status_byte) {

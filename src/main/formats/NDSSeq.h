@@ -23,5 +23,6 @@ class NDSTrack
 
   uint8_t jumpCount;
   uint32_t loopReturnOffset;
+  bool hasLoopReturnOffset;
   bool noteWithDelta;
 };

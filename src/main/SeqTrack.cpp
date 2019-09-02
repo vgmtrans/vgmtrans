@@ -109,6 +109,7 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
       }
 
       if (!ReadEvent()) {
+        deltaLength = GetTime();
         active = false;
         break;
       }
@@ -193,7 +194,7 @@ void SeqTrack::AddTime(uint32_t AddDelta) {
 }
 
 uint32_t SeqTrack::ReadVarLen(uint32_t &offset) {
-  register uint32_t value;
+  register uint32_t value = 0;
   register uint8_t c;
 
   if (IsValidOffset(offset) && (value = GetByte(offset++)) & 0x80) {
@@ -521,7 +522,7 @@ void SeqTrack::AddNoteByDur(uint32_t offset,
   OnEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
-    AddEvent(new DurNoteSeqEvent(this, key, vel, dur, offset, length, sEventName));
+    AddEvent(new DurNoteSeqEvent(this, key + cKeyCorrection, vel, dur, offset, length, sEventName));
   AddNoteByDurNoItem(key, vel, dur);
 }
 

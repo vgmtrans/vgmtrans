@@ -85,7 +85,18 @@ SF2File::SF2File(SynthFile *synthfile)
     memset(&presetHdr, 0, sizeof(sfPresetHeader));
     memcpy(presetHdr.achPresetName, instr->name.c_str(), min((unsigned long) instr->name.length(), (unsigned long) 20));
     presetHdr.wPreset = (uint16_t) instr->ulInstrument;
-    presetHdr.wBank = (uint16_t) instr->ulBank;
+
+    // Despite being a 16-bit value, SF2 only supports banks up to 127. Since
+    // it's pretty common to have either MSB or LSB be 0, we'll use whatever
+    // one is not zero, with preference for MSB.
+    uint16_t bank16 = (uint16_t)instr->ulBank;
+
+    if ((bank16 & 0xFF00) == 0) {
+      presetHdr.wBank = bank16 & 0x7F;
+    }
+    else {
+      presetHdr.wBank = (bank16 >> 8) & 0x7F;
+    }
     presetHdr.wPresetBagNdx = (uint16_t) i;
     presetHdr.dwLibrary = 0;
     presetHdr.dwGenre = 0;
@@ -155,7 +166,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
     // reverbEffectsSend
     genList.sfGenOper = reverbEffectsSend;
-    genList.genAmount.shAmount = 700;
+    genList.genAmount.shAmount = 250;
     memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
     dataPtr += sizeof(sfGenList);
 

@@ -253,11 +253,17 @@
     <Filter Include="Header Files\formats\rsar">
       <UniqueIdentifier>{421ed46d-2c16-4746-9bca-ea6899534bdb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\formats\jaiseq">
-      <UniqueIdentifier>{75e9c5d7-35a2-47de-ad7d-82c68f551d5c}</UniqueIdentifier>
+    <Filter Include="Source Files\formats\falcomsnes">
+      <UniqueIdentifier>{1d0be765-4a5d-42e0-98ec-1dc4722042a4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\formats\jaiseq">
-      <UniqueIdentifier>{92fb3d94-b5bf-4ae9-b41b-3c84b042d2af}</UniqueIdentifier>
+    <Filter Include="Header Files\formats\falcomsnes">
+      <UniqueIdentifier>{da100128-8159-4652-be41-16e738e2aea4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\konamips1">
+      <UniqueIdentifier>{f01dfa68-eca7-4990-ad12-3374027fee94}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\konamips1">
+      <UniqueIdentifier>{38d11b15-8e84-4ce6-bf22-a9bf11c40fc5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -810,8 +816,20 @@
     <ClCompile Include="src\main\formats\RSARInstrSet.cpp">
       <Filter>Source Files\formats\rsar</Filter>
     </ClCompile>
-    <ClCompile Include="src\main\formats\JaiSeqScanner.cpp">
-      <Filter>Source Files\formats\jaiseq</Filter>
+    <ClCompile Include="src\main\formats\FalcomSnesInstr.cpp">
+      <Filter>Source Files\formats\falcomsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\FalcomSnesScanner.cpp">
+      <Filter>Source Files\formats\falcomsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\FalcomSnesSeq.cpp">
+      <Filter>Source Files\formats\falcomsnes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\KonamiPS1Scanner.cpp">
+      <Filter>Source Files\formats\konamips1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\KonamiPS1Seq.cpp">
+      <Filter>Source Files\formats\konamips1</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1466,11 +1484,26 @@
     <ClInclude Include="src\main\formats\RSARInstrSet.h">
       <Filter>Header Files\formats\rsar</Filter>
     </ClInclude>
-    <ClInclude Include="src\main\formats\JaiSeqFormat.h">
-      <Filter>Header Files\formats\jaiseq</Filter>
+    <ClInclude Include="src\main\formats\FalcomSnesSeq.h">
+      <Filter>Header Files\formats\falcomsnes</Filter>
     </ClInclude>
-    <ClInclude Include="src\main\formats\JaiSeqScanner.h">
-      <Filter>Header Files\formats\jaiseq</Filter>
+    <ClInclude Include="src\main\formats\FalcomSnesScanner.h">
+      <Filter>Header Files\formats\falcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\FalcomSnesInstr.h">
+      <Filter>Header Files\formats\falcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\FalcomSnesFormat.h">
+      <Filter>Header Files\formats\falcomsnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\KonamiPS1Format.h">
+      <Filter>Header Files\formats\konamips1</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\KonamiPS1Scanner.h">
+      <Filter>Header Files\formats\konamips1</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\KonamiPS1Seq.h">
+      <Filter>Header Files\formats\konamips1</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

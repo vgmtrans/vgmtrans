@@ -17,7 +17,8 @@ HudsonSnesSeq::HudsonSnesSeq(RawFile *file, HudsonSnesVersion ver, uint32_t seqd
       InstrumentTableAddress(0),
       InstrumentTableSize(0),
       PercussionTableAddress(0),
-      PercussionTableSize(0) {
+      PercussionTableSize(0),
+      NoteEventHasVelocity(false) {
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
   bUseLinearAmplitudeScale = true;
@@ -33,6 +34,8 @@ HudsonSnesSeq::~HudsonSnesSeq(void) {
 
 void HudsonSnesSeq::ResetVars(void) {
   VGMSeq::ResetVars();
+
+  DisableNoteVelocity = false;
 
   memset(UserRAM, 0, HUDSONSNES_USERRAM_SIZE);
   UserCmpReg = 0;
@@ -257,24 +260,37 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
         VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Echo Param");
         aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
 
-        aHeader->AddUnknownItem(curOffset, 1);
-        uint8_t arg1 = GetByte(curOffset++);
+        aHeader->AddSimpleItem(curOffset, 1, L"Use Default Echo");
+        uint8_t useDefaultEcho = GetByte(curOffset++);
 
-        if (arg1 == 0) {
-          aHeader->AddUnknownItem(curOffset, 6);
-          curOffset += 6;
+        if (useDefaultEcho == 0) {
+          aHeader->AddSimpleItem(curOffset, 1, L"EVOL(L)");
+          curOffset++;
+          aHeader->AddSimpleItem(curOffset, 1, L"EVOL(R)");
+          curOffset++;
+          aHeader->AddSimpleItem(curOffset, 1, L"EDL");
+          curOffset++;
+          aHeader->AddSimpleItem(curOffset, 1, L"EFB");
+          curOffset++;
+		  aHeader->AddSimpleItem(curOffset, 1, L"FIR");
+          curOffset++;
+          aHeader->AddSimpleItem(curOffset, 1, L"EON");
+          curOffset++;
         }
 
         aHeader->unLength = curOffset - beginOffset;
         break;
       }
 
-      case HEADER_EVENT_08: {
-        VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Unknown");
+      case HEADER_EVENT_NOTE_VELOCITY: {
+        VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Note Velocity");
         aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
 
-        aHeader->AddUnknownItem(curOffset, 1);
-        uint8_t arg1 = GetByte(curOffset++);
+        aHeader->AddSimpleItem(curOffset, 1, L"Note Velocity On/Off");
+        uint8_t noteVelOn = GetByte(curOffset++);
+        if (noteVelOn != 0) {
+          NoteEventHasVelocity = true;
+        }
 
         aHeader->unLength = curOffset - beginOffset;
         break;
@@ -370,7 +386,7 @@ void HudsonSnesSeq::LoadEventMap() {
     HeaderEventMap[0x05] = HEADER_EVENT_05;
     HeaderEventMap[0x06] = HEADER_EVENT_06;
     HeaderEventMap[0x07] = HEADER_EVENT_ECHO_PARAM;
-    HeaderEventMap[0x08] = HEADER_EVENT_08;
+    HeaderEventMap[0x08] = HEADER_EVENT_NOTE_VELOCITY;
     HeaderEventMap[0x09] = HEADER_EVENT_09;
   }
 
@@ -452,7 +468,7 @@ void HudsonSnesSeq::LoadEventMap() {
     SubEventMap[0x07] = SUBEVENT_NOP;
     SubEventMap[0x0a] = SUBEVENT_UNKNOWN0;
     SubEventMap[0x0b] = SUBEVENT_UNKNOWN0;
-    SubEventMap[0x0c] = SUBEVENT_UNKNOWN0;
+    SubEventMap[0x0c] = SUBEVENT_NOTE_VEL_OFF;
     SubEventMap[0x0d] = SUBEVENT_UNKNOWN1;
     SubEventMap[0x0e] = SUBEVENT_NOP;
     SubEventMap[0x0f] = SUBEVENT_NOP;
@@ -488,7 +504,7 @@ HudsonSnesTrack::HudsonSnesTrack(HudsonSnesSeq *parentFile, long offset, long le
 void HudsonSnesTrack::ResetVars(void) {
   SeqTrack::ResetVars();
 
-  vel = 100;
+  vel = 127;
   octave = 2;
   prevNoteKey = -1;
   prevNoteSlurred = false;
@@ -611,6 +627,11 @@ bool HudsonSnesTrack::ReadEvent(void) {
         len <<= parentSeq->TimebaseShift;
       }
 
+      // Note: velocity is not officially used
+      if (parentSeq->NoteEventHasVelocity && !parentSeq->DisableNoteVelocity) {
+        vel = GetByte(curOffset++);
+      }
+
       uint8_t dur;
       if (noKeyoff) {
         // slur/tie = full-length
@@ -683,6 +704,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
 
     case EVENT_QUANTIZE: {
       uint8_t newQuantize = GetByte(curOffset++);
+	  spcNoteQuantize = newQuantize;
       if (newQuantize <= 8) {
         desc << L"Length: " << (int) newQuantize << L"/8";
       }
@@ -1173,6 +1195,12 @@ bool HudsonSnesTrack::ReadEvent(void) {
                           desc.str().c_str(),
                           CLR_LFO,
                           ICON_CONTROL);
+          break;
+        }
+
+        case SUBEVENT_NOTE_VEL_OFF: {
+          parentSeq->DisableNoteVelocity = true;
+          AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Velocity Off", desc.str().c_str(), CLR_MISC, ICON_CONTROL);
           break;
         }
 
