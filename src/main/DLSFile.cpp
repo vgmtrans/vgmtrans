@@ -487,7 +487,7 @@ void DLSWave::WriteSample(vector<uint8_t> &buf, bool mono) {
 }
 
 void DLSWave::Write(vector<uint8_t> &buf, bool mono) {
-  mono = false;
+  //mono = false;
   uint32_t theDWORD;
   uint16_t numChannels = mono ? 1 : wChannels;
 
