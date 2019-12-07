@@ -43,7 +43,7 @@ class VGMFileTreeView : public QTreeWidget {
 
    private:
     VGMFile *vgmfile;
-    std::unordered_map<VGMItem *, std::unique_ptr<VGMTreeItem>> m_parents;
+    std::unordered_map<VGMItem *, VGMTreeItem *> m_parents;
 
     VGMTreeItem *parent_cache = nullptr;
 };

@@ -24,25 +24,25 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent)
 
 void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name, void *) {
     auto item_name = QString::fromStdWString(name);
-    auto tree_item = std::make_unique<VGMTreeItem>(item_name, item, nullptr, parent);
+    auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
     tree_item->setText(0, item_name);
     tree_item->setIcon(0, iconForItemType(item->GetIcon()));
 
     if (parent) {
         if (parent_cache && parent_cache->item_parent() == parent) {
-            parent_cache->addChild(tree_item.get());
+            parent_cache->addChild(tree_item);
         } else {
-            auto item_app = m_parents[parent].get();
+            auto item_app = m_parents[parent];
             if (item_app) {
-                item_app->addChild(tree_item.get());
+                item_app->addChild(tree_item);
                 parent_cache = item_app;
             } else {
                 /* We have this, sometimes */
-                addTopLevelItem(tree_item.get());
+                addTopLevelItem(tree_item);
             }
         }
     } else {
-        addTopLevelItem(tree_item.get());
-        m_parents.insert(std::make_pair(item, std::move(tree_item)));
+        addTopLevelItem(tree_item);
+        m_parents.insert(std::make_pair(item, tree_item));
     }
 }
