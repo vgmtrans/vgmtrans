@@ -6,8 +6,7 @@
 #include <QColor>
 #include <QHash>
 
-struct QHexMetadataItem
-{
+struct QHexMetadataItem {
     int line, start, length;
     QColor foreground, background;
     QString comment;
@@ -15,35 +14,34 @@ struct QHexMetadataItem
 
 typedef QVector<QHexMetadataItem> QHexLineMetadata;
 
-class QHexMetadata : public QObject
-{
+class QHexMetadata : public QObject {
     Q_OBJECT
 
-    public:
-        explicit QHexMetadata(QObject *parent = nullptr);
-        const QHexLineMetadata& get(int line) const;
-        QString comments(int line) const;
-        QString comments(int line, int col) const;
-        bool hasMetadata(int line) const;
-        void clear(int line);
-        void clear();
+   public:
+    explicit QHexMetadata(QObject *parent = nullptr);
+    const QHexLineMetadata &get(int line) const;
+    QString comments(int line, int col) const;
+    bool hasMetadata(int line) const;
+    void clear(int line);
+    void clear();
 
-    public:
-        void metadata(int line, int start, int length, const QColor& fgcolor, const QColor& bgcolor, const QString& comment);
-        void color(int line, int start, int length, const QColor& fgcolor, const QColor& bgcolor);
-        void foreground(int line, int start, int length, const QColor& fgcolor);
-        void background(int line, int start, int length, const QColor& bgcolor);
-        void comment(int line, int start, int length, const QString &comment);
+   public:
+    void metadata(int line, int start, int length, const QColor &fgcolor, const QColor &bgcolor,
+                  const QString &comment);
+    void color(int line, int start, int length, const QColor &fgcolor, const QColor &bgcolor);
+    void foreground(int line, int start, int length, const QColor &fgcolor);
+    void background(int line, int start, int length, const QColor &bgcolor);
+    void comment(int line, int start, int length, const QString &comment);
 
-    private:
-        void setMetadata(const QHexMetadataItem& mi);
+   private:
+    void setMetadata(const QHexMetadataItem &mi);
 
-    signals:
-        void metadataChanged(int line);
-        void metadataCleared();
+   signals:
+    void metadataChanged(int line);
+    void metadataCleared();
 
-    private:
-        QHash<int, QHexLineMetadata> m_metadata;
+   private:
+    QHash<int, QHexLineMetadata> m_metadata;
 };
 
-#endif // QHEXMETADATA_H
+#endif  // QHEXMETADATA_H
