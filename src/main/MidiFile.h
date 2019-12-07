@@ -277,7 +277,7 @@ class NoteEvent : public MidiEvent {
 //{
 // public:
 //	DurNoteEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theKey,
-// uint8_t theVel, uint32_t theDur);
+//uint8_t theVel, uint32_t theDur);
 //	//virtual void PrepareWrite(std::vector<MidiEvent*> & aEvents);
 //	virtual uint32_t WriteEvent(std::vector<uint8_t> & buf, uint32_t time);
 //

@@ -352,10 +352,10 @@ class FilenameMatcher : public SimpleMatcher<std::wstring> {
 // *************
 
 // Filegroup matcher is sort of a last resort method because it's highly prone to error.  It
-// attempts to match based on an assumption of association between files by the fact they were
-// loaded from the same source RawFile.  This is necessary for formats that do not use any built-in
-// file association between sequences, instrument sets, and sample collections, like the standard
-// PS1 format (SEQ/VAB).
+// attempts to match based on an assumption of association between files by the fact they were loaded
+// from the same source RawFile.  This is necessary for formats that do not use any built-in file
+// association between sequences, instrument sets, and sample collections, like the standard PS1
+// format (SEQ/VAB).
 
 // I should probably also program in some routines to allow it to be enabled or disabled based
 // on the type of RawFile that was loaded.  PSF files, for example, have an almost certain

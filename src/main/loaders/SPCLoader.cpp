@@ -16,17 +16,19 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
         return KEEP_IT;
     }
 
-    if (std::equal(file->data()->cbegin(), file->data()->cend(), "SNES-SPC700 Sound File Data") ||
+    char signature[34] = {0};
+    file->GetBytes(0, 33, signature);
+    if (memcmp(signature, "SNES-SPC700 Sound File Data", 27) != 0 ||
         file->GetShort(0x21) != 0x1a1a) {
         return KEEP_IT;
     }
 
     uint8_t *spcData = new uint8_t[0x10000];
-    memcpy(spcData, file->rawData() + 0x100, 0x10000);
+    memcpy(spcData, file->buf.data + 0x100, 0x10000);
 
     VirtFile *spcFile = new VirtFile(spcData, 0x10000, file->GetFileName());
 
-    std::vector<uint8_t> dsp(file->rawData() + 0x10100, file->rawData() + 0x10100 + 0x80);
+    std::vector<uint8_t> dsp(file->buf.data + 0x10100, file->buf.data + 0x10100 + 0x80);
     spcFile->tag.binaries[L"dsp"] = dsp;
 
     // Parse [ID666](http://vspcplay.raphnet.net/spc_file_format.txt) if available.
@@ -101,7 +103,7 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
 
                     case 1: {
                         // String (data contains null character)
-                        std::string s_str = std::string((char *)(file->rawData() + xid6_offset + 4),
+                        std::string s_str = std::string((char *)(file->buf.data + xid6_offset + 4),
                                                         xid6_length - 1);
                         std::wstring xid6_string = string2wstring(s_str);
                         switch (xid6_id) {

@@ -143,7 +143,8 @@ bool Vab::GetInstrPointers() {
                 vagLocations.push_back(SizeOffsetPair(vagOffset, vagSize));
                 totalVAGSize += vagSize;
             } else {
-                L_WARN("VAG #{} at {:#x} with size {:#x}) is invalid", i + 1, vagOffset, vagSize);
+                L_WARN("VAG #{} at {:#x} with size {:#x}) is invalid", i+1, vagOffset, vagSize);
+
             }
         }
         unLength = (offVAGOffsets + 2 * 256) - dwOffset;

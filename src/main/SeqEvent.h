@@ -552,7 +552,7 @@ class MarkerSeqEvent : public SeqEvent {
 //{
 // public:
 //	VibratoSeqEvent(SeqTrack* pTrack, uint8_t detph, uint32_t offset = 0, uint32_t length = 0,
-// const std::wstring& name = L"") 	: SeqEvent(pTrack, offset, length, name), depth(depth)
+//const std::wstring& name = L"") 	: SeqEvent(pTrack, offset, length, name), depth(depth)
 //	{}
 //	virtual EventType GetEventType() { return EVENTTYPE_VIBRATO; }
 //

@@ -709,7 +709,7 @@ uint32_t NoteEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 
 // DurNoteEvent::DurNoteEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t
 // theKey, uint8_t theVel, uint32_t theDur) : MidiEvent(prntTrk, absoluteTime, channel,
-// PRIORITY_LOWER), key(theKey), vel(theVel), duration(theDur)
+//PRIORITY_LOWER), key(theKey), vel(theVel), duration(theDur)
 //{
 //}
 /*
@@ -725,8 +725,8 @@ DurNoteEvent* DurNoteEvent::MakeCopy()
 key, vel));  //add note off at end of dur
 }*/
 
-// uint32_t DurNoteEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)		//we do note
-// use WriteEvent on DurNoteEvents... this is what PrepareWrite is for, to create NoteEvents in
+// uint32_t DurNoteEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)		//we do note use
+// WriteEvent on DurNoteEvents... this is what PrepareWrite is for, to create NoteEvents in
 // substitute
 //{
 //	return false;

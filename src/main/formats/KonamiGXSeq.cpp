@@ -115,8 +115,8 @@ bool KonamiGXTrack::ReadEvent(void) {
         AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, newdur);
         AddTime(delta);
         //		if (newdur > delta)
-        //			ATLTRACE("newdur > delta.  %X > %X.  occurring at %X\n", newdur,
-        // delta, beginOffset); AddDelta(dur);
+        //			ATLTRACE("newdur > delta.  %X > %X.  occurring at %X\n", newdur, delta,
+        //beginOffset); AddDelta(dur);
     } else
         switch (status_byte) {
             case 0xC0:

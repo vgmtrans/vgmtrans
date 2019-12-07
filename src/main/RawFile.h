@@ -11,7 +11,6 @@
 #include "DataSeg.h"
 #include "BytePattern.h"
 #include "VGMTag.h"
-#include "DataBlock.h"
 
 class VGMFile;
 class VGMItem;
@@ -23,7 +22,11 @@ class RawFile {
     RawFile(void);
     RawFile(const std::wstring name, uint32_t fileSize = 0, bool bCanRead = true,
             const VGMTag tag = VGMTag());
+
+   public:
     virtual ~RawFile(void);
+
+    //	void kill(void);
 
     bool open(const std::wstring &filename);
     void close();
@@ -47,43 +50,40 @@ class RawFile {
     float GetProPreRatio(void) { return propreRatio; }
     void SetProPreRatio(float newRatio);
 
-    uint8_t *rawData() noexcept { return m_data->data(); }
-    DataBlock *data() noexcept { return m_data.get(); }
-
     inline uint8_t &operator[](uint32_t offset) {
-        if ((offset < m_data->beginOffset()) || (offset >= m_data->endOffset()))
+        if ((offset < buf.startOff) || (offset >= buf.endOff))
             UpdateBuffer(offset);
-        return (*m_data)[offset];
+        return buf[offset];
     }
 
     inline uint8_t GetByte(uint32_t nIndex) {
-        if ((nIndex < m_data->beginOffset()) || (nIndex + 1 > m_data->endOffset()))
+        if ((nIndex < buf.startOff) || (nIndex + 1 > buf.endOff))
             UpdateBuffer(nIndex);
-        return (*m_data)[nIndex];
+        return buf[nIndex];
     }
 
     inline uint16_t GetShort(uint32_t nIndex) {
-        if ((nIndex < m_data->beginOffset()) || (nIndex + 2 > m_data->endOffset()))
+        if ((nIndex < buf.startOff) || (nIndex + 2 > buf.endOff))
             UpdateBuffer(nIndex);
-        return m_data->GetShort(nIndex);
+        return buf.GetShort(nIndex);
     }
 
     inline uint32_t GetWord(uint32_t nIndex) {
-        if ((nIndex < m_data->beginOffset()) || (nIndex + 4 > m_data->endOffset()))
+        if ((nIndex < buf.startOff) || (nIndex + 4 > buf.endOff))
             UpdateBuffer(nIndex);
-        return m_data->GetWord(nIndex);
+        return buf.GetWord(nIndex);
     }
 
     inline uint16_t GetShortBE(uint32_t nIndex) {
-        if ((nIndex < m_data->beginOffset()) || (nIndex + 2 > m_data->endOffset()))
+        if ((nIndex < buf.startOff) || (nIndex + 2 > buf.endOff))
             UpdateBuffer(nIndex);
-        return m_data->GetShortBE(nIndex);
+        return buf.GetShortBE(nIndex);
     }
 
     inline uint32_t GetWordBE(uint32_t nIndex) {
-        if ((nIndex < m_data->beginOffset()) || (nIndex + 4 > m_data->endOffset()))
+        if ((nIndex < buf.startOff) || (nIndex + 4 > buf.endOff))
             UpdateBuffer(nIndex);
-        return m_data->GetWordBE(nIndex);
+        return buf.GetWordBE(nIndex);
     }
 
     inline bool IsValidOffset(uint32_t nIndex) { return (nIndex < fileSize); }
@@ -107,7 +107,6 @@ class RawFile {
    public:
     DataSeg buf;
     uint32_t bufSize;
-
     float propreRatio;
     uint8_t processFlags;
 
@@ -120,8 +119,6 @@ class RawFile {
     std::wstring filename;
     std::wstring extension;
     std::wstring parRawFileFullPath;
-
-    std::unique_ptr<DataBlock> m_data;
 
    public:
     std::list<VGMFile *> containedVGMFiles;

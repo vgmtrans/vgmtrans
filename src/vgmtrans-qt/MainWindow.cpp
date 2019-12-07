@@ -99,7 +99,8 @@ void MainWindow::RouteSignals() {
     });
 
     connect(m_iconbar, &IconBar::OpenPressed, this, &MainWindow::OpenFile);
-    connect(m_iconbar, &IconBar::PlayToggle, m_colls_list, &VGMCollListView::HandlePlaybackRequest);
+    connect(m_iconbar, &IconBar::PlayToggle, m_colls_list,
+            &VGMCollListView::HandlePlaybackRequest);
     connect(m_iconbar, &IconBar::StopPressed, m_colls_list, &VGMCollListView::HandleStopRequest);
 
     connect(&MusicPlayer::Instance(), &MusicPlayer::StatusChange, m_iconbar,
@@ -115,9 +116,9 @@ void MainWindow::RouteSignals() {
 
         VGMFile *clicked_item = qtVGMRoot.vVGMFile[m_vgmfiles_list->currentIndex().row()];
         m_statusbar_offset->setText("Offset: 0x" +
-                                    QString::number(clicked_item->dwOffset, 16).toUpper());
+                                     QString::number(clicked_item->dwOffset, 16).toUpper());
         m_statusbar_length->setText("Length: 0x" +
-                                    QString::number(clicked_item->size(), 16).toUpper());
+                                     QString::number(clicked_item->size(), 16).toUpper());
     });
 }
 

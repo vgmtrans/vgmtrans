@@ -13,19 +13,22 @@ class QTextEdit;
 class QComboBox;
 class QPushButton;
 
-class Logger : public QDockWidget, public Sink {
+class Logger
+    : public QDockWidget
+    , public Sink
+{
     Q_OBJECT
 
-   public:
+  public:
     explicit Logger(QWidget *parent = nullptr);
     ~Logger() override;
 
     bool Push(const Entry &e) override;
 
-   signals:
+  signals:
     void closeEvent(QCloseEvent *) override;
 
-   private:
+  private:
     void CreateElements();
     void ConnectElements();
     void exportLog();

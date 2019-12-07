@@ -177,6 +177,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
     else
         L_WARN("Requested deletion for RawFile but it was not found");
 
+
     delete targFile;
     return true;
 }

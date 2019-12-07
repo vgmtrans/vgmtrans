@@ -131,8 +131,7 @@ AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, const std::w
 bool AkaoRgn::LoadRgn() {
     // instrument[i].region[k].fine_tune = stuff[(instrument[i].info_ptr + k*0x20 + 0x12)];
     // AddUnityKey(0x3A - GetByte(dwOffset + k*0x20 + 0x13), dwOffset + k*0x20 + 0x13);
-    // instrument[i].region[k].unity_key =		0x3A - stuff[(instrument[i].info_ptr + k*0x20
-    // + 0x13)]
+    // instrument[i].region[k].unity_key =		0x3A - stuff[(instrument[i].info_ptr + k*0x20 + 0x13)]
     // ;
     AddGeneralItem(dwOffset + 0, 1, L"Associated Articulation ID");
     artNum = GetByte(dwOffset + 0);  //- first_sample_id;
@@ -146,8 +145,8 @@ bool AkaoRgn::LoadRgn() {
     AddUnknown(dwOffset + 6, 1);
     AddVolume(GetByte(dwOffset + 7) / 127.0, dwOffset + 7, 1);
 
-    // if (aInstrs[i]->info_ptr + (k+1)*8 >= aInstrs[i+1]->info_ptr - 8)	//if this is the
-    // last region of the instrument 	aInstrs[i]->aRegions[k]->last_key = 0x7F; if (k == 0)
+    // if (aInstrs[i]->info_ptr + (k+1)*8 >= aInstrs[i+1]->info_ptr - 8)	//if this is the last
+    // region of the instrument 	aInstrs[i]->aRegions[k]->last_key = 0x7F; if (k == 0)
     // //if this is the first region of the instrument 	aInstrs[i]->aRegions[k]->first_key = 0;
 
     // if (keyLow > keyHigh && k > 0)	//if the first key is greater than the last key, and this
@@ -318,8 +317,8 @@ bool AkaoSampColl::GetSampleInfo() {
             samples.push_back(samp);
         }
     }
-    // num_samples = aSamps.GetCount();										//-1 to offset the
-    // last unnecessary k++
+    // num_samples = aSamps.GetCount();										//-1 to offset the last unnecessary
+    // k++
 
     if (samples.size() == 0)
         return false;

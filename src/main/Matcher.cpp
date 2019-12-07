@@ -114,8 +114,8 @@ AddItem(ITEM_TYPE type, uint32_t id)
 //	if (!success)
 //		return false;
 //	//uint32_t id = instrset->GetID();
-//	//if (!id)						//for the time being, 0 isn't a valid
-//value of id
+//	//if (!id)						//for the time being, 0 isn't a valid value of
+//id
 //	//	return false;
 //	if (instrsets[id])
 //		return false;

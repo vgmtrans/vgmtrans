@@ -34,12 +34,12 @@ class SonyPS2Seq : public VGMSeqNoTrks {
     VersCk versCk;
     HdrCk hdrCk;
     uint32_t midiChunkSize;
-    uint32_t maxMidiNumber;   // this determines the number of midi blocks.  Seems very similar to
-                              // SMF Type 2 (blech!) for the moment, I'm going to assume the
-                              // maxMidiNumber is always 0 (meaning one midi data block)
+    uint32_t maxMidiNumber;  // this determines the number of midi blocks.  Seems very similar to
+                             // SMF Type 2 (blech!) for the moment, I'm going to assume the
+                             // maxMidiNumber is always 0 (meaning one midi data block)
     uint32_t midiOffsetAddr;  // the offset for midi data block 0.  I won't bother with > 0 data
                               // blocks for the time being
-    uint16_t compOption;      // determines compression mode for midi data block 0
+    uint16_t compOption;  // determines compression mode for midi data block 0
 
     bool bSkipDeltaTime;
     uint8_t runningStatus;

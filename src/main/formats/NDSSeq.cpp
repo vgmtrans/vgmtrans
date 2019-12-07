@@ -244,7 +244,7 @@ bool NDSTrack::ReadEvent(void) {
                 int8_t transpose = (signed)GetByte(curOffset++);
                 AddTranspose(beginOffset, curOffset - beginOffset, transpose);
                 //			AddGenericEvent(beginOffset, curOffset-beginOffset,
-                // L"Transpose", NULL, BG_CLR_GREEN);
+                //L"Transpose", NULL, BG_CLR_GREEN);
                 break;
             }
 

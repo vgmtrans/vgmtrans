@@ -162,7 +162,7 @@ bool WDInstr::LoadInstr() {
         // Key Ranges
         if (((WDRgn *)aRgns[k])
                 ->bFirstRegion)  //&& !instrument[i].region[k].bLastRegion) //used in ffx2 0049 YRP
-                                 // battle 1.  check out first instrument, flags are weird
+                                 //battle 1.  check out first instrument, flags are weird
             aRgns[k]->keyLow = 0;
         else if (k > 0) {
             if (aRgns[k]->keyHigh == aRgns[k - 1]->keyHigh)

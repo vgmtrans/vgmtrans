@@ -114,8 +114,7 @@ void AkaoTrack::ResetVars(void) {
 //--------------------------------------------------
 // Revisions:
 //	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "内蔵音源をMIDI変換するスレ(in
-// http://www.2ch.net)" 						Add un-known
-// command(op-code).
+//http://www.2ch.net)" 						Add un-known command(op-code).
 //--------------------------------------------------
 bool AkaoTrack::ReadEvent(void) {
     uint32_t beginOffset = curOffset;
@@ -240,13 +239,13 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xA8: {
                 // vel = GetByte(curOffset++);
-                // vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS
-                // APPLIES, BUT NOT POSITIVE AddGenericEvent(beginOffset, curOffset-beginOffset,
-                // L"Set Velocity", NULL, BG_CLR_CYAN);
+                // vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES,
+                // BUT NOT POSITIVE AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set
+                // Velocity", NULL, BG_CLR_CYAN);
                 uint8_t cExpression = GetByte(curOffset++);
                 ////			 こっちのlog演算は要らない
-                ////			 vel = Convert7bitPercentVolValToStdMidiVal(vel);
-                /////I THINK THIS APPLIES, BUT NOT POSITIVE
+                ////			 vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I
+                ///THINK THIS APPLIES, BUT NOT POSITIVE
                 vel = 127;  //とりあえず 127 にしておく
                 AddExpression(beginOffset, curOffset - beginOffset, cExpression);
                 break;
@@ -671,8 +670,8 @@ bool AkaoTrack::ReadEvent(void) {
                                 curOffset += 2;
                         }
                         else
-                            curOffset += 2;								//otherwise,
-                        just skip over the relative branch offset*/
+                            curOffset += 2;								//otherwise, just skip
+                        over the relative branch offset*/
                         break;
                     }
 

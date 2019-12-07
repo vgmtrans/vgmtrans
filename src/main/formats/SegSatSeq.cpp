@@ -23,10 +23,10 @@ bool SegSatSeq::GetHeaderInfo(void) {
     // nNumTracks = GetShort(offset()+2);
     // headerFlag = GetByte(offset()+3);
     // length() = GetShort(offset()+4);
-    // if (nNumTracks == 0 || nNumTracks > 24)		//if there are no tracks or there are more
-    // tracks than allowed
-    //	return FALSE;							//return an error, the sequence
-    //shall be deleted
+    // if (nNumTracks == 0 || nNumTracks > 24)		//if there are no tracks or there are more tracks
+    // than allowed
+    //	return FALSE;							//return an error, the sequence shall be
+    //deleted
 
     name() = L"Sega Saturn Seq";
 

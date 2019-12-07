@@ -114,8 +114,7 @@ bool HOSATrack::ReadEvent(void) {
     const uint8_t cCom_bit7 = (cCommand & 0x80) >> 7;  // 0=Notes / 1=Controls
 
     //	unsigned 	int					iMinLengthCounter;
-    ////デルタタイム最小値 				int					i;
-    /////general
+    ////デルタタイム最小値 				int					i;		//general
     //	vector<char>::iterator			it_note;
     //	vector<int unsigned >::iterator	it_Length;
 
@@ -331,14 +330,13 @@ bool HOSATrack::ReadEvent(void) {
 //					int		*iVariable		Pointer of Variable
 //	Output
 //					int		*iVariable		Result of read
-// variable
+//variable
 //==============================================================
 void HOSATrack::ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable) {
     switch (cCom_bit5) {
         //----
         case (2):  //	2 : 可変長
-                   //			*iVariable = ReadVarLen(curOffset);		//No count
-                   // curOffset
+                   //			*iVariable = ReadVarLen(curOffset);		//No count curOffset
             *iVariable = DecodeVariable();
             break;
             //----

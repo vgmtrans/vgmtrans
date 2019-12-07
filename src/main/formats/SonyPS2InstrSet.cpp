@@ -432,8 +432,7 @@ bool SonyPS2Instr::LoadInstr() {
 
             long vol = progParam.progVolume * splitblock.splitVolume * sampParam.sampleVolume;
             // we divide the above value by 127^3 to get the percent vol it represents.  Then we
-            // convert it to DB units. 0xA0000 = 1db in the DLS lScale val for atten (dls1 specs
-            // p30)
+            // convert it to DB units. 0xA0000 = 1db in the DLS lScale val for atten (dls1 specs p30)
             double percentvol = vol / (double)(127 * 127 * 127);
             rgn->SetVolume(percentvol);
             PSXConvADSR(rgn, sampParam.sampleAdsr1, sampParam.sampleAdsr2, true);

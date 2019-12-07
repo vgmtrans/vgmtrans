@@ -51,7 +51,7 @@ class HOSAInstr : public VGMInstr {
                            // gets 0'd out in PSF file I disassembled (removed during optimization),
                            // so I can't see what it does. probably determines Sm and Sd, so not
                            // terribly important.
-        uint8_t ADSR_Am;   // Determines ADSR Attack Mode value.
+        uint8_t ADSR_Am;  // Determines ADSR Attack Mode value.
         uint8_t unk_A;
         uint8_t iPan;  // pan 0x80 - hard left    0xFF - hard right.  anything below results in
                        // center (but may be undefined)

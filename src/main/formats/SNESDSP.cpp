@@ -132,9 +132,9 @@ uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t
                     // then consider the slope of the line as envelope speed.
                     // double env_start = std::maxenv_from, 1);
                     // double decibelDiff = ConvertPercentAmplitudeToAttenDB(env_start / 2047.0) -
-                    // ConvertPercentAmplitudeToAttenDB((env_start + 1) / 2047.0); double
-                    // timePerTick = SDSP_COUNTER_RATES[rate] / 32000.0; sf2_time = timePerTick *
-                    // (-100.0 / decibelDiff);
+                    // ConvertPercentAmplitudeToAttenDB((env_start + 1) / 2047.0); double timePerTick
+                    // = SDSP_COUNTER_RATES[rate] / 32000.0; sf2_time = timePerTick * (-100.0 /
+                    // decibelDiff);
                 }
             }
         } else {  // 6,7: linear increase
