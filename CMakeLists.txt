@@ -50,11 +50,10 @@ if(MSVC)
                                    -D_CRT_SECURE_NO_DEPRECATE
                                    -D_CRT_NONSTDC_NO_DEPRECATE
                                    -D_CRT_SECURE_NO_WARNINGS)
-  if(NOT ${CMAKE_BUILD_TYPE} MATCHES "Release")
-    target_compile_options(g_warnings
-                           INTERFACE # /W4 /WX someday
-                                     /W3 "/permissive-")
-  endif()
+
+  target_compile_options(g_warnings
+                         INTERFACE /W3)
+
 else()
   if(ENABLE_ASAN)
     target_compile_options(g_options INTERFACE -fsanitize=address)
