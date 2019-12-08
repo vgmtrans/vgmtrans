@@ -5,7 +5,9 @@
  */
 
 #include "common.h"
+#include <zlib.h>
 #include <cstring>
+#include <array>
 
 std::wstring StringToUpper(std::wstring myString) {
     const size_t length = myString.length();
@@ -98,4 +100,52 @@ wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile) {
         wcscat(ret, newfile);
     }
     return (ret);
+}
+
+std::vector<char> zdecompress(std::vector<char> &src) {
+    std::vector<char> result;
+
+    /* allocate inflate state */
+    z_stream strm;
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    strm.avail_in = 0;
+    strm.next_in = Z_NULL;
+    int ret = inflateInit(&strm);
+    if (ret != Z_OK) {
+        throw std::runtime_error("Failed to init decompression");
+    }
+
+    strm.avail_in = src.size();
+    strm.next_in = reinterpret_cast<Bytef *>(src.data());
+
+    unsigned actual_size = 0;
+    constexpr int CHUNK = 16384;
+    std::array<char, CHUNK> out;
+    do {
+        strm.avail_out = CHUNK;
+        strm.next_out = reinterpret_cast<Bytef *>(out.data());
+        ret = inflate(&strm, Z_NO_FLUSH);
+
+        assert(ret != Z_STREAM_ERROR);
+
+        switch (ret) {
+            case Z_NEED_DICT:
+                ret = Z_DATA_ERROR;
+                [[fallthrough]];
+            case Z_DATA_ERROR:
+            case Z_MEM_ERROR:
+                (void)inflateEnd(&strm);
+                throw std::runtime_error("Decompression failed");
+        }
+
+        actual_size = CHUNK - strm.avail_out;
+        result.insert(result.end(), out.begin(), out.begin() + actual_size);
+    } while (strm.avail_out == 0);
+
+    assert(ret == Z_STREAM_END);
+
+    (void)inflateEnd(&strm);
+    return result;
 }
