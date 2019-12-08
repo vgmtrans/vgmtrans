@@ -41,7 +41,6 @@ RawFile::~RawFile(void) {
     }
 
     pRoot->UI_EndRemoveVGMFiles();
-    pRoot->UI_CloseRawFile(this);
 }
 
 // opens a file using the standard c++ file i/o routines
@@ -147,7 +146,8 @@ void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
     if (iter != containedVGMFiles.end())
         containedVGMFiles.erase(iter);
     else
-        L_WARN("Requested deletion for VGMFile '{}' but it was not found", wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
+        L_WARN("Requested deletion for VGMFile '{}' but it was not found",
+               wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
 
     if (containedVGMFiles.size() == 0)
         pRoot->CloseRawFile(this);

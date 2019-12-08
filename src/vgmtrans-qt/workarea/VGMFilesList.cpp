@@ -112,6 +112,10 @@ void VGMFilesListModel::AddVGMFile() {
 
 void VGMFilesListModel::RemoveVGMFile() {
     int position = static_cast<int>(qtVGMRoot.vVGMFile.size()) - 1;
+    if (position < 0) {
+        return;
+    }
+
     beginRemoveRows(QModelIndex(), position, position);
     endRemoveRows();
 }

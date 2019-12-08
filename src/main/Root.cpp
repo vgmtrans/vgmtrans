@@ -134,7 +134,7 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
     if (newRawFile->processFlags & PF_USELOADERS)
         for (uint32_t i = 0; i < vLoader.size(); i++) {
             if (vLoader[i]->Apply(newRawFile) == DELETE_IT) {
-                // delete newRawFile;
+                delete newRawFile;
                 return true;
             }
         }
@@ -158,7 +158,7 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
     // this->UI_OnEndScan();
 
     if (newRawFile->containedVGMFiles.size() == 0) {
-        // delete newRawFile;
+        delete newRawFile;
         return true;
     }
     newRawFile->SetProPreRatio(0.5);
