@@ -9,32 +9,29 @@
 
 #include <LogManager.h>
 
-class QTextEdit;
+class QPlainTextEdit;
 class QComboBox;
 class QPushButton;
 
-class Logger
-    : public QDockWidget
-    , public Sink
-{
+class Logger : public QDockWidget, public Sink {
     Q_OBJECT
 
-  public:
+   public:
     explicit Logger(QWidget *parent = nullptr);
     ~Logger() override;
 
     bool Push(const Entry &e) override;
 
-  signals:
+   signals:
     void closeEvent(QCloseEvent *) override;
 
-  private:
+   private:
     void CreateElements();
     void ConnectElements();
     void exportLog();
 
     QWidget *logger_wrapper;
-    QTextEdit *logger_textarea;
+    QPlainTextEdit *logger_textarea;
 
     QComboBox *logger_filter;
     QPushButton *logger_clear;

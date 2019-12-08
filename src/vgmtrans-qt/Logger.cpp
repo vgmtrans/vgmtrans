@@ -9,7 +9,7 @@
 #include <QGridLayout>
 #include <QComboBox>
 #include <QPushButton>
-#include <QTextEdit>
+#include <QPlainTextEdit>
 #include <QSaveFile>
 #include <QFileDialog>
 
@@ -29,7 +29,7 @@ Logger::~Logger() {
 void Logger::CreateElements() {
     logger_wrapper = new QWidget;
 
-    logger_textarea = new QTextEdit(logger_wrapper);
+    logger_textarea = new QPlainTextEdit(logger_wrapper);
     logger_textarea->setReadOnly(true);
     logger_textarea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     logger_textarea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -59,7 +59,7 @@ void Logger::CreateElements() {
 };
 
 void Logger::ConnectElements() {
-    connect(logger_clear, &QPushButton::pressed, logger_textarea, &QTextEdit::clear);
+    connect(logger_clear, &QPushButton::pressed, logger_textarea, &QPlainTextEdit::clear);
     connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged),
             [=](int level) { setLogLevel(static_cast<LogLevel>(level)); });
     connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
@@ -91,10 +91,10 @@ bool Logger::Push(const Entry &e) {
 
     const char *log_colors[] = {"red", "yellow", "darkgrey", "white"};
 
-    logger_textarea->append(QStringLiteral("<font color=%3>[%1:%2] %4</font>")
-                                .arg(QString::fromStdString(e.file), QString::number(e.line),
-                                     QString(log_colors[static_cast<int>(e.level)]),
-                                     QString::fromStdString(e.message)));
+    logger_textarea->appendHtml(QStringLiteral("<font color=%3>[%1:%2] %4</font>")
+                                    .arg(QString::fromStdString(e.file), QString::number(e.line),
+                                         QString(log_colors[static_cast<int>(e.level)]),
+                                         QString::fromStdString(e.message)));
 
     return true;
 }
