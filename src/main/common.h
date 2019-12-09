@@ -52,8 +52,8 @@ uint32_t StringToHex(const std::string &str);
 
 std::wstring ConvertToSafeFileName(const std::wstring &str);
 
-std::string wstring2string(std::wstring &wstr);
-std::wstring string2wstring(std::string &str);
+std::string wstring2string(const std::wstring &wstr);
+std::wstring string2wstring(const std::string &str);
 
 inline int CountBytesOfVal(uint8_t *buf, uint32_t numBytes, uint8_t val) {
     int count = 0;

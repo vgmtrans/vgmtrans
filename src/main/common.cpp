@@ -25,7 +25,7 @@ std::wstring StringToLower(std::wstring myString) {
     return myString;
 }
 
-std::string wstring2string(std::wstring &wstr) {
+std::string wstring2string(const std::wstring &wstr) {
     char *mbs = new char[wstr.length() * MB_CUR_MAX + 1];
     wcstombs(mbs, wstr.c_str(), wstr.length() * MB_CUR_MAX + 1);
     std::string str(mbs);
@@ -33,7 +33,7 @@ std::string wstring2string(std::wstring &wstr) {
     return str;
 }
 
-std::wstring string2wstring(std::string &str) {
+std::wstring string2wstring(const std::string &str) {
     wchar_t *wcs = new wchar_t[str.length() + 1];
     mbstowcs(wcs, str.c_str(), str.length() + 1);
     std::wstring wstr(wcs);
