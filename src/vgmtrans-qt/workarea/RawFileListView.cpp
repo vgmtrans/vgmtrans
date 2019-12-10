@@ -119,6 +119,19 @@ RawFileListView::RawFileListView(QWidget *parent) : QTableView(parent) {
     rawfile_context_menu = new QMenu();
     QAction *rawfile_remove = rawfile_context_menu->addAction("Remove");
     connect(rawfile_remove, &QAction::triggered, this, &RawFileListView::DeleteRawFiles);
+    rawfile_context_menu->addAction("Save raw unpacked image(s)", [sm = selectionModel()]() {
+        if (!sm->hasSelection())
+            return;
+
+        QModelIndexList list = sm->selectedRows();
+        for (auto &index : list) {
+            auto rawfile = qtVGMRoot.vRawFile[index.row()];
+            std::wstring filepath = pRoot->UI_GetSaveFilePath(L"");
+            if (!filepath.empty()) {
+                pRoot->UI_WriteBufferToFile(filepath, (u8 *)(rawfile->data()), rawfile->size());
+            }
+        }
+    });
 
     connect(this, &QAbstractItemView::customContextMenuRequested, this,
             &RawFileListView::RawFilesMenu);
