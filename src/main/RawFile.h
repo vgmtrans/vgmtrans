@@ -5,25 +5,23 @@
  */
 #pragma once
 
-#include <fstream>
 #include <string_view>
 #include <filesystem>
 #include <vector>
 #include "mio.hpp"
 
 #include "common.h"
-#include "DataSeg.h"
-#include "BytePattern.h"
 #include "VGMTag.h"
 
 class VGMFile;
 class VGMItem;
+class BytePattern;
 
 enum ProcessFlag { PF_USELOADERS = 1, PF_USESCANNERS = 2 };
 
 class RawFile {
    public:
-    virtual ~RawFile();
+    virtual ~RawFile() = default;
 
     [[nodiscard]] virtual std::wstring name() const = 0;
     [[nodiscard]] virtual std::wstring path() const = 0;
@@ -82,8 +80,6 @@ class RawFile {
 
     void AddContainedVGMFile(VGMFile *vgmfile);
     void RemoveContainedVGMFile(VGMFile *vgmfile);
-
-    bool OnSaveAsRaw();
 
     VGMItem *GetItemFromOffset(long offset);
     VGMFile *GetVGMFileFromOffset(long offset);

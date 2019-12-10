@@ -5,20 +5,10 @@
  */
 
 #include "VGMFile.h"
+#include "BytePattern.h"
 #include "Root.h"
 
 /* RawFile */
-
-RawFile::~RawFile(void) {
-    pRoot->UI_BeginRemoveVGMFiles();
-    size_t size = containedVGMFiles.size();
-    for (size_t i = 0; i < size; i++) {
-        pRoot->RemoveVGMFile(containedVGMFiles.front(), false);
-        containedVGMFiles.erase(containedVGMFiles.begin());
-    }
-
-    pRoot->UI_EndRemoveVGMFiles();
-}
 
 std::wstring RawFile::removeExtFromPath(const std::wstring &s) {
     size_t i = s.rfind('.', s.length());
@@ -64,9 +54,6 @@ void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
     else
         L_WARN("Requested deletion for VGMFile '{}' but it was not found",
                wstring2string(*const_cast<std::wstring *>(vgmfile->GetName())));
-
-    if (containedVGMFiles.size() == 0)
-        pRoot->CloseRawFile(this);
 }
 
 uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
@@ -99,18 +86,6 @@ bool RawFile::SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffs
             nMatchOffset = nIndex;
             return true;
         }
-    }
-    return false;
-}
-
-bool RawFile::OnSaveAsRaw() {
-    std::wstring filepath = pRoot->UI_GetSaveFilePath(L"");
-    if (!filepath.empty()) {
-        uint8_t *buf = new uint8_t[size()];
-        GetBytes(0, size(), buf);
-        bool result = pRoot->UI_WriteBufferToFile(filepath, buf, size());
-        delete[] buf;
-        return result;
     }
     return false;
 }

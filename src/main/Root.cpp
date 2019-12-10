@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include <fstream>
+
 #include "VGMColl.h"
 
 #include "PS1Format.h"
@@ -162,13 +164,23 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
 
 // Name says it all.
 bool VGMRoot::CloseRawFile(RawFile *targFile) {
-    if (targFile == NULL)
+    if (!targFile) {
         return false;
-    vector<RawFile *>::iterator iter = find(vRawFile.begin(), vRawFile.end(), targFile);
-    if (iter != vRawFile.end())
-        vRawFile.erase(iter);
-    else
+    }
+
+    auto file = find(vRawFile.begin(), vRawFile.end(), targFile);
+    if (file != vRawFile.end()) {
+        auto &vgmfiles = (*file)->containedVGMFiles;
+        auto size = vgmfiles.size();
+        for (size_t i = 0; i < size; i++) {
+            pRoot->RemoveVGMFile(vgmfiles.front(), false);
+            vgmfiles.erase(vgmfiles.begin());
+        }
+
+        vRawFile.erase(file);
+    } else {
         L_WARN("Requested deletion for RawFile but it was not found");
+    }
 
     delete targFile;
     return true;
