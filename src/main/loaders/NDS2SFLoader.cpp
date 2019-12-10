@@ -24,18 +24,15 @@ PostLoadCommand NDS2SFLoader::Apply(RawFile *file) {
     if (memcmp(sig, "PSF", 3) == 0) {
         uint8_t version = sig[3];
         if (version == NDS2SF_VERSION) {
-            std::wstring complaint;
             size_t exebufsize = NDS2SF_MAX_ROM_SIZE;
             uint8_t *exebuf = NULL;
-            // memset(exebuf, 0, exebufsize);
 
-            complaint = std::wstring{psf_read_exe(file, exebuf, exebufsize)};
-            if (!complaint.empty()) {
-                L_ERROR("{}", wstring2string(complaint));
+            auto complaint = psf_read_exe(file, exebuf, exebufsize);
+            if (complaint) {
+                L_ERROR("{}", wstring2string(std::wstring{complaint}));
                 delete[] exebuf;
                 return KEEP_IT;
             }
-            // pRoot->UI_WriteBufferToFile(L"uncomp.nds", exebuf, exebufsize);
 
             wstring str = file->GetFileName();
             pRoot->CreateVirtFile(exebuf, (uint32_t)exebufsize, str.data(), L"", file->tag);
@@ -126,13 +123,10 @@ const wchar_t *NDS2SFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned
         fullPath = GetFileWithBase(file->GetFullPath(), tempfn);
 
         // TODO: Make sure to limit recursion to avoid crashing.
-        RawFile *newRawFile = new RawFile(fullPath);
+        DiskFile *newRawFile = new DiskFile(fullPath);
         const wchar_t *psflibError = NULL;
-        if (newRawFile->open(fullPath))
-            psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
-        else
-            psflibError = L"Unable to open lib file.";
-        delete fullPath;
+        psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
+        // delete fullPath;
         delete newRawFile;
 
         if (psflibError != NULL)

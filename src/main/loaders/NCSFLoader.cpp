@@ -126,12 +126,9 @@ const wchar_t *NCSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned c
         fullPath = GetFileWithBase(file->GetFullPath(), tempfn);
 
         // TODO: Make sure to limit recursion to avoid crashing.
-        RawFile *newRawFile = new RawFile(fullPath);
+        DiskFile *newRawFile = new DiskFile(fullPath);
         const wchar_t *psflibError = NULL;
-        if (newRawFile->open(fullPath))
-            psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
-        else
-            psflibError = L"Unable to open lib file.";
+        psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
         delete fullPath;
         delete newRawFile;
 

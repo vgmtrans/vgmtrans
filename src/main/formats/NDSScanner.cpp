@@ -19,9 +19,10 @@ void NDSScanner::Scan(RawFile *file, void *info) {
 void NDSScanner::SearchForSDAT(RawFile *file) {
     uint32_t nFileLength = file->size();
     for (uint32_t i = 0; i + 4 < nFileLength; i++) {
-        if ((*file)[i] == 'S' && (*file)[i + 1] == 'D' && (*file)[i + 2] == 'A' &&
-            (*file)[i + 3] == 'T' && (*file)[i + 4] == 0xFF && (*file)[i + 5] == 0xFE &&
-            (*file)[i + 6] == 0 && (*file)[i + 7] == 0x01 && (file->GetShort(i + 12) < 0x100) &&
+        if (file->GetByte(i) == 'S' && file->GetByte(i + 1) == 'D' && file->GetByte(i + 2) == 'A' &&
+            file->GetByte(i + 3) == 'T' && file->GetByte(i + 4) == 0xFF &&
+            file->GetByte(i + 5) == 0xFE && file->GetByte(i + 6) == 0 &&
+            file->GetByte(i + 7) == 0x01 && (file->GetShort(i + 12) < 0x100) &&
             (file->GetWord(i + 0x10) < 0x10000)) {
             i += LoadFromSDAT(file, i);
         }
@@ -275,7 +276,8 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
         uint32_t nFileLength = file->size();
         for (uint32_t i=0; i+4<nFileLength; i++)
         {
-                if ((*file)[i] == 'S' && (*file)[i+1] == 'S' && (*file)[i+2] == 'E' && (*file)[i+3]
+                if (file->GetByte(i) == 'S' && file->GetByte(i+1) == 'S' && file->GetByte(i+2) ==
+'E' && file->GetByte(i+3)
 == 'Q')
                 {
                         //if (file->GetShort(i+10) == 0 && file->GetShort(i+16) == 0)

@@ -12,5 +12,6 @@ target_link_libraries(vgmcore
                              ZLIB::ZLIB
                              minizip
                              tinyxml
+														 mio
                       PRIVATE g_options
                               g_warnings)

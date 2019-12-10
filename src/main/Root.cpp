@@ -94,15 +94,11 @@ void VGMRoot::Reset(void) {
 
 // opens up a file from the filesystem and scans it for known formats
 bool VGMRoot::OpenRawFile(const wstring &filename) {
-    RawFile *newRawFile = new RawFile(filename);
-    if (!newRawFile->open(filename)) {
-        delete newRawFile;
-        return false;
-    }
+    DiskFile *newfile = new DiskFile(filename);
 
     // if the file was set up properly, apply loaders, scan it, and add it to our list if it
     // contains vgmfiles
-    return SetupNewRawFile(newRawFile);
+    return SetupNewRawFile(newfile);
 }
 
 // creates a virtual file, a RawFile that was data was created manually,
@@ -129,8 +125,6 @@ bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const wstring 
 // called by OpenRawFile.  Applies all of the loaders and scanners
 // to the RawFile
 bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
-    newRawFile->SetProPreRatio((float)0.80);
-
     if (newRawFile->processFlags & PF_USELOADERS)
         for (uint32_t i = 0; i < vLoader.size(); i++) {
             if (vLoader[i]->Apply(newRawFile) == DELETE_IT) {
@@ -161,7 +155,6 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
         delete newRawFile;
         return true;
     }
-    newRawFile->SetProPreRatio(0.5);
     vRawFile.push_back(newRawFile);
     UI_AddRawFile(newRawFile);
     return true;

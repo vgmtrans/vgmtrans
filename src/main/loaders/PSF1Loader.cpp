@@ -7,13 +7,7 @@
 #include "PSF1Loader.h"
 #include "Root.h"
 
-using namespace std;
-
-wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
-
-PSF1Loader::PSF1Loader(void) {}
-
-PSF1Loader::~PSF1Loader(void) {}
+#include "PSFFile.h"
 
 PostLoadCommand PSF1Loader::Apply(RawFile *file) {
     uint8_t sig[4];
@@ -21,48 +15,14 @@ PostLoadCommand PSF1Loader::Apply(RawFile *file) {
     if (memcmp(sig, "PSF", 3) == 0) {
         uint8_t version = sig[3];
         if (version == 0x01) {
-            const size_t exebufsize = 0x200000;
-            // uint32_t exeRealSize;
-            uint8_t *exebuf = new uint8_t[exebufsize];
-            memset(exebuf, 0, exebufsize);
-
-            std::wstring complaint;
-
-            complaint = std::wstring{psf_read_exe(file, exebuf, exebufsize)};
-            if (!complaint.empty()) {
-                L_ERROR("{}", wstring2string(complaint));
-                delete[] exebuf;
+            auto data = psf_read_exe(file);
+            if (data->empty()) {
                 return KEEP_IT;
             }
-            // pRoot->UI_WriteBufferToFile(L"uncomp.raw", exebuf, 0x200000);
 
-            // uint8_t* cutbuf = new uint8_t[exeRealSize];
-            // memcpy(cutbuf, exebuf, exeRealSize);
-            // delete[] exebuf;
-
-            // DO EMULATION
-
-            // if (!sexy_load(file->GetFullPath()))
-            //{
-            //	delete exebuf;
-            //	return DELETE_IT;
-            //}
-            ////sexy_execute(200000);//10000000);
-            // sexy_execute(10000000);
-            //
-            // memcpy(exebuf, GetPSXMainMemBuf(), 0x200000);
-
-            // pRoot->UI_WriteBufferToFile(L"dump.raw", exebuf, 0x200000);
-
-            ////EmulatePSX(cutbuf
-
-            wstring str = file->GetFileName();
-            // wstring::size_type pos = str.find_last_of('.');
-            // str.erase(pos);
-            // str.append(L" MemDump");
-
-            // pRoot->CreateVirtFile(str.data(), exebuf, 0x200000);
-            pRoot->CreateVirtFile(exebuf, exebufsize, str.data(), L"", file->tag);
+            std::wstring name = file->GetFileName();
+            pRoot->CreateVirtFile(reinterpret_cast<u8 *>(data->data()), data->size(), name.data(),
+                                  L"", file->tag);
             return DELETE_IT;
         }
     }
@@ -70,65 +30,24 @@ PostLoadCommand PSF1Loader::Apply(RawFile *file) {
     return KEEP_IT;
 }
 
-// The code below was written by Neill Corlett and adapted for VGMTrans.
-// Recursive psflib loading has been added.
+std::vector<char> *PSF1Loader::psf_read_exe(RawFile *file) {
+    PSFFile2 psf(file);
+    auto out = new std::vector<char>();
 
-/***************************************************************************/
-/*
-** Read the EXE from a PSF file
-**
-** Returns the error message, or NULL on success
-*/
-const wchar_t *PSF1Loader::psf_read_exe(RawFile *file, unsigned char *exebuffer,
-                                        unsigned exebuffersize) {
-    uint32_t fileSize = file->size();
-    if (fileSize >= 0x10000000)
-        return L"PSF too large - likely corrupt";
+    size_t stext_ofs = psf.getExe<u32>(0x18) & 0x3FFFFF;
+    size_t stext_size = psf.getExe<u32>(0x1C);
 
-    PSFFile psf;
-    if (!psf.Load(file))
-        return psf.GetError();
+    auto loaded_libs = load_psf_libs(psf, file);
+    if (!loaded_libs)
+        return out;
 
-    // Now we get into the stuff related to recursive psflib loading.
-    // the actual size of the header is 0x800, but we only need the first 0x20 for the text section
-    // offset/size
-    DataSeg *psfExeHeadSeg;
-    if (!psf.ReadExeDataSeg(psfExeHeadSeg, 0x20, 0))
-        return psf.GetError();
+    auto exeb = psf.exe().cbegin() + 0x800;
+    std::copy(exeb, exeb + stext_size, std::back_inserter(*out));
 
-    uint32_t textSectionStart = psfExeHeadSeg->GetWord(0x18) & 0x3FFFFF;
-    uint32_t textSectionSize = psfExeHeadSeg->GetWord(0x1C);
-    delete psfExeHeadSeg;
-    if (textSectionStart + textSectionSize > 0x200000)
-        return L"Text section start and/or size values are corrupt in PSX-EXE header.";
-
-    // search exclusively for _lib tag, and if found, perform a recursive load
-    const wchar_t *psflibError = load_psf_libs(psf, file, exebuffer, exebuffersize);
-    if (psflibError != NULL)
-        return psflibError;
-
-    if (!psf.ReadExe(exebuffer + textSectionStart, textSectionSize, 0x800))
-        return L"Decompression failed";
-
-    // set tags to RawFile
-    if (psf.tags.count("title") != 0) {
-        file->tag.title = string2wstring(psf.tags["title"]);
-    }
-    if (psf.tags.count("artist") != 0) {
-        file->tag.artist = string2wstring(psf.tags["artist"]);
-    }
-    if (psf.tags.count("game") != 0) {
-        file->tag.album = string2wstring(psf.tags["game"]);
-    }
-    if (psf.tags.count("comment") != 0) {
-        file->tag.comment = string2wstring(psf.tags["comment"]);
-    }
-
-    return NULL;
+    return out;
 }
 
-const wchar_t *PSF1Loader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned char *exebuffer,
-                                         unsigned exebuffersize) {
+bool PSF1Loader::load_psf_libs(PSFFile2 &psf, RawFile *file) {
     char libTagName[16];
     int libIndex = 1;
     while (true) {
@@ -137,8 +56,8 @@ const wchar_t *PSF1Loader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned c
         else
             sprintf(libTagName, "_lib%d", libIndex);
 
-        map<string, string>::iterator itLibTag = psf.tags.find(libTagName);
-        if (itLibTag == psf.tags.end())
+        auto itLibTag = psf.tags().find(libTagName);
+        if (itLibTag == psf.tags().end())
             break;
 
         wchar_t tempfn[PATH_MAX] = {0};
@@ -147,20 +66,17 @@ const wchar_t *PSF1Loader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned c
         wchar_t *fullPath;
         fullPath = GetFileWithBase(file->GetFullPath(), tempfn);
 
-        // TODO: Make sure to limit recursion to avoid crashing.
-        RawFile *newRawFile = new RawFile(fullPath);
-        const wchar_t *psflibError = NULL;
-        if (newRawFile->open(fullPath))
-            psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
-        else
-            psflibError = L"Unable to open lib file.";
+        DiskFile *newRawFile = new DiskFile(fullPath);
+        std::vector<char> *out = nullptr;
+        out = psf_read_exe(newRawFile);
         delete fullPath;
         delete newRawFile;
 
-        if (psflibError != NULL)
-            return psflibError;
+        if (out && out->empty())
+            return false;
 
         libIndex++;
     }
-    return NULL;
+
+    return true;
 }

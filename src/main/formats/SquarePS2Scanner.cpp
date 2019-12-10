@@ -52,9 +52,6 @@ void SquarePS2Scanner::SearchForBGMSeq(RawFile *file) {
 void SquarePS2Scanner::SearchForWDSet(RawFile *file) {
     uint32_t numRegions, firstRgnPtr;
 
-    float prevProPreRatio = file->GetProPreRatio();
-    file->SetProPreRatio(1);
-
     uint32_t nFileLength = file->size();
     for (uint32_t i = 0; i + 0x3000 < nFileLength; i++) {
         if ((*file)[i] == 'W' && (*file)[i + 1] == 'D' && (*file)[i + 3] < 0x03) {
@@ -118,5 +115,4 @@ void SquarePS2Scanner::SearchForWDSet(RawFile *file) {
             }
         }
     }
-    file->SetProPreRatio(prevProPreRatio);
 }

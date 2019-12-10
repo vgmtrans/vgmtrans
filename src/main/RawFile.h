@@ -6,6 +6,10 @@
 #pragma once
 
 #include <fstream>
+#include <string_view>
+#include <filesystem>
+#include <vector>
+#include "mio.hpp"
 
 #include "common.h"
 #include "DataSeg.h"
@@ -19,79 +23,57 @@ enum ProcessFlag { PF_USELOADERS = 1, PF_USESCANNERS = 2 };
 
 class RawFile {
    public:
-    RawFile(void);
-    RawFile(const std::wstring name, uint32_t fileSize = 0, bool bCanRead = true,
-            const VGMTag tag = VGMTag());
+    virtual ~RawFile();
 
-   public:
-    virtual ~RawFile(void);
+    [[nodiscard]] virtual std::wstring name() const = 0;
+    [[nodiscard]] virtual size_t size() const noexcept = 0;
 
-    //	void kill(void);
+    virtual std::wstring GetExtension() const = 0;
+    virtual std::wstring GetParRawFileFullPath() const = 0;
+    virtual const wchar_t *GetFullPath() const = 0;
+    virtual const wchar_t *GetFileName() const = 0;
 
-    bool open(const std::wstring &filename);
-    void close();
-    unsigned long size(void);
-    inline const wchar_t *GetFullPath() { return fullpath.c_str(); }
-    inline const wchar_t *GetFileName() {
-        return filename.c_str();
-    }  // returns the filename with extension
-    inline const std::wstring &GetExtension() { return extension; }
-    inline const std::wstring &GetParRawFileFullPath() { return parRawFileFullPath; }
-    static std::wstring getFileNameFromPath(const std::wstring &s);
-    static std::wstring getExtFromPath(const std::wstring &s);
     static std::wstring removeExtFromPath(const std::wstring &s);
-    VGMItem *GetItemFromOffset(long offset);
-    VGMFile *GetVGMFileFromOffset(long offset);
 
-    virtual int FileRead(void *dest, uint32_t index, uint32_t length);
+    bool IsValidOffset(uint32_t ofs) noexcept { return ofs < size(); }
 
-    void UpdateBuffer(uint32_t index);
+    void UseLoaders() noexcept { processFlags |= PF_USELOADERS; }
+    void DontUseLoaders() noexcept { processFlags &= ~PF_USELOADERS; }
+    void UseScanners() noexcept { processFlags |= PF_USESCANNERS; }
+    void DontUseScanners() noexcept { processFlags &= ~PF_USESCANNERS; }
 
-    float GetProPreRatio(void) { return propreRatio; }
-    void SetProPreRatio(float newRatio);
+    template <typename T>
+    T get(const size_t ind) const {
+        assert(ind + sizeof(T) < size());
 
-    inline uint8_t &operator[](uint32_t offset) {
-        if ((offset < buf.startOff) || (offset >= buf.endOff))
-            UpdateBuffer(offset);
-        return buf[offset];
+        T value = 0;
+        for (size_t i = 0; i < sizeof(T); i++) {
+            value |= (static_cast<u8>(operator[](ind + i)) << (i * CHAR_BIT));
+        }
+
+        return value;
     }
 
-    inline uint8_t GetByte(uint32_t nIndex) {
-        if ((nIndex < buf.startOff) || (nIndex + 1 > buf.endOff))
-            UpdateBuffer(nIndex);
-        return buf[nIndex];
+    template <typename T>
+    T getBE(const size_t ind) const {
+        assert(ind + sizeof(T) < size());
+
+        T value = 0;
+        for (size_t i = 0; i < sizeof(T); i++) {
+            value |= (static_cast<u8>(operator[](ind + i)) << ((sizeof(T) - i - 1) * CHAR_BIT));
+        }
+
+        return value;
     }
 
-    inline uint16_t GetShort(uint32_t nIndex) {
-        if ((nIndex < buf.startOff) || (nIndex + 2 > buf.endOff))
-            UpdateBuffer(nIndex);
-        return buf.GetShort(nIndex);
-    }
-
-    inline uint32_t GetWord(uint32_t nIndex) {
-        if ((nIndex < buf.startOff) || (nIndex + 4 > buf.endOff))
-            UpdateBuffer(nIndex);
-        return buf.GetWord(nIndex);
-    }
-
-    inline uint16_t GetShortBE(uint32_t nIndex) {
-        if ((nIndex < buf.startOff) || (nIndex + 2 > buf.endOff))
-            UpdateBuffer(nIndex);
-        return buf.GetShortBE(nIndex);
-    }
-
-    inline uint32_t GetWordBE(uint32_t nIndex) {
-        if ((nIndex < buf.startOff) || (nIndex + 4 > buf.endOff))
-            UpdateBuffer(nIndex);
-        return buf.GetWordBE(nIndex);
-    }
-
-    inline bool IsValidOffset(uint32_t nIndex) { return (nIndex < fileSize); }
-
-    inline void UseLoaders() { processFlags |= PF_USELOADERS; }
-    inline void DontUseLoaders() { processFlags &= ~PF_USELOADERS; }
-    inline void UseScanners() { processFlags |= PF_USESCANNERS; }
-    inline void DontUseScanners() { processFlags &= ~PF_USESCANNERS; }
+    virtual const char *data() const = 0;
+    virtual char &operator[](uint32_t offset) = 0;
+    virtual const char &operator[](uint32_t offset) const = 0;
+    virtual uint8_t GetByte(uint32_t nIndex) = 0;
+    virtual uint16_t GetShort(uint32_t nIndex) = 0;
+    virtual uint32_t GetWord(uint32_t nIndex) = 0;
+    virtual uint16_t GetShortBE(uint32_t nIndex) = 0;
+    virtual uint32_t GetWordBE(uint32_t nIndex) = 0;
 
     uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer);
     bool MatchBytes(const uint8_t *pattern, uint32_t nIndex, size_t nCount);
@@ -104,30 +86,97 @@ class RawFile {
 
     bool OnSaveAsRaw();
 
-   public:
-    DataSeg buf;
-    uint32_t bufSize;
-    float propreRatio;
-    uint8_t processFlags;
+    VGMItem *GetItemFromOffset(long offset);
+    VGMFile *GetVGMFileFromOffset(long offset);
 
-   protected:
-    std::ifstream file;
-    std::filebuf *pbuf;
-    bool bCanFileRead;
-    unsigned long fileSize;
-    std::wstring fullpath;
-    std::wstring filename;
-    std::wstring extension;
-    std::wstring parRawFileFullPath;
-
-   public:
+    uint8_t processFlags = PF_USESCANNERS | PF_USELOADERS;
     std::list<VGMFile *> containedVGMFiles;
     VGMTag tag;
 };
 
-class VirtFile : public RawFile {
+class DiskFile final : public RawFile {
    public:
-    VirtFile();
+    DiskFile(std::string_view path);
+    DiskFile(const std::wstring &path);
+    ~DiskFile() = default;
+
+    [[nodiscard]] std::wstring name() const override { return m_path.filename().wstring(); };
+    [[nodiscard]] size_t size() const noexcept override { return m_data.length(); };
+
+    std::wstring GetExtension() const override {
+        auto tmp = m_path.extension().wstring();
+        if (!tmp.empty()) {
+            return tmp.substr(1, tmp.size() - 1);
+        }
+
+        return tmp;
+    }
+
+    std::wstring GetParRawFileFullPath() const override { return {}; }
+
+    const wchar_t *GetFullPath() const override {
+        std::wstring *tmp = new std::wstring(m_path.wstring());
+        return tmp->c_str();
+    }
+
+    const wchar_t *GetFileName() const override {
+        std::wstring *tmp = new std::wstring(m_path.filename().wstring());
+        return tmp->c_str();
+    }
+
+    const char *data() const override { return m_data.data(); }
+    char &operator[](uint32_t offset) override { return m_data[offset]; }
+    const char &operator[](uint32_t offset) const override { return m_data[offset]; }
+    uint8_t GetByte(uint32_t nIndex) override { return m_data[nIndex]; }
+    uint16_t GetShort(uint32_t nIndex) override { return get<u16>(nIndex); }
+    uint32_t GetWord(uint32_t nIndex) override { return get<u32>(nIndex); }
+    uint16_t GetShortBE(uint32_t nIndex) override { return getBE<u16>(nIndex); }
+    uint32_t GetWordBE(uint32_t nIndex) override { return getBE<u32>(nIndex); }
+
+   private:
+    mio::mmap_source m_data;
+    std::filesystem::path m_path;
+};
+
+class VirtFile final : public RawFile {
+   public:
+    VirtFile() = default;
+    VirtFile(const RawFile &, size_t offset = 0);
     VirtFile(uint8_t *data, uint32_t fileSize, const std::wstring &name,
              const wchar_t *parRawFileFullPath = L"", const VGMTag tag = VGMTag());
+    ~VirtFile() = default;
+
+    [[nodiscard]] std::wstring name() const override { return m_name; };
+    [[nodiscard]] size_t size() const noexcept override { return m_data.size(); };
+
+    std::wstring GetExtension() const override {
+        auto tmp = m_lpath.extension().wstring();
+        if (!tmp.empty()) {
+            return tmp.substr(1, tmp.size() - 1);
+        } else {
+            std::filesystem::path tmp2(m_name);
+            if (tmp2.has_extension()) {
+                return tmp2.extension().wstring().substr(1, tmp2.extension().wstring().size() - 1);
+            }
+        }
+
+        return tmp;
+    }
+    std::wstring GetParRawFileFullPath() const override { return m_lpath.wstring(); }
+    const wchar_t *GetFullPath() const override { return m_lpath.c_str(); }
+    const wchar_t *GetFileName() const override { return m_name.c_str(); }
+
+    const char *data() const override { return m_data.data(); }
+    char &operator[](uint32_t offset) override { return m_data[offset]; }
+    const char &operator[](uint32_t offset) const override { return m_data[offset]; }
+    uint8_t GetByte(uint32_t nIndex) override { return m_data[nIndex]; }
+    uint16_t GetShort(uint32_t nIndex) override { return get<u16>(nIndex); }
+    uint32_t GetWord(uint32_t nIndex) override { return get<u32>(nIndex); }
+    uint16_t GetShortBE(uint32_t nIndex) override { return getBE<u16>(nIndex); }
+    uint32_t GetWordBE(uint32_t nIndex) override { return getBE<u32>(nIndex); }
+
+   private:
+    std::vector<char> m_data;
+    std::wstring m_name;
+    std::filesystem::path m_lpath;
 };

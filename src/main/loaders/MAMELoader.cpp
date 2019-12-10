@@ -328,7 +328,6 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
     VirtFile *newVirtFile = new VirtFile(destFile, destFileSize, strstream.str());
     newVirtFile->DontUseLoaders();
     newVirtFile->DontUseScanners();
-    newVirtFile->SetProPreRatio((float)0.80);
     return newVirtFile;
 }
 
