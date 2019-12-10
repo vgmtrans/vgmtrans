@@ -9,6 +9,15 @@
 #include <cstring>
 #include <array>
 
+std::wstring removeExtFromPath(const std::wstring &s) {
+    size_t i = s.rfind('.', s.length());
+    if (i != std::wstring::npos) {
+        return (s.substr(0, i));
+    }
+
+    return s;
+}
+
 std::wstring StringToUpper(std::wstring myString) {
     const size_t length = myString.length();
     for (size_t i = 0; i != length; ++i) {

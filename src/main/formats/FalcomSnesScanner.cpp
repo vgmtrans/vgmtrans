@@ -75,7 +75,7 @@ void FalcomSnesScanner::Scan(RawFile *file, void *info) {
 void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
     FalcomSnesVersion version = FALCOMSNES_NONE;
     std::wstring name =
-        file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->name());
+        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     uint32_t ofsLoadSeq;
     uint16_t addrSeqHeader;

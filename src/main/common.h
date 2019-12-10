@@ -45,6 +45,8 @@ using uptr = std::uintptr_t;
     struct _##type;                          \
     typedef _##type type
 
+std::wstring removeExtFromPath(const std::wstring &s);
+
 std::wstring StringToUpper(std::wstring myString);
 std::wstring StringToLower(std::wstring myString);
 

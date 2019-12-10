@@ -30,8 +30,6 @@ class RawFile {
 
     virtual std::wstring GetParRawFileFullPath() const { return {}; }
 
-    static std::wstring removeExtFromPath(const std::wstring &s);
-
     bool IsValidOffset(uint32_t ofs) noexcept { return ofs < size(); }
 
     void UseLoaders() noexcept { processFlags |= PF_USELOADERS; }

@@ -116,7 +116,7 @@ void PrismSnesScanner::Scan(RawFile *file, void *info) {
 void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
     PrismSnesVersion version = PRISMSNES_NONE;
     std::wstring name =
-        file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->name());
+        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search song list
     uint32_t ofsLoadSeq;

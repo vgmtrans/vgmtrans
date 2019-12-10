@@ -10,15 +10,6 @@
 
 /* RawFile */
 
-std::wstring RawFile::removeExtFromPath(const std::wstring &s) {
-    size_t i = s.rfind('.', s.length());
-    if (i != std::wstring::npos) {
-        return (s.substr(0, i));
-    }
-
-    return s;
-}
-
 /* Get the item at the specified offset */
 VGMItem *RawFile::GetItemFromOffset(long offset) {
     for (auto file : containedVGMFiles) {

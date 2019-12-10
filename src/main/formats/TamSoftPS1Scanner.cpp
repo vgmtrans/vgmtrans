@@ -8,7 +8,7 @@
 #include "TamSoftPS1Instr.h"
 
 void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
-    std::wstring basename(RawFile::removeExtFromPath(file->name()));
+    std::wstring basename(removeExtFromPath(file->name()));
     std::wstring extension(StringToLower(file->extension()));
 
     if (extension == L"tsq") {

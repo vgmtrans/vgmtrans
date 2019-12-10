@@ -45,7 +45,7 @@ void MoriSnesScanner::Scan(RawFile *file, void *info) {
 void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
     MoriSnesVersion version = MORISNES_NONE;
     std::wstring name =
-        file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->name());
+        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // scan for song list table
     uint32_t ofsLoadSeq;
