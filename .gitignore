@@ -197,3 +197,4 @@ FakesAssemblies/
 
 # VisualStudio.gitignore end ---------------------------------------------------
 /.vs
+/CMakeSettings.json

@@ -17,8 +17,6 @@ class VGMFile;
 class VGMItem;
 class BytePattern;
 
-enum ProcessFlag { PF_USELOADERS = 1, PF_USESCANNERS = 2 };
-
 class RawFile {
    public:
     virtual ~RawFile() = default;
@@ -32,10 +30,22 @@ class RawFile {
 
     bool IsValidOffset(uint32_t ofs) noexcept { return ofs < size(); }
 
-    void UseLoaders() noexcept { processFlags |= PF_USELOADERS; }
-    void DontUseLoaders() noexcept { processFlags &= ~PF_USELOADERS; }
-    void UseScanners() noexcept { processFlags |= PF_USESCANNERS; }
-    void DontUseScanners() noexcept { processFlags &= ~PF_USESCANNERS; }
+    bool useLoaders() noexcept { return m_flags & UseLoaders; }
+    void setUseLoaders(bool enable) noexcept {
+        if (enable) {
+            m_flags |= UseLoaders;
+        } else {
+            m_flags &= ~UseLoaders;
+        }
+    }
+    bool useScanners() noexcept { return m_flags & UseLoaders; }
+    void setUseScanners(bool enable) noexcept {
+        if (enable) {
+            m_flags |= UseScanners;
+        } else {
+            m_flags &= ~UseScanners;
+        }
+    }
 
     template <typename T>
     T get(const size_t ind) const {
@@ -82,9 +92,12 @@ class RawFile {
     VGMItem *GetItemFromOffset(long offset);
     VGMFile *GetVGMFileFromOffset(long offset);
 
-    uint8_t processFlags = PF_USESCANNERS | PF_USELOADERS;
     std::list<VGMFile *> containedVGMFiles;
     VGMTag tag;
+
+   private:
+    enum ProcessFlags { UseLoaders = 1, UseScanners = 2 };
+    int m_flags = UseLoaders | UseScanners;
 };
 
 class DiskFile final : public RawFile {

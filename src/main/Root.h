@@ -23,9 +23,7 @@ FORWARD_DECLARE_TYPEDEF_STRUCT(ItemSet);
 
 class VGMRoot {
    public:
-    VGMRoot(void);
-
-   public:
+    VGMRoot() = default;
     virtual ~VGMRoot(void);
 
     bool Init(void);

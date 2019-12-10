@@ -154,13 +154,44 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
     if (!element.isValid())
         return;
 
-    VGMFile *pointed_vgmfile = qtVGMRoot.vVGMFile[element.row()];
-    if (!pointed_vgmfile) {
+    VGMFile *file = qtVGMRoot.vVGMFile[element.row()];
+    if (!file) {
         return;
     }
 
-    QMenu *vgmfile_menu = new QMenu();
-    std::vector<const wchar_t *> *menu_item_names = pointed_vgmfile->GetMenuItemNames();
+    auto vgmfile_menu = new QMenu();
+    vgmfile_menu->addAction("Close", [file]() { qtVGMRoot.RemoveVGMFile(file); });
+    vgmfile_menu->addAction("Save as raw", [file]() {
+        std::wstring filepath = qtVGMRoot.UI_GetSaveFilePath(L"");
+        if (!filepath.empty()) {
+            u8 *buf = new u8[file->size()];
+            file->GetBytes(file->dwOffset, file->unLength, buf);
+            qtVGMRoot.UI_WriteBufferToFile(filepath, buf, file->unLength);
+            delete[] buf;
+        }
+    });
+
+    switch (file->GetFileType()) {
+        case FILETYPE_SEQ: {
+            vgmfile_menu->addAction("Save as MIDI", [file]() {
+                std::wstring filepath = qtVGMRoot.UI_GetSaveFilePath(L"");
+                if (!filepath.empty()) {
+                    u8 *buf = new u8[file->size()];
+                    file->GetBytes(file->dwOffset, file->unLength, buf);
+                    qtVGMRoot.UI_WriteBufferToFile(filepath, buf, file->unLength);
+                    delete[] buf;
+                }
+            });
+
+            break;
+        }
+
+        default:
+            break;
+    }
+
+    /*
+    std::vector<const wchar_t *> *menu_item_names = file->GetMenuItemNames();
     for (auto &menu_item : *menu_item_names) {
         vgmfile_menu->addAction(QString::fromStdWString(menu_item));
     }
@@ -169,13 +200,14 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
     int action_index = 0;
     for (auto &action : vgmfile_menu->actions()) {
         if (performed_action == action) {
-            pointed_vgmfile->CallMenuItem(pointed_vgmfile, action_index);
+            file->CallMenuItem(file, action_index);
             break;
         }
         action_index++;
     }
-
-    vgmfile_menu->deleteLater();
+    */
+    vgmfile_menu->exec(mapToGlobal(pos));
+    // menu->deleteLater();
 }
 
 void VGMFilesList::keyPressEvent(QKeyEvent *input) {

@@ -23,8 +23,6 @@ using namespace std;
 
 VGMRoot *pRoot;
 
-VGMRoot::VGMRoot(void) {}
-
 VGMRoot::~VGMRoot(void) {
     DeleteVect<VGMLoader>(vLoader);
     // DeleteVect<VGMScanner>(vScanner);
@@ -127,7 +125,7 @@ bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const wstring 
 // called by OpenRawFile.  Applies all of the loaders and scanners
 // to the RawFile
 bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
-    if (newRawFile->processFlags & PF_USELOADERS)
+    if (newRawFile->useLoaders())
         for (uint32_t i = 0; i < vLoader.size(); i++) {
             if (vLoader[i]->Apply(newRawFile) == DELETE_IT) {
                 delete newRawFile;
@@ -135,8 +133,7 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
             }
         }
 
-    // this->UI_OnBeginScan();
-    if (newRawFile->processFlags & PF_USESCANNERS) {
+    if (newRawFile->useScanners()) {
         // see if there is an extension discriminator
         list<VGMScanner *> *lScanners =
             ExtensionDiscriminator::instance().GetScannerList(newRawFile->extension());
@@ -151,7 +148,6 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
                 vScanner[i]->Scan(newRawFile);
         }
     }
-    // this->UI_OnEndScan();
 
     if (newRawFile->containedVGMFiles.size() == 0) {
         delete newRawFile;

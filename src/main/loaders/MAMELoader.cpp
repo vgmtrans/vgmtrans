@@ -326,8 +326,8 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
     std::wostringstream strstream;
     strstream << L"romgroup  - " << entry->type.c_str();
     VirtFile *newVirtFile = new VirtFile(destFile, destFileSize, strstream.str());
-    newVirtFile->DontUseLoaders();
-    newVirtFile->DontUseScanners();
+    newVirtFile->setUseLoaders(false);
+    newVirtFile->setUseScanners(false);
     return newVirtFile;
 }
 

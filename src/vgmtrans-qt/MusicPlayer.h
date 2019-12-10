@@ -113,7 +113,7 @@ class SF2Wrapper {
             return nullptr;
         }
 
-        sscanf(filename, "&%p", &sf2_buf);
+        (void)sscanf(filename, "&%p", &sf2_buf);
 
         m_old_sf2_buf = sf2_buf;
 

@@ -75,8 +75,8 @@ void TriAcePS1Scanner::SearchForSLZSeq(RawFile *file) {
         if (!instrsets.size())
             return;
 
-        std::wstring name = file->tag.HasTitle() ? file->tag.title
-                                                 : removeExtFromPath(file->name());
+        std::wstring name =
+            file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
         VGMColl *coll = new VGMColl(name);
         coll->UseSeq(seq);
         for (uint32_t i = 0; i < instrsets.size(); i++)
@@ -206,8 +206,8 @@ TriAcePS1Seq *TriAcePS1Scanner::TriAceSLZDecompress(RawFile *file, uint32_t cfOf
     }
 
     // If we had to use DEFAULT_UFSIZE because the uncompressed file size was not given (Valkyrie
-    // Profile), then create a new buffer of the correct size now that we know it, and delete the old
-    // one.
+    // Profile), then create a new buffer of the correct size now that we know it, and delete the
+    // old one.
     if (ufSize == DEFAULT_UFSIZE) {
         uint8_t *newUF = new uint8_t[ufOff];
         memcpy(newUF, uf, ufOff);
@@ -217,16 +217,15 @@ TriAcePS1Seq *TriAcePS1Scanner::TriAceSLZDecompress(RawFile *file, uint32_t cfOf
     // pRoot->UI_WriteBufferToFile(L"uncomp.raw", uf, ufOff);
 
     // Create the new virtual file, and analyze the sequence
-    std::wstring name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::wstring name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
     VirtFile *newVirtFile = newVirtFile = new VirtFile(uf, ufOff, name + std::wstring(L" Sequence"),
                                                        file->GetParRawFileFullPath().c_str());
 
     TriAcePS1Seq *newSeq = new TriAcePS1Seq(newVirtFile, 0, name);
     bool bLoadSucceed = newSeq->LoadVGMFile();
 
-    newVirtFile->DontUseLoaders();
-    newVirtFile->DontUseScanners();
+    newVirtFile->setUseLoaders(false);
+    newVirtFile->setUseScanners(false);
     pRoot->SetupNewRawFile(newVirtFile);
 
     if (bLoadSucceed)

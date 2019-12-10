@@ -36,9 +36,6 @@ enum FileType {
 class VGMFile : public VGMContainerItem {
    public:
     BEGIN_MENU(VGMFile)
-    MENU_ITEM(VGMFile, OnClose, L"Close")
-    MENU_ITEM(VGMFile, OnSaveAsRaw, L"Save as original format")
-    // MENU_ITEM(VGMFile, OnSaveAllAsRaw, L"Save all as original format")
     END_MENU()
 
    public:
@@ -140,9 +137,7 @@ class VGMFile : public VGMContainerItem {
             return data.size;
     }
 
-    inline uint8_t *rawData() {
-        return data.data;
-    }
+    inline uint8_t *rawData() { return data.data; }
 
    protected:
     DataSeg data, col;
