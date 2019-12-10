@@ -137,7 +137,7 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
     if (newRawFile->processFlags & PF_USESCANNERS) {
         // see if there is an extension discriminator
         list<VGMScanner *> *lScanners =
-            ExtensionDiscriminator::instance().GetScannerList(newRawFile->GetExtension());
+            ExtensionDiscriminator::instance().GetScannerList(newRawFile->extension());
         if (lScanners) {
             // if there is, scan with all relevant scanners
             for (list<VGMScanner *>::iterator iter = lScanners->begin(); iter != lScanners->end();

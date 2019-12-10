@@ -160,10 +160,10 @@ int MAMELoader::LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGameEntry *gam
 PostLoadCommand MAMELoader::Apply(RawFile *file) {
     if (!bLoadedXml)
         return KEEP_IT;
-    if (file->GetExtension() != L"zip")
+    if (file->extension() != L"zip")
         return KEEP_IT;
 
-    wstring fullfilename_w = file->GetFileName();
+    wstring fullfilename_w = file->name();
     string fullfilename = wstring2string(fullfilename_w);
     const char *endoffilename = strrchr(fullfilename.c_str(), '.');
     char filename[10] = {0};

@@ -37,7 +37,7 @@ PostLoadCommand NCSFLoader::Apply(RawFile *file) {
             }
             // pRoot->UI_WriteBufferToFile(L"uncomp.sdat", exebuf, exebufsize);
 
-            wstring str = file->GetFileName();
+            wstring str = file->name();
             pRoot->CreateVirtFile(exebuf, (uint32_t)exebufsize, str.data(), L"", file->tag);
             return DELETE_IT;
         }

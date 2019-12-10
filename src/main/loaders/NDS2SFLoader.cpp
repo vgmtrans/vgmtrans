@@ -34,7 +34,7 @@ PostLoadCommand NDS2SFLoader::Apply(RawFile *file) {
                 return KEEP_IT;
             }
 
-            wstring str = file->GetFileName();
+            wstring str = file->name();
             pRoot->CreateVirtFile(exebuf, (uint32_t)exebufsize, str.data(), L"", file->tag);
             return DELETE_IT;
         }

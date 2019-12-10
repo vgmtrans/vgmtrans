@@ -8,8 +8,8 @@
 #include "TamSoftPS1Instr.h"
 
 void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
-    std::wstring basename(RawFile::removeExtFromPath(file->GetFileName()));
-    std::wstring extension(StringToLower(file->GetExtension()));
+    std::wstring basename(RawFile::removeExtFromPath(file->name()));
+    std::wstring extension(StringToLower(file->extension()));
 
     if (extension == L"tsq") {
         uint8_t numSongs = 0;

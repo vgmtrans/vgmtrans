@@ -27,11 +27,10 @@ class RawFile {
 
     [[nodiscard]] virtual std::wstring name() const = 0;
     [[nodiscard]] virtual size_t size() const noexcept = 0;
+    [[nodiscard]] virtual std::wstring extension() const = 0;
 
-    virtual std::wstring GetExtension() const = 0;
-    virtual std::wstring GetParRawFileFullPath() const = 0;
+    virtual std::wstring GetParRawFileFullPath() const { return {}; }
     virtual const wchar_t *GetFullPath() const = 0;
-    virtual const wchar_t *GetFileName() const = 0;
 
     static std::wstring removeExtFromPath(const std::wstring &s);
 
@@ -102,8 +101,7 @@ class DiskFile final : public RawFile {
 
     [[nodiscard]] std::wstring name() const override { return m_path.filename().wstring(); };
     [[nodiscard]] size_t size() const noexcept override { return m_data.length(); };
-
-    std::wstring GetExtension() const override {
+    [[nodiscard]] std::wstring extension() const override {
         auto tmp = m_path.extension().wstring();
         if (!tmp.empty()) {
             return tmp.substr(1, tmp.size() - 1);
@@ -112,15 +110,8 @@ class DiskFile final : public RawFile {
         return tmp;
     }
 
-    std::wstring GetParRawFileFullPath() const override { return {}; }
-
     const wchar_t *GetFullPath() const override {
         std::wstring *tmp = new std::wstring(m_path.wstring());
-        return tmp->c_str();
-    }
-
-    const wchar_t *GetFileName() const override {
-        std::wstring *tmp = new std::wstring(m_path.filename().wstring());
         return tmp->c_str();
     }
 
@@ -148,8 +139,7 @@ class VirtFile final : public RawFile {
 
     [[nodiscard]] std::wstring name() const override { return m_name; };
     [[nodiscard]] size_t size() const noexcept override { return m_data.size(); };
-
-    std::wstring GetExtension() const override {
+    [[nodiscard]] std::wstring extension() const override {
         auto tmp = m_lpath.extension().wstring();
         if (!tmp.empty()) {
             return tmp.substr(1, tmp.size() - 1);
@@ -162,9 +152,9 @@ class VirtFile final : public RawFile {
 
         return tmp;
     }
+
     std::wstring GetParRawFileFullPath() const override { return m_lpath.wstring(); }
     const wchar_t *GetFullPath() const override { return m_lpath.c_str(); }
-    const wchar_t *GetFileName() const override { return m_name.c_str(); }
 
     const char *data() const override { return m_data.data(); }
     char &operator[](uint32_t offset) override { return m_data[offset]; }

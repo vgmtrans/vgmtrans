@@ -139,7 +139,7 @@ void SuzukiSnesScanner::Scan(RawFile *file, void *info) {
 void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
     SuzukiSnesVersion version = SUZUKISNES_NONE;
     std::wstring name =
-        file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+        file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->name());
 
     // search for note length table
     uint32_t ofsSongLoad;

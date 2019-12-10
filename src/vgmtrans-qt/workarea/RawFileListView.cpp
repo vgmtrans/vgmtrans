@@ -76,7 +76,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
     switch (index.column()) {
         case Property::Name: {
             if (role == Qt::DisplayRole) {
-                return QString::fromWCharArray(qtVGMRoot.vRawFile[index.row()]->GetFileName());
+                return QString::fromStdWString(qtVGMRoot.vRawFile[index.row()]->name());
             } else if (role == Qt::DecorationRole) {
                 return QIcon(":/images/file-32.png");
             }

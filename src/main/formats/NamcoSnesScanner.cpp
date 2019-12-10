@@ -112,7 +112,7 @@ void NamcoSnesScanner::Scan(RawFile *file, void *info) {
 void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
     NamcoSnesVersion version = NAMCOSNES_NONE;
     std::wstring name =
-        file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+        file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->name());
 
     // search song list
     uint32_t ofsReadSongList;

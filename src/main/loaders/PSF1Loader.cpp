@@ -20,7 +20,7 @@ PostLoadCommand PSF1Loader::Apply(RawFile *file) {
                 return KEEP_IT;
             }
 
-            std::wstring name = file->GetFileName();
+            std::wstring name = file->name();
             pRoot->CreateVirtFile(reinterpret_cast<u8 *>(data->data()), data->size(), name.data(),
                                   L"", file->tag);
             return DELETE_IT;

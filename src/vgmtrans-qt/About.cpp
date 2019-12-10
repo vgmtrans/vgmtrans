@@ -6,7 +6,7 @@
 #include <QPixmap>
 
 About::About(QWidget *parent) : QDialog(parent) {
-    setWindowTitle("About VGMTransQt");
+    setWindowTitle("About VGMTrans");
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
     const QString small =
@@ -15,7 +15,7 @@ About::About(QWidget *parent) : QDialog(parent) {
 
     QString text;
     text.append(QStringLiteral("<p style='font-size:38pt; font-weight:400; margin-bottom:0;'>") +
-                "VGMTrans" + QStringLiteral("</p>"));
+                "VGMTransQt" + QStringLiteral("</p>"));
 
     text.append(medium + "An open-source videogame music translator</p>");
     text.append(

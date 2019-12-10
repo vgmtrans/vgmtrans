@@ -7,8 +7,6 @@
 #include "VGMFile.h"
 #include "Root.h"
 
-using namespace std;
-
 /* RawFile */
 
 RawFile::~RawFile(void) {
@@ -22,11 +20,12 @@ RawFile::~RawFile(void) {
     pRoot->UI_EndRemoveVGMFiles();
 }
 
-wstring RawFile::removeExtFromPath(const wstring &s) {
+std::wstring RawFile::removeExtFromPath(const std::wstring &s) {
     size_t i = s.rfind('.', s.length());
-    if (i != string::npos) {
+    if (i != std::wstring::npos) {
         return (s.substr(0, i));
     }
+
     return s;
 }
 
@@ -59,8 +58,7 @@ void RawFile::AddContainedVGMFile(VGMFile *vgmfile) {
 }
 
 void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
-    list<VGMFile *>::iterator iter =
-        find(containedVGMFiles.begin(), containedVGMFiles.end(), vgmfile);
+    auto iter = find(containedVGMFiles.begin(), containedVGMFiles.end(), vgmfile);
     if (iter != containedVGMFiles.end())
         containedVGMFiles.erase(iter);
     else
@@ -129,7 +127,7 @@ VirtFile::VirtFile(const RawFile &file, size_t offset) : m_name(file.name()) {
     std::copy(file.data() + offset, file.data() + offset + file.size(), std::back_inserter(m_data));
 }
 
-VirtFile::VirtFile(uint8_t *data, uint32_t fileSize, const wstring &name,
+VirtFile::VirtFile(uint8_t *data, uint32_t fileSize, const std::wstring &name,
                    const wchar_t *rawFileName, const VGMTag tag)
     : m_name(name), m_lpath(rawFileName) {
     std::copy(data, data + fileSize, std::back_inserter(m_data));
