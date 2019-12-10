@@ -182,7 +182,7 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
         return KEEP_IT;
 
     // try to open up the game zip
-    wstring fullpath = file->GetFullPath();
+    wstring fullpath = file->path();
     string test = wstring2string(fullpath);
     unzFile cur_file = unzOpen(wstring2string(fullpath).c_str());
     if (!cur_file) {

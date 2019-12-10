@@ -26,7 +26,7 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
     uint8_t *spcData = new uint8_t[0x10000];
     memcpy(spcData, file->data() + 0x100, 0x10000);
 
-    VirtFile *spcFile = new VirtFile(spcData, 0x10000, file->name(), file->GetFullPath());
+    VirtFile *spcFile = new VirtFile(spcData, 0x10000, file->name(), file->path());
 
     std::vector<uint8_t> dsp(file->data() + 0x10100, file->data() + 0x10100 + 0x80);
     spcFile->tag.binaries[L"dsp"] = dsp;

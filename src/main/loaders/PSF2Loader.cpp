@@ -147,7 +147,7 @@ int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned lon
             }
 
             mbstowcs(wfilename, (const char *)filename, sizeof(filename) / sizeof(filename[0]));
-            pRoot->CreateVirtFile(newdataBuf, actualFileSize, wfilename, file->GetFullPath());
+            pRoot->CreateVirtFile(newdataBuf, actualFileSize, wfilename, file->path());
             delete[] dblock;
         }
     }

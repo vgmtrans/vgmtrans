@@ -64,7 +64,7 @@ bool PSF1Loader::load_psf_libs(PSFFile2 &psf, RawFile *file) {
         mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
 
         wchar_t *fullPath;
-        fullPath = GetFileWithBase(file->GetFullPath(), tempfn);
+        fullPath = GetFileWithBase(file->path().c_str(), tempfn);
 
         DiskFile *newRawFile = new DiskFile(fullPath);
         std::vector<char> *out = nullptr;

@@ -123,12 +123,12 @@ DiskFile::DiskFile(std::string_view path) : m_data(mio::mmap_source(path)), m_pa
 
 /* VirtFile */
 
-VirtFile::VirtFile(const RawFile &file, size_t offset) : m_name(file.name()) {
+VirtFile::VirtFile(const RawFile &file, size_t offset) : m_name(file.name()), m_lpath(file.path()) {
     std::copy(file.data() + offset, file.data() + offset + file.size(), std::back_inserter(m_data));
 }
 
-VirtFile::VirtFile(uint8_t *data, uint32_t fileSize, const std::wstring &name,
-                   const wchar_t *rawFileName, const VGMTag tag)
-    : m_name(name), m_lpath(rawFileName) {
+VirtFile::VirtFile(uint8_t *data, uint32_t fileSize, std::wstring name,
+                   std::wstring parent_fullpath, const VGMTag tag)
+    : m_name(std::move(name)), m_lpath(std::move(parent_fullpath)) {
     std::copy(data, data + fileSize, std::back_inserter(m_data));
 }

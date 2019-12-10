@@ -141,7 +141,7 @@ const wchar_t *SNSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned c
         mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
 
         wchar_t *fullPath;
-        fullPath = GetFileWithBase(file->GetFullPath(), tempfn);
+        fullPath = GetFileWithBase(file->path().c_str(), tempfn);
 
         // TODO: Make sure to limit recursion to avoid crashing.
         DiskFile *newRawFile = new DiskFile(fullPath);
