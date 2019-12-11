@@ -14,7 +14,6 @@ MusicPlayer::MusicPlayer() {
     makeSynth();
 }
 
-
 MusicPlayer::~MusicPlayer() {
     Stop();
 }
@@ -26,12 +25,12 @@ MusicPlayer &MusicPlayer::Instance() {
 
 void MusicPlayer::makeSettings() {
     /* Create settings if needed */
-    if(!settings) {
+    if (!settings) {
         settings = new_fluid_settings();
-        /* Default to Pulseaudio on Linux */
-        #ifdef __linux__
-            fluid_settings_setstr(settings, "audio.driver", "pulseaudio");
-        #endif
+/* Default to Pulseaudio on Linux */
+#ifdef __linux__
+        fluid_settings_setstr(settings, "audio.driver", "pulseaudio");
+#endif
     }
 
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
@@ -47,7 +46,7 @@ void MusicPlayer::makeSettings() {
 }
 
 void MusicPlayer::makeSynth() {
-    if(synth) {
+    if (synth) {
         Stop();
         delete_fluid_synth(synth);
     }
@@ -141,10 +140,9 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
     sprintf(abused_filename, "&%p", sf2_buf);
 #else
     QTemporaryDir dir;
-    std::wstring temp_sf2 = dir.path().toStdWString() + L"/" + L"temp";
+    std::string temp_sf2 = dir.path().toStdString() + "/temp";
     sf2->SaveSF2File(temp_sf2);
-    char abused_filename[temp_sf2.length() + 1];
-    std::wcstombs(abused_filename, temp_sf2.c_str(), sizeof abused_filename);
+    const char *abused_filename = temp_sf2.c_str();
 #endif
 
     sfont_id = fluid_synth_sfload(synth, abused_filename, 0);
