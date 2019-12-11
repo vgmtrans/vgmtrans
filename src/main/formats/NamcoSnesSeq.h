@@ -56,7 +56,7 @@ enum NamcoSnesSeqNoteType {
 class NamcoSnesSeq : public VGMSeqNoTrks {
    public:
     NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, uint32_t seqdataOffset,
-                 std::wstring newName = L"Namco SNES Seq");
+                 std::string newName = "Namco SNES Seq");
     virtual ~NamcoSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);
@@ -67,7 +67,7 @@ class NamcoSnesSeq : public VGMSeqNoTrks {
     NamcoSnesVersion version;
     std::map<uint8_t, NamcoSnesSeqEventType> EventMap;
     std::map<uint8_t, NamcoSnesSeqControlType> ControlChangeMap;
-    std::map<NamcoSnesSeqControlType, std::wstring> ControlChangeNames;
+    std::map<NamcoSnesSeqControlType, std::string> ControlChangeNames;
 
    private:
     void LoadEventMap(void);

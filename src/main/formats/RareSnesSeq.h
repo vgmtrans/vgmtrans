@@ -88,7 +88,7 @@ enum RareSnesSeqEventType {
 class RareSnesSeq : public VGMSeq {
    public:
     RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdata_offset,
-                std::wstring newName = L"Rare SNES Seq");
+                std::string newName = "Rare SNES Seq");
     virtual ~RareSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);
@@ -127,7 +127,7 @@ class RareSnesTrack : public SeqTrack {
     virtual void OnTickEnd(void);
 
     void AddVolLR(uint32_t offset, uint32_t length, int8_t spcVolL, int8_t spcVolR,
-                  const std::wstring &sEventName = L"Volume L/R");
+                  const std::string &sEventName = "Volume L/R");
     void AddVolLRNoItem(int8_t spcVolL, int8_t spcVolR);
 
    private:

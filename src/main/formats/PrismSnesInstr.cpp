@@ -14,7 +14,7 @@
 PrismSnesInstrSet::PrismSnesInstrSet(RawFile *file, PrismSnesVersion ver, uint32_t spcDirAddr,
                                      uint16_t addrADSR1Table, uint16_t addrADSR2Table,
                                      uint16_t addrTuningTableHigh, uint16_t addrTuningTableLow,
-                                     const std::wstring &name)
+                                     const std::string &name)
     : VGMInstrSet(PrismSnesFormat::name, file, addrADSR1Table, 0, name),
       version(ver),
       spcDirAddr(spcDirAddr),
@@ -70,8 +70,8 @@ bool PrismSnesInstrSet::GetInstrPointers() {
 
         usedSRCNs.push_back(srcn);
 
-        std::wostringstream instrName;
-        instrName << L"Instrument " << srcn;
+        std::ostringstream instrName;
+        instrName << "Instrument " << srcn;
         PrismSnesInstr *newInstr =
             new PrismSnesInstr(this, version, srcn, spcDirAddr, ofsADSR1Entry, ofsADSR2Entry,
                                ofsTuningEntryHigh, ofsTuningEntryLow, instrName.str());
@@ -100,7 +100,7 @@ bool PrismSnesInstrSet::GetInstrPointers() {
 PrismSnesInstr::PrismSnesInstr(VGMInstrSet *instrSet, PrismSnesVersion ver, uint8_t srcn,
                                uint32_t spcDirAddr, uint16_t addrADSR1Entry,
                                uint16_t addrADSR2Entry, uint16_t addrTuningEntryHigh,
-                               uint16_t addrTuningEntryLow, const std::wstring &name)
+                               uint16_t addrTuningEntryLow, const std::string &name)
     : VGMInstr(instrSet, addrADSR1Entry, 0, srcn >> 7, srcn & 0x7f, name),
       version(ver),
       srcn(srcn),
@@ -143,8 +143,8 @@ PrismSnesRgn::PrismSnesRgn(PrismSnesInstr *instr, PrismSnesVersion ver, uint8_t 
     double coarse_tuning;
     fine_tuning = modf(tuning / 256.0, &coarse_tuning) * 100.0;
 
-    AddSimpleItem(addrADSR1Entry, 1, L"ADSR1");
-    AddSimpleItem(addrADSR2Entry, 1, L"ADSR2");
+    AddSimpleItem(addrADSR1Entry, 1, "ADSR1");
+    AddSimpleItem(addrADSR2Entry, 1, "ADSR2");
     AddUnityKey(93 - (int)coarse_tuning, addrTuningEntryHigh, 1);
     AddFineTune((int16_t)fine_tuning, addrTuningEntryLow, 1);
 

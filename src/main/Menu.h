@@ -32,7 +32,7 @@
     static origclassMenu<origclass> menu;                                                        \
                                                                                                  \
    public:                                                                                       \
-    virtual std::vector<const wchar_t *> *GetMenuItemNames() { return menu.GetMenuItemNames(); } \
+    virtual std::vector<const char *> *GetMenuItemNames() { return menu.GetMenuItemNames(); } \
     virtual bool CallMenuItem(VGMItem *item, int menuItemNum) {                                  \
         return menu.CallMenuItem(item, menuItemNum);                                             \
     }                                                                                            \
@@ -48,7 +48,7 @@
     static origclassMenu<origclass> menu;                                                        \
                                                                                                  \
    public:                                                                                       \
-    virtual std::vector<const wchar_t *> *GetMenuItemNames() { return menu.GetMenuItemNames(); } \
+    virtual std::vector<const char *> *GetMenuItemNames() { return menu.GetMenuItemNames(); } \
     virtual bool CallMenuItem(VGMItem *item, int menuItemNum) {                                  \
         return menu.CallMenuItem(item, menuItemNum);                                             \
     }                                                                                            \
@@ -87,7 +87,7 @@ class Menu {
     Menu() {}
     virtual ~Menu() {}
 
-    void AddMenuItem(bool (T::*funcPtr)(void), const wchar_t *name, uint8_t flag = 0) {
+    void AddMenuItem(bool (T::*funcPtr)(void), const char *name, uint8_t flag = 0) {
         funcs.push_back(funcPtr);
         names.push_back(name);
         // menuItems.push_back(MenuItem(funcPtr, name, flag));
@@ -97,14 +97,14 @@ class Menu {
         return (((T *)item)->*funcs[menuItemNum])();
     }
 
-    std::vector<const wchar_t *> *GetMenuItemNames(void) { return &names; }
+    std::vector<const char *> *GetMenuItemNames(void) { return &names; }
     // vector<MenuItem>* GetMenuItems(void)
     //{
     //	return &menuItems;
     //}
 
    protected:
-    std::vector<const wchar_t *> names;
+    std::vector<const char *> names;
     std::vector<bool (T::*)(void)> funcs;
     // vector<MenuItem> menuItems;
 };

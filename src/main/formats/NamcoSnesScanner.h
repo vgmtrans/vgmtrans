@@ -11,7 +11,7 @@ enum NamcoSnesVersion : uint8_t;  // see NamcoSnesFormat.h
 
 class NamcoSnesScanner : public VGMScanner {
    public:
-    NamcoSnesScanner(void) { USE_EXTENSION(L"spc"); }
+    NamcoSnesScanner(void) { USE_EXTENSION("spc"); }
     virtual ~NamcoSnesScanner(void) {}
 
     virtual void Scan(RawFile *file, void *info = 0);

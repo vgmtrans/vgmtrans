@@ -18,7 +18,7 @@
 //		Constructor
 //--------------------------------------------------------------
 HOSAInstrSet::HOSAInstrSet(RawFile *file, uint32_t offset)
-    : VGMInstrSet(HOSAFormat::name, file, offset, 0, L"HOSAWAH ") {}
+    : VGMInstrSet(HOSAFormat::name, file, offset, 0, "HOSAWAH ") {}
 
 //==============================================================
 //		Destructor
@@ -37,12 +37,12 @@ bool HOSAInstrSet::GetHeaderInfo() {
     id = 0;  // Bank number.
 
     //バイナリエディタ表示用
-    name = L"HOSAWAH";
+    name = "HOSAWAH";
 
     //ヘッダーobjectの生成
     VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(InstrHeader));
     wdsHeader->AddSig(dwOffset, 8);
-    wdsHeader->AddSimpleItem(dwOffset + 8, sizeof(uint32_t), L"Number of Instruments");
+    wdsHeader->AddSimpleItem(dwOffset + 8, sizeof(uint32_t), "Number of Instruments");
 
     //波形objectの生成
     //	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800); // moved to HOSAScanner
@@ -95,7 +95,7 @@ bool HOSAInstr::LoadInstr() {
     // Get the instr data
     GetBytes(dwOffset, sizeof(InstrInfo), &instrinfo);
     unLength = sizeof(InstrInfo) + sizeof(RgnInfo) * instrinfo.numRgns;
-    AddSimpleItem(dwOffset, sizeof(uint32_t), L"Number of Rgns");
+    AddSimpleItem(dwOffset, sizeof(uint32_t), "Number of Rgns");
 
     // Get the rgn data
     rgns = new RgnInfo[instrinfo.numRgns];
@@ -110,7 +110,7 @@ bool HOSAInstr::LoadInstr() {
         VGMRgn *rgn =
             new VGMRgn(this, dwOffset + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
 
-        rgn->AddSimpleItem(rgn->dwOffset, 4, L"Sample Offset");
+        rgn->AddSimpleItem(rgn->dwOffset, 4, "Sample Offset");
         rgn->sampOffset =
             rgninfo->sampOffset;  //+ ((VGMInstrSet*)this->vgmfile)->sampColl->dwOffset;
 
@@ -121,7 +121,7 @@ bool HOSAInstr::LoadInstr() {
         cKeyLow = (rgninfo->note_range_high) + 1;
 
         rgn->AddUnityKey((int8_t)0x3C + 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset + 0x06);
-        rgn->AddSimpleItem(rgn->dwOffset + 0x07, 1, L"Semi Tone Tune");
+        rgn->AddSimpleItem(rgn->dwOffset + 0x07, 1, "Semi Tone Tune");
         rgn->fineTune = (short)((double)rgninfo->iFineTune * (100.0 / 256.0));
 
         // Might want to simplify the code below.  I'm being nitpicky.
@@ -136,7 +136,7 @@ bool HOSAInstr::LoadInstr() {
 
         // The ADSR value ordering is all messed up for the hell of it.  This was a bitch to
         // reverse-engineer.
-        rgn->AddSimpleItem(rgn->dwOffset + 0x0C, 4, L"ADSR Values (non-standard ordering)");
+        rgn->AddSimpleItem(rgn->dwOffset + 0x0C, 4, "ADSR Values (non-standard ordering)");
         uint8_t Ar = (rgninfo->ADSR_vals >> 20) & 0x7F;
         uint8_t Dr = (rgninfo->ADSR_vals >> 16) & 0xF;
         uint8_t Sr = ((rgninfo->ADSR_vals >> 8) & 0xFF) >> 1;

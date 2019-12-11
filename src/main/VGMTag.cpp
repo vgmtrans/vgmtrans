@@ -11,7 +11,7 @@
 
 VGMTag::VGMTag(void) : title(), album(), artist(), comment(), track_number(0), length(0.0) {}
 
-VGMTag::VGMTag(const std::wstring &_title, const std::wstring &_artist, const std::wstring &_album)
+VGMTag::VGMTag(const std::string &_title, const std::string &_artist, const std::string &_album)
     : title(_title), album(_album), artist(_artist), comment(), track_number(0), length(0.0) {}
 
 VGMTag::~VGMTag(void) {}

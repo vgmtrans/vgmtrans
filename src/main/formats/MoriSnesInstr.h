@@ -48,7 +48,7 @@ class MoriSnesInstrSet : public VGMInstrSet {
     MoriSnesInstrSet(RawFile *file, MoriSnesVersion ver, uint32_t spcDirAddr,
                      std::vector<uint16_t> instrumentAddresses,
                      std::map<uint16_t, MoriSnesInstrHintDir> instrumentHints,
-                     const std::wstring &name = L"MoriSnesInstrSet");
+                     const std::string &name = "MoriSnesInstrSet");
     virtual ~MoriSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -71,7 +71,7 @@ class MoriSnesInstr : public VGMInstr {
    public:
     MoriSnesInstr(VGMInstrSet *instrSet, MoriSnesVersion ver, uint8_t instrNum, uint32_t spcDirAddr,
                   const MoriSnesInstrHintDir &instrHintDir,
-                  const std::wstring &name = L"MoriSnesInstr");
+                  const std::string &name = "MoriSnesInstr");
     virtual ~MoriSnesInstr(void);
 
     virtual bool LoadInstr();

@@ -34,7 +34,7 @@ class SynthFile {
     void SetName(std::string synth_name);
 
     // int WriteDLSToBuffer(std::vector<uint8_t> &buf);
-    // bool SaveDLSFile(const wchar_t* filepath);
+    // bool SaveDLSFile(const char* filepath);
 
    public:
     std::vector<SynthInstr *> vInstrs;

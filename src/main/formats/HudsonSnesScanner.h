@@ -11,7 +11,7 @@ enum HudsonSnesVersion : uint8_t;  // see HudsonSnesFormat.h
 
 class HudsonSnesScanner : public VGMScanner {
    public:
-    HudsonSnesScanner(void) { USE_EXTENSION(L"spc"); }
+    HudsonSnesScanner(void) { USE_EXTENSION("spc"); }
     virtual ~HudsonSnesScanner(void) {}
 
     virtual void Scan(RawFile *file, void *info = 0);

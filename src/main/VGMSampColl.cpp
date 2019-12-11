@@ -17,7 +17,7 @@ using namespace std;
 DECLARE_MENU(VGMSampColl)
 
 VGMSampColl::VGMSampColl(const string &format, RawFile *rawfile, uint32_t offset, uint32_t length,
-                         wstring theName)
+                         string theName)
     : VGMFile(FILETYPE_SAMPCOLL, format, rawfile, offset, length, theName),
       parInstrSet(NULL),
       bLoadOnInstrSetMatch(false),
@@ -27,7 +27,7 @@ VGMSampColl::VGMSampColl(const string &format, RawFile *rawfile, uint32_t offset
 }
 
 VGMSampColl::VGMSampColl(const string &format, RawFile *rawfile, VGMInstrSet *instrset,
-                         uint32_t offset, uint32_t length, wstring theName)
+                         uint32_t offset, uint32_t length, string theName)
     : VGMFile(FILETYPE_SAMPCOLL, format, rawfile, offset, length, theName),
       parInstrSet(instrset),
       bLoadOnInstrSetMatch(false),
@@ -89,7 +89,7 @@ bool VGMSampColl::GetSampleInfo() {
 
 VGMSamp *VGMSampColl::AddSamp(uint32_t offset, uint32_t length, uint32_t dataOffset,
                               uint32_t dataLength, uint8_t nChannels, uint16_t bps,
-                              uint32_t theRate, wstring name) {
+                              uint32_t theRate, string name) {
     VGMSamp *newSamp =
         new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels, bps, theRate, name);
     samples.push_back(newSamp);
@@ -97,11 +97,11 @@ VGMSamp *VGMSampColl::AddSamp(uint32_t offset, uint32_t length, uint32_t dataOff
 }
 
 bool VGMSampColl::OnSaveAllAsWav() {
-    wstring dirpath = pRoot->UI_GetSaveDirPath();
+    string dirpath = pRoot->UI_GetSaveDirPath();
     if (dirpath.length() != 0) {
         for (uint32_t i = 0; i < samples.size(); i++) {
-            wstring filepath =
-                dirpath + L"/" + ConvertToSafeFileName(samples[i]->sampName) + L".wav";
+            string filepath =
+                dirpath + "/" + ConvertToSafeFileName(samples[i]->sampName) + ".wav";
             samples[i]->SaveAsWav(filepath);
         }
         return true;

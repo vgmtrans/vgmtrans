@@ -105,7 +105,7 @@ enum HudsonSnesSeqHeaderEventType {
 class HudsonSnesSeq : public VGMSeq {
    public:
     HudsonSnesSeq(RawFile *file, HudsonSnesVersion ver, uint32_t seqdataOffset,
-                  std::wstring newName = L"Hudson SNES Seq");
+                  std::string newName = "Hudson SNES Seq");
     virtual ~HudsonSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);

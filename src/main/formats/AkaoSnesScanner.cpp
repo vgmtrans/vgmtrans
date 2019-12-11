@@ -282,7 +282,7 @@ void AkaoSnesScanner::Scan(RawFile *file, void *info) {
 void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
     AkaoSnesVersion version = AKAOSNES_NONE;
     AkaoSnesMinorVersion minorVersion = AKAOSNES_NOMINORVERSION;
-    std::wstring name =
+    std::string name =
         file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search for note length table

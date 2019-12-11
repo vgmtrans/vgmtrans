@@ -25,7 +25,7 @@ const uint8_t length_table[0x31] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x
 
 class MP2kSeq : public VGMSeq {
    public:
-    MP2kSeq(RawFile *file, uint32_t offset, std::wstring name = L"MP2kSeq");
+    MP2kSeq(RawFile *file, uint32_t offset, std::string name = "MP2kSeq");
     virtual ~MP2kSeq(void);
 
     virtual bool GetHeaderInfo(void);

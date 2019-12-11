@@ -8,7 +8,7 @@
 
 using namespace std;
 
-VGMSeqNoTrks::VGMSeqNoTrks(const string &format, RawFile *file, uint32_t offset, wstring name)
+VGMSeqNoTrks::VGMSeqNoTrks(const string &format, RawFile *file, uint32_t offset, string name)
     : VGMSeq(format, file, offset, 0, name), SeqTrack(this) {
     ResetVars();
     VGMSeq::AddContainer<SeqEvent>(aEvents);

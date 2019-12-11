@@ -9,7 +9,7 @@
 
 class PrismSnesScanner : public VGMScanner {
    public:
-    PrismSnesScanner(void) { USE_EXTENSION(L"spc"); }
+    PrismSnesScanner(void) { USE_EXTENSION("spc"); }
     virtual ~PrismSnesScanner(void) {}
 
     virtual void Scan(RawFile *file, void *info = 0);

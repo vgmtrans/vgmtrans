@@ -19,7 +19,7 @@ class PandoraBoxSnesInstrSet : public VGMInstrSet {
         RawFile *file, PandoraBoxSnesVersion ver, uint32_t spcDirAddr, uint16_t addrLocalInstrTable,
         uint16_t addrGlobalInstrTable, uint8_t globalInstrumentCount,
         const std::map<uint8_t, uint16_t> &instrADSRHints = std::map<uint8_t, uint16_t>(),
-        const std::wstring &name = L"PandoraBoxSnesInstrSet");
+        const std::string &name = "PandoraBoxSnesInstrSet");
     virtual ~PandoraBoxSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -45,7 +45,7 @@ class PandoraBoxSnesInstr : public VGMInstr {
    public:
     PandoraBoxSnesInstr(VGMInstrSet *instrSet, PandoraBoxSnesVersion ver, uint32_t offset,
                         uint8_t theInstrNum, uint8_t srcn, uint32_t spcDirAddr,
-                        uint16_t adsr = 0x8fe0, const std::wstring &name = L"PandoraBoxSnesInstr");
+                        uint16_t adsr = 0x8fe0, const std::string &name = "PandoraBoxSnesInstr");
     virtual ~PandoraBoxSnesInstr(void);
 
     virtual bool LoadInstr();

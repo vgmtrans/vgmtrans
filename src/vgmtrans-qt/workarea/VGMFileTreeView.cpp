@@ -22,8 +22,8 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent)
     disconnect(&qtVGMRoot, &QtVGMRoot::UI_AddItem, this, &VGMFileTreeView::addVGMItem);
 }
 
-void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name, void *) {
-    auto item_name = QString::fromStdWString(name);
+void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name, void *) {
+    auto item_name = QString::fromStdString(name);
     auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
     tree_item->setText(0, item_name);
     tree_item->setIcon(0, iconForItemType(item->GetIcon()));

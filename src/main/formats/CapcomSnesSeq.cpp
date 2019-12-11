@@ -31,7 +31,7 @@ const uint8_t CapcomSnesSeq::panTable[] = {
 };
 
 CapcomSnesSeq::CapcomSnesSeq(RawFile *file, CapcomSnesVersion ver, uint32_t seqdataOffset,
-                             bool priorityInHeader, wstring newName)
+                             bool priorityInHeader, string newName)
     : VGMSeq(CapcomSnesFormat::name, file, seqdataOffset),
       version(ver),
       priorityInHeader(priorityInHeader) {
@@ -61,17 +61,17 @@ bool CapcomSnesSeq::GetHeaderInfo(void) {
     SetPPQN(SEQ_PPQN);
 
     VGMHeader *seqHeader =
-        AddHeader(dwOffset, (priorityInHeader ? 1 : 0) + MAX_TRACKS * 2, L"Sequence Header");
+        AddHeader(dwOffset, (priorityInHeader ? 1 : 0) + MAX_TRACKS * 2, "Sequence Header");
     uint32_t curHeaderOffset = dwOffset;
 
     if (priorityInHeader) {
-        seqHeader->AddSimpleItem(curHeaderOffset, 1, L"Priority");
+        seqHeader->AddSimpleItem(curHeaderOffset, 1, "Priority");
         curHeaderOffset++;
     }
 
     for (int i = 0; i < MAX_TRACKS; i++) {
         uint16_t trkOff = GetShortBE(curHeaderOffset);
-        seqHeader->AddPointer(curHeaderOffset, 2, trkOff, true, L"Track Pointer");
+        seqHeader->AddPointer(curHeaderOffset, 2, trkOff, true, "Track Pointer");
         curHeaderOffset += 2;
     }
 
@@ -238,7 +238,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
     uint8_t statusByte = GetByte(curOffset++);
     bool bContinue = true;
 
-    wstringstream desc;
+    stringstream desc;
 
     if (statusByte >= 0x20) {
         uint8_t keyIndex = statusByte & 0x1f;
@@ -293,7 +293,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 AddTime(dur);
                 MakePrevDurNoteEnd();
                 AddTime(len - dur);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(),
                                 CLR_TIE, ICON_NOTE);
             } else {
                 AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
@@ -312,18 +312,18 @@ bool CapcomSnesTrack::ReadEvent(void) {
 
         switch (eventType) {
             case EVENT_UNKNOWN0:
-                desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
+                desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
                      << std::uppercase << (int)statusByte;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                            desc.str().c_str());
                 break;
 
             case EVENT_UNKNOWN1: {
                 uint8_t arg1 = GetByte(curOffset++);
-                desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                     << std::uppercase << (int)statusByte << std::dec << std::setfill(L' ')
-                     << std::setw(0) << L"  Arg1: " << (int)arg1;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                     << std::uppercase << (int)statusByte << std::dec << std::setfill(' ')
+                     << std::setw(0) << "  Arg1: " << (int)arg1;
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                            desc.str().c_str());
                 break;
             }
@@ -331,10 +331,10 @@ bool CapcomSnesTrack::ReadEvent(void) {
             case EVENT_UNKNOWN2: {
                 uint8_t arg1 = GetByte(curOffset++);
                 uint8_t arg2 = GetByte(curOffset++);
-                desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                     << std::uppercase << (int)statusByte << std::dec << std::setfill(L' ')
-                     << std::setw(0) << L"  Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                     << std::uppercase << (int)statusByte << std::dec << std::setfill(' ')
+                     << std::setw(0) << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2;
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                            desc.str().c_str());
                 break;
             }
@@ -343,11 +343,11 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 uint8_t arg1 = GetByte(curOffset++);
                 uint8_t arg2 = GetByte(curOffset++);
                 uint8_t arg3 = GetByte(curOffset++);
-                desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                     << std::uppercase << (int)statusByte << std::dec << std::setfill(L' ')
-                     << std::setw(0) << L"  Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2
-                     << L"  Arg3: " << (int)arg3;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                     << std::uppercase << (int)statusByte << std::dec << std::setfill(' ')
+                     << std::setw(0) << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2
+                     << "  Arg3: " << (int)arg3;
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                            desc.str().c_str());
                 break;
             }
@@ -357,36 +357,36 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 uint8_t arg2 = GetByte(curOffset++);
                 uint8_t arg3 = GetByte(curOffset++);
                 uint8_t arg4 = GetByte(curOffset++);
-                desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                     << std::uppercase << (int)statusByte << std::dec << std::setfill(L' ')
-                     << std::setw(0) << L"  Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2
-                     << L"  Arg3: " << (int)arg3 << L"  Arg4: " << (int)arg4;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                     << std::uppercase << (int)statusByte << std::dec << std::setfill(' ')
+                     << std::setw(0) << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2
+                     << "  Arg3: " << (int)arg3 << "  Arg4: " << (int)arg4;
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                            desc.str().c_str());
                 break;
             }
 
             case EVENT_TOGGLE_TRIPLET:
                 setNoteTriplet(!isNoteTriplet());
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Toggle Triplet", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Triplet", "",
                                 CLR_DURNOTE, ICON_CONTROL);
                 break;
 
             case EVENT_TOGGLE_SLUR:
                 setNoteSlurred(!isNoteSlurred());
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Toggle Slur/Tie", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Slur/Tie", "",
                                 CLR_DURNOTE, ICON_CONTROL);
                 break;
 
             case EVENT_DOTTED_NOTE_ON:
                 setNoteDotted(true);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Dotted Note On", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Dotted Note On", "",
                                 CLR_DURNOTE, ICON_CONTROL);
                 break;
 
             case EVENT_TOGGLE_OCTAVE_UP:
                 setNoteOctaveUp(!isNoteOctaveUp());
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Toggle 2-Octave Up", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Toggle 2-Octave Up", "",
                                 CLR_DURNOTE, ICON_CONTROL);
                 break;
 
@@ -395,10 +395,10 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 noteAttributes &= ~(CAPCOM_SNES_MASK_NOTE_OCTAVE_UP |
                                     CAPCOM_SNES_MASK_NOTE_TRIPLET | CAPCOM_SNES_MASK_NOTE_SLURRED);
                 noteAttributes |= attributes;
-                desc << L"Triplet: " << (isNoteTriplet() ? L"On" : L"Off") << L"  " << L"Slur: "
-                     << (isNoteSlurred() ? L"On" : L"Off") << L"  " << L"2-Octave Up: "
-                     << (isNoteOctaveUp() ? L"On" : L"Off");
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Attributes",
+                desc << "Triplet: " << (isNoteTriplet() ? "On" : "Off") << "  " << "Slur: "
+                     << (isNoteSlurred() ? "On" : "Off") << "  " << "2-Octave Up: "
+                     << (isNoteOctaveUp() ? "On" : "Off");
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Note Attributes",
                                 desc.str().c_str(), CLR_DURNOTE, ICON_CONTROL);
                 break;
             }
@@ -414,8 +414,8 @@ bool CapcomSnesTrack::ReadEvent(void) {
             case EVENT_DURATION: {
                 uint8_t newDurationRate = GetByte(curOffset++);
                 durationRate = newDurationRate;
-                desc << L"Duration: " << (int)newDurationRate << L"/256";
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration",
+                desc << "Duration: " << (int)newDurationRate << "/256";
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration",
                                 desc.str().c_str(), CLR_DURNOTE, ICON_CONTROL);
                 break;
             }
@@ -449,9 +449,9 @@ bool CapcomSnesTrack::ReadEvent(void) {
 
             case EVENT_OCTAVE: {
                 uint8_t newOctave = GetByte(curOffset++);
-                desc << L"Octave: " << (int)newOctave;
+                desc << "Octave: " << (int)newOctave;
                 setNoteOctave(newOctave);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Octave", desc.str().c_str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc.str().c_str(),
                                 CLR_DURNOTE, ICON_CONTROL);
                 break;
             }
@@ -478,8 +478,8 @@ bool CapcomSnesTrack::ReadEvent(void) {
             case EVENT_PORTAMENTO_TIME: {
                 // TODO: calculate portamento time in milliseconds
                 uint8_t newPortamentoTime = GetByte(curOffset++);
-                desc << L"Time: " << (int)newPortamentoTime;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento Time",
+                desc << "Time: " << (int)newPortamentoTime;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time",
                                 desc.str().c_str(), CLR_PORTAMENTOTIME, ICON_CONTROL);
                 AddPortamentoTimeNoItem(newPortamentoTime >> 1);
                 AddPortamentoNoItem(newPortamentoTime != 0);
@@ -495,28 +495,28 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 curOffset += 2;
 
                 uint8_t repeatSlot;
-                wchar_t *repeatEventName;
+                char *repeatEventName;
                 switch (eventType) {
                     case EVENT_REPEAT_UNTIL_1:
                         repeatSlot = 0;
-                        repeatEventName = L"Repeat Until #1";
+                        repeatEventName = "Repeat Until #1";
                         break;
                     case EVENT_REPEAT_UNTIL_2:
                         repeatSlot = 1;
-                        repeatEventName = L"Repeat Until #2";
+                        repeatEventName = "Repeat Until #2";
                         break;
                     case EVENT_REPEAT_UNTIL_3:
                         repeatSlot = 2;
-                        repeatEventName = L"Repeat Until #3";
+                        repeatEventName = "Repeat Until #3";
                         break;
                     case EVENT_REPEAT_UNTIL_4:
                         repeatSlot = 3;
-                        repeatEventName = L"Repeat Until #4";
+                        repeatEventName = "Repeat Until #4";
                         break;
                 }
 
-                desc << L"Times: " << (int)times << L"  Destination: $" << std::hex
-                     << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)dest;
+                desc << "Times: " << (int)times << "  Destination: $" << std::hex
+                     << std::setfill('0') << std::setw(4) << std::uppercase << (int)dest;
                 if (times == 0 && repeatCount[repeatSlot] == 0) {
                     // infinite loop
                     bContinue =
@@ -555,30 +555,30 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 curOffset += 2;
 
                 uint8_t repeatSlot;
-                wchar_t *repeatEventName;
+                char *repeatEventName;
                 switch (eventType) {
                     case EVENT_REPEAT_BREAK_1:
                         repeatSlot = 0;
-                        repeatEventName = L"Repeat Break #1";
+                        repeatEventName = "Repeat Break #1";
                         break;
                     case EVENT_REPEAT_BREAK_2:
                         repeatSlot = 1;
-                        repeatEventName = L"Repeat Break #2";
+                        repeatEventName = "Repeat Break #2";
                         break;
                     case EVENT_REPEAT_BREAK_3:
                         repeatSlot = 2;
-                        repeatEventName = L"Repeat Break #3";
+                        repeatEventName = "Repeat Break #3";
                         break;
                     case EVENT_REPEAT_BREAK_4:
                         repeatSlot = 3;
-                        repeatEventName = L"Repeat Break #4";
+                        repeatEventName = "Repeat Break #4";
                         break;
                 }
 
-                desc << L"Note: { " << L"Triplet: " << (isNoteTriplet() ? L"On" : L"Off") << L"  "
-                     << L"Slur: " << (isNoteSlurred() ? L"On" : L"Off") << L"  " << L"2-Octave Up: "
-                     << (isNoteOctaveUp() ? L"On" : L"Off") << L" }  " << L"Destination: $"
-                     << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase
+                desc << "Note: { " << "Triplet: " << (isNoteTriplet() ? "On" : "Off") << "  "
+                     << "Slur: " << (isNoteSlurred() ? "On" : "Off") << "  " << "2-Octave Up: "
+                     << (isNoteOctaveUp() ? "On" : "Off") << " }  " << "Destination: $"
+                     << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
                      << (int)dest;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, repeatEventName,
                                 desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
@@ -598,15 +598,15 @@ bool CapcomSnesTrack::ReadEvent(void) {
             case EVENT_GOTO: {
                 uint16_t dest = GetShortBE(curOffset);
                 curOffset += 2;
-                desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+                desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                      << std::uppercase << (int)dest;
                 uint32_t length = curOffset - beginOffset;
 
                 if (!IsOffsetUsed(dest)) {
-                    AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(),
+                    AddGenericEvent(beginOffset, length, "Jump", desc.str().c_str(),
                                     CLR_LOOPFOREVER);
                 } else {
-                    bContinue = AddLoopForever(beginOffset, length, L"Jump");
+                    bContinue = AddLoopForever(beginOffset, length, "Jump");
 
                     if (readMode == READMODE_ADD_TO_UI) {
                         if (GetByte(curOffset) == 0x17) {
@@ -672,8 +672,8 @@ bool CapcomSnesTrack::ReadEvent(void) {
             case EVENT_LFO: {
                 uint8_t lfoType = GetByte(curOffset++);
                 uint8_t lfoAmount = GetByte(curOffset++);
-                desc << L"Type: " << (int)lfoType << L"  Amount: " << (int)lfoAmount;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO Param",
+                desc << "Type: " << (int)lfoType << "  Amount: " << (int)lfoAmount;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Param",
                                 desc.str().c_str(), CLR_LFO, ICON_CONTROL);
                 break;
             }
@@ -681,8 +681,8 @@ bool CapcomSnesTrack::ReadEvent(void) {
             case EVENT_ECHO_PARAM: {
                 uint8_t echoArg1 = GetByte(curOffset++);
                 uint8_t echoPreset = GetByte(curOffset++);
-                desc << L"Arg1: " << (int)echoArg1 << L"  Preset: " << (int)echoPreset;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Param",
+                desc << "Arg1: " << (int)echoArg1 << "  Preset: " << (int)echoPreset;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param",
                                 desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
                 break;
             }
@@ -691,26 +691,26 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 bool echoOn = (GetByte(curOffset++) & 1) != 0;
                 if (echoOn) {
                     AddReverb(beginOffset, curOffset - beginOffset, parentSeq->midiReverb,
-                              L"Echo On");
+                              "Echo On");
                 } else {
-                    AddReverb(beginOffset, curOffset - beginOffset, 0, L"Echo Off");
+                    AddReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
                 }
                 break;
             }
 
             case EVENT_RELEASE_RATE: {
                 uint8_t gain = GetByte(curOffset++) | 0xa0;
-                desc << L"GAIN: $" << std::hex << std::setfill(L'0') << std::setw(2)
+                desc << "GAIN: $" << std::hex << std::setfill('0') << std::setw(2)
                      << std::uppercase << (int)gain;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Release Rate",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Release Rate",
                                 desc.str().c_str(), CLR_SUSTAIN, ICON_CONTROL);
                 break;
             }
 
             default:
-                desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
+                desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
                      << std::uppercase << (int)statusByte;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                            desc.str().c_str());
                 L_ERROR("Unknown event {:#x}", statusByte);
 
@@ -719,8 +719,8 @@ bool CapcomSnesTrack::ReadEvent(void) {
         }
     }
 
-    // ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase <<
-    // beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) <<
+    // ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase <<
+    // beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) <<
     // curOffset << std::endl; LogDebug(ssTrace.str().c_str());
 
     return bContinue;

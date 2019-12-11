@@ -69,7 +69,7 @@ void SonyPS2Scanner::SearchForSampColl(RawFile *file) {
     if (nFileLength < 32)
         return;
 
-    if (StringToLower(file->extension()) == L"bd") {
+    if (StringToLower(file->extension()) == "bd") {
         // Hack for incorrectly ripped bd files.  Should ALWAYS start with 16 0x00 bytes (must...
         // suppress... rage) If it doesn't, we'll throw out this file and create a new one with the
         // correct formating

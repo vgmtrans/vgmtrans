@@ -65,7 +65,7 @@ enum ChunSnesSeqPresetType {
 class ChunSnesSeq : public VGMSeq {
    public:
     ChunSnesSeq(RawFile *file, ChunSnesVersion ver, ChunSnesMinorVersion minorVer,
-                uint32_t seqdataOffset, std::wstring newName = L"Chun SNES Seq");
+                uint32_t seqdataOffset, std::string newName = "Chun SNES Seq");
     virtual ~ChunSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);

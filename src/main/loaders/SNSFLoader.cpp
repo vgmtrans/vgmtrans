@@ -12,7 +12,7 @@ using namespace std;
 #define SNSF_VERSION 0x23
 #define SNSF_MAX_ROM_SIZE 0x600000
 
-wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
+char *GetFileWithBase(const char *f, const char *newfile);
 
 SNSFLoader::SNSFLoader(void) {}
 
@@ -27,18 +27,18 @@ PostLoadCommand SNSFLoader::Apply(RawFile *file) {
             size_t exebufsize = SNSF_MAX_ROM_SIZE;
             uint8_t *exebuf = NULL;
             // memset(exebuf, 0, exebufsize);
-            std::wstring complaint;
+            std::string complaint;
 
-            complaint = std::wstring{psf_read_exe(file, exebuf, exebufsize)};
+            complaint = std::string{psf_read_exe(file, exebuf, exebufsize)};
             if (!complaint.empty()) {
-                L_ERROR("{}", wstring2string(complaint));
+                L_ERROR("{}", (complaint));
                 delete[] exebuf;
                 return KEEP_IT;
             }
-            // pRoot->UI_WriteBufferToFile(L"uncomp.smc", exebuf, exebufsize);
+            // pRoot->UI_WriteBufferToFile("uncomp.smc", exebuf, exebufsize);
 
-            wstring str = file->name();
-            pRoot->CreateVirtFile(exebuf, (uint32_t)exebufsize, str.data(), L"", file->tag);
+            string str = file->name();
+            pRoot->CreateVirtFile(exebuf, (uint32_t)exebufsize, str.data(), "", file->tag);
             return DELETE_IT;
         }
     }
@@ -55,22 +55,22 @@ PostLoadCommand SNSFLoader::Apply(RawFile *file) {
 **
 ** Returns the error message, or NULL on success
 */
-const wchar_t *SNSFLoader::psf_read_exe(RawFile *file, unsigned char *&exebuffer,
-                                        size_t &exebuffersize) {
+const char *SNSFLoader::psf_read_exe(RawFile *file, unsigned char *&exebuffer,
+                                     size_t &exebuffersize) {
     uint32_t base_offset = 0;
     bool base_set = false;
     return psf_read_exe_sub(file, exebuffer, exebuffersize, base_offset, base_set);
 }
 
-const wchar_t *SNSFLoader::psf_read_exe_sub(RawFile *file, unsigned char *&exebuffer,
-                                            size_t &exebuffersize, uint32_t &base_offset,
-                                            bool &base_set) {
+const char *SNSFLoader::psf_read_exe_sub(RawFile *file, unsigned char *&exebuffer,
+                                         size_t &exebuffersize, uint32_t &base_offset,
+                                         bool &base_set) {
     PSFFile psf;
     if (!psf.Load(file))
         return psf.GetError();
 
     // search exclusively for _lib tag, and if found, perform a recursive load
-    const wchar_t *psflibError =
+    const char *psflibError =
         load_psf_libs(psf, file, exebuffer, exebuffersize, base_offset, base_set);
     if (psflibError != NULL)
         return psflibError;
@@ -91,40 +91,40 @@ const wchar_t *SNSFLoader::psf_read_exe_sub(RawFile *file, unsigned char *&exebu
     }
 
     if (snsfRomStart + snsfRomSize > exebuffersize || (exebuffer == NULL && exebuffersize == 0))
-        return L"SNSF ROM section start and/or size values are likely corrupt.";
+        return "SNSF ROM section start and/or size values are likely corrupt.";
 
     if (exebuffer == NULL) {
         exebuffersize = snsfRomStart + snsfRomSize;
         exebuffer = new uint8_t[exebuffersize];
         if (exebuffer == NULL) {
-            return L"SNSF ROM memory allocation error.";
+            return "SNSF ROM memory allocation error.";
         }
         memset(exebuffer, 0, exebuffersize);
     }
 
     if (!psf.ReadExe(exebuffer + snsfRomStart, snsfRomSize, 0x08))
-        return L"Decompression failed";
+        return "Decompression failed";
 
     // set tags to RawFile
     if (psf.tags.count("title") != 0) {
-        file->tag.title = string2wstring(psf.tags["title"]);
+        file->tag.title = (psf.tags["title"]);
     }
     if (psf.tags.count("artist") != 0) {
-        file->tag.artist = string2wstring(psf.tags["artist"]);
+        file->tag.artist = (psf.tags["artist"]);
     }
     if (psf.tags.count("game") != 0) {
-        file->tag.album = string2wstring(psf.tags["game"]);
+        file->tag.album = (psf.tags["game"]);
     }
     if (psf.tags.count("comment") != 0) {
-        file->tag.comment = string2wstring(psf.tags["comment"]);
+        file->tag.comment = (psf.tags["comment"]);
     }
 
     return NULL;
 }
 
-const wchar_t *SNSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned char *&exebuffer,
-                                         size_t &exebuffersize, uint32_t &base_offset,
-                                         bool &base_set) {
+const char *SNSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned char *&exebuffer,
+                                      size_t &exebuffersize, uint32_t &base_offset,
+                                      bool &base_set) {
     char libTagName[16];
     int libIndex = 1;
     while (true) {
@@ -137,15 +137,12 @@ const wchar_t *SNSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned c
         if (itLibTag == psf.tags.end())
             break;
 
-        wchar_t tempfn[PATH_MAX] = {0};
-        mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
-
-        wchar_t *fullPath;
-        fullPath = GetFileWithBase(file->path().c_str(), tempfn);
+        char *fullPath;
+        fullPath = GetFileWithBase(file->path().c_str(), itLibTag->second.c_str());
 
         // TODO: Make sure to limit recursion to avoid crashing.
         DiskFile *newRawFile = new DiskFile(fullPath);
-        const wchar_t *psflibError = NULL;
+        const char *psflibError = NULL;
         psflibError = psf_read_exe_sub(newRawFile, exebuffer, exebuffersize, base_offset, base_set);
         delete fullPath;
         delete newRawFile;

@@ -14,8 +14,8 @@ TEST_CASE("DiskFile") {
     DiskFile file("testfile.bin");
 
     REQUIRE(file.size() == 18);
-    REQUIRE(file.name() == L"testfile.bin");
-    REQUIRE(file.extension() == L"bin");
+    REQUIRE(file.name() == "testfile.bin");
+    REQUIRE(file.extension() == "bin");
 
     REQUIRE(file.IsValidOffset(0) == true);
     REQUIRE(file.IsValidOffset(123) == false);
@@ -43,7 +43,7 @@ TEST_CASE("MemFile from DiskFile") {
     DiskFile dfile("testfile.bin");
     VirtFile file(dfile);
 
-    REQUIRE(file.extension() == L"bin");
+    REQUIRE(file.extension() == "bin");
 
     /* In the future:
     REQUIRE(file.size() == dfile.size());

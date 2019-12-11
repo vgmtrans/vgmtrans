@@ -131,7 +131,7 @@ void MainWindow::OpenFile() {
         return;
 
     for (QString &filename : filenames)
-        qtVGMRoot.OpenRawFile(filename.toStdWString());
+        qtVGMRoot.OpenRawFile(filename.toStdString());
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -146,6 +146,6 @@ void MainWindow::dropEvent(QDropEvent *event) {
 
     for (const auto &file : files) {
         // Leave sanity checks to the backend
-        qtVGMRoot.OpenRawFile(QFileInfo(file.toLocalFile()).filePath().toStdWString());
+        qtVGMRoot.OpenRawFile(QFileInfo(file.toLocalFile()).filePath().toStdString());
     }
 }

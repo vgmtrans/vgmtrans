@@ -18,7 +18,7 @@ class GraphResSnesInstrSet : public VGMInstrSet {
     GraphResSnesInstrSet(
         RawFile *file, GraphResSnesVersion ver, uint32_t spcDirAddr,
         const std::map<uint8_t, uint16_t> &instrADSRHints = std::map<uint8_t, uint16_t>(),
-        const std::wstring &name = L"GraphResSnesInstrSet");
+        const std::string &name = "GraphResSnesInstrSet");
     virtual ~GraphResSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -40,7 +40,7 @@ class GraphResSnesInstr : public VGMInstr {
    public:
     GraphResSnesInstr(VGMInstrSet *instrSet, GraphResSnesVersion ver, uint8_t srcn,
                       uint32_t spcDirAddr, uint16_t adsr = 0x8fe0,
-                      const std::wstring &name = L"GraphResSnesInstr");
+                      const std::string &name = "GraphResSnesInstr");
     virtual ~GraphResSnesInstr(void);
 
     virtual bool LoadInstr();

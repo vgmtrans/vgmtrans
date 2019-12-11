@@ -16,7 +16,7 @@
 class NamcoSnesInstrSet : public VGMInstrSet {
    public:
     NamcoSnesInstrSet(RawFile *file, NamcoSnesVersion ver, uint32_t spcDirAddr,
-                      uint16_t addrTuningTable, const std::wstring &name = L"NamcoSnesInstrSet");
+                      uint16_t addrTuningTable, const std::string &name = "NamcoSnesInstrSet");
     virtual ~NamcoSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -37,7 +37,7 @@ class NamcoSnesInstrSet : public VGMInstrSet {
 class NamcoSnesInstr : public VGMInstr {
    public:
     NamcoSnesInstr(VGMInstrSet *instrSet, NamcoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr,
-                   uint16_t addrTuningEntry, const std::wstring &name = L"NamcoSnesInstr");
+                   uint16_t addrTuningEntry, const std::string &name = "NamcoSnesInstr");
     virtual ~NamcoSnesInstr(void);
 
     virtual bool LoadInstr();

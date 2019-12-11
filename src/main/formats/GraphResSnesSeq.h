@@ -51,7 +51,7 @@ enum GraphResSnesSeqEventType {
 class GraphResSnesSeq : public VGMSeq {
    public:
     GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_t seqdata_offset,
-                    std::wstring newName = L"GraphRes SNES Seq");
+                    std::string newName = "GraphRes SNES Seq");
     virtual ~GraphResSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);

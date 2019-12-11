@@ -15,7 +15,7 @@
 class CapcomSnesInstrSet : public VGMInstrSet {
    public:
     CapcomSnesInstrSet(RawFile *file, uint32_t offset, uint32_t spcDirAddr,
-                       const std::wstring &name = L"CapcomSnesInstrSet");
+                       const std::string &name = "CapcomSnesInstrSet");
     virtual ~CapcomSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -33,7 +33,7 @@ class CapcomSnesInstrSet : public VGMInstrSet {
 class CapcomSnesInstr : public VGMInstr {
    public:
     CapcomSnesInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum,
-                    uint32_t spcDirAddr, const std::wstring &name = L"CapcomSnesInstr");
+                    uint32_t spcDirAddr, const std::string &name = "CapcomSnesInstr");
     virtual ~CapcomSnesInstr(void);
 
     virtual bool LoadInstr();

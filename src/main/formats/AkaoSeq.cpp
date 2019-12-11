@@ -49,17 +49,17 @@ bool AkaoSeq::GetHeaderInfo(void) {
         return false;
     }
 
-    name = L"Akao Seq";
+    name = "Akao Seq";
 
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
-    hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
-    hdr->AddSimpleItem(dwOffset + 0x6, 2, L"Size");
-    hdr->AddSimpleItem(dwOffset + 0x8, 1, L"Reverb Type");
-    hdr->AddSimpleItem(dwOffset + 0x14, 2, L"Associated Sample Set ID");
-    hdr->AddSimpleItem(dwOffset + 0x20, 4, L"Number of Tracks (# of true bits)");
-    hdr->AddSimpleItem(dwOffset + 0x30, 4, L"Instrument Data Pointer");
-    hdr->AddSimpleItem(dwOffset + 0x34, 4, L"Drumkit Data Pointer");
+    hdr->AddSimpleItem(dwOffset + 0x4, 2, "ID");
+    hdr->AddSimpleItem(dwOffset + 0x6, 2, "Size");
+    hdr->AddSimpleItem(dwOffset + 0x8, 1, "Reverb Type");
+    hdr->AddSimpleItem(dwOffset + 0x14, 2, "Associated Sample Set ID");
+    hdr->AddSimpleItem(dwOffset + 0x20, 4, "Number of Tracks (# of true bits)");
+    hdr->AddSimpleItem(dwOffset + 0x30, 4, "Instrument Data Pointer");
+    hdr->AddSimpleItem(dwOffset + 0x34, 4, "Drumkit Data Pointer");
 
     SetPPQN(0x30);
     nNumTracks = GetNumPositiveBits(GetWord(dwOffset + 0x20));
@@ -79,7 +79,7 @@ bool AkaoSeq::GetHeaderInfo(void) {
     else
         instrSetLength = unLength - (drumkitOff - dwOffset);
     instrset =
-        new AkaoInstrSet(rawfile, instrSetLength, instrOff, drumkitOff, id, L"Akao Instr Set");
+        new AkaoInstrSet(rawfile, instrSetLength, instrOff, drumkitOff, id, "Akao Instr Set");
     if (!instrset->LoadVGMFile()) {
         delete instrset;
         instrset = NULL;
@@ -158,7 +158,7 @@ bool AkaoTrack::ReadEvent(void) {
             AddTime(delta_time_table[k]);
             if (loop_counter[loop_layer] == 0 &&
                 loop_layer == 0)  // do this so we don't repeat this for every single time it loops
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", L"", CLR_TIE);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_TIE);
         } else  // otherwise, it's between 0x8F and 0x99 and it's a rest message
         {
             if (bNotePlaying) {
@@ -199,7 +199,7 @@ bool AkaoTrack::ReadEvent(void) {
             // set next note length [ticks]
             case 0xA2:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Next note length", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Next note length", "",
                                 CLR_CHANGESTATE);
                 break;
 
@@ -216,7 +216,7 @@ bool AkaoTrack::ReadEvent(void) {
                     GetByte(curOffset++);  // second byte is number of halfsteps to slide... not
                                            // sure if signed or not, only seen positive
                 // AddPitchBendSlide(
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", "",
                                 CLR_PORTAMENTO);
                 break;
             }
@@ -240,7 +240,7 @@ bool AkaoTrack::ReadEvent(void) {
             case 0xA8: {
                 // vel = GetByte(curOffset++);
                 // vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES,
-                // BUT NOT POSITIVE AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set
+                // BUT NOT POSITIVE AddGenericEvent(beginOffset, curOffset-beginOffset, "Set
                 // Velocity", NULL, BG_CLR_CYAN);
                 uint8_t cExpression = GetByte(curOffset++);
                 ////			 こっちのlog演算は要らない
@@ -287,31 +287,31 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xAD:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", "", CLR_ADSR);
                 break;
             case 0xAE:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", "", CLR_ADSR);
                 break;
             case 0xAF:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", "", CLR_ADSR);
                 break;
             case 0xB0:
                 curOffset++;
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", "", CLR_ADSR);
                 break;
             case 0xB1:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", "", CLR_ADSR);
                 break;
             case 0xB2:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", "", CLR_ADSR);
                 break;
             case 0xB3:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", "", CLR_ADSR);
                 break;
 
                 //
@@ -323,15 +323,15 @@ bool AkaoTrack::ReadEvent(void) {
             case 0xB4:
                 curOffset += 3;
                 AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                L"LFO(Pitch bend) Length, cycle", L"", CLR_LFO);
+                                "LFO(Pitch bend) Length, cycle", "", CLR_LFO);
                 break;
             case 0xB5:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Pitch bend) Depth", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Pitch bend) Depth", "",
                                 CLR_LFO);
                 break;
             case 0xB6:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Pitch bend) off", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Pitch bend) off", "",
                                 CLR_LFO);
                 break;
             case 0xB7:
@@ -342,15 +342,15 @@ bool AkaoTrack::ReadEvent(void) {
             case 0xB8:
                 curOffset += 3;
                 AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                L"LFO(Expression) Length, cycle", L"", CLR_LFO);
+                                "LFO(Expression) Length, cycle", "", CLR_LFO);
                 break;
             case 0xB9:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Expression) Depth", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Expression) Depth", "",
                                 CLR_LFO);
                 break;
             case 0xBA:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Expression) off", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Expression) off", "",
                                 CLR_LFO);
                 break;
             case 0xBB:
@@ -360,16 +360,16 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xBC:
                 curOffset += 2;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Panpot) Length, cycle",
-                                L"", CLR_LFO);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Panpot) Length, cycle",
+                                "", CLR_LFO);
                 break;
             case 0xBD:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Panpot) Depth", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Panpot) Depth", "",
                                 CLR_LFO);
                 break;
             case 0xBE:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Panpot) off", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Panpot) off", "",
                                 CLR_LFO);
                 break;
             case 0xBF:
@@ -385,41 +385,41 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xC1: {
                 uint8_t cTranspose = GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Transpose move", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Transpose move", "",
                                 CLR_TRANSPOSE);
                 break;
             }
 
             case 0xC2:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb On", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "",
                                 CLR_REVERB);
                 break;
             case 0xC3:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Off", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "",
                                 CLR_REVERB);
                 break;
 
             case 0xC4:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise On", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", "",
                                 CLR_UNKNOWN);
                 break;
             case 0xC5:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Off", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", "",
                                 CLR_UNKNOWN);
                 break;
 
             case 0xC6:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM Modulation On", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "FM Modulation On", "",
                                 CLR_UNKNOWN);
                 break;
             case 0xC7:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM Modulation Off", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "FM Modulation Off", "",
                                 CLR_UNKNOWN);
                 break;
 
             // set loop begin marker
             case 0xC8:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat Start", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Start", "",
                                 CLR_LOOP);
                 loop_begin_layer++;
                 loop_begin_loc[loop_begin_layer] = curOffset;
@@ -428,7 +428,7 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xC9: {
                 uint8_t value1 = GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat End", L"", CLR_LOOP);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat End", "", CLR_LOOP);
 
                 // if loop_begin_layer == 0, then there was never a matching loop begin event!  this
                 // is seen in ff9 402 and ff9 hunter's chance
@@ -457,7 +457,7 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xCA: {
                 uint8_t value1 = 2;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat End", L"", CLR_LOOP);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat End", "", CLR_LOOP);
                 if (loop_begin_layer == 0)
                     break;
                 if (loopID[loop_layer] != curOffset) {
@@ -482,12 +482,12 @@ bool AkaoTrack::ReadEvent(void) {
             }
 
             case 0xCC:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", "",
                                 CLR_PORTAMENTO);
                 break;
 
             case 0xCD:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur Off", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", "",
                                 CLR_PORTAMENTO);
                 break;
 
@@ -496,7 +496,7 @@ bool AkaoTrack::ReadEvent(void) {
                 break;
 
             case 0xD1:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Deactivate Notes?", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Deactivate Notes?", "",
                                 CLR_UNKNOWN);
                 break;
 
@@ -524,7 +524,7 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xD9:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch bend move", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch bend move", "",
                                 CLR_UNKNOWN);
                 break;
 
@@ -540,19 +540,19 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xDD:
                 curOffset += 2;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Pitch bend) times", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Pitch bend) times", "",
                                 CLR_UNKNOWN);
                 break;
 
             case 0xDE:
                 curOffset += 2;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Expression) times", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Expression) times", "",
                                 CLR_UNKNOWN);
                 break;
 
             case 0xDF:
                 curOffset += 2;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Panpot) times", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO(Panpot) times", "",
                                 CLR_UNKNOWN);
                 break;
 
@@ -572,7 +572,7 @@ bool AkaoTrack::ReadEvent(void) {
                 //	 goto MetaEvent;
                 // rest_time += pDoc->GetByte(j++);
                 AddTime(GetByte(curOffset++));
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie (custom)", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie (custom)", "",
                                 CLR_TIE);
                 break;
 
@@ -612,25 +612,25 @@ bool AkaoTrack::ReadEvent(void) {
                     case 0x02:
                         curOffset++;
                         curOffset++;
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Level", L"",
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Leve", "",
                                         CLR_REVERB);
                         break;
 
                     case 0x03:
                         curOffset++;
                         curOffset++;
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Fade", L"",
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Fade", "",
                                         CLR_REVERB);
                         break;
 
                     // signals this track uses the drum kit
                     case 0x04:
-                        AddProgramChange(beginOffset, curOffset - beginOffset, 127, L"Drum kit On");
+                        AddProgramChange(beginOffset, curOffset - beginOffset, 127, "Drum kit On");
                         // channel = 9;
                         break;
 
                     case 0x05:
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum kit Off", L"",
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Drum kit Off", "",
                                         CLR_UNKNOWN);
                         break;
 
@@ -656,7 +656,7 @@ bool AkaoTrack::ReadEvent(void) {
                         if (readMode == READMODE_FIND_DELTA_LENGTH)
                             deltaLength = GetTime();
 
-                        AddGenericEvent(beginOffset, eventLength, L"Dal Segno.(Loop)", L"",
+                        AddGenericEvent(beginOffset, eventLength, "Dal Segno.(Loop)", "",
                                         CLR_LOOP);
                         return bContinue;
 
@@ -694,7 +694,7 @@ bool AkaoTrack::ReadEvent(void) {
                             curOffset = dest;
                         }
 
-                        AddGenericEvent(beginOffset, eventLength, L"Dal Segno (Loop) Break", L"",
+                        AddGenericEvent(beginOffset, eventLength, "Dal Segno (Loop) Break", "",
                                         CLR_LOOP);
                         break;
                     }
@@ -704,7 +704,7 @@ bool AkaoTrack::ReadEvent(void) {
                         curOffset++;
                         curOffset++;
                         curOffset++;
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat Break", L"",
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", "",
                                         CLR_LOOP);
                         break;
 
@@ -732,14 +732,14 @@ bool AkaoTrack::ReadEvent(void) {
                         uint8_t numer = GetByte(curOffset++);
                         // AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom,
                         // parentSeq->GetPPQN()); // why it's disabled?
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Time Signature",
-                                        L"", CLR_TIMESIG, ICON_TIMESIG);
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Time Signature",
+                                        "", CLR_TIMESIG, ICON_TIMESIG);
                         break;
                     }
 
                     case 0x16:
                         curOffset += 2;
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Maker", L"",
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Maker", "",
                                         CLR_UNKNOWN);
                         break;
 
@@ -749,14 +749,14 @@ bool AkaoTrack::ReadEvent(void) {
                         break;
 
                     default:
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN META EVENT",
-                                        L"", CLR_UNRECOGNIZED);
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN META EVENT",
+                                        "", CLR_UNRECOGNIZED);
                         break;
                 }
                 break;
 
             default:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN EVENT", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN EVENT", "",
                                 CLR_UNRECOGNIZED);
                 break;
         }

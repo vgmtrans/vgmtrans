@@ -18,7 +18,7 @@ const uint8_t SuzukiSnesSeq::NOTE_DUR_TABLE[13] = {0xc0, 0x90, 0x60, 0x48, 0x30,
                                                    0x18, 0x10, 0x0c, 0x08, 0x06, 0x03};
 
 SuzukiSnesSeq::SuzukiSnesSeq(RawFile *file, SuzukiSnesVersion ver, uint32_t seqdataOffset,
-                             std::wstring newName)
+                             std::string newName)
     : VGMSeq(SuzukiSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
     bLoadTickByTick = true;
     bAllowDiscontinuousTrackData = true;
@@ -53,7 +53,7 @@ bool SuzukiSnesSeq::GetHeaderInfo(void) {
 
             uint8_t firstByte = GetByte(curOffset);
             if (firstByte >= 0x80) {
-                header->AddSimpleItem(curOffset, 1, L"Unknown Items End");
+                header->AddSimpleItem(curOffset, 1, "Unknown Items End");
                 curOffset++;
                 break;
             } else {
@@ -68,14 +68,14 @@ bool SuzukiSnesSeq::GetHeaderInfo(void) {
         uint16_t addrTrackStart = GetShort(curOffset);
 
         if (addrTrackStart != 0) {
-            std::wstringstream trackName;
-            trackName << L"Track Pointer " << (trackIndex + 1);
+            std::stringstream trackName;
+            trackName << "Track Pointer " << (trackIndex + 1);
             header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
 
             aTracks.push_back(new SuzukiSnesTrack(this, addrTrackStart));
         } else {
             // example: Super Mario RPG - Where Am I Going?
-            header->AddSimpleItem(curOffset, 2, L"NULL");
+            header->AddSimpleItem(curOffset, 2, "NUL");
         }
 
         curOffset += 2;
@@ -218,7 +218,7 @@ bool SuzukiSnesTrack::ReadEvent(void) {
     uint8_t statusByte = GetByte(curOffset++);
     bool bContinue = true;
 
-    std::wstringstream desc;
+    std::stringstream desc;
 
     SuzukiSnesSeqEventType eventType = (SuzukiSnesSeqEventType)0;
     std::map<uint8_t, SuzukiSnesSeqEventType>::iterator pEventType =
@@ -229,27 +229,27 @@ bool SuzukiSnesTrack::ReadEvent(void) {
 
     switch (eventType) {
         case EVENT_UNKNOWN0:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
 
         case EVENT_UNKNOWN1: {
             uint8_t arg1 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
                  << (int)arg1;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
         case EVENT_UNKNOWN2: {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -257,10 +257,10 @@ bool SuzukiSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -269,11 +269,11 @@ bool SuzukiSnesTrack::ReadEvent(void) {
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
             uint8_t arg4 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3 << L"  Arg4: "
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3 << "  Arg4: "
                  << (int)arg4;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -300,7 +300,7 @@ bool SuzukiSnesTrack::ReadEvent(void) {
                 AddTime(dur);
             } else if (noteIndex == 13) {
                 MakePrevDurNoteEnd(GetTime() + dur);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(),
                                 CLR_TIE, ICON_NOTE);
                 AddTime(dur);
             } else {
@@ -327,39 +327,39 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_NOP: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(),
                             CLR_MISC, ICON_BINARY);
             break;
         }
 
         case EVENT_NOISE_FREQ: {
             uint8_t newNCK = GetByte(curOffset++) & 0x1f;
-            desc << L"Noise Frequency (NCK): " << (int)newNCK;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Frequency",
+            desc << "Noise Frequency (NCK): " << (int)newNCK;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
 
         case EVENT_NOISE_ON: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise On", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", desc.str().c_str(),
                             CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
 
         case EVENT_NOISE_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Off", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", desc.str().c_str(),
                             CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
 
         case EVENT_PITCH_MOD_ON: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Modulation On",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Modulation On",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
 
         case EVENT_PITCH_MOD_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Modulation Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Modulation Off",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
@@ -367,8 +367,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_JUMP_TO_SFX_LO: {
             // TODO: EVENT_JUMP_TO_SFX_LO
             uint8_t sfxIndex = GetByte(curOffset++);
-            desc << L"SFX: " << (int)sfxIndex;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Jump to SFX (LOWORD)",
+            desc << "SFX: " << (int)sfxIndex;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (LOWORD)",
                        desc.str().c_str());
             bContinue = false;
             break;
@@ -377,8 +377,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_JUMP_TO_SFX_HI: {
             // TODO: EVENT_JUMP_TO_SFX_HI
             uint8_t sfxIndex = GetByte(curOffset++);
-            desc << L"SFX: " << (int)sfxIndex;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Jump to SFX (HIWORD)",
+            desc << "SFX: " << (int)sfxIndex;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (HIWORD)",
                        desc.str().c_str());
             bContinue = false;
             break;
@@ -387,8 +387,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_CALL_SFX_LO: {
             // TODO: EVENT_CALL_SFX_LO
             uint8_t sfxIndex = GetByte(curOffset++);
-            desc << L"SFX: " << (int)sfxIndex;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Call SFX (LOWORD)",
+            desc << "SFX: " << (int)sfxIndex;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Call SFX (LOWORD)",
                        desc.str().c_str());
             bContinue = false;
             break;
@@ -397,8 +397,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_CALL_SFX_HI: {
             // TODO: EVENT_CALL_SFX_HI
             uint8_t sfxIndex = GetByte(curOffset++);
-            desc << L"SFX: " << (int)sfxIndex;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Call SFX (HIWORD)",
+            desc << "SFX: " << (int)sfxIndex;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Call SFX (HIWORD)",
                        desc.str().c_str());
             bContinue = false;
             break;
@@ -434,22 +434,22 @@ bool SuzukiSnesTrack::ReadEvent(void) {
             int8_t delta = GetByte(curOffset++);
             parentSeq->spcTempo += delta;
             AddTempoBPM(beginOffset, curOffset - beginOffset,
-                        parentSeq->GetTempoInBPM(parentSeq->spcTempo), L"Tempo (Relative)");
+                        parentSeq->GetTempoInBPM(parentSeq->spcTempo), "Tempo (Relative)");
             break;
         }
 
         case EVENT_TIMER1_FREQ: {
             uint8_t newFreq = GetByte(curOffset++);
-            desc << L"Frequency: " << (0.125 * newFreq) << L"ms";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Timer 1 Frequency",
+            desc << "Frequency: " << (0.125 * newFreq) << "ms";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Timer 1 Frequency",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_TEMPO);
             break;
         }
 
         case EVENT_TIMER1_FREQ_REL: {
             int8_t delta = GetByte(curOffset++);
-            desc << L"Frequency Delta: " << (0.125 * delta) << L"ms";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Timer 1 Frequency (Relative)",
+            desc << "Frequency Delta: " << (0.125 * delta) << "ms";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Timer 1 Frequency (Relative)",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_TEMPO);
             break;
         }
@@ -458,8 +458,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
             uint8_t count = GetByte(curOffset++);
             int realLoopCount = (count == 0) ? 256 : count;
 
-            desc << L"Loop Count: " << realLoopCount;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", desc.str().c_str(),
+            desc << "Loop Count: " << realLoopCount;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(),
                             CLR_LOOP, ICON_STARTREP);
 
             if (loopLevel >= SUZUKISNES_LOOP_LEVEL_MAX) {
@@ -475,7 +475,7 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_LOOP_END: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(),
                             CLR_LOOP, ICON_ENDREP);
 
             if (loopLevel == 0) {
@@ -498,7 +498,7 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_LOOP_BREAK: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Break", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc.str().c_str(),
                             CLR_LOOP, ICON_ENDREP);
 
             if (loopLevel == 0) {
@@ -517,45 +517,45 @@ bool SuzukiSnesTrack::ReadEvent(void) {
 
         case EVENT_LOOP_POINT: {
             infiniteLoopPoint = curOffset;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Infinite Loop Point",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Infinite Loop Point",
                             desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
             break;
         }
 
         case EVENT_ADSR_DEFAULT: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Default ADSR",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Default ADSR",
                             desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
             break;
         }
 
         case EVENT_ADSR_AR: {
             uint8_t newAR = GetByte(curOffset++) & 15;
-            desc << L"AR: " << (int)newAR;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Attack Rate",
+            desc << "AR: " << (int)newAR;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate",
                             desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
             break;
         }
 
         case EVENT_ADSR_DR: {
             uint8_t newDR = GetByte(curOffset++) & 7;
-            desc << L"DR: " << (int)newDR;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Decay Rate",
+            desc << "DR: " << (int)newDR;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate",
                             desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
             break;
         }
 
         case EVENT_ADSR_SL: {
             uint8_t newSL = GetByte(curOffset++) & 7;
-            desc << L"SL: " << (int)newSL;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Level",
+            desc << "SL: " << (int)newSL;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Leve",
                             desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
             break;
         }
 
         case EVENT_ADSR_SR: {
             uint8_t newSR = GetByte(curOffset++) & 15;
-            desc << L"SR: " << (int)newSR;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Rate",
+            desc << "SR: " << (int)newSR;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate",
                             desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
             break;
         }
@@ -563,8 +563,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_DURATION_RATE: {
             // TODO: save duration rate and apply to note length
             uint8_t newDurRate = GetByte(curOffset++);
-            desc << L"Duration Rate: " << (int)newDurRate;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration Rate",
+            desc << "Duration Rate: " << (int)newDurRate;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate",
                             desc.str().c_str(), CLR_DURNOTE);
             break;
         }
@@ -577,8 +577,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
 
         case EVENT_NOISE_FREQ_REL: {
             int8_t delta = GetByte(curOffset++);
-            desc << L"Noise Frequency (NCK) Delta: " << (int)delta;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Frequency (Relative)",
+            desc << "Noise Frequency (NCK) Delta: " << (int)delta;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency (Relative)",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
@@ -593,15 +593,15 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_VOLUME_REL: {
             int8_t delta = GetByte(curOffset++);
             spcVolume = (spcVolume + delta) & 0x7f;
-            AddVol(beginOffset, curOffset - beginOffset, spcVolume, L"Volume (Relative)");
+            AddVol(beginOffset, curOffset - beginOffset, spcVolume, "Volume (Relative)");
             break;
         }
 
         case EVENT_VOLUME_FADE: {
             uint8_t fadeLength = GetByte(curOffset++);
             uint8_t vol = GetByte(curOffset++);
-            desc << L"Fade Length: " << (int)fadeLength << L"  Volume: " << (int)vol;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume Fade",
+            desc << "Fade Length: " << (int)fadeLength << "  Volume: " << (int)vol;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Volume Fade",
                             desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
             break;
         }
@@ -609,14 +609,14 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_PORTAMENTO: {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
-            desc << L"Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento", desc.str().c_str(),
+            desc << "Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc.str().c_str(),
                             CLR_PORTAMENTO, ICON_CONTROL);
             break;
         }
 
         case EVENT_PORTAMENTO_TOGGLE: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento On/Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento On/Off",
                             desc.str().c_str(), CLR_PORTAMENTO, ICON_CONTROL);
             break;
         }
@@ -635,10 +635,10 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_PAN_FADE: {
             uint8_t fadeLength = GetByte(curOffset++);
             uint8_t pan = GetByte(curOffset++);
-            desc << L"Fade Length: " << (int)fadeLength << L"  Pan: " << (int)(pan >> 1);
+            desc << "Fade Length: " << (int)fadeLength << "  Pan: " << (int)(pan >> 1);
 
             // TODO: correct midi pan value, apply volume scale, do pan slide
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan Fade", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc.str().c_str(),
                             CLR_PAN, ICON_CONTROL);
             break;
         }
@@ -646,20 +646,20 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_PAN_LFO_ON: {
             uint8_t lfoDepth = GetByte(curOffset++);
             uint8_t lfoRate = GetByte(curOffset++);
-            desc << L"Depth: " << (int)lfoDepth << L"  Rate: " << (int)lfoRate;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO", desc.str().c_str(),
+            desc << "Depth: " << (int)lfoDepth << "  Rate: " << (int)lfoRate;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO", desc.str().c_str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_PAN_LFO_RESTART: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO Restart",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Restart",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_PAN_LFO_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Off",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -677,18 +677,18 @@ bool SuzukiSnesTrack::ReadEvent(void) {
             int8_t newTranspose = GetByte(curOffset++);
             int8_t semitones = newTranspose / 4;
             AddTranspose(beginOffset, curOffset - beginOffset, transpose + semitones,
-                         L"Transpose (Relative)");
+                         "Transpose (Relative)");
             break;
         }
 
         case EVENT_PERC_ON: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion On",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
 
         case EVENT_PERC_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
@@ -696,8 +696,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_VIBRATO_ON: {
             uint8_t lfoDepth = GetByte(curOffset++);
             uint8_t lfoRate = GetByte(curOffset++);
-            desc << L"Depth: " << (int)lfoDepth << L"  Rate: " << (int)lfoRate;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str().c_str(),
+            desc << "Depth: " << (int)lfoDepth << "  Rate: " << (int)lfoRate;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str().c_str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -706,15 +706,15 @@ bool SuzukiSnesTrack::ReadEvent(void) {
             uint8_t lfoDepth = GetByte(curOffset++);
             uint8_t lfoRate = GetByte(curOffset++);
             uint8_t lfoDelay = GetByte(curOffset++);
-            desc << L"Depth: " << (int)lfoDepth << L"  Rate: " << (int)lfoRate << L"  Delay: "
+            desc << "Depth: " << (int)lfoDepth << "  Rate: " << (int)lfoRate << "  Delay: "
                  << (int)lfoDelay;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str().c_str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_VIBRATO_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -722,8 +722,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
         case EVENT_TREMOLO_ON: {
             uint8_t lfoDepth = GetByte(curOffset++);
             uint8_t lfoRate = GetByte(curOffset++);
-            desc << L"Depth: " << (int)lfoDepth << L"  Rate: " << (int)lfoRate;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo", desc.str().c_str(),
+            desc << "Depth: " << (int)lfoDepth << "  Rate: " << (int)lfoRate;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc.str().c_str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -732,47 +732,47 @@ bool SuzukiSnesTrack::ReadEvent(void) {
             uint8_t lfoDepth = GetByte(curOffset++);
             uint8_t lfoRate = GetByte(curOffset++);
             uint8_t lfoDelay = GetByte(curOffset++);
-            desc << L"Depth: " << (int)lfoDepth << L"  Rate: " << (int)lfoRate << L"  Delay: "
+            desc << "Depth: " << (int)lfoDepth << "  Rate: " << (int)lfoRate << "  Delay: "
                  << (int)lfoDelay;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc.str().c_str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_TREMOLO_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Off",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_SLUR_ON: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc.str().c_str(),
                             CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
 
         case EVENT_SLUR_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur Off", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", desc.str().c_str(),
                             CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
 
         case EVENT_ECHO_ON: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo On", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
         }
 
         case EVENT_ECHO_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
         }
 
         default:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             L_ERROR("Unknown event {:#x}", statusByte);
 
             bContinue = false;
@@ -780,8 +780,8 @@ bool SuzukiSnesTrack::ReadEvent(void) {
     }
 
     //
-    // ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase <<
-    // beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) <<
+    // ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase <<
+    // beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) <<
     // curOffset << std::endl; OutputDebugString(ssTrace.str().c_str());
 
     return bContinue;

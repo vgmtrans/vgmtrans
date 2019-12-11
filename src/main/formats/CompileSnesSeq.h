@@ -48,7 +48,7 @@ enum CompileSnesSeqEventType {
 class CompileSnesSeq : public VGMSeq {
    public:
     CompileSnesSeq(RawFile *file, CompileSnesVersion ver, uint32_t seqdataOffset,
-                   std::wstring newName = L"Compile SNES Seq");
+                   std::string newName = "Compile SNES Seq");
     virtual ~CompileSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);

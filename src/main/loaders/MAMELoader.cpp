@@ -50,7 +50,7 @@ MAMELoader::~MAMELoader() {
 }
 
 int MAMELoader::LoadXML() {
-    TiXmlDocument doc("mame_roms.xml");
+    TiXmlDocument doc("mame_roms.xm");
     if (!doc.LoadFile())  // if loading the xml file fails
     {
         return 1;
@@ -160,11 +160,11 @@ int MAMELoader::LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGameEntry *gam
 PostLoadCommand MAMELoader::Apply(RawFile *file) {
     if (!bLoadedXml)
         return KEEP_IT;
-    if (file->extension() != L"zip")
+    if (file->extension() != "zip")
         return KEEP_IT;
 
-    wstring fullfilename_w = file->name();
-    string fullfilename = wstring2string(fullfilename_w);
+    string fullfilename_w = file->name();
+    string fullfilename = (fullfilename_w);
     const char *endoffilename = strrchr(fullfilename.c_str(), '.');
     char filename[10] = {0};
     strncpy(filename, fullfilename.c_str(), endoffilename - fullfilename.c_str());
@@ -182,9 +182,9 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
         return KEEP_IT;
 
     // try to open up the game zip
-    wstring fullpath = file->path();
-    string test = wstring2string(fullpath);
-    unzFile cur_file = unzOpen(wstring2string(fullpath).c_str());
+    string fullpath = file->path();
+    string test = (fullpath);
+    unzFile cur_file = unzOpen((fullpath).c_str());
     if (!cur_file) {
         return KEEP_IT;
     }
@@ -315,16 +315,16 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
             uint8_t *decrypt = new uint8_t[0x8000];
             KabukiDecrypter::kabuki_decode(destFile, decrypt, destFile, 0x0000, 0x8000, swap_key1,
                                            swap_key2, addr_key, xor_key);
-            // pRoot->UI_WriteBufferToFile(L"opcodesdump", decrypt, destFileSize);
+            // pRoot->UI_WriteBufferToFile("opcodesdump", decrypt, destFileSize);
             delete[] decrypt;
         }
     }
 
     // static int num = 0;
-    // fn << L"romgroup " << num++;
+    // fn << "romgroup " << num++;
     // pRoot->UI_WriteBufferToFile(fn.str().c_str(), destFile, destFileSize);
-    std::wostringstream strstream;
-    strstream << L"romgroup  - " << entry->type.c_str();
+    std::ostringstream strstream;
+    strstream << "romgroup  - " << entry->type.c_str();
     VirtFile *newVirtFile = new VirtFile(destFile, destFileSize, strstream.str());
     newVirtFile->setUseLoaders(false);
     newVirtFile->setUseScanners(false);

@@ -32,11 +32,11 @@ class QtVGMRoot : public QObject, public VGMRoot {
     virtual void UI_BeginRemoveVGMFiles();
     virtual void UI_EndRemoveVGMFiles();
     virtual void UI_AddItemSet(VGMFile *file, std::vector<ItemSet> *itemset);
-    virtual std::wstring UI_GetOpenFilePath(const std::wstring &suggestedFilename = L"",
-                                            const std::wstring &extension = L"");
-    virtual std::wstring UI_GetSaveFilePath(const std::wstring &suggestedFilename,
-                                            const std::wstring &extension = L"");
-    virtual std::wstring UI_GetSaveDirPath(const std::wstring &suggestedDir = L"");
+    virtual std::string UI_GetOpenFilePath(const std::string &suggestedFilename = "",
+                                           const std::string &extension = "");
+    virtual std::string UI_GetSaveFilePath(const std::string &suggestedFilename,
+                                           const std::string &extension = "");
+    virtual std::string UI_GetSaveDirPath(const std::string &suggestedDir = "");
 
    signals:
     void UI_AddedRawFile();
@@ -46,7 +46,7 @@ class QtVGMRoot : public QObject, public VGMRoot {
     void UI_AddedVGMColl();
     void UI_RemovedVGMColl();
     void UI_RemoveVGMFile(VGMFile *targFile);
-    void UI_AddItem(VGMItem *item, VGMItem *parent, const std::wstring &itemName, void *UI_specific);
+    void UI_AddItem(VGMItem *item, VGMItem *parent, const std::string &itemName, void *UI_specific);
 };
 
 extern QtVGMRoot qtVGMRoot;

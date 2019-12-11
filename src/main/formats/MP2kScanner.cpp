@@ -49,7 +49,7 @@ static bool test_pointer_validity(RawFile *file, off_t offset, uint32_t inGBA_le
 }
 
 MP2kScanner::MP2kScanner(void) {
-    //	USE_EXTENSION(L"gba")
+    //	USE_EXTENSION("gba")
 }
 
 MP2kScanner::~MP2kScanner(void) {}

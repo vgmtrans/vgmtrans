@@ -61,7 +61,7 @@ enum CapcomSnesSeqEventType {
 class CapcomSnesSeq : public VGMSeq {
    public:
     CapcomSnesSeq(RawFile *file, CapcomSnesVersion ver, uint32_t seqdata_offset,
-                  bool priorityInHeader, std::wstring newName = L"Capcom SNES Seq");
+                  bool priorityInHeader, std::string newName = "Capcom SNES Seq");
     virtual ~CapcomSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);

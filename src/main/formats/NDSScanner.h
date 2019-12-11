@@ -9,10 +9,10 @@
 class NDSScanner : public VGMScanner {
    public:
     NDSScanner(void) {
-        USE_EXTENSION(L"nds")
-        USE_EXTENSION(L"sdat")
-        USE_EXTENSION(L"2sf")
-        USE_EXTENSION(L"mini2sf")
+        USE_EXTENSION("nds")
+        USE_EXTENSION("sdat")
+        USE_EXTENSION("2sf")
+        USE_EXTENSION("mini2sf")
     }
     virtual ~NDSScanner(void) {}
 

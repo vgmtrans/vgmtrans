@@ -94,7 +94,7 @@ class DLSFile : public RiffFile {
     uint32_t GetSize(void);
 
     int WriteDLSToBuffer(std::vector<uint8_t> &buf);
-    bool SaveDLSFile(const std::wstring &filepath);
+    bool SaveDLSFile(const std::string &filepath);
 
    public:
     std::vector<DLSInstr *> aInstrs;

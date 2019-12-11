@@ -14,7 +14,7 @@
 FalcomSnesInstrSet::FalcomSnesInstrSet(RawFile *file, FalcomSnesVersion ver, uint32_t offset,
                                        uint32_t addrSampToInstrTable, uint32_t spcDirAddr,
                                        const std::map<uint8_t, uint16_t> &instrADSRHints,
-                                       const std::wstring &name)
+                                       const std::string &name)
     : VGMInstrSet(FalcomSnesFormat::name, file, offset, 0, name),
       version(ver),
       spcDirAddr(spcDirAddr),
@@ -75,8 +75,8 @@ bool FalcomSnesInstrSet::GetInstrPointers() {
             usedSRCNs.push_back(srcn);
         }
 
-        std::wostringstream instrName;
-        instrName << L"Instrument " << instr;
+        std::ostringstream instrName;
+        instrName << "Instrument " << instr;
         FalcomSnesInstr *newInstr =
             new FalcomSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f, srcn,
                                 spcDirAddr, instrName.str());
@@ -103,7 +103,7 @@ bool FalcomSnesInstrSet::GetInstrPointers() {
 
 FalcomSnesInstr::FalcomSnesInstr(VGMInstrSet *instrSet, FalcomSnesVersion ver, uint32_t offset,
                                  uint32_t theBank, uint32_t theInstrNum, uint8_t srcn,
-                                 uint32_t spcDirAddr, const std::wstring &name)
+                                 uint32_t spcDirAddr, const std::string &name)
     : VGMInstr(instrSet, offset, 5, theBank, theInstrNum, name),
       version(ver),
       srcn(srcn),
@@ -163,8 +163,8 @@ FalcomSnesRgn::FalcomSnesRgn(FalcomSnesInstr *instr, FalcomSnesVersion ver, uint
     }
 
     sampNum = srcn;
-    AddSimpleItem(offset, 1, L"ADSR1");
-    AddSimpleItem(offset + 1, 1, L"ADSR2");
+    AddSimpleItem(offset, 1, "ADSR1");
+    AddSimpleItem(offset + 1, 1, "ADSR2");
     AddUnityKey(96 - (int)(coarse_tuning), offset + 3, 1);
     AddFineTune((int16_t)(fine_tuning * 100.0), offset + 4, 1);
     SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);

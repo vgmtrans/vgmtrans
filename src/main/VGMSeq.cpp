@@ -16,7 +16,7 @@ DECLARE_MENU(VGMSeq)
 
 using namespace std;
 
-VGMSeq::VGMSeq(const string &format, RawFile *file, uint32_t offset, uint32_t length, wstring name)
+VGMSeq::VGMSeq(const string &format, RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMFile(FILETYPE_SEQ, format, file, offset, length, name),
       midi(NULL),
       bMonophonicTracks(false),
@@ -316,13 +316,13 @@ void VGMSeq::AddInstrumentRef(uint32_t progNum) {
 }
 
 bool VGMSeq::OnSaveAsMidi(void) {
-    wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"mid");
+    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "mid");
     if (filepath.length() != 0)
         return SaveAsMidi(filepath);
     return false;
 }
 
-bool VGMSeq::SaveAsMidi(const std::wstring &filepath) {
+bool VGMSeq::SaveAsMidi(const std::string &filepath) {
     MidiFile *midi = this->ConvertToMidi();
     if (!midi)
         return false;

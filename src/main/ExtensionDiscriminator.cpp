@@ -13,13 +13,13 @@ ExtensionDiscriminator::ExtensionDiscriminator(void) {}
 
 ExtensionDiscriminator::~ExtensionDiscriminator(void) {}
 
-int ExtensionDiscriminator::AddExtensionScannerAssoc(std::wstring extension, VGMScanner *scanner) {
+int ExtensionDiscriminator::AddExtensionScannerAssoc(std::string extension, VGMScanner *scanner) {
     mScannerExt[extension].push_back(scanner);
     return true;
 }
 
-std::list<VGMScanner *> *ExtensionDiscriminator::GetScannerList(std::wstring extension) {
-    std::map<std::wstring, std::list<VGMScanner *>>::iterator iter =
+std::list<VGMScanner *> *ExtensionDiscriminator::GetScannerList(std::string extension) {
+    std::map<std::string, std::list<VGMScanner *>>::iterator iter =
         mScannerExt.find(StringToLower(extension));
     if (iter == mScannerExt.end())
         return NULL;

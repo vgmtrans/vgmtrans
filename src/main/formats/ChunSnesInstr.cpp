@@ -13,7 +13,7 @@
 
 ChunSnesInstrSet::ChunSnesInstrSet(RawFile *file, ChunSnesVersion ver, uint16_t addrInstrSet,
                                    uint16_t addrSampNumTable, uint16_t addrSampleTable,
-                                   uint32_t spcDirAddr, const std::wstring &name)
+                                   uint32_t spcDirAddr, const std::string &name)
     : VGMInstrSet(ChunSnesFormat::name, file, addrInstrSet, 0, name),
       version(ver),
       addrSampNumTable(addrSampNumTable),
@@ -29,7 +29,7 @@ bool ChunSnesInstrSet::GetHeaderInfo() {
     }
 
     unsigned int nNumInstrs = GetByte(curOffset);
-    AddSimpleItem(curOffset, 1, L"Number of Instruments");
+    AddSimpleItem(curOffset, 1, "Number of Instruments");
     curOffset++;
 
     if (version != CHUNSNES_SUMMER) {  // CHUNSNES_WINTER
@@ -56,8 +56,8 @@ bool ChunSnesInstrSet::GetInstrPointers() {
     }
 
     for (unsigned int instrNum = 0; instrNum < nNumInstrs; instrNum++) {
-        std::wstringstream instrName;
-        instrName << L"Instrument " << (instrNum + 1);
+        std::stringstream instrName;
+        instrName << "Instrument " << (instrNum + 1);
         AddSimpleItem(curOffset, 1, instrName.str().c_str());
 
         uint8_t globalInstrNum = GetByte(curOffset);
@@ -106,7 +106,7 @@ bool ChunSnesInstrSet::GetInstrPointers() {
 
 ChunSnesInstr::ChunSnesInstr(VGMInstrSet *instrSet, ChunSnesVersion ver, uint8_t theInstrNum,
                              uint16_t addrInstr, uint16_t addrSampleTable, uint32_t spcDirAddr,
-                             const std::wstring &name)
+                             const std::string &name)
     : VGMInstr(instrSet, addrInstr, 0, 0, theInstrNum, name),
       version(ver),
       addrSampleTable(addrSampleTable),
@@ -116,7 +116,7 @@ ChunSnesInstr::~ChunSnesInstr() {}
 
 bool ChunSnesInstr::LoadInstr() {
     uint8_t srcn = GetByte(dwOffset);
-    AddSimpleItem(dwOffset, 1, L"Sample Number");
+    AddSimpleItem(dwOffset, 1, "Sample Number");
     if (srcn == 0xff) {
         return false;
     }
@@ -149,10 +149,10 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn
                          uint32_t spcDirAddr)
     : VGMRgn(instr, addrRgn, 8), version(ver) {
     AddUnknown(dwOffset, 2);
-    AddSimpleItem(dwOffset + 2, 1, L"ADSR(1)");
-    AddSimpleItem(dwOffset + 3, 1, L"ADSR(2)");
-    AddSimpleItem(dwOffset + 4, 1, L"GAIN");
-    AddSimpleItem(dwOffset + 5, 2, L"Tuning");
+    AddSimpleItem(dwOffset + 2, 1, "ADSR(1)");
+    AddSimpleItem(dwOffset + 3, 1, "ADSR(2)");
+    AddSimpleItem(dwOffset + 4, 1, "GAIN");
+    AddSimpleItem(dwOffset + 5, 2, "Tuning");
     AddUnknown(dwOffset + 7, 1);
 
     uint8_t adsr1 = GetByte(dwOffset + 2);

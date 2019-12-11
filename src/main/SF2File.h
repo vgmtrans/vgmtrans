@@ -281,5 +281,5 @@ class SF2File : public RiffFile {
     ~SF2File(void);
 
     const void *SaveToMem();
-    bool SaveSF2File(const std::wstring &filepath);
+    bool SaveSF2File(const std::string &filepath);
 };

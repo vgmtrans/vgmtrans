@@ -64,7 +64,7 @@ class WDInstrSet : public VGMInstrSet {
 class WDInstr : public VGMInstr {
    public:
     WDInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-            uint32_t theInstrNum, std::wstring name);
+            uint32_t theInstrNum, std::string name);
     virtual ~WDInstr(void);
     virtual bool LoadInstr();
 

@@ -23,20 +23,20 @@ SonyPS2Seq::SonyPS2Seq(RawFile *file, uint32_t offset)
 SonyPS2Seq::~SonyPS2Seq(void) {}
 
 bool SonyPS2Seq::GetHeaderInfo(void) {
-    name() = L"Sony PS2 Seq";
+    name() = "Sony PS2 Seq";
     uint32_t curOffset = offset();
     // read the version chunk
     GetBytes(curOffset, 0x10, &versCk);
-    VGMHeader *versCkHdr = VGMSeq::AddHeader(curOffset, versCk.chunkSize, L"Version Chunk");
-    versCkHdr->AddSimpleItem(curOffset, 4, L"Creator");
-    versCkHdr->AddSimpleItem(curOffset + 4, 4, L"Type");
+    VGMHeader *versCkHdr = VGMSeq::AddHeader(curOffset, versCk.chunkSize, "Version Chunk");
+    versCkHdr->AddSimpleItem(curOffset, 4, "Creator");
+    versCkHdr->AddSimpleItem(curOffset + 4, 4, "Type");
     curOffset += versCk.chunkSize;
 
     // read the header chunk
     GetBytes(curOffset, 0x20, &hdrCk);
-    VGMHeader *hdrCkHdr = VGMSeq::AddHeader(curOffset, hdrCk.chunkSize, L"Header Chunk");
-    hdrCkHdr->AddSimpleItem(curOffset, 4, L"Creator");
-    hdrCkHdr->AddSimpleItem(curOffset + 4, 4, L"Type");
+    VGMHeader *hdrCkHdr = VGMSeq::AddHeader(curOffset, hdrCk.chunkSize, "Header Chunk");
+    hdrCkHdr->AddSimpleItem(curOffset, 4, "Creator");
+    hdrCkHdr->AddSimpleItem(curOffset + 4, 4, "Type");
     curOffset += hdrCk.chunkSize;
     // Now we're at the Midi chunk, which starts with the sig "SCEIMidi" (in 32bit little endian)
     midiChunkSize = GetWord(curOffset + 8);
@@ -122,9 +122,9 @@ bool SonyPS2Seq::ReadEvent(void) {
                     break;
 
                 case 6:
-                    // AddGenericEvent(beginOffset, curOffset-beginOffset, L"NRPN Data Entry", NULL,
+                    // AddGenericEvent(beginOffset, curOffset-beginOffset, "NRPN Data Entry", NULL,
                     // BG_CLR_PINK);
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop start number", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop start number", "",
                                     CLR_LOOP);
                     break;
 
@@ -145,7 +145,7 @@ bool SonyPS2Seq::ReadEvent(void) {
 
                 // 0 == endless loop
                 case 38:
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop count", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop count", "",
                                     CLR_LOOP);
                     break;
 
@@ -153,12 +153,12 @@ bool SonyPS2Seq::ReadEvent(void) {
                 case 99:
                     switch (value) {
                         case 0:
-                            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start",
-                                            L"", CLR_LOOP);
+                            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start",
+                                            "", CLR_LOOP);
                             break;
 
                         case 1:
-                            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", L"",
+                            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "",
                                             CLR_LOOP);
                             break;
                     }
@@ -202,7 +202,7 @@ bool SonyPS2Seq::ReadEvent(void) {
         }
 
         default:
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN", L"",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "",
                             CLR_UNRECOGNIZED);
             return false;
     }

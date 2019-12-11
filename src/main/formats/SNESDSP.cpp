@@ -311,11 +311,11 @@ SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uin
 }
 
 SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t offset,
-                           const std::vector<uint8_t> &targetSRCNs, std::wstring name)
+                           const std::vector<uint8_t> &targetSRCNs, std::string name)
     : VGMSampColl(format, rawfile, offset, 0, name), spcDirAddr(offset), targetSRCNs(targetSRCNs) {}
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
-                           const std::vector<uint8_t> &targetSRCNs, std::wstring name)
+                           const std::vector<uint8_t> &targetSRCNs, std::string name)
     : VGMSampColl(format, instrset->rawfile, instrset, offset, 0, name),
       spcDirAddr(offset),
       targetSRCNs(targetSRCNs) {}
@@ -335,11 +335,11 @@ void SNESSampColl::SetDefaultTargets(uint32_t maxNumSamps) {
 }
 
 bool SNESSampColl::GetSampleInfo() {
-    spcDirHeader = AddHeader(spcDirAddr, 0, L"Sample DIR");
+    spcDirHeader = AddHeader(spcDirAddr, 0, "Sample DIR");
     for (std::vector<uint8_t>::iterator itr = this->targetSRCNs.begin();
          itr != this->targetSRCNs.end(); ++itr) {
         uint8_t srcn = (*itr);
-        std::wostringstream name;
+        std::ostringstream name;
 
         uint32_t offDirEnt = spcDirAddr + (srcn * 4);
         if (!SNESSampColl::IsValidSampleDir(GetRawFile(), offDirEnt, true)) {
@@ -352,15 +352,15 @@ bool SNESSampColl::GetSampleInfo() {
         bool loop;
         uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart, loop);
 
-        name << L"SA " << srcn;
+        name << "SA " << srcn;
         spcDirHeader->AddSimpleItem(offDirEnt, 2, name.str().c_str());
 
-        name.str(L"");
-        name << L"LSA " << srcn;
+        name.str("");
+        name << "LSA " << srcn;
         spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, name.str().c_str());
 
-        name.str(L"");
-        name << L"Sample " << srcn;
+        name.str("");
+        name << "Sample " << srcn;
         SNESSamp *samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length,
                                       addrSampLoop, name.str());
         samples.push_back(samp);
@@ -401,7 +401,7 @@ bool SNESSampColl::IsValidSampleDir(RawFile *file, uint32_t spcDirEntAddr, bool 
 //  ********
 
 SNESSamp::SNESSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-                   uint32_t dataLen, uint32_t loopOffset, std::wstring name)
+                   uint32_t dataLen, uint32_t loopOffset, std::string name)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, 1, 16, 32000, name),
       brrLoopOffset(loopOffset) {}
 
@@ -443,7 +443,7 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
     for (uint32_t k = 0; k + 9 <= dataLength; k += 9)  // for every adpcm chunk
     {
         if (dwOffset + k + 9 > GetRawFile()->size()) {
-            L_WARN("Unexpected EOF ({})", wstring2string(name));
+            L_WARN("Unexpected EOF ({})", (name));
             break;
         }
 

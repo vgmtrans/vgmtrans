@@ -14,7 +14,7 @@ using namespace std;
 // ************
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t length, uint32_t instrOff, uint32_t dkitOff,
-                           uint32_t theID, wstring name)
+                           uint32_t theID, string name)
     : VGMInstrSet(AkaoFormat::name, file, 0, length, name) {
     id = theID;
     drumkitOff = dkitOff;
@@ -28,12 +28,12 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t length, uint32_t instrOff, ui
 
 bool AkaoInstrSet::GetInstrPointers() {
     if (bMelInstrs) {
-        VGMHeader *SSEQHdr = AddHeader(dwOffset, 0x10, L"Instr Ptr Table");
+        VGMHeader *SSEQHdr = AddHeader(dwOffset, 0x10, "Instr Ptr Table");
         int i = 0;
         //-1 aka 0xFFFF if signed or 0 and past the first pointer value
         for (int j = dwOffset;
              (GetShort(j) != (uint16_t)-1) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
-            SSEQHdr->AddSimpleItem(j, 2, L"Instr Pointer");
+            SSEQHdr->AddSimpleItem(j, 2, "Instr Pointer");
             aInstrs.push_back(new AkaoInstr(this, dwOffset + 0x20 + GetShort(j), 0, 0, i++));
         }
     }
@@ -47,7 +47,7 @@ bool AkaoInstrSet::GetInstrPointers() {
 // *********
 
 AkaoInstr::AkaoInstr(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                     uint32_t theInstrNum, const std::wstring &name)
+                     uint32_t theInstrNum, const std::string &name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {
     bDrumKit = false;
 }
@@ -76,7 +76,7 @@ bool AkaoInstr::LoadInstr() {
 
 AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
                          uint32_t theInstrNum)
-    : AkaoInstr(instrSet, offset, length, theBank, theInstrNum, L"Drum Kit") {
+    : AkaoInstr(instrSet, offset, length, theBank, theInstrNum, "Drum Kit") {
     bDrumKit = true;
 }
 
@@ -99,13 +99,13 @@ bool AkaoDrumKit::LoadInstr() {
             rgn->drumRelUnityKey = GetByte(j + 1);
             uint8_t vol = GetByte(j + 6);
             rgn->SetVolume((double)vol / 127.0);
-            rgn->AddGeneralItem(j, 1, L"Associated Articulation ID");
-            rgn->AddGeneralItem(j + 1, 1, L"Relative Unity Key");
+            rgn->AddGeneralItem(j, 1, "Associated Articulation ID");
+            rgn->AddGeneralItem(j + 1, 1, "Relative Unity Key");
             rgn->AddUnknown(j + 2, 1);
             rgn->AddUnknown(j + 3, 1);
             rgn->AddUnknown(j + 4, 1);
             rgn->AddUnknown(j + 5, 1);
-            rgn->AddGeneralItem(j + 6, 1, L"Attenuation");
+            rgn->AddGeneralItem(j + 6, 1, "Attenuation");
             rgn->AddPan(GetByte(j + 7), j + 7);
         }
         j += 8;
@@ -122,10 +122,10 @@ bool AkaoDrumKit::LoadInstr() {
 // AkaoRgn
 // *******
 AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
-                 uint8_t artIDNum, const std::wstring &name)
+                 uint8_t artIDNum, const std::string &name)
     : VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0), artNum(artIDNum) {}
 
-AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, const std::wstring &name)
+AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, const std::string &name)
     : VGMRgn(instr, offset, length, name) {}
 
 bool AkaoRgn::LoadRgn() {
@@ -133,7 +133,7 @@ bool AkaoRgn::LoadRgn() {
     // AddUnityKey(0x3A - GetByte(dwOffset + k*0x20 + 0x13), dwOffset + k*0x20 + 0x13);
     // instrument[i].region[k].unity_key =		0x3A - stuff[(instrument[i].info_ptr + k*0x20 + 0x13)]
     // ;
-    AddGeneralItem(dwOffset + 0, 1, L"Associated Articulation ID");
+    AddGeneralItem(dwOffset + 0, 1, "Associated Articulation ID");
     artNum = GetByte(dwOffset + 0);  //- first_sample_id;
     AddKeyLow(GetByte(dwOffset + 1), dwOffset + 1);
     AddKeyHigh(GetByte(dwOffset + 2), dwOffset + 2);
@@ -217,7 +217,7 @@ bool AkaoRgn::LoadRgn() {
 // AkaoSampColl
 // ************
 
-AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, uint32_t length, wstring name)
+AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMSampColl(AkaoFormat::name, file, offset, length, name) {}
 
 AkaoSampColl::~AkaoSampColl() {}
@@ -226,10 +226,10 @@ bool AkaoSampColl::GetHeaderInfo() {
     // Read Sample Set header info
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
-    hdr->AddSimpleItem(dwOffset + 4, 2, L"ID");
-    hdr->AddSimpleItem(dwOffset + 0x14, 4, L"Sample Section Size");
-    hdr->AddSimpleItem(dwOffset + 0x18, 4, L"Starting Articulation ID");
-    hdr->AddSimpleItem(dwOffset + 0x1C, 4, L"Number of Articulations");
+    hdr->AddSimpleItem(dwOffset + 4, 2, "ID");
+    hdr->AddSimpleItem(dwOffset + 0x14, 4, "Sample Section Size");
+    hdr->AddSimpleItem(dwOffset + 0x18, 4, "Starting Articulation ID");
+    hdr->AddSimpleItem(dwOffset + 0x1C, 4, "Number of Articulations");
 
     id = GetShort(0x4 + dwOffset);
     sample_section_size = GetWord(0x14 + dwOffset);
@@ -249,13 +249,13 @@ bool AkaoSampColl::GetSampleInfo() {
 
     // Read Articulation Data
     for (i = 0; i < nNumArts; i++) {
-        VGMHeader *ArtHdr = AddHeader(arts_offset + i * 0x10, 16, L"Articulation");
-        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 0, 4, L"Sample Offset");
-        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 4, 4, L"Loop Point");
-        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 8, 2, L"Fine Tune");
-        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 10, 2, L"Unity Key");
-        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 12, 2, L"ADSR1");
-        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 14, 2, L"ADSR2");
+        VGMHeader *ArtHdr = AddHeader(arts_offset + i * 0x10, 16, "Articulation");
+        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 0, 4, "Sample Offset");
+        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 4, 4, "Loop Point");
+        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 8, 2, "Fine Tune");
+        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 10, 2, "Unity Key");
+        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 12, 2, "ADSR1");
+        ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 14, 2, "ADSR2");
 
         if (arts_offset + i * 0x10 + 0x10 > rawfile->size())
             return false;
@@ -310,8 +310,8 @@ bool AkaoSampColl::GetSampleInfo() {
         // if we found a chunk of 00 bytes 16 bytes in size or greater, then we found the beginning
         // a new sample
         if (i >= 16) {
-            std::wostringstream name;
-            name << L"Sample " << samples.size();
+            std::ostringstream name;
+            name << "Sample " << samples.size();
             PSXSamp *samp = new PSXSamp(this, j, 0, j, 0, 1, 16, 44100, name.str());
 
             samples.push_back(samp);

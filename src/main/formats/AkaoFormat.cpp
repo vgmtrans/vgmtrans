@@ -94,7 +94,7 @@ bool AkaoColl::PreDLSMainCreation() {
     // AkaoInstrSet.  We don't want to make any permanent changes to the InstrSet, in case the
     // collection gets recreated or something.
     /*origInstrSet = (AkaoInstrSet*)instrsets[0];
-    AkaoInstrSet* newInstrSet = new AkaoInstrSet(NULL, 0, 0, 0, L"");
+    AkaoInstrSet* newInstrSet = new AkaoInstrSet(NULL, 0, 0, 0, "");
     *newInstrSet = *origInstrSet;
     //copy all of the instruments so that we have copied instruments deleted on the destructor of
     the Instrument Set for (uint32_t i=0; i<origInstrSet->aInstrs.size(); i++)
@@ -105,7 +105,7 @@ bool AkaoColl::PreDLSMainCreation() {
         //ditto for all regions in the instruments
         for (uint32_t j=0; j<cpyInstr->aRgns.size(); j++)
         {
-            AkaoRgn* cpyRgn = new AkaoRgn(cpyInstr, 0, 0, L"");
+            AkaoRgn* cpyRgn = new AkaoRgn(cpyInstr, 0, 0, "");
             *cpyRgn = *((AkaoRgn*)cpyInstr->aRgns[j]);
             cpyInstr->aRgns[j] =  cpyRgn;
             cpyRgn->items.clear();

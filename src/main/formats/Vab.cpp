@@ -22,22 +22,22 @@ bool Vab::GetHeaderInfo() {
         return false;
     }
 
-    name = L"VAB";
+    name = "VAB";
 
-    VGMHeader *vabHdr = AddHeader(dwOffset, 0x20, L"VAB Header");
-    vabHdr->AddSimpleItem(dwOffset + 0x00, 4, L"ID");
-    vabHdr->AddSimpleItem(dwOffset + 0x04, 4, L"Version");
-    vabHdr->AddSimpleItem(dwOffset + 0x08, 4, L"VAB ID");
-    vabHdr->AddSimpleItem(dwOffset + 0x0c, 4, L"Total Size");
-    vabHdr->AddSimpleItem(dwOffset + 0x10, 2, L"Reserved");
-    vabHdr->AddSimpleItem(dwOffset + 0x12, 2, L"Number of Programs");
-    vabHdr->AddSimpleItem(dwOffset + 0x14, 2, L"Number of Tones");
-    vabHdr->AddSimpleItem(dwOffset + 0x16, 2, L"Number of VAGs");
-    vabHdr->AddSimpleItem(dwOffset + 0x18, 1, L"Master Volume");
-    vabHdr->AddSimpleItem(dwOffset + 0x19, 1, L"Master Pan");
-    vabHdr->AddSimpleItem(dwOffset + 0x1a, 1, L"Bank Attributes 1");
-    vabHdr->AddSimpleItem(dwOffset + 0x1b, 1, L"Bank Attributes 2");
-    vabHdr->AddSimpleItem(dwOffset + 0x1c, 4, L"Reserved");
+    VGMHeader *vabHdr = AddHeader(dwOffset, 0x20, "VAB Header");
+    vabHdr->AddSimpleItem(dwOffset + 0x00, 4, "ID");
+    vabHdr->AddSimpleItem(dwOffset + 0x04, 4, "Version");
+    vabHdr->AddSimpleItem(dwOffset + 0x08, 4, "VAB ID");
+    vabHdr->AddSimpleItem(dwOffset + 0x0c, 4, "Total Size");
+    vabHdr->AddSimpleItem(dwOffset + 0x10, 2, "Reserved");
+    vabHdr->AddSimpleItem(dwOffset + 0x12, 2, "Number of Programs");
+    vabHdr->AddSimpleItem(dwOffset + 0x14, 2, "Number of Tones");
+    vabHdr->AddSimpleItem(dwOffset + 0x16, 2, "Number of VAGs");
+    vabHdr->AddSimpleItem(dwOffset + 0x18, 1, "Master Volume");
+    vabHdr->AddSimpleItem(dwOffset + 0x19, 1, "Master Pan");
+    vabHdr->AddSimpleItem(dwOffset + 0x1a, 1, "Bank Attributes 1");
+    vabHdr->AddSimpleItem(dwOffset + 0x1b, 1, "Bank Attributes 2");
+    vabHdr->AddSimpleItem(dwOffset + 0x1c, 4, "Reserved");
 
     GetBytes(dwOffset, 0x20, &hdr);
 
@@ -57,8 +57,8 @@ bool Vab::GetInstrPointers() {
 
     uint32_t offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
 
-    VGMHeader *progsHdr = AddHeader(offProgs, 16 * 128, L"Program Table");
-    VGMHeader *toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, L"Tone Attributes Table");
+    VGMHeader *progsHdr = AddHeader(offProgs, 16 * 128, "Program Table");
+    VGMHeader *toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, "Tone Attributes Table");
 
     if (numPrograms > 128) {
         L_ERROR("Too many programs ({:#x}), offset {:#x}", numPrograms, dwOffset);
@@ -95,16 +95,16 @@ bool Vab::GetInstrPointers() {
             aInstrs.push_back(newInstr);
             GetBytes(offCurrProg, 0x10, &newInstr->attr);
 
-            VGMHeader *hdr = progsHdr->AddHeader(offCurrProg, 0x10, L"Program");
-            hdr->AddSimpleItem(offCurrProg + 0x00, 1, L"Number of Tones");
-            hdr->AddSimpleItem(offCurrProg + 0x01, 1, L"Volume");
-            hdr->AddSimpleItem(offCurrProg + 0x02, 1, L"Priority");
-            hdr->AddSimpleItem(offCurrProg + 0x03, 1, L"Mode");
-            hdr->AddSimpleItem(offCurrProg + 0x04, 1, L"Pan");
-            hdr->AddSimpleItem(offCurrProg + 0x05, 1, L"Reserved");
-            hdr->AddSimpleItem(offCurrProg + 0x06, 2, L"Attribute");
-            hdr->AddSimpleItem(offCurrProg + 0x08, 4, L"Reserved");
-            hdr->AddSimpleItem(offCurrProg + 0x0c, 4, L"Reserved");
+            VGMHeader *hdr = progsHdr->AddHeader(offCurrProg, 0x10, "Program");
+            hdr->AddSimpleItem(offCurrProg + 0x00, 1, "Number of Tones");
+            hdr->AddSimpleItem(offCurrProg + 0x01, 1, "Volume");
+            hdr->AddSimpleItem(offCurrProg + 0x02, 1, "Priority");
+            hdr->AddSimpleItem(offCurrProg + 0x03, 1, "Mode");
+            hdr->AddSimpleItem(offCurrProg + 0x04, 1, "Pan");
+            hdr->AddSimpleItem(offCurrProg + 0x05, 1, "Reserved");
+            hdr->AddSimpleItem(offCurrProg + 0x06, 2, "Attribute");
+            hdr->AddSimpleItem(offCurrProg + 0x08, 4, "Reserved");
+            hdr->AddSimpleItem(offCurrProg + 0x0c, 4, "Reserved");
 
             newInstr->masterVol = GetByte(offCurrProg + 0x01);
 
@@ -115,13 +115,13 @@ bool Vab::GetInstrPointers() {
     }
 
     if ((offVAGOffsets + 2 * 256) <= nEndOffset) {
-        wchar_t name[256];
+        char name[256];
         std::vector<SizeOffsetPair> vagLocations;
         uint32_t totalVAGSize = 0;
-        VGMHeader *vagOffsetHdr = AddHeader(offVAGOffsets, 2 * 256, L"VAG Pointer Table");
+        VGMHeader *vagOffsetHdr = AddHeader(offVAGOffsets, 2 * 256, "VAG Pointer Table");
 
         uint32_t vagStartOffset = GetShort(offVAGOffsets) * 8;
-        vagOffsetHdr->AddSimpleItem(offVAGOffsets, 2, L"VAG Size /8 #0");
+        vagOffsetHdr->AddSimpleItem(offVAGOffsets, 2, "VAG Size /8 #0");
         totalVAGSize = vagStartOffset;
 
         for (uint32_t i = 0; i < numVAGs; i++) {
@@ -136,15 +136,14 @@ bool Vab::GetInstrPointers() {
                 vagSize = GetShort(offVAGOffsets + (i + 1) * 2) * 8;
             }
 
-            swprintf(name, 256, L"VAG Size /8 #%u", i + 1);
+            sprintf(name, "VAG Size /8 #%u", i + 1);
             vagOffsetHdr->AddSimpleItem(offVAGOffsets + (i + 1) * 2, 2, name);
 
             if (vagOffset + vagSize <= nEndOffset) {
                 vagLocations.push_back(SizeOffsetPair(vagOffset, vagSize));
                 totalVAGSize += vagSize;
             } else {
-                L_WARN("VAG #{} at {:#x} with size {:#x}) is invalid", i+1, vagOffset, vagSize);
-
+                L_WARN("VAG #{} at {:#x} with size {:#x}) is invalid", i + 1, vagOffset, vagSize);
             }
         }
         unLength = (offVAGOffsets + 2 * 256) - dwOffset;
@@ -172,7 +171,7 @@ bool Vab::GetInstrPointers() {
 // ********
 
 VabInstr::VabInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, const wstring &name)
+                   uint32_t theInstrNum, const string &name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name), masterVol(127) {}
 
 VabInstr::~VabInstr(void) {}
@@ -201,30 +200,30 @@ bool VabRgn::LoadRgn() {
     unLength = 0x20;
     GetBytes(dwOffset, 0x20, &attr);
 
-    AddGeneralItem(dwOffset, 1, L"Priority");
-    AddGeneralItem(dwOffset + 1, 1, L"Mode (use reverb?)");
+    AddGeneralItem(dwOffset, 1, "Priority");
+    AddGeneralItem(dwOffset + 1, 1, "Mode (use reverb?)");
     AddVolume((GetByte(dwOffset + 2) * instr->masterVol) / (127.0 * 127.0), dwOffset + 2, 1);
     AddPan(GetByte(dwOffset + 3), dwOffset + 3);
     AddUnityKey(GetByte(dwOffset + 4), dwOffset + 4);
-    AddGeneralItem(dwOffset + 5, 1, L"Pitch Tune");
+    AddGeneralItem(dwOffset + 5, 1, "Pitch Tune");
     AddKeyLow(GetByte(dwOffset + 6), dwOffset + 6);
     AddKeyHigh(GetByte(dwOffset + 7), dwOffset + 7);
-    AddGeneralItem(dwOffset + 8, 1, L"Vibrato Width");
-    AddGeneralItem(dwOffset + 9, 1, L"Vibrato Time");
-    AddGeneralItem(dwOffset + 10, 1, L"Portamento Width");
-    AddGeneralItem(dwOffset + 11, 1, L"Portamento Holding Time");
-    AddGeneralItem(dwOffset + 12, 1, L"Pitch Bend Min");
-    AddGeneralItem(dwOffset + 13, 1, L"Pitch Bend Max");
-    AddGeneralItem(dwOffset + 14, 1, L"Reserved");
-    AddGeneralItem(dwOffset + 15, 1, L"Reserved");
-    AddGeneralItem(dwOffset + 16, 2, L"ADSR1");
-    AddGeneralItem(dwOffset + 18, 2, L"ADSR2");
-    AddGeneralItem(dwOffset + 20, 2, L"Parent Program");
+    AddGeneralItem(dwOffset + 8, 1, "Vibrato Width");
+    AddGeneralItem(dwOffset + 9, 1, "Vibrato Time");
+    AddGeneralItem(dwOffset + 10, 1, "Portamento Width");
+    AddGeneralItem(dwOffset + 11, 1, "Portamento Holding Time");
+    AddGeneralItem(dwOffset + 12, 1, "Pitch Bend Min");
+    AddGeneralItem(dwOffset + 13, 1, "Pitch Bend Max");
+    AddGeneralItem(dwOffset + 14, 1, "Reserved");
+    AddGeneralItem(dwOffset + 15, 1, "Reserved");
+    AddGeneralItem(dwOffset + 16, 2, "ADSR1");
+    AddGeneralItem(dwOffset + 18, 2, "ADSR2");
+    AddGeneralItem(dwOffset + 20, 2, "Parent Program");
     AddSampNum(GetShort(dwOffset + 22) - 1, dwOffset + 22, 2);
-    AddGeneralItem(dwOffset + 24, 2, L"Reserved");
-    AddGeneralItem(dwOffset + 26, 2, L"Reserved");
-    AddGeneralItem(dwOffset + 28, 2, L"Reserved");
-    AddGeneralItem(dwOffset + 30, 2, L"Reserved");
+    AddGeneralItem(dwOffset + 24, 2, "Reserved");
+    AddGeneralItem(dwOffset + 26, 2, "Reserved");
+    AddGeneralItem(dwOffset + 28, 2, "Reserved");
+    AddGeneralItem(dwOffset + 30, 2, "Reserved");
     ADSR1 = attr.adsr1;
     ADSR2 = attr.adsr2;
     if ((int)sampNum < 0)

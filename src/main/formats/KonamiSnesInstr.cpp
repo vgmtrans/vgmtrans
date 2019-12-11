@@ -21,7 +21,7 @@ using namespace std;
 KonamiSnesInstrSet::KonamiSnesInstrSet(RawFile *file, KonamiSnesVersion ver, uint32_t offset,
                                        uint32_t bankedInstrOffset, uint8_t firstBankedInstr,
                                        uint32_t percInstrOffset, uint32_t spcDirAddr,
-                                       const std::wstring &name)
+                                       const std::string &name)
     : VGMInstrSet(KonamiSnesFormat::name, file, offset, 0, name),
       version(ver),
       bankedInstrOffset(bankedInstrOffset),
@@ -78,8 +78,8 @@ bool KonamiSnesInstrSet::GetInstrPointers() {
             usedSRCNs.push_back(srcn);
         }
 
-        std::wostringstream instrName;
-        instrName << L"Instrument " << instr;
+        std::ostringstream instrName;
+        instrName << "Instrument " << instr;
         KonamiSnesInstr *newInstr =
             new KonamiSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f,
                                 spcDirAddr, false, instrName.str());
@@ -91,7 +91,7 @@ bool KonamiSnesInstrSet::GetInstrPointers() {
 
     // percussive samples
     KonamiSnesInstr *newInstr = new KonamiSnesInstr(this, version, percInstrOffset, 127, 0,
-                                                    spcDirAddr, true, L"Percussions");
+                                                    spcDirAddr, true, "Percussions");
     aInstrs.push_back(newInstr);
 
     std::sort(usedSRCNs.begin(), usedSRCNs.end());
@@ -111,7 +111,7 @@ bool KonamiSnesInstrSet::GetInstrPointers() {
 
 KonamiSnesInstr::KonamiSnesInstr(VGMInstrSet *instrSet, KonamiSnesVersion ver, uint32_t offset,
                                  uint32_t theBank, uint32_t theInstrNum, uint32_t spcDirAddr,
-                                 bool percussion, const std::wstring &name)
+                                 bool percussion, const std::string &name)
     : VGMInstr(instrSet, offset, KonamiSnesInstr::ExpectedSize(ver), theBank, theInstrNum, name),
       spcDirAddr(spcDirAddr),
       percussion(percussion) {}
@@ -217,9 +217,9 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint
     AddSampNum(srcn, offset, 1);
     AddUnityKey(71 - (int)(coarse_tuning), offset + 1, 1);
     AddFineTune((int16_t)(fine_tuning * 100.0), offset + 2, 1);
-    AddSimpleItem(offset + 3, 1, L"ADSR1");
-    AddSimpleItem(offset + 4, 1, use_adsr ? L"ADSR2" : L"GAIN");
-    AddSimpleItem(offset + 5, 1, L"Pan");
+    AddSimpleItem(offset + 3, 1, "ADSR1");
+    AddSimpleItem(offset + 4, 1, use_adsr ? "ADSR2" : "GAIN");
+    AddSimpleItem(offset + 5, 1, "Pan");
     // volume is *decreased* by final volume value
     // so it is impossible to convert it in 100% accuracy
     // the following value 72.0 is chosen as a "average channel volume level (before pan

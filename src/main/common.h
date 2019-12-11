@@ -45,17 +45,14 @@ using uptr = std::uintptr_t;
     struct _##type;                          \
     typedef _##type type
 
-std::wstring removeExtFromPath(const std::wstring &s);
+std::string removeExtFromPath(const std::string &s);
 
-std::wstring StringToUpper(std::wstring myString);
-std::wstring StringToLower(std::wstring myString);
+std::string StringToUpper(std::string myString);
+std::string StringToLower(std::string myString);
 
 uint32_t StringToHex(const std::string &str);
 
-std::wstring ConvertToSafeFileName(const std::wstring &str);
-
-std::string wstring2string(const std::wstring &wstr);
-std::wstring string2wstring(const std::string &str);
+std::string ConvertToSafeFileName(const std::string &str);
 
 inline int CountBytesOfVal(uint8_t *buf, uint32_t numBytes, uint8_t val) {
     int count = 0;
@@ -74,6 +71,6 @@ struct SizeOffsetPair {
     SizeOffsetPair(uint32_t offset_, uint32_t size_) : size(size_), offset(offset_) {}
 };
 
-wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
+char *GetFileWithBase(const char *f, const char *newfile);
 
 std::vector<char> zdecompress(std::vector<char> &data);

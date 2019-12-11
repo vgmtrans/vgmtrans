@@ -16,7 +16,7 @@ using namespace std;
 // QSoundArticTable
 // ****************
 
-QSoundArticTable::QSoundArticTable(RawFile *file, std::wstring &name, uint32_t offset,
+QSoundArticTable::QSoundArticTable(RawFile *file, std::string &name, uint32_t offset,
                                    uint32_t length)
     : VGMMiscFile(QSoundFormat::name, file, offset, length, name) {}
 
@@ -36,16 +36,16 @@ bool QSoundArticTable::LoadMain() {
         if ((test1 == 0 && test2 == 0) || (test1 == 0xFFFFFFFF && test2 == 0xFFFFFFFF))
             continue;
 
-        std::wostringstream name;
-        name << L"Articulation " << i;
+        std::ostringstream name;
+        name << "Articulation " << i;
         VGMContainerItem *containerItem =
             new VGMContainerItem(this, off, sizeof(qs_samp_info), name.str());
-        containerItem->AddSimpleItem(off, 1, L"Attack Rate");
-        containerItem->AddSimpleItem(off + 1, 1, L"Decay Rate");
-        containerItem->AddSimpleItem(off + 2, 1, L"Sustain Level");
-        containerItem->AddSimpleItem(off + 3, 1, L"Sustain Rate");
-        containerItem->AddSimpleItem(off + 4, 1, L"Release Rate");
-        containerItem->AddSimpleItem(off + 5, 3, L"Unknown");
+        containerItem->AddSimpleItem(off, 1, "Attack Rate");
+        containerItem->AddSimpleItem(off + 1, 1, "Decay Rate");
+        containerItem->AddSimpleItem(off + 2, 1, "Sustain Leve");
+        containerItem->AddSimpleItem(off + 3, 1, "Sustain Rate");
+        containerItem->AddSimpleItem(off + 4, 1, "Release Rate");
+        containerItem->AddSimpleItem(off + 5, 3, "Unknown");
         this->AddItem(containerItem);
     }
     // unLength = off - dwOffset;
@@ -60,7 +60,7 @@ bool QSoundArticTable::LoadMain() {
 // QSoundSampleInfoTable
 // *********************
 
-QSoundSampleInfoTable::QSoundSampleInfoTable(RawFile *file, wstring &name, uint32_t offset,
+QSoundSampleInfoTable::QSoundSampleInfoTable(RawFile *file, string &name, uint32_t offset,
                                              uint32_t length)
     : VGMMiscFile(QSoundFormat::name, file, offset, length, name) {}
 
@@ -80,15 +80,15 @@ bool QSoundSampleInfoTable::LoadMain() {
         test1 = GetWord(off + 8);
         test2 = GetWord(off + 12);
 
-        std::wostringstream name;
-        name << L"Sample Info " << i;
+        std::ostringstream name;
+        name << "Sample Info " << i;
         VGMContainerItem *containerItem =
             new VGMContainerItem(this, off, sizeof(qs_samp_info), name.str());
-        containerItem->AddSimpleItem(off, 1, L"Bank");
-        containerItem->AddSimpleItem(off + 1, 2, L"Offset");
-        containerItem->AddSimpleItem(off + 3, 2, L"Loop Offset");
-        containerItem->AddSimpleItem(off + 5, 2, L"End Offset");
-        containerItem->AddSimpleItem(off + 7, 1, L"Unity Key");
+        containerItem->AddSimpleItem(off, 1, "Bank");
+        containerItem->AddSimpleItem(off + 1, 2, "Offset");
+        containerItem->AddSimpleItem(off + 3, 2, "Loop Offset");
+        containerItem->AddSimpleItem(off + 5, 2, "End Offset");
+        containerItem->AddSimpleItem(off + 7, 1, "Unity Key");
         this->AddItem(containerItem);
     }
     unLength = off - dwOffset;
@@ -105,7 +105,7 @@ bool QSoundSampleInfoTable::LoadMain() {
 
 QSoundInstrSet::QSoundInstrSet(RawFile *file, QSoundVer version, uint32_t offset, int numInstrBanks,
                                QSoundSampleInfoTable *theSampInfoTable,
-                               QSoundArticTable *theArticTable, wstring &name)
+                               QSoundArticTable *theArticTable, string &name)
     : VGMInstrSet(QSoundFormat::name, file, offset, 0, name),
       fmt_version(version),
       num_instr_banks(numInstrBanks),
@@ -131,9 +131,9 @@ bool QSoundInstrSet::GetInstrPointers() {
 
         for (uint32_t bank = 0; bank < num_instr_banks; bank++)
             for (uint32_t i = 0; i < 256; i++) {
-                std::wostringstream ss;
-                ss << L"Instrument " << bank * 256 << i;
-                wstring name = ss.str();
+                std::ostringstream ss;
+                ss << "Instrument " << bank * 256 << i;
+                string name = ss.str();
                 aInstrs.push_back(new QSoundInstr(this, dwOffset + i * 8 + (bank * 256 * 8), 8,
                                                   (bank * 2) + (i / 128), i % 128, name));
             }
@@ -158,9 +158,9 @@ bool QSoundInstrSet::GetInstrPointers() {
             for (int j = instr_table_ptrs[i]; j < endOffset; j += instr_info_length, k++) {
                 if (GetShort(j) == 0 && GetByte(j + 2) == 0 && i != 0)
                     break;
-                std::wostringstream ss;
-                ss << L"Instrument " << totalInstrs << k;
-                wstring name = ss.str();
+                std::ostringstream ss;
+                ss << "Instrument " << totalInstrs << k;
+                string name = ss.str();
                 aInstrs.push_back(new QSoundInstr(this, j, instr_info_length, (i * 2) + (k / 128),
                                                   (k % 128), name));
             }
@@ -175,7 +175,7 @@ bool QSoundInstrSet::GetInstrPointers() {
 // ***********
 
 QSoundInstr::QSoundInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                         uint32_t theInstrNum, wstring &name)
+                         uint32_t theInstrNum, string &name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {}
 
 QSoundInstr::~QSoundInstr(void) {}
@@ -184,15 +184,15 @@ bool QSoundInstr::LoadInstr() {
     VGMRgn *rgn;
 
     if (GetFormatVer() < VER_103) {
-        rgn = new VGMRgn(this, dwOffset, unLength, L"Instrument Info ver < 1.03");
-        rgn->AddSimpleItem(this->dwOffset, 1, L"Sample Info Index");
-        rgn->AddSimpleItem(this->dwOffset + 1, 1, L"Unknown / Ignored");
-        rgn->AddSimpleItem(this->dwOffset + 2, 1, L"Attack Rate");
-        rgn->AddSimpleItem(this->dwOffset + 3, 1, L"Decay Rate");
-        rgn->AddSimpleItem(this->dwOffset + 4, 1, L"Sustain Level");
-        rgn->AddSimpleItem(this->dwOffset + 5, 1, L"Sustain Rate");
-        rgn->AddSimpleItem(this->dwOffset + 6, 1, L"Release Rate");
-        rgn->AddSimpleItem(this->dwOffset + 7, 1, L"Unknown");
+        rgn = new VGMRgn(this, dwOffset, unLength, "Instrument Info ver < 1.03");
+        rgn->AddSimpleItem(this->dwOffset, 1, "Sample Info Index");
+        rgn->AddSimpleItem(this->dwOffset + 1, 1, "Unknown / Ignored");
+        rgn->AddSimpleItem(this->dwOffset + 2, 1, "Attack Rate");
+        rgn->AddSimpleItem(this->dwOffset + 3, 1, "Decay Rate");
+        rgn->AddSimpleItem(this->dwOffset + 4, 1, "Sustain Leve");
+        rgn->AddSimpleItem(this->dwOffset + 5, 1, "Sustain Rate");
+        rgn->AddSimpleItem(this->dwOffset + 6, 1, "Release Rate");
+        rgn->AddSimpleItem(this->dwOffset + 7, 1, "Unknown");
 
         qs_prog_info_ver_101 progInfo;
         GetBytes(dwOffset, sizeof(qs_prog_info_ver_101), &progInfo);
@@ -203,14 +203,14 @@ bool QSoundInstr::LoadInstr() {
         this->sustain_rate = progInfo.sustain_rate;
         this->release_rate = progInfo.release_rate;
     } else if (GetFormatVer() < VER_130) {
-        rgn = new VGMRgn(this, dwOffset, unLength, L"Instrument Info ver < 1.30");
-        rgn->AddSimpleItem(this->dwOffset, 2, L"Sample Info Index");
-        rgn->AddSimpleItem(this->dwOffset + 2, 1, L"Unknown");
-        rgn->AddSimpleItem(this->dwOffset + 3, 1, L"Attack Rate");
-        rgn->AddSimpleItem(this->dwOffset + 4, 1, L"Decay Rate");
-        rgn->AddSimpleItem(this->dwOffset + 5, 1, L"Sustain Level");
-        rgn->AddSimpleItem(this->dwOffset + 6, 1, L"Sustain Rate");
-        rgn->AddSimpleItem(this->dwOffset + 7, 1, L"Release Rate");
+        rgn = new VGMRgn(this, dwOffset, unLength, "Instrument Info ver < 1.30");
+        rgn->AddSimpleItem(this->dwOffset, 2, "Sample Info Index");
+        rgn->AddSimpleItem(this->dwOffset + 2, 1, "Unknown");
+        rgn->AddSimpleItem(this->dwOffset + 3, 1, "Attack Rate");
+        rgn->AddSimpleItem(this->dwOffset + 4, 1, "Decay Rate");
+        rgn->AddSimpleItem(this->dwOffset + 5, 1, "Sustain Leve");
+        rgn->AddSimpleItem(this->dwOffset + 6, 1, "Sustain Rate");
+        rgn->AddSimpleItem(this->dwOffset + 7, 1, "Release Rate");
 
         qs_prog_info_ver_103 progInfo;
         GetBytes(dwOffset, sizeof(qs_prog_info_ver_103), &progInfo);
@@ -221,13 +221,13 @@ bool QSoundInstr::LoadInstr() {
         this->sustain_rate = progInfo.sustain_rate;
         this->release_rate = progInfo.release_rate;
     } else {
-        rgn = new VGMRgn(this, dwOffset, unLength, L"Instrument Info ver >= 1.30");
+        rgn = new VGMRgn(this, dwOffset, unLength, "Instrument Info ver >= 1.30");
         qs_prog_info_ver_130 progInfo;
         GetBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
 
-        rgn->AddSimpleItem(this->dwOffset, 2, L"Sample Info Index");
-        rgn->AddSimpleItem(this->dwOffset + 2, 1, L"Unknown");
-        rgn->AddSimpleItem(this->dwOffset + 3, 1, L"Articulation Index");
+        rgn->AddSimpleItem(this->dwOffset, 2, "Sample Info Index");
+        rgn->AddSimpleItem(this->dwOffset + 2, 1, "Unknown");
+        rgn->AddSimpleItem(this->dwOffset + 3, 1, "Articulation Index");
 
         QSoundArticTable *articTable = ((QSoundInstrSet *)this->parInstrSet)->articTable;
         qs_artic_info *artic = &articTable->artics[progInfo.artic_index];
@@ -313,7 +313,7 @@ bool QSoundInstr::LoadInstr() {
 
 QSoundSampColl::QSoundSampColl(RawFile *file, QSoundInstrSet *theinstrset,
                                QSoundSampleInfoTable *sampinfotable, uint32_t offset,
-                               uint32_t length, wstring name)
+                               uint32_t length, string name)
     : VGMSampColl(QSoundFormat::name, file, offset, length, name),
       instrset(theinstrset),
       sampInfoTable(sampinfotable) {}
@@ -326,8 +326,8 @@ bool QSoundSampColl::GetHeaderInfo() {
 bool QSoundSampColl::GetSampleInfo() {
     uint32_t numSamples = instrset->sampInfoTable->numSamples;
     for (uint32_t i = 0; i < numSamples; i++) {
-        std::wostringstream name;
-        name << L"Sample " << i;
+        std::ostringstream name;
+        name << "Sample " << i;
 
         qs_samp_info *sampInfo = &sampInfoTable->infos[i];
         uint32_t sampOffset =

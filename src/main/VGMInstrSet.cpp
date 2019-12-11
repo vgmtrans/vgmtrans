@@ -19,7 +19,7 @@ using namespace std;
 // ***********
 
 VGMInstrSet::VGMInstrSet(const string &format, /*FmtID fmtID,*/
-                         RawFile *file, uint32_t offset, uint32_t length, wstring name,
+                         RawFile *file, uint32_t offset, uint32_t length, string name,
                          VGMSampColl *theSampColl)
     : VGMFile(FILETYPE_INSTRSET, /*fmtID,*/ format, file, offset, length, name),
       sampColl(theSampColl) {
@@ -32,10 +32,10 @@ VGMInstrSet::~VGMInstrSet() {
 }
 
 VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
-                                unsigned long instrNum, const wstring &instrName) {
-    std::wostringstream name;
-    if (instrName == L"")
-        name << L"Instrument " << aInstrs.size();
+                                unsigned long instrNum, const string &instrName) {
+    std::ostringstream name;
+    if (instrName == "")
+        name << "Instrument " << aInstrs.size();
     else
         name << instrName;
 
@@ -89,7 +89,7 @@ bool VGMInstrSet::LoadInstrs() {
 }
 
 bool VGMInstrSet::OnSaveAsDLS(void) {
-    wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"dls");
+    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "dls");
     if (filepath.length() != 0) {
         return SaveAsDLS(filepath.c_str());
     }
@@ -97,14 +97,14 @@ bool VGMInstrSet::OnSaveAsDLS(void) {
 }
 
 bool VGMInstrSet::OnSaveAsSF2(void) {
-    wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"sf2");
+    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "sf2");
     if (filepath.length() != 0) {
         return SaveAsSF2(filepath);
     }
     return false;
 }
 
-bool VGMInstrSet::SaveAsDLS(const std::wstring &filepath) {
+bool VGMInstrSet::SaveAsDLS(const std::string &filepath) {
     DLSFile dlsfile;
     bool dlsCreationSucceeded = false;
 
@@ -119,7 +119,7 @@ bool VGMInstrSet::SaveAsDLS(const std::wstring &filepath) {
     return false;
 }
 
-bool VGMInstrSet::SaveAsSF2(const std::wstring &filepath) {
+bool VGMInstrSet::SaveAsSF2(const std::string &filepath) {
     SF2File *sf2file = NULL;
 
     if (assocColls.size())
@@ -139,7 +139,7 @@ bool VGMInstrSet::SaveAsSF2(const std::wstring &filepath) {
 // ********
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, const wstring &name)
+                   uint32_t theInstrNum, const string &name)
     : VGMContainerItem(instrSet, offset, length, name),
       parInstrSet(instrSet),
       bank(theBank),

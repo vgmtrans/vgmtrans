@@ -39,7 +39,7 @@ class VGMFileTreeView : public QTreeWidget {
     ~VGMFileTreeView() = default;
 
    public slots:
-    void addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &, void *);
+    void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &, void *);
 
    private:
     VGMFile *vgmfile;

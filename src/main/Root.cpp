@@ -93,7 +93,7 @@ void VGMRoot::Reset(void) {
 }
 
 // opens up a file from the filesystem and scans it for known formats
-bool VGMRoot::OpenRawFile(const wstring &filename) {
+bool VGMRoot::OpenRawFile(const string &filename) {
     DiskFile *newfile = new DiskFile(filename);
 
     // if the file was set up properly, apply loaders, scan it, and add it to our list if it
@@ -104,8 +104,8 @@ bool VGMRoot::OpenRawFile(const wstring &filename) {
 // creates a virtual file, a RawFile that was data was created manually,
 // not actually opened from the filesystem.  Used, for example, when decompressing
 // the contents of PSF2 files
-bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const wstring &filename,
-                             const wstring &parRawFileFullPath, const VGMTag tag) {
+bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const string &filename,
+                             const string &parRawFileFullPath, const VGMTag tag) {
     assert(fileSize != 0);
 
     VirtFile *newVirtFile =
@@ -254,7 +254,7 @@ void VGMRoot::UI_AddVGMFile(VGMFile *theFile) {
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32_t size) {
+bool VGMRoot::UI_WriteBufferToFile(const string &filepath, uint8_t *buf, uint32_t size) {
 #if _MSC_VER < 1400  // if we're not using VC8, and the new STL that supports widechar filenames in
                      // ofstream...
     char newpath[PATH_MAX];
@@ -272,12 +272,12 @@ bool VGMRoot::UI_WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32
 }
 
 bool VGMRoot::SaveAllAsRaw() {
-    wstring dirpath = UI_GetSaveDirPath();
+    string dirpath = UI_GetSaveDirPath();
     if (dirpath.length() != 0) {
         for (uint32_t i = 0; i < vVGMFile.size(); i++) {
             bool result;
             VGMFile *file = vVGMFile[i];
-            wstring filepath = dirpath + L"/" + file->GetName()->c_str();
+            string filepath = dirpath + "/" + file->GetName()->c_str();
             uint8_t *buf = new uint8_t[file->unLength];  // create a buffer the size of the file
             file->GetBytes(file->dwOffset, file->unLength, buf);
             result = UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);

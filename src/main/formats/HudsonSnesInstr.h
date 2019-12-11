@@ -17,7 +17,7 @@ class HudsonSnesInstrSet : public VGMInstrSet {
    public:
     HudsonSnesInstrSet(RawFile *file, HudsonSnesVersion ver, uint32_t offset, uint32_t length,
                        uint32_t spcDirAddr, uint32_t addrSampTuningTable,
-                       const std::wstring &name = L"HudsonSnesInstrSet");
+                       const std::string &name = "HudsonSnesInstrSet");
     virtual ~HudsonSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -39,7 +39,7 @@ class HudsonSnesInstr : public VGMInstr {
    public:
     HudsonSnesInstr(VGMInstrSet *instrSet, HudsonSnesVersion ver, uint32_t offset, uint8_t instrNum,
                     uint32_t spcDirAddr, uint32_t addrSampTuningTable,
-                    const std::wstring &name = L"HudsonSnesInstr");
+                    const std::string &name = "HudsonSnesInstr");
     virtual ~HudsonSnesInstr(void);
 
     virtual bool LoadInstr();

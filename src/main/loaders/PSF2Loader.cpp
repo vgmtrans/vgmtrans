@@ -90,8 +90,7 @@ int PSF2Loader::psf2_decompress_block(RawFile *file, unsigned fileoffset, unsign
 int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned long dircount) {
     unsigned int i, j, k;
 
-    wchar_t wfilename[37];
-    unsigned char filename[37];
+    char filename[37];
     unsigned long offset = 0;
     unsigned long filesize = 0;
     unsigned long buffersize = 0;
@@ -146,8 +145,7 @@ int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned lon
                 }
             }
 
-            mbstowcs(wfilename, (const char *)filename, sizeof(filename) / sizeof(filename[0]));
-            pRoot->CreateVirtFile(newdataBuf, actualFileSize, wfilename, file->path());
+            pRoot->CreateVirtFile(newdataBuf, actualFileSize, filename, file->path());
             delete[] dblock;
         }
     }

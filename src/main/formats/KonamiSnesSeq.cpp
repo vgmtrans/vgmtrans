@@ -38,7 +38,7 @@ const uint8_t KonamiSnesSeq::PAN_TABLE[] = {
     0xdc, 0xe0, 0xe4, 0xe8, 0xec, 0xf0, 0xf4, 0xf6, 0xf8, 0xfa, 0xfc, 0xfe, 0xfe, 0xfe};
 
 KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset,
-                             std::wstring newName)
+                             std::string newName)
     : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset), version(ver) {
     name = newName;
 
@@ -65,7 +65,7 @@ bool KonamiSnesSeq::GetHeaderInfo(void) {
     // For instance: Ganbare Goemon 3 - Title
     nNumTracks = MAX_TRACKS;
 
-    VGMHeader *seqHeader = AddHeader(dwOffset, nNumTracks * 2, L"Sequence Header");
+    VGMHeader *seqHeader = AddHeader(dwOffset, nNumTracks * 2, "Sequence Header");
     for (uint32_t trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
         uint32_t trackPointerOffset = dwOffset + (trackNumber * 2);
         if (trackPointerOffset + 2 > 0x10000) {
@@ -73,7 +73,7 @@ bool KonamiSnesSeq::GetHeaderInfo(void) {
         }
 
         uint16_t trkOff = GetShort(trackPointerOffset);
-        seqHeader->AddPointer(trackPointerOffset, 2, trkOff, true, L"Track Pointer");
+        seqHeader->AddPointer(trackPointerOffset, 2, trkOff, true, "Track Pointer");
 
         assert(trkOff >= dwOffset);
 
@@ -306,7 +306,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
     uint8_t statusByte = GetByte(curOffset++);
     bool bContinue = true;
 
-    std::wstringstream desc;
+    std::stringstream desc;
 
     KonamiSnesSeqEventType eventType = (KonamiSnesSeqEventType)0;
     std::map<uint8_t, KonamiSnesSeqEventType>::iterator pEventType =
@@ -317,27 +317,27 @@ bool KonamiSnesTrack::ReadEvent(void) {
 
     switch (eventType) {
         case EVENT_UNKNOWN0:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
 
         case EVENT_UNKNOWN1: {
             uint8_t arg1 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
                  << (int)arg1;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
         case EVENT_UNKNOWN2: {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -345,10 +345,10 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -357,11 +357,11 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
             uint8_t arg4 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3 << L"  Arg4: "
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3 << "  Arg4: "
                  << (int)arg4;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -371,11 +371,11 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t arg3 = GetByte(curOffset++);
             uint8_t arg4 = GetByte(curOffset++);
             uint8_t arg5 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3 << L"  Arg4: "
-                 << (int)arg4 << L"  Arg5: " << (int)arg5;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3 << "  Arg4: "
+                 << (int)arg4 << "  Arg5: " << (int)arg5;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -421,7 +421,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
                 // TODO: Note volume can be changed during a tied note
                 // See the end of Konami Logo sequence for example
                 MakePrevDurNoteEnd(GetTime() + dur);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(),
                                 CLR_TIE, ICON_NOTE);
             } else {
                 AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
@@ -434,7 +434,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_PERCUSSION_ON: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion On",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On",
                             desc.str().c_str(), CLR_CHANGESTATE);
             if (!percussion) {
                 AddProgramChange(beginOffset, curOffset - beginOffset, 127 << 7, true);
@@ -444,7 +444,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_PERCUSSION_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off",
                             desc.str().c_str(), CLR_CHANGESTATE);
             if (percussion) {
                 AddProgramChange(beginOffset, curOffset - beginOffset, instrument, true);
@@ -457,9 +457,9 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t newGAINAmount = GetByte(curOffset++);
             uint8_t newGAIN = ConvertGAINAmountToGAIN(newGAINAmount);
 
-            desc << L"GAIN: " << (int)newGAINAmount << L" ($" << std::hex << std::setfill(L'0')
-                 << std::setw(2) << std::uppercase << (int)newGAIN << L")";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"GAIN", desc.str().c_str(),
+            desc << "GAIN: " << (int)newGAINAmount << " ($" << std::hex << std::setfill('0')
+                 << std::setw(2) << std::uppercase << (int)newGAIN << ")";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "GAIN", desc.str().c_str(),
                             CLR_ADSR, ICON_CONTROL);
             break;
         }
@@ -472,7 +472,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
             }
 
             double cents = GetTuningInSemitones(newTuning) * 100.0;
-            AddFineTuning(beginOffset, curOffset - beginOffset, cents, L"Instant Fine Tuning");
+            AddFineTuning(beginOffset, curOffset - beginOffset, cents, "Instant Fine Tuning");
             break;
         }
 
@@ -502,12 +502,12 @@ bool KonamiSnesTrack::ReadEvent(void) {
                 }
 
                 MakePrevDurNoteEnd(GetTime() + dur);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(),
                                 CLR_TIE, ICON_NOTE);
                 AddTime(noteLength);
                 prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX);
             } else {
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(),
                                 CLR_TIE, ICON_NOTE);
                 AddTime(noteLength);
             }
@@ -554,10 +554,10 @@ bool KonamiSnesTrack::ReadEvent(void) {
             }
 
             if (instrumentPanOff) {
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Per-Instrument Pan Off",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Per-Instrument Pan Off",
                                 desc.str().c_str(), CLR_PAN, ICON_CONTROL);
             } else if (instrumentPanOn) {
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Per-Instrument Pan On",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Per-Instrument Pan On",
                                 desc.str().c_str(), CLR_PAN, ICON_CONTROL);
             } else {
                 uint8_t volumeLeft;
@@ -600,9 +600,9 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t vibratoDelay = GetByte(curOffset++);
             uint8_t vibratoRate = GetByte(curOffset++);
             uint8_t vibratoDepth = GetByte(curOffset++);
-            desc << L"Delay: " << (int)vibratoDelay << L"  Rate: " << (int)vibratoRate
-                 << L"  Depth: " << (int)vibratoDepth;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str().c_str(),
+            desc << "Delay: " << (int)vibratoDelay << "  Rate: " << (int)vibratoRate
+                 << "  Depth: " << (int)vibratoDepth;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str().c_str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -611,15 +611,15 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t envRate = GetByte(curOffset++);
             uint16_t envPitchMask = GetShort(curOffset);
             curOffset += 2;
-            desc << L"Rate: " << (int)envRate << L"  Pitch Mask: $" << std::hex
-                 << std::setfill(L'0') << std::setw(4) << std::uppercase << (int)envPitchMask;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Random Pitch",
+            desc << "Rate: " << (int)envRate << "  Pitch Mask: $" << std::hex
+                 << std::setfill('0') << std::setw(4) << std::uppercase << (int)envPitchMask;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Random Pitch",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_LOOP_START: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(),
                             CLR_LOOP, ICON_STARTREP);
             loopReturnAddr = curOffset;
             break;
@@ -630,12 +630,12 @@ bool KonamiSnesTrack::ReadEvent(void) {
             int8_t volumeDelta = GetByte(curOffset++);
             int8_t pitchDelta = GetByte(curOffset++);
 
-            desc << L"Times: " << (int)times << L"  Volume Delta: " << (int)volumeDelta
-                 << L"  Pitch Delta: " << (int)pitchDelta;
+            desc << "Times: " << (int)times << "  Volume Delta: " << (int)volumeDelta
+                 << "  Pitch Delta: " << (int)pitchDelta;
             if (times == 0) {
-                bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, L"Loop End");
+                bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, "Loop End");
             } else {
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End",
                                 desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
             }
 
@@ -663,7 +663,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_LOOP_START_2: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start #2",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start #2",
                             desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
             loopReturnAddr2 = curOffset;
             break;
@@ -674,12 +674,12 @@ bool KonamiSnesTrack::ReadEvent(void) {
             int8_t volumeDelta = GetByte(curOffset++);
             int8_t pitchDelta = GetByte(curOffset++);
 
-            desc << L"Times: " << (int)times << L"  Volume Delta: " << (int)volumeDelta
-                 << L"  Pitch Delta: " << (int)pitchDelta;
+            desc << "Times: " << (int)times << "  Volume Delta: " << (int)volumeDelta
+                 << "  Pitch Delta: " << (int)pitchDelta;
             if (times == 0) {
-                bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, L"Loop End #2");
+                bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, "Loop End #2");
             } else {
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End #2",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End #2",
                                 desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
             }
 
@@ -718,9 +718,9 @@ bool KonamiSnesTrack::ReadEvent(void) {
         case EVENT_TEMPO_FADE: {
             uint8_t newTempo = GetByte(curOffset++);
             uint8_t fadeSpeed = GetByte(curOffset++);
-            desc << L"BPM: " << parentSeq->GetTempoInBPM(newTempo) << L"  Fade Length: "
+            desc << "BPM: " << parentSeq->GetTempoInBPM(newTempo) << "  Fade Length: "
                  << (int)fadeSpeed;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tempo Fade", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc.str().c_str(),
                             CLR_TEMPO, ICON_TEMPO);
             break;
         }
@@ -733,18 +733,18 @@ bool KonamiSnesTrack::ReadEvent(void) {
 
         case EVENT_ADSR1: {
             uint8_t newADSR1 = GetByte(curOffset++);
-            desc << L"ADSR(1): $" << std::hex << std::setfill(L'0') << std::setw(2)
+            desc << "ADSR(1): $" << std::hex << std::setfill('0') << std::setw(2)
                  << std::uppercase << (int)newADSR1;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR(1)", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(1)", desc.str().c_str(),
                             CLR_ADSR, ICON_CONTROL);
             break;
         }
 
         case EVENT_ADSR2: {
             uint8_t newADSR2 = GetByte(curOffset++);
-            desc << L"ADSR(2): $" << std::hex << std::setfill(L'0') << std::setw(2)
+            desc << "ADSR(2): $" << std::hex << std::setfill('0') << std::setw(2)
                  << std::uppercase << (int)newADSR2;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR(2)", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(2)", desc.str().c_str(),
                             CLR_ADSR, ICON_CONTROL);
             break;
         }
@@ -759,16 +759,16 @@ bool KonamiSnesTrack::ReadEvent(void) {
         case EVENT_VOLUME_FADE: {
             uint8_t newVolume = GetByte(curOffset++);
             uint8_t fadeSpeed = GetByte(curOffset++);
-            desc << L"Volume: " << (int)newVolume << L"  Fade Length: " << (int)fadeSpeed;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume Fade",
+            desc << "Volume: " << (int)newVolume << "  Fade Length: " << (int)fadeSpeed;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Volume Fade",
                             desc.str().c_str(), CLR_VOLUME, ICON_CONTROL);
             break;
         }
 
         case EVENT_PORTAMENTO: {
             uint8_t portamentoSpeed = GetByte(curOffset++);
-            desc << L"Portamento Speed: " << (int)portamentoSpeed;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento", desc.str().c_str(),
+            desc << "Portamento Speed: " << (int)portamentoSpeed;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc.str().c_str(),
                             CLR_PORTAMENTO, ICON_CONTROL);
             break;
         }
@@ -777,9 +777,9 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t pitchEnvDelay = GetByte(curOffset++);
             uint8_t pitchEnvSpeed = GetByte(curOffset++);
             uint8_t pitchEnvDepth = GetByte(curOffset++);
-            desc << L"Delay: " << (int)pitchEnvDelay << L"  Speed: " << (int)pitchEnvSpeed
-                 << L"  Depth: " << (int)-pitchEnvDepth;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope",
+            desc << "Delay: " << (int)pitchEnvDelay << "  Speed: " << (int)pitchEnvSpeed
+                 << "  Depth: " << (int)-pitchEnvDepth;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -790,10 +790,10 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t pitchEnvOffset = GetByte(curOffset++);
             int16_t pitchDelta = GetShort(curOffset);
             curOffset += 2;
-            desc << L"Delay: " << (int)pitchEnvDelay << L"  Length: " << (int)pitchEnvLength
-                 << L"  Offset: " << (int)-pitchEnvOffset << L" semitones" << L"  Delta: "
-                 << (pitchDelta / 256.0) << L" semitones";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope",
+            desc << "Delay: " << (int)pitchEnvDelay << "  Length: " << (int)pitchEnvLength
+                 << "  Offset: " << (int)-pitchEnvOffset << " semitones" << "  Delta: "
+                 << (pitchDelta / 256.0) << " semitones";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -809,8 +809,8 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
-            desc << L"Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide",
+            desc << "Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide",
                             desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
@@ -819,17 +819,17 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
-            desc << L"Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
+            desc << "Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
 
             if (arg2 != 0) {
                 uint8_t arg4 = GetByte(curOffset++);
                 uint8_t arg5 = GetByte(curOffset++);
                 uint8_t arg6 = GetByte(curOffset++);
-                desc << L"Arg4: " << (int)arg4 << L"  Arg5: " << (int)arg5 << L"  Arg6: "
+                desc << "Arg4: " << (int)arg4 << "  Arg5: " << (int)arg5 << "  Arg6: "
                      << (int)arg6;
             }
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide",
                             desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
@@ -843,10 +843,10 @@ bool KonamiSnesTrack::ReadEvent(void) {
 
             uint8_t pitchSlideNoteNumber = (pitchSlideNote & 0x7f) + transpose;
 
-            desc << L"Delay: " << (int)pitchSlideDelay << L"  Length: " << (int)pitchSlideLength
-                 << L"  Final Note: " << (int)pitchSlideNoteNumber << L"  Delta: "
-                 << (pitchDelta / 256.0) << L" semitones";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide",
+            desc << "Delay: " << (int)pitchSlideDelay << "  Length: " << (int)pitchSlideLength
+                 << "  Final Note: " << (int)pitchSlideNoteNumber << "  Delta: "
+                 << (pitchDelta / 256.0) << " semitones";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide",
                             desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
@@ -856,10 +856,10 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t echoVolumeL = GetByte(curOffset++);
             uint8_t echoVolumeR = GetByte(curOffset++);
 
-            desc << L"EON: " << (int)echoChannels << L"  EVOL(L): " << (int)echoVolumeL
-                 << L"  EVOL(R): " << (int)echoVolumeR;
+            desc << "EON: " << (int)echoChannels << "  EVOL(L): " << (int)echoVolumeL
+                 << "  EVOL(R): " << (int)echoVolumeR;
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
         }
@@ -869,16 +869,16 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t echoFeedback = GetByte(curOffset++);
             uint8_t echoArg3 = GetByte(curOffset++);
 
-            desc << L"EDL: " << (int)echoDelay << L"  EFB: " << (int)echoFeedback << L"  Arg3: "
+            desc << "EDL: " << (int)echoDelay << "  EFB: " << (int)echoFeedback << "  Arg3: "
                  << (int)echoArg3;
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Param", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
         }
 
         case EVENT_LOOP_WITH_VOLTA_START: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop With Volta Start",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop With Volta Start",
                             desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
             voltaLoopStart = curOffset;
@@ -888,7 +888,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_LOOP_WITH_VOLTA_END: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop With Volta End",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop With Volta End",
                             desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
             if (voltaEndMeansPlayFromStart) {
@@ -913,16 +913,16 @@ bool KonamiSnesTrack::ReadEvent(void) {
         case EVENT_PAN_FADE: {
             uint8_t newPan = GetByte(curOffset++);
             uint8_t fadeSpeed = GetByte(curOffset++);
-            desc << L"Pan: " << (int)newPan << L"  Fade Length: " << (int)fadeSpeed;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan Fade", desc.str().c_str(),
+            desc << "Pan: " << (int)newPan << "  Fade Length: " << (int)fadeSpeed;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc.str().c_str(),
                             CLR_PAN, ICON_CONTROL);
             break;
         }
 
         case EVENT_VIBRATO_FADE: {
             uint8_t fadeSpeed = GetByte(curOffset++);
-            desc << L"Fade Length: " << (int)fadeSpeed;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Fade",
+            desc << "Fade Length: " << (int)fadeSpeed;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -933,10 +933,10 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint8_t newGAINAmount = GetByte(curOffset++);
             uint8_t newGAIN = ConvertGAINAmountToGAIN(newGAINAmount);
 
-            desc << L"ADSR(1): $" << std::hex << std::setfill(L'0') << std::setw(2)
-                 << std::uppercase << (int)newADSR1 << L"  ADSR(2): $" << (int)newADSR2
-                 << L"  GAIN: $" << (int)newGAIN;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR(2)", desc.str().c_str(),
+            desc << "ADSR(1): $" << std::hex << std::setfill('0') << std::setw(2)
+                 << std::uppercase << (int)newADSR1 << "  ADSR(2): $" << (int)newADSR2
+                 << "  GAIN: $" << (int)newGAIN;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(2)", desc.str().c_str(),
                             CLR_ADSR, ICON_CONTROL);
             break;
         }
@@ -944,21 +944,21 @@ bool KonamiSnesTrack::ReadEvent(void) {
         case EVENT_GOTO: {
             uint16_t dest = GetShort(curOffset);
             curOffset += 2;
-            desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+            desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                  << std::uppercase << (int)dest;
             uint32_t length = curOffset - beginOffset;
 
             assert(dest >= dwOffset);
 
             if (curOffset < 0x10000 && GetByte(curOffset) == 0xff) {
-                AddGenericEvent(curOffset, 1, L"End of Track", L"", CLR_TRACKEND, ICON_TRACKEND);
+                AddGenericEvent(curOffset, 1, "End of Track", "", CLR_TRACKEND, ICON_TRACKEND);
             }
 
             curOffset = dest;
             if (!IsOffsetUsed(dest)) {
-                AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
+                AddGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), CLR_LOOPFOREVER);
             } else {
-                bContinue = AddLoopForever(beginOffset, length, L"Jump");
+                bContinue = AddLoopForever(beginOffset, length, "Jump");
             }
             break;
         }
@@ -967,9 +967,9 @@ bool KonamiSnesTrack::ReadEvent(void) {
             uint16_t dest = GetShort(curOffset);
             curOffset += 2;
 
-            desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+            desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                  << std::uppercase << (int)dest;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play",
                             desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
             assert(dest >= dwOffset);
@@ -982,7 +982,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
 
         case EVENT_END: {
             if (inSubroutine) {
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"End Pattern",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern",
                                 desc.str().c_str(), CLR_TRACKEND, ICON_ENDREP);
 
                 inSubroutine = false;
@@ -995,9 +995,9 @@ bool KonamiSnesTrack::ReadEvent(void) {
         }
 
         default:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             L_ERROR("Unknown event {:#x}", statusByte);
 
             bContinue = false;
@@ -1005,8 +1005,8 @@ bool KonamiSnesTrack::ReadEvent(void) {
     }
 
     ///
-    // ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase <<
-    // beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) <<
+    // ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase <<
+    // beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) <<
     // curOffset << std::endl; LogDebug(ssTrace.str().c_str());
 
     return bContinue;

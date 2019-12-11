@@ -79,7 +79,7 @@ enum SuzukiSnesSeqEventType {
 class SuzukiSnesSeq : public VGMSeq {
    public:
     SuzukiSnesSeq(RawFile *file, SuzukiSnesVersion ver, uint32_t seqdataOffset,
-                  std::wstring newName = L"Square SUZUKI SNES Seq");
+                  std::string newName = "Square SUZUKI SNES Seq");
     virtual ~SuzukiSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);

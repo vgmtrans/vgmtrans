@@ -14,7 +14,7 @@
 GraphResSnesInstrSet::GraphResSnesInstrSet(RawFile *file, GraphResSnesVersion ver,
                                            uint32_t spcDirAddr,
                                            const std::map<uint8_t, uint16_t> &instrADSRHints,
-                                           const std::wstring &name)
+                                           const std::string &name)
     : VGMInstrSet(GraphResSnesFormat::name, file, spcDirAddr, 0, name),
       version(ver),
       spcDirAddr(spcDirAddr),
@@ -60,8 +60,8 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
             adsr = instrADSRHints[srcn];
         }
 
-        std::wostringstream instrName;
-        instrName << L"Instrument " << srcn;
+        std::ostringstream instrName;
+        instrName << "Instrument " << srcn;
         GraphResSnesInstr *newInstr =
             new GraphResSnesInstr(this, version, srcn, spcDirAddr, adsr, instrName.str());
         aInstrs.push_back(newInstr);
@@ -87,7 +87,7 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
 // *****************
 
 GraphResSnesInstr::GraphResSnesInstr(VGMInstrSet *instrSet, GraphResSnesVersion ver, uint8_t srcn,
-                                     uint32_t spcDirAddr, uint16_t adsr, const std::wstring &name)
+                                     uint32_t spcDirAddr, uint16_t adsr, const std::string &name)
     : VGMInstr(instrSet, spcDirAddr + srcn * 4, 4, 0, srcn, name),
       version(ver),
       spcDirAddr(spcDirAddr),
@@ -122,8 +122,8 @@ GraphResSnesRgn::GraphResSnesRgn(GraphResSnesInstr *instr, GraphResSnesVersion v
     uint8_t adsr2 = adsr & 0xff;
 
     uint32_t offDirEnt = spcDirAddr + srcn * 4;
-    AddSimpleItem(offDirEnt, 2, L"SA");
-    AddSimpleItem(offDirEnt + 2, 2, L"LSA");
+    AddSimpleItem(offDirEnt, 2, "SA");
+    AddSimpleItem(offDirEnt + 2, 2, "LSA");
 
     sampNum = srcn;
     unityKey = 57;  // o4a = $1000

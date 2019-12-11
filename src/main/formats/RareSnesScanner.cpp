@@ -99,7 +99,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
     uint32_t ofsVCmdExecASM;
     uint32_t addrSeqHeader;
     uint32_t addrVCmdTable;
-    wstring name =
+    string name =
         file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // find a sequence

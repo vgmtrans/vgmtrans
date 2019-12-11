@@ -115,7 +115,7 @@ class NinSnesSeq : public VGMMultiSectionSeq {
     NinSnesSeq(RawFile *file, NinSnesVersion ver, uint32_t offset, uint8_t percussion_base = 0,
                const std::vector<uint8_t> &theVolumeTable = std::vector<uint8_t>(),
                const std::vector<uint8_t> &theDurRateTable = std::vector<uint8_t>(),
-               std::wstring theName = L"NinSnes Seq");
+               std::string theName = "NinSnes Seq");
     virtual ~NinSnesSeq();
 
     virtual bool GetHeaderInfo();
@@ -185,7 +185,7 @@ class NinSnesSection : public VGMSeqSection {
 class NinSnesTrack : public SeqTrack {
    public:
     NinSnesTrack(NinSnesSection *parentSection, long offset = 0, long length = 0,
-                 const std::wstring &theName = L"NinSnes Track");
+                 const std::string &theName = "NinSnes Track");
 
     virtual void ResetVars(void);
     virtual bool ReadEvent(void);

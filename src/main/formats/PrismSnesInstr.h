@@ -18,7 +18,7 @@ class PrismSnesInstrSet : public VGMInstrSet {
     PrismSnesInstrSet(RawFile *file, PrismSnesVersion ver, uint32_t spcDirAddr,
                       uint16_t addrADSR1Table, uint16_t addrADSR2Table,
                       uint16_t addrTuningTableHigh, uint16_t addrTuningTableLow,
-                      const std::wstring &name = L"PrismSnesInstrSet");
+                      const std::string &name = "PrismSnesInstrSet");
     virtual ~PrismSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -43,7 +43,7 @@ class PrismSnesInstr : public VGMInstr {
    public:
     PrismSnesInstr(VGMInstrSet *instrSet, PrismSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr,
                    uint16_t addrADSR1Entry, uint16_t addrADSR2Entry, uint16_t addrTuningEntryHigh,
-                   uint16_t addrTuningEntryLow, const std::wstring &name = L"PrismSnesInstr");
+                   uint16_t addrTuningEntryLow, const std::string &name = "PrismSnesInstr");
     virtual ~PrismSnesInstr(void);
 
     virtual bool LoadInstr();

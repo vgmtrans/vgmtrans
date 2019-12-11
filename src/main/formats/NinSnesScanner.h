@@ -9,7 +9,7 @@
 
 class NinSnesScanner : public VGMScanner {
    public:
-    NinSnesScanner(void) { USE_EXTENSION(L"spc"); }
+    NinSnesScanner(void) { USE_EXTENSION("spc"); }
     virtual ~NinSnesScanner(void) {}
 
     virtual void Scan(RawFile *file, void *info = 0);

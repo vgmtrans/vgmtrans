@@ -19,17 +19,17 @@ class SynthFile;
 class VGMColl : public VGMItem {
    public:
     BEGIN_MENU(VGMColl)
-    MENU_ITEM(VGMColl, OnSaveAllDLS, L"Save as MIDI and DLS.")
-    MENU_ITEM(VGMColl, OnSaveAllSF2, L"Save as MIDI and SoundFont 2.")
-    MENU_ITEM(VGMColl, OnSaveAll, L"Save as MIDI, SoundFont 2 and DLS")
+    MENU_ITEM(VGMColl, OnSaveAllDLS, "Save as MIDI and DLS.")
+    MENU_ITEM(VGMColl, OnSaveAllSF2, "Save as MIDI and SoundFont 2.")
+    MENU_ITEM(VGMColl, OnSaveAll, "Save as MIDI, SoundFont 2 and DLS")
     END_MENU()
 
-    VGMColl(std::wstring name = L"Unnamed Collection");
+    VGMColl(std::string name = "Unnamed Collection");
     virtual ~VGMColl(void);
 
     void RemoveFileAssocs();
-    const std::wstring *GetName(void) const;
-    void SetName(const std::wstring *newName);
+    const std::string *GetName(void) const;
+    void SetName(const std::string *newName);
     VGMSeq *GetSeq();
     void UseSeq(VGMSeq *theSeq);
     void AddInstrSet(VGMInstrSet *theInstrSet);
@@ -46,7 +46,7 @@ class VGMColl : public VGMItem {
 
     // This feels stupid, but the current callbacks system
     // is not exactly flexible.
-    inline void SetDefaultSavePath(std::wstring savepath) { dirpath = savepath; }
+    inline void SetDefaultSavePath(std::string savepath) { dirpath = savepath; }
 
     bool OnSaveAll();
     bool OnSaveAllDLS();
@@ -63,6 +63,6 @@ class VGMColl : public VGMItem {
                         std::vector<VGMSamp *> &finalSamps);
 
    protected:
-    std::wstring name;
-    std::wstring dirpath = L"";
+    std::string name;
+    std::string dirpath = "";
 };

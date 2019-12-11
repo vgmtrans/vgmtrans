@@ -17,7 +17,7 @@
 class AkaoInstrSet : public VGMInstrSet {
    public:
     AkaoInstrSet(RawFile *file, uint32_t length, uint32_t instrOff, uint32_t dkitOff, uint32_t id,
-                 std::wstring name = L"Akao Instrument Bank" /*, VGMSampColl* sampColl = NULL*/);
+                 std::string name = "Akao Instrument Bank" /*, VGMSampColl* sampColl = NULL*/);
     virtual bool GetInstrPointers();
 
    public:
@@ -32,7 +32,7 @@ class AkaoInstrSet : public VGMInstrSet {
 class AkaoInstr : public VGMInstr {
    public:
     AkaoInstr(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t bank,
-              uint32_t instrNum, const std::wstring &name = L"Instrument");
+              uint32_t instrNum, const std::string &name = "Instrument");
     virtual bool LoadInstr();
 
    public:
@@ -58,9 +58,9 @@ class AkaoDrumKit : public AkaoInstr {
 class AkaoRgn : public VGMRgn {
    public:
     AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0,
-            const std::wstring &name = L"Region");
+            const std::string &name = "Region");
     AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
-            uint8_t artIDNum, const std::wstring &name = L"Region");
+            uint8_t artIDNum, const std::string &name = "Region");
 
     virtual bool LoadRgn();
 
@@ -89,7 +89,7 @@ typedef struct _AkaoArt {
 class AkaoSampColl : public VGMSampColl {
    public:
     AkaoSampColl(RawFile *file, uint32_t offset, uint32_t length,
-                 std::wstring name = L"Akao Sample Collection");
+                 std::string name = "Akao Sample Collection");
     virtual ~AkaoSampColl();
 
     virtual bool GetHeaderInfo();

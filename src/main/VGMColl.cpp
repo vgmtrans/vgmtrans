@@ -17,7 +17,7 @@ using namespace std;
 
 DECLARE_MENU(VGMColl)
 
-VGMColl::VGMColl(wstring theName) : VGMItem(), name(theName), seq(NULL) {}
+VGMColl::VGMColl(string theName) : VGMItem(), name(theName), seq(NULL) {}
 
 VGMColl::~VGMColl(void) {}
 
@@ -32,11 +32,11 @@ void VGMColl::RemoveFileAssocs() {
         miscfiles[i]->RemoveCollAssoc(this);
 }
 
-const wstring *VGMColl::GetName(void) const {
+const string *VGMColl::GetName(void) const {
     return &name;
 }
 
-void VGMColl::SetName(const wstring *newName) {
+void VGMColl::SetName(const string *newName) {
     name = *newName;
 }
 
@@ -98,7 +98,7 @@ void VGMColl::UnpackSampColl(DLSFile &dls, VGMSampColl *sampColl, vector<VGMSamp
 
         uint16_t blockAlign = samp->bps / 8 * samp->channels;
         dls.AddWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign, samp->bps,
-                    bufSize, uncompSampBuf, wstring2string(samp->name));
+                    bufSize, uncompSampBuf, (samp->name));
         finalSamps.push_back(samp);
     }
 }
@@ -124,7 +124,7 @@ void VGMColl::UnpackSampColl(SynthFile &synthfile, VGMSampColl *sampColl,
         uint16_t blockAlign = samp->bps / 8 * samp->channels;
         SynthWave *wave =
             synthfile.AddWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                              samp->bps, bufSize, uncompSampBuf, wstring2string(samp->name));
+                              samp->bps, bufSize, uncompSampBuf, (samp->name));
         finalSamps.push_back(samp);
 
         // If we don't have any loop information, then don't create a sampInfo structure for the
@@ -196,7 +196,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
         for (size_t i = 0; i < nInstrs; i++) {
             VGMInstr *vgminstr = set->aInstrs[i];
             size_t nRgns = vgminstr->aRgns.size();
-            std::string name = wstring2string(vgminstr->name);
+            std::string name = (vgminstr->name);
             DLSInstr *newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum, name);
             for (uint32_t j = 0; j < nRgns; j++) {
                 VGMRgn *rgn = vgminstr->aRgns[j];
@@ -559,7 +559,7 @@ bool VGMColl::OnSaveAll() {
     }
 
     SF2File *sf2file = CreateSF2File();
-    auto filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".sf2";
+    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
     if (sf2file != nullptr) {
         if (!sf2file->SaveSF2File(filepath))
             L_ERROR("Failed to save SF2 file");
@@ -569,7 +569,7 @@ bool VGMColl::OnSaveAll() {
     }
 
     DLSFile dlsfile;
-    filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".dls";
+    filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".dls";
     if (CreateDLSFile(dlsfile)) {
         if (!dlsfile.SaveDLSFile(filepath))
             L_ERROR("Failed to save DLS file");
@@ -578,7 +578,7 @@ bool VGMColl::OnSaveAll() {
     }
 
     if (this->seq != nullptr) {
-        filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".mid";
+        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
         if (!this->seq->SaveAsMidi(filepath)) {
             L_ERROR("Failed to save MIDI file");
         }
@@ -595,7 +595,7 @@ bool VGMColl::OnSaveAllDLS() {
     }
 
     SF2File *sf2file = CreateSF2File();
-    auto filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".sf2";
+    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
     if (sf2file != nullptr) {
         if (!sf2file->SaveSF2File(filepath))
             L_ERROR("Failed to save SF2 file");
@@ -605,7 +605,7 @@ bool VGMColl::OnSaveAllDLS() {
     }
 
     DLSFile dlsfile;
-    filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".dls";
+    filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".dls";
     if (CreateDLSFile(dlsfile)) {
         if (!dlsfile.SaveDLSFile(filepath))
              L_ERROR("Failed to save DLS file");
@@ -614,7 +614,7 @@ bool VGMColl::OnSaveAllDLS() {
     }
 
     if (this->seq != nullptr) {
-        filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".mid";
+        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
         if (!this->seq->SaveAsMidi(filepath))
             L_ERROR("Failed to save MIDI file");
     }
@@ -629,7 +629,7 @@ bool VGMColl::OnSaveAllSF2() {
         dirpath = pRoot->UI_GetSaveDirPath();
     }
 
-    auto filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".sf2";
+    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
     SF2File *sf2file = CreateSF2File();
     if (sf2file != nullptr) {
         if (!sf2file->SaveSF2File(filepath))
@@ -640,7 +640,7 @@ bool VGMColl::OnSaveAllSF2() {
     }
 
     if (this->seq != nullptr) {
-        filepath = dirpath + L"/" + ConvertToSafeFileName(this->name) + L".mid";
+        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
         if (!this->seq->SaveAsMidi(filepath))
             L_ERROR("Failed to save MIDI file");
     }

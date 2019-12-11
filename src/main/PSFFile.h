@@ -26,7 +26,7 @@ class PSFFile {
     size_t GetCompressedExeSize(void) const;
     size_t GetReservedSize(void) const;
     void Clear(void);
-    const wchar_t *GetError(void) const;
+    const char *GetError(void) const;
 
    public:
     PSFFile *parent;
@@ -41,7 +41,7 @@ class PSFFile {
     DataSeg *reservedData;
     uint32_t exeCRC;
     bool decompressed;
-    wchar_t *errorstr;
+    char *errorstr;
     uint8_t *stripBuf;
     size_t stripBufSize;
 

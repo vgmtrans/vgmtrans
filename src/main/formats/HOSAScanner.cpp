@@ -54,7 +54,7 @@ void HOSAScanner::Scan(RawFile *file, void *info) {
 }
 
 HOSASeq *HOSAScanner::SearchForHOSASeq(RawFile *file) {
-    std::wstring name =
+    std::string name =
         file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     uint32_t nFileLength = file->size();

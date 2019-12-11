@@ -25,7 +25,7 @@ class FalcomSnesInstrSet : public VGMInstrSet {
     FalcomSnesInstrSet(RawFile *file, FalcomSnesVersion ver, uint32_t offset,
                        uint32_t addrSampToInstrTable, uint32_t spcDirAddr,
                        const std::map<uint8_t, uint16_t> &instrADSRHints,
-                       const std::wstring &name = L"FalcomSnesInstrSet");
+                       const std::string &name = "FalcomSnesInstrSet");
     virtual ~FalcomSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -48,7 +48,7 @@ class FalcomSnesInstr : public VGMInstr {
    public:
     FalcomSnesInstr(VGMInstrSet *instrSet, FalcomSnesVersion ver, uint32_t offset, uint32_t theBank,
                     uint32_t theInstrNum, uint8_t srcn, uint32_t spcDirAddr,
-                    const std::wstring &name = L"FalcomSnesInstr");
+                    const std::string &name = "FalcomSnesInstr");
     virtual ~FalcomSnesInstr(void);
 
     virtual bool LoadInstr();

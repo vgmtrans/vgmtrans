@@ -20,7 +20,7 @@ const uint8_t PandoraBoxSnesSeq::VOLUME_TABLE[16] = {
 };
 
 PandoraBoxSnesSeq::PandoraBoxSnesSeq(RawFile *file, PandoraBoxSnesVersion ver,
-                                     uint32_t seqdataOffset, std::wstring newName)
+                                     uint32_t seqdataOffset, std::string newName)
     : VGMSeq(PandoraBoxSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
     bLoadTickByTick = true;
     bAllowDiscontinuousTrackData = true;
@@ -48,8 +48,8 @@ bool PandoraBoxSnesSeq::GetHeaderInfo(void) {
         return false;
     }
 
-    AddSimpleItem(dwOffset + 6, 1, L"Tempo");
-    AddSimpleItem(dwOffset + 7, 1, L"Timebase");
+    AddSimpleItem(dwOffset + 6, 1, "Tempo");
+    AddSimpleItem(dwOffset + 7, 1, "Timebase");
 
     uint8_t timebase = GetByte(dwOffset + 7);
     assert((timebase % 4) == 0);
@@ -59,11 +59,11 @@ bool PandoraBoxSnesSeq::GetHeaderInfo(void) {
     for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
         uint16_t ofsTrackStart = GetShort(curOffset);
         if (ofsTrackStart != 0xffff) {
-            std::wstringstream trackName;
-            trackName << L"Track Pointer " << (trackIndex + 1);
+            std::stringstream trackName;
+            trackName << "Track Pointer " << (trackIndex + 1);
             header->AddSimpleItem(curOffset, 2, trackName.str());
         } else {
-            header->AddSimpleItem(curOffset, 2, L"NULL");
+            header->AddSimpleItem(curOffset, 2, "NUL");
         }
         curOffset += 2;
     }
@@ -172,7 +172,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
     uint8_t statusByte = GetByte(curOffset++);
     bool bContinue = true;
 
-    std::wstringstream desc;
+    std::stringstream desc;
 
     PandoraBoxSnesSeqEventType eventType = (PandoraBoxSnesSeqEventType)0;
     std::map<uint8_t, PandoraBoxSnesSeqEventType>::iterator pEventType =
@@ -183,27 +183,27 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
 
     switch (eventType) {
         case EVENT_UNKNOWN0:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
 
         case EVENT_UNKNOWN1: {
             uint8_t arg1 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
                  << (int)arg1;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
         }
 
         case EVENT_UNKNOWN2: {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
         }
 
@@ -211,10 +211,10 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
         }
 
@@ -223,16 +223,16 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
             uint8_t arg4 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3 << L"  Arg4: "
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3 << "  Arg4: "
                  << (int)arg4;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
         }
 
         case EVENT_NOP: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str(), CLR_MISC,
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str(), CLR_MISC,
                             ICON_BINARY);
             break;
         }
@@ -271,7 +271,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
                 if (prevNoteSlurred && key == prevNoteKey) {
                     // tie
                     MakePrevDurNoteEnd(GetTime() + dur);
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str(),
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(),
                                     CLR_TIE, ICON_NOTE);
                 } else {
                     // note
@@ -287,16 +287,16 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
 
         case EVENT_OCTAVE: {
             octave = (statusByte - 0x40);
-            desc << L"Octave: " << octave;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Octave", desc.str(),
+            desc << "Octave: " << octave;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc.str(),
                             CLR_CHANGESTATE);
             break;
         }
 
         case EVENT_QUANTIZE: {
             spcNoteQuantize = (statusByte - 0x48);
-            desc << L"Length: " << spcNoteQuantize << L"/8";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration Rate", desc.str(),
+            desc << "Length: " << spcNoteQuantize << "/8";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc.str(),
                             CLR_DURNOTE);
             break;
         }
@@ -305,9 +305,9 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
             uint8_t newVolumeIndex = (statusByte - 0x50);
 
             uint8_t newVolume = GetVolume(newVolumeIndex);
-            desc << L"Volume Index: " << spcVolumeIndex << L" (" << newVolume << L")";
+            desc << "Volume Index: " << spcVolumeIndex << " (" << newVolume << ")";
 
-            AddVol(beginOffset, curOffset - beginOffset, newVolume, L"Volume From Table");
+            AddVol(beginOffset, curOffset - beginOffset, newVolume, "Volume From Table");
             break;
         }
 
@@ -326,8 +326,8 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
 
         case EVENT_TUNING: {
             int8_t newTuning = GetByte(curOffset++);
-            desc << L"Hearz: " << (newTuning >= 0 ? L"+" : L"") << newTuning << L" Hz";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Fine Tuning", desc.str(),
+            desc << "Hearz: " << (newTuning >= 0 ? "+" : "") << newTuning << " Hz";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc.str(),
                             CLR_TRANSPOSE, ICON_CONTROL);
             break;
         }
@@ -367,9 +367,9 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
             }
 
             uint8_t newVolume = GetVolume(spcVolumeIndex);
-            desc << L"Volume Index: " << spcVolumeIndex << L" (" << newVolume << L")";
+            desc << "Volume Index: " << spcVolumeIndex << " (" << newVolume << ")";
 
-            AddVol(beginOffset, curOffset - beginOffset, newVolume, L"Increase Volume");
+            AddVol(beginOffset, curOffset - beginOffset, newVolume, "Increase Volume");
             break;
         }
 
@@ -379,9 +379,9 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
             }
 
             uint8_t newVolume = GetVolume(spcVolumeIndex);
-            desc << L"Volume Index: " << spcVolumeIndex << L" (" << newVolume << L")";
+            desc << "Volume Index: " << spcVolumeIndex << " (" << newVolume << ")";
 
-            AddVol(beginOffset, curOffset - beginOffset, newVolume, L"Decrease Volume");
+            AddVol(beginOffset, curOffset - beginOffset, newVolume, "Decrease Volume");
             break;
         }
 
@@ -392,36 +392,36 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
             uint8_t arg4 = GetByte(curOffset++);
             uint8_t arg5 = GetByte(curOffset++);
 
-            desc << L"Arg1: " << arg1 << L"  Arg2: " << arg2 << L"  Arg3: " << arg3 << L"  Arg4: "
-                 << arg4 << L"  Arg5: " << arg5;
+            desc << "Arg1: " << arg1 << "  Arg2: " << arg2 << "  Arg3: " << arg3 << "  Arg4: "
+                 << arg4 << "  Arg5: " << arg5;
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Param", desc.str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Param", desc.str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_VIBRATO: {
             bool vibratoOn = (GetByte(curOffset++) != 0);
-            desc << L"Vibrato: " << (vibratoOn ? L"On" : L"Off");
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato On/Off", desc.str(),
+            desc << "Vibrato: " << (vibratoOn ? "On" : "Off");
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato On/Off", desc.str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_ECHO_OFF: {
-            AddReverb(beginOffset, curOffset - beginOffset, 0, L"Echo Off");
+            AddReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
             break;
         }
 
         case EVENT_ECHO_ON: {
-            AddReverb(beginOffset, curOffset - beginOffset, 40, L"Echo On");
+            AddReverb(beginOffset, curOffset - beginOffset, 40, "Echo On");
             break;
         }
 
         case EVENT_LOOP_START: {
             uint8_t count = GetByte(curOffset++);
-            desc << L"Times: " << (int)count;
-            AddGenericEvent(beginOffset, 2, L"Loop Start", desc.str(), CLR_LOOP, ICON_STARTREP);
+            desc << "Times: " << (int)count;
+            AddGenericEvent(beginOffset, 2, "Loop Start", desc.str(), CLR_LOOP, ICON_STARTREP);
 
             if (spcCallStackPtr + 5 > PANDORABOXSNES_CALLSTACK_SIZE) {
                 // stack overflow
@@ -450,10 +450,10 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
 
             if (spcCallStack[spcCallStackPtr - 1] == 0xff) {
                 // infinite loop
-                bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, L"Loop End");
+                bContinue = AddLoopForever(beginOffset, curOffset - beginOffset, "Loop End");
             } else {
                 // regular loop
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str(),
                                 CLR_LOOP, ICON_ENDREP);
 
                 // decrease repeat count (0 becomes an infinite loop, as a result)
@@ -477,7 +477,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_LOOP_BREAK: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Break", desc.str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc.str(),
                             CLR_LOOP, ICON_ENDREP);
 
             if (spcCallStackPtr < 5) {
@@ -498,9 +498,9 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
         case EVENT_DSP_WRITE: {
             uint8_t dspReg = GetByte(curOffset++);
             uint8_t dspValue = GetByte(curOffset++);
-            desc << L"Register: $" << std::hex << std::setfill(L'0') << std::setw(2)
-                 << std::uppercase << (int)dspReg << L"  Value: $" << (int)dspValue;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Write to DSP", desc.str(),
+            desc << "Register: $" << std::hex << std::setfill('0') << std::setw(2)
+                 << std::uppercase << (int)dspReg << "  Value: $" << (int)dspValue;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Write to DSP", desc.str(),
                             CLR_CHANGESTATE);
             break;
         }
@@ -510,19 +510,19 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
 
             uint8_t newTarget = param & 3;
             if (newTarget != 0) {
-                desc << L"Channel Type: " << newTarget;
+                desc << "Channel Type: " << newTarget;
             } else {
-                desc << L"Channel Type: " << newTarget << L" (Keep Current)";
+                desc << "Channel Type: " << newTarget << " (Keep Current)";
             }
 
             if ((param & 0x80) == 0) {
                 uint8_t newNCK = (param >> 2) & 15;
-                desc << L"  Noise Frequency (NCK): " << newNCK;
+                desc << "  Noise Frequency (NCK): " << newNCK;
             } else {
-                desc << L"  Noise Frequency (NCK): " << L" (Keep Current)";
+                desc << "  Noise Frequency (NCK): " << " (Keep Current)";
             }
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Param", desc.str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Param", desc.str(),
                             CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
@@ -540,12 +540,12 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
             uint8_t sr = (srRate * 0x1f) / 127;
             spcADSR = ((0x80 | (dr << 4) | ar) << 8) | ((sl << 5) | sr);
 
-            desc << L"AR: " << arRate << L"/127" << L" (" << ar << L")" << L"  DR: " << drRate
-                 << L"/127" << L" (" << dr << L")" << L"  SR: " << srRate << L"/127" << L" (" << sr
-                 << L")" << L"  SL: " << slRate << L"/127" << L" (" << sl << L")" << L"  Arg5: "
-                 << xxRate << L"/127";
+            desc << "AR: " << arRate << "/127" << " (" << ar << ")" << "  DR: " << drRate
+                 << "/127" << " (" << dr << ")" << "  SR: " << srRate << "/127" << " (" << sr
+                 << ")" << "  SL: " << slRate << "/127" << " (" << sl << ")" << "  Arg5: "
+                 << xxRate << "/127";
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR,
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str(), CLR_ADSR,
                             ICON_CONTROL);
             break;
         }
@@ -565,9 +565,9 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
         }
 
         default:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             L_ERROR("Unknown event {:#x}", statusByte);
 
             bContinue = false;
@@ -575,8 +575,8 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
     }
 
     ///
-    // ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase <<
-    // beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) <<
+    // ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase <<
+    // beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) <<
     // curOffset << std::endl; OutputDebugString(ssTrace.str().c_str());
 
     return bContinue;

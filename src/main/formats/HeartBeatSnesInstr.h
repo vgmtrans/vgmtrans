@@ -17,7 +17,7 @@ class HeartBeatSnesInstrSet : public VGMInstrSet {
    public:
     HeartBeatSnesInstrSet(RawFile *file, HeartBeatSnesVersion ver, uint32_t offset, uint32_t length,
                           uint16_t addrSRCNTable, uint8_t songIndex, uint32_t spcDirAddr,
-                          const std::wstring &name = L"HeartBeatSnesInstrSet");
+                          const std::string &name = "HeartBeatSnesInstrSet");
     virtual ~HeartBeatSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -41,7 +41,7 @@ class HeartBeatSnesInstr : public VGMInstr {
     HeartBeatSnesInstr(VGMInstrSet *instrSet, HeartBeatSnesVersion ver, uint32_t offset,
                        uint32_t theBank, uint32_t theInstrNum, uint16_t addrSRCNTable,
                        uint8_t songIndex, uint32_t spcDirAddr,
-                       const std::wstring &name = L"HeartBeatSnesInstr");
+                       const std::string &name = "HeartBeatSnesInstr");
     virtual ~HeartBeatSnesInstr(void);
 
     virtual bool LoadInstr();

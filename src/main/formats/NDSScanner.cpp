@@ -38,9 +38,9 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
     uint32_t nSeqs;
     uint32_t nBnks;
     uint32_t nWAs;
-    vector<wstring> seqNames;
-    vector<wstring> bnkNames;
-    vector<wstring> waNames;
+    vector<string> seqNames;
+    vector<string> bnkNames;
+    vector<string> waNames;
     vector<uint16_t> seqFileIDs;
     vector<uint16_t> bnkFileIDs;
     vector<uint16_t> waFileIDs;
@@ -74,38 +74,35 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
 
     for (uint32_t i = 0; i < nSeqs; i++) {
         char temp[32];  // that 32 is totally arbitrary, i should change it
-        wchar_t wtemp[32];
+        char wtemp[32];
         if (hasSYMB) {
             file->GetBytes(file->GetWord(pSeqNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-            mbstowcs(wtemp, temp, 32);
         } else {
-            swprintf(wtemp, 32, L"SSEQ_%04d", i);
+            sprintf(wtemp, "SSEQ_%04d", i);
         }
         seqNames.push_back(wtemp);
     }
 
     for (uint32_t i = 0; i < nBnks; i++) {
         char temp[32];  // that 32 is totally arbitrary, i should change it
-        wchar_t wtemp[32];
+        char wtemp[32];
 
         if (hasSYMB) {
             file->GetBytes(file->GetWord(pBnkNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-            mbstowcs(wtemp, temp, 32);
         } else {
-            swprintf(wtemp, 32, L"SBNK_%04d", i);
+            sprintf(wtemp, "SBNK_%04d", i);
         }
         bnkNames.push_back(wtemp);
     }
 
     for (uint32_t i = 0; i < nWAs; i++) {
         char temp[32];  // that 32 is totally arbitrary, i should change it
-        wchar_t wtemp[32];
+        char wtemp[32];
 
         if (hasSYMB) {
             file->GetBytes(file->GetWord(pWANamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-            mbstowcs(wtemp, temp, 32);
         } else {
-            swprintf(wtemp, 32, L"SWAR_%04d", i);
+            sprintf(wtemp, "SWAR_%04d", i);
         }
         waNames.push_back(wtemp);
     }

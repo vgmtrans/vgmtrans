@@ -106,7 +106,7 @@ const uint16_t decay_rate_table[64] = {
 
 class QSoundArticTable : public VGMMiscFile {
    public:
-    QSoundArticTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length);
+    QSoundArticTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length);
     virtual ~QSoundArticTable(void);
 
     virtual bool LoadMain();
@@ -121,7 +121,7 @@ class QSoundArticTable : public VGMMiscFile {
 
 class QSoundSampleInfoTable : public VGMMiscFile {
    public:
-    QSoundSampleInfoTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length = 0);
+    QSoundSampleInfoTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length = 0);
     virtual ~QSoundSampleInfoTable(void);
 
     virtual bool LoadMain();
@@ -139,7 +139,7 @@ class QSoundInstrSet : public VGMInstrSet {
    public:
     QSoundInstrSet(RawFile *file, QSoundVer fmt_version, uint32_t offset, int numInstrBanks,
                    QSoundSampleInfoTable *sampInfoTable, QSoundArticTable *articTable,
-                   std::wstring &name);
+                   std::string &name);
     virtual ~QSoundInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -159,7 +159,7 @@ class QSoundInstrSet : public VGMInstrSet {
 class QSoundInstr : public VGMInstr {
    public:
     QSoundInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                uint32_t theInstrNum, std::wstring &name);
+                uint32_t theInstrNum, std::string &name);
     virtual ~QSoundInstr(void);
     virtual bool LoadInstr();
 
@@ -185,7 +185,7 @@ class QSoundSampColl : public VGMSampColl {
    public:
     QSoundSampColl(RawFile *file, QSoundInstrSet *instrset, QSoundSampleInfoTable *sampinfotable,
                    uint32_t offset, uint32_t length = 0,
-                   std::wstring name = std::wstring(L"QSound Sample Collection"));
+                   std::string name = std::string("QSound Sample Collection"));
     virtual bool GetHeaderInfo();
     virtual bool GetSampleInfo();
 

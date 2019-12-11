@@ -65,7 +65,7 @@ void MidiFile::Sort(void) {
     }
 }
 
-bool MidiFile::SaveMidiFile(const std::wstring &filepath) {
+bool MidiFile::SaveMidiFile(const std::string &filepath) {
     vector<uint8_t> midiBuf;
     WriteMidiToBuffer(midiBuf);
     return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], (uint32_t)midiBuf.size());
@@ -533,27 +533,27 @@ void MidiTrack::InsertEndOfTrack(uint32_t absTime) {
     bHasEndOfTrack = true;
 }
 
-void MidiTrack::AddText(const std::wstring &wstr) {
+void MidiTrack::AddText(const std::string &wstr) {
     aEvents.push_back(new TextEvent(this, GetDelta(), wstr));
 }
 
-void MidiTrack::InsertText(const std::wstring &wstr, uint32_t absTime) {
+void MidiTrack::InsertText(const std::string &wstr, uint32_t absTime) {
     aEvents.push_back(new TextEvent(this, absTime, wstr));
 }
 
-void MidiTrack::AddSeqName(const std::wstring &wstr) {
+void MidiTrack::AddSeqName(const std::string &wstr) {
     aEvents.push_back(new SeqNameEvent(this, GetDelta(), wstr));
 }
 
-void MidiTrack::InsertSeqName(const std::wstring &wstr, uint32_t absTime) {
+void MidiTrack::InsertSeqName(const std::string &wstr, uint32_t absTime) {
     aEvents.push_back(new SeqNameEvent(this, absTime, wstr));
 }
 
-void MidiTrack::AddTrackName(const std::wstring &wstr) {
+void MidiTrack::AddTrackName(const std::string &wstr) {
     aEvents.push_back(new TrackNameEvent(this, GetDelta(), wstr));
 }
 
-void MidiTrack::InsertTrackName(const std::wstring &wstr, uint32_t absTime) {
+void MidiTrack::InsertTrackName(const std::string &wstr, uint32_t absTime) {
     aEvents.push_back(new TrackNameEvent(this, absTime, wstr));
 }
 
@@ -629,8 +629,8 @@ uint32_t MidiEvent::WriteMetaEvent(vector<uint8_t> &buf, uint32_t time, uint8_t 
 }
 
 uint32_t MidiEvent::WriteMetaTextEvent(vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
-                                       wstring wstr) {
-    string str = wstring2string(wstr);
+                                       string wstr) {
+    string str = (wstr);
     return WriteMetaEvent(buf, time, metaType, (uint8_t *)str.c_str(), str.length());
 }
 
@@ -639,9 +639,9 @@ uint32_t MidiEvent::WriteMetaTextEvent(vector<uint8_t> &buf, uint32_t time, uint
 // aEvents.push_back(MakeCopy());
 //}
 
-std::wstring MidiEvent::GetNoteName(int noteNumber) {
-    const wchar_t *noteNames[12] = {L"C",  L"C#", L"D",  L"D#", L"E",  L"F",
-                                    L"F#", L"G",  L"G#", L"A",  L"A#", L"B"};
+std::string MidiEvent::GetNoteName(int noteNumber) {
+    const char *noteNames[12] = {"C",  "C#", "D",  "D#", "E",  "F",
+                                    "F#", "G",  "G#", "A",  "A#", "B"};
 
     int octave;
     int key;
@@ -654,7 +654,7 @@ std::wstring MidiEvent::GetNoteName(int noteNumber) {
     }
     octave--;
 
-    std::wstringstream name;
+    std::stringstream name;
     name << noteNames[key] << " " << octave;
     return name.str();
 }
@@ -856,7 +856,7 @@ uint32_t EndOfTrackEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 //  TextEvent
 //  *********
 
-TextEvent::TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::wstring &wstr)
+TextEvent::TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr) {}
 
 uint32_t TextEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
@@ -867,7 +867,7 @@ uint32_t TextEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 //  SeqNameEvent
 //  ************
 
-SeqNameEvent::SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::wstring &wstr)
+SeqNameEvent::SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr) {}
 
 uint32_t SeqNameEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
@@ -878,7 +878,7 @@ uint32_t SeqNameEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 //  TrackNameEvent
 //  **************
 
-TrackNameEvent::TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::wstring &wstr)
+TrackNameEvent::TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr) {}
 
 uint32_t TrackNameEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {

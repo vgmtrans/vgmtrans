@@ -8,7 +8,7 @@
 #include "VGMMultiSectionSeq.h"
 
 VGMMultiSectionSeq::VGMMultiSectionSeq(const std::string &format, RawFile *file, uint32_t offset,
-                                       uint32_t length, std::wstring name)
+                                       uint32_t length, std::string name)
     : VGMSeq(format, file, offset, length, name), dwStartOffset(offset) {
     AddContainer<VGMSeqSection>(aSections);
     RemoveContainer<SeqTrack>(aTracks);

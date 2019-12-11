@@ -20,7 +20,7 @@ using namespace std;
 // NDSInstrSet
 // ***********
 
-NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, wstring name)
+NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMInstrSet(NDSFormat::name, file, offset, length, name) {}
 /*
 NDSInstrSet::~NDSInstrSet(void)
@@ -31,7 +31,7 @@ bool NDSInstrSet::GetInstrPointers() {
     VGMHeader *header = AddHeader(dwOffset, 0x38);
     uint32_t nInstruments = GetWord(dwOffset + 0x38);
     VGMHeader *instrptrHdr =
-        AddHeader(dwOffset + 0x38, nInstruments * 4 + 4, L"Instrument Pointers");
+        AddHeader(dwOffset + 0x38, nInstruments * 4 + 4, "Instrument Pointers");
 
     for (uint32_t i = 0; i < nInstruments; i++) {
         uint32_t instrPtrOff = dwOffset + 0x3C + i * 4;
@@ -42,9 +42,9 @@ bool NDSInstrSet::GetInstrPointers() {
         uint32_t pInstr = temp >> 8;
         aInstrs.push_back(new NDSInstr(this, pInstr + dwOffset, 0, 0, i, instrType));
 
-        VGMHeader *hdr = instrptrHdr->AddHeader(instrPtrOff, 4, L"Pointer");
-        hdr->AddSimpleItem(instrPtrOff, 1, L"Type");
-        hdr->AddSimpleItem(instrPtrOff + 1, 3, L"Offset");
+        VGMHeader *hdr = instrptrHdr->AddHeader(instrPtrOff, 4, "Pointer");
+        hdr->AddSimpleItem(instrPtrOff, 1, "Type");
+        hdr->AddSimpleItem(instrPtrOff + 1, 3, "Offset");
     }
     return true;
 }
@@ -62,7 +62,7 @@ bool NDSInstr::LoadInstr() {
     switch (instrType) {
         // single region format
         case 0x01: {
-            name = L"Single-Region Instrument";
+            name = "Single-Region Instrument";
             unLength = 10;
             VGMRgn *rgn = AddRgn(dwOffset, 10, GetShort(dwOffset));
             GetSampCollPtr(rgn, GetShort(dwOffset + 2));
@@ -73,20 +73,20 @@ bool NDSInstr::LoadInstr() {
         case 0x02: {
             /* PGM Tone */
             uint8_t dutyCycle = GetByte(dwOffset) & 0x07;
-            std::wstring dutyCycles[8] = {L"12.5%", L"25%", L"37.5%", L"50%",
-                                          L"62.5%", L"75%", L"87.5%", L"0%"};
-            name = L"NES Sq (" + dutyCycles[dutyCycle] + L")";
+            std::string dutyCycles[8] = {"12.5%", "25%", "37.5%", "50%",
+                                          "62.5%", "75%", "87.5%", "0%"};
+            name = "NES Sq (" + dutyCycles[dutyCycle] + ")";
             unLength = 10;
             break;
         }
         case 0x03:
-            name = L"NES Noise";
+            name = "NES Noise";
             unLength = 10;
             break;
 
         // drumset
         case 0x10: {
-            name = L"Drumset";
+            name = "Drumset";
             uint8_t lowKey = GetByte(dwOffset);
             uint8_t highKey = GetByte(dwOffset + 1);
             uint8_t nRgns = (highKey - lowKey) + 1;
@@ -102,7 +102,7 @@ bool NDSInstr::LoadInstr() {
 
         // multiple regions format
         case 0x11: {
-            name = L"Multi-Region Instrument";
+            name = "Multi-Region Instrument";
             uint8_t keyRanges[8];
             uint8_t nRgns = 0;
             for (int i = 0; i < 8; i++) {
@@ -227,7 +227,7 @@ uint16_t NDSInstr::GetFallingRate(uint8_t DecayTime) {
 // NDSWaveArch
 // ***********
 
-NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, wstring name)
+NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMSampColl(NDSFormat::name, file, offset, length, name) {}
 
 NDSWaveArch::~NDSWaveArch() {}
@@ -273,8 +273,8 @@ bool NDSWaveArch::GetSampleInfo() {
             dataLength = loopOff + nonLoopLength;
         }
 
-        std::wostringstream name;
-        name << L"Sample " << (float)samples.size();
+        std::ostringstream name;
+        name << "Sample " << (float)samples.size();
         NDSSamp *samp = new NDSSamp(this, pSample, dataStart + dataLength - pSample, dataStart,
                                     dataLength, nChannels, bps, rate, waveType, name.str());
 
@@ -303,7 +303,7 @@ bool NDSWaveArch::GetSampleInfo() {
 
 NDSSamp::NDSSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 uint8_t theWaveType, wstring name)
+                 uint8_t theWaveType, string name)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
       waveType(theWaveType) {}
 

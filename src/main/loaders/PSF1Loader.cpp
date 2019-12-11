@@ -20,9 +20,9 @@ PostLoadCommand PSF1Loader::Apply(RawFile *file) {
                 return KEEP_IT;
             }
 
-            std::wstring name = file->name();
+            std::string name = file->name();
             pRoot->CreateVirtFile(reinterpret_cast<u8 *>(data->data()), data->size(), name.data(),
-                                  L"", file->tag);
+                                  "", file->tag);
             return DELETE_IT;
         }
     }
@@ -60,11 +60,8 @@ bool PSF1Loader::load_psf_libs(PSFFile2 &psf, RawFile *file) {
         if (itLibTag == psf.tags().end())
             break;
 
-        wchar_t tempfn[PATH_MAX] = {0};
-        mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
-
-        wchar_t *fullPath;
-        fullPath = GetFileWithBase(file->path().c_str(), tempfn);
+        char *fullPath;
+        fullPath = GetFileWithBase(file->path().c_str(), itLibTag->second.c_str());
 
         DiskFile *newRawFile = new DiskFile(fullPath);
         std::vector<char> *out = nullptr;

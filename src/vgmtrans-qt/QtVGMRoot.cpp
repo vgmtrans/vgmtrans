@@ -60,26 +60,26 @@ void QtVGMRoot::UI_EndRemoveVGMFiles() {}
 
 void QtVGMRoot::UI_AddItemSet(VGMFile *file, std::vector<ItemSet> *itemset) {}
 
-std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring &suggestedFilename,
-                                           const std::wstring &extension) {
+std::string QtVGMRoot::UI_GetOpenFilePath(const std::string &suggestedFilename,
+                                          const std::string &extension) {
     return QFileDialog::getOpenFileName(
                QApplication::activeWindow(), "Select a file...",
                QStandardPaths::writableLocation(QStandardPaths::MusicLocation), "All files (*)")
-        .toStdWString();
+        .toStdString();
 }
 
-std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring &suggestedFilename,
-                                           const std::wstring &extension) {
+std::string QtVGMRoot::UI_GetSaveFilePath(const std::string &suggestedFilename,
+                                          const std::string &extension) {
     return QFileDialog::getSaveFileName(
                QApplication::activeWindow(), "Save file...",
                QStandardPaths::writableLocation(QStandardPaths::MusicLocation), "All files (*)")
-        .toStdWString();
+        .toStdString();
 }
 
-std::wstring QtVGMRoot::UI_GetSaveDirPath(const std::wstring &suggestedDir) {
+std::string QtVGMRoot::UI_GetSaveDirPath(const std::string &suggestedDir) {
     return QFileDialog::getExistingDirectory(
                QApplication::activeWindow(), "Save file...",
                QStandardPaths::writableLocation(QStandardPaths::MusicLocation),
                QFileDialog::ShowDirsOnly)
-        .toStdWString();
+        .toStdString();
 }

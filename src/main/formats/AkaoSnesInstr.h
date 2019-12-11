@@ -19,7 +19,7 @@ class AkaoSnesInstrSet : public VGMInstrSet {
 
     AkaoSnesInstrSet(RawFile *file, AkaoSnesVersion ver, uint32_t spcDirAddr,
                      uint16_t addrTuningTable, uint16_t addrADSRTable, uint16_t addrDrumKitTable,
-                     const std::wstring &name = L"AkaoSnesInstrSet");
+                     const std::string &name = "AkaoSnesInstrSet");
     virtual ~AkaoSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -43,7 +43,7 @@ class AkaoSnesInstr : public VGMInstr {
    public:
     AkaoSnesInstr(VGMInstrSet *instrSet, AkaoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr,
                   uint16_t addrTuningTable, uint16_t addrADSRTable,
-                  const std::wstring &name = L"AkaoSnesInstr");
+                  const std::string &name = "AkaoSnesInstr");
     virtual ~AkaoSnesInstr(void);
 
     virtual bool LoadInstr();
@@ -64,7 +64,7 @@ class AkaoSnesDrumKit : public VGMInstr {
    public:
     AkaoSnesDrumKit(VGMInstrSet *instrSet, AkaoSnesVersion ver, uint32_t programNum,
                     uint32_t spcDirAddr, uint16_t addrTuningTable, uint16_t addrADSRTable,
-                    uint16_t addrDrumKitTable, const std::wstring &name = L"AkaoSnesDrumKit");
+                    uint16_t addrDrumKitTable, const std::string &name = "AkaoSnesDrumKit");
     virtual ~AkaoSnesDrumKit(void);
 
     virtual bool LoadInstr();

@@ -14,7 +14,7 @@ using namespace std;
 // ***********
 
 VGMMiscFile::VGMMiscFile(const string &format, RawFile *file, uint32_t offset, uint32_t length,
-                         wstring name)
+                         string name)
     : VGMFile(FILETYPE_MISC, format, file, offset, length, name) {}
 
 bool VGMMiscFile::LoadMain() {

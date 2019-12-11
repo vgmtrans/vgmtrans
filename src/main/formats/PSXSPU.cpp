@@ -114,8 +114,8 @@ bool PSXSampColl::GetSampleInfo() {
                     i += 16;
                 }
 
-                std::wostringstream name;
-                name << L"Sample " << samples.size();
+                std::ostringstream name;
+                name << "Sample " << samples.size();
                 PSXSamp *samp =
                     new PSXSamp(this, beginOffset, i - beginOffset, beginOffset,
                                 i - beginOffset - extraGunkLength, 1, 16, 44100, name.str());
@@ -144,8 +144,8 @@ bool PSXSampColl::GetSampleInfo() {
                 offSampEnd += 16;
             } while (!lastBlock);
 
-            std::wostringstream name;
-            name << L"Sample " << sampleIndex;
+            std::ostringstream name;
+            name << "Sample " << sampleIndex;
             PSXSamp *samp =
                 new PSXSamp(this, dwOffset + it->offset, it->size, dwOffset + it->offset,
                             offSampEnd - offSampStart, 1, 16, 44100, name.str());
@@ -257,7 +257,7 @@ const std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file,
 
 PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 wstring name, bool bSetloopOnConversion)
+                 string name, bool bSetloopOnConversion)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
       bSetLoopOnConversion(bSetloopOnConversion) {
     bPSXLoopInfoPrioritizing = true;
@@ -282,10 +282,10 @@ void PSXSamp::ConvertToStdWave(uint8_t *buf) {
     for (uint32_t k = 0; k < dataLength; k += 0x10)  // for every adpcm chunk
     {
         if (dwOffset + k + 16 > vgmfile->GetEndOffset()) {
-            L_WARN("Unexpected EOF ({})", wstring2string(name));
+            L_WARN("Unexpected EOF ({})", (name));
             break;
         } else if (!addrOutOfVirtFile && k + 16 > unLength) {
-            L_WARN("Unexpected end of PSXSamp ({})", wstring2string(name));
+            L_WARN("Unexpected end of PSXSamp ({})", (name));
             addrOutOfVirtFile = true;
         }
 

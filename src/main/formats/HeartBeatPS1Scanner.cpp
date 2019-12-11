@@ -143,7 +143,7 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
 
         // valid file, open it as VGMFile
         if (total_instr_size != 0) {
-            // LogDebug(L"HeartBeatPS1InstrSet 0x%X", offset);
+            // LogDebug("HeartBeatPS1InstrSet 0x%X", offset);
         }
 
         if (seq_size != 0) {

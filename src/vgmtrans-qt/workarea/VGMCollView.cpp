@@ -27,7 +27,7 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
     VGMFile *file = fileFromIndex(index);
 
     if (role == Qt::DisplayRole) {
-        return QString::fromStdWString(*file->GetName());
+        return QString::fromStdString(*file->GetName());
     } else if (role == Qt::DecorationRole) {
         return iconForFileType(file->GetFileType());
     }
@@ -36,7 +36,8 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
 }
 
 void VGMCollViewModel::handleNewCollSelected(QModelIndex modelIndex) {
-    if (!modelIndex.isValid() || qtVGMRoot.vVGMColl.empty() || qtVGMRoot.vVGMColl.size() < modelIndex.row()) {
+    if (!modelIndex.isValid() || qtVGMRoot.vVGMColl.empty() ||
+        qtVGMRoot.vVGMColl.size() < modelIndex.row()) {
         m_coll = nullptr;
     } else {
         m_coll = qtVGMRoot.vVGMColl[modelIndex.row()];

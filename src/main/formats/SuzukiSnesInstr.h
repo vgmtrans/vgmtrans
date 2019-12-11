@@ -17,7 +17,7 @@ class SuzukiSnesInstrSet : public VGMInstrSet {
    public:
     SuzukiSnesInstrSet(RawFile *file, SuzukiSnesVersion ver, uint32_t spcDirAddr,
                        uint16_t addrSRCNTable, uint16_t addrVolumeTable, uint16_t addrADSRTable,
-                       uint16_t addrTuningTable, const std::wstring &name = L"SuzukiSnesInstrSet");
+                       uint16_t addrTuningTable, const std::string &name = "SuzukiSnesInstrSet");
     virtual ~SuzukiSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -43,7 +43,7 @@ class SuzukiSnesInstr : public VGMInstr {
     SuzukiSnesInstr(VGMInstrSet *instrSet, SuzukiSnesVersion ver, uint8_t instrNum,
                     uint32_t spcDirAddr, uint16_t addrSRCNTable, uint16_t addrVolumeTable,
                     uint16_t addrADSRTable, uint16_t addrTuningTable,
-                    const std::wstring &name = L"SuzukiSnesInstr");
+                    const std::string &name = "SuzukiSnesInstr");
     virtual ~SuzukiSnesInstr(void);
 
     virtual bool LoadInstr();

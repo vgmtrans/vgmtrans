@@ -149,12 +149,12 @@ class MidiTrack {
     void InsertTimeSig(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime);
     void AddEndOfTrack(void);
     void InsertEndOfTrack(uint32_t absTime);
-    void AddText(const std::wstring &wstr);
-    void InsertText(const std::wstring &wstr, uint32_t absTime);
-    void AddSeqName(const std::wstring &wstr);
-    void InsertSeqName(const std::wstring &wstr, uint32_t absTime);
-    void AddTrackName(const std::wstring &wstr);
-    void InsertTrackName(const std::wstring &wstr, uint32_t absTime);
+    void AddText(const std::string &wstr);
+    void InsertText(const std::string &wstr, uint32_t absTime);
+    void AddSeqName(const std::string &wstr);
+    void InsertSeqName(const std::string &wstr, uint32_t absTime);
+    void AddTrackName(const std::string &wstr);
+    void InsertTrackName(const std::string &wstr, uint32_t absTime);
     void AddGMReset();
     void InsertGMReset(uint32_t absTime);
     void AddGM2Reset();
@@ -202,7 +202,7 @@ class MidiFile {
     uint32_t GetPPQN();
     void WriteMidiToBuffer(std::vector<uint8_t> &buf);
     void Sort(void);
-    bool SaveMidiFile(const std::wstring &filepath);
+    bool SaveMidiFile(const std::string &filepath);
 
    protected:
     // bool bAddedTempo;
@@ -231,9 +231,9 @@ class MidiEvent {
     uint32_t WriteMetaEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
                             uint8_t *data, size_t dataSize);
     uint32_t WriteMetaTextEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
-                                std::wstring wstr);
+                                std::string wstr);
 
-    static std::wstring GetNoteName(int noteNumber);
+    static std::string GetNoteName(int noteNumber);
 
     bool operator<(const MidiEvent &) const;
     bool operator>(const MidiEvent &) const;
@@ -473,29 +473,29 @@ class EndOfTrackEvent : public MidiEvent {
 
 class TextEvent : public MidiEvent {
    public:
-    TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::wstring &wstr);
+    TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr);
     virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
     virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 
-    std::wstring text;
+    std::string text;
 };
 
 class SeqNameEvent : public MidiEvent {
    public:
-    SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::wstring &wstr);
+    SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr);
     virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
     virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 
-    std::wstring text;
+    std::string text;
 };
 
 class TrackNameEvent : public MidiEvent {
    public:
-    TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::wstring &wstr);
+    TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr);
     virtual MidiEventType GetEventType() { return MIDIEVENT_TEXT; }
     virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 
-    std::wstring text;
+    std::string text;
 };
 
 // SPECIAL EVENTS THAT AFFECT OTHER MIDI EVENTS RATHER THAN DIRECTLY OUTPUT TO THE FILE

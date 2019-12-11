@@ -15,7 +15,7 @@ DECLARE_FORMAT(HudsonSnes);
 #define SEQ_PPQN 48
 
 HudsonSnesSeq::HudsonSnesSeq(RawFile *file, HudsonSnesVersion ver, uint32_t seqdataOffset,
-                             std::wstring newName)
+                             std::string newName)
     : VGMSeq(HudsonSnesFormat::name, file, seqdataOffset, 0, newName),
       version(ver),
       TimebaseShift(2),
@@ -55,7 +55,7 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
 
     // track addresses
     if (version == HUDSONSNES_V0 || version == HUDSONSNES_V1) {
-        VGMHeader *trackPtrHeader = header->AddHeader(curOffset, 0, L"Track Pointers");
+        VGMHeader *trackPtrHeader = header->AddHeader(curOffset, 0, "Track Pointers");
         if (!GetTrackPointersInHeaderInfo(trackPtrHeader, curOffset)) {
             return false;
         }
@@ -79,17 +79,17 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
 
         switch (eventType) {
             case HEADER_EVENT_END: {
-                header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Header End");
+                header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Header End");
                 goto header_end;
             }
 
             case HEADER_EVENT_TIMEBASE: {
-                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Timebase");
-                aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Timebase");
+                aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
                 // actual music engine decreases timebase based on the following value.
                 // however, we always use SEQ_PPQN and adjust note lengths when necessary instead.
-                aHeader->AddSimpleItem(curOffset, 1, L"Timebase");
+                aHeader->AddSimpleItem(curOffset, 1, "Timebase");
                 TimebaseShift = GetByte(curOffset++) & 3;
 
                 aHeader->unLength = curOffset - beginOffset;
@@ -97,8 +97,8 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_TRACKS: {
-                VGMHeader *trackPtrHeader = header->AddHeader(beginOffset, 0, L"Track Pointers");
-                trackPtrHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *trackPtrHeader = header->AddHeader(beginOffset, 0, "Track Pointers");
+                trackPtrHeader->AddSimpleItem(beginOffset, 1, "Event ID");
                 if (!GetTrackPointersInHeaderInfo(trackPtrHeader, curOffset)) {
                     return false;
                 }
@@ -107,10 +107,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_INSTRUMENTS_V1: {
-                VGMHeader *instrHeader = header->AddHeader(beginOffset, 1, L"Instruments");
-                instrHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *instrHeader = header->AddHeader(beginOffset, 1, "Instruments");
+                instrHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                instrHeader->AddSimpleItem(curOffset, 1, L"Size");
+                instrHeader->AddSimpleItem(curOffset, 1, "Size");
                 uint8_t tableSize = GetByte(curOffset++);
                 if (curOffset + tableSize > 0x10000) {
                     return false;
@@ -123,14 +123,14 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
                 uint8_t tableLength = tableSize / 4;
                 for (uint8_t instrNum = 0; instrNum < tableLength; instrNum++) {
                     uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
-                    std::wstringstream instrName;
-                    instrName << L"Instrument " << instrNum;
+                    std::stringstream instrName;
+                    instrName << "Instrument " << instrNum;
                     VGMHeader *aInstrHeader =
                         instrHeader->AddHeader(addrInstrItem, 4, instrName.str().c_str());
-                    aInstrHeader->AddSimpleItem(addrInstrItem, 1, L"SRCN");
-                    aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, L"ADSR(1)");
-                    aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, L"ADSR(2)");
-                    aInstrHeader->AddSimpleItem(addrInstrItem + 3, 1, L"GAIN");
+                    aInstrHeader->AddSimpleItem(addrInstrItem, 1, "SRCN");
+                    aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, "ADSR(1)");
+                    aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, "ADSR(2)");
+                    aInstrHeader->AddSimpleItem(addrInstrItem + 3, 1, "GAIN");
                 }
                 curOffset += tableSize;
 
@@ -139,10 +139,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_PERCUSSIONS_V1: {
-                VGMHeader *percHeader = header->AddHeader(beginOffset, 1, L"Percussions");
-                percHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *percHeader = header->AddHeader(beginOffset, 1, "Percussions");
+                percHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                percHeader->AddSimpleItem(curOffset, 1, L"Size");
+                percHeader->AddSimpleItem(curOffset, 1, "Size");
                 uint8_t tableSize = GetByte(curOffset++);
                 if (curOffset + tableSize > 0x10000) {
                     return false;
@@ -154,14 +154,14 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
                 uint8_t tableLength = tableSize / 4;
                 for (uint8_t percNote = 0; percNote < tableLength; percNote++) {
                     uint16_t addrPercItem = PercussionTableAddress + percNote * 4;
-                    std::wstringstream percNoteName;
-                    percNoteName << L"Percussion " << percNote;
+                    std::stringstream percNoteName;
+                    percNoteName << "Percussion " << percNote;
                     VGMHeader *percNoteHeader =
                         percHeader->AddHeader(addrPercItem, 4, percNoteName.str().c_str());
-                    percNoteHeader->AddSimpleItem(addrPercItem, 1, L"Instrument");
-                    percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, L"Unity Key");
-                    percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, L"Volume");
-                    percNoteHeader->AddSimpleItem(addrPercItem + 3, 1, L"Pan");
+                    percNoteHeader->AddSimpleItem(addrPercItem, 1, "Instrument");
+                    percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, "Unity Key");
+                    percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, "Volume");
+                    percNoteHeader->AddSimpleItem(addrPercItem + 3, 1, "Pan");
                 }
                 curOffset += tableSize;
 
@@ -170,10 +170,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_INSTRUMENTS_V2: {
-                VGMHeader *instrHeader = header->AddHeader(beginOffset, 1, L"Instruments");
-                instrHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *instrHeader = header->AddHeader(beginOffset, 1, "Instruments");
+                instrHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                instrHeader->AddSimpleItem(curOffset, 1, L"Number of Items");
+                instrHeader->AddSimpleItem(curOffset, 1, "Number of Items");
                 uint8_t tableSize = GetByte(curOffset++) * 4;
                 if (curOffset + tableSize > 0x10000) {
                     return false;
@@ -186,14 +186,14 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
                 uint8_t tableLength = tableSize / 4;
                 for (uint8_t instrNum = 0; instrNum < tableLength; instrNum++) {
                     uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
-                    std::wstringstream instrName;
-                    instrName << L"Instrument " << instrNum;
+                    std::stringstream instrName;
+                    instrName << "Instrument " << instrNum;
                     VGMHeader *aInstrHeader =
                         instrHeader->AddHeader(addrInstrItem, 4, instrName.str().c_str());
-                    aInstrHeader->AddSimpleItem(addrInstrItem, 1, L"SRCN");
-                    aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, L"ADSR(1)");
-                    aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, L"ADSR(2)");
-                    aInstrHeader->AddSimpleItem(addrInstrItem + 3, 1, L"GAIN");
+                    aInstrHeader->AddSimpleItem(addrInstrItem, 1, "SRCN");
+                    aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, "ADSR(1)");
+                    aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, "ADSR(2)");
+                    aInstrHeader->AddSimpleItem(addrInstrItem + 3, 1, "GAIN");
                 }
                 curOffset += tableSize;
 
@@ -202,10 +202,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_PERCUSSIONS_V2: {
-                VGMHeader *percHeader = header->AddHeader(beginOffset, 1, L"Percussions");
-                percHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *percHeader = header->AddHeader(beginOffset, 1, "Percussions");
+                percHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                percHeader->AddSimpleItem(curOffset, 1, L"Number of Items");
+                percHeader->AddSimpleItem(curOffset, 1, "Number of Items");
                 uint8_t tableSize = GetByte(curOffset++) * 4;
                 if (curOffset + tableSize > 0x10000) {
                     return false;
@@ -217,14 +217,14 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
                 uint8_t tableLength = tableSize / 4;
                 for (uint8_t percNote = 0; percNote < tableLength; percNote++) {
                     uint16_t addrPercItem = PercussionTableAddress + percNote * 4;
-                    std::wstringstream percNoteName;
-                    percNoteName << L"Percussion " << percNote;
+                    std::stringstream percNoteName;
+                    percNoteName << "Percussion " << percNote;
                     VGMHeader *percNoteHeader =
                         percHeader->AddHeader(addrPercItem, 4, percNoteName.str().c_str());
-                    percNoteHeader->AddSimpleItem(addrPercItem, 1, L"Instrument");
-                    percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, L"Unity Key");
-                    percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, L"Volume");
-                    percNoteHeader->AddSimpleItem(addrPercItem + 3, 1, L"Pan");
+                    percNoteHeader->AddSimpleItem(addrPercItem, 1, "Instrument");
+                    percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, "Unity Key");
+                    percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, "Volume");
+                    percNoteHeader->AddSimpleItem(addrPercItem + 3, 1, "Pan");
                 }
                 curOffset += tableSize;
 
@@ -233,10 +233,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_05: {
-                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Unknown");
-                aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Unknown");
+                aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                aHeader->AddSimpleItem(curOffset, 1, L"Number of Items");
+                aHeader->AddSimpleItem(curOffset, 1, "Number of Items");
                 uint8_t tableSize = GetByte(curOffset++) * 2;
                 if (curOffset + tableSize > 0x10000) {
                     return false;
@@ -250,10 +250,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_06: {
-                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Unknown");
-                aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Unknown");
+                aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                aHeader->AddSimpleItem(curOffset, 1, L"Number of Items");
+                aHeader->AddSimpleItem(curOffset, 1, "Number of Items");
                 uint8_t tableSize = GetByte(curOffset++) * 2;
                 if (curOffset + tableSize > 0x10000) {
                     return false;
@@ -267,24 +267,24 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_ECHO_PARAM: {
-                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Echo Param");
-                aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Echo Param");
+                aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                aHeader->AddSimpleItem(curOffset, 1, L"Use Default Echo");
+                aHeader->AddSimpleItem(curOffset, 1, "Use Default Echo");
                 uint8_t useDefaultEcho = GetByte(curOffset++);
 
                 if (useDefaultEcho == 0) {
-                    aHeader->AddSimpleItem(curOffset, 1, L"EVOL(L)");
+                    aHeader->AddSimpleItem(curOffset, 1, "EVOL(L)");
                     curOffset++;
-                    aHeader->AddSimpleItem(curOffset, 1, L"EVOL(R)");
+                    aHeader->AddSimpleItem(curOffset, 1, "EVOL(R)");
                     curOffset++;
-                    aHeader->AddSimpleItem(curOffset, 1, L"EDL");
+                    aHeader->AddSimpleItem(curOffset, 1, "ED");
                     curOffset++;
-                    aHeader->AddSimpleItem(curOffset, 1, L"EFB");
+                    aHeader->AddSimpleItem(curOffset, 1, "EFB");
                     curOffset++;
-                    aHeader->AddSimpleItem(curOffset, 1, L"FIR");
+                    aHeader->AddSimpleItem(curOffset, 1, "FIR");
                     curOffset++;
-                    aHeader->AddSimpleItem(curOffset, 1, L"EON");
+                    aHeader->AddSimpleItem(curOffset, 1, "EON");
                     curOffset++;
                 }
 
@@ -293,10 +293,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_NOTE_VELOCITY: {
-                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Note Velocity");
-                aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Note Velocity");
+                aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                aHeader->AddSimpleItem(curOffset, 1, L"Note Velocity On/Off");
+                aHeader->AddSimpleItem(curOffset, 1, "Note Velocity On/Off");
                 uint8_t noteVelOn = GetByte(curOffset++);
                 if (noteVelOn != 0) {
                     NoteEventHasVelocity = true;
@@ -307,10 +307,10 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
             }
 
             case HEADER_EVENT_09: {
-                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, L"Unknown");
-                aHeader->AddSimpleItem(beginOffset, 1, L"Event ID");
+                VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Unknown");
+                aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
 
-                aHeader->AddSimpleItem(curOffset, 1, L"Number of Items");
+                aHeader->AddSimpleItem(curOffset, 1, "Number of Items");
                 uint8_t tableSize = GetByte(curOffset++) * 2;
                 if (curOffset + tableSize > 0x10000) {
                     return false;
@@ -344,7 +344,7 @@ bool HudsonSnesSeq::GetTrackPointersInHeaderInfo(VGMHeader *header, uint32_t &of
     }
 
     // flag field that indicates track availability
-    header->AddSimpleItem(curOffset, 1, L"Track Availability");
+    header->AddSimpleItem(curOffset, 1, "Track Availability");
     TrackAvailableBits = GetByte(curOffset++);
 
     // read track addresses (DSP channel 8 to 1)
@@ -355,8 +355,8 @@ bool HudsonSnesSeq::GetTrackPointersInHeaderInfo(VGMHeader *header, uint32_t &of
                 return false;
             }
 
-            std::wstringstream trackName;
-            trackName << L"Track Pointer " << (trackIndex + 1);
+            std::stringstream trackName;
+            trackName << "Track Pointer " << (trackIndex + 1);
             header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
             TrackAddresses[trackIndex] = GetShort(curOffset);
             curOffset += 2;
@@ -535,7 +535,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
     uint8_t statusByte = GetByte(curOffset++);
     bool bContinue = true;
 
-    std::wstringstream desc;
+    std::stringstream desc;
 
     HudsonSnesSeqEventType eventType = (HudsonSnesSeqEventType)0;
     std::map<uint8_t, HudsonSnesSeqEventType>::iterator pEventType =
@@ -546,27 +546,27 @@ bool HudsonSnesTrack::ReadEvent(void) {
 
     switch (eventType) {
         case EVENT_UNKNOWN0:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
 
         case EVENT_UNKNOWN1: {
             uint8_t arg1 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
                  << (int)arg1;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
         case EVENT_UNKNOWN2: {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -574,10 +574,10 @@ bool HudsonSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -586,23 +586,23 @@ bool HudsonSnesTrack::ReadEvent(void) {
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
             uint8_t arg4 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3 << L"  Arg4: "
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
+                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3 << "  Arg4: "
                  << (int)arg4;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
         case EVENT_NOP: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(),
                             CLR_MISC, ICON_BINARY);
             break;
         }
 
         case EVENT_NOP1: {
             curOffset++;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(),
                             CLR_MISC, ICON_BINARY);
             break;
         }
@@ -666,7 +666,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 if (prevNoteSlurred && key == prevNoteKey) {
                     // tie
                     MakePrevDurNoteEnd(GetTime() + dur);
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie",
                                     desc.str().c_str(), CLR_TIE, ICON_NOTE);
                 } else {
                     // note
@@ -706,11 +706,11 @@ bool HudsonSnesTrack::ReadEvent(void) {
             uint8_t newQuantize = GetByte(curOffset++);
             spcNoteQuantize = newQuantize;
             if (newQuantize <= 8) {
-                desc << L"Length: " << (int)newQuantize << L"/8";
+                desc << "Length: " << (int)newQuantize << "/8";
             } else {
-                desc << L"Length: " << L"Full-Length - " << (int)(newQuantize - 8);
+                desc << "Length: " << "Full-Length - " << (int)(newQuantize - 8);
             }
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration Rate",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate",
                             desc.str().c_str(), CLR_DURNOTE);
             break;
         }
@@ -753,9 +753,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
             uint8_t reverse = GetByte(curOffset++);
             bool reverseLeft = (reverse & 2) != 0;
             bool reverseRight = (reverse & 1) != 0;
-            desc << L"Reverse Left: " << (reverseLeft ? L"On" : L"Off") << L"Reverse Right: "
-                 << (reverseRight ? L"On" : L"Off");
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverse Phase",
+            desc << "Reverse Left: " << (reverseLeft ? "On" : "Off") << "Reverse Right: "
+                 << (reverseRight ? "On" : "Off");
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverse Phase",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
@@ -769,14 +769,14 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 newVolume = 0xff;
             }
             spcVolume = (uint8_t)newVolume;
-            AddVol(beginOffset, curOffset - beginOffset, spcVolume >> 1, L"Volume (Relative)");
+            AddVol(beginOffset, curOffset - beginOffset, spcVolume >> 1, "Volume (Relative)");
             break;
         }
 
         case EVENT_LOOP_START: {
             uint8_t count = GetByte(curOffset);
-            desc << L"Loop Count: " << (int)count;
-            AddGenericEvent(beginOffset, 2, L"Loop Start", desc.str().c_str(), CLR_LOOP,
+            desc << "Loop Count: " << (int)count;
+            AddGenericEvent(beginOffset, 2, "Loop Start", desc.str().c_str(), CLR_LOOP,
                             ICON_STARTREP);
 
             if (spcCallStackPtr + 3 > HUDSONSNES_CALLSTACK_SIZE) {
@@ -797,7 +797,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_LOOP_END: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(),
                             CLR_LOOP, ICON_ENDREP);
 
             if (spcCallStackPtr < 3) {
@@ -823,9 +823,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
 
         case EVENT_SUBROUTINE: {
             uint16_t dest = GetShort(curOffset);
-            desc << "Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+            desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                  << std::uppercase << (int)dest;
-            AddGenericEvent(beginOffset, 3, L"Pattern Play", desc.str().c_str(), CLR_LOOP,
+            AddGenericEvent(beginOffset, 3, "Pattern Play", desc.str().c_str(), CLR_LOOP,
                             ICON_STARTREP);
 
             if (spcCallStackPtr + 2 > HUDSONSNES_CALLSTACK_SIZE) {
@@ -847,15 +847,15 @@ bool HudsonSnesTrack::ReadEvent(void) {
         case EVENT_GOTO: {
             uint16_t dest = GetShort(curOffset);
             curOffset += 2;
-            desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+            desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                  << std::uppercase << (int)dest;
             uint32_t length = curOffset - beginOffset;
 
             curOffset = dest;
             if (!IsOffsetUsed(dest)) {
-                AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
+                AddGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), CLR_LOOPFOREVER);
             } else {
-                bContinue = AddLoopForever(beginOffset, length, L"Jump");
+                bContinue = AddLoopForever(beginOffset, length, "Jump");
             }
             break;
         }
@@ -871,16 +871,16 @@ bool HudsonSnesTrack::ReadEvent(void) {
             if (parentSeq->version == HUDSONSNES_V0 || parentSeq->version == HUDSONSNES_V1) {
                 uint8_t lfoRate = GetByte(curOffset++);
                 uint8_t lfoDepth = GetByte(curOffset++);
-                desc << L"Rate: " << (int)lfoRate << L"  Depth: " << (int)lfoDepth;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato",
+                desc << "Rate: " << (int)lfoRate << "  Depth: " << (int)lfoDepth;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato",
                                 desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             } else {  // HUDSONSNES_V2
                 uint8_t arg1 = GetByte(curOffset++);
                 uint8_t arg2 = GetByte(curOffset++);
                 uint8_t arg3 = GetByte(curOffset++);
-                desc << L"Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: "
+                desc << "Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: "
                      << (int)arg3;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato",
                                 desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             }
             break;
@@ -888,8 +888,8 @@ bool HudsonSnesTrack::ReadEvent(void) {
 
         case EVENT_VIBRATO_DELAY: {
             uint8_t lfoDelay = GetByte(curOffset++);
-            desc << L"Delay: " << (int)lfoDelay;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Delay",
+            desc << "Delay: " << (int)lfoDelay;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Delay",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -897,8 +897,8 @@ bool HudsonSnesTrack::ReadEvent(void) {
         case EVENT_ECHO_VOLUME: {
             int8_t volumeLeft = GetByte(curOffset++);
             int8_t volumeRight = GetByte(curOffset++);
-            desc << L"Left Volume: " << (int)volumeLeft << L"  Right Volume: " << (int)volumeRight;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume",
+            desc << "Left Volume: " << (int)volumeLeft << "  Right Volume: " << (int)volumeRight;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume",
                             desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
             break;
         }
@@ -907,15 +907,15 @@ bool HudsonSnesTrack::ReadEvent(void) {
             uint8_t delay = GetByte(curOffset++);
             uint8_t feedback = GetByte(curOffset++);
             uint8_t filterIndex = GetByte(curOffset++);
-            desc << L"Echo Delay: " << (int)delay << L"  Echo Feedback: " << (int)feedback
-                 << L"  FIR: " << (int)filterIndex;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Parameter",
+            desc << "Echo Delay: " << (int)delay << "  Echo Feedback: " << (int)feedback
+                 << "  FIR: " << (int)filterIndex;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Parameter",
                             desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
             break;
         }
 
         case EVENT_ECHO_ON: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo On", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
         }
@@ -929,7 +929,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
         case EVENT_TRANSPOSE_REL: {
             int8_t delta = GetByte(curOffset++);
             AddTranspose(beginOffset, curOffset - beginOffset, transpose + delta,
-                         L"Transpose (Relative)");
+                         "Transpose (Relative)");
             break;
         }
 
@@ -938,22 +938,22 @@ bool HudsonSnesTrack::ReadEvent(void) {
             uint8_t depth = GetByte(curOffset++);
             uint8_t direction = GetByte(curOffset++);
             bool upTo = (direction != 0);
-            desc << L"Speed: " << (int)speed << L"  Depth: " << (int)depth << L"  Direction: "
-                 << (upTo ? L"Up" : L"Down");
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Attack Pitch Envelope On",
+            desc << "Speed: " << (int)speed << "  Depth: " << (int)depth << "  Direction: "
+                 << (upTo ? "Up" : "Down");
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Attack Pitch Envelope On",
                             desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
 
         case EVENT_PITCH_ATTACK_ENV_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Attack Pitch Envelope Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Attack Pitch Envelope Off",
                             desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
 
         case EVENT_LOOP_POINT: {
             infiniteLoopPoint = curOffset;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Infinite Loop Point",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Infinite Loop Point",
                             desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
             break;
         }
@@ -966,7 +966,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
 
         case EVENT_LOOP_POINT_ONCE: {
             AddGenericEvent(beginOffset, curOffset - beginOffset,
-                            L"Infinite Loop Point (Ignore after the Second Time)",
+                            "Infinite Loop Point (Ignore after the Second Time)",
                             desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
             if (!loopPointOnceProcessed) {
                 infiniteLoopPoint = curOffset;
@@ -993,7 +993,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
             }
 
             spcVolume = VOLUME_TABLE[volIndex];
-            AddVol(beginOffset, curOffset - beginOffset, spcVolume >> 1, L"Volume From Table");
+            AddVol(beginOffset, curOffset - beginOffset, spcVolume >> 1, "Volume From Table");
             break;
         }
 
@@ -1019,7 +1019,7 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 bContinue = false;
             } else {
                 // end subroutine
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"End Pattern",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern",
                                 desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
 
                 if (spcCallStackPtr < 2) {
@@ -1047,18 +1047,18 @@ bool HudsonSnesTrack::ReadEvent(void) {
 
             switch (subEventType) {
                 case SUBEVENT_UNKNOWN0:
-                    desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
+                    desc << "Subevent: 0x" << std::hex << std::setfill('0') << std::setw(2)
                          << std::uppercase << (int)subStatusByte;
-                    AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                    AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                                desc.str().c_str());
                     break;
 
                 case SUBEVENT_UNKNOWN1: {
                     uint8_t arg1 = GetByte(curOffset++);
-                    desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                         << std::uppercase << (int)subStatusByte << std::dec << std::setfill(L' ')
-                         << std::setw(0) << L"  Arg1: " << (int)arg1;
-                    AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                    desc << "Subevent: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                         << std::uppercase << (int)subStatusByte << std::dec << std::setfill(' ')
+                         << std::setw(0) << "  Arg1: " << (int)arg1;
+                    AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                                desc.str().c_str());
                     break;
                 }
@@ -1066,10 +1066,10 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_UNKNOWN2: {
                     uint8_t arg1 = GetByte(curOffset++);
                     uint8_t arg2 = GetByte(curOffset++);
-                    desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                         << std::uppercase << (int)subStatusByte << std::dec << std::setfill(L' ')
-                         << std::setw(0) << L"  Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2;
-                    AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                    desc << "Subevent: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                         << std::uppercase << (int)subStatusByte << std::dec << std::setfill(' ')
+                         << std::setw(0) << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2;
+                    AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                                desc.str().c_str());
                     break;
                 }
@@ -1078,11 +1078,11 @@ bool HudsonSnesTrack::ReadEvent(void) {
                     uint8_t arg1 = GetByte(curOffset++);
                     uint8_t arg2 = GetByte(curOffset++);
                     uint8_t arg3 = GetByte(curOffset++);
-                    desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                         << std::uppercase << (int)subStatusByte << std::dec << std::setfill(L' ')
-                         << std::setw(0) << L"  Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2
-                         << L"  Arg3: " << (int)arg3;
-                    AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                    desc << "Subevent: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                         << std::uppercase << (int)subStatusByte << std::dec << std::setfill(' ')
+                         << std::setw(0) << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2
+                         << "  Arg3: " << (int)arg3;
+                    AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                                desc.str().c_str());
                     break;
                 }
@@ -1092,17 +1092,17 @@ bool HudsonSnesTrack::ReadEvent(void) {
                     uint8_t arg2 = GetByte(curOffset++);
                     uint8_t arg3 = GetByte(curOffset++);
                     uint8_t arg4 = GetByte(curOffset++);
-                    desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                         << std::uppercase << (int)subStatusByte << std::dec << std::setfill(L' ')
-                         << std::setw(0) << L"  Arg1: " << (int)arg1 << L"  Arg2: " << (int)arg2
-                         << L"  Arg3: " << (int)arg3 << L"  Arg4: " << (int)arg4;
-                    AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                    desc << "Subevent: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                         << std::uppercase << (int)subStatusByte << std::dec << std::setfill(' ')
+                         << std::setw(0) << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2
+                         << "  Arg3: " << (int)arg3 << "  Arg4: " << (int)arg4;
+                    AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                                desc.str().c_str());
                     break;
                 }
 
                 case SUBEVENT_NOP: {
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP",
                                     desc.str().c_str(), CLR_MISC, ICON_BINARY);
                     break;
                 }
@@ -1114,34 +1114,34 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 }
 
                 case SUBEVENT_ECHO_OFF: {
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off",
                                     desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
                     break;
                 }
 
                 case SUBEVENT_PERC_ON: {
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion On",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On",
                                     desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
                     break;
                 }
 
                 case SUBEVENT_PERC_OFF: {
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Off",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off",
                                     desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
                     break;
                 }
 
                 case SUBEVENT_VIBRATO_TYPE: {
                     uint8_t vibratoType = subStatusByte - 0x05;
-                    desc << L"Vibrato Type: " << (int)vibratoType;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Type",
+                    desc << "Vibrato Type: " << (int)vibratoType;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Type",
                                     desc.str().c_str(), CLR_LFO, ICON_CONTROL);
                     break;
                 }
 
                 case SUBEVENT_NOTE_VEL_OFF: {
                     parentSeq->DisableNoteVelocity = true;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Velocity Off",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Note Velocity Off",
                                     desc.str().c_str(), CLR_MISC, ICON_CONTROL);
                     break;
                 }
@@ -1149,8 +1149,8 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_MOV_IMM: {
                     uint8_t reg = GetByte(curOffset++);
                     uint8_t val = GetByte(curOffset++);
-                    desc << L"Register: " << (int)reg << L"  Value: " << (int)val;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"MOV (Immediate)",
+                    desc << "Register: " << (int)reg << "  Value: " << (int)val;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "MOV (Immediate)",
                                     desc.str().c_str(), CLR_MISC);
 
                     if (reg < HUDSONSNES_USERRAM_SIZE) {
@@ -1163,9 +1163,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_MOV: {
                     uint8_t regDst = GetByte(curOffset++);
                     uint8_t regSrc = GetByte(curOffset++);
-                    desc << L"Destination Register: " << (int)regDst << L"  Source Register: "
+                    desc << "Destination Register: " << (int)regDst << "  Source Register: "
                          << (int)regSrc;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"MOV",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "MOV",
                                     desc.str().c_str(), CLR_MISC);
 
                     if (regDst < HUDSONSNES_USERRAM_SIZE && regSrc < HUDSONSNES_USERRAM_SIZE) {
@@ -1179,8 +1179,8 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_CMP_IMM: {
                     uint8_t reg = GetByte(curOffset++);
                     uint8_t val = GetByte(curOffset++);
-                    desc << L"Register: " << (int)reg << L"  Value: " << (int)val;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"CMP (Immediate)",
+                    desc << "Register: " << (int)reg << "  Value: " << (int)val;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "CMP (Immediate)",
                                     desc.str().c_str(), CLR_MISC);
 
                     if (reg < HUDSONSNES_USERRAM_SIZE) {
@@ -1193,9 +1193,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_CMP: {
                     uint8_t regDst = GetByte(curOffset++);
                     uint8_t regSrc = GetByte(curOffset++);
-                    desc << L"Destination Register: " << (int)regDst << L"  Source Register: "
+                    desc << "Destination Register: " << (int)regDst << "  Source Register: "
                          << (int)regSrc;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"CMP",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "CMP",
                                     desc.str().c_str(), CLR_MISC);
 
                     if (regDst < HUDSONSNES_USERRAM_SIZE && regSrc < HUDSONSNES_USERRAM_SIZE) {
@@ -1210,9 +1210,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_BNE: {
                     uint16_t dest = GetShort(curOffset);
                     curOffset += 2;
-                    desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+                    desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                          << std::uppercase << (int)dest;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"BNE",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "BNE",
                                     desc.str().c_str(), CLR_MISC);
 
                     if (parentSeq->UserCmpReg != 0) {
@@ -1225,9 +1225,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_BEQ: {
                     uint16_t dest = GetShort(curOffset);
                     curOffset += 2;
-                    desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+                    desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                          << std::uppercase << (int)dest;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"BEQ",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "BEQ",
                                     desc.str().c_str(), CLR_MISC);
 
                     if (parentSeq->UserCmpReg != 0) {
@@ -1240,9 +1240,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_BCS: {
                     uint16_t dest = GetShort(curOffset);
                     curOffset += 2;
-                    desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+                    desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                          << std::uppercase << (int)dest;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"BCS",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "BCS",
                                     desc.str().c_str(), CLR_MISC);
 
                     if (parentSeq->UserCarry) {
@@ -1255,9 +1255,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_BCC: {
                     uint16_t dest = GetShort(curOffset);
                     curOffset += 2;
-                    desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+                    desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                          << std::uppercase << (int)dest;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"BCC",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "BCC",
                                     desc.str().c_str(), CLR_MISC);
 
                     if (!parentSeq->UserCarry) {
@@ -1270,9 +1270,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_BMI: {
                     uint16_t dest = GetShort(curOffset);
                     curOffset += 2;
-                    desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+                    desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                          << std::uppercase << (int)dest;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"BMI",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "BMI",
                                     desc.str().c_str(), CLR_MISC);
 
                     if ((parentSeq->UserCmpReg & 0x80) != 0) {
@@ -1285,9 +1285,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
                 case SUBEVENT_BPL: {
                     uint16_t dest = GetShort(curOffset);
                     curOffset += 2;
-                    desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+                    desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                          << std::uppercase << (int)dest;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"BPL",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "BP",
                                     desc.str().c_str(), CLR_MISC);
 
                     if ((parentSeq->UserCmpReg & 0x80) == 0) {
@@ -1299,48 +1299,48 @@ bool HudsonSnesTrack::ReadEvent(void) {
 
                 case SUBEVENT_ADSR_AR: {
                     uint8_t newAR = GetByte(curOffset++) & 15;
-                    desc << L"AR: " << (int)newAR;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Attack Rate",
+                    desc << "AR: " << (int)newAR;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate",
                                     desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
                     break;
                 }
 
                 case SUBEVENT_ADSR_DR: {
                     uint8_t newDR = GetByte(curOffset++) & 7;
-                    desc << L"DR: " << (int)newDR;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Decay Rate",
+                    desc << "DR: " << (int)newDR;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate",
                                     desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
                     break;
                 }
 
                 case SUBEVENT_ADSR_SL: {
                     uint8_t newSL = GetByte(curOffset++) & 7;
-                    desc << L"SL: " << (int)newSL;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Level",
+                    desc << "SL: " << (int)newSL;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Leve",
                                     desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
                     break;
                 }
 
                 case SUBEVENT_ADSR_SR: {
                     uint8_t newSR = GetByte(curOffset++) & 15;
-                    desc << L"SR: " << (int)newSR;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Rate",
+                    desc << "SR: " << (int)newSR;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate",
                                     desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
                     break;
                 }
 
                 case SUBEVENT_ADSR_RR: {
                     uint8_t newSR = GetByte(curOffset++) & 15;
-                    desc << L"SR: " << (int)newSR;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Release Rate",
+                    desc << "SR: " << (int)newSR;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate",
                                     desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
                     break;
                 }
 
                 default:
-                    desc << L"Subevent: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
+                    desc << "Subevent: 0x" << std::hex << std::setfill('0') << std::setw(2)
                          << std::uppercase << (int)subStatusByte;
-                    AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                    AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                                desc.str().c_str());
                     L_ERROR("Unknown (sub)event {:#x}", statusByte);
 
@@ -1352,9 +1352,9 @@ bool HudsonSnesTrack::ReadEvent(void) {
         }
 
         default:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             L_ERROR("Unknown event {:#x}", statusByte);
 
             bContinue = false;
@@ -1362,8 +1362,8 @@ bool HudsonSnesTrack::ReadEvent(void) {
     }
 
     //
-    // ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase <<
-    // beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) <<
+    // ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase <<
+    // beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) <<
     // curOffset << std::endl; OutputDebugString(ssTrace.str().c_str());
 
     return bContinue;

@@ -444,7 +444,7 @@ const void *SF2File::SaveToMem() {
     return buf;
 }
 
-bool SF2File::SaveSF2File(const std::wstring &filepath) {
+bool SF2File::SaveSF2File(const std::string &filepath) {
     uint32_t size = this->GetSize();
     const void *buf = this->SaveToMem();
     bool result = pRoot->UI_WriteBufferToFile(filepath, (uint8_t *)buf, size);

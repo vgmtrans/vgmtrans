@@ -21,12 +21,12 @@ class RawFile {
    public:
     virtual ~RawFile() = default;
 
-    [[nodiscard]] virtual std::wstring name() const = 0;
-    [[nodiscard]] virtual std::wstring path() const = 0;
+    [[nodiscard]] virtual std::string name() const = 0;
+    [[nodiscard]] virtual std::string path() const = 0;
     [[nodiscard]] virtual size_t size() const noexcept = 0;
-    [[nodiscard]] virtual std::wstring extension() const = 0;
+    [[nodiscard]] virtual std::string extension() const = 0;
 
-    virtual std::wstring GetParRawFileFullPath() const { return {}; }
+    virtual std::string GetParRawFileFullPath() const { return {}; }
 
     bool IsValidOffset(uint32_t ofs) noexcept { return ofs < size(); }
 
@@ -102,15 +102,15 @@ class RawFile {
 
 class DiskFile final : public RawFile {
    public:
-    DiskFile(std::string_view path);
-    DiskFile(const std::wstring &path);
+    // DiskFile(std::string_view path);
+    DiskFile(const std::string &path);
     ~DiskFile() = default;
 
-    [[nodiscard]] std::wstring name() const override { return m_path.filename().wstring(); };
-    [[nodiscard]] std::wstring path() const override { return m_path.wstring(); };
+    [[nodiscard]] std::string name() const override { return m_path.filename().string(); };
+    [[nodiscard]] std::string path() const override { return m_path.string(); };
     [[nodiscard]] size_t size() const noexcept override { return m_data.length(); };
-    [[nodiscard]] std::wstring extension() const override {
-        auto tmp = m_path.extension().wstring();
+    [[nodiscard]] std::string extension() const override {
+        auto tmp = m_path.extension().string();
         if (!tmp.empty()) {
             return tmp.substr(1, tmp.size() - 1);
         }
@@ -136,28 +136,28 @@ class VirtFile final : public RawFile {
    public:
     VirtFile() = default;
     VirtFile(const RawFile &, size_t offset = 0);
-    VirtFile(uint8_t *data, uint32_t size, std::wstring name, std::wstring parent_fullpath = L"",
+    VirtFile(uint8_t *data, uint32_t size, std::string name, std::string parent_fullpath = "",
              const VGMTag tag = VGMTag());
     ~VirtFile() = default;
 
-    [[nodiscard]] std::wstring name() const override { return m_name; };
-    [[nodiscard]] std::wstring path() const override { return m_lpath.wstring(); };
+    [[nodiscard]] std::string name() const override { return m_name; };
+    [[nodiscard]] std::string path() const override { return m_lpath.string(); };
     [[nodiscard]] size_t size() const noexcept override { return m_data.size(); };
-    [[nodiscard]] std::wstring extension() const override {
-        auto tmp = m_lpath.extension().wstring();
+    [[nodiscard]] std::string extension() const override {
+        auto tmp = m_lpath.extension().string();
         if (!tmp.empty()) {
             return tmp.substr(1, tmp.size() - 1);
         } else {
             std::filesystem::path tmp2(m_name);
             if (tmp2.has_extension()) {
-                return tmp2.extension().wstring().substr(1, tmp2.extension().wstring().size() - 1);
+                return tmp2.extension().string().substr(1, tmp2.extension().string().size() - 1);
             }
         }
 
         return tmp;
     }
 
-    std::wstring GetParRawFileFullPath() const override { return m_lpath.wstring(); }
+    std::string GetParRawFileFullPath() const override { return m_lpath.string(); }
 
     const char *data() const override { return m_data.data(); }
     char &operator[](uint32_t offset) override { return m_data[offset]; }
@@ -170,6 +170,6 @@ class VirtFile final : public RawFile {
 
    private:
     std::vector<char> m_data;
-    std::wstring m_name;
+    std::string m_name;
     std::filesystem::path m_lpath;
 };

@@ -31,7 +31,7 @@ const uint16_t TamSoftPS1Seq::PITCH_TABLE[73] = {
 };
 
 TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong,
-                             const std::wstring &name)
+                             const std::string &name)
     : VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), ps2(false), type(0) {
     bLoadTickByTick = true;
     bUseLinearAmplitudeScale = true;
@@ -63,11 +63,11 @@ bool TamSoftPS1Seq::GetHeaderInfo(void) {
     type = GetShort(dwSongItemOffset);
     uint16_t seqHeaderRelOffset = GetShort(dwSongItemOffset + 2);
 
-    std::wstringstream songTableItemName;
-    songTableItemName << L"Song " << song;
+    std::stringstream songTableItemName;
+    songTableItemName << "Song " << song;
     VGMHeader *songTableItem = AddHeader(dwSongItemOffset, 4, songTableItemName.str());
-    songTableItem->AddSimpleItem(dwSongItemOffset, 2, L"BGM/SFX");
-    songTableItem->AddSimpleItem(dwSongItemOffset + 2, 2, L"Header Offset");
+    songTableItem->AddSimpleItem(dwSongItemOffset, 2, "BGM/SFX");
+    songTableItem->AddSimpleItem(dwSongItemOffset + 2, 2, "Header Offset");
 
     if (seqHeaderRelOffset < dwSongItemOffset + 4) {
         return false;
@@ -115,16 +115,16 @@ bool TamSoftPS1Seq::GetHeaderInfo(void) {
             for (uint8_t trackIndex = 0; trackIndex < maxTracks; trackIndex++) {
                 uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
-                std::wstringstream trackHeaderName;
-                trackHeaderName << L"Track " << (trackIndex + 1);
+                std::stringstream trackHeaderName;
+                trackHeaderName << "Track " << (trackIndex + 1);
                 VGMHeader *trackHeader =
                     seqHeader->AddHeader(dwTrackHeaderOffset, 4, trackHeaderName.str());
 
                 uint8_t live = GetByte(dwTrackHeaderOffset);
                 uint32_t dwRelTrackOffset = GetShort(dwTrackHeaderOffset + 2);
-                trackHeader->AddSimpleItem(dwTrackHeaderOffset, 1, L"Active/Inactive");
-                trackHeader->AddSimpleItem(dwTrackHeaderOffset + 1, 1, L"Padding");
-                trackHeader->AddSimpleItem(dwTrackHeaderOffset + 2, 2, L"Track Offset");
+                trackHeader->AddSimpleItem(dwTrackHeaderOffset, 1, "Active/Inactive");
+                trackHeader->AddSimpleItem(dwTrackHeaderOffset + 1, 1, "Padding");
+                trackHeader->AddSimpleItem(dwTrackHeaderOffset + 2, 2, "Track Offset");
 
                 if (live != 0) {
                     if (dwHeaderOffset + dwRelTrackOffset < vgmfile->GetEndOffset()) {
@@ -185,16 +185,16 @@ bool TamSoftPS1Track::ReadEvent(void) {
     uint8_t statusByte = GetByte(curOffset++);
     bool bContinue = true;
 
-    std::wstringstream desc;
+    std::stringstream desc;
 
     if (statusByte >= 0x00 && statusByte <= 0x7f) {
         // if status_byte == 0, it actually sets 0xffffffff to delta-time o_O
-        desc << L"Delta Time: " << statusByte;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Delta Time", desc.str(), CLR_REST);
+        desc << "Delta Time: " << statusByte;
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time", desc.str(), CLR_REST);
         AddTime(statusByte);
     } else if (statusByte >= 0x80 && statusByte <= 0xdf) {
         uint8_t key = statusByte & 0x7f;
-        desc << L"Key: " << key;
+        desc << "Key: " << key;
 
         if (lastNoteKey >= 0) {
             FinalizeAllNotes();
@@ -224,9 +224,9 @@ bool TamSoftPS1Track::ReadEvent(void) {
                 uint8_t midiPan = ConvertVolumeBalanceToStdMidiPan(
                     volumeBalanceLeft / 256.0, volumeBalanceRight / 256.0, &volumeScale);
 
-                desc << L"Left Volume: " << volumeBalanceLeft << L"  Right Volume: "
+                desc << "Left Volume: " << volumeBalanceLeft << "  Right Volume: "
                      << volumeBalanceRight;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume Balance", desc.str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc.str(),
                                 CLR_PAN, ICON_CONTROL);
                 AddPanNoItem(midiPan);
                 break;
@@ -241,7 +241,7 @@ bool TamSoftPS1Track::ReadEvent(void) {
             case 0xE3: {
                 uint16_t a1 = GetShort(curOffset);
                 curOffset += 2;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"NOP", desc.str());
+                AddUnknown(beginOffset, curOffset - beginOffset, "NOP", desc.str());
                 break;
             }
 
@@ -249,15 +249,15 @@ bool TamSoftPS1Track::ReadEvent(void) {
                 // pitch bend
                 uint16_t pitchRegValue = GetShort(curOffset);
                 curOffset += 2;
-                desc << L"Pitch: " << pitchRegValue;
+                desc << "Pitch: " << pitchRegValue;
 
                 double cents = 0;
                 if (lastNoteKey >= 0) {
                     cents = PitchScaleToCents((double)pitchRegValue / lastNotePitch);
-                    desc << L" (" << cents << L" cents)";
+                    desc << " (" << cents << " cents)";
                 }
 
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Pitch Bend", desc.str());
+                AddUnknown(beginOffset, curOffset - beginOffset, "Pitch Bend", desc.str());
                 break;
             }
 
@@ -265,43 +265,43 @@ bool TamSoftPS1Track::ReadEvent(void) {
                 // pitch bend that updates volume/ADSR registers too?
                 uint16_t pitchRegValue = GetShort(curOffset);
                 curOffset += 2;
-                desc << L"Pitch: " << pitchRegValue;
+                desc << "Pitch: " << pitchRegValue;
 
                 double cents = 0;
                 if (lastNoteKey >= 0) {
                     cents = PitchScaleToCents((double)pitchRegValue / lastNotePitch);
-                    desc << L" (" << cents << L" cents)";
+                    desc << " (" << cents << " cents)";
                 }
 
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Note By Pitch?", desc.str());
+                AddUnknown(beginOffset, curOffset - beginOffset, "Note By Pitch?", desc.str());
                 break;
             }
 
             case 0xE6: {
                 uint8_t mode = GetByte(curOffset++);
-                desc << L"Reverb Mode: " << mode;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Mode", desc.str(),
+                desc << "Reverb Mode: " << mode;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc.str(),
                                 CLR_REVERB, ICON_CONTROL);
                 break;
             }
 
             case 0xE7: {
                 uint8_t depth = GetByte(curOffset++);
-                desc << L"Reverb Depth: " << depth;
+                desc << "Reverb Depth: " << depth;
                 parentSeq->reverbDepth = depth << 8;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Depth", desc.str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(),
                                 CLR_REVERB, ICON_CONTROL);
                 break;
             }
 
             case 0xE8: {
                 uint8_t midiReverb = std::round(fabs(parentSeq->reverbDepth / 32768.0) * 127.0);
-                AddReverb(beginOffset, curOffset - beginOffset, midiReverb, L"Reverb On");
+                AddReverb(beginOffset, curOffset - beginOffset, midiReverb, "Reverb On");
                 break;
             }
 
             case 0xE9: {
-                AddReverb(beginOffset, curOffset - beginOffset, 0, L"Reverb Off");
+                AddReverb(beginOffset, curOffset - beginOffset, 0, "Reverb Off");
                 break;
             }
 
@@ -315,15 +315,15 @@ bool TamSoftPS1Track::ReadEvent(void) {
 
             case 0xF0: {
                 FinalizeAllNotes();
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Off", desc.str(),
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Note Off", desc.str(),
                                 CLR_NOTEOFF, ICON_NOTE);
                 break;
             }
 
             case 0xF1: {
                 uint16_t a1 = GetByte(curOffset++);
-                desc << L"Arg1: " << a1;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event F1", desc.str());
+                desc << "Arg1: " << a1;
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event F1", desc.str());
                 break;
             }
 
@@ -332,22 +332,22 @@ bool TamSoftPS1Track::ReadEvent(void) {
                 curOffset += 2;
 
                 uint32_t dest = curOffset + relOffset;
-                desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+                desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                      << std::uppercase << (int)dest;
                 uint32_t length = curOffset - beginOffset;
 
                 curOffset = dest;
                 if (!IsOffsetUsed(dest)) {
-                    AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(),
+                    AddGenericEvent(beginOffset, length, "Jump", desc.str().c_str(),
                                     CLR_LOOPFOREVER);
                 } else {
-                    bContinue = AddLoopForever(beginOffset, length, L"Jump");
+                    bContinue = AddLoopForever(beginOffset, length, "Jump");
                 }
                 break;
             }
 
             case 0xF9: {
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event F9", desc.str());
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event F9", desc.str());
                 break;
             }
 
@@ -357,9 +357,9 @@ bool TamSoftPS1Track::ReadEvent(void) {
                 break;
 
             default:
-                desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
+                desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
                      << std::uppercase << (int)statusByte;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
                 L_ERROR("Unknown event {:#x}", statusByte);
 
                 bContinue = false;
@@ -368,8 +368,8 @@ bool TamSoftPS1Track::ReadEvent(void) {
     }
 
     ///
-    // ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase <<
-    // beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) <<
+    // ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase <<
+    // beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) <<
     // curOffset << std::endl; OutputDebugString(ssTrace.str().c_str());
 
     if (!bContinue) {

@@ -99,7 +99,7 @@ class VGMHeader;
 typedef struct _ItemSet {
     VGMItem *item;
     VGMItem *parent;
-    const wchar_t *itemName;
+    const char *itemName;
 } ItemSet;
 
 enum ItemType { ITEMTYPE_UNDEFINED, ITEMTYPE_VGMFILE, ITEMTYPE_SEQEVENT };
@@ -131,7 +131,7 @@ class VGMItem {
    public:
     VGMItem();
     VGMItem(VGMFile *thevgmfile, uint32_t theOffset, uint32_t theLength = 0,
-            const std::wstring theName = L"", uint8_t color = 0);
+            const std::string theName = "", uint8_t color = 0);
     virtual ~VGMItem(void);
 
     friend bool operator>(VGMItem &item1, VGMItem &item2);
@@ -149,9 +149,9 @@ class VGMItem {
 
     RawFile *GetRawFile();
 
-    virtual std::vector<const wchar_t *> *GetMenuItemNames() { return NULL; }
+    virtual std::vector<const char *> *GetMenuItemNames() { return NULL; }
     virtual bool CallMenuItem(VGMItem *item, int menuItemNum) { return false; }
-    virtual std::wstring GetDescription() { return name; }
+    virtual std::string GetDescription() { return name; }
     virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
     virtual Icon GetIcon() { return ICON_BINARY; /*ICON_UNKNOWN*/ }
     virtual void AddToUI(VGMItem *parent, void *UI_specific);
@@ -170,7 +170,7 @@ class VGMItem {
    public:
     uint8_t color;
     VGMFile *vgmfile;
-    std::wstring name;
+    std::string name;
     uint32_t dwOffset;  // offset in the pDoc data buffer
     uint32_t unLength;  // num of bytes the event engulfs
 };
@@ -179,7 +179,7 @@ class VGMContainerItem : public VGMItem {
    public:
     VGMContainerItem();
     VGMContainerItem(VGMFile *thevgmfile, uint32_t theOffset, uint32_t theLength = 0,
-                     const std::wstring theName = L"", uint8_t color = CLR_HEADER);
+                     const std::string theName = "", uint8_t color = CLR_HEADER);
     virtual ~VGMContainerItem(void);
     virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true,
                                        bool matchStartOffset = false);
@@ -188,10 +188,10 @@ class VGMContainerItem : public VGMItem {
     virtual void AddToUI(VGMItem *parent, void *UI_specific);
     virtual bool IsContainerItem() { return true; }
 
-    VGMHeader *AddHeader(uint32_t offset, uint32_t length, const std::wstring &name = L"Header");
+    VGMHeader *AddHeader(uint32_t offset, uint32_t length, const std::string &name = "Header");
 
     void AddItem(VGMItem *item);
-    void AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring &theName);
+    void AddSimpleItem(uint32_t offset, uint32_t length, const std::string &theName);
     void AddUnknownItem(uint32_t offset, uint32_t length);
 
     template <class T>

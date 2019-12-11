@@ -14,7 +14,7 @@ DECLARE_FORMAT(KonamiPS1);
 //  KonamiPS1Seq
 //  ************
 
-KonamiPS1Seq::KonamiPS1Seq(RawFile *file, uint32_t offset, const std::wstring &name)
+KonamiPS1Seq::KonamiPS1Seq(RawFile *file, uint32_t offset, const std::string &name)
     : VGMSeq(KonamiPS1Format::name, file, offset, kHeaderSize + file->GetWord(offset + 4), name) {
     bLoadTickByTick = true;
 
@@ -32,16 +32,16 @@ bool KonamiPS1Seq::GetHeaderInfo(void) {
 
     VGMHeader *header = AddHeader(dwOffset, kHeaderSize);
     header->AddSig(dwOffset, 4);
-    header->AddSimpleItem(dwOffset + kOffsetToFileSize, 4, L"Size");
-    header->AddSimpleItem(dwOffset + kOffsetToTimebase, 4, L"Timebase");
+    header->AddSimpleItem(dwOffset + kOffsetToFileSize, 4, "Size");
+    header->AddSimpleItem(dwOffset + kOffsetToTimebase, 4, "Timebase");
     SetPPQN(GetWord(dwOffset + kOffsetToTimebase));
-    header->AddSimpleItem(dwOffset + kOffsetToTrackCount, 4, L"Number Of Tracks");
+    header->AddSimpleItem(dwOffset + kOffsetToTrackCount, 4, "Number Of Tracks");
 
     uint32_t numTracks = GetWord(dwOffset + kOffsetToTrackCount);
-    VGMHeader *trackSizeHeader = AddHeader(dwOffset + kHeaderSize, 2 * numTracks, L"Track Size");
+    VGMHeader *trackSizeHeader = AddHeader(dwOffset + kHeaderSize, 2 * numTracks, "Track Size");
     for (size_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
-        std::wstringstream itemName;
-        itemName << L"Track " << (trackIndex + 1) << L" Size";
+        std::stringstream itemName;
+        itemName << "Track " << (trackIndex + 1) << " Size";
         trackSizeHeader->AddSimpleItem(trackSizeHeader->dwOffset + (trackIndex * 2), 2,
                                        itemName.str());
     }
@@ -128,9 +128,9 @@ bool KonamiPS1Track::ReadEvent(void) {
         uint32_t delta = ReadVarLen(curOffset);
         AddTime(delta);
 
-        std::wstringstream description;
-        description << L"Duration: " << delta;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Delta Time", description.str(),
+        std::stringstream description;
+        description << "Duration: " << delta;
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time", description.str(),
                         CLR_REST, ICON_REST);
 
         skipDeltaTime = true;
@@ -152,7 +152,7 @@ bool KonamiPS1Track::ReadEvent(void) {
         prevKey = noteNumber;
         prevVel = velocity;
     } else {
-        std::wstringstream description;
+        std::stringstream description;
 
         uint8_t paramByte;
         if (command == 0x4a) {
@@ -174,8 +174,8 @@ bool KonamiPS1Track::ReadEvent(void) {
                 break;
 
             case 6:
-                description << L"Parameter: " << paramByte;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"NRPN Data Entry",
+                description << "Parameter: " << paramByte;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "NRPN Data Entry",
                                 description.str(), CLR_MISC);
                 if (readMode == READMODE_CONVERT_TO_MIDI) {
                     pMidiTrack->AddControllerEvent(channel, command, paramByte);
@@ -195,8 +195,8 @@ bool KonamiPS1Track::ReadEvent(void) {
                 break;
 
             case 15:
-                description << L"Parameter: " << paramByte;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Stereo Widening (?)",
+                description << "Parameter: " << paramByte;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Stereo Widening (?)",
                                 description.str(), CLR_PAN, ICON_CONTROL);
                 if (readMode == READMODE_CONVERT_TO_MIDI) {
                     pMidiTrack->AddControllerEvent(channel, command, paramByte);
@@ -204,13 +204,13 @@ bool KonamiPS1Track::ReadEvent(void) {
                 break;
 
             case 64:
-                description << L"Parameter: " << paramByte;
+                description << "Parameter: " << paramByte;
                 AddSustainEvent(beginOffset, curOffset - beginOffset, paramByte);
                 break;
 
             case 70:
-                description << L"Parameter: " << paramByte;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Channel",
+                description << "Parameter: " << paramByte;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Channe",
                                 description.str(), CLR_PAN, ICON_CONTROL);
                 if (readMode == READMODE_CONVERT_TO_MIDI) {
                     pMidiTrack->AddControllerEvent(channel, command, paramByte);
@@ -232,7 +232,7 @@ bool KonamiPS1Track::ReadEvent(void) {
                 // decided to use it universally.
                 uint8_t bpm = static_cast<uint8_t>(std::min<unsigned int>(paramByte * 2 + 10, 255));
                 AddTempoBPM(beginOffset, curOffset - beginOffset, bpm,
-                            L"Tempo (10-255 BPM, divisible by two)");
+                            "Tempo (10-255 BPM, divisible by two)");
                 break;
             }
 
@@ -248,22 +248,22 @@ bool KonamiPS1Track::ReadEvent(void) {
             case 74:
                 // Not sure how it will work for a chord (polyphonic track)
                 AddNoteOff(beginOffset, curOffset - beginOffset, prevKey,
-                           L"Note Off (Reset Running Status)");
+                           "Note Off (Reset Running Status)");
                 break;
 
             case 75:
                 // Not sure how it will work for a chord (polyphonic track)
                 AddNoteOff(beginOffset, curOffset - beginOffset, prevKey,
-                           L"Note Off (Sustain Running Status)");
+                           "Note Off (Sustain Running Status)");
                 break;
 
             case 76:
-                AddTempoBPM(beginOffset, curOffset - beginOffset, paramByte, L"Tempo (0-127 BPM)");
+                AddTempoBPM(beginOffset, curOffset - beginOffset, paramByte, "Tempo (0-127 BPM)");
                 break;
 
             case 77:
                 AddTempoBPM(beginOffset, curOffset - beginOffset, paramByte + 128,
-                            L"Tempo (128-255 BPM)");
+                            "Tempo (128-255 BPM)");
                 break;
 
             case 91:
@@ -271,8 +271,8 @@ bool KonamiPS1Track::ReadEvent(void) {
                 break;
 
             case 99:
-                description << L"Parameter: " << paramByte;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"NRPN (LSB)",
+                description << "Parameter: " << paramByte;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)",
                                 description.str(), CLR_MISC);
                 if (readMode == READMODE_CONVERT_TO_MIDI) {
                     pMidiTrack->AddControllerEvent(channel, command, paramByte);
@@ -281,14 +281,14 @@ bool KonamiPS1Track::ReadEvent(void) {
 
             case 100:
                 if (paramByte == 20) {
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "",
                                     CLR_LOOP);
                 } else if (paramByte == 30) {
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "",
                                     CLR_LOOP);
                 } else {
-                    description << L"Parameter: " << paramByte;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"NRPN (LSB)",
+                    description << "Parameter: " << paramByte;
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)",
                                     description.str(), CLR_MISC);
                 }
                 if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -297,8 +297,8 @@ bool KonamiPS1Track::ReadEvent(void) {
                 break;
 
             case 118:
-                description << L"Parameter: " << paramByte;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Seq Beat",
+                description << "Parameter: " << paramByte;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Seq Beat",
                                 description.str(), CLR_MISC);
                 if (readMode == READMODE_CONVERT_TO_MIDI) {
                     pMidiTrack->AddControllerEvent(channel, command, paramByte);

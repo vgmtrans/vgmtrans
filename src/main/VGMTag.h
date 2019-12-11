@@ -13,8 +13,8 @@
 class VGMTag {
    public:
     VGMTag(void);
-    VGMTag(const std::wstring &_title, const std::wstring &_artist = L"",
-           const std::wstring &_album = L"");
+    VGMTag(const std::string &_title, const std::string &_artist = "",
+           const std::string &_album = "");
     virtual ~VGMTag(void);
 
     bool HasTitle(void);
@@ -25,11 +25,11 @@ class VGMTag {
     bool HasLength(void);
 
    public:
-    std::wstring title;
-    std::wstring artist;
-    std::wstring album;
-    std::wstring comment;
-    std::map<std::wstring, std::vector<uint8_t>> binaries;
+    std::string title;
+    std::string artist;
+    std::string album;
+    std::string comment;
+    std::map<std::string, std::vector<uint8_t>> binaries;
 
     /** Track number */
     int track_number;

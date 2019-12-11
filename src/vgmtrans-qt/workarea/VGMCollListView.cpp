@@ -29,7 +29,7 @@ int VGMCollListViewModel::rowCount(const QModelIndex &parent) const {
 
 QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
     if (role == Qt::DisplayRole || role == Qt::EditRole) {
-        return QString::fromStdWString(*qtVGMRoot.vVGMColl[index.row()]->GetName());
+        return QString::fromStdString(*qtVGMRoot.vVGMColl[index.row()]->GetName());
     } else if (role == Qt::DecorationRole) {
         return QIcon(":/images/collection-32.png");
     }
@@ -57,7 +57,7 @@ void VGMCollNameEditor::setEditorData(QWidget *editor, const QModelIndex &index)
 void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
                                      const QModelIndex &index) const {
     QLineEdit *line_edit = qobject_cast<QLineEdit *>(editor);
-    auto new_name = line_edit->text().toStdWString();
+    auto new_name = line_edit->text().toStdString();
     qtVGMRoot.vVGMColl[index.row()]->SetName(&new_name);
     model->dataChanged(index, index);
 }
@@ -79,14 +79,13 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     setWrapping(true);
 
     connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollListView::CollMenu);
-    connect(model, &VGMCollListViewModel::dataChanged,
-        [=]() {
-            if(!selectedIndexes().empty()) {
-                selectionModel()->currentChanged(selectedIndexes().front(), {});
-            } else {
-                selectionModel()->currentChanged({}, {});
-            }
-        });
+    connect(model, &VGMCollListViewModel::dataChanged, [=]() {
+        if (!selectedIndexes().empty()) {
+            selectionModel()->currentChanged(selectedIndexes().front(), {});
+        } else {
+            selectionModel()->currentChanged({}, {});
+        }
+    });
 }
 
 void VGMCollListView::CollMenu(const QPoint &pos) {
@@ -98,9 +97,9 @@ void VGMCollListView::CollMenu(const QPoint &pos) {
         }
 
         QMenu *vgmcoll_menu = new QMenu();
-        std::vector<const wchar_t *> *menu_item_names = pointed_coll->GetMenuItemNames();
+        std::vector<const char *> *menu_item_names = pointed_coll->GetMenuItemNames();
         for (auto &menu_item : *menu_item_names) {
-            vgmcoll_menu->addAction(QString::fromStdWString(menu_item));
+            vgmcoll_menu->addAction(QString::fromStdString(menu_item));
         }
 
         QAction *performed_action = vgmcoll_menu->exec(mapToGlobal(pos));

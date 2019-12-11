@@ -74,7 +74,7 @@ const uint16_t lfo_rate_table[128] = {
 // QSoundSeq
 // *********
 
-QSoundSeq::QSoundSeq(RawFile *file, uint32_t offset, QSoundVer fmtVersion, wstring &name)
+QSoundSeq::QSoundSeq(RawFile *file, uint32_t offset, QSoundVer fmtVersion, string &name)
     : VGMSeq(QSoundFormat::name, file, offset, 0, name), fmt_version(fmtVersion) {
     HasMonophonicTracks();
     AlwaysWriteInitialVol(127);
@@ -93,21 +93,21 @@ bool QSoundSeq::GetTrackPointers(void) {
     if (GetByte(dwOffset) == 0x92)
         return false;
 
-    this->AddHeader(dwOffset, 1, L"Sequence Flags");
+    this->AddHeader(dwOffset, 1, "Sequence Flags");
     VGMHeader *header =
-        this->AddHeader(dwOffset + 1, GetShortBE(dwOffset + 1) - 1, L"Track Pointers");
+        this->AddHeader(dwOffset + 1, GetShortBE(dwOffset + 1) - 1, "Track Pointers");
 
     for (int i = 0; i < 16; i++) {
         uint32_t offset = GetShortBE(dwOffset + 1 + i * 2);
         if (offset == 0) {
-            header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, L"No Track");
+            header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, "No Track");
             continue;
         }
         // if (GetShortBE(offset+dwOffset) == 0xE017)	//Rest, EndTrack (used by empty tracks)
         //	continue;
         QSoundTrack *newTrack = new QSoundTrack(this, offset + dwOffset);
         aTracks.push_back(newTrack);
-        header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, L"Track Pointer");
+        header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, "Track Pointer");
     }
     if (aTracks.size() == 0)
         return false;
@@ -360,13 +360,13 @@ bool QSoundTrack::ReadEvent(void) {
                 if (!bPrevNoteTie) {
                     // AddPortamentoNoItem(true);
                     AddNoteOn(beginOffset, curOffset - beginOffset, key, 127,
-                              L"Note On (tied / with portamento)");
+                              "Note On (tied / with portamento)");
                     origTieNote = key;
                 } else if (key != prevTieNote) {
                     AddNoteOffNoItem(0);
-                    AddNoteOn(beginOffset, curOffset - beginOffset, key, 127, L"Note On (tied)");
+                    AddNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied)");
                 } else
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", L"", CLR_NOTEON);
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_NOTEON);
                 bPrevNoteTie = true;
                 prevTieNote = key;
             } else {
@@ -378,14 +378,14 @@ bool QSoundTrack::ReadEvent(void) {
                     } else {
                         AddTime(absDur);
                         delta -= absDur;
-                        AddNoteOff(beginOffset, curOffset - beginOffset, 0, L"Note Off (tied)");
+                        AddNoteOff(beginOffset, curOffset - beginOffset, 0, "Note Off (tied)");
                     }
                 } else
                     AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
                 bPrevNoteTie = false;
             }
         } else {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Rest", L"", CLR_REST);
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Rest", "", CLR_REST);
         }
         AddTime(delta);
     } else {
@@ -394,31 +394,31 @@ bool QSoundTrack::ReadEvent(void) {
             case 0x00:
                 noteState ^= 0x20;
                 AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                L"Note State xor 0x20 (change duration table)", L"",
+                                "Note State xor 0x20 (change duration table)", "",
                                 CLR_CHANGESTATE);
                 break;
             case 0x01:
                 noteState ^= 0x40;
                 AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                L"Note State xor 0x40 (Toggle tie)", L"", CLR_CHANGESTATE);
+                                "Note State xor 0x40 (Toggle tie)", "", CLR_CHANGESTATE);
                 break;
             case 0x02:
                 noteState |= (1 << 4);
                 AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                L"Note State |= 0x10 (change duration table)", L"",
+                                "Note State |= 0x10 (change duration table)", "",
                                 CLR_CHANGESTATE);
                 break;
             case 0x03:
                 noteState ^= 8;
                 AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                L"Note State xor 8 (change octave)", L"", CLR_CHANGESTATE);
+                                "Note State xor 8 (change octave)", "", CLR_CHANGESTATE);
                 break;
 
             case 0x04:
                 noteState &= 0x97;
                 noteState |= GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Change Note State (& 0x97)",
-                                L"", CLR_CHANGESTATE);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Change Note State (& 0x97)",
+                                "", CLR_CHANGESTATE);
                 break;
 
             case 0x05: {
@@ -459,7 +459,7 @@ bool QSoundTrack::ReadEvent(void) {
 
             case 0x06:
                 dur = GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Duration", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "",
                                 CLR_CHANGESTATE);
                 break;
 
@@ -484,7 +484,7 @@ bool QSoundTrack::ReadEvent(void) {
             case 0x09:
                 noteState &= 0xF8;
                 noteState |= GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Octave", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Octave", "",
                                 CLR_CHANGESTATE);
                 break;
 
@@ -507,7 +507,7 @@ bool QSoundTrack::ReadEvent(void) {
                 uint8_t pitchbend = GetByte(curOffset++);
                 // double cents = (pitchbend / 256.0) * 100;
                 AddMarker(beginOffset, curOffset - beginOffset, string("pitchbend"), pitchbend, 0,
-                          L"Pitch Bend", PRIORITY_MIDDLE, CLR_PITCHBEND);
+                          "Pitch Bend", PRIORITY_MIDDLE, CLR_PITCHBEND);
                 // AddPitchBend(beginOffset, curOffset-beginOffset, (cents / 200) * 8192);
             } break;
             case 0x0D: {
@@ -564,7 +564,7 @@ bool QSoundTrack::ReadEvent(void) {
                     jump = GetShortBE(curOffset);
                     curOffset += 2;
                 }
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop", L"", CLR_LOOP);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
 
                 if (loop[loopNum] == 0) {
                     bInLoop = false;
@@ -596,7 +596,7 @@ bool QSoundTrack::ReadEvent(void) {
                     noteState |= GetByte(curOffset++);
                     {
                         short jump = (GetByte(curOffset++) << 8) + GetByte(curOffset++);
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Break", L"",
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "",
                                         CLR_LOOP);
                         curOffset += jump;
                     }
@@ -629,14 +629,14 @@ bool QSoundTrack::ReadEvent(void) {
 
             case 0x19:
                 curOffset++;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Reg9 Event (unknown to MAME)");
+                AddUnknown(beginOffset, curOffset - beginOffset, "Reg9 Event (unknown to MAME)");
                 break;
 
             case 0x1A:  // master(?) vol
             {
                 // curOffset++;
                 vol = GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Master Volume", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "",
                                 CLR_UNKNOWN);
                 // this->AddMasterVol(beginOffset, curOffset-beginOffset, vol);
                 // AddVolume(beginOffset, curOffset-beginOffset, vool);
@@ -650,7 +650,7 @@ bool QSoundTrack::ReadEvent(void) {
                 if (GetVersion() < VER_171) {
                     vibratoDepth = GetByte(curOffset++);
                     AddMarker(beginOffset, curOffset - beginOffset, string("vibrato"), vibratoDepth,
-                              0, L"Vibrato", PRIORITY_HIGH, CLR_PITCHBEND);
+                              0, "Vibrato", PRIORITY_HIGH, CLR_PITCHBEND);
                 } else {
                     // First data byte defines behavior 0-3
                     uint8_t type = GetByte(curOffset++);
@@ -659,25 +659,25 @@ bool QSoundTrack::ReadEvent(void) {
                         // vibrato
                         case 0:
                             AddMarker(beginOffset, curOffset - beginOffset, string("vibrato"), data,
-                                      0, L"Vibrato", PRIORITY_HIGH, CLR_PITCHBEND);
+                                      0, "Vibrato", PRIORITY_HIGH, CLR_PITCHBEND);
                             break;
 
                         // tremelo
                         case 1:
                             AddMarker(beginOffset, curOffset - beginOffset, string("tremelo"), data,
-                                      0, L"Tremelo", PRIORITY_MIDDLE, CLR_EXPRESSION);
+                                      0, "Tremelo", PRIORITY_MIDDLE, CLR_EXPRESSION);
                             break;
 
                         // LFO rate
                         case 2:
                             AddMarker(beginOffset, curOffset - beginOffset, string("lfo"), data, 0,
-                                      L"LFO Rate", PRIORITY_MIDDLE, CLR_LFO);
+                                      "LFO Rate", PRIORITY_MIDDLE, CLR_LFO);
                             break;
 
                         // LFO reset
                         case 3:
                             AddMarker(beginOffset, curOffset - beginOffset, string("resetlfo"),
-                                      data, 0, L"LFO Reset", PRIORITY_MIDDLE, CLR_LFO);
+                                      data, 0, "LFO Reset", PRIORITY_MIDDLE, CLR_LFO);
                             break;
                     }
                 }
@@ -688,7 +688,7 @@ bool QSoundTrack::ReadEvent(void) {
                 if (GetVersion() < VER_171) {
                     tremeloDepth = GetByte(curOffset++);
                     AddMarker(beginOffset, curOffset - beginOffset, string("tremelo"), tremeloDepth,
-                              0, L"Tremelo", PRIORITY_MIDDLE, CLR_EXPRESSION);
+                              0, "Tremelo", PRIORITY_MIDDLE, CLR_EXPRESSION);
                 } else {
                     // I'm not sure at all about the behavior here, need to test
                     curOffset += 2;
@@ -702,9 +702,9 @@ bool QSoundTrack::ReadEvent(void) {
                 uint8_t rate = GetByte(curOffset++);
                 if (GetVersion() < VER_171)
                     AddMarker(beginOffset, curOffset - beginOffset, string("lfo"), rate, 0,
-                              L"LFO Rate", PRIORITY_MIDDLE, CLR_LFO);
+                              "LFO Rate", PRIORITY_MIDDLE, CLR_LFO);
                 else
-                    AddUnknown(beginOffset, curOffset - beginOffset, L"NOP");
+                    AddUnknown(beginOffset, curOffset - beginOffset, "NOP");
                 break;
             }
 
@@ -713,9 +713,9 @@ bool QSoundTrack::ReadEvent(void) {
                 uint8_t data = GetByte(curOffset++);
                 if (GetVersion() < VER_171)
                     AddMarker(beginOffset, curOffset - beginOffset, string("resetlfo"), data, 0,
-                              L"LFO Reset", PRIORITY_MIDDLE, CLR_LFO);
+                              "LFO Reset", PRIORITY_MIDDLE, CLR_LFO);
                 else
-                    AddUnknown(beginOffset, curOffset - beginOffset, L"NOP");
+                    AddUnknown(beginOffset, curOffset - beginOffset, "NOP");
             } break;
             case 0x1F: {
                 uint8_t value = GetByte(curOffset++);
@@ -725,7 +725,7 @@ bool QSoundTrack::ReadEvent(void) {
                 } else {
                     bank = value;
                     AddBankSelectNoItem(bank * 2);
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Bank Change", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Bank Change", "",
                                     CLR_PROGCHANGE);
                 }
 
@@ -753,7 +753,7 @@ bool QSoundTrack::ReadEvent(void) {
                 break;
 
             default:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "",
                                 CLR_UNRECOGNIZED);
         }
     }

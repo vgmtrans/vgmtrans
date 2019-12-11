@@ -19,7 +19,7 @@ DECLARE_FORMAT(MP2k);
 
 using namespace std;
 
-MP2kSeq::MP2kSeq(RawFile *file, uint32_t offset, std::wstring name)
+MP2kSeq::MP2kSeq(RawFile *file, uint32_t offset, std::string name)
     : VGMSeq(MP2kFormat::name, file, offset, 0, name) {
     bAllowDiscontinuousTrackData = true;
 }
@@ -42,17 +42,17 @@ bool MP2kSeq::GetHeaderInfo(void) {
         return false;
     }
 
-    VGMHeader *seqHdr = AddHeader(dwOffset, 8 + nNumTracks * 4, L"Sequence Header");
-    seqHdr->AddSimpleItem(dwOffset, 1, L"Number of Tracks");
-    seqHdr->AddSimpleItem(dwOffset + 1, 1, L"Unknown");
-    seqHdr->AddSimpleItem(dwOffset + 2, 1, L"Priority");
-    seqHdr->AddSimpleItem(dwOffset + 3, 1, L"Reverb");
+    VGMHeader *seqHdr = AddHeader(dwOffset, 8 + nNumTracks * 4, "Sequence Header");
+    seqHdr->AddSimpleItem(dwOffset, 1, "Number of Tracks");
+    seqHdr->AddSimpleItem(dwOffset + 1, 1, "Unknown");
+    seqHdr->AddSimpleItem(dwOffset + 2, 1, "Priority");
+    seqHdr->AddSimpleItem(dwOffset + 3, 1, "Reverb");
     uint32_t dwInstPtr = GetWord(dwOffset + 4);
-    seqHdr->AddPointer(dwOffset + 4, 4, dwInstPtr - 0x8000000, true, L"Instrument Pointer");
+    seqHdr->AddPointer(dwOffset + 4, 4, dwInstPtr - 0x8000000, true, "Instrument Pointer");
     for (unsigned int i = 0; i < nNumTracks; i++) {
         uint32_t dwTrackPtrOffset = dwOffset + 8 + i * 4;
         uint32_t dwTrackPtr = GetWord(dwTrackPtrOffset);
-        seqHdr->AddPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, L"Track Pointer");
+        seqHdr->AddPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track Pointer");
     }
 
     SetPPQN(0x30);
@@ -135,10 +135,10 @@ bool MP2kTrack::ReadEvent(void) {
                         0x7F)  // if the next value is 0-127, it is an _unknown_ value
                         curOffset++;
                 }
-                AddNoteOn(beginOffset, curOffset - beginOffset, status_byte, current_vel, L"Tie");
+                AddNoteOn(beginOffset, curOffset - beginOffset, status_byte, current_vel, "Tie");
                 break;
             case STATE_TIE_END:
-                AddNoteOff(beginOffset, curOffset - beginOffset, status_byte, L"End Tie");
+                AddNoteOff(beginOffset, curOffset - beginOffset, status_byte, "End Tie");
                 break;
             case STATE_VOL:
                 AddVol(beginOffset, curOffset - beginOffset, status_byte);
@@ -169,9 +169,9 @@ bool MP2kTrack::ReadEvent(void) {
         if (GetByte(curOffset) > 0x7F) {
             AddNoteByDurNoItem(prevKey, prevVel, curDuration);
             AddGenericEvent(beginOffset, curOffset - beginOffset,
-                            L"Duration Note State + Note On (prev key and vel)", L"", CLR_DURNOTE);
+                            "Duration Note State + Note On (prev key and vel)", "", CLR_DURNOTE);
         } else
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration Note State", L"",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration Note State", "",
                             CLR_CHANGESTATE);
     } else if (status_byte >= 0xB1 && status_byte <= 0xCF) {
         // it's a special event
@@ -190,9 +190,9 @@ bool MP2kTrack::ReadEvent(void) {
 
                 curOffset = destOffset;
                 if (!IsOffsetUsed(destOffset) || loopEndPositions.size() != 0) {
-                    AddGenericEvent(beginOffset, length, L"Goto", L"", CLR_LOOPFOREVER);
+                    AddGenericEvent(beginOffset, length, "Goto", "", CLR_LOOPFOREVER);
                 } else {
-                    bContinue = AddLoopForever(beginOffset, length, L"Goto");
+                    bContinue = AddLoopForever(beginOffset, length, "Goto");
                 }
 
                 // Add next end of track event
@@ -212,7 +212,7 @@ bool MP2kTrack::ReadEvent(void) {
                 uint32_t destOffset = GetWord(curOffset);
                 curOffset += 4;
                 loopEndPositions.push_back(curOffset);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", "",
                                 CLR_LOOP);
                 curOffset = destOffset - 0x8000000;
                 break;
@@ -220,7 +220,7 @@ bool MP2kTrack::ReadEvent(void) {
 
             // Branch Break
             case 0xB4:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern End", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", "",
                                 CLR_LOOP);
                 if (loopEndPositions.size() != 0) {
                     curOffset = loopEndPositions.back();
@@ -230,7 +230,7 @@ bool MP2kTrack::ReadEvent(void) {
 
             case 0xBA:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Priority", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Priority", "",
                                 CLR_PRIORITY);
                 break;
 
@@ -242,7 +242,7 @@ bool MP2kTrack::ReadEvent(void) {
 
             case 0xBC:
                 transpose = GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Key Shift", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Key Shift", "",
                                 CLR_TRANSPOSE);
                 break;
 
@@ -253,21 +253,21 @@ bool MP2kTrack::ReadEvent(void) {
             }
 
             case 0xBE:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Volume State", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Volume State", "",
                                 CLR_CHANGESTATE);
                 state = STATE_VOL;
                 break;
 
             // pan
             case 0xBF:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan State", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan State", "",
                                 CLR_CHANGESTATE);
                 state = STATE_PAN;
                 break;
 
             // pitch bend
             case 0xC0:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Bend State", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend State", "",
                                 CLR_CHANGESTATE);
                 state = STATE_PITCHBEND;
                 break;
@@ -275,39 +275,39 @@ bool MP2kTrack::ReadEvent(void) {
             // pitch bend range
             case 0xC1:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Bend Range", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend Range", "",
                                 CLR_PITCHBENDRANGE);
                 break;
 
             // lfo speed
             case 0xC2:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO Speed", L"", CLR_LFO);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Speed", "", CLR_LFO);
                 break;
 
             // lfo delay
             case 0xC3:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO Delay", L"", CLR_LFO);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Delay", "", CLR_LFO);
                 break;
 
             // modulation depth
             case 0xC4:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Modulation Depth State",
-                                L"", CLR_MODULATION);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Depth State",
+                                "", CLR_MODULATION);
                 state = STATE_MODULATION;
                 break;
 
             // modulation type
             case 0xC5:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Modulation Type", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Type", "",
                                 CLR_MODULATION);
                 break;
 
             case 0xC8: {
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Microtune", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Microtune", "",
                                 CLR_PITCHBEND);
                 break;
             }
@@ -325,11 +325,11 @@ bool MP2kTrack::ReadEvent(void) {
 
                 if (subCommand == 0x08 && subParam <= 127) {
                     curOffset++;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", "",
                                     CLR_MISC);
                 } else if (subCommand == 0x09 && subParam <= 127) {
                     curOffset++;
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Length", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Length", "",
                                     CLR_MISC);
                 } else {
                     // Heuristic method
@@ -337,7 +337,7 @@ bool MP2kTrack::ReadEvent(void) {
                         curOffset++;
                         subParam = GetByte(curOffset);
                     }
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Extend Command", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Extend Command", "",
                                     CLR_UNKNOWN);
                 }
                 break;
@@ -351,9 +351,9 @@ bool MP2kTrack::ReadEvent(void) {
                 if (GetByte(curOffset) > 0x7F) {
                     AddNoteOffNoItem(prevKey);
                     AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                    L"End Tie State + End Tie", L"", CLR_TIE);
+                                    "End Tie State + End Tie", "", CLR_TIE);
                 } else
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"End Tie State", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "End Tie State", "",
                                     CLR_TIE);
                 break;
             }
@@ -363,9 +363,9 @@ bool MP2kTrack::ReadEvent(void) {
                 if (GetByte(curOffset) > 0x7F) {
                     AddNoteOnNoItem(prevKey, prevVel);
                     AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                    L"Tie State + Tie (with prev key and vel)", L"", CLR_TIE);
+                                    "Tie State + Tie (with prev key and vel)", "", CLR_TIE);
                 } else
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie State", L"",
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie State", "",
                                     CLR_TIE);
                 break;
 

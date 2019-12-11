@@ -22,7 +22,7 @@ enum SoftCreatSnesSeqEventType {
 class SoftCreatSnesSeq : public VGMSeq {
    public:
     SoftCreatSnesSeq(RawFile *file, SoftCreatSnesVersion ver, uint32_t seqdata_offset,
-                     uint8_t headerAlignSize, std::wstring newName = L"SoftCreat SNES Seq");
+                     uint8_t headerAlignSize, std::string newName = "SoftCreat SNES Seq");
     virtual ~SoftCreatSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);

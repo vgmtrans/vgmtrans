@@ -41,7 +41,7 @@ class VGMFile : public VGMContainerItem {
    public:
     VGMFile(FileType fileType, /*FmtID fmtID,*/
             const std::string &format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
-            std::wstring theName = L"VGM File");
+            std::string theName = "VGM File");
     virtual ~VGMFile(void);
 
     virtual ItemType GetType() const { return ITEMTYPE_VGMFILE; }
@@ -49,7 +49,7 @@ class VGMFile : public VGMContainerItem {
 
     virtual void AddToUI(VGMItem *parent, void *UI_specific);
 
-    const std::wstring *GetName(void) const;
+    const std::string *GetName(void) const;
 
     bool OnClose();
     bool OnSaveAsRaw();
@@ -144,7 +144,7 @@ class VGMFile : public VGMContainerItem {
     FileType file_type;
     const std::string &format;
     uint32_t id;
-    std::wstring name;
+    std::string name;
 
    public:
     RawFile *rawfile;
@@ -160,15 +160,15 @@ class VGMFile : public VGMContainerItem {
 class VGMHeader : public VGMContainerItem {
    public:
     VGMHeader(VGMItem *parItem, uint32_t offset = 0, uint32_t length = 0,
-              const std::wstring &name = L"Header");
+              const std::string &name = "Header");
     virtual ~VGMHeader();
 
     virtual Icon GetIcon() { return ICON_BINARY; };
 
     void AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull,
-                    const std::wstring &name = L"Pointer");
-    void AddTempo(uint32_t offset, uint32_t length, const std::wstring &name = L"Tempo");
-    void AddSig(uint32_t offset, uint32_t length, const std::wstring &name = L"Signature");
+                    const std::string &name = "Pointer");
+    void AddTempo(uint32_t offset, uint32_t length, const std::string &name = "Tempo");
+    void AddSig(uint32_t offset, uint32_t length, const std::string &name = "Signature");
 
     // vector<VGMItem*> items;
 };
@@ -188,7 +188,7 @@ class VGMHeaderItem : public VGMItem {
     };  // HIT = Header Item Type
 
     VGMHeaderItem(VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
-                  const std::wstring &name);
+                  const std::string &name);
     virtual Icon GetIcon();
 
    public:

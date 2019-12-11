@@ -78,7 +78,7 @@ enum HeartBeatSnesSeqSubEventType {
 class HeartBeatSnesSeq : public VGMSeq {
    public:
     HeartBeatSnesSeq(RawFile *file, HeartBeatSnesVersion ver, uint32_t seqdataOffset,
-                     std::wstring newName = L"HeartBeat SNES Seq");
+                     std::string newName = "HeartBeat SNES Seq");
     virtual ~HeartBeatSnesSeq(void);
 
     virtual bool GetHeaderInfo(void);

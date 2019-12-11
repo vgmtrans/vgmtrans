@@ -13,7 +13,7 @@
 // ****************
 
 CapcomSnesInstrSet::CapcomSnesInstrSet(RawFile *file, uint32_t offset, uint32_t spcDirAddr,
-                                       const std::wstring &name)
+                                       const std::string &name)
     : VGMInstrSet(CapcomSnesFormat::name, file, offset, 0, name), spcDirAddr(spcDirAddr) {}
 
 CapcomSnesInstrSet::~CapcomSnesInstrSet() {}
@@ -50,8 +50,8 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
             usedSRCNs.push_back(srcn);
         }
 
-        std::wostringstream instrName;
-        instrName << L"Instrument " << instr;
+        std::ostringstream instrName;
+        instrName << "Instrument " << instr;
         CapcomSnesInstr *newInstr = new CapcomSnesInstr(this, addrInstrHeader, instr >> 7,
                                                         instr & 0x7f, spcDirAddr, instrName.str());
         aInstrs.push_back(newInstr);
@@ -77,7 +77,7 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
 
 CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t theBank,
                                  uint32_t theInstrNum, uint32_t spcDirAddr,
-                                 const std::wstring &name)
+                                 const std::string &name)
     : VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), spcDirAddr(spcDirAddr) {}
 
 CapcomSnesInstr::~CapcomSnesInstr() {}
@@ -154,9 +154,9 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset) : VGMRgn(i
     }
 
     AddSampNum(srcn, offset, 1);
-    AddSimpleItem(offset + 1, 1, L"ADSR1");
-    AddSimpleItem(offset + 2, 1, L"ADSR2");
-    AddSimpleItem(offset + 3, 1, L"GAIN");
+    AddSimpleItem(offset + 1, 1, "ADSR1");
+    AddSimpleItem(offset + 2, 1, "ADSR2");
+    AddSimpleItem(offset + 3, 1, "GAIN");
     AddUnityKey(96 - (int)(coarse_tuning), offset + 4, 1);
     AddFineTune((int16_t)(fine_tuning * 100.0), offset + 5, 1);
     SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);

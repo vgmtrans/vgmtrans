@@ -19,9 +19,9 @@ class VGMSampColl;
 class VGMRgn : public VGMContainerItem {
    public:
     VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0,
-           const std::wstring &name = L"Region");
+           const std::string &name = "Region");
     VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
-           uint8_t velLow, uint8_t velHigh, int sampNum, const std::wstring &name = L"Region");
+           uint8_t velLow, uint8_t velHigh, int sampNum, const std::string &name = "Region");
     ~VGMRgn(void);
 
     virtual bool LoadRgn() { return true; }
@@ -35,7 +35,7 @@ class VGMRgn : public VGMContainerItem {
     void SetADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
                  uint16_t rls_transform, long release_time);
 
-    void AddGeneralItem(uint32_t offset, uint32_t length, const std::wstring &name);
+    void AddGeneralItem(uint32_t offset, uint32_t length, const std::string &name);
     void AddUnknown(uint32_t offset, uint32_t length);
     void SetFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
     void SetPan(uint8_t pan);
@@ -121,7 +121,7 @@ class VGMRgnItem : public VGMItem {
     };  // HIT = Header Item Type
 
     VGMRgnItem(VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length,
-               const std::wstring &name);
+               const std::string &name);
     virtual Icon GetIcon();
 
    public:

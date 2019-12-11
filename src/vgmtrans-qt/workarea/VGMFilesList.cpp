@@ -31,7 +31,7 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
     switch (index.column()) {
         case Property::Name: {
             if (role == Qt::DisplayRole) {
-                return QString::fromStdWString(*vgmfile->GetName());
+                return QString::fromStdString(*vgmfile->GetName());
             } else if (role == Qt::DecorationRole) {
                 return iconForFileType(vgmfile->GetFileType());
             }
@@ -162,7 +162,7 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
     auto vgmfile_menu = new QMenu();
     vgmfile_menu->addAction("Close", [file]() { qtVGMRoot.RemoveVGMFile(file); });
     vgmfile_menu->addAction("Save as raw", [file]() {
-        std::wstring filepath = qtVGMRoot.UI_GetSaveFilePath(L"");
+        std::string filepath = qtVGMRoot.UI_GetSaveFilePath("");
         if (!filepath.empty()) {
             u8 *buf = new u8[file->size()];
             file->GetBytes(file->dwOffset, file->unLength, buf);
@@ -170,25 +170,6 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
             delete[] buf;
         }
     });
-
-    switch (file->GetFileType()) {
-        case FILETYPE_SEQ: {
-            vgmfile_menu->addAction("Save as MIDI", [file]() {
-                std::wstring filepath = qtVGMRoot.UI_GetSaveFilePath(L"");
-                if (!filepath.empty()) {
-                    u8 *buf = new u8[file->size()];
-                    file->GetBytes(file->dwOffset, file->unLength, buf);
-                    qtVGMRoot.UI_WriteBufferToFile(filepath, buf, file->unLength);
-                    delete[] buf;
-                }
-            });
-
-            break;
-        }
-
-        default:
-            break;
-    }
 
     /*
     std::vector<const wchar_t *> *menu_item_names = file->GetMenuItemNames();

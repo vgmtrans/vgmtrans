@@ -29,7 +29,7 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
     VirtFile *spcFile = new VirtFile(spcData, 0x10000, file->name(), file->path());
 
     std::vector<uint8_t> dsp(file->data() + 0x10100, file->data() + 0x10100 + 0x80);
-    spcFile->tag.binaries[L"dsp"] = dsp;
+    spcFile->tag.binaries["dsp"] = dsp;
 
     // Parse [ID666](http://vspcplay.raphnet.net/spc_file_format.txt) if available.
     if (file->GetByte(0x23) == 0x1a) {
@@ -38,24 +38,24 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
         file->GetBytes(0x2e, 32, s);
         s[32] = '\0';
         std::string s_str = s;
-        spcFile->tag.title = string2wstring(s_str);
+        spcFile->tag.title = (s_str);
 
         file->GetBytes(0x4e, 32, s);
         s[32] = '\0';
         s_str = s;
-        spcFile->tag.album = string2wstring(s_str);
+        spcFile->tag.album = (s_str);
 
         file->GetBytes(0x7e, 32, s);
         s[32] = '\0';
         s_str = s;
-        spcFile->tag.comment = string2wstring(s_str);
+        spcFile->tag.comment = (s_str);
 
         if (file->GetByte(0xd2) < 0x30) {
             // binary format
             file->GetBytes(0xb0, 32, s);
             s[32] = '\0';
             s_str = s;
-            spcFile->tag.artist = string2wstring(s_str);
+            spcFile->tag.artist = (s_str);
 
             spcFile->tag.length = (double)(file->GetWord(0xa9) & 0xffffff);
         } else {
@@ -63,7 +63,7 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
             file->GetBytes(0xb1, 32, s);
             s[32] = '\0';
             s_str = s;
-            spcFile->tag.artist = string2wstring(s_str);
+            spcFile->tag.artist = (s_str);
 
             file->GetBytes(0xa9, 3, s);
             s[3] = '\0';
@@ -105,7 +105,7 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
                         // String (data contains null character)
                         std::string s_str =
                             std::string((char *)(file->data() + xid6_offset + 4), xid6_length - 1);
-                        std::wstring xid6_string = string2wstring(s_str);
+                        std::string xid6_string = (s_str);
                         switch (xid6_id) {
                             case 1:
                                 // Song name

@@ -18,7 +18,7 @@ DECLARE_FORMAT(NinSnes);
 
 NinSnesSeq::NinSnesSeq(RawFile *file, NinSnesVersion ver, uint32_t offset, uint8_t percussion_base,
                        const std::vector<uint8_t> &theVolumeTable,
-                       const std::vector<uint8_t> &theDurRateTable, std::wstring theName)
+                       const std::vector<uint8_t> &theDurRateTable, std::string theName)
     : VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName),
       version(ver),
       header(NULL),
@@ -119,7 +119,7 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
     if (sectionAddress == 0) {
         // End
         if (!IsOffsetUsed(beginOffset)) {
-            header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Section Playlist End");
+            header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Section Playlist End");
         }
         bContinue = false;
     } else if (sectionAddress <= 0xff) {
@@ -180,11 +180,11 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
 
         // add event to sequence
         if (!IsOffsetUsed(beginOffset)) {
-            header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Playlist Jump");
+            header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Playlist Jump");
 
             // add the last event too, if available
             if (curOffset + 1 < 0x10000 && GetShort(curOffset) == 0x0000) {
-                header->AddSimpleItem(curOffset, 2, L"Playlist End");
+                header->AddSimpleItem(curOffset, 2, "Playlist End");
             }
         }
 
@@ -209,7 +209,7 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
 
         // Play the section
         if (!IsOffsetUsed(beginOffset)) {
-            header->AddSimpleItem(beginOffset, curOffset - beginOffset, L"Section Pointer");
+            header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Section Pointer");
         }
 
         NinSnesSection *section = (NinSnesSection *)GetSectionFromOffset(sectionAddress);
@@ -650,21 +650,21 @@ bool NinSnesSection::GetTrackPointers() {
                 }
             }
 
-            std::wstringstream trackName;
-            trackName << L"Track " << (trackIndex + 1);
+            std::stringstream trackName;
+            trackName << "Track " << (trackIndex + 1);
             track = new NinSnesTrack(this, startAddress, 0, trackName.str());
 
             numActiveTracks++;
         } else {
             // add an inactive track
-            track = new NinSnesTrack(this, curOffset, 2, L"NULL");
+            track = new NinSnesTrack(this, curOffset, 2, "NUL");
             track->available = false;
         }
         track->shared = &parentSeq->sharedTrackData[trackIndex];
         aTracks.push_back(track);
 
-        wchar_t name[32];
-        swprintf(name, 32, L"Track Pointer #%d", trackIndex + 1);
+        char name[32];
+        sprintf(name, "Track Pointer #%d", trackIndex + 1);
 
         header->AddSimpleItem(curOffset, 2, name);
         curOffset += 2;
@@ -710,7 +710,7 @@ void NinSnesTrackSharedData::ResetVars(void) {
 //  ************
 
 NinSnesTrack::NinSnesTrack(NinSnesSection *parentSection, long offset, long length,
-                           const std::wstring &theName)
+                           const std::string &theName)
     : SeqTrack(parentSection->parentSeq, offset, length, theName),
       parentSection(parentSection),
       shared(NULL),
@@ -742,7 +742,7 @@ bool NinSnesTrack::ReadEvent(void) {
     uint8_t statusByte = GetByte(curOffset++);
     bool bContinue = true;
 
-    std::wstringstream desc;
+    std::stringstream desc;
 
     NinSnesSeqEventType eventType = (NinSnesSeqEventType)0;
     std::map<uint8_t, NinSnesSeqEventType>::iterator pEventType =
@@ -753,28 +753,28 @@ bool NinSnesTrack::ReadEvent(void) {
 
     switch (eventType) {
         case EVENT_UNKNOWN0: {
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
         case EVENT_UNKNOWN1: {
             uint8_t arg1 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
         case EVENT_UNKNOWN2: {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -782,10 +782,10 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
@@ -794,23 +794,23 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
             uint8_t arg4 = GetByte(curOffset++);
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(L' ') << std::setw(0) << L"  Arg1: "
-                 << (int)arg1 << L"  Arg2: " << (int)arg2 << L"  Arg3: " << (int)arg3 << L"  Arg4: "
-                 << (int)arg4;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3
+                 << "  Arg4: " << (int)arg4;
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
 
         case EVENT_NOP: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(),
                             CLR_MISC, ICON_BINARY);
             break;
         }
 
         case EVENT_NOP1: {
             curOffset++;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(),
                             CLR_MISC, ICON_BINARY);
             break;
         }
@@ -854,7 +854,7 @@ bool NinSnesTrack::ReadEvent(void) {
         OnEventNoteParam:
             // param #0: duration
             shared->spcNoteDuration = statusByte;
-            desc << L"Duration: " << (int)shared->spcNoteDuration;
+            desc << "Duration: " << (int)shared->spcNoteDuration;
 
             // param #1: quantize and velocity (optional)
             if (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
@@ -866,12 +866,13 @@ bool NinSnesTrack::ReadEvent(void) {
                 shared->spcNoteDurRate = parentSeq->durRateTable[durIndex];
                 shared->spcNoteVolume = parentSeq->volumeTable[velIndex];
 
-                desc << L"  Quantize: " << (int)durIndex << L" (" << (int)shared->spcNoteDurRate
-                     << L"/256)" << L"  Velocity: " << (int)velIndex << L" ("
-                     << (int)shared->spcNoteVolume << L"/256)";
+                desc << "  Quantize: " << (int)durIndex << " (" << (int)shared->spcNoteDurRate
+                     << "/256)"
+                     << "  Velocity: " << (int)velIndex << " (" << (int)shared->spcNoteVolume
+                     << "/256)";
             }
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Param", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc.str().c_str(),
                             CLR_DURNOTE, ICON_CONTROL);
             break;
         }
@@ -884,7 +885,7 @@ bool NinSnesTrack::ReadEvent(void) {
 
             // Note: Konami engine can have volume=0
             AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber,
-                         shared->spcNoteVolume / 2, duration, L"Note");
+                         shared->spcNoteVolume / 2, duration, "Note");
             AddTime(shared->spcNoteDuration);
             break;
         }
@@ -893,9 +894,9 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
             duration =
                 std::min(std::max(duration, (uint8_t)1), (uint8_t)(shared->spcNoteDuration - 2));
-            desc << L"Duration: " << (int)duration;
+            desc << "Duration: " << (int)duration;
             MakePrevDurNoteEnd(GetTime() + duration);
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(),
                             CLR_TIE);
             AddTime(shared->spcNoteDuration);
             break;
@@ -922,7 +923,7 @@ bool NinSnesTrack::ReadEvent(void) {
 
             // Note: Konami engine can have volume=0
             AddPercNoteByDur(beginOffset, curOffset - beginOffset, noteNumber,
-                             shared->spcNoteVolume / 2, duration, L"Percussion Note");
+                             shared->spcNoteVolume / 2, duration, "Percussion Note");
             AddTime(shared->spcNoteDuration);
             break;
         }
@@ -981,16 +982,16 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t vibratoRate = GetByte(curOffset++);
             uint8_t vibratoDepth = GetByte(curOffset++);
 
-            desc << L"Delay: " << (int)vibratoDelay << L"  Rate: " << (int)vibratoRate
-                 << L"  Depth: " << (int)vibratoDepth;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str().c_str(),
+            desc << "Delay: " << (int)vibratoDelay << "  Rate: " << (int)vibratoRate
+                 << "  Depth: " << (int)vibratoDepth;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str().c_str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_VIBRATO_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Off",
-                            desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc.str().c_str(),
+                            CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
@@ -1004,7 +1005,7 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t fadeLength = GetByte(curOffset++);
             uint8_t newVol = GetByte(curOffset++);
 
-            desc << L"Length: " << (int)fadeLength << L"  Volume: " << (int)newVol;
+            desc << "Length: " << (int)fadeLength << "  Volume: " << (int)newVol;
             AddMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
             break;
         }
@@ -1042,16 +1043,16 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t tremoloRate = GetByte(curOffset++);
             uint8_t tremoloDepth = GetByte(curOffset++);
 
-            desc << L"Delay: " << (int)tremoloDelay << L"  Rate: " << (int)tremoloRate
-                 << L"  Depth: " << (int)tremoloDepth;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo", desc.str().c_str(),
+            desc << "Delay: " << (int)tremoloDelay << "  Rate: " << (int)tremoloRate
+                 << "  Depth: " << (int)tremoloDepth;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc.str().c_str(),
                             CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
         case EVENT_TREMOLO_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo Off",
-                            desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Off", desc.str().c_str(),
+                            CLR_MODULATION, ICON_CONTROL);
             break;
         }
 
@@ -1077,19 +1078,19 @@ bool NinSnesTrack::ReadEvent(void) {
             shared->loopStartAddress = dest;
             shared->loopCount = times;
 
-            desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
-                 << std::uppercase << (int)dest << std::dec << std::setfill(L' ') << std::setw(0)
-                 << L"  Times: " << (int)times;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play",
+            desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
+                 << std::uppercase << (int)dest << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Times: " << (int)times;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play",
                             desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
             // Add the next "END" event to UI
             if (curOffset < 0x10000 && GetByte(curOffset) == parentSeq->STATUS_END) {
                 if (shared->loopCount == 0) {
-                    AddGenericEvent(curOffset, 1, L"Section End", desc.str().c_str(), CLR_TRACKEND,
+                    AddGenericEvent(curOffset, 1, "Section End", desc.str().c_str(), CLR_TRACKEND,
                                     ICON_TRACKEND);
                 } else {
-                    AddGenericEvent(curOffset, 1, L"Pattern End", desc.str().c_str(), CLR_TRACKEND,
+                    AddGenericEvent(curOffset, 1, "Pattern End", desc.str().c_str(), CLR_TRACKEND,
                                     ICON_TRACKEND);
                 }
             }
@@ -1100,8 +1101,8 @@ bool NinSnesTrack::ReadEvent(void) {
 
         case EVENT_VIBRATO_FADE: {
             uint8_t fadeLength = GetByte(curOffset++);
-            desc << L"Length: " << (int)fadeLength;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Fade",
+            desc << "Length: " << (int)fadeLength;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade",
                             desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
             break;
         }
@@ -1111,9 +1112,9 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t pitchEnvLength = GetByte(curOffset++);
             int8_t pitchEnvSemitones = (int8_t)GetByte(curOffset++);
 
-            desc << L"Delay: " << (int)pitchEnvDelay << L"  Length: " << (int)pitchEnvLength
-                 << L"  Semitones: " << (int)pitchEnvSemitones;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope (To)",
+            desc << "Delay: " << (int)pitchEnvDelay << "  Length: " << (int)pitchEnvLength
+                 << "  Semitones: " << (int)pitchEnvSemitones;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (To)",
                             desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
@@ -1123,15 +1124,15 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t pitchEnvLength = GetByte(curOffset++);
             int8_t pitchEnvSemitones = (int8_t)GetByte(curOffset++);
 
-            desc << L"Delay: " << (int)pitchEnvDelay << L"  Length: " << (int)pitchEnvLength
-                 << L"  Semitones: " << (int)pitchEnvSemitones;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope (From)",
+            desc << "Delay: " << (int)pitchEnvDelay << "  Length: " << (int)pitchEnvLength
+                 << "  Semitones: " << (int)pitchEnvSemitones;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (From)",
                             desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
 
         case EVENT_PITCH_ENVELOPE_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope Off",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope Off",
                             desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
@@ -1148,8 +1149,8 @@ bool NinSnesTrack::ReadEvent(void) {
             // fractional part of instrument tuning. In other words, we cannot calculate the tuning
             // amount without reading the instrument table.
             uint8_t newTuning = GetByte(curOffset++);
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Fine Tuning",
-                            desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc.str().c_str(),
+                            CLR_PITCHBEND, ICON_CONTROL);
             AddFineTuningNoItem((newTuning / 256.0) *
                                 61.8);  // obviously not correct, but better than nothing?
             break;
@@ -1160,25 +1161,25 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t spcEVOL_L = GetByte(curOffset++);
             uint8_t spcEVOL_R = GetByte(curOffset++);
 
-            desc << L"Channels: ";
+            desc << "Channels: ";
             for (int channelNo = MAX_TRACKS - 1; channelNo >= 0; channelNo--) {
                 if ((spcEON & (1 << channelNo)) != 0) {
                     desc << (int)channelNo;
                     parentSeq->aTracks[channelNo]->AddReverbNoItem(40);
                 } else {
-                    desc << L"-";
+                    desc << "-";
                     parentSeq->aTracks[channelNo]->AddReverbNoItem(0);
                 }
             }
 
-            desc << L"  Volume Left: " << (int)spcEVOL_L << L"  Volume Right: " << (int)spcEVOL_R;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo", desc.str().c_str(),
+            desc << "  Volume Left: " << (int)spcEVOL_L << "  Volume Right: " << (int)spcEVOL_R;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
         }
 
         case EVENT_ECHO_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
         }
@@ -1188,9 +1189,9 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t spcEFB = GetByte(curOffset++);
             uint8_t spcFIR = GetByte(curOffset++);
 
-            desc << L"Delay: " << (int)spcEDL << L"  Feedback: " << (int)spcEFB << L"  FIR: "
-                 << (int)spcFIR;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Param", desc.str().c_str(),
+            desc << "Delay: " << (int)spcEDL << "  Feedback: " << (int)spcEFB
+                 << "  FIR: " << (int)spcFIR;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
         }
@@ -1200,9 +1201,9 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t spcEVOL_L = GetByte(curOffset++);
             uint8_t spcEVOL_R = GetByte(curOffset++);
 
-            desc << L"Length: " << (int)fadeLength << L"  Volume Left: " << (int)spcEVOL_L
-                 << L"  Volume Right: " << (int)spcEVOL_R;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Volume Fade",
+            desc << "Length: " << (int)fadeLength << "  Volume Left: " << (int)spcEVOL_L
+                 << "  Volume Right: " << (int)spcEVOL_R;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume Fade",
                             desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
             break;
         }
@@ -1212,10 +1213,10 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t pitchSlideLength = GetByte(curOffset++);
             uint8_t pitchSlideTargetNote = GetByte(curOffset++);
 
-            desc << L"Delay: " << (int)pitchSlideDelay << L"  Length: " << (int)pitchSlideLength
-                 << L"  Note: " << (int)(pitchSlideTargetNote - 0x80);
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide",
-                            desc.str().c_str(), CLR_PITCHBEND, ICON_CONTROL);
+            desc << "Delay: " << (int)pitchSlideDelay << "  Length: " << (int)pitchSlideLength
+                 << "  Note: " << (int)(pitchSlideTargetNote - 0x80);
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str().c_str(),
+                            CLR_PITCHBEND, ICON_CONTROL);
             break;
         }
 
@@ -1223,8 +1224,8 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t percussionBase = GetByte(curOffset++);
             parentSeq->spcPercussionBase = percussionBase;
 
-            desc << L"Percussion Base: " << (int)percussionBase;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Percussion Base",
+            desc << "Percussion Base: " << (int)percussionBase;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Base",
                             desc.str().c_str(), CLR_CHANGESTATE, ICON_CONTROL);
             break;
         }
@@ -1237,7 +1238,7 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t adsr1 = GetByte(curOffset++);
             uint8_t adsr2 = GetByte(curOffset++);
             AddProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true,
-                             L"Program Change & ADSR");
+                             "Program Change & ADSR");
             break;
         }
 
@@ -1246,7 +1247,7 @@ bool NinSnesTrack::ReadEvent(void) {
             // KONAMI EVENTS START >>
 
         case EVENT_KONAMI_LOOP_START: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(),
                             CLR_LOOP, ICON_STARTREP);
             shared->konamiLoopStart = curOffset;
             shared->konamiLoopCount = 0;
@@ -1258,9 +1259,9 @@ bool NinSnesTrack::ReadEvent(void) {
             int8_t volumeDelta = GetByte(curOffset++);
             int8_t pitchDelta = GetByte(curOffset++);
 
-            desc << L"Times: " << (int)times << L"  Volume Delta: " << (int)volumeDelta
-                 << L"  Pitch Delta: " << (int)pitchDelta << L"/16 semitones";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str().c_str(),
+            desc << "Times: " << (int)times << "  Volume Delta: " << (int)volumeDelta
+                 << "  Pitch Delta: " << (int)pitchDelta << "/16 semitones";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(),
                             CLR_LOOP, ICON_ENDREP);
 
             shared->konamiLoopCount++;
@@ -1276,10 +1277,10 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t adsr1 = GetByte(curOffset++);
             uint8_t adsr2 = GetByte(curOffset++);
             uint8_t gain = GetByte(curOffset++);
-            desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << L"ADSR(1): $" << adsr1 << L"  ADSR(2): $" << adsr2 << L"  GAIN: $" << gain;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR/GAIN", desc.str(),
-                            CLR_ADSR, ICON_CONTROL);
+            desc << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << "ADSR(1): $"
+                 << adsr1 << "  ADSR(2): $" << adsr2 << "  GAIN: $" << gain;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR/GAIN", desc.str(), CLR_ADSR,
+                            ICON_CONTROL);
             break;
         }
 
@@ -1290,25 +1291,24 @@ bool NinSnesTrack::ReadEvent(void) {
         case EVENT_LEMMINGS_NOTE_PARAM: {
             // param #0: duration
             shared->spcNoteDuration = statusByte;
-            desc << L"Duration: " << (int)shared->spcNoteDuration;
+            desc << "Duration: " << (int)shared->spcNoteDuration;
 
             // param #1: quantize (optional)
             if (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
                 uint8_t durByte = GetByte(curOffset++);
                 shared->spcNoteDurRate =
                     (durByte << 1) + (durByte >> 1) + (durByte & 1);  // approx percent?
-                desc << L"  Quantize: " << durByte << L" (" << shared->spcNoteDurRate << L"/256)";
+                desc << "  Quantize: " << durByte << " (" << shared->spcNoteDurRate << "/256)";
 
                 // param #2: velocity (optional)
                 if (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
                     uint8_t velByte = GetByte(curOffset++);
                     shared->spcNoteVolume = velByte << 1;
-                    desc << L"  Velocity: " << velByte << L" (" << shared->spcNoteVolume
-                         << L"/256)";
+                    desc << "  Velocity: " << velByte << " (" << shared->spcNoteVolume << "/256)";
                 }
             }
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Param", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc.str().c_str(),
                             CLR_DURNOTE, ICON_CONTROL);
             break;
         }
@@ -1325,7 +1325,7 @@ bool NinSnesTrack::ReadEvent(void) {
 
             // param #0: duration
             shared->spcNoteDuration = statusByte;
-            desc << L"Duration: " << (int)shared->spcNoteDuration;
+            desc << "Duration: " << (int)shared->spcNoteDuration;
 
             // param #1,2...: quantize/velocity (optional)
             while (curOffset + 1 < 0x10000 && GetByte(curOffset) <= 0x7f) {
@@ -1333,40 +1333,38 @@ bool NinSnesTrack::ReadEvent(void) {
                 if (noteParam < 0x40) {  // 00..3f
                     uint8_t durIndex = noteParam & 0x3f;
                     shared->spcNoteDurRate = parentSeq->intelliDurVolTable[durIndex];
-                    desc << L"  Quantize: " << durIndex << L" (" << shared->spcNoteDurRate
-                         << L"/256)";
+                    desc << "  Quantize: " << durIndex << " (" << shared->spcNoteDurRate << "/256)";
                 } else {  // 40..7f
                     uint8_t velIndex = noteParam & 0x3f;
                     shared->spcNoteVolume = parentSeq->intelliDurVolTable[velIndex];
-                    desc << L"  Velocity: " << velIndex << L" (" << shared->spcNoteVolume
-                         << L"/256)";
+                    desc << "  Velocity: " << velIndex << " (" << shared->spcNoteVolume << "/256)";
                 }
             }
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note Param", desc.str().c_str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc.str().c_str(),
                             CLR_DURNOTE, ICON_CONTROL);
             break;
         }
 
         case EVENT_INTELLI_ECHO_ON: {
-            AddReverb(beginOffset, curOffset - beginOffset, 40, L"Echo On");
+            AddReverb(beginOffset, curOffset - beginOffset, 40, "Echo On");
             break;
         }
 
         case EVENT_INTELLI_ECHO_OFF: {
-            AddReverb(beginOffset, curOffset - beginOffset, 0, L"Echo Off");
+            AddReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
             break;
         }
 
         case EVENT_INTELLI_LEGATO_ON: {
             // TODO: cancel keyoff of note (i.e. full duration)
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato On", desc.str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Legato On", desc.str(),
                             CLR_PORTAMENTO, ICON_CONTROL);
             break;
         }
 
         case EVENT_INTELLI_LEGATO_OFF: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato Off", desc.str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Legato Off", desc.str(),
                             CLR_PORTAMENTO, ICON_CONTROL);
             break;
         }
@@ -1375,9 +1373,9 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t offset = GetByte(curOffset++);
             uint16_t dest = curOffset + offset;
 
-            desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+            desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                  << std::uppercase << (int)dest;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Conditional Jump (Short)",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump (Short)",
                             desc.str().c_str(), CLR_MISC);
 
             // condition for branch has not been researched yet
@@ -1389,9 +1387,9 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t offset = GetByte(curOffset++);
             uint16_t dest = curOffset + offset;
 
-            desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+            desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                  << std::uppercase << (int)dest;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Jump (Short)",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Jump (Short)",
                             desc.str().c_str(), CLR_MISC);
 
             curOffset = dest;
@@ -1402,31 +1400,30 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t param = GetByte(curOffset++);
             if (param < 0xf0) {
                 // wait for APU port #2
-                desc << L"Value: " << param;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Wait for APU Port #2",
+                desc << "Value: " << param;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Wait for APU Port #2",
                                 desc.str(), CLR_CHANGESTATE);
             } else {
                 // set/clear bitflag in $ca
                 uint8_t bit = param & 7;
                 bool bitValue = (param & 8) == 0;
 
-                desc << L"Status: " << (bitValue ? L"On" : L"Off");
+                desc << "Status: " << (bitValue ? "On" : "Off");
                 switch (bit) {
                     case 0:
                         parentSeq->intelliUseCustomPercTable = bitValue;
                         AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                        L"Use Custom Percussion Table", desc.str(),
-                                        CLR_CHANGESTATE);
+                                        "Use Custom Percussion Table", desc.str(), CLR_CHANGESTATE);
                         break;
 
                     case 7:
                         parentSeq->intelliUseCustomNoteParam = bitValue;
                         AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                        L"Use Custom Note Param", desc.str(), CLR_CHANGESTATE);
+                                        "Use Custom Note Param", desc.str(), CLR_CHANGESTATE);
                         break;
 
                     default:
-                        AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event",
+                        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event",
                                    desc.str());
                 }
             }
@@ -1435,8 +1432,8 @@ bool NinSnesTrack::ReadEvent(void) {
 
         case EVENT_INTELLI_WRITE_APU_PORT: {
             uint8_t value = GetByte(curOffset++);
-            desc << L"Value: " << value;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Write APU Port", desc.str(),
+            desc << "Value: " << value;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Write APU Port", desc.str(),
                             CLR_CHANGESTATE);
             break;
         }
@@ -1453,17 +1450,17 @@ bool NinSnesTrack::ReadEvent(void) {
                 parentSeq->intelliVoiceParamTableSize = param;
                 parentSeq->intelliVoiceParamTable = curOffset;
                 curOffset += parentSeq->intelliVoiceParamTableSize * 4;
-                desc << L"Number of Items: " << parentSeq->intelliVoiceParamTableSize;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Voice Param Table",
+                desc << "Number of Items: " << parentSeq->intelliVoiceParamTableSize;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Voice Param Table",
                                 desc.str(), CLR_MISC);
             } else {
                 if (parentSeq->version == NINSNES_INTELLI_FE3 ||
                     parentSeq->version == NINSNES_INTELLI_TA) {
                     uint8_t instrNum = param & 0x3f;
                     curOffset += 6;
-                    desc << L"Instrument: " << instrNum;
+                    desc << "Instrument: " << instrNum;
                     AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                    L"Overwrite Instrument Region", desc.str(), CLR_MISC);
+                                    "Overwrite Instrument Region", desc.str(), CLR_MISC);
                 } else {
                     AddUnknown(beginOffset, curOffset - beginOffset);
                 }
@@ -1473,7 +1470,7 @@ bool NinSnesTrack::ReadEvent(void) {
 
         case EVENT_INTELLI_LOAD_VOICE_PARAM: {
             uint8_t paramIndex = GetByte(curOffset++);
-            desc << L"Index: " << paramIndex;
+            desc << "Index: " << paramIndex;
 
             if (paramIndex < parentSeq->intelliVoiceParamTableSize) {
                 uint16_t addrVoiceParam = parentSeq->intelliVoiceParamTable + (paramIndex * 4);
@@ -1532,7 +1529,7 @@ bool NinSnesTrack::ReadEvent(void) {
                 }
             }
 
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Load Voice Param", desc.str(),
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Load Voice Param", desc.str(),
                             CLR_PROGCHANGE, ICON_PROGCHANGE);
             break;
         }
@@ -1540,9 +1537,9 @@ bool NinSnesTrack::ReadEvent(void) {
         case EVENT_INTELLI_ADSR: {
             uint8_t adsr1 = GetByte(curOffset++);
             uint8_t adsr2 = GetByte(curOffset++);
-            desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
-                 << L"ADSR(1): $" << adsr1 << L"  ADSR(2): $" << adsr2;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR,
+            desc << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << "ADSR(1): $"
+                 << adsr1 << "  ADSR(2): $" << adsr2;
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str(), CLR_ADSR,
                             ICON_CONTROL);
             break;
         }
@@ -1552,11 +1549,11 @@ bool NinSnesTrack::ReadEvent(void) {
             uint8_t sustain_rate = GetByte(curOffset++);
             uint8_t sustain_level = GetByte(curOffset++);
             uint8_t adsr2 = (sustain_level << 5) | sustain_rate;
-            desc << L"ADSR(1): $" << std::hex << std::setfill(L'0') << std::setw(2)
-                 << std::uppercase << adsr1 << L"  Sustain Rate: " << std::dec << sustain_rate
-                 << L"  Sustain Level: " << sustain_level << L"  (ADSR(2): $" << std::hex
-                 << std::setfill(L'0') << std::setw(2) << std::uppercase << adsr2 << L")";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR,
+            desc << "ADSR(1): $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                 << adsr1 << "  Sustain Rate: " << std::dec << sustain_rate
+                 << "  Sustain Level: " << sustain_level << "  (ADSR(2): $" << std::hex
+                 << std::setfill('0') << std::setw(2) << std::uppercase << adsr2 << ")";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str(), CLR_ADSR,
                             ICON_CONTROL);
             break;
         }
@@ -1564,18 +1561,18 @@ bool NinSnesTrack::ReadEvent(void) {
         case EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE: {
             uint8_t sustainDurRate = GetByte(curOffset++);
             uint8_t sustainGAIN = GetByte(curOffset++);
-            desc << L"Duration for Sustain: " << sustainDurRate << L"/256" << std::hex
-                 << std::setfill(L'0') << std::setw(2) << std::uppercase << L"  GAIN for Sustain: $"
+            desc << "Duration for Sustain: " << sustainDurRate << "/256" << std::hex
+                 << std::setfill('0') << std::setw(2) << std::uppercase << "  GAIN for Sustain: $"
                  << sustainGAIN;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"GAIN Sustain Time/Rate",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Sustain Time/Rate",
                             desc.str(), CLR_ADSR, ICON_CONTROL);
             break;
         }
 
         case EVENT_INTELLI_GAIN_SUSTAIN_TIME: {
             uint8_t sustainDurRate = GetByte(curOffset++);
-            desc << L"Duration for Sustain: " << sustainDurRate << L"/256";
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"GAIN Sustain Time", desc.str(),
+            desc << "Duration for Sustain: " << sustainDurRate << "/256";
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Sustain Time", desc.str(),
                             CLR_ADSR, ICON_CONTROL);
             break;
         }
@@ -1584,10 +1581,10 @@ bool NinSnesTrack::ReadEvent(void) {
             // This event will update GAIN immediately,
             // however, note that Fire Emblem 4 does not switch to GAIN mode until note off.
             uint8_t gain = GetByte(curOffset++);
-            desc << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << L"  GAIN: $"
+            desc << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << "  GAIN: $"
                  << gain;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"GAIN (Release Rate)",
-                            desc.str(), CLR_ADSR, ICON_CONTROL);
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "GAIN (Release Rate)", desc.str(),
+                            CLR_ADSR, ICON_CONTROL);
             break;
         }
 
@@ -1621,22 +1618,21 @@ bool NinSnesTrack::ReadEvent(void) {
                     }
 
                     if (param == 0x80) {
-                        desc << L"Status: " << (bitValue ? L"On" : L"Off");
+                        desc << "Status: " << (bitValue ? "On" : "Off");
                         AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                        L"Use Custom Note Param", desc.str(), CLR_CHANGESTATE);
+                                        "Use Custom Note Param", desc.str(), CLR_CHANGESTATE);
                     } else if (param == 0x40) {
-                        desc << L"Status: " << (bitValue ? L"On" : L"Off");
+                        desc << "Status: " << (bitValue ? "On" : "Off");
                         AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                        L"Use Custom Percussion Table", desc.str(),
-                                        CLR_CHANGESTATE);
+                                        "Use Custom Percussion Table", desc.str(), CLR_CHANGESTATE);
                     } else {
-                        desc << L"Value: $" << std::hex << std::setfill(L'0') << std::setw(2)
+                        desc << "Value: $" << std::hex << std::setfill('0') << std::setw(2)
                              << std::uppercase << param;
                         if (type == 0x01) {
-                            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Flags On",
+                            AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Flags On",
                                             desc.str(), CLR_CHANGESTATE);
                         } else {
-                            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Flags Off",
+                            AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Flags Off",
                                             desc.str(), CLR_CHANGESTATE);
                         }
                     }
@@ -1646,12 +1642,12 @@ bool NinSnesTrack::ReadEvent(void) {
 
                 case 0x03:
                     // TODO: cancel keyoff of note (i.e. full duration)
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato On", desc.str(),
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Legato On", desc.str(),
                                     CLR_PORTAMENTO, ICON_CONTROL);
                     break;
 
                 case 0x04:
-                    AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato Off", desc.str(),
+                    AddGenericEvent(beginOffset, curOffset - beginOffset, "Legato Off", desc.str(),
                                     CLR_PORTAMENTO, ICON_CONTROL);
                     break;
 
@@ -1693,9 +1689,9 @@ bool NinSnesTrack::ReadEvent(void) {
             // << INTELLIGENT SYSTEMS EVENTS END
 
         default:
-            desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase
+            desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
                  << (int)statusByte;
-            AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+            AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             L_ERROR("Unknown event {:#x}", statusByte);
 
             bContinue = false;
@@ -1707,10 +1703,10 @@ bool NinSnesTrack::ReadEvent(void) {
     if (curOffset + 1 <= 0x10000 && statusByte != parentSeq->STATUS_END &&
         GetByte(curOffset) == parentSeq->STATUS_END) {
         if (shared->loopCount == 0) {
-            AddGenericEvent(curOffset, 1, L"Section End", desc.str().c_str(), CLR_TRACKEND,
+            AddGenericEvent(curOffset, 1, "Section End", desc.str().c_str(), CLR_TRACKEND,
                             ICON_TRACKEND);
         } else {
-            AddGenericEvent(curOffset, 1, L"Pattern End", desc.str().c_str(), CLR_TRACKEND,
+            AddGenericEvent(curOffset, 1, "Pattern End", desc.str().c_str(), CLR_TRACKEND,
                             ICON_TRACKEND);
         }
     }

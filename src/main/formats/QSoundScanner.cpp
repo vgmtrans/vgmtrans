@@ -55,26 +55,26 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
     QSoundSampleInfoTable *sampInfoTable = 0;
     QSoundArticTable *articTable = 0;
 
-    wstring artic_table_name;
-    wstring instrset_name;
-    wstring samp_info_table_name;
-    wstring sampcoll_name;
-    wstring seq_table_name;
+    string artic_table_name;
+    string instrset_name;
+    string samp_info_table_name;
+    string sampcoll_name;
+    string seq_table_name;
 
-    std::wostringstream name;
-    name << gameentry->name.c_str() << L" articulation table";
+    std::ostringstream name;
+    name << gameentry->name.c_str() << " articulation table";
     artic_table_name = name.str();
-    name.str(L"");
-    name << gameentry->name.c_str() << L" instrument set";
+    name.str("");
+    name << gameentry->name.c_str() << " instrument set";
     instrset_name = name.str();
-    name.str(L"");
-    name << gameentry->name.c_str() << L" sample collection";
+    name.str("");
+    name << gameentry->name.c_str() << " sample collection";
     sampcoll_name = name.str();
-    name.str(L"");
-    name << gameentry->name.c_str() << L" sample info table";
+    name.str("");
+    name << gameentry->name.c_str() << " sample info table";
     samp_info_table_name = name.str();
-    name.str(L"");
-    name << gameentry->name.c_str() << L" sequence pointer table";
+    name.str("");
+    name << gameentry->name.c_str() << " sequence pointer table";
     seq_table_name = name.str();
 
     RawFile *programFile = seqRomGroupEntry->file;
@@ -132,14 +132,14 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
         seqPointer = programFile->GetWordBE(seq_table_offset + k) & 0x0FFFFF;
         if (seqPointer == 0)
             continue;
-        seqTable->AddSimpleItem(seq_table_offset + k, 4, L"Sequence Pointer");
+        seqTable->AddSimpleItem(seq_table_offset + k, 4, "Sequence Pointer");
 
-        name.str(L"");
-        name << gameentry->name.c_str() << L" song " << k / 4;
+        name.str("");
+        name << gameentry->name.c_str() << " song " << k / 4;
         VGMColl *coll = new VGMColl(name.str());
-        name.str(L"");
-        name << gameentry->name.c_str() << L" seq " << k / 4;
-        wstring seqName = name.str();
+        name.str("");
+        name << gameentry->name.c_str() << " seq " << k / 4;
+        string seqName = name.str();
         QSoundSeq *newSeq = new QSoundSeq(programFile, seqPointer, ver, seqName);
         if (newSeq->LoadVGMFile()) {
             coll->UseSeq(newSeq);

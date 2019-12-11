@@ -28,7 +28,7 @@ bool SegSatSeq::GetHeaderInfo(void) {
     //	return FALSE;							//return an error, the sequence shall be
     //deleted
 
-    name() = L"Sega Saturn Seq";
+    name() = "Sega Saturn Seq";
 
     return true;
 }
@@ -79,7 +79,7 @@ bool SegSatSeq::ReadEvent(void) {
             curOffset += 2;
             remainingEventsInLoop = GetByte(curOffset++);
             loopEndPos = curOffset;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reference Event", L"",
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "Reference Event", "",
                             CLR_LOOP);
             curOffset = loopOffset;
             bInLoop = true;

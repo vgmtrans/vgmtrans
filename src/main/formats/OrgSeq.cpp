@@ -16,7 +16,7 @@ bool OrgSeq::GetHeaderInfo(void) {
     waitTime = GetShort(dwOffset + 6);
     beatsPerMeasure = GetByte(dwOffset + 8);
     SetPPQN(GetByte(dwOffset + 9));
-    name = L"Org Seq";
+    name = "Org Seq";
 
     uint32_t notesSoFar = 0;  // this must be used to determine the length of the entire seq
 

@@ -86,9 +86,9 @@ class SNESSampColl : public VGMSampColl {
     SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
                  uint32_t maxNumSamps = 256);
     SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t offset,
-                 const std::vector<uint8_t> &targetSRCNs, std::wstring name = L"SNESSampColl");
+                 const std::vector<uint8_t> &targetSRCNs, std::string name = "SNESSampColl");
     SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
-                 const std::vector<uint8_t> &targetSRCNs, std::wstring name = L"SNESSampColl");
+                 const std::vector<uint8_t> &targetSRCNs, std::string name = "SNESSampColl");
     virtual ~SNESSampColl();
 
     virtual bool GetSampleInfo();
@@ -110,7 +110,7 @@ class SNESSampColl : public VGMSampColl {
 class SNESSamp : public VGMSamp {
    public:
     SNESSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-             uint32_t dataLen, uint32_t loopOffset, std::wstring name = L"BRR");
+             uint32_t dataLen, uint32_t loopOffset, std::string name = "BRR");
     virtual ~SNESSamp(void);
 
     static uint32_t GetSampleLength(RawFile *file, uint32_t offset, bool &loop);

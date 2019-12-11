@@ -9,8 +9,8 @@
 class TamSoftPS1Scanner : public VGMScanner {
    public:
     TamSoftPS1Scanner(void) {
-        USE_EXTENSION(L"tsq");
-        USE_EXTENSION(L"tvb");
+        USE_EXTENSION("tsq");
+        USE_EXTENSION("tvb");
     }
 
     virtual ~TamSoftPS1Scanner(void) {}

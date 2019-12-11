@@ -9,9 +9,9 @@
 class SonyPS2Scanner : public VGMScanner {
    public:
     SonyPS2Scanner(void) {
-        USE_EXTENSION(L"sq")
-        USE_EXTENSION(L"hd")
-        USE_EXTENSION(L"bd")
+        USE_EXTENSION("sq")
+        USE_EXTENSION("hd")
+        USE_EXTENSION("bd")
     }
 
    public:

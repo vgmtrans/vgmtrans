@@ -411,7 +411,7 @@ class PSXSamp : public VGMSamp {
    public:
     PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
             uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-            std::wstring name, bool bSetLoopOnConversion = true);
+            std::string name, bool bSetLoopOnConversion = true);
     virtual ~PSXSamp(void);
 
     // ratio of space conserved.  should generally be > 1

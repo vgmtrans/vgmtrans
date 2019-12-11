@@ -42,7 +42,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
     m_treeview = new VGMFileTreeView(m_vgmfile, m_splitter);
     m_splitter->setSizes(QList<int>() << 900 << 270);
 
-    setWindowTitle(QString::fromStdWString(*m_vgmfile->GetName()));
+    setWindowTitle(QString::fromStdString(*m_vgmfile->GetName()));
     setWindowIcon(iconForFileType(m_vgmfile->GetFileType()));
     setAttribute(Qt::WA_DeleteOnClose);
 
@@ -67,7 +67,7 @@ void VGMFileView::markEvents() {
             auto line = std::floor((item->dwOffset - base_offset) / 16);
             auto col = (item->dwOffset - base_offset) % 16;
             auto item_len = item->unLength;
-            auto desc = QString::fromStdWString(item->GetDescription());
+            auto desc = QString::fromStdString(item->GetDescription());
             while (col + item_len > 16) {
                 auto part_len = 16 - col;
                 overlay->metadata(line, col, part_len, textColorForEventColor(item->color),

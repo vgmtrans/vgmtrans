@@ -16,7 +16,7 @@ DECLARE_FORMAT(TriAcePS1);
 // TriAcePS1Seq
 // ************
 
-TriAcePS1Seq::TriAcePS1Seq(RawFile *file, uint32_t offset, const std::wstring &name)
+TriAcePS1Seq::TriAcePS1Seq(RawFile *file, uint32_t offset, const std::string &name)
     : VGMSeq(TriAcePS1Format::name, file, offset, 0, name) {
     AddContainer<TriAcePS1ScorePattern>(aScorePatterns);
     UseLinearAmplitudeScale();
@@ -32,10 +32,10 @@ bool TriAcePS1Seq::GetHeaderInfo(void) {
     SetPPQN(0x30);
 
     header = AddHeader(dwOffset, 0xD5);
-    header->AddSimpleItem(dwOffset + 2, 2, L"Size");
-    header->AddSimpleItem(dwOffset + 0xB, 4, L"Song title");
-    header->AddSimpleItem(dwOffset + 0xF, 1, L"BPM");
-    header->AddSimpleItem(dwOffset + 0x10, 2, L"Time Signature");
+    header->AddSimpleItem(dwOffset + 2, 2, "Size");
+    header->AddSimpleItem(dwOffset + 0xB, 4, "Song title");
+    header->AddSimpleItem(dwOffset + 0xF, 1, "BPM");
+    header->AddSimpleItem(dwOffset + 0x10, 2, "Time Signature");
 
     unLength = GetShort(dwOffset + 2);
     AlwaysWriteInitialTempo(GetByte(dwOffset + 0xF));
@@ -43,7 +43,7 @@ bool TriAcePS1Seq::GetHeaderInfo(void) {
 }
 
 bool TriAcePS1Seq::GetTrackPointers(void) {
-    VGMHeader *TrkInfoHeader = header->AddHeader(dwOffset + 0x16, 6 * 32, L"Track Info Blocks");
+    VGMHeader *TrkInfoHeader = header->AddHeader(dwOffset + 0x16, 6 * 32, "Track Info Blocks");
 
     GetBytes(dwOffset + 0x16, 6 * 32, &TrkInfos);
     for (int i = 0; i < 32; i++)
@@ -51,7 +51,7 @@ bool TriAcePS1Seq::GetTrackPointers(void) {
             aTracks.push_back(new TriAcePS1Track(this, TrkInfos[i].trkOffset, 0));
 
             VGMHeader *TrkInfoBlock =
-                TrkInfoHeader->AddHeader(dwOffset + 0x16 + 6 * i, 6, L"Track Info");
+                TrkInfoHeader->AddHeader(dwOffset + 0x16 + 6 * i, 6, "Track Info");
         }
     return true;
 }
@@ -83,7 +83,7 @@ void TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
         uint32_t endOffset = ReadScorePattern(scorePatternOffset);
         if (seq->curScorePattern)
             seq->curScorePattern->unLength = endOffset - seq->curScorePattern->dwOffset;
-        AddSimpleItem(scorePatternPtrOffset, 2, L"Score Pattern Ptr");
+        AddSimpleItem(scorePatternPtrOffset, 2, "Score Pattern Ptr");
         scorePatternPtrOffset += 2;
         scorePatternOffset = GetShort(scorePatternPtrOffset);
     }
@@ -124,7 +124,7 @@ bool TriAcePS1Track::ReadEvent(void) {
     } else
         switch (status_byte) {
             case 0x80:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Score Pattern End", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Score Pattern End", "",
                                 CLR_TRACKEND);
                 return false;
 
@@ -206,20 +206,20 @@ bool TriAcePS1Track::ReadEvent(void) {
             case 0x8A: {
                 event_dur = GetByte(curOffset++);
                 uint8_t val = GetByte(curOffset++);
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event (tempo?)");
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event (tempo?)");
                 break;
             }
 
             // Dal Segno: start point
             case 0x8D:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Dal Segno: start point",
-                                L"", CLR_UNKNOWN);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Dal Segno: start point",
+                                "", CLR_UNKNOWN);
                 break;
 
             // Dal Segno: end point
             case 0x8E:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Dal Segno: end point", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Dal Segno: end point", "",
                                 CLR_UNKNOWN);
                 break;
 
@@ -262,7 +262,7 @@ bool TriAcePS1Track::ReadEvent(void) {
             case 0x95:
                 event_dur = GetByte(curOffset++);
                 curOffset++;
-                AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event  (Tie?)");
+                AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event  (Tie?)");
                 break;
 
             // Pitch Bend Range
@@ -305,7 +305,7 @@ bool TriAcePS1Track::ReadEvent(void) {
             case 0x9E:
                 impliedNoteDur = GetByte(curOffset++);
                 impliedVelocity = GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, L"Imply Note Params", L"",
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Imply Note Params", "",
                                 CLR_CHANGESTATE);
                 break;
 

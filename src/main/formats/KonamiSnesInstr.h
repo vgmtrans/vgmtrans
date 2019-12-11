@@ -18,7 +18,7 @@ class KonamiSnesInstrSet : public VGMInstrSet {
     KonamiSnesInstrSet(RawFile *file, KonamiSnesVersion ver, uint32_t offset,
                        uint32_t bankedInstrOffset, uint8_t firstBankedInstr,
                        uint32_t percInstrOffset, uint32_t spcDirAddr,
-                       const std::wstring &name = L"KonamiSnesInstrSet");
+                       const std::string &name = "KonamiSnesInstrSet");
     virtual ~KonamiSnesInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -42,7 +42,7 @@ class KonamiSnesInstr : public VGMInstr {
    public:
     KonamiSnesInstr(VGMInstrSet *instrSet, KonamiSnesVersion ver, uint32_t offset, uint32_t theBank,
                     uint32_t theInstrNum, uint32_t spcDirAddr, bool percussion,
-                    const std::wstring &name = L"KonamiSnesInstr");
+                    const std::string &name = "KonamiSnesInstr");
     virtual ~KonamiSnesInstr(void);
 
     virtual bool LoadInstr();

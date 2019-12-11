@@ -14,7 +14,7 @@
 MoriSnesInstrSet::MoriSnesInstrSet(RawFile *file, MoriSnesVersion ver, uint32_t spcDirAddr,
                                    std::vector<uint16_t> instrumentAddresses,
                                    std::map<uint16_t, MoriSnesInstrHintDir> instrumentHints,
-                                   const std::wstring &name)
+                                   const std::string &name)
     : VGMInstrSet(MoriSnesFormat::name, file, 0, 0, name),
       version(ver),
       spcDirAddr(spcDirAddr),
@@ -113,8 +113,8 @@ bool MoriSnesInstrSet::GetInstrPointers() {
             }
         }
 
-        std::wostringstream instrName;
-        instrName << L"Instrument " << instrNum;
+        std::ostringstream instrName;
+        instrName << "Instrument " << instrNum;
         MoriSnesInstr *newInstr = new MoriSnesInstr(this, version, instrNum, spcDirAddr,
                                                     instrumentHints[instrAddress], instrName.str());
         aInstrs.push_back(newInstr);
@@ -141,7 +141,7 @@ bool MoriSnesInstrSet::GetInstrPointers() {
 
 MoriSnesInstr::MoriSnesInstr(VGMInstrSet *instrSet, MoriSnesVersion ver, uint8_t instrNum,
                              uint32_t spcDirAddr, const MoriSnesInstrHintDir &instrHintDir,
-                             const std::wstring &name)
+                             const std::string &name)
     : VGMInstr(instrSet, instrHintDir.startAddress, instrHintDir.size, 0, instrNum, name),
       version(ver),
       spcDirAddr(spcDirAddr),
@@ -150,7 +150,7 @@ MoriSnesInstr::MoriSnesInstr(VGMInstrSet *instrSet, MoriSnesVersion ver, uint8_t
 MoriSnesInstr::~MoriSnesInstr() {}
 
 bool MoriSnesInstr::LoadInstr() {
-    AddSimpleItem(dwOffset, 1, L"Melody/Percussion");
+    AddSimpleItem(dwOffset, 1, "Melody/Percussion");
 
     if (!instrHintDir.percussion) {
         MoriSnesInstrHint *instrHint = &instrHintDir.instrHint;
@@ -161,7 +161,7 @@ bool MoriSnesInstr::LoadInstr() {
             return false;
         }
 
-        AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, L"Envelope Sequence");
+        AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, "Envelope Sequence");
 
         uint16_t addrSampStart = GetShort(offDirEnt);
         MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint);
@@ -177,12 +177,12 @@ bool MoriSnesInstr::LoadInstr() {
                 return false;
             }
 
-            std::wostringstream seqOffsetName;
-            seqOffsetName << L"Sequence Offset " << (int)percNoteKey;
+            std::ostringstream seqOffsetName;
+            seqOffsetName << "Sequence Offset " << (int)percNoteKey;
             AddSimpleItem(dwOffset + 1 + (percNoteKey * 2), 2, seqOffsetName.str().c_str());
 
-            std::wostringstream seqName;
-            seqName << L"Envelope Sequence " << (int)percNoteKey;
+            std::ostringstream seqName;
+            seqName << "Envelope Sequence " << (int)percNoteKey;
             AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, seqName.str().c_str());
 
             uint16_t addrSampStart = GetShort(offDirEnt);
@@ -228,10 +228,10 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr, MoriSnesVersion ver, uint32_t spc
     }
 
     AddSampNum(srcn, rgnAddress, 1);
-    AddSimpleItem(rgnAddress + 1, 1, L"ADSR1");
-    AddSimpleItem(rgnAddress + 2, 1, L"ADSR2");
-    AddSimpleItem(rgnAddress + 3, 1, L"GAIN");
-    AddSimpleItem(rgnAddress + 4, 1, L"Key-Off Delay");
+    AddSimpleItem(rgnAddress + 1, 1, "ADSR1");
+    AddSimpleItem(rgnAddress + 2, 1, "ADSR2");
+    AddSimpleItem(rgnAddress + 3, 1, "GAIN");
+    AddSimpleItem(rgnAddress + 4, 1, "Key-Off Delay");
     AddUnityKey(71 - (int)(coarse_tuning), rgnAddress + 5, 1);
     AddFineTune((int16_t)(fine_tuning * 100.0), rgnAddress + 6, 1);
     if (instrHint.pan > 0) {

@@ -452,8 +452,8 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
 
     bool hasSongList;
 
-    std::wstring basefilename = removeExtFromPath(file->name());
-    std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+    std::string basefilename = removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
     // TODO: Unsupported games
     // Tiny Toon Adventures: Buster Bus
@@ -577,12 +577,12 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
     // scan for DIR address
     uint32_t ofsSetDIR;
     uint16_t spcDirAddr;
-    std::map<std::wstring, std::vector<uint8_t>>::iterator itrDSP;
+    std::map<std::string, std::vector<uint8_t>>::iterator itrDSP;
     if (file->SearchBytePattern(ptnSetDIRGG4, ofsSetDIR)) {
         spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
     } else if (file->SearchBytePattern(ptnSetDIRCNTR3, ofsSetDIR)) {
         spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-    } else if ((itrDSP = file->tag.binaries.find(L"dsp")) != file->tag.binaries.end()) {
+    } else if ((itrDSP = file->tag.binaries.find("dsp")) != file->tag.binaries.end()) {
         // read DIR from SPC700 snapshot
         spcDirAddr = itrDSP->second[0x5d] << 8;
     } else {

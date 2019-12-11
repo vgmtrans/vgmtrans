@@ -19,7 +19,7 @@ class AkaoInstrSet;
 
 class AkaoColl : public VGMColl {
    public:
-    AkaoColl(std::wstring name = L"Unnamed Collection") : VGMColl(name) {}
+    AkaoColl(std::string name = "Unnamed Collection") : VGMColl(name) {}
     virtual ~AkaoColl() {}
 
     virtual bool LoadMain();

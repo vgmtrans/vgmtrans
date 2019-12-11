@@ -67,9 +67,9 @@ uint32_t DLSFile::GetSize(void) {
 
     for (uint32_t i = 0; i < aInstrs.size(); i++)
         size += aInstrs[i]->GetSize();                   // each "ins " list
-    size += 16;                                          // "ptbl" + size + cbSize + cCues
+    size += 16;                                          // "ptb" + size + cbSize + cCues
     size += (uint32_t)aWaves.size() * sizeof(uint32_t);  // each wave gets a poolcue
-    size += LIST_HDR_SIZE;  //"wvpl" list (wave pool - contains all the "wave" lists)
+    size += LIST_HDR_SIZE;  //"wvp" list (wave pool - contains all the "wave" lists)
     for (uint32_t i = 0; i < aWaves.size(); i++)
         size += aWaves[i]->GetSize();  // each "wave" list
     size += LIST_HDR_SIZE;             //"INFO" list
@@ -97,7 +97,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
     for (uint32_t i = 0; i < aInstrs.size(); i++)
         aInstrs[i]->Write(buf);  // Write each "ins " list
 
-    PushTypeOnVectBE<uint32_t>(buf, 0x7074626C);  //"ptbl"
+    PushTypeOnVectBE<uint32_t>(buf, 0x7074626C);  //"ptb"
     theDWORD = 8;
     theDWORD += (uint32_t)aWaves.size() * sizeof(uint32_t);  // each wave gets a poolcue
     PushTypeOnVect<uint32_t>(buf, theDWORD);                 // size
@@ -114,7 +114,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
     theDWORD = 4;
     for (uint32_t i = 0; i < aWaves.size(); i++)
         theDWORD += aWaves[i]->GetSize();  // each "wave" list
-    WriteLIST(buf, 0x7776706C, theDWORD);  // Write the "wvpl" LIST
+    WriteLIST(buf, 0x7776706C, theDWORD);  // Write the "wvp" LIST
     for (uint32_t i = 0; i < aWaves.size(); i++)
         aWaves[i]->Write(buf);  // Write each "wave" list
 
@@ -128,7 +128,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
 }
 
 // I should probably make this function part of a parent class for both Midi and DLS file
-bool DLSFile::SaveDLSFile(const std::wstring &filepath) {
+bool DLSFile::SaveDLSFile(const std::string &filepath) {
     vector<uint8_t> dlsBuf;
     WriteDLSToBuffer(dlsBuf);
     return pRoot->UI_WriteBufferToFile(filepath, &dlsBuf[0], (uint32_t)dlsBuf.size());

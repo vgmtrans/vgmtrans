@@ -12,7 +12,7 @@
 // ******************
 
 TamSoftPS1InstrSet::TamSoftPS1InstrSet(RawFile *file, uint32_t offset, bool ps2,
-                                       const std::wstring &name)
+                                       const std::string &name)
     : VGMInstrSet(TamSoftPS1Format::name, file, offset, 0, name), ps2(ps2) {}
 
 TamSoftPS1InstrSet::~TamSoftPS1InstrSet() {}
@@ -43,8 +43,8 @@ bool TamSoftPS1InstrSet::GetInstrPointers() {
                 PSXSamp::GetSampleLength(rawfile, vagOffset, dwOffset + unLength, vagLoop));
             vagLocations.push_back(vagLocation);
 
-            std::wstringstream instrName;
-            instrName << L"Instrument " << instrNum;
+            std::stringstream instrName;
+            instrName << "Instrument " << instrNum;
             TamSoftPS1Instr *newInstr = new TamSoftPS1Instr(this, instrNum, instrName.str());
             aInstrs.push_back(newInstr);
         }
@@ -69,7 +69,7 @@ bool TamSoftPS1InstrSet::GetInstrPointers() {
 // ***************
 
 TamSoftPS1Instr::TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, uint8_t instrNum,
-                                 const std::wstring &name)
+                                 const std::string &name)
     : VGMInstr(instrSet, instrSet->dwOffset + 4 * instrNum, 0x400 + 4, 0, instrNum, name) {}
 
 TamSoftPS1Instr::~TamSoftPS1Instr() {}
@@ -77,7 +77,7 @@ TamSoftPS1Instr::~TamSoftPS1Instr() {}
 bool TamSoftPS1Instr::LoadInstr() {
     TamSoftPS1InstrSet *parInstrSet = (TamSoftPS1InstrSet *)this->parInstrSet;
 
-    AddSimpleItem(dwOffset, 4, L"Sample Offset");
+    AddSimpleItem(dwOffset, 4, "Sample Offset");
 
     TamSoftPS1Rgn *rgn = new TamSoftPS1Rgn(this, dwOffset + 0x400, parInstrSet->ps2);
     rgn->sampNum = instrNum;
@@ -92,8 +92,8 @@ bool TamSoftPS1Instr::LoadInstr() {
 TamSoftPS1Rgn::TamSoftPS1Rgn(TamSoftPS1Instr *instr, uint32_t offset, bool ps2)
     : VGMRgn(instr, offset, 4) {
     unityKey = TAMSOFTPS1_KEY_OFFSET + 48;
-    AddSimpleItem(offset, 2, L"ADSR1");
-    AddSimpleItem(offset + 2, 2, L"ADSR2");
+    AddSimpleItem(offset, 2, "ADSR1");
+    AddSimpleItem(offset + 2, 2, "ADSR2");
 
     uint16_t adsr1 = GetShort(offset);
     uint16_t adsr2 = GetShort(offset + 2);
