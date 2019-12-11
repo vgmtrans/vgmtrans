@@ -6,6 +6,7 @@
 
 #include "MoriSnesInstr.h"
 #include "SNESDSP.h"
+#include <fmt/format.h>
 
 // ****************
 // MoriSnesInstrSet
@@ -113,10 +114,9 @@ bool MoriSnesInstrSet::GetInstrPointers() {
             }
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << instrNum;
-        MoriSnesInstr *newInstr = new MoriSnesInstr(this, version, instrNum, spcDirAddr,
-                                                    instrumentHints[instrAddress], instrName.str());
+        MoriSnesInstr *newInstr =
+            new MoriSnesInstr(this, version, instrNum, spcDirAddr, instrumentHints[instrAddress],
+                              fmt::format("Instrument {}", instrNum));
         aInstrs.push_back(newInstr);
     }
 
@@ -177,13 +177,11 @@ bool MoriSnesInstr::LoadInstr() {
                 return false;
             }
 
-            std::ostringstream seqOffsetName;
-            seqOffsetName << "Sequence Offset " << (int)percNoteKey;
-            AddSimpleItem(dwOffset + 1 + (percNoteKey * 2), 2, seqOffsetName.str().c_str());
+            AddSimpleItem(dwOffset + 1 + (percNoteKey * 2), 2,
+                          fmt::format("Sequence offset {}", percNoteKey));
 
-            std::ostringstream seqName;
-            seqName << "Envelope Sequence " << (int)percNoteKey;
-            AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, seqName.str().c_str());
+            AddSimpleItem(instrHint->seqAddress, instrHint->seqSize,
+                          fmt::format("Envelope sequence ", percNoteKey));
 
             uint16_t addrSampStart = GetShort(offDirEnt);
             MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);

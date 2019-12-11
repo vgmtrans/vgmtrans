@@ -54,10 +54,9 @@ bool CompileSnesInstrSet::GetInstrPointers() {
 
         usedSRCNs.push_back(srcn);
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << srcn;
-        CompileSnesInstr *newInstr = new CompileSnesInstr(
-            this, version, ofsInstrEntry, addrPitchTablePtrs, srcn, spcDirAddr, instrName.str());
+        CompileSnesInstr *newInstr =
+            new CompileSnesInstr(this, version, ofsInstrEntry, addrPitchTablePtrs, srcn, spcDirAddr,
+                                 fmt::format("Instrument: {:#x}", srcn));
         aInstrs.push_back(newInstr);
     }
     if (aInstrs.size() == 0) {

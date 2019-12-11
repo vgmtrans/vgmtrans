@@ -70,11 +70,9 @@ bool PrismSnesInstrSet::GetInstrPointers() {
 
         usedSRCNs.push_back(srcn);
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << srcn;
-        PrismSnesInstr *newInstr =
-            new PrismSnesInstr(this, version, srcn, spcDirAddr, ofsADSR1Entry, ofsADSR2Entry,
-                               ofsTuningEntryHigh, ofsTuningEntryLow, instrName.str());
+        PrismSnesInstr *newInstr = new PrismSnesInstr(
+            this, version, srcn, spcDirAddr, ofsADSR1Entry, ofsADSR2Entry, ofsTuningEntryHigh,
+            ofsTuningEntryLow, fmt::format("Instrument: {:#x}", srcn));
         aInstrs.push_back(newInstr);
     }
 

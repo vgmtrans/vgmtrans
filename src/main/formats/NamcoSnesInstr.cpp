@@ -58,10 +58,9 @@ bool NamcoSnesInstrSet::GetInstrPointers() {
 
         usedSRCNs.push_back(srcn);
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << srcn;
         NamcoSnesInstr *newInstr =
-            new NamcoSnesInstr(this, version, srcn, spcDirAddr, ofsTuningEntry, instrName.str());
+            new NamcoSnesInstr(this, version, srcn, spcDirAddr, ofsTuningEntry,
+                               fmt::format("Instrument: {:#x}", srcn));
         aInstrs.push_back(newInstr);
     }
 

@@ -85,8 +85,6 @@ bool RawFile::SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffs
 
 DiskFile::DiskFile(const std::string &path) : m_data(mio::mmap_source(path)), m_path(path) {}
 
-// DiskFile::DiskFile(std::string_view path) : m_data(mio::mmap_source(path)), m_path(path) {}
-
 /* VirtFile */
 
 VirtFile::VirtFile(const RawFile &file, size_t offset) : m_name(file.name()), m_lpath(file.path()) {

@@ -12,6 +12,7 @@
 #include "ScaleConversion.h"
 #include "Options.h"
 #include "helper.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -151,10 +152,8 @@ void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum) {
 void SeqTrack::AddInitialMidiEvents(int trackNum) {
     if (trackNum == 0)
         pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
-    std::ostringstream ssTrackName;
-    ssTrackName << "Track: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                << dwStartOffset << std::endl;
-    pMidiTrack->AddTrackName(ssTrackName.str().c_str());
+
+    pMidiTrack->AddTrackName(fmt::format("Track {:#x}", dwStartOffset));
 
     if (trackNum == 0) {
         pMidiTrack->AddGMReset();

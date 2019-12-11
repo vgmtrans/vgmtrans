@@ -6,6 +6,7 @@
 
 #include "NinSnesInstr.h"
 #include "SNESDSP.h"
+#include <fmt/format.h>
 
 // ****************
 // NinSnesInstrSet
@@ -84,10 +85,9 @@ bool NinSnesInstrSet::GetInstrPointers() {
             usedSRCNs.push_back(srcn);
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << instr;
-        NinSnesInstr *newInstr = new NinSnesInstr(this, version, addrInstrHeader, instr >> 7,
-                                                  instr & 0x7f, spcDirAddr, instrName.str());
+        NinSnesInstr *newInstr =
+            new NinSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr,
+                             fmt::format("Instrument {}", instr));
         newInstr->konamiTuningTableAddress = konamiTuningTableAddress;
         newInstr->konamiTuningTableSize = konamiTuningTableSize;
         aInstrs.push_back(newInstr);

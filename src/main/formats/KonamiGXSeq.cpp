@@ -26,9 +26,7 @@ bool KonamiGXSeq::GetHeaderInfo(void) {
     // nNumTracks = GetByte(dwOffset+8);
     SetPPQN(0x30);
 
-    std::ostringstream theName;
-    theName << "Konami GX Seq";
-    name = theName.str();
+    name = "Konami GX Seq";
     return true;
 }
 
@@ -115,8 +113,8 @@ bool KonamiGXTrack::ReadEvent(void) {
         AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, newdur);
         AddTime(delta);
         //		if (newdur > delta)
-        //			ATLTRACE("newdur > delta.  %X > %X.  occurring at %X\n", newdur, delta,
-        //beginOffset); AddDelta(dur);
+        //			ATLTRACE("newdur > delta.  %X > %X.  occurring at %X\n", newdur,
+        //delta, beginOffset); AddDelta(dur);
     } else
         switch (status_byte) {
             case 0xC0:

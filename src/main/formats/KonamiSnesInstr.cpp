@@ -6,6 +6,7 @@
 
 #include "KonamiSnesInstr.h"
 #include "SNESDSP.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -78,11 +79,9 @@ bool KonamiSnesInstrSet::GetInstrPointers() {
             usedSRCNs.push_back(srcn);
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << instr;
         KonamiSnesInstr *newInstr =
             new KonamiSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f,
-                                spcDirAddr, false, instrName.str());
+                                spcDirAddr, false, fmt::format("Instrument {}", instr));
         aInstrs.push_back(newInstr);
     }
     if (aInstrs.size() == 0) {

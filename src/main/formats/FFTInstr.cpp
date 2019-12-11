@@ -9,6 +9,7 @@
 
 #include "FFTInstr.h"
 #include "PSXSPU.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -47,9 +48,7 @@ bool WdsInstrSet::GetHeaderInfo() {
         version = VERSION_WDS;
 
     //バイナリエディタ表示用
-    std::ostringstream theName;
-    theName << "wds " << id;
-    name = theName.str();
+    name = fmt::format("wds {}", id);
 
     //ヘッダーobjectの生成
     VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(WdsHdr));

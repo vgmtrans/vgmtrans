@@ -9,6 +9,7 @@
 #include "Root.h"
 #include "Format.h"
 #include "KabukiDecrypt.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -320,12 +321,8 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
         }
     }
 
-    // static int num = 0;
-    // fn << "romgroup " << num++;
-    // pRoot->UI_WriteBufferToFile(fn.str().c_str(), destFile, destFileSize);
-    std::ostringstream strstream;
-    strstream << "romgroup  - " << entry->type.c_str();
-    VirtFile *newVirtFile = new VirtFile(destFile, destFileSize, strstream.str());
+    VirtFile *newVirtFile =
+        new VirtFile(destFile, destFileSize, fmt::format("romgroup - {}", entry->type.c_str()));
     newVirtFile->setUseLoaders(false);
     newVirtFile->setUseScanners(false);
     return newVirtFile;

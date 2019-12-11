@@ -7,6 +7,7 @@
 #include "WD.h"
 #include "SquarePS2Format.h"
 #include "PSXSPU.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -34,9 +35,7 @@ bool WDInstrSet::GetHeaderInfo() {
     if (dwSampSectSize < 0x40)  // Some songs in the Bouncer have bizarre values here
         dwSampSectSize = 0;
 
-    std::ostringstream theName;
-    theName << "WD " << id;
-    name = theName.str();
+    name = fmt::format("WD {}", id);
 
     uint32_t sampCollOff = dwOffset + GetWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
 
@@ -61,10 +60,9 @@ bool WDInstrSet::GetInstrPointers() {
             instrLength = GetWord(j + ((i + 1) * 4)) - GetWord(j + (i * 4));
         else
             instrLength = sampColl->dwOffset - (GetWord(j + (i * 4)) + dwOffset);
-        std::ostringstream name;
-        name << "Instrument " << i;
+
         WDInstr *newWDInstr = new WDInstr(this, dwOffset + GetWord(j + (i * 4)), instrLength, 0, i,
-                                          name.str());  // strStr);
+                                          fmt::format("Instrument {}", i));
         aInstrs.push_back(newWDInstr);
     }
     return true;
@@ -81,7 +79,6 @@ WDInstr::WDInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32
 WDInstr::~WDInstr(void) {}
 
 bool WDInstr::LoadInstr() {
-    std::ostringstream strStr;
     uint32_t j = 0;
     long startAddress = 0;
     bool notSampleStart = false;
@@ -162,7 +159,7 @@ bool WDInstr::LoadInstr() {
         // Key Ranges
         if (((WDRgn *)aRgns[k])
                 ->bFirstRegion)  //&& !instrument[i].region[k].bLastRegion) //used in ffx2 0049 YRP
-                                 //battle 1.  check out first instrument, flags are weird
+                                 // battle 1.  check out first instrument, flags are weird
             aRgns[k]->keyLow = 0;
         else if (k > 0) {
             if (aRgns[k]->keyHigh == aRgns[k - 1]->keyHigh)

@@ -7,6 +7,7 @@
 #include "RareSnesInstr.h"
 #include "SNESDSP.h"
 #include "RareSnesFormat.h"
+#include <fmt/format.h>
 
 // ****************
 // RareSnesInstrSet
@@ -154,11 +155,9 @@ bool RareSnesInstrSet::GetInstrPointers() {
             adsr = itrADSR->second;
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << inst;
         RareSnesInstr *newInstr =
             new RareSnesInstr(this, dwOffset + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose,
-                              pitch, adsr, instrName.str());
+                              pitch, adsr, fmt::format("Instrument: {:#x}", inst));
         aInstrs.push_back(newInstr);
     }
     return aInstrs.size() != 0;

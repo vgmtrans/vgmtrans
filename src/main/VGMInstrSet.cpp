@@ -10,6 +10,8 @@
 #include "VGMColl.h"
 #include "Root.h"
 
+#include <fmt/format.h>
+
 DECLARE_MENU(VGMInstrSet)
 
 using namespace std;
@@ -33,13 +35,9 @@ VGMInstrSet::~VGMInstrSet() {
 
 VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
                                 unsigned long instrNum, const string &instrName) {
-    std::ostringstream name;
-    if (instrName == "")
-        name << "Instrument " << aInstrs.size();
-    else
-        name << instrName;
-
-    VGMInstr *instr = new VGMInstr(this, offset, length, bank, instrNum, name.str());
+    VGMInstr *instr =
+        new VGMInstr(this, offset, length, bank, instrNum,
+                     instrName.empty() ? fmt::format("Instrument {}", aInstrs.size()) : instrName);
     aInstrs.push_back(instr);
     return instr;
 }

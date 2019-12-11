@@ -6,6 +6,7 @@
 
 #include "SonyPS2InstrSet.h"
 #include "PSXSPU.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -284,8 +285,7 @@ bool SonyPS2InstrSet::GetInstrPointers() {
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 10, 1, "Key Follow Pan");
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 11, 1,
                              "Key Follow Pan Center");
-        instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 12, 1,
-                             "Program Attributes");
+        instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 12, 1, "Program Attributes");
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 13, 1, "Reserved");
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 14, 1,
                              "Program Pitch LFO Waveform");
@@ -432,7 +432,8 @@ bool SonyPS2Instr::LoadInstr() {
 
             long vol = progParam.progVolume * splitblock.splitVolume * sampParam.sampleVolume;
             // we divide the above value by 127^3 to get the percent vol it represents.  Then we
-            // convert it to DB units. 0xA0000 = 1db in the DLS lScale val for atten (dls1 specs p30)
+            // convert it to DB units. 0xA0000 = 1db in the DLS lScale val for atten (dls1 specs
+            // p30)
             double percentvol = vol / (double)(127 * 127 * 127);
             rgn->SetVolume(percentvol);
             PSXConvADSR(rgn, sampParam.sampleAdsr1, sampParam.sampleAdsr2, true);
@@ -487,10 +488,8 @@ bool SonyPS2SampColl::GetSampleInfo() {
 
         uint16_t sampleRate = vagInfoParam.vagSampleRate;
 
-        std::ostringstream name;
-        name << "Sample " << samples.size();
-        PSXSamp *samp =
-            new PSXSamp(this, offset, length, offset, length, 1, 16, sampleRate, name.str(), true);
+        PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, sampleRate,
+                                    fmt::format("Sample {}", samples.size()), true);
         samples.push_back(samp);
 
         // Determine loop information from VAGInfo Param

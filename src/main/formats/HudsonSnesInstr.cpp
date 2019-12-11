@@ -6,6 +6,7 @@
 
 #include "HudsonSnesInstr.h"
 #include "SNESDSP.h"
+#include <fmt/format.h>
 
 // ******************
 // HudsonSnesInstrSet
@@ -46,11 +47,9 @@ bool HudsonSnesInstrSet::GetInstrPointers() {
 
         usedSRCNs.push_back(srcn);
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << instrNum;
         HudsonSnesInstr *newInstr =
             new HudsonSnesInstr(this, version, ofsInstrEntry, instrNum, spcDirAddr,
-                                addrSampTuningTable, instrName.str());
+                                addrSampTuningTable, fmt::format("Instrument {}", instrNum));
         aInstrs.push_back(newInstr);
     }
     if (aInstrs.size() == 0) {

@@ -60,10 +60,8 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
             adsr = instrADSRHints[srcn];
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << srcn;
-        GraphResSnesInstr *newInstr =
-            new GraphResSnesInstr(this, version, srcn, spcDirAddr, adsr, instrName.str());
+        GraphResSnesInstr *newInstr = new GraphResSnesInstr(this, version, srcn, spcDirAddr, adsr,
+                                                            fmt::format("Instrument: {:#x}", srcn));
         aInstrs.push_back(newInstr);
     }
 

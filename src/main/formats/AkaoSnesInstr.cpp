@@ -6,6 +6,7 @@
 
 #include "AkaoSnesInstr.h"
 #include "SNESDSP.h"
+#include <fmt/format.h>
 
 // ****************
 // AkaoSnesInstrSet
@@ -75,10 +76,9 @@ bool AkaoSnesInstrSet::GetInstrPointers() {
 
         usedSRCNs.push_back(srcn);
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << srcn;
-        AkaoSnesInstr *newInstr = new AkaoSnesInstr(
-            this, version, srcn, spcDirAddr, addrTuningTable, addrADSRTable, instrName.str());
+        AkaoSnesInstr *newInstr =
+            new AkaoSnesInstr(this, version, srcn, spcDirAddr, addrTuningTable, addrADSRTable,
+                              fmt::format("Instrument: {:#x}", srcn));
         aInstrs.push_back(newInstr);
     }
     if (aInstrs.size() == 0) {
@@ -292,10 +292,7 @@ AkaoSnesDrumKitRgn::AkaoSnesDrumKitRgn(AkaoSnesDrumKit *instr, AkaoSnesVersion v
 bool AkaoSnesDrumKitRgn::InitializePercussionRegion(uint8_t percussionIndex, uint32_t spcDirAddr,
                                                     uint16_t addrADSRTable,
                                                     uint16_t addrDrumKitTable) {
-    std::ostringstream newName;
-
-    newName << "Drum " << percussionIndex;
-    name = newName.str();
+    name = fmt::format("Drum {}", percussionIndex);
 
     uint32_t srcnOffset = addrDrumKitTable + percussionIndex * 3;
     uint32_t keyOffset = srcnOffset + 1;

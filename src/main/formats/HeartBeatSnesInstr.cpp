@@ -66,11 +66,9 @@ bool HeartBeatSnesInstrSet::GetInstrPointers() {
             usedSRCNs.push_back(srcn);
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << instrNum;
-        HeartBeatSnesInstr *newInstr =
-            new HeartBeatSnesInstr(this, version, addrInstrHeader, instrNum >> 7, instrNum & 0x7f,
-                                   addrSRCNTable, songIndex, spcDirAddr, instrName.str());
+        HeartBeatSnesInstr *newInstr = new HeartBeatSnesInstr(
+            this, version, addrInstrHeader, instrNum >> 7, instrNum & 0x7f, addrSRCNTable,
+            songIndex, spcDirAddr, fmt::format("Instrument {}", instrNum));
         aInstrs.push_back(newInstr);
     }
 

@@ -102,7 +102,6 @@ class RawFile {
 
 class DiskFile final : public RawFile {
    public:
-    // DiskFile(std::string_view path);
     DiskFile(const std::string &path);
     ~DiskFile() = default;
 

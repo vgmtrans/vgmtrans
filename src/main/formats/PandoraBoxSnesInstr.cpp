@@ -6,6 +6,7 @@
 
 #include "PandoraBoxSnesInstr.h"
 #include "SNESDSP.h"
+#include <fmt/format.h>
 
 // **********************
 // PandoraBoxSnesInstrSet
@@ -81,10 +82,9 @@ bool PandoraBoxSnesInstrSet::GetInstrPointers() {
             adsr = instrADSRHints[srcn];
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << srcn;
-        PandoraBoxSnesInstr *newInstr = new PandoraBoxSnesInstr(
-            this, version, addrLocalInstrItem, instrNum, srcn, spcDirAddr, adsr, instrName.str());
+        PandoraBoxSnesInstr *newInstr =
+            new PandoraBoxSnesInstr(this, version, addrLocalInstrItem, instrNum, srcn, spcDirAddr,
+                                    adsr, fmt::format("Instrument: {:#x}", srcn));
         aInstrs.push_back(newInstr);
     }
 

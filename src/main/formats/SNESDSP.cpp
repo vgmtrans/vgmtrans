@@ -132,9 +132,9 @@ uint32_t EmulateSDSPGAIN(uint8_t gain, int16_t env_from, int16_t env_to, int16_t
                     // then consider the slope of the line as envelope speed.
                     // double env_start = std::maxenv_from, 1);
                     // double decibelDiff = ConvertPercentAmplitudeToAttenDB(env_start / 2047.0) -
-                    // ConvertPercentAmplitudeToAttenDB((env_start + 1) / 2047.0); double timePerTick
-                    // = SDSP_COUNTER_RATES[rate] / 32000.0; sf2_time = timePerTick * (-100.0 /
-                    // decibelDiff);
+                    // ConvertPercentAmplitudeToAttenDB((env_start + 1) / 2047.0); double
+                    // timePerTick = SDSP_COUNTER_RATES[rate] / 32000.0; sf2_time = timePerTick *
+                    // (-100.0 / decibelDiff);
                 }
             }
         } else {  // 6,7: linear increase
@@ -339,7 +339,6 @@ bool SNESSampColl::GetSampleInfo() {
     for (std::vector<uint8_t>::iterator itr = this->targetSRCNs.begin();
          itr != this->targetSRCNs.end(); ++itr) {
         uint8_t srcn = (*itr);
-        std::ostringstream name;
 
         uint32_t offDirEnt = spcDirAddr + (srcn * 4);
         if (!SNESSampColl::IsValidSampleDir(GetRawFile(), offDirEnt, true)) {
@@ -352,17 +351,12 @@ bool SNESSampColl::GetSampleInfo() {
         bool loop;
         uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart, loop);
 
-        name << "SA " << srcn;
-        spcDirHeader->AddSimpleItem(offDirEnt, 2, name.str().c_str());
+        spcDirHeader->AddSimpleItem(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
 
-        name.str("");
-        name << "LSA " << srcn;
-        spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, name.str().c_str());
+        spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
 
-        name.str("");
-        name << "Sample " << srcn;
         SNESSamp *samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length,
-                                      addrSampLoop, name.str());
+                                      addrSampLoop, fmt::format("Sample: {:#x}", srcn));
         samples.push_back(samp);
     }
     spcDirHeader->SetGuessedLength();

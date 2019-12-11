@@ -7,6 +7,7 @@
 #include "CapcomSnesInstr.h"
 #include "SNESDSP.h"
 #include "CapcomSnesFormat.h"
+#include <fmt/format.h>
 
 // ****************
 // CapcomSnesInstrSet
@@ -50,10 +51,9 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
             usedSRCNs.push_back(srcn);
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << instr;
-        CapcomSnesInstr *newInstr = new CapcomSnesInstr(this, addrInstrHeader, instr >> 7,
-                                                        instr & 0x7f, spcDirAddr, instrName.str());
+        CapcomSnesInstr *newInstr =
+            new CapcomSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr,
+                                fmt::format("Instrument {}", instr));
         aInstrs.push_back(newInstr);
     }
     if (aInstrs.size() == 0) {
@@ -76,8 +76,7 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
 // *************
 
 CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t theBank,
-                                 uint32_t theInstrNum, uint32_t spcDirAddr,
-                                 const std::string &name)
+                                 uint32_t theInstrNum, uint32_t spcDirAddr, const std::string &name)
     : VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), spcDirAddr(spcDirAddr) {}
 
 CapcomSnesInstr::~CapcomSnesInstr() {}

@@ -6,6 +6,7 @@
 
 #include "SuzukiSnesInstr.h"
 #include "SNESDSP.h"
+#include <fmt/format.h>
 
 // ******************
 // SuzukiSnesInstrSet
@@ -76,11 +77,9 @@ bool SuzukiSnesInstrSet::GetInstrPointers() {
 
         usedSRCNs.push_back(srcn);
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << srcn;
-        SuzukiSnesInstr *newInstr =
-            new SuzukiSnesInstr(this, version, instrNum, spcDirAddr, addrSRCNTable, addrVolumeTable,
-                                addrADSRTable, addrTuningTable, instrName.str());
+        SuzukiSnesInstr *newInstr = new SuzukiSnesInstr(
+            this, version, instrNum, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable,
+            addrTuningTable, fmt::format("Instrument: {:#x}", srcn));
         aInstrs.push_back(newInstr);
     }
     if (aInstrs.size() == 0) {

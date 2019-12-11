@@ -37,11 +37,11 @@ bool BGMSeq::GetHeaderInfo(void) {
     SetPPQN(GetShort(dwOffset + 0xE));
     unLength = GetWord(dwOffset + 0x10);
 
-    std::ostringstream theName;
-    theName << "BGM " << seqID;
-    if (seqID != assocWDID)
-        theName << "using WD " << assocWDID;
-    name = theName.str();
+    name = fmt::format("BGM {}", seqID);
+    if (seqID != assocWDID) {
+        name += fmt::format(" using WD {}", assocWDID);
+    }
+
     return true;
 }
 
@@ -75,7 +75,8 @@ bool BGMTrack::ReadEvent(void) {
     // address range check for safety
     if (!vgmfile->IsValidOffset(curOffset)) {
         if (readMode == ReadMode::READMODE_ADD_TO_UI) {
-            L_ERROR("Address out of range. Conversion will be aborted ({})", (*const_cast<std::string *>(vgmfile->GetName())));
+            L_ERROR("Address out of range. Conversion will be aborted ({})",
+                    (*const_cast<std::string *>(vgmfile->GetName())));
         }
         return false;
     }
@@ -94,7 +95,7 @@ bool BGMTrack::ReadEvent(void) {
             // rest_time += current_delta_time;
             // if (nScanMode == MODE_SCAN)
             //	AddBGMEvent("Loop Begin", ICON_STARTREP, aBGMTracks[cur_track]->pTreeItem,
-            //offsetAtDelta, j-offsetAtDelta, BG_CLR_CYAN);
+            // offsetAtDelta, j-offsetAtDelta, BG_CLR_CYAN);
             AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Begin", "", CLR_LOOP);
             break;
 
@@ -253,8 +254,7 @@ bool BGMTrack::ReadEvent(void) {
             break;
 
         default:
-            AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "",
-                            CLR_UNRECOGNIZED);
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", CLR_UNRECOGNIZED);
             break;
     }
     return true;

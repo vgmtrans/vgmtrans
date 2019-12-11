@@ -6,6 +6,7 @@
 
 #include "NDSInstrSet.h"
 #include "VGMRgn.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -74,7 +75,7 @@ bool NDSInstr::LoadInstr() {
             /* PGM Tone */
             uint8_t dutyCycle = GetByte(dwOffset) & 0x07;
             std::string dutyCycles[8] = {"12.5%", "25%", "37.5%", "50%",
-                                          "62.5%", "75%", "87.5%", "0%"};
+                                         "62.5%", "75%", "87.5%", "0%"};
             name = "NES Sq (" + dutyCycles[dutyCycle] + ")";
             unLength = 10;
             break;
@@ -273,10 +274,9 @@ bool NDSWaveArch::GetSampleInfo() {
             dataLength = loopOff + nonLoopLength;
         }
 
-        std::ostringstream name;
-        name << "Sample " << (float)samples.size();
-        NDSSamp *samp = new NDSSamp(this, pSample, dataStart + dataLength - pSample, dataStart,
-                                    dataLength, nChannels, bps, rate, waveType, name.str());
+        NDSSamp *samp =
+            new NDSSamp(this, pSample, dataStart + dataLength - pSample, dataStart, dataLength,
+                        nChannels, bps, rate, waveType, fmt::format("Sample {}", samples.size()));
 
         if (waveType == NDSSamp::IMA_ADPCM) {
             samp->SetLoopStartMeasure(LM_SAMPLES);
@@ -363,8 +363,8 @@ void NDSSamp::ConvertImaAdpcm(uint8_t *buf) {
 // Info is at http://nocash.emubase.de/gbatek.htm#dssound and the algorithm is described as follows:
 //
 // The NDS data consist of a 32bit header, followed by 4bit values (so each byte contains two
-// values, the first value in the lower 4bits, the second in upper 4 bits). The 32bit header contains
-// initial values:
+// values, the first value in the lower 4bits, the second in upper 4 bits). The 32bit header
+// contains initial values:
 //
 //  Bit0-15   Initial PCM16 Value (Pcm16bit = -7FFFh..+7FFF) (not -8000h)
 //  Bit16-22  Initial Table Index Value (Index = 0..88)

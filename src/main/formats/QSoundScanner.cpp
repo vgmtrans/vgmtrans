@@ -7,6 +7,7 @@
 #include "QSoundSeq.h"
 #include "QSoundInstr.h"
 #include "MAMELoader.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -55,27 +56,11 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
     QSoundSampleInfoTable *sampInfoTable = 0;
     QSoundArticTable *articTable = 0;
 
-    string artic_table_name;
-    string instrset_name;
-    string samp_info_table_name;
-    string sampcoll_name;
-    string seq_table_name;
-
-    std::ostringstream name;
-    name << gameentry->name.c_str() << " articulation table";
-    artic_table_name = name.str();
-    name.str("");
-    name << gameentry->name.c_str() << " instrument set";
-    instrset_name = name.str();
-    name.str("");
-    name << gameentry->name.c_str() << " sample collection";
-    sampcoll_name = name.str();
-    name.str("");
-    name << gameentry->name.c_str() << " sample info table";
-    samp_info_table_name = name.str();
-    name.str("");
-    name << gameentry->name.c_str() << " sequence pointer table";
-    seq_table_name = name.str();
+    string artic_table_name = fmt::format("{} articulation table", gameentry->name.c_str());
+    string instrset_name = fmt::format("{} instrument set", gameentry->name.c_str());
+    string sampcoll_name = fmt::format("{} sample collection", gameentry->name.c_str());
+    string samp_info_table_name = fmt::format("{} sample info table", gameentry->name.c_str());
+    string seq_table_name = fmt::format("{} sequence pointer table", gameentry->name.c_str());
 
     RawFile *programFile = seqRomGroupEntry->file;
     RawFile *samplesFile = sampsRomGroupEntry->file;
@@ -134,13 +119,10 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
             continue;
         seqTable->AddSimpleItem(seq_table_offset + k, 4, "Sequence Pointer");
 
-        name.str("");
-        name << gameentry->name.c_str() << " song " << k / 4;
-        VGMColl *coll = new VGMColl(name.str());
-        name.str("");
-        name << gameentry->name.c_str() << " seq " << k / 4;
-        string seqName = name.str();
-        QSoundSeq *newSeq = new QSoundSeq(programFile, seqPointer, ver, seqName);
+        VGMColl *coll = new VGMColl(fmt::format("{} song {}", gameentry->name.c_str(), k / 4));
+
+        QSoundSeq *newSeq = new QSoundSeq(programFile, seqPointer, ver,
+                                          fmt::format("{} seq {}", gameentry->name.c_str(), k / 4));
         if (newSeq->LoadVGMFile()) {
             coll->UseSeq(newSeq);
             coll->AddInstrSet(instrset);

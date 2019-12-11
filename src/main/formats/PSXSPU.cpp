@@ -32,7 +32,8 @@ bool PSXSampColl::GetSampleInfo() {
     if (vagLocations.size() == 0) {
         // We scan through the sample section, and determine the offsets and size of each sample
         // We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning
-        // of a sample, and they will never be found at any other point within the adpcm sample data.
+        // of a sample, and they will never be found at any other point within the adpcm sample
+        // data.
 
         uint32_t nEndOffset = dwOffset + unLength;
         if (unLength == 0)
@@ -114,11 +115,9 @@ bool PSXSampColl::GetSampleInfo() {
                     i += 16;
                 }
 
-                std::ostringstream name;
-                name << "Sample " << samples.size();
-                PSXSamp *samp =
-                    new PSXSamp(this, beginOffset, i - beginOffset, beginOffset,
-                                i - beginOffset - extraGunkLength, 1, 16, 44100, name.str());
+                PSXSamp *samp = new PSXSamp(this, beginOffset, i - beginOffset, beginOffset,
+                                            i - beginOffset - extraGunkLength, 1, 16, 44100,
+                                            fmt::format("Sample {}", samples.size()));
                 samples.push_back(samp);
             } else
                 break;
@@ -144,11 +143,9 @@ bool PSXSampColl::GetSampleInfo() {
                 offSampEnd += 16;
             } while (!lastBlock);
 
-            std::ostringstream name;
-            name << "Sample " << sampleIndex;
-            PSXSamp *samp =
-                new PSXSamp(this, dwOffset + it->offset, it->size, dwOffset + it->offset,
-                            offSampEnd - offSampStart, 1, 16, 44100, name.str());
+            PSXSamp *samp = new PSXSamp(this, dwOffset + it->offset, it->size,
+                                        dwOffset + it->offset, offSampEnd - offSampStart, 1, 16,
+                                        44100, fmt::format("Sample {}", sampleIndex));
             samples.push_back(samp);
             sampleIndex++;
         }

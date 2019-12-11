@@ -10,6 +10,8 @@
 #include "QSoundInstr.h"
 #include "QSoundFormat.h"
 
+#include <fmt/format.h>
+
 using namespace std;
 
 // ****************
@@ -80,10 +82,8 @@ bool QSoundSampleInfoTable::LoadMain() {
         test1 = GetWord(off + 8);
         test2 = GetWord(off + 12);
 
-        std::ostringstream name;
-        name << "Sample Info " << i;
         VGMContainerItem *containerItem =
-            new VGMContainerItem(this, off, sizeof(qs_samp_info), name.str());
+            new VGMContainerItem(this, off, sizeof(qs_samp_info), fmt::format("Sample info {}", i));
         containerItem->AddSimpleItem(off, 1, "Bank");
         containerItem->AddSimpleItem(off + 1, 2, "Offset");
         containerItem->AddSimpleItem(off + 3, 2, "Loop Offset");
@@ -131,11 +131,9 @@ bool QSoundInstrSet::GetInstrPointers() {
 
         for (uint32_t bank = 0; bank < num_instr_banks; bank++)
             for (uint32_t i = 0; i < 256; i++) {
-                std::ostringstream ss;
-                ss << "Instrument " << bank * 256 << i;
-                string name = ss.str();
                 aInstrs.push_back(new QSoundInstr(this, dwOffset + i * 8 + (bank * 256 * 8), 8,
-                                                  (bank * 2) + (i / 128), i % 128, name));
+                                                  (bank * 2) + (i / 128), i % 128,
+                                                  fmt::format("Instrument {}{}", bank * 256, i)));
             }
     } else {
         uint8_t instr_info_length = sizeof(qs_prog_info_ver_130);
@@ -158,11 +156,9 @@ bool QSoundInstrSet::GetInstrPointers() {
             for (int j = instr_table_ptrs[i]; j < endOffset; j += instr_info_length, k++) {
                 if (GetShort(j) == 0 && GetByte(j + 2) == 0 && i != 0)
                     break;
-                std::ostringstream ss;
-                ss << "Instrument " << totalInstrs << k;
-                string name = ss.str();
                 aInstrs.push_back(new QSoundInstr(this, j, instr_info_length, (i * 2) + (k / 128),
-                                                  (k % 128), name));
+                                                  (k % 128),
+                                                  fmt::format("Instrument {}{}", totalInstrs, k)));
             }
             totalInstrs += k;
         }
@@ -326,9 +322,6 @@ bool QSoundSampColl::GetHeaderInfo() {
 bool QSoundSampColl::GetSampleInfo() {
     uint32_t numSamples = instrset->sampInfoTable->numSamples;
     for (uint32_t i = 0; i < numSamples; i++) {
-        std::ostringstream name;
-        name << "Sample " << i;
-
         qs_samp_info *sampInfo = &sampInfoTable->infos[i];
         uint32_t sampOffset =
             (sampInfo->bank << 16) + (sampInfo->start_addr_hi << 8) + sampInfo->start_addr_lo;
@@ -348,8 +341,8 @@ bool QSoundSampColl::GetSampleInfo() {
             loopOffset = sampLength;
         if (sampLength == 0 || sampOffset > unLength)
             break;
-        VGMSamp *newSamp =
-            AddSamp(sampOffset, sampLength, sampOffset, sampLength, 1, 8, 24000, name.str());
+        VGMSamp *newSamp = AddSamp(sampOffset, sampLength, sampOffset, sampLength, 1, 8, 24000,
+                                   fmt::format("Sample {}", i));
         newSamp->SetWaveType(WT_PCM8);
         if (sampLength - loopOffset < 40)
             newSamp->SetLoopStatus(false);
