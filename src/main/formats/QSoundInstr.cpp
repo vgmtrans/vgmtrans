@@ -18,7 +18,7 @@ using namespace std;
 // QSoundArticTable
 // ****************
 
-QSoundArticTable::QSoundArticTable(RawFile *file, std::string &name, uint32_t offset,
+QSoundArticTable::QSoundArticTable(RawFile *file, const std::string &name, uint32_t offset,
                                    uint32_t length)
     : VGMMiscFile(QSoundFormat::name, file, offset, length, name) {}
 
@@ -62,8 +62,8 @@ bool QSoundArticTable::LoadMain() {
 // QSoundSampleInfoTable
 // *********************
 
-QSoundSampleInfoTable::QSoundSampleInfoTable(RawFile *file, string &name, uint32_t offset,
-                                             uint32_t length)
+QSoundSampleInfoTable::QSoundSampleInfoTable(RawFile *file, const std::string &name,
+                                             uint32_t offset, uint32_t length)
     : VGMMiscFile(QSoundFormat::name, file, offset, length, name) {}
 
 QSoundSampleInfoTable::~QSoundSampleInfoTable(void) {
@@ -105,7 +105,7 @@ bool QSoundSampleInfoTable::LoadMain() {
 
 QSoundInstrSet::QSoundInstrSet(RawFile *file, QSoundVer version, uint32_t offset, int numInstrBanks,
                                QSoundSampleInfoTable *theSampInfoTable,
-                               QSoundArticTable *theArticTable, string &name)
+                               QSoundArticTable *theArticTable, const std::string &name)
     : VGMInstrSet(QSoundFormat::name, file, offset, 0, name),
       fmt_version(version),
       num_instr_banks(numInstrBanks),
@@ -171,7 +171,7 @@ bool QSoundInstrSet::GetInstrPointers() {
 // ***********
 
 QSoundInstr::QSoundInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                         uint32_t theInstrNum, string &name)
+                         uint32_t theInstrNum, const std::string &name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {}
 
 QSoundInstr::~QSoundInstr(void) {}

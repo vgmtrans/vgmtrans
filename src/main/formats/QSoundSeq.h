@@ -12,7 +12,7 @@ enum QSoundVer : uint8_t;
 
 class QSoundSeq : public VGMSeq {
    public:
-    QSoundSeq(RawFile *file, uint32_t offset, QSoundVer fmt_version, std::string &name);
+    QSoundSeq(RawFile *file, uint32_t offset, QSoundVer fmt_version, const std::string &name);
     virtual ~QSoundSeq(void);
 
     virtual bool GetHeaderInfo(void);

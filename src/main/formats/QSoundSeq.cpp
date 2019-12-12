@@ -74,7 +74,7 @@ const uint16_t lfo_rate_table[128] = {
 // QSoundSeq
 // *********
 
-QSoundSeq::QSoundSeq(RawFile *file, uint32_t offset, QSoundVer fmtVersion, string &name)
+QSoundSeq::QSoundSeq(RawFile *file, uint32_t offset, QSoundVer fmtVersion, const std::string &name)
     : VGMSeq(QSoundFormat::name, file, offset, 0, name), fmt_version(fmtVersion) {
     HasMonophonicTracks();
     AlwaysWriteInitialVol(127);
@@ -253,7 +253,7 @@ bool QSoundSeq::PostLoad() {
                         pitchbendRange = std::max<int>(200,
                                                        (int)ceil((vibrato + 50) / 100.0) *
                                                            100);  //+50 cents to allow for pitchbend
-                                                                  //values, which range -50/+50
+                                                                  // values, which range -50/+50
                         track->InsertPitchBendRange(channel, pitchbendRange / 100,
                                                     pitchbendRange % 100, curTicks);
 
@@ -394,8 +394,7 @@ bool QSoundTrack::ReadEvent(void) {
             case 0x00:
                 noteState ^= 0x20;
                 AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                "Note State xor 0x20 (change duration table)", "",
-                                CLR_CHANGESTATE);
+                                "Note State xor 0x20 (change duration table)", "", CLR_CHANGESTATE);
                 break;
             case 0x01:
                 noteState ^= 0x40;
@@ -405,8 +404,7 @@ bool QSoundTrack::ReadEvent(void) {
             case 0x02:
                 noteState |= (1 << 4);
                 AddGenericEvent(beginOffset, curOffset - beginOffset,
-                                "Note State |= 0x10 (change duration table)", "",
-                                CLR_CHANGESTATE);
+                                "Note State |= 0x10 (change duration table)", "", CLR_CHANGESTATE);
                 break;
             case 0x03:
                 noteState ^= 8;

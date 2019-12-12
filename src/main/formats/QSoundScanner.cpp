@@ -142,7 +142,7 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
     return;
 }
 
-QSoundVer QSoundScanner::GetVersionEnum(string &versionStr) {
+QSoundVer QSoundScanner::GetVersionEnum(const std::string &versionStr) {
     if (versionStr == "1.00")
         return VER_100;
     if (versionStr == "1.01")

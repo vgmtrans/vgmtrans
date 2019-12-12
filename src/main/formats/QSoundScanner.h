@@ -36,5 +36,5 @@ enum QSoundVer : uint8_t {
 class QSoundScanner : public VGMScanner {
    public:
     virtual void Scan(RawFile *file, void *info = 0);
-    QSoundVer GetVersionEnum(std::string &versionStr);
+    QSoundVer GetVersionEnum(const std::string &versionStr);
 };

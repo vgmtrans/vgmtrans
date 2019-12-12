@@ -106,7 +106,7 @@ const uint16_t decay_rate_table[64] = {
 
 class QSoundArticTable : public VGMMiscFile {
    public:
-    QSoundArticTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length);
+    QSoundArticTable(RawFile *file, const std::string &name, uint32_t offset, uint32_t length);
     virtual ~QSoundArticTable(void);
 
     virtual bool LoadMain();
@@ -121,7 +121,8 @@ class QSoundArticTable : public VGMMiscFile {
 
 class QSoundSampleInfoTable : public VGMMiscFile {
    public:
-    QSoundSampleInfoTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length = 0);
+    QSoundSampleInfoTable(RawFile *file, const std::string &name, uint32_t offset,
+                          uint32_t length = 0);
     virtual ~QSoundSampleInfoTable(void);
 
     virtual bool LoadMain();
@@ -139,7 +140,7 @@ class QSoundInstrSet : public VGMInstrSet {
    public:
     QSoundInstrSet(RawFile *file, QSoundVer fmt_version, uint32_t offset, int numInstrBanks,
                    QSoundSampleInfoTable *sampInfoTable, QSoundArticTable *articTable,
-                   std::string &name);
+                   const std::string &name);
     virtual ~QSoundInstrSet(void);
 
     virtual bool GetHeaderInfo();
@@ -159,7 +160,7 @@ class QSoundInstrSet : public VGMInstrSet {
 class QSoundInstr : public VGMInstr {
    public:
     QSoundInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                uint32_t theInstrNum, std::string &name);
+                uint32_t theInstrNum, const std::string &name);
     virtual ~QSoundInstr(void);
     virtual bool LoadInstr();
 
