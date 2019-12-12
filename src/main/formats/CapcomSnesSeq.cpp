@@ -395,9 +395,9 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 noteAttributes &= ~(CAPCOM_SNES_MASK_NOTE_OCTAVE_UP |
                                     CAPCOM_SNES_MASK_NOTE_TRIPLET | CAPCOM_SNES_MASK_NOTE_SLURRED);
                 noteAttributes |= attributes;
-                desc << "Triplet: " << (isNoteTriplet() ? "On" : "Off") << "  " << "Slur: "
-                     << (isNoteSlurred() ? "On" : "Off") << "  " << "2-Octave Up: "
-                     << (isNoteOctaveUp() ? "On" : "Off");
+                desc << "Triplet: " << (isNoteTriplet() ? "On" : "Off") << "  "
+                     << "Slur: " << (isNoteSlurred() ? "On" : "Off") << "  "
+                     << "2-Octave Up: " << (isNoteOctaveUp() ? "On" : "Off");
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Note Attributes",
                                 desc.str().c_str(), CLR_DURNOTE, ICON_CONTROL);
                 break;
@@ -495,7 +495,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 curOffset += 2;
 
                 uint8_t repeatSlot;
-                char *repeatEventName;
+                const char *repeatEventName;
                 switch (eventType) {
                     case EVENT_REPEAT_UNTIL_1:
                         repeatSlot = 0;
@@ -575,11 +575,12 @@ bool CapcomSnesTrack::ReadEvent(void) {
                         break;
                 }
 
-                desc << "Note: { " << "Triplet: " << (isNoteTriplet() ? "On" : "Off") << "  "
-                     << "Slur: " << (isNoteSlurred() ? "On" : "Off") << "  " << "2-Octave Up: "
-                     << (isNoteOctaveUp() ? "On" : "Off") << " }  " << "Destination: $"
-                     << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
-                     << (int)dest;
+                desc << "Note: { "
+                     << "Triplet: " << (isNoteTriplet() ? "On" : "Off") << "  "
+                     << "Slur: " << (isNoteSlurred() ? "On" : "Off") << "  "
+                     << "2-Octave Up: " << (isNoteOctaveUp() ? "On" : "Off") << " }  "
+                     << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
+                     << std::uppercase << (int)dest;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, repeatEventName,
                                 desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
@@ -700,8 +701,8 @@ bool CapcomSnesTrack::ReadEvent(void) {
 
             case EVENT_RELEASE_RATE: {
                 uint8_t gain = GetByte(curOffset++) | 0xa0;
-                desc << "GAIN: $" << std::hex << std::setfill('0') << std::setw(2)
-                     << std::uppercase << (int)gain;
+                desc << "GAIN: $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                     << (int)gain;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Release Rate",
                                 desc.str().c_str(), CLR_SUSTAIN, ICON_CONTROL);
                 break;

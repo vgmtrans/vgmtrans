@@ -255,8 +255,8 @@ bool MoriSnesTrack::ReadEvent(void) {
         case EVENT_UNKNOWN1: {
             uint8_t arg1 = GetByte(curOffset++);
             desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
-                 << (int)arg1;
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1;
             AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
@@ -265,8 +265,8 @@ bool MoriSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
-                 << (int)arg1 << "  Arg2: " << (int)arg2;
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2;
             AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
@@ -276,8 +276,8 @@ bool MoriSnesTrack::ReadEvent(void) {
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
             desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
-                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
             AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
@@ -288,9 +288,9 @@ bool MoriSnesTrack::ReadEvent(void) {
             uint8_t arg3 = GetByte(curOffset++);
             uint8_t arg4 = GetByte(curOffset++);
             desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
-                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3 << "  Arg4: "
-                 << (int)arg4;
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3
+                 << "  Arg4: " << (int)arg4;
             AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
             break;
         }
@@ -299,7 +299,7 @@ bool MoriSnesTrack::ReadEvent(void) {
         case EVENT_NOTE_WITH_PARAM: {
             uint8_t keyOffset = statusByte & 0x1f;
 
-            char *eventName;
+            const char *eventName;
             if (eventType == EVENT_NOTE_WITH_PARAM) {
                 uint8_t noteParam = GetByte(curOffset++);
                 if (noteParam <= 0x7f) {
@@ -346,8 +346,8 @@ bool MoriSnesTrack::ReadEvent(void) {
             int16_t instrOffset = GetShort(curOffset);
             curOffset += 2;
             uint16_t instrAddress = curOffset + instrOffset;
-            desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4)
-                 << std::uppercase << (int)instrAddress;
+            desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
+                 << (int)instrAddress;
 
             uint8_t instrNum;
             for (instrNum = 0; instrNum < parentSeq->InstrumentAddresses.size(); instrNum++) {
@@ -436,8 +436,8 @@ bool MoriSnesTrack::ReadEvent(void) {
             int8_t volume = GetByte(curOffset++);
             int8_t feedback = GetByte(curOffset++);
             uint8_t filterIndex = GetByte(curOffset++);
-            desc << "Delay: " << (int)delay << "  FIR: " << (int)volume << "  volume: "
-                 << (int)feedback << "  FIR: " << (int)filterIndex;
+            desc << "Delay: " << (int)delay << "  FIR: " << (int)volume
+                 << "  volume: " << (int)feedback << "  FIR: " << (int)filterIndex;
             AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc.str().c_str(),
                             CLR_REVERB, ICON_CONTROL);
             break;
@@ -488,8 +488,8 @@ bool MoriSnesTrack::ReadEvent(void) {
         }
 
         case EVENT_RET: {
-            AddGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern",
-                            desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+            AddGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc.str().c_str(),
+                            CLR_LOOP, ICON_ENDREP);
 
             if (spcCallStackPtr < 2) {
                 // access violation
@@ -957,7 +957,8 @@ void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
             default:
                 //#ifdef _WIN32
                 //			std::ostringstream ssTrace;
-                //			ssTrace << "" << std::hex << std::setfill('0') << std::setw(8)
+                //			ssTrace << "" << std::hex << std::setfill('0') <<
+                //std::setw(8)
                 //<< std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  <<
                 //" -> " << std::setw(8) << curOffset << std::endl;
                 //			OutputDebugString(ssTrace.str().c_str());
