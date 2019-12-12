@@ -24,14 +24,13 @@ PostLoadCommand GSFLoader::Apply(RawFile *file) {
     if (memcmp(sig, "PSF", 3) == 0) {
         uint8_t version = sig[3];
         if (version == GSF_VERSION) {
-            std::string complaint;
             size_t exebufsize = GSF_MAX_ROM_SIZE;
             uint8_t *exebuf = NULL;
             // memset(exebuf, 0, exebufsize);
 
-            complaint = std::string{psf_read_exe(file, exebuf, exebufsize)};
-            if (!complaint.empty()) {
-                L_ERROR("{}", (complaint));
+            auto complaint = psf_read_exe(file, exebuf, exebufsize);
+            if (complaint) {
+                L_ERROR("{}", complaint);
                 delete[] exebuf;
                 return KEEP_IT;
             }

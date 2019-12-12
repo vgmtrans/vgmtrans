@@ -9,6 +9,7 @@
 
 class PSF1Loader : public VGMLoader {
    public:
+    ~PSF1Loader() = default;
     PostLoadCommand Apply(RawFile *) override;
 
    private:

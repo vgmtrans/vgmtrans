@@ -27,11 +27,10 @@ PostLoadCommand SNSFLoader::Apply(RawFile *file) {
             size_t exebufsize = SNSF_MAX_ROM_SIZE;
             uint8_t *exebuf = NULL;
             // memset(exebuf, 0, exebufsize);
-            std::string complaint;
 
-            complaint = std::string{psf_read_exe(file, exebuf, exebufsize)};
-            if (!complaint.empty()) {
-                L_ERROR("{}", (complaint));
+            auto complaint = psf_read_exe(file, exebuf, exebufsize);
+            if (complaint) {
+                L_ERROR("{}", complaint);
                 delete[] exebuf;
                 return KEEP_IT;
             }

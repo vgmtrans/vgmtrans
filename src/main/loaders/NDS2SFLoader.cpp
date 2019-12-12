@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include <filesystem>
 #include "NDS2SFLoader.h"
 #include "Root.h"
 
@@ -112,18 +113,17 @@ const char *NDS2SFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned ch
         else
             sprintf(libTagName, "_lib%d", libIndex);
 
-        map<string, string>::iterator itLibTag = psf.tags.find(libTagName);
+        auto itLibTag = psf.tags.find(libTagName);
         if (itLibTag == psf.tags.end())
             break;
 
-        char *fullPath;
-        fullPath = GetFileWithBase(file->path().c_str(), itLibTag->second.c_str());
+        std::string newpath =
+            std::filesystem::path{file->path()}.replace_filename(itLibTag->second).string();
 
         // TODO: Make sure to limit recursion to avoid crashing.
-        DiskFile *newRawFile = new DiskFile(fullPath);
+        DiskFile *newRawFile = new DiskFile(newpath);
         const char *psflibError = NULL;
         psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
-        // delete fullPath;
         delete newRawFile;
 
         if (psflibError != NULL)

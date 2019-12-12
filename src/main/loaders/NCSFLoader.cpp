@@ -24,14 +24,13 @@ PostLoadCommand NCSFLoader::Apply(RawFile *file) {
     if (memcmp(sig, "PSF", 3) == 0) {
         uint8_t version = sig[3];
         if (version == NCSF_VERSION) {
-            std::string complaint;
             size_t exebufsize = NCSF_MAX_ROM_SIZE;
             uint8_t *exebuf = NULL;
             // memset(exebuf, 0, exebufsize);
 
-            complaint = std::string{psf_read_exe(file, exebuf, exebufsize)};
-            if (!complaint.empty()) {
-                L_ERROR("{}", (complaint));
+            auto complaint = psf_read_exe(file, exebuf, exebufsize);
+            if (complaint) {
+                L_ERROR("{}", complaint);
                 delete[] exebuf;
                 return KEEP_IT;
             }
@@ -119,14 +118,13 @@ const char *NCSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned char
         if (itLibTag == psf.tags.end())
             break;
 
-        char *fullPath;
-        fullPath = GetFileWithBase(file->path().c_str(), itLibTag->second.c_str());
+        std::string newpath =
+            std::filesystem::path{file->path()}.replace_filename(itLibTag->second).string();
 
         // TODO: Make sure to limit recursion to avoid crashing.
-        DiskFile *newRawFile = new DiskFile(fullPath);
+        DiskFile *newRawFile = new DiskFile(newpath);
         const char *psflibError = NULL;
         psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
-        delete fullPath;
         delete newRawFile;
 
         if (psflibError != NULL)
