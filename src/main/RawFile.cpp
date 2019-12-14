@@ -47,21 +47,21 @@ void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
                (*const_cast<std::string *>(vgmfile->GetName())));
 }
 
-uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
+uint32_t RawFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
     memcpy(pBuffer, data() + nIndex, nCount);
     return nCount;
 }
 
-bool RawFile::MatchBytes(const uint8_t *pattern, uint32_t nIndex, size_t nCount) {
+bool RawFile::MatchBytes(const uint8_t *pattern, uint32_t nIndex, size_t nCount) const {
     return memcmp(data() + nIndex, pattern, nCount) == 0;
 }
 
-bool RawFile::MatchBytePattern(const BytePattern &pattern, uint32_t nIndex) {
+bool RawFile::MatchBytePattern(const BytePattern &pattern, uint32_t nIndex) const {
     return pattern.match(data() + nIndex, pattern.length());
 }
 
 bool RawFile::SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
-                                uint32_t nSearchOffset, uint32_t nSearchSize) {
+                                uint32_t nSearchOffset, uint32_t nSearchSize) const {
     if (nSearchOffset >= size())
         return false;
 
@@ -91,8 +91,12 @@ VirtFile::VirtFile(const RawFile &file, size_t offset) : m_name(file.name()), m_
     std::copy(file.data() + offset, file.data() + offset + file.size(), std::back_inserter(m_data));
 }
 
-VirtFile::VirtFile(uint8_t *data, uint32_t fileSize, std::string name, std::string parent_fullpath,
-                   const VGMTag tag)
+VirtFile::VirtFile(const RawFile &file, size_t offset, size_t limit)
+    : m_name(file.name()), m_lpath(file.path()) {
+    std::copy(file.data() + offset, file.data() + offset + limit, std::back_inserter(m_data));
+}
+VirtFile::VirtFile(const uint8_t *data, uint32_t fileSize, std::string name,
+                   std::string parent_fullpath, const VGMTag tag)
     : m_name(std::move(name)), m_lpath(std::move(parent_fullpath)) {
     std::copy(data, data + fileSize, std::back_inserter(m_data));
 }
