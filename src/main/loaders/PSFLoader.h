@@ -9,15 +9,15 @@
 
 class PSFFile2;
 
-class PSF1Loader : public FileLoader {
+class PSFLoader : public FileLoader {
    public:
-    ~PSF1Loader() = default;
+    ~PSFLoader() = default;
     void apply(const RawFile *) override;
 
    private:
-    void psf_read_exe(const RawFile *file);
+    void psf_read_exe(const RawFile *file, int version);
 };
 
 namespace vgmtrans::loaders {
-LoaderRegistration<PSF1Loader> _psf1{"PSF1"};
+LoaderRegistration<PSFLoader> psf{"PSF"};
 }

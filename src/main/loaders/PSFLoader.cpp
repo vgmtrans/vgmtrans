@@ -4,28 +4,36 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "NDS2SFLoader.h"
+#include "PSFLoader.h"
 
-#include <filesystem>
-
+#include <unordered_map>
 #include "PSFFile2.h"
 #include <fmt/compile.h>
 #include <fmt/format.h>
 
-int constexpr NDS2SF_VERSION = 0x24;
+constexpr int PSF1_VERSION = 0x1;
+constexpr int GSF_VERSION = 0x22;
+constexpr int SNSF_VERSION = 0x23;
+constexpr int NDS2SF_VERSION = 0x24;
+constexpr int NCSF_VERSION = 0x25;
+const std::unordered_map<int, size_t> data_offset = {{PSF1_VERSION, 0x800},
+                                                     {GSF_VERSION, 0x0C},
+                                                     {SNSF_VERSION, 0x08},
+                                                     {NDS2SF_VERSION, 0x08},
+                                                     {NCSF_VERSION, 0x0}};
 
-void NDS2SFLoader::apply(const RawFile *file) {
+void PSFLoader::apply(const RawFile *file) {
     uint8_t sig[4];
     file->GetBytes(0, 4, sig);
     if (memcmp(sig, "PSF", 3) == 0) {
         uint8_t version = sig[3];
-        if (version == NDS2SF_VERSION) {
-            psf_read_exe(file);
+        if (data_offset.find(version) != data_offset.end()) {
+            psf_read_exe(file, version);
         }
     }
 }
 
-void NDS2SFLoader::psf_read_exe(const RawFile *file) {
+void PSFLoader::psf_read_exe(const RawFile *file, int version) {
     PSFFile2 psf(*file);
 
     std::filesystem::path basepath(file->path());
@@ -50,9 +58,10 @@ void NDS2SFLoader::psf_read_exe(const RawFile *file) {
         }
     }
 
-    auto romsize = psf.getExe<u32>(0x04);
-    auto newfile =
-        std::make_shared<VirtFile>(reinterpret_cast<const u8 *>(psf.exe().data()) + 0x8,
-                                   psf.exe().size(), file->name(), file->path(), file->tag);
-    enqueue(newfile);
+    if (!psf.exe().empty()) {
+        auto newfile = std::make_shared<VirtFile>(
+            reinterpret_cast<const u8 *>(psf.exe().data()) + data_offset.at(version),
+            psf.exe().size() - data_offset.at(version), file->name(), file->path(), file->tag);
+        enqueue(newfile);
+    }
 }
