@@ -4,20 +4,20 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Loader.h"
-#include "PSFFile.h"
+#include "FileLoader.h"
+#include "LoaderManager.h"
 
-class NDS2SFLoader : public VGMLoader {
+class PSFFile2;
+
+class NDS2SFLoader : public FileLoader {
    public:
-    NDS2SFLoader(void);
-
-   public:
-    virtual ~NDS2SFLoader(void);
-
-    virtual PostLoadCommand Apply(RawFile *theFile);
-    const char *psf_read_exe(RawFile *file, unsigned char *&exebuffer, size_t &exebuffersize);
+    ~NDS2SFLoader() = default;
+    void apply(const RawFile *) override;
 
    private:
-    const char *load_psf_libs(PSFFile &psf, RawFile *file, unsigned char *&exebuffer,
-                                 size_t &exebuffersize);
+    void psf_read_exe(const RawFile *file);
 };
+
+namespace vgmtrans::loaders {
+LoaderRegistration<NDS2SFLoader> _nds2sf{"NDS_2SF"};
+}
