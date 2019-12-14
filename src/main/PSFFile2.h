@@ -17,7 +17,8 @@ constexpr auto PSF_STRIP_BUF_SIZE = 4096;
 
 class PSFFile2 {
    public:
-    PSFFile2(RawFile *file);
+    PSFFile2(const RawFile &file);
+    ~PSFFile2() = default;
 
     uint8_t version() const noexcept { return m_version; }
     const std::map<std::string, std::string> &tags() const noexcept { return m_tags; }

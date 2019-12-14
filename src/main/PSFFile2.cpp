@@ -10,43 +10,47 @@
 #include <algorithm>
 #include <zlib.h>
 
-PSFFile2::PSFFile2(RawFile *file) {
-    uint32_t fileSize = file->size();
+PSFFile2::PSFFile2(const RawFile &file) {
+    uint32_t fileSize = file.size();
     if (fileSize < 0x10) {
         throw std::length_error("PSF file smaller than header, likely corrupt");
     }
 
     uint8_t signature[4];
-    file->GetBytes(0, 4, signature);
+    file.GetBytes(0, 4, signature);
     if (memcmp(signature, "PSF", 3) != 0) {
         throw std::runtime_error("Invalid PSF signature");
     }
 
     m_version = signature[3];
 
-    uint32_t reservedarea_size = file->GetWord(4);
-    uint32_t exe_size = file->GetWord(8);
-    m_exe_CRC = file->GetWord(12);
+    uint32_t reservedarea_size = file.GetWord(4);
+    if (reservedarea_size) {
+        m_reserved_data.resize(reservedarea_size);
+        file.GetBytes(16, reservedarea_size, m_reserved_data.data());
+    }
+
+    uint32_t exe_size = file.GetWord(8);
+    m_exe_CRC = file.GetWord(12);
 
     if ((reservedarea_size > fileSize) || (exe_size > fileSize) ||
         ((16 + reservedarea_size + exe_size) > fileSize)) {
         throw std::runtime_error("PSF header is corrupt or invalid");
     }
 
-    /* FIXME: Use std::copy whenever RawFile gets iterators */
-    std::vector<char> tmp_data;
-    tmp_data.resize(exe_size);
-    file->GetBytes(16 + reservedarea_size, exe_size, tmp_data.data());
+    if (exe_size > 0) {
+        /* FIXME: Use std::copy whenever RawFile gets iterators */
+        std::vector<char> tmp_data;
+        tmp_data.resize(exe_size);
+        file.GetBytes(16 + reservedarea_size, exe_size, tmp_data.data());
 
-    if (m_exe_CRC != crc32(crc32(0L, Z_NULL, 0), reinterpret_cast<const Bytef *>(tmp_data.data()),
-                           tmp_data.size())) {
-        throw std::runtime_error("CRC32 mismatch, data is corrupt");
+        if (m_exe_CRC != crc32(crc32(0L, Z_NULL, 0),
+                               reinterpret_cast<const Bytef *>(tmp_data.data()), tmp_data.size())) {
+            throw std::runtime_error("CRC32 mismatch, data is corrupt");
+        }
+
+        m_exe_data = zdecompress(tmp_data);
     }
-
-    m_reserved_data.resize(reservedarea_size);
-    file->GetBytes(16, reservedarea_size, m_reserved_data.data());
-
-    m_exe_data = zdecompress(tmp_data);
 
     // Check existence of tag section.
     uint32_t tag_section_offset = 16 + reservedarea_size + exe_size;
@@ -54,7 +58,7 @@ PSFFile2::PSFFile2(RawFile *file) {
     bool valid_tag_section = false;
     if (tag_section_size >= PSF_TAG_SIG_LEN) {
         uint8_t tagSig[5];
-        file->GetBytes(tag_section_offset, PSF_TAG_SIG_LEN, tagSig);
+        file.GetBytes(tag_section_offset, PSF_TAG_SIG_LEN, tagSig);
         if (memcmp(tagSig, PSF_TAG_SIG, PSF_TAG_SIG_LEN) == 0) {
             valid_tag_section = true;
         }
@@ -63,7 +67,7 @@ PSFFile2::PSFFile2(RawFile *file) {
     if (valid_tag_section) {
         std::vector<char> tag_section;
         tag_section.resize(tag_section_size);
-        file->GetBytes(tag_section_offset, tag_section_size, tag_section.data());
+        file.GetBytes(tag_section_offset, tag_section_size, tag_section.data());
         tag_section.push_back('\0');
         parseTags(tag_section);
     }
