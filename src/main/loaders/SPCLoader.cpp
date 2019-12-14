@@ -5,28 +5,20 @@
  */
 
 #include "SPCLoader.h"
-#include "Root.h"
 
-SPCLoader::SPCLoader(void) {}
-
-SPCLoader::~SPCLoader(void) {}
-
-PostLoadCommand SPCLoader::Apply(RawFile *file) {
+void SPCLoader::apply(const RawFile *file) {
     if (file->size() < 0x10180) {
-        return KEEP_IT;
+        return;
     }
 
     char signature[34] = {0};
     file->GetBytes(0, 33, signature);
     if (memcmp(signature, "SNES-SPC700 Sound File Data", 27) != 0 ||
         file->GetShort(0x21) != 0x1a1a) {
-        return KEEP_IT;
+        return;
     }
 
-    uint8_t *spcData = new uint8_t[0x10000];
-    memcpy(spcData, file->data() + 0x100, 0x10000);
-
-    VirtFile *spcFile = new VirtFile(spcData, 0x10000, file->name(), file->path());
+    auto spcFile = std::make_shared<VirtFile>(*file, 0x100, 0x10000);
 
     std::vector<uint8_t> dsp(file->data() + 0x10100, file->data() + 0x10100 + 0x80);
     spcFile->tag.binaries["dsp"] = dsp;
@@ -144,11 +136,5 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
         }
     }
 
-    // Load SPC after parsing tag
-    if (!pRoot->SetupNewRawFile(spcFile)) {
-        delete spcFile;
-        return KEEP_IT;
-    }
-
-    return DELETE_IT;
+    enqueue(spcFile);
 }

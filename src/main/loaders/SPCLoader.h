@@ -4,14 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Loader.h"
 
-class SPCLoader : public VGMLoader {
+#include "loaders/FileLoader.h"
+#include "loaders/LoaderManager.h"
+
+class SPCLoader : public FileLoader {
    public:
-    SPCLoader(void);
-
-   public:
-    virtual ~SPCLoader(void);
-
-    virtual PostLoadCommand Apply(RawFile *theFile);
+    ~SPCLoader() = default;
+    void apply(const RawFile *) override;
 };
+
+namespace vgmtrans::loaders {
+LoaderRegistration<SPCLoader> _spc{"SPC"};
+}
