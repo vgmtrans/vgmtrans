@@ -4,15 +4,20 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Loader.h"
-#include "PSFFile2.h"
+#include "FileLoader.h"
+#include "LoaderManager.h"
 
-class PSF1Loader : public VGMLoader {
+class PSFFile2;
+
+class PSF1Loader : public FileLoader {
    public:
     ~PSF1Loader() = default;
-    PostLoadCommand Apply(RawFile *) override;
+    void apply(const RawFile *) override;
 
    private:
-    std::vector<char> *psf_read_exe(RawFile *file);
-    bool load_psf_libs(PSFFile2 &psf, RawFile *file);
+    void psf_read_exe(const RawFile *file);
 };
+
+namespace vgmtrans::loaders {
+LoaderRegistration<PSF1Loader> _psf1{"PSF1"};
+}

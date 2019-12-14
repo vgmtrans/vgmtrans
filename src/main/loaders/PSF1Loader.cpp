@@ -7,73 +7,49 @@
 #include "PSF1Loader.h"
 #include "Root.h"
 
-#include "PSFFile.h"
+#include "PSFFile2.h"
+#include <fmt/compile.h>
+#include <fmt/format.h>
 
-PostLoadCommand PSF1Loader::Apply(RawFile *file) {
+void PSF1Loader::apply(const RawFile *file) {
     uint8_t sig[4];
     file->GetBytes(0, 4, sig);
     if (memcmp(sig, "PSF", 3) == 0) {
         uint8_t version = sig[3];
         if (version == 0x01) {
-            auto data = psf_read_exe(file);
-            if (data->empty()) {
-                return KEEP_IT;
-            }
+            psf_read_exe(file);
+        }
+    }
+}
 
-            std::string name = file->name();
-            pRoot->CreateVirtFile(reinterpret_cast<u8 *>(data->data()), data->size(), name.data(),
-                                  "", file->tag);
-            return DELETE_IT;
+void PSF1Loader::psf_read_exe(const RawFile *file) {
+    PSFFile2 psf(*file);
+    auto out = new std::vector<char>();
+
+    std::filesystem::path basepath(file->path());
+    auto libtag = psf.tags().find("_lib");
+    if (libtag != psf.tags().end()) {
+        auto newpath = basepath.replace_filename(libtag->second).string();
+        auto newfile = std::make_shared<DiskFile>(newpath);
+        enqueue(newfile);
+
+        /* Look for additional libraries in the same folder */
+        auto libstring = fmt::compile("_lib{:d}");
+        int i = 1;
+        while (true) {
+            libtag = psf.tags().find(fmt::format(libstring, i++));
+            if (libtag != psf.tags().end()) {
+                newpath = basepath.replace_filename(libtag->second).string();
+                newfile = std::make_shared<DiskFile>(newpath);
+                enqueue(newfile);
+            } else {
+                break;
+            }
         }
     }
 
-    return KEEP_IT;
-}
-
-std::vector<char> *PSF1Loader::psf_read_exe(RawFile *file) {
-    PSFFile2 psf(file);
-    auto out = new std::vector<char>();
-
-    size_t stext_ofs = psf.getExe<u32>(0x18) & 0x3FFFFF;
-    size_t stext_size = psf.getExe<u32>(0x1C);
-
-    auto loaded_libs = load_psf_libs(psf, file);
-    if (!loaded_libs)
-        return out;
-
-    auto exeb = psf.exe().cbegin() + 0x800;
-    std::copy(exeb, exeb + stext_size, std::back_inserter(*out));
-
-    return out;
-}
-
-bool PSF1Loader::load_psf_libs(PSFFile2 &psf, RawFile *file) {
-    char libTagName[16];
-    int libIndex = 1;
-    while (true) {
-        if (libIndex == 1)
-            strcpy(libTagName, "_lib");
-        else
-            sprintf(libTagName, "_lib%d", libIndex);
-
-        auto itLibTag = psf.tags().find(libTagName);
-        if (itLibTag == psf.tags().end())
-            break;
-
-        char *fullPath;
-        fullPath = GetFileWithBase(file->path().c_str(), itLibTag->second.c_str());
-
-        DiskFile *newRawFile = new DiskFile(fullPath);
-        std::vector<char> *out = nullptr;
-        out = psf_read_exe(newRawFile);
-        delete fullPath;
-        delete newRawFile;
-
-        if (out && out->empty())
-            return false;
-
-        libIndex++;
-    }
-
-    return true;
+    auto newfile =
+        std::make_shared<VirtFile>(reinterpret_cast<const u8 *>(psf.exe().data()) + 0x800,
+                                   psf.exe().size() - 0x800, file->name(), file->path(), file->tag);
+    enqueue(newfile);
 }
