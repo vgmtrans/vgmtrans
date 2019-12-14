@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <memory>
+
 #include "common.h"
 #include "Loader.h"
 #include "Scanner.h"
@@ -32,7 +34,7 @@ class VGMRoot {
     bool OpenRawFile(const std::string &filename);
     bool CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::string &filename,
                         const std::string &parRawFileFullPath = "", const VGMTag tag = VGMTag());
-    bool SetupNewRawFile(RawFile *newRawFile);
+    bool SetupNewRawFile(std::shared_ptr<RawFile> newRawFile);
     bool CloseRawFile(RawFile *targFile);
     void AddVGMFile(VGMFile *theFile);
     void RemoveVGMFile(VGMFile *theFile, bool bRemoveFromRaw = true);
@@ -69,24 +71,23 @@ class VGMRoot {
                             void *UI_specific) {}
     virtual void UI_AddItemSet(void *UI_specific, std::vector<ItemSet> *itemset) {}
     virtual std::string UI_GetOpenFilePath(const std::string &suggestedFilename = "",
-                                            const std::string &extension = "") = 0;
+                                           const std::string &extension = "") = 0;
     virtual std::string UI_GetSaveFilePath(const std::string &suggestedFilename,
-                                            const std::string &extension = "") = 0;
+                                           const std::string &extension = "") = 0;
     virtual std::string UI_GetSaveDirPath(const std::string &suggestedDir = "") = 0;
     virtual bool UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, uint32_t size);
 
     bool SaveAllAsRaw();
 
-   public:
-    // MatchMaker matchmaker;
     std::vector<RawFile *> vRawFile;
     std::vector<VGMFile *> vVGMFile;
     std::vector<VGMColl *> vVGMColl;
 
     std::vector<VGMLoader *> vLoader;
     std::vector<VGMScanner *> vScanner;
-    // std::map<uint32_t, Format*> fmt_map;
-    // std::vector<Format*> vFormats;
+
+   private:
+    std::vector<std::shared_ptr<RawFile>> m_activefiles;
 };
 
 extern VGMRoot *pRoot;

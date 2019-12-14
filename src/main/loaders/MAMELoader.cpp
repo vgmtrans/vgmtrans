@@ -10,7 +10,7 @@
 #include "Format.h"
 #include "KabukiDecrypt.h"
 #include <fmt/format.h>
-
+#include <memory>
 using namespace std;
 
 // template < class T >
@@ -203,8 +203,9 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
 
     for (list<MAMERomGroupEntry>::iterator it = gameentry->romgroupentries.begin();
          it != gameentry->romgroupentries.end(); it++) {
-        if (it->file != NULL)
-            pRoot->SetupNewRawFile(it->file);
+        if (it->file != NULL) {
+            // pRoot->SetupNewRawFile(it->file);
+        }
     }
 
     ret = unzClose(cur_file);

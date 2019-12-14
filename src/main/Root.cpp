@@ -10,14 +10,15 @@
 
 #include "PS1Format.h"
 
-#include "PSF1Loader.h"
 #include "PSF2Loader.h"
 #include "GSFLoader.h"
 #include "SNSFLoader.h"
 #include "NDS2SFLoader.h"
 #include "NCSFLoader.h"
-#include "SPCLoader.h"
 #include "MAMELoader.h"
+
+#include "loaders/FileLoader.h"
+#include "loaders/LoaderManager.h"
 
 using namespace std;
 
@@ -25,8 +26,6 @@ VGMRoot *pRoot;
 
 VGMRoot::~VGMRoot(void) {
     DeleteVect<VGMLoader>(vLoader);
-    // DeleteVect<VGMScanner>(vScanner);
-    DeleteVect<RawFile>(vRawFile);
     DeleteVect<VGMFile>(vVGMFile);
 }
 
@@ -59,13 +58,11 @@ bool VGMRoot::Init(void) {
     // AddScanner("RareSnes");
 
     // load all the... loaders
-    AddLoader<PSF1Loader>();
     AddLoader<PSF2Loader>();
     AddLoader<GSFLoader>();
     AddLoader<SNSFLoader>();
     AddLoader<NDS2SFLoader>();
     AddLoader<NCSFLoader>();
-    AddLoader<SPCLoader>();
     AddLoader<MAMELoader>();
 
     return true;
@@ -87,14 +84,11 @@ void VGMRoot::Exit(void) {
     UI_Exit();
 }
 
-void VGMRoot::Reset(void) {
-    // Close all RawFiles
-    DeleteVect<RawFile>(vRawFile);
-}
+void VGMRoot::Reset(void) {}
 
 // opens up a file from the filesystem and scans it for known formats
 bool VGMRoot::OpenRawFile(const string &filename) {
-    DiskFile *newfile = new DiskFile(filename);
+    auto newfile = std::make_shared<DiskFile>(filename);
 
     // if the file was set up properly, apply loaders, scan it, and add it to our list if it
     // contains vgmfiles
@@ -108,53 +102,62 @@ bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const string &
                              const string &parRawFileFullPath, const VGMTag tag) {
     assert(fileSize != 0);
 
-    VirtFile *newVirtFile =
-        new VirtFile(databuf, fileSize, filename.c_str(), parRawFileFullPath.c_str(), tag);
-    if (newVirtFile == NULL) {
-        return false;
-    }
+    auto newVirtFile =
+        std::make_shared<VirtFile>(databuf, fileSize, filename, parRawFileFullPath, tag);
 
-    if (!SetupNewRawFile(newVirtFile)) {
-        delete newVirtFile;
-        return false;
-    }
-
-    return true;
+    return SetupNewRawFile(newVirtFile);
 }
 
 // called by OpenRawFile.  Applies all of the loaders and scanners
 // to the RawFile
-bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
-    if (newRawFile->useLoaders())
-        for (uint32_t i = 0; i < vLoader.size(); i++) {
+bool VGMRoot::SetupNewRawFile(std::shared_ptr<RawFile> newRawFile) {
+    if (newRawFile->useLoaders()) {
+        /*/
+      for (uint32_t i = 0; i < vLoader.size(); i++) {
             if (vLoader[i]->Apply(newRawFile) == DELETE_IT) {
                 delete newRawFile;
                 return true;
             }
         }
+        */
+        for (auto l : LoaderManager::get().loaders()) {
+            l->apply(newRawFile.get());
+            auto res = l->results();
 
-    if (newRawFile->useScanners()) {
-        // see if there is an extension discriminator
-        list<VGMScanner *> *lScanners =
-            ExtensionDiscriminator::instance().GetScannerList(newRawFile->extension());
-        if (lScanners) {
-            // if there is, scan with all relevant scanners
-            for (list<VGMScanner *>::iterator iter = lScanners->begin(); iter != lScanners->end();
-                 iter++)
-                (*iter)->Scan(newRawFile);
-        } else {
-            // otherwise, use every scanner
-            for (uint32_t i = 0; i < vScanner.size(); i++)
-                vScanner[i]->Scan(newRawFile);
+            for (auto file : res) {
+                SetupNewRawFile(file);
+                return true;
+            }
         }
     }
 
-    if (newRawFile->containedVGMFiles.size() == 0) {
-        delete newRawFile;
+    if (newRawFile->useScanners()) {
+        /*
+         * Make use of the extension to run only a subset of scanners.
+         * Unsure how good of an idea this is
+         */
+        auto specific_scanners =
+            ExtensionDiscriminator::instance().GetScannerList(newRawFile->extension());
+        if (specific_scanners) {
+            for (auto scanner : *specific_scanners) {
+                scanner->Scan(newRawFile.get());
+            }
+        } else {
+            for (auto scanner : vScanner) {
+                scanner->Scan(newRawFile.get());
+            }
+        }
+    }
+
+    if (newRawFile->containedVGMFiles.empty()) {
         return true;
     }
-    vRawFile.push_back(newRawFile);
-    UI_AddRawFile(newRawFile);
+
+    // FIXME
+    auto &newref = m_activefiles.emplace_back(newRawFile);
+    vRawFile.emplace_back(newref.get());
+    UI_AddRawFile(newref.get());
+
     return true;
 }
 
@@ -178,7 +181,6 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
         L_WARN("Requested deletion for RawFile but it was not found");
     }
 
-    delete targFile;
     return true;
 }
 
