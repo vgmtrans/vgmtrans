@@ -11,10 +11,6 @@
 #include "PS1Format.h"
 
 #include "PSF2Loader.h"
-#include "GSFLoader.h"
-#include "SNSFLoader.h"
-#include "NDS2SFLoader.h"
-#include "NCSFLoader.h"
 #include "MAMELoader.h"
 
 #include "loaders/FileLoader.h"
@@ -59,10 +55,6 @@ bool VGMRoot::Init(void) {
 
     // load all the... loaders
     AddLoader<PSF2Loader>();
-    AddLoader<GSFLoader>();
-    AddLoader<SNSFLoader>();
-    AddLoader<NDS2SFLoader>();
-    AddLoader<NCSFLoader>();
     AddLoader<MAMELoader>();
 
     return true;
