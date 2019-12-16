@@ -71,9 +71,17 @@ class RawFile {
         return value;
     }
 
+    const char *begin() const noexcept { return data(); }
+    const char *end() const noexcept { return data() + size(); }
+    std::reverse_iterator<const char *> rbegin() const noexcept {
+        return std::reverse_iterator<const char *>(end());
+    }
+    std::reverse_iterator<const char *> rend() const noexcept {
+        return std::reverse_iterator<const char *>(begin());
+    }
     virtual const char *data() const = 0;
-    virtual char &operator[](uint32_t offset) = 0;
-    virtual const char &operator[](uint32_t offset) const = 0;
+
+    virtual const char &operator[](const uint32_t i) const = 0;
     virtual uint8_t GetByte(uint32_t nIndex) const = 0;
     virtual uint16_t GetShort(uint32_t nIndex) const = 0;
     virtual uint32_t GetWord(uint32_t nIndex) const = 0;
@@ -118,7 +126,6 @@ class DiskFile final : public RawFile {
     }
 
     const char *data() const override { return m_data.data(); }
-    char &operator[](uint32_t offset) override { return m_data[offset]; }
     const char &operator[](uint32_t offset) const override { return m_data[offset]; }
     uint8_t GetByte(uint32_t nIndex) const override { return m_data[nIndex]; }
     uint16_t GetShort(uint32_t nIndex) const override { return get<u16>(nIndex); }
@@ -160,7 +167,6 @@ class VirtFile final : public RawFile {
     std::string GetParRawFileFullPath() const override { return m_lpath.string(); }
 
     const char *data() const override { return m_data.data(); }
-    char &operator[](uint32_t offset) override { return m_data[offset]; }
     const char &operator[](uint32_t offset) const override { return m_data[offset]; }
     uint8_t GetByte(uint32_t nIndex) const override { return m_data[nIndex]; }
     uint16_t GetShort(uint32_t nIndex) const override { return get<u16>(nIndex); }
