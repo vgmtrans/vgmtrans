@@ -10,9 +10,6 @@
 
 #include "PS1Format.h"
 
-#include "PSF2Loader.h"
-#include "MAMELoader.h"
-
 #include "loaders/FileLoader.h"
 #include "loaders/LoaderManager.h"
 
@@ -25,8 +22,7 @@ VGMRoot::~VGMRoot(void) {
     DeleteVect<VGMFile>(vVGMFile);
 }
 
-// initializes the VGMRoot class by pushing every VGMScanner and
-// VGMLoader onto the vectors.
+/* FIXME: We want automatic registration */
 bool VGMRoot::Init(void) {
     UI_SetRootPtr(&pRoot);
 
@@ -52,10 +48,6 @@ bool VGMRoot::Init(void) {
     // AddScanner("SuzukiSnes");
     // AddScanner("CapcomSnes");
     // AddScanner("RareSnes");
-
-    // load all the... loaders
-    AddLoader<PSF2Loader>();
-    AddLoader<MAMELoader>();
 
     return true;
 }
@@ -100,25 +92,19 @@ bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const string &
     return SetupNewRawFile(newVirtFile);
 }
 
-// called by OpenRawFile.  Applies all of the loaders and scanners
-// to the RawFile
 bool VGMRoot::SetupNewRawFile(std::shared_ptr<RawFile> newRawFile) {
     if (newRawFile->useLoaders()) {
-        /*/
-      for (uint32_t i = 0; i < vLoader.size(); i++) {
-            if (vLoader[i]->Apply(newRawFile) == DELETE_IT) {
-                delete newRawFile;
-                return true;
-            }
-        }
-        */
         for (auto l : LoaderManager::get().loaders()) {
             l->apply(newRawFile.get());
             auto res = l->results();
 
-            for (auto file : res) {
-                SetupNewRawFile(file);
-                return true;
+            /* If the loader extracted anything we shoulnd't have to scan */
+            if (!res.empty()) {
+                newRawFile->setUseScanners(false);
+
+                for (auto file : res) {
+                    SetupNewRawFile(file);
+                }
             }
         }
     }
