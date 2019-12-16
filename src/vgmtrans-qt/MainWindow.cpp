@@ -86,6 +86,7 @@ void MainWindow::CreateElements() {
 
     vertical_splitter_left->addWidget(m_rawfiles_list_container);
     vertical_splitter_left->addWidget(m_vgmfiles_list_container);
+    vertical_splitter_left->setContentsMargins(10, 0, 10, 5);
     vertical_splitter_left->setHandleWidth(1);
 
     setCentralWidget(vertical_splitter);

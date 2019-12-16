@@ -14,7 +14,7 @@ HeaderContainer::HeaderContainer(QWidget *content, const QString title, QObject 
     font.setBold(true);
 
     header = new QLabel(title);
-    header->setContentsMargins(10, 5, 10, 5);
+    header->setContentsMargins(0, 5, 0, 5);
     header->setFont(font);
 
     layout = new QVBoxLayout();
