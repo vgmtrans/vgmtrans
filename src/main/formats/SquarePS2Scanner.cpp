@@ -23,8 +23,8 @@ void SquarePS2Scanner::SearchForBGMSeq(RawFile *file) {
     uint32_t nFileLength;
     nFileLength = file->size();
     for (uint32_t i = 0; i + 4 < nFileLength; i++) {
-        if ((*file)[i] == 'B' && (*file)[i + 1] == 'G' && (*file)[i + 2] == 'M' &&
-            (*file)[i + 3] == ' ') {
+        if (file->get<u8>(i) == 'B' && file->get<u8>(i + 1) == 'G' && file->get<u8>(i + 2) == 'M' &&
+            file->get<u8>(i + 3) == ' ') {
             if (file->GetWord(i + 0x14) == 0 && file->GetWord(i + 0x18) == 0 &&
                 file->GetWord(i + 0x1C) == 0) {
                 uint8_t nNumTracks = (*file)[i + 8];
@@ -54,7 +54,7 @@ void SquarePS2Scanner::SearchForWDSet(RawFile *file) {
 
     uint32_t nFileLength = file->size();
     for (uint32_t i = 0; i + 0x3000 < nFileLength; i++) {
-        if ((*file)[i] == 'W' && (*file)[i + 1] == 'D' && (*file)[i + 3] < 0x03) {
+        if (file->get<u8>(i) == 'W' && file->get<u8>(i + 1) == 'D' && file->get<u8>(i + 3) < 0x03) {
             if (file->GetWord(i + 0x14) == 0 && file->GetWord(i + 0x18) == 0 &&
                 file->GetWord(i + 0x1C) == 0) {
                 // check the data at the offset of the first region entry's sample pointer.  It
