@@ -14,6 +14,10 @@
 #include <fmt/format.h>
 #include <memory>
 
+namespace vgmtrans::loaders {
+LoaderRegistration<MAMELoader> _mame("MAME");
+}
+
 bool MAMERomGroupEntry::GetHexAttribute(const std::string &attrName, uint32_t *out) const {
     auto strValue = attributes.at(attrName);
     if (strValue.empty()) {

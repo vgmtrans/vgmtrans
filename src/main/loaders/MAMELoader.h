@@ -78,7 +78,3 @@ class MAMELoader : public FileLoader {
     GameMap gamemap;
     bool bLoadedXml;
 };
-
-namespace vgmtrans::loaders {
-LoaderRegistration<MAMELoader> _mame("MAME");
-}
