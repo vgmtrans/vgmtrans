@@ -555,7 +555,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 curOffset += 2;
 
                 uint8_t repeatSlot;
-                char *repeatEventName;
+                const char *repeatEventName;
                 switch (eventType) {
                     case EVENT_REPEAT_BREAK_1:
                         repeatSlot = 0;

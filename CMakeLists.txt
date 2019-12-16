@@ -45,8 +45,7 @@ target_compile_features(g_options INTERFACE cxx_std_17)
 
 if(MSVC)
   target_compile_options(g_options
-                         INTERFACE /Zc:strictStrings-
-                                   -DNOMINMAX
+                         INTERFACE -DNOMINMAX
                                    -D_CRT_SECURE_NO_DEPRECATE
                                    -D_CRT_NONSTDC_NO_DEPRECATE
                                    -D_CRT_SECURE_NO_WARNINGS
