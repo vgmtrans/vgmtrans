@@ -17,10 +17,6 @@
 
 VGMRoot *pRoot;
 
-VGMRoot::~VGMRoot(void) {
-    DeleteVect<VGMFile>(vVGMFile);
-}
-
 /* FIXME: We want automatic registration */
 bool VGMRoot::Init(void) {
     UI_SetRootPtr(&pRoot);
@@ -126,7 +122,7 @@ bool VGMRoot::SetupNewRawFile(std::shared_ptr<RawFile> newRawFile) {
         }
     }
 
-    if (newRawFile->containedVGMFiles.empty()) {
+    if (newRawFile->containedVGMFiles().empty()) {
         return true;
     }
 
@@ -144,13 +140,12 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
         return false;
     }
 
-    auto file = find(vRawFile.begin(), vRawFile.end(), targFile);
+    auto file = std::find(vRawFile.begin(), vRawFile.end(), targFile);
     if (file != vRawFile.end()) {
-        auto &vgmfiles = (*file)->containedVGMFiles;
+        auto &vgmfiles = (*file)->containedVGMFiles();
         auto size = vgmfiles.size();
         for (size_t i = 0; i < size; i++) {
-            pRoot->RemoveVGMFile(vgmfiles.front(), false);
-            vgmfiles.erase(vgmfiles.begin());
+            pRoot->RemoveVGMFile(vgmfiles.front().get(), true);
         }
 
         vRawFile.erase(file);
@@ -163,10 +158,13 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
 
 // Adds a a VGMFile to the interface.  The UI_AddVGMFile function will handle the
 // interface-specific stuff
-void VGMRoot::AddVGMFile(VGMFile *theFile) {
-    theFile->GetRawFile()->AddContainedVGMFile(theFile);
-    vVGMFile.push_back(theFile);
-    UI_AddVGMFile(theFile);
+void VGMRoot::AddVGMFile(VGMFile *file) {
+    std::shared_ptr<VGMFile> ptr(file);
+
+    file->GetRawFile()->AddContainedVGMFile(ptr);
+
+    vVGMFile.push_back(ptr.get());
+    UI_AddVGMFile(ptr.get());
 }
 
 // Removes a VGMFile from the interface.  The UI_RemoveVGMFile will handle the
@@ -175,22 +173,24 @@ void VGMRoot::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
     // First we should call the format's onClose handler in case it needs to use
     // the RawFile before we close it (FilenameMatcher, for ex)
     Format *fmt = targFile->GetFormat();
-    if (fmt)
+    if (fmt) {
         fmt->OnCloseFile(targFile);
+    }
 
-    auto iter = find(vVGMFile.begin(), vVGMFile.end(), targFile);
-    if (iter != vVGMFile.end())
+    auto iter = std::find(vVGMFile.begin(), vVGMFile.end(), targFile);
+    if (iter != vVGMFile.end()) {
+        UI_RemoveVGMFile(targFile);
         vVGMFile.erase(iter);
-    else
+    } else {
         L_WARN("Requested deletion for VGMFile but it was not found");
+    }
+
+    while (targFile->assocColls.size()) {
+        RemoveVGMColl(targFile->assocColls.back());
+    }
 
     if (bRemoveFromRaw)
         targFile->rawfile->RemoveContainedVGMFile(targFile);
-    while (targFile->assocColls.size())
-        RemoveVGMColl(targFile->assocColls.back());
-
-    UI_RemoveVGMFile(targFile);
-    delete targFile;
 }
 
 void VGMRoot::AddVGMColl(VGMColl *theColl) {

@@ -78,13 +78,14 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
             if (role == Qt::DisplayRole) {
                 return QString::fromStdString(qtVGMRoot.vRawFile[index.row()]->name());
             } else if (role == Qt::DecorationRole) {
-                return QIcon(":/images/file-32.png");
+                static QIcon fileicon(":/images/file-32.png");
+                return fileicon;
             }
         }
 
         case Property::ContainedFiles: {
             if (role == Qt::DisplayRole) {
-                return QString::number(qtVGMRoot.vRawFile[index.row()]->containedVGMFiles.size());
+                return QString::number(qtVGMRoot.vRawFile[index.row()]->containedVGMFiles().size());
             }
         }
 

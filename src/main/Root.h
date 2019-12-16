@@ -27,7 +27,7 @@ FORWARD_DECLARE_TYPEDEF_STRUCT(ItemSet);
 class VGMRoot {
    public:
     VGMRoot() = default;
-    virtual ~VGMRoot(void);
+    virtual ~VGMRoot() = default;
 
     bool Init(void);
     void Reset(void);
@@ -83,6 +83,7 @@ class VGMRoot {
 
    private:
     std::vector<std::shared_ptr<RawFile>> m_activefiles;
+    std::vector<std::shared_ptr<VGMColl>> m_colls;
 };
 
 extern VGMRoot *pRoot;

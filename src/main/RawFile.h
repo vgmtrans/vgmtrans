@@ -8,6 +8,7 @@
 #include <string_view>
 #include <filesystem>
 #include <vector>
+#include <memory>
 #include "mio.hpp"
 
 #include "common.h"
@@ -82,28 +83,32 @@ class RawFile {
     virtual const char *data() const = 0;
 
     virtual const char &operator[](const uint32_t i) const = 0;
-    virtual uint8_t GetByte(uint32_t nIndex) const = 0;
-    virtual uint16_t GetShort(uint32_t nIndex) const = 0;
-    virtual uint32_t GetWord(uint32_t nIndex) const = 0;
-    virtual uint16_t GetShortBE(uint32_t nIndex) const = 0;
-    virtual uint32_t GetWordBE(uint32_t nIndex) const = 0;
+    virtual uint8_t GetByte(size_t offset) const = 0;
+    virtual uint16_t GetShort(size_t offset) const = 0;
+    virtual uint32_t GetWord(size_t offset) const = 0;
+    virtual uint16_t GetShortBE(size_t offset) const = 0;
+    virtual uint32_t GetWordBE(size_t offset) const = 0;
 
-    uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const;
-    bool MatchBytes(const uint8_t *pattern, uint32_t nIndex, size_t nCount) const;
-    bool MatchBytePattern(const BytePattern &pattern, uint32_t nIndex) const;
+    uint32_t GetBytes(size_t offset, uint32_t nCount, void *pBuffer) const;
+    bool MatchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const;
+    bool MatchBytePattern(const BytePattern &pattern, size_t offset) const;
     bool SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
                            uint32_t nSearchOffset = 0, uint32_t nSearchSize = (uint32_t)-1) const;
 
-    void AddContainedVGMFile(VGMFile *vgmfile);
-    void RemoveContainedVGMFile(VGMFile *vgmfile);
+    const std::vector<std::shared_ptr<VGMFile>> &containedVGMFiles() const noexcept {
+        return m_vgmfiles;
+    }
+    void AddContainedVGMFile(std::shared_ptr<VGMFile>);
+    void RemoveContainedVGMFile(VGMFile *);
 
     VGMItem *GetItemFromOffset(long offset);
     VGMFile *GetVGMFileFromOffset(long offset);
 
-    std::list<VGMFile *> containedVGMFiles;
     VGMTag tag;
 
    private:
+    std::vector<std::shared_ptr<VGMFile>> m_vgmfiles;
+
     enum ProcessFlags { UseLoaders = 1, UseScanners = 2 };
     int m_flags = UseLoaders | UseScanners;
 };
@@ -127,11 +132,11 @@ class DiskFile final : public RawFile {
 
     const char *data() const override { return m_data.data(); }
     const char &operator[](uint32_t offset) const override { return m_data[offset]; }
-    uint8_t GetByte(uint32_t nIndex) const override { return m_data[nIndex]; }
-    uint16_t GetShort(uint32_t nIndex) const override { return get<u16>(nIndex); }
-    uint32_t GetWord(uint32_t nIndex) const override { return get<u32>(nIndex); }
-    uint16_t GetShortBE(uint32_t nIndex) const override { return getBE<u16>(nIndex); }
-    uint32_t GetWordBE(uint32_t nIndex) const override { return getBE<u32>(nIndex); }
+    uint8_t GetByte(size_t offset) const override { return m_data[offset]; }
+    uint16_t GetShort(size_t offset) const override { return get<u16>(offset); }
+    uint32_t GetWord(size_t offset) const override { return get<u32>(offset); }
+    uint16_t GetShortBE(size_t offset) const override { return getBE<u16>(offset); }
+    uint32_t GetWordBE(size_t offset) const override { return getBE<u32>(offset); }
 
    private:
     mio::mmap_source m_data;
@@ -168,11 +173,11 @@ class VirtFile final : public RawFile {
 
     const char *data() const override { return m_data.data(); }
     const char &operator[](uint32_t offset) const override { return m_data[offset]; }
-    uint8_t GetByte(uint32_t nIndex) const override { return m_data[nIndex]; }
-    uint16_t GetShort(uint32_t nIndex) const override { return get<u16>(nIndex); }
-    uint32_t GetWord(uint32_t nIndex) const override { return get<u32>(nIndex); }
-    uint16_t GetShortBE(uint32_t nIndex) const override { return getBE<u16>(nIndex); }
-    uint32_t GetWordBE(uint32_t nIndex) const override { return getBE<u32>(nIndex); }
+    uint8_t GetByte(size_t offset) const override { return m_data[offset]; }
+    uint16_t GetShort(size_t offset) const override { return get<u16>(offset); }
+    uint32_t GetWord(size_t offset) const override { return get<u32>(offset); }
+    uint16_t GetShortBE(size_t offset) const override { return getBE<u16>(offset); }
+    uint32_t GetWordBE(size_t offset) const override { return getBE<u32>(offset); }
 
    private:
     std::vector<char> m_data;
