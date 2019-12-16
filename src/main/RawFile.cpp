@@ -88,13 +88,14 @@ DiskFile::DiskFile(const std::string &path) : m_data(mio::mmap_source(path)), m_
 /* VirtFile */
 
 VirtFile::VirtFile(const RawFile &file, size_t offset) : m_name(file.name()), m_lpath(file.path()) {
-    std::copy(file.data() + offset, file.data() + offset + file.size(), std::back_inserter(m_data));
+    std::copy(file.begin() + offset, file.end(), std::back_inserter(m_data));
 }
 
 VirtFile::VirtFile(const RawFile &file, size_t offset, size_t limit)
     : m_name(file.name()), m_lpath(file.path()) {
     std::copy(file.data() + offset, file.data() + offset + limit, std::back_inserter(m_data));
 }
+
 VirtFile::VirtFile(const uint8_t *data, uint32_t fileSize, std::string name,
                    std::string parent_fullpath, const VGMTag tag)
     : m_name(std::move(name)), m_lpath(std::move(parent_fullpath)) {

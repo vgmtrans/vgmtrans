@@ -4,11 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "Scanner.h"
 #include "Root.h"
-
-VGMScanner::VGMScanner() {}
-
-VGMScanner::~VGMScanner(void) {}
 
 bool VGMScanner::Init() {
     // if (!UseExtension())

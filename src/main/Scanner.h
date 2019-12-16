@@ -11,14 +11,12 @@ class RawFile;
 #define USE_EXTENSION(extension) \
     ExtensionDiscriminator::instance().AddExtensionScannerAssoc(extension, this);
 //	virtual bool UseExtension() {return
-//theExtensionDiscriminator.AddExtensionScannerAssoc(extension, this);}
+// theExtensionDiscriminator.AddExtensionScannerAssoc(extension, this);}
 
 class VGMScanner {
    public:
-    VGMScanner(void);
-
-   public:
-    virtual ~VGMScanner(void);
+    VGMScanner() = default;
+    virtual ~VGMScanner() = default;
 
     virtual bool Init();
     // virtual bool UseExtension() {return true;}
