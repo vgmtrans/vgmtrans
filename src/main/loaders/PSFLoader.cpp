@@ -33,6 +33,10 @@ void PSFLoader::apply(const RawFile *file) {
     }
 }
 
+/*
+ * This isn't the way the spec advises loading a PSF file;
+ * however the following is perfectly fine for our purposes.
+ */
 void PSFLoader::psf_read_exe(const RawFile *file, int version) {
     PSFFile2 psf(*file);
 

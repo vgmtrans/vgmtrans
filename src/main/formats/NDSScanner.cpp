@@ -7,6 +7,9 @@
 #include "NDSSeq.h"
 #include "NDSInstrSet.h"
 
+#include <fmt/format.h>
+#include <algorithm>
+#include <functional>
 using namespace std;
 
 #define SRCH_BUF_SIZE 0x20000
@@ -17,168 +20,143 @@ void NDSScanner::Scan(RawFile *file, void *info) {
 }
 
 void NDSScanner::SearchForSDAT(RawFile *file) {
-    uint32_t nFileLength = file->size();
-    for (uint32_t i = 0; i + 4 < nFileLength; i++) {
-        if (file->GetByte(i) == 'S' && file->GetByte(i + 1) == 'D' && file->GetByte(i + 2) == 'A' &&
-            file->GetByte(i + 3) == 'T' && file->GetByte(i + 4) == 0xFF &&
-            file->GetByte(i + 5) == 0xFE && file->GetByte(i + 6) == 0 &&
-            file->GetByte(i + 7) == 0x01 && (file->GetShort(i + 12) < 0x100) &&
-            (file->GetWord(i + 0x10) < 0x10000)) {
-            i += LoadFromSDAT(file, i);
+    using namespace std::string_literals;
+    const std::string signature = "SDAT\xFF\xFE\x00\x01"s;
+
+    auto it = std::search(file->begin(), file->end(),
+                          std::boyer_moore_searcher(signature.begin(), signature.end()));
+    while (it != file->end()) {
+        int offset = it - file->begin();
+        if (file->get<u32>(offset + 0x10) < 0x10000) {
+            LoadFromSDAT(file, offset);
         }
+
+        it = std::search(++it, file->end(),
+                         std::boyer_moore_searcher(signature.begin(), signature.end()));
     }
 }
 
 // The following is pretty god-awful messy.  I should have created structs for the different
 // blocks and loading the entire blocks at a time.
 uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
-    uint32_t SYMBoff;
-    uint32_t INFOoff;
-    uint32_t FAToff;
-    uint32_t nSeqs;
-    uint32_t nBnks;
-    uint32_t nWAs;
-    vector<string> seqNames;
-    vector<string> bnkNames;
-    vector<string> waNames;
-    vector<uint16_t> seqFileIDs;
-    vector<uint16_t> bnkFileIDs;
-    vector<uint16_t> waFileIDs;
-    vector<uint16_t> seqFileBnks;
-    vector<vector<uint16_t>> bnkWAs;
-    vector<NDSWaveArch *> WAs;
-    vector<pair<uint16_t, NDSInstrSet *>> BNKs;
-
     uint32_t SDATLength = file->GetWord(baseOff + 8) + 8;
 
-    SYMBoff = file->GetWord(baseOff + 0x10) + baseOff;
-    INFOoff = file->GetWord(baseOff + 0x18) + baseOff;
-    FAToff = file->GetWord(baseOff + 0x20) + baseOff;
+    auto SYMBoff = file->GetWord(baseOff + 0x10) + baseOff;
+    auto INFOoff = file->GetWord(baseOff + 0x18) + baseOff;
+    auto FAToff = file->GetWord(baseOff + 0x20) + baseOff;
     bool hasSYMB = (SYMBoff != baseOff);
 
-    nSeqs = file->GetWord(file->GetWord(INFOoff + 0x08) + INFOoff);
-    nBnks = file->GetWord(file->GetWord(INFOoff + 0x10) + INFOoff);
-    nWAs = file->GetWord(file->GetWord(INFOoff + 0x14) + INFOoff);
+    auto nSeqs = file->GetWord(file->GetWord(INFOoff + 0x08) + INFOoff);
+    auto nBnks = file->GetWord(file->GetWord(INFOoff + 0x10) + INFOoff);
+    auto nWAs = file->GetWord(file->GetWord(INFOoff + 0x14) + INFOoff);
 
-    uint32_t pSeqNamePtrList;
-    uint32_t pBnkNamePtrList;
-    uint32_t pWANamePtrList;
+    std::vector<std::string> bnkNames(nBnks), seqNames(nSeqs), waNames(nWAs);
+    uint32_t pSeqNamePtrList = 0, pBnkNamePtrList = 0, pWANamePtrList = 0;
     if (hasSYMB) {
-        pSeqNamePtrList = file->GetWord(SYMBoff + 0x08) +
-                          SYMBoff;  // get pointer to list of sequence name pointers
-        pBnkNamePtrList =
-            file->GetWord(SYMBoff + 0x10) + SYMBoff;  // get pointer to list of bank name pointers
-        pWANamePtrList = file->GetWord(SYMBoff + 0x14) +
-                         SYMBoff;  // get pointer to list of wavearchive name pointers
-    }
+        /* Pointer to the list of sequence name pointers */
+        pSeqNamePtrList = file->GetWord(SYMBoff + 0x08) + SYMBoff;
+        /* Pointer to the list of bank name pointers */
+        pBnkNamePtrList = file->GetWord(SYMBoff + 0x10) + SYMBoff;
+        /* Pointer to the list of wave archive name pointers */
+        pWANamePtrList = file->GetWord(SYMBoff + 0x14) + SYMBoff;
 
-    for (uint32_t i = 0; i < nSeqs; i++) {
-        char temp[32];  // that 32 is totally arbitrary, i should change it
-        char wtemp[32];
-        if (hasSYMB) {
-            file->GetBytes(file->GetWord(pSeqNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-        } else {
-            sprintf(wtemp, "SSEQ_%04d", i);
-        }
-        seqNames.push_back(wtemp);
-    }
-
-    for (uint32_t i = 0; i < nBnks; i++) {
-        char temp[32];  // that 32 is totally arbitrary, i should change it
-        char wtemp[32];
-
-        if (hasSYMB) {
+        char temp[32] = {0};
+        for (int i = 0; i < nBnks; i++) {
             file->GetBytes(file->GetWord(pBnkNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-        } else {
-            sprintf(wtemp, "SBNK_%04d", i);
+            bnkNames[i] = temp;
         }
-        bnkNames.push_back(wtemp);
-    }
 
-    for (uint32_t i = 0; i < nWAs; i++) {
-        char temp[32];  // that 32 is totally arbitrary, i should change it
-        char wtemp[32];
+        for (int i = 0; i < nSeqs; i++) {
+            file->GetBytes(file->GetWord(pSeqNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
+            seqNames[i] = temp;
+        }
 
-        if (hasSYMB) {
+        for (int i = 0; i < nWAs; i++) {
             file->GetBytes(file->GetWord(pWANamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-        } else {
-            sprintf(wtemp, "SWAR_%04d", i);
+            waNames[i] = temp;
         }
-        waNames.push_back(wtemp);
+    } else {
+        std::generate(std::begin(bnkNames), std::end(bnkNames),
+                      [n = 0]() mutable { return fmt::format("SBNK_{}", n++); });
+        std::generate(std::begin(seqNames), std::end(seqNames),
+                      [n = 0]() mutable { return fmt::format("SSEQ_{}", n++); });
+        std::generate(std::begin(waNames), std::end(waNames),
+                      [n = 0]() mutable { return fmt::format("SWAR_{}", n++); });
     }
 
     uint32_t pSeqInfoPtrList = file->GetWord(INFOoff + 8) + INFOoff;
     // uint32_t seqInfoPtrListLength = file->GetWord(INFOoff + 12);
     uint32_t nSeqInfos = file->GetWord(pSeqInfoPtrList);
+    std::vector<uint16_t> seqFileIDs(nSeqInfos), seqFileBnks(nSeqInfos);
     for (uint32_t i = 0; i < nSeqInfos; i++) {
         uint32_t pSeqInfoUnadjusted = file->GetWord(pSeqInfoPtrList + 4 + i * 4);
         uint32_t pSeqInfo = INFOoff + pSeqInfoUnadjusted;
-        if (pSeqInfoUnadjusted == 0)
-            seqFileIDs.push_back((uint16_t)-1);
-        else
-            seqFileIDs.push_back(file->GetShort(pSeqInfo));
-        seqFileBnks.push_back(file->GetShort(pSeqInfo + 4));
+        seqFileIDs[i] = pSeqInfoUnadjusted ? file->GetShort(pSeqInfo) : 0xFFFF;
+        seqFileBnks[i] = file->GetShort(pSeqInfo + 4);
         // next bytes would be vol, cpr, ppr, and ply respectively, whatever the heck those last 3
         // stand for
     }
 
     uint32_t pBnkInfoPtrList = file->GetWord(INFOoff + 0x10) + INFOoff;
     uint32_t nBnkInfos = file->GetWord(pBnkInfoPtrList);
+    std::vector<uint16_t> bnkFileIDs(nBnkInfos);
+    std::vector<std::vector<uint16_t>> bnkWAs(nBnkInfos);
     for (uint32_t i = 0; i < nBnkInfos; i++) {
         uint32_t pBnkInfoUnadjusted = file->GetWord(pBnkInfoPtrList + 4 + i * 4);
         uint32_t pBnkInfo = INFOoff + pBnkInfoUnadjusted;
-        if (pBnkInfoUnadjusted == 0)
-            bnkFileIDs.push_back((uint16_t)-1);
-        else
-            bnkFileIDs.push_back(file->GetShort(pBnkInfo));
-        bnkWAs.push_back(vector<uint16_t>());
-        vector<vector<uint16_t>>::reference ref = bnkWAs.back();
+        bnkFileIDs[i] = pBnkInfoUnadjusted ? file->GetShort(pBnkInfo) : 0xFFFF;
+
+        std::vector<uint16_t> ref;
         for (int j = 0; j < 4; j++) {
             uint16_t WANum = file->GetShort(pBnkInfo + 4 + (j * 2));
-            // if (WANum > 0x200)			//insanity check
-            if (WANum >= nWAs)
+            if (WANum >= nWAs) {
                 ref.push_back(0xFFFF);
-            else
+            } else {
                 ref.push_back(WANum);
+            }
         }
+
+        bnkWAs[i] = std::move(ref);
     }
 
     uint32_t pWAInfoList = file->GetWord(INFOoff + 0x14) + INFOoff;
     uint32_t nWAInfos = file->GetWord(pWAInfoList);
+    std::vector<uint16_t> waFileIDs(nWAInfos);
     for (uint32_t i = 0; i < nWAInfos; i++) {
         uint32_t pWAInfoUnadjusted = file->GetWord(pWAInfoList + 4 + i * 4);
         uint32_t pWAInfo = INFOoff + pWAInfoUnadjusted;
-        if (pWAInfoUnadjusted == 0)
-            waFileIDs.push_back((uint16_t)-1);
-        else
-            waFileIDs.push_back(file->GetShort(pWAInfo));
+        waFileIDs[i] = pWAInfoUnadjusted ? file->GetShort(pWAInfo) : 0xFFFF;
     }
 
+    std::vector<NDSWaveArch *> WAs;
     {
-        vector<uint16_t> vUniqueWAs;  // = vector<uint16_t>(bnkWAs);
-        for (uint32_t i = 0; i < bnkWAs.size(); i++)
-            vUniqueWAs.insert(vUniqueWAs.end(), bnkWAs[i].begin(), bnkWAs[i].end());
-        sort(vUniqueWAs.begin(), vUniqueWAs.end());
-        vector<uint16_t>::iterator new_end = unique(vUniqueWAs.begin(), vUniqueWAs.end());
+        std::vector<uint16_t> vUniqueWAs;
+        for (auto &v : bnkWAs) {
+            vUniqueWAs.insert(std::end(vUniqueWAs), std::begin(v), std::end(v));
+        }
+        std::sort(std::begin(vUniqueWAs), std::end(vUniqueWAs));
 
-        vector<bool> valid;
-        valid.resize(nWAs);
-        for (vector<uint16_t>::iterator iter = vUniqueWAs.begin(); iter != new_end; iter++) {
-            if ((*iter != (uint16_t)-1) && (*iter < valid.size()))
-                valid[*iter] = 1;
+        auto new_end = std::unique(vUniqueWAs.begin(), vUniqueWAs.end());
+        vUniqueWAs.erase(new_end, std::end(vUniqueWAs));
+
+        std::vector<bool> valid(nWAs);
+        for (auto &WAid : vUniqueWAs) {
+            if (WAid != 0xFFFF && WAid < nWAs) {
+                valid[WAid] = 1;
+            }
         }
 
-        for (uint32_t i = 0; i < nWAs; i++)
-        // for (vector<uint16_t>::iterator iter = vUniqueWAs.begin(); iter != new_end; iter++)
-        {
-            if (valid[i] != 1 || waFileIDs[i] == (uint16_t)-1) {
-                WAs.push_back(NULL);
+        for (uint32_t i = 0; i < nWAs; i++) {
+            if (valid[i] != true || waFileIDs[i] == 0xFFFF) {
+                WAs.push_back(nullptr);
                 continue;
             }
+
             uint32_t offset = FAToff + 12 + waFileIDs[i] * 0x10;
             uint32_t pWAFatData = file->GetWord(offset) + baseOff;
             offset += 4;
             uint32_t fileSize = file->GetWord(offset);
+
             NDSWaveArch *NewNDSwa = new NDSWaveArch(file, pWAFatData, fileSize, waNames[i]);
             if (!NewNDSwa->LoadVGMFile()) {
                 L_ERROR("Failed to load NDSWaveArch at {:#x}", pWAFatData);
@@ -186,10 +164,12 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
                 delete NewNDSwa;
                 continue;
             }
+
             WAs.push_back(NewNDSwa);
         }
     }
 
+    std::vector<std::pair<uint16_t, NDSInstrSet *>> BNKs;
     {
         vector<uint16_t> vUniqueBanks = vector<uint16_t>(seqFileBnks);
         sort(vUniqueBanks.begin(), vUniqueBanks.end());
@@ -253,7 +233,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
                     break;
                 }
             }
-            NDSInstrSet *instrset = BNKs[bnkIndex].second;
+
             coll->AddInstrSet(BNKs[bnkIndex].second);
             for (int j = 0; j < 4; j++) {
                 short WAnum = bnkWAs[seqFileBnks[i]][j];
@@ -267,21 +247,3 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
     }
     return SDATLength;
 }
-
-/*void NDSScanner::SearchForNDSSeq (RawFile* file)
-{
-        uint32_t nFileLength = file->size();
-        for (uint32_t i=0; i+4<nFileLength; i++)
-        {
-                if (file->GetByte(i) == 'S' && file->GetByte(i+1) == 'S' && file->GetByte(i+2) ==
-'E' && file->GetByte(i+3)
-== 'Q')
-                {
-                        //if (file->GetShort(i+10) == 0 && file->GetShort(i+16) == 0)
-                        //{
-                                NDSSeq* NewNDSSeq = new NDSSeq(file, i);
-                                NewNDSSeq->Load();
-                        //}
-                }
-        }
-}*/

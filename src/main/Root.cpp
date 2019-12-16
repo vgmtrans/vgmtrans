@@ -98,7 +98,7 @@ bool VGMRoot::SetupNewRawFile(std::shared_ptr<RawFile> newRawFile) {
             l->apply(newRawFile.get());
             auto res = l->results();
 
-            /* If the loader extracted anything we shoulnd't have to scan */
+            /* If the loader extracted anything we shouldn't have to scan */
             if (!res.empty()) {
                 newRawFile->setUseScanners(false);
 
