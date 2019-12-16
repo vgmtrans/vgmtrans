@@ -49,7 +49,7 @@ class RawFile {
 
     template <typename T>
     T get(const size_t ind) const {
-        assert(ind + sizeof(T) < size());
+        assert(ind + sizeof(T) <= size());
 
         T value = 0;
         for (size_t i = 0; i < sizeof(T); i++) {
@@ -61,7 +61,7 @@ class RawFile {
 
     template <typename T>
     T getBE(const size_t ind) const {
-        assert(ind + sizeof(T) < size());
+        assert(ind + sizeof(T) <= size());
 
         T value = 0;
         for (size_t i = 0; i < sizeof(T); i++) {
