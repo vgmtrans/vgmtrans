@@ -43,11 +43,6 @@ class VGMRoot {
     void RemoveVGMColl(VGMColl *theFile);
     void AddScanner(const std::string &formatname);
 
-    template <class T>
-    void AddLoader() {
-        vLoader.push_back(new T());
-    }
-
     virtual void UI_SetRootPtr(VGMRoot **theRoot) = 0;
     virtual void UI_PreExit() {}
     virtual void UI_Exit() = 0;
