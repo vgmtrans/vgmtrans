@@ -4,17 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Loader.h"
 
-/* Our own unzip */
+#include "FileLoader.h"
+#include "LoaderManager.h"
 #include <unzip.h>
 
 class TiXmlElement;
 class VirtFile;
 
 enum LoadMethod { LM_APPEND, LM_APPEND_SWAP16, LM_DEINTERLACE };
-
-using namespace std;
 
 /**
 Converts a std::string to any class with a proper overload of the >> opertor
@@ -29,8 +27,8 @@ void FromString(const std::string &temp, T *out) {
     assert(!val.fail());
 }
 
-typedef struct _MAMERomGroupEntry {
-    _MAMERomGroupEntry() : file(NULL) {}
+struct MAMERomGroupEntry {
+    MAMERomGroupEntry() : file(nullptr) {}
     template <class T>
     bool GetAttribute(const std::string &attrName, T *out) {
         string strValue = attributes[attrName];
@@ -40,7 +38,7 @@ typedef struct _MAMERomGroupEntry {
         FromString(strValue, out);
         return true;
     }
-    bool GetHexAttribute(const std::string &attrName, uint32_t *out);
+    bool GetHexAttribute(const std::string &attrName, uint32_t *out) const;
 
     LoadMethod loadmethod;
     std::string type;
@@ -48,39 +46,39 @@ typedef struct _MAMERomGroupEntry {
     std::map<const std::string, std::string> attributes;
     std::list<std::string> roms;
     VirtFile *file;
-} MAMERomGroupEntry;
+};
 
-typedef struct _MAMEGameEntry {
-    _MAMEGameEntry() {}
+struct MAMEGameEntry {
     MAMERomGroupEntry *GetRomGroupOfType(const std::string &strType);
 
     std::string name;
     std::string format;
     float fmt_version;
     std::string fmt_version_str;
-    // map<const std::string, const std::string> attributes;
     std::list<MAMERomGroupEntry> romgroupentries;
-} MAMEGameEntry;
+};
 
 typedef std::map<std::string, MAMEGameEntry *> GameMap;
 
-class MAMELoader : public VGMLoader {
+class MAMELoader : public FileLoader {
    public:
     MAMELoader();
     ~MAMELoader();
-    virtual PostLoadCommand Apply(RawFile *theFile);
+    void apply(const RawFile *theFile) override;
 
    private:
-    VirtFile *LoadRomGroup(MAMERomGroupEntry *romgroupentry, const std::string &format,
+    VirtFile *LoadRomGroup(const MAMERomGroupEntry &romgroupentry, const std::string &format,
                            unzFile &cur_file);
     void DeleteBuffers(std::list<std::pair<uint8_t *, uint32_t>> &buffers);
 
-   private:
     int LoadXML();
     MAMEGameEntry *LoadGameEntry(TiXmlElement *gameElmt);
     int LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGameEntry *gameentry);
 
-   private:
     GameMap gamemap;
     bool bLoadedXml;
 };
+
+namespace vgmtrans::loaders {
+LoaderRegistration<MAMELoader> _mame("MAME");
+}
