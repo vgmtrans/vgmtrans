@@ -8,13 +8,14 @@
 #include <memory>
 
 #include "common.h"
-#include "Loader.h"
-#include "Scanner.h"
-
+#include "VGMTag.h"
 #include "LogManager.h"
 
+class VGMScanner;
 class VGMColl;
 class VGMFile;
+class VGMItem;
+
 class RawFile;
 class VGMSeq;
 class VGMInstrSet;
@@ -33,7 +34,7 @@ class VGMRoot {
     void Exit(void);
     bool OpenRawFile(const std::string &filename);
     bool CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::string &filename,
-                        const std::string &parRawFileFullPath = "", const VGMTag tag = VGMTag());
+                        const std::string &parRawFileFullPath = "", VGMTag tag = VGMTag());
     bool SetupNewRawFile(std::shared_ptr<RawFile> newRawFile);
     bool CloseRawFile(RawFile *targFile);
     void AddVGMFile(VGMFile *theFile);
@@ -83,7 +84,6 @@ class VGMRoot {
     std::vector<VGMFile *> vVGMFile;
     std::vector<VGMColl *> vVGMColl;
 
-    std::vector<VGMLoader *> vLoader;
     std::vector<VGMScanner *> vScanner;
 
    private:

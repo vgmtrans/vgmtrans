@@ -6,19 +6,18 @@
 
 #include <fstream>
 
+#include "Root.h"
 #include "VGMColl.h"
-
-#include "PS1Format.h"
+#include "VGMFile.h"
+#include "Format.h"
+#include "Scanner.h"
 
 #include "loaders/FileLoader.h"
 #include "loaders/LoaderManager.h"
 
-using namespace std;
-
 VGMRoot *pRoot;
 
 VGMRoot::~VGMRoot(void) {
-    DeleteVect<VGMLoader>(vLoader);
     DeleteVect<VGMFile>(vVGMFile);
 }
 
@@ -52,7 +51,7 @@ bool VGMRoot::Init(void) {
     return true;
 }
 
-void VGMRoot::AddScanner(const string &formatname) {
+void VGMRoot::AddScanner(const std::string &formatname) {
     Format *fmt = Format::GetFormatFromName(formatname);
     if (!fmt)
         return;
@@ -71,7 +70,7 @@ void VGMRoot::Exit(void) {
 void VGMRoot::Reset(void) {}
 
 // opens up a file from the filesystem and scans it for known formats
-bool VGMRoot::OpenRawFile(const string &filename) {
+bool VGMRoot::OpenRawFile(const std::string &filename) {
     auto newfile = std::make_shared<DiskFile>(filename);
 
     // if the file was set up properly, apply loaders, scan it, and add it to our list if it
@@ -82,8 +81,8 @@ bool VGMRoot::OpenRawFile(const string &filename) {
 // creates a virtual file, a RawFile that was data was created manually,
 // not actually opened from the filesystem.  Used, for example, when decompressing
 // the contents of PSF2 files
-bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const string &filename,
-                             const string &parRawFileFullPath, const VGMTag tag) {
+bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::string &filename,
+                             const std::string &parRawFileFullPath, VGMTag tag) {
     assert(fileSize != 0);
 
     auto newVirtFile =
@@ -179,7 +178,7 @@ void VGMRoot::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
     if (fmt)
         fmt->OnCloseFile(targFile);
 
-    vector<VGMFile *>::iterator iter = find(vVGMFile.begin(), vVGMFile.end(), targFile);
+    auto iter = find(vVGMFile.begin(), vVGMFile.end(), targFile);
     if (iter != vVGMFile.end())
         vVGMFile.erase(iter);
     else
@@ -201,7 +200,7 @@ void VGMRoot::AddVGMColl(VGMColl *theColl) {
 
 void VGMRoot::RemoveVGMColl(VGMColl *targColl) {
     targColl->RemoveFileAssocs();
-    vector<VGMColl *>::iterator iter = find(vVGMColl.begin(), vVGMColl.end(), targColl);
+    auto iter = find(vVGMColl.begin(), vVGMColl.end(), targColl);
     if (iter != vVGMColl.end())
         vVGMColl.erase(iter);
     else
@@ -229,13 +228,15 @@ void VGMRoot::UI_AddVGMFile(VGMFile *theFile) {
         case FILETYPE_MISC:
             UI_AddVGMMisc((VGMMiscFile *)theFile);
             break;
+        default:
+            L_ERROR("Attempted to load some unknown kind of VGMFile");
     }
 }
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_WriteBufferToFile(const string &filepath, uint8_t *buf, uint32_t size) {
-    ofstream outfile(filepath, ios::out | ios::trunc | ios::binary);
+bool VGMRoot::UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, uint32_t size) {
+    std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
     if (!outfile.is_open())  // if attempt to open file failed
         return false;
@@ -246,18 +247,20 @@ bool VGMRoot::UI_WriteBufferToFile(const string &filepath, uint8_t *buf, uint32_
 }
 
 bool VGMRoot::SaveAllAsRaw() {
-    string dirpath = UI_GetSaveDirPath();
-    if (dirpath.length() != 0) {
-        for (uint32_t i = 0; i < vVGMFile.size(); i++) {
-            bool result;
-            VGMFile *file = vVGMFile[i];
-            string filepath = dirpath + "/" + file->GetName()->c_str();
-            uint8_t *buf = new uint8_t[file->unLength];  // create a buffer the size of the file
-            file->GetBytes(file->dwOffset, file->unLength, buf);
-            result = UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);
-            delete[] buf;
-        }
-        return true;
+    std::string dirpath = UI_GetSaveDirPath();
+    if (dirpath.empty()) {
+        return false;
     }
-    return false;
+
+    for (auto file : vVGMFile) {
+        std::string filepath = dirpath + "/" + file->GetName()->c_str();
+
+        uint8_t *buf = new uint8_t[file->unLength];
+        file->GetBytes(file->dwOffset, file->unLength, buf);
+        UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);
+
+        delete[] buf;
+    }
+
+    return true;
 }
