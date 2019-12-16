@@ -11,6 +11,11 @@
 #include "PSFFile2.h"
 
 void PSF2Loader::apply(const RawFile *file) {
+    /* Don't bother on a file too small */
+    if (file->size() < 0x10) {
+        return;
+    }
+
     u32 sig = file->GetWord(0);
     if ((sig & 0x00FFFFFF) == 0x465350 && ((sig & 0xFF000000) == 0x02000000)) {
         auto dircount = file->get<u32>(0x10);

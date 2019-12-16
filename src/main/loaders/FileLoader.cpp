@@ -5,8 +5,10 @@
 std::vector<std::shared_ptr<RawFile>> FileLoader::results() {
     std::vector<std::shared_ptr<RawFile>> res;
 
-    std::move(std::begin(m_res), std::end(m_res), std::back_inserter(res));
-    m_res.clear();
+    if (!m_res.empty()) {
+        std::move(std::begin(m_res), std::end(m_res), std::back_inserter(res));
+        m_res.clear();
+    }
 
     return res;
 }
