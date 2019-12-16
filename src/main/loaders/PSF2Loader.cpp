@@ -8,51 +8,30 @@
 #include "Root.h"
 #include <zlib.h>
 
-PSF2Loader::PSF2Loader(void) {}
+#include "PSFFile2.h"
 
-PSF2Loader::~PSF2Loader(void) {}
-
-PostLoadCommand PSF2Loader::Apply(RawFile *file) {
-    uint32_t sig = file->GetWord(0);
-    if ((sig & 0x00FFFFFF) == 0x465350 &&
-        ((sig & 0xFF000000) == 0x02000000))  // if the sig is PSF 0x02
-    {
-        int r;
-        int dircount;
-        unsigned char hdr[16];
-
-        unsigned long reserved_size;
-        unsigned long exe_size;
-
-        file->GetBytes(0, 0x10, hdr);
-
-        reserved_size = get32lsb(hdr + 4);
-        exe_size = get32lsb(hdr + 8);
-
-        dircount = file->GetWord(0x10);
-
-        r = psf2unpack(file, 0x14, dircount);
-        return DELETE_IT;
+void PSF2Loader::apply(const RawFile *file) {
+    u32 sig = file->GetWord(0);
+    if ((sig & 0x00FFFFFF) == 0x465350 && ((sig & 0xFF000000) == 0x02000000)) {
+        auto dircount = file->get<u32>(0x10);
+        psf2unpack(file, 0x14, dircount);
     }
-    return KEEP_IT;
 }
 
-uint32 PSF2Loader::get32lsb(uint8 *src) {
-    return ((((uint32)(src[0])) & 0xFF) << 0) | ((((uint32)(src[1])) & 0xFF) << 8) |
-           ((((uint32)(src[2])) & 0xFF) << 16) | ((((uint32)(src[3])) & 0xFF) << 24);
+static u32 get32lsb(u8 *src) {
+    return ((((u32)(src[0])) & 0xFF) << 0) | ((((u32)(src[1])) & 0xFF) << 8) |
+           ((((u32)(src[2])) & 0xFF) << 16) | ((((u32)(src[3])) & 0xFF) << 24);
 }
 
-/////////////////////////////////////////////////////////////////////////////
-
-int PSF2Loader::psf2_decompress_block(RawFile *file, unsigned fileoffset, unsigned blocknumber,
-                                      unsigned numblocks, unsigned char *decompressedblock,
-                                      unsigned blocksize) {
+int PSF2Loader::psf2_decompress_block(const RawFile *file, unsigned fileoffset,
+                                      unsigned blocknumber, unsigned numblocks,
+                                      unsigned char *decompressedblock, unsigned blocksize) {
     unsigned int i;
     unsigned long destlen;
     unsigned long current_block;
-    uint8 *blocks;
-    uint8 *zblock;
-    blocks = new uint8[numblocks * 4];
+    u8 *blocks;
+    u8 *zblock;
+    blocks = new u8[numblocks * 4];
 
     if (!blocks) {
         L_ERROR("Out of memory");
@@ -61,7 +40,7 @@ int PSF2Loader::psf2_decompress_block(RawFile *file, unsigned fileoffset, unsign
 
     file->GetBytes(fileoffset, numblocks * 4, blocks);
     current_block = get32lsb(blocks + (blocknumber * 4));
-    zblock = new uint8[current_block];
+    zblock = new u8[current_block];
 
     if (!zblock) {
         L_ERROR("Out of memory");
@@ -87,7 +66,7 @@ int PSF2Loader::psf2_decompress_block(RawFile *file, unsigned fileoffset, unsign
     return 0;
 }
 
-int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned long dircount) {
+int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsigned long dircount) {
     unsigned int i, j, k;
 
     char filename[37];
@@ -98,7 +77,7 @@ int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned lon
     int r;
 
     unsigned int blockcount;
-    uint8 *dblock;
+    u8 *dblock;
 
     memset(filename, 0, sizeof(filename) / sizeof(filename[0]));
 
@@ -118,11 +97,11 @@ int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned lon
         } else {
             blockcount = ((filesize + buffersize) - 1) / buffersize;
 
-            uint8_t *newdataBuf = new uint8_t[filesize];
-            uint32_t actualFileSize = filesize;
+            u8 *newdataBuf = new u8[filesize];
+            u32 actualFileSize = filesize;
             k = 0;
 
-            dblock = new uint8[buffersize];
+            dblock = new u8[buffersize];
             if (!dblock) {
                 L_ERROR("Out of memory");
                 return -1;
@@ -145,9 +124,10 @@ int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned lon
                 }
             }
 
-            pRoot->CreateVirtFile(newdataBuf, actualFileSize, filename, file->path());
+            enqueue(std::make_shared<VirtFile>(newdataBuf, actualFileSize, filename, file->path()));
             delete[] dblock;
         }
     }
+
     return 0;
 }

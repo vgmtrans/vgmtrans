@@ -3,24 +3,23 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+
 #pragma once
-#include "Loader.h"
+#include "FileLoader.h"
+#include "LoaderManager.h"
 
-#define uint32 unsigned
-#define uint16 unsigned short
-#define uint8 unsigned char
-
-class PSF2Loader : public VGMLoader {
+class PSF2Loader final : public FileLoader {
    public:
-    PSF2Loader(void);
+    ~PSF2Loader() = default;
+    void apply(const RawFile *) override;
 
-   public:
-    virtual ~PSF2Loader(void);
-
-    virtual PostLoadCommand Apply(RawFile *theFile);
-    uint32 get32lsb(uint8 *src);
-    int psf2_decompress_block(RawFile *file, unsigned fileoffset, unsigned blocknumber,
+   private:
+    int psf2_decompress_block(const RawFile *file, unsigned fileoffset, unsigned blocknumber,
                               unsigned numblocks, unsigned char *decompressedblock,
                               unsigned blocksize);
-    int psf2unpack(RawFile *file, unsigned long fileoffset, unsigned long dircount);
+    int psf2unpack(const RawFile *file, unsigned long fileoffset, unsigned long dircount);
 };
+
+namespace vgmtrans::loaders {
+LoaderRegistration<PSF2Loader> _psf2("PSF2");
+}
