@@ -20,12 +20,8 @@ TEST_CASE("DiskFile") {
     REQUIRE(file.IsValidOffset(0) == true);
     REQUIRE(file.IsValidOffset(123) == false);
 
-    /* In the future:
     REQUIRE(std::equal(file.begin(), file.end(), "Nice-data-sequence"));
-    REQUIRE(std::equal(file.cbegin(), file.cend(), "Nice-data-sequence"));
     REQUIRE(std::equal(file.rbegin(), file.rend(), "ecneuqes-atad-eciN"));
-    REQUIRE(std::equal(file.crbegin(), file.crend(), "ecneuqes-atad-eciN"));
-    */
 
     REQUIRE(file[0] == 'N');
     REQUIRE(file.get<uint8_t>(0) == 0x4e);
@@ -45,13 +41,9 @@ TEST_CASE("MemFile from DiskFile") {
 
     REQUIRE(file.extension() == "bin");
 
-    /* In the future:
     REQUIRE(file.size() == dfile.size());
     REQUIRE(std::equal(file.begin(), file.end(), "Nice-data-sequence"));
-    REQUIRE(std::equal(file.cbegin(), file.cend(), "Nice-data-sequence"));
     REQUIRE(std::equal(file.rbegin(), file.rend(), "ecneuqes-atad-eciN"));
-    REQUIRE(std::equal(file.crbegin(), file.crend(), "ecneuqes-atad-eciN"));
-    */
 
     REQUIRE(file[0] == 'N');
     REQUIRE(file.get<uint8_t>(0) == 0x4e);
