@@ -9,7 +9,7 @@
 #include "util/Helpers.h"
 #include "IconBar.h"
 
-auto constexpr icons_size = QSize(16, 16);
+constexpr QSize icons_size(20, 20);
 
 IconBar::IconBar(QWidget *parent) : QToolBar(parent) {
     setMovable(false);
