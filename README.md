@@ -27,3 +27,13 @@ Contributors
 
 - Bregalad: Author of [GBAMusRiper](http://www.romhacking.net/utilities/881/), great reference of MP2k interpretation.
 - Nisto: Author of [kdt-tool](https://github.com/Nisto/kdt-tool), thank you for your approval of porting to VGMTrans.
+
+Third party libraries
+------------
+
+- [FluidSynth](https://github.com/FluidSynth/fluidsynth)
+- [TinyXML](http://www.grinninglizard.com/tinyxml/)
+- [Qt](https://www.qt.io/download-open-source)
+- [PhantomStyle](https://github.com/randrew/phantomstyle)
+- [zlib](https://github.com/madler/zlib)
+- [fmtlib](https://github.com/fmtlib/fmt)
