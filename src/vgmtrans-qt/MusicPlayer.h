@@ -10,6 +10,7 @@
 #include <QObject>
 #include <VGMColl.h>
 #include <SF2File.h>
+#include <memory>
 
 extern "C" {
 #include <fluidsynth.h>
@@ -92,30 +93,21 @@ class MusicPlayer : public QObject {
 
 class SF2Wrapper {
    public:
-    static void SetSF2(SF2File &obj) {
-        if (m_sf2_obj) {
-            delete m_sf2_obj;
-        }
-
-        if (m_old_sf2_buf) {
-            delete[] static_cast<char *>(m_old_sf2_buf);
-            m_old_sf2_buf = nullptr;
-        }
-
-        m_sf2_obj = &obj;
+    static void SetSF2(std::shared_ptr<SF2File> obj) {
+        m_sf2_obj.swap(obj);
+        m_old_sf2_buf.reset();
         m_index = 0;
     }
 
     static void *sf_open(const char *filename) {
-        void *sf2_buf;
-
         if (filename[0] != '&') {
             return nullptr;
         }
 
+        void *sf2_buf;
         (void)sscanf(filename, "&%p", &sf2_buf);
 
-        m_old_sf2_buf = sf2_buf;
+        m_old_sf2_buf = std::shared_ptr<char>(reinterpret_cast<char *>(sf2_buf));
 
         return sf2_buf;
     }
@@ -161,17 +153,13 @@ class SF2Wrapper {
 
     /* Guaranteed to be called only on a SF2 buf */
     static int sf_close(void *file) {
-        if (file == m_old_sf2_buf && m_old_sf2_buf != nullptr) {
-            delete[] static_cast<char *>(m_old_sf2_buf);
-            m_old_sf2_buf = nullptr;
-        }
-
+        m_old_sf2_buf.reset();
         return FLUID_OK;
     }
 
    private:
-    inline static SF2File *m_sf2_obj = nullptr;
-    inline static void *m_old_sf2_buf = nullptr;
+    inline static std::shared_ptr<SF2File> m_sf2_obj = nullptr;
+    inline static std::shared_ptr<char> m_old_sf2_buf = nullptr;
     inline static long m_index = 0;
 };
 
