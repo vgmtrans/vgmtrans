@@ -168,7 +168,12 @@ void RawFileListView::DeleteRawFiles() {
         return;
 
     QModelIndexList list = selectionModel()->selectedRows();
+    std::vector<RawFile *> to_close;
+    to_close.reserve(list.size());
     for (auto &index : list) {
-        qtVGMRoot.CloseRawFile(qtVGMRoot.vRawFile[index.row()]);
+        to_close.emplace_back(qtVGMRoot.vRawFile[index.row()]);
     }
+
+    std::for_each(std::begin(to_close), std::end(to_close),
+                  [](RawFile *file) { qtVGMRoot.CloseRawFile(file); });
 }
