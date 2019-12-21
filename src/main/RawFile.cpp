@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "RawFile.h"
+#include "LogManager.h"
 #include "VGMFile.h"
 #include "BytePattern.h"
-#include "Root.h"
 
 /* RawFile */
 

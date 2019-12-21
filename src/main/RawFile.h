@@ -108,7 +108,6 @@ class RawFile {
 
    private:
     std::vector<std::shared_ptr<VGMFile>> m_vgmfiles;
-
     enum ProcessFlags { UseLoaders = 1, UseScanners = 2 };
     int m_flags = UseLoaders | UseScanners;
 };
