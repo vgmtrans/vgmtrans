@@ -3,41 +3,40 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-// Many thanks to Neill Corlett for his work in analyzing the playstation SPU.
-// Most of the code below is based on his work.
-// Also, thanks to Antires for his ADPCM decompression routine.
 
 #include "PSXSPU.h"
 #include "PS1Format.h"
 
-using namespace std;
+/*
+ * PSX's PSU analysis was done by Neill Corlett.
+ * Thanks to Antires for his ADPCM decompression routine.
+ */
 
-// ***********
-// PSXSampColl
-// ***********
-
-PSXSampColl::PSXSampColl(const string &format, RawFile *rawfile, uint32_t offset, uint32_t length)
+PSXSampColl::PSXSampColl(const std::string &format, RawFile *rawfile, uint32_t offset,
+                         uint32_t length)
     : VGMSampColl(format, rawfile, offset, length) {}
 
-PSXSampColl::PSXSampColl(const string &format, VGMInstrSet *instrset, uint32_t offset,
+PSXSampColl::PSXSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
                          uint32_t length)
-    : VGMSampColl(format, instrset->rawfile, instrset, offset, length) {}
+    : VGMSampColl(format, instrset->GetRawFile(), instrset, offset, length) {}
 
-PSXSampColl::PSXSampColl(const string &format, VGMInstrSet *instrset, uint32_t offset,
+PSXSampColl::PSXSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
                          uint32_t length, const std::vector<SizeOffsetPair> &vagLocations)
-    : VGMSampColl(format, instrset->rawfile, instrset, offset, length),
+    : VGMSampColl(format, instrset->GetRawFile(), instrset, offset, length),
       vagLocations(vagLocations) {}
 
 bool PSXSampColl::GetSampleInfo() {
-    if (vagLocations.size() == 0) {
-        // We scan through the sample section, and determine the offsets and size of each sample
-        // We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning
-        // of a sample, and they will never be found at any other point within the adpcm sample
-        // data.
-
+    if (vagLocations.empty()) {
+        /*
+         * We scan through the sample section, and determine the offsets and size of each sample
+         * We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning
+         * of a sample, and they will never be found at any other point within the adpcm sample
+         * data.
+         */
         uint32_t nEndOffset = dwOffset + unLength;
-        if (unLength == 0)
+        if (unLength == 0) {
             nEndOffset = GetEndOffset();
+        }
 
         uint32_t i = dwOffset;
         while (i + 32 <= nEndOffset) {
@@ -47,7 +46,8 @@ bool PSXSampColl::GetSampleInfo() {
                 GetWord(i + 12) == 0) {
                 // most of samples starts with 0s
                 isSample = true;
-            } else {
+            }
+            else {
                 // some sample blocks may not start with 0.
                 // so here is a dirty hack for it.
                 // (Dragon Quest VII, for example)
@@ -119,8 +119,9 @@ bool PSXSampColl::GetSampleInfo() {
                                             i - beginOffset - extraGunkLength, 1, 16, 44100,
                                             fmt::format("Sample {}", samples.size()));
                 samples.push_back(samp);
-            } else
+            } else {
                 break;
+            }
         }
         unLength = i - dwOffset;
     } else {
@@ -160,7 +161,7 @@ bool PSXSampColl::GetSampleInfo() {
 #define MIN_ALLOWED_FILTER_DIFF 0
 
 // GENERIC FUNCTION USED FOR SCANNERS
-PSXSampColl *PSXSampColl::SearchForPSXADPCM(RawFile *file, const string &format) {
+PSXSampColl *PSXSampColl::SearchForPSXADPCM(RawFile *file, const std::string &format) {
     const std::vector<PSXSampColl *> &sampColls = SearchForPSXADPCMs(file, format);
     if (sampColls.size() != 0) {
         // pick up one of the SampColls
@@ -179,7 +180,7 @@ PSXSampColl *PSXSampColl::SearchForPSXADPCM(RawFile *file, const string &format)
 }
 
 const std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file,
-                                                                 const string &format) {
+                                                                 const std::string &format) {
     std::vector<PSXSampColl *> sampColls;
     uint32_t nFileLength = file->size();
     for (uint32_t i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < nFileLength; i++) {
@@ -254,7 +255,7 @@ const std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file,
 
 PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 string name, bool bSetloopOnConversion)
+                 std::string name, bool bSetloopOnConversion)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
       bSetLoopOnConversion(bSetloopOnConversion) {
     bPSXLoopInfoPrioritizing = true;

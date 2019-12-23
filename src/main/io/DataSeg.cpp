@@ -57,7 +57,7 @@ void DataSeg::clear() {
     bAlloced = false;
 }
 
-uint8_t &DataSeg::operator[](uint32_t offset) {
+uint8_t &DataSeg::operator[](size_t offset) {
     assert(offset >= startOff && (offset < (startOff + size)));
     return data[offset - startOff];
 }

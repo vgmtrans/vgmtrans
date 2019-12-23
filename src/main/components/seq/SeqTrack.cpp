@@ -59,7 +59,6 @@ bool SeqTrack::ReadEvent(void) {
 
 bool SeqTrack::LoadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
     VisitedAddresses.clear();
-    VisitedAddresses.reserve(8192);
     VisitedAddressMax = 0;
 
     ResetVars();

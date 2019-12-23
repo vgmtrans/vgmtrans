@@ -6,6 +6,7 @@
 // Many thanks to bsnes and snes9x.
 
 #include "SNESDSP.h"
+#include "RawFile.h"
 #include "Root.h"
 
 // *************
@@ -306,7 +307,7 @@ SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
                            uint32_t maxNumSamps)
-    : VGMSampColl(format, instrset->rawfile, instrset, offset, 0), spcDirAddr(offset) {
+    : VGMSampColl(format, instrset->GetRawFile(), instrset, offset, 0), spcDirAddr(offset) {
     SetDefaultTargets(maxNumSamps);
 }
 
@@ -316,7 +317,7 @@ SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
                            const std::vector<uint8_t> &targetSRCNs, std::string name)
-    : VGMSampColl(format, instrset->rawfile, instrset, offset, 0, name),
+    : VGMSampColl(format, instrset->GetRawFile(), instrset, offset, 0, name),
       spcDirAddr(offset),
       targetSRCNs(targetSRCNs) {}
 

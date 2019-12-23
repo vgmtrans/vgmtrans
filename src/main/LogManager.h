@@ -103,7 +103,7 @@ class LogManager {
      */
     void removeSink(Sink *s) {
         auto it = std::find(m_sinks.begin(), m_sinks.end(), s);
-        if(it != m_sinks.end()) {
+        if (it != m_sinks.end()) {
             m_sinks.erase(it);
         }
     }

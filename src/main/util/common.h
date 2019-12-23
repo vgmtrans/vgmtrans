@@ -35,12 +35,6 @@ using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 using uptr = std::uintptr_t;
 
-#ifdef _MSC_VER
-#include <windows.h>
-
-#define PATH_MAX MAX_PATH
-#endif
-
 #define FORWARD_DECLARE_TYPEDEF_STRUCT(type) \
     struct _##type;                          \
     typedef _##type type

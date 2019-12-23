@@ -190,7 +190,7 @@ void VGMRoot::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
     }
 
     if (bRemoveFromRaw)
-        targFile->rawfile->RemoveContainedVGMFile(targFile);
+        targFile->GetRawFile()->RemoveContainedVGMFile(targFile);
 }
 
 void VGMRoot::AddVGMColl(VGMColl *theColl) {

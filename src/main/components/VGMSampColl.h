@@ -9,10 +9,6 @@
 class VGMInstrSet;
 class VGMSamp;
 
-// ***********
-// VGMSampColl
-// ***********
-
 class VGMSampColl : public VGMFile {
    public:
     BEGIN_MENU_SUB(VGMSampColl, VGMFile)

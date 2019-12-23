@@ -6,6 +6,7 @@
 
 #include "VGMSamp.h"
 #include "VGMRgn.h"
+#include "RawFile.h"
 #include "ScaleConversion.h"
 #include "QSoundInstr.h"
 #include "QSoundFormat.h"

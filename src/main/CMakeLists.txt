@@ -5,7 +5,7 @@ file(GLOB_RECURSE
 
 add_library(vgmcore OBJECT ${MAIN_FILES})
 
-target_include_directories(vgmcore PUBLIC . ./formats ./loaders)
+target_include_directories(vgmcore PUBLIC . ./formats ./loaders ./util ./io ./conversion ./components ./components/instr ./components/seq)
 #fixme: this stuff shouldn't be public
 target_link_libraries(vgmcore
                       PUBLIC fmt::fmt
