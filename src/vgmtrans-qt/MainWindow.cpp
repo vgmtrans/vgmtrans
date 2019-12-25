@@ -119,7 +119,7 @@ void MainWindow::RouteSignals() {
         m_statusbar_offset->setText("Offset: 0x" +
                                     QString::number(clicked_item->dwOffset, 16).toUpper());
         m_statusbar_length->setText("Length: 0x" +
-                                    QString::number(clicked_item->size(), 16).toUpper());
+                                    QString::number(clicked_item->unLength, 16).toUpper());
     });
 }
 
