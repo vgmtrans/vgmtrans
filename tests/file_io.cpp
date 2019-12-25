@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <fstream>
 
-#include "RawFile.h"
+#include "io/RawFile.h"
 
 TEST_CASE("DiskFile") {
     {

@@ -1,8 +1,8 @@
 #include <catch.hpp>
 #include <fstream>
 
-#include "PSFFile2.h"
-#include "RawFile.h"
+#include "loaders/PSFFile2.h"
+#include "io/RawFile.h"
 
 TEST_CASE("0-sized exe sections") {
     {
@@ -16,5 +16,5 @@ TEST_CASE("0-sized exe sections") {
     REQUIRE(psf.exe().empty() == true);
     REQUIRE(psf.reservedSection().empty() == true);
 
-    REQUIRE(psf.tags().empty() == true);   
+    REQUIRE(psf.tags().empty() == true);
 }
