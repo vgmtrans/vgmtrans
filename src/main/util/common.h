@@ -35,10 +35,6 @@ using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 using uptr = std::uintptr_t;
 
-#define FORWARD_DECLARE_TYPEDEF_STRUCT(type) \
-    struct _##type;                          \
-    typedef _##type type
-
 std::string removeExtFromPath(const std::string &s);
 
 std::string StringToUpper(std::string myString);

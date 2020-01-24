@@ -22,7 +22,7 @@ class VGMInstrSet;
 class VGMSampColl;
 class VGMMiscFile;
 
-FORWARD_DECLARE_TYPEDEF_STRUCT(ItemSet);
+struct ItemSet;
 
 class VGMRoot {
    public:
