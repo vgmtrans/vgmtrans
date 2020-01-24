@@ -5,9 +5,10 @@
  */
 
 #include "RawFile.h"
+
 #include "LogManager.h"
-#include "VGMFile.h"
-#include "BytePattern.h"
+#include "components/VGMFile.h"
+#include "util/BytePattern.h"
 
 /* RawFile */
 

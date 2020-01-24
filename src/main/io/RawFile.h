@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+
 #pragma once
 
 #include <string_view>
@@ -11,8 +12,8 @@
 #include <memory>
 #include "mio.hpp"
 
-#include "common.h"
-#include "VGMTag.h"
+#include "util/common.h"
+#include "components/VGMTag.h"
 
 class VGMFile;
 class VGMItem;
@@ -82,7 +83,7 @@ class RawFile {
     }
     virtual const char *data() const = 0;
 
-    virtual const char &operator[](const uint32_t i) const = 0;
+    virtual const char &operator[](const size_t i) const = 0;
     virtual uint8_t GetByte(size_t offset) const = 0;
     virtual uint16_t GetShort(size_t offset) const = 0;
     virtual uint32_t GetWord(size_t offset) const = 0;
@@ -130,7 +131,7 @@ class DiskFile final : public RawFile {
     }
 
     const char *data() const override { return m_data.data(); }
-    const char &operator[](uint32_t offset) const override { return m_data[offset]; }
+    const char &operator[](size_t offset) const override { return m_data[offset]; }
     uint8_t GetByte(size_t offset) const override { return m_data[offset]; }
     uint16_t GetShort(size_t offset) const override { return get<u16>(offset); }
     uint32_t GetWord(size_t offset) const override { return get<u32>(offset); }
@@ -171,7 +172,7 @@ class VirtFile final : public RawFile {
     std::string GetParRawFileFullPath() const override { return m_lpath.string(); }
 
     const char *data() const override { return m_data.data(); }
-    const char &operator[](uint32_t offset) const override { return m_data[offset]; }
+    const char &operator[](size_t offset) const override { return m_data[offset]; }
     uint8_t GetByte(size_t offset) const override { return m_data[offset]; }
     uint16_t GetShort(size_t offset) const override { return get<u16>(offset); }
     uint32_t GetWord(size_t offset) const override { return get<u32>(offset); }
