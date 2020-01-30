@@ -65,7 +65,10 @@ matrix:
         - CMAKE_FLAGS="-DENABLE_UI_QT=0 -DENABLE_TESTING=1"
     - os: osx
       osx_image: xcode10.2
+      env:
+        - MATRIX_EVAL="MAKE_APPIMAGE=1"
       before_install:
+        - eval "${MATRIX_EVAL}"
         - brew upgrade gcc || brew install gcc
         - brew upgrade cmake || brew install cmake
         - brew upgrade ninja || brew install ninja
@@ -83,7 +86,7 @@ script:
   - if [ $TRAVIS_OS_NAME = linux ]; then
       cmake -DCMAKE_BUILD_TYPE=Release ${CMAKE_FLAGS} -DCMAKE_INSTALL_PREFIX=/usr/bin -GNinja .. ;
       ninja -j$(nproc) ;
-      if [ $MAKE_APPIMAGE -eq 1]; then
+      if [ $MAKE_APPIMAGE -eq 1 ]; then
         DESTDIR=appdir ninja -j$(nproc) install ; find appdir/ ;
         wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage" ;
         chmod a+x linuxdeployqt-continuous-x86_64.AppImage ;
@@ -92,25 +95,33 @@ script:
         cp ../data/mame_roms.xml appdir/usr/bin ;
         cp ../src/vgmtrans-qt/resources/images/logo.png appdir/usr/share/default.png ;
         ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage ;
+      else
+        ctest ;
       fi
     fi
   - if [ $TRAVIS_OS_NAME = osx ]; then
       cmake -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9 -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
       ninja -j$(sysctl -n hw.physicalcpu) ;
-      cp ../data/mame_roms.xml src/vgmtrans-qt/VGMTrans.app/Contents/MacOS/ ;
-      /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app -dmg -always-overwrite ;
-      cd src/vgmtrans-qt/ ;
-      zip -vr ../../VGMTrans-$(git rev-parse --short HEAD)-x86_64-osx.zip VGMTrans.app -x "*.DS_Store" ;
-      mv VGMTrans.dmg ../../VGMTrans-$(git rev-parse --short HEAD)-x86_64-osx.dmg ;
-      cd ../.. ;
+      if [ $MAKE_APPIMAGE -eq 1 ]; then
+        cp ../data/mame_roms.xml src/vgmtrans-qt/VGMTrans.app/Contents/MacOS/ ;
+        /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app -dmg -always-overwrite ;
+        cd src/vgmtrans-qt/ ;
+        zip -vr ../../VGMTrans-$(git rev-parse --short HEAD)-x86_64-osx.zip VGMTrans.app -x "*.DS_Store" ;
+        mv VGMTrans.dmg ../../VGMTrans-$(git rev-parse --short HEAD)-x86_64-osx.dmg ;
+        cd ../.. ;
+      else
+        ctest ;
+      fi
     fi
 
 after_success:
-  - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
-  - if [ $TRAVIS_OS_NAME = linux ]; then
-      bash upload.sh VGMTrans*.AppImage ;
-    fi
-  - if [ $TRAVIS_OS_NAME = osx ]; then
-      bash upload.sh VGMTrans*.dmg ;
-      bash upload.sh VGMTrans*.zip ;
+  - if [ $MAKE_APPIMAGE -eq 1 ]; then
+      wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh ;
+      if [ $TRAVIS_OS_NAME = linux ]; then
+        bash upload.sh VGMTrans*.AppImage ;
+      fi
+      if [ $TRAVIS_OS_NAME = osx ]; then
+        bash upload.sh VGMTrans*.dmg ;
+        bash upload.sh VGMTrans*.zip ;
+      fi
     fi
