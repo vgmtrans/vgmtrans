@@ -15,6 +15,7 @@
 #include <climits>
 #include <algorithm>
 #include <vector>
+#include <gsl-lite.hpp>
 
 #include "helper.h"
 
@@ -63,4 +64,5 @@ struct SizeOffsetPair {
 
 char *GetFileWithBase(const char *f, const char *newfile);
 
+std::vector<char> zdecompress(gsl::span<const char> data);
 std::vector<char> zdecompress(std::vector<char> &data);

@@ -5,9 +5,13 @@
  */
 
 #include "common.h"
-#include <zlib.h>
+#include <string>
 #include <cstring>
 #include <array>
+#include <gsl-lite.hpp>
+
+#define ZLIB_CONST
+#include <zlib.h>
 
 std::string removeExtFromPath(const std::string &s) {
     size_t i = s.rfind('.', s.length());
@@ -94,6 +98,53 @@ char *GetFileWithBase(const char *f, const char *newfile) {
     return (ret);
 }
 
+std::vector<char> zdecompress(gsl::span<const char> src) {
+    std::vector<char> result;
+
+    /* allocate inflate state */
+    z_stream strm;
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    strm.avail_in = 0;
+    strm.next_in = Z_NULL;
+    int ret = inflateInit(&strm);
+    if (ret != Z_OK) {
+        throw std::runtime_error("Failed to init decompression");
+    }
+
+    strm.avail_in = src.size();
+    strm.next_in = reinterpret_cast<z_const Bytef *>(src.data());
+
+    unsigned actual_size = 0;
+    constexpr int CHUNK = 4096;
+    std::array<char, CHUNK> out;
+    do {
+        strm.avail_out = CHUNK;
+        strm.next_out = reinterpret_cast<Bytef *>(out.data());
+        ret = inflate(&strm, Z_NO_FLUSH);
+
+        assert(ret != Z_STREAM_ERROR);
+
+        switch (ret) {
+            case Z_NEED_DICT:
+                [[fallthrough]];
+            case Z_DATA_ERROR:
+            case Z_MEM_ERROR:
+                (void)inflateEnd(&strm);
+                throw std::runtime_error("Decompression failed");
+        }
+
+        actual_size = CHUNK - strm.avail_out;
+        result.insert(result.end(), out.begin(), out.begin() + actual_size);
+    } while (strm.avail_out == 0);
+
+    assert(ret == Z_STREAM_END);
+
+    (void)inflateEnd(&strm);
+    return result;
+}
+
 std::vector<char> zdecompress(std::vector<char> &src) {
     std::vector<char> result;
 
@@ -110,10 +161,10 @@ std::vector<char> zdecompress(std::vector<char> &src) {
     }
 
     strm.avail_in = src.size();
-    strm.next_in = reinterpret_cast<Bytef *>(src.data());
+    strm.next_in = reinterpret_cast<const Bytef *>(src.data());
 
     unsigned actual_size = 0;
-    constexpr int CHUNK = 16384;
+    constexpr int CHUNK = 4096;
     std::array<char, CHUNK> out;
     do {
         strm.avail_out = CHUNK;

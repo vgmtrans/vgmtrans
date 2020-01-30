@@ -101,6 +101,7 @@ add_subdirectory(externals/tinyxml EXCLUDE_FROM_ALL)
 # Use our own to ensure compatibility
 add_subdirectory(externals/fmt EXCLUDE_FROM_ALL)
 add_subdirectory(externals/mio EXCLUDE_FROM_ALL)
+add_subdirectory(externals/gsl-lite EXCLUDE_FROM_ALL)
 
 #
 # Targets

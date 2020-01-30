@@ -13,5 +13,6 @@ target_link_libraries(vgmcore
                              minizip
                              tinyxml
 														 mio
+														 gsl-lite
                       PRIVATE g_options
                               g_warnings)

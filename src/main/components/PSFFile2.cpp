@@ -32,7 +32,7 @@ PSFFile2::PSFFile2(const RawFile &file) {
         file.GetBytes(16, reservedarea_size, m_reserved_data.data());
     }
 
-    uint32_t exe_size = file.GetWord(8);
+    size_t exe_size = file.GetWord(8);
     m_exe_CRC = file.GetWord(12);
 
     if ((reservedarea_size > fileSize) || (exe_size > fileSize) ||
@@ -41,17 +41,14 @@ PSFFile2::PSFFile2(const RawFile &file) {
     }
 
     if (exe_size > 0) {
-        /* FIXME: Use std::copy whenever RawFile gets iterators */
-        std::vector<char> tmp_data;
-        tmp_data.resize(exe_size);
-        file.GetBytes(16 + reservedarea_size, exe_size, tmp_data.data());
+        auto exe_begin = file.begin() + 16 + reservedarea_size;
 
-        if (m_exe_CRC != crc32(crc32(0L, Z_NULL, 0),
-                               reinterpret_cast<const Bytef *>(tmp_data.data()), tmp_data.size())) {
+        if (m_exe_CRC !=
+            crc32(crc32(0L, Z_NULL, 0), reinterpret_cast<const Bytef *>(exe_begin), exe_size)) {
             throw std::runtime_error("CRC32 mismatch, data is corrupt");
         }
 
-        m_exe_data = zdecompress(tmp_data);
+        m_exe_data = zdecompress(gsl::make_span<const char>(exe_begin, exe_size));
     }
 
     // Check existence of tag section.
@@ -59,36 +56,27 @@ PSFFile2::PSFFile2(const RawFile &file) {
     uint32_t tag_section_size = fileSize - tag_section_offset;
     bool valid_tag_section = false;
     if (tag_section_size >= PSF_TAG_SIG_LEN) {
-        uint8_t tagSig[5];
-        file.GetBytes(tag_section_offset, PSF_TAG_SIG_LEN, tagSig);
-        if (memcmp(tagSig, PSF_TAG_SIG, PSF_TAG_SIG_LEN) == 0) {
-            valid_tag_section = true;
-        }
+        valid_tag_section =
+            std::equal(file.begin() + tag_section_offset,
+                       file.begin() + tag_section_offset + tag_section_size, PSF_TAG_SIG);
     }
 
     if (valid_tag_section) {
-        std::vector<char> tag_section;
-        tag_section.resize(tag_section_size);
-        file.GetBytes(tag_section_offset, tag_section_size, tag_section.data());
-        tag_section.push_back('\0');
-        parseTags(tag_section);
+        parseTags(gsl::make_span<const char>(file.begin() + tag_section_offset, tag_section_size));
     }
 }
 
-void PSFFile2::parseTags(std::vector<char> &tag_section) {
+void PSFFile2::parseTags(gsl::span<const char> tag_section) {
     size_t needle = PSF_TAG_SIG_LEN;
     while (needle < tag_section.size()) {
         // Search the end position of the current line.
-        auto line_end = std::find(std::begin(tag_section) + needle, std::end(tag_section), 0x0A);
+        auto line_end = std::find(std::begin(tag_section) + needle,
+                                  std::begin(tag_section) + tag_section.size(), 0x0A);
         if (line_end == std::end(tag_section)) {
             // Tag section must end with a newline.
             // Read the all remaining bytes if a newline lacks though.
             line_end = std::begin(tag_section) + tag_section.size() - 1;
         }
-
-        // Replace the newline with NUL,
-        // for better C string function compatibility.
-        *line_end = '\0';
 
         // Search the variable=value separator.
         auto separator_token =
@@ -134,7 +122,7 @@ void PSFFile2::parseTags(std::vector<char> &tag_section) {
             it->second += "\n";
             it->second += value;
         } else {
-            m_tags.insert(it, make_pair(name, value));
+            m_tags.insert(it, make_pair(std::move(name), std::move(value)));
         }
 
         needle = line_end + 1 - std::begin(tag_section);

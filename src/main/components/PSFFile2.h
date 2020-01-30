@@ -11,6 +11,7 @@
 #include <string>
 #include <cassert>
 #include <climits>
+#include <gsl-lite.hpp>
 
 class RawFile;
 
@@ -59,5 +60,5 @@ class PSFFile2 {
     std::vector<char> m_reserved_data;
     std::map<std::string, std::string> m_tags;
 
-    void parseTags(std::vector<char> &tag_section);
+    void parseTags(gsl::span<const char> data);
 };
