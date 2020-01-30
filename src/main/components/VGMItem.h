@@ -96,11 +96,11 @@ class VGMFile;
 class VGMItem;
 class VGMHeader;
 
-typedef struct _ItemSet {
+struct ItemSet {
     VGMItem *item;
     VGMItem *parent;
     const char *itemName;
-} ItemSet;
+};
 
 enum ItemType { ITEMTYPE_UNDEFINED, ITEMTYPE_VGMFILE, ITEMTYPE_SEQEVENT };
 
