@@ -54,6 +54,7 @@ matrix:
             - sourceline: 'deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main'
               key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
           packages:
+            - g++-9
             - clang-9
       env:
         - MATRIX_EVAL="CC=clang-9 CXX=clang++-9 MAKE_APPIMAGE=0"

@@ -29,6 +29,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 option(ENABLE_ASAN "Enable address sanitizer" OFF)
 option(ENABLE_TESTING "Enable unit testing" ON)
 option(ENABLE_UI_QT "Build the UI (Qt)" ON)
+option(ENABLE_LIBCPP "Build using libc++" OFF)
 
 #
 # Compiler and build settings
@@ -78,7 +79,7 @@ else()
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_link_libraries(g_options INTERFACE stdc++fs)
   else()
-    if(LIBCPP)
+    if(ENABLE_LIBCPP)
       target_compile_options(g_options INTERFACE -stdlib=libc++)
     else()
       target_link_libraries(g_options INTERFACE stdc++fs)
