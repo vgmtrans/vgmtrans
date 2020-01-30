@@ -1,7 +1,7 @@
 #include <catch.hpp>
 #include <fstream>
 
-#include "loaders/PSFFile2.h"
+#include "components/PSFFile2.h"
 #include "io/RawFile.h"
 
 TEST_CASE("0-sized exe sections") {
