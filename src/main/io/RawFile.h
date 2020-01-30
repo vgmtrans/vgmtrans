@@ -10,6 +10,9 @@
 #include <filesystem>
 #include <vector>
 #include <memory>
+#include <climits>
+#include <cassert>
+
 #include "mio.hpp"
 
 #include "util/common.h"
