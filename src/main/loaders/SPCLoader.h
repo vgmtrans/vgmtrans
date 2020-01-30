@@ -5,8 +5,8 @@
  */
 #pragma once
 
-#include "loaders/FileLoader.h"
-#include "loaders/LoaderManager.h"
+#include "components/FileLoader.h"
+#include "LoaderManager.h"
 
 class SPCLoader : public FileLoader {
    public:

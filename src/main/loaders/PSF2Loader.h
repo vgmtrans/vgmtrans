@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include "FileLoader.h"
+#include "components/FileLoader.h"
 #include "LoaderManager.h"
 
 class PSF2Loader final : public FileLoader {

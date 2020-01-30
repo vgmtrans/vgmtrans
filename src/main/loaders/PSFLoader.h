@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "FileLoader.h"
+#include "components/FileLoader.h"
 #include "LoaderManager.h"
 
 class PSFFile2;

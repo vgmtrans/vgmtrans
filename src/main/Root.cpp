@@ -12,7 +12,7 @@
 #include "Format.h"
 #include "Scanner.h"
 
-#include "loaders/FileLoader.h"
+#include "components/FileLoader.h"
 #include "loaders/LoaderManager.h"
 
 VGMRoot *pRoot;
@@ -145,7 +145,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
         auto &vgmfiles = (*file)->containedVGMFiles();
         auto size = vgmfiles.size();
         for (size_t i = 0; i < size; i++) {
-            pRoot->RemoveVGMFile(vgmfiles.front().get(), true);
+            RemoveVGMFile(vgmfiles.front().get(), true);
         }
 
         vRawFile.erase(file);

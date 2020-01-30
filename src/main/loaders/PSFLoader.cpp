@@ -7,9 +7,10 @@
 #include "PSFLoader.h"
 
 #include <unordered_map>
-#include "PSFFile2.h"
 #include <fmt/compile.h>
 #include <fmt/format.h>
+
+#include "components/PSFFile2.h"
 
 constexpr int PSF1_VERSION = 0x1;
 constexpr int GSF_VERSION = 0x22;

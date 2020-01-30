@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <zlib.h>
 
+#include "io/RawFile.h"
+
 PSFFile2::PSFFile2(const RawFile &file) {
     uint32_t fileSize = file.size();
     if (fileSize < 0x10) {

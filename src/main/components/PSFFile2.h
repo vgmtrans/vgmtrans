@@ -8,8 +8,9 @@
 #include <cstdint>
 #include <vector>
 #include <map>
+#include <string>
 
-#include "RawFile.h"
+class RawFile;
 
 constexpr auto PSF_TAG_SIG = "[TAG]";
 constexpr auto PSF_TAG_SIG_LEN = 5;
