@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
 #include "SynthFile.h"
 #include "VGMItem.h"
 #include "Loop.h"
@@ -22,7 +23,7 @@ class VGMRgn : public VGMContainerItem {
            const std::string &name = "Region");
     VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
            uint8_t velLow, uint8_t velHigh, int sampNum, const std::string &name = "Region");
-    ~VGMRgn(void);
+    ~VGMRgn();
 
     virtual bool LoadRgn() { return true; }
 
@@ -30,7 +31,7 @@ class VGMRgn : public VGMContainerItem {
     // VGMSamp* AddSamp(void);
     void SetRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
     void SetUnityKey(uint8_t unityNote);
-    void SetSampNum(uint8_t sampNumber);
+    void SetSampNum(size_t sampNumber);
     void SetLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength);
     void SetADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
                  uint16_t rls_transform, long release_time);
@@ -118,7 +119,7 @@ class VGMRgnItem : public VGMItem {
         RIT_PAN,
         RIT_VOL,
         RIT_SAMPNUM
-    };  // HIT = Header Item Type
+    };
 
     VGMRgnItem(VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length,
                const std::string &name);
@@ -127,12 +128,3 @@ class VGMRgnItem : public VGMItem {
    public:
     RgnItemType type;
 };
-
-/*
-class VGMArt :
-        public VGMItem
-{
-public:
-        VGMArt();
-        ~VGMArt();
-};*/

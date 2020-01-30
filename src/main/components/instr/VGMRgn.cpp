@@ -76,7 +76,7 @@ void VGMRgn::SetUnityKey(uint8_t theUnityKey) {
     unityKey = theUnityKey;
 }
 
-void VGMRgn::SetSampNum(uint8_t sampNumber) {
+void VGMRgn::SetSampNum(size_t sampNumber) {
     sampNum = sampNumber;
 }
 
@@ -156,8 +156,7 @@ void VGMRgn::AddKeyHigh(uint8_t kh, uint32_t offset, uint32_t length) {
 
 void VGMRgn::AddVelLow(uint8_t vl, uint32_t offset, uint32_t length) {
     velLow = vl;
-    items.push_back(
-        new VGMRgnItem(this, VGMRgnItem::RIT_VELLOW, offset, length, "Vel Range: Low"));
+    items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_VELLOW, offset, length, "Vel Range: Low"));
 }
 
 void VGMRgn::AddVelHigh(uint8_t vh, uint32_t offset, uint32_t length) {
@@ -168,8 +167,7 @@ void VGMRgn::AddVelHigh(uint8_t vh, uint32_t offset, uint32_t length) {
 
 void VGMRgn::AddSampNum(int sn, uint32_t offset, uint32_t length) {
     sampNum = sn;
-    items.push_back(
-        new VGMRgnItem(this, VGMRgnItem::RIT_SAMPNUM, offset, length, "Sample Number"));
+    items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_SAMPNUM, offset, length, "Sample Number"));
 }
 
 // **********
