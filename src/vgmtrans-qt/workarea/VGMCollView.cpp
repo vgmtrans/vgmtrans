@@ -26,6 +26,10 @@ int VGMCollViewModel::rowCount(const QModelIndex &parent) const {
 QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
     VGMFile *file = fileFromIndex(index);
 
+    if (!file) {
+        return QVariant{};
+    }
+
     if (role == Qt::DisplayRole) {
         return QString::fromStdString(*file->GetName());
     } else if (role == Qt::DecorationRole) {
@@ -47,27 +51,28 @@ void VGMCollViewModel::handleNewCollSelected(QModelIndex modelIndex) {
 }
 
 VGMFile *VGMCollViewModel::fileFromIndex(QModelIndex index) const {
-    VGMFile *file;
     auto row = index.row();
     auto num_instrsets = m_coll->instrsets.size();
     auto num_sampcolls = m_coll->sampcolls.size();
     auto num_miscfiles = m_coll->miscfiles.size();
+
     if (row < num_miscfiles) {
-        file = m_coll->miscfiles[row];
-    } else {
-        row -= num_miscfiles;
-        if (row < num_sampcolls) {
-            file = m_coll->instrsets[row];
-        } else {
-            row -= num_instrsets;
-            if (row < num_sampcolls) {
-                file = m_coll->sampcolls[row];
-            } else {
-                file = m_coll->seq;
-            }
-        }
+        return m_coll->miscfiles[row];
     }
-    return file;
+
+    row -= num_miscfiles;
+    if (row < num_instrsets) {
+        return m_coll->instrsets[row];
+    }
+
+    row -= num_instrsets;
+    if (row < num_sampcolls) {
+        return m_coll->sampcolls[row];
+    } else {
+        return m_coll->seq;
+    }
+
+    return nullptr;
 }
 
 VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
