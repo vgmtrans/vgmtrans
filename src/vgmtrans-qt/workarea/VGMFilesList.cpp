@@ -160,21 +160,10 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
     }
 
     auto vgmfile_menu = new QMenu();
-    vgmfile_menu->addAction("Close", [file]() { qtVGMRoot.RemoveVGMFile(file); });
-    vgmfile_menu->addAction("Save as raw", [file]() {
-        std::string filepath = qtVGMRoot.UI_GetSaveFilePath("");
-        if (!filepath.empty()) {
-            u8 *buf = new u8[file->size()];
-            file->GetBytes(file->dwOffset, file->unLength, buf);
-            qtVGMRoot.UI_WriteBufferToFile(filepath, buf, file->unLength);
-            delete[] buf;
-        }
-    });
 
-    /*
-    std::vector<const wchar_t *> *menu_item_names = file->GetMenuItemNames();
+    auto menu_item_names = file->GetMenuItemNames();
     for (auto &menu_item : *menu_item_names) {
-        vgmfile_menu->addAction(QString::fromStdWString(menu_item));
+        vgmfile_menu->addAction(QString::fromStdString(menu_item));
     }
 
     QAction *performed_action = vgmfile_menu->exec(mapToGlobal(pos));
@@ -186,9 +175,9 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
         }
         action_index++;
     }
-    */
+
     vgmfile_menu->exec(mapToGlobal(pos));
-    // menu->deleteLater();
+    vgmfile_menu->deleteLater();
 }
 
 void VGMFilesList::keyPressEvent(QKeyEvent *input) {

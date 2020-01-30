@@ -21,21 +21,11 @@ enum FileType {
     FILETYPE_MISC
 };
 
-// MACROS
-
-/*#define USING_FORMAT(fmt_id)									\
-        public:
-   \
-        virtual Format* GetFormat() \
-        {
-   \
-                return pRoot->GetFormat(fmt_id);						\
-        }
-*/
-
 class VGMFile : public VGMContainerItem {
    public:
     BEGIN_MENU(VGMFile)
+    MENU_ITEM(VGMFile, OnClose, "Close")
+    MENU_ITEM(VGMFile, OnSaveAsRaw, "Dump raw format")
     END_MENU()
 
    public:
@@ -116,21 +106,21 @@ class VGMFile : public VGMContainerItem {
             return data.IsValidOffset(offset);
     }
 
-    inline uint32_t GetStartOffset() {
+    inline size_t GetStartOffset() {
         if (bUsingRawFile)
             return 0;
         else
             return data.startOff;
     }
 
-    inline uint32_t GetEndOffset() {
+    inline size_t GetEndOffset() {
         if (bUsingRawFile)
             return rawfile->size();
         else
             return data.endOff;
     }
 
-    inline unsigned long size() {
+    inline size_t size() {
         if (bUsingRawFile)
             return rawfile->size();
         else
