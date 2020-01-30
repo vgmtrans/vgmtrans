@@ -13,14 +13,56 @@ dist: xenial
 matrix:
   include:
     - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-9
+      env:
+        - MATRIX_EVAL="CC=gcc-9 CXX=g++-9 MAKE_APPIMAGE=1"
       before_install:
+        - eval "${MATRIX_EVAL}"
         - sudo add-apt-repository ppa:janisozaur/cmake-update -y
         - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
         - sudo add-apt-repository ppa:beineri/opt-qt-5.11.1-xenial -y
         - sudo apt-get update -qq
-        - sudo apt-get -y install g++-8 qt511base libfluidsynth-dev libgl1-mesa-dev cmake ninja-build        
-        - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
+        - sudo apt-get -y install qt511base libfluidsynth-dev libgl1-mesa-dev cmake ninja-build        
         - source /opt/qt*/bin/qt*-env.sh
+        - CMAKE_FLAGS="-DENABLE_TESTING=0"
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-9
+      env:
+        - MATRIX_EVAL="CC=gcc-9 CXX=g++-9 MAKE_APPIMAGE=0"
+      before_install:
+        - eval "${MATRIX_EVAL}"
+        - sudo add-apt-repository ppa:janisozaur/cmake-update -y
+        - sudo apt-get update -qq
+        - sudo apt-get -y install cmake ninja-build
+        - CMAKE_FLAGS="-DENABLE_UI_QT=0 -DENABLE_TESTING=1"
+    - os: linux
+      compiler: clang
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - sourceline: 'deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main'
+              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+          packages:
+            - clang-9
+      env:
+        - MATRIX_EVAL="CC=clang-9 CXX=clang++-9 MAKE_APPIMAGE=0"
+      before_install:
+        - eval "${MATRIX_EVAL}"
+        - sudo add-apt-repository ppa:janisozaur/cmake-update -y
+        - sudo apt-get update -qq
+        - sudo apt-get -y install cmake ninja-build
+        - CMAKE_FLAGS="-DENABLE_UI_QT=0 -DENABLE_TESTING=1"
     - os: osx
       osx_image: xcode10.2
       before_install:
@@ -28,6 +70,7 @@ matrix:
         - brew upgrade cmake || brew install cmake
         - brew upgrade ninja || brew install ninja
         - brew upgrade fluid-synth || brew install fluid-synth
+        - CMAKE_FLAGS="-DENABLE_TESTING=0"
         # This image contains Qt5.12, and we're fine with that for now
         #- brew upgrade qt || brew install qt
 
@@ -38,19 +81,21 @@ script:
     fi
   - mkdir build && cd build
   - if [ $TRAVIS_OS_NAME = linux ]; then
-      cmake -DCMAKE_BUILD_TYPE=Release  -DENABLE_TESTING=0 -DCMAKE_INSTALL_PREFIX=/usr/bin -GNinja .. ;
+      cmake -DCMAKE_BUILD_TYPE=Release ${CMAKE_FLAGS} -DCMAKE_INSTALL_PREFIX=/usr/bin -GNinja .. ;
       ninja -j$(nproc) ;
-      DESTDIR=appdir ninja -j$(nproc) install ; find appdir/ ;
-      wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage" ;
-      chmod a+x linuxdeployqt-continuous-x86_64.AppImage ;
-      mkdir -p appdir/usr/share ;
-      cp ../data/vgmtrans.desktop appdir/usr/share ;
-      cp ../data/mame_roms.xml appdir/usr/bin ;
-      cp ../src/vgmtrans-qt/resources/images/logo.png appdir/usr/share/default.png ;
-      ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage ;
+      if [ $MAKE_APPIMAGE -eq 1]; then
+        DESTDIR=appdir ninja -j$(nproc) install ; find appdir/ ;
+        wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage" ;
+        chmod a+x linuxdeployqt-continuous-x86_64.AppImage ;
+        mkdir -p appdir/usr/share ;
+        cp ../data/vgmtrans.desktop appdir/usr/share ;
+        cp ../data/mame_roms.xml appdir/usr/bin ;
+        cp ../src/vgmtrans-qt/resources/images/logo.png appdir/usr/share/default.png ;
+        ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage ;
+      fi
     fi
   - if [ $TRAVIS_OS_NAME = osx ]; then
-      CC=gcc-9 CXX=g++-9 cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
+      cmake -DCMAKE_C_COMPILER=gcc-9 -DCMAKE_CXX_COMPILER=g++-9 -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=0 -GNinja .. ;
       ninja -j$(sysctl -n hw.physicalcpu) ;
       cp ../data/mame_roms.xml src/vgmtrans-qt/VGMTrans.app/Contents/MacOS/ ;
       /usr/local/opt/qt5/bin/macdeployqt src/vgmtrans-qt/VGMTrans.app -dmg -always-overwrite ;
