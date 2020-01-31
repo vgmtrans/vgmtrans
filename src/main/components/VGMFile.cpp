@@ -16,11 +16,9 @@ VGMFile::VGMFile(FileType fileType, const string &fmt, RawFile *theRawFile, uint
                  uint32_t length, string theName)
     : VGMContainerItem(this, offset, length),
       rawfile(theRawFile),
-      bUsingRawFile(true),
-      bUsingCompressedLocalData(false),
       format(fmt),
       file_type(fileType),
-      name(theName),
+      m_name(theName),
       id(-1) {}
 
 VGMFile::~VGMFile(void) {}
@@ -40,7 +38,7 @@ bool VGMFile::OnClose() {
 }
 
 bool VGMFile::OnSaveAsRaw() {
-    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name));
+    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name));
     if (filepath.length() != 0) {
         bool result;
         uint8_t *buf = new uint8_t[unLength];  // create a buffer the size of the file
@@ -64,7 +62,7 @@ bool VGMFile::LoadVGMFile() {
     if (fmt)
         fmt->OnNewFile(this);
 
-    L_INFO("Loaded file '{}'", (name));
+    L_INFO("Loaded file '{}'", m_name);
     return val;
 }
 
@@ -77,7 +75,7 @@ const string &VGMFile::GetFormatName() {
 }
 
 const string *VGMFile::GetName(void) const {
-    return &name;
+    return &m_name;
 }
 
 void VGMFile::AddCollAssoc(VGMColl *coll) {
@@ -96,25 +94,6 @@ RawFile *VGMFile::GetRawFile() {
     return rawfile;
 }
 
-void VGMFile::LoadLocalData() {
-    assert(unLength <
-           1024 * 1024 * 256);  // sanity check... we're probably not allocating more than 256mb
-    data.clear();
-    data.alloc(unLength);
-    rawfile->GetBytes(dwOffset, unLength, data.data);
-    data.startOff = dwOffset;
-    data.endOff = dwOffset + unLength;
-    data.size = unLength;
-}
-
-void VGMFile::UseLocalData() {
-    bUsingRawFile = false;
-}
-
-void VGMFile::UseRawFileData() {
-    bUsingRawFile = true;
-}
-
 uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
     // if unLength != 0, verify that we're within the bounds of the file, and truncate num read
     // bytes to end of file
@@ -125,16 +104,9 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
             nCount = endOff - nIndex;
     }
 
-    if (bUsingRawFile)
-        return rawfile->GetBytes(nIndex, nCount, pBuffer);
-    else {
-        if ((nIndex + nCount) > data.endOff)
-            nCount = data.endOff - nIndex;
+    return rawfile->GetBytes(nIndex, nCount, pBuffer);
 
-        assert(nIndex >= data.startOff && (nIndex + nCount <= data.endOff));
-        memcpy(pBuffer, data.data + nIndex - data.startOff, nCount);
-        return nCount;
-    }
+    return nCount;
 }
 
 // *********

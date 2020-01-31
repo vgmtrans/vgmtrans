@@ -5,7 +5,6 @@
  */
 #pragma once
 #include "VGMItem.h"
-#include "DataSeg.h"
 #include "RawFile.h"
 #include "Menu.h"
 
@@ -32,7 +31,7 @@ class VGMFile : public VGMContainerItem {
     VGMFile(FileType fileType, /*FmtID fmtID,*/
             const std::string &format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
             std::string theName = "VGM File");
-    virtual ~VGMFile(void);
+    virtual ~VGMFile();
 
     virtual ItemType GetType() const { return ITEMTYPE_VGMFILE; }
     FileType GetFileType() { return file_type; }
@@ -55,92 +54,37 @@ class VGMFile : public VGMContainerItem {
     void AddCollAssoc(VGMColl *coll);
     void RemoveCollAssoc(VGMColl *coll);
     RawFile *GetRawFile();
-    void LoadLocalData();
-    void UseLocalData();
-    void UseRawFileData();
 
-   public:
+    size_t size() const noexcept { return unLength; }
+    std::string name() const noexcept { return m_name; }
+
     uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer);
 
-    inline uint8_t GetByte(uint32_t offset) {
-        if (bUsingRawFile)
-            return rawfile->GetByte(offset);
-        else
-            return data[offset];
-    }
+    inline uint8_t GetByte(uint32_t offset) const { return rawfile->GetByte(offset); }
+    inline uint16_t GetShort(uint32_t offset) const { return rawfile->GetShort(offset); }
+    inline uint32_t GetWord(uint32_t offset) const { return rawfile->GetWord(offset); }
+    inline uint16_t GetShortBE(uint32_t offset) const { return rawfile->GetShortBE(offset); }
+    inline uint32_t GetWordBE(uint32_t offset) const { return rawfile->GetWordBE(offset); }
+    inline bool IsValidOffset(uint32_t offset) const { return rawfile->IsValidOffset(offset); }
 
-    inline uint16_t GetShort(uint32_t offset) {
-        if (bUsingRawFile)
-            return rawfile->GetShort(offset);
-        else
-            return data.GetShort(offset);
-    }
+    size_t GetStartOffset() { return dwOffset; }
+    /*
+     * For whatever reason, you can create null-length VGMItems.
+     * The only safe way for now is to
+     * assume maximum length
+     */
+    size_t GetEndOffset() { return rawfile->size(); }
 
-    inline uint32_t GetWord(uint32_t offset) {
-        if (bUsingRawFile)
-            return rawfile->GetWord(offset);
-        else
-            return data.GetWord(offset);
-    }
+    const char *data() const { return rawfile->data() + dwOffset; }
 
-    // GetShort Big Endian
-    inline uint16_t GetShortBE(uint32_t offset) {
-        if (bUsingRawFile)
-            return rawfile->GetShortBE(offset);
-        else
-            return data.GetShortBE(offset);
-    }
-
-    // GetWord Big Endian
-    inline uint32_t GetWordBE(uint32_t offset) {
-        if (bUsingRawFile)
-            return rawfile->GetWordBE(offset);
-        else
-            return data.GetWordBE(offset);
-    }
-
-    inline bool IsValidOffset(uint32_t offset) {
-        if (bUsingRawFile)
-            return rawfile->IsValidOffset(offset);
-        else
-            return data.IsValidOffset(offset);
-    }
-
-    inline size_t GetStartOffset() {
-        if (bUsingRawFile)
-            return 0;
-        else
-            return data.startOff;
-    }
-
-    inline size_t GetEndOffset() {
-        if (bUsingRawFile)
-            return rawfile->size();
-        else
-            return data.endOff;
-    }
-
-    inline size_t size() {
-        if (bUsingRawFile)
-            return rawfile->size();
-        else
-            return data.size;
-    }
-
-    inline uint8_t *rawData() { return data.data; }
+    RawFile *rawfile;
+    std::list<VGMColl *> assocColls;
 
    protected:
-    DataSeg data, col;
     FileType file_type;
     const std::string &format;
     uint32_t id;
-    std::string name;
-
-   public:
-    RawFile *rawfile;
-    std::list<VGMColl *> assocColls;
-    bool bUsingRawFile;
-    bool bUsingCompressedLocalData;
+    std::string m_name;
 };
 
 // *********
