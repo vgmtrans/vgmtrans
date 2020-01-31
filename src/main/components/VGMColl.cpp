@@ -156,39 +156,48 @@ bool VGMColl::CreateDLSFile(DLSFile &dls) {
 
 SF2File *VGMColl::CreateSF2File() {
     SynthFile *synthfile = CreateSynthFile();
-    if (synthfile == NULL)
-        return NULL;
+    if (!synthfile) {
+        L_ERROR("SF2 conversion for '{}' aborted", name);
+        return nullptr;
+    }
+
     SF2File *sf2file = new SF2File(synthfile);
     delete synthfile;
     return sf2file;
 }
 
 bool VGMColl::MainDLSCreation(DLSFile &dls) {
-    vector<VGMSamp *> finalSamps;
-    // we have to collect the finalSampColls in case sampcolls is empty but there are multiple
-    // instrSets with embedded sampcolls
-    vector<VGMSampColl *> finalSampColls;
-
-    if (!instrsets.size() /*|| !sampcolls.size()*/)
+    if (instrsets.empty()) {
+        L_ERROR("{} has no instruments", name);
         return false;
+    }
 
-    // if there are independent SampColl(s) in the collection
-    if (sampcolls.size()) {
-        for (uint32_t sam = 0; sam < sampcolls.size(); sam++) {
+    /* FIXME: shared_ptr eventually */
+    SynthFile *synthfile = new SynthFile("SynthFile");
+
+    std::vector<VGMSamp *> finalSamps;
+    std::vector<VGMSampColl *> finalSampColls;
+
+    /* Grab samples either from the local sampcolls or from the instrument sets */
+    if (!sampcolls.empty()) {
+        for (int sam = 0; sam < sampcolls.size(); sam++) {
             finalSampColls.push_back(sampcolls[sam]);
             UnpackSampColl(dls, sampcolls[sam], finalSamps);
         }
-    }
-    // otherwise, the SampColl(s) are children of the InstrSet(s)
-    else {
-        for (uint32_t i = 0; i < instrsets.size(); i++) {
-            finalSampColls.push_back(instrsets[i]->sampColl);
-            UnpackSampColl(dls, instrsets[i]->sampColl, finalSamps);
+    } else {
+        for (int i = 0; i < instrsets.size(); i++) {
+            auto instrset_sampcoll = instrsets[i]->sampColl;
+            if (instrset_sampcoll) {
+                finalSampColls.push_back(instrset_sampcoll);
+                UnpackSampColl(dls, instrset_sampcoll, finalSamps);
+            }
         }
     }
 
-    if (finalSamps.size() == 0)
+    if (finalSamps.empty()) {
+        L_ERROR("No sample collection present for '{}'", name);
         return false;
+    }
 
     for (size_t inst = 0; inst < instrsets.size(); inst++) {
         VGMInstrSet *set = instrsets[inst];
@@ -200,8 +209,8 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
             DLSInstr *newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum, name);
             for (uint32_t j = 0; j < nRgns; j++) {
                 VGMRgn *rgn = vgminstr->aRgns[j];
-                //				if (rgn->sampNum+1 > sampColl->samples.size())	//does
-                //thereferenced sample exist? 					continue;
+                //				if (rgn->sampNum+1 > sampColl->samples.size())
+                ////does thereferenced sample exist? 					continue;
 
                 // Determine the SampColl associated with this rgn.  If there's an explicit pointer
                 // to it, use that.
@@ -238,7 +247,9 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
                         }
                     }
                     if (!bFoundIt) {
-                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset {}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
+                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset "
+                                "{}, Instr {}, Region {})",
+                                rgn->sampOffset, inst, i, j);
                         realSampNum = 0;
                     }
                 }
@@ -247,7 +258,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
                     realSampNum = rgn->sampNum;
 
                 // Determine the sampCollNum (index into our finalSampColls vector)
-                unsigned int sampCollNum;
+                unsigned int sampCollNum = 0;
                 for (unsigned int k = 0; k < finalSampColls.size(); k++) {
                     if (finalSampColls[k] == sampColl)
                         sampCollNum = k;
@@ -270,11 +281,13 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
                 //	}
                 //}
                 // if (rgn->sampCollNum != -1)		//if a sampCollNum is defined
-                //{									//then sampNum represents
-                //the sample number in the specific sample collection 	for (int k=0; k <
-                //rgn->sampCollNum; k++) 		realSampNum += finalSampColls[k]->samples.size();
+                //{									//then
+                // sampNum represents
+                // the sample number in the specific sample collection 	for (int k=0; k <
+                // rgn->sampCollNum; k++) 		realSampNum +=
+                // finalSampColls[k]->samples.size();
                 ////so now we add all previous sample collection samples to the value to get the
-                //real (absolute) sampNum
+                // real (absolute) sampNum
                 //}
 
                 DLSRgn *newRgn = newInstr->AddRgn();
@@ -365,36 +378,37 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
 }
 
 SynthFile *VGMColl::CreateSynthFile() {
-    SynthFile *synthfile = new SynthFile("SynthFile" /**this->instrsets[0]->GetName()*/);
-
-    vector<VGMSamp *> finalSamps;
-    // we have to collect the finalSampColls in case sampcolls is empty but there are multiple
-    // instrSets with embedded sampcolls
-    vector<VGMSampColl *> finalSampColls;
-
-    if (!instrsets.size() /*|| !sampcolls.size()*/) {
-        delete synthfile;
-        return NULL;
+    if (instrsets.empty()) {
+        L_ERROR("{} has no instruments", name);
+        return nullptr;
     }
 
-    // if there are independent SampColl(s) in the collection
-    if (sampcolls.size()) {
-        for (uint32_t sam = 0; sam < sampcolls.size(); sam++) {
+    /* FIXME: shared_ptr eventually */
+    SynthFile *synthfile = new SynthFile("SynthFile");
+
+    std::vector<VGMSamp *> finalSamps;
+    std::vector<VGMSampColl *> finalSampColls;
+
+    /* Grab samples either from the local sampcolls or from the instrument sets */
+    if (!sampcolls.empty()) {
+        for (int sam = 0; sam < sampcolls.size(); sam++) {
             finalSampColls.push_back(sampcolls[sam]);
             UnpackSampColl(*synthfile, sampcolls[sam], finalSamps);
         }
-    }
-    // otherwise, the SampColl(s) are children of the InstrSet(s)
-    else {
-        for (uint32_t i = 0; i < instrsets.size(); i++) {
-            finalSampColls.push_back(instrsets[i]->sampColl);
-            UnpackSampColl(*synthfile, instrsets[i]->sampColl, finalSamps);
+    } else {
+        for (int i = 0; i < instrsets.size(); i++) {
+            auto instrset_sampcoll = instrsets[i]->sampColl;
+            if (instrset_sampcoll) {
+                finalSampColls.push_back(instrset_sampcoll);
+                UnpackSampColl(*synthfile, instrset_sampcoll, finalSamps);
+            }
         }
     }
 
-    if (finalSamps.size() == 0) {
+    if (finalSamps.empty()) {
+        L_ERROR("No sample collection present for '{}'", name);
         delete synthfile;
-        return NULL;
+        return nullptr;
     }
 
     for (size_t inst = 0; inst < instrsets.size(); inst++) {
@@ -408,8 +422,8 @@ SynthFile *VGMColl::CreateSynthFile() {
             SynthInstr *newInstr = synthfile->AddInstr(vgminstr->bank, vgminstr->instrNum);
             for (uint32_t j = 0; j < nRgns; j++) {
                 VGMRgn *rgn = vgminstr->aRgns[j];
-                //				if (rgn->sampNum+1 > sampColl->samples.size())	//does
-                //thereferenced sample exist? 					continue;
+                //				if (rgn->sampNum+1 > sampColl->samples.size())
+                ////does thereferenced sample exist? 					continue;
 
                 // Determine the SampColl associated with this rgn.  If there's an explicit pointer
                 // to it, use that.
@@ -446,7 +460,9 @@ SynthFile *VGMColl::CreateSynthFile() {
                         }
                     }
                     if (!bFoundIt) {
-                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset {}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
+                        L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset "
+                                "{}, Instr {}, Region {})",
+                                rgn->sampOffset, inst, i, j);
                         realSampNum = 0;
                     }
                 }
@@ -455,8 +471,8 @@ SynthFile *VGMColl::CreateSynthFile() {
                     realSampNum = rgn->sampNum;
 
                 // Determine the sampCollNum (index into our finalSampColls vector)
-                unsigned int sampCollNum = finalSampColls.size();
-                for (uint32_t i = 0; i < finalSampColls.size(); i++) {
+                auto sampCollNum = finalSampColls.size();
+                for (size_t i = 0; i < finalSampColls.size(); i++) {
                     if (finalSampColls[i] == sampColl)
                         sampCollNum = i;
                 }
@@ -608,7 +624,7 @@ bool VGMColl::OnSaveAllDLS() {
     filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".dls";
     if (CreateDLSFile(dlsfile)) {
         if (!dlsfile.SaveDLSFile(filepath))
-             L_ERROR("Failed to save DLS file");
+            L_ERROR("Failed to save DLS file");
     } else {
         L_ERROR("Failed creating DLS instance");
     }
