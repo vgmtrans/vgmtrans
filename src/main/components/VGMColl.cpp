@@ -528,7 +528,7 @@ SynthFile *VGMColl::CreateSynthFile() {
                 } else
                     sampInfo->SetLoopInfo(rgn->loop, samp);
 
-                uint8_t realUnityKey;
+                int8_t realUnityKey;
                 if (rgn->unityKey == -1)
                     realUnityKey = samp->unityKey;
                 else

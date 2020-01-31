@@ -58,7 +58,7 @@ class VGMSamp : public VGMItem {
     bool bPSXLoopInfoPrioritizing;
     Loop loop;
 
-    uint8_t unityKey;
+    int8_t unityKey;
     short fineTune;
     double
         volume;  // as percent of full volume.  This will be converted to attenuation for SynthFile
