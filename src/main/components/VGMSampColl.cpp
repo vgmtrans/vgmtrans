@@ -72,7 +72,6 @@ bool VGMSampColl::Load() {
         }
     }
 
-    UseRawFileData();
     if (!parInstrSet)
         pRoot->AddVGMFile(this);
     bLoaded = true;
@@ -100,8 +99,7 @@ bool VGMSampColl::OnSaveAllAsWav() {
     string dirpath = pRoot->UI_GetSaveDirPath();
     if (dirpath.length() != 0) {
         for (uint32_t i = 0; i < samples.size(); i++) {
-            string filepath =
-                dirpath + "/" + ConvertToSafeFileName(samples[i]->sampName) + ".wav";
+            string filepath = dirpath + "/" + ConvertToSafeFileName(samples[i]->sampName) + ".wav";
             samples[i]->SaveAsWav(filepath);
         }
         return true;

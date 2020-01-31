@@ -48,7 +48,7 @@ bool WdsInstrSet::GetHeaderInfo() {
         version = VERSION_WDS;
 
     //バイナリエディタ表示用
-    name = fmt::format("wds {}", id);
+    m_name = fmt::format("wds {}", id);
 
     //ヘッダーobjectの生成
     VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(WdsHdr));

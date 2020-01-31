@@ -316,7 +316,7 @@ void VGMSeq::AddInstrumentRef(uint32_t progNum) {
 }
 
 bool VGMSeq::OnSaveAsMidi(void) {
-    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "mid");
+    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name), "mid");
     if (filepath.length() != 0)
         return SaveAsMidi(filepath);
     return false;

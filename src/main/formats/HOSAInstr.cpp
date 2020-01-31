@@ -37,7 +37,7 @@ bool HOSAInstrSet::GetHeaderInfo() {
     id = 0;  // Bank number.
 
     //バイナリエディタ表示用
-    name = "HOSAWAH";
+    m_name = "HOSAWAH";
 
     //ヘッダーobjectの生成
     VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(InstrHeader));

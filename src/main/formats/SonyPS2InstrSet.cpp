@@ -20,7 +20,7 @@ SonyPS2InstrSet::SonyPS2InstrSet(RawFile *file, uint32_t offset)
 SonyPS2InstrSet::~SonyPS2InstrSet(void) {}
 
 bool SonyPS2InstrSet::GetHeaderInfo() {
-    name = "Sony PS2 InstrSet";
+    m_name = "Sony PS2 InstrSet";
 
     // VERSION CHUNK
     uint32_t curOffset = dwOffset;

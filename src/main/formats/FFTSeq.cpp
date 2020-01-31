@@ -43,7 +43,7 @@ bool FFTSeq::GetHeaderInfo(void) {
     int titleLength = ptPercussionTbl - ptSongTitle;
     char *songtitle = new char[titleLength];
     GetBytes(dwOffset + ptSongTitle, titleLength, songtitle);
-    this->name = std::string(songtitle, songtitle + titleLength);
+    this->m_name = std::string(songtitle, songtitle + titleLength);
     delete[] songtitle;
 
     VGMHeader *hdr = AddHeader(dwOffset, 0x22);
@@ -116,7 +116,8 @@ void FFTTrack::ResetVars() {
 //--------------------------------------------------
 // Revisions:
 //	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "内蔵音源をMIDI変換するスレ(in
-//http://www.2ch.net)" 						Add un-known command(op-code).
+// http://www.2ch.net)" 						Add un-known
+// command(op-code).
 //--------------------------------------------------
 bool FFTTrack::ReadEvent(void) {
     uint32_t beginOffset = curOffset;
@@ -221,8 +222,7 @@ bool FFTTrack::ReadEvent(void) {
                 loop_counter[loop_layer] = 0;
                 loop_repeats[loop_layer] = loopCount - 1;
                 loop_octave[loop_layer] = octave;  // 1,Sep.2009 revise
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Begin", "",
-                                CLR_LOOP);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Begin", "", CLR_LOOP);
                 // AddEventItem("Loop Begin", ICON_STARTREP, beginOffset, curOffset-beginOffset,
                 // BG_CLR_WHEAT);
                 break;
@@ -260,8 +260,7 @@ bool FFTTrack::ReadEvent(void) {
 
                 // Repeat break on last repeat
             case 0x9A:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", "",
-                                CLR_LOOP);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", "", CLR_LOOP);
                 // AddEventItem("Loop Break", ICON_ENDREP, beginOffset, curOffset-beginOffset,
                 // BG_CLR_WHEAT);
 
@@ -290,8 +289,7 @@ bool FFTTrack::ReadEvent(void) {
             case 0xA2: {
                 uint8_t cTempoSlideTimes = GetByte(curOffset++);  // slide times [ticks]
                 uint8_t cTempoSlideTarget = (GetByte(curOffset++) * 256) / 218;  // Target Panpot
-                AddTempoBPM(beginOffset, curOffset - beginOffset, cTempoSlideTarget,
-                            "Tempo slide");
+                AddTempoBPM(beginOffset, curOffset - beginOffset, cTempoSlideTarget, "Tempo slide");
                 break;
             }
 
@@ -359,14 +357,12 @@ bool FFTTrack::ReadEvent(void) {
 
                 // Reverb On
             case 0xBA:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "",
-                                CLR_REVERB);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "", CLR_REVERB);
                 break;
 
                 // Reverb Off
             case 0xBB:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "",
-                                CLR_REVERB);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "", CLR_REVERB);
                 break;
 
                 //--------
@@ -374,8 +370,7 @@ bool FFTTrack::ReadEvent(void) {
 
                 // ADSR Reset
             case 0xC0:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Reset", "",
-                                CLR_ADSR);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Reset", "", CLR_ADSR);
                 break;
 
             case 0xC2:
@@ -458,15 +453,14 @@ bool FFTTrack::ReadEvent(void) {
                 // unknown
             case 0xD6:
                 curOffset++;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Detune?", "",
-                                CLR_PITCHBEND);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Detune?", "", CLR_PITCHBEND);
                 break;
 
                 // LFO Depth
             case 0xD7: {
                 uint8_t cPitchLFO_Depth = GetByte(curOffset++);  // slide times [ticks]
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Pitch bend)",
-                                "", CLR_LFO);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Pitch bend)", "",
+                                CLR_LFO);
                 break;
             }
 
@@ -475,8 +469,8 @@ bool FFTTrack::ReadEvent(void) {
                 uint8_t cPitchLFO_Decay2 = GetByte(curOffset++);
                 uint8_t cPitchLFO_Cycle = GetByte(curOffset++);
                 uint8_t cPitchLFO_Decay1 = GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Pitch bend)",
-                                "", CLR_LFO);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Pitch bend)", "",
+                                CLR_LFO);
                 break;
             }
 

@@ -31,10 +31,9 @@ const uint16_t RareSnesSeq::NOTE_PITCH_TABLE[128] = {
     0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff,
     0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff};
 
-RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdataOffset,
-                         string newName)
+RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdataOffset, string newName)
     : VGMSeq(RareSnesFormat::name, file, seqdataOffset), version(ver) {
-    name = newName;
+    m_name = newName;
 
     bLoadTickByTick = true;
     bAllowDiscontinuousTrackData = true;
@@ -624,8 +623,8 @@ bool RareSnesTrack::ReadEvent(void) {
 
             case EVENT_VIBRATO: {
                 curOffset += 4;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato",
-                                desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str().c_str(),
+                                CLR_MODULATION, ICON_CONTROL);
                 break;
             }
 
@@ -636,8 +635,8 @@ bool RareSnesTrack::ReadEvent(void) {
 
             case EVENT_TREMOLO: {
                 curOffset += 4;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo",
-                                desc.str().c_str(), CLR_MODULATION, ICON_CONTROL);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc.str().c_str(),
+                                CLR_MODULATION, ICON_CONTROL);
                 break;
             }
 
@@ -646,8 +645,8 @@ bool RareSnesTrack::ReadEvent(void) {
                 curOffset += 2;
                 spcADSR = newADSR;
 
-                desc << "ADSR: " << std::hex << std::setfill('0') << std::setw(4)
-                     << std::uppercase << (int)newADSR;
+                desc << "ADSR: " << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
+                     << (int)newADSR;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str().c_str(),
                                 CLR_ADSR, ICON_CONTROL);
                 break;
@@ -771,16 +770,16 @@ bool RareSnesTrack::ReadEvent(void) {
 
             case EVENT_SETALTNOTE1:
                 altNoteByte1 = GetByte(curOffset++);
-                desc << "Note: " << std::hex << std::setfill('0') << std::setw(2)
-                     << std::uppercase << (int)altNoteByte1;
+                desc << "Note: " << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                     << (int)altNoteByte1;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Alt Note 1",
                                 desc.str().c_str(), CLR_CHANGESTATE, ICON_NOTE);
                 break;
 
             case EVENT_SETALTNOTE2:
                 altNoteByte2 = GetByte(curOffset++);
-                desc << "Note: " << std::hex << std::setfill('0') << std::setw(2)
-                     << std::uppercase << (int)altNoteByte2;
+                desc << "Note: " << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
+                     << (int)altNoteByte2;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Alt Note 2",
                                 desc.str().c_str(), CLR_CHANGESTATE, ICON_NOTE);
                 break;
@@ -828,9 +827,9 @@ bool RareSnesTrack::ReadEvent(void) {
 
                 // add event without MIDI events
                 CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: "
-                     << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl << "  SR: "
-                     << (int)sr;
+                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR
+                     << "  AR: " << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl
+                     << "  SR: " << (int)sr;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 1",
                                 desc.str(), CLR_VOLUME, ICON_CONTROL);
                 break;
@@ -853,9 +852,9 @@ bool RareSnesTrack::ReadEvent(void) {
 
                 // add event without MIDI events
                 CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: "
-                     << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl << "  SR: "
-                     << (int)sr;
+                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR
+                     << "  AR: " << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl
+                     << "  SR: " << (int)sr;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 2",
                                 desc.str(), CLR_VOLUME, ICON_CONTROL);
                 break;
@@ -878,9 +877,9 @@ bool RareSnesTrack::ReadEvent(void) {
 
                 // add event without MIDI events
                 CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: "
-                     << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl << "  SR: "
-                     << (int)sr;
+                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR
+                     << "  AR: " << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl
+                     << "  SR: " << (int)sr;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 3",
                                 desc.str(), CLR_VOLUME, ICON_CONTROL);
                 break;
@@ -903,9 +902,9 @@ bool RareSnesTrack::ReadEvent(void) {
 
                 // add event without MIDI events
                 CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: "
-                     << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl << "  SR: "
-                     << (int)sr;
+                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR
+                     << "  AR: " << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl
+                     << "  SR: " << (int)sr;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 4",
                                 desc.str(), CLR_VOLUME, ICON_CONTROL);
                 break;
@@ -928,9 +927,9 @@ bool RareSnesTrack::ReadEvent(void) {
 
                 // add event without MIDI events
                 CalcVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: "
-                     << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl << "  SR: "
-                     << (int)sr;
+                desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR
+                     << "  AR: " << (int)ar << "  DR: " << (int)dr << "  SL: " << (int)sl
+                     << "  SR: " << (int)sr;
                 AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 5",
                                 desc.str(), CLR_VOLUME, ICON_CONTROL);
                 break;

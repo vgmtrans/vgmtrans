@@ -64,9 +64,9 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
     // set name to the sequence
     if (rawName[0] != ('\0')) {
         std::string nameStr = std::string(rawName);
-        name = (nameStr);
+        m_name = (nameStr);
     } else {
-        name = "NeverlandSnesSeq";
+        m_name = "NeverlandSnesSeq";
     }
 
     for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
@@ -160,8 +160,8 @@ bool NeverlandSnesTrack::ReadEvent(void) {
         case EVENT_UNKNOWN1: {
             uint8_t arg1 = GetByte(curOffset++);
             desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
-                 << (int)arg1;
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1;
             AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
         }
@@ -170,8 +170,8 @@ bool NeverlandSnesTrack::ReadEvent(void) {
             uint8_t arg1 = GetByte(curOffset++);
             uint8_t arg2 = GetByte(curOffset++);
             desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
-                 << (int)arg1 << "  Arg2: " << (int)arg2;
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2;
             AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
         }
@@ -181,8 +181,8 @@ bool NeverlandSnesTrack::ReadEvent(void) {
             uint8_t arg2 = GetByte(curOffset++);
             uint8_t arg3 = GetByte(curOffset++);
             desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
-                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3;
             AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
         }
@@ -193,9 +193,9 @@ bool NeverlandSnesTrack::ReadEvent(void) {
             uint8_t arg3 = GetByte(curOffset++);
             uint8_t arg4 = GetByte(curOffset++);
             desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase
-                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0) << "  Arg1: "
-                 << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3 << "  Arg4: "
-                 << (int)arg4;
+                 << (int)statusByte << std::dec << std::setfill(' ') << std::setw(0)
+                 << "  Arg1: " << (int)arg1 << "  Arg2: " << (int)arg2 << "  Arg3: " << (int)arg3
+                 << "  Arg4: " << (int)arg4;
             AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
             break;
         }

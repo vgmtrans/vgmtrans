@@ -22,13 +22,12 @@ bool VGMMiscFile::LoadMain() {
 }
 
 bool VGMMiscFile::Load() {
-    if (!LoadMain())
+    if (!LoadMain()) {
         return false;
-    if (unLength == 0)
+    }
+    if (unLength == 0) {
         return false;
-
-    LoadLocalData();
-    UseLocalData();
+    }
     pRoot->AddVGMFile(this);
     return true;
 }

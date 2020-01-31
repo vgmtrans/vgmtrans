@@ -37,9 +37,9 @@ bool BGMSeq::GetHeaderInfo(void) {
     SetPPQN(GetShort(dwOffset + 0xE));
     unLength = GetWord(dwOffset + 0x10);
 
-    name = fmt::format("BGM {}", seqID);
+    m_name = fmt::format("BGM {}", seqID);
     if (seqID != assocWDID) {
-        name += fmt::format(" using WD {}", assocWDID);
+        m_name += fmt::format(" using WD {}", assocWDID);
     }
 
     return true;

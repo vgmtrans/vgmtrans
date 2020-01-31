@@ -16,7 +16,7 @@ bool OrgSeq::GetHeaderInfo(void) {
     waitTime = GetShort(dwOffset + 6);
     beatsPerMeasure = GetByte(dwOffset + 8);
     SetPPQN(GetByte(dwOffset + 9));
-    name = "Org Seq";
+    m_name = "Org Seq";
 
     uint32_t notesSoFar = 0;  // this must be used to determine the length of the entire seq
 
@@ -85,9 +85,10 @@ bool OrgTrack::ReadEvent(void) {
     else
         pan = (uint8_t)(GetByte(curOffset + (numNotes - curNote) * 4 + numNotes * 3 + curNote) *
                         10.66666666666666666666666666666);
-    // if (newPan > 0x7F)	//sometimes the value is 0xFF, even though the range would seem to be 0-C
-    // according to the org editor 	newPan = 64;	//in this case, set it to the center position, i
-    //can't distinguish it from center on hearing tests
+    // if (newPan > 0x7F)	//sometimes the value is 0xFF, even though the range would seem to be
+    // 0-C according to the org editor 	newPan = 64;	//in this case, set it to the center
+    // position, i
+    // can't distinguish it from center on hearing tests
     if (pan != prevPan) {
         InsertPan(curOffset + (numNotes - curNote) * 4 + numNotes * 3 + curNote, 1, pan, absTime);
         prevPan = pan;

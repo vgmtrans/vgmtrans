@@ -49,7 +49,7 @@ bool AkaoSeq::GetHeaderInfo(void) {
         return false;
     }
 
-    name = "Akao Seq";
+    m_name = "Akao Seq";
 
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
@@ -114,7 +114,8 @@ void AkaoTrack::ResetVars(void) {
 //--------------------------------------------------
 // Revisions:
 //	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "内蔵音源をMIDI変換するスレ(in
-//http://www.2ch.net)" 						Add un-known command(op-code).
+// http://www.2ch.net)" 						Add un-known
+// command(op-code).
 //--------------------------------------------------
 bool AkaoTrack::ReadEvent(void) {
     uint32_t beginOffset = curOffset;
@@ -239,13 +240,13 @@ bool AkaoTrack::ReadEvent(void) {
 
             case 0xA8: {
                 // vel = GetByte(curOffset++);
-                // vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES,
-                // BUT NOT POSITIVE AddGenericEvent(beginOffset, curOffset-beginOffset, "Set
-                // Velocity", NULL, BG_CLR_CYAN);
+                // vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS
+                // APPLIES, BUT NOT POSITIVE AddGenericEvent(beginOffset, curOffset-beginOffset,
+                // "Set Velocity", NULL, BG_CLR_CYAN);
                 uint8_t cExpression = GetByte(curOffset++);
                 ////			 こっちのlog演算は要らない
-                ////			 vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I
-                ///THINK THIS APPLIES, BUT NOT POSITIVE
+                ////			 vel = Convert7bitPercentVolValToStdMidiVal(vel);
+                /////I THINK THIS APPLIES, BUT NOT POSITIVE
                 vel = 127;  //とりあえず 127 にしておく
                 AddExpression(beginOffset, curOffset - beginOffset, cExpression);
                 break;
@@ -391,21 +392,17 @@ bool AkaoTrack::ReadEvent(void) {
             }
 
             case 0xC2:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "",
-                                CLR_REVERB);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "", CLR_REVERB);
                 break;
             case 0xC3:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "",
-                                CLR_REVERB);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "", CLR_REVERB);
                 break;
 
             case 0xC4:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", "",
-                                CLR_UNKNOWN);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", "", CLR_UNKNOWN);
                 break;
             case 0xC5:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", "",
-                                CLR_UNKNOWN);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", "", CLR_UNKNOWN);
                 break;
 
             case 0xC6:
@@ -419,8 +416,7 @@ bool AkaoTrack::ReadEvent(void) {
 
             // set loop begin marker
             case 0xC8:
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Start", "",
-                                CLR_LOOP);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Start", "", CLR_LOOP);
                 loop_begin_layer++;
                 loop_begin_loc[loop_begin_layer] = curOffset;
                 // bInLoop = true;
@@ -572,8 +568,7 @@ bool AkaoTrack::ReadEvent(void) {
                 //	 goto MetaEvent;
                 // rest_time += pDoc->GetByte(j++);
                 AddTime(GetByte(curOffset++));
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie (custom)", "",
-                                CLR_TIE);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie (custom)", "", CLR_TIE);
                 break;
 
             case 0xFD: {
@@ -656,8 +651,7 @@ bool AkaoTrack::ReadEvent(void) {
                         if (readMode == READMODE_FIND_DELTA_LENGTH)
                             deltaLength = GetTime();
 
-                        AddGenericEvent(beginOffset, eventLength, "Dal Segno.(Loop)", "",
-                                        CLR_LOOP);
+                        AddGenericEvent(beginOffset, eventLength, "Dal Segno.(Loop)", "", CLR_LOOP);
                         return bContinue;
 
                         /*uint16_t siValue = GetShort(pDoc, j);
@@ -670,8 +664,8 @@ bool AkaoTrack::ReadEvent(void) {
                                 curOffset += 2;
                         }
                         else
-                            curOffset += 2;								//otherwise, just skip
-                        over the relative branch offset*/
+                            curOffset += 2;								//otherwise, just
+                        skip over the relative branch offset*/
                         break;
                     }
 
@@ -732,8 +726,8 @@ bool AkaoTrack::ReadEvent(void) {
                         uint8_t numer = GetByte(curOffset++);
                         // AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom,
                         // parentSeq->GetPPQN()); // why it's disabled?
-                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Time Signature",
-                                        "", CLR_TIMESIG, ICON_TIMESIG);
+                        AddGenericEvent(beginOffset, curOffset - beginOffset, "Time Signature", "",
+                                        CLR_TIMESIG, ICON_TIMESIG);
                         break;
                     }
 

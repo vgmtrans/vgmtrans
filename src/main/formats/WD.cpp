@@ -35,7 +35,7 @@ bool WDInstrSet::GetHeaderInfo() {
     if (dwSampSectSize < 0x40)  // Some songs in the Bouncer have bizarre values here
         dwSampSectSize = 0;
 
-    name = fmt::format("WD {}", id);
+    m_name = fmt::format("WD {}", id);
 
     uint32_t sampCollOff = dwOffset + GetWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
 

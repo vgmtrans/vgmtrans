@@ -63,8 +63,6 @@ bool VGMInstrSet::Load() {
         }
     }
 
-    LoadLocalData();
-    UseLocalData();
     pRoot->AddVGMFile(this);
     return true;
 }
@@ -87,7 +85,7 @@ bool VGMInstrSet::LoadInstrs() {
 }
 
 bool VGMInstrSet::OnSaveAsDLS(void) {
-    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "dls");
+    std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name), "dls");
     if (filepath.length() != 0) {
         return SaveAsDLS(filepath.c_str());
     }
@@ -95,7 +93,7 @@ bool VGMInstrSet::OnSaveAsDLS(void) {
 }
 
 bool VGMInstrSet::OnSaveAsSF2(void) {
-    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "sf2");
+    std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name), "sf2");
     if (filepath.length() != 0) {
         return SaveAsSF2(filepath);
     }

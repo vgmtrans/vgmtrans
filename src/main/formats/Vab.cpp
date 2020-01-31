@@ -22,7 +22,7 @@ bool Vab::GetHeaderInfo() {
         return false;
     }
 
-    name = "VAB";
+    m_name = "VAB";
 
     VGMHeader *vabHdr = AddHeader(dwOffset, 0x20, "VAB Header");
     vabHdr->AddSimpleItem(dwOffset + 0x00, 4, "ID");

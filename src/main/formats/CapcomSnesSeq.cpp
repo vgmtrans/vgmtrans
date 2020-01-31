@@ -35,7 +35,7 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile *file, CapcomSnesVersion ver, uint32_t seqd
     : VGMSeq(CapcomSnesFormat::name, file, seqdataOffset),
       version(ver),
       priorityInHeader(priorityInHeader) {
-    name = newName;
+    m_name = newName;
 
     bLoadTickByTick = true;
     bAllowDiscontinuousTrackData = true;

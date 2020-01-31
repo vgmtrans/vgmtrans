@@ -27,7 +27,7 @@ class VGMSeqNoTrks : public VGMSeq, public SeqTrack {
     inline uint32_t GetWordBE(uint32_t offset) { return VGMSeq::GetWordBE(offset); }
     inline uint32_t &offset(void) { return VGMSeq::dwOffset; }
     inline uint32_t &length(void) { return VGMSeq::unLength; }
-    inline std::string &name(void) { return VGMSeq::name; }
+    inline std::string &name(void) { return VGMSeq::m_name; }
 
     inline uint32_t &eventsOffset() { return dwEventsOffset; }
 
