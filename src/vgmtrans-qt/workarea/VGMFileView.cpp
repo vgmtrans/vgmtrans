@@ -23,13 +23,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
     m_splitter = new QSplitter(Qt::Horizontal, this);
 
     m_buffer = new QBuffer();
-    if (!vgmfile->bUsingRawFile) {
-        m_buffer->setData(reinterpret_cast<const char *>(vgmfile->rawData()), vgmfile->unLength);
-    } else {
-        auto tmpbuf = new char[vgmfile->unLength];
-        vgmfile->GetBytes(vgmfile->dwOffset, vgmfile->unLength, tmpbuf);
-        m_buffer->setData(tmpbuf, vgmfile->unLength);
-    }
+    m_buffer->setData(vgmfile->data(), vgmfile->size());
     m_buffer->open(QIODevice::ReadOnly);
     m_hexview = new QHexView(m_splitter);
 
