@@ -30,7 +30,7 @@ class VGMRgn : public VGMContainerItem {
     // VGMArt* AddArt(vector<connectionBlock*> connBlocks);
     // VGMSamp* AddSamp(void);
     void SetRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
-    void SetUnityKey(uint8_t unityNote);
+    void SetUnityKey(int8_t unityNote);
     void SetSampNum(size_t sampNumber);
     void SetLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength);
     void SetADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
@@ -45,7 +45,7 @@ class VGMRgn : public VGMContainerItem {
     // void AddAttenuation(long atten, uint32_t offset, uint32_t length = 1);
     void SetVolume(double volume);
     void AddVolume(double volume, uint32_t offset, uint32_t length = 1);
-    void AddUnityKey(uint8_t unityKey, uint32_t offset, uint32_t length = 1);
+    void AddUnityKey(int8_t unityKey, uint32_t offset, uint32_t length = 1);
     void AddFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length = 1);
     void AddKeyLow(uint8_t keyLow, uint32_t offset, uint32_t length = 1);
     void AddKeyHigh(uint8_t keyHigh, uint32_t offset, uint32_t length = 1);
@@ -67,7 +67,7 @@ class VGMRgn : public VGMContainerItem {
     uint8_t velLow;
     uint8_t velHigh;
 
-    uint8_t unityKey;
+    int8_t unityKey;
     short fineTune;
 
     Loop loop;

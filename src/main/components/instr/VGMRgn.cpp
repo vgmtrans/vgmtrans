@@ -72,7 +72,7 @@ void VGMRgn::SetRanges(uint8_t theKeyLow, uint8_t theKeyHigh, uint8_t theVelLow,
     velHigh = theVelHigh;
 }
 
-void VGMRgn::SetUnityKey(uint8_t theUnityKey) {
+void VGMRgn::SetUnityKey(int8_t theUnityKey) {
     unityKey = theUnityKey;
 }
 
@@ -132,7 +132,7 @@ void VGMRgn::AddVolume(double vol, uint32_t offset, uint32_t length) {
     items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_VOL, offset, length, "Volume"));
 }
 
-void VGMRgn::AddUnityKey(uint8_t uk, uint32_t offset, uint32_t length) {
+void VGMRgn::AddUnityKey(int8_t uk, uint32_t offset, uint32_t length) {
     this->unityKey = uk;
     items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_UNITYKEY, offset, length, "Unity Key"));
 }
