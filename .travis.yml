@@ -118,11 +118,7 @@ script:
 after_success:
   - if [ $MAKE_APPIMAGE -eq 1 ]; then
       wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh ;
-      if [ $TRAVIS_OS_NAME = linux ]; then
-        bash upload.sh VGMTrans*.AppImage ;
-      fi
-      if [ $TRAVIS_OS_NAME = osx ]; then
-        bash upload.sh VGMTrans*.dmg ;
-        bash upload.sh VGMTrans*.zip ;
-      fi
+      for i in VGMTrans*.{AppImage,dmg,zip}; do
+        [ -f "$i" ] && bash upload.sh "$i" ;
+      done
     fi
