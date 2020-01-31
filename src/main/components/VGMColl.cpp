@@ -329,7 +329,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
                 } else
                     newWsmp->SetLoopInfo(rgn->loop, samp);
 
-                uint8_t realUnityKey;
+                int8_t realUnityKey;
                 if (rgn->unityKey == -1)
                     realUnityKey = samp->unityKey;
                 else
