@@ -10,9 +10,8 @@
 #include <fmt/format.h>
 #include <algorithm>
 #include <functional>
-using namespace std;
 
-#define SRCH_BUF_SIZE 0x20000
+constexpr int SRCH_BUF_SIZE = 0x20000;
 
 void NDSScanner::Scan(RawFile *file, void *info) {
     SearchForSDAT(file);
@@ -31,7 +30,7 @@ void NDSScanner::SearchForSDAT(RawFile *file) {
             LoadFromSDAT(file, offset);
         }
 
-        it = std::search(++it, file->end(),
+        it = std::search(std::next(it), file->end(),
                          std::boyer_moore_searcher(signature.begin(), signature.end()));
     }
 }
@@ -39,6 +38,7 @@ void NDSScanner::SearchForSDAT(RawFile *file) {
 // The following is pretty god-awful messy.  I should have created structs for the different
 // blocks and loading the entire blocks at a time.
 uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
+    using namespace std;
     uint32_t SDATLength = file->GetWord(baseOff + 8) + 8;
 
     auto SYMBoff = file->GetWord(baseOff + 0x10) + baseOff;
