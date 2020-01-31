@@ -18,14 +18,11 @@ PSFFile2::PSFFile2(const RawFile &file) {
         throw std::length_error("PSF file smaller than header, likely corrupt");
     }
 
-    uint8_t signature[4];
-    file.GetBytes(0, 4, signature);
-    if (memcmp(signature, "PSF", 3) != 0) {
+    if (!std::equal(file.begin(), file.begin() + 3, "PSF")) {
         throw std::runtime_error("Invalid PSF signature");
     }
 
-    m_version = signature[3];
-
+    m_version = file[3];
     uint32_t reservedarea_size = file.GetWord(4);
     if (reservedarea_size) {
         m_reserved_data.resize(reservedarea_size);
@@ -58,7 +55,7 @@ PSFFile2::PSFFile2(const RawFile &file) {
     if (tag_section_size >= PSF_TAG_SIG_LEN) {
         valid_tag_section =
             std::equal(file.begin() + tag_section_offset,
-                       file.begin() + tag_section_offset + tag_section_size, PSF_TAG_SIG);
+                       file.begin() + tag_section_offset + PSF_TAG_SIG_LEN, PSF_TAG_SIG);
     }
 
     if (valid_tag_section) {
