@@ -13,6 +13,11 @@
 #include "VGMColl.h"
 #include "../MusicPlayer.h"
 
+static const QIcon &VGMCollIcon() {
+    static QIcon icon(":/images/collection-32.png");
+    return icon;
+}
+
 /*
  * VGMCollListViewModel
  */
@@ -31,7 +36,7 @@ QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
     if (role == Qt::DisplayRole || role == Qt::EditRole) {
         return QString::fromStdString(*qtVGMRoot.vVGMColl[index.row()]->GetName());
     } else if (role == Qt::DecorationRole) {
-        return QIcon(":/images/collection-32.png");
+        return VGMCollIcon();
     }
 
     return QVariant();
