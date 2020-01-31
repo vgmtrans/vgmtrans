@@ -8,6 +8,7 @@
 
 #include <QTemporaryDir>
 #include <VGMSeq.h>
+#include <LogManager.h>
 
 MusicPlayer::MusicPlayer() {
     makeSettings();
@@ -42,7 +43,6 @@ void MusicPlayer::makeSettings() {
 #endif
     fluid_settings_setstr(settings, "synth.midi-bank-select", "mma");
     fluid_settings_setint(settings, "synth.midi-channels", 48);
-    fluid_settings_setstr(settings, "player.timing-source", "system");
 }
 
 void MusicPlayer::makeSynth() {
@@ -118,17 +118,20 @@ bool MusicPlayer::SynthPlaying() {
 }
 
 void MusicPlayer::LoadCollection(VGMColl *coll) {
+    /* Don't reload the same collection - allows pausing */
     if (active_coll == coll) {
         return;
     }
 
     VGMSeq *seq = coll->GetSeq();
     if (!seq) {
+        L_ERROR("There's no sequence to play for '{}'", *coll->GetName());
         return;
     }
 
     std::shared_ptr<SF2File> sf2(coll->CreateSF2File());
     if (!sf2) {
+        L_ERROR("No soundfont could be generated for '{}'. Playback aborted", *coll->GetName());
         return;
     }
 
