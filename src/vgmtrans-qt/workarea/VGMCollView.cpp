@@ -41,7 +41,7 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
 
 void VGMCollViewModel::handleNewCollSelected(QModelIndex modelIndex) {
     if (!modelIndex.isValid() || qtVGMRoot.vVGMColl.empty() ||
-        qtVGMRoot.vVGMColl.size() < modelIndex.row()) {
+        modelIndex.row() >= qtVGMRoot.vVGMColl.size()) {
         m_coll = nullptr;
     } else {
         m_coll = qtVGMRoot.vVGMColl[modelIndex.row()];
