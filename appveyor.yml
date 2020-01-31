@@ -55,7 +55,7 @@ artifacts:
 deploy:
   tag: continuous-$(APPVEYOR_REPO_BRANCH)
   release: Continuous build ($(APPVEYOR_REPO_BRANCH))
-  description: 'Precompiled VGMTrans-Qt binaries for Windows, Linux (AppImage) and OS X (Sierra or newer)'
+  description: 'Bleeding-edge precompiled VGMTrans-Qt binaries for Windows, Linux (AppImage) and OS X (Sierra or newer)'
   provider: GitHub
   auth_token:
     secure: KYZwviB+62BKdGabNbACZB3zWyfBT8euilehsYRtXKxCY27vlLWOetU+WIxV3bdD

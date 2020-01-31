@@ -1,16 +1,13 @@
-language: cpp
-
 git:
   submodules: false
 
 if: tag IS blank
 
 language: cpp
-compiler: gcc
-sudo: require
+os: linux
 dist: xenial
 
-matrix:
+jobs:
   include:
     - os: linux
       addons:
@@ -116,6 +113,7 @@ script:
     fi
 
 after_success:
+  - export UPLOADTOOL_BODY="Bleeding-edge precompiled VGMTrans-Qt binaries for Windows, Linux (AppImage) and OS X (Sierra or newer)"
   - if [ $MAKE_APPIMAGE -eq 1 ]; then
       wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh ;
       for i in VGMTrans*.{AppImage,dmg,zip}; do
