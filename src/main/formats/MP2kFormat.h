@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
 #include "Format.h"
 #include "Root.h"
 #include "MP2kScanner.h"
