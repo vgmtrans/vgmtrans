@@ -52,6 +52,13 @@ static bool test_pointer_validity(RawFile *file, size_t offset, uint32_t inGBA_l
     return params.valid() && valid_table;
 }
 
+MP2kScanner::MP2kScanner() {
+    USE_EXTENSION("gba");
+    USE_EXTENSION("minigsf");
+    USE_EXTENSION("gsf");
+    USE_EXTENSION("gsflib");
+}
+
 void MP2kScanner::Scan(RawFile *file, void *info) {
     /* Detect if the sound engine is actually MP2K */
     size_t sound_engine_adr = 0;
