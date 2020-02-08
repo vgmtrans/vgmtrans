@@ -129,8 +129,11 @@ void VGMColl::UnpackSampColl(SynthFile &synthfile, VGMSampColl *sampColl,
 
         // If we don't have any loop information, then don't create a sampInfo structure for the
         // Wave
-        if (samp->loop.loopStatus == -1)
+        if (samp->loop.loopStatus == -1) {
+            L_ERROR("No loop information for {} - some parameters might be incorrect",
+                    samp->sampName);
             return;
+        }
 
         SynthSampInfo *sampInfo = wave->AddSampInfo();
         if (samp->bPSXLoopInfoPrioritizing) {
@@ -329,7 +332,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
                 } else
                     newWsmp->SetLoopInfo(rgn->loop, samp);
 
-                int8_t realUnityKey;
+                int8_t realUnityKey = -1;
                 if (rgn->unityKey == -1)
                     realUnityKey = samp->unityKey;
                 else
@@ -528,7 +531,7 @@ SynthFile *VGMColl::CreateSynthFile() {
                 } else
                     sampInfo->SetLoopInfo(rgn->loop, samp);
 
-                int8_t realUnityKey;
+                int8_t realUnityKey = -1;
                 if (rgn->unityKey == -1)
                     realUnityKey = samp->unityKey;
                 else
