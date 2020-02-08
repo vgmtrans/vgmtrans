@@ -7,6 +7,7 @@
 #include "VGMSeq.h"
 
 #include <climits>
+#include "JSONDump.h"
 #include "SeqEvent.h"
 #include "SeqSlider.h"
 #include "Options.h"
@@ -329,4 +330,13 @@ bool VGMSeq::SaveAsMidi(const std::string &filepath) {
     bool result = midi->SaveMidiFile(filepath);
     delete midi;
     return result;
+}
+
+bool VGMSeq::OnSaveAsJSON(void) {
+    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name), "json");
+    if (filepath.length() != 0) {
+        conversion::DumpToJSON(filepath, *this);
+    }
+
+    return true;
 }

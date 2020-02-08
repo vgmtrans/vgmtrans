@@ -24,6 +24,7 @@ class VGMSeq : public VGMFile {
    public:
     BEGIN_MENU_SUB(VGMSeq, VGMFile)
     MENU_ITEM(VGMSeq, OnSaveAsMidi, "Save as MIDI")
+    MENU_ITEM(VGMSeq, OnSaveAsJSON, "Dump structure as JSON")
     END_MENU()
 
     VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
@@ -69,6 +70,8 @@ class VGMSeq : public VGMFile {
         bAlwaysWriteInitialTempo = true;
         initialTempoBPM = tempoBPM;
     }
+
+    bool OnSaveAsJSON();
 
     bool OnSaveAsMidi(void);
     virtual bool SaveAsMidi(const std::string &filepath);
