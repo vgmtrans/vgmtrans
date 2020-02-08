@@ -62,7 +62,6 @@ bool VGMFile::LoadVGMFile() {
     if (fmt)
         fmt->OnNewFile(this);
 
-    L_INFO("Loaded file '{}'", m_name);
     return val;
 }
 
@@ -105,8 +104,6 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
     }
 
     return rawfile->GetBytes(nIndex, nCount, pBuffer);
-
-    return nCount;
 }
 
 // *********
