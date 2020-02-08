@@ -11,52 +11,21 @@
 // VGMRgn
 // ******
 
-VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, const std::string &name)
-    : VGMContainerItem(instr->parInstrSet, offset, length, name),
-      parInstr(instr),
-      keyLow(0),
-      keyHigh(0x7F),
-      velLow(0),
-      velHigh(0x7F),
-      sampNum(0),
-      sampOffset(-1),
-      sampCollPtr(NULL),
-      unityKey(-1),
-      fineTune(0),
-      pan(0.5),
-      volume(-1),
-      attack_time(0),
-      attack_transform(no_transform),
-      decay_time(0),
-      sustain_level(-1),
-      release_transform(no_transform),
-      release_time(0) {
+VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, std::string name)
+    : VGMContainerItem(instr->parInstrSet, offset, length, name), parInstr(instr) {
     AddContainer<VGMRgnItem>(items);
 }
 
 VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t theKeyLow,
                uint8_t theKeyHigh, uint8_t theVelLow, uint8_t theVelHigh, int theSampNum,
-               const std::string &name)
+               std::string name)
     : VGMContainerItem(instr->parInstrSet, offset, length, name),
       parInstr(instr),
       keyLow(theKeyLow),
       keyHigh(theKeyHigh),
       velLow(theVelLow),
       velHigh(theVelHigh),
-      sampNum(theSampNum),
-      sampOffset(-1),
-      sampCollPtr(NULL),
-      unityKey(-1),
-      fineTune(0),
-      pan(0.5),
-      volume(-1),
-      attack_time(0),
-      attack_transform(no_transform),
-      decay_time(0),
-      sustain_level(-1),
-      sustain_time(0),
-      release_transform(no_transform),
-      release_time(0) {
+      sampNum(theSampNum) {
     AddContainer<VGMRgnItem>(items);
 }
 
@@ -81,16 +50,15 @@ void VGMRgn::SetSampNum(size_t sampNumber) {
 }
 
 void VGMRgn::SetPan(uint8_t p) {
-    // pan = thePan;
-    pan = p;
-    if (pan == 127)
+    if (p == 127) {
         pan = 1.0;
-    else if (pan == 0)
+    } else if (p == 0) {
         pan = 0;
-    else if (pan == 64)
+    } else if (p == 64) {
         pan = 0.5;
-    else
-        pan = (double)pan / (double)127;
+    } else {
+        pan = pan / 127.0;
+    }
 }
 
 void VGMRgn::SetLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength) {

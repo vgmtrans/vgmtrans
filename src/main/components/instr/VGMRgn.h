@@ -19,16 +19,13 @@ class VGMSampColl;
 
 class VGMRgn : public VGMContainerItem {
    public:
-    VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0,
-           const std::string &name = "Region");
+    VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::string name = "Region");
     VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
-           uint8_t velLow, uint8_t velHigh, int sampNum, const std::string &name = "Region");
+           uint8_t velLow, uint8_t velHigh, int sampNum, std::string name = "Region");
     ~VGMRgn();
 
     virtual bool LoadRgn() { return true; }
 
-    // VGMArt* AddArt(vector<connectionBlock*> connBlocks);
-    // VGMSamp* AddSamp(void);
     void SetRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
     void SetUnityKey(int8_t unityNote);
     void SetSampNum(size_t sampNumber);
@@ -41,8 +38,6 @@ class VGMRgn : public VGMContainerItem {
     void SetFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
     void SetPan(uint8_t pan);
     void AddPan(uint8_t pan, uint32_t offset, uint32_t length = 1);
-    // void SetAttenuation(long attenuation);
-    // void AddAttenuation(long atten, uint32_t offset, uint32_t length = 1);
     void SetVolume(double volume);
     void AddVolume(double volume, uint32_t offset, uint32_t length = 1);
     void AddUnityKey(int8_t unityKey, uint32_t offset, uint32_t length = 1);
@@ -52,51 +47,32 @@ class VGMRgn : public VGMContainerItem {
     void AddVelLow(uint8_t velLow, uint32_t offset, uint32_t length = 1);
     void AddVelHigh(uint8_t velHigh, uint32_t offset, uint32_t length = 1);
     void AddSampNum(int sampNum, uint32_t offset, uint32_t length = 1);
-    // void SetAttack();
-    // void SetDelay();
-    // void SetSustain();
-    // void SetRelease();
 
-    // void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t
-    // theTableIndex);
+    VGMInstr *parInstr = nullptr;
+    uint8_t keyLow = 0;
+    uint8_t keyHigh = 127;
+    uint8_t velLow = 0;
+    uint8_t velHigh = 127;
 
-   public:
-    VGMInstr *parInstr;
-    uint8_t keyLow;
-    uint8_t keyHigh;
-    uint8_t velLow;
-    uint8_t velHigh;
-
-    int8_t unityKey;
-    short fineTune;
+    int8_t unityKey = -1;
+    short fineTune = 0;
 
     Loop loop;
 
-    // uint16_t fusOptions;
-    // uint16_t usPhaseGroup;
-    // uint32_t channel;
-    // uint32_t tableIndex;
+    int sampNum = 0;
+    uint32_t sampOffset = -1; /* Offset wrt whatever collection of samples we have */
+    VGMSampColl *sampCollPtr = nullptr;
 
-    int sampNum;
-    uint32_t sampOffset;  // optional value. If a sample offset is provided, then find the sample
-                          // number based on this offset.
-    // This is an absolute offset into the SampColl.  It's not necessarily relative to the beginning
-    // of the actual sample data, unless the sample data begins at offset 0.
-    // int sampCollNum;	//optional value. for formats that use multiple sampColls and reference
-    // samples base 0 for each sampColl (NDS, for instance)
-    VGMSampColl *sampCollPtr;
+    double volume = -1;        /* Percentage of full volume */
+    double pan = 0.5;          /* Left 0 <- 0.5 Center -> 1 Right */
+    double attack_time = 0;    /* In seconds */
+    double decay_time = 0;     /* In seconds */
+    double release_time = 0;   /* In seconds */
+    double sustain_level = -1; /* Percentage */
+    double sustain_time = 0;   /* In seconds (no positive rate!) */
 
-    // long attenuation;
-    double volume;  // as percentage of full volume.  This will be converted to to an attenuation
-                    // when we convert to a SynthFile
-    double pan;     // percentage.  0 = full left. 0.5 = center.  1 = full right
-    double attack_time;  // in seconds
-    uint16_t attack_transform;
-    double decay_time;     // in seconds
-    double sustain_level;  // as a percentage
-    double sustain_time;  // in seconds (we don't support positive rate here, as is possible on psx)
-    uint16_t release_transform;
-    double release_time;  // in seconds
+    uint16_t attack_transform = no_transform;
+    uint16_t release_transform = no_transform;
 
     std::vector<VGMRgnItem *> items;
 };
