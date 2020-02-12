@@ -18,8 +18,15 @@
 
 #include <optional>
 #include <functional>
+#include <set>
+
+#include "VGMColl.h"
 #include "MP2kSeq.h"
+#include "MP2kInstrSet.h"
 #include "LogManager.h"
+
+static constexpr int samplerate_LUT[16] = {-1,    5734,  7884,  10512, 13379, 15768, 18157, 21024,
+                                           26758, 31536, 36314, 40137, 42048, -1,    -1,    -1};
 
 struct EngineParams {
     EngineParams(u32 data)
@@ -33,11 +40,10 @@ struct EngineParams {
                sampling_rate_index >= 1 && sampling_rate_index <= 12;
     }
 
-   private:
-    u32 polyphony;
-    u32 main_vol;
-    u32 sampling_rate_index;
-    u32 dac_bits;
+    const u32 polyphony;
+    const u32 main_vol;
+    const u32 sampling_rate_index;
+    const u32 dac_bits;
 };
 
 /* Test if an area of ROM is eligible to be the base pointer */
@@ -68,6 +74,8 @@ void MP2kScanner::Scan(RawFile *file, void *info) {
         return;
     }
 
+    EngineParams engine_settings(file->get<u32>(sound_engine_adr));
+
     /* Compute song table location */
     u32 song_levels = file->get<u32>(sound_engine_adr + 4);  // Read # of song levels
     u32 song_tbl_ptr = (file->get<u32>(sound_engine_adr + 8) & 0x1FFFFFF) + 12 * song_levels;
@@ -84,6 +92,8 @@ void MP2kScanner::Scan(RawFile *file, void *info) {
     }
 
     /* First 32 bytes are the pointer, the rest is song info */
+    std::set<size_t> soundbanks;
+    std::map<u32, std::vector<MP2kSeq *>> seqs;
     for (auto it = song_entry; it < song_tbl.end(); std::advance(it, 2)) {
         u32 song_pointer = *it & 0x1FFFFFF;
         if (song_pointer >= file->size()) {
@@ -96,8 +106,48 @@ void MP2kScanner::Scan(RawFile *file, void *info) {
             break;
         }
 
-        if (auto nseq = new MP2kSeq(file, song_pointer); !nseq->LoadVGMFile()) {
+        auto nseq = new MP2kSeq(file, song_pointer);
+        if (!nseq->LoadVGMFile()) {
             delete nseq;
+        }
+
+        /* Load the soundbanks later because we need to know the number of instruments in each of
+         * them */
+        u32 inst_pointer = file->get<u32>(song_pointer + 4) & 0x1FFFFFF;
+        soundbanks.insert(inst_pointer);
+        if (auto inst = seqs.find(inst_pointer); inst != seqs.end()) {
+            inst->second.emplace_back(nseq);
+        } else {
+            seqs.insert(std::pair(inst_pointer, std::vector<MP2kSeq *>{nseq}));
+        }
+    }
+
+    for (auto it = soundbanks.begin(); it != soundbanks.end(); std::advance(it, 1)) {
+        int count = 128;
+        if (auto next_addr = std::next(it);
+            next_addr != soundbanks.end() && (*next_addr - *it) / 12 < 128) {
+            count = (*next_addr - *it) / 12;
+        }
+
+        if (auto iset = new MP2kInstrSet(file, samplerate_LUT[engine_settings.sampling_rate_index],
+                                         *it, count);
+            !iset->LoadVGMFile()) {
+            delete iset;
+        } else {
+            auto seq = seqs.find(*it);
+            if (seq != seqs.end()) {
+                for (auto seqval : seq->second) {
+                    auto coll = new VGMColl("MP2k Collection");
+                    coll->UseSeq(seqval);
+                    coll->AddInstrSet(iset);
+                    coll->AddSampColl(iset->sampColl);
+
+                    if (!coll->Load()) {
+                        delete coll;
+                    }
+                }
+                seqs.erase(seq);
+            }
         }
     }
 }
