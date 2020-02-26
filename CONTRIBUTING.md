@@ -1,13 +1,22 @@
 # Contributing to VGMTrans
 ## Licensing 
-By making any contributions to VGMTrans you agree that any code you have contributed shall be licensed under the zlib/libpng license.
+By making any contributions to VGMTrans you agree that any code you have contributed
+shall be licensed under the zlib/libpng license.
 
 ## General notes
-The codebase currently being converted to follow `C++17`. We support any `C++17`-compliant compiler, so be sure to test your changes across as many as possible (Travis is supposed to help with this). Keep your code portable and always prefer builtins over macros. Don't use global namespaces. Use raw pointers only when strictly necessary (smart pointers are always preferred over manual memory management). Range-based for-loops are preferred over iterators.
+Keep your commits as small as possible.
+When working on a feature to merge, please use an appropriate branch name (e.g. if working on something NDS-related, then your branch should be named something like `vgmtrans/nds-fixes`).
+
+The codebase currently being converted to `C++17`.
+We support any `C++17`-compliant compiler, so be sure to test your changes across as many as possible (CI is supposed to help with this).
+Keep your code portable and always prefer builtins over macros. Don't use global namespaces.
+Use raw pointers only when strictly necessary (smart pointers are always preferred over manual memory management).
+Range-based for-loops are preferred over iterators.
 
 When making UI changes, please include a screenshot.
 
-This tool deals with proprietary formats, so keep your code well documented and *never* include copyrighted data directly (decryption keys and anything of the sort).
+This tool deals with proprietary formats, so keep your code well-documented and *never*
+include copyrighted data directly (decryption keys and anything of the sort).
 
 ## Coding style
 The coding style is self-documented in `.clang-format`
