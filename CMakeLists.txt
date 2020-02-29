@@ -1,5 +1,7 @@
-# VGMTrans (c) 2002-2019 Licensed under the zlib license Check the included
-# LICENSE.txt for details
+# VGMTrans (c) 2002-2020
+# Licensed under the zlib license
+# Check the included LICENSE.txt for details
+
 cmake_minimum_required(VERSION 3.12) # For object library liinking
 
 # People still use Yosemite
