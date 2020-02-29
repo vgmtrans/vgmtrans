@@ -15,6 +15,9 @@
 *.user
 *.sln.docstates
 
+# qtcreator
+.cmake
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
