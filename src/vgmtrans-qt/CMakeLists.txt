@@ -37,7 +37,7 @@ endif()
 
 if(NOT Qt5_DIR AND MSVC)
   set(Qt5_DIR
-      "${CMAKE_SOURCE_DIR}/externals/win-deps/qt5-msvc2017-x64/lib/cmake/Qt5")
+      "${CMAKE_SOURCE_DIR}/externals/win-deps/qt5-msvc2019-x64/lib/cmake/Qt5")
   message(STATUS "Using Qt5 fallback")
 endif()
 
