@@ -5,6 +5,8 @@
  */
 
 #include "SynthFile.h"
+
+#include <fmt/format.h>
 #include "VGMSamp.h"
 
 using namespace std;
@@ -17,15 +19,14 @@ using namespace std;
 
 SynthFile::SynthFile(string synth_name) : name(synth_name) {}
 
-SynthFile::~SynthFile(void) {
+SynthFile::~SynthFile() {
     DeleteVect(vInstrs);
     DeleteVect(vWaves);
 }
 
 SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum) {
-    stringstream str;
-    str << "Instr bnk" << bank << " num" << instrNum;
-    vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str.str()));
+    auto str = fmt::format("Instr bnk {} num {}", bank, instrNum);
+    vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str));
     return vInstrs.back();
 }
 
@@ -51,9 +52,7 @@ SynthWave *SynthFile::AddWave(uint16_t formatTag, uint16_t channels, int samples
 
 SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument)
     : ulBank(bank), ulInstrument(instrument) {
-    stringstream str;
-    str << "Instr bnk" << bank << " num" << instrument;
-    name = str.str();
+    name = fmt::format("Instr bnk {} num {}", bank, instrument);
     // RiffFile::AlignName(name);
 }
 

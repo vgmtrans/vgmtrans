@@ -13,6 +13,7 @@
 #include <tinyxml.h>
 #include <fmt/format.h>
 #include <memory>
+#include <cstdlib>
 
 namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");
@@ -24,7 +25,7 @@ bool MAMERomGroupEntry::GetHexAttribute(const std::string &attrName, uint32_t *o
         return false;
     }
 
-    *out = StringToHex(strValue);
+    *out = std::strtoul(strValue.c_str(), nullptr, 16);
     return true;
 }
 
