@@ -5,6 +5,8 @@
  */
 
 #include "VGMSeq.h"
+
+#include <fmt/format.h>
 #include "Root.h"
 
 using namespace std;
@@ -37,9 +39,9 @@ MidiTrack *MidiFile::InsertTrack(uint32_t trackNum) {
 }
 
 int MidiFile::GetMidiTrackIndex(MidiTrack *midiTrack) {
-    std::vector<MidiTrack *>::iterator it = std::find(aTracks.begin(), aTracks.end(), midiTrack);
+    auto it = std::find(aTracks.begin(), aTracks.end(), midiTrack);
     if (it != aTracks.end()) {
-        return (int)std::distance(aTracks.begin(), it);
+        return static_cast<int>(std::distance(aTracks.begin(), it));
     } else {
         return -1;
     }
@@ -654,9 +656,7 @@ std::string MidiEvent::GetNoteName(int noteNumber) {
     }
     octave--;
 
-    std::stringstream name;
-    name << noteNames[key] << " " << octave;
-    return name.str();
+    return fmt::format("{} {}", noteNames[key], octave);
 }
 
 bool MidiEvent::operator<(const MidiEvent &theMidiEvent) const {
