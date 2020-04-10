@@ -15,8 +15,10 @@
 *.user
 *.sln.docstates
 
-# qtcreator
+# qtcreator, clion
 .cmake
+cmake-*
+CMakeLists.txt.user
 
 # Build results
 [Dd]ebug/
