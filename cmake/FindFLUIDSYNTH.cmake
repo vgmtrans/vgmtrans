@@ -81,13 +81,13 @@ if(NOT FLUIDSYNTH_VERSION)
 endif()
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(fluidsynth
+find_package_handle_standard_args(FLUIDSYNTH
   FOUND_VAR FLUIDSYNTH_FOUND
   REQUIRED_VARS FLUIDSYNTH_LIBRARIES FLUIDSYNTH_INCLUDE_DIRS
   VERSION_VAR FLUIDSYNTH_VERSION
 )
 
-if(FLUIDSYNTH_FOUND AND NOT TARGET fluidsynth)
+if(FLUIDSYNTH_FOUND AND NOT TARGET FLUIDSYNTH)
   add_library(fluidsynth UNKNOWN IMPORTED)
   set_target_properties(fluidsynth PROPERTIES
     IMPORTED_LOCATION "${FLUIDSYNTH_LIBRARIES}"
