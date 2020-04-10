@@ -5,6 +5,9 @@
  */
 
 #include "NinSnesSeq.h"
+
+#include <fmt/format.h>
+#include <sstream>
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(NinSnes);
@@ -650,14 +653,13 @@ bool NinSnesSection::GetTrackPointers() {
                 }
             }
 
-            std::stringstream trackName;
-            trackName << "Track " << (trackIndex + 1);
-            track = new NinSnesTrack(this, startAddress, 0, trackName.str());
+            std::string trackName = fmt::format("Track {}", trackIndex + 1);
+            track = new NinSnesTrack(this, startAddress, 0, trackName);
 
             numActiveTracks++;
         } else {
             // add an inactive track
-            track = new NinSnesTrack(this, curOffset, 2, "NUL");
+            track = new NinSnesTrack(this, curOffset, 2, "NULL");
             track->available = false;
         }
         track->shared = &parentSeq->sharedTrackData[trackIndex];

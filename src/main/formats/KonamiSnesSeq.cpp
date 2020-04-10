@@ -5,6 +5,8 @@
  */
 
 #include "KonamiSnesSeq.h"
+
+#include <sstream>
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(KonamiSnes);

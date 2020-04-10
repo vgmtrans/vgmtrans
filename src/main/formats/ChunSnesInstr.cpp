@@ -5,6 +5,8 @@
  */
 
 #include "ChunSnesInstr.h"
+
+#include <fmt/format.h>
 #include "SNESDSP.h"
 
 // ****************
@@ -56,9 +58,8 @@ bool ChunSnesInstrSet::GetInstrPointers() {
     }
 
     for (unsigned int instrNum = 0; instrNum < nNumInstrs; instrNum++) {
-        std::stringstream instrName;
-        instrName << "Instrument " << (instrNum + 1);
-        AddSimpleItem(curOffset, 1, instrName.str().c_str());
+        std::string instrName = fmt::format("Instrument {}", instrNum + 1);
+        AddSimpleItem(curOffset, 1, instrName);
 
         uint8_t globalInstrNum = GetByte(curOffset);
         curOffset++;
@@ -80,7 +81,7 @@ bool ChunSnesInstrSet::GetInstrPointers() {
             }
 
             ChunSnesInstr *newInstr = new ChunSnesInstr(
-                this, version, instrNum, addrInstr, addrSampleTable, spcDirAddr, instrName.str());
+                this, version, instrNum, addrInstr, addrSampleTable, spcDirAddr, instrName);
             aInstrs.push_back(newInstr);
         }
     }

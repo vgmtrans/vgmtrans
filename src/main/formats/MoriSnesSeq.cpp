@@ -6,6 +6,9 @@
 
 #include "MoriSnesSeq.h"
 
+#include <fmt/format.h>
+#include <sstream>
+
 DECLARE_FORMAT(MoriSnes);
 
 //  ***********
@@ -74,9 +77,8 @@ bool MoriSnesSeq::GetHeaderInfo(void) {
             curOffset += 2;
             TrackStartAddress[trackIndex] = curOffset + ofsTrackStart;
 
-            std::stringstream trackName;
-            trackName << "Track " << (trackIndex + 1) << " Offset";
-            header->AddSimpleItem(beginOffset, curOffset - beginOffset, trackName.str().c_str());
+            std::string trackName = fmt::format("Track {} offset", trackIndex + 1);
+            header->AddSimpleItem(beginOffset, curOffset - beginOffset, trackName);
         } else {
             header->AddUnknownItem(beginOffset, curOffset - beginOffset);
             break;

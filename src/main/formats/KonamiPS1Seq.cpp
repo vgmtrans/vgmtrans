@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <iomanip>
-
 #include "KonamiPS1Seq.h"
+
+#include <iomanip>
+#include <sstream>
+#include <fmt/format.h>
 
 DECLARE_FORMAT(KonamiPS1);
 
@@ -40,10 +42,9 @@ bool KonamiPS1Seq::GetHeaderInfo(void) {
     uint32_t numTracks = GetWord(dwOffset + kOffsetToTrackCount);
     VGMHeader *trackSizeHeader = AddHeader(dwOffset + kHeaderSize, 2 * numTracks, "Track Size");
     for (size_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
-        std::stringstream itemName;
-        itemName << "Track " << (trackIndex + 1) << " Size";
+        std::string itemName = fmt::format("Track {} size", trackIndex + 1);
         trackSizeHeader->AddSimpleItem(trackSizeHeader->dwOffset + (trackIndex * 2), 2,
-                                       itemName.str());
+                                       itemName);
     }
 
     return true;

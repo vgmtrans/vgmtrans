@@ -39,10 +39,9 @@ bool QSoundArticTable::LoadMain() {
         if ((test1 == 0 && test2 == 0) || (test1 == 0xFFFFFFFF && test2 == 0xFFFFFFFF))
             continue;
 
-        std::ostringstream name;
-        name << "Articulation " << i;
+        std::string name = fmt::format("Articulation {}", i);
         VGMContainerItem *containerItem =
-            new VGMContainerItem(this, off, sizeof(qs_samp_info), name.str());
+            new VGMContainerItem(this, off, sizeof(qs_samp_info), name);
         containerItem->AddSimpleItem(off, 1, "Attack Rate");
         containerItem->AddSimpleItem(off + 1, 1, "Decay Rate");
         containerItem->AddSimpleItem(off + 2, 1, "Sustain Leve");

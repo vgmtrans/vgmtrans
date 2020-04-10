@@ -5,6 +5,8 @@
  */
 
 #include "HeartBeatSnesSeq.h"
+
+#include <sstream>
 #include "ScaleConversion.h"
 
 using namespace std;
@@ -68,9 +70,8 @@ bool HeartBeatSnesSeq::GetHeaderInfo(void) {
             break;
         }
 
-        std::stringstream trackName;
-        trackName << "Track Pointer " << (trackIndex + 1);
-        header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+        std::string trackName = fmt::format("Track pointer {}", trackIndex + 1);
+        header->AddSimpleItem(curOffset, 2, trackName);
 
         curOffset += 2;
     }

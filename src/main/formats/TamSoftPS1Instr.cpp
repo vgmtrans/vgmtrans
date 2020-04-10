@@ -5,6 +5,8 @@
  */
 
 #include "TamSoftPS1Instr.h"
+
+#include <fmt/format.h>
 #include "PSXSPU.h"
 
 // ******************
@@ -43,9 +45,8 @@ bool TamSoftPS1InstrSet::GetInstrPointers() {
                 PSXSamp::GetSampleLength(rawfile, vagOffset, dwOffset + unLength, vagLoop));
             vagLocations.push_back(vagLocation);
 
-            std::stringstream instrName;
-            instrName << "Instrument " << instrNum;
-            TamSoftPS1Instr *newInstr = new TamSoftPS1Instr(this, instrNum, instrName.str());
+            std::string instrName = fmt::format("Instrument {}", instrNum);
+            TamSoftPS1Instr *newInstr = new TamSoftPS1Instr(this, instrNum, instrName);
             aInstrs.push_back(newInstr);
         }
     }

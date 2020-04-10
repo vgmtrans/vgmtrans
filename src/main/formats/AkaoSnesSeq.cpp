@@ -5,6 +5,9 @@
  */
 
 #include "AkaoSnesSeq.h"
+
+#include <fmt/format.h>
+#include <sstream>
 #include "AkaoSnesInstr.h"
 #include "ScaleConversion.h"
 
@@ -81,11 +84,9 @@ bool AkaoSnesSeq::GetHeaderInfo(void) {
     for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
         uint16_t addrTrackStart = GetShortAddress(curOffset);
         if (addrTrackStart != addrSequenceEnd) {
-            std::stringstream trackName;
-            trackName << "Track Pointer " << (trackIndex + 1);
-            header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+            header->AddSimpleItem(curOffset, 2, fmt::format("Track pointer {}", trackIndex + 1));
         } else {
-            header->AddSimpleItem(curOffset, 2, "NUL");
+            header->AddSimpleItem(curOffset, 2, "NULL");
         }
         curOffset += 2;
     }

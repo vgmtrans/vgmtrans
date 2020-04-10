@@ -6,6 +6,9 @@
 
 #include "SoftCreatSnesSeq.h"
 
+#include <fmt/format.h>
+#include <sstream>
+
 DECLARE_FORMAT(SoftCreatSnes);
 
 //  ****************
@@ -50,10 +53,9 @@ bool SoftCreatSnesSeq::GetHeaderInfo(void) {
             return false;
         }
 
-        std::stringstream trackName;
-        trackName << "Track Pointer " << (trackIndex + 1);
-        header->AddSimpleItem(addrTrackLowPtr, 1, trackName.str() + " (LSB)");
-        header->AddSimpleItem(addrTrackHighPtr, 1, trackName.str() + " (MSB)");
+        std::string trackName = fmt::format("Track pointer {}", trackIndex + 1);
+        header->AddSimpleItem(addrTrackLowPtr, 1, trackName + " (LSB)");
+        header->AddSimpleItem(addrTrackHighPtr, 1, trackName + " (MSB)");
 
         uint16_t addrTrackStart = GetByte(addrTrackLowPtr) | (GetByte(addrTrackHighPtr) << 8);
         if (addrTrackStart != 0xffff) {

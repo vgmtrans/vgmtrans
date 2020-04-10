@@ -5,6 +5,9 @@
  */
 
 #include "CompileSnesSeq.h"
+
+#include <fmt/format.h>
+#include <sstream>
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(CompileSnes);
@@ -59,10 +62,9 @@ bool CompileSnesSeq::GetHeaderInfo(void) {
 
     uint32_t curOffset = dwOffset + 1;
     for (uint8_t trackIndex = 0; trackIndex < nNumTracks; trackIndex++) {
-        std::stringstream trackName;
-        trackName << "Track " << (trackIndex + 1);
+        std::string trackName = fmt::format("Track {}", trackIndex + 1);
 
-        VGMHeader *trackHeader = header->AddHeader(curOffset, 14, trackName.str().c_str());
+        VGMHeader *trackHeader = header->AddHeader(curOffset, 14, trackName);
         trackHeader->AddSimpleItem(curOffset, 1, "Channe");
         trackHeader->AddSimpleItem(curOffset + 1, 1, "Flags");
         trackHeader->AddSimpleItem(curOffset + 2, 1, "Volume");

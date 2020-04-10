@@ -5,6 +5,7 @@
  */
 
 #include "KonamiPS1Seq.h"
+#include <fmt/format.h>
 
 void KonamiPS1Scanner::Scan(RawFile *file, void *info) {
     uint32_t offset = 0;
@@ -15,9 +16,7 @@ void KonamiPS1Scanner::Scan(RawFile *file, void *info) {
                                     ? file->tag.title
                                     : removeExtFromPath(file->name());
             if (numSeqFiles >= 1) {
-                std::stringstream postfix;
-                postfix << " (" << (numSeqFiles + 1) << ")";
-                name += postfix.str();
+                name += fmt::format("({})", numSeqFiles + 1);
             }
 
             KonamiPS1Seq *newSeq = new KonamiPS1Seq(file, offset, name);

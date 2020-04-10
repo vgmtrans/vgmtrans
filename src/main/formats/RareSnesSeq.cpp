@@ -5,6 +5,8 @@
  */
 
 #include "RareSnesSeq.h"
+
+#include <sstream>
 #include "ScaleConversion.h"
 
 using namespace std;
@@ -292,7 +294,7 @@ bool RareSnesTrack::ReadEvent(void) {
     uint8_t newMidiVol, newMidiPan;
     bool bContinue = true;
 
-    stringstream desc;
+    std::stringstream desc;
 
     if (statusByte >= 0x80) {
         uint8_t noteByte = statusByte;

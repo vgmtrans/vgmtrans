@@ -6,6 +6,10 @@
 
 #include "NeverlandSnesSeq.h"
 
+
+#include <fmt/format.h>
+#include <sstream>
+
 DECLARE_FORMAT(NeverlandSnes);
 
 //  ****************
@@ -73,17 +77,15 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
         uint16_t trackSignPtr = dwOffset + 0x10 + trackIndex;
         uint8_t trackSign = GetByte(trackSignPtr);
 
-        std::stringstream trackSignName;
-        trackSignName << "Track " << (trackIndex + 1) << " Entry";
-        header->AddSimpleItem(trackSignPtr, 1, trackSignName.str());
+        std::string trackSignName = fmt::format("Track {} entry", trackIndex + 1);
+        header->AddSimpleItem(trackSignPtr, 1, trackSignName);
 
         uint16_t sectionListOffsetPtr = dwOffset + 0x20 + (trackIndex * 2);
         if (trackSign != 0xff) {
             uint16_t sectionListAddress = GetShortAddress(sectionListOffsetPtr);
 
-            std::stringstream playlistName;
-            playlistName << "Track " << (trackIndex + 1) << " Playlist Pointer";
-            header->AddSimpleItem(sectionListOffsetPtr, 2, playlistName.str());
+            std::string playlistName = fmt::format("Track {} playlist pointer", trackIndex + 1);
+            header->AddSimpleItem(sectionListOffsetPtr, 2, playlistName);
 
             NeverlandSnesTrack *track = new NeverlandSnesTrack(this, sectionListAddress);
             aTracks.push_back(track);

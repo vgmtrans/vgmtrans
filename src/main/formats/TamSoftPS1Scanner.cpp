@@ -5,6 +5,8 @@
  */
 
 #include "TamSoftPS1Seq.h"
+
+#include <fmt/format.h>
 #include "TamSoftPS1Instr.h"
 
 void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
@@ -35,10 +37,8 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
         }
 
         for (uint8_t songIndex = 0; songIndex < numSongs; songIndex++) {
-            std::stringstream seqname;
-            seqname << basename << " (" << songIndex << ")";
-
-            TamSoftPS1Seq *newSeq = new TamSoftPS1Seq(file, 0, songIndex, seqname.str());
+            std::string seqname = fmt::format("{} ({})", basename, songIndex);
+            TamSoftPS1Seq *newSeq = new TamSoftPS1Seq(file, 0, songIndex, seqname);
             if (newSeq->LoadVGMFile()) {
                 newSeq->unLength = file->size();
             } else {

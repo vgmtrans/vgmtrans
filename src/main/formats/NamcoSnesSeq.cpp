@@ -5,6 +5,8 @@
  */
 
 #include "NamcoSnesSeq.h"
+
+#include <sstream>
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(NamcoSnes);

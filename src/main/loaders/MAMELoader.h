@@ -5,9 +5,11 @@
  */
 #pragma once
 
+#include <sstream>
+#include <unzip.h>
+
 #include "components/FileLoader.h"
 #include "LoaderManager.h"
-#include <unzip.h>
 
 class TiXmlElement;
 class VirtFile;

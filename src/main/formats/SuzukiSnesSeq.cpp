@@ -6,6 +6,9 @@
 
 #include "SuzukiSnesSeq.h"
 
+#include <fmt/format.h>
+#include <sstream>
+
 DECLARE_FORMAT(SuzukiSnes);
 
 //  *************
@@ -68,9 +71,8 @@ bool SuzukiSnesSeq::GetHeaderInfo(void) {
         uint16_t addrTrackStart = GetShort(curOffset);
 
         if (addrTrackStart != 0) {
-            std::stringstream trackName;
-            trackName << "Track Pointer " << (trackIndex + 1);
-            header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+            std::string trackName = fmt::format("Track pointer {}", trackIndex + 1);
+            header->AddSimpleItem(curOffset, 2, trackName);
 
             aTracks.push_back(new SuzukiSnesTrack(this, addrTrackStart));
         } else {

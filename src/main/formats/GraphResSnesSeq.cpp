@@ -5,6 +5,8 @@
  */
 
 #include "GraphResSnesSeq.h"
+
+#include <sstream>
 #include "ScaleConversion.h"
 
 using namespace std;
@@ -49,8 +51,7 @@ bool GraphResSnesSeq::GetHeaderInfo(void) {
 
     uint32_t curOffset = dwOffset;
     for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-        std::stringstream trackName;
-        trackName << "Track Pointer " << (trackIndex + 1);
+        std::string trackName = fmt::format("Track pointer {}", trackIndex + 1);
 
         bool trackUsed = (GetByte(curOffset) != 0);
         if (trackUsed) {
@@ -58,7 +59,7 @@ bool GraphResSnesSeq::GetHeaderInfo(void) {
         } else {
             header->AddSimpleItem(curOffset, 1, "Disable Track");
         }
-        header->AddSimpleItem(curOffset + 1, 2, trackName.str());
+        header->AddSimpleItem(curOffset + 1, 2, trackName);
         curOffset += 3;
     }
 

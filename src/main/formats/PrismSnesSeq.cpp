@@ -5,8 +5,10 @@
  */
 
 #include "PrismSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <fmt/format.h>
+#include <sstream>
+#include "ScaleConversion.h"
 
 // TODO: Fix envelope event length
 

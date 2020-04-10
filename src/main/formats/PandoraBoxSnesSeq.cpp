@@ -5,6 +5,9 @@
  */
 
 #include "PandoraBoxSnesSeq.h"
+
+#include <fmt/format.h>
+#include <sstream>
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(PandoraBoxSnes);
@@ -59,9 +62,8 @@ bool PandoraBoxSnesSeq::GetHeaderInfo(void) {
     for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
         uint16_t ofsTrackStart = GetShort(curOffset);
         if (ofsTrackStart != 0xffff) {
-            std::stringstream trackName;
-            trackName << "Track Pointer " << (trackIndex + 1);
-            header->AddSimpleItem(curOffset, 2, trackName.str());
+            std::string trackName = fmt::format("Track pointer {}", trackIndex + 1);
+            header->AddSimpleItem(curOffset, 2, trackName);
         } else {
             header->AddSimpleItem(curOffset, 2, "NUL");
         }

@@ -6,6 +6,8 @@
 
 #include <iomanip>
 
+#include <fmt/format.h>
+#include <sstream>
 #include "ScaleConversion.h"
 #include "TamSoftPS1Seq.h"
 
@@ -63,9 +65,8 @@ bool TamSoftPS1Seq::GetHeaderInfo(void) {
     type = GetShort(dwSongItemOffset);
     uint16_t seqHeaderRelOffset = GetShort(dwSongItemOffset + 2);
 
-    std::stringstream songTableItemName;
-    songTableItemName << "Song " << song;
-    VGMHeader *songTableItem = AddHeader(dwSongItemOffset, 4, songTableItemName.str());
+    std::string songTableItemName = fmt::format("Song {}", song);
+    VGMHeader *songTableItem = AddHeader(dwSongItemOffset, 4, songTableItemName);
     songTableItem->AddSimpleItem(dwSongItemOffset, 2, "BGM/SFX");
     songTableItem->AddSimpleItem(dwSongItemOffset + 2, 2, "Header Offset");
 
@@ -115,10 +116,9 @@ bool TamSoftPS1Seq::GetHeaderInfo(void) {
             for (uint8_t trackIndex = 0; trackIndex < maxTracks; trackIndex++) {
                 uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
-                std::stringstream trackHeaderName;
-                trackHeaderName << "Track " << (trackIndex + 1);
+                std::string trackHeaderName = fmt::format("Track {}", trackIndex + 1);
                 VGMHeader *trackHeader =
-                    seqHeader->AddHeader(dwTrackHeaderOffset, 4, trackHeaderName.str());
+                    seqHeader->AddHeader(dwTrackHeaderOffset, 4, trackHeaderName);
 
                 uint8_t live = GetByte(dwTrackHeaderOffset);
                 uint32_t dwRelTrackOffset = GetShort(dwTrackHeaderOffset + 2);

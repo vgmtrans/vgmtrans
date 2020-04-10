@@ -5,6 +5,8 @@
  */
 
 #include "FalcomSnesInstr.h"
+
+#include <fmt/format.h>
 #include "SNESDSP.h"
 
 // ******************
@@ -75,11 +77,10 @@ bool FalcomSnesInstrSet::GetInstrPointers() {
             usedSRCNs.push_back(srcn);
         }
 
-        std::ostringstream instrName;
-        instrName << "Instrument " << instr;
+        std::string instrName = fmt::format("Instrument {}", instr);
         FalcomSnesInstr *newInstr =
             new FalcomSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f, srcn,
-                                spcDirAddr, instrName.str());
+                                spcDirAddr, instrName);
         aInstrs.push_back(newInstr);
     }
     if (aInstrs.size() == 0) {

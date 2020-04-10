@@ -6,6 +6,9 @@
 
 #include "HudsonSnesSeq.h"
 
+#include <fmt/format.h>
+#include <sstream>
+
 DECLARE_FORMAT(HudsonSnes);
 
 //  *************
@@ -123,10 +126,9 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
                 uint8_t tableLength = tableSize / 4;
                 for (uint8_t instrNum = 0; instrNum < tableLength; instrNum++) {
                     uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
-                    std::stringstream instrName;
-                    instrName << "Instrument " << instrNum;
+                    std::string instrName = fmt::format("Instrument {}", instrNum);
                     VGMHeader *aInstrHeader =
-                        instrHeader->AddHeader(addrInstrItem, 4, instrName.str().c_str());
+                        instrHeader->AddHeader(addrInstrItem, 4, instrName);
                     aInstrHeader->AddSimpleItem(addrInstrItem, 1, "SRCN");
                     aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, "ADSR(1)");
                     aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, "ADSR(2)");
@@ -154,10 +156,9 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
                 uint8_t tableLength = tableSize / 4;
                 for (uint8_t percNote = 0; percNote < tableLength; percNote++) {
                     uint16_t addrPercItem = PercussionTableAddress + percNote * 4;
-                    std::stringstream percNoteName;
-                    percNoteName << "Percussion " << percNote;
+                    std::string percNoteName = fmt::format("Percussion {}", percNote);
                     VGMHeader *percNoteHeader =
-                        percHeader->AddHeader(addrPercItem, 4, percNoteName.str().c_str());
+                        percHeader->AddHeader(addrPercItem, 4, percNoteName);
                     percNoteHeader->AddSimpleItem(addrPercItem, 1, "Instrument");
                     percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, "Unity Key");
                     percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, "Volume");
@@ -186,10 +187,9 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
                 uint8_t tableLength = tableSize / 4;
                 for (uint8_t instrNum = 0; instrNum < tableLength; instrNum++) {
                     uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
-                    std::stringstream instrName;
-                    instrName << "Instrument " << instrNum;
+                    std::string instrName = fmt::format("Instrument {}", instrNum);
                     VGMHeader *aInstrHeader =
-                        instrHeader->AddHeader(addrInstrItem, 4, instrName.str().c_str());
+                        instrHeader->AddHeader(addrInstrItem, 4, instrName);
                     aInstrHeader->AddSimpleItem(addrInstrItem, 1, "SRCN");
                     aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, "ADSR(1)");
                     aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, "ADSR(2)");
@@ -217,10 +217,9 @@ bool HudsonSnesSeq::GetHeaderInfo(void) {
                 uint8_t tableLength = tableSize / 4;
                 for (uint8_t percNote = 0; percNote < tableLength; percNote++) {
                     uint16_t addrPercItem = PercussionTableAddress + percNote * 4;
-                    std::stringstream percNoteName;
-                    percNoteName << "Percussion " << percNote;
+                    std::string percNoteName = fmt::format("Percussion {}", percNote);
                     VGMHeader *percNoteHeader =
-                        percHeader->AddHeader(addrPercItem, 4, percNoteName.str().c_str());
+                        percHeader->AddHeader(addrPercItem, 4, percNoteName);
                     percNoteHeader->AddSimpleItem(addrPercItem, 1, "Instrument");
                     percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, "Unity Key");
                     percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, "Volume");
@@ -355,9 +354,8 @@ bool HudsonSnesSeq::GetTrackPointersInHeaderInfo(VGMHeader *header, uint32_t &of
                 return false;
             }
 
-            std::stringstream trackName;
-            trackName << "Track Pointer " << (trackIndex + 1);
-            header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+            std::string trackName = fmt::format("Track pointer {}", trackIndex + 1);
+            header->AddSimpleItem(curOffset, 2, trackName);
             TrackAddresses[trackIndex] = GetShort(curOffset);
             curOffset += 2;
         }
