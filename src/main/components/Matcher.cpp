@@ -12,8 +12,6 @@ Matcher::Matcher(Format *format) {
     fmt = format;
 }
 
-Matcher::~Matcher(void) {}
-
 bool Matcher::OnNewFile(VGMFile *file) {
     switch (file->GetFileType()) {
         case FILETYPE_SEQ:

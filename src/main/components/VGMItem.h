@@ -149,8 +149,8 @@ class VGMItem {
 
     RawFile *GetRawFile();
 
-    virtual std::vector<const char *> *GetMenuItemNames() { return NULL; }
-    virtual bool CallMenuItem(VGMItem *item, int menuItemNum) { return false; }
+    virtual std::vector<const char *> *GetMenuItemNames() { return nullptr; }
+    virtual bool CallMenuItem(VGMItem *, int ) { return false; }
     virtual std::string GetDescription() { return name; }
     virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
     virtual Icon GetIcon() { return ICON_BINARY; /*ICON_UNKNOWN*/ }
@@ -196,7 +196,7 @@ class VGMContainerItem : public VGMItem {
 
     template <class T>
     void AddContainer(std::vector<T *> &container) {
-        containers.push_back((std::vector<VGMItem *> *)&container);
+        containers.push_back(reinterpret_cast<std::vector<VGMItem *> *>(&container));
     }
     template <class T>
     bool RemoveContainer(std::vector<T *> &container) {
@@ -221,13 +221,3 @@ class ItemPtrOffsetCmp {
         return (a->dwOffset < b->dwOffset);
     }
 };
-
-template <class T>
-VGMItem *GetItemAtOffsetInItemVector(uint32_t offset, std::vector<T *> &theArray) {
-    int nArraySize = (int)theArray.size();
-    for (int i = 0; i < nArraySize; i++) {
-        if (((VGMItem *)theArray[i])->IsItemAtOffset(offset))
-            return theArray[i];
-    }
-    return NULL;
-}

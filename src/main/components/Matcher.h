@@ -12,32 +12,6 @@
 #include "VGMSampColl.h"
 #include "VGMColl.h"
 
-/*#define USE_SIMPLE_MATCHER(fmt_id, id_var)
-   \
-        public:
-   \
-        virtual void Announce()
-   \
-        {
-   \
-                Format* format = pRoot->GetFormat(fmt_id);
-   \
-                SimpleMatcher* matcher = (SimpleMatcher*)format->matcher;
-   \
-                vector<VGMFile*>* files = matcher->AddMatchItem(this, id_var);
-   \
-                if (files)
-   \
-                {
-   \
-                        format->OnMatch(*files);
-   \
-                        delete files;
-   \
-                }
-   \
-        }*/
-
 // *******
 // Matcher
 // *******
@@ -45,21 +19,18 @@
 class Matcher {
    public:
     Matcher(Format *format);
-    virtual ~Matcher();
+    virtual ~Matcher() = default;
 
-    // virtual bool Match() = 0;
-
-   public:
     virtual bool OnNewFile(VGMFile *file);
     virtual bool OnCloseFile(VGMFile *file);
 
    protected:
-    virtual bool OnNewSeq(VGMSeq *seq) { return false; }
-    virtual bool OnNewInstrSet(VGMInstrSet *instrset) { return false; }
-    virtual bool OnNewSampColl(VGMSampColl *sampcoll) { return false; }
-    virtual bool OnCloseSeq(VGMSeq *seq) { return false; }
-    virtual bool OnCloseInstrSet(VGMInstrSet *instrset) { return false; }
-    virtual bool OnCloseSampColl(VGMSampColl *sampcoll) { return false; }
+    virtual bool OnNewSeq(VGMSeq *) { return false; }
+    virtual bool OnNewInstrSet(VGMInstrSet *) { return false; }
+    virtual bool OnNewSampColl(VGMSampColl *) { return false; }
+    virtual bool OnCloseSeq(VGMSeq *) { return false; }
+    virtual bool OnCloseInstrSet(VGMInstrSet *) { return false; }
+    virtual bool OnCloseSampColl(VGMSampColl *) { return false; }
 
     Format *fmt;
 };
@@ -383,5 +354,3 @@ class FilegroupMatcher : public Matcher {
     std::list<VGMInstrSet *> instrsets;
     std::list<VGMSampColl *> sampcolls;
 };
-//
-//
