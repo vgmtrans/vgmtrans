@@ -17,35 +17,38 @@ using namespace std;
 
 DECLARE_MENU(VGMColl)
 
-VGMColl::VGMColl(string theName) : VGMItem(), name(theName), seq(NULL) {}
-
-VGMColl::~VGMColl(void) {}
+VGMColl::VGMColl(std::string theName) : VGMItem(), name(std::move(theName)), seq(nullptr) {}
 
 void VGMColl::RemoveFileAssocs() {
-    if (seq)
+    if (seq) {
         seq->RemoveCollAssoc(this);
-    for (uint32_t i = 0; i < instrsets.size(); i++)
-        instrsets[i]->RemoveCollAssoc(this);
-    for (uint32_t i = 0; i < sampcolls.size(); i++)
-        sampcolls[i]->RemoveCollAssoc(this);
-    for (uint32_t i = 0; i < miscfiles.size(); i++)
-        miscfiles[i]->RemoveCollAssoc(this);
+    }
+
+    for (auto set : instrsets) {
+        set->RemoveCollAssoc(this);
+    }
+    for (auto samp : sampcolls) {
+        samp->RemoveCollAssoc(this);
+    }
+    for (auto file : miscfiles) {
+        file->RemoveCollAssoc(this);
+    }
 }
 
-const string *VGMColl::GetName(void) const {
-    return &name;
+const string &VGMColl::GetName() const {
+    return name;
 }
 
 void VGMColl::SetName(const string *newName) {
     name = *newName;
 }
 
-VGMSeq *VGMColl::GetSeq(void) {
+VGMSeq *VGMColl::GetSeq() {
     return seq;
 }
 
 void VGMColl::UseSeq(VGMSeq *theSeq) {
-    if (theSeq != NULL)
+    if (theSeq != nullptr)
         theSeq->AddCollAssoc(this);
     if (seq && (theSeq != seq))  // if we associated with a previous sequence
         seq->RemoveCollAssoc(this);
@@ -53,21 +56,21 @@ void VGMColl::UseSeq(VGMSeq *theSeq) {
 }
 
 void VGMColl::AddInstrSet(VGMInstrSet *theInstrSet) {
-    if (theInstrSet != NULL) {
+    if (theInstrSet != nullptr) {
         theInstrSet->AddCollAssoc(this);
         instrsets.push_back(theInstrSet);
     }
 }
 
 void VGMColl::AddSampColl(VGMSampColl *theSampColl) {
-    if (theSampColl != NULL) {
+    if (theSampColl != nullptr) {
         theSampColl->AddCollAssoc(this);
         sampcolls.push_back(theSampColl);
     }
 }
 
 void VGMColl::AddMiscFile(VGMFile *theMiscFile) {
-    if (theMiscFile != NULL) {
+    if (theMiscFile != nullptr) {
         theMiscFile->AddCollAssoc(this);
         miscfiles.push_back(theMiscFile);
     }
@@ -81,7 +84,7 @@ bool VGMColl::Load() {
 }
 
 void VGMColl::UnpackSampColl(DLSFile &dls, VGMSampColl *sampColl, vector<VGMSamp *> &finalSamps) {
-    assert(sampColl != NULL);
+    assert(sampColl != nullptr);
 
     size_t nSamples = sampColl->samples.size();
     for (size_t i = 0; i < nSamples; i++) {
@@ -105,7 +108,7 @@ void VGMColl::UnpackSampColl(DLSFile &dls, VGMSampColl *sampColl, vector<VGMSamp
 
 void VGMColl::UnpackSampColl(SynthFile &synthfile, VGMSampColl *sampColl,
                              vector<VGMSamp *> &finalSamps) {
-    assert(sampColl != NULL);
+    assert(sampColl != nullptr);
 
     size_t nSamples = sampColl->samples.size();
     for (size_t i = 0; i < nSamples; i++) {
@@ -481,7 +484,7 @@ SynthFile *VGMColl::CreateSynthFile() {
                 }
                 if (sampCollNum == finalSampColls.size()) {
                     L_ERROR("SampColl does not exist");
-                    return NULL;
+                    return nullptr;
                 }
                 //   now we add the number of samples from the preceding SampColls to the value to
                 //   get the real sampNum in the final DLS file.

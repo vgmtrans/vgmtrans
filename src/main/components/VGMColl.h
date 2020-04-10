@@ -24,11 +24,11 @@ class VGMColl : public VGMItem {
     MENU_ITEM(VGMColl, OnSaveAll, "Save as MIDI, SoundFont 2 and DLS")
     END_MENU()
 
-    VGMColl(std::string name = "Unnamed Collection");
-    virtual ~VGMColl(void);
+    explicit VGMColl(std::string name = "Unnamed Collection");
+    virtual ~VGMColl() = default;
 
     void RemoveFileAssocs();
-    const std::string *GetName(void) const;
+    [[nodiscard]] const std::string &GetName() const;
     void SetName(const std::string *newName);
     VGMSeq *GetSeq();
     void UseSeq(VGMSeq *theSeq);
@@ -46,7 +46,7 @@ class VGMColl : public VGMItem {
 
     // This feels stupid, but the current callbacks system
     // is not exactly flexible.
-    inline void SetDefaultSavePath(std::string savepath) { dirpath = savepath; }
+    inline void SetDefaultSavePath(std::string savepath) { dirpath = std::move(savepath); }
 
     bool OnSaveAll();
     bool OnSaveAllDLS();

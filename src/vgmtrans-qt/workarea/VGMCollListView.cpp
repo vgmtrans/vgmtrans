@@ -34,7 +34,7 @@ int VGMCollListViewModel::rowCount(const QModelIndex &parent) const {
 
 QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
     if (role == Qt::DisplayRole || role == Qt::EditRole) {
-        return QString::fromStdString(*qtVGMRoot.vVGMColl[index.row()]->GetName());
+        return QString::fromStdString(qtVGMRoot.vVGMColl[index.row()]->GetName());
     } else if (role == Qt::DecorationRole) {
         return VGMCollIcon();
     }
@@ -55,13 +55,13 @@ Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
 
 void VGMCollNameEditor::setEditorData(QWidget *editor, const QModelIndex &index) const {
     QString orig_name = index.model()->data(index, Qt::EditRole).toString();
-    QLineEdit *line_edit = qobject_cast<QLineEdit *>(editor);
+    auto *line_edit = qobject_cast<QLineEdit *>(editor);
     line_edit->setText(orig_name);
 }
 
 void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
                                      const QModelIndex &index) const {
-    QLineEdit *line_edit = qobject_cast<QLineEdit *>(editor);
+    auto *line_edit = qobject_cast<QLineEdit *>(editor);
     auto new_name = line_edit->text().toStdString();
     qtVGMRoot.vVGMColl[index.row()]->SetName(&new_name);
     model->dataChanged(index, index);
@@ -101,7 +101,7 @@ void VGMCollListView::CollMenu(const QPoint &pos) {
             return;
         }
 
-        QMenu *vgmcoll_menu = new QMenu();
+        auto *vgmcoll_menu = new QMenu();
         std::vector<const char *> *menu_item_names = pointed_coll->GetMenuItemNames();
         for (auto &menu_item : *menu_item_names) {
             vgmcoll_menu->addAction(QString::fromStdString(menu_item));
@@ -117,8 +117,8 @@ void VGMCollListView::CollMenu(const QPoint &pos) {
             action_index++;
         }
         vgmcoll_menu->deleteLater();
-    } else if (qtVGMRoot.vVGMColl.size() > 0) {
-        QMenu *vgmcoll_menu = new QMenu();
+    } else if (!qtVGMRoot.vVGMColl.empty()) {
+        auto *vgmcoll_menu = new QMenu();
         auto export_all = vgmcoll_menu->addAction("Export all as MIDI, SF2 and DLS");
 
         if (vgmcoll_menu->exec(mapToGlobal(pos)) == export_all) {
