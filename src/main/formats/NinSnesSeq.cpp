@@ -665,9 +665,7 @@ bool NinSnesSection::GetTrackPointers() {
         track->shared = &parentSeq->sharedTrackData[trackIndex];
         aTracks.push_back(track);
 
-        char name[32];
-        sprintf(name, "Track Pointer #%d", trackIndex + 1);
-
+        std::string name = fmt::format("Track pointer {}", trackIndex + 1);
         header->AddSimpleItem(curOffset, 2, name);
         curOffset += 2;
     }
