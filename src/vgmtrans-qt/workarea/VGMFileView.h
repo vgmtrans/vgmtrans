@@ -28,7 +28,6 @@ class VGMFileView : public QMdiSubWindow {
    private:
     void closeEvent(QCloseEvent *closeEvent) override;
     void markEvents();
-    void highlightItem(QTreeWidgetItem *item, int col);
 
     QSplitter *m_splitter;
     QHexView *m_hexview;

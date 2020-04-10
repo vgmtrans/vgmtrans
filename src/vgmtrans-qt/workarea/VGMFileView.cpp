@@ -11,6 +11,7 @@
 
 #include <QTreeWidgetItem>
 #include <QBuffer>
+#include <cmath>
 
 #include "QHexView/qhexview.h"
 #include "QHexView/document/buffer/qmemoryrefbuffer.h"
@@ -77,10 +78,6 @@ void VGMFileView::markEvents() {
             i++;
         }
     }
-}
-
-void VGMFileView::highlightItem(QTreeWidgetItem *item, int) {
-    auto vgmitem = static_cast<VGMTreeItem *>(item);
 }
 
 void VGMFileView::closeEvent(QCloseEvent *) {
