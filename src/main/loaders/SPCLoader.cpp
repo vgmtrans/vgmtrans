@@ -11,10 +11,8 @@ void SPCLoader::apply(const RawFile *file) {
         return;
     }
 
-    char signature[34] = {0};
-    file->GetBytes(0, 33, signature);
-    if (memcmp(signature, "SNES-SPC700 Sound File Data", 27) != 0 ||
-        file->GetShort(0x21) != 0x1a1a) {
+    if (!std::equal(file->begin(), file->begin() + 27, "SNES-SPC700 Sound File Data") ||
+            file->GetShort(0x21) != 0x1a1a) {
         return;
     }
 
@@ -59,16 +57,14 @@ void SPCLoader::apply(const RawFile *file) {
 
             file->GetBytes(0xa9, 3, s);
             s[3] = '\0';
-            spcFile->tag.length = strtoul(s, NULL, 10);
+            spcFile->tag.length = strtoul(s, nullptr, 10);
         }
     }
 
     // Parse Extended ID666 if available
     if (file->size() >= 0x10208) {
-        char xid6_signature[4] = {0};
-        file->GetBytes(0x10200, 4, xid6_signature);
         uint32_t xid6_end_offset = 0x10208 + file->GetWord(0x10204);
-        if (memcmp(xid6_signature, "xid6", 4) == 0 && file->size() >= xid6_end_offset) {
+        if (std::equal(file->begin() + 0x10200, file->begin() + 0x10204, "xid6") && file->size() >= xid6_end_offset) {
             uint32_t xid6_offset = 0x10208;
             while (xid6_offset + 4 < xid6_end_offset) {
                 uint8_t xid6_id = file->GetByte(xid6_offset);
