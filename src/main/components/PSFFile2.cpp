@@ -8,8 +8,8 @@
 
 #include <exception>
 #include <algorithm>
-#include <zlib.h>
 
+#include "util/decompression.h"
 #include "io/RawFile.h"
 
 PSFFile2::PSFFile2(const RawFile &file) {

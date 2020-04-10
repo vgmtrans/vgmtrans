@@ -7,16 +7,6 @@
 #pragma once
 
 #include <string>
-#include <sstream>
-#include <cassert>
-#include <cmath>
-#include <cstring>
-#include <iomanip>
-#include <climits>
-#include <algorithm>
-#include <vector>
-#include <gsl-lite.hpp>
-
 #include "helper.h"
 
 #define VERSION "1.0.3"
@@ -41,28 +31,13 @@ std::string removeExtFromPath(const std::string &s);
 std::string StringToUpper(std::string myString);
 std::string StringToLower(std::string myString);
 
-uint32_t StringToHex(const std::string &str);
-
 std::string ConvertToSafeFileName(const std::string &str);
 
-inline int CountBytesOfVal(uint8_t *buf, uint32_t numBytes, uint8_t val) {
-    int count = 0;
-    for (uint32_t i = 0; i < numBytes; i++)
-        if (buf[i] == val)
-            count++;
-    return count;
-}
-
 struct SizeOffsetPair {
-    uint32_t size;
-    uint32_t offset;
+    std::uint32_t size;
+    std::uint32_t offset;
 
     SizeOffsetPair() : size(0), offset(0) {}
 
-    SizeOffsetPair(uint32_t offset_, uint32_t size_) : size(size_), offset(offset_) {}
+    SizeOffsetPair(std::uint32_t offset_, std::uint32_t size_) : size(size_), offset(offset_) {}
 };
-
-char *GetFileWithBase(const char *f, const char *newfile);
-
-std::vector<char> zdecompress(gsl::span<const char> data);
-std::vector<char> zdecompress(std::vector<char> &data);
