@@ -5,6 +5,8 @@
  */
 
 #include "CapcomSnesSeq.h"
+
+#include <sstream>
 #include "ScaleConversion.h"
 
 using namespace std;

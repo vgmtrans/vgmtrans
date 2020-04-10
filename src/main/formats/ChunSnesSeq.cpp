@@ -5,6 +5,9 @@
  */
 
 #include "ChunSnesSeq.h"
+
+#include <fmt/format.h>
+#include <sstream>
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(ChunSnes);
@@ -69,9 +72,8 @@ bool ChunSnesSeq::GetHeaderInfo(void) {
             addrTrackStart = dwOffset + ofsTrackStart;
         }
 
-        std::stringstream trackName;
-        trackName << "Track Pointer " << (trackIndex + 1);
-        header->AddSimpleItem(curOffset, 2, trackName.str());
+        std::string trackName = fmt::format("Track pointer {}", (trackIndex + 1));
+        header->AddSimpleItem(curOffset, 2, trackName);
 
         ChunSnesTrack *track = new ChunSnesTrack(this, addrTrackStart);
         track->index = aTracks.size();
