@@ -13,6 +13,8 @@
  */
 
 #include "MP2kSeq.h"
+
+#include <array>
 #include "MP2kFormat.h"
 
 DECLARE_FORMAT(MP2k);
