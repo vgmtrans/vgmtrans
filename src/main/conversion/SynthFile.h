@@ -23,7 +23,7 @@ typedef enum { no_transform, concave_transform } Transform;
 class SynthFile {
    public:
     SynthFile(const std::string synth_name = "Instrument Set");
-    ~SynthFile(void);
+    ~SynthFile();
 
     SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum);
     SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, std::string Name);

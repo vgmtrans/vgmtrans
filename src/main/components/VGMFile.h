@@ -82,7 +82,7 @@ class VGMFile : public VGMContainerItem {
 
    protected:
     FileType file_type;
-    const std::string &format;
+    std::string format;
     uint32_t id;
     std::string m_name;
 };

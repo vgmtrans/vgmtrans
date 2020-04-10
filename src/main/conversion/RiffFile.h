@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstring>
+#include <cassert>
 #include "common.h"
 
 //////////////////////////////////////////////

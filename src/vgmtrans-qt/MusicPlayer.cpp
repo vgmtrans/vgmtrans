@@ -125,13 +125,13 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
 
     VGMSeq *seq = coll->GetSeq();
     if (!seq) {
-        L_ERROR("There's no sequence to play for '{}'", *coll->GetName());
+        L_ERROR("There's no sequence to play for '{}'", coll->GetName());
         return;
     }
 
     std::shared_ptr<SF2File> sf2(coll->CreateSF2File());
     if (!sf2) {
-        L_ERROR("No soundfont could be generated for '{}'. Playback aborted", *coll->GetName());
+        L_ERROR("No soundfont could be generated for '{}'. Playback aborted", coll->GetName());
         return;
     }
 

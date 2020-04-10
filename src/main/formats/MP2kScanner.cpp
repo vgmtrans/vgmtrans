@@ -19,6 +19,7 @@
 #include <optional>
 #include <functional>
 #include <set>
+#include <gsl-lite.hpp>
 
 #include "VGMColl.h"
 #include "MP2kSeq.h"

@@ -50,15 +50,10 @@ void PSFLoader::psf_read_exe(const RawFile *file, int version) {
             /* Look for additional libraries in the same folder */
             auto libstring = fmt::compile("_lib{:d}");
             int i = 1;
-            while (true) {
-                libtag = psf.tags().find(fmt::format(libstring, i++));
-                if (libtag != psf.tags().end()) {
-                    newpath = basepath.replace_filename(libtag->second).string();
-                    newfile = std::make_shared<DiskFile>(newpath);
-                    enqueue(newfile);
-                } else {
-                    break;
-                }
+            for(libtag = psf.tags().find(fmt::format(libstring, i++)); libtag != psf.tags().end(); psf.tags().find(fmt::format(libstring, i++))) {
+                newpath = basepath.replace_filename(libtag->second).string();
+                newfile = std::make_shared<DiskFile>(newpath);
+                enqueue(newfile);
             }
         }
 

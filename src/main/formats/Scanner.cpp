@@ -14,11 +14,5 @@ bool VGMScanner::Init() {
 }
 
 void VGMScanner::InitiateScan(RawFile *file, void *offset) {
-    pRoot->UI_SetScanInfo();
     this->Scan(file, offset);
 }
-
-// void VGMScanner::Scan(RawFile* file)
-//{
-//	return;
-//}

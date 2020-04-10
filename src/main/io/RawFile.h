@@ -97,7 +97,7 @@ class RawFile {
     bool MatchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const;
     bool MatchBytePattern(const BytePattern &pattern, size_t offset) const;
     bool SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
-                           uint32_t nSearchOffset = 0, uint32_t nSearchSize = (uint32_t)-1) const;
+                           uint32_t nSearchOffset = 0, uint32_t nSearchSize = static_cast<uint32_t>(-1)) const;
 
     const std::vector<std::shared_ptr<VGMFile>> &containedVGMFiles() const noexcept {
         return m_vgmfiles;
