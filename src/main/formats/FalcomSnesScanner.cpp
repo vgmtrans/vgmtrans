@@ -6,6 +6,10 @@
 
 #include "FalcomSnesSeq.h"
 #include "FalcomSnesInstr.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<FalcomSnesScanner> s_falcom_snes("FALCOMSNES", {"spc"});
+}
 
 //; Ys V: Ushinawareta Suna no Miyako Kefin SPC
 // 0c05: 4b 67     lsr   $67
@@ -74,8 +78,7 @@ void FalcomSnesScanner::Scan(RawFile *file, void *info) {
 
 void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
     FalcomSnesVersion version = FALCOMSNES_NONE;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     uint32_t ofsLoadSeq;
     uint16_t addrSeqHeader;

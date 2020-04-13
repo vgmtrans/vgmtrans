@@ -6,6 +6,10 @@
 
 #include "NamcoSnesInstr.h"
 #include "NamcoSnesSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<NamcoSnesScanner> s_namco_snes("NAMCOSNES", {"spc"});
+}
 
 // Wagan Paradise SPC
 // 05cc: 68 60     cmp   a,#$60
@@ -111,8 +115,7 @@ void NamcoSnesScanner::Scan(RawFile *file, void *info) {
 
 void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
     NamcoSnesVersion version = NAMCOSNES_NONE;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search song list
     uint32_t ofsReadSongList;

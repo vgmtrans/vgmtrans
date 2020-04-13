@@ -8,6 +8,11 @@
 #include <map>
 
 #include "NeverlandSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<NeverlandSnesScanner> s_neverland_snes("NEVERLANDSNES", {"spc"});
+}
 
 //; Lufia SPC
 // 16c3: 8f 10 08  mov   $08,#$10

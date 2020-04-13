@@ -79,8 +79,6 @@ class VGMRoot {
     std::vector<VGMFile *> vVGMFile;
     std::vector<VGMColl *> vVGMColl;
 
-    std::vector<VGMScanner *> vScanner;
-
    private:
     std::vector<std::shared_ptr<RawFile>> m_activefiles;
     std::vector<std::shared_ptr<VGMColl>> m_colls;

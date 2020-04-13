@@ -5,6 +5,10 @@
  */
 
 #include "SegSatSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<SegSatScanner> s_segsat("SEGSAT");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 

@@ -8,13 +8,23 @@
 #include "QSoundInstr.h"
 #include "MAMELoader.h"
 #include <fmt/format.h>
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<QSoundScanner> s_qsound("QSOUND");
+}
 
 using namespace std;
 
 //#define PROG_INFO_TABLE_OFFSET 0x7000
 //#define qs_samp_info_TABLE_OFFSET 0x8000
 
+// TODO: Fix this void* nonsense
 void QSoundScanner::Scan(RawFile *file, void *info) {
+    if (!info) {
+        return;
+    }
+
     MAMEGameEntry *gameentry = (MAMEGameEntry *)info;
     MAMERomGroupEntry *seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
     MAMERomGroupEntry *sampsRomGroupEntry = gameentry->GetRomGroupOfType("qsound");

@@ -8,6 +8,10 @@
 
 #include <fmt/format.h>
 #include "TamSoftPS1Instr.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TAMSOFTPS1", {"tsq", "tvb"});
+}
 
 void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
     std::string basename(removeExtFromPath(file->name()));

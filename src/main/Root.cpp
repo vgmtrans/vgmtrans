@@ -9,52 +9,23 @@
 #include "Root.h"
 #include "VGMColl.h"
 #include "VGMFile.h"
+#include "components/seq/VGMSeq.h"
+#include "components/instr/VGMInstrSet.h"
+#include "components/VGMSampColl.h"
+#include "components/VGMMiscFile.h"
 #include "Format.h"
 #include "Scanner.h"
 
 #include "components/FileLoader.h"
 #include "loaders/LoaderManager.h"
+#include "components/ScannerManager.h"
 
 VGMRoot *pRoot;
 
 /* FIXME: We want automatic registration */
 bool VGMRoot::Init(void) {
     UI_SetRootPtr(&pRoot);
-
-    AddScanner("NDS");
-    AddScanner("Akao");
-    AddScanner("FFT");
-    AddScanner("HOSA");
-    AddScanner("PS1");
-    AddScanner("SquarePS2");
-    AddScanner("SonyPS2");
-    AddScanner("TriAcePS1");
-    AddScanner("MP2k");
-    AddScanner("HeartBeatPS1");
-    AddScanner("TamSoftPS1");
-    AddScanner("KonamiPS1");
-    // AddScanner("Org");
-    // AddScanner("QSound");
-    // AddScanner("SegSat");
-    // AddScanner("TaitoF3");
-
-    // the following scanners use USE_EXTENSION
-    // AddScanner("NinSnes");
-    // AddScanner("SuzukiSnes");
-    // AddScanner("CapcomSnes");
-    // AddScanner("RareSnes");
-
     return true;
-}
-
-void VGMRoot::AddScanner(const std::string &formatname) {
-    Format *fmt = Format::GetFormatFromName(formatname);
-    if (!fmt)
-        return;
-    VGMScanner &scanner = fmt->GetScanner();
-    if (!scanner.Init())
-        return;
-    vScanner.push_back(&scanner);
 }
 
 void VGMRoot::Exit(void) {
@@ -110,26 +81,24 @@ bool VGMRoot::SetupNewRawFile(std::shared_ptr<RawFile> newRawFile) {
          * Unsure how good of an idea this is
          */
         auto specific_scanners =
-            ExtensionDiscriminator::instance().GetScannerList(newRawFile->extension());
-        if (specific_scanners) {
-            for (auto scanner : *specific_scanners) {
+            ScannerManager::get().scanners_with_extension(newRawFile->extension());
+        if (!specific_scanners.empty()) {
+            for (const auto& scanner : specific_scanners) {
                 scanner->Scan(newRawFile.get());
             }
         } else {
-            for (auto scanner : vScanner) {
+            for (const auto& scanner : ScannerManager::get().scanners()) {
                 scanner->Scan(newRawFile.get());
             }
         }
     }
 
-    if (newRawFile->containedVGMFiles().empty()) {
-        return true;
+    if (!newRawFile->containedVGMFiles().empty()) {
+        // FIXME
+        auto &newref = m_activefiles.emplace_back(newRawFile);
+        vRawFile.emplace_back(newref.get());
+        UI_AddRawFile(newref.get());
     }
-
-    // FIXME
-    auto &newref = m_activefiles.emplace_back(newRawFile);
-    vRawFile.emplace_back(newref.get());
-    UI_AddRawFile(newref.get());
 
     return true;
 }
@@ -185,7 +154,7 @@ void VGMRoot::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
         L_WARN("Requested deletion for VGMFile but it was not found");
     }
 
-    while (targFile->assocColls.size()) {
+    while (!targFile->assocColls.empty()) {
         RemoveVGMColl(targFile->assocColls.back());
     }
 
@@ -217,16 +186,16 @@ void VGMRoot::RemoveVGMColl(VGMColl *targColl) {
 void VGMRoot::UI_AddVGMFile(VGMFile *theFile) {
     switch (theFile->GetFileType()) {
         case FILETYPE_SEQ:
-            UI_AddVGMSeq((VGMSeq *)theFile);
+            UI_AddVGMSeq(dynamic_cast<VGMSeq *>(theFile));
             break;
         case FILETYPE_INSTRSET:
-            UI_AddVGMInstrSet((VGMInstrSet *)theFile);
+            UI_AddVGMInstrSet(dynamic_cast<VGMInstrSet *>(theFile));
             break;
         case FILETYPE_SAMPCOLL:
-            UI_AddVGMSampColl((VGMSampColl *)theFile);
+            UI_AddVGMSampColl(dynamic_cast<VGMSampColl *>(theFile));
             break;
         case FILETYPE_MISC:
-            UI_AddVGMMisc((VGMMiscFile *)theFile);
+            UI_AddVGMMisc(dynamic_cast<VGMMiscFile *>(theFile));
             break;
         default:
             L_ERROR("Attempted to load some unknown kind of VGMFile");
@@ -238,10 +207,11 @@ void VGMRoot::UI_AddVGMFile(VGMFile *theFile) {
 bool VGMRoot::UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, uint32_t size) {
     std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
-    if (!outfile.is_open())  // if attempt to open file failed
+    if (!outfile.is_open()) {
         return false;
+    }
 
-    outfile.write((const char *)buf, size);
+    outfile.write(reinterpret_cast<char *>(buf), size);
     outfile.close();
     return true;
 }
@@ -253,11 +223,11 @@ bool VGMRoot::SaveAllAsRaw() {
     }
 
     for (auto file : vVGMFile) {
-        std::string filepath = dirpath + "/" + file->GetName()->c_str();
+        std::string filepath = dirpath + "/" + *file->GetName();
 
-        uint8_t *buf = new uint8_t[file->unLength];
+        auto *buf = new uint8_t[file->unLength];
         file->GetBytes(file->dwOffset, file->unLength, buf);
-        UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);
+        UI_WriteBufferToFile(filepath, buf, file->unLength);
 
         delete[] buf;
     }

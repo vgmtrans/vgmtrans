@@ -6,6 +6,10 @@
 
 #include "FFTSeq.h"
 #include "FFTInstr.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<FFTScanner> s_fft_snes("FFT");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 

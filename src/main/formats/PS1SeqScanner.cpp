@@ -10,6 +10,11 @@
 #include <functional>
 #include "PS1Format.h"
 #include "PSXSPU.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<PS1SeqScanner> s_ps1seq("PS1SEQ");
+}
 
 constexpr int SRCH_BUF_SIZE = 0x20000;
 

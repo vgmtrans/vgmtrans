@@ -7,6 +7,10 @@
 #include "RareSnesSeq.h"
 #include "RareSnesInstr.h"
 #include "SNESDSP.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<RareSnesScanner> s_raresnes("RARESNES", {"spc"});
+}
 
 using namespace std;
 
@@ -99,8 +103,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
     uint32_t ofsVCmdExecASM;
     uint32_t addrSeqHeader;
     uint32_t addrVCmdTable;
-    string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // find a sequence
     if (file->SearchBytePattern(ptnSongLoadDKC2, ofsSongLoadASM)) {

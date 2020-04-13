@@ -9,9 +9,6 @@
 
 class NeverlandSnesScanner : public VGMScanner {
    public:
-    NeverlandSnesScanner(void) { USE_EXTENSION("spc"); }
-    virtual ~NeverlandSnesScanner(void) {}
-
     virtual void Scan(RawFile *file, void *info = 0);
     void SearchForNeverlandSnesFromARAM(RawFile *file);
     void SearchForNeverlandSnesFromROM(RawFile *file);

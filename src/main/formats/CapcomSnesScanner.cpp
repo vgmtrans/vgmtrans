@@ -6,6 +6,10 @@
 
 #include "CapcomSnesSeq.h"
 #include "CapcomSnesInstr.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<CapcomSnesScanner> s_capcom_snes("CAPCOMSNES", {"spc"});
+}
 
 using namespace std;
 

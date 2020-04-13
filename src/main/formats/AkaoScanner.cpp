@@ -6,10 +6,11 @@
 
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
+#include "ScannerManager.h"
 
-AkaoScanner::AkaoScanner(void) {}
-
-AkaoScanner::~AkaoScanner(void) {}
+namespace vgmtrans::scanners {
+ScannerRegistration<AkaoScanner> s_akao("AKAO");
+}
 
 void AkaoScanner::Scan(RawFile *file, void *info) {
     uint32_t nFileLength = file->size();
@@ -34,9 +35,9 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
         } else {
             if (file->GetWord(i + 8) != 0 || file->GetWord(i + 0x0C) != 0 ||
                 file->GetWord(i + 0x24) != 0 || file->GetWord(i + 0x28) != 0 ||
-                file->GetWord(i + 0x2C) != 0 && file->GetWord(i + 0x30) != 0 ||
+                (file->GetWord(i + 0x2C) != 0 && file->GetWord(i + 0x30) != 0) ||
                 file->GetWord(i + 0x34) != 0 ||
-                file->GetWord(i + 0x38) != 0 && file->GetWord(i + 0x3C) != 0 ||
+                (file->GetWord(i + 0x38) != 0 && file->GetWord(i + 0x3C) != 0) ||
                 file->GetWord(i + 0x40) != 0 ||
                 file->GetWord(i + 0x4C) ==
                     0)  // ADSR1 and ADSR2 will never be 0 in any real-world case.

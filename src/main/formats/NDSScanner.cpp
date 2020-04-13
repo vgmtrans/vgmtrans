@@ -8,14 +8,15 @@
 #include "NDSInstrSet.h"
 
 #include <fmt/format.h>
-#include <algorithm>
 #include <functional>
+#include "ScannerManager.h"
 
-constexpr int SRCH_BUF_SIZE = 0x20000;
+namespace vgmtrans::scanners {
+ScannerRegistration<NDSScanner> s_nds("NDS", {"nds", "sdat", "mini2sf", "2sf", "2sflib"});
+}
 
-void NDSScanner::Scan(RawFile *file, void *info) {
+void NDSScanner::Scan(RawFile *file, void *) {
     SearchForSDAT(file);
-    return;
 }
 
 void NDSScanner::SearchForSDAT(RawFile *file) {
@@ -142,7 +143,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
         std::vector<bool> valid(nWAs);
         for (auto &WAid : vUniqueWAs) {
             if (WAid != 0xFFFF && WAid < nWAs) {
-                valid[WAid] = 1;
+                valid[WAid] = true;
             }
         }
 

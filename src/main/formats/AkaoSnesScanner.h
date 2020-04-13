@@ -11,9 +11,6 @@ enum AkaoSnesVersion : uint8_t;  // see AkaoSnesFormat.h
 
 class AkaoSnesScanner : public VGMScanner {
    public:
-    AkaoSnesScanner(void) { USE_EXTENSION("spc"); }
-    virtual ~AkaoSnesScanner(void) {}
-
     virtual void Scan(RawFile *file, void *info = 0);
     void SearchForAkaoSnesFromARAM(RawFile *file);
     void SearchForAkaoSnesFromROM(RawFile *file);

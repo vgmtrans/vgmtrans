@@ -6,6 +6,10 @@
 
 #include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<SuzukiSnesScanner> s_suzuki_snes("SUZUKISNES", {"spc"});
+}
 
 //; Seiken Densetsu 3 SPC
 // 038b: fa f5 5c  mov   ($5c),($f5)
@@ -138,8 +142,7 @@ void SuzukiSnesScanner::Scan(RawFile *file, void *info) {
 
 void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
     SuzukiSnesVersion version = SUZUKISNES_NONE;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search for note length table
     uint32_t ofsSongLoad;

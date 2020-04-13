@@ -9,6 +9,11 @@
 #include "VGMColl.h"
 
 #include <memory>
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<TriAcePS1Scanner> s_triace_ps1("TRIACEPS1");
+}
 
 using namespace std;
 

@@ -6,6 +6,10 @@
 
 #include "SquarePS2Seq.h"
 #include "WD.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<SquarePS2Scanner> s_squareps2("SQUAREPS2");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 

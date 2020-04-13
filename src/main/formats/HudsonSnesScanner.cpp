@@ -6,6 +6,11 @@
 
 #include "HudsonSnesInstr.h"
 #include "HudsonSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<HudsonSnesScanner> s_hudson_snes("HUDSONSNES", {"spc"});
+}
 
 BytePattern HudsonSnesScanner::ptnNoteLenTable("\xc0\x60\x30\x18\x0c\x06\x03\x01", "xxxxxxxx", 8);
 
@@ -103,8 +108,7 @@ void HudsonSnesScanner::Scan(RawFile *file, void *info) {
 
 void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile *file) {
     HudsonSnesVersion version = HUDSONSNES_NONE;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search for note length table
     uint32_t ofsNoteLenTable;

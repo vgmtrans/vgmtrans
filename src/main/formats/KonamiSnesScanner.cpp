@@ -6,6 +6,11 @@
 
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesInstr.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<KonamiSnesScanner> s_konami_snes("KONAMISNES", {"spc"});
+}
 
 //; Ganbare Goemon 4
 // 13d6: 8f 00 0a  mov   $0a,#$00

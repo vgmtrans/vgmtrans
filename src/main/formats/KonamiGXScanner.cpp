@@ -6,8 +6,17 @@
 
 #include "KonamiGXSeq.h"
 #include "MAMELoader.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<KonamiGXScanner> s_konami_gx("KONAMIGX");
+}
 
 void KonamiGXScanner::Scan(RawFile *file, void *info) {
+    if (!info) {
+        return;
+    }
+
     MAMEGameEntry *gameentry = (MAMEGameEntry *)info;
     MAMERomGroupEntry *seqRomGroupEntry = gameentry->GetRomGroupOfType("soundcpu");
     MAMERomGroupEntry *sampsRomGroupEntry = gameentry->GetRomGroupOfType("shared");

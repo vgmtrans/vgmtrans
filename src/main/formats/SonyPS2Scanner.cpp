@@ -6,6 +6,10 @@
 
 #include "SonyPS2Seq.h"
 #include "SonyPS2InstrSet.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<SonyPS2Scanner> s_sonyps2("SONYPS2", {"sq", "hd", "bd"});
+}
 
 #define SRCH_BUF_SIZE 0x20000
 

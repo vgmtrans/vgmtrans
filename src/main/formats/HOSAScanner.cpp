@@ -7,6 +7,11 @@
 #include "HOSASeq.h"
 #include "HOSAInstr.h"
 #include "PSXSPU.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<HOSAScanner> s_hosa("HOSA");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 
@@ -54,8 +59,7 @@ void HOSAScanner::Scan(RawFile *file, void *info) {
 }
 
 HOSASeq *HOSAScanner::SearchForHOSASeq(RawFile *file) {
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     uint32_t nFileLength = file->size();
     for (uint32_t i = 0; i + 4 < nFileLength; i++) {

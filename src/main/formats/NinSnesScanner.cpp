@@ -9,6 +9,11 @@
 
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<NinSnesScanner> s_nin_snes("NINSNES", {"spc"});
+}
 
 //; Yoshi's Island SPC
 //; vcmd branches 80-ff

@@ -5,6 +5,10 @@
  */
 
 #include "MoriSnesSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<MoriSnesScanner> s_mori_snes("MORISNES", {"spc"});
+}
 
 //; Gokinjo Boukentai SPC
 // 0c3c: 1c        asl   a                 ; song index in A
@@ -44,8 +48,7 @@ void MoriSnesScanner::Scan(RawFile *file, void *info) {
 
 void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
     MoriSnesVersion version = MORISNES_NONE;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // scan for song list table
     uint32_t ofsLoadSeq;

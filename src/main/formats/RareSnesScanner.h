@@ -9,9 +9,6 @@
 
 class RareSnesScanner : public VGMScanner {
    public:
-    RareSnesScanner(void) { USE_EXTENSION("spc"); }
-    virtual ~RareSnesScanner(void) {}
-
     virtual void Scan(RawFile *file, void *info = 0);
     void SearchForRareSnesFromARAM(RawFile *file);
     void SearchForRareSnesFromROM(RawFile *file);

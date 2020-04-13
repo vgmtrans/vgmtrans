@@ -6,6 +6,10 @@
 
 #include "CompileSnesInstr.h"
 #include "CompileSnesSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<CompileSnesScanner> s_compile_snes("COMPILESNES", {"spc"});
+}
 
 //; Super Puyo Puyo 2 SPC
 // 08e6: e5 00 18  mov   a,$1800

@@ -6,6 +6,10 @@
 
 #include "ChunSnesSeq.h"
 #include "ChunSnesInstr.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<ChunSnesScanner> s_chun_snes("CHUNSNES", {"spc"});
+}
 
 //; Otogirisou SPC
 // 0eca: d5 1d 05  mov   $051d+x,a         ; $051D+X = A
@@ -379,8 +383,7 @@ void ChunSnesScanner::Scan(RawFile *file, void *info) {
 void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile *file) {
     ChunSnesVersion version = CHUNSNES_NONE;
     ChunSnesMinorVersion minorVersion = CHUNSNES_NOMINORVERSION;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search song list and detect engine version
     uint32_t ofsLoadSeq;

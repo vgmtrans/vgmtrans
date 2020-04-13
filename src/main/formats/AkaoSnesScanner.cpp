@@ -6,6 +6,10 @@
 
 #include "AkaoSnesInstr.h"
 #include "AkaoSnesSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<AkaoSnesScanner> s_akao_snes("AKAOSNES", {"spc"});
+}
 
 //; Final Fantasy 4 SPC
 // 0a0d: cd 0f     mov   x,#$0f
@@ -282,8 +286,7 @@ void AkaoSnesScanner::Scan(RawFile *file, void *info) {
 void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
     AkaoSnesVersion version = AKAOSNES_NONE;
     AkaoSnesMinorVersion minorVersion = AKAOSNES_NOMINORVERSION;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search for note length table
     uint32_t ofsReadNoteLength;

@@ -6,6 +6,11 @@
 
 #include "PandoraBoxSnesSeq.h"
 #include "PandoraBoxSnesInstr.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<PandoraBoxSnesScanner> s_pandorabox_snes("PANDORABOXSNES", {"spc"});
+}
 
 // ; Kishin Kourinden Oni SPC
 // f91d: 8d 10     mov   y,#$10
@@ -82,8 +87,7 @@ void PandoraBoxSnesScanner::Scan(RawFile *file, void *info) {
 
 void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM(RawFile *file) {
     PandoraBoxSnesVersion version = PANDORABOXSNES_NONE;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     uint32_t ofsLoadSeq;
     uint16_t addrSeqHeader;

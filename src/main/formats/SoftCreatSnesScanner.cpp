@@ -5,6 +5,10 @@
  */
 
 #include "SoftCreatSnesSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<SoftCreatSnesScanner> s_softcreat_snes("SOFTCREATSNES", {"spc"});
+}
 
 //; Plok!
 // 0589: 7d        mov   a,x
@@ -62,8 +66,7 @@ void SoftCreatSnesScanner::Scan(RawFile *file, void *info) {
 
 void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
     SoftCreatSnesVersion version = SOFTCREATSNES_NONE;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search song list
     uint32_t ofsLoadSeq;

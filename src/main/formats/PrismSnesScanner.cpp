@@ -6,6 +6,11 @@
 
 #include "PrismSnesInstr.h"
 #include "PrismSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<PrismSnesScanner> s_prism_snes("PRISMSNES", {"spc"});
+}
 
 //; Dual Orb 2 SPC
 // 0a28: f6 00 23  mov   a,$2300+y
@@ -115,8 +120,7 @@ void PrismSnesScanner::Scan(RawFile *file, void *info) {
 
 void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
     PrismSnesVersion version = PRISMSNES_NONE;
-    std::string name =
-        file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // search song list
     uint32_t ofsLoadSeq;

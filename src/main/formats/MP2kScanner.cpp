@@ -25,6 +25,10 @@
 #include "MP2kSeq.h"
 #include "MP2kInstrSet.h"
 #include "LogManager.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<MP2kScanner> s_mp2k("MP2K", {"gba", "gsf", "minigsf", "gsflib"});
+}
 
 static constexpr int samplerate_LUT[16] = {-1,    5734,  7884,  10512, 13379, 15768, 18157, 21024,
                                            26758, 31536, 36314, 40137, 42048, -1,    -1,    -1};
@@ -57,13 +61,6 @@ static bool test_pointer_validity(RawFile *file, size_t offset, uint32_t inGBA_l
         file->get<u32>(offset + 4) < 256 && ((file->get<u32>(offset) & 0xff000000) == 0);
 
     return params.valid() && valid_table;
-}
-
-MP2kScanner::MP2kScanner() {
-    USE_EXTENSION("gba");
-    USE_EXTENSION("minigsf");
-    USE_EXTENSION("gsf");
-    USE_EXTENSION("gsflib");
 }
 
 void MP2kScanner::Scan(RawFile *file, void *info) {
@@ -256,7 +253,7 @@ std::optional<size_t> MP2kScanner::DetectMP2K(RawFile *file) {
     /* Settings location used by most games */
     bool valid_m16 = test_pointer_validity(file, main_ofs - 16, file->size());
 
-    /* Settings location used by Pokémon */
+    /* Settings location used by Pokï¿½mon */
     bool valid_m32 = test_pointer_validity(file, main_ofs - 32, file->size());
 
     if (!(valid_m16 || valid_m32)) {

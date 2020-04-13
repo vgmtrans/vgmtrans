@@ -5,6 +5,11 @@
  */
 
 #include "OrgSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<OrgScanner> s_org("ORG");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 
