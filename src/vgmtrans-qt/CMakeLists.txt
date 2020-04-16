@@ -14,7 +14,7 @@ else()
       fluidsynth
       PROPERTIES
         IMPORTED_LOCATION
-        "${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2017-x64/fluidsynth.lib"
+        "${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2019-x64/fluidsynth.lib"
       )
 
     target_include_directories(
@@ -96,7 +96,7 @@ add_executable(vgmtrans
                workarea/VGMFilesList.cpp
                workarea/VGMFilesList.h
                phantom/phantomstyle.cpp
-               phantom/phantomcolor.cpp)
+               phantom/phantomcolor.cpp PlayerControl.cpp PlayerControl.h)
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
