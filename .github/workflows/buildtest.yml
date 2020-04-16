@@ -108,7 +108,7 @@ jobs:
           mkdir deploy
           copy src\vgmtrans-qt\Release\vgmtrans.exe deploy\vgmtrans.exe
           copy ..\data\mame_roms.xml deploy\
-          copy ..\externals\win-deps\fluidsynth2-msvc2017-x64\*.dll deploy\
+          copy ..\externals\win-deps\fluidsynth2-msvc2019-x64\*.dll deploy\
           # Someday windeployqt --release --no-translations --no-angle --no-opengl-sw deploy\vgmtrans.exe
           copy ..\externals\win-deps\qt5-msvc2019-x64\bin\Qt5Core.dll deploy\
           copy ..\externals\win-deps\qt5-msvc2019-x64\bin\Qt5Gui.dll deploy\
