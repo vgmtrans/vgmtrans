@@ -20,7 +20,7 @@ else()
     target_include_directories(
       fluidsynth
       INTERFACE
-        ${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2017-x64/include)
+        ${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2019-x64/include)
 
     message(STATUS "Using FluidSynth fallback from Windows externals")
   else()
