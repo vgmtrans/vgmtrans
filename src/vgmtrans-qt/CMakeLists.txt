@@ -96,7 +96,7 @@ add_executable(vgmtrans
                workarea/VGMFilesList.cpp
                workarea/VGMFilesList.h
                phantom/phantomstyle.cpp
-               phantom/phantomcolor.cpp PlayerControl.cpp PlayerControl.h)
+               phantom/phantomcolor.cpp)
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
