@@ -26,82 +26,82 @@ MusicPlayer &MusicPlayer::Instance() {
 
 void MusicPlayer::makeSettings() {
     /* Create settings if needed */
-    if (!settings) {
-        settings = new_fluid_settings();
+    if (!m_settings) {
+        m_settings = new_fluid_settings();
 /* Default to Pulseaudio on Linux */
 #ifdef __linux__
-        fluid_settings_setstr(settings, "audio.driver", "pulseaudio");
+        fluid_settings_setstr(m_settings, "audio.driver", "pulseaudio");
 #endif
     }
 
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
-    fluid_settings_setint(settings, "synth.reverb.active", 1);
-    fluid_settings_setint(settings, "synth.chorus.active", 0);
+    fluid_settings_setint(m_settings, "synth.reverb.active", 1);
+    fluid_settings_setint(m_settings, "synth.chorus.active", 0);
 #else
     fluid_settings_setstr(settings, "synth.reverb.active", "yes");
     fluid_settings_setstr(settings, "synth.chorus.active", "no");
 #endif
-    fluid_settings_setstr(settings, "synth.midi-bank-select", "mma");
-    fluid_settings_setint(settings, "synth.midi-channels", 48);
+    fluid_settings_setstr(m_settings, "synth.midi-bank-select", "mma");
+    fluid_settings_setint(m_settings, "synth.midi-channels", 48);
 }
 
 void MusicPlayer::makeSynth() {
-    if (synth) {
+    if (m_synth) {
         Stop();
-        delete_fluid_synth(synth);
+        delete_fluid_synth(m_synth);
     }
 
-    synth = new_fluid_synth(settings);
+    m_synth = new_fluid_synth(m_settings);
 
 /* FluidSynth < 2 doesn't support reading SF2 from RAM */
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
-    fluid_sfloader_t *loader = new_fluid_defsfloader(settings);
+    fluid_sfloader_t *loader = new_fluid_defsfloader(m_settings);
 
     fluid_sfloader_set_callbacks(loader, &SF2Wrapper::sf_open, &SF2Wrapper::sf_read,
                                  &SF2Wrapper::sf_seek, &SF2Wrapper::sf_tell, &SF2Wrapper::sf_close);
 
-    fluid_synth_add_sfloader(synth, loader);
+    fluid_synth_add_sfloader(m_synth, loader);
 #endif
 }
 
 void MusicPlayer::updateSetting(const char *setting, int value) {
-    fluid_settings_setint(settings, setting, value);
+    fluid_settings_setint(m_settings, setting, value);
     makeSynth();
 }
 
 void MusicPlayer::updateSetting(const char *setting, const char *value) {
-    fluid_settings_setstr(settings, setting, value);
+    fluid_settings_setstr(m_settings, setting, value);
     makeSynth();
 }
 
-bool MusicPlayer::checkSetting(const char *setting, const char *value) {
-    return !!fluid_settings_str_equal(settings, setting, value);
+bool MusicPlayer::checkSetting(const char *setting, const char *value) const {
+    return fluid_settings_str_equal(m_settings, setting, value) != 0;
 }
 
 void MusicPlayer::Toggle() {
-    if (!player) {
+    if (!m_active_player) {
         return;
     }
 
     if (SynthPlaying()) {
-        fluid_player_stop(player);
+        fluid_player_stop(m_active_player);
     } else {
-        fluid_player_play(player);
+        fluid_player_play(m_active_player);
     }
 
     emit StatusChange(SynthPlaying());
 }
 
 void MusicPlayer::Stop() {
-    if (player) {
-        fluid_player_stop(player);
-        delete_fluid_player(player);
-        player = nullptr;
+    if (m_active_player) {
+        fluid_player_stop(m_active_player);
+        delete_fluid_player(m_active_player);
+        m_active_player = nullptr;
     }
 
-    if (adriver) {
-        delete_fluid_audio_driver(adriver);
-        adriver = nullptr;
+    if (m_active_driver) {
+        delete_fluid_audio_driver(m_active_driver);
+        m_active_driver = nullptr;
     }
 
     active_coll = nullptr;
@@ -110,11 +110,7 @@ void MusicPlayer::Stop() {
 }
 
 bool MusicPlayer::SynthPlaying() {
-    if (player && fluid_player_get_status(player) == FLUID_PLAYER_PLAYING) {
-        return true;
-    }
-
-    return false;
+    return m_active_player && fluid_player_get_status(m_active_player) == FLUID_PLAYER_PLAYING;
 }
 
 void MusicPlayer::LoadCollection(VGMColl *coll) {
@@ -136,19 +132,15 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
     }
 
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
-    SF2Wrapper::SetSF2(sf2);
-
-    char abused_filename[64];
-    const void *sf2_buf = sf2->SaveToMem();
-    sprintf(abused_filename, "&%p", sf2_buf);
+    const char *sf2_data = SF2Wrapper::SetSF2(sf2.get());
 #else
     QTemporaryDir dir;
     std::string temp_sf2 = dir.path().toStdString() + "/temp";
     sf2->SaveSF2File(temp_sf2);
-    const char *abused_filename = temp_sf2.c_str();
+    const char *sf2_data = temp_sf2.c_str();
 #endif
 
-    sfont_id = fluid_synth_sfload(synth, abused_filename, 0);
+    fluid_synth_sfload(m_synth, sf2_data, 0);
 
     std::shared_ptr<MidiFile> midi(seq->ConvertToMidi());
     std::vector<uint8_t> midi_buf;
@@ -156,9 +148,9 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
 
     Stop();
 
-    player = new_fluid_player(synth);
-    adriver = new_fluid_audio_driver(settings, synth);
-    if (fluid_player_add_mem(player, &midi_buf.at(0), midi_buf.size()) == FLUID_OK) {
+    m_active_player = new_fluid_player(m_synth);
+    m_active_driver = new_fluid_audio_driver(m_settings, m_synth);
+    if (fluid_player_add_mem(m_active_player, midi_buf.data(), midi_buf.size()) == FLUID_OK) {
         active_coll = coll;
     }
 }
