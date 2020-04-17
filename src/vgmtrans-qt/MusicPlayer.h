@@ -12,6 +12,15 @@
 #include <SF2File.h>
 #include <memory>
 
+#ifdef _MSC_VER
+#ifndef _SSIZE_T_DEFINED
+#undef ssize_t
+#include <BaseTsd.h>
+typedef _W64 SSIZE_T ssize_t;
+#define _SSIZE_T_DEFINED
+#endif
+#endif
+
 extern "C" {
 #include <fluidsynth.h>
 }
@@ -33,12 +42,12 @@ class MusicPlayer : public QObject {
     void Toggle();
     void Stop();
 
-    const char *defaultAudioDriver() {
+    const char *defaultAudioDriver() const {
         char *def_driver;
 #if FLUIDSYNTH_VERSION_MAJOR >= 2
         fluid_settings_getstr_default(m_settings, "audio.driver", &def_driver);
 #else
-        def_driver = fluid_settings_getstr_default(settings, "audio.driver");
+        def_driver = fluid_settings_getstr_default(m_settings, "audio.driver");
 #endif
 
         return def_driver;

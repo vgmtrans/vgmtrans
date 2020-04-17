@@ -38,8 +38,8 @@ void MusicPlayer::makeSettings() {
     fluid_settings_setint(m_settings, "synth.reverb.active", 1);
     fluid_settings_setint(m_settings, "synth.chorus.active", 0);
 #else
-    fluid_settings_setstr(settings, "synth.reverb.active", "yes");
-    fluid_settings_setstr(settings, "synth.chorus.active", "no");
+    fluid_settings_setstr(m_settings, "synth.reverb.active", "yes");
+    fluid_settings_setstr(m_settings, "synth.chorus.active", "no");
 #endif
     fluid_settings_setstr(m_settings, "synth.midi-bank-select", "mma");
     fluid_settings_setint(m_settings, "synth.midi-channels", 48);
