@@ -131,14 +131,15 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
         return;
     }
 
-#if FLUIDSYNTH_VERSION_MAJOR >= 2
-    const char *sf2_data = SF2Wrapper::SetSF2(sf2.get());
-#else
-    QTemporaryDir dir;
-    std::string temp_sf2 = dir.path().toStdString() + "/temp";
-    sf2->SaveSF2File(temp_sf2);
-    const char *sf2_data = temp_sf2.c_str();
-#endif
+    const char *sf2_data{};
+    if constexpr (FLUIDSYNTH_VERSION_MAJOR >= 2) {
+        sf2_data = SF2Wrapper::SetSF2(sf2.get());
+    } else {
+        QTemporaryDir dir;
+        std::string temp_sf2 = dir.path().toStdString() + "/temp";
+        sf2->SaveSF2File(temp_sf2);
+        sf2_data = temp_sf2.c_str();
+    }
 
     fluid_synth_sfload(m_synth, sf2_data, 0);
 

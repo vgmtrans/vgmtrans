@@ -42,24 +42,10 @@ class MusicPlayer : public QObject {
     void Toggle();
     void Stop();
 
-    const char *defaultAudioDriver() const {
-        char *def_driver;
-#if FLUIDSYNTH_VERSION_MAJOR >= 2
-        fluid_settings_getstr_default(m_settings, "audio.driver", &def_driver);
-#else
-        def_driver = fluid_settings_getstr_default(m_settings, "audio.driver");
-#endif
-
-        return def_driver;
-    }
     [[nodiscard]] std::vector<const char *> audioDrivers() const {
         std::vector<const char *> drivers_buf;
         fluid_settings_foreach_option(m_settings, "audio.driver", &drivers_buf,
-#if FLUIDSYNTH_VERSION_MAJOR >= 2
-                                      [](void *data, const char *, const char *option) {
-#else
-                                      [](void *data, char *, char *option) {
-#endif
+                                      [](void *data, auto, auto option) {
                                           auto drivers =
                                               static_cast<std::vector<const char *> *>(data);
                                           drivers->push_back(option);
@@ -85,10 +71,8 @@ class MusicPlayer : public QObject {
     fluid_player_t *m_active_player = nullptr;
     VGMColl *active_coll = nullptr;
 
-    explicit MusicPlayer();
+    MusicPlayer();
 };
-
-#if FLUIDSYNTH_VERSION_MAJOR >= 2
 
 /*
  * A static wrapper for an SF2File object,
@@ -196,5 +180,3 @@ class SF2Wrapper {
     inline static long s_index = 0;
     inline static ssize_t s_sf2_size = 0;
 };
-
-#endif
