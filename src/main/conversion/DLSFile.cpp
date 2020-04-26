@@ -409,10 +409,8 @@ void DLSWsmp::SetPitchInfo(uint16_t unityNote, short fineTune, long attenuation)
 //  *******
 
 DLSWave::~DLSWave() {
-    if (Wsmp)
-        delete Wsmp;
-    if (data)
-        delete data;
+    delete Wsmp;
+    delete[] data;
 }
 
 uint32_t DLSWave::GetSize() {

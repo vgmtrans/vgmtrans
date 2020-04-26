@@ -192,10 +192,8 @@ void SynthWave::ConvertTo16bitSigned() {
 }
 
 SynthWave::~SynthWave() {
-    if (sampinfo)
-        delete sampinfo;
-    if (data)
-        delete data;
+    delete sampinfo;
+    delete[] data;
 }
 
 SynthSampInfo *SynthWave::AddSampInfo(void) {
