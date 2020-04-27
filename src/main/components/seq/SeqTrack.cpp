@@ -1224,5 +1224,5 @@ bool SeqTrack::AddLoopForever(uint32_t offset, uint32_t length, const std::strin
         deltaLength = GetTime();
         return (this->foreverLoops < ConversionOptions::GetNumSequenceLoops());
     }
-    return true;
+    return false;
 }
