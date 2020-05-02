@@ -23,8 +23,18 @@ file(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp"
 add_library(vgmtranscore OBJECT ${MAIN_FILES})
 
 configure_file("version.h.in" "version.h")
-target_include_directories(vgmtranscore PUBLIC . ./formats/common ./loaders
-                                               ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(vgmtranscore PUBLIC
+        .
+        ./components
+        ./components/instr
+        ./components/seq
+        ./conversion
+        ./formats
+        ./formats/common
+        ./io
+        ./loaders
+        ./util
+        ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
   PUBLIC ZLIB::ZLIB unarr minizip tinyxml ghc_filesystem
