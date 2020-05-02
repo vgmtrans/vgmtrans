@@ -15,7 +15,6 @@
 
 #include "QHexView/qhexview.h"
 #include "QHexView/document/buffer/qmemoryrefbuffer.h"
-#include "QHexView/document/qhexmetadata.h"
 
 #include "../util/Helpers.h"
 
@@ -38,7 +37,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
     m_splitter->setSizes(QList<int>() << 900 << 270);
 
     setWindowTitle(QString::fromStdString(*m_vgmfile->GetName()));
-    setWindowIcon(iconForFileType(m_vgmfile->GetFileType()));
+    /* Todo: icon */
     setAttribute(Qt::WA_DeleteOnClose);
 
     connect(m_treeview, &VGMFileTreeView::itemClicked, [=](QTreeWidgetItem *item, int) {

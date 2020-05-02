@@ -155,6 +155,7 @@ bool Vab::GetInstrPointers() {
             PSXSampColl *newSampColl =
                 new PSXSampColl(format, this, offVAGs, totalVAGSize, vagLocations);
             if (newSampColl->LoadVGMFile()) {
+                rawfile->AddContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
                 pRoot->AddVGMFile(newSampColl);
                 // this->sampColl = newSampColl;
             } else {

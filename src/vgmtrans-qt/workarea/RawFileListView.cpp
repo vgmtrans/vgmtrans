@@ -9,6 +9,7 @@
 #include <QHeaderView>
 #include "RawFileListView.h"
 #include "RawFile.h"
+#include "QtVGMRoot.h"
 
 /*
  * RawFileListViewModel

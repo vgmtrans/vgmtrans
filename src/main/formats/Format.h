@@ -5,23 +5,17 @@
  */
 #pragma once
 
+#include <variant>
+
 class VGMColl;
 class VGMScanner;
 class Matcher;
 class VGMScanner;
 
-#if 0
-#define FORMAT_NAME(name) \
-    virtual std::string GetName() { return name; }
-#endif
-
 #define DECLARE_FORMAT(_name_)                 \
     _name_##Format _name_##FormatRegisterThis; \
     const std::string _name_##Format::name = #_name_;
 
-//#define DECLARE_FORMAT(_name_)	const string _name_##Format::name = #_name_;
-
-// static _name_##Format _className_##FormatRegisterThis;
 #define BEGIN_FORMAT(_name_)                                    \
     class _name_##Format : public Format {                      \
        public:                                                  \
@@ -56,6 +50,10 @@ class VGMScanner;
 
 class Format;
 class VGMFile;
+class VGMSeq;
+class VGMInstrSet;
+class VGMSampColl;
+class VGMMiscFile;
 
 typedef std::map<std::string, Format *> FormatMap;
 
@@ -65,20 +63,20 @@ class Format {
 
    public:
     Format(const std::string &scannerName);
-    virtual ~Format(void);
+    virtual ~Format();
 
     static Format *GetFormatFromName(const std::string &name);
 
-    virtual bool Init(void);
+    virtual bool Init();
     virtual const std::string &GetName() = 0;
     // virtual string GetName() = 0;
     // virtual uint32_t GetFormatID() = 0;
-    virtual VGMScanner *NewScanner() { return NULL; }
-    VGMScanner &GetScanner() { return *scanner; }
-    virtual Matcher *NewMatcher() { return NULL; }
+    virtual VGMScanner *NewScanner() { return nullptr; }
+    VGMScanner &GetScanner() const { return *scanner; }
+    virtual Matcher *NewMatcher() { return nullptr; }
     virtual VGMColl *NewCollection();
-    virtual bool OnNewFile(VGMFile *file);
-    virtual bool OnCloseFile(VGMFile *file);
+    virtual bool OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+    virtual bool OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
     // virtual int OnNewSeq(VGMSeq* seq);
     // virtual int OnNewInstrSet(VGMInstrSet* instrset);
     // virtual int OnNewSampColl(VGMSampColl* sampcoll);

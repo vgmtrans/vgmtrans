@@ -7,18 +7,17 @@
 #include "VGMSeq.h"
 
 #include <climits>
-#include "JSONDump.h"
+#include <utility>
 #include "SeqEvent.h"
 #include "SeqSlider.h"
 #include "Options.h"
 #include "Root.h"
-
-DECLARE_MENU(VGMSeq)
+#include "Format.h"
 
 using namespace std;
 
 VGMSeq::VGMSeq(const string &format, RawFile *file, uint32_t offset, uint32_t length, string name)
-    : VGMFile(FILETYPE_SEQ, format, file, offset, length, name),
+    : VGMFile(format, file, offset, length, std::move(name)),
       midi(NULL),
       bMonophonicTracks(false),
       bReverb(false),
@@ -48,12 +47,28 @@ VGMSeq::~VGMSeq(void) {
     DeleteVect<ISeqSlider>(aSliders);
 }
 
+bool VGMSeq::LoadVGMFile() {
+    bool val = Load();
+    if (!val) {
+        return false;
+    }
+
+    if (auto fmt = GetFormat(); fmt) {
+        fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    }
+
+    return val;
+}
+
 bool VGMSeq::Load() {
     if (!LoadMain())
         return false;
 
     // LoadLocalData();
     // UseLocalData();
+    rawfile->AddContainedVGMFile(
+        std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(
+            this));
     pRoot->AddVGMFile(this);
     return true;
 }
@@ -61,29 +76,32 @@ bool VGMSeq::Load() {
 MidiFile *VGMSeq::ConvertToMidi() {
     size_t numTracks = aTracks.size();
 
-    if (!LoadTracks(READMODE_FIND_DELTA_LENGTH))
-        return NULL;
+    if (!LoadTracks(READMODE_FIND_DELTA_LENGTH)) {
+        return nullptr;
+    }
 
     // Find the greatest length of all tracks to use as stop point for every track
     long stopTime = -1;
     for (size_t i = 0; i < numTracks; i++)
         stopTime = std::max(stopTime, aTracks[i]->deltaLength);
 
-    MidiFile *newmidi = new MidiFile(this);
+    auto *newmidi = new MidiFile(this);
     this->midi = newmidi;
     if (!LoadTracks(READMODE_CONVERT_TO_MIDI, stopTime)) {
         delete midi;
-        this->midi = NULL;
-        return NULL;
+        this->midi = nullptr;
+        return nullptr;
     }
-    this->midi = NULL;
+    this->midi = nullptr;
     return newmidi;
 }
 
 MidiTrack *VGMSeq::GetFirstMidiTrack() {
-    MidiTrack *pFirstMidiTrack = NULL;
-    if (aTracks.size() > 0)
+    MidiTrack *pFirstMidiTrack = nullptr;
+    if (!aTracks.empty()) {
         pFirstMidiTrack = aTracks[0]->pMidiTrack;
+    }
+
     return pFirstMidiTrack;
 }
 
@@ -99,18 +117,15 @@ bool VGMSeq::LoadMain() {
     if (nNumTracks == 0)
         return false;
 
-    if (!LoadTracks(readMode))
-        return false;
-
-    return true;
+    return LoadTracks(readMode);
 }
 
 bool VGMSeq::PostLoad() {
     if (readMode == READMODE_ADD_TO_UI) {
         std::sort(aInstrumentsUsed.begin(), aInstrumentsUsed.end());
 
-        for (uint32_t i = 0; i < aTracks.size(); i++) {
-            std::sort(aTracks[i]->aEvents.begin(), aTracks[i]->aEvents.end(), ItemPtrOffsetCmp());
+        for (auto & aTrack : aTracks) {
+            std::sort(aTrack->aEvents.begin(), aTrack->aEvents.end(), ItemPtrOffsetCmp());
         }
     } else if (readMode == READMODE_CONVERT_TO_MIDI) {
         midi->Sort();
@@ -131,7 +146,7 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime) {
     // reset variables
     ResetVars();
     for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
-        if (!aTracks[trackNum]->LoadTrackInit(trackNum, NULL))
+        if (!aTracks[trackNum]->LoadTrackInit(trackNum, nullptr))
             return false;
     }
 
@@ -218,7 +233,7 @@ void VGMSeq::LoadTracksMain(long stopTime) {
 
             if (readMode == READMODE_CONVERT_TO_MIDI) {
                 for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
-                    if (aTracks[trackNum]->pMidiTrack != NULL) {
+                    if (aTracks.at(trackNum)->pMidiTrack != nullptr) {
                         aTracks[trackNum]->pMidiTrack->SetDelta(time);
                     }
                 }
@@ -236,7 +251,8 @@ void VGMSeq::LoadTracksMain(long stopTime) {
         uint32_t initialTime = time;  // preserve current time for multi section sequence
 
         // load track by track
-        for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+        for (uint32_t trackNum = 0; trackNum < nNumTracks && trackNum < aTracks.size();
+             trackNum++) {
             time = initialTime;
 
             aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime);
@@ -244,8 +260,6 @@ void VGMSeq::LoadTracksMain(long stopTime) {
         }
     }
     delete[] aStopOffset;
-
-    return;
 }
 
 bool VGMSeq::HasActiveTracks() {
@@ -277,17 +291,17 @@ int VGMSeq::GetForeverLoops() {
     return (foreverLoops != INT_MAX) ? foreverLoops : 0;
 }
 
-bool VGMSeq::GetHeaderInfo(void) {
+bool VGMSeq::GetHeaderInfo() {
     return true;
 }
 
 // GetTrackPointers() should contain logic for parsing track pointers
 // and instantiating/adding each track in the sequence
-bool VGMSeq::GetTrackPointers(void) {
+bool VGMSeq::GetTrackPointers() {
     return true;
 }
 
-void VGMSeq::ResetVars(void) {
+void VGMSeq::ResetVars() {
     time = 0;
     tempoBPM = initialTempoBPM;
 
@@ -304,7 +318,7 @@ void VGMSeq::SetPPQN(uint16_t ppqn) {
         midi->SetPPQN(ppqn);
 }
 
-uint16_t VGMSeq::GetPPQN(void) {
+uint16_t VGMSeq::GetPPQN() {
     return this->ppqn;
     // return midi->GetPPQN();
 }
@@ -316,13 +330,6 @@ void VGMSeq::AddInstrumentRef(uint32_t progNum) {
     }
 }
 
-bool VGMSeq::OnSaveAsMidi(void) {
-    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name), "mid");
-    if (filepath.length() != 0)
-        return SaveAsMidi(filepath);
-    return false;
-}
-
 bool VGMSeq::SaveAsMidi(const std::string &filepath) {
     MidiFile *midi = this->ConvertToMidi();
     if (!midi)
@@ -330,13 +337,4 @@ bool VGMSeq::SaveAsMidi(const std::string &filepath) {
     bool result = midi->SaveMidiFile(filepath);
     delete midi;
     return result;
-}
-
-bool VGMSeq::OnSaveAsJSON(void) {
-    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name), "json");
-    if (filepath.length() != 0) {
-        conversion::DumpToJSON(filepath, *this);
-    }
-
-    return true;
 }

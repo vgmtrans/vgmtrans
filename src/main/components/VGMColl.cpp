@@ -12,16 +12,16 @@
 #include "VGMRgn.h"
 #include "ScaleConversion.h"
 #include "Root.h"
+#include "VGMMiscFile.h"
 
 using namespace std;
 
-DECLARE_MENU(VGMColl)
-
-VGMColl::VGMColl(std::string theName) : VGMItem(), name(std::move(theName)), seq(nullptr) {}
+VGMColl::VGMColl(std::string theName) : VGMItem(), seq(nullptr), name(std::move(theName)) {}
 
 void VGMColl::RemoveFileAssocs() {
     if (seq) {
         seq->RemoveCollAssoc(this);
+        seq = nullptr;
     }
 
     for (auto set : instrsets) {
@@ -69,7 +69,7 @@ void VGMColl::AddSampColl(VGMSampColl *theSampColl) {
     }
 }
 
-void VGMColl::AddMiscFile(VGMFile *theMiscFile) {
+void VGMColl::AddMiscFile(VGMMiscFile *theMiscFile) {
     if (theMiscFile != nullptr) {
         theMiscFile->AddCollAssoc(this);
         miscfiles.push_back(theMiscFile);
@@ -573,101 +573,4 @@ SynthFile *VGMColl::CreateSynthFile() {
         }
     }
     return synthfile;
-}
-
-bool VGMColl::OnSaveAll() {
-    if (dirpath.empty()) {
-        dirpath = pRoot->UI_GetSaveDirPath();
-    }
-
-    SF2File *sf2file = CreateSF2File();
-    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
-    if (sf2file != nullptr) {
-        if (!sf2file->SaveSF2File(filepath))
-            L_ERROR("Failed to save SF2 file");
-        delete sf2file;
-    } else {
-        L_ERROR("Failed creating SF2");
-    }
-
-    DLSFile dlsfile;
-    filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".dls";
-    if (CreateDLSFile(dlsfile)) {
-        if (!dlsfile.SaveDLSFile(filepath))
-            L_ERROR("Failed to save DLS file");
-    } else {
-        L_ERROR("Failed creating DLS instance");
-    }
-
-    if (this->seq != nullptr) {
-        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
-        if (!this->seq->SaveAsMidi(filepath)) {
-            L_ERROR("Failed to save MIDI file");
-        }
-    }
-
-    dirpath.clear();
-
-    return true;
-}
-
-bool VGMColl::OnSaveAllDLS() {
-    if (dirpath.empty()) {
-        dirpath = pRoot->UI_GetSaveDirPath();
-    }
-
-    SF2File *sf2file = CreateSF2File();
-    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
-    if (sf2file != nullptr) {
-        if (!sf2file->SaveSF2File(filepath))
-            L_ERROR("Failed to save SF2 file");
-        delete sf2file;
-    } else {
-        L_ERROR("Failed creating SF2");
-    }
-
-    DLSFile dlsfile;
-    filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".dls";
-    if (CreateDLSFile(dlsfile)) {
-        if (!dlsfile.SaveDLSFile(filepath))
-            L_ERROR("Failed to save DLS file");
-    } else {
-        L_ERROR("Failed creating DLS instance");
-    }
-
-    if (this->seq != nullptr) {
-        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
-        if (!this->seq->SaveAsMidi(filepath))
-            L_ERROR("Failed to save MIDI file");
-    }
-
-    dirpath.clear();
-
-    return true;
-}
-
-bool VGMColl::OnSaveAllSF2() {
-    if (dirpath.empty()) {
-        dirpath = pRoot->UI_GetSaveDirPath();
-    }
-
-    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
-    SF2File *sf2file = CreateSF2File();
-    if (sf2file != nullptr) {
-        if (!sf2file->SaveSF2File(filepath))
-            L_ERROR("Failed to save SF2 file");
-        delete sf2file;
-    } else {
-        L_ERROR("Failed creating SF2");
-    }
-
-    if (this->seq != nullptr) {
-        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
-        if (!this->seq->SaveAsMidi(filepath))
-            L_ERROR("Failed to save MIDI file");
-    }
-
-    dirpath.clear();
-
-    return true;
 }

@@ -4,12 +4,19 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "VGMFilesList.h"
+
+#include <iostream>
 #include <QHeaderView>
 #include <QMenu>
 
+#include "components/instr/VGMInstrSet.h"
+#include "components/seq/VGMSeq.h"
+#include "components/VGMSampColl.h"
+#include "components/VGMMiscFile.h"
+#include "conversion/JSONDump.h"
 #include "../util/Helpers.h"
 #include "../QtVGMRoot.h"
-#include "VGMFilesList.h"
 #include "MdiArea.h"
 
 /*
@@ -26,38 +33,54 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
         return QVariant();
     }
 
-    VGMFile *vgmfile = qtVGMRoot.vVGMFile.at(static_cast<unsigned long>(index.row()));
+    auto vgmfile = qtVGMRoot.vVGMFile.at(static_cast<unsigned long>(index.row()));
 
     switch (index.column()) {
         case Property::Name: {
             if (role == Qt::DisplayRole) {
-                return QString::fromStdString(*vgmfile->GetName());
+                return QString::fromStdString(
+                    std::visit([](auto file) -> std::string { return *file->GetName(); }, vgmfile));
             } else if (role == Qt::DecorationRole) {
-                return iconForFileType(vgmfile->GetFileType());
+                static Visitor icon{
+                    [](VGMSeq *) -> const QIcon & {
+                        static QIcon i_gen{":/images/sequence-32.png"};
+                        return i_gen;
+                    },
+                    [](VGMInstrSet *) -> const QIcon & {
+                        static QIcon i_gen{":/images/instrument-set-32.png"};
+                        return i_gen;
+                    },
+                    [](VGMSampColl *) -> const QIcon & {
+                        static QIcon i_gen{":/images/sample-set-32.png"};
+                        return i_gen;
+                    },
+                    [](VGMMiscFile *) -> const QIcon & {
+                        static QIcon i_gen{":/images/generic-32.png"};
+                        return i_gen;
+                    },
+                };
+
+                return std::visit(icon, vgmfile);
             }
         }
 
         case Property::Type: {
             if (role == Qt::DisplayRole) {
-                switch (vgmfile->GetFileType()) {
-                    case FILETYPE_SEQ:
-                        return "Sequence";
-
-                    case FILETYPE_INSTRSET:
-                        return "Instrument set";
-
-                    case FILETYPE_SAMPCOLL:
-                        return "Sample collection";
-
-                    default:
-                        return "Unknown";
+                static Visitor description{
+                    [](VGMSeq *) { return QStringLiteral("Sequence"); },
+                    [](VGMInstrSet *) { return QStringLiteral("Instrument set"); },
+                    [](VGMSampColl *) { return QStringLiteral("Sample collection"); },
+                    [](VGMMiscFile *) { return QStringLiteral("Unknown"); },
                 };
+
+                return std::visit(description, vgmfile);
             }
         }
 
         case Property::Format: {
             if (role == Qt::DisplayRole) {
-                return QString::fromStdString(vgmfile->GetFormatName());
+                return QString::fromStdString(std::visit(
+                    [](auto file) -> std::string { return file->GetFormatName(); }, vgmfile));
             }
         }
 
@@ -149,35 +172,97 @@ VGMFilesList::VGMFilesList(QWidget *parent) : QTableView(parent) {
     connect(this, &QAbstractItemView::doubleClicked, this, &VGMFilesList::RequestVGMFileView);
 }
 
+static struct {
+    QMenu *operator()(VGMSeq *seq) {
+        auto menu = new QMenu;
+        menu->addAction("Save as MIDI", [seq]() {
+            auto save_path = qtVGMRoot.UI_GetSaveFilePath(seq->name());
+            if (save_path.empty()) {
+                return;
+            }
+
+            auto midi = seq->ConvertToMidi();
+            midi->SaveMidiFile(save_path);
+            delete midi;
+        });
+        menu->addAction("Save as JSON", [seq]() {
+            auto save_path = qtVGMRoot.UI_GetSaveFilePath(seq->name());
+            if (save_path.empty()) {
+                return;
+            }
+
+            conversion::DumpToJSON(*seq, save_path);
+        });
+
+        return menu;
+    }
+
+    QMenu *operator()(VGMInstrSet *set) {
+        auto menu = new QMenu;
+        menu->addAction("Save as DLS", [set]() {
+            auto save_path = qtVGMRoot.UI_GetSaveFilePath(set->name());
+            if (save_path.empty()) {
+                return;
+            }
+
+            conversion::SaveAsDLS(*set, save_path);
+        });
+        menu->addAction("Save as SF2", [set]() {
+            auto save_path = qtVGMRoot.UI_GetSaveFilePath(set->name());
+            if (save_path.empty()) {
+                return;
+            }
+
+            conversion::SaveAsSF2(*set, save_path);
+        });
+
+        return menu;
+    }
+
+    QMenu *operator()(VGMSampColl *coll) {
+        auto menu = new QMenu;
+        menu->addAction("Save samples as WAV", [coll]() {
+            auto save_path = qtVGMRoot.UI_GetSaveDirPath();
+            if (save_path.empty()) {
+                return;
+            }
+
+            conversion::SaveAsWAV(*coll, save_path);
+        });
+
+        return menu;
+    }
+
+    QMenu *operator()(VGMMiscFile *) { return new QMenu; }
+} MakeMenu;
+
 void VGMFilesList::ItemMenu(const QPoint &pos) {
     auto element = indexAt(pos);
     if (!element.isValid())
         return;
 
-    VGMFile *file = qtVGMRoot.vVGMFile[element.row()];
-    if (!file) {
-        return;
-    }
+    auto file = qtVGMRoot.vVGMFile[element.row()];
+    auto menu = std::visit(MakeMenu, file);
+    std::visit(
+        [&menu](auto file) mutable {
+            menu->addSeparator();
+            menu->addAction("Save raw data", [file]() {
+                auto save_path = qtVGMRoot.UI_GetSaveFilePath(file->name());
+                if (save_path.empty()) {
+                    return;
+                }
 
-    auto vgmfile_menu = new QMenu();
+                std::ofstream out{save_path, std::ios::out | std::ofstream::binary};
+                std::copy(file->rawfile->begin() + file->dwOffset,
+                          file->rawfile->begin() + file->dwOffset + file->unLength,
+                          std::ostreambuf_iterator<char>(out));
+            });
+            menu->addAction("Remove file", [file]() { qtVGMRoot.RemoveVGMFile(file); });
+        },
+        file);
 
-    auto menu_item_names = file->GetMenuItemNames();
-    for (auto &menu_item : *menu_item_names) {
-        vgmfile_menu->addAction(QString::fromStdString(menu_item));
-    }
-
-    QAction *performed_action = vgmfile_menu->exec(mapToGlobal(pos));
-    int action_index = 0;
-    for (auto &action : vgmfile_menu->actions()) {
-        if (performed_action == action) {
-            file->CallMenuItem(file, action_index);
-            break;
-        }
-        action_index++;
-    }
-
-    vgmfile_menu->exec(mapToGlobal(pos));
-    vgmfile_menu->deleteLater();
+    menu->exec(mapToGlobal(pos));
+    menu->deleteLater();
 }
 
 void VGMFilesList::keyPressEvent(QKeyEvent *input) {
@@ -207,5 +292,6 @@ void VGMFilesList::RemoveVGMFile(VGMFile *file) {
 }
 
 void VGMFilesList::RequestVGMFileView(QModelIndex index) {
-    MdiArea::Instance()->NewView(qtVGMRoot.vVGMFile[index.row()]);
+    MdiArea::Instance()->NewView(
+        std::visit([](VGMFile *file) { return file; }, qtVGMRoot.vVGMFile[index.row()]));
 }

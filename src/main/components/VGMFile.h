@@ -6,45 +6,24 @@
 #pragma once
 #include "VGMItem.h"
 #include "RawFile.h"
-#include "Menu.h"
 
 enum FmtID : unsigned int;
 class VGMColl;
 class Format;
 
-enum FileType {
-    FILETYPE_UNDEFINED,
-    FILETYPE_SEQ,
-    FILETYPE_INSTRSET,
-    FILETYPE_SAMPCOLL,
-    FILETYPE_MISC
-};
-
 class VGMFile : public VGMContainerItem {
    public:
-    BEGIN_MENU(VGMFile)
-    MENU_ITEM(VGMFile, OnClose, "Close")
-    MENU_ITEM(VGMFile, OnSaveAsRaw, "Dump raw format")
-    END_MENU()
-
-   public:
-    VGMFile(FileType fileType, /*FmtID fmtID,*/
-            const std::string &format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
+    VGMFile(std::string format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
             std::string theName = "VGM File");
-    virtual ~VGMFile();
+    virtual ~VGMFile() = default;
 
     virtual ItemType GetType() const { return ITEMTYPE_VGMFILE; }
-    FileType GetFileType() { return file_type; }
 
     virtual void AddToUI(VGMItem *parent, void *UI_specific);
 
-    const std::string *GetName(void) const;
+    [[nodiscard]] const std::string *GetName() const;
 
-    bool OnClose();
-    bool OnSaveAsRaw();
-    bool OnSaveAllAsRaw();
-
-    bool LoadVGMFile();
+    virtual bool LoadVGMFile() = 0;
     virtual bool Load() = 0;
     Format *GetFormat();
     const std::string &GetFormatName();
@@ -53,10 +32,10 @@ class VGMFile : public VGMContainerItem {
 
     void AddCollAssoc(VGMColl *coll);
     void RemoveCollAssoc(VGMColl *coll);
-    RawFile *GetRawFile();
+    [[nodiscard]] RawFile *GetRawFile() const;
 
-    size_t size() const noexcept { return unLength; }
-    std::string name() const noexcept { return m_name; }
+    [[nodiscard]] size_t size() const noexcept { return unLength; }
+    [[nodiscard]] std::string name() const noexcept { return m_name; }
 
     uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer);
 
@@ -75,13 +54,12 @@ class VGMFile : public VGMContainerItem {
      */
     size_t GetEndOffset() { return rawfile->size(); }
 
-    const char *data() const { return rawfile->data() + dwOffset; }
+    [[nodiscard]] const char *data() const { return rawfile->data() + dwOffset; }
 
     RawFile *rawfile;
     std::list<VGMColl *> assocColls;
 
    protected:
-    FileType file_type;
     std::string format;
     uint32_t id;
     std::string m_name;

@@ -18,32 +18,6 @@ QIcon MakeIconFromPath(QString path, QColor color) {
     return QIcon(icon_pixmap);
 }
 
-const QIcon &iconForFileType(FileType filetype) {
-    switch (filetype) {
-        case FILETYPE_SEQ: {
-            static QIcon i_gen{":/images/sequence-32.png"};
-            return i_gen;
-        }
-        
-        case FILETYPE_INSTRSET:{
-            static QIcon i_gen{":/images/instrument-set-32.png"};
-            return i_gen;
-        }
-        
-        case FILETYPE_SAMPCOLL:{
-            static QIcon i_gen{":/images/sample-set-32.png"};
-            return i_gen;
-        }
-
-        default:
-            break;
-    }
-
-    static QIcon i_gen{":/images/generic-audio-32.png"};
-    return i_gen;
-}
-
-
 const QIcon &iconForItemType(VGMItem::Icon type) {
     switch (type) {
         case VGMItem::ICON_NOTE: {

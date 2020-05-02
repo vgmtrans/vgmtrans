@@ -39,7 +39,7 @@ class VGMFilesList final : public QTableView {
     explicit VGMFilesList(QWidget *parent = nullptr);
 
    public slots:
-    void RequestVGMFileView(QModelIndex index);
+    static void RequestVGMFileView(QModelIndex index);
     void RemoveVGMFile(VGMFile *file);
 
    private:

@@ -7,17 +7,16 @@
 #pragma once
 #include <QAbstractTableModel>
 #include <QTableView>
-#include "../QtVGMRoot.h"
 
 class RawFileListViewModel : public QAbstractTableModel {
     Q_OBJECT
 
    public:
-    RawFileListViewModel(QObject *parent = nullptr);
-    int rowCount(const QModelIndex &parent = QModelIndex()) const;
-    int columnCount(const QModelIndex &parent = QModelIndex()) const;
+    explicit RawFileListViewModel(QObject *parent = nullptr);
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
-    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
    public slots:
     void AddRawFile();

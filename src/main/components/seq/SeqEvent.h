@@ -6,7 +6,6 @@
 
 #pragma once
 #include "VGMItem.h"
-#include "Menu.h"
 #include "MidiFile.h"
 #include <fmt/format.h>
 

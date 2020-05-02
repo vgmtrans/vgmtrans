@@ -270,7 +270,7 @@ void MidiTrack::PurgePrevNoteOffs() {
 
 void MidiTrack::PurgePrevNoteOffs(uint32_t absTime) {
     prevDurNoteOffs.erase(std::remove_if(prevDurNoteOffs.begin(), prevDurNoteOffs.end(),
-                                         [absTime](NoteEvent *e) { return e->AbsTime <= absTime; }),
+                                         [absTime](NoteEvent *e) { return e && e->AbsTime <= absTime; }),
                           prevDurNoteOffs.end());
 }
 

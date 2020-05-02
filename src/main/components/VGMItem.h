@@ -42,55 +42,6 @@ enum EventColors {
     CLR_TRACKEND,
 };
 
-/*
-#define TEXT_CLR_BLACK 0
-#define TEXT_CLR_RED 0x20
-#define TEXT_CLR_PURPLE 0x40
-#define TEXT_CLR_BLUE 0x60
-
-#define BG_CLR_WHITE 0
-#define BG_CLR_RED 1
-#define BG_CLR_GREEN 2
-#define BG_CLR_BLUE 3
-#define BG_CLR_YELLOW 4
-#define BG_CLR_MAGENTA 5
-#define BG_CLR_CYAN 6
-#define BG_CLR_DARKRED 7
-#define BG_CLR_BLACK 8
-#define BG_CLR_DARKBLUE 9
-#define BG_CLR_STEEL 10
-#define BG_CLR_CHEDDAR 11
-#define BG_CLR_PINK 12
-#define BG_CLR_LIGHTBLUE 13
-#define BG_CLR_AQUA 14
-#define BG_CLR_PEACH 15
-#define BG_CLR_WHEAT 16
-
-#define CLR_UNKNOWN			(BG_CLR_BLACK|TEXT_CLR_RED)
-#define CLR_NOTEON			BG_CLR_BLUE
-#define CLR_NOTEOFF			BG_CLR_DARKBLUE
-#define CLR_DURNOTE			CLR_NOTEON
-#define CLR_REST			CLR_NOTEOFF
-#define CLR_PROGCHANGE		BG_CLR_PINK
-#define CLR_VOLUME			BG_CLR_CYAN
-#define CLR_EXPRESSION		BG_CLR_CYAN
-#define CLR_PAN				BG_CLR_MAGENTA
-#define CLR_PITCHBEND		BG_CLR_PEACH
-#define CLR_PITCHBENDRANGE	BG_CLR_PEACH
-#define CLR_TRANSPOSE		BG_CLR_GREEN
-#define CLR_TIMESIG			BG_CLR_CHEDDAR
-#define CLR_MODULATION		BG_CLR_PEACH
-#define CLR_TEMPO			BG_CLR_AQUA
-#define CLR_SUSTAIN			BG_CLR_WHEAT
-#define CLR_PORTAMENTO		BG_CLR_LIGHTBLUE
-#define CLR_PORTAMENTOTIME	BG_CLR_LIGHTBLUE
-#define CLR_TRACKEND		BG_CLR_RED
-#define CLR_LOOPFOREVER		BG_CLR_CHEDDAR
-#define CLR_HEADER			BG_CLR_YELLOW*/
-
-template <class T>
-class Menu;
-
 class RawFile;
 class VGMFile;
 class VGMItem;
@@ -150,7 +101,7 @@ class VGMItem {
     RawFile *GetRawFile();
 
     virtual std::vector<const char *> *GetMenuItemNames() { return nullptr; }
-    virtual bool CallMenuItem(VGMItem *, int ) { return false; }
+    virtual bool CallMenuItem(VGMItem *, int) { return false; }
     virtual std::string GetDescription() { return name; }
     virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
     virtual Icon GetIcon() { return ICON_BINARY; /*ICON_UNKNOWN*/ }

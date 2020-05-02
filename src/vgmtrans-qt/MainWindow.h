@@ -27,7 +27,7 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
    public:
-    explicit MainWindow();
+    MainWindow();
 
    private:
     void CreateElements();
@@ -38,20 +38,20 @@ class MainWindow : public QMainWindow {
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
-    MenuBar *m_menu_bar;
-    RawFileListView *m_rawfiles_list;
-    VGMFilesList *m_vgmfiles_list;
-    VGMCollListView *m_colls_list;
-    VGMCollView *m_coll_view;
-    IconBar *m_iconbar;
-    Logger *m_logger;
-    MdiArea *m_mdiarea;
+    MenuBar *m_menu_bar{};
+    RawFileListView *m_rawfiles_list{};
+    VGMFilesList *m_vgmfiles_list{};
+    VGMCollListView *m_colls_list{};
+    VGMCollView *m_coll_view{};
+    IconBar *m_iconbar{};
+    Logger *m_logger{};
+    MdiArea *m_mdiarea{};
 
-    QStatusBar *m_statusbar;
-    QLabel *m_statusbar_offset;
-    QLabel *m_statusbar_length;
+    QStatusBar *m_statusbar{};
+    QLabel *m_statusbar_offset{};
+    QLabel *m_statusbar_length{};
 
-    QSplitter *vertical_splitter;
-    QSplitter *horizontal_splitter;
-    QSplitter *vertical_splitter_left;
+    QSplitter *vertical_splitter{};
+    QSplitter *horizontal_splitter{};
+    QSplitter *vertical_splitter_left{};
 };

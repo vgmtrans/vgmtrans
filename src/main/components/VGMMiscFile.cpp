@@ -5,7 +5,10 @@
  */
 
 #include "VGMMiscFile.h"
+
+#include <utility>
 #include "Root.h"
+#include "Format.h"
 
 using namespace std;
 
@@ -15,10 +18,23 @@ using namespace std;
 
 VGMMiscFile::VGMMiscFile(const string &format, RawFile *file, uint32_t offset, uint32_t length,
                          string name)
-    : VGMFile(FILETYPE_MISC, format, file, offset, length, name) {}
+    : VGMFile(format, file, offset, length, std::move(name)) {}
 
 bool VGMMiscFile::LoadMain() {
     return true;
+}
+
+bool VGMMiscFile::LoadVGMFile() {
+    bool val = Load();
+    if (!val) {
+        return false;
+    }
+
+    if (auto fmt = GetFormat(); fmt) {
+        fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    }
+
+    return val;
 }
 
 bool VGMMiscFile::Load() {
@@ -28,6 +44,8 @@ bool VGMMiscFile::Load() {
     if (unLength == 0) {
         return false;
     }
+
+    rawfile->AddContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
     pRoot->AddVGMFile(this);
     return true;
 }

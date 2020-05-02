@@ -9,10 +9,11 @@
 #include "VGMRgn.h"
 #include "VGMColl.h"
 #include "Root.h"
+#include "Format.h"
 
 #include <fmt/format.h>
 
-DECLARE_MENU(VGMInstrSet)
+#include <utility>
 
 using namespace std;
 
@@ -23,7 +24,7 @@ using namespace std;
 VGMInstrSet::VGMInstrSet(const string &format, /*FmtID fmtID,*/
                          RawFile *file, uint32_t offset, uint32_t length, string name,
                          VGMSampColl *theSampColl)
-    : VGMFile(FILETYPE_INSTRSET, /*fmtID,*/ format, file, offset, length, name),
+    : VGMFile(/*fmtID,*/ format, file, offset, length, std::move(name)),
       sampColl(theSampColl) {
     AddContainer<VGMInstr>(aInstrs);
 }
@@ -41,6 +42,20 @@ VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long 
     aInstrs.push_back(instr);
     return instr;
 }
+
+bool VGMInstrSet::LoadVGMFile() {
+    bool val = Load();
+    if (!val) {
+        return false;
+    }
+
+    if (auto fmt = GetFormat(); fmt) {
+        fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    }
+
+    return val;
+}
+
 
 bool VGMInstrSet::Load() {
     if (!GetHeaderInfo())
@@ -63,6 +78,7 @@ bool VGMInstrSet::Load() {
         }
     }
 
+    rawfile->AddContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
     pRoot->AddVGMFile(this);
     return true;
 }
@@ -84,30 +100,16 @@ bool VGMInstrSet::LoadInstrs() {
     return true;
 }
 
-bool VGMInstrSet::OnSaveAsDLS(void) {
-    std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name), "dls");
-    if (filepath.length() != 0) {
-        return SaveAsDLS(filepath.c_str());
-    }
-    return false;
-}
-
-bool VGMInstrSet::OnSaveAsSF2(void) {
-    std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name), "sf2");
-    if (filepath.length() != 0) {
-        return SaveAsSF2(filepath);
-    }
-    return false;
-}
-
-bool VGMInstrSet::SaveAsDLS(const std::string &filepath) {
+namespace conversion {
+bool SaveAsDLS(const VGMInstrSet &set, const std::string &filepath) {
     DLSFile dlsfile;
     bool dlsCreationSucceeded = false;
 
-    if (assocColls.size())
-        dlsCreationSucceeded = assocColls.front()->CreateDLSFile(dlsfile);
-    else
+    if (set.assocColls.empty()) {
         return false;
+    }
+
+    dlsCreationSucceeded = set.assocColls.front()->CreateDLSFile(dlsfile);
 
     if (dlsCreationSucceeded) {
         return dlsfile.SaveDLSFile(filepath);
@@ -115,20 +117,20 @@ bool VGMInstrSet::SaveAsDLS(const std::string &filepath) {
     return false;
 }
 
-bool VGMInstrSet::SaveAsSF2(const std::string &filepath) {
-    SF2File *sf2file = NULL;
-
-    if (assocColls.size())
-        sf2file = assocColls.front()->CreateSF2File();
-    else
+bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath) {
+    if (set.assocColls.empty()) {
         return false;
-    if (sf2file != NULL) {
+    }
+
+    if (auto sf2file = set.assocColls.front()->CreateSF2File(); sf2file) {
         bool bResult = sf2file->SaveSF2File(filepath);
         delete sf2file;
         return bResult;
     }
+
     return false;
 }
+}  // namespace conversion
 
 // ********
 // VGMInstr

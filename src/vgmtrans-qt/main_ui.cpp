@@ -84,10 +84,7 @@ QPalette namedColorSchemePalette() {
 }
 
 int main(int argc, char *argv[]) {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-#endif
-
     QCoreApplication::setOrganizationName(QStringLiteral("VGMTrans"));
     QCoreApplication::setApplicationName(QStringLiteral("VGMTransQt"));
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);

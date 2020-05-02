@@ -36,7 +36,7 @@ class VGMCollListView : public QListView {
 
    public slots:
     void HandlePlaybackRequest();
-    void HandleStopRequest();
+    static void HandleStopRequest();
 
    private:
     void CollMenu(const QPoint &pos);

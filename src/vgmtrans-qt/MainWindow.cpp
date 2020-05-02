@@ -9,7 +9,6 @@
 #include <QVBoxLayout>
 #include <QStandardPaths>
 #include <QFileDialog>
-#include <QGridLayout>
 
 #include "QtVGMRoot.h"
 #include "MainWindow.h"
@@ -17,7 +16,10 @@
 #include "util/HeaderContainer.h"
 
 #include "About.h"
-#include "VGMFile.h"
+#include "components/VGMMiscFile.h"
+#include "components/seq/VGMSeq.h"
+#include "components/instr/VGMInstrSet.h"
+#include "components/VGMSampColl.h"
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
     setWindowTitle("VGMTrans");
@@ -48,19 +50,19 @@ void MainWindow::CreateElements() {
     setStatusBar(m_statusbar);
 
     m_rawfiles_list = new RawFileListView();
-    HeaderContainer *m_rawfiles_list_container =
+    auto *m_rawfiles_list_container =
         new HeaderContainer(m_rawfiles_list, QStringLiteral("Imported Files"));
 
     m_vgmfiles_list = new VGMFilesList();
-    HeaderContainer *m_vgmfiles_list_container =
+    auto *m_vgmfiles_list_container =
         new HeaderContainer(m_vgmfiles_list, QStringLiteral("Detected files"));
 
     m_colls_list = new VGMCollListView();
-    HeaderContainer *m_colls_list_container =
+    auto *m_colls_list_container =
         new HeaderContainer(m_colls_list, QStringLiteral("Detected collections"));
 
     m_coll_view = new VGMCollView(m_colls_list->selectionModel());
-    HeaderContainer *m_coll_view_container =
+    auto *m_coll_view_container =
         new HeaderContainer(m_coll_view, QStringLiteral("Selected collection"));
 
     auto coll_wrapper = new QWidget();
@@ -115,11 +117,14 @@ void MainWindow::RouteSignals() {
         if (!m_vgmfiles_list->currentIndex().isValid())
             return;
 
-        VGMFile *clicked_item = qtVGMRoot.vVGMFile[m_vgmfiles_list->currentIndex().row()];
-        m_statusbar_offset->setText("Offset: 0x" +
-                                    QString::number(clicked_item->dwOffset, 16).toUpper());
-        m_statusbar_length->setText("Length: 0x" +
-                                    QString::number(clicked_item->unLength, 16).toUpper());
+        auto clicked_item = qtVGMRoot.vVGMFile[m_vgmfiles_list->currentIndex().row()];
+
+        std::visit([this](auto clicked_item) {
+            m_statusbar_offset->setText("Offset: 0x" +
+                                        QString::number(clicked_item->dwOffset, 16).toUpper());
+            m_statusbar_length->setText("Length: 0x" +
+                                        QString::number(clicked_item->unLength, 16).toUpper());
+        }, clicked_item);
     });
 }
 
@@ -131,8 +136,12 @@ void MainWindow::OpenFile() {
     if (filenames.isEmpty())
         return;
 
-    for (QString &filename : filenames)
+    for (QString &filename : filenames) {
+        m_statusbar->showMessage("Scanning \"" + filename + "\"...", 1000);
         qtVGMRoot.OpenRawFile(filename.toStdString());
+    }
+
+    m_statusbar->showMessage("Operation completed");
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -146,7 +155,6 @@ void MainWindow::dropEvent(QDropEvent *event) {
         return;
 
     for (const auto &file : files) {
-        // Leave sanity checks to the backend
         qtVGMRoot.OpenRawFile(QFileInfo(file.toLocalFile()).filePath().toStdString());
     }
 }
