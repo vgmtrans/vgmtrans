@@ -54,7 +54,7 @@ bool AkaoSeq::GetHeaderInfo(void) {
     VGMHeader *hdr = AddHeader(dwOffset, 0x14);
     hdr->AddSig(dwOffset, 4);
     hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
-    hdr->AddSimpleItem(dwOffset + 0x6, 2, L"Size");
+    hdr->AddSimpleItem(dwOffset + 0x6, 2, L"Size (Excluding first 16 bytes)");
     hdr->AddSimpleItem(dwOffset + 0x8, 1, L"Reverb Type");
     hdr->AddSimpleItem(dwOffset + 0x10, 4, L"Number of Tracks (# of true bits)");
 
@@ -91,14 +91,22 @@ bool AkaoSeq::GetHeaderInfo(void) {
     }
   }
 
+  const uint32_t track_header_offset = version == AkaoPs1Version::VERSION_1 ? 0x14 : 0x40;
+  VGMHeader *track_pointer_header = AddHeader(dwOffset + track_header_offset, nNumTracks * 2);
+  for (unsigned int i = 0; i < nNumTracks; i++) {
+    std::wstringstream name;
+    name << L"Offset: Track " << (i + 1);
+    track_pointer_header->AddSimpleItem(dwOffset + track_header_offset + (i * 2), 2, name.str());
+  }
+
   return true;
 }
 
 
 bool AkaoSeq::GetTrackPointers(void) {
-  const uint32_t head = version == AkaoPs1Version::VERSION_1 ? 0x14 : 0x40;
+  const uint32_t track_header_offset = version == AkaoPs1Version::VERSION_1 ? 0x14 : 0x40;
   for (unsigned int i = 0; i < nNumTracks; i++) {
-    const uint32_t p = head + (i * 2);
+    const uint32_t p = track_header_offset + (i * 2);
     const uint32_t base = p + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
     const uint32_t relative_offset = GetShort(dwOffset + p);
     const uint32_t track_offset = base + relative_offset;
