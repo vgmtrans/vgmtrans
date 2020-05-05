@@ -30,9 +30,20 @@ class AkaoSeq:
   virtual bool GetHeaderInfo();
   virtual bool GetTrackPointers(void);
 
-  uint8_t GetNumPositiveBits(uint32_t ulWord);
-
   static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
+  static uint32_t ReadNumOfTracks(RawFile *file, uint32_t offset);
+
+private:
+  static uint8_t GetNumPositiveBits(uint32_t ulWord) {
+    return   ((ulWord & 0x80000000)>0) + ((ulWord & 0x40000000)>0) + ((ulWord & 0x20000000)>0) + ((ulWord & 0x10000000)>0)
+      + ((ulWord & 0x8000000)>0) + ((ulWord & 0x4000000)>0) + ((ulWord & 0x2000000)>0) + ((ulWord & 0x1000000)>0)
+      + ((ulWord & 0x800000)>0) + ((ulWord & 0x400000)>0) + ((ulWord & 0x200000)>0) + ((ulWord & 0x100000)>0)
+      + ((ulWord & 0x80000)>0) + ((ulWord & 0x40000)>0) + ((ulWord & 0x20000)>0) + ((ulWord & 0x10000)>0)
+      + ((ulWord & 0x8000)>0) + ((ulWord & 0x4000)>0) + ((ulWord & 0x2000)>0) + ((ulWord & 0x1000)>0)
+      + ((ulWord & 0x800)>0) + ((ulWord & 0x400)>0) + ((ulWord & 0x200)>0) + ((ulWord & 0x100)>0)
+      + ((ulWord & 0x80)>0) + ((ulWord & 0x40)>0) + ((ulWord & 0x20)>0) + ((ulWord & 0x10)>0)
+      + ((ulWord & 0x8)>0) + ((ulWord & 0x4)>0) + ((ulWord & 0x2)>0) + ((ulWord & 0x1));
+  }
 
  public:
   AkaoInstrSet *instrset;
