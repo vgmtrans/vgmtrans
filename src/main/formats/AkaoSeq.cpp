@@ -16,30 +16,26 @@ AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset)
 AkaoSeq::~AkaoSeq(void) {
 }
 
-AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset)
-{
+AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset) {
   if (file->GetWord(offset + 0x2C) == 0)
     return AkaoPs1Version::VERSION_2;
   else
     return AkaoPs1Version::VERSION_1;
 }
 
-uint8_t AkaoSeq::GetNumPositiveBits(uint32_t ulWord) {
-	return   ((ulWord&0x80000000)>0) + ((ulWord&0x40000000)>0) + ((ulWord&0x20000000)>0) + ((ulWord&0x10000000)>0)
-           + ((ulWord&0x8000000)>0)+((ulWord&0x4000000)>0)+((ulWord&0x2000000)>0)+((ulWord&0x1000000)>0)
-           + ((ulWord&0x800000)>0)+((ulWord&0x400000)>0)+((ulWord&0x200000)>0)+((ulWord&0x100000)>0)
-           + ((ulWord&0x80000)>0)+((ulWord&0x40000)>0)+((ulWord&0x20000)>0)+((ulWord&0x10000)>0)
-           + ((ulWord&0x8000)>0) + ((ulWord&0x4000)>0) + ((ulWord&0x2000)>0) + ((ulWord&0x1000)>0)
-           + ((ulWord&0x800)>0)+((ulWord&0x400)>0)+((ulWord&0x200)>0)+((ulWord&0x100)>0)
-           + ((ulWord&0x80)>0)+((ulWord&0x40)>0)+((ulWord&0x20)>0)+((ulWord&0x10)>0)
-           + ((ulWord&0x8)>0)+((ulWord&0x4)>0)+((ulWord&0x2)>0)+((ulWord&0x1));
+uint32_t AkaoSeq::ReadNumOfTracks(RawFile *file, uint32_t offset) {
+  const AkaoPs1Version version = GuessVersion(file, offset);
+  const uint32_t track_bits = (version == AkaoPs1Version::VERSION_1)
+    ? file->GetWord(offset + 0x10)
+    : file->GetWord(offset + 0x20);
+  return GetNumPositiveBits(track_bits);
 }
 
 bool AkaoSeq::GetHeaderInfo(void) {
   //first do a version check to see if it's older or newer version of AKAO sequence format
   version = GuessVersion(rawfile, dwOffset);
+  nNumTracks = ReadNumOfTracks(rawfile, dwOffset);
 
-  uint32_t track_bits;
   if (version == AkaoPs1Version::VERSION_2) {
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
@@ -52,7 +48,6 @@ bool AkaoSeq::GetHeaderInfo(void) {
     hdr->AddSimpleItem(dwOffset + 0x34, 4, L"Drumkit Data Pointer");
 
     unLength = GetShort(dwOffset + 6);
-    track_bits = GetWord(dwOffset + 0x20);
     id = GetShort(dwOffset + 0x14);
   }
   else if (version == AkaoPs1Version::VERSION_1) {
@@ -64,7 +59,6 @@ bool AkaoSeq::GetHeaderInfo(void) {
     hdr->AddSimpleItem(dwOffset + 0x10, 4, L"Number of Tracks (# of true bits)");
 
     unLength = 0x10 + GetShort(dwOffset + 6);
-    track_bits = GetWord(dwOffset + 0x10);
   }
   else {
     return false;
@@ -73,7 +67,6 @@ bool AkaoSeq::GetHeaderInfo(void) {
   name = L"Akao Seq";
 
   SetPPQN(0x30);
-  nNumTracks = GetNumPositiveBits(track_bits);
   seq_id = GetShort(dwOffset + 4);
 
   if (version == AkaoPs1Version::VERSION_2)

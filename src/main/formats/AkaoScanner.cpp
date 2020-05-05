@@ -15,21 +15,27 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
     if (file->GetWordBE(offset) != 0x414B414F)
       continue;
 
-    //0x20 contains the num of tracks, via num positive bits
-    if (file->GetWord(offset + 0x20) != 0 && file->GetWord(offset + 8) != 0) {
-      if (file->GetWord(offset + 0x2C) != 0 || file->GetWord(offset + 0x28) != 0)
+    const uint16_t seq_length = file->GetShort(offset + 6);
+    if (seq_length != 0) {
+      // Sequence
+      const AkaoPs1Version version = AkaoSeq::GuessVersion(file, offset);
+      const uint32_t numTracks = AkaoSeq::ReadNumOfTracks(file, offset);
+      if (numTracks == 0)
         continue;
-      if (file->GetWord(offset + 0x38) != 0 || file->GetWord(offset + 0x3C) != 0)
-        continue;
-      //sequence length value must != 0
-      if (file->GetShort(offset + 6) == 0)
-        continue;
+
+      if (version == AkaoPs1Version::VERSION_2) {
+        if (file->GetWord(offset + 0x2C) != 0 || file->GetWord(offset + 0x28) != 0)
+          continue;
+        if (file->GetWord(offset + 0x38) != 0 || file->GetWord(offset + 0x3C) != 0)
+          continue;
+      }
 
       AkaoSeq *NewAkaoSeq = new AkaoSeq(file, offset);
       if (!NewAkaoSeq->LoadVGMFile())
         delete NewAkaoSeq;
     }
     else {
+      // Samples
       if (file->GetWord(offset + 8) != 0 || file->GetWord(offset + 0x0C) != 0 ||
         file->GetWord(offset + 0x24) != 0 || file->GetWord(offset + 0x28) != 0 || file->GetWord(offset + 0x2C) != 0 &&
         file->GetWord(offset + 0x30) != 0 || file->GetWord(offset + 0x34) != 0 || file->GetWord(offset + 0x38) != 0 &&
