@@ -390,7 +390,7 @@ bool AkaoTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM Modulation Off", L"", CLR_UNKNOWN);
       break;
 
-      // set loop begin marker
+    // set loop begin marker
     case 0xC8:
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat Start", L"", CLR_LOOP);
       loop_begin_layer++;
@@ -525,7 +525,8 @@ bool AkaoTrack::ReadEvent(void) {
       break;
 
     default:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN EVENT", L"", CLR_UNRECOGNIZED);
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      return false;
     }
   }
   else { // 0xE0..0xFF
@@ -725,14 +726,14 @@ bool AkaoTrack::ReadEvent(void) {
             break;
 
           default:
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN META EVENT", L"", CLR_UNRECOGNIZED);
-            break;
+            AddUnknown(beginOffset, curOffset - beginOffset);
+            return false;
           }
           break;
 
         default:
-          AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN EVENT", L"", CLR_UNRECOGNIZED);
-          break;
+          AddUnknown(beginOffset, curOffset - beginOffset);
+          return false;
         }
     }
   }
