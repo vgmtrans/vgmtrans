@@ -6,6 +6,17 @@
 
 class AkaoInstrSet;
 
+enum class AkaoPs1Version : uint8_t {
+  // Final Fantasy 7
+  // SaGa Frontier
+  // Front Mission 2
+  // Chocobo's Mysterious Dungeon
+  // Parasite Eve
+  VERSION_1,
+
+  VERSION_2
+};
+
 static const unsigned short
     delta_time_table[] = {0xC0, 0x60, 0x30, 0x18, 0x0C, 0x6, 0x3, 0x20, 0x10, 0x8, 0x4, 0x0, 0xA0A0, 0xA0A0};
 
@@ -21,15 +32,14 @@ class AkaoSeq:
 
   uint8_t GetNumPositiveBits(uint32_t ulWord);
 
+  static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
+
  public:
   AkaoInstrSet *instrset;
   uint16_t seq_id;
-  uint16_t assoc_ss_id;
-  int nVersion;        // AKAO format version number
+  AkaoPs1Version version;
 
   bool bUsesIndividualArts;
-
-  enum { VERSION_1, VERSION_2, VERSION_3 };
 };
 
 class AkaoTrack
