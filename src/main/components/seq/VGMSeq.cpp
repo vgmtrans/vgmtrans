@@ -125,7 +125,7 @@ bool VGMSeq::PostLoad() {
         std::sort(aInstrumentsUsed.begin(), aInstrumentsUsed.end());
 
         for (auto & aTrack : aTracks) {
-            std::sort(aTrack->aEvents.begin(), aTrack->aEvents.end(), ItemPtrOffsetCmp());
+            std::sort(aTrack->aEvents.begin(), aTrack->aEvents.end(), [](const VGMItem *a, const VGMItem *b) { return a->dwOffset < b->dwOffset; });
         }
     } else if (readMode == READMODE_CONVERT_TO_MIDI) {
         midi->Sort();

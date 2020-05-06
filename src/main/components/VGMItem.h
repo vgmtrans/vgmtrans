@@ -47,14 +47,6 @@ class VGMFile;
 class VGMItem;
 class VGMHeader;
 
-struct ItemSet {
-    VGMItem *item;
-    VGMItem *parent;
-    const char *itemName;
-};
-
-enum ItemType { ITEMTYPE_UNDEFINED, ITEMTYPE_VGMFILE, ITEMTYPE_SEQEVENT };
-
 class VGMItem {
    public:
     enum Icon {
@@ -100,13 +92,10 @@ class VGMItem {
 
     RawFile *GetRawFile();
 
-    virtual std::vector<const char *> *GetMenuItemNames() { return nullptr; }
-    virtual bool CallMenuItem(VGMItem *, int) { return false; }
     virtual std::string GetDescription() { return name; }
     virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
     virtual Icon GetIcon() { return ICON_BINARY; /*ICON_UNKNOWN*/ }
     virtual void AddToUI(VGMItem *parent, void *UI_specific);
-    virtual bool IsContainerItem() { return false; }
 
    protected:
     // TODO make inline
@@ -164,11 +153,4 @@ class VGMContainerItem : public VGMItem {
     std::vector<VGMHeader *> headers;
     std::vector<std::vector<VGMItem *> *> containers;
     std::vector<VGMItem *> localitems;
-};
-
-class ItemPtrOffsetCmp {
-   public:
-    bool operator()(const VGMItem *a, const VGMItem *b) const {
-        return (a->dwOffset < b->dwOffset);
-    }
 };

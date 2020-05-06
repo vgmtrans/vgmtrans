@@ -35,8 +35,8 @@ bool VGMSeqSection::GetTrackPointers() {
 
 bool VGMSeqSection::PostLoad() {
     if (parentSeq->readMode == READMODE_ADD_TO_UI) {
-        for (uint32_t i = 0; i < aTracks.size(); i++) {
-            std::sort(aTracks[i]->aEvents.begin(), aTracks[i]->aEvents.end(), ItemPtrOffsetCmp());
+        for (auto & aTrack : aTracks) {
+            std::sort(aTrack->aEvents.begin(), aTrack->aEvents.end(), [](const VGMItem *a, const VGMItem *b) { return a->dwOffset < b->dwOffset; });
         }
     }
 

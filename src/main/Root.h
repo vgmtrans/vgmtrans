@@ -23,8 +23,6 @@ class VGMInstrSet;
 class VGMSampColl;
 class VGMMiscFile;
 
-struct ItemSet;
-
 class VGMRoot {
    public:
     VGMRoot() = default;
