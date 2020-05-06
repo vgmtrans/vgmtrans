@@ -6,7 +6,6 @@
 #pragma once
 
 #include "common.h"
-#include "VGMFile.h"
 
 class VGMSeq;
 class VGMInstrSet;
@@ -17,15 +16,15 @@ class DLSFile;
 class SF2File;
 class SynthFile;
 
-class VGMColl : public VGMItem {
+class VGMColl {
    public:
-    explicit VGMColl(std::string name = "Unnamed Collection");
+    explicit VGMColl(std::string name = "Unnamed collection");
     virtual ~VGMColl() = default;
 
     void RemoveFileAssocs();
     [[nodiscard]] const std::string &GetName() const;
     void SetName(const std::string *newName);
-    VGMSeq *GetSeq();
+    [[nodiscard]] VGMSeq *GetSeq() const;
     void UseSeq(VGMSeq *theSeq);
     void AddInstrSet(VGMInstrSet *theInstrSet);
     void AddSampColl(VGMSampColl *theSampColl);
@@ -39,7 +38,7 @@ class VGMColl : public VGMItem {
     virtual bool MainDLSCreation(DLSFile &dls);
     virtual bool PostDLSMainCreation() { return true; }
 
-    VGMSeq *seq;
+    VGMSeq *seq{};
     std::vector<VGMInstrSet *> instrsets;
     std::vector<VGMSampColl *> sampcolls;
     std::vector<VGMMiscFile *> miscfiles;
