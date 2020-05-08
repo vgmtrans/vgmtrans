@@ -10,14 +10,12 @@
 #include "Root.h"
 #include "Format.h"
 
-using namespace std;
-
 // ***********
 // VGMMiscFile
 // ***********
 
-VGMMiscFile::VGMMiscFile(const string &format, RawFile *file, uint32_t offset, uint32_t length,
-                         string name)
+VGMMiscFile::VGMMiscFile(const std::string &format, RawFile *file, uint32_t offset, uint32_t length,
+                         std::string name)
     : VGMFile(format, file, offset, length, std::move(name)) {}
 
 bool VGMMiscFile::LoadMain() {

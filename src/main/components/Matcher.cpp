@@ -6,8 +6,6 @@
 
 #include "Matcher.h"
 
-using namespace std;
-
 Matcher::Matcher(Format *format) {
     fmt = format;
 }
@@ -117,17 +115,4 @@ void FilegroupMatcher::LookForMatch() {
         instrsets.clear();
         sampcolls.clear();
     }
-}
-
-template <class T>
-T *FilegroupMatcher::GetLargestVGMFileInList(list<T *> theList) {
-    uint32_t s = 0;
-    T *curWinner = nullptr;
-    for (typename list<T *>::iterator iter = theList.begin(); iter != theList.end(); iter++) {
-        if ((*iter)->unLength > s) {
-            s = (*iter)->unLength;
-            curWinner = *iter;
-        }
-    }
-    return curWinner;
 }

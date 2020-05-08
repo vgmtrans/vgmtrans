@@ -14,13 +14,11 @@
 #include "helper.h"
 #include <fmt/format.h>
 
-using namespace std;
-
 //  ********
 //  SeqTrack
 //  ********
 
-SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, string name)
+SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::string name)
     : VGMContainerItem(parentFile, offset, length, name), parentSeq(parentFile) {
     dwStartOffset = offset;
     bMonophonic = parentSeq->bMonophonicTracks;
@@ -287,7 +285,7 @@ void SeqTrack::AddGenericEvent(uint32_t offset, uint32_t length, const std::stri
         AddEvent(new SeqEvent(this, offset, length, sEventName, color, icon, sEventDesc));
     } else if (readMode == READMODE_CONVERT_TO_MIDI) {
         if (bWriteGenericEventAsTextEvent) {
-            string miditext(sEventName);
+            std::string miditext(sEventName);
             if (!sEventDesc.empty()) {
                 miditext += " - ";
                 miditext += sEventDesc;
@@ -306,7 +304,7 @@ void SeqTrack::AddUnknown(uint32_t offset, uint32_t length, const std::string &s
             new SeqEvent(this, offset, length, sEventName, CLR_UNKNOWN, ICON_BINARY, sEventDesc));
     } else if (readMode == READMODE_CONVERT_TO_MIDI) {
         if (bWriteGenericEventAsTextEvent) {
-            string miditext(sEventName);
+            std::string miditext(sEventName);
             if (!sEventDesc.empty()) {
                 miditext += " - ";
                 miditext += sEventDesc;
@@ -1198,7 +1196,7 @@ void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semit
     // pMidiTrack->(channel, transpose);
 }
 
-void SeqTrack::AddMarker(uint32_t offset, uint32_t length, const string &markername,
+void SeqTrack::AddMarker(uint32_t offset, uint32_t length, const std::string &markername,
                          uint8_t databyte1, uint8_t databyte2, const std::string &sEventName,
                          int8_t priority, uint8_t color) {
     OnEvent(offset, length);

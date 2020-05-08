@@ -8,8 +8,6 @@
 #include "PSXSPU.h"
 #include "PS1Format.h"
 
-using namespace std;
-
 Vab::Vab(RawFile *file, uint32_t offset) : VGMInstrSet(PS1Format::name, file, offset) {}
 
 Vab::~Vab(void) {}
@@ -172,7 +170,7 @@ bool Vab::GetInstrPointers() {
 // ********
 
 VabInstr::VabInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, const string &name)
+                   uint32_t theInstrNum, const std::string &name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name), masterVol(127) {}
 
 VabInstr::~VabInstr(void) {}

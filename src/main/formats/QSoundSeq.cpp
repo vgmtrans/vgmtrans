@@ -9,10 +9,8 @@
 
 DECLARE_FORMAT(QSound);
 
-using namespace std;
-
-const uint8_t delta_table[3][7] = {2,    4,    8,    0x10, 0x20, 0x40, 0x80, 3,    6,    0xC, 0x18,
-                                   0x30, 0x60, 0xC0, 0,    9,    0x12, 0x24, 0x48, 0x90, 0};
+const uint8_t delta_table[3][7] = {{2,    4,    8,    0x10, 0x20, 0x40, 0x80}, {3,    6,    0xC, 0x18,
+                                   0x30, 0x60, 0xC0}, {0,    9,    0x12, 0x24, 0x48, 0x90, 0}};
 // octave_table provides the note value for the start of each octave.
 // wholly unnecessary for me include it, but i'm following the original driver code verbatim for now
 const uint8_t octave_table[] = {0x00, 0x0C, 0x18, 0x24, 0x30, 0x3C, 0x48, 0x54,
@@ -124,8 +122,8 @@ bool QSoundSeq::PostLoad() {
     //  tempo.  It gets updated (251/4) times a second, always.  We will have to convert
     //  ticks in our sequence into absolute elapsed time, which means we also need to keep
     //  track of any tempo events that change the absolute time per tick.
-    vector<MidiEvent *> tempoEvents;
-    vector<MidiTrack *> &miditracks = midi->aTracks;
+    std::vector<MidiEvent *> tempoEvents;
+    std::vector<MidiTrack *> &miditracks = midi->aTracks;
 
     // First get all tempo events, we assume they occur on track 1
     for (unsigned int i = 0; i < miditracks[0]->aEvents.size(); i++) {
@@ -137,7 +135,7 @@ bool QSoundSeq::PostLoad() {
     // Now for each track, gather all vibrato events, lfo events, pitch bend events and track end
     // events
     for (unsigned int i = 0; i < miditracks.size(); i++) {
-        vector<MidiEvent *> events(tempoEvents);
+        std::vector<MidiEvent *> events(tempoEvents);
         MidiTrack *track = miditracks[i];
         int channel = this->aTracks[i]->channel;
 
@@ -504,7 +502,7 @@ bool QSoundTrack::ReadEvent(void) {
             case 0x0C: {
                 uint8_t pitchbend = GetByte(curOffset++);
                 // double cents = (pitchbend / 256.0) * 100;
-                AddMarker(beginOffset, curOffset - beginOffset, string("pitchbend"), pitchbend, 0,
+                AddMarker(beginOffset, curOffset - beginOffset, std::string("pitchbend"), pitchbend, 0,
                           "Pitch Bend", PRIORITY_MIDDLE, CLR_PITCHBEND);
                 // AddPitchBend(beginOffset, curOffset-beginOffset, (cents / 200) * 8192);
             } break;
@@ -647,7 +645,7 @@ bool QSoundTrack::ReadEvent(void) {
                 uint8_t vibratoDepth;
                 if (GetVersion() < VER_171) {
                     vibratoDepth = GetByte(curOffset++);
-                    AddMarker(beginOffset, curOffset - beginOffset, string("vibrato"), vibratoDepth,
+                    AddMarker(beginOffset, curOffset - beginOffset, std::string("vibrato"), vibratoDepth,
                               0, "Vibrato", PRIORITY_HIGH, CLR_PITCHBEND);
                 } else {
                     // First data byte defines behavior 0-3
@@ -656,25 +654,25 @@ bool QSoundTrack::ReadEvent(void) {
                     switch (type) {
                         // vibrato
                         case 0:
-                            AddMarker(beginOffset, curOffset - beginOffset, string("vibrato"), data,
+                            AddMarker(beginOffset, curOffset - beginOffset, std::string("vibrato"), data,
                                       0, "Vibrato", PRIORITY_HIGH, CLR_PITCHBEND);
                             break;
 
                         // tremelo
                         case 1:
-                            AddMarker(beginOffset, curOffset - beginOffset, string("tremelo"), data,
+                            AddMarker(beginOffset, curOffset - beginOffset, std::string("tremelo"), data,
                                       0, "Tremelo", PRIORITY_MIDDLE, CLR_EXPRESSION);
                             break;
 
                         // LFO rate
                         case 2:
-                            AddMarker(beginOffset, curOffset - beginOffset, string("lfo"), data, 0,
+                            AddMarker(beginOffset, curOffset - beginOffset, std::string("lfo"), data, 0,
                                       "LFO Rate", PRIORITY_MIDDLE, CLR_LFO);
                             break;
 
                         // LFO reset
                         case 3:
-                            AddMarker(beginOffset, curOffset - beginOffset, string("resetlfo"),
+                            AddMarker(beginOffset, curOffset - beginOffset, std::string("resetlfo"),
                                       data, 0, "LFO Reset", PRIORITY_MIDDLE, CLR_LFO);
                             break;
                     }
@@ -685,7 +683,7 @@ bool QSoundTrack::ReadEvent(void) {
                 uint8_t tremeloDepth;
                 if (GetVersion() < VER_171) {
                     tremeloDepth = GetByte(curOffset++);
-                    AddMarker(beginOffset, curOffset - beginOffset, string("tremelo"), tremeloDepth,
+                    AddMarker(beginOffset, curOffset - beginOffset, std::string("tremelo"), tremeloDepth,
                               0, "Tremelo", PRIORITY_MIDDLE, CLR_EXPRESSION);
                 } else {
                     // I'm not sure at all about the behavior here, need to test
@@ -699,7 +697,7 @@ bool QSoundTrack::ReadEvent(void) {
             case 0x1D: {
                 uint8_t rate = GetByte(curOffset++);
                 if (GetVersion() < VER_171)
-                    AddMarker(beginOffset, curOffset - beginOffset, string("lfo"), rate, 0,
+                    AddMarker(beginOffset, curOffset - beginOffset, std::string("lfo"), rate, 0,
                               "LFO Rate", PRIORITY_MIDDLE, CLR_LFO);
                 else
                     AddUnknown(beginOffset, curOffset - beginOffset, "NOP");
@@ -710,7 +708,7 @@ bool QSoundTrack::ReadEvent(void) {
             case 0x1E: {
                 uint8_t data = GetByte(curOffset++);
                 if (GetVersion() < VER_171)
-                    AddMarker(beginOffset, curOffset - beginOffset, string("resetlfo"), data, 0,
+                    AddMarker(beginOffset, curOffset - beginOffset, std::string("resetlfo"), data, 0,
                               "LFO Reset", PRIORITY_MIDDLE, CLR_LFO);
                 else
                     AddUnknown(beginOffset, curOffset - beginOffset, "NOP");

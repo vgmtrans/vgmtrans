@@ -11,31 +11,6 @@
 #include "AkaoInstr.h"
 #include "PSXSPU.h"
 
-using namespace std;
-
-/*
-int AkaoFormat::OnMatch(vector<VGMFile*>& files)
-{
-        uint32_t i;
-        for (i=0; files[i]->GetFileType() != FILETYPE_SEQ  &&  i<2; i++)
-                ;
-
-        AkaoSeq* seq = (AkaoSeq*)files[i];
-        AkaoInstrSet* instrset = seq->instrset;
-        AkaoSampColl* sampcoll = (AkaoSampColl*)files[!i];
-
-        AkaoColl* coll = new AkaoColl(*seq->GetName());
-        coll->UseSeq(seq);
-        coll->AddInstrSet(instrset);
-        coll->AddSampColl(sampcoll);
-        if (!coll->Load())
-        {
-                delete coll;
-                return false;
-        }
-        return true;
-}*/
-
 bool AkaoColl::LoadMain() {
     AkaoInstrSet *instrset = (AkaoInstrSet *)instrsets[0];
     AkaoSampColl *sampcoll = (AkaoSampColl *)sampcolls[0];
@@ -43,7 +18,7 @@ bool AkaoColl::LoadMain() {
     // Set the sample numbers of each region using the articulation data references of each region
     for (uint32_t i = 0; i < instrset->aInstrs.size(); i++) {
         AkaoInstr *instr = (AkaoInstr *)instrset->aInstrs[i];
-        vector<VGMRgn *> *rgns = &instr->aRgns;
+        std::vector<VGMRgn *> *rgns = &instr->aRgns;
         for (uint32_t j = 0; j < rgns->size(); j++) {
             AkaoRgn *rgn = (AkaoRgn *)(*rgns)[j];
 

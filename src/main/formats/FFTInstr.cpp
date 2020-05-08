@@ -11,8 +11,6 @@
 #include "PSXSPU.h"
 #include <fmt/format.h>
 
-using namespace std;
-
 /****************************************************************/
 /*																*/
 /*			Instrument Set		(Bank全体)

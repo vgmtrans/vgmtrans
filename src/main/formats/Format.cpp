@@ -7,17 +7,14 @@
 #include <vector>
 #include <map>
 #include "Scanner.h"
-
 #include "Matcher.h"
-
-using namespace std;
 
 FormatMap &Format::registry() {
     static FormatMap registry;
     return registry;
 }
 
-Format::Format(const string &formatName) : scanner(nullptr), matcher(nullptr) {
+Format::Format(const std::string &formatName) : scanner(nullptr), matcher(nullptr) {
     registry().insert(make_pair(formatName, this));
 }
 
@@ -26,7 +23,7 @@ Format::~Format() {
     delete matcher;
 }
 
-Format *Format::GetFormatFromName(const string &name) {
+Format *Format::GetFormatFromName(const std::string &name) {
     auto findIt = registry().find(name);
     if (findIt == registry().end())
         return nullptr;

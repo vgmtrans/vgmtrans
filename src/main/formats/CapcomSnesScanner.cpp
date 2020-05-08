@@ -11,8 +11,6 @@ namespace vgmtrans::scanners {
 ScannerRegistration<CapcomSnesScanner> s_capcom_snes("CAPCOMSNES", {"spc"});
 }
 
-using namespace std;
-
 // ; Super Ghouls 'N Ghosts SPC
 // 03f5: 1c        asl   a
 // 03f6: 5d        mov   x,a
@@ -107,8 +105,8 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) {
     uint32_t addrBGMHeader;
     uint32_t addrInstrTable;
 
-    string basefilename = removeExtFromPath(file->name());
-    string name = file->tag.HasTitle() ? file->tag.title : basefilename;
+    std::string basefilename = removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
     // find a song list
     hasSongList = file->SearchBytePattern(ptnReadSongList, ofsReadSongListASM);

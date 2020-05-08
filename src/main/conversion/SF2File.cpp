@@ -9,9 +9,7 @@
 #include "ScaleConversion.h"
 #include "Root.h"
 
-using namespace std;
-
-SF2InfoListChunk::SF2InfoListChunk(string name) : LISTChunk("INFO") {
+SF2InfoListChunk::SF2InfoListChunk(std::string name) : LISTChunk("INFO") {
     // Create a date string
     time_t current_time = time(NULL);
     char *c_time_string = ctime(&current_time);
@@ -25,8 +23,8 @@ SF2InfoListChunk::SF2InfoListChunk(string name) : LISTChunk("INFO") {
     AddChildChunk(ifilCk);
     AddChildChunk(new SF2StringChunk("isng", "EMU8000"));
     AddChildChunk(new SF2StringChunk("INAM", name));
-    AddChildChunk(new SF2StringChunk("ICRD", string(c_time_string)));
-    AddChildChunk(new SF2StringChunk("ISFT", string("VGMTrans " + string(VERSION))));
+    AddChildChunk(new SF2StringChunk("ICRD", std::string(c_time_string)));
+    AddChildChunk(new SF2StringChunk("ISFT", std::string("VGMTrans " + std::string(VERSION))));
 }
 
 //  *******

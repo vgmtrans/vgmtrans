@@ -6,8 +6,6 @@
 
 #include "RiffFile.h"
 
-using namespace std;
-
 uint32_t Chunk::GetSize() {
     return 8 + GetPaddedSize(size);
 }
@@ -74,4 +72,4 @@ void ListTypeChunk::Write(uint8_t *buffer) {
     }
 }
 
-RiffFile::RiffFile(string file_name, string form) : RIFFChunk(form), name(file_name) {}
+RiffFile::RiffFile(std::string file_name, std::string form) : RIFFChunk(form), name(file_name) {}

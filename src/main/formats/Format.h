@@ -80,7 +80,7 @@ class Format {
     // virtual int OnNewSeq(VGMSeq* seq);
     // virtual int OnNewInstrSet(VGMInstrSet* instrset);
     // virtual int OnNewSampColl(VGMSampColl* sampcoll);
-    virtual bool OnMatch(std::vector<VGMFile *> &files) { return true; }
+    virtual bool OnMatch(std::vector<VGMFile *> &) { return true; }
 
    public:
     Matcher *matcher;

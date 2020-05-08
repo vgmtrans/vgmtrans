@@ -39,7 +39,6 @@ void NDSScanner::SearchForSDAT(RawFile *file) {
 // The following is pretty god-awful messy.  I should have created structs for the different
 // blocks and loading the entire blocks at a time.
 uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
-    using namespace std;
     uint32_t SDATLength = file->GetWord(baseOff + 8) + 8;
 
     auto SYMBoff = file->GetWord(baseOff + 0x10) + baseOff;
@@ -172,13 +171,13 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
 
     std::vector<std::pair<uint16_t, NDSInstrSet *>> BNKs;
     {
-        vector<uint16_t> vUniqueBanks = vector<uint16_t>(seqFileBnks);
+        std::vector<uint16_t> vUniqueBanks(seqFileBnks);
         sort(vUniqueBanks.begin(), vUniqueBanks.end());
-        vector<uint16_t>::iterator new_end = unique(vUniqueBanks.begin(), vUniqueBanks.end());
+        std::vector<uint16_t>::iterator new_end = unique(vUniqueBanks.begin(), vUniqueBanks.end());
 
         // for (uint32_t i=0; i<nBnks; i++)
         // for (uint32_t i=0; i<seqFileBnks.size(); i++)
-        for (vector<uint16_t>::iterator iter = vUniqueBanks.begin(); iter != new_end; iter++) {
+        for (std::vector<uint16_t>::iterator iter = vUniqueBanks.begin(); iter != new_end; iter++) {
             if (*iter >= bnkFileIDs.size() /*0x1000*/ ||
                 bnkFileIDs[*iter] ==
                     (uint16_t)-1)  // > 0x1000 is idiot test for Phoenix Wright, which had many
@@ -203,7 +202,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
             if (!NewNDSInstrSet->LoadVGMFile()) {
                 L_ERROR("Failed to load NDSInstrSet at {:#x}", pBnkFatData);
             }
-            pair<uint16_t, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
+            std::pair<uint16_t, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
             BNKs.push_back(theBank);
         }
     }

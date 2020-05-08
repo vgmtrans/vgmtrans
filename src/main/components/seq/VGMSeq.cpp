@@ -14,9 +14,7 @@
 #include "Root.h"
 #include "Format.h"
 
-using namespace std;
-
-VGMSeq::VGMSeq(const string &format, RawFile *file, uint32_t offset, uint32_t length, string name)
+VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMFile(format, file, offset, length, std::move(name)),
       midi(NULL),
       bMonophonicTracks(false),

@@ -8,15 +8,13 @@
 #include "VGMSampColl.h"
 #include "Root.h"
 
-using namespace std;
-
 // *******
 // VGMSamp
 // *******
 
 VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 string theName)
+                 std::string theName)
     : parSampColl(sampColl),
       sampName(theName),
       VGMItem(sampColl->vgmfile, offset, length),
@@ -62,7 +60,7 @@ void VGMSamp::ConvertToStdWave(uint8_t *buf) {
 }
 
 bool VGMSamp::SaveAsWav(const std::string &filepath) {
-    vector<uint8_t> waveBuf;
+    std::vector<uint8_t> waveBuf;
     uint32_t bufSize;
     if (this->ulUncompressedSize)
         bufSize = this->ulUncompressedSize;

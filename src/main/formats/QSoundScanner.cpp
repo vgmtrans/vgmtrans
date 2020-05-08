@@ -14,11 +14,6 @@ namespace vgmtrans::scanners {
 ScannerRegistration<QSoundScanner> s_qsound("QSOUND");
 }
 
-using namespace std;
-
-//#define PROG_INFO_TABLE_OFFSET 0x7000
-//#define qs_samp_info_TABLE_OFFSET 0x8000
-
 // TODO: Fix this void* nonsense
 void QSoundScanner::Scan(RawFile *file, void *info) {
     if (!info) {
@@ -66,11 +61,11 @@ void QSoundScanner::Scan(RawFile *file, void *info) {
     QSoundSampleInfoTable *sampInfoTable = 0;
     QSoundArticTable *articTable = 0;
 
-    string artic_table_name = fmt::format("{} articulation table", gameentry->name.c_str());
-    string instrset_name = fmt::format("{} instrument set", gameentry->name.c_str());
-    string sampcoll_name = fmt::format("{} sample collection", gameentry->name.c_str());
-    string samp_info_table_name = fmt::format("{} sample info table", gameentry->name.c_str());
-    string seq_table_name = fmt::format("{} sequence pointer table", gameentry->name.c_str());
+    std::string artic_table_name = fmt::format("{} articulation table", gameentry->name.c_str());
+    std::string instrset_name = fmt::format("{} instrument set", gameentry->name.c_str());
+    std::string sampcoll_name = fmt::format("{} sample collection", gameentry->name.c_str());
+    std::string samp_info_table_name = fmt::format("{} sample info table", gameentry->name.c_str());
+    std::string seq_table_name = fmt::format("{} sequence pointer table", gameentry->name.c_str());
 
     RawFile *programFile = seqRomGroupEntry->file;
     RawFile *samplesFile = sampsRomGroupEntry->file;

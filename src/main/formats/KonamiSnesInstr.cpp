@@ -8,8 +8,6 @@
 #include "SNESDSP.h"
 #include <fmt/format.h>
 
-using namespace std;
-
 // ******************
 // KonamiSnesInstrSet
 // ******************

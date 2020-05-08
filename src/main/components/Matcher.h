@@ -356,10 +356,8 @@ class FilegroupMatcher : public Matcher {
     bool OnCloseSampColl(VGMSampColl *sampcoll) override;
 
     virtual void LookForMatch();
-    template <class T>
-    T *GetLargestVGMFileInList(std::list<T *> theList);
 
-   protected:
+protected:
     std::list<VGMSeq *> seqs;
     std::list<VGMInstrSet *> instrsets;
     std::list<VGMSampColl *> sampcolls;

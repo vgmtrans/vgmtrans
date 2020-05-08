@@ -8,9 +8,7 @@
 
 DECLARE_FORMAT(NDS);
 
-using namespace std;
-
-NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
+NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMSeq(NDSFormat::name, file, offset, length, name) {}
 
 bool NDSSeq::GetHeaderInfo(void) {

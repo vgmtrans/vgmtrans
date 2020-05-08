@@ -10,8 +10,6 @@
 #include <utility>
 #include "Format.h"
 
-using namespace std;
-
 VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
                  uint32_t length, std::string theName)
         : VGMContainerItem(this, offset, length),
@@ -33,11 +31,11 @@ Format *VGMFile::GetFormat() {
     return Format::GetFormatFromName(format);
 }
 
-const string &VGMFile::GetFormatName() {
+const std::string &VGMFile::GetFormatName() {
     return format;
 }
 
-const string *VGMFile::GetName() const {
+const std::string *VGMFile::GetName() const {
     return &m_name;
 }
 

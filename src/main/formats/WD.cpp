@@ -9,8 +9,6 @@
 #include "PSXSPU.h"
 #include <fmt/format.h>
 
-using namespace std;
-
 // **********
 // WDInstrSet
 // **********
@@ -73,7 +71,7 @@ bool WDInstrSet::GetInstrPointers() {
 // *******
 
 WDInstr::WDInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                 uint32_t theInstrNum, const string name)
+                 uint32_t theInstrNum, const std::string name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {}
 
 WDInstr::~WDInstr(void) {}

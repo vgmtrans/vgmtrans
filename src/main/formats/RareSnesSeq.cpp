@@ -9,8 +9,6 @@
 #include <sstream>
 #include "ScaleConversion.h"
 
-using namespace std;
-
 DECLARE_FORMAT(RareSnes);
 
 //  **********
@@ -33,7 +31,7 @@ const uint16_t RareSnesSeq::NOTE_PITCH_TABLE[128] = {
     0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff,
     0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff};
 
-RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdataOffset, string newName)
+RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdataOffset, std::string newName)
     : VGMSeq(RareSnesFormat::name, file, seqdataOffset), version(ver) {
     m_name = newName;
 
@@ -358,7 +356,7 @@ bool RareSnesTrack::ReadEvent(void) {
         }
     } else {
         RareSnesSeqEventType eventType = (RareSnesSeqEventType)0;
-        map<uint8_t, RareSnesSeqEventType>::iterator pEventType =
+        std::map<uint8_t, RareSnesSeqEventType>::iterator pEventType =
             parentSeq->EventMap.find(statusByte);
         if (pEventType != parentSeq->EventMap.end()) {
             eventType = pEventType->second;

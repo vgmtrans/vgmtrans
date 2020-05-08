@@ -15,16 +15,14 @@
 
 #include <utility>
 
-using namespace std;
-
 // ***********
 // VGMInstrSet
 // ***********
 
-VGMInstrSet::VGMInstrSet(const string &format, /*FmtID fmtID,*/
-                         RawFile *file, uint32_t offset, uint32_t length, string name,
+VGMInstrSet::VGMInstrSet(const std::string &format,
+                         RawFile *file, uint32_t offset, uint32_t length, std::string name,
                          VGMSampColl *theSampColl)
-    : VGMFile(/*fmtID,*/ format, file, offset, length, std::move(name)),
+    : VGMFile(format, file, offset, length, std::move(name)),
       sampColl(theSampColl) {
     AddContainer<VGMInstr>(aInstrs);
 }
@@ -35,7 +33,7 @@ VGMInstrSet::~VGMInstrSet() {
 }
 
 VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
-                                unsigned long instrNum, const string &instrName) {
+                                unsigned long instrNum, const std::string &instrName) {
     VGMInstr *instr =
         new VGMInstr(this, offset, length, bank, instrNum,
                      instrName.empty() ? fmt::format("Instrument {}", aInstrs.size()) : instrName);
@@ -137,7 +135,7 @@ bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath) {
 // ********
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, const string &name)
+                   uint32_t theInstrNum, const std::string &name)
     : VGMContainerItem(instrSet, offset, length, name),
       parInstrSet(instrSet),
       bank(theBank),
