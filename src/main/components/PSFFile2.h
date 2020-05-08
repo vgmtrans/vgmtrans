@@ -15,19 +15,15 @@
 
 class RawFile;
 
-constexpr auto PSF_TAG_SIG = "[TAG]";
-constexpr auto PSF_TAG_SIG_LEN = 5;
-constexpr auto PSF_STRIP_BUF_SIZE = 4096;
-
 class PSFFile2 {
    public:
-    PSFFile2(const RawFile &file);
+    explicit PSFFile2(const RawFile &file);
     ~PSFFile2() = default;
 
-    uint8_t version() const noexcept { return m_version; }
-    const std::map<std::string, std::string> &tags() const noexcept { return m_tags; }
-    const std::vector<char> &exe() const noexcept { return m_exe_data; }
-    const std::vector<char> &reservedSection() const noexcept { return m_reserved_data; }
+    [[nodiscard]] uint8_t version() const noexcept { return m_version; }
+    [[nodiscard]] const std::map<std::string, std::string> &tags() const noexcept { return m_tags; }
+    [[nodiscard]] const std::vector<char> &exe() const noexcept { return m_exe_data; }
+    [[nodiscard]] const std::vector<char> &reservedSection() const noexcept { return m_reserved_data; }
 
     template <typename T>
     T getExe(size_t ind) const {
