@@ -62,6 +62,7 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
 
                 return std::visit(icon, vgmfile);
             }
+            [[fallthrough]];
         }
 
         case Property::Type: {
@@ -75,6 +76,7 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
 
                 return std::visit(description, vgmfile);
             }
+            [[fallthrough]];
         }
 
         case Property::Format: {
@@ -82,6 +84,7 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
                 return QString::fromStdString(std::visit(
                     [](auto file) -> std::string { return file->GetFormatName(); }, vgmfile));
             }
+            [[fallthrough]];
         }
 
         default: {
@@ -241,8 +244,8 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
     if (!element.isValid())
         return;
 
-    auto file = qtVGMRoot.vVGMFile[element.row()];
-    auto menu = std::visit(MakeMenu, file);
+    auto selected_file = qtVGMRoot.vVGMFile[element.row()];
+    auto menu = std::visit(MakeMenu, selected_file);
     std::visit(
         [&menu](auto file) mutable {
             menu->addSeparator();
@@ -259,7 +262,7 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
             });
             menu->addAction("Remove file", [file]() { qtVGMRoot.RemoveVGMFile(file); });
         },
-        file);
+        selected_file);
 
     menu->exec(mapToGlobal(pos));
     menu->deleteLater();
