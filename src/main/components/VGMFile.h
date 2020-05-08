@@ -7,7 +7,6 @@
 #include "VGMItem.h"
 #include "RawFile.h"
 
-enum FmtID : unsigned int;
 class VGMColl;
 class Format;
 
@@ -16,8 +15,6 @@ class VGMFile : public VGMContainerItem {
     VGMFile(std::string format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
             std::string theName = "VGM File");
     virtual ~VGMFile() = default;
-
-    virtual ItemType GetType() const { return ITEMTYPE_VGMFILE; }
 
     virtual void AddToUI(VGMItem *parent, void *UI_specific);
 
@@ -57,7 +54,7 @@ class VGMFile : public VGMContainerItem {
     [[nodiscard]] const char *data() const { return rawfile->data() + dwOffset; }
 
     RawFile *rawfile;
-    std::list<VGMColl *> assocColls;
+    std::vector<VGMColl *> assocColls;
 
    protected:
     std::string format;

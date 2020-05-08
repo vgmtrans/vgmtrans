@@ -14,18 +14,17 @@ using namespace std;
 
 VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
                  uint32_t length, std::string theName)
-    : VGMContainerItem(this, offset, length),
-      rawfile(theRawFile),
-      format(std::move(fmt)),
-      id(-1),
-      m_name(std::move(theName))
-    {}
+        : VGMContainerItem(this, offset, length),
+          rawfile(theRawFile),
+          format(std::move(fmt)),
+          id(-1),
+          m_name(std::move(theName)) {}
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add
 // this as an item because we do not want the VGMFile to be itself an item in the Item View
 void VGMFile::AddToUI(VGMItem *parent, void *UI_specific) {
-    for (auto & container : containers) {
-        for (auto & j : *container)
+    for (auto &container : containers) {
+        for (auto &j : *container)
             j->AddToUI(nullptr, UI_specific);
     }
 }
@@ -76,7 +75,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
 // *********
 
 VGMHeader::VGMHeader(VGMItem *parItem, uint32_t offset, uint32_t length, const std::string &name)
-    : VGMContainerItem(parItem->vgmfile, offset, length, name) {}
+        : VGMContainerItem(parItem->vgmfile, offset, length, name) {}
 
 VGMHeader::~VGMHeader() = default;
 
@@ -99,7 +98,7 @@ void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::string &name
 
 VGMHeaderItem::VGMHeaderItem(VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
                              const std::string &name)
-    : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType) {}
+        : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType) {}
 
 VGMItem::Icon VGMHeaderItem::GetIcon() {
     switch (type) {
@@ -110,7 +109,7 @@ VGMItem::Icon VGMHeaderItem::GetIcon() {
         case HIT_TEMPO:
             return ICON_TEMPO;
         case HIT_SIG:
-            return ICON_BINARY;
+            [[fallthrough]];
         default:
             return ICON_BINARY;
     }
