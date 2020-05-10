@@ -6,34 +6,33 @@
 
 #pragma once
 
-#include <QAction>
 #include <QToolBar>
-#include <QIcon>
 
-class IconBar : public QToolBar {
+class QSlider;
+class QIcon;
+class QTimer;
+
+class ToolBar : public QToolBar {
     Q_OBJECT
 
    public:
-    explicit IconBar(QWidget *parent = nullptr);
+    explicit ToolBar(QWidget *parent = nullptr);
 
    signals:
     void OpenPressed();
     void PlayToggle();
     void StopPressed();
+    void SeekingTo(int);
 
    public slots:
     void OnPlayerStatusChange(bool playing);
+    void RangeUpdate(int cur, int max);
 
    private:
-    void SetupActions();
-    void SetupIcons();
+    void SetupControls();
 
-    QAction *iconbar_open;
-    QAction *iconbar_play;
-    QAction *iconbar_stop;
-
-    QIcon iconopen;
-    QIcon iconplay;
-    QIcon iconpause;
-    QIcon iconstop;
+    QAction *m_open{};
+    QAction *m_play{};
+    QAction *m_stop{};
+    QSlider *m_slider{};
 };

@@ -38,7 +38,7 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 void MainWindow::CreateElements() {
     m_menu_bar = new MenuBar(this);
     setMenuBar(m_menu_bar);
-    m_iconbar = new IconBar(this);
+    m_iconbar = new ToolBar(this);
     addToolBar(m_iconbar);
     m_mdiarea = MdiArea::Init();
 
@@ -102,12 +102,13 @@ void MainWindow::RouteSignals() {
         about.exec();
     });
 
-    connect(m_iconbar, &IconBar::OpenPressed, this, &MainWindow::OpenFile);
-    connect(m_iconbar, &IconBar::PlayToggle, m_colls_list, &VGMCollListView::HandlePlaybackRequest);
-    connect(m_iconbar, &IconBar::StopPressed, m_colls_list, &VGMCollListView::HandleStopRequest);
+    connect(m_iconbar, &ToolBar::OpenPressed, this, &MainWindow::OpenFile);
+    connect(m_iconbar, &ToolBar::PlayToggle, m_colls_list, &VGMCollListView::HandlePlaybackRequest);
+    connect(m_iconbar, &ToolBar::StopPressed, m_colls_list, &VGMCollListView::HandleStopRequest);
+    connect(m_iconbar, &ToolBar::SeekingTo, &MusicPlayer::Instance(), &MusicPlayer::Seek);
 
     connect(&MusicPlayer::Instance(), &MusicPlayer::StatusChange, m_iconbar,
-            &IconBar::OnPlayerStatusChange);
+            &ToolBar::OnPlayerStatusChange);
 
     connect(m_menu_bar, &MenuBar::LoggerToggled,
             [=] { m_logger->setHidden(!m_menu_bar->IsLoggerToggled()); });

@@ -31,7 +31,7 @@ void MenuBar::AppendFileMenu() {
 
 void MenuBar::AppendOptionsMenu() {
     QMenu *options_dropdown = addMenu("Options");
-    auto audio_backend = options_dropdown->addMenu("Player audio backend");
+    auto audio_backend = options_dropdown->addMenu("Player audio driver");
     menu_drivers = new QActionGroup(this);
 
     for(auto driver : MusicPlayer::Instance().audioDrivers()) {

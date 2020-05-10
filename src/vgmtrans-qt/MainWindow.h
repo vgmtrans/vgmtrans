@@ -20,7 +20,7 @@
 #include "workarea/VGMCollView.h"
 #include "workarea/VGMCollListView.h"
 #include "workarea/MdiArea.h"
-#include "IconBar.h"
+#include "ToolBar.h"
 #include "Logger.h"
 
 class MainWindow : public QMainWindow {
@@ -43,7 +43,7 @@ class MainWindow : public QMainWindow {
     VGMFilesList *m_vgmfiles_list{};
     VGMCollListView *m_colls_list{};
     VGMCollView *m_coll_view{};
-    IconBar *m_iconbar{};
+    ToolBar *m_iconbar{};
     Logger *m_logger{};
     MdiArea *m_mdiarea{};
 

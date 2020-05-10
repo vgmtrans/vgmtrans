@@ -5,7 +5,7 @@ endif()
 
 # TODO: Make optional: no fluidsynth, no playback support.
 find_package(FLUIDSYNTH)
-if(FLUIDSYNTH_FOUND)
+if(FLUIDSYNTH_FOUND AND "${FLUIDSYNTH_VERSION}" MATCHES "2(.)*")
   message(STATUS "Using FluidSynth ${FLUIDSYNTH_VERSION}")
 else()
   if(MSVC)
@@ -25,7 +25,7 @@ else()
     message(STATUS "Using FluidSynth fallback from Windows externals")
   else()
     message(
-      FATAL_ERROR "Please install FluidSynth! Bundled version not available")
+      FATAL_ERROR "Failed to locate FluidSynth or library too old")
   endif()
 endif()
 
@@ -64,8 +64,8 @@ add_executable(vgmtrans
                ${UI_RESOURCES}
                About.cpp
                About.h
-               IconBar.cpp
-               IconBar.h
+        ToolBar.cpp
+        ToolBar.h
                Logger.cpp
                Logger.h
                MainWindow.cpp
