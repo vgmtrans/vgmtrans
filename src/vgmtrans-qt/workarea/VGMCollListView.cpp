@@ -168,7 +168,7 @@ void VGMCollListView::HandlePlaybackRequest() {
         return;
 
     MusicPlayer &player = MusicPlayer::Instance();
-    player.LoadCollection(qtVGMRoot.vVGMColl[list[0].row()]);
+    player.LoadCollection(qtVGMRoot.vVGMColl[list[0].row()], list[0].row());
     player.Toggle();
 }
 
