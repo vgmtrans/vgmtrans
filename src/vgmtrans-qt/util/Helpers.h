@@ -10,8 +10,6 @@
 #include <VGMFile.h>
 #include <VGMItem.h>
 
-QIcon MakeIconFromPath(QString path, QColor color = QColor(0x547aa5));
-
 const QIcon &iconForItemType(VGMItem::Icon type);
 
 QColor colorForEventColor(uint8_t eventColor);

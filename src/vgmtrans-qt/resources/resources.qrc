@@ -1,16 +1,18 @@
 <!DOCTYPE RCC><RCC version="1.0">
 <qresource>
-  <file>images/collection-32.png</file>
-  <file>images/file-32.png</file>
+  <file>images/open_file.svg</file>
+  <file>images/player_play.svg</file>
+  <file>images/player_pause.svg</file>
+  <file>images/player_stop.svg</file>
+  <file>images/player_next.svg</file>
+  <file>images/player_prev.svg</file>
+  <file>images/sequence.svg</file>
+  <file>images/wave.svg</file>
+  <file>images/file.svg</file>
+  <file>images/collection.svg</file>
+  <file>images/instrument-set.svg</file>
   <file>images/generic-audio-32.png</file>
-  <file>images/instrument-set-32.png</file>
   <file>images/note_music-32.png</file>
-  <file>images/open-32.png</file>
-  <file>images/pause-32.png</file>
-  <file>images/play-32.png</file>
-  <file>images/sample-set-32.png</file>
-  <file>images/sequence-32.png</file>
-  <file>images/stop-32.png</file>
   <file>images/logo.png</file>
 </qresource>
 </RCC>

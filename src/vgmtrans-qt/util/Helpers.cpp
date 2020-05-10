@@ -8,16 +8,6 @@
 #include <QPixmap>
 #include <QBitmap>
 
-QIcon MakeIconFromPath(QString path, QColor color) {
-    QPixmap icon_pixmap{path};
-
-    auto mask = icon_pixmap.createHeuristicMask(true);
-    icon_pixmap.fill(color);
-    icon_pixmap.setMask(mask);
-
-    return QIcon(icon_pixmap);
-}
-
 const QIcon &iconForItemType(VGMItem::Icon type) {
     switch (type) {
         case VGMItem::ICON_NOTE: {
@@ -26,17 +16,17 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
         }
 
         case VGMItem::ICON_SEQ:{
-            static QIcon i_gen{":/images/sequence-32.png"};
+            static QIcon i_gen{":/images/sequence.svg"};
             return i_gen;
             }
 
         case VGMItem::ICON_SAMPCOLL: {
-            static QIcon i_gen{":/images/sample-set-32.png"};
+            static QIcon i_gen{":/images/wave.svg"};
             return i_gen;
         }
 
         case VGMItem::ICON_INSTRSET: {
-            static QIcon i_gen{":/images/instrument-set-32.png"};
+            static QIcon i_gen{":/images/instrument-set.svg"};
             return i_gen;    
         }
 

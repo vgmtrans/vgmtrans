@@ -29,7 +29,7 @@ class VGMFilesListModel : public QAbstractTableModel {
     void RemoveVGMFile();
 
    private:
-    enum Property : uint8_t { Name = 0, Type = 1, Format = 2 };
+    enum Property : uint8_t { Name = 0, Format };
 };
 
 class VGMFilesList final : public QTableView {

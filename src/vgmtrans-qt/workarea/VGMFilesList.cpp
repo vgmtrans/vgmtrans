@@ -43,38 +43,24 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
             } else if (role == Qt::DecorationRole) {
                 static Visitor icon{
                     [](VGMSeq *) -> const QIcon & {
-                        static QIcon i_gen{":/images/sequence-32.png"};
+                        static QIcon i_gen{":/images/sequence.svg"};
                         return i_gen;
                     },
                     [](VGMInstrSet *) -> const QIcon & {
-                        static QIcon i_gen{":/images/instrument-set-32.png"};
+                        static QIcon i_gen{":/images/instrument-set.svg"};
                         return i_gen;
                     },
                     [](VGMSampColl *) -> const QIcon & {
-                        static QIcon i_gen{":/images/sample-set-32.png"};
+                        static QIcon i_gen{":/images/wave.svg"};
                         return i_gen;
                     },
                     [](VGMMiscFile *) -> const QIcon & {
-                        static QIcon i_gen{":/images/generic-32.png"};
+                        static QIcon i_gen{":/images/file.svg"};
                         return i_gen;
                     },
                 };
 
                 return std::visit(icon, vgmfile);
-            }
-            [[fallthrough]];
-        }
-
-        case Property::Type: {
-            if (role == Qt::DisplayRole) {
-                static Visitor description{
-                    [](VGMSeq *) { return QStringLiteral("Sequence"); },
-                    [](VGMInstrSet *) { return QStringLiteral("Instrument set"); },
-                    [](VGMSampColl *) { return QStringLiteral("Sample collection"); },
-                    [](VGMMiscFile *) { return QStringLiteral("Unknown"); },
-                };
-
-                return std::visit(description, vgmfile);
             }
             [[fallthrough]];
         }
@@ -102,10 +88,6 @@ QVariant VGMFilesListModel::headerData(int column, Qt::Orientation orientation, 
             return "Name";
         }
 
-        case Property::Type: {
-            return "Type";
-        }
-
         case Property::Format: {
             return "Format";
         }
@@ -127,7 +109,7 @@ int VGMFilesListModel::columnCount(const QModelIndex &parent) const {
     if (parent.isValid())
         return 0;
 
-    return 3;
+    return 2;
 }
 
 void VGMFilesListModel::AddVGMFile() {

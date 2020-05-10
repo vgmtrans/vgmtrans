@@ -15,7 +15,7 @@
 #include "../MusicPlayer.h"
 
 static const QIcon &VGMCollIcon() {
-    static QIcon icon(":/images/collection-32.png");
+    static QIcon icon(":/images/collection.svg");
     return icon;
 }
 

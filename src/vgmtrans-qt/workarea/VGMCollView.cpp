@@ -32,19 +32,19 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
     } else if (role == Qt::DecorationRole) {
         static Visitor icon{
             [](VGMSeq *) -> const QIcon & {
-                static QIcon i_gen{":/images/sequence-32.png"};
+                static QIcon i_gen{":/images/sequence.svg"};
                 return i_gen;
             },
             [](VGMInstrSet *) -> const QIcon & {
-                static QIcon i_gen{":/images/instrument-set-32.png"};
+                static QIcon i_gen{":/images/instrument-set.svg"};
                 return i_gen;
             },
             [](VGMSampColl *) -> const QIcon & {
-                static QIcon i_gen{":/images/sample-set-32.png"};
+                static QIcon i_gen{":/images/wave.svg"};
                 return i_gen;
             },
             [](VGMMiscFile *) -> const QIcon & {
-                static QIcon i_gen{":/images/generic-32.png"};
+                static QIcon i_gen{":/images/file.svg"};
                 return i_gen;
             },
         };
