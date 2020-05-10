@@ -6,6 +6,7 @@
 
 #include "MusicPlayer.h"
 
+#include "QtVGMRoot.h"
 #include <QTemporaryDir>
 #include <VGMSeq.h>
 #include <LogManager.h>
@@ -124,6 +125,28 @@ void MusicPlayer::Stop() {
     emit StatusChange(false);
 }
 
+void MusicPlayer::Next() {
+    if(m_latest_index == -1) {
+        return;
+    }
+
+    if(m_latest_index + 1 > 0 && m_latest_index + 1 < qtVGMRoot.vVGMColl.size()) {
+        LoadCollection(qtVGMRoot.vVGMColl[m_latest_index + 1], m_latest_index + 1);
+        Toggle();
+    }
+}
+
+void MusicPlayer::Prev() {
+    if(m_latest_index == -1) {
+        return;
+    }
+
+    if(m_latest_index - 1 >= 0 && m_latest_index - 1 < qtVGMRoot.vVGMColl.size()) {
+        LoadCollection(qtVGMRoot.vVGMColl[m_latest_index - 1], m_latest_index - 1);
+        Toggle();
+    }
+}
+
 void MusicPlayer::Seek(int position) {
     if (!m_active_player) {
         return;
@@ -138,7 +161,7 @@ bool MusicPlayer::SynthPlaying() {
     return m_active_player && fluid_player_get_status(m_active_player) == FLUID_PLAYER_PLAYING;
 }
 
-void MusicPlayer::LoadCollection(VGMColl *coll) {
+void MusicPlayer::LoadCollection(VGMColl *coll, int index) {
     /* Don't reload the same collection - allows pausing */
     if (active_coll == coll) {
         return;
@@ -167,5 +190,6 @@ void MusicPlayer::LoadCollection(VGMColl *coll) {
 
     if (fluid_player_add_mem(m_active_player, midi_buf.data(), midi_buf.size()) == FLUID_OK) {
         active_coll = coll;
+        m_latest_index = index;
     }
 }

@@ -7,10 +7,11 @@
 #pragma once
 
 #include <QToolBar>
+#include <QIcon>
 
 class QSlider;
-class QIcon;
 class QTimer;
+class QLabel;
 
 class ToolBar : public QToolBar {
     Q_OBJECT
@@ -32,7 +33,12 @@ class ToolBar : public QToolBar {
     void SetupControls();
 
     QAction *m_open{};
+    QAction *m_prev{};
     QAction *m_play{};
+    QAction *m_next{};
     QAction *m_stop{};
     QSlider *m_slider{};
+    QLabel *m_title;
+    inline static QIcon s_playicon;
+    inline static QIcon s_pauseicon;
 };

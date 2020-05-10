@@ -51,7 +51,7 @@ void MainWindow::CreateElements() {
 
     m_rawfiles_list = new RawFileListView();
     auto *m_rawfiles_list_container =
-        new HeaderContainer(m_rawfiles_list, QStringLiteral("Imported Files"));
+        new HeaderContainer(m_rawfiles_list, QStringLiteral("Imported files"));
 
     m_vgmfiles_list = new VGMFilesList();
     auto *m_vgmfiles_list_container =

@@ -38,10 +38,19 @@ class MusicPlayer : public QObject {
     ~MusicPlayer() override;
 
     bool SynthPlaying();
-    void LoadCollection(VGMColl *coll);
+    void LoadCollection(VGMColl *coll, int index);
     void Toggle();
     void Stop();
+    void Next();
+    void Prev();
     void Seek(int ticks);
+    [[nodiscard]] std::string Title() {
+        if(active_coll) {
+            return active_coll->GetName();
+        }
+
+        return {};
+    }
 
     [[nodiscard]] std::vector<const char *> audioDrivers() const {
         std::vector<const char *> drivers_buf;
@@ -88,6 +97,7 @@ class MusicPlayer : public QObject {
     fluid_audio_driver_t *m_active_driver = nullptr;
     fluid_player_t *m_active_player = nullptr;
     VGMColl *active_coll = nullptr;
+    int m_latest_index = -1;
 
     MusicPlayer();
 };
