@@ -105,6 +105,5 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 
 void VGMCollView::doubleClickedSlot(QModelIndex index) {
     auto file_to_open = qobject_cast<VGMCollViewModel *>(model())->fileFromIndex(index);
-    MdiArea::Instance()->NewView(
-        std::visit([](auto file) -> VGMFile * { return file; }, file_to_open));
+    MdiArea::Instance()->NewView(file_to_open);
 }

@@ -41,7 +41,7 @@ if(NOT Qt5_DIR AND MSVC)
   message(STATUS "Using Qt5 fallback")
 endif()
 
-find_package(Qt5 REQUIRED COMPONENTS Gui Widgets)
+find_package(Qt5 REQUIRED COMPONENTS Gui Widgets Svg)
 message(STATUS "Using Qt ${Qt5Core_VERSION}")
 
 set_property(TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_FEATURES "")
@@ -105,6 +105,7 @@ target_link_libraries(vgmtrans
                               g_warnings
                               vgmcore
                               Qt5::Widgets
+                              Qt5::Svg
                               fluidsynth)
 
 if(APPLE)

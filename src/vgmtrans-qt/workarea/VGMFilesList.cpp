@@ -39,25 +39,25 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
         case Property::Name: {
             if (role == Qt::DisplayRole) {
                 return QString::fromStdString(
-                    std::visit([](auto file) -> std::string { return *file->GetName(); }, vgmfile));
+                        std::visit([](auto file) -> std::string { return *file->GetName(); }, vgmfile));
             } else if (role == Qt::DecorationRole) {
                 static Visitor icon{
-                    [](VGMSeq *) -> const QIcon & {
-                        static QIcon i_gen{":/images/sequence.svg"};
-                        return i_gen;
-                    },
-                    [](VGMInstrSet *) -> const QIcon & {
-                        static QIcon i_gen{":/images/instrument-set.svg"};
-                        return i_gen;
-                    },
-                    [](VGMSampColl *) -> const QIcon & {
-                        static QIcon i_gen{":/images/wave.svg"};
-                        return i_gen;
-                    },
-                    [](VGMMiscFile *) -> const QIcon & {
-                        static QIcon i_gen{":/images/file.svg"};
-                        return i_gen;
-                    },
+                        [](VGMSeq *) -> const QIcon & {
+                            static QIcon i_gen{":/images/sequence.svg"};
+                            return i_gen;
+                        },
+                        [](VGMInstrSet *) -> const QIcon & {
+                            static QIcon i_gen{":/images/instrument-set.svg"};
+                            return i_gen;
+                        },
+                        [](VGMSampColl *) -> const QIcon & {
+                            static QIcon i_gen{":/images/wave.svg"};
+                            return i_gen;
+                        },
+                        [](VGMMiscFile *) -> const QIcon & {
+                            static QIcon i_gen{":/images/file.svg"};
+                            return i_gen;
+                        },
                 };
 
                 return std::visit(icon, vgmfile);
@@ -68,7 +68,7 @@ QVariant VGMFilesListModel::data(const QModelIndex &index, int role) const {
         case Property::Format: {
             if (role == Qt::DisplayRole) {
                 return QString::fromStdString(std::visit(
-                    [](auto file) -> std::string { return file->GetFormatName(); }, vgmfile));
+                        [](auto file) -> std::string { return file->GetFormatName(); }, vgmfile));
             }
             [[fallthrough]];
         }
@@ -229,22 +229,25 @@ void VGMFilesList::ItemMenu(const QPoint &pos) {
     auto selected_file = qtVGMRoot.vVGMFile[element.row()];
     auto menu = std::visit(MakeMenu, selected_file);
     std::visit(
-        [&menu](auto file) mutable {
-            menu->addSeparator();
-            menu->addAction("Save raw data", [file]() {
-                auto save_path = qtVGMRoot.UI_GetSaveFilePath(file->name());
-                if (save_path.empty()) {
-                    return;
-                }
+            [&menu](auto file) mutable {
+                menu->addSeparator();
+                menu->addAction("Save raw data", [file]() {
+                    auto save_path = qtVGMRoot.UI_GetSaveFilePath(file->name());
+                    if (save_path.empty()) {
+                        return;
+                    }
 
-                std::ofstream out{save_path, std::ios::out | std::ofstream::binary};
-                std::copy(file->rawfile->begin() + file->dwOffset,
-                          file->rawfile->begin() + file->dwOffset + file->unLength,
-                          std::ostreambuf_iterator<char>(out));
-            });
-            menu->addAction("Remove file", [file]() { qtVGMRoot.RemoveVGMFile(file); });
-        },
-        selected_file);
+                    std::ofstream out{save_path, std::ios::out | std::ofstream::binary};
+                    std::copy(file->rawfile->begin() + file->dwOffset,
+                              file->rawfile->begin() + file->dwOffset + file->unLength,
+                              std::ostreambuf_iterator<char>(out));
+                });
+                menu->addAction("Remove file", [file]() {
+                    MdiArea::Instance()->RemoveView(file);
+                    qtVGMRoot.RemoveVGMFile(file);
+                });
+            },
+            selected_file);
 
     menu->exec(mapToGlobal(pos));
     menu->deleteLater();
@@ -259,24 +262,23 @@ void VGMFilesList::keyPressEvent(QKeyEvent *input) {
 
             QModelIndexList list = selectionModel()->selectedRows();
             for (auto &index : list) {
+                MdiArea::Instance()->RemoveView(qtVGMRoot.vVGMFile[index.row()]);
                 qtVGMRoot.RemoveVGMFile(qtVGMRoot.vVGMFile[index.row()]);
             }
 
             return;
         }
 
-        // Pass the event back to the base class, needed for keyboard navigation
+            // Pass the event back to the base class, needed for keyboard navigation
         default:
             QTableView::keyPressEvent(input);
     }
 }
 
 void VGMFilesList::RemoveVGMFile(VGMFile *file) {
-    MdiArea::Instance()->RemoveView(file);
     view_model->RemoveVGMFile();
 }
 
 void VGMFilesList::RequestVGMFileView(QModelIndex index) {
-    MdiArea::Instance()->NewView(
-        std::visit([](VGMFile *file) { return file; }, qtVGMRoot.vVGMFile[index.row()]));
+    MdiArea::Instance()->NewView(qtVGMRoot.vVGMFile[index.row()]);
 }

@@ -11,16 +11,17 @@
 #include <QObject>
 
 #include <unordered_map>
+#include <utility>
 #include <VGMFile.h>
 
 class VGMFile;
 
 class VGMTreeItem : public QTreeWidgetItem {
    public:
-    VGMTreeItem(const QString &name, VGMItem *item, QTreeWidget *parent = nullptr,
+    VGMTreeItem(QString name, VGMItem *item, QTreeWidget *parent = nullptr,
                 VGMItem *item_parent = nullptr)
-        : QTreeWidgetItem(parent, 1001), m_name(name), m_item(item), m_parent(item_parent){};
-    ~VGMTreeItem() = default;
+        : QTreeWidgetItem(parent, 1001), m_name(std::move(name)), m_item(item), m_parent(item_parent){};
+    ~VGMTreeItem() override = default;
 
     [[nodiscard]] inline auto item_parent() noexcept { return m_parent; }
     [[nodiscard]] inline auto item_offset() noexcept { return m_item->dwOffset; }
@@ -35,8 +36,8 @@ class VGMFileTreeView : public QTreeWidget {
     Q_OBJECT
 
    public:
-    VGMFileTreeView(VGMFile *vgmfile, QWidget *parent = nullptr);
-    ~VGMFileTreeView() = default;
+    explicit VGMFileTreeView(VGMFile *vgmfile, QWidget *parent = nullptr);
+    ~VGMFileTreeView() override = default;
 
    public slots:
     void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &, void *);

@@ -11,7 +11,7 @@
 const QIcon &iconForItemType(VGMItem::Icon type) {
     switch (type) {
         case VGMItem::ICON_NOTE: {
-            static QIcon i_gen{":/images/note_music-32.png"};
+            static QIcon i_gen{":/images/note.svg"};
             return i_gen;
         }
 
@@ -30,20 +30,55 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
             return i_gen;    
         }
 
+        case VGMItem::ICON_INSTR: {
+            static QIcon i_gen{":/images/instr.svg"};
+            return i_gen;
+        }
+
+        case VGMItem::ICON_STARTREP:
+            [[fallthrough]];
         case VGMItem::ICON_TRACK: {
-            static QIcon i_gen{":/images/generic-audio-32.png"};
+            static QIcon i_gen{":/images/track.svg"};
             return i_gen;            
         }
 
-        case VGMItem::ICON_INSTR: {
-            static QIcon i_gen{":/images/instr-32.png"};
-            return i_gen;            
+        case VGMItem::ICON_ENDREP:
+            [[fallthrough]];
+        case VGMItem::ICON_TRACKEND: {
+            static QIcon i_gen{":/images/trackend.svg"};
+            return i_gen;
         }
+
+        case VGMItem::ICON_PROGCHANGE: {
+            static QIcon i_gen{":/images/progchange.svg"};
+            return i_gen;
+        }
+
+        case VGMItem::ICON_CONTROL: {
+            static QIcon i_gen{":/images/control.svg"};
+            return i_gen;
+        }
+
+        case VGMItem::ICON_BINARY: {
+            static QIcon i_gen{":/images/binary.svg"};
+            return i_gen;
+        }
+
+        case VGMItem::ICON_REST: {
+            static QIcon i_gen{":/images/rest.svg"};
+            return i_gen;
+        }
+
+        case VGMItem::ICON_TEMPO: {
+            static QIcon i_gen{":/images/tempo.svg"};
+            return i_gen;
+        }
+
         default:
             break;
     }
 
-    static auto i_gen = QIcon(":/images/generic-audio-32.png");
+    static auto i_gen = QIcon(":/images/file.svg");
     return i_gen;
 }
 

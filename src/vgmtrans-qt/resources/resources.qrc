@@ -11,8 +11,14 @@
   <file>images/file.svg</file>
   <file>images/collection.svg</file>
   <file>images/instrument-set.svg</file>
-  <file>images/generic-audio-32.png</file>
-  <file>images/note_music-32.png</file>
+  <file>images/instr.svg</file>
+  <file>images/note.svg</file>
+  <file>images/control.svg</file>
+  <file>images/track.svg</file>
+  <file>images/trackend.svg</file>
+  <file>images/binary.svg</file>
+  <file>images/rest.svg</file>
+  <file>images/tempo.svg</file>
   <file>images/logo.png</file>
 </qresource>
 </RCC>

@@ -11,7 +11,10 @@
 #include <QCloseEvent>
 #include <QGridLayout>
 
-class VGMFile;
+class VGMSeq;
+class VGMInstrSet;
+class VGMSampColl;
+class VGMMiscFile;
 
 class QHexView;
 class QBuffer;
@@ -23,7 +26,7 @@ class VGMFileView : public QMdiSubWindow {
     Q_OBJECT
 
    public:
-    explicit VGMFileView(VGMFile *vgmfile);
+    explicit VGMFileView(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>);
 
    private:
     void closeEvent(QCloseEvent *closeEvent) override;
@@ -32,6 +35,6 @@ class VGMFileView : public QMdiSubWindow {
     QSplitter *m_splitter;
     QHexView *m_hexview;
     VGMFileTreeView *m_treeview;
-    VGMFile *m_vgmfile;
+    std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> m_vgmfile;
     QBuffer *m_buffer;
 };

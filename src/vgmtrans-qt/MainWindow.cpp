@@ -81,15 +81,13 @@ void MainWindow::CreateElements() {
     vertical_splitter_left = new QSplitter(Qt::Vertical, horizontal_splitter);
 
     vertical_splitter->addWidget(coll_wrapper);
-    vertical_splitter->setHandleWidth(1);
 
     horizontal_splitter->addWidget(m_mdiarea);
-    horizontal_splitter->setHandleWidth(1);
+    horizontal_splitter->setSizes(QList<int>() << 450 << 1200);
 
     vertical_splitter_left->addWidget(m_rawfiles_list_container);
     vertical_splitter_left->addWidget(m_vgmfiles_list_container);
     vertical_splitter_left->setContentsMargins(9, 0, 10, 0);
-    vertical_splitter_left->setHandleWidth(1);
 
     setCentralWidget(vertical_splitter);
 }
