@@ -48,6 +48,11 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: 'refactor'
+      - name: "Set environment variables"
+        run: |
+          echo ::set-env name=CXX::g++-9
+          echo ::set-env name=CC::gcc-9
+          echo "::set-env name=BRANCH::$(git rev-parse --abbrev-ref HEAD)"
       - name: "Install dependencies"
         run: |
           sudo add-apt-repository ppa:beineri/opt-qt-5.14.2-xenial -y
@@ -59,13 +64,8 @@ jobs:
           mkdir build && cd build
           cmake -Denable-network=off -Denable-ipv6=off -DCMAKE_INSTALL_PREFIX=/usr/ -DLIB_INSTALL_DIR=lib -GNinja ..
           ninja -j$(nproc)
-          ninja install
+          sudo ninja install
           cd ../..
-      - name: "Set environment variables"
-        run: |
-          echo ::set-env name=CXX::g++-9
-          echo ::set-env name=CC::gcc-9
-          echo "::set-env name=BRANCH::$(git rev-parse --abbrev-ref HEAD)"
       - name: "Prepare build"
         run: |
           mkdir build
