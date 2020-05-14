@@ -30,8 +30,7 @@ jobs:
         run: cmake --build build --config "Release" --parallel
       - name: "Run tests"
         run: ctest -C Release
-      - if: matrix.os == 'macos-latest'
-        working-directory: "build"
+      - working-directory: "build"
         name: "Package DMG (macOS)"
         run: |
           cp ../data/mame_roms.xml src/vgmtrans-qt/VGMTrans.app/Contents/MacOS/
