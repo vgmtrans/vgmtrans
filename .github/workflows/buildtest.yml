@@ -52,13 +52,13 @@ jobs:
         run: |
           sudo add-apt-repository ppa:beineri/opt-qt-5.14.2-xenial -y
           sudo apt-get update -qq
-          sudo apt-get -y install qt514base qt514wayland libjack-dev libsndfile1 libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
+          sudo apt-get -y install pkg-config qt514base qt514wayland libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
           wget https://github.com/FluidSynth/fluidsynth/archive/v2.1.2.zip
           unzip v2.1.2.zip
           cd fluidsynth-2.1.2
           mkdir build && cd build
           cmake -Denable-network=off -Denable-ipv6=off -DCMAKE_INSTALL_PREFIX=/usr/ -DLIB_INSTALL_DIR=lib -GNinja ..
-          ninja make
+          ninja -j$(nproc)
           ninja install
           cd ../..
       - name: "Set environment variables"
