@@ -55,7 +55,7 @@
 #=============================================================================
 
 if(NOT ${FluidSynth_FIND_VERSION})
-  set(FluidSynth_FIND_VERSION "1.1.6")
+  set(FluidSynth_FIND_VERSION "2.0.0")
 endif()
 
 find_package(PkgConfig QUIET)
