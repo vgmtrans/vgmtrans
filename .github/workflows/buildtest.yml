@@ -47,6 +47,9 @@ jobs:
     runs-on: ubuntu-latest
     container: vgmtrans/vgmtrans-deps:xenial
     steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 'refactor'
       - name: "Set environment variables"
         run: |
           echo ::set-env name=CXX::g++-9
