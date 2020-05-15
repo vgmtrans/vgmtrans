@@ -58,8 +58,6 @@ void QtVGMRoot::UI_BeginRemoveVGMFiles() {}
 
 void QtVGMRoot::UI_EndRemoveVGMFiles() {}
 
-void QtVGMRoot::UI_AddItemSet(VGMFile *file, std::vector<ItemSet> *itemset) {}
-
 std::string QtVGMRoot::UI_GetSaveFilePath(const std::string &suggestedFilename,
                                           const std::string &extension) {
     return QFileDialog::getSaveFileName(

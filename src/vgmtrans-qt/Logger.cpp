@@ -70,7 +70,7 @@ void Logger::exportLog() {
         return;
     }
 
-    auto path = QFileDialog::getSaveFileName(this, "Export log");
+    auto path = QFileDialog::getSaveFileName(this, "Export log", "", "Log files (*.log)");
     if (path.isEmpty()) {
         return;
     }

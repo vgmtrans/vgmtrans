@@ -9,27 +9,40 @@
 #include "QtVGMRoot.h"
 #include "phantom/phantomstyle.h"
 
-QPalette namedColorSchemePalette() {
-    struct ThemeColors {
-        QColor window;
-        QColor text;
-        QColor disabledText;
-        QColor brightText;
-        QColor highlight;
-        QColor highlightedText;
-        QColor base;
-        QColor alternateBase;
-        QColor shadow;
-        QColor button;
-        QColor disabledButton;
-        QColor unreadBadge;
-        QColor unreadBadgeText;
-        QColor icon;
-        QColor disabledIcon;
-        QColor chatTimestampText;
-    };
+struct LightTheme {
+    QColor window{245, 245, 245};
+    QColor text{15, 15, 15};
+    QColor disabledText{0x60a4a6a8};
+    QColor brightText{Qt::white};
+    QColor highlight{0xbfc7d5};
+    QColor highlightedText{0x2d2c27};
+    QColor base{230, 230, 230};
+    QColor alternateBase{230, 230, 230};
+    QColor shadow = base;
+    QColor button{245, 245, 245};
+    QColor disabledButton = button.darker(105);
+    QColor icon = text;
+    QColor disabledIcon = disabledButton;
+};
 
-    auto themeColorsToPalette = [](const ThemeColors &x) -> QPalette {
+struct DarkTheme {
+    QColor window{60, 63, 65};
+    QColor text{185, 185, 185};
+    QColor disabledText{0x60a4a6a8};
+    QColor brightText{Qt::white};
+    QColor highlight{47, 101, 202};
+    QColor highlightedText = text;
+    QColor base{49, 51, 53};
+    QColor alternateBase = base;
+    QColor shadow = base;
+    QColor button = alternateBase;
+    QColor disabledButton = button.lighter(105);
+    QColor icon = text;
+    QColor disabledIcon = disabledButton;
+};
+
+QPalette namedColorSchemePalette(std::variant<LightTheme, DarkTheme> theme) {
+    auto themeColorsToPalette = [](auto x) -> QPalette {
         QPalette pal;
         pal.setColor(QPalette::Window, x.window);
         pal.setColor(QPalette::WindowText, x.text);
@@ -54,33 +67,7 @@ QPalette namedColorSchemePalette() {
         return pal;
     };
 
-    ThemeColors c;
-    QColor window(60, 61, 64);
-    QColor button(74, 75, 80);
-    QColor base(46, 47, 49);
-    QColor alternateBase(41, 41, 43);
-    QColor text(208, 209, 212);
-    QColor highlight(0xbfc7d5);
-    QColor highlightedText(0x2d2c27);
-    QColor disabledText(0x60a4a6a8);
-    c.window = window;
-    c.text = text;
-    c.disabledText = disabledText;
-    c.base = base;
-    c.alternateBase = alternateBase;
-    c.shadow = base;
-    c.button = button;
-    c.disabledButton = button.darker(107);
-    c.brightText = Qt::white;
-    c.highlight = highlight;
-    c.highlightedText = highlightedText;
-    c.icon = text;
-    c.disabledIcon = c.disabledText;
-    c.unreadBadge = c.text;
-    c.unreadBadgeText = c.highlightedText;
-    c.chatTimestampText = c.base.lighter(160);
-
-    return themeColorsToPalette(c);
+    return std::visit(themeColorsToPalette, theme);
 }
 
 int main(int argc, char *argv[]) {
@@ -91,7 +78,7 @@ int main(int argc, char *argv[]) {
 
     QApplication app(argc, argv);
     QApplication::setStyle(new PhantomStyle);
-    QApplication::setPalette(namedColorSchemePalette());
+    QApplication::setPalette(namedColorSchemePalette(DarkTheme{}));
 
     qtVGMRoot.Init();
     MainWindow window;

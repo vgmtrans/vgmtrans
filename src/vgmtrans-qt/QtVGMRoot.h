@@ -13,28 +13,27 @@ class QtVGMRoot : public QObject, public VGMRoot {
     Q_OBJECT
 
    public:
-    virtual void UI_SetRootPtr(VGMRoot **theRoot);
-    virtual void UI_PreExit();
-    virtual void UI_Exit();
-    virtual void UI_AddRawFile(RawFile *newFile);
+    void UI_SetRootPtr(VGMRoot **theRoot) override;
+    void UI_PreExit() override;
+    void UI_Exit() override;
+    void UI_AddRawFile(RawFile *newFile) override;
     virtual void UI_CloseRawFile(RawFile *targFile);
 
     virtual void UI_OnBeginScan();
     virtual void UI_SetScanInfo();
     virtual void UI_OnEndScan();
-    virtual void UI_AddVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-    virtual void UI_AddVGMSeq(VGMSeq *theSeq);
-    virtual void UI_AddVGMInstrSet(VGMInstrSet *theInstrSet);
-    virtual void UI_AddVGMSampColl(VGMSampColl *theSampColl);
-    virtual void UI_AddVGMMisc(VGMMiscFile *theMiscFile);
-    virtual void UI_AddVGMColl(VGMColl *theColl);
-    virtual void UI_RemoveVGMColl(VGMColl *targColl);
+    void UI_AddVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) override;
+    void UI_AddVGMSeq(VGMSeq *theSeq) override;
+    void UI_AddVGMInstrSet(VGMInstrSet *theInstrSet) override;
+    void UI_AddVGMSampColl(VGMSampColl *theSampColl) override;
+    void UI_AddVGMMisc(VGMMiscFile *theMiscFile) override;
+    void UI_AddVGMColl(VGMColl *theColl) override;
+    void UI_RemoveVGMColl(VGMColl *targColl) override;
     virtual void UI_BeginRemoveVGMFiles();
     virtual void UI_EndRemoveVGMFiles();
-    virtual void UI_AddItemSet(VGMFile *file, std::vector<ItemSet> *itemset);
-    virtual std::string UI_GetSaveFilePath(const std::string &suggestedFilename,
-                                           const std::string &extension = "");
-    virtual std::string UI_GetSaveDirPath(const std::string &suggestedDir = "");
+    std::string UI_GetSaveFilePath(const std::string &suggestedFilename,
+                                           const std::string &extension = "") override;
+    std::string UI_GetSaveDirPath(const std::string &suggestedDir = "") override;
 
    signals:
     void UI_AddedRawFile();
@@ -44,7 +43,7 @@ class QtVGMRoot : public QObject, public VGMRoot {
     void UI_AddedVGMColl();
     void UI_RemovedVGMColl();
     void UI_RemoveVGMFile(VGMFile *targFile);
-    void UI_AddItem(VGMItem *item, VGMItem *parent, const std::string &itemName, void *UI_specific);
+    void UI_AddItem(VGMItem *item, VGMItem *parent, const std::string &itemName, void *UI_specific) override;
 };
 
 extern QtVGMRoot qtVGMRoot;
