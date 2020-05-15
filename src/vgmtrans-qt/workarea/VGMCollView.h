@@ -2,6 +2,7 @@
 
 #include <QAbstractListModel>
 #include <QListView>
+#include <variant>
 
 class VGMColl;
 class VGMFile;

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <QHeaderView>
 #include <QMenu>
+#include <variant>
 
 #include "components/instr/VGMInstrSet.h"
 #include "components/seq/VGMSeq.h"

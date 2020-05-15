@@ -10,6 +10,7 @@
 #include <QMdiSubWindow>
 #include <QCloseEvent>
 #include <QGridLayout>
+#include <variant>
 
 class VGMSeq;
 class VGMInstrSet;

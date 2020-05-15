@@ -6,6 +6,9 @@
 #pragma once
 
 #include <variant>
+#include <string>
+#include <map>
+#include <vector>
 
 class VGMColl;
 class VGMScanner;
@@ -40,14 +43,6 @@ class VGMScanner;
 #define USING_COLL(coll) \
     virtual VGMColl *NewCollection() { return new coll(); }
 
-/*#define SIMPLE_INIT()					\
-        virtual int Init(void)					\
-        {										\
-                pRoot->AddScanner(NewScanner());	\
-                matcher = NewMatcher(this);			\
-                return true;						\
-        }*/
-
 class Format;
 class VGMFile;
 class VGMSeq;
@@ -55,12 +50,9 @@ class VGMInstrSet;
 class VGMSampColl;
 class VGMMiscFile;
 
-typedef std::map<std::string, Format *> FormatMap;
+using FormatMap = std::map<std::string, Format *>;
 
 class Format {
-   protected:
-    static FormatMap &registry();
-
    public:
     Format(const std::string &scannerName);
     virtual ~Format();
@@ -69,20 +61,17 @@ class Format {
 
     virtual bool Init();
     virtual const std::string &GetName() = 0;
-    // virtual string GetName() = 0;
-    // virtual uint32_t GetFormatID() = 0;
     virtual VGMScanner *NewScanner() { return nullptr; }
     VGMScanner &GetScanner() const { return *scanner; }
     virtual Matcher *NewMatcher() { return nullptr; }
     virtual VGMColl *NewCollection();
     virtual bool OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
     virtual bool OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-    // virtual int OnNewSeq(VGMSeq* seq);
-    // virtual int OnNewInstrSet(VGMInstrSet* instrset);
-    // virtual int OnNewSampColl(VGMSampColl* sampcoll);
     virtual bool OnMatch(std::vector<VGMFile *> &) { return true; }
 
-   public:
     Matcher *matcher;
     VGMScanner *scanner;
+
+protected:
+    static FormatMap &registry();
 };

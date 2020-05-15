@@ -4,8 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <vector>
-#include <map>
+#include "Format.h"
 #include "Scanner.h"
 #include "Matcher.h"
 
@@ -14,7 +13,7 @@ FormatMap &Format::registry() {
     return registry;
 }
 
-Format::Format(const std::string &formatName) : scanner(nullptr), matcher(nullptr) {
+Format::Format(const std::string &formatName) : matcher(nullptr), scanner(nullptr) {
     registry().insert(make_pair(formatName, this));
 }
 
