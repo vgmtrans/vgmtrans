@@ -9,8 +9,6 @@
 
 DECLARE_FORMAT(Akao);
 
-using namespace std;
-
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset) : VGMSeq(AkaoFormat::name, file, offset) {
     UseLinearAmplitudeScale();  // I think this applies, but not certain, see FF9 320, track 3 for
                                 // example of problem
@@ -639,7 +637,7 @@ bool AkaoTrack::ReadEvent(void) {
                         curOffset = dest;
 
                         // Check the remaining area that will be processed by CPU-controlled jump.
-                        for (vector<uint32_t>::iterator itAddr = vCondJumpAddr.begin();
+                        for (std::vector<uint32_t>::iterator itAddr = vCondJumpAddr.begin();
                              itAddr != vCondJumpAddr.end(); ++itAddr) {
                             if (!IsOffsetUsed(*itAddr)) {
                                 // There is an area not visited yet, VGMTrans must try to go there.

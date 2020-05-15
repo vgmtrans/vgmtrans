@@ -14,29 +14,29 @@ class VGMCollListViewModel : public QAbstractListModel {
     Q_OBJECT
 
    public:
-    VGMCollListViewModel(QObject *parent = nullptr);
-    int rowCount(const QModelIndex &parent = QModelIndex()) const;
-    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
-    Qt::ItemFlags flags(const QModelIndex &index) const;
+    explicit VGMCollListViewModel(QObject *parent = nullptr);
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    Qt::ItemFlags flags(const QModelIndex &index) const override;
 };
 
 class VGMCollNameEditor : public QStyledItemDelegate {
     Q_OBJECT
 
    protected:
-    void setEditorData(QWidget *editor, const QModelIndex &index) const;
-    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
+    void setEditorData(QWidget *editor, const QModelIndex &index) const override;
+    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const override;
 };
 
 class VGMCollListView : public QListView {
     Q_OBJECT
 
    public:
-    VGMCollListView(QWidget *parent = nullptr);
+    explicit VGMCollListView(QWidget *parent = nullptr);
 
    public slots:
     void HandlePlaybackRequest();
-    void HandleStopRequest();
+    static void HandleStopRequest();
 
    private:
     void CollMenu(const QPoint &pos);

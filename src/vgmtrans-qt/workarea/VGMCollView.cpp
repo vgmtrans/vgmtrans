@@ -7,6 +7,7 @@
 #include <VGMInstrSet.h>
 #include <VGMSeq.h>
 #include <VGMSampColl.h>
+#include <VGMMiscFile.h>
 #include <VGMColl.h>
 
 VGMCollViewModel::VGMCollViewModel(QItemSelectionModel *collListSelModel, QObject *parent)
@@ -24,16 +25,31 @@ int VGMCollViewModel::rowCount(const QModelIndex &parent) const {
 }
 
 QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
-    VGMFile *file = fileFromIndex(index);
-
-    if (!file) {
-        return QVariant{};
-    }
-
+    auto file = fileFromIndex(index);
     if (role == Qt::DisplayRole) {
-        return QString::fromStdString(*file->GetName());
+        return QString::fromStdString(
+            std::visit([](auto file) -> std::string { return file->name(); }, file));
     } else if (role == Qt::DecorationRole) {
-        return iconForFileType(file->GetFileType());
+        static Visitor icon{
+            [](VGMSeq *) -> const QIcon & {
+                static QIcon i_gen{":/images/sequence.svg"};
+                return i_gen;
+            },
+            [](VGMInstrSet *) -> const QIcon & {
+                static QIcon i_gen{":/images/instrument-set.svg"};
+                return i_gen;
+            },
+            [](VGMSampColl *) -> const QIcon & {
+                static QIcon i_gen{":/images/wave.svg"};
+                return i_gen;
+            },
+            [](VGMMiscFile *) -> const QIcon & {
+                static QIcon i_gen{":/images/file.svg"};
+                return i_gen;
+            },
+        };
+
+        return std::visit(icon, file);
     }
 
     return QVariant();
@@ -50,7 +66,8 @@ void VGMCollViewModel::handleNewCollSelected(QModelIndex modelIndex) {
     emit dataChanged(index(0, 0), index(0, 0));
 }
 
-VGMFile *VGMCollViewModel::fileFromIndex(QModelIndex index) const {
+std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> VGMCollViewModel::fileFromIndex(
+    QModelIndex index) const {
     auto row = index.row();
     auto num_instrsets = m_coll->instrsets.size();
     auto num_sampcolls = m_coll->sampcolls.size();
@@ -71,8 +88,6 @@ VGMFile *VGMCollViewModel::fileFromIndex(QModelIndex index) const {
     } else {
         return m_coll->seq;
     }
-
-    return nullptr;
 }
 
 VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
@@ -89,5 +104,6 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 }
 
 void VGMCollView::doubleClickedSlot(QModelIndex index) {
-    MdiArea::Instance()->NewView(qobject_cast<VGMCollViewModel *>(model())->fileFromIndex(index));
+    auto file_to_open = qobject_cast<VGMCollViewModel *>(model())->fileFromIndex(index);
+    MdiArea::Instance()->NewView(file_to_open);
 }

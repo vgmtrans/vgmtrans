@@ -13,8 +13,6 @@
 
 #include <fmt/format.h>
 
-using namespace std;
-
 // ****************
 // QSoundArticTable
 // ****************
@@ -140,7 +138,7 @@ bool QSoundInstrSet::GetInstrPointers() {
         if (fmt_version < VER_130)
             instr_info_length = sizeof(qs_prog_info_ver_103);  // 1.16 (Xmen vs SF) is like this
 
-        vector<uint16_t> instr_table_ptrs;
+        std::vector<uint16_t> instr_table_ptrs;
         for (unsigned int i = 0; i < num_instr_banks; i++)
             instr_table_ptrs.push_back(GetShort(dwOffset + i * 2));  // get the instr table ptrs
         int totalInstrs = 0;
@@ -309,7 +307,7 @@ bool QSoundInstr::LoadInstr() {
 
 QSoundSampColl::QSoundSampColl(RawFile *file, QSoundInstrSet *theinstrset,
                                QSoundSampleInfoTable *sampinfotable, uint32_t offset,
-                               uint32_t length, string name)
+                               uint32_t length, std::string name)
     : VGMSampColl(QSoundFormat::name, file, offset, length, name),
       instrset(theinstrset),
       sampInfoTable(sampinfotable) {}

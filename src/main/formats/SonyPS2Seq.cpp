@@ -8,8 +8,6 @@
 
 DECLARE_FORMAT(SonyPS2);
 
-using namespace std;
-
 // ******
 // BGMSeq
 // ******

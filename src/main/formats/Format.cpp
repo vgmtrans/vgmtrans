@@ -6,60 +6,49 @@
 
 #include <vector>
 #include <map>
-
+#include "Scanner.h"
 #include "Matcher.h"
-
-using namespace std;
 
 FormatMap &Format::registry() {
     static FormatMap registry;
     return registry;
 }
 
-Format::Format(const string &formatName) : scanner(NULL), matcher(NULL) {
+Format::Format(const std::string &formatName) : scanner(nullptr), matcher(nullptr) {
     registry().insert(make_pair(formatName, this));
 }
 
-Format::~Format(void) {
-    if (scanner != NULL)
-        delete scanner;
-    if (matcher != NULL)
-        delete matcher;
+Format::~Format() {
+    delete scanner;
+    delete matcher;
 }
 
-Format *Format::GetFormatFromName(const string &name) {
-    FormatMap::iterator findIt = registry().find(name);
+Format *Format::GetFormatFromName(const std::string &name) {
+    auto findIt = registry().find(name);
     if (findIt == registry().end())
-        return NULL;
+        return nullptr;
     return (*findIt).second;
 }
 
-bool Format::OnNewFile(VGMFile *file) {
-    if (!matcher)
+bool Format::OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+    if (!matcher) {
         return false;
+    }
     return matcher->OnNewFile(file);
-    // switch (file->GetFileType())
-    //{
-    // case FILETYPE_SEQ:
-    //	return OnNewSeq((VGMSeq*)file);
-    // case FILETYPE_INSTRSET:
-    //	return OnNewInstrSet((VGMInstrSet*)file);
-    // case FILETYPE_SAMPCOLL:
-    //	return OnNewSampColl((VGMSampColl*)file);
-    //}
 }
 
 VGMColl *Format::NewCollection() {
     return new VGMColl();
 }
 
-bool Format::OnCloseFile(VGMFile *file) {
-    if (!matcher)
+bool Format::OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+    if (!matcher) {
         return false;
+    }
     return matcher->OnCloseFile(file);
 }
 
-bool Format::Init(void) {
+bool Format::Init() {
     scanner = NewScanner();
     matcher = NewMatcher();
     return true;

@@ -35,12 +35,22 @@ class MusicPlayer : public QObject {
     MusicPlayer &operator=(MusicPlayer &&) = delete;
 
     static MusicPlayer &Instance();
-    ~MusicPlayer();
+    ~MusicPlayer() override;
 
     bool SynthPlaying();
-    void LoadCollection(VGMColl *coll);
+    void LoadCollection(VGMColl *coll, int index);
     void Toggle();
     void Stop();
+    void Next();
+    void Prev();
+    void Seek(int ticks);
+    [[nodiscard]] std::string Title() {
+        if(active_coll) {
+            return active_coll->GetName();
+        }
+
+        return {};
+    }
 
     [[nodiscard]] std::vector<const char *> audioDrivers() const {
         std::vector<const char *> drivers_buf;
@@ -54,22 +64,40 @@ class MusicPlayer : public QObject {
         return drivers_buf;
     }
 
-    void updateSetting(const char *setting, int value);
+    [[maybe_unused]] void updateSetting(const char *setting, int value);
     void updateSetting(const char *setting, const char *value);
     [[nodiscard]] bool checkSetting(const char *setting, const char *value) const;
 
+    /* This thing intercepts all MIDI events to keep the UI slider scrolling.
+     * There is really no other sane way of doing this.
+     * Periodically querying the status with a timer is not an option as the total number of ticks
+     * isn't reported in a reliable way unless you're 100% sure the player is playing a file.
+     * Which you can't be unless you're processing one, since the player can be in the playing state while actually
+     * playing back nothing */
+    static int PlayerCallback(void *data, fluid_midi_event_t *event) {
+        auto fdata = static_cast<std::pair<fluid_player_t *, fluid_synth_t *>*>(data);
+        auto player = fdata->first;
+        emit MusicPlayer::Instance().PositionChanged(fluid_player_get_current_tick(player), fluid_player_get_total_ticks(player));
+
+        auto synth = fdata->second;
+        return fluid_synth_handle_midi_event(synth, event);
+    }
+
    signals:
     void StatusChange(bool playing);
+    void PositionChanged(int cur, int max);
 
    private:
     void makeSettings();
     void makeSynth();
+    void makePlayer();
 
     fluid_settings_t *m_settings = nullptr;
     fluid_synth_t *m_synth = nullptr;
     fluid_audio_driver_t *m_active_driver = nullptr;
     fluid_player_t *m_active_player = nullptr;
     VGMColl *active_coll = nullptr;
+    int m_latest_index = -1;
 
     MusicPlayer();
 };

@@ -6,74 +6,36 @@
 
 #include "Root.h"
 #include "VGMFile.h"
+
+#include <utility>
 #include "Format.h"
 
-DECLARE_MENU(VGMFile)
-
-using namespace std;
-
-VGMFile::VGMFile(FileType fileType, const string &fmt, RawFile *theRawFile, uint32_t offset,
-                 uint32_t length, string theName)
-    : VGMContainerItem(this, offset, length),
-      rawfile(theRawFile),
-      format(fmt),
-      file_type(fileType),
-      m_name(theName),
-      id(-1) {}
-
-VGMFile::~VGMFile(void) {}
+VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
+                 uint32_t length, std::string theName)
+        : VGMContainerItem(this, offset, length),
+          rawfile(theRawFile),
+          format(std::move(fmt)),
+          id(-1),
+          m_name(std::move(theName)) {}
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add
 // this as an item because we do not want the VGMFile to be itself an item in the Item View
 void VGMFile::AddToUI(VGMItem *parent, void *UI_specific) {
-    for (uint32_t i = 0; i < containers.size(); i++) {
-        for (uint32_t j = 0; j < containers[i]->size(); j++)
-            (*containers[i])[j]->AddToUI(nullptr, UI_specific);
+    for (auto &container : containers) {
+        for (auto &j : *container)
+            j->AddToUI(nullptr, UI_specific);
     }
-}
-
-bool VGMFile::OnClose() {
-    pRoot->RemoveVGMFile(this);
-    return true;
-}
-
-bool VGMFile::OnSaveAsRaw() {
-    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(m_name));
-    if (filepath.length() != 0) {
-        bool result;
-        uint8_t *buf = new uint8_t[unLength];  // create a buffer the size of the file
-        GetBytes(dwOffset, unLength, buf);
-        result = pRoot->UI_WriteBufferToFile(filepath, buf, unLength);
-        delete[] buf;
-        return result;
-    }
-    return false;
-}
-
-bool VGMFile::OnSaveAllAsRaw() {
-    return pRoot->SaveAllAsRaw();
-}
-
-bool VGMFile::LoadVGMFile() {
-    bool val = Load();
-    if (!val)
-        return false;
-    Format *fmt = GetFormat();
-    if (fmt)
-        fmt->OnNewFile(this);
-
-    return val;
 }
 
 Format *VGMFile::GetFormat() {
     return Format::GetFormatFromName(format);
 }
 
-const string &VGMFile::GetFormatName() {
+const std::string &VGMFile::GetFormatName() {
     return format;
 }
 
-const string *VGMFile::GetName(void) const {
+const std::string *VGMFile::GetName() const {
     return &m_name;
 }
 
@@ -82,14 +44,14 @@ void VGMFile::AddCollAssoc(VGMColl *coll) {
 }
 
 void VGMFile::RemoveCollAssoc(VGMColl *coll) {
-    list<VGMColl *>::iterator iter = find(assocColls.begin(), assocColls.end(), coll);
+    auto iter = find(assocColls.begin(), assocColls.end(), coll);
     if (iter != assocColls.end())
         assocColls.erase(iter);
 }
 
 // These functions are common to all VGMItems, but no reason to refer to vgmfile
 // or call GetRawFile() if the item itself is a VGMFile
-RawFile *VGMFile::GetRawFile() {
+RawFile *VGMFile::GetRawFile() const {
     return rawfile;
 }
 
@@ -111,9 +73,9 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
 // *********
 
 VGMHeader::VGMHeader(VGMItem *parItem, uint32_t offset, uint32_t length, const std::string &name)
-    : VGMContainerItem(parItem->vgmfile, offset, length, name) {}
+        : VGMContainerItem(parItem->vgmfile, offset, length, name) {}
 
-VGMHeader::~VGMHeader() {}
+VGMHeader::~VGMHeader() = default;
 
 void VGMHeader::AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull,
                            const std::string &name) {
@@ -134,7 +96,7 @@ void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::string &name
 
 VGMHeaderItem::VGMHeaderItem(VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
                              const std::string &name)
-    : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType) {}
+        : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType) {}
 
 VGMItem::Icon VGMHeaderItem::GetIcon() {
     switch (type) {
@@ -145,7 +107,7 @@ VGMItem::Icon VGMHeaderItem::GetIcon() {
         case HIT_TEMPO:
             return ICON_TEMPO;
         case HIT_SIG:
-            return ICON_BINARY;
+            [[fallthrough]];
         default:
             return ICON_BINARY;
     }

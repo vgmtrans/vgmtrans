@@ -9,9 +9,7 @@
 #include "ScaleConversion.h"
 #include "Root.h"
 
-using namespace std;
-
-SF2InfoListChunk::SF2InfoListChunk(string name) : LISTChunk("INFO") {
+SF2InfoListChunk::SF2InfoListChunk(std::string name) : LISTChunk("INFO") {
     // Create a date string
     time_t current_time = time(NULL);
     char *c_time_string = ctime(&current_time);
@@ -25,8 +23,8 @@ SF2InfoListChunk::SF2InfoListChunk(string name) : LISTChunk("INFO") {
     AddChildChunk(ifilCk);
     AddChildChunk(new SF2StringChunk("isng", "EMU8000"));
     AddChildChunk(new SF2StringChunk("INAM", name));
-    AddChildChunk(new SF2StringChunk("ICRD", string(c_time_string)));
-    AddChildChunk(new SF2StringChunk("ISFT", string("VGMTrans " + string(VERSION))));
+    AddChildChunk(new SF2StringChunk("ICRD", std::string(c_time_string)));
+    AddChildChunk(new SF2StringChunk("ISFT", std::string("VGMTrans " + std::string(VERSION))));
 }
 
 //  *******
@@ -85,7 +83,7 @@ SF2File::SF2File(SynthFile *synthfile) : RiffFile(synthfile->name, "sfbk") {
         sfPresetHeader presetHdr;
         memset(&presetHdr, 0, sizeof(sfPresetHeader));
         memcpy(presetHdr.achPresetName, instr->name.c_str(),
-               std::min((unsigned long)instr->name.length(), (unsigned long)20));
+               std::min(instr->name.length(), (unsigned long)20));
         presetHdr.wPreset = (uint16_t)instr->ulInstrument;
 
         // Despite being a 16-bit value, SF2 only supports banks up to 127. Since
@@ -197,7 +195,7 @@ SF2File::SF2File(SynthFile *synthfile) : RiffFile(synthfile->name, "sfbk") {
         sfInst inst;
         memset(&inst, 0, sizeof(sfInst));
         memcpy(inst.achInstName, instr->name.c_str(),
-               std::min((unsigned long)instr->name.length(), (unsigned long)20));
+               std::min(instr->name.length(), (unsigned long)20));
         inst.wInstBagNdx = (uint16_t)rgnCounter;
         rgnCounter += instr->vRgns.size();
 
@@ -391,7 +389,7 @@ SF2File::SF2File(SynthFile *synthfile) : RiffFile(synthfile->name, "sfbk") {
         sfSample samp;
         memset(&samp, 0, sizeof(sfSample));
         memcpy(samp.achSampleName, wave->name.c_str(),
-               std::min((unsigned long)wave->name.length(), (unsigned long)20));
+               std::min(wave->name.length(), (unsigned long)20));
         samp.dwStart = sampOffset;
         samp.dwEnd = samp.dwStart + (wave->dataSize / sizeof(uint16_t));
         sampOffset = samp.dwEnd + 46;  // plus the 46 padding samples required by sf2 spec

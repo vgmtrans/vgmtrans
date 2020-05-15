@@ -6,15 +6,13 @@
 
 #include "VGMSeqNoTrks.h"
 
-using namespace std;
-
-VGMSeqNoTrks::VGMSeqNoTrks(const string &format, RawFile *file, uint32_t offset, string name)
+VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, std::string name)
     : VGMSeq(format, file, offset, 0, name), SeqTrack(this) {
     ResetVars();
     VGMSeq::AddContainer<SeqEvent>(aEvents);
 }
 
-VGMSeqNoTrks::~VGMSeqNoTrks(void) {}
+VGMSeqNoTrks::~VGMSeqNoTrks() = default;
 
 void VGMSeqNoTrks::ResetVars() {
     midiTracks.clear();  // no need to delete the contents, that happens when the midi is deleted

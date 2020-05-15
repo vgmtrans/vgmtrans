@@ -8,14 +8,12 @@
 #include "PSXSPU.h"
 #include <fmt/format.h>
 
-using namespace std;
-
 // ************
 // AkaoInstrSet
 // ************
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t length, uint32_t instrOff, uint32_t dkitOff,
-                           uint32_t theID, string name)
+                           uint32_t theID, std::string name)
     : VGMInstrSet(AkaoFormat::name, file, 0, length, name) {
     id = theID;
     drumkitOff = dkitOff;
@@ -219,7 +217,7 @@ bool AkaoRgn::LoadRgn() {
 // AkaoSampColl
 // ************
 
-AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, uint32_t length, string name)
+AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMSampColl(AkaoFormat::name, file, offset, length, name) {}
 
 AkaoSampColl::~AkaoSampColl() {}
@@ -239,10 +237,8 @@ bool AkaoSampColl::GetHeaderInfo() {
     nNumArts = GetWord(0x1C + dwOffset);
     arts_offset = 0x40 + dwOffset;
 
-    if (nNumArts > 300 || nNumArts == 0)
-        return false;
+    return !(nNumArts > 300 || nNumArts == 0);
 
-    return true;
 }
 
 bool AkaoSampColl::GetSampleInfo() {

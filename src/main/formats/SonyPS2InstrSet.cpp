@@ -8,8 +8,6 @@
 #include "PSXSPU.h"
 #include <fmt/format.h>
 
-using namespace std;
-
 // ***************
 // SonyPS2InstrSet
 // ***************

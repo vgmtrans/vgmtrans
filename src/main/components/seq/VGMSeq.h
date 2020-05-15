@@ -8,7 +8,6 @@
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
-#include "Menu.h"
 
 class SeqTrack;
 class SeqEvent;
@@ -22,17 +21,13 @@ enum ReadMode : uint8_t {
 
 class VGMSeq : public VGMFile {
    public:
-    BEGIN_MENU_SUB(VGMSeq, VGMFile)
-    MENU_ITEM(VGMSeq, OnSaveAsMidi, "Save as MIDI")
-    MENU_ITEM(VGMSeq, OnSaveAsJSON, "Dump structure as JSON")
-    END_MENU()
-
     VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
            std::string name = "VGM Sequence");
     virtual ~VGMSeq(void);
 
     virtual Icon GetIcon() { return ICON_SEQ; }
 
+    bool LoadVGMFile() override;
     virtual bool Load();  // Function to load all the information about the sequence
     virtual bool LoadMain();
     virtual bool GetHeaderInfo(void);

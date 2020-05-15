@@ -14,9 +14,8 @@
 #include "SeqEvent.h"
 
 namespace conversion {
-using json = nlohmann::json;
-
-void DumpToJSON(std::string path, VGMSeq &seq) {
+void DumpToJSON(VGMSeq &seq, const std::string &path) {
+    using json = nlohmann::json;
     json out;
 
     out["name"] = seq.name();

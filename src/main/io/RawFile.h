@@ -12,7 +12,7 @@
 #include <memory>
 #include <climits>
 #include <cassert>
-
+#include <variant>
 #include "mio.hpp"
 
 #include "util/common.h"
@@ -21,6 +21,11 @@
 class VGMFile;
 class VGMItem;
 class BytePattern;
+
+class VGMSeq;
+class VGMInstrSet;
+class VGMSampColl;
+class VGMMiscFile;
 
 class RawFile {
    public:
@@ -33,9 +38,9 @@ class RawFile {
 
     virtual std::string GetParRawFileFullPath() const { return {}; }
 
-    bool IsValidOffset(uint32_t ofs) const noexcept { return ofs < size(); }
+    [[nodiscard]] bool IsValidOffset(uint32_t ofs) const noexcept { return ofs < size(); }
 
-    bool useLoaders() const noexcept { return m_flags & UseLoaders; }
+    [[nodiscard]] bool useLoaders() const noexcept { return m_flags & UseLoaders; }
     void setUseLoaders(bool enable) noexcept {
         if (enable) {
             m_flags |= UseLoaders;
@@ -43,7 +48,7 @@ class RawFile {
             m_flags &= ~UseLoaders;
         }
     }
-    bool useScanners() const noexcept { return m_flags & UseScanners; }
+    [[nodiscard]] bool useScanners() const noexcept { return m_flags & UseScanners; }
     void setUseScanners(bool enable) noexcept {
         if (enable) {
             m_flags |= UseScanners;
@@ -53,7 +58,7 @@ class RawFile {
     }
 
     template <typename T>
-    T get(const size_t ind) const {
+    [[nodiscard]] T get(const size_t ind) const {
         assert(ind + sizeof(T) <= size());
 
         T value = 0;
@@ -65,10 +70,10 @@ class RawFile {
     }
 
     template <typename T>
-    T getBE(const size_t ind) const {
+    [[nodiscard]] T getBE(const size_t ind) const {
         assert(ind + sizeof(T) <= size());
 
-        T value = 0;
+        T value = 0u;
         for (size_t i = 0; i < sizeof(T); i++) {
             value |= (static_cast<u8>(operator[](ind + i)) << ((sizeof(T) - i - 1) * CHAR_BIT));
         }
@@ -86,7 +91,7 @@ class RawFile {
     }
     virtual const char *data() const = 0;
 
-    virtual const char &operator[](const size_t i) const = 0;
+    virtual const char &operator[](size_t i) const = 0;
     virtual uint8_t GetByte(size_t offset) const = 0;
     virtual uint16_t GetShort(size_t offset) const = 0;
     virtual uint32_t GetWord(size_t offset) const = 0;
@@ -99,21 +104,18 @@ class RawFile {
     bool SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
                            uint32_t nSearchOffset = 0, uint32_t nSearchSize = static_cast<uint32_t>(-1)) const;
 
-    const std::vector<std::shared_ptr<VGMFile>> &containedVGMFiles() const noexcept {
+    [[nodiscard]] const auto &containedVGMFiles() const noexcept {
         return m_vgmfiles;
     }
-    void AddContainedVGMFile(std::shared_ptr<VGMFile>);
-    void RemoveContainedVGMFile(VGMFile *);
-
-    VGMItem *GetItemFromOffset(long offset);
-    VGMFile *GetVGMFileFromOffset(long offset);
+    void AddContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>);
+    void RemoveContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>);
 
     VGMTag tag;
 
    private:
-    std::vector<std::shared_ptr<VGMFile>> m_vgmfiles;
+    std::vector<std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>> m_vgmfiles;
     enum ProcessFlags { UseLoaders = 1, UseScanners = 2 };
-    int m_flags = UseLoaders | UseScanners;
+    unsigned m_flags = UseLoaders | UseScanners;
 };
 
 class DiskFile final : public RawFile {
@@ -152,7 +154,7 @@ class VirtFile final : public RawFile {
     VirtFile(const RawFile &, size_t offset = 0);
     VirtFile(const RawFile &, size_t offset, size_t limit);
     VirtFile(const uint8_t *data, uint32_t size, std::string name, std::string parent_fullpath = "",
-             const VGMTag tag = VGMTag());
+             VGMTag tag = VGMTag());
     ~VirtFile() = default;
 
     [[nodiscard]] std::string name() const override { return m_name; };

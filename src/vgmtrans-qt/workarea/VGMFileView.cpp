@@ -15,35 +15,63 @@
 
 #include "QHexView/qhexview.h"
 #include "QHexView/document/buffer/qmemoryrefbuffer.h"
-#include "QHexView/document/qhexmetadata.h"
 
 #include "../util/Helpers.h"
 
-VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
+#include "components/seq/VGMSeq.h"
+#include "components/instr/VGMInstrSet.h"
+#include "components/VGMSampColl.h"
+#include "components/VGMMiscFile.h"
+
+VGMFileView::VGMFileView(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> vgmfile)
+        : QMdiSubWindow() {
     m_vgmfile = vgmfile;
     m_splitter = new QSplitter(Qt::Horizontal, this);
 
     m_buffer = new QBuffer();
-    m_buffer->setData(vgmfile->data(), vgmfile->size());
-    m_buffer->open(QIODevice::ReadOnly);
+    std::visit([&](auto file) {
+        m_buffer->setData(file->data(), file->size());
+        m_buffer->open(QIODevice::ReadOnly);
+    }, vgmfile);
     m_hexview = new QHexView(m_splitter);
 
     auto doc = QHexDocument::fromDevice<QMemoryRefBuffer>(m_buffer);
-    doc->setBaseAddress(vgmfile->dwOffset);
+    auto file_ofs = std::visit([&](auto file) {
+        return file->dwOffset;
+    }, vgmfile);
+    doc->setBaseAddress(file_ofs);
     m_hexview->setDocument(doc);
     m_hexview->setReadOnly(true);
     markEvents();
 
-    m_treeview = new VGMFileTreeView(m_vgmfile, m_splitter);
+    m_treeview = new VGMFileTreeView(std::visit([](auto file) ->VGMFile* { return file; }, vgmfile), m_splitter);
     m_splitter->setSizes(QList<int>() << 900 << 270);
 
-    setWindowTitle(QString::fromStdString(*m_vgmfile->GetName()));
-    setWindowIcon(iconForFileType(m_vgmfile->GetFileType()));
+    setWindowTitle(QString::fromStdString(*std::visit([&](auto file) { return file->GetName(); }, vgmfile)));
+    static Visitor icon{
+            [](VGMSeq *) -> const QIcon & {
+                static QIcon i_gen{":/images/sequence.svg"};
+                return i_gen;
+            },
+            [](VGMInstrSet *) -> const QIcon & {
+                static QIcon i_gen{":/images/instrument-set.svg"};
+                return i_gen;
+            },
+            [](VGMSampColl *) -> const QIcon & {
+                static QIcon i_gen{":/images/wave.svg"};
+                return i_gen;
+            },
+            [](VGMMiscFile *) -> const QIcon & {
+                static QIcon i_gen{":/images/file.svg"};
+                return i_gen;
+            },
+    };
+    setWindowIcon(std::visit(icon, vgmfile));
     setAttribute(Qt::WA_DeleteOnClose);
 
     connect(m_treeview, &VGMFileTreeView::itemClicked, [=](QTreeWidgetItem *item, int) {
         auto vgmitem = reinterpret_cast<VGMTreeItem *>(item);
-        auto offset = vgmitem->item_offset() - vgmfile->dwOffset;
+        auto offset = vgmitem->item_offset() - file_ofs;
 
         m_hexview->moveTo(offset);
     });
@@ -52,12 +80,15 @@ VGMFileView::VGMFileView(VGMFile *vgmfile) : QMdiSubWindow() {
 }
 
 void VGMFileView::markEvents() {
-    auto base_offset = m_vgmfile->dwOffset;
+    auto [base_offset, file_len] = std::visit(
+            [](auto file) { return std::pair<size_t, size_t>{file->dwOffset, file->unLength}; }, m_vgmfile);
     auto overlay = m_hexview->document()->metadata();
 
-    uint32_t i = 0;
-    while (i < m_vgmfile->unLength) {
-        auto item = m_vgmfile->GetItemFromOffset(base_offset + i, false);
+    size_t i = 0;
+    while (i < file_len) {
+        auto item = std::visit(
+                [base_offset = base_offset, i](auto file) { return file->GetItemFromOffset(base_offset + i, false); },
+                m_vgmfile);
         if (item) {
             auto line = std::floor((item->dwOffset - base_offset) / 16);
             auto col = (item->dwOffset - base_offset) % 16;

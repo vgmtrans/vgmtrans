@@ -8,17 +8,13 @@
 #include "VGMSampColl.h"
 #include "Root.h"
 
-using namespace std;
-
 // *******
 // VGMSamp
 // *******
 
-DECLARE_MENU(VGMSamp)
-
 VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 string theName)
+                 std::string theName)
     : parSampColl(sampColl),
       sampName(theName),
       VGMItem(sampColl->vgmfile, offset, length),
@@ -34,8 +30,8 @@ VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32
       volume(-1),
       waveType(WT_UNDEFINED),
       bPSXLoopInfoPrioritizing(false) {
-    name = sampName.data();  // I would do this in the initialization list, but VGMItem()
-                             // constructor is called before sampName is initialized,
+    name = sampName;  // I would do this in the initialization list, but VGMItem()
+                      // constructor is called before sampName is initialized,
     // so data() ends up returning a bad pointer
 }
 
@@ -63,15 +59,8 @@ void VGMSamp::ConvertToStdWave(uint8_t *buf) {
     }
 }
 
-bool VGMSamp::OnSaveAsWav() {
-    string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "wav");
-    if (filepath.length() != 0)
-        return SaveAsWav(filepath);
-    return false;
-}
-
 bool VGMSamp::SaveAsWav(const std::string &filepath) {
-    vector<uint8_t> waveBuf;
+    std::vector<uint8_t> waveBuf;
     uint32_t bufSize;
     if (this->ulUncompressedSize)
         bufSize = this->ulUncompressedSize;

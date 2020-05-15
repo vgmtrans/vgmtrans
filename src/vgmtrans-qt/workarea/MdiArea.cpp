@@ -8,6 +8,7 @@
 
 #include <QTabBar>
 
+#include "VGMFileView.h"
 #include "../util/Helpers.h"
 
 MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
@@ -16,17 +17,17 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
     setTabsMovable(true);
     setTabsClosable(true);
 
-    QTabBar *tab_bar = findChild<QTabBar *>();
+    auto *tab_bar = findChild<QTabBar *>();
     if (tab_bar) {
         tab_bar->setExpanding(false);
         tab_bar->setUsesScrollButtons(true);
     }
 }
 
-void MdiArea::NewView(VGMFile *file) {
-    auto it = registered_views_.find(file);
+void MdiArea::NewView(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+    auto it = m_registered_views.find(file);
     // Check if a fileview for this vgmfile already exists
-    if (it != registered_views_.end()) {
+    if (it != m_registered_views.end()) {
         // If it does, let's focus it
         auto *vgmfile_view = it->second;
         vgmfile_view->setFocus();
@@ -36,14 +37,14 @@ void MdiArea::NewView(VGMFile *file) {
         auto tab = addSubWindow(vgmfile_view, Qt::SubWindow);
         tab->show();
 
-        registered_views_.insert(std::make_pair(file, tab));
+        m_registered_views.insert(std::make_pair(file, tab));
     }
 }
 
-void MdiArea::RemoveView(VGMFile *file) {
+void MdiArea::RemoveView(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
     // Let's check if we have a VGMFileView to remove
-    auto it = registered_views_.find(file);
-    if (it != registered_views_.end()) {
+    auto it = m_registered_views.find(file);
+    if (it != m_registered_views.end()) {
         // Sanity check
         if (it->second) {
             // Close the tab (automatically deletes it)
@@ -51,7 +52,7 @@ void MdiArea::RemoveView(VGMFile *file) {
             it->second->close();
         }
         // Get rid of the saved pointers
-        registered_views_.erase(file);
+        m_registered_views.erase(file);
     }
 }
 

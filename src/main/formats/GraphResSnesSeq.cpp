@@ -9,8 +9,6 @@
 #include <sstream>
 #include "ScaleConversion.h"
 
-using namespace std;
-
 DECLARE_FORMAT(GraphResSnes);
 
 //  ***************

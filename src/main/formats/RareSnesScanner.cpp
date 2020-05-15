@@ -12,8 +12,6 @@ namespace vgmtrans::scanners {
 ScannerRegistration<RareSnesScanner> s_raresnes("RARESNES", {"spc"});
 }
 
-using namespace std;
-
 // ; Load DIR address
 // 10df: 8f 5d f2  mov   $f2,#$5d
 // 10e2: 8f 32 f3  mov   $f3,#$32
@@ -103,7 +101,7 @@ void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
     uint32_t ofsVCmdExecASM;
     uint32_t addrSeqHeader;
     uint32_t addrVCmdTable;
-    string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
     // find a sequence
     if (file->SearchBytePattern(ptnSongLoadDKC2, ofsSongLoadASM)) {

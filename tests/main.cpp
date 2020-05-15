@@ -7,10 +7,6 @@
 class TestRoot : public VGMRoot {
     void UI_SetRootPtr(VGMRoot **theRoot) override;
     void UI_Exit() override {}
-    std::string UI_GetOpenFilePath(const std::string &suggestedFilename = "",
-                                   const std::string &extension = "") override {
-        return {};
-    }
     virtual std::string UI_GetSaveFilePath(const std::string &suggestedFilename,
                                            const std::string &extension = "") override {
         return {};

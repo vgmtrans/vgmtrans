@@ -9,6 +9,7 @@
 #include <QHeaderView>
 #include "RawFileListView.h"
 #include "RawFile.h"
+#include "QtVGMRoot.h"
 
 /*
  * RawFileListViewModel
@@ -78,7 +79,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
             if (role == Qt::DisplayRole) {
                 return QString::fromStdString(qtVGMRoot.vRawFile[index.row()]->name());
             } else if (role == Qt::DecorationRole) {
-                static QIcon fileicon(":/images/file-32.png");
+                static QIcon fileicon(":/images/file.svg");
                 return fileicon;
             }
         }

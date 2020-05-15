@@ -6,7 +6,6 @@
 #pragma once
 #include "VGMItem.h"
 #include "Loop.h"
-#include "Menu.h"
 
 class VGMSampColl;
 
@@ -14,10 +13,6 @@ enum WAVE_TYPE { WT_UNDEFINED, WT_PCM8, WT_PCM16 };
 
 class VGMSamp : public VGMItem {
    public:
-    BEGIN_MENU(VGMSamp)
-    MENU_ITEM(VGMSamp, OnSaveAsWav, "Convert to WAV file")
-    END_MENU()
-
     VGMSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0,
             uint32_t dataOffset = 0, uint32_t dataLength = 0, uint8_t channels = 1,
             uint16_t bps = 16, uint32_t rate = 0, std::string name = "Sample");
@@ -43,7 +38,6 @@ class VGMSamp : public VGMItem {
     inline void SetLoopStartMeasure(LoopMeasure measure) { loop.loopStartMeasure = measure; }
     inline void SetLoopLengthMeasure(LoopMeasure measure) { loop.loopLengthMeasure = measure; }
 
-    bool OnSaveAsWav();
     bool SaveAsWav(const std::string &filepath);
 
    public:

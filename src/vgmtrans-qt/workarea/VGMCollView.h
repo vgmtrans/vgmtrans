@@ -5,6 +5,10 @@
 
 class VGMColl;
 class VGMFile;
+class VGMSeq;
+class VGMInstrSet;
+class VGMSampColl;
+class VGMMiscFile;
 
 class VGMCollViewModel : public QAbstractListModel {
     Q_OBJECT
@@ -15,7 +19,8 @@ class VGMCollViewModel : public QAbstractListModel {
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
 
-    VGMFile *fileFromIndex(QModelIndex index) const;
+    [[nodiscard]] std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> fileFromIndex(
+        QModelIndex index) const;
 
    public slots:
     void handleNewCollSelected(QModelIndex modelIndex);

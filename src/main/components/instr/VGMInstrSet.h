@@ -8,7 +8,6 @@
 #include "VGMFile.h"
 #include "DLSFile.h"
 #include "SF2File.h"
-#include "Menu.h"
 
 class VGMSampColl;
 class VGMInstr;
@@ -23,15 +22,11 @@ class VGMRgnItem;
 
 class VGMInstrSet : public VGMFile {
    public:
-    BEGIN_MENU_SUB(VGMInstrSet, VGMFile)
-    MENU_ITEM(VGMInstrSet, OnSaveAsDLS, "Convert to DLS")
-    MENU_ITEM(VGMInstrSet, OnSaveAsSF2, "Convert to SoundFont 2")
-    END_MENU()
-
     VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
                 std::string name = "VGMInstrSet", VGMSampColl *theSampColl = NULL);
     virtual ~VGMInstrSet(void);
 
+    bool LoadVGMFile() override;
     virtual bool Load();
     virtual bool GetHeaderInfo();
     virtual bool GetInstrPointers();
@@ -40,17 +35,14 @@ class VGMInstrSet : public VGMFile {
     VGMInstr *AddInstr(uint32_t offset, uint32_t length, unsigned long bank, unsigned long instrNum,
                        const std::string &instrName = "");
 
-    virtual FileType GetFileType() { return FILETYPE_INSTRSET; }
-
-    bool OnSaveAsDLS(void);
-    bool OnSaveAsSF2(void);
-    virtual bool SaveAsDLS(const std::string &filepath);
-    virtual bool SaveAsSF2(const std::string &filepath);
-
-   public:
     std::vector<VGMInstr *> aInstrs;
     VGMSampColl *sampColl;
 };
+
+namespace conversion {
+bool SaveAsDLS(const VGMInstrSet &set, const std::string &filepath);
+bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath);
+}  // namespace conversion
 
 // ********
 // VGMInstr

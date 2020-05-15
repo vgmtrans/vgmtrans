@@ -9,8 +9,6 @@
 
 DECLARE_FORMAT(FFT);
 
-using namespace std;
-
 //  ******
 //  FFTSeq
 //  ******

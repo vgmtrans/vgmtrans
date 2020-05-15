@@ -34,7 +34,7 @@ void QtVGMRoot::UI_SetScanInfo() {}
 
 void QtVGMRoot::UI_OnEndScan() {}
 
-void QtVGMRoot::UI_AddVGMFile(VGMFile *theFile) {
+void QtVGMRoot::UI_AddVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
     this->UI_AddedVGMFile();
 }
 
@@ -59,14 +59,6 @@ void QtVGMRoot::UI_BeginRemoveVGMFiles() {}
 void QtVGMRoot::UI_EndRemoveVGMFiles() {}
 
 void QtVGMRoot::UI_AddItemSet(VGMFile *file, std::vector<ItemSet> *itemset) {}
-
-std::string QtVGMRoot::UI_GetOpenFilePath(const std::string &suggestedFilename,
-                                          const std::string &extension) {
-    return QFileDialog::getOpenFileName(
-               QApplication::activeWindow(), "Select a file...",
-               QStandardPaths::writableLocation(QStandardPaths::MusicLocation), "All files (*)")
-        .toStdString();
-}
 
 std::string QtVGMRoot::UI_GetSaveFilePath(const std::string &suggestedFilename,
                                           const std::string &extension) {

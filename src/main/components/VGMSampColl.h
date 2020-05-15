@@ -11,10 +11,6 @@ class VGMSamp;
 
 class VGMSampColl : public VGMFile {
    public:
-    BEGIN_MENU_SUB(VGMSampColl, VGMFile)
-    MENU_ITEM(VGMSampColl, OnSaveAllAsWav, "Save all as WAV")
-    END_MENU()
-
     VGMSampColl(const std::string &format, RawFile *rawfile, uint32_t offset, uint32_t length = 0,
                 std::string theName = "VGMSampColl");
     VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset, uint32_t offset,
@@ -22,6 +18,7 @@ class VGMSampColl : public VGMFile {
     virtual ~VGMSampColl(void);
     void UseInstrSet(VGMInstrSet *instrset) { parInstrSet = instrset; }
 
+    bool LoadVGMFile() override;
     virtual bool Load();
     virtual bool GetHeaderInfo();  // retrieve any header data
     virtual bool
@@ -30,7 +27,6 @@ class VGMSampColl : public VGMFile {
     VGMSamp *AddSamp(uint32_t offset, uint32_t length, uint32_t dataOffset, uint32_t dataLength,
                      uint8_t nChannels = 1, uint16_t bps = 16, uint32_t theRate = 0,
                      std::string name = "Sample");
-    bool OnSaveAllAsWav();
 
    protected:
     void LoadOnInstrMatch() { bLoadOnInstrSetMatch = true; }
@@ -43,3 +39,7 @@ class VGMSampColl : public VGMFile {
     VGMInstrSet *parInstrSet;
     std::vector<VGMSamp *> samples;
 };
+
+namespace conversion {
+void SaveAsWAV(const VGMSampColl &coll, const std::string &save_dir);
+}

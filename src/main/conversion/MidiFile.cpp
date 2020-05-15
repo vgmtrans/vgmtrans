@@ -9,8 +9,6 @@
 #include <fmt/format.h>
 #include "Root.h"
 
-using namespace std;
-
 MidiFile::MidiFile(VGMSeq *theAssocSeq)
     : assocSeq(theAssocSeq),
       globalTrack(this, false),
@@ -68,12 +66,12 @@ void MidiFile::Sort(void) {
 }
 
 bool MidiFile::SaveMidiFile(const std::string &filepath) {
-    vector<uint8_t> midiBuf;
+    std::vector<uint8_t> midiBuf;
     WriteMidiToBuffer(midiBuf);
     return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], (uint32_t)midiBuf.size());
 }
 
-void MidiFile::WriteMidiToBuffer(vector<uint8_t> &buf) {
+void MidiFile::WriteMidiToBuffer(std::vector<uint8_t> &buf) {
     size_t nNumTracks = aTracks.size();
     buf.push_back('M');
     buf.push_back('T');
@@ -94,7 +92,7 @@ void MidiFile::WriteMidiToBuffer(vector<uint8_t> &buf) {
 
     for (uint32_t i = 0; i < aTracks.size(); i++) {
         if (aTracks[i]) {
-            vector<uint8_t> trackBuf;
+            std::vector<uint8_t> trackBuf;
             globalTranspose = 0;
             aTracks[i]->WriteTrack(trackBuf);
             buf.insert(buf.end(), trackBuf.begin(), trackBuf.end());
@@ -131,7 +129,7 @@ void MidiTrack::Sort(void) {
     }
 }
 
-void MidiTrack::WriteTrack(vector<uint8_t> &buf) {
+void MidiTrack::WriteTrack(std::vector<uint8_t> &buf) {
     buf.push_back('M');
     buf.push_back('T');
     buf.push_back('r');
@@ -142,8 +140,8 @@ void MidiTrack::WriteTrack(vector<uint8_t> &buf) {
     buf.push_back(0);
     uint32_t time = 0;  // start at 0 ticks
 
-    vector<MidiEvent *> finalEvents(aEvents);
-    vector<MidiEvent *> &globEvents = parentSeq->globalTrack.aEvents;
+    std::vector<MidiEvent *> finalEvents(aEvents);
+    std::vector<MidiEvent *> &globEvents = parentSeq->globalTrack.aEvents;
     finalEvents.insert(finalEvents.end(), globEvents.begin(), globEvents.end());
 
     stable_sort(finalEvents.begin(), finalEvents.end(),
@@ -270,7 +268,7 @@ void MidiTrack::PurgePrevNoteOffs() {
 
 void MidiTrack::PurgePrevNoteOffs(uint32_t absTime) {
     prevDurNoteOffs.erase(std::remove_if(prevDurNoteOffs.begin(), prevDurNoteOffs.end(),
-                                         [absTime](NoteEvent *e) { return e->AbsTime <= absTime; }),
+                                         [absTime](NoteEvent *e) { return e && e->AbsTime <= absTime; }),
                           prevDurNoteOffs.end());
 }
 
@@ -568,7 +566,7 @@ void MidiTrack::InsertGlobalTranspose(uint32_t absTime, int8_t semitones) {
     aEvents.push_back(new GlobalTransposeEvent(this, absTime, semitones));
 }
 
-void MidiTrack::AddMarker(uint8_t channel, const string &markername, uint8_t databyte1,
+void MidiTrack::AddMarker(uint8_t channel, const std::string &markername, uint8_t databyte1,
                           uint8_t databyte2, int8_t priority) {
     aEvents.push_back(
         new MarkerEvent(this, channel, GetDelta(), markername, databyte1, databyte2, priority));
@@ -584,7 +582,7 @@ MidiEvent::MidiEvent(MidiTrack *thePrntTrk, uint32_t absoluteTime, uint8_t theCh
 
 MidiEvent::~MidiEvent(void) {}
 
-void MidiEvent::WriteVarLength(vector<uint8_t> &buf, uint32_t value) {
+void MidiEvent::WriteVarLength(std::vector<uint8_t> &buf, uint32_t value) {
     unsigned long buffer;
     buffer = value & 0x7F;
 
@@ -602,7 +600,7 @@ void MidiEvent::WriteVarLength(vector<uint8_t> &buf, uint32_t value) {
     }
 }
 
-uint32_t MidiEvent::WriteSysexEvent(vector<uint8_t> &buf, uint32_t time, uint8_t *data,
+uint32_t MidiEvent::WriteSysexEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t *data,
                                     size_t dataSize) {
     WriteVarLength(buf, AbsTime - time);
     buf.push_back(0xF0);
@@ -613,7 +611,7 @@ uint32_t MidiEvent::WriteSysexEvent(vector<uint8_t> &buf, uint32_t time, uint8_t
     return AbsTime;
 }
 
-uint32_t MidiEvent::WriteMetaEvent(vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
+uint32_t MidiEvent::WriteMetaEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
                                    uint8_t *data, size_t dataSize) {
     WriteVarLength(buf, AbsTime - time);
     buf.push_back(0xFF);
@@ -625,9 +623,9 @@ uint32_t MidiEvent::WriteMetaEvent(vector<uint8_t> &buf, uint32_t time, uint8_t 
     return AbsTime;
 }
 
-uint32_t MidiEvent::WriteMetaTextEvent(vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
-                                       string wstr) {
-    string str = (wstr);
+uint32_t MidiEvent::WriteMetaTextEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
+                                       std::string wstr) {
+    std::string str = (wstr);
     return WriteMetaEvent(buf, time, metaType, (uint8_t *)str.c_str(), str.length());
 }
 
@@ -677,7 +675,7 @@ NoteEvent::NoteEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime,
 //	return new NoteEvent(prntTrk, channel, AbsTime, bNoteDown, key, vel);
 //}
 
-uint32_t NoteEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t NoteEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     WriteVarLength(buf, AbsTime - time);
     if (bNoteDown)
         buf.push_back(0x90 + channel);
@@ -748,7 +746,7 @@ MastVolEvent::MastVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absolut
                            uint8_t theMastVol)
     : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_HIGHER), mastVol(theMastVol) {}
 
-uint32_t MastVolEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t MastVolEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     uint8_t data[7] = {0x7F, 0x7F, 0x04, 0x01, /*LSB*/ 0, (uint8_t)(mastVol & 0x7F), 0xF7};
     return WriteSysexEvent(buf, time, data, 7);
 }
@@ -763,7 +761,7 @@ ControllerEvent::ControllerEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t a
       controlNum(controllerNum),
       dataByte(theDataByte) {}
 
-uint32_t ControllerEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t ControllerEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     WriteVarLength(buf, AbsTime - time);
     buf.push_back(0xB0 + channel);
     buf.push_back(controlNum & 0x7F);
@@ -779,7 +777,7 @@ ProgChangeEvent::ProgChangeEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t a
                                  uint8_t progNum)
     : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_HIGH), programNum(progNum) {}
 
-uint32_t ProgChangeEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t ProgChangeEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     WriteVarLength(buf, AbsTime - time);
     buf.push_back(0xC0 + channel);
     buf.push_back(programNum & 0x7F);
@@ -794,7 +792,7 @@ PitchBendEvent::PitchBendEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t abs
                                int16_t bendAmt)
     : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_MIDDLE), bend(bendAmt) {}
 
-uint32_t PitchBendEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t PitchBendEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     uint8_t loByte = (bend + 0x2000) & 0x7F;
     uint8_t hiByte = ((bend + 0x2000) & 0x3F80) >> 7;
     WriteVarLength(buf, AbsTime - time);
@@ -811,7 +809,7 @@ uint32_t PitchBendEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 TempoEvent::TempoEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint32_t microSeconds)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST), microSecs(microSeconds) {}
 
-uint32_t TempoEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t TempoEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     uint8_t data[3] = {(uint8_t)((microSecs & 0xFF0000) >> 16),
                        (uint8_t)((microSecs & 0x00FF00) >> 8), (uint8_t)(microSecs & 0x0000FF)};
     return WriteMetaEvent(buf, time, 0x51, data, 3);
@@ -828,7 +826,7 @@ TimeSigEvent::TimeSigEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint8_t nu
       denom(denominator),
       ticksPerQuarter(clicksPerQuarter) {}
 
-uint32_t TimeSigEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t TimeSigEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     // denom is expressed in power of 2... so if we have 6/8 time.  it's 6 = 2^x  ==  ln6 / ln2
     uint8_t data[4] = {numer, (uint8_t)(log((double)denom) / 0.69314718055994530941723212145818),
                        ticksPerQuarter, 8};
@@ -842,7 +840,7 @@ uint32_t TimeSigEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 EndOfTrackEvent::EndOfTrackEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST) {}
 
-uint32_t EndOfTrackEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t EndOfTrackEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     return WriteMetaEvent(buf, time, 0x2F, NULL, 0);
 }
 
@@ -853,7 +851,7 @@ uint32_t EndOfTrackEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 TextEvent::TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr) {}
 
-uint32_t TextEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t TextEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     return WriteMetaTextEvent(buf, time, 0x01, text);
 }
 
@@ -864,7 +862,7 @@ uint32_t TextEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 SeqNameEvent::SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr) {}
 
-uint32_t SeqNameEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t SeqNameEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     return WriteMetaTextEvent(buf, time, 0x03, text);
 }
 
@@ -875,7 +873,7 @@ uint32_t SeqNameEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 TrackNameEvent::TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &wstr)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(wstr) {}
 
-uint32_t TrackNameEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t TrackNameEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     return WriteMetaTextEvent(buf, time, 0x03, text);
 }
 
@@ -886,7 +884,7 @@ uint32_t TrackNameEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
 GMResetEvent::GMResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {}
 
-uint32_t GMResetEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t GMResetEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     uint8_t data[5] = {0x7E, 0x7F, 0x09, 0x01, 0xF7};
     return WriteSysexEvent(buf, time, data, 5);
 }
@@ -906,7 +904,7 @@ void MidiTrack::InsertGMReset(uint32_t absTime) {
 GM2ResetEvent::GM2ResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {}
 
-uint32_t GM2ResetEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t GM2ResetEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     uint8_t data[5] = {0x7E, 0x7F, 0x09, 0x03, 0xF7};
     return WriteSysexEvent(buf, time, data, 5);
 }
@@ -926,7 +924,7 @@ void MidiTrack::InsertGM2Reset(uint32_t absTime) {
 GSResetEvent::GSResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {}
 
-uint32_t GSResetEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t GSResetEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     uint8_t data[10] = {0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, 0xF7};
     return WriteSysexEvent(buf, time, data, 10);
 }
@@ -946,7 +944,7 @@ void MidiTrack::InsertGSReset(uint32_t absTime) {
 XGResetEvent::XGResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {}
 
-uint32_t XGResetEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t XGResetEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     uint8_t data[8] = {0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00, 0xF7};
     return WriteSysexEvent(buf, time, data, 8);
 }
@@ -973,7 +971,7 @@ GlobalTransposeEvent::GlobalTransposeEvent(MidiTrack *prntTrk, uint32_t absolute
     semitones = theSemitones;
 }
 
-uint32_t GlobalTransposeEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+uint32_t GlobalTransposeEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     this->prntTrk->parentSeq->globalTranspose = this->semitones;
     return time;
 }

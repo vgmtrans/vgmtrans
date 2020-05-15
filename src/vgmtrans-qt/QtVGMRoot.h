@@ -22,7 +22,7 @@ class QtVGMRoot : public QObject, public VGMRoot {
     virtual void UI_OnBeginScan();
     virtual void UI_SetScanInfo();
     virtual void UI_OnEndScan();
-    virtual void UI_AddVGMFile(VGMFile *theFile);
+    virtual void UI_AddVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
     virtual void UI_AddVGMSeq(VGMSeq *theSeq);
     virtual void UI_AddVGMInstrSet(VGMInstrSet *theInstrSet);
     virtual void UI_AddVGMSampColl(VGMSampColl *theSampColl);
@@ -32,8 +32,6 @@ class QtVGMRoot : public QObject, public VGMRoot {
     virtual void UI_BeginRemoveVGMFiles();
     virtual void UI_EndRemoveVGMFiles();
     virtual void UI_AddItemSet(VGMFile *file, std::vector<ItemSet> *itemset);
-    virtual std::string UI_GetOpenFilePath(const std::string &suggestedFilename = "",
-                                           const std::string &extension = "");
     virtual std::string UI_GetSaveFilePath(const std::string &suggestedFilename,
                                            const std::string &extension = "");
     virtual std::string UI_GetSaveDirPath(const std::string &suggestedDir = "");

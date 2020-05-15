@@ -9,8 +9,6 @@
 #include <sstream>
 #include "ScaleConversion.h"
 
-using namespace std;
-
 DECLARE_FORMAT(CapcomSnes);
 
 //  **********
@@ -33,7 +31,7 @@ const uint8_t CapcomSnesSeq::panTable[] = {
 };
 
 CapcomSnesSeq::CapcomSnesSeq(RawFile *file, CapcomSnesVersion ver, uint32_t seqdataOffset,
-                             bool priorityInHeader, string newName)
+                             bool priorityInHeader, std::string newName)
     : VGMSeq(CapcomSnesFormat::name, file, seqdataOffset),
       version(ver),
       priorityInHeader(priorityInHeader) {
@@ -240,7 +238,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
     uint8_t statusByte = GetByte(curOffset++);
     bool bContinue = true;
 
-    stringstream desc;
+    std::stringstream desc;
 
     if (statusByte >= 0x20) {
         uint8_t keyIndex = statusByte & 0x1f;
@@ -306,7 +304,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
         }
     } else {
         CapcomSnesSeqEventType eventType = (CapcomSnesSeqEventType)0;
-        map<uint8_t, CapcomSnesSeqEventType>::iterator pEventType =
+        std::map<uint8_t, CapcomSnesSeqEventType>::iterator pEventType =
             parentSeq->EventMap.find(statusByte);
         if (pEventType != parentSeq->EventMap.end()) {
             eventType = pEventType->second;

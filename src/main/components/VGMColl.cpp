@@ -12,16 +12,14 @@
 #include "VGMRgn.h"
 #include "ScaleConversion.h"
 #include "Root.h"
+#include "VGMMiscFile.h"
 
-using namespace std;
-
-DECLARE_MENU(VGMColl)
-
-VGMColl::VGMColl(std::string theName) : VGMItem(), name(std::move(theName)), seq(nullptr) {}
+VGMColl::VGMColl(std::string theName) : name(std::move(theName)) {}
 
 void VGMColl::RemoveFileAssocs() {
     if (seq) {
         seq->RemoveCollAssoc(this);
+        seq = nullptr;
     }
 
     for (auto set : instrsets) {
@@ -35,15 +33,15 @@ void VGMColl::RemoveFileAssocs() {
     }
 }
 
-const string &VGMColl::GetName() const {
+const std::string &VGMColl::GetName() const {
     return name;
 }
 
-void VGMColl::SetName(const string *newName) {
+void VGMColl::SetName(const std::string *newName) {
     name = *newName;
 }
 
-VGMSeq *VGMColl::GetSeq() {
+VGMSeq *VGMColl::GetSeq() const {
     return seq;
 }
 
@@ -69,7 +67,7 @@ void VGMColl::AddSampColl(VGMSampColl *theSampColl) {
     }
 }
 
-void VGMColl::AddMiscFile(VGMFile *theMiscFile) {
+void VGMColl::AddMiscFile(VGMMiscFile *theMiscFile) {
     if (theMiscFile != nullptr) {
         theMiscFile->AddCollAssoc(this);
         miscfiles.push_back(theMiscFile);
@@ -83,7 +81,7 @@ bool VGMColl::Load() {
     return true;
 }
 
-void VGMColl::UnpackSampColl(DLSFile &dls, VGMSampColl *sampColl, vector<VGMSamp *> &finalSamps) {
+void VGMColl::UnpackSampColl(DLSFile &dls, VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
     assert(sampColl != nullptr);
 
     size_t nSamples = sampColl->samples.size();
@@ -95,7 +93,7 @@ void VGMColl::UnpackSampColl(DLSFile &dls, VGMSampColl *sampColl, vector<VGMSamp
             bufSize = samp->ulUncompressedSize;
         else
             bufSize = (uint32_t)ceil((double)samp->dataLength * samp->GetCompressionRatio());
-        uint8_t *uncompSampBuf =
+        auto *uncompSampBuf =
             new uint8_t[bufSize];  // create a new memory space for the uncompressed wave
         samp->ConvertToStdWave(uncompSampBuf);  // and uncompress into that space
 
@@ -107,7 +105,7 @@ void VGMColl::UnpackSampColl(DLSFile &dls, VGMSampColl *sampColl, vector<VGMSamp
 }
 
 void VGMColl::UnpackSampColl(SynthFile &synthfile, VGMSampColl *sampColl,
-                             vector<VGMSamp *> &finalSamps) {
+                             std::vector<VGMSamp *> &finalSamps) {
     assert(sampColl != nullptr);
 
     size_t nSamples = sampColl->samples.size();
@@ -178,21 +176,18 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
         return false;
     }
 
-    /* FIXME: shared_ptr eventually */
-    SynthFile *synthfile = new SynthFile("SynthFile");
-
     std::vector<VGMSamp *> finalSamps;
     std::vector<VGMSampColl *> finalSampColls;
 
     /* Grab samples either from the local sampcolls or from the instrument sets */
     if (!sampcolls.empty()) {
-        for (int sam = 0; sam < sampcolls.size(); sam++) {
-            finalSampColls.push_back(sampcolls[sam]);
-            UnpackSampColl(dls, sampcolls[sam], finalSamps);
+        for (auto & sampcoll : sampcolls) {
+            finalSampColls.push_back(sampcoll);
+            UnpackSampColl(dls, sampcoll, finalSamps);
         }
     } else {
-        for (int i = 0; i < instrsets.size(); i++) {
-            auto instrset_sampcoll = instrsets[i]->sampColl;
+        for (auto & instrset : instrsets) {
+            auto instrset_sampcoll = instrset->sampColl;
             if (instrset_sampcoll) {
                 finalSampColls.push_back(instrset_sampcoll);
                 UnpackSampColl(dls, instrset_sampcoll, finalSamps);
@@ -397,13 +392,13 @@ SynthFile *VGMColl::CreateSynthFile() {
 
     /* Grab samples either from the local sampcolls or from the instrument sets */
     if (!sampcolls.empty()) {
-        for (int sam = 0; sam < sampcolls.size(); sam++) {
-            finalSampColls.push_back(sampcolls[sam]);
-            UnpackSampColl(*synthfile, sampcolls[sam], finalSamps);
+        for (auto & sampcoll : sampcolls) {
+            finalSampColls.push_back(sampcoll);
+            UnpackSampColl(*synthfile, sampcoll, finalSamps);
         }
     } else {
-        for (int i = 0; i < instrsets.size(); i++) {
-            auto instrset_sampcoll = instrsets[i]->sampColl;
+        for (auto & instrset : instrsets) {
+            auto instrset_sampcoll = instrset->sampColl;
             if (instrset_sampcoll) {
                 finalSampColls.push_back(instrset_sampcoll);
                 UnpackSampColl(*synthfile, instrset_sampcoll, finalSamps);
@@ -573,101 +568,4 @@ SynthFile *VGMColl::CreateSynthFile() {
         }
     }
     return synthfile;
-}
-
-bool VGMColl::OnSaveAll() {
-    if (dirpath.empty()) {
-        dirpath = pRoot->UI_GetSaveDirPath();
-    }
-
-    SF2File *sf2file = CreateSF2File();
-    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
-    if (sf2file != nullptr) {
-        if (!sf2file->SaveSF2File(filepath))
-            L_ERROR("Failed to save SF2 file");
-        delete sf2file;
-    } else {
-        L_ERROR("Failed creating SF2");
-    }
-
-    DLSFile dlsfile;
-    filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".dls";
-    if (CreateDLSFile(dlsfile)) {
-        if (!dlsfile.SaveDLSFile(filepath))
-            L_ERROR("Failed to save DLS file");
-    } else {
-        L_ERROR("Failed creating DLS instance");
-    }
-
-    if (this->seq != nullptr) {
-        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
-        if (!this->seq->SaveAsMidi(filepath)) {
-            L_ERROR("Failed to save MIDI file");
-        }
-    }
-
-    dirpath.clear();
-
-    return true;
-}
-
-bool VGMColl::OnSaveAllDLS() {
-    if (dirpath.empty()) {
-        dirpath = pRoot->UI_GetSaveDirPath();
-    }
-
-    SF2File *sf2file = CreateSF2File();
-    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
-    if (sf2file != nullptr) {
-        if (!sf2file->SaveSF2File(filepath))
-            L_ERROR("Failed to save SF2 file");
-        delete sf2file;
-    } else {
-        L_ERROR("Failed creating SF2");
-    }
-
-    DLSFile dlsfile;
-    filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".dls";
-    if (CreateDLSFile(dlsfile)) {
-        if (!dlsfile.SaveDLSFile(filepath))
-            L_ERROR("Failed to save DLS file");
-    } else {
-        L_ERROR("Failed creating DLS instance");
-    }
-
-    if (this->seq != nullptr) {
-        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
-        if (!this->seq->SaveAsMidi(filepath))
-            L_ERROR("Failed to save MIDI file");
-    }
-
-    dirpath.clear();
-
-    return true;
-}
-
-bool VGMColl::OnSaveAllSF2() {
-    if (dirpath.empty()) {
-        dirpath = pRoot->UI_GetSaveDirPath();
-    }
-
-    auto filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".sf2";
-    SF2File *sf2file = CreateSF2File();
-    if (sf2file != nullptr) {
-        if (!sf2file->SaveSF2File(filepath))
-            L_ERROR("Failed to save SF2 file");
-        delete sf2file;
-    } else {
-        L_ERROR("Failed creating SF2");
-    }
-
-    if (this->seq != nullptr) {
-        filepath = dirpath + "/" + ConvertToSafeFileName(this->name) + ".mid";
-        if (!this->seq->SaveAsMidi(filepath))
-            L_ERROR("Failed to save MIDI file");
-    }
-
-    dirpath.clear();
-
-    return true;
 }

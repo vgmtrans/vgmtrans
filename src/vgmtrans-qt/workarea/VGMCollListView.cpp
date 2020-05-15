@@ -8,13 +8,14 @@
 #include <QMenu>
 #include <QLineEdit>
 #include <QObject>
+
+#include "conversion/VGMExport.h"
 #include "VGMCollListView.h"
 #include "../QtVGMRoot.h"
-#include "VGMColl.h"
 #include "../MusicPlayer.h"
 
 static const QIcon &VGMCollIcon() {
-    static QIcon icon(":/images/collection-32.png");
+    static QIcon icon(":/images/collection.svg");
     return icon;
 }
 
@@ -28,7 +29,7 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
             [=]() { dataChanged(index(0, 0), index(0, 0)); });
 }
 
-int VGMCollListViewModel::rowCount(const QModelIndex &parent) const {
+int VGMCollListViewModel::rowCount(const QModelIndex &) const {
     return qtVGMRoot.vVGMColl.size();
 }
 
@@ -43,8 +44,9 @@ QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
 }
 
 Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
-    if (!index.isValid())
+    if (!index.isValid()) {
         return Qt::ItemIsEnabled;
+    }
 
     return QAbstractListModel::flags(index) | Qt::ItemIsEditable;
 }
@@ -77,7 +79,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     setItemDelegate(new VGMCollNameEditor);
 
     setContextMenuPolicy(Qt::CustomContextMenu);
-    setSelectionMode(QAbstractItemView::SingleSelection);
+    setSelectionMode(QAbstractItemView::ExtendedSelection);
     setEditTriggers(QAbstractItemView::DoubleClicked);
     setResizeMode(QListView::Adjust);
     setIconSize(QSize(16, 16));
@@ -94,44 +96,53 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
 }
 
 void VGMCollListView::CollMenu(const QPoint &pos) {
-    auto element = indexAt(pos);
-    if (element.isValid()) {
-        VGMColl *pointed_coll = qtVGMRoot.vVGMColl[element.row()];
-        if (pointed_coll == nullptr) {
+    if (selectedIndexes().empty()) {
+        return;
+    }
+
+    auto *vgmcoll_menu = new QMenu();
+    vgmcoll_menu->addAction("Export as MIDI and DLS", [this]() {
+        auto save_path = qtVGMRoot.UI_GetSaveDirPath();
+        if (save_path.empty()) {
             return;
         }
 
-        auto *vgmcoll_menu = new QMenu();
-        std::vector<const char *> *menu_item_names = pointed_coll->GetMenuItemNames();
-        for (auto &menu_item : *menu_item_names) {
-            vgmcoll_menu->addAction(QString::fromStdString(menu_item));
-        }
-
-        QAction *performed_action = vgmcoll_menu->exec(mapToGlobal(pos));
-        int action_index = 0;
-        for (auto &action : vgmcoll_menu->actions()) {
-            if (performed_action == action) {
-                pointed_coll->CallMenuItem(pointed_coll, action_index);
-                break;
-            }
-            action_index++;
-        }
-        vgmcoll_menu->deleteLater();
-    } else if (!qtVGMRoot.vVGMColl.empty()) {
-        auto *vgmcoll_menu = new QMenu();
-        auto export_all = vgmcoll_menu->addAction("Export all as MIDI, SF2 and DLS");
-
-        if (vgmcoll_menu->exec(mapToGlobal(pos)) == export_all) {
-            auto save_path = qtVGMRoot.UI_GetSaveDirPath();
-            if (!save_path.empty()) {
-                for (auto &coll : qtVGMRoot.vVGMColl) {
-                    coll->SetDefaultSavePath(save_path);
-                    coll->OnSaveAll();
-                }
+        for (auto &index : selectedIndexes()) {
+            if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
+                conversion::SaveAs<conversion::ConversionTarget::MIDI | conversion::ConversionTarget::DLS>(*coll, save_path);
             }
         }
-        vgmcoll_menu->deleteLater();
-    }
+    });
+
+    vgmcoll_menu->addAction("Export as MIDI and SF2", [this]() {
+        auto save_path = qtVGMRoot.UI_GetSaveDirPath();
+        if (save_path.empty()) {
+            return;
+        }
+
+        for (auto &index : selectedIndexes()) {
+            if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
+                conversion::SaveAs<conversion::ConversionTarget::MIDI | conversion::ConversionTarget::SF2>(*coll, save_path);
+            }
+        }
+    });
+
+    vgmcoll_menu->addAction("Export as MIDI, DLS and SF2", [this]() {
+        auto save_path = qtVGMRoot.UI_GetSaveDirPath();
+        if (save_path.empty()) {
+            return;
+        }
+
+        for (auto &index : selectedIndexes()) {
+            if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
+                conversion::SaveAs<conversion::ConversionTarget::MIDI | conversion::ConversionTarget::DLS | conversion::ConversionTarget::SF2>(*coll,
+                                                                                         save_path);
+            }
+        }
+    });
+
+    vgmcoll_menu->exec(mapToGlobal(pos));
+    vgmcoll_menu->deleteLater();
 }
 
 void VGMCollListView::keyPressEvent(QKeyEvent *e) {
@@ -157,7 +168,7 @@ void VGMCollListView::HandlePlaybackRequest() {
         return;
 
     MusicPlayer &player = MusicPlayer::Instance();
-    player.LoadCollection(qtVGMRoot.vVGMColl[list[0].row()]);
+    player.LoadCollection(qtVGMRoot.vVGMColl[list[0].row()], list[0].row());
     player.Toggle();
 }
 

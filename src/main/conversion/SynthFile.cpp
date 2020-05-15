@@ -9,15 +9,13 @@
 #include <fmt/format.h>
 #include "VGMSamp.h"
 
-using namespace std;
-
 //  **********************************************************************************
 //  SynthFile - An intermediate class to lay out all of the the data necessary for Coll conversion
 //				to DLS or SF2 formats.  Currently, the structure is identical to
 //DLS.
 //  **********************************************************************************
 
-SynthFile::SynthFile(string synth_name) : name(synth_name) {}
+SynthFile::SynthFile(std::string synth_name) : name(synth_name) {}
 
 SynthFile::~SynthFile() {
     DeleteVect(vInstrs);
@@ -30,7 +28,7 @@ SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum) {
     return vInstrs.back();
 }
 
-SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, string name) {
+SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, std::string name) {
     vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, name));
     return vInstrs.back();
 }
@@ -39,7 +37,7 @@ void SynthFile::DeleteInstr(uint32_t bank, uint32_t instrNum) {}
 
 SynthWave *SynthFile::AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec,
                               int aveBytesPerSec, uint16_t blockAlign, uint16_t bitsPerSample,
-                              uint32_t waveDataSize, unsigned char *waveData, string name) {
+                              uint32_t waveDataSize, unsigned char *waveData, std::string name) {
     vWaves.insert(vWaves.end(),
                   new SynthWave(formatTag, channels, samplesPerSec, aveBytesPerSec, blockAlign,
                                 bitsPerSample, waveDataSize, waveData, name));
@@ -56,13 +54,13 @@ SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument)
     // RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName)
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName)
     : ulBank(bank), ulInstrument(instrument), name(instrName) {
     // RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName,
-                       vector<SynthRgn *> listRgns)
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName,
+                       std::vector<SynthRgn *> listRgns)
     : ulBank(bank), ulInstrument(instrument), name(instrName) {
     // RiffFile::AlignName(name);
     vRgns = listRgns;

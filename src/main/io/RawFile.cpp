@@ -12,43 +12,19 @@
 
 /* RawFile */
 
-/* Get the item at the specified offset */
-VGMItem *RawFile::GetItemFromOffset(long offset) {
-    for (auto file : m_vgmfiles) {
-        auto item = file->GetItemFromOffset(offset);
-        if (item) {
-            return item;
-        }
-    }
-
-    return nullptr;
-}
-
-/* Get the VGMFile at the specified offset */
-VGMFile *RawFile::GetVGMFileFromOffset(long offset) {
-    for (auto file : m_vgmfiles) {
-        if (file->IsItemAtOffset(offset)) {
-            return file.get();
-        }
-    }
-
-    return nullptr;
-}
-
 /* FIXME: we own the VGMFile, should use unique_ptr instead */
-void RawFile::AddContainedVGMFile(std::shared_ptr<VGMFile> vgmfile) {
+void RawFile::AddContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>> vgmfile) {
     m_vgmfiles.emplace_back(vgmfile);
 }
 
-void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
+void RawFile::RemoveContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> vgmfile) {
     auto iter =
-        std::find_if(m_vgmfiles.begin(), m_vgmfiles.end(),
-                     [vgmfile](const std::shared_ptr<VGMFile> &p) { return p.get() == vgmfile; });
+        std::find_if(m_vgmfiles.begin(), m_vgmfiles.end(), [vgmfile](auto file) { return *file == vgmfile; });
     if (iter != m_vgmfiles.end())
         m_vgmfiles.erase(iter);
-    else
-        L_WARN("Requested deletion for VGMFile '{}' but it was not found",
-               (*const_cast<std::string *>(vgmfile->GetName())));
+    else {
+        L_WARN("Requested deletion for VGMFile but it was not found");
+    }
 }
 
 uint32_t RawFile::GetBytes(size_t offset, uint32_t nCount, void *pBuffer) const {

@@ -9,8 +9,6 @@
 #include <sstream>
 #include "ScaleConversion.h"
 
-using namespace std;
-
 DECLARE_FORMAT(HeartBeatSnes);
 
 //  ****************
@@ -363,7 +361,7 @@ bool HeartBeatSnesTrack::ReadEvent(void) {
             uint8_t fadeLength = GetByte(curOffset++);
             uint8_t newPan = GetByte(curOffset++);
 
-            uint8_t panIndex = (uint8_t)min<uint8_t>((unsigned)(newPan & 0x1f), (unsigned)20);
+            uint8_t panIndex = (uint8_t)std::min<uint8_t>((unsigned)(newPan & 0x1f), (unsigned)20);
 
             double volumeLeft = HeartBeatSnesSeq::PAN_TABLE[20 - panIndex] / 128.0;
             double volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex] / 128.0;

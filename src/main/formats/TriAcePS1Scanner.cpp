@@ -15,8 +15,6 @@ namespace vgmtrans::scanners {
 ScannerRegistration<TriAcePS1Scanner> s_triace_ps1("TRIACEPS1");
 }
 
-using namespace std;
-
 #define DEFAULT_UFSIZE 0x100000
 
 TriAcePS1Scanner::TriAcePS1Scanner(void) {}
@@ -69,7 +67,7 @@ void TriAcePS1Scanner::SearchForSLZSeq(RawFile *file) {
         // The size of the compressed file is 4 bytes behind the SLZ sig.
         // We need this to calculate the offset of the InstrSet, which comes immediately after the
         // SLZ'd sequence.
-        vector<TriAcePS1InstrSet *> instrsets;
+        std::vector<TriAcePS1InstrSet *> instrsets;
         SearchForInstrSet(file, instrsets);
 
         // uint32_t cfSize = file->GetWord(i-4);
@@ -93,7 +91,7 @@ void TriAcePS1Scanner::SearchForSLZSeq(RawFile *file) {
     }
 }
 
-void TriAcePS1Scanner::SearchForInstrSet(RawFile *file, vector<TriAcePS1InstrSet *> &instrsets) {
+void TriAcePS1Scanner::SearchForInstrSet(RawFile *file, std::vector<TriAcePS1InstrSet *> &instrsets) {
     uint32_t nFileLength = file->size();
     for (uint32_t i = 4; i + 0x800 < nFileLength; i++) {
         uint8_t precedingByte = file->GetByte(i + 3);

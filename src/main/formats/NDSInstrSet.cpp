@@ -8,8 +8,6 @@
 #include "VGMRgn.h"
 #include <fmt/format.h>
 
-using namespace std;
-
 // INTR_FREQUENCY is the interval in seconds between updates to the vol for articulation.
 // In the original software, this is done via a hardware interrupt timer.
 // After calculating the number of volume updates that will be made for the articulation values,
@@ -21,7 +19,7 @@ using namespace std;
 // NDSInstrSet
 // ***********
 
-NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, string name)
+NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMInstrSet(NDSFormat::name, file, offset, length, name) {}
 /*
 NDSInstrSet::~NDSInstrSet(void)
@@ -228,7 +226,7 @@ uint16_t NDSInstr::GetFallingRate(uint8_t DecayTime) {
 // NDSWaveArch
 // ***********
 
-NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, string name)
+NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMSampColl(NDSFormat::name, file, offset, length, name) {}
 
 NDSWaveArch::~NDSWaveArch() {}
@@ -303,7 +301,7 @@ bool NDSWaveArch::GetSampleInfo() {
 
 NDSSamp::NDSSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 uint8_t theWaveType, string name)
+                 uint8_t theWaveType, std::string name)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
       waveType(theWaveType) {}
 

@@ -6,7 +6,6 @@
 
 #pragma once
 #include "VGMItem.h"
-#include "Menu.h"
 #include "MidiFile.h"
 #include <fmt/format.h>
 
@@ -46,11 +45,11 @@ class SeqEvent : public VGMItem {
     SeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0,
              const std::string &name = "", uint8_t color = 0, Icon icon = ICON_BINARY,
              const std::string &desc = "");
-    virtual ~SeqEvent(void) {}
+    ~SeqEvent(void) override = default;
     virtual std::string GetDescription() {
         return desc.empty() ? std::string(name) : (std::string(name) + " - " + desc);
     }
-    virtual ItemType GetType() const { return ITEMTYPE_SEQEVENT; }
+
     virtual EventType GetEventType() { return EVENTTYPE_UNDEFINED; }
     virtual Icon GetIcon() { return icon; }
 
