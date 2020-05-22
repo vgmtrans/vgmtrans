@@ -36,6 +36,7 @@ void SeqTrack::ResetVars() {
   foreverLoops = 0;
   deltaLength = -1;
   deltaTime = 0;
+  vel = 100;
   vol = 100;
   expression = 127;
   mastVol = 127;

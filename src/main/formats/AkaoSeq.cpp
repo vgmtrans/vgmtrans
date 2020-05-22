@@ -1,10 +1,16 @@
 #include "pch.h"
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
+#include "AkaoSnesFormat.h"
 
 DECLARE_FORMAT(Akao);
 
 using namespace std;
+
+namespace
+{
+  const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 8, 4 };
+}
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset)
     : VGMSeq(AkaoFormat::name, file, offset), instrset(nullptr), seq_id(0), version(AkaoPs1Version::VERSION_2) {
@@ -13,7 +19,7 @@ AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset)
   UseReverb();
 }
 
-AkaoSeq::~AkaoSeq(void) {
+AkaoSeq::~AkaoSeq() {
 }
 
 AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset) {
@@ -31,7 +37,7 @@ uint32_t AkaoSeq::ReadNumOfTracks(RawFile *file, uint32_t offset) {
   return GetNumPositiveBits(track_bits);
 }
 
-bool AkaoSeq::GetHeaderInfo(void) {
+bool AkaoSeq::GetHeaderInfo() {
   //first do a version check to see if it's older or newer version of AKAO sequence format
   version = GuessVersion(rawfile, dwOffset);
   nNumTracks = ReadNumOfTracks(rawfile, dwOffset);
@@ -41,7 +47,7 @@ bool AkaoSeq::GetHeaderInfo(void) {
     hdr->AddSig(dwOffset, 4);
     hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
     hdr->AddSimpleItem(dwOffset + 0x6, 2, L"Size");
-    hdr->AddSimpleItem(dwOffset + 0x8, 1, L"Reverb Type");
+    hdr->AddSimpleItem(dwOffset + 0x8, 2, L"Reverb Type");
     hdr->AddSimpleItem(dwOffset + 0x14, 2, L"Associated Sample Set ID");
     hdr->AddSimpleItem(dwOffset + 0x20, 4, L"Number of Tracks (# of true bits)");
     hdr->AddSimpleItem(dwOffset + 0x30, 4, L"Instrument Data Pointer");
@@ -55,7 +61,10 @@ bool AkaoSeq::GetHeaderInfo(void) {
     hdr->AddSig(dwOffset, 4);
     hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
     hdr->AddSimpleItem(dwOffset + 0x6, 2, L"Size (Excluding first 16 bytes)");
-    hdr->AddSimpleItem(dwOffset + 0x8, 1, L"Reverb Type");
+    hdr->AddSimpleItem(dwOffset + 0x8, 2, L"Reverb Type");
+    std::wostringstream timestamp_text;
+    timestamp_text << L"Timestamp (" << ReadTimestampAsText() << L")";
+    hdr->AddSimpleItem(dwOffset + 0xA, 6, timestamp_text.str());
     hdr->AddSimpleItem(dwOffset + 0x10, 4, L"Number of Tracks (# of true bits)");
 
     unLength = 0x10 + GetShort(dwOffset + 6);
@@ -69,9 +78,11 @@ bool AkaoSeq::GetHeaderInfo(void) {
   SetPPQN(0x30);
   seq_id = GetShort(dwOffset + 4);
 
+  LoadEventMap();
+
   if (version == AkaoPs1Version::VERSION_2)
   {
-    //There must be either a melodic instrument section, a drumkit, or both.  We determiine
+    //There must be either a melodic instrument section, a drumkit, or both.  We determine
     //the start of the InstrSet based on whether a melodic instrument section is given.
     uint32_t instrOff = GetWord(dwOffset + 0x30);
     uint32_t drumkitOff = GetWord(dwOffset + 0x34);
@@ -103,7 +114,7 @@ bool AkaoSeq::GetHeaderInfo(void) {
 }
 
 
-bool AkaoSeq::GetTrackPointers(void) {
+bool AkaoSeq::GetTrackPointers() {
   const uint32_t track_header_offset = version == AkaoPs1Version::VERSION_1 ? 0x14 : 0x40;
   for (unsigned int i = 0; i < nNumTracks; i++) {
     const uint32_t p = track_header_offset + (i * 2);
@@ -115,81 +126,306 @@ bool AkaoSeq::GetTrackPointers(void) {
   return true;
 }
 
+std::wstring AkaoSeq::ReadTimestampAsText() {
+  const uint8_t year_bcd = GetByte(dwOffset + 0xA);
+  const uint8_t month_bcd = GetByte(dwOffset + 0xB);
+  const uint8_t day_bcd = GetByte(dwOffset + 0xC);
+  const uint8_t hour_bcd = GetByte(dwOffset + 0xD);
+  const uint8_t minute_bcd = GetByte(dwOffset + 0xE);
+  const uint8_t second_bcd = GetByte(dwOffset + 0xF);
+
+  // Should we solve the year 2000 problem?
+  const unsigned int year_bcd_full = 0x1900 + year_bcd;
+
+  std::wostringstream text;
+  text << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << year_bcd_full << L"-"
+    << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << month_bcd << L"-"
+    << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << day_bcd << L"T"
+    << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << hour_bcd << L":"
+    << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << minute_bcd << L":"
+    << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << second_bcd;
+  return text.str();
+}
+
+double AkaoSeq::GetTempoInBPM(uint16_t tempo) const {
+  if (tempo != 0) {
+    // V1: Timer 2 frequency 0x43D1 comes from Final Fantasy 7.
+    // V2: Timer 2 frequency 0x44E8 comes from Final Fantasy 9.
+    const uint16_t freq = (version == AkaoPs1Version::VERSION_1) ? 0x43D1 : 0x44E8;
+    return 60.0 / (ppqn * (65536.0 / tempo) * (0x43D1 / (33868800.0 / 8)));
+  }
+  else {
+    // since tempo 0 cannot be expressed, this function returns a very small value.
+    return 1.0;
+  }
+}
+
+void AkaoSeq::LoadEventMap()
+{
+  event_map[0xa0] = EVENT_END;
+  event_map[0xa1] = EVENT_PROGCHANGE;
+  event_map[0xa2] = EVENT_ONE_TIME_DURATION;
+  event_map[0xa3] = EVENT_VOLUME;
+  event_map[0xa4] = EVENT_PITCH_SLIDE;
+  event_map[0xa5] = EVENT_OCTAVE;
+  event_map[0xa6] = EVENT_INCREMENT_OCTAVE;
+  event_map[0xa7] = EVENT_DECREMENT_OCTAVE;
+  event_map[0xa8] = EVENT_EXPRESSION;
+  event_map[0xa9] = EVENT_EXPRESSION_FADE;
+  event_map[0xaa] = EVENT_PAN;
+  event_map[0xab] = EVENT_PAN_FADE;
+  event_map[0xac] = EVENT_NOISE_CLOCK;
+  event_map[0xad] = EVENT_ADSR_ATTACK_RATE;
+  event_map[0xae] = EVENT_ADSR_DECAY_RATE;
+  event_map[0xaf] = EVENT_ADSR_SUSTAIN_LEVEL;
+  event_map[0xb0] = EVENT_ADSR_DECAY_RATE_AND_SUSTAIN_LEVEL;
+  event_map[0xb1] = EVENT_ADSR_SUSTAIN_RATE;
+  event_map[0xb2] = EVENT_ADSR_RELEASE_RATE;
+  event_map[0xb3] = EVENT_RESET_ADSR;
+  event_map[0xb4] = EVENT_VIBRATO;
+  event_map[0xb5] = EVENT_VIBRATO_DEPTH;
+  event_map[0xb6] = EVENT_VIBRATO_OFF;
+  event_map[0xb7] = EVENT_ADSR_ATTACK_MODE;
+  event_map[0xb8] = EVENT_TREMOLO;
+  event_map[0xb9] = EVENT_TREMOLO_DEPTH;
+  event_map[0xba] = EVENT_TREMOLO_OFF;
+  event_map[0xbb] = EVENT_ADSR_SUSTAIN_MODE;
+  event_map[0xbc] = EVENT_PAN_LFO;
+  event_map[0xbd] = EVENT_PAN_LFO_DEPTH;
+  event_map[0xbe] = EVENT_PAN_LFO_OFF;
+  event_map[0xbf] = EVENT_ADSR_RELEASE_MODE;
+  event_map[0xc0] = EVENT_TRANSPOSE_ABS;
+  event_map[0xc1] = EVENT_TRANSPOSE_REL;
+  event_map[0xc2] = EVENT_REVERB_ON;
+  event_map[0xc3] = EVENT_REVERB_OFF;
+  event_map[0xc4] = EVENT_NOISE_ON;
+  event_map[0xc5] = EVENT_NOISE_OFF;
+  event_map[0xc6] = EVENT_PITCH_MOD_ON;
+  event_map[0xc7] = EVENT_PITCH_MOD_OFF;
+  event_map[0xc8] = EVENT_LOOP_START;
+  event_map[0xc9] = EVENT_LOOP_UNTIL;
+  event_map[0xca] = EVENT_LOOP_AGAIN;
+  event_map[0xcb] = EVENT_RESET_VOICE_EFFECTS;
+  event_map[0xcc] = EVENT_SLUR_ON;
+  event_map[0xcd] = EVENT_SLUR_OFF;
+  event_map[0xce] = EVENT_NOISE_ON_DELAY_TOGGLE;
+  event_map[0xcf] = EVENT_NOISE_DELAY_TOGGLE;
+  event_map[0xd0] = EVENT_LEGATO_ON;
+  event_map[0xd1] = EVENT_LEGATO_OFF;
+  event_map[0xd2] = EVENT_PITCH_MOD_ON_DELAY_TOGGLE;
+  event_map[0xd3] = EVENT_PITCH_MOD_DELAY_TOGGLE;
+  event_map[0xd4] = EVENT_D4;
+  event_map[0xd5] = EVENT_D5;
+  event_map[0xd6] = EVENT_D6;
+  event_map[0xd7] = EVENT_D7;
+  event_map[0xd8] = EVENT_TUNING_ABS;
+  event_map[0xd9] = EVENT_TUNING_REL;
+  event_map[0xda] = EVENT_PORTAMENTO_ON;
+  event_map[0xdb] = EVENT_PORTAMENTO_OFF;
+  event_map[0xdc] = EVENT_FIXED_DURATION;
+  event_map[0xdd] = EVENT_VIBRATO_DEPTH_FADE;
+  event_map[0xde] = EVENT_TREMOLO_DEPTH_FADE;
+  event_map[0xdf] = EVENT_PAN_LFO_FADE;
+
+  if (version == AkaoPs1Version::VERSION_1) {
+    event_map[0xe0] = EVENT_UNIMPLEMENTED;
+    event_map[0xe1] = EVENT_UNIMPLEMENTED;
+    event_map[0xe2] = EVENT_UNIMPLEMENTED;
+    event_map[0xe3] = EVENT_UNIMPLEMENTED;
+    event_map[0xe4] = EVENT_UNIMPLEMENTED;
+    event_map[0xe5] = EVENT_UNIMPLEMENTED;
+    event_map[0xe6] = EVENT_UNIMPLEMENTED;
+    event_map[0xe7] = EVENT_UNIMPLEMENTED;
+    event_map[0xe8] = EVENT_TEMPO;
+    event_map[0xe9] = EVENT_TEMPO_FADE;
+    event_map[0xea] = EVENT_REVERB_DEPTH;
+    event_map[0xeb] = EVENT_REVERB_DEPTH_FADE;
+    event_map[0xec] = EVENT_DRUM_ON_V1;
+    event_map[0xed] = EVENT_DRUM_OFF;
+    event_map[0xee] = EVENT_UNCONDITIONAL_JUMP;
+    event_map[0xef] = EVENT_CPU_CONDITIONAL_JUMP;
+    event_map[0xf0] = EVENT_LOOP_BRANCH;
+    event_map[0xf1] = EVENT_LOOP_BREAK;
+    event_map[0xf2] = EVENT_PROGCHANGE_NO_ATTACK;
+    event_map[0xf3] = EVENT_F3_V1;
+    event_map[0xf4] = EVENT_UNISON_ON;
+    event_map[0xf5] = EVENT_UNISON_OFF;
+    event_map[0xf6] = EVENT_UNISON_VOLUME_BALANCE;
+    event_map[0xf7] = EVENT_UNISON_VOLUME_BALANCE_FADE;
+    event_map[0xf8] = EVENT_ALTERNATE_VOICE_ON;
+    event_map[0xf9] = EVENT_ALTERNATE_VOICE_OFF;
+    event_map[0xfa] = EVENT_UNIMPLEMENTED;
+    event_map[0xfb] = EVENT_UNIMPLEMENTED;
+    event_map[0xfc] = EVENT_UNIMPLEMENTED;
+    event_map[0xfd] = EVENT_TIME_SIGNATURE;
+    event_map[0xfe] = EVENT_MEASURE;
+    event_map[0xff] = EVENT_UNIMPLEMENTED;
+  }
+  else if (version == AkaoPs1Version::VERSION_2) {
+    event_map[0xe0] = EVENT_E0_V2;
+    event_map[0xe1] = EVENT_E1_V2;
+    event_map[0xe2] = EVENT_E2_V2;
+    event_map[0xe3] = EVENT_UNIMPLEMENTED;
+    event_map[0xe4] = EVENT_E4_V2;
+    event_map[0xe5] = EVENT_E5_V2;
+    event_map[0xe6] = EVENT_E6_V2;
+    event_map[0xe7] = EVENT_UNIMPLEMENTED;
+    event_map[0xe8] = EVENT_UNIMPLEMENTED;
+    event_map[0xe9] = EVENT_UNIMPLEMENTED;
+    event_map[0xea] = EVENT_UNIMPLEMENTED;
+    event_map[0xeb] = EVENT_UNIMPLEMENTED;
+    event_map[0xec] = EVENT_UNIMPLEMENTED;
+    event_map[0xed] = EVENT_UNIMPLEMENTED;
+    event_map[0xee] = EVENT_UNIMPLEMENTED;
+    event_map[0xef] = EVENT_UNIMPLEMENTED;
+    // 0xf0-0xfd: note with duration
+    // 0xfe: extra opcodes
+    event_map[0xff] = EVENT_UNIMPLEMENTED;
+
+    sub_event_map[0x00] = EVENT_TEMPO;
+    sub_event_map[0x01] = EVENT_TEMPO_FADE;
+    sub_event_map[0x02] = EVENT_REVERB_DEPTH;
+    sub_event_map[0x03] = EVENT_REVERB_DEPTH_FADE;
+    sub_event_map[0x04] = EVENT_DRUM_ON_V2;
+    sub_event_map[0x05] = EVENT_DRUM_OFF;
+    sub_event_map[0x06] = EVENT_UNCONDITIONAL_JUMP;
+    sub_event_map[0x07] = EVENT_CPU_CONDITIONAL_JUMP;
+    sub_event_map[0x08] = EVENT_LOOP_BRANCH;
+    sub_event_map[0x09] = EVENT_LOOP_BREAK;
+    sub_event_map[0x0a] = EVENT_FE_0A_V2;
+    sub_event_map[0x0b] = EVENT_FE_0B_V2;
+    sub_event_map[0x0c] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x0d] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x0e] = EVENT_FE_0E_V2;
+    sub_event_map[0x0f] = EVENT_FE_0F_V2;
+    sub_event_map[0x10] = EVENT_FE_10_V2;
+    sub_event_map[0x11] = EVENT_FE_11_V2;
+    sub_event_map[0x12] = EVENT_FE_12_V2;
+    sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x14] = EVENT_FE_14_V2;
+    sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
+    sub_event_map[0x16] = EVENT_MEASURE;
+    sub_event_map[0x17] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x18] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x19] = EVENT_FE_19_V2;
+    sub_event_map[0x1a] = EVENT_FE_1A_V2;
+    sub_event_map[0x1b] = EVENT_FE_1B_V2;
+    sub_event_map[0x1c] = EVENT_FE_1C_V2;
+    sub_event_map[0x1d] = EVENT_FE_1D_V2;
+    sub_event_map[0x1e] = EVENT_FE_1E_V2;
+    sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
+  }
+}
+
 
 AkaoTrack::AkaoTrack(AkaoSeq *parentFile, long offset, long length)
     : SeqTrack(parentFile, offset, length) {
 }
 
-void AkaoTrack::ResetVars(void) {
+void AkaoTrack::ResetVars() {
   SeqTrack::ResetVars();
 
-  memset(loopID, 0, 8);
-  memset(loop_counter, 0, 8);
+  slur = false;
+  legato = false;
 
-  loop_begin_layer = 0;
+  memset(loop_begin_loc, 0, sizeof(loop_begin_loc));
   loop_layer = 0;
-  bNotePlaying = false;
+  memset(loop_counter, 0, sizeof(loop_counter));
 
-  vCondJumpAddr.clear();
+  last_delta_time = 0;
+  use_one_time_delta_time = false;
+  one_time_delta_time = 0;
+  delta_time_overwrite = 0;
+  tuning = 0;
 }
 
-bool AkaoTrack::ReadEvent(void) {
-  AkaoSeq *parentSeq = reinterpret_cast<AkaoSeq*>(this->parentSeq);
+bool AkaoTrack::ReadEvent() {
+  AkaoSeq *parentSeq = seq();
   const AkaoPs1Version version = parentSeq->version;
   const uint32_t beginOffset = curOffset;
   const uint8_t status_byte = GetByte(curOffset++);
 
-  if (status_byte <= 0x99)   //it's either a  note-on message, a tie message, or a rest message
+  std::wstringstream desc;
+
+  const bool op_note_with_length = (version == AkaoPs1Version::VERSION_2)
+    && (status_byte >= 0xF0) && (status_byte <= 0xFD);
+
+  if (status_byte <= 0x99 || op_note_with_length)   //it's either a  note-on message, a tie message, or a rest message
   {
-    //looking at offset 8005E5C8 in the FFO FF2 exe for this delta time table code
-    const unsigned short delta_time = delta_time_table[status_byte % 11];
+    const uint8_t note_byte = op_note_with_length
+      ? ((status_byte - 0xF0) * 11)
+      : status_byte;
 
-    //relative key calculation found at 8005E6F8 in FFO FF2 exe
+    const bool op_rest = note_byte >= 0x8F;
+    const bool op_tie = !op_rest && note_byte >= 0x83;
+    const bool op_note = !op_rest && !op_tie;
+    const uint8_t delta_time_from_op = static_cast<uint8_t>(DELTA_TIME_TABLE[note_byte % 11]);
 
-    if (status_byte < 0x83) // it's a note-on message
+    uint8_t delta_time = 0;
+    if (op_note_with_length)
+      delta_time = GetByte(curOffset++);
+    if (use_one_time_delta_time) {
+      delta_time = one_time_delta_time;
+      use_one_time_delta_time = false;
+    }
+    if (delta_time_overwrite != 0)
+      delta_time = static_cast<uint8_t>(delta_time_overwrite);
+    if (delta_time == 0)
+      delta_time = delta_time_from_op;
+
+    uint8_t dur = delta_time;
+    if (!op_tie && !slur && !legato)
+      dur = static_cast<uint8_t>(max(int(dur) - 2, 0));
+
+    last_delta_time = delta_time;
+
+    if (op_note)
     {
-      relative_key = status_byte / 11;
-      base_key = octave * 12;
-      if (bNotePlaying) {
-        AddNoteOffNoItem(prevKey);
-        bNotePlaying = false;
-      }
-      //if (bAssociatedWithSSTable)
-      //	FindNoteInstrAssoc(hFile, base_key + relative_key);
-
-
-      AddNoteOn(beginOffset, curOffset - beginOffset, base_key + relative_key, vel);
-      bNotePlaying = true;
-
+      const uint8_t relative_key = note_byte / 11;
+      const uint8_t key = (octave * 12) + relative_key;
+      AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
       AddTime(delta_time);
     }
-    else if (status_byte < 0x8F)  //if it's between 0x83 and 0x8E it is a tie event
+    else if (op_tie)
     {
+      MakePrevDurNoteEnd(GetTime() + dur);
       AddTime(delta_time);
-      if (loop_counter[loop_layer] == 0
-          && loop_layer == 0)        //do this so we don't repeat this for every single time it loops
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", L"", CLR_TIE);
+      desc << L"Length: " << delta_time << L"  Duration: " << dur;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str(), CLR_TIE);
     }
-    else                //otherwise, it's between 0x8F and 0x99 and it's a rest message
+    else // rest
     {
-      if (bNotePlaying) {
-        AddNoteOff(beginOffset, curOffset - beginOffset, prevKey);
-        bNotePlaying = false;
-      }
       AddRest(beginOffset, curOffset - beginOffset, delta_time);
     }
   }
   else if ((status_byte >= 0x9A) && (status_byte <= 0x9F)) {
-    AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN EVENT", L"", CLR_UNRECOGNIZED);
+    AddUnknown(beginOffset, curOffset - beginOffset, L"Undefined");
+    return false; // they should not be used
   }
-  else if ((status_byte >= 0xA0) && (status_byte <= 0xDF)) {
-    switch (status_byte) {
-    case 0xA0:
+  else {
+    AkaoSeqEventType event = static_cast<AkaoSeqEventType>(0);
+
+    if (version == AkaoPs1Version::VERSION_2 && status_byte == 0xFE)
+    {
+      const uint8_t op = GetByte(curOffset++);
+      const auto event_iterator = parentSeq->sub_event_map.find(op);
+      if (event_iterator != parentSeq->sub_event_map.end())
+        event = event_iterator->second;
+    }
+    else
+    {
+      const auto event_iterator = parentSeq->event_map.find(status_byte);
+      if (event_iterator != parentSeq->event_map.end())
+        event = event_iterator->second;
+    }
+
+    switch (event) {
+    case EVENT_END:
       AddEndOfTrack(beginOffset, curOffset - beginOffset);
       return false;
 
-    // change program to articulation number
-    case 0xA1: {
+    case EVENT_PROGCHANGE: {
+      // change program to articulation number
       parentSeq->bUsesIndividualArts = true;
       const uint8_t artNum = GetByte(curOffset++);
       const uint8_t progNum = (parentSeq->instrset != nullptr)
@@ -199,550 +435,722 @@ bool AkaoTrack::ReadEvent(void) {
       break;
     }
 
-    // set next note length [ticks]
-    case 0xA2:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Next note length", L"", CLR_CHANGESTATE);
-      break;
-
-    //set track volume
-    case 0xA3:
-      vol = GetByte(curOffset++);            //expression value
-      AddVol(beginOffset, curOffset - beginOffset, vol);
-      break;
-
-    // pitch slide half steps.  (Portamento)
-    case 0xA4: {
-      const uint8_t dur = GetByte(curOffset++);        //first byte is duration of slide
-      const uint8_t steps =
-        GetByte(curOffset++);        //second byte is number of halfsteps to slide... not sure if signed or not, only seen positive
-                                     //AddPitchBendSlide(
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento", L"", CLR_PORTAMENTO);
+    case EVENT_ONE_TIME_DURATION: {
+      const uint8_t delta_time = GetByte(curOffset++);
+      last_delta_time = one_time_delta_time = delta_time;
+      use_one_time_delta_time = true;
+      desc << L"Length: " << delta_time;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Next Note Length", desc.str(), CLR_CHANGESTATE);
       break;
     }
 
-    //set octave
-    case 0xA5:
-      octave = GetByte(curOffset++);
-      AddSetOctave(beginOffset, curOffset - beginOffset, octave);
+    case EVENT_VOLUME: {
+      const uint8_t vol = GetByte(curOffset++);
+      AddVol(beginOffset, curOffset - beginOffset, vol);
       break;
+    }
 
-    //set octave + 1
-    case 0xA6:
+    case EVENT_PITCH_SLIDE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const int8_t semitones = GetByte(curOffset++);
+      desc << L"Length: " << length << L"  Key: " << semitones << L" semitones";
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_OCTAVE: {
+      const uint8_t new_octave = GetByte(curOffset++);
+      AddSetOctave(beginOffset, curOffset - beginOffset, new_octave);
+      break;
+    }
+
+    case EVENT_INCREMENT_OCTAVE:
+      // The formula below is more accurate implementation of this (at least in FF7), but who cares?
+      //octave = (octave + 1) & 0xf;
       AddIncrementOctave(beginOffset, curOffset - beginOffset);
       break;
 
-    //set octave - 1
-    case 0xA7:
+    case EVENT_DECREMENT_OCTAVE:
+      // The formula below is more accurate implementation of this (at least in FF7), but who cares?
+      //octave = (octave - 1) & 0xf;
       AddDecrementOctave(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xA8: {
-      //vel = GetByte(curOffset++);
-      //vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES, BUT NOT POSITIVE
-      //AddGenericEvent(beginOffset, curOffset-beginOffset, L"Set Velocity", NULL, BG_CLR_CYAN);
-      const uint8_t cExpression = GetByte(curOffset++);
-      ////			 こっちのlog演算は要らない
-      ////			 vel = Convert7bitPercentVolValToStdMidiVal(vel);		//I THINK THIS APPLIES, BUT NOT POSITIVE
-      vel = 127;        //とりあえず 127 にしておく
-      AddExpression(beginOffset, curOffset - beginOffset, cExpression);
+    case EVENT_EXPRESSION: {
+      const uint8_t expression = GetByte(curOffset++);
+      AddExpression(beginOffset, curOffset - beginOffset, expression);
       break;
     }
 
-    //set Expression fade
-    case 0xA9: {
-      const uint8_t dur = GetByte(curOffset++);
-      const uint8_t targExpr = GetByte(curOffset++);
-      AddExpressionSlide(beginOffset, curOffset - beginOffset, dur, targExpr);
+    case EVENT_EXPRESSION_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t expression = GetByte(curOffset++);
+      AddExpressionSlide(beginOffset, curOffset - beginOffset, length, expression);
       break;
     }
 
-    //set pan
-    case 0xAA: {
-      const uint8_t pan = GetByte(curOffset++);
+    case EVENT_PAN: {
+      // TODO: volume balance conversion
+      const uint8_t pan = GetByte(curOffset++); // 0-127
       AddPan(beginOffset, curOffset - beginOffset, pan);
       break;
     }
 
-    //set pan fade
-    case 0xAB: {
-      const uint8_t dur = GetByte(curOffset++);
-      const uint8_t targPan = GetByte(curOffset++);
-      AddPanSlide(beginOffset, curOffset - beginOffset, dur, targPan);
+    case EVENT_PAN_FADE: {
+      // TODO: volume balance conversion
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t pan = GetByte(curOffset++);
+      AddPanSlide(beginOffset, curOffset - beginOffset, length, pan);
       break;
     }
 
-    case 0xAC:            //unknown
-      curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      break;
-
-      /*AD = set attack AE = set decay AF = set sustain level  B0 = AE then AF
-      <CBongo> B1 = set sustain release  B2 = set release
-      B7 might be set A,D,S,R values all at once
-      B3 appears to be "reset ADSR to the initial values from the instrument/sample data"*/
-
-    case 0xAD:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
-      break;
-    case 0xAE:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
-      break;
-    case 0xAF:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
-      break;
-    case 0xB0:
-      curOffset++;
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
-      break;
-    case 0xB1:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
-      break;
-    case 0xB2:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
-      break;
-    case 0xB3:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", L"", CLR_ADSR);
-      break;
-
-      //
-      //	0xB4 to 0xB7	LFO Pitch bend
-      //	0xB8 to 0xBC	LFO Expression
-      //	0xBC to 0xBF	LFO Panpot
-      //
-
-    case 0xB4:
-      curOffset += 3;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Pitch bend) Length, cycle", L"", CLR_LFO);
-      break;
-    case 0xB5:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Pitch bend) Depth", L"", CLR_LFO);
-      break;
-    case 0xB6:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Pitch bend) off", L"", CLR_LFO);
-      break;
-    case 0xB7:
-      curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      break;
-
-    case 0xB8:
-      curOffset += 3;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Expression) Length, cycle", L"", CLR_LFO);
-      break;
-    case 0xB9:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Expression) Depth", L"", CLR_LFO);
-      break;
-    case 0xBA:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Expression) off", L"", CLR_LFO);
-      break;
-    case 0xBB:
-      curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      break;
-
-    case 0xBC:
-      curOffset += 2;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Panpot) Length, cycle", L"", CLR_LFO);
-      break;
-    case 0xBD:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Panpot) Depth", L"", CLR_LFO);
-      break;
-    case 0xBE:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Panpot) off", L"", CLR_LFO);
-      break;
-    case 0xBF:
-      curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      break;
-
-    case 0xC0: {
-      const int8_t cTranspose = GetByte(curOffset++);
-      AddTranspose(beginOffset, curOffset - beginOffset, cTranspose);
+    case EVENT_NOISE_CLOCK: {
+      const uint8_t raw_clock = GetByte(curOffset++);
+      const bool relative = (raw_clock & 0xc0) != 0;
+      if (relative)
+      {
+        const uint8_t clock = raw_clock & 0x3f;
+        const int8_t signed_clock = ((clock & 0x20) != 0) ? (0x20 - (clock & 0x1f)) : clock;
+        desc << L"Clock: " << signed_clock << " (Relative)";
+      }
+      else
+      {
+        const uint8_t clock = raw_clock & 0x3f;
+        desc << L"Clock: " << clock;
+      }
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Clock", desc.str(), CLR_CHANGESTATE, ICON_CONTROL);
       break;
     }
 
-    case 0xC1: {
-      const uint8_t cTranspose = GetByte(curOffset++);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Transpose move", L"", CLR_TRANSPOSE);
+    case EVENT_ADSR_ATTACK_RATE: {
+      const uint8_t ar = GetByte(curOffset++); // 0-127
+      desc << L"AR: " << ar;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Attack Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
-    case 0xC2:
+    case EVENT_ADSR_DECAY_RATE: {
+      const uint8_t dr = GetByte(curOffset++); // 0-15
+      desc << L"DR: " << dr;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Decay Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_ADSR_SUSTAIN_LEVEL: {
+      const uint8_t sl = GetByte(curOffset++); // 0-15
+      desc << L"SL: " << sl;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Level", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_ADSR_DECAY_RATE_AND_SUSTAIN_LEVEL: {
+      const uint8_t dr = GetByte(curOffset++); // 0-15
+      const uint8_t sl = GetByte(curOffset++); // 0-15
+      desc << L"DR: " << dr << L"  SL: " << sl;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Decay Rate & Sustain Level", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_ADSR_SUSTAIN_RATE: {
+      const uint8_t sr = GetByte(curOffset++); // 0-127
+      desc << L"SR: " << sr;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_ADSR_RELEASE_RATE: {
+      const uint8_t rr = GetByte(curOffset++); // 0-127
+      desc << L"RR: " << rr;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Release Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_RESET_ADSR:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reset ADSR", L"", CLR_ADSR);
+      break;
+
+    case EVENT_VIBRATO: {
+      const uint8_t delay = GetByte(curOffset++);
+      const uint8_t raw_rate = GetByte(curOffset++);
+      const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
+      const uint8_t type = GetByte(curOffset++); // 0-15
+      desc << L"Delay: " << delay << L"  Rate: " << rate << L"  LFO Type: " << type;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato", desc.str(), CLR_LFO, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_VIBRATO_DEPTH: {
+      const uint8_t raw_depth = GetByte(curOffset++);
+      const uint8_t depth = raw_depth & 0x7f;
+      const uint8_t depth_type = (raw_depth & 0x80) >> 7;
+      desc << L"Depth: " << depth;
+      if (depth_type == 0) {
+        desc << L" (15/256 scale, approx 50 cents at maximum)";
+      }
+      else {
+        desc << L" (1/1 scale, approx 700 cents at maximum)";
+      }
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Depth", desc.str(), CLR_LFO);
+      break;
+    }
+
+    case EVENT_VIBRATO_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Off", L"", CLR_LFO);
+      break;
+
+    case EVENT_ADSR_ATTACK_MODE: {
+      const uint8_t ar_mode = GetByte(curOffset++);
+      desc << L"Mode: " << ar_mode;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Attack Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_TREMOLO: {
+      const uint8_t delay = GetByte(curOffset++);
+      const uint8_t raw_rate = GetByte(curOffset++);
+      const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
+      const uint8_t type = GetByte(curOffset++); // 0-15
+      desc << L"Delay: " << delay << L"  Rate: " << rate << L"  LFO Type: " << type;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo", desc.str(), CLR_LFO, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_TREMOLO_DEPTH: {
+      const uint8_t depth = GetByte(curOffset++);
+      desc << L"Depth: " << depth;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo Depth", desc.str(), CLR_LFO);
+      break;
+    }
+
+    case EVENT_TREMOLO_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo Off", L"", CLR_LFO);
+      break;
+
+    case EVENT_ADSR_SUSTAIN_MODE: {
+      const uint8_t sr_mode = GetByte(curOffset++);
+      desc << L"Mode: " << sr_mode;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Sustain Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_PAN_LFO: {
+      const uint8_t raw_rate = GetByte(curOffset++);
+      const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
+      const uint8_t type = GetByte(curOffset++); // 0-15
+      desc << L"Rate: " << rate << L"  LFO Type: " << type;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO", desc.str(), CLR_LFO, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_PAN_LFO_DEPTH: {
+      const uint8_t depth = GetByte(curOffset++);
+      desc << L"Depth: " << depth;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO Depth", desc.str(), CLR_LFO);
+      break;
+    }
+
+    case EVENT_PAN_LFO_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO Off", L"", CLR_LFO);
+      break;
+
+    case EVENT_ADSR_RELEASE_MODE: {
+      const uint8_t rr_mode = GetByte(curOffset++);
+      desc << L"Mode: " << rr_mode;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Release Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_TRANSPOSE_ABS: {
+      const int8_t key = GetByte(curOffset++);
+      AddTranspose(beginOffset, curOffset - beginOffset, key);
+      break;
+    }
+
+    case EVENT_TRANSPOSE_REL: {
+      const int8_t key = GetByte(curOffset++);
+      AddTranspose(beginOffset, curOffset - beginOffset, transpose + key, L"Transpose (Relative)");
+      break;
+    }
+
+    case EVENT_REVERB_ON:
+      // TODO: reverb control
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb On", L"", CLR_REVERB);
       break;
-    case 0xC3:
+
+    case EVENT_REVERB_OFF:
+      // TODO: reverb control
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Off", L"", CLR_REVERB);
       break;
 
-    case 0xC4:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise On", L"", CLR_UNKNOWN);
-      break;
-    case 0xC5:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Off", L"", CLR_UNKNOWN);
+    case EVENT_NOISE_ON:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise On", L"", CLR_PROGCHANGE, ICON_CONTROL);
       break;
 
-    case 0xC6:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM Modulation On", L"", CLR_UNKNOWN);
-      break;
-    case 0xC7:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM Modulation Off", L"", CLR_UNKNOWN);
+    case EVENT_NOISE_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Off", L"", CLR_PROGCHANGE, ICON_CONTROL);
       break;
 
-    // set loop begin marker
-    case 0xC8:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat Start", L"", CLR_LOOP);
-      loop_begin_layer++;
-      loop_begin_loc[loop_begin_layer] = curOffset;
-      //bInLoop = true;
+    case EVENT_PITCH_MOD_ON:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM (Pitch LFO) On", L"", CLR_PROGCHANGE, ICON_CONTROL);
       break;
 
-    case 0xC9: {
-      const uint8_t value1 = GetByte(curOffset++);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat End", L"", CLR_LOOP);
-
-      //if loop_begin_layer == 0, then there was never a matching loop begin event!  this is seen in ff9 402 and ff9 hunter's chance
-      if (loop_begin_layer == 0)
-        break;
-      if (loopID[loop_layer] != curOffset) {
-        loop_layer++;
-        loopID[loop_layer] = curOffset;
-        curOffset = loop_begin_loc[loop_begin_layer];
-        loop_counter[loop_layer] = value1 - 2;
-        bInLoop = true;
-      }
-      else if (loop_counter[loop_layer] > 0) {
-        loop_counter[loop_layer]--;
-        curOffset = loop_begin_loc[loop_begin_layer];
-        //if (loop_counter[loop_layer] == 0 && loop_layer == 1)
-        //	bInLoop = false;
-      }
-      else {
-        loopID[loop_layer] = 0;
-        loop_layer--;
-        loop_begin_layer--;
-        if (loop_layer == 0)
-          bInLoop = false;
-      }
-      break;
-    }
-
-    case 0xCA: {
-      const uint8_t value1 = 2;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat End", L"", CLR_LOOP);
-      if (loop_begin_layer == 0)
-        break;
-      if (loopID[loop_layer] != curOffset) {
-        loop_layer++;
-        loopID[loop_layer] = curOffset;
-        curOffset = loop_begin_loc[loop_begin_layer];
-        loop_counter[loop_layer] = value1 - 2;
-        bInLoop = true;
-      }
-      else if (loop_counter[loop_layer] > 0) {
-        loop_counter[loop_layer]--;
-        curOffset = loop_begin_loc[loop_begin_layer];
-        //if (loop_counter[loop_layer] == 0 && loop_layer == 1)
-        //	bInLoop = false;
-      }
-      else {
-        loopID[loop_layer] = 0;
-        loop_layer--;
-        loop_begin_layer--;
-        if (loop_layer == 0)
-          bInLoop = false;
-      }
-      break;
-    }
-
-    case 0xCC:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On", L"", CLR_PORTAMENTO);
+    case EVENT_PITCH_MOD_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM (Pitch LFO) Off", L"", CLR_PROGCHANGE, ICON_CONTROL);
       break;
 
-    case 0xCD:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur Off", L"", CLR_PORTAMENTO);
+    case EVENT_LOOP_START:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat Start", L"", CLR_LOOP, ICON_STARTREP);
+
+      loop_layer = (loop_layer + 1) & 3;
+      loop_begin_loc[loop_layer] = curOffset;
+      loop_counter[loop_layer] = 0;
       break;
 
-    case 0xD0:
-      AddNoteOff(beginOffset, curOffset - beginOffset, prevKey);
-      break;
+    case EVENT_LOOP_UNTIL: {
+      const uint8_t raw_count = GetByte(curOffset++);
+      const uint16_t count = raw_count == 0 ? 256 : raw_count;
 
-    case 0xD1:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Deactivate Notes?", L"", CLR_UNKNOWN);
-      break;
+      desc << L"Count: " << count;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat Until", desc.str(), CLR_LOOP, ICON_ENDREP);
 
-    case 0xD2:
-      curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      break;
-
-    case 0xD3:
-      curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      break;
-
-    // pitch bend
-    case 0xD8:
-    {
-      //signed data byte.  range of 1 octave (0x7F = +1 octave 0x80 = -1 octave)
-      const uint8_t cValue = GetByte(curOffset++);
-      const int fullValue = static_cast<int>(cValue * 64.503937007874015748031496062992) + 0x2000;
-      const uint8_t lo = fullValue & 0x7F;
-      const uint8_t hi = (fullValue & 0x3F80) >> 7;
-      AddPitchBendMidiFormat(beginOffset, curOffset - beginOffset, lo, hi);
-      break;
-    }
-
-    case 0xD9:
-      curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch bend move", L"", CLR_UNKNOWN);
-      break;
-
-    case 0xDA:
-      curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      break;
-
-    case 0xDC:
-      curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      break;
-
-    case 0xDD:
-      curOffset += 2;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Pitch bend) times", L"", CLR_UNKNOWN);
-      break;
-
-    case 0xDE:
-      curOffset += 2;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Expression) times", L"", CLR_UNKNOWN);
-      break;
-
-    case 0xDF:
-      curOffset += 2;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"LFO(Panpot) times", L"", CLR_UNKNOWN);
-      break;
-
-    default:
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      return false;
-    }
-  }
-  else { // 0xE0..0xFF
-    if (version == AkaoPs1Version::VERSION_1) {
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      return false;
-    }
-    else {
-      if ((status_byte >= 0xF0) && (status_byte <= 0xFB)) {
-        relative_key = status_byte - 0xF0;
-        base_key = octave * 12;
-        if (bNotePlaying) {
-          AddNoteOffNoItem(prevKey);
-          bNotePlaying = false;
-        }
-        bNotePlaying = true;
-        AddNoteOn(beginOffset, curOffset - beginOffset + 1, base_key + relative_key, vel);
-        AddTime(GetByte(curOffset++));
+      loop_counter[loop_layer]++;
+      if (loop_counter[loop_layer] == count)
+      {
+        loop_layer = (loop_layer - 1) & 3;
       }
       else
-        switch (status_byte) {
-        case 0xE1:
-          curOffset++;
-          AddUnknown(beginOffset, curOffset - beginOffset);
-          break;
+      {
+        curOffset = loop_begin_loc[loop_layer];
+      }
+      break;
+    }
 
-        case 0xE6:
-          curOffset += 2;
-          AddUnknown(beginOffset, curOffset - beginOffset);
-          break;
+    case EVENT_LOOP_AGAIN: {
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat Again", L"", CLR_LOOP, ICON_ENDREP);
 
-        //tie time
-        case 0xFC:
-          AddTime(GetByte(curOffset++));
-          AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie (custom)", L"", CLR_TIE);
-          break;
+      loop_counter[loop_layer]++;
+      curOffset = loop_begin_loc[loop_layer];
+      break;
+    }
 
-        case 0xFD: {
-          if (bNotePlaying) {
-            AddNoteOffNoItem(prevKey);
-            bNotePlaying = false;
-          }
-          const uint8_t restTime = GetByte(curOffset++);
-          AddRest(beginOffset, curOffset - beginOffset, restTime);
-          break;
-        }
+    case EVENT_RESET_VOICE_EFFECTS:
+      // Reset noise, FM modulation, reverb, etc.
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reset Voice Effects", L"", CLR_CHANGESTATE, ICON_CONTROL);
+      break;
 
-        //meta event
-        case 0xFE:
-          //MetaEvent:
-          switch (GetByte(curOffset++)) {
-          //tempo
-          case 0x00: {
-            const uint8_t value1 = GetByte(curOffset++);
-            const uint8_t value2 = GetByte(curOffset++);
-            //no clue how this magic number is properly derived
-            const double dValue1 = ((value2 << 8) + value1) / 218.4555555555555555555555555;
-            AddTempoBPM(beginOffset, curOffset - beginOffset, dValue1);
-            break;
-          }
+    case EVENT_SLUR_ON:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur On (No Key Off, No Retrigger)", L"", CLR_CHANGESTATE, ICON_CONTROL);
+      slur = true;
+      break;
 
-          //tempo slide
-          case 0x01: {
-            const uint8_t value1 = GetByte(curOffset++);    //NEED TO ADDRESS value 1
-            const uint8_t value2 = GetByte(curOffset++);
-            //AddTempoSlide(
-            //RecordMidiSetTempo(current_delta_time, value2);
-            break;
-          }
+    case EVENT_SLUR_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Slur Off", L"", CLR_CHANGESTATE, ICON_CONTROL);
+      slur = false;
+      break;
 
-          case 0x02:
-            curOffset++;
-            curOffset++;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Level", L"", CLR_REVERB);
-            break;
+    case EVENT_NOISE_ON_DELAY_TOGGLE: {
+      const uint8_t raw_delay = GetByte(curOffset++);
+      const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
+      desc << "Delay: " << delay;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise On & Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      break;
+    }
 
-          case 0x03:
-            curOffset++;
-            curOffset++;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Fade", L"", CLR_REVERB);
-            break;
+    case EVENT_NOISE_DELAY_TOGGLE: {
+      const uint8_t raw_delay = GetByte(curOffset++);
+      const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
+      desc << "Delay: " << delay;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise On/Off Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      break;
+    }
 
-          //signals this track uses the drum kit
-          case 0x04:
-            AddProgramChange(beginOffset, curOffset - beginOffset, 127, L"Drum kit On");
-            //channel = 9;
-            break;
+    case EVENT_LEGATO_ON:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato On (No Key Off)", L"", CLR_CHANGESTATE, ICON_CONTROL);
+      legato = true;
+      break;
 
-          case 0x05:
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum kit Off", L"", CLR_UNKNOWN);
-            break;
+    case EVENT_LEGATO_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Legato Off", L"", CLR_CHANGESTATE, ICON_CONTROL);
+      legato = false;
+      break;
 
-          //Branch Relative
-          case 0x06: {
-            const uint32_t dest = static_cast<int16_t>(GetShort(curOffset)) + curOffset;
-            curOffset += 2;
-            const uint32_t eventLength = curOffset - beginOffset;
-            bool bContinue = false;
+    case EVENT_PITCH_MOD_ON_DELAY_TOGGLE: {
+      const uint8_t raw_delay = GetByte(curOffset++);
+      const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
+      desc << "Delay: " << delay;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM (Pitch LFO) On & Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      break;
+    }
 
-            curOffset = dest;
+    case EVENT_PITCH_MOD_DELAY_TOGGLE: {
+      const uint8_t raw_delay = GetByte(curOffset++);
+      const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
+      desc << "Delay: " << delay;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"FM (Pitch LFO) On/Off Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      break;
+    }
 
-            // Check the remaining area that will be processed by CPU-controlled jump.
-            for (vector<uint32_t>::iterator itAddr = vCondJumpAddr.begin(); itAddr != vCondJumpAddr.end(); ++itAddr) {
-              if (!IsOffsetUsed(*itAddr)) {
-                // There is an area not visited yet, VGMTrans must try to go there.
-                bContinue = true;
-                break;
-              }
-            }
+    case EVENT_D4:
+    case EVENT_D5:
+    case EVENT_D6:
+    case EVENT_D7:
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
 
-            if (readMode == READMODE_FIND_DELTA_LENGTH)
-              deltaLength = GetTime();
+    case EVENT_TUNING_ABS:
+    {
+      // signed data byte.  range of 1 octave (0x7F = +1 octave, 0x80 = -1 octave)
+      tuning = GetByte(curOffset++);
 
-            AddGenericEvent(beginOffset, eventLength, L"Dal Segno.(Loop)", L"", CLR_LOOP);
-            return bContinue;
+      const int div = tuning >= 0 ? 128 : 256;
+      const double scale = tuning / static_cast<double>(div);
+      const double cents = (scale / log(2.0)) * 1200.0;
+      desc << L"Tuning: " << cents << L" cents (" << tuning << L"/" << div << L")";
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tuning", desc.str(), CLR_MISC, ICON_CONTROL);
+      AddFineTuningNoItem(cents);
+      break;
+    }
 
-            /*uint16_t siValue = GetShort(pDoc, j);
-            if (nScanMode == MODE_CONVERT_MIDI)		//if we are converting the midi, the actually branch
-            {
-            if (seq_repeat_counter-- > 0)
-            curOffset += siValue;
-            else
-            curOffset += 2;
-            }
-            else
-            curOffset += 2;								//otherwise, just skip over the relative branch offset
-            break; */
-          }
+    case EVENT_TUNING_REL: {
+      const int8_t relative_tuning = GetByte(curOffset++);
+      tuning += relative_tuning;
 
-          //Permanence Loop break with conditional.
-          case 0x07: {
-            const uint8_t condValue = GetByte(curOffset++);
-            const uint32_t dest = static_cast<int16_t>(GetShort(curOffset)) + curOffset;
-            curOffset += 2;
-            const uint32_t eventLength = curOffset - beginOffset;
+      const int div = tuning >= 0 ? 128 : 256;
+      const double scale = tuning / static_cast<double>(div);
+      const double cents = (scale / log(2.0)) * 1200.0;
+      desc << L"Amount: " << relative_tuning <<  L"  Tuning: " << cents << L" cents (" << tuning << L"/" << div << L")";
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tuning (Relative)", desc.str(), CLR_MISC, ICON_CONTROL);
+      AddFineTuningNoItem(cents);
+      break;
+    }
 
-            // This event performs conditional jump if certain CPU variable matches to the condValue.
-            // VGMTrans will simply try to parse all events as far as possible, instead.
-            // (Test case: FF9 416 Final Battle)
-            if (!IsOffsetUsed(beginOffset)) {
-              // For the first time, VGMTrans just skips the event,
-              // but remembers the destination address for future jump.
-              vCondJumpAddr.push_back(dest);
-            }
-            else {
-              // For the second time, VGMTrans jumps to the destination address.
-              curOffset = dest;
-            }
+    case EVENT_PORTAMENTO_ON: {
+      const uint8_t raw_speed = GetByte(curOffset++);
+      const uint16_t speed = raw_speed == 0 ? 256 : raw_speed;
+      desc << L"Time: " << speed << " tick(s)";
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
+      //AddPortamentoTimeNoItem(speed);
+      AddPortamentoNoItem(true);
+      break;
+    }
 
-            AddGenericEvent(beginOffset, eventLength, L"Dal Segno (Loop) Break", L"", CLR_LOOP);
-            break;
-          }
+    case EVENT_PORTAMENTO_OFF: {
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento Off", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
+      //AddPortamentoTimeNoItem(0);
+      AddPortamentoNoItem(false);
+      break;
+    }
 
-          //Repeat break with conditional.
-          case 0x09:
-            curOffset++;
-            curOffset++;
-            curOffset++;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Repeat Break", L"", CLR_LOOP);
-            break;
+    case EVENT_FIXED_DURATION: {
+      const int8_t relative_length = GetByte(curOffset++);
+      const int16_t length = min(max(last_delta_time + relative_length, 1), 255);
+      delta_time_overwrite = length;
+      desc << L"Duration (Relative Amount): " << relative_length;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Fixed Note Length", desc.str(), CLR_MISC, ICON_CONTROL);
+      break;
+    }
 
-          //case 0x0E:			//call subroutine
-          //case 0x0F:			//return from subroutine
+    case EVENT_VIBRATO_DEPTH_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t raw_depth = GetByte(curOffset++);
+      const uint8_t depth = raw_depth & 0x7f;
+      const uint8_t depth_type = (raw_depth & 0x80) >> 7;
+      desc << L"Duration: " << length << L"  Target Depth: " << depth;
+      if (depth_type == 0) {
+        desc << L" (15/256 scale, approx 50 cents at maximum)";
+      }
+      else {
+        desc << L" (1/1 scale, approx 700 cents at maximum)";
+      }
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Depth Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      break;
+    }
 
-          case 0x10:
-            curOffset++;
-            AddUnknown(beginOffset, curOffset - beginOffset);
-            break;
+    case EVENT_TREMOLO_DEPTH_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t depth = GetByte(curOffset++);
+      desc << L"Duration: " << length << L"  Target Depth: " << depth;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo Depth Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      break;
+    }
 
-          //program change
-          case 0x14: {
-            const uint8_t curProgram = GetByte(curOffset++);
-            //if (!bAssociatedWithSSTable)
-            //	RecordMidiProgramChange(current_delta_time, curProgram, hFile);
-            AddProgramChange(beginOffset, curOffset - beginOffset, curProgram);
-            break;
-          }
+    case EVENT_PAN_LFO_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t depth = GetByte(curOffset++);
+      desc << L"Duration: " << length << L"  Target Depth: " << depth;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO Depth Slide", desc.str(), CLR_LFO);
+      break;
+    }
 
-                     //Time Signature
-          case 0x15: {
-            const uint8_t denom = 4;
-            curOffset++;//(192 / GetByte(curOffset++));
-            const uint8_t numer = GetByte(curOffset++);
-            //AddTimeSig(beginOffset, curOffset-beginOffset, numer, denom, parentSeq->GetPPQN()); // why it's disabled?
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Time Signature", L"", CLR_TIMESIG, ICON_TIMESIG);
-            break;
-          }
+    case EVENT_TEMPO: {
+      const uint16_t raw_tempo = GetShort(curOffset);
+      curOffset += 2;
 
-          case 0x16:
-            curOffset += 2;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, L"Maker", L"", CLR_UNKNOWN);
-            break;
+      const double bpm = parentSeq->GetTempoInBPM(raw_tempo);
+      AddTempoBPM(beginOffset, curOffset - beginOffset, bpm);
+      break;
+    }
 
-          case 0x1C:
-            curOffset++;
-            AddUnknown(beginOffset, curOffset - beginOffset);
-            break;
+    case EVENT_TEMPO_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint16_t raw_tempo = GetShort(curOffset);
+      curOffset += 2;
 
-          default:
-            AddUnknown(beginOffset, curOffset - beginOffset);
-            return false;
-          }
-          break;
+      const double bpm = parentSeq->GetTempoInBPM(raw_tempo);
+      AddTempoBPMSlide(beginOffset, curOffset - beginOffset, length, bpm);
+      break;
+    }
 
-        default:
-          AddUnknown(beginOffset, curOffset - beginOffset);
+    case EVENT_REVERB_DEPTH: {
+      const int16_t depth = GetShort(curOffset);
+      curOffset += 2;
+
+      desc << L"Depth: " << depth;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Depth", desc.str(), CLR_REVERB, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_REVERB_DEPTH_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const int16_t depth = GetShort(curOffset);
+      curOffset += 2;
+
+      desc << L"Duration: " << length << L"  Target Depth: " << depth;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Depth Slide", desc.str(), CLR_REVERB, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_DRUM_ON_V1: {
+      const int16_t relative_drum_offset = GetShort(curOffset);
+      curOffset += 2;
+      const uint32_t drum_instrset_offset = curOffset + relative_drum_offset;
+
+      desc << L"Offset: 0x" << std::hex << std::setfill(L'0') << std::uppercase << drum_instrset_offset;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddProgramChangeNoItem(127, false);
+      //channel = 9;
+      break;
+    }
+
+    case EVENT_DRUM_ON_V2: {
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddProgramChangeNoItem(127, false);
+      //channel = 9;
+      break;
+    }
+
+    case EVENT_DRUM_OFF:
+      // TODO: restore program change for regular instrument
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit Off", L"", CLR_PROGCHANGE, ICON_PROGCHANGE);
+      break;
+
+    case EVENT_UNCONDITIONAL_JUMP: {
+      const int16_t relative_offset = GetShort(curOffset);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+      curOffset += 2;
+      const uint32_t length = curOffset - beginOffset;
+
+      desc << L"Destination: 0x" << std::hex << std::setfill(L'0') << std::uppercase << dest;
+      curOffset = dest;
+
+      if (!IsOffsetUsed(dest)) {
+        AddGenericEvent(beginOffset, length, L"Jump", desc.str(), CLR_LOOPFOREVER);
+      }
+      else {
+        if (!AddLoopForever(beginOffset, length, L"Jump"))
           return false;
-        }
+      }
+    }
+
+    case EVENT_CPU_CONDITIONAL_JUMP: {
+      const uint8_t target_value = GetByte(curOffset++);
+      const int16_t relative_offset = GetShort(curOffset);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+      curOffset += 2;
+      const uint32_t length = curOffset - beginOffset;
+
+      desc << L"Conditional Value" << target_value << L"  Destination: 0x" << std::hex << std::setfill(L'0') << std::uppercase << dest;
+
+      // This event performs conditional jump if certain CPU variable matches to the target value.
+      // VGMTrans will simply try to parse all events as far as possible, instead.
+      // (Test case: FF9 416 Final Battle)
+      if (IsOffsetUsed(beginOffset)) {
+        // For the first time, VGMTrans just skips the event.
+        // For the second time, VGMTrans jumps to the destination address.
+        curOffset = dest;
+      }
+
+      AddGenericEvent(beginOffset, length, L"CPU-Conditional Jump", desc.str(), CLR_LOOP);
+      break;
+    }
+
+    case EVENT_LOOP_BRANCH: {
+      const uint8_t raw_count = GetByte(curOffset++);
+      const uint16_t count = raw_count == 0 ? 256 : raw_count;
+      const int16_t relative_offset = GetShort(curOffset);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+      curOffset += 2;
+      const uint32_t length = curOffset - beginOffset;
+
+      desc << L"Count: " << count << L"  Destination: 0x" << std::hex << std::setfill(L'0') << std::uppercase << dest;
+      AddGenericEvent(beginOffset, length, L"Repeat Branch", desc.str(), CLR_MISC);
+
+      if (loop_counter[loop_layer] == count)
+        curOffset = dest;
+    }
+
+    case EVENT_LOOP_BREAK: {
+      const uint8_t raw_count = GetByte(curOffset++);
+      const uint16_t count = raw_count == 0 ? 256 : raw_count;
+      const int16_t relative_offset = GetShort(curOffset);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+      curOffset += 2;
+      const uint32_t length = curOffset - beginOffset;
+
+      desc << L"Count: " << count << L"  Destination: 0x" << std::hex << std::setfill(L'0') << std::uppercase << dest;
+      AddGenericEvent(beginOffset, length, L"Repeat Break", desc.str(), CLR_MISC);
+
+      if (loop_counter[loop_layer] == count)
+        curOffset = dest;
+
+      loop_layer = (loop_layer - 1) & 3;
+    }
+
+    case EVENT_PROGCHANGE_NO_ATTACK: {
+      parentSeq->bUsesIndividualArts = true;
+      const uint8_t artNum = GetByte(curOffset++);
+      const uint8_t progNum = (parentSeq->instrset != nullptr)
+        ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
+        : artNum;
+      AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, L"Program Change w/o Attack Sample");
+      break;
+    }
+
+    case EVENT_F3_V1:
+    {
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      return false;
+    }
+
+    case EVENT_UNISON_ON: {
+      parentSeq->bUsesIndividualArts = true;
+      const uint8_t artNum = GetByte(curOffset++);
+      const uint8_t artNum2 = GetByte(curOffset++);
+
+      const uint8_t progNum = (parentSeq->instrset != nullptr)
+        ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
+        : artNum;
+
+      desc << L"Program Number for Primary Voice: " << artNum << L"  Program Number for Secondary Voice: " << artNum2;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Unison On (With Program Change)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddProgramChangeNoItem(progNum, false);
+      break;
+    }
+
+    case EVENT_UNISON_OFF: {
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Unison Off", L"", CLR_MISC, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_UNISON_VOLUME_BALANCE: {
+      const uint8_t balance = GetByte(curOffset++);
+      const int primary_percent = (127 - balance) * 100 / 256;
+      const int secondary_percent = balance * 100 / 256;
+      desc << L"Balance: " << balance << L" (Primary Voice Volume " << primary_percent << "%, Secondary Voice Volume " << secondary_percent << L"%)";
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Unison Volume Balance", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_UNISON_VOLUME_BALANCE_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t balance = GetByte(curOffset++);
+      const int primary_percent = (127 - balance) * 100 / 256;
+      const int secondary_percent = balance * 100 / 256;
+      desc << L"Duration: " << length << L"  Target Balance: " << balance << L" (Primary Voice Volume " << primary_percent << "%, Secondary Voice Volume " << secondary_percent << L"%)";
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Unison Volume Balance Fade", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_ALTERNATE_VOICE_ON: {
+      const uint8_t rr = GetByte(curOffset++); // 0-127
+      desc << L"Release Rate: " << rr;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Alternate Voice On", desc.str(), CLR_MISC);
+      break;
+    }
+
+    case EVENT_ALTERNATE_VOICE_OFF: {
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Alternate Voice Off", L"", CLR_MISC);
+      break;
+    }
+
+    case EVENT_TIME_SIGNATURE: {
+      // Both of arguments can be zero: Front Mission 3: 1-08 Setup 2.psf
+      const uint8_t ticksPerBeat = GetByte(curOffset++);
+      const uint8_t beatsPerMeasure = GetByte(curOffset++);
+      const uint8_t denom = ticksPerBeat == 0 ? 4 : ((parentSeq->ppqn * 4) / ticksPerBeat); // or should it always be 4? no idea
+      AddTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat);
+      break;
+    }
+
+    case EVENT_MEASURE: {
+      const uint16_t measure = GetShort(curOffset);
+      curOffset += 2;
+      desc << L"Measure: " << measure;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Marker (Measure Number)", desc.str(), CLR_MISC);
+      // TODO: write midi marker event
+      break;
+    }
+
+    case EVENT_FE_10_V2: // needs research
+      curOffset++;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      break;
+
+    case EVENT_FE_14_V2: { // needs more research
+      const uint8_t curProgram = GetByte(curOffset++);
+      //if (!bAssociatedWithSSTable)
+      //	RecordMidiProgramChange(current_delta_time, curProgram, hFile);
+      AddProgramChange(beginOffset, curOffset - beginOffset, curProgram);
+      break;
+    }
+
+    case EVENT_FE_1C_V2: // needs research
+      curOffset++;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      break;
+
+    case EVENT_FE_0A_V2:
+    case EVENT_FE_0B_V2:
+    case EVENT_FE_0E_V2:
+    case EVENT_FE_0F_V2:
+    case EVENT_FE_11_V2:
+    case EVENT_FE_12_V2:
+    case EVENT_FE_19_V2:
+    case EVENT_FE_1A_V2:
+    case EVENT_FE_1B_V2:
+    case EVENT_FE_1D_V2:
+    case EVENT_FE_1E_V2:
+    default:
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      return false;
     }
   }
 
