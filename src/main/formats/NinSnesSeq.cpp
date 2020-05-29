@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -344,7 +344,7 @@ void NinSnesSeq::LoadEventMap() {
             EventMap[0xe1] = EVENT_MASTER_VOLUME_FADE;
             EventMap[0xe2] = EVENT_TEMPO;
             EventMap[0xe3] = EVENT_TEMPO_FADE;
-            EventMap[0xe4] = EVENT_GLOBAL_TRANSPOSE;
+            EventMap[0xe4] = EVENT_GLOBAL_CISPOSE;
             EventMap[0xe5] = EVENT_TREMOLO_ON;
             EventMap[0xe6] = EVENT_TREMOLO_OFF;
             EventMap[0xe7] = EVENT_VOLUME;
@@ -576,8 +576,8 @@ void NinSnesSeq::LoadStandardVcmdMap(uint8_t statusByte) {
     EventMap[statusByte + 0x06] = EVENT_MASTER_VOLUME_FADE;
     EventMap[statusByte + 0x07] = EVENT_TEMPO;
     EventMap[statusByte + 0x08] = EVENT_TEMPO_FADE;
-    EventMap[statusByte + 0x09] = EVENT_GLOBAL_TRANSPOSE;
-    EventMap[statusByte + 0x0a] = EVENT_TRANSPOSE;
+    EventMap[statusByte + 0x09] = EVENT_GLOBAL_CISPOSE;
+    EventMap[statusByte + 0x0a] = EVENT_CISPOSE;
     EventMap[statusByte + 0x0b] = EVENT_TREMOLO_ON;
     EventMap[statusByte + 0x0c] = EVENT_TREMOLO_OFF;
     EventMap[statusByte + 0x0d] = EVENT_VOLUME;
@@ -693,7 +693,7 @@ NinSnesTrackSharedData::NinSnesTrackSharedData() {
 
 void NinSnesTrackSharedData::ResetVars(void) {
     loopCount = 0;
-    spcTranspose = 0;
+    spcCispose = 0;
 
     // just in case
     spcNoteDuration = 1;
@@ -724,7 +724,7 @@ void NinSnesTrack::ResetVars(void) {
 
     cKeyCorrection = SEQ_KEYOFS;
     if (shared != NULL) {
-        transpose = shared->spcTranspose;
+        cispose = shared->spcCispose;
     }
 }
 
@@ -1025,16 +1025,16 @@ bool NinSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_GLOBAL_TRANSPOSE: {
+        case EVENT_GLOBAL_CISPOSE: {
             int8_t semitones = GetByte(curOffset++);
-            AddGlobalTranspose(beginOffset, curOffset - beginOffset, semitones);
+            AddGlobalCispose(beginOffset, curOffset - beginOffset, semitones);
             break;
         }
 
-        case EVENT_TRANSPOSE: {
+        case EVENT_CISPOSE: {
             int8_t semitones = GetByte(curOffset++);
-            shared->spcTranspose = semitones;
-            AddTranspose(beginOffset, curOffset - beginOffset, semitones);
+            shared->spcCispose = semitones;
+            AddCispose(beginOffset, curOffset - beginOffset, semitones);
             break;
         }
 
@@ -1498,18 +1498,18 @@ bool NinSnesTrack::ReadEvent(void) {
                 switch (parentSeq->version) {
                     case NINSNES_INTELLI_FE3: {
                         uint8_t tuningIndex = tuningByte & 15;
-                        uint8_t transposeIndex = (tuningByte & 0x70) >> 4;
+                        uint8_t cisposeIndex = (tuningByte & 0x70) >> 4;
 
                         if (tuningIndex != 0) {
                             uint8_t newTuning = (tuningIndex - 1) * 5;
                             AddFineTuningNoItem((newTuning / 256.0) * 100.0);
                         }
 
-                        if (transposeIndex != 0) {
-                            const int8_t FE3_TRANSPOSE_TABLE[7] = {-24, -12, -1, 0, 1, 12, 24};
-                            int8_t newTranspose = FE3_TRANSPOSE_TABLE[transposeIndex - 1];
-                            shared->spcTranspose = newTranspose;
-                            transpose = newTranspose;
+                        if (cisposeIndex != 0) {
+                            const int8_t FE3_CISPOSE_TABLE[7] = {-24, -12, -1, 0, 1, 12, 24};
+                            int8_t newCispose = FE3_CISPOSE_TABLE[cisposeIndex - 1];
+                            shared->spcCispose = newCispose;
+                            cispose = newCispose;
                         }
 
                         break;
@@ -1517,9 +1517,9 @@ bool NinSnesTrack::ReadEvent(void) {
 
                     case NINSNES_INTELLI_TA:
                     case NINSNES_INTELLI_FE4: {
-                        int8_t newTranspose = tuningByte;
-                        shared->spcTranspose = newTranspose;
-                        transpose = newTranspose;
+                        int8_t newCispose = tuningByte;
+                        shared->spcCispose = newCispose;
+                        cispose = newCispose;
 
                         uint8_t newTuning = (instrByte >> 3) * 5;
                         AddFineTuningNoItem((newTuning / 256.0) * 100.0);

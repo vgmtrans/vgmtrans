@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -28,7 +28,7 @@ class NoteEvent;
 typedef enum {
     MIDIEVENT_UNDEFINED,
     MIDIEVENT_MASTERVOL,
-    MIDIEVENT_GLOBALTRANSPOSE,
+    MIDIEVENT_GLOBALCISPOSE,
     MIDIEVENT_BANKSELECT,
     MIDIEVENT_BANKSELECTFINE,
     MIDIEVENT_MARKER,
@@ -135,7 +135,7 @@ class MidiTrack {
     void InsertModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
     void AddModulationDepthRange(uint8_t channel, double semitones);
     void InsertModulationDepthRange(uint8_t channel, double semitones, uint32_t absTime);
-    // void AddTranspose(uint8_t channel, int transpose);
+    // void AddCispose(uint8_t channel, int cispose);
     void AddProgramChange(uint8_t channel, uint8_t progNum);
     void AddBankSelect(uint8_t channel, uint8_t bank);
     void AddBankSelectFine(uint8_t channel, uint8_t lsb);
@@ -165,8 +165,8 @@ class MidiTrack {
     void InsertXGReset(uint32_t absTime);
 
     // SPECIAL EVENTS
-    // void AddTranspose(int8_t semitones);
-    void InsertGlobalTranspose(uint32_t absTime, int8_t semitones);
+    // void AddCispose(int8_t semitones);
+    void InsertGlobalCispose(uint32_t absTime, int8_t semitones);
     void AddMarker(uint8_t channel, const std::string &markername, uint8_t databyte1,
                    uint8_t databyte2, int8_t priority = PRIORITY_MIDDLE);
 
@@ -214,7 +214,7 @@ class MidiFile {
 
     std::vector<MidiTrack *> aTracks;
     MidiTrack globalTrack;  // events in the globalTrack will be copied into every other track
-    int8_t globalTranspose;
+    int8_t globalCispose;
     bool bMonophonicTracks;
 };
 
@@ -499,10 +499,10 @@ class TrackNameEvent : public MidiEvent {
 };
 
 // SPECIAL EVENTS THAT AFFECT OTHER MIDI EVENTS RATHER THAN DIRECTLY OUTPUT TO THE FILE
-class GlobalTransposeEvent : public MidiEvent {
+class GlobalCisposeEvent : public MidiEvent {
    public:
-    GlobalTransposeEvent(MidiTrack *prntTrk, uint32_t absoluteTime, int8_t semitones);
-    virtual MidiEventType GetEventType() { return MIDIEVENT_GLOBALTRANSPOSE; }
+    GlobalCisposeEvent(MidiTrack *prntTrk, uint32_t absoluteTime, int8_t semitones);
+    virtual MidiEventType GetEventType() { return MIDIEVENT_GLOBALCISPOSE; }
     virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 
     int8_t semitones;

@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -110,8 +110,8 @@ void RareSnesSeq::LoadEventMap() {
     EventMap[0x10] = EVENT_ADSR;
     EventMap[0x11] = EVENT_MASTVOLLR;
     EventMap[0x12] = EVENT_TUNING;
-    EventMap[0x13] = EVENT_TRANSPABS;
-    EventMap[0x14] = EVENT_TRANSPREL;
+    EventMap[0x13] = EVENT_CISPABS;
+    EventMap[0x14] = EVENT_CISPREL;
     EventMap[0x15] = EVENT_ECHOPARAM;
     EventMap[0x16] = EVENT_ECHOON;
     EventMap[0x17] = EVENT_ECHOOFF;
@@ -252,8 +252,8 @@ void RareSnesTrack::ResetVars(void) {
 
     rptNestLevel = 0;
     spcNotePitch = 0;
-    spcTranspose = 0;
-    spcTransposeAbs = 0;
+    spcCispose = 0;
+    spcCisposeAbs = 0;
     spcInstr = 0;
     spcADSR = 0x8EE0;
     spcTuning = 0;
@@ -305,7 +305,7 @@ bool RareSnesTrack::ReadEvent(void) {
         }
 
         uint8_t key = noteByte - 0x81;
-        uint8_t spcKey = std::min(std::max(noteByte - 0x80 + 36 + spcTranspose, 0), 0x7f);
+        uint8_t spcKey = std::min(std::max(noteByte - 0x80 + 36 + spcCispose, 0), 0x7f);
 
         uint16_t dur;
         if (defNoteDur != 0) {
@@ -330,13 +330,13 @@ bool RareSnesTrack::ReadEvent(void) {
             int8_t instrTuningDelta = 0;
             if (parentSeq->instrUnityKeyHints.find(spcInstr) ==
                 parentSeq->instrUnityKeyHints.end()) {
-                parentSeq->instrUnityKeyHints[spcInstr] = spcTransposeAbs;
+                parentSeq->instrUnityKeyHints[spcInstr] = spcCisposeAbs;
                 parentSeq->instrPitchHints[spcInstr] =
                     (int16_t)std::round(GetTuningInSemitones(spcTuning) * 100.0);
             } else {
                 // check difference between preserved tuning and current tuning
                 // example case: Donkey Kong Country 2 - Forest Interlude (Pads)
-                instrTuningDelta = spcTransposeAbs - parentSeq->instrUnityKeyHints[spcInstr];
+                instrTuningDelta = spcCisposeAbs - parentSeq->instrUnityKeyHints[spcInstr];
             }
             if (parentSeq->instrADSRHints.find(spcInstr) == parentSeq->instrADSRHints.end()) {
                 parentSeq->instrADSRHints[spcInstr] = spcADSR;
@@ -680,33 +680,33 @@ bool RareSnesTrack::ReadEvent(void) {
                 break;
             }
 
-            case EVENT_TRANSPABS:  // should be used for pitch correction of instrument
+            case EVENT_CISPABS:  // should be used for pitch correction of instrument
             {
-                int8_t newTransp = (int8_t)GetByte(curOffset++);
-                spcTranspose = spcTransposeAbs = newTransp;
-                // AddTranspose(beginOffset, curOffset-beginOffset, 0, "Transpose (Abs)");
+                int8_t newCisp = (int8_t)GetByte(curOffset++);
+                spcCispose = spcCisposeAbs = newCisp;
+                // AddCispose(beginOffset, curOffset-beginOffset, 0, "Cispose (Abs)");
 
                 // add event without MIDI event
-                desc << "Transpose: " << newTransp;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", desc.str(),
-                                CLR_TRANSPOSE, ICON_CONTROL);
+                desc << "Cispose: " << newCisp;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Cispose", desc.str(),
+                                CLR_CISPOSE, ICON_CONTROL);
 
                 cKeyCorrection = SEQ_KEYOFS;
                 break;
             }
 
-            case EVENT_TRANSPREL: {
-                int8_t deltaTransp = (int8_t)GetByte(curOffset++);
-                spcTranspose = (spcTranspose + deltaTransp) & 0xff;
-                // AddTranspose(beginOffset, curOffset-beginOffset, spcTransposeAbs - spcTranspose,
-                // "Transpose (Rel)");
+            case EVENT_CISPREL: {
+                int8_t deltaCisp = (int8_t)GetByte(curOffset++);
+                spcCispose = (spcCispose + deltaCisp) & 0xff;
+                // AddCispose(beginOffset, curOffset-beginOffset, spcCisposeAbs - spcCispose,
+                // "Cispose (Rel)");
 
                 // add event without MIDI event
-                desc << "Transpose: " << deltaTransp;
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Transpose (Relative)",
-                                desc.str(), CLR_TRANSPOSE, ICON_CONTROL);
+                desc << "Cispose: " << deltaCisp;
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Cispose (Relative)",
+                                desc.str(), CLR_CISPOSE, ICON_CONTROL);
 
-                cKeyCorrection += deltaTransp;
+                cKeyCorrection += deltaCisp;
                 break;
             }
 
@@ -999,10 +999,10 @@ bool RareSnesTrack::ReadEvent(void) {
 
             case EVENT_VOICEPARAMSHORT: {
                 uint8_t newProg = GetByte(curOffset++);
-                int8_t newTransp = (int8_t)GetByte(curOffset++);
+                int8_t newCisp = (int8_t)GetByte(curOffset++);
                 int8_t newTuning = (int8_t)GetByte(curOffset++);
 
-                desc << "Program Number: " << (int)newProg << "  Transpose: " << (int)newTransp
+                desc << "Program Number: " << (int)newProg << "  Cispose: " << (int)newCisp
                      << "  Tuning: " << (int)newTuning << " ("
                      << (int)(GetTuningInSemitones(newTuning) * 100 + 0.5) << " cents)";
                 ;
@@ -1010,10 +1010,10 @@ bool RareSnesTrack::ReadEvent(void) {
                 // instrument
                 spcInstr = newProg;
                 AddProgramChange(beginOffset, curOffset - beginOffset, newProg, true,
-                                 "Program Change, Transpose, Tuning");
+                                 "Program Change, Cispose, Tuning");
 
-                // transpose
-                spcTranspose = spcTransposeAbs = newTransp;
+                // cispose
+                spcCispose = spcCisposeAbs = newCisp;
                 cKeyCorrection = SEQ_KEYOFS;
 
                 // tuning
@@ -1023,14 +1023,14 @@ bool RareSnesTrack::ReadEvent(void) {
 
             case EVENT_VOICEPARAM: {
                 uint8_t newProg = GetByte(curOffset++);
-                int8_t newTransp = (int8_t)GetByte(curOffset++);
+                int8_t newCisp = (int8_t)GetByte(curOffset++);
                 int8_t newTuning = (int8_t)GetByte(curOffset++);
                 int8_t newVolL = (int8_t)GetByte(curOffset++);
                 int8_t newVolR = (int8_t)GetByte(curOffset++);
                 uint16_t newADSR = GetShortBE(curOffset);
                 curOffset += 2;
 
-                desc << "Program Number: " << (int)newProg << "  Transpose: " << (int)newTransp
+                desc << "Program Number: " << (int)newProg << "  Cispose: " << (int)newCisp
                      << "  Tuning: " << (int)newTuning << " ("
                      << (int)(GetTuningInSemitones(newTuning) * 100 + 0.5) << " cents)";
                 ;
@@ -1041,10 +1041,10 @@ bool RareSnesTrack::ReadEvent(void) {
                 // instrument
                 spcInstr = newProg;
                 AddProgramChange(beginOffset, curOffset - beginOffset, newProg, true,
-                                 "Program Change, Transpose, Tuning, Volume L/R, ADSR");
+                                 "Program Change, Cispose, Tuning, Volume L/R, ADSR");
 
-                // transpose
-                spcTranspose = spcTransposeAbs = newTransp;
+                // cispose
+                spcCispose = spcCisposeAbs = newCisp;
                 cKeyCorrection = SEQ_KEYOFS;
 
                 // tuning

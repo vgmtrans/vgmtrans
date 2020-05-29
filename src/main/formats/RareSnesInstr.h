@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -47,7 +47,7 @@ class RareSnesInstrSet : public VGMInstrSet {
 class RareSnesInstr : public VGMInstr {
    public:
     RareSnesInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t theBank, uint32_t theInstrNum,
-                  uint32_t spcDirAddr, int8_t transpose = 0, int16_t pitch = 0,
+                  uint32_t spcDirAddr, int8_t cispose = 0, int16_t pitch = 0,
                   uint16_t adsr = 0x8FE0, const std::string &name = "RareSnesInstr");
     virtual ~RareSnesInstr(void);
 
@@ -55,7 +55,7 @@ class RareSnesInstr : public VGMInstr {
 
    protected:
     uint32_t spcDirAddr;
-    int8_t transpose;
+    int8_t cispose;
     int16_t pitch;
     uint16_t adsr;
 };
@@ -66,14 +66,14 @@ class RareSnesInstr : public VGMInstr {
 
 class RareSnesRgn : public VGMRgn {
    public:
-    RareSnesRgn(RareSnesInstr *instr, uint32_t offset, int8_t transpose = 0, int16_t pitch = 0,
+    RareSnesRgn(RareSnesInstr *instr, uint32_t offset, int8_t cispose = 0, int16_t pitch = 0,
                 uint16_t adsr = 0x8FE0);
     virtual ~RareSnesRgn(void);
 
     virtual bool LoadRgn();
 
    protected:
-    int8_t transpose;
+    int8_t cispose;
     int16_t pitch;
     uint16_t adsr;
 };

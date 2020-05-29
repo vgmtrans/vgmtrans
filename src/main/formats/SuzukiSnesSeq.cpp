@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -146,8 +146,8 @@ void SuzukiSnesSeq::LoadEventMap() {
     EventMap[0xe9] = EVENT_PAN_LFO_ON;
     EventMap[0xea] = EVENT_PAN_LFO_RESTART;
     EventMap[0xeb] = EVENT_PAN_LFO_OFF;
-    EventMap[0xec] = EVENT_TRANSPOSE_ABS;
-    EventMap[0xed] = EVENT_TRANSPOSE_REL;
+    EventMap[0xec] = EVENT_CISPOSE_ABS;
+    EventMap[0xed] = EVENT_CISPOSE_REL;
     EventMap[0xee] = EVENT_PERC_ON;
     EventMap[0xef] = EVENT_PERC_OFF;
     EventMap[0xf0] = EVENT_VIBRATO_ON;
@@ -666,20 +666,20 @@ bool SuzukiSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE_ABS: {
-            // TODO: fraction part of transpose?
-            int8_t newTranspose = GetByte(curOffset++);
-            int8_t semitones = newTranspose / 4;
-            AddTranspose(beginOffset, curOffset - beginOffset, semitones);
+        case EVENT_CISPOSE_ABS: {
+            // TODO: fraction part of cispose?
+            int8_t newCispose = GetByte(curOffset++);
+            int8_t semitones = newCispose / 4;
+            AddCispose(beginOffset, curOffset - beginOffset, semitones);
             break;
         }
 
-        case EVENT_TRANSPOSE_REL: {
-            // TODO: fraction part of transpose?
-            int8_t newTranspose = GetByte(curOffset++);
-            int8_t semitones = newTranspose / 4;
-            AddTranspose(beginOffset, curOffset - beginOffset, transpose + semitones,
-                         "Transpose (Relative)");
+        case EVENT_CISPOSE_REL: {
+            // TODO: fraction part of cispose?
+            int8_t newCispose = GetByte(curOffset++);
+            int8_t semitones = newCispose / 4;
+            AddCispose(beginOffset, curOffset - beginOffset, cispose + semitones,
+                         "Cispose (Relative)");
             break;
         }
 

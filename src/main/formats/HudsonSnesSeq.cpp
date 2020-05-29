@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -424,8 +424,8 @@ void HudsonSnesSeq::LoadEventMap() {
     EventMap[0xe4] = EVENT_ECHO_VOLUME;
     EventMap[0xe5] = EVENT_ECHO_PARAM;
     EventMap[0xe6] = EVENT_ECHO_ON;
-    EventMap[0xe7] = EVENT_TRANSPOSE_ABS;
-    EventMap[0xe8] = EVENT_TRANSPOSE_REL;
+    EventMap[0xe7] = EVENT_CISPOSE_ABS;
+    EventMap[0xe8] = EVENT_CISPOSE_REL;
     EventMap[0xe9] = EVENT_PITCH_ATTACK_ENV_ON;
     EventMap[0xea] = EVENT_PITCH_ATTACK_ENV_OFF;
     EventMap[0xeb] = EVENT_LOOP_POINT;
@@ -918,16 +918,16 @@ bool HudsonSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE_ABS: {
-            int8_t newTranspose = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+        case EVENT_CISPOSE_ABS: {
+            int8_t newCispose = GetByte(curOffset++);
+            AddCispose(beginOffset, curOffset - beginOffset, newCispose);
             break;
         }
 
-        case EVENT_TRANSPOSE_REL: {
+        case EVENT_CISPOSE_REL: {
             int8_t delta = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, transpose + delta,
-                         "Transpose (Relative)");
+            AddCispose(beginOffset, curOffset - beginOffset, cispose + delta,
+                         "Cispose (Relative)");
             break;
         }
 

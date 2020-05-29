@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -503,7 +503,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
             int8_t newTuning = GetByte(curOffset++);
             desc << "Hearz: " << (newTuning >= 0 ? "+" : "") << newTuning << " Hz";
             AddGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc.str(),
-                            CLR_TRANSPOSE, ICON_CONTROL);
+                            CLR_CISPOSE, ICON_CONTROL);
 
             // TODO: more accurate fine tuning
             AddFineTuningNoItem(newTuning / 128.0 * 64.0);

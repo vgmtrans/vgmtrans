@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -57,8 +57,8 @@ enum SuzukiSnesSeqEventType {
     EVENT_PAN_LFO_ON,
     EVENT_PAN_LFO_RESTART,
     EVENT_PAN_LFO_OFF,
-    EVENT_TRANSPOSE_ABS,
-    EVENT_TRANSPOSE_REL,
+    EVENT_CISPOSE_ABS,
+    EVENT_CISPOSE_REL,
     EVENT_PERC_ON,
     EVENT_PERC_OFF,
     EVENT_VIBRATO_ON,

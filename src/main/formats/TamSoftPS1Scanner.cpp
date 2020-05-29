@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -9,7 +9,7 @@
 #include <fmt/format.h>
 #include "TamSoftPS1Instr.h"
 #include "ScannerManager.h"
-namespace vgmtrans::scanners {
+namespace vgmcis::scanners {
 ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TAMSOFTPS1", {"tsq", "tvb"});
 }
 

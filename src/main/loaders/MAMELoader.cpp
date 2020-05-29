@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -15,7 +15,7 @@
 #include <memory>
 #include <cstdlib>
 
-namespace vgmtrans::loaders {
+namespace vgmcis::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");
 }
 

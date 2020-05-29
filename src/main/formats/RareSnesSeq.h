@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -46,8 +46,8 @@ enum RareSnesSeqEventType {
     EVENT_MASTVOL,
     EVENT_MASTVOLLR,
     EVENT_TUNING,
-    EVENT_TRANSPABS,
-    EVENT_TRANSPREL,
+    EVENT_CISPABS,
+    EVENT_CISPREL,
     EVENT_ECHOPARAM,
     EVENT_ECHOON,
     EVENT_ECHOOFF,
@@ -137,8 +137,8 @@ class RareSnesTrack : public SeqTrack {
     uint32_t rptRetnAddr[RARESNES_RPTNESTMAX];  // return address for repeat-subroutine command
     uint16_t spcNotePitch;    // SPC700 pitch register value (0000-3fff), converter will need it for
                               // pitch slide
-    int8_t spcTranspose;      // transpose (compatible with actual engine)
-    int8_t spcTransposeAbs;   // transpose (without relative change)
+    int8_t spcCispose;      // cispose (compatible with actual engine)
+    int8_t spcCisposeAbs;   // cispose (without relative change)
     int8_t spcTuning;         // tuning (compatible with actual engine)
     int8_t spcVolL, spcVolR;  // SPC700 left/right volume
     uint8_t spcInstr;         // SPC700 instrument index (NOT SRCN value)

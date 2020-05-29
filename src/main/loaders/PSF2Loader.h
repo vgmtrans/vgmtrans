@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -20,6 +20,6 @@ class PSF2Loader final : public FileLoader {
     int psf2unpack(const RawFile *file, unsigned long fileoffset, unsigned long dircount);
 };
 
-namespace vgmtrans::loaders {
+namespace vgmcis::loaders {
 LoaderRegistration<PSF2Loader> _psf2("PSF2");
 }

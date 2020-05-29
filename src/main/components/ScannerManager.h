@@ -55,7 +55,7 @@ class ScannerManager final {
     std::unordered_map<std::string, std::vector<scannerSpawner>> m_generators_ext;
 };
 
-namespace vgmtrans::scanners {
+namespace vgmcis::scanners {
 template <typename T>
 class ScannerRegistration final {
    public:
@@ -71,4 +71,4 @@ class ScannerRegistration final {
         }
     }
 };
-}  // namespace vgmtrans::scanners
+}  // namespace vgmcis::scanners

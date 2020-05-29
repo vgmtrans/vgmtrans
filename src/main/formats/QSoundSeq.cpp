@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -484,17 +484,17 @@ bool QSoundTrack::ReadEvent(void) {
                                 CLR_CHANGESTATE);
                 break;
 
-            // Global Transpose
+            // Global Cispose
             case 0x0A: {
-                int8_t globTranspose = GetByte(curOffset++);
-                AddGlobalTranspose(beginOffset, curOffset - beginOffset, globTranspose);
+                int8_t globCispose = GetByte(curOffset++);
+                AddGlobalCispose(beginOffset, curOffset - beginOffset, globCispose);
                 break;
             }
 
-            // Transpose
+            // Cispose
             case 0x0B:
-                transpose = GetByte(curOffset++);
-                AddTranspose(beginOffset, curOffset - beginOffset, transpose);
+                cispose = GetByte(curOffset++);
+                AddCispose(beginOffset, curOffset - beginOffset, cispose);
                 break;
 
             // Pitch bend - only gets applied at Note-on, but don't care.  It's used mostly as a

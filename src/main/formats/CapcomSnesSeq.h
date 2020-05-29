@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -35,8 +35,8 @@ enum CapcomSnesSeqEventType {
     EVENT_VOLUME,
     EVENT_PROGRAM_CHANGE,
     EVENT_OCTAVE,
-    EVENT_GLOBAL_TRANSPOSE,
-    EVENT_TRANSPOSE,
+    EVENT_GLOBAL_CISPOSE,
+    EVENT_CISPOSE,
     EVENT_TUNING,
     EVENT_PORTAMENTO_TIME,
     EVENT_REPEAT_UNTIL_1,
@@ -72,7 +72,7 @@ class CapcomSnesSeq : public VGMSeq {
     std::map<uint8_t, CapcomSnesSeqEventType> EventMap;
 
     bool priorityInHeader;
-    int8_t transpose;
+    int8_t cispose;
     uint16_t tempo;
     uint8_t midiReverb;
 
@@ -109,7 +109,7 @@ class CapcomSnesTrack : public SeqTrack {
     uint8_t repeatCount[CAPCOM_SNES_REPEAT_SLOT_MAX];  // repeat count for repeat command
     uint8_t noteAttributes;
     uint8_t durationRate;
-    // int8_t transpose;
+    // int8_t cispose;
 
     bool lastNoteSlurred;
     int8_t lastKey;

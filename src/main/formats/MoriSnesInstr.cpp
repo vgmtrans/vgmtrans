@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -236,7 +236,7 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr, MoriSnesVersion ver, uint32_t spc
         pan = instrHint.pan / 32.0;
     }
     if (percNoteKey >= 0) {
-        int8_t unityKeyCandidate = percNoteKey - (instrHint.transpose - unityKey);  // correct?
+        int8_t unityKeyCandidate = percNoteKey - (instrHint.cispose - unityKey);  // correct?
         int8_t negativeUnityKeyAmount = 0;
         if (unityKeyCandidate < 0) {
             negativeUnityKeyAmount = -unityKeyCandidate;

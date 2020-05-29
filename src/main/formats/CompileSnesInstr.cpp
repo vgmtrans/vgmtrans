@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -120,8 +120,8 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr, CompileSnesVersion ver,
                                uint16_t addrTuningTableItem, uint16_t addrPitchTablePtrs,
                                uint8_t srcn, uint32_t spcDirAddr)
     : VGMRgn(instr, addrTuningTableItem, CompileSnesInstr::ExpectedSize(ver)), version(ver) {
-    int8_t transpose = GetByte(addrTuningTableItem);
-    AddUnityKey(transpose, addrTuningTableItem, 1);
+    int8_t cispose = GetByte(addrTuningTableItem);
+    AddUnityKey(cispose, addrTuningTableItem, 1);
 
     const uint16_t REGULAR_PITCH_TABLE[0x77] = {
         0x0012, 0x0013, 0x0014, 0x0015, 0x0017, 0x0018, 0x0019, 0x001b, 0x001d, 0x001e, 0x0020,
@@ -193,8 +193,8 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr, CompileSnesVersion ver,
         fine_tuning += 1.0;
     }
 
-    // apply per-instrument transpose
-    coarse_tuning += transpose;
+    // apply per-instrument cispose
+    coarse_tuning += cispose;
 
     // set final result
     unityKey = theUnityKey - 24 - (int)(coarse_tuning);

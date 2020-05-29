@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -141,7 +141,7 @@ void ChunSnesSeq::LoadEventMap() {
     EventMap[0xf7] = EVENT_UNKNOWN1;
     EventMap[0xf8] = EVENT_CALL;
     EventMap[0xf9] = EVENT_RET;
-    EventMap[0xfa] = EVENT_TRANSPOSE;
+    EventMap[0xfa] = EVENT_CISPOSE;
     EventMap[0xfb] = EVENT_PITCH_SLIDE;
     EventMap[0xfc] = EVENT_ECHO_ON;
     EventMap[0xfd] = EVENT_ECHO_OFF;
@@ -736,9 +736,9 @@ bool ChunSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE: {
-            int8_t newTranspose = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+        case EVENT_CISPOSE: {
+            int8_t newCispose = GetByte(curOffset++);
+            AddCispose(beginOffset, curOffset - beginOffset, newCispose);
             break;
         }
 

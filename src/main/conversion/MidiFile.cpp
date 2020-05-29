@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -12,7 +12,7 @@
 MidiFile::MidiFile(VGMSeq *theAssocSeq)
     : assocSeq(theAssocSeq),
       globalTrack(this, false),
-      globalTranspose(0),
+      globalCispose(0),
       bMonophonicTracks(false) {
     this->bMonophonicTracks = assocSeq->bMonophonicTracks;
     this->globalTrack.bMonophonic = this->bMonophonicTracks;
@@ -93,12 +93,12 @@ void MidiFile::WriteMidiToBuffer(std::vector<uint8_t> &buf) {
     for (uint32_t i = 0; i < aTracks.size(); i++) {
         if (aTracks[i]) {
             std::vector<uint8_t> trackBuf;
-            globalTranspose = 0;
+            globalCispose = 0;
             aTracks[i]->WriteTrack(trackBuf);
             buf.insert(buf.end(), trackBuf.begin(), trackBuf.end());
         }
     }
-    globalTranspose = 0;
+    globalCispose = 0;
 }
 
 //  *********
@@ -554,16 +554,16 @@ void MidiTrack::InsertTrackName(const std::string &wstr, uint32_t absTime) {
 
 // SPECIAL NON-MIDI EVENTS
 
-// Transpose events offset the key when we write the Midi file.
-//  used to implement global transpose events found in QSound
+// Cispose events offset the key when we write the Midi file.
+//  used to implement global cispose events found in QSound
 
-// void MidiTrack::AddTranspose(int8_t semitones)
+// void MidiTrack::AddCispose(int8_t semitones)
 //{
-//	aEvents.push_back(new TransposeEvent(this, GetDelta(), semitones));
+//	aEvents.push_back(new CisposeEvent(this, GetDelta(), semitones));
 //}
 
-void MidiTrack::InsertGlobalTranspose(uint32_t absTime, int8_t semitones) {
-    aEvents.push_back(new GlobalTransposeEvent(this, absTime, semitones));
+void MidiTrack::InsertGlobalCispose(uint32_t absTime, int8_t semitones) {
+    aEvents.push_back(new GlobalCisposeEvent(this, absTime, semitones));
 }
 
 void MidiTrack::AddMarker(uint8_t channel, const std::string &markername, uint8_t databyte1,
@@ -685,7 +685,7 @@ uint32_t NoteEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
     if (prntTrk->bMonophonic && !bNoteDown)
         buf.push_back(prntTrk->prevKey);
     else {
-        prntTrk->prevKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
+        prntTrk->prevKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalCispose);
         buf.push_back(prntTrk->prevKey);
     }
     // buf.push_back(key);
@@ -962,16 +962,16 @@ void MidiTrack::InsertXGReset(uint32_t absTime) {
 //***************
 
 //  **************
-//  TransposeEvent
+//  CisposeEvent
 //  **************
 
-GlobalTransposeEvent::GlobalTransposeEvent(MidiTrack *prntTrk, uint32_t absoluteTime,
+GlobalCisposeEvent::GlobalCisposeEvent(MidiTrack *prntTrk, uint32_t absoluteTime,
                                            int8_t theSemitones)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {
     semitones = theSemitones;
 }
 
-uint32_t GlobalTransposeEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
-    this->prntTrk->parentSeq->globalTranspose = this->semitones;
+uint32_t GlobalCisposeEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
+    this->prntTrk->parentSeq->globalCispose = this->semitones;
     return time;
 }

@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -249,7 +249,7 @@ void AkaoSnesSeq::LoadEventMap() {
         EventMap[0xd7] = EVENT_PAN_FADE;
         EventMap[0xd8] = EVENT_ECHO_VOLUME;
         EventMap[0xd9] = EVENT_ECHO_VOLUME_FADE;
-        EventMap[0xda] = EVENT_TRANSPOSE_ABS;
+        EventMap[0xda] = EVENT_CISPOSE_ABS;
         EventMap[0xdb] = EVENT_PITCH_SLIDE_ON;
         EventMap[0xdc] = EVENT_PITCH_SLIDE_OFF;
         EventMap[0xdd] = EVENT_TREMOLO_ON;
@@ -310,8 +310,8 @@ void AkaoSnesSeq::LoadEventMap() {
         EventMap[0xe4] = EVENT_OCTAVE;
         EventMap[0xe5] = EVENT_OCTAVE_UP;
         EventMap[0xe6] = EVENT_OCTAVE_DOWN;
-        EventMap[0xe7] = EVENT_TRANSPOSE_ABS;
-        EventMap[0xe8] = EVENT_TRANSPOSE_REL;
+        EventMap[0xe7] = EVENT_CISPOSE_ABS;
+        EventMap[0xe8] = EVENT_CISPOSE_REL;
         EventMap[0xe9] = EVENT_TUNING;
         EventMap[0xea] = EVENT_PROGCHANGE;
         EventMap[0xeb] = EVENT_ADSR_AR;
@@ -369,8 +369,8 @@ void AkaoSnesSeq::LoadEventMap() {
         EventMap[0xd6] = EVENT_OCTAVE;
         EventMap[0xd7] = EVENT_OCTAVE_UP;
         EventMap[0xd8] = EVENT_OCTAVE_DOWN;
-        EventMap[0xd9] = EVENT_TRANSPOSE_ABS;
-        EventMap[0xda] = EVENT_TRANSPOSE_REL;
+        EventMap[0xd9] = EVENT_CISPOSE_ABS;
+        EventMap[0xda] = EVENT_CISPOSE_REL;
         EventMap[0xdb] = EVENT_TUNING;
         EventMap[0xdc] = EVENT_PROGCHANGE;
         EventMap[0xdd] = EVENT_ADSR_AR;
@@ -645,7 +645,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
                 if (percussion) {
                     AddNoteByDur(beginOffset, curOffset - beginOffset,
-                                 noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, vel, dur,
+                                 noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - cispose, vel, dur,
                                  "Percussion Note with Duration");
                 } else {
                     AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
@@ -898,16 +898,16 @@ bool AkaoSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE_ABS: {
-            int8_t newTranspose = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+        case EVENT_CISPOSE_ABS: {
+            int8_t newCispose = GetByte(curOffset++);
+            AddCispose(beginOffset, curOffset - beginOffset, newCispose);
             break;
         }
 
-        case EVENT_TRANSPOSE_REL: {
-            int8_t newTranspose = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, transpose + newTranspose,
-                         "Transpose (Relative)");
+        case EVENT_CISPOSE_REL: {
+            int8_t newCispose = GetByte(curOffset++);
+            AddCispose(beginOffset, curOffset - beginOffset, cispose + newCispose,
+                         "Cispose (Relative)");
             break;
         }
 

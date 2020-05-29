@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -70,7 +70,7 @@ bool CompileSnesSeq::GetHeaderInfo(void) {
         trackHeader->AddSimpleItem(curOffset + 2, 1, "Volume");
         trackHeader->AddSimpleItem(curOffset + 3, 1, "Volume Envelope");
         trackHeader->AddSimpleItem(curOffset + 4, 1, "Vibrato");
-        trackHeader->AddSimpleItem(curOffset + 5, 1, "Transpose");
+        trackHeader->AddSimpleItem(curOffset + 5, 1, "Cispose");
         trackHeader->AddTempo(curOffset + 6, 1);
         trackHeader->AddSimpleItem(curOffset + 7, 1, "Branch ID (Channel #)");
         trackHeader->AddSimpleItem(curOffset + 8, 2, "Score Pointer");
@@ -92,7 +92,7 @@ bool CompileSnesSeq::GetTrackPointers(void) {
         CompileSnesTrack *track = new CompileSnesTrack(this, ofsTrackStart);
         track->spcInitialFlags = GetByte(curOffset + 1);
         track->spcInitialVolume = GetByte(curOffset + 2);
-        track->spcInitialTranspose = (int8_t)GetByte(curOffset + 5);
+        track->spcInitialCispose = (int8_t)GetByte(curOffset + 5);
         track->spcInitialTempo = GetByte(curOffset + 6);
         track->spcInitialSRCN = GetByte(curOffset + 10);
         track->spcInitialPan = (int8_t)GetByte(curOffset + 12);
@@ -122,7 +122,7 @@ void CompileSnesSeq::LoadEventMap() {
     // EventMap[0x86] = 0;
     EventMap[0x87] = EVENT_VOLUME;
     EventMap[0x88] = EVENT_VOLUME_ENVELOPE;
-    EventMap[0x89] = EVENT_TRANSPOSE;
+    EventMap[0x89] = EVENT_CISPOSE;
     EventMap[0x8a] = EVENT_VOLUME_REL;
     EventMap[0x8b] = EVENT_UNKNOWN2;
     EventMap[0x8c] = EVENT_UNKNOWN1;  // NOP
@@ -205,13 +205,13 @@ void CompileSnesTrack::ResetVars(void) {
     spcNoteDuration = 1;
     spcFlags = spcInitialFlags;
     spcVolume = spcInitialVolume;
-    spcTranspose = spcInitialTranspose;
+    spcCispose = spcInitialCispose;
     spcTempo = spcInitialTempo;
     spcSRCN = spcInitialSRCN;
     spcPan = spcInitialPan;
     memset(repeatCount, 0, sizeof(repeatCount));
 
-    transpose = spcTranspose;
+    cispose = spcCispose;
 }
 
 void CompileSnesTrack::AddInitialMidiEvents(int trackNum) {
@@ -381,11 +381,11 @@ bool CompileSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE: {
+        case EVENT_CISPOSE: {
             int8_t delta = (int8_t)GetByte(curOffset++);
-            spcTranspose += delta;
-            AddTranspose(beginOffset, curOffset - beginOffset, spcTranspose,
-                         "Transpose (Relative)");
+            spcCispose += delta;
+            AddCispose(beginOffset, curOffset - beginOffset, spcCispose,
+                         "Cispose (Relative)");
             break;
         }
 

@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -16,7 +16,7 @@ struct MoriSnesInstrHint {
           seqAddress(0),
           seqSize(0),
           rgnAddress(0),
-          transpose(0),
+          cispose(0),
           pan(0) {}
 
     uint16_t startAddress;
@@ -24,7 +24,7 @@ struct MoriSnesInstrHint {
     uint16_t seqAddress;
     uint16_t seqSize;
     uint16_t rgnAddress;
-    int8_t transpose;
+    int8_t cispose;
     int8_t pan;
 };
 

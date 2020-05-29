@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -112,7 +112,7 @@ void PandoraBoxSnesSeq::LoadEventMap() {
 
     EventMap[0xe0] = EVENT_TEMPO;
     EventMap[0xe1] = EVENT_TUNING;
-    EventMap[0xe2] = EVENT_TRANSPOSE;
+    EventMap[0xe2] = EVENT_CISPOSE;
     EventMap[0xe3] = EVENT_PAN;
     EventMap[0xe4] = EVENT_INC_OCTAVE;
     EventMap[0xe5] = EVENT_DEC_OCTAVE;
@@ -330,13 +330,13 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
             int8_t newTuning = GetByte(curOffset++);
             desc << "Hearz: " << (newTuning >= 0 ? "+" : "") << newTuning << " Hz";
             AddGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc.str(),
-                            CLR_TRANSPOSE, ICON_CONTROL);
+                            CLR_CISPOSE, ICON_CONTROL);
             break;
         }
 
-        case EVENT_TRANSPOSE: {
-            int8_t newTranspose = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+        case EVENT_CISPOSE: {
+            int8_t newCispose = GetByte(curOffset++);
+            AddCispose(beginOffset, curOffset - beginOffset, newCispose);
             break;
         }
 

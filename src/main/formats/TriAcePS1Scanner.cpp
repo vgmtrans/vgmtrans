@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -11,7 +11,7 @@
 #include <memory>
 #include "ScannerManager.h"
 
-namespace vgmtrans::scanners {
+namespace vgmcis::scanners {
 ScannerRegistration<TriAcePS1Scanner> s_triace_ps1("TRIACEPS1");
 }
 

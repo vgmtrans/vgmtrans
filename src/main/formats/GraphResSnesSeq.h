@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -23,7 +23,7 @@ enum GraphResSnesSeqEventType {
     EVENT_NOTE,
     EVENT_INSTANT_VOLUME,
     EVENT_INSTANT_OCTAVE,
-    EVENT_TRANSPOSE,
+    EVENT_CISPOSE,
     EVENT_MASTER_VOLUME,
     EVENT_ECHO_VOLUME,
     EVENT_DEC_OCTAVE,

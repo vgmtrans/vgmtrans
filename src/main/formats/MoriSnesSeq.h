@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -42,8 +42,8 @@ enum MoriSnesSeqEventType {
     EVENT_OCTAVE_DOWN,
     EVENT_WAIT,
     EVENT_PITCHBENDRANGE,
-    EVENT_TRANSPOSE,
-    EVENT_TRANSPOSE_REL,
+    EVENT_CISPOSE,
+    EVENT_CISPOSE_REL,
     EVENT_TUNING_REL,
     EVENT_KEY_ON,
     EVENT_KEY_OFF,
@@ -97,7 +97,7 @@ class MoriSnesTrack : public SeqTrack {
     uint8_t spcNoteDuration;
     uint8_t spcNoteVelocity;
     uint8_t spcVolume;
-    int8_t spcTranspose;
+    int8_t spcCispose;
     uint8_t spcTuning;
 
     uint8_t spcCallStack[MORISNES_CALLSTACK_SIZE];  // shared by multiple commands

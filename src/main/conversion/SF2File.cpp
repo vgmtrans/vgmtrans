@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -24,7 +24,7 @@ SF2InfoListChunk::SF2InfoListChunk(std::string name) : LISTChunk("INFO") {
     AddChildChunk(new SF2StringChunk("isng", "EMU8000"));
     AddChildChunk(new SF2StringChunk("INAM", name));
     AddChildChunk(new SF2StringChunk("ICRD", std::string(c_time_string)));
-    AddChildChunk(new SF2StringChunk("ISFT", std::string("VGMTrans " + std::string(VERSION))));
+    AddChildChunk(new SF2StringChunk("ISFT", std::string("VGMCis " + std::string(VERSION))));
 }
 
 //  *******
@@ -146,7 +146,7 @@ SF2File::SF2File(SynthFile *synthfile) : RiffFile(synthfile->name, "sfbk") {
     // modList.sfModDestOper = startAddrsOffset;
     // modList.modAmount = 0;
     // modList.sfModAmtSrcOper = cc1_Mod;
-    // modList.sfModTransOper = linear;
+    // modList.sfModCisOper = linear;
     pdtaCk->AddChildChunk(pmodCk);
 
     //***********

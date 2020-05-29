@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -239,10 +239,10 @@ bool NDSTrack::ReadEvent(void) {
 
             // [loveemu] (ex: Puyo Pop Fever 2: BGM00)
             case 0xC3: {
-                int8_t transpose = (signed)GetByte(curOffset++);
-                AddTranspose(beginOffset, curOffset - beginOffset, transpose);
+                int8_t cispose = (signed)GetByte(curOffset++);
+                AddCispose(beginOffset, curOffset - beginOffset, cispose);
                 //			AddGenericEvent(beginOffset, curOffset-beginOffset,
-                //"Transpose", NULL, BG_CLR_GREEN);
+                //"Cispose", NULL, BG_CLR_GREEN);
                 break;
             }
 

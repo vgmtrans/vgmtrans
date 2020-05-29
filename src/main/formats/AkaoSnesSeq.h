@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -45,8 +45,8 @@ enum AkaoSnesSeqEventType {
     EVENT_OCTAVE,
     EVENT_OCTAVE_UP,
     EVENT_OCTAVE_DOWN,
-    EVENT_TRANSPOSE_ABS,
-    EVENT_TRANSPOSE_REL,
+    EVENT_CISPOSE_ABS,
+    EVENT_CISPOSE_REL,
     EVENT_TUNING,
     EVENT_PROGCHANGE,
     EVENT_VOLUME_ENVELOPE,

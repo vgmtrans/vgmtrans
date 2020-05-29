@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -38,7 +38,7 @@ enum PrismSnesSeqEventType {
     EVENT_PLAY_SONG_3,
     EVENT_PLAY_SONG_2,
     EVENT_PLAY_SONG_1,
-    EVENT_TRANSPOSE_REL,
+    EVENT_CISPOSE_REL,
     EVENT_PAN_ENVELOPE,
     EVENT_PAN_TABLE,
     EVENT_DEFAULT_LENGTH_OFF,
@@ -48,7 +48,7 @@ enum PrismSnesSeqEventType {
     EVENT_RET,
     EVENT_CALL,
     EVENT_GOTO,
-    EVENT_TRANSPOSE,
+    EVENT_CISPOSE,
     EVENT_TUNING,
     EVENT_VIBRATO_DELAY,
     EVENT_VIBRATO_OFF,

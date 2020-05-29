@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2020
+ * VGMCis (c) 2002-2020
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */

@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -177,12 +177,12 @@ ModulationDepthRangeSeqEvent::ModulationDepthRangeSeqEvent(SeqTrack *pTrack, dou
     : SeqEvent(pTrack, offset, length, name, CLR_MISC), semitones(semitones) {}
 
 // *****************
-// TransposeSeqEvent
+// CisposeSeqEvent
 // *****************
 
-TransposeSeqEvent::TransposeSeqEvent(SeqTrack *pTrack, int theTranspose, uint32_t offset,
+CisposeSeqEvent::CisposeSeqEvent(SeqTrack *pTrack, int theCispose, uint32_t offset,
                                      uint32_t length, const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, CLR_TRANSPOSE), transpose(theTranspose) {}
+    : SeqEvent(pTrack, offset, length, name, CLR_CISPOSE), cispose(theCispose) {}
 
 // ******************
 // ModulationSeqEvent

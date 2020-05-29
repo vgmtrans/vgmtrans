@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -185,7 +185,7 @@ struct sfModList {
     SFGenerator sfModDestOper;
     int16_t modAmount;
     SFModulator sfModAmtSrcOper;
-    SFTransform sfModTransOper;
+    SFTransform sfModCisOper;
 };
 
 typedef struct {
@@ -209,7 +209,7 @@ struct sfInstModList {
     SFGenerator sfModDestOper;
     int16_t modAmount;
     SFModulator sfModAmtSrcOper;
-    SFTransform sfModTransOper;
+    SFTransform sfModCisOper;
 };
 
 struct sfInstGenList {

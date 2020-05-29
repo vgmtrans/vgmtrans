@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -35,7 +35,7 @@ enum KonamiSnesSeqEventType {
     EVENT_LOOP_END_2,
     EVENT_TEMPO,
     EVENT_TEMPO_FADE,
-    EVENT_TRANSPABS,
+    EVENT_CISPABS,
     EVENT_ADSR1,
     EVENT_ADSR2,
     EVENT_VOLUME,

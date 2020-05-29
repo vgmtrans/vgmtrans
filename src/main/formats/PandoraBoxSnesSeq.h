@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -27,7 +27,7 @@ enum PandoraBoxSnesSeqEventType {
     EVENT_PROGCHANGE,
     EVENT_TEMPO,
     EVENT_TUNING,
-    EVENT_TRANSPOSE,
+    EVENT_CISPOSE,
     EVENT_PAN,
     EVENT_INC_OCTAVE,
     EVENT_DEC_OCTAVE,

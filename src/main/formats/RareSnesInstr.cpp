@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -134,11 +134,11 @@ bool RareSnesInstrSet::GetInstrPointers() {
             inst_remapped = addrToInstrLookups[offDirEnt];
         }
 
-        int8_t transpose = 0;
+        int8_t cispose = 0;
         std::map<uint8_t, int8_t>::iterator itrKey;
         itrKey = this->instrUnityKeyHints.find(inst_remapped);
         if (itrKey != instrUnityKeyHints.end()) {
-            transpose = itrKey->second;
+            cispose = itrKey->second;
         }
 
         int16_t pitch = 0;
@@ -156,7 +156,7 @@ bool RareSnesInstrSet::GetInstrPointers() {
         }
 
         RareSnesInstr *newInstr =
-            new RareSnesInstr(this, dwOffset + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose,
+            new RareSnesInstr(this, dwOffset + inst, inst >> 7, inst & 0x7f, spcDirAddr, cispose,
                               pitch, adsr, fmt::format("Instrument: {:#x}", inst));
         aInstrs.push_back(newInstr);
     }
@@ -172,11 +172,11 @@ const std::vector<uint8_t> &RareSnesInstrSet::GetAvailableInstruments() {
 // *************
 
 RareSnesInstr::RareSnesInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t theBank,
-                             uint32_t theInstrNum, uint32_t spcDirAddr, int8_t transpose,
+                             uint32_t theInstrNum, uint32_t spcDirAddr, int8_t cispose,
                              int16_t pitch, uint16_t adsr, const std::string &name)
     : VGMInstr(instrSet, offset, 1, theBank, theInstrNum, name),
       spcDirAddr(spcDirAddr),
-      transpose(transpose),
+      cispose(cispose),
       pitch(pitch),
       adsr(adsr) {}
 
@@ -191,7 +191,7 @@ bool RareSnesInstr::LoadInstr() {
 
     uint16_t addrSampStart = GetShort(offDirEnt);
 
-    RareSnesRgn *rgn = new RareSnesRgn(this, dwOffset, transpose, pitch, adsr);
+    RareSnesRgn *rgn = new RareSnesRgn(this, dwOffset, cispose, pitch, adsr);
     rgn->sampOffset = addrSampStart - spcDirAddr;
     aRgns.push_back(rgn);
     return true;
@@ -201,17 +201,17 @@ bool RareSnesInstr::LoadInstr() {
 // RareSnesRgn
 // ***********
 
-RareSnesRgn::RareSnesRgn(RareSnesInstr *instr, uint32_t offset, int8_t transpose, int16_t pitch,
+RareSnesRgn::RareSnesRgn(RareSnesInstr *instr, uint32_t offset, int8_t cispose, int16_t pitch,
                          uint16_t adsr)
-    : VGMRgn(instr, offset, 1), transpose(transpose), pitch(pitch), adsr(adsr) {
+    : VGMRgn(instr, offset, 1), cispose(cispose), pitch(pitch), adsr(adsr) {
     // normalize (it is needed especially since SF2 pitch correction is signed 8-bit)
     int16_t pitchKeyShift = (pitch / 100);
-    int8_t realTranspose = transpose + pitchKeyShift;
+    int8_t realCispose = cispose + pitchKeyShift;
     int16_t realPitch = pitch - (pitchKeyShift * 100);
 
     // NOTE_PITCH_TABLE[73] == 0x1000
     // 0x80 + (73 - 36) = 0xA5
-    SetUnityKey(36 + 36 - realTranspose);
+    SetUnityKey(36 + 36 - realCispose);
     SetFineTune(realPitch);
     SNESConvADSR<VGMRgn>(this, adsr >> 8, adsr & 0xff, 0);
 }

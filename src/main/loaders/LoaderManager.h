@@ -36,7 +36,7 @@ class LoaderManager final {
     std::unordered_map<std::string, loaderSpawner> m_generators;
 };
 
-namespace vgmtrans::loaders {
+namespace vgmcis::loaders {
 template <typename T>
 class LoaderRegistration final {
    public:
@@ -44,4 +44,4 @@ class LoaderRegistration final {
         LoaderManager::get().add(id, std::make_shared<T>);
     }
 };
-}  // namespace vgmtrans::loaders
+}  // namespace vgmcis::loaders

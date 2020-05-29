@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -54,7 +54,7 @@ void CapcomSnesSeq::ResetVars(void) {
     VGMSeq::ResetVars();
 
     midiReverb = 40;
-    transpose = 0;
+    cispose = 0;
 }
 
 bool CapcomSnesSeq::GetHeaderInfo(void) {
@@ -98,8 +98,8 @@ void CapcomSnesSeq::LoadEventMap() {
     EventMap[0x07] = EVENT_VOLUME;
     EventMap[0x08] = EVENT_PROGRAM_CHANGE;
     EventMap[0x09] = EVENT_OCTAVE;
-    EventMap[0x0a] = EVENT_GLOBAL_TRANSPOSE;
-    EventMap[0x0b] = EVENT_TRANSPOSE;
+    EventMap[0x0a] = EVENT_GLOBAL_CISPOSE;
+    EventMap[0x0b] = EVENT_CISPOSE;
     EventMap[0x0c] = EVENT_TUNING;
     EventMap[0x0d] = EVENT_PORTAMENTO_TIME;
     EventMap[0x0e] = EVENT_REPEAT_UNTIL_1;
@@ -159,7 +159,7 @@ void CapcomSnesTrack::ResetVars(void) {
 
     noteAttributes = 0;
     durationRate = 0;
-    transpose = 0;
+    cispose = 0;
     lastNoteSlurred = false;
     lastKey = -1;
     for (int i = 0; i < CAPCOM_SNES_REPEAT_SLOT_MAX; i++) {
@@ -456,15 +456,15 @@ bool CapcomSnesTrack::ReadEvent(void) {
                 break;
             }
 
-            case EVENT_GLOBAL_TRANSPOSE: {
-                int8_t newTranspose = GetByte(curOffset++);
-                AddGlobalTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+            case EVENT_GLOBAL_CISPOSE: {
+                int8_t newCispose = GetByte(curOffset++);
+                AddGlobalCispose(beginOffset, curOffset - beginOffset, newCispose);
                 break;
             }
 
-            case EVENT_TRANSPOSE: {
-                int8_t newTranspose = GetByte(curOffset++);
-                AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+            case EVENT_CISPOSE: {
+                int8_t newCispose = GetByte(curOffset++);
+                AddCispose(beginOffset, curOffset - beginOffset, newCispose);
                 break;
             }
 

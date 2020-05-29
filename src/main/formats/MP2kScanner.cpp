@@ -1,6 +1,6 @@
 /*
- * VGMTrans (c) 2002-2019
- * VGMTransQt (c) 2020
+ * VGMCis (c) 2002-2019
+ * VGMCisQt (c) 2020
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
 
@@ -26,7 +26,7 @@
 #include "MP2kInstrSet.h"
 #include "LogManager.h"
 #include "ScannerManager.h"
-namespace vgmtrans::scanners {
+namespace vgmcis::scanners {
 ScannerRegistration<MP2kScanner> s_mp2k("MP2K", {"gba", "gsf", "minigsf", "gsflib"});
 }
 

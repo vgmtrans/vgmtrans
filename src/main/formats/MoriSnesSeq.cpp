@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -141,8 +141,8 @@ void MoriSnesSeq::LoadEventMap() {
     EventMap[0xd4] = EVENT_WAIT;
     EventMap[0xd5] = EVENT_UNKNOWN1;
     EventMap[0xd6] = EVENT_PITCHBENDRANGE;
-    EventMap[0xd7] = EVENT_TRANSPOSE;
-    EventMap[0xd8] = EVENT_TRANSPOSE_REL;
+    EventMap[0xd7] = EVENT_CISPOSE;
+    EventMap[0xd8] = EVENT_CISPOSE_REL;
     EventMap[0xd9] = EVENT_TUNING_REL;
     EventMap[0xda] = EVENT_KEY_ON;
     EventMap[0xdb] = EVENT_KEY_OFF;
@@ -187,7 +187,7 @@ void MoriSnesTrack::ResetVars(void) {
     spcNoteDuration = 1;
     spcNoteVelocity = 1;
     spcVolume = 200;
-    spcTranspose = 0;
+    spcCispose = 0;
     spcTuning = 0;
     spcCallStackPtr = 0;
 }
@@ -592,17 +592,17 @@ bool MoriSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE: {
-            int8_t newTranspose = GetByte(curOffset++);
-            spcTranspose = newTranspose;
-            AddTranspose(beginOffset, curOffset - beginOffset, spcTranspose);
+        case EVENT_CISPOSE: {
+            int8_t newCispose = GetByte(curOffset++);
+            spcCispose = newCispose;
+            AddCispose(beginOffset, curOffset - beginOffset, spcCispose);
         }
 
-        case EVENT_TRANSPOSE_REL: {
+        case EVENT_CISPOSE_REL: {
             int8_t delta = GetByte(curOffset++);
-            spcTranspose += delta;
-            AddTranspose(beginOffset, curOffset - beginOffset, spcTranspose,
-                         "Transpose (Relative)");
+            spcCispose += delta;
+            AddCispose(beginOffset, curOffset - beginOffset, spcCispose,
+                         "Cispose (Relative)");
             break;
         }
 
@@ -924,13 +924,13 @@ void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
                 bContinue = false;
                 break;
 
-            case EVENT_TRANSPOSE:
-                instrHint->transpose = GetByte(curOffset++);
+            case EVENT_CISPOSE:
+                instrHint->cispose = GetByte(curOffset++);
                 break;
 
-            case EVENT_TRANSPOSE_REL: {
+            case EVENT_CISPOSE_REL: {
                 int8_t delta = GetByte(curOffset++);
-                instrHint->transpose += delta;
+                instrHint->cispose += delta;
                 break;
             }
 

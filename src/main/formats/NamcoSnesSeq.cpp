@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -368,7 +368,7 @@ bool NamcoSnesSeq::ReadEvent(void) {
                         key = keyByte;
                         noteType = NOTE_MELODY;
                         desc << " [" << (trackIndex + 1) << "] " << key << " ("
-                             << MidiEvent::GetNoteName(key + transpose) << ")";
+                             << MidiEvent::GetNoteName(key + cispose) << ")";
                     }
 
                     if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {

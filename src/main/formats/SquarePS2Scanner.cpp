@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -7,7 +7,7 @@
 #include "SquarePS2Seq.h"
 #include "WD.h"
 #include "ScannerManager.h"
-namespace vgmtrans::scanners {
+namespace vgmcis::scanners {
 ScannerRegistration<SquarePS2Scanner> s_squareps2("SQUAREPS2");
 }
 

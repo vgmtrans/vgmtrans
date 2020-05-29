@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -91,7 +91,7 @@ class VGMSeq : public VGMFile {
     // attributes
     bool bMonophonicTracks;  // Only 1 voice at a time on a track.  We can assume note offs always
                              // use last note on key. which is important when drivers allow things
-                             // like global transposition events mid note
+                             // like global cisposition events mid note
     bool bUseLinearAmplitudeScale;  // This will cause all all velocity, volume, and expression
                                     // events to be automatically converted from a linear scale to
                                     // MIDI's logarithmic scale

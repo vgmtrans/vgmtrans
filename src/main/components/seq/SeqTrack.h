@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -151,8 +151,8 @@ class SeqTrack : public VGMContainerItem {
     void AddModulationDepthRange(uint32_t offset, uint32_t length, double semitones,
                                  const std::string &sEventName = "Modulation Depth Range");
     void AddModulationDepthRangeNoItem(double semitones);
-    void AddTranspose(uint32_t offset, uint32_t length, int8_t transpose,
-                      const std::string &sEventName = "Transpose");
+    void AddCispose(uint32_t offset, uint32_t length, int8_t cispose,
+                      const std::string &sEventName = "Cispose");
     void AddPitchBendMidiFormat(uint32_t offset, uint32_t length, uint8_t lo, uint8_t hi,
                                 const std::string &sEventName = "Pitch Bend");
     void AddModulation(uint32_t offset, uint32_t length, uint8_t depth,
@@ -209,8 +209,8 @@ class SeqTrack : public VGMContainerItem {
                        const std::string &sEventName = "Track End");
     bool AddEndOfTrackNoItem();
 
-    void AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones,
-                            const std::string &sEventName = "Global Transpose");
+    void AddGlobalCispose(uint32_t offset, uint32_t length, int8_t semitones,
+                            const std::string &sEventName = "Global Cispose");
     void AddMarker(uint32_t offset, uint32_t length, const std::string &markername,
                    uint8_t databyte1, uint8_t databyte2, const std::string &sEventName,
                    int8_t priority = 0, uint8_t color = CLR_MISC);
@@ -244,7 +244,7 @@ class SeqTrack : public VGMContainerItem {
     uint8_t mastVol;
     uint8_t prevPan;
     uint8_t prevReverb;
-    int8_t transpose;
+    int8_t cispose;
     uint32_t curOffset;
     bool bInLoop;
     int8_t cDrumNote;  //-1 signals do not use drumNote, otherwise,

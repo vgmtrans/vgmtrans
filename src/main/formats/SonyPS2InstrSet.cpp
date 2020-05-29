@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -278,7 +278,7 @@ bool SonyPS2InstrSet::GetInstrPointers() {
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 5, 1, "Size of SplitBlock");
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 6, 1, "Program Volume");
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 7, 1, "Program Panpot");
-        instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 8, 1, "Program Transpose");
+        instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 8, 1, "Program Cispose");
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 9, 1, "Program Detune");
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 10, 1, "Key Follow Pan");
         instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 11, 1,
@@ -348,7 +348,7 @@ bool SonyPS2InstrSet::GetInstrPointers() {
             splitBlockHdr->AddSimpleItem(splitOff + 15, 1, "Key Follow Pan Center");
             splitBlockHdr->AddSimpleItem(splitOff + 16, 1, "Split Volume");
             splitBlockHdr->AddSimpleItem(splitOff + 17, 1, "Split Panpot");
-            splitBlockHdr->AddSimpleItem(splitOff + 18, 1, "Split Transpose");
+            splitBlockHdr->AddSimpleItem(splitOff + 18, 1, "Split Cispose");
             splitBlockHdr->AddSimpleItem(splitOff + 19, 1, "Split Detune");
         }
     }
@@ -426,7 +426,7 @@ bool SonyPS2Instr::LoadInstr() {
                 pan = 0;
             // double realPan = (pan-0x40)* (1.0/(double)0x40);
             rgn->SetPan((uint8_t)pan);
-            rgn->SetFineTune(splitblock.splitTranspose * 100 + splitblock.splitDetune);
+            rgn->SetFineTune(splitblock.splitCispose * 100 + splitblock.splitDetune);
 
             long vol = progParam.progVolume * splitblock.splitVolume * sampParam.sampleVolume;
             // we divide the above value by 127^3 to get the percent vol it represents.  Then we

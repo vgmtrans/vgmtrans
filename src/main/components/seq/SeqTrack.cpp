@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -46,7 +46,7 @@ void SeqTrack::ResetVars() {
     prevPan = 64;
     prevReverb = 40;
     channelGroup = 0;
-    transpose = 0;
+    cispose = 0;
     cDrumNote = -1;
     cKeyCorrection = 0;
 }
@@ -374,7 +374,7 @@ void SeqTrack::AddNoteOnNoItem(int8_t key, int8_t vel) {
             finalVel = Convert7bitPercentVolValToStdMidiVal(vel);
 
         if (cDrumNote == -1) {
-            pMidiTrack->AddNoteOn(channel, key + cKeyCorrection + transpose, finalVel);
+            pMidiTrack->AddNoteOn(channel, key + cKeyCorrection + cispose, finalVel);
         } else
             AddPercNoteOnNoItem(cDrumNote, finalVel);
     }
@@ -392,7 +392,7 @@ void SeqTrack::AddPercNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_
     //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
     //	if (pDrumAssoc)
     //		key = pDrumAssoc->GMDrumNote;
-    AddNoteOn(offset, length, key - transpose, vel, sEventName);
+    AddNoteOn(offset, length, key - cispose, vel, sEventName);
     cDrumNote = origDrumNote;
     channel = origChan;
 }
@@ -405,7 +405,7 @@ void SeqTrack::AddPercNoteOnNoItem(int8_t key, int8_t vel) {
     //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
     //	if (pDrumAssoc)
     //		key = pDrumAssoc->GMDrumNote;
-    AddNoteOnNoItem(key - transpose, vel);
+    AddNoteOnNoItem(key - cispose, vel);
     cDrumNote = origDrumNote;
     channel = origChan;
 }
@@ -421,7 +421,7 @@ void SeqTrack::InsertNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t
     if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true)) {
         AddEvent(new NoteOnSeqEvent(this, key, vel, offset, length, sEventName));
     } else if (readMode == READMODE_CONVERT_TO_MIDI) {
-        pMidiTrack->InsertNoteOn(channel, key + cKeyCorrection + transpose, finalVel, absTime);
+        pMidiTrack->InsertNoteOn(channel, key + cKeyCorrection + cispose, finalVel, absTime);
     }
     prevKey = key;
     prevVel = vel;
@@ -441,7 +441,7 @@ void SeqTrack::AddNoteOffNoItem(int8_t key) {
         return;
 
     if (cDrumNote == -1) {
-        pMidiTrack->AddNoteOff(channel, key + cKeyCorrection + transpose);
+        pMidiTrack->AddNoteOff(channel, key + cKeyCorrection + cispose);
     } else {
         AddPercNoteOffNoItem(cDrumNote);
     }
@@ -457,7 +457,7 @@ void SeqTrack::AddPercNoteOff(uint32_t offset, uint32_t length, int8_t key,
     //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
     //	if (pDrumAssoc)
     //		key = pDrumAssoc->GMDrumNote;
-    AddNoteOff(offset, length, key - transpose, sEventName);
+    AddNoteOff(offset, length, key - cispose, sEventName);
     cDrumNote = origDrumNote;
     channel = origChan;
 }
@@ -470,7 +470,7 @@ void SeqTrack::AddPercNoteOffNoItem(int8_t key) {
     //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
     //	if (pDrumAssoc)
     //		key = pDrumAssoc->GMDrumNote;
-    AddNoteOffNoItem(key - transpose);
+    AddNoteOffNoItem(key - cispose);
     cDrumNote = origDrumNote;
     channel = origChan;
 }
@@ -486,7 +486,7 @@ void SeqTrack::InsertNoteOff(uint32_t offset, uint32_t length, int8_t key, uint3
 
 void SeqTrack::InsertNoteOffNoItem(int8_t key, uint32_t absTime) {
     if (readMode == READMODE_CONVERT_TO_MIDI) {
-        pMidiTrack->InsertNoteOff(channel, key + cKeyCorrection + transpose, absTime);
+        pMidiTrack->InsertNoteOff(channel, key + cKeyCorrection + cispose, absTime);
     }
 }
 
@@ -507,7 +507,7 @@ void SeqTrack::AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur) {
             finalVel = Convert7bitPercentVolValToStdMidiVal(vel);
 
         if (cDrumNote == -1) {
-            pMidiTrack->AddNoteByDur(channel, key + cKeyCorrection + transpose, finalVel, dur);
+            pMidiTrack->AddNoteByDur(channel, key + cKeyCorrection + cispose, finalVel, dur);
         } else
             AddPercNoteByDurNoItem(cDrumNote, vel, dur);
     }
@@ -532,7 +532,7 @@ void SeqTrack::AddNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur) {
             finalVel = Convert7bitPercentVolValToStdMidiVal(vel);
 
         if (cDrumNote == -1) {
-            pMidiTrack->AddNoteByDur_TriAce(channel, key + cKeyCorrection + transpose, finalVel,
+            pMidiTrack->AddNoteByDur_TriAce(channel, key + cKeyCorrection + cispose, finalVel,
                                             dur);
         } else
             AddPercNoteByDurNoItem(cDrumNote, vel, dur);
@@ -551,7 +551,7 @@ void SeqTrack::AddPercNoteByDur(uint32_t offset, uint32_t length, int8_t key, in
     //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
     //	if (pDrumAssoc)
     //		key = pDrumAssoc->GMDrumNote;
-    AddNoteByDur(offset, length, key - transpose, vel, dur, sEventName);
+    AddNoteByDur(offset, length, key - cispose, vel, dur, sEventName);
     cDrumNote = origDrumNote;
     channel = origChan;
 }
@@ -564,7 +564,7 @@ void SeqTrack::AddPercNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur) {
     //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);
     //	if (pDrumAssoc)
     //		key = pDrumAssoc->GMDrumNote;
-    AddNoteByDurNoItem(key - transpose, vel, dur);
+    AddNoteByDurNoItem(key - cispose, vel, dur);
     cDrumNote = origDrumNote;
     channel = origChan;
 }
@@ -589,7 +589,7 @@ void SeqTrack::InsertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int
         if (parentSeq->bUseLinearAmplitudeScale)
             finalVel = Convert7bitPercentVolValToStdMidiVal(vel);
 
-        pMidiTrack->InsertNoteByDur(channel, key + cKeyCorrection + transpose, finalVel, dur,
+        pMidiTrack->InsertNoteByDur(channel, key + cKeyCorrection + cispose, finalVel, dur,
                                     absTime);
     }
     prevKey = key;
@@ -882,13 +882,13 @@ void SeqTrack::AddModulationDepthRangeNoItem(double semitones) {
         pMidiTrack->AddModulationDepthRange(channel, semitones);
 }
 
-void SeqTrack::AddTranspose(uint32_t offset, uint32_t length, int8_t theTranspose,
+void SeqTrack::AddCispose(uint32_t offset, uint32_t length, int8_t theCispose,
                             const std::string &sEventName) {
     OnEvent(offset, length);
 
     if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
-        AddEvent(new TransposeSeqEvent(this, theTranspose, offset, length, sEventName));
-    transpose = theTranspose;
+        AddEvent(new CisposeSeqEvent(this, theCispose, offset, length, sEventName));
+    cispose = theCispose;
 }
 
 void SeqTrack::AddModulation(uint32_t offset, uint32_t length, uint8_t depth,
@@ -1185,15 +1185,15 @@ bool SeqTrack::AddEndOfTrackNoItem() {
     return false;
 }
 
-void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones,
+void SeqTrack::AddGlobalCispose(uint32_t offset, uint32_t length, int8_t semitones,
                                   const std::string &sEventName) {
     OnEvent(offset, length);
 
     if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
-        AddEvent(new TransposeSeqEvent(this, semitones, offset, length, sEventName));
+        AddEvent(new CisposeSeqEvent(this, semitones, offset, length, sEventName));
     else if (readMode == READMODE_CONVERT_TO_MIDI)
-        parentSeq->midi->globalTrack.InsertGlobalTranspose(GetTime(), semitones);
-    // pMidiTrack->(channel, transpose);
+        parentSeq->midi->globalTrack.InsertGlobalCispose(GetTime(), semitones);
+    // pMidiTrack->(channel, cispose);
 }
 
 void SeqTrack::AddMarker(uint32_t offset, uint32_t length, const std::string &markername,

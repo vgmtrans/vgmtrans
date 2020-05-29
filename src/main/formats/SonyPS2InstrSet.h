@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -54,7 +54,7 @@ class SonyPS2Instr : public VGMInstr {
         uint8_t sizeSplitBlock;
         uint8_t progVolume;
         int8_t progPanpot;
-        int8_t progTranspose;
+        int8_t progCispose;
         int8_t progDetune;
         int8_t keyFollowPan;
         uint8_t keyFollowPanCenter;
@@ -94,7 +94,7 @@ class SonyPS2Instr : public VGMInstr {
         uint8_t keyFollowPanCenter;
         uint8_t splitVolume;
         int8_t splitPanpot;
-        int8_t splitTranspose;
+        int8_t splitCispose;
         int8_t splitDetune;
     } SplitBlock;
 

@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -147,7 +147,7 @@ void PrismSnesSeq::LoadEventMap() {
     EventMap[0xd5] = EVENT_PLAY_SONG_3;
     EventMap[0xd6] = EVENT_PLAY_SONG_2;
     EventMap[0xd7] = EVENT_PLAY_SONG_1;
-    EventMap[0xd8] = EVENT_TRANSPOSE_REL;
+    EventMap[0xd8] = EVENT_CISPOSE_REL;
     EventMap[0xd9] = EVENT_PAN_ENVELOPE;
     EventMap[0xda] = EVENT_PAN_TABLE;
     EventMap[0xdb] = EVENT_NOP2;
@@ -158,7 +158,7 @@ void PrismSnesSeq::LoadEventMap() {
     EventMap[0xe0] = EVENT_RET;
     EventMap[0xe1] = EVENT_CALL;
     EventMap[0xe2] = EVENT_GOTO;
-    EventMap[0xe3] = EVENT_TRANSPOSE;
+    EventMap[0xe3] = EVENT_CISPOSE;
     EventMap[0xe4] = EVENT_TUNING;
     EventMap[0xe5] = EVENT_VIBRATO_DELAY;
     EventMap[0xe6] = EVENT_VIBRATO_OFF;
@@ -557,10 +557,10 @@ bool PrismSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE_REL: {
+        case EVENT_CISPOSE_REL: {
             int8_t delta = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, transpose + delta,
-                         "Transpose (Relative)");
+            AddCispose(beginOffset, curOffset - beginOffset, cispose + delta,
+                         "Cispose (Relative)");
             break;
         }
 
@@ -720,9 +720,9 @@ bool PrismSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE: {
-            int8_t newTranspose = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+        case EVENT_CISPOSE: {
+            int8_t newCispose = GetByte(curOffset++);
+            AddCispose(beginOffset, curOffset - beginOffset, newCispose);
             break;
         }
 

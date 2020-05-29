@@ -1,5 +1,5 @@
 /*
- * VGMTransQt (c) 2020
+ * VGMCisQt (c) 2020
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */

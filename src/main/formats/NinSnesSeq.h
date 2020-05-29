@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -34,8 +34,8 @@ enum NinSnesSeqEventType {
     EVENT_MASTER_VOLUME_FADE,
     EVENT_TEMPO,
     EVENT_TEMPO_FADE,
-    EVENT_GLOBAL_TRANSPOSE,
-    EVENT_TRANSPOSE,
+    EVENT_GLOBAL_CISPOSE,
+    EVENT_CISPOSE,
     EVENT_TREMOLO_ON,
     EVENT_TREMOLO_OFF,
     EVENT_VOLUME,
@@ -100,7 +100,7 @@ class NinSnesTrackSharedData {
     uint8_t spcNoteDuration;
     uint8_t spcNoteDurRate;
     uint8_t spcNoteVolume;
-    int8_t spcTranspose;
+    int8_t spcCispose;
     uint16_t loopReturnAddress;
     uint16_t loopStartAddress;
     uint8_t loopCount;

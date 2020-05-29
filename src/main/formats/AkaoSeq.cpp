@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -377,15 +377,15 @@ bool AkaoTrack::ReadEvent(void) {
                 break;
 
             case 0xC0: {
-                int8_t cTranspose = GetByte(curOffset++);
-                AddTranspose(beginOffset, curOffset - beginOffset, cTranspose);
+                int8_t cCispose = GetByte(curOffset++);
+                AddCispose(beginOffset, curOffset - beginOffset, cCispose);
                 break;
             }
 
             case 0xC1: {
-                uint8_t cTranspose = GetByte(curOffset++);
-                AddGenericEvent(beginOffset, curOffset - beginOffset, "Transpose move", "",
-                                CLR_TRANSPOSE);
+                uint8_t cCispose = GetByte(curOffset++);
+                AddGenericEvent(beginOffset, curOffset - beginOffset, "Cispose move", "",
+                                CLR_CISPOSE);
                 break;
             }
 
@@ -640,7 +640,7 @@ bool AkaoTrack::ReadEvent(void) {
                         for (std::vector<uint32_t>::iterator itAddr = vCondJumpAddr.begin();
                              itAddr != vCondJumpAddr.end(); ++itAddr) {
                             if (!IsOffsetUsed(*itAddr)) {
-                                // There is an area not visited yet, VGMTrans must try to go there.
+                                // There is an area not visited yet, VGMCis must try to go there.
                                 bContinue = true;
                                 break;
                             }
@@ -675,14 +675,14 @@ bool AkaoTrack::ReadEvent(void) {
                         uint32_t eventLength = curOffset - beginOffset;
 
                         // This event performs conditional jump if certain CPU variable matches to
-                        // the condValue. VGMTrans will simply try to parse all events as far as
+                        // the condValue. VGMCis will simply try to parse all events as far as
                         // possible, instead. (Test case: FF9 416 Final Battle)
                         if (!IsOffsetUsed(beginOffset)) {
-                            // For the first time, VGMTrans just skips the event,
+                            // For the first time, VGMCis just skips the event,
                             // but remembers the destination address for future jump.
                             vCondJumpAddr.push_back(dest);
                         } else {
-                            // For the second time, VGMTrans jumps to the destination address.
+                            // For the second time, VGMCis jumps to the destination address.
                             curOffset = dest;
                         }
 

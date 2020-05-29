@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -129,8 +129,8 @@ void HeartBeatSnesSeq::LoadEventMap() {
     EventMap[0xdc] = EVENT_MASTER_VOLUME_FADE;
     EventMap[0xdd] = EVENT_TEMPO;
     EventMap[0xde] = EVENT_UNKNOWN1;
-    EventMap[0xdf] = EVENT_GLOBAL_TRANSPOSE;
-    EventMap[0xe0] = EVENT_TRANSPOSE;
+    EventMap[0xdf] = EVENT_GLOBAL_CISPOSE;
+    EventMap[0xe0] = EVENT_CISPOSE;
     EventMap[0xe1] = EVENT_TREMOLO_ON;
     EventMap[0xe2] = EVENT_TREMOLO_OFF;
     EventMap[0xe3] = EVENT_VOLUME;
@@ -421,15 +421,15 @@ bool HeartBeatSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_GLOBAL_TRANSPOSE: {
+        case EVENT_GLOBAL_CISPOSE: {
             int8_t semitones = GetByte(curOffset++);
-            AddGlobalTranspose(beginOffset, curOffset - beginOffset, semitones);
+            AddGlobalCispose(beginOffset, curOffset - beginOffset, semitones);
             break;
         }
 
-        case EVENT_TRANSPOSE: {
+        case EVENT_CISPOSE: {
             int8_t semitones = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, semitones);
+            AddCispose(beginOffset, curOffset - beginOffset, semitones);
             break;
         }
 

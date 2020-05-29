@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -139,7 +139,7 @@ void KonamiSnesSeq::LoadEventMap() {
     EventMap[0xe9] = EVENT_LOOP_END_2;
     EventMap[0xea] = EVENT_TEMPO;
     EventMap[0xeb] = EVENT_TEMPO_FADE;
-    EventMap[0xec] = EVENT_TRANSPABS;
+    EventMap[0xec] = EVENT_CISPABS;
     EventMap[0xed] = EVENT_ADSR1;
     EventMap[0xee] = EVENT_VOLUME;
     EventMap[0xef] = EVENT_VOLUME_FADE;
@@ -727,9 +727,9 @@ bool KonamiSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPABS: {
-            int8_t newTransp = (int8_t)GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, newTransp);
+        case EVENT_CISPABS: {
+            int8_t newCisp = (int8_t)GetByte(curOffset++);
+            AddCispose(beginOffset, curOffset - beginOffset, newCisp);
             break;
         }
 
@@ -842,7 +842,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
             int16_t pitchDelta = GetShort(curOffset);
             curOffset += 2;
 
-            uint8_t pitchSlideNoteNumber = (pitchSlideNote & 0x7f) + transpose;
+            uint8_t pitchSlideNoteNumber = (pitchSlideNote & 0x7f) + cispose;
 
             desc << "Delay: " << (int)pitchSlideDelay << "  Length: " << (int)pitchSlideLength
                  << "  Final Note: " << (int)pitchSlideNoteNumber

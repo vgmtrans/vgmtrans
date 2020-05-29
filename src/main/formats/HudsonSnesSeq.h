@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -42,8 +42,8 @@ enum HudsonSnesSeqEventType {
     EVENT_ECHO_VOLUME,
     EVENT_ECHO_PARAM,
     EVENT_ECHO_ON,
-    EVENT_TRANSPOSE_ABS,
-    EVENT_TRANSPOSE_REL,
+    EVENT_CISPOSE_ABS,
+    EVENT_CISPOSE_REL,
     EVENT_PITCH_ATTACK_ENV_ON,
     EVENT_PITCH_ATTACK_ENV_OFF,
     EVENT_LOOP_POINT,

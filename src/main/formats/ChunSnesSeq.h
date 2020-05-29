@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -49,7 +49,7 @@ enum ChunSnesSeqEventType {
     EVENT_EXPRESSION,
     EVENT_CALL,
     EVENT_RET,
-    EVENT_TRANSPOSE,
+    EVENT_CISPOSE,
     EVENT_PITCH_SLIDE,
     EVENT_ECHO_ON,
     EVENT_ECHO_OFF,

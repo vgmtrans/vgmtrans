@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -18,6 +18,6 @@ class PSFLoader : public FileLoader {
     void psf_read_exe(const RawFile *file, int version);
 };
 
-namespace vgmtrans::loaders {
+namespace vgmcis::loaders {
 LoaderRegistration<PSFLoader> psf{"PSF"};
 }

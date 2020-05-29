@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -31,8 +31,8 @@ enum HeartBeatSnesSeqEventType {
     EVENT_MASTER_VOLUME,
     EVENT_MASTER_VOLUME_FADE,
     EVENT_TEMPO,
-    EVENT_GLOBAL_TRANSPOSE,
-    EVENT_TRANSPOSE,
+    EVENT_GLOBAL_CISPOSE,
+    EVENT_CISPOSE,
     EVENT_TREMOLO_ON,
     EVENT_TREMOLO_OFF,
     EVENT_VOLUME,

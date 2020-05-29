@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -101,7 +101,7 @@ void GraphResSnesSeq::LoadEventMap() {
     // EventMap[0xe1] = (GraphResSnesSeqEventType)0;
     // EventMap[0xe2] = (GraphResSnesSeqEventType)0;
     // EventMap[0xe3] = (GraphResSnesSeqEventType)0;
-    EventMap[0xe4] = EVENT_TRANSPOSE;
+    EventMap[0xe4] = EVENT_CISPOSE;
     EventMap[0xe5] = EVENT_MASTER_VOLUME;
     EventMap[0xe6] = EVENT_ECHO_VOLUME;
     EventMap[0xe7] = EVENT_DEC_OCTAVE;
@@ -305,9 +305,9 @@ bool GraphResSnesTrack::ReadEvent(void) {
             break;
         }
 
-        case EVENT_TRANSPOSE: {
-            int8_t newTranspose = GetByte(curOffset++);
-            AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+        case EVENT_CISPOSE: {
+            int8_t newCispose = GetByte(curOffset++);
+            AddCispose(beginOffset, curOffset - beginOffset, newCispose);
             break;
         }
 

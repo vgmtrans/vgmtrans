@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -25,7 +25,7 @@ enum CompileSnesSeqEventType {
     EVENT_PORTAMENTO_TIME,
     EVENT_VOLUME,
     EVENT_VOLUME_ENVELOPE,
-    EVENT_TRANSPOSE,
+    EVENT_CISPOSE,
     EVENT_VOLUME_REL,
     EVENT_LOOP_COUNT,
     EVENT_FLAGS,
@@ -82,14 +82,14 @@ class CompileSnesTrack : public SeqTrack {
     uint8_t spcNoteDuration;
     uint8_t spcFlags;
     uint8_t spcVolume;
-    int8_t spcTranspose;
+    int8_t spcCispose;
     uint8_t spcTempo;
     uint8_t spcSRCN;
     int8_t spcPan;
 
     uint8_t spcInitialFlags;
     uint8_t spcInitialVolume;
-    int8_t spcInitialTranspose;
+    int8_t spcInitialCispose;
     uint8_t spcInitialTempo;
     uint8_t spcInitialSRCN;
     int8_t spcInitialPan;

@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMCis (c) 2002-2019
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -27,7 +27,7 @@ enum EventType {
     EVENTTYPE_PITCHBEND,
     EVENTTYPE_PITCHBENDRANGE,
     EVENTTYPE_FINETUNING,
-    EVENTTYPE_TRANSPOSE,
+    EVENTTYPE_CISPOSE,
     EVENTTYPE_TEMPO,
     EVENTTYPE_TIMESIG,
     EVENTTYPE_MODULATION,
@@ -414,21 +414,21 @@ class ModulationDepthRangeSeqEvent : public SeqEvent {
 };
 
 //  *****************
-//  TransposeSeqEvent
+//  CisposeSeqEvent
 //  *****************
 
-class TransposeSeqEvent : public SeqEvent {
+class CisposeSeqEvent : public SeqEvent {
    public:
-    TransposeSeqEvent(SeqTrack *pTrack, int theTranspose, uint32_t offset = 0, uint32_t length = 0,
+    CisposeSeqEvent(SeqTrack *pTrack, int theCispose, uint32_t offset = 0, uint32_t length = 0,
                       const std::string &name = "");
-    virtual EventType GetEventType() { return EVENTTYPE_TRANSPOSE; }
+    virtual EventType GetEventType() { return EVENTTYPE_CISPOSE; }
 
     std::string GetDescription() override {
-        return fmt::format("{} - transpose: {}", name, transpose);
+        return fmt::format("{} - cispose: {}", name, cispose);
     };
 
    public:
-    int transpose;
+    int cispose;
 };
 
 //  ******************
