@@ -18,19 +18,11 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
     const uint16_t seq_length = file->GetShort(offset + 6);
     if (seq_length != 0) {
       // Sequence
-      const AkaoPs1Version version = AkaoSeq::GuessVersion(file, offset);
-      const uint32_t numTracks = AkaoSeq::ReadNumOfTracks(file, offset);
-      if (numTracks == 0)
+      if (!AkaoSeq::IsPossibleAkaoSeq(file, offset))
         continue;
 
-      if (version == AkaoPs1Version::VERSION_2) {
-        if (file->GetWord(offset + 0x2C) != 0 || file->GetWord(offset + 0x28) != 0)
-          continue;
-        if (file->GetWord(offset + 0x38) != 0 || file->GetWord(offset + 0x3C) != 0)
-          continue;
-      }
-
-      AkaoSeq *NewAkaoSeq = new AkaoSeq(file, offset);
+      const AkaoPs1Version version = AkaoSeq::GuessVersion(file, offset);
+      AkaoSeq *NewAkaoSeq = new AkaoSeq(file, offset, version);
       if (!NewAkaoSeq->LoadVGMFile())
         delete NewAkaoSeq;
     }
