@@ -12,8 +12,8 @@ namespace
   const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 8, 4 };
 }
 
-AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset)
-    : VGMSeq(AkaoFormat::name, file, offset), instrset(nullptr), seq_id(0), version(AkaoPs1Version::VERSION_2) {
+AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
+    : VGMSeq(AkaoFormat::name, file, offset), instrset(nullptr), version_(version), seq_id(0) {
   UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   bUsesIndividualArts = false;
   UseReverb();
@@ -22,27 +22,57 @@ AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset)
 AkaoSeq::~AkaoSeq() {
 }
 
-AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset) {
-  if (file->GetWord(offset + 0x2C) == 0)
-    return AkaoPs1Version::VERSION_2;
-  else
-    return AkaoPs1Version::VERSION_1;
+bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
+  if (offset + 0x10 > file->size())
+    return false;
+  if (file->GetWordBE(offset) != 0x414B414F)
+    return false;
+
+  const AkaoPs1Version version = GuessVersion(file, offset);
+  const uint32_t track_bits_offset = GetTrackAllocationBitsOffset(version);
+  if (offset + track_bits_offset + 4 > file->size())
+    return false;
+
+  const uint32_t track_bits = file->GetWord(offset + track_bits_offset);
+  if (track_bits == 0)
+    return false;
+  for (int i = 0; i < 32; i++) {
+    const uint32_t bit = uint32_t(1) << i;
+    const uint32_t mask = bit | (bit - 1);
+    if ((track_bits & bit) == 0) {
+      if ((track_bits & ~mask) != 0)
+        return false;
+      break;
+    }
+  }
+
+  if (version == AkaoPs1Version::VERSION_3) {
+    if (file->GetWord(offset + 0x2C) != 0 || file->GetWord(offset + 0x28) != 0)
+      return false;
+    if (file->GetWord(offset + 0x38) != 0 || file->GetWord(offset + 0x3C) != 0)
+      return false;
+  }
+
+  return true;
 }
 
-uint32_t AkaoSeq::ReadNumOfTracks(RawFile *file, uint32_t offset) {
-  const AkaoPs1Version version = GuessVersion(file, offset);
-  const uint32_t track_bits = (version == AkaoPs1Version::VERSION_1)
-    ? file->GetWord(offset + 0x10)
-    : file->GetWord(offset + 0x20);
-  return GetNumPositiveBits(track_bits);
+AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset) {
+  if (file->GetWord(offset + 0x2C) == 0)
+    return AkaoPs1Version::VERSION_3;
+  else if (file->GetWord(offset + 0x1C) == 0)
+    return AkaoPs1Version::VERSION_2;
+  else
+    return AkaoPs1Version::VERSION_1_1;
 }
 
 bool AkaoSeq::GetHeaderInfo() {
-  //first do a version check to see if it's older or newer version of AKAO sequence format
-  version = GuessVersion(rawfile, dwOffset);
-  nNumTracks = ReadNumOfTracks(rawfile, dwOffset);
+  const uint32_t track_bits = (version() == AkaoPs1Version::VERSION_3)
+    ? GetWord(dwOffset + 0x20)
+    : GetWord(dwOffset + 0x10);
+  nNumTracks = GetNumPositiveBits(track_bits);
 
-  if (version == AkaoPs1Version::VERSION_2) {
+  uint32_t track_header_offset;
+  if (version() == AkaoPs1Version::VERSION_3) {
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
     hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
@@ -55,8 +85,20 @@ bool AkaoSeq::GetHeaderInfo() {
 
     unLength = GetShort(dwOffset + 6);
     id = GetShort(dwOffset + 0x14);
+    track_header_offset = 0x40;
   }
-  else if (version == AkaoPs1Version::VERSION_1) {
+  else if (version() == AkaoPs1Version::VERSION_2) {
+    VGMHeader *hdr = AddHeader(dwOffset, 0x20);
+    hdr->AddSig(dwOffset, 4);
+    hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
+    hdr->AddSimpleItem(dwOffset + 0x6, 2, L"Size (Excluding first 16 bytes)");
+    hdr->AddSimpleItem(dwOffset + 0x8, 2, L"Reverb Type");
+    hdr->AddSimpleItem(dwOffset + 0x10, 4, L"Number of Tracks (# of true bits)");
+
+    unLength = GetShort(dwOffset + 6);
+    track_header_offset = 0x20;
+  }
+  else if (version() < AkaoPs1Version::VERSION_2) {
     VGMHeader *hdr = AddHeader(dwOffset, 0x14);
     hdr->AddSig(dwOffset, 4);
     hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
@@ -68,6 +110,7 @@ bool AkaoSeq::GetHeaderInfo() {
     hdr->AddSimpleItem(dwOffset + 0x10, 4, L"Number of Tracks (# of true bits)");
 
     unLength = 0x10 + GetShort(dwOffset + 6);
+    track_header_offset = 0x14;
   }
   else {
     return false;
@@ -80,7 +123,7 @@ bool AkaoSeq::GetHeaderInfo() {
 
   LoadEventMap();
 
-  if (version == AkaoPs1Version::VERSION_2)
+  if (version() == AkaoPs1Version::VERSION_3)
   {
     //There must be either a melodic instrument section, a drumkit, or both.  We determine
     //the start of the InstrSet based on whether a melodic instrument section is given.
@@ -90,19 +133,23 @@ bool AkaoSeq::GetHeaderInfo() {
       instrOff += 0x30 + dwOffset;
     if (drumkitOff != 0)
       drumkitOff += 0x34 + dwOffset;
-    uint32_t instrSetLength;
+
+    uint32_t instrSetLength = 0;
     if (instrOff != 0)
       instrSetLength = unLength - (instrOff - dwOffset);
-    else
+    else if (drumkitOff != 0)
       instrSetLength = unLength - (drumkitOff - dwOffset);
-    instrset = new AkaoInstrSet(rawfile, instrSetLength, instrOff, drumkitOff, id, L"Akao Instr Set");
-    if (!instrset->LoadVGMFile()) {
-      delete instrset;
-      instrset = nullptr;
+
+    if (instrSetLength != 0)
+    {
+      instrset = new AkaoInstrSet(rawfile, instrSetLength, instrOff, drumkitOff, id, L"Akao Instr Set");
+      if (!instrset->LoadVGMFile()) {
+        delete instrset;
+        instrset = nullptr;
+      }
     }
   }
 
-  const uint32_t track_header_offset = version == AkaoPs1Version::VERSION_1 ? 0x14 : 0x40;
   VGMHeader *track_pointer_header = AddHeader(dwOffset + track_header_offset, nNumTracks * 2);
   for (unsigned int i = 0; i < nNumTracks; i++) {
     std::wstringstream name;
@@ -115,10 +162,28 @@ bool AkaoSeq::GetHeaderInfo() {
 
 
 bool AkaoSeq::GetTrackPointers() {
-  const uint32_t track_header_offset = version == AkaoPs1Version::VERSION_1 ? 0x14 : 0x40;
+  uint32_t track_header_offset;
+  switch (version())
+  {
+  case AkaoPs1Version::VERSION_1_0:
+  case AkaoPs1Version::VERSION_1_1:
+  case AkaoPs1Version::VERSION_1_2:
+    track_header_offset = 0x14;
+    break;
+
+  case AkaoPs1Version::VERSION_2:
+    track_header_offset = 0x20;
+    break;
+
+  case AkaoPs1Version::VERSION_3:
+  default:
+    track_header_offset = 0x40;
+    break;
+  }
+
   for (unsigned int i = 0; i < nNumTracks; i++) {
     const uint32_t p = track_header_offset + (i * 2);
-    const uint32_t base = p + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+    const uint32_t base = p + (version() == AkaoPs1Version::VERSION_3 ? 0 : 2);
     const uint32_t relative_offset = GetShort(dwOffset + p);
     const uint32_t track_offset = base + relative_offset;
     aTracks.push_back(new AkaoTrack(this, dwOffset + track_offset));
@@ -149,10 +214,8 @@ std::wstring AkaoSeq::ReadTimestampAsText() {
 
 double AkaoSeq::GetTempoInBPM(uint16_t tempo) const {
   if (tempo != 0) {
-    // V1: Timer 2 frequency 0x43D1 comes from Final Fantasy 7.
-    // V2: Timer 2 frequency 0x44E8 comes from Final Fantasy 9.
-    const uint16_t freq = (version == AkaoPs1Version::VERSION_1) ? 0x43D1 : 0x44E8;
-    return 60.0 / (ppqn * (65536.0 / tempo) * (0x43D1 / (33868800.0 / 8)));
+    const uint16_t freq = (version() == AkaoPs1Version::VERSION_1_0) ? 0x43D1 : 0x44E8;
+    return 60.0 / (ppqn * (65536.0 / tempo) * (freq / (33868800.0 / 8)));
   }
   else {
     // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -214,10 +277,10 @@ void AkaoSeq::LoadEventMap()
   event_map[0xd1] = EVENT_LEGATO_OFF;
   event_map[0xd2] = EVENT_PITCH_MOD_ON_DELAY_TOGGLE;
   event_map[0xd3] = EVENT_PITCH_MOD_DELAY_TOGGLE;
-  event_map[0xd4] = EVENT_D4;
-  event_map[0xd5] = EVENT_D5;
-  event_map[0xd6] = EVENT_D6;
-  event_map[0xd7] = EVENT_D7;
+  event_map[0xd4] = EVENT_PITCH_SIDE_CHAIN_ON;
+  event_map[0xd5] = EVENT_PITCH_SIDE_CHAIN_OFF;
+  event_map[0xd6] = EVENT_PITCH_TO_VOLUME_SIDE_CHAIN_ON;
+  event_map[0xd7] = EVENT_PITCH_TO_VOLUME_SIDE_CHAIN_OFF;
   event_map[0xd8] = EVENT_TUNING_ABS;
   event_map[0xd9] = EVENT_TUNING_REL;
   event_map[0xda] = EVENT_PORTAMENTO_ON;
@@ -227,7 +290,7 @@ void AkaoSeq::LoadEventMap()
   event_map[0xde] = EVENT_TREMOLO_DEPTH_FADE;
   event_map[0xdf] = EVENT_PAN_LFO_FADE;
 
-  if (version == AkaoPs1Version::VERSION_1) {
+  if (version() == AkaoPs1Version::VERSION_1_0 || version() == AkaoPs1Version::VERSION_1_1) {
     event_map[0xe0] = EVENT_UNIMPLEMENTED;
     event_map[0xe1] = EVENT_UNIMPLEMENTED;
     event_map[0xe2] = EVENT_UNIMPLEMENTED;
@@ -247,11 +310,11 @@ void AkaoSeq::LoadEventMap()
     event_map[0xf0] = EVENT_LOOP_BRANCH;
     event_map[0xf1] = EVENT_LOOP_BREAK;
     event_map[0xf2] = EVENT_PROGCHANGE_NO_ATTACK;
-    event_map[0xf3] = EVENT_F3_V1;
-    event_map[0xf4] = EVENT_UNISON_ON;
-    event_map[0xf5] = EVENT_UNISON_OFF;
-    event_map[0xf6] = EVENT_UNISON_VOLUME_BALANCE;
-    event_map[0xf7] = EVENT_UNISON_VOLUME_BALANCE_FADE;
+    event_map[0xf3] = EVENT_F3_FF7;
+    event_map[0xf4] = EVENT_OVERLAY_VOICE_ON;
+    event_map[0xf5] = EVENT_OVERLAY_VOICE_OFF;
+    event_map[0xf6] = EVENT_OVERLAY_VOLUME_BALANCE;
+    event_map[0xf7] = EVENT_OVERLAY_VOLUME_BALANCE_FADE;
     event_map[0xf8] = EVENT_ALTERNATE_VOICE_ON;
     event_map[0xf9] = EVENT_ALTERNATE_VOICE_OFF;
     event_map[0xfa] = EVENT_UNIMPLEMENTED;
@@ -260,8 +323,85 @@ void AkaoSeq::LoadEventMap()
     event_map[0xfd] = EVENT_TIME_SIGNATURE;
     event_map[0xfe] = EVENT_MEASURE;
     event_map[0xff] = EVENT_UNIMPLEMENTED;
+
+    if (version() == AkaoPs1Version::VERSION_1_1)
+    {
+      event_map[0xf3] = EVENT_F3_SAGAFRO;
+      //event_map[0xf4] = EVENT_UNIMPLEMENTED;
+      //event_map[0xf5] = EVENT_UNIMPLEMENTED;
+      //event_map[0xf6] = EVENT_UNIMPLEMENTED;
+      //event_map[0xf7] = EVENT_UNIMPLEMENTED;
+      event_map[0xfc] = EVENT_FC_SAGAFRO;
+    }
   }
-  else if (version == AkaoPs1Version::VERSION_2) {
+  else if (version() == AkaoPs1Version::VERSION_1_2 || version() == AkaoPs1Version::VERSION_2) {
+    event_map[0xe0] = EVENT_E0_V2;
+    event_map[0xe1] = EVENT_UNIMPLEMENTED;
+    event_map[0xe2] = EVENT_UNIMPLEMENTED;
+    event_map[0xe3] = EVENT_UNIMPLEMENTED;
+    event_map[0xe4] = EVENT_UNIMPLEMENTED;
+    event_map[0xe5] = EVENT_UNIMPLEMENTED;
+    event_map[0xe6] = EVENT_UNIMPLEMENTED;
+    event_map[0xe7] = EVENT_UNIMPLEMENTED;
+    event_map[0xe8] = EVENT_UNIMPLEMENTED;
+    event_map[0xe9] = EVENT_UNIMPLEMENTED;
+    event_map[0xea] = EVENT_UNIMPLEMENTED;
+    event_map[0xeb] = EVENT_UNIMPLEMENTED;
+    event_map[0xec] = EVENT_UNIMPLEMENTED;
+    event_map[0xed] = EVENT_UNIMPLEMENTED;
+    event_map[0xee] = EVENT_UNIMPLEMENTED;
+    event_map[0xef] = EVENT_UNIMPLEMENTED;
+    event_map[0xf0] = EVENT_UNIMPLEMENTED;
+    event_map[0xf1] = EVENT_UNIMPLEMENTED;
+    event_map[0xf2] = EVENT_UNIMPLEMENTED;
+    event_map[0xf3] = EVENT_UNIMPLEMENTED;
+    event_map[0xf4] = EVENT_UNIMPLEMENTED;
+    event_map[0xf5] = EVENT_UNIMPLEMENTED;
+    event_map[0xf6] = EVENT_UNIMPLEMENTED;
+    event_map[0xf7] = EVENT_UNIMPLEMENTED;
+    event_map[0xf8] = EVENT_UNIMPLEMENTED;
+    event_map[0xf9] = EVENT_UNIMPLEMENTED;
+    event_map[0xfa] = EVENT_UNIMPLEMENTED;
+    event_map[0xfb] = EVENT_UNIMPLEMENTED;
+    event_map[0xfc] = EVENT_UNIMPLEMENTED; // 0xfc: extra opcodes
+    event_map[0xfd] = EVENT_UNIMPLEMENTED;
+    event_map[0xfe] = EVENT_UNIMPLEMENTED;
+    event_map[0xff] = EVENT_UNIMPLEMENTED;
+
+    sub_event_map[0x00] = EVENT_TEMPO;
+    sub_event_map[0x01] = EVENT_TEMPO_FADE;
+    sub_event_map[0x02] = EVENT_REVERB_DEPTH;
+    sub_event_map[0x03] = EVENT_REVERB_DEPTH_FADE;
+    sub_event_map[0x04] = EVENT_DRUM_ON_V2;
+    sub_event_map[0x05] = EVENT_DRUM_OFF;
+    sub_event_map[0x06] = EVENT_UNCONDITIONAL_JUMP;
+    sub_event_map[0x07] = EVENT_CPU_CONDITIONAL_JUMP;
+    sub_event_map[0x08] = EVENT_LOOP_BRANCH;
+    sub_event_map[0x09] = EVENT_LOOP_BREAK;
+    sub_event_map[0x0a] = EVENT_FE_0A;
+    sub_event_map[0x0b] = EVENT_FE_0B;
+    sub_event_map[0x0c] = EVENT_FE_0C;
+    sub_event_map[0x0d] = EVENT_FE_0D;
+    sub_event_map[0x0e] = EVENT_FE_0E;
+    sub_event_map[0x0f] = EVENT_FE_0F;
+    sub_event_map[0x10] = EVENT_FE_10;
+    sub_event_map[0x11] = EVENT_FE_11;
+    sub_event_map[0x12] = EVENT_FE_12;
+    sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT;
+    sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
+    sub_event_map[0x16] = EVENT_MEASURE;
+    sub_event_map[0x17] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x18] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x19] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x1a] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x1b] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x1c] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x1d] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x1e] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
+  }
+  else if (version() == AkaoPs1Version::VERSION_3) {
     event_map[0xe0] = EVENT_E0_V2;
     event_map[0xe1] = EVENT_E1_V2;
     event_map[0xe2] = EVENT_E2_V2;
@@ -292,27 +432,27 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x07] = EVENT_CPU_CONDITIONAL_JUMP;
     sub_event_map[0x08] = EVENT_LOOP_BRANCH;
     sub_event_map[0x09] = EVENT_LOOP_BREAK;
-    sub_event_map[0x0a] = EVENT_FE_0A_V2;
-    sub_event_map[0x0b] = EVENT_FE_0B_V2;
+    sub_event_map[0x0a] = EVENT_FE_0A;
+    sub_event_map[0x0b] = EVENT_FE_0B;
     sub_event_map[0x0c] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x0d] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x0e] = EVENT_FE_0E_V2;
-    sub_event_map[0x0f] = EVENT_FE_0F_V2;
-    sub_event_map[0x10] = EVENT_FE_10_V2;
-    sub_event_map[0x11] = EVENT_FE_11_V2;
-    sub_event_map[0x12] = EVENT_FE_12_V2;
+    sub_event_map[0x0e] = EVENT_SUBROUTINE_JUMP;
+    sub_event_map[0x0f] = EVENT_RETURN_FROM_SUBROUTINE;
+    sub_event_map[0x10] = EVENT_FE_10;
+    sub_event_map[0x11] = EVENT_FE_11;
+    sub_event_map[0x12] = EVENT_FE_12;
     sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x14] = EVENT_FE_14_V2;
+    sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT;
     sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
     sub_event_map[0x16] = EVENT_MEASURE;
     sub_event_map[0x17] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x18] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x19] = EVENT_FE_19_V2;
-    sub_event_map[0x1a] = EVENT_FE_1A_V2;
-    sub_event_map[0x1b] = EVENT_FE_1B_V2;
-    sub_event_map[0x1c] = EVENT_FE_1C_V2;
-    sub_event_map[0x1d] = EVENT_FE_1D_V2;
-    sub_event_map[0x1e] = EVENT_FE_1E_V2;
+    sub_event_map[0x19] = EVENT_FE_19;
+    sub_event_map[0x1a] = EVENT_FE_1A;
+    sub_event_map[0x1b] = EVENT_FE_1B;
+    sub_event_map[0x1c] = EVENT_FE_1C;
+    sub_event_map[0x1d] = EVENT_FE_1D;
+    sub_event_map[0x1e] = EVENT_FE_1E;
     sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
   }
 }
@@ -341,13 +481,13 @@ void AkaoTrack::ResetVars() {
 
 bool AkaoTrack::ReadEvent() {
   AkaoSeq *parentSeq = seq();
-  const AkaoPs1Version version = parentSeq->version;
+  const AkaoPs1Version version = parentSeq->version();
   const uint32_t beginOffset = curOffset;
   const uint8_t status_byte = GetByte(curOffset++);
 
   std::wstringstream desc;
 
-  const bool op_note_with_length = (version == AkaoPs1Version::VERSION_2)
+  const bool op_note_with_length = (version == AkaoPs1Version::VERSION_3)
     && (status_byte >= 0xF0) && (status_byte <= 0xFD);
 
   if (status_byte <= 0x99 || op_note_with_length)   //it's either a  note-on message, a tie message, or a rest message
@@ -405,7 +545,14 @@ bool AkaoTrack::ReadEvent() {
   else {
     AkaoSeqEventType event = static_cast<AkaoSeqEventType>(0);
 
-    if (version == AkaoPs1Version::VERSION_2 && status_byte == 0xFE)
+    if (version == AkaoPs1Version::VERSION_3 && status_byte == 0xFE)
+    {
+      const uint8_t op = GetByte(curOffset++);
+      const auto event_iterator = parentSeq->sub_event_map.find(op);
+      if (event_iterator != parentSeq->sub_event_map.end())
+        event = event_iterator->second;
+    }
+    else if ((version == AkaoPs1Version::VERSION_1_2 || version == AkaoPs1Version::VERSION_2) && status_byte == 0xFC)
     {
       const uint8_t op = GetByte(curOffset++);
       const auto event_iterator = parentSeq->sub_event_map.find(op);
@@ -793,14 +940,20 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
-    case EVENT_D4:
-    case EVENT_D5:
-    case EVENT_D6:
-    case EVENT_D7:
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
-        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+    case EVENT_PITCH_SIDE_CHAIN_ON:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Side Chain On", L"", CLR_MISC);
+      break;
+
+    case EVENT_PITCH_SIDE_CHAIN_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Side Chain Off", L"", CLR_MISC);
+      break;
+
+    case EVENT_PITCH_TO_VOLUME_SIDE_CHAIN_ON:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch-Volume Side Chain On", L"", CLR_MISC);
+      break;
+
+    case EVENT_PITCH_TO_VOLUME_SIDE_CHAIN_OFF:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch-Volume Side Chain Off", L"", CLR_MISC);
       break;
 
     case EVENT_TUNING_ABS:
@@ -957,7 +1110,7 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_UNCONDITIONAL_JUMP: {
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -976,7 +1129,7 @@ bool AkaoTrack::ReadEvent() {
     case EVENT_CPU_CONDITIONAL_JUMP: {
       const uint8_t target_value = GetByte(curOffset++);
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -999,7 +1152,7 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t raw_count = GetByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1014,7 +1167,7 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t raw_count = GetByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_1 ? 2 : 0);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1037,8 +1190,15 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
-    case EVENT_F3_V1:
-    {
+    case EVENT_F3_FF7: {
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_F3_SAGAFRO: {
       desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
         << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
       AddUnknown(beginOffset, curOffset - beginOffset);
@@ -1046,7 +1206,7 @@ bool AkaoTrack::ReadEvent() {
       return false;
     }
 
-    case EVENT_UNISON_ON: {
+    case EVENT_OVERLAY_VOICE_ON: {
       parentSeq->bUsesIndividualArts = true;
       const uint8_t artNum = GetByte(curOffset++);
       const uint8_t artNum2 = GetByte(curOffset++);
@@ -1056,33 +1216,33 @@ bool AkaoTrack::ReadEvent() {
         : artNum;
 
       desc << L"Program Number for Primary Voice: " << artNum << L"  Program Number for Secondary Voice: " << artNum2;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Unison On (With Program Change)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Overlay Voice On (With Program Change)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       AddProgramChangeNoItem(progNum, false);
       break;
     }
 
-    case EVENT_UNISON_OFF: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Unison Off", L"", CLR_MISC, ICON_CONTROL);
+    case EVENT_OVERLAY_VOICE_OFF: {
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Overlay Voice Off", L"", CLR_MISC, ICON_CONTROL);
       break;
     }
 
-    case EVENT_UNISON_VOLUME_BALANCE: {
+    case EVENT_OVERLAY_VOLUME_BALANCE: {
       const uint8_t balance = GetByte(curOffset++);
       const int primary_percent = (127 - balance) * 100 / 256;
       const int secondary_percent = balance * 100 / 256;
       desc << L"Balance: " << balance << L" (Primary Voice Volume " << primary_percent << "%, Secondary Voice Volume " << secondary_percent << L"%)";
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Unison Volume Balance", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Overlay Volume Balance", desc.str(), CLR_VOLUME, ICON_CONTROL);
       break;
     }
 
-    case EVENT_UNISON_VOLUME_BALANCE_FADE: {
+    case EVENT_OVERLAY_VOLUME_BALANCE_FADE: {
       const uint8_t raw_length = GetByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const uint8_t balance = GetByte(curOffset++);
       const int primary_percent = (127 - balance) * 100 / 256;
       const int secondary_percent = balance * 100 / 256;
       desc << L"Duration: " << length << L"  Target Balance: " << balance << L" (Primary Voice Volume " << primary_percent << "%, Secondary Voice Volume " << secondary_percent << L"%)";
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Unison Volume Balance Fade", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Overlay Volume Balance Fade", desc.str(), CLR_VOLUME, ICON_CONTROL);
       break;
     }
 
@@ -1098,12 +1258,46 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
+    case EVENT_FC_SAGAFRO:
+    {
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      return false;
+    }
+
+    case EVENT_FE_0A:
+      curOffset++;
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+
+    case EVENT_FE_0B: {
+      int16_t offset1 = GetShort(curOffset);
+      curOffset += 2;
+      int16_t offset2 = GetShort(curOffset);
+      curOffset += 2;
+
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
     case EVENT_TIME_SIGNATURE: {
       // Both of arguments can be zero: Front Mission 3: 1-08 Setup 2.psf
       const uint8_t ticksPerBeat = GetByte(curOffset++);
       const uint8_t beatsPerMeasure = GetByte(curOffset++);
-      const uint8_t denom = ticksPerBeat == 0 ? 4 : ((parentSeq->ppqn * 4) / ticksPerBeat); // or should it always be 4? no idea
-      AddTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat);
+      if (ticksPerBeat != 0 && beatsPerMeasure != 0) {
+        const uint8_t denom = (parentSeq->ppqn * 4) / ticksPerBeat; // or should it always be 4? no idea
+        AddTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat);
+      } else {
+        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Time Signature", L"", CLR_TIMESIG, ICON_TIMESIG);
+      }
       break;
     }
 
@@ -1116,35 +1310,43 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
-    case EVENT_FE_10_V2: // needs research
+    case EVENT_FE_10:
       curOffset++;
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
       AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
       break;
 
-    case EVENT_FE_14_V2: { // needs more research
-      const uint8_t curProgram = GetByte(curOffset++);
-      //if (!bAssociatedWithSSTable)
-      //	RecordMidiProgramChange(current_delta_time, curProgram, hFile);
-      AddProgramChange(beginOffset, curOffset - beginOffset, curProgram);
+    case EVENT_PROGCHANGE_KEY_SPLIT: {
+      const uint8_t progNum = GetByte(curOffset++);
+      AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, L"Program Change (Key-Split Instrument)");
       break;
     }
 
-    case EVENT_FE_1C_V2: // needs research
+    case EVENT_FE_1C:
       curOffset++;
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
       AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
       break;
 
-    case EVENT_FE_0A_V2:
-    case EVENT_FE_0B_V2:
-    case EVENT_FE_0E_V2:
-    case EVENT_FE_0F_V2:
-    case EVENT_FE_11_V2:
-    case EVENT_FE_12_V2:
-    case EVENT_FE_19_V2:
-    case EVENT_FE_1A_V2:
-    case EVENT_FE_1B_V2:
-    case EVENT_FE_1D_V2:
-    case EVENT_FE_1E_V2:
+    case EVENT_FE_1D:
+    case EVENT_FE_1E:
+      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+
+    case EVENT_SUBROUTINE_JUMP:
+    case EVENT_RETURN_FROM_SUBROUTINE:
+    case EVENT_FE_11:
+    case EVENT_FE_12:
+    case EVENT_FE_19:
+    case EVENT_FE_1A:
+    case EVENT_FE_1B:
     default:
       desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
         << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;

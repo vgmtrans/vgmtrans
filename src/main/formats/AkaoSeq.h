@@ -4,18 +4,9 @@
 #include "AkaoFormat.h"
 #include "Matcher.h"
 
+class AkaoSeq;
+class AkaoTrack;
 class AkaoInstrSet;
-
-enum class AkaoPs1Version : uint8_t {
-  // Final Fantasy 7
-  // SaGa Frontier
-  // Front Mission 2
-  // Chocobo's Mysterious Dungeon
-  // Parasite Eve
-  VERSION_1,
-
-  VERSION_2
-};
 
 enum AkaoSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
@@ -72,10 +63,10 @@ enum AkaoSeqEventType {
   EVENT_LEGATO_OFF,
   EVENT_PITCH_MOD_ON_DELAY_TOGGLE,
   EVENT_PITCH_MOD_DELAY_TOGGLE,
-  EVENT_D4,
-  EVENT_D5,
-  EVENT_D6,
-  EVENT_D7,
+  EVENT_PITCH_SIDE_CHAIN_ON,
+  EVENT_PITCH_SIDE_CHAIN_OFF,
+  EVENT_PITCH_TO_VOLUME_SIDE_CHAIN_ON,
+  EVENT_PITCH_TO_VOLUME_SIDE_CHAIN_OFF,
   EVENT_TUNING_ABS,
   EVENT_TUNING_REL,
   EVENT_PORTAMENTO_ON,
@@ -102,45 +93,70 @@ enum AkaoSeqEventType {
   EVENT_LOOP_BRANCH,
   EVENT_LOOP_BREAK,
   EVENT_PROGCHANGE_NO_ATTACK,
-  EVENT_F3_V1,
-  EVENT_UNISON_ON,
-  EVENT_UNISON_OFF,
-  EVENT_UNISON_VOLUME_BALANCE,
-  EVENT_UNISON_VOLUME_BALANCE_FADE,
-  EVENT_FE_0A_V2,
-  EVENT_FE_0B_V2,
-  EVENT_FE_0E_V2,
-  EVENT_FE_0F_V2,
-  EVENT_FE_10_V2,
-  EVENT_FE_11_V2,
-  EVENT_FE_12_V2,
-  EVENT_FE_14_V2,
+  EVENT_F3_FF7,
+  EVENT_F3_SAGAFRO,
+  EVENT_OVERLAY_VOICE_ON,
+  EVENT_OVERLAY_VOICE_OFF,
+  EVENT_OVERLAY_VOLUME_BALANCE,
+  EVENT_OVERLAY_VOLUME_BALANCE_FADE,
+  EVENT_FC_SAGAFRO,
+  EVENT_FE_0A,
+  EVENT_FE_0B,
+  EVENT_FE_0C,
+  EVENT_FE_0D,
+  EVENT_FE_0E,
+  EVENT_FE_0F,
+  EVENT_SUBROUTINE_JUMP,
+  EVENT_RETURN_FROM_SUBROUTINE,
+  EVENT_FE_10,
+  EVENT_FE_11,
+  EVENT_FE_12,
+  EVENT_PROGCHANGE_KEY_SPLIT,
   EVENT_ALTERNATE_VOICE_ON,
   EVENT_ALTERNATE_VOICE_OFF,
   EVENT_TIME_SIGNATURE,
   EVENT_MEASURE,
-  EVENT_FE_19_V2,
-  EVENT_FE_1A_V2,
-  EVENT_FE_1B_V2,
-  EVENT_FE_1C_V2,
-  EVENT_FE_1D_V2,
-  EVENT_FE_1E_V2
+  EVENT_FE_19,
+  EVENT_FE_1A,
+  EVENT_FE_1B,
+  EVENT_FE_1C,
+  EVENT_FE_1D,
+  EVENT_FE_1E
 };
 
 class AkaoSeq:
     public VGMSeq {
  public:
-  AkaoSeq(RawFile *file, uint32_t offset);
+  AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version);
   virtual ~AkaoSeq();
 
   virtual bool GetHeaderInfo() override;
   virtual bool GetTrackPointers() override;
 
+  AkaoPs1Version version() const { return version_; }
+
   std::wstring ReadTimestampAsText();
   double GetTempoInBPM(uint16_t tempo) const;
 
+  static bool IsPossibleAkaoSeq(RawFile *file, uint32_t offset);
   static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
-  static uint32_t ReadNumOfTracks(RawFile *file, uint32_t offset);
+
+  static uint32_t GetTrackAllocationBitsOffset(AkaoPs1Version version) {
+    switch (version)
+    {
+    case AkaoPs1Version::VERSION_1_0:
+    case AkaoPs1Version::VERSION_1_1:
+    case AkaoPs1Version::VERSION_1_2:
+      return 0x10;
+
+    case AkaoPs1Version::VERSION_2:
+      return 0x10;
+
+    case AkaoPs1Version::VERSION_3:
+    default:
+      return 0x20;
+    }
+  }
 
  private:
   void LoadEventMap();
@@ -159,12 +175,15 @@ class AkaoSeq:
  public:
   AkaoInstrSet *instrset;
   uint16_t seq_id;
-  AkaoPs1Version version;
+  bool bUsesIndividualArts;
+
+ private:
+  AkaoPs1Version version_;
 
   std::map<uint8_t, AkaoSeqEventType> event_map;
   std::map<uint8_t, AkaoSeqEventType> sub_event_map;
 
-  bool bUsesIndividualArts;
+  friend AkaoTrack;
 };
 
 class AkaoTrack
