@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
-#include "AkaoSnesFormat.h"
 
 DECLARE_FORMAT(Akao);
 
@@ -66,6 +65,9 @@ AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset) {
 }
 
 bool AkaoSeq::GetHeaderInfo() {
+  if (version() == AkaoPs1Version::UNKNOWN)
+    return false;
+
   const uint32_t track_bits = (version() == AkaoPs1Version::VERSION_3)
     ? GetWord(dwOffset + 0x20)
     : GetWord(dwOffset + 0x10);

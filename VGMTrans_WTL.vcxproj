@@ -430,6 +430,7 @@
   <ItemGroup>
     <ClInclude Include="src\main\BytePattern.h" />
     <ClInclude Include="src\main\datetime.h" />
+    <ClInclude Include="src\main\formats\AkaoFormatVersion.h" />
     <ClInclude Include="src\main\formats\AkaoSnesFormat.h" />
     <ClInclude Include="src\main\formats\AkaoSnesInstr.h" />
     <ClInclude Include="src\main\formats\AkaoSnesScanner.h" />
