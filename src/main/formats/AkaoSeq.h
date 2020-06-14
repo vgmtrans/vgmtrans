@@ -1,7 +1,7 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
-#include "AkaoFormat.h"
+#include "AkaoFormatVersion.h"
 #include "Matcher.h"
 
 class AkaoSeq;
