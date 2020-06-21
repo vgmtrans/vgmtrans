@@ -70,15 +70,15 @@ bool AkaoColl::LoadMain() {
       else
         rgn->unityKey = art->unityKey;
 
-      short ft = art->fineTune;
-      if (ft < 0)
-        ft += 0x8000;
-      //this gives us the pitch multiplier value ex. 1.05946
-      double freq_multiplier = (double) (((ft * 32) + 0x100000) / (double) 0x100000);
-      double cents = log(freq_multiplier) / log((double) 2) * 1200;
-      if (art->fineTune < 0)
-        cents -= 1200;
-      rgn->fineTune = (short) cents;
+      const double freq_multiplier = (art->fineTune >= 0)
+        ? 1.0 + (art->fineTune / 32768.0)
+        : static_cast<uint16_t>(art->fineTune) / 65536.0;
+      const double cents = log(freq_multiplier) / log(2.0) * 1200;
+
+      const int8_t coarseTune = static_cast<int8_t>(cents / 100);
+      const int16_t fineTune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+      rgn->unityKey -= coarseTune;
+      rgn->fineTune = fineTune;
     }
   }
 
@@ -136,17 +136,17 @@ void AkaoColl::PreSynthFileCreation() {
       rgn->SetLoopInfo(1, art->loop_point, sampcoll->samples[rgn->sampNum]->dataLength - art->loop_point);
 
     PSXConvADSR<AkaoRgn>(rgn, art->ADSR1, art->ADSR2, false);
-    rgn->unityKey = art->unityKey;
 
-    short ft = art->fineTune;
-    if (ft < 0)
-      ft += 0x8000;
-    double freq_multiplier =
-        (double) (((ft * 32) + 0x100000) / (double) 0x100000);  //this gives us the pitch multiplier value ex. 1.05946
-    double cents = log(freq_multiplier) / log((double) 2) * 1200;
-    if (art->fineTune < 0)
-      cents -= 1200;
-    rgn->fineTune = (short) cents;
+    const double freq_multiplier = (art->fineTune >= 0)
+      ? 1.0 + (art->fineTune / 32768.0)
+      : static_cast<uint16_t>(art->fineTune) / 65536.0;
+    const double cents = log(freq_multiplier) / log(2.0) * 1200;
+
+    const int8_t coarseTune = static_cast<int8_t>(cents / 100);
+    const int16_t fineTune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+    rgn->unityKey = art->unityKey - coarseTune;
+    rgn->fineTune = fineTune;
+
     newInstr->aRgns.push_back(rgn);
 
     instrSet->aInstrs.push_back(newInstr);

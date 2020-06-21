@@ -408,11 +408,15 @@ SF2File::SF2File(SynthFile *synthfile)
       sampInfo = wave->sampinfo;
     assert (sampInfo != NULL);
 
+    const int16_t coarseTune = sampInfo->sFineTune / 100;
+    const int16_t fineTune = sampInfo->sFineTune % 100;
+    assert(coarseTune == 0);
+
     samp.dwStartloop = samp.dwStart + sampInfo->ulLoopStart;
     samp.dwEndloop = samp.dwStartloop + sampInfo->ulLoopLength;
     samp.dwSampleRate = wave->dwSamplesPerSec;
-    samp.byOriginalKey = (uint8_t) (sampInfo->usUnityNote);
-    samp.chCorrection = (char) (sampInfo->sFineTune);
+    samp.byOriginalKey = (uint8_t) sampInfo->usUnityNote;
+    samp.chCorrection = (char) fineTune;
     samp.wSampleLink = 0;
     samp.sfSampleType = monoSample;
 
