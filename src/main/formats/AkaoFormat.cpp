@@ -86,7 +86,7 @@ bool AkaoColl::LoadMain() {
   return true;
 }
 
-bool AkaoColl::PreDLSMainCreation() {
+void AkaoColl::PreSynthFileCreation() {
   //Before DLS Conversion, we want to add instruments for every single articulation definition
   //in the Akao Sample Collection, so that they can be used with the 0xA1 program change sequence event
   //to do this, we create a copy of the AkaoInstrSet before conversion and add the instruments, then
@@ -113,7 +113,7 @@ bool AkaoColl::PreDLSMainCreation() {
   instrsets[0] = newInstrSet;*/
 
   if (!((AkaoSeq *) seq)->bUsesIndividualArts)    //only do this if the 0xA1 event is actually used
-    return true;
+    return;
 
   AkaoInstrSet *instrSet = (AkaoInstrSet *) instrsets[0];
 
@@ -151,16 +151,14 @@ bool AkaoColl::PreDLSMainCreation() {
 
     instrSet->aInstrs.push_back(newInstr);
   }
-
-  return true;
 }
 
-bool AkaoColl::PostDLSMainCreation() {
+void AkaoColl::PostSynthFileCreation() {
 
   //if the 0xA1 event isn't used in the sequence, then we didn't modify the instrset
   //so skip this
   if (!((AkaoSeq *) seq)->bUsesIndividualArts)
-    return true;
+    return;
 
   AkaoInstrSet *instrSet = (AkaoInstrSet *) instrsets[0];
   AkaoSampColl *sampcoll = (AkaoSampColl *) sampcolls[0];
@@ -170,5 +168,4 @@ bool AkaoColl::PostDLSMainCreation() {
     delete instrSet->aInstrs.back();
     instrSet->aInstrs.pop_back();
   }
-  return true;
 }

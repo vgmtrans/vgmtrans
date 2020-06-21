@@ -19,8 +19,8 @@ class AkaoColl:
   virtual ~AkaoColl() { }
 
   virtual bool LoadMain();
-  virtual bool PreDLSMainCreation();
-  virtual bool PostDLSMainCreation();
+  virtual void PreSynthFileCreation();
+  virtual void PostSynthFileCreation();
 
  public:
   AkaoInstrSet *origInstrSet;
