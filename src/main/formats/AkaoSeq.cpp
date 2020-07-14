@@ -12,7 +12,8 @@ namespace
 }
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
-    : VGMSeq(AkaoFormat::name, file, offset), instrset(nullptr), version_(version), seq_id(0) {
+    : VGMSeq(AkaoFormat::name, file, offset), instrument_set_offset_(0), drum_set_offset_(0),
+      instrset(nullptr), seq_id(0), version_(version) {
   UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   bUsesIndividualArts = false;
   UseReverb();
@@ -129,22 +130,22 @@ bool AkaoSeq::GetHeaderInfo() {
   {
     //There must be either a melodic instrument section, a drumkit, or both.  We determine
     //the start of the InstrSet based on whether a melodic instrument section is given.
-    uint32_t instrOff = GetWord(dwOffset + 0x30);
-    uint32_t drumkitOff = GetWord(dwOffset + 0x34);
+    const uint32_t instrOff = GetWord(dwOffset + 0x30);
+    const uint32_t drumkitOff = GetWord(dwOffset + 0x34);
     if (instrOff != 0)
-      instrOff += 0x30 + dwOffset;
+      set_instrument_set_offset(dwOffset + 0x30 + instrOff);
     if (drumkitOff != 0)
-      drumkitOff += 0x34 + dwOffset;
+      set_drum_set_offset(dwOffset + 0x34 + drumkitOff);
 
     uint32_t instrSetLength = 0;
     if (instrOff != 0)
-      instrSetLength = unLength - (instrOff - dwOffset);
+      instrSetLength = unLength - (instrument_set_offset() - dwOffset);
     else if (drumkitOff != 0)
-      instrSetLength = unLength - (drumkitOff - dwOffset);
+      instrSetLength = unLength - (drum_set_offset() - dwOffset);
 
     if (instrSetLength != 0)
     {
-      instrset = new AkaoInstrSet(rawfile, instrSetLength, instrOff, drumkitOff, id, L"Akao Instr Set");
+      instrset = new AkaoInstrSet(rawfile, instrSetLength, instrument_set_offset(), drum_set_offset(), id, L"Akao Instr Set");
       if (!instrset->LoadVGMFile()) {
         delete instrset;
         instrset = nullptr;
@@ -380,15 +381,15 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x07] = EVENT_CPU_CONDITIONAL_JUMP;
     sub_event_map[0x08] = EVENT_LOOP_BRANCH;
     sub_event_map[0x09] = EVENT_LOOP_BREAK;
-    sub_event_map[0x0a] = EVENT_FE_0A;
+    sub_event_map[0x0a] = EVENT_PROGCHANGE_NO_ATTACK;
     sub_event_map[0x0b] = EVENT_FE_0B;
     sub_event_map[0x0c] = EVENT_FE_0C;
     sub_event_map[0x0d] = EVENT_FE_0D;
     sub_event_map[0x0e] = EVENT_FE_0E;
     sub_event_map[0x0f] = EVENT_FE_0F;
-    sub_event_map[0x10] = EVENT_FE_10;
-    sub_event_map[0x11] = EVENT_FE_11;
-    sub_event_map[0x12] = EVENT_FE_12;
+    sub_event_map[0x10] = EVENT_FC_10;
+    sub_event_map[0x11] = EVENT_FC_11;
+    sub_event_map[0x12] = EVENT_VOLUME_FADE;
     sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT;
     sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
@@ -408,9 +409,9 @@ void AkaoSeq::LoadEventMap()
     event_map[0xe1] = EVENT_E1_V2;
     event_map[0xe2] = EVENT_E2_V2;
     event_map[0xe3] = EVENT_UNIMPLEMENTED;
-    event_map[0xe4] = EVENT_E4_V2;
-    event_map[0xe5] = EVENT_E5_V2;
-    event_map[0xe6] = EVENT_E6_V2;
+    event_map[0xe4] = EVENT_VIBRATO_RATE_FADE;
+    event_map[0xe5] = EVENT_TREMOLO_RATE_FADE;
+    event_map[0xe6] = EVENT_PAN_LFO_RATE_FADE;
     event_map[0xe7] = EVENT_UNIMPLEMENTED;
     event_map[0xe8] = EVENT_UNIMPLEMENTED;
     event_map[0xe9] = EVENT_UNIMPLEMENTED;
@@ -434,27 +435,27 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x07] = EVENT_CPU_CONDITIONAL_JUMP;
     sub_event_map[0x08] = EVENT_LOOP_BRANCH;
     sub_event_map[0x09] = EVENT_LOOP_BREAK;
-    sub_event_map[0x0a] = EVENT_FE_0A;
+    sub_event_map[0x0a] = EVENT_PROGCHANGE_NO_ATTACK;
     sub_event_map[0x0b] = EVENT_FE_0B;
     sub_event_map[0x0c] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x0d] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x0e] = EVENT_SUBROUTINE_JUMP;
-    sub_event_map[0x0f] = EVENT_RETURN_FROM_SUBROUTINE;
-    sub_event_map[0x10] = EVENT_FE_10;
-    sub_event_map[0x11] = EVENT_FE_11;
-    sub_event_map[0x12] = EVENT_FE_12;
+    sub_event_map[0x0e] = EVENT_PATTERN;
+    sub_event_map[0x0f] = EVENT_END_PATTERN;
+    sub_event_map[0x10] = EVENT_ALLOC_RESERVED_VOICES;
+    sub_event_map[0x11] = EVENT_FREE_RESERVED_VOICES;
+    sub_event_map[0x12] = EVENT_VOLUME_FADE;
     sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT;
     sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
     sub_event_map[0x16] = EVENT_MEASURE;
     sub_event_map[0x17] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x18] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x19] = EVENT_FE_19;
+    sub_event_map[0x19] = EVENT_EXPRESSION_FADE_PER_NOTE;
     sub_event_map[0x1a] = EVENT_FE_1A;
     sub_event_map[0x1b] = EVENT_FE_1B;
     sub_event_map[0x1c] = EVENT_FE_1C;
-    sub_event_map[0x1d] = EVENT_FE_1D;
-    sub_event_map[0x1e] = EVENT_FE_1E;
+    sub_event_map[0x1d] = EVENT_USE_RESERVED_VOICES;
+    sub_event_map[0x1e] = EVENT_USE_NO_RESERVED_VOICES;
     sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
   }
 }
@@ -469,6 +470,8 @@ void AkaoTrack::ResetVars() {
 
   slur = false;
   legato = false;
+
+  pattern_return_offset = 0;
 
   memset(loop_begin_loc, 0, sizeof(loop_begin_loc));
   loop_layer = 0;
@@ -599,6 +602,14 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
+    case EVENT_VOLUME_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t vol = GetByte(curOffset++);
+      AddVolSlide(beginOffset, curOffset - beginOffset, length, vol);
+      break;
+    }
+
     case EVENT_PITCH_SLIDE: {
       const uint8_t raw_length = GetByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
@@ -637,6 +648,15 @@ bool AkaoTrack::ReadEvent() {
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const uint8_t expression = GetByte(curOffset++);
       AddExpressionSlide(beginOffset, curOffset - beginOffset, length, expression);
+      break;
+    }
+
+    case EVENT_EXPRESSION_FADE_PER_NOTE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t expression = GetByte(curOffset++);
+      desc << L"Target Expression: " << expression << L"  Duration: " << length;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Expression Slide Per Note", desc.str(), CLR_VOLUME, ICON_CONTROL);
       break;
     }
 
@@ -1046,6 +1066,33 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
+    case EVENT_VIBRATO_RATE_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t rate = GetByte(curOffset++);
+      desc << L"Duration: " << length << L"  Target Rate: " << rate;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Vibrato Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_TREMOLO_RATE_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t rate = GetByte(curOffset++);
+      desc << L"Duration: " << length << L"  Target Rate: " << rate;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tremolo Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      break;
+    }
+
+    case EVENT_PAN_LFO_RATE_FADE: {
+      const uint8_t raw_length = GetByte(curOffset++);
+      const uint16_t length = raw_length == 0 ? 256 : raw_length;
+      const uint8_t rate = GetByte(curOffset++);
+      desc << L"Duration: " << length << L"  Target Rate: " << rate;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan LFO Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      break;
+    }
+
     case EVENT_TEMPO: {
       const uint16_t raw_tempo = GetShort(curOffset);
       curOffset += 2;
@@ -1269,14 +1316,6 @@ bool AkaoTrack::ReadEvent() {
       return false;
     }
 
-    case EVENT_FE_0A:
-      curOffset++;
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
-        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
-      break;
-
     case EVENT_FE_0B: {
       int16_t offset1 = GetShort(curOffset);
       curOffset += 2;
@@ -1287,6 +1326,40 @@ bool AkaoTrack::ReadEvent() {
         << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
       AddUnknown(beginOffset, curOffset - beginOffset);
       pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_PATTERN: {
+      const int16_t relative_offset = GetShort(curOffset);
+      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
+      curOffset += 2;
+      const uint32_t length = curOffset - beginOffset;
+
+      desc << L"Destination: 0x" << std::hex << std::setfill(L'0') << std::uppercase << dest;
+      AddGenericEvent(beginOffset, length, L"Play Pattern", desc.str(), CLR_MISC);
+
+      pattern_return_offset = curOffset;
+      curOffset = dest;
+      break;
+    }
+
+    case EVENT_END_PATTERN: {
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"End Pattern", L"", CLR_MISC);
+      curOffset = pattern_return_offset;
+      break;
+    }
+
+    case EVENT_ALLOC_RESERVED_VOICES: {
+      const uint8_t count = GetByte(curOffset++);
+      desc << L"Number of Voices: " << count;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Allocate Reserved Voices", desc.str(), CLR_MISC);
+      break;
+    }
+
+    case EVENT_FREE_RESERVED_VOICES: {
+      const uint8_t count = 0;
+      desc << L"Number of Voices: " << count;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Free Reserved Voices", desc.str(), CLR_MISC);
       break;
     }
 
@@ -1312,43 +1385,20 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
-    case EVENT_FE_10:
-      curOffset++;
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
-        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
-      break;
-
     case EVENT_PROGCHANGE_KEY_SPLIT: {
       const uint8_t progNum = GetByte(curOffset++);
       AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, L"Program Change (Key-Split Instrument)");
       break;
     }
 
-    case EVENT_FE_1C:
-      curOffset++;
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
-        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+    case EVENT_USE_RESERVED_VOICES:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Use Reserved Voices", L"", CLR_MISC);
       break;
 
-    case EVENT_FE_1D:
-    case EVENT_FE_1E:
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
-        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+    case EVENT_USE_NO_RESERVED_VOICES:
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Use No Reserved Voices", L"", CLR_MISC);
       break;
 
-    case EVENT_SUBROUTINE_JUMP:
-    case EVENT_RETURN_FROM_SUBROUTINE:
-    case EVENT_FE_11:
-    case EVENT_FE_12:
-    case EVENT_FE_19:
-    case EVENT_FE_1A:
-    case EVENT_FE_1B:
     default:
       desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte
         << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
