@@ -78,9 +78,9 @@ enum AkaoSeqEventType {
   EVENT_E0_V2,
   EVENT_E1_V2,
   EVENT_E2_V2,
-  EVENT_E4_V2,
-  EVENT_E5_V2,
-  EVENT_E6_V2,
+  EVENT_VIBRATO_RATE_FADE,
+  EVENT_TREMOLO_RATE_FADE,
+  EVENT_PAN_LFO_RATE_FADE,
   EVENT_TEMPO,
   EVENT_TEMPO_FADE,
   EVENT_REVERB_DEPTH,
@@ -100,28 +100,29 @@ enum AkaoSeqEventType {
   EVENT_OVERLAY_VOLUME_BALANCE,
   EVENT_OVERLAY_VOLUME_BALANCE_FADE,
   EVENT_FC_SAGAFRO,
-  EVENT_FE_0A,
   EVENT_FE_0B,
   EVENT_FE_0C,
   EVENT_FE_0D,
   EVENT_FE_0E,
   EVENT_FE_0F,
-  EVENT_SUBROUTINE_JUMP,
-  EVENT_RETURN_FROM_SUBROUTINE,
-  EVENT_FE_10,
-  EVENT_FE_11,
-  EVENT_FE_12,
+  EVENT_FC_10,
+  EVENT_FC_11,
+  EVENT_PATTERN,
+  EVENT_END_PATTERN,
+  EVENT_ALLOC_RESERVED_VOICES,
+  EVENT_FREE_RESERVED_VOICES,
+  EVENT_VOLUME_FADE,
   EVENT_PROGCHANGE_KEY_SPLIT,
   EVENT_ALTERNATE_VOICE_ON,
   EVENT_ALTERNATE_VOICE_OFF,
   EVENT_TIME_SIGNATURE,
   EVENT_MEASURE,
-  EVENT_FE_19,
+  EVENT_EXPRESSION_FADE_PER_NOTE,
   EVENT_FE_1A,
   EVENT_FE_1B,
   EVENT_FE_1C,
-  EVENT_FE_1D,
-  EVENT_FE_1E
+  EVENT_USE_RESERVED_VOICES,
+  EVENT_USE_NO_RESERVED_VOICES
 };
 
 class AkaoSeq:
@@ -177,8 +178,15 @@ class AkaoSeq:
   uint16_t seq_id;
   bool bUsesIndividualArts;
 
+  uint32_t instrument_set_offset() const noexcept { return instrument_set_offset_; }
+  void set_instrument_set_offset(uint32_t offset) noexcept { instrument_set_offset_ = offset; }
+  uint32_t drum_set_offset() const noexcept { return drum_set_offset_; }
+  void set_drum_set_offset(uint32_t offset) noexcept { drum_set_offset_ = offset; }
+
  private:
   AkaoPs1Version version_;
+  uint32_t instrument_set_offset_;
+  uint32_t drum_set_offset_;
 
   std::map<uint8_t, AkaoSeqEventType> event_map;
   std::map<uint8_t, AkaoSeqEventType> sub_event_map;
@@ -204,6 +212,7 @@ class AkaoTrack
  protected:
   bool slur;
   bool legato;
+  uint32_t pattern_return_offset;
   uint32_t loop_begin_loc[4];
   uint16_t loop_layer;
   uint16_t loop_counter[4];
