@@ -375,7 +375,7 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x01] = EVENT_TEMPO_FADE;
     sub_event_map[0x02] = EVENT_REVERB_DEPTH;
     sub_event_map[0x03] = EVENT_REVERB_DEPTH_FADE;
-    sub_event_map[0x04] = EVENT_DRUM_ON_V2;
+    sub_event_map[0x04] = EVENT_DRUM_ON_V1;
     sub_event_map[0x05] = EVENT_DRUM_OFF;
     sub_event_map[0x06] = EVENT_UNCONDITIONAL_JUMP;
     sub_event_map[0x07] = EVENT_CPU_CONDITIONAL_JUMP;
@@ -391,11 +391,11 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x11] = EVENT_FC_11;
     sub_event_map[0x12] = EVENT_VOLUME_FADE;
     sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT;
+    sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT_V1;
     sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
     sub_event_map[0x16] = EVENT_MEASURE;
-    sub_event_map[0x17] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x18] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x17] = EVENT_FC_17;
+    sub_event_map[0x18] = EVENT_FC_18;
     sub_event_map[0x19] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x1a] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x1b] = EVENT_UNIMPLEMENTED;
@@ -445,7 +445,7 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x11] = EVENT_FREE_RESERVED_VOICES;
     sub_event_map[0x12] = EVENT_VOLUME_FADE;
     sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT;
+    sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT_V2;
     sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
     sub_event_map[0x16] = EVENT_MEASURE;
     sub_event_map[0x17] = EVENT_UNIMPLEMENTED;
@@ -1394,7 +1394,17 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
-    case EVENT_PROGCHANGE_KEY_SPLIT: {
+    case EVENT_PROGCHANGE_KEY_SPLIT_V1: {
+      const int16_t relative_key_split_regions_offset = GetShort(curOffset);
+      curOffset += 2;
+      const uint32_t key_split_regions_offset = curOffset + relative_key_split_regions_offset;
+
+      desc << L"Offset: 0x" << std::hex << std::setfill(L'0') << std::uppercase << key_split_regions_offset;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Program Change (Key-Split Instrument)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      break;
+    }
+
+    case EVENT_PROGCHANGE_KEY_SPLIT_V2: {
       const uint8_t progNum = GetByte(curOffset++);
       AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, L"Program Change (Key-Split Instrument)");
       break;
