@@ -444,7 +444,7 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x10] = EVENT_ALLOC_RESERVED_VOICES;
     sub_event_map[0x11] = EVENT_FREE_RESERVED_VOICES;
     sub_event_map[0x12] = EVENT_VOLUME_FADE;
-    sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x13] = EVENT_FE_13;
     sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT_V2;
     sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
     sub_event_map[0x16] = EVENT_MEASURE;
@@ -1391,6 +1391,14 @@ bool AkaoTrack::ReadEvent() {
       desc << L"Measure: " << measure;
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Marker (Measure Number)", desc.str(), CLR_MISC);
       // TODO: write midi marker event
+      break;
+    }
+
+    case EVENT_FE_13: {
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
       break;
     }
 
