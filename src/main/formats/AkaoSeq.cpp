@@ -442,8 +442,8 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x0d] = EVENT_UNIMPLEMENTED; // Formerly used in Chocobo Dungeon but not implemented in this later version
     sub_event_map[0x0e] = EVENT_FC_0E;
     sub_event_map[0x0f] = EVENT_FC_0F;
-    sub_event_map[0x10] = EVENT_FC_10;
-    sub_event_map[0x11] = EVENT_FC_11;
+    sub_event_map[0x10] = EVENT_ALLOC_RESERVED_VOICES; // Possible having different implementation before Chocobo Racing
+    sub_event_map[0x11] = EVENT_FREE_RESERVED_VOICES; // Possible having different implementation before Chocobo Racing
     sub_event_map[0x12] = EVENT_VOLUME_FADE;
     sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT_V2;
@@ -455,8 +455,8 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x1a] = EVENT_FE_1A;
     sub_event_map[0x1b] = EVENT_FE_1B;
     sub_event_map[0x1c] = EVENT_FE_1C; // ommitted since SaGa Frontier 2
-    sub_event_map[0x1d] = EVENT_USE_RESERVED_VOICES; // introduced since Final Fantasy 8 or Chocobo Racing
-    sub_event_map[0x1e] = EVENT_USE_NO_RESERVED_VOICES; // introduced since Final Fantasy 8 or Chocobo Racing
+    sub_event_map[0x1d] = EVENT_USE_RESERVED_VOICES; // Possible having different implementation before Chocobo Racing
+    sub_event_map[0x1e] = EVENT_USE_NO_RESERVED_VOICES; // Possible having different implementation before Chocobo Racing
     sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
   }
   else if (version() == AkaoPs1Version::VERSION_3_1) {
