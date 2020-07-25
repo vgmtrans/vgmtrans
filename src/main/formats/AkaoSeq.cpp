@@ -46,7 +46,7 @@ bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
     }
   }
 
-  if (version == AkaoPs1Version::VERSION_3) {
+  if (version >= AkaoPs1Version::VERSION_3) {
     if (file->GetWord(offset + 0x2C) != 0 || file->GetWord(offset + 0x28) != 0)
       return false;
     if (file->GetWord(offset + 0x38) != 0 || file->GetWord(offset + 0x3C) != 0)
@@ -58,7 +58,7 @@ bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
 
 AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset) {
   if (file->GetWord(offset + 0x2C) == 0)
-    return AkaoPs1Version::VERSION_3;
+    return AkaoPs1Version::VERSION_3_1;
   else if (file->GetWord(offset + 0x1C) == 0)
     return AkaoPs1Version::VERSION_2;
   else
@@ -69,13 +69,13 @@ bool AkaoSeq::GetHeaderInfo() {
   if (version() == AkaoPs1Version::UNKNOWN)
     return false;
 
-  const uint32_t track_bits = (version() == AkaoPs1Version::VERSION_3)
+  const uint32_t track_bits = (version() >= AkaoPs1Version::VERSION_3)
     ? GetWord(dwOffset + 0x20)
     : GetWord(dwOffset + 0x10);
   nNumTracks = GetNumPositiveBits(track_bits);
 
   uint32_t track_header_offset;
-  if (version() == AkaoPs1Version::VERSION_3) {
+  if (version() >= AkaoPs1Version::VERSION_3) {
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
     hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
@@ -126,7 +126,7 @@ bool AkaoSeq::GetHeaderInfo() {
 
   LoadEventMap();
 
-  if (version() == AkaoPs1Version::VERSION_3)
+  if (version() >= AkaoPs1Version::VERSION_3)
   {
     //There must be either a melodic instrument section, a drumkit, or both.  We determine
     //the start of the InstrSet based on whether a melodic instrument section is given.
@@ -179,6 +179,7 @@ bool AkaoSeq::GetTrackPointers() {
     break;
 
   case AkaoPs1Version::VERSION_3:
+  case AkaoPs1Version::VERSION_3_1:
   default:
     track_header_offset = 0x40;
     break;
@@ -186,7 +187,7 @@ bool AkaoSeq::GetTrackPointers() {
 
   for (unsigned int i = 0; i < nNumTracks; i++) {
     const uint32_t p = track_header_offset + (i * 2);
-    const uint32_t base = p + (version() == AkaoPs1Version::VERSION_3 ? 0 : 2);
+    const uint32_t base = p + (version() >= AkaoPs1Version::VERSION_3 ? 0 : 2);
     const uint32_t relative_offset = GetShort(dwOffset + p);
     const uint32_t track_offset = base + relative_offset;
     aTracks.push_back(new AkaoTrack(this, dwOffset + track_offset));
@@ -338,7 +339,7 @@ void AkaoSeq::LoadEventMap()
     }
   }
   else if (version() == AkaoPs1Version::VERSION_1_2 || version() == AkaoPs1Version::VERSION_2) {
-    event_map[0xe0] = EVENT_E0_V2;
+    event_map[0xe0] = EVENT_E0;
     event_map[0xe1] = EVENT_UNIMPLEMENTED;
     event_map[0xe2] = EVENT_UNIMPLEMENTED;
     event_map[0xe3] = EVENT_UNIMPLEMENTED;
@@ -382,11 +383,11 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x08] = EVENT_LOOP_BRANCH;
     sub_event_map[0x09] = EVENT_LOOP_BREAK;
     sub_event_map[0x0a] = EVENT_PROGCHANGE_NO_ATTACK;
-    sub_event_map[0x0b] = EVENT_FE_0B;
-    sub_event_map[0x0c] = EVENT_FE_0C;
-    sub_event_map[0x0d] = EVENT_FE_0D;
-    sub_event_map[0x0e] = EVENT_FE_0E;
-    sub_event_map[0x0f] = EVENT_FE_0F;
+    sub_event_map[0x0b] = EVENT_FC_0B;
+    sub_event_map[0x0c] = EVENT_FC_0C;
+    sub_event_map[0x0d] = EVENT_FC_0D;
+    sub_event_map[0x0e] = EVENT_FC_0E;
+    sub_event_map[0x0f] = EVENT_FC_0F;
     sub_event_map[0x10] = EVENT_FC_10;
     sub_event_map[0x11] = EVENT_FC_11;
     sub_event_map[0x12] = EVENT_VOLUME_FADE;
@@ -405,9 +406,63 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
   }
   else if (version() == AkaoPs1Version::VERSION_3) {
-    event_map[0xe0] = EVENT_E0_V2;
-    event_map[0xe1] = EVENT_E1_V2;
-    event_map[0xe2] = EVENT_E2_V2;
+    event_map[0xe0] = EVENT_E0;
+    event_map[0xe1] = EVENT_UNIMPLEMENTED;
+    event_map[0xe2] = EVENT_UNIMPLEMENTED;
+    event_map[0xe3] = EVENT_UNIMPLEMENTED;
+    event_map[0xe4] = EVENT_UNIMPLEMENTED;
+    event_map[0xe5] = EVENT_UNIMPLEMENTED;
+    event_map[0xe6] = EVENT_UNIMPLEMENTED;
+    event_map[0xe7] = EVENT_UNIMPLEMENTED;
+    event_map[0xe8] = EVENT_UNIMPLEMENTED;
+    event_map[0xe9] = EVENT_UNIMPLEMENTED;
+    event_map[0xea] = EVENT_UNIMPLEMENTED;
+    event_map[0xeb] = EVENT_UNIMPLEMENTED;
+    event_map[0xec] = EVENT_UNIMPLEMENTED;
+    event_map[0xed] = EVENT_UNIMPLEMENTED;
+    event_map[0xee] = EVENT_UNIMPLEMENTED;
+    event_map[0xef] = EVENT_UNIMPLEMENTED;
+    // 0xf0-0xfd: note with duration
+    // 0xfe: extra opcodes
+    event_map[0xff] = EVENT_UNIMPLEMENTED;
+
+    sub_event_map[0x00] = EVENT_TEMPO;
+    sub_event_map[0x01] = EVENT_TEMPO_FADE;
+    sub_event_map[0x02] = EVENT_REVERB_DEPTH;
+    sub_event_map[0x03] = EVENT_REVERB_DEPTH_FADE;
+    sub_event_map[0x04] = EVENT_DRUM_ON_V2;
+    sub_event_map[0x05] = EVENT_DRUM_OFF;
+    sub_event_map[0x06] = EVENT_UNCONDITIONAL_JUMP;
+    sub_event_map[0x07] = EVENT_CPU_CONDITIONAL_JUMP;
+    sub_event_map[0x08] = EVENT_LOOP_BRANCH;
+    sub_event_map[0x09] = EVENT_LOOP_BREAK;
+    sub_event_map[0x0a] = EVENT_PROGCHANGE_NO_ATTACK;
+    sub_event_map[0x0b] = EVENT_UNIMPLEMENTED; // Same as 0xFC 0x0B in former version. Aside from that, it seems that Chrono Cross assigns a different operation for this opcode than other games
+    sub_event_map[0x0c] = EVENT_UNIMPLEMENTED; // Formerly used in Chocobo Dungeon but not implemented in this later version. Aside from that, Vagrant Story uses this opcode for a different operation (See 0x8001B70C)
+    sub_event_map[0x0d] = EVENT_UNIMPLEMENTED; // Formerly used in Chocobo Dungeon but not implemented in this later version
+    sub_event_map[0x0e] = EVENT_FC_0E;
+    sub_event_map[0x0f] = EVENT_FC_0F;
+    sub_event_map[0x10] = EVENT_FC_10;
+    sub_event_map[0x11] = EVENT_FC_11;
+    sub_event_map[0x12] = EVENT_VOLUME_FADE;
+    sub_event_map[0x13] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT_V2;
+    sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
+    sub_event_map[0x16] = EVENT_MEASURE;
+    sub_event_map[0x17] = EVENT_FC_17;
+    sub_event_map[0x18] = EVENT_FC_18;
+    sub_event_map[0x19] = EVENT_EXPRESSION_FADE_PER_NOTE;
+    sub_event_map[0x1a] = EVENT_FE_1A;
+    sub_event_map[0x1b] = EVENT_FE_1B;
+    sub_event_map[0x1c] = EVENT_FE_1C; // ommitted since SaGa Frontier 2
+    sub_event_map[0x1d] = EVENT_USE_RESERVED_VOICES; // introduced since Final Fantasy 8 or Chocobo Racing
+    sub_event_map[0x1e] = EVENT_USE_NO_RESERVED_VOICES; // introduced since Final Fantasy 8 or Chocobo Racing
+    sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
+  }
+  else if (version() == AkaoPs1Version::VERSION_3_1) {
+    event_map[0xe0] = EVENT_E0;
+    event_map[0xe1] = EVENT_E1;
+    event_map[0xe2] = EVENT_E2;
     event_map[0xe3] = EVENT_UNIMPLEMENTED;
     event_map[0xe4] = EVENT_VIBRATO_RATE_FADE;
     event_map[0xe5] = EVENT_TREMOLO_RATE_FADE;
@@ -436,24 +491,24 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x08] = EVENT_LOOP_BRANCH;
     sub_event_map[0x09] = EVENT_LOOP_BREAK;
     sub_event_map[0x0a] = EVENT_PROGCHANGE_NO_ATTACK;
-    sub_event_map[0x0b] = EVENT_FE_0B;
-    sub_event_map[0x0c] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x0b] = EVENT_UNIMPLEMENTED; // Same as 0xFC 0x0B in former version. Aside from that, it seems that Chrono Cross assigns a different operation for this opcode than other games
+    sub_event_map[0x0c] = EVENT_UNIMPLEMENTED; // Generally not implemented, but Vagrant Story uses this opcode for a different operation from the former version (See 0x8001B70C)
     sub_event_map[0x0d] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x0e] = EVENT_PATTERN;
     sub_event_map[0x0f] = EVENT_END_PATTERN;
     sub_event_map[0x10] = EVENT_ALLOC_RESERVED_VOICES;
     sub_event_map[0x11] = EVENT_FREE_RESERVED_VOICES;
     sub_event_map[0x12] = EVENT_VOLUME_FADE;
-    sub_event_map[0x13] = EVENT_FE_13;
+    sub_event_map[0x13] = EVENT_FE_13_CHRONO_CROSS; // used only in Chrono Cross
     sub_event_map[0x14] = EVENT_PROGCHANGE_KEY_SPLIT_V2;
     sub_event_map[0x15] = EVENT_TIME_SIGNATURE;
     sub_event_map[0x16] = EVENT_MEASURE;
-    sub_event_map[0x17] = EVENT_UNIMPLEMENTED;
-    sub_event_map[0x18] = EVENT_UNIMPLEMENTED;
+    sub_event_map[0x17] = EVENT_FC_17; // ommitted since Chrono Cross
+    sub_event_map[0x18] = EVENT_FC_18; // ommitted since Chrono Cross
     sub_event_map[0x19] = EVENT_EXPRESSION_FADE_PER_NOTE;
     sub_event_map[0x1a] = EVENT_FE_1A;
     sub_event_map[0x1b] = EVENT_FE_1B;
-    sub_event_map[0x1c] = EVENT_FE_1C;
+    sub_event_map[0x1c] = EVENT_FE_1C; // Generally not implemented, but Vagrant Story uses this opcode (for a different operation from the former version?)
     sub_event_map[0x1d] = EVENT_USE_RESERVED_VOICES;
     sub_event_map[0x1e] = EVENT_USE_NO_RESERVED_VOICES;
     sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
@@ -495,7 +550,7 @@ bool AkaoTrack::ReadEvent() {
   std::wstringstream opcode_strm;
   opcode_strm << L"0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte;
 
-  const bool op_note_with_length = (version == AkaoPs1Version::VERSION_3)
+  const bool op_note_with_length = (version >= AkaoPs1Version::VERSION_3)
     && (status_byte >= 0xF0) && (status_byte <= 0xFD);
 
   if (status_byte <= 0x99 || op_note_with_length)   //it's either a  note-on message, a tie message, or a rest message
@@ -553,7 +608,7 @@ bool AkaoTrack::ReadEvent() {
   else {
     AkaoSeqEventType event = static_cast<AkaoSeqEventType>(0);
 
-    if (version == AkaoPs1Version::VERSION_3 && status_byte == 0xFE)
+    if (version >= AkaoPs1Version::VERSION_3 && status_byte == 0xFE)
     {
       const uint8_t op = GetByte(curOffset++);
       const auto event_iterator = parentSeq->sub_event_map.find(op);
@@ -1102,6 +1157,31 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
+    case EVENT_E0: {
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_E1: {
+      curOffset++;
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_E2: {
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
     case EVENT_TEMPO: {
       const uint16_t raw_tempo = GetShort(curOffset);
       curOffset += 2;
@@ -1168,7 +1248,7 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_UNCONDITIONAL_JUMP: {
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1187,7 +1267,7 @@ bool AkaoTrack::ReadEvent() {
     case EVENT_CPU_CONDITIONAL_JUMP: {
       const uint8_t target_value = GetByte(curOffset++);
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1210,7 +1290,7 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t raw_count = GetByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1225,7 +1305,7 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t raw_count = GetByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1325,22 +1405,9 @@ bool AkaoTrack::ReadEvent() {
       return false;
     }
 
-    case EVENT_FE_0B: {
-      int16_t offset1 = GetShort(curOffset);
-      curOffset += 2;
-      int16_t offset2 = GetShort(curOffset);
-      curOffset += 2;
-
-      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
-        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
-      break;
-    }
-
     case EVENT_PATTERN: {
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version == AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1394,11 +1461,14 @@ bool AkaoTrack::ReadEvent() {
       break;
     }
 
-    case EVENT_FE_13: {
+    case EVENT_FE_13_CHRONO_CROSS: {
+      // Chrono Cross - 114 Shadow Forest
+      // Chrono Cross - 119 Hydra Marshes
+      // Chrono Cross - 302 Chronopolis
       desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
         << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
       AddUnknown(beginOffset, curOffset - beginOffset);
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_WARN, L"AkaoSeq"));
       break;
     }
 
@@ -1415,6 +1485,15 @@ bool AkaoTrack::ReadEvent() {
     case EVENT_PROGCHANGE_KEY_SPLIT_V2: {
       const uint8_t progNum = GetByte(curOffset++);
       AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, L"Program Change (Key-Split Instrument)");
+      break;
+    }
+
+    case EVENT_FE_1C: {
+      curOffset++;
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_WARN, L"AkaoSeq"));
       break;
     }
 

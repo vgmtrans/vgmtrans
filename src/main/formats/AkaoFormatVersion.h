@@ -20,5 +20,20 @@ enum class AkaoPs1Version : uint8_t {
   VERSION_2,
 
   // Header size increased to 0x40 bytes:
-  VERSION_3
+  // Another Mind
+  // Chocobo Dungeon 2
+  // Final Fantasy 8
+  // Chocobo Racing
+  // SaGa Frontier 2
+  // Racing Lagoon
+  VERSION_3,
+
+  // Slight breaking changes on opcode mapping:
+  // Legend of Mana
+  // Front Mission 3
+  // Chrono Cross
+  // Vagrant Story
+  // Final Fantasy 9
+  // Final Fantasy Origins - Final Fantasy 2
+  VERSION_3_1
 };
