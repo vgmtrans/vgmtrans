@@ -577,7 +577,7 @@ bool AkaoTrack::ReadEvent() {
       delta_time = delta_time_from_op;
 
     uint8_t dur = delta_time;
-    if (!slur && !legato) // and the next note event is not op_tie
+    if (version < AkaoPs1Version::VERSION_3 && !slur && !legato) // and the next note event is not op_tie
       dur = static_cast<uint8_t>(max(int(dur) - 2, 0));
 
     last_delta_time = delta_time;
