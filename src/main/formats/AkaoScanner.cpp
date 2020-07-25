@@ -40,6 +40,9 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
                                              //file->GetWord(i+0x50) == 0 || file->GetWord(i+0x54) == 00) //Chrono Cross 311 is exception to this :-/
         continue;
 
+      if (version == AkaoPs1Version::VERSION_3_0)
+        continue; // not implemented yet
+
       AkaoSampColl *sampColl = new AkaoSampColl(file, offset, 0);
       if (!sampColl->LoadVGMFile())
         delete sampColl;
@@ -57,13 +60,14 @@ AkaoPs1Version AkaoScanner::DetermineVersionFromTag(RawFile *file) {
     return AkaoPs1Version::VERSION_1_2;
   else if (album == L"Parasite Eve")
     return AkaoPs1Version::VERSION_2;
-  else if (album == L"Another Mind" || album == L"Chocobo Dungeon 2" || album == L"Final Fantasy 8"
-    || album == L"Final Fantasy VIII" || album == L"Chocobo Racing" || album == L"SaGa Frontier 2"
-    || album == L"Racing Lagoon")
-    return AkaoPs1Version::VERSION_3;
+  else if (album == L"Another Mind")
+    return AkaoPs1Version::VERSION_3_0;
+  else if (album == L"Chocobo Dungeon 2" || album == L"Final Fantasy 8" || album == L"Final Fantasy VIII"
+    || album == L"Chocobo Racing" || album == L"SaGa Frontier 2" || album == L"Racing Lagoon")
+    return AkaoPs1Version::VERSION_3_1;
   else if (album == L"Legend of Mana" || album == L"Front Mission 3" || album == L"Chrono Cross"
     || album == L"Vagrant Story" || album == L"Final Fantasy 9" || album == L"Final Fantasy IX"
     || album == L"Final Fantasy Origins - FF2")
-    return AkaoPs1Version::VERSION_3_1;
+    return AkaoPs1Version::VERSION_3_2;
   return AkaoPs1Version::UNKNOWN;
 }

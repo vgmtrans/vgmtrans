@@ -289,34 +289,35 @@ bool AkaoSampColl::GetSampleInfo() {
     sample_section_size = rawfile->size(); //- sample_section_offset;
   //AddItem("Samples", ICON_TRACK, FileVGMItem.pTreeItem, sample_section_offset, 0, 0, &AllSampsVGMItem); //add the parent "Samples" tree item
 
-  //until we reach the end of the sample set file
-  for (j = sample_section_offset; j < sample_section_offset + sample_section_size; j += 0x10)
-  {
-    for (i = 0; GetByte(j + i) == 0; i++);
+  std::set<uint32_t> sample_offsets;
+  for (const auto & art : akArts) {
+    sample_offsets.insert(art.sample_offset);
+  }
 
-    //if we found a chunk of 00 bytes 16 bytes in size or greater, then we found the beginning a new sample
-    if (i >= 16) {
-      wostringstream name;
-      name << L"Sample " << samples.size();
-      PSXSamp *samp = new PSXSamp(this, j, 0, j, 0, 1, 16, 44100, name.str());
+  for (const auto & sample_offset : sample_offsets) {
+    wostringstream name;
+    name << L"Sample " << samples.size();
 
-      samples.push_back(samp);
+    bool loop;
+    const uint32_t offset = sample_section_offset + sample_offset;
+    if (offset >= sample_section_offset + sample_section_size) {
+      // Out of bounds (Example: Another Mind)
+      wostringstream message;
+      message << L"The sample offset of AkaoRgn exceeds the sample section size."
+        << L" Offset: 0x" << std::hex << std::uppercase << sample_offset
+        << L" (0x" << std::hex << std::uppercase << offset << L")";
+      pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"AkaoSampColl"));
+      continue;
     }
-  }
-  //num_samples = aSamps.GetCount();										//-1 to offset the last unnecessary k++
 
-  if (samples.size() == 0)
+    const uint32_t length = PSXSamp::GetSampleLength(rawfile, offset, sample_section_offset + sample_section_size, loop);
+    PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, 44100, name.str());
+
+    samples.push_back(samp);
+  }
+
+  if (samples.empty())
     return false;
-
-
-  //Calculate sample sizes
-  for (i = 0; i < samples.size() - 1; i++) {
-    samples[i]->SetDataLength(samples[i + 1]->dwOffset - samples[i]->dwOffset);
-  }
-
-  //for the last sample size, we compare it's offset with the end of the entire sample section
-  samples[i]->SetDataLength(sample_section_offset + sample_section_size - samples[i]->dwOffset);
-
 
   // now to verify and associate each articulation with a sample index value
   // for every sample of every instrument, we add sample_section offset, because those values

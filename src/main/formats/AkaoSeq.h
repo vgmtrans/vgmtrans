@@ -161,7 +161,6 @@ class AkaoSeq:
     case AkaoPs1Version::VERSION_2:
       return 0x10;
 
-    case AkaoPs1Version::VERSION_3:
     default:
       return 0x20;
     }

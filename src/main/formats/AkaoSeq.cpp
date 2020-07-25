@@ -46,7 +46,7 @@ bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
     }
   }
 
-  if (version >= AkaoPs1Version::VERSION_3) {
+  if (version >= AkaoPs1Version::VERSION_3_0) {
     if (file->GetWord(offset + 0x2C) != 0 || file->GetWord(offset + 0x28) != 0)
       return false;
     if (file->GetWord(offset + 0x38) != 0 || file->GetWord(offset + 0x3C) != 0)
@@ -58,7 +58,7 @@ bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
 
 AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset) {
   if (file->GetWord(offset + 0x2C) == 0)
-    return AkaoPs1Version::VERSION_3_1;
+    return AkaoPs1Version::VERSION_3_2;
   else if (file->GetWord(offset + 0x1C) == 0)
     return AkaoPs1Version::VERSION_2;
   else
@@ -69,13 +69,13 @@ bool AkaoSeq::GetHeaderInfo() {
   if (version() == AkaoPs1Version::UNKNOWN)
     return false;
 
-  const uint32_t track_bits = (version() >= AkaoPs1Version::VERSION_3)
+  const uint32_t track_bits = (version() >= AkaoPs1Version::VERSION_3_0)
     ? GetWord(dwOffset + 0x20)
     : GetWord(dwOffset + 0x10);
   nNumTracks = GetNumPositiveBits(track_bits);
 
   uint32_t track_header_offset;
-  if (version() >= AkaoPs1Version::VERSION_3) {
+  if (version() >= AkaoPs1Version::VERSION_3_0) {
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
     hdr->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
@@ -126,7 +126,7 @@ bool AkaoSeq::GetHeaderInfo() {
 
   LoadEventMap();
 
-  if (version() >= AkaoPs1Version::VERSION_3)
+  if (version() >= AkaoPs1Version::VERSION_3_0)
   {
     //There must be either a melodic instrument section, a drumkit, or both.  We determine
     //the start of the InstrSet based on whether a melodic instrument section is given.
@@ -178,8 +178,9 @@ bool AkaoSeq::GetTrackPointers() {
     track_header_offset = 0x20;
     break;
 
-  case AkaoPs1Version::VERSION_3:
+  case AkaoPs1Version::VERSION_3_0:
   case AkaoPs1Version::VERSION_3_1:
+  case AkaoPs1Version::VERSION_3_2:
   default:
     track_header_offset = 0x40;
     break;
@@ -187,7 +188,7 @@ bool AkaoSeq::GetTrackPointers() {
 
   for (unsigned int i = 0; i < nNumTracks; i++) {
     const uint32_t p = track_header_offset + (i * 2);
-    const uint32_t base = p + (version() >= AkaoPs1Version::VERSION_3 ? 0 : 2);
+    const uint32_t base = p + (version() >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
     const uint32_t relative_offset = GetShort(dwOffset + p);
     const uint32_t track_offset = base + relative_offset;
     aTracks.push_back(new AkaoTrack(this, dwOffset + track_offset));
@@ -405,7 +406,7 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x1e] = EVENT_UNIMPLEMENTED;
     sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
   }
-  else if (version() == AkaoPs1Version::VERSION_3) {
+  else if (version() == AkaoPs1Version::VERSION_3_0 || version() == AkaoPs1Version::VERSION_3_1) {
     event_map[0xe0] = EVENT_E0;
     event_map[0xe1] = EVENT_UNIMPLEMENTED;
     event_map[0xe2] = EVENT_UNIMPLEMENTED;
@@ -459,7 +460,7 @@ void AkaoSeq::LoadEventMap()
     sub_event_map[0x1e] = EVENT_USE_NO_RESERVED_VOICES; // Possible having different implementation before Chocobo Racing
     sub_event_map[0x1f] = EVENT_UNIMPLEMENTED;
   }
-  else if (version() == AkaoPs1Version::VERSION_3_1) {
+  else if (version() == AkaoPs1Version::VERSION_3_2) {
     event_map[0xe0] = EVENT_E0;
     event_map[0xe1] = EVENT_E1;
     event_map[0xe2] = EVENT_E2;
@@ -550,7 +551,7 @@ bool AkaoTrack::ReadEvent() {
   std::wstringstream opcode_strm;
   opcode_strm << L"0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << status_byte;
 
-  const bool op_note_with_length = (version >= AkaoPs1Version::VERSION_3)
+  const bool op_note_with_length = (version >= AkaoPs1Version::VERSION_3_0)
     && (status_byte >= 0xF0) && (status_byte <= 0xFD);
 
   if (status_byte <= 0x99 || op_note_with_length)   //it's either a  note-on message, a tie message, or a rest message
@@ -577,7 +578,7 @@ bool AkaoTrack::ReadEvent() {
       delta_time = delta_time_from_op;
 
     uint8_t dur = delta_time;
-    if (version < AkaoPs1Version::VERSION_3 && !slur && !legato) // and the next note event is not op_tie
+    if (version < AkaoPs1Version::VERSION_3_0 && !slur && !legato) // and the next note event is not op_tie
       dur = static_cast<uint8_t>(max(int(dur) - 2, 0));
 
     last_delta_time = delta_time;
@@ -608,7 +609,7 @@ bool AkaoTrack::ReadEvent() {
   else {
     AkaoSeqEventType event = static_cast<AkaoSeqEventType>(0);
 
-    if (version >= AkaoPs1Version::VERSION_3 && status_byte == 0xFE)
+    if (version >= AkaoPs1Version::VERSION_3_0 && status_byte == 0xFE)
     {
       const uint8_t op = GetByte(curOffset++);
       const auto event_iterator = parentSeq->sub_event_map.find(op);
@@ -1248,7 +1249,7 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_UNCONDITIONAL_JUMP: {
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1267,7 +1268,7 @@ bool AkaoTrack::ReadEvent() {
     case EVENT_CPU_CONDITIONAL_JUMP: {
       const uint8_t target_value = GetByte(curOffset++);
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1290,7 +1291,7 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t raw_count = GetByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1305,7 +1306,7 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t raw_count = GetByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
@@ -1407,7 +1408,7 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_PATTERN: {
       const int16_t relative_offset = GetShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3 ? 0 : 2);
+      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
