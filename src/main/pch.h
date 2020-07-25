@@ -21,6 +21,7 @@
 #include <string>
 #include <cstring>
 #include <sstream>
+#include <set>
 #include <unordered_set>
 #include <iterator>
 #include <iostream>
