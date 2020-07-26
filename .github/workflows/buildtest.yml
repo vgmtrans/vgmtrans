@@ -129,6 +129,7 @@ jobs:
           copy ..\externals\win-deps\qt5-msvc2019-x64\bin\Qt5Core.dll deploy\
           copy ..\externals\win-deps\qt5-msvc2019-x64\bin\Qt5Gui.dll deploy\
           copy ..\externals\win-deps\qt5-msvc2019-x64\bin\Qt5Widgets.dll deploy\
+          copy ..\externals\win-deps\qt5-msvc2019-x64\bin\Qt5Svg.dll deploy\
           mkdir deploy\qtdata
           xcopy ..\externals\win-deps\qt5-msvc2019-x64\plugins deploy\qtdata /s /e /h
           Set-Content -Value "[Paths]`nPlugins = ./qtdata" -Path deploy\qt.conf
