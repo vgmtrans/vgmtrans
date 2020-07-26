@@ -19,11 +19,11 @@ class ScannerManager final {
     }
 
     void add(const char *scanner_name, scannerSpawner gen) {
-        m_generators.emplace(scanner_name, gen);
+        m_generators.emplace(scanner_name, std::move(gen));
     }
 
     void add_extension_binding(const char *ext, scannerSpawner gen) {
-        m_generators_ext[ext].push_back(gen);
+        m_generators_ext[ext].emplace_back(std::move(gen));
     }
 
     std::vector<std::shared_ptr<VGMScanner>> scanners() const {
@@ -34,7 +34,7 @@ class ScannerManager final {
         return tmp;
     }
 
-    std::vector<std::shared_ptr<VGMScanner>> scanners_with_extension(std::string ext) const {
+    std::vector<std::shared_ptr<VGMScanner>> scanners_with_extension(const std::string& ext) const {
         std::vector<std::shared_ptr<VGMScanner>> tmp;
         if (auto vec = m_generators_ext.find(ext); vec != m_generators_ext.end()) {
             tmp.resize(vec->second.size());
