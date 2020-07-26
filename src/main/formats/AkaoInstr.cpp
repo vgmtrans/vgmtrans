@@ -33,7 +33,7 @@ bool AkaoInstrSet::GetInstrPointers() {
     //-1 aka 0xFFFF if signed or 0 and past the first pointer value
     for (int j = dwOffset; (GetShort(j) != (uint16_t) -1) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
       SSEQHdr->AddSimpleItem(j, 2, L"Instr Pointer");
-      aInstrs.push_back(new AkaoInstr(this, dwOffset + 0x20 + GetShort(j), 0, 0, i++));
+      aInstrs.push_back(new AkaoInstr(this, dwOffset + 0x20 + GetShort(j), 0, 1, i++));
     }
   }
   if (bDrumKit)

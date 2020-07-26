@@ -119,15 +119,11 @@ void AkaoColl::PreSynthFileCreation() {
 
   AkaoSampColl *sampcoll = (AkaoSampColl *) sampcolls[0];
   const uint32_t numArts = (const uint32_t) sampcoll->akArts.size();
-  const uint32_t origNumInstrs = (const uint32_t) instrSet->aInstrs.size();
-  if (origNumInstrs + numArts > 0x7F)
-    numAddedInstrs = 0x7F - origNumInstrs;
-  else
-    numAddedInstrs = numArts;
+  numAddedInstrs = numArts;
 
   for (uint32_t i = 0; i < numAddedInstrs; i++) {
     AkaoArt *art = &sampcoll->akArts[i];
-    AkaoInstr *newInstr = new AkaoInstr(instrSet, 0, 0, 0, origNumInstrs + sampcoll->starting_art_id + i);
+    AkaoInstr *newInstr = new AkaoInstr(instrSet, 0, 0, 0, sampcoll->starting_art_id + i);
 
     AkaoRgn *rgn = new AkaoRgn(newInstr, 0, 0);
 

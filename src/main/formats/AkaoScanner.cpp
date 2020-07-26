@@ -26,8 +26,16 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
       if (version == AkaoPs1Version::UNKNOWN)
         version = AkaoSeq::GuessVersion(file, offset);
       AkaoSeq *NewAkaoSeq = new AkaoSeq(file, offset, version);
-      if (!NewAkaoSeq->LoadVGMFile())
+      if (!NewAkaoSeq->LoadVGMFile()) {
         delete NewAkaoSeq;
+        continue;
+      }
+
+      AkaoInstrSet* instrset = NewAkaoSeq->NewInstrSet();
+      if (instrset == nullptr)
+        continue;
+      if (!instrset->LoadVGMFile())
+        delete instrset;
     }
     else {
       // Samples
