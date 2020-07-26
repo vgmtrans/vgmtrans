@@ -13,7 +13,7 @@ namespace
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
     : VGMSeq(AkaoFormat::name, file, offset), instrument_set_offset_(0), drum_set_offset_(0),
-      instrset(nullptr), seq_id(0), version_(version) {
+      seq_id(0), version_(version) {
   UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   bUsesIndividualArts = false;
   UseReverb();
@@ -136,21 +136,6 @@ bool AkaoSeq::GetHeaderInfo() {
       set_instrument_set_offset(dwOffset + 0x30 + instrOff);
     if (drumkitOff != 0)
       set_drum_set_offset(dwOffset + 0x34 + drumkitOff);
-
-    uint32_t instrSetLength = 0;
-    if (instrOff != 0)
-      instrSetLength = unLength - (instrument_set_offset() - dwOffset);
-    else if (drumkitOff != 0)
-      instrSetLength = unLength - (drum_set_offset() - dwOffset);
-
-    if (instrSetLength != 0)
-    {
-      instrset = new AkaoInstrSet(rawfile, instrSetLength, instrument_set_offset(), drum_set_offset(), id, L"Akao Instr Set");
-      if (!instrset->LoadVGMFile()) {
-        delete instrset;
-        instrset = nullptr;
-      }
-    }
   }
 
   VGMHeader *track_pointer_header = AddHeader(dwOffset + track_header_offset, nNumTracks * 2);
@@ -226,6 +211,18 @@ double AkaoSeq::GetTempoInBPM(uint16_t tempo) const {
     // since tempo 0 cannot be expressed, this function returns a very small value.
     return 1.0;
   }
+}
+
+AkaoInstrSet* AkaoSeq::NewInstrSet() const {
+  uint32_t length = 0;
+  if (has_instrument_set_offset())
+    length = unLength - (instrument_set_offset() - dwOffset);
+  else if (has_drum_set_offset())
+    length = unLength - (drum_set_offset() - dwOffset);
+
+  return (length != 0)
+    ? new AkaoInstrSet(rawfile, length, instrument_set_offset(), drum_set_offset(), id, L"Akao Instr Set")
+    : nullptr;
 }
 
 void AkaoSeq::LoadEventMap()
@@ -645,9 +642,11 @@ bool AkaoTrack::ReadEvent() {
       // change program to articulation number
       parentSeq->bUsesIndividualArts = true;
       const uint8_t artNum = GetByte(curOffset++);
-      const uint8_t progNum = (parentSeq->instrset != nullptr)
-        ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
-        : artNum;
+      const uint8_t progNum = artNum;
+      //const uint8_t progNum = (parentSeq->instrset != nullptr)
+      //  ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
+      //  : artNum;
+      AddBankSelectNoItem(0);
       AddProgramChange(beginOffset, curOffset - beginOffset, progNum);
       break;
     }
@@ -1230,6 +1229,7 @@ bool AkaoTrack::ReadEvent() {
 
       desc << L"Offset: 0x" << std::hex << std::setfill(L'0') << std::uppercase << drum_instrset_offset;
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddBankSelectNoItem(0);
       AddProgramChangeNoItem(127, false);
       //channel = 9;
       break;
@@ -1237,6 +1237,7 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_DRUM_ON_V2: {
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddBankSelectNoItem(0);
       AddProgramChangeNoItem(127, false);
       //channel = 9;
       break;
@@ -1322,9 +1323,11 @@ bool AkaoTrack::ReadEvent() {
     case EVENT_PROGCHANGE_NO_ATTACK: {
       parentSeq->bUsesIndividualArts = true;
       const uint8_t artNum = GetByte(curOffset++);
-      const uint8_t progNum = (parentSeq->instrset != nullptr)
-        ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
-        : artNum;
+      const uint8_t progNum = artNum;
+      //const uint8_t progNum = (parentSeq->instrset != nullptr)
+      //  ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
+      //  : artNum;
+      AddBankSelectNoItem(0);
       AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, L"Program Change w/o Attack Sample");
       break;
     }
@@ -1350,12 +1353,14 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t artNum = GetByte(curOffset++);
       const uint8_t artNum2 = GetByte(curOffset++);
 
-      const uint8_t progNum = (parentSeq->instrset != nullptr)
-        ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
-        : artNum;
+      const uint8_t progNum = artNum;
+      //const uint8_t progNum = (parentSeq->instrset != nullptr)
+      //  ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
+      //  : artNum;
 
       desc << L"Program Number for Primary Voice: " << artNum << L"  Program Number for Secondary Voice: " << artNum2;
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Overlay Voice On (With Program Change)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddBankSelectNoItem(0);
       AddProgramChangeNoItem(progNum, false);
       break;
     }
@@ -1485,6 +1490,7 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_PROGCHANGE_KEY_SPLIT_V2: {
       const uint8_t progNum = GetByte(curOffset++);
+      AddBankSelectNoItem(1);
       AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, L"Program Change (Key-Split Instrument)");
       break;
     }

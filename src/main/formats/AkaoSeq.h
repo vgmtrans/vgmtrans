@@ -147,6 +147,8 @@ class AkaoSeq:
   std::wstring ReadTimestampAsText();
   double GetTempoInBPM(uint16_t tempo) const;
 
+  AkaoInstrSet* NewInstrSet() const;
+
   static bool IsPossibleAkaoSeq(RawFile *file, uint32_t offset);
   static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
 
@@ -181,13 +183,15 @@ class AkaoSeq:
   }
 
  public:
-  AkaoInstrSet *instrset;
+  //AkaoInstrSet *instrset;
   uint16_t seq_id;
   bool bUsesIndividualArts;
 
   uint32_t instrument_set_offset() const noexcept { return instrument_set_offset_; }
+  bool has_instrument_set_offset() const noexcept { return instrument_set_offset_ != 0; }
   void set_instrument_set_offset(uint32_t offset) noexcept { instrument_set_offset_ = offset; }
   uint32_t drum_set_offset() const noexcept { return drum_set_offset_; }
+  bool has_drum_set_offset() const noexcept { return drum_set_offset_ != 0; }
   void set_drum_set_offset(uint32_t offset) noexcept { drum_set_offset_ = offset; }
 
  private:
