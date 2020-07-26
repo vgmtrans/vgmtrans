@@ -198,14 +198,14 @@ std::optional<size_t> MP2kScanner::DetectMP2K(RawFile *file) {
             continue;
         }
 
-        int validsongcount = 0;
-        for (int songindex = 0; validsongcount < 1; songindex++) {
-            uint32_t songaddroffset = songtable_ofs_tmp + (songindex * 8);
+        u32 validsongcount = 0;
+        for (u32 songindex = 0; validsongcount < 1; songindex++) {
+            u32 songaddroffset = songtable_ofs_tmp + (songindex * 8);
             if (!IsValidOffset(songaddroffset + 4 - 1, file->size())) {
                 break;
             }
 
-            uint32_t songaddr = file->GetWord(songaddroffset);
+            u32 songaddr = file->GetWord(songaddroffset);
             if (songaddr == 0) {
                 continue;
             }
@@ -234,7 +234,7 @@ std::optional<size_t> MP2kScanner::DetectMP2K(RawFile *file) {
         return std::nullopt;
     }
 
-    uint32_t main_ofs_tmp = select_song - file->begin();
+    u32 main_ofs_tmp = select_song - file->begin();
     if (!IsValidOffset(main_ofs_tmp + 2 - 1, file->size())) {
         return std::nullopt;
     }
@@ -264,16 +264,16 @@ std::optional<size_t> MP2kScanner::DetectMP2K(RawFile *file) {
     return main_ofs - (valid_m16 ? 16 : 32);
 }
 
-bool MP2kScanner::IsValidOffset(uint32_t offset, uint32_t romsize) {
+bool MP2kScanner::IsValidOffset(u32 offset, u32 romsize) {
     return (offset < romsize);
 }
 
-bool MP2kScanner::IsGBAROMAddress(uint32_t address) {
-    uint8_t region = (address >> 24) & 0xFE;
+bool MP2kScanner::IsGBAROMAddress(u32 address) {
+    u8 region = (address >> 24) & 0xFE;
     return (region == 8);
 }
 
-uint32_t MP2kScanner::GBAAddressToOffset(uint32_t address) {
+u32 MP2kScanner::GBAAddressToOffset(u32 address) {
     if (!IsGBAROMAddress(address)) {
         L_WARN("Address {:#x} is not a ROM address", address);
     }
