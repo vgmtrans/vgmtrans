@@ -10,7 +10,7 @@ AkaoScanner::~AkaoScanner(void) {
 }
 
 void AkaoScanner::Scan(RawFile *file, void *info) {
-  AkaoPs1Version version = DetermineVersionFromTag(file);
+  AkaoPs1Version file_version = DetermineVersionFromTag(file);
 
   for (uint32_t offset = 0; offset + 0x60 < file->size(); offset++) {
     //sig must match ascii characters "AKAO"
@@ -23,15 +23,16 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
       if (!AkaoSeq::IsPossibleAkaoSeq(file, offset))
         continue;
 
+      AkaoPs1Version version = file_version;
       if (version == AkaoPs1Version::UNKNOWN)
         version = AkaoSeq::GuessVersion(file, offset);
-      AkaoSeq *NewAkaoSeq = new AkaoSeq(file, offset, version);
-      if (!NewAkaoSeq->LoadVGMFile()) {
-        delete NewAkaoSeq;
+      AkaoSeq *seq = new AkaoSeq(file, offset, version);
+      if (!seq->LoadVGMFile()) {
+        delete seq;
         continue;
       }
 
-      AkaoInstrSet* instrset = NewAkaoSeq->NewInstrSet();
+      AkaoInstrSet* instrset = seq->NewInstrSet();
       if (instrset == nullptr)
         continue;
       if (!instrset->LoadVGMFile())
@@ -39,19 +40,14 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
     }
     else {
       // Samples
-      if (file->GetWord(offset + 8) != 0 || file->GetWord(offset + 0x0C) != 0 ||
-        file->GetWord(offset + 0x24) != 0 || file->GetWord(offset + 0x28) != 0 || file->GetWord(offset + 0x2C) != 0 &&
-        file->GetWord(offset + 0x30) != 0 || file->GetWord(offset + 0x34) != 0 || file->GetWord(offset + 0x38) != 0 &&
-        file->GetWord(offset + 0x3C) != 0 ||
-        file->GetWord(offset + 0x40) != 0 ||
-        file->GetWord(offset + 0x4C) == 0)        //ADSR1 and ADSR2 will never be 0 in any real-world case.
-                                             //file->GetWord(i+0x50) == 0 || file->GetWord(i+0x54) == 00) //Chrono Cross 311 is exception to this :-/
+      if (!AkaoSampColl::IsPossibleAkaoSampColl(file, offset))
         continue;
 
-      if (version == AkaoPs1Version::VERSION_3_0)
-        continue; // not implemented yet
+      AkaoPs1Version version = file_version;
+      if (version == AkaoPs1Version::UNKNOWN)
+        version = AkaoSampColl::GuessVersion(file, offset);
 
-      AkaoSampColl *sampColl = new AkaoSampColl(file, offset, 0);
+      AkaoSampColl *sampColl = new AkaoSampColl(file, offset, version);
       if (!sampColl->LoadVGMFile())
         delete sampColl;
     }

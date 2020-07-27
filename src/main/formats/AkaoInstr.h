@@ -95,11 +95,16 @@ typedef struct _AkaoArt {
 class AkaoSampColl:
     public VGMSampColl {
  public:
-  AkaoSampColl(RawFile *file, uint32_t offset, uint32_t length, std::wstring name = L"Akao Sample Collection");
+  AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name = L"Akao Sample Collection");
   virtual ~AkaoSampColl();
 
   virtual bool GetHeaderInfo();
   virtual bool GetSampleInfo();
+
+  AkaoPs1Version version() const { return version_; }
+
+  static bool IsPossibleAkaoSampColl(RawFile *file, uint32_t offset);
+  static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
 
  public:
   std::vector<AkaoArt> akArts;
@@ -107,6 +112,7 @@ class AkaoSampColl:
   uint16_t sample_set_id;
 
  private:
+  AkaoPs1Version version_;
   uint32_t sample_section_size;
   uint32_t nNumArts;
   uint32_t arts_offset;
