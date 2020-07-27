@@ -206,14 +206,62 @@ bool AkaoRgn::LoadRgn() {
 // AkaoSampColl
 // ************
 
-AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, uint32_t length, wstring name)
-    : VGMSampColl(AkaoFormat::name, file, offset, length, name) {
+AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, wstring name)
+    : VGMSampColl(AkaoFormat::name, file, offset, 0, name), version_(version) {
 }
 
 AkaoSampColl::~AkaoSampColl() {
 }
 
+bool AkaoSampColl::IsPossibleAkaoSampColl(RawFile *file, uint32_t offset) {
+  if (offset + 0x50 > file->size())
+    return false;
+
+  if (file->GetWordBE(offset) != 0x414B414F)
+    return false;
+
+  if (file->GetWord(offset + 0x24) != 0 || file->GetWord(offset + 0x28) != 0 || file->GetWord(offset + 0x2C) != 0 &&
+    file->GetWord(offset + 0x30) != 0 || file->GetWord(offset + 0x34) != 0 || file->GetWord(offset + 0x38) != 0 &&
+    file->GetWord(offset + 0x3C) != 0)
+    return false;
+
+  const uint32_t first_dest = file->GetWord(offset + 0x40);
+  if (first_dest != 0 && first_dest != file->GetWord(offset + 0x10))
+    return false;
+
+  return true;
+}
+
+AkaoPs1Version AkaoSampColl::GuessVersion(RawFile *file, uint32_t offset) {
+  if (file->GetWord(offset + 0x40) == 0) {
+    const uint32_t num_articulations = file->GetWord(offset + 0x1C);
+
+    if (offset + 0x10 * num_articulations >= file->size())
+      return AkaoPs1Version::UNKNOWN;
+
+    for (uint32_t i = 0; i < num_articulations; i++) {
+      const uint32_t art_offset = offset + 0x10 * i;
+
+      // verify the higher byte of unity key is 0
+      if (file->GetByte(art_offset + 0x0B) != 0)
+        return AkaoPs1Version::VERSION_3_0;
+    }
+
+    return AkaoPs1Version::VERSION_3_2;
+  }
+  else if (file->GetWord(offset + 0x18) != 0 || file->GetWord(offset + 0x1C) != 0)
+    return AkaoPs1Version::VERSION_2;
+  else
+    return AkaoPs1Version::VERSION_1_1;
+}
+
 bool AkaoSampColl::GetHeaderInfo() {
+  if (version() == AkaoPs1Version::UNKNOWN)
+    return false;
+
+  if (version() <= AkaoPs1Version::VERSION_3_0)
+    return false;
+
   //Read Sample Set header info
   VGMHeader *hdr = AddHeader(dwOffset, 0x40);
   hdr->AddSig(dwOffset, 4);

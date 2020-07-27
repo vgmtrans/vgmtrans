@@ -12,5 +12,5 @@ class AkaoScanner:
   virtual void Scan(RawFile *file, void *info = 0);
 
  private:
-  AkaoPs1Version DetermineVersionFromTag(RawFile *file);
+ AkaoPs1Version DetermineVersionFromTag(RawFile *file);
 };
