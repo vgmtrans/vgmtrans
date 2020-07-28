@@ -80,7 +80,7 @@ class AkaoRgn:
 // AkaoSampColl
 // ***********
 
-typedef struct _AkaoArt {
+struct AkaoArt {
   uint8_t unityKey;
   short fineTune;
   uint32_t sample_offset;
@@ -89,7 +89,9 @@ typedef struct _AkaoArt {
   uint16_t ADSR2;
   uint32_t artID;
   int sample_num;
-} AkaoArt;
+
+  AkaoArt() : unityKey(0), fineTune(0), sample_offset(0), loop_point(0), ADSR1(0), ADSR2(0), artID(0), sample_num(0){}
+};
 
 
 class AkaoSampColl:
