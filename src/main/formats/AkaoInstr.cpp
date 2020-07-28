@@ -343,18 +343,18 @@ bool AkaoSampColl::GetSampleInfo() {
       VGMHeader *ArtHdr = AddHeader(art_offset, 0x40, L"Articulation");
       ArtHdr->AddSimpleItem(art_offset, 4, L"Sample Offset");
       ArtHdr->AddSimpleItem(art_offset + 4, 4, L"Loop Point");
-      ArtHdr->AddSimpleItem(art_offset + 8, 4, L"Base Pitch? (C)");
-      ArtHdr->AddSimpleItem(art_offset + 0x0C, 4, L"Base Pitch? (C#)");
-      ArtHdr->AddSimpleItem(art_offset + 0x10, 4, L"Base Pitch? (D)");
-      ArtHdr->AddSimpleItem(art_offset + 0x14, 4, L"Base Pitch? (D#)");
-      ArtHdr->AddSimpleItem(art_offset + 0x18, 4, L"Base Pitch? (E)");
-      ArtHdr->AddSimpleItem(art_offset + 0x1C, 4, L"Base Pitch? (F)");
-      ArtHdr->AddSimpleItem(art_offset + 0x20, 4, L"Base Pitch? (F#)");
-      ArtHdr->AddSimpleItem(art_offset + 0x24, 4, L"Base Pitch? (G)");
-      ArtHdr->AddSimpleItem(art_offset + 0x28, 4, L"Base Pitch? (G#)");
-      ArtHdr->AddSimpleItem(art_offset + 0x2C, 4, L"Base Pitch? (A)");
-      ArtHdr->AddSimpleItem(art_offset + 0x30, 4, L"Base Pitch? (A#)");
-      ArtHdr->AddSimpleItem(art_offset + 0x34, 4, L"Base Pitch? (B)");
+      ArtHdr->AddSimpleItem(art_offset + 8, 4, L"Base Pitch (C)");
+      ArtHdr->AddSimpleItem(art_offset + 0x0C, 4, L"Base Pitch (C#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x10, 4, L"Base Pitch (D)");
+      ArtHdr->AddSimpleItem(art_offset + 0x14, 4, L"Base Pitch (D#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x18, 4, L"Base Pitch (E)");
+      ArtHdr->AddSimpleItem(art_offset + 0x1C, 4, L"Base Pitch (F)");
+      ArtHdr->AddSimpleItem(art_offset + 0x20, 4, L"Base Pitch (F#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x24, 4, L"Base Pitch (G)");
+      ArtHdr->AddSimpleItem(art_offset + 0x28, 4, L"Base Pitch (G#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x2C, 4, L"Base Pitch (A)");
+      ArtHdr->AddSimpleItem(art_offset + 0x30, 4, L"Base Pitch (A#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x34, 4, L"Base Pitch (B)");
       ArtHdr->AddSimpleItem(art_offset + 0x38, 1, L"ADSR Attack Rate");
       ArtHdr->AddSimpleItem(art_offset + 0x39, 1, L"ADSR Decay Rate");
       ArtHdr->AddSimpleItem(art_offset + 0x3A, 1, L"ADSR Sustain Level");
@@ -373,10 +373,16 @@ bool AkaoSampColl::GetSampleInfo() {
       const uint8_t s_mode = GetByte(art_offset + 0x3E);
       const uint8_t r_mode = GetByte(art_offset + 0x3F);
 
+      const uint32_t base_pitch = GetWord(art_offset + 8);
+      const double freq_multiplier = base_pitch / static_cast<double>(4096 * 256);
+      const double cents = log(freq_multiplier) / log(2.0) * 1200;
+      const int8_t coarse_tune = static_cast<int8_t>(cents / 100);
+      const int16_t fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+
       art.sample_offset = GetWord(art_offset);
       art.loop_point = GetWord(art_offset + 4) - art.sample_offset;
-      art.fineTune = 0; // TODO
-      art.unityKey = 60; // TODO
+      art.fineTune = fine_tune;
+      art.unityKey = 72 - coarse_tune;
       art.ADSR1 = ComposePSXADSR1((a_mode & 4) >> 2, ar, dr, sl);
       art.ADSR2 = ComposePSXADSR2((s_mode & 4) >> 2, (s_mode & 2) >> 1, sr, (r_mode & 4) >> 2, rr);
       art.artID = starting_art_id + i;
@@ -409,6 +415,11 @@ bool AkaoSampColl::GetSampleInfo() {
       ArtHdr->AddSimpleItem(art_offset + 0x38, 4, L"Base Pitch (A#)");
       ArtHdr->AddSimpleItem(art_offset + 0x3C, 4, L"Base Pitch (B)");
 
+      const uint32_t sample_start_address = GetWord(art_offset);
+      const uint32_t loop_start_address = GetWord(art_offset + 4);
+      if (sample_start_address < spu_dest_address || loop_start_address < spu_dest_address || sample_start_address > loop_start_address)
+        return false;
+
       const uint8_t ar = GetByte(art_offset + 8);
       const uint8_t dr = GetByte(art_offset + 9);
       const uint8_t sl = GetByte(art_offset + 0x0A);
@@ -418,15 +429,16 @@ bool AkaoSampColl::GetSampleInfo() {
       const uint8_t s_mode = GetByte(art_offset + 0x0E);
       const uint8_t r_mode = GetByte(art_offset + 0x0F);
 
-      const uint32_t sample_start_address = GetWord(art_offset);
-      const uint32_t loop_start_address = GetWord(art_offset + 4);
-      if (sample_start_address < spu_dest_address || loop_start_address < spu_dest_address || sample_start_address > loop_start_address)
-        return false;
+      const uint32_t base_pitch = GetWord(art_offset + 0x10);
+      const double freq_multiplier = base_pitch / 4096.0;
+      const double cents = log(freq_multiplier) / log(2.0) * 1200;
+      const int8_t coarse_tune = static_cast<int8_t>(cents / 100);
+      const int16_t fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
 
       art.sample_offset = sample_start_address - spu_dest_address;
       art.loop_point = loop_start_address - sample_start_address;
-      art.fineTune = 0; // TODO
-      art.unityKey = 60; // TODO
+      art.fineTune = fine_tune;
+      art.unityKey = 72 - coarse_tune;
       art.ADSR1 = ComposePSXADSR1((a_mode & 4) >> 2, ar, dr, sl);
       art.ADSR2 = ComposePSXADSR2((s_mode & 4) >> 2, (s_mode & 2) >> 1, sr, (r_mode & 4) >> 2, rr);
       art.artID = starting_art_id + i;
