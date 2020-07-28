@@ -73,9 +73,9 @@ bool VGMSamp::SaveAsWav(const std::wstring &filepath) {
   else
     bufSize = (uint32_t) ceil((double) dataLength * GetCompressionRatio());
 
-  uint8_t *uncompSampBuf = new uint8_t[bufSize];    //create a new memory space for the uncompressed wave
+  vector<uint8_t> uncompSampBuf(bufSize);     //create a new memory space for the uncompressed wave
   //waveBuf.resize(bufSize );
-  ConvertToStdWave(uncompSampBuf);            //and uncompress into that space
+  ConvertToStdWave(uncompSampBuf.data());     //and uncompress into that space
 
   uint16_t blockAlign = bps / 8 * channels;
 
@@ -97,7 +97,7 @@ bool VGMSamp::SaveAsWav(const std::wstring &filepath) {
 
   PushTypeOnVectBE<uint32_t>(waveBuf, 0x64617461);            //"data"
   PushTypeOnVect<uint32_t>(waveBuf, bufSize);            //size
-  waveBuf.insert(waveBuf.end(), uncompSampBuf, uncompSampBuf + bufSize);    //Write the sample
+  waveBuf.insert(waveBuf.end(), uncompSampBuf.begin(), uncompSampBuf.end());    //Write the sample
   if (bufSize % 2)
     waveBuf.push_back(0);
 
