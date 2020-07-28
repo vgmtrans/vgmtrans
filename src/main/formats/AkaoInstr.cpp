@@ -26,6 +26,11 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
     dwOffset = drumkitOff;
 }
 
+AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset, wstring name)
+  : VGMInstrSet(AkaoFormat::name, file, offset, 0, name), drumkitOff(0), bMelInstrs(false), bDrumKit(false)
+{
+}
+
 bool AkaoInstrSet::GetInstrPointers() {
   if (bMelInstrs) {
     VGMHeader *SSEQHdr = AddHeader(dwOffset, 0x10, L"Instr Ptr Table");

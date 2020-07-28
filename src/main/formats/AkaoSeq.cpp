@@ -222,7 +222,7 @@ AkaoInstrSet* AkaoSeq::NewInstrSet() const {
 
   return (length != 0)
     ? new AkaoInstrSet(rawfile, length, instrument_set_offset(), drum_set_offset(), id, L"Akao Instr Set")
-    : nullptr;
+    : new AkaoInstrSet(rawfile, dwOffset);
 }
 
 void AkaoSeq::LoadEventMap()
