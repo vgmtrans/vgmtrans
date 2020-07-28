@@ -51,8 +51,8 @@ class AkaoColl:
 BEGIN_FORMAT(Akao)
   USING_SCANNER(AkaoScanner)
   //USING_MATCHER_WITH_ARG(SimpleMatcher, true)
-  USING_MATCHER_WITH_ARG(GetIdMatcher, true)
-  //USING_MATCHER(FilegroupMatcher)
+  //USING_MATCHER_WITH_ARG(GetIdMatcher, true)
+  USING_MATCHER(FilegroupMatcher)
   USING_COLL(AkaoColl)
 END_FORMAT()
 //};
