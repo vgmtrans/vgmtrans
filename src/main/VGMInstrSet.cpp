@@ -50,8 +50,9 @@ bool VGMInstrSet::Load() {
   if (!LoadInstrs())
     return false;
 
-  if (aInstrs.size() == 0)
-    return false;
+  // Allow empty instrument set for dummy use (AkaoInstrSet)
+  //if (aInstrs.empty())
+  //  return false;
 
   if (unLength == 0) {
     SetGuessedLength();
