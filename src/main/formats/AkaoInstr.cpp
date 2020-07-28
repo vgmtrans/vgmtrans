@@ -259,22 +259,23 @@ bool AkaoSampColl::GetHeaderInfo() {
   if (version() == AkaoPs1Version::UNKNOWN)
     return false;
 
-  if (version() <= AkaoPs1Version::VERSION_3_0)
-    return false;
-
   //Read Sample Set header info
-  VGMHeader *hdr = AddHeader(dwOffset, 0x40);
-  hdr->AddSig(dwOffset, 4);
-  hdr->AddSimpleItem(dwOffset + 4, 2, L"ID");
-  hdr->AddSimpleItem(dwOffset + 0x14, 4, L"Sample Section Size");
-  hdr->AddSimpleItem(dwOffset + 0x18, 4, L"Starting Articulation ID");
-  hdr->AddSimpleItem(dwOffset + 0x1C, 4, L"Number of Articulations");
+  if (version() >= AkaoPs1Version::VERSION_3_0) {
+    VGMHeader *hdr = AddHeader(dwOffset, 0x40);
+    hdr->AddSig(dwOffset, 4);
+    hdr->AddSimpleItem(dwOffset + 4, 2, L"ID");
+    hdr->AddSimpleItem(dwOffset + 0x14, 4, L"Sample Section Size");
+    hdr->AddSimpleItem(dwOffset + 0x18, 4, L"Starting Articulation ID");
+    hdr->AddSimpleItem(dwOffset + 0x1C, 4, L"Number of Articulations");
 
-  id = GetShort(0x4 + dwOffset);
-  sample_section_size = GetWord(0x14 + dwOffset);
-  starting_art_id = GetWord(0x18 + dwOffset);
-  nNumArts = GetWord(0x1C + dwOffset);
-  arts_offset = 0x40 + dwOffset;
+    id = GetShort(0x4 + dwOffset);
+    sample_section_size = GetWord(0x14 + dwOffset);
+    starting_art_id = GetWord(0x18 + dwOffset);
+    nNumArts = GetWord(0x1C + dwOffset);
+    arts_offset = 0x40 + dwOffset;
+  }
+  else
+    return false;
 
   if (nNumArts > 300 || nNumArts == 0)
     return false;
@@ -286,27 +287,76 @@ bool AkaoSampColl::GetSampleInfo() {
   uint32_t i;
   uint32_t j;
 
+  const uint32_t kAkaoArtSize = (version() >= AkaoPs1Version::VERSION_3_1) ? 0x10 : 0x40;
+  if (arts_offset + kAkaoArtSize * nNumArts > rawfile->size())
+    return false;
+
   //Read Articulation Data
   for (i = 0; i < nNumArts; i++) {
-    VGMHeader *ArtHdr = AddHeader(arts_offset + i * 0x10, 16, L"Articulation");
-    ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 0, 4, L"Sample Offset");
-    ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 4, 4, L"Loop Point");
-    ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 8, 2, L"Fine Tune");
-    ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 10, 2, L"Unity Key");
-    ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 12, 2, L"ADSR1");
-    ArtHdr->AddSimpleItem(arts_offset + i * 0x10 + 14, 2, L"ADSR2");
+    AkaoArt art;
 
-    if (arts_offset + i * 0x10 + 0x10 > rawfile->size())
-      return false;
+    if (version() >= AkaoPs1Version::VERSION_3_1) {
+      const uint32_t art_offset = arts_offset + i * 0x10;
+      VGMHeader *ArtHdr = AddHeader(art_offset, 16, L"Articulation");
+      ArtHdr->AddSimpleItem(art_offset, 4, L"Sample Offset");
+      ArtHdr->AddSimpleItem(art_offset + 4, 4, L"Loop Point");
+      ArtHdr->AddSimpleItem(art_offset + 8, 2, L"Fine Tune");
+      ArtHdr->AddSimpleItem(art_offset + 10, 2, L"Unity Key");
+      ArtHdr->AddSimpleItem(art_offset + 12, 2, L"ADSR1");
+      ArtHdr->AddSimpleItem(art_offset + 14, 2, L"ADSR2");
 
-    akArts.push_back(AkaoArt());
-    akArts[i].sample_offset = GetWord(arts_offset + i * 0x10);
-    akArts[i].loop_point = GetWord(arts_offset + i * 0x10 + 4) - akArts[i].sample_offset;
-    akArts[i].fineTune = GetShort(arts_offset + i * 0x10 + 8);
-    akArts[i].unityKey = (uint8_t) GetShort(arts_offset + i * 0x10 + 0xA);
-    akArts[i].ADSR1 = GetShort(arts_offset + i * 0x10 + 0xC);
-    akArts[i].ADSR2 = GetShort(arts_offset + i * 0x10 + 0xE);
-    akArts[i].artID = starting_art_id + i;
+      art.sample_offset = GetWord(art_offset);
+      art.loop_point = GetWord(art_offset + 4) - art.sample_offset;
+      art.fineTune = GetShort(art_offset + 8);
+      art.unityKey = static_cast<uint8_t>(GetShort(art_offset + 0xA));
+      art.ADSR1 = GetShort(art_offset + 0xC);
+      art.ADSR2 = GetShort(art_offset + 0xE);
+      art.artID = starting_art_id + i;
+    } else if (version() == AkaoPs1Version::VERSION_3_0) {
+      const uint32_t art_offset = arts_offset + i * 0x40;
+      VGMHeader *ArtHdr = AddHeader(art_offset, 0x40, L"Articulation");
+      ArtHdr->AddSimpleItem(art_offset, 4, L"Sample Offset");
+      ArtHdr->AddSimpleItem(art_offset + 4, 4, L"Loop Point");
+      ArtHdr->AddSimpleItem(art_offset + 8, 4, L"Base Pitch? (C)");
+      ArtHdr->AddSimpleItem(art_offset + 0x0C, 4, L"Base Pitch? (C#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x10, 4, L"Base Pitch? (D)");
+      ArtHdr->AddSimpleItem(art_offset + 0x14, 4, L"Base Pitch? (D#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x18, 4, L"Base Pitch? (E)");
+      ArtHdr->AddSimpleItem(art_offset + 0x1C, 4, L"Base Pitch? (F)");
+      ArtHdr->AddSimpleItem(art_offset + 0x20, 4, L"Base Pitch? (F#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x24, 4, L"Base Pitch? (G)");
+      ArtHdr->AddSimpleItem(art_offset + 0x28, 4, L"Base Pitch? (G#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x2C, 4, L"Base Pitch? (A)");
+      ArtHdr->AddSimpleItem(art_offset + 0x30, 4, L"Base Pitch? (A#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x34, 4, L"Base Pitch? (B)");
+      ArtHdr->AddSimpleItem(art_offset + 0x38, 1, L"ADSR Attack Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x39, 1, L"ADSR Decay Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x3A, 1, L"ADSR Sustain Level");
+      ArtHdr->AddSimpleItem(art_offset + 0x3B, 1, L"ADSR Sustain Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x3C, 1, L"ADSR Release Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x3D, 1, L"ADSR Attack Mode");
+      ArtHdr->AddSimpleItem(art_offset + 0x3E, 1, L"ADSR Sustain Mode");
+      ArtHdr->AddSimpleItem(art_offset + 0x3F, 1, L"ADSR Release Mode");
+
+      const uint8_t ar = GetByte(art_offset + 0x38);
+      const uint8_t dr = GetByte(art_offset + 0x39);
+      const uint8_t sl = GetByte(art_offset + 0x3A);
+      const uint8_t sr = GetByte(art_offset + 0x3B);
+      const uint8_t rr = GetByte(art_offset + 0x3C);
+      const uint8_t a_mode = GetByte(art_offset + 0x3D);
+      const uint8_t s_mode = GetByte(art_offset + 0x3E);
+      const uint8_t r_mode = GetByte(art_offset + 0x3F);
+
+      art.sample_offset = GetWord(art_offset);
+      art.loop_point = GetWord(art_offset + 4) - art.sample_offset;
+      art.fineTune = 0; // TODO
+      art.unityKey = 60; // TODO
+      art.ADSR1 = ComposePSXADSR1((a_mode & 4) >> 2, ar, dr, sl);
+      art.ADSR2 = ComposePSXADSR2((s_mode & 4) >> 2, (s_mode & 2) >> 1, sr, (r_mode & 4) >> 2, rr);
+      art.artID = starting_art_id + i;
+    }
+
+    akArts.push_back(art);
   }
 
   //Time to organize and convert the samples
@@ -318,7 +368,7 @@ bool AkaoSampColl::GetSampleInfo() {
 
   //sample_section_offset = SampleSetSize - sample_section_size;
 
-  sample_section_offset = arts_offset + (uint32_t) (akArts.size() * 0x10);
+  sample_section_offset = arts_offset + (uint32_t) (akArts.size() * kAkaoArtSize);
 
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
@@ -349,7 +399,7 @@ bool AkaoSampColl::GetSampleInfo() {
     bool loop;
     const uint32_t offset = sample_section_offset + sample_offset;
     if (offset >= sample_section_offset + sample_section_size) {
-      // Out of bounds (Example: Another Mind)
+      // Out of bounds
       wostringstream message;
       message << L"The sample offset of AkaoRgn exceeds the sample section size."
         << L" Offset: 0x" << std::hex << std::uppercase << sample_offset
