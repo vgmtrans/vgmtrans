@@ -274,6 +274,27 @@ bool AkaoSampColl::GetHeaderInfo() {
     nNumArts = GetWord(0x1C + dwOffset);
     arts_offset = 0x40 + dwOffset;
   }
+  else if (version() >= AkaoPs1Version::VERSION_1_1) {
+    VGMHeader *hdr = AddHeader(dwOffset, 0x40);
+    hdr->AddSig(dwOffset, 4);
+    hdr->AddSimpleItem(dwOffset + 0x14, 4, L"Sample Section Size");
+    hdr->AddSimpleItem(dwOffset + 0x18, 4, L"Starting Articulation ID");
+    if (version() >= AkaoPs1Version::VERSION_1_2)
+      hdr->AddSimpleItem(dwOffset + 0x1C, 4, L"Ending Articulation ID");
+
+    sample_section_size = GetWord(0x14 + dwOffset);
+    starting_art_id = GetWord(0x18 + dwOffset);
+    uint32_t ending_art_id;
+    if (version() == AkaoPs1Version::VERSION_1_1)
+      ending_art_id = 0x80;
+    else {
+      ending_art_id = GetWord(0x1C + dwOffset);
+      if (ending_art_id == 0)
+        ending_art_id = 0x100;
+    }
+    nNumArts = ending_art_id - starting_art_id;
+    arts_offset = 0x40 + dwOffset;
+  }
   else
     return false;
 
@@ -349,6 +370,56 @@ bool AkaoSampColl::GetSampleInfo() {
 
       art.sample_offset = GetWord(art_offset);
       art.loop_point = GetWord(art_offset + 4) - art.sample_offset;
+      art.fineTune = 0; // TODO
+      art.unityKey = 60; // TODO
+      art.ADSR1 = ComposePSXADSR1((a_mode & 4) >> 2, ar, dr, sl);
+      art.ADSR2 = ComposePSXADSR2((s_mode & 4) >> 2, (s_mode & 2) >> 1, sr, (r_mode & 4) >> 2, rr);
+      art.artID = starting_art_id + i;
+    }
+    else if (version() >= AkaoPs1Version::VERSION_1_1) {
+      const uint32_t spu_dest_address = GetWord(dwOffset + 0x10);
+
+      const uint32_t art_offset = arts_offset + i * 0x40;
+      VGMHeader *ArtHdr = AddHeader(art_offset, 0x40, L"Articulation");
+      ArtHdr->AddSimpleItem(art_offset, 4, L"Sample Offset");
+      ArtHdr->AddSimpleItem(art_offset + 4, 4, L"Loop Point");
+      ArtHdr->AddSimpleItem(art_offset + 8, 1, L"ADSR Attack Rate");
+      ArtHdr->AddSimpleItem(art_offset + 9, 1, L"ADSR Decay Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x0A, 1, L"ADSR Sustain Level");
+      ArtHdr->AddSimpleItem(art_offset + 0x0B, 1, L"ADSR Sustain Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x0C, 1, L"ADSR Release Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x0D, 1, L"ADSR Attack Mode");
+      ArtHdr->AddSimpleItem(art_offset + 0x0E, 1, L"ADSR Sustain Mode");
+      ArtHdr->AddSimpleItem(art_offset + 0x0F, 1, L"ADSR Release Mode");
+      ArtHdr->AddSimpleItem(art_offset + 0x10, 4, L"Base Pitch (C)");
+      ArtHdr->AddSimpleItem(art_offset + 0x14, 4, L"Base Pitch (C#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x18, 4, L"Base Pitch (D)");
+      ArtHdr->AddSimpleItem(art_offset + 0x1C, 4, L"Base Pitch (D#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x20, 4, L"Base Pitch (E)");
+      ArtHdr->AddSimpleItem(art_offset + 0x24, 4, L"Base Pitch (F)");
+      ArtHdr->AddSimpleItem(art_offset + 0x28, 4, L"Base Pitch (F#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x2C, 4, L"Base Pitch (G)");
+      ArtHdr->AddSimpleItem(art_offset + 0x30, 4, L"Base Pitch (G#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x34, 4, L"Base Pitch (A)");
+      ArtHdr->AddSimpleItem(art_offset + 0x38, 4, L"Base Pitch (A#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x3C, 4, L"Base Pitch (B)");
+
+      const uint8_t ar = GetByte(art_offset + 8);
+      const uint8_t dr = GetByte(art_offset + 9);
+      const uint8_t sl = GetByte(art_offset + 0x0A);
+      const uint8_t sr = GetByte(art_offset + 0x0B);
+      const uint8_t rr = GetByte(art_offset + 0x0C);
+      const uint8_t a_mode = GetByte(art_offset + 0x0D);
+      const uint8_t s_mode = GetByte(art_offset + 0x0E);
+      const uint8_t r_mode = GetByte(art_offset + 0x0F);
+
+      const uint32_t sample_start_address = GetWord(art_offset);
+      const uint32_t loop_start_address = GetWord(art_offset + 4);
+      if (sample_start_address < spu_dest_address || loop_start_address < spu_dest_address || sample_start_address > loop_start_address)
+        return false;
+
+      art.sample_offset = sample_start_address - spu_dest_address;
+      art.loop_point = loop_start_address - sample_start_address;
       art.fineTune = 0; // TODO
       art.unityKey = 60; // TODO
       art.ADSR1 = ComposePSXADSR1((a_mode & 4) >> 2, ar, dr, sl);
