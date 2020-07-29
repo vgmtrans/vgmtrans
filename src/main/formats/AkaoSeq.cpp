@@ -1345,7 +1345,7 @@ bool AkaoTrack::ReadEvent() {
         << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
       AddUnknown(beginOffset, curOffset - beginOffset);
       pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
-      return false;
+      break;
     }
 
     case EVENT_OVERLAY_VOICE_ON: {
@@ -1404,11 +1404,64 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_FC_SAGAFRO:
     {
+      curOffset += 2;
       desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
         << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
       AddUnknown(beginOffset, curOffset - beginOffset);
       pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
-      return false;
+      break;
+    }
+
+    case EVENT_FC_0C: {
+      curOffset += 2;
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_FC_0D: {
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_FC_0E: {
+      curOffset++;
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_FC_0F: {
+      curOffset += 2;
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_FC_10: {
+      curOffset++;
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
+    }
+
+    case EVENT_FC_11: {
+      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
+        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
+      AddUnknown(beginOffset, curOffset - beginOffset);
+      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
+      break;
     }
 
     case EVENT_PATTERN: {
