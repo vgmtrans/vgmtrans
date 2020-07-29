@@ -70,15 +70,7 @@ bool AkaoColl::LoadMain() {
       else
         rgn->unityKey = art->unityKey;
 
-      const double freq_multiplier = (art->fineTune >= 0)
-        ? 1.0 + (art->fineTune / 32768.0)
-        : static_cast<uint16_t>(art->fineTune) / 65536.0;
-      const double cents = log(freq_multiplier) / log(2.0) * 1200;
-
-      const int8_t coarseTune = static_cast<int8_t>(cents / 100);
-      const int16_t fineTune = static_cast<int16_t>(static_cast<int>(cents) % 100);
-      rgn->unityKey -= coarseTune;
-      rgn->fineTune = fineTune;
+      rgn->fineTune = art->fineTune;
     }
   }
 
@@ -133,15 +125,8 @@ void AkaoColl::PreSynthFileCreation() {
 
     PSXConvADSR<AkaoRgn>(rgn, art->ADSR1, art->ADSR2, false);
 
-    const double freq_multiplier = (art->fineTune >= 0)
-      ? 1.0 + (art->fineTune / 32768.0)
-      : static_cast<uint16_t>(art->fineTune) / 65536.0;
-    const double cents = log(freq_multiplier) / log(2.0) * 1200;
-
-    const int8_t coarseTune = static_cast<int8_t>(cents / 100);
-    const int16_t fineTune = static_cast<int16_t>(static_cast<int>(cents) % 100);
-    rgn->unityKey = art->unityKey - coarseTune;
-    rgn->fineTune = fineTune;
+    rgn->unityKey = art->unityKey;
+    rgn->fineTune = art->fineTune;
 
     newInstr->aRgns.push_back(rgn);
 
