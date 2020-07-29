@@ -11,11 +11,12 @@ using namespace std;
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file,
                            uint32_t length,
+                           AkaoPs1Version version,
                            uint32_t instrOff,
                            uint32_t dkitOff,
                            uint32_t theID,
                            wstring name)
-    : VGMInstrSet(AkaoFormat::name, file, 0, length, name) {
+    : VGMInstrSet(AkaoFormat::name, file, 0, length, name), version_(version) {
   id = theID;
   instrSetOff = instrOff;
   drumkitOff = dkitOff;
@@ -27,10 +28,10 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
     dwOffset = drumkitOff;
 }
 
-AkaoInstrSet::AkaoInstrSet(RawFile *file, std::set<uint32_t> custom_instrument_addresses,
+AkaoInstrSet::AkaoInstrSet(RawFile *file, AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses,
   std::set<uint32_t> drum_instrument_addresses, std::wstring name)
   : VGMInstrSet(AkaoFormat::name, file, 0, 0, name), bMelInstrs(false), bDrumKit(false),
-  instrSetOff(0), drumkitOff(0)
+  instrSetOff(0), drumkitOff(0), version_(version)
 {
   uint32_t first_instrument_offset = 0;
   if (!custom_instrument_addresses.empty()) {
@@ -51,8 +52,8 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, std::set<uint32_t> custom_instrument_a
   this->drum_instrument_addresses = drum_instrument_addresses;
 }
 
-AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset, wstring name)
-  : VGMInstrSet(AkaoFormat::name, file, offset, 0, name), drumkitOff(0), bMelInstrs(false), bDrumKit(false)
+AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset, AkaoPs1Version version, wstring name)
+  : VGMInstrSet(AkaoFormat::name, file, offset, 0, name), drumkitOff(0), bMelInstrs(false), bDrumKit(false), version_(version)
 {
 }
 
@@ -98,7 +99,7 @@ AkaoInstr::AkaoInstr(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, u
 
 bool AkaoInstr::LoadInstr() {
   for (int k = 0; dwOffset + k * 8 < GetRawFile()->size(); k++) {
-    if (GetWord(dwOffset + k * 8 + 5) == 0) {
+    if (GetByte(dwOffset + k * 8 + 5) == 0) {
       AddSimpleItem(dwOffset + k * 8, 8, L"Region Terminator");
       break;
     }
@@ -129,6 +130,9 @@ AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t lengt
 }
 
 bool AkaoDrumKit::LoadInstr() {
+  if (version() < AkaoPs1Version::VERSION_3_0)
+    return false;
+
   uint32_t j = dwOffset;  //j = the end of the last instrument of the instrument table ie, the beginning of drumkit data
   uint32_t endOffset = parInstrSet->dwOffset + parInstrSet->unLength;
   for (uint32_t i = 0; (i < 128) && (j < endOffset); i++) {
