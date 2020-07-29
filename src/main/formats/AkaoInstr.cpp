@@ -99,9 +99,17 @@ AkaoInstr::AkaoInstr(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, u
 
 bool AkaoInstr::LoadInstr() {
   for (int k = 0; dwOffset + k * 8 < GetRawFile()->size(); k++) {
-    if (GetByte(dwOffset + k * 8 + 5) == 0) {
-      AddSimpleItem(dwOffset + k * 8, 8, L"Region Terminator");
-      break;
+    if (version() < AkaoPs1Version::VERSION_3_0) {
+      if (GetByte(dwOffset + k * 8) >= 0x80) {
+        AddSimpleItem(dwOffset + k * 8, 8, L"Region Terminator");
+        break;
+      }
+    }
+    else {
+      if (GetByte(dwOffset + k * 8 + 5) == 0) {
+        AddSimpleItem(dwOffset + k * 8, 8, L"Region Terminator");
+        break;
+      }
     }
 
     AkaoRgn *rgn = new AkaoRgn(this, dwOffset + k * 8, 8);
