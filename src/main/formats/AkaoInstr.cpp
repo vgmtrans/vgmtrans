@@ -331,10 +331,18 @@ bool AkaoSampColl::GetSampleInfo() {
       ArtHdr->AddSimpleItem(art_offset + 12, 2, L"ADSR1");
       ArtHdr->AddSimpleItem(art_offset + 14, 2, L"ADSR2");
 
+      const int16_t raw_fine_tune = GetShort(art_offset + 8);
+      const double freq_multiplier = (raw_fine_tune >= 0)
+        ? 1.0 + (raw_fine_tune / 32768.0)
+        : static_cast<uint16_t>(raw_fine_tune) / 65536.0;
+      const double cents = log(freq_multiplier) / log(2.0) * 1200;
+      const int8_t coarse_tune = static_cast<int8_t>(cents / 100);
+      const int16_t fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+
       art.sample_offset = GetWord(art_offset);
       art.loop_point = GetWord(art_offset + 4) - art.sample_offset;
-      art.fineTune = GetShort(art_offset + 8);
-      art.unityKey = static_cast<uint8_t>(GetShort(art_offset + 0xA));
+      art.fineTune = fine_tune;
+      art.unityKey = static_cast<uint8_t>(GetShort(art_offset + 0xA)) - coarse_tune;
       art.ADSR1 = GetShort(art_offset + 0xC);
       art.ADSR2 = GetShort(art_offset + 0xE);
       art.artID = starting_art_id + i;
