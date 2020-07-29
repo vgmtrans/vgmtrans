@@ -214,15 +214,21 @@ double AkaoSeq::GetTempoInBPM(uint16_t tempo) const {
 }
 
 AkaoInstrSet* AkaoSeq::NewInstrSet() const {
-  uint32_t length = 0;
-  if (has_instrument_set_offset())
-    length = unLength - (instrument_set_offset() - dwOffset);
-  else if (has_drum_set_offset())
-    length = unLength - (drum_set_offset() - dwOffset);
+  if (version() >= AkaoPs1Version::VERSION_3_0) {
+    uint32_t length = 0;
+    if (has_instrument_set_offset())
+      length = unLength - (instrument_set_offset() - dwOffset);
+    else if (has_drum_set_offset())
+      length = unLength - (drum_set_offset() - dwOffset);
 
-  return (length != 0)
-    ? new AkaoInstrSet(rawfile, length, instrument_set_offset(), drum_set_offset(), id, L"Akao Instr Set")
-    : new AkaoInstrSet(rawfile, dwOffset);
+    return (length != 0)
+      ? new AkaoInstrSet(rawfile, length, instrument_set_offset(), drum_set_offset(), id, L"Akao Instr Set")
+      : new AkaoInstrSet(rawfile, dwOffset);
+  } else if (version() >= AkaoPs1Version::VERSION_1_2) {
+    return new AkaoInstrSet(rawfile, custom_instrument_addresses, drum_instrument_addresses);
+  } else {
+   return new AkaoInstrSet(rawfile, dwOffset);
+  }
 }
 
 void AkaoSeq::LoadEventMap()
@@ -333,7 +339,7 @@ void AkaoSeq::LoadEventMap()
       //event_map[0xf5] = EVENT_UNIMPLEMENTED;
       //event_map[0xf6] = EVENT_UNIMPLEMENTED;
       //event_map[0xf7] = EVENT_UNIMPLEMENTED;
-      event_map[0xfc] = EVENT_FC_SAGAFRO;
+      event_map[0xfc] = EVENT_PROGCHANGE_KEY_SPLIT_V1;
     }
   }
   else if (version() == AkaoPs1Version::VERSION_1_2 || version() == AkaoPs1Version::VERSION_2) {
@@ -642,12 +648,8 @@ bool AkaoTrack::ReadEvent() {
       // change program to articulation number
       parentSeq->bUsesIndividualArts = true;
       const uint8_t artNum = GetByte(curOffset++);
-      const uint8_t progNum = artNum;
-      //const uint8_t progNum = (parentSeq->instrset != nullptr)
-      //  ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
-      //  : artNum;
       AddBankSelectNoItem(0);
-      AddProgramChange(beginOffset, curOffset - beginOffset, progNum);
+      AddProgramChange(beginOffset, curOffset - beginOffset, artNum);
       break;
     }
 
@@ -1229,9 +1231,19 @@ bool AkaoTrack::ReadEvent() {
 
       desc << L"Offset: 0x" << std::hex << std::setfill(L'0') << std::uppercase << drum_instrset_offset;
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
-      AddBankSelectNoItem(127);
-      AddProgramChangeNoItem(127, false);
-      //channel = 9;
+
+      if (readMode == READMODE_ADD_TO_UI) {
+        parentSeq->drum_instrument_addresses.insert(drum_instrset_offset);
+      }
+      else {
+        const int instrument_index = std::distance(parentSeq->drum_instrument_addresses.begin(),
+          parentSeq->drum_instrument_addresses.find(drum_instrset_offset));
+
+        AddBankSelectNoItem(127 - instrument_index);
+        AddProgramChangeNoItem(127, false);
+        //channel = 9;
+      }
+
       break;
     }
 
@@ -1323,12 +1335,8 @@ bool AkaoTrack::ReadEvent() {
     case EVENT_PROGCHANGE_NO_ATTACK: {
       parentSeq->bUsesIndividualArts = true;
       const uint8_t artNum = GetByte(curOffset++);
-      const uint8_t progNum = artNum;
-      //const uint8_t progNum = (parentSeq->instrset != nullptr)
-      //  ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
-      //  : artNum;
       AddBankSelectNoItem(0);
-      AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, L"Program Change w/o Attack Sample");
+      AddProgramChange(beginOffset, curOffset - beginOffset, artNum, false, L"Program Change w/o Attack Sample");
       break;
     }
 
@@ -1353,15 +1361,10 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t artNum = GetByte(curOffset++);
       const uint8_t artNum2 = GetByte(curOffset++);
 
-      const uint8_t progNum = artNum;
-      //const uint8_t progNum = (parentSeq->instrset != nullptr)
-      //  ? static_cast<uint8_t>(parentSeq->instrset->aInstrs.size() + artNum)
-      //  : artNum;
-
       desc << L"Program Number for Primary Voice: " << artNum << L"  Program Number for Secondary Voice: " << artNum2;
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Overlay Voice On (With Program Change)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       AddBankSelectNoItem(0);
-      AddProgramChangeNoItem(progNum, false);
+      AddProgramChangeNoItem(artNum, false);
       break;
     }
 
@@ -1399,16 +1402,6 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_ALTERNATE_VOICE_OFF: {
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Alternate Voice Off", L"", CLR_MISC);
-      break;
-    }
-
-    case EVENT_FC_SAGAFRO:
-    {
-      curOffset += 2;
-      desc << L"Filename: " << parentSeq->rawfile->GetFileName() << L" Event: " << opcode_str
-        << " Address: 0x" << std::hex << std::setfill(L'0') << std::uppercase << beginOffset;
-      AddUnknown(beginOffset, curOffset - beginOffset);
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()), LOG_LEVEL_ERR, L"AkaoSeq"));
       break;
     }
 
@@ -1538,6 +1531,17 @@ bool AkaoTrack::ReadEvent() {
 
       desc << L"Offset: 0x" << std::hex << std::setfill(L'0') << std::uppercase << key_split_regions_offset;
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Program Change (Key-Split Instrument)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+
+      if (readMode == READMODE_ADD_TO_UI) {
+        parentSeq->custom_instrument_addresses.insert(key_split_regions_offset);
+      }
+      else {
+        const int instrument_index = std::distance(parentSeq->custom_instrument_addresses.begin(),
+          parentSeq->custom_instrument_addresses.find(key_split_regions_offset));
+
+        AddBankSelectNoItem(1);
+        AddProgramChangeNoItem(instrument_index, false);
+      }
       break;
     }
 

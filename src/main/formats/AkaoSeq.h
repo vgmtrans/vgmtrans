@@ -101,7 +101,6 @@ enum AkaoSeqEventType {
   EVENT_ALTERNATE_VOICE_OFF,
   EVENT_F3_FF7,
   EVENT_F3_SAGAFRO,
-  EVENT_FC_SAGAFRO,
   EVENT_VOLUME_FADE,
   EVENT_PROGCHANGE_KEY_SPLIT_V1,
   EVENT_PROGCHANGE_KEY_SPLIT_V2,
@@ -198,6 +197,9 @@ class AkaoSeq:
   AkaoPs1Version version_;
   uint32_t instrument_set_offset_;
   uint32_t drum_set_offset_;
+
+  std::set<uint32_t> custom_instrument_addresses;
+  std::set<uint32_t> drum_instrument_addresses;
 
   std::map<uint8_t, AkaoSeqEventType> event_map;
   std::map<uint8_t, AkaoSeqEventType> sub_event_map;
