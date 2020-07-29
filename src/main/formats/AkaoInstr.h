@@ -17,11 +17,15 @@ class AkaoInstrSet: public VGMInstrSet {
                uint32_t dkitOff,
                uint32_t id,
                std::wstring name = L"Akao Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
+  AkaoInstrSet(RawFile *file, std::set<uint32_t> custom_instrument_addresses, std::set<uint32_t> drum_instrument_addresses, std::wstring name = L"Akao Instrument Bank");
   AkaoInstrSet(RawFile *file, uint32_t offset, std::wstring name = L"Akao Instrument Bank (Dummy)");
   virtual bool GetInstrPointers();
  public:
   bool bMelInstrs, bDrumKit;
+  uint32_t instrSetOff;
   uint32_t drumkitOff;
+  std::set<uint32_t> custom_instrument_addresses;
+  std::set<uint32_t> drum_instrument_addresses;
 };
 
 // *********

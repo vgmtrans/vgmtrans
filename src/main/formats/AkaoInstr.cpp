@@ -17,13 +17,38 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
                            wstring name)
     : VGMInstrSet(AkaoFormat::name, file, 0, length, name) {
   id = theID;
+  instrSetOff = instrOff;
   drumkitOff = dkitOff;
-  bMelInstrs = instrOff > 0;
+  bMelInstrs = instrSetOff > 0;
   bDrumKit = drumkitOff > 0;
   if (bMelInstrs)
-    dwOffset = instrOff;
+    dwOffset = instrSetOff;
   else
     dwOffset = drumkitOff;
+}
+
+AkaoInstrSet::AkaoInstrSet(RawFile *file, std::set<uint32_t> custom_instrument_addresses,
+  std::set<uint32_t> drum_instrument_addresses, std::wstring name)
+  : VGMInstrSet(AkaoFormat::name, file, 0, 0, name), bMelInstrs(false), bDrumKit(false),
+  instrSetOff(0), drumkitOff(0)
+{
+  uint32_t first_instrument_offset = 0;
+  if (!custom_instrument_addresses.empty()) {
+    first_instrument_offset = *custom_instrument_addresses.begin();
+    dwOffset = first_instrument_offset;
+  }
+
+  if (!drum_instrument_addresses.empty()) {
+    const uint32_t first_drum_offset = *drum_instrument_addresses.begin();
+
+    if (custom_instrument_addresses.empty())
+      dwOffset = first_drum_offset;
+    else
+      dwOffset = min(first_instrument_offset, first_drum_offset);
+  }
+
+  this->custom_instrument_addresses = custom_instrument_addresses;
+  this->drum_instrument_addresses = drum_instrument_addresses;
 }
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset, wstring name)
@@ -33,16 +58,31 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset, wstring name)
 
 bool AkaoInstrSet::GetInstrPointers() {
   if (bMelInstrs) {
-    VGMHeader *SSEQHdr = AddHeader(dwOffset, 0x10, L"Instr Ptr Table");
+    VGMHeader *SSEQHdr = AddHeader(instrSetOff, 0x10, L"Instr Ptr Table");
     int i = 0;
     //-1 aka 0xFFFF if signed or 0 and past the first pointer value
-    for (int j = dwOffset; (GetShort(j) != (uint16_t) -1) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
+    for (int j = instrSetOff; (GetShort(j) != (uint16_t) -1) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
       SSEQHdr->AddSimpleItem(j, 2, L"Instr Pointer");
-      aInstrs.push_back(new AkaoInstr(this, dwOffset + 0x20 + GetShort(j), 0, 1, i++));
+      aInstrs.push_back(new AkaoInstr(this, instrSetOff + 0x20 + GetShort(j), 0, 1, i++));
     }
   }
-  if (bDrumKit)
+  else if (!custom_instrument_addresses.empty()) {
+    uint32_t instrNum = 0;
+    for (uint32_t instrOff : custom_instrument_addresses) {
+      aInstrs.push_back(new AkaoInstr(this, instrOff, 0, 1, instrNum++));
+    }
+  }
+
+  if (bDrumKit) {
     aInstrs.push_back(new AkaoDrumKit(this, drumkitOff, 0, 127, 127));
+  }
+  else if (!drum_instrument_addresses.empty()) {
+    uint32_t instrNum = 127;
+    for (uint32_t instrOff : drum_instrument_addresses) {
+      aInstrs.push_back(new AkaoInstr(this, instrOff, 0, 127, instrNum--));
+    }
+  }
+
   return true;
 }
 
