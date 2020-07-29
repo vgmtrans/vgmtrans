@@ -142,29 +142,36 @@ bool AkaoDrumKit::LoadInstr() {
       if ((GetWord(j) == 0xFFFFFFFF) && (GetWord(j + 4) == 0xFFFFFFFF))
         break;
 
-      uint8_t assoc_art_id = GetByte(j + 0); //- first_sample_id;
-      uint8_t lowKey = i; //-12;		//-7 CORRECT ?? WHO KNOWS?
-      uint8_t highKey = lowKey;  //the region only covers the one key
+      const uint8_t assoc_art_id = GetByte(j + 0); //- first_sample_id;
+      const uint8_t lowKey = i; //-12;		//-7 CORRECT ?? WHO KNOWS?
+      const uint8_t highKey = lowKey;  //the region only covers the one key
       AkaoRgn *rgn = (AkaoRgn *) AddRgn(new AkaoRgn(this, j, 8, lowKey, highKey, assoc_art_id));
       rgn->drumRelUnityKey = GetByte(j + 1);
-      uint8_t vol = GetByte(j + 6);
-      rgn->SetVolume((double) vol / 127.0);
+      const uint8_t raw_volume = GetByte(j + 6);
+      const double volume = raw_volume == 0 ? 1.0 : raw_volume / 128.0;
+      rgn->SetVolume(volume);
       rgn->AddGeneralItem(j, 1, L"Associated Articulation ID");
       rgn->AddGeneralItem(j + 1, 1, L"Relative Unity Key");
-      rgn->AddUnknown(j + 2, 1);
-      rgn->AddUnknown(j + 3, 1);
-      rgn->AddUnknown(j + 4, 1);
-      rgn->AddUnknown(j + 5, 1);
+      // TODO: set ADSR to the region
+      rgn->AddGeneralItem(j + 2, 1, L"ADSR Attack Rate");
+      rgn->AddGeneralItem(j + 3, 1, L"ADSR Sustain Rate");
+      rgn->AddGeneralItem(j + 4, 1, L"ADSR Sustain Mode");
+      rgn->AddGeneralItem(j + 5, 1, L"ADSR Release Rate");
       rgn->AddGeneralItem(j + 6, 1, L"Attenuation");
-      rgn->AddPan(GetByte(j + 7), j + 7);
+      const uint8_t raw_pan_reverb = GetByte(j + 7);
+      const uint8_t pan = raw_pan_reverb & 0x7f;
+      const bool reverb = (raw_pan_reverb & 0x80) != 0;
+      rgn->AddGeneralItem(j + 7, 1, L"Pan & Reverb");
+      rgn->SetPan(pan);
+      // TODO: set reverb on/off to the region
     }
     j += 8;
   }
+  SetGuessedLength();
 
-  if (aRgns.size() != 0)
-    unLength = aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
-  else
+  if (aRgns.empty())
     pRoot->AddLogItem(new LogItem(L"Instrument has no regions.", LOG_LEVEL_WARN, L"AkaoInstr"));
+
   return true;
 }
 
