@@ -61,7 +61,7 @@ bool AkaoInstrSet::GetInstrPointers() {
     VGMHeader *SSEQHdr = AddHeader(instrSetOff, 0x10, L"Instr Ptr Table");
     int i = 0;
     //-1 aka 0xFFFF if signed or 0 and past the first pointer value
-    for (int j = instrSetOff; (GetShort(j) != (uint16_t) -1) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
+    for (int j = instrSetOff; (GetShort(j) != (uint16_t)-1) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
       SSEQHdr->AddSimpleItem(j, 2, L"Instr Pointer");
       aInstrs.push_back(new AkaoInstr(this, instrSetOff + 0x20 + GetShort(j), 0, 1, i++));
     }
@@ -97,8 +97,12 @@ AkaoInstr::AkaoInstr(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, u
 }
 
 bool AkaoInstr::LoadInstr() {
-  for (int k = 0; (GetWord(dwOffset + k * 8) != 0 || GetWord(dwOffset + k * 8 + 4) != 0) &&
-      dwOffset + k * 8 < GetRawFile()->size(); k++) {
+  for (int k = 0; dwOffset + k * 8 < GetRawFile()->size(); k++) {
+    if (GetWord(dwOffset + k * 8 + 5) == 0) {
+      AddSimpleItem(dwOffset + k * 8, 8, L"Region Terminator");
+      break;
+    }
+
     AkaoRgn *rgn = new AkaoRgn(this, dwOffset + k * 8, 8);
     if (!rgn->LoadRgn()) {
       delete rgn;
@@ -106,10 +110,11 @@ bool AkaoInstr::LoadInstr() {
     }
     aRgns.push_back(rgn);
   }
-  if (aRgns.size() != 0)
-    unLength = aRgns.back()->dwOffset + aRgns.back()->unLength - dwOffset;
-  else
+  SetGuessedLength();
+
+  if (aRgns.empty())
     pRoot->AddLogItem(new LogItem(L"Instrument has no regions.", LOG_LEVEL_WARN, L"AkaoInstr"));
+
   return true;
 }
 
@@ -180,13 +185,14 @@ bool AkaoRgn::LoadRgn() {
   artNum = GetByte(dwOffset + 0); //- first_sample_id;
   AddKeyLow(GetByte(dwOffset + 1), dwOffset + 1);
   AddKeyHigh(GetByte(dwOffset + 2), dwOffset + 2);
-  //AddVelLow(GetByte(dwOffset + 3), dwOffset + 3);
-  //AddVelHigh(GetByte(dwOffset + 4), dwOffset + 4);
-  AddUnknown(dwOffset + 3, 1);
-  AddUnknown(dwOffset + 4, 1);
-  AddUnknown(dwOffset + 5, 1);
-  AddUnknown(dwOffset + 6, 1);
-  AddVolume(GetByte(dwOffset + 7) / 127.0, dwOffset + 7, 1);
+  // TODO: ADSR conversion?
+  AddGeneralItem(dwOffset + 3, 1, L"ADSR Attack Rate");
+  AddGeneralItem(dwOffset + 4, 1, L"ADSR Sustain Rate");
+  AddGeneralItem(dwOffset + 5, 1, L"ADSR Sustain Mode");
+  AddGeneralItem(dwOffset + 6, 1, L"ADSR Release Rate");
+  const uint8_t raw_volume = GetByte(dwOffset + 7);
+  const double volume = raw_volume == 0 ? 1.0 : raw_volume / 128.0;
+  AddVolume(volume, dwOffset + 7, 1);
 
   //if (aInstrs[i]->info_ptr + (k+1)*8 >= aInstrs[i+1]->info_ptr - 8)	//if this is the last region of the instrument
   //	aInstrs[i]->aRegions[k]->last_key = 0x7F;
