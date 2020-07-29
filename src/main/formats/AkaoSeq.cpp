@@ -1229,7 +1229,7 @@ bool AkaoTrack::ReadEvent() {
 
       desc << L"Offset: 0x" << std::hex << std::setfill(L'0') << std::uppercase << drum_instrset_offset;
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
-      AddBankSelectNoItem(0);
+      AddBankSelectNoItem(127);
       AddProgramChangeNoItem(127, false);
       //channel = 9;
       break;
@@ -1237,7 +1237,7 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_DRUM_ON_V2: {
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
-      AddBankSelectNoItem(0);
+      AddBankSelectNoItem(127);
       AddProgramChangeNoItem(127, false);
       //channel = 9;
       break;

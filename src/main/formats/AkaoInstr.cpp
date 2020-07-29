@@ -42,7 +42,7 @@ bool AkaoInstrSet::GetInstrPointers() {
     }
   }
   if (bDrumKit)
-    aInstrs.push_back(new AkaoDrumKit(this, drumkitOff, 0, 0, 127));
+    aInstrs.push_back(new AkaoDrumKit(this, drumkitOff, 0, 127, 127));
   return true;
 }
 
