@@ -138,6 +138,7 @@ class AkaoSeq:
   AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version);
   virtual ~AkaoSeq();
 
+  virtual void ResetVars() override;
   virtual bool GetHeaderInfo() override;
   virtual bool GetTrackPointers() override;
 
@@ -203,6 +204,8 @@ class AkaoSeq:
 
   std::map<uint8_t, AkaoSeqEventType> event_map;
   std::map<uint8_t, AkaoSeqEventType> sub_event_map;
+
+  uint8_t condition;
 
   friend AkaoTrack;
 };
