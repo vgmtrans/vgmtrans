@@ -13,13 +13,20 @@ namespace
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
     : VGMSeq(AkaoFormat::name, file, offset), instrument_set_offset_(0), drum_set_offset_(0),
-      seq_id(0), version_(version) {
+      seq_id(0), version_(version), condition(0) {
   UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   bUsesIndividualArts = false;
   UseReverb();
 }
 
 AkaoSeq::~AkaoSeq() {
+}
+
+void AkaoSeq::ResetVars() {
+  VGMSeq::ResetVars();
+
+  condition = 0;
+  //condition = 2; // FF9 Final Battle
 }
 
 bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
@@ -1293,6 +1300,9 @@ bool AkaoTrack::ReadEvent() {
           // For the second time, VGMTrans jumps to the destination address.
           curOffset = dest;
         }
+      } else {
+        if (parentSeq->condition == target_value)
+          curOffset = dest;
       }
 
       AddGenericEvent(beginOffset, length, L"CPU-Conditional Jump", desc.str(), CLR_LOOP);
