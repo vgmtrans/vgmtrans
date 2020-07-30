@@ -142,10 +142,11 @@ AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t lengt
 }
 
 bool AkaoDrumKit::LoadInstr() {
+  const uint8_t drum_octave = 6; // a drum note ignores octave, this is the octave number for midi remapping
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     const uint32_t kRgnLength = 8;
-    for (uint32_t note_number = 0; note_number < 128; note_number++) {
-      const uint32_t rgn_offset = dwOffset + note_number * kRgnLength;
+    for (uint32_t drum_key = 0; drum_key < 12; drum_key++) {
+      const uint32_t rgn_offset = dwOffset + drum_key * kRgnLength;
       if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
         break;
 
@@ -160,7 +161,8 @@ bool AkaoDrumKit::LoadInstr() {
         break;
 
       const uint8_t assoc_art_id = GetByte(rgn_offset + 0);
-      AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, note_number, note_number, assoc_art_id);
+      const uint8_t drum_note_number = drum_octave * 12 + drum_key;
+      AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       AddRgn(rgn);
       rgn->drumRelUnityKey = GetByte(rgn_offset + 1);
       const uint8_t raw_volume = GetByte(rgn_offset + 6);
@@ -184,8 +186,8 @@ bool AkaoDrumKit::LoadInstr() {
   }
   else if (version() >= AkaoPs1Version::VERSION_1_1) {
     const uint32_t kRgnLength = version() >= AkaoPs1Version::VERSION_2 ? 6 : 5;
-    for (uint32_t note_number = 0; note_number < 128; note_number++) {
-      const uint32_t rgn_offset = dwOffset + note_number * kRgnLength;
+    for (uint32_t drum_key = 0; drum_key < 12; drum_key++) {
+      const uint32_t rgn_offset = dwOffset + drum_key * kRgnLength;
       if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
         break;
 
@@ -195,10 +197,11 @@ bool AkaoDrumKit::LoadInstr() {
         continue;
 
       const uint8_t assoc_art_id = GetByte(rgn_offset + 0);
-      AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, note_number, note_number, assoc_art_id);
+      const uint8_t drum_note_number = drum_octave * 12 + drum_key;
+      AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       AddRgn(rgn);
       rgn->drumRelUnityKey = GetByte(rgn_offset + 1);
-      const uint16_t raw_volume = GetByte(rgn_offset + 2);
+      const uint16_t raw_volume = GetWord(rgn_offset + 2);
       rgn->SetVolume(raw_volume / static_cast<double>(127 * 128));
       rgn->AddGeneralItem(rgn_offset, 1, L"Associated Articulation ID");
       rgn->AddGeneralItem(rgn_offset + 1, 1, L"Relative Unity Key");

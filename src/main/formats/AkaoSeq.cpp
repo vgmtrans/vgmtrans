@@ -527,6 +527,7 @@ void AkaoTrack::ResetVars() {
 
   slur = false;
   legato = false;
+  drum = false;
 
   pattern_return_offset = 0;
 
@@ -589,7 +590,12 @@ bool AkaoTrack::ReadEvent() {
     if (op_note)
     {
       const uint8_t relative_key = note_byte / 11;
-      const uint8_t key = (octave * 12) + relative_key;
+      const uint8_t real_key = (octave * 12) + relative_key;
+
+      // drum instrument will ignore the octave number
+      const uint8_t drum_octave = 6;
+      const uint8_t key = drum ? (drum_octave * 12) + relative_key : real_key;
+
       AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
       AddTime(delta_time);
     }
@@ -1241,6 +1247,7 @@ bool AkaoTrack::ReadEvent() {
 
         AddBankSelectNoItem(127 - instrument_index);
         AddProgramChangeNoItem(127, false);
+        drum = true;
         //channel = 9;
       }
 
@@ -1251,6 +1258,7 @@ bool AkaoTrack::ReadEvent() {
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       AddBankSelectNoItem(127);
       AddProgramChangeNoItem(127, false);
+      drum = true;
       //channel = 9;
       break;
     }
@@ -1258,6 +1266,7 @@ bool AkaoTrack::ReadEvent() {
     case EVENT_DRUM_OFF:
       // TODO: restore program change for regular instrument
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Drum Kit Off", L"", CLR_PROGCHANGE, ICON_PROGCHANGE);
+      drum = false;
       break;
 
     case EVENT_UNCONDITIONAL_JUMP: {

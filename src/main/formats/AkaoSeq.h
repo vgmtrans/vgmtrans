@@ -228,6 +228,7 @@ class AkaoTrack
  protected:
   bool slur;
   bool legato;
+  bool drum;
   uint32_t pattern_return_offset;
   uint32_t loop_begin_loc[4];
   uint16_t loop_layer;
