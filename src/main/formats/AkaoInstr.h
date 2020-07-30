@@ -28,8 +28,8 @@ class AkaoInstrSet: public VGMInstrSet {
                uint32_t dkitOff,
                uint32_t id,
                std::wstring name = L"Akao Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
-  AkaoInstrSet(RawFile *file, AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses, std::set<uint32_t> drum_instrument_addresses, std::wstring name = L"Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name = L"Akao Instrument Bank (Dummy)");
+  AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset, AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses, std::set<uint32_t> drum_instrument_addresses, std::wstring name = L"Akao Instrument Bank");
+  AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version, std::wstring name = L"Akao Instrument Bank (Dummy)");
   virtual bool GetInstrPointers();
 
   AkaoPs1Version version() const { return version_; }
@@ -38,6 +38,7 @@ class AkaoInstrSet: public VGMInstrSet {
   bool bMelInstrs, bDrumKit;
   uint32_t instrSetOff;
   uint32_t drumkitOff;
+  uint32_t end_boundary_offset;
   std::set<uint32_t> custom_instrument_addresses;
   std::set<uint32_t> drum_instrument_addresses;
 

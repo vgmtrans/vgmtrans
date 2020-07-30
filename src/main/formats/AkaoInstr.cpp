@@ -26,12 +26,14 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
     dwOffset = instrSetOff;
   else
     dwOffset = drumkitOff;
+  end_boundary_offset = unLength;
 }
 
-AkaoInstrSet::AkaoInstrSet(RawFile *file, AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses,
+AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
+  AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses,
   std::set<uint32_t> drum_instrument_addresses, std::wstring name)
   : VGMInstrSet(AkaoFormat::name, file, 0, 0, name), bMelInstrs(false), bDrumKit(false),
-  instrSetOff(0), drumkitOff(0), version_(version)
+  instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset), version_(version)
 {
   uint32_t first_instrument_offset = 0;
   if (!custom_instrument_addresses.empty()) {
@@ -52,8 +54,10 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, AkaoPs1Version version, std::set<uint3
   this->drum_instrument_addresses = drum_instrument_addresses;
 }
 
-AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset, AkaoPs1Version version, wstring name)
-  : VGMInstrSet(AkaoFormat::name, file, offset, 0, name), drumkitOff(0), bMelInstrs(false), bDrumKit(false), version_(version)
+AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset,
+  uint32_t end_boundary_offset, AkaoPs1Version version, wstring name)
+  : VGMInstrSet(AkaoFormat::name, file, offset, 0, name), drumkitOff(0),
+    end_boundary_offset(end_boundary_offset), bMelInstrs(false), bDrumKit(false), version_(version)
 {
 }
 
@@ -80,7 +84,7 @@ bool AkaoInstrSet::GetInstrPointers() {
   else if (!drum_instrument_addresses.empty()) {
     uint32_t instrNum = 127;
     for (uint32_t instrOff : drum_instrument_addresses) {
-      aInstrs.push_back(new AkaoInstr(this, instrOff, 0, 127, instrNum--));
+      aInstrs.push_back(new AkaoDrumKit(this, instrOff, 0, 127, instrNum--));
     }
   }
 
@@ -138,43 +142,82 @@ AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t lengt
 }
 
 bool AkaoDrumKit::LoadInstr() {
-  if (version() < AkaoPs1Version::VERSION_3_0)
-    return false;
-
-  uint32_t j = dwOffset;  //j = the end of the last instrument of the instrument table ie, the beginning of drumkit data
-  uint32_t endOffset = parInstrSet->dwOffset + parInstrSet->unLength;
-  for (uint32_t i = 0; (i < 128) && (j < endOffset); i++) {
-    //we found some region data for the drum kit
-    if ((GetWord(j) != 0) && (GetWord(j + 4) != 0)) {
-      //if we run into 0xFFFFFFFF FFFFFFFF, then we quit reading for drumkit regions early
-      if ((GetWord(j) == 0xFFFFFFFF) && (GetWord(j + 4) == 0xFFFFFFFF))
+  if (version() >= AkaoPs1Version::VERSION_3_0) {
+    const uint32_t kRgnLength = 8;
+    for (uint32_t note_number = 0; note_number < 128; note_number++) {
+      const uint32_t rgn_offset = dwOffset + note_number * kRgnLength;
+      if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
         break;
 
-      const uint8_t assoc_art_id = GetByte(j + 0); //- first_sample_id;
-      const uint8_t lowKey = i; //-12;		//-7 CORRECT ?? WHO KNOWS?
-      const uint8_t highKey = lowKey;  //the region only covers the one key
-      AkaoRgn *rgn = (AkaoRgn *) AddRgn(new AkaoRgn(this, j, 8, lowKey, highKey, assoc_art_id));
-      rgn->drumRelUnityKey = GetByte(j + 1);
-      const uint8_t raw_volume = GetByte(j + 6);
+      // skip the region if zero-filled
+      if (GetWord(rgn_offset) == 0 && GetWord(rgn_offset + 4) == 0)
+        continue;
+
+      // if we run into 0xFFFFFFFF FFFFFFFF, then we quit reading for drumkit regions early
+      //
+      // Is this necessary? Is there any real-world case? (loveemu)
+      if (GetWord(rgn_offset) == 0xFFFFFFFF && GetWord(rgn_offset + 4) == 0xFFFFFFFF)
+        break;
+
+      const uint8_t assoc_art_id = GetByte(rgn_offset + 0);
+      AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, note_number, note_number, assoc_art_id);
+      AddRgn(rgn);
+      rgn->drumRelUnityKey = GetByte(rgn_offset + 1);
+      const uint8_t raw_volume = GetByte(rgn_offset + 6);
       const double volume = raw_volume == 0 ? 1.0 : raw_volume / 128.0;
       rgn->SetVolume(volume);
-      rgn->AddGeneralItem(j, 1, L"Associated Articulation ID");
-      rgn->AddGeneralItem(j + 1, 1, L"Relative Unity Key");
+      rgn->AddGeneralItem(rgn_offset, 1, L"Associated Articulation ID");
+      rgn->AddGeneralItem(rgn_offset + 1, 1, L"Relative Unity Key");
       // TODO: set ADSR to the region
-      rgn->AddGeneralItem(j + 2, 1, L"ADSR Attack Rate");
-      rgn->AddGeneralItem(j + 3, 1, L"ADSR Sustain Rate");
-      rgn->AddGeneralItem(j + 4, 1, L"ADSR Sustain Mode");
-      rgn->AddGeneralItem(j + 5, 1, L"ADSR Release Rate");
-      rgn->AddGeneralItem(j + 6, 1, L"Attenuation");
-      const uint8_t raw_pan_reverb = GetByte(j + 7);
+      rgn->AddGeneralItem(rgn_offset + 2, 1, L"ADSR Attack Rate");
+      rgn->AddGeneralItem(rgn_offset + 3, 1, L"ADSR Sustain Rate");
+      rgn->AddGeneralItem(rgn_offset + 4, 1, L"ADSR Sustain Mode");
+      rgn->AddGeneralItem(rgn_offset + 5, 1, L"ADSR Release Rate");
+      rgn->AddGeneralItem(rgn_offset + 6, 1, L"Attenuation");
+      const uint8_t raw_pan_reverb = GetByte(rgn_offset + 7);
       const uint8_t pan = raw_pan_reverb & 0x7f;
       const bool reverb = (raw_pan_reverb & 0x80) != 0;
-      rgn->AddGeneralItem(j + 7, 1, L"Pan & Reverb");
+      rgn->AddGeneralItem(rgn_offset + 7, 1, L"Pan & Reverb On/Off");
       rgn->SetPan(pan);
       // TODO: set reverb on/off to the region
     }
-    j += 8;
   }
+  else if (version() >= AkaoPs1Version::VERSION_1_1) {
+    const uint32_t kRgnLength = version() >= AkaoPs1Version::VERSION_2 ? 6 : 5;
+    for (uint32_t note_number = 0; note_number < 128; note_number++) {
+      const uint32_t rgn_offset = dwOffset + note_number * kRgnLength;
+      if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
+        break;
+
+      // skip the region if zero-filled
+      if (GetWord(rgn_offset) == 0 && GetByte(rgn_offset + 4) == 0
+        && (version() < AkaoPs1Version::VERSION_2 || GetByte(rgn_offset + 5) == 0))
+        continue;
+
+      const uint8_t assoc_art_id = GetByte(rgn_offset + 0);
+      AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, note_number, note_number, assoc_art_id);
+      AddRgn(rgn);
+      rgn->drumRelUnityKey = GetByte(rgn_offset + 1);
+      const uint16_t raw_volume = GetByte(rgn_offset + 2);
+      rgn->SetVolume(raw_volume / static_cast<double>(127 * 128));
+      rgn->AddGeneralItem(rgn_offset, 1, L"Associated Articulation ID");
+      rgn->AddGeneralItem(rgn_offset + 1, 1, L"Relative Unity Key");
+      rgn->AddGeneralItem(rgn_offset + 2, 2, L"Attenuation");
+      const uint8_t raw_pan = GetByte(rgn_offset + 4);
+      const uint8_t pan = version() < AkaoPs1Version::VERSION_1_2
+        ? raw_pan
+        : raw_pan + 64;
+      rgn->AddPan(pan, rgn_offset + 4, 1);
+
+      // TODO: set reverb on/off to the region
+      if (version() >= AkaoPs1Version::VERSION_2) {
+        rgn->AddGeneralItem(rgn_offset + 5, 1, L"Reverb On/Off");
+      }
+    }
+  }
+  else
+    return false;
+
   SetGuessedLength();
 
   if (aRgns.empty())
