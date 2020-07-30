@@ -346,6 +346,7 @@ bool AkaoSampColl::GetHeaderInfo() {
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
     hdr->AddSimpleItem(dwOffset + 4, 2, L"ID");
+    hdr->AddSimpleItem(dwOffset + 0x10, 4, L"SPU Destination Address");
     hdr->AddSimpleItem(dwOffset + 0x14, 4, L"Sample Section Size");
     hdr->AddSimpleItem(dwOffset + 0x18, 4, L"Starting Articulation ID");
     hdr->AddSimpleItem(dwOffset + 0x1C, 4, L"Number of Articulations");
@@ -359,6 +360,7 @@ bool AkaoSampColl::GetHeaderInfo() {
   else if (version() >= AkaoPs1Version::VERSION_1_1) {
     VGMHeader *hdr = AddHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
+    hdr->AddSimpleItem(dwOffset + 0x10, 4, L"SPU Destination Address");
     hdr->AddSimpleItem(dwOffset + 0x14, 4, L"Sample Section Size");
     hdr->AddSimpleItem(dwOffset + 0x18, 4, L"Starting Articulation ID");
     if (version() >= AkaoPs1Version::VERSION_1_2)
