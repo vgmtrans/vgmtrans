@@ -34,16 +34,9 @@ bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
     return false;
 
   const uint32_t track_bits = file->GetWord(offset + track_bits_offset);
-  if (track_bits == 0)
-    return false;
-  for (int i = 0; i < 32; i++) {
-    const uint32_t bit = uint32_t(1) << i;
-    const uint32_t mask = bit | (bit - 1);
-    if ((track_bits & bit) == 0) {
-      if ((track_bits & ~mask) != 0)
-        return false;
-      break;
-    }
+  if (version <= AkaoPs1Version::VERSION_2) {
+    if ((track_bits & ~0xffffff) != 0)
+      return false;
   }
 
   if (version >= AkaoPs1Version::VERSION_3_0) {
