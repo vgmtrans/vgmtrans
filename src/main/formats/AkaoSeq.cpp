@@ -1280,17 +1280,19 @@ bool AkaoTrack::ReadEvent() {
 
       desc << L"Conditional Value" << target_value << L"  Destination: 0x" << std::hex << std::setfill(L'0') << std::uppercase << dest;
 
-      // This event performs conditional jump if certain CPU variable matches to the condValue.
-      // VGMTrans will simply try to parse all events as far as possible, instead.
-      // (Test case: FF9 416 Final Battle)
-      if (!IsOffsetUsed(beginOffset)) {
-        // For the first time, VGMTrans just skips the event,
-        // but remembers the destination address for future jump.
-        conditional_jump_destinations.push_back(dest);
-      }
-      else {
-        // For the second time, VGMTrans jumps to the destination address.
-        curOffset = dest;
+      if (readMode == READMODE_ADD_TO_UI) {
+        // This event performs conditional jump if certain CPU variable matches to the condValue.
+        // VGMTrans will simply try to parse all events as far as possible, instead.
+        // (Test case: FF9 416 Final Battle)
+        if (!IsOffsetUsed(beginOffset)) {
+          // For the first time, VGMTrans just skips the event,
+          // but remembers the destination address for future jump.
+          conditional_jump_destinations.push_back(dest);
+        }
+        else {
+          // For the second time, VGMTrans jumps to the destination address.
+          curOffset = dest;
+        }
       }
 
       AddGenericEvent(beginOffset, length, L"CPU-Conditional Jump", desc.str(), CLR_LOOP);
