@@ -98,7 +98,7 @@ bool AkaoSeq::GetHeaderInfo() {
     hdr->AddSimpleItem(dwOffset + 0x8, 2, L"Reverb Type");
     hdr->AddSimpleItem(dwOffset + 0x10, 4, L"Number of Tracks (# of true bits)");
 
-    unLength = GetShort(dwOffset + 6);
+    unLength = 0x10 + GetShort(dwOffset + 6);
     track_header_offset = 0x20;
   }
   else if (version() < AkaoPs1Version::VERSION_2) {
@@ -221,11 +221,11 @@ AkaoInstrSet* AkaoSeq::NewInstrSet() const {
     else if (has_drum_set_offset())
       length = unLength - (drum_set_offset() - dwOffset);
 
-    return (length != 0)
+    return length != 0
       ? new AkaoInstrSet(rawfile, length, version(), instrument_set_offset(), drum_set_offset(), id, L"Akao Instr Set")
-      : new AkaoInstrSet(rawfile, dwOffset, version());
+      : new AkaoInstrSet(rawfile, dwOffset, dwOffset + unLength, version());
   } else {
-    return new AkaoInstrSet(rawfile, version(), custom_instrument_addresses, drum_instrument_addresses);
+    return new AkaoInstrSet(rawfile, dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses);
   }
 }
 
