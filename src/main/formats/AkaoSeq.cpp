@@ -224,10 +224,8 @@ AkaoInstrSet* AkaoSeq::NewInstrSet() const {
     return (length != 0)
       ? new AkaoInstrSet(rawfile, length, version(), instrument_set_offset(), drum_set_offset(), id, L"Akao Instr Set")
       : new AkaoInstrSet(rawfile, dwOffset, version());
-  } else if (version() >= AkaoPs1Version::VERSION_1_2) {
-    return new AkaoInstrSet(rawfile, version(), custom_instrument_addresses, drum_instrument_addresses);
   } else {
-   return new AkaoInstrSet(rawfile, dwOffset, version());
+    return new AkaoInstrSet(rawfile, version(), custom_instrument_addresses, drum_instrument_addresses);
   }
 }
 
