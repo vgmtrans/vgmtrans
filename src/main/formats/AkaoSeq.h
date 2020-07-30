@@ -234,4 +234,8 @@ class AkaoTrack
   uint8_t one_time_delta_time;
   uint16_t delta_time_overwrite;
   int8_t tuning;
+  std::vector<uint32_t> conditional_jump_destinations;
+
+ private:
+  bool AnyUnvisitedJumpDestinations();
 };
