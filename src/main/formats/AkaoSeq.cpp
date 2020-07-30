@@ -1288,6 +1288,7 @@ bool AkaoTrack::ReadEvent() {
         if (!AddLoopForever(beginOffset, length, L"Jump"))
           return AnyUnvisitedJumpDestinations();
       }
+      break;
     }
 
     case EVENT_CPU_CONDITIONAL_JUMP: {
@@ -1334,6 +1335,8 @@ bool AkaoTrack::ReadEvent() {
 
       if (loop_counter[loop_layer] == count)
         curOffset = dest;
+
+      break;
     }
 
     case EVENT_LOOP_BREAK: {
@@ -1351,6 +1354,7 @@ bool AkaoTrack::ReadEvent() {
         curOffset = dest;
 
       loop_layer = (loop_layer - 1) & 3;
+      break;
     }
 
     case EVENT_PROGCHANGE_NO_ATTACK: {
