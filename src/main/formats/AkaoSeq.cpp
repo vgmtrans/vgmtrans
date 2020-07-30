@@ -592,9 +592,12 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t relative_key = note_byte / 11;
       const uint8_t real_key = (octave * 12) + relative_key;
 
-      // drum instrument will ignore the octave number
-      const uint8_t drum_octave = 6;
-      const uint8_t key = drum ? (drum_octave * 12) + relative_key : real_key;
+      // in earlier verion, drum instrument will ignore the octave number
+      uint8_t key = real_key;
+      if (version <= AkaoPs1Version::VERSION_2) {
+        const uint8_t drum_octave = 2;
+        key = drum ? (drum_octave * 12) + relative_key : real_key;
+      }
 
       AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
       AddTime(delta_time);
