@@ -182,7 +182,7 @@ bool AkaoDrumKit::LoadInstr() {
       // TODO: set reverb on/off to the region
     }
   }
-  else if (version() >= AkaoPs1Version::VERSION_1_1) {
+  else if (version() >= AkaoPs1Version::VERSION_1_0) {
     const uint8_t drum_octave = 2; // a drum note ignores octave, this is the octave number for midi remapping
     const uint32_t kRgnLength = version() >= AkaoPs1Version::VERSION_2 ? 6 : 5;
     for (uint32_t drum_key = 0; drum_key < 12; drum_key++) {
@@ -319,19 +319,26 @@ bool AkaoRgn::LoadRgn() {
 // ************
 
 AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, wstring name)
-    : VGMSampColl(AkaoFormat::name, file, offset, 0, name), version_(version) {
+  : VGMSampColl(AkaoFormat::name, file, offset, 0, name), sample_section_size(0), nNumArts(0),
+  arts_offset(0), sample_section_offset(0), version_(version) {
 }
 
-AkaoSampColl::AkaoSampColl(RawFile *file, std::vector<AkaoInstrDatLocation> file_locations, std::wstring name)
-  : VGMSampColl(AkaoFormat::name, file, 0, 0, name), version_(AkaoPs1Version::VERSION_1_0), file_locations(file_locations)
+AkaoSampColl::AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::wstring name)
+  : VGMSampColl(AkaoFormat::name, file, 0, 0, name), version_(AkaoPs1Version::VERSION_1_0),
+  sample_section_size(0), nNumArts(0), arts_offset(0), sample_section_offset(0), file_location(file_location)
 {
-  dwOffset = file_locations[0].instrAllOffset;
-  for (const auto & loc : file_locations) {
-    if (dwOffset > loc.instrAllOffset)
-      dwOffset = loc.instrAllOffset;
-    if (dwOffset > loc.instrDatOffset)
-      dwOffset = loc.instrDatOffset;
+  dwOffset = file_location.instrAllOffset;
+  if (dwOffset > file_location.instrAllOffset) {
+    dwOffset = file_location.instrAllOffset;
   }
+  if (dwOffset > file_location.instrDatOffset) {
+    dwOffset = file_location.instrDatOffset;
+  }
+
+  sample_section_size = GetWord(file_location.instrAllOffset);
+  const uint32_t end_offset = max(file_location.instrAllOffset + 0x10 + sample_section_size,
+    file_location.instrDatOffset + 64 * file_location.numArticulations);
+  unLength = end_offset - dwOffset;
 }
 
 AkaoSampColl::~AkaoSampColl() {
@@ -421,6 +428,18 @@ bool AkaoSampColl::GetHeaderInfo() {
     nNumArts = ending_art_id - starting_art_id;
     arts_offset = 0x40 + dwOffset;
   }
+  else if (version() == AkaoPs1Version::VERSION_1_0) {
+    VGMHeader *hdr = AddHeader(file_location.instrAllOffset, 0x10);
+    hdr->AddSig(dwOffset, 4);
+    hdr->AddSimpleItem(file_location.instrAllOffset, 4, L"SPU Destination Address");
+    hdr->AddSimpleItem(file_location.instrAllOffset + 4, 4, L"Sample Section Size");
+
+    sample_section_offset = file_location.instrAllOffset + 0x10;
+    sample_section_size = GetWord(file_location.instrAllOffset + 4);
+    starting_art_id = file_location.startingArticulationId;
+    nNumArts = file_location.numArticulations;
+    arts_offset = file_location.instrDatOffset;
+  }
   else
     return false;
 
@@ -434,11 +453,11 @@ bool AkaoSampColl::GetSampleInfo() {
   uint32_t i;
   uint32_t j;
 
+  //Read Articulation Data
   const uint32_t kAkaoArtSize = (version() >= AkaoPs1Version::VERSION_3_1) ? 0x10 : 0x40;
   if (arts_offset + kAkaoArtSize * nNumArts > rawfile->size())
     return false;
 
-  //Read Articulation Data
   for (i = 0; i < nNumArts; i++) {
     AkaoArt art;
 
@@ -467,7 +486,8 @@ bool AkaoSampColl::GetSampleInfo() {
       art.ADSR1 = GetShort(art_offset + 0xC);
       art.ADSR2 = GetShort(art_offset + 0xE);
       art.artID = starting_art_id + i;
-    } else if (version() == AkaoPs1Version::VERSION_3_0) {
+    }
+    else if (version() == AkaoPs1Version::VERSION_3_0) {
       const uint32_t art_offset = arts_offset + i * 0x40;
       VGMHeader *ArtHdr = AddHeader(art_offset, 0x40, L"Articulation");
       ArtHdr->AddSimpleItem(art_offset, 4, L"Sample Offset");
@@ -572,6 +592,62 @@ bool AkaoSampColl::GetSampleInfo() {
       art.ADSR2 = ComposePSXADSR2((s_mode & 4) >> 2, (s_mode & 2) >> 1, sr, (r_mode & 4) >> 2, rr);
       art.artID = starting_art_id + i;
     }
+    else if (version() == AkaoPs1Version::VERSION_1_0) {
+      const uint32_t spu_dest_address = GetWord(file_location.instrAllOffset);
+
+      const uint32_t art_offset = file_location.instrDatOffset + i * 0x40;
+      VGMHeader *ArtHdr = AddHeader(art_offset, 0x40, L"Articulation");
+      ArtHdr->AddSimpleItem(art_offset, 4, L"Sample Offset");
+      ArtHdr->AddSimpleItem(art_offset + 4, 4, L"Loop Point");
+      ArtHdr->AddSimpleItem(art_offset + 8, 1, L"ADSR Attack Rate");
+      ArtHdr->AddSimpleItem(art_offset + 9, 1, L"ADSR Decay Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x0A, 1, L"ADSR Sustain Level");
+      ArtHdr->AddSimpleItem(art_offset + 0x0B, 1, L"ADSR Sustain Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x0C, 1, L"ADSR Release Rate");
+      ArtHdr->AddSimpleItem(art_offset + 0x0D, 1, L"ADSR Attack Mode");
+      ArtHdr->AddSimpleItem(art_offset + 0x0E, 1, L"ADSR Sustain Mode");
+      ArtHdr->AddSimpleItem(art_offset + 0x0F, 1, L"ADSR Release Mode");
+      ArtHdr->AddSimpleItem(art_offset + 0x10, 4, L"Base Pitch (C)");
+      ArtHdr->AddSimpleItem(art_offset + 0x14, 4, L"Base Pitch (C#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x18, 4, L"Base Pitch (D)");
+      ArtHdr->AddSimpleItem(art_offset + 0x1C, 4, L"Base Pitch (D#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x20, 4, L"Base Pitch (E)");
+      ArtHdr->AddSimpleItem(art_offset + 0x24, 4, L"Base Pitch (F)");
+      ArtHdr->AddSimpleItem(art_offset + 0x28, 4, L"Base Pitch (F#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x2C, 4, L"Base Pitch (G)");
+      ArtHdr->AddSimpleItem(art_offset + 0x30, 4, L"Base Pitch (G#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x34, 4, L"Base Pitch (A)");
+      ArtHdr->AddSimpleItem(art_offset + 0x38, 4, L"Base Pitch (A#)");
+      ArtHdr->AddSimpleItem(art_offset + 0x3C, 4, L"Base Pitch (B)");
+
+      const uint32_t sample_start_address = GetWord(art_offset);
+      const uint32_t loop_start_address = GetWord(art_offset + 4);
+      if (sample_start_address < spu_dest_address || loop_start_address < spu_dest_address || sample_start_address > loop_start_address)
+        continue;
+
+      const uint8_t ar = GetByte(art_offset + 8);
+      const uint8_t dr = GetByte(art_offset + 9);
+      const uint8_t sl = GetByte(art_offset + 0x0A);
+      const uint8_t sr = GetByte(art_offset + 0x0B);
+      const uint8_t rr = GetByte(art_offset + 0x0C);
+      const uint8_t a_mode = GetByte(art_offset + 0x0D);
+      const uint8_t s_mode = GetByte(art_offset + 0x0E);
+      const uint8_t r_mode = GetByte(art_offset + 0x0F);
+
+      const uint32_t base_pitch = GetWord(art_offset + 0x10);
+      const double freq_multiplier = base_pitch / 4096.0;
+      const double cents = log(freq_multiplier) / log(2.0) * 1200;
+      const int8_t coarse_tune = static_cast<int8_t>(cents / 100);
+      const int16_t fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+
+      art.sample_offset = sample_start_address - spu_dest_address;
+      art.loop_point = loop_start_address - sample_start_address;
+      art.fineTune = fine_tune;
+      art.unityKey = 72 - coarse_tune;
+      art.ADSR1 = ComposePSXADSR1((a_mode & 4) >> 2, ar, dr, sl);
+      art.ADSR2 = ComposePSXADSR2((s_mode & 4) >> 2, (s_mode & 2) >> 1, sr, (r_mode & 4) >> 2, rr);
+      art.artID = starting_art_id + i;
+    }
 
     akArts.push_back(art);
   }
@@ -583,9 +659,8 @@ bool AkaoSampColl::GetSampleInfo() {
 
   //Find sample offsets
 
-  //sample_section_offset = SampleSetSize - sample_section_size;
-
-  sample_section_offset = arts_offset + (uint32_t) (akArts.size() * kAkaoArtSize);
+  if (version() != AkaoPs1Version::VERSION_1_0)
+    sample_section_offset = arts_offset + (uint32_t)(akArts.size() * kAkaoArtSize);
 
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
@@ -602,7 +677,7 @@ bool AkaoSampColl::GetSampleInfo() {
   // then shorten the sample section size to the actual end of the document
   if (sample_section_offset + sample_section_size > rawfile->size())
     sample_section_size = rawfile->size(); //- sample_section_offset;
-  //AddItem("Samples", ICON_TRACK, FileVGMItem.pTreeItem, sample_section_offset, 0, 0, &AllSampsVGMItem); //add the parent "Samples" tree item
+                                           //AddItem("Samples", ICON_TRACK, FileVGMItem.pTreeItem, sample_section_offset, 0, 0, &AllSampsVGMItem); //add the parent "Samples" tree item
 
   std::set<uint32_t> sample_offsets;
   for (const auto & art : akArts) {
