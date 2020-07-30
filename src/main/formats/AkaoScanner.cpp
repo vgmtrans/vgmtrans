@@ -55,8 +55,8 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
 
   if (file->size() >= 0x1A8000) {
     // Hard-coded loader for Final Fantasy 7 PSF
-    const AkaoInstrDatLocation instrLocation(0xf0000, 0x166000);
-    const AkaoInstrDatLocation instr2Location(0x168000, 0x1a6000);
+    const AkaoInstrDatLocation instrLocation(0xf0000, 0x166000, 0, 128);
+    const AkaoInstrDatLocation instr2Location(0x168000, 0x1a6000, 53, 75); // One-Winged Angel
 
     std::vector<AkaoInstrDatLocation> instrLocations;
 
@@ -64,14 +64,16 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
       && file->GetWord(instrLocation.instrDatOffset) == 0x1010)
       instrLocations.push_back(instrLocation);
 
-    if (file->GetWord(instr2Location.instrAllOffset) == 0x38560
-      && file->GetWord(instr2Location.instrDatOffset) == 0x38560)
-      instrLocations.push_back(instr2Location);
+    //if (file->GetWord(instr2Location.instrAllOffset) == 0x38560
+    //  && file->GetWord(instr2Location.instrDatOffset) == 0x38560)
+    //  instrLocations.push_back(instr2Location);
 
     if (!instrLocations.empty()) {
-      AkaoSampColl *sampColl = new AkaoSampColl(file, instrLocations);
-      if (!sampColl->LoadVGMFile())
-        delete sampColl;
+      for (const auto & loc : instrLocations) {
+        AkaoSampColl *sampColl = new AkaoSampColl(file, loc);
+        if (!sampColl->LoadVGMFile())
+          delete sampColl;
+      }
     }
   }
 }

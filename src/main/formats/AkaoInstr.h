@@ -8,11 +8,13 @@
 struct AkaoInstrDatLocation {
   uint32_t instrAllOffset;
   uint32_t instrDatOffset;
+  uint32_t startingArticulationId;
+  uint32_t numArticulations;
 
-  AkaoInstrDatLocation() : instrAllOffset(0), instrDatOffset(0) {}
+  AkaoInstrDatLocation() : instrAllOffset(0), instrDatOffset(0), startingArticulationId(0), numArticulations(0) {}
 
-  AkaoInstrDatLocation(uint32_t instrAllOffset, uint32_t instrDatOffset)
-    : instrAllOffset(instrAllOffset), instrDatOffset(instrDatOffset) {}
+  AkaoInstrDatLocation(uint32_t instrAllOffset, uint32_t instrDatOffset, uint32_t startingArticulationId, uint32_t numArticulations)
+    : instrAllOffset(instrAllOffset), instrDatOffset(instrDatOffset), startingArticulationId(startingArticulationId), numArticulations(numArticulations) {}
 };
 
 // ************
@@ -125,7 +127,7 @@ class AkaoSampColl:
     public VGMSampColl {
  public:
    AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name = L"Akao Sample Collection");
-   AkaoSampColl(RawFile *file, std::vector<AkaoInstrDatLocation> fileLocations, std::wstring name = L"Akao Sample Collection");
+   AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::wstring name = L"Akao Sample Collection");
    virtual ~AkaoSampColl();
 
   virtual bool GetHeaderInfo();
@@ -147,6 +149,6 @@ class AkaoSampColl:
   uint32_t nNumArts;
   uint32_t arts_offset;
   uint32_t sample_section_offset;
-  std::vector<AkaoInstrDatLocation> file_locations;
+  AkaoInstrDatLocation file_location;
 };
 
