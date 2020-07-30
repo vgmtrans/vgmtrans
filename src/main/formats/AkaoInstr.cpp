@@ -280,6 +280,18 @@ AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version versio
     : VGMSampColl(AkaoFormat::name, file, offset, 0, name), version_(version) {
 }
 
+AkaoSampColl::AkaoSampColl(RawFile *file, std::vector<AkaoInstrDatLocation> file_locations, std::wstring name)
+  : VGMSampColl(AkaoFormat::name, file, 0, 0, name), version_(AkaoPs1Version::VERSION_1_0), file_locations(file_locations)
+{
+  dwOffset = file_locations[0].instrAllOffset;
+  for (const auto & loc : file_locations) {
+    if (dwOffset > loc.instrAllOffset)
+      dwOffset = loc.instrAllOffset;
+    if (dwOffset > loc.instrDatOffset)
+      dwOffset = loc.instrDatOffset;
+  }
+}
+
 AkaoSampColl::~AkaoSampColl() {
 }
 

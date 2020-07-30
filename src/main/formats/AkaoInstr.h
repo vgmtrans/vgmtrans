@@ -5,6 +5,16 @@
 #include "AkaoFormat.h"
 #include "Matcher.h"
 
+struct AkaoInstrDatLocation {
+  uint32_t instrAllOffset;
+  uint32_t instrDatOffset;
+
+  AkaoInstrDatLocation() : instrAllOffset(0), instrDatOffset(0) {}
+
+  AkaoInstrDatLocation(uint32_t instrAllOffset, uint32_t instrDatOffset)
+    : instrAllOffset(instrAllOffset), instrDatOffset(instrDatOffset) {}
+};
+
 // ************
 // AkaoInstrSet
 // ************
@@ -113,8 +123,9 @@ struct AkaoArt {
 class AkaoSampColl:
     public VGMSampColl {
  public:
-  AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name = L"Akao Sample Collection");
-  virtual ~AkaoSampColl();
+   AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name = L"Akao Sample Collection");
+   AkaoSampColl(RawFile *file, std::vector<AkaoInstrDatLocation> fileLocations, std::wstring name = L"Akao Sample Collection");
+   virtual ~AkaoSampColl();
 
   virtual bool GetHeaderInfo();
   virtual bool GetSampleInfo();
@@ -135,5 +146,6 @@ class AkaoSampColl:
   uint32_t nNumArts;
   uint32_t arts_offset;
   uint32_t sample_section_offset;
+  std::vector<AkaoInstrDatLocation> file_locations;
 };
 
