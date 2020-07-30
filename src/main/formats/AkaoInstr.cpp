@@ -206,10 +206,7 @@ bool AkaoDrumKit::LoadInstr() {
       rgn->AddGeneralItem(rgn_offset, 1, L"Associated Articulation ID");
       rgn->AddGeneralItem(rgn_offset + 1, 1, L"Relative Unity Key");
       rgn->AddGeneralItem(rgn_offset + 2, 2, L"Attenuation");
-      const uint8_t raw_pan = GetByte(rgn_offset + 4);
-      const uint8_t pan = version() < AkaoPs1Version::VERSION_1_2
-        ? raw_pan
-        : raw_pan + 64;
+      const uint8_t pan = GetByte(rgn_offset + 4);
       rgn->AddPan(pan, rgn_offset + 4, 1);
 
       // TODO: set reverb on/off to the region
