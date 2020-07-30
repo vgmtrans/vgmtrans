@@ -26,7 +26,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
     dwOffset = instrSetOff;
   else
     dwOffset = drumkitOff;
-  end_boundary_offset = unLength;
+  end_boundary_offset = dwOffset + unLength;
 }
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
@@ -142,11 +142,10 @@ AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t lengt
 }
 
 bool AkaoDrumKit::LoadInstr() {
-  const uint8_t drum_octave = 6; // a drum note ignores octave, this is the octave number for midi remapping
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     const uint32_t kRgnLength = 8;
-    for (uint32_t drum_key = 0; drum_key < 12; drum_key++) {
-      const uint32_t rgn_offset = dwOffset + drum_key * kRgnLength;
+    for (uint32_t drum_note_number = 0; drum_note_number < 128; drum_note_number++) {
+      const uint32_t rgn_offset = dwOffset + drum_note_number * kRgnLength;
       if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
         break;
 
@@ -161,7 +160,6 @@ bool AkaoDrumKit::LoadInstr() {
         break;
 
       const uint8_t assoc_art_id = GetByte(rgn_offset + 0);
-      const uint8_t drum_note_number = drum_octave * 12 + drum_key;
       AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       AddRgn(rgn);
       rgn->drumRelUnityKey = GetByte(rgn_offset + 1);
@@ -185,6 +183,7 @@ bool AkaoDrumKit::LoadInstr() {
     }
   }
   else if (version() >= AkaoPs1Version::VERSION_1_1) {
+    const uint8_t drum_octave = 2; // a drum note ignores octave, this is the octave number for midi remapping
     const uint32_t kRgnLength = version() >= AkaoPs1Version::VERSION_2 ? 6 : 5;
     for (uint32_t drum_key = 0; drum_key < 12; drum_key++) {
       const uint32_t rgn_offset = dwOffset + drum_key * kRgnLength;
