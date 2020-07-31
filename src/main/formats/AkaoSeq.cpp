@@ -1333,7 +1333,7 @@ bool AkaoTrack::ReadEvent() {
       desc << L"Count: " << count << L"  Destination: 0x" << std::hex << std::setfill(L'0') << std::uppercase << dest;
       AddGenericEvent(beginOffset, length, L"Repeat Branch", desc.str(), CLR_MISC);
 
-      if (loop_counter[loop_layer] == count)
+      if (loop_counter[loop_layer] + 1 == count)
         curOffset = dest;
 
       break;
@@ -1350,7 +1350,7 @@ bool AkaoTrack::ReadEvent() {
       desc << L"Count: " << count << L"  Destination: 0x" << std::hex << std::setfill(L'0') << std::uppercase << dest;
       AddGenericEvent(beginOffset, length, L"Repeat Break", desc.str(), CLR_MISC);
 
-      if (loop_counter[loop_layer] == count)
+      if (loop_counter[loop_layer] + 1 == count)
         curOffset = dest;
 
       loop_layer = (loop_layer - 1) & 3;
