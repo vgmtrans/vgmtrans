@@ -17,6 +17,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
                            uint32_t theID,
                            wstring name)
     : VGMInstrSet(AkaoFormat::name, file, 0, length, name), version_(version) {
+  allowEmptyInstrs = true;
   id = theID;
   instrSetOff = instrOff;
   drumkitOff = dkitOff;
@@ -35,6 +36,8 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
   : VGMInstrSet(AkaoFormat::name, file, 0, 0, name), bMelInstrs(false), bDrumKit(false),
   instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset), version_(version)
 {
+  allowEmptyInstrs = true;
+
   uint32_t first_instrument_offset = 0;
   if (!custom_instrument_addresses.empty()) {
     first_instrument_offset = *custom_instrument_addresses.begin();
@@ -59,6 +62,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset,
   : VGMInstrSet(AkaoFormat::name, file, offset, 0, name), drumkitOff(0),
     end_boundary_offset(end_boundary_offset), bMelInstrs(false), bDrumKit(false), version_(version)
 {
+  allowEmptyInstrs = true;
 }
 
 bool AkaoInstrSet::GetInstrPointers() {
