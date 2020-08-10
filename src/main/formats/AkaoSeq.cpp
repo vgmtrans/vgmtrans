@@ -26,7 +26,8 @@ void AkaoSeq::ResetVars() {
   VGMSeq::ResetVars();
 
   condition = 0;
-  //condition = 2; // FF9 Final Battle
+  if (rawfile->tag.album == L"Final Fantasy 9" && rawfile->tag.title == L"Final Battle")
+    condition = 2;
 }
 
 bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
