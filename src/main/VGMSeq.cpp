@@ -18,6 +18,7 @@ VGMSeq::VGMSeq(const string &format, RawFile *file, uint32_t offset, uint32_t le
       bMonophonicTracks(false),
       bReverb(false),
       bUseLinearAmplitudeScale(false),
+      bUseLinearPanAmplitudeScale(false),
       bAlwaysWriteInitialTempo(false),
       bAlwaysWriteInitialVol(false),
       bAlwaysWriteInitialExpression(false),
@@ -282,7 +283,7 @@ bool VGMSeq::GetHeaderInfo(void) {
 }
 
 
-//GetTrackPointers() should contain logic for parsing track pointers 
+//GetTrackPointers() should contain logic for parsing track pointers
 // and instantiating/adding each track in the sequence
 bool VGMSeq::GetTrackPointers(void) {
   return true;
