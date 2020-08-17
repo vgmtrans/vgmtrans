@@ -15,7 +15,8 @@ using namespace std;
 
 SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, wstring name)
     : VGMContainerItem(parentFile, offset, length, name),
-      parentSeq(parentFile) {
+      parentSeq(parentFile),
+      panVolumeCorrectionRate(1.0) {
   dwStartOffset = offset;
   bMonophonic = parentSeq->bMonophonicTracks;
   pMidiTrack = NULL;
@@ -46,6 +47,7 @@ void SeqTrack::ResetVars() {
   transpose = 0;
   cDrumNote = -1;
   cKeyCorrection = 0;
+  panVolumeCorrectionRate = 1.0;
 }
 
 
@@ -672,14 +674,16 @@ void SeqTrack::AddVol(uint32_t offset, uint32_t length, uint8_t newVol, const st
 
 void SeqTrack::AddVolNoItem(uint8_t newVol) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    uint8_t finalVol = newVol;
+    double newVolPercent = newVol / 127.0;
+    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
+      newVolPercent *= panVolumeCorrectionRate;
     if (parentSeq->bUseLinearAmplitudeScale)
-      finalVol = Convert7bitPercentVolValToStdMidiVal(newVol);
+      newVolPercent = sqrt(newVolPercent);
 
+    const uint8_t finalVol = static_cast<uint8_t>(min(newVolPercent * 127, 127));
     pMidiTrack->AddVol(channel, finalVol);
   }
   vol = newVol;
-  return;
 }
 
 void SeqTrack::AddVolSlide(uint32_t offset,
@@ -708,10 +712,13 @@ void SeqTrack::InsertVol(uint32_t offset,
                          const std::wstring &sEventName) {
   OnEvent(offset, length);
 
-  uint8_t finalVol = newVol;
+  double newVolPercent = newVol / 127.0;
+  if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
+    newVolPercent *= panVolumeCorrectionRate;
   if (parentSeq->bUseLinearAmplitudeScale)
-    finalVol = Convert7bitPercentVolValToStdMidiVal(newVol);
+    newVolPercent = sqrt(newVolPercent);
 
+  const uint8_t finalVol = static_cast<uint8_t>(min(newVolPercent * 127, 127));
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new VolSeqEvent(this, newVol, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -729,10 +736,13 @@ void SeqTrack::AddExpression(uint32_t offset, uint32_t length, uint8_t level, co
 
 void SeqTrack::AddExpressionNoItem(uint8_t level) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    uint8_t finalExpression = level;
+    double newVolPercent = level / 127.0;
+    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustExpressionController)
+      newVolPercent *= panVolumeCorrectionRate;
     if (parentSeq->bUseLinearAmplitudeScale)
-      finalExpression = Convert7bitPercentVolValToStdMidiVal(level);
+      newVolPercent = sqrt(newVolPercent);
 
+    const uint8_t finalExpression = static_cast<uint8_t>(min(newVolPercent * 127, 127));
     pMidiTrack->AddExpression(channel, finalExpression);
   }
   expression = level;
@@ -764,10 +774,13 @@ void SeqTrack::InsertExpression(uint32_t offset,
                                 const std::wstring &sEventName) {
   OnEvent(offset, length);
 
-  uint8_t finalExpression = level;
+  double newVolPercent = level / 127.0;
+  if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustExpressionController)
+    newVolPercent *= panVolumeCorrectionRate;
   if (parentSeq->bUseLinearAmplitudeScale)
-    finalExpression = Convert7bitPercentVolValToStdMidiVal(level);
+    newVolPercent = sqrt(newVolPercent);
 
+  const uint8_t finalExpression = static_cast<uint8_t>(min(newVolPercent * 127, 127));
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new ExpressionSeqEvent(this, level, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -824,7 +837,23 @@ void SeqTrack::AddPan(uint32_t offset, uint32_t length, uint8_t pan, const std::
 
 void SeqTrack::AddPanNoItem(uint8_t pan) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    pMidiTrack->AddPan(channel, pan);
+    const uint8_t midiPan = parentSeq->bUseLinearPanAmplitudeScale
+      ? Convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
+      : pan;
+    pMidiTrack->AddPan(channel, midiPan);
+
+    switch (parentSeq->panVolumeCorrectionMode) {
+    case PanVolumeCorrectionMode::kAdjustVolumeController:
+      AddVolNoItem(vol);
+      break;
+
+    case PanVolumeCorrectionMode::kAdjustExpressionController:
+      AddExpressionNoItem(expression);
+      break;
+
+    default:
+      break;
+    }
   }
   prevPan = pan;
 }
@@ -852,8 +881,26 @@ void SeqTrack::InsertPan(uint32_t offset,
 
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new PanSeqEvent(this, pan, offset, length, sEventName));
-  else if (readMode == READMODE_CONVERT_TO_MIDI)
-    pMidiTrack->InsertPan(channel, pan, absTime);
+  else if (readMode == READMODE_CONVERT_TO_MIDI) {
+    const uint8_t midiPan = parentSeq->bUseLinearPanAmplitudeScale
+      ? Convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
+      : pan;
+    pMidiTrack->InsertPan(channel, midiPan, absTime);
+
+    // TODO: (bugfix) Pan volume compensation does not work properly when using pan slider and volume slider at the same time
+    switch (parentSeq->panVolumeCorrectionMode) {
+    case PanVolumeCorrectionMode::kAdjustVolumeController:
+      InsertVol(offset, length, vol, absTime);
+      break;
+
+    case PanVolumeCorrectionMode::kAdjustExpressionController:
+      InsertExpression(offset, length, expression, absTime);
+      break;
+
+    default:
+      break;
+    }
+  }
 }
 
 void SeqTrack::AddReverb(uint32_t offset, uint32_t length, uint8_t reverb, const std::wstring &sEventName) {
