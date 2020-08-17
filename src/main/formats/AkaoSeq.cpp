@@ -15,7 +15,7 @@ AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
     : VGMSeq(AkaoFormat::name, file, offset), instrument_set_offset_(0), drum_set_offset_(0),
       seq_id(0), version_(version), condition(0) {
   UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
-  UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController);
+  //UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController); // disabled, it only changes the volume and the pan slightly, and also its output becomes undefined if pan and volume slides are used at the same time
   bUsesIndividualArts = false;
   UseReverb();
 }
