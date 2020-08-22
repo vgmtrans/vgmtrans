@@ -1358,14 +1358,32 @@ bool AkaoSnesTrack::ReadEvent(void) {
                       ICON_ENDREP);
 
       uint8_t prevLoopLevel = (loopLevel != 0 ? loopLevel : AKAOSNES_LOOP_LEVEL_MAX) - 1;
-      if (parentSeq->version != AKAOSNES_V4) { // AKAOSNES_V1, AKAOSNES_V2, AKAOSNES_V3
+      if (parentSeq->version != AKAOSNES_V4) { // AKAOSNES_V1, AKAOSNES_V2, AKAOSNES_V3, and Romancing SaGa 2
+        // (Romancing SaGa 2 also increments the counter here actually, unlike other V4 games. VGMTrans doesn't try to emulate it at this time.)
         loopIncCount[prevLoopLevel]++;
       }
 
+      // Branch if the incremental loop count matches the specified count.
       if (count == loopIncCount[prevLoopLevel]) {
-        if (loopDecCount[prevLoopLevel] - 1 == 0) {
-          loopLevel = prevLoopLevel;
+        // The last iteration will end the loop (i.e. decreases the loop level)
+        //
+        // Note that V2 and V3 does not do this!
+        // If you use an opcode to exit the innermost loop in a nested loop, the loop-level mismatch will break the nested loop.
+        // (I don't think the songs officially released by Square use this opcode in a nested loop. That was probably not recommended.)
+        if (parentSeq->version == AKAOSNES_V1) {
+          if (loopDecCount[prevLoopLevel] != 0) {
+            // Only Final Fantasy 4 decreases the remaining count of the most-inner repeat.
+            loopDecCount[prevLoopLevel]--;
+            if (loopDecCount[prevLoopLevel] == 0) {
+              loopLevel = prevLoopLevel;
+            }
+          }
+        } else if (parentSeq->version != AKAOSNES_V2 && parentSeq->version != AKAOSNES_V3) {
+          if (loopDecCount[prevLoopLevel] - 1 == 0) {
+            loopLevel = prevLoopLevel;
+          }
         }
+
         curOffset = dest;
       }
 
