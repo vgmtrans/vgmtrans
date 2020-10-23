@@ -52,8 +52,9 @@ jobs:
         run: |
           sudo add-apt-repository ppa:beineri/opt-qt-5.15.0-xenial -y
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-          sudo apt-get update -qq
-          sudo apt-get -y install pkg-config gcc-10 qt515base qt515wayland qt515svg libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
+          sudo apt clean
+          sudo apt update
+          sudo apt install -y pkg-config gcc-10 qt515base qt515wayland qt515svg libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
           wget https://github.com/FluidSynth/fluidsynth/archive/v2.1.5.zip
           unzip v2.1.5.zip
           cd fluidsynth-2.1.5
