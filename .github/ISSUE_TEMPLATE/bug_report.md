@@ -5,6 +5,8 @@ labels:
 
 ---
 
+<!-- THE FOLLOWING IS **REQUIRED**, NOT PROVIDING THIS INFORMATION WILL RESULT IN YOUR ISSUE BEING CLOSED -->
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
