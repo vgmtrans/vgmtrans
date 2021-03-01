@@ -10,6 +10,7 @@
 #include "MainFrm.h"
 #include "ScanDlg.h"
 #include "DLSFile.h"
+#include "osdepend.h"
 
 using namespace std;
 
