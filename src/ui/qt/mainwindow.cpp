@@ -3,10 +3,10 @@
 #include <QMimeData>
 #include "mainwindow.h"
 #include "QtVGMRoot.h"
-#include "RawFileListView.h"
-#include "VGMFileListView.h"
-#include "VGMCollListView.h"
-#include "MdiArea.h"
+#include "workarea/RawFileListView.h"
+#include "workarea/VGMFileListView.h"
+#include "workarea/VGMCollListView.h"
+#include "workarea/MdiArea.h"
 
 const int defaultWindowWidth = 800;
 const int defaultWindowHeight = 600;

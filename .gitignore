@@ -196,3 +196,5 @@ UpgradeLog*.htm
 FakesAssemblies/
 
 # VisualStudio.gitignore end ---------------------------------------------------
+
+cmake-build-*

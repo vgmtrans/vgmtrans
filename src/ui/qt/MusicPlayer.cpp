@@ -2,13 +2,7 @@
 // Created by Mike on 8/31/14.
 //
 
-#include <stdlib.h>
 #include "MusicPlayer.h"
-
-extern "C" {
-#include "mem_sfloader.h"
-#include "vgmtrans_fluid_midi.h"
-}
 
 int midi_event_callback(void* data, fluid_midi_event_t* event);
 
@@ -29,7 +23,7 @@ MusicPlayer::MusicPlayer()
     /* Create the synthesizer. */
     this->synth = new_fluid_synth(this->settings);
 
-
+/*
     // allocate and add our custom memory sfont loader
     loader = new_memsfloader(settings);
 
@@ -38,10 +32,10 @@ MusicPlayer::MusicPlayer()
     } else {
         fluid_synth_add_sfloader(synth, loader);
     }
-
+*/
 
 //        fluid_synth_set_reverb(synth, 0.5, 0.8, FLUID_REVERB_DEFAULT_WIDTH, 0.5);
-        fluid_synth_set_reverb(synth, 0.5, 0.8, FLUID_REVERB_DEFAULT_WIDTH, 0.3);
+       // fluid_synth_set_reverb(synth, 0.5, 0.8, FLUID_REVERB_DEFAULT_WIDTH, 0.3);
 //    fluid_synth_set_reverb(this->synth, 0.7, 0.8, 0.9, 0.4);
     //fluid_synth_set_interp_method(synth, -1, FLUID_INTERP_NONE);
 
@@ -70,13 +64,15 @@ void MusicPlayer::LoadSF2(const void *data)
 
 int midi_event_callback(void* data, fluid_midi_event_t* event)
 {
-
-	int track_num = (vgmtrans_fluid_midi_event_get_track((vgmtrans_fluid_midi_event_t*)event))->num;
+/*
+	int track_num = (fluid_midi_event_get_track((fluid_midi_event_t*)event))->num;
     int chan = fluid_midi_event_get_channel(event);
     int new_chan = ((track_num / 15) * 16) + chan;
     fluid_midi_event_set_channel(event, new_chan);
 
 	return fluid_synth_handle_midi_event(data, event);
+*/
+	return 0;
 }
 
 void MusicPlayer::StopMidi() {
@@ -96,7 +92,6 @@ void MusicPlayer::PlayMidi(const void* data, size_t len)
     this->adriver = new_fluid_audio_driver(this->settings, this->synth);
 
     if (FLUID_OK == fluid_player_add_mem(this->player, data, len)) {
-		fluid_player_set_playback_callback(this->player, &midi_event_callback, this->synth);
-        vgmtrans_fluid_player_play(this->player);
+		//fluid_player_set_playback_callback(this->player, &midi_event_callback, this->synth);
 	}
 }
