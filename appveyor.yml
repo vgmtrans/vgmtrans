@@ -8,6 +8,10 @@ environment:
   - platform: Win32
     target: Release
     visualstudio_string: vs2019
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+
+matrix:
+  fast_finish: true
 
 init:
 # Use CRLF line endings on Windows so users can just use Notepad.
