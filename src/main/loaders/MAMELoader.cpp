@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "tinyxml.h"
+#include <tinyxml.h>
 #include "MAMELoader.h"
 #include "Root.h"
 #include "Format.h"
