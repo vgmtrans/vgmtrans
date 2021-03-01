@@ -1,0 +1,28 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'windows-latest'
+
+name: 
+jobs:
+- job: Windows_x86
+  strategy:
+    matrix:
+      x86:
+        platform: Win32
+        toolset: v142
+        artifact-prefix: 'vgmtrans'
+  steps:
+  - task: VSBuild@1
+    inputs:
+      solution: 'VGMTrans_WTL.sln'
+      platform: 'Win32'
+      configuration: 'Release'
+      maximumCpuCount: true
+    displayName: 'Compile the VGMTrans solution'
+  - task: PublishBuildArtifacts@1
+    inputs:
+        pathtoPublish: $(Build.ArtifactStagingDirectory)
+        artifactName: $(artifact-prefix)-$(platform)
+    
