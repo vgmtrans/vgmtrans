@@ -2,7 +2,6 @@
 #define COMMON_H
 
 #include "pch.h"
-#include "osdepend.h"
 #include "helper.h"
 
 #define VERSION "1.0.3"

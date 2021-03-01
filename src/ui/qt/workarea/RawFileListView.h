@@ -5,7 +5,7 @@
 
 #include <QAbstractListModel>
 #include <QListView>
-#include "QtVGMRoot.h"
+#include "../QtVGMRoot.h"
 
 #ifndef __RawFileListView_H_
 #define __RawFileListView_H_

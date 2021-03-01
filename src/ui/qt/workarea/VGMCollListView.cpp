@@ -7,9 +7,9 @@
 #include "SF2File.h"
 #include "VGMSeq.h"
 #include "VGMCollListView.h"
-#include "QtVGMRoot.h"
+#include "../QtVGMRoot.h"
 #include "VGMColl.h"
-#include "MusicPlayer.h"
+#include "../MusicPlayer.h"
 
 const int cellWidth = 200;
 const int cellHeight = 20;
