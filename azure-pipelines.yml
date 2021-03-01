@@ -4,14 +4,15 @@ trigger:
 name: 
 jobs:
 - job: Windows_Legacy
-  pool:
-    vmImage: 'windows-latest'
   strategy:
     matrix:
       x86:
         platform: Win32
         toolset: v142
         artifact-prefix: 'vgmtrans'
+        image-name: 'windows-2019'
+  pool:
+    vmImage: $(image-name)
   steps:
   - task: VSBuild@1
     inputs:
