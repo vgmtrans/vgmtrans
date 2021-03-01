@@ -1,12 +1,11 @@
 trigger:
 - master
 
-pool:
-  vmImage: 'windows-latest'
-
 name: 
 jobs:
-- job: Windows_x86
+- job: Windows_Legacy
+  pool:
+    vmImage: 'windows-latest'
   strategy:
     matrix:
       x86:
@@ -19,7 +18,6 @@ jobs:
       solution: 'VGMTrans_WTL.sln'
       platform: 'Win32'
       configuration: 'Release'
-      maximumCpuCount: true
     displayName: 'Compile the VGMTrans solution'
   - task: PublishBuildArtifacts@1
     inputs:
