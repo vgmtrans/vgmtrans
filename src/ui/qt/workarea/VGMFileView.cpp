@@ -3,7 +3,7 @@
 #include "HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
-#include "Helpers.h"
+#include "../util/Helpers.h"
 
 
 const int splitterHandleWidth = 1;

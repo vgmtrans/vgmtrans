@@ -1,6 +1,6 @@
 #include "HexView.h"
 #include "VGMFile.h"
-#include "Helpers.h"
+#include "../util/Helpers.h"
 
 const int horzPadding = 5;
 
