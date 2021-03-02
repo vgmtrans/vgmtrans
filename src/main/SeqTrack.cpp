@@ -194,8 +194,8 @@ void SeqTrack::AddTime(uint32_t AddDelta) {
 }
 
 uint32_t SeqTrack::ReadVarLen(uint32_t &offset) {
-  register uint32_t value = 0;
-  register uint8_t c;
+  uint32_t value = 0;
+  uint8_t c;
 
   if (IsValidOffset(offset) && (value = GetByte(offset++)) & 0x80) {
     value &= 0x7F;
