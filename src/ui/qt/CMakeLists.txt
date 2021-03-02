@@ -6,7 +6,7 @@ endif()
 # TODO: Make optional: no fluidsynth, no playback support.
 find_package(FluidSynth)
 if(FluidSynth_FOUND AND "${FluidSynth_VERSION}" MATCHES "2(.)*")
-    message(STATUS "Using FluidSynth ${FLUIDSYNTH_VERSION}")
+    message(STATUS "Using FluidSynth ${FluidSynth_VERSION}")
 else()
     if(MSVC)
         add_library(fluidsynth STATIC IMPORTED)

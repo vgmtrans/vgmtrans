@@ -1,5 +1,5 @@
-find_package(MINIZIP)
-if(NOT MINIZIP_FOUND)
+find_package(minizip)
+if(NOT minizip_FOUND)
     # Use our own, if there's no minizip there's probably also no zlib
     # Also avoid risks of having to link to BZip2 on some platforms
     message(INFO "Using built-in zlib and minizip")

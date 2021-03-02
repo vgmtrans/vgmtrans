@@ -72,10 +72,6 @@ set(ZLIB_SRCS
     compress.c
     crc32.c
     deflate.c
-    gzclose.c
-    gzlib.c
-    gzread.c
-    gzwrite.c
     inflate.c
     infback.c
     inftrees.c
@@ -100,7 +96,6 @@ PUBLIC
 set(MINIZIP_HDRS
 	minizip/crypt.h
 	minizip/ioapi.h
-	minizip/iowin32.h
 	minizip/mztools.h
 	minizip/unzip.h
 	minizip/zip.h
@@ -108,7 +103,6 @@ set(MINIZIP_HDRS
 
 set(MINIZIP_SRCS
 	minizip/ioapi.c
-	minizip/iowin32.c
 	minizip/mztools.c
 	minizip/unzip.c
 	minizip/zip.c
@@ -117,5 +111,5 @@ set(MINIZIP_SRCS
 add_library(minizip STATIC ${MINIZIP_SRCS} ${MINIZIP_HDRS})
 target_include_directories(minizip
 PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/minizip
 )
