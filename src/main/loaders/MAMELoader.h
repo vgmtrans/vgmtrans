@@ -1,6 +1,6 @@
 #pragma once
 #include "Loader.h"
-#include <minizip/unzip.h>
+#include <unzip.h>
 
 class TiXmlElement;
 class VirtFile;
