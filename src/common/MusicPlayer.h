@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include <atomic>
 #include <string_view>
+#include <vector>
 #include <fluidsynth.h>
 #include <gsl-lite.hpp>
 
