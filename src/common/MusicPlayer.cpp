@@ -241,14 +241,14 @@ int MusicPlayer::totalTicks() const {
   return fluid_player_get_total_ticks(m_active_player);
 }
 
-std::vector<std::string_view> MusicPlayer::getAvailableDrivers() const {
-  static std::vector<std::string_view> drivers_buf{};
+std::vector<const char *> MusicPlayer::getAvailableDrivers() const {
+  static std::vector<const char *> drivers_buf{};
 
   /* Availability of audio drivers shouldn't change over time, cache the result */
   if (!drivers_buf.empty()) {
     fluid_settings_foreach_option(
         m_settings, "audio.driver", &drivers_buf, [](void *data, auto, auto option) {
-          auto drivers = static_cast<std::vector<std::string_view> *>(data);
+          auto drivers = static_cast<std::vector<const char *> *>(data);
           drivers->push_back(option);
         });
   }
@@ -256,8 +256,8 @@ std::vector<std::string_view> MusicPlayer::getAvailableDrivers() const {
   return drivers_buf;
 }
 
-bool MusicPlayer::setAudioDriver(std::string_view driver_name) {
-  if (fluid_settings_setstr(m_settings, "audio.driver", driver_name.data()) == FLUID_FAILED) {
+bool MusicPlayer::setAudioDriver(const char* driver_name) {
+  if (fluid_settings_setstr(m_settings, "audio.driver", driver_name) == FLUID_FAILED) {
     return false;
   }
 
