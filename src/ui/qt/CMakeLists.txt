@@ -1,34 +1,3 @@
-if(APPLE AND EXISTS /usr/local/lib/)
-    # Generic Homebrew include path
-    list(APPEND CMAKE_PREFIX_PATH "/usr/local/include")
-endif()
-
-# TODO: Make optional: no fluidsynth, no playback support.
-find_package(FluidSynth)
-if(FluidSynth_FOUND AND "${FluidSynth_VERSION}" MATCHES "2(.)*")
-    message(STATUS "Using FluidSynth ${FluidSynth_VERSION}")
-else()
-    if(MSVC)
-        add_library(fluidsynth STATIC IMPORTED)
-        set_target_properties(
-                fluidsynth
-                PROPERTIES
-                IMPORTED_LOCATION
-                "${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2019-x64/fluidsynth.lib"
-        )
-
-        target_include_directories(
-                fluidsynth
-                INTERFACE
-                ${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2019-x64/include)
-
-        message(STATUS "Using FluidSynth fallback from Windows externals")
-    else()
-        message(
-                FATAL_ERROR "Failed to locate FluidSynth or library too old")
-    endif()
-endif()
-
 if(APPLE AND EXISTS /usr/local/opt/qt5)
     # Homebrew installs Qt5 (up to at least 5.9.1) in /usr/local/qt5, ensure it
     # can be found by CMake since it is not in the default /usr/local prefix.
@@ -60,8 +29,6 @@ add_executable(vgmtrans
         ${UI_RESOURCES}
         mainwindow.cpp
         mainwindow.h
-        MusicPlayer.cpp
-        MusicPlayer.h
         QtVGMRoot.cpp
         QtVGMRoot.h
         main_ui.cpp
@@ -90,9 +57,9 @@ target_link_libraries(vgmtrans
         PRIVATE g_options
         g_warnings
         vgmtranscore
+        vgmtranscommon
         Qt5::Widgets
-        Qt5::Svg
-        FluidSynth::FluidSynth)
+        Qt5::Svg)
 
 #TODO: Add icon for win32 and macOS, add xdg .desktop file
 if(APPLE)

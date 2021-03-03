@@ -24,6 +24,12 @@ message(STATUS "Will build in ${CMAKE_BUILD_TYPE} mode")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
+if(APPLE AND EXISTS /usr/local/lib/)
+    # Generic Homebrew include path
+    list(APPEND CMAKE_PREFIX_PATH "/usr/local/include")
+endif()
+
+
 #
 # Options
 #

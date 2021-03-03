@@ -1,38 +1,33 @@
-//
-// Created by Mike on 8/31/14.
-//
+/**
+* VGMTrans (c) - 2002-2021
+* Licensed under the zlib license
+* See the included LICENSE for more information
+*/
+
+#pragma once
 
 #include <QAbstractListModel>
 #include <QListView>
+#include "MusicPlayer.h"
 
-#ifndef __VGMCollListViewModel_H_
-#define __VGMCollListViewModel_H_
-
-
-class VGMCollListViewModel : public QAbstractListModel
-{
-    Q_OBJECT
+class VGMCollListViewModel : public QAbstractListModel {
+  Q_OBJECT
 
 public:
-    VGMCollListViewModel(QObject *parent = 0);
+  explicit VGMCollListViewModel(QObject *parent = nullptr);
 
-    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
-
-    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
+  int rowCount(const QModelIndex &parent) const override;
+  QVariant data(const QModelIndex &index, int role) const override;
 
 public slots:
-    void changedVGMColls();
+  void changedVGMColls();
 };
 
-
-
-class VGMCollListView : public QListView
-{
+class VGMCollListView : public QListView {
 public:
-    VGMCollListView(QWidget *parent = 0);
+  explicit VGMCollListView(QWidget *parent = nullptr);
+  void keyPressEvent(QKeyEvent *e) override;
 
-    void keyPressEvent(QKeyEvent* e);
+private:
+  MusicPlayer m_player;
 };
-
-
-#endif //__VGMCollListViewModel_H_
