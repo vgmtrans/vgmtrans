@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <string_view>
 #include <vector>
 #include <fluidsynth.h>
 #include <gsl-lite.hpp>
@@ -59,13 +58,13 @@ public:
    * Gets all the audio driver the player supports
    * @return the driver list
    */
-  [[nodiscard]] std::vector<std::string_view> getAvailableDrivers() const;
+  [[nodiscard]] std::vector<const char *> getAvailableDrivers() const;
   /**
    * Changes the current audio driver and restarts playing
    * @param driver_name
    * @return true if the driver changed
    */
-  bool setAudioDriver(std::string_view driver_name);
+  bool setAudioDriver(const char* driver_name);
 
 private:
   fluid_settings_t *m_settings = nullptr;
