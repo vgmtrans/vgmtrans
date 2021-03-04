@@ -22,31 +22,13 @@ WinVGMRoot winroot;
 
 extern HANDLE killProgramSem;
 
-WinVGMRoot::WinVGMRoot(void)
-: selectedItem(NULL), selectedColl(NULL), loadedColl(NULL), bClosingVGMFile(false), bExiting(false)
-{
-}
+void WinVGMRoot::SelectItem(VGMItem* item) {
+  if (bClosingVGMFile) {
+    return;
+  }
 
-WinVGMRoot::~WinVGMRoot(void)
-{
-}
-
-void WinVGMRoot::SelectItem(VGMItem* item)
-{
-	if (bClosingVGMFile)//AreWeExiting())
-		return;
-	selectedItem = item;
-	if (item->GetType() == ITEMTYPE_VGMFILE)
-	{
-	//	if (((VGMFile*)item)->GetFileType() == FILETYPE_INSTRSET)
-	//	{
-	//		DLSFile dls;
-	//		((VGMInstrSet*)item)->CreateDLSFile(dls);
-	//		musicplayer.ChangeDLS(&dls);
-	//	}
-	}
-
-	pMainFrame->SelectItem(item);
+  selectedItem = item;
+  pMainFrame->SelectItem(item);
 }
 
 void WinVGMRoot::SelectColl(VGMColl* coll)
