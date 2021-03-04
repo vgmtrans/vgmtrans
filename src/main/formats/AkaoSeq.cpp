@@ -6,10 +6,7 @@ DECLARE_FORMAT(Akao);
 
 using namespace std;
 
-namespace
-{
-  const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 8, 4 };
-}
+static const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 8, 4 };
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
     : VGMSeq(AkaoFormat::name, file, offset), instrument_set_offset_(0), drum_set_offset_(0),
