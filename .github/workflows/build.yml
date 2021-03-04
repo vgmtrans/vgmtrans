@@ -78,6 +78,7 @@ jobs:
           mkdir -p appdir/usr/share
           cp ../bin/mame_roms.xml appdir/usr/bin
           cp ../src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
+          cp ../src/ui/qt/resources/appicon.png appdir/
           ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/ -verbose=2
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
