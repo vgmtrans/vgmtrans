@@ -10,16 +10,15 @@ class AkaoInstrSet;
 // AkaoColl
 // ********
 
-class AkaoColl:
+class AkaoColl final :
     public VGMColl {
  public:
-  AkaoColl(std::wstring name = L"Unnamed Collection") : VGMColl(name) { }
+  explicit AkaoColl(std::wstring name = L"Unnamed Collection") : VGMColl(name), origInstrSet(nullptr), numAddedInstrs(0) {}
 
-  virtual bool LoadMain();
-  virtual void PreSynthFileCreation();
-  virtual void PostSynthFileCreation();
+  bool LoadMain() override;
+  void PreSynthFileCreation() override;
+  void PostSynthFileCreation() override;
 
- public:
   AkaoInstrSet *origInstrSet;
   uint32_t numAddedInstrs;
 };

@@ -64,7 +64,7 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
 
     if (!instrLocations.empty()) {
       for (const auto & loc : instrLocations) {
-        AkaoSampColl *sampColl = new AkaoSampColl(file, loc);
+        auto *sampColl = new AkaoSampColl(file, loc);
         if (!sampColl->LoadVGMFile())
           delete sampColl;
       }
@@ -72,7 +72,7 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
   }
 }
 
-AkaoPs1Version AkaoScanner::DetermineVersionFromTag(RawFile *file) {
+AkaoPs1Version AkaoScanner::DetermineVersionFromTag(RawFile *file) noexcept {
   const std::wstring & album = file->tag.album;
   if (album == L"Final Fantasy 7" || album == L"Final Fantasy VII")
     return AkaoPs1Version::VERSION_1_0;

@@ -11,9 +11,9 @@ struct AkaoInstrDatLocation {
   uint32_t startingArticulationId;
   uint32_t numArticulations;
 
-  AkaoInstrDatLocation() : instrAllOffset(0), instrDatOffset(0), startingArticulationId(0), numArticulations(0) {}
+  AkaoInstrDatLocation() noexcept : instrAllOffset(0), instrDatOffset(0), startingArticulationId(0), numArticulations(0) {}
 
-  AkaoInstrDatLocation(uint32_t instrAllOffset, uint32_t instrDatOffset, uint32_t startingArticulationId, uint32_t numArticulations)
+  AkaoInstrDatLocation(uint32_t instrAllOffset, uint32_t instrDatOffset, uint32_t startingArticulationId, uint32_t numArticulations) noexcept
     : instrAllOffset(instrAllOffset), instrDatOffset(instrDatOffset), startingArticulationId(startingArticulationId), numArticulations(numArticulations) {}
 };
 
@@ -21,7 +21,7 @@ struct AkaoInstrDatLocation {
 // AkaoInstrSet
 // ************
 
-class AkaoInstrSet: public VGMInstrSet {
+class AkaoInstrSet final : public VGMInstrSet {
  public:
   AkaoInstrSet(RawFile *file,
                uint32_t length,
@@ -29,14 +29,13 @@ class AkaoInstrSet: public VGMInstrSet {
                uint32_t instrOff,
                uint32_t dkitOff,
                uint32_t id,
-               std::wstring name = L"Akao Instrument Bank"/*, VGMSampColl* sampColl = NULL*/);
+               std::wstring name = L"Akao Instrument Bank");
   AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset, AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses, std::set<uint32_t> drum_instrument_addresses, std::wstring name = L"Akao Instrument Bank");
   AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version, std::wstring name = L"Akao Instrument Bank (Dummy)");
-  virtual bool GetInstrPointers();
+  bool GetInstrPointers() override;
 
-  [[nodiscard]] AkaoPs1Version version() const { return version_; }
+  [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
- public:
   bool bMelInstrs, bDrumKit;
   uint32_t instrSetOff;
   uint32_t drumkitOff;
@@ -60,14 +59,13 @@ class AkaoInstr: public VGMInstr {
             uint32_t length,
             uint32_t bank,
             uint32_t instrNum,
-            const std::wstring &name = L"Instrument");
-  virtual bool LoadInstr();
+            std::wstring name = L"Instrument");
+  bool LoadInstr() override;
 
-  [[nodiscard]] AkaoInstrSet * instrSet() const { return reinterpret_cast<AkaoInstrSet*>(this->parInstrSet); }
+  [[nodiscard]] AkaoInstrSet * instrSet() const noexcept { return reinterpret_cast<AkaoInstrSet*>(this->parInstrSet); }
 
-  [[nodiscard]] AkaoPs1Version version() const { return instrSet()->version(); }
+  [[nodiscard]] AkaoPs1Version version() const noexcept { return instrSet()->version(); }
 
-  uint8_t instrType;
   bool bDrumKit;
 };
 
@@ -76,10 +74,10 @@ class AkaoInstr: public VGMInstr {
 // ***********
 
 
-class AkaoDrumKit: public AkaoInstr {
+class AkaoDrumKit final : public AkaoInstr {
  public:
   AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum);
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
 };
 
 
@@ -87,18 +85,17 @@ class AkaoDrumKit: public AkaoInstr {
 // AkaoRgn
 // *******
 
-class AkaoRgn:
+class AkaoRgn final :
     public VGMRgn {
  public:
-  AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, const std::wstring &name = L"Region");
+  AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::wstring name = L"Region");
   AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
-          uint8_t artIDNum, const std::wstring &name = L"Region");
+          uint8_t artIDNum, std::wstring name = L"Region");
 
-  virtual bool LoadRgn();
+  bool LoadRgn() override;
 
- public:
-  unsigned short ADSR1;                //raw psx ADSR1 value (articulation data)
-  unsigned short ADSR2;                //raw psx ADSR2 value (articulation data)
+  unsigned short adsr1;                //raw psx ADSR1 value (articulation data)
+  unsigned short adsr2;                //raw psx ADSR2 value (articulation data)
   uint8_t artNum;
   uint8_t drumRelUnityKey;
 };
@@ -122,21 +119,20 @@ struct AkaoArt {
 };
 
 
-class AkaoSampColl:
+class AkaoSampColl final :
     public VGMSampColl {
  public:
    AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name = L"Akao Sample Collection");
    AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::wstring name = L"Akao Sample Collection");
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetSampleInfo();
+  bool GetHeaderInfo() override;
+  bool GetSampleInfo() override;
 
-  [[nodiscard]] AkaoPs1Version version() const { return version_; }
+  [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
   [[nodiscard]] static bool IsPossibleAkaoSampColl(RawFile *file, uint32_t offset);
   [[nodiscard]] static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
 
- public:
   std::vector<AkaoArt> akArts;
   uint32_t starting_art_id;
   uint16_t sample_set_id;

@@ -137,16 +137,16 @@ enum AkaoSeqEventType {
   EVENT_FE_1F_VAGRANT_STORY
 };
 
-class AkaoSeq:
+class AkaoSeq final :
     public VGMSeq {
  public:
-  AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version);
+  explicit AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version);
 
-  virtual void ResetVars() override;
-  virtual bool GetHeaderInfo() override;
-  virtual bool GetTrackPointers() override;
+  void ResetVars() override;
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
 
-  [[nodiscard]] AkaoPs1Version version() const { return version_; }
+  [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
   [[nodiscard]] std::wstring ReadTimestampAsText();
   [[nodiscard]] double GetTempoInBPM(uint16_t tempo) const;
@@ -156,7 +156,7 @@ class AkaoSeq:
   [[nodiscard]] static bool IsPossibleAkaoSeq(RawFile *file, uint32_t offset);
   [[nodiscard]] static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
 
-  [[nodiscard]] static uint32_t GetTrackAllocationBitsOffset(AkaoPs1Version version) {
+  [[nodiscard]] static uint32_t GetTrackAllocationBitsOffset(AkaoPs1Version version) noexcept {
     switch (version)
     {
     case AkaoPs1Version::VERSION_1_0:
@@ -175,7 +175,7 @@ class AkaoSeq:
  private:
   void LoadEventMap();
 
-  [[nodiscard]] static uint8_t GetNumPositiveBits(uint32_t ulWord) {
+  [[nodiscard]] static uint8_t GetNumPositiveBits(uint32_t ulWord) noexcept {
     return __builtin_popcount(ulWord);
   }
 
@@ -206,29 +206,26 @@ class AkaoSeq:
   friend AkaoTrack;
 };
 
-class AkaoTrack
+class AkaoTrack final
     : public SeqTrack {
  public:
-  AkaoTrack(AkaoSeq *parentFile, long offset = 0, long length = 0);
+  explicit AkaoTrack(AkaoSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
 
-  virtual void ResetVars() override;
-  virtual bool ReadEvent() override;
+  void ResetVars() override;
+  bool ReadEvent() override;
 
-  [[nodiscard]] AkaoSeq * seq() const {
+  [[nodiscard]] AkaoSeq * seq() const noexcept {
     return reinterpret_cast<AkaoSeq*>(this->parentSeq);
   }
-
- public:
-
 
  protected:
   bool slur;
   bool legato;
   bool drum;
   uint32_t pattern_return_offset;
-  uint32_t loop_begin_loc[4];
+  std::array<uint32_t, 4> loop_begin_loc;
   uint16_t loop_layer;
-  uint16_t loop_counter[4];
+  std::array<uint16_t, 4> loop_counter;
   uint16_t last_delta_time;
   bool use_one_time_delta_time;
   uint8_t one_time_delta_time;

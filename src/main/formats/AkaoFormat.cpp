@@ -7,15 +7,15 @@
 using namespace std;
 
 bool AkaoColl::LoadMain() {
-  AkaoInstrSet *instrset = (AkaoInstrSet *) instrsets[0];
-  AkaoSampColl *sampcoll = (AkaoSampColl *) sampcolls[0];
+  AkaoInstrSet *instrset = reinterpret_cast<AkaoInstrSet *>(instrsets[0]);
+  AkaoSampColl *sampcoll = reinterpret_cast<AkaoSampColl *>(sampcolls[0]);
 
   //Set the sample numbers of each region using the articulation data references of each region
   for (uint32_t i = 0; i < instrset->aInstrs.size(); i++) {
-    AkaoInstr *instr = (AkaoInstr *) instrset->aInstrs[i];
-    vector<VGMRgn *> *rgns = &instr->aRgns;
+    AkaoInstr *instr = reinterpret_cast<AkaoInstr *>(instrset->aInstrs[i]);
+    std::vector<VGMRgn *> *rgns = &instr->aRgns;
     for (uint32_t j = 0; j < rgns->size(); j++) {
-      AkaoRgn *rgn = (AkaoRgn *) (*rgns)[j];
+      AkaoRgn *rgn = reinterpret_cast<AkaoRgn *>((*rgns)[j]);
 
 
       AkaoArt *art;
@@ -55,13 +55,13 @@ bool AkaoColl::LoadMain() {
 }
 
 void AkaoColl::PreSynthFileCreation() {
-  if (!((AkaoSeq *) seq)->bUsesIndividualArts)    //only do this if the 0xA1 event is actually used
+  if (!static_cast<AkaoSeq*>(seq)->bUsesIndividualArts)    //only do this if the 0xA1 event is actually used
     return;
 
-  AkaoInstrSet *instrSet = (AkaoInstrSet *) instrsets[0];
+  AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrsets[0]);
 
-  AkaoSampColl *sampcoll = (AkaoSampColl *) sampcolls[0];
-  const uint32_t numArts = (const uint32_t) sampcoll->akArts.size();
+  AkaoSampColl *sampcoll = reinterpret_cast<AkaoSampColl *>(sampcolls[0]);
+  const uint32_t numArts = static_cast<uint32_t>(sampcoll->akArts.size());
   numAddedInstrs = numArts;
 
   for (uint32_t i = 0; i < numAddedInstrs; i++) {
@@ -88,13 +88,10 @@ void AkaoColl::PreSynthFileCreation() {
 void AkaoColl::PostSynthFileCreation() {
   //if the 0xA1 event isn't used in the sequence, then we didn't modify the instrset
   //so skip this
-  if (!((AkaoSeq *) seq)->bUsesIndividualArts)
+  if (!static_cast<AkaoSeq*>(seq)->bUsesIndividualArts)
     return;
 
-  AkaoInstrSet *instrSet = (AkaoInstrSet *) instrsets[0];
-  AkaoSampColl *sampcoll = (AkaoSampColl *) sampcolls[0];
-  const size_t numArts = sampcoll->akArts.size();
-  size_t beginOffset = instrSet->aInstrs.size() - numArts;
+  AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrsets[0]);
   for (size_t i = 0; i < numAddedInstrs; i++) {
     delete instrSet->aInstrs.back();
     instrSet->aInstrs.pop_back();

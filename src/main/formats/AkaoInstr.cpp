@@ -15,8 +15,8 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
                            uint32_t instrOff,
                            uint32_t dkitOff,
                            uint32_t theID,
-                           wstring name)
-    : VGMInstrSet(AkaoFormat::name, file, 0, length, name), version_(version) {
+                           std::wstring name)
+    : VGMInstrSet(AkaoFormat::name, file, 0, length, std::move(name)), version_(version) {
   allowEmptyInstrs = true;
   id = theID;
   instrSetOff = instrOff;
@@ -33,7 +33,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
   AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses,
   std::set<uint32_t> drum_instrument_addresses, std::wstring name)
-  : VGMInstrSet(AkaoFormat::name, file, 0, 0, name), bMelInstrs(false), bDrumKit(false),
+  : VGMInstrSet(AkaoFormat::name, file, 0, 0, std::move(name)), bMelInstrs(false), bDrumKit(false),
   instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset), version_(version)
 {
   allowEmptyInstrs = true;
@@ -59,8 +59,9 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset,
   uint32_t end_boundary_offset, AkaoPs1Version version, wstring name)
-  : VGMInstrSet(AkaoFormat::name, file, offset, 0, name), drumkitOff(0),
-    end_boundary_offset(end_boundary_offset), bMelInstrs(false), bDrumKit(false), version_(version)
+    : VGMInstrSet(AkaoFormat::name, file, offset, 0, std::move(name)), bMelInstrs(false),
+      bDrumKit(false), instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset),
+      version_(version)
 {
   allowEmptyInstrs = true;
 }
@@ -70,14 +71,14 @@ bool AkaoInstrSet::GetInstrPointers() {
     VGMHeader *SSEQHdr = AddHeader(instrSetOff, 0x10, L"Instr Ptr Table");
     int i = 0;
     //-1 aka 0xFFFF if signed or 0 and past the first pointer value
-    for (int j = instrSetOff; (GetShort(j) != (uint16_t)-1) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
+    for (int j = instrSetOff; (GetShort(j) != static_cast<uint16_t>(-1)) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
       SSEQHdr->AddSimpleItem(j, 2, L"Instr Pointer");
       aInstrs.push_back(new AkaoInstr(this, instrSetOff + 0x20 + GetShort(j), 0, 1, i++));
     }
   }
   else if (!custom_instrument_addresses.empty()) {
     uint32_t instrNum = 0;
-    for (uint32_t instrOff : custom_instrument_addresses) {
+    for (const uint32_t instrOff : custom_instrument_addresses) {
       aInstrs.push_back(new AkaoInstr(this, instrOff, 0, 1, instrNum++));
     }
   }
@@ -87,7 +88,7 @@ bool AkaoInstrSet::GetInstrPointers() {
   }
   else if (!drum_instrument_addresses.empty()) {
     uint32_t instrNum = 127;
-    for (uint32_t instrOff : drum_instrument_addresses) {
+    for (const uint32_t instrOff : drum_instrument_addresses) {
       aInstrs.push_back(new AkaoDrumKit(this, instrOff, 0, 127, instrNum--));
     }
   }
@@ -100,9 +101,8 @@ bool AkaoInstrSet::GetInstrPointers() {
 // *********
 
 AkaoInstr::AkaoInstr(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                     uint32_t theInstrNum, const std::wstring &name)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {
-  bDrumKit = false;
+                     uint32_t theInstrNum, std::wstring name)
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, std::move(name)), bDrumKit(false) {
 }
 
 bool AkaoInstr::LoadInstr() {
@@ -120,7 +120,7 @@ bool AkaoInstr::LoadInstr() {
       }
     }
 
-    AkaoRgn *rgn = new AkaoRgn(this, dwOffset + k * 8, 8);
+    auto rgn = new AkaoRgn(this, dwOffset + k * 8, 8);
     if (!rgn->LoadRgn()) {
       delete rgn;
       return false;
@@ -148,7 +148,7 @@ AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t lengt
 bool AkaoDrumKit::LoadInstr() {
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     const uint32_t kRgnLength = 8;
-    for (uint32_t drum_note_number = 0; drum_note_number < 128; drum_note_number++) {
+    for (uint8_t drum_note_number = 0; drum_note_number < 128; drum_note_number++) {
       const uint32_t rgn_offset = dwOffset + drum_note_number * kRgnLength;
       if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
         break;
@@ -164,7 +164,7 @@ bool AkaoDrumKit::LoadInstr() {
         break;
 
       const uint8_t assoc_art_id = GetByte(rgn_offset + 0);
-      AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
+      auto *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       AddRgn(rgn);
       rgn->drumRelUnityKey = GetByte(rgn_offset + 1);
       const uint8_t raw_volume = GetByte(rgn_offset + 6);
@@ -189,7 +189,7 @@ bool AkaoDrumKit::LoadInstr() {
   else if (version() >= AkaoPs1Version::VERSION_1_0) {
     const uint8_t drum_octave = 2; // a drum note ignores octave, this is the octave number for midi remapping
     const uint32_t kRgnLength = version() >= AkaoPs1Version::VERSION_2 ? 6 : 5;
-    for (uint32_t drum_key = 0; drum_key < 12; drum_key++) {
+    for (uint8_t drum_key = 0; drum_key < 12; drum_key++) {
       const uint32_t rgn_offset = dwOffset + drum_key * kRgnLength;
       if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
         break;
@@ -201,7 +201,7 @@ bool AkaoDrumKit::LoadInstr() {
 
       const uint8_t assoc_art_id = GetByte(rgn_offset + 0);
       const uint8_t drum_note_number = drum_octave * 12 + drum_key;
-      AkaoRgn *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
+      auto *rgn = new AkaoRgn(this, rgn_offset, kRgnLength, drum_note_number, drum_note_number, assoc_art_id);
       AddRgn(rgn);
       rgn->drumRelUnityKey = GetByte(rgn_offset + 1);
       const uint16_t raw_volume = GetWord(rgn_offset + 2);
@@ -234,12 +234,13 @@ bool AkaoDrumKit::LoadInstr() {
 // AkaoRgn
 // *******
 AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
-                 uint8_t artIDNum, const std::wstring &name)
-    : VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0), artNum(artIDNum) {
+                 uint8_t artIDNum, std::wstring name)
+    : VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0, name), artNum(artIDNum),
+      adsr1(0), adsr2(0), drumRelUnityKey(0) {
 }
 
-AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, const std::wstring &name)
-    : VGMRgn(instr, offset, length, name) {
+AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, std::wstring name)
+    : VGMRgn(instr, offset, length, name), artNum(0), adsr1(0), adsr2(0), drumRelUnityKey(0) {
 }
 
 bool AkaoRgn::LoadRgn() {
@@ -256,9 +257,6 @@ bool AkaoRgn::LoadRgn() {
   const double volume = raw_volume == 0 ? 1.0 : raw_volume / 128.0;
   AddVolume(volume, dwOffset + 7, 1);
 
-  uint8_t attenuation = 0x7F;  //default to no attenuation
-  uint8_t pan = 0x40;  //default to center pan
-
   return true;
 }
 
@@ -266,14 +264,16 @@ bool AkaoRgn::LoadRgn() {
 // AkaoSampColl
 // ************
 
-AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, wstring name)
-  : VGMSampColl(AkaoFormat::name, file, offset, 0, name), sample_section_size(0), nNumArts(0),
-  arts_offset(0), sample_section_offset(0), version_(version) {
+AkaoSampColl::AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name)
+    : VGMSampColl(AkaoFormat::name, file, offset, 0, std::move(name)), starting_art_id(0), sample_set_id(0),
+      version_(version), sample_section_size(0), nNumArts(0), arts_offset(0),
+      sample_section_offset(0) {
 }
 
 AkaoSampColl::AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::wstring name)
-  : VGMSampColl(AkaoFormat::name, file, 0, 0, name), version_(AkaoPs1Version::VERSION_1_0),
-  sample_section_size(0), nNumArts(0), arts_offset(0), sample_section_offset(0), file_location(file_location)
+    : VGMSampColl(AkaoFormat::name, file, 0, 0, std::move(name)), starting_art_id(0), sample_set_id(0),
+      version_(AkaoPs1Version::VERSION_1_0), sample_section_size(0), nNumArts(0), arts_offset(0),
+      sample_section_offset(0), file_location(file_location)
 {
   dwOffset = file_location.instrAllOffset;
   if (dwOffset > file_location.instrAllOffset) {
@@ -395,15 +395,12 @@ bool AkaoSampColl::GetHeaderInfo() {
 }
 
 bool AkaoSampColl::GetSampleInfo() {
-  uint32_t i;
-  uint32_t j;
-
   //Read Articulation Data
   const uint32_t kAkaoArtSize = (version() >= AkaoPs1Version::VERSION_3_1) ? 0x10 : 0x40;
   if (arts_offset + kAkaoArtSize * nNumArts > rawfile->size())
     return false;
 
-  for (i = 0; i < nNumArts; i++) {
+  for (uint32_t i = 0; i < nNumArts; i++) {
     AkaoArt art;
 
     if (version() >= AkaoPs1Version::VERSION_3_1) {
@@ -421,8 +418,8 @@ bool AkaoSampColl::GetSampleInfo() {
         ? 1.0 + (raw_fine_tune / 32768.0)
         : static_cast<uint16_t>(raw_fine_tune) / 65536.0;
       const double cents = log(freq_multiplier) / log(2.0) * 1200;
-      const int8_t coarse_tune = static_cast<int8_t>(cents / 100);
-      const int16_t fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+      const auto coarse_tune = static_cast<int8_t>(cents / 100);
+      const auto fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
 
       art.sample_offset = GetWord(art_offset);
       art.loop_point = GetWord(art_offset + 4) - art.sample_offset;
@@ -470,8 +467,8 @@ bool AkaoSampColl::GetSampleInfo() {
       const uint32_t base_pitch = GetWord(art_offset + 8);
       const double freq_multiplier = base_pitch / static_cast<double>(4096 * 256);
       const double cents = log(freq_multiplier) / log(2.0) * 1200;
-      const int8_t coarse_tune = static_cast<int8_t>(cents / 100);
-      const int16_t fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+      const auto coarse_tune = static_cast<int8_t>(cents / 100);
+      const auto fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
 
       art.sample_offset = GetWord(art_offset);
       art.loop_point = GetWord(art_offset + 4) - art.sample_offset;
@@ -526,8 +523,8 @@ bool AkaoSampColl::GetSampleInfo() {
       const uint32_t base_pitch = GetWord(art_offset + 0x10);
       const double freq_multiplier = base_pitch / 4096.0;
       const double cents = log(freq_multiplier) / log(2.0) * 1200;
-      const int8_t coarse_tune = static_cast<int8_t>(cents / 100);
-      const int16_t fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+      const auto coarse_tune = static_cast<int8_t>(cents / 100);
+      const auto fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
 
       art.sample_offset = sample_start_address - spu_dest_address;
       art.loop_point = loop_start_address - sample_start_address;
@@ -582,8 +579,8 @@ bool AkaoSampColl::GetSampleInfo() {
       const uint32_t base_pitch = GetWord(art_offset + 0x10);
       const double freq_multiplier = base_pitch / 4096.0;
       const double cents = log(freq_multiplier) / log(2.0) * 1200;
-      const int8_t coarse_tune = static_cast<int8_t>(cents / 100);
-      const int16_t fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
+      const auto coarse_tune = static_cast<int8_t>(cents / 100);
+      const auto fine_tune = static_cast<int16_t>(static_cast<int>(cents) % 100);
 
       art.sample_offset = sample_start_address - spu_dest_address;
       art.loop_point = loop_start_address - sample_start_address;
@@ -605,7 +602,7 @@ bool AkaoSampColl::GetSampleInfo() {
   //Find sample offsets
 
   if (version() != AkaoPs1Version::VERSION_1_0)
-    sample_section_offset = arts_offset + (uint32_t)(akArts.size() * kAkaoArtSize);
+    sample_section_offset = arts_offset + static_cast<uint32_t>(akArts.size() * kAkaoArtSize);
 
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
@@ -614,7 +611,8 @@ bool AkaoSampColl::GetSampleInfo() {
 
   //check the last 10 bytes to make sure they aren't null, if they are, abbreviate things till there is no 0x10 block of null bytes
   if (GetWord(sample_section_offset + sample_section_size - 0x10) == 0) {
-    for (j = 0x10; GetWord(sample_section_offset + sample_section_size - j) == 0; j += 0x10);;
+    uint32_t j;
+    for (j = 0x10; GetWord(sample_section_offset + sample_section_size - j) == 0; j += 0x10);
     sample_section_size -= j - 0x10;        //-0x10 because we went 1 0x10 block too far
   }
 
@@ -645,7 +643,7 @@ bool AkaoSampColl::GetSampleInfo() {
     }
 
     const uint32_t length = PSXSamp::GetSampleLength(rawfile, offset, sample_section_offset + sample_section_size, loop);
-    PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, 44100, name.str());
+    auto *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, 44100, name.str());
 
     samples.push_back(samp);
   }
@@ -656,7 +654,7 @@ bool AkaoSampColl::GetSampleInfo() {
   // now to verify and associate each articulation with a sample index value
   // for every sample of every instrument, we add sample_section offset, because those values
   //  are relative to the beginning of the sample section
-  for (i = 0; i < akArts.size(); i++) {
+  for (uint32_t i = 0; i < akArts.size(); i++) {
     for (uint32_t l = 0; l < samples.size(); l++) {
       if (akArts[i].sample_offset + sample_section_offset == samples[l]->dwOffset) {
         akArts[i].sample_num = l;
