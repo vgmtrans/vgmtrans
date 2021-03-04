@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include <array>
 #include <fstream>
 #include <vector>
 #include <list>
@@ -21,10 +22,12 @@
 #include <string>
 #include <cstring>
 #include <sstream>
+#include <set>
 #include <unordered_set>
 #include <iterator>
 #include <iostream>
 #include <iomanip>
+#include <limits>
 #include <wchar.h>
 #include <ctype.h>
 

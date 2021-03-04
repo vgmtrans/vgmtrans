@@ -198,7 +198,7 @@ void CHexView::DoPaint(CDCHandle dc)
 	dc.GetClipBox (&rect);
 
 	UINT nStart = rect.top / m_cyScreen;
-	UINT nEnd = min (m_nLinesTotal - 1,
+	UINT nEnd = std::min ((ULONG) m_nLinesTotal - 1,
 		(rect.bottom + m_cyScreen - 1) / m_cyScreen);
 
 	HFONT oldFont = dc.SelectFont (m_fontScreen);

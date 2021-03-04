@@ -146,9 +146,9 @@ void VGMColl::UnpackSampColl(SynthFile &synthfile, VGMSampColl *sampColl, vector
 
 bool VGMColl::CreateDLSFile(DLSFile &dls) {
   bool result = true;
-  result &= PreDLSMainCreation();
+  PreSynthFileCreation();
   result &= MainDLSCreation(dls);
-  result &= PostDLSMainCreation();
+  PostSynthFileCreation();
   return result;
 }
 
@@ -361,6 +361,8 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
 
 
 SynthFile *VGMColl::CreateSynthFile() {
+  PreSynthFileCreation();
+
   SynthFile *synthfile = new SynthFile("SynthFile"/**this->instrsets[0]->GetName()*/);
 
 
@@ -371,6 +373,7 @@ SynthFile *VGMColl::CreateSynthFile() {
 
   if (!instrsets.size() /*|| !sampcolls.size()*/) {
     delete synthfile;
+    PostSynthFileCreation();
     return NULL;
   }
 
@@ -391,6 +394,7 @@ SynthFile *VGMColl::CreateSynthFile() {
 
   if (finalSamps.size() == 0) {
     delete synthfile;
+    PostSynthFileCreation();
     return NULL;
   }
 
@@ -456,6 +460,8 @@ SynthFile *VGMColl::CreateSynthFile() {
         }
         if (sampCollNum == finalSampColls.size()) {
           pRoot->AddLogItem(new LogItem(L"SampColl does not exist.", LOG_LEVEL_ERR, L"VGMColl"));
+          delete synthfile;
+          PostSynthFileCreation();
           return NULL;
         }
         //   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
@@ -547,6 +553,7 @@ SynthFile *VGMColl::CreateSynthFile() {
       }
     }
   }
+  PostSynthFileCreation();
   return synthfile;
 }
 

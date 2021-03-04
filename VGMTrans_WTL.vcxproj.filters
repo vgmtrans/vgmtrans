@@ -1478,6 +1478,9 @@
     <ClInclude Include="src\main\formats\KonamiPS1Seq.h">
       <Filter>Header Files\formats\konamips1</Filter>
     </ClInclude>
+    <ClInclude Include="src\main\formats\AkaoFormatVersion.h">
+      <Filter>Header Files\formats\akao</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\ui\windows\res\addcoll.ico">

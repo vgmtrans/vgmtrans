@@ -408,6 +408,9 @@ SF2File::SF2File(SynthFile *synthfile)
       sampInfo = wave->sampinfo;
     assert (sampInfo != NULL);
 
+    assert(sampInfo->sFineTune >= std::numeric_limits<char>::min() &&
+           sampInfo->sFineTune <= std::numeric_limits<char>::max());
+
     samp.dwStartloop = samp.dwStart + sampInfo->ulLoopStart;
     samp.dwEndloop = samp.dwStartloop + sampInfo->ulLoopLength;
     samp.dwSampleRate = wave->dwSamplesPerSec;
