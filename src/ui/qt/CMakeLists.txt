@@ -61,7 +61,7 @@ target_link_libraries(vgmtrans
         Qt5::Widgets
         Qt5::Svg)
 
-#TODO: Add icon for win32 and macOS, add xdg .desktop file
+#TODO: add resource manifest for win32
 if(APPLE)
     set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app)
 
@@ -72,6 +72,6 @@ if(APPLE)
             ${CMAKE_CURRENT_LIST_DIR}/resources/Info.plist.in
             OUTPUT_NAME
             VGMTrans)
-else()
+elseif(NOT WIN32)
     install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})
 endif()
