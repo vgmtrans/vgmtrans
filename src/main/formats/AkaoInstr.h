@@ -127,7 +127,6 @@ class AkaoSampColl:
  public:
    AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name = L"Akao Sample Collection");
    AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::wstring name = L"Akao Sample Collection");
-   virtual ~AkaoSampColl();
 
   virtual bool GetHeaderInfo();
   virtual bool GetSampleInfo();

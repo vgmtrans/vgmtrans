@@ -345,9 +345,6 @@ AkaoSampColl::AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, st
   unLength = end_offset - dwOffset;
 }
 
-AkaoSampColl::~AkaoSampColl() {
-}
-
 bool AkaoSampColl::IsPossibleAkaoSampColl(RawFile *file, uint32_t offset) {
   if (offset + 0x50 > file->size())
     return false;
