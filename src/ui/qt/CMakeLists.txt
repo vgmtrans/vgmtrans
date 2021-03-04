@@ -69,7 +69,7 @@ if(APPLE)
             PROPERTIES MACOSX_BUNDLE
             true
             MACOSX_BUNDLE_INFO_PLIST
-            ${CMAKE_SOURCE_DIR}/bin/Info.plist.in
+            ${CMAKE_CURRENT_LIST_DIR}/resources/Info.plist.in
             OUTPUT_NAME
             VGMTrans)
 else()
