@@ -30,8 +30,7 @@ jobs:
         run: |
           cp ../bin/mame_roms.xml src/ui/qt/VGMTrans.app/Contents/MacOS/
           /usr/local/opt/qt5/bin/macdeployqt src/ui/qt/VGMTrans.app -dmg -always-overwrite
-          cd src/ui/qt/
-          mv VGMTrans.dmg ../..
+          mv src/ui/qt/VGMTrans.dmg .
       - name: "Upload artifact"
         uses: actions/upload-artifact@v1
         with:
@@ -78,7 +77,8 @@ jobs:
           chmod a+x linuxdeployqt-continuous-x86_64.AppImage
           mkdir -p appdir/usr/share
           cp ../bin/mame_roms.xml appdir/usr/bin
-          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/ -verbose=2
+          cp ../src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
+          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/ -verbose=2
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
         uses: actions/upload-artifact@v1
