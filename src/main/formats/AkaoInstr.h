@@ -34,7 +34,7 @@ class AkaoInstrSet: public VGMInstrSet {
   AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version, std::wstring name = L"Akao Instrument Bank (Dummy)");
   virtual bool GetInstrPointers();
 
-  AkaoPs1Version version() const { return version_; }
+  [[nodiscard]] AkaoPs1Version version() const { return version_; }
 
  public:
   bool bMelInstrs, bDrumKit;
@@ -63,9 +63,9 @@ class AkaoInstr: public VGMInstr {
             const std::wstring &name = L"Instrument");
   virtual bool LoadInstr();
 
-  AkaoInstrSet * instrSet() const { return reinterpret_cast<AkaoInstrSet*>(this->parInstrSet); }
+  [[nodiscard]] AkaoInstrSet * instrSet() const { return reinterpret_cast<AkaoInstrSet*>(this->parInstrSet); }
 
-  AkaoPs1Version version() const { return instrSet()->version(); }
+  [[nodiscard]] AkaoPs1Version version() const { return instrSet()->version(); }
 
  public:
   uint8_t instrType;
@@ -133,10 +133,10 @@ class AkaoSampColl:
   virtual bool GetHeaderInfo();
   virtual bool GetSampleInfo();
 
-  AkaoPs1Version version() const { return version_; }
+  [[nodiscard]] AkaoPs1Version version() const { return version_; }
 
-  static bool IsPossibleAkaoSampColl(RawFile *file, uint32_t offset);
-  static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
+  [[nodiscard]] static bool IsPossibleAkaoSampColl(RawFile *file, uint32_t offset);
+  [[nodiscard]] static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
 
  public:
   std::vector<AkaoArt> akArts;

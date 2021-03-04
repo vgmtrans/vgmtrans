@@ -142,17 +142,17 @@ class AkaoSeq:
   virtual bool GetHeaderInfo() override;
   virtual bool GetTrackPointers() override;
 
-  AkaoPs1Version version() const { return version_; }
+  [[nodiscard]] AkaoPs1Version version() const { return version_; }
 
-  std::wstring ReadTimestampAsText();
-  double GetTempoInBPM(uint16_t tempo) const;
+  [[nodiscard]] std::wstring ReadTimestampAsText();
+  [[nodiscard]] double GetTempoInBPM(uint16_t tempo) const;
 
-  AkaoInstrSet* NewInstrSet() const;
+  [[nodiscard]] AkaoInstrSet* NewInstrSet() const;
 
-  static bool IsPossibleAkaoSeq(RawFile *file, uint32_t offset);
-  static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
+  [[nodiscard]] static bool IsPossibleAkaoSeq(RawFile *file, uint32_t offset);
+  [[nodiscard]] static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
 
-  static uint32_t GetTrackAllocationBitsOffset(AkaoPs1Version version) {
+  [[nodiscard]] static uint32_t GetTrackAllocationBitsOffset(AkaoPs1Version version) {
     switch (version)
     {
     case AkaoPs1Version::VERSION_1_0:
@@ -171,7 +171,7 @@ class AkaoSeq:
  private:
   void LoadEventMap();
 
-  static uint8_t GetNumPositiveBits(uint32_t ulWord) {
+  [[nodiscard]] static uint8_t GetNumPositiveBits(uint32_t ulWord) {
     return   ((ulWord & 0x80000000)>0) + ((ulWord & 0x40000000)>0) + ((ulWord & 0x20000000)>0) + ((ulWord & 0x10000000)>0)
       + ((ulWord & 0x8000000)>0) + ((ulWord & 0x4000000)>0) + ((ulWord & 0x2000000)>0) + ((ulWord & 0x1000000)>0)
       + ((ulWord & 0x800000)>0) + ((ulWord & 0x400000)>0) + ((ulWord & 0x200000)>0) + ((ulWord & 0x100000)>0)
@@ -187,11 +187,11 @@ class AkaoSeq:
   uint16_t seq_id;
   bool bUsesIndividualArts;
 
-  uint32_t instrument_set_offset() const noexcept { return instrument_set_offset_; }
-  bool has_instrument_set_offset() const noexcept { return instrument_set_offset_ != 0; }
+  [[nodiscard]] uint32_t instrument_set_offset() const noexcept { return instrument_set_offset_; }
+  [[nodiscard]] bool has_instrument_set_offset() const noexcept { return instrument_set_offset_ != 0; }
   void set_instrument_set_offset(uint32_t offset) noexcept { instrument_set_offset_ = offset; }
-  uint32_t drum_set_offset() const noexcept { return drum_set_offset_; }
-  bool has_drum_set_offset() const noexcept { return drum_set_offset_ != 0; }
+  [[nodiscard]] uint32_t drum_set_offset() const noexcept { return drum_set_offset_; }
+  [[nodiscard]] bool has_drum_set_offset() const noexcept { return drum_set_offset_ != 0; }
   void set_drum_set_offset(uint32_t offset) noexcept { drum_set_offset_ = offset; }
 
  private:
@@ -218,7 +218,7 @@ class AkaoTrack
   virtual void ResetVars() override;
   virtual bool ReadEvent() override;
 
-  AkaoSeq * seq() const {
+  [[nodiscard]] AkaoSeq * seq() const {
     return reinterpret_cast<AkaoSeq*>(this->parentSeq);
   }
 
@@ -241,5 +241,5 @@ class AkaoTrack
   std::vector<uint32_t> conditional_jump_destinations;
 
  private:
-  bool AnyUnvisitedJumpDestinations();
+   [[nodiscard]] bool AnyUnvisitedJumpDestinations();
 };
