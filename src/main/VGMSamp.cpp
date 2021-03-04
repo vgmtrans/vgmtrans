@@ -73,7 +73,7 @@ bool VGMSamp::SaveAsWav(const std::wstring &filepath) {
   else
     bufSize = (uint32_t) ceil((double) dataLength * GetCompressionRatio());
 
-  vector<uint8_t> uncompSampBuf(bufSize);     //create a new memory space for the uncompressed wave
+  std::vector<uint8_t> uncompSampBuf(bufSize);  //create a new memory space for the uncompressed wave
   //waveBuf.resize(bufSize );
   ConvertToStdWave(uncompSampBuf.data());     //and uncompress into that space
 
