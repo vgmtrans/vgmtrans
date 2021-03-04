@@ -6,30 +6,6 @@
 
 using namespace std;
 
-/*
-int AkaoFormat::OnMatch(vector<VGMFile*>& files)
-{
-	uint32_t i;
-	for (i=0; files[i]->GetFileType() != FILETYPE_SEQ  &&  i<2; i++)
-		;
-
-	AkaoSeq* seq = (AkaoSeq*)files[i];
-	AkaoInstrSet* instrset = seq->instrset;
-	AkaoSampColl* sampcoll = (AkaoSampColl*)files[!i];
-
-	AkaoColl* coll = new AkaoColl(*seq->GetName());
-	coll->UseSeq(seq);
-	coll->AddInstrSet(instrset);
-	coll->AddSampColl(sampcoll);
-	if (!coll->Load())
-	{
-		delete coll;
-		return false;
-	}
-	return true;
-}*/
-
-
 bool AkaoColl::LoadMain() {
   AkaoInstrSet *instrset = (AkaoInstrSet *) instrsets[0];
   AkaoSampColl *sampcoll = (AkaoSampColl *) sampcolls[0];
@@ -79,31 +55,6 @@ bool AkaoColl::LoadMain() {
 }
 
 void AkaoColl::PreSynthFileCreation() {
-  //Before DLS Conversion, we want to add instruments for every single articulation definition
-  //in the Akao Sample Collection, so that they can be used with the 0xA1 program change sequence event
-  //to do this, we create a copy of the AkaoInstrSet before conversion and add the instruments, then
-  //when we finish the dls conversion, we put back the original unchanged AkaoInstrSet.  We don't want to make
-  //any permanent changes to the InstrSet, in case the collection gets recreated or something.
-  /*origInstrSet = (AkaoInstrSet*)instrsets[0];
-  AkaoInstrSet* newInstrSet = new AkaoInstrSet(NULL, 0, 0, 0, L"");
-  *newInstrSet = *origInstrSet;
-  //copy all of the instruments so that we have copied instruments deleted on the destructor of the Instrument Set
-  for (uint32_t i=0; i<origInstrSet->aInstrs.size(); i++)
-  {
-      AkaoInstr* cpyInstr = new AkaoInstr(newInstrSet, 0, 0, 0, 0);
-      *cpyInstr = *((AkaoInstr*)origInstrSet->aInstrs[i]);
-      newInstrSet->aInstrs[i] =  cpyInstr;
-      //ditto for all regions in the instruments
-      for (uint32_t j=0; j<cpyInstr->aRgns.size(); j++)
-      {
-          AkaoRgn* cpyRgn = new AkaoRgn(cpyInstr, 0, 0, L"");
-          *cpyRgn = *((AkaoRgn*)cpyInstr->aRgns[j]);
-          cpyInstr->aRgns[j] =  cpyRgn;
-          cpyRgn->items.clear();
-      }
-  }
-  instrsets[0] = newInstrSet;*/
-
   if (!((AkaoSeq *) seq)->bUsesIndividualArts)    //only do this if the 0xA1 event is actually used
     return;
 
@@ -135,7 +86,6 @@ void AkaoColl::PreSynthFileCreation() {
 }
 
 void AkaoColl::PostSynthFileCreation() {
-
   //if the 0xA1 event isn't used in the sequence, then we didn't modify the instrset
   //so skip this
   if (!((AkaoSeq *) seq)->bUsesIndividualArts)

@@ -243,9 +243,6 @@ AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, const std::w
 }
 
 bool AkaoRgn::LoadRgn() {
-  //instrument[i].region[k].fine_tune = stuff[(instrument[i].info_ptr + k*0x20 + 0x12)];
-  //AddUnityKey(0x3A - GetByte(dwOffset + k*0x20 + 0x13), dwOffset + k*0x20 + 0x13);
-  //instrument[i].region[k].unity_key =		0x3A - stuff[(instrument[i].info_ptr + k*0x20 + 0x13)] ;
   AddGeneralItem(dwOffset + 0, 1, L"Associated Articulation ID");
   artNum = GetByte(dwOffset + 0); //- first_sample_id;
   AddKeyLow(GetByte(dwOffset + 1), dwOffset + 1);
@@ -259,62 +256,9 @@ bool AkaoRgn::LoadRgn() {
   const double volume = raw_volume == 0 ? 1.0 : raw_volume / 128.0;
   AddVolume(volume, dwOffset + 7, 1);
 
-  //if (aInstrs[i]->info_ptr + (k+1)*8 >= aInstrs[i+1]->info_ptr - 8)	//if this is the last region of the instrument
-  //	aInstrs[i]->aRegions[k]->last_key = 0x7F;
-  //if (k == 0)																//if this is the first region of the instrument
-  //	aInstrs[i]->aRegions[k]->first_key = 0;
-
-  //if (keyLow > keyHigh && k > 0)	//if the first key is greater than the last key, and this isn't the first region of the instr
-  //{
-  //	keyLow = keyHigh+1;
-  //	Alert(_T("Funkiness going down: lowKey > highKey (also, k > 0)"));
-  //}
-
-/*		if ((k > 0) && (pDoc->GetByte(aInstrs[i]->info_ptr + (k-1)*8 + 1) == aInstrs[i]->aRegions[k]->first_key))
-	{
-		if ((k > 1) && (pDoc->GetByte(aInstrs[i]->info_ptr + (k-2)*8 + 1) == aInstrs[i]->aRegions[k]->first_key))
-		{
-			aInstrs[i]->aRegions[k]->first_key += 5;
-			if (aInstrs[i]->info_ptr + (k+1)*8 < aInstrs[i+1]->info_ptr - 8)  //if there's another region in the instrument (k+1)
-				aInstrs[i]->aRegions[k]->last_key = pDoc->GetByte(aInstrs[i]->info_ptr + (k+1)*8 + 2) - 1;
-			else
-				aInstrs[i]->aRegions[k]->last_key = 0x7F;
-			aInstrs[i]->aRegions[k-1]->first_key = aInstrs[i]->aRegions[k]->first_key-5;
-			aInstrs[i]->aRegions[k-1]->last_key =  aInstrs[i]->aRegions[k]->first_key -1;
-			aInstrs[i]->aRegions[k-2]->first_key = aInstrs[i]->aRegions[k]->first_key-12;
-			aInstrs[i]->aRegions[k-2]->last_key =  aInstrs[i]->aRegions[k]->first_key-6;
-			if (k == 2)	//if this is the third region of the instrument, then we need to make sure the first region's first key is 0
-				aInstrs[i]->aRegions[k-2]->first_key = 0;
-		}
-		else
-		{
-			aInstrs[i]->aRegions[k]->first_key += 5;
-			if (aInstrs[i]->info_ptr + (k+1)*8 < aInstrs[i+1]->info_ptr - 8)  //if there's another region in the instrument (k+1)
-				aInstrs[i]->aRegions[k]->last_key = pDoc->GetByte(aInstrs[i]->info_ptr + (k+1)*8 + 2) - 1;
-			else
-				aInstrs[i]->aRegions[k]->last_key = 0x7F;
-			aInstrs[i]->aRegions[k-1]->first_key = aInstrs[i]->aRegions[k]->first_key-5;
-			aInstrs[i]->aRegions[k-1]->last_key =  aInstrs[i]->aRegions[k]->first_key-1;
-			if (k == 1)	//if this is the third region of the instrument, then we need to make sure the first region's first key is 0
-				aInstrs[i]->aRegions[k-1]->first_key = 0;
-		}
-	}*/
-
   uint8_t attenuation = 0x7F;  //default to no attenuation
   uint8_t pan = 0x40;  //default to center pan
 
-  //aInstrs[i]->aRegions[k]->sample_offset = GetWord(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10);
-  //aInstrs[i]->aRegions[k]->loop_point =	GetWord(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 4) - GetWord(sampleinfo_offset+ instrument[i].region[k].assoc_art_id *0x10 + 0);//GetWord(sampleinfo_offset+ instrument[i].region[k].assoc_art_id *0x10 + 4) - (instrument[i].region[k].sample_offset + sample_section_offset);
-  //aInstrs[i]->aRegions[k]->fine_tune =		GetShort(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 8);
-  //aInstrs[i]->aRegions[k]->unity_key =		GetShort(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 0xA);
-  //aInstrs[i]->aRegions[k]->ADSR1 =			GetShort(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 0xC);
-  //aInstrs[i]->aRegions[k]->ADSR2 =			GetShort(sampleinfo_offset+ aInstrs[i]->aRegions[k]->assoc_art_id *0x10 + 0xE);
-
-  //instrument[i].region[k].vel_range_high =stuff[(instrument[i].info_ptr + k*0x20 + 0x15)];
-  //instrument[i].region[k].pan =			stuff[(instrument[i].info_ptr + k*0x20 + 0x17)];
-//	AkaoRgn* rgn = AkaoRgn();
-
-  //AddRgn(new AkaoRgn(this, dwOffset+k*8, 8, lowKey, highKey, assoc_art_id));
   return true;
 }
 
@@ -677,8 +621,7 @@ bool AkaoSampColl::GetSampleInfo() {
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
   if (sample_section_offset + sample_section_size > rawfile->size())
-    sample_section_size = rawfile->size(); //- sample_section_offset;
-                                           //AddItem("Samples", ICON_TRACK, FileVGMItem.pTreeItem, sample_section_offset, 0, 0, &AllSampsVGMItem); //add the parent "Samples" tree item
+    sample_section_size = rawfile->size();
 
   std::set<uint32_t> sample_offsets;
   for (const auto & art : akArts) {

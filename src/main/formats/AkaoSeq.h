@@ -180,7 +180,6 @@ class AkaoSeq:
   }
 
  public:
-  //AkaoInstrSet *instrset;
   uint16_t seq_id;
   bool bUsesIndividualArts;
 
