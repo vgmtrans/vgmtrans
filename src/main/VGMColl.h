@@ -35,10 +35,10 @@ class VGMColl
   virtual bool LoadMain() { return true; }
   virtual bool CreateDLSFile(DLSFile &dls);
   virtual SF2File *CreateSF2File();
-  virtual bool PreDLSMainCreation() { return true; }
+  virtual void PreSynthFileCreation() {}
   virtual SynthFile *CreateSynthFile();
   virtual bool MainDLSCreation(DLSFile &dls);
-  virtual bool PostDLSMainCreation() { return true; }
+  virtual void PostSynthFileCreation() {}
 
   bool OnSaveAllDLS();
   bool OnSaveAllSF2();

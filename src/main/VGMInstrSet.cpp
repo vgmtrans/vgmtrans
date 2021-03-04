@@ -19,7 +19,7 @@ VGMInstrSet::VGMInstrSet(const string &format,/*FmtID fmtID,*/
                          uint32_t length,
                          wstring name,
                          VGMSampColl *theSampColl)
-    : VGMFile(FILETYPE_INSTRSET, /*fmtID,*/format, file, offset, length, name), sampColl(theSampColl) {
+    : VGMFile(FILETYPE_INSTRSET, /*fmtID,*/format, file, offset, length, name), sampColl(theSampColl), allowEmptyInstrs(false) {
   AddContainer<VGMInstr>(aInstrs);
 }
 
@@ -50,7 +50,7 @@ bool VGMInstrSet::Load() {
   if (!LoadInstrs())
     return false;
 
-  if (aInstrs.size() == 0)
+  if (!allowEmptyInstrs && aInstrs.empty())
     return false;
 
   if (unLength == 0) {

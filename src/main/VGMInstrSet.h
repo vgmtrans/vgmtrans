@@ -54,6 +54,9 @@ class VGMInstrSet:
  public:
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
+
+ protected:
+  bool allowEmptyInstrs;
 };
 
 

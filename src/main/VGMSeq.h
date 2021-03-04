@@ -14,6 +14,11 @@ enum ReadMode: uint8_t {
   READMODE_FIND_DELTA_LENGTH
 };
 
+enum class PanVolumeCorrectionMode : uint8_t {
+  kNoVolumeAdjust,
+  kAdjustVolumeController,
+  kAdjustExpressionController
+};
 
 class VGMSeq: public VGMFile {
  public:
@@ -45,6 +50,10 @@ class VGMSeq: public VGMFile {
   void UseReverb() { bReverb = true; }
   void HasMonophonicTracks() { bMonophonicTracks = true; }
   void UseLinearAmplitudeScale() { bUseLinearAmplitudeScale = true; }
+  void UseLinearPanAmplitudeScale(PanVolumeCorrectionMode mode) {
+    bUseLinearPanAmplitudeScale = true;
+    panVolumeCorrectionMode = mode;
+  }
   void AlwaysWriteInitialVol(uint8_t theVol = 100) {
     bAlwaysWriteInitialVol = true;
     initialVol = theVol;
@@ -92,6 +101,9 @@ class VGMSeq: public VGMFile {
                                   //which is important when drivers allow things like global transposition events mid note
   bool bUseLinearAmplitudeScale;  //This will cause all all velocity, volume, and expression events to be
                                   //automatically converted from a linear scale to MIDI's logarithmic scale
+  bool bUseLinearPanAmplitudeScale; //This will cause all all pan events to be automatically converted
+                                    //from a linear scale to MIDI's sin/cos scale
+  PanVolumeCorrectionMode panVolumeCorrectionMode;
   bool bAlwaysWriteInitialTempo;
   bool bAlwaysWriteInitialVol;
   bool bAlwaysWriteInitialExpression;

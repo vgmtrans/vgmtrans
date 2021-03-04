@@ -165,6 +165,7 @@ class SeqTrack:
   uint8_t vol;
   uint8_t expression;
   uint8_t mastVol;
+  double panVolumeCorrectionRate; // as percentage of original volume (default: 1.0)
   uint8_t prevPan;
   uint8_t prevReverb;
   int8_t transpose;

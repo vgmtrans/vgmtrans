@@ -1,12 +1,12 @@
 #pragma once
 #include "Scanner.h"
+#include "AkaoFormatVersion.h"
 
-class AkaoScanner:
+class AkaoScanner final :
     public VGMScanner {
  public:
-  AkaoScanner(void);
- public:
-  virtual ~AkaoScanner(void);
+  void Scan(RawFile *file, void *info = 0) override;
 
-  virtual void Scan(RawFile *file, void *info = 0);
+ private:
+  static AkaoPs1Version DetermineVersionFromTag(RawFile *file) noexcept;
 };

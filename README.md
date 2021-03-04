@@ -63,6 +63,7 @@ Contributors
 - Bregalad: Author of [GBAMusRiper](http://www.romhacking.net/utilities/881/), great reference of MP2k interpretation.
 - Nisto: Author of [kdt-tool](https://github.com/Nisto/kdt-tool), thank you for your approval of porting to VGMTrans.
 - [Gnilda](https://twitter.com/god_gnilda): for his/her dedicated research of SNES AKAO format. <http://gnilda.rosx.net/SPC/>
+- [@brr890](https://twitter.com/brr890) and [@tssf](https://twitter.com/tssf): Contributed a lot of hints on PS1 AKAO format.
 
 Contact
 -------
