@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleExecutable</key>
     <string>VGMTrans</string>
+    <key>CFBundleIconFile</key>
+    <string>appicon.icns</string>
     <key>CFBundleIdentifier</key>
     <string>org.vgmtrans.vgmtrans</string>
     <key>CFBundleDevelopmentRegion</key>

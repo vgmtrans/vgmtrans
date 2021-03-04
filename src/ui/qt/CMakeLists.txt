@@ -72,6 +72,12 @@ if(APPLE)
             ${CMAKE_CURRENT_LIST_DIR}/resources/Info.plist.in
             OUTPUT_NAME
             VGMTrans)
+
+    target_sources(vgmtrans PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns")
+    set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
+            PROPERTIES
+            MACOSX_PACKAGE_LOCATION
+            Resources)
 elseif(NOT WIN32)
     install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})
 endif()
