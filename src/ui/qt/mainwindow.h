@@ -6,7 +6,7 @@
 #include <qtreeview.h>
 #include <qlistview.h>
 #include <QMdiArea>
-#include "VGMFileView.h"
+#include "workarea/VGMFileView.h"
 
 class MainWindow : public QMainWindow
 {

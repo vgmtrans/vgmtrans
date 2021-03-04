@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8140E68D-B9D7-40F1-A633-FE484428FDB6}</ProjectGuid>
     <RootNamespace>VGMTrans</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -29,14 +29,14 @@
     <UseOfAtl>Static</UseOfAtl>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseOfAtl>Static</UseOfAtl>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -48,7 +48,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseOfAtl>Static</UseOfAtl>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -84,31 +84,19 @@
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(ProjectDir)src\ui\windows;$(IncludePath)</IncludePath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(ProjectDir)lib\zlib\lib\win32;$(LibraryPath)</LibraryPath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(ProjectDir)lib\zlib\lib\x64;$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(IncludePath)</IncludePath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)lib\zlib\include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(ProjectDir)lib\zlib\lib\win32;$(LibraryPath)</LibraryPath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(ProjectDir)lib\zlib\lib\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)lib\zlib;$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(ProjectDir)src\ui\windows;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)lib\zlib;$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(OutDir);$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir);$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)lib\zlib;$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)lib\zlib;$(ProjectDir)lib\dxAug07\include;$(ProjectDir)lib\wtl;$(ProjectDir)lib\tinyxml;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir);$(ProjectDir)lib\dxAug07\lib\x86;$(ProjectDir)lib\tinyxml\lib\win32;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir);$(ProjectDir)lib\dxAug07\lib\x64;$(ProjectDir)lib\tinyxml\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(SolutionDir)$(Configuration)_WTL\</OutDir>
-    <IntDir>$(Configuration)_WTL\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)_WTL\</OutDir>
-    <IntDir>$(Platform)\$(Configuration)_WTL\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)_WTL\</OutDir>
-    <IntDir>$(Platform)\$(Configuration)_WTL\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(SolutionDir)$(Configuration)_WTL\</OutDir>
-    <IntDir>$(Configuration)_WTL\</IntDir>
-  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Midl>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -120,7 +108,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>./src/main;./src/main/loaders;./src/main/formats;./src/ui/windows;./src/ui/windows/include;./src/ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NOMINMAX;_DEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NOMINMAX;_DEBUG;_WINDOWS;UNICODE;STRICT;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -131,7 +119,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;tinyxmlSTL-mtd.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlib.lib;Winmm.lib;dxguid.lib;dsound.lib;tinyxmlSTL-mtd.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
@@ -149,7 +137,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>./src/main;./src/main/loaders;./src/main/formats;./src/ui/windows;./src/ui/windows/include;./src/ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NOMINMAX;_DEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NOMINMAX;_DEBUG;_WINDOWS;UNICODE;STRICT;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -159,7 +147,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;tinyxmlSTL-mtd.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlib.lib;Winmm.lib;dxguid.lib;dsound.lib;tinyxmlSTL-mtd.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
@@ -178,7 +166,7 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <AdditionalIncludeDirectories>./src/main;./src/main/loaders;./src/main/formats;./src/ui/windows;./src/ui/windows/include;./src/ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NOMINMAX;NDEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NOMINMAX;NDEBUG;_WINDOWS;UNICODE;STRICT;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -190,7 +178,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlib.lib;Winmm.lib;dxguid.lib;dsound.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
@@ -211,7 +199,7 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <AdditionalIncludeDirectories>./src/main;./src/main/loaders;./src/main/formats;./src/ui/windows;./src/ui/windows/include;./src/ui/windows/include/Sergey Klimov;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NOMINMAX;NDEBUG;_WINDOWS;UNICODE;STRICT;ZLIB_WINAPI;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NOMINMAX;NDEBUG;_WINDOWS;UNICODE;STRICT;_SCL_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -223,7 +211,7 @@
     </ClCompile>
     <ResourceCompile />
     <Link>
-      <AdditionalDependencies>zlibstat.lib;Winmm.lib;dxguid.lib;dsound.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>zlib.lib;Winmm.lib;dxguid.lib;dsound.lib;tinyxmlSTL-mt.lib;ShLwApi.Lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <DataExecutionPrevention>
       </DataExecutionPrevention>

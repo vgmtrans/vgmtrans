@@ -40,8 +40,8 @@ bool NDSSeq::GetTrackPointers(void) {
     uint32_t songDelay = 0;
 
     while (b == 0x80) {
-      register uint32_t value;
-      register uint8_t c;
+      uint32_t value;
+      uint8_t c;
       uint32_t beginOffset = offset;
       offset++;
       if ((value = GetByte(offset++)) & 0x80) {

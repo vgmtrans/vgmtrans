@@ -1,3 +1,9 @@
+/**
+ * VGMTrans (c) - 2002-2021
+ * Licensed under the zlib license
+ * See the included LICENSE for more information
+ */
+
 #include "pch.h"
 #include "WinVGMRoot.h"
 #include "VGMFileTreeView.h"
@@ -10,38 +16,19 @@
 #include "MainFrm.h"
 #include "ScanDlg.h"
 #include "DLSFile.h"
-
-using namespace std;
+#include "osdepend.h"
 
 WinVGMRoot winroot;
 
 extern HANDLE killProgramSem;
 
-WinVGMRoot::WinVGMRoot(void)
-: selectedItem(NULL), selectedColl(NULL), loadedColl(NULL), bClosingVGMFile(false), bExiting(false)
-{
-}
+void WinVGMRoot::SelectItem(VGMItem* item) {
+  if (bClosingVGMFile) {
+    return;
+  }
 
-WinVGMRoot::~WinVGMRoot(void)
-{
-}
-
-void WinVGMRoot::SelectItem(VGMItem* item)
-{
-	if (bClosingVGMFile)//AreWeExiting())
-		return;
-	selectedItem = item;
-	if (item->GetType() == ITEMTYPE_VGMFILE)
-	{
-	//	if (((VGMFile*)item)->GetFileType() == FILETYPE_INSTRSET)
-	//	{
-	//		DLSFile dls;
-	//		((VGMInstrSet*)item)->CreateDLSFile(dls);
-	//		musicplayer.ChangeDLS(&dls);
-	//	}
-	}
-
-	pMainFrame->SelectItem(item);
+  selectedItem = item;
+  pMainFrame->SelectItem(item);
 }
 
 void WinVGMRoot::SelectColl(VGMColl* coll)
@@ -240,79 +227,119 @@ void WinVGMRoot::UI_AddItemSet(VGMFile* vgmfile, vector<ItemSet>* vItemSets)
 //	pMainFrame->itemViewMap[vgmfile]->AddItemSet(vgmfile, vItemSets);
 }
 
-wstring WinVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const wstring& extension)
-{
-	CFileDialog dlgFile(TRUE, extension.c_str(), suggestedFilename.c_str(), OFN_HIDEREADONLY | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_EXPLORER);
+wstring WinVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const wstring& extension) {
+  HRESULT hr = S_OK;
 
-	if (dlgFile.DoModal() != IDOK)
-		return L"";
+  /* Create a new common open file dialog */
+  IFileOpenDialog* pfd = nullptr;
+  hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+  if (!SUCCEEDED(hr)) {
+    return {};
+  }
 
-	//dlgFile.GetFilePath(/*strFilePath.GetBufferSetLength( MAX_PATH )*/strFilePath, MAX_PATH);
-	//strFilePath.ReleaseBuffer();
-	return dlgFile.m_szFileName;
+  DWORD dwOptions;
+  pfd->GetOptions(&dwOptions);
+  pfd->SetOptions(dwOptions | FOS_FILEMUSTEXIST);
+  pfd->SetTitle(L"Select file to analyze");
+
+  /* We don't have the parent window pointer here.. */
+  hr = pfd->Show(nullptr);
+  if (!SUCCEEDED(hr)) {
+    return {};
+  }
+
+  /* Get the selection */
+  IShellItem* psiResult = nullptr;
+  pfd->GetResult(&psiResult);
+  PWSTR pszPath = nullptr;
+  std::wstring directory{};
+  hr = psiResult->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+  if (SUCCEEDED(hr)) {
+    directory = std::wstring(pszPath);
+    CoTaskMemFree(pszPath);
+  }
+  psiResult->Release();
+
+  pfd->Release();
+
+  return directory;
 }
 
-wstring WinVGMRoot::UI_GetSaveFilePath(const wstring& suggestedFilename, const wstring& extension)
-{
-	CFileDialog dlgFile(FALSE, extension.c_str(), suggestedFilename.c_str(), OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_EXPLORER);
+wstring WinVGMRoot::UI_GetSaveFilePath(const wstring& suggestedFilename, const wstring& extension) {
+  HRESULT hr = S_OK;
 
-	if (dlgFile.DoModal() != IDOK)
-		return L"";
+  /* Create a new common save file dialog */
+  IFileSaveDialog* pfd = nullptr;
+  hr = CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+  if (!SUCCEEDED(hr)) {
+    return {};
+  }
 
-	//dlgFile.GetFilePath(/*strFilePath.GetBufferSetLength( MAX_PATH )*/strFilePath, MAX_PATH);
-	//strFilePath.ReleaseBuffer();
-	return dlgFile.m_szFileName;
+  DWORD dwOptions;
+  pfd->GetOptions(&dwOptions);
+  pfd->SetOptions(dwOptions);
+  pfd->SetTitle(L"Save file");
+  pfd->SetFileName(suggestedFilename.c_str());
+  pfd->SetDefaultExtension(extension.c_str());
+
+  /* We don't have the parent window pointer here.. */
+  hr = pfd->Show(nullptr);
+  if (!SUCCEEDED(hr)) {
+    return {};
+  }
+
+  /* Get the selection */
+  IShellItem* psiResult = nullptr;
+  pfd->GetResult(&psiResult);
+  PWSTR pszPath = nullptr;
+  std::wstring directory{};
+  hr = psiResult->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+  if (SUCCEEDED(hr)) {
+    directory = std::wstring(pszPath);
+    CoTaskMemFree(pszPath);
+  }
+  psiResult->Release();
+
+  pfd->Release();
+
+  return directory;
 }
 
+wstring WinVGMRoot::UI_GetSaveDirPath(const wstring& suggestedDir) {
+  HRESULT hr = S_OK;
 
-wstring WinVGMRoot::UI_GetSaveDirPath(const wstring& suggestedDir)
-{
-	wstring myStr;
-	GetFolder(myStr, L"Save to Folder");
-	return myStr;
+  /* Create a new common open file dialog */
+  IFileOpenDialog* pfd = nullptr;
+  hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+  if (!SUCCEEDED(hr)) {
+    return {};
+  }
+
+  DWORD dwOptions;
+  pfd->GetOptions(&dwOptions);
+  /* Make the dialog a folder picker*/
+  pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
+  pfd->SetTitle(L"Select the export folder");
+
+  /* We don't have the parent window pointer here.. */
+  hr = pfd->Show(nullptr);
+  if (!SUCCEEDED(hr)) {
+    return {};
+  }
+
+  /* Get the selection */
+  IShellItem* psiResult = nullptr;
+  pfd->GetResult(&psiResult);
+  PWSTR pszPath = nullptr;
+  std::wstring directory{};
+  hr = psiResult->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+  if (SUCCEEDED(hr)) {
+    directory = std::wstring(pszPath);
+    CoTaskMemFree(pszPath);
+  }
+  psiResult->Release();
+
+  pfd->Release();
+
+  return directory;
 }
-
-
-
-
-//bool UI_WriteBufferToFile(string filename, unsigned char* buf, unsigned long size)
-//{
-//	
-bool WinVGMRoot::GetFolder(std::wstring& folderpath, const wstring& szCaption, HWND hOwner)
-{
-	bool retVal = false;
-
-	// The BROWSEINFO struct tells the shell 
-	// how it should display the dialog.
-	BROWSEINFO bi;
-	memset(&bi, 0, sizeof(bi));
-
-	bi.ulFlags   = BIF_USENEWUI;
-	bi.hwndOwner = hOwner;
-	bi.lpszTitle = szCaption.c_str();
-
-	// must call this if using BIF_USENEWUI
-	::OleInitialize(NULL);
-
-	// Show the dialog and get the itemIDList for the selected folder.
-	LPITEMIDLIST pIDL = ::SHBrowseForFolder(&bi);
-
-	if(pIDL != NULL)
-	{
-		// Create a buffer to store the path, then get the path.
-		wchar_t buffer[_MAX_PATH] = {'\0'};
-		if(::SHGetPathFromIDList(pIDL, buffer) != 0)
-		{
-			// Set the string value.
-			folderpath = buffer;
-			retVal = true;
-		}		
-
-		// free the item id list
-		CoTaskMemFree(pIDL);
-	}
-
-	::OleUninitialize();
-
-	return retVal;
-}//}

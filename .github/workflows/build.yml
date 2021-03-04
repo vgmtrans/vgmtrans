@@ -1,0 +1,87 @@
+name: Build and test
+on: [push, pull_request]
+jobs:
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install dependencies"
+        run: |
+          brew upgrade gcc@10 || brew install gcc@10
+          brew upgrade ninja || brew install ninja
+          brew upgrade cmake || brew install cmake
+          brew upgrade qt@5 || brew install qt@5
+          brew upgrade fluid-synth || brew install fluid-synth
+          echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+          echo "/usr/local/bin" >> $GITHUB_PATH
+      - name: "Prepare build"
+        run: |
+          mkdir build
+          cd build
+          cmake --version
+          cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -G Ninja ..
+      - name: "Build project"
+        run: cmake --build build --config "Release" --parallel
+      - name: "Run tests"
+        run: ctest -C Release
+      - working-directory: "build"
+        name: "Package DMG (macOS)"
+        run: |
+          cp ../bin/mame_roms.xml src/ui/qt/VGMTrans.app/Contents/MacOS/
+          /usr/local/opt/qt5/bin/macdeployqt src/ui/qt/VGMTrans.app -dmg -always-overwrite
+          cd src/ui/qt/
+          mv VGMTrans.dmg ../..
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@v1
+        with:
+          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.dmg
+          path: "build/VGMTrans.dmg"
+  Ubuntu:
+    runs-on: ubuntu-16.04
+    name: Linux
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Set environment variables"
+        run: |
+          echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+      - name: "Install dependencies"
+        run: |
+          sudo add-apt-repository ppa:beineri/opt-qt-5.15.2-xenial -y
+          sudo apt clean
+          sudo apt update
+          sudo apt install -y pkg-config qt515base qt515svg libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
+          wget https://github.com/FluidSynth/fluidsynth/archive/v2.1.7.zip
+          unzip v2.1.7.zip
+          cd fluidsynth-2.1.7
+          mkdir build && cd build
+          cmake -DCMAKE_C_COMPILER="gcc-9" -DCMAKE_CXX_COMPILER="g++-9" -Denable-network=off -Denable-ipv6=off -DCMAKE_INSTALL_PREFIX=/usr/ -DLIB_INSTALL_DIR=lib -GNinja ..
+          cmake --build . --config "Release" --parallel
+          sudo ninja install
+          cd ../..
+      - name: "Prepare build"
+        run: |
+          mkdir build
+          cd build
+          cmake --version
+          cmake -DCMAKE_C_COMPILER="gcc-9" -DCMAKE_CXX_COMPILER="g++-9" -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -GNinja ..
+      - name: "Build project"
+        run: cmake --build build --config "Release" --parallel
+      - name: "Run tests"
+        run: ctest -C Release
+      - name: "Make AppImage"
+        working-directory: "build"
+        run: |
+          DESTDIR=appdir ninja -j$(nproc) install
+          find appdir/
+          wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
+          chmod a+x linuxdeployqt-continuous-x86_64.AppImage
+          mkdir -p appdir/usr/share
+          cp ../bin/mame_roms.xml appdir/usr/bin
+          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/vgmtrans.desktop -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/ -verbose=2
+          mv VGMTrans*.AppImage VGMTrans.AppImage
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@v1
+        with:
+          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.AppImage
+          path: "build/VGMTrans.AppImage"

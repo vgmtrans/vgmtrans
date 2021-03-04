@@ -7,7 +7,11 @@ environment:
   matrix:
   - platform: Win32
     target: Release
-    visualstudio_string: vs2015
+    visualstudio_string: vs2019
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+
+matrix:
+  fast_finish: true
 
 init:
 # Use CRLF line endings on Windows so users can just use Notepad.
@@ -20,7 +24,7 @@ after_build:
   - ps: $env:gitrev = git describe --tags
   - ps: $env:my_version = "$env:gitrev-$env:appveyor_repo_branch-$env:appveyor_build_number"
   - set package_name=vgmtrans-%my_version%-%visualstudio_string%-%platform%-%target%
-  - copy %target%_WTL\VGMTrans_WTL.exe bin\vgmtrans.exe
+  - copy %target%\VGMTrans_WTL.exe bin\vgmtrans.exe
   - mkdir vgmtrans
   - move bin vgmtrans
   - move LICENSE.txt vgmtrans
