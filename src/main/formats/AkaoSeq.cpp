@@ -514,7 +514,7 @@ void AkaoSeq::LoadEventMap()
 }
 
 
-AkaoTrack::AkaoTrack(AkaoSeq *parentFile, long offset, long length)
+AkaoTrack::AkaoTrack(AkaoSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
 }
 
@@ -527,9 +527,9 @@ void AkaoTrack::ResetVars() {
 
   pattern_return_offset = 0;
 
-  memset(loop_begin_loc, 0, sizeof(loop_begin_loc));
+  std::fill(loop_begin_loc.begin(), loop_begin_loc.end(), 0);
   loop_layer = 0;
-  memset(loop_counter, 0, sizeof(loop_counter));
+  std::fill(loop_counter.begin(), loop_counter.end(), 0);
 
   last_delta_time = 0;
   use_one_time_delta_time = false;
@@ -563,7 +563,7 @@ bool AkaoTrack::ReadEvent() {
     const bool op_rest = note_byte >= 0x8F;
     const bool op_tie = !op_rest && note_byte >= 0x83;
     const bool op_note = !op_rest && !op_tie;
-    const uint8_t delta_time_from_op = static_cast<uint8_t>(DELTA_TIME_TABLE[note_byte % 11]);
+    const auto delta_time_from_op = static_cast<uint8_t>(DELTA_TIME_TABLE[note_byte % 11]);
 
     uint8_t delta_time = 0;
     if (op_note_with_length)
@@ -579,7 +579,7 @@ bool AkaoTrack::ReadEvent() {
 
     uint8_t dur = delta_time;
     if (version < AkaoPs1Version::VERSION_3_0 && !slur && !legato) // and the next note event is not op_tie
-      dur = static_cast<uint8_t>(max(int(dur) - 2, 0));
+      dur = static_cast<uint8_t>(max(static_cast<int>(dur) - 2, 0));
 
     last_delta_time = delta_time;
 
@@ -615,7 +615,7 @@ bool AkaoTrack::ReadEvent() {
     return false; // they should not be used
   }
   else {
-    AkaoSeqEventType event = static_cast<AkaoSeqEventType>(0);
+    auto event = static_cast<AkaoSeqEventType>(0);
 
     if (version >= AkaoPs1Version::VERSION_3_0 && status_byte == 0xFE)
     {
@@ -1095,7 +1095,7 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_FIXED_DURATION: {
       const int8_t relative_length = GetByte(curOffset++);
-      const int16_t length = min(max(last_delta_time + relative_length, 1), 255);
+      const int16_t length = std::min(std::max(last_delta_time + relative_length, 1), 255);
       delta_time_overwrite = length;
       desc << L"Duration (Relative Amount): " << relative_length;
       AddGenericEvent(beginOffset, curOffset - beginOffset, L"Fixed Note Length", desc.str(), CLR_MISC, ICON_CONTROL);
@@ -1244,7 +1244,7 @@ bool AkaoTrack::ReadEvent() {
         const int instrument_index = std::distance(parentSeq->drum_instrument_addresses.begin(),
           parentSeq->drum_instrument_addresses.find(drum_instrset_offset));
 
-        AddBankSelectNoItem(127 - instrument_index);
+        AddBankSelectNoItem(127 - static_cast<uint8_t>(instrument_index));
         AddProgramChangeNoItem(127, false);
         drum = true;
         //channel = 9;
@@ -1517,7 +1517,7 @@ bool AkaoTrack::ReadEvent() {
       const uint8_t ticksPerBeat = GetByte(curOffset++);
       const uint8_t beatsPerMeasure = GetByte(curOffset++);
       if (ticksPerBeat != 0 && beatsPerMeasure != 0) {
-        const uint8_t denom = (parentSeq->ppqn * 4) / ticksPerBeat; // or should it always be 4? no idea
+        const uint8_t denom = static_cast<uint8_t>((parentSeq->ppqn * 4) / ticksPerBeat); // or should it always be 4? no idea
         AddTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat);
       } else {
         AddGenericEvent(beginOffset, curOffset - beginOffset, L"Time Signature", L"", CLR_TIMESIG, ICON_TIMESIG);
@@ -1604,9 +1604,6 @@ bool AkaoTrack::ReadEvent() {
 
 bool AkaoTrack::AnyUnvisitedJumpDestinations()
 {
-  for (const uint32_t dest : conditional_jump_destinations) {
-    if (!IsOffsetUsed(dest))
-      return true;
-  }
-  return false;
+  return std::any_of(conditional_jump_destinations.begin(), conditional_jump_destinations.end(),
+                     [this](uint32_t dest) { return !IsOffsetUsed(dest); });
 }

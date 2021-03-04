@@ -2,11 +2,11 @@
 #include "Scanner.h"
 #include "AkaoFormatVersion.h"
 
-class AkaoScanner:
+class AkaoScanner final :
     public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
+  void Scan(RawFile *file, void *info = 0) override;
 
  private:
- AkaoPs1Version DetermineVersionFromTag(RawFile *file);
+  static AkaoPs1Version DetermineVersionFromTag(RawFile *file) noexcept;
 };
