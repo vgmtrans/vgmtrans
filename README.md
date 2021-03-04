@@ -1,8 +1,9 @@
-[![Build Status](https://travis-ci.org/vgmtrans/vgmtrans.svg?branch=master)](https://travis-ci.org/vgmtrans/vgmtrans)
-[![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/djsal74fdlue142s/branch/master?svg=true)](https://ci.appveyor.com/project/mikelow/vgmtrans)
-
 VGMTrans - Video Game Music Translator
 ======================================
+| Platform | Status | Build available |
+| :-: | :-: | :-: |
+| Windows (legacy) | [![Build status](https://ci.appveyor.com/api/projects/status/ns62qg09yn5kmf18/branch/master?svg=true)](https://ci.appveyor.com/project/sykhro/vgmtrans-ci/branch/master) | [Yes](https://ci.appveyor.com/project/sykhro/vgmtrans-ci/branch/master/artifacts) |
+| FreeBSD | [![Build Status](https://api.cirrus-ci.com/github/vgmtrans/vgmtrans.svg)](https://cirrus-ci.com/github/vgmtrans/vgmtrans) | No |
 
 VGMTrans converts a music files used in console video games into standard midi and dls/sf2 files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
 
