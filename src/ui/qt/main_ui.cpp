@@ -1,3 +1,9 @@
+/**
+ * VGMTrans (c) - 2002-2021
+ * Licensed under the zlib license
+ * See the included LICENSE for more information
+ */
+
 #include <QApplication>
 #include <QtPlugin>
 #include <QFile>
@@ -5,21 +11,10 @@
 #include "mainwindow.h"
 #include "QtVGMRoot.h"
 
-#ifdef Q_OS_WIN
-Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
-#endif
-
-#ifdef Q_OS_MAC
-Q_IMPORT_PLUGIN(QCocoaIntegrationPlugin)
-#endif
-
-
-//! [main() function]
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     qApp->setStyleSheet("QSplitter::handle{background-color: #B8B8B8;}");
-//    QFile file(":/qss/default.qss");
+
     QFile file(":/qdarkstyle/style.qss");
     file.open(QFile::ReadOnly);
     QString styleSheet = QLatin1String(file.readAll());
@@ -32,5 +27,3 @@ int main(int argc, char *argv[])
     window.show();
     return app.exec();
 }
-//! [main() function]
-
