@@ -26,6 +26,7 @@
 #include <iterator>
 #include <iostream>
 #include <iomanip>
+#include <limits>
 #include <wchar.h>
 #include <ctype.h>
 
