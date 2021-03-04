@@ -118,13 +118,12 @@ inline int RoundToZero(int val) {
   return val;
 }
 
-inline uint16_t ComposePSXADSR1(uint8_t am, uint8_t ar, uint8_t dr, uint8_t sl)
-{
+inline constexpr uint16_t ComposePSXADSR1(uint8_t am, uint8_t ar, uint8_t dr, uint8_t sl) {
   return ((am & 1) << 15) | ((ar & 0x7f) << 8) | ((dr & 0xf) << 4) | (sl & 0x0f);
 }
 
-inline uint16_t ComposePSXADSR2(uint8_t sm, uint8_t sd, uint8_t sr, uint8_t rm, uint8_t rr)
-{
+inline constexpr uint16_t ComposePSXADSR2(uint8_t sm, uint8_t sd, uint8_t sr, uint8_t rm,
+                                         uint8_t rr) {
   return ((sm & 1) << 15) | ((sd & 1) << 14) | ((sr & 0x7f) << 6) | ((rm & 1) << 5) | (rr & 0x1f);
 }
 
