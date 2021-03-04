@@ -1,3 +1,9 @@
+/**
+* VGMTrans (c) - 2002-2021
+* Licensed under the zlib license
+* See the included LICENSE for more information
+*/
+
 #pragma once
 
 enum class AkaoPs1Version : uint8_t {
