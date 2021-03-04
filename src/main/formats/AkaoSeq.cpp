@@ -329,10 +329,10 @@ void AkaoSeq::LoadEventMap()
     if (version() == AkaoPs1Version::VERSION_1_1)
     {
       event_map[0xf3] = EVENT_F3_SAGAFRO;
-      //event_map[0xf4] = EVENT_UNIMPLEMENTED;
-      //event_map[0xf5] = EVENT_UNIMPLEMENTED;
-      //event_map[0xf6] = EVENT_UNIMPLEMENTED;
-      //event_map[0xf7] = EVENT_UNIMPLEMENTED;
+      event_map[0xf4] = EVENT_UNIMPLEMENTED;
+      event_map[0xf5] = EVENT_UNIMPLEMENTED;
+      event_map[0xf6] = EVENT_UNIMPLEMENTED;
+      event_map[0xf7] = EVENT_UNIMPLEMENTED;
       event_map[0xfc] = EVENT_PROGCHANGE_KEY_SPLIT_V1;
     }
   }
