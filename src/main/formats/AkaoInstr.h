@@ -67,7 +67,6 @@ class AkaoInstr: public VGMInstr {
 
   [[nodiscard]] AkaoPs1Version version() const { return instrSet()->version(); }
 
- public:
   uint8_t instrType;
   bool bDrumKit;
 };
