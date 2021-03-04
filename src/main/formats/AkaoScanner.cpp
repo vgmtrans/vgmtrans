@@ -58,9 +58,11 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
       && file->GetWord(instrLocation.instrDatOffset) == 0x1010)
       instrLocations.push_back(instrLocation);
 
-    //if (file->GetWord(instr2Location.instrAllOffset) == 0x38560
-    //  && file->GetWord(instr2Location.instrDatOffset) == 0x38560)
-    //  instrLocations.push_back(instr2Location);
+    // Add choir samples for One-Winged Angel.
+    // It is unlikely that any other song will load this sample collection in actual gameplay.
+    if (file->GetWord(instr2Location.instrAllOffset) == 0x38560 &&
+        file->GetWord(instr2Location.instrDatOffset) == 0x38560)
+      instrLocations.push_back(instr2Location);
 
     if (!instrLocations.empty()) {
       for (const auto & loc : instrLocations) {
