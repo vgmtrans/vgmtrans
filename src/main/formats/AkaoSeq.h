@@ -136,7 +136,6 @@ class AkaoSeq:
     public VGMSeq {
  public:
   AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version);
-  virtual ~AkaoSeq();
 
   virtual void ResetVars() override;
   virtual bool GetHeaderInfo() override;

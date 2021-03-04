@@ -20,9 +20,6 @@ AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
   UseReverb();
 }
 
-AkaoSeq::~AkaoSeq() {
-}
-
 void AkaoSeq::ResetVars() {
   VGMSeq::ResetVars();
 

@@ -3,12 +3,6 @@
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 
-AkaoScanner::AkaoScanner(void) {
-}
-
-AkaoScanner::~AkaoScanner(void) {
-}
-
 void AkaoScanner::Scan(RawFile *file, void *info) {
   const AkaoPs1Version file_version = DetermineVersionFromTag(file);
 
