@@ -680,7 +680,7 @@ void SeqTrack::AddVolNoItem(uint8_t newVol) {
     if (parentSeq->bUseLinearAmplitudeScale)
       newVolPercent = sqrt(newVolPercent);
 
-    const uint8_t finalVol = static_cast<uint8_t>(min(newVolPercent * 127, 127));
+    const uint8_t finalVol = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
     pMidiTrack->AddVol(channel, finalVol);
   }
   vol = newVol;
@@ -718,7 +718,7 @@ void SeqTrack::InsertVol(uint32_t offset,
   if (parentSeq->bUseLinearAmplitudeScale)
     newVolPercent = sqrt(newVolPercent);
 
-  const uint8_t finalVol = static_cast<uint8_t>(min(newVolPercent * 127, 127));
+  const uint8_t finalVol = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new VolSeqEvent(this, newVol, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -742,7 +742,7 @@ void SeqTrack::AddExpressionNoItem(uint8_t level) {
     if (parentSeq->bUseLinearAmplitudeScale)
       newVolPercent = sqrt(newVolPercent);
 
-    const uint8_t finalExpression = static_cast<uint8_t>(min(newVolPercent * 127, 127));
+    const uint8_t finalExpression = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
     pMidiTrack->AddExpression(channel, finalExpression);
   }
   expression = level;
@@ -780,7 +780,7 @@ void SeqTrack::InsertExpression(uint32_t offset,
   if (parentSeq->bUseLinearAmplitudeScale)
     newVolPercent = sqrt(newVolPercent);
 
-  const uint8_t finalExpression = static_cast<uint8_t>(min(newVolPercent * 127, 127));
+  const uint8_t finalExpression = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new ExpressionSeqEvent(this, level, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
