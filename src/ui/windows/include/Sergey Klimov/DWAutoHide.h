@@ -22,6 +22,7 @@
 
 #include <queue>
 #include <deque>
+#include <memory>
 #include "ssec.h"
 #include "DockMisc.h"
 #include "ExtDockingWindow.h"
@@ -1754,7 +1755,7 @@ public:
 ///////////////////////////////////////////////////////////
 	void StartResizing(const CPoint& pt)
 	{
-		std::auto_ptr<CSizeTrackerFull> pTracker;
+		std::unique_ptr<CSizeTrackerFull> pTracker;
 		CDWSettings settings;
 		if(settings.GhostDrag())
 		{
@@ -1763,13 +1764,11 @@ public:
       /*
       CSplitterBar splitter(this->IsHorizontal());
       splitter.CalculateRect(rc, this->m_side.Side());
-			pTracker=std::auto_ptr<CSizeTrackerFull>(
-          new CSizeTrackerGhost(this->m_hWnd, pt, this->Orientation(), splitter, m_rcBound));
+			pTracker=std::make_unique<CSizeTrackerGhost>(this->m_hWnd, pt, this->Orientation(), splitter, m_rcBound);
       */
 		}
 		else
-			pTracker=std::auto_ptr<CSizeTrackerFull>(new CSizeTrackerFull(
-          this->m_hWnd, pt, this->Orientation(), this->m_splitter.GetThickness(), m_rcBound));
+			pTracker=std::make_unique<CSizeTrackerFull>(this->m_hWnd, pt, this->Orientation(), this->m_splitter.GetThickness(), m_rcBound);
 
 		HWND hWndParent=GetParent(this->m_hWnd);
 		assert(hWndParent);
