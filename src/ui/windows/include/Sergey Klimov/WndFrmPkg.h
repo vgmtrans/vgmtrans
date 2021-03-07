@@ -150,9 +150,9 @@ protected:
 	struct CWndFrameTraits : ssec::spraits<T, typename T::position, typename T::distance/*,TMinDist*/>
 	{
 		typedef ssec::spraits<T,position,position/*,TMinDist*/> baseClass;
-		static distance min_distance(const T& x)
+		static auto min_distance(const T& x)
 		{
-			const distance dist=TMinDist;
+			auto dist=TMinDist;
 			return dist+x.MinDistance();
 		}
 
@@ -172,19 +172,19 @@ protected:
 		CEmbeddedSplitterBar(bool bHorizontal,position vertex,const CRect& rcClient)
 				:CSplitterBar(bHorizontal)
 		{
-			if(IsHorizontal())
+			if(this->IsHorizontal())
 			{
-					top=vertex;
-					bottom=top+GetThickness();
-					left=rcClient.left;
-					right=rcClient.right;
+        this->top = vertex;
+        this->bottom = this->top + this->GetThickness();
+					this->left=rcClient.left;
+					this->right=rcClient.right;
 			}
 			else
 			{
-					left=vertex;
-					right=left+GetThickness();
-					top=rcClient.top;
-					bottom=rcClient.bottom;
+					this->left=vertex;
+        this->right = this->left + this->GetThickness();
+          this->top = rcClient.top;
+          this->bottom = rcClient.bottom;
 			}
 
 		}
@@ -267,8 +267,7 @@ protected:
 		{
 		}
 		void Move()
-		{
-			SetPosition();
+		{ this->SetPosition();
 		}
 	};
 
@@ -279,8 +278,8 @@ protected:
 	public:
 		CSplitterMoveTrackerGhost(HWND hWnd,thisClass& owner,
 									const CPoint& pt,const CRect& rc)
-			:CSplitterMoveTrackerBase(hWnd,owner,pt,rc),
-			  m_dc(NULL),m_splitter(!owner.IsHorizontal(),m_pos,rc),m_slider(m_splitter)
+			:CSplitterMoveTrackerBase(hWnd,owner,pt,rc), m_dc(NULL),
+          m_splitter(!owner.IsHorizontal(), this->m_pos, rc), m_slider(m_splitter)
 		{
 			CPoint point(rc.TopLeft ());
 			::ClientToScreen(hWnd,&point);
@@ -298,12 +297,12 @@ protected:
 		{
 			m_splitter.CleanGhostBar(m_dc);
 			if(!bCanceled)
-				SetPosition();
+				this->SetPosition();
 		}
 		void Move()
 		{
 			m_splitter.CleanGhostBar(m_dc);
-			m_slider=m_pos+m_ghOffset;
+      m_slider = this->m_pos + m_ghOffset;
 			m_splitter.DrawGhostBar(m_dc);
 		}
 
@@ -516,7 +515,7 @@ public:
 		}
 		bounds.low-=splitterSize;
 
-		CBounds::distance_t limit=m_frames.distance_limit();
+		auto limit=m_frames.distance_limit();
 		if(bounds.distance()<limit)
 						bounds.hi=bounds.low+limit;
 		m_frames.set_bounds(bounds);
@@ -583,7 +582,7 @@ public:
 	bool Dock(CFrame& frame,const DFDOCKRECT* pHdr,const CRect& rc)
 	{
 		position		  pos;
-		CFrames::distance len;
+		typename CFrames::distance len;
 
 		if(IsHorizontal())
 		{
@@ -651,7 +650,7 @@ public:
 		wnd.SetParent(bar);
 		wnd.SendMessage(WM_NCACTIVATE,TRUE);
 		wnd.SendMessage(WMDF_NDOCKSTATECHANGED,
-					MAKEWPARAM(TRUE,IsHorizontal()),
+					MAKEWPARAM(TRUE,this->IsHorizontal()),
 					reinterpret_cast<LPARAM>(bar));
 	}
 	void PrepareForUndocking(CWindow wnd,HDOCKBAR bar)
@@ -672,10 +671,10 @@ public:
 		assert(::IsWindow(pHdr->hdr.hWnd));
 		CWindow wnd(pHdr->hdr.hWnd);
 		PrepareForDocking(wnd,pHdr->hdr.hBar);
-		position pos=m_frames.low()+position((m_frames.hi()-m_frames.low())*pHdr->fPctPos);
-		m_frames.insert(CFrame(pos,pHdr->hdr.hWnd),pHdr->nHeight);
+    auto pos = this->m_frames.low() + dockwins::CWndFrame::position((this->m_frames.hi() - this->m_frames.low()) * pHdr->fPctPos);
+		this->m_frames.insert(CFrame(pos,pHdr->hdr.hWnd),pHdr->nHeight);
 //		wnd.ShowWindow(SW_SHOWNA);
-		bool bRes=Arrange(rc);
+    bool bRes = this->Arrange(rc);
 		wnd.SetWindowPos(NULL,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
 		return bRes;
 	}
@@ -683,16 +682,16 @@ public:
 	bool GetDockingPosition(DFDOCKPOS* pHdr,const CRect& /*rc*/) const
 	{
 		assert(::IsWindow(pHdr->hdr.hWnd));
-		const_iterator i=std::find_if(m_frames.begin(),m_frames.end(),CFrame::CCmp(pHdr->hdr.hWnd));
-		bool bRes=(i!=m_frames.end());
+		auto i=std::find_if(this->m_frames.begin(),this->m_frames.end(),CFrame::CCmp(pHdr->hdr.hWnd));
+		bool bRes=(i!=this->m_frames.end());
 		if(bRes)
 		{
-			position pos=*i-m_frames.low();
-			pHdr->fPctPos=float(pos)/(m_frames.hi()-m_frames.low());
-			pHdr->nHeight=m_frames.get_frame_size(i)-CSplitterBar::GetThickness();
+			auto pos=*i-this->m_frames.low();
+			pHdr->fPctPos=float(pos)/(this->m_frames.hi()-this->m_frames.low());
+			pHdr->nHeight=this->m_frames.get_frame_size(i)-CSplitterBar::GetThickness();
 //			pHdr->nWidth=IsHorizontal() ? rc.Height() : rc.Width();
 //			pHdr->nWidth-=CSplitterBar::GetThickness();
-			if(m_frames.size()==1)
+			if(this->m_frames.size()==1)
 				pHdr->dwDockSide|=CDockingSide::sSingle;
 		}
 		return bRes;
@@ -700,8 +699,8 @@ public:
 
 	bool AcceptDock(DFDOCKRECT* pHdr,const CRect& rc)
 	{
-		return (!((m_frames.size()==1)
-					&&(m_frames.begin()->hwnd()==pHdr->hdr.hWnd)))
+    return (!((this->m_frames.size() == 1) &&
+              (this->m_frames.begin()->hwnd() == pHdr->hdr.hWnd)))
 						  &&baseClass::AcceptDock(pHdr,rc);
 	}
 	bool Dock(DFDOCKRECT* pHdr,const CRect& rc)
@@ -721,7 +720,7 @@ public:
 		bool bRes=baseClass::Undock(pHdr,rc);
 		assert(bRes);
 		PrepareForUndocking(pHdr->hWnd,pHdr->hBar);
-		if(m_frames.size()==0)
+		if(this->m_frames.size()==0)
 		{
 			DFMHDR dockHdr;
 			dockHdr.hWnd = pHdr->hBar;
@@ -911,7 +910,7 @@ protected:
 };
 
 //TImbeddedPackegeWnd
-template<class TPackageFrame,class TTraits = CDockingWindowTraits >
+template<class TPackageFrame,class TTraits = CDockingWindowTraits<COutlookLikeCaption> >
 class CSubWndFramesPackage :
 		public CRect,
 		public CWndFramesPackageBase<CPtrFrame<IFrame>,TTraits >
@@ -1006,8 +1005,8 @@ public:
 		if(!bRes)
 		{
 			CopyRect(rc);
-			CBounds bounds;
-			if(IsHorizontal())
+			ssec::bounds_type<LONG> bounds;
+			if(this->IsHorizontal())
 			{
 					bounds.low=rc.left;
 					bounds.hi=rc.right;
@@ -1017,16 +1016,16 @@ public:
 					bounds.low=rc.top;
 					bounds.hi=rc.bottom;
 			}
-			bounds.low-=splitterSize;
+			bounds.low-=this->splitterSize;
 
-			CBounds::distance_t limit=m_frames.distance_limit();
+			dockwins::CWndFrame::distance limit=this->m_frames.distance_limit();
 			if(bounds.distance()<limit)
 							bounds.hi=bounds.low+limit;
 			if(m_pDecl!=0)
-				m_frames.set_bounds(bounds,CFrame::CCmp(m_pDecl->hwnd()));
+				this->m_frames.set_bounds(bounds,CFrame::CCmp(m_pDecl->hwnd()));
 			else
-				m_frames.set_bounds(bounds);
-			bRes=Arrange(rc);
+        this->m_frames.set_bounds(bounds);
+      bRes = this->Arrange(rc);
 		}
 		return bRes;
 	}
@@ -1051,8 +1050,8 @@ public:
 	{
 		CPoint pt(pHdr->rect.left,pHdr->rect.top);
 		CSize sz(0,0);
-		position pos;
-		if(IsHorizontal())
+		dockwins::CWndFrame::position pos;
+		if(this->IsHorizontal())
 		{
 			pos=pt.x;
 			sz.cx=controlledLen;
@@ -1065,13 +1064,12 @@ public:
 		bool bRes=PtInRect(pt)==TRUE;
 		if(bRes)
 		{
-//			position pos=IsHorizontal() ? pHdr->rect.left :pHdr->rect.top;
-			const_iterator i=m_frames.locate(pos);
-			if( m_frames.get_frame_low(i)+controlledLen>pos)
+      auto i = this->m_frames.locate(pos);
+      if (this->m_frames.get_frame_low(i) + controlledLen > pos)
 				bRes=AcceptDock(i,pHdr,*this);
 			else
 			{
-				if( m_frames.get_frame_hi(i)-controlledLen<pos)
+        if (this->m_frames.get_frame_hi(i) - controlledLen < pos)
 					bRes=AcceptDock(++i,pHdr,*this);
 				else
 				{
@@ -1088,19 +1086,21 @@ public:
 			bRes=rc.PtInRect(pt)==TRUE;
 			if(bRes)
 			{
-				if(pos<m_frames.hi())
-					bRes=AcceptDock(m_frames.begin(),pHdr,rc);
+        if (pos < this->m_frames.hi())
+          bRes = AcceptDock(this->m_frames.begin(), pHdr, rc);
 				else
-					bRes=AcceptDock(m_frames.end(),pHdr,rc);
+          bRes = AcceptDock(this->m_frames.end(), pHdr, rc);
 			}
 		}
 		return bRes;
 	}
 
+  template <typename const_iterator>
 	bool AcceptDock(const_iterator i,DFDOCKRECT* pHdr,const CRect& rc)
 	{
-		assert(std::find_if(m_frames.begin(),m_frames.end(),CFrame::CCmp(m_pDecl->hwnd()))!=m_frames.end());
-		const_iterator begin=m_frames.begin();
+    assert(std::find_if(this->m_frames.begin(), this->m_frames.end(),
+                        CFrame::CCmp(m_pDecl->hwnd())) != this->m_frames.end());
+    const_iterator begin = this->m_frames.begin();
 		if(std::find_if(begin,i,CFrame::CCmp(m_pDecl->hwnd()))==i)
 			CDockOrientationFlag::SetLow(pHdr->flag);
 		else
@@ -1109,18 +1109,17 @@ public:
 		bool bRes=baseClass::AcceptDock(pHdr,rc);
 		if(bRes)
 		{
-			if(IsHorizontal())
+      if (this->IsHorizontal())
 			{
 				long len=(pHdr->rect.right-pHdr->rect.left);
 				if(CDockOrientationFlag::IsLow(pHdr->flag))
 				{
-					assert(i!=m_frames.end());
 					pHdr->rect.left=(*i)+CSplitterBar::GetThickness();
 					pHdr->rect.right=pHdr->rect.left+len;
 				}
 				else
 				{
-					pHdr->rect.right=(i==m_frames.end()) ? m_frames.hi() : (*i);
+          pHdr->rect.right = (i == this->m_frames.end()) ? this->m_frames.hi() : (*i);
 					pHdr->rect.left=pHdr->rect.right-len;
 
 				}
@@ -1130,13 +1129,12 @@ public:
 				long len=(pHdr->rect.bottom-pHdr->rect.top);
 				if(CDockOrientationFlag::IsLow(pHdr->flag))
 				{
-					assert(i!=m_frames.end());
 					pHdr->rect.top=(*i)+CSplitterBar::GetThickness();
 					pHdr->rect.bottom=pHdr->rect.top+len;
 				}
 				else
 				{
-					pHdr->rect.bottom=(i==m_frames.end()) ? m_frames.hi() : (*i);
+          pHdr->rect.bottom = (i == this->m_frames.end()) ? this->m_frames.hi() : (*i);
 					pHdr->rect.top=pHdr->rect.bottom-len;
 				}
 			}
@@ -1145,10 +1143,10 @@ public:
 	}
 	bool Dock(CFrame& frame,const DFDOCKRECT* pHdr,const CRect& rc)
 	{
-		position		  pos;
-		CFrames::distance len;
+		dockwins::CWndFrame::position		  pos;
+    LONG len;
 
-		if(IsHorizontal())
+		if (this->IsHorizontal())
 		{
 			pos=pHdr->rect.left;
 			len=pHdr->rect.right-pHdr->rect.left;
@@ -1161,18 +1159,20 @@ public:
 		frame=pos;
 		if(!CDockOrientationFlag::IsLow(pHdr->flag))
 			pos+=len;
-		iterator i;
-		if(pos!=m_frames.hi())
-			i=m_frames.locate(pos);
+
+    /* HACK: determine iterator type with a call to begin() */
+    auto i = this->m_frames.begin();
+		if(pos!=this->m_frames.hi())
+      i = this->m_frames.locate(pos);
 		else
-			i=m_frames.end();
-		m_frames.insert(i,CFrame::CCmp(m_pDecl->hwnd()),frame,len);
-		return Arrange(rc);
+      i = this->m_frames.end();
+    this->m_frames.insert(i, CFrame::CCmp(m_pDecl->hwnd()), frame, len);
+    return this->Arrange(rc);
 	}
 
 	bool Dock(DFDOCKRECT* pHdr)
 	{
-		CPackageFrame* ptr=CPackageFrame::CreateInstance(pHdr->hdr.hBar,!IsHorizontal());
+    CPackageFrame* ptr = CPackageFrame::CreateInstance(pHdr->hdr.hBar, !this->IsHorizontal());
 		bool bRes=(ptr!=0);
 		if(bRes)
 		{
@@ -1195,27 +1195,28 @@ public:
 
 	bool Undock(const DFMHDR* pHdr)
 	{
-		iterator i=std::find_if(m_frames.begin(),m_frames.end(),CFrame::CCmp(pHdr->hWnd));
-		bool bRes=(i!=m_frames.end());
+    auto i =
+        std::find_if(this->m_frames.begin(), this->m_frames.end(), CFrame::CCmp(pHdr->hWnd));
+    bool bRes = (i != this->m_frames.end());
 		if(bRes)
 		{
-			m_frames.erase(i,CFrame::CCmp(m_pDecl->hwnd()));
-			bRes=Arrange(*this);
+      this->m_frames.erase(i, CFrame::CCmp(m_pDecl->hwnd()));
+      bRes = this->Arrange(*this);
 		}
 		return bRes;
 	}
 
 	bool GetDockingPosition(DFDOCKPOS* pHdr) const
 	{
-		const_iterator i=std::find_if(m_frames.begin(),m_frames.end(),CFrame::CCmp(pHdr->hdr.hBar));
-		bool bRes=(i!=m_frames.end());
+    auto i =
+        std::find_if(this->m_frames.begin(), this->m_frames.end(), CFrame::CCmp(pHdr->hdr.hBar));
+    bool bRes = (i != this->m_frames.end());
 		if(bRes)
 		{
-			pHdr->nWidth=m_frames.get_frame_size(i)-CSplitterBar::GetThickness();
-			CFrames::size_type dWnd=std::distance(m_frames.begin(),i);
-			i=std::find_if(m_frames.begin(),m_frames.end(),CFrame::CCmp(m_pDecl->hwnd()));
-			assert(i!=m_frames.end());
-			CFrames::size_type dBWnd=std::distance(m_frames.begin(),i);
+      pHdr->nWidth = this->m_frames.get_frame_size(i) - CSplitterBar::GetThickness();
+      auto dWnd = std::distance(this->m_frames.begin(), i);
+      i = std::find_if(this->m_frames.begin(), this->m_frames.end(), CFrame::CCmp(m_pDecl->hwnd()));
+      auto dBWnd = std::distance(this->m_frames.begin(), i);
 			if(dBWnd>dWnd)
 			{
 				pHdr->nBar=(unsigned long)dWnd;
@@ -1223,8 +1224,8 @@ public:
 			}
 			else
 			{
-				pHdr->nBar=(unsigned long)(m_frames.size()-dWnd-1);
-//				pHdr->dwDockSide|=0;
+        pHdr->nBar = (unsigned long)(this->m_frames.size() - dWnd - 1);
+        //				pHdr->dwDockSide|=0;
 			}
 			bRes=(::SendMessage(pHdr->hdr.hBar,WMDF_DOCK,NULL,reinterpret_cast<LPARAM>(pHdr))!=FALSE);
 		}
@@ -1295,23 +1296,25 @@ public:
 	bool SetDockingPosition(DFDOCKPOS* pHdr)
 	{
 		bool bRes=true;
-		unsigned long limit=(unsigned long)GetMinFrameDist(&(pHdr->hdr));
+    unsigned long limit = (unsigned long)this->GetMinFrameDist(&(pHdr->hdr));
 		if(pHdr->nWidth<limit)
 						pHdr->nWidth=limit;
 		CDockingSide side(pHdr->dwDockSide);
 		if(side.IsTop())
 		{
-			iterator i=ssec::search_n(m_frames.begin(),m_frames.end(),CFrame::CCmp(m_pDecl->hwnd()),pHdr->nBar);
-			assert(i!=m_frames.end());
+      auto i = ssec::search_n(this->m_frames.begin(), this->m_frames.end(),
+                                  CFrame::CCmp(m_pDecl->hwnd()), pHdr->nBar);
+      assert(i != this->m_frames.end());
 			if(i->hwnd()==m_pDecl->hwnd() || side.IsSingle())
 			{
-				CPackageFrame* ptr=CPackageFrame::CreateInstance(pHdr->hdr.hBar,!IsHorizontal());
+        CPackageFrame* ptr = CPackageFrame::CreateInstance(pHdr->hdr.hBar, !this->IsHorizontal());
 				bRes=(ptr!=0);
 				if(bRes)
 				{
 //					i=m_frames.insert(i,CFrame(*i,ptr),pHdr->nWidth);
-					i=m_frames.insert(i,CFrame::CCmp(m_pDecl->hwnd()),CFrame(*i,ptr),pHdr->nWidth+splitterSize);
-					bRes=Arrange(*this);
+          i = this->m_frames.insert(i, CFrame::CCmp(m_pDecl->hwnd()), CFrame(*i, ptr),
+                          pHdr->nWidth + this->splitterSize);
+          bRes = this->Arrange(*this);
 					assert(bRes);
 				}
 			}
@@ -1319,22 +1322,22 @@ public:
 		}
 		else
 		{
-			reverse_iterator ri=ssec::search_n(m_frames.rbegin(),m_frames.rend(),CFrame::CCmp(m_pDecl->hwnd()),pHdr->nBar);
-			assert(ri!=m_frames.rend());
-			iterator i=ri.base();
+      auto ri = ssec::search_n(this->m_frames.rbegin(), this->m_frames.rend(),
+                               CFrame::CCmp(m_pDecl->hwnd()), pHdr->nBar);
+			auto i=ri.base();
 			if(/*ri->hwnd()*/(*ri).hwnd()==m_pDecl->hwnd() || side.IsSingle())
 			{
-				CPackageFrame* ptr=CPackageFrame::CreateInstance(pHdr->hdr.hBar,!IsHorizontal());
+        CPackageFrame* ptr = CPackageFrame::CreateInstance(pHdr->hdr.hBar, !this->IsHorizontal());
 				bRes=(ptr!=0);
 				if(bRes)
 				{
-					position pos=(i==m_frames.end())? m_frames.hi():*i;
+          auto pos = (i == this->m_frames.end()) ? this->m_frames.hi() : *i;
 					pos-=pHdr->nWidth+CSplitterBar::GetThickness();
-					if(pos<m_frames.low())
-						pos=m_frames.low();
-//					i=m_frames.insert(i,CFrame(pos,ptr),pHdr->nWidth);
-					i=m_frames.insert(i,CFrame::CCmp(m_pDecl->hwnd()),CFrame(pos,ptr),pHdr->nWidth+splitterSize);
-					bRes=Arrange(*this);
+          if (pos < this->m_frames.low())
+            pos = this->m_frames.low();
+          i = this->m_frames.insert(i, CFrame::CCmp(m_pDecl->hwnd()), CFrame(pos, ptr),
+                                    pHdr->nWidth + this->splitterSize);
+          bRes = this->Arrange(*this);
 					assert(bRes);
 					pHdr->hdr.hBar=i->hwnd();
 				}
@@ -1369,7 +1372,7 @@ public:
 		return baseClass::Dock(frame,&dockHdr,*this);
 	}
 protected:
-	IFrame* m_pDecl;
+	IFrame* m_pDecl = nullptr;
 };
 
 }//namespace dockwins

@@ -239,6 +239,7 @@ public:
 	}
 };
 
+/*
 template<class T>
 struct CDockingWindowStateAdapterEx : CDockingWindowStateAdapter<T>
 {
@@ -247,5 +248,6 @@ struct CDockingWindowStateAdapterEx : CDockingWindowStateAdapter<T>
 	{
 	}
 };
+*/
 }//namespace sstate
 #endif // __WTL_DW__DBSTATE_H__

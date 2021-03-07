@@ -550,61 +550,7 @@ void CVGMFileListView::RemoveFile(VGMFile* theFile)
 }
 
 
-LRESULT CVGMFileListView::OnListBeginDrag ( NMHDR* phdr )
-{
-NMLISTVIEW* pnmlv = (NMLISTVIEW*) phdr;
-std::vector<CDraggedFileInfo> vec;
-CComObjectStack2<CDragDropSource> dropsrc;
-DWORD dwEffect = 0;
-HRESULT hr;
-CComPtr<IDragSourceHelper> pdsh;
-
-    // Get a list of the files being dragged (minus files that we can't extract
-    // from the current CAB).
-    if ( !GetDraggedFileInfo ( vec ) )
-        {
-        ATLTRACE("Error: Couldn't get list of files dragged (or only partial files were dragged)\n");
-        return 0;   // do nothing
-        }
-
-    // Init the drag/drop data object.
-    if ( !dropsrc.Init ( /*m_sCurrentCabFilePath,*/ vec ) )
-        {
-        ATLTRACE("Error: Couldn't init drop source object\n");
-        return 0;   // do nothing
-        }
-
-    // On 2K+, init a drag source helper object that will do the fancy drag
-    // image when the user drags into Explorer (or another target that supports
-    // the drag/drop helper).
-    hr = pdsh.CoCreateInstance ( CLSID_DragDropHelper );
-
-    if ( SUCCEEDED(hr) )
-        {
-        CComQIPtr<IDataObject> pdo;
-
-        if ( pdo = dropsrc.GetUnknown() )
-            pdsh->InitializeFromWindow ( this->m_hWnd, &pnmlv->ptAction, pdo );
-        }
-
-    // Start the drag/drop!
-    hr = dropsrc.DoDragDrop ( DROPEFFECT_COPY, &dwEffect );
-
-    if ( FAILED(hr) )
-        ATLTRACE("Error: DoDragDrop() failed, error: 0x%08X\n", hr);
-    else
-        {
-        // If we found any files continued into other CABs, update the UI.
-        /*const std::vector<CDraggedFileInfo>& vecResults = dropsrc.GetDragResults();
-        std::vector<CDraggedFileInfo>::const_iterator it;
-
-        for ( it = vecResults.begin(); it != vecResults.end(); it++ )
-            {
-            if ( it->bPartialFile )
-                m_view.UpdateContinuedFile ( *it );
-            }*/
-        }
-
+LRESULT CVGMFileListView::OnListBeginDrag ( NMHDR* phdr ){
     return 0;
 }
 

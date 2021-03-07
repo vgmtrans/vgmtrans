@@ -120,20 +120,6 @@ struct CDraggedFileInfo {
       : sFilename(s), nListIdx(n), bPartialFile(false), bCabMissing(false) {}
 };
 
-// Version of CComObjectStack that doesn't freak out and assert when IUnknown
-// methods are called.
-template <class Base>
-class CComObjectStack2 : public CComObjectStack<Base> {
-public:
-  CComObjectStack2() : CComObjectStack<Base>() {}
-
-  STDMETHOD_(ULONG, AddRef)() { return 1; }
-  STDMETHOD_(ULONG, Release)() { return 1; }
-
-  STDMETHOD(QueryInterface)(REFIID iid, void** ppvObject) {
-    return _InternalQueryInterface(iid, ppvObject);
-  }
-};
 
 // Convenience macros
 #define _S(x) (CString(LPCTSTR(x)))
@@ -176,34 +162,6 @@ public:
     }                 \
   }
 #endif
-#endif
-
-#ifndef SAFE_DELETE
-#define SAFE_DELETE(p) \
-  {                    \
-    if (p) {           \
-      delete (p);      \
-      (p) = NULL;      \
-    }                  \
-  }
-#endif
-#ifndef SAFE_DELETE_ARRAY
-#define SAFE_DELETE_ARRAY(p) \
-  {                          \
-    if (p) {                 \
-      delete[](p);           \
-      (p) = NULL;            \
-    }                        \
-  }
-#endif
-#ifndef SAFE_RELEASE
-#define SAFE_RELEASE(p) \
-  {                     \
-    if (p) {            \
-      (p)->Release();   \
-      (p) = NULL;       \
-    }                   \
-  }
 #endif
 
 //{{AFX_INSERT_LOCATION}}

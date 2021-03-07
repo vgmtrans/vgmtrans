@@ -59,15 +59,19 @@ public:
 
 	HCURSOR GetCursor(const CPoint& pt) const
 	{
-		HCURSOR hCursor=NULL;
-		if(IsPtIn(pt))
-		{
-			CDWSettings settings;
-			 hCursor=((IsHorizontal())
+    return NULL;
+    /*
+    if (!IsPtIn(pt)) {
+      return NULL;
+    }
+		
+    CDWSettings settings{};
+		hCursor=this->IsHorizontal()
 								?settings.HResizeCursor()
 								:settings.VResizeCursor());
-		}
+		
 		return hCursor;
+  */
 	}
 
     void Draw(CDC& dc) const
@@ -76,11 +80,11 @@ public:
     }
 	void DrawGhostBar(CDC& dc) const
 	{
-        CBrush brush = CDCHandle::GetHalftoneBrush();
+        auto brush = CDCHandle::GetHalftoneBrush();
         if(brush.m_hBrush != NULL)
         {
             HBRUSH hBrushOld = dc.SelectBrush(brush);
-            dc.PatBlt(this->left, this->top,this->Width(),this->Height(), PATINVERT);
+            dc.PatBlt(left, top,Width(),Height(), PATINVERT);
             dc.SelectBrush(hBrushOld);
 
         }
@@ -115,7 +119,7 @@ public:
         dc.FillRect(this, (HBRUSH)LongToPtr(COLOR_3DFACE + 1));
 		CRect rc(*this);
 //		dc.DrawEdge(&rc, EDGE_RAISED, (IsHorizontal()) ? (BF_TOP | BF_BOTTOM) : (BF_LEFT | BF_RIGHT) );
-		dc.DrawEdge(&rc, BDR_RAISEDINNER, (IsHorizontal()) ? (BF_TOP | BF_BOTTOM) : (BF_LEFT | BF_RIGHT) );
+		dc.DrawEdge(&rc, BDR_RAISEDINNER, (this->IsHorizontal()) ? (BF_TOP | BF_BOTTOM) : (BF_LEFT | BF_RIGHT) );
 
     }
 

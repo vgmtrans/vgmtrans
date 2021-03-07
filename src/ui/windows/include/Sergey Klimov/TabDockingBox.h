@@ -66,23 +66,23 @@ public:
 				if(pHdr->hdr.hWnd!=NULL)
 				{
 					RemoveWindow(pHdr->hdr.hWnd);
-					m_docker.Dock(pHdr);
+					this->m_docker.Dock(pHdr);
 				}
 			}
 			pHdr->hdr.hWnd=hActiveWnd;
 //			pHdr->hdr.code=DC_ACTIVATE;
-			m_docker.Activate(&pHdr->hdr);
+			this->m_docker.Activate(&pHdr->hdr);
 
-			PostMessage(WM_CLOSE);
+			PostMessage(this->m_hWnd, WM_CLOSE, NULL, NULL);
 		}
 		else
-			m_docker.Dock(pHdr);
+			this->m_docker.Dock(pHdr);
 		return true;
 	}
 	bool IsPointInAcceptedArea(POINT *pPt) const
 	{
 		HWND hWnd=::WindowFromPoint(*pPt);
-		while( (hWnd!=m_hWnd)
+		while( (hWnd!=this->m_hWnd)
 					&&(hWnd!=NULL))
 			hWnd=::GetParent(hWnd);
 		bool bRes=(hWnd!=NULL);
@@ -95,10 +95,10 @@ public:
 			bRes=(rc.PtInRect(*pPt)!=FALSE);
 			if(!bRes)
 			{
-				bRes=::SendMessage(m_hWnd,WM_NCHITTEST,NULL,MAKELPARAM(pt.x, pt.y))==HTCAPTION;
+				bRes=::SendMessage(this->m_hWnd,WM_NCHITTEST,NULL,MAKELPARAM(pt.x, pt.y))==HTCAPTION;
 				if(bRes)
 				{
-					if( !IsDocking() || m_caption.IsHorizontal() )
+          if (!this->IsDocking() || this->m_caption.IsHorizontal())
 						pPt->y=(rc.bottom+rc.top)/2;
 					else
 						*pPt=rc.CenterPoint();
@@ -163,7 +163,7 @@ public:
 				m_prevItem=m_tabs.HitTest(&tchti);
 			}
 			m_prevPos = pos;
-			pHdr->hdr.hBar=m_hWnd;
+      pHdr->hdr.hBar = this->m_hWnd;
 			SetIndex(pHdr,curSel);
 
 			//check next message
@@ -233,8 +233,8 @@ public:
 		BOOL bRes=(index!=-1);
 		if(bRes)
 			m_tabs.SetCurSel(index);
-		if(!IsWindowVisible())
-			Show();
+    if (!IsWindowVisible(this->m_hWnd))
+      this->Show();
 		return bRes;
 	}
 
@@ -244,11 +244,11 @@ public:
 		DWORD style = wnd.GetWindowLong(GWL_STYLE);
 		DWORD newStyle = style&(~(WS_POPUP | WS_CAPTION))|WS_CHILD;
 		wnd.SetWindowLong( GWL_STYLE, newStyle);
-		wnd.SetParent(m_hWnd);
+    wnd.SetParent(this->m_hWnd);
 		wnd.SendMessage(WM_NCACTIVATE,TRUE);
 		wnd.SendMessage(WMDF_NDOCKSTATECHANGED,
 			MAKEWPARAM(TRUE,FALSE),
-			reinterpret_cast<LPARAM>(m_hWnd));
+                    reinterpret_cast<LPARAM>(this->m_hWnd));
 
 	}
 	void PrepareForUndock(CWindow wnd)
@@ -259,8 +259,7 @@ public:
 		wnd.SetWindowLong( GWL_STYLE, newStyle);
 		wnd.SetParent(NULL);
 		wnd.SendMessage(WMDF_NDOCKSTATECHANGED,
-			FALSE,
-			reinterpret_cast<LPARAM>(m_hWnd));
+			FALSE, reinterpret_cast<LPARAM>(this->m_hWnd));
 	}
 	int InsertWndTab(int index,CWindow wnd)
 	{
@@ -332,11 +331,9 @@ public:
 	{
 		if(m_wnd.m_hWnd!=0)
 		{
-			assert(m_wnd.GetParent()==m_hWnd);
 			CRect rc;
-			GetClientRect(&rc);
+      this->GetClientRect(&rc);
 			m_tabs.AdjustRect(FALSE,&rc);
-			assert( (m_wnd.GetWindowLong(GWL_STYLE) & WS_CAPTION ) == 0 );
 			m_wnd.SetWindowPos(HWND_TOP,&rc,SWP_SHOWWINDOW);
 		}
 	}
@@ -344,13 +341,12 @@ public:
 	{
 		if(m_wnd.m_hWnd!=0)
 		{
-			assert(m_wnd.GetParent()==m_hWnd);
 			int len= m_wnd.GetWindowTextLength()+1;
 			TCHAR* ptxt = new TCHAR[len];
 			m_wnd.GetWindowText(ptxt,len);
-			SetWindowText(ptxt);
+      this->SetWindowText(ptxt);
 			HICON hIcon=m_wnd.GetIcon(FALSE);
-			SetIcon(hIcon , FALSE);
+      this->SetIcon(hIcon, FALSE);
 			delete [] ptxt;
 		}
 	}
@@ -360,9 +356,9 @@ public:
 		int n=m_tabs.GetItemCount();
 		if(n<=1)
 		{
-			PostMessage(WM_CLOSE,TRUE);
+      PostMessage(this->m_hWnd, WM_CLOSE, TRUE, NULL);
 			if(n==0)
-				Hide();
+        this->Hide();
 		}
 	}
 	bool CanBeClosed(unsigned long param)
@@ -380,23 +376,22 @@ public:
 				{
 					::ShowWindow(hWnd,SW_HIDE);
 					RemoveWindow(hWnd);
-					if(IsDocking())
+          if (this->IsDocking())
 					{
 						DFDOCKREPLACE dockHdr;
-						dockHdr.hdr.hBar=GetOwnerDockingBar();
-						dockHdr.hdr.hWnd=m_hWnd;
+						dockHdr.hdr.hBar=this->GetOwnerDockingBar();
+            dockHdr.hdr.hWnd = this->m_hWnd;
 						dockHdr.hWnd=hWnd;
-						m_docker.Replace(&dockHdr);
+            this->m_docker.Replace(&dockHdr);
 					}
 					else
 					{
 						RECT rc;
-						BOOL bRes=GetWindowRect(&rc);
+            BOOL bRes = GetWindowRect(this->m_hWnd, & rc);
 						if(bRes)
 							bRes=::SetWindowPos(hWnd,HWND_TOP,rc.left, rc.top,
 													rc.right - rc.left, rc.bottom - rc.top,SWP_SHOWWINDOW);
 					}
-					assert(!IsDocking());
 				}
 			}
 		}
@@ -433,14 +428,14 @@ public:
 public:
 	bool OnGetDockingPosition(DFDOCKPOS* pHdr) const
 	{
-		pHdr->hdr.hBar=GetOwnerDockingBar();
+    pHdr->hdr.hBar = this->GetOwnerDockingBar();
 		bool bRes=baseClass::OnGetDockingPosition(pHdr);
 		pHdr->nIndex=FindItem(pHdr->hdr.hWnd);
 		assert(pHdr->nIndex!=-1);
 		if(m_tabs.GetItemCount()==2)
 			pHdr->hdr.hBar=GetItemHWND((pHdr->nIndex==0)?1:0);
 		else
-			pHdr->hdr.hBar=m_hWnd;
+      pHdr->hdr.hBar = this->m_hWnd;
 		if(m_wnd.m_hWnd==pHdr->hdr.hWnd)
 			pHdr->dwDockSide|=CDockingSide::sActive;
 		return bRes;
@@ -458,12 +453,12 @@ public:
 #ifdef DF_AUTO_HIDE_FEATURES
 	bool PinUp(const CDockingSide& side,unsigned long width,bool bVisualize=false)
 	{
-		if(IsDocking())
-					Undock();
+    if (this->IsDocking())
+      this->Undock();
 		DFPINUP pinHdr;
 		pinHdr.hdr.hWnd=m_wnd;
-		pinHdr.hdr.hBar=GetOwnerDockingBar();
-//		pinHdr.hdr.code=DC_PINUP;
+    pinHdr.hdr.hBar = this->GetOwnerDockingBar();
+    //		pinHdr.hdr.code=DC_PINUP;
 		pinHdr.dwDockSide=side;
 		pinHdr.nWidth=width;
 		pinHdr.dwFlags=(bVisualize) ? DFPU_VISUALIZE : 0 ;
@@ -479,9 +474,10 @@ public:
 				RemoveWindow(pinHdr.phWnds[n]);
 			}
 
-			bRes=m_docker.PinUp(&pinHdr);
+			bRes = this->m_docker.PinUp(&pinHdr);
 			delete [] pinHdr.phWnds;
-			PostMessage(WM_CLOSE);
+      //PostMessage(this->m_hWnd, WM_CLOSE, NULL, NULL);
+      this->PostMessage(WM_CLOSE);
 		}
 		catch(std::bad_alloc& /*e*/)
 		{
@@ -490,7 +486,7 @@ public:
 	}
 #endif
 
-	DECLARE_WND_CLASS(_T("CTabDockingBox"))
+	DECLARE_WND_CLASS2(_T("CTabDockingBox"), CTabDockingBox)
 	BEGIN_MSG_MAP(thisClass)
 		MESSAGE_HANDLER(WM_CREATE, OnCreate)
 		MESSAGE_HANDLER(WM_SIZE, OnSize)
@@ -511,7 +507,9 @@ public:
 	LRESULT OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)
 	{
 ///11	m_tabs.Create(m_hWnd, rcDefault, NULL,WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | TCS_TOOLTIPS | TCS_BOTTOM);
-		m_tabs.Create(m_hWnd, rcDefault, NULL,WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | CTCS_TOOLTIPS | CTCS_BOTTOM);
+    m_tabs.Create(
+    this->m_hWnd, this->rcDefault, NULL,
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | CTCS_TOOLTIPS | CTCS_BOTTOM);
 		BOOL bRes=m_images.Create(16, 16, ILC_COLOR32 | ILC_MASK , 0, 5);
 		assert(bRes);
 		if(bRes)
@@ -524,7 +522,7 @@ public:
 		if(wParam != SIZE_MINIMIZED )
 		{
 			RECT rc;
-			GetClientRect(&rc);
+      GetClientRect(this->m_hWnd, & rc);
 			m_tabs.SetWindowPos(NULL, &rc ,SWP_NOZORDER | SWP_NOACTIVATE);
 			AdjustCurentItem();
 		}
@@ -570,7 +568,6 @@ public:
 				{
 					if(m_wnd.m_hWnd!=NULL)
 					{
-						assert(::GetParent(m_wnd.m_hWnd)==m_hWnd);
 						m_wnd.ShowWindow(SW_HIDE);
 					}
 					m_wnd=hWnd;

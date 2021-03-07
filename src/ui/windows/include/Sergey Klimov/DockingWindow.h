@@ -250,12 +250,12 @@ public:
 	}
 	bool IsPinned() const
 	{
-		bool bRes=IsDocking();
+		bool bRes=this->IsDocking();
 		if(bRes)
 		{
 			DFMHDR dockHdr;
 //			dockHdr.code=DC_ISPINNED;
-			dockHdr.hWnd=m_hWnd;
+      dockHdr.hWnd = this->m_hWnd;
 			dockHdr.hBar=GetOwnerDockingBar();
 			bRes=m_docker.IsPinned(&dockHdr);
 		}
@@ -269,13 +269,13 @@ public:
 
 	bool GetDockingPosition(DFDOCKPOS* pHdr) const
 	{
-		assert(::IsWindow(m_hWnd));
+    assert(::IsWindow(this->m_hWnd));
 		bool bRes=true;
 		pHdr->hdr.hBar=GetOwnerDockingBar();
-		if(IsDocking())
+		if(this->IsDocking())
 		{
-			pHdr->hdr.hWnd=m_hWnd;
-//		    pHdr->hdr.code=DC_GETDOCKPOSITION;
+      pHdr->hdr.hWnd = this->m_hWnd;
+      //		    pHdr->hdr.code=DC_GETDOCKPOSITION;
 			bRes=m_docker.GetDockingPosition(pHdr);
 		}
 		return bRes;
@@ -284,23 +284,23 @@ public:
 	bool GetDockingWindowPlacement(DFDOCKPOSEX* pHdr) const
 	{
 		bool bRes=true;
-		pHdr->bDocking=IsDocking();
+		pHdr->bDocking=this->IsDocking();
 		if(pHdr->bDocking)
 		{
 			::CopyRect(&pHdr->rect,&m_rcUndock);
 			bRes=GetDockingPosition(&(pHdr->dockPos));
 		}
 		else
-			GetWindowRect(&pHdr->rect);
+			GetWindowRect(this->m_hWnd, &pHdr->rect);
 		return bRes;
 	}
 	bool SetDockingPosition(DFDOCKPOS* pHdr)
 	{
-		assert(::IsWindow(m_hWnd));
-		if(IsDocking())
+    assert(::IsWindow(this->m_hWnd));
+		if(this->IsDocking())
 					Undock();
-		pHdr->hdr.hWnd=m_hWnd;
-//	    pHdr->hdr.code=DC_SETDOCKPOSITION;
+    pHdr->hdr.hWnd = this->m_hWnd;
+    //	    pHdr->hdr.code=DC_SETDOCKPOSITION;
 		return m_docker.SetDockingPosition(pHdr);
 	}
 
@@ -314,9 +314,10 @@ public:
 		}
 		else
 		{
-			if(IsDocking())
+			if(this->IsDocking())
 						Undock();
-			bRes=(SetWindowPos(HWND_TOP,&(pHdr->rect),SWP_SHOWWINDOW | SWP_NOACTIVATE)!=FALSE);
+      bRes =
+          (this->SetWindowPos(HWND_TOP, &(pHdr->rect), SWP_SHOWWINDOW | SWP_NOACTIVATE) != FALSE);
 		}
 		return bRes;
 	}
@@ -328,11 +329,11 @@ public:
 
 	bool Float(LPCRECT pRc,UINT flags=SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_FRAMECHANGED,HWND hWndInsertAfter=HWND_TOP)
 	{
-		bool bRes=IsDocking();
+		bool bRes=this->IsDocking();
 		if(bRes)
 		{
 			if(Undock())
-				bRes=(SetWindowPos(hWndInsertAfter,pRc,flags)!=FALSE);
+        bRes = (this->SetWindowPos(hWndInsertAfter, pRc, flags) != FALSE);
 		}
 		return bRes;
 	}
@@ -347,10 +348,10 @@ public:
 
 	virtual bool Undock()
 	{
-		assert(IsDocking());
+		assert(this->IsDocking());
 		DFMHDR dockHdr;
 //		dockHdr.code=DC_UNDOCK;
-		dockHdr.hWnd=m_hWnd;
+    dockHdr.hWnd = this->m_hWnd;
 		dockHdr.hBar=GetOwnerDockingBar();
 		return m_docker.Undock(&dockHdr);
 	}
@@ -358,7 +359,7 @@ public:
 	bool OnClosing()
 	{
 		bool bRes=true;
-		if(IsDocking())
+		if(this->IsDocking())
 			bRes=Undock();
 		return bRes;
 	}
@@ -372,30 +373,30 @@ public:
     {
 		DFDOCKRECT dockHdr;
 //		dockHdr.hdr.code=DC_ACCEPT;
-		dockHdr.hdr.hWnd=m_hWnd;
+    dockHdr.hdr.hWnd = this->m_hWnd;
 		dockHdr.hdr.hBar=HNONDOCKBAR;//GetOwnerDockingBar();
 
 		if(m_rcUndock.IsRectEmpty())
 		{
-			GetWindowRect(&dockHdr.rect);
-//			dockHdr.hdr.code=DC_ADJUSTDRAGRECT;
+      GetWindowRect(this->m_hWnd, &dockHdr.rect);
+      //			dockHdr.hdr.code=DC_ADJUSTDRAGRECT;
 			m_docker.AdjustDragRect(&dockHdr);
 			m_rcUndock.CopyRect(&dockHdr.rect);
 		}
-		GetWindowRect(&dockHdr.rect);
+    GetWindowRect(this->m_hWnd, &dockHdr.rect);
 		CPoint pt(point);
-		ClientToScreen(&pt);
+		ClientToScreen(this->m_hWnd, &pt);
 
 		float ratio=float(pt.x-dockHdr.rect.left)/(dockHdr.rect.right-dockHdr.rect.left);
-		dockHdr.rect.left=pt.x-long(ratio*m_rcUndock.Width());
+    dockHdr.rect.left = pt.x - long(ratio * this->m_rcUndock.Width());
 		ratio=float(pt.y-dockHdr.rect.top)/(dockHdr.rect.bottom-dockHdr.rect.top);
-		dockHdr.rect.top=pt.y-long(ratio*m_rcUndock.Height());
+    dockHdr.rect.top = pt.y - long(ratio * this->m_rcUndock.Height());
 
-		dockHdr.rect.right=dockHdr.rect.left+m_rcUndock.Width();
-		dockHdr.rect.bottom=dockHdr.rect.top+m_rcUndock.Height();
+		dockHdr.rect.right = dockHdr.rect.left + this->m_rcUndock.Width();
+    dockHdr.rect.bottom = dockHdr.rect.top + this->m_rcUndock.Height();
 
-		CGhostMoveTracker tracker(m_docker,point,dockHdr);
-		if(TrackDragAndDrop(tracker,m_hWnd))
+		CGhostMoveTracker tracker(this->m_docker, point, dockHdr);
+    if (TrackDragAndDrop(tracker, this->m_hWnd))
 		{
 
 			CPoint ptCur;
@@ -403,25 +404,25 @@ public:
 			if((dockHdr.hdr.hBar!=HNONDOCKBAR)
 				|| (ptCur.x!=pt.x) || (ptCur.y!=pt.y))
 			{
-				if(IsDocking())
+				if(this->IsDocking())
 							Undock();
 				if(dockHdr.hdr.hBar!=HNONDOCKBAR)
 //						m_docker.Dock(&dockHdr);
 					DockMe(&dockHdr);
 				else
-					SetWindowPos(HWND_TOP,&(dockHdr.rect),SWP_SHOWWINDOW | SWP_FRAMECHANGED);
+          this->SetWindowPos(HWND_TOP, &(dockHdr.rect), SWP_SHOWWINDOW | SWP_FRAMECHANGED);
 			}
 		}
 		return true;
 	}
 	void OnDocked(HDOCKBAR hBar,bool /*bHorizontal*/)
 	{
-		assert(!IsDocking());
+		assert(!this->IsDocking());
 		m_hBarOwner=hBar;
 	}
 	void OnUndocked(HDOCKBAR /*hBar*/)
 	{
-		assert(IsDocking());
+		assert(this->IsDocking());
 		m_hBarOwner=HNONDOCKBAR;
 	}
 ////////////////messages handlers/////////////////////////////////
@@ -446,7 +447,7 @@ public:
 		if(
 			(pWPos->flags&SWP_SHOWWINDOW
 			|| ((pWPos->flags&(SWP_NOSIZE | SWP_NOMOVE))!=(SWP_NOSIZE | SWP_NOMOVE)))
-				&& !IsDocking()
+				&& !this->IsDocking()
 					&& IsWindowVisible()
 						/*&& !(pWPos->flags&SWP_HIDEWINDOW)*/)
 		{
@@ -471,9 +472,9 @@ public:
 		bHandled=(wParam==HTCAPTION);
         if(bHandled)
         {
-			SetWindowPos(HWND_TOP,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE );
+      SetWindowPos(this->m_hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 			POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-			if(::DragDetect(m_hWnd,pt))
+      if (::DragDetect(this->m_hWnd, pt))
 			{
 				T* pThis=static_cast<T*>(this);
 				pThis->ScreenToClient(&pt);
@@ -495,7 +496,7 @@ public:
 
 	LRESULT OnMenuChar(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& /*bHandled*/)
 	{
-		LRESULT lRes = DefWindowProc(uMsg, wParam, lParam);
+		LRESULT lRes = DefWindowProc(this->m_hWnd, uMsg, wParam, lParam);
 		if( HIWORD(lRes) == MNC_IGNORE ) {
 			return ::SendMessage(this->GetTopLevelParent(), uMsg, wParam, lParam);
 		}
@@ -511,31 +512,30 @@ template<class T>
 class CDockingWindowPlacement : public DFDOCKPOS
 {
 public:
-	CDockingWindowPlacement(T& dw)
-		:DFDOCKPOS(0),m_dw(dw)
+	CDockingWindowPlacement(T& dw) : DFDOCKPOS(0), m_dw(dw)
 	{
 		hdr.hBar=HNONDOCKBAR;
 	}
 	bool IsVisible() const
 	{
-		assert(::IsWindow(dw.m_hWnd));
-		return (m_dw.IsWindowVisible()!=FALSE);
+    assert(::IsWindow(this->dw.m_hWnd));
+    return (this->m_dw.IsWindowVisible() != FALSE);
 	}
 	bool IsDocking() const
 	{
-		assert(::IsWindow(dw.m_hWnd));
-		return m_dw.IsDocking();
+    assert(::IsWindow(this->dw.m_hWnd));
+    return this->m_dw.IsDocking();
 	}
 	bool Hide()
 	{
-		assert(::IsWindow(dw.m_hWnd));
+    assert(::IsWindow(this->dw.m_hWnd));
 		bool bRes=true;
-		if(m_dw.IsDocking())
+    if (this->m_dw.IsDocking())
 		{
-			bRes=m_dw.GetDockingPosition(this);
+      bRes = this->m_dw.GetDockingPosition(this);
 			assert(bRes);
 			if(bRes)
-				bRes=m_dw.Undock();
+        bRes = this->m_dw.Undock();
 			assert(bRes);
 		}
 		else
@@ -544,12 +544,12 @@ public:
 	}
 	bool Show()
 	{
-		assert(::IsWindow(dw.m_hWnd));
+		assert(::IsWindow(this->dw.m_hWnd));
 		bool bRes=true;
 		if(hdr.hBar!=HNONDOCKBAR)
-			bRes=m_dw.SetDockingPosition(this);
+      bRes = this->m_dw.SetDockingPosition(this);
 		else
-			m_dw.ShowWindow(SW_SHOW);
+      this->m_dw.ShowWindow(SW_SHOW);
 		assert(bRes);
 		return bRes;
 	}
@@ -725,7 +725,7 @@ public:
 		else
 		{
 			if(GetCapture()==NULL)
-				m_caption.HotTrack(m_hWnd,(unsigned int)lRes);
+        m_caption.HotTrack(this->m_hWnd, (unsigned int)lRes);
 		}
 		return lRes;
 	}
@@ -747,7 +747,7 @@ public:
 
 	void NcCalcSize(CRect* pRc)
 	{
-		DWORD style = GetWindowLong(GWL_STYLE);
+		DWORD style = GetWindowLong(this->m_hWnd, GWL_STYLE);
 		if((style&WS_CAPTION)==0)
 			m_caption.SetRectEmpty();
 		else
@@ -755,9 +755,9 @@ public:
 	}
 	void NcDraw(CDC& dc)
 	{
-		DWORD style = GetWindowLong(GWL_STYLE);
+		DWORD style = GetWindowLong(this->m_hWnd, GWL_STYLE);
 		if((style&WS_CAPTION)!=0)
-			m_caption.Draw(m_hWnd,dc);
+      m_caption.Draw(this->m_hWnd, dc);
 	}
 	void OnDocked(HDOCKBAR hBar,bool bHorizontal)
 	{
@@ -771,14 +771,14 @@ public:
 	}
 	bool CloseBtnPress()
 	{
-		PostMessage(WM_CLOSE);
+    PostMessage(this->m_hWnd, WM_CLOSE, NULL, NULL);
 		return false;
 	}
 #ifdef DF_AUTO_HIDE_FEATURES
 	bool PinUp(const CDockingSide& side)
 	{
 		CRect rc;
-		GetWindowRect(&rc);
+    GetWindowRect(this->m_hWnd, &rc);
 		T* pThis=static_cast<T*>(this);
 		assert(rc.Width()>0);
 		assert(rc.Height()>0);
@@ -787,30 +787,30 @@ public:
 
 	bool PinUp(const CDockingSide& side,unsigned long width,bool bVisualize=false)
 	{
-		if(IsDocking())
-					Undock();
+		if(this->IsDocking())
+      this->Undock();
 		DFPINUP pinHdr;
-		pinHdr.hdr.hWnd=m_hWnd;
-		pinHdr.hdr.hBar=GetOwnerDockingBar();
-//		pinHdr.hdr.code=DC_PINUP;
+    pinHdr.hdr.hWnd = this->m_hWnd;
+    pinHdr.hdr.hBar = this->GetOwnerDockingBar();
+    //		pinHdr.hdr.code=DC_PINUP;
 		pinHdr.dwDockSide=side;
 		pinHdr.nWidth=width;
 		pinHdr.dwFlags= bVisualize ? DFPU_VISUALIZE : 0 ;
 		pinHdr.n=0;
-		return m_docker.PinUp(&pinHdr);
+		return this->m_docker.PinUp(&pinHdr);
 	}
 
 	bool PinBtnPress(bool bVisualize=true)
 	{
-		assert(IsDocking());
+		assert(this->IsDocking());
 		DFDOCKPOS dockHdr={0};
 //		dockHdr.hdr.code=DC_GETDOCKPOSITION;
-		dockHdr.hdr.hWnd=m_hWnd;
-		dockHdr.hdr.hBar=GetOwnerDockingBar();
-		bool bRes=GetDockingPosition(&dockHdr);
+    dockHdr.hdr.hWnd = this->m_hWnd;
+    dockHdr.hdr.hBar = this->GetOwnerDockingBar();
+    bool bRes = this->GetDockingPosition(&dockHdr);
 		if(bRes)
 		{
-			bRes=Undock();
+      bRes = this->Undock();
 			if(bRes)
 			{
 				T* pThis=static_cast<T*>(this);
@@ -822,7 +822,7 @@ public:
 #endif
 protected:
 	BEGIN_MSG_MAP(thisClass)
-		if(IsDocking())
+		if(this->IsDocking())
 		{
 			MESSAGE_HANDLER(WM_WINDOWPOSCHANGING,OnWindowPosChanging)
 			MESSAGE_HANDLER(WM_NCCALCSIZE, OnNcCalcSize)
@@ -858,7 +858,7 @@ protected:
 
 	LRESULT OnSettingChange(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 	{
-		if(!IsDocking())
+		if(!this->IsDocking())
 		{
 			// If we're floating, we're a top level window.
 			// We might be getting this message before the main frame
@@ -890,7 +890,7 @@ protected:
 
 	LRESULT OnSysColorChange(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 	{
-		if(!IsDocking())
+		if(!this->IsDocking())
 		{
 			// If we're floating, we're a top level window.
 			// We might be getting this message before the main frame
@@ -927,7 +927,7 @@ protected:
 
 	LRESULT OnNcActivate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& bHandled)
 	{
-		bHandled=IsWindowEnabled();
+    bHandled = IsWindowEnabled(this->m_hWnd);
 		return TRUE;
 	}
 
@@ -947,7 +947,7 @@ protected:
 		CPoint pt(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		T* pThis=static_cast<T*>(this);
 		CRect rcWnd;
-		GetWindowRect(&rcWnd);
+    GetWindowRect(this->m_hWnd, &rcWnd);
 		pt.x-=rcWnd.TopLeft().x;
 		pt.y-=rcWnd.TopLeft().y;
 		return pThis->NcHitTest(pt);
@@ -963,10 +963,10 @@ protected:
 	LRESULT OnCaptionChange(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& /*bHandled*/)
 	{
 //		LockWindowUpdate();
-		DWORD style = ::GetWindowLong(m_hWnd,GWL_STYLE);
-		::SetWindowLong(m_hWnd, GWL_STYLE, style&(~WS_CAPTION));
-		LRESULT lRes=DefWindowProc(uMsg,wParam,lParam);
-		::SetWindowLong(m_hWnd, GWL_STYLE, style);
+    DWORD style = ::GetWindowLong(this->m_hWnd, GWL_STYLE);
+::SetWindowLong(this->m_hWnd, GWL_STYLE, style & (~WS_CAPTION));
+		LRESULT lRes=DefWindowProc(this->m_hWnd, uMsg,wParam,lParam);
+::SetWindowLong(this->m_hWnd, GWL_STYLE, style);
 		T* pThis=static_cast<T*>(this);
 		pThis->SetWindowPos(NULL,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 //		CWindowDC dc(m_hWnd);
@@ -976,7 +976,7 @@ protected:
 	}
 	LRESULT OnNcPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)
 	{
-		CWindowDC dc(m_hWnd);
+    CWindowDC dc(this->m_hWnd);
 		T* pThis=static_cast<T*>(this);
 		pThis->NcDraw(dc);
 		return NULL;
@@ -984,7 +984,7 @@ protected:
 
 	LRESULT OnNcLButtonDown(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& bHandled)
 	{
-		bHandled=m_caption.OnAction(m_hWnd,(unsigned int)wParam);
+    bHandled = m_caption.OnAction(this->m_hWnd, (unsigned int)wParam);
 		if(!bHandled && wParam == HTCAPTION)
 			this->SetFocus();
 
@@ -1046,33 +1046,33 @@ public:
 	}
 	virtual bool Undock()
 	{
-		assert(IsDocking());
-		GetDockingPosition(&m_pos);
+		assert(this->IsDocking());
+    this->GetDockingPosition(&m_pos);
 		return baseClass::Undock();
 	}
 	virtual bool Hide()
 	{
 		bool bRes=true;
-		if(IsDocking())
+		if(this->IsDocking())
 		{
-			bRes=GetDockingPosition(&m_pos);
+      bRes = this->GetDockingPosition(&m_pos);
 			assert(bRes);
 			if(bRes)
 			//	bRes=Undock();
-				bRes=Float(&m_rcUndock,SWP_HIDEWINDOW);
+        bRes = this->Float(&this->m_rcUndock, SWP_HIDEWINDOW);
 			assert(bRes);
 		}
 		else
 			m_pos.hdr.hBar=HNONDOCKBAR;
-		return (bRes && ShowWindow(SW_HIDE));
+    return (bRes && ShowWindow(this->m_hWnd, SW_HIDE));
 	}
 	virtual bool Show()
 	{
 		bool bRes=true;
 		if(m_pos.hdr.hBar!=HNONDOCKBAR)
-			bRes=SetDockingPosition(&m_pos);
+      bRes = this->SetDockingPosition(&m_pos);
 		else
-			ShowWindow(SW_SHOW);
+      ShowWindow(this->m_hWnd, SW_SHOW);
 		assert(bRes);
 		return bRes;
 	}
@@ -1099,17 +1099,16 @@ public:
 	bool SetDockingWindowPlacement(DFDOCKPOSEX* pHdr)
 	{
 		bool bRes=true;
-		pHdr->dockPos.hdr.hWnd=m_hWnd;
+    pHdr->dockPos.hdr.hWnd = this->m_hWnd;
 		::CopyMemory(&m_pos,&(pHdr->dockPos),sizeof(DFDOCKPOS));
 		if(pHdr->bVisible)
 			bRes=baseClass::SetDockingWindowPlacement(pHdr);
 		else
 		{
-			if(IsDocking())
+			if(this->IsDocking())
 				Undock();
-			::CopyRect(&m_rcUndock,&pHdr->rect);
-			bRes=(SetWindowPos(NULL,&m_rcUndock,
-					SWP_NOZORDER | SWP_HIDEWINDOW |	SWP_NOACTIVATE )!=FALSE);
+      ::CopyRect(&this->m_rcUndock, &pHdr->rect);
+      bRes = (this->SetWindowPos(NULL, &this->m_rcUndock, SWP_NOZORDER | SWP_HIDEWINDOW |	SWP_NOACTIVATE)!=FALSE);
 		}
 
 #ifdef DF_AUTO_HIDE_FEATURES
@@ -1117,7 +1116,7 @@ public:
 		//  A fix for the pin restore problem.
 		CDockingSide side(pHdr->dockPos.dwDockSide);
 		if (side.IsPinned())
-			PinUp(side, (side.IsHorizontal() ? pHdr->dockPos.nHeight : pHdr->dockPos.nWidth));
+      this->PinUp(side, (side.IsHorizontal() ? pHdr->dockPos.nHeight : pHdr->dockPos.nWidth));
 		//
 #endif
 
@@ -1157,7 +1156,7 @@ public:
 	}
 	LRESULT OnNcLButtonDblClk(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& bHandled)
 	{
-		if(IsIconic() || IsZoomed())
+    if (IsIconic(this->m_hWnd) || IsZoomed(this->m_hWnd))
 		{
 			// Docking a minimised window is a bad idea!
 			// Let Windows restore.
@@ -1167,12 +1166,12 @@ public:
 
 		if(wParam==HTCAPTION)
 		{
-			if(IsDocking())
-				Float();
+			if(this->IsDocking())
+        this->Float();
 			else
 			{
 				if(m_pos.hdr.hBar!=HNONDOCKBAR)
-					SetDockingPosition(&m_pos);
+          this->SetDockingPosition(&m_pos);
 			}
 		}
 		return 0;

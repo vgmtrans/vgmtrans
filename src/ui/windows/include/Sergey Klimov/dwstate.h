@@ -310,13 +310,13 @@ public:
 				{
 					if(dside.IsHorizontal())
 					{
-						pDocPos->dockPos.nWidth=unsigned long(pDocPos->dockPos.nWidth*pMState->YRatio());
-						pDocPos->dockPos.nHeight=unsigned long(pDocPos->dockPos.nHeight*pMState->XRatio());
+						pDocPos->dockPos.nWidth=(pDocPos->dockPos.nWidth*pMState->YRatio());
+						pDocPos->dockPos.nHeight=(pDocPos->dockPos.nHeight*pMState->XRatio());
 					}
 					else
 					{
-						pDocPos->dockPos.nWidth=unsigned long(pDocPos->dockPos.nWidth*pMState->XRatio());
-						pDocPos->dockPos.nHeight=unsigned long(pDocPos->dockPos.nHeight*pMState->YRatio());
+						pDocPos->dockPos.nWidth=(pDocPos->dockPos.nWidth*pMState->XRatio());
+						pDocPos->dockPos.nHeight=(pDocPos->dockPos.nHeight*pMState->YRatio());
 					}
 				}
             }

@@ -84,17 +84,17 @@ protected:
 	{
 		// Be sure the notification is from the tab control
 		// (and not from a sibling like a list view control)
-		if(pnmh && (m_TabCtrl == pnmh->hwndFrom))
+    if (pnmh && (this->m_TabCtrl == pnmh->hwndFrom))
 		{
-			int nNewTab = m_TabCtrl.GetCurSel();
+      int nNewTab = this->m_TabCtrl.GetCurSel();
 
 			if(nNewTab >= 0)
 			{
-				TTabCtrl::TItem* pItem = m_TabCtrl.GetItem(nNewTab);
+        auto pItem = this->m_TabCtrl.GetItem(nNewTab);
 				if(pItem->UsingTabView())
 				{
 					HWND hWndNew = pItem->GetTabView();
-					HWND hWndOld = (HWND)::SendMessage(m_hWndMDIClient, WM_MDIGETACTIVE, 0, NULL);
+          HWND hWndOld = (HWND)::SendMessage(this->m_hWndMDIClient, WM_MDIGETACTIVE, 0, NULL);
 					if( hWndNew != hWndOld )
 					{
 						// We don't want any flickering when switching the active child
@@ -119,10 +119,10 @@ protected:
 						::GetWindowPlacement(hWndOld, &wpOld);
 						if(wpOld.showCmd == SW_SHOWMAXIMIZED)
 						{
-							nResult = ::SendMessage(m_hWndMDIClient, WM_SETREDRAW, FALSE, 0);
+              nResult = ::SendMessage(this->m_hWndMDIClient, WM_SETREDRAW, FALSE, 0);
 						}
 
-						nResult = ::SendMessage(m_hWndMDIClient, WM_MDIACTIVATE, (LPARAM)hWndNew, 0);
+						nResult = ::SendMessage(this->m_hWndMDIClient, WM_MDIACTIVATE, (LPARAM)hWndNew, 0);
 
 						WINDOWPLACEMENT wpNew = {0};
 						wpNew.length = sizeof(WINDOWPLACEMENT);
@@ -134,8 +134,8 @@ protected:
 
 						if(wpOld.showCmd == SW_SHOWMAXIMIZED)
 						{
-							nResult = ::SendMessage(m_hWndMDIClient, WM_SETREDRAW, TRUE, 0);
-							::RedrawWindow(m_hWndMDIClient, NULL, NULL,
+              nResult = ::SendMessage(this->m_hWndMDIClient, WM_SETREDRAW, TRUE, 0);
+              ::RedrawWindow(this->m_hWndMDIClient, NULL, NULL,
 								//A little more forceful if necessary: RDW_ERASE | RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
 								RDW_INVALIDATE | RDW_ALLCHILDREN);
 						}

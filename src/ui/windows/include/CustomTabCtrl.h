@@ -617,7 +617,7 @@ public:
 public:
 	bool UsingTabView() const
 	{
-		return (m_hWndTabView != NULL);
+		return (this->m_hWndTabView != NULL);
 	}
 
 	bool MatchItem(CTabViewTabItem* pItem, DWORD eFlags) const
@@ -627,7 +627,7 @@ public:
 		{
 			// Make the common case a little faster
 			// (searching only for a match to the "tab view" HWND)
-			bMatch = (m_hWndTabView == pItem->m_hWndTabView);
+			bMatch = (this->m_hWndTabView == pItem->m_hWndTabView);
 		}
 		else
 		{
@@ -635,7 +635,7 @@ public:
 			bMatch = baseClass::MatchItem(pItem, eFlags);
 			if(bMatch && (eFlags & CTFI_TABVIEW) == CTFI_TABVIEW)
 			{
-				bMatch = (m_hWndTabView == pItem->m_hWndTabView);
+				bMatch = (this->m_hWndTabView == pItem->m_hWndTabView);
 			}
 		}
 
@@ -908,7 +908,7 @@ protected:
 		{
 			// Be sure InitCommonControlsEx is called before this,
 			//  with one of the flags that includes the tooltip control
-			m_tooltip.Create(m_hWnd, NULL, NULL, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP /* | TTS_BALLOON */, WS_EX_TOOLWINDOW);
+			m_tooltip.Create(this->m_hWnd, NULL, NULL, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP /* | TTS_BALLOON */, WS_EX_TOOLWINDOW);
 			if(m_tooltip.IsWindow())
 			{
 				m_tooltip.SetWindowPos(HWND_TOPMOST, 0, 0, 0, 0,
@@ -1094,8 +1094,8 @@ public:
 	{
 		T* pT = static_cast<T*>(this);
 
-		NMCTC2ITEMS nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_ACCEPTITEMDRAG }, m_iDragItemOriginal, m_iDragItem, {-1,-1}};
-		::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
+		NMCTC2ITEMS nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_ACCEPTITEMDRAG }, m_iDragItemOriginal, m_iDragItem, {-1,-1}};
+		::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
 
 		// In this implementation, the tab is moved as they drag.
 		pT->StopItemDrag(bRedrawEffectedArea);
@@ -1115,8 +1115,8 @@ public:
 			pT->EnsureVisible(m_iDragItemOriginal);
 		}
 
-		NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_CANCELITEMDRAG }, m_iDragItemOriginal, {-1,-1}};
-		::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
+		NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_CANCELITEMDRAG }, m_iDragItemOriginal, {-1,-1}};
+    ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
 
 		pT->StopItemDrag(bRedrawEffectedArea);
 	}
@@ -1130,9 +1130,9 @@ public:
 			// Restore the default cursor
 // need conditional code because types don't match in winuser.h
 #ifdef _WIN64
-			::SetCursor((HCURSOR)::GetClassLongPtr(m_hWnd, GCLP_HCURSOR));
+			::SetCursor((HCURSOR)::GetClassLongPtr(this->m_hWnd, GCLP_HCURSOR));
 #else
-			::SetCursor((HCURSOR)LongToHandle(::GetClassLongPtr(m_hWnd, GCLP_HCURSOR)));
+			::SetCursor((HCURSOR)LongToHandle(::GetClassLongPtr(this->m_hWnd, GCLP_HCURSOR)));
 #endif
 
 			if(m_hCursorMove != NULL)
@@ -1166,8 +1166,9 @@ public:
 
 			if(CTCS_DRAGREARRANGE == (dwStyle & CTCS_DRAGREARRANGE))
 			{
-				NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_BEGINITEMDRAG }, index, {ptDragOrigin.x, ptDragOrigin.y} };
-				if(FALSE != ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
+				NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_BEGINITEMDRAG }, index, {ptDragOrigin.x, ptDragOrigin.y} };
+        if (FALSE !=
+            ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
 				{
 					// Returning non-zero prevents our default handling.
 					// We've possibly already set a couple things that we
@@ -1314,9 +1315,9 @@ public:
 		NOTIFY_CODE_HANDLER(TTN_GETDISPINFO, OnGetToolTipInfo)
 	END_MSG_MAP()
 
-	LRESULT OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)
+	LRESULT OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& /*bHandled*/)
 	{
-		LRESULT lRes = DefWindowProc();
+		LRESULT lRes = DefWindowProc(this->m_hWnd, uMsg, wParam, lParam);
 		if(lRes == -1)
 		{
 			return -1;
@@ -1354,7 +1355,7 @@ public:
 
 	LRESULT OnGetDlgCode(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& /*bHandled*/)
 	{
-		return DefWindowProc(uMsg, wParam, lParam) | DLGC_WANTARROWS;
+		return DefWindowProc(this->m_hWnd, uMsg, wParam, lParam) | DLGC_WANTARROWS;
 	}
 
 	LRESULT OnMouseMessage(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
@@ -1362,7 +1363,7 @@ public:
 		bHandled = FALSE;
 		if(m_tooltip.IsWindow())
 		{
-			MSG msg = { m_hWnd, uMsg, wParam, lParam };
+			MSG msg = { this->m_hWnd, uMsg, wParam, lParam };
 			m_tooltip.RelayEvent(&msg);
 		}
 		return 1;
@@ -1381,7 +1382,7 @@ public:
 			TRACKMOUSEEVENT tme = { 0 };
 			tme.cbSize = sizeof(tme);
 			tme.dwFlags = TME_LEAVE;
-			tme.hwndTrack = m_hWnd;
+			tme.hwndTrack = this->m_hWnd;
 			if( _TrackMouseEvent(&tme) )
 			{
 				m_dwState |= ectcMouseInWindow;
@@ -1658,8 +1659,8 @@ public:
 			tchti.pt = ptCursor;
 			int nIndex = pT->HitTest(&tchti);
 
-			NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), NM_CLICK }, nIndex, {ptCursor.x, ptCursor.y} };
-			if(FALSE == ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
+			NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), NM_CLICK }, nIndex, {ptCursor.x, ptCursor.y} };
+			if(FALSE == ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
 			{
 				// returning FALSE let's us do our default handling
 				if(nIndex >= 0)
@@ -1687,7 +1688,7 @@ public:
 
 	LRESULT OnLButtonUp(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/)
 	{
-		if(m_hWnd == ::GetCapture())
+		if(this->m_hWnd == ::GetCapture())
 		{
 			T* pT = static_cast<T*>(this);
 
@@ -1708,8 +1709,8 @@ public:
 				ectcMouseOver_CloseButton == (dwState & ectcMouseOver))
 			{
 				// Close Button
-				NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_CLOSE }, m_iCurSel, {ptCursor.x, ptCursor.y}};
-				::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
+				NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_CLOSE }, m_iCurSel, {ptCursor.x, ptCursor.y}};
+				::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
 			}
 
 			pT->UpdateLayout();
@@ -1729,8 +1730,8 @@ public:
 		int nIndex = pT->HitTest(&tchti);
 
 		// returning TRUE tells us not to do our default handling
-		NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), NM_DBLCLK }, nIndex, {ptCursor.x, ptCursor.y}};
-		if(FALSE == ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
+		NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), NM_DBLCLK }, nIndex, {ptCursor.x, ptCursor.y}};
+		if(FALSE == ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
 		{
 			// returning FALSE let's us do our default handling
 			if(nIndex >= 0)
@@ -1754,8 +1755,8 @@ public:
 		int nIndex = pT->HitTest(&tchti);
 
 		// returning TRUE tells us not to do our default handling
-		NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), NM_RCLICK }, nIndex, {ptCursor.x, ptCursor.y}};
-		if(FALSE == ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
+		NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), NM_RCLICK }, nIndex, {ptCursor.x, ptCursor.y}};
+		if(FALSE == ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
 		{
 			// returning FALSE let's us do our default handling
 			if(nIndex >= 0)
@@ -1787,8 +1788,8 @@ public:
 		int nIndex = pT->HitTest(&tchti);
 
 		// returning TRUE tells us not to do our default handling
-		NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), NM_RDBLCLK }, nIndex, {ptCursor.x, ptCursor.y}};
-		if(FALSE == ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
+		NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), NM_RDBLCLK }, nIndex, {ptCursor.x, ptCursor.y}};
+		if(FALSE == ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
 		{
 			// returning FALSE let's us do our default handling
 			if(nIndex >= 0)
@@ -1812,8 +1813,8 @@ public:
 		int nIndex = pT->HitTest(&tchti);
 
 		// returning TRUE tells us not to do our default handling
-		NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_MCLICK }, nIndex, {ptCursor.x, ptCursor.y}};
-		if(FALSE == ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
+		NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_MCLICK }, nIndex, {ptCursor.x, ptCursor.y}};
+		if(FALSE == ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
 		{
 			// returning FALSE let's us do our default handling
 			if( nIndex!=-1 )
@@ -1843,8 +1844,8 @@ public:
 		int nIndex = pT->HitTest(&tchti);
 
 		// returning TRUE tells us not to do our default handling
-		NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_MDBLCLK }, nIndex, {ptCursor.x, ptCursor.y}};
-		if(FALSE == ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
+		NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_MDBLCLK }, nIndex, {ptCursor.x, ptCursor.y}};
+		if(FALSE == ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh))
 		{
 			// returning FALSE let's us do our default handling
 			if( nIndex!=-1 )
@@ -1948,8 +1949,8 @@ public:
 				{
 					if(m_tooltip.IsWindow())
 					{
-						m_tooltip.AddTool(m_hWnd, _T("Scroll Right"), &rcDefault, (UINT)ectcToolTip_ScrollRight);
-						m_tooltip.AddTool(m_hWnd, _T("Scroll Left"), &rcDefault, (UINT)ectcToolTip_ScrollLeft);
+						m_tooltip.AddTool(this->m_hWnd, _T("Scroll Right"), &this->rcDefault, (UINT)ectcToolTip_ScrollRight);
+						m_tooltip.AddTool(this->m_hWnd, _T("Scroll Left"), &this->rcDefault, (UINT)ectcToolTip_ScrollLeft);
 					}
 
 					//pT->UpdateLayout();
@@ -1960,8 +1961,8 @@ public:
 				{
 					if(m_tooltip.IsWindow())
 					{
-						m_tooltip.DelTool(m_hWnd, (UINT)ectcToolTip_ScrollRight);
-						m_tooltip.DelTool(m_hWnd, (UINT)ectcToolTip_ScrollLeft);
+						m_tooltip.DelTool(this->m_hWnd, (UINT)ectcToolTip_ScrollRight);
+						m_tooltip.DelTool(this->m_hWnd, (UINT)ectcToolTip_ScrollLeft);
 					}
 
 					m_iScrollOffset = 0;
@@ -1975,7 +1976,7 @@ public:
 				{
 					if(m_tooltip.IsWindow())
 					{
-						m_tooltip.AddTool(m_hWnd, _T("Close"), &rcDefault, (UINT)ectcToolTip_Close);
+						m_tooltip.AddTool(this->m_hWnd, _T("Close"), &this->rcDefault, (UINT)ectcToolTip_Close);
 					}
 
 					//pT->UpdateLayout();
@@ -1986,7 +1987,7 @@ public:
 				{
 					if(m_tooltip.IsWindow())
 					{
-						m_tooltip.DelTool(m_hWnd, (UINT)ectcToolTip_Close);
+						m_tooltip.DelTool(this->m_hWnd, (UINT)ectcToolTip_Close);
 					}
 
 					//pT->UpdateLayout();
@@ -2150,7 +2151,7 @@ public:
 
 	void Initialize(void)
 	{
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 
 		this->SendMessage(WM_SETTINGCHANGE, 0, 0);
 
@@ -2167,8 +2168,8 @@ public:
 		{
 			if(m_tooltip.IsWindow())
 			{
-				m_tooltip.AddTool(m_hWnd, _T("Scroll Right"), &rcDefault, (UINT)ectcToolTip_ScrollRight);
-				m_tooltip.AddTool(m_hWnd, _T("Scroll Left"), &rcDefault, (UINT)ectcToolTip_ScrollLeft);
+				m_tooltip.AddTool(this->m_hWnd, _T("Scroll Right"), &this->rcDefault, (UINT)ectcToolTip_ScrollRight);
+				m_tooltip.AddTool(this->m_hWnd, _T("Scroll Left"), &this->rcDefault, (UINT)ectcToolTip_ScrollLeft);
 			}
 		}
 
@@ -2176,7 +2177,7 @@ public:
 		{
 			if(m_tooltip.IsWindow())
 			{
-				m_tooltip.AddTool(m_hWnd, _T("Close"), &rcDefault, (UINT)ectcToolTip_Close);
+				m_tooltip.AddTool(this->m_hWnd, _T("Close"), &this->rcDefault, (UINT)ectcToolTip_Close);
 			}
 		}
 	}
@@ -2191,13 +2192,13 @@ public:
 		{
 			if(CTCS_SCROLL == (dwStyle & CTCS_SCROLL))
 			{
-				m_tooltip.DelTool(m_hWnd, (UINT)ectcToolTip_ScrollRight);
-				m_tooltip.DelTool(m_hWnd, (UINT)ectcToolTip_ScrollLeft);
+				m_tooltip.DelTool(this->m_hWnd, (UINT)ectcToolTip_ScrollRight);
+				m_tooltip.DelTool(this->m_hWnd, (UINT)ectcToolTip_ScrollLeft);
 			}
 
 			if(CTCS_CLOSEBUTTON == (dwStyle & CTCS_CLOSEBUTTON))
 			{
-				m_tooltip.DelTool(m_hWnd, (UINT)ectcToolTip_Close);
+				m_tooltip.DelTool(this->m_hWnd, (UINT)ectcToolTip_Close);
 			}
 		}
 
@@ -2240,8 +2241,8 @@ public:
 
 	void UpdateLayout(void)
 	{
-		if(	!m_hWnd ||
-			!::IsWindow(m_hWnd) ||
+		if(	!this->m_hWnd ||
+			!::IsWindow(this->m_hWnd) ||
 			(ectcEnableRedraw != (m_dwState & ectcEnableRedraw)))
 		{
 			return;
@@ -2301,7 +2302,7 @@ public:
 
 	void UpdateLayout_ScrollToFit(RECT rcTabItemArea)
 	{
-		WTL::CClientDC dc(m_hWnd);
+		WTL::CClientDC dc(this->m_hWnd);
 		HFONT hOldFont = dc.SelectFont(this->GetFont());    
 
 		int height = rcTabItemArea.bottom-rcTabItemArea.top;
@@ -2363,7 +2364,7 @@ public:
 				// don't intersect at all, we still need
 				// to update the tool rect, or we'll get the wrong
 				// tooltip in some cases.
-				m_tooltip.SetToolRect(m_hWnd, (UINT)i+1, &rcIntersect);
+				m_tooltip.SetToolRect(this->m_hWnd, (UINT)i+1, &rcIntersect);
 			}
 		}
 	}
@@ -2380,7 +2381,7 @@ public:
 		{
 			this->Invalidate();
 			// If something a little more forceful is needed:
-			//::RedrawWindow(m_hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+			//::RedrawWindow(this->m_hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 		}
 	}
 
@@ -2396,7 +2397,7 @@ public:
 		{
 			this->Invalidate();
 			// If something a little more forceful is needed:
-			//::RedrawWindow(m_hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+			//::RedrawWindow(this->m_hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 		}
 	}
 
@@ -2439,7 +2440,7 @@ public:
 
 		// Make sure we don't paint outside client area (possible with paint dc)
 		RECT rcClient = {0};
-		GetClientRect(&rcClient);
+		GetClientRect(this->m_hWnd, &rcClient);
 		dc.IntersectClipRect(&rcClient);
 
 
@@ -2450,7 +2451,7 @@ public:
 		LRESULT lResCustom;
 		NMCTCCUSTOMDRAW nmc = { 0 };
 		LPNMCUSTOMDRAW pnmcd= &(nmc.nmcd);
-		pnmcd->hdr.hwndFrom = m_hWnd;
+		pnmcd->hdr.hwndFrom = this->m_hWnd;
 		pnmcd->hdr.idFrom = this->GetDlgCtrlID();
 		pnmcd->hdr.code = NM_CUSTOMDRAW;
 		pnmcd->hdc = dc;
@@ -2459,7 +2460,7 @@ public:
 		pT->InitializeDrawStruct(&nmc);
 
 		pnmcd->dwDrawStage = CDDS_PREPAINT;
-		lResCustom = ::SendMessage(GetParent(), WM_NOTIFY, pnmcd->hdr.idFrom, (LPARAM)&nmc);
+		lResCustom = ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, pnmcd->hdr.idFrom, (LPARAM)&nmc);
 
 		if( CDRF_SKIPDEFAULT != (lResCustom & CDRF_SKIPDEFAULT) )
 		{
@@ -2576,7 +2577,7 @@ public:
 			pnmcd->dwItemSpec = 0;
 			pnmcd->uItemState = 0;
 			pnmcd->rc = rcClient;
-			::SendMessage(GetParent(), WM_NOTIFY, pnmcd->hdr.idFrom, (LPARAM)&nmc);
+			::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, pnmcd->hdr.idFrom, (LPARAM)&nmc);
 		}
 
 		dc.RestoreDC(nSave);
@@ -2588,7 +2589,7 @@ public:
 		if( CDRF_NOTIFYITEMDRAW == (lResCustom & CDRF_NOTIFYITEMDRAW) )
 		{
 			lpNMCustomDraw->nmcd.dwDrawStage = CDDS_ITEMPREPAINT;
-			lResItem = ::SendMessage(GetParent(), WM_NOTIFY, lpNMCustomDraw->nmcd.hdr.idFrom, (LPARAM)lpNMCustomDraw);
+			lResItem = ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, lpNMCustomDraw->nmcd.hdr.idFrom, (LPARAM)lpNMCustomDraw);
 		}
 		if( CDRF_SKIPDEFAULT != (lResCustom & CDRF_SKIPDEFAULT) )
 		{
@@ -2600,7 +2601,7 @@ public:
 			CDRF_NOTIFYPOSTPAINT == (lResItem & CDRF_NOTIFYPOSTPAINT))
 		{
 			lpNMCustomDraw->nmcd.dwDrawStage = CDDS_ITEMPOSTPAINT;
-			::SendMessage(GetParent(), WM_NOTIFY, lpNMCustomDraw->nmcd.hdr.idFrom, (LPARAM)lpNMCustomDraw);
+			::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, lpNMCustomDraw->nmcd.hdr.idFrom, (LPARAM)lpNMCustomDraw);
 		}
 	}
 
@@ -2659,7 +2660,7 @@ public:
 
 	BOOL SubclassWindow(HWND hWnd)
 	{
-		ATLASSERT(m_hWnd == NULL);
+		ATLASSERT(this->m_hWnd == NULL);
 		ATLASSERT(::IsWindow(hWnd));
 		BOOL bRet = baseClass::SubclassWindow(hWnd);
 		if( bRet )
@@ -2695,8 +2696,8 @@ public:
 	}
 	//void SetTooltips(HWND hWndToolTip)
 	//{
-	//	ATLASSERT(::IsWindow(m_hWnd));
-	//	::SendMessage(m_hWnd, TCM_SETTOOLTIPS, (WPARAM)hWndToolTip, 0L);
+	//	ATLASSERT(::IsWindow(this->m_hWnd));
+	//	::SendMessage(this->m_hWnd, TCM_SETTOOLTIPS, (WPARAM)hWndToolTip, 0L);
 	//}
 
 	bool SetScrollDelta(UINT nDelta)
@@ -2747,10 +2748,10 @@ public:
 	{
 		T* pT = static_cast<T*>(this);
 
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 		ATLASSERT(pItem);
 		ATLASSERT(nItem >= 0 && nItem <= (int)m_Items.GetCount());
-		if(!::IsWindow(m_hWnd) || pItem == NULL)
+		if(!::IsWindow(this->m_hWnd) || pItem == NULL)
 		{
 			return -1;
 		}
@@ -2767,8 +2768,8 @@ public:
 		size_t nNewCount = m_Items.GetCount();
 
 		// Send notification
-		NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_INSERTITEM }, nItem, {-1,-1}};
-		::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
+		NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_INSERTITEM }, nItem, {-1,-1}};
+		::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
 		// Select if first tab
 		if( nNewCount==1 )
 		{
@@ -2787,7 +2788,7 @@ public:
 		// We supply the RECT and text elsewhere.
 		if(m_tooltip.IsWindow())
 		{
-			m_tooltip.AddTool(m_hWnd, LPSTR_TEXTCALLBACK, &rcDefault, (UINT)nNewCount);
+			m_tooltip.AddTool(this->m_hWnd, LPSTR_TEXTCALLBACK, &this->rcDefault, (UINT)nNewCount);
 		}
 
 		pT->UpdateLayout();
@@ -2799,11 +2800,11 @@ public:
 	{
 		T* pT = static_cast<T*>(this);
 
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 		ATLASSERT(nFromIndex < m_Items.GetCount());
 		ATLASSERT(nToIndex < m_Items.GetCount());
 
-		if(!::IsWindow(m_hWnd) || nFromIndex >= m_Items.GetCount() || nToIndex >= m_Items.GetCount())
+		if(!::IsWindow(this->m_hWnd) || nFromIndex >= m_Items.GetCount() || nToIndex >= m_Items.GetCount())
 		{
 			return FALSE;
 		}
@@ -2825,8 +2826,8 @@ public:
 
 		if(bNotify)
 		{
-			NMCTC2ITEMS nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_MOVEITEM }, (int)nFromIndex, (int)nToIndex, {-1,-1}};
-			::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
+			NMCTC2ITEMS nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_MOVEITEM }, (int)nFromIndex, (int)nToIndex, {-1,-1}};
+			::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
 		}
 
 		return TRUE;
@@ -2836,11 +2837,11 @@ public:
 	{
 		T* pT = static_cast<T*>(this);
 
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 		ATLASSERT(nFromIndex < m_Items.GetCount());
 		ATLASSERT(nToIndex < m_Items.GetCount());
 
-		if(!::IsWindow(m_hWnd) || nFromIndex >= m_Items.GetCount() || nToIndex >= m_Items.GetCount())
+		if(!::IsWindow(this->m_hWnd) || nFromIndex >= m_Items.GetCount() || nToIndex >= m_Items.GetCount())
 		{
 			return FALSE;
 		}
@@ -2868,8 +2869,8 @@ public:
 
 		if(bNotify)
 		{
-			NMCTC2ITEMS nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_SWAPITEMPOSITIONS }, (int)nFromIndex, (int)nToIndex, {-1,-1}};
-			::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
+			NMCTC2ITEMS nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_SWAPITEMPOSITIONS }, (int)nFromIndex, (int)nToIndex, {-1,-1}};
+			::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
 		}
 
 		return TRUE;
@@ -2878,7 +2879,7 @@ public:
 	BOOL DeleteItem(size_t nItem, bool bUpdateSelection = true, bool bNotify = true)
 	{
 		T* pT = static_cast<T*>(this);
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 		size_t nOldCount = m_Items.GetCount();
 		if( nItem >= nOldCount )
 		{
@@ -2889,8 +2890,8 @@ public:
 		if(bNotify)
 		{
 			// Returning TRUE tells us not to delete the item
-			NMCTCITEM nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_DELETEITEM }, (int)nItem, {-1,-1}};
-			if( TRUE == ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh) )
+			NMCTCITEM nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_DELETEITEM }, (int)nItem, {-1,-1}};
+			if( TRUE == ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh) )
 			{
 				// Cancel the attempt
 				return FALSE;
@@ -2992,7 +2993,7 @@ public:
 		// We supply the RECT and text elsewhere.
 		if(m_tooltip.IsWindow())
 		{
-			m_tooltip.DelTool(m_hWnd, (UINT)m_Items.GetCount());
+			m_tooltip.DelTool(this->m_hWnd, (UINT)m_Items.GetCount());
 		}
 
 		TItem* pItem = m_Items[nItem];
@@ -3014,7 +3015,7 @@ public:
 
 	BOOL DeleteAllItems(bool bForceRedraw = false)
 	{
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 		m_iCurSel = -1;
 
 		this->SendMessage(WM_SETREDRAW, FALSE, 0);
@@ -3031,7 +3032,7 @@ public:
 		{
 			this->Invalidate();
 			// If something a little more forceful is needed:
-			//::RedrawWindow(m_hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+			//::RedrawWindow(this->m_hWnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 		}
 
 		return TRUE;
@@ -3044,7 +3045,7 @@ public:
 	/*
 	BOOL SetItem(int nItem, TItem* pItem)
 	{
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 		ATLASSERT(!::IsBadReadPtr(pItem,sizeof(TItem)));
 		CHECK_ITEM(nItem);
 
@@ -3089,7 +3090,7 @@ public:
 	int SetCurSel(int nItem, bool bNotify = true)
 	{
 		T* pT = static_cast<T*>(this);
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 
 		// NEW (DDB):
 		// Even if the newly requested selection index is
@@ -3111,10 +3112,10 @@ public:
 
 		int iOldSel = m_iCurSel;
 		// Send notification
-		NMCTC2ITEMS nmh = {{ m_hWnd, this->GetDlgCtrlID(), CTCN_SELCHANGING }, iOldSel, nItem, {-1,-1}};
+		NMCTC2ITEMS nmh = {{ this->m_hWnd, this->GetDlgCtrlID(), CTCN_SELCHANGING }, iOldSel, nItem, {-1,-1}};
 		if(bNotify)
 		{
-			if( TRUE == ::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh) )
+			if( TRUE == ::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh) )
 			{
 				// Cancel the attempt
 				return -1;
@@ -3137,7 +3138,7 @@ public:
 		{
 			// Send notification
 			nmh.hdr.code = CTCN_SELCHANGE;
-			::SendMessage(GetParent(), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
+			::SendMessage(GetParent(this->m_hWnd), WM_NOTIFY, nmh.hdr.idFrom, (LPARAM)&nmh);
 		}
 		return iOldSel;
 	}
@@ -3258,7 +3259,7 @@ public:
 
 	DWORD SetItemSize(size_t nItem, int cx, int cy)
 	{
-		ATLASSERT(::IsWindow(m_hWnd));
+		ATLASSERT(::IsWindow(this->m_hWnd));
 		ATLASSERT(nItem < m_Items.GetCount());
 		if( nItem >= m_Items.GetCount() )
 		{
@@ -3272,9 +3273,10 @@ public:
 		TItem* pItem = m_Items[nItem];
 		ATLASSERT(pItem != NULL);
 
+    /*FIXME: Syntax error..? */
 		RECT rcOld = pItem->GetRect();
-		RECT rcNew = { rcOld.left, rcOld.top, rcOld.left + cx, rcOld.top cy };
-		pItem->SetRect(rcNew);
+		//RECT rcNew{ rcOld.left, rcOld.top, rcOld.left + cx, rcOld.top cy };
+		//pItem->SetRect(rcNew);
 		T* pT = static_cast<T*>(this);
 		pT->UpdateLayout();
 		this->Invalidate();
@@ -3332,7 +3334,7 @@ public:
 
 	void SetPadding(int iPadding) 
 	{ 
-		m_iPadding = iPadding; 
+		this->m_iPadding = iPadding; 
 		T* pT = static_cast<T*>(this);
 		pT->UpdateLayout();
 		this->Invalidate();
