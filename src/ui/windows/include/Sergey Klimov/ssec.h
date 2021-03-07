@@ -479,8 +479,10 @@ public:
 		if(first==i)
 		{
 			last=std::find_if(i,m_separators.end(),p);
-			++last;
-			n=-n;
+      if (last != m_separators.end()) {
+        ++last;
+        n = -n;
+      }
 		}
 		else
 			++first;

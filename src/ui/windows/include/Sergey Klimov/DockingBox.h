@@ -200,16 +200,16 @@ public:
 		bool bRet=CDockingBox::IsWindowBox(hWnd);
 		if(bRet)
 		{
-			if(IsDocking())
-						Undock();
+      if (this->IsDocking())
+        this->Undock();
 			DFDOCKPOS dockHdr={0};
 //			dockHdr.hdr.code=DC_SETDOCKPOSITION;
-			dockHdr.hdr.hWnd=m_hWnd;
+      dockHdr.hdr.hWnd = this->m_hWnd;
 			dockHdr.hdr.hBar=hWnd;
 			dockHdr.nIndex=index;
 			CDockingSide::Invalidate(dockHdr.dwDockSide);
-			GetWindowRect(&dockHdr.rcFloat);
-			bRet=m_docker.SetDockingPosition(&dockHdr);
+      GetWindowRect(this->m_hWnd, & dockHdr.rcFloat);
+      bRet = this->m_docker.SetDockingPosition(&dockHdr);
 		}
 		return bRet;
 	}
@@ -254,24 +254,24 @@ public:
 	{
 		HWND hWnd=pHdr->hdr.hWnd;
 		bool bRes;
-		if(IsDocking())
+    if (this->IsDocking())
 		{
-			pHdr->hdr.hWnd=m_hWnd;
-			bRes=GetDockingPosition(pHdr);
+      pHdr->hdr.hWnd = this->m_hWnd;
+      bRes = this->GetDockingPosition(pHdr);
 		}
 		else
 		{
-			if(IsWindowVisible() || m_pos.hdr.hBar==HNONDOCKBAR)
+      if (IsWindowVisible(this->m_hWnd) || this->m_pos.hdr.hBar == HNONDOCKBAR)
 			{
 				CDockingSide::Invalidate(pHdr->dwDockSide);
-				GetWindowRect(&pHdr->rcFloat);
+        GetWindowRect(this->m_hWnd, & pHdr->rcFloat);
 			}
 			else
-				CopyMemory(pHdr,&m_pos,sizeof(DFDOCKPOS));
+        CopyMemory(pHdr, &this->m_pos, sizeof(DFDOCKPOS));
 			bRes=true;
 		}
 		pHdr->hdr.hWnd=hWnd;
-		pHdr->hdr.hBar=m_hWnd;
+    pHdr->hdr.hBar = this->m_hWnd;
 		return bRes;
 	}
 
@@ -372,9 +372,9 @@ public:
 		BOOL bRes=baseClass::IsWindowVisible();
 		if(!bRes)
 		{
-			bRes=IsDocking();
+      bRes = this->IsDocking();
 			if(bRes)
-				bRes=::IsWindowVisible(GetOwnerDockingBar());
+        bRes = ::IsWindowVisible(this->GetOwnerDockingBar());
 		}
 		return bRes;
 	}
@@ -382,15 +382,15 @@ public:
 	bool Show()
 	{
 		bool bRes;
-		if(IsDocking())
+    if (this->IsDocking())
 		{
 			DFMHDR dockHdr;
-			dockHdr.hBar=GetOwnerDockingBar();
+      dockHdr.hBar = this->GetOwnerDockingBar();
 			if(CDockingBox::IsWindowBox(dockHdr.hBar))
 			{
 //				dockHdr.code=DC_ACTIVATE;
-				dockHdr.hWnd=m_hWnd;
-				bRes=m_docker.Activate(&dockHdr);
+        dockHdr.hWnd = this->m_hWnd;
+        bRes = this->m_docker.Activate(&dockHdr);
 			}
 			else
 				bRes=baseClass::Show();
@@ -402,18 +402,18 @@ public:
 
 	bool Activate()
 	{
-		bool bRes=IsDocking();
+    bool bRes = this->IsDocking();
 		if(bRes)
 		{
 			DFMHDR dockHdr;
 			DFMHDR dockHdr;
-			dockHdr.hBar=GetOwnerDockingBar();
+      dockHdr.hBar = this->GetOwnerDockingBar();
 			bRes=CDockingBox::IsWindowBox(dockHdr.hBar);
 			if(bRes)
 			{
 //				dockHdr.code=DC_ACTIVATE;
-				dockHdr.hWnd=m_hWnd;
-				bRes=m_docker.Activate(&dockHdr);
+        dockHdr.hWnd = this->m_hWnd;
+        bRes = this->m_docker.Activate(&dockHdr);
 			}
 		}
 		return bRes;
@@ -421,44 +421,43 @@ public:
 
 	LRESULT OnAcceptDock(DFDOCKRECT* pHdr)
 	{
-		bool bRes=SendMessage(WM_NCHITTEST,NULL,MAKELPARAM(pHdr->rect.left, pHdr->rect.top))==HTCAPTION;
+		bool bRes=SendMessage(this->m_hWnd, WM_NCHITTEST,NULL,MAKELPARAM(pHdr->rect.left, pHdr->rect.top))==HTCAPTION;
 		if(bRes)
 		{
-			//GetWindowRect(&(pHdr->rect));
-			pHdr->hdr.hBar=m_hWnd;
-			GetClientRect(&(pHdr->rect));
-			ClientToScreen(&(pHdr->rect));
+      pHdr->hdr.hBar = this->m_hWnd;
+      this->GetClientRect(&(pHdr->rect));
+      this->ClientToScreen(&(pHdr->rect));
 		}
 		return bRes;
 	}
 	HDOCKBAR CreateDockingBox()
 	{
-		HDOCKBAR hBar=CBox::CreateInstance(m_docker);
+    HDOCKBAR hBar = CBox::CreateInstance(this->m_docker);
 		assert(hBar!=HNONDOCKBAR);
 		if(hBar!=HNONDOCKBAR)
 		{
 			CDockingBox	box(hBar);
-			if(IsDocking())
+      if (this->IsDocking())
 			{
 				DFDOCKREPLACE dockHdr;
-				dockHdr.hdr.hBar=GetOwnerDockingBar();
-				dockHdr.hdr.hWnd=m_hWnd;
+        dockHdr.hdr.hBar = this->GetOwnerDockingBar();
+        dockHdr.hdr.hWnd = this->m_hWnd;
 				dockHdr.hWnd=hBar;
-				if(!m_docker.Replace(&dockHdr))
+        if (!this->m_docker.Replace(&dockHdr))
 				{
 					::PostMessage(hBar,WM_CLOSE,0,0);
 					hBar=HNONDOCKBAR;
 				}
 			}
 			else
-				box.PlaceAs(m_hWnd);
+        box.PlaceAs(this->m_hWnd);
 		}
 		return hBar;
 	}
 	LRESULT OnDock(DFDOCKRECT* pHdr)
 	{
-		pHdr->hdr.hBar=GetOwnerDockingBar();
-		bool bRes = !IsDocking() || !CDockingBox::IsWindowBox(pHdr->hdr.hBar);
+    pHdr->hdr.hBar = this->GetOwnerDockingBar();
+    bool bRes = !this->IsDocking() || !CDockingBox::IsWindowBox(pHdr->hdr.hBar);
 		if(bRes)
 		{
 			pHdr->hdr.hBar=CreateDockingBox();
@@ -466,7 +465,7 @@ public:
 			if(bRes)
 			{
 				HWND hPrevDockWnd=pHdr->hdr.hWnd;
-				pHdr->hdr.hWnd=m_hWnd;
+        pHdr->hdr.hWnd = this->m_hWnd;
 				CDockingBox	box(pHdr->hdr.hBar);
 				bRes=box.Dock(pHdr);
 	//			bRes=m_docker.Dock(pHdr);
@@ -483,8 +482,8 @@ public:
 
 	bool OnSetDockingPosition(DFDOCKPOS* pHdr)
 	{
-		pHdr->hdr.hBar=GetOwnerDockingBar();
-		bool bRes=!IsDocking() || !CDockingBox::IsWindowBox(pHdr->hdr.hBar);
+    pHdr->hdr.hBar = this->GetOwnerDockingBar();
+    bool bRes = !this->IsDocking() || !CDockingBox::IsWindowBox(pHdr->hdr.hBar);
 		if(bRes )
 		{
 			pHdr->hdr.hBar=CreateDockingBox();
@@ -493,11 +492,11 @@ public:
 			{
 
 				HWND hPrevDockWnd=pHdr->hdr.hWnd;
-				pHdr->hdr.hWnd=m_hWnd;
+        pHdr->hdr.hWnd = this->m_hWnd;
 
 	//			CDockingBox	box(pHdr->hdr.hBar);
 	//			bRes=box.SetDockingPosition(pHdr);
-				bRes=m_docker.SetDockingPosition(pHdr);
+        bRes = this->m_docker.SetDockingPosition(pHdr);
 				pHdr->hdr.hWnd=hPrevDockWnd;
 			}
 			else
@@ -506,17 +505,17 @@ public:
 		}
 //		CDockingBox	box(pHdr->hdr.hBar);
 //		bRes=box.SetDockingPosition(pHdr);
-		bRes=m_docker.SetDockingPosition(pHdr);
+    bRes = this->m_docker.SetDockingPosition(pHdr);
 		return bRes;
 	}
 	LRESULT OnActivate(DFMHDR* pHdr)
 	{
-		bool bRes=IsDocking();
+    bool bRes = this->IsDocking();
 		if(bRes)
 		{
-			pHdr->hBar=GetOwnerDockingBar();
+      pHdr->hBar = this->GetOwnerDockingBar();
 			assert(CDockingBox::IsWindowBox(pHdr->hBar));
-			bRes=m_docker.Activate(pHdr);
+      bRes = this->m_docker.Activate(pHdr);
 		}
 		return bRes;
 	}

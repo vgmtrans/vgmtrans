@@ -26,6 +26,19 @@
 #include "DockMisc.h"
 #include "ExtDockingWindow.h"
 
+#define DECLARE_WND_CLASS_WORKAROUND(WndClassName)                                              \
+  static ATL::CWndClassInfo& GetWndClassInfo() {                                                \
+    static ATL::CWndClassInfo wc = {                                                            \
+        {sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS, this->StartWindowProc, 0, 0, NULL, \
+         NULL, NULL, (HBRUSH)(COLOR_WINDOW + 1), NULL, WndClassName, NULL},                     \
+        NULL,                                                                                   \
+        NULL,                                                                                   \
+        IDC_ARROW,                                                                              \
+        TRUE,                                                                                   \
+        0,                                                                                      \
+        _T("")};                                                                                \
+    return wc;                                                                                  \
+  }
 
 namespace dockwins{
 
@@ -1014,7 +1027,7 @@ public:
 			else
 			{
 				if(GetCapture()==NULL)
-					m_caption.HotTrack(m_hWnd,(unsigned int)lRes);
+          m_caption.HotTrack(this->m_hWnd, (unsigned int)lRes);
 			}
 		}
 		return lRes;
@@ -1022,7 +1035,7 @@ public:
 	void NcCalcSize(CRect* pRc)
 	{
 		m_splitter.CalculateRect(*pRc,m_side.Side());
-		DWORD style = GetWindowLong(GWL_STYLE);
+		DWORD style = GetWindowLong(this->m_hWnd, GWL_STYLE);
 		if((style&WS_CAPTION)==0)
 			m_caption.SetRectEmpty();
 		else
@@ -1030,14 +1043,14 @@ public:
 	}
 	void NcDraw(CDC& dc)
 	{
-		DWORD style = GetWindowLong(GWL_STYLE);
+		DWORD style = GetWindowLong(this->m_hWnd, GWL_STYLE);
 		if((style&WS_CAPTION)!=0)
-			m_caption.Draw(m_hWnd,dc);
+      m_caption.Draw(this->m_hWnd, dc);
 		m_splitter.Draw(dc);
 	}
 	bool CloseBtnPress()
 	{
-		PostMessage(WM_CLOSE);
+    PostMessage(this->m_hWnd, WM_CLOSE, NULL, NULL);
 		return false;
 	}
 	bool PinBtnPress(bool bVisualize=true)
@@ -1056,8 +1069,8 @@ public:
 	{
 		const int n=10;
 		CRect rc;
-		GetWindowRect(&rc);
-		CWindow parent(GetParent());
+    GetWindowRect(this->m_hWnd, &rc);
+		CWindow parent(GetParent(this->m_hWnd));
 		if(parent.m_hWnd!=NULL)
 			parent.ScreenToClient(&rc);
 		long* ppoint;
@@ -1104,13 +1117,13 @@ public:
 		{
 			parent.RedrawWindow(&rc,NULL,RDW_INVALIDATE | RDW_UPDATENOW);
 			*ppoint-=step*n;
-			SetWindowPos(HWND_TOP,&rc,SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+      this->SetWindowPos(HWND_TOP, &rc, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
 		}
 		bool bRes=true;
 		for(int i=0;i<n;i++)
 		{
 			*ppoint+=step;
-			bRes=(SetWindowPos(HWND_TOP,&rc,NULL)!=FALSE);
+      bRes = (this->SetWindowPos(HWND_TOP, &rc, NULL) != FALSE);
 			if(!bShow)
 			{
 				*pipoint+=step;
@@ -1119,8 +1132,8 @@ public:
 			else
 			{
 				CRect rcInvalidateClient(rc);
-				parent.MapWindowPoints(m_hWnd,&rcInvalidateClient);
-				RedrawWindow(&rcInvalidateClient,NULL,RDW_INVALIDATE | RDW_UPDATENOW);
+        parent.MapWindowPoints(this->m_hWnd, &rcInvalidateClient);
+        RedrawWindow(this->m_hWnd, & rcInvalidateClient, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 			}
 			Sleep(time/n);
 		}
@@ -1153,7 +1166,7 @@ protected:
 
 	LRESULT OnNcActivate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& bHandled)
 	{
-		bHandled=IsWindowEnabled();
+    bHandled = IsWindowEnabled(this->m_hWnd);
 		return TRUE;
 	}
 
@@ -1173,7 +1186,7 @@ protected:
 		CPoint pt(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         T* pThis=static_cast<T*>(this);
 		CRect rcWnd;
-		GetWindowRect(&rcWnd);
+        GetWindowRect(this->m_hWnd, &rcWnd);
 		pt.x-=rcWnd.TopLeft().x;
 		pt.y-=rcWnd.TopLeft().y;
 		return pThis->NcHitTest(pt);
@@ -1184,10 +1197,10 @@ protected:
 	LRESULT OnCaptionChange(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& /*bHandled*/)
 	{
 //		LockWindowUpdate();
-		DWORD style = ::GetWindowLong(m_hWnd,GWL_STYLE);
-		::SetWindowLong(m_hWnd, GWL_STYLE, style&(~WS_CAPTION));
-		LRESULT lRes=DefWindowProc(uMsg,wParam,lParam);
-		::SetWindowLong(m_hWnd, GWL_STYLE, style);
+    DWORD style = ::GetWindowLong(this->m_hWnd, GWL_STYLE);
+::SetWindowLong(this->m_hWnd, GWL_STYLE, style & (~WS_CAPTION));
+		LRESULT lRes=DefWindowProc(this->m_hWnd,uMsg,wParam,lParam);
+::SetWindowLong(this->m_hWnd, GWL_STYLE, style);
 		T* pThis=static_cast<T*>(this);
 		pThis->SetWindowPos(NULL,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 //		CWindowDC dc(m_hWnd);
@@ -1198,7 +1211,7 @@ protected:
 
 	LRESULT OnNcPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)
 	{
-		CWindowDC dc(m_hWnd);
+    CWindowDC dc(this->m_hWnd);
 		T* pThis=static_cast<T*>(this);
 		pThis->NcDraw(dc);
 		return NULL;
@@ -1209,7 +1222,7 @@ protected:
 		if( (wParam==HTSPLITTERH) || (wParam==HTSPLITTERV) )
 			static_cast<T*>(this)->StartResizing(CPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)));
 		else
-			m_caption.OnAction(m_hWnd,(unsigned int)wParam);
+      m_caption.OnAction(this->m_hWnd, (unsigned int)wParam);
         return 0;
 	}
 
@@ -1377,33 +1390,33 @@ protected:
 	};
 	class CSizeTrackerGhost : public CSizeTrackerFull
 	{
-        typedef CSimpleSplitterBarSlider<CSplitterBar> CSlider;
+        typedef CSimpleSplitterBarSlider<CSimpleSplitterBarEx<>> CSlider;
 	public:
-		CSizeTrackerGhost(HWND hWnd,CPoint pt,const CSide& side,CSplitterBar& splitter,const CRect& rcBound)
-			: CSizeTrackerFull(hWnd,pt,side,splitter.GetThickness(),rcBound),m_dc(NULL)
-			,m_splitter(splitter),m_slider(splitter)
+        CSizeTrackerGhost(HWND hWnd, CPoint pt, const CSide& side, CSimpleSplitterBarEx<>& splitter,
+                          const CRect& rcBound)
+			: CSizeTrackerFull(hWnd,pt,side,splitter.GetThickness(),rcBound),m_dc(NULL),
+          m_splitter(splitter), m_slider(splitter)
 		{
-			m_spOffset=m_slider-*m_ppos;
+      m_spOffset = m_slider - *this->m_ppos;
 		}
         void BeginDrag()
-        {
-            m_splitter.DrawGhostBar(m_dc);
+        { this->m_splitter.DrawGhostBar(m_dc);
         }
         void EndDrag(bool bCanceled)
         {
-            m_splitter.CleanGhostBar(m_dc);
+          this->m_splitter.CleanGhostBar(m_dc);
             if(!bCanceled)
-                SetPosition();
+                this->SetPosition();
         }
 		virtual void Move()
 		{
-			m_splitter.CleanGhostBar(m_dc);
-			m_slider=*m_ppos+m_spOffset;
-			m_splitter.DrawGhostBar(m_dc);
+          this->m_splitter.CleanGhostBar(m_dc);
+      this->m_slider = *this->m_ppos + m_spOffset;
+          this->m_splitter.DrawGhostBar(m_dc);
 		}
 	protected:
 		CWindowDC		m_dc;
-		CSplitterBar&	m_splitter;
+    CSimpleSplitterBarEx<>& m_splitter;
 		CSlider			m_slider;
 		long			m_spOffset;
 	};
@@ -1412,7 +1425,7 @@ public:
 		: m_barThickness(0),m_pActive(0),m_pTracked(0)
 	{
 		m_rcBound.SetRectEmpty();
-		m_side=0;
+    this->m_side = 0;
 	}
 	bool Initialize(HWND hWnd)
 	{
@@ -1422,7 +1435,7 @@ public:
 		m_bars[CSide::sLeft].Initialize(CSide(CSide::sLeft));
 		m_bars[CSide::sRight].Initialize(CSide(CSide::sRight));
 		RECT rc={0,0,0,0};
-		return (Create(hWnd,rc)!=NULL);
+    return (this->Create(hWnd, rc) != NULL);
 	}
 	void ApplySystemSettings(HWND hWnd)
 	{
@@ -1483,13 +1496,13 @@ public:
 	bool FitPane()
 	{
 		CRect rc(m_rcBound);
-		long spliterWidth=m_splitter.GetThickness();
-		long width=m_pActive->Width()+spliterWidth;
-		if(IsHorizontal())
+    long spliterWidth = this->m_splitter.GetThickness();
+    long width = this->m_pActive->Width() + spliterWidth;
+    if (this->IsHorizontal())
 		{
 			long maxWidth=rc.Height();
 			maxWidth=(maxWidth<spliterWidth) ? spliterWidth : maxWidth-spliterWidth;
-			if(IsTop())
+			if(this->IsTop())
 				rc.bottom=rc.top+( (maxWidth>width) ? width : maxWidth );
 			else
 				rc.top=rc.bottom-( (maxWidth>width) ? width : maxWidth );
@@ -1498,12 +1511,12 @@ public:
 		{
 			long maxWidth=rc.Width();
 			maxWidth=(maxWidth<spliterWidth) ? spliterWidth : maxWidth-spliterWidth;
-			if(IsTop())
+      if (this->IsTop())
 				rc.right=rc.left+( (maxWidth>width) ? width : maxWidth );
 			else
 				rc.left=rc.right-( (maxWidth>width) ? width : maxWidth );
 		}
-		return (SetWindowPos(HWND_TOP,rc,SWP_NOACTIVATE)!=FALSE);
+		return (this->SetWindowPos(HWND_TOP,rc,SWP_NOACTIVATE)!=FALSE);
 	}
 
 	IPinnedLabel::CPinnedWindow* LocatePinnedWindow(const CPoint& pt) const
@@ -1611,7 +1624,7 @@ public:
 
 	bool PinUp(HWND hWnd,DFPINUP* pHdr,bool& bUpdate)
 	{
-		pHdr->hdr.hBar=m_hWnd;
+    pHdr->hdr.hBar = this->m_hWnd;
 		CSide side(pHdr->dwDockSide);
 		assert(side.IsValid());
 		CAutoHideBar* pbar=m_bars+side.Side();
@@ -1634,7 +1647,7 @@ public:
 		if(m_pActive!=0 && (m_pActive->Wnd()==hWnd ) )
 												Vanish();
 
-		HDOCKBAR hBar=GetParent();
+		HDOCKBAR hBar=GetParent(this->m_hWnd);
 		assert(::IsWindow(hBar));
 		DFDOCKPOS* pHdr=0;
 		DFDOCKPOS dockHdr={0};
@@ -1649,7 +1662,7 @@ public:
 		for(int i=0;i<barsCount;i++)
 		{
 			CAutoHideBar* pbar=m_bars+i;
-			bRes=pbar->Remove(hWnd,m_hWnd,pHdr);
+      bRes = pbar->Remove(hWnd, this->m_hWnd, pHdr);
 			if(bRes)
 			{
 				if(pbar->IsVisible())
@@ -1692,7 +1705,7 @@ public:
 		assert(ptr);
 		assert(IsVisualizationNeeded(ptr));
 		Vanish();
-		Orientation(side);
+    this->Orientation(side);
 		assert(m_pActive==0);
 		m_pActive=ptr;
 		bool bRes=(::SetWindowPos(m_pActive->Wnd(),HWND_TOP,0,0,0,0,
@@ -1702,19 +1715,20 @@ public:
 			bRes=FitPane();
 			if(bRes)
 			{
-				SetWindowText(m_pActive->Text());
+        SetWindowText(this->m_hWnd, m_pActive->Text());
 				CDWSettings setting;
 				if(bAnimate && setting.IsAnimationEnabled())
-					AnimateWindow(animateTimeout,true);
+          this->AnimateWindow(animateTimeout, true);
 				else
-					bRes=(SetWindowPos(HWND_TOP,0,0,0,0,
+          bRes =
+              (SetWindowPos(this->m_hWnd, HWND_TOP, 0, 0, 0, 0,
 											SWP_NOMOVE | SWP_NOSIZE |
 											SWP_SHOWWINDOW | SWP_FRAMECHANGED )!=FALSE);
 				if(bRes)
 				{
 					BOOL dummy;
 					OnSize(0,0,0,dummy);
-					bRes=(SetTimer(tmID,tmTimeout)==tmID);
+          bRes = (this->SetTimer(tmID, tmTimeout) == tmID);
 				}
 			}
 		}
@@ -1727,13 +1741,13 @@ public:
 		bool bRes=(m_pActive==0);
 		if(!bRes)
 		{
-			KillTimer(tmID);
+			KillTimer(this->m_hWnd, tmID);
 			::ShowWindow(m_pActive->Wnd(),SW_HIDE);
 			m_pActive=0;
 			CDWSettings setting;
 			if(bAnimate && setting.IsAnimationEnabled())
-				AnimateWindow(animateTimeout,false);
-			bRes=ShowWindow(SW_HIDE)!=FALSE;
+				this->AnimateWindow(animateTimeout,false);
+      bRes = ShowWindow(this->m_hWnd, SW_HIDE) != FALSE;
 		}
 		return bRes;
 	}
@@ -1745,17 +1759,19 @@ public:
 		if(settings.GhostDrag())
 		{
 			CRect rc;
-			GetWindowRect(&rc);
-			CSplitterBar splitter(IsHorizontal());
-			splitter.CalculateRect(rc,m_side.Side());
+      GetWindowRect(this->m_hWnd, & rc);
+      /*
+      CSplitterBar splitter(this->IsHorizontal());
+      splitter.CalculateRect(rc, this->m_side.Side());
 			pTracker=std::auto_ptr<CSizeTrackerFull>(
-								new CSizeTrackerGhost(m_hWnd,pt,Orientation(),splitter,m_rcBound));
+          new CSizeTrackerGhost(this->m_hWnd, pt, this->Orientation(), splitter, m_rcBound));
+      */
 		}
 		else
-			pTracker=std::auto_ptr<CSizeTrackerFull>(
-								new CSizeTrackerFull(m_hWnd,pt,Orientation(),m_splitter.GetThickness(),m_rcBound));
+			pTracker=std::auto_ptr<CSizeTrackerFull>(new CSizeTrackerFull(
+          this->m_hWnd, pt, this->Orientation(), this->m_splitter.GetThickness(), m_rcBound));
 
-		HWND hWndParent=GetParent();
+		HWND hWndParent=GetParent(this->m_hWnd);
 		assert(hWndParent);
 		TrackDragAndDrop(*pTracker,hWndParent);
 	}
@@ -1773,7 +1789,7 @@ public:
 		return true;
 	}
 
-	DECLARE_WND_CLASS(_T("CAutoHideManager"))
+	DECLARE_WND_CLASS2(_T("CAutoHideManager"), CAutoHideManager)
 protected:
 	BEGIN_MSG_MAP(thisClass)
 		MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
@@ -1796,17 +1812,17 @@ protected:
 		POINT pt;
 		CRect rc;
 		GetCursorPos(&pt);
-		GetWindowRect(&rc);
+    GetWindowRect(this->m_hWnd, &rc);
 		if(!rc.PtInRect(pt))
 		{
-			CWindow wndParent (GetParent());
+			CWindow wndParent (GetParent(this->m_hWnd));
 			wndParent.ScreenToClient(&pt);
 
 			IPinnedLabel::CPinnedWindow* ptr=LocatePinnedWindow(pt);
 			if(ptr==0 || IsVisualizationNeeded(ptr))
 			{
 				HWND hWnd=GetFocus();
-				while( hWnd!=m_hWnd )
+        while (hWnd != this->m_hWnd)
 				{
 					if(hWnd==NULL)
 					{
@@ -1825,15 +1841,15 @@ protected:
         if(wParam != SIZE_MINIMIZED && (m_pActive!=0))
         {
 			CRect rc;
-			GetClientRect(&rc);
+          GetClientRect(this->m_hWnd, &rc);
 			::SetWindowPos(m_pActive->Wnd(),NULL,
 							 rc.left,rc.top,
 							 rc.Width(),rc.Height(),
 							 SWP_NOZORDER | SWP_NOACTIVATE);
-			GetWindowRect(&rc);
-			long width = (IsHorizontal())	? rc.Height() : rc.Width();
-			width -= m_splitter.GetThickness();
-			if(width>m_caption.GetThickness()/*0*/)
+          GetWindowRect(this->m_hWnd, &rc);
+      long width = (this->IsHorizontal()) ? rc.Height() : rc.Width();
+          width -= this->m_splitter.GetThickness();
+      if (width > this->m_caption.GetThickness() /*0*/)
 				m_pActive->Width(width);
         }
         bHandled = FALSE;
@@ -1862,3 +1878,5 @@ protected:
 
 }//namespace dockwins
 #endif // __WTL_DW__DWAUTOHIDE_H__
+
+#undef DECLARE_WND_CLASS_WORKAROUND
