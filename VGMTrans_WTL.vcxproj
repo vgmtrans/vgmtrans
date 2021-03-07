@@ -118,6 +118,7 @@
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/Zc:strictStrings- %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -148,6 +149,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/Zc:strictStrings- %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -181,6 +183,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/Zc:strictStrings- %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -216,6 +219,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/Zc:strictStrings- %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ResourceCompile />
     <Link>

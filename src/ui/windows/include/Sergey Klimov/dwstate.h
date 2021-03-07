@@ -56,7 +56,7 @@ public:
 			ID		id;
 		};
 protected:
-		struct weighter : std::binary_function<CRestPos, CRestPos, bool>
+		struct weighter
 		{
 			bool operator()(const CRestPos& x, const CRestPos& y) const
 			{

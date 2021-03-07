@@ -454,7 +454,7 @@ public:
 /*
 	bool StartSliding(HWND hWnd,const CPoint& pt,const CRect& rc,bool bGhostMove)
 	{
-		std::auto_ptr<CSplitterMoveTrackerBase> pTracker;
+		std::shared_ptr<CSplitterMoveTrackerBase> pTracker;
 
 		if(bGhostMove)
 			pTracker.reset(new CSplitterMoveTrackerGhost(hWnd,*this,pt,rc));
@@ -477,21 +477,13 @@ public:
 			CEmbeddedSplitterBar splitter(!IsHorizontal(),(*i),rc);
 			if(splitter.IsPtIn(pt))
 			{
-				std::auto_ptr<CSplitterMoveTrackerBase> pTracker;
+        std::shared_ptr<CSplitterMoveTrackerBase> pTracker;
 
-#if (_MSC_VER >= 1310)
 				if(bGhostMove)
-					pTracker.reset(new CSplitterMoveTrackerGhost(hWnd,*this,pt,rc));
+					pTracker = std::make_shared<CSplitterMoveTrackerGhost>(hWnd,*this,pt,rc);
 				else
-					pTracker.reset(new CSplitterMoveTrackerFull(hWnd,*this,pt,rc));
-#else // (_MSC_VER < 1310)
-				if(bGhostMove)
-					pTracker=std::auto_ptr<CSplitterMoveTrackerBase>(
-										new CSplitterMoveTrackerGhost(hWnd,*this,pt,rc));
-				else
-					pTracker=std::auto_ptr<CSplitterMoveTrackerBase>(
-										new CSplitterMoveTrackerFull(hWnd,*this,pt,rc));
-#endif
+					pTracker = std::make_shared<CSplitterMoveTrackerFull>(hWnd,*this,pt,rc);
+
 
 				if(const_iterator(*pTracker)!=m_frames.end())
 					 bRes=TrackDragAndDrop(*pTracker,hWnd);
@@ -838,7 +830,7 @@ protected:
 #ifdef USE_BOOST
 	mutable boost::shared_ptr<T> m_ptr;
 #else
-	mutable std::auto_ptr<T> m_ptr;
+	mutable std::shared_ptr<T> m_ptr;
 #endif
 };
 

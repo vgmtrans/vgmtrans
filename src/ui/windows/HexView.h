@@ -15,7 +15,7 @@
 #define COL_BLOCK_SIZE 0x100
 #define COL_BLOCKDEST_SIZE (COL_BLOCK_SIZE * 1.2 + 12)
 
-typedef enum HexTextColors {
+enum HexTextColors {
 	TXT_CLR_BLACK = 0x00,
 	TXT_CLR_WHITE = 0x20,
 	TXT_CLR_RED =   0x40,
@@ -23,7 +23,7 @@ typedef enum HexTextColors {
 };
 
 
-typedef enum HexBgColors {
+enum HexBgColors {
 	BG_CLR_WHITE,
 	BG_CLR_BLACK,
 	BG_CLR_RED,
