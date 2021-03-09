@@ -1943,10 +1943,10 @@ public:
 			{
 // need conditional code because types don't match in winuser.h
 #ifdef _WIN64
-				m_hIconChildMaximized = (HICON)::GetClassLongPtr(wnd, GCLP_HICONSM);
-				if(m_hIconChildMaximized == NULL)
+				this->m_hIconChildMaximized = (HICON)::GetClassLongPtr(wnd, GCLP_HICONSM);
+				if(this->m_hIconChildMaximized == NULL)
 				{
-					m_hIconChildMaximized = (HICON) ::GetClassLongPtr(wnd, GCLP_HICON);
+					this->m_hIconChildMaximized = (HICON) ::GetClassLongPtr(wnd, GCLP_HICON);
 				}
 #else
         this->m_hIconChildMaximized = (HICON)LongToHandle(::GetClassLongPtr(wnd, GCLP_HICONSM));

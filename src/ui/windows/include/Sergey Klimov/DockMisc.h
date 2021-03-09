@@ -22,7 +22,6 @@
 #endif
 
 #include <cassert>
-#include "SimpleSplitterBar.h"
 
 namespace dockwins{
 
@@ -529,6 +528,7 @@ protected:
 
 	};
 public:
+
 	typedef CSettings::CStyle CStyle;
 	void Update() const
 	{
