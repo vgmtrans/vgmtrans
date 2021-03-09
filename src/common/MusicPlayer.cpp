@@ -130,6 +130,9 @@ void MusicPlayer::makeSettings() {
 #ifdef __linux__
     /* Default to Pulseaudio on Linux */
     fluid_settings_setstr(m_settings, "audio.driver", "pulseaudio");
+#elif defined(_WIN32)
+    /* Default to DirectSound on Windows */
+    fluid_settings_setstr(m_settings, "audio.driver", "waveout");
 #endif
   }
 
@@ -245,7 +248,7 @@ std::vector<const char *> MusicPlayer::getAvailableDrivers() const {
   static std::vector<const char *> drivers_buf{};
 
   /* Availability of audio drivers shouldn't change over time, cache the result */
-  if (!drivers_buf.empty()) {
+  if (drivers_buf.empty()) {
     fluid_settings_foreach_option(
         m_settings, "audio.driver", &drivers_buf, [](void *data, auto, auto option) {
           auto drivers = static_cast<std::vector<const char *> *>(data);
