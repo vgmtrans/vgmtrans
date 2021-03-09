@@ -73,7 +73,7 @@ public:
 //			pHdr->hdr.code=DC_ACTIVATE;
 			this->m_docker.Activate(&pHdr->hdr);
 
-			PostMessage(this->m_hWnd, WM_CLOSE, NULL, NULL);
+			this->PostMessage(WM_CLOSE);
 		}
 		else
 			this->m_docker.Dock(pHdr);
@@ -356,7 +356,7 @@ public:
 		int n=m_tabs.GetItemCount();
 		if(n<=1)
 		{
-      PostMessage(this->m_hWnd, WM_CLOSE, TRUE, NULL);
+      this->PostMessage(WM_CLOSE, TRUE);
 			if(n==0)
         this->Hide();
 		}
@@ -522,7 +522,7 @@ public:
 		if(wParam != SIZE_MINIMIZED )
 		{
 			RECT rc;
-      GetClientRect(this->m_hWnd, & rc);
+      this->GetClientRect(&rc);
 			m_tabs.SetWindowPos(NULL, &rc ,SWP_NOZORDER | SWP_NOACTIVATE);
 			AdjustCurentItem();
 		}
