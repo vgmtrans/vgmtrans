@@ -174,7 +174,7 @@ class AkaoSeq final :
 
   [[nodiscard]] static uint8_t GetNumPositiveBits(uint32_t x) noexcept {
     std::bitset<sizeof(x) * CHAR_BIT> bs{x};
-    return bs.count();
+    return static_cast<uint8_t>(bs.count());
   }
 
  public:

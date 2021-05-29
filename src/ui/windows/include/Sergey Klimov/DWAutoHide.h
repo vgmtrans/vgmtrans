@@ -293,7 +293,7 @@ public:
       return this;
     }
 
-    auto tab_index = std::distance(m_tabs.begin(), tab);
+    auto tab_index = static_cast<unsigned long>(std::distance(m_tabs.begin(), tab));
     /* We're past the tab that's gonna go away, need to shrink back by one */
     if (m_activeTab >= tab_index) {
       m_activeTab--;
@@ -321,8 +321,8 @@ public:
   [[nodiscard]] long Width() const override { return m_width; }
   void Width(long width) override {
     m_width = width;
-    if (m_width < m_passiveTabWidth * m_tabs.size()) {
-      if (m_width < m_tabs.size())
+    if (m_width < static_cast<long>(m_passiveTabWidth * m_tabs.size())) {
+      if (m_width < static_cast<long>(m_tabs.size()))
         m_passiveTabWidth = 0;
       else
         m_passiveTabWidth = m_width / m_tabs.size();
@@ -471,7 +471,7 @@ public:
   [[nodiscard]] bool IsVisible() const { return !m_bunch.empty(); }
   [[nodiscard]] bool IsHorizontal() const { return Orientation().IsHorizontal(); }
   [[nodiscard]] bool IsTop() const { return Orientation().IsTop(); }
-  [[nodiscard]] void Initialize(CSide side) { m_side = side; }
+  void Initialize(CSide side) { m_side = side; }
 
   bool CalculateRect(CDC& dc, CRect& rc, long width, long leftPadding, long rightPadding) {
     if (IsVisible()) {
