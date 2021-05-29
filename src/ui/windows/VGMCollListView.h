@@ -12,9 +12,8 @@
 template <class T>
 class VGMTransWindow;
 
-#define VIEW_STYLES                                                                              \
-  (LVS_LIST | LVS_SHOWSELALWAYS | /*LVS_SINGLESEL |*/ LVS_NOCOLUMNHEADER | LVS_SHAREIMAGELISTS | \
-   LVS_AUTOARRANGE)
+#define VIEW_STYLES \
+  (LVS_LIST | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOCOLUMNHEADER | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE)
 #define VIEW_EX_STYLES 0
 
 class CVGMCollListView : public CWindowImpl<CVGMCollListView, CListViewCtrl,
@@ -24,22 +23,22 @@ protected:
   typedef CVGMCollListView thisClass;
 
 public:
+ 
   DECLARE_WND_SUPERCLASS(NULL, CListViewCtrl::GetWndClassName())
 
   BOOL PreTranslateMessage(MSG* pMsg);
 
   BEGIN_MSG_MAP(thisClass)
-  MESSAGE_HANDLER(WM_CREATE, OnCreate)
-  MSG_WM_DESTROY(OnDestroy)
-  MSG_WM_CHAR(OnChar)
-  MSG_WM_CONTEXTMENU(OnContextMenu)
+    MESSAGE_HANDLER(WM_CREATE, OnCreate)
+    MSG_WM_DESTROY(OnDestroy)
+    MSG_WM_CHAR(OnChar)
+    MSG_WM_CONTEXTMENU(OnContextMenu)
 
-  REFLECTED_NOTIFY_CODE_HANDLER(LVN_ITEMCHANGED, OnLvnItemChanged)
-  if (uMsg == WM_FORWARDMSG)
-    if (PreTranslateMessage((LPMSG)lParam))
-      return TRUE;
-
-  REFLECT_NOTIFICATIONS()
+    REFLECTED_NOTIFY_CODE_HANDLER(LVN_ITEMCHANGED, OnLvnItemChanged)
+    if (uMsg == WM_FORWARDMSG)
+      if (PreTranslateMessage((LPMSG)lParam))
+        return TRUE;
+    REFLECT_NOTIFICATIONS()
   END_MSG_MAP()
 
   LRESULT OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
@@ -59,8 +58,8 @@ public:
   BOOL SelectColl(VGMColl* coll);
 
 protected:
-  int m_nSortedCol{-1};
-  BOOL m_bSortAscending{TRUE};
+  int m_nSortedCol{-1};  // -1 if list hasn't been sorted yet
+  bool m_bSortAscending{true};
 
   CImageList m_imlSmall, m_imlLarge, m_imlTiles, m_imlState;
   CComPtr<IImageList> m_TileIml;

@@ -83,19 +83,16 @@ void CVGMCollListView::Init() {
   InitImageLists();
   SetExtendedListViewStyle(LVS_EX_HEADERDRAGDROP, LVS_EX_HEADERDRAGDROP);
 
-  // On XP, set some additional properties of the list ctrl.
-  if (g_bXPOrLater) {
-    // Turning on LVS_EX_DOUBLEBUFFER also enables the transparent
-    // selection marquee.
-    SetExtendedListViewStyle(LVS_EX_DOUBLEBUFFER, LVS_EX_DOUBLEBUFFER);
+  // Turning on LVS_EX_DOUBLEBUFFER also enables the transparent
+  // selection marquee.
+  SetExtendedListViewStyle(LVS_EX_DOUBLEBUFFER, LVS_EX_DOUBLEBUFFER);
 
-    // Each tile will have 2 additional lines (3 lines total).
-    LVTILEVIEWINFO lvtvi = {sizeof(LVTILEVIEWINFO), LVTVIM_COLUMNS};
+  // Each tile will have 2 additional lines (3 lines total).
+  LVTILEVIEWINFO lvtvi = {sizeof(LVTILEVIEWINFO), LVTVIM_COLUMNS};
 
-    lvtvi.cLines = 2;
-    lvtvi.dwFlags = LVTVIF_AUTOSIZE;
-    SetTileViewInfo(&lvtvi);
-  }
+  lvtvi.cLines = 2;
+  lvtvi.dwFlags = LVTVIF_AUTOSIZE;
+  SetTileViewInfo(&lvtvi);
 }
 
 void CVGMCollListView::Clear() {
@@ -103,18 +100,16 @@ void CVGMCollListView::Clear() {
   theCollDialog.Clear();
 
   if (-1 != m_nSortedCol) {
-    if (g_bXPOrLater) {
-      // Remove the sort arrow indicator from the sorted column.
-      HDITEM hdi = {HDI_FORMAT};
-      CHeaderCtrl wndHdr = GetHeader();
+    // Remove the sort arrow indicator from the sorted column.
+    HDITEM hdi = {HDI_FORMAT};
+    CHeaderCtrl wndHdr = GetHeader();
 
-      wndHdr.GetItem(m_nSortedCol, &hdi);
-      hdi.fmt &= ~(HDF_SORTDOWN | HDF_SORTUP);
-      wndHdr.SetItem(m_nSortedCol, &hdi);
+    wndHdr.GetItem(m_nSortedCol, &hdi);
+    hdi.fmt &= ~(HDF_SORTDOWN | HDF_SORTUP);
+    wndHdr.SetItem(m_nSortedCol, &hdi);
 
-      // Remove the sorted column color from the list.
-      SetSelectedColumn(-1);
-    }
+    // Remove the sorted column color from the list.
+    SetSelectedColumn(-1);
 
     m_nSortedCol = -1;
     m_bSortAscending = TRUE;
@@ -124,36 +119,12 @@ void CVGMCollListView::Clear() {
 void CVGMCollListView::SetViewMode(int nMode) {
   ATLASSERT(nMode >= LV_VIEW_ICON && nMode <= LV_VIEW_TILE);
 
-  if (g_bXPOrLater) {
-    if (LV_VIEW_TILE == nMode)
-      SetImageList(m_imlTiles, LVSIL_NORMAL);
-    else
-      SetImageList(m_imlLarge, LVSIL_NORMAL);
+  if (LV_VIEW_TILE == nMode)
+    SetImageList(m_imlTiles, LVSIL_NORMAL);
+  else
+    SetImageList(m_imlLarge, LVSIL_NORMAL);
 
-    SetView(nMode);
-  } else {
-    DWORD dwViewStyle;
-
-    ATLASSERT(LV_VIEW_TILE != nMode);
-
-    switch (nMode) {
-      case LV_VIEW_ICON:
-        dwViewStyle = LVS_ICON;
-        break;
-      case LV_VIEW_SMALLICON:
-        dwViewStyle = LVS_SMALLICON;
-        break;
-      case LV_VIEW_LIST:
-        dwViewStyle = LVS_LIST;
-        break;
-      case LV_VIEW_DETAILS:
-        dwViewStyle = LVS_REPORT;
-        break;
-        DEFAULT_UNREACHABLE;
-    }
-
-    ModifyStyle(LVS_TYPEMASK, dwViewStyle);
-  }
+  SetView(nMode);
 }
 
 LRESULT CVGMCollListView::OnLvnItemChanged(int idCtrl, LPNMHDR pnmh, BOOL& bHandled) {
