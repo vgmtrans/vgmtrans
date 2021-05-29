@@ -10,7 +10,6 @@
 
 #include "aboutdlg.h"
 #include "MainFrm.h"
-#include "MediaThread.h"
 #include "Root.h"
 
 CAppModule _Module;
