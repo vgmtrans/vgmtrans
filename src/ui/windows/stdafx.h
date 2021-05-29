@@ -7,7 +7,6 @@
 #if !defined(AFX_STDAFX_H__99FC9CAD_4832_49BC_A30D_F8FA14DDBB4F__INCLUDED_)
 #define AFX_STDAFX_H__99FC9CAD_4832_49BC_A30D_F8FA14DDBB4F__INCLUDED_
 
-#define _ATL_APARTMENT_THREADED
 #define _ATL_NO_OPENGL
 
 /* Support Windows 7+ */
@@ -37,7 +36,6 @@
 #pragma warning(pop)
 
 extern CAppModule _Module;
-extern bool g_bXPOrLater;
 
 #include <atlmisc.h>
 #include <atlcom.h>
