@@ -18,21 +18,21 @@ init:
   - git config --global core.autocrlf true
 
 build_script:
-  - msbuild buildbot.xml /m /t:%target% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - msbuild VGMTrans_WTL.sln /m /p:BuildInParallel=true /p:Configuration=%target% /p:Platform=%platform% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
 
 after_build:
-  - ps: $env:gitrev = git describe --tags
-  - ps: $env:my_version = "$env:gitrev-$env:appveyor_repo_branch-$env:appveyor_build_number"
-  - set package_name=vgmtrans-%my_version%-%visualstudio_string%-%platform%-%target%
-  - copy %target%\VGMTrans_WTL.exe bin\vgmtrans.exe
+  - ps: $env:gitrev = git describe --always
+  - ps: $env:buildinfo = "$env:gitrev-$env:appveyor_repo_branch-$env:appveyor_build_number"
+  - set package_name=vgmtrans-%buildinfo%-%platform%-%target%
+  - copy %target%\VGMTrans_WTL.exe bin\vgmtrans.exe || copy %platform%\%target%\VGMTrans_WTL.exe bin\vgmtrans.exe
   - mkdir vgmtrans
   - move bin vgmtrans
   - move LICENSE.txt vgmtrans
   - move README.md vgmtrans
-  - 7z a -mx9 %package_name%.7z vgmtrans
 
 test: off
 
 artifacts:
-  - path: $(package_name).7z
-    name: $(visualstudio_string)-$(target)
+  - path: vgmtrans
+    name: $(package_name)
+    type: zip
