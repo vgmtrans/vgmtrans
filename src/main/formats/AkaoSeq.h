@@ -1,13 +1,10 @@
 #pragma once
+#include <bitset>
+#include <climits>
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "AkaoFormatVersion.h"
 #include "Matcher.h"
-
-#ifdef _MSC_VER
-#include <intrin.h>
-#define __builtin_popcount __popcnt
-#endif
 
 class AkaoSeq;
 class AkaoTrack;
@@ -175,8 +172,9 @@ class AkaoSeq final :
  private:
   void LoadEventMap();
 
-  [[nodiscard]] static uint8_t GetNumPositiveBits(uint32_t ulWord) noexcept {
-    return __builtin_popcount(ulWord);
+  [[nodiscard]] static uint8_t GetNumPositiveBits(uint32_t x) noexcept {
+    std::bitset<sizeof(x) * CHAR_BIT> bs{x};
+    return bs.count();
   }
 
  public:
