@@ -327,7 +327,6 @@
     <ClCompile Include="src\ui\windows\ItemTreeView.cpp" />
     <ClCompile Include="src\ui\windows\LogListView.cpp" />
     <ClCompile Include="src\ui\windows\mainfrm.cpp" />
-    <ClCompile Include="src\ui\windows\MediaThread.cpp" />
     <ClCompile Include="src\ui\windows\MusicPlayer.cpp" />
     <ClCompile Include="src\ui\windows\MyCoCreateInstance.cpp" />
     <ClCompile Include="src\ui\windows\osdepend.cpp" />
@@ -545,7 +544,6 @@
     <ClInclude Include="src\ui\windows\ItemTreeView.h" />
     <ClInclude Include="src\ui\windows\LogListView.h" />
     <ClInclude Include="src\ui\windows\mainfrm.h" />
-    <ClInclude Include="src\ui\windows\MediaThread.h" />
     <ClInclude Include="src\ui\windows\MusicPlayer.h" />
     <ClInclude Include="src\ui\windows\MyCoCreateInstance.h" />
     <ClInclude Include="src\ui\windows\MySplitter.h" />

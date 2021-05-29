@@ -576,9 +576,6 @@
     <ClCompile Include="src\ui\windows\ItemTreeView.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="src\ui\windows\MediaThread.cpp">
-      <Filter>Source Files\windows</Filter>
-    </ClCompile>
     <ClCompile Include="src\ui\windows\MusicPlayer.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
@@ -1173,9 +1170,6 @@
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\windows\ItemTreeView.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="src\ui\windows\MediaThread.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\windows\MusicPlayer.h">
