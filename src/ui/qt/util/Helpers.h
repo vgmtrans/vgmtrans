@@ -1,11 +1,17 @@
-#ifndef VGMTRANS_HELPERS_H
-#define VGMTRANS_HELPERS_H
+/*
+ * VGMTrans (c) 2002-2021
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#pragma once
 
 #include <QIcon>
-#include "VGMFile.h"
+#include <VGMFile.h>
+#include <VGMItem.h>
 
-QIcon iconForFileType(FileType filetype);
+const QIcon &iconForItemType(VGMItem::Icon type);
+const QIcon &iconForFileType(FileType filetype);
+
 QColor colorForEventColor(uint8_t eventColor);
 QColor textColorForEventColor(uint8_t eventColor);
-
-#endif //VGMTRANS_HELPERS_H
