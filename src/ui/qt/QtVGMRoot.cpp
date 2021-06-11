@@ -1,7 +1,13 @@
-//
-// Created by Mike on 8/30/14.
-//
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
+#include <QApplication>
+#include <QStandardPaths>
+#include <QFileDialog>
+#include <QString>
 #include "QtVGMRoot.h"
 
 QtVGMRoot qtVGMRoot;
@@ -15,21 +21,6 @@ QtVGMRoot::~QtVGMRoot(void)
 {
 
 }
-
-//void QtVGMRoot::Play(void)
-//{
-//
-//}
-//
-//void QtVGMRoot::Pause(void)
-//{
-//
-//}
-//
-//void QtVGMRoot::Stop(void)
-//{
-//
-//}
 
 void QtVGMRoot::UI_SetRootPtr(VGMRoot** theRoot)
 {
@@ -116,14 +107,18 @@ std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring& suggestedFilename
     return path;
 }
 
-std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggestedFilename, const std::wstring& extension)
-{
-    std::wstring path = L"Placeholder";
-    return path;
+std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring &suggestedFilename,
+                                          const std::wstring &extension) {
+    return QFileDialog::getSaveFileName(
+               QApplication::activeWindow(), "Save file...",
+               QStandardPaths::writableLocation(QStandardPaths::MusicLocation), "All files (*)")
+        .toStdWString();
 }
 
-std::wstring QtVGMRoot::UI_GetSaveDirPath(const std::wstring& suggestedDir)
-{
-    std::wstring path = L"Placeholder";
-    return path;
+std::wstring QtVGMRoot::UI_GetSaveDirPath(const std::wstring &suggestedDir) {
+    return QFileDialog::getExistingDirectory(
+               QApplication::activeWindow(), "Save file...",
+               QStandardPaths::writableLocation(QStandardPaths::MusicLocation),
+               QFileDialog::ShowDirsOnly)
+        .toStdWString();
 }

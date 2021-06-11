@@ -1,30 +1,44 @@
-/**
-* VGMTrans (c) - 2002-2021
-* Licensed under the zlib license
-* See the included LICENSE for more information
-*/
+/*
+ * VGMTrans (c) 2002-2021
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
 #pragma once
-
 #include <QAbstractListModel>
+#include <QStyledItemDelegate>
 #include <QListView>
-#include "MusicPlayer.h"
+#include <QKeyEvent>
 
 class VGMCollListViewModel : public QAbstractListModel {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
-  explicit VGMCollListViewModel(QObject *parent = nullptr);
+   public:
+    explicit VGMCollListViewModel(QObject *parent = nullptr);
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    Qt::ItemFlags flags(const QModelIndex &index) const override;
+};
 
-  int rowCount(const QModelIndex &parent) const override;
-  QVariant data(const QModelIndex &index, int role) const override;
+class VGMCollNameEditor : public QStyledItemDelegate {
+    Q_OBJECT
 
-public slots:
-  void changedVGMColls();
+   protected:
+    void setEditorData(QWidget *editor, const QModelIndex &index) const override;
+    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const override;
 };
 
 class VGMCollListView : public QListView {
-public:
-  explicit VGMCollListView(QWidget *parent = nullptr);
-  void keyPressEvent(QKeyEvent *e) override;
+    Q_OBJECT
+
+   public:
+    explicit VGMCollListView(QWidget *parent = nullptr);
+
+   public slots:
+    void HandlePlaybackRequest();
+    void HandleStopRequest();
+
+   private:
+    void CollMenu(const QPoint &pos);
+    void keyPressEvent(QKeyEvent *e) override;
 };
