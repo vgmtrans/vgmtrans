@@ -1,4 +1,4 @@
-#if defined(_MSC_VER) && !defined(VGMTRANS_FOR_QT)
+#if defined(_MSC_VER) && defined(VGMTRANS_LEGACY)
 #include "stdafx.h"
 #endif
 
