@@ -27,7 +27,4 @@ class VGMCollListView : public QListView {
 public:
   explicit VGMCollListView(QWidget *parent = nullptr);
   void keyPressEvent(QKeyEvent *e) override;
-
-private:
-  MusicPlayer m_player;
 };
