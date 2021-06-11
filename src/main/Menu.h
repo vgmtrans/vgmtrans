@@ -1,18 +1,15 @@
+/**
+ * VGMTrans (c) - 2002-2021
+ * Licensed under the zlib license
+ * See the included LICENSE for more information
+ */
+
 #pragma once
 
 #include "common.h"
 #include "VGMItem.h"
 
-//typedef bool (*funcPtr)(void);
-//typedef bool (VGMItem::*funcPtr)(void); 
-
-/*#define DECLARE_MENU_CALLS(menuclass, origclass)											\
-	protected:																		\
-		static menuclass<origclass> menu;											\
-	public:																			\
-	virtual vector<const char*>* GetMenuItemNames() {return menu.GetMenuItemNames();}	\
-	virtual bool CallMenuItem(VGMItem* item, int menuItemNum){ return menu.CallMenuItem(item, menuItemNum); }
-*/
+#ifdef VGMTRANS_LEGACY
 
 #define BEGIN_MENU_SUB(origclass, parentclass)                                            \
     template <class T> class origclassMenu;                                                \
@@ -58,23 +55,13 @@
 
 #define DECLARE_MENU(origclass)   origclass::origclassMenu<origclass> origclass::menu;
 
-//  ********
-//  MenuItem
-//  ********
-
-
-/*class MenuItem
-{
-public:
-	MenuItem( bool (VGMItem::*functionPtr)(void), const char* theName, uint8_t theFlag = 0)
-		: func(functionPtr), name(theName), flag(theFlag) {}
-	~MenuItem() {}
-
-public:
-	const char* name;
-	bool (*func)(void);
-	uint8_t flag;
-};*/
+#else
+    #define BEGIN_MENU_SUB(STUB, STUB2)
+    #define BEGIN_MENU(STUB)
+    #define MENU_ITEM(STUB, STUB2, STUB3)
+    #define END_MENU()
+    #define DECLARE_MENU(STUB)
+#endif
 
 template<class T>
 class Menu {
@@ -85,7 +72,6 @@ class Menu {
   void AddMenuItem(bool (T::*funcPtr)(void), const wchar_t *name, uint8_t flag = 0) {
     funcs.push_back(funcPtr);
     names.push_back(name);
-    //menuItems.push_back(MenuItem(funcPtr, name, flag));
   }
 
   bool CallMenuItem(VGMItem *item, int menuItemNum) {
@@ -95,13 +81,8 @@ class Menu {
   std::vector<const wchar_t *> *GetMenuItemNames(void) {
     return &names;
   }
-  //vector<MenuItem>* GetMenuItems(void)
-  //{
-  //	return &menuItems;
-  //}
 
  protected:
   std::vector<const wchar_t *> names;
   std::vector<bool (T::*)(void)> funcs;
-  //vector<MenuItem> menuItems;
 };
