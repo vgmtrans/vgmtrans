@@ -12,6 +12,8 @@
 class QSplitter;
 class QListView;
 
+class MenuBar;
+
 class MainWindow final : public QMainWindow {
   Q_OBJECT
 
@@ -32,8 +34,15 @@ protected:
   QListView *vgmCollListView;
   QListView *collListView;
 
-protected:
-  void dragEnterEvent(QDragEnterEvent *event);
-  void dragMoveEvent(QDragMoveEvent *event);
-  void dropEvent(QDropEvent *event);
+  void dragEnterEvent(QDragEnterEvent *event) override;
+  void dragMoveEvent(QDragMoveEvent *event) override;
+  void dropEvent(QDropEvent *event) override;
+
+private:
+  void createElements();
+  void routeSignals();
+
+  void OpenFile();
+
+  MenuBar *m_menu_bar{};
 };

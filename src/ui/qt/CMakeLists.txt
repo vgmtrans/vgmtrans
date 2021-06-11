@@ -29,6 +29,8 @@ add_executable(vgmtrans
         ${UI_RESOURCES}
         About.cpp
         About.h
+        MenuBar.cpp
+        MenuBar.h
         MainWindow.cpp
         MainWindow.h
         QtVGMRoot.cpp

@@ -8,8 +8,12 @@
 #include <QMimeData>
 #include <QFileInfo>
 #include <QSplitter>
+#include <QFileDialog>
+#include <QStandardPaths>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
+#include "MenuBar.h"
+#include "About.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
@@ -28,6 +32,16 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
   setUnifiedTitleAndToolBarOnMac(true);
   setAcceptDrops(true);
   setContextMenuPolicy(Qt::NoContextMenu);
+
+  createElements();
+  routeSignals();
+
+  resize(defaultWindowWidth, defaultWindowHeight);
+}
+
+void MainWindow::createElements() {
+  m_menu_bar = new MenuBar(this);
+  setMenuBar(m_menu_bar);
 
   rawFileListView = new RawFileListView();
   vgmFileListView = new VGMFileListView();
@@ -60,7 +74,15 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
   vertSplitterLeft->setHandleWidth(splitterHandleWidth);
 
   setCentralWidget(vertSplitter);
-  resize(defaultWindowWidth, defaultWindowHeight);
+}
+
+void MainWindow::routeSignals() {
+  connect(m_menu_bar, &MenuBar::OpenFile, this, &MainWindow::OpenFile);
+  connect(m_menu_bar, &MenuBar::Exit, this, &MainWindow::close);
+  connect(m_menu_bar, &MenuBar::ShowAbout, [=]() {
+    About about(this);
+    about.exec();
+  });
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -72,15 +94,28 @@ void MainWindow::dragMoveEvent(QDragMoveEvent *event) {
 }
 
 void MainWindow::dropEvent(QDropEvent *event) {
-    const auto &files = event->mimeData()->urls();
+  const auto &files = event->mimeData()->urls();
 
-    if (files.isEmpty())
-        return;
+  if (files.isEmpty())
+    return;
 
-    for (const auto &file : files) {
-        qtVGMRoot.OpenRawFile(QFileInfo(file.toLocalFile()).filePath().toStdWString());
-    }
+  for (const auto &file : files) {
+    qtVGMRoot.OpenRawFile(QFileInfo(file.toLocalFile()).filePath().toStdWString());
+  }
 
-    setBackgroundRole(QPalette::Dark);
-    event->acceptProposedAction();
+  setBackgroundRole(QPalette::Dark);
+  event->acceptProposedAction();
+}
+
+void MainWindow::OpenFile() {
+  auto filenames = QFileDialog::getOpenFileNames(
+      this, "Select a file...", QStandardPaths::writableLocation(QStandardPaths::MusicLocation),
+      "All files (*)");
+
+  if (filenames.isEmpty())
+    return;
+
+  for (QString &filename : filenames) {
+    qtVGMRoot.OpenRawFile(filename.toStdWString());
+  }
 }
