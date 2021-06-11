@@ -10,6 +10,5 @@
     <file>images/piano-32.png</file>
     <file>images/treble_clef-32.png</file>
     <file>images/music_folder-32.png</file>
-    <file>qss/default.qss</file>
 </qresource>
 </RCC>
