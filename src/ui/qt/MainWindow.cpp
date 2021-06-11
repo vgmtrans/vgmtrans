@@ -1,7 +1,7 @@
 #include <qtextedit.h>
 #include <QDragEnterEvent>
 #include <QMimeData>
-#include "mainwindow.h"
+#include "MainWindow.h"
 #include "QtVGMRoot.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
