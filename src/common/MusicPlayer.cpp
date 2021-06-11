@@ -10,6 +10,14 @@
  * Wrapper for memory-loaded soundfonts that implements basic IO
  */
 struct MemFileWrapper {
+#if (FLUIDSYNTH_VERSION_MAJOR == 2) && (FLUIDSYNTH_VERSION_MINOR <= 1)
+  using size_type = long;
+  using count_type = int;
+#else
+  using size_type = fluid_long_long_t;
+  using count_type = fluid_long_long_t;
+#endif
+
   static void *sf_open(const char *data_buffer) {
     if (!data_buffer) {
       return nullptr;
@@ -22,7 +30,7 @@ struct MemFileWrapper {
     return reinterpret_cast<void *>(data);
   }
 
-  static int sf_read(void *buf, int count, void *handle) {
+  static int sf_read(void *buf, count_type count, void *handle) {
     auto blob = static_cast<DataBlob *>(handle);
     if (!buf || !blob || count < 0 || count + blob->index >= static_cast<long>(blob->data.size())) {
       return FLUID_FAILED;
@@ -36,7 +44,7 @@ struct MemFileWrapper {
     return FLUID_OK;
   }
 
-  static int sf_seek(void *handle, long offset, int origin) {
+  static int sf_seek(void *handle, size_type offset, int origin) {
     auto blob = static_cast<DataBlob *>(handle);
     if (!blob) {
       return FLUID_FAILED;
@@ -44,7 +52,7 @@ struct MemFileWrapper {
 
     switch (origin) {
       case SEEK_CUR: {
-        if (blob->index + offset > static_cast<long>(blob->data.size()) ||
+        if (blob->index + offset > static_cast<size_type>(blob->data.size()) ||
             blob->index + offset < 0) {
           return FLUID_FAILED;
         }
@@ -54,7 +62,7 @@ struct MemFileWrapper {
       }
 
       case SEEK_SET: {
-        if (offset > static_cast<long>(blob->data.size()) || offset < 0) {
+        if (offset > static_cast<size_type>(blob->data.size()) || offset < 0) {
           return FLUID_FAILED;
         }
 
@@ -63,7 +71,7 @@ struct MemFileWrapper {
       }
 
       case SEEK_END: {
-        if (offset + static_cast<long>(blob->data.size()) < 0 || offset > 0) {
+        if (offset + static_cast<size_type>(blob->data.size()) < 0 || offset > 0) {
           return FLUID_FAILED;
         }
 
@@ -79,7 +87,7 @@ struct MemFileWrapper {
     return FLUID_OK;
   }
 
-  static long sf_tell(void *handle) {
+  static size_type sf_tell(void *handle) {
     auto blob = static_cast<DataBlob *>(handle);
     if (!blob) {
       return FLUID_FAILED;
@@ -100,10 +108,12 @@ struct MemFileWrapper {
 
 private:
   struct DataBlob {
-    long index{};
+    size_type index{};
     gsl::span<char> data;
   };
 };
+
+namespace common {
 
 MusicPlayer::MusicPlayer() {
   makeSettings();
@@ -132,7 +142,7 @@ void MusicPlayer::makeSettings() {
     fluid_settings_setstr(m_settings, "audio.driver", "pulseaudio");
 #elif defined(_WIN32)
     /* Default to DirectSound on Windows */
-    fluid_settings_setstr(m_settings, "audio.driver", "waveout");
+    fluid_settings_setstr(m_settings, "audio.driver", "directsound");
 #endif
   }
 
@@ -249,17 +259,17 @@ std::vector<const char *> MusicPlayer::getAvailableDrivers() const {
 
   /* Availability of audio drivers shouldn't change over time, cache the result */
   if (drivers_buf.empty()) {
-    fluid_settings_foreach_option(
-        m_settings, "audio.driver", &drivers_buf, [](void *data, auto, auto option) {
-          auto drivers = static_cast<std::vector<const char *> *>(data);
-          drivers->push_back(option);
-        });
+    fluid_settings_foreach_option(m_settings, "audio.driver", &drivers_buf,
+                                  [](void *data, auto, auto option) {
+                                    auto drivers = static_cast<std::vector<const char *> *>(data);
+                                    drivers->push_back(option);
+                                  });
   }
 
   return drivers_buf;
 }
 
-bool MusicPlayer::setAudioDriver(const char* driver_name) {
+bool MusicPlayer::setAudioDriver(const char *driver_name) {
   if (fluid_settings_setstr(m_settings, "audio.driver", driver_name) == FLUID_FAILED) {
     return false;
   }
@@ -275,3 +285,14 @@ bool MusicPlayer::setAudioDriver(const char* driver_name) {
 
   return true;
 }
+
+bool MusicPlayer::checkSetting(const char *setting, const char *value) const {
+  return fluid_settings_str_equal(m_settings, setting, value) != 0;
+}
+
+void MusicPlayer::updateSetting(const char *setting, const char *value) {
+  fluid_settings_setstr(m_settings, setting, value);
+  makeSynth();
+}
+
+}  // namespace common

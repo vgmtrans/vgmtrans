@@ -1,8 +1,8 @@
 /**
-* VGMTrans (c) - 2002-2021
-* Licensed under the zlib license
-* See the included LICENSE for more information
-*/
+ * VGMTrans (c) - 2002-2021
+ * Licensed under the zlib license
+ * See the included LICENSE for more information
+ */
 
 #pragma once
 
@@ -10,9 +10,20 @@
 #include <fluidsynth.h>
 #include <gsl-lite.hpp>
 
+namespace common {
+
 class MusicPlayer {
 public:
-  MusicPlayer();
+  static auto &the() {
+    static MusicPlayer instance;
+    return instance;
+  }
+
+  MusicPlayer(const MusicPlayer &) = delete;
+  MusicPlayer &operator=(const MusicPlayer &) = delete;
+  MusicPlayer(MusicPlayer &&) = delete;
+  MusicPlayer &operator=(MusicPlayer &&) = delete;
+
   ~MusicPlayer();
 
   /**
@@ -64,9 +75,25 @@ public:
    * @param driver_name
    * @return true if the driver changed
    */
-  bool setAudioDriver(const char* driver_name);
+  bool setAudioDriver(const char *driver_name);
+
+  /**
+   * Checks the value of a setting of the player corresponds to the passed value
+   * @param setting
+   * @param value
+   * @return true if the value matches
+   */
+  [[nodiscard]] bool checkSetting(const char *setting, const char *value) const;
+  /**
+   * Sets a parameter of the player to the corrisponding passed value
+   * @param setting
+   * @param value
+   */
+  void updateSetting(const char *setting, const char *value);
 
 private:
+  MusicPlayer();
+
   fluid_settings_t *m_settings = nullptr;
   fluid_synth_t *m_synth = nullptr;
   fluid_audio_driver_t *m_active_driver = nullptr;
@@ -76,3 +103,5 @@ private:
   void makeSynth();
   void makePlayer();
 };
+
+}  // namespace common
