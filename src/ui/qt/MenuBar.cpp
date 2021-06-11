@@ -47,7 +47,7 @@ void MenuBar::AppendOptionsMenu() {
   }
 
   connect(menu_drivers, &QActionGroup::triggered, [](QAction *driver) {
-    common::MusicPlayer::the().updateSetting("audio.driver", driver->text().toStdString().c_str());
+    common::MusicPlayer::the().setAudioDriver(driver->text().toStdString().c_str());
   });
 }
 
