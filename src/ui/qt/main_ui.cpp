@@ -7,7 +7,6 @@
 #include <QApplication>
 #include <QtPlugin>
 #include <QFile>
-#include "dropsitewindow.h"
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 
