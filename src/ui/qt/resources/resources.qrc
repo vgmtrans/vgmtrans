@@ -1,15 +1,24 @@
 <!DOCTYPE RCC><RCC version="1.0">
 <qresource>
-    <file>images/close.png</file>
-    <file>images/file-32.png</file>
-    <file>images/audio_file-32.png</file>
-    <file>images/audio_wave-32.png</file>
-    <file>images/music_transcripts-32.png</file>
-    <file>images/note_music-32.png</file>
-    <file>images/bugle-32.png</file>
-    <file>images/piano-32.png</file>
-    <file>images/treble_clef-32.png</file>
-    <file>images/music_folder-32.png</file>
-    <file>appicon.png</file>
+  <file>images/open_file.svg</file>
+  <file>images/player_play.svg</file>
+  <file>images/player_pause.svg</file>
+  <file>images/player_stop.svg</file>
+  <file>images/player_next.svg</file>
+  <file>images/player_prev.svg</file>
+  <file>images/sequence.svg</file>
+  <file>images/wave.svg</file>
+  <file>images/file.svg</file>
+  <file>images/collection.svg</file>
+  <file>images/instrument-set.svg</file>
+  <file>images/instr.svg</file>
+  <file>images/note.svg</file>
+  <file>images/control.svg</file>
+  <file>images/track.svg</file>
+  <file>images/trackend.svg</file>
+  <file>images/binary.svg</file>
+  <file>images/rest.svg</file>
+  <file>images/tempo.svg</file>
+  <file>appicon.png</file>
 </qresource>
 </RCC>
