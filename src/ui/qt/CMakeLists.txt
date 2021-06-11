@@ -27,8 +27,8 @@ endif()
 add_executable(vgmtrans
         ${GUI_TYPE}
         ${UI_RESOURCES}
-        mainwindow.cpp
-        mainwindow.h
+        MainWindow.cpp
+        MainWindow.h
         QtVGMRoot.cpp
         QtVGMRoot.h
         main_ui.cpp
