@@ -282,9 +282,9 @@ class SynthFile;
 class SF2File: public RiffFile {
  public:
   SF2File(SynthFile *synthfile);
-  ~SF2File(void);
+  ~SF2File() = default;
 
-  const void *SaveToMem();
+  std::vector<uint8_t> SaveToMem();
   bool SaveSF2File(const std::wstring &filepath);
 
 };

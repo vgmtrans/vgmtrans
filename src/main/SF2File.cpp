@@ -430,21 +430,14 @@ SF2File::SF2File(SynthFile *synthfile)
 
 }
 
-SF2File::~SF2File(void) {
-}
-
-
-const void *SF2File::SaveToMem() {
-  uint32_t size = this->GetSize();
-  uint8_t *buf = new uint8_t[size];
-  this->Write(buf);
+std::vector<uint8_t> SF2File::SaveToMem() {
+  std::vector<uint8_t> buf(GetSize());
+  Write(buf.data());
   return buf;
 }
 
 bool SF2File::SaveSF2File(const std::wstring &filepath) {
-  uint32_t size = this->GetSize();
-  const void *buf = this->SaveToMem();
-  bool result = pRoot->UI_WriteBufferToFile(filepath, (uint8_t *) buf, size);
-  delete[] buf;
+  auto buf = SaveToMem();
+  bool result = pRoot->UI_WriteBufferToFile(filepath, buf.data(), size);
   return result;
 }
