@@ -156,14 +156,17 @@ void MusicPlayer::makeSynth() {
   if (m_active_player) {
     stop();
     delete_fluid_player(m_active_player);
-  }
-
-  if (m_synth) {
-    delete_fluid_synth(m_synth);
+    m_active_player = nullptr;
   }
 
   if (m_active_driver) {
     delete_fluid_audio_driver(m_active_driver);
+    m_active_driver = nullptr;
+  }
+
+  if (m_synth) {
+    delete_fluid_synth(m_synth);
+    m_synth = nullptr;
   }
 
   m_synth = new_fluid_synth(m_settings);
@@ -174,8 +177,6 @@ void MusicPlayer::makeSynth() {
                                &MemFileWrapper::sf_close);
   fluid_synth_add_sfloader(m_synth, loader);
   m_active_driver = new_fluid_audio_driver(m_settings, m_synth);
-
-  makePlayer();
 }
 
 void MusicPlayer::makePlayer() {
@@ -274,14 +275,7 @@ bool MusicPlayer::setAudioDriver(const char *driver_name) {
     return false;
   }
 
-  auto position = elapsedTicks();
-  auto was_playing = playing();
-  makePlayer();
-
-  seek(position);
-  if (was_playing) {
-    toggle();
-  }
+  makeSynth();
 
   return true;
 }
