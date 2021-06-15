@@ -22,7 +22,6 @@
 
 VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMFile, this, &VGMFileListModel::AddVGMFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedVGMFile, this, &VGMFileListModel::RemoveVGMFile);
 }
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
@@ -169,6 +168,7 @@ void VGMFileListView::ItemMenu(const QPoint &pos) {
   auto vgmfile_menu = new QMenu();
   vgmfile_menu->addAction("Remove", [file] { file->OnClose(); });
   vgmfile_menu->addAction("Save raw format", [file] { file->OnSaveAsRaw(); });
+  vgmfile_menu->addSeparator();
 
   /* todo: implement free functions to export this stuff */
   switch (file->GetFileType()) {
@@ -208,7 +208,8 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
 
       QModelIndexList list = selectionModel()->selectedRows();
       for (auto &index : list) {
-        qtVGMRoot.RemoveVGMFile(qtVGMRoot.vVGMFile[index.row()]);
+        auto file = qtVGMRoot.vVGMFile[index.row()];
+        file->OnClose();
       }
 
       return;
@@ -221,17 +222,10 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
 }
 
 void VGMFileListView::RemoveVGMFile(VGMFile *file) {
+  MdiArea::the()->RemoveView(file);
   view_model->RemoveVGMFile();
 }
 
 void VGMFileListView::RequestVGMFileView(QModelIndex index) {
-  VGMFile *vgmFile = qtVGMRoot.vVGMFile[index.row()];
-  VGMFileView *vgmFileView = new VGMFileView(vgmFile);
-  QString vgmFileName = QString::fromStdWString(*vgmFile->GetName());
-  vgmFileView->setWindowTitle(vgmFileName);
-  vgmFileView->setWindowIcon(iconForFileType(vgmFile->GetFileType()));
-
-  MdiArea::getInstance()->addSubWindow(vgmFileView);
-
-  vgmFileView->show();
+  MdiArea::the()->NewView(qtVGMRoot.vVGMFile[index.row()]);
 }

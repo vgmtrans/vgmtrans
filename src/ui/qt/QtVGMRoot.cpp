@@ -70,10 +70,6 @@ void QtVGMRoot::UI_AddLogItem(LogItem* theLog) {
   //    [[MacVGMRoot sharedInstance] UI_AddLogItem:theLog];
 }
 
-void QtVGMRoot::UI_RemoveVGMFile(VGMFile* targFile) {
-  this->UI_RemovedVGMFile();
-}
-
 void QtVGMRoot::UI_RemoveVGMColl(VGMColl* targColl) {
   this->UI_RemovedVGMColl();
 }

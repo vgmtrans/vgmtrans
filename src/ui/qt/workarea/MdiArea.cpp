@@ -1,85 +1,57 @@
+/*
+ * VGMTrans (c) 2002-2021
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "MdiArea.h"
+
 #include <QTabBar>
-#include <QAbstractButton>
-//#include <QStyleOptionTab>
-//#include <QStyle>
-#include <QDebug>
-#include <QApplication>
+#include <VGMFile.h>
+#include "VGMFileView.h"
+#include "Helpers.h"
 
-MdiArea::MdiArea(QWidget *parent)
-        : QMdiArea(parent)
-{
-    setViewMode(QMdiArea::TabbedView);
-    setDocumentMode(true);
-    setTabsMovable(true);
-    setTabsClosable(true);
-    setTabShape(QTabWidget::Triangular);
+MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
+  setViewMode(QMdiArea::TabbedView);
+  setDocumentMode(true);
+  setTabsMovable(true);
+  setTabsClosable(true);
 
-    QTabBar *tabBar = getTabBar();
-    if (tabBar) {
-        tabBar->setExpanding(false);
-        tabBar->setUsesScrollButtons(true);
+  auto *tab_bar = findChild<QTabBar *>();
+  if (tab_bar) {
+    tab_bar->setExpanding(false);
+    tab_bar->setUsesScrollButtons(true);
+  }
+}
 
-//        tabBar->setStyle(new TabBarStyle(tabBar->style()));
+void MdiArea::NewView(VGMFile *file) {
+  auto it = m_registered_views.find(file);
+  // Check if a fileview for this vgmfile already exists
+  if (it != m_registered_views.end()) {
+    // If it does, let's focus it
+    auto *vgmfile_view = it->second;
+    vgmfile_view->setFocus();
+  } else {
+    // No VGMFileView could be found, we have to make one
+    auto *vgmfile_view = new VGMFileView(file);
+    auto tab = addSubWindow(vgmfile_view, Qt::SubWindow);
+    tab->show();
+
+    m_registered_views.insert(std::make_pair(file, tab));
+  }
+}
+
+void MdiArea::RemoveView(VGMFile *file) {
+  // Let's check if we have a VGMFileView to remove
+  auto it = m_registered_views.find(file);
+  if (it != m_registered_views.end()) {
+    // Sanity check
+    if (it->second) {
+      // Close the tab (automatically deletes it)
+      // Workaround for QTBUG-5446 (removeMdiSubWindow would be a better option)
+      it->second->close();
     }
-}
-
-QMdiSubWindow* MdiArea::addSubWindow(QWidget *widget) {
-
-    QTabBar *tabBar = getTabBar();
-    QMdiSubWindow* newWindow = QMdiArea::addSubWindow(widget);
-    auto index = tabBar->count()-1;
-//    QPushButton *button = new QPushButton("X");
-//    button->setFixedSize(32, tabBar->height());
-    tabBar->setTabToolTip(index, widget->windowTitle());
-//    QAbstractButton *button = getCloseButton();
-
-//    connect(button, SIGNAL (clicked()), this, SLOT (closeButtonClicked()));
-
-//    qDebug() << "button position is: " << button->pos();
-//    button->setGeometry(0, 0, 20, 20);
-//    tabBar->setTabButton(index, QTabBar::RightSide, button);
-    return newWindow;
-
-}
-
-void MdiArea::closeButtonClicked()
-{
-    qDebug() << "CLOSE BUTTON CLICKED";
-}
-
-QTabBar* MdiArea::getTabBar() {
-    QList<QTabBar *> tabBarList = findChildren<QTabBar*>();
-    QTabBar *tabBar = tabBarList.at(0);
-//    QList<QAbstractButton*> buttonList = tabBar->findChildren<QAbstractButton*>() ;
-//
-//    QStyleOptionTab opt;
-//    QRect rect = style()->subElementRect(QStyle::SE_TabBarTabRightButton, &opt, this);
-//    qDebug() << "TABBAR RIGHT: " << rect.left() << rect;
-
-//    qDebug() << "buttonList: " << buttonList.count();
-//    for (auto *button : buttonList ) {
-//        qDebug() << "button position: " << button->pos() << "  typeid: " << typeid(button).name();
-//        button->move(0, 0);
-//        button->setGeometry(10, 10, 50, 50);
-//    }
-    return tabBarList.at(0);
-}
-
-QAbstractButton* MdiArea::getCloseButton() {
-    QTabBar *tabBar = getTabBar();
-    QList<QAbstractButton*> buttonList = tabBar->findChildren<QAbstractButton*>();
-
-    return buttonList.at(0);
-//    for (int i=0; i<buttonList.count(); i++) {
-//        auto button = buttonList[i];
-//
-//        qDebug() << "button " << i << " position: " << button->pos();
-//
-//    }
-    //    for (auto *button : buttonList ) {
-//        qDebug() << "button position: " << button->pos() << "  typeid: " << typeid(button).name();
-//        button->move(0, 0);
-//        button->setGeometry(10, 10, 50, 50);
-//    }
+    // Get rid of the saved pointers
+    m_registered_views.erase(file);
+  }
 }

@@ -60,7 +60,7 @@ void MainWindow::createElements() {
 
   sizes = QList<int>({defaultFileListWidth, defaultWindowWidth - defaultFileListWidth});
   horzSplitter->addWidget(vertSplitterLeft);
-  horzSplitter->addWidget(MdiArea::getInstance());
+  horzSplitter->addWidget(MdiArea::the());
   horzSplitter->setStretchFactor(1, 1);
   horzSplitter->setSizes(sizes);
   horzSplitter->setHandleWidth(splitterHandleWidth);
