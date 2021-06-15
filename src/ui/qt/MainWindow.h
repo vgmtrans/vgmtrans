@@ -21,16 +21,11 @@ class MainWindow final : public QMainWindow {
 public:
   MainWindow();
 
-  static MainWindow &getInstance() {
-    static MainWindow instance;
-    return instance;
-  }
-
 protected:
   QSplitter *vertSplitter;
   QSplitter *horzSplitter;
   QSplitter *vertSplitterLeft;
-  QListView *rawFileListView;
+  QTableView *rawFileListView;
   QTableView *vgmFileListView;
   QListView *vgmCollListView;
   QListView *collListView;
