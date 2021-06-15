@@ -24,6 +24,8 @@ elseif(APPLE)
     set(GUI_TYPE MACOSX_BUNDLE)
 endif()
 
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/qhexview" "${CMAKE_CURRENT_BINARY_DIR}/qhexview" EXCLUDE_FROM_ALL)
+
 add_executable(vgmtrans
         ${GUI_TYPE}
         ${UI_RESOURCES}
@@ -63,7 +65,8 @@ target_link_libraries(vgmtrans
         vgmtranscore
         vgmtranscommon
         Qt5::Widgets
-        Qt5::Svg)
+        Qt5::Svg
+        qhexview-lib)
 
 #TODO: add resource manifest for win32
 if(APPLE)
