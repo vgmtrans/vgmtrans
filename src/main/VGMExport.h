@@ -9,6 +9,7 @@
 #include "MidiFile.h"
 #include "SF2File.h"
 #include "VGMColl.h"
+#include "VGMSeq.h"
 
 /*
  * The following free functions implement
