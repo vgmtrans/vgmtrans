@@ -113,3 +113,4 @@ target_include_directories(minizip
 PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/minizip
 )
+target_link_libraries(minizip PRIVATE ZLIB::ZLIB)
