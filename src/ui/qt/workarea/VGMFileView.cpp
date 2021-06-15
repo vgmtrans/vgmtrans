@@ -17,7 +17,9 @@
 const int splitterHandleWidth = 1;
 
 VGMFileView::VGMFileView(VGMFile *vgmfile)
-    : QSplitter(Qt::Horizontal), m_vgmfile(vgmfile), m_hexview(new QHexView) {
+    : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new QHexView) {
+  m_splitter = new QSplitter(Qt::Horizontal, this);
+
   /* this copy is nasty, removing it involves some serious backend refactoring... */
   auto &internal_buffer = m_buffer.buffer();
   internal_buffer.resize(m_vgmfile->unLength);
@@ -40,9 +42,9 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   m_treeview = new VGMFileTreeView(m_vgmfile, this);
 
-  addWidget(m_hexview);
-  addWidget(m_treeview);
-  setSizes(QList<int>() << 900 << 270);
+  m_splitter->addWidget(m_hexview);
+  m_splitter->addWidget(m_treeview);
+  m_splitter->setSizes(QList<int>() << 900 << 270);
 
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
           [file_ofs = m_vgmfile->dwOffset, hexview = m_hexview](
@@ -64,6 +66,8 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
     font.setPointSizeF(font.pointSizeF() - 0.5);
     hexview->setFont(font);
   });
+
+  setWidget(m_splitter);
 }
 
 void VGMFileView::markEvents() {
@@ -93,7 +97,7 @@ void VGMFileView::markEvents() {
     }
   }
 }
-void VGMFileView::addToMdi() {
-  MdiArea::getInstance()->addSubWindow(this);
-  show();
+
+void VGMFileView::closeEvent(QCloseEvent *) {
+    MdiArea::the()->RemoveView(m_vgmfile);
 }
