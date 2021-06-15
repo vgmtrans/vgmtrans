@@ -173,6 +173,10 @@ void VGMCollListView::HandlePlaybackRequest() {
 
   //todo: move somewhere else
   VGMColl *coll = qtVGMRoot.vVGMColl[list[0].row()];
+  if(coll->sampcolls.empty()) {
+    return;
+  }
+
   VGMSeq *seq = coll->GetSeq();
   if (!seq) {
     return;
@@ -188,13 +192,12 @@ void VGMCollListView::HandlePlaybackRequest() {
   std::vector<uint8_t> midiBuf;
   midi->WriteMidiToBuffer(midiBuf);
 
-  void *rawSF2 = const_cast<void *>(sf2->SaveToMem());
+  auto rawSF2 = sf2->SaveToMem();
 
   common::MusicPlayer::the().loadDataAndPlay(
-      gsl::make_span(static_cast<char *>(rawSF2), sf2->GetSize()),
+      gsl::make_span(reinterpret_cast<char *>(rawSF2.data()), rawSF2.size()),
       gsl::make_span(reinterpret_cast<char *>(midiBuf.data()), midiBuf.size()));
 
-  delete[] rawSF2;
   delete sf2;
   delete midi;
 }
