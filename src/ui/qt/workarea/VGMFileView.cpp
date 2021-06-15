@@ -44,6 +44,15 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   addWidget(m_treeview);
   setSizes(QList<int>() << 900 << 270);
 
+  connect(m_treeview, &VGMFileTreeView::currentItemChanged,
+          [file_ofs = m_vgmfile->dwOffset, hexview = m_hexview](
+              QTreeWidgetItem *item, [[maybe_unused]] QTreeWidgetItem *) {
+            auto vgmitem = static_cast<VGMItem *>(item->data(0, Qt::UserRole).value<void *>());
+            auto offset = vgmitem->dwOffset - file_ofs;
+
+            hexview->document()->cursor()->selectOffset(offset, vgmitem->unLength);
+          });
+
   new QShortcut(QKeySequence::ZoomIn, this, [hexview = m_hexview]() {
     auto font = hexview->font();
     font.setPointSizeF(font.pointSizeF() + 0.5);
