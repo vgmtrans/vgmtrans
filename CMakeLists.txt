@@ -59,6 +59,7 @@ if(MSVC)
             -D_CRT_NONSTDC_NO_DEPRECATE
             -D_CRT_SECURE_NO_WARNINGS
             /permissive-
+            /Zc:strictStrings-
             )
 
     target_compile_options(g_warnings
