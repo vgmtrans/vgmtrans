@@ -11,6 +11,7 @@
 
 class QSplitter;
 class QListView;
+class QTableView;
 
 class MenuBar;
 
@@ -30,7 +31,7 @@ protected:
   QSplitter *horzSplitter;
   QSplitter *vertSplitterLeft;
   QListView *rawFileListView;
-  QListView *vgmFileListView;
+  QTableView *vgmFileListView;
   QListView *vgmCollListView;
   QListView *collListView;
 

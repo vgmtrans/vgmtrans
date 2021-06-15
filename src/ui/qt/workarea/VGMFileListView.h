@@ -1,44 +1,50 @@
-//
-// Created by Mike on 8/31/14.
-//
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-#include <QAbstractListModel>
-#include <QEvent>
-#include <QListView>
+#pragma once
 
-#ifndef __VGMFileListView_H_
-#define __VGMFileListView_H_
+#include <QTableView>
+#include <QAbstractTableModel>
+#include <QKeyEvent>
+#include <QSortFilterProxyModel>
 
+#include "VGMFile.h"
 
-class VGMFileListViewModel : public QAbstractListModel
-{
+class VGMFileListModel : public QAbstractTableModel {
     Q_OBJECT
 
-public:
-    VGMFileListViewModel(QObject *parent = 0);
+   public:
+    explicit VGMFileListModel(QObject *parent = nullptr);
 
-    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+    int rowCount(const QModelIndex &parent) const override;
+    int columnCount(const QModelIndex &parent) const override;
 
-    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
+   public slots:
+    void AddVGMFile();
+    void RemoveVGMFile();
 
-public slots:
-    void changedVGMFiles();
+   private:
+    enum Property : uint8_t { Name = 0, Type = 1, Format = 2 };
 };
 
-
-
-class VGMFileListView : public QListView
-{
+class VGMFileListView final : public QTableView {
     Q_OBJECT
 
-public:
-    VGMFileListView(QWidget *parent = 0);
+   public:
+    explicit VGMFileListView(QWidget *parent = nullptr);
 
-    void keyPressEvent(QKeyEvent* e);
-//    void mouseDoubleClickEvent(QMouseEvent *event);
-public slots:
-    void doubleClickedSlot(QModelIndex);
+   public slots:
+    void RequestVGMFileView(QModelIndex index);
+    void RemoveVGMFile(VGMFile *file);
+
+   private:
+    void keyPressEvent(QKeyEvent *input) override;
+    void ItemMenu(const QPoint &pos);
+
+    VGMFileListModel *view_model;
 };
-
-
-#endif //__VGMFileListView_H_
