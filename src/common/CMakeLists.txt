@@ -5,23 +5,22 @@ if(FluidSynth_FOUND AND "${FluidSynth_VERSION}" MATCHES "2(.)*")
     message(STATUS "Using FluidSynth ${FluidSynth_VERSION}")
 else()
     if(MSVC)
-        add_library(fluidsynth STATIC IMPORTED)
+        add_library(FluidSynth::FluidSynth STATIC IMPORTED)
         set_target_properties(
-                fluidsynth
+                FluidSynth::FluidSynth
                 PROPERTIES
                 IMPORTED_LOCATION
-                "${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2019-x64/fluidsynth.lib"
+                "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/solidsynth-msvc2019-x64/fluidsynth.lib"
         )
 
         target_include_directories(
-                fluidsynth
+                FluidSynth::FluidSynth
                 INTERFACE
-                ${CMAKE_SOURCE_DIR}/externals/win-deps/fluidsynth2-msvc2019-x64/include)
+                "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/solidsynth-msvc2019-x64")
 
         message(STATUS "Using FluidSynth fallback from Windows externals")
     else()
-        message(
-                FATAL_ERROR "Failed to locate FluidSynth or library too old")
+        message(FATAL_ERROR "Failed to locate FluidSynth or library too old")
     endif()
 endif()
 

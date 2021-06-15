@@ -86,3 +86,32 @@ jobs:
         with:
           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.AppImage
           path: "build/VGMTrans.AppImage"
+  Windows:
+    runs-on: windows-latest
+    name: Windows
+    steps:
+       - uses: actions/checkout@v2
+         with:
+          submodules: true
+       - name: "Prepare build"
+         run: |
+          echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          mkdir build
+          cd build
+          cmake --version
+          cmake -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release ..
+       - name: "Build project"
+         run: cmake --build build --parallel --config "Release"
+       - name: "Package artifact"
+         working-directory: build
+         run: |
+            mkdir deploy
+            copy src\ui\qt\Release\vgmtrans.exe deploy\vgmtrans.exe
+            copy ..\bin\mame_roms.xml deploy\
+            windeployqt --release --no-translations --no-angle --no-opengl-sw deploy\vgmtrans.exe
+       - name: "Upload artifact"
+         uses: actions/upload-artifact@v2.2.3
+         with:
+           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
+           path: build\deploy
+       
