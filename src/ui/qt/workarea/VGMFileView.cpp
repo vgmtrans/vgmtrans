@@ -55,17 +55,19 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
             hexview->document()->cursor()->selectOffset(offset, vgmitem->unLength);
           });
 
-  new QShortcut(QKeySequence::ZoomIn, this, [hexview = m_hexview]() {
-    auto font = hexview->font();
-    font.setPointSizeF(font.pointSizeF() + 0.5);
-    hexview->setFont(font);
-  });
+  connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated,
+          [hexview = m_hexview]() {
+            auto font = hexview->font();
+            font.setPointSizeF(font.pointSizeF() + 0.5);
+            hexview->setFont(font);
+          });
 
-  new QShortcut(QKeySequence::ZoomOut, this, [hexview = m_hexview]() {
-    auto font = hexview->font();
-    font.setPointSizeF(font.pointSizeF() - 0.5);
-    hexview->setFont(font);
-  });
+  connect(new QShortcut(QKeySequence::ZoomOut, this), &QShortcut::activated,
+          [hexview = m_hexview]() {
+            auto font = hexview->font();
+            font.setPointSizeF(font.pointSizeF() - 0.5);
+            hexview->setFont(font);
+          });
 
   setWidget(m_splitter);
 }
@@ -99,5 +101,5 @@ void VGMFileView::markEvents() {
 }
 
 void VGMFileView::closeEvent(QCloseEvent *) {
-    MdiArea::the()->RemoveView(m_vgmfile);
+  MdiArea::the()->RemoveView(m_vgmfile);
 }
