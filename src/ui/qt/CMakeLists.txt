@@ -51,9 +51,7 @@ add_executable(vgmtrans
         workarea/VGMFileView.cpp
         workarea/VGMFileView.h
         workarea/VGMFileListView.cpp
-        workarea/VGMFileListView.h
-        workarea/VGMFileItemModel.cpp
-        workarea/VGMFileItemModel.h)
+        workarea/VGMFileListView.h)
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
