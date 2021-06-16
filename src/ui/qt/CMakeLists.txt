@@ -96,7 +96,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
         "${WINDEPLOYQT}"
             --plugindir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
             --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
-            $<IF$<CONFIG:Debug>,--debug,--release>
+            $<IF:$<CONFIG:Debug>,--debug,--release>
             --no-translations
             --no-compiler-runtime
             --no-angle
