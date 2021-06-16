@@ -28,7 +28,6 @@ jobs:
       - working-directory: "build"
         name: "Package DMG (macOS)"
         run: |
-          cp ../bin/mame_roms.xml src/ui/qt/VGMTrans.app/Contents/MacOS/
           /usr/local/opt/qt5/bin/macdeployqt src/ui/qt/VGMTrans.app -dmg -always-overwrite
           mv src/ui/qt/VGMTrans.dmg .
       - name: "Upload artifact"
@@ -78,7 +77,7 @@ jobs:
           mkdir -p appdir/usr/share
           cp ../bin/mame_roms.xml appdir/usr/bin
           cp ../src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
-          cp ../src/ui/qt/resources/appicon.png appdir/
+          cp ../src/ui/qt/resources/vgmtrans.png appdir/
           ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/ -verbose=2
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
@@ -103,15 +102,10 @@ jobs:
        - name: "Build project"
          run: cmake --build build --parallel --config "Release"
        - name: "Package artifact"
-         working-directory: build
-         run: |
-            mkdir deploy
-            copy src\ui\qt\Release\vgmtrans.exe deploy\vgmtrans.exe
-            copy ..\bin\mame_roms.xml deploy\
-            windeployqt --release --no-translations --no-angle --no-opengl-sw deploy\vgmtrans.exe
-       - name: "Upload artifact"
-         uses: actions/upload-artifact@v2.2.3
-         with:
-           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
-           path: build\deploy
+         run: cmake --build build --target package
+       #- name: "Upload artifact"
+        # uses: actions/upload-artifact@v2.2.3
+        # with:
+         #  name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
+         #  path: build\deploy
        
