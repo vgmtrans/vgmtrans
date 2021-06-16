@@ -81,10 +81,13 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     set_source_files_properties("${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
             PROPERTIES MACOSX_PACKAGE_LOCATION MacOS)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
+    # Make sure the executable ends up in the binary directory without any additional folders
+    set_target_properties(vgmtrans PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<$<CONFIG:Debug>:>")
     target_sources(vgmtrans PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
 
+    # Copy ROMs definitions for CPS
     add_custom_command(TARGET vgmtrans POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/mame_roms.xml"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
     )
 
     get_target_property(MOC_EXECUTABLE_LOCATION Qt5::moc IMPORTED_LOCATION)
@@ -95,7 +98,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
         COMMAND "${CMAKE_COMMAND}" -E env PATH="${QT_BIN_LOCATION}"
         "${WINDEPLOYQT}"
             --plugindir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
-            --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
+            --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
             $<IF:$<CONFIG:Debug>,--debug,--release>
             --no-translations
             --no-compiler-runtime
@@ -103,6 +106,8 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
             --no-opengl-sw
             "$<TARGET_FILE:vgmtrans>"
     )
+
+    file(WRITE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf" "[Paths]\r\nPlugins = ./QtPlugins")
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
     install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})
     install(FILES resources/vgmtrans.png
@@ -117,6 +122,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A converter for sequenced proprietary vid
 set(CPACK_RPM_PACKAGE_LICENSE ZLIB)
 
 set(CPACK_SET_DESTDIR ON)
+set(CPACK_GENERATOR "ZIP")
 set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
 set(CPACK_SOURCE_IGNORE_FILES "/build.*/;/\\\\.git/")
 list(APPEND CPACK_SOURCE_IGNORE_FILES "${CMAKE_BINARY_DIR}")

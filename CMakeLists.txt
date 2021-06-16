@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 3.12)
 
 # We're still targeting High Sierra, despite the fact it went EOL in 2019
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.12.0" CACHE STRING "Minimum OSX version" FORCE)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 project(VGMTrans VERSION 1.1 LANGUAGES CXX)
 
