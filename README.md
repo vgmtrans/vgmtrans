@@ -2,10 +2,11 @@ VGMTrans - Video Game Music Translator
 ======================================
 | Platform | Status | Build available |
 | :-: | :-: | :-: |
-| Windows (legacy) | [![Build status](https://ci.appveyor.com/api/projects/status/ns62qg09yn5kmf18/branch/master?svg=true)](https://ci.appveyor.com/project/sykhro/vgmtrans-ci/branch/master) | [Yes](https://ci.appveyor.com/project/sykhro/vgmtrans-ci/branch/master/artifacts) |
-| FreeBSD | [![Build Status](https://api.cirrus-ci.com/github/vgmtrans/vgmtrans.svg)](https://cirrus-ci.com/github/vgmtrans/vgmtrans) | No |
+| Windows | [![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) | [Yes](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) |
 | macOS | [![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) | [DMG (not signed)](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) |
 | Linux | [![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) | [AppImage](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) |
+| FreeBSD | [![Build Status](https://api.cirrus-ci.com/github/vgmtrans/vgmtrans.svg)](https://cirrus-ci.com/github/vgmtrans/vgmtrans) | No |
+| Windows (legacy, 32-bit) | [![Build status](https://ci.appveyor.com/api/projects/status/ns62qg09yn5kmf18/branch/master?svg=true)](https://ci.appveyor.com/project/sykhro/vgmtrans-ci/branch/master) | [Yes](https://ci.appveyor.com/project/sykhro/vgmtrans-ci/branch/master/artifacts) |
 
 VGMTrans converts a music files used in console video games into standard midi and dls/sf2 files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
 
