@@ -142,7 +142,7 @@ void MusicPlayer::makeSettings() {
     fluid_settings_setstr(m_settings, "audio.driver", "pulseaudio");
 #elif defined(_WIN32)
     /* Default to DirectSound on Windows */
-    fluid_settings_setstr(m_settings, "audio.driver", "directsound");
+    fluid_settings_setstr(m_settings, "audio.driver", "dsound");
 #endif
   }
 
