@@ -64,23 +64,61 @@ target_link_libraries(vgmtrans
         Qt5::Svg
         qhexview-lib)
 
-#TODO: add resource manifest for win32
-if(APPLE)
-    set(BUNDLE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app)
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
 
     set_target_properties(vgmtrans
-            PROPERTIES MACOSX_BUNDLE
-            true
-            MACOSX_BUNDLE_INFO_PLIST
-            ${CMAKE_CURRENT_LIST_DIR}/resources/Info.plist.in
-            OUTPUT_NAME
-            VGMTrans)
+            PROPERTIES
+            MACOSX_BUNDLE true
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/resources/Info.plist.in"
+            OUTPUT_NAME VGMTrans)
 
     target_sources(vgmtrans PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns")
     set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
-            PROPERTIES
-            MACOSX_PACKAGE_LOCATION
-            Resources)
-elseif(NOT WIN32)
+            PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    
+    target_sources(vgmtrans PRIVATE "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml")
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
+            PROPERTIES MACOSX_PACKAGE_LOCATION MacOS)
+elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
+    target_sources(vgmtrans PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
+
+    add_custom_command(TARGET vgmtrans POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/mame_roms.xml"
+    )
+
+    get_target_property(MOC_EXECUTABLE_LOCATION Qt5::moc IMPORTED_LOCATION)
+    get_filename_component(QT_BIN_LOCATION "${MOC_EXECUTABLE_LOCATION}" DIRECTORY)
+    find_program(WINDEPLOYQT windeployqt HINTS "${QT_BIN_LOCATION}")
+
+    add_custom_command(TARGET vgmtrans POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E env PATH="${QT_BIN_LOCATION}"
+        "${WINDEPLOYQT}"
+            --plugindir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
+            --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
+            $<IF$<CONFIG:Debug>,--debug,--release>
+            --no-translations
+            --no-compiler-runtime
+            --no-angle
+            --no-opengl-sw
+            "$<TARGET_FILE:vgmtrans>"
+    )
+elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
     install(TARGETS vgmtrans DESTINATION ${CMAKE_INSTALL_PREFIX})
+    install(FILES resources/vgmtrans.png
+            DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/512x512/apps")
+    install(FILES resources/VGMTrans.desktop
+            DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications")
 endif()
+
+set(CPACK_PACKAGE_NAME "vgmtrans")
+set(CPACK_PACKAGE_VENDOR "VGMTrans Team")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A converter for sequenced proprietary videogame music formats")
+set(CPACK_RPM_PACKAGE_LICENSE ZLIB)
+
+set(CPACK_SET_DESTDIR ON)
+set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
+set(CPACK_SOURCE_IGNORE_FILES "/build.*/;/\\\\.git/")
+list(APPEND CPACK_SOURCE_IGNORE_FILES "${CMAKE_BINARY_DIR}")
+
+include(CPack)
