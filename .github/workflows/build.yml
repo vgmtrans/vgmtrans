@@ -23,8 +23,6 @@ jobs:
           cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -G Ninja ..
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
-      - name: "Run tests"
-        run: ctest -C Release
       - working-directory: "build"
         name: "Package DMG (macOS)"
         run: |
@@ -65,8 +63,6 @@ jobs:
           cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -GNinja ..
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
-      - name: "Run tests"
-        run: ctest -C Release
       - name: "Make AppImage"
         working-directory: "build"
         run: |
@@ -100,12 +96,10 @@ jobs:
           cmake --version
           cmake -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release ..
        - name: "Build project"
-         run: cmake --build build --parallel --config "Release"
-       - name: "Package artifact"
-         run: cmake --build build --target package
-       #- name: "Upload artifact"
-        # uses: actions/upload-artifact@v2.2.3
-        # with:
-         #  name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
-         #  path: build\deploy
+         run: cmake --build build --config "Release" --parallel
+       - name: "Upload artifact"
+         uses: actions/upload-artifact@v2.2.3
+         with:
+           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
+           path: build\bin\
        
