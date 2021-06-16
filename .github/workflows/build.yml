@@ -83,9 +83,11 @@ jobs:
           cmake -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -B build
        - name: "Build project"
          run: cmake --build build --config "Release" --parallel
+       - name: "Package artifact"
+         run: 7z a "VGMTrans.zip" -r .\build\bin*
        - name: "Upload artifact"
          uses: actions/upload-artifact@v2.2.3
          with:
            name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
-           path: build\bin\
+           path: VGMTrans.zip
        
