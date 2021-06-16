@@ -5,10 +5,10 @@
 # For object library liinking
 cmake_minimum_required(VERSION 3.12)
 
-# People still use Yosemite
+# We're still targeting High Sierra, despite the fact it went EOL in 2019
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.12.0" CACHE STRING "Minimum OSX version" FORCE)
 
-project(VGMTrans VERSION 0.1 LANGUAGES CXX)
+project(VGMTrans VERSION 1.1 LANGUAGES CXX)
 
 add_library(g_options INTERFACE)
 add_library(g_warnings INTERFACE)
