@@ -27,7 +27,7 @@ const int splitterHandleWidth = 1;
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
-  setWindowIcon(QIcon(":/appicon.png"));
+  setWindowIcon(QIcon(":/vgmtrans.png"));
 
   setUnifiedTitleAndToolBarOnMac(true);
   setAcceptDrops(true);

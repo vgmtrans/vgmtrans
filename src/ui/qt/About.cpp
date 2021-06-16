@@ -30,15 +30,14 @@ About::About(QWidget *parent) : QDialog(parent) {
     QLabel *text_label = new QLabel(text);
     text_label->setTextInteractionFlags(Qt::TextBrowserInteraction);
     text_label->setOpenExternalLinks(true);
-    text_label->setContentsMargins(30, 0, 30, 0);
+    text_label->setContentsMargins(15, 0, 15, 0);
 
     QLabel *copyright =
-        new QLabel(small + "\u00A9 2002-2021 VGMTrans Team | Licensed under the zlib license" +
-                   QStringLiteral("</p>"));
+        new QLabel("<p style='margin-top:0; margin-bottom:0; font-size:small;'>\u00A9 2002-2021 VGMTrans Team | Licensed under the zlib license</p>");
 
     QLabel *logo = new QLabel();
-    logo->setPixmap(QPixmap(":/appicon.png").scaledToHeight(300, Qt::SmoothTransformation));
-    logo->setContentsMargins(30, 0, 30, 0);
+    logo->setPixmap(QPixmap(":/vgmtrans.png").scaledToHeight(250, Qt::SmoothTransformation));
+    logo->setContentsMargins(15, 0, 15, 0);
 
     QVBoxLayout *main_layout = new QVBoxLayout;
     QHBoxLayout *h_layout = new QHBoxLayout;

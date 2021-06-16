@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=VGMTrans
-Exec=/usr/bin/vgmtrans
-Icon=appicon
+Exec=vgmtrans
+Icon=vgmtrans
 Comment=A converter for sequenced videogame music
 Terminal=false
 Categories=AudioVideo;
