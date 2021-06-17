@@ -14,6 +14,7 @@ class QListView;
 class QTableView;
 
 class MenuBar;
+class Logger;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -41,4 +42,5 @@ private:
   void OpenFile();
 
   MenuBar *m_menu_bar{};
+  Logger *m_logger{};
 };

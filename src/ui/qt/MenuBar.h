@@ -14,10 +14,14 @@ class MenuBar final : public QMenuBar {
 public:
   explicit MenuBar(QWidget *parent = nullptr);
 
+public slots:
+  void SetLoggerHidden();
+
 signals:
   void OpenFile();
   void Exit();
   void ShowAbout();
+  void ShowLogger(bool show);
 
 private:
   void AppendFileMenu();
@@ -33,4 +37,5 @@ private:
 
   // Options actions
   QActionGroup *menu_drivers;
+  QAction *menu_logger_show;
 };

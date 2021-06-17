@@ -14,6 +14,7 @@
 #include "QtVGMRoot.h"
 #include "MenuBar.h"
 #include "About.h"
+#include "Logger.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
@@ -74,6 +75,9 @@ void MainWindow::createElements() {
   vertSplitterLeft->setHandleWidth(splitterHandleWidth);
 
   setCentralWidget(vertSplitter);
+
+  m_logger = new Logger();
+  addDockWidget(Qt::BottomDockWidgetArea, m_logger);
 }
 
 void MainWindow::routeSignals() {
@@ -83,6 +87,9 @@ void MainWindow::routeSignals() {
     About about(this);
     about.exec();
   });
+  connect(m_menu_bar, &MenuBar::ShowLogger, m_logger, &Logger::setVisible);
+
+  connect(m_logger, &Logger::closeEvent, m_menu_bar, &MenuBar::SetLoggerHidden);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
