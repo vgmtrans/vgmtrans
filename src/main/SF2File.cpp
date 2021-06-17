@@ -438,6 +438,6 @@ std::vector<uint8_t> SF2File::SaveToMem() {
 
 bool SF2File::SaveSF2File(const std::wstring &filepath) {
   auto buf = SaveToMem();
-  bool result = pRoot->UI_WriteBufferToFile(filepath, buf.data(), size);
+  bool result = pRoot->UI_WriteBufferToFile(filepath, buf.data(), buf.size());
   return result;
 }
