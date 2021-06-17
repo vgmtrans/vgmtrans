@@ -49,10 +49,19 @@ void MenuBar::AppendOptionsMenu() {
   connect(menu_drivers, &QActionGroup::triggered, [](QAction *driver) {
     common::MusicPlayer::the().setAudioDriver(driver->text().toStdString().c_str());
   });
+
+  menu_logger_show = options_dropdown->addAction("Show logs");
+  menu_logger_show->setCheckable(true);
+  menu_logger_show->setChecked(true);
+  connect(menu_logger_show, &QAction::triggered, this, &MenuBar::ShowLogger);
 }
 
 void MenuBar::AppendInfoMenu() {
   QMenu *info_dropdown = addMenu("Help");
   menu_about_dlg = info_dropdown->addAction("About VGMTrans");
   connect(menu_about_dlg, &QAction::triggered, this, &MenuBar::ShowAbout);
+}
+
+void MenuBar::SetLoggerHidden() {
+  menu_logger_show->setChecked(false);
 }
