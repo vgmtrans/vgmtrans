@@ -37,6 +37,8 @@ add_executable(vgmtrans
         MainWindow.h
         QtVGMRoot.cpp
         QtVGMRoot.h
+        Logger.cpp
+        Logger.h
         main_ui.cpp
         util/Helpers.cpp
         util/Helpers.h
