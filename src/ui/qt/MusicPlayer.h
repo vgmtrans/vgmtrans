@@ -9,8 +9,11 @@
 #include <vector>
 #include <fluidsynth.h>
 #include <gsl-lite.hpp>
+#include <QObject>
+#include <QString>
 
-class MusicPlayer {
+class MusicPlayer : public QObject {
+  Q_OBJECT
 public:
   static auto &the() {
     static MusicPlayer instance;
@@ -38,6 +41,12 @@ public:
    * @param position relative to song start
    */
   void seek(int position);
+
+  /**
+   * Returns the title of the song currently playing
+   * @return the song title
+   */
+  [[nodiscard]] QString songTitle() const;
 
   /**
    * Loads SF2 and MIDI data into the player; resources are copied
@@ -88,6 +97,10 @@ public:
    * @param value
    */
   void updateSetting(const char *setting, const char *value);
+
+signals:
+  void statusChange(bool playing);
+  void playbackPositionChanged(int current, int max);
 
 private:
   MusicPlayer();
