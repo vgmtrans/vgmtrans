@@ -5,6 +5,13 @@
 #include "ScaleConversion.h"
 #include "Root.h"
 
+#ifdef VGMTRANS_LEGACY
+  /* No worries about hard-coding, legacy will be dropped past this release*/
+  VGMTRANS_VERSION "v1.1-LEGACY"
+#else
+#include "version.h"
+#endif
+
 using namespace std;
 
 SF2InfoListChunk::SF2InfoListChunk(string name)
@@ -23,7 +30,7 @@ SF2InfoListChunk::SF2InfoListChunk(string name)
   AddChildChunk(new SF2StringChunk("isng", "EMU8000"));
   AddChildChunk(new SF2StringChunk("INAM", name));
   AddChildChunk(new SF2StringChunk("ICRD", string(c_time_string)));
-  AddChildChunk(new SF2StringChunk("ISFT", string("VGMTrans " + string(VERSION))));
+  AddChildChunk(new SF2StringChunk("ISFT", string("VGMTrans " + string(VGMTRANS_VERSION))));
 }
 
 
