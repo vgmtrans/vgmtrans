@@ -15,7 +15,8 @@ file(GLOB_RECURSE
 
 add_library(vgmtranscore OBJECT ${MAIN_FILES})
 
-target_include_directories(vgmtranscore PUBLIC . ./formats ./loaders)
+configure_file("version.h.in" "version.h")
+target_include_directories(vgmtranscore PUBLIC . ./formats ./loaders ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(vgmtranscore
         PUBLIC
         ZLIB::ZLIB
