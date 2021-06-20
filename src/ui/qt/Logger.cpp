@@ -29,10 +29,6 @@ void Logger::CreateElements() {
   logger_textarea->setReadOnly(true);
   logger_textarea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   logger_textarea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-  QPalette palette = logger_textarea->palette();
-  palette.setColor(QPalette::Base, Qt::black);
-  palette.setColor(QPalette::Text, Qt::white);
-  logger_textarea->setPalette(palette);
   logger_textarea->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
 
   logger_filter = new QComboBox(logger_wrapper);
@@ -83,7 +79,7 @@ void Logger::exportLog() {
 }
 
 void Logger::Push(const LogItem *item) {
-  static constexpr const char *log_colors[]{"red", "yellow", "darkgrey", "white"};
+  static constexpr const char *log_colors[]{"red", "orange", "darkgrey", "black"};
 
   if (item->GetLogLevel() > m_level) {
     return;
