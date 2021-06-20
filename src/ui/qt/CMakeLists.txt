@@ -72,10 +72,12 @@ add_executable(vgmtrans
         ${UI_RESOURCES}
         About.cpp
         About.h
-        MenuBar.cpp
-        MenuBar.h
+        IconBar.cpp
+        IconBar.h
         MainWindow.cpp
         MainWindow.h
+        MenuBar.cpp
+        MenuBar.h
         MusicPlayer.cpp
         MusicPlayer.h
         QtVGMRoot.cpp
