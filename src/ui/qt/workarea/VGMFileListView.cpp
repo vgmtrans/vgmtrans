@@ -126,12 +126,12 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QTableView(parent) {
   header_hor->setHighlightSections(true);
   header_hor->setSectionResizeMode(QHeaderView::Stretch);
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::RemoveVGMFile);
-  connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::ItemMenu);
-  connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::RequestVGMFileView);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::removeVGMFile);
+  connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
+  connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
 }
 
-void VGMFileListView::ItemMenu(const QPoint &pos) {
+void VGMFileListView::itemMenu(const QPoint &pos) {
   auto element = indexAt(pos);
   if (!element.isValid())
     return;
@@ -198,11 +198,11 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
   }
 }
 
-void VGMFileListView::RemoveVGMFile(VGMFile *file) {
-  MdiArea::the()->RemoveView(file);
+void VGMFileListView::removeVGMFile(VGMFile *file) {
+  MdiArea::the()->removeView(file);
   view_model->RemoveVGMFile();
 }
 
-void VGMFileListView::RequestVGMFileView(QModelIndex index) {
-  MdiArea::the()->NewView(qtVGMRoot.vVGMFile[index.row()]);
+void VGMFileListView::requestVGMFileView(QModelIndex index) {
+  MdiArea::the()->newView(qtVGMRoot.vVGMFile[index.row()]);
 }

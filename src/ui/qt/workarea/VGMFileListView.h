@@ -39,12 +39,12 @@ class VGMFileListView final : public QTableView {
     explicit VGMFileListView(QWidget *parent = nullptr);
 
    public slots:
-    void RequestVGMFileView(QModelIndex index);
-    void RemoveVGMFile(VGMFile *file);
+    void requestVGMFileView(QModelIndex index);
+    void removeVGMFile(VGMFile *file);
 
    private:
     void keyPressEvent(QKeyEvent *input) override;
-    void ItemMenu(const QPoint &pos);
+    void itemMenu(const QPoint &pos);
 
     VGMFileListModel *view_model;
 };

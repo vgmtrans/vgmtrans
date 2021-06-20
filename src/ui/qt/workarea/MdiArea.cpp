@@ -24,7 +24,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   }
 }
 
-void MdiArea::NewView(VGMFile *file) {
+void MdiArea::newView(VGMFile *file) {
   auto it = m_registered_views.find(file);
   // Check if a fileview for this vgmfile already exists
   if (it != m_registered_views.end()) {
@@ -41,7 +41,7 @@ void MdiArea::NewView(VGMFile *file) {
   }
 }
 
-void MdiArea::RemoveView(VGMFile *file) {
+void MdiArea::removeView(VGMFile *file) {
   // Let's check if we have a VGMFileView to remove
   auto it = m_registered_views.find(file);
   if (it != m_registered_views.end()) {

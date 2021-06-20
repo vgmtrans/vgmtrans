@@ -11,8 +11,6 @@
 #include <QKeyEvent>
 
 class VGMCollListViewModel : public QAbstractListModel {
-    Q_OBJECT
-
    public:
     explicit VGMCollListViewModel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -21,8 +19,6 @@ class VGMCollListViewModel : public QAbstractListModel {
 };
 
 class VGMCollNameEditor : public QStyledItemDelegate {
-    Q_OBJECT
-
    protected:
     void setEditorData(QWidget *editor, const QModelIndex &index) const override;
     void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const override;
@@ -30,15 +26,14 @@ class VGMCollNameEditor : public QStyledItemDelegate {
 
 class VGMCollListView : public QListView {
     Q_OBJECT
-
    public:
     explicit VGMCollListView(QWidget *parent = nullptr);
 
    public slots:
-    void HandlePlaybackRequest();
-    void HandleStopRequest();
+    void handlePlaybackRequest();
+    void handleStopRequest();
 
    private:
-    void CollMenu(const QPoint &pos);
+    void collectionMenu(const QPoint &pos);
     void keyPressEvent(QKeyEvent *e) override;
 };

@@ -85,21 +85,21 @@ void MainWindow::createElements() {
 }
 
 void MainWindow::routeSignals() {
-  connect(m_menu_bar, &MenuBar::OpenFile, this, &MainWindow::OpenFile);
-  connect(m_menu_bar, &MenuBar::Exit, this, &MainWindow::close);
-  connect(m_menu_bar, &MenuBar::ShowAbout, [=]() {
+  connect(m_menu_bar, &MenuBar::openFile, this, &MainWindow::OpenFile);
+  connect(m_menu_bar, &MenuBar::exit, this, &MainWindow::close);
+  connect(m_menu_bar, &MenuBar::showAbout, [=]() {
     About about(this);
     about.exec();
   });
-  connect(m_menu_bar, &MenuBar::ShowLogger, m_logger, &Logger::setVisible);
+  connect(m_menu_bar, &MenuBar::showLogger, m_logger, &Logger::setVisible);
 
   connect(m_icon_bar, &IconBar::openPressed, this, &MainWindow::OpenFile);
   connect(m_icon_bar, &IconBar::playToggle, m_vgmcollview,
-          &VGMCollListView::HandlePlaybackRequest);
-  connect(m_icon_bar, &IconBar::stopPressed, m_vgmcollview, &VGMCollListView::HandleStopRequest);
+          &VGMCollListView::handlePlaybackRequest);
+  connect(m_icon_bar, &IconBar::stopPressed, m_vgmcollview, &VGMCollListView::handleStopRequest);
   connect(m_icon_bar, &IconBar::seekingTo, &MusicPlayer::the(), &MusicPlayer::seek);
 
-  connect(m_logger, &Logger::closeEvent, m_menu_bar, &MenuBar::SetLoggerHidden);
+  connect(m_logger, &Logger::closeEvent, m_menu_bar, &MenuBar::setLoggerHidden);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {

@@ -18,14 +18,14 @@ class Logger : public QDockWidget {
 public:
   explicit Logger(QWidget *parent = nullptr);
 
-  void Push(const LogItem *item);
+  void push(const LogItem *item);
 
 signals:
   void closeEvent(QCloseEvent *) override;
 
 private:
-  void CreateElements();
-  void ConnectElements();
+  void createElements();
+  void connectElements();
   void exportLog();
 
   QWidget *logger_wrapper;

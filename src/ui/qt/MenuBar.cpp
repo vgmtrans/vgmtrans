@@ -10,25 +10,25 @@
 #include "MenuBar.h"
 
 MenuBar::MenuBar(QWidget *parent) : QMenuBar(parent) {
-  AppendFileMenu();
-  AppendOptionsMenu();
-  AppendInfoMenu();
+  appendFileMenu();
+  appendOptionsMenu();
+  appendInfoMenu();
 }
 
-void MenuBar::AppendFileMenu() {
+void MenuBar::appendFileMenu() {
   QMenu *file_dropdown = addMenu("File");
   menu_open_file = file_dropdown->addAction("Open");
   menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
-  connect(menu_open_file, &QAction::triggered, this, &MenuBar::OpenFile);
+  connect(menu_open_file, &QAction::triggered, this, &MenuBar::openFile);
 
   file_dropdown->addSeparator();
 
   menu_app_exit = file_dropdown->addAction("Exit");
   menu_app_exit->setShortcut(QKeySequence(QStringLiteral("Alt+F4")));
-  connect(menu_app_exit, &QAction::triggered, this, &MenuBar::Exit);
+  connect(menu_app_exit, &QAction::triggered, this, &MenuBar::exit);
 }
 
-void MenuBar::AppendOptionsMenu() {
+void MenuBar::appendOptionsMenu() {
   QMenu *options_dropdown = addMenu("Options");
   auto audio_backend = options_dropdown->addMenu("Player audio driver");
   menu_drivers = new QActionGroup(this);
@@ -53,15 +53,15 @@ void MenuBar::AppendOptionsMenu() {
   menu_logger_show = options_dropdown->addAction("Show logs");
   menu_logger_show->setCheckable(true);
   menu_logger_show->setChecked(true);
-  connect(menu_logger_show, &QAction::triggered, this, &MenuBar::ShowLogger);
+  connect(menu_logger_show, &QAction::triggered, this, &MenuBar::showLogger);
 }
 
-void MenuBar::AppendInfoMenu() {
+void MenuBar::appendInfoMenu() {
   QMenu *info_dropdown = addMenu("Help");
   menu_about_dlg = info_dropdown->addAction("About VGMTrans");
-  connect(menu_about_dlg, &QAction::triggered, this, &MenuBar::ShowAbout);
+  connect(menu_about_dlg, &QAction::triggered, this, &MenuBar::showAbout);
 }
 
-void MenuBar::SetLoggerHidden() {
+void MenuBar::setLoggerHidden() {
   menu_logger_show->setChecked(false);
 }

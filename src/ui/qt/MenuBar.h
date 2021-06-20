@@ -15,18 +15,18 @@ public:
   explicit MenuBar(QWidget *parent = nullptr);
 
 public slots:
-  void SetLoggerHidden();
+  void setLoggerHidden();
 
 signals:
-  void OpenFile();
-  void Exit();
-  void ShowAbout();
-  void ShowLogger(bool show);
+  void openFile();
+  void exit();
+  void showAbout();
+  void showLogger(bool show);
 
 private:
-  void AppendFileMenu();
-  void AppendOptionsMenu();
-  void AppendInfoMenu();
+  void appendFileMenu();
+  void appendOptionsMenu();
+  void appendInfoMenu();
 
   // File actions
   QAction *menu_open_file;

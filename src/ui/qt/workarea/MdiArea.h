@@ -29,10 +29,10 @@ public:
   MdiArea(MdiArea &&) = delete;
   MdiArea &operator=(MdiArea &&) = delete;
 
-  void NewView(VGMFile *file);
-  void RemoveView(VGMFile *file);
+  void newView(VGMFile *file);
+  void removeView(VGMFile *file);
 
 private:
-  std::unordered_map<VGMFile *, QMdiSubWindow *> m_registered_views;
   MdiArea(QWidget *parent = nullptr);
+  std::unordered_map<VGMFile *, QMdiSubWindow *> m_registered_views;
 };
