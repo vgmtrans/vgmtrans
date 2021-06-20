@@ -178,6 +178,8 @@ void MusicPlayer::makeSynth() {
 }
 
 void MusicPlayer::makePlayer() {
+  static std::pair<fluid_player_t *, fluid_synth_t *> data = {nullptr, nullptr};
+
   if (m_active_player) {
     stop();
     delete_fluid_player(m_active_player);
@@ -186,6 +188,19 @@ void MusicPlayer::makePlayer() {
 
   m_active_player = new_fluid_player(m_synth);
   fluid_player_stop(m_active_player);
+
+  data = {m_active_player, m_synth};
+  auto callback = [](void *user, fluid_midi_event_t *event) {
+    auto context = static_cast<std::pair<fluid_player_t *, fluid_synth_t *> *>(user);
+    auto player = context->first;
+
+    MusicPlayer::the().playbackPositionChanged(fluid_player_get_current_tick(player),
+                                               fluid_player_get_total_ticks(player));
+
+    auto synth = context->second;
+    return fluid_synth_handle_midi_event(synth, event);
+  };
+  fluid_player_set_playback_callback(m_active_player, callback, &data);
 }
 
 bool MusicPlayer::playing() const {
@@ -213,7 +228,10 @@ bool MusicPlayer::toggle() {
     fluid_player_play(m_active_player);
   }
 
-  return playing();
+  bool status = playing();
+  statusChange(status);
+
+  return status;
 }
 
 void MusicPlayer::stop() {
@@ -221,7 +239,13 @@ void MusicPlayer::stop() {
     return;
   }
 
-  fluid_player_stop(m_active_player);
+  if (fluid_player_stop(m_active_player) == FLUID_OK) {
+    statusChange(false);
+  }
+}
+
+QString MusicPlayer::songTitle() const {
+  return {};
 }
 
 bool MusicPlayer::loadDataAndPlay(gsl::span<char> soundfont_data, gsl::span<char> midi_data) {
@@ -231,7 +255,7 @@ bool MusicPlayer::loadDataAndPlay(gsl::span<char> soundfont_data, gsl::span<char
 
   makePlayer();
 
-  if(fluid_player_add_mem(m_active_player, midi_data.data(), midi_data.size()) == FLUID_OK) {
+  if (fluid_player_add_mem(m_active_player, midi_data.data(), midi_data.size()) == FLUID_OK) {
     toggle();
     return true;
   }
