@@ -11,6 +11,22 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 project(VGMTrans VERSION 1.1 LANGUAGES CXX)
 
+find_package(Git)
+if(GIT_FOUND)
+    execute_process(WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} COMMAND ${GIT_EXECUTABLE} rev-parse --git-path HEAD
+        OUTPUT_VARIABLE GIT_HEAD_FILEREF
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${GIT_HEAD_FILEREF}")
+    
+    execute_process(WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0 --dirty=+
+        OUTPUT_VARIABLE VCS_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+else()
+    set(VCS_VERSION "unknown")
+endif()
+
 add_library(g_options INTERFACE)
 add_library(g_warnings INTERFACE)
 
