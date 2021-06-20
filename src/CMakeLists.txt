@@ -1,4 +1,3 @@
-add_subdirectory(common)
 add_subdirectory(main)
 if(ENABLE_UI_QT)
     message(STATUS "Building UI (Qt)")

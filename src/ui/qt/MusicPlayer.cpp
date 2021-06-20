@@ -113,8 +113,6 @@ private:
   };
 };
 
-namespace common {
-
 MusicPlayer::MusicPlayer() {
   makeSettings();
   makeSynth();
@@ -233,10 +231,12 @@ bool MusicPlayer::loadDataAndPlay(gsl::span<char> soundfont_data, gsl::span<char
 
   makePlayer();
 
-  bool res = fluid_player_add_mem(m_active_player, midi_data.data(), midi_data.size()) == FLUID_OK;
-  toggle();
+  if(fluid_player_add_mem(m_active_player, midi_data.data(), midi_data.size()) == FLUID_OK) {
+    toggle();
+    return true;
+  }
 
-  return res;
+  return false;
 }
 
 int MusicPlayer::elapsedTicks() const {
@@ -288,5 +288,3 @@ void MusicPlayer::updateSetting(const char *setting, const char *value) {
   fluid_settings_setstr(m_settings, setting, value);
   makeSynth();
 }
-
-}  // namespace common

@@ -194,7 +194,7 @@ void VGMCollListView::HandlePlaybackRequest() {
 
   auto rawSF2 = sf2->SaveToMem();
 
-  common::MusicPlayer::the().loadDataAndPlay(
+  MusicPlayer::the().loadDataAndPlay(
       gsl::make_span(reinterpret_cast<char *>(rawSF2.data()), rawSF2.size()),
       gsl::make_span(reinterpret_cast<char *>(midiBuf.data()), midiBuf.size()));
 
@@ -203,5 +203,5 @@ void VGMCollListView::HandlePlaybackRequest() {
 }
 
 void VGMCollListView::HandleStopRequest() {
-  common::MusicPlayer::the().stop();
+  MusicPlayer::the().stop();
 }

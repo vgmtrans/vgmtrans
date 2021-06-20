@@ -10,8 +10,6 @@
 #include <fluidsynth.h>
 #include <gsl-lite.hpp>
 
-namespace common {
-
 class MusicPlayer {
 public:
   static auto &the() {
@@ -103,5 +101,3 @@ private:
   void makeSynth();
   void makePlayer();
 };
-
-}  // namespace common
