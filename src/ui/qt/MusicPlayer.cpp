@@ -6,6 +6,11 @@
 
 #include "MusicPlayer.h"
 
+#include <VGMColl.h>
+#include <VGMSeq.h>
+#include <MidiFile.h>
+#include <SF2File.h>
+
 /**
  * Wrapper for memory-loaded soundfonts that implements basic IO
  */
@@ -170,9 +175,9 @@ void MusicPlayer::makeSynth() {
   m_synth = new_fluid_synth(m_settings);
 
   fluid_sfloader_t *loader = new_fluid_defsfloader(m_settings);
-  fluid_sfloader_set_callbacks(loader, MemFileWrapper::sf_open, &MemFileWrapper::sf_read,
-                               &MemFileWrapper::sf_seek, &MemFileWrapper::sf_tell,
-                               &MemFileWrapper::sf_close);
+  fluid_sfloader_set_callbacks(loader, MemFileWrapper::sf_open, MemFileWrapper::sf_read,
+                               MemFileWrapper::sf_seek, MemFileWrapper::sf_tell,
+                               MemFileWrapper::sf_close);
   fluid_synth_add_sfloader(m_synth, loader);
   m_active_driver = new_fluid_audio_driver(m_settings, m_synth);
 }
@@ -240,25 +245,62 @@ void MusicPlayer::stop() {
   }
 
   if (fluid_player_stop(m_active_player) == FLUID_OK) {
+    m_active_coll = nullptr;
     statusChange(false);
   }
 }
 
 QString MusicPlayer::songTitle() const {
-  return {};
+  if (!m_active_coll) {
+    return {};
+  }
+
+  return QString::fromStdWString(*m_active_coll->GetName());
 }
 
-bool MusicPlayer::loadDataAndPlay(gsl::span<char> soundfont_data, gsl::span<char> midi_data) {
+bool MusicPlayer::playCollection(VGMColl *coll) {
+  if (coll == m_active_coll) {
+    toggle();
+    return false;
+  }
+
+  /*todo: log the failures*/
+  if (coll->sampcolls.empty()) {
+    return false;
+  }
+
+  VGMSeq *seq = coll->GetSeq();
+  if (!seq) {
+    return false;
+  }
+
+  SF2File *sf2 = coll->CreateSF2File();
+  if (!sf2) {
+    return false;
+  }
+
+  auto rawSF2 = sf2->SaveToMem();
+  auto soundfont_data = gsl::make_span(reinterpret_cast<char *>(rawSF2.data()), rawSF2.size());
+
   if (fluid_synth_sfload(m_synth, reinterpret_cast<char *>(&soundfont_data), 0) == FLUID_FAILED) {
     return false;
   }
 
   makePlayer();
 
+  MidiFile *midi = seq->ConvertToMidi();
+  std::vector<uint8_t> midi_buf;
+  midi->WriteMidiToBuffer(midi_buf);
+  auto midi_data = gsl::make_span(reinterpret_cast<char *>(midi_buf.data()), midi_buf.size());
+
   if (fluid_player_add_mem(m_active_player, midi_data.data(), midi_data.size()) == FLUID_OK) {
+    m_active_coll = coll;
     toggle();
     return true;
   }
+
+  delete sf2;
+  delete midi;
 
   return false;
 }
