@@ -10,6 +10,7 @@
 #include <QSplitter>
 #include <QFileDialog>
 #include <QStandardPaths>
+#include <QGridLayout>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 #include "MenuBar.h"
@@ -20,6 +21,7 @@
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
+#include "workarea/VGMCollView.h"
 #include "workarea/MdiArea.h"
 
 const int defaultWindowWidth = 800;
@@ -50,7 +52,14 @@ void MainWindow::createElements() {
 
   rawFileListView = new RawFileListView();
   vgmFileListView = new VGMFileListView();
-  m_vgmcollview = new VGMCollListView();
+  m_coll_listview = new VGMCollListView();
+  m_coll_view = new VGMCollView(m_coll_listview->selectionModel());
+
+  auto coll_wrapper = new QWidget();
+  auto coll_layout = new QGridLayout();
+  coll_layout->addWidget(m_coll_view, 0, 0, 1, 1, Qt::AlignLeft);
+  coll_layout->addWidget(m_coll_listview, 0, 1, -1, -1);
+  coll_wrapper->setLayout(coll_layout);
 
   vertSplitter = new QSplitter(Qt::Vertical, this);
   horzSplitter = new QSplitter(Qt::Horizontal, vertSplitter);
@@ -58,7 +67,7 @@ void MainWindow::createElements() {
 
   QList<int> sizes({defaultWindowHeight - defaultCollListHeight, defaultCollListHeight});
   vertSplitter->addWidget(horzSplitter);
-  vertSplitter->addWidget(m_vgmcollview);
+  vertSplitter->addWidget(coll_wrapper);
   vertSplitter->setStretchFactor(0, 1);
   vertSplitter->setSizes(sizes);
   vertSplitter->setHandleWidth(splitterHandleWidth);
@@ -94,9 +103,9 @@ void MainWindow::routeSignals() {
   connect(m_menu_bar, &MenuBar::showLogger, m_logger, &Logger::setVisible);
 
   connect(m_icon_bar, &IconBar::openPressed, this, &MainWindow::OpenFile);
-  connect(m_icon_bar, &IconBar::playToggle, m_vgmcollview,
+  connect(m_icon_bar, &IconBar::playToggle, m_coll_listview,
           &VGMCollListView::handlePlaybackRequest);
-  connect(m_icon_bar, &IconBar::stopPressed, m_vgmcollview, &VGMCollListView::handleStopRequest);
+  connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
   connect(m_icon_bar, &IconBar::seekingTo, &MusicPlayer::the(), &MusicPlayer::seek);
 
   connect(m_logger, &Logger::closeEvent, m_menu_bar, &MenuBar::setLoggerHidden);

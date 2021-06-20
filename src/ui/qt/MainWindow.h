@@ -18,6 +18,7 @@ class IconBar;
 class Logger;
 
 class VGMCollListView;
+class VGMCollView;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -46,5 +47,6 @@ private:
   MenuBar *m_menu_bar{};
   IconBar *m_icon_bar{};
   Logger *m_logger{};
-  VGMCollListView *m_vgmcollview{};
+  VGMCollListView *m_coll_listview{};
+  VGMCollView *m_coll_view{};
 };
