@@ -12,6 +12,8 @@
 #include <QObject>
 #include <QString>
 
+class VGMColl;
+
 class MusicPlayer : public QObject {
   Q_OBJECT
 public:
@@ -49,12 +51,11 @@ public:
   [[nodiscard]] QString songTitle() const;
 
   /**
-   * Loads SF2 and MIDI data into the player; resources are copied
-   * @param soundfont_data
-   * @param midi_data
+   * Loads a VGMColl for playback
+   * @param collection
    * @return true if data was loaded correctly
    */
-  bool loadDataAndPlay(gsl::span<char> soundfont_data, gsl::span<char> midi_data);
+  bool playCollection(VGMColl *collection);
 
   /**
    * Checks whether the player is playing
@@ -109,6 +110,7 @@ private:
   fluid_synth_t *m_synth = nullptr;
   fluid_audio_driver_t *m_active_driver = nullptr;
   fluid_player_t *m_active_player = nullptr;
+  VGMColl *m_active_coll = nullptr;
 
   void makeSettings();
   void makeSynth();

@@ -4,19 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "VGMCollListView.h"
+
 #include <QEvent>
 #include <QMenu>
 #include <QLineEdit>
 #include <QObject>
-#include <MusicPlayer.h>
 #include <VGMColl.h>
 #include <VGMExport.h>
-#include "VGMCollListView.h"
-#include "../QtVGMRoot.h"
-
-#include <SF2File.h>
-#include <MidiFile.h>
-#include <VGMSeq.h>
+#include "MusicPlayer.h"
+#include "QtVGMRoot.h"
 
 static const QIcon &VGMCollIcon() {
   static QIcon icon(":/images/collection.svg");
@@ -139,7 +136,8 @@ void VGMCollListView::CollMenu(const QPoint &pos) {
 
     for (auto &index : selectedIndexes()) {
       if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
-        SaveAs<VGMCollConversionTarget::MIDI | VGMCollConversionTarget::DLS | VGMCollConversionTarget::SF2>(*coll, save_path);
+        SaveAs<VGMCollConversionTarget::MIDI | VGMCollConversionTarget::DLS |
+               VGMCollConversionTarget::SF2>(*coll, save_path);
       }
     }
   });
@@ -171,35 +169,8 @@ void VGMCollListView::HandlePlaybackRequest() {
     return;
   }
 
-  //todo: move somewhere else
   VGMColl *coll = qtVGMRoot.vVGMColl[list[0].row()];
-  if(coll->sampcolls.empty()) {
-    return;
-  }
-
-  VGMSeq *seq = coll->GetSeq();
-  if (!seq) {
-    return;
-  }
-
-  SF2File *sf2 = coll->CreateSF2File();
-  if (!sf2) {
-    return;
-  }
-  
-  MidiFile *midi = seq->ConvertToMidi();
-
-  std::vector<uint8_t> midiBuf;
-  midi->WriteMidiToBuffer(midiBuf);
-
-  auto rawSF2 = sf2->SaveToMem();
-
-  MusicPlayer::the().loadDataAndPlay(
-      gsl::make_span(reinterpret_cast<char *>(rawSF2.data()), rawSF2.size()),
-      gsl::make_span(reinterpret_cast<char *>(midiBuf.data()), midiBuf.size()));
-
-  delete sf2;
-  delete midi;
+  MusicPlayer::the().playCollection(coll);
 }
 
 void VGMCollListView::HandleStopRequest() {
