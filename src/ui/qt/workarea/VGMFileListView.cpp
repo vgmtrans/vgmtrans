@@ -41,25 +41,6 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
       break;
     }
 
-    case Property::Type: {
-      if (role == Qt::DisplayRole) {
-        switch (vgmfile->GetFileType()) {
-          case FILETYPE_SEQ:
-            return "Sequence";
-
-          case FILETYPE_INSTRSET:
-            return "Instrument set";
-
-          case FILETYPE_SAMPCOLL:
-            return "Sample collection";
-
-          default:
-            return "Unknown";
-        };
-      }
-      break;
-    }
-
     case Property::Format: {
       if (role == Qt::DisplayRole) {
         return QString::fromStdString(vgmfile->GetFormatName());
@@ -79,10 +60,6 @@ QVariant VGMFileListModel::headerData(int column, Qt::Orientation orientation, i
   switch (column) {
     case Property::Name: {
       return "Name";
-    }
-
-    case Property::Type: {
-      return "Type";
     }
 
     case Property::Format: {
@@ -108,7 +85,7 @@ int VGMFileListModel::columnCount(const QModelIndex &parent) const {
     return 0;
   }
 
-  return 3;
+  return 2;
 }
 
 void VGMFileListModel::AddVGMFile() {
