@@ -13,8 +13,10 @@
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 #include "MenuBar.h"
+#include "IconBar.h"
 #include "About.h"
 #include "Logger.h"
+#include "MusicPlayer.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
@@ -43,10 +45,12 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 void MainWindow::createElements() {
   m_menu_bar = new MenuBar(this);
   setMenuBar(m_menu_bar);
+  m_icon_bar = new IconBar(this);
+  addToolBar(m_icon_bar);
 
   rawFileListView = new RawFileListView();
   vgmFileListView = new VGMFileListView();
-  vgmCollListView = new VGMCollListView();
+  m_vgmcollview = new VGMCollListView();
 
   vertSplitter = new QSplitter(Qt::Vertical, this);
   horzSplitter = new QSplitter(Qt::Horizontal, vertSplitter);
@@ -54,7 +58,7 @@ void MainWindow::createElements() {
 
   QList<int> sizes({defaultWindowHeight - defaultCollListHeight, defaultCollListHeight});
   vertSplitter->addWidget(horzSplitter);
-  vertSplitter->addWidget(vgmCollListView);
+  vertSplitter->addWidget(m_vgmcollview);
   vertSplitter->setStretchFactor(0, 1);
   vertSplitter->setSizes(sizes);
   vertSplitter->setHandleWidth(splitterHandleWidth);
@@ -88,6 +92,12 @@ void MainWindow::routeSignals() {
     about.exec();
   });
   connect(m_menu_bar, &MenuBar::ShowLogger, m_logger, &Logger::setVisible);
+
+  connect(m_icon_bar, &IconBar::openPressed, this, &MainWindow::OpenFile);
+  connect(m_icon_bar, &IconBar::playToggle, m_vgmcollview,
+          &VGMCollListView::HandlePlaybackRequest);
+  connect(m_icon_bar, &IconBar::stopPressed, m_vgmcollview, &VGMCollListView::HandleStopRequest);
+  connect(m_icon_bar, &IconBar::seekingTo, &MusicPlayer::the(), &MusicPlayer::seek);
 
   connect(m_logger, &Logger::closeEvent, m_menu_bar, &MenuBar::SetLoggerHidden);
 }

@@ -14,7 +14,10 @@ class QListView;
 class QTableView;
 
 class MenuBar;
+class IconBar;
 class Logger;
+
+class VGMCollListView;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -28,7 +31,6 @@ protected:
   QSplitter *vertSplitterLeft;
   QTableView *rawFileListView;
   QTableView *vgmFileListView;
-  QListView *vgmCollListView;
   QListView *collListView;
 
   void dragEnterEvent(QDragEnterEvent *event) override;
@@ -42,5 +44,7 @@ private:
   void OpenFile();
 
   MenuBar *m_menu_bar{};
+  IconBar *m_icon_bar{};
   Logger *m_logger{};
+  VGMCollListView *m_vgmcollview{};
 };
