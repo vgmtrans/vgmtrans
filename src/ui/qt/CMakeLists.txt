@@ -93,6 +93,8 @@ add_executable(vgmtrans
         workarea/RawFileListView.h
         workarea/VGMCollListView.cpp
         workarea/VGMCollListView.h
+        workarea/VGMCollView.cpp
+        workarea/VGMCollView.h
         workarea/VGMFileTreeView.cpp
         workarea/VGMFileTreeView.h
         workarea/VGMFileView.cpp
