@@ -10,6 +10,7 @@
 #include <VGMSeq.h>
 #include <MidiFile.h>
 #include <SF2File.h>
+#include "QtVGMRoot.h"
 
 /**
  * Wrapper for memory-loaded soundfonts that implements basic IO

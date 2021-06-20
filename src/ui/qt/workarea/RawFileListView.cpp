@@ -120,7 +120,7 @@ RawFileListView::RawFileListView(QWidget *parent) : QTableView(parent) {
   setContextMenuPolicy(Qt::CustomContextMenu);
   rawfile_context_menu = new QMenu();
   QAction *rawfile_remove = rawfile_context_menu->addAction("Remove");
-  connect(rawfile_remove, &QAction::triggered, this, &RawFileListView::DeleteRawFiles);
+  connect(rawfile_remove, &QAction::triggered, this, &RawFileListView::deleteRawFiles);
   rawfile_context_menu->addAction("Save raw unpacked image(s)", [sm = selectionModel()]() {
     if (!sm->hasSelection())
       return;
@@ -137,14 +137,14 @@ RawFileListView::RawFileListView(QWidget *parent) : QTableView(parent) {
   });
 
   connect(this, &QAbstractItemView::customContextMenuRequested, this,
-          &RawFileListView::RawFilesMenu);
+          &RawFileListView::rawFilesMenu);
 }
 
 /*
  * This is different from the other context menus,
  * since the only possible action on a RawFile is removing it
  */
-void RawFileListView::RawFilesMenu(const QPoint &pos) {
+void RawFileListView::rawFilesMenu(const QPoint &pos) {
   if (!indexAt(pos).isValid())
     return;
 
@@ -156,7 +156,7 @@ void RawFileListView::keyPressEvent(QKeyEvent *input) {
   switch (input->key()) {
     case Qt::Key_Delete:
     case Qt::Key_Backspace: {
-      DeleteRawFiles();
+      deleteRawFiles();
     }
 
     // Pass the event back to the base class, needed for keyboard navigation
@@ -165,7 +165,7 @@ void RawFileListView::keyPressEvent(QKeyEvent *input) {
   }
 }
 
-void RawFileListView::DeleteRawFiles() {
+void RawFileListView::deleteRawFiles() {
   if (!selectionModel()->hasSelection())
     return;
 

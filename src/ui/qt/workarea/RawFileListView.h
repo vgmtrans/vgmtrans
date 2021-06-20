@@ -10,7 +10,6 @@
 
 class RawFileListViewModel : public QAbstractTableModel {
   Q_OBJECT
-
 public:
   explicit RawFileListViewModel(QObject *parent = nullptr);
   int rowCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -34,8 +33,8 @@ public:
 
 private:
   void keyPressEvent(QKeyEvent *input) override;
-  void RawFilesMenu(const QPoint &pos);
-  void DeleteRawFiles();
+  void rawFilesMenu(const QPoint &pos);
+  void deleteRawFiles();
 
   RawFileListViewModel *rawFileListViewModel;
   QMenu *rawfile_context_menu;

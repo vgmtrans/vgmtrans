@@ -101,5 +101,5 @@ void VGMFileView::markEvents() {
 }
 
 void VGMFileView::closeEvent(QCloseEvent *) {
-  MdiArea::the()->RemoveView(m_vgmfile);
+  MdiArea::the()->removeView(m_vgmfile);
 }

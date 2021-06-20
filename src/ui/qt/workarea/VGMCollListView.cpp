@@ -86,7 +86,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   setIconSize(QSize(16, 16));
   setWrapping(true);
 
-  connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollListView::CollMenu);
+  connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollListView::collectionMenu);
   connect(model, &VGMCollListViewModel::dataChanged, [=]() {
     if (!selectedIndexes().empty()) {
       selectionModel()->currentChanged(selectedIndexes().front(), {});
@@ -96,7 +96,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   });
 }
 
-void VGMCollListView::CollMenu(const QPoint &pos) {
+void VGMCollListView::collectionMenu(const QPoint &pos) {
   if (selectedIndexes().empty()) {
     return;
   }
@@ -149,12 +149,12 @@ void VGMCollListView::CollMenu(const QPoint &pos) {
 void VGMCollListView::keyPressEvent(QKeyEvent *e) {
   switch (e->key()) {
     case Qt::Key_Space: {
-      HandlePlaybackRequest();
+      handlePlaybackRequest();
       break;
     }
 
     case Qt::Key_Escape: {
-      HandleStopRequest();
+      handleStopRequest();
       break;
     }
 
@@ -163,7 +163,7 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
   }
 }
 
-void VGMCollListView::HandlePlaybackRequest() {
+void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
   if (list.empty() || list[0].row() >= qtVGMRoot.vVGMColl.size()) {
     return;
@@ -173,6 +173,6 @@ void VGMCollListView::HandlePlaybackRequest() {
   MusicPlayer::the().playCollection(coll);
 }
 
-void VGMCollListView::HandleStopRequest() {
+void VGMCollListView::handleStopRequest() {
   MusicPlayer::the().stop();
 }

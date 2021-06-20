@@ -18,11 +18,11 @@
 Logger::Logger(QWidget *parent) : QDockWidget("Log", parent), m_level(LOG_LEVEL_ERR) {
   setAllowedAreas(Qt::AllDockWidgetAreas);
 
-  CreateElements();
-  ConnectElements();
+  createElements();
+  connectElements();
 }
 
-void Logger::CreateElements() {
+void Logger::createElements() {
   logger_wrapper = new QWidget;
 
   logger_textarea = new QPlainTextEdit(logger_wrapper);
@@ -51,12 +51,12 @@ void Logger::CreateElements() {
   setWidget(logger_wrapper);
 };
 
-void Logger::ConnectElements() {
+void Logger::connectElements() {
   connect(logger_clear, &QPushButton::pressed, logger_textarea, &QPlainTextEdit::clear);
   connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged),
           [=](int level) { m_level = level; });
   connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_AddLogItem, this, &Logger::Push);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_AddLogItem, this, &Logger::push);
 }
 
 void Logger::exportLog() {
@@ -78,7 +78,7 @@ void Logger::exportLog() {
   log.commit();
 }
 
-void Logger::Push(const LogItem *item) {
+void Logger::push(const LogItem *item) {
   static constexpr const char *log_colors[]{"red", "orange", "darkgrey", "black"};
 
   if (item->GetLogLevel() > m_level) {
