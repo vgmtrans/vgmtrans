@@ -10,24 +10,21 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPixmap>
+#include <version.h>
 
 About::About(QWidget *parent) : QDialog(parent) {
     setWindowTitle("About VGMTrans");
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
-    const QString small =
-        QStringLiteral("<p style='margin-top:0; margin-bottom:0; font-size:small;'>");
-    const QString medium = QStringLiteral("<p style='margin-top:15px;'>");
+    auto text = R"(
+        <p style='font-size:36pt; font-weight:300; margin-bottom:0;'>VGMTrans</p>
+        <p style='margin-top:0;'>Version: <b>%1</b></p>
+        <hr>
+        <p>An open-source videogame music translator</p><br>
+        <a href='https://github.com/vgmtrans/vgmtrans'>Source code</a>
+    )";
 
-    QString text;
-    text.append(QStringLiteral("<p style='font-size:38pt; font-weight:300; margin-bottom:0;'>VGMTrans</p>"));
-
-    text.append(medium + "An open-source videogame music translator</p>");
-    text.append(
-        medium +
-        QStringLiteral("<a href='https://github.com/vgmtrans/vgmtrans'>Source code</a>"));
-
-    QLabel *text_label = new QLabel(text);
+    QLabel *text_label = new QLabel(QString(text).arg(VGMTRANS_VERSION));
     text_label->setTextInteractionFlags(Qt::TextBrowserInteraction);
     text_label->setOpenExternalLinks(true);
     text_label->setContentsMargins(15, 0, 15, 0);
