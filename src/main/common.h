@@ -4,8 +4,6 @@
 #include "pch.h"
 #include "helper.h"
 
-#define VERSION "1.0.3"
-
 #define KILOBYTE 1024
 #define MEGABYTE (KILOBYTE*1024)
 #define GIGABYTE (MEGABYTE*1024)
@@ -18,9 +16,6 @@
 
 std::wstring StringToUpper(std::wstring myString);
 std::wstring StringToLower(std::wstring myString);
-
-//#define for_each(_ITER_, _COLL_) for (auto _ITER_ = _COLL_.begin(); \
-//    _ITER_ != _COLL_.end(); _ITER_++)
 
 /**
 Converts a std::string to any class with a proper overload of the >> opertor
