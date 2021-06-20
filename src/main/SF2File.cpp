@@ -7,7 +7,7 @@
 
 #ifdef VGMTRANS_LEGACY
   /* No worries about hard-coding, legacy will be dropped past this release*/
-  VGMTRANS_VERSION "v1.1-LEGACY"
+  #define VGMTRANS_VERSION "v1.1-LEGACY"
 #else
 #include "version.h"
 #endif
