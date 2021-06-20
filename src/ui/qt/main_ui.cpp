@@ -11,12 +11,14 @@
 #include "QtVGMRoot.h"
 
 int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
+  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+  QApplication app(argc, argv);
 
-    qtVGMRoot.Init();
+  qtVGMRoot.Init();
 
-    MainWindow window;
-    window.resize(900, 600);
-    window.show();
-    return app.exec();
+  MainWindow window;
+  window.resize(900, 600);
+  window.show();
+  return app.exec();
 }
