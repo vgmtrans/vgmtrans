@@ -15,7 +15,7 @@
 #include <LogItem.h>
 #include "QtVGMRoot.h"
 
-Logger::Logger(QWidget *parent) : QDockWidget("Log", parent), m_level(LOG_LEVEL_ERR) {
+Logger::Logger(QWidget *parent) : QDockWidget("Log", parent), m_level(LOG_LEVEL_INFO) {
   setAllowedAreas(Qt::AllDockWidgetAreas);
 
   createElements();
