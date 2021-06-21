@@ -7,3 +7,5 @@
 #pragma once
 
 #define VGMTRANS_VERSION "@VCS_TAG@"
+#define VGMTRANS_REVISION "@VCS_HASH@"
+#define VGMTRANS_BRANCH "@VCS_BRANCH@"
