@@ -11,6 +11,8 @@
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QGridLayout>
+#include <version.h>
+#include <fluidsynth.h>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 #include "MenuBar.h"
@@ -42,6 +44,15 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
   routeSignals();
 
   resize(defaultWindowWidth, defaultWindowHeight);
+
+  auto infostring = QString("Running %1 (%4, %5), libfluidsynth %2, Qt %3")
+                        .arg(VGMTRANS_VERSION)
+                        .arg(FLUIDSYNTH_VERSION)
+                        .arg(qVersion())
+                        .arg(VGMTRANS_REVISION)
+                        .arg(VGMTRANS_BRANCH)
+                        .toStdWString();
+  qtVGMRoot.UI_AddLogItem(new LogItem(infostring, LOG_LEVEL_INFO, L"VGMTransQt"));
 }
 
 void MainWindow::createElements() {
