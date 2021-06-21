@@ -165,7 +165,7 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
-  if (list.empty() || list[0].row() >= qtVGMRoot.vVGMColl.size()) {
+  if (list.empty() || list[0].row() >= model()->rowCount()) {
     return;
   }
 
