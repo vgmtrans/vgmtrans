@@ -141,7 +141,8 @@ bool NDSTrack::ReadEvent(void) {
         // See Zelda The Spirit Tracks - SSEQ_0018 (overworld train theme)
         bool bContinue = true;
         if (IsOffsetUsed(jumpAddr)) {
-          bContinue = AddLoopForever(beginOffset, 4, L"Loop");
+          AddLoopForever(beginOffset, 4, L"Loop");
+          bContinue = false;
         }
         else {
           AddGenericEvent(beginOffset, 4, L"Jump", L"", CLR_LOOPFOREVER);
