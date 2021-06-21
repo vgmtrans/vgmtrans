@@ -18,13 +18,13 @@ About::About(QWidget *parent) : QDialog(parent) {
 
     auto text = R"(
         <p style='font-size:36pt; font-weight:300; margin-bottom:0;'>VGMTrans</p>
-        <p style='margin-top:0;'>Version: <b>%1</b></p>
+        <p style='margin-top:0;'>Version: <b>%1 (%2, %3)</b></p>
         <hr>
         <p>An open-source videogame music translator</p><br>
         <a href='https://github.com/vgmtrans/vgmtrans'>Source code</a>
     )";
 
-    QLabel *text_label = new QLabel(QString(text).arg(VGMTRANS_VERSION));
+    QLabel *text_label = new QLabel(QString(text).arg(VGMTRANS_VERSION).arg(VGMTRANS_REVISION).arg(VGMTRANS_BRANCH));
     text_label->setTextInteractionFlags(Qt::TextBrowserInteraction);
     text_label->setOpenExternalLinks(true);
     text_label->setContentsMargins(15, 0, 15, 0);
