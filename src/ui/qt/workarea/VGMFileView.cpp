@@ -81,17 +81,8 @@ void VGMFileView::markEvents() {
     if (item) {
       auto line = std::floor((item->dwOffset - base_offset) / 16);
       auto col = (item->dwOffset - base_offset) % 16;
-      auto item_len = item->unLength;
       auto desc = QString::fromStdWString(item->GetDescription());
-      while (col + item_len > 16) {
-        auto part_len = 16 - col;
-        overlay->metadata(line, col, part_len, textColorForEventColor(item->color),
-                          colorForEventColor(item->color), desc);
-        line++;
-        col = 0;
-        item_len -= part_len;
-      }
-      overlay->metadata(line, col, item_len, textColorForEventColor(item->color),
+      overlay->metadata(line, col, item->unLength, textColorForEventColor(item->color),
                         colorForEventColor(item->color), desc);
       i += item->unLength;
     } else {
