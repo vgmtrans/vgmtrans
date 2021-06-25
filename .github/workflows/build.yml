@@ -13,7 +13,7 @@ jobs:
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
-        run: cmake -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -G Ninja -B build
+        run: cmake -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
