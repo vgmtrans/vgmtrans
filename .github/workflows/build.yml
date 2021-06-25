@@ -3,20 +3,17 @@ on: [push, pull_request]
 jobs:
   macos:
     name: macOS
-    runs-on: macos-latest
+    runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v2
       - name: "Install dependencies"
         run: |
-          brew upgrade gcc@10 || brew install gcc@10
-          brew upgrade ninja || brew install ninja
-          brew upgrade cmake || brew install cmake
           brew upgrade qt@5 || brew install qt@5
           brew upgrade fluid-synth || brew install fluid-synth
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
-        run: cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -G Ninja -B build
+        run: cmake -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -G Ninja -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
