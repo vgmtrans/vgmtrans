@@ -1,5 +1,6 @@
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/gsl-lite" "${CMAKE_CURRENT_BINARY_DIR}/gsl-lite" EXCLUDE_FROM_ALL)
 
+set(FluidSynth_FIND_VERSION "2.0.0")
 find_package(FluidSynth)
 if(FluidSynth_FOUND AND "${FluidSynth_VERSION}" MATCHES "2(.)*")
     message(STATUS "Using FluidSynth ${FluidSynth_VERSION}")
@@ -54,18 +55,20 @@ endif()
 find_package(Qt5 REQUIRED COMPONENTS Gui Widgets Svg)
 message(STATUS "Using Qt ${Qt5Core_VERSION}")
 
+# Workaround for QTBUG-57886
 set_property(TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_FEATURES "")
+
 set(CMAKE_AUTOMOC ON)
 qt5_add_resources(UI_RESOURCES
         "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
+
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/qhexview" "${CMAKE_CURRENT_BINARY_DIR}/qhexview" EXCLUDE_FROM_ALL)
 
 if(WIN32)
     set(GUI_TYPE WIN32)
 elseif(APPLE)
     set(GUI_TYPE MACOSX_BUNDLE)
 endif()
-
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/qhexview" "${CMAKE_CURRENT_BINARY_DIR}/qhexview" EXCLUDE_FROM_ALL)
 
 add_executable(vgmtrans
         ${GUI_TYPE}
