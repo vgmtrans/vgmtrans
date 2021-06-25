@@ -20,5 +20,6 @@ add_library(qhexview-lib STATIC
     qhexview.cpp
 )
 
+target_compile_features(qhexview-lib PUBLIC cxx_std_11)
 target_link_libraries(qhexview-lib PRIVATE Qt5::Widgets)
 target_include_directories(qhexview-lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
