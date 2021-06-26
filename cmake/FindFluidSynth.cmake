@@ -55,16 +55,15 @@
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #=============================================================================
 
-if(NOT ${FluidSynth_FIND_VERSION})
+if(NOT FluidSynth_FIND_VERSION)
   set(FluidSynth_FIND_VERSION "1.1.6")
 endif()
 
 find_package(PkgConfig QUIET)
 pkg_check_modules(PC_FluidSynth QUIET fluidsynth>=${FluidSynth_FIND_VERSION})
 
-# The Windows library may be called fluidsynth_debug
 find_library(FluidSynth_LIBRARIES
-        NAMES fluidsynth fluidsynth_debug
+        NAMES fluidsynth libfluidsynth
         HINTS ${PC_FluidSynth_LIBDIR}
         )
 
@@ -101,6 +100,6 @@ endif()
 
 include(FeatureSummary)
 set_package_properties(FluidSynth PROPERTIES
-        URL "http://www.fluidsynth.org/"
+        URL "https://www.fluidsynth.org/"
         DESCRIPTION "A SoundFont Synthesizer"
         )
