@@ -6,6 +6,7 @@
 
 #include <QApplication>
 #include <QMessageBox>
+#include <QActionGroup>
 #include <MusicPlayer.h>
 #include "MenuBar.h"
 

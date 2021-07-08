@@ -4,6 +4,7 @@
  * See the included LICENSE for more information
  */
 
+#include <QtGlobal>
 #include <QApplication>
 #include <QtPlugin>
 #include <QFile>
@@ -11,10 +12,12 @@
 #include "QtVGMRoot.h"
 
 int main(int argc, char *argv[]) {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
   QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
   QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-  QApplication app(argc, argv);
+#endif
 
+  QApplication app(argc, argv);
   qtVGMRoot.Init();
 
   MainWindow window;
