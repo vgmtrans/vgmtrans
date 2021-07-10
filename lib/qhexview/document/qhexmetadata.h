@@ -1,8 +1,13 @@
 #ifndef QHEXMETADATA_H
 #define QHEXMETADATA_H
 
-#include <QLinkedList>
+#include <QtGlobal>
 #include <QObject>
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+#include <QLinkedList>
+#else
+#include <list>
+#endif
 #include <QColor>
 #include <QHash>
 #include <QVector>
