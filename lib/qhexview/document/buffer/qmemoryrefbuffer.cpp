@@ -1,5 +1,6 @@
 #include "qmemoryrefbuffer.h"
 
+#include <climits>
 #include <QObject>
 
 QMemoryRefBuffer::QMemoryRefBuffer(QObject *parent): QHexBuffer(parent) { }
