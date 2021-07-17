@@ -7,25 +7,24 @@
 #pragma once
 #include <QMenu>
 #include <QMenuBar>
+#include <QList>
+
+class QDockWidget;
 
 class MenuBar final : public QMenuBar {
   Q_OBJECT
 
 public:
-  explicit MenuBar(QWidget *parent = nullptr);
-
-public slots:
-  void setLoggerHidden();
+  explicit MenuBar(QWidget *parent = nullptr, const QList<QDockWidget *>& dockWidgets = {});
 
 signals:
   void openFile();
   void exit();
   void showAbout();
-  void showLogger(bool show);
 
 private:
   void appendFileMenu();
-  void appendOptionsMenu();
+  void appendOptionsMenu(const QList<QDockWidget *>& dockWidgets);
   void appendInfoMenu();
 
   // File actions
@@ -37,5 +36,4 @@ private:
 
   // Options actions
   QActionGroup *menu_drivers;
-  QAction *menu_logger_show;
 };
