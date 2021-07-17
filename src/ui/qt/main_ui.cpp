@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
   qtVGMRoot.Init();
 
   MainWindow window;
-  window.resize(900, 600);
   window.show();
+
   return app.exec();
 }
