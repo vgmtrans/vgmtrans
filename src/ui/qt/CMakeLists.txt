@@ -26,7 +26,7 @@ else()
                 FluidSynth::FluidSynth
                 PROPERTIES
                 IMPORTED_LOCATION
-                "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/solidsynth-msvc2019-${FLUID_LIBRARY_ARCH}/libfluidsynth-2.dll"
+                "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/solidsynth-msvc2019-${FLUID_LIBRARY_ARCH}/libfluidsynth-3.dll"
         )
 
         target_include_directories(
