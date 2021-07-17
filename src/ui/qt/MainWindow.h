@@ -9,14 +9,10 @@
 #include <QMainWindow>
 #include "workarea/VGMFileView.h"
 
-class QSplitter;
-class QListView;
-class QTableView;
-
+class QDockWidget;
 class MenuBar;
 class IconBar;
 class Logger;
-
 class VGMCollListView;
 class VGMCollView;
 
@@ -27,13 +23,6 @@ public:
   MainWindow();
 
 protected:
-  QSplitter *vertSplitter;
-  QSplitter *horzSplitter;
-  QSplitter *vertSplitterLeft;
-  QTableView *rawFileListView;
-  QTableView *vgmFileListView;
-  QListView *collListView;
-
   void dragEnterEvent(QDragEnterEvent *event) override;
   void dragMoveEvent(QDragMoveEvent *event) override;
   void dropEvent(QDropEvent *event) override;
@@ -44,6 +33,8 @@ private:
 
   void OpenFile();
 
+  QDockWidget *m_rawfile_dock{};
+  QDockWidget *m_vgmfile_dock{};
   MenuBar *m_menu_bar{};
   IconBar *m_icon_bar{};
   Logger *m_logger{};

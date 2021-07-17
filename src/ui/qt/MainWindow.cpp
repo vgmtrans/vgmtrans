@@ -26,12 +26,6 @@
 #include "workarea/VGMCollView.h"
 #include "workarea/MdiArea.h"
 
-const int defaultWindowWidth = 800;
-const int defaultWindowHeight = 600;
-const int defaultCollListHeight = 140;
-const int defaultFileListWidth = 200;
-const int splitterHandleWidth = 1;
-
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
   setWindowIcon(QIcon(":/vgmtrans.png"));
@@ -42,8 +36,6 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 
   createElements();
   routeSignals();
-
-  resize(defaultWindowWidth, defaultWindowHeight);
 
   auto infostring = QString("Running %1 (%4, %5), libfluidsynth %2, Qt %3")
                         .arg(VGMTRANS_VERSION)
@@ -56,13 +48,28 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 }
 
 void MainWindow::createElements() {
-  m_menu_bar = new MenuBar(this);
-  setMenuBar(m_menu_bar);
   m_icon_bar = new IconBar(this);
   addToolBar(m_icon_bar);
 
-  rawFileListView = new RawFileListView();
-  vgmFileListView = new VGMFileListView();
+  setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
+  setTabPosition(Qt::RightDockWidgetArea, QTabWidget::East);
+
+  m_rawfile_dock = new QDockWidget("Raw files");
+  m_rawfile_dock->setWidget(new RawFileListView());
+  m_rawfile_dock->setContentsMargins(0, 0, 0, 0);
+  m_rawfile_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
+
+  m_vgmfile_dock = new QDockWidget("Detected music files");
+  m_vgmfile_dock->setWidget(new VGMFileListView());
+  m_vgmfile_dock->setContentsMargins(0, 0, 0, 0);
+  m_vgmfile_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
+
+  addDockWidget(Qt::LeftDockWidgetArea, m_rawfile_dock);
+  tabifyDockWidget(m_rawfile_dock, m_vgmfile_dock);
+  m_vgmfile_dock->setFocus();
+
+  setCentralWidget(MdiArea::the());
+
   m_coll_listview = new VGMCollListView();
   m_coll_view = new VGMCollView(m_coll_listview->selectionModel());
 
@@ -72,36 +79,20 @@ void MainWindow::createElements() {
   coll_layout->addWidget(m_coll_listview, 0, 1, -1, -1);
   coll_wrapper->setLayout(coll_layout);
 
-  vertSplitter = new QSplitter(Qt::Vertical, this);
-  horzSplitter = new QSplitter(Qt::Horizontal, vertSplitter);
-  vertSplitterLeft = new QSplitter(Qt::Vertical, horzSplitter);
-
-  QList<int> sizes({defaultWindowHeight - defaultCollListHeight, defaultCollListHeight});
-  vertSplitter->addWidget(horzSplitter);
-  vertSplitter->addWidget(coll_wrapper);
-  vertSplitter->setStretchFactor(0, 1);
-  vertSplitter->setSizes(sizes);
-  vertSplitter->setHandleWidth(splitterHandleWidth);
-
-  sizes = QList<int>({defaultFileListWidth, defaultWindowWidth - defaultFileListWidth});
-  horzSplitter->addWidget(vertSplitterLeft);
-  horzSplitter->addWidget(MdiArea::the());
-  horzSplitter->setStretchFactor(1, 1);
-  horzSplitter->setSizes(sizes);
-  horzSplitter->setHandleWidth(splitterHandleWidth);
-  horzSplitter->setMinimumSize(100, 100);
-  horzSplitter->setMaximumSize(500, 0);
-  horzSplitter->setCollapsible(0, false);
-  horzSplitter->setCollapsible(1, false);
-
-  vertSplitterLeft->addWidget(rawFileListView);
-  vertSplitterLeft->addWidget(vgmFileListView);
-  vertSplitterLeft->setHandleWidth(splitterHandleWidth);
-
-  setCentralWidget(vertSplitter);
+  auto coll_widget = new QDockWidget("Collections");
+  coll_widget->setWidget(coll_wrapper);
+  coll_widget->setContentsMargins(0, 0, 0, 0);
+  addDockWidget(Qt::BottomDockWidgetArea, coll_widget);
 
   m_logger = new Logger();
   addDockWidget(Qt::BottomDockWidgetArea, m_logger);
+
+  tabifyDockWidget(m_logger, coll_widget);
+  coll_widget->setFocus();
+
+  QList<QDockWidget *> docks = findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly);
+  m_menu_bar = new MenuBar(this, docks);
+  setMenuBar(m_menu_bar);
 }
 
 void MainWindow::routeSignals() {
@@ -111,15 +102,12 @@ void MainWindow::routeSignals() {
     About about(this);
     about.exec();
   });
-  connect(m_menu_bar, &MenuBar::showLogger, m_logger, &Logger::setVisible);
 
   connect(m_icon_bar, &IconBar::openPressed, this, &MainWindow::OpenFile);
   connect(m_icon_bar, &IconBar::playToggle, m_coll_listview,
           &VGMCollListView::handlePlaybackRequest);
   connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
   connect(m_icon_bar, &IconBar::seekingTo, &MusicPlayer::the(), &MusicPlayer::seek);
-
-  connect(m_logger, &Logger::closeEvent, m_menu_bar, &MenuBar::setLoggerHidden);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
