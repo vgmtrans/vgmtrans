@@ -279,7 +279,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
 
         if (realSampNum >= finalSamps.size()) {
           wchar_t log[256];
-          swprintf(log, 256, L"Sample %u does not exist.", realSampNum);
+          swprintf(log, 256, L"Sample %zu does not exist.", realSampNum);
           pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
           realSampNum = finalSamps.size() - 1;
         }
@@ -451,23 +451,18 @@ SynthFile *VGMColl::CreateSynthFile() {
         else
           realSampNum = rgn->sampNum;
 
-
-        // Determine the sampCollNum (index into our finalSampColls vector)
-        unsigned int sampCollNum = finalSampColls.size();
-        for (uint32_t i = 0; i < finalSampColls.size(); i++) {
-          if (finalSampColls[i] == sampColl)
-            sampCollNum = i;
-        }
-        if (sampCollNum == finalSampColls.size()) {
+        // Determine the position of sampColl within finalSampColls
+        auto sampCollIt = std::find(finalSampColls.begin(), finalSampColls.end(), sampColl);
+        if (sampCollIt == finalSampColls.end()) {
           pRoot->AddLogItem(new LogItem(L"SampColl does not exist.", LOG_LEVEL_ERR, L"VGMColl"));
           delete synthfile;
           PostSynthFileCreation();
           return NULL;
         }
-        //   now we add the number of samples from the preceding SampColls to the value to get the real sampNum
-        //   in the final DLS file.
-        for (uint32_t k = 0; k < sampCollNum; k++)
-          realSampNum += finalSampColls[k]->samples.size();
+        // Now add the number of samples from the preceding SampColls to get the real sampNum in the
+        // final DLS file.
+        for (auto it = finalSampColls.begin(); it != sampCollIt; it++)
+          realSampNum += (*it)->samples.size();
 
         SynthRgn *newRgn = newInstr->AddRgn();
         newRgn->SetRanges(rgn->keyLow, rgn->keyHigh,
@@ -476,7 +471,7 @@ SynthFile *VGMColl::CreateSynthFile() {
 
         if (realSampNum >= finalSamps.size()) {
           wchar_t log[256];
-          swprintf(log, 256, L"Sample %u does not exist.", realSampNum);
+          swprintf(log, 256, L"Sample %zu does not exist.", realSampNum);
           pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_ERR, L"VGMColl"));
           realSampNum = finalSamps.size() - 1;
         }

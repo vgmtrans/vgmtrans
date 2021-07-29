@@ -154,23 +154,19 @@ bool NinSnesInstr::IsValidHeader(RawFile *file,
                                  uint32_t addrInstrHeader,
                                  uint32_t spcDirAddr,
                                  bool validateSample) {
-  size_t instrItemSize = NinSnesInstr::ExpectedSize(version);
+  auto instrItemSize = NinSnesInstr::ExpectedSize(version);
 
   if (addrInstrHeader + instrItemSize > 0x10000) {
     return false;
   }
 
-  bool hasUniqueByte = false;
-  for (size_t offset = 0; offset <= instrItemSize; offset++) {
+  for (uint32_t offset = 0; offset <= instrItemSize; offset++) {
     uint8_t theByte = file->GetByte(addrInstrHeader + offset);
-    if (theByte != 0x00 && theByte != 0xff) {
-      hasUniqueByte = true;
-      break;
-    }
+    if (theByte != 0x00 && theByte != 0xff)
+      goto hasUniqueByte;
   }
-  if (!hasUniqueByte) {
-    return false;
-  }
+  return false;
+hasUniqueByte:
 
   uint8_t srcn = file->GetByte(addrInstrHeader);
   uint8_t adsr1 = file->GetByte(addrInstrHeader + 1);
