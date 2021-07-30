@@ -31,7 +31,7 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {
-  return qtVGMRoot.vVGMColl.size();
+  return static_cast<int>(qtVGMRoot.vVGMColl.size());
 }
 
 QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
