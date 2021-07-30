@@ -198,3 +198,6 @@ FakesAssemblies/
 # VisualStudio.gitignore end ---------------------------------------------------
 
 cmake-build-*
+
+# Visual Studio Code
+.vscode
