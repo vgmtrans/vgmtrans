@@ -154,28 +154,25 @@ bool NinSnesInstr::IsValidHeader(RawFile *file,
                                  uint32_t addrInstrHeader,
                                  uint32_t spcDirAddr,
                                  bool validateSample) {
-  size_t instrItemSize = NinSnesInstr::ExpectedSize(version);
+  
+  auto instrItemSize = NinSnesInstr::ExpectedSize(version);
 
   if (addrInstrHeader + instrItemSize > 0x10000) {
     return false;
   }
 
-  bool hasUniqueByte = false;
-  for (size_t offset = 0; offset <= instrItemSize; offset++) {
-    uint8_t theByte = file->GetByte(addrInstrHeader + offset);
-    if (theByte != 0x00 && theByte != 0xff) {
-      hasUniqueByte = true;
-      break;
-    }
-  }
-  if (!hasUniqueByte) {
+  std::vector<uint8_t> instrHeader(instrItemSize);
+  file->GetBytes(addrInstrHeader, instrItemSize, instrHeader.data());
+
+  if (std::all_of(instrHeader.cbegin(), instrHeader.cend(),
+                  [](const uint8_t b) { return b == 0x00 || b == 0xFF; })) {
     return false;
   }
 
-  uint8_t srcn = file->GetByte(addrInstrHeader);
-  uint8_t adsr1 = file->GetByte(addrInstrHeader + 1);
-  uint8_t adsr2 = file->GetByte(addrInstrHeader + 2);
-  uint8_t gain = file->GetByte(addrInstrHeader + 3);
+  const uint8_t &srcn = instrHeader[0];
+  const uint8_t &adsr1 = instrHeader[1];
+  const uint8_t &adsr2 = instrHeader[2];
+  const uint8_t &gain = instrHeader[3];
 
   if (srcn >= 0x80 || (adsr1 == 0 && gain == 0)) {
     return false;
