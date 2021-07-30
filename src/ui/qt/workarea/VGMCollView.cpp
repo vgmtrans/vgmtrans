@@ -23,11 +23,12 @@ VGMCollViewModel::VGMCollViewModel(QItemSelectionModel *collListSelModel, QObjec
 }
 
 int VGMCollViewModel::rowCount(const QModelIndex &parent) const {
-  if (m_coll == nullptr)
+  if (m_coll == nullptr) {
     return 0;
-  // plus one because of the VGMColl sequence
-  return static_cast<int>(m_coll->instrsets.size() + m_coll->sampcolls.size() +
-                          m_coll->miscfiles.size() + 1);
+  }
+
+  /* Sum one because of the VGMColl sequence */
+  return m_coll->instrsets.size() + m_coll->sampcolls.size() + m_coll->miscfiles.size() + 1;
 }
 
 QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
@@ -53,7 +54,7 @@ void VGMCollViewModel::handleNewCollSelected(QModelIndex modelIndex) {
 }
 
 VGMFile *VGMCollViewModel::fileFromIndex(QModelIndex index) const {
-  size_t row = index.row();
+  auto row = index.row();
   auto num_instrsets = m_coll->instrsets.size();
   auto num_sampcolls = m_coll->sampcolls.size();
   auto num_miscfiles = m_coll->miscfiles.size();

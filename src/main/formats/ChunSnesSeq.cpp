@@ -74,7 +74,7 @@ bool ChunSnesSeq::GetHeaderInfo(void) {
     header->AddSimpleItem(curOffset, 2, trackName.str());
 
     ChunSnesTrack *track = new ChunSnesTrack(this, addrTrackStart);
-    track->index = static_cast<uint8_t>(aTracks.size());
+    track->index = aTracks.size();
     aTracks.push_back(track);
 
     curOffset += 2;

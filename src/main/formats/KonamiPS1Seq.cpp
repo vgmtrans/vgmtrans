@@ -33,7 +33,7 @@ bool KonamiPS1Seq::GetHeaderInfo(void) {
 
     uint32_t numTracks = GetWord(dwOffset + kOffsetToTrackCount);
     VGMHeader *trackSizeHeader = AddHeader(dwOffset + kHeaderSize, 2 * numTracks, L"Track Size");
-    for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
+    for (size_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
         std::wstringstream itemName;
         itemName << L"Track " << (trackIndex + 1) << L" Size";
         trackSizeHeader->AddSimpleItem(trackSizeHeader->dwOffset + (trackIndex * 2), 2, itemName.str());
@@ -45,7 +45,7 @@ bool KonamiPS1Seq::GetHeaderInfo(void) {
 bool KonamiPS1Seq::GetTrackPointers(void) {
     uint32_t numTracks = GetWord(dwOffset + kOffsetToTrackCount);
     uint32_t trackStart = dwOffset + kHeaderSize + (numTracks * 2);
-    for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
+    for (size_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
         uint16_t trackSize = GetShort(dwOffset + kHeaderSize + (trackIndex * 2));
         KonamiPS1Track *track = new KonamiPS1Track(this, trackStart, trackSize);
         aTracks.push_back(track);
@@ -77,7 +77,7 @@ bool KonamiPS1Seq::IsKDT1Seq(RawFile *file, uint32_t offset) {
     }
 
     uint32_t trackSize = 0;
-    for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
+    for (size_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
         trackSize += file->GetShort(offset + kHeaderSize + (trackIndex * 2));
     }
 

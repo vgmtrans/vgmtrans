@@ -31,7 +31,7 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {
-  return static_cast<int>(qtVGMRoot.vVGMColl.size());
+  return qtVGMRoot.vVGMColl.size();
 }
 
 QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
@@ -84,6 +84,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   setEditTriggers(QAbstractItemView::DoubleClicked);
   setResizeMode(QListView::Adjust);
   setIconSize(QSize(16, 16));
+  setWrapping(true);
 
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollListView::collectionMenu);
   connect(model, &VGMCollListViewModel::dataChanged, [=]() {

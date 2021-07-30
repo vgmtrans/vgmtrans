@@ -68,7 +68,7 @@ bool AkaoSeq::GetHeaderInfo() {
   const uint32_t track_bits = (version() >= AkaoPs1Version::VERSION_3_0)
     ? GetWord(dwOffset + 0x20)
     : GetWord(dwOffset + 0x10);
-  nNumTracks = static_cast<uint32_t>(std::bitset<32>(track_bits).count()); // popcount
+  nNumTracks = GetNumPositiveBits(track_bits);
 
   uint32_t track_header_offset;
   if (version() >= AkaoPs1Version::VERSION_3_0) {
@@ -1239,12 +1239,12 @@ bool AkaoTrack::ReadEvent() {
 
       if (readMode == READMODE_ADD_TO_UI) {
         parentSeq->drum_instrument_addresses.insert(drum_instrset_offset);
-      } else {
-        const auto instrument_index = static_cast<uint8_t>(
-            std::distance(parentSeq->drum_instrument_addresses.begin(),
-                          parentSeq->drum_instrument_addresses.find(drum_instrset_offset)));
+      }
+      else {
+        const int instrument_index = std::distance(parentSeq->drum_instrument_addresses.begin(),
+          parentSeq->drum_instrument_addresses.find(drum_instrset_offset));
 
-        AddBankSelectNoItem(127 - instrument_index);
+        AddBankSelectNoItem(127 - static_cast<uint8_t>(instrument_index));
         AddProgramChangeNoItem(127, false);
         drum = true;
         //channel = 9;
@@ -1555,10 +1555,10 @@ bool AkaoTrack::ReadEvent() {
 
       if (readMode == READMODE_ADD_TO_UI) {
         parentSeq->custom_instrument_addresses.insert(key_split_regions_offset);
-      } else {
-        const auto instrument_index = static_cast<uint32_t>(
-            std::distance(parentSeq->custom_instrument_addresses.begin(),
-                          parentSeq->custom_instrument_addresses.find(key_split_regions_offset)));
+      }
+      else {
+        const int instrument_index = std::distance(parentSeq->custom_instrument_addresses.begin(),
+          parentSeq->custom_instrument_addresses.find(key_split_regions_offset));
 
         AddBankSelectNoItem(1);
         AddProgramChangeNoItem(instrument_index, false);

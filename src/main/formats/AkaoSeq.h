@@ -172,6 +172,11 @@ class AkaoSeq final :
  private:
   void LoadEventMap();
 
+  [[nodiscard]] static uint8_t GetNumPositiveBits(uint32_t x) noexcept {
+    std::bitset<sizeof(x) * CHAR_BIT> bs{x};
+    return bs.count();
+  }
+
  public:
   uint16_t seq_id;
   bool bUsesIndividualArts;
