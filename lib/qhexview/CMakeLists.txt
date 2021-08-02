@@ -16,7 +16,6 @@ add_library(qhexview-lib STATIC
     document/qhexcursor.cpp
     document/qhexdocument.cpp
     document/qhexmetadata.cpp
-    document/qhexrenderer.cpp
     qhexview.cpp
 )
 

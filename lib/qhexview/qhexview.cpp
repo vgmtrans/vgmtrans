@@ -7,640 +7,1050 @@
 #include <QScrollBar>
 #include <QPainter>
 #include <QToolTip>
+#include <QTextFormat>
+#include <QWidget>
 #include <cmath>
+#include <cctype>
 
-#define CURSOR_BLINK_INTERVAL 500 // ms
-#define DOCUMENT_WHEEL_LINES  3
+#define CURSOR_BLINK_INTERVAL 500  // ms
+#define DOCUMENT_WHEEL_LINES 3
 
-QHexView::QHexView(QWidget *parent) : QAbstractScrollArea(parent), m_document(nullptr), m_renderer(nullptr), m_readonly(false)
-{
-    QFont f = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+QHexView::QHexView(QWidget *parent)
+    : QAbstractScrollArea(parent), m_document(nullptr), m_readonly(false) {
+  QFont f = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 
-    if(f.styleHint() != QFont::TypeWriter)
-    {
-        f.setFamily("Monospace"); // Force Monospaced font
-        f.setStyleHint(QFont::TypeWriter);
-    }
+  if (f.styleHint() != QFont::TypeWriter) {
+    f.setFamily("Monospace");  // Force Monospaced font
+    f.setStyleHint(QFont::TypeWriter);
+  }
 
-    this->setFont(f);
-    this->setFocusPolicy(Qt::StrongFocus);
-    this->setMouseTracking(true);
-    this->verticalScrollBar()->setSingleStep(1);
-    this->verticalScrollBar()->setPageStep(1);
+  this->setFont(f);
+  this->setFocusPolicy(Qt::StrongFocus);
+  this->setMouseTracking(true);
+  this->verticalScrollBar()->setSingleStep(1);
+  this->verticalScrollBar()->setPageStep(1);
 
-    m_blinktimer = new QTimer(this);
-    m_blinktimer->setInterval(CURSOR_BLINK_INTERVAL);
+  m_blinktimer = new QTimer(this);
+  m_blinktimer->setInterval(CURSOR_BLINK_INTERVAL);
 
-    connect(m_blinktimer, &QTimer::timeout, this, &QHexView::blinkCursor);
+  connect(m_blinktimer, &QTimer::timeout, this, &QHexView::blinkCursor);
 
-    this->setDocument(QHexDocument::fromMemory<QMemoryBuffer>(QByteArray(), this));
+  this->setDocument(QHexDocument::fromMemory<QMemoryBuffer>(QByteArray(), this));
 }
 
-QHexDocument *QHexView::document() { return m_document; }
+void QHexView::setDocument(QHexDocument *document) {
+  if (m_document)
+    m_document->deleteLater();
 
-void QHexView::setDocument(QHexDocument *document)
-{
-    if(m_renderer)
-        m_renderer->deleteLater();
+  m_document = document;
 
-    if(m_document)
-        m_document->deleteLater();
+  m_selectedarea = QHexView::HEX_AREA;
+  m_cursorenabled = false;
 
-    m_document = document;
-    m_renderer = new QHexRenderer(m_document, this->fontMetrics(), this);
-
-    connect(m_document, &QHexDocument::documentChanged, this, [&]() {
-        this->adjustScrollBars();
-        this->viewport()->update();
-    });
-
-    connect(m_document->cursor(), &QHexCursor::positionChanged, this, &QHexView::moveToSelection);
-    connect(m_document->cursor(), &QHexCursor::insertionModeChanged, this, &QHexView::renderCurrentLine);
-
+  connect(m_document, &QHexDocument::documentChanged, this, [&]() {
     this->adjustScrollBars();
+    this->viewport()->update();
+  });
+
+  connect(m_document->cursor(), &QHexCursor::positionChanged, this, &QHexView::moveToSelection);
+  connect(m_document->cursor(), &QHexCursor::insertionModeChanged, this,
+          &QHexView::renderCurrentLine);
+
+  this->adjustScrollBars();
+  this->viewport()->update();
+}
+
+void QHexView::setReadOnly(bool b) {
+  m_readonly = b;
+  if (m_document)
+    m_document->cursor()->setInsertionMode(QHexCursor::OverwriteMode);
+}
+
+bool QHexView::event(QEvent *e) {
+  if (m_document && (e->type() == QEvent::ToolTip)) {
+    QHelpEvent *helpevent = static_cast<QHelpEvent *>(e);
+    QHexPosition position;
+
+    QPoint abspos = absolutePosition(helpevent->pos());
+    if (this->hitTest(abspos, &position, this->firstVisibleLine())) {
+      QString comments = m_document->metadata()->comments(position.line, position.column);
+
+      if (!comments.isEmpty())
+        QToolTip::showText(helpevent->globalPos(), comments, this);
+    }
+
+    return true;
+  }
+
+  return QAbstractScrollArea::event(e);
+}
+
+void QHexView::keyPressEvent(QKeyEvent *e) {
+  if (!m_document) {
+    QAbstractScrollArea::keyPressEvent(e);
+    return;
+  }
+
+  QHexCursor *cur = m_document->cursor();
+
+  m_blinktimer->stop();
+  this->enableCursor();
+
+  bool handled = this->processMove(cur, e);
+  if (!handled)
+    handled = this->processAction(cur, e);
+  if (!handled)
+    handled = this->processTextInput(cur, e);
+  if (!handled)
+    QAbstractScrollArea::keyPressEvent(e);
+
+  m_blinktimer->start();
+}
+
+QPoint QHexView::absolutePosition(const QPoint &pos) const {
+  QPoint shift(horizontalScrollBar()->value(), 0);
+  return pos + shift;
+}
+
+void QHexView::mousePressEvent(QMouseEvent *e) {
+  QAbstractScrollArea::mousePressEvent(e);
+
+  if ((e->buttons() != Qt::LeftButton))
+    return;
+
+  QHexPosition position;
+  QPoint abspos = absolutePosition(e->pos());
+
+  if (!this->hitTest(abspos, &position, this->firstVisibleLine()))
+    return;
+
+  this->selectArea(abspos);
+
+  if (this->editableArea(this->selectedArea()))
+    m_document->cursor()->moveTo(position);
+
+  e->accept();
+}
+
+void QHexView::mouseMoveEvent(QMouseEvent *e) {
+  QAbstractScrollArea::mouseMoveEvent(e);
+  if (!m_document)
+    return;
+
+  QPoint abspos = absolutePosition(e->pos());
+
+  if (e->buttons() == Qt::LeftButton) {
+    if (m_blinktimer->isActive()) {
+      m_blinktimer->stop();
+      this->enableCursor(false);
+    }
+
+    QHexCursor *cursor = m_document->cursor();
+    QHexPosition position;
+
+    if (!this->hitTest(abspos, &position, this->firstVisibleLine()))
+      return;
+
+    cursor->select(position.line, position.column, 0);
+    e->accept();
+  }
+
+  if (e->buttons() != Qt::NoButton)
+    return;
+
+  int hittest = this->hitTestArea(abspos);
+
+  if (this->editableArea(hittest))
+    this->setCursor(Qt::IBeamCursor);
+  else
+    this->setCursor(Qt::ArrowCursor);
+}
+
+void QHexView::mouseReleaseEvent(QMouseEvent *e) {
+  QAbstractScrollArea::mouseReleaseEvent(e);
+  if (e->button() != Qt::LeftButton)
+    return;
+  if (!m_blinktimer->isActive())
+    m_blinktimer->start();
+  e->accept();
+}
+
+void QHexView::focusInEvent(QFocusEvent *e) {
+  QAbstractScrollArea::focusInEvent(e);
+
+  this->enableCursor();
+  m_blinktimer->start();
+}
+
+void QHexView::focusOutEvent(QFocusEvent *e) {
+  QAbstractScrollArea::focusOutEvent(e);
+
+  m_blinktimer->stop();
+  this->enableCursor(false);
+}
+
+void QHexView::wheelEvent(QWheelEvent *e) {
+  if (e->angleDelta().y() == 0) {
+    int value = this->verticalScrollBar()->value();
+
+    if (e->angleDelta().x() < 0)  // Scroll Down
+      this->verticalScrollBar()->setValue(value + DOCUMENT_WHEEL_LINES);
+    else if (e->angleDelta().x() > 0)  // Scroll Up
+      this->verticalScrollBar()->setValue(value - DOCUMENT_WHEEL_LINES);
+
+    return;
+  }
+
+  QAbstractScrollArea::wheelEvent(e);
+}
+
+void QHexView::resizeEvent(QResizeEvent *e) {
+  QAbstractScrollArea::resizeEvent(e);
+  this->adjustScrollBars();
+}
+
+void QHexView::paintEvent(QPaintEvent *e) {
+  if (!m_document)
+    return;
+
+  QPainter painter(this->viewport());
+  painter.setFont(this->font());
+
+  const QRect &paint_zone = e->rect();
+  const quint64 firstVisible = this->firstVisibleLine();
+  const int lineHeight = this->lineHeight();
+  const int headerCount = this->headerLineCount();
+
+  // these are lines from the point of view of the visible rect
+  // where the first "headerCount" are taken by the header
+  const int first = (paint_zone.top() / lineHeight);               // included
+  const int lastPlusOne = (paint_zone.bottom() / lineHeight) + 1;  // excluded
+
+  // compute document lines, adding firstVisible and removing the header
+  // the max is necessary if the rect covers the header
+  const quint64 begin = firstVisible + std::max(first - headerCount, 0);
+  const quint64 end = firstVisible + std::max(lastPlusOne - headerCount, 0);
+
+  painter.save();
+  painter.translate(-this->horizontalScrollBar()->value(), 0);
+  this->render(&painter, begin, end, firstVisible);
+  this->renderFrame(&painter);
+  painter.restore();
+}
+
+void QHexView::moveToSelection() {
+  QHexCursor *cur = m_document->cursor();
+
+  if (!this->isLineVisible(cur->currentLine())) {
+    QScrollBar *vscrollbar = this->verticalScrollBar();
+    int scrollPos =
+        static_cast<int>(std::max(quint64(0), (cur->currentLine() - this->visibleLines() / 2)) /
+                         documentSizeFactor());
+    vscrollbar->setValue(scrollPos);
+  } else
     this->viewport()->update();
 }
 
-void QHexView::setReadOnly(bool b)
-{
-    m_readonly = b;
-    if(m_document) m_document->cursor()->setInsertionMode(QHexCursor::OverwriteMode);
+void QHexView::blinkCursor() {
+  m_cursorenabled = !m_cursorenabled;
+  this->renderCurrentLine();
 }
 
-bool QHexView::event(QEvent *e)
-{
-    if(m_renderer && (e->type() == QEvent::FontChange))
-    {
-        m_renderer->updateMetrics(QFontMetricsF(this->font()));
-        return true;
-    }
+void QHexView::moveNext(bool select) {
+  QHexCursor *cur = m_document->cursor();
+  quint64 line = cur->currentLine();
+  int column = cur->currentColumn();
+  bool lastcell = (line >= this->documentLastLine()) && (column >= this->documentLastColumn());
 
-    if(m_document && m_renderer && (e->type() == QEvent::ToolTip))
-    {
-        QHelpEvent* helpevent = static_cast<QHelpEvent*>(e);
-        QHexPosition position;
+  if ((this->selectedArea() == QHexView::ASCII_AREA) && lastcell)
+    return;
 
-        QPoint abspos = absolutePosition(helpevent->pos());
-        if(m_renderer->hitTest(abspos, &position, this->firstVisibleLine()))
-        {
-            QString comments = m_document->metadata()->comments(position.line, position.column);
+  int nibbleindex = cur->currentNibble();
 
-            if(!comments.isEmpty())
-                QToolTip::showText(helpevent->globalPos(), comments, this);
-        }
+  if (this->selectedArea() == QHexView::HEX_AREA) {
+    if (lastcell && !nibbleindex)
+      return;
 
-        return true;
-    }
+    if (cur->position().offset() >= m_document->length() && nibbleindex)
+      return;
+  }
 
-    return QAbstractScrollArea::event(e);
+  if ((this->selectedArea() == QHexView::HEX_AREA)) {
+    nibbleindex++;
+    nibbleindex %= 2;
+
+    if (nibbleindex)
+      column++;
+  } else {
+    nibbleindex = 1;
+    column++;
+  }
+
+  if (column > this->hexLineWidth() - 1) {
+    line = std::min(this->documentLastLine(), line + 1);
+    column = 0;
+    nibbleindex = 1;
+  }
+
+  if (select)
+    cur->select(line, std::min(this->hexLineWidth() - 1, column), nibbleindex);
+  else
+    cur->moveTo(line, std::min(this->hexLineWidth() - 1, column), nibbleindex);
 }
 
-void QHexView::keyPressEvent(QKeyEvent *e)
-{
-    if(!m_renderer || !m_document)
-    {
-        QAbstractScrollArea::keyPressEvent(e);
-        return;
-    }
+void QHexView::movePrevious(bool select) {
+  QHexCursor *cur = m_document->cursor();
+  quint64 line = cur->currentLine();
+  int column = cur->currentColumn();
+  bool firstcell = !line && !column;
 
-    QHexCursor* cur = m_document->cursor();
+  if ((this->selectedArea() == QHexView::ASCII_AREA) && firstcell)
+    return;
 
-    m_blinktimer->stop();
-    m_renderer->enableCursor();
+  int nibbleindex = cur->currentNibble();
 
-    bool handled = this->processMove(cur, e);
-    if(!handled) handled = this->processAction(cur, e);
-    if(!handled) handled = this->processTextInput(cur, e);
-    if(!handled) QAbstractScrollArea::keyPressEvent(e);
+  if ((this->selectedArea() == QHexView::HEX_AREA) && firstcell && nibbleindex)
+    return;
 
-    m_blinktimer->start();
+  if ((this->selectedArea() == QHexView::HEX_AREA)) {
+    nibbleindex--;
+    nibbleindex %= 2;
+    if (!nibbleindex)
+      column--;
+  } else {
+    nibbleindex = 1;
+    column--;
+  }
+
+  if (column < 0) {
+    line = std::max(quint64(0), line - 1);
+    column = this->hexLineWidth() - 1;
+    nibbleindex = 0;
+  }
+
+  if (select)
+    cur->select(line, std::max(0, column), nibbleindex);
+  else
+    cur->moveTo(line, std::max(0, column), nibbleindex);
 }
 
-QPoint QHexView::absolutePosition(const QPoint & pos) const
-{
-    QPoint shift(horizontalScrollBar()->value(), 0);
-    return pos + shift;
+void QHexView::renderCurrentLine() {
+  if (m_document)
+    this->renderLine(m_document->cursor()->currentLine());
 }
 
-void QHexView::mousePressEvent(QMouseEvent *e)
-{
-    QAbstractScrollArea::mousePressEvent(e);
-
-    if(!m_renderer || (e->buttons() != Qt::LeftButton))
-        return;
-
-    QHexPosition position;
-    QPoint abspos = absolutePosition(e->pos());
-
-    if(!m_renderer->hitTest(abspos, &position, this->firstVisibleLine()))
-        return;
-
-    m_renderer->selectArea(abspos);
-
-    if(m_renderer->editableArea(m_renderer->selectedArea()))
-        m_document->cursor()->moveTo(position);
-
-    e->accept();
-}
-
-void QHexView::mouseMoveEvent(QMouseEvent *e)
-{
-    QAbstractScrollArea::mouseMoveEvent(e);
-    if(!m_renderer || !m_document) return;
-
-    QPoint abspos = absolutePosition(e->pos());
-
-    if(e->buttons() == Qt::LeftButton)
-    {
-        if(m_blinktimer->isActive())
-        {
-            m_blinktimer->stop();
-            m_renderer->enableCursor(false);
-        }
-
-        QHexCursor* cursor = m_document->cursor();
-        QHexPosition position;
-
-        if(!m_renderer->hitTest(abspos, &position, this->firstVisibleLine()))
-            return;
-
-        cursor->select(position.line, position.column, 0);
-        e->accept();
-    }
-
-    if(e->buttons() != Qt::NoButton) return;
-
-    int hittest = m_renderer->hitTestArea(abspos);
-
-    if(m_renderer->editableArea(hittest))
-        this->setCursor(Qt::IBeamCursor);
-    else
-        this->setCursor(Qt::ArrowCursor);
-}
-
-void QHexView::mouseReleaseEvent(QMouseEvent *e)
-{
-   QAbstractScrollArea::mouseReleaseEvent(e);
-   if(e->button() != Qt::LeftButton) return;
-   if(!m_blinktimer->isActive()) m_blinktimer->start();
-   e->accept();
-}
-
-void QHexView::focusInEvent(QFocusEvent *e)
-{
-    QAbstractScrollArea::focusInEvent(e);
-    if(!m_renderer) return;
-
-    m_renderer->enableCursor();
-    m_blinktimer->start();
-}
-
-void QHexView::focusOutEvent(QFocusEvent *e)
-{
-    QAbstractScrollArea::focusOutEvent(e);
-    if(!m_renderer) return;
-
-    m_blinktimer->stop();
-    m_renderer->enableCursor(false);
-}
-
-void QHexView::wheelEvent(QWheelEvent *e)
-{
-    if(e->angleDelta().y() == 0)
-    {
-        int value = this->verticalScrollBar()->value();
-
-        if(e->angleDelta().x() < 0) // Scroll Down
-            this->verticalScrollBar()->setValue(value + DOCUMENT_WHEEL_LINES);
-        else if(e->angleDelta().x() > 0) // Scroll Up
-            this->verticalScrollBar()->setValue(value - DOCUMENT_WHEEL_LINES);
-
-        return;
-    }
-
-    QAbstractScrollArea::wheelEvent(e);
-}
-
-void QHexView::resizeEvent(QResizeEvent *e)
-{
-    QAbstractScrollArea::resizeEvent(e);
-    this->adjustScrollBars();
-}
-
-void QHexView::paintEvent(QPaintEvent *e)
-{
-    if(!m_document)
-        return;
-
-    QPainter painter(this->viewport());
-    painter.setFont(this->font());
-
-    const QRect& r = e->rect();
-
-    const quint64 firstVisible = this->firstVisibleLine();
-    const int lineHeight = m_renderer->lineHeight();
-    const int headerCount = m_renderer->headerLineCount();
-
-    // these are lines from the point of view of the visible rect
-    // where the first "headerCount" are taken by the header
-    const int first = (r.top() / lineHeight);  // included
-    const int lastPlusOne = (r.bottom() / lineHeight) + 1;  // excluded
-
-    // compute document lines, adding firstVisible and removing the header
-    // the max is necessary if the rect covers the header
-    const quint64 begin = firstVisible + std::max(first - headerCount, 0);
-    const quint64 end = firstVisible + std::max(lastPlusOne - headerCount, 0) ;
-
-    painter.save();
-    painter.translate(-this->horizontalScrollBar()->value(), 0);
-    m_renderer->render(&painter, begin, end, firstVisible);
-    m_renderer->renderFrame(&painter);
-    painter.restore();
-}
-
-void QHexView::moveToSelection()
-{
-    QHexCursor* cur = m_document->cursor();
-
-    if(!this->isLineVisible(cur->currentLine()))
-    {
-        QScrollBar* vscrollbar = this->verticalScrollBar();
-        int scrollPos = static_cast<int>(std::max(quint64(0), (cur->currentLine() - this->visibleLines() / 2)) / documentSizeFactor());
-        vscrollbar->setValue(scrollPos);
-    }
-    else
-        this->viewport()->update();
-}
-
-void QHexView::blinkCursor()
-{
-    if(!m_renderer) return;
-    m_renderer->blinkCursor();
-    this->renderCurrentLine();
-}
-
-void QHexView::moveNext(bool select)
-{
-    QHexCursor* cur = m_document->cursor();
-    quint64 line = cur->currentLine();
-    int column = cur->currentColumn();
-    bool lastcell = (line >= m_renderer->documentLastLine()) && (column >= m_renderer->documentLastColumn());
-
-    if((m_renderer->selectedArea() == QHexRenderer::AsciiArea) && lastcell)
-        return;
-
-    int nibbleindex = cur->currentNibble();
-
-    if(m_renderer->selectedArea() == QHexRenderer::HexArea)
-    {
-        if(lastcell && !nibbleindex) return;
-
-        if(cur->position().offset() >= m_document->length() && nibbleindex)
-            return;
-    }
-
-    if((m_renderer->selectedArea() == QHexRenderer::HexArea))
-    {
-        nibbleindex++;
-        nibbleindex %= 2;
-
-        if(nibbleindex)
-            column++;
-    }
-    else
-    {
-        nibbleindex = 1;
-        column++;
-    }
-
-    if(column > m_renderer->hexLineWidth() - 1)
-    {
-        line = std::min(m_renderer->documentLastLine(), line + 1);
-        column = 0;
-        nibbleindex = 1;
-    }
-
-    if(select)
-        cur->select(line, std::min(m_renderer->hexLineWidth() - 1, column), nibbleindex);
-    else
-        cur->moveTo(line, std::min(m_renderer->hexLineWidth() - 1, column), nibbleindex);
-}
-
-void QHexView::movePrevious(bool select)
-{
-    QHexCursor* cur = m_document->cursor();
-    quint64 line = cur->currentLine();
-    int column = cur->currentColumn();
-    bool firstcell = !line && !column;
-
-    if((m_renderer->selectedArea() == QHexRenderer::AsciiArea) && firstcell)
-        return;
-
-    int nibbleindex = cur->currentNibble();
-
-    if((m_renderer->selectedArea() == QHexRenderer::HexArea) && firstcell && nibbleindex)
-        return;
-
-    if((m_renderer->selectedArea() == QHexRenderer::HexArea))
-    {
-        nibbleindex--;
-        nibbleindex %= 2;
-        if(!nibbleindex) column--;
-    }
-    else
-    {
-        nibbleindex = 1;
-        column--;
-    }
-
-    if(column < 0)
-    {
-        line = std::max(quint64(0), line - 1);
-        column = m_renderer->hexLineWidth() - 1;
-        nibbleindex = 0;
-    }
-
-    if(select) cur->select(line, std::max(0, column), nibbleindex);
-    else cur->moveTo(line, std::max(0, column), nibbleindex);
-}
-
-void QHexView::renderCurrentLine() { if(m_document) this->renderLine(m_document->cursor()->currentLine()); }
-
-bool QHexView::processAction(QHexCursor *cur, QKeyEvent *e)
-{
-   if(m_readonly) return false;
-
-   if(e->modifiers() != Qt::NoModifier)
-   {
-       if(e->matches(QKeySequence::SelectAll))
-       {
-           m_document->cursor()->moveTo(0, 0);
-           m_document->cursor()->select(m_renderer->documentLastLine(), m_renderer->documentLastColumn() - 1);
-       }
-       else if(e->matches(QKeySequence::Undo))
-           m_document->undo();
-       else if(e->matches(QKeySequence::Redo))
-           m_document->redo();
-       else if(e->matches(QKeySequence::Cut))
-           m_document->cut((m_renderer->selectedArea() == QHexRenderer::HexArea));
-       else if(e->matches(QKeySequence::Copy))
-           m_document->copy((m_renderer->selectedArea() == QHexRenderer::HexArea));
-       else if(e->matches(QKeySequence::Paste))
-           m_document->paste((m_renderer->selectedArea() == QHexRenderer::HexArea));
-       else
-           return false;
-
-       return true;
-   }
-
-   if((e->key() == Qt::Key_Backspace) || (e->key() == Qt::Key_Delete))
-   {
-       if(!cur->hasSelection())
-       {
-           const QHexPosition& pos = cur->position();
-
-           if(pos.offset() <= 0)
-               return true;
-
-           if(e->key() == Qt::Key_Backspace)
-               m_document->remove(cur->position().offset() - 1, 1);
-           else
-               m_document->remove(cur->position().offset(), 1);
-       }
-       else
-       {
-           QHexPosition oldpos = cur->selectionStart();
-           m_document->removeSelection();
-           cur->moveTo(oldpos.line, oldpos.column + 1);
-       }
-
-       if(e->key() == Qt::Key_Backspace)
-       {
-           if(m_renderer->selectedArea() == QHexRenderer::HexArea)
-               this->movePrevious();
-
-           this->movePrevious();
-       }
-   }
-   else if(e->key() == Qt::Key_Insert)
-       cur->switchInsertionMode();
-   else
-       return false;
-
-   return true;
-}
-
-bool QHexView::processMove(QHexCursor *cur, QKeyEvent *e)
-{
-    if(e->matches(QKeySequence::MoveToNextChar) || e->matches(QKeySequence::SelectNextChar))
-        this->moveNext(e->matches(QKeySequence::SelectNextChar));
-    else if(e->matches(QKeySequence::MoveToPreviousChar) || e->matches(QKeySequence::SelectPreviousChar))
-        this->movePrevious(e->matches(QKeySequence::SelectPreviousChar));
-    else if(e->matches(QKeySequence::MoveToNextLine) || e->matches(QKeySequence::SelectNextLine))
-    {
-        if(m_renderer->documentLastLine() == cur->currentLine())
-            return true;
-
-        int nextline = cur->currentLine() + 1;
-
-        if(e->matches(QKeySequence::MoveToNextLine))
-            cur->moveTo(nextline, cur->currentColumn());
-        else
-            cur->select(nextline, cur->currentColumn());
-    }
-    else if(e->matches(QKeySequence::MoveToPreviousLine) || e->matches(QKeySequence::SelectPreviousLine))
-    {
-        if(!cur->currentLine())
-            return true;
-
-        quint64 prevline = cur->currentLine() - 1;
-
-        if(e->matches(QKeySequence::MoveToPreviousLine))
-            cur->moveTo(prevline, cur->currentColumn());
-        else
-            cur->select(prevline, cur->currentColumn());
-    }
-    else if(e->matches(QKeySequence::MoveToNextPage) || e->matches(QKeySequence::SelectNextPage))
-    {
-        if(m_renderer->documentLastLine() == cur->currentLine()) return true;
-
-        int pageline = std::min(m_renderer->documentLastLine(), cur->currentLine() + this->visibleLines());
-
-        if(e->matches(QKeySequence::MoveToNextPage)) cur->moveTo(pageline, cur->currentColumn());
-        else cur->select(pageline, cur->currentColumn());
-    }
-    else if(e->matches(QKeySequence::MoveToPreviousPage) || e->matches(QKeySequence::SelectPreviousPage))
-    {
-        if(!cur->currentLine()) return true;
-
-        quint64 pageline = std::max(quint64(0), cur->currentLine() - this->visibleLines());
-
-        if(e->matches(QKeySequence::MoveToPreviousPage)) cur->moveTo(pageline, cur->currentColumn());
-        else cur->select(pageline, cur->currentColumn());
-    }
-    else if(e->matches(QKeySequence::MoveToStartOfDocument) || e->matches(QKeySequence::SelectStartOfDocument))
-    {
-        if(!cur->currentLine()) return true;
-
-        if(e->matches(QKeySequence::MoveToStartOfDocument)) cur->moveTo(0, 0);
-        else cur->select(0, 0);
-    }
-    else if(e->matches(QKeySequence::MoveToEndOfDocument) || e->matches(QKeySequence::SelectEndOfDocument))
-    {
-        if(m_renderer->documentLastLine() == cur->currentLine()) return true;
-
-        if(e->matches(QKeySequence::MoveToEndOfDocument)) cur->moveTo(m_renderer->documentLastLine(), m_renderer->documentLastColumn());
-        else cur->select(m_renderer->documentLastLine(), m_renderer->documentLastColumn());
-    }
-    else if(e->matches(QKeySequence::MoveToStartOfLine) || e->matches(QKeySequence::SelectStartOfLine))
-    {
-        if(e->matches(QKeySequence::MoveToStartOfLine)) cur->moveTo(cur->currentLine(), 0);
-        else cur->select(cur->currentLine(), 0);
-    }
-    else if(e->matches(QKeySequence::MoveToEndOfLine) || e->matches(QKeySequence::SelectEndOfLine))
-    {
-        if(e->matches(QKeySequence::MoveToEndOfLine))
-        {
-            if(cur->currentLine() == m_renderer->documentLastLine()) cur->moveTo(cur->currentLine(), m_renderer->documentLastColumn());
-            else cur->moveTo(cur->currentLine(), m_renderer->hexLineWidth() - 1, 0);
-        }
-        else
-        {
-            if(cur->currentLine() == m_renderer->documentLastLine()) cur->select(cur->currentLine(), m_renderer->documentLastColumn()); else
-                cur->select(cur->currentLine(), m_renderer->hexLineWidth() - 1, 0);
-        }
-    }
-    else
-        return false;
-
-    return true;
-}
-
-bool QHexView::processTextInput(QHexCursor *cur, QKeyEvent *e)
-{
-    if(m_readonly || (e->modifiers() & Qt::ControlModifier))
-        return false;
-
-    uchar key = static_cast<uchar>(e->text()[0].toLatin1());
-
-    if((m_renderer->selectedArea() == QHexRenderer::HexArea))
-    {
-        if(!((key >= '0' && key <= '9') || (key >= 'a' && key <= 'f'))) // Check if is a Hex Char
-            return false;
-
-        uchar val = static_cast<uchar>(QString(static_cast<char>(key)).toUInt(nullptr, 16));
-        m_document->removeSelection();
-
-        if(m_document->atEnd() || (cur->currentNibble() && (cur->insertionMode() == QHexCursor::InsertMode)))
-        {
-            m_document->insert(cur->position().offset(), val << 4); // X0 byte
-            this->moveNext();
-            return true;
-        }
-
-        uchar ch = static_cast<uchar>(m_document->at(cur->position().offset()));
-
-        if(cur->currentNibble()) // X0
-            val = (ch & 0x0F) | (val << 4);
-        else // 0X
-            val = (ch & 0xF0) | val;
-
-        m_document->replace(cur->position().offset(), val);
-        this->moveNext();
-        return true;
-    }
-
-    if((m_renderer->selectedArea() == QHexRenderer::AsciiArea))
-    {
-        if(!(key >= 0x20 && key <= 0x7E)) // Check if is a Printable Char
-            return false;
-
-        m_document->removeSelection();
-
-        if(!m_document->atEnd() && (cur->insertionMode() == QHexCursor::OverwriteMode))
-            m_document->replace(cur->position().offset(), key);
-        else
-            m_document->insert(cur->position().offset(), key);
-
-        QKeyEvent keyevent(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier);
-        qApp->sendEvent(this, &keyevent);
-        return true;
-    }
-
+bool QHexView::processAction(QHexCursor *cur, QKeyEvent *e) {
+  if (m_readonly)
     return false;
-}
 
-void QHexView::adjustScrollBars()
-{
-    QScrollBar *vscrollbar = this->verticalScrollBar();
-    int sizeFactor = this->documentSizeFactor();
-    vscrollbar->setSingleStep(sizeFactor);
-
-    quint64 docLines = m_renderer->documentLines();
-    quint64 visLines = this->visibleLines();
-
-    if(docLines > visLines)
-    {
-        this->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-        vscrollbar->setMaximum(static_cast<int>((docLines - visLines) / sizeFactor + 1));
-    }
+  if (e->modifiers() != Qt::NoModifier) {
+    if (e->matches(QKeySequence::SelectAll)) {
+      m_document->cursor()->moveTo(0, 0);
+      m_document->cursor()->select(this->documentLastLine(), this->documentLastColumn() - 1);
+    } else if (e->matches(QKeySequence::Undo))
+      m_document->undo();
+    else if (e->matches(QKeySequence::Redo))
+      m_document->redo();
+    else if (e->matches(QKeySequence::Cut))
+      m_document->cut((this->selectedArea() == QHexView::HEX_AREA));
+    else if (e->matches(QKeySequence::Copy))
+      m_document->copy((this->selectedArea() == QHexView::HEX_AREA));
+    else if (e->matches(QKeySequence::Paste))
+      m_document->paste((this->selectedArea() == QHexView::HEX_AREA));
     else
-    {
-        this->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        vscrollbar->setValue(0);
-        vscrollbar->setMaximum(static_cast<int>(docLines));
-    }
+      return false;
 
-    QScrollBar *hscrollbar = this->horizontalScrollBar();
-    int documentWidth = m_renderer->documentWidth();
-    int viewportWidth = viewport()->width();
-
-    if(documentWidth > viewportWidth)
-    {
-        this->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-        // +1 to see the rightmost vertical line, +2 seems more pleasant to the eyes
-        hscrollbar->setMaximum(documentWidth - viewportWidth + 2);
-    }
-    else
-    {
-        this->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        hscrollbar->setValue(0);
-        hscrollbar->setMaximum(documentWidth);
-    }
-}
-
-void QHexView::renderLine(quint64 line)
-{
-    if(!this->isLineVisible(line)) return;
-    this->viewport()->update(/*m_renderer->getLineRect(line, this->firstVisibleLine())*/);
-}
-
-quint64 QHexView::firstVisibleLine() const { return static_cast<quint64>(this->verticalScrollBar()->value()) * documentSizeFactor(); }
-quint64 QHexView::lastVisibleLine() const { return this->firstVisibleLine() + this->visibleLines() - 1; }
-
-quint64 QHexView::visibleLines() const
-{
-    int visLines = std::ceil(this->height() / m_renderer->lineHeight()) - m_renderer->headerLineCount();
-    return std::min(quint64(visLines), m_renderer->documentLines());
-}
-
-bool QHexView::isLineVisible(quint64 line) const
-{
-    if(!m_document) return false;
-    if(line < this->firstVisibleLine()) return false;
-    if(line > this->lastVisibleLine()) return false;
     return true;
-}
+  }
 
-int QHexView::documentSizeFactor() const
-{
-    int factor = 1;
+  if ((e->key() == Qt::Key_Backspace) || (e->key() == Qt::Key_Delete)) {
+    if (!cur->hasSelection()) {
+      const QHexPosition &pos = cur->position();
 
-    if(m_document)
-    {
-        quint64 docLines = m_renderer->documentLines();
-        if(docLines >= INT_MAX) factor = static_cast<int>(docLines / INT_MAX) + 1;
+      if (pos.offset() <= 0)
+        return true;
+
+      if (e->key() == Qt::Key_Backspace)
+        m_document->remove(cur->position().offset() - 1, 1);
+      else
+        m_document->remove(cur->position().offset(), 1);
+    } else {
+      QHexPosition oldpos = cur->selectionStart();
+      m_document->removeSelection();
+      cur->moveTo(oldpos.line, oldpos.column + 1);
     }
 
-    return factor;
+    if (e->key() == Qt::Key_Backspace) {
+      if (this->selectedArea() == QHexView::HEX_AREA)
+        this->movePrevious();
+
+      this->movePrevious();
+    }
+  } else if (e->key() == Qt::Key_Insert)
+    cur->switchInsertionMode();
+  else
+    return false;
+
+  return true;
+}
+
+bool QHexView::processMove(QHexCursor *cur, QKeyEvent *e) {
+  if (e->matches(QKeySequence::MoveToNextChar) || e->matches(QKeySequence::SelectNextChar))
+    this->moveNext(e->matches(QKeySequence::SelectNextChar));
+  else if (e->matches(QKeySequence::MoveToPreviousChar) ||
+           e->matches(QKeySequence::SelectPreviousChar))
+    this->movePrevious(e->matches(QKeySequence::SelectPreviousChar));
+  else if (e->matches(QKeySequence::MoveToNextLine) || e->matches(QKeySequence::SelectNextLine)) {
+    if (this->documentLastLine() == cur->currentLine())
+      return true;
+
+    int nextline = cur->currentLine() + 1;
+
+    if (e->matches(QKeySequence::MoveToNextLine))
+      cur->moveTo(nextline, cur->currentColumn());
+    else
+      cur->select(nextline, cur->currentColumn());
+  } else if (e->matches(QKeySequence::MoveToPreviousLine) ||
+             e->matches(QKeySequence::SelectPreviousLine)) {
+    if (!cur->currentLine())
+      return true;
+
+    quint64 prevline = cur->currentLine() - 1;
+
+    if (e->matches(QKeySequence::MoveToPreviousLine))
+      cur->moveTo(prevline, cur->currentColumn());
+    else
+      cur->select(prevline, cur->currentColumn());
+  } else if (e->matches(QKeySequence::MoveToNextPage) || e->matches(QKeySequence::SelectNextPage)) {
+    if (this->documentLastLine() == cur->currentLine())
+      return true;
+
+    int pageline = std::min(this->documentLastLine(), cur->currentLine() + this->visibleLines());
+
+    if (e->matches(QKeySequence::MoveToNextPage))
+      cur->moveTo(pageline, cur->currentColumn());
+    else
+      cur->select(pageline, cur->currentColumn());
+  } else if (e->matches(QKeySequence::MoveToPreviousPage) ||
+             e->matches(QKeySequence::SelectPreviousPage)) {
+    if (!cur->currentLine())
+      return true;
+
+    quint64 pageline = std::max(quint64(0), cur->currentLine() - this->visibleLines());
+
+    if (e->matches(QKeySequence::MoveToPreviousPage))
+      cur->moveTo(pageline, cur->currentColumn());
+    else
+      cur->select(pageline, cur->currentColumn());
+  } else if (e->matches(QKeySequence::MoveToStartOfDocument) ||
+             e->matches(QKeySequence::SelectStartOfDocument)) {
+    if (!cur->currentLine())
+      return true;
+
+    if (e->matches(QKeySequence::MoveToStartOfDocument))
+      cur->moveTo(0, 0);
+    else
+      cur->select(0, 0);
+  } else if (e->matches(QKeySequence::MoveToEndOfDocument) ||
+             e->matches(QKeySequence::SelectEndOfDocument)) {
+    if (this->documentLastLine() == cur->currentLine())
+      return true;
+
+    if (e->matches(QKeySequence::MoveToEndOfDocument))
+      cur->moveTo(this->documentLastLine(), this->documentLastColumn());
+    else
+      cur->select(this->documentLastLine(), this->documentLastColumn());
+  } else if (e->matches(QKeySequence::MoveToStartOfLine) ||
+             e->matches(QKeySequence::SelectStartOfLine)) {
+    if (e->matches(QKeySequence::MoveToStartOfLine))
+      cur->moveTo(cur->currentLine(), 0);
+    else
+      cur->select(cur->currentLine(), 0);
+  } else if (e->matches(QKeySequence::MoveToEndOfLine) ||
+             e->matches(QKeySequence::SelectEndOfLine)) {
+    if (e->matches(QKeySequence::MoveToEndOfLine)) {
+      if (cur->currentLine() == this->documentLastLine())
+        cur->moveTo(cur->currentLine(), this->documentLastColumn());
+      else
+        cur->moveTo(cur->currentLine(), this->hexLineWidth() - 1, 0);
+    } else {
+      if (cur->currentLine() == this->documentLastLine())
+        cur->select(cur->currentLine(), this->documentLastColumn());
+      else
+        cur->select(cur->currentLine(), this->hexLineWidth() - 1, 0);
+    }
+  } else
+    return false;
+
+  return true;
+}
+
+bool QHexView::processTextInput(QHexCursor *cur, QKeyEvent *e) {
+  if (m_readonly || (e->modifiers() & Qt::ControlModifier))
+    return false;
+
+  uchar key = static_cast<uchar>(e->text()[0].toLatin1());
+
+  if ((this->selectedArea() == QHexView::HEX_AREA)) {
+    if (!((key >= '0' && key <= '9') || (key >= 'a' && key <= 'f')))  // Check if is a Hex Char
+      return false;
+
+    uchar val = static_cast<uchar>(QString(static_cast<char>(key)).toUInt(nullptr, 16));
+    m_document->removeSelection();
+
+    if (m_document->atEnd() ||
+        (cur->currentNibble() && (cur->insertionMode() == QHexCursor::InsertMode))) {
+      m_document->insert(cur->position().offset(), val << 4);  // X0 byte
+      this->moveNext();
+      return true;
+    }
+
+    uchar ch = static_cast<uchar>(m_document->at(cur->position().offset()));
+
+    if (cur->currentNibble())  // X0
+      val = (ch & 0x0F) | (val << 4);
+    else  // 0X
+      val = (ch & 0xF0) | val;
+
+    m_document->replace(cur->position().offset(), val);
+    this->moveNext();
+    return true;
+  }
+
+  if ((this->selectedArea() == QHexView::ASCII_AREA)) {
+    if (!(key >= 0x20 && key <= 0x7E))  // Check if is a Printable Char
+      return false;
+
+    m_document->removeSelection();
+
+    if (!m_document->atEnd() && (cur->insertionMode() == QHexCursor::OverwriteMode))
+      m_document->replace(cur->position().offset(), key);
+    else
+      m_document->insert(cur->position().offset(), key);
+
+    QKeyEvent keyevent(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier);
+    qApp->sendEvent(this, &keyevent);
+    return true;
+  }
+
+  return false;
+}
+
+void QHexView::adjustScrollBars() {
+  QScrollBar *vscrollbar = this->verticalScrollBar();
+  int sizeFactor = this->documentSizeFactor();
+  vscrollbar->setSingleStep(sizeFactor);
+
+  quint64 docLines = this->documentLines();
+  quint64 visLines = this->visibleLines();
+
+  if (docLines > visLines) {
+    this->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    vscrollbar->setMaximum(static_cast<int>((docLines - visLines) / sizeFactor + 1));
+  } else {
+    this->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    vscrollbar->setValue(0);
+    vscrollbar->setMaximum(static_cast<int>(docLines));
+  }
+
+  QScrollBar *hscrollbar = this->horizontalScrollBar();
+  int documentWidth = this->documentWidth();
+  int viewportWidth = viewport()->width();
+
+  if (documentWidth > viewportWidth) {
+    this->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    // +1 to see the rightmost vertical line, +2 seems more pleasant to the eyes
+    hscrollbar->setMaximum(documentWidth - viewportWidth + 2);
+  } else {
+    this->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    hscrollbar->setValue(0);
+    hscrollbar->setMaximum(documentWidth);
+  }
+}
+
+void QHexView::renderLine(quint64 line) {
+  if (!this->isLineVisible(line))
+    return;
+  this->viewport()->update(/*this->getLineRect(line, this->firstVisibleLine())*/);
+}
+
+quint64 QHexView::firstVisibleLine() const {
+  return static_cast<quint64>(this->verticalScrollBar()->value()) * documentSizeFactor();
+}
+quint64 QHexView::lastVisibleLine() const {
+  return this->firstVisibleLine() + this->visibleLines() - 1;
+}
+
+quint64 QHexView::visibleLines() const {
+  int visLines = std::ceil(this->height() / this->lineHeight()) - this->headerLineCount();
+  return std::min(quint64(visLines), this->documentLines());
+}
+
+bool QHexView::isLineVisible(quint64 line) const {
+  if (!m_document)
+    return false;
+  if (line < this->firstVisibleLine())
+    return false;
+  if (line > this->lastVisibleLine())
+    return false;
+  return true;
+}
+
+int QHexView::documentSizeFactor() const {
+  int factor = 1;
+
+  if (m_document) {
+    quint64 docLines = this->documentLines();
+    if (docLines >= INT_MAX)
+      factor = static_cast<int>(docLines / INT_MAX) + 1;
+  }
+
+  return factor;
+}
+
+// renderer
+#define HEX_UNPRINTABLE_CHAR '.'
+
+void QHexView::renderFrame(QPainter *painter) {
+  QRect rect = painter->window();
+  int hexx = this->getHexColumnX();
+  int asciix = this->getAsciiColumnX();
+  int endx = this->getEndColumnX();
+
+  // x coordinates are in absolute space
+  // y coordinates are in viewport space
+  // see QHexView::paintEvent where the painter has been shifted horizontally
+
+  painter->drawLine(0, this->headerLineCount() * this->lineHeight() - 1, endx,
+                    this->headerLineCount() * this->lineHeight() - 1);
+
+  painter->drawLine(hexx, rect.top(), hexx, rect.bottom());
+
+  painter->drawLine(asciix, rect.top(), asciix, rect.bottom());
+
+  painter->drawLine(endx, rect.top(), endx, rect.bottom());
+}
+
+void QHexView::render(QPainter *painter, quint64 begin, quint64 end, quint64 firstline) {
+  QPalette palette = qApp->palette();
+
+  this->drawHeader(painter, palette);
+
+  quint64 documentLines = this->documentLines();
+  for (quint64 line = begin; line < std::min(end, documentLines); line++) {
+    QRect linerect = this->getLineRect(line, firstline);
+    if (line % 2)
+      painter->fillRect(linerect, palette.brush(QPalette::Window));
+    else
+      painter->fillRect(linerect, palette.brush(QPalette::Base));
+
+    this->drawAddress(painter, palette, linerect, line);
+    this->drawHex(painter, palette, linerect, line);
+    this->drawAscii(painter, palette, linerect, line);
+  }
+}
+
+void QHexView::enableCursor(bool b) {
+  m_cursorenabled = b;
+}
+
+void QHexView::selectArea(const QPoint &pt) {
+  int area = this->hitTestArea(pt);
+  if (!this->editableArea(area))
+    return;
+
+  m_selectedarea = area;
+}
+
+bool QHexView::hitTest(const QPoint &pt, QHexPosition *position, quint64 firstline) const {
+  int area = this->hitTestArea(pt);
+  if (!this->editableArea(area))
+    return false;
+
+  position->line = std::min(firstline + (pt.y() / this->lineHeight()) - headerLineCount(),
+                            this->documentLastLine());
+  position->lineWidth = this->hexLineWidth();
+
+  if (area == QHexView::HEX_AREA) {
+    int relx = pt.x() - this->getHexColumnX() - this->borderSize();
+    int column = relx / this->getCellWidth();
+    position->column = column / 3;
+    // first char is nibble 1, 2nd and space are 0
+    position->nibbleindex = (column % 3 == 0) ? 1 : 0;
+  } else {
+    int relx = pt.x() - this->getAsciiColumnX() - this->borderSize();
+    position->column = relx / this->getCellWidth();
+    position->nibbleindex = 1;
+  }
+
+  if (position->line == this->documentLastLine())  // Check last line's columns
+  {
+    QByteArray ba = this->getLine(position->line);
+    position->column = std::min(position->column, static_cast<int>(ba.length()));
+  } else
+    position->column = std::min(position->column, hexLineWidth() - 1);
+
+  return true;
+}
+
+QHexView::RenderArea QHexView::hitTestArea(const QPoint &pt) const {
+  if (pt.y() < headerLineCount() * lineHeight())
+    return QHexView::HEADER_AREA;
+
+  if ((pt.x() >= this->borderSize()) && (pt.x() <= (this->getHexColumnX() - this->borderSize())))
+    return QHexView::ADDRESS_AREA;
+
+  if ((pt.x() > (this->getHexColumnX() + this->borderSize())) &&
+      (pt.x() < (this->getAsciiColumnX() - this->borderSize())))
+    return QHexView::HEX_AREA;
+
+  if ((pt.x() > (this->getAsciiColumnX() + this->borderSize())) &&
+      (pt.x() < (this->getEndColumnX() - this->borderSize())))
+    return QHexView::ASCII_AREA;
+
+  return QHexView::EXTRA_AREA;
+}
+
+int QHexView::selectedArea() const {
+  return m_selectedarea;
+}
+bool QHexView::editableArea(int area) const {
+  return (area == QHexView::HEX_AREA || area == QHexView::ASCII_AREA);
+}
+quint64 QHexView::documentLastLine() const {
+  return this->documentLines() - 1;
+}
+int QHexView::documentLastColumn() const {
+  return this->getLine(this->documentLastLine()).length();
+}
+quint64 QHexView::documentLines() const {
+  return std::ceil(this->rendererLength() / static_cast<float>(hexLineWidth()));
+}
+int QHexView::lineHeight() const {
+  return this->fontMetrics().height();
+}
+int QHexView::documentWidth() const {
+  return this->getEndColumnX();
+}
+QRect QHexView::getLineRect(quint64 line, quint64 firstline) const {
+  return QRect(0, static_cast<int>((line - firstline + headerLineCount()) * lineHeight()),
+               this->getEndColumnX(), lineHeight());
+}
+
+int QHexView::borderSize() const {
+  if (m_document)
+    return this->getNCellsWidth(m_document->areaIndent());
+  return this->getNCellsWidth(DEFAULT_AREA_IDENTATION);
+}
+
+int QHexView::hexLineWidth() const {
+  if (m_document)
+    return m_document->hexLineWidth();
+  return DEFAULT_HEX_LINE_LENGTH;
+}
+
+QString QHexView::hexString(quint64 line, QByteArray *rawline) const {
+  QByteArray lrawline = this->getLine(line);
+  if (rawline)
+    *rawline = lrawline;
+
+  return lrawline.toHex(' ').toUpper() + " ";
+}
+
+QString QHexView::asciiString(quint64 line, QByteArray *rawline) const {
+  QByteArray lrawline = this->getLine(line);
+  if (rawline)
+    *rawline = lrawline;
+
+  QByteArray ascii = lrawline;
+  this->unprintableChars(ascii);
+  return ascii;
+}
+
+QByteArray QHexView::getLine(quint64 line) const {
+  return m_document->read(line * hexLineWidth(), hexLineWidth());
+}
+qint64 QHexView::rendererLength() const {
+  return m_document->length() + 1;
+}
+
+int QHexView::getAddressWidth() const {
+  quint64 maxAddr = m_document->baseAddress() + this->rendererLength();
+  if (maxAddr <= 0xFFFF)
+    return 4;
+  if (maxAddr <= 0xFFFFFFFF)
+    return 8;
+
+  return QString::number(maxAddr, 16).length();
+}
+
+int QHexView::getHexColumnX() const {
+  return this->getNCellsWidth(this->getAddressWidth()) + 2 * this->borderSize();
+}
+int QHexView::getAsciiColumnX() const {
+  return this->getHexColumnX() + this->getNCellsWidth(hexLineWidth() * 3) + 2 * this->borderSize();
+}
+int QHexView::getEndColumnX() const {
+  return this->getAsciiColumnX() + this->getNCellsWidth(hexLineWidth()) + 2 * this->borderSize();
+}
+
+qreal QHexView::getCellWidth() const {
+  return this->fontMetrics().horizontalAdvance(" ");
+}
+
+int QHexView::getNCellsWidth(int n) const {
+  return qRound(n * getCellWidth());
+}
+
+void QHexView::unprintableChars(QByteArray &ascii) const {
+  for (char &ch : ascii) {
+    if (std::isprint(static_cast<unsigned char>(ch)))
+      continue;
+
+    ch = HEX_UNPRINTABLE_CHAR;
+  }
+}
+
+void QHexView::applyDocumentStyles(QPainter *painter, QTextDocument *textdocument) const {
+  textdocument->setDocumentMargin(0);
+  textdocument->setUndoRedoEnabled(false);
+  textdocument->setDefaultFont(painter->font());
+}
+
+void QHexView::applyBasicStyle(QTextCursor &textcursor, const QByteArray &rawline,
+                               int factor) const {
+  QPalette palette = qApp->palette();
+  QColor color = palette.color(QPalette::WindowText);
+
+  if (color.lightness() < 50) {
+    if (color == Qt::black)
+      color = Qt::gray;
+    else
+      color = color.darker();
+  } else
+    color = color.lighter();
+
+  QTextCharFormat charformat;
+  charformat.setForeground(color);
+
+  for (int i = 0; i < rawline.length(); i++) {
+    if ((rawline[i] != 0x00) && (static_cast<uchar>(rawline[i]) != 0xFF))
+      continue;
+
+    textcursor.setPosition(i * factor);
+    textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, factor);
+    textcursor.setCharFormat(charformat);
+  }
+}
+
+void QHexView::applyMetadata(QTextCursor &textcursor, quint64 line, int factor) const {
+  QHexMetadata *metadata = m_document->metadata();
+
+  if (!metadata->hasMetadata(line))
+    return;
+
+  const QHexLineMetadata &linemetadata = metadata->get(line);
+
+  for (const QHexMetadataItem &mi : linemetadata) {
+    QTextCharFormat charformat;
+    if (mi.background.isValid())
+      charformat.setBackground(mi.background);
+    if (mi.foreground.isValid())
+      charformat.setForeground(mi.foreground);
+    if (!mi.comment.isEmpty())
+      charformat.setUnderlineStyle(QTextCharFormat::SingleUnderline);
+
+    textcursor.setPosition(mi.start * factor);
+    textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor,
+                            (mi.length * factor) - (factor > 1 ? 1 : 0));
+    textcursor.setCharFormat(charformat);
+  }
+}
+
+void QHexView::applySelection(QTextCursor &textcursor, quint64 line, int factor) const {
+  QHexCursor *cursor = m_document->cursor();
+  if (!cursor->isLineSelected(line))
+    return;
+
+  const QHexPosition &startsel = cursor->selectionStart();
+  const QHexPosition &endsel = cursor->selectionEnd();
+
+  if (startsel.line == endsel.line) {
+    textcursor.setPosition(startsel.column * factor);
+    textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor,
+                            ((endsel.column - startsel.column + 1) * factor) - 1);
+  } else {
+    if (line == startsel.line)
+      textcursor.setPosition(startsel.column * factor);
+    else
+      textcursor.setPosition(0);
+
+    if (line == endsel.line)
+      textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor,
+                              ((endsel.column + 1) * factor) - 1);
+    else
+      textcursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+  }
+
+  QPalette palette = qApp->palette();
+
+  QTextCharFormat charformat;
+  charformat.setBackground(palette.color(QPalette::Highlight));
+  charformat.setForeground(palette.color(QPalette::HighlightedText));
+  textcursor.setCharFormat(charformat);
+}
+
+void QHexView::applyCursorAscii(QTextCursor &textcursor, quint64 line) const {
+  QHexCursor *cursor = m_document->cursor();
+  if ((line != cursor->currentLine()) || !m_cursorenabled)
+    return;
+
+  textcursor.clearSelection();
+  textcursor.setPosition(m_document->cursor()->currentColumn());
+  textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
+
+  QPalette palette = qApp->palette();
+  QTextCharFormat charformat;
+
+  if ((cursor->insertionMode() == QHexCursor::OverwriteMode) ||
+      (m_selectedarea != QHexView::ASCII_AREA)) {
+    charformat.setForeground(palette.color(QPalette::Window));
+    if (m_selectedarea == QHexView::ASCII_AREA)
+      charformat.setBackground(palette.color(QPalette::WindowText));
+    else
+      charformat.setBackground(palette.color(QPalette::WindowText).lighter(250));
+  } else
+    charformat.setUnderlineStyle(QTextCharFormat::UnderlineStyle::SingleUnderline);
+
+  textcursor.setCharFormat(charformat);
+}
+
+void QHexView::applyCursorHex(QTextCursor &textcursor, quint64 line) const {
+  QHexCursor *cursor = m_document->cursor();
+  if ((line != cursor->currentLine()) || !m_cursorenabled)
+    return;
+
+  textcursor.clearSelection();
+  textcursor.setPosition(m_document->cursor()->currentColumn() * 3);
+
+  if ((m_selectedarea == QHexView::HEX_AREA) && !m_document->cursor()->currentNibble())
+    textcursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor);
+
+  textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
+
+  if (m_selectedarea == QHexView::ASCII_AREA)
+    textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
+
+  QPalette palette = qApp->palette();
+  QTextCharFormat charformat;
+
+  if ((cursor->insertionMode() == QHexCursor::OverwriteMode) ||
+      (m_selectedarea != QHexView::HEX_AREA)) {
+    charformat.setForeground(palette.color(QPalette::Window));
+    if (m_selectedarea == QHexView::HEX_AREA)
+      charformat.setBackground(palette.color(QPalette::WindowText));
+    else
+      charformat.setBackground(palette.color(QPalette::WindowText).lighter(250));
+  } else
+    charformat.setUnderlineStyle(QTextCharFormat::UnderlineStyle::SingleUnderline);
+
+  textcursor.setCharFormat(charformat);
+}
+
+void QHexView::drawAddress(QPainter *painter, const QPalette &palette, const QRect &linerect,
+                           quint64 line) {
+  quint64 addr = line * hexLineWidth() + m_document->baseAddress();
+  QString addrStr =
+      QString::number(addr, 16).rightJustified(this->getAddressWidth(), QLatin1Char('0')).toUpper();
+
+  QRect addressrect = linerect;
+  addressrect.setWidth(this->getHexColumnX());
+
+  painter->save();
+  painter->setPen(palette.color(QPalette::Highlight));
+  painter->drawText(addressrect, Qt::AlignHCenter | Qt::AlignVCenter, addrStr);
+  painter->restore();
+}
+
+void QHexView::drawHex(QPainter *painter, const QPalette &palette, const QRect &linerect,
+                       quint64 line) {
+  Q_UNUSED(palette)
+  QTextDocument textdocument;
+  QTextCursor textcursor(&textdocument);
+  QByteArray rawline;
+
+  textcursor.insertText(this->hexString(line, &rawline));
+
+  if (line == this->documentLastLine())
+    textcursor.insertText(" ");
+
+  QRect hexrect = linerect;
+  hexrect.setX(this->getHexColumnX() + this->borderSize());
+
+  this->applyDocumentStyles(painter, &textdocument);
+  this->applyBasicStyle(textcursor, rawline, 3);
+  this->applyMetadata(textcursor, line, 3);
+  this->applySelection(textcursor, line, 3);
+  this->applyCursorHex(textcursor, line);
+
+  painter->save();
+  painter->translate(hexrect.topLeft());
+  textdocument.drawContents(painter);
+  painter->restore();
+}
+
+void QHexView::drawAscii(QPainter *painter, const QPalette &palette, const QRect &linerect,
+                         quint64 line) {
+  Q_UNUSED(palette)
+  QTextDocument textdocument;
+  QTextCursor textcursor(&textdocument);
+  QByteArray rawline;
+  textcursor.insertText(this->asciiString(line, &rawline));
+
+  if (line == this->documentLastLine())
+    textcursor.insertText(" ");
+
+  QRect asciirect = linerect;
+  asciirect.setX(this->getAsciiColumnX() + this->borderSize());
+
+  this->applyDocumentStyles(painter, &textdocument);
+  this->applyBasicStyle(textcursor, rawline);
+  this->applyMetadata(textcursor, line);
+  this->applySelection(textcursor, line);
+  this->applyCursorAscii(textcursor, line);
+
+  painter->save();
+  painter->translate(asciirect.topLeft());
+  textdocument.drawContents(painter);
+  painter->restore();
+}
+
+void QHexView::drawHeader(QPainter *painter, const QPalette &palette) {
+  QRect rect = QRect(0, 0, this->getEndColumnX(), this->headerLineCount() * this->lineHeight());
+  QString hexheader;
+
+  for (quint8 i = 0; i < this->hexLineWidth(); i++)
+    hexheader.append(
+        QString("%1 ").arg(QString::number(i, 16).rightJustified(2, QChar('0'))).toUpper());
+
+  QRect addressrect = rect;
+  addressrect.setWidth(this->getHexColumnX());
+
+  QRect hexrect = rect;
+  hexrect.setX(this->getHexColumnX() + this->borderSize());
+  hexrect.setWidth(this->getNCellsWidth(hexLineWidth() * 3));
+
+  QRect asciirect = rect;
+  asciirect.setX(this->getAsciiColumnX());
+  asciirect.setWidth(this->getEndColumnX() - this->getAsciiColumnX());
+
+  painter->save();
+  painter->setPen(palette.color(QPalette::Highlight));
+
+  painter->drawText(addressrect, Qt::AlignHCenter | Qt::AlignVCenter, QString("Offset"));
+  // align left for maximum consistency with drawHex() which prints from the left.
+  // so hex and positions are aligned vertically
+  painter->drawText(hexrect, Qt::AlignLeft | Qt::AlignVCenter, hexheader);
+  painter->drawText(asciirect, Qt::AlignHCenter | Qt::AlignVCenter, QString("Ascii"));
+  painter->restore();
 }
