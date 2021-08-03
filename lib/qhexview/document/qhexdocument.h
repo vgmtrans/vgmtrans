@@ -17,22 +17,21 @@ class QHexDocument: public QObject
 
     public:
         bool isEmpty() const;
-        bool atEnd() const;
+        bool atEnd(QHexCursor* cursor) const;
         bool canUndo() const;
         bool canRedo() const;
         qint64 length() const;
         quint64 baseAddress() const;
-        QHexCursor* cursor() const;
         QHexMetadata* metadata() const;
         int areaIndent() const;
         void setAreaIndent(quint8 value);
         int hexLineWidth() const;
-        void setHexLineWidth(quint8 value);
+        void setHexLineWidth(QHexCursor* cursor, quint8 value);
 
     public:
-        void removeSelection();
+        void removeSelection(QHexCursor* cursor);
         QByteArray read(qint64 offset, int len = 0);
-        QByteArray selectedBytes() const;
+        QByteArray selectedBytes(QHexCursor* cursor) const;
         char at(int offset) const;
         void setBaseAddress(quint64 baseaddress);
         void sync();
@@ -40,19 +39,21 @@ class QHexDocument: public QObject
     public slots:
         void undo();
         void redo();
-        void cut(bool hex = false);
-        void copy(bool hex = false);
-        void paste(bool hex = false);
+        void cut(QHexCursor* cursor, bool hex = false);
+        void copy(QHexCursor* cursor, bool hex = false);
+        void paste(QHexCursor* cursor, bool hex = false);
         void insert(qint64 offset, uchar b);
         void replace(qint64 offset, uchar b);
         void insert(qint64 offset, const QByteArray& data);
         void replace(qint64 offset, const QByteArray& data);
         void remove(qint64 offset, int len);
+      
+        qint64 searchForward(QHexCursor* cursor, const QByteArray &ba);
+        qint64 searchBackward(QHexCursor* cursor, const QByteArray &ba);
+        
         QByteArray read(qint64 offset, int len) const;
         bool saveTo(QIODevice* device);
         
-        qint64 searchForward(const QByteArray &ba);
-        qint64 searchBackward(const QByteArray &ba);
 
     public:
         template<typename T> static QHexDocument* fromDevice(QIODevice* iodevice, QObject* parent = nullptr);
@@ -71,9 +72,9 @@ class QHexDocument: public QObject
         QHexBuffer* m_buffer;
         QHexMetadata* m_metadata;
         QUndoStack m_undostack;
-        QHexCursor* m_cursor;
         quint64 m_baseaddress;
         quint8 m_areaindent;
+        // Number of bytes displayed per row
         quint8 m_hexlinewidth;
 };
 
