@@ -62,8 +62,6 @@ set(CMAKE_AUTOMOC ON)
 qt5_add_resources(UI_RESOURCES
         "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
 
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/qhexview" "${CMAKE_CURRENT_BINARY_DIR}/qhexview" EXCLUDE_FROM_ALL)
-
 if(WIN32)
     set(GUI_TYPE WIN32)
 elseif(APPLE)
@@ -103,7 +101,19 @@ add_executable(vgmtrans
         workarea/VGMFileView.cpp
         workarea/VGMFileView.h
         workarea/VGMFileListView.cpp
-        workarea/VGMFileListView.h)
+        workarea/VGMFileListView.h
+        workarea/qhexview/document/buffer/qfilebuffer.cpp
+        workarea/qhexview/document/buffer/qhexbuffer.cpp
+        workarea/qhexview/document/buffer/qmemorybuffer.cpp
+        workarea/qhexview/document/buffer/qmemoryrefbuffer.cpp
+        workarea/qhexview/document/commands/hexcommand.cpp
+        workarea/qhexview/document/commands/insertcommand.cpp
+        workarea/qhexview/document/commands/removecommand.cpp
+        workarea/qhexview/document/commands/replacecommand.cpp
+        workarea/qhexview/document/qhexcursor.cpp
+        workarea/qhexview/document/qhexdocument.cpp
+        workarea/qhexview/document/qhexmetadata.cpp
+        workarea/qhexview/qhexview.cpp)
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
@@ -114,7 +124,6 @@ target_link_libraries(vgmtrans
         vgmtranscore
         Qt5::Widgets
         Qt5::Svg
-        qhexview-lib
         gsl-lite
         FluidSynth::FluidSynth)
 
