@@ -27,6 +27,5 @@ private:
   VGMFileTreeView *m_treeview{};
   VGMFile *m_vgmfile{};
   QHexView *m_hexview{};
-  QBuffer m_buffer{};
   QSplitter *m_splitter;
 };

@@ -17,6 +17,11 @@ public:
   QHexDocument* document() { return m_document; };
   void setDocument(QHexDocument* document);
   void setReadOnly(bool b);
+  // Set how many bytes should be displayed per line
+  void setHexLineWidth(qint8 width);
+  // How many bytes are displayed per line
+  qint8 getLineWidth() const { return m_linewidth; };
+  void setMetaSelection(qint64 offset) { selected_meta_offset = offset; };
   QHexCursor* cursor() const { return m_cursor; };
 
 protected:
@@ -50,27 +55,32 @@ private:
   quint64 lastVisibleLine() const;
   quint64 visibleLines() const;
   bool isLineVisible(quint64 line) const;
-
   int documentSizeFactor() const;
-
   QPoint absolutePosition(const QPoint& pos) const;
 
-private:
-  QHexCursor* m_cursor;
-  QHexDocument* m_document;
-  QTimer* m_blinktimer;
-  bool m_readonly;
-
-  // renderer
 private:
   enum RenderArea { HEADER_AREA, ADDRESS_AREA, HEX_AREA, ASCII_AREA, EXTRA_AREA };
   static constexpr bool editableArea(RenderArea area) {
     return (area == HEX_AREA || area == ASCII_AREA);
   };
 
+private:
+  QHexCursor* m_cursor;
+  qint64 selected_meta_offset;
+  QHexDocument* m_document;
+  QTimer* m_blinktimer;
+  bool m_readonly;
+  RenderArea m_selectedarea;
+  // TODO: move this into qhexcursor
+  bool m_cursorenabled;
+  // how many bytes displayed per line
+  // don't set directly or the cursor and document will desync
+  qint8 m_linewidth;
+
+private:
   void renderFrame(QPainter* painter);
-  void render(QPainter* painter, quint64 start, quint64 end,
-              quint64 firstline);  // begin included, end excluded
+  // begin included, end excluded
+  void render(QPainter* painter, quint64 start, quint64 end, quint64 firstline);
   void enableCursor(bool b = true);
   void selectArea(const QPoint& pt);
 
@@ -106,16 +116,11 @@ private:
   void applySelection(QTextCursor& textcursor, quint64 line, int factor = 1) const;
   void applyCursorAscii(QTextCursor& textcursor, quint64 line) const;
   void applyCursorHex(QTextCursor& textcursor, quint64 line) const;
-  // Highlight selected VGM event
-  void applyEventSelection(QTextCursor& textcursor, quint64 line) const;
+  void applyMetaSelection(QTextCursor& textcursor, quint64 line, int factor = 1) const;
   void drawAddress(QPainter* painter, const QPalette& palette, const QRect& linerect, quint64 line);
   void drawHex(QPainter* painter, const QPalette& palette, const QRect& linerect, quint64 line);
   void drawAscii(QPainter* painter, const QPalette& palette, const QRect& linerect, quint64 line);
   void drawHeader(QPainter* painter, const QPalette& palette);
-
-private:
-  RenderArea m_selectedarea;
-  bool m_cursorenabled;
 };
 
 #endif  // QHEXVIEW_H
