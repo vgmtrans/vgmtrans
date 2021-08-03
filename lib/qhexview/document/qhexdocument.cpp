@@ -14,8 +14,6 @@ QHexDocument::QHexDocument(QHexBuffer *buffer, QObject *parent): QObject(parent)
     m_areaindent = DEFAULT_AREA_IDENTATION;
     m_hexlinewidth = DEFAULT_HEX_LINE_LENGTH;
 
-    m_cursor = new QHexCursor(this);
-    m_cursor->setLineWidth(m_hexlinewidth);
     m_metadata = new QHexMetadata(this);
     m_metadata->setLineWidth(m_hexlinewidth);
 
@@ -27,41 +25,40 @@ QHexDocument::QHexDocument(QHexBuffer *buffer, QObject *parent): QObject(parent)
 }
 
 bool QHexDocument::isEmpty() const { return m_buffer->isEmpty(); }
-bool QHexDocument::atEnd() const { return m_cursor->position().offset() >= m_buffer->length(); }
+bool QHexDocument::atEnd(QHexCursor* cursor) const { return cursor->position().offset() >= m_buffer->length(); }
 bool QHexDocument::canUndo() const { return m_undostack.canUndo(); }
 bool QHexDocument::canRedo() const { return m_undostack.canRedo(); }
 qint64 QHexDocument::length() const { return m_buffer->length(); }
 quint64 QHexDocument::baseAddress() const { return m_baseaddress; }
-QHexCursor *QHexDocument::cursor() const { return m_cursor; }
 
 int QHexDocument::areaIndent() const { return m_areaindent;}
 void QHexDocument::setAreaIndent(quint8 value) { m_areaindent = value; }
 int QHexDocument::hexLineWidth() const { return m_hexlinewidth; }
-void QHexDocument::setHexLineWidth(quint8 value)
+void QHexDocument::setHexLineWidth(QHexCursor* cursor, quint8 value)
 {
     m_hexlinewidth = value;
-    m_cursor->setLineWidth(value);
+    cursor->setLineWidth(value);
     m_metadata->setLineWidth(value);
 }
 
 QHexMetadata *QHexDocument::metadata() const { return m_metadata; }
 QByteArray QHexDocument::read(qint64 offset, int len) { return m_buffer->read(offset, len); }
 
-void QHexDocument::removeSelection()
+void QHexDocument::removeSelection(QHexCursor* cursor)
 {
-    if(!m_cursor->hasSelection())
+    if(!cursor->hasSelection())
         return;
 
-    this->remove(m_cursor->selectionStart().offset(), m_cursor->selectionLength());
-    m_cursor->clearSelection();
+    this->remove(cursor->selectionStart().offset(), cursor->selectionLength());
+    cursor->clearSelection();
 }
 
-QByteArray QHexDocument::selectedBytes() const
+QByteArray QHexDocument::selectedBytes(QHexCursor* cursor) const
 {
-    if(!m_cursor->hasSelection())
+    if(!cursor->hasSelection())
         return QByteArray();
 
-    return m_buffer->read(m_cursor->selectionStart().offset(), m_cursor->selectionLength());
+    return m_buffer->read(cursor->selectionStart().offset(), cursor->selectionLength());
 }
 
 char QHexDocument::at(int offset) const { return m_buffer->at(offset); }
@@ -89,22 +86,22 @@ void QHexDocument::redo()
     emit documentChanged();
 }
 
-void QHexDocument::cut(bool hex)
+void QHexDocument::cut(QHexCursor* cursor, bool hex)
 {
-    if(!m_cursor->hasSelection())
+    if(!cursor->hasSelection())
         return;
 
-    this->copy(hex);
-    this->removeSelection();
+    this->copy(cursor, hex);
+    this->removeSelection(cursor);
 }
 
-void QHexDocument::copy(bool hex)
+void QHexDocument::copy(QHexCursor* cursor, bool hex)
 {
-    if(!m_cursor->hasSelection())
+    if(!cursor->hasSelection())
         return;
 
     QClipboard* c = qApp->clipboard();
-    QByteArray bytes = this->selectedBytes();
+    QByteArray bytes = this->selectedBytes(cursor);
 
     if(hex)
         bytes = bytes.toHex(' ').toUpper();
@@ -112,7 +109,7 @@ void QHexDocument::copy(bool hex)
     c->setText(bytes);
 }
 
-void QHexDocument::paste(bool hex)
+void QHexDocument::paste(QHexCursor* cursor, bool hex)
 {
     QClipboard* c = qApp->clipboard();
     QByteArray data = c->text().toUtf8();
@@ -120,15 +117,15 @@ void QHexDocument::paste(bool hex)
     if(data.isEmpty())
         return;
 
-    this->removeSelection();
+    this->removeSelection(cursor);
 
     if(hex)
         data = QByteArray::fromHex(data);
 
-    if(m_cursor->insertionMode() == QHexCursor::InsertMode)
-        this->insert(m_cursor->position().offset(), data);
+    if(cursor->insertionMode() == QHexCursor::InsertMode)
+        this->insert(cursor->position().offset(), data);
     else
-        this->replace(m_cursor->position().offset(), data);
+        this->replace(cursor->position().offset(), data);
 }
 
 void QHexDocument::insert(qint64 offset, uchar b)
@@ -170,29 +167,29 @@ bool QHexDocument::saveTo(QIODevice *device)
     return true;
 }
 
-qint64 QHexDocument::searchForward(const QByteArray &ba)
+qint64 QHexDocument::searchForward( QHexCursor* cursor, const QByteArray &ba)
 {
-    qint64 startPos = m_cursor->position().offset();
+    qint64 startPos = cursor->position().offset();
     qint64 findPos = m_buffer->indexOf(ba, startPos);
     if (findPos > -1) {
-        m_cursor->clearSelection();
-        m_cursor->moveTo(findPos);
-        m_cursor->select(ba.length());
+        cursor->clearSelection();
+        cursor->moveTo(findPos);
+        cursor->select(ba.length());
     }
     return findPos;
 }
 
-qint64 QHexDocument::searchBackward(const QByteArray &ba)
+qint64 QHexDocument::searchBackward(QHexCursor* cursor, const QByteArray &ba)
 {
-    qint64 startPos = m_cursor->position().offset() - 1;
-    if (m_cursor->hasSelection()) {
-        startPos = m_cursor->selectionStart().offset() - 1;
+    qint64 startPos = cursor->position().offset() - 1;
+    if (cursor->hasSelection()) {
+        startPos = cursor->selectionStart().offset() - 1;
     }
     qint64 findPos = m_buffer->lastIndexOf(ba, startPos);
     if (findPos > -1) {
-        m_cursor->clearSelection();
-        m_cursor->moveTo(findPos);
-        m_cursor->select(ba.length());
+        cursor->clearSelection();
+        cursor->moveTo(findPos);
+        cursor->select(ba.length());
     }
     return findPos;
 }
