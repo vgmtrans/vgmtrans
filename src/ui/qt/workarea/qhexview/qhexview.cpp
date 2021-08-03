@@ -34,8 +34,6 @@ QHexView::QHexView(QWidget *parent)
   m_blinktimer->setInterval(CURSOR_BLINK_INTERVAL);
 
   connect(m_blinktimer, &QTimer::timeout, this, &QHexView::blinkCursor);
-
-  this->setDocument(QHexDocument::fromMemory<QMemoryBuffer>(QByteArray(), this));
 }
 
 void QHexView::setDocument(QHexDocument *document) {
@@ -43,7 +41,7 @@ void QHexView::setDocument(QHexDocument *document) {
     m_document->deleteLater();
   m_document = document;
 
-  if(m_cursor)
+  if (m_cursor)
     m_cursor->deleteLater();
   m_cursor = new QHexCursor(this);
 
@@ -56,8 +54,7 @@ void QHexView::setDocument(QHexDocument *document) {
   });
 
   connect(this->cursor(), &QHexCursor::positionChanged, this, &QHexView::moveToSelection);
-  connect(this->cursor(), &QHexCursor::insertionModeChanged, this,
-          &QHexView::renderCurrentLine);
+  connect(this->cursor(), &QHexCursor::insertionModeChanged, this, &QHexView::renderCurrentLine);
 
   this->adjustScrollBars();
   this->viewport()->update();
@@ -67,6 +64,14 @@ void QHexView::setReadOnly(bool b) {
   m_readonly = b;
   if (m_cursor)
     cursor()->setInsertionMode(QHexCursor::OverwriteMode);
+}
+
+void QHexView::setHexLineWidth(qint8 width) {
+  m_linewidth = width;
+  if (m_document)
+    m_document->setHexLineWidth(width);
+  if (m_cursor)
+    m_cursor->setLineWidth(width);
 }
 
 bool QHexView::event(QEvent *e) {
@@ -823,9 +828,12 @@ void QHexView::applyDocumentStyles(QPainter *painter, QTextDocument *textdocumen
   textdocument->setDefaultFont(painter->font());
 }
 
+// factor is the number of chars displayed per byte, 1 for ascii, 3 for hex
 void QHexView::applyBasicStyle(QTextCursor &textcursor, const QByteArray &rawline,
                                int factor) const {
   QPalette palette = qApp->palette();
+
+  // Draw 00 and FF bytes in a different color
   QColor color = palette.color(QPalette::WindowText);
 
   if (color.lightness() < 50) {
@@ -833,8 +841,9 @@ void QHexView::applyBasicStyle(QTextCursor &textcursor, const QByteArray &rawlin
       color = Qt::gray;
     else
       color = color.darker();
-  } else
+  } else {
     color = color.lighter();
+  }
 
   QTextCharFormat charformat;
   charformat.setForeground(color);
@@ -962,9 +971,6 @@ void QHexView::applyCursorHex(QTextCursor &textcursor, quint64 line) const {
   textcursor.setCharFormat(charformat);
 }
 
-void QHexView::applyEventSelection(QTextCursor &textcursor, quint64 line) const {
-  // TODO
-}
 
 void QHexView::drawAddress(QPainter *painter, const QPalette &palette, const QRect &linerect,
                            quint64 line) {

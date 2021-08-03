@@ -7,13 +7,14 @@
 #include "buffer/qfilebuffer.h"
 #include "qhexmetadata.h"
 #include "qhexcursor.h"
+#include "VGMFile.h"
 
 class QHexDocument: public QObject
 {
     Q_OBJECT
 
-    private:
-        explicit QHexDocument(QHexBuffer* buffer, QObject *parent = nullptr);
+    public:
+        explicit QHexDocument(VGMFile* buffer, QObject *parent = nullptr);
 
     public:
         bool isEmpty() const;
@@ -26,11 +27,10 @@ class QHexDocument: public QObject
         int areaIndent() const;
         void setAreaIndent(quint8 value);
         int hexLineWidth() const;
-        void setHexLineWidth(QHexCursor* cursor, quint8 value);
+        void setHexLineWidth(quint8 value);
 
     public:
         void removeSelection(QHexCursor* cursor);
-        QByteArray read(qint64 offset, int len = 0);
         QByteArray selectedBytes(QHexCursor* cursor) const;
         char at(int offset) const;
         void setBaseAddress(quint64 baseaddress);
@@ -52,15 +52,6 @@ class QHexDocument: public QObject
         qint64 searchBackward(QHexCursor* cursor, const QByteArray &ba);
         
         QByteArray read(qint64 offset, int len) const;
-        bool saveTo(QIODevice* device);
-        
-
-    public:
-        template<typename T> static QHexDocument* fromDevice(QIODevice* iodevice, QObject* parent = nullptr);
-        template<typename T> static QHexDocument* fromFile(QString filename, QObject* parent = nullptr);
-        template<typename T> static QHexDocument* fromMemory(char *data, int size, QObject* parent = nullptr);
-        template<typename T> static QHexDocument* fromMemory(const QByteArray& ba, QObject* parent = nullptr);
-        static QHexDocument* fromLargeFile(QString filename, QObject *parent = nullptr);
 
     signals:
         void canUndoChanged(bool canUndo);
@@ -69,61 +60,13 @@ class QHexDocument: public QObject
         void lineChanged(quint64 line);
 
     private:
-        QHexBuffer* m_buffer;
+        VGMFile* m_buffer;
         QHexMetadata* m_metadata;
         QUndoStack m_undostack;
         quint64 m_baseaddress;
         quint8 m_areaindent;
-        // Number of bytes displayed per row
+        // TODO: move this to the qhexview
         quint8 m_hexlinewidth;
 };
-
-template<typename T> QHexDocument* QHexDocument::fromDevice(QIODevice* iodevice, QObject *parent)
-{
-    bool needsclose = false;
-
-    if(!iodevice->isOpen())
-    {
-        needsclose = true;
-        iodevice->open(QIODevice::ReadWrite);
-    }
-
-    QHexBuffer* hexbuffer = new T();
-    if (hexbuffer->read(iodevice))
-    {
-        if(needsclose)
-            iodevice->close();
-
-        return new QHexDocument(hexbuffer, parent);
-    } else {
-        delete hexbuffer;
-    }
-
-    return nullptr;
-}
-
-template<typename T> QHexDocument* QHexDocument::fromFile(QString filename, QObject *parent)
-{
-    QFile f(filename);
-    f.open(QFile::ReadOnly);
-
-    QHexDocument* doc = QHexDocument::fromDevice<T>(&f, parent);
-    f.close();
-    return doc;
-}
-
-template<typename T> QHexDocument* QHexDocument::fromMemory(char *data, int size, QObject *parent)
-{
-    QHexBuffer* hexbuffer = new T();
-    hexbuffer->read(data, size);
-    return new QHexDocument(hexbuffer, parent);
-}
-
-template<typename T> QHexDocument* QHexDocument::fromMemory(const QByteArray& ba, QObject *parent)
-{
-    QHexBuffer* hexbuffer = new T();
-    hexbuffer->read(ba);
-    return new QHexDocument(hexbuffer, parent);
-}
 
 #endif // QHEXEDITDATA_H
