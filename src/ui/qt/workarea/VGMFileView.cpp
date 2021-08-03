@@ -30,9 +30,12 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   document->setBaseAddress(m_vgmfile->dwOffset);
 
   m_hexview->setDocument(document);
-  m_hexview->setReadOnly(true);
-  QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+  int id = QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-Regular.ttf");
+  QString family = QFontDatabase::applicationFontFamilies(id).at(0);
+  QFont fixedFont(family);
+  fixedFont.setFixedPitch(true);
   fixedFont.setPointSizeF(10.5);
+
   m_hexview->setFont(fixedFont);
   markEvents();
 
