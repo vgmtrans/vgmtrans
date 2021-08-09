@@ -43,6 +43,7 @@ public:
   ~VGMFileTreeView() override = default;
 
   void addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name);
+  auto getTreeWidgetItem(VGMItem *vgm_item) { return m_items.at(vgm_item); };
 
 private:
   QTreeWidgetItem *parent_item_cached{};

@@ -1,5 +1,6 @@
 #include "qhexview.h"
 #include "document/buffer/qmemorybuffer.h"
+#include "QtVGMRoot.h"
 #include <QFontDatabase>
 #include <QApplication>
 #include <QPaintEvent>
@@ -16,7 +17,8 @@
 #define DOCUMENT_WHEEL_LINES 3
 
 QHexView::QHexView(QWidget *parent)
-    : QAbstractScrollArea(parent), m_document(nullptr), m_readonly(false), m_cursor(nullptr) {
+    : QAbstractScrollArea(parent), m_document(nullptr), m_readonly(false), m_cursor(nullptr),
+      selected_item(nullptr) {
   QFont f = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 
   if (f.styleHint() != QFont::TypeWriter) {
@@ -72,6 +74,28 @@ void QHexView::setHexLineWidth(qint8 width) {
     m_document->setHexLineWidth(width);
   if (m_cursor)
     m_cursor->setLineWidth(width);
+}
+
+/**
+ * Sets the highlighted VGM item
+ * Pass nullptr to clear selection
+ * The item will be scrolled to if it is not on screen
+ */
+void QHexView::setSelectedItem(VGMItem *item) {
+  selected_item = item;
+  if (selected_item) {
+    auto selected_line =
+        (selected_item->dwOffset - document()->vgmFile()->dwOffset) / hexLineWidth();
+
+    if (!isLineVisible(selected_line)) {
+      QScrollBar *vscrollbar = this->verticalScrollBar();
+      int scrollPos = static_cast<int>(std::max(quint64(0), selected_line - this->visibleLines() / 2) /
+                                       documentSizeFactor());
+      vscrollbar->setValue(scrollPos);
+      return;  // don't need to update viewport again
+    }
+  }
+  this->viewport()->update();
 }
 
 bool QHexView::event(QEvent *e) {
@@ -649,7 +673,7 @@ void QHexView::render(QPainter *painter, quint64 begin, quint64 end, quint64 fir
   quint64 documentLines = this->documentLines();
   for (quint64 line = begin; line < std::min(end, documentLines); line++) {
     QRect linerect = this->getLineRect(line, firstline);
-    if (line % 2)
+    if (line % 2)  // alternate background color for each line
       painter->fillRect(linerect, palette.brush(QPalette::Window));
     else
       painter->fillRect(linerect, palette.brush(QPalette::Base));
@@ -828,36 +852,6 @@ void QHexView::applyDocumentStyles(QPainter *painter, QTextDocument *textdocumen
   textdocument->setDefaultFont(painter->font());
 }
 
-// factor is the number of chars displayed per byte, 1 for ascii, 3 for hex
-void QHexView::applyBasicStyle(QTextCursor &textcursor, const QByteArray &rawline,
-                               int factor) const {
-  QPalette palette = qApp->palette();
-
-  // Draw 00 and FF bytes in a different color
-  QColor color = palette.color(QPalette::WindowText);
-
-  if (color.lightness() < 50) {
-    if (color == Qt::black)
-      color = Qt::gray;
-    else
-      color = color.darker();
-  } else {
-    color = color.lighter();
-  }
-
-  QTextCharFormat charformat;
-  charformat.setForeground(color);
-
-  for (int i = 0; i < rawline.length(); i++) {
-    if ((rawline[i] != 0x00) && (static_cast<uchar>(rawline[i]) != 0xFF))
-      continue;
-
-    textcursor.setPosition(i * factor);
-    textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, factor);
-    textcursor.setCharFormat(charformat);
-  }
-}
-
 void QHexView::applyMetadata(QTextCursor &textcursor, quint64 line, int chars_per_data) const {
   QHexMetadata *metadata = m_document->metadata();
 
@@ -872,7 +866,6 @@ void QHexView::applyMetadata(QTextCursor &textcursor, quint64 line, int chars_pe
       charformat.setBackground(mi.background);
     if (mi.foreground.isValid())
       charformat.setForeground(mi.foreground);
-    // if (!mi.comment.isEmpty()) charformat.setUnderlineStyle(QTextCharFormat::SingleUnderline);
 
     textcursor.setPosition(mi.start * chars_per_data);
     textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor,
@@ -971,6 +964,50 @@ void QHexView::applyCursorHex(QTextCursor &textcursor, quint64 line) const {
   textcursor.setCharFormat(charformat);
 }
 
+void QHexView::applyEventSelectionStyle(QTextCursor &textcursor, quint64 line, int factor) const {
+  if (!selected_item) {
+    return;
+  }
+
+  struct {
+    uint32_t line, column;
+  } startsel, endsel;
+
+  auto file_offset = selected_item->dwOffset - document()->vgmFile()->dwOffset;
+  startsel.line = file_offset / hexLineWidth();
+  startsel.column = file_offset % hexLineWidth();
+
+  auto selection_end = file_offset + selected_item->unLength - 1;
+  endsel.line = selection_end / hexLineWidth();
+  endsel.column = selection_end % hexLineWidth();
+
+  if (line < startsel.line || line > endsel.line) {
+    return;
+  }
+
+  if (startsel.line == endsel.line) {
+    textcursor.setPosition(startsel.column * factor);
+    textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor,
+                            ((endsel.column - startsel.column + 1) * factor) - 1);
+  } else {
+    if (line == startsel.line) {
+      textcursor.setPosition(startsel.column * factor);
+    } else {
+      textcursor.setPosition(0);
+    }
+
+    if (line == endsel.line) {
+      textcursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor,
+                              ((endsel.column + 1) * factor) - 1);
+    } else {
+      textcursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+    }
+  }
+
+  QTextCharFormat charformat;
+  charformat.setFontWeight(QFont::Bold);
+  textcursor.mergeCharFormat(charformat);
+}
 
 void QHexView::drawAddress(QPainter *painter, const QPalette &palette, const QRect &linerect,
                            quint64 line) {
@@ -1003,14 +1040,15 @@ void QHexView::drawHex(QPainter *painter, const QPalette &palette, const QRect &
   hexrect.setX(this->getHexColumnX() + this->borderSize());
 
   this->applyDocumentStyles(painter, &textdocument);
-  this->applyBasicStyle(textcursor, rawline, 3);
   this->applyMetadata(textcursor, line, 3);
   this->applySelection(textcursor, line, 3);
+  this->applyEventSelectionStyle(textcursor, line, 3);
   this->applyCursorHex(textcursor, line);
 
   painter->save();
   painter->translate(hexrect.topLeft());
   textdocument.drawContents(painter);
+  this->drawEventSelectionOutline(painter, line, 3);
   painter->restore();
 }
 
@@ -1029,14 +1067,15 @@ void QHexView::drawAscii(QPainter *painter, const QPalette &palette, const QRect
   asciirect.setX(this->getAsciiColumnX() + this->borderSize());
 
   this->applyDocumentStyles(painter, &textdocument);
-  this->applyBasicStyle(textcursor, rawline);
   this->applyMetadata(textcursor, line);
+  this->applyEventSelectionStyle(textcursor, line);
   this->applySelection(textcursor, line);
   this->applyCursorAscii(textcursor, line);
 
   painter->save();
   painter->translate(asciirect.topLeft());
   textdocument.drawContents(painter);
+  this->drawEventSelectionOutline(painter, line);
   painter->restore();
 }
 
@@ -1067,5 +1106,75 @@ void QHexView::drawHeader(QPainter *painter, const QPalette &palette) {
   // so hex and positions are aligned vertically
   painter->drawText(hexrect, Qt::AlignLeft | Qt::AlignVCenter, hexheader);
   painter->drawText(asciirect, Qt::AlignHCenter | Qt::AlignVCenter, QString("Ascii"));
+  painter->restore();
+}
+
+void QHexView::drawEventSelectionOutline(QPainter *painter, quint64 line, const int factor) const {
+  // copied code from applyEventSeletionStyle, TODO: consider
+  if (!selected_item) {
+    return;
+  }
+
+  struct {
+    uint32_t line, column;
+  } startsel, endsel;
+
+  auto file_offset = selected_item->dwOffset - document()->vgmFile()->dwOffset;
+  startsel.line = file_offset / hexLineWidth();
+  startsel.column = file_offset % hexLineWidth();
+
+  auto selection_end = file_offset + selected_item->unLength - 1;
+  endsel.line = selection_end / hexLineWidth();
+  endsel.column = selection_end % hexLineWidth();
+
+  if (line < startsel.line || line > endsel.line) {
+    return;
+  }
+
+  painter->save();
+  painter->setPen(Qt::red);
+
+  const float pad = factor > 1 ? 0.5 : 0;
+  const int start = getCellWidth() * (startsel.column * factor - pad);
+  const int end = getCellWidth() * ((endsel.column + 1) * factor - pad);
+  const int right = getCellWidth() * (hexLineWidth() * factor + pad);
+  const int left = getCellWidth() * -pad;
+  const int height = lineHeight();
+
+  QVector<QLine> outline;
+
+  if (startsel.line == endsel.line) {
+    outline.push_back({start, 0, end, 0});
+    outline.push_back({start, height, end, height});
+    outline.push_back({start, 0, start, height});
+    outline.push_back({end, 0, end, height});
+  } else {
+    if (line == startsel.line) {
+      outline.push_back({start, 0, right, 0});
+      outline.push_back({start, 0, start, height});
+
+      if (endsel.line > startsel.line + 1 || end > start) {
+        outline.push_back({left, height, start, height});
+        outline.push_back({right, 0, right, height});
+      } else {  // disjoint
+        outline.push_back({start, height, right, height});
+      }
+    } else if (line == endsel.line) {
+      outline.push_back({left, height, end, height});
+      outline.push_back({end, 0, end, height});
+
+      if (endsel.line > startsel.line + 1 || end > start) {
+        outline.push_back({end, 0, right, 0});
+        outline.push_back({left, 0, left, height});
+      } else {  // disjoint
+        outline.push_back({left, 0, end, 0});
+      }
+    } else {
+      outline.push_back({left, 0, left, height});
+      outline.push_back({right, 0, right, height});
+    }
+  }
+
+  painter->drawLines(outline);
   painter->restore();
 }
