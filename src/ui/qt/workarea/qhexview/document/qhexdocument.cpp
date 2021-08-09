@@ -7,8 +7,8 @@
 #include <QBuffer>
 #include <QFile>
 
-QHexDocument::QHexDocument(VGMFile* buffer, QObject* parent) : QObject(parent), m_baseaddress(0) {
-  m_buffer = buffer;
+QHexDocument::QHexDocument(VGMFile* vgm_file, QObject* parent) : QObject(parent), m_baseaddress(0) {
+  m_vgm_file = vgm_file;
   m_areaindent = DEFAULT_AREA_IDENTATION;
   m_hexlinewidth = DEFAULT_HEX_LINE_LENGTH;
 
@@ -23,10 +23,10 @@ QHexDocument::QHexDocument(VGMFile* buffer, QObject* parent) : QObject(parent), 
 }
 
 bool QHexDocument::isEmpty() const {
-  return m_buffer->unLength == 0;
+  return m_vgm_file->unLength == 0;
 }
 bool QHexDocument::atEnd(QHexCursor* cursor) const {
-  return cursor->position().offset() >= m_buffer->unLength;
+  return cursor->position().offset() >= m_vgm_file->unLength;
 }
 bool QHexDocument::canUndo() const {
   return m_undostack.canUndo();
@@ -35,7 +35,7 @@ bool QHexDocument::canRedo() const {
   return m_undostack.canRedo();
 }
 qint64 QHexDocument::length() const {
-  return m_buffer->unLength;
+  return m_vgm_file->unLength;
 }
 quint64 QHexDocument::baseAddress() const {
   return m_baseaddress;
@@ -75,7 +75,7 @@ QByteArray QHexDocument::selectedBytes(QHexCursor* cursor) const {
 }
 
 char QHexDocument::at(int offset) const {
-  return m_buffer->GetByte(offset);
+  return m_vgm_file->GetByte(offset);
 }
 
 void QHexDocument::setBaseAddress(quint64 baseaddress) {
@@ -164,12 +164,12 @@ void QHexDocument::remove(qint64 offset, int len) {
 
 QByteArray QHexDocument::read(qint64 offset, int len) const {
   QByteArray buffer;
-  if (offset >= 0 && offset < m_buffer->unLength) {
-    if (offset + len > m_buffer->unLength) {
-      len = m_buffer->unLength - offset;
+  if (offset >= 0 && offset < m_vgm_file->unLength) {
+    if (offset + len > m_vgm_file->unLength) {
+      len = m_vgm_file->unLength - offset;
     }
     buffer.resize(len);
-    m_buffer->GetBytes(m_baseaddress + offset, len, buffer.data());
+    m_vgm_file->GetBytes(m_baseaddress + offset, len, buffer.data());
   }
   return buffer;
 }
