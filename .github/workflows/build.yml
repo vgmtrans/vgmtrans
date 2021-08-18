@@ -60,7 +60,7 @@ jobs:
           cp ../bin/mame_roms.xml appdir/usr/bin
           cp ../src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
           cp ../src/ui/qt/resources/vgmtrans.png appdir/
-          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/ -verbose=2
+          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/,wayland-shell-integration/,wayland-decoration-client/  -verbose=2
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
         uses: actions/upload-artifact@v1
