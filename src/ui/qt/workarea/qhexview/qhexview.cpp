@@ -15,6 +15,7 @@
 
 #define CURSOR_BLINK_INTERVAL 500  // ms
 #define DOCUMENT_WHEEL_LINES 3
+#define HEX_UNPRINTABLE_CHAR '.'
 
 QHexView::QHexView(QWidget *parent)
     : QAbstractScrollArea(parent), m_document(nullptr), m_readonly(false), m_cursor(nullptr),
@@ -89,8 +90,8 @@ void QHexView::setSelectedItem(VGMItem *item) {
 
     if (!isLineVisible(selected_line)) {
       QScrollBar *vscrollbar = this->verticalScrollBar();
-      int scrollPos = static_cast<int>(std::max(quint64(0), selected_line - this->visibleLines() / 2) /
-                                       documentSizeFactor());
+      int scrollPos = static_cast<int>(
+          std::max(quint64(0), selected_line - this->visibleLines() / 2) / documentSizeFactor());
       vscrollbar->setValue(scrollPos);
       return;  // don't need to update viewport again
     }
@@ -642,9 +643,6 @@ int QHexView::documentSizeFactor() const {
   return factor;
 }
 
-// renderer
-#define HEX_UNPRINTABLE_CHAR '.'
-
 void QHexView::renderFrame(QPainter *painter) {
   QRect rect = painter->window();
   int hexx = this->getHexColumnX();
@@ -1144,34 +1142,42 @@ void QHexView::drawEventSelectionOutline(QPainter *painter, quint64 line, const 
   QVector<QLine> outline;
 
   if (startsel.line == endsel.line) {
-    outline.push_back({start, 0, end, 0});
-    outline.push_back({start, height, end, height});
-    outline.push_back({start, 0, start, height});
-    outline.push_back({end, 0, end, height});
+    // selection only spans a single line, outline with a rectangle
+    outline.push_back({start, 0, end, 0});            // top
+    outline.push_back({start, height, end, height});  // bottom
+    outline.push_back({start, 0, start, height});     // left
+    outline.push_back({end, 0, end, height});         // right
   } else {
     if (line == startsel.line) {
-      outline.push_back({start, 0, right, 0});
-      outline.push_back({start, 0, start, height});
+      // first of multiple lines
+      outline.push_back({start, 0, right, 0});       // top
+      outline.push_back({start, 0, start, height});  // left
 
       if (endsel.line > startsel.line + 1 || end > start) {
-        outline.push_back({left, height, start, height});
-        outline.push_back({right, 0, right, height});
-      } else {  // disjoint
-        outline.push_back({start, height, right, height});
+        // the selection is contiguous, outline merges together
+        outline.push_back({left, height, start, height});  // top of next line
+        outline.push_back({right, 0, right, height});      // right
+      } else {
+        // the selection is disjoint, outline rectangle wraps around
+        outline.push_back({start, height, right, height});  // bottom
       }
     } else if (line == endsel.line) {
-      outline.push_back({left, height, end, height});
-      outline.push_back({end, 0, end, height});
+      // last of multiple lines
+      outline.push_back({left, height, end, height});  // bottom
+      outline.push_back({end, 0, end, height});        // right
 
       if (endsel.line > startsel.line + 1 || end > start) {
-        outline.push_back({end, 0, right, 0});
-        outline.push_back({left, 0, left, height});
-      } else {  // disjoint
-        outline.push_back({left, 0, end, 0});
+        // the selection is contiguous, outline merges together
+        outline.push_back({end, 0, right, 0});       // bottom of previous line
+        outline.push_back({left, 0, left, height});  // left
+      } else {
+        // the selection is disjoint, outline rectangle wraps around
+        outline.push_back({left, 0, end, 0});  // top
       }
     } else {
-      outline.push_back({left, 0, left, height});
-      outline.push_back({right, 0, right, height});
+      // line in the middle of a multi line selection
+      outline.push_back({left, 0, left, height});    // left
+      outline.push_back({right, 0, right, height});  // right
     }
   }
 
