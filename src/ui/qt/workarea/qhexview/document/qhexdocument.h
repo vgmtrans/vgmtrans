@@ -31,6 +31,7 @@ public:
   char at(int offset) const;
   void setBaseAddress(quint64 baseaddress);
   void sync();
+  QByteArray read(qint64 offset, int len) const;
 
 public slots:
   void undo();
@@ -43,11 +44,7 @@ public slots:
   void insert(qint64 offset, const QByteArray& data);
   void replace(qint64 offset, const QByteArray& data);
   void remove(qint64 offset, int len);
-
-  qint64 searchForward(QHexCursor* cursor, const QByteArray& ba);
-  qint64 searchBackward(QHexCursor* cursor, const QByteArray& ba);
-
-  QByteArray read(qint64 offset, int len) const;
+  
 
 signals:
   void canUndoChanged(bool canUndo);

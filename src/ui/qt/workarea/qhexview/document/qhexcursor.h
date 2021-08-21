@@ -69,7 +69,6 @@ private:
   InsertionMode m_insertionmode;
   quint8 m_lineWidth;
   // bounds of the cursor selection
-  // TODO: figure out if they're always the left and right or visa versa
   QHexPosition position1, position2; 
 };
 
