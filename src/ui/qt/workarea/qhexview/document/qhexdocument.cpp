@@ -174,31 +174,3 @@ QByteArray QHexDocument::read(qint64 offset, int len) const {
   return buffer;
 }
 
-// TODO: reimplement
-qint64 QHexDocument::searchForward(QHexCursor* cursor, const QByteArray& ba) {
-  return 0;
-  // qint64 startPos = cursor->position().offset();
-  // qint64 findPos = m_buffer->indexOf(ba, startPos);
-  // if (findPos > -1) {
-  //   cursor->clearSelection();
-  //   cursor->moveTo(findPos);
-  //   cursor->select(ba.length());
-  // }
-  // return findPos;
-}
-
-// TODO: reimplement
-qint64 QHexDocument::searchBackward(QHexCursor* cursor, const QByteArray& ba) {
-  return 0;
-  // qint64 startPos = cursor->position().offset() - 1;
-  // if (cursor->hasSelection()) {
-  //   startPos = cursor->selectionStart().offset() - 1;
-  // }
-  // qint64 findPos = m_buffer->lastIndexOf(ba, startPos);
-  // if (findPos > -1) {
-  //   cursor->clearSelection();
-  //   cursor->moveTo(findPos);
-  //   cursor->select(ba.length());
-  // }
-  // return findPos;
-}
