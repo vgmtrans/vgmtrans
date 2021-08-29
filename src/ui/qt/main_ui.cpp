@@ -8,6 +8,7 @@
 #include <QApplication>
 #include <QtPlugin>
 #include <QFile>
+#include <QFontDatabase>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 
@@ -19,6 +20,11 @@ int main(int argc, char *argv[]) {
 
   QApplication app(argc, argv);
   qtVGMRoot.Init();
+
+  QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-Regular.ttf");
+  QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-Bold.ttf");
+  QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-Italic.ttf");
+  QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-BoldItalic.ttf");
 
   MainWindow window;
   window.show();
