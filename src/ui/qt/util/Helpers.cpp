@@ -21,7 +21,7 @@ const QIcon &iconForFileType(FileType filetype) {
     }
 
     case FILETYPE_SAMPCOLL: {
-      static QIcon i_gen{":/images/wave.svg"};
+      static QIcon i_gen{":/images/sample-collection.svg"};
       return i_gen;
     }
 
@@ -96,6 +96,11 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
 
     case VGMItem::ICON_TEMPO: {
       static QIcon i_gen{":/images/tempo.svg"};
+      return i_gen;
+    }
+
+    case VGMItem::ICON_SAMP: {
+      static QIcon i_gen{":/images/sample.svg"};
       return i_gen;
     }
 

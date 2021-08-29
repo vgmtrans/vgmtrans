@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#499c54" width="48" height="48">
+    <path d="M 0 0 h 24 v 24 H 0 z" fill="none"/>
+    <path d="M 7 18 h 2 V 6 H 7 v 12 z 
+             m 4 4 h 2 V 2 h -2 v 20 z
+             m -8 -8 h 2 v -4 H 3 v 4 z 
+             m 12 4 h 2 V 6 h -2 v 12 z
+             m 4 -8 v 4 h 2 v -4 h -2 z" />
+</svg>
