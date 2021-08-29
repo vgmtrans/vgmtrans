@@ -6,8 +6,7 @@
 
 #include "VGMFileView.h"
 #include <QShortcut>
-#include <QFontDatabase>
-#include <QRawFont>
+#include <QFont>
 #include <VGMFile.h>
 #include "qhexview/qhexview.h"
 #include "VGMFileTreeView.h"
@@ -25,13 +24,13 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   document->setBaseAddress(m_vgmfile->dwOffset);
   m_hexview->setDocument(document);
 
-  int id = QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-Regular.ttf");
-  QString family = QFontDatabase::applicationFontFamilies(id).at(0);
-  QFont fixedFont(family);
-  fixedFont.setFixedPitch(true);
-  fixedFont.setPointSizeF(10.5);
-
-  m_hexview->setFont(fixedFont);
+  QFont font("Ubuntu Mono", 10);
+  QFontInfo font_info(font);
+  if (font_info.fixedPitch()) {
+    m_hexview->setFont(font);
+  } else {
+    qtVGMRoot.AddLogItem(new LogItem(L"error loading font.", LOG_LEVEL_WARN, L"VGMFileView"));
+  }
   markEvents();
 
   setWindowTitle(QString::fromStdWString(*m_vgmfile->GetName()));
@@ -63,7 +62,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   });
 
   // TODO: zoom
-  
+
   setWidget(m_splitter);
 }
 
