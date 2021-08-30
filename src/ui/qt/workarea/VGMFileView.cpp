@@ -61,7 +61,17 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
     }
   });
 
-  // TODO: zoom
+  connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, [&] {
+    auto font = m_hexview->font();
+    font.setPointSizeF(font.pointSizeF() + 0.5);
+    m_hexview->setFont(font);
+  });
+
+  connect(new QShortcut(QKeySequence::ZoomOut, this), &QShortcut::activated, [&] {
+    auto font = m_hexview->font();
+    font.setPointSizeF(font.pointSizeF() - 0.5);
+    m_hexview->setFont(font);
+  });
 
   setWidget(m_splitter);
 }
