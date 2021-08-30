@@ -105,7 +105,7 @@ private:
   int getHexColumnX() const;
   int getAsciiColumnX() const;
   int getEndColumnX() const;
-  qreal getCellWidth() const;
+  int getCellWidth() const;
   int getNCellsWidth(int n) const;
   void unprintableChars(QByteArray& ascii) const;
 

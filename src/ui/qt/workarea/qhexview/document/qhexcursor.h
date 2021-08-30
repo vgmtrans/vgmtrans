@@ -10,6 +10,7 @@ struct QHexPosition {
   quint64 line;
   int column;
   quint8 lineWidth;
+  // indexed from right to left
   int nibbleindex;
 
   QHexPosition() = default;
