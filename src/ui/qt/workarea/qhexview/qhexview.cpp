@@ -704,22 +704,24 @@ bool QHexView::hitTest(const QPoint &pt, QHexPosition *position, quint64 firstli
 
   if (area == QHexView::HEX_AREA) {
     int relx = pt.x() - this->getHexColumnX() - this->borderSize();
-    int column = relx / this->getCellWidth();
+    // divide relx by cellWidth to get the column, expanded to account for rounding
+    int column = relx * this->hexLineWidth() * 3 / this->getNCellsWidth(this->hexLineWidth() * 3);
     position->column = column / 3;
     // first char is nibble 1, 2nd and space are 0
     position->nibbleindex = (column % 3 == 0) ? 1 : 0;
   } else {
     int relx = pt.x() - this->getAsciiColumnX() - this->borderSize();
-    position->column = relx / this->getCellWidth();
+    // divide relx by cellWidth to get the column, expanded to account for rounding
+    position->column = relx * this->hexLineWidth() / this->getNCellsWidth(this->hexLineWidth());
     position->nibbleindex = 1;
   }
 
-  if (position->line == this->documentLastLine())  // Check last line's columns
-  {
-    QByteArray ba = this->getLine(position->line);
+  if (position->line == this->documentLastLine()) {
+    QByteArray ba = this->getLine(position->line);  // Check last line's columns
     position->column = std::min(position->column, static_cast<int>(ba.length()));
-  } else
+  } else {
     position->column = std::min(position->column, hexLineWidth() - 1);
+  }
 
   return true;
 }
@@ -827,12 +829,12 @@ int QHexView::getEndColumnX() const {
   return this->getAsciiColumnX() + this->getNCellsWidth(hexLineWidth()) + 2 * this->borderSize();
 }
 
-qreal QHexView::getCellWidth() const {
-  return this->fontMetrics().horizontalAdvance(" ");
+int QHexView::getCellWidth() const {
+  return getNCellsWidth(1);
 }
 
 int QHexView::getNCellsWidth(int n) const {
-  return qRound(n * getCellWidth());
+  return this->fontMetrics().horizontalAdvance(QString(n, ' '));
 }
 
 void QHexView::unprintableChars(QByteArray &ascii) const {
@@ -1132,11 +1134,11 @@ void QHexView::drawEventSelectionOutline(QPainter *painter, quint64 line, const 
   painter->save();
   painter->setPen(Qt::red);
 
-  const float pad = factor > 1 ? 0.5 : 0;
-  const int start = getCellWidth() * (startsel.column * factor - pad);
-  const int end = getCellWidth() * ((endsel.column + 1) * factor - pad);
-  const int right = getCellWidth() * (hexLineWidth() * factor + pad);
-  const int left = getCellWidth() * -pad;
+  const float pad = factor > 1 ? getCellWidth() / 2.0 : 0;
+  const int start = getNCellsWidth(startsel.column * factor) - pad;
+  const int end = getNCellsWidth((endsel.column + 1) * factor) - pad;
+  const int right = getNCellsWidth(hexLineWidth() * factor) + pad;
+  const int left = -pad;
   const int height = lineHeight();
 
   QVector<QLine> outline;
