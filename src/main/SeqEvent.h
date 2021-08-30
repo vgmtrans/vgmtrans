@@ -50,7 +50,7 @@ class SeqEvent:
            uint32_t offset = 0,
            uint32_t length = 0,
            const std::wstring &name = L"",
-           uint8_t color = 0,
+           EventColor color = CLR_UNKNOWN,
            Icon icon = ICON_BINARY,
            const std::wstring &desc = L"");
   virtual ~SeqEvent(void) { }
@@ -612,7 +612,7 @@ class MarkerSeqEvent:
                  uint32_t offset = 0,
                  uint32_t length = 0,
                  const std::wstring &name = L"",
-                 uint8_t color = CLR_MARKER)
+                 EventColor color = CLR_MARKER)
       : SeqEvent(pTrack, offset, length, name, color), databyte1(databyte1), databyte2(databyte2) { }
   virtual EventType GetEventType() { return EVENTTYPE_MARKER; }
 

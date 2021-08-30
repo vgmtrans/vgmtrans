@@ -13,7 +13,7 @@ class VGMInstrSet;
 class VGMSampColl;
 class VGMMiscFile;
 class LogItem;
-FORWARD_DECLARE_TYPEDEF_STRUCT(ItemSet);
+struct ItemSet;
 
 
 class VGMRoot {

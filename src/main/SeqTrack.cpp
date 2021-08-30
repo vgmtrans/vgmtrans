@@ -292,7 +292,7 @@ void SeqTrack::AddGenericEvent(uint32_t offset,
                                uint32_t length,
                                const std::wstring &sEventName,
                                const std::wstring &sEventDesc,
-                               uint8_t color,
+                               EventColor color,
                                Icon icon) {
   OnEvent(offset, length);
 
@@ -1354,7 +1354,7 @@ void SeqTrack::AddMarker(uint32_t offset,
                          uint8_t databyte2,
                          const std::wstring &sEventName,
                          int8_t priority,
-                         uint8_t color) {
+                         EventColor color) {
   OnEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))

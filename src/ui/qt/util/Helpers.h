@@ -13,5 +13,5 @@
 const QIcon &iconForItemType(VGMItem::Icon type);
 const QIcon &iconForFileType(FileType filetype);
 
-QColor colorForEventColor(uint8_t eventColor);
-QColor textColorForEventColor(uint8_t eventColor);
+QColor colorForEventColor(VGMItem::EventColor eventColor);
+QColor textColorForEventColor(VGMItem::EventColor eventColor);
