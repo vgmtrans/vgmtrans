@@ -61,14 +61,12 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
     }
 
     case VGMItem::ICON_STARTREP:
-      [[fallthrough]];
     case VGMItem::ICON_TRACK: {
       static QIcon i_gen{":/images/track.svg"};
       return i_gen;
     }
 
     case VGMItem::ICON_ENDREP:
-      [[fallthrough]];
     case VGMItem::ICON_TRACKEND: {
       static QIcon i_gen{":/images/trackend.svg"};
       return i_gen;
@@ -112,74 +110,74 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
   return i_gen;
 }
 
-QColor colorForEventColor(uint8_t eventColor) {
+QColor colorForEventColor(VGMItem::EventColor eventColor) {
   switch (eventColor) {
-    case CLR_UNKNOWN:
+    case VGMItem::CLR_UNKNOWN:
       return Qt::black;
-    case CLR_UNRECOGNIZED:
+    case VGMItem::CLR_UNRECOGNIZED:
       return Qt::red;
-    case CLR_HEADER:
+    case VGMItem::CLR_HEADER:
       return Qt::lightGray;
-    case CLR_MISC:
+    case VGMItem::CLR_MISC:
       return Qt::gray;
-    case CLR_MARKER:
+    case VGMItem::CLR_MARKER:
       return Qt::gray;
-    case CLR_TIMESIG:
+    case VGMItem::CLR_TIMESIG:
       return Qt::green;
-    case CLR_TEMPO:
+    case VGMItem::CLR_TEMPO:
       return Qt::darkGreen;
-    case CLR_PROGCHANGE:
+    case VGMItem::CLR_PROGCHANGE:
       return QColor(244, 152, 16, 255);
-    case CLR_TRANSPOSE:
+    case VGMItem::CLR_TRANSPOSE:
       return Qt::darkMagenta;
-    case CLR_PRIORITY:
+    case VGMItem::CLR_PRIORITY:
       return Qt::darkMagenta;
-    case CLR_VOLUME:
+    case VGMItem::CLR_VOLUME:
       return QColor(174, 138, 190, 255);
-    case CLR_EXPRESSION:
+    case VGMItem::CLR_EXPRESSION:
       return QColor(83, 43, 46, 255);
-    case CLR_PAN:
+    case VGMItem::CLR_PAN:
       return QColor(50, 89, 61, 255);
-    case CLR_NOTEON:
+    case VGMItem::CLR_NOTEON:
       return QColor(40, 123, 222, 255);
-    case CLR_NOTEOFF:
+    case VGMItem::CLR_NOTEOFF:
       return QColor(65, 159, 211, 255);
-    case CLR_DURNOTE:
+    case VGMItem::CLR_DURNOTE:
       return QColor(73, 164, 219, 255);
-    case CLR_TIE:
+    case VGMItem::CLR_TIE:
       return QColor(117, 109, 220, 255);
-    case CLR_REST:
+    case VGMItem::CLR_REST:
       return QColor(142, 101, 207, 255);
-    case CLR_PITCHBEND:
+    case VGMItem::CLR_PITCHBEND:
       return Qt::magenta;
-    case CLR_PITCHBENDRANGE:
+    case VGMItem::CLR_PITCHBENDRANGE:
       return Qt::magenta;
-    case CLR_MODULATION:
+    case VGMItem::CLR_MODULATION:
       return QColor(176, 97, 0, 255);
-    case CLR_PORTAMENTO:
+    case VGMItem::CLR_PORTAMENTO:
       return Qt::magenta;
-    case CLR_PORTAMENTOTIME:
+    case VGMItem::CLR_PORTAMENTOTIME:
       return Qt::magenta;
-    case CLR_CHANGESTATE:
+    case VGMItem::CLR_CHANGESTATE:
       return Qt::gray;
-    case CLR_ADSR:
+    case VGMItem::CLR_ADSR:
       return Qt::gray;
-    case CLR_LFO:
+    case VGMItem::CLR_LFO:
       return Qt::gray;
-    case CLR_REVERB:
+    case VGMItem::CLR_REVERB:
       return Qt::gray;
-    case CLR_SUSTAIN:
+    case VGMItem::CLR_SUSTAIN:
       return Qt::yellow;
-    case CLR_LOOP:
+    case VGMItem::CLR_LOOP:
       return QColor(188, 63, 60, 255);
-    case CLR_LOOPFOREVER:
+    case VGMItem::CLR_LOOPFOREVER:
       return QColor(188, 63, 60, 255);
-    case CLR_TRACKEND:
+    case VGMItem::CLR_TRACKEND:
       return QColor(158, 41, 39, 255);
   }
   return Qt::red;
 }
 
-QColor textColorForEventColor(uint8_t eventColor) {
+QColor textColorForEventColor(VGMItem::EventColor eventColor) {
   return Qt::white;
 }

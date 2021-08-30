@@ -15,7 +15,7 @@ class VGMSeqSection
                 uint32_t theOffset,
                 uint32_t theLength = 0,
                 const std::wstring theName = L"Section",
-                uint8_t color = CLR_HEADER);
+                EventColor color = CLR_HEADER);
   virtual ~VGMSeqSection(void);
 
   virtual bool Load();
