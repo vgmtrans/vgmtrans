@@ -44,7 +44,7 @@ class SeqTrack:
   virtual void AddEvent(SeqEvent *pSeqEvent);
   void AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t &prevVal, uint8_t targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t));
  public:
-  void AddGenericEvent(uint32_t offset, uint32_t length, const std::wstring &sEventName, const std::wstring &sEventDesc, uint8_t color, Icon icon = ICON_BINARY);
+  void AddGenericEvent(uint32_t offset, uint32_t length, const std::wstring &sEventName, const std::wstring &sEventDesc, EventColor color, Icon icon = ICON_BINARY);
   void AddSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::wstring &sEventName = L"Set Octave");
   void AddIncrementOctave(uint32_t offset, uint32_t length, const std::wstring &sEventName = L"Increment Octave");    // 1,Sep.2009 revise
   void AddDecrementOctave(uint32_t offset, uint32_t length, const std::wstring &sEventName = L"Decrement Octave");    // 1,Sep.2009 revise
@@ -138,7 +138,7 @@ class SeqTrack:
   bool AddEndOfTrackNoItem();
 
   void AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::wstring &sEventName = L"Global Transpose");
-  void AddMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::wstring &sEventName, int8_t priority = 0, uint8_t color = CLR_MISC);
+  void AddMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::wstring &sEventName, int8_t priority = 0, EventColor color = CLR_MISC);
 
   bool AddLoopForever(uint32_t offset, uint32_t length, const std::wstring &sEventName = L"Loop Forever");
 

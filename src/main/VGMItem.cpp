@@ -6,19 +6,15 @@
 
 using namespace std;
 
-VGMItem::VGMItem()
-    : color(0) {
+VGMItem::VGMItem() : color(CLR_UNKNOWN) {
 }
 
-VGMItem::VGMItem(VGMFile *thevgmfile, uint32_t theOffset, uint32_t theLength, const wstring theName, uint8_t theColor)
-    : vgmfile(thevgmfile),
-      name(theName),
-      dwOffset(theOffset),
-      unLength(theLength),
-      color(theColor) {
+VGMItem::VGMItem(
+    VGMFile *thevgmfile, uint32_t theOffset, uint32_t theLength, const wstring theName, EventColor theColor)
+    : vgmfile(thevgmfile), name(theName), dwOffset(theOffset), unLength(theLength), color(theColor) {
 }
 
-VGMItem::~VGMItem(void) {
+VGMItem::~VGMItem() {
 }
 
 bool operator>(VGMItem &item1, VGMItem &item2) {
@@ -37,17 +33,14 @@ bool operator>=(VGMItem &item1, VGMItem &item2) {
   return item1.dwOffset >= item2.dwOffset;
 }
 
-
 RawFile *VGMItem::GetRawFile() {
   return vgmfile->rawfile;
 }
 
-
 bool VGMItem::IsItemAtOffset(uint32_t offset, bool includeContainer, bool matchStartOffset) {
-  if (GetItemFromOffset(offset, includeContainer, matchStartOffset) != NULL) {
+  if (GetItemFromOffset(offset, includeContainer, matchStartOffset) != nullptr) {
     return true;
-  }
-  else {
+  } else {
     return false;
   }
 }
@@ -55,17 +48,16 @@ bool VGMItem::IsItemAtOffset(uint32_t offset, bool includeContainer, bool matchS
 VGMItem *VGMItem::GetItemFromOffset(uint32_t offset, bool includeContainer, bool matchStartOffset) {
   if ((matchStartOffset ? offset == dwOffset : offset >= dwOffset) && (offset < dwOffset + unLength)) {
     return this;
-  }
-  else {
-    return NULL;
+  } else {
+    return nullptr;
   }
 }
 
-uint32_t VGMItem::GuessLength(void) {
+uint32_t VGMItem::GuessLength() {
   return unLength;
 }
 
-void VGMItem::SetGuessedLength(void) {
+void VGMItem::SetGuessedLength() {
   return;
 }
 
@@ -89,12 +81,12 @@ uint32_t VGMItem::GetWord(uint32_t offset) {
   return GetRawFile()->GetWord(offset);
 }
 
-//GetShort Big Endian
+// GetShort Big Endian
 uint16_t VGMItem::GetShortBE(uint32_t offset) {
   return GetRawFile()->GetShortBE(offset);
 }
 
-//GetWord Big Endian
+// GetWord Big Endian
 uint32_t VGMItem::GetWordBE(uint32_t offset) {
   return GetRawFile()->GetWordBE(offset);
 }
@@ -103,24 +95,17 @@ bool VGMItem::IsValidOffset(uint32_t offset) {
   return vgmfile->IsValidOffset(offset);
 }
 
-
-
 //  ****************
 //  VGMContainerItem
 //  ****************
 
-VGMContainerItem::VGMContainerItem()
-    : VGMItem() {
+VGMContainerItem::VGMContainerItem() : VGMItem() {
   AddContainer(headers);
   AddContainer(localitems);
 }
 
-
-VGMContainerItem::VGMContainerItem(VGMFile *thevgmfile,
-                                   uint32_t theOffset,
-                                   uint32_t theLength,
-                                   const wstring theName,
-                                   uint8_t color)
+VGMContainerItem::VGMContainerItem(
+    VGMFile *thevgmfile, uint32_t theOffset, uint32_t theLength, const wstring theName, EventColor color)
     : VGMItem(thevgmfile, theOffset, theLength, theName, color) {
   AddContainer(headers);
   AddContainer(localitems);
@@ -143,17 +128,16 @@ VGMItem *VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContai
     }
   }
 
-  if (includeContainer && (matchStartOffset ? offset == dwOffset : offset >= dwOffset)
-      && (offset < dwOffset + unLength)) {
+  if (includeContainer && (matchStartOffset ? offset == dwOffset : offset >= dwOffset) &&
+      (offset < dwOffset + unLength)) {
     return this;
-  }
-  else {
-    return NULL;
+  } else {
+    return nullptr;
   }
 }
 
 // Guess length of a container from its descendants
-uint32_t VGMContainerItem::GuessLength(void) {
+uint32_t VGMContainerItem::GuessLength() {
   uint32_t guessedLength = 0;
 
   // Note: children items can sometimes overwrap each other
@@ -178,7 +162,7 @@ uint32_t VGMContainerItem::GuessLength(void) {
   return guessedLength;
 }
 
-void VGMContainerItem::SetGuessedLength(void) {
+void VGMContainerItem::SetGuessedLength() {
   for (uint32_t i = 0; i < containers.size(); i++) {
     for (uint32_t j = 0; j < containers[i]->size(); j++) {
       VGMItem *item = (*containers[i])[j];

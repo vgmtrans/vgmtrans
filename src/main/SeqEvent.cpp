@@ -12,7 +12,7 @@ SeqEvent::SeqEvent(SeqTrack *pTrack,
                    uint32_t offset,
                    uint32_t length,
                    const std::wstring &name,
-                   uint8_t color,
+                   EventColor color,
                    Icon icon,
                    const std::wstring &desc)
     : VGMItem((VGMFile *) pTrack->parentSeq, offset, length, name, color), desc(desc), icon(icon), parentTrack(pTrack) {
