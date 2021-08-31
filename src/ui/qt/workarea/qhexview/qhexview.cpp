@@ -1132,14 +1132,14 @@ void QHexView::drawEventSelectionOutline(QPainter *painter, quint64 line, const 
   }
 
   painter->save();
-  painter->setPen(Qt::red);
+  painter->setPen(QPen(QBrush(Qt::red), 2));
 
   const float pad = factor > 1 ? getCellWidth() / 2.0 : 0;
   const int start = getNCellsWidth(startsel.column * factor) - pad;
   const int end = getNCellsWidth((endsel.column + 1) * factor) - pad;
   const int right = getNCellsWidth(hexLineWidth() * factor) + pad;
   const int left = -pad;
-  const int height = lineHeight();
+  const int height = lineHeight() - 1;
 
   QVector<QLine> outline;
 
