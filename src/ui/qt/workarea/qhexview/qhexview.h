@@ -26,6 +26,7 @@ public:
 
 protected:
   virtual bool event(QEvent* e) override;
+  virtual void changeEvent(QEvent* e) override;
   virtual void keyPressEvent(QKeyEvent* e) override;
   virtual void mousePressEvent(QMouseEvent* e) override;
   virtual void mouseMoveEvent(QMouseEvent* e) override;
