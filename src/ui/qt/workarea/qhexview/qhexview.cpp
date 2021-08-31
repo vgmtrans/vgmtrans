@@ -1147,7 +1147,7 @@ void QHexView::drawEventSelectionOutline(QPainter *painter, quint64 line, const 
   const float pad = factor > 1 ? getCellWidth() / 2.0 : 0;
   const int start = getNCellsWidth(startsel.column * factor) - pad;
   const int end = getNCellsWidth((endsel.column + 1) * factor) - pad;
-  const int right = getNCellsWidth(hexLineWidth() * factor) + pad;
+  const int right = getNCellsWidth(hexLineWidth() * factor) - pad;
   const int left = -pad;
   const int height = lineHeight() - 1;
 
@@ -1167,8 +1167,9 @@ void QHexView::drawEventSelectionOutline(QPainter *painter, quint64 line, const 
 
       if (endsel.line > startsel.line + 1 || end > start) {
         // the selection is contiguous, outline merges together
-        outline.push_back({left, height, start, height});  // top of next line
-        outline.push_back({right, 0, right, height});      // right
+        if (startsel.column != 0)
+          outline.push_back({left, height, start, height});  // top of next line
+        outline.push_back({right, 0, right, height});        // right
       } else {
         // the selection is disjoint, outline rectangle wraps around
         outline.push_back({start, height, right, height});  // bottom
@@ -1180,7 +1181,8 @@ void QHexView::drawEventSelectionOutline(QPainter *painter, quint64 line, const 
 
       if (endsel.line > startsel.line + 1 || end > start) {
         // the selection is contiguous, outline merges together
-        outline.push_back({end, 0, right, 0});       // bottom of previous line
+        if (endsel.column != hexLineWidth() - 1)
+          outline.push_back({end, 0, right, 0});     // bottom of previous line
         outline.push_back({left, 0, left, height});  // left
       } else {
         // the selection is disjoint, outline rectangle wraps around
