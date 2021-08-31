@@ -118,6 +118,13 @@ bool QHexView::event(QEvent *e) {
   return QAbstractScrollArea::event(e);
 }
 
+void QHexView::changeEvent(QEvent *e) {
+  bool font_change = e->type() == QEvent::FontChange;
+  QAbstractScrollArea::changeEvent(e);
+  if (font_change)
+    this->adjustScrollBars();
+}
+
 void QHexView::keyPressEvent(QKeyEvent *e) {
   if (!m_document) {
     QAbstractScrollArea::keyPressEvent(e);
@@ -572,6 +579,9 @@ bool QHexView::processTextInput(QHexCursor *cur, QKeyEvent *e) {
 }
 
 void QHexView::adjustScrollBars() {
+  if (!m_document)
+    return;
+
   QScrollBar *vscrollbar = this->verticalScrollBar();
   int sizeFactor = this->documentSizeFactor();
   vscrollbar->setSingleStep(sizeFactor);
