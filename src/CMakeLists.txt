@@ -1,5 +1,5 @@
 add_subdirectory(main)
 if(ENABLE_UI_QT)
-    message(STATUS "Building UI (Qt)")
-    add_subdirectory(ui/qt)
+  message(STATUS "Building UI (Qt)")
+  add_subdirectory(ui/qt)
 endif()
