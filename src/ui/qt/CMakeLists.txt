@@ -54,31 +54,38 @@ if(APPLE)
   endif()
 endif()
 
-if((NOT Qt5_DIR OR NOT Qt6_DIR) AND MSVC)
-  set(Qt5_DIR
+if(Qt6_DIR)
+  set(Qt_DIR "${Qt6_DIR}")
+elseif(Qt5_DIR)
+  set(Qt_DIR "${Qt5_DIR}")
+endif()
+
+if(NOT Qt_DIR AND MSVC)
+  set(Qt_DIR
       "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/qt5-msvc2019-x64/lib/cmake/Qt5")
+  set(Qt5_DIR ${Qt_DIR})
   message(STATUS "Using Qt5 fallback")
 endif()
 
 find_package(
-  QT NAMES Qt6 Qt5
+  Qt NAMES Qt6 Qt5
   COMPONENTS Gui Widgets Svg
   REQUIRED)
 find_package(
-  Qt${QT_VERSION_MAJOR} 5.9
+  Qt${Qt_VERSION_MAJOR} 5.9
   COMPONENTS Gui Widgets Svg
   REQUIRED)
-message(STATUS "Using Qt ${QT_VERSION}")
+message(STATUS "Using Qt ${Qt_VERSION}")
 
 # Workaround for QTBUG-57886
-set_property(TARGET Qt${QT_VERSION_MAJOR}::Core
+set_property(TARGET Qt${Qt_VERSION_MAJOR}::Core
              PROPERTY INTERFACE_COMPILE_FEATURES "")
 
 set(CMAKE_AUTOMOC ON)
-if(${QT_VERSION_MAJOR} EQUAL 6)
+if(${Qt_VERSION_MAJOR} EQUAL 6)
   qt6_add_resources(UI_RESOURCES
                     "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
-elseif(${QT_VERSION_MAJOR} EQUAL 5)
+elseif(${Qt_VERSION_MAJOR} EQUAL 5)
   qt5_add_resources(UI_RESOURCES
                     "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
 endif()
@@ -144,8 +151,8 @@ target_link_libraries(
   PRIVATE g_options
           g_warnings
           vgmtranscore
-          Qt${QT_VERSION_MAJOR}::Widgets
-          Qt${QT_VERSION_MAJOR}::Svg
+          Qt${Qt_VERSION_MAJOR}::Widgets
+          Qt${Qt_VERSION_MAJOR}::Svg
           gsl-lite
           FluidSynth::FluidSynth)
 
@@ -185,7 +192,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
       "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 
-  get_target_property(MOC_EXECUTABLE_LOCATION Qt${QT_VERSION_MAJOR}::moc
+  get_target_property(MOC_EXECUTABLE_LOCATION Qt${Qt_VERSION_MAJOR}::moc
                       IMPORTED_LOCATION)
   get_filename_component(QT_BIN_LOCATION "${MOC_EXECUTABLE_LOCATION}" DIRECTORY)
   find_program(WINDEPLOYQT windeployqt HINTS "${QT_BIN_LOCATION}")
