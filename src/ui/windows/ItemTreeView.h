@@ -76,7 +76,6 @@ public:
 		//lItems.push_back(newItem);
 	}
 	//void PopulateWithItem(VGMItem* item, VGMItem* parent);
-	void AddItemSet(VGMFile* file, std::vector<ItemSet>* itemset);
 	void RemoveItem(VGMItem* theItem);
 	void RemoveAllItems(void);
 	BOOL SelectItem(VGMItem* item);
