@@ -222,11 +222,6 @@ void WinVGMRoot::UI_AddItem(VGMItem* item, VGMItem* parent, const wstring& itemN
 //	pMainFrame->itemViewMap[vgmfile]->AddItem(vgmfile, item, parent, itemName);
 }
 
-void WinVGMRoot::UI_AddItemSet(VGMFile* vgmfile, vector<ItemSet>* vItemSets)
-{
-//	pMainFrame->itemViewMap[vgmfile]->AddItemSet(vgmfile, vItemSets);
-}
-
 wstring WinVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const wstring& extension) {
   HRESULT hr = S_OK;
 

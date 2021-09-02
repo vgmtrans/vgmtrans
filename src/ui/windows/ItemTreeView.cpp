@@ -195,28 +195,6 @@ void CItemTreeView::Init(int cx, int cy)
 //add a item to the Item treeview.  Pass NULL for parent to put item in root of tree.
 
 
-void CItemTreeView::AddItemSet(VGMFile* file, vector<ItemSet>* itemset)
-{
-	if (!itemset->empty())
-	{
-		VGMItem* parent = NULL;
-		HTREEITEM parentTreeItem = TVI_ROOT;
-		for (vector<ItemSet>::iterator iter = itemset->begin(); iter != itemset->end(); iter++)
-		//for (UINT i = 0; i<itemset->size(); i++)
-		{
-			if (iter->parent != parent)
-			{
-				parent = iter->parent;
-				parentTreeItem = items[iter->parent].m_hTreeItem;
-			}
-			int iconIndex = iter->item->GetIcon();
-			CTreeItem treeItem = InsertItem(iter->itemName, iconIndex, iconIndex, parentTreeItem, NULL);
-			treeItem.SetData((DWORD_PTR)iter->item);
-			items[iter->item] = treeItem;
-		}
-	}
-}
-
 void CItemTreeView::RemoveItem(VGMItem* theItem)
 {
 	items[theItem].Delete();			//remove CTreeItem from view
