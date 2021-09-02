@@ -6,14 +6,7 @@ template <class T>
 class Menu;
 class RawFile;
 class VGMFile;
-class VGMItem;
 class VGMHeader;
-
-struct ItemSet {
-  VGMItem *item;
-  VGMItem *parent;
-  const wchar_t *itemName;
-};
 
 class VGMItem {
 public:
@@ -75,12 +68,11 @@ public:
 
 public:
   VGMItem();
-  VGMItem(VGMFile *thevgmfile,
-          uint32_t theOffset,
-          uint32_t theLength = 0,
-          const std::wstring theName = L"",
+  VGMItem(VGMFile *vgmfile,
+          uint32_t offset,
+          uint32_t length = 0,
+          const std::wstring name = L"",
           EventColor color = CLR_UNKNOWN);
-  virtual ~VGMItem();
 
   friend bool operator>(VGMItem &item1, VGMItem &item2);
   friend bool operator<=(VGMItem &item1, VGMItem &item2);
@@ -88,30 +80,28 @@ public:
   friend bool operator>=(VGMItem &item1, VGMItem &item2);
 
 public:
-  virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
-  virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
-  virtual uint32_t GuessLength();
-  virtual void SetGuessedLength();
-
   RawFile *GetRawFile();
 
+  virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
+  virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
+  virtual uint32_t GuessLength() { return unLength; };
+  virtual void SetGuessedLength(){};
   virtual std::vector<const wchar_t *> *GetMenuItemNames() { return nullptr; }
   virtual bool CallMenuItem(VGMItem *item, int menuItemNum) { return false; }
   virtual std::wstring GetDescription() { return name; }
   virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
-  virtual Icon GetIcon() { return ICON_BINARY; /*ICON_UNKNOWN*/ }
+  virtual Icon GetIcon() { return ICON_BINARY; }
   virtual void AddToUI(VGMItem *parent, void *UI_specific);
-  virtual bool IsContainerItem() { return false; }
+  virtual bool IsContainerItem() const { return false; }
 
 protected:
-  // TODO make inline
-  uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer);
-  uint8_t GetByte(uint32_t offset);
-  uint16_t GetShort(uint32_t offset);
-  uint32_t GetWord(uint32_t offset);
-  uint16_t GetShortBE(uint32_t offset);
-  uint32_t GetWordBE(uint32_t offset);
-  bool IsValidOffset(uint32_t offset);
+  uint32_t GetBytes(uint32_t index, uint32_t count, void *buffer) const;
+  uint8_t GetByte(uint32_t offset) const;
+  uint16_t GetShort(uint32_t offset) const;
+  uint32_t GetWord(uint32_t offset) const;
+  uint16_t GetShortBE(uint32_t offset) const;
+  uint32_t GetWordBE(uint32_t offset) const;
+  bool IsValidOffset(uint32_t offset) const;
 
 public:
   EventColor color;
@@ -121,35 +111,40 @@ public:
   uint32_t unLength;  // num of bytes the event engulfs
 };
 
+//  ****************
+//  VGMContainerItem
+//  ****************
+
 class VGMContainerItem : public VGMItem {
 public:
   VGMContainerItem();
-  VGMContainerItem(VGMFile *thevgmfile,
-                   uint32_t theOffset,
-                   uint32_t theLength = 0,
-                   const std::wstring theName = L"",
+  VGMContainerItem(VGMFile *vgmfile,
+                   uint32_t offset,
+                   uint32_t length = 0,
+                   const std::wstring name = L"",
                    EventColor color = CLR_HEADER);
   virtual ~VGMContainerItem();
-  virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
-  virtual uint32_t GuessLength();
-  virtual void SetGuessedLength();
-  virtual void AddToUI(VGMItem *parent, void *UI_specific);
-  virtual bool IsContainerItem() { return true; }
+
+  VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false) override;
+  uint32_t GuessLength() override;
+  void SetGuessedLength() override;
+  void AddToUI(VGMItem *parent, void *UI_specific) override;
+  bool IsContainerItem() const override { return true; }
 
   VGMHeader *AddHeader(uint32_t offset, uint32_t length, const std::wstring &name = L"Header");
 
   void AddItem(VGMItem *item);
-  void AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring &theName);
+  void AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring &name);
   void AddUnknownItem(uint32_t offset, uint32_t length);
 
   template <class T>
   void AddContainer(std::vector<T *> &container) {
     containers.push_back((std::vector<VGMItem *> *)&container);
   }
+
   template <class T>
   bool RemoveContainer(std::vector<T *> &container) {
-    std::vector<std::vector<VGMItem *> *>::iterator iter =
-        std::find(containers.begin(), containers.end(), (std::vector<VGMItem *> *)&container);
+    auto iter = std::find(containers.begin(), containers.end(), (std::vector<VGMItem *> *)&container);
     if (iter != containers.end()) {
       containers.erase(iter);
       return true;
@@ -164,17 +159,6 @@ public:
   std::vector<VGMItem *> localitems;
 };
 
-class ItemPtrOffsetCmp {
-public:
+struct ItemPtrOffsetCmp {
   bool operator()(const VGMItem *a, const VGMItem *b) const { return (a->dwOffset < b->dwOffset); }
 };
-
-template <class T>
-VGMItem *GetItemAtOffsetInItemVector(uint32_t offset, std::vector<T *> &theArray) {
-  int nArraySize = (int)theArray.size();
-  for (int i = 0; i < nArraySize; i++) {
-    if (((VGMItem *)theArray[i])->IsItemAtOffset(offset))
-      return theArray[i];
-  }
-  return nullptr;
-}
