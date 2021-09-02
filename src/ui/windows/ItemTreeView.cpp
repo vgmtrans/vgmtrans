@@ -233,7 +233,7 @@ void CItemTreeView::RemoveAllItems(void)
 
 BOOL CItemTreeView::SelectItem(VGMItem* item)
 {
-	if (item && (item->GetType() != ITEMTYPE_VGMFILE))	//test for NULL pointer and that it could be an item
+	if (item && (item->GetType() != VGMItem::ITEMTYPE_VGMFILE))	//test for NULL pointer and that it could be an item
 	{
 		VGMFile* itemsVGMFile = item->vgmfile;//item->GetRawFile()->GetVGMFileFromOffset(item->dwOffset);
 		if (itemsVGMFile)

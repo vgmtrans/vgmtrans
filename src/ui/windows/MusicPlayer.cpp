@@ -432,7 +432,7 @@ void CMusicReceiver::RecvMidiMsg(REFERENCE_TIME lprt,DWORD dwChannel,DWORD dwMsg
 
 void MusicPlayer::Play(VGMItem* pItem, ULONG absTime)
 {
-	if (pItem->GetType() == ITEMTYPE_VGMFILE)						//if we were passed a VGMFile
+	if (pItem->GetType() == VGMItem::ITEMTYPE_VGMFILE)						//if we were passed a VGMFile
 	{
 		if (((VGMFile*)pItem)->GetFileType() == FILETYPE_SEQ)		//and that VGMFile just so happens to be a VGMSeq
 		{

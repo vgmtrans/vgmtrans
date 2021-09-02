@@ -903,7 +903,7 @@ void CMainFrame::SelectItem(VGMItem* pItem)
 	if (!pItem)
 		return;
 	WriteItemToStatusBar(pItem);
-	if (pItem->GetType() == ITEMTYPE_VGMFILE)						//if we were passed a VGMFile
+	if (pItem->GetType() == VGMItem::ITEMTYPE_VGMFILE)						//if we were passed a VGMFile
 	{
 		CFileFrame* selFrame = frameMap[(VGMFile*)pItem];
 		if (selFrame)
