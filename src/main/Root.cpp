@@ -18,6 +18,8 @@
 #include "SPCLoader.h"
 #include "MAMELoader.h"
 
+#include <ghc/filesystem.hpp>
+
 using namespace std;
 
 VGMRoot *pRoot;
@@ -266,13 +268,7 @@ void VGMRoot::UI_AddVGMFile(VGMFile *theFile) {
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
 bool VGMRoot::UI_WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32_t size) {
-#if _MSC_VER < 1400            //if we're not using VC8, and the new STL that supports widechar filenames in ofstream...
-  char newpath[PATH_MAX];
-  wcstombs(newpath, filepath.c_str(), PATH_MAX);
-  ofstream outfile(newpath, ios::out | ios::trunc | ios::binary);
-#else
-  ofstream outfile (filepath, ios::out | ios::trunc | ios::binary);
-#endif
+  ofstream outfile(ghc::filesystem::path(filepath), ios::out | ios::trunc | ios::binary);
   if (!outfile.is_open())        //if attempt to open file failed
     return false;
 
