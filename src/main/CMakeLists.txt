@@ -19,5 +19,5 @@ target_include_directories(vgmtranscore PUBLIC . ./formats ./loaders
                                                ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC ZLIB::ZLIB minizip tinyxml
+  PUBLIC ZLIB::ZLIB minizip tinyxml ghc_filesystem
   PRIVATE g_options g_warnings)

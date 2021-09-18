@@ -1,0 +1,6 @@
+@PACKAGE_INIT@
+
+# import targets
+include("${CMAKE_CURRENT_LIST_DIR}/ghc_filesystem-targets.cmake")
+
+check_required_components(ghcfilesystem)
