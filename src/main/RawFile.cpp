@@ -4,6 +4,8 @@
 #include "VGMFile.h"
 #include "Root.h"
 
+#include <ghc/filesystem.hpp>
+
 using namespace std;
 
 #define BUF_SIZE 0x100000        //1mb
@@ -44,14 +46,7 @@ RawFile::~RawFile(void) {
 
 // opens a file using the standard c++ file i/o routines
 bool RawFile::open(const wstring &theFileName) {
-#if _MSC_VER < 1400            //if we're not using VC8, and the new STL that supports widechar filenames in ofstream...
-
-  char newpath[PATH_MAX];
-  wcstombs(newpath, theFileName.c_str(), PATH_MAX);
-  file.open(newpath, ios::in | ios::binary);
-#else
-  file.open(theFileName,  ios::in | ios::binary);
-#endif
+  file.open(ghc::filesystem::path(theFileName), ios::in | ios::binary);
   if (!file.is_open()) {
     pRoot->AddLogItem(new LogItem((std::wstring(L"File ") + theFileName.c_str() + L" could not be opened"),
                                   LOG_LEVEL_ERR,
