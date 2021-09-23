@@ -42,8 +42,6 @@ void MenuBar::appendOptionsMenu(const QList<QDockWidget *>& dockWidgets) {
     if (MusicPlayer::the().checkSetting("audio.driver", driver)) {
       driveropt->setChecked(true);
       auto font = driveropt->font();
-      font.setBold(true);
-      driveropt->setFont(font);
     }
   }
 
