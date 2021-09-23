@@ -6,6 +6,7 @@
 
 #include "MusicPlayer.h"
 
+#include <QSettings>
 #include <VGMColl.h>
 #include <VGMSeq.h>
 #include <MidiFile.h>
@@ -120,6 +121,18 @@ private:
 };
 
 MusicPlayer::MusicPlayer() {
+  QSettings settings;
+  auto driver_option = settings.value("playback.audioDriver");
+  if (driver_option.isNull()) {
+#ifdef __linux__
+    /* Default to Pulseaudio on Linux */
+    settings.setValue("playback.audioDriver", "pulseaudio");
+#elif defined(_WIN32)
+    /* Default to DirectSound on Windows */
+    settings.setValue("playback.audioDriver", "dsound");
+#endif
+  }
+
   makeSettings();
   makeSynth();
 }
@@ -141,13 +154,10 @@ void MusicPlayer::makeSettings() {
   /* Create settings if needed */
   if (!m_settings) {
     m_settings = new_fluid_settings();
-#ifdef __linux__
-    /* Default to Pulseaudio on Linux */
-    fluid_settings_setstr(m_settings, "audio.driver", "pulseaudio");
-#elif defined(_WIN32)
-    /* Default to DirectSound on Windows */
-    fluid_settings_setstr(m_settings, "audio.driver", "dsound");
-#endif
+
+    QSettings settings;
+    fluid_settings_setstr(m_settings, "audio.driver",
+                          settings.value("playback.audioDriver").toString().toStdString().c_str());
   }
 
   fluid_settings_setint(m_settings, "synth.reverb.active", 1);
@@ -325,7 +335,7 @@ int MusicPlayer::totalTicks() const {
 std::vector<const char *> MusicPlayer::getAvailableDrivers() const {
   static std::vector<const char *> drivers_buf{};
 
-  /* Availability of audio drivers shouldn't change over time, cache the result */
+  /* Availability of audio drivers can't change over time, cache the result */
   if (drivers_buf.empty()) {
     fluid_settings_foreach_option(m_settings, "audio.driver", &drivers_buf,
                                   [](void *data, auto, auto option) {
@@ -341,6 +351,9 @@ bool MusicPlayer::setAudioDriver(const char *driver_name) {
   if (fluid_settings_setstr(m_settings, "audio.driver", driver_name) == FLUID_FAILED) {
     return false;
   }
+
+  QSettings settings;
+  settings.setValue("playback.audioDriver", driver_name);
 
   makeSynth();
 
