@@ -152,7 +152,7 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
     case FileType::FILETYPE_INSTRSET: {
       auto set = dynamic_cast<VGMInstrSet *>(file);
       vgmfile_menu->addAction("Save as DLS", [set] { set->OnSaveAsDLS(); });
-      vgmfile_menu->addAction("Save as SF2", [set] { set->OnSaveAsDLS(); });
+      vgmfile_menu->addAction("Save as SF2", [set] { set->OnSaveAsSF2(); });
       break;
     }
 
