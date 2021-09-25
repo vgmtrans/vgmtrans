@@ -83,10 +83,11 @@ std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring&, const std::wstri
 
 std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggested_filename,
                                            const std::wstring& extension) {
+  static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
   QFileDialog dialog(QApplication::activeWindow());
   dialog.setFileMode(QFileDialog::AnyFile);
   dialog.selectFile(QString::fromStdWString(suggested_filename));
-  dialog.setDirectory(QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
+  dialog.setDirectory(selected_dir);
   dialog.setAcceptMode(QFileDialog::AcceptSave);
 
   if (extension == L"mid") {
@@ -95,7 +96,7 @@ std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggested_filenam
   } else if (extension == L"dls") {
     dialog.setDefaultSuffix("dls");
     dialog.setNameFilter("Downloadable Sound (*.dls)");
-  }  else if (extension == L"sf2") {
+  } else if (extension == L"sf2") {
     dialog.setDefaultSuffix("sf2");
     dialog.setNameFilter("SoundFont\u00AE 2 (*.sf2)");
   } else {
@@ -103,6 +104,7 @@ std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggested_filenam
   }
 
   if (dialog.exec()) {
+    selected_dir = dialog.directory().absolutePath();
     return dialog.selectedFiles().at(0).toStdWString();
   } else {
     return {};
@@ -110,9 +112,16 @@ std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggested_filenam
 }
 
 std::wstring QtVGMRoot::UI_GetSaveDirPath(const std::wstring&) {
-  return QFileDialog::getExistingDirectory(
-             QApplication::activeWindow(), "Save file...",
-             QStandardPaths::writableLocation(QStandardPaths::MusicLocation),
-             QFileDialog::ShowDirsOnly)
-      .toStdWString();
+  static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
+  QFileDialog dialog(QApplication::activeWindow());
+  dialog.setFileMode(QFileDialog::FileMode::Directory);
+  dialog.setOption(QFileDialog::ShowDirsOnly, true);
+  dialog.setDirectory(selected_dir);
+
+  if (dialog.exec()) {
+    selected_dir = dialog.directory().absolutePath();
+    return dialog.selectedFiles().at(0).toStdWString();
+  } else {
+    return {};
+  }
 }
