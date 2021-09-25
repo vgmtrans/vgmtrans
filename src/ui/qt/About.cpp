@@ -30,7 +30,7 @@ About::About(QWidget *parent) : QDialog(parent) {
     text_label->setContentsMargins(15, 0, 15, 0);
 
     QLabel *copyright =
-        new QLabel("<p style='margin-top:0; margin-bottom:0; font-size:small;'>&copy; 2002-2021 VGMTrans Team | Licensed under the zlib license</p>");
+        new QLabel("<p style='margin-top:0; margin-bottom:0; font-size:small;'>&copy; 2002-2021 VGMTrans Team | Licensed under the zlib license<br>SoundFont&reg; is a registered trademark of Creative Technology Ltd.</p>");
 
     QLabel *logo = new QLabel();
     logo->setPixmap(QPixmap(":/vgmtrans.png").scaledToHeight(250, Qt::SmoothTransformation));
