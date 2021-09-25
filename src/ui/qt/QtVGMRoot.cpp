@@ -76,18 +76,37 @@ void QtVGMRoot::UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& i
   treeview->addVGMItem(item, parent, itemName);
 }
 
-std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring&,
-                                           const std::wstring&) {
+std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring&, const std::wstring&) {
   std::wstring path = L"Placeholder";
   return path;
 }
 
-std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring&,
-                                           const std::wstring&) {
-  return QFileDialog::getSaveFileName(
-             QApplication::activeWindow(), "Save file...",
-             QStandardPaths::writableLocation(QStandardPaths::MusicLocation), "All files (*)")
-      .toStdWString();
+std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggested_filename,
+                                           const std::wstring& extension) {
+  QFileDialog dialog(QApplication::activeWindow());
+  dialog.setFileMode(QFileDialog::AnyFile);
+  dialog.selectFile(QString::fromStdWString(suggested_filename));
+  dialog.setDirectory(QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
+  dialog.setAcceptMode(QFileDialog::AcceptSave);
+
+  if (extension == L"mid") {
+    dialog.setDefaultSuffix("mid");
+    dialog.setNameFilter("Standard MIDI (*.mid)");
+  } else if (extension == L"dls") {
+    dialog.setDefaultSuffix("dls");
+    dialog.setNameFilter("Downloadable Sound (*.dls)");
+  }  else if (extension == L"sf2") {
+    dialog.setDefaultSuffix("sf2");
+    dialog.setNameFilter("SoundFont\u00AE 2 (*.sf2)");
+  } else {
+    dialog.setNameFilter("All files (*)");
+  }
+
+  if (dialog.exec()) {
+    return dialog.selectedFiles().at(0).toStdWString();
+  } else {
+    return {};
+  }
 }
 
 std::wstring QtVGMRoot::UI_GetSaveDirPath(const std::wstring&) {
