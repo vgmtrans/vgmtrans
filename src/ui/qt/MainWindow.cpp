@@ -48,19 +48,18 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 }
 
 void MainWindow::createElements() {
-  setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
-  setTabPosition(Qt::RightDockWidgetArea, QTabWidget::East);
+  setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
   m_rawfile_dock = new QDockWidget("Raw files");
   m_rawfile_dock->setWidget(new RawFileListView());
   m_rawfile_dock->setContentsMargins(0, 0, 0, 0);
-  m_rawfile_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
+  m_rawfile_dock->setTitleBarWidget(new QWidget());
 
   m_vgmfile_dock = new QDockWidget("Detected music files");
   m_vgmfile_dock->setWidget(new VGMFileListView());
   m_vgmfile_dock->setContentsMargins(0, 0, 0, 0);
-  m_vgmfile_dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
-
+  m_vgmfile_dock->setTitleBarWidget(new QWidget());
+  
   addDockWidget(Qt::LeftDockWidgetArea, m_rawfile_dock);
   tabifyDockWidget(m_rawfile_dock, m_vgmfile_dock);
   m_vgmfile_dock->setFocus();
@@ -73,6 +72,7 @@ void MainWindow::createElements() {
 
   auto coll_list_area = new QWidget();
   auto coll_list_area_layout = new QVBoxLayout();
+  coll_list_area_layout->setContentsMargins(0, 0, 0, 0);
   coll_list_area_layout->addWidget(m_coll_listview);
   coll_list_area_layout->addWidget(m_icon_bar);
   coll_list_area->setLayout(coll_list_area_layout);
@@ -87,10 +87,12 @@ void MainWindow::createElements() {
   coll_widget->setWidget(coll_wrapper);
   coll_widget->setContentsMargins(0, 0, 0, 0);
   addDockWidget(Qt::BottomDockWidgetArea, coll_widget);
+  coll_widget->setTitleBarWidget(new QWidget());
 
   m_logger = new Logger();
   addDockWidget(Qt::BottomDockWidgetArea, m_logger);
-
+  m_logger->setTitleBarWidget(new QWidget());
+  
   tabifyDockWidget(m_logger, coll_widget);
   coll_widget->setFocus();
 
