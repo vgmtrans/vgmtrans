@@ -10,6 +10,7 @@
 #include <QIcon>
 #include <QSlider>
 #include <QLabel>
+#include <QLayout>
 
 #include "util/Helpers.h"
 #include "MusicPlayer.h"
@@ -17,27 +18,21 @@
 IconBar::IconBar(QWidget *parent) : QToolBar(parent) {
     setMovable(false);
     setFloatable(false);
-
+    layout()->setContentsMargins(0, 0, 0, 0);
     setupControls();
 }
 
 void IconBar::setupControls() {
-    m_open = addAction("Open");
-    m_open->setIcon(QIcon(":/images/open_file.svg"));
-    connect(m_open, &QAction::triggered, this, &IconBar::openPressed);
-
-    addSeparator();
-
-    m_stop = addAction("Stop");
-    m_stop->setIcon(QIcon(":/images/player_stop.svg"));
-    m_stop->setDisabled(true);
-    connect(m_stop, &QAction::triggered, this, &IconBar::stopPressed);
-
     m_play = addAction("Play");
     s_playicon = QIcon(":/images/player_play.svg");
     s_pauseicon = QIcon(":/images/player_pause.svg");
     m_play->setIcon(s_playicon);
     connect(m_play, &QAction::triggered, this, &IconBar::playToggle);
+
+    m_stop = addAction("Stop");
+    m_stop->setIcon(QIcon(":/images/player_stop.svg"));
+    m_stop->setDisabled(true);
+    connect(m_stop, &QAction::triggered, this, &IconBar::stopPressed);
 
     /* A bit of a hack to get some spacing */
     auto spacing_label = new QLabel();
@@ -47,8 +42,6 @@ void IconBar::setupControls() {
     m_slider = new QSlider(Qt::Horizontal);
     m_slider->setRange(0, 0);
     m_slider->setEnabled(false);
-    m_slider->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    m_slider->setMinimumWidth(300);
     m_slider->setToolTip("Seek");
     connect(m_slider, &QSlider::sliderMoved, this, &IconBar::seekingTo);
     addWidget(m_slider);
@@ -83,7 +76,6 @@ void IconBar::playerStatusChanged(bool playing) {
     } else {
         m_play->setIcon(s_playicon);
         m_stop->setDisabled(true);
-        m_slider->setDisabled(true);
         m_title->setText("");
     }
 }

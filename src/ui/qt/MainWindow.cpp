@@ -107,7 +107,6 @@ void MainWindow::routeSignals() {
     about.exec();
   });
 
-  connect(m_icon_bar, &IconBar::openPressed, this, &MainWindow::OpenFile);
   connect(m_icon_bar, &IconBar::playToggle, m_coll_listview,
           &VGMCollListView::handlePlaybackRequest);
   connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);

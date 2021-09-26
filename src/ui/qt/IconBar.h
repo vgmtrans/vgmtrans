@@ -19,7 +19,6 @@ public:
   explicit IconBar(QWidget *parent = nullptr);
 
 signals:
-  void openPressed();
   void playToggle();
   void stopPressed();
   void seekingTo(int position);
