@@ -48,9 +48,6 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 }
 
 void MainWindow::createElements() {
-  m_icon_bar = new IconBar(this);
-  addToolBar(m_icon_bar);
-
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
   setTabPosition(Qt::RightDockWidgetArea, QTabWidget::East);
 
@@ -72,11 +69,18 @@ void MainWindow::createElements() {
 
   m_coll_listview = new VGMCollListView();
   m_coll_view = new VGMCollView(m_coll_listview->selectionModel());
+  m_icon_bar = new IconBar();
+
+  auto coll_list_area = new QWidget();
+  auto coll_list_area_layout = new QVBoxLayout();
+  coll_list_area_layout->addWidget(m_coll_listview);
+  coll_list_area_layout->addWidget(m_icon_bar);
+  coll_list_area->setLayout(coll_list_area_layout);
 
   auto coll_wrapper = new QWidget();
   auto coll_layout = new QGridLayout();
-  coll_layout->addWidget(m_coll_view, 0, 0, 1, 1, Qt::AlignLeft);
-  coll_layout->addWidget(m_coll_listview, 0, 1, -1, -1);
+  coll_layout->addWidget(m_coll_view, 1, 0, 1, 1, Qt::AlignLeft);
+  coll_layout->addWidget(coll_list_area, 0, 1, -1, -1);
   coll_wrapper->setLayout(coll_layout);
 
   auto coll_widget = new QDockWidget("Collections");
