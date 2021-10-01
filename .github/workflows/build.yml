@@ -12,6 +12,7 @@ jobs:
           version: '12.0'
       - name: "Install dependencies"
         run: |
+          export HOMEBREW_NO_EMOJI=1 HOMEBREW_NO_COLOR=1
           qt_bottle=$(brew fetch --bottle-tag=mojave qt@6 | head -n 1 | awk '{print $3}')
           brew reinstall --force $qt_bottle
           fluidsynth_bottle=$(brew fetch --bottle-tag=mojave fluidsynth | head -n 1 | awk '{print $3}')
