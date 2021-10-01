@@ -6,10 +6,16 @@ jobs:
     runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v2
+      - name: Setup Xcode version
+        uses: maxim-lobanov/setup-xcode@v1.3.0
+        with:
+          version: '12.0'
       - name: "Install dependencies"
         run: |
-          brew upgrade qt@5 || brew install qt@5
-          brew upgrade fluid-synth || brew install fluid-synth
+          qt_bottle=$(brew fetch --bottle-tag=mojave qt@6 | head -n 1 | awk '{print $3}')
+          brew reinstall --force $qt_bottle
+          fluidsynth_bottle=$(brew fetch --bottle-tag=mojave fluidsynth | head -n 1 | awk '{print $3}')
+          brew reinstall --force $fluidsynth_bottle
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
@@ -18,7 +24,7 @@ jobs:
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
         name: "Package DMG (macOS)"
-        run: /usr/local/opt/qt5/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
+        run: /usr/local/opt/qt6/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
       - name: "Upload artifact"
         uses: actions/upload-artifact@v1
         with:
@@ -38,9 +44,9 @@ jobs:
           sudo apt clean
           sudo apt update
           sudo apt install -y pkg-config qt515base qt515svg qt515wayland libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
-          wget https://github.com/FluidSynth/fluidsynth/archive/v2.1.9.zip
-          unzip v2.1.9.zip
-          cd fluidsynth-2.1.9
+          wget https://github.com/FluidSynth/fluidsynth/archive/v2.2.3.zip
+          unzip v2.2.3.zip
+          cd fluidsynth-2.2.3
           mkdir build && cd build
           cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -Denable-network=off -Denable-ipv6=off -DCMAKE_INSTALL_PREFIX=/usr/ -DLIB_INSTALL_DIR=lib -GNinja ..
           cmake --build . --config "Release" --parallel
