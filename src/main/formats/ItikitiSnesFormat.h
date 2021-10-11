@@ -4,6 +4,8 @@
 #include "Root.h"
 #include "ItikitiSnesScanner.h"
 
+constexpr uint8_t kItikitiSnesSeqNoteKeyBias = 24;
+
 BEGIN_FORMAT(ItikitiSnes)
   USING_SCANNER(ItikitiSnesScanner)
   USING_MATCHER(FilegroupMatcher)

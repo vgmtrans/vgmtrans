@@ -819,6 +819,9 @@
     <ClCompile Include="src\main\formats\KonamiPS1Seq.cpp">
       <Filter>Source Files\formats\konamips1</Filter>
     </ClCompile>
+    <ClCompile Include="src\main\formats\ItikitiSnesInstr.cpp">
+      <Filter>Source Files\formats\itikitisnes</Filter>
+    </ClCompile>
     <ClCompile Include="src\main\formats\ItikitiSnesScanner.cpp">
       <Filter>Source Files\formats\itikitisnes</Filter>
     </ClCompile>
@@ -1488,6 +1491,9 @@
       <Filter>Header Files\formats\akao</Filter>
     </ClInclude>
     <ClInclude Include="src\main\formats\ItikitiSnesFormat.h">
+      <Filter>Header Files\formats\itikitisnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\ItikitiSnesInstr.h">
       <Filter>Header Files\formats\itikitisnes</Filter>
     </ClInclude>
     <ClInclude Include="src\main\formats\ItikitiSnesScanner.h">
