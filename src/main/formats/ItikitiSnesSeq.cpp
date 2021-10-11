@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "ItikitiSnesSeq.h"
+#include "ScaleConversion.h"
 
 DECLARE_FORMAT(ItikitiSnes);
 
@@ -70,30 +71,30 @@ void ItikitiSnesSeq::LoadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEven
   }
 
   event_map[0x00] = ItikitiSnesSeqEventType::EVENT_END;
-  event_map[0x01] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x02] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x03] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x04] = ItikitiSnesSeqEventType::EVENT_UNKNOWN2;
+  event_map[0x01] = ItikitiSnesSeqEventType::EVENT_MASTER_VOLUME;
+  event_map[0x02] = ItikitiSnesSeqEventType::EVENT_ECHO_VOLUME;
+  event_map[0x03] = ItikitiSnesSeqEventType::EVENT_CHANNEL_VOLUME;
+  event_map[0x04] = ItikitiSnesSeqEventType::EVENT_ECHO_FEEDBACK_FIR;
   event_map[0x05] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
   event_map[0x06] = ItikitiSnesSeqEventType::EVENT_TEMPO;
-  event_map[0x07] = ItikitiSnesSeqEventType::EVENT_UNKNOWN2;
+  event_map[0x07] = ItikitiSnesSeqEventType::EVENT_TEMPO_FADE;
   event_map[0x08] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
   event_map[0x09] = ItikitiSnesSeqEventType::EVENT_SELECT_NOTE_LENGTH_PATTERN;
   event_map[0x0a] = ItikitiSnesSeqEventType::EVENT_CUSTOM_NOTE_LENGTH_PATTERN;
   event_map[0x0b] = ItikitiSnesSeqEventType::EVENT_NOTE_NUMBER_BASE;
-  event_map[0x0c] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x0d] = ItikitiSnesSeqEventType::EVENT_UNKNOWN2;
-  event_map[0x0e] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x0f] = ItikitiSnesSeqEventType::EVENT_UNKNOWN2;
+  event_map[0x0c] = ItikitiSnesSeqEventType::EVENT_VOLUME;
+  event_map[0x0d] = ItikitiSnesSeqEventType::EVENT_VOLUME_FADE;
+  event_map[0x0e] = ItikitiSnesSeqEventType::EVENT_PAN;
+  event_map[0x0f] = ItikitiSnesSeqEventType::EVENT_PAN_FADE;
   event_map[0x10] = ItikitiSnesSeqEventType::EVENT_PROGRAM_CHANGE;
   event_map[0x11] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x12] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x13] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x14] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x15] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x16] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
-  event_map[0x17] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
-  event_map[0x18] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
+  event_map[0x12] = ItikitiSnesSeqEventType::EVENT_ADSR_AR;
+  event_map[0x13] = ItikitiSnesSeqEventType::EVENT_ADSR_DR;
+  event_map[0x14] = ItikitiSnesSeqEventType::EVENT_ADSR_SR;
+  event_map[0x15] = ItikitiSnesSeqEventType::EVENT_ADSR_SR;
+  event_map[0x16] = ItikitiSnesSeqEventType::EVENT_ADSR_DEFAULT;
+  event_map[0x17] = ItikitiSnesSeqEventType::EVENT_TRANSPOSE_ABS;
+  event_map[0x18] = ItikitiSnesSeqEventType::EVENT_TRANSPOSE_REL;
   event_map[0x19] = ItikitiSnesSeqEventType::EVENT_UNKNOWN3;
   event_map[0x1a] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
   event_map[0x1b] = ItikitiSnesSeqEventType::EVENT_UNKNOWN3;
@@ -104,7 +105,7 @@ void ItikitiSnesSeq::LoadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEven
   event_map[0x20] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
   event_map[0x21] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
   event_map[0x22] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
-  event_map[0x23] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
+  event_map[0x23] = ItikitiSnesSeqEventType::EVENT_ECHO_ON;
   event_map[0x24] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
   event_map[0x25] = ItikitiSnesSeqEventType::EVENT_UNKNOWN1;
   event_map[0x26] = ItikitiSnesSeqEventType::EVENT_UNKNOWN0;
@@ -139,7 +140,7 @@ bool ItikitiSnesTrack::ReadEvent() {
   if (curOffset >= 0x10000)
     return false;
 
-  const auto command = GetByte(curOffset++);
+  const uint8_t command = GetByte(curOffset++);
   const auto event_type = seq->GetEventType(command);
 
   bool stop_parser = false;
@@ -182,7 +183,7 @@ bool ItikitiSnesTrack::ReadEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_NOTE: {
-      const auto len_index = command & 7;
+      const uint8_t len_index = command & 7;
 
       uint8_t len;
       if (len_index == 7)
@@ -215,14 +216,52 @@ bool ItikitiSnesTrack::ReadEvent() {
       break;
     }
 
+    case ItikitiSnesSeqEventType::EVENT_MASTER_VOLUME: {
+      const uint8_t vol = GetByte(curOffset++);
+      description << L"Volume: " << vol;
+      AddGenericEvent(start, curOffset - start, L"Master Volume", description.str(), CLR_VOLUME,
+                      ICON_CONTROL);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_ECHO_VOLUME: {
+      const uint8_t vol = GetByte(curOffset++);
+      description << L"Volume: " << vol;
+      AddGenericEvent(start, curOffset - start, L"Echo Volume", description.str(), CLR_REVERB,
+                      ICON_CONTROL);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_CHANNEL_VOLUME: {
+      const uint8_t vol = GetByte(curOffset++);
+      AddVol(start, curOffset - start, vol >> 1);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_ECHO_FEEDBACK_FIR: {
+      const int8_t feedback = GetByte(curOffset++);
+      const uint8_t filter_index = GetByte(curOffset++);
+      description << L"Feedback: " << feedback << L"  FIR: " << filter_index;
+      AddGenericEvent(start, curOffset - start, L"Echo Feedback & FIR", description.str(),
+                      CLR_REVERB, ICON_CONTROL);
+      break;
+    }
+
     case ItikitiSnesSeqEventType::EVENT_TEMPO: {
-      const auto tempo = GetByte(curOffset++);
+      const uint8_t tempo = GetByte(curOffset++);
       AddTempoBPM(start, curOffset - start, seq->GetTempoInBpm(tempo));
       break;
     }
 
+    case ItikitiSnesSeqEventType::EVENT_TEMPO_FADE: {
+      const uint8_t fade_length = GetByte(curOffset++);
+      const uint8_t tempo = GetByte(curOffset++);
+      AddTempoBPMSlide(start, curOffset - start, fade_length, seq->GetTempoInBpm(tempo));
+      break;
+    }
+
     case ItikitiSnesSeqEventType::EVENT_SELECT_NOTE_LENGTH_PATTERN: {
-      const auto bits = GetShort(curOffset);
+      const uint16_t bits = GetShort(curOffset);
       curOffset += 2;
       description << L"Length Bits: 0x" << std::hex << std::setfill(L'0') << std::setw(4) << bits;
       AddGenericEvent(start, curOffset - start, L"Note Length Pattern", description.str(),
@@ -240,13 +279,13 @@ bool ItikitiSnesTrack::ReadEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_CUSTOM_NOTE_LENGTH_PATTERN: {
-      const auto arg1 = GetByte(curOffset++);
-      const auto arg2 = GetByte(curOffset++);
-      const auto arg3 = GetByte(curOffset++);
-      const auto arg4 = GetByte(curOffset++);
-      const auto arg5 = GetByte(curOffset++);
-      const auto arg6 = GetByte(curOffset++);
-      const auto arg7 = GetByte(curOffset++);
+      const uint8_t arg1 = GetByte(curOffset++);
+      const uint8_t arg2 = GetByte(curOffset++);
+      const uint8_t arg3 = GetByte(curOffset++);
+      const uint8_t arg4 = GetByte(curOffset++);
+      const uint8_t arg5 = GetByte(curOffset++);
+      const uint8_t arg6 = GetByte(curOffset++);
+      const uint8_t arg7 = GetByte(curOffset++);
       description << L"Lengths: " << arg1 << L", " << arg2 << L", " << arg3 << L", " << arg4
                   << L", " << arg5 << L", " << arg6 << L", " << arg7;
       AddGenericEvent(start, curOffset - start, L"Custom Note Length Pattern", description.str(),
@@ -263,11 +302,41 @@ bool ItikitiSnesTrack::ReadEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_NOTE_NUMBER_BASE: {
-      const auto note_number = GetByte(curOffset++);
+      const uint8_t note_number = GetByte(curOffset++);
       description << L"Note Number: " << note_number;
       AddGenericEvent(start, curOffset - start, L"Note Number Base", description.str(),
                       CLR_CHANGESTATE, ICON_CONTROL);
       m_note_number_base = note_number;
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_VOLUME: {
+      const uint8_t vol = GetByte(curOffset++);
+      AddExpression(start, curOffset - start, vol >> 1);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_VOLUME_FADE: {
+      const uint8_t fade_length = GetByte(curOffset++);
+      const uint8_t vol = GetByte(curOffset++);
+      AddExpressionSlide(start, curOffset - start, fade_length, vol >> 1);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_PAN: {
+      const uint8_t pan = GetByte(curOffset++);
+      const uint8_t midi_pan = ConvertLinearPercentPanValToStdMidiVal(pan / 255.0);
+      AddPan(start, curOffset - start, midi_pan);
+      // TODO: apply volume scale
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_PAN_FADE: {
+      const uint8_t fade_length = GetByte(curOffset++);
+      const uint8_t pan = GetByte(curOffset++);
+      const uint8_t midi_pan = ConvertLinearPercentPanValToStdMidiVal(pan / 255.0);
+      AddPanSlide(start, curOffset - start, fade_length, midi_pan); // TODO: fix pan curve
+      // TODO: apply volume scale
       break;
     }
 
@@ -277,8 +346,64 @@ bool ItikitiSnesTrack::ReadEvent() {
       break;
     }
 
+    case ItikitiSnesSeqEventType::EVENT_ADSR_AR: {
+      const uint8_t ar = GetByte(curOffset++) & 15;
+      description << L"AR: " << ar;
+      AddGenericEvent(start, curOffset - start, L"ADSR Attack Rate", description.str(), CLR_ADSR,
+                      ICON_CONTROL);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_ADSR_DR: {
+      const uint8_t dr = GetByte(curOffset++) & 7;
+      description << L"DR: " << dr;
+      AddGenericEvent(start, curOffset - start, L"ADSR Decay Rate", description.str(), CLR_ADSR,
+                      ICON_CONTROL);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_ADSR_SL: {
+      const uint8_t sl = GetByte(curOffset++) & 7;
+      description << L"SL: " << sl;
+      AddGenericEvent(start, curOffset - start, L"ADSR Sustain Level", description.str(), CLR_ADSR,
+                      ICON_CONTROL);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_ADSR_SR: {
+      const uint8_t sr = GetByte(curOffset++) & 15;
+      description << L"SR: " << sr;
+      AddGenericEvent(start, curOffset - start, L"ADSR Sustain Rate", description.str(), CLR_ADSR,
+                      ICON_CONTROL);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_ADSR_DEFAULT: {
+      AddGenericEvent(start, curOffset - start, L"Default ADSR", description.str(), CLR_ADSR,
+                      ICON_CONTROL);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_TRANSPOSE_ABS: {
+      const int8_t transpose = GetByte(curOffset++);
+      AddTranspose(start, curOffset - start, transpose);
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_TRANSPOSE_REL: {
+      const int8_t transpose_amount = GetByte(curOffset++);
+      const int8_t new_transpose = std::max(-128, std::min(127, transpose + transpose_amount));
+      AddTranspose(start, curOffset - start, new_transpose, L"Transpose (Relative)");
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_ECHO_ON: {
+      AddReverb(start, curOffset - start, 40, L"Echo On");
+      break;
+    }
+
     case ItikitiSnesSeqEventType::EVENT_LOOP_START: {
-      const auto count = GetByte(curOffset++);
+      const uint8_t count = GetByte(curOffset++);
       description << L"Repeat Count: ";
       if (count == 0)
         description << L"Infinite";
