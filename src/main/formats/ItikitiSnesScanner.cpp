@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "ItikitiSnesScanner.h"
 #include "ItikitiSnesSeq.h"
+#include "ItikitiSnesInstr.h"
 
 void ItikitiSnesScanner::Scan(RawFile *file, void *info) {
   if (file->size() == 0x10000)
@@ -21,6 +22,11 @@ void ItikitiSnesScanner::ScanFromApuRam(RawFile *file) {
   if (!seq->LoadVGMFile())
     return;
   (void)seq.release();
+
+  auto insrument_set = std::make_unique<ItikitiSnesInstrSet>(file, 0x1d40, 0x1b00);
+  if (!insrument_set->LoadVGMFile())
+    return;
+  (void)insrument_set.release();
 }
 
 void ItikitiSnesScanner::ScanFromRom(RawFile *file) {

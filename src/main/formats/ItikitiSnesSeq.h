@@ -8,7 +8,6 @@ constexpr uint16_t kItikitiSnesSeqTimebase = 48;
 constexpr uint8_t kItikitiSnesSeqTimerFreq = 0x27;
 
 constexpr uint8_t kItikitiSnesSeqMinNoteByte = 0x30;
-constexpr uint8_t kItikitiSnesSeqNoteKeyBias = 24;
 constexpr uint8_t kItikitiSnesSeqMaxLoopLevel = 4;
 
 enum class ItikitiSnesSeqEventType {
