@@ -272,6 +272,8 @@
     <ClCompile Include="src\main\formats\HudsonSnesInstr.cpp" />
     <ClCompile Include="src\main\formats\HudsonSnesScanner.cpp" />
     <ClCompile Include="src\main\formats\HudsonSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\ItikitiSnesScanner.cpp" />
+    <ClCompile Include="src\main\formats\ItikitiSnesSeq.cpp" />
     <ClCompile Include="src\main\formats\KonamiPS1Scanner.cpp" />
     <ClCompile Include="src\main\formats\KonamiPS1Seq.cpp" />
     <ClCompile Include="src\main\formats\NamcoSnesInstr.cpp" />
@@ -473,6 +475,9 @@
     <ClInclude Include="src\main\formats\HudsonSnesInstr.h" />
     <ClInclude Include="src\main\formats\HudsonSnesScanner.h" />
     <ClInclude Include="src\main\formats\HudsonSnesSeq.h" />
+    <ClInclude Include="src\main\formats\ItikitiSnesFormat.h" />
+    <ClInclude Include="src\main\formats\ItikitiSnesScanner.h" />
+    <ClInclude Include="src\main\formats\ItikitiSnesSeq.h" />
     <ClInclude Include="src\main\formats\KonamiPS1Format.h" />
     <ClInclude Include="src\main\formats\KonamiPS1Scanner.h" />
     <ClInclude Include="src\main\formats\KonamiPS1Seq.h" />

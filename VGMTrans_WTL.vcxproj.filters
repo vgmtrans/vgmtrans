@@ -259,6 +259,12 @@
     <Filter Include="Header Files\formats\konamips1">
       <UniqueIdentifier>{38d11b15-8e84-4ce6-bf22-a9bf11c40fc5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\formats\itikitisnes">
+      <UniqueIdentifier>{22748c60-ff78-4728-bf4a-9b180e796749}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\itikitisnes">
+      <UniqueIdentifier>{9f79b423-64ef-41a6-b72d-94da176633aa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\ui\windows\aboutdlg.cpp">
@@ -812,6 +818,12 @@
     </ClCompile>
     <ClCompile Include="src\main\formats\KonamiPS1Seq.cpp">
       <Filter>Source Files\formats\konamips1</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\ItikitiSnesScanner.cpp">
+      <Filter>Source Files\formats\itikitisnes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\ItikitiSnesSeq.cpp">
+      <Filter>Source Files\formats\itikitisnes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1474,6 +1486,15 @@
     </ClInclude>
     <ClInclude Include="src\main\formats\AkaoFormatVersion.h">
       <Filter>Header Files\formats\akao</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\ItikitiSnesFormat.h">
+      <Filter>Header Files\formats\itikitisnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\ItikitiSnesScanner.h">
+      <Filter>Header Files\formats\itikitisnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\ItikitiSnesSeq.h">
+      <Filter>Header Files\formats\itikitisnes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
