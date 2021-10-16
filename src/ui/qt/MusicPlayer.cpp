@@ -127,6 +127,9 @@ MusicPlayer::MusicPlayer() {
 #ifdef __linux__
     /* Default to Pulseaudio on Linux */
     settings.setValue("playback.audioDriver", "pulseaudio");
+#elif defined(__APPLE__)
+    /* Default to CoreAudio on macOS */
+    settings.setValue("playback.audioDriver", "coreaudio");
 #elif defined(_WIN32)
     /* Default to DirectSound on Windows */
     settings.setValue("playback.audioDriver", "dsound");
@@ -355,6 +358,7 @@ bool MusicPlayer::setAudioDriver(const char *driver_name) {
   QSettings settings;
   settings.setValue("playback.audioDriver", driver_name);
 
+  qtVGMRoot.UI_AddLogItem(new LogItem(QString("Switched playback backend to \"%1\"").arg(driver_name).toStdWString(), LOG_LEVEL_INFO, L"MusicPlayer"));
   makeSynth();
 
   return true;
