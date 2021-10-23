@@ -22,7 +22,7 @@ VGMTrans converts a music files used in console video games into standard midi a
 - Konami's PS1 sequence format known as KDT1
 - Nintendo's Gameboy Advance sequence format
 - Nintendo's SNES sequence and instrument format known as N-SPC (.spc)
-- Squaresoft's SNES sequence and instrument format (AKAO/SUZUKI) (.spc)
+- Squaresoft's SNES sequence and instrument format (AKAO/SUZUKI/Itikiti) (.spc)
 - Capcom's SNES sequence and instrument format (.spc)
 - Konami's SNES sequence and instrument format (.spc)
 - Hudson's SNES sequence and instrument format (.spc)
