@@ -90,7 +90,7 @@ void ItikitiSnesSeq::LoadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEven
   event_map[0x11] = ItikitiSnesSeqEventType::EVENT_TUNING;
   event_map[0x12] = ItikitiSnesSeqEventType::EVENT_ADSR_AR;
   event_map[0x13] = ItikitiSnesSeqEventType::EVENT_ADSR_DR;
-  event_map[0x14] = ItikitiSnesSeqEventType::EVENT_ADSR_SR;
+  event_map[0x14] = ItikitiSnesSeqEventType::EVENT_ADSR_SL;
   event_map[0x15] = ItikitiSnesSeqEventType::EVENT_ADSR_SR;
   event_map[0x16] = ItikitiSnesSeqEventType::EVENT_ADSR_DEFAULT;
   event_map[0x17] = ItikitiSnesSeqEventType::EVENT_TRANSPOSE_ABS;
