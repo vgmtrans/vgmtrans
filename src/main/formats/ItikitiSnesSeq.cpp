@@ -117,7 +117,7 @@ void ItikitiSnesSeq::LoadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEven
   event_map[0x2c] = ItikitiSnesSeqEventType::EVENT_GOTO;
   event_map[0x2d] = ItikitiSnesSeqEventType::EVENT_UNDEFINED; // conditional jump (length=2)
   event_map[0x2e] = ItikitiSnesSeqEventType::EVENT_LOOP_END;
-  event_map[0x2f] = ItikitiSnesSeqEventType::EVENT_UNDEFINED; // conditional jump (length=3)
+  event_map[0x2f] = ItikitiSnesSeqEventType::EVENT_LOOP_BREAK;
 }
 
 ItikitiSnesTrack::ItikitiSnesTrack(ItikitiSnesSeq *seq, long offset, long length)
@@ -131,6 +131,7 @@ void ItikitiSnesTrack::ResetVars() {
   m_note_number_base = 0;
   m_note_length_table = kDefaultNoteLengths;
   m_loop_level = -1;
+  m_alt_loop_count = 0; // actual driver does not initialize this
 }
 
 bool ItikitiSnesTrack::ReadEvent() {
@@ -420,6 +421,7 @@ bool ItikitiSnesTrack::ReadEvent() {
       m_loop_level++;
       m_loop_counts[m_loop_level] = (count == 0) ? 0 : count + 1;
       m_loop_start_addresses[m_loop_level] = static_cast<uint16_t>(curOffset);
+      m_alt_loop_count = 0;
       break;
     }
 
@@ -456,6 +458,22 @@ bool ItikitiSnesTrack::ReadEvent() {
           // repeat again
           curOffset = m_loop_start_addresses[m_loop_level];
         }
+      }
+      break;
+    }
+
+    case ItikitiSnesSeqEventType::EVENT_LOOP_BREAK: {
+      const uint8_t target_count = GetByte(curOffset++);
+      const uint16_t dest = ReadDecodedOffset(curOffset);
+      curOffset += 2;
+
+      description << L"Count: " << target_count << L"  Destination: $" << std::hex << std::setfill(L'0')
+                  << std::setw(4) << std::uppercase << dest;
+      AddGenericEvent(start, curOffset - start, L"Loop Break / Jump to Volta", description.str(),
+                      CLR_LOOP, ICON_ENDREP);
+      
+      if (++m_alt_loop_count == target_count) {
+        curOffset = dest;
       }
       break;
     }

@@ -43,6 +43,7 @@ enum class ItikitiSnesSeqEventType {
   EVENT_LOOP_START,
   EVENT_GOTO,
   EVENT_LOOP_END,
+  EVENT_LOOP_BREAK,
 };
 
 class ItikitiSnesSeq : public VGMSeq {
@@ -103,4 +104,5 @@ class ItikitiSnesTrack : public SeqTrack {
   int8_t m_loop_level{};
   std::array<uint8_t, kItikitiSnesSeqMaxLoopLevel> m_loop_counts{};
   std::array<uint16_t, kItikitiSnesSeqMaxLoopLevel> m_loop_start_addresses{};
+  uint8_t m_alt_loop_count{};
 };
