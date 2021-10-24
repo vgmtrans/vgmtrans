@@ -9,7 +9,7 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QObject>
-
+#include <QStyledItemDelegate>
 #include <unordered_map>
 #include <utility>
 #include <VGMFile.h>
@@ -34,6 +34,14 @@ private:
   QString m_name;
   VGMItem *m_item = nullptr;
   VGMItem *m_parent = nullptr;
+};
+
+class VGMTreeDisplayItem : public QStyledItemDelegate {
+  Q_OBJECT
+public:
+  void paint(QPainter *painter, const QStyleOptionViewItem &option,
+             const QModelIndex &index) const override;
+  QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 };
 
 class VGMFileTreeView : public QTreeWidget {
