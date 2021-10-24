@@ -30,6 +30,7 @@ void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstr
   auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
   tree_item->setText(0, item_name);
   tree_item->setIcon(0, iconForItemType(item->GetIcon()));
+  tree_item->setToolTip(0, QString::fromStdWString(item->GetDescription()));
 
   if(parent != parent_cached) {
     parent_cached = parent;
