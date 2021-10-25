@@ -10,11 +10,11 @@
 #include <QIcon>
 
 class QSlider;
-class QAction;
+class QPushButton;
 class QLabel;
 
-class IconBar final : public QToolBar {
-    Q_OBJECT
+class IconBar final : public QWidget {
+  Q_OBJECT
 public:
   explicit IconBar(QWidget *parent = nullptr);
 
@@ -30,9 +30,8 @@ private slots:
 private:
   void setupControls();
 
-  QAction *m_open{};
-  QAction *m_play{};
-  QAction *m_stop{};
+  QPushButton *m_play{};
+  QPushButton *m_stop{};
   QSlider *m_slider{};
   QLabel *m_title;
   inline static QIcon s_playicon;
