@@ -48,6 +48,7 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 }
 
 void MainWindow::createElements() {
+  setDocumentMode(true);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
   m_rawfile_dock = new QDockWidget("Raw files");
@@ -59,7 +60,7 @@ void MainWindow::createElements() {
   m_vgmfile_dock->setWidget(new VGMFileListView());
   m_vgmfile_dock->setContentsMargins(0, 0, 0, 0);
   m_vgmfile_dock->setTitleBarWidget(new QWidget());
-  
+
   addDockWidget(Qt::LeftDockWidgetArea, m_rawfile_dock);
   tabifyDockWidget(m_rawfile_dock, m_vgmfile_dock);
   m_vgmfile_dock->setFocus();
@@ -92,7 +93,7 @@ void MainWindow::createElements() {
   m_logger = new Logger();
   addDockWidget(Qt::BottomDockWidgetArea, m_logger);
   m_logger->setTitleBarWidget(new QWidget());
-  
+
   tabifyDockWidget(m_logger, coll_widget);
   coll_widget->setFocus();
 
