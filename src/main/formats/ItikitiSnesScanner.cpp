@@ -23,7 +23,7 @@ void ItikitiSnesScanner::ScanFromApuRam(RawFile *file) {
     return;
   (void)seq.release();
 
-  auto insrument_set = std::make_unique<ItikitiSnesInstrSet>(file, 0x1d40, 0x1b00);
+  auto insrument_set = std::make_unique<ItikitiSnesInstrSet>(file, 0x1d40, 0x1e60, 0x1b00);
   if (!insrument_set->LoadVGMFile())
     return;
   (void)insrument_set.release();
