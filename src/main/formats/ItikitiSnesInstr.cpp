@@ -74,19 +74,16 @@ bool ItikitiSnesInstr::LoadInstr() {
 ItikitiSnesRgn::ItikitiSnesRgn(ItikitiSnesInstr *instrument, uint32_t tuning_offset,
                                uint32_t adsr_offset, uint8_t srcn)
     : VGMRgn(instrument, adsr_offset, 2) {
-  const uint8_t tuning1 = GetByte(tuning_offset);
-  const uint8_t tuning2 = GetByte(tuning_offset + 1);
+  const uint16_t tuning = GetShortBE(tuning_offset);
   const uint8_t adsr1 = GetByte(adsr_offset) | 0x80;
   const uint8_t adsr2 = GetByte(adsr_offset + 1);
 
   double pitch_scale;
-  if (tuning1 <= 0x7f) {
-    pitch_scale = 1.0 + (tuning1 / 256.0);
+  if (tuning <= 0x7fff) {
+    pitch_scale = 1.0 + (tuning / 32768.0);
   } else {
-    pitch_scale = tuning1 / 256.0;
+    pitch_scale = tuning / 65536.0;
   }
-  pitch_scale += tuning2 / 65536.0;
-  pitch_scale *= 4096.0 / 4286.0;
 
   double fine_tuning;
   double coarse_tuning;
@@ -102,7 +99,7 @@ ItikitiSnesRgn::ItikitiSnesRgn(ItikitiSnesInstr *instrument, uint32_t tuning_off
   }
 
   sampNum = srcn;
-  unityKey = static_cast<uint8_t>(71 - static_cast<int>(coarse_tuning));
+  unityKey = static_cast<uint8_t>(72 - static_cast<int>(coarse_tuning));
   fineTune = static_cast<int16_t>(fine_tuning * 100.0);
   AddSimpleItem(adsr_offset, 1, L"ADSR1");
   AddSimpleItem(adsr_offset + 1, 1, L"ADSR2");
