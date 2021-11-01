@@ -25,9 +25,9 @@ static const QIcon &VGMCollIcon() {
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMColl,
-          [=]() { dataChanged(index(0, 0), index(0, 0)); });
+          [=]() { dataChanged(index(0, 0), index(rowCount() - 1, 0)); });
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedVGMColl,
-          [=]() { dataChanged(index(0, 0), index(0, 0)); });
+          [=]() { dataChanged(index(0, 0), index(rowCount() - 1, 0)); });
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {
