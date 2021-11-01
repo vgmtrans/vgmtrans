@@ -7,10 +7,14 @@
 #pragma once
 
 #include <QAbstractListModel>
-#include <QListView>
+#include <QGroupBox>
+#include <QItemSelectionModel>
 
 class VGMColl;
 class VGMFile;
+class QLabel;
+class QListView;
+class QLineEdit;
 
 class VGMCollViewModel : public QAbstractListModel {
   Q_OBJECT
@@ -29,11 +33,16 @@ private:
   VGMColl *m_coll;
 };
 
-class VGMCollView : public QListView {
+class VGMCollView : public QGroupBox {
   Q_OBJECT
 public:
   VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent = 0);
 
 public slots:
   void doubleClickedSlot(QModelIndex);
+
+private:
+  QLineEdit *m_collection_title;
+  QListView *m_listview;
+  QLabel *m_title;
 };

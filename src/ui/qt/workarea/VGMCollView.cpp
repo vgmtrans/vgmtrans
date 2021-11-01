@@ -6,6 +6,12 @@
 
 #include "VGMCollView.h"
 
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QListView>
+#include <QLineEdit>
+#include <QPushButton>
+
 #include <VGMFile.h>
 #include <VGMInstrSet.h>
 #include <VGMSeq.h>
@@ -50,7 +56,7 @@ void VGMCollViewModel::handleNewCollSelected(QModelIndex modelIndex) {
     m_coll = qtVGMRoot.vVGMColl[modelIndex.row()];
   }
 
-  emit dataChanged(index(0, 0), index(0, 0));
+  dataChanged(index(0, 0), modelIndex);
 }
 
 VGMFile *VGMCollViewModel::fileFromIndex(QModelIndex index) const {
@@ -77,20 +83,68 @@ VGMFile *VGMCollViewModel::fileFromIndex(QModelIndex index) const {
 }
 
 VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
-    : QListView(parent) {
-  setAttribute(Qt::WA_MacShowFocusRect, 0);
-  setIconSize(QSize(16, 16));
+    : QGroupBox("Selected collection", parent) {
+  auto layout = new QVBoxLayout();
+
+  auto rename_layout = new QHBoxLayout();
+  m_collection_title = new QLineEdit("No collection selected");
+  m_collection_title->setReadOnly(true);
+  rename_layout->addWidget(m_collection_title);
+
+  auto commit_rename = new QPushButton("Rename");
+  commit_rename->setEnabled(false);
+  commit_rename->setAutoDefault(true);
+  commit_rename->setIcon(QIcon(":/images/collection.svg"));
+  rename_layout->addWidget(commit_rename);
+  layout->addLayout(rename_layout);
+
+  m_listview = new QListView(this);
+  m_listview->setAttribute(Qt::WA_MacShowFocusRect, 0);
+  m_listview->setIconSize(QSize(16, 16));
+  layout->addWidget(m_listview);
 
   VGMCollViewModel *vgmCollViewModel = new VGMCollViewModel(collListSelModel, this);
-  setModel(vgmCollViewModel);
-  setSelectionMode(QAbstractItemView::SingleSelection);
-  setSelectionRectVisible(true);
-  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_listview->setModel(vgmCollViewModel);
+  m_listview->setSelectionMode(QAbstractItemView::SingleSelection);
+  m_listview->setSelectionRectVisible(true);
+  m_listview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-  connect(this, &VGMCollView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
+  connect(m_listview, &QListView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
+
+  QObject::connect(collListSelModel, &QItemSelectionModel::currentChanged, [=](QModelIndex index) {
+    if (!index.isValid() || qtVGMRoot.vVGMColl.empty() ||
+        index.row() >= qtVGMRoot.vVGMColl.size()) {
+      commit_rename->setEnabled(false);
+      m_collection_title->setReadOnly(true);
+      m_collection_title->setText("No collection selected");
+    } else {
+      m_collection_title->setText(
+          QString::fromStdWString(*qtVGMRoot.vVGMColl[index.row()]->GetName()));
+      m_collection_title->setReadOnly(false);
+      commit_rename->setEnabled(true);
+    }
+  });
+
+  QObject::connect(commit_rename, &QPushButton::pressed, [=]() {
+    auto model_index = collListSelModel->currentIndex();
+    if (!model_index.isValid() || qtVGMRoot.vVGMColl.empty() ||
+        model_index.row() >= qtVGMRoot.vVGMColl.size()) {
+      return;
+    }
+
+    auto title = m_collection_title->text().toStdWString();
+    /* This makes a copy, no worries */
+    qtVGMRoot.vVGMColl[model_index.row()]->SetName(&title);
+
+    auto coll_list_model = collListSelModel->model();
+    coll_list_model->dataChanged(coll_list_model->index(0, 0),
+                                 coll_list_model->index(model_index.row(), 0));
+  });
+
+  setLayout(layout);
 }
 
 void VGMCollView::doubleClickedSlot(QModelIndex index) {
-  auto file_to_open = qobject_cast<VGMCollViewModel *>(model())->fileFromIndex(index);
+  auto file_to_open = qobject_cast<VGMCollViewModel *>(m_listview->model())->fileFromIndex(index);
   MdiArea::the()->newView(file_to_open);
 }
