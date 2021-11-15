@@ -203,20 +203,23 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint
   // TODO: percussive samples
 
   uint8_t srcn = GetByte(offset);
-  int8_t key = GetByte(offset + 1);
+  int8_t raw_key = GetByte(offset + 1);
   int8_t tuning = GetByte(offset + 2);
   uint8_t adsr1 = GetByte(offset + 3);
   uint8_t adsr2 = GetByte(offset + 4);
   uint8_t pan = GetByte(offset + 5);
   uint8_t vol = GetByte(offset + 6);
 
+  const int8_t key = (tuning >= 0) ? raw_key : (raw_key - 1);
+  const int16_t full_tuning = static_cast<int16_t>((static_cast<uint8_t>(key) << 8) | static_cast<uint8_t>(tuning));
+
   uint8_t gain = adsr2;
   bool use_adsr = ((adsr1 & 0x80) != 0);
 
   double fine_tuning;
   double coarse_tuning;
-  const double pitch_fixer = log(4096.0 / 4286.0) / log(2); // from pitch table ($10be vs $1000)
-  fine_tuning = modf((key + (tuning / 256.0)) + pitch_fixer, &coarse_tuning);
+  const double pitch_fixer = log(4286.0 / 4096.0) / log(2) * 12;  // from pitch table ($10be vs $1000)
+  fine_tuning = modf((full_tuning / 256.0) + pitch_fixer, &coarse_tuning);
 
   // normalize
   if (fine_tuning >= 0.5) {
@@ -229,7 +232,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint
   }
 
   AddSampNum(srcn, offset, 1);
-  AddUnityKey(71 - (int) (coarse_tuning), offset + 1, 1);
+  AddUnityKey(72 - (int) (coarse_tuning), offset + 1, 1);
   AddFineTune((int16_t) (fine_tuning * 100.0), offset + 2, 1);
   AddSimpleItem(offset + 3, 1, L"ADSR1");
   AddSimpleItem(offset + 4, 1, use_adsr ? L"ADSR2" : L"GAIN");
