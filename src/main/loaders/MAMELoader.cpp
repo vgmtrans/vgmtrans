@@ -85,10 +85,8 @@ MAMEGameEntry *MAMELoader::LoadGameEntry(TiXmlElement *gameElmt) {
     gameentry->fmt_version_str = "";
   }
   else {
-    FromString(fmtVersionStr, &gameentry->fmt_version);
-    gameentry->fmt_version_str = fmtVersionStr;
-    //stringstream convert ( fmtVersionStr );
-    //convert >> std::setprecision(2) >> gameentry->fmt_version;		//read seq_table as hexadecimal value
+    stringstream convert (fmtVersionStr);
+    convert >> std::setprecision(2) >> gameentry->fmt_version;		//read seq_table as hexadecimal value
   }
 
   // Load rom groups
