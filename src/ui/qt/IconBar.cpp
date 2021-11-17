@@ -43,6 +43,7 @@ void IconBar::setupControls() {
   m_slider->setRange(0, 0);
   m_slider->setEnabled(false);
   m_slider->setToolTip("Seek");
+  m_slider->setFixedHeight(30);
   connect(m_slider, &QSlider::sliderMoved, this, &IconBar::seekingTo);
   layout()->addWidget(m_slider);
 
