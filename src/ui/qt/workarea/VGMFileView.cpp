@@ -5,6 +5,7 @@
  */
 
 #include "VGMFileView.h"
+#include <QApplication>
 #include <QShortcut>
 #include <QFont>
 #include <VGMFile.h>
@@ -14,8 +15,6 @@
 #include "Helpers.h"
 #include "QtVGMRoot.h"
 
-const int splitterHandleWidth = 1;
-
 VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new QHexView) {
   m_splitter = new QSplitter(Qt::Horizontal, this);
@@ -24,7 +23,10 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   document->setBaseAddress(m_vgmfile->dwOffset);
   m_hexview->setDocument(document);
 
-  QFont font("Ubuntu Mono", 10);
+  /* This is silly, but Qt doesn't have constructor for float sizes.. */
+  QFont font("Ubuntu Mono", QApplication::font().pointSize());
+  font.setPointSizeF(QApplication::font().pointSizeF());
+
   QFontInfo font_info(font);
   if (font_info.fixedPitch()) {
     m_hexview->setFont(font);
