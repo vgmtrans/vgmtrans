@@ -5,10 +5,6 @@
 # For object library linking
 cmake_minimum_required(VERSION 3.12)
 
-# Target macOS 10.14 Mojave
-set(CMAKE_OSX_DEPLOYMENT_TARGET
-    "10.14.0"
-    CACHE STRING "Minimum macOS version targeted" FORCE)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 project(
