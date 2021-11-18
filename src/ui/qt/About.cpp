@@ -48,4 +48,6 @@ About::About(QWidget *parent) : QDialog(parent) {
     h_layout->setAlignment(Qt::AlignLeft);
     h_layout->addWidget(logo);
     h_layout->addWidget(text_label);
+    
+    layout()->setSizeConstraint(QLayout::SetFixedSize);
 }
