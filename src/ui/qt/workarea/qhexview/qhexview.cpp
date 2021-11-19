@@ -1026,7 +1026,7 @@ void QHexView::drawAddress(QPainter *painter, const QPalette &palette, const QRe
   addressrect.setWidth(this->getHexColumnX());
 
   painter->save();
-  painter->setPen(palette.color(QPalette::Dark));
+  painter->setPen(palette.color(QPalette::Text));
   painter->drawText(addressrect, Qt::AlignHCenter | Qt::AlignVCenter, addrStr);
   painter->restore();
 }
@@ -1039,9 +1039,6 @@ void QHexView::drawHex(QPainter *painter, const QPalette &palette, const QRect &
   QByteArray rawline;
 
   textcursor.insertText(this->hexString(line, &rawline));
-
-  if (line == this->documentLastLine())
-    textcursor.insertText(" ");
 
   QRect hexrect = linerect;
   hexrect.setX(this->getHexColumnX() + this->borderSize());
@@ -1108,7 +1105,7 @@ void QHexView::drawHeader(QPainter *painter, const QPalette &palette) {
   asciirect.setWidth(this->getEndColumnX() - this->getAsciiColumnX());
 
   painter->save();
-  painter->setPen(palette.color(QPalette::Dark));
+  painter->setPen(palette.color(QPalette::Text));
 
   painter->drawText(addressrect, Qt::AlignHCenter | Qt::AlignVCenter, QString("Offset"));
   // align left for maximum consistency with drawHex() which prints from the left.
