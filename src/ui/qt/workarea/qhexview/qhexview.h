@@ -99,7 +99,7 @@ private:
   int hexLineWidth() const;
 
   QString hexString(quint64 line, QByteArray* rawline = nullptr) const;
-  QString asciiString(quint64 line, QByteArray* rawline = nullptr) const;
+  QString asciiString(quint64 line) const;
   QByteArray getLine(quint64 line) const;
   qint64 rendererLength() const;
   int getAddressWidth() const;
