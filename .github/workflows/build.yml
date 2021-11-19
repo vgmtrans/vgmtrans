@@ -1,9 +1,12 @@
 name: Build and test
 on: [push, pull_request]
 jobs:
-  macos:
-    name: macOS
+  macos_x64:
+    name: macOS (x64)
     runs-on: macos-10.15
+    env:
+      osx_min_ver: "10.14"
+      osx_arch: "x86_64"
     steps:
       - uses: actions/checkout@v2
       - name: "Install dependencies"
@@ -13,7 +16,7 @@ jobs:
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
-        run: cmake -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -B build
+        run: cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.osx_min_ver }} -DCMAKE_OSX_ARCHITECTURES=${{ env.osx_arch }} -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
@@ -22,7 +25,7 @@ jobs:
       - name: "Upload artifact"
         uses: actions/upload-artifact@v1
         with:
-          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.dmg
+          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ env.osx_arch }}-${{ runner.os }}.dmg
           path: "build/bin/VGMTrans.dmg"
   Ubuntu:
     runs-on: ubuntu-18.04
