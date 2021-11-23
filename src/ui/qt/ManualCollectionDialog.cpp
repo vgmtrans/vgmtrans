@@ -1,0 +1,171 @@
+/**
+ * VGMTrans (c) - 2002-2021
+ * Licensed under the zlib license
+ * See the included LICENSE for more information
+ */
+
+#include "ManualCollectionDialog.h"
+
+#include <QMessageBox>
+#include <QLabel>
+#include <QPushButton>
+#include <QLineEdit>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QListWidget>
+#include <QComboBox>
+#include <QRadioButton>
+#include <QCheckBox>
+#include <QVariant>
+#include <algorithm>
+#include <vector>
+
+#include "QtVGMRoot.h"
+
+#include <VGMSeq.h>
+#include <VGMColl.h>
+#include <VGMFile.h>
+#include <VGMInstrSet.h>
+#include <VGMSampColl.h>
+
+ManualCollectionDialog::ManualCollectionDialog(QWidget *parent) : QDialog(parent) {
+  setWindowTitle("Manual collection creation");
+
+  auto name_label = new QLabel("Collection &name");
+  m_name_field = new QLineEdit();
+  m_name_field->setText("User-defined collection");
+  name_label->setBuddy(m_name_field);
+
+  auto seq_label = new QLabel("Music &sequence");
+  m_seq_list = makeSequenceList();
+  seq_label->setBuddy(m_seq_list);
+
+  auto instr_label = new QLabel("&Instrument set");
+  m_instr_list = makeInstrumentSetList();
+  instr_label->setBuddy(m_instr_list);
+
+  auto samp_label = new QLabel("Sample &collections");
+  m_samp_list = makeSampleCollectionList();
+  samp_label->setBuddy(m_samp_list);
+
+  auto attempt = new QPushButton("Create collection");
+  attempt->setAutoDefault(true);
+
+  auto cancel = new QPushButton("Cancel");
+
+  auto l = new QGridLayout();
+  l->addWidget(name_label, 0, 0);
+  l->addWidget(m_name_field, 0, 1);
+  l->addWidget(seq_label, 1, 0, 1, -1);
+  l->addWidget(m_seq_list, 2, 0, 1, -1);
+  l->addWidget(instr_label, 3, 0, 1, -1);
+  l->addWidget(m_instr_list, 4, 0, 1, -1);
+  l->addWidget(samp_label, 5, 0, 1, -1);
+  l->addWidget(m_samp_list, 6, 0, 1, -1);
+  l->addWidget(cancel, 7, 0);
+  l->addWidget(attempt, 7, 1);
+  setLayout(l);
+
+  connect(m_name_field, &QLineEdit::textChanged,
+          [=](const QString &text) { attempt->setEnabled(!text.isEmpty()); });
+  connect(attempt, &QPushButton::pressed, this, &ManualCollectionDialog::createCollection);
+  connect(cancel, &QPushButton::pressed, this, &ManualCollectionDialog::close);
+}
+
+QListWidget *ManualCollectionDialog::makeSequenceList() {
+  std::vector<VGMFile *> seqs;
+  std::copy_if(std::begin(qtVGMRoot.vVGMFile), std::end(qtVGMRoot.vVGMFile),
+               std::back_inserter(seqs),
+               [](VGMFile *file) { return file->GetFileType() == FILETYPE_SEQ; });
+
+  auto widget = new QListWidget();
+  for (auto seq : seqs) {
+    auto seq_item = new QListWidgetItem(widget);
+    seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
+    widget->setItemWidget(seq_item, new QRadioButton(QString::fromStdWString(*seq->GetName())));
+  }
+
+  return widget;
+}
+
+QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
+  std::vector<VGMFile *> seqs;
+  std::copy_if(std::begin(qtVGMRoot.vVGMFile), std::end(qtVGMRoot.vVGMFile),
+               std::back_inserter(seqs),
+               [](VGMFile *file) { return file->GetFileType() == FILETYPE_INSTRSET; });
+
+  auto widget = new QListWidget();
+  for (auto seq : seqs) {
+    auto seq_item = new QListWidgetItem(widget);
+    seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
+    widget->setItemWidget(seq_item, new QCheckBox(QString::fromStdWString(*seq->GetName())));
+  }
+
+  return widget;
+}
+
+QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
+  std::vector<VGMFile *> seqs;
+  std::copy_if(std::begin(qtVGMRoot.vVGMFile), std::end(qtVGMRoot.vVGMFile),
+               std::back_inserter(seqs),
+               [](VGMFile *file) { return file->GetFileType() == FILETYPE_SAMPCOLL; });
+
+  auto widget = new QListWidget();
+  for (auto seq : seqs) {
+    auto seq_item = new QListWidgetItem(widget);
+    seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
+    widget->setItemWidget(seq_item, new QCheckBox(QString::fromStdWString(*seq->GetName())));
+  }
+
+  return widget;
+}
+
+void ManualCollectionDialog::createCollection() {
+  auto coll = new VGMColl(m_name_field->text().toStdWString());
+
+  VGMSeq *chosen_seq = nullptr;
+  for (int i = 0; i < m_seq_list->count(); i++) {
+    auto item = m_seq_list->item(i);
+    auto radio = qobject_cast<QRadioButton *>(m_seq_list->itemWidget(item));
+    if (radio->isChecked()) {
+      chosen_seq = reinterpret_cast<VGMSeq *>(item->data(Qt::UserRole).value<void *>());
+      break;
+    }
+  }
+
+  if (!chosen_seq) {
+    QMessageBox::critical(this, "Error creating collection", "A music sequence must be selected");
+    return;
+  }
+  coll->UseSeq(chosen_seq);
+
+  for (int i = 0; i < m_instr_list->count(); i++) {
+    auto item = m_instr_list->item(i);
+    auto radio = qobject_cast<QCheckBox *>(m_instr_list->itemWidget(item));
+    if (radio->checkState() == (Qt::Checked)) {
+      auto chosen_set = reinterpret_cast<VGMInstrSet *>(item->data(Qt::UserRole).value<void *>());
+      coll->AddInstrSet(chosen_set);
+    }
+  }
+  if (coll->instrsets.empty()) {
+    QMessageBox::critical(this, "Error creating collection",
+                          "At least an instrument set must be selected");
+    return;
+  }
+
+  for (int i = 0; i < m_samp_list->count(); i++) {
+    auto item = m_samp_list->item(i);
+    auto radio = qobject_cast<QCheckBox *>(m_samp_list->itemWidget(item));
+    if (radio->checkState() == (Qt::Checked)) {
+      auto sampcoll = reinterpret_cast<VGMSampColl *>(item->data(Qt::UserRole).value<void *>());
+      coll->AddSampColl(sampcoll);
+    }
+  }
+  if (coll->sampcolls.empty()) {
+    QMessageBox::warning(this, windowTitle(),
+                          "No sample collections were selected\nThe instrument bank will be silent...");
+  }
+
+  qtVGMRoot.AddVGMColl(coll);
+  close();
+}
