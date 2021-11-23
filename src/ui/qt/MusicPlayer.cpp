@@ -11,6 +11,8 @@
 #include <VGMSeq.h>
 #include <MidiFile.h>
 #include <SF2File.h>
+#include <LogItem.h>
+#include <fluidsynth/log.h>
 #include "QtVGMRoot.h"
 
 /**
@@ -120,6 +122,15 @@ private:
   };
 };
 
+static void fluidLogAdapter(int level, const char *message, void *data) {
+  auto root = reinterpret_cast<QtVGMRoot *>(data);
+  // FluidSynth's log levels are +1 compared to ours
+  level--;
+  auto to_log = std::wstring{};
+  to_log.assign(message, strlen(message) + message);
+  root->UI_AddLogItem(new LogItem(to_log, static_cast<LogLevel>(level), L"MusicPlayer"));
+}
+
 MusicPlayer::MusicPlayer() {
   QSettings settings;
   auto driver_option = settings.value("playback.audioDriver");
@@ -138,6 +149,12 @@ MusicPlayer::MusicPlayer() {
 
   makeSettings();
   makeSynth();
+
+  fluid_set_log_function(FLUID_PANIC, fluidLogAdapter, &qtVGMRoot);
+  fluid_set_log_function(FLUID_ERR, fluidLogAdapter, &qtVGMRoot);
+  fluid_set_log_function(FLUID_WARN, fluidLogAdapter, &qtVGMRoot);
+  fluid_set_log_function(FLUID_INFO, fluidLogAdapter, &qtVGMRoot);
+  fluid_set_log_function(FLUID_DBG, fluidLogAdapter, &qtVGMRoot);
 }
 
 MusicPlayer::~MusicPlayer() {
@@ -358,7 +375,9 @@ bool MusicPlayer::setAudioDriver(const char *driver_name) {
   QSettings settings;
   settings.setValue("playback.audioDriver", driver_name);
 
-  qtVGMRoot.UI_AddLogItem(new LogItem(QString("Switched playback backend to \"%1\"").arg(driver_name).toStdWString(), LOG_LEVEL_INFO, L"MusicPlayer"));
+  qtVGMRoot.UI_AddLogItem(
+      new LogItem(QString("Switched playback backend to \"%1\"").arg(driver_name).toStdWString(),
+                  LOG_LEVEL_INFO, L"MusicPlayer"));
   makeSynth();
 
   return true;
