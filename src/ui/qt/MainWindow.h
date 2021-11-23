@@ -15,6 +15,7 @@ class IconBar;
 class Logger;
 class VGMCollListView;
 class VGMCollView;
+class QPushButton;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -40,4 +41,5 @@ private:
   Logger *m_logger{};
   VGMCollListView *m_coll_listview{};
   VGMCollView *m_coll_view{};
+  QPushButton *m_manual_creation_btn{};
 };

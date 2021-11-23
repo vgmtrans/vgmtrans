@@ -26,6 +26,17 @@ void IconBar::setupControls() {
   s_playicon = QIcon(":/images/player_play.svg");
   s_pauseicon = QIcon(":/images/player_pause.svg");
 
+  m_create = new QPushButton("Create collection manually");
+  m_create->setAutoDefault(false);
+  connect(m_create, &QPushButton::pressed, this, &IconBar::createPressed);
+  layout()->addWidget(m_create);
+
+  QFrame *line;
+  line = new QFrame(this);
+  line->setFrameShape(QFrame::VLine);
+  line->setFrameShadow(QFrame::Sunken);
+  layout()->addWidget(line);
+
   m_play = new QPushButton();
   m_play->setIcon(s_playicon);
   m_play->setToolTip("Play selected collection (Space)");

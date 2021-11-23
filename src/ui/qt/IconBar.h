@@ -22,6 +22,7 @@ signals:
   void playToggle();
   void stopPressed();
   void seekingTo(int position);
+  void createPressed();
 
 private slots:
   void playerStatusChanged(bool playing);
@@ -30,6 +31,7 @@ private slots:
 private:
   void setupControls();
 
+  QPushButton *m_create{};
   QPushButton *m_play{};
   QPushButton *m_stop{};
   QSlider *m_slider{};

@@ -11,8 +11,10 @@
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QGridLayout>
+#include <QPushButton>
 #include <version.h>
 #include <fluidsynth.h>
+#include "ManualCollectionDialog.h"
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 #include "MenuBar.h"
@@ -80,7 +82,7 @@ void MainWindow::createElements() {
 
   auto coll_wrapper = new QWidget();
   auto coll_layout = new QGridLayout();
-  coll_layout->addWidget(m_coll_view, 1, 0, 1, 1, Qt::AlignLeft);
+  coll_layout->addWidget(m_coll_view, 0, 0, 1, 1, Qt::AlignLeft);
   coll_layout->addWidget(coll_list_area, 0, 1, -1, -1);
   coll_wrapper->setLayout(coll_layout);
 
@@ -114,6 +116,10 @@ void MainWindow::routeSignals() {
           &VGMCollListView::handlePlaybackRequest);
   connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
   connect(m_icon_bar, &IconBar::seekingTo, &MusicPlayer::the(), &MusicPlayer::seek);
+  connect(m_icon_bar, &IconBar::createPressed, [=]() {
+    ManualCollectionDialog wiz(this);
+    wiz.exec();
+  });
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
