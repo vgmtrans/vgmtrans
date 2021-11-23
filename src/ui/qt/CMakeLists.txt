@@ -106,6 +106,8 @@ add_executable(
   IconBar.h
   MainWindow.cpp
   MainWindow.h
+  ManualCollectionDialog.cpp
+  ManualCollectionDialog.h
   MenuBar.cpp
   MenuBar.h
   MusicPlayer.cpp
