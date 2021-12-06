@@ -90,10 +90,30 @@ bool PS1Seq::ReadEvent(void) {
 //	else
   // Running Status
   if (status_byte <= 0x7F) {
-    // some games were ripped to PSF with the EndTrack event missing, so
-    //if we read a sequence of four 0 bytes, then just treat that as the end of the track
-    if (status_byte == 0 && GetWord(curOffset) == 0) {
-      return false;
+    if (status_byte == 0) {
+      // Workaround: some games (exactly what?) were ripped to PSF with the EndTrack event missing,
+      // so if we read a sequence of 0 bytes, then just treat that as the end of the track.
+      //
+      // EXCEPTIONAL CASE: Mega Man 8: 12. Ruins Stage.psf (Sword Man stage)
+      // 3182D: 00 C0 00 00 00 00 00 00 00 00 00 00 C2 02
+
+      constexpr size_t kZeroDataLengthThreshold = 10;
+      bool no_next_data = true;
+      for (off_t off = beginOffset; off < beginOffset + kZeroDataLengthThreshold; off++) {
+        if (GetByte(off) != 0) {
+          no_next_data = false;
+          break;
+        }
+      }
+
+      if (no_next_data) {
+        std::wostringstream message;
+        message << L"SEQ parser has reached zero-filled data at 0x" << std::hex << std::uppercase
+                << beginOffset
+                << L". Parser terminates the analysis because it is considered to be out of bounds of the song data.";
+        pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, L"PS1Seq"));
+        return false;
+      }
     }
     status_byte = runningStatus;
     curOffset--;
