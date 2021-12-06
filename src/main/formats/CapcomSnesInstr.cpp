@@ -28,13 +28,16 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
       return false;
     }
 
-    // skip blank slot (Mega Man X2)
-    if (GetByte(addrInstrHeader) == 0xff
-        && GetByte(addrInstrHeader + 1) == 0xff
-        && GetByte(addrInstrHeader + 2) == 0xff
-        && GetByte(addrInstrHeader + 3) == 0xff
-        && GetByte(addrInstrHeader + 4) == 0xff
-        && GetByte(addrInstrHeader + 5) == 0xff) {
+    // skip blank slot (Mega Man X2, Super Street Fighter II Turbo)
+    bool empty_garbage = true;
+    for (uint32_t off = addrInstrHeader; off < addrInstrHeader + 6; off++) {
+      const uint8_t v = GetByte(off);
+      if (v != 0 && v != 0xff) {
+        empty_garbage = false;
+        break;
+      }
+    }
+    if (empty_garbage) {
       continue;
     }
 
