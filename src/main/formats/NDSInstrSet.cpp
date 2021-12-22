@@ -4,23 +4,32 @@
  * See the included LICENSE for more information
  */
 
+#include <cmath>
+#include <iterator>
+#include <numeric>
+#include <string>
+#include <vector>
+#include "Loop.h"
+#include "NDSFormat.h"
+#include "VGMSampColl.h"
 #include "pch.h"
 #include "NDSInstrSet.h"
 #include "VGMRgn.h"
 
 // INTR_FREQUENCY is the interval in seconds between updates to the vol for articulation.
-// In the original software, this is done via a hardware interrupt timer.
-// After calculating the number of volume updates that will be made for the articulation values,
-// a calculation found through reverse-engineering the music driver code,  we can multiply the count
-// by this frequency to find the duration of the articulation phases with exact accuracy.
-#define INTR_FREQUENCY (1.0 / 192.0)  // 0.005210332809750868
+// In the original software, this is done via an interrupt timer.
+// The value was copied from the nocash docs.
+// We can multiply the count  by this frequency to find the duration of the articulation phases with
+// exact accuracy.
+constexpr double INTR_FREQUENCY = 64 * 2728.0 / 33e6;
 
 // ***********
 // NDSInstrSet
 // ***********
 
-NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, wstring name)
-    : VGMInstrSet(NDSFormat::name, file, offset, length, name) {
+NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSampColl *psg_samples,
+                         std::wstring name)
+    : VGMInstrSet(NDSFormat::name, file, offset, length, name), m_psg_samples(psg_samples) {
 }
 
 bool NDSInstrSet::GetInstrPointers() {
@@ -58,10 +67,10 @@ NDSInstr::NDSInstr(NDSInstrSet *instrSet, uint32_t offset, uint32_t length, uint
 bool NDSInstr::LoadInstr() {
   // All of the undefined case values below are used for tone or noise channels
   switch (instrType) {
-    // single region format
     case 0x01: {
       name = L"Single-Region Instrument";
       unLength = 10;
+
       VGMRgn *rgn = AddRgn(dwOffset, 10, GetShort(dwOffset));
       GetSampCollPtr(rgn, GetShort(dwOffset + 2));
       GetArticData(rgn, dwOffset + 4);
@@ -69,24 +78,39 @@ bool NDSInstr::LoadInstr() {
     }
 
     case 0x02: {
-      /* PGM Tone */
+      /* PSG Tone */
       uint8_t dutyCycle = GetByte(dwOffset) & 0x07;
       std::wstring dutyCycles[8] = {L"12.5%", L"25%", L"37.5%", L"50%",
                                     L"62.5%", L"75%", L"87.5%", L"0%"};
-      name = L"NES Sq (" + dutyCycles[dutyCycle] + L")";
+      name = L"PSG Wave (" + dutyCycles[dutyCycle] + L")";
       unLength = 10;
+
+      VGMRgn *rgn = AddRgn(dwOffset, 10, dutyCycle);
+      GetArticData(rgn, dwOffset + 4);
+
+      rgn->sampCollPtr = ((NDSInstrSet *)parInstrSet)->m_psg_samples;
+      /* We have to set this manually as all of our samples are generated at 440Hz (69 = A4) */
+      rgn->SetUnityKey(69);
       break;
     }
 
     case 0x03: {
-      name = L"NES Noise";
+      name = L"PSG Noise";
       unLength = 10;
+
+      /* The noise sample is the 8th in our PSG sample collection */
+      VGMRgn *rgn = AddRgn(dwOffset, 10, 8);
+      GetArticData(rgn, dwOffset + 4);
+
+      rgn->sampCollPtr = ((NDSInstrSet *)parInstrSet)->m_psg_samples;
+      rgn->SetUnityKey(45);
+
       break;
     }
 
-    // drumset
     case 0x10: {
       name = L"Drumset";
+
       uint8_t lowKey = GetByte(dwOffset);
       uint8_t highKey = GetByte(dwOffset + 1);
       uint8_t nRgns = (highKey - lowKey) + 1;
@@ -97,10 +121,10 @@ bool NDSInstr::LoadInstr() {
         GetArticData(rgn, dwOffset + 2 + 6 + i * 12);
       }
       unLength = 2 + nRgns * 12;
+
       break;
     }
 
-    // multiple regions format
     case 0x11: {
       name = L"Multi-Region Instrument";
       uint8_t keyRanges[8];
@@ -121,6 +145,7 @@ bool NDSInstr::LoadInstr() {
         GetArticData(rgn, dwOffset + 8 + i * 12 + 6);
       }
       unLength = nRgns * 12 + 8;
+
       break;
     }
   }
@@ -232,9 +257,6 @@ NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, wstrin
     : VGMSampColl(NDSFormat::name, file, offset, length, name) {
 }
 
-NDSWaveArch::~NDSWaveArch() {
-}
-
 bool NDSWaveArch::GetHeaderInfo() {
   unLength = GetWord(dwOffset + 8);
   return true;
@@ -295,6 +317,18 @@ bool NDSWaveArch::GetSampleInfo() {
     samp->SetLoopLength(nonLoopLength);
     samples.push_back(samp);
   }
+  return true;
+}
+
+NDSPSG::NDSPSG(RawFile *file) : VGMSampColl(NDSFormat::name, file, 0, 0, L"NDS PSG samples") {
+}
+
+bool NDSPSG::GetSampleInfo() {
+  /* 8 waves + noise */
+  for (uint8_t i = 0; i <= 8; i++) {
+    samples.push_back(new NDSPSGSamp(this, i));
+  }
+
   return true;
 }
 
@@ -426,4 +460,115 @@ void NDSSamp::clamp_sample(int &decompSample) {
     decompSample = -32768;
   if (decompSample > 32767)
     decompSample = 32767;
+}
+
+NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(sampcoll) {
+  switch (duty_cycle) {
+    case 7: {
+      m_duty_cycle = 0;
+      break;
+    }
+    case 0: {
+      m_duty_cycle = 0.125;
+      break;
+    }
+    case 1: {
+      m_duty_cycle = 0.25;
+      break;
+    }
+    case 2: {
+      m_duty_cycle = 0.375;
+      break;
+    }
+    case 3: {
+      m_duty_cycle = 0.5;
+      break;
+    }
+    case 4: {
+      m_duty_cycle = 0.625;
+      break;
+    }
+    case 5: {
+      m_duty_cycle = 0.75;
+      break;
+    }
+    case 6: {
+      m_duty_cycle = 0.875;
+      break;
+    }
+    default: {
+      /* We don't care about the rest */
+      break;
+    }
+  }
+
+  SetNumChannels(1);
+  /* This is the NDS mixer frequency */
+  SetRate(32768);
+  SetBPS(16);
+  SetWaveType(WT_PCM16);
+
+  SetLoopStatus(true);
+
+  SetLoopOffset(0);
+  SetLoopLength(32768);
+  SetLoopStartMeasure(LM_SAMPLES);
+  SetLoopLengthMeasure(LM_SAMPLES);
+  ulUncompressedSize = 32768 * bps / 8;
+
+  sampName = L"PSG_duty_" + std::to_wstring(duty_cycle);
+}
+
+void NDSPSGSamp::ConvertToStdWave(uint8_t *buf) {
+  /* Give that the wave type is PCM-16, this is handy */
+  int16_t *output = reinterpret_cast<int16_t *>(buf);
+
+  /* Noise mode */
+  if (m_duty_cycle == -1) {
+    int16_t value = 0x7FFF;
+    output[0] = 0x7FFF;
+    for (int i = 1, len = GetLoopLength(); i < len; i++) {
+      bool carry = value & 0x0001;
+      value >>= 1;
+      if (carry) {
+        output[i] = -0x7FFF;
+        value ^= 0x6000;
+      } else {
+        output[i] = 0x7FFF;
+      }
+    }
+  } else {
+    /*
+     * PSG wave mode
+     * It's band limited so it should sound nice!
+     */
+
+    /* Generate Fourier coefficients */
+    std::vector<double> coefficients = {m_duty_cycle - 0.5};
+    {
+      int i = 1;
+      std::generate_n(std::back_inserter(coefficients), rate / (440 * 2),
+                      [duty_cycle = m_duty_cycle, &i]() {
+                        double val = sin(i * duty_cycle * M_PI) * 2 / (i * M_PI);
+                        i++;
+
+                        return val;
+                      });
+    }
+
+    /* Generate audio */
+    double scale = 440 * M_PI * 2 / rate;
+    for (int i = 0, len = GetLoopLength(); i < len; i++) {
+      int counter = 0;
+      double value = std::accumulate(std::begin(coefficients), std::end(coefficients), 0.0,
+                                     [i, scale, &counter](double sum, double coef) {
+                                       sum += coef * cos(counter++ * scale * i);
+                                       return sum;
+                                     });
+
+      /* We have to go from F64 to S16 */
+      int16_t out_value = static_cast<int16_t>(std::round(value * 0x7FFF));
+      output[i] = out_value;
+    }
+  }
 }

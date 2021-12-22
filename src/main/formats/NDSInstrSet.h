@@ -5,11 +5,14 @@
  */
 
 #pragma once
+#include "RawFile.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMColl.h"
 #include "NDSFormat.h"
+
+class NDSInstr;
 
 // ***********
 // NDSInstrSet
@@ -17,11 +20,15 @@
 
 class NDSInstrSet : public VGMInstrSet {
 public:
-  NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length,
-              std::wstring name = L"NDS Instrument Bank" /*, VGMSampColl* sampColl = NULL*/);
+  NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSampColl *psg_samples,
+              std::wstring name = L"NDS Instrument Bank");
   virtual bool GetInstrPointers();
 
   std::vector<VGMSampColl *> sampCollWAList;
+
+private:
+  VGMSampColl* m_psg_samples{};
+  friend NDSInstr;
 };
 
 // ********
@@ -69,10 +76,19 @@ class NDSWaveArch : public VGMSampColl {
 public:
   NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length,
               std::wstring name = L"NDS Wave Archive");
-  virtual ~NDSWaveArch();
+  ~NDSWaveArch() override = default;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetSampleInfo();
+  bool GetHeaderInfo() override;
+  bool GetSampleInfo() override;
+};
+
+class NDSPSG : public VGMSampColl {
+public:
+  NDSPSG(RawFile *file);
+  ~NDSPSG() override = default;
+  
+private:
+  bool GetSampleInfo() override;
 };
 
 // *******
@@ -98,4 +114,16 @@ public:
   enum { PCM8, PCM16, IMA_ADPCM };
 
   uint8_t waveType;
+};
+
+class NDSPSGSamp : public VGMSamp {
+public:
+  NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle);
+  ~NDSPSGSamp() override = default;
+
+private:
+  void ConvertToStdWave(uint8_t *buf) override;
+
+  /* We use -1 to indicate noise */
+  double m_duty_cycle{-1};
 };
