@@ -90,11 +90,11 @@ target_compile_features(g_options INTERFACE cxx_std_17)
 if(MSVC)
   target_compile_options(
     g_options
-    INTERFACE -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE
-              -D_CRT_SECURE_NO_WARNINGS /permissive- /Zc:strictStrings-)
-
+    INTERFACE /permissive- /Zc:strictStrings-)
+  target_compile_definitions(
+    g_options
+    INTERFACE NOMINMAX _CRT_SECURE_NO_DEPRECATE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE _USE_MATH_DEFINES)
   target_compile_options(g_warnings INTERFACE /W3)
-
 else()
   if(ENABLE_ASAN)
     target_compile_options(g_options INTERFACE -fsanitize=address)
