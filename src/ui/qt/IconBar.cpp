@@ -51,10 +51,13 @@ void IconBar::setupControls() {
   layout()->addWidget(m_stop);
 
   m_slider = new QSlider(Qt::Horizontal);
-  m_slider->setRange(0, 0);
+  /* Needed to make sure the slider is properly rendered on macOS */
+  m_slider->setRange(0, 1);
+  m_slider->setValue(0);
+  m_slider->setFixedHeight(30);
+
   m_slider->setEnabled(false);
   m_slider->setToolTip("Seek");
-  m_slider->setFixedHeight(30);
   connect(m_slider, &QSlider::sliderMoved, this, &IconBar::seekingTo);
   layout()->addWidget(m_slider);
 
