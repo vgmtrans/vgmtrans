@@ -1,3 +1,4 @@
+#include <string>
 #include "pch.h"
 #include "common.h"
 #include "NDSScanner.h"
@@ -7,7 +8,6 @@
 using namespace std;
 
 #define SRCH_BUF_SIZE 0x20000
-
 
 void NDSScanner::Scan(RawFile *file, void *info) {
   SearchForSDAT(file);
@@ -154,6 +154,9 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       waFileIDs.push_back(file->GetShort(pWAInfo));
   }
 
+  NDSPSG* psg_sampcoll = new NDSPSG(file);
+  psg_sampcoll->LoadVGMFile();
+
   {
     vector<uint16_t> vUniqueWAs;// = vector<uint16_t>(bnkWAs);
     for (uint32_t i = 0; i < bnkWAs.size(); i++)
@@ -208,8 +211,8 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       uint32_t fileSize = file->GetWord(offset);
       //if (bnkWAs[*iter][0] == (uint16_t)-1 || numWAs != 1)
       //	continue;
-      NDSInstrSet *NewNDSInstrSet = new NDSInstrSet(file, pBnkFatData, fileSize,
-                                                    bnkNames[*iter]/*, WAs[bnkWAs[*iter][0]]*/);
+      NDSInstrSet *NewNDSInstrSet = new NDSInstrSet(file, pBnkFatData, fileSize, psg_sampcoll,
+                                                    bnkNames[*iter]);
       for (int i = 0; i < 4; i++)        //use first WA found.  Ideally, should load all WAs
       {
         short WAnum = bnkWAs[*iter][i];
@@ -219,8 +222,8 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
           NewNDSInstrSet->sampCollWAList.push_back(NULL);
       }
       if (!NewNDSInstrSet->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSInstrSet at 0x%08x\n",
-                                                            pBnkFatData).c_str(), LOG_LEVEL_ERR, L"NDSScanner"));
+        pRoot->AddLogItem(new LogItem((L"Failed to load NDSInstrSet at " + std::to_wstring(
+                                                            pBnkFatData)).c_str(), LOG_LEVEL_ERR, L"NDSScanner"));
       }
       pair<uint16_t, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
       BNKs.push_back(theBank);
@@ -255,7 +258,9 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
           break;
         }
       }
+      
       NDSInstrSet *instrset = BNKs[bnkIndex].second;
+      coll->AddSampColl(psg_sampcoll);
       coll->AddInstrSet(BNKs[bnkIndex].second);
       for (int j = 0; j < 4; j++) {
         short WAnum = bnkWAs[seqFileBnks[i]][j];
@@ -269,22 +274,3 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
   }
   return SDATLength;
 }
-
-
-
-
-/*void NDSScanner::SearchForNDSSeq (RawFile* file)
-{
-	uint32_t nFileLength = file->size();
-	for (uint32_t i=0; i+4<nFileLength; i++)
-	{
-		if ((*file)[i] == 'S' && (*file)[i+1] == 'S' && (*file)[i+2] == 'E' && (*file)[i+3] == 'Q')
-		{
-			//if (file->GetShort(i+10) == 0 && file->GetShort(i+16) == 0)
-			//{
-				NDSSeq* NewNDSSeq = new NDSSeq(file, i);
-				NewNDSSeq->Load();
-			//}
-		}
-	}
-}*/
