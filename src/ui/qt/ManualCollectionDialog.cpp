@@ -30,6 +30,8 @@
 
 ManualCollectionDialog::ManualCollectionDialog(QWidget *parent) : QDialog(parent) {
   setWindowTitle("Manual collection creation");
+  setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint & Qt::Sheet);
+  setWindowModality(Qt::WindowModal);
 
   auto name_label = new QLabel("Collection &name");
   m_name_field = new QLineEdit();
