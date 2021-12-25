@@ -516,7 +516,7 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   SetLoopLengthMeasure(LM_SAMPLES);
   ulUncompressedSize = 32768 * bps / 8;
 
-  sampName = L"PSG_duty_" + std::to_wstring(duty_cycle);
+  name = L"PSG_duty_" + std::to_wstring(duty_cycle);
 }
 
 void NDSPSGSamp::ConvertToStdWave(uint8_t *buf) {

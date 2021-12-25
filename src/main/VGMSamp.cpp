@@ -9,8 +9,6 @@
 #include "VGMSampColl.h"
 #include "Root.h"
 
-using namespace std;
-
 // *******
 // VGMSamp
 // *******
@@ -20,12 +18,8 @@ DECLARE_MENU(VGMSamp)
 VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
                  wstring theName)
-    : VGMItem(sampColl->vgmfile, offset, length, theName),
-      dataOff(dataOffset), dataLength(dataLen), bps(theBPS), rate(theRate),
-      channels(nChannels), parSampColl(sampColl), sampName(theName) {
-  name = sampName.data();  // I would do this in the initialization list, but VGMItem() constructor
-                           // is called before sampName is initialized,
-  // so data() ends up returning a bad pointer
+    : VGMItem(sampColl->vgmfile, offset, length, theName), dataOff(dataOffset), dataLength(dataLen),
+      bps(theBPS), rate(theRate), channels(nChannels), parSampColl(sampColl) {
 }
 
 double VGMSamp::GetCompressionRatio() {
@@ -34,16 +28,16 @@ double VGMSamp::GetCompressionRatio() {
 
 void VGMSamp::ConvertToStdWave(uint8_t *buf) {
   switch (waveType) {
-    // case WT_IMA_ADPCM:
-    //	ConvertImaAdpcm(buf);
     case WT_PCM8:
       GetBytes(dataOff, dataLength, buf);
-      for (unsigned int i = 0; i < dataLength;
-           i++)          // convert every byte from signed to unsigned value
-        buf[i] ^= 0x80;  // For no good reason, the WAV standard has PCM8 unsigned and PCM16 signed
+      /* Need to transform to unsigned (despite what the type imples), as standard WAVE uses PCM8
+       * unsigned */
+      for (unsigned int i = 0; i < dataLength; i++)
+        buf[i] ^= 0x80;
       break;
     case WT_PCM16:
     default:
+      /* Nothing to do here, PCM16 is signed */
       GetBytes(dataOff, dataLength, buf);
       break;
   }
@@ -51,13 +45,12 @@ void VGMSamp::ConvertToStdWave(uint8_t *buf) {
 
 bool VGMSamp::OnSaveAsWav() {
   wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"wav");
-  if (filepath.length() != 0)
+  if (filepath.empty())
     return SaveAsWav(filepath);
   return false;
 }
 
 bool VGMSamp::SaveAsWav(const std::wstring &filepath) {
-  vector<uint8_t> waveBuf;
   uint32_t bufSize;
   if (this->ulUncompressedSize)
     bufSize = this->ulUncompressedSize;
@@ -65,13 +58,14 @@ bool VGMSamp::SaveAsWav(const std::wstring &filepath) {
     bufSize = (uint32_t)ceil((double)dataLength * GetCompressionRatio());
 
   std::vector<uint8_t> uncompSampBuf(
-      bufSize);                            // create a new memory space for the uncompressed wave
-  ConvertToStdWave(uncompSampBuf.data());  // and uncompress into that space
+      bufSize);                           
+  ConvertToStdWave(uncompSampBuf.data());
 
   uint16_t blockAlign = bps / 8 * channels;
 
   bool hasLoop = (this->loop.loopStatus != -1 && this->loop.loopStatus != 0);
 
+  std::vector<uint8_t> waveBuf;
   PushTypeOnVectBE<uint32_t>(waveBuf, 0x52494646);                                        //"RIFF"
   PushTypeOnVect<uint32_t>(waveBuf, 0x24 + ((bufSize + 1) & ~1) + (hasLoop ? 0x50 : 0));  // size
 
