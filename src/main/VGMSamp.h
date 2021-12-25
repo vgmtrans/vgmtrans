@@ -1,3 +1,9 @@
+/**
+ * VGMTrans (c) - 2002-2021
+ * Licensed under the zlib license
+ * See the included LICENSE for more information
+ */
+
 #pragma once
 #include "VGMItem.h"
 #include "Loop.h"
@@ -5,30 +11,22 @@
 
 class VGMSampColl;
 
+enum WAVE_TYPE { WT_UNDEFINED, WT_PCM8, WT_PCM16 };
 
-enum WAVE_TYPE {
-  WT_UNDEFINED,
-  WT_PCM8,
-  WT_PCM16
-};
-
-
-class VGMSamp:
-    public VGMItem {
- public:
+class VGMSamp : public VGMItem {
+public:
   BEGIN_MENU(VGMSamp)
-      MENU_ITEM(VGMSamp, OnSaveAsWav, L"Convert to WAV file")
+  MENU_ITEM(VGMSamp, OnSaveAsWav, L"Convert to WAV file")
   END_MENU()
 
-
-  VGMSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0,
-          uint32_t dataOffset = 0, uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16,
-          uint32_t rate = 0, std::wstring name = L"Sample");
-  virtual ~VGMSamp();
+  VGMSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0, uint32_t dataOffset = 0,
+          uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16, uint32_t rate = 0,
+          std::wstring name = L"Sample");
+  virtual ~VGMSamp() = default;
 
   virtual Icon GetIcon() { return ICON_SAMP; };
 
-  virtual double GetCompressionRatio(); // ratio of space conserved.  should generally be > 1
+  virtual double GetCompressionRatio();  // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion
   virtual void ConvertToStdWave(uint8_t *buf);
 
@@ -49,23 +47,24 @@ class VGMSamp:
   bool OnSaveAsWav();
   bool SaveAsWav(const std::wstring &filepath);
 
- public:
-  WAVE_TYPE waveType;
-  uint32_t dataOff;    //offset of original sample data
+public:
+  WAVE_TYPE waveType = WT_UNDEFINED;
+  uint32_t dataOff;  // offset of original sample data
   uint32_t dataLength;
-  uint16_t bps;        //bits per sample
-  uint32_t rate;        //sample rate in herz (samples per second)
-  uint8_t channels;    //mono or stereo?
-  uint32_t ulUncompressedSize;
+  uint16_t bps;      // bits per sample
+  uint32_t rate;     // sample rate in herz (samples per second)
+  uint8_t channels;  // mono or stereo?
+  uint32_t ulUncompressedSize{0};
 
-  bool bPSXLoopInfoPrioritizing;
+  bool bPSXLoopInfoPrioritizing = false;
   Loop loop;
 
-  uint8_t unityKey;
-  short fineTune;
-  double volume;    //as percent of full volume.  This will be converted to attenuation for SynthFile
+  /* FIXME: these placeholders value are not so clean... */
+  uint8_t unityKey = -1;
+  short fineTune = 0;
+  double volume = -1;  // as percent of full volume.  This will be converted to attenuation for SynthFile
 
-  long pan;
+  long pan{0};
 
   VGMSampColl *parSampColl;
   std::wstring sampName;
