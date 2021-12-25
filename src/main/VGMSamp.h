@@ -67,5 +67,4 @@ public:
   long pan{0};
 
   VGMSampColl *parSampColl;
-  std::wstring sampName;
 };
