@@ -77,6 +77,7 @@ enum AkaoSnesSeqEventType {
   EVENT_ECHO_FIR,
   EVENT_CPU_CONTROLED_SET_VALUE,
   EVENT_CPU_CONTROLED_JUMP,
+  EVENT_CPU_CONTROLED_JUMP_V2,
   EVENT_PERC_ON,
   EVENT_PERC_OFF,
   EVENT_VOLUME_ALT,
@@ -144,6 +145,7 @@ class AkaoSnesTrack
   bool legato;
   bool percussion;
   uint8_t nonPercussionProgram;
+  bool jumpActivatedByMainCpu;
 
   uint8_t loopLevel;
   uint8_t loopIncCount[AKAOSNES_LOOP_LEVEL_MAX];
