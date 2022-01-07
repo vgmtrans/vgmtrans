@@ -468,7 +468,7 @@ void AkaoSnesSeq::LoadEventMap() {
       EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
       EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
       EventMap[0xf9] = EVENT_UNKNOWN1;
-      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP_V2;
       EventMap[0xfb] = EVENT_PERC_ON;
       EventMap[0xfc] = EVENT_PERC_OFF;
       EventMap[0xfd] = EVENT_VOLUME_ALT;
@@ -482,7 +482,7 @@ void AkaoSnesSeq::LoadEventMap() {
       EventMap[0xf7] = EVENT_ECHO_FEEDBACK_FADE;
       EventMap[0xf8] = EVENT_ECHO_FIR_FADE;
       EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
-      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP_V2;
       EventMap[0xfb] = EVENT_PERC_ON;
       EventMap[0xfc] = EVENT_PERC_OFF;
       EventMap[0xfd] = EVENT_VOLUME_ALT;
@@ -496,7 +496,7 @@ void AkaoSnesSeq::LoadEventMap() {
       EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
       EventMap[0xf8] = EVENT_ECHO_FIR;
       EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
-      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP_V2;
       EventMap[0xfb] = EVENT_PERC_ON;
       EventMap[0xfc] = EVENT_PERC_OFF;
       EventMap[0xfd] = EVENT_PLAY_SFX;
@@ -513,7 +513,7 @@ void AkaoSnesSeq::LoadEventMap() {
       EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
       EventMap[0xf8] = EVENT_ECHO_FIR;
       EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
-      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP_V2;
       EventMap[0xfb] = EVENT_PERC_ON;
       EventMap[0xfc] = EVENT_PERC_OFF;
       EventMap[0xfd] = EVENT_END; // duplicated
@@ -527,7 +527,7 @@ void AkaoSnesSeq::LoadEventMap() {
       EventMap[0xf7] = EVENT_ECHO_FEEDBACK;
       EventMap[0xf8] = EVENT_ECHO_FIR;
       EventMap[0xf9] = EVENT_CPU_CONTROLED_SET_VALUE;
-      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP;
+      EventMap[0xfa] = EVENT_CPU_CONTROLED_JUMP_V2;
       EventMap[0xfb] = EVENT_PERC_ON;
       EventMap[0xfc] = EVENT_PERC_OFF;
       EventMap[0xfd] = EVENT_UNKNOWN1;
@@ -577,6 +577,7 @@ void AkaoSnesTrack::ResetVars(void) {
   legato = false;
   percussion = false;
   nonPercussionProgram = 0;
+  jumpActivatedByMainCpu = true; // it should be false in the actual driver, but for convenience
 
   ignoreMasterVolumeProgNum = 0xff;
 }
@@ -1470,11 +1471,31 @@ bool AkaoSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_CPU_CONTROLED_JUMP: {
+      uint16_t dest = GetShortAddress(curOffset);
+      curOffset += 2;
+      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase
+           << (int)dest;
+
+      AddGenericEvent(beginOffset, curOffset - beginOffset, L"CPU-Controled Jump", desc.str(),
+                      CLR_LOOP);
+
+      if (jumpActivatedByMainCpu) {
+        curOffset = dest;
+
+        if (parentSeq->version == AKAOSNES_V3 ||
+            (parentSeq->version == AKAOSNES_V4 && parentSeq->minorVersion == AKAOSNES_V4_FF6))
+          jumpActivatedByMainCpu = false;
+      }
+
+      break;
+    }
+
+    case EVENT_CPU_CONTROLED_JUMP_V2: {
       uint8_t arg1 = GetByte(curOffset++) & 15;
       uint16_t dest = GetShortAddress(curOffset);
       curOffset += 2;
-      desc << L"Arg1: " << (int) arg1 << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
-          << std::uppercase << (int) dest;
+      desc << L"Arg1: " << (int)arg1 << L"  Destination: $" << std::hex << std::setfill(L'0')
+           << std::setw(4) << std::uppercase << (int)dest;
       AddUnknown(beginOffset, curOffset - beginOffset, L"CPU-Controled Jump", desc.str().c_str());
       break;
     }
