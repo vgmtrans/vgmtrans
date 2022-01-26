@@ -131,19 +131,13 @@ bool Vab::GetInstrPointers() {
     uint32_t vagOffset = vagStartOffset;
 
     for (uint32_t i = 0; i < numVAGs; i++) {
-      uint32_t vagSize;
-
-      if (i != 0) {
-        vagOffset += vagLocations[i - 1].size;
-      }
-
-      vagSize = GetShort(offVAGOffsets + i * 2) * 8;
+      uint32_t vagSize = GetShort(offVAGOffsets + i * 2) * 8;
 
       swprintf(name, 256, L"VAG Size /8 #%u", i);
       vagOffsetHdr->AddSimpleItem(offVAGOffsets + i * 2, 2, name);
 
       if (vagOffset + vagSize <= nEndOffset) {
-        vagLocations.push_back(SizeOffsetPair(vagOffset, vagSize));
+        vagLocations.emplace_back(SizeOffsetPair(vagOffset, vagSize));
         totalVAGSize += vagSize;
       }
       else {
@@ -151,6 +145,8 @@ bool Vab::GetInstrPointers() {
         swprintf(log, 512, L"VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i, vagOffset, vagSize);
         pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
       }
+
+      vagOffset += vagSize;
     }
     unLength = vagStartOffset - dwOffset;
 
@@ -227,7 +223,7 @@ bool VabRgn::LoadRgn() {
 
   AddGeneralItem(dwOffset, 1, L"Priority");
   AddGeneralItem(dwOffset + 1, 1, L"Mode (use reverb?)");
-  AddVolume(((long)GetByte(dwOffset + 2) * (long)instr->masterVol) / (127.0 * 127.0), dwOffset + 2, 1);
+  AddVolume(long{(GetByte(dwOffset + 2) * instr->masterVol)} / (127.0 * 127.0), dwOffset + 2, 1);
   AddPan(GetByte(dwOffset + 3), dwOffset + 3);
   AddUnityKey(GetByte(dwOffset + 4), dwOffset + 4);
   AddGeneralItem(dwOffset + 5, 1, L"Pitch Tune");
