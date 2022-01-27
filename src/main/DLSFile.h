@@ -90,6 +90,9 @@ public:
                    uint8_t *waveData, std::string name = "Unnamed Wave");
   void SetName(std::string dls_name);
 
+  std::vector<DLSInstr *> GetInstruments();
+  std::vector<DLSWave *> GetWaves();
+
   uint32_t GetSize() override;
 
   int WriteDLSToBuffer(std::vector<uint8_t> &buf);

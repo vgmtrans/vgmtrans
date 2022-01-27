@@ -22,6 +22,24 @@ using namespace std;
 DLSFile::DLSFile(string dls_name) : RiffFile(dls_name, "DLS ") {
 }
 
+std::vector<DLSInstr *> DLSFile::GetInstruments() {
+  std::vector<DLSInstr *> instrs(m_instrs.size());
+  std::transform(std::begin(m_instrs), std::end(m_instrs), std::begin(instrs), [](auto &instr_pointer) {
+    return instr_pointer.get();
+  });
+
+  return instrs;
+}
+
+std::vector<DLSWave *> DLSFile::GetWaves() {
+  std::vector<DLSWave *> waves(m_waves.size());
+  std::transform(std::begin(m_waves), std::end(m_waves), std::begin(waves), [](auto &wave_pointer) {
+    return wave_pointer.get();
+  });
+
+  return waves;
+}
+
 DLSInstr *DLSFile::AddInstr(unsigned long bank, unsigned long instrNum) {
   auto instr = m_instrs.emplace_back(std::make_unique<DLSInstr>(bank, instrNum)).get();
   return instr;
