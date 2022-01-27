@@ -39,6 +39,10 @@ int VGMCollViewModel::rowCount(const QModelIndex &parent) const {
 
 QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
   auto file = fileFromIndex(index);
+  if (!file) {
+    return iconForFileType(FileType::FILETYPE_UNDEFINED);
+  }
+
   if (role == Qt::DisplayRole) {
     return QString::fromStdWString(*file->GetName());
   } else if (role == Qt::DecorationRole) {
