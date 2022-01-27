@@ -223,7 +223,7 @@ bool VabRgn::LoadRgn() {
 
   AddGeneralItem(dwOffset, 1, L"Priority");
   AddGeneralItem(dwOffset + 1, 1, L"Mode (use reverb?)");
-  AddVolume(long{(GetByte(dwOffset + 2) * instr->masterVol)} / (127.0 * 127.0), dwOffset + 2, 1);
+  AddVolume((GetByte(dwOffset + 2) * instr->masterVol) / (127.0 * 127.0), dwOffset + 2, 1);
   AddPan(GetByte(dwOffset + 3), dwOffset + 3);
   AddUnityKey(GetByte(dwOffset + 4), dwOffset + 4);
   AddGeneralItem(dwOffset + 5, 1, L"Pitch Tune");
