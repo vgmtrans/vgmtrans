@@ -137,7 +137,7 @@ bool Vab::GetInstrPointers() {
       vagOffsetHdr->AddSimpleItem(offVAGOffsets + i * 2, 2, name);
 
       if (vagOffset + vagSize <= nEndOffset) {
-        vagLocations.emplace_back(SizeOffsetPair(vagOffset, vagSize));
+        vagLocations.emplace_back(vagOffset, vagSize);
         totalVAGSize += vagSize;
       }
       else {
