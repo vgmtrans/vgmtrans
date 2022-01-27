@@ -301,7 +301,7 @@ void MusicPlayer::ChangeDLS(DLSFile* dlsfile)
 	//DLSLoader.LoadDLS(_T("TEST.dls"),Collection);	// Loads the standard GM set
 
 	//while (Collection.EnumInstrument(dwIndex,&InstInfo) != S_FALSE)
-	DWORD nInstrs = (DWORD)dlsfile->aInstrs.size();
+	DWORD nInstrs = dlsfile->GetInstruments().size();
 	for (DWORD dwIndex=0; dwIndex < nInstrs /*&& dwIndex < 0x50*/; dwIndex++)
 	{
 		vpInstruments.push_back(new CInstrument());
