@@ -127,43 +127,33 @@ bool Vab::GetInstrPointers() {
     uint32_t totalVAGSize = 0;
     VGMHeader *vagOffsetHdr = AddHeader(offVAGOffsets, 2 * 256, L"VAG Pointer Table");
 
-    uint32_t vagStartOffset = GetShort(offVAGOffsets) * 8;
-    vagOffsetHdr->AddSimpleItem(offVAGOffsets, 2, L"VAG Size /8 #0");
-    totalVAGSize = vagStartOffset;
+    uint32_t vagStartOffset = offVAGOffsets + 2 * 256;
+    uint32_t vagOffset = vagStartOffset;
 
     for (uint32_t i = 0; i < numVAGs; i++) {
-      uint32_t vagOffset;
-      uint32_t vagSize;
+      uint32_t vagSize = GetShort(offVAGOffsets + i * 2) * 8;
 
-      if (i == 0) {
-        vagOffset = vagStartOffset;
-        vagSize = GetShort(offVAGOffsets + (i + 1) * 2) * 8;
-      }
-      else {
-        vagOffset = vagStartOffset + vagLocations[i - 1].offset + vagLocations[i - 1].size;
-        vagSize = GetShort(offVAGOffsets + (i + 1) * 2) * 8;
-      }
-
-      swprintf(name, 256, L"VAG Size /8 #%u", i + 1);
-      vagOffsetHdr->AddSimpleItem(offVAGOffsets + (i + 1) * 2, 2, name);
+      swprintf(name, 256, L"VAG Size /8 #%u", i);
+      vagOffsetHdr->AddSimpleItem(offVAGOffsets + i * 2, 2, name);
 
       if (vagOffset + vagSize <= nEndOffset) {
-        vagLocations.push_back(SizeOffsetPair(vagOffset, vagSize));
+        vagLocations.emplace_back(vagOffset, vagSize);
         totalVAGSize += vagSize;
       }
       else {
         wchar_t log[512];
-        swprintf(log, 512, L"VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i + 1, vagOffset, vagSize);
+        swprintf(log, 512, L"VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i, vagOffset, vagSize);
         pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, L"Vab"));
       }
+
+      vagOffset += vagSize;
     }
-    unLength = (offVAGOffsets + 2 * 256) - dwOffset;
+    unLength = vagStartOffset - dwOffset;
 
     // single VAB file?
-    uint32_t offVAGs = offVAGOffsets + 2 * 256;
     if (dwOffset == 0 && vagLocations.size() != 0) {
       // load samples as well
-      PSXSampColl *newSampColl = new PSXSampColl(format, this, offVAGs, totalVAGSize, vagLocations);
+      PSXSampColl *newSampColl = new PSXSampColl(format, this, vagStartOffset, totalVAGSize, vagLocations);
       if (newSampColl->LoadVGMFile()) {
         pRoot->AddVGMFile(newSampColl);
         //this->sampColl = newSampColl;
