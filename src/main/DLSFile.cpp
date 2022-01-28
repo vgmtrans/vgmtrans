@@ -201,7 +201,7 @@ void DLSInstr::Write(vector<uint8_t> &buf) {
 }
 
 DLSRgn *DLSInstr::AddRgn() {
-  auto reg = m_regions.emplace_back().get();
+  auto reg = m_regions.emplace_back(std::make_unique<DLSRgn>()).get();
   return reg;
 }
 
