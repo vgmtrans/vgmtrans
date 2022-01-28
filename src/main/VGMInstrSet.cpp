@@ -109,10 +109,17 @@ bool VGMInstrSet::SaveAsDLS(const std::wstring &filepath) {
   DLSFile dlsfile;
   bool dlsCreationSucceeded = false;
 
-  if (assocColls.size())
+  if (!assocColls.empty()) {
     dlsCreationSucceeded = assocColls.front()->CreateDLSFile(dlsfile);
-  else
+  } else {
+    std::wostringstream message;
+    message << name
+            << L": "
+               L"Instrument sets that are not part of a collection cannot be "
+               L"converted to DLS at the moment.";
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VGMInstrSet"));
     return false;
+  }
 
   if (dlsCreationSucceeded) {
     return dlsfile.SaveDLSFile(filepath);
@@ -123,10 +130,18 @@ bool VGMInstrSet::SaveAsDLS(const std::wstring &filepath) {
 bool VGMInstrSet::SaveAsSF2(const std::wstring &filepath) {
   SF2File *sf2file = NULL;
 
-  if (assocColls.size())
+  if (!assocColls.empty()) {
     sf2file = assocColls.front()->CreateSF2File();
-  else
+  } else {
+    std::wostringstream message;
+    message << name
+            << L": "
+               L"Instrument sets that are not part of a collection cannot be "
+               L"converted to SF2 at the moment.";
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VGMInstrSet"));
     return false;
+  }
+
   if (sf2file != NULL) {
     bool bResult = sf2file->SaveSF2File(filepath);
     delete sf2file;
