@@ -13,6 +13,7 @@
 #include <QString>
 
 class VGMColl;
+class MidiFile;
 
 class MusicPlayer : public QObject {
   Q_OBJECT
@@ -106,13 +107,42 @@ signals:
 private:
   MusicPlayer();
 
+  static void sequencerDeleter(fluid_sequencer_t *seq) {
+    fluid_sequencer_unregister_client(seq, fluid_sequencer_get_client_id(seq, 0));
+    fluid_sequencer_unregister_client(seq, fluid_sequencer_get_client_id(seq, 1));
+    delete_fluid_sequencer(seq);
+  }
+
   fluid_settings_t *m_settings = nullptr;
   fluid_synth_t *m_synth = nullptr;
   fluid_audio_driver_t *m_active_driver = nullptr;
-  fluid_player_t *m_active_player = nullptr;
+  std::unique_ptr<fluid_sequencer_t, decltype(&sequencerDeleter)> m_sequencer{nullptr,
+                                                                             sequencerDeleter};
+  int m_total_ticks = 0;
   VGMColl *m_active_coll = nullptr;
 
+  /**
+   * @brief Creates settings for the synth.
+   */
   void makeSettings();
+
+  /**
+   * @brief Spawns a new synth.
+   */
   void makeSynth();
-  void makePlayer();
+
+  /**
+   * @brief Spawns a new sequencer, replacing the old instance.
+   *
+   * It automatically binds to the MusicPlayer's synth, hence it MUST be called after makeSynth()
+   */
+  void makeSequencer();
+
+  /**
+   * @brief Places MIDI events from a MIDI file onto the sequencer, essentially implementing
+   * playback
+   *
+   * @param midi
+   */
+  void processMidiFile(std::unique_ptr<MidiFile> midi);
 };
