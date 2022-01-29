@@ -442,11 +442,6 @@ void MusicPlayer::processMidiFile(std::unique_ptr<MidiFile> midi) {
         break;
       }
 
-      case MIDIEVENT_MASTERVOL: {
-        // todo: this needs to be done with some sort of callback to change the synth gain at a
-        // specific tick count
-      }
-
       case MIDIEVENT_MODULATION: {
         auto modulation = dynamic_cast<ModulationEvent *>(event);
         fluid_event_modulation(seq_event, channel, modulation->dataByte);
@@ -482,6 +477,7 @@ void MusicPlayer::processMidiFile(std::unique_ptr<MidiFile> midi) {
       default:
       /* These 3 events are not useful when listening to the track */
       case MIDIEVENT_ENDOFTRACK:
+      case MIDIEVENT_MASTERVOL:
       case MIDIEVENT_TEXT: {
         delete_fluid_event(seq_event);
         continue;
