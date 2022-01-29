@@ -41,7 +41,7 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 
   auto infostring = QString("Running %1 (%4, %5), libfluidsynth %2, Qt %3")
                         .arg(VGMTRANS_VERSION)
-                        .arg(FLUIDSYNTH_VERSION)
+                        .arg(fluid_version_str())
                         .arg(qVersion())
                         .arg(VGMTRANS_REVISION)
                         .arg(VGMTRANS_BRANCH)
