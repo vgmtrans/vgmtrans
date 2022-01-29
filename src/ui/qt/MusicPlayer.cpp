@@ -123,12 +123,11 @@ private:
 };
 
 static void fluidLogAdapter(int level, const char *message, void *data) {
+  auto to_log = std::wstring{}.assign(message, strlen(message) + message);
   auto root = reinterpret_cast<QtVGMRoot *>(data);
+
   // FluidSynth's log levels are +1 compared to ours
-  level--;
-  auto to_log = std::wstring{};
-  to_log.assign(message, strlen(message) + message);
-  root->UI_AddLogItem(new LogItem(to_log, static_cast<LogLevel>(level), L"MusicPlayer"));
+  root->UI_AddLogItem(new LogItem(to_log, static_cast<LogLevel>(level--), L"FluidSynth"));
 }
 
 MusicPlayer::MusicPlayer() {
