@@ -41,9 +41,9 @@ jobs:
           sudo apt clean
           sudo apt update
           sudo apt install -y pkg-config qt515base qt515svg qt515wayland libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
-          wget https://github.com/FluidSynth/fluidsynth/archive/v2.1.9.zip
-          unzip v2.1.9.zip
-          cd fluidsynth-2.1.9
+          wget https://github.com/FluidSynth/fluidsynth/archive/v2.2.5.zip
+          unzip v2.2.5.zip
+          cd fluidsynth-2.2.5
           mkdir build && cd build
           cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -Denable-network=off -Denable-ipv6=off -DCMAKE_INSTALL_PREFIX=/usr/ -DLIB_INSTALL_DIR=lib -GNinja ..
           cmake --build . --config "Release" --parallel
