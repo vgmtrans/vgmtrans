@@ -229,25 +229,26 @@ void MusicPlayer::makeSequencer() {
 }
 
 bool MusicPlayer::playing() const {
-  return m_sequencer != nullptr;
+  return m_sequencer != nullptr && elapsedTicks() <= totalTicks();
 }
 
-void MusicPlayer::seek(int position) {
+void MusicPlayer::seek(int) {
   /* TODO: Reimplement */
   return;
 }
 
 bool MusicPlayer::toggle() {
   /* TODO: Implement pausing */
-
   if (!m_sequencer) {
     return false;
   }
 
-  m_sequencer = nullptr;
-  statusChange(false);
+  if (playing()) {
+    stop();
+  }
 
-  return false;
+  statusChange(true);
+  return true;
 }
 
 void MusicPlayer::stop() {
@@ -302,7 +303,9 @@ bool MusicPlayer::playCollection(VGMColl *coll) {
 
   auto midi = std::unique_ptr<MidiFile>(seq->ConvertToMidi());
   processMidiFile(std::move(midi));
+
   statusChange(true);
+  m_active_coll = coll;
 
   return true;
 }
