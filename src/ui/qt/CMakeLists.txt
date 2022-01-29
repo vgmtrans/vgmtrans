@@ -1,7 +1,7 @@
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/gsl-lite"
                  "${CMAKE_CURRENT_BINARY_DIR}/gsl-lite" EXCLUDE_FROM_ALL)
 
-set(FluidSynth_FIND_VERSION "2.0.0")
+set(FluidSynth_FIND_VERSION "2.2.0")
 find_package(FluidSynth)
 if(FluidSynth_FOUND AND "${FluidSynth_VERSION}" MATCHES "2(.)*")
   message(STATUS "Using FluidSynth ${FluidSynth_VERSION}")
