@@ -16,7 +16,6 @@
 
 #include "SequencePlayer.h"
 #include "util/Helpers.h"
-#include "MusicPlayer.h"
 #include "util/MarqueeLabel.h"
 
 IconBar::IconBar(QWidget *parent) : QWidget(parent) {

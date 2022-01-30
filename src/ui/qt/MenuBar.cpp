@@ -8,7 +8,6 @@
 
 #include <QActionGroup>
 #include <QDockWidget>
-#include "MusicPlayer.h"
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *>& dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
@@ -31,25 +30,6 @@ void MenuBar::appendFileMenu() {
 
 void MenuBar::appendOptionsMenu(const QList<QDockWidget *>& dockWidgets) {
   QMenu *options_dropdown = addMenu("Options");
-  auto audio_backend = options_dropdown->addMenu("Player audio driver");
-  menu_drivers = new QActionGroup(this);
-
-  for (auto &driver : MusicPlayer::the().getAvailableDrivers()) {
-    auto driveropt = audio_backend->addAction(QString(driver));
-    menu_drivers->addAction(driveropt);
-
-    driveropt->setCheckable(true);
-    if (MusicPlayer::the().checkSetting("audio.driver", driver)) {
-      driveropt->setChecked(true);
-      auto font = driveropt->font();
-    }
-  }
-
-  connect(menu_drivers, &QActionGroup::triggered, [](QAction *driver) {
-    MusicPlayer::the().setAudioDriver(driver->text().toStdString().c_str());
-  });
-
-  options_dropdown->addSeparator();
 
   for(auto& widget : dockWidgets) {
     options_dropdown->addAction(widget->toggleViewAction());
