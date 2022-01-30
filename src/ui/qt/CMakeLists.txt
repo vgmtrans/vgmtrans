@@ -176,13 +176,21 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   file(WRITE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf"
        "[Paths]\r\nPlugins = ./QtPlugins")
 
-  get_target_property(FLUIDSYNTH_DLL_LOCATION FluidSynth::FluidSynth
+  get_target_property(BASS_DLL_LOCATION BASS::BASS
                       IMPORTED_LOCATION)
   add_custom_command(
     TARGET vgmtrans
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FLUIDSYNTH_DLL_LOCATION}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"
             "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+
+  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI
+                      IMPORTED_LOCATION)
+  add_custom_command(
+  TARGET vgmtrans
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
+    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
   install(TARGETS vgmtrans DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
   install(
