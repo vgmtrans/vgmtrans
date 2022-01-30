@@ -13,7 +13,6 @@
 #include <QGridLayout>
 #include <QPushButton>
 #include <version.h>
-#include <fluidsynth.h>
 #include "ManualCollectionDialog.h"
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
@@ -21,7 +20,7 @@
 #include "IconBar.h"
 #include "About.h"
 #include "Logger.h"
-#include "MusicPlayer.h"
+#include "SequencePlayer.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
@@ -39,9 +38,9 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
   createElements();
   routeSignals();
 
-  auto infostring = QString("Running %1 (%4, %5), libfluidsynth %2, Qt %3")
+  auto infostring = QString("Running %1 (%4, %5), BASS %2, Qt %3")
                         .arg(VGMTRANS_VERSION)
-                        .arg(fluid_version_str())
+                        .arg(int(BASS_GetVersion()), 0, 16)
                         .arg(qVersion())
                         .arg(VGMTRANS_REVISION)
                         .arg(VGMTRANS_BRANCH)
@@ -116,7 +115,7 @@ void MainWindow::routeSignals() {
           &VGMCollListView::handlePlaybackRequest);
   connect(m_coll_listview, &VGMCollListView::nothingToPlay, m_icon_bar, &IconBar::showPlayInfo);
   connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
-  connect(m_icon_bar, &IconBar::seekingTo, &MusicPlayer::the(), &MusicPlayer::seek);
+  connect(m_icon_bar, &IconBar::seekingTo, &SequencePlayer::the(), &SequencePlayer::seek);
   connect(m_icon_bar, &IconBar::createPressed, [=]() {
     ManualCollectionDialog wiz(this);
     wiz.exec();

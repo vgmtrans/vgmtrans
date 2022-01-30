@@ -14,6 +14,7 @@
 #include <QWhatsThis>
 #include <QPushButton>
 
+#include "SequencePlayer.h"
 #include "util/Helpers.h"
 #include "MusicPlayer.h"
 #include "util/MarqueeLabel.h"
@@ -66,16 +67,17 @@ void IconBar::setupControls() {
   
   m_slider->setEnabled(false);
   m_slider->setToolTip("Seek");
-  connect(m_slider, &QSlider::sliderReleased, [this]() { seekingTo(m_slider->value()); });
+  connect(m_slider, &QSlider::sliderReleased, [this]() {
+    seekingTo(m_slider->value());
+  });
   layout()->addWidget(m_slider);
 
   m_title = new MarqueeLabel();
   m_title->setText("Playback interrupted");
   layout()->addWidget(m_title);
 
-  connect(&MusicPlayer::the(), &MusicPlayer::playbackPositionChanged, this,
-          &IconBar::playbackRangeUpdate);
-  connect(&MusicPlayer::the(), &MusicPlayer::statusChange, this, &IconBar::playerStatusChanged);
+  connect(&SequencePlayer::the(), &SequencePlayer::statusChange, this, &IconBar::playerStatusChanged);
+  connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged, this, &IconBar::playbackRangeUpdate);
 }
 
 void IconBar::showPlayInfo() {
@@ -98,7 +100,7 @@ void IconBar::playerStatusChanged(bool playing) {
     m_slider->setEnabled(true);
     m_play->setIcon(s_pauseicon);
     m_stop->setEnabled(true);
-    m_title->setText("Playing: " + MusicPlayer::the().songTitle());
+    m_title->setText("Playing: " + SequencePlayer::the().songTitle());
   } else {
     m_play->setIcon(s_playicon);
     m_stop->setDisabled(true);
