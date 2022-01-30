@@ -1,6 +1,9 @@
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/gsl-lite"
                  "${CMAKE_CURRENT_BINARY_DIR}/gsl-lite" EXCLUDE_FROM_ALL)
 
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/bass"
+                 "${CMAKE_CURRENT_BINARY_DIR}/bass" EXCLUDE_FROM_ALL)
+
 set(FluidSynth_FIND_VERSION "2.0.0")
 find_package(FluidSynth)
 if(FluidSynth_FOUND AND "${FluidSynth_VERSION}" MATCHES "2(.)*")
@@ -104,6 +107,8 @@ add_executable(
   About.h
   IconBar.cpp
   IconBar.h
+  Logger.cpp
+  Logger.h
   MainWindow.cpp
   MainWindow.h
   ManualCollectionDialog.cpp
@@ -114,8 +119,8 @@ add_executable(
   MusicPlayer.h
   QtVGMRoot.cpp
   QtVGMRoot.h
-  Logger.cpp
-  Logger.h
+  SequencePlayer.cpp
+  SequencePlayer.h
   main_ui.cpp
   util/Helpers.cpp
   util/Helpers.h
@@ -158,7 +163,8 @@ target_link_libraries(
           Qt${Qt_VERSION_MAJOR}::Widgets
           Qt${Qt_VERSION_MAJOR}::Svg
           gsl-lite
-          FluidSynth::FluidSynth)
+          FluidSynth::FluidSynth
+          BASS::MIDI)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
