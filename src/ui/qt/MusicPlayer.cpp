@@ -386,10 +386,6 @@ void MusicPlayer::processMidiFile(std::unique_ptr<MidiFile> midi) {
     return;
   }
 
-  /* We want events in their absolute time order, sorted by priority */
-  std::stable_sort(std::begin(events), std::end(events), PriorityCmp());
-  std::stable_sort(std::begin(events), std::end(events), AbsTimeCmp());
-
   /* Default to 120 BPM */
   auto ppqn = midi->GetPPQN();
   fluid_sequencer_set_time_scale(m_sequencer.get(), 1000000.0 * (ppqn / 500000.0));
