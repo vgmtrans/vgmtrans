@@ -140,6 +140,19 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   target_sources(vgmtrans PRIVATE "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml")
   set_source_files_properties("${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
                               PROPERTIES MACOSX_PACKAGE_LOCATION MacOS)
+
+  get_target_property(BASS_DLL_LOCATION BASS::BASS
+                      IMPORTED_LOCATION)
+  add_custom_command(TARGET vgmtrans
+                      POST_BUILD
+                      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"
+                      "${BUNDLE_PATH}/Contents/MacOS/")
+  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI
+                      IMPORTED_LOCATION)
+  add_custom_command(TARGET vgmtrans
+                      POST_BUILD
+                      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
+                      "${BUNDLE_PATH}/Contents/MacOS/")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   # Make sure the executable ends up in the binary directory without any
   # additional folders
