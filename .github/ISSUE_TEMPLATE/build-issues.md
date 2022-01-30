@@ -9,7 +9,6 @@ labels:
 Followed the wiki instructions? (yes/no)
 Operating system:
 CMake version:
-libfluidsynth version:
 Qt version:
 VGMTrans commit being built: 
 Please provide the full CMake log (the one that gets generated when you do `cmake ..`).
