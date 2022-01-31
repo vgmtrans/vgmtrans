@@ -51,14 +51,17 @@ void IconBar::setupControls() {
   layout()->addWidget(m_stop);
 
   m_slider = new QSlider(Qt::Horizontal);
-  /* Needed to make sure the slider is properly rendered on macOS */
+  /* Needed to make sure the slider is properly rendered */
   m_slider->setRange(0, 1);
   m_slider->setValue(0);
-  m_slider->setFixedHeight(30);
-
+  #ifdef __APPLE__
+  /* HACK: workaround the slider being cut off on macOS */
+  m_slider->setFixedHeight(25);
+  #endif
+  
   m_slider->setEnabled(false);
   m_slider->setToolTip("Seek");
-  connect(m_slider, &QSlider::sliderMoved, this, &IconBar::seekingTo);
+  connect(m_slider, &QSlider::sliderReleased, [this]() { seekingTo(m_slider->value()); });
   layout()->addWidget(m_slider);
 
   m_title = new QLabel("Player stopped");
