@@ -49,7 +49,7 @@ jobs:
           cmake --build . --config "Release" --parallel
           sudo cmake --build . --target install
       - name: "Prepare build"
-        run: cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -GNinja -B build
+        run: cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -GNinja -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
       - name: "Make AppImage"
