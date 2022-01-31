@@ -75,7 +75,7 @@ void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
  */
 
 VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
-  auto model = new VGMCollListViewModel;
+  auto model = new VGMCollListViewModel(this);
   setModel(model);
   setItemDelegate(new VGMCollNameEditor);
 
@@ -86,7 +86,8 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   setIconSize(QSize(16, 16));
   setWrapping(true);
 
-  connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollListView::collectionMenu);
+  connect(this, &QAbstractItemView::customContextMenuRequested, this,
+          &VGMCollListView::collectionMenu);
   connect(model, &VGMCollListViewModel::dataChanged, [=]() {
     if (!selectedIndexes().empty()) {
       selectionModel()->currentChanged(selectedIndexes().front(), {});
@@ -166,6 +167,7 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
   if (list.empty() || list[0].row() >= model()->rowCount()) {
+    nothingToPlay();
     return;
   }
 

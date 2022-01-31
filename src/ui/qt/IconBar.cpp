@@ -11,6 +11,7 @@
 #include <QSlider>
 #include <QLabel>
 #include <QLayout>
+#include <QWhatsThis>
 #include <QPushButton>
 
 #include "util/Helpers.h"
@@ -40,6 +41,9 @@ void IconBar::setupControls() {
   m_play = new QPushButton();
   m_play->setIcon(s_playicon);
   m_play->setToolTip("Play selected collection (Space)");
+  m_play->setWhatsThis("Select a collection in the panel above and click this \u25b6 button or press 'Space' to play it.\n"
+                       "Clicking the button again will pause playback or play a different collection "
+                       "if you have changed the selection.");
   connect(m_play, &QPushButton::pressed, this, &IconBar::playToggle);
   layout()->addWidget(m_play);
 
@@ -70,6 +74,11 @@ void IconBar::setupControls() {
   connect(&MusicPlayer::the(), &MusicPlayer::playbackPositionChanged, this,
           &IconBar::playbackRangeUpdate);
   connect(&MusicPlayer::the(), &MusicPlayer::statusChange, this, &IconBar::playerStatusChanged);
+}
+
+void IconBar::showPlayInfo() {
+  QWhatsThis::showText(m_play->mapToGlobal(m_play->pos()), m_play->whatsThis(), this);
+  m_play->clearFocus();
 }
 
 void IconBar::playbackRangeUpdate(int cur, int max) {

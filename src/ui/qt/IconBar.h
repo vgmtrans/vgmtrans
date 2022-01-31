@@ -18,6 +18,8 @@ class IconBar final : public QWidget {
 public:
   explicit IconBar(QWidget *parent = nullptr);
 
+  void showPlayInfo();
+
 signals:
   void playToggle();
   void stopPressed();
