@@ -84,28 +84,12 @@ void MarqueeLabel::updateText() {
 
 void MarqueeLabel::paintEvent(QPaintEvent *) {
   QPainter p(this);
-
   if (m_scroll_enabled) {
-    m_render_buffer.fill(qRgba(0, 0, 0, 0));
-
-    QPainter pb(&m_render_buffer);
-    pb.setRenderHints(QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
-    pb.setPen(p.pen());
-    pb.setFont(p.font());
-
     int x = std::min(-m_scroll_pos, 0) + m_margin_left;
     while (x < width()) {
-      pb.drawStaticText(QPointF(x, (height() - m_renderlabel_size.height()) / 2.0), m_static_text);
+      p.drawStaticText(QPointF(x, (height() - m_renderlabel_size.height()) / 2.0), m_static_text);
       x += m_renderlabel_size.width();
     }
-
-    /* Apply alpha */
-    pb.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-    pb.setClipRect(width() - 15, 0, 15, height());
-    pb.drawImage(0, 0, m_alpha_channel);
-    pb.setClipRect(0, 0, 15, height());
-    pb.drawImage(0, 0, m_alpha_channel);
-    p.drawImage(0, 0, m_render_buffer);
   } else {
     p.drawStaticText(QPointF(m_margin_left, (height() - m_renderlabel_size.height()) / 2.0),
                      m_static_text);
@@ -113,33 +97,6 @@ void MarqueeLabel::paintEvent(QPaintEvent *) {
 }
 
 void MarqueeLabel::resizeEvent(QResizeEvent *) {
-  /* When the widget is resized, we need to update the alpha channel. */
-  m_alpha_channel = QImage(size(), QImage::Format_ARGB32_Premultiplied);
-  m_render_buffer = QImage(size(), QImage::Format_ARGB32_Premultiplied);
-  m_alpha_channel.fill(qRgba(0, 0, 0, 0));
-  m_render_buffer.fill(qRgba(0, 0, 0, 0));
-
-  /* It's not always necessary to create the alpha channel (used for fades when scrolling) */
-  if (width() > 64) {
-    QLinearGradient grad(QPointF(0, 0), QPointF(16, 0));
-    grad.setColorAt(0, qRgba(0, 0, 0, 0));
-    grad.setColorAt(1, qRgba(0, 0, 0, 255));
-
-    QPainter painter(static_cast<QPaintDevice *>(&m_alpha_channel));
-    painter.setBrush(grad);
-    painter.setPen(Qt::NoPen);
-    painter.drawRect(0, 0, 16, height());
-
-    grad = QLinearGradient(QPointF(m_alpha_channel.width() - 16, 0),
-                           QPointF(m_alpha_channel.width(), 0));
-    grad.setColorAt(0, qRgba(0, 0, 0, 255));
-    grad.setColorAt(1, qRgba(0, 0, 0, 0));
-    painter.setBrush(grad);
-    painter.drawRect(m_alpha_channel.width() - 16, 0, m_alpha_channel.width(), height());
-  } else {
-    m_alpha_channel.fill(qRgb(0, 0, 0));
-  }
-
   /* Since the size has changed, we might not have to scroll if the text fits in the render area */
   if (bool should_scroll = (m_text_width > width() - m_margin_left);
       should_scroll != m_scroll_enabled) {
