@@ -16,6 +16,7 @@
 
 #include "util/Helpers.h"
 #include "MusicPlayer.h"
+#include "util/MarqueeLabel.h"
 
 IconBar::IconBar(QWidget *parent) : QWidget(parent) {
   setLayout(new QHBoxLayout());
@@ -68,7 +69,8 @@ void IconBar::setupControls() {
   connect(m_slider, &QSlider::sliderReleased, [this]() { seekingTo(m_slider->value()); });
   layout()->addWidget(m_slider);
 
-  m_title = new QLabel("Player stopped");
+  m_title = new MarqueeLabel();
+  m_title->setText("Playback interrupted");
   layout()->addWidget(m_title);
 
   connect(&MusicPlayer::the(), &MusicPlayer::playbackPositionChanged, this,
