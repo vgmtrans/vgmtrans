@@ -119,6 +119,8 @@ add_executable(
   main_ui.cpp
   util/Helpers.cpp
   util/Helpers.h
+  util/MarqueeLabel.cpp
+  util/MarqueeLabel.h
   workarea/MdiArea.cpp
   workarea/MdiArea.h
   workarea/RawFileListView.cpp
