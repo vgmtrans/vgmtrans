@@ -98,10 +98,10 @@ void IconBar::playerStatusChanged(bool playing) {
     m_slider->setEnabled(true);
     m_play->setIcon(s_pauseicon);
     m_stop->setEnabled(true);
-    m_title->setText("Now playing: " + MusicPlayer::the().songTitle());
+    m_title->setText("Playing: " + MusicPlayer::the().songTitle());
   } else {
     m_play->setIcon(s_playicon);
     m_stop->setDisabled(true);
-    m_title->setText("Player stopped");
+    m_title->setText("Playback interrupted");
   }
 }

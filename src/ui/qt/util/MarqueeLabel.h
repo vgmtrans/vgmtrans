@@ -44,9 +44,6 @@ private:
   bool m_scroll_enabled{false};
   int m_scroll_pos{0};
 
-  QImage m_alpha_channel;
-  QImage m_render_buffer;
-
   QTimer m_scroll_timer;
   QTimer m_delayscroll_timer;
   bool m_delaying = true;
