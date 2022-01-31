@@ -135,6 +135,7 @@ add_compile_definitions(TIXML_USE_STL)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/tinyxml"
                  "${CMAKE_CURRENT_BINARY_DIR}/tinyxml" EXCLUDE_FROM_ALL)
 
+set(GHC_FILESYSTEM_WITH_INSTALL OFF)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/filesystem")
 
 add_subdirectory(src)
