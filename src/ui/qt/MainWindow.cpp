@@ -114,6 +114,7 @@ void MainWindow::routeSignals() {
 
   connect(m_icon_bar, &IconBar::playToggle, m_coll_listview,
           &VGMCollListView::handlePlaybackRequest);
+  connect(m_coll_listview, &VGMCollListView::nothingToPlay, m_icon_bar, &IconBar::showPlayInfo);
   connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
   connect(m_icon_bar, &IconBar::seekingTo, &MusicPlayer::the(), &MusicPlayer::seek);
   connect(m_icon_bar, &IconBar::createPressed, [=]() {
