@@ -126,7 +126,7 @@ bool VGMMultiSectionSeq::AddLoopForeverNoItem() {
     return false;
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
-    return (foreverLoops < ConversionOptions::GetNumSequenceLoops());
+    return (foreverLoops < ConversionOptions::the().GetNumSequenceLoops());
   }
   return true;
 }
