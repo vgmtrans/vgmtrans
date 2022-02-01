@@ -226,7 +226,7 @@ void VGMSeq::LoadTracksMain(long stopTime) {
       }
 
       // check loop count
-      int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 : ConversionOptions::GetNumSequenceLoops();
+      int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 : ConversionOptions::the().GetNumSequenceLoops();
       if (GetForeverLoops() >= requiredLoops) {
         InactivateAllTracks();
         break;
