@@ -83,4 +83,5 @@ private:
   HSOUNDFONT m_loaded_sf{};
 
   QTimer *m_seekupdate_timer{};
+  QString m_song_title{};
 };
