@@ -1203,8 +1203,13 @@ void SeqTrack::AddProgramChange(uint32_t offset,
 void SeqTrack::AddProgramChangeNoItem(uint32_t progNum, bool requireBank) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (requireBank) {
-      pMidiTrack->AddBankSelect(channel, (progNum >> 14) & 0x7f);
-      pMidiTrack->AddBankSelectFine(channel, (progNum >> 7) & 0x7f);
+      if (auto style = ConversionOptions::the().GetBankSelectStyle();
+          style == BankSelectStyle::GS) {
+        pMidiTrack->AddBankSelect(channel, (progNum >> 7) & 0x7f);
+      } else if (style == BankSelectStyle::MMA) {
+        pMidiTrack->AddBankSelect(channel, (progNum >> 14) & 0x7f);
+        pMidiTrack->AddBankSelectFine(channel, (progNum >> 7) & 0x7f);
+      }
     }
     pMidiTrack->AddProgramChange(channel, progNum & 0x7f);
   }
@@ -1212,8 +1217,13 @@ void SeqTrack::AddProgramChangeNoItem(uint32_t progNum, bool requireBank) {
 
 void SeqTrack::AddBankSelectNoItem(uint8_t bank) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    pMidiTrack->AddBankSelect(channel, bank / 128);
-    pMidiTrack->AddBankSelectFine(channel, bank % 128);
+    if (auto style = ConversionOptions::the().GetBankSelectStyle();
+        style == BankSelectStyle::GS) {
+      pMidiTrack->AddBankSelect(channel, bank & 0x7f);
+    } else if (style == BankSelectStyle::MMA) {
+      pMidiTrack->AddBankSelect(channel, bank >> 7);
+      pMidiTrack->AddBankSelectFine(channel, bank & 0x7f);
+    }
   }
 }
 
