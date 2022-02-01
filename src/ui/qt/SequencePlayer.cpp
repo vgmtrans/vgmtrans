@@ -150,7 +150,7 @@ int SequencePlayer::totalTicks() const {
 }
 
 QString SequencePlayer::songTitle() const {
-  return QString::fromStdWString(*m_active_vgmcoll->GetName());
+  return m_song_title;
 }
 
 bool SequencePlayer::playCollection(VGMColl *coll) {
@@ -234,6 +234,7 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
   m_active_vgmcoll = coll;
   m_active_stream = midi_stream;
   m_loaded_sf = sf2_handle;
+  m_song_title = QString::fromStdWString(*m_active_vgmcoll->GetName());
   toggle();
 
   return true;
