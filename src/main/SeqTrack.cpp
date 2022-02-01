@@ -1375,7 +1375,7 @@ bool SeqTrack::AddLoopForever(uint32_t offset, uint32_t length, const std::wstri
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
     deltaLength = GetTime();
-    return (this->foreverLoops < ConversionOptions::GetNumSequenceLoops());
+    return (this->foreverLoops < ConversionOptions::the().GetNumSequenceLoops());
   }
   return true;
 
