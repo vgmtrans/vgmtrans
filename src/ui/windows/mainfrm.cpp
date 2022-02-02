@@ -21,6 +21,7 @@
 #include "LogListView.h"
 #include "HexView.h"
 #include "FileFrame.h"
+#include "Options.h"
 
 using namespace std;
 
@@ -185,6 +186,7 @@ LRESULT CMainFrame::OnCreate(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/
 
 
 	winroot.Init();
+    ConversionOptions::the().SetBankSelectStyle(BankSelectStyle::MMA);
 	//winroot.SetWndPtrs(this);
 
 	PostMessage(CWM_INITIALIZE);
