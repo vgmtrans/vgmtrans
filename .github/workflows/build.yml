@@ -15,7 +15,7 @@ jobs:
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
-        run: cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.osx_min_ver }} -DCMAKE_OSX_ARCHITECTURES=${{ env.osx_arch }} -DCMAKE_INSTALL_PREFIX=/usr/bin -DCMAKE_BUILD_TYPE=Release -B build
+        run: cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.osx_min_ver }} -DCMAKE_OSX_ARCHITECTURES=${{ env.osx_arch }} -DCMAKE_BUILD_TYPE=Release -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
@@ -37,26 +37,32 @@ jobs:
       - name: "Install dependencies"
         run: |
           sudo add-apt-repository ppa:beineri/opt-qt-5.15.2-bionic -y
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main" -y
+          sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-13 main" -y
           sudo apt clean
           sudo apt update
-          sudo apt install -y pkg-config qt515base qt515svg qt515wayland libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev patchelf
+          sudo apt install -y pkg-config clang-13 lld-13 qt515base qt515svg qt515wayland libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
       - name: "Prepare build"
-        run: cmake -DCMAKE_C_COMPILER="gcc-10" -DCMAKE_CXX_COMPILER="g++-10" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -GNinja -B build
+        run: cmake -DCMAKE_C_COMPILER="clang-13" -DCMAKE_CXX_COMPILER="clang++-13" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -GNinja -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
       - name: "Make AppImage"
         working-directory: "build"
         run: |
-          DESTDIR=appdir ninja -j$(nproc) install
+          echo "Creating AppDir structure for AppImage"
+          DESTDIR=appdir ninja install
           find appdir/
-          wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
-          chmod a+x linuxdeployqt-continuous-x86_64.AppImage
           mkdir -p appdir/usr/share
           cp ../bin/mame_roms.xml appdir/usr/bin
           cp ../src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
           cp ../src/ui/qt/resources/vgmtrans.png appdir/
           mkdir -p appdir/usr/lib
           cp ../lib/bass/*.so appdir/usr/lib/
+          echo "Downloading linuxdeployqt"
+          wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
+          chmod a+x linuxdeployqt-continuous-x86_64.AppImage
+          echo "Creating AppImage"
           ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop -executable=appdir/usr/lib/libbass.so -executable=appdir/usr/lib/libbassmidi.so -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/,wayland-shell-integration/,wayland-decoration-client/  -verbose=2
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
@@ -65,16 +71,17 @@ jobs:
           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.AppImage
           path: "build/VGMTrans.AppImage"
   Windows:
-    runs-on: windows-latest
+    runs-on: windows-2019
     name: Windows
     steps:
        - uses: actions/checkout@v2
          with:
           submodules: true
+       - uses: ilammy/msvc-dev-cmd@v1
        - name: "Prepare build"
          run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          cmake -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -B build
+          cmake -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -GNinja -B build
        - name: "Build project"
          run: cmake --build build --config "Release" --parallel
        - name: "Package artifact"
