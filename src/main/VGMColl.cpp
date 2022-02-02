@@ -7,6 +7,7 @@
 #include "VGMRgn.h"
 #include "ScaleConversion.h"
 #include "Root.h"
+#include "Options.h"
 
 using namespace std;
 
@@ -196,7 +197,22 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
       VGMInstr *vgminstr = set->aInstrs[i];
       size_t nRgns = vgminstr->aRgns.size();
       std::string name = wstring2string(vgminstr->name);
-      DLSInstr *newInstr = dls.AddInstr(vgminstr->bank, vgminstr->instrNum, name);
+      auto bank_no = vgminstr->bank;
+      /*
+      * The ulBank field follows this structure:
+      * F|00000000000000000|CC0|0|CC32
+      * where F = 0 if the instrument is melodic, 1 otherwise
+      * (length of each CC is 7 bits, obviously)
+      */
+      if (auto bs = ConversionOptions::the().GetBankSelectStyle(); bs == BankSelectStyle::GS) {
+        bank_no &= 0x7f;
+        bank_no = bank_no << 8;
+      } else if (bs == BankSelectStyle::MMA) {
+        const uint8_t bank_msb = (bank_no >> 7) & 0x7f;
+        const uint8_t bank_lsb = bank_no & 0x7f;
+        bank_no = (bank_msb << 8) | bank_lsb;
+      }
+      DLSInstr *newInstr = dls.AddInstr(bank_no, vgminstr->instrNum, name);
       for (uint32_t j = 0; j < nRgns; j++) {
         VGMRgn *rgn = vgminstr->aRgns[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
