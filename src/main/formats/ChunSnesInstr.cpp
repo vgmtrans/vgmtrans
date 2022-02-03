@@ -159,15 +159,14 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn
   AddSimpleItem(dwOffset + 5, 2, L"Tuning");
   AddUnknown(dwOffset + 7, 1);
 
-  uint8_t adsr1 = GetByte(dwOffset + 2);
-  uint8_t adsr2 = GetByte(dwOffset + 3);
-  uint8_t gain = GetByte(dwOffset + 4);
-  int16_t pitch_scale = GetShortBE(dwOffset + 5);
+  const uint8_t adsr1 = GetByte(dwOffset + 2);
+  const uint8_t adsr2 = GetByte(dwOffset + 3);
+  const uint8_t gain = GetByte(dwOffset + 4);
+  const int16_t pitch_scale = GetShortBE(dwOffset + 5);
 
-  const double pitch_fixer = (version == CHUNSNES_SUMMER) ? (4096.0 / 4208.0) : (8192.0 / 8410.0);
-  double fine_tuning;
+  const double pitch_fixer = (version == CHUNSNES_SUMMER) ? (7902.0 / 8192.0) : (7938.0 / 8192.0); // from pitch table
   double coarse_tuning;
-  fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
+  double fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
 
   // normalize
   if (fine_tuning >= 0.5) {
@@ -180,13 +179,9 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn
   }
 
   sampNum = srcn;
-  if (version == CHUNSNES_SUMMER) {
-    unityKey = 95 - (int) coarse_tuning;
-  }
-  else {
-    unityKey = 119 - (int) coarse_tuning;
-  }
-  fineTune = (int16_t) (fine_tuning * 100.0);
+  const int baseKey = (version == CHUNSNES_SUMMER) ? 95 : 119;
+  unityKey = baseKey - static_cast<int>(coarse_tuning);
+  fineTune = static_cast<int16_t>(fine_tuning * 100.0);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
   // use ADSR sustain for release rate
