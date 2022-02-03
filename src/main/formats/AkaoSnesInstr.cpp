@@ -154,7 +154,7 @@ AkaoSnesDrumKit::AkaoSnesDrumKit(VGMInstrSet *instrSet,
                                  uint16_t addrADSRTable,
                                  uint16_t addrDrumKitTable,
                                  const std::wstring &name) :
-  VGMInstr(instrSet, addrTuningTable, 0, ((programNum >> 6) & 0x7F00) | ((programNum >> 7) & 0x7F), programNum & 0xFF, name), version(ver),
+  VGMInstr(instrSet, addrTuningTable, 0, programNum >> 7, programNum & 0x7F, name), version(ver),
   spcDirAddr(spcDirAddr),
   addrTuningTable(addrTuningTable),
   addrADSRTable(addrADSRTable),
