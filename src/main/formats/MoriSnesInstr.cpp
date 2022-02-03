@@ -218,7 +218,7 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
 
   double fine_tuning;
   double coarse_tuning;
-  const double pitch_fixer = log(4096.0 / 4286.0) / log(2); // from pitch table ($10be vs $1000)
+  const double pitch_fixer = log(4286.0 / 4096.0) / log(2) * 12;  // from pitch table ($10be vs $1000)
   fine_tuning = modf((key + (tuning / 256.0)) + pitch_fixer, &coarse_tuning);
 
   // normalize
@@ -236,7 +236,7 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
   AddSimpleItem(rgnAddress + 2, 1, L"ADSR2");
   AddSimpleItem(rgnAddress + 3, 1, L"GAIN");
   AddSimpleItem(rgnAddress + 4, 1, L"Key-Off Delay");
-  AddUnityKey(71 - (int) (coarse_tuning), rgnAddress + 5, 1);
+  AddUnityKey(72 - (int) (coarse_tuning), rgnAddress + 5, 1);
   AddFineTune((int16_t) (fine_tuning * 100.0), rgnAddress + 6, 1);
   if (instrHint.pan > 0) {
     pan = instrHint.pan / 32.0;
