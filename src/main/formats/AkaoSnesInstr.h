@@ -11,7 +11,7 @@
 class AkaoSnesInstrSet:
     public VGMInstrSet {
  public:
-  static const uint32_t DRUMKIT_PROGRAM = (0x7F << 14);
+  static const uint32_t DRUMKIT_PROGRAM = (0x7F << 7);
 
   AkaoSnesInstrSet(RawFile *file,
                    AkaoSnesVersion ver,
