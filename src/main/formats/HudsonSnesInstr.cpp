@@ -128,26 +128,29 @@ HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
   AddSimpleItem(dwOffset + 2, 1, L"ADSR(2)");
   AddSimpleItem(dwOffset + 3, 1, L"GAIN");
 
-  double pitch_scale = GetShortBE(addrTuningEntry) / 256.0;
-  double fine_tuning;
+  const double pitch_fixer = 4286.0 / 4096.0;  // from pitch table ($10be vs $1000)
+  const double pitch_scale = GetShortBE(addrTuningEntry) / 256.0;
   double coarse_tuning;
-  fine_tuning = modf((log(pitch_scale) / log(2.0)) * 12.0, &coarse_tuning);
+  double fine_tuning = modf((log(pitch_scale * pitch_fixer) / log(2.0)) * 12.0, &coarse_tuning);
+
+  const int8_t coarse_tuning_byte = GetByte(addrTuningEntry + 2);
+  const int8_t fine_tuning_byte = GetByte(addrTuningEntry + 3);
+  coarse_tuning += coarse_tuning_byte;
+  fine_tuning += fine_tuning_byte / 256.0;
 
   // normalize
-  if (fine_tuning >= 0.5) {
-    coarse_tuning += 1.0;
-    fine_tuning -= 1.0;
-  }
-  else if (fine_tuning <= -0.5) {
-    coarse_tuning -= 1.0;
-    fine_tuning += 1.0;
+  while (fabs(fine_tuning) >= 1.0) {
+    if (fine_tuning >= 0.5) {
+      coarse_tuning += 1.0;
+      fine_tuning -= 1.0;
+    } else if (fine_tuning <= -0.5) {
+      coarse_tuning -= 1.0;
+      fine_tuning += 1.0;
+    }
   }
 
-  int8_t coarse_tuning_byte = GetByte(addrTuningEntry + 2);
-  int8_t fine_tuning_byte = GetByte(addrTuningEntry + 3);
-
-  unityKey = 71 - (int) (coarse_tuning) - coarse_tuning_byte;
-  fineTune = (int16_t) (fine_tuning + (fine_tuning_byte / 256.0) * 100.0);
+  unityKey = 72 - static_cast<int>(coarse_tuning);
+  fineTune = static_cast<int16_t>(fine_tuning * 100.0);
 
   AddSimpleItem(addrTuningEntry, 2, L"Pitch Multiplier");
   AddSimpleItem(addrTuningEntry + 2, 1, L"Coarse Tune");
