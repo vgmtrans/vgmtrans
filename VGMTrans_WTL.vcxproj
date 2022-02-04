@@ -245,7 +245,6 @@
   <ItemGroup>
     <ClCompile Include="lib\dxAug07\dxerr\dxerr.cpp" />
     <ClCompile Include="src\main\BytePattern.cpp" />
-    <ClCompile Include="src\main\datetime.cpp" />
     <ClCompile Include="src\main\formats\AkaoSnesInstr.cpp" />
     <ClCompile Include="src\main\formats\AkaoSnesScanner.cpp" />
     <ClCompile Include="src\main\formats\AkaoSnesSeq.cpp" />
@@ -440,7 +439,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\main\BytePattern.h" />
-    <ClInclude Include="src\main\datetime.h" />
     <ClInclude Include="src\main\formats\AkaoFormatVersion.h" />
     <ClInclude Include="src\main\formats\AkaoSnesFormat.h" />
     <ClInclude Include="src\main\formats\AkaoSnesInstr.h" />

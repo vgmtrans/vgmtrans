@@ -1172,9 +1172,6 @@
     <ClInclude Include="src\ui\windows\LogListView.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
-    <ClInclude Include="src\main\datetime.h">
-      <Filter>Header Files\main</Filter>
-    </ClInclude>
     <ClInclude Include="src\ui\windows\BmpBtn.h">
       <Filter>Header Files\windows</Filter>
     </ClInclude>
