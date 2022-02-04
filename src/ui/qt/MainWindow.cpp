@@ -12,6 +12,7 @@
 #include <QStandardPaths>
 #include <QGridLayout>
 #include <QPushButton>
+#include <QMessageBox>
 #include <version.h>
 #include "ManualCollectionDialog.h"
 #include "MainWindow.h"
@@ -137,7 +138,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
     return;
 
   for (const auto &file : files) {
-    qtVGMRoot.OpenRawFile(QFileInfo(file.toLocalFile()).filePath().toStdWString());
+    openFileInternal(file.toLocalFile());
   }
 
   setBackgroundRole(QPalette::Dark);
@@ -153,6 +154,32 @@ void MainWindow::OpenFile() {
     return;
 
   for (QString &filename : filenames) {
-    qtVGMRoot.OpenRawFile(filename.toStdWString());
+    openFileInternal(filename);
   }
+}
+
+void MainWindow::openFileInternal(QString filename) {
+  static QString UNSUPPORTED_RAW_IMAGE_WARNING{
+      "VGMTrans has detected a .img file in input. Please note that raw "
+      "optical media images are not "
+      "supported.\n\n"
+      "If this is a dump of a CD or DVD (e.g. PlayStation), please "
+      "convert it to .iso: the program is otherwise "
+      "unable to read the file contents correctly.\n\n"
+      "Do you wish to try and load the file anyway?"};
+
+  auto file_info = QFileInfo(filename);
+  if (file_info.completeSuffix().contains("img")) {
+    QMessageBox user_choice(QMessageBox::Icon::Warning,
+        "File format might be unsopported", UNSUPPORTED_RAW_IMAGE_WARNING,
+        QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, this);
+    user_choice.setWindowModality(Qt::WindowModal);
+    user_choice.exec();
+
+    if (user_choice.result() != QMessageBox::StandardButton::Yes) {
+      return;
+    }
+  }
+
+  qtVGMRoot.OpenRawFile(filename.toStdWString());
 }
