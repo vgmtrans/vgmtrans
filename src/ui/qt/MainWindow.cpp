@@ -160,19 +160,20 @@ void MainWindow::OpenFile() {
 
 void MainWindow::openFileInternal(QString filename) {
   static QString UNSUPPORTED_RAW_IMAGE_WARNING{
-      "VGMTrans has detected a .img file in input. Please note that raw "
-      "optical media images are not "
-      "supported.\n\n"
+      "'%1' is a raw image file. Data is unlikely to be read correctly, do you wish "
+      "to continue anyway?"};
+
+  static QString UNSUPPORTED_RAW_IMAGE_DESCRIPTION{
       "If this is a dump of a CD or DVD (e.g. PlayStation), please "
-      "convert it to .iso: the program is otherwise "
-      "unable to read the file contents correctly.\n\n"
-      "Do you wish to try and load the file anyway?"};
+      "convert it to '.iso'. The program cannot read raw dumps from optical media."};
 
   auto file_info = QFileInfo(filename);
   if (file_info.completeSuffix().contains("img")) {
-    QMessageBox user_choice(QMessageBox::Icon::Warning,
-        "File format might be unsopported", UNSUPPORTED_RAW_IMAGE_WARNING,
-        QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, this);
+    QMessageBox user_choice(QMessageBox::Icon::Warning, "File format might be unsopported",
+                            UNSUPPORTED_RAW_IMAGE_WARNING.arg(file_info.fileName()),
+                            QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No,
+                            this);
+    user_choice.setInformativeText(UNSUPPORTED_RAW_IMAGE_DESCRIPTION);
     user_choice.setWindowModality(Qt::WindowModal);
     user_choice.exec();
 
