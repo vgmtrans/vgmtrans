@@ -55,12 +55,12 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
   setlocale(LC_ALL, ".ACP");
 #endif
 
-  HRESULT hRes = ::CoInitializeEx(NULL, COINIT_MULTITHREADED);
-  ATLASSERT(SUCCEEDED(hRes) || hRes == RPC_E_CHANGED_MODE);
+  const HRESULT hCoInitializeResult = ::CoInitializeEx(NULL, COINIT_MULTITHREADED);
+  ATLASSERT(SUCCEEDED(hCoInitializeResult) || hCoInitializeResult == RPC_E_CHANGED_MODE);
 
   AtlInitCommonControls(ICC_COOL_CLASSES | ICC_BAR_CLASSES);
 
-  hRes = _Module.Init(NULL, hInstance);
+  HRESULT hRes = _Module.Init(NULL, hInstance);
   ATLASSERT(SUCCEEDED(hRes));
 
   AtlAxWinInit();
@@ -68,7 +68,8 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
   int nRet = Run(lpstrCmdLine, nCmdShow);
 
   _Module.Term();
-  ::CoUninitialize();
+  if (SUCCEEDED(hCoInitializeResult))
+    ::CoUninitialize();
 
   return nRet;
 }

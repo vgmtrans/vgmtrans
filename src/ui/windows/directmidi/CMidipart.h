@@ -220,7 +220,8 @@ namespace directmidi
 		CDirectMusic();					// Constructor and the destructor of the class
 		~CDirectMusic();
 		HRESULT Initialize(HWND hWnd = NULL,IDirectSound8* pDirectSound = NULL);	// Initialize object and DirectSound
-		
+	private:
+		HRESULT m_hCoInitializeResult;
 	};
 
 	// CMasterClock class definition
