@@ -114,7 +114,7 @@ using namespace directmidi;
 // The constructor of the class, member variables initialization
 CDirectMusic::CDirectMusic()
 {
-    CoInitialize(NULL);	// Initialize COM
+	m_hCoInitializeResult = CoInitialize(NULL);  // Initialize COM
 	m_pMusic8			= NULL; 
 
 }
@@ -123,8 +123,9 @@ CDirectMusic::CDirectMusic()
 
 CDirectMusic::~CDirectMusic()
 {
- 	SAFE_RELEASE(m_pMusic8);	
-	CoUninitialize();	// Uninitialize COM
+	SAFE_RELEASE(m_pMusic8);
+	if (SUCCEEDED(m_hCoInitializeResult))
+		CoUninitialize();	// Uninitialize COM
 }	
 
 // Intialization of CDirectMusic object.
