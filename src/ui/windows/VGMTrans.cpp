@@ -56,7 +56,7 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
 #endif
 
   HRESULT hRes = ::CoInitializeEx(NULL, COINIT_MULTITHREADED);
-  ATLASSERT(SUCCEEDED(hRes));
+  ATLASSERT(SUCCEEDED(hRes) || hRes == RPC_E_CHANGED_MODE);
 
   AtlInitCommonControls(ICC_COOL_CLASSES | ICC_BAR_CLASSES);
 
