@@ -510,6 +510,13 @@ void MidiTrack::InsertTempoBPM(double BPM, uint32_t absTime) {
   //bAddedTempo = true;
 }
 
+void MidiTrack::AddMidiPort(uint8_t port) {
+  aEvents.push_back(new MidiPortEvent(this, GetDelta(), port));
+}
+
+void MidiTrack::InsertMidiPort(uint8_t port, uint32_t absTime) {
+  aEvents.push_back(new MidiPortEvent(this, absTime, port));
+}
 
 void MidiTrack::AddTimeSig(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter) {
   aEvents.push_back(new TimeSigEvent(this, GetDelta(), numer, denom, ticksPerQuarter));
@@ -840,6 +847,19 @@ uint32_t TempoEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
       (uint8_t) (microSecs & 0x0000FF)
   };
   return WriteMetaEvent(buf, time, 0x51, data, 3);
+}
+
+
+//  *************
+//  MidiPortEvent
+//  *************
+
+MidiPortEvent::MidiPortEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint8_t port)
+    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST), port(port) {
+}
+
+uint32_t MidiPortEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+  return WriteMetaEvent(buf, time, 0x21, &port, 1);
 }
 
 

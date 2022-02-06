@@ -157,6 +157,8 @@ void SeqTrack::AddInitialMidiEvents(int trackNum) {
       << std::endl;
   pMidiTrack->AddTrackName(ssTrackName.str().c_str());
 
+  pMidiTrack->AddMidiPort(channelGroup);
+
   if (trackNum == 0) {
     pMidiTrack->AddGMReset();
     pMidiTrack->AddGM2Reset();

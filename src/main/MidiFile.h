@@ -50,7 +50,8 @@ typedef enum {
   MIDIEVENT_VIBRATO,
   MIDIEVENT_ENDOFTRACK,
   MIDIEVENT_TEXT,
-  MIDIEVENT_RESET
+  MIDIEVENT_RESET,
+  MIDIEVENT_MIDIPORT
 } MidiEventType;
 
 class MidiTrack {
@@ -137,6 +138,8 @@ class MidiTrack {
   void AddTempoBPM(double BPM);
   void InsertTempo(uint32_t microSeconds, uint32_t absTime);
   void InsertTempoBPM(double BPM, uint32_t absTime);
+  void AddMidiPort(uint8_t port);
+  void InsertMidiPort(uint8_t port, uint32_t absTime);
   void AddTimeSig(uint8_t numer, uint8_t denom, uint8_t clicksPerQuarter);
   void InsertTimeSig(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime);
   void AddEndOfTrack(void);
@@ -459,6 +462,16 @@ class TempoEvent
   virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 
   uint32_t microSecs;
+};
+
+class MidiPortEvent : public MidiEvent {
+public:
+  MidiPortEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint8_t port);
+  virtual MidiEventType GetEventType() { return MIDIEVENT_MIDIPORT; }
+  // virtual TimeSigEvent* MakeCopy();
+  virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
+
+  uint8_t port;
 };
 
 class TimeSigEvent
