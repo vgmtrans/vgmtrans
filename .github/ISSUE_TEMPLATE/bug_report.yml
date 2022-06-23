@@ -1,0 +1,61 @@
+name: 'Bug Report'
+description: 'Report a bug, something does not work as it supposed to'
+title: 'SHORT DESCRIPTION'
+labels: bug
+body:
+- type: markdown
+  attributes:
+    value: |
+      Please don't forget to update the issue title.
+      Include all applicable information to help us reproduce your problem.
+
+- type: textarea
+  attributes:
+    label: Environment details
+    description: include every applicable attribute
+    value: |
+     * Operating System+version: **YOUR OPERATING SYSTEM HERE**
+     * VGMTrans version: **YOU VGMTRANS VERSION HERE**
+     * Game ROM/music dump name and sha256: **NAME HERE**, **SHA256 HERE**
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Describe the bug
+    description: A clear and concise description of what the bug is.
+  validations:
+    required: true
+    
+- type: textarea
+  attributes:
+    label:  Steps to reproduce
+    description: Include if applicable
+    value: |
+     1. Load the game
+     2. ...
+
+- type: textarea
+  attributes:
+    label: Expected behaviour
+    description: A clear and concise description of what you expected to happen.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label:  Additional context
+    description: Any other information you would like to include.
+
+- type: textarea
+  attributes:
+    label:  Logs
+    description: Include/Attach if Applicable
+    value: |
+      <details><summary>Click to expand log</summary>
+
+      ```
+      REPLACE THIS LINE WITH YOUR LOG
+      ```
+
+      </details>
