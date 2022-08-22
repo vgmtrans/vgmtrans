@@ -7,4 +7,4 @@ task:
 
     install_script: pwd && ls -la && pkg update --force && pkg install -y cmake ninja qt5-widgets qt5-qmake qt5-svg qt5-buildtools minizip fluidsynth
     
-    compile_script: && cmake -B build -GNinja . && cmake --build build --parallel
+    compile_script: cmake -B build -GNinja . && cmake --build build --parallel
