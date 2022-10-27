@@ -838,6 +838,7 @@ bool NinSnesTrack::ReadEvent(void) {
 
         parentSeq->InactivateAllTracks();
         bContinue = false;
+        parentSeq->bIncTickAfterProcessingTracks = false;
       }
       else {
         uint32_t eventLength = curOffset - beginOffset;
