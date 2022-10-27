@@ -906,9 +906,10 @@ bool NinSnesTrack::ReadEvent(void) {
       break;
     }
 
-    case EVENT_REST:
+    case EVENT_REST: {
       AddRest(beginOffset, curOffset - beginOffset, shared->spcNoteDuration);
       break;
+    }
 
     case EVENT_PERCUSSION_NOTE: {
       uint8_t noteNumber = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
