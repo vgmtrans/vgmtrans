@@ -122,6 +122,9 @@ class VGMSeq: public VGMFile {
   //     because a track must pause the parsing every time a parser encounters to delta time event.
   //     It can be used anyway, but it is useless and annoys you, in most cases.
   bool bLoadTickByTick;
+  
+  // There may be a rare case when you do not want to increment the tick counter after processing a tick because you want to go to a new section.
+  bool bIncTickAfterProcessingTracks;
 
   uint8_t initialVol;
   uint8_t initialExpression;
