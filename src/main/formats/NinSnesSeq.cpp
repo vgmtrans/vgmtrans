@@ -1753,7 +1753,7 @@ bool NinSnesTrack::ReadEvent(void) {
       AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
       pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(),
                                     LOG_LEVEL_ERR,
-                                    std::wstring(L"AkaoSnesSeq")));
+                                    std::wstring(L"NinSnesSeq")));
       bContinue = false;
       break;
   }
