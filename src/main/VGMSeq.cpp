@@ -27,6 +27,7 @@ VGMSeq::VGMSeq(const string &format, RawFile *file, uint32_t offset, uint32_t le
       bAlwaysWriteInitialMono(false),
       bAllowDiscontinuousTrackData(false),
       bLoadTickByTick(false),
+      bIncTickAfterProcessingTracks(true),
       initialVol(100),                    //GM standard (dls1 spec p16)
       initialExpression(127),            //''
       initialReverb(40),                //GM standard
@@ -215,8 +216,10 @@ void VGMSeq::LoadTracksMain(long stopTime) {
         itrSlider = itrNextSlider;
       }
 
-      time++;
-
+      if (bIncTickAfterProcessingTracks == true) {
+        time++;
+      }
+      bIncTickAfterProcessingTracks = true;
       if (readMode == READMODE_CONVERT_TO_MIDI) {
         for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
           if (aTracks[trackNum]->pMidiTrack != NULL) {
