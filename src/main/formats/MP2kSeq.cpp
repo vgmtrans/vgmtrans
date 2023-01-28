@@ -12,6 +12,7 @@
  * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
+#include "pch.h"
 #include "MP2kSeq.h"
 
 #include <array>
