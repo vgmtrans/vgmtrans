@@ -8,7 +8,7 @@ jobs:
       osx_min_ver: "11.0"
       osx_arch: "x86_64"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: "Install dependencies"
         run: |
           brew upgrade qt@6 || brew install qt@6
@@ -22,15 +22,15 @@ jobs:
         name: "Package DMG (macOS)"
         run: /usr/local/opt/qt6/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ env.osx_arch }}-${{ runner.os }}.dmg
           path: "build/bin/VGMTrans.dmg"
   Ubuntu:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-18.04 # Bump to 20.04 once 18.04 goes out of support
     name: Linux
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: "Set environment variables"
         run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
@@ -75,7 +75,7 @@ jobs:
             -verbose=10
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.AppImage
           path: "build/VGMTrans.AppImage"
@@ -83,7 +83,7 @@ jobs:
     runs-on: windows-2022
     name: Windows
     steps:
-       - uses: actions/checkout@v2
+       - uses: actions/checkout@v3
          with:
           submodules: true
        - uses: ilammy/msvc-dev-cmd@v1
@@ -96,7 +96,7 @@ jobs:
        - name: "Package artifact"
          run: 7z a "VGMTrans.zip" -r .\build\bin*
        - name: "Upload artifact"
-         uses: actions/upload-artifact@v2.2.3
+         uses: actions/upload-artifact@v3
          with:
            name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
            path: VGMTrans.zip
