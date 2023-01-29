@@ -1,17 +1,17 @@
-name: Build and test
+name: Build
 on: [push, pull_request, workflow_dispatch]
 jobs:
   macos_x64:
-    name: macOS (x64)
-    runs-on: macos-10.15
+    name: macOS (Intel)
+    runs-on: macos-11
     env:
-      osx_min_ver: "10.14"
+      osx_min_ver: "11.0"
       osx_arch: "x86_64"
     steps:
       - uses: actions/checkout@v2
       - name: "Install dependencies"
         run: |
-          brew upgrade qt@5 || brew install qt@5
+          brew upgrade qt@6 || brew install qt@6
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
@@ -20,7 +20,7 @@ jobs:
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
         name: "Package DMG (macOS)"
-        run: /usr/local/opt/qt5/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
+        run: /usr/local/opt/qt6/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
       - name: "Upload artifact"
         uses: actions/upload-artifact@v1
         with:
@@ -36,15 +36,21 @@ jobs:
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
       - name: "Install dependencies"
         run: |
-          sudo add-apt-repository ppa:beineri/opt-qt-5.15.2-bionic -y
+          sudo add-apt-repository ppa:savoury1/display
+          sudo add-apt-repository ppa:savoury1/ffmpeg4
+          sudo add-apt-repository ppa:savoury1/qt-6-2 -y
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
           sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main" -y
-          sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-13 main" -y
-          sudo apt clean
-          sudo apt update
-          sudo apt install -y pkg-config clang-13 lld-13 qt515base qt515svg qt515wayland libjack-dev libsndfile1-dev libpulse-dev libglib2.0-dev ninja-build libgl1-mesa-dev
+          sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-16 main" -y
+          sudo apt-get update && sudo apt-get upgrade -y
+          sudo apt-get install -y pkg-config clang-16 lld-16 \
+            adwaita-qt6 qt6-gtk2-platformtheme qt6-base-dev \
+            libqt6svg6 libqt6svg6-dev libqt6svgwidgets6 \
+            qt6-wayland qt6-wayland-dev qt6-wayland-dev-tools \
+            libjack-dev libsndfile1-dev libpulse-dev \
+            libgl1-mesa-dev libglib2.0-dev ninja-build
       - name: "Prepare build"
-        run: cmake -DCMAKE_C_COMPILER="clang-13" -DCMAKE_CXX_COMPILER="clang++-13" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -GNinja -B build
+        run: cmake -DCMAKE_C_COMPILER="clang-16" -DCMAKE_CXX_COMPILER="clang++-16" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -GNinja -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
       - name: "Make AppImage"
@@ -63,7 +69,10 @@ jobs:
           wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
           chmod a+x linuxdeployqt-continuous-x86_64.AppImage
           echo "Creating AppImage"
-          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop -executable=appdir/usr/lib/libbass.so -executable=appdir/usr/lib/libbassmidi.so -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/,wayland-shell-integration/,wayland-decoration-client/  -verbose=2
+          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop \
+            -executable=appdir/usr/lib/libbass.so -executable=appdir/usr/lib/libbassmidi.so \
+            -appimage -qmake=/opt/qt6/bin/qmake -extra-plugins=platforms/,wayland-shell-integration/,wayland-decoration-client/ \
+            -verbose=10
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
         uses: actions/upload-artifact@v1
@@ -71,7 +80,7 @@ jobs:
           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.AppImage
           path: "build/VGMTrans.AppImage"
   Windows:
-    runs-on: windows-2019
+    runs-on: windows-2022
     name: Windows
     steps:
        - uses: actions/checkout@v2
