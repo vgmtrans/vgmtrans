@@ -72,6 +72,7 @@ endif()
 
 option(ENABLE_ASAN "Enable address sanitizer" OFF)
 option(ENABLE_UI_QT "Build the UI (Qt)" ON)
+option(ENABLE_CLI "Build the CLI application" ON)
 option(ENABLE_LIBCPP "Build using libc++" OFF)
 
 #
