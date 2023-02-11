@@ -65,7 +65,7 @@ void WinVGMRoot::Play(void)
 		}
 		musicplayer.Play((VGMItem*)seq, 0);
 	}
-	else	
+	else
 		musicplayer.Play(selectedItem, 0);
 
 	pMainFrame->UIEnable(ID_STOP, 1);

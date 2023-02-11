@@ -269,9 +269,12 @@ void VGMRoot::UI_AddVGMFile(VGMFile *theFile) {
 // into a file on the filesystem.
 bool VGMRoot::UI_WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32_t size) {
   ofstream outfile(ghc::filesystem::path(filepath), ios::out | ios::trunc | ios::binary);
-  if (!outfile.is_open())        //if attempt to open file failed
+  if (!outfile.is_open()) {        //if attempt to open file failed
+    pRoot->AddLogItem(new LogItem(
+      std::wstring(L"Error: could not open file " + filepath + L" for writing"),
+      LOG_LEVEL_ERR, L"Root"));
     return false;
-
+  }
   outfile.write((const char *) buf, size);
   outfile.close();
   return true;
@@ -288,6 +291,7 @@ bool VGMRoot::SaveAllAsRaw() {
       wstring filepath = dirpath + L"\\" + file->GetName()->c_str();
       uint8_t *buf = new uint8_t[file->unLength];        //create a buffer the size of the file
       file->GetBytes(file->dwOffset, file->unLength, buf);
+      wcout << filepath << endl;
       result = UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);
       delete[] buf;
     }
