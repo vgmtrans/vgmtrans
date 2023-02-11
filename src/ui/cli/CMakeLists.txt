@@ -1,5 +1,6 @@
 add_executable(
   vgmtrans-cli
+  CLIVGMRoot.cpp
   main_cli.cpp
 )
 

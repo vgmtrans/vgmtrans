@@ -38,7 +38,7 @@ bool Matcher::OnCloseFile(VGMFile *file) {
 /*
 AddItem(ITEM_TYPE type, uint32_t id)
 {
-	
+
 }*/
 
 // *************
