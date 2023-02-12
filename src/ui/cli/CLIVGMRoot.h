@@ -48,8 +48,8 @@ public:
                                           const wstring& extension = L"");
   virtual wstring UI_GetSaveDirPath(const wstring& suggestedDir = L"");
 
-  set<const string> inputFiles {};
-  string outputDir {"."};
+  set<string> inputFiles = {};
+  string outputDir = ".";
 };
 
 extern CLIVGMRoot cliroot;
