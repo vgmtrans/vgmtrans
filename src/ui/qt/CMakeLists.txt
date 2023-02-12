@@ -205,6 +205,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
     "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
+  set_target_properties(vgmtrans PROPERTIES OUTPUT_NAME vgmtrans-gui)
   install(TARGETS vgmtrans DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
   install(
     FILES resources/vgmtrans.png
