@@ -12,6 +12,8 @@ project(
   VERSION 1.1
   LANGUAGES CXX)
 
+configure_file(src/VGMTransConfig.h.in src/VGMTransConfig.h)
+
 find_package(Git)
 if(GIT_FOUND)
   execute_process(

@@ -12,12 +12,20 @@
 #include "SF2File.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
+#include "VGMTransConfig.h"
 
 CLIVGMRoot cliroot;
 
 // displays a usage message
 void CLIVGMRoot::DisplayUsage() {
-    cerr << "usage: " << CLI_APP_NAME << " input_file1 input_file2 ... -o output_directory" << endl;
+  cerr << "Usage: " << CLI_APP_NAME << " input_file1 input_file2 ... -o output_directory" << endl;
+}
+
+// displays a help message
+void CLIVGMRoot::DisplayHelp() {
+  cerr << "VGMTrans version " << VGMTrans_VERSION << endl;
+  cerr << "Converts music files used in console video games into industry-standard MIDI and DLS/SF2 files." << endl << endl;
+  DisplayUsage();
 }
 
 // creates the output directory if it does not already exist
@@ -42,8 +50,8 @@ bool CLIVGMRoot::OpenRawFile(const wstring &filename) {
 
 bool CLIVGMRoot::Init() {
   if (inputFiles.empty()) {
-    DisplayUsage();
     cerr << "Error: must provide at least one input file" << endl;
+    DisplayUsage();
     return false;
   }
 

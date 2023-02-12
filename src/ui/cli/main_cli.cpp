@@ -18,10 +18,14 @@ int main(int argc, char *argv[]) {
 
   for(int i = 1; i < argc; ++i) {
     string s(argv[i]);
-    if (s == "-o") {
+    if ((s == "-h") || (s == "--help")) {
+      cliroot.DisplayHelp();
+      return EXIT_SUCCESS;
+    }
+    else if (s == "-o") {
       if (i == argc - 1) {
-        cliroot.DisplayUsage();
         cerr << "Error: expected output directory" << endl;
+        cliroot.DisplayUsage();
         return EXIT_FAILURE;
       }
       else {
