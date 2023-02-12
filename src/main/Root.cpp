@@ -281,18 +281,16 @@ bool VGMRoot::UI_WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32
 
 }
 
-
 bool VGMRoot::SaveAllAsRaw() {
-  wstring dirpath = UI_GetSaveDirPath();\
-    if (dirpath.length() != 0) {
+  fs::path dirpath = fs::path(UI_GetSaveDirPath());
+  if (dirpath.string().length() != 0) {
     for (uint32_t i = 0; i < vVGMFile.size(); i++) {
       bool result;
       VGMFile *file = vVGMFile[i];
-      wstring filepath = dirpath + L"\\" + file->GetName()->c_str();
+      fs::path filepath = dirpath / fs::path(*file->GetName());
       uint8_t *buf = new uint8_t[file->unLength];        //create a buffer the size of the file
       file->GetBytes(file->dwOffset, file->unLength, buf);
-      wcout << filepath << endl;
-      result = UI_WriteBufferToFile(filepath.c_str(), buf, file->unLength);
+      result = UI_WriteBufferToFile(filepath.wstring(), buf, file->unLength);
       delete[] buf;
     }
     return true;

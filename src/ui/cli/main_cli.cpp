@@ -4,12 +4,15 @@
  * See the included LICENSE for more information
  */
 
+#include <ghc/filesystem.hpp>
+
 #include "pch.h"
 #include "CLIVGMRoot.h"
 #include "VGMColl.h"
 #include "VGMExport.h"
 
 using namespace std;
+namespace fs = ghc::filesystem;
 
 int main(int argc, char *argv[]) {
 
@@ -22,11 +25,11 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
       }
       else {
-        cliroot.outputDir = std::string(argv[++i]);
+        cliroot.outputDir = fs::path(argv[++i]);
       }
     }
     else {
-      cliroot.inputFiles.insert(s);
+      cliroot.inputFiles.insert(fs::path(s));
     }
   }
 
