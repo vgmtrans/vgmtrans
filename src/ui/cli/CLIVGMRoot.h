@@ -22,9 +22,9 @@ public:
 
   bool MakeOutputDir();
 
-  bool ConvertAllCollections();
+  bool ExportAllCollections();
 
-  bool ConvertCollection(VGMColl* coll);
+  bool ExportCollection(VGMColl* coll);
 
   bool SaveMidi(VGMColl *coll);
 
@@ -32,7 +32,7 @@ public:
 
   bool SaveDLS(VGMColl *coll);
 
-  virtual bool OpenRawFile(const std::wstring &filename);
+  virtual bool OpenRawFile(const wstring &filename);
 
   virtual bool Init();
 
@@ -42,14 +42,14 @@ public:
 
   virtual void UI_AddLogItem(LogItem* theLog);
 
-  virtual std::wstring UI_GetOpenFilePath(const std::wstring& suggestedFilename = L"",
-                                          const std::wstring& extension = L"");
-  virtual std::wstring UI_GetSaveFilePath(const std::wstring& suggestedFilename,
-                                          const std::wstring& extension = L"");
-  virtual std::wstring UI_GetSaveDirPath(const std::wstring& suggestedDir = L"");
+  virtual wstring UI_GetOpenFilePath(const wstring& suggestedFilename = L"",
+                                          const wstring& extension = L"");
+  virtual wstring UI_GetSaveFilePath(const wstring& suggestedFilename,
+                                          const wstring& extension = L"");
+  virtual wstring UI_GetSaveDirPath(const wstring& suggestedDir = L"");
 
-  vector<const string> inputFiles {};
-  std::string outputDir {"."};
+  set<const string> inputFiles {};
+  string outputDir {"."};
 };
 
 extern CLIVGMRoot cliroot;
