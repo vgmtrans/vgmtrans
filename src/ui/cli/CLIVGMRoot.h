@@ -22,6 +22,8 @@ public:
 
   void DisplayUsage();
 
+  void DisplayHelp();
+
   bool MakeOutputDir();
 
   bool ExportAllCollections();
@@ -46,8 +48,10 @@ public:
 
   virtual wstring UI_GetOpenFilePath(const wstring& suggestedFilename = L"",
                                           const wstring& extension = L"");
+
   virtual wstring UI_GetSaveFilePath(const wstring& suggestedFilename,
                                           const wstring& extension = L"");
+
   virtual wstring UI_GetSaveDirPath(const wstring& suggestedDir = L"");
 
   set<string> inputFiles = {};

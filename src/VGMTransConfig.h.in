@@ -1,0 +1,2 @@
+// the configured options and settings for VGMTrans
+#define VGMTrans_VERSION @VGMTrans_VERSION@
