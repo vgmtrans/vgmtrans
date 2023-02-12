@@ -1,9 +1,13 @@
 #pragma once
 
+#include <ghc/filesystem.hpp>
+
 #include "common.h"
 #include "Loader.h"
 #include "Scanner.h"
 #include "LogItem.h"
+
+namespace fs = ghc::filesystem;
 
 class VGMColl;
 class VGMFile;

@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include <array>
+#include <filesystem>
 #include <fstream>
 #include <vector>
 #include <list>

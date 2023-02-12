@@ -10,6 +10,8 @@
 
 #define CLI_APP_NAME "vgmtrans"
 
+namespace fs = ghc::filesystem;
+
 class CLIVGMRoot : public VGMRoot {
 
 public:
@@ -49,7 +51,7 @@ public:
   virtual wstring UI_GetSaveDirPath(const wstring& suggestedDir = L"");
 
   set<string> inputFiles = {};
-  string outputDir = ".";
+  fs::path outputDir = fs::path(".");
 };
 
 extern CLIVGMRoot cliroot;
