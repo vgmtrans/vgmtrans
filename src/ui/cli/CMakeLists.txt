@@ -4,6 +4,8 @@ add_executable(
   main_cli.cpp
 )
 
+target_include_directories(vgmtrans-cli PUBLIC "${PROJECT_BINARY_DIR}/src")
+
 target_link_libraries(
   vgmtrans-cli
   PRIVATE g_options
