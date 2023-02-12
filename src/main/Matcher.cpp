@@ -270,8 +270,7 @@ bool FilegroupMatcher::OnCloseSampColl(VGMSampColl *sampcoll) {
 
 
 void FilegroupMatcher::LookForMatch() {
-
-  if (instrsets.size() == 1 && sampcolls.size() == 1) {
+  if (instrsets.size() >= 1 && sampcolls.size() >= 1) {
     if (seqs.size() >= 1) {
       for (list<VGMSeq *>::iterator iter = seqs.begin(); iter != seqs.end(); iter++) {
         VGMSeq *seq = *iter;

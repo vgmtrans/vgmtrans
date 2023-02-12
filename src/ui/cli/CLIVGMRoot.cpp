@@ -15,6 +15,14 @@
 
 CLIVGMRoot cliroot;
 
+// gets the base name of a file path
+string getBaseName(const string& filename) {
+  size_t lastSlash = filename.find_last_of("/");
+  string fname = (lastSlash == string::npos) ? filename : filename.substr(lastSlash + 1, filename.length());
+  size_t lastDot = fname.find_last_of(".");
+  return (lastDot == string::npos) ? fname : fname.substr(0, lastDot);
+}
+
 // displays a usage message
 void CLIVGMRoot::DisplayUsage() {
     cerr << "usage: " << CLI_APP_NAME << " input_file1 input_file2 ... -o output_directory" << endl;
@@ -49,49 +57,97 @@ bool CLIVGMRoot::Init() {
   VGMRoot::Init();
 
   // get collection for each input file
-  int inputFileCtr = 0;
+  size_t inputFileCtr = 0;
+  size_t numColls = 0;
+  // map for deconflicting identical collection names using input filenames
+  map<wstring, vector<pair<size_t, string>>> collNameMap {};
   for (string infile : inputFiles) {
     if (!OpenRawFile(string2wstring(infile))) {  // file not found
       return false;
     }
-    int numCollsAdded = GetNumCollections() - inputFileCtr;
+    size_t numCollsAdded = GetNumCollections() - numColls;
     if (numCollsAdded == 0) {
       cerr << "File " << infile << " is not a recognized music file" << endl;
     }
-    else if (numCollsAdded == 1) {
-      ++inputFileCtr;
-    }
     else {
-      // TODO: handle this case
-      cerr << numCollsAdded << " collections added for " << infile << endl;
-      return false;
+      // string collStr = (numCollsAdded == 1) ? "collection" : "collections";
+      // cerr << numCollsAdded << " " << collStr << " added for " << infile << endl;
+      for(size_t i = numColls; i < GetNumCollections(); ++i) {
+        VGMColl* coll = vVGMColl[i];
+        wstring collName = *coll->GetName();
+        auto it = collNameMap.find(collName);
+        pair<size_t, string> p = make_pair(i, infile);
+        if (it == collNameMap.end()) {
+          vector<pair<size_t, string>> pairs {p};
+          collNameMap[collName] = pairs;
+        }
+        else {
+          it->second.push_back(p);
+        }
+      }
+      ++inputFileCtr;
+      numColls += numCollsAdded;
     }
   }
-  size_t numCollections = GetNumCollections();
-  if (numCollections == 0) {
+
+  if (numColls == 0) {
     cerr << "\nNo music files to convert." << endl;
     return true;
   }
   else {
+    // deconflict collection names
+    for(auto collNameIt = collNameMap.begin(); collNameIt != collNameMap.end(); ++collNameIt) {
+      vector<pair<size_t, string>> pairs = collNameIt->second;
+      if (pairs.size() > 1) {  // name conflict
+        map<string, size_t> baseNameCtr {};
+        string baseName;
+        size_t ct;
+        for(pair<size_t, string> p : pairs) {
+          baseName = getBaseName(p.second);
+          auto baseNameCtrIt = baseNameCtr.find(baseName);
+          ct = (baseNameCtrIt == baseNameCtr.end()) ? 0 : baseNameCtrIt->second;
+          baseNameCtr[baseName] = ct + 1;
+        }
+        map<string, size_t> baseNameIdx {};
+        for(pair<size_t, string> p : pairs) {
+          baseName = getBaseName(p.second);
+          // apply a unique suffix to the collection name
+          string suffix = " - " + baseName;
+          ct = baseNameCtr.find(baseName)->second;
+          if (ct > 1) {
+            // base name is not unique, so we additionally need an integer to distinguish
+            auto baseNameIdxIt = baseNameIdx.find(baseName);
+            size_t idx = (baseNameIdxIt == baseNameIdx.end()) ? 0 : baseNameIdxIt->second;
+            ++idx;
+            suffix += " - " + to_string(idx);
+            baseNameIdx[baseName] = idx;
+          }
+          // update collection name to be unique
+          wstring newCollName = collNameIt->first + string2wstring(suffix);
+          vVGMColl[p.first]->SetName(&newCollName);
+        }
+      }
+    }
+
     cerr << "\nInput files:     " << inputFileCtr << endl;
-    cerr << "VGM collections: " << numCollections << endl;
+    cerr << "VGM collections: " << numColls << endl;
     cerr << "Output files:    " << cliroot.vVGMFile.size() << endl << endl;
     return MakeOutputDir();
   }
 }
 
-bool CLIVGMRoot::ConvertAllCollections() {
+bool CLIVGMRoot::ExportAllCollections() {
   bool success = true;
   for (VGMColl* coll : vVGMColl) {
     wstring collName = *coll->GetName();
-    success &= ConvertCollection(coll);
+    success &= ExportCollection(coll);
   }
   return success;
 }
 
-bool CLIVGMRoot::ConvertCollection(VGMColl* coll) {
+bool CLIVGMRoot::ExportCollection(VGMColl* coll) {
     wstring collName = *coll->GetName();
-    wcerr << "Converting " << collName << " -> " << endl;
+    wcerr << "Exporting " << collName << endl;
     return SaveMidi(coll) & SaveSF2(coll) & SaveDLS(coll);
 }
 
