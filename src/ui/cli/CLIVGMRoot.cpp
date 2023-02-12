@@ -128,9 +128,8 @@ bool CLIVGMRoot::Init() {
       }
     }
 
-    cout << "\nInput files:     " << inputFileCtr << endl;
-    cout << "VGM collections: " << numColls << endl;
-    cout << "Output files:    " << cliroot.vVGMFile.size() << endl << endl;
+    cout << "\nInput files:        " << inputFileCtr << endl;
+    cout << "Output collections: " << numColls << endl << endl;
     return MakeOutputDir();
   }
 }
