@@ -15,14 +15,6 @@
 
 CLIVGMRoot cliroot;
 
-// gets the base name of a file path
-string getBaseName(const string& filename) {
-  size_t lastSlash = filename.find_last_of("/");
-  string fname = (lastSlash == string::npos) ? filename : filename.substr(lastSlash + 1, filename.length());
-  size_t lastDot = fname.find_last_of(".");
-  return (lastDot == string::npos) ? fname : fname.substr(0, lastDot);
-}
-
 // displays a usage message
 void CLIVGMRoot::DisplayUsage() {
     cerr << "usage: " << CLI_APP_NAME << " input_file1 input_file2 ... -o output_directory" << endl;
@@ -31,13 +23,13 @@ void CLIVGMRoot::DisplayUsage() {
 // creates the output directory if it does not already exist
 bool CLIVGMRoot::MakeOutputDir() {
   struct stat sb;
-  if (stat(outputDir.c_str(), &sb) != 0) {
+  if (!fs::exists(outputDir)) {
     // directory doesn't exist: need to create it
     if (mkdir(outputDir.c_str(), 0770)) {
-      cerr << "Could not create directory " + outputDir << endl;
+      cerr << "Could not create directory " + outputDir.string() << endl;
       return false;
     }
-    cout << "Created new directory " + outputDir << endl;
+    cout << "Created new directory " + outputDir.string() << endl;
   }
   return true;
 }
@@ -61,25 +53,23 @@ bool CLIVGMRoot::Init() {
   size_t inputFileCtr = 0;
   size_t numColls = 0;
   // map for deconflicting identical collection names using input filenames
-  map<wstring, vector<pair<size_t, string>>> collNameMap {};
-  for (string infile : inputFiles) {
-    if (!OpenRawFile(string2wstring(infile))) {  // file not found
+  map<wstring, vector<pair<size_t, fs::path>>> collNameMap {};
+  for (fs::path infile : inputFiles) {
+    if (!OpenRawFile(infile.wstring())) {  // file not found
       return false;
     }
     size_t numCollsAdded = GetNumCollections() - numColls;
     if (numCollsAdded == 0) {
-      cout << "File " << infile << " is not a recognized music file" << endl;
+      cout << "File " << infile.string() << " is not a recognized music file" << endl;
     }
     else {
-      // string collStr = (numCollsAdded == 1) ? "collection" : "collections";
-      // cout << numCollsAdded << " " << collStr << " added for " << infile << endl;
       for(size_t i = numColls; i < GetNumCollections(); ++i) {
         VGMColl* coll = vVGMColl[i];
         wstring collName = *coll->GetName();
         auto it = collNameMap.find(collName);
-        pair<size_t, string> p = make_pair(i, infile);
+        pair<size_t, fs::path> p = make_pair(i, infile);
         if (it == collNameMap.end()) {
-          vector<pair<size_t, string>> pairs {p};
+          vector<pair<size_t, fs::path>> pairs {p};
           collNameMap[collName] = pairs;
         }
         else {
@@ -98,20 +88,20 @@ bool CLIVGMRoot::Init() {
   else {
     // deconflict collection names
     for(auto collNameIt = collNameMap.begin(); collNameIt != collNameMap.end(); ++collNameIt) {
-      vector<pair<size_t, string>> pairs = collNameIt->second;
+      vector<pair<size_t, fs::path>> pairs = collNameIt->second;
       if (pairs.size() > 1) {  // name conflict
         map<string, size_t> baseNameCtr {};
         string baseName;
         size_t ct;
-        for(pair<size_t, string> p : pairs) {
-          baseName = getBaseName(p.second);
+        for(pair<size_t, fs::path> p : pairs) {
+          baseName = p.second.stem();
           auto baseNameCtrIt = baseNameCtr.find(baseName);
           ct = (baseNameCtrIt == baseNameCtr.end()) ? 0 : baseNameCtrIt->second;
           baseNameCtr[baseName] = ct + 1;
         }
         map<string, size_t> baseNameIdx {};
-        for(pair<size_t, string> p : pairs) {
-          baseName = getBaseName(p.second);
+        for(pair<size_t, fs::path> p : pairs) {
+          baseName = p.second.stem();
           // apply a unique suffix to the collection name
           string suffix = " - " + baseName;
           ct = baseNameCtr.find(baseName)->second;
@@ -224,9 +214,10 @@ wstring CLIVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const w
 }
 
 wstring CLIVGMRoot::UI_GetSaveFilePath(const wstring& suggestedFilename, const wstring& extension) {
-  return string2wstring(outputDir) + L"/" + ConvertToSafeFileName(suggestedFilename) + L"." + extension;
+  fs::path savePath = outputDir / fs::path(ConvertToSafeFileName(suggestedFilename) + L"." + extension);
+  return savePath.wstring();
 }
 
 wstring CLIVGMRoot::UI_GetSaveDirPath(const std::wstring& suggestedDir) {
-  return string2wstring(this->outputDir);
+  return this->outputDir.wstring();
 }
