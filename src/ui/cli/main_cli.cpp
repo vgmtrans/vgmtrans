@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
     if (s == "-o") {
       if (i == argc - 1) {
         cliroot.DisplayUsage();
-        cerr << "error: expected output directory" << endl;
+        cerr << "Error: expected output directory" << endl;
         return EXIT_FAILURE;
       }
       else {

@@ -37,20 +37,21 @@ bool CLIVGMRoot::MakeOutputDir() {
       cerr << "Could not create directory " + outputDir << endl;
       return false;
     }
-    cerr << "Created new directory " + outputDir << endl;
+    cout << "Created new directory " + outputDir << endl;
   }
   return true;
 }
 
 bool CLIVGMRoot::OpenRawFile(const wstring &filename) {
-  wcerr << "Loading " << filename << endl;
+  wstring fname = filename;
+  cout << "Loading " << wstring2string(fname) << endl;
   return VGMRoot::OpenRawFile(filename);
 }
 
 bool CLIVGMRoot::Init() {
   if (inputFiles.empty()) {
     DisplayUsage();
-    cerr << "error: must provide at least one input file" << endl;
+    cerr << "Error: must provide at least one input file" << endl;
     return false;
   }
 
@@ -67,11 +68,11 @@ bool CLIVGMRoot::Init() {
     }
     size_t numCollsAdded = GetNumCollections() - numColls;
     if (numCollsAdded == 0) {
-      cerr << "File " << infile << " is not a recognized music file" << endl;
+      cout << "File " << infile << " is not a recognized music file" << endl;
     }
     else {
       // string collStr = (numCollsAdded == 1) ? "collection" : "collections";
-      // cerr << numCollsAdded << " " << collStr << " added for " << infile << endl;
+      // cout << numCollsAdded << " " << collStr << " added for " << infile << endl;
       for(size_t i = numColls; i < GetNumCollections(); ++i) {
         VGMColl* coll = vVGMColl[i];
         wstring collName = *coll->GetName();
@@ -91,7 +92,7 @@ bool CLIVGMRoot::Init() {
   }
 
   if (numColls == 0) {
-    cerr << "\nNo music files to convert." << endl;
+    cout << "\nNo music files to convert." << endl;
     return true;
   }
   else {
@@ -129,9 +130,9 @@ bool CLIVGMRoot::Init() {
       }
     }
 
-    cerr << "\nInput files:     " << inputFileCtr << endl;
-    cerr << "VGM collections: " << numColls << endl;
-    cerr << "Output files:    " << cliroot.vVGMFile.size() << endl << endl;
+    cout << "\nInput files:     " << inputFileCtr << endl;
+    cout << "VGM collections: " << numColls << endl;
+    cout << "Output files:    " << cliroot.vVGMFile.size() << endl << endl;
     return MakeOutputDir();
   }
 }
@@ -147,7 +148,7 @@ bool CLIVGMRoot::ExportAllCollections() {
 
 bool CLIVGMRoot::ExportCollection(VGMColl* coll) {
     wstring collName = *coll->GetName();
-    wcerr << "Exporting " << collName << endl;
+    cout << "Exporting: " << wstring2string(collName) << endl;
     return SaveMidi(coll) & SaveSF2(coll) & SaveDLS(coll);
 }
 
@@ -160,7 +161,7 @@ bool CLIVGMRoot::SaveMidi(VGMColl* coll) {
         LOG_LEVEL_ERR, L"VGMColl"));
       return false;
     }
-    wcerr << L"\t" + filepath << endl;
+    cout << "\t" + wstring2string(filepath) << endl;
   }
   return true;
 }
@@ -177,7 +178,7 @@ bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
     delete sf2file;
   }
   if (success) {
-    wcerr << L"\t" + filepath << endl;
+    cout << "\t" + wstring2string(filepath) << endl;
   }
   else {
     pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"),
@@ -197,7 +198,7 @@ bool CLIVGMRoot::SaveDLS(VGMColl* coll) {
     }
   }
   if (success) {
-    wcerr << L"\t" + filepath << endl;
+    cout << "\t" + wstring2string(filepath) << endl;
   }
   else {
     pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"),
@@ -212,7 +213,9 @@ void CLIVGMRoot::UI_SetRootPtr(VGMRoot** theRoot) {
 
 void CLIVGMRoot::UI_AddLogItem(LogItem* theLog) {
   if (theLog->GetLogLevel() <= LOG_LEVEL_WARN) {
-    wcerr << "[" << theLog->GetSource() << "]" << theLog->GetText() << endl;
+    wstring source = theLog->GetSource();
+    wstring text = theLog->GetText();
+    cerr << "[" << wstring2string(source) << "]" << wstring2string(text) << endl;
   }
 }
 
