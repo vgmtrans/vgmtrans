@@ -26,14 +26,14 @@ int main(int argc, char *argv[]) {
       }
     }
     else {
-      cliroot.inputFiles.push_back(s);
+      cliroot.inputFiles.insert(s);
     }
   }
 
   bool success = false;
 
   if (cliroot.Init()) {
-    if (cliroot.ConvertAllCollections()) {
+    if (cliroot.ExportAllCollections()) {
       success = true;
     }
   }
