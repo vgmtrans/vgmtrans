@@ -39,7 +39,7 @@ class VGMRoot {
   bool SetupNewRawFile(RawFile *newRawFile);
   bool CloseRawFile(RawFile *targFile);
   void AddVGMFile(VGMFile *theFile);
-  virtual void RemoveVGMFile(VGMFile *theFile, bool bRemoveFromRaw = true);
+  void RemoveVGMFile(VGMFile *theFile, bool bRemoveFromRaw = true);
   void AddVGMColl(VGMColl *theColl);
   void RemoveVGMColl(VGMColl *theFile);
   void AddLogItem(LogItem *theLog);
