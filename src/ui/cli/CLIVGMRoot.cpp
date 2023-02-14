@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 
 #include "pch.h"
+#include "Format.h"
+#include "Matcher.h"
 #include "CLIVGMRoot.h"
 #include "DLSFile.h"
 #include "SF2File.h"
@@ -66,6 +68,7 @@ bool CLIVGMRoot::Init() {
     if (!OpenRawFile(infile.wstring())) {  // file not found
       return false;
     }
+    UpdateCollections();
     size_t numCollsAdded = GetNumCollections() - numColls;
     if (numCollsAdded == 0) {
       cout << "File " << infile.string() << " is not a recognized music file" << endl;
@@ -215,6 +218,17 @@ void CLIVGMRoot::UI_AddLogItem(LogItem* theLog) {
     cerr << "[" << wstring2string(source) << "]" << wstring2string(text) << endl;
   }
 }
+
+void CLIVGMRoot::UpdateCollections() {
+  for (VGMFile *targFile : vVGMFile) {
+    Format *fmt = targFile->GetFormat();
+    if (fmt->matcher) {
+      fmt->matcher->MakeCollectionsForFile(targFile);
+    }
+  }
+  vVGMFile.clear();
+}
+
 
 wstring CLIVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const wstring& extension) {
   return L"Placeholder";

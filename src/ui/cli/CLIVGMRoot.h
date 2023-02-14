@@ -46,6 +46,8 @@ public:
 
   virtual void UI_AddLogItem(LogItem* theLog);
 
+  virtual void UpdateCollections();
+
   virtual wstring UI_GetOpenFilePath(const wstring& suggestedFilename = L"",
                                           const wstring& extension = L"");
 

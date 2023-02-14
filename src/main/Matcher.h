@@ -36,6 +36,7 @@ class Matcher {
  public:
   virtual bool OnNewFile(VGMFile *file);
   virtual bool OnCloseFile(VGMFile *file);
+  virtual bool MakeCollectionsForFile(VGMFile *file);
  protected:
   virtual bool OnNewSeq(VGMSeq *seq) { return false; }
   virtual bool OnNewInstrSet(VGMInstrSet *instrset) { return false; }
@@ -53,7 +54,7 @@ class Matcher {
 // SimpleMatcher
 // *************
 
-//Simple Matcher is used for those collections that use only 1 Instr Set 
+//Simple Matcher is used for those collections that use only 1 Instr Set
 //and optionally 1 SampColl
 
 template<class IdType>
@@ -375,15 +376,16 @@ class FilegroupMatcher:
   virtual bool OnCloseInstrSet(VGMInstrSet *instrset);
   virtual bool OnCloseSampColl(VGMSampColl *sampcoll);
 
+  virtual void MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampcoll);
+  virtual bool MakeCollectionsForFile(VGMFile *file);
+
   virtual void LookForMatch();
+
   template<class T>
   T *GetLargestVGMFileInList(std::list<T *> theList);
-
 
  protected:
   std::list<VGMSeq *> seqs;
   std::list<VGMInstrSet *> instrsets;
   std::list<VGMSampColl *> sampcolls;
 };
-//
-//
