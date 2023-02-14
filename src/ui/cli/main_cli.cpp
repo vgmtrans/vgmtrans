@@ -5,6 +5,7 @@
  */
 
 #include <ghc/filesystem.hpp>
+#include <stdlib.h>
 
 #include "pch.h"
 #include "CLIVGMRoot.h"

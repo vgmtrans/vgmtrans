@@ -4,8 +4,7 @@
  * See the included LICENSE for more information
  */
 
-#include <sys/stat.h>
-
+#include <version.h>
 #include "pch.h"
 #include "Format.h"
 #include "Matcher.h"
@@ -14,7 +13,6 @@
 #include "SF2File.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
-#include "VGMTransConfig.h"
 
 CLIVGMRoot cliroot;
 
@@ -25,7 +23,7 @@ void CLIVGMRoot::DisplayUsage() {
 
 // displays a help message
 void CLIVGMRoot::DisplayHelp() {
-  cerr << "VGMTrans version " << VGMTrans_VERSION << endl;
+  cerr << "VGMTrans version " << VGMTRANS_VERSION << endl;
   cerr << "Converts music files used in console video games into industry-standard MIDI and DLS/SF2 files." << endl << endl;
   DisplayUsage();
 }
@@ -35,7 +33,7 @@ bool CLIVGMRoot::MakeOutputDir() {
   struct stat sb;
   if (!fs::exists(outputDir)) {
     // directory doesn't exist: need to create it
-    if (mkdir(outputDir.c_str(), 0770)) {
+    if (!fs::create_directory(outputDir)) {
       cerr << "Could not create directory " + outputDir.string() << endl;
       return false;
     }
@@ -105,14 +103,14 @@ bool CLIVGMRoot::Init() {
         string baseName;
         size_t ct;
         for(pair<size_t, fs::path> p : pairs) {
-          baseName = p.second.stem();
+          baseName = p.second.stem().string();
           auto baseNameCtrIt = baseNameCtr.find(baseName);
           ct = (baseNameCtrIt == baseNameCtr.end()) ? 0 : baseNameCtrIt->second;
           baseNameCtr[baseName] = ct + 1;
         }
         map<string, size_t> baseNameIdx {};
         for(pair<size_t, fs::path> p : pairs) {
-          baseName = p.second.stem();
+          baseName = p.second.stem().string();
           // apply a unique suffix to the collection name
           string suffix = " - " + baseName;
           ct = baseNameCtr.find(baseName)->second;
