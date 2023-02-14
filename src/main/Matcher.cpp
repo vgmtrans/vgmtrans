@@ -34,6 +34,11 @@ bool Matcher::OnCloseFile(VGMFile *file) {
   return false;
 }
 
+bool Matcher::MakeCollectionsForFile(VGMFile *file) {
+  return false;
+}
+
+
 
 /*
 AddItem(ITEM_TYPE type, uint32_t id)
@@ -238,7 +243,6 @@ bool FilegroupMatcher::OnNewInstrSet(VGMInstrSet *instrset) {
 }
 
 bool FilegroupMatcher::OnNewSampColl(VGMSampColl *sampcoll) {
-
   sampcolls.push_back(sampcoll);
   LookForMatch();
   return true;
@@ -268,40 +272,81 @@ bool FilegroupMatcher::OnCloseSampColl(VGMSampColl *sampcoll) {
   return true;
 }
 
-
-void FilegroupMatcher::LookForMatch() {
-  if (instrsets.size() >= 1 && sampcolls.size() >= 1) {
-    if (seqs.size() >= 1) {
-      for (list<VGMSeq *>::iterator iter = seqs.begin(); iter != seqs.end(); iter++) {
-        VGMSeq *seq = *iter;
-        VGMInstrSet *instrset = instrsets.front();
-        VGMSampColl *sampcoll = sampcolls.front();
-        VGMColl *coll = fmt->NewCollection();
-        coll->SetName(seq->GetName());
-        coll->UseSeq(seq);
-        coll->AddInstrSet(instrset);
-        coll->AddSampColl(sampcoll);
-        if (!coll->Load()) {
-          delete coll;
-        }
-      }
-    }
-    else {
-      VGMInstrSet *instrset = instrsets.front();
-      VGMSampColl *sampcoll = sampcolls.front();
+void FilegroupMatcher::MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampcoll) {
+  if (seqs.size() >= 1) {
+    for(VGMSeq *seq : seqs) {
       VGMColl *coll = fmt->NewCollection();
-      coll->SetName(instrset->GetName());
-      coll->UseSeq(NULL);
+      coll->SetName(seq->GetName());
+      coll->UseSeq(seq);
       coll->AddInstrSet(instrset);
       coll->AddSampColl(sampcoll);
       if (!coll->Load()) {
         delete coll;
       }
     }
+  }
+  else {
+    VGMColl *coll = fmt->NewCollection();
+    coll->SetName(instrset->GetName());
+    coll->UseSeq(NULL);
+    coll->AddInstrSet(instrset);
+    coll->AddSampColl(sampcoll);
+    if (!coll->Load()) {
+      delete coll;
+    }
+  }
+}
+
+void FilegroupMatcher::LookForMatch() {
+
+  if (g_isCliMode) {
+    // in CLI mode, do not update collections dynamically
+    return;
+  }
+
+  if (instrsets.size() == 1 && sampcolls.size() == 1) {
+    VGMInstrSet* instrset = instrsets.front();
+    VGMSampColl* sampcoll = sampcolls.front();
+    MakeCollection(instrset, sampcoll);
     seqs.clear();
     instrsets.clear();
     sampcolls.clear();
   }
+}
+
+bool FilegroupMatcher::MakeCollectionsForFile(VGMFile *file) {
+
+  if (instrsets.size() >= 1 && sampcolls.size() >= 1) {
+
+    // make one VGMCollection for each sequence
+
+    // NOTE: this only uses the first instrument set & sample collection
+    // VGMInstrSet *instrset = instrsets.front();
+    // VGMSampColl *sampcoll = sampcolls.front();
+    // MakeCollection(instrset, sampcoll);
+
+    // alternatively, we can combine all instrument sets & sample collections
+    // into the same VGMCollection
+    for(VGMSeq *seq : seqs) {
+      VGMColl *coll = fmt->NewCollection();
+      coll->SetName(seq->GetName());
+      coll->UseSeq(seq);
+      for (VGMInstrSet* instrset : instrsets) {
+        for (VGMSampColl* sampcoll : sampcolls) {
+          coll->AddInstrSet(instrset);
+          coll->AddSampColl(sampcoll);
+        }
+      }
+      if (!coll->Load()) {
+        delete coll;
+      }
+    }
+  }
+
+  seqs.clear();
+  instrsets.clear();
+  sampcolls.clear();
+  return true;
 }
 
 template<class T>

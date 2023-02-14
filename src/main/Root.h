@@ -18,6 +18,9 @@ class VGMSampColl;
 class VGMMiscFile;
 class LogItem;
 
+// global switch indicating if we are in CLI mode
+inline bool g_isCliMode = false;
+
 class VGMRoot {
  public:
   VGMRoot(void);
@@ -36,7 +39,7 @@ class VGMRoot {
   bool SetupNewRawFile(RawFile *newRawFile);
   bool CloseRawFile(RawFile *targFile);
   void AddVGMFile(VGMFile *theFile);
-  void RemoveVGMFile(VGMFile *theFile, bool bRemoveFromRaw = true);
+  virtual void RemoveVGMFile(VGMFile *theFile, bool bRemoveFromRaw = true);
   void AddVGMColl(VGMColl *theColl);
   void RemoveVGMColl(VGMColl *theFile);
   void AddLogItem(LogItem *theLog);
