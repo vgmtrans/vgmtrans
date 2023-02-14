@@ -56,7 +56,7 @@ public:
 
   virtual wstring UI_GetSaveDirPath(const wstring& suggestedDir = L"");
 
-  set<string> inputFiles = {};
+  set<fs::path> inputFiles = {};
   fs::path outputDir = fs::path(".");
 };
 
