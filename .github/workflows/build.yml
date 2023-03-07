@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Install dependencies"
         run: |
-          brew upgrade qt@6 || brew install qt@6
+          brew upgrade qt@5 || brew install qt@5
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
@@ -20,7 +20,7 @@ jobs:
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
         name: "Package DMG (macOS)"
-        run: /usr/local/opt/qt6/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
+        run: /usr/local/opt/qt5/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
       - name: "Upload artifact"
         uses: actions/upload-artifact@v3
         with:
