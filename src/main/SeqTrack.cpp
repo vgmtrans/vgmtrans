@@ -200,17 +200,16 @@ void SeqTrack::AddTime(uint32_t AddDelta) {
 
 uint32_t SeqTrack::ReadVarLen(uint32_t &offset) {
   uint32_t value = 0;
-  uint8_t c;
+  uint8_t c = 0;
 
-  if (IsValidOffset(offset) && (value = GetByte(offset++)) & 0x80) {
-    value &= 0x7F;
-    do {
-      if (!IsValidOffset(offset))
-        break;
-      value = (value << 7) + ((c = GetByte(offset++)) & 0x7F);
-    } while (c & 0x80);
+  while (IsValidOffset(offset)) {
+	c = GetByte(offset++);
+    value = (value << 7) + (c & 0x7F);
+	// Check if continue bit is set
+	if(c & 0x80 == 0) {
+		break;
+	}
   }
-
   return value;
 }
 
