@@ -36,19 +36,14 @@ jobs:
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
       - name: "Install dependencies"
         run: |
-          sudo add-apt-repository ppa:savoury1/display
-          sudo add-apt-repository ppa:savoury1/ffmpeg4
-          sudo add-apt-repository ppa:savoury1/qt-6-2 -y
+          sudo add-apt-repository ppa:beineri/opt-qt-5.15.2-bionic -y
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
           sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main" -y
           sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-16 main" -y
           sudo apt-get update && sudo apt-get upgrade -y
-          sudo apt-get install -y pkg-config clang-16 lld-16 \
-            adwaita-qt6 qt6-gtk2-platformtheme qt6-base-dev \
-            libqt6svg6 libqt6svg6-dev libqt6svgwidgets6 \
-            qt6-wayland qt6-wayland-dev qt6-wayland-dev-tools \
-            libjack-dev libsndfile1-dev libpulse-dev \
-            libgl1-mesa-dev libglib2.0-dev ninja-build
+          sudo apt-get install -y pkg-config clang-16 lld-16 ninja-build \
+            qt515base qt515svg qt515wayland libgl1-mesa-dev \
+            libjack-dev libsndfile1-dev libpulse-dev
       - name: "Prepare build"
         run: cmake -DCMAKE_C_COMPILER="clang-16" -DCMAKE_CXX_COMPILER="clang++-16" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -GNinja -B build
       - name: "Build project"
@@ -71,7 +66,7 @@ jobs:
           echo "Creating AppImage"
           ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop \
             -executable=appdir/usr/lib/libbass.so -executable=appdir/usr/lib/libbassmidi.so \
-            -appimage -qmake=/opt/qt6/bin/qmake -extra-plugins=platforms/,wayland-shell-integration/,wayland-decoration-client/ \
+            -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/,wayland-shell-integration/,wayland-decoration-client/ \
             -verbose=10
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
