@@ -7,6 +7,7 @@
 #pragma once
 
 #include "common.h"
+#include <memory>
 #include "RiffFile.h"
 
 struct Loop;
