@@ -6,7 +6,6 @@
 
 #include "pch.h"
 #include <algorithm>
-#include <memory>
 #include <numeric>
 #include "DLSFile.h"
 #include "VGMInstrSet.h"
