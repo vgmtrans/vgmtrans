@@ -206,7 +206,8 @@ uint32_t SeqTrack::ReadVarLen(uint32_t &offset) {
     c &= 0x7F;
     value = (value << 7) + c;
   }
-
+  if(c>value):
+    return c;
   return value;
 }
 
