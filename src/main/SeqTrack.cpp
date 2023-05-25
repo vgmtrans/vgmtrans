@@ -206,7 +206,7 @@ uint32_t SeqTrack::ReadVarLen(uint32_t &offset) {
 	c = GetByte(offset++);
     value = (value << 7) + (c & 0x7F);
 	// Check if continue bit is set
-	if(c & 0x80 == 0) {
+	if((c & 0x80) == 0) {
 		break;
 	}
   }
