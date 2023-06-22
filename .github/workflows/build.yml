@@ -75,7 +75,7 @@ jobs:
           echo "Creating AppImage"
           ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop \
             -executable=appdir/usr/lib/libbass.so -executable=appdir/usr/lib/libbassmidi.so \
-            -appimage -qmake=/opt/qt515/bin/qmake -extra-plugins=platforms/,wayland-shell-integration/,wayland-decoration-client/ \
+            -appimage -extra-plugins=platforms/,wayland-shell-integration/,wayland-decoration-client/ \
             -verbose=10
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
