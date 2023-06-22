@@ -51,7 +51,7 @@ jobs:
           sudo ./llvm.sh 16
           sudo apt-get update && sudo apt-get upgrade -y
           sudo apt-get install -y pkg-config clang-16 lld-16 ninja-build \
-            qtbase5 qtbase5-dev libqt5svg5-dev libqt5svg5 libqt5waylandclient5 libqt5waylandclient5-dev libqt5waylandcompositor5 libqt5waylandcompositor5-dev libgl1-mesa-dev \
+            qtbase5-dev libqt5svg5-dev libqt5svg5 libqt5waylandclient5 libqt5waylandclient5-dev libqt5waylandcompositor5 libqt5waylandcompositor5-dev libgl1-mesa-dev \
             libjack-dev libsndfile1-dev libpulse-dev
       - name: "Prepare build"
         run: cmake -DCMAKE_C_COMPILER="clang-16" -DCMAKE_CXX_COMPILER="clang++-16" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -GNinja -B build
