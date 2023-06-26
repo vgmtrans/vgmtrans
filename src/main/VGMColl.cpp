@@ -559,7 +559,7 @@ SynthFile *VGMColl::CreateSynthFile() {
 
         SynthArt *newArt = newRgn->AddArt();
         newArt->AddPan(rgn->pan);
-        newArt->AddADSR(rgn->attack_time, (Transform) rgn->attack_transform, rgn->decay_time,
+        newArt->AddADSR(rgn->attack_time, (Transform) rgn->attack_transform, rgn->hold_time, rgn->decay_time,
                         sustainLevAttenDb, rgn->sustain_time, rgn->release_time, (Transform) rgn->release_transform);
 
         sampInfo->SetPitchInfo(realUnityKey, realFineTune, attenuation);
