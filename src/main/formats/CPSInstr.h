@@ -40,7 +40,7 @@ struct qs_prog_info_ver_130 {
 };
 
 struct qs_prog_info_ver_cps3 {
-  uint8_t key_high;//sample_index;
+  uint8_t key_high;
   uint8_t unknown1;
   uint8_t unknown2;
   uint8_t unknown3;
@@ -85,11 +85,6 @@ struct qs_samp_info_cps3 {
   uint32_t loop_offset;
   uint32_t end_addr;
   uint32_t unity_key;
-
-  //  virtual uint32_t startAddr() override { return htonl(start_addr); }
-  //  virtual uint32_t loopOffset() override { return htonl(loop_addr); }
-  //  virtual uint32_t endAddr() override { return htonl(end_addr); }
-  //  virtual uint8_t unityKey() override { return htonl(unity_key); }
 };
 
 struct qs_samp_info {
