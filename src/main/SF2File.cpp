@@ -171,7 +171,7 @@ SF2File::SF2File(SynthFile *synthfile)
     sfGenList genList;
     memset(&genList, 0, sizeof(sfGenList));
 
-    // reverbEffectsSend - Value is in 0.1% units, so value of 250 == 25%. So multiply by 1000
+    // reverbEffectsSend - Value is in 0.1% units, so multiply by 1000. Ex: 250 == 25%.
     genList.sfGenOper = reverbEffectsSend;
     genList.genAmount.shAmount = instr->reverb * 1000;
     memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
