@@ -158,9 +158,11 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
 
   wstring fullfilename_w = file->GetFileName();
   string fullfilename = wstring2string(fullfilename_w);
-  const char *endoffilename = strrchr(fullfilename.c_str(), '.');
-  char filename[10] = {0};
-  strncpy(filename, fullfilename.c_str(), endoffilename - fullfilename.c_str());
+  size_t endoffilename = fullfilename.rfind('.');
+  if (endoffilename == string::npos)
+    return KEEP_IT;             // no '.' found in filename, so don't do anything
+  string filename = fullfilename.substr(0, endoffilename);
+
 
   // look up the game name in our little database
   GameMap::iterator it = gamemap.find(filename);

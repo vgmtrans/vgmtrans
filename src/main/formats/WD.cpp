@@ -5,6 +5,9 @@
 
 using namespace std;
 
+const float defaultWDReverbPercent = 0.75;
+
+
 // **********
 // WDInstrSet
 // **********
@@ -75,14 +78,13 @@ bool WDInstrSet::GetInstrPointers() {
 // WDInstr
 // *******
 
-
 WDInstr::WDInstr(VGMInstrSet *instrSet,
                  uint32_t offset,
                  uint32_t length,
                  uint32_t theBank,
                  uint32_t theInstrNum,
                  const wstring name)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name, defaultWDReverbPercent) {
 }
 
 WDInstr::~WDInstr(void) {

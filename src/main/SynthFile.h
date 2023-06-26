@@ -23,8 +23,8 @@ class SynthFile {
   SynthFile(const std::string synth_name = "Instrument Set");
   ~SynthFile(void);
 
-  SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum);
-  SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, std::string Name);
+  SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, float reverb);
+  SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, std::string Name, float reverb);
   void DeleteInstr(uint32_t bank, uint32_t instrNum);
   SynthWave *AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
                      uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t *waveData,
@@ -43,9 +43,9 @@ class SynthFile {
 class SynthInstr {
  public:
   SynthInstr(void);
-  SynthInstr(uint32_t bank, uint32_t instrument);
-  SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName);
-  SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, std::vector<SynthRgn *> listRgns);
+  SynthInstr(uint32_t bank, uint32_t instrument, float reverb);
+  SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, float reverb);
+  SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, std::vector<SynthRgn *> listRgns, float reverb);
   ~SynthInstr(void);
 
   void AddRgnList(std::vector<SynthRgn> &RgnList);
@@ -55,6 +55,7 @@ class SynthInstr {
  public:
   uint32_t ulBank;
   uint32_t ulInstrument;
+  float reverb;
 
   std::vector<SynthRgn *> vRgns;
   std::string name;
@@ -98,13 +99,14 @@ class SynthArt {
   //SynthArt(uint16_t source, uint16_t control, uint16_t destination, uint16_t transform);
   ~SynthArt(void);
 
-  void AddADSR(double attack, Transform atk_transform, double decay, double sustain_lev,
+  void AddADSR(double attack, Transform atk_transform, double hold, double decay, double sustain_lev,
                double sustain_time, double release_time, Transform rls_transform);
   void AddPan(double pan);
 
   double pan;                // -100% = left channel 100% = right channel 0 = 50/50
 
   double attack_time;        // rate expressed as seconds from 0 to 100% level
+  double hold_time;
   double decay_time;        // rate expressed as seconds from 100% to 0% level, even though the sustain level isn't necessarily 0%
   double sustain_lev;        // db of attenuation at sustain level
   double sustain_time;    // this is part of the PSX envelope (and can actually be positive), but is not in DLS or SF2.  from 100 to 0, like release
