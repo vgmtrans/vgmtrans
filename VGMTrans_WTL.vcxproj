@@ -257,6 +257,11 @@
     <ClCompile Include="src\main\formats\CompileSnesInstr.cpp" />
     <ClCompile Include="src\main\formats\CompileSnesScanner.cpp" />
     <ClCompile Include="src\main\formats\CompileSnesSeq.cpp" />
+    <ClCompile Include="src\main\formats\CPSInstr.cpp" />
+    <ClCompile Include="src\main\formats\CPSScanner.cpp" />
+    <ClCompile Include="src\main\formats\CPSSeq.cpp" />
+    <ClCompile Include="src\main\formats\CPSTrackV1.cpp" />
+    <ClCompile Include="src\main\formats\CPSTrackV2.cpp" />
     <ClCompile Include="src\main\formats\FalcomSnesInstr.cpp" />
     <ClCompile Include="src\main\formats\FalcomSnesScanner.cpp" />
     <ClCompile Include="src\main\formats\FalcomSnesSeq.cpp" />
@@ -302,6 +307,7 @@
     <ClCompile Include="src\main\formats\TamSoftPS1Instr.cpp" />
     <ClCompile Include="src\main\formats\TamSoftPS1Scanner.cpp" />
     <ClCompile Include="src\main\formats\TamSoftPS1Seq.cpp" />
+    <ClCompile Include="src\main\loaders\CPS3Decrypt.cpp" />
     <ClCompile Include="src\main\loaders\GSFLoader.cpp" />
     <ClCompile Include="src\main\LogItem.cpp" />
     <ClCompile Include="src\main\loaders\NCSFLoader.cpp" />
@@ -399,9 +405,6 @@
     <ClCompile Include="src\main\formats\MP2kScanner.cpp" />
     <ClCompile Include="src\main\formats\KonamiGXScanner.cpp" />
     <ClCompile Include="src\main\formats\KonamiGXSeq.cpp" />
-    <ClCompile Include="src\main\formats\QSoundInstr.cpp" />
-    <ClCompile Include="src\main\formats\QSoundScanner.cpp" />
-    <ClCompile Include="src\main\formats\QSoundSeq.cpp" />
     <ClCompile Include="src\main\formats\SonyPS2InstrSet.cpp" />
     <ClCompile Include="src\main\formats\SonyPS2Scanner.cpp" />
     <ClCompile Include="src\main\formats\SonyPS2Seq.cpp" />
@@ -456,6 +459,12 @@
     <ClInclude Include="src\main\formats\CompileSnesInstr.h" />
     <ClInclude Include="src\main\formats\CompileSnesScanner.h" />
     <ClInclude Include="src\main\formats\CompileSnesSeq.h" />
+    <ClInclude Include="src\main\formats\CPSFormat.h" />
+    <ClInclude Include="src\main\formats\CPSInstr.h" />
+    <ClInclude Include="src\main\formats\CPSScanner.h" />
+    <ClInclude Include="src\main\formats\CPSSeq.h" />
+    <ClInclude Include="src\main\formats\CPSTrackV1.h" />
+    <ClInclude Include="src\main\formats\CPSTrackV2.h" />
     <ClInclude Include="src\main\formats\FalcomSnesFormat.h" />
     <ClInclude Include="src\main\formats\FalcomSnesInstr.h" />
     <ClInclude Include="src\main\formats\FalcomSnesScanner.h" />
@@ -515,6 +524,7 @@
     <ClInclude Include="src\main\formats\TamSoftPS1Instr.h" />
     <ClInclude Include="src\main\formats\TamSoftPS1Scanner.h" />
     <ClInclude Include="src\main\formats\TamSoftPS1Seq.h" />
+    <ClInclude Include="src\main\loaders\CPS3Decrypt.h" />
     <ClInclude Include="src\main\loaders\GSFLoader.h" />
     <ClInclude Include="src\main\LogItem.h" />
     <ClInclude Include="src\main\loaders\NCSFLoader.h" />
@@ -614,10 +624,6 @@
     <ClInclude Include="src\main\formats\KonamiGXFormat.h" />
     <ClInclude Include="src\main\formats\KonamiGXScanner.h" />
     <ClInclude Include="src\main\formats\KonamiGXSeq.h" />
-    <ClInclude Include="src\main\formats\QSoundFormat.h" />
-    <ClInclude Include="src\main\formats\QSoundInstr.h" />
-    <ClInclude Include="src\main\formats\QSoundScanner.h" />
-    <ClInclude Include="src\main\formats\QSoundSeq.h" />
     <ClInclude Include="src\main\formats\SonyPS2Format.h" />
     <ClInclude Include="src\main\formats\SonyPS2InstrSet.h" />
     <ClInclude Include="src\main\formats\SonyPS2Scanner.h" />
