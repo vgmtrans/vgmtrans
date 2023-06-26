@@ -57,6 +57,14 @@
             <rom>btc.12m</rom>
         </romgroup>
     </game>
+    <game name="burnforc" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>bu1_snd0.bin</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>bu_voi-1.bin</rom>
+        </romgroup>
+    </game>
     <game name="cawing" format="CPS" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>ca_9.12b</rom>
@@ -106,6 +114,17 @@
             <rom>cyb.12m</rom>
         </romgroup>
     </game>
+    <game name="cybsled" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>cy1-snd0.8j</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>cy1-voi0.12b</rom>
+            <rom>cy1-voi1.12c</rom>
+            <rom>cy1-voi2.12d</rom>
+            <rom>cy1-voi3.12e</rom>
+        </romgroup>
+    </game>
     <game name="ddsom" format="CPS" fmt_version="1.15">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x39E9" num_instr_banks="2" samp_table="0x49E9">
             <rom>dd2.01</rom>
@@ -144,6 +163,24 @@
             <rom>cd-q2.2k</rom>
             <rom>cd-q3.3k</rom>
             <rom>cd-q4.4k</rom>
+        </romgroup>
+    </game>
+    <game name="dirtfoxj" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x10000" c140_bank="0x4000">
+            <rom>df1_snd0.bin</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>df1_voi1.bin</rom>
+        </romgroup>
+    </game>
+    <game name="dsaber" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>snd0.bin</rom>
+            <rom>snd1.bin</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>voi1.bin</rom>
+            <rom>voi2.bin</rom>
         </romgroup>
     </game>
     <game name="dstlk" format="CPS" fmt_version="1.05">
@@ -247,6 +284,15 @@
             <rom>so2_09.12b</rom>
         </romgroup>
     </game>
+    <game name="metlhawk" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>mh1s0.7j</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>mhvoi-1.bin</rom>
+            <rom>mhvoi-2.bin</rom>
+        </romgroup>
+    </game>
     <game name="mmancp2u" format="CPS" fmt_version="1.05a">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>rcm.01</rom>
@@ -329,6 +375,11 @@
     <game name="pang3" format="CPS" fmt_version="CPS1_5.00">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1C80" >
             <rom>pa3_11.11f</rom>
+        </romgroup>
+    </game>
+    <game name="phelios" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>ps2_snd0.snd0</rom>
         </romgroup>
     </game>
     <game name="pnickj" format="CPS" fmt_version="CPS1_4.25">
@@ -612,6 +663,19 @@
         </romgroup>
         <romgroup type="qsound"  load_method="append_swap16">
             <rom>ts2-01m.3b</rom>
+        </romgroup>
+    </game>
+    <game name="valkyrie" format="NamcoS2">
+        <romgroup type="audiocpu" load_method="append" ym2151_bank="0x4000" c140_bank="0x10000">
+            <rom>wd1snd0.bin</rom>
+        </romgroup>
+        <romgroup type="pcm"  load_method="append">
+            <rom>wd1voi1.bin</rom>
+            <rom>wd1voi1.bin</rom>
+            <rom>wd1voi2.bin</rom>
+            <rom>wd1voi2.bin</rom>
+            <rom>wd1voi2.bin</rom>
+            <rom>wd1voi2.bin</rom>
         </romgroup>
     </game>
     <game name="varth" format="CPS" fmt_version="CPS1_4.25">
