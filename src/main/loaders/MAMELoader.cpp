@@ -1,9 +1,11 @@
 #include "pch.h"
-#include <tinyxml.h>
+#include "tinyxml.h"
 #include "MAMELoader.h"
 #include "Root.h"
+#include "Scanner.h"
 #include "Format.h"
 #include "KabukiDecrypt.h"
+#include "CPS3Decrypt.h"
 
 using namespace std;
 
@@ -18,7 +20,7 @@ using namespace std;
 //	return true;
 //}
 
-bool MAMERomGroupEntry::GetHexAttribute(const std::string &attrName, uint32_t *out) {
+bool MAMERomGroup::GetHexAttribute(const std::string &attrName, uint32_t *out) {
   string strValue = attributes[attrName];
   if (strValue.empty())
     return false;            //Attribute name does not exist.
@@ -27,8 +29,8 @@ bool MAMERomGroupEntry::GetHexAttribute(const std::string &attrName, uint32_t *o
   return true;
 }
 
-MAMERomGroupEntry *MAMEGameEntry::GetRomGroupOfType(const string &strType) {
-  for (list<MAMERomGroupEntry>::iterator it = romgroupentries.begin(); it != romgroupentries.end(); it++) {
+MAMERomGroup *MAMEGame::GetRomGroupOfType(const string &strType) {
+  for (list<MAMERomGroup>::iterator it = romgroupentries.begin(); it != romgroupentries.end(); it++) {
     if (it->type.compare(strType) == 0)
       return &(*it);
   }
@@ -41,7 +43,7 @@ MAMELoader::MAMELoader() {
 }
 
 MAMELoader::~MAMELoader() {
-  DeleteMap<string, MAMEGameEntry>(gamemap);
+  DeleteMap<string, MAMEGame>(gamemap);
 }
 
 int MAMELoader::LoadXML() {
@@ -60,7 +62,7 @@ int MAMELoader::LoadXML() {
        gameElmt = gameElmt->NextSiblingElement()) {
     if (gameElmt->ValueStr() != "game")
       return 1;
-    MAMEGameEntry *gameentry = LoadGameEntry(gameElmt);
+    MAMEGame *gameentry = LoadGameEntry(gameElmt);
     if (!gameentry)
       return 1;
     gamemap[gameentry->name] = gameentry;
@@ -68,9 +70,9 @@ int MAMELoader::LoadXML() {
   return 0;
 }
 
-MAMEGameEntry *MAMELoader::LoadGameEntry(TiXmlElement *gameElmt) {
-  MAMEGameEntry *gameentry = new MAMEGameEntry;
-  string gamename, fmtVersionStr;
+MAMEGame *MAMELoader::LoadGameEntry(TiXmlElement *gameElmt) {
+  MAMEGame *gameentry = new MAMEGame;
+  string gamename;
 
   if (gameElmt->QueryValueAttribute("name", &gameentry->name) != TIXML_SUCCESS) {
     delete gameentry;
@@ -80,14 +82,8 @@ MAMEGameEntry *MAMELoader::LoadGameEntry(TiXmlElement *gameElmt) {
     delete gameentry;
     return NULL;
   }
-  if (gameElmt->QueryValueAttribute("fmt_version", &fmtVersionStr) != TIXML_SUCCESS) {
-    gameentry->fmt_version = 0;
+  if (gameElmt->QueryValueAttribute("fmt_version", &gameentry->fmt_version_str) != TIXML_SUCCESS) {
     gameentry->fmt_version_str = "";
-  }
-  else {
-    stringstream convert (fmtVersionStr);
-    convert >> std::setprecision(2) >> gameentry->fmt_version;		//read seq_table as hexadecimal value
-    gameentry->fmt_version_str = fmtVersionStr;
   }
 
   // Load rom groups
@@ -105,8 +101,8 @@ MAMEGameEntry *MAMELoader::LoadGameEntry(TiXmlElement *gameElmt) {
   return gameentry;
 }
 
-int MAMELoader::LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGameEntry *gameentry) {
-  MAMERomGroupEntry romgroupentry;
+int MAMELoader::LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentry) {
+  MAMERomGroup romgroupentry;
 
   //First, get the "type" and "load_method" attributes.  If they don't exist, we return with an error.
   string load_method;
@@ -169,7 +165,7 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
   if (it == gamemap.end())        //if we couldn't find an entry for the game name
     return KEEP_IT;               //don't do anything
 
-  MAMEGameEntry *gameentry = it->second;
+  MAMEGame *gameentry = it->second;
 
   //Get the format given and check if it is defined in VGMTrans
   Format *fmt = Format::GetFormatFromName(gameentry->format);
@@ -188,14 +184,14 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
   //Now we try to load the rom groups.  We save the created file into the rom MAMERomGroupEntry's file member
   // Note that this does not check for an error, so the romgroup entry's file member may receive NULL.
   // This must be checked for in Scan().
-  for (list<MAMERomGroupEntry>::iterator it = gameentry->romgroupentries.begin();
+  for (list<MAMERomGroup>::iterator it = gameentry->romgroupentries.begin();
        it != gameentry->romgroupentries.end(); it++)
     it->file = LoadRomGroup(&(*it), gameentry->format, cur_file);
 
 
   fmt->GetScanner().Scan(NULL, gameentry);
 
-  for (list<MAMERomGroupEntry>::iterator it = gameentry->romgroupentries.begin();
+  for (list<MAMERomGroup>::iterator it = gameentry->romgroupentries.begin();
        it != gameentry->romgroupentries.end(); it++) {
     if (it->file != NULL)
       pRoot->SetupNewRawFile(it->file);
@@ -210,7 +206,7 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
 }
 
 
-VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &format, unzFile &cur_file) {
+VirtFile *MAMELoader::LoadRomGroup(MAMERomGroup *entry, const string &format, unzFile &cur_file) {
   uint32_t destFileSize = 0;
   list<pair<uint8_t *, uint32_t>> buffers;
   list<string> &roms = entry->roms;
@@ -303,6 +299,7 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
           !entry->GetHexAttribute("kabuki_swap_key2", &swap_key2) ||
           !entry->GetHexAttribute("kabuki_addr_key", &addr_key) ||
           !entry->GetHexAttribute("kabuki_xor_key", &xor_key)) {
+
         delete[] destFile;
         return 0;
       }
@@ -318,6 +315,17 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroupEntry *entry, const string &forma
                                      xor_key);
       //pRoot->UI_WriteBufferToFile(L"opcodesdump", decrypt, destFileSize);
       delete[] decrypt;
+    }
+    else if (entry->encryption == "cps3") {
+      uint32_t key1, key2;
+      if (!entry->GetHexAttribute("key1", &key1) ||
+          !entry->GetHexAttribute("key2", &key2)) {
+
+        delete[] destFile;
+        return 0;
+      }
+      CPS3Decrypt::cps3_decode((uint32_t*) destFile, (uint32_t*) destFile, key1, key2, destFileSize);
+      //      core.WriteBufferToFile(L"cps3dump_decrypted", destFile, destFileSize);
     }
   }
 

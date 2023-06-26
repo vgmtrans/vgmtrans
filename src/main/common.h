@@ -96,6 +96,14 @@ inline uint8_t sqrt7bit(uint8_t x) {
   return roundi(sqrt(x / 127.0) * 127.0);
 }
 
+inline uint16_t swap_bytes16(uint16_t val) {
+  return (val << 8) | (val >> 8);
+}
+
+inline uint32_t swap_bytes32(uint32_t val) {
+  return ((val << 24) | ((val & 0x0000FF00) << 8) | ((val & 0x00FF0000) >> 8) | (val >> 24));
+}
+
 struct SizeOffsetPair {
   uint32_t size;
   uint32_t offset;
@@ -112,5 +120,6 @@ struct SizeOffsetPair {
 };
 
 wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
+
 
 #endif // !defined(COMMON_H)

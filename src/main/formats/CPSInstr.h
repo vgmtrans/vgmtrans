@@ -3,12 +3,12 @@
 #include "VGMSampColl.h"
 #include "VGMMiscFile.h"
 
-class QSoundInstr;
+class CPSInstr;
 
-enum QSoundVer: uint8_t;
+enum CPSFormatVer: uint8_t;
 
 // ex: Punisher
-typedef struct _qs_qs_prog_info_ver_101 {
+struct qs_prog_info_ver_101 {
   uint8_t sample_index;
   uint8_t ignored;        //only seen used in slammast, but the game never reads the val
   uint8_t attack_rate;
@@ -17,26 +17,41 @@ typedef struct _qs_qs_prog_info_ver_101 {
   uint8_t sustain_rate;
   uint8_t release_rate;
   uint8_t unknown;
-} qs_prog_info_ver_101;
+};
 
 // ex: Super Street Fighter 2
-typedef struct _qs_qs_prog_info_ver_103 {
+struct qs_prog_info_ver_103 {
   uint16_t sample_index;
-  uint8_t unknown;
+  int8_t fine_tune;
   uint8_t attack_rate;
   uint8_t decay_rate;
   uint8_t sustain_level;
   uint8_t sustain_rate;
   uint8_t release_rate;
-} qs_prog_info_ver_103;
+};
 
-typedef struct _qs_prog_info_ver_130 {
+struct qs_prog_info_ver_130 {
   uint16_t sample_index;
   uint8_t unknown;
   uint8_t artic_index;
-} qs_prog_info_ver_130;
+};
 
-typedef struct _qs_artic_info {
+struct qs_prog_info_ver_cps3 {
+  uint8_t key_high;
+  uint8_t unknown1;
+  uint8_t unknown2;
+  uint8_t unknown3;
+  uint8_t unknown4;
+  uint8_t sample_index;
+  uint8_t unknown6;
+  uint8_t attack_rate;
+  uint8_t decay_rate;
+  uint8_t sustain_level;
+  uint8_t sustain_rate;
+  uint8_t release_rate;
+};
+
+struct qs_artic_info {
   uint8_t attack_rate;
   uint8_t decay_rate;
   uint8_t sustain_level;
@@ -45,22 +60,57 @@ typedef struct _qs_artic_info {
   uint8_t unknown_5;
   uint8_t unknown_6;
   uint8_t unknown_7;
-} qs_artic_info;
+};
 
-typedef struct _qs_samp_info {
-  uint8_t bank;
-  uint8_t start_addr_lo;
-  uint8_t start_addr_hi;
-  uint8_t loop_offset_lo;
-  uint8_t loop_offset_hi;
-  uint8_t end_addr_lo;
-  uint8_t end_addr_hi;
+struct sample_info {
+  uint32_t start_addr;
+  uint32_t loop_offset;
+  uint32_t end_addr;
   uint8_t unity_key;
-} qs_samp_info;
+};
 
-// The QSound interrupt clock is set to 251hz in mame.  But the main sound
+struct qs_samp_info_cps2 {
+  uint8_t bank;
+  uint16_t start_addr;
+  uint16_t loop_offset;
+  uint16_t end_addr;
+  uint8_t unity_key;
+};// qs_samp_info_cps2;
+
+struct qs_samp_info_cps3 {
+  uint32_t start_addr;
+  uint32_t loop_offset;
+  uint32_t end_addr;
+  uint32_t unity_key;
+};
+
+struct qs_samp_info {
+  uint32_t start_addr;
+  uint32_t loop_offset;
+  uint32_t end_addr;
+  uint8_t unity_key;
+
+  qs_samp_info() {
+  }
+
+  qs_samp_info(qs_samp_info_cps2* cps2) {
+    this->start_addr = (cps2->bank << 16) | swap_bytes16(cps2->start_addr);
+    this->loop_offset = (cps2->bank << 16) | swap_bytes16(cps2->loop_offset);
+    this->end_addr = swap_bytes16(cps2->end_addr) + (cps2->end_addr == 0) ? (cps2->bank + 1) << 16 : 0;
+    this->unity_key = cps2->unity_key;
+  }
+
+  qs_samp_info(qs_samp_info_cps3* cps3) {
+    this->start_addr = swap_bytes32(cps3->start_addr);
+    this->loop_offset = swap_bytes32(cps3->loop_offset);
+    this->end_addr = swap_bytes32(cps3->end_addr);
+    this->unity_key = (uint8_t)swap_bytes32(cps3->unity_key);
+  }
+};
+
+// The QSound interrupt clock is set to 250hz in mame.  But the main sound
 // code runs only every 4th tick. (see the "and 3" instruction at 0xF9 in sfa2 code)
-#define QSOUND_TICK_FREQ (1/(251/4.0))
+#define QSOUND_TICK_FREQ (1/(250/4.0))
 
 
 // the tables below are taken from sfa2
@@ -103,84 +153,99 @@ const uint16_t decay_rate_table[64] = {
 };
 
 // ****************
-// QSoundArticTable
+// CPSArticTable
 // ****************
 
-class QSoundArticTable
+class CPSArticTable
     : public VGMMiscFile {
- public:
-  QSoundArticTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length);
-  virtual ~QSoundArticTable(void);
+public:
+  CPSArticTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length);
+  virtual ~CPSArticTable(void);
 
   virtual bool LoadMain();
 
- public:
+public:
   qs_artic_info *artics;
 };
 
-// *********************
-// QSoundSampleInfoTable
-// *********************
+// ******************
+// CPSSampleInfoTable
+// ******************
 
-class QSoundSampleInfoTable
+class CPSSampleInfoTable
     : public VGMMiscFile {
- public:
-  QSoundSampleInfoTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length = 0);
-  virtual ~QSoundSampleInfoTable(void);
+public:
+  CPSSampleInfoTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length = 0);
+  ~CPSSampleInfoTable(void);
+
+public:
+  sample_info* infos;
+
+  uint32_t numSamples;
+};
+
+class CPS2SampleInfoTable
+    : public CPSSampleInfoTable {
+public:
+  CPS2SampleInfoTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length = 0);
 
   virtual bool LoadMain();
+};
 
- public:
-  qs_samp_info *infos;
-  int numSamples;
+class CPS3SampleInfoTable
+    : public CPSSampleInfoTable {
+public:
+  CPS3SampleInfoTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length = 0);
+
+  virtual bool LoadMain();
 };
 
 // **************
-// QSoundInstrSet
+// CPSInstrSet
 // **************
 
-class QSoundInstrSet
+class CPSInstrSet
     : public VGMInstrSet {
- public:
-  QSoundInstrSet(RawFile *file,
-                 QSoundVer fmt_version,
-                 uint32_t offset,
-                 int numInstrBanks,
-                 QSoundSampleInfoTable *sampInfoTable,
-                 QSoundArticTable *articTable,
-                 std::wstring &name);
-  virtual ~QSoundInstrSet(void);
+public:
+  CPSInstrSet(RawFile *file,
+              CPSFormatVer fmt_version,
+              uint32_t offset,
+              int numInstrBanks,
+              CPSSampleInfoTable *sampInfoTable,
+              CPSArticTable *articTable,
+              std::wstring &name);
+  virtual ~CPSInstrSet(void);
 
   virtual bool GetHeaderInfo();
   virtual bool GetInstrPointers();
 
- public:
-  QSoundVer fmt_version;
+public:
   uint32_t num_instr_banks;
-  QSoundSampleInfoTable *sampInfoTable;
-  QSoundArticTable *articTable;
+  CPSFormatVer fmt_version;
+  CPSSampleInfoTable *sampInfoTable;
+  CPSArticTable *articTable;
 };
 
 
 // ***********
-// QSoundInstr
+// CPSInstr
 // ***********
 
-class QSoundInstr
+class CPSInstr
     : public VGMInstr {
- public:
-  QSoundInstr(VGMInstrSet *instrSet,
-              uint32_t offset,
-              uint32_t length,
-              uint32_t theBank,
-              uint32_t theInstrNum,
-              std::wstring &name);
-  virtual ~QSoundInstr(void);
+public:
+  CPSInstr(VGMInstrSet *instrSet,
+           uint32_t offset,
+           uint32_t length,
+           uint32_t theBank,
+           uint32_t theInstrNum,
+           std::wstring &name);
+  virtual ~CPSInstr(void);
   virtual bool LoadInstr();
- protected:
-  QSoundVer GetFormatVer() { return ((QSoundInstrSet *) parInstrSet)->fmt_version; }
+protected:
+  CPSFormatVer GetFormatVer() { return ((CPSInstrSet *) parInstrSet)->fmt_version; }
 
- protected:
+protected:
   uint8_t attack_rate;
   uint8_t decay_rate;
   uint8_t sustain_level;
@@ -193,18 +258,18 @@ class QSoundInstr
 
 
 // **************
-// QSoundSampColl
+// CPSSampColl
 // **************
 
-class QSoundSampColl
+class CPSSampColl
     : public VGMSampColl {
- public:
-  QSoundSampColl(RawFile *file, QSoundInstrSet *instrset, QSoundSampleInfoTable *sampinfotable, uint32_t offset,
-                 uint32_t length = 0, std::wstring name = std::wstring(L"QSound Sample Collection"));
+public:
+  CPSSampColl(RawFile *file, CPSInstrSet *instrset, CPSSampleInfoTable *sampinfotable, uint32_t offset,
+              uint32_t length = 0, std::wstring name = std::wstring(L"QSound Sample Collection"));
   virtual bool GetHeaderInfo();
   virtual bool GetSampleInfo();
 
- private:
-  QSoundInstrSet *instrset;
-  QSoundSampleInfoTable *sampInfoTable;
+private:
+  CPSInstrSet *instrset;
+  CPSSampleInfoTable *sampInfoTable;
 };
