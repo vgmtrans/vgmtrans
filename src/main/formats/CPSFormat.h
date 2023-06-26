@@ -2,10 +2,9 @@
 #include "Format.h"
 #include "Root.h"
 #include "VGMColl.h"
-#include "QSoundScanner.h"
+#include "CPSScanner.h"
 
 
-BEGIN_FORMAT(QSound)
-  USING_SCANNER(QSoundScanner)
+BEGIN_FORMAT(CPS)
+  USING_SCANNER(CPSScanner)
 END_FORMAT()
-
