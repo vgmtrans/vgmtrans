@@ -61,7 +61,7 @@ bool NDSInstrSet::GetInstrPointers() {
 
 NDSInstr::NDSInstr(NDSInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
                    uint32_t theInstrNum, uint8_t theInstrType)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum), instrType(theInstrType) {
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, L"Instrument", 0), instrType(theInstrType) {
 }
 
 bool NDSInstr::LoadInstr() {

@@ -352,6 +352,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
           realAttenuation = (long) (-(ConvertLogScaleValToAtten(rgn->volume) * DLS_DECIBEL_UNIT * 10));
 
         long convAttack = (long) roundi(SecondsToTimecents(rgn->attack_time) * 65536);
+        long convHold = (long) roundi(SecondsToTimecents(rgn->hold_time) * 65536);
         long convDecay = (long) roundi(SecondsToTimecents(rgn->decay_time) * 65536);
         long convSustainLev;
         if (rgn->sustain_level == -1)
@@ -366,7 +367,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
 
         DLSArt *newArt = newRgn->AddArt();
         newArt->AddPan(ConvertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
-        newArt->AddADSR(convAttack, 0, convDecay, convSustainLev, convRelease, 0);
+        newArt->AddADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
 
         newWsmp->SetPitchInfo(realUnityKey, realFineTune, realAttenuation);
       }
@@ -423,7 +424,7 @@ SynthFile *VGMColl::CreateSynthFile() {
       size_t nRgns = vgminstr->aRgns.size();
       if (nRgns == 0)                                //do not write an instrument if it has no regions
         continue;
-      SynthInstr *newInstr = synthfile->AddInstr(vgminstr->bank, vgminstr->instrNum);
+      SynthInstr *newInstr = synthfile->AddInstr(vgminstr->bank, vgminstr->instrNum, vgminstr->reverb);
       for (uint32_t j = 0; j < nRgns; j++) {
         VGMRgn *rgn = vgminstr->aRgns[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?

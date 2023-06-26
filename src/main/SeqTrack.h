@@ -14,6 +14,7 @@ class SeqTrack:
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::wstring name = L"Track");
   virtual ~SeqTrack(void);
   virtual void ResetVars();
+  void ResetVisitedAddresses();
 
   virtual Icon GetIcon() { return ICON_TRACK; };
 

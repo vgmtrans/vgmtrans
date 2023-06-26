@@ -54,6 +54,8 @@ class VGMSamp;
 #define CONN_DST_EG1_RESERVED 0x0208
 #define CONN_DST_EG1_RELEASETIME 0x0209
 #define CONN_DST_EG1_SUSTAINLEVEL 0x020a
+#define CONN_DST_EG1_HOLDTIME      0x020c
+
 
 /* EG2 Destinations */
 #define CONN_DST_EG2_ATTACKTIME 0x030a
@@ -61,6 +63,16 @@ class VGMSamp;
 #define CONN_DST_EG2_RESERVED 0x030c
 #define CONN_DST_EG2_RELEASETIME 0x030d
 #define CONN_DST_EG2_SUSTAINLEVEL 0x030e
+
+/* DLS2 EG DESTINATIONS */
+#define CONN_DST_EG1_DELAYTIME 0x020B
+#define CONN_DST_EG1_HOLDTIME 0x020C
+#define CONN_DST_EG1_SHUTDOWNTIME 0x020D
+
+#define CONN_DST_EG2_DELAYTIME 0x030F
+#define CONN_DST_EG2_HOLDTIME 0x0310
+
+
 
 #define CONN_TRN_NONE 0x0000
 #define CONN_TRN_CONCAVE 0x0001
@@ -180,8 +192,8 @@ public:
   DLSArt() = default;
   DLSArt(std::vector<ConnectionBlock> &connectionBlocks);
 
-  void AddADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
-               long release_time, uint16_t rls_transform);
+  void AddADSR(long attack_time, uint16_t atk_transform, long hold_time, long decay_time,
+               long sustain_lev, long release_time, uint16_t rls_transform);
   void AddPan(long pan);
 
   uint32_t GetSize(void);

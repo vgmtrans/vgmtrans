@@ -20,15 +20,15 @@ SynthFile::~SynthFile(void) {
   DeleteVect(vWaves);
 }
 
-SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum) {
+SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, float reverb) {
   stringstream str;
   str << "Instr bnk" << bank << " num" << instrNum;
-  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str.str()));
+  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str.str(), reverb));
   return vInstrs.back();
 }
 
-SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, string name) {
-  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, name));
+SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, string name, float reverb) {
+  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, name, reverb));
   return vInstrs.back();
 }
 
@@ -63,21 +63,21 @@ SynthWave *SynthFile::AddWave(uint16_t formatTag,
 //  **********
 
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument)
-    : ulBank(bank), ulInstrument(instrument) {
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, float reverb)
+    : ulBank(bank), ulInstrument(instrument), reverb(reverb) {
   stringstream str;
   str << "Instr bnk" << bank << " num" << instrument;
   name = str.str();
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName)
-    : ulBank(bank), ulInstrument(instrument), name(instrName) {
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName, float reverb)
+    : ulBank(bank), ulInstrument(instrument), name(instrName), reverb(reverb)  {
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName, vector<SynthRgn *> listRgns)
-    : ulBank(bank), ulInstrument(instrument), name(instrName) {
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName, vector<SynthRgn *> listRgns, float reverb)
+    : ulBank(bank), ulInstrument(instrument), name(instrName), reverb(reverb)  {
   //RiffFile::AlignName(name);
   vRgns = listRgns;
 }
@@ -141,10 +141,11 @@ SynthArt::~SynthArt() {
   //DeleteVect(vConnBlocks);
 }
 
-void SynthArt::AddADSR(double attack, Transform atk_transform, double decay, double sustain_level,
-                       double sustain, double release, Transform rls_transform) {
+void SynthArt::AddADSR(double attack, Transform atk_transform, double hold, double decay,
+                       double sustain_level, double sustain, double release, Transform rls_transform) {
   this->attack_time = attack;
   this->attack_transform = atk_transform;
+  this->hold_time = hold;
   this->decay_time = decay;
   this->sustain_lev = sustain_level;
   this->sustain_time = sustain;

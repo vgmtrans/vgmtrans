@@ -301,10 +301,13 @@ void DLSArt::Write(vector<uint8_t> &buf) {
   }
 }
 
-void DLSArt::AddADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
-                     long release_time, uint16_t rls_transform) {
+void DLSArt::AddADSR(long attack_time, uint16_t atk_transform, long hold_time, long decay_time,
+                     long sustain_lev, long release_time, uint16_t rls_transform) {
   m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
       CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_EG1_ATTACKTIME, atk_transform, attack_time));
+
+  m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+      CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_EG1_HOLDTIME, CONN_TRN_NONE,hold_time));
 
   m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
       CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_EG1_DECAYTIME, CONN_TRN_NONE, decay_time));

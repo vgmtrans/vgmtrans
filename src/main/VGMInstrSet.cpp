@@ -156,10 +156,11 @@ bool VGMInstrSet::SaveAsSF2(const std::wstring &filepath) {
 // ********
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, const wstring &name)
+                   uint32_t theInstrNum, const wstring &name, float reverb)
     : VGMContainerItem(instrSet, offset, length, name),
       parInstrSet(instrSet),
       bank(theBank),
+      reverb(reverb),
       instrNum(theInstrNum) {
   AddContainer<VGMRgn>(aRgns);
 }

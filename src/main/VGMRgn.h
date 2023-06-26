@@ -60,8 +60,8 @@ class VGMRgn:
   uint8_t velLow;
   uint8_t velHigh;
 
-  uint8_t unityKey;
-  short fineTune;
+  int8_t unityKey;
+  int16_t fineTune;
 
   Loop loop;
 
@@ -82,6 +82,7 @@ class VGMRgn:
   double pan;        //percentage.  0 = full left. 0.5 = center.  1 = full right
   double attack_time;            //in seconds
   uint16_t attack_transform;
+  double hold_time;            //in seconds
   double decay_time;            //in seconds
   double sustain_level;        //as a percentage
   double sustain_time;        //in seconds (we don't support positive rate here, as is possible on psx)
