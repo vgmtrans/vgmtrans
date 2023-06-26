@@ -171,9 +171,9 @@ SF2File::SF2File(SynthFile *synthfile)
     sfGenList genList;
     memset(&genList, 0, sizeof(sfGenList));
 
-    // reverbEffectsSend
+    // reverbEffectsSend - Value is in 0.1% units, so value of 250 == 25%. So multiply by 1000
     genList.sfGenOper = reverbEffectsSend;
-    genList.genAmount.shAmount = 250;
+    genList.genAmount.shAmount = instr->reverb * 1000;
     memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
     dataPtr += sizeof(sfGenList);
 
@@ -237,7 +237,7 @@ SF2File::SF2File(SynthFile *synthfile)
       sfInstBag instBag;
       memset(&instBag, 0, sizeof(sfInstBag));
       instBag.wInstGenNdx = instGenCounter;
-      instGenCounter += 11;
+      instGenCounter += 12;
       instBag.wInstModNdx = 0;
 
       memcpy(ibagCk->data + (rgnCounter++ * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
@@ -264,7 +264,7 @@ SF2File::SF2File(SynthFile *synthfile)
   // igen chunk
   //***********
   Chunk *igenCk = new Chunk("igen");
-  igenCk->size = (uint32_t) ((numRgns * sizeof(sfInstGenList) * 11) + sizeof(sfInstGenList));
+  igenCk->size = (uint32_t) ((numRgns * sizeof(sfInstGenList) * 12) + sizeof(sfInstGenList));
   igenCk->data = new uint8_t[igenCk->size];
   dataPtr = 0;
   for (size_t i = 0; i < numInstrs; i++) {
@@ -320,6 +320,13 @@ SF2File::SF2File(SynthFile *synthfile)
       instGenList.sfGenOper = attackVolEnv;
       instGenList.genAmount.shAmount =
           (rgn->art->attack_time == 0) ? -32768 : roundi(SecondsToTimecents(rgn->art->attack_time));
+      memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+      dataPtr += sizeof(sfInstGenList);
+
+      // holdVolEnv
+      instGenList.sfGenOper = holdVolEnv;
+      instGenList.genAmount.shAmount =
+          (rgn->art->hold_time == 0) ? -32768 : roundi(SecondsToTimecents(rgn->art->hold_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
@@ -421,8 +428,8 @@ SF2File::SF2File(SynthFile *synthfile)
     samp.dwStartloop = samp.dwStart + sampInfo->ulLoopStart;
     samp.dwEndloop = samp.dwStartloop + sampInfo->ulLoopLength;
     samp.dwSampleRate = wave->dwSamplesPerSec;
-    samp.byOriginalKey = (uint8_t) (sampInfo->usUnityNote);
-    samp.chCorrection = (char) (sampInfo->sFineTune);
+    samp.byOriginalKey = (uint8_t) (sampInfo->usUnityNote) - (sampInfo->sFineTune / 100);
+    samp.chCorrection = (char) (sampInfo->sFineTune % 100);
     samp.wSampleLink = 0;
     samp.sfSampleType = monoSample;
 

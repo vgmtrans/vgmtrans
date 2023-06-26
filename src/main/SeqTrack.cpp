@@ -50,16 +50,18 @@ void SeqTrack::ResetVars() {
   panVolumeCorrectionRate = 1.0;
 }
 
+void SeqTrack::ResetVisitedAddresses() {
+  VisitedAddresses.clear();
+  VisitedAddresses.reserve(8192);
+  VisitedAddressMax = 0;
+}
 
 bool SeqTrack::ReadEvent(void) {
   return false;        //by default, don't add any events, just stop immediately.
 }
 
 bool SeqTrack::LoadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
-  VisitedAddresses.clear();
-  VisitedAddresses.reserve(8192);
-  VisitedAddressMax = 0;
-
+  ResetVisitedAddresses();
   ResetVars();
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (preparedMidiTrack != NULL) {

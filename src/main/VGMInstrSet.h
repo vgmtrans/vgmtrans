@@ -10,7 +10,9 @@ class VGMInstr;
 class VGMRgn;
 class VGMSamp;
 class VGMRgnItem;
-//class VGMArt;
+
+
+const float defaultReverbPercent = 0.25;
 
 // ***********
 // VGMInstrSet
@@ -71,7 +73,7 @@ class VGMInstr:
     public VGMContainerItem {
  public:
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
-           uint32_t instrNum, const std::wstring &name = L"Instrument");
+           uint32_t instrNum, const std::wstring &name = L"Instrument", float reverb = defaultReverbPercent);
   virtual ~VGMInstr(void);
 
   virtual Icon GetIcon() { return ICON_INSTR; };
@@ -88,6 +90,7 @@ class VGMInstr:
  public:
   uint32_t bank;
   uint32_t instrNum;
+  float reverb;
 
   VGMInstrSet *parInstrSet;
   std::vector<VGMRgn *> aRgns;
