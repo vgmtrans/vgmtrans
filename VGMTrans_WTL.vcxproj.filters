@@ -50,9 +50,6 @@
     <Filter Include="Source Files\formats\konami_gx">
       <UniqueIdentifier>{868718b9-8efd-4853-b199-89c0b1736205}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\formats\qsound">
-      <UniqueIdentifier>{014bc5df-33d1-4d3a-81ef-954a7ee3aad6}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\formats\sonyps2">
       <UniqueIdentifier>{7321866f-0690-4182-8981-f7532001a37a}</UniqueIdentifier>
     </Filter>
@@ -113,9 +110,6 @@
     </Filter>
     <Filter Include="Header Files\formats\konami_gx">
       <UniqueIdentifier>{06f81b08-b4c8-4660-99bf-a05a1e255bf5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\formats\qsound">
-      <UniqueIdentifier>{b063fcf2-dc1f-4640-9274-d2b181487eb5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\formats\sonyps2">
       <UniqueIdentifier>{2422dc80-61e7-4aed-9491-d8e7d61baa3e}</UniqueIdentifier>
@@ -264,6 +258,12 @@
     </Filter>
     <Filter Include="Header Files\formats\itikitisnes">
       <UniqueIdentifier>{9f79b423-64ef-41a6-b72d-94da176633aa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\cps">
+      <UniqueIdentifier>{4401a19d-a3fd-41af-ac74-64089f0ecac9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\formats\cps">
+      <UniqueIdentifier>{71c73ca7-305f-44a4-9af2-1e67750ad8f9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -435,15 +435,6 @@
     <ClCompile Include="src\main\formats\KonamiGXSeq.cpp">
       <Filter>Source Files\formats\konami_gx</Filter>
     </ClCompile>
-    <ClCompile Include="src\main\formats\QSoundInstr.cpp">
-      <Filter>Source Files\formats\qsound</Filter>
-    </ClCompile>
-    <ClCompile Include="src\main\formats\QSoundScanner.cpp">
-      <Filter>Source Files\formats\qsound</Filter>
-    </ClCompile>
-    <ClCompile Include="src\main\formats\QSoundSeq.cpp">
-      <Filter>Source Files\formats\qsound</Filter>
-    </ClCompile>
     <ClCompile Include="src\main\formats\SonyPS2InstrSet.cpp">
       <Filter>Source Files\formats\sonyps2</Filter>
     </ClCompile>
@@ -569,9 +560,6 @@
     </ClCompile>
     <ClCompile Include="src\ui\windows\LogListView.cpp">
       <Filter>Source Files\windows</Filter>
-    </ClCompile>
-    <ClCompile Include="src\main\datetime.cpp">
-      <Filter>Source Files\main</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\windows\DragDropSource.cpp">
       <Filter>Source Files\windows</Filter>
@@ -828,6 +816,24 @@
     <ClCompile Include="src\main\formats\ItikitiSnesSeq.cpp">
       <Filter>Source Files\formats\itikitisnes</Filter>
     </ClCompile>
+    <ClCompile Include="src\main\formats\CPSInstr.cpp">
+      <Filter>Source Files\formats\cps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\CPSScanner.cpp">
+      <Filter>Source Files\formats\cps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\CPSSeq.cpp">
+      <Filter>Source Files\formats\cps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\CPSTrackV1.cpp">
+      <Filter>Source Files\formats\cps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\CPSTrackV2.cpp">
+      <Filter>Source Files\formats\cps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\loaders\CPS3Decrypt.cpp">
+      <Filter>Source Files\loaders</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ui\windows\aboutdlg.h">
@@ -994,18 +1000,6 @@
     </ClInclude>
     <ClInclude Include="src\main\formats\KonamiGXSeq.h">
       <Filter>Header Files\formats\konami_gx</Filter>
-    </ClInclude>
-    <ClInclude Include="src\main\formats\QSoundFormat.h">
-      <Filter>Header Files\formats\qsound</Filter>
-    </ClInclude>
-    <ClInclude Include="src\main\formats\QSoundInstr.h">
-      <Filter>Header Files\formats\qsound</Filter>
-    </ClInclude>
-    <ClInclude Include="src\main\formats\QSoundScanner.h">
-      <Filter>Header Files\formats\qsound</Filter>
-    </ClInclude>
-    <ClInclude Include="src\main\formats\QSoundSeq.h">
-      <Filter>Header Files\formats\qsound</Filter>
     </ClInclude>
     <ClInclude Include="src\main\formats\SonyPS2Format.h">
       <Filter>Header Files\formats\sonyps2</Filter>
@@ -1498,6 +1492,27 @@
     </ClInclude>
     <ClInclude Include="src\main\formats\ItikitiSnesSeq.h">
       <Filter>Header Files\formats\itikitisnes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\CPSFormat.h">
+      <Filter>Header Files\formats\cps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\CPSInstr.h">
+      <Filter>Header Files\formats\cps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\CPSScanner.h">
+      <Filter>Header Files\formats\cps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\CPSSeq.h">
+      <Filter>Header Files\formats\cps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\CPSTrackV1.h">
+      <Filter>Header Files\formats\cps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\CPSTrackV2.h">
+      <Filter>Header Files\formats\cps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\loaders\CPS3Decrypt.h">
+      <Filter>Header Files\loaders</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

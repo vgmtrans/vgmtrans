@@ -1,5 +1,5 @@
-#include <netinet/in.h>
 #include "pch.h"
+#include "common.h"
 #include "CPS3Decrypt.h"
 
 // The following code comes directly from MAME
@@ -37,10 +37,8 @@ uint32_t CPS3Decrypt::cps3_mask(uint32_t address, uint32_t key1, uint32_t key2)
 
 
 void CPS3Decrypt::cps3_decode(uint32_t *src, uint32_t *dest, uint32_t key1, uint32_t key2, uint32_t length) {
-
   for (int i = 0; i < length; i += 4) {
-    uint32_t data = htonl(src[i/4]) ^ cps3_mask(0x6000000+i, key1, key2);
-    dest[i/4] = htonl(data);
+    uint32_t data = swap_bytes32(src[i / 4]) ^ cps3_mask(0x6000000 + i, key1, key2);
+    dest[i / 4] = swap_bytes32(data);
   }
-
 }
