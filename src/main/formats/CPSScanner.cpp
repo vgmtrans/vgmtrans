@@ -62,6 +62,7 @@ void CPSScanner::Scan(RawFile *file, void *info) {
       if (!seqRomGroupEntry->GetHexAttribute("instr_table", &instr_table_offset))
         return;
       break;
+    case VER_200:
     case VER_201B:
     case VER_CPS3:
       if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
@@ -75,6 +76,7 @@ void CPSScanner::Scan(RawFile *file, void *info) {
     case VER_171:
     case VER_180:
     case VER_210:
+    case VER_211:
       if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
       if (fmt_ver >= VER_130 && !seqRomGroupEntry->GetHexAttribute("artic_table", &artic_table_offset))
@@ -322,8 +324,10 @@ CPSFormatVer CPSScanner::GetVersionEnum(string &versionStr) {
   if (versionStr == "1.40") return VER_140;
   if (versionStr == "1.71") return VER_171;
   if (versionStr == "1.80") return VER_180;
+  if (versionStr == "2.00") return VER_200;
   if (versionStr == "2.01b") return VER_201B;
   if (versionStr == "2.10") return VER_210;
+  if (versionStr == "2.11") return VER_211;
   if (versionStr == "CPS3") return VER_CPS3;
   return VER_UNDEFINED;
 }

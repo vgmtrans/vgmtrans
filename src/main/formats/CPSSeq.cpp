@@ -26,7 +26,7 @@ CPSSeq::~CPSSeq(void) {
 bool CPSSeq::GetHeaderInfo(void) {
   // for 100% accuracy, we'd left shift by 256, but that seems unnecessary and excessive
 
-  if (fmt_version >= VER_201B)
+  if (fmt_version >= VER_200)
     SetPPQN(0x30);
   else
     SetPPQN(0x30 << 4);
@@ -63,8 +63,10 @@ bool CPSSeq::GetTrackPointers(void) {
       case VER_CPS1_425:
         newTrack = new CPSTrackV1(this, offset);
         break;
+      case VER_200:
       case VER_201B:
       case VER_210:
+      case VER_211:
       case VER_CPS3:
         newTrack = new CPSTrackV2(this, offset + dwOffset);
         break;
@@ -193,7 +195,8 @@ bool CPSSeq::PostLoad() {
         // TODO add adjustment for segmentDurTicks % tickRes
       }
 
-      uint32_t fmtPitchBendRange = fmt_version < VER_201B ? 50 : 1200;
+//      uint32_t fmtPitchBendRange = fmt_version != VER_201B ? 50 : 1200;
+      uint32_t fmtPitchBendRange = 50;
 
       switch (event->GetEventType()) {
         case MIDIEVENT_TEMPO: {

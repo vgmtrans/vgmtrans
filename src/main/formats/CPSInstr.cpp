@@ -224,7 +224,7 @@ bool CPSInstrSet::GetInstrPointers() {
   }
   else {
     uint8_t instr_info_length = sizeof(qs_prog_info_ver_130);
-    if (fmt_version < VER_130 || fmt_version == VER_201B) {
+    if (fmt_version < VER_130 || fmt_version == VER_200 || fmt_version == VER_201B) {
       instr_info_length = sizeof(qs_prog_info_ver_103);        //1.16 (Xmen vs SF) is like this
     }
     else if (fmt_version == VER_CPS3) {
@@ -315,7 +315,8 @@ CPSInstr::~CPSInstr(void) {
 
 bool CPSInstr::LoadInstr() {
   vector<VGMRgn*> rgns;
-  if (GetFormatVer() < VER_103) {
+  const CPSFormatVer formatVersion = GetFormatVer();
+  if (formatVersion < VER_103) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, L"Instrument Info ver < 1.03");
     rgns.push_back(rgn);
     rgn->AddSimpleItem(this->dwOffset,     1, L"Sample Info Index");
@@ -336,7 +337,7 @@ bool CPSInstr::LoadInstr() {
     this->sustain_rate = progInfo.sustain_rate;
     this->release_rate = progInfo.release_rate;
   }
-  else if (GetFormatVer() < VER_130 || GetFormatVer() == VER_201B) {
+  else if (formatVersion < VER_130 || formatVersion == VER_200 || formatVersion == VER_201B) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, L"Instrument Info ver < 1.30");
     rgns.push_back(rgn);
     qs_prog_info_ver_103 progInfo;
@@ -356,7 +357,7 @@ bool CPSInstr::LoadInstr() {
     this->sustain_rate = progInfo.sustain_rate;
     this->release_rate = progInfo.release_rate;
   }
-  else if (GetFormatVer() == VER_CPS3) {
+  else if (formatVersion == VER_CPS3) {
 
     uint8_t prevKeyHigh = 0;
     uint32_t off;

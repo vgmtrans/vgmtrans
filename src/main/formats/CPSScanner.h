@@ -32,8 +32,10 @@ enum CPSFormatVer: uint8_t {
   VER_140,
   VER_171,
   VER_180,
+  VER_200,
   VER_201B,
   VER_210,
+  VER_211,
   VER_CPS3
 };
 
