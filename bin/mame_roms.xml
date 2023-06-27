@@ -194,6 +194,30 @@
             <rom>hs2.11m</rom>
         </romgroup>
     </game>
+    <game name="jojo" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x02203ee3" key2="0x01301972" seq_table="0x760008" samp_table="0x75c000" samp_table_length="0x2480" instr_table_ptrs="0x758000" num_instr_banks="2">
+            <rom>jojon/jojo-simm1.0</rom>
+            <rom>jojon/jojo-simm1.1</rom>
+            <rom>jojon/jojo-simm1.2</rom>
+            <rom>jojon/jojo-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">
+            <rom>jojon/jojo-simm3.0</rom>
+            <rom>jojon/jojo-simm3.1</rom>
+        </romgroup>
+    </game>
+    <game name="jojoba" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x23323ee3" key2="0x03021972" seq_table="0x760008" samp_table="0x75c000" samp_table_length="0x2480" instr_table_ptrs="0x758000" num_instr_banks="2">
+            <rom>jojoban/jojoba-simm1.0</rom>
+            <rom>jojoban/jojoba-simm1.1</rom>
+            <rom>jojoban/jojoba-simm1.2</rom>
+            <rom>jojoban/jojoba-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">
+            <rom>jojoban/jojoba-simm3.0</rom>
+            <rom>jojoban/jojoba-simm3.1</rom>
+        </romgroup>
+    </game>
     <game name="jyangoku" format="CPS" fmt_version="1.80">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3EF4" num_instr_banks="3" samp_table="0x40B8" artic_table="0x4428">
             <rom>maj_01.1a</rom>
@@ -331,6 +355,15 @@
             <rom>pa3_11.11f</rom>
         </romgroup>
     </game>
+    <game name="plsmaswd" format="CPS" fmt_version="2.10">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table_ptrs="0x3FF4" num_instr_banks="3" samp_table="0x6000" samp_table_length="0x480" artic_table="0x8000">
+            <rom>sg2_02.2e</rom>
+            <rom>sg2_03.3e</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="append_swap16">
+            <rom>sg2-01m.3a</rom>
+        </romgroup>
+    </game>
     <game name="pnickj" format="CPS" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>pnij_17.13b</rom>
@@ -372,21 +405,6 @@
             <rom>qd_23.13b</rom>
         </romgroup>
     </game>
-    <game name="qtono2j" format="CPS" fmt_version="CPS1_5.00">
-        <romgroup type="audiocpu" load_method="append" seq_table="0x13C0" >
-            <rom>tn2j_09.12a</rom>
-        </romgroup>
-    </game>
-    <game name="salmndr2" format="KonamiGX">
-        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x6B04">
-            <rom>521-a04.9c</rom>
-            <rom>521-a05.7c</rom>
-        </romgroup>
-        <romgroup type="shared"  load_method="append">
-            <rom>521-a12.9g</rom>
-            <rom>521-a13.7g</rom>
-        </romgroup>
-    </game>
     <game name="qndream" format="CPS" fmt_version="1.16b">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x4004" num_instr_banks="15" samp_table="0x5062">
             <rom>tqz.01</rom>
@@ -394,6 +412,23 @@
         <romgroup type="qsound"  load_method="append_swap16">
             <rom>tqz.11m</rom>
             <rom>tqz.12m</rom>
+        </romgroup>
+    </game>
+    <game name="qtono2j" format="CPS" fmt_version="CPS1_5.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x13C0" >
+            <rom>tn2j_09.12a</rom>
+        </romgroup>
+    </game>
+    <game name="redearth" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x9e300ab1" key2="0xa175b82c" seq_table="0xbc198" samp_table="0xb83ec" samp_table_length="0x1690" instr_table_ptrs="0xb9a7c" num_instr_banks="2">
+            <rom>redearthn/redearth-simm1.0</rom>
+            <rom>redearthn/redearth-simm1.1</rom>
+            <rom>redearthn/redearth-simm1.2</rom>
+            <rom>redearthn/redearth-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">∂
+            <rom>redearthn/redearth-simm3.0</rom>
+            <rom>redearthn/redearth-simm3.1</rom>
         </romgroup>
     </game>
     <game name="ringdest" format="CPS" fmt_version="1.05a">
@@ -404,6 +439,25 @@
         <romgroup type="qsound"  load_method="append_swap16">
             <rom>smb.11m</rom>
             <rom>smb.12m</rom>
+        </romgroup>
+    </game>
+    <game name="rvschool" format="CPS"  fmt_version="2.10">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table_ptrs="0x7079" num_instr_banks="2" samp_table="0x733D" samp_table_length="0x468" artic_table="0x77A5">
+            <rom>jst_02.2e</rom>
+            <rom>jst_03.3e</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="append_swap16">
+            <rom>jst-01m.3b</rom>
+        </romgroup>
+    </game>
+    <game name="salmndr2" format="KonamiGX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x6B04">
+            <rom>521-a04.9c</rom>
+            <rom>521-a05.7c</rom>
+        </romgroup>
+        <romgroup type="shared"  load_method="append">
+            <rom>521-a12.9g</rom>
+            <rom>521-a13.7g</rom>
         </romgroup>
     </game>
     <game name="sf2" format="CPS" fmt_version="CPS1_4.25">
@@ -461,52 +515,58 @@
             <rom>sz3.12m</rom>
         </romgroup>
     </game>
+    <game name="sfex" format="CPS" fmt_version="2.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x6004" seq_table_length="0x58" instr_table_ptrs="0x39F4" num_instr_banks="6" samp_table="0x4638">
+            <rom>sfe_02.2e</rom>
+            <rom>sfe_03.3e</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="append_swap16">
+            <rom>sfe-01m.3b</rom>
+        </romgroup>
+    </game>
+    <game name="sfexp" format="CPS" fmt_version="2.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x6004" seq_table_length="0x58" instr_table_ptrs="0x39F4" num_instr_banks="6" samp_table="0x4638">
+            <rom>sfe_02.2e</rom>
+            <rom>sfe_03.3e</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="append_swap16">
+            <rom>sfe-01m.3b</rom>
+        </romgroup>
+    </game>
     <game name="sfiii" format="CPS" fmt_version="CPS3">
         <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0xb5fe053e" key2="0xfc03925a" seq_table="0x3865cc" samp_table="0x3829FC" samp_table_length="0x1750" instr_table_ptrs="0x38414C" num_instr_banks="2">
-            <rom>sfiii-simm1.0</rom>
-            <rom>sfiii-simm1.1</rom>
-            <rom>sfiii-simm1.2</rom>
-            <rom>sfiii-simm1.3</rom>
+            <rom>sfiiin/sfiii-simm1.0</rom>
+            <rom>sfiiin/sfiii-simm1.1</rom>
+            <rom>sfiiin/sfiii-simm1.2</rom>
+            <rom>sfiiin/sfiii-simm1.3</rom>
         </romgroup>
         <romgroup type="qsound"  load_method="deinterlace">∂
-            <rom>sfiii-simm3.0</rom>
-            <rom>sfiii-simm3.1</rom>
+            <rom>sfiiin/sfiii-simm3.0</rom>
+            <rom>sfiiin/sfiii-simm3.1</rom>
         </romgroup>
     </game>
     <game name="sfiii2" format="CPS" fmt_version="CPS3">
-        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x00000000" key2="0x00000000" seq_table="0x52c298" samp_table="0x5271b0" samp_table_length="0x2300" instr_table_ptrs="0x5294b0" num_instr_banks="2">
-            <rom>sfiii2-simm1.0</rom>
-            <rom>sfiii2-simm1.1</rom>
-            <rom>sfiii2-simm1.2</rom>
-            <rom>sfiii2-simm1.3</rom>
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x00000000" key2="0x00000000" seq_table="0x52c29C" samp_table="0x5271b0" samp_table_length="0x2300" instr_table_ptrs="0x5294b0" num_instr_banks="2">
+            <rom>sfiii2n/sfiii2-simm1.0</rom>
+            <rom>sfiii2n/sfiii2-simm1.1</rom>
+            <rom>sfiii2n/sfiii2-simm1.2</rom>
+            <rom>sfiii2n/sfiii2-simm1.3</rom>
         </romgroup>
         <romgroup type="qsound"  load_method="deinterlace">∂
-            <rom>sfiii2-simm3.0</rom>
-            <rom>sfiii2-simm3.1</rom>
+            <rom>sfiii2n/sfiii2-simm3.0</rom>
+            <rom>sfiii2n/sfiii2-simm3.1</rom>
         </romgroup>
     </game>
     <game name="sfiii3" format="CPS" fmt_version="CPS3">
         <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0xa55432b4" key2="0x0c129981" seq_table="0x78f008" samp_table="0x78C000" samp_table_length="0x2DD0" instr_table_ptrs="0x788000" num_instr_banks="4">
-            <rom>sfiii3-simm1.0</rom>
-            <rom>sfiii3-simm1.1</rom>
-            <rom>sfiii3-simm1.2</rom>
-            <rom>sfiii3-simm1.3</rom>
+            <rom>sfiii3n/sfiii3-simm1.0</rom>
+            <rom>sfiii3n/sfiii3-simm1.1</rom>
+            <rom>sfiii3n/sfiii3-simm1.2</rom>
+            <rom>sfiii3n/sfiii3-simm1.3</rom>
         </romgroup>
         <romgroup type="qsound"  load_method="deinterlace">∂
-            <rom>sfiii3-simm3.0</rom>
-            <rom>sfiii3-simm3.1</rom>
-        </romgroup>
-    </game>
-    <game name="jojoj" format="CPS" fmt_version="CPS3">
-        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x02203ee3" key2="0x01301972" seq_table="0x760008" samp_table="0x75c000" samp_table_length="0x2480" instr_table_ptrs="0x758000" num_instr_banks="2">
-            <rom>jojo-simm1.0</rom>
-            <rom>jojo-simm1.1</rom>
-            <rom>jojo-simm1.2</rom>
-            <rom>jojo-simm1.3</rom>
-        </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
-            <rom>jojo-simm3.0</rom>
-            <rom>jojo-simm3.1</rom>
+            <rom>sfiii3n/sfiii3-simm3.0</rom>
+            <rom>sfiii3n/sfiii3-simm3.1</rom>
         </romgroup>
     </game>
     <game name="sgemf" format="CPS" fmt_version="1.30">
@@ -569,24 +629,6 @@
             <rom>sfx.12m</rom>
         </romgroup>
     </game>
-    <game name="rvschool" format="CPS"  fmt_version="2.10">
-        <romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table_ptrs="0x7079" num_instr_banks="2" samp_table="0x733D" samp_table_length="0x468" artic_table="0x77A5">
-            <rom>jst_02.2e</rom>
-            <rom>jst_03.3e</rom>
-        </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
-            <rom>jst-01m.3b</rom>
-        </romgroup>
-    </game>
-    <game name="sfex" format="CPS" fmt_version="2.01b">
-        <romgroup type="audiocpu" load_method="append" seq_table="0x6004" seq_table_length="0x58" instr_table_ptrs="0x39F4" num_instr_banks="6" samp_table="0x4638">
-            <rom>sfe_02.2e</rom>
-            <rom>sfe_03.3e</rom>
-        </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
-            <rom>sfe-01m.3b</rom>
-        </romgroup>
-    </game>
     <game name="starglad" format="CPS" fmt_version="2.01b">
         <romgroup type="audiocpu" load_method="append" seq_table="0x6008" instr_table_ptrs="0x3EF4" num_instr_banks="6" samp_table="0x4700">
             <rom>ps1_02a.2e</rom>
@@ -605,7 +647,15 @@
             <rom>hr2-01m.3a</rom>
         </romgroup>
     </game>
-
+    <game name="techromn" format="CPS" fmt_version="2.11">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table_ptrs="0x3EF4" num_instr_banks="3" samp_table="0x430c" samp_table_length="0x6E8" artic_table="0x49f4">
+            <rom>kio_02.2e</rom>
+            <rom>kio_03.3e</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="append_swap16">
+            <rom>kio-01m.3a</rom>
+        </romgroup>
+    </game>
     <game name="ts2" format="CPS" fmt_version="1.05">
         <romgroup type="audiocpu" load_method="append" seq_table="0x4809" instr_table="0x3847" num_instr_banks="1" samp_table="0x4047" samp_table_length="0x2E0">
             <rom>ts2_02.2e</rom>
