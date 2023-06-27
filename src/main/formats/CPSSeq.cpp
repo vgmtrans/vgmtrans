@@ -57,10 +57,15 @@ bool CPSSeq::GetTrackPointers(void) {
     SeqTrack *newTrack;
 
     switch (fmt_version) {
-      case VER_CPS1_200 ... VER_CPS1_425:
+      case VER_CPS1_200:
+      case VER_CPS1_200ff:
+      case VER_CPS1_350:
+      case VER_CPS1_425:
         newTrack = new CPSTrackV1(this, offset);
         break;
-      case VER_201B ... VER_CPS3:
+      case VER_201B:
+      case VER_210:
+      case VER_CPS3:
         newTrack = new CPSTrackV2(this, offset + dwOffset);
         break;
       default:

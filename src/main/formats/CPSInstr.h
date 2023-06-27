@@ -7,9 +7,6 @@ class CPSInstr;
 
 enum CPSFormatVer: uint8_t;
 
-uint16_t swap_bytes16(uint16_t val);
-uint32_t swap_bytes32(uint32_t val);
-
 // ex: Punisher
 struct qs_prog_info_ver_101 {
   uint8_t sample_index;

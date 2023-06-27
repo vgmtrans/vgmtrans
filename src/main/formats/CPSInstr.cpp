@@ -7,17 +7,6 @@
 
 using namespace std;
 
-uint16_t swap_bytes16(uint16_t val) {
-  return (val << 8) | (val >> 8);
-}
-
-uint32_t swap_bytes32(uint32_t val) {
-  return ((val << 24) |
-          ((val & 0x0000FF00) << 8) |
-          ((val & 0x00FF0000) >> 8) |
-          (val >> 24));
-}
-
 // ****************
 // CPSArticTable
 // ****************

@@ -17,7 +17,12 @@ void CPSScanner::Scan(RawFile *file, void *info) {
   }
 
   switch (fmt_ver) {
-    case VER_CPS1_200 ... VER_CPS1_502:
+    case VER_CPS1_200:
+    case VER_CPS1_200ff:
+    case VER_CPS1_350:
+    case VER_CPS1_425:
+    case VER_CPS1_500:
+    case VER_CPS1_502:
       LoadCPS1(gameentry);
       return;
     default:
@@ -44,7 +49,16 @@ void CPSScanner::Scan(RawFile *file, void *info) {
   seqRomGroupEntry->GetHexAttribute("samp_table_length", &samp_table_length);
 
   switch (fmt_ver) {
-    case VER_100 ... VER_115:
+    case VER_100:
+    case VER_101:
+    case VER_103:
+    case VER_104:
+    case VER_105A:
+    case VER_105C:
+    case VER_105:
+    case VER_106B:
+    case VER_115C:
+    case VER_115:
       if (!seqRomGroupEntry->GetHexAttribute("instr_table", &instr_table_offset))
         return;
       break;
@@ -53,7 +67,13 @@ void CPSScanner::Scan(RawFile *file, void *info) {
       if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
       break;
-    case VER_116B ... VER_180:
+    case VER_116B:
+    case VER_116:
+    case VER_130:
+    case VER_131:
+    case VER_140:
+    case VER_171:
+    case VER_180:
     case VER_210:
       if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
@@ -234,7 +254,11 @@ void CPSScanner::LoadCPS1(MAMEGame *gameentry) {
   }
 
   switch (fmt_ver) {
-    case VER_CPS1_200 ... VER_CPS1_500:
+    case VER_CPS1_200:
+    case VER_CPS1_200ff:
+    case VER_CPS1_350:
+    case VER_CPS1_425:
+    case VER_CPS1_500:
       seq_table_length = (uint32_t) (programFile->GetByte(seq_table_offset) * 2) + ptrsStart;
       break;
     case VER_CPS1_502:
