@@ -324,8 +324,14 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroup *entry, const string &format, un
         delete[] destFile;
         return 0;
       }
-      CPS3Decrypt::cps3_decode((uint32_t*) destFile, (uint32_t*) destFile, key1, key2, destFileSize);
-      //      core.WriteBufferToFile(L"cps3dump_decrypted", destFile, destFileSize);
+
+      if (key1 != 0 && key2 != 0) {
+        CPS3Decrypt::cps3_decode((uint32_t *)destFile, (uint32_t *)destFile, key1, key2,
+                                 destFileSize);
+      }
+//      wostringstream strstream;
+//      strstream << L"romgroup  - " << entry->type.c_str();
+//      pRoot->UI_WriteBufferToFile(strstream.str(), destFile, destFileSize);
     }
   }
 
