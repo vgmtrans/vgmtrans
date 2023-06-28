@@ -265,6 +265,12 @@
     <Filter Include="Header Files\formats\cps">
       <UniqueIdentifier>{71c73ca7-305f-44a4-9af2-1e67750ad8f9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\formats\namcos2">
+      <UniqueIdentifier>{e3b02082-f090-4d2b-87a3-7b05c1494f22}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats\namcos2">
+      <UniqueIdentifier>{83a7ad23-2a57-4238-b944-df5700c7db61}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\ui\windows\aboutdlg.cpp">
@@ -833,6 +839,21 @@
     </ClCompile>
     <ClCompile Include="src\main\loaders\CPS3Decrypt.cpp">
       <Filter>Source Files\loaders</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\NamcoS2C140Instr.cpp">
+      <Filter>Source Files\formats\namcos2</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\NamcoS2C140Section.cpp">
+      <Filter>Source Files\formats\namcos2</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\NamcoS2FMSection.cpp">
+      <Filter>Source Files\formats\namcos2</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\NamcoS2Scanner.cpp">
+      <Filter>Source Files\formats\namcos2</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main\formats\NamcoS2Seq.cpp">
+      <Filter>Source Files\formats\namcos2</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1513,6 +1534,18 @@
     </ClInclude>
     <ClInclude Include="src\main\loaders\CPS3Decrypt.h">
       <Filter>Header Files\loaders</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\NamcoS2Format.h">
+      <Filter>Header Files\formats\namcos2</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\NamcoS2Scanner.h">
+      <Filter>Header Files\formats\namcos2</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\NamcoS2Seq.h">
+      <Filter>Header Files\formats\namcos2</Filter>
+    </ClInclude>
+    <ClInclude Include="src\main\formats\NamcoS2C140Instr.h">
+      <Filter>Header Files\formats\namcos2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

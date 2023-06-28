@@ -39,8 +39,22 @@ bool NamcoS2Seq::ReadFMEvent(SectionState& state) {
 
   bool isChannelOpcode = false;
   switch (statusByte & 0x3F) {
-    case 0x06 ... 0x08:
-    case 0x0C ... 0x18:
+    case 0x06:
+    case 0x07:
+    case 0x08:
+    case 0x0C:
+    case 0x0D:
+    case 0x0E:
+    case 0x0F:
+    case 0x10:
+    case 0x11:
+    case 0x12:
+    case 0x13:
+    case 0x14:
+    case 0x15:
+    case 0x16:
+    case 0x17:
+    case 0x18:
     case 0x1B:
     case 0x1F:
     case 0x22:
@@ -138,9 +152,17 @@ bool NamcoS2Seq::ReadFMEvent(SectionState& state) {
           }
           break;
 
-        case S2FM_OPC_0C_PITCHBEND_HI ... S2FM_OPC_10:
-        case S2FM_OPC_12 ... S2FM_OPC_15_LFO:
-        case S2FM_OPC_17_NOP ... S2FM_OPC_18_NOP:
+        case S2FM_OPC_0C_PITCHBEND_HI:
+        case S2FM_OPC_0D_PITCHBEND_LO:
+        case S2FM_OPC_0E:
+        case S2FM_OPC_0F:
+        case S2FM_OPC_10:
+        case S2FM_OPC_12:
+        case S2FM_OPC_13:
+        case S2FM_OPC_14:
+        case S2FM_OPC_15_LFO:
+        case S2FM_OPC_17_NOP:
+        case S2FM_OPC_18_NOP:
         case S2FM_OPC_1B_NOP:
         case S2FM_OPC_1F_NOP:
         case S2FM_OPC_22:
@@ -185,9 +207,15 @@ bool NamcoS2Seq::ReadFMEvent(SectionState& state) {
         AddGenericEvent(beginOffset, curOffset - beginOffset, L"RL Enable, Feedback, Connection", desc.str(), CLR_CHANGESTATE);
         break;
 
-      case S2FM_OPC_0E ... S2FM_OPC_10:
-      case S2FM_OPC_12 ... S2FM_OPC_15_LFO:
-      case S2FM_OPC_17_NOP ... S2FM_OPC_18_NOP:
+      case S2FM_OPC_0E:
+      case S2FM_OPC_0F:
+      case S2FM_OPC_10:
+      case S2FM_OPC_12:
+      case S2FM_OPC_13:
+      case S2FM_OPC_14:
+      case S2FM_OPC_15_LFO:
+      case S2FM_OPC_17_NOP:
+      case S2FM_OPC_18_NOP:
       case S2FM_OPC_1F_NOP:
       case S2FM_OPC_22:
         AddUnknown(beginOffset, curOffset-beginOffset);

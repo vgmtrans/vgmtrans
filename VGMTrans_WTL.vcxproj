@@ -281,6 +281,11 @@
     <ClCompile Include="src\main\formats\ItikitiSnesSeq.cpp" />
     <ClCompile Include="src\main\formats\KonamiPS1Scanner.cpp" />
     <ClCompile Include="src\main\formats\KonamiPS1Seq.cpp" />
+    <ClCompile Include="src\main\formats\NamcoS2C140Instr.cpp" />
+    <ClCompile Include="src\main\formats\NamcoS2C140Section.cpp" />
+    <ClCompile Include="src\main\formats\NamcoS2FMSection.cpp" />
+    <ClCompile Include="src\main\formats\NamcoS2Scanner.cpp" />
+    <ClCompile Include="src\main\formats\NamcoS2Seq.cpp" />
     <ClCompile Include="src\main\formats\NamcoSnesInstr.cpp" />
     <ClCompile Include="src\main\formats\PrismSnesInstr.cpp" />
     <ClCompile Include="src\main\formats\PrismSnesScanner.cpp" />
@@ -490,6 +495,10 @@
     <ClInclude Include="src\main\formats\KonamiPS1Format.h" />
     <ClInclude Include="src\main\formats\KonamiPS1Scanner.h" />
     <ClInclude Include="src\main\formats\KonamiPS1Seq.h" />
+    <ClInclude Include="src\main\formats\NamcoS2C140Instr.h" />
+    <ClInclude Include="src\main\formats\NamcoS2Format.h" />
+    <ClInclude Include="src\main\formats\NamcoS2Scanner.h" />
+    <ClInclude Include="src\main\formats\NamcoS2Seq.h" />
     <ClInclude Include="src\main\formats\NamcoSnesInstr.h" />
     <ClInclude Include="src\main\formats\PrismSnesFormat.h" />
     <ClInclude Include="src\main\formats\PrismSnesInstr.h" />

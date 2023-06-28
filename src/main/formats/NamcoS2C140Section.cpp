@@ -40,8 +40,22 @@ bool NamcoS2Seq::ReadC140Event(SectionState& state) {
 
   bool isChannelOpcode = false;
   switch (statusByte & 0x3F) {
-    case 0x06 ... 0x08:
-    case 0x0C ... 0x18:
+    case 0x06:
+    case 0x07:
+    case 0x08:
+    case 0x0C:
+    case 0x0D:
+    case 0x0E:
+    case 0x0F:
+    case 0x10:
+    case 0x11:
+    case 0x12:
+    case 0x13:
+    case 0x14:
+    case 0x15:
+    case 0x16:
+    case 0x17:
+    case 0x18:
     case 0x1B:
     case 0x1F:
     case 0x22:
@@ -160,10 +174,14 @@ bool NamcoS2Seq::ReadC140Event(SectionState& state) {
           break;
         }
 
-        case S2C140_OPC_0E ... S2C140_OPC_10:
+        case S2C140_OPC_0E:
+        case S2C140_OPC_0F:
+        case S2C140_OPC_10:
         case S2C140_OPC_12:
-        case S2C140_OPC_14 ... S2C140_OPC_15_NOP:
-        case S2C140_OPC_17 ... S2C140_OPC_18_NOP:
+        case S2C140_OPC_14:
+        case S2C140_OPC_15_NOP:
+        case S2C140_OPC_17:
+        case S2C140_OPC_18_NOP:
         case S2C140_OPC_1B:
         case S2C140_OPC_1F:
         case S2C140_OPC_22:
@@ -214,10 +232,14 @@ bool NamcoS2Seq::ReadC140Event(SectionState& state) {
         AddTime(state.delta);
         break;
 
-      case S2C140_OPC_0E ... S2C140_OPC_10:
+      case S2C140_OPC_0E:
+      case S2C140_OPC_0F:
+      case S2C140_OPC_10:
       case S2C140_OPC_12:
-      case S2C140_OPC_14 ... S2C140_OPC_15_NOP:
-      case S2C140_OPC_17 ... S2C140_OPC_18_NOP:
+      case S2C140_OPC_14:
+      case S2C140_OPC_15_NOP:
+      case S2C140_OPC_17:
+      case S2C140_OPC_18_NOP:
       case S2C140_OPC_1F:
       case S2C140_OPC_22:
         AddUnknown(beginOffset, curOffset-beginOffset);

@@ -44,7 +44,7 @@ void NamcoS2Seq::AddC140ProgramChangeIfNeeded(ChannelState& chanState) {
   if (key == chanState.curInstrKey)
     return;
 
-  uint32_t progNum;
+  uint32_t progNum = 0;
   auto it = c140InstrMap->find(key);
   if (it != c140InstrMap->end()) {
     progNum = it->second;
