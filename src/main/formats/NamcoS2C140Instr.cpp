@@ -232,34 +232,6 @@ bool NamcoS2C140InstrSet::GetInstrPointers() {
   }
 
   return true;
-
-
-
-//  for (uint32_t i=0; i<sampColl->samples.size(); i++) {
-//
-//    for (uint8_t a=0; a<articTable->artics.size(); a++) {
-//      auto& artic = articTable->artics[a];
-//      auto instr = new VGMInstr(this, dwOffset, 0, a, i);
-//      auto rgn = new VGMRgn(instr, 0);
-//      rgn->keyLow = 0x0;
-//      rgn->keyHigh = 0x7F;
-//      rgn->sampNum = i;
-//      rgn->attack_time = artic.attackTime();
-//      rgn->decay_time = artic.decayTime();
-//      rgn->sustain_level = artic.sustainLevel();
-//      rgn->sustain_time = artic.sustainTime();
-//      rgn->release_time = artic.releaseTime();
-//
-//      printf("a: %f d: %f sl: %f\n", rgn->attack_time, rgn->decay_time, rgn->sustain_level);
-//
-//      instr->AddRgn(rgn);
-//      aInstrs.push_back(instr);
-//
-//
-//    }
-//  }
-
-  return true;
 }
 
 
