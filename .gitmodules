@@ -13,3 +13,10 @@
 [submodule "lib/qwindowkit"]
 	path = lib/qwindowkit
 	url = https://github.com/stdware/qwindowkit.git
+[submodule "external/JUCE"]
+    path = external/JUCE
+    url = https://github.com/juce-framework/JUCE.git
+[submodule "external/juicysfplugin"]
+    path = external/juicysfplugin
+    url = https://github.com/mikelow/juicysfplugin.git
+    branch = cmake
