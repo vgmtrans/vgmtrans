@@ -32,8 +32,10 @@ bool NewSequencePlayer::loadVST() {
   // Create a known plugin list
   juce::KnownPluginList pluginList;
 
-  juce::FileSearchPath searchPath ("/Users/mike/vgmtrans/external/juicysfplugin/cmake-build-debug/juicysfplugin_artefacts/Debug/VST3/");
-  juce::PluginDirectoryScanner scanner (pluginList, *pluginFormatManager.getFormat(0), searchPath, false, juce::File());
+  juce::File vstDirFile = juce::File::getCurrentWorkingDirectory().getChildFile("vst");
+  juce::FileSearchPath vstDir(vstDirFile.getFullPathName());
+  // Non-recursive scan doesn't seem to find the vst file on Windows.
+  juce::PluginDirectoryScanner scanner (pluginList, *pluginFormatManager.getFormat(0), vstDir, true, juce::File());
 
   // Scan for new plugins
   juce::String pluginName;
@@ -41,10 +43,10 @@ bool NewSequencePlayer::loadVST() {
 
   // Choose the first available plugin
   jassert(pluginList.getNumTypes() > 0);
-  auto pluginDesc = pluginList.getTypeForFile("/Users/mike/vgmtrans/external/juicysfplugin/cmake-build-debug/juicysfplugin_artefacts/Debug/VST3/juicysfplugin.vst3");
+  auto pluginDesc = pluginList.getTypes()[0];
   // Create an instance of the plugin
   auto instance = pluginFormatManager.createPluginInstance(
-      *pluginDesc,
+      pluginDesc,
       deviceManager.getCurrentAudioDevice()->getCurrentSampleRate(),
       deviceManager.getCurrentAudioDevice()->getDefaultBufferSize(),
       error);
