@@ -281,6 +281,6 @@ class SF2File: public RiffFile {
 
   static int numOfGeneratorsForRgn(SynthRgn* rgn);
 
-  std::vector<uint8_t> saveToMem();
+  uint8_t* saveToMem();
   bool saveSF2File(const std::string &filepath);
 };
