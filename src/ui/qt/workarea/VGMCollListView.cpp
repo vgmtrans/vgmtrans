@@ -11,7 +11,7 @@
 #include <VGMColl.h>
 #include <VGMExport.h>
 #include <VGMSeq.h>
-#include "SequencePlayer.h"
+#include "NewSequencePlayer.h"
 #include "workarea/MdiArea.h"
 #include "QtVGMRoot.h"
 #include "services/MenuManager.h"
@@ -196,11 +196,11 @@ void VGMCollListView::handlePlaybackRequest() {
   }
 
   VGMColl *coll = qtVGMRoot.vgmColls()[list[0].row()];
-  SequencePlayer::the().playCollection(coll);
+  NewSequencePlayer::the().playCollection(coll);
 }
 
 void VGMCollListView::handleStopRequest() {
-  SequencePlayer::the().stop();
+  NewSequencePlayer::the().stop();
 }
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

@@ -47,6 +47,10 @@ add_executable(
   About.h
   IconBar.cpp
   IconBar.h
+  InstrClient.cpp
+  InstrClient.h
+  InstrServerMessage.cpp
+  InstrServerMessage.h
   Logger.cpp
   Logger.h
   MainWindow.cpp
@@ -55,6 +59,8 @@ add_executable(
   ManualCollectionDialog.h
   MenuBar.cpp
   MenuBar.h
+  NewSequencePlayer.cpp
+  NewSequencePlayer.h
   QtVGMRoot.cpp
   QtVGMRoot.h
   ReportDialog.cpp
@@ -122,7 +128,23 @@ if(APPLE)
   target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
 endif()
 
-target_include_directories(vgmtrans PRIVATE . ./util ./widgets ./workarea)
+target_include_directories(vgmtrans PRIVATE
+        .
+        ./util
+        ./widgets
+        ./workarea
+        "${PROJECT_SOURCE_DIR}/external/juicysfplugin/src")
+
+set_target_properties(juce_recommended_config_flags PROPERTIES
+        INTERFACE_COMPILE_DEFINITIONS
+        JUCE_PLUGINHOST_VST3=1)
+
+target_compile_definitions(vgmtrans PRIVATE
+        JUCE_PLUGINHOST_AU=0
+        JUCE_PLUGINHOST_LADSPA=0
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0)
 
 target_link_libraries(
   vgmtrans
@@ -130,7 +152,9 @@ target_link_libraries(
           Qt6::Widgets
           Qt6::GuiPrivate
           Qt6::Svg
-          BASS::MIDI)
+          BASS::MIDI
+          juce::juce_audio_utils
+          juce::juce_audio_processors)
 
 qt_add_shaders(
   vgmtrans
