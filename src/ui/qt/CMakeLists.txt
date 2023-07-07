@@ -37,11 +37,14 @@ target_sources(vgmtrans
   PRIVATE
     About.cpp
     PlaybackControls.cpp
+    InstrClient.cpp
+    InstrServerMessage.cpp
     Logger.cpp
     MainWindow.cpp
     MainWindowDockLayout.cpp
     ManualCollectionDialog.cpp
     MenuBar.cpp
+    NewSequencePlayer.cpp
     QtVGMRoot.cpp
     ReportDialog.cpp
     SequencePlayer.cpp
@@ -85,11 +88,14 @@ target_sources(vgmtrans
     FILES
       About.h
       PlaybackControls.h
+      InstrClient.h
+      InstrServerMessage.h
       Logger.h
       MainWindow.h
       MainWindowDockLayout.h
       ManualCollectionDialog.h
       MenuBar.h
+      NewSequencePlayer.h
       QtVGMRoot.h
       ReportDialog.h
       SequencePlayer.h
@@ -155,6 +161,23 @@ if(APPLE)
 endif()
 
 target_compile_features(vgmtrans PRIVATE cxx_std_20)
+target_include_directories(vgmtrans PRIVATE
+        .
+        ./util
+        ./widgets
+        ./workarea
+        "${PROJECT_SOURCE_DIR}/external/juicysfplugin/src")
+
+set_target_properties(juce_recommended_config_flags PROPERTIES
+        INTERFACE_COMPILE_DEFINITIONS
+        JUCE_PLUGINHOST_VST3=1)
+
+target_compile_definitions(vgmtrans PRIVATE
+        JUCE_PLUGINHOST_AU=0
+        JUCE_PLUGINHOST_LADSPA=0
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0)
 
 target_link_libraries(
   vgmtrans
@@ -163,7 +186,9 @@ target_link_libraries(
           Qt6::Widgets
           Qt6::GuiPrivate
           Qt6::Svg
-          BASS::MIDI)
+          BASS::MIDI
+          juce::juce_audio_utils
+          juce::juce_audio_processors)
 
 if(Qt6DBus_FOUND)
   target_link_libraries(vgmtrans PRIVATE Qt6::DBus)

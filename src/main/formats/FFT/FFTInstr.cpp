@@ -103,7 +103,7 @@ bool    WdsInstrSet::parseInstrPointers() {
 //		Constructor
 //--------------------------------------------------------------
 WdsInstr::WdsInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum) :
-    VGMInstr(instrSet, offset, length, theBank, theInstrNum) {}
+    VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Instrument", defaultFFTReverbPercent) {}
 
 //==============================================================
 //		Destructor
