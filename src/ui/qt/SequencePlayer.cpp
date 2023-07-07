@@ -173,11 +173,12 @@ bool SequencePlayer::playCollection(const VGMColl *coll) {
   auto rawSF2 = sf2->saveToMem();
   delete sf2;
   /* Deleted by MemFile::mem_close */
-  auto sf2_data_blob = new MemFile::DataBlob{0, std::move(rawSF2)};
+//  auto sf2_data_blob = new MemFile::DataBlob{0, std::vector<uint8_t>(rawSF2)};
 
   /* Init soundfont */
   HSOUNDFONT sf2_handle =
-      BASS_MIDI_FontInitUser(&memory_file_callbacks, sf2_data_blob, BASS_MIDI_FONT_XGDRUMS);
+      BASS_MIDI_FontInitUser(&memory_file_callbacks, rawSF2, BASS_MIDI_FONT_XGDRUMS);
+  delete[] rawSF2;
   if (BASS_ErrorGetCode() != BASS_OK) {
     L_ERROR("Could not load soundfont. Maybe the system is running out of "
                                   "memory or the sountfont was too large?");

@@ -74,31 +74,6 @@ option(ENABLE_CLI "Build the CLI application" ON)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/spdlog")
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/mio")
 
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/JUCE")
-
 add_subdirectory(src)
 
-# JUCE configuration
 
-juce_add_console_app(VGMTrans
-        PRODUCT_NAME "VGMTrans")
-
-set_target_properties(juce_recommended_config_flags PROPERTIES
-        INTERFACE_COMPILE_DEFINITIONS
-        JUCE_PLUGINHOST_VST3=1)
-
-target_compile_definitions(VGMTrans PRIVATE
-        JUCE_PLUGINHOST_AU=0
-        JUCE_PLUGINHOST_LADSPA=0
-        JUCE_PLUGINHOST_VST3=1
-        JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
-        JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:VGMTrans,JUCE_PRODUCT_NAME>"
-        JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:VGMTrans,JUCE_VERSION>")
-
-target_link_libraries(VGMTrans PRIVATE
-        juce::juce_audio_utils
-        juce::juce_audio_processors)
-
-target_compile_definitions(VGMTrans PUBLIC
-        JUCE_VST3_CAN_REPLACE_VST2=0)
