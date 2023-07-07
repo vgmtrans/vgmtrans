@@ -278,6 +278,6 @@ class SF2File: public RiffFile {
   SF2File(SynthFile *synthfile);
   ~SF2File() override = default;
 
-  std::vector<uint8_t> SaveToMem();
+  uint8_t* SaveToMem();
   bool SaveSF2File(const std::string &filepath);
 };
