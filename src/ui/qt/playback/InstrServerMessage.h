@@ -1,16 +1,17 @@
 
 #pragma once
 
-#include <juce_core/juce_core.h>
+#include "juce_core/juce_core.h"
 
 enum InstrServerMessageCode
 {
   kMessageError = 0,
   ResponseOk,
   ResponseError,
-  SF2Start,
-  SF2Content,
-  SF2End
+  SF2Send,
+  SF2StartBlockTransfer,
+  SF2Block,
+  SF2EndBlockTransfer
 };
 
 class InstrServerMessage {
@@ -20,6 +21,7 @@ public:
 
   bool FromFile(juce::String filePath);
   InstrServerMessageCode GetCode();
+  uint32_t GetSequence();
   void* GetData();
   size_t GetDataLength();
 
