@@ -13,7 +13,9 @@ using namespace std;
 
 NewSequencePlayer::NewSequencePlayer() = default;
 
-NewSequencePlayer::~NewSequencePlayer() = default;
+NewSequencePlayer::~NewSequencePlayer() {
+  delete state.midiFile;
+}
 
 void NewSequencePlayer::initialize() {
   juce::String error = deviceManager.initialiseWithDefaultDevices(0, 2);
@@ -252,6 +254,7 @@ bool NewSequencePlayer::sendSF2ToVST(VGMColl* coll) {
 }
 
 void NewSequencePlayer::clearState() {
+  delete state.midiFile;
   state.events.clear();
   state.eventSampleOffsets.clear();
   state.eventOffset = 0;
@@ -262,32 +265,34 @@ void NewSequencePlayer::clearState() {
 bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   clearState();
 
-  MidiFile* pMidi = seq->ConvertToMidi();
+  MidiFile* midiFile = seq->ConvertToMidi();
   size_t reserveSize = 0;
-  for (size_t i=0; i<pMidi->aTracks.size(); i++) {
-    reserveSize += pMidi->aTracks[i]->aEvents.size();
+  for (size_t i=0; i< midiFile->aTracks.size(); i++) {
+    reserveSize += midiFile->aTracks[i]->aEvents.size();
   }
   state.events.reserve(reserveSize);
 
-  for (size_t i=0; i<pMidi->aTracks.size(); i++) {
+  for (size_t i=0; i< midiFile->aTracks.size(); i++) {
     state.events.insert(
         state.events.end(),
-        pMidi->aTracks[i]->aEvents.begin(),
-        pMidi->aTracks[i]->aEvents.end()
+        midiFile->aTracks[i]->aEvents.begin(),
+        midiFile->aTracks[i]->aEvents.end()
     );
   }
 
   //Add global events
-  pMidi->globalTranspose = 0;
+  midiFile->globalTranspose = 0;
   state.events.insert(
       state.events.end(),
-      pMidi->globalTrack.aEvents.begin(),
-      pMidi->globalTrack.aEvents.end()
+      midiFile->globalTrack.aEvents.begin(),
+      midiFile->globalTrack.aEvents.end()
   );
 
   if (state.events.empty()) {
-    delete pMidi;
+    delete midiFile;
     return true;
+  } else {
+    state.midiFile = midiFile;
   }
 
   //Sort all the events by priority then absolute time in ticks
@@ -295,7 +300,7 @@ bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   stable_sort(state.events.begin(), state.events.end(), AbsTimeCmp());
 
   // Calculate sample offset times for all midi events
-  state.eventSampleOffsets = generateEventSampleTimes(state.events, pMidi->GetPPQN());
+  state.eventSampleOffsets = generateEventSampleTimes(state.events, midiFile->GetPPQN());
 }
 
 std::vector<int> NewSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>& events, int ppqn) const {

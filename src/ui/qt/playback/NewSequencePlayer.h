@@ -11,6 +11,7 @@
 class VGMColl;
 class VGMSeq;
 class MidiEvent;
+class MidiFile;
 
 enum MusicState {
   Unloaded,
@@ -20,6 +21,7 @@ enum MusicState {
 };
 
 struct PlaybackState {
+  MidiFile* midiFile;
   std::vector<MidiEvent*> events;
   std::vector<int> eventSampleOffsets;
   uint32_t samplesOffset;
@@ -58,7 +60,6 @@ public:
   void seek(int samples);
 
   bool isPlaying() const {
-    DBG("IS PLAYING CALLED AND IS PLAYING?  " + juce::String(state.musicState));
     return state.musicState == MusicState::Playing;
   }
 
