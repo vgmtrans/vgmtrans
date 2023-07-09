@@ -1,8 +1,9 @@
 
 #pragma once
 
-#include <juce_events/juce_events.h>
-#include <juce_core/juce_core.h>
+#include "juce_events/juce_events.h"
+#include "juce_core/juce_core.h"
+#include "PendingCalls.h"
 
 #define kPortNumber 0xBEEF
 #define kPipeName "InstrServer"
@@ -17,10 +18,12 @@ public:
   void connectionLost() override;
   void messageReceived(const juce::MemoryBlock &message) override;
 
-  void sendSF2File(const juce::MemoryBlock& sf2Data);
+  bool sendSF2File(const juce::MemoryBlock& sf2Data);
+  void sendSF2FileInBlocks(const juce::MemoryBlock& sf2Data);
 
   bool IsConnected() { return fIsConnected; };
 
 private:
   bool fIsConnected;
+  PendingCallList fPending;
 };
