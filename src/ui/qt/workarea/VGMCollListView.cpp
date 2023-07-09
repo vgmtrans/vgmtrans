@@ -9,7 +9,7 @@
 #include <QLineEdit>
 #include <VGMColl.h>
 #include <VGMExport.h>
-#include "NewSequencePlayer.h"
+#include "SequencePlayer.h"
 #include "QtVGMRoot.h"
 #include "services/MenuManager.h"
 
@@ -172,9 +172,9 @@ void VGMCollListView::handlePlaybackRequest() {
   }
 
   VGMColl *coll = qtVGMRoot.vgmColls()[list[0].row()];
-  NewSequencePlayer::the().playCollection(coll);
+  SequencePlayer::the().playCollection(coll);
 }
 
 void VGMCollListView::handleStopRequest() {
-  NewSequencePlayer::the().stop();
+  SequencePlayer::the().stop();
 }
