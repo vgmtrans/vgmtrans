@@ -10,6 +10,7 @@
 #include <bassmidi.h>
 #include <QObject>
 #include <QTimer>
+#include "playback/NewSequencePlayer.h"
 
 class VGMColl;
 
@@ -37,15 +38,16 @@ public:
   /**
    * Toggles the status of the player
    */
-  void toggle();
+  Q_INVOKABLE void toggle();
+
   /**
    * Stops the player (unloads resources)
    */
   void stop();
   /**
-   * Moves the player position
-   * @param position relative to song start
-   */
+ * Moves the player position
+ * @param position relative to song start
+ */
   void seek(int position, PositionChangeOrigin origin);
 
   /**
@@ -54,15 +56,15 @@ public:
    */
   [[nodiscard]] bool playing() const;
   /**
-   * The number of MIDI ticks elapsed since the player was started
+   * The number of samples elapsed since the player was started
    * @return number of ticks relative to song start
    */
-  [[nodiscard]] int elapsedTicks() const;
+  [[nodiscard]] int elapsedSamples() const;
   /**
-   * The total number of MIDI ticks in the song
+   * The total number of samples in the song
    * @return total ticks in the song
    */
-  [[nodiscard]] int totalTicks() const;
+  [[nodiscard]] int totalSamples() const;
 
   /**
    * Returns the title of the song currently playing
@@ -93,9 +95,11 @@ private:
   SequencePlayer();
   bool loadCollection(const VGMColl *collection, bool startPlaying);
 
+  NewSequencePlayer player;
+
   const VGMColl *m_active_vgmcoll{};
-  HSTREAM m_active_stream{};
-  HSOUNDFONT m_loaded_sf{};
+//  HSTREAM m_active_stream{};
+//  HSOUNDFONT m_loaded_sf{};
 
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};

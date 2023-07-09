@@ -7,7 +7,6 @@
 #include "VGMCollListView.h"
 
 #include "QtVGMRoot.h"
-#include "NewSequencePlayer.h"
 #include "SequencePlayer.h"
 #include "services/MenuManager.h"
 #include "services/NotificationCenter.h"
@@ -521,11 +520,11 @@ void VGMCollListView::handlePlaybackRequest() {
   }
 
   VGMColl *coll = qtVGMRoot.vgmColls()[list[0].row()];
-  NewSequencePlayer::the().playCollection(coll);
+  SequencePlayer::the().playCollection(coll);
 }
 
 void VGMCollListView::handleStopRequest() {
-  NewSequencePlayer::the().stop();
+  SequencePlayer::the().stop();
 }
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

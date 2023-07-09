@@ -37,14 +37,11 @@ target_sources(vgmtrans
   PRIVATE
     About.cpp
     PlaybackControls.cpp
-    InstrClient.cpp
-    InstrServerMessage.cpp
     Logger.cpp
     MainWindow.cpp
     MainWindowDockLayout.cpp
     ManualCollectionDialog.cpp
     MenuBar.cpp
-    NewSequencePlayer.cpp
     QtVGMRoot.cpp
     ReportDialog.cpp
     SequencePlayer.cpp
@@ -82,20 +79,21 @@ target_sources(vgmtrans
     workarea/VGMFileTreeView.cpp
     workarea/VGMFileView.cpp
     workarea/VGMFileListView.cpp
+    playback/InstrClient.cpp
+    playback/InstrServerMessage.cpp
+    playback/NewSequencePlayer.cpp
+    playback/PendingCalls.cpp
 
   PRIVATE
     FILE_SET HEADERS TYPE HEADERS
     FILES
       About.h
       PlaybackControls.h
-      InstrClient.h
-      InstrServerMessage.h
       Logger.h
       MainWindow.h
       MainWindowDockLayout.h
       ManualCollectionDialog.h
       MenuBar.h
-      NewSequencePlayer.h
       QtVGMRoot.h
       ReportDialog.h
       SequencePlayer.h
@@ -153,6 +151,13 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiRenderer.h
       workarea/hexview/HexViewRhiWidget.h
       workarea/hexview/HexViewRhiWindow.h
+  PRIVATE
+    FILE_SET headers_playback TYPE HEADERS BASE_DIRS playback
+    FILES
+      playback/InstrClient.h
+      playback/InstrServerMessage.h
+      playback/NewSequencePlayer.h
+      playback/PendingCalls.h
 )
 
 if(APPLE)
