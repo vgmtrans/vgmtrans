@@ -47,10 +47,6 @@ add_executable(
   About.h
   IconBar.cpp
   IconBar.h
-  InstrClient.cpp
-  InstrClient.h
-  InstrServerMessage.cpp
-  InstrServerMessage.h
   Logger.cpp
   Logger.h
   MainWindow.cpp
@@ -59,8 +55,6 @@ add_executable(
   ManualCollectionDialog.h
   MenuBar.cpp
   MenuBar.h
-  NewSequencePlayer.cpp
-  NewSequencePlayer.h
   QtVGMRoot.cpp
   QtVGMRoot.h
   ReportDialog.cpp
@@ -122,7 +116,15 @@ add_executable(
   workarea/VGMFileView.cpp
   workarea/VGMFileView.h
   workarea/VGMFileListView.cpp
-  workarea/VGMFileListView.h)
+  workarea/VGMFileListView.h
+  playback/InstrClient.cpp
+  playback/InstrClient.h
+  playback/InstrServerMessage.cpp
+  playback/InstrServerMessage.h
+  playback/NewSequencePlayer.cpp
+  playback/NewSequencePlayer.h
+  playback/PendingCalls.cpp
+  playback/PendingCalls.h)
 
 if(APPLE)
   target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
