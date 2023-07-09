@@ -2,10 +2,17 @@
 
 using namespace juce;
 
+namespace
+{
+  Atomic<uint32> sSequence{1};
+}
+
 InstrServerMessage::InstrServerMessage(InstrServerMessageCode code, void * data = nullptr, size_t numBytes = 0)
 {
-  uint32 code32 = (uint32)code;
+  auto code32 = static_cast<uint32>(code);
   fData.append(&code32, sizeof(uint32));
+  uint32 sequence = ++sSequence;
+  fData.append(&sequence, sizeof(uint32));
   if (data != nullptr && numBytes != 0) {
     fData.append(data, numBytes);
   }
@@ -42,16 +49,23 @@ InstrServerMessageCode InstrServerMessage::GetCode() {
   if (fData.getSize() < sizeof(uint32)) {
     return kMessageError;
   }
-  return (InstrServerMessageCode)(static_cast<uint32*>(fData.getData())[0]);
+  return static_cast<InstrServerMessageCode>((static_cast<uint32*>(fData.getData())[0]));
+}
+
+uint32 InstrServerMessage::GetSequence() {
+  if (fData.getSize() < (2 * sizeof(uint32))) {
+    return kMessageError;
+  }
+  return static_cast<uint32*>(fData.getData())[1];
 }
 
 void* InstrServerMessage::GetData() {
   if (fData.getSize() < 2*sizeof(uint32)) {
     return nullptr;
   }
-  return static_cast<char*>(fData.getData()) + sizeof(uint32);
+  return static_cast<char*>(fData.getData()) + (2 * sizeof(uint32));
 }
 
 size_t InstrServerMessage::GetDataLength() {
-  return fData.getSize() - sizeof(uint32);
+  return fData.getSize() - (2*sizeof(uint32));
 }
