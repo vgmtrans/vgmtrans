@@ -1120,6 +1120,23 @@ void SeqTrack::AddPortamentoTimeNoItem(uint8_t time) {
     pMidiTrack->AddPortamentoTime(channel, time);
 }
 
+void SeqTrack::AddPortamentoTime14Bit(uint32_t offset, uint32_t length, uint16_t time, const std::wstring &sEventName) {
+  OnEvent(offset, length);
+
+  if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
+    AddEvent(new PortamentoTimeSeqEvent(this, time, offset, length, sEventName));
+  AddPortamentoTime14BitNoItem(time);
+}
+
+void SeqTrack::AddPortamentoTime14BitNoItem(uint16_t time) {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    uint8_t lsb = time & 127;
+    uint8_t msb = (time >> 7) & 127;
+    pMidiTrack->AddPortamentoTimeFine(channel, lsb);
+    pMidiTrack->AddPortamentoTime(channel, msb);
+  }
+}
+
 void SeqTrack::InsertPortamentoTime(uint32_t offset,
                                     uint32_t length,
                                     uint8_t time,
@@ -1129,10 +1146,18 @@ void SeqTrack::InsertPortamentoTime(uint32_t offset,
 
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new PortamentoTimeSeqEvent(this, time, offset, length, sEventName));
-  else if (readMode == READMODE_CONVERT_TO_MIDI)
+  InsertPortamentoTimeNoItem(time, absTime);
+}
+
+void SeqTrack::InsertPortamentoTimeNoItem(uint8_t time, uint32_t absTime) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
     pMidiTrack->InsertPortamentoTime(channel, time, absTime);
 }
 
+void SeqTrack::AddPortamentoControlNoItem(uint8_t key) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->AddPortamentoControl(channel, key);
+}
 
 /*void InsertNoteOnEvent(int8_t key, int8_t vel, uint32_t absTime);
 void AddNoteOffEvent(int8_t key);

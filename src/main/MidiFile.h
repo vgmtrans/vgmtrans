@@ -45,6 +45,8 @@ typedef enum {
   MIDIEVENT_SUSTAIN,
   MIDIEVENT_PORTAMENTO,
   MIDIEVENT_PORTAMENTOTIME,
+  MIDIEVENT_PORTAMENTOTIMEFINE,
+  MIDIEVENT_PORTAMENTOCONTROL,
   MIDIEVENT_MONO,
   MIDIEVENT_LFO,
   MIDIEVENT_VIBRATO,
@@ -109,6 +111,9 @@ class MidiTrack {
   void InsertPortamento(uint8_t channel, bool bOn, uint32_t absTime);
   void AddPortamentoTime(uint8_t channel, uint8_t time);
   void InsertPortamentoTime(uint8_t channel, uint8_t time, uint32_t absTime);
+  void AddPortamentoTimeFine(uint8_t channel, uint8_t time);
+  void InsertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime);
+  void AddPortamentoControl(uint8_t channel, uint8_t key);
   void AddMono(uint8_t channel);
   void InsertMono(uint8_t channel, uint32_t absTime);
 
@@ -221,6 +226,8 @@ class MidiEvent {
   MidiEvent(MidiTrack *thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, int8_t thePriority);
   virtual ~MidiEvent(void);
   virtual MidiEventType GetEventType() = 0;
+  bool IsMetaEvent();
+  bool IsSysexEvent();
   void WriteVarLength(std::vector<uint8_t> &buf, uint32_t value);
   //virtual void PrepareWrite(void/*vector<MidiEvent*> & aEvents*/);
   virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) = 0;
@@ -337,6 +344,22 @@ class PortamentoTimeEvent
   virtual MidiEventType GetEventType() { return MIDIEVENT_PORTAMENTOTIME; }
 };
 
+class PortamentoTimeFineEvent
+    : public ControllerEvent {
+public:
+  PortamentoTimeFineEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t time)
+      : ControllerEvent(prntTrk, channel, absoluteTime, 37, time, PRIORITY_MIDDLE) { }
+  virtual MidiEventType GetEventType() { return MIDIEVENT_PORTAMENTOTIMEFINE; }
+};
+
+class PortamentoControlEvent
+    : public ControllerEvent {
+public:
+  PortamentoControlEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t key)
+      : ControllerEvent(prntTrk, channel, absoluteTime, 84, key, PRIORITY_MIDDLE) { }
+  virtual MidiEventType GetEventType() { return MIDIEVENT_PORTAMENTOCONTROL; }
+};
+
 class PanEvent
     : public ControllerEvent {
  public:
@@ -426,7 +449,7 @@ class MonoEvent
     : public ControllerEvent {
  public:
   MonoEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 126, 127, PRIORITY_MIDDLE) { }
+      : ControllerEvent(prntTrk, channel, absoluteTime, 126, 0, PRIORITY_HIGHER) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_MONO; }
 };
 
