@@ -481,6 +481,8 @@ void MidiTrack::InsertModulationDepthRange(uint8_t channel, double semitones, ui
 
 void MidiTrack::AddProgramChange(uint8_t channel, uint8_t progNum) {
   aEvents.push_back(new ProgChangeEvent(this, channel, GetDelta(), progNum));
+  // Temporary hack workaround Cubase refusing to send program change events to VST3
+  aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), 115, progNum));
 }
 
 void MidiTrack::AddBankSelect(uint8_t channel, uint8_t bank) {
