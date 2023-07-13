@@ -47,14 +47,14 @@ bool NewSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> cons
   myThread.detach();
 
   prepMidiPlayback(coll->GetSeq());
+  enqueueResetEvent();
   return true;
 }
 
-// Explanation for why we wrap deviceManager calls in MessageManager::callAsync below:
-// JUCE will complain if deviceManager calls execute outside the "Messaging Thread", and
-// MessageManager::callAsync ensures that the block passed in is run on the Messaging Thread.
-// These methods may be invoked in the callback after an SF2 is loaded, which runs on a separate,
-// thread, hence the need.
+// We wrap deviceManager calls in MessageManager::callAsync below because JUCE will complain if
+// deviceManager calls execute outside the "Messaging Thread", and MessageManager::callAsync ensures
+// that the block is run on the Messaging Thread. These methods may be invoked in the callback after
+// an SF2 is loaded, which runs on a separate, thread, hence the need.
 void NewSequencePlayer::stop() {
   state.musicState = MusicState::Stopped;
   juce::MessageManager::callAsync([this](){
@@ -140,8 +140,7 @@ void NewSequencePlayer::seek(int samples) {
   }
 
   // Start by adding a reset event that will cause our VST instrument to reset all channel states
-  juce::MidiMessage resetEvent(0xF0, 0xBF, 0xFF, 0xF7);
-  seekMidiBuffer.addEvent(resetEvent, 0);
+  enqueueResetEvent();
 
   // Add the sysex events
   for (int i = 0; i < sysexEvents.size(); i++) {
@@ -179,6 +178,11 @@ void NewSequencePlayer::seek(int samples) {
 
 void NewSequencePlayer::setSongEndCallback(std::function<void()> callback) {
   songEndCallback = callback;
+}
+
+void NewSequencePlayer::enqueueResetEvent() {
+  juce::MidiMessage resetEvent(0xF0, 0xBF, 0xFF, 0xF7);
+  seekMidiBuffer.addEvent(resetEvent, 0);
 }
 
 bool NewSequencePlayer::loadVST() {
@@ -265,6 +269,7 @@ void NewSequencePlayer::clearState() {
 bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   clearState();
 
+  // Convert the VGMSeq to midi, then allocate a vector to hold every midi event in the sequence
   MidiFile* midiFile = seq->ConvertToMidi();
   size_t reserveSize = 0;
   for (size_t i=0; i< midiFile->aTracks.size(); i++) {
@@ -272,6 +277,7 @@ bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   }
   state.events.reserve(reserveSize);
 
+  // Copy every midi event from every track into the vector
   for (size_t i=0; i< midiFile->aTracks.size(); i++) {
     state.events.insert(
         state.events.end(),
@@ -288,6 +294,8 @@ bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
       midiFile->globalTrack.aEvents.end()
   );
 
+  // If there are no events, delete and return. Otherwise store a reference to the midi file
+  // so that we can delete it later
   if (state.events.empty()) {
     delete midiFile;
     return true;
@@ -391,6 +399,11 @@ void NewSequencePlayer::populateMidiBuffer(juce::MidiBuffer& midiBuffer, int sam
 
     state.eventOffset++;
   }
+//  DBG("PRINTING MIDI BUFFER at sampleOffset" + juce::String(state.samplesOffset));
+//  for (auto i=midiBuffer.begin(); i != midiBuffer.end(); i++) {
+//    auto test = *i;
+//    DBG(test.getMessage().getDescription());
+//  }
 }
 
 void NewSequencePlayer::audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
@@ -399,31 +412,34 @@ void NewSequencePlayer::audioDeviceIOCallbackWithContext (const float* const* in
                                                          int numOutputChannels,
                                                          int numSamples,
                                                          const juce::AudioIODeviceCallbackContext& context)    {
-  if (state.musicState != MusicState::Playing) {
-    juce::AudioSampleBuffer buffer(outputChannelData, numOutputChannels, numSamples);
-    buffer.clear();
-    return;
-  }
-  if (state.eventOffset >= state.events.size()) {
-    state.musicState = MusicState::Stopped;
-    songEndCallback();
-    return;
-  }
-
   // Prepare an audio buffer
   juce::AudioSampleBuffer buffer(outputChannelData, numOutputChannels, numSamples);
 
   // Clear the output
   buffer.clear();
+  midiBuffer.clear();
 
+  // If the seekMidiBuffer is non-empty, we'll exclusively process its messages in this
+  // callback iteration. After we clear the buffer, playback will commence next iteration.
   if (! seekMidiBuffer.isEmpty()) {
     pluginInstance->processBlock(buffer, seekMidiBuffer);
     seekMidiBuffer.clear();
     return;
   }
 
+  // If we're not playing, return without processing any samples
+  if (state.musicState != MusicState::Playing) {
+    return;
+  }
+
+  // If we've reached the end of the song, set state to stopped and execute song end callback
+  if (state.eventOffset >= state.events.size()) {
+    state.musicState = MusicState::Stopped;
+    songEndCallback();
+    return;
+  }
+
   // Populate MIDI buffer for this block
-  midiBuffer.clear();
   populateMidiBuffer(midiBuffer, numSamples);
 
   // Let the processor prepare for this block
