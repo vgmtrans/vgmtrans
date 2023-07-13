@@ -76,6 +76,10 @@ class VGMSeq: public VGMFile {
     initialTempoBPM = tempoBPM;
   }
 
+  void AlwaysWriteInitialMonoMode() {
+    bAlwaysWriteInitialMono = true;
+  }
+
   bool OnSaveAsMidi(void);
   virtual bool SaveAsMidi(const std::wstring &filepath);
 
