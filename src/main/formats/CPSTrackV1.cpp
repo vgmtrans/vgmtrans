@@ -19,7 +19,6 @@ void CPSTrackV1::ResetVars() {
   dur = 0xFF;        // verified in progear (required there as well)
   bPrevNoteTie = 0;
   prevTieNote = 0;
-  origTieNote = 0;
   curDeltaTable = 0;
   noteState = 0;
   bank = 0;
@@ -61,13 +60,12 @@ bool CPSTrackV1::ReadEvent(void) {
       // Tie note
       if ((noteState & 0x40) > 0) {
         if (!bPrevNoteTie) {
-          //AddPortamentoNoItem(true);
           AddNoteOn(beginOffset, curOffset - beginOffset, key, 127, L"Note On (tied / with portamento)");
-          origTieNote = key;
+          AddPortamentoNoItem(true);
         }
         else if (key != prevTieNote) {
-          AddNoteOffNoItem(0);
           AddNoteOn(beginOffset, curOffset - beginOffset, key, 127, L"Note On (tied)");
+          InsertNoteOffNoItem(prevTieNote, GetTime()+2);
         }
         else
           AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", L"", CLR_NOTEON);
@@ -76,19 +74,20 @@ bool CPSTrackV1::ReadEvent(void) {
       }
       else {
         if (bPrevNoteTie) {
+          AddPortamentoNoItem(false);
           if (key != prevTieNote) {
-            AddNoteOffNoItem(0);
-            //AddPortamentoNoItem(false);
+            AddNoteOffNoItem(prevTieNote);
             AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
           }
           else {
             AddTime(absDur);
             delta -= absDur;
-            AddNoteOff(beginOffset, curOffset - beginOffset, 0, L"Note Off (tied)");
+            AddNoteOff(beginOffset, curOffset - beginOffset, prevTieNote, L"Note Off (tied)");
           }
         }
-        else
+        else {
           AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+        }
         bPrevNoteTie = false;
       }
     }
@@ -232,10 +231,11 @@ bool CPSTrackV1::ReadEvent(void) {
       }
       break;
       case 0x0D : {
-        // Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every (250/4) seconds until we hit target key.
+        // Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every 1/(250/4) seconds until we hit target key.
         uint8_t portamentoRate = GetByte(curOffset++);
-        AddPortamento(beginOffset, curOffset - beginOffset, portamentoRate > 0);
-        //        AddPortamentoTimeNoItem(portamentoRate);
+        auto centsPerSecond = static_cast<uint16_t>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
+        centsPerSecond = std::min(centsPerSecond, static_cast<uint16_t>(0x3FFF));
+        AddPortamentoTime14Bit(beginOffset, curOffset - beginOffset, centsPerSecond);
         break;
       }
 
