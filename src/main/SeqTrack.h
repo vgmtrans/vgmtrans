@@ -120,6 +120,10 @@ class SeqTrack:
   void AddPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, const std::wstring &sEventName = L"Portamento Time");
   void AddPortamentoTimeNoItem(uint8_t time);
   void InsertPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, uint32_t absTime, const std::wstring &sEventName = L"Portamento Time");
+  void InsertPortamentoTimeNoItem(uint8_t time, uint32_t absTime);
+  void AddPortamentoTime14Bit(uint32_t offset, uint32_t length, uint16_t time, const std::wstring &sEventName = L"Portamento Time");
+  void AddPortamentoTime14BitNoItem(uint16_t time);
+  void AddPortamentoControlNoItem(uint8_t key);
   void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const std::wstring &sEventName = L"Program Change");
   void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const std::wstring &sEventName = L"Program Change");
   void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const std::wstring &sEventName = L"Program Change");

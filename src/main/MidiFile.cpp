@@ -349,6 +349,18 @@ void MidiTrack::InsertPortamentoTime(uint8_t channel, uint8_t time, uint32_t abs
   aEvents.push_back(new PortamentoTimeEvent(this, channel, absTime, time));
 }
 
+void MidiTrack::AddPortamentoTimeFine(uint8_t channel, uint8_t time) {
+  aEvents.push_back(new PortamentoTimeFineEvent(this, channel, GetDelta(), time));
+}
+
+void MidiTrack::InsertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime) {
+  aEvents.push_back(new PortamentoTimeFineEvent(this, channel, absTime, time));
+}
+
+void MidiTrack::AddPortamentoControl(uint8_t channel, uint8_t key) {
+  aEvents.push_back(new PortamentoControlEvent(this, channel, GetDelta(), key));
+}
+
 void MidiTrack::AddMono(uint8_t channel) {
   aEvents.push_back(new MonoEvent(this, channel, GetDelta()));
 }
@@ -402,10 +414,11 @@ void MidiTrack::AddPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t ce
 }
 
 void MidiTrack::InsertPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t cents, uint32_t absTime) {
+  // We push the LSB controller event first as somee virtual instruments only react upon receiving MSB
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 0, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, semitones, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, cents, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, semitones, PRIORITY_HIGHER - 1));
 }
 
 void MidiTrack::AddFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb) {
@@ -413,10 +426,11 @@ void MidiTrack::AddFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb) {
 }
 
 void MidiTrack::InsertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime) {
+  // We push the LSB controller event first as somee virtual instruments only react upon receiving MSB
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 1, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
 }
 
 void MidiTrack::AddFineTuning(uint8_t channel, double cents) {
@@ -436,8 +450,8 @@ void MidiTrack::AddCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb) {
 void MidiTrack::InsertCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 2, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
 }
 
 void MidiTrack::AddCoarseTuning(uint8_t channel, double semitones) {
@@ -457,8 +471,8 @@ void MidiTrack::AddModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t ls
 void MidiTrack::InsertModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 5, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
 }
 
 void MidiTrack::AddModulationDepthRange(uint8_t channel, double semitones) {
@@ -473,6 +487,7 @@ void MidiTrack::InsertModulationDepthRange(uint8_t channel, double semitones, ui
 
 void MidiTrack::AddProgramChange(uint8_t channel, uint8_t progNum) {
   aEvents.push_back(new ProgChangeEvent(this, channel, GetDelta(), progNum));
+//  aEvents.push_back(new ControllerEvent(this, channel, GetDelta(), 115, progNum));
 }
 
 void MidiTrack::AddBankSelect(uint8_t channel, uint8_t bank) {
@@ -598,6 +613,21 @@ MidiEvent::MidiEvent(MidiTrack *thePrntTrk, uint32_t absoluteTime, uint8_t theCh
 MidiEvent::~MidiEvent(void) {
 }
 
+bool MidiEvent::IsMetaEvent() {
+  MidiEventType type = GetEventType();
+  return type == MIDIEVENT_TEMPO ||
+         type == MIDIEVENT_TEXT ||
+         type == MIDIEVENT_MIDIPORT ||
+         type == MIDIEVENT_TIMESIG ||
+         type == MIDIEVENT_ENDOFTRACK;
+}
+
+bool MidiEvent::IsSysexEvent() {
+  MidiEventType type = GetEventType();
+  return type == MIDIEVENT_MASTERVOL ||
+         type == MIDIEVENT_RESET;
+}
+
 void MidiEvent::WriteVarLength(vector<uint8_t> &buf, uint32_t value) {
   unsigned long buffer;
   buffer = value & 0x7F;
@@ -698,11 +728,6 @@ NoteEvent::NoteEvent(MidiTrack *prntTrk,
       vel(theVel) {
 }
 
-//NoteEvent* NoteEvent::MakeCopy()
-//{
-//	return new NoteEvent(prntTrk, channel, AbsTime, bNoteDown, key, vel);
-//}
-
 uint32_t NoteEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
   WriteVarLength(buf, AbsTime - time);
   if (bNoteDown)
@@ -710,13 +735,8 @@ uint32_t NoteEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
   else
     buf.push_back(0x80 + channel);
 
-  if (prntTrk->bMonophonic && !bNoteDown)
-    buf.push_back(prntTrk->prevKey);
-  else {
-    prntTrk->prevKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
-    buf.push_back(prntTrk->prevKey);
-  }
-  //buf.push_back(key);
+  prntTrk->prevKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
+  buf.push_back(prntTrk->prevKey);
 
   buf.push_back(vel);
 
