@@ -74,7 +74,7 @@ public:
   void setSongEndCallback(std::function<void()> callback);
 
 private:
-
+  void enqueueResetEvent();
   bool loadVST();
   void clearState();
   bool prepMidiPlayback(VGMSeq* seq);
