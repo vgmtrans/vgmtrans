@@ -181,7 +181,7 @@ void NewSequencePlayer::setSongEndCallback(std::function<void()> callback) {
 }
 
 void NewSequencePlayer::enqueueResetEvent() {
-  juce::MidiMessage resetEvent(0xF0, 0xBF, 0xFF, 0xF7);
+  juce::MidiMessage resetEvent(0xF0, 0x7D, 0x7F, 0xF7);
   seekMidiBuffer.addEvent(resetEvent, 0);
 }
 
@@ -352,8 +352,8 @@ juce::MidiMessage NewSequencePlayer::convertToChannelGroupMessage(MidiEvent* eve
   event->WriteEvent(eventData, event->AbsTime);
   // Remove the delta time byte (which should be 0x00)
   eventData.erase(eventData.begin());
-  // Wrap the original event around a Sysex Event with arbitrary type 0xBF. First data byte is channel group
-  uint8_t sysexBegin[] = { 0xF0, 0xBF, static_cast<uint8_t>(event->prntTrk->channelGroup)};//, 0xF7};
+  // Wrap the original event around a Sysex Event with arbitrary type 0x7D. First data byte is channel group
+  uint8_t sysexBegin[] = { 0xF0, 0x7D, static_cast<uint8_t>(event->prntTrk->channelGroup)};//, 0xF7};
   // Next add the original event
   eventData.insert(eventData.begin(), sysexBegin, sysexBegin + sizeof(sysexBegin));
   // Add the Sysex end marker byte
