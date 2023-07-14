@@ -20,6 +20,12 @@ enum class PanVolumeCorrectionMode : uint8_t {
   kAdjustExpressionController
 };
 
+enum class PortamentoTimeMode : uint8_t {
+  kDurationInMs = 0,
+  kCentsPerSecond,
+  kUndefined
+};
+
 class VGMSeq: public VGMFile {
  public:
   BEGIN_MENU_SUB(VGMSeq, VGMFile)
@@ -80,6 +86,10 @@ class VGMSeq: public VGMFile {
     bAlwaysWriteInitialMono = true;
   }
 
+  void AlwaysWritePortamentoTimeMode(PortamentoTimeMode mode) {
+    portamentoTimeMode = mode;
+  }
+
   bool OnSaveAsMidi(void);
   virtual bool SaveAsMidi(const std::wstring &filepath);
 
@@ -115,6 +125,7 @@ class VGMSeq: public VGMFile {
   bool bAlwaysWriteInitialPitchBendRange;
   bool bAlwaysWriteInitialMono;
   bool bAllowDiscontinuousTrackData;
+  PortamentoTimeMode portamentoTimeMode;
 
   // True if each tracks in a sequence needs to be loaded simultaneously in tick by tick, as the real music player does.
   // Pros:

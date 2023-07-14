@@ -166,6 +166,8 @@ void SeqTrack::AddInitialMidiEvents(int trackNum) {
     pMidiTrack->AddGM2Reset();
     if (parentSeq->bAlwaysWriteInitialTempo)
       pMidiTrack->AddTempoBPM(parentSeq->initialTempoBPM);
+    if (parentSeq->portamentoTimeMode != PortamentoTimeMode::kUndefined)
+      AddPortamentoTimeModeNoItem(parentSeq->portamentoTimeMode);
   }
   if (parentSeq->bAlwaysWriteInitialVol)
     AddVolNoItem(parentSeq->initialVol);
@@ -1152,6 +1154,11 @@ void SeqTrack::InsertPortamentoTime(uint32_t offset,
 void SeqTrack::InsertPortamentoTimeNoItem(uint8_t time, uint32_t absTime) {
   if (readMode == READMODE_CONVERT_TO_MIDI)
     pMidiTrack->InsertPortamentoTime(channel, time, absTime);
+}
+
+void SeqTrack::AddPortamentoTimeModeNoItem(PortamentoTimeMode mode) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->AddPortamentoTimeMode(mode);
 }
 
 void SeqTrack::AddPortamentoControlNoItem(uint8_t key) {

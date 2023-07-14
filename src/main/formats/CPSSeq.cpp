@@ -19,6 +19,7 @@ CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, wstring 
   HasMonophonicTracks();
   AlwaysWriteInitialVol(127);
   AlwaysWriteInitialMonoMode();
+  AlwaysWritePortamentoTimeMode(PortamentoTimeMode::kCentsPerSecond);
 }
 
 CPSSeq::~CPSSeq(void) {

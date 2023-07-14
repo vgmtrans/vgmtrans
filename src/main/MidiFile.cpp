@@ -306,14 +306,15 @@ void MidiTrack::InsertVol(uint8_t channel, uint8_t vol, uint32_t absTime) {
   aEvents.push_back(new VolumeEvent(this, channel, absTime, vol));
 }
 
-//mast volume has a full byte of resolution
+//TODO: Master Volume sysex events are meant to be global to device, not per channel.
+// For per channel master volume, we should add a system for normalizing controller vol events.
 void MidiTrack::AddMasterVol(uint8_t channel, uint8_t mastVol) {
-  MidiEvent *newEvent = new MastVolEvent(this, channel, GetDelta(), mastVol);
+  MidiEvent *newEvent = new MasterVolEvent(this, channel, GetDelta(), mastVol);
   aEvents.push_back(newEvent);
 }
 
 void MidiTrack::InsertMasterVol(uint8_t channel, uint8_t mastVol, uint32_t absTime) {
-  MidiEvent *newEvent = new MastVolEvent(this, channel, absTime, mastVol);
+  MidiEvent *newEvent = new MasterVolEvent(this, channel, absTime, mastVol);
   aEvents.push_back(newEvent);
 }
 
@@ -355,6 +356,10 @@ void MidiTrack::AddPortamentoTimeFine(uint8_t channel, uint8_t time) {
 
 void MidiTrack::InsertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime) {
   aEvents.push_back(new PortamentoTimeFineEvent(this, channel, absTime, time));
+}
+
+void MidiTrack::AddPortamentoTimeMode(PortamentoTimeMode mode) {
+  aEvents.push_back(new PortamentoTimeModeEvent(this, GetDelta(), mode));
 }
 
 void MidiTrack::AddPortamentoControl(uint8_t channel, uint8_t key) {
@@ -577,6 +582,38 @@ void MidiTrack::InsertTrackName(const std::wstring &wstr, uint32_t absTime) {
   aEvents.push_back(new TrackNameEvent(this, absTime, wstr));
 }
 
+void MidiTrack::AddGMReset() {
+  aEvents.push_back(new GMResetEvent(this, GetDelta()));
+}
+
+void MidiTrack::InsertGMReset(uint32_t absTime) {
+  aEvents.push_back(new GMResetEvent(this, absTime));
+}
+
+void MidiTrack::AddGM2Reset() {
+  aEvents.push_back(new GM2ResetEvent(this, GetDelta()));
+}
+
+void MidiTrack::InsertGM2Reset(uint32_t absTime) {
+  aEvents.push_back(new GM2ResetEvent(this, absTime));
+}
+
+void MidiTrack::AddGSReset() {
+  aEvents.push_back(new GSResetEvent(this, GetDelta()));
+}
+
+void MidiTrack::InsertGSReset(uint32_t absTime) {
+  aEvents.push_back(new GSResetEvent(this, absTime));
+}
+
+void MidiTrack::AddXGReset() {
+  aEvents.push_back(new XGResetEvent(this, GetDelta()));
+}
+
+void MidiTrack::InsertXGReset(uint32_t absTime) {
+  aEvents.push_back(new XGResetEvent(this, absTime));
+}
+
 // SPECIAL NON-MIDI EVENTS
 
 // Transpose events offset the key when we write the Midi file.
@@ -625,7 +662,8 @@ bool MidiEvent::IsMetaEvent() {
 bool MidiEvent::IsSysexEvent() {
   MidiEventType type = GetEventType();
   return type == MIDIEVENT_MASTERVOL ||
-         type == MIDIEVENT_RESET;
+         type == MIDIEVENT_RESET ||
+         type == MIDIEVENT_PORTAMENTOTIMEMODE;
 }
 
 void MidiEvent::WriteVarLength(vector<uint8_t> &buf, uint32_t value) {
@@ -644,16 +682,6 @@ void MidiEvent::WriteVarLength(vector<uint8_t> &buf, uint32_t value) {
     else
       break;
   }
-}
-
-uint32_t MidiEvent::WriteSysexEvent(vector<uint8_t> &buf, uint32_t time, uint8_t *data, size_t dataSize) {
-  WriteVarLength(buf, AbsTime - time);
-  buf.push_back(0xF0);
-  WriteVarLength(buf, (uint32_t) dataSize);
-  for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++) {
-    buf.push_back(data[dataIndex]);
-  }
-  return AbsTime;
 }
 
 uint32_t MidiEvent::WriteMetaEvent(vector<uint8_t> &buf,
@@ -783,20 +811,6 @@ VolEvent* VolEvent::MakeCopy()
 	return new VolEvent(prntTrk, channel, AbsTime, vol, priority);
 }*/
 
-
-//  ************
-//  MastVolEvent
-//  ************
-
-MastVolEvent::MastVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theMastVol)
-    : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_HIGHER), mastVol(theMastVol) {
-}
-
-uint32_t MastVolEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
-  uint8_t data[7] = {0x7F, 0x7F, 0x04, 0x01, /*LSB*/0, (uint8_t) (mastVol & 0x7F), 0xF7};
-  return WriteSysexEvent(buf, time, data, 7);
-}
-
 //  ***************
 //  ControllerEvent
 //  ***************
@@ -815,6 +829,25 @@ uint32_t ControllerEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
   buf.push_back(0xB0 + channel);
   buf.push_back(controlNum & 0x7F);
   buf.push_back(dataByte);
+  return AbsTime;
+}
+
+//  **********
+//  SysexEvent
+//  **********
+
+SysexEvent::SysexEvent(MidiTrack *prntTrk,
+                       uint32_t absoluteTime,
+                       vector<uint8_t> sysexData,
+                       int8_t thePriority)
+    : MidiEvent(prntTrk, absoluteTime, 0, thePriority), sysexData(sysexData) {
+}
+
+uint32_t SysexEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
+  WriteVarLength(buf, AbsTime - time);
+  buf.push_back(0xF0);
+  buf.insert(buf.end(), sysexData.begin(), sysexData.end());
+  buf.push_back(0xF7);
   return AbsTime;
 }
 
@@ -955,90 +988,6 @@ TrackNameEvent::TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const 
 
 uint32_t TrackNameEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
   return WriteMetaTextEvent(buf, time, 0x03, text);
-}
-
-//  ************
-//  GMResetEvent
-//  ************
-
-GMResetEvent::GMResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {
-}
-
-uint32_t GMResetEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
-  uint8_t data[5] = {0x7E, 0x7F, 0x09, 0x01, 0xF7};
-  return WriteSysexEvent(buf, time, data, 5);
-}
-
-void MidiTrack::AddGMReset() {
-  aEvents.push_back(new GMResetEvent(this, GetDelta()));
-}
-
-void MidiTrack::InsertGMReset(uint32_t absTime) {
-  aEvents.push_back(new GMResetEvent(this, absTime));
-}
-
-//  *************
-//  GM2ResetEvent
-//  *************
-
-GM2ResetEvent::GM2ResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {
-}
-
-uint32_t GM2ResetEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
-  uint8_t data[5] = {0x7E, 0x7F, 0x09, 0x03, 0xF7};
-  return WriteSysexEvent(buf, time, data, 5);
-}
-
-void MidiTrack::AddGM2Reset() {
-  aEvents.push_back(new GM2ResetEvent(this, GetDelta()));
-}
-
-void MidiTrack::InsertGM2Reset(uint32_t absTime) {
-  aEvents.push_back(new GM2ResetEvent(this, absTime));
-}
-
-//  ************
-//  GSResetEvent
-//  ************
-
-GSResetEvent::GSResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {
-}
-
-uint32_t GSResetEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
-  uint8_t data[10] = {0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, 0xF7};
-  return WriteSysexEvent(buf, time, data, 10);
-}
-
-void MidiTrack::AddGSReset() {
-  aEvents.push_back(new GSResetEvent(this, GetDelta()));
-}
-
-void MidiTrack::InsertGSReset(uint32_t absTime) {
-  aEvents.push_back(new GSResetEvent(this, absTime));
-}
-
-//  ************
-//  XGResetEvent
-//  ************
-
-XGResetEvent::XGResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {
-}
-
-uint32_t XGResetEvent::WriteEvent(vector<uint8_t> &buf, uint32_t time) {
-  uint8_t data[8] = {0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00, 0xF7};
-  return WriteSysexEvent(buf, time, data, 8);
-}
-
-void MidiTrack::AddXGReset() {
-  aEvents.push_back(new XGResetEvent(this, GetDelta()));
-}
-
-void MidiTrack::InsertXGReset(uint32_t absTime) {
-  aEvents.push_back(new XGResetEvent(this, absTime));
 }
 
 //***************
