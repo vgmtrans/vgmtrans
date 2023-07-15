@@ -65,7 +65,7 @@ bool CPSTrackV1::ReadEvent(void) {
         }
         else if (key != prevTieNote) {
           AddNoteOn(beginOffset, curOffset - beginOffset, key, 127, L"Note On (tied)");
-          InsertNoteOffNoItem(prevTieNote, GetTime()+2);
+          InsertNoteOffNoItem(prevTieNote, GetTime());
         }
         else
           AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", L"", CLR_NOTEON);
@@ -75,7 +75,7 @@ bool CPSTrackV1::ReadEvent(void) {
       else {
         if (bPrevNoteTie) {
           if (key != prevTieNote) {
-            InsertNoteOffNoItem(prevTieNote, GetTime()+2);
+            InsertNoteOffNoItem(prevTieNote, GetTime());
             AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
           }
           else {
