@@ -19,7 +19,9 @@ CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, wstring 
   HasMonophonicTracks();
   AlwaysWriteInitialVol(127);
   AlwaysWriteInitialMonoMode();
-  AlwaysWritePortamentoTimeMode(PortamentoTimeMode::kCentsPerSecond);
+  // While we still use the BASS audio library, we won't call the PortamentoTimeMode Sysex event
+  // because BASS insists the first sysex data byte be the length of the data, which is non-standard
+//  AlwaysWritePortamentoTimeMode(PortamentoTimeMode::kCentsPerSecond);
 }
 
 CPSSeq::~CPSSeq(void) {
