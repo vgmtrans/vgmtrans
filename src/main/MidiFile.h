@@ -11,6 +11,7 @@ class MidiTrack;
 class MidiEvent;
 class DurNoteEvent;
 class NoteEvent;
+enum class PortamentoTimeMode: uint8_t;
 
 #define PRIORITY_LOWEST 127
 #define PRIORITY_LOWER 96
@@ -46,6 +47,7 @@ typedef enum {
   MIDIEVENT_PORTAMENTO,
   MIDIEVENT_PORTAMENTOTIME,
   MIDIEVENT_PORTAMENTOTIMEFINE,
+  MIDIEVENT_PORTAMENTOTIMEMODE,
   MIDIEVENT_PORTAMENTOCONTROL,
   MIDIEVENT_MONO,
   MIDIEVENT_LFO,
@@ -113,6 +115,7 @@ class MidiTrack {
   void InsertPortamentoTime(uint8_t channel, uint8_t time, uint32_t absTime);
   void AddPortamentoTimeFine(uint8_t channel, uint8_t time);
   void InsertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime);
+  void AddPortamentoTimeMode(PortamentoTimeMode mode);
   void AddPortamentoControl(uint8_t channel, uint8_t key);
   void AddMono(uint8_t channel);
   void InsertMono(uint8_t channel, uint32_t absTime);
@@ -231,7 +234,6 @@ class MidiEvent {
   void WriteVarLength(std::vector<uint8_t> &buf, uint32_t value);
   //virtual void PrepareWrite(void/*vector<MidiEvent*> & aEvents*/);
   virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) = 0;
-  uint32_t WriteSysexEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t *data, size_t dataSize);
   uint32_t WriteMetaEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType, uint8_t *data, size_t dataSize);
   uint32_t WriteMetaTextEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType, std::wstring wstr);
 
@@ -304,6 +306,19 @@ class ControllerEvent
   uint8_t dataByte;
 };
 
+class SysexEvent
+    : public MidiEvent {
+public:
+  SysexEvent(MidiTrack *prntTrk,
+             uint32_t absoluteTime,
+             vector<uint8_t> sysexData,
+             int8_t thePriority = PRIORITY_MIDDLE);
+  virtual MidiEventType GetEventType() { return MIDIEVENT_UNDEFINED; }
+  virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
+
+  vector<uint8_t> sysexData;
+};
+
 class VolumeEvent
     : public ControllerEvent {
  public:
@@ -350,6 +365,14 @@ public:
   PortamentoTimeFineEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t time)
       : ControllerEvent(prntTrk, channel, absoluteTime, 37, time, PRIORITY_MIDDLE) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_PORTAMENTOTIMEFINE; }
+};
+
+class PortamentoTimeModeEvent
+    : public SysexEvent {
+public:
+  PortamentoTimeModeEvent(MidiTrack *prntTrk, uint32_t absoluteTime, PortamentoTimeMode mode)
+      : SysexEvent(prntTrk, absoluteTime, {0x7D, 0x7E, static_cast<uint8_t>(mode) }, PRIORITY_MIDDLE) { }
+  virtual MidiEventType GetEventType() { return MIDIEVENT_PORTAMENTOTIMEMODE; }
 };
 
 class PortamentoControlEvent
@@ -423,16 +446,14 @@ public:
 	uint8_t vol;
 };*/
 
-class MastVolEvent
-    : public MidiEvent {
- public:
-  MastVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t mastVol);
+class MasterVolEvent
+    : public SysexEvent {
+public:
+  MasterVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t msb)
+      : SysexEvent(prntTrk, absoluteTime, {0x7F, 0x7F, 0x04, 0x01, 0, static_cast<uint8_t>(msb) }, PRIORITY_HIGHER) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_MASTERVOL; }
-  //virtual MastVolEvent* MakeCopy();
-  virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
-
-  uint8_t mastVol;
 };
+
 /*
 class ExpressionEvent
 	: public MidiEvent
@@ -581,35 +602,37 @@ class MarkerEvent
 };
 
 class GMResetEvent
-    : public MidiEvent {
+    : public SysexEvent {
  public:
-  GMResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime);
+  GMResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
+       : SysexEvent(prntTrk, absoluteTime, { 0x05, 0x7E, 0x7F, 0x09, 0x01 }, PRIORITY_HIGHEST) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
-  virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 };
 
 class GM2ResetEvent
-    : public MidiEvent {
+    : public SysexEvent {
  public:
-  GM2ResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime);
+  GM2ResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
+       : SysexEvent(prntTrk, absoluteTime, { 0x05, 0x7E, 0x7F, 0x09, 0x03 }, PRIORITY_HIGHEST) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
-  virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 };
 
 class GSResetEvent
-    : public MidiEvent {
+    : public SysexEvent {
  public:
-  GSResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime);
+  GSResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
+       : SysexEvent(prntTrk, absoluteTime, { 0x0A, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41 },
+                    PRIORITY_HIGHEST) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
-  virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 };
 
 class XGResetEvent
-    : public MidiEvent {
+    : public SysexEvent {
  public:
-  XGResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime);
+  XGResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
+       : SysexEvent(prntTrk, absoluteTime,  { 0x08, 0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00 },
+                    PRIORITY_HIGHEST) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_RESET; }
-  virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 };
 
 
