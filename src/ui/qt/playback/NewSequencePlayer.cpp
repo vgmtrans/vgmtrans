@@ -22,6 +22,7 @@ void NewSequencePlayer::initialize() {
 }
 
 void NewSequencePlayer::shutdown() {
+  client->disconnect();
   deviceManager.removeAudioCallback(this);
   deviceManager.closeAudioDevice();
   pluginPlayer.setProcessor(nullptr);
@@ -234,7 +235,7 @@ bool NewSequencePlayer::loadVST() {
 }
 
 bool NewSequencePlayer::sendSF2ToVST(VGMColl* coll) {
-  auto client = new InstrClient();
+  client = make_unique<InstrClient>();
 
   juce::String hostname("127.0.0.1");
 
