@@ -450,7 +450,7 @@ class MasterVolEvent
     : public SysexEvent {
 public:
   MasterVolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t msb)
-      : SysexEvent(prntTrk, absoluteTime, {0x7F, 0x7F, 0x04, 0x01, 0, static_cast<uint8_t>(msb) }, PRIORITY_HIGHER) { }
+      : SysexEvent(prntTrk, absoluteTime, {0x07, 0x7F, 0x7F, 0x04, 0x01, 0, static_cast<uint8_t>(msb) }, PRIORITY_HIGHER) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_MASTERVOL; }
 };
 
