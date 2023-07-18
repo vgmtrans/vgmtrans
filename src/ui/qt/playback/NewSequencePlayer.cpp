@@ -309,7 +309,7 @@ bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   // so that we can delete it later
   if (state.events.empty()) {
     delete midiFile;
-    return true;
+    return false;
   } else {
     state.midiFile = midiFile;
   }
@@ -320,6 +320,7 @@ bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
 
   // Calculate sample offset times for all midi events
   state.eventSampleOffsets = generateEventSampleTimes(state.events, midiFile->GetPPQN());
+  return true;
 }
 
 std::vector<int> NewSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>& events, int ppqn) const {
