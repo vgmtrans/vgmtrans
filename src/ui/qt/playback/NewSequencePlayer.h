@@ -75,6 +75,7 @@ public:
   void setSongEndCallback(std::function<void()> callback);
 
 private:
+  void callAsyncIfNotInMessageThread(std::function<void()> fn);
   void enqueueResetEvent();
   bool loadVST();
   void clearState();

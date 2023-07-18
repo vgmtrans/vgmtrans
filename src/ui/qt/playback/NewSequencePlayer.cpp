@@ -52,13 +52,23 @@ bool NewSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> cons
   return true;
 }
 
+void NewSequencePlayer::callAsyncIfNotInMessageThread(std::function<void()> fn) {
+  auto mm = juce::MessageManager::getInstance();
+  auto inMessageThread = mm->isThisTheMessageThread();
+  if (! inMessageThread) {
+    juce::MessageManager::callAsync(fn);
+  } else {
+    fn();
+  }
+}
+
 // We wrap deviceManager calls in MessageManager::callAsync below because JUCE will complain if
 // deviceManager calls execute outside the "Messaging Thread", and MessageManager::callAsync ensures
 // that the block is run on the Messaging Thread. These methods may be invoked in the callback after
 // an SF2 is loaded, which runs on a separate, thread, hence the need.
 void NewSequencePlayer::stop() {
   state.musicState = MusicState::Stopped;
-  juce::MessageManager::callAsync([this](){
+  callAsyncIfNotInMessageThread([this](){
     deviceManager.removeAudioCallback(this);
   });
   state.eventOffset = 0;
@@ -67,13 +77,13 @@ void NewSequencePlayer::stop() {
 
 void NewSequencePlayer::pause() {
   state.musicState = MusicState::Paused;
-  juce::MessageManager::callAsync([this](){
+  callAsyncIfNotInMessageThread([this](){
     deviceManager.removeAudioCallback(this);
   });
 }
 
 void NewSequencePlayer::play() {
-  juce::MessageManager::callAsync([this](){
+  callAsyncIfNotInMessageThread([this](){
     deviceManager.removeAudioCallback(this);
     deviceManager.addAudioCallback(this);
   });
