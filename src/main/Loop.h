@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 enum LoopMeasure {
   LM_SAMPLES,
   LM_BYTES
