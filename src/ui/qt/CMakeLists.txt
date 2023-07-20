@@ -2,8 +2,8 @@
 # Dependencies
 # ~~~
 
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/bass"
-                 "${CMAKE_CURRENT_BINARY_DIR}/bass" EXCLUDE_FROM_ALL)
+add_subdirectory("${PROJECT_SOURCE_DIR}/external/JUCE"
+        "${CMAKE_CURRENT_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Homebrew installs Qt (up to at least 5.9.1) in /usr/local/qt*, ensure it can
@@ -139,7 +139,6 @@ target_link_libraries(
   PRIVATE vgmtranscore
           Qt::Widgets
           Qt::Svg
-          BASS::MIDI
           juce::juce_audio_utils
           juce::juce_audio_processors)
 
@@ -172,17 +171,18 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
                               PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 
-  get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
-  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI IMPORTED_LOCATION)
-
   add_custom_command(
     TARGET vgmtrans
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
           "$<TARGET_FILE_DIR:vgmtrans>/../Resources"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"  "$<TARGET_FILE_DIR:vgmtrans>/"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"  "$<TARGET_FILE_DIR:vgmtrans>/"
   )
+
+  add_custom_command(TARGET vgmtrans
+          POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/bin/vst"
+          "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   # Make sure the executable ends up in the binary directory without any
   # additional folders
@@ -224,19 +224,6 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_LIST_DIR}/qt.conf"
       "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 
-  get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"
-            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-
-  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI IMPORTED_LOCATION)
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
-            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
   install(TARGETS vgmtrans DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
   install(
