@@ -63,9 +63,8 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
   updateDragOverlayAppearance();
   updateDragOverlayGeometry();
 
-  auto infostring = QString("Running %1 (%4, %5), BASS %2, Qt %3")
+  auto infostring = QString("Running %1 (%3, %4), Qt %2")
                         .arg(VGMTRANS_VERSION,
-                             QString::number(BASS_GetVersion(), 16),
                              qVersion(),
                              VGMTRANS_REVISION,
                              VGMTRANS_BRANCH)
