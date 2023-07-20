@@ -9,8 +9,6 @@
 #include <cstddef>
 
 #include "Root.h"
-#include "bass.h"
-#include "bassmidi.h"
 #include "VGMColl.h"
 #include "SF2File.h"
 #include "VGMSeq.h"
