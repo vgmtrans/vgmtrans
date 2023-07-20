@@ -5,6 +5,10 @@ find_package(Qt6 COMPONENTS GuiPrivate QUIET)
 message(STATUS "Using Qt: ${Qt6_VERSION}")
 message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 
+<<<<<<< HEAD
+add_subdirectory("${PROJECT_SOURCE_DIR}/external/JUCE"
+        "${CMAKE_CURRENT_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
+
 if(NOT TARGET QWindowKit::Widgets)
   set(QWINDOWKIT_BUILD_STATIC ON CACHE BOOL "" FORCE)
   set(QWINDOWKIT_BUILD_WIDGETS ON CACHE BOOL "" FORCE)
@@ -191,7 +195,6 @@ target_link_libraries(
           Qt6::Widgets
           Qt6::GuiPrivate
           Qt6::Svg
-          BASS::MIDI
           juce::juce_audio_utils
           juce::juce_audio_processors)
 
@@ -318,11 +321,11 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
       INSTALL_RPATH_USE_LINK_PATH TRUE
   )
 
-  install(FILES
-          $<TARGET_FILE:BASS::BASS>
-          $<TARGET_FILE:BASS::MIDI>
-          DESTINATION "VGMTrans.app/Contents/Frameworks"
-  )
+  add_custom_command(TARGET vgmtrans
+          POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/bin/vst"
+          "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   target_sources(vgmtrans
                  PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
@@ -332,18 +335,13 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   install(FILES $<TARGET_RUNTIME_DLLS:vgmtrans>
           DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
-	set(DEPLOY_EXTRA_OPTIONS
+  set(DEPLOY_EXTRA_OPTIONS
       --no-system-d3d-compiler
       --no-opengl-sw
       --skip-plugin-types tls
   )
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
   set(APP_ID "io.github.vgmtrans.vgmtrans")
-
-  install(FILES
-          $<TARGET_FILE:BASS::BASS>
-          $<TARGET_FILE:BASS::MIDI>
-	        DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
   set_target_properties(vgmtrans PROPERTIES
     INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"

@@ -196,6 +196,19 @@ void NewSequencePlayer::enqueueResetEvent() {
   seekMidiBuffer.addEvent(resetEvent, 0);
 }
 
+juce::FileSearchPath NewSequencePlayer::getVSTSearchPath() {
+  #if defined(Q_OS_MAC)
+    juce::File appBundle = juce::File::getSpecialLocation(juce::File::currentApplicationFile);
+    juce::File resourcesDir = appBundle.getChildFile("Contents/Resources");
+    juce::File vstDirFile = resourcesDir.getChildFile("vst");
+  #elif defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+    juce::File vstDirFile = juce::File::getCurrentWorkingDirectory().getChildFile("vst");
+  #endif
+
+  juce::FileSearchPath vstDir(vstDirFile.getFullPathName());
+  return vstDir;
+}
+
 bool NewSequencePlayer::loadVST() {
   juce::String error;
 
@@ -205,10 +218,8 @@ bool NewSequencePlayer::loadVST() {
   // Create a known plugin list
   juce::KnownPluginList pluginList;
 
-  juce::File vstDirFile = juce::File::getCurrentWorkingDirectory().getChildFile("vst");
-  juce::FileSearchPath vstDir(vstDirFile.getFullPathName());
   // Non-recursive scan doesn't seem to find the vst file on Windows.
-  juce::PluginDirectoryScanner scanner (pluginList, *pluginFormatManager.getFormat(0), vstDir, true, juce::File());
+  juce::PluginDirectoryScanner scanner (pluginList, *pluginFormatManager.getFormat(0), getVSTSearchPath(), true, juce::File());
 
   // Scan for new plugins
   juce::String pluginName;

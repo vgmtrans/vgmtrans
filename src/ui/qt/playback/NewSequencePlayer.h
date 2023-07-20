@@ -75,6 +75,7 @@ public:
   void setSongEndCallback(std::function<void()> callback);
 
 private:
+  juce::FileSearchPath getVSTSearchPath();
   void callAsyncIfNotInMessageThread(std::function<void()> fn);
   void enqueueResetEvent();
   bool loadVST();
