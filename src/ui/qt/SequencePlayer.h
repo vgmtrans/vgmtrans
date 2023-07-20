@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include <bass.h>
-#include <bassmidi.h>
 #include <QObject>
 #include <QTimer>
 #include "playback/NewSequencePlayer.h"
