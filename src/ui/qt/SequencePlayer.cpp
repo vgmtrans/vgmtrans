@@ -17,6 +17,8 @@
 /* How often (in ms) the current ticks are polled */
 static constexpr auto TICK_POLL_INTERVAL_MS = 10;
 
+JUCE_IMPLEMENT_SINGLETON (SequencePlayer)
+
 SequencePlayer::SequencePlayer() {
   player.initialize();
 
@@ -30,8 +32,7 @@ SequencePlayer::SequencePlayer() {
 }
 
 SequencePlayer::~SequencePlayer() {
-  stop();
-  player.shutdown();
+  clearSingletonInstance();
 }
 
 void SequencePlayer::toggle() {

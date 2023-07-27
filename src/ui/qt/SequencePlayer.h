@@ -15,10 +15,9 @@ class VGMColl;
 class SequencePlayer : public QObject {
   Q_OBJECT
 public:
-  static auto &the() {
-    static SequencePlayer instance;
-    return instance;
-  }
+  // Use the JUCE Singleton helpers as JUCE leak detection runs before static deconstructors and would therefore find
+  // false positive memory leaks otherwise
+  JUCE_DECLARE_SINGLETON(SequencePlayer, false )
 
   SequencePlayer(const SequencePlayer &) = delete;
   SequencePlayer &operator=(const SequencePlayer &) = delete;
@@ -83,8 +82,6 @@ private:
   NewSequencePlayer player;
 
   VGMColl *m_active_vgmcoll{};
-//  HSTREAM m_active_stream{};
-//  HSOUNDFONT m_loaded_sf{};
 
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};
