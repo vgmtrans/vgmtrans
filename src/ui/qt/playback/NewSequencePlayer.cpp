@@ -14,19 +14,17 @@ using namespace std;
 NewSequencePlayer::NewSequencePlayer() = default;
 
 NewSequencePlayer::~NewSequencePlayer() {
-  delete state.midiFile;
-}
-
-void NewSequencePlayer::initialize() {
-  juce::String error = deviceManager.initialiseWithDefaultDevices(0, 2);
-}
-
-void NewSequencePlayer::shutdown() {
-  client->disconnect();
+  if (client && client->isConnected()) {
+    client->disconnect();
+  }
   deviceManager.removeAudioCallback(this);
   deviceManager.closeAudioDevice();
   pluginPlayer.setProcessor(nullptr);
   pluginInstance = nullptr;
+}
+
+void NewSequencePlayer::initialize() {
+  juce::String error = deviceManager.initialiseWithDefaultDevices(0, 2);
 }
 
 bool NewSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> const& onCompletion) {
@@ -280,7 +278,6 @@ bool NewSequencePlayer::sendSF2ToVST(VGMColl* coll) {
 }
 
 void NewSequencePlayer::clearState() {
-  delete state.midiFile;
   state.events.clear();
   state.eventSampleOffsets.clear();
   state.eventOffset = 0;
@@ -293,6 +290,8 @@ bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
 
   // Convert the VGMSeq to midi, then allocate a vector to hold every midi event in the sequence
   MidiFile* midiFile = seq->ConvertToMidi();
+  state.midiFile.reset(midiFile);
+
   size_t reserveSize = 0;
   for (size_t i=0; i< midiFile->aTracks.size(); i++) {
     reserveSize += midiFile->aTracks[i]->aEvents.size();
@@ -319,10 +318,8 @@ bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   // If there are no events, delete and return. Otherwise store a reference to the midi file
   // so that we can delete it later
   if (state.events.empty()) {
-    delete midiFile;
+    state.midiFile.reset();
     return false;
-  } else {
-    state.midiFile = midiFile;
   }
 
   //Sort all the events by priority then absolute time in ticks
