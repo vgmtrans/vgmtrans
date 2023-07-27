@@ -165,7 +165,7 @@ void MainWindow::routeSignals() {
           &VGMCollListView::handlePlaybackRequest);
   connect(m_coll_listview, &VGMCollListView::nothingToPlay, m_icon_bar, &IconBar::showPlayInfo);
   connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
-  connect(m_icon_bar, &IconBar::seekingTo, &SequencePlayer::the(), &SequencePlayer::seek);
+  connect(m_icon_bar, &IconBar::seekingTo, &SequencePlayer::getInstance(), &SequencePlayer::seek);
   connect(m_icon_bar, &IconBar::createPressed, [this]() {
     ManualCollectionDialog wiz(this);
     wiz.exec();
@@ -238,6 +238,11 @@ void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
   for (const auto &url : urls) {
     openFileInternal(url.toLocalFile());
   }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+  qtVGMRoot.Exit();
+  event->accept();
 }
 
 void MainWindow::openFile() {
