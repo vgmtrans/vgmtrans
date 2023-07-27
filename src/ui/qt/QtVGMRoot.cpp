@@ -10,6 +10,7 @@
 #include "QtVGMRoot.h"
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
+#include "SequencePlayer.h"
 
 QtVGMRoot qtVGMRoot;
 
