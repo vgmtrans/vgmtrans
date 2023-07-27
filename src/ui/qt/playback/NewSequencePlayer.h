@@ -22,7 +22,7 @@ enum MusicState {
 };
 
 struct PlaybackState {
-  MidiFile* midiFile;
+  std::unique_ptr<MidiFile> midiFile;
   std::vector<MidiEvent*> events;
   std::vector<int> eventSampleOffsets;
   uint32_t samplesOffset;
@@ -47,7 +47,6 @@ public:
   ~NewSequencePlayer();
 
   void initialize();
-  void shutdown();
 
   /**
    * Loads a VGMColl for playback

@@ -188,11 +188,11 @@ void VGMCollListView::handlePlaybackRequest() {
   }
 
   VGMColl *coll = qtVGMRoot.vgmColls()[list[0].row()];
-  SequencePlayer::the().playCollection(coll);
+  SequencePlayer::getInstance().playCollection(coll);
 }
 
 void VGMCollListView::handleStopRequest() {
-  SequencePlayer::the().stop();
+  SequencePlayer::getInstance()->stop();
 }
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

@@ -6,6 +6,7 @@
 
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
+#include "SequencePlayer.h"
 #include <QApplication>
 #include <QFileDialog>
 #include <QString>

@@ -73,8 +73,8 @@ void IconBar::setupControls() {
   m_title->setText("Playback interrupted");
   layout()->addWidget(m_title);
 
-  connect(&SequencePlayer::the(), &SequencePlayer::statusChange, this, &IconBar::playerStatusChanged);
-  connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged, this, &IconBar::playbackRangeUpdate);
+  connect(SequencePlayer::getInstance(), &SequencePlayer::statusChange, this, &IconBar::playerStatusChanged);
+  connect(SequencePlayer::getInstance(), &SequencePlayer::playbackPositionChanged, this, &IconBar::playbackRangeUpdate);
 }
 
 void IconBar::showPlayInfo() {
@@ -97,7 +97,7 @@ void IconBar::playerStatusChanged(bool playing) const {
     m_slider->setEnabled(true);
     m_play->setIcon(s_pauseicon);
     m_stop->setEnabled(true);
-    m_title->setText("Playing: " + SequencePlayer::the().songTitle());
+    m_title->setText("Playing: " + SequencePlayer::getInstance()->songTitle());
   } else {
     m_play->setIcon(s_playicon);
     m_stop->setDisabled(true);
