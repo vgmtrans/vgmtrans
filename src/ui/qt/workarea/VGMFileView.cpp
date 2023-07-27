@@ -78,9 +78,9 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this), &QShortcut::activated,
           this, &VGMFileView::resetHexViewFont);
 
-  connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged,
+  connect(SequencePlayer::getInstance(), &SequencePlayer::playbackPositionChanged,
           this, &VGMFileView::onPlaybackPositionChanged);
-  connect(&SequencePlayer::the(), &SequencePlayer::statusChange,
+  connect(SequencePlayer::getInstance(), &SequencePlayer::statusChange,
           this, &VGMFileView::onPlayerStatusChanged);
 
   setWidget(m_splitter);
@@ -183,9 +183,8 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   }
   if (!m_vgmfile->assocColls.empty()) {
     auto assocColl = m_vgmfile->assocColls.front();
-    if (SequencePlayer::the().activeCollection() != assocColl) {
-      auto& seqPlayer = SequencePlayer::the();
-      seqPlayer.setActiveCollection(assocColl);
+    if (SequencePlayer::getInstance()->activeCollection() != assocColl) {
+      SequencePlayer::getInstance()->setActiveCollection(assocColl);
     }
   }
 
@@ -198,7 +197,7 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
     return;
   }
 
-  SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
+  SequencePlayer::getInstance()->seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
 }
 
 void VGMFileView::ensureTrackIndexMap(VGMSeq* seq) {
@@ -265,7 +264,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     return;
   }
 
-  const auto* coll = SequencePlayer::the().activeCollection();
+  const auto* coll = SequencePlayer::getInstance()->activeCollection();
   if (!coll || !coll->containsVGMFile(m_vgmfile)) {
     if (hexVisible) {
       m_hexview->setPlaybackActive(false);
@@ -279,7 +278,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     return;
   }
 
-  const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
+  const bool shouldHighlight = SequencePlayer::getInstance()->playing() || current > 0;
   if (!shouldHighlight) {
     if (hexVisible) {
       m_hexview->setPlaybackActive(false);
@@ -394,7 +393,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 void VGMFileView::onPlayerStatusChanged(bool playing) {
   if (playing || !m_hexview)
     return;
-  if (SequencePlayer::the().activeCollection() != nullptr)
+  if (SequencePlayer::getInstance()->activeCollection() != nullptr)
     return;
   m_playbackTimedEvents.clear();
   m_playbackItems.clear();

@@ -7,6 +7,7 @@
 #include "QtVGMRoot.h"
 
 #include "UIHelpers.h"
+#include "SequencePlayer.h"
 #include "VGMFileTreeView.h"
 
 #include <filesystem>

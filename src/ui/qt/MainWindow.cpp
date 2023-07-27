@@ -436,7 +436,8 @@ void MainWindow::routeSignals() {
           &PlaybackControls::showPlayInfo);
   connect(m_playback_controls, &PlaybackControls::stopPressed, m_coll_listview,
           &VGMCollListView::handleStopRequest);
-  connect(m_playback_controls, &PlaybackControls::seekingTo, &SequencePlayer::the(), &SequencePlayer::seek);
+  connect(m_playback_controls, &PlaybackControls::seekingTo, SequencePlayer::getInstance(),
+          &SequencePlayer::seek);
   connect(&qtVGMRoot, &QtVGMRoot::UI_toastRequested, this, &MainWindow::showToast);
 
   auto *playShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
@@ -568,6 +569,11 @@ void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
       openFileInternal(localFile);
     }
   }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+  qtVGMRoot.Exit();
+  event->accept();
 }
 
 void MainWindow::openFile() {

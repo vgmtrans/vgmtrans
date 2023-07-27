@@ -16,14 +16,15 @@
 /* How often (in ms) the current ticks are polled */
 static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
 
+JUCE_IMPLEMENT_SINGLETON (SequencePlayer)
+
 SequencePlayer::SequencePlayer() {
   player.initialize();
 
   m_seekupdate_timer = new QTimer(this);
   connect(m_seekupdate_timer, &QTimer::timeout, [this]() {
     if (playing()) {
-      // playbackPositionChanged(elapsedTicks(), totalTicks(), PositionChangeOrigin::Playback);
-      playbackPositionChanged(elapsedSamples(), totalSamples());
+      playbackPositionChanged(elapsedSamples(), totalSamples(), PositionChangeOrigin::Playback);
     }
   });
   //  m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
@@ -37,8 +38,7 @@ SequencePlayer::SequencePlayer() {
 }
 
 SequencePlayer::~SequencePlayer() {
-  stop();
-  player.shutdown();
+  clearSingletonInstance();
 }
 
 void SequencePlayer::toggle() {
@@ -114,22 +114,12 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
     return false;
   }
 
-  SF2File *sf2 = conversion::createSF2File(*coll);
-  if (!sf2) {
-    L_ERROR("Failed to play collection as a soundfont file could not be produced.");
-    return false;
-  }
-
-  auto rawSF2 = sf2->saveToMem();
-  delete sf2;
-  /* Deleted by MemFile::mem_close */
-  /* Init soundfont */
-  if (! player.loadCollection(coll, [this](){
+  if (!player.loadCollection(const_cast<VGMColl *>(coll), [this]() {
       QMetaObject::invokeMethod(this, "toggle", Qt::QueuedConnection);
-      }))
-  {
+    })) {
     L_ERROR("Could not load soundfont. Maybe the system is running out of "
                                   "memory or the sountfont was too large?");
+    return false;
   }
   /* Set callback used to signal that the playback is over */
   static auto stop_callback = [this]() {
@@ -142,10 +132,7 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
 
   /* Reassign tracking info and start playback */
   m_active_vgmcoll = coll;
-//  m_active_stream = midi_stream;
-//  m_loaded_sf = sf2_handle;
-  m_song_title = QString::fromStdString(*m_active_vgmcoll->name());
-//  toggle();
+  m_song_title = QString::fromStdString(m_active_vgmcoll->name());
   if (startPlaying) {
     toggle();
   } else {

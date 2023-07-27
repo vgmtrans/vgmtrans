@@ -144,7 +144,7 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, endResettingModel);
   connect(NotificationCenter::the(), &NotificationCenter::stitchPlanCollectionsChanged, this,
           &VGMCollListViewModel::setStitchPlanCollections);
-    connect(&SequencePlayer::the(), &SequencePlayer::statusChange, this,
+    connect(SequencePlayer::getInstance(), &SequencePlayer::statusChange, this,
       [this](bool) { refreshDecorationIcons(); });
 }
 
@@ -163,8 +163,8 @@ QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
   if (role == Qt::DisplayRole || role == Qt::EditRole) {
     return QString::fromStdString(coll->name());
   } else if (role == Qt::DecorationRole) {
-    const auto &player = SequencePlayer::the();
-    if (player.playing() && player.activeCollection() == coll) {
+    const auto *player = SequencePlayer::getInstance();
+    if (player->playing() && player->activeCollection() == coll) {
       return VGMPlayingCollIcon();
     }
     if (const auto it = m_stitchPlanPositionByCollection.constFind(coll);
@@ -511,8 +511,8 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
   if (list.empty() || !indexIsVisible(list[0]) || list[0].row() >= model()->rowCount()) {
-    if (SequencePlayer::the().activeCollection() != nullptr) {
-      SequencePlayer::the().toggle();
+    if (SequencePlayer::getInstance()->activeCollection() != nullptr) {
+      SequencePlayer::getInstance()->toggle();
       return;
     }
     nothingToPlay();
@@ -520,11 +520,11 @@ void VGMCollListView::handlePlaybackRequest() {
   }
 
   VGMColl *coll = qtVGMRoot.vgmColls()[list[0].row()];
-  SequencePlayer::the().playCollection(coll);
+  SequencePlayer::getInstance()->playCollection(coll);
 }
 
 void VGMCollListView::handleStopRequest() {
-  SequencePlayer::the().stop();
+  SequencePlayer::getInstance()->stop();
 }
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

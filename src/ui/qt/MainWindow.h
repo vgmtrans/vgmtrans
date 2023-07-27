@@ -51,6 +51,7 @@ protected:
   void dropEvent(QDropEvent *event) override;
   void closeEvent(QCloseEvent *event) override;
   void resizeEvent(QResizeEvent *event) override;
+  void closeEvent(QCloseEvent *event) override;
   bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:

@@ -106,13 +106,14 @@ void PlaybackControls::setupControls() {
   connect(NotificationCenter::the(), &NotificationCenter::vgmCollSelected, this,
           [this](VGMColl *coll, QWidget *) {
             m_hasSelectedCollection = coll != nullptr;
-            playerStatusChanged(SequencePlayer::the().playing());
+            playerStatusChanged(SequencePlayer::getInstance()->playing());
           });
-  connect(&SequencePlayer::the(), &SequencePlayer::statusChange, this, &PlaybackControls::playerStatusChanged);
-  connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged, this,
+  connect(SequencePlayer::getInstance(), &SequencePlayer::statusChange, this,
+          &PlaybackControls::playerStatusChanged);
+  connect(SequencePlayer::getInstance(), &SequencePlayer::playbackPositionChanged, this,
           &PlaybackControls::playbackRangeUpdate);
   updateSeekBarVisibility();
-  playerStatusChanged(SequencePlayer::the().playing());
+  playerStatusChanged(SequencePlayer::getInstance()->playing());
 }
 
 void PlaybackControls::showPlayInfo() {
@@ -126,7 +127,7 @@ void PlaybackControls::changeEvent(QEvent *event) {
     const QString buttonStyle = toolBarButtonStyle(palette());
     m_play->setStyleSheet(buttonStyle);
     m_stop->setStyleSheet(buttonStyle);
-    playerStatusChanged(SequencePlayer::the().playing());
+    playerStatusChanged(SequencePlayer::getInstance()->playing());
   }
 }
 
@@ -163,7 +164,7 @@ void PlaybackControls::playbackRangeUpdate(int cur, int max, PositionChangeOrigi
 
 void PlaybackControls::playerStatusChanged(bool playing) {
   m_skipNextPlaybackSliderUpdate = false;
-  const bool hasActive = SequencePlayer::the().activeCollection() != nullptr;
+  const bool hasActive = SequencePlayer::getInstance()->activeCollection() != nullptr;
   const bool canPlay = m_hasSelectedCollection || hasActive;
 
   m_play->setEnabled(canPlay);

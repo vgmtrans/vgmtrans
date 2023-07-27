@@ -19,7 +19,7 @@ using MenuPath = Command::MenuPath;
 class PlayCommand : public SingleItemCommand<VGMColl> {
 public:
   void executeItem(VGMColl* coll) const override {
-    SequencePlayer::the().playCollection(coll);
+    SequencePlayer::getInstance()->playCollection(coll);
   }
   [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Return}; };
   [[nodiscard]] std::string name() const override { return "Play / Pause"; }
