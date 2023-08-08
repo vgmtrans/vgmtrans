@@ -77,13 +77,14 @@ bool CPSTrackV1::ReadEvent(void) {
           if (key != prevTieNote) {
             AddNoteOffNoItem(prevTieNote);
             AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+            InsertPortamentoNoItem(false, GetTime()+absDur);
           }
           else {
             AddTime(absDur);
             delta -= absDur;
             AddNoteOff(beginOffset, curOffset - beginOffset, prevTieNote, L"Note Off (tied)");
+            AddPortamentoNoItem(false);
           }
-          AddPortamentoNoItem(false);
         }
         else {
           AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
