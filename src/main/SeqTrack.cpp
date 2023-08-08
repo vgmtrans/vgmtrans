@@ -1109,6 +1109,11 @@ void SeqTrack::InsertPortamento(uint32_t offset,
     pMidiTrack->InsertPortamento(channel, bOn, absTime);
 }
 
+void SeqTrack::InsertPortamentoNoItem(bool bOn, uint32_t absTime) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->InsertPortamento(channel, bOn, absTime);
+}
+
 void SeqTrack::AddPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, const std::wstring &sEventName) {
   OnEvent(offset, length);
 

@@ -117,6 +117,7 @@ class SeqTrack:
   void AddPortamento(uint32_t offset, uint32_t length, bool bOn, const std::wstring &sEventName = L"Portamento");
   void AddPortamentoNoItem(bool bOn);
   void InsertPortamento(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const std::wstring &sEventName = L"Portamento");
+  void InsertPortamentoNoItem(bool bOn, uint32_t absTime);
   void AddPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, const std::wstring &sEventName = L"Portamento Time");
   void AddPortamentoTimeNoItem(uint8_t time);
   void InsertPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, uint32_t absTime, const std::wstring &sEventName = L"Portamento Time");
