@@ -11,8 +11,9 @@
 
 class VGMFile;
 class HexView;
-class QHexView;
 class VGMFileTreeView;
+class VGMItem;
+class QScrollArea;
 
 class VGMFileView final : public QMdiSubWindow {
   Q_OBJECT
@@ -24,8 +25,12 @@ private:
   void closeEvent(QCloseEvent *closeEvent) override;
   void markEvents();
 
-  VGMFileTreeView *m_treeview{};
-  VGMFile *m_vgmfile{};
-  QHexView *m_hexview{};
-  QSplitter *m_splitter;
+  VGMFileTreeView* m_treeview{};
+  VGMFile* m_vgmfile{};
+  QScrollArea* m_hexScrollArea;
+  HexView* m_hexview{};
+  QSplitter* m_splitter;
+
+public slots:
+  void onSelectionChange(VGMItem* item);
 };

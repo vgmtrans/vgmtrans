@@ -8,32 +8,28 @@
 #include <QApplication>
 #include <QShortcut>
 #include <QFont>
+#include <QScrollArea>
 #include <VGMFile.h>
-#include "qhexview/qhexview.h"
+#include "HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
 #include "Helpers.h"
-#include "QtVGMRoot.h"
+#include <QScrollBar>
 
 VGMFileView::VGMFileView(VGMFile *vgmfile)
-    : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new QHexView) {
+    : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
   m_splitter = new QSplitter(Qt::Horizontal, this);
 
-  auto document = new QHexDocument(vgmfile);
-  document->setBaseAddress(m_vgmfile->dwOffset);
-  m_hexview->setDocument(document);
-
   /* This is silly, but Qt doesn't have constructor for float sizes.. */
-  QFont font("Ubuntu Mono", QApplication::font().pointSize());
-  font.setPointSizeF(QApplication::font().pointSizeF());
-
-  QFontInfo font_info(font);
-  if (font_info.fixedPitch()) {
-    m_hexview->setFont(font);
-  } else {
-    qtVGMRoot.AddLogItem(new LogItem(L"error loading font.", LOG_LEVEL_WARN, L"VGMFileView"));
-  }
-  markEvents();
+//  QFont font("Ubuntu Mono", QApplication::font().pointSize() + 5);
+//  font.setPointSizeF(QApplication::font().pointSizeF() + 3.0);
+//
+//  QFontInfo font_info(font);
+//  if (font_info.fixedPitch()) {
+//    m_hexview->setFont(font);
+//  } else {
+//    qtVGMRoot.AddLogItem(new LogItem(L"error loading font.", LOG_LEVEL_WARN, L"VGMFileView"));
+//  }
 
   setWindowTitle(QString::fromStdWString(*m_vgmfile->GetName()));
   setWindowIcon(iconForFileType(m_vgmfile->GetFileType()));
@@ -41,27 +37,27 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   m_treeview = new VGMFileTreeView(m_vgmfile, this);
 
-  m_splitter->addWidget(m_hexview);
+  m_hexScrollArea = new QScrollArea;
+  m_hexScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_hexScrollArea->setWidgetResizable(true);
+  m_hexScrollArea->setWidget(m_hexview);
+  m_hexScrollArea->show();
+
+  m_splitter->addWidget(m_hexScrollArea);
   m_splitter->addWidget(m_treeview);
   m_splitter->setSizes(QList<int>() << 900 << 270);
 
+
+  connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
+
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
           [&](QTreeWidgetItem *item, QTreeWidgetItem *) {
+            if (item == nullptr) {
+              return;
+            }
             auto vgmitem = static_cast<VGMItem *>(item->data(0, Qt::UserRole).value<void *>());
-            m_hexview->setSelectedItem(vgmitem);
+            onSelectionChange(vgmitem);
           });
-
-  connect(m_hexview->cursor(), &QHexCursor::positionChanged, [&]() {
-    const QHexCursor *cursor = m_hexview->cursor();
-    const auto &base_offset = m_vgmfile->dwOffset;
-    VGMItem *item = m_vgmfile->GetItemFromOffset(base_offset + cursor->position().offset(), false);
-    if (item) {
-      auto widget_item = m_treeview->getTreeWidgetItem(item);
-      m_treeview->setCurrentItem(widget_item);
-    } else {
-      m_treeview->clearSelection();
-    }
-  });
 
   connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, [&] {
     auto font = m_hexview->font();
@@ -78,24 +74,18 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   setWidget(m_splitter);
 }
 
-void VGMFileView::markEvents() {
-  auto base_offset = m_vgmfile->dwOffset;
-  auto overlay = m_hexview->document()->metadata();
-  uint32_t i = 0;
-  while (i < m_vgmfile->unLength) {
-    auto item = m_vgmfile->GetItemFromOffset(base_offset + i, false);
-    if (item) {
-      auto item_offset = item->dwOffset - base_offset;  // offset from start of hexdocument
-      auto desc = QString::fromStdWString(item->GetDescription());
-      overlay->metadata(item_offset, item_offset + item->unLength,
-                        textColorForEventColor(item->color), colorForEventColor(item->color), desc);
-      i += item->unLength;
-    } else {
-      i++;
-    }
-  }
-}
-
 void VGMFileView::closeEvent(QCloseEvent *) {
   MdiArea::the()->removeView(m_vgmfile);
+}
+
+void VGMFileView::onSelectionChange(VGMItem *item) {
+  m_hexview->setSelectedItem(item);
+  if (item) {
+    auto widget_item = m_treeview->getTreeWidgetItem(item);
+    m_treeview->blockSignals(true);
+    m_treeview->setCurrentItem(widget_item);
+    m_treeview->blockSignals(false);
+  } else {
+    m_treeview->clearSelection();
+  }
 }

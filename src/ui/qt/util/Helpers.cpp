@@ -5,7 +5,7 @@
  */
 
 #include "Helpers.h"
-#include <QPixmap>
+#include "Colors.h"
 #include <QBitmap>
 
 const QIcon &iconForFileType(FileType filetype) {
@@ -113,71 +113,74 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
 QColor colorForEventColor(VGMItem::EventColor eventColor) {
   switch (eventColor) {
     case VGMItem::CLR_UNKNOWN:
-      return Qt::black;
+      return EventColors::CLR_BG_DARK;
     case VGMItem::CLR_UNRECOGNIZED:
-      return Qt::red;
+      return EventColors::CLR_RED;
     case VGMItem::CLR_HEADER:
-      return Qt::lightGray;
+      return EventColors::CLR_GRAY;
     case VGMItem::CLR_MISC:
-      return Qt::gray;
+      return EventColors::CLR_DARK_GRAY;
     case VGMItem::CLR_MARKER:
-      return Qt::gray;
+      return EventColors::CLR_DARK_GRAY;
     case VGMItem::CLR_TIMESIG:
-      return Qt::green;
+      return EventColors::CLR_ORANGE;
     case VGMItem::CLR_TEMPO:
-      return Qt::darkGreen;
+      return EventColors::CLR_GREEN;
     case VGMItem::CLR_PROGCHANGE:
-      return QColor(244, 152, 16, 255);
+      return EventColors::CLR_PERIWINKLE;
     case VGMItem::CLR_TRANSPOSE:
-      return Qt::darkMagenta;
+      return EventColors::CLR_DARK_GREEN;
     case VGMItem::CLR_PRIORITY:
-      return Qt::darkMagenta;
+      return EventColors::CLR_DARK_GREEN;
     case VGMItem::CLR_VOLUME:
-      return QColor(174, 138, 190, 255);
+      return EventColors::CLR_MAGENTA;
     case VGMItem::CLR_EXPRESSION:
-      return QColor(83, 43, 46, 255);
+      return EventColors::CLR_MAGENTA;
     case VGMItem::CLR_PAN:
-      return QColor(50, 89, 61, 255);
+      return EventColors::CLR_ORANGE;
     case VGMItem::CLR_NOTEON:
-      return QColor(40, 123, 222, 255);
-    case VGMItem::CLR_NOTEOFF:
-      return QColor(65, 159, 211, 255);
     case VGMItem::CLR_DURNOTE:
-      return QColor(73, 164, 219, 255);
+      return EventColors::CLR_BLUE;
+    case VGMItem::CLR_NOTEOFF:
+      return EventColors::CLR_LIGHT_BLUE;
     case VGMItem::CLR_TIE:
-      return QColor(117, 109, 220, 255);
+      return EventColors::CLR_LIGHT_BLUE;
     case VGMItem::CLR_REST:
-      return QColor(142, 101, 207, 255);
+      return EventColors::CLR_LIGHT_BLUE;
     case VGMItem::CLR_PITCHBEND:
-      return Qt::magenta;
+      return EventColors::CLR_GREEN;
     case VGMItem::CLR_PITCHBENDRANGE:
-      return Qt::magenta;
+      return EventColors::CLR_DARK_GREEN;
     case VGMItem::CLR_MODULATION:
-      return QColor(176, 97, 0, 255);
+      return EventColors::CLR_LIGHT_GREEN;
     case VGMItem::CLR_PORTAMENTO:
-      return Qt::magenta;
+      return EventColors::CLR_LIGHT_GREEN;
     case VGMItem::CLR_PORTAMENTOTIME:
-      return Qt::magenta;
+      return EventColors::CLR_LIGHT_GREEN;
     case VGMItem::CLR_CHANGESTATE:
-      return Qt::gray;
+      return EventColors::CLR_GRAY;
     case VGMItem::CLR_ADSR:
-      return Qt::gray;
+      return EventColors::CLR_GRAY;
     case VGMItem::CLR_LFO:
-      return Qt::gray;
+      return EventColors::CLR_GRAY;
     case VGMItem::CLR_REVERB:
-      return Qt::gray;
+      return EventColors::CLR_GRAY;
     case VGMItem::CLR_SUSTAIN:
-      return Qt::yellow;
+      return EventColors::CLR_YELLOW;
     case VGMItem::CLR_LOOP:
-      return QColor(188, 63, 60, 255);
+      return EventColors::CLR_LIGHT_RED;
     case VGMItem::CLR_LOOPFOREVER:
-      return QColor(188, 63, 60, 255);
+      return EventColors::CLR_LIGHT_RED;
     case VGMItem::CLR_TRACKEND:
-      return QColor(158, 41, 39, 255);
+      return EventColors::CLR_RED;
   }
-  return Qt::red;
+  return EventColors::CLR_RED;
 }
 
 QColor textColorForEventColor(VGMItem::EventColor eventColor) {
-  return Qt::white;
+    if (eventColor == VGMItem::CLR_UNKNOWN) {
+      return EventColors::CLR_GRAY;
+    }
+    return EventColors::CLR_BG_DARK;
 }
+

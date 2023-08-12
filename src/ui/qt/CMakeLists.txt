@@ -79,10 +79,16 @@ add_executable(
   SequencePlayer.cpp
   SequencePlayer.h
   main_ui.cpp
+  util/Colors.h
   util/Helpers.cpp
   util/Helpers.h
+  util/LambdaEventFilter.h
   util/MarqueeLabel.cpp
   util/MarqueeLabel.h
+  util/UIHelpers.cpp
+  util/UIHelpers.h
+  workarea/HexView.cpp
+  workarea/HexView.h
   workarea/MdiArea.cpp
   workarea/MdiArea.h
   workarea/RawFileListView.cpp
@@ -96,19 +102,7 @@ add_executable(
   workarea/VGMFileView.cpp
   workarea/VGMFileView.h
   workarea/VGMFileListView.cpp
-  workarea/VGMFileListView.h
-  workarea/qhexview/document/buffer/qfilebuffer.cpp
-  workarea/qhexview/document/buffer/qhexbuffer.cpp
-  workarea/qhexview/document/buffer/qmemorybuffer.cpp
-  workarea/qhexview/document/buffer/qmemoryrefbuffer.cpp
-  workarea/qhexview/document/commands/hexcommand.cpp
-  workarea/qhexview/document/commands/insertcommand.cpp
-  workarea/qhexview/document/commands/removecommand.cpp
-  workarea/qhexview/document/commands/replacecommand.cpp
-  workarea/qhexview/document/qhexcursor.cpp
-  workarea/qhexview/document/qhexdocument.cpp
-  workarea/qhexview/document/qhexmetadata.cpp
-  workarea/qhexview/qhexview.cpp)
+  workarea/VGMFileListView.h)
 
 target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
 
