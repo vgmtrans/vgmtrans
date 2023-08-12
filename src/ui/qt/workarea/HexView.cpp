@@ -28,13 +28,11 @@
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
       QWidget(parent), vgmfile(vgmfile), selectedItem(nullptr) {
 
-  QFont font("Ubuntu Mono", QApplication::font().pointSize() + 5);
-  font.setPointSizeF(QApplication::font().pointSizeF() + 5.0);
+  QFont font("Ubuntu Mono", QApplication::font().pointSize() + 4);
+  font.setPointSizeF(QApplication::font().pointSizeF() + 4.0);
 
   this->setFont(font);
   this->setFocusPolicy(Qt::StrongFocus);
-
-  qDebug() << "Virtual Width: " << getVirtualWidth();
 
   overlay = new QWidget(this);
   overlay->hide();
@@ -210,12 +208,12 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, QEvent* event) {
 
     QPainter painter(static_cast<QWidget*>(obj));
     painter.fillRect(QRect(0, 0, BYTES_PER_LINE * 3 * charWidth, overlay->height()),
-                     QColor(0, 0, 0, 128));
+                     QColor(0, 0, 0, 100));
 
     painter.fillRect(QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + (charWidth / 2),
                            0,
                            BYTES_PER_LINE * charWidth, overlay->height()),
-                           QColor(0, 0, 0, 128));
+                           QColor(0, 0, 0, 100));
 
     return true;
   }
@@ -265,7 +263,7 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) {
   auto defaultTextColor = painter.pen().color();
   QColor windowColor = this->palette().color(QPalette::Window);
 
-  uint8_t data[bytesToPrint];
+  uint8_t data[16];
   vgmfile->GetBytes(startAddress, bytesToPrint, data);
   int emptyAddressBytes = 0;
   auto offset = 0;
@@ -469,7 +467,7 @@ void HexView::drawSelectedItem() {
   selectionView->installEventFilter(
       new LambdaEventFilter([this, numLines, startColumn](QObject* obj, QEvent* event) -> bool {
         if (event->type() == QEvent::Paint) {
-          uint8_t data[selectedItem->unLength];
+          uint8_t* data = new uint8_t[selectedItem->unLength];
           vgmfile->GetBytes(selectedItem->dwOffset, selectedItem->unLength, data);
 
           QColor bgColor = colorForEventColor(selectedItem->color);
@@ -504,6 +502,7 @@ void HexView::drawSelectedItem() {
             }
             painter.restore();
           }
+          delete[] data;
           return true;
         }
         return false;
@@ -512,7 +511,7 @@ void HexView::drawSelectedItem() {
 
   QGraphicsDropShadowEffect* glowEffect = new QGraphicsDropShadowEffect();
   glowEffect->setBlurRadius(20);
-  glowEffect->setColor(Qt::white);
+  glowEffect->setColor(Qt::black);
   glowEffect->setOffset(0, 0);
   selectionView->setGraphicsEffect(glowEffect);
 
