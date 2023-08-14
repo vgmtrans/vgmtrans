@@ -19,6 +19,7 @@
 #include <QScrollBar>
 #include <QTimer>
 
+#define NUM_CACHED_LINE_PIXMAPS 300
 #define BYTES_PER_LINE 16
 #define NUM_ADDRESS_NIBBLES 8
 #define ADDRESS_SPACING_CHARS 4
@@ -31,10 +32,14 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   QFont font("Ubuntu Mono", QApplication::font().pointSize() + 4);
   font.setPointSizeF(QApplication::font().pointSizeF() + 4.0);
 
+  lineCache.setMaxCost(NUM_CACHED_LINE_PIXMAPS);
+
   this->setFont(font);
   this->setFocusPolicy(Qt::StrongFocus);
 
   overlay = new QWidget(this);
+  overlay->setAttribute(Qt::WA_NoSystemBackground);
+  overlay->setAttribute(Qt::WA_TranslucentBackground);
   overlay->hide();
 
   overlay->installEventFilter(
@@ -147,13 +152,28 @@ void HexView::changeEvent(QEvent *event) {
         new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
             if (event->type() == QEvent::Resize) {
               redrawOverlay();
+              // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
+              // scroll events don't trigger on resize, and the user could expand the viewport so that it's in view
+              if (selectionView) {
+                selectionView->show();
+              }
               return false;
             }
             return false;
           })
       );
 
-      connect(scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value) { overlay->move(overlay->x(), value);
+      connect(scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this, scrollArea](int value) {
+        overlay->move(overlay->x(), value);
+        if (selectedItem != nullptr) {
+          int startLine = value / lineHeight;
+          int endLine = (value + scrollArea->height()) / lineHeight;
+
+          int selectedItemStartLine = ((selectedItem->dwOffset - vgmfile->dwOffset) / BYTES_PER_LINE) - 1;
+          int selectedItemEndLine = (((selectedItem->dwOffset - vgmfile->dwOffset) + selectedItem->unLength) / BYTES_PER_LINE) + 1;
+          bool selectionVisible = ((startLine <= selectedItemEndLine) && (selectedItemStartLine <= endLine));
+          selectionVisible ? selectionView->show() : selectionView->hide();
+        }
       });
     }
   }
@@ -229,9 +249,25 @@ void HexView::paintEvent(QPaintEvent *e) {
   int startLine = paintRect.top() / lineHeight;
   int endLine = (paintRect.bottom() + lineHeight - 1) / lineHeight;
 
+  qreal dpr = devicePixelRatioF();
+  auto linePixmap = new QPixmap(getVirtualWidth() * dpr, lineHeight * dpr);
+  linePixmap->setDevicePixelRatio(dpr);
+  linePixmap->fill(Qt::transparent);
+
+  QPainter linePainter(linePixmap);
+  linePainter.setFont(this->font());
+  linePainter.setRenderHints(painter.renderHints());
+  linePainter.setPen(painter.pen());
+  linePainter.setBrush(painter.brush());
+
   painter.translate(0, startLine * lineHeight);
   for (int line = startLine; line <= endLine; line++) {
-    printLine(painter, line);
+    if (!this->lineCache.contains(line)) {
+      linePixmap->fill(Qt::transparent);
+      printLine(linePainter, line);
+      lineCache.insert(line, new QPixmap(*linePixmap));
+    }
+    painter.drawPixmap(0, 0, *lineCache.object(line));
     painter.translate(0, lineHeight);
   }
 }

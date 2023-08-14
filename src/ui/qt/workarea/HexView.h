@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QCache>
 
 class VGMFile;
 class VGMItem;
@@ -70,14 +71,12 @@ private:
   int lineHeight;
   bool addressAsHex = true;
 
+  QCache<int, QPixmap> lineCache;
   QGraphicsOpacityEffect* overlayOpacityEffect = nullptr;
   QPropertyAnimation* overlayAnimation = nullptr;
   QWidget* overlay;
-  QWidget* asciiOverlay;
   QWidget* selectionView = nullptr;
-  QWidget* asciiSelectionView = nullptr;
 
 signals:
   void selectionChanged(VGMItem* item);
 };
-
