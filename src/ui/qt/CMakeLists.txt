@@ -4,7 +4,12 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/lib/gsl-lite"
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/bass"
                  "${CMAKE_CURRENT_BINARY_DIR}/bass" EXCLUDE_FROM_ALL)
 
-if(APPLE)
+if(POLICY CMP0084)
+  # Disable Qt{3,4} fallback
+  cmake_policy(SET CMP0084 NEW)
+endif()
+
+if(CMAKE_SYSTEN_NAME MATCHES "Darwin" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
   # Homebrew installs Qt (up to at least 5.9.1) in /usr/local/qt*, ensure it can
   # be found by CMake since it is not in the default /usr/local prefix.
   if(EXISTS /usr/local/opt/qt5)
