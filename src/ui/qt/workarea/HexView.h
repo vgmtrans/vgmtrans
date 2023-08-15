@@ -19,7 +19,7 @@ class HexView : public QWidget {
 public:
   explicit HexView(VGMFile* vgmfile, QWidget *parent = nullptr);
   void setSelectedItem(VGMItem* item);
-  void setFont(const QFont& font);
+  void setFont(QFont& font);
 
 protected:
   void changeEvent(QEvent *event) override;

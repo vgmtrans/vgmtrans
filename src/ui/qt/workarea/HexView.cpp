@@ -29,10 +29,12 @@
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
       QWidget(parent), vgmfile(vgmfile), selectedItem(nullptr) {
 
-  QFont font("Ubuntu Mono", QApplication::font().pointSize() + 4);
-  font.setPointSizeF(QApplication::font().pointSizeF() + 4.0);
-
   lineCache.setMaxCost(NUM_CACHED_LINE_PIXMAPS);
+
+  double appFontPointSize = QApplication::font().pointSizeF();
+  QFont font("Roboto Mono", appFontPointSize + 2);
+  // Call setPointSizeF, as QFont() doesn't accept a float size value
+  font.setPointSizeF(appFontPointSize + 2.0);
 
   this->setFont(font);
   this->setFocusPolicy(Qt::StrongFocus);
@@ -52,14 +54,32 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   overlay->setGraphicsEffect(overlayOpacityEffect);
 }
 
-void HexView::setFont(const QFont& font) {
-  QFontMetrics fontMetrics(font);
-  this->charWidth = fontMetrics.averageCharWidth();
-  this->lineHeight = fontMetrics.height();
+void HexView::setFont(QFont& font) {
+  QFontMetricsF fontMetrics(font);
+
+  // We need both charWidth and the actual font character width to be a whole number, otherwise,
+  // we run into a host of drawing problems. (alternatively we could draw one byte at a time in
+  // printHex). Qt isn't very flexible about fractional font sizing, but it is flexible about
+  // letter spacing. So here we find the letter spacing which results in the closest whole number
+  // character width. We could probably achieve the same with word spacing instead, since we
+  // render hex with actual ASCII spaces between bytes, but the visual difference is minimal.
+  auto originalCharWidth = fontMetrics.horizontalAdvance("A");
+  auto originalLetterSpacing = font.letterSpacing();
+  auto charWidthSansSpacing = originalCharWidth - originalLetterSpacing;
+  auto targetLetterSpacing = std::round(charWidthSansSpacing) - charWidthSansSpacing;
+  font.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, targetLetterSpacing);
+
+  fontMetrics = QFontMetrics(font);
+  // We need to use horizontalAdvance(), as averageCharWidth() doesn't capture letter spacing.
+  this->charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
+  this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
+
   QWidget::setFont(font);
   this->setMinimumWidth(getVirtualWidth());
   this->setFixedHeight(getVirtualHeight());
 
+  // Force everything to redraw
+  lineCache.clear();
   redrawOverlay();
   redrawSelectedItem();
 }
