@@ -244,6 +244,10 @@ void HexView::keyPressEvent(QKeyEvent* event) {
       newOffset = selectedItem->dwOffset + selectedItem->unLength;
       goto selectNewOffset;
 
+    case Qt::Key_Escape:
+      selectionChanged(nullptr);
+      break;
+
     selectNewOffset:
       if (newOffset >= vgmfile->dwOffset && newOffset < (vgmfile->dwOffset + vgmfile->unLength)) {
         selectedOffset = newOffset;
