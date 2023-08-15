@@ -29,6 +29,8 @@ protected:
   bool handleSelectedItemPaintEvent(QObject* obj, QEvent* event);
   void paintEvent(QPaintEvent *event) override;
   void mousePressEvent(QMouseEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
+  void mouseReleaseEvent(QMouseEvent *event) override;
   void mouseDoubleClickEvent(QMouseEvent* event);
 
 private:
@@ -73,6 +75,7 @@ private:
   int charWidth;
   int lineHeight;
   bool addressAsHex = true;
+  bool isDragging = false;
 
   QCache<int, QPixmap> lineCache;
   QGraphicsOpacityEffect* overlayOpacityEffect = nullptr;

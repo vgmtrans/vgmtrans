@@ -127,6 +127,11 @@ void HexView::setSelectedItem(VGMItem *item) {
       int viewPortStartLine = scrollArea->verticalScrollBar()->value() / lineHeight;
       int viewPortEndLine = viewPortStartLine + ((scrollArea->viewport()->height()) / lineHeight);
 
+      // If the item is already visible, don't scroll.
+      if (line <= viewPortEndLine && endLine > viewPortStartLine) {
+        return;
+      }
+
       if (line < viewPortStartLine) {
         scrollArea->verticalScrollBar()->setValue(line * lineHeight);
       } else if (endLine > viewPortEndLine) {
@@ -597,6 +602,9 @@ void HexView::showOverlay(bool show, bool animate) {
 void HexView::drawSelectedItem() {
   // Set a limit for selected item size, as it can halt the system to draw huge items
   if (!selectedItem || selectedItem->unLength > 0x3000) {
+    if (selectionView) {
+      selectionView->setGeometry(QRect(0, 0, 0, 0));
+    }
     return;
   }
 
@@ -654,16 +662,50 @@ void HexView::mousePressEvent(QMouseEvent *event) {
     } else {
       selectionChanged(item);
     }
+    isDragging = true;
   }
 
   QWidget::mousePressEvent(event);
 }
+
+void HexView::mouseReleaseEvent(QMouseEvent *event) {
+  if (event->button() == Qt::LeftButton) {
+    isDragging = false;
+  }
+  QWidget::mouseReleaseEvent(event);
+}
+
+void HexView::mouseMoveEvent(QMouseEvent *event) {
+  if (isDragging && event->buttons() & Qt::LeftButton) {
+
+    QPoint pos = event->pos();
+    int offset = getOffsetFromPoint(pos);
+    if (offset == -1) {
+      selectionChanged(nullptr);
+      return;
+    }
+    this->selectedOffset = offset;
+    // If the new offset overlaps with the currently selected item, do nothing
+    if (selectedItem && (selectedOffset >= selectedItem->dwOffset) &&
+        (selectedOffset < (selectedItem->dwOffset + selectedItem->unLength))) {
+      return;
+    }
+    auto item = vgmfile->GetItemFromOffset(offset, false);
+    if (item != selectedItem) {
+      selectionChanged(item);
+    }
+  }
+  QWidget::mouseMoveEvent(event);
+}
+
+
 
 void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     QPoint pos = event->pos();
     if (pos.x() >= 0 && pos.x() < (NUM_ADDRESS_NIBBLES * charWidth)) {
       addressAsHex = !addressAsHex;
+      lineCache.clear();
       update();
     }
   }
