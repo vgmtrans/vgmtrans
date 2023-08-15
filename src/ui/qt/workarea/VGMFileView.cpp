@@ -48,6 +48,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
           [&](QTreeWidgetItem *item, QTreeWidgetItem *) {
             if (item == nullptr) {
+              onSelectionChange(nullptr);
               return;
             }
             auto vgmitem = static_cast<VGMItem *>(item->data(0, Qt::UserRole).value<void *>());

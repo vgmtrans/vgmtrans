@@ -50,12 +50,16 @@ public:
   explicit VGMFileTreeView(VGMFile *vgmfile, QWidget *parent = nullptr);
   ~VGMFileTreeView() override = default;
 
+  void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name);
+  auto getTreeWidgetItem(VGMItem *vgm_item) { return m_items.at(vgm_item); };
+
+protected:
   void focusInEvent(QFocusEvent* event) override;
   void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
   void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
-
-  void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name);
-  auto getTreeWidgetItem(VGMItem *vgm_item) { return m_items.at(vgm_item); };
+  void mousePressEvent(QMouseEvent *event) override;
+  void mouseDoubleClickEvent(QMouseEvent *event) override;
+  void keyPressEvent(QKeyEvent *event) override;
 
 private:
   int getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item);
