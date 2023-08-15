@@ -52,9 +52,9 @@ elseif(${Qt_VERSION_MAJOR} EQUAL 5)
                     "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
 endif()
 
-if(WIN32)
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
   set(GUI_TYPE WIN32)
-elseif(APPLE)
+elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set(GUI_TYPE MACOSX_BUNDLE)
 endif()
 
@@ -117,12 +117,19 @@ target_link_libraries(
   PRIVATE g_options
           g_warnings
           vgmtranscore
+          Qt${Qt_VERSION_MAJOR}::Gui
           Qt${Qt_VERSION_MAJOR}::Widgets
           Qt${Qt_VERSION_MAJOR}::Svg
           gsl-lite
           BASS::MIDI)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  if (${Qt_VERSION} EQUAL 6)
+    # Workaround macdeployqt not copying the DBus framework
+    find_package(Qt6 COMPONENTS DBus REQUIRED)
+    target_link_libraries(vgmtrans PRIVATE Qt::DBus)
+  endif()
+
   set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
 
   set_target_properties(
