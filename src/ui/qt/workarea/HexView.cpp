@@ -309,8 +309,8 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       int startColumn = baseOffset % BYTES_PER_LINE;
       int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
 
-      uint8_t* data = new uint8_t[selectedItem->unLength];
-      vgmfile->GetBytes(selectedItem->dwOffset, selectedItem->unLength, data);
+      auto itemData = std::vector<uint8_t>(selectedItem->unLength):
+      vgmfile->GetBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
 
       QColor bgColor = colorForEventColor(selectedItem->color);
       QColor textColor = textColorForEventColor(selectedItem->color);
