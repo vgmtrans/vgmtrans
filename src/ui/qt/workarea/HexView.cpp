@@ -86,6 +86,7 @@ void HexView::setFont(QFont& font) {
   this->setFixedHeight(getVirtualHeight());
 
   // Force everything to redraw
+  prevSelectedItem = nullptr;
   lineCache.clear();
   redrawOverlay();
   drawSelectedItem();
@@ -697,8 +698,6 @@ void HexView::mouseMoveEvent(QMouseEvent *event) {
   }
   QWidget::mouseMoveEvent(event);
 }
-
-
 
 void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
