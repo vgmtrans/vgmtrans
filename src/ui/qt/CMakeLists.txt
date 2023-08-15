@@ -124,7 +124,7 @@ target_link_libraries(
           BASS::MIDI)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  if (${Qt_VERSION} EQUAL 6)
+  if (${Qt_VERSION_MAJOR} EQUAL 6)
     # Workaround macdeployqt not copying the DBus framework
     find_package(Qt6 COMPONENTS DBus REQUIRED)
     target_link_libraries(vgmtrans PRIVATE Qt::DBus)

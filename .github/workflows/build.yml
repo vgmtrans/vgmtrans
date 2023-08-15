@@ -6,23 +6,60 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  macos_x64:
-    name: macOS (Intel)
+  macos_arm64:
+    name: macOS (Apple Silicon)
     runs-on: macos-12
-    env:
-      osx_min_ver: "11.0"
-      osx_arch: "x86_64"
     steps:
       - uses: actions/checkout@v3
       - name: "Install dependencies"
         run: |
-          brew upgrade qt@5 ninja || brew install qt@5 ninja
+          brew upgrade || brew install ninja
+          brew install \
+            --force-bottle \
+            --ignore-dependencies \
+            "$(brew fetch --deps --bottle-tag=arm64_monterey qt@6)"
+
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
         run: |
-          cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.osx_min_ver }} \
-                -DCMAKE_OSX_ARCHITECTURES=${{ env.osx_arch }} \
+          # CMAKE_PREFIX_PATH:
+          # On homebrew for arm, the default path is /opt/homebrew
+          # On Intel macs, it's /usr/local
+          # CMAKE_OSX_ARCHITECTURE:
+          # For arm, it's arm64. This selects the appropriate SDK
+          # CMAKE_SYSTEM_PROCESSOR:
+          # Has to be set so that CMake knows if we're cross-compiling
+          cmake \
+                -D CMAKE_PREFIX_PATH="/opt/homebrew;/usr/local/opt/qt"  \
+                -D CMAKE_OSX_ARCHITECTURES=arm64 \
+                -D CMAKE_SYSTEM_PROCESSOR=arm64 \
+                -D CMAKE_BUILD_TYPE=Release \
+                -G Ninja \
+                -B build
+      - name: "Build project"
+        run: cmake --build build --config "Release" --parallel
+      - working-directory: "build"
+        name: "Package DMG (macOS)"
+        run: /usr/local/opt/qt6/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@v3
+        with:
+          name: VGMTrans-AppleSilicon-${{ github.sha }}-${{ env.BRANCH }}-${{ runner.os }}.dmg
+          path: "build/bin/VGMTrans.dmg"
+  macos_x64:
+    name: macOS (Intel)
+    runs-on: macos-12
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install dependencies"
+        run: |
+          brew upgrade qt@6 ninja || brew install qt@6 ninja
+          echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+          echo "/usr/local/bin" >> $GITHUB_PATH
+      - name: "Prepare build"
+        run: |
+          cmake \
                 -DCMAKE_BUILD_TYPE=Release \
                 -G Ninja \
                 -B build
@@ -30,11 +67,11 @@ jobs:
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
         name: "Package DMG (macOS)"
-        run: /usr/local/opt/qt5/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
+        run: /usr/local/opt/qt6/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
       - name: "Upload artifact"
         uses: actions/upload-artifact@v3
         with:
-          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ env.osx_arch }}-${{ runner.os }}.dmg
+          name: VGMTrans-Intel-${{ github.sha }}-${{ env.BRANCH }}-${{ runner.os }}.dmg
           path: "build/bin/VGMTrans.dmg"
   Ubuntu:
     runs-on: ubuntu-20.04
