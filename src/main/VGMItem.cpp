@@ -100,6 +100,9 @@ VGMContainerItem::~VGMContainerItem() {
   DeleteVect(localitems);
 }
 
+// Get the bottom-most VGMItem at a given offset. If includeContainer is false, only return
+// a non-VGMContainerItem. Otherwise, return the bottom-most VGMContainerItem if a
+// non-VGMContainerItem does not exist at the offset.
 VGMItem *VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContainer, bool matchStartOffset) {
   for (const auto *container : containers) {
     for (VGMItem *item : *container) {

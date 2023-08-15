@@ -9,9 +9,7 @@
 #include <QAbstractTextDocumentLayout>
 #include <QPainter>
 #include <QApplication>
-#include <VGMFile.h>
-#include <VGMItem.h>
-#include "QtVGMRoot.h"
+#include <QAccessible>
 #include "Helpers.h"
 
 void VGMTreeDisplayItem::paint(QPainter *painter, const QStyleOptionViewItem &option,
@@ -61,6 +59,30 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(p
   file->AddToUI(nullptr, this);
 
   setItemDelegate(new VGMTreeDisplayItem());
+}
+
+// Override the focusInEvent to prevent item selection upon focus
+void VGMFileTreeView::focusInEvent(QFocusEvent* event) {
+
+}
+
+void VGMFileTreeView::currentChanged(const QModelIndex &current, const QModelIndex &previous) {
+  // On MacOS, there is a peculiar accessibility-related bug that causes an exception to be thrown here. It causes
+  // multiple problems, including issues with tree item selection and a second MDI window not appearing. With no
+  // good fix, for now we bypass QTreeView::currentChanged.
+#ifdef Q_OS_MAC
+  QAbstractItemView::currentChanged(current, previous);
+#else
+  QTreeView::currentChanged(current, previous);
+#endif
+}
+
+void VGMFileTreeView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
+#ifdef Q_OS_MAC
+  QAbstractItemView::selectionChanged(selected, deselected);
+#else
+  QTreeView::selectionChanged(selected, deselected);
+#endif
 }
 
 void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name) {

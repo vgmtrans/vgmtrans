@@ -19,10 +19,7 @@ int main(int argc, char *argv[]) {
   QApplication app(argc, argv);
   qtVGMRoot.Init();
 
-  QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-Regular.ttf");
-  QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-Bold.ttf");
-  QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-Italic.ttf");
-  QFontDatabase::addApplicationFont(":/fonts/Ubuntu_Mono/UbuntuMono-BoldItalic.ttf");
+  QFontDatabase::addApplicationFont(":/fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf");
 
   MainWindow window;
   window.show();
