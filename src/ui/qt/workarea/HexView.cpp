@@ -17,7 +17,7 @@
 #include <QPropertyAnimation>
 #include <QScrollArea>
 #include <QScrollBar>
-#include <QTimer>
+#include <QToolTip>
 
 #define NUM_CACHED_LINE_PIXMAPS 300
 #define BYTES_PER_LINE 16
@@ -162,6 +162,28 @@ void HexView::redrawSelectedItem() {
   if (selectedItem) {
     drawSelectedItem();
   }
+}
+
+bool HexView::event(QEvent *e) {
+  if (e->type() == QEvent::ToolTip) {
+    QHelpEvent *helpevent = static_cast<QHelpEvent *>(e);
+
+    int offset = getOffsetFromPoint(helpevent->pos());
+    if (offset < 0) {
+      return true;
+    }
+
+    VGMItem* item = vgmfile->GetItemFromOffset(offset, false);
+    if (item) {
+      auto description = QString::fromStdWString(item->GetDescription());
+      if (!description.isEmpty()) {
+        QToolTip::showText(helpevent->globalPos(), description, this);
+      }
+    }
+    return true;
+  }
+
+  return QWidget::event(e);
 }
 
 void HexView::changeEvent(QEvent *event) {
@@ -574,30 +596,40 @@ void HexView::drawSelectedItem() {
   selectionView->show();
 }
 
+// Find the VGMFile offset represented at the given QPoint. Returns -1 for invalid points.
+int HexView::getOffsetFromPoint(QPoint pos) {
+  auto halfCharWidth = charWidth / 2;
+  auto hexStart = (NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth;
+  auto hexEnd = hexStart + (BYTES_PER_LINE * 3 * charWidth);
+
+  auto asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * charWidth);
+  auto asciiEnd = asciiStart + (BYTES_PER_LINE * charWidth);
+
+  int byteNum = -1;
+  if (pos.x() >= hexStart - halfCharWidth && pos.x() < hexEnd - halfCharWidth) {
+    byteNum = ((pos.x() - hexStart + halfCharWidth) / charWidth) / 3;
+  } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
+    byteNum = (pos.x() - asciiStart) / charWidth;
+  }
+  if (byteNum == -1) {
+    return -1;
+  }
+  int line = pos.y() / lineHeight;
+  return vgmfile->dwOffset + (line * BYTES_PER_LINE) + byteNum;
+}
+
 void HexView::mousePressEvent(QMouseEvent *event) {
   if (event->button() == Qt::LeftButton) {
     QPoint pos = event->pos();
 
-    auto halfCharWidth = charWidth / 2;
-    auto hexStart = (NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth;
-    auto hexEnd = hexStart + (BYTES_PER_LINE * 3 * charWidth);
-
-    auto asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * charWidth);
-    auto asciiEnd = asciiStart + (BYTES_PER_LINE * charWidth);
-
-    int byteNum = -1;
-    if (pos.x() >= hexStart - halfCharWidth && pos.x() < hexEnd - halfCharWidth) {
-      byteNum = ((pos.x() - hexStart + halfCharWidth) / charWidth) / 3;
-    } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
-      byteNum = (pos.x() - asciiStart) / charWidth;
-    }
-    if (byteNum == -1) {
+    int offset = getOffsetFromPoint(pos);
+    if (offset == -1) {
       selectionChanged(nullptr);
       return;
     }
-    int line = pos.y() / lineHeight;
-    selectedOffset = vgmfile->dwOffset + (line * BYTES_PER_LINE) + byteNum;
-    auto item = vgmfile->GetItemFromOffset(selectedOffset, false);
+
+    this->selectedOffset = offset;
+    auto item = vgmfile->GetItemFromOffset(offset, false);
     if (item == selectedItem) {
       selectionChanged(nullptr);
     } else {

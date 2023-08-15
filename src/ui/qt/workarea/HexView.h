@@ -22,6 +22,7 @@ public:
   void setFont(QFont& font);
 
 protected:
+  bool event(QEvent *event) override;
   void changeEvent(QEvent *event) override;
   void keyPressEvent(QKeyEvent *event) override;
   bool handleOverlayPaintEvent(QObject* obj, QEvent* event);
@@ -33,6 +34,7 @@ private:
   int getVirtualHeight();
   int getVirtualWidth();
   int getTotalLines();
+  int getOffsetFromPoint(QPoint pos);
   void resizeOverlays(int height);
   void redrawOverlay();
   void redrawSelectedItem();
