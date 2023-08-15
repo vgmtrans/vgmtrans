@@ -26,6 +26,7 @@ protected:
   void changeEvent(QEvent *event) override;
   void keyPressEvent(QKeyEvent *event) override;
   bool handleOverlayPaintEvent(QObject* obj, QEvent* event);
+  bool handleSelectedItemPaintEvent(QObject* obj, QEvent* event);
   void paintEvent(QPaintEvent *event) override;
   void mousePressEvent(QMouseEvent *event) override;
   void mouseDoubleClickEvent(QMouseEvent* event);
@@ -78,6 +79,8 @@ private:
   QPropertyAnimation* overlayAnimation = nullptr;
   QWidget* overlay;
   QWidget* selectionView = nullptr;
+  VGMItem* prevSelectedItem = nullptr;
+  QPixmap selectionViewPixmap;
 
 signals:
   void selectionChanged(VGMItem* item);

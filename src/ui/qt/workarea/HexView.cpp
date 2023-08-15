@@ -52,6 +52,13 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
 
   overlayOpacityEffect = new QGraphicsOpacityEffect(this);
   overlay->setGraphicsEffect(overlayOpacityEffect);
+
+  selectionView = new QWidget(this);
+  selectionView->installEventFilter(
+      new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
+        return this->handleSelectedItemPaintEvent(obj, event);
+      })
+  );
 }
 
 void HexView::setFont(QFont& font) {
@@ -81,7 +88,7 @@ void HexView::setFont(QFont& font) {
   // Force everything to redraw
   lineCache.clear();
   redrawOverlay();
-  redrawSelectedItem();
+  drawSelectedItem();
 }
 
 int HexView::getVirtualHeight() {
@@ -101,17 +108,14 @@ int HexView::getTotalLines() {
 void HexView::setSelectedItem(VGMItem *item) {
   selectedItem = item;
 
-  // Delete the selection view if it exists
-  if (selectionView != nullptr) {
-    delete selectionView;
-    selectionView = nullptr;
-  }
-
   if (selectedItem == nullptr) {
     showOverlay(false, true);
+    selectionView->hide();
+    prevSelectedItem = nullptr;
   } else {
     showOverlay(true, true);
     drawSelectedItem();
+    selectionView->show();
 
     // Handle scrolling to the selected event
     QScrollArea* scrollArea = getContainingScrollArea(this);
@@ -154,16 +158,6 @@ void HexView::redrawOverlay() {
   }
 }
 
-void HexView::redrawSelectedItem() {
-  if (selectionView != nullptr) {
-    delete selectionView;
-    selectionView = nullptr;
-  }
-  if (selectedItem) {
-    drawSelectedItem();
-  }
-}
-
 bool HexView::event(QEvent *e) {
   if (e->type() == QEvent::ToolTip) {
     QHelpEvent *helpevent = static_cast<QHelpEvent *>(e);
@@ -196,7 +190,7 @@ void HexView::changeEvent(QEvent *event) {
               redrawOverlay();
               // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
               // scroll events don't trigger on resize, and the user could expand the viewport so that it's in view
-              if (selectionView) {
+              if (selectedItem && selectionView) {
                 selectionView->show();
               }
               return false;
@@ -277,6 +271,82 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, QEvent* event) {
                            BYTES_PER_LINE * charWidth, overlay->height()),
                            QColor(0, 0, 0, 100));
 
+    return true;
+  }
+  return false;
+}
+
+bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
+  if (event->type() == QEvent::Paint) {
+    if (!selectedItem) {
+      return true;
+    }
+    auto widget = static_cast<QWidget*>(obj);
+    if (prevSelectedItem != selectedItem) {
+
+      prevSelectedItem = selectedItem;
+
+      qreal dpr = devicePixelRatioF();
+      auto widgetSize = widget->size();
+      auto pixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
+      pixmap.setDevicePixelRatio(dpr);
+      pixmap.fill(Qt::transparent);
+
+      QPainter pixmapPainter = QPainter(&pixmap);
+
+      int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
+      int startLine = baseOffset / BYTES_PER_LINE;
+      int startColumn = baseOffset % BYTES_PER_LINE;
+      int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
+
+      uint8_t* data = new uint8_t[selectedItem->unLength];
+      vgmfile->GetBytes(selectedItem->dwOffset, selectedItem->unLength, data);
+
+      QColor bgColor = colorForEventColor(selectedItem->color);
+      QColor textColor = textColorForEventColor(selectedItem->color);
+
+      pixmapPainter.setFont(this->font());
+      pixmapPainter.translate(SELECTION_PADDING, SELECTION_PADDING);
+
+      int col = startColumn;
+      int offsetIntoEvent = 0;
+      for (int line=0; line<numLines; line++) {
+        pixmapPainter.save();
+        pixmapPainter.translate(0, line * lineHeight);
+
+        // If the selected item is a container item, then we need to draw all of its sub items.
+        if (selectedItem->IsContainerItem()) {
+          int startAddress = selectedItem->dwOffset + offsetIntoEvent;
+          int endAddress = selectedItem->dwOffset + selectedItem->unLength;
+          printData(pixmapPainter, startAddress, endAddress);
+          offsetIntoEvent += BYTES_PER_LINE - col;
+          col = 0;
+        } else {
+          int bytesToPrint = min(
+              min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
+              BYTES_PER_LINE);
+          translateAndPrintAscii(pixmapPainter, data + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+          translateAndPrintHex(pixmapPainter, data + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+
+          offsetIntoEvent += bytesToPrint;
+          col = 0;
+        }
+        pixmapPainter.restore();
+      }
+      delete[] data;
+
+      auto glowEffect = new QGraphicsDropShadowEffect();
+      glowEffect->setBlurRadius(SELECTION_PADDING);
+      glowEffect->setColor(Qt::black);
+      glowEffect->setOffset(0, 0);
+
+      selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
+      selectionViewPixmap.setDevicePixelRatio(dpr);
+      selectionViewPixmap.fill(Qt::transparent);
+      applyEffectToPixmap(pixmap, selectionViewPixmap, glowEffect, 0);
+    }
+    QPainter painter(widget);
+    painter.drawPixmap(0, 0, selectionViewPixmap);
     return true;
   }
   return false;
@@ -521,13 +591,10 @@ void HexView::showOverlay(bool show, bool animate) {
 }
 
 void HexView::drawSelectedItem() {
-
-  // Set a limit for selected item size, lest we grind the system to a halt painting a giant view
-  if (selectedItem->unLength > 0x1000) {
+  // Set a limit for selected item size, as it can halt the system to draw huge items
+  if (!selectedItem || selectedItem->unLength > 0x3000) {
     return;
   }
-
-  selectionView = new QWidget(this);
 
   int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
   int startLine = baseOffset / BYTES_PER_LINE;
@@ -541,59 +608,7 @@ void HexView::drawSelectedItem() {
   int widgetHeight = (numLines * lineHeight) + (SELECTION_PADDING * 2);
 
   selectionView->setGeometry(QRect(widgetX, widgetY, widgetWidth, widgetHeight));
-
-  selectionView->installEventFilter(
-      new LambdaEventFilter([this, numLines, startColumn](QObject* obj, QEvent* event) -> bool {
-        if (event->type() == QEvent::Paint) {
-          uint8_t* data = new uint8_t[selectedItem->unLength];
-          vgmfile->GetBytes(selectedItem->dwOffset, selectedItem->unLength, data);
-
-          QColor bgColor = colorForEventColor(selectedItem->color);
-          QColor textColor = textColorForEventColor(selectedItem->color);
-
-          QPainter painter(static_cast<QWidget*>(obj));
-          painter.setFont(this->font());
-          painter.translate(SELECTION_PADDING, SELECTION_PADDING);
-
-          int col = startColumn;
-          int offsetIntoEvent = 0;
-          for (int line=0; line<numLines; line++) {
-            painter.save();
-            painter.translate(0, line * lineHeight);
-
-            // If the selected item is a container item, then we need to draw all of its sub items.
-            if (selectedItem->IsContainerItem()) {
-              int startAddress = selectedItem->dwOffset + offsetIntoEvent;
-              int endAddress = selectedItem->dwOffset + selectedItem->unLength;
-              printData(painter, startAddress, endAddress);
-              offsetIntoEvent += BYTES_PER_LINE - col;
-              col = 0;
-            } else {
-              int bytesToPrint = min(
-                  min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
-                  BYTES_PER_LINE);
-              translateAndPrintAscii(painter, data + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
-              translateAndPrintHex(painter, data + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
-
-              offsetIntoEvent += bytesToPrint;
-              col = 0;
-            }
-            painter.restore();
-          }
-          delete[] data;
-          return true;
-        }
-        return false;
-      })
-    );
-
-  QGraphicsDropShadowEffect* glowEffect = new QGraphicsDropShadowEffect();
-  glowEffect->setBlurRadius(20);
-  glowEffect->setColor(Qt::black);
-  glowEffect->setOffset(0, 0);
-  selectionView->setGraphicsEffect(glowEffect);
-
-  selectionView->show();
+  selectionView->update();
 }
 
 // Find the VGMFile offset represented at the given QPoint. Returns -1 for invalid points.
