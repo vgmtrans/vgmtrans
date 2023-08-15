@@ -40,7 +40,6 @@ private:
   int getOffsetFromPoint(QPoint pos);
   void resizeOverlays(int height);
   void redrawOverlay();
-  void redrawSelectedItem();
   void printLine(QPainter& painter, int line);
   void printAddress(QPainter& painter, int line);
   void printData(QPainter& painter, int startAddress, int endAddress);

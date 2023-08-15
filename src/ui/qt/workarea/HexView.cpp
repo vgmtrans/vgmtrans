@@ -25,6 +25,7 @@
 #define ADDRESS_SPACING_CHARS 4
 #define HEX_TO_ASCII_SPACING_CHARS 4
 #define SELECTION_PADDING 20
+#define DIM_DURATION_MS 200
 
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
       QWidget(parent), vgmfile(vgmfile), selectedItem(nullptr) {
@@ -99,7 +100,7 @@ int HexView::getVirtualHeight() {
 int HexView::getVirtualWidth() {
   const int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
                        HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
-  return (numChars * charWidth) + 15;
+  return (numChars * charWidth) + SELECTION_PADDING;
 }
 
 int HexView::getTotalLines() {
@@ -113,38 +114,38 @@ void HexView::setSelectedItem(VGMItem *item) {
     showOverlay(false, true);
     selectionView->hide();
     prevSelectedItem = nullptr;
-  } else {
-    showOverlay(true, true);
-    drawSelectedItem();
-    selectionView->show();
+    return;
+  }
+  showOverlay(true, true);
+  drawSelectedItem();
+  selectionView->show();
 
-    // Handle scrolling to the selected event
-    QScrollArea* scrollArea = getContainingScrollArea(this);
-    if (scrollArea) {
-      auto itemBaseOffset = static_cast<int>(item->dwOffset - vgmfile->dwOffset);
-      int line = itemBaseOffset / BYTES_PER_LINE;
-      int endLine = static_cast<int>(item->dwOffset + item->unLength - vgmfile->dwOffset) / BYTES_PER_LINE;
+  // Handle scrolling to the selected event
+  QScrollArea* scrollArea = getContainingScrollArea(this);
+  if (!scrollArea) return;
 
-      int viewPortStartLine = scrollArea->verticalScrollBar()->value() / lineHeight;
-      int viewPortEndLine = viewPortStartLine + ((scrollArea->viewport()->height()) / lineHeight);
+  auto itemBaseOffset = static_cast<int>(item->dwOffset - vgmfile->dwOffset);
+  int line = itemBaseOffset / BYTES_PER_LINE;
+  int endLine = static_cast<int>(item->dwOffset + item->unLength - vgmfile->dwOffset) / BYTES_PER_LINE;
 
-      // If the item is already visible, don't scroll.
-      if (line <= viewPortEndLine && endLine > viewPortStartLine) {
-        return;
-      }
+  int viewPortStartLine = scrollArea->verticalScrollBar()->value() / lineHeight;
+  int viewPortEndLine = viewPortStartLine + ((scrollArea->viewport()->height()) / lineHeight);
 
-      if (line < viewPortStartLine) {
-        scrollArea->verticalScrollBar()->setValue(line * lineHeight);
-      } else if (endLine > viewPortEndLine) {
+  // If the item is already visible, don't scroll.
+  if (line <= viewPortEndLine && endLine > viewPortStartLine) {
+    return;
+  }
 
-        if ((endLine - line) > (scrollArea->size().height() / lineHeight)) {
-          int y = (line * lineHeight);
-          scrollArea->verticalScrollBar()->setValue(y);
-        } else {
-          int y = ((endLine + 1) * lineHeight) + 1 - scrollArea->size().height();
-          scrollArea->verticalScrollBar()->setValue(y);
-        }
-      }
+  if (line < viewPortStartLine) {
+    scrollArea->verticalScrollBar()->setValue(line * lineHeight);
+  } else if (endLine > viewPortEndLine) {
+
+    if ((endLine - line) > (scrollArea->size().height() / lineHeight)) {
+      int y = (line * lineHeight);
+      scrollArea->verticalScrollBar()->setValue(y);
+    } else {
+      int y = ((endLine + 1) * lineHeight) + 1 - scrollArea->size().height();
+      scrollArea->verticalScrollBar()->setValue(y);
     }
   }
 }
@@ -189,35 +190,35 @@ bool HexView::event(QEvent *e) {
 void HexView::changeEvent(QEvent *event) {
   if (event->type() == QEvent::ParentChange) {
     QScrollArea* scrollArea = getContainingScrollArea(this);
-    if (scrollArea) {
-      scrollArea->installEventFilter(
-        new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
-            if (event->type() == QEvent::Resize) {
-              redrawOverlay();
-              // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
-              // scroll events don't trigger on resize, and the user could expand the viewport so that it's in view
-              if (selectedItem && selectionView) {
-                selectionView->show();
-              }
-              return false;
+    if (!scrollArea) return;
+
+    scrollArea->installEventFilter(
+      new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
+          if (event->type() == QEvent::Resize) {
+            redrawOverlay();
+            // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
+            // scroll events don't trigger on resize, and the user could expand the viewport so that it's in view
+            if (selectedItem && selectionView) {
+              selectionView->show();
             }
             return false;
-          })
-      );
+          }
+          return false;
+        })
+    );
 
-      connect(scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this, scrollArea](int value) {
-        overlay->move(overlay->x(), value);
-        if (selectedItem != nullptr) {
-          int startLine = value / lineHeight;
-          int endLine = (value + scrollArea->height()) / lineHeight;
+    connect(scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this, scrollArea](int value) {
+      overlay->move(overlay->x(), value);
+      if (selectedItem != nullptr) {
+        int startLine = value / lineHeight;
+        int endLine = (value + scrollArea->height()) / lineHeight;
 
-          int selectedItemStartLine = ((selectedItem->dwOffset - vgmfile->dwOffset) / BYTES_PER_LINE) - 1;
-          int selectedItemEndLine = (((selectedItem->dwOffset - vgmfile->dwOffset) + selectedItem->unLength) / BYTES_PER_LINE) + 1;
-          bool selectionVisible = ((startLine <= selectedItemEndLine) && (selectedItemStartLine <= endLine));
-          selectionVisible ? selectionView->show() : selectionView->hide();
-        }
-      });
-    }
+        int selectedItemStartLine = ((selectedItem->dwOffset - vgmfile->dwOffset) / BYTES_PER_LINE) - 1;
+        int selectedItemEndLine = (((selectedItem->dwOffset - vgmfile->dwOffset) + selectedItem->unLength) / BYTES_PER_LINE) + 1;
+        bool selectionVisible = ((startLine <= selectedItemEndLine) && (selectedItemStartLine <= endLine));
+        selectionVisible ? selectionView->show() : selectionView->hide();
+      }
+    });
   }
   QWidget::changeEvent(event);
 }
@@ -305,11 +306,10 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       QPainter pixmapPainter = QPainter(&pixmap);
 
       int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
-      int startLine = baseOffset / BYTES_PER_LINE;
       int startColumn = baseOffset % BYTES_PER_LINE;
       int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
 
-      auto itemData = std::vector<uint8_t>(selectedItem->unLength):
+      auto itemData = std::vector<uint8_t>(selectedItem->unLength);
       vgmfile->GetBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
 
       QColor bgColor = colorForEventColor(selectedItem->color);
@@ -335,16 +335,14 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
           int bytesToPrint = min(
               min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
               BYTES_PER_LINE);
-          translateAndPrintAscii(pixmapPainter, data + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
-          translateAndPrintHex(pixmapPainter, data + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+          translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+          translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
 
           offsetIntoEvent += bytesToPrint;
           col = 0;
         }
         pixmapPainter.restore();
       }
-      delete[] data;
-
       auto glowEffect = new QGraphicsDropShadowEffect();
       glowEffect->setBlurRadius(SELECTION_PADDING);
       glowEffect->setColor(Qt::black);
@@ -566,7 +564,7 @@ void HexView::showOverlay(bool show, bool animate) {
     }
 
     overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
-    overlayAnimation->setDuration(200);
+    overlayAnimation->setDuration(DIM_DURATION_MS);
     overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 0 : overlayOpacityEffect->opacity());
     overlayAnimation->setEndValue(1.0);
     overlayAnimation->setEasingCurve(QEasingCurve::OutQuad);
@@ -586,7 +584,7 @@ void HexView::showOverlay(bool show, bool animate) {
     }
 
     overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
-    overlayAnimation->setDuration(200);
+    overlayAnimation->setDuration(DIM_DURATION_MS);
     overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 1.0 : overlayOpacityEffect->opacity());
     overlayAnimation->setEndValue(0.0);
 

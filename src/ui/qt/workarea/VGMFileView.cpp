@@ -20,17 +20,6 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
   m_splitter = new QSplitter(Qt::Horizontal, this);
 
-  /* This is silly, but Qt doesn't have constructor for float sizes.. */
-//  QFont font("Ubuntu Mono", QApplication::font().pointSize() + 5);
-//  font.setPointSizeF(QApplication::font().pointSizeF() + 3.0);
-//
-//  QFontInfo font_info(font);
-//  if (font_info.fixedPitch()) {
-//    m_hexview->setFont(font);
-//  } else {
-//    qtVGMRoot.AddLogItem(new LogItem(L"error loading font.", LOG_LEVEL_WARN, L"VGMFileView"));
-//  }
-
   setWindowTitle(QString::fromStdWString(*m_vgmfile->GetName()));
   setWindowIcon(iconForFileType(m_vgmfile->GetFileType()));
   setAttribute(Qt::WA_DeleteOnClose);
