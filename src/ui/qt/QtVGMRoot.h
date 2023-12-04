@@ -15,6 +15,7 @@ class QtVGMRoot final : public QObject, public VGMRoot {
 public:
   ~QtVGMRoot() override = default;
 
+  const std::wstring UI_GetResourceDirPath();
   void UI_SetRootPtr(VGMRoot** theRoot) override;
   void UI_PreExit() override;
   void UI_Exit() override;

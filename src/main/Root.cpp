@@ -304,3 +304,7 @@ void VGMRoot::AddLogItem(LogItem *theLog) {
   vLogItem.push_back(theLog);
   UI_AddLogItem(theLog);
 }
+
+const std::wstring VGMRoot::UI_GetResourceDirPath() {
+  return std::wstring(fs::current_path().generic_wstring());
+}

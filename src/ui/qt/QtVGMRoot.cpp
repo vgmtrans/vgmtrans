@@ -13,6 +13,18 @@
 
 QtVGMRoot qtVGMRoot;
 
+const std::wstring QtVGMRoot::UI_GetResourceDirPath() {
+#if defined(Q_OS_WIN)
+  return (QApplication::applicationDirPath() + "/").toStdWString();
+#elif defined(Q_OS_OSX)
+  return (QApplication::applicationDirPath() + "/../Resources/").toStdWString();
+#elif defined(Q_OS_LINUX)
+  return (QApplication::applicationDirPath() + "/").toStdWString();
+#else
+  return (QApplication::applicationDirPath() + "/").toStdWString();
+#endif
+}
+
 void QtVGMRoot::UI_SetRootPtr(VGMRoot** theRoot) {
   *theRoot = &qtVGMRoot;
 }
