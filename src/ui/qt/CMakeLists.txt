@@ -131,9 +131,11 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
                               PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 
-  target_sources(vgmtrans PRIVATE "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml")
-  set_source_files_properties("${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
-                              PROPERTIES MACOSX_PACKAGE_LOCATION MacOS)
+  add_custom_command(TARGET vgmtrans
+          POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/bin"
+          "${BUNDLE_PATH}/Contents/Resources")
 
   get_target_property(BASS_DLL_LOCATION BASS::BASS
                       IMPORTED_LOCATION)

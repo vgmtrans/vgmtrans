@@ -50,6 +50,7 @@ class VGMRoot {
     vLoader.push_back(new T());
   }
 
+  virtual const std::wstring UI_GetResourceDirPath();
   virtual void UI_SetRootPtr(VGMRoot **theRoot) = 0;
   virtual void UI_PreExit() { }
   virtual void UI_Exit() = 0;
