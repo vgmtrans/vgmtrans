@@ -2,7 +2,7 @@
 # Dependencies
 # ~~~
 
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/JUCE"
+add_subdirectory("${PROJECT_SOURCE_DIR}/external/juicysfplugin/external/JUCE"
         "${CMAKE_CURRENT_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
