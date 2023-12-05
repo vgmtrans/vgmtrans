@@ -5,7 +5,7 @@ find_package(Qt6 COMPONENTS GuiPrivate QUIET)
 message(STATUS "Using Qt: ${Qt6_VERSION}")
 message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/JUCE"
+add_subdirectory("${PROJECT_SOURCE_DIR}/external/juicysfplugin/external/JUCE"
         "${CMAKE_CURRENT_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
 
 if(NOT TARGET QWindowKit::Widgets)
