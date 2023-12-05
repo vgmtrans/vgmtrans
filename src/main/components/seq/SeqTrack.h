@@ -137,6 +137,7 @@ class SeqTrack : public VGMItem {
   void addPortamentoTime14Bit(uint32_t offset, uint32_t length, uint16_t time, const std::string &sEventName = "Portamento Time");
   void addPortamentoTime14BitNoItem(uint16_t time) const;
   void addPortamentoControlNoItem(uint8_t key) const;
+  void addLegatoPedalNoItem(bool bOn);
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const std::string &sEventName = "Program Change");
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const std::string &sEventName = "Program Change");
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const std::string &sEventName = "Program Change");
