@@ -27,6 +27,11 @@ void CPSTrackV1::ResetVars() {
   SeqTrack::ResetVars();
 }
 
+void CPSTrackV1::AddInitialMidiEvents(int trackNum) {
+  SeqTrack::AddInitialMidiEvents(trackNum);
+  AddPortamentoTime14BitNoItem(0x3FFF);
+}
+
 
 bool CPSTrackV1::ReadEvent(void) {
   uint32_t beginOffset = curOffset;
@@ -235,8 +240,11 @@ bool CPSTrackV1::ReadEvent(void) {
         // Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every 1/(250/4) seconds until we hit target key.
         uint8_t portamentoRate = GetByte(curOffset++);
         auto centsPerSecond = static_cast<uint16_t>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
-        centsPerSecond = std::min(centsPerSecond, static_cast<uint16_t>(0x3FFF));
-        AddPortamentoTime14Bit(beginOffset, curOffset - beginOffset, centsPerSecond);
+        auto decacentsPerSecond = std::min(static_cast<uint16_t>(centsPerSecond / 10), static_cast<uint16_t>(0x3FFF));
+        if (portamentoRate == 0) {
+          decacentsPerSecond = 0x3FFF;
+        }
+        AddPortamentoTime14Bit(beginOffset, curOffset - beginOffset, decacentsPerSecond);
         break;
       }
 
