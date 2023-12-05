@@ -1304,6 +1304,11 @@ void InsertExpression(uint8_t expression, uint32_t absTime);
 void AddPanEvent(uint8_t pan);
 void InsertPanEvent(uint8_t pan, uint32_t absTime);*/
 
+void SeqTrack::addLegatoPedalNoItem(bool bOn) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->addLegatoPedal(channel, bOn);
+}
+
 void SeqTrack::addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const std::string &sEventName) {
   addProgramChange(offset, length, progNum, false, sEventName);
 }
