@@ -132,6 +132,27 @@ selecting multiple.
 
 Please refer to [BUILDING.md](BUILDING.md) for compilation instructions.
 
+*Special compilation instructions for JUCE VST plugin version*
+- run `git submodule update --init --recursive` to clone all submodules
+
+For Mac and linux:
+- `cd external/juicysfplugin/scripts/linux`
+- `sh build-fluidsynth.sh`
+- `sh build.sh`
+
+For Windows, run the equivalent scripts:
+- `cd external/juicysfplugin/scripts/win`
+- `build-fluidsynth-x64.bat`
+- `build-x64.bat`
+
+For now, manually copy the vst3 into the vgmtrans root /bin/vst dir:
+- `cp -r ./external/juicysfplugin/build/juicysfplugin_artefacts/Release/VST3/juicysfplugin.vst3 ./bin/vst/juicysfplugin.vst3`
+
+Proceed with the normal build procedure:
+
+- in vgmtrans root dir `cmake -B build`
+- `cmake --build build --target vgmtrans --parallel`
+
 ## Contributing
 
 Pull requests are greatly appreciated. Check out our [guidelines](CONTRIBUTING.md)
