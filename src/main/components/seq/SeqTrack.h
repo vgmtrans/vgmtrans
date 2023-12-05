@@ -241,6 +241,7 @@ private:
   void insertPortamentoTime14BitNoItem(uint16_t time, uint32_t absTime) const;
   void addPortamentoControlNoItem(uint8_t key) const;
   void insertPortamentoControlNoItem(uint8_t key, uint32_t absTime) const;
+  void addLegatoPedalNoItem(bool bOn);
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const std::string &sEventName = "Program Change");
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const std::string &sEventName = "Program Change");
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const std::string &sEventName = "Program Change");
