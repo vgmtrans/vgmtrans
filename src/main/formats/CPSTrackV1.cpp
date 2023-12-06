@@ -27,6 +27,11 @@ void CPSTrackV1::ResetVars() {
   SeqTrack::ResetVars();
 }
 
+void CPSTrackV1::AddInitialMidiEvents(int trackNum) {
+  SeqTrack::AddInitialMidiEvents(trackNum);
+  AddPortamentoTime14BitNoItem(0);
+}
+
 
 bool CPSTrackV1::ReadEvent(void) {
   uint32_t beginOffset = curOffset;
@@ -233,10 +238,18 @@ bool CPSTrackV1::ReadEvent(void) {
       break;
       case 0x0D : {
         // Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every 1/(250/4) seconds until we hit target key.
+        // A portamento rate value of 0 means instantaneous slide
         uint8_t portamentoRate = GetByte(curOffset++);
-        auto centsPerSecond = static_cast<uint16_t>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
-        centsPerSecond = std::min(centsPerSecond, static_cast<uint16_t>(0x3FFF));
-        AddPortamentoTime14Bit(beginOffset, curOffset - beginOffset, centsPerSecond);
+        uint16_t value = 0;
+        // the rate is represented as decacents per second, but is passed in on an inverse 14 bit scale (from 0-0x3FFF)
+        // value of 0 means a rate of 0x3FFF decacents per second - the fastest slide
+        // value of 0x3FFF means 0 decacents per second - no slide
+        if (portamentoRate != 0) {
+          auto centsPerSecond = static_cast<uint16_t>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
+          auto decacentsPerSecond = std::min(static_cast<uint16_t>(centsPerSecond / 10), static_cast<uint16_t>(0x3FFF));
+          value = 0x3FFF - decacentsPerSecond;
+        }
+        AddPortamentoTime14Bit(beginOffset, curOffset - beginOffset, value);
         break;
       }
 

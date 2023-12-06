@@ -10,6 +10,7 @@ class CPSTrackV1
 public:
   CPSTrackV1(CPSSeq *parentSeq, long offset = 0, long length = 0);
   virtual void ResetVars();
+  virtual void AddInitialMidiEvents(int trackNum);
   virtual bool ReadEvent(void);
 
 private:
