@@ -1394,7 +1394,6 @@ void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semit
     AddEvent(new TransposeSeqEvent(this, semitones, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
     parentSeq->midi->globalTrack.InsertGlobalTranspose(GetTime(), semitones);
-  //pMidiTrack->(channel, transpose);
 }
 
 void SeqTrack::AddMarker(uint32_t offset,
