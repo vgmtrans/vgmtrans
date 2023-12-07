@@ -398,8 +398,7 @@ void NewSequencePlayer::populateMidiBuffer(juce::MidiBuffer& midiBuffer, int sam
 
     // Ignore Meta events because they will be filtered by JUCE (and are irrelevant anyway).
     if (midiEvent->IsMetaEvent() ||
-        midiEvent->GetEventType() == MidiEventType::MIDIEVENT_MARKER ||
-        midiEvent->GetEventType() == MidiEventType::MIDIEVENT_GLOBALTRANSPOSE) {
+        midiEvent->GetEventType() == MidiEventType::MIDIEVENT_MARKER) {
       state.eventOffset++;
       continue;
     }
@@ -408,6 +407,12 @@ void NewSequencePlayer::populateMidiBuffer(juce::MidiBuffer& midiBuffer, int sam
     else if (midiEvent->IsSysexEvent()) {
       juce::MidiMessage msg = convertToJuceMidiMessage(midiEvent);
       midiBuffer.addEvent(msg, offset);
+    } else if (midiEvent->GetEventType() == MidiEventType::MIDIEVENT_GLOBALTRANSPOSE) {
+      // Global transpose events are not actual MIDI events but instead change sequence-level state
+      // when written, affecting all subsequent notes. As such, we call WriteEvent() but don't pass
+      // the event into the buffer as there is no data to send.
+      vector<uint8_t> eventData;
+      midiEvent->WriteEvent(eventData, midiEvent->AbsTime);
     } else {
       // Otherwise we wrap the event in a sysex event of our creation. We do this because we need
       // to pass channelGroup information to allow for > 16 midi channel playback. Other methods of
