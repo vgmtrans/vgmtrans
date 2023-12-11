@@ -25,4 +25,5 @@ private:
   uint8_t loop[4];
   uint32_t loopOffset[4];    //used for detecting infinite loops
   int16_t portamentoCentsPerSec;
+  uint16_t prevPortamentoDuration;
 };
