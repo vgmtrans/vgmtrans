@@ -50,10 +50,11 @@ bool CPSTrackV2::ReadEvent(void) {
 
   // Note opcodes are [0x80 - 0xBF]
   if (status_byte < 0xC0) {
-    uint8_t velocity = (status_byte & 0x3F) * 2;
+    uint8_t velocity = status_byte & 0x3F;
+    uint8_t midiVel = ConvertPercentAmpToStdMidiVal(static_cast<double>(velocity) / static_cast<double>(0x3F));
     uint8_t note = GetByte(curOffset++);
     uint32_t duration = ReadVarLength();
-    AddNoteByDur(beginOffset, curOffset - beginOffset, note, velocity, duration);
+    AddNoteByDur(beginOffset, curOffset - beginOffset, note, midiVel, duration);
     return true;
   }
 
@@ -80,15 +81,16 @@ bool CPSTrackV2::ReadEvent(void) {
       break;
 
     case C3_PITCHBEND: {
-      uint8_t pitchbend = GetByte(curOffset++);
-      AddMarker(beginOffset,
-                curOffset - beginOffset,
-                string("pitchbend"),
-                pitchbend,
-                0,
-                L"Pitch Bend",
-                PRIORITY_MIDDLE,
-                CLR_PITCHBEND);
+      int8_t pitch = GetByte(curOffset++);
+      AddPitchBend(beginOffset, curOffset - beginOffset, pitch * 64);
+//      AddMarker(beginOffset,
+//                curOffset - beginOffset,
+//                string("pitchbend"),
+//                pitchbend,
+//                0,
+//                L"Pitch Bend",
+//                PRIORITY_MIDDLE,
+//                CLR_PITCHBEND);
       break;
     }
 
@@ -126,8 +128,7 @@ bool CPSTrackV2::ReadEvent(void) {
 
     case EVENT_C8: {
       uint8_t expression = GetByte(curOffset++);
-      //      expression = ConvertPercentAmpToStdMidiVal(vol_table[expression] / (double) 0x1FFF);
-      expression = ConvertPercentAmpToStdMidiVal(((double)expression / 128.0));
+      expression = ConvertPercentAmpToStdMidiVal(((double)expression / 127.0));
       this->AddExpression(beginOffset, curOffset - beginOffset, expression);
       break;
     }
@@ -248,40 +249,40 @@ bool CPSTrackV2::ReadEvent(void) {
     case E0_RESET_LFO: {
       //TODO: Go back and tweak this logic. It's doing something more.
       uint8_t data = GetByte(curOffset++);
-      AddMarker(beginOffset,
-                curOffset - beginOffset,
-                string("resetlfo"),
-                data,
-                0,
-                L"LFO Reset",
-                PRIORITY_MIDDLE,
-                CLR_LFO);
+//      AddMarker(beginOffset,
+//                curOffset - beginOffset,
+//                string("resetlfo"),
+//                data,
+//                0,
+//                L"LFO Reset",
+//                PRIORITY_MIDDLE,
+//                CLR_LFO);
       break;
     }
 
     case E1_LFO_RATE: {
       uint8_t rate = GetByte(curOffset++);
-      AddMarker(beginOffset,
-                curOffset - beginOffset,
-                string("lfo"),
-                rate,
-                0,
-                L"LFO Rate",
-                PRIORITY_MIDDLE,
-                CLR_LFO);
+//      AddMarker(beginOffset,
+//                curOffset - beginOffset,
+//                string("lfo"),
+//                rate,
+//                0,
+//                L"LFO Rate",
+//                PRIORITY_MIDDLE,
+//                CLR_LFO);
       break;
     }
 
     case E2_TREMELO: {
       uint8_t tremeloDepth = GetByte(curOffset++);
-      AddMarker(beginOffset,
-                curOffset - beginOffset,
-                string("tremelo"),
-                tremeloDepth,
-                0,
-                L"Tremelo",
-                PRIORITY_MIDDLE,
-                CLR_EXPRESSION);
+//      AddMarker(beginOffset,
+//                curOffset - beginOffset,
+//                string("tremelo"),
+//                tremeloDepth,
+//                0,
+//                L"Tremelo",
+//                PRIORITY_MIDDLE,
+//                CLR_EXPRESSION);
       break;
     }
 

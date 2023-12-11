@@ -247,16 +247,20 @@ bool CPSInstrSet::GetInstrPointers() {
         uint8_t bank = i;
         uint32_t bankOff = instr_table_ptrs[bank] - 0x6000000;
 
+        std::wostringstream pointersStream;
+        pointersStream << L"Bank " << bank << " Instrument Pointers";
+        auto instrPointersItem = new VGMContainerItem(this->vgmfile, bankOff, 128*2, pointersStream.str(), CLR_HEADER);
+
         // For each bank, iterate over all instr ptrs and create instruments
-        uint32_t instrPtrTableEnd = GetShortBE(bankOff) + bankOff;
-        uint8_t instrNum = 0;
-        //          for (uint32_t instrPtrOff = bankOff; instrPtrOff < instrPtrTableEnd && GetShort(instrPtrOff) != 0; instrPtrOff += 2) {
         for (uint8_t j = 0; j < 128; j++) {
           uint16_t instrPtrOffset = GetShortBE(bankOff + (j*2));
           uint32_t instrPtr = instrPtrOffset + bankOff;
           if (instrPtrOffset == 0) {
             continue;
           }
+          std::wostringstream pointerStream;
+          pointerStream << L"Instrument Pointer " << j;
+          instrPointersItem->AddSimpleItem(bankOff + (j*2), 2, pointerStream.str());
 
           std::wostringstream ss;
           ss << L"Instrument " << j << " bank " << bank;
@@ -266,7 +270,7 @@ bool CPSInstrSet::GetInstrPointers() {
 
           instrNum++;
         }
-        //          totalInstrs += 128;//instrNum;
+        this->AddItem(instrPointersItem);
 
         continue;
       }
@@ -278,7 +282,6 @@ bool CPSInstrSet::GetInstrPointers() {
         endOffset = instr_table_ptrs[i + 1];
       else
         endOffset = instr_table_ptrs[i] + instr_info_length * 256;//4*0x7F;
-
 
       for (int j = instr_table_ptrs[i]; j < endOffset; j += instr_info_length, k++) {
         if (GetShort(j) == 0 && GetByte(j + 2) == 0 && i != 0)
