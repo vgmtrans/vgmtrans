@@ -23,6 +23,7 @@ void CPSTrackV1::ResetVars() {
   noteState = 0;
   bank = 0;
   portamentoCentsPerSec = 0;
+  prevPortamentoDuration = 0;
   memset(loop, 0, sizeof(loop));
   memset(loopOffset, 0, sizeof(loopOffset));
   SeqTrack::ResetVars();
@@ -40,6 +41,10 @@ void CPSTrackV1::CalculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
     uint16_t centDistance = abs(noteDistance) * 100;
     durationInMillis = (static_cast<double>(centDistance) / static_cast<double>(portamentoCentsPerSec)) * 1000.0;
   }
+  if (durationInMillis == prevPortamentoDuration) {
+    return;
+  }
+  prevPortamentoDuration = durationInMillis;
   AddPortamentoTime14BitNoItem(durationInMillis);
 }
 
