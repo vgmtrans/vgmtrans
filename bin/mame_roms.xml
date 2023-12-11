@@ -558,7 +558,7 @@
         </romgroup>
     </game>
     <game name="sfiii3" format="CPS" fmt_version="CPS3">
-        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0xa55432b4" key2="0x0c129981" seq_table="0x78f008" samp_table="0x78C000" samp_table_length="0x2DD0" instr_table_ptrs="0x788000" num_instr_banks="4">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0xa55432b4" key2="0x0c129981" seq_table="0x78f008" samp_table="0x78C000" samp_table_length="0x2DD0" instr_table_ptrs="0x788000" num_instr_banks="16">
             <rom>sfiii3n/sfiii3-simm1.0</rom>
             <rom>sfiii3n/sfiii3-simm1.1</rom>
             <rom>sfiii3n/sfiii3-simm1.2</rom>
