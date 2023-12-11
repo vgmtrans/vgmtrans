@@ -531,7 +531,9 @@ bool CPSSampColl::GetSampleInfo() {
     if (sampLength == 0 || sampOffset > unLength)
       break;
 
-    uint32_t frequency = instrset->fmt_version == VER_CPS3 ? 37000 : 24038;
+    // CPS3 frequency is (42954545 hz / 3) / 384) ~= 37287
+    // CPS2 frequency is (60 MHz / 2 / 1248) ~= 24038
+    uint32_t frequency = instrset->fmt_version == VER_CPS3 ? 37287 : 24038;
     VGMSamp *newSamp = AddSamp(sampOffset, sampLength, sampOffset, sampLength, 1, 8, frequency, name.str());
     newSamp->SetWaveType(WT_PCM8);
     if (sampLength - relativeLoopOffset < 40)
