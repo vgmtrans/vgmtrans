@@ -265,10 +265,7 @@ bool CPSInstrSet::GetInstrPointers() {
           std::wostringstream ss;
           ss << L"Instrument " << j << " bank " << bank;
           wstring name = ss.str();
-          //            aInstrs.push_back(new CPSInstr(this, instrPtr, 0, (uint32_t)(bank * 2) + (i / 128), (uint32_t)(instrNum % 128), name));
           aInstrs.push_back(new CPSInstr(this, instrPtr, 0, bank*2, j, name));
-
-          instrNum++;
         }
         this->AddItem(instrPointersItem);
 
@@ -320,7 +317,7 @@ bool CPSInstr::LoadInstr() {
   vector<VGMRgn*> rgns;
   const CPSFormatVer formatVersion = GetFormatVer();
   if (formatVersion < VER_103) {
-    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, L"Instrument Info ver < 1.03");
+    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
     rgn->AddSimpleItem(this->dwOffset,     1, L"Sample Info Index");
     rgn->AddSimpleItem(this->dwOffset + 1, 1, L"Unknown / Ignored");
@@ -341,7 +338,7 @@ bool CPSInstr::LoadInstr() {
     this->release_rate = progInfo.release_rate;
   }
   else if (formatVersion < VER_130 || formatVersion == VER_200 || formatVersion == VER_201B) {
-    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, L"Instrument Info ver < 1.30");
+    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
     qs_prog_info_ver_103 progInfo;
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_103), &progInfo);
@@ -365,7 +362,7 @@ bool CPSInstr::LoadInstr() {
     uint8_t prevKeyHigh = 0;
     uint32_t off;
     for (off = dwOffset; GetShort(off) != 0xFFFF; off += 12) {
-      VGMRgn* rgn = new VGMRgn(this, off, 12, L"Instrument Info ver CPS3");
+      VGMRgn* rgn = new VGMRgn(this, off, 12);
       rgns.push_back(rgn);
 
       qs_prog_info_ver_cps3 progInfo;
@@ -392,7 +389,7 @@ bool CPSInstr::LoadInstr() {
     unLength = off - dwOffset;
   }
   else {
-    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, L"Instrument Info ver >= 1.30");
+    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, L"Region");
     rgns.push_back(rgn);
     qs_prog_info_ver_130 progInfo;
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
@@ -409,7 +406,6 @@ bool CPSInstr::LoadInstr() {
     this->sustain_level = artic->sustain_level;
     this->sustain_rate = artic->sustain_rate;
     this->release_rate = artic->release_rate;
-
   }
 
   for (int i=0; i<rgns.size(); i++) {
@@ -535,7 +531,7 @@ bool CPSSampColl::GetSampleInfo() {
     if (sampLength == 0 || sampOffset > unLength)
       break;
 
-    uint32_t frequency = instrset->fmt_version == VER_CPS3 ? 37000 : 24000;
+    uint32_t frequency = instrset->fmt_version == VER_CPS3 ? 37000 : 24038;
     VGMSamp *newSamp = AddSamp(sampOffset, sampLength, sampOffset, sampLength, 1, 8, frequency, name.str());
     newSamp->SetWaveType(WT_PCM8);
     if (sampLength - relativeLoopOffset < 40)
