@@ -637,7 +637,14 @@ void MidiTrack::AddMarker(uint8_t channel,
   aEvents.push_back(new MarkerEvent(this, channel, GetDelta(), markername, databyte1, databyte2, priority));
 }
 
-
+void MidiTrack::InsertMarker(uint8_t channel,
+                  const string &markername,
+                  uint8_t databyte1,
+                  uint8_t databyte2,
+                  int8_t priority,
+                  uint32_t absTime) {
+  aEvents.push_back(new MarkerEvent(this, channel, absTime, markername, databyte1, databyte2, priority));
+}
 
 //  *********
 //  MidiEvent

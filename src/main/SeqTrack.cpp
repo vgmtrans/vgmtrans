@@ -1408,8 +1408,24 @@ void SeqTrack::AddMarker(uint32_t offset,
 
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new MarkerSeqEvent(this, markername, databyte1, databyte2, offset, length, sEventName, color));
-  else if (readMode == READMODE_CONVERT_TO_MIDI)
+  AddMarkerNoItem(markername, databyte1, databyte2, priority);
+}
+
+void SeqTrack::AddMarkerNoItem(const string &markername,
+                               uint8_t databyte1,
+                               uint8_t databyte2,
+                               int8_t priority) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
     pMidiTrack->AddMarker(channel, markername, databyte1, databyte2, priority);
+}
+
+void SeqTrack::InsertMarkerNoItem(uint32_t absTime,
+                                  const string &markername,
+                                  uint8_t databyte1,
+                                  uint8_t databyte2,
+                                  int8_t priority) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->InsertMarker(channel, markername, databyte1, databyte2, priority, absTime);
 }
 
 // when in FIND_DELTA_LENGTH mode, returns true until we've hit the max number of loops defined in options
