@@ -58,6 +58,8 @@ public:
   auto getTreeWidgetItem(VGMItem *vgm_item) { return m_items.at(vgm_item); };
 
 private:
+  int getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item);
+
   QTreeWidgetItem *parent_item_cached{};
   VGMItem *parent_cached{};
   std::unordered_map<VGMItem *, QTreeWidgetItem *> m_items{};

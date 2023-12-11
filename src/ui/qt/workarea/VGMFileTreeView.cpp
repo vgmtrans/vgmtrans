@@ -85,6 +85,28 @@ void VGMFileTreeView::selectionChanged(const QItemSelection &selected, const QIt
 #endif
 }
 
+// Find the index to insert a child item, sorted by offset, using binary search
+int VGMFileTreeView::getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item) {
+  int newOffset = item->item_offset();
+  int left = 0;
+  int right = parent->childCount() - 1;
+
+  while (left <= right) {
+    int mid = left + (right - left) / 2;
+    VGMTreeItem* childItem = static_cast<VGMTreeItem*>(parent->child(mid));
+
+    if (childItem->item_offset() == newOffset) {
+      return mid;
+    } else if (childItem->item_offset() < newOffset) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+  return left;
+}
+
+
 void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name) {
   auto item_name = QString::fromStdWString(name);
   auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
@@ -108,7 +130,8 @@ void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstr
     parent_item_cached = m_items[parent];
   }
 
-  parent_item_cached->addChild(tree_item);
+  int insertIndex = getSortedIndex(parent_item_cached, tree_item);
+  parent_item_cached->insertChild(insertIndex, tree_item);
   m_items[item] = tree_item;
   tree_item->setData(0, Qt::UserRole, QVariant::fromValue((void *)item));
 }
