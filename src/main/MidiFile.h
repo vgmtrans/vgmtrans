@@ -175,6 +175,12 @@ class MidiTrack {
                  uint8_t databyte1,
                  uint8_t databyte2,
                  int8_t priority = PRIORITY_MIDDLE);
+  void InsertMarker(uint8_t channel,
+                    const std::string &markername,
+                    uint8_t databyte1,
+                    uint8_t databyte2,
+                    int8_t priority,
+                    uint32_t absTime);
 
  public:
   MidiFile *parentSeq;

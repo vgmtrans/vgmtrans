@@ -22,9 +22,6 @@ CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, wstring 
   // Until we add CPS3 vibrato and pitch bend using markers, set the default pitch bend range here
   if (fmt_version >= VER_200)
     AlwaysWriteInitialPitchBendRange(12, 0);
-  // While we still use the BASS audio library, we won't call the PortamentoTimeMode Sysex event
-  // because BASS insists the first sysex data byte be the length of the data, which is non-standard
-//  AlwaysWritePortamentoTimeMode(PortamentoTimeMode::kCentsPerSecond);
 }
 
 CPSSeq::~CPSSeq(void) {

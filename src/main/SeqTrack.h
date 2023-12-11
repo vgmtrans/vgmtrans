@@ -146,6 +146,8 @@ class SeqTrack:
 
   void AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::wstring &sEventName = L"Global Transpose");
   void AddMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::wstring &sEventName, int8_t priority = 0, EventColor color = CLR_MISC);
+  void AddMarkerNoItem(const string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority);
+  void InsertMarkerNoItem(uint32_t absTime, const string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority);
 
   bool AddLoopForever(uint32_t offset, uint32_t length, const std::wstring &sEventName = L"Loop Forever");
 

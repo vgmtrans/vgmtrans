@@ -22,6 +22,7 @@ void CPSTrackV1::ResetVars() {
   curDeltaTable = 0;
   noteState = 0;
   bank = 0;
+  portamentoCentsPerSec = 0;
   memset(loop, 0, sizeof(loop));
   memset(loopOffset, 0, sizeof(loopOffset));
   SeqTrack::ResetVars();
@@ -32,6 +33,15 @@ void CPSTrackV1::AddInitialMidiEvents(int trackNum) {
   AddPortamentoTime14BitNoItem(0);
 }
 
+void CPSTrackV1::CalculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
+  // Portamento time will be expressed in milliseconds
+  uint16_t durationInMillis = 0;
+  if (portamentoCentsPerSec > 0) {
+    uint16_t centDistance = abs(noteDistance) * 100;
+    durationInMillis = (static_cast<double>(centDistance) / static_cast<double>(portamentoCentsPerSec)) * 1000.0;
+  }
+  AddPortamentoTime14BitNoItem(durationInMillis);
+}
 
 bool CPSTrackV1::ReadEvent(void) {
   uint32_t beginOffset = curOffset;
@@ -69,6 +79,7 @@ bool CPSTrackV1::ReadEvent(void) {
           AddPortamentoNoItem(true);
         }
         else if (key != prevTieNote) {
+          CalculateAndAddPortamentoTimeNoItem(key - prevTieNote);
           AddNoteOn(beginOffset, curOffset - beginOffset, key, 127, L"Note On (tied)");
           AddNoteOffNoItem(prevTieNote);
         }
@@ -80,6 +91,7 @@ bool CPSTrackV1::ReadEvent(void) {
       else {
         if (bPrevNoteTie) {
           if (key != prevTieNote) {
+            CalculateAndAddPortamentoTimeNoItem(key - prevTieNote);
             AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
             AddNoteOffNoItem(prevTieNote);
             InsertPortamentoNoItem(false, GetTime()+absDur);
@@ -248,8 +260,11 @@ bool CPSTrackV1::ReadEvent(void) {
           auto centsPerSecond = static_cast<uint16_t>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
           auto decacentsPerSecond = std::min(static_cast<uint16_t>(centsPerSecond / 10), static_cast<uint16_t>(0x3FFF));
           value = 0x3FFF - decacentsPerSecond;
+          portamentoCentsPerSec = centsPerSecond;
+        } else {
+          portamentoCentsPerSec = 0;
         }
-        AddPortamentoTime14Bit(beginOffset, curOffset - beginOffset, value);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Portamento Time", L"", CLR_PORTAMENTOTIME);
         break;
       }
 
