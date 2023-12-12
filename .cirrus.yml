@@ -2,7 +2,6 @@ task:
     name: FreeBSD
     freebsd_instance:
         matrix:
-            image_family: freebsd-12-4
             image_family: freebsd-13-2
 
     install_script: pwd && ls -la && pkg update --force && pkg install -y cmake ninja qt6-base qt6-svg minizip
