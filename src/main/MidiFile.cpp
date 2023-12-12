@@ -358,10 +358,6 @@ void MidiTrack::InsertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t
   aEvents.push_back(new PortamentoTimeFineEvent(this, channel, absTime, time));
 }
 
-void MidiTrack::AddPortamentoTimeMode(PortamentoTimeMode mode) {
-  aEvents.push_back(new PortamentoTimeModeEvent(this, GetDelta(), mode));
-}
-
 void MidiTrack::AddPortamentoControl(uint8_t channel, uint8_t key) {
   aEvents.push_back(new PortamentoControlEvent(this, channel, GetDelta(), key));
 }
@@ -669,8 +665,7 @@ bool MidiEvent::IsMetaEvent() {
 bool MidiEvent::IsSysexEvent() {
   MidiEventType type = GetEventType();
   return type == MIDIEVENT_MASTERVOL ||
-         type == MIDIEVENT_RESET ||
-         type == MIDIEVENT_PORTAMENTOTIMEMODE;
+         type == MIDIEVENT_RESET;
 }
 
 void MidiEvent::WriteVarLength(vector<uint8_t> &buf, uint32_t value) {
