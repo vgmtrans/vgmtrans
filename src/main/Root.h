@@ -57,6 +57,8 @@ class VGMRoot {
   virtual void UI_AddRawFile(RawFile *newFile) { }
   virtual void UI_CloseRawFile(RawFile *targFile) { }
 
+  virtual void UI_OnBeginLoadRawFile() { }
+  virtual void UI_OnEndLoadRawFile() { }
   virtual void UI_OnBeginScan() { }
   virtual void UI_SetScanInfo() { }
   virtual void UI_OnEndScan() { }

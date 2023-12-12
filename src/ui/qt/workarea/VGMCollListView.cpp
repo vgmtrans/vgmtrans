@@ -24,10 +24,27 @@ static const QIcon &VGMCollIcon() {
  * VGMCollListViewModel
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
+  connect(&qtVGMRoot, &QtVGMRoot::UI_BeganLoadingRawFile,
+          [=]() {
+            resettingModel = true;
+            beginResetModel();
+          });
+  connect(&qtVGMRoot, &QtVGMRoot::UI_EndedLoadingRawFile,
+          [=]() {
+            endResetModel();
+            resettingModel = false;
+          });
+
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMColl,
-          [=]() { dataChanged(index(0, 0), index(rowCount() - 1, 0)); });
+          [=]() {
+            if (!resettingModel)
+              dataChanged(index(0, 0), index(rowCount() - 1, 0));
+          });
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedVGMColl,
-          [=]() { dataChanged(index(0, 0), index(rowCount() - 1, 0)); });
+          [=]() {
+            if (!resettingModel)
+              dataChanged(index(0, 0), index(rowCount() - 1, 0));
+          });
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {

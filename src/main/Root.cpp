@@ -137,11 +137,13 @@ bool VGMRoot::CreateVirtFile(uint8_t *databuf,
 // to the RawFile
 bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
   newRawFile->SetProPreRatio((float) 0.80);
+  this->UI_OnBeginLoadRawFile();
 
   if (newRawFile->processFlags & PF_USELOADERS)
     for (uint32_t i = 0; i < vLoader.size(); i++) {
       if (vLoader[i]->Apply(newRawFile) == DELETE_IT) {
         delete newRawFile;
+        this->UI_OnEndLoadRawFile();
         return true;
       }
     }
@@ -165,11 +167,13 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
 
   if (newRawFile->containedVGMFiles.size() == 0) {
     delete newRawFile;
+    this->UI_OnEndLoadRawFile();
     return true;
   }
   newRawFile->SetProPreRatio(0.5);
   vRawFile.push_back(newRawFile);
   UI_AddRawFile(newRawFile);
+  this->UI_OnEndLoadRawFile();
   return true;
 }
 

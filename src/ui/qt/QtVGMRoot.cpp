@@ -43,6 +43,16 @@ void QtVGMRoot::UI_CloseRawFile(RawFile*) {
   this->UI_RemovedRawFile();
 }
 
+void QtVGMRoot::UI_OnBeginLoadRawFile() {
+  if (rawFileLoadRecurseStack++ == 0)
+    this->UI_BeganLoadingRawFile();
+}
+
+void QtVGMRoot::UI_OnEndLoadRawFile() {
+  if (--rawFileLoadRecurseStack == 0)
+    this->UI_EndedLoadingRawFile();
+}
+
 void QtVGMRoot::UI_OnBeginScan() {
 }
 

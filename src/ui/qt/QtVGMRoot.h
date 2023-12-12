@@ -22,6 +22,8 @@ public:
   void UI_AddRawFile(RawFile* newFile) override;
   void UI_CloseRawFile(RawFile* targFile) override;
 
+  void UI_OnBeginLoadRawFile() override;
+  void UI_OnEndLoadRawFile() override;
   void UI_OnBeginScan() override;
   void UI_SetScanInfo() override;
   void UI_OnEndScan() override;
@@ -42,7 +44,12 @@ public:
                                           const std::wstring& extension = L"") override;
   std::wstring UI_GetSaveDirPath(const std::wstring& suggestedDir = L"") override;
 
+private:
+  int rawFileLoadRecurseStack = 0;
+
 signals:
+  void UI_BeganLoadingRawFile();
+  void UI_EndedLoadingRawFile();
   void UI_AddedRawFile();
   void UI_RemovedRawFile();
   void UI_AddedVGMFile();

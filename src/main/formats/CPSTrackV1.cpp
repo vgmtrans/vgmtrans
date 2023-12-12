@@ -319,7 +319,7 @@ bool CPSTrackV1::ReadEvent(void) {
           loopOffset[loopNum] = 0;
         }
         else {
-          printf("%X JUMPING TO %X\n", curOffset, jump);
+//          printf("%X JUMPING TO %X\n", curOffset, jump);
           curOffset = jump;
         }
         break;
@@ -350,7 +350,7 @@ bool CPSTrackV1::ReadEvent(void) {
             curOffset += 2;
             AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Break", L"", CLR_LOOP);
 
-            printf("%X LOOP BREAK JUMPING TO %X\n", curOffset, jump);
+//            printf("%X LOOP BREAK JUMPING TO %X\n", curOffset, jump);
             if (((CPSSeq *) parentSeq)->fmt_version <= VER_CPS1_425) {
               curOffset = jump;
             }
@@ -374,8 +374,7 @@ bool CPSTrackV1::ReadEvent(void) {
           jump = curOffset + 2 + (short)GetShortBE(curOffset);
         }
 
-        printf("%X LOOP ALWAYS JUMPING TO %X\n", curOffset, jump);
-        //        curOffset += 2;
+//        printf("%X LOOP ALWAYS JUMPING TO %X\n", curOffset, jump);
         bool bResult = AddLoopForever(beginOffset, 3);
         curOffset = jump;
 
@@ -401,16 +400,12 @@ bool CPSTrackV1::ReadEvent(void) {
         AddUnknown(beginOffset, curOffset - beginOffset, L"Reg9 Event (unknown to MAME)");
         break;
 
-      case 0x1A :    //master(?) vol
-      {
-        //curOffset++;
+      case 0x1A : {
         vol = GetByte(curOffset++);
         AddGenericEvent(beginOffset, curOffset - beginOffset, L"Master Volume", L"", CLR_UNKNOWN);
         //this->AddMasterVol(beginOffset, curOffset-beginOffset, vol);
-        //AddVolume(beginOffset, curOffset-beginOffset, vool);
         break;
       }
-        //AddUnknown(beginOffset, curOffset-beginOffset);
 
       //Vibrato depth...
       case 0x1B : {
