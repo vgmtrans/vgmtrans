@@ -26,7 +26,6 @@ VGMSeq::VGMSeq(const string &format, RawFile *file, uint32_t offset, uint32_t le
       bAlwaysWriteInitialPitchBendRange(false),
       bAlwaysWriteInitialMono(false),
       bAllowDiscontinuousTrackData(false),
-      portamentoTimeMode(PortamentoTimeMode::kUndefined),
       bLoadTickByTick(false),
       bIncTickAfterProcessingTracks(true),
       initialVol(100),                    //GM standard (dls1 spec p16)

@@ -11,7 +11,6 @@ class MidiTrack;
 class MidiEvent;
 class DurNoteEvent;
 class NoteEvent;
-enum class PortamentoTimeMode: uint8_t;
 
 #define PRIORITY_LOWEST 127
 #define PRIORITY_LOWER 96
@@ -47,7 +46,6 @@ typedef enum {
   MIDIEVENT_PORTAMENTO,
   MIDIEVENT_PORTAMENTOTIME,
   MIDIEVENT_PORTAMENTOTIMEFINE,
-  MIDIEVENT_PORTAMENTOTIMEMODE,
   MIDIEVENT_PORTAMENTOCONTROL,
   MIDIEVENT_MONO,
   MIDIEVENT_LFO,
@@ -115,7 +113,6 @@ class MidiTrack {
   void InsertPortamentoTime(uint8_t channel, uint8_t time, uint32_t absTime);
   void AddPortamentoTimeFine(uint8_t channel, uint8_t time);
   void InsertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime);
-  void AddPortamentoTimeMode(PortamentoTimeMode mode);
   void AddPortamentoControl(uint8_t channel, uint8_t key);
   void AddMono(uint8_t channel);
   void InsertMono(uint8_t channel, uint32_t absTime);
@@ -371,14 +368,6 @@ public:
   PortamentoTimeFineEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t time)
       : ControllerEvent(prntTrk, channel, absoluteTime, 37, time, PRIORITY_MIDDLE) { }
   virtual MidiEventType GetEventType() { return MIDIEVENT_PORTAMENTOTIMEFINE; }
-};
-
-class PortamentoTimeModeEvent
-    : public SysexEvent {
-public:
-  PortamentoTimeModeEvent(MidiTrack *prntTrk, uint32_t absoluteTime, PortamentoTimeMode mode)
-      : SysexEvent(prntTrk, absoluteTime, {0x7D, 0x7E, static_cast<uint8_t>(mode) }, PRIORITY_MIDDLE) { }
-  virtual MidiEventType GetEventType() { return MIDIEVENT_PORTAMENTOTIMEMODE; }
 };
 
 class PortamentoControlEvent

@@ -124,7 +124,6 @@ class SeqTrack:
   void InsertPortamentoTimeNoItem(uint8_t time, uint32_t absTime);
   void AddPortamentoTime14Bit(uint32_t offset, uint32_t length, uint16_t time, const std::wstring &sEventName = L"Portamento Time");
   void AddPortamentoTime14BitNoItem(uint16_t time);
-  void AddPortamentoTimeModeNoItem(PortamentoTimeMode mode);
   void AddPortamentoControlNoItem(uint8_t key);
   void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const std::wstring &sEventName = L"Program Change");
   void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const std::wstring &sEventName = L"Program Change");
