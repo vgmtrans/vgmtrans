@@ -33,9 +33,9 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   lineCache.setMaxCost(NUM_CACHED_LINE_PIXMAPS);
 
   double appFontPointSize = QApplication::font().pointSizeF();
-  QFont font("Roboto Mono", appFontPointSize + 2);
+  QFont font("Roboto Mono", appFontPointSize);
   // Call setPointSizeF, as QFont() doesn't accept a float size value
-  font.setPointSizeF(appFontPointSize + 2.0);
+  font.setPointSizeF(appFontPointSize);
 
   this->setFont(font);
   this->setFocusPolicy(Qt::StrongFocus);
