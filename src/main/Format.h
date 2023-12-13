@@ -15,13 +15,13 @@ class Matcher;
 class VGMScanner;
 
 #define DECLARE_FORMAT(_name_)               \
-  _name_##Format _name_##FormatRegisterThis; \
+  const _name_##Format* _name_##Format::_name_##FormatInstance = new _name_##Format(); \
   const std::string _name_##Format::name = #_name_;
 
 #define BEGIN_FORMAT(_name_)                                \
   class _name_##Format : public Format {                    \
   public:                                                   \
-    static const _name_##Format _name_##FormatRegisterThis; \
+    static const _name_##Format* _name_##FormatInstance;    \
     static const std::string name;                          \
     _name_##Format() : Format(#_name_) { Init(); }          \
     virtual const std::string &GetName() { return name; }
@@ -53,15 +53,16 @@ protected:
 
 public:
   Format(const std::string &scannerName);
-  virtual ~Format(void);
+  virtual ~Format();
 
   static Format *GetFormatFromName(const std::string &name);
+  static void DeleteFormatRegistry();
 
-  virtual bool Init(void);
+  virtual bool Init();
   virtual const std::string &GetName() = 0;
-  virtual VGMScanner *NewScanner() { return NULL; }
-  VGMScanner &GetScanner() { return *scanner; }
-  virtual Matcher *NewMatcher() { return NULL; }
+  virtual VGMScanner *NewScanner() { return nullptr; }
+  VGMScanner &GetScanner() const { return *scanner; }
+  virtual Matcher *NewMatcher() { return nullptr; }
   virtual VGMColl *NewCollection();
   virtual bool OnNewFile(VGMFile *file);
   virtual bool OnCloseFile(VGMFile *file);

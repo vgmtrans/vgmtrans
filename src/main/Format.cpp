@@ -4,9 +4,9 @@
 
 using namespace std;
 
-FormatMap &Format::registry() {
-  static FormatMap registry;
-  return registry;
+FormatMap& Format::registry() {
+  static FormatMap* registry = new FormatMap();
+  return *registry;
 }
 
 Format::Format(const string &formatName) :
@@ -22,6 +22,13 @@ Format::~Format(void) {
     delete matcher;
 }
 
+void Format::DeleteFormatRegistry() {
+  for (auto& pair : registry()) {
+    delete pair.second;
+  }
+  registry().clear();
+}
+
 Format *Format::GetFormatFromName(const string &name) {
   FormatMap::iterator findIt = registry().find(name);
   if (findIt == registry().end())
@@ -33,15 +40,6 @@ bool Format::OnNewFile(VGMFile *file) {
   if (!matcher)
     return false;
   return matcher->OnNewFile(file);
-  //switch (file->GetFileType())
-  //{
-  //case FILETYPE_SEQ:
-  //	return OnNewSeq((VGMSeq*)file);
-  //case FILETYPE_INSTRSET:
-  //	return OnNewInstrSet((VGMInstrSet*)file);
-  //case FILETYPE_SAMPCOLL:
-  //	return OnNewSampColl((VGMSampColl*)file);
-  //}
 }
 
 VGMColl *Format::NewCollection() {

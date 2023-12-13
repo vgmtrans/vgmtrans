@@ -94,8 +94,6 @@ class VGMRoot {
 
   std::vector<VGMLoader *> vLoader;
   std::vector<VGMScanner *> vScanner;
-  //std::map<uint32_t, Format*> fmt_map;
-  //std::vector<Format*> vFormats;
 };
 
 extern VGMRoot *pRoot;
