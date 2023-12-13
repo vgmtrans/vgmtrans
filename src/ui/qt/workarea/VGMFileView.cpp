@@ -74,11 +74,14 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
   QFontMetricsF fontMetrics(font);
   qreal origWidth = fontMetrics.horizontalAdvance("A");
   qreal fontSize = font.pointSizeF();
-  do {
+  for (int i = 0; i < 3; i++) {
     fontSize += sizeIncrement;
     font.setPointSizeF(fontSize);
     fontMetrics = QFontMetricsF(font);
-  } while (fontMetrics.horizontalAdvance("A") == origWidth);
+    if (fontMetrics.horizontalAdvance("A") != origWidth) {
+      break;
+    }
+  }
 
   // Updating the font will shrink or expand the maximum possible width of the hex view
   int actualWidthBeforeResize = m_splitter->sizes()[0];
