@@ -20,6 +20,7 @@ public:
   explicit HexView(VGMFile* vgmfile, QWidget *parent = nullptr);
   void setSelectedItem(VGMItem* item);
   void setFont(QFont& font);
+  int getVirtualWidth();
 
 protected:
   bool event(QEvent *event) override;
@@ -35,7 +36,6 @@ protected:
 
 private:
   int getVirtualHeight();
-  int getVirtualWidth();
   int getTotalLines();
   int getOffsetFromPoint(QPoint pos);
   void resizeOverlays(int height);

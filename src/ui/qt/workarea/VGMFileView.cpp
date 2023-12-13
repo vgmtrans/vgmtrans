@@ -34,7 +34,12 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   m_splitter->addWidget(m_hexScrollArea);
   m_splitter->addWidget(m_treeview);
-  m_splitter->setSizes(QList<int>() << 900 << 270);
+  m_splitter->setSizes(QList<int>{hexViewWidth(), treeViewMinimumWidth});
+  m_splitter->setStretchFactor(0, 0);
+  m_splitter->setStretchFactor(1, 1);
+  m_hexScrollArea->setMaximumWidth(hexViewWidth());
+  m_treeview->setMinimumWidth(treeViewMinimumWidth);
+
 
 
   connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
@@ -49,18 +54,53 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
           });
 
   connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, [&] {
-    auto font = m_hexview->font();
-    font.setPointSizeF(font.pointSizeF() + 0.5);
-    m_hexview->setFont(font);
+    updateHexViewFont(+0.5);
+  });
+
+  QShortcut* shortcutEqual = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_Equal), this);
+  connect(shortcutEqual, &QShortcut::activated, [&] {
+    updateHexViewFont(+0.5);
   });
 
   connect(new QShortcut(QKeySequence::ZoomOut, this), &QShortcut::activated, [&] {
-    auto font = m_hexview->font();
-    font.setPointSizeF(font.pointSizeF() - 0.5);
-    m_hexview->setFont(font);
+    updateHexViewFont(-0.5);
   });
 
   setWidget(m_splitter);
+}
+
+int VGMFileView::hexViewWidth() {
+  return m_hexview->getVirtualWidth() + hexViewPadding;
+}
+
+void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
+  // Increment the font size until it has an actual effect on width
+  QFont font = m_hexview->font();
+  QFontMetricsF fontMetrics(font);
+  qreal origWidth = fontMetrics.horizontalAdvance("A");
+  qreal fontSize = font.pointSizeF();
+  for (int i = 0; i < 3; i++) {
+    fontSize += sizeIncrement;
+    font.setPointSizeF(fontSize);
+    fontMetrics = QFontMetricsF(font);
+    if (fontMetrics.horizontalAdvance("A") != origWidth) {
+      break;
+    }
+  }
+
+  // Updating the font will shrink or expand the maximum possible width of the hex view
+  int actualWidthBeforeResize = m_splitter->sizes()[0];
+  int fullWidthBeforeResize = hexViewWidth();
+
+  m_hexview->setFont(font);
+  m_hexScrollArea->setMaximumWidth(hexViewWidth());
+
+  // We'll scale the hex view size such that approximately the same portion of text will be visible
+  float percentHexViewVisible = static_cast<float>(actualWidthBeforeResize) / static_cast<float>(fullWidthBeforeResize);
+  int fullWidthAfterResize = hexViewWidth();
+  int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
+  int newWidth = actualWidthBeforeResize + static_cast<int>(round(static_cast<float>(widthChange) * percentHexViewVisible));
+  m_splitter->setSizes(QList<int>{newWidth, treeViewMinimumWidth});
 }
 
 void VGMFileView::closeEvent(QCloseEvent *) {
