@@ -9,7 +9,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="9" samp_table="0x6000" artic_table="0x8000">
             <rom>nff.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>nff.11m</rom>
             <rom>nff.12m</rom>
         </romgroup>
@@ -18,7 +18,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>19x.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>19x.11m</rom>
             <rom>19x.12m</rom>
         </romgroup>
@@ -33,7 +33,7 @@
             <rom>pwg.01</rom>
             <rom>pwg.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>pwg.11m</rom>
             <rom>pwg.12m</rom>`
         </romgroup>
@@ -42,7 +42,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>avp.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>avp.11m</rom>
             <rom>avp.12m</rom>
         </romgroup>
@@ -52,7 +52,7 @@
             <rom>btc.01</rom>
             <rom>btc.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>btc.11m</rom>
             <rom>btc.12m</rom>
         </romgroup>
@@ -71,7 +71,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="2" samp_table="0x3D95" artic_table="0x40BD">
             <rom>tko.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>tkoj5_a.simm5</rom>
             <rom>tkoj5_b.simm5</rom>
         </romgroup>
@@ -80,7 +80,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x7005" instr_table_ptrs="0x3b04" num_instr_banks="16" samp_table="0x5000" artic_table="0x6000">
             <rom>csc.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>csc.51</rom>
             <rom>csc.52</rom>
             <rom>csc.53</rom>
@@ -101,7 +101,7 @@
             <rom>cyb.01</rom>
             <rom>cyb.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>cyb.11m</rom>
             <rom>cyb.12m</rom>
         </romgroup>
@@ -111,7 +111,7 @@
             <rom>dd2.01</rom>
             <rom>dd2.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>dd2.11m</rom>
             <rom>dd2.12m</rom>
         </romgroup>
@@ -120,7 +120,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>dad.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>dad.11m</rom>
             <rom>dad.12m</rom>
         </romgroup>
@@ -130,7 +130,7 @@
             <rom>gmd.01</rom>
             <rom>gmd.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>gmd.11m</rom>
             <rom>gmd.12m</rom>
         </romgroup>
@@ -139,7 +139,7 @@
         <romgroup type="audiocpu" load_method="append" encryption="kabuki" kabuki_swap_key1="0x76543210" kabuki_swap_key2="0x24601357" kabuki_addr_key="0x4343" kabuki_xor_key="0x43" seq_table="0x8005" instr_table="0x6E62" num_instr_banks="1" samp_table="0x6A82" samp_table_length="0x3E0">
             <rom>cd_q.5k</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append">
+        <romgroup type="qsound" load_method="append">
             <rom>cd-q1.1k</rom>
             <rom>cd-q2.2k</rom>
             <rom>cd-q3.3k</rom>
@@ -151,7 +151,7 @@
             <rom>vam.01</rom>
             <rom>vam.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>vam.11m</rom>
             <rom>vam.12m</rom>
         </romgroup>
@@ -160,7 +160,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>uec.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>uec.11m</rom>
             <rom>uec.12m</rom>
         </romgroup>
@@ -180,7 +180,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="6" samp_table="0x6000" artic_table="0x8000">
             <rom>ggw.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>ggw.11m</rom>
             <rom>ggw.12m</rom>
         </romgroup>
@@ -190,7 +190,7 @@
             <rom>hs2.01</rom>
             <rom>hs2.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>hs2.11m</rom>
         </romgroup>
     </game>
@@ -201,7 +201,7 @@
             <rom>jojon/jojo-simm1.2</rom>
             <rom>jojon/jojo-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>jojon/jojo-simm3.0</rom>
             <rom>jojon/jojo-simm3.1</rom>
         </romgroup>
@@ -213,7 +213,7 @@
             <rom>jojo-simm1.2</rom>
             <rom>jojo-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>jojo-simm3.0</rom>
             <rom>jojo-simm3.1</rom>
         </romgroup>
@@ -225,7 +225,7 @@
             <rom>jojoban/jojoba-simm1.2</rom>
             <rom>jojoban/jojoba-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>jojoban/jojoba-simm3.0</rom>
             <rom>jojoban/jojoba-simm3.1</rom>
         </romgroup>
@@ -237,7 +237,7 @@
             <rom>jojoba-simm1.2</rom>
             <rom>jojoba-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>jojoba-simm3.0</rom>
             <rom>jojoba-simm3.1</rom>
         </romgroup>
@@ -270,7 +270,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="9" samp_table="0x6000" samp_table_length="0x828" artic_table="0x8000">
             <rom>mmx.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>mmx.11m</rom>
             <rom>mmx.12m</rom>
         </romgroup>
@@ -285,7 +285,7 @@
             <rom>rm2.01a</rom>
             <rom>rm2.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>rm2.11m</rom>
             <rom>rm2.12m</rom>
         </romgroup>
@@ -299,7 +299,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>rcm.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>rcm.51</rom>
             <rom>rcm.52</rom>
             <rom>rcm.53</rom>
@@ -314,7 +314,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="3" samp_table="0x3FBF" artic_table="0x45E7">
             <rom>mpn.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>mpn-simm.05a</rom>
             <rom>mpn-simm.05b</rom>
         </romgroup>
@@ -324,7 +324,7 @@
             <rom>msh.01</rom>
             <rom>msh.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>msh.11m</rom>
             <rom>msh.12m</rom>
         </romgroup>
@@ -334,7 +334,7 @@
             <rom>mvs.01</rom>
             <rom>mvs.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>mvs.11m</rom>
             <rom>mvs.12m</rom>
         </romgroup>
@@ -354,7 +354,7 @@
             <rom>mvc.01</rom>
             <rom>mvc.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>mvc.11m</rom>
             <rom>mvc.12m</rom>
         </romgroup>
@@ -369,7 +369,7 @@
             <rom>vph.01</rom>
             <rom>vph.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>vph.11m</rom>
             <rom>vph.12m</rom>
         </romgroup>
@@ -384,7 +384,7 @@
             <rom>sg2_02.2e</rom>
             <rom>sg2_03.3e</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>sg2-01m.3a</rom>
         </romgroup>
     </game>
@@ -397,7 +397,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="4" samp_table="0x6000" artic_table="0x8000">
             <rom>pga.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>pga-simm.05a</rom>
             <rom>pga-simm.05b</rom>
             <rom>pga-simm.06a</rom>
@@ -408,7 +408,7 @@
         <romgroup type="audiocpu" load_method="append" encryption="kabuki" kabuki_swap_key1="0x67452103" kabuki_swap_key2="0x75316024" kabuki_addr_key="0x2222" kabuki_xor_key="0x22" seq_table="0x8005" instr_table="0x6F75" num_instr_banks="2" samp_table="0x6A9D" samp_table_length="0x4D8">
             <rom>ps_q.5k</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append">
+        <romgroup type="qsound" load_method="append">
             <rom>ps-q1.1k</rom>
             <rom>ps-q2.2k</rom>
             <rom>ps-q3.3k</rom>
@@ -419,7 +419,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="2" samp_table="0x3F5D" artic_table="0x45A5">
             <rom>pl2.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>pl2-simm.05a</rom>
             <rom>pl2-simm.05b</rom>
         </romgroup>
@@ -433,7 +433,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x4004" num_instr_banks="15" samp_table="0x5062">
             <rom>tqz.01</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>tqz.11m</rom>
             <rom>tqz.12m</rom>
         </romgroup>
@@ -450,7 +450,7 @@
             <rom>redearthn/redearth-simm1.2</rom>
             <rom>redearthn/redearth-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">∂
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>redearthn/redearth-simm3.0</rom>
             <rom>redearthn/redearth-simm3.1</rom>
         </romgroup>
@@ -462,7 +462,7 @@
             <rom>redearth-simm1.2</rom>
             <rom>redearth-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">∂
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>redearth-simm3.0</rom>
             <rom>redearth-simm3.1</rom>
         </romgroup>
@@ -472,7 +472,7 @@
             <rom>smb.01</rom>
             <rom>smb.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>smb.11m</rom>
             <rom>smb.12m</rom>
         </romgroup>
@@ -482,7 +482,7 @@
             <rom>jst_02.2e</rom>
             <rom>jst_03.3e</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>jst-01m.3b</rom>
         </romgroup>
     </game>
@@ -516,7 +516,7 @@
             <rom>sfz.01</rom>
             <rom>sfz.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>sfz.11m</rom>
             <rom>sfz.12m</rom>
         </romgroup>
@@ -526,7 +526,7 @@
             <rom>sz2.01a</rom>
             <rom>sz2.02a</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>sz2.11m</rom>
             <rom>sz2.12m</rom>
         </romgroup>
@@ -536,7 +536,7 @@
             <rom>sza.01</rom>
             <rom>sza.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>sza.11m</rom>
             <rom>sza.12m</rom>
         </romgroup>
@@ -546,7 +546,7 @@
             <rom>sz3.01</rom>
             <rom>sz3.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>sz3.11m</rom>
             <rom>sz3.12m</rom>
         </romgroup>
@@ -556,7 +556,7 @@
             <rom>sfe_02.2e</rom>
             <rom>sfe_03.3e</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>sfe-01m.3b</rom>
         </romgroup>
     </game>
@@ -565,7 +565,7 @@
             <rom>sfe_02.2e</rom>
             <rom>sfe_03.3e</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>sfe-01m.3b</rom>
         </romgroup>
     </game>
@@ -576,7 +576,7 @@
             <rom>sfiiin/sfiii-simm1.2</rom>
             <rom>sfiiin/sfiii-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>sfiiin/sfiii-simm3.0</rom>
             <rom>sfiiin/sfiii-simm3.1</rom>
         </romgroup>
@@ -588,7 +588,7 @@
             <rom>sfiii-simm1.2</rom>
             <rom>sfiii-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>sfiii-simm3.0</rom>
             <rom>sfiii-simm3.1</rom>
         </romgroup>
@@ -600,7 +600,7 @@
             <rom>sfiii2n/sfiii2-simm1.2</rom>
             <rom>sfiii2n/sfiii2-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>sfiii2n/sfiii2-simm3.0</rom>
             <rom>sfiii2n/sfiii2-simm3.1</rom>
         </romgroup>
@@ -612,7 +612,7 @@
             <rom>sfiii2-simm1.2</rom>
             <rom>sfiii2-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>sfiii2-simm3.0</rom>
             <rom>sfiii2-simm3.1</rom>
         </romgroup>
@@ -624,7 +624,7 @@
             <rom>sfiii3n/sfiii3-simm1.2</rom>
             <rom>sfiii3n/sfiii3-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>sfiii3n/sfiii3-simm3.0</rom>
             <rom>sfiii3n/sfiii3-simm3.1</rom>
         </romgroup>
@@ -636,7 +636,7 @@
             <rom>sfiii3-simm1.2</rom>
             <rom>sfiii3-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace">
             <rom>sfiii3-simm3.0</rom>
             <rom>sfiii3-simm3.1</rom>
         </romgroup>
@@ -646,7 +646,7 @@
             <rom>pcf.01</rom>
             <rom>pcf.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>pcf.11m</rom>
             <rom>pcf.12m</rom>
         </romgroup>
@@ -655,7 +655,7 @@
         <romgroup type="audiocpu" load_method="append" encryption="kabuki" kabuki_swap_key1="0x54321076" kabuki_swap_key2="0x65432107" kabuki_addr_key="0x3131" kabuki_xor_key="0x19" seq_table="0x8005" instr_table="0x72DA" num_instr_banks="1" samp_table="0x6AF2" samp_table_length="0x7E8">
             <rom>mb_qa.5k</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append">
+        <romgroup type="qsound" load_method="append">
             <rom>mb-q1.1k</rom>
             <rom>mb-q2.2k</rom>
             <rom>mb-q3.3k</rom>
@@ -671,7 +671,7 @@
             <rom>pzf.01</rom>
             <rom>pzf.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>pzf.11m</rom>
             <rom>pzf.12m</rom>
         </romgroup>
@@ -680,7 +680,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x7C15" instr_table="0x6C00" num_instr_banks="1" samp_table="0x7410">
             <rom>ssf.01a</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append">
+        <romgroup type="qsound" load_method="append">
             <rom>ssf.q01</rom>
             <rom>ssf.q02</rom>
             <rom>ssf.q03</rom>
@@ -696,7 +696,7 @@
             <rom>sfx.01</rom>
             <rom>sfx.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>sfx.11m</rom>
             <rom>sfx.12m</rom>
         </romgroup>
@@ -706,16 +706,15 @@
             <rom>ps1_02a.2e</rom>
             <rom>ps1_03a.3e</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>ps1-01m.3b</rom>
         </romgroup>
     </game>
     <game name="strider2" format="CPS"  fmt_version="2.10">
-        <!--<romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table="0x3847" num_instr_banks="1" samp_table="0x4047" samp_table_length="0x2E0">-->
         <romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table_ptrs="0x7079" num_instr_banks="2" samp_table="0x7145" samp_table_length="0x168" artic_table="0x72AD">>
             <rom>hr2_02.2e</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>hr2-01m.3a</rom>
         </romgroup>
     </game>
@@ -724,7 +723,7 @@
             <rom>kio_02.2e</rom>
             <rom>kio_03.3e</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>kio-01m.3a</rom>
         </romgroup>
     </game>
@@ -732,7 +731,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x4809" instr_table="0x3847" num_instr_banks="1" samp_table="0x4047" samp_table_length="0x2E0">
             <rom>ts2_02.2e</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>ts2-01m.3b</rom>
         </romgroup>
     </game>
@@ -746,7 +745,7 @@
             <rom>vh2.01</rom>
             <rom>vh2.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>vh2.11m</rom>
             <rom>vh2.12m</rom>
         </romgroup>
@@ -756,7 +755,7 @@
             <rom>vm3.01</rom>
             <rom>vm3.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>vm3.11m</rom>
             <rom>vm3.12m</rom>
         </romgroup>
@@ -766,7 +765,7 @@
             <rom>vs2.01</rom>
             <rom>vs2.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>vs2.11m</rom>
             <rom>vs2.12m</rom>
         </romgroup>
@@ -775,7 +774,7 @@
         <romgroup type="audiocpu" load_method="append" encryption="kabuki" kabuki_swap_key1="0x01234567" kabuki_swap_key2="0x54163072" kabuki_addr_key="0x5151" kabuki_xor_key="0x51" seq_table="0x8005" instr_table="0x6DDA" num_instr_banks="1" samp_table="0x6A82" samp_table_length="0x358">
             <rom>tk2_qa.rom</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append">
+        <romgroup type="qsound" load_method="append">
             <rom>tk2_q1.rom</rom>
             <rom>tk2_q2.rom</rom>
             <rom>tk2_q3.rom</rom>
@@ -787,7 +786,7 @@
             <rom>xmn.01a</rom>
             <rom>xmn.02a</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>xmn.11m</rom>
             <rom>xmn.12m</rom>
         </romgroup>
@@ -797,7 +796,7 @@
             <rom>xvs.01</rom>
             <rom>xvs.02</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="append_swap16">
+        <romgroup type="qsound" load_method="append_swap16">
             <rom>xvs.11m</rom>
             <rom>xvs.12m</rom>
         </romgroup>
