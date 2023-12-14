@@ -128,7 +128,14 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QTableView(parent) {
   header_hor->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   header_hor->setSectionResizeMode(1, QHeaderView::Fixed);
   header_hor->setStyleSheet("QHeaderView::section { padding-left: 6px; }");
-  setColumnWidth(1, 60);
+
+  // set the "Format" section header size
+  QFont headerFont = header_hor->font();
+  QFontMetrics fm(headerFont);
+  QVariant headerTextVariant = view_model->headerData(1, Qt::Horizontal, Qt::DisplayRole);
+  auto headerText = headerTextVariant.isValid() ? headerTextVariant.toString() : "Format";
+  int textWidth = fm.horizontalAdvance(headerText);
+  setColumnWidth(1, textWidth + 45);
 
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 

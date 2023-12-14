@@ -54,5 +54,5 @@ class VGMFileListView final : public QTableView {
     void itemMenu(const QPoint &pos);
     void resizeColumns();
 
-        VGMFileListModel *view_model;
+    VGMFileListModel *view_model;
 };
