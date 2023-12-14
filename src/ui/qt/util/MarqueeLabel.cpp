@@ -6,6 +6,7 @@
 
 #include "MarqueeLabel.h"
 #include <QPainter>
+#include <QApplication>
 
 MarqueeLabel::MarqueeLabel(QWidget *parent) : QWidget(parent) {
   m_static_text.setTextFormat(Qt::PlainText);
@@ -84,6 +85,8 @@ void MarqueeLabel::updateText() {
 
 void MarqueeLabel::paintEvent(QPaintEvent *) {
   QPainter p(this);
+  QPalette palette = QApplication::palette();
+  p.setPen(palette.color(QPalette::WindowText));
   if (m_scroll_enabled) {
     int x = std::min(-m_scroll_pos, 0) + m_margin_left;
     while (x < width()) {
