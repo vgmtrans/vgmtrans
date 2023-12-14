@@ -180,8 +180,12 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       --no-compiler-runtime --no-system-d3d-compiler --no-opengl-sw
       "$<TARGET_FILE:vgmtrans>")
 
-  file(WRITE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf"
-       "[Paths]\r\nPlugins = ./QtPlugins")
+  add_custom_command(
+    TARGET vgmtrans
+    POST_BUILD
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_LIST_DIR}/qt.conf"
+      "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 
   get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
   add_custom_command(
