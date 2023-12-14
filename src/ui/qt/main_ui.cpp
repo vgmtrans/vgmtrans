@@ -9,6 +9,7 @@
 #include <QtPlugin>
 #include <QFile>
 #include <QFontDatabase>
+#include <QStyleFactory>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 
@@ -17,6 +18,9 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setApplicationName("VGMTrans");
 
   QApplication app(argc, argv);
+  #ifdef _WIN32
+  app.setStyle(QStyleFactory::create("fusion"));
+  #endif
   qtVGMRoot.Init();
 
   QFontDatabase::addApplicationFont(":/fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf");
