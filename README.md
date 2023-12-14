@@ -58,8 +58,8 @@ Contributors
 
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
+- sykhro: Worked on the Qt port, CI whisperer, contributed improvements and general housekeeping.
 - Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
-- sykhro: Worked on the Qt port, contributed improvements and general housekeeping.
 
 ### Special Thanks
 
