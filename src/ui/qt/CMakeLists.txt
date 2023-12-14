@@ -1,67 +1,45 @@
+# ~~~
+# Dependencies
+# ~~~
+
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/gsl-lite"
                  "${CMAKE_CURRENT_BINARY_DIR}/gsl-lite" EXCLUDE_FROM_ALL)
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/bass"
                  "${CMAKE_CURRENT_BINARY_DIR}/bass" EXCLUDE_FROM_ALL)
 
-if(APPLE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Homebrew installs Qt (up to at least 5.9.1) in /usr/local/qt*, ensure it can
   # be found by CMake since it is not in the default /usr/local prefix.
-  if(EXISTS /usr/local/opt/qt5)
-    list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/qt5")
-  endif()
-
   if(EXISTS /usr/local/opt/qt6)
     list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/qt6")
   endif()
 endif()
 
-if(Qt6_DIR)
-  set(Qt_DIR "${Qt6_DIR}")
-elseif(Qt5_DIR)
-  set(Qt_DIR "${Qt5_DIR}")
+if(NOT Qt6_DIR AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  message(STATUS "Using vendored Qt6")
+  set(Qt6_DIR
+      "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/qt6.6.1-x86_64-pc-windows-msvc/lib/cmake/Qt6")
+  if(NOT EXISTS "${Qt6_DIR}")
+    message(SEND_ERROR "Could not find `${Qt6_DIR}`")
+    message(SEND_ERROR "Did you forget to run `git submodule update --init --recursive`?")
+  endif()
 endif()
 
-if(NOT Qt_DIR AND MSVC)
-  set(Qt_DIR
-      "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/qt5-msvc2019-x64/lib/cmake/Qt5")
-  set(Qt5_DIR ${Qt_DIR})
-  message(STATUS "Using Qt5 fallback")
-endif()
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
+message(STATUS "Using Qt ${Qt6_VERSION}")
 
-find_package(
-  Qt NAMES Qt6 Qt5
-  COMPONENTS Gui Widgets Svg
-  REQUIRED)
-find_package(
-  Qt${Qt_VERSION_MAJOR} 5.9
-  COMPONENTS Gui Widgets Svg
-  REQUIRED)
-message(STATUS "Using Qt ${Qt_VERSION}")
+# ~~~
+# Build
+# ~~~
 
-# Workaround for QTBUG-57886
-set_property(TARGET Qt${Qt_VERSION_MAJOR}::Core
-             PROPERTY INTERFACE_COMPILE_FEATURES "")
-
-set(CMAKE_AUTOMOC ON)
-if(${Qt_VERSION_MAJOR} EQUAL 6)
-  qt6_add_resources(UI_RESOURCES
-                    "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
-elseif(${Qt_VERSION_MAJOR} EQUAL 5)
-  qt5_add_resources(UI_RESOURCES
-                    "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
-endif()
-
-if(WIN32)
-  set(GUI_TYPE WIN32)
-elseif(APPLE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(GUI_TYPE MACOSX_BUNDLE)
 endif()
 
 add_executable(
   vgmtrans
   ${GUI_TYPE}
-  ${UI_RESOURCES}
   About.cpp
   About.h
   IconBar.cpp
@@ -111,11 +89,19 @@ target_link_libraries(
   PRIVATE g_options
           g_warnings
           vgmtranscore
-          Qt${Qt_VERSION_MAJOR}::Widgets
-          Qt${Qt_VERSION_MAJOR}::Svg
+          Qt::Widgets
+          Qt::Svg
           gsl-lite
           BASS::MIDI)
 
+set_target_properties(vgmtrans PROPERTIES AUTOMOC ON)
+qt_add_resources(UI_RESOURCES
+                 "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
+target_sources(vgmtrans PRIVATE ${UI_RESOURCES})
+
+# ~~~
+# Install & package
+# ~~~
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
 
@@ -131,24 +117,24 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
                               PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 
-  add_custom_command(TARGET vgmtrans
-          POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${CMAKE_SOURCE_DIR}/bin"
-          "${BUNDLE_PATH}/Contents/Resources")
+  add_custom_command(
+    TARGET vgmtrans
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/bin"
+            "${BUNDLE_PATH}/Contents/Resources")
 
-  get_target_property(BASS_DLL_LOCATION BASS::BASS
-                      IMPORTED_LOCATION)
-  add_custom_command(TARGET vgmtrans
-                      POST_BUILD
-                      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"
-                      "${BUNDLE_PATH}/Contents/MacOS/")
-  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI
-                      IMPORTED_LOCATION)
-  add_custom_command(TARGET vgmtrans
-                      POST_BUILD
-                      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
-                      "${BUNDLE_PATH}/Contents/MacOS/")
+  get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
+  add_custom_command(
+    TARGET vgmtrans
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"
+            "${BUNDLE_PATH}/Contents/MacOS/")
+  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI IMPORTED_LOCATION)
+  add_custom_command(
+    TARGET vgmtrans
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
+            "${BUNDLE_PATH}/Contents/MacOS/")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   # Make sure the executable ends up in the binary directory without any
   # additional folders
@@ -180,26 +166,24 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       --plugindir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
       --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
       $<IF:$<CONFIG:Debug>,--debug,--release> --no-translations
-      --no-compiler-runtime --no-angle --no-opengl-sw "$<TARGET_FILE:vgmtrans>")
+      --no-compiler-runtime --no-system-d3d-compiler --no-opengl-sw "$<TARGET_FILE:vgmtrans>")
 
   file(WRITE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf"
        "[Paths]\r\nPlugins = ./QtPlugins")
 
-  get_target_property(BASS_DLL_LOCATION BASS::BASS
-                      IMPORTED_LOCATION)
+  get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
   add_custom_command(
     TARGET vgmtrans
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"
             "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 
-  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI
-                      IMPORTED_LOCATION)
+  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI IMPORTED_LOCATION)
   add_custom_command(
-  TARGET vgmtrans
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    TARGET vgmtrans
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
+            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
   install(TARGETS vgmtrans DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
   install(
