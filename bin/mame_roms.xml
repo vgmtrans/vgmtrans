@@ -206,6 +206,18 @@
             <rom>jojon/jojo-simm3.1</rom>
         </romgroup>
     </game>
+    <game name="jojon" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x02203ee3" key2="0x01301972" seq_table="0x760008" samp_table="0x75c000" samp_table_length="0x2480" instr_table_ptrs="0x758000" num_instr_banks="2">
+            <rom>jojo-simm1.0</rom>
+            <rom>jojo-simm1.1</rom>
+            <rom>jojo-simm1.2</rom>
+            <rom>jojo-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">
+            <rom>jojo-simm3.0</rom>
+            <rom>jojo-simm3.1</rom>
+        </romgroup>
+    </game>
     <game name="jojoba" format="CPS" fmt_version="CPS3">
         <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x23323ee3" key2="0x03021972" seq_table="0x760008" samp_table="0x75c000" samp_table_length="0x2480" instr_table_ptrs="0x758000" num_instr_banks="2">
             <rom>jojoban/jojoba-simm1.0</rom>
@@ -216,6 +228,18 @@
         <romgroup type="qsound"  load_method="deinterlace">
             <rom>jojoban/jojoba-simm3.0</rom>
             <rom>jojoban/jojoba-simm3.1</rom>
+        </romgroup>
+    </game>
+        <game name="jojoban" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x23323ee3" key2="0x03021972" seq_table="0x760008" samp_table="0x75c000" samp_table_length="0x2480" instr_table_ptrs="0x758000" num_instr_banks="2">
+            <rom>jojoba-simm1.0</rom>
+            <rom>jojoba-simm1.1</rom>
+            <rom>jojoba-simm1.2</rom>
+            <rom>jojoba-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">
+            <rom>jojoba-simm3.0</rom>
+            <rom>jojoba-simm3.1</rom>
         </romgroup>
     </game>
     <game name="jyangoku" format="CPS" fmt_version="1.80">
@@ -431,6 +455,18 @@
             <rom>redearthn/redearth-simm3.1</rom>
         </romgroup>
     </game>
+        <game name="redearthn" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x9e300ab1" key2="0xa175b82c" seq_table="0xbc198" samp_table="0xb83ec" samp_table_length="0x1690" instr_table_ptrs="0xb9a7c" num_instr_banks="2">
+            <rom>redearth-simm1.0</rom>
+            <rom>redearth-simm1.1</rom>
+            <rom>redearth-simm1.2</rom>
+            <rom>redearth-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">∂
+            <rom>redearth-simm3.0</rom>
+            <rom>redearth-simm3.1</rom>
+        </romgroup>
+    </game>
     <game name="ringdest" format="CPS" fmt_version="1.05a">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>smb.01</rom>
@@ -540,9 +576,21 @@
             <rom>sfiiin/sfiii-simm1.2</rom>
             <rom>sfiiin/sfiii-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">∂
+        <romgroup type="qsound"  load_method="deinterlace">
             <rom>sfiiin/sfiii-simm3.0</rom>
             <rom>sfiiin/sfiii-simm3.1</rom>
+        </romgroup>
+    </game>
+    <game name="sfiiin" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0xb5fe053e" key2="0xfc03925a" seq_table="0x3865cc" samp_table="0x3829FC" samp_table_length="0x1750" instr_table_ptrs="0x38414C" num_instr_banks="2">
+            <rom>sfiii-simm1.0</rom>
+            <rom>sfiii-simm1.1</rom>
+            <rom>sfiii-simm1.2</rom>
+            <rom>sfiii-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">
+            <rom>sfiii-simm3.0</rom>
+            <rom>sfiii-simm3.1</rom>
         </romgroup>
     </game>
     <game name="sfiii2" format="CPS" fmt_version="CPS3">
@@ -552,9 +600,21 @@
             <rom>sfiii2n/sfiii2-simm1.2</rom>
             <rom>sfiii2n/sfiii2-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">∂
+        <romgroup type="qsound"  load_method="deinterlace">
             <rom>sfiii2n/sfiii2-simm3.0</rom>
             <rom>sfiii2n/sfiii2-simm3.1</rom>
+        </romgroup>
+    </game>
+    <game name="sfiii2n" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x00000000" key2="0x00000000" seq_table="0x52c29C" samp_table="0x5271b0" samp_table_length="0x2300" instr_table_ptrs="0x5294b0" num_instr_banks="2">
+            <rom>sfiii2-simm1.0</rom>
+            <rom>sfiii2-simm1.1</rom>
+            <rom>sfiii2-simm1.2</rom>
+            <rom>sfiii2-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">
+            <rom>sfiii2-simm3.0</rom>
+            <rom>sfiii2-simm3.1</rom>
         </romgroup>
     </game>
     <game name="sfiii3" format="CPS" fmt_version="CPS3">
@@ -564,9 +624,21 @@
             <rom>sfiii3n/sfiii3-simm1.2</rom>
             <rom>sfiii3n/sfiii3-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound"  load_method="deinterlace">∂
+        <romgroup type="qsound"  load_method="deinterlace">
             <rom>sfiii3n/sfiii3-simm3.0</rom>
             <rom>sfiii3n/sfiii3-simm3.1</rom>
+        </romgroup>
+    </game>
+    <game name="sfiii3n" format="CPS" fmt_version="CPS3">
+        <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0xa55432b4" key2="0x0c129981" seq_table="0x78f008" samp_table="0x78C000" samp_table_length="0x2DD0" instr_table_ptrs="0x788000" num_instr_banks="16">
+            <rom>sfiii3-simm1.0</rom>
+            <rom>sfiii3-simm1.1</rom>
+            <rom>sfiii3-simm1.2</rom>
+            <rom>sfiii3-simm1.3</rom>
+        </romgroup>
+        <romgroup type="qsound"  load_method="deinterlace">
+            <rom>sfiii3-simm3.0</rom>
+            <rom>sfiii3-simm3.1</rom>
         </romgroup>
     </game>
     <game name="sgemf" format="CPS" fmt_version="1.30">
