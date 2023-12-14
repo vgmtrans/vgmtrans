@@ -16,7 +16,7 @@ VGMTrans converts a music files used in console video games into standard midi a
 - Sony's PS1 sequence and instrument formats (.seq, .vab)
 - Heartbeat's PS1 sequence format used in PS1 Dragon Quest games (.seqq)
 - Tamsoft's PS1 sequence and instrument formats (.tsq, .tvb)
-- Capcom's QSound sequence and instrument formats used in CPS1/CPS2 arcade games
+- Capcom's QSound sequence and instrument formats used in CPS1/CPS2/CPS3 arcade games
 - Squaresoft's PS1 format used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
 - Konami's PS1 sequence format known as KDT1
 - Nintendo's Gameboy Advance sequence format
@@ -51,7 +51,7 @@ The "Collections" window displays file groupings that the software was able to i
 How to compile it
 -----------------
 
-Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for information on how to compile the two flavors of VGMTrans. 
+Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for compilation instructions.
 
 Contributors
 ------------
