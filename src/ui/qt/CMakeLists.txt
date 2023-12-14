@@ -38,7 +38,7 @@ message(STATUS "Using Qt ${Qt6_VERSION}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(GUI_TYPE MACOSX_BUNDLE)
-elseif(CMAKE_SYSTEM_BAME STREQUAL "Windows")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(GUI_TYPE WIN32)
 endif()
 
