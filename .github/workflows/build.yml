@@ -34,7 +34,10 @@ jobs:
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
         name: "Package DMG (macOS)"
-        run: /usr/local/opt/qt6/bin/macdeployqt bin/VGMTrans.app -dmg -always-overwrite
+        run: |
+          /usr/local/opt/qt6/bin/macdeployqt \
+            bin/VGMTrans.app \
+            -verbose=3 -dmg -always-overwrite -appstore-compliant
       - name: "Upload artifact"
         uses: actions/upload-artifact@v3
         with:
