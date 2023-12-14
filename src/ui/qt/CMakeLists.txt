@@ -19,10 +19,13 @@ endif()
 if(NOT Qt6_DIR AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
   message(STATUS "Using vendored Qt6")
   set(Qt6_DIR
-      "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/qt6.6.1-x86_64-pc-windows-msvc/lib/cmake/Qt6")
+      "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/qt6.6.1-x86_64-pc-windows-msvc/lib/cmake/Qt6"
+  )
   if(NOT EXISTS "${Qt6_DIR}")
     message(SEND_ERROR "Could not find `${Qt6_DIR}`")
-    message(SEND_ERROR "Did you forget to run `git submodule update --init --recursive`?")
+    message(
+      SEND_ERROR
+        "Did you forget to run `git submodule update --init --recursive`?")
   endif()
 endif()
 
@@ -96,6 +99,12 @@ target_link_libraries(
           gsl-lite
           BASS::MIDI)
 
+# Workaround macdeployqt not correctly deploying QtDbus
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  find_package(Qt6 REQUIRED COMPONENTS DBus)
+  target_link_libraries(vgmtrans PUBLIC Qt::DBus)
+endif()
+
 set_target_properties(vgmtrans PROPERTIES AUTOMOC ON)
 qt_add_resources(UI_RESOURCES
                  "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
@@ -168,7 +177,8 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       --plugindir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
       --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
       $<IF:$<CONFIG:Debug>,--debug,--release> --no-translations
-      --no-compiler-runtime --no-system-d3d-compiler --no-opengl-sw "$<TARGET_FILE:vgmtrans>")
+      --no-compiler-runtime --no-system-d3d-compiler --no-opengl-sw
+      "$<TARGET_FILE:vgmtrans>")
 
   file(WRITE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf"
        "[Paths]\r\nPlugins = ./QtPlugins")
