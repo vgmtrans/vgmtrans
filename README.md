@@ -1,12 +1,11 @@
 VGMTrans - Video Game Music Translator
 ======================================
-| Platform | Status | Build available |
-| :-: | :-: | :-: |
-| Windows | [![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) | [Yes](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) |
-| macOS | [![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) | [DMG (not signed)](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) |
-| Linux | [![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) | [AppImage](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml) |
-| FreeBSD | [![Build Status](https://api.cirrus-ci.com/github/vgmtrans/vgmtrans.svg)](https://cirrus-ci.com/github/vgmtrans/vgmtrans) | No |
-| Windows (legacy, 32-bit) | [![Build status](https://ci.appveyor.com/api/projects/status/ns62qg09yn5kmf18/branch/master?svg=true)](https://ci.appveyor.com/project/sykhro/vgmtrans-ci/branch/master) | [Yes](https://ci.appveyor.com/project/sykhro/vgmtrans-ci/branch/master/artifacts) |
+![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)
+
+## Download
+You can download the bleeding edge version from [here](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master). We have builds for macOS, Windows & Linux.
+
+## About
 
 VGMTrans converts a music files used in console video games into standard midi and dls/sf2 files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
 
@@ -60,6 +59,7 @@ Contributors
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
 - Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
+- sykhro: Worked on the Qt port, contributed improvements and general housekeeping.
 
 ### Special Thanks
 
