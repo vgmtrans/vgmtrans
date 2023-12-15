@@ -24,16 +24,21 @@ static const QIcon &VGMCollIcon() {
  * VGMCollListViewModel
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_BeganLoadingRawFile,
-          [=]() {
-            resettingModel = true;
-            beginResetModel();
-          });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_EndedLoadingRawFile,
-          [=]() {
-            endResetModel();
-            resettingModel = false;
-          });
+  auto startResettingModel = [=]() {
+    resettingModel = true;
+    beginResetModel();
+  };
+
+  auto endResettingModel = [=]() {
+    endResetModel();
+    resettingModel = false;
+  };
+
+  connect(&qtVGMRoot, &QtVGMRoot::UI_BeganLoadingRawFile, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_EndedLoadingRawFile, endResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_BeganRemovingVGMFiles, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_EndedRemovingVGMFiles, endResettingModel);
+
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMColl,
           [=]() {

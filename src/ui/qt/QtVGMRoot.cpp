@@ -87,9 +87,11 @@ void QtVGMRoot::UI_RemoveVGMColl(VGMColl*) {
 }
 
 void QtVGMRoot::UI_BeginRemoveVGMFiles() {
+  this->UI_BeganRemovingVGMFiles();
 }
 
 void QtVGMRoot::UI_EndRemoveVGMFiles() {
+  this->UI_EndedRemovingVGMFiles();
 }
 
 void QtVGMRoot::UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName,

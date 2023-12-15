@@ -50,6 +50,8 @@ private:
 signals:
   void UI_BeganLoadingRawFile();
   void UI_EndedLoadingRawFile();
+  void UI_BeganRemovingVGMFiles();
+  void UI_EndedRemovingVGMFiles();
   void UI_AddedRawFile();
   void UI_RemovedRawFile();
   void UI_AddedVGMFile();
