@@ -466,7 +466,7 @@ bool CPSInstr::LoadInstr() {
     rgn->sustain_time = (Sr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
     rgn->sustain_time = LinAmpDecayTimeToLinDBDecayTime(rgn->sustain_time, 0x800);
 
-    ticks = Rr ? 0xFFFF / Rr : 0;
+    ticks = Rr ? 0xFFFF / Rr : 0xFFFF;
     rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
     rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0x800);
 
