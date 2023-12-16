@@ -109,7 +109,7 @@ void VGMFileListModel::RemoveVGMFile() {
  */
 
 VGMFileListView::VGMFileListView(QWidget *parent) : QTableView(parent) {
-  setSelectionMode(QAbstractItemView::SingleSelection);
+  setSelectionMode(QAbstractItemView::ExtendedSelection);
   setSelectionBehavior(QAbstractItemView::SelectRows);
   setAlternatingRowColors(true);
   setShowGrid(false);
@@ -206,11 +206,22 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
         return;
 
       QModelIndexList list = selectionModel()->selectedRows();
-      for (auto &index : list) {
-        auto file = qtVGMRoot.vVGMFile[index.row()];
-        file->OnClose();
+
+      std::vector<VGMFile*> selectedFiles;
+      selectedFiles.reserve(list.size());
+      for (const auto &index : list) {
+        if (index.isValid()) {
+          selectedFiles.push_back(qtVGMRoot.vVGMFile[index.row()]);
+        }
       }
 
+      pRoot->UI_BeginRemoveVGMFiles();
+      for (auto vgmfile : selectedFiles) {
+        vgmfile->OnClose();
+      }
+      pRoot->UI_EndRemoveVGMFiles();
+
+      this->clearSelection();
       return;
     }
 
