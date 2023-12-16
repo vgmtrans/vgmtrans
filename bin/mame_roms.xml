@@ -606,7 +606,7 @@
     </game>
     <game name="ssf2" format="CPS" fmt_version="1.03">
         <romgroup type="audiocpu" load_method="append" seq_table="0x7C15" instr_table="0x6C00" num_instr_banks="1" samp_table="0x7410">
-            <rom>ssf.01a</rom>
+            <rom>ssf-01a</rom>
         </romgroup>
         <romgroup type="qsound"  load_method="append">
             <rom>ssf.q01</rom>
