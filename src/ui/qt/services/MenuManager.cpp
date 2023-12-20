@@ -9,26 +9,26 @@
 #include "services/commands/SaveCommands.h"
 
 MenuManager::MenuManager() {
-  RegisterCommands<VGMSeq>({
+  RegisterCommands<VGMSeq, VGMItem>({
       make_shared<CloseVGMFileCommand>(),
       make_shared<CommandSeparator>(),
       make_shared<SaveAsMidiCommand>(),
       make_shared<SaveAsOriginalFormatCommand>(),
   });
-  RegisterCommands<VGMInstrSet>({
+  RegisterCommands<VGMInstrSet, VGMItem>({
       make_shared<CloseVGMFileCommand>(),
       make_shared<CommandSeparator>(),
       make_shared<SaveAsSF2Command>(),
       make_shared<SaveAsDLSCommand>(),
       make_shared<SaveAsOriginalFormatCommand>(),
   });
-  RegisterCommands<VGMSampColl>({
+  RegisterCommands<VGMSampColl, VGMItem>({
       make_shared<CloseVGMFileCommand>(),
       make_shared<CommandSeparator>(),
       make_shared<SaveWavBatchCommand>(),
       make_shared<SaveAsOriginalFormatCommand>(),
   });
-  RegisterCommands<VGMFile>({
+  RegisterCommands<VGMFile, VGMItem>({
       make_shared<CloseVGMFileCommand>(),
       make_shared<CommandSeparator>(),
       make_shared<SaveAsOriginalFormatCommand>(),
@@ -39,32 +39,13 @@ MenuManager::MenuManager() {
   });
 }
 
-template<typename T>
-void MenuManager::RegisterCommand(shared_ptr<Command> command) {
-  commandsForType[typeid(T)].push_back(command);
-
-  if constexpr (is_convertible<T*, VGMItem*>::value) {
-    auto checkFunc = [](VGMItem* item) -> bool { return dynamic_cast<T*>(item) != nullptr; };
-    auto it = find_if(
-        commandsForCheckedType.begin(), commandsForCheckedType.end(),
-        [&checkFunc](const CheckedTypeEntry& entry) { return &entry.first == &checkFunc; });
-
-    if (it != commandsForCheckedType.end()) {
-      // Add command to the existing entry
-      it->second.push_back(command);
-    } else {
-      // Create a new entry
-      commandsForCheckedType.emplace_back(checkFunc, CommandsList{command});
-    }
-  }
-}
-
-template<typename T>
+template<typename T, typename Base>
 void MenuManager::RegisterCommands(const vector<shared_ptr<Command>>& commands) {
   commandsForType[typeid(T)] = commands;
 
-  if constexpr (is_convertible<T*, VGMItem*>::value) {
-    auto checkFunc = [](VGMItem* item) -> bool { return dynamic_cast<T*>(item) != nullptr; };
-    commandsForCheckedType.emplace_back(checkFunc, commands);
+  if constexpr (!is_same<T, Base>::value && is_convertible<T*, Base*>::value) {
+    auto checkFunc = [](void* base) -> bool { return dynamic_cast<T*>(static_cast<Base*>(base)) != nullptr; };
+    auto typeErasedCheckFunc = static_cast<CheckFunc<void>>(checkFunc);
+    commandsForCheckedType[typeid(Base)].emplace_back(typeErasedCheckFunc, commands);
   }
 }

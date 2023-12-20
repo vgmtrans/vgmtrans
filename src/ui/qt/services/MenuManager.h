@@ -17,7 +17,6 @@
 
 namespace fs = ghc::filesystem;
 
-class VGMItem;
 class VGMFile;
 class VGMSeq;
 class VGMInstrSet;
@@ -131,40 +130,40 @@ public:
 /**
  * MenuManager is the service responsible for the registration and retrieval of commands.
  */
- class MenuManager {
+class MenuManager {
 public:
-  using CheckFunc = function<bool(VGMItem*)>;
+  template<typename T, typename Base = T>
+  using CheckFunc = function<bool(Base*)>;
   using CommandsList = vector<shared_ptr<Command>>;
-  using CheckedTypeEntry = pair<CheckFunc, CommandsList>;
-
-  MenuManager();
-
-  /**
-   * Registers a command for the template parameter type.
-   * @param command The command to be registered.
-   */
   template<typename T>
-  void RegisterCommand(shared_ptr<Command> command);
+  using CheckedTypeEntry = pair<CheckFunc<T>, CommandsList>;
+
+private:
+  map<type_index, vector<shared_ptr<Command>>> commandsForType;
+  map<type_index, vector<CheckedTypeEntry<void>>> commandsForCheckedType;
+
+public:
+  MenuManager();
 
   /**
    * Registers multiple commands at once for the template parameter type.
    * @param commands A vector of commands to be registered.
    */
-  template<typename T>
+  template<typename T, typename Base = T>
   void RegisterCommands(const vector<shared_ptr<Command>>& commands);
 
   /**
    * Retrieves the list of commands suitable for a given item.
-   * @param item The VGMItem for which commands are requested.
+   * @param item The object instance for which commands are requested.
    * @return A vector of shared pointers to the commands.
    */
-  template<typename T>
-  vector<std::shared_ptr<Command>> GetCommands(T* item) {
-    if (!item) {
-      return {}; // Return empty vector if item is nullptr
+  template<typename Base>
+  vector<shared_ptr<Command>> GetCommands(Base* base) {
+    if (!base) {
+      return {}; // Return empty vector if base is nullptr
     }
 
-    std::type_index typeIndex(typeid(*item));
+    std::type_index typeIndex(typeid(*base));
 
     // Check direct type associations first
     auto it = commandsForType.find(typeIndex);
@@ -172,12 +171,12 @@ public:
       return it->second;
     }
 
-    // Special handling for VGMItem types
-    auto vgmItem = dynamic_cast<VGMItem*>(item);
-    if (vgmItem) {
-      // Check for matches using full class hierarchy
-      for (const auto& pair : commandsForCheckedType) {
-        if (pair.first(vgmItem)) {
+    // Check for matches using full class hierarchy
+    auto baseTypeIndex = type_index(typeid(Base));
+    auto baseIt = commandsForCheckedType.find(baseTypeIndex);
+    if (baseIt != commandsForCheckedType.end()) {
+      for (const auto& pair : baseIt->second) {
+        if (pair.first(base)) {
           return pair.second;
         }
       }
@@ -194,7 +193,7 @@ public:
  * @param commandManager A reference to a MenuManager
  * @return A list of commands shared by all items, ordered as they are in the first item's Command registry.
    */
-  template <typename T>
+  template <typename Base, typename T>
   vector<shared_ptr<Command>> FindCommonCommands(const vector<T*>& items) {
     if (items.empty()) {
       return {};
@@ -202,7 +201,7 @@ public:
 
     vector<shared_ptr<Command>> commonCommands;
     // Get commands of the first file as the reference order
-    auto referenceCommands = GetCommands(items.front());
+    auto referenceCommands = GetCommands<Base>(items.front());
 
     // Iterate over each command in the reference list
     for (const auto& refCmd : referenceCommands) {
@@ -211,7 +210,7 @@ public:
 
       // Check if this command is present in all other files
       for (auto* item : items) {
-        auto commands = GetCommands(item);
+        auto commands = GetCommands<Base>(item);
         if (none_of(commands.begin(), commands.end(),
                     [&refCmdName](const shared_ptr<Command>& cmd) { return cmd->Name() == refCmdName; })) {
           isCommon = false;
@@ -226,14 +225,22 @@ public:
     return commonCommands;
   }
 
-  template <typename T>
+
+  // Helper trait to determine if Base has a GetName method.
+  template <typename Base, typename = void>
+  struct has_getname : std::false_type {};
+
+  template <typename Base>
+  struct has_getname<Base, decltype(std::declval<Base>().GetName(), void())> : std::true_type {};
+
+  template <typename Base, typename T = Base>
   QMenu* CreateMenuForItems(shared_ptr<vector<T*>> selectedFiles) {
 
     auto menu = new QMenu();
     if (selectedFiles->empty()) {
       return nullptr;
     }
-    auto commands = FindCommonCommands(*selectedFiles);
+    auto commands = FindCommonCommands<Base>(*selectedFiles);
 
     for (const auto& command : commands) {
 
@@ -262,13 +269,16 @@ public:
                 }
                 propMap.insert({ propSpec.key, dirpath.generic_string() });
               } else {
-                auto suggestedFileName = ConvertToSafeFileName(*(*selectedFiles)[0]->GetName());
+                std::string suggestedFileName = "";
+                if constexpr (has_getname<T>::value) {
+                  suggestedFileName = ConvertToSafeFileName(*(*selectedFiles)[0]->GetName());
+                }
                 auto fileExtension = get<string>(propSpec.defaultValue);
                 auto path = OpenSaveFileDialog(suggestedFileName, fileExtension);
                 if (path.empty()) {
                   return;
                 }
-                propMap.insert({ propSpec.key, path });
+                propMap.insert({propSpec.key, path});
               }
               break;
             case PropertySpecValueType::ItemList:
@@ -285,8 +295,4 @@ public:
     }
     return menu;
   }
-
-private:
-  map<type_index, vector<shared_ptr<Command>>> commandsForType;
-  vector<CheckedTypeEntry> commandsForCheckedType;
 };
