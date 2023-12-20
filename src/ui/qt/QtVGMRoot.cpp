@@ -5,11 +5,11 @@
  */
 
 #include <QApplication>
-#include <QStandardPaths>
 #include <QFileDialog>
 #include <QString>
 #include "QtVGMRoot.h"
 #include "VGMFileTreeView.h"
+#include "util/UIHelpers.h"
 
 QtVGMRoot qtVGMRoot;
 
@@ -107,45 +107,9 @@ std::string QtVGMRoot::UI_GetOpenFilePath(const std::string&, const std::string&
 
 std::string QtVGMRoot::UI_GetSaveFilePath(const std::string& suggested_filename,
                                            const std::string& extension) {
-  static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
-  QFileDialog dialog(QApplication::activeWindow());
-  dialog.setFileMode(QFileDialog::AnyFile);
-  dialog.selectFile(QString::fromStdString(suggested_filename));
-  dialog.setDirectory(selected_dir);
-  dialog.setAcceptMode(QFileDialog::AcceptSave);
-
-  if (extension == "mid") {
-    dialog.setDefaultSuffix("mid");
-    dialog.setNameFilter("Standard MIDI (*.mid)");
-  } else if (extension == "dls") {
-    dialog.setDefaultSuffix("dls");
-    dialog.setNameFilter("Downloadable Sound (*.dls)");
-  } else if (extension == "sf2") {
-    dialog.setDefaultSuffix("sf2");
-    dialog.setNameFilter("SoundFont\u00AE 2 (*.sf2)");
-  } else {
-    dialog.setNameFilter("All files (*)");
-  }
-
-  if (dialog.exec()) {
-    selected_dir = dialog.directory().absolutePath();
-    return dialog.selectedFiles().at(0).toStdString();
-  } else {
-    return {};
-  }
+  return OpenSaveFileDialog(suggested_filename, extension);
 }
 
 std::string QtVGMRoot::UI_GetSaveDirPath(const std::string&) {
-  static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
-  QFileDialog dialog(QApplication::activeWindow());
-  dialog.setFileMode(QFileDialog::FileMode::Directory);
-  dialog.setOption(QFileDialog::ShowDirsOnly, true);
-  dialog.setDirectory(selected_dir);
-
-  if (dialog.exec()) {
-    selected_dir = dialog.directory().absolutePath();
-    return dialog.selectedFiles().at(0).toStdString();
-  } else {
-    return {};
-  }
+  return OpenSaveDirDialog();
 }

@@ -9,6 +9,10 @@ class Format;
 
 enum FileType { FILETYPE_UNDEFINED, FILETYPE_SEQ, FILETYPE_INSTRSET, FILETYPE_SAMPCOLL, FILETYPE_MISC };
 
+// *******
+// VGMFile
+// *******
+
 class VGMFile:
     public VGMContainerItem {
  public:
@@ -28,7 +32,7 @@ class VGMFile:
   const std::string *GetName(void) const;
 
   bool OnClose();
-  bool OnSaveAsRaw();
+  bool OnSaveAsRaw(const std::string &filepath);
   bool OnSaveAllAsRaw();
 
   bool LoadVGMFile();

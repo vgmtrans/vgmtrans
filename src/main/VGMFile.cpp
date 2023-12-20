@@ -41,8 +41,7 @@ bool VGMFile::OnClose() {
   return true;
 }
 
-bool VGMFile::OnSaveAsRaw() {
-  string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name));
+bool VGMFile::OnSaveAsRaw(const std::string &filepath) {
   if (filepath.length() != 0) {
     bool result;
     uint8_t *buf = new uint8_t[unLength];        //create a buffer the size of the file

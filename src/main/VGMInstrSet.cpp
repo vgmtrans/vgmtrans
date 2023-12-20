@@ -85,24 +85,6 @@ bool VGMInstrSet::LoadInstrs() {
   return true;
 }
 
-
-bool VGMInstrSet::OnSaveAsDLS(void) {
-  string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "dls");
-  if (filepath.length() != 0) {
-    return SaveAsDLS(filepath.c_str());
-  }
-  return false;
-}
-
-bool VGMInstrSet::OnSaveAsSF2(void) {
-  string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "sf2");
-  if (filepath.length() != 0) {
-    return SaveAsSF2(filepath);
-  }
-  return false;
-}
-
-
 bool VGMInstrSet::SaveAsDLS(const std::string &filepath) {
   DLSFile dlsfile;
   bool dlsCreationSucceeded = false;
