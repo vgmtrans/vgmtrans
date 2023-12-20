@@ -169,7 +169,7 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
       selectedFiles->push_back(qtVGMRoot.vVGMFile[index.row()]);
     }
   }
-  auto menu = menuManager.CreateMenuForItems(selectedFiles);
+  auto menu = menuManager.CreateMenuForItems<VGMItem>(selectedFiles);
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
 }
