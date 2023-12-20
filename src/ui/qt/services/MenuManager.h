@@ -260,7 +260,7 @@ public:
                 if (dirpath.string().empty()) {
                   return;
                 }
-                propMap.insert({ propSpec.key, dirpath });
+                propMap.insert({ propSpec.key, dirpath.generic_string() });
               } else {
                 auto suggestedFileName = ConvertToSafeFileName(*(*selectedFiles)[0]->GetName());
                 auto fileExtension = get<string>(propSpec.defaultValue);
