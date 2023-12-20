@@ -41,9 +41,6 @@ class VGMInstrSet:
 
   virtual FileType GetFileType() { return FILETYPE_INSTRSET; }
 
-
-  bool OnSaveAsDLS(void);
-  bool OnSaveAsSF2(void);
   virtual bool SaveAsDLS(const std::string &filepath);
   virtual bool SaveAsSF2(const std::string &filepath);
 

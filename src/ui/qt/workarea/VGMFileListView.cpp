@@ -11,10 +11,10 @@
 #include <VGMSampColl.h>
 
 #include "VGMFileListView.h"
-#include "VGMFileView.h"
 #include "Helpers.h"
 #include "QtVGMRoot.h"
 #include "MdiArea.h"
+#include "services/commands/GeneralCommands.h"
 
 /*
  *  VGMFileListModel
@@ -26,7 +26,7 @@ VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
   if (!index.isValid()) {
-    return QVariant();
+    return {};
   }
 
   VGMFile *vgmfile = qtVGMRoot.vVGMFile.at(static_cast<unsigned long>(index.row()));
@@ -49,12 +49,12 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
     }
   }
 
-  return QVariant();
+  return {};
 }
 
 QVariant VGMFileListModel::headerData(int column, Qt::Orientation orientation, int role) const {
   if (orientation == Qt::Vertical || role != Qt::DisplayRole) {
-    return QVariant();
+    return {};
   }
 
   switch (column) {
@@ -67,7 +67,7 @@ QVariant VGMFileListModel::headerData(int column, Qt::Orientation orientation, i
     }
 
     default: {
-      return QVariant();
+      return {};
     }
   }
 }
@@ -154,48 +154,24 @@ void VGMFileListView::onHeaderSectionResized(int index, int oldSize, int newSize
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
-  auto element = indexAt(pos);
-  if (!element.isValid())
-    return;
 
-  VGMFile *file = qtVGMRoot.vVGMFile[element.row()];
-  if (!file) {
+  auto selectedFiles = make_shared<vector<VGMFile*>>();
+
+  if (!selectionModel()->hasSelection()) {
     return;
   }
 
-  /* This machinery is not great, no safe alternative until backend becomes type-erased */
-  auto vgmfile_menu = new QMenu();
-  vgmfile_menu->addAction("Remove", [file] { file->OnClose(); });
-  vgmfile_menu->addAction("Save raw format", [file] { file->OnSaveAsRaw(); });
-  vgmfile_menu->addSeparator();
+  QModelIndexList list = selectionModel()->selectedRows();
 
-  /* todo: implement free functions to export this stuff */
-  switch (file->GetFileType()) {
-    case FileType::FILETYPE_INSTRSET: {
-      auto set = dynamic_cast<VGMInstrSet *>(file);
-      vgmfile_menu->addAction("Save as DLS", [set] { set->OnSaveAsDLS(); });
-      vgmfile_menu->addAction("Save as SF2", [set] { set->OnSaveAsSF2(); });
-      break;
+  selectedFiles->reserve(list.size());
+  for (const auto &index : list) {
+    if (index.isValid()) {
+      selectedFiles->push_back(qtVGMRoot.vVGMFile[index.row()]);
     }
-
-    case FileType::FILETYPE_SEQ: {
-      auto seq = dynamic_cast<VGMSeq *>(file);
-      vgmfile_menu->addAction("Save as MIDI", [seq] { seq->OnSaveAsMidi(); });
-      break;
-    }
-
-    case FileType::FILETYPE_SAMPCOLL: {
-      auto samps = dynamic_cast<VGMSampColl *>(file);
-      vgmfile_menu->addAction("Save as WAV", [samps] { samps->OnSaveAllAsWav(); });
-      break;
-    }
-
-    default:
-      break;
   }
-
-  vgmfile_menu->exec(mapToGlobal(pos));
-  vgmfile_menu->deleteLater();
+  auto menu = menuManager.CreateMenuForItems(selectedFiles);
+  menu->exec(mapToGlobal(pos));
+  menu->deleteLater();
 }
 
 void VGMFileListView::keyPressEvent(QKeyEvent *input) {
@@ -207,7 +183,7 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
 
       QModelIndexList list = selectionModel()->selectedRows();
 
-      std::vector<VGMFile*> selectedFiles;
+      vector<VGMFile*> selectedFiles;
       selectedFiles.reserve(list.size());
       for (const auto &index : list) {
         if (index.isValid()) {

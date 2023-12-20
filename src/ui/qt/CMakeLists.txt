@@ -62,6 +62,10 @@ add_executable(
   SequencePlayer.cpp
   SequencePlayer.h
   main_ui.cpp
+  services/MenuManager.cpp
+  services/MenuManager.h
+  services/commands/SaveCommands.h
+  services/commands/GeneralCommands.h
   util/Colors.h
   util/Helpers.cpp
   util/Helpers.h

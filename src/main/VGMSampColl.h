@@ -25,7 +25,8 @@ class VGMSampColl:
   VGMSamp *AddSamp(uint32_t offset, uint32_t length, uint32_t dataOffset, uint32_t dataLength,
                    uint8_t nChannels = 1, uint16_t bps = 16, uint32_t theRate = 0,
                    std::string name = "Sample");
-  bool OnSaveAllAsWav();
+
+  bool SaveAllAsWav(const string& dirpath);
 
  protected:
   void LoadOnInstrMatch() { bLoadOnInstrSetMatch = true; }

@@ -75,7 +75,6 @@ class VGMSeq: public VGMFile {
     bAlwaysWriteInitialMono = true;
   }
 
-  bool OnSaveAsMidi(void);
   virtual bool SaveAsMidi(const std::string &filepath);
 
   virtual bool HasActiveTracks();
