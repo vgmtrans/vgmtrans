@@ -42,9 +42,9 @@ bool CLIVGMRoot::MakeOutputDir() {
   return true;
 }
 
-bool CLIVGMRoot::OpenRawFile(const wstring &filename) {
-  wstring fname = filename;
-  cout << "Loading " << wstring2string(fname) << endl;
+bool CLIVGMRoot::OpenRawFile(const string &filename) {
+  string fname = filename;
+  cout << "Loading " << fname << endl;
   return VGMRoot::OpenRawFile(filename);
 }
 
@@ -61,9 +61,9 @@ bool CLIVGMRoot::Init() {
   size_t inputFileCtr = 0;
   size_t numColls = 0;
   // map for deconflicting identical collection names using input filenames
-  map<wstring, vector<pair<size_t, fs::path>>> collNameMap {};
+  map<string, vector<pair<size_t, fs::path>>> collNameMap {};
   for (fs::path infile : inputFiles) {
-    if (!OpenRawFile(infile.wstring())) {  // file not found
+    if (!OpenRawFile(infile.string())) {  // file not found
       return false;
     }
     UpdateCollections();
@@ -74,7 +74,7 @@ bool CLIVGMRoot::Init() {
     else {
       for(size_t i = numColls; i < GetNumCollections(); ++i) {
         VGMColl* coll = vVGMColl[i];
-        wstring collName = *coll->GetName();
+        string collName = *coll->GetName();
         auto it = collNameMap.find(collName);
         pair<size_t, fs::path> p = make_pair(i, infile);
         if (it == collNameMap.end()) {
@@ -123,7 +123,7 @@ bool CLIVGMRoot::Init() {
             baseNameIdx[baseName] = idx;
           }
           // update collection name to be unique
-          wstring newCollName = collNameIt->first + string2wstring(suffix);
+          string newCollName = collNameIt->first + suffix;
           vVGMColl[p.first]->SetName(&newCollName);
         }
       }
@@ -138,35 +138,35 @@ bool CLIVGMRoot::Init() {
 bool CLIVGMRoot::ExportAllCollections() {
   bool success = true;
   for (VGMColl* coll : vVGMColl) {
-    wstring collName = *coll->GetName();
+    string collName = *coll->GetName();
     success &= ExportCollection(coll);
   }
   return success;
 }
 
 bool CLIVGMRoot::ExportCollection(VGMColl* coll) {
-    wstring collName = *coll->GetName();
-    cout << "Exporting: " << wstring2string(collName) << endl;
+    string collName = *coll->GetName();
+    cout << "Exporting: " << collName << endl;
     return SaveMidi(coll) & SaveSF2(coll) & SaveDLS(coll);
 }
 
 bool CLIVGMRoot::SaveMidi(VGMColl* coll) {
   if (coll->seq != nullptr) {
-    wstring collName = *coll->GetName();
-    wstring filepath = UI_GetSaveFilePath(collName, L"mid");
+    string collName = *coll->GetName();
+    string filepath = UI_GetSaveFilePath(collName, "mid");
     if (!coll->seq->SaveAsMidi(filepath)) {
-      pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save MIDI file"),
-        LOG_LEVEL_ERR, L"VGMColl"));
+      pRoot->AddLogItem(new LogItem(std::string("Failed to save MIDI file"),
+        LOG_LEVEL_ERR, "VGMColl"));
       return false;
     }
-    cout << "\t" + wstring2string(filepath) << endl;
+    cout << "\t" + filepath << endl;
   }
   return true;
 }
 
 bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
-  wstring collName = *coll->GetName();
-  wstring filepath = UI_GetSaveFilePath(collName, L"sf2");
+  string collName = *coll->GetName();
+  string filepath = UI_GetSaveFilePath(collName, "sf2");
   SF2File *sf2file = coll->CreateSF2File();
   bool success = false;
   if (sf2file != nullptr) {
@@ -176,18 +176,18 @@ bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
     delete sf2file;
   }
   if (success) {
-    cout << "\t" + wstring2string(filepath) << endl;
+    cout << "\t" + filepath << endl;
   }
   else {
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save SF2 file"),
-      LOG_LEVEL_ERR, L"VGMColl"));
+    pRoot->AddLogItem(new LogItem(std::string("Failed to save SF2 file"),
+      LOG_LEVEL_ERR, "VGMColl"));
   }
   return success;
 }
 
 bool CLIVGMRoot::SaveDLS(VGMColl* coll) {
-  wstring collName = *coll->GetName();
-  wstring filepath = UI_GetSaveFilePath(collName, L"dls");
+  string collName = *coll->GetName();
+  string filepath = UI_GetSaveFilePath(collName, "dls");
   DLSFile dlsfile;
   bool success = false;
   if (coll->CreateDLSFile(dlsfile)) {
@@ -196,11 +196,11 @@ bool CLIVGMRoot::SaveDLS(VGMColl* coll) {
     }
   }
   if (success) {
-    cout << "\t" + wstring2string(filepath) << endl;
+    cout << "\t" + filepath << endl;
   }
   else {
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Failed to save DLS file"),
-      LOG_LEVEL_ERR, L"VGMColl"));
+    pRoot->AddLogItem(new LogItem(std::string("Failed to save DLS file"),
+      LOG_LEVEL_ERR, "VGMColl"));
   }
   return success;
 }
@@ -211,9 +211,9 @@ void CLIVGMRoot::UI_SetRootPtr(VGMRoot** theRoot) {
 
 void CLIVGMRoot::UI_AddLogItem(LogItem* theLog) {
   if (theLog->GetLogLevel() <= LOG_LEVEL_WARN) {
-    wstring source = theLog->GetSource();
-    wstring text = theLog->GetText();
-    cerr << "[" << wstring2string(source) << "]" << wstring2string(text) << endl;
+    string source = theLog->GetSource();
+    string text = theLog->GetText();
+    cerr << "[" << source << "]" << text << endl;
   }
 }
 
@@ -228,15 +228,15 @@ void CLIVGMRoot::UpdateCollections() {
 }
 
 
-wstring CLIVGMRoot::UI_GetOpenFilePath(const wstring& suggestedFilename, const wstring& extension) {
-  return L"Placeholder";
+string CLIVGMRoot::UI_GetOpenFilePath(const string& suggestedFilename, const string& extension) {
+  return "Placeholder";
 }
 
-wstring CLIVGMRoot::UI_GetSaveFilePath(const wstring& suggestedFilename, const wstring& extension) {
-  fs::path savePath = outputDir / fs::path(ConvertToSafeFileName(suggestedFilename) + L"." + extension);
-  return savePath.wstring();
+string CLIVGMRoot::UI_GetSaveFilePath(const string& suggestedFilename, const string& extension) {
+  fs::path savePath = outputDir / fs::path(ConvertToSafeFileName(suggestedFilename) + "." + extension);
+  return savePath.string();
 }
 
-wstring CLIVGMRoot::UI_GetSaveDirPath(const std::wstring& suggestedDir) {
-  return this->outputDir.wstring();
+string CLIVGMRoot::UI_GetSaveDirPath(const std::string& suggestedDir) {
+  return this->outputDir.string();
 }

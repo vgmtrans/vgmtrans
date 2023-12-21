@@ -19,7 +19,7 @@ class AkaoSnesInstrSet:
                    uint16_t addrTuningTable,
                    uint16_t addrADSRTable,
                    uint16_t addrDrumKitTable,
-                   const std::wstring &name = L"AkaoSnesInstrSet");
+                   const std::string &name = "AkaoSnesInstrSet");
   virtual ~AkaoSnesInstrSet(void);
 
   virtual bool GetHeaderInfo();
@@ -48,7 +48,7 @@ class AkaoSnesInstr
                 uint32_t spcDirAddr,
                 uint16_t addrTuningTable,
                 uint16_t addrADSRTable,
-                const std::wstring &name = L"AkaoSnesInstr");
+                const std::string &name = "AkaoSnesInstr");
   virtual ~AkaoSnesInstr(void);
 
   virtual bool LoadInstr();
@@ -75,7 +75,7 @@ public:
                   uint16_t addrTuningTable,
                   uint16_t addrADSRTable,
                   uint16_t addrDrumKitTable,
-                  const std::wstring &name = L"AkaoSnesDrumKit");
+                  const std::string &name = "AkaoSnesDrumKit");
   virtual ~AkaoSnesDrumKit(void);
 
   virtual bool LoadInstr();

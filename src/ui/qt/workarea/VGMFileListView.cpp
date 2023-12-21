@@ -34,7 +34,7 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
   switch (index.column()) {
     case Property::Name: {
       if (role == Qt::DisplayRole) {
-        return QString::fromStdWString(*vgmfile->GetName());
+        return QString::fromStdString(*vgmfile->GetName());
       } else if (role == Qt::DecorationRole) {
         return iconForFileType(vgmfile->GetFileType());
       }

@@ -11,8 +11,8 @@ void CPSScanner::Scan(RawFile *file, void *info) {
   CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
 
   if (fmt_ver == VER_UNDEFINED) {
-    wstring alert = L"XML entry uses an undefined QSound version: " + string2wstring(gameentry->fmt_version_str);
-    pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, L"CPSScanner"));
+    string alert = "XML entry uses an undefined QSound version: " + gameentry->fmt_version_str;
+    pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, "CPSScanner"));
     return;
   }
 
@@ -89,26 +89,26 @@ void CPSScanner::Scan(RawFile *file, void *info) {
   CPSSampleInfoTable *sampInfoTable = 0;
   CPSArticTable *articTable = 0;
 
-  wstring artic_table_name;
-  wstring instrset_name;
-  wstring samp_info_table_name;
-  wstring sampcoll_name;
-  wstring seq_table_name;
+  string artic_table_name;
+  string instrset_name;
+  string samp_info_table_name;
+  string sampcoll_name;
+  string seq_table_name;
 
-  wostringstream name;
-  name << gameentry->name.c_str() << L" articulation table";
+  ostringstream name;
+  name << gameentry->name.c_str() << " articulation table";
   artic_table_name = name.str();
-  name.str(L"");
-  name << gameentry->name.c_str() << L" instrument set";
+  name.str("");
+  name << gameentry->name.c_str() << " instrument set";
   instrset_name = name.str();
-  name.str(L"");
-  name << gameentry->name.c_str() << L" sample collection";
+  name.str("");
+  name << gameentry->name.c_str() << " sample collection";
   sampcoll_name = name.str();
-  name.str(L"");
-  name << gameentry->name.c_str() << L" sample info table";
+  name.str("");
+  name << gameentry->name.c_str() << " sample info table";
   samp_info_table_name = name.str();
-  name.str(L"");
-  name << gameentry->name.c_str() << L" sequence pointer table";
+  name.str("");
+  name << gameentry->name.c_str() << " sequence pointer table";
   seq_table_name = name.str();
 
 
@@ -189,14 +189,14 @@ void CPSScanner::Scan(RawFile *file, void *info) {
       seqPointer = programFile->GetWordBE(seq_table_offset + k) & 0x0FFFFF;
     }
 
-    seqTable->AddSimpleItem(seq_table_offset + k, 4, L"Sequence Pointer");
+    seqTable->AddSimpleItem(seq_table_offset + k, 4, "Sequence Pointer");
 
-    name.str(L"");
-    name << gameentry->name.c_str() << L" song " << k / 4;
+    name.str("");
+    name << gameentry->name.c_str() << " song " << k / 4;
     VGMColl *coll = new VGMColl(name.str());
-    name.str(L"");
-    name << gameentry->name.c_str() << L" seq " << k / 4;
-    wstring seqName = name.str();
+    name.str("");
+    name << gameentry->name.c_str() << " seq " << k / 4;
+    string seqName = name.str();
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
     if (newSeq->LoadVGMFile()) {
       coll->UseSeq(newSeq);
@@ -232,18 +232,18 @@ void CPSScanner::LoadCPS1(MAMEGame *gameentry) {
     return;
 
   if (fmt_ver == VER_UNDEFINED) {
-    wstring alert = L"XML entry uses an undefined QSound version: " + string2wstring(gameentry->fmt_version_str);
-    pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, L"CPSScanner"));
+    string alert = "XML entry uses an undefined QSound version: " + gameentry->fmt_version_str;
+    pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, "CPSScanner"));
     return;
   }
 
   RawFile *programFile = seqRomGroupEntry->file;
 
-  wstring seq_table_name;
-  wostringstream name;
+  string seq_table_name;
+  ostringstream name;
 
-  name.str(L"");
-  name << gameentry->name.c_str() << L" sequence pointer table";
+  name.str("");
+  name << gameentry->name.c_str() << " sequence pointer table";
   seq_table_name = name.str();
 
   uint8_t ptrsStart;
@@ -287,11 +287,11 @@ void CPSScanner::LoadCPS1(MAMEGame *gameentry) {
       continue;
     }
 
-    seqTable->AddSimpleItem(seq_table_offset + k, ptrSize, L"Sequence Pointer");
+    seqTable->AddSimpleItem(seq_table_offset + k, ptrSize, "Sequence Pointer");
 
-    name.str(L"");
-    name << gameentry->name.c_str() << L" seq " << (k-ptrsStart) / ptrSize;
-    wstring seqName = name.str();
+    name.str("");
+    name << gameentry->name.c_str() << " seq " << (k-ptrsStart) / ptrSize;
+    string seqName = name.str();
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
     //    printf("LOADING SEQ at %X\n", seqPointer);
     if (!newSeq->LoadVGMFile()) {

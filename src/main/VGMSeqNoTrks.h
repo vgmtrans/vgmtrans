@@ -6,7 +6,7 @@ class VGMSeqNoTrks:
     public VGMSeq,
     public SeqTrack {
  public:
-  VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, std::wstring name = L"VGM Sequence");
+  VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, std::string name = "VGM Sequence");
  public:
   virtual ~VGMSeqNoTrks(void);
 
@@ -24,7 +24,7 @@ class VGMSeqNoTrks:
   inline uint32_t GetWordBE(uint32_t offset) { return VGMSeq::GetWordBE(offset); }
   inline uint32_t &offset(void) { return VGMSeq::dwOffset; }
   inline uint32_t &length(void) { return VGMSeq::unLength; }
-  inline std::wstring &name(void) { return VGMSeq::name; }
+  inline std::string &name(void) { return VGMSeq::name; }
 
   inline uint32_t &eventsOffset() { return dwEventsOffset; }
 

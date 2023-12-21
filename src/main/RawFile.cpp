@@ -13,16 +13,16 @@ using namespace std;
 RawFile::RawFile(void)
     : propreRatio(0.5),
       processFlags(PF_USESCANNERS | PF_USELOADERS),
-      parRawFileFullPath(L""),
+      parRawFileFullPath(""),
       bCanFileRead(true),
       fileSize(0) {
   bufSize = (BUF_SIZE > fileSize) ? fileSize : BUF_SIZE;
 }
 
-RawFile::RawFile(const wstring name, uint32_t theFileSize, bool bCanRead, const VGMTag tag)
+RawFile::RawFile(const string name, uint32_t theFileSize, bool bCanRead, const VGMTag tag)
     : fileSize(theFileSize),
       fullpath(name),
-      parRawFileFullPath(L""),        //this should only be defined by VirtFile
+      parRawFileFullPath(""),        //this should only be defined by VirtFile
       propreRatio(0.5),
       bCanFileRead(bCanRead),
       tag(tag),
@@ -45,12 +45,12 @@ RawFile::~RawFile(void) {
 }
 
 // opens a file using the standard c++ file i/o routines
-bool RawFile::open(const wstring &theFileName) {
+bool RawFile::open(const string &theFileName) {
   file.open(ghc::filesystem::path(theFileName), ios::in | ios::binary);
   if (!file.is_open()) {
-    pRoot->AddLogItem(new LogItem((std::wstring(L"File ") + theFileName.c_str() + L" could not be opened"),
+    pRoot->AddLogItem(new LogItem((std::string("File ") + theFileName.c_str() + " could not be opened"),
                                   LOG_LEVEL_ERR,
-                                  L"RawFile"));
+                                  "RawFile"));
     return false;
   }
 
@@ -76,7 +76,7 @@ unsigned long RawFile::size(void) {
 }
 
 // Name says it all.
-wstring RawFile::getFileNameFromPath(const wstring &s) {
+string RawFile::getFileNameFromPath(const string &s) {
   size_t i = s.rfind('/', s.length());
   size_t j = s.rfind('\\', s.length());
   if (i == string::npos || (j != string::npos && i < j))
@@ -87,15 +87,15 @@ wstring RawFile::getFileNameFromPath(const wstring &s) {
   return s;
 }
 
-wstring RawFile::getExtFromPath(const wstring &s) {
+string RawFile::getExtFromPath(const string &s) {
   size_t i = s.rfind('.', s.length());
   if (i != string::npos) {
     return (s.substr(i + 1, s.length() - i));
   }
-  return (L"");
+  return ("");
 }
 
-wstring RawFile::removeExtFromPath(const wstring &s) {
+string RawFile::removeExtFromPath(const string &s) {
   size_t i = s.rfind('.', s.length());
   if (i != string::npos) {
     return (s.substr(0, i));
@@ -145,10 +145,10 @@ void RawFile::RemoveContainedVGMFile(VGMFile *vgmfile) {
   if (iter != containedVGMFiles.end())
     containedVGMFiles.erase(iter);
   else
-    pRoot->AddLogItem(new LogItem(std::wstring(
-        L"Error: trying to delete a vgmfile which cannot be found in containedVGMFiles."),
+    pRoot->AddLogItem(new LogItem(std::string(
+        "Error: trying to delete a vgmfile which cannot be found in containedVGMFiles."),
                                   LOG_LEVEL_DEBUG,
-                                  L"RawFile"));
+                                  "RawFile"));
 
   if (containedVGMFiles.size() == 0)
     pRoot->CloseRawFile(this);
@@ -280,7 +280,7 @@ void RawFile::UpdateBuffer(uint32_t index) {
 }
 
 bool RawFile::OnSaveAsRaw() {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(filename));
+  string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(filename));
   if (filepath.length() != 0) {
     bool result;
     uint8_t *buf = new uint8_t[fileSize];        //create a buffer the size of the file
@@ -300,7 +300,7 @@ VirtFile::VirtFile()
     : RawFile() {
 }
 
-VirtFile::VirtFile(uint8_t *data, uint32_t fileSize, const wstring &name, const wchar_t *rawFileName, const VGMTag tag)
+VirtFile::VirtFile(uint8_t *data, uint32_t fileSize, const string &name, const char* rawFileName, const VGMTag tag)
     : RawFile(name, fileSize, false, tag) {
   parRawFileFullPath = rawFileName;
   buf.load(data, 0, fileSize);

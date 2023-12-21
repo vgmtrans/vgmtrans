@@ -36,9 +36,9 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
   uint32_t nSeqs;
   uint32_t nBnks;
   uint32_t nWAs;
-  vector<wstring> seqNames;
-  vector<wstring> bnkNames;
-  vector<wstring> waNames;
+  vector<string> seqNames;
+  vector<string> bnkNames;
+  vector<string> waNames;
   vector<uint16_t> seqFileIDs;
   vector<uint16_t> bnkFileIDs;
   vector<uint16_t> waFileIDs;
@@ -69,43 +69,37 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
 
   for (uint32_t i = 0; i < nSeqs; i++) {
     char temp[32];        //that 32 is totally arbitrary, i should change it
-    wchar_t wtemp[32];
     if (hasSYMB) {
       file->GetBytes(file->GetWord(pSeqNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-      mbstowcs(wtemp, temp, 32);
     }
     else {
-      swprintf(wtemp, 32, L"SSEQ_%04d", i);
+      snprintf(temp, 32, "SSEQ_%04d", i);
     }
-    seqNames.push_back(wtemp);
+    seqNames.push_back(temp);
   }
 
   for (uint32_t i = 0; i < nBnks; i++) {
     char temp[32];        //that 32 is totally arbitrary, i should change it
-    wchar_t wtemp[32];
 
     if (hasSYMB) {
       file->GetBytes(file->GetWord(pBnkNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-      mbstowcs(wtemp, temp, 32);
     }
     else {
-      swprintf(wtemp, 32, L"SBNK_%04d", i);
+      snprintf(temp, 32, "SBNK_%04d", i);
     }
-    bnkNames.push_back(wtemp);
+    bnkNames.push_back(temp);
   }
 
   for (uint32_t i = 0; i < nWAs; i++) {
     char temp[32];        //that 32 is totally arbitrary, i should change it
-    wchar_t wtemp[32];
 
     if (hasSYMB) {
       file->GetBytes(file->GetWord(pWANamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
-      mbstowcs(wtemp, temp, 32);
     }
     else {
-      swprintf(wtemp, 32, L"SWAR_%04d", i);
+      snprintf(temp, 32, "SWAR_%04d", i);
     }
-    waNames.push_back(wtemp);
+    waNames.push_back(temp);
   }
 
   uint32_t pSeqInfoPtrList = file->GetWord(INFOoff + 8) + INFOoff;
@@ -184,8 +178,8 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       uint32_t fileSize = file->GetWord(offset);
       NDSWaveArch *NewNDSwa = new NDSWaveArch(file, pWAFatData, fileSize, waNames[i]);
       if (!NewNDSwa->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSWaveArch at 0x%08x\n",
-                                                            pWAFatData).c_str(), LOG_LEVEL_ERR, L"NDSScanner"));
+        pRoot->AddLogItem(new LogItem(FormatString<string>("Failed to load NDSWaveArch at 0x%08x\n",
+                                                            pWAFatData).c_str(), LOG_LEVEL_ERR, "NDSScanner"));
         WAs.push_back(NULL);
         delete NewNDSwa;
         continue;
@@ -222,8 +216,8 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
           NewNDSInstrSet->sampCollWAList.push_back(NULL);
       }
       if (!NewNDSInstrSet->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem((L"Failed to load NDSInstrSet at " + std::to_wstring(
-                                                            pBnkFatData)).c_str(), LOG_LEVEL_ERR, L"NDSScanner"));
+        pRoot->AddLogItem(new LogItem(("Failed to load NDSInstrSet at " + std::to_string(
+                                                            pBnkFatData)).c_str(), LOG_LEVEL_ERR, "NDSScanner"));
       }
       pair<uint16_t, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
       BNKs.push_back(theBank);
@@ -244,9 +238,9 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       uint32_t fileSize = file->GetWord(offset);
       NDSSeq *NewNDSSeq = new NDSSeq(file, pSeqFatData, fileSize, seqNames[i]);
       if (!NewNDSSeq->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(FormatString<wstring>(L"Failed to load NDSSeq at 0x%08x\n", pSeqFatData).c_str(),
+        pRoot->AddLogItem(new LogItem(FormatString<string>("Failed to load NDSSeq at 0x%08x\n", pSeqFatData).c_str(),
                                       LOG_LEVEL_ERR,
-                                      L"NDSScanner"));
+                                      "NDSScanner"));
       }
 
       VGMColl *coll = new VGMColl(seqNames[i]);

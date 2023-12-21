@@ -21,11 +21,11 @@ WDInstrSet::~WDInstrSet(void) {
 
 
 bool WDInstrSet::GetHeaderInfo() {
-  VGMHeader *header = AddHeader(dwOffset, 0x10, L"Header");
-  header->AddSimpleItem(dwOffset + 0x2, 2, L"ID");
-  header->AddSimpleItem(dwOffset + 0x4, 4, L"Sample Section Size");
-  header->AddSimpleItem(dwOffset + 0x8, 4, L"Number of Instruments");
-  header->AddSimpleItem(dwOffset + 0xC, 4, L"Number of Regions");
+  VGMHeader *header = AddHeader(dwOffset, 0x10, "Header");
+  header->AddSimpleItem(dwOffset + 0x2, 2, "ID");
+  header->AddSimpleItem(dwOffset + 0x4, 4, "Sample Section Size");
+  header->AddSimpleItem(dwOffset + 0x8, 4, "Number of Instruments");
+  header->AddSimpleItem(dwOffset + 0xC, 4, "Number of Regions");
 
   id = GetShort(0x2 + dwOffset);
   dwSampSectSize = GetWord(0x4 + dwOffset);
@@ -35,8 +35,8 @@ bool WDInstrSet::GetHeaderInfo() {
   if (dwSampSectSize < 0x40)    //Some songs in the Bouncer have bizarre values here
     dwSampSectSize = 0;
 
-  wostringstream theName;
-  theName << L"WD " << id;
+  ostringstream theName;
+  theName << "WD " << id;
   name = theName.str();
 
   uint32_t sampCollOff = dwOffset + GetWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
@@ -65,8 +65,8 @@ bool WDInstrSet::GetInstrPointers() {
       instrLength = GetWord(j + ((i + 1) * 4)) - GetWord(j + (i * 4));
     else
       instrLength = sampColl->dwOffset - (GetWord(j + (i * 4)) + dwOffset);
-    wostringstream name;
-    name << L"Instrument " << i;
+    ostringstream name;
+    name << "Instrument " << i;
     WDInstr *newWDInstr = new WDInstr(this, dwOffset + GetWord(j + (i * 4)), instrLength, 0, i, name.str());//strStr);
     aInstrs.push_back(newWDInstr);
   }
@@ -83,7 +83,7 @@ WDInstr::WDInstr(VGMInstrSet *instrSet,
                  uint32_t length,
                  uint32_t theBank,
                  uint32_t theInstrNum,
-                 const wstring name)
+                 const string name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name, defaultWDReverbPercent) {
 }
 
@@ -92,7 +92,7 @@ WDInstr::~WDInstr(void) {
 
 
 bool WDInstr::LoadInstr() {
-  wostringstream strStr;
+  ostringstream strStr;
   uint32_t j = 0;
   long startAddress = 0;
   bool notSampleStart = false;
@@ -108,19 +108,19 @@ bool WDInstr::LoadInstr() {
     WDRgn *rgn = new WDRgn(this, k * 0x20 + dwOffset);
     aRgns.push_back(rgn);
 
-    rgn->AddSimpleItem(k * 0x20 + dwOffset, 1, L"Stereo Region Flag");
-    rgn->AddSimpleItem(k * 0x20 + 1 + dwOffset, 1, L"First/Last Region Flags");
-    rgn->AddSimpleItem(k * 0x20 + 2 + dwOffset, 2, L"Unknown Flag");
-    rgn->AddSimpleItem(k * 0x20 + 0x4 + dwOffset, 4, L"Sample Offset");
-    rgn->AddSimpleItem(k * 0x20 + 0x8 + dwOffset, 4, L"Loop Start");
-    rgn->AddSimpleItem(k * 0x20 + 0xC + dwOffset, 2, L"ADSR1");
-    rgn->AddSimpleItem(k * 0x20 + 0xE + dwOffset, 2, L"ADSR2");
-    rgn->AddSimpleItem(k * 0x20 + 0x12 + dwOffset, 1, L"Finetune");
-    rgn->AddSimpleItem(k * 0x20 + 0x13 + dwOffset, 1, L"UnityKey");
-    rgn->AddSimpleItem(k * 0x20 + 0x14 + dwOffset, 1, L"Key High");
-    rgn->AddSimpleItem(k * 0x20 + 0x15 + dwOffset, 1, L"Velocity High");
-    rgn->AddSimpleItem(k * 0x20 + 0x16 + dwOffset, 1, L"Attenuation");
-    rgn->AddSimpleItem(k * 0x20 + 0x17 + dwOffset, 1, L"Pan");
+    rgn->AddSimpleItem(k * 0x20 + dwOffset, 1, "Stereo Region Flag");
+    rgn->AddSimpleItem(k * 0x20 + 1 + dwOffset, 1, "First/Last Region Flags");
+    rgn->AddSimpleItem(k * 0x20 + 2 + dwOffset, 2, "Unknown Flag");
+    rgn->AddSimpleItem(k * 0x20 + 0x4 + dwOffset, 4, "Sample Offset");
+    rgn->AddSimpleItem(k * 0x20 + 0x8 + dwOffset, 4, "Loop Start");
+    rgn->AddSimpleItem(k * 0x20 + 0xC + dwOffset, 2, "ADSR1");
+    rgn->AddSimpleItem(k * 0x20 + 0xE + dwOffset, 2, "ADSR2");
+    rgn->AddSimpleItem(k * 0x20 + 0x12 + dwOffset, 1, "Finetune");
+    rgn->AddSimpleItem(k * 0x20 + 0x13 + dwOffset, 1, "UnityKey");
+    rgn->AddSimpleItem(k * 0x20 + 0x14 + dwOffset, 1, "Key High");
+    rgn->AddSimpleItem(k * 0x20 + 0x15 + dwOffset, 1, "Velocity High");
+    rgn->AddSimpleItem(k * 0x20 + 0x16 + dwOffset, 1, "Attenuation");
+    rgn->AddSimpleItem(k * 0x20 + 0x17 + dwOffset, 1, "Pan");
 
     rgn->bStereoRegion = GetByte(k * 0x20 + dwOffset) & 0x1;
     rgn->bUnknownFlag2 = GetByte(k * 0x20 + 2 + dwOffset) & 0x1;

@@ -8,7 +8,7 @@ class CapcomSnesScanner:
     public VGMScanner {
  public:
   CapcomSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~CapcomSnesScanner(void) {
   }

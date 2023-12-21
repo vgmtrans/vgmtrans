@@ -84,7 +84,7 @@ QListWidget *ManualCollectionDialog::makeSequenceList() {
   for (auto seq : seqs) {
     auto seq_item = new QListWidgetItem(widget);
     seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
-    widget->setItemWidget(seq_item, new QRadioButton(QString::fromStdWString(*seq->GetName())));
+    widget->setItemWidget(seq_item, new QRadioButton(QString::fromStdString(*seq->GetName())));
   }
 
   return widget;
@@ -100,7 +100,7 @@ QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
   for (auto seq : seqs) {
     auto seq_item = new QListWidgetItem(widget);
     seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
-    widget->setItemWidget(seq_item, new QCheckBox(QString::fromStdWString(*seq->GetName())));
+    widget->setItemWidget(seq_item, new QCheckBox(QString::fromStdString(*seq->GetName())));
   }
 
   return widget;
@@ -116,14 +116,14 @@ QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
   for (auto seq : seqs) {
     auto seq_item = new QListWidgetItem(widget);
     seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
-    widget->setItemWidget(seq_item, new QCheckBox(QString::fromStdWString(*seq->GetName())));
+    widget->setItemWidget(seq_item, new QCheckBox(QString::fromStdString(*seq->GetName())));
   }
 
   return widget;
 }
 
 void ManualCollectionDialog::createCollection() {
-  auto coll = new VGMColl(m_name_field->text().toStdWString());
+  auto coll = new VGMColl(m_name_field->text().toStdString());
 
   VGMSeq *chosen_seq = nullptr;
   for (int i = 0; i < m_seq_list->count(); i++) {

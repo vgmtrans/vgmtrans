@@ -4,10 +4,10 @@
 #include "TamSoftPS1Instr.h"
 
 void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
-  std::wstring basename(RawFile::removeExtFromPath(file->GetFileName()));
-  std::wstring extension(StringToLower(file->GetExtension()));
+  std::string basename(RawFile::removeExtFromPath(file->GetFileName()));
+  std::string extension(StringToLower(file->GetExtension()));
 
-  if (extension == L"tsq") {
+  if (extension == "tsq") {
     uint8_t numSongs = 0;
     uint32_t seqHeaderBoundaryOffset = 0xffffffff;
     for (numSongs = 0; numSongs < 128; numSongs++) {
@@ -31,8 +31,8 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
     }
 
     for (uint8_t songIndex = 0; songIndex < numSongs; songIndex++) {
-      std::wstringstream seqname;
-      seqname << basename << L" (" << songIndex << L")";
+      std::stringstream seqname;
+      seqname << basename << " (" << songIndex << ")";
 
       TamSoftPS1Seq *newSeq = new TamSoftPS1Seq(file, 0, songIndex, seqname.str());
       if (newSeq->LoadVGMFile()) {
@@ -43,9 +43,9 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
       }
     }
   }
-  else if (extension == L"tvb" || extension == L"tvb2") {
+  else if (extension == "tvb" || extension == "tvb2") {
     bool ps2 = false;
-    if (extension == L"tvb2") {
+    if (extension == "tvb2") {
       // note: this is not a real extension
       ps2 = true;
     }

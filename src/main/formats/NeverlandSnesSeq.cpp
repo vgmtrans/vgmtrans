@@ -43,13 +43,13 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
     return false;
   }
 
-  header->AddSimpleItem(dwOffset, 3, L"Signature");
+  header->AddSimpleItem(dwOffset, 3, "Signature");
   header->AddUnknownItem(dwOffset + 3, 1);
 
   const size_t NAME_SIZE = 12;
   char rawName[NAME_SIZE + 1] = {0};
   GetBytes(dwOffset + 4, NAME_SIZE, rawName);
-  header->AddSimpleItem(dwOffset + 4, 12, L"Song Name");
+  header->AddSimpleItem(dwOffset + 4, 12, "Song Name");
 
   // trim name text
   for (int i = NAME_SIZE - 1; i >= 0; i--) {
@@ -61,33 +61,33 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
   // set name to the sequence
   if (rawName[0] != ('\0')) {
     std::string nameStr = std::string(rawName);
-    name = string2wstring(nameStr);
+    name = nameStr;
   }
   else {
-    name = L"NeverlandSnesSeq";
+    name = "NeverlandSnesSeq";
   }
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t trackSignPtr = dwOffset + 0x10 + trackIndex;
     uint8_t trackSign = GetByte(trackSignPtr);
 
-    std::wstringstream trackSignName;
-    trackSignName << L"Track " << (trackIndex + 1) << L" Entry";
+    std::stringstream trackSignName;
+    trackSignName << "Track " << (trackIndex + 1) << " Entry";
     header->AddSimpleItem(trackSignPtr, 1, trackSignName.str());
 
     uint16_t sectionListOffsetPtr = dwOffset + 0x20 + (trackIndex * 2);
     if (trackSign != 0xff) {
       uint16_t sectionListAddress = GetShortAddress(sectionListOffsetPtr);
 
-      std::wstringstream playlistName;
-      playlistName << L"Track " << (trackIndex + 1) << L" Playlist Pointer";
+      std::stringstream playlistName;
+      playlistName << "Track " << (trackIndex + 1) << " Playlist Pointer";
       header->AddSimpleItem(sectionListOffsetPtr, 2, playlistName.str());
 
       NeverlandSnesTrack *track = new NeverlandSnesTrack(this, sectionListAddress);
       aTracks.push_back(track);
     }
     else {
-      header->AddSimpleItem(sectionListOffsetPtr, 2, L"NULL");
+      header->AddSimpleItem(sectionListOffsetPtr, 2, "NULL");
     }
   }
 
@@ -141,7 +141,7 @@ bool NeverlandSnesTrack::ReadEvent(void) {
   uint8_t statusByte = GetByte(curOffset++);
   bool bContinue = true;
 
-  std::wstringstream desc;
+  std::stringstream desc;
 
   NeverlandSnesSeqEventType eventType = (NeverlandSnesSeqEventType) 0;
   std::map<uint8_t, NeverlandSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
@@ -151,27 +151,27 @@ bool NeverlandSnesTrack::ReadEvent(void) {
 
   switch (eventType) {
     case EVENT_UNKNOWN0:
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN2: {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
@@ -179,12 +179,12 @@ bool NeverlandSnesTrack::ReadEvent(void) {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2
-          << L"  Arg3: " << (int) arg3;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2
+          << "  Arg3: " << (int) arg3;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
@@ -193,28 +193,28 @@ bool NeverlandSnesTrack::ReadEvent(void) {
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
       uint8_t arg4 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2
-          << L"  Arg3: " << (int) arg3
-          << L"  Arg4: " << (int) arg4;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2
+          << "  Arg3: " << (int) arg3
+          << "  Arg4: " << (int) arg4;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     default:
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
-      pRoot->AddLogItem(new LogItem(std::wstring(L"Unknown Event - ") + desc.str(),
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      pRoot->AddLogItem(new LogItem(std::string("Unknown Event - ") + desc.str(),
                                     LOG_LEVEL_ERR,
-                                    std::wstring(L"NeverlandSnesSeq")));
+                                    std::string("NeverlandSnesSeq")));
       bContinue = false;
       break;
   }
 
-  //std::wostringstream ssTrace;
-  //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
+  //std::ostringstream ssTrace;
+  //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
   return bContinue;

@@ -17,7 +17,7 @@ VGMInstrSet::VGMInstrSet(const string &format,/*FmtID fmtID,*/
                          RawFile *file,
                          uint32_t offset,
                          uint32_t length,
-                         wstring name,
+                         string name,
                          VGMSampColl *theSampColl)
     : VGMFile(FILETYPE_INSTRSET, /*fmtID,*/format, file, offset, length, name), sampColl(theSampColl), allowEmptyInstrs(false) {
   AddContainer<VGMInstr>(aInstrs);
@@ -30,10 +30,10 @@ VGMInstrSet::~VGMInstrSet() {
 
 
 VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
-                                unsigned long instrNum, const wstring &instrName) {
-  wostringstream name;
-  if (instrName == L"")
-    name << L"Instrument " << aInstrs.size();
+                                unsigned long instrNum, const string &instrName) {
+  ostringstream name;
+  if (instrName == "")
+    name << "Instrument " << aInstrs.size();
   else
     name << instrName;
 
@@ -59,7 +59,7 @@ bool VGMInstrSet::Load() {
 
   if (sampColl != NULL) {
     if (!sampColl->Load()) {
-      pRoot->AddLogItem(new LogItem(L"Failed to load VGMSampColl.", LOG_LEVEL_ERR, L"VGMInstrSet"));
+      pRoot->AddLogItem(new LogItem("Failed to load VGMSampColl.", LOG_LEVEL_ERR, "VGMInstrSet"));
     }
   }
 
@@ -89,7 +89,7 @@ bool VGMInstrSet::LoadInstrs() {
 
 
 bool VGMInstrSet::OnSaveAsDLS(void) {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"dls");
+  string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "dls");
   if (filepath.length() != 0) {
     return SaveAsDLS(filepath.c_str());
   }
@@ -97,7 +97,7 @@ bool VGMInstrSet::OnSaveAsDLS(void) {
 }
 
 bool VGMInstrSet::OnSaveAsSF2(void) {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), L"sf2");
+  string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "sf2");
   if (filepath.length() != 0) {
     return SaveAsSF2(filepath);
   }
@@ -105,19 +105,19 @@ bool VGMInstrSet::OnSaveAsSF2(void) {
 }
 
 
-bool VGMInstrSet::SaveAsDLS(const std::wstring &filepath) {
+bool VGMInstrSet::SaveAsDLS(const std::string &filepath) {
   DLSFile dlsfile;
   bool dlsCreationSucceeded = false;
 
   if (!assocColls.empty()) {
     dlsCreationSucceeded = assocColls.front()->CreateDLSFile(dlsfile);
   } else {
-    std::wostringstream message;
+    std::ostringstream message;
     message << name
-            << L": "
-               L"Instrument sets that are not part of a collection cannot be "
-               L"converted to DLS at the moment.";
-    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VGMInstrSet"));
+            << ": "
+               "Instrument sets that are not part of a collection cannot be "
+               "converted to DLS at the moment.";
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, "VGMInstrSet"));
     return false;
   }
 
@@ -127,18 +127,18 @@ bool VGMInstrSet::SaveAsDLS(const std::wstring &filepath) {
   return false;
 }
 
-bool VGMInstrSet::SaveAsSF2(const std::wstring &filepath) {
+bool VGMInstrSet::SaveAsSF2(const std::string &filepath) {
   SF2File *sf2file = NULL;
 
   if (!assocColls.empty()) {
     sf2file = assocColls.front()->CreateSF2File();
   } else {
-    std::wostringstream message;
+    std::ostringstream message;
     message << name
-            << L": "
-               L"Instrument sets that are not part of a collection cannot be "
-               L"converted to SF2 at the moment.";
-    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, L"VGMInstrSet"));
+            << ": "
+               "Instrument sets that are not part of a collection cannot be "
+               "converted to SF2 at the moment.";
+    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, "VGMInstrSet"));
     return false;
   }
 
@@ -156,7 +156,7 @@ bool VGMInstrSet::SaveAsSF2(const std::wstring &filepath) {
 // ********
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, const wstring &name, float reverb)
+                   uint32_t theInstrNum, const string &name, float reverb)
     : VGMContainerItem(instrSet, offset, length, name),
       parInstrSet(instrSet),
       bank(theBank),

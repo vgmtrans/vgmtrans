@@ -11,7 +11,7 @@ DECLARE_FORMAT(HOSA);
 //==============================================================
 //		Constructor
 //==============================================================
-HOSASeq::HOSASeq(RawFile *file, uint32_t offset, const std::wstring &name)
+HOSASeq::HOSASeq(RawFile *file, uint32_t offset, const std::string &name)
     : VGMSeq(HOSAFormat::name, file, offset, 0, name) {
   UseReverb();
   UseLinearAmplitudeScale();
@@ -44,7 +44,7 @@ bool HOSASeq::GetHeaderInfo(void) {
 //	Delect object is in "VGMContainerItem::~VGMContainerItem()"
   VGMHeader *hdr = AddHeader(dwOffset, 0x0050);
   hdr->AddSig(dwOffset, 4);
-  hdr->AddSimpleItem(dwOffset + 0x06, 1, L"Quantity of Tracks");
+  hdr->AddSimpleItem(dwOffset + 0x06, 1, "Quantity of Tracks");
 
   SetPPQN(0x30);                                //Timebase
 
@@ -226,7 +226,7 @@ bool HOSATrack::ReadEvent(void) {
           //Reverb
         case (0x02):
           curOffset++;
-          AddGenericEvent(beginOffset, curOffset - beginOffset, L"Reverb Depth", L"", CLR_REVERB);
+          AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", "", CLR_REVERB);
           break;
           //------------
           //Instrument
@@ -263,7 +263,7 @@ bool HOSATrack::ReadEvent(void) {
           //Dal Segno. (Loop)
         case (0x09):
           curOffset++;
-          AddGenericEvent(beginOffset, curOffset - beginOffset, L"Dal Segno.(Loop)", L"", CLR_LOOP);
+          AddGenericEvent(beginOffset, curOffset - beginOffset, "Dal Segno.(Loop)", "", CLR_LOOP);
           break;
           //------------
           //Unknown
@@ -283,7 +283,7 @@ bool HOSATrack::ReadEvent(void) {
       uint32_t beginOffset2 = curOffset;
       ReadDeltaTime(cCom_bit5, &iDeltaTimeCom);
       if (curOffset != beginOffset2) {
-        AddGenericEvent(beginOffset2, curOffset - beginOffset2, L"Delta time", L"", CLR_CHANGESTATE);
+        AddGenericEvent(beginOffset2, curOffset - beginOffset2, "Delta time", "", CLR_CHANGESTATE);
       };
 
       //----------------------------------

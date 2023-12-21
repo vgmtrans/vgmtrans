@@ -69,7 +69,7 @@ class Menu {
   Menu() { }
   virtual ~Menu() { }
 
-  void AddMenuItem(bool (T::*funcPtr)(void), const wchar_t *name, uint8_t flag = 0) {
+  void AddMenuItem(bool (T::*funcPtr)(void), const char* name, uint8_t flag = 0) {
     funcs.push_back(funcPtr);
     names.push_back(name);
   }
@@ -78,11 +78,11 @@ class Menu {
     return (((T *) item)->*funcs[menuItemNum])();
   }
 
-  std::vector<const wchar_t *> *GetMenuItemNames(void) {
+  std::vector<const char* > *GetMenuItemNames(void) {
     return &names;
   }
 
  protected:
-  std::vector<const wchar_t *> names;
+  std::vector<const char* > names;
   std::vector<bool (T::*)(void)> funcs;
 };

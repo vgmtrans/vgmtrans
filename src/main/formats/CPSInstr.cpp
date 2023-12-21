@@ -12,7 +12,7 @@ using namespace std;
 // ****************
 
 
-CPSArticTable::CPSArticTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length)
+CPSArticTable::CPSArticTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length)
     : VGMMiscFile(CPSFormat::name, file, offset, length, name) {
 }
 
@@ -32,15 +32,15 @@ bool CPSArticTable::LoadMain() {
       continue;
 
 
-    wostringstream name;
-    name << L"Articulation " << i;
+    ostringstream name;
+    name << "Articulation " << i;
     VGMContainerItem *containerItem = new VGMContainerItem(this, off, sizeof(qs_artic_info), name.str());
-    containerItem->AddSimpleItem(off, 1, L"Attack Rate");
-    containerItem->AddSimpleItem(off + 1, 1, L"Decay Rate");
-    containerItem->AddSimpleItem(off + 2, 1, L"Sustain Level");
-    containerItem->AddSimpleItem(off + 3, 1, L"Sustain Rate");
-    containerItem->AddSimpleItem(off + 4, 1, L"Release Rate");
-    containerItem->AddSimpleItem(off + 5, 3, L"Unknown");
+    containerItem->AddSimpleItem(off, 1, "Attack Rate");
+    containerItem->AddSimpleItem(off + 1, 1, "Decay Rate");
+    containerItem->AddSimpleItem(off + 2, 1, "Sustain Level");
+    containerItem->AddSimpleItem(off + 3, 1, "Sustain Rate");
+    containerItem->AddSimpleItem(off + 4, 1, "Release Rate");
+    containerItem->AddSimpleItem(off + 5, 3, "Unknown");
     this->AddItem(containerItem);
   }
   //unLength = off - dwOffset;
@@ -57,7 +57,7 @@ bool CPSArticTable::LoadMain() {
 // ******************
 
 CPSSampleInfoTable::CPSSampleInfoTable(RawFile *file,
-                                       wstring &name,
+                                       string &name,
                                        uint32_t offset,
                                        uint32_t length)
     : VGMMiscFile(CPSFormat::name, file, offset, length, name) {
@@ -71,7 +71,7 @@ CPSSampleInfoTable::~CPSSampleInfoTable(void) {
 
 
 CPS2SampleInfoTable::CPS2SampleInfoTable(RawFile *file,
-                                         wstring &name,
+                                         string &name,
                                          uint32_t offset,
                                          uint32_t length)
     : CPSSampleInfoTable(file, name, offset, length) {
@@ -87,15 +87,15 @@ bool CPS2SampleInfoTable::LoadMain() {
     test1 = GetWord(off + 8);
     test2 = GetWord(off + 12);
 
-    wostringstream name;
-    name << L"Sample Info " << i;
+    ostringstream name;
+    name << "Sample Info " << i;
 
     VGMContainerItem *containerItem = new VGMContainerItem(this, off, sizeof(qs_samp_info_cps2), name.str());
-    containerItem->AddSimpleItem(off + 0, 1, L"Bank");
-    containerItem->AddSimpleItem(off + 1, 2, L"Offset");
-    containerItem->AddSimpleItem(off + 3, 2, L"Loop Offset");
-    containerItem->AddSimpleItem(off + 5, 2, L"End Offset");
-    containerItem->AddSimpleItem(off + 7, 1, L"Unity Key");
+    containerItem->AddSimpleItem(off + 0, 1, "Bank");
+    containerItem->AddSimpleItem(off + 1, 2, "Offset");
+    containerItem->AddSimpleItem(off + 3, 2, "Loop Offset");
+    containerItem->AddSimpleItem(off + 5, 2, "End Offset");
+    containerItem->AddSimpleItem(off + 7, 1, "Unity Key");
     this->AddItem(containerItem);
   }
   unLength = off - 8 - dwOffset;
@@ -132,7 +132,7 @@ bool CPS2SampleInfoTable::LoadMain() {
 
 
 CPS3SampleInfoTable::CPS3SampleInfoTable(RawFile *file,
-                                         wstring &name,
+                                         string &name,
                                          uint32_t offset,
                                          uint32_t length)
     : CPSSampleInfoTable(file, name, offset, length) {
@@ -152,14 +152,14 @@ bool CPS3SampleInfoTable::LoadMain() {
   int i=0;
   for (uint32_t off = dwOffset; off < dwOffset + unLength; off += 16) {
 
-    wostringstream name;
-    name << L"Sample Info " << i;
+    ostringstream name;
+    name << "Sample Info " << i;
 
     VGMContainerItem *containerItem = new VGMContainerItem(this, off, 16, name.str());
-    containerItem->AddSimpleItem(off + 0, 4, L"Offset");
-    containerItem->AddSimpleItem(off + 4, 4, L"Loop Offset");
-    containerItem->AddSimpleItem(off + 8, 4, L"End Offset");
-    containerItem->AddSimpleItem(off + 12, 4, L"Unity Key");
+    containerItem->AddSimpleItem(off + 0, 4, "Offset");
+    containerItem->AddSimpleItem(off + 4, 4, "Loop Offset");
+    containerItem->AddSimpleItem(off + 8, 4, "End Offset");
+    containerItem->AddSimpleItem(off + 12, 4, "Unity Key");
     this->AddItem(containerItem);
 
     sample_info& info = infos[i];
@@ -183,7 +183,7 @@ CPSInstrSet::CPSInstrSet(RawFile *file,
                          int numInstrBanks,
                          CPSSampleInfoTable *theSampInfoTable,
                          CPSArticTable *theArticTable,
-                         wstring &name)
+                         string &name)
     : VGMInstrSet(CPSFormat::name, file, offset, 0, name),
       fmt_version(version),
       num_instr_banks(numInstrBanks),
@@ -211,9 +211,9 @@ bool CPSInstrSet::GetInstrPointers() {
 
     for (uint32_t bank = 0; bank < num_instr_banks; bank++)
       for (uint32_t i = 0; i < 256; i++) {
-        std::wostringstream ss;
-        ss << L"Instrument " << bank * 256 << i;
-        wstring name = ss.str();
+        std::ostringstream ss;
+        ss << "Instrument " << bank * 256 << i;
+        string name = ss.str();
         aInstrs.push_back(new CPSInstr(this,
                                        dwOffset + i * 8 + (bank * 256 * 8),
                                        8,
@@ -247,8 +247,8 @@ bool CPSInstrSet::GetInstrPointers() {
         uint8_t bank = i;
         uint32_t bankOff = instr_table_ptrs[bank] - 0x6000000;
 
-        std::wostringstream pointersStream;
-        pointersStream << L"Bank " << bank << " Instrument Pointers";
+        std::ostringstream pointersStream;
+        pointersStream << "Bank " << bank << " Instrument Pointers";
         auto instrPointersItem = new VGMContainerItem(this->vgmfile, bankOff, 128*2, pointersStream.str(), CLR_HEADER);
 
         // For each bank, iterate over all instr ptrs and create instruments
@@ -258,13 +258,13 @@ bool CPSInstrSet::GetInstrPointers() {
           if (instrPtrOffset == 0) {
             continue;
           }
-          std::wostringstream pointerStream;
-          pointerStream << L"Instrument Pointer " << j;
+          std::ostringstream pointerStream;
+          pointerStream << "Instrument Pointer " << j;
           instrPointersItem->AddSimpleItem(bankOff + (j*2), 2, pointerStream.str());
 
-          std::wostringstream ss;
-          ss << L"Instrument " << j << " bank " << bank;
-          wstring name = ss.str();
+          std::ostringstream ss;
+          ss << "Instrument " << j << " bank " << bank;
+          string name = ss.str();
           aInstrs.push_back(new CPSInstr(this, instrPtr, 0, bank*2, j, name));
         }
         this->AddItem(instrPointersItem);
@@ -284,9 +284,9 @@ bool CPSInstrSet::GetInstrPointers() {
         if (GetShort(j) == 0 && GetByte(j + 2) == 0 && i != 0)
           break;
 
-        std::wostringstream ss;
-        ss << L"Instrument " << totalInstrs << k;
-        wstring name = ss.str();
+        std::ostringstream ss;
+        ss << "Instrument " << totalInstrs << k;
+        string name = ss.str();
         aInstrs.push_back(new CPSInstr(this, j, instr_info_length, (i * 2) + (k / 128), (k % 128), name));
       }
       totalInstrs += k;
@@ -305,7 +305,7 @@ CPSInstr::CPSInstr(VGMInstrSet *instrSet,
                    uint32_t length,
                    uint32_t theBank,
                    uint32_t theInstrNum,
-                   wstring &name)
+                   string &name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {
 }
 
@@ -319,14 +319,14 @@ bool CPSInstr::LoadInstr() {
   if (formatVersion < VER_103) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
-    rgn->AddSimpleItem(this->dwOffset,     1, L"Sample Info Index");
-    rgn->AddSimpleItem(this->dwOffset + 1, 1, L"Unknown / Ignored");
-    rgn->AddSimpleItem(this->dwOffset + 2, 1, L"Attack Rate");
-    rgn->AddSimpleItem(this->dwOffset + 3, 1, L"Decay Rate");
-    rgn->AddSimpleItem(this->dwOffset + 4, 1, L"Sustain Level");
-    rgn->AddSimpleItem(this->dwOffset + 5, 1, L"Sustain Rate");
-    rgn->AddSimpleItem(this->dwOffset + 6, 1, L"Release Rate");
-    rgn->AddSimpleItem(this->dwOffset + 7, 1, L"Unknown");
+    rgn->AddSimpleItem(this->dwOffset,     1, "Sample Info Index");
+    rgn->AddSimpleItem(this->dwOffset + 1, 1, "Unknown / Ignored");
+    rgn->AddSimpleItem(this->dwOffset + 2, 1, "Attack Rate");
+    rgn->AddSimpleItem(this->dwOffset + 3, 1, "Decay Rate");
+    rgn->AddSimpleItem(this->dwOffset + 4, 1, "Sustain Level");
+    rgn->AddSimpleItem(this->dwOffset + 5, 1, "Sustain Rate");
+    rgn->AddSimpleItem(this->dwOffset + 6, 1, "Release Rate");
+    rgn->AddSimpleItem(this->dwOffset + 7, 1, "Unknown");
 
     qs_prog_info_ver_101 progInfo;
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_101), &progInfo);
@@ -345,11 +345,11 @@ bool CPSInstr::LoadInstr() {
 
     rgn->AddSampNum(progInfo.sample_index, this->dwOffset, 2);
     rgn->AddFineTune( (int16_t)((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
-    rgn->AddSimpleItem(this->dwOffset + 3, 1, L"Attack Rate");
-    rgn->AddSimpleItem(this->dwOffset + 4, 1, L"Decay Rate");
-    rgn->AddSimpleItem(this->dwOffset + 5, 1, L"Sustain Level");
-    rgn->AddSimpleItem(this->dwOffset + 6, 1, L"Sustain Rate");
-    rgn->AddSimpleItem(this->dwOffset + 7, 1, L"Release Rate");
+    rgn->AddSimpleItem(this->dwOffset + 3, 1, "Attack Rate");
+    rgn->AddSimpleItem(this->dwOffset + 4, 1, "Decay Rate");
+    rgn->AddSimpleItem(this->dwOffset + 5, 1, "Sustain Level");
+    rgn->AddSimpleItem(this->dwOffset + 6, 1, "Sustain Rate");
+    rgn->AddSimpleItem(this->dwOffset + 7, 1, "Release Rate");
 
     this->attack_rate = progInfo.attack_rate;
     this->decay_rate = progInfo.decay_rate;
@@ -373,11 +373,11 @@ bool CPSInstr::LoadInstr() {
       rgn->keyLow = prevKeyHigh + (uint8_t)1;
       prevKeyHigh = progInfo.key_high;
       rgn->AddSampNum(progInfo.sample_index, off+5, 1);
-      rgn->AddSimpleItem(off + 7, 1, L"Attack Rate");
-      rgn->AddSimpleItem(off + 8, 1, L"Decay Rate");
-      rgn->AddSimpleItem(off + 9, 1, L"Sustain Level");
-      rgn->AddSimpleItem(off + 10, 1, L"Sustain Rate");
-      rgn->AddSimpleItem(off + 11, 1, L"Release Rate");
+      rgn->AddSimpleItem(off + 7, 1, "Attack Rate");
+      rgn->AddSimpleItem(off + 8, 1, "Decay Rate");
+      rgn->AddSimpleItem(off + 9, 1, "Sustain Level");
+      rgn->AddSimpleItem(off + 10, 1, "Sustain Rate");
+      rgn->AddSimpleItem(off + 11, 1, "Release Rate");
 
 
       this->attack_rate = progInfo.attack_rate;
@@ -389,14 +389,14 @@ bool CPSInstr::LoadInstr() {
     unLength = off - dwOffset;
   }
   else {
-    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, L"Region");
+    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, "Region");
     rgns.push_back(rgn);
     qs_prog_info_ver_130 progInfo;
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
 
-    rgn->AddSimpleItem(this->dwOffset,     2, L"Sample Info Index");
-    rgn->AddSimpleItem(this->dwOffset + 2, 1, L"Unknown");
-    rgn->AddSimpleItem(this->dwOffset + 3, 1, L"Articulation Index");
+    rgn->AddSimpleItem(this->dwOffset,     2, "Sample Info Index");
+    rgn->AddSimpleItem(this->dwOffset + 2, 1, "Unknown");
+    rgn->AddSimpleItem(this->dwOffset + 3, 1, "Articulation Index");
 
     CPSArticTable *articTable = ((CPSInstrSet *) this->parInstrSet)->articTable;
     qs_artic_info *artic = &articTable->artics[progInfo.artic_index];
@@ -489,7 +489,7 @@ CPSSampColl::CPSSampColl(RawFile *file,
                          CPSSampleInfoTable *sampinfotable,
                          uint32_t offset,
                          uint32_t length,
-                         wstring name)
+                         string name)
     : VGMSampColl(CPSFormat::name, file, offset, length, name),
       instrset(theinstrset),
       sampInfoTable(sampinfotable) {
@@ -508,8 +508,8 @@ bool CPSSampColl::GetSampleInfo() {
   uint32_t baseOffset;
 
   for (uint32_t i = 0; i < numSamples; i++) {
-    wostringstream name;
-    name << L"Sample " << i;
+    ostringstream name;
+    name << "Sample " << i;
 
     sample_info& sampInfo = sampInfoTable->infos[i];
     // Base address correction for Strider2, which maps qsound start address to 200000h.

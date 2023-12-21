@@ -4,7 +4,7 @@
 class ItikitiSnesScanner: public VGMScanner {
  public:
   ItikitiSnesScanner() {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
 
   void Scan(RawFile *file, void *info) override;

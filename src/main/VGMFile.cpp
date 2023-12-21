@@ -14,7 +14,7 @@ VGMFile::VGMFile(FileType fileType,
                  RawFile *theRawFile,
                  uint32_t offset,
                  uint32_t length,
-                 wstring theName)
+                 string theName)
     : VGMContainerItem(this, offset, length),
       rawfile(theRawFile),
       bUsingRawFile(true),
@@ -44,7 +44,7 @@ bool VGMFile::OnClose() {
 }
 
 bool VGMFile::OnSaveAsRaw() {
-  wstring filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name));
+  string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name));
   if (filepath.length() != 0) {
     bool result;
     uint8_t *buf = new uint8_t[unLength];        //create a buffer the size of the file
@@ -68,9 +68,9 @@ bool VGMFile::LoadVGMFile() {
   if (fmt)
     fmt->OnNewFile(this);
 
-  pRoot->AddLogItem(new LogItem(wstring(L"Loaded \"" + name + L"\" successfully.").c_str(),
+  pRoot->AddLogItem(new LogItem(string("Loaded \"" + name + "\" successfully.").c_str(),
                                 LOG_LEVEL_INFO,
-                                L"VGMFile"));
+                                "VGMFile"));
   return val;
 }
 
@@ -83,7 +83,7 @@ const string &VGMFile::GetFormatName() {
 }
 
 
-const wstring *VGMFile::GetName(void) const {
+const string *VGMFile::GetName(void) const {
   return &name;
 }
 
@@ -149,7 +149,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
 // VGMHeader
 // *********
 
-VGMHeader::VGMHeader(VGMItem *parItem, uint32_t offset, uint32_t length, const std::wstring &name)
+VGMHeader::VGMHeader(VGMItem *parItem, uint32_t offset, uint32_t length, const std::string &name)
     : VGMContainerItem(parItem->vgmfile, offset, length, name) {
 }
 
@@ -160,15 +160,15 @@ void VGMHeader::AddPointer(uint32_t offset,
                            uint32_t length,
                            uint32_t destAddress,
                            bool notNull,
-                           const std::wstring &name) {
+                           const std::string &name) {
   localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_POINTER, offset, length, name));
 }
 
-void VGMHeader::AddTempo(uint32_t offset, uint32_t length, const std::wstring &name) {
+void VGMHeader::AddTempo(uint32_t offset, uint32_t length, const std::string &name) {
   localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_TEMPO, offset, length, name));
 }
 
-void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::wstring &name) {
+void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::string &name) {
   localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_SIG, offset, length, name));
 }
 
@@ -180,7 +180,7 @@ VGMHeaderItem::VGMHeaderItem(VGMHeader *hdr,
                              HdrItemType theType,
                              uint32_t offset,
                              uint32_t length,
-                             const std::wstring &name)
+                             const std::string &name)
     : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType) {
 }
 

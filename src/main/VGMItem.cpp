@@ -9,7 +9,7 @@ using namespace std;
 VGMItem::VGMItem() : color(CLR_UNKNOWN) {
 }
 
-VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, const wstring name, EventColor color)
+VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, const string name, EventColor color)
     : vgmfile(vgmfile), name(name), dwOffset(offset), unLength(length), color(color) {
 }
 
@@ -89,7 +89,7 @@ VGMContainerItem::VGMContainerItem() : VGMItem() {
 }
 
 VGMContainerItem::VGMContainerItem(
-    VGMFile *vgmfile, uint32_t offset, uint32_t length, const wstring name, EventColor color)
+    VGMFile *vgmfile, uint32_t offset, uint32_t length, const string name, EventColor color)
     : VGMItem(vgmfile, offset, length, name, color) {
   AddContainer(headers);
   AddContainer(localitems);
@@ -167,7 +167,7 @@ void VGMContainerItem::AddToUI(VGMItem *parent, void *UI_specific) {
   }
 }
 
-VGMHeader *VGMContainerItem::AddHeader(uint32_t offset, uint32_t length, const std::wstring &name) {
+VGMHeader *VGMContainerItem::AddHeader(uint32_t offset, uint32_t length, const std::string &name) {
   VGMHeader *header = new VGMHeader(this, offset, length, name);
   headers.push_back(header);
   return header;
@@ -177,10 +177,10 @@ void VGMContainerItem::AddItem(VGMItem *item) {
   localitems.push_back(item);
 }
 
-void VGMContainerItem::AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring &name) {
+void VGMContainerItem::AddSimpleItem(uint32_t offset, uint32_t length, const std::string &name) {
   localitems.push_back(new VGMItem(this->vgmfile, offset, length, name, CLR_HEADER));
 }
 
 void VGMContainerItem::AddUnknownItem(uint32_t offset, uint32_t length) {
-  localitems.push_back(new VGMItem(this->vgmfile, offset, length, L"Unknown"));
+  localitems.push_back(new VGMItem(this->vgmfile, offset, length, "Unknown"));
 }

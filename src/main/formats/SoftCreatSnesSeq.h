@@ -20,7 +20,7 @@ class SoftCreatSnesSeq
                    SoftCreatSnesVersion ver,
                    uint32_t seqdata_offset,
                    uint8_t headerAlignSize,
-                   std::wstring newName = L"SoftCreat SNES Seq");
+                   std::string newName = "SoftCreat SNES Seq");
   virtual ~SoftCreatSnesSeq(void);
 
   virtual bool GetHeaderInfo(void);

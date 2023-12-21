@@ -49,10 +49,10 @@ void MenuBar::appendOptionsMenu(const QList<QDockWidget *> &dockWidgets) {
     } else if (text == "MMA") {
       ConversionOptions::the().SetBankSelectStyle(BankSelectStyle::MMA);
       pRoot->UI_AddLogItem(
-          new LogItem(L"MMA style (CC0 * 128 + CC32) bank select was chosen and "
-                      L"it will be used for bank select events in generated MIDIs. This "
-                      L"will cause in-program playback to sound incorrect!",
-                      LOG_LEVEL_WARN, L"VGMTransQt"));
+          new LogItem("MMA style (CC0 * 128 + CC32) bank select was chosen and "
+                      "it will be used for bank select events in generated MIDIs. This "
+                      "will cause in-program playback to sound incorrect!",
+                      LOG_LEVEL_WARN, "VGMTransQt"));
     }
   });
 

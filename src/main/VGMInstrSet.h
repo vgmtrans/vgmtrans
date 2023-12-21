@@ -22,15 +22,15 @@ class VGMInstrSet:
     public VGMFile {
  public:
   BEGIN_MENU_SUB(VGMInstrSet, VGMFile)
-      MENU_ITEM(VGMInstrSet, OnSaveAsDLS, L"Convert to DLS")
-      MENU_ITEM(VGMInstrSet, OnSaveAsSF2, L"Convert to SoundFont 2")
+      MENU_ITEM(VGMInstrSet, OnSaveAsDLS, "Convert to DLS")
+      MENU_ITEM(VGMInstrSet, OnSaveAsSF2, "Convert to SoundFont 2")
   END_MENU()
 
   VGMInstrSet(const std::string &format,
               RawFile *file,
               uint32_t offset,
               uint32_t length = 0,
-              std::wstring name = L"VGMInstrSet",
+              std::string name = "VGMInstrSet",
               VGMSampColl *theSampColl = NULL);
   virtual ~VGMInstrSet(void);
 
@@ -43,15 +43,15 @@ class VGMInstrSet:
                      uint32_t length,
                      unsigned long bank,
                      unsigned long instrNum,
-                     const std::wstring &instrName = L"");
+                     const std::string &instrName = "");
 
   virtual FileType GetFileType() { return FILETYPE_INSTRSET; }
 
 
   bool OnSaveAsDLS(void);
   bool OnSaveAsSF2(void);
-  virtual bool SaveAsDLS(const std::wstring &filepath);
-  virtual bool SaveAsSF2(const std::wstring &filepath);
+  virtual bool SaveAsDLS(const std::string &filepath);
+  virtual bool SaveAsSF2(const std::string &filepath);
 
  public:
   std::vector<VGMInstr *> aInstrs;
@@ -73,7 +73,7 @@ class VGMInstr:
     public VGMContainerItem {
  public:
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
-           uint32_t instrNum, const std::wstring &name = L"Instrument", float reverb = defaultReverbPercent);
+           uint32_t instrNum, const std::string &name = "Instrument", float reverb = defaultReverbPercent);
   virtual ~VGMInstr(void);
 
   virtual Icon GetIcon() { return ICON_INSTR; };

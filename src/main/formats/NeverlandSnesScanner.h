@@ -6,7 +6,7 @@ class NeverlandSnesScanner:
     public VGMScanner {
  public:
   NeverlandSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~NeverlandSnesScanner(void) {
   }

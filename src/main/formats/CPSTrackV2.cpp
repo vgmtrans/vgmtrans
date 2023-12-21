@@ -77,7 +77,7 @@ bool CPSTrackV2::ReadEvent(void) {
 
     case C2_SETBANK:
       AddBankSelectNoItem(GetByte(curOffset++) * 2);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Bank Change", L"", CLR_PROGCHANGE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Bank Change", "", CLR_PROGCHANGE);
       break;
 
     case C3_PITCHBEND: {
@@ -88,7 +88,7 @@ bool CPSTrackV2::ReadEvent(void) {
 //                string("pitchbend"),
 //                pitchbend,
 //                0,
-//                L"Pitch Bend",
+//                "Pitch Bend",
 //                PRIORITY_MIDDLE,
 //                CLR_PITCHBEND);
       break;
@@ -107,7 +107,7 @@ bool CPSTrackV2::ReadEvent(void) {
                 string("vibrato"),
                 vibratoDepth,
                 0,
-                L"Vibrato",
+                "Vibrato",
                 PRIORITY_HIGH,
                 CLR_PITCHBEND);
       break;
@@ -166,22 +166,22 @@ bool CPSTrackV2::ReadEvent(void) {
 
     case D0_LOOP_1_START:
       loopOffset[0] = curOffset;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop 1 Start", L"", CLR_LOOP);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop 1 Start", "", CLR_LOOP);
       break;
 
     case D1_LOOP_2_START:
       loopOffset[1] = curOffset;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop 2 Start", L"", CLR_LOOP);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop 2 Start", "", CLR_LOOP);
       break;
 
     case D2_LOOP_3_START:
       loopOffset[2] = curOffset;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop 3 Start", L"", CLR_LOOP);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop 3 Start", "", CLR_LOOP);
       break;
 
     case D3_LOOP_4_START:
       loopOffset[3] = curOffset;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop 4 Start", L"", CLR_LOOP);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop 4 Start", "", CLR_LOOP);
       break;
 
     case D4_LOOP_1: loopNum = 0; goto handleLoop;
@@ -203,7 +203,7 @@ bool CPSTrackV2::ReadEvent(void) {
         curOffset = loopOffset[loopNum];
       }
       else {
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop", L"", CLR_LOOP);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
         loopCounter[loopNum] = loopCount; //start loop
         curOffset = loopOffset[loopNum];
       }
@@ -218,7 +218,7 @@ bool CPSTrackV2::ReadEvent(void) {
       if (loopCounter[loopNum] - 1 == 0) {
         loopCounter[loopNum] = 0;
         uint16_t jump = GetShortBE(curOffset);
-        AddGenericEvent(beginOffset, (curOffset+2) - beginOffset, L"Loop Break", L"", CLR_LOOP);
+        AddGenericEvent(beginOffset, (curOffset+2) - beginOffset, "Loop Break", "", CLR_LOOP);
         curOffset += jump + 2;
       }
       else {
@@ -233,7 +233,7 @@ bool CPSTrackV2::ReadEvent(void) {
 
     case DD_TRANSPOSE:
       transpose += (int8_t)GetByte(curOffset++);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Transpose", L"", CLR_CHANGESTATE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", "", CLR_CHANGESTATE);
       break;
 
     case EVENT_DE:
@@ -254,7 +254,7 @@ bool CPSTrackV2::ReadEvent(void) {
 //                string("resetlfo"),
 //                data,
 //                0,
-//                L"LFO Reset",
+//                "LFO Reset",
 //                PRIORITY_MIDDLE,
 //                CLR_LFO);
       break;
@@ -267,7 +267,7 @@ bool CPSTrackV2::ReadEvent(void) {
 //                string("lfo"),
 //                rate,
 //                0,
-//                L"LFO Rate",
+//                "LFO Rate",
 //                PRIORITY_MIDDLE,
 //                CLR_LFO);
       break;
@@ -280,7 +280,7 @@ bool CPSTrackV2::ReadEvent(void) {
 //                string("tremelo"),
 //                tremeloDepth,
 //                0,
-//                L"Tremelo",
+//                "Tremelo",
 //                PRIORITY_MIDDLE,
 //                CLR_EXPRESSION);
       break;
@@ -323,7 +323,7 @@ bool CPSTrackV2::ReadEvent(void) {
       return false;
 
     default :
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN", L"", CLR_UNRECOGNIZED);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", CLR_UNRECOGNIZED);
       break;
   }
 

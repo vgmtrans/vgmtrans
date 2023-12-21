@@ -8,7 +8,7 @@ class CompileSnesScanner:
     public VGMScanner {
  public:
   CompileSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~CompileSnesScanner(void) {
   }

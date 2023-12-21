@@ -64,7 +64,7 @@ class ChunSnesSeq
               ChunSnesVersion ver,
               ChunSnesMinorVersion minorVer,
               uint32_t seqdataOffset,
-              std::wstring newName = L"Chun SNES Seq");
+              std::string newName = "Chun SNES Seq");
   virtual ~ChunSnesSeq(void);
 
   virtual bool GetHeaderInfo(void);

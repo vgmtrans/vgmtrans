@@ -21,7 +21,7 @@ typedef struct _VersCk {
 class SonyPS2Coll:
     public VGMColl {
  public:
-  SonyPS2Coll(std::wstring name = L"Unnamed Collection") : VGMColl(name) { }
+  SonyPS2Coll(std::string name = "Unnamed Collection") : VGMColl(name) { }
   virtual ~SonyPS2Coll() { }
 };
 

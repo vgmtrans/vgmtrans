@@ -15,7 +15,7 @@ ChunSnesSeq::ChunSnesSeq(RawFile *file,
                          ChunSnesVersion ver,
                          ChunSnesMinorVersion minorVer,
                          uint32_t seqdataOffset,
-                         std::wstring newName)
+                         std::string newName)
     : VGMSeq(ChunSnesFormat::name, file, seqdataOffset, 0, newName),
       version(ver),
       minorVersion(minorVer),
@@ -52,7 +52,7 @@ bool ChunSnesSeq::GetHeaderInfo(void) {
   initialTempo = GetByte(curOffset++);
   AlwaysWriteInitialTempo(GetTempoInBPM(initialTempo));
 
-  header->AddSimpleItem(curOffset, 1, L"Number of Tracks");
+  header->AddSimpleItem(curOffset, 1, "Number of Tracks");
   nNumTracks = GetByte(curOffset++);
   if (nNumTracks == 0 || nNumTracks > MAX_TRACKS) {
     return false;
@@ -69,8 +69,8 @@ bool ChunSnesSeq::GetHeaderInfo(void) {
       addrTrackStart = dwOffset + ofsTrackStart;
     }
 
-    std::wstringstream trackName;
-    trackName << L"Track Pointer " << (trackIndex + 1);
+    std::stringstream trackName;
+    trackName << "Track Pointer " << (trackIndex + 1);
     header->AddSimpleItem(curOffset, 2, trackName.str());
 
     ChunSnesTrack *track = new ChunSnesTrack(this, addrTrackStart);
@@ -239,7 +239,7 @@ bool ChunSnesTrack::ReadEvent(void) {
   uint8_t statusByte = GetByte(curOffset++);
   bool bContinue = true;
 
-  std::wstringstream desc;
+  std::stringstream desc;
 
   ChunSnesSeqEventType eventType = (ChunSnesSeqEventType) 0;
   std::map<uint8_t, ChunSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
@@ -249,27 +249,27 @@ bool ChunSnesTrack::ReadEvent(void) {
 
   switch (eventType) {
     case EVENT_UNKNOWN0:
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN2: {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
@@ -277,12 +277,12 @@ bool ChunSnesTrack::ReadEvent(void) {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2
-          << L"  Arg3: " << (int) arg3;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2
+          << "  Arg3: " << (int) arg3;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
@@ -291,18 +291,18 @@ bool ChunSnesTrack::ReadEvent(void) {
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
       uint8_t arg4 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2
-          << L"  Arg3: " << (int) arg3
-          << L"  Arg4: " << (int) arg4;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2
+          << "  Arg3: " << (int) arg3
+          << "  Arg4: " << (int) arg4;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_NOP: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str(), CLR_MISC, ICON_BINARY);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str(), CLR_MISC, ICON_BINARY);
       break;
     }
 
@@ -346,7 +346,7 @@ bool ChunSnesTrack::ReadEvent(void) {
       }
       else if (tie) {
         // update note duration without changing note pitch
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str(), CLR_TIE, ICON_NOTE);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(), CLR_TIE, ICON_NOTE);
         MakePrevDurNoteEnd(GetTime() + dur);
         AddTime(noteLength);
       }
@@ -354,8 +354,8 @@ bool ChunSnesTrack::ReadEvent(void) {
         if (prevNoteSlurred && key == prevNoteKey) {
           // slurred note with same key works as tie
           MakePrevDurNoteEnd(GetTime() + dur);
-          desc << L"Abs Key: " << key << " (" << MidiEvent::GetNoteName(key) << ") " << L"  Duration: " << dur;
-          AddGenericEvent(beginOffset, curOffset - beginOffset, L"Note with Duration", desc.str(), CLR_TIE, ICON_NOTE);
+          desc << "Abs Key: " << key << " (" << MidiEvent::GetNoteName(key) << ") " << "  Duration: " << dur;
+          AddGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration", desc.str(), CLR_TIE, ICON_NOTE);
         }
         else {
           AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
@@ -378,15 +378,15 @@ bool ChunSnesTrack::ReadEvent(void) {
       uint8_t durIndex = statusByte - 0xa0;
       noteDurationRate = NOTE_DUR_TABLE[durIndex];
       if (noteDurationRate == 0) {
-        desc << L"Duration Rate: Slur (Full)";
+        desc << "Duration Rate: Slur (Full)";
       }
       else if (noteDurationRate == 254) {
-        desc << L"Duration Rate: Full - 1";
+        desc << "Duration Rate: Full - 1";
       }
       else {
-        desc << L"Duration Rate: " << ((int) noteDurationRate + 1) << L"/256";
+        desc << "Duration Rate: " << ((int) noteDurationRate + 1) << "/256";
       }
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration Rate from Table", desc.str(), CLR_DURNOTE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate from Table", desc.str(), CLR_DURNOTE);
       break;
     }
 
@@ -394,8 +394,8 @@ bool ChunSnesTrack::ReadEvent(void) {
       int16_t destOffset = GetShort(curOffset);
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
-      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Break (Alt)", desc.str(), CLR_LOOP, ICON_ENDREP);
+      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break (Alt)", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       if (loopCountAlt != 0) {
         curOffset = dest;
@@ -408,8 +408,8 @@ bool ChunSnesTrack::ReadEvent(void) {
       int16_t destOffset = GetShort(curOffset);
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
-      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Again (Alt)", desc.str(), CLR_LOOP, ICON_ENDREP);
+      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Again (Alt)", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       if (loopCountAlt == 0) {
         loopCountAlt = 2;
@@ -425,8 +425,8 @@ bool ChunSnesTrack::ReadEvent(void) {
 
     case EVENT_ADSR_RELEASE_SR: {
       uint8_t release_sr = GetByte(curOffset++) & 31;
-      desc << L"SR (Release): " << (int) release_sr;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR Release Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      desc << "SR (Release): " << (int) release_sr;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
@@ -440,9 +440,9 @@ bool ChunSnesTrack::ReadEvent(void) {
       uint8_t sl = (adsr2 & 0xe0) >> 5;
       uint8_t sr = adsr2 & 0x1f;
 
-      desc << L"AR: " << (int) ar << L"  DR: " << (int) dr << L"  SL: " << (int) sl << L"  SR: " << (int) sr
-          << L"  SR (Release): " << (int) release_sr;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR & Release Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      desc << "AR: " << (int) ar << "  DR: " << (int) dr << "  SL: " << (int) sl << "  SR: " << (int) sr
+          << "  SR (Release): " << (int) release_sr;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR & Release Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
@@ -450,9 +450,9 @@ bool ChunSnesTrack::ReadEvent(void) {
       uint8_t param = GetByte(curOffset++);
       bool invertLeft = (param & 1) != 0;
       bool invertRight = (param & 2) != 0;
-      desc << L"Invert Left: " << (invertLeft ? L"On" : L"Off") << L"  Invert Right: "
-          << (invertRight ? L"On" : L"Off");
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Surround", desc.str(), CLR_PAN, ICON_CONTROL);
+      desc << "Invert Left: " << (invertLeft ? "On" : "Off") << "  Invert Right: "
+          << (invertRight ? "On" : "Off");
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Surround", desc.str(), CLR_PAN, ICON_CONTROL);
       break;
     }
 
@@ -461,8 +461,8 @@ bool ChunSnesTrack::ReadEvent(void) {
       curOffset += 2;
       uint8_t condValue = GetByte(curOffset++);
       uint16_t dest = curOffset + destOffset;
-      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Conditional Jump", desc.str(), CLR_MISC);
+      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump", desc.str(), CLR_MISC);
 
       if ((parentSeq->conditionVar & 0x7f) == condValue) {
         // repeat again
@@ -478,36 +478,36 @@ bool ChunSnesTrack::ReadEvent(void) {
 
     case EVENT_INC_COUNTER: {
       // increment a counter value, which will be sent to main CPU
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Increment Counter", desc.str(), CLR_MISC);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Increment Counter", desc.str(), CLR_MISC);
       break;
     }
 
     case EVENT_PITCH_ENVELOPE: {
       uint8_t envelopeIndex = GetByte(curOffset++);
       if (envelopeIndex == 0xff) {
-        desc << L"Envelope: Off";
+        desc << "Envelope: Off";
       }
       else {
-        desc << L"Envelope: " << envelopeIndex;
+        desc << "Envelope: " << envelopeIndex;
       }
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Envelope", desc.str(), CLR_LFO, ICON_CONTROL);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_NOISE_ON: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       break;
     }
 
     case EVENT_NOISE_OFF: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Noise Off", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       break;
     }
 
     case EVENT_MASTER_VOLUME_FADE: {
       uint8_t mastVol = GetByte(curOffset++);
       uint8_t fadeLength = GetByte(curOffset++);
-      desc << L"Master Volume: " << (int) mastVol << L"  Fade Length: " << (int) fadeLength;
+      desc << "Master Volume: " << (int) mastVol << "  Fade Length: " << (int) fadeLength;
 
       uint8_t midiMastVol = min(mastVol, (uint8_t) 0x7f);
       AddMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, midiMastVol);
@@ -517,7 +517,7 @@ bool ChunSnesTrack::ReadEvent(void) {
     case EVENT_EXPRESSION_FADE: {
       uint8_t vol = GetByte(curOffset++);
       uint8_t fadeLength = GetByte(curOffset++);
-      desc << L"Expression: " << (int) vol << L"  Fade Length: " << (int) fadeLength;
+      desc << "Expression: " << (int) vol << "  Fade Length: " << (int) fadeLength;
 
       AddExpressionSlide(beginOffset, curOffset - beginOffset, fadeLength, vol >> 1);
       break;
@@ -526,15 +526,15 @@ bool ChunSnesTrack::ReadEvent(void) {
     case EVENT_FULL_VOLUME_FADE: {
       // fade channel volume to zero or full, do not know where it is used
       uint8_t arg1 = GetByte(curOffset++);
-      desc << L"Arg1: " << arg1;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Fade", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      desc << "Arg1: " << arg1;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Fade", desc.str(), CLR_VOLUME, ICON_CONTROL);
       break;
     }
 
     case EVENT_PAN_FADE: {
       int8_t pan = GetByte(curOffset++);
       uint8_t fadeLength = GetByte(curOffset++);
-      desc << L"Pan: " << (int) pan << L"  Fade Length: " << (int) fadeLength;
+      desc << "Pan: " << (int) pan << "  Fade Length: " << (int) fadeLength;
 
       // TODO: slide in real curve, apply volume scale
       double volumeScale;
@@ -555,15 +555,15 @@ bool ChunSnesTrack::ReadEvent(void) {
       int16_t destOffset = GetShort(curOffset);
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
-      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int) dest;
+      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;
       if (!IsOffsetUsed(dest)) {
-        AddGenericEvent(beginOffset, length, L"Jump", desc.str(), CLR_LOOPFOREVER);
+        AddGenericEvent(beginOffset, length, "Jump", desc.str(), CLR_LOOPFOREVER);
       }
       else {
-        bContinue = AddLoopForever(beginOffset, length, L"Jump");
+        bContinue = AddLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -583,15 +583,15 @@ bool ChunSnesTrack::ReadEvent(void) {
     case EVENT_DURATION_RATE: {
       noteDurationRate = GetByte(curOffset++);
       if (noteDurationRate == 0) {
-        desc << L"Duration Rate: Tie/Slur";
+        desc << "Duration Rate: Tie/Slur";
       }
       else if (noteDurationRate == 254) {
-        desc << L"Duration Rate: Full - 1";
+        desc << "Duration Rate: Full - 1";
       }
       else {
-        desc << L"Duration Rate: " << ((int) noteDurationRate + 1) << L"/256";
+        desc << "Duration Rate: " << ((int) noteDurationRate + 1) << "/256";
       }
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration Rate", desc.str(), CLR_DURNOTE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc.str(), CLR_DURNOTE);
       break;
     }
 
@@ -620,8 +620,8 @@ bool ChunSnesTrack::ReadEvent(void) {
       uint8_t sl = (adsr2 & 0xe0) >> 5;
       uint8_t sr = adsr2 & 0x1f;
 
-      desc << L"AR: " << (int) ar << L"  DR: " << (int) dr << L"  SL: " << (int) sl << L"  SR: " << (int) sr;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
+      desc << "AR: " << (int) ar << "  DR: " << (int) dr << "  SL: " << (int) sl << "  SR: " << (int) sr;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
@@ -637,13 +637,13 @@ bool ChunSnesTrack::ReadEvent(void) {
       // refresh duration info promptly
       SyncNoteLengthWithPriorTrack();
 
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Sync Note Length On", desc.str(), CLR_DURNOTE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Sync Note Length On", desc.str(), CLR_DURNOTE);
       break;
     }
 
     case EVENT_SYNC_NOTE_LEN_OFF: {
       syncNoteLen = false;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Sync Note Length Off", desc.str(), CLR_DURNOTE);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Sync Note Length Off", desc.str(), CLR_DURNOTE);
       break;
     }
 
@@ -651,8 +651,8 @@ bool ChunSnesTrack::ReadEvent(void) {
       int16_t destOffset = GetShort(curOffset);
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
-      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Again", desc.str(), CLR_LOOP, ICON_ENDREP);
+      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Again", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       if (loopCount == 0) {
         loopCount = 2;
@@ -671,9 +671,9 @@ bool ChunSnesTrack::ReadEvent(void) {
       int16_t destOffset = GetShort(curOffset);
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
-      desc << L"Times: " << (int) times << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+      desc << "Times: " << (int) times << "  Destination: $" << std::hex << std::setfill('0') << std::setw(4)
           << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Until", desc.str(), CLR_LOOP, ICON_ENDREP);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       if (loopCount == 0) {
         loopCount = times;
@@ -697,8 +697,8 @@ bool ChunSnesTrack::ReadEvent(void) {
       int16_t destOffset = GetShort(curOffset);
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
-      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern Play", desc.str(), CLR_LOOP, ICON_STARTREP);
+      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc.str(), CLR_LOOP, ICON_STARTREP);
 
       if (subNestLevel >= CHUNSNES_SUBLEVEL_MAX) {
         // stack overflow
@@ -714,7 +714,7 @@ bool ChunSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_RET: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pattern End", desc.str(), CLR_LOOP, ICON_ENDREP);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       if (subNestLevel > 0) {
         curOffset = subReturnAddr[subNestLevel - 1];
@@ -733,19 +733,19 @@ bool ChunSnesTrack::ReadEvent(void) {
     case EVENT_PITCH_SLIDE: {
       int8_t semitones = GetByte(curOffset++);
       uint8_t length = GetByte(curOffset++);
-      desc << L"Key: " << (semitones > 0 ? L"+" : L"") << (int) semitones << L" semitones" << L"  Length: "
+      desc << "Key: " << (semitones > 0 ? "+" : "") << (int) semitones << " semitones" << "  Length: "
           << (int) length;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
       break;
     }
 
     case EVENT_ECHO_ON: {
-      AddReverb(beginOffset, curOffset - beginOffset, 40, L"Echo On");
+      AddReverb(beginOffset, curOffset - beginOffset, 40, "Echo On");
       break;
     }
 
     case EVENT_ECHO_OFF: {
-      AddReverb(beginOffset, curOffset - beginOffset, 0, L"Echo Off");
+      AddReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
       break;
     }
 
@@ -763,14 +763,14 @@ bool ChunSnesTrack::ReadEvent(void) {
       // here we dispatch only a part of them
       switch (presetType) {
         case PRESET_CONDITION:
-          desc << L"Value: " << presetIndex;
+          desc << "Value: " << presetIndex;
           parentSeq->conditionVar = presetIndex; // luckily those preset starts from preset 0 :)
-          AddGenericEvent(beginOffset, curOffset - beginOffset, L"Set Condition Value", desc.str(), CLR_CHANGESTATE);
+          AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Condition Value", desc.str(), CLR_CHANGESTATE);
           break;
 
         default:
-          desc << L"Preset: " << presetIndex;
-          AddGenericEvent(beginOffset, curOffset - beginOffset, L"Load Preset", desc.str(), CLR_MISC);
+          desc << "Preset: " << presetIndex;
+          AddGenericEvent(beginOffset, curOffset - beginOffset, "Load Preset", desc.str(), CLR_MISC);
           break;
       }
 
@@ -780,7 +780,7 @@ bool ChunSnesTrack::ReadEvent(void) {
     case EVENT_END: {
       if (subNestLevel > 0) {
         // return from subroutine (normally not used)
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"End of Track", desc.str(), CLR_TRACKEND, ICON_TRACKEND);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "End of Track", desc.str(), CLR_TRACKEND, ICON_TRACKEND);
         curOffset = subReturnAddr[subNestLevel - 1];
         subNestLevel--;
       }
@@ -793,17 +793,17 @@ bool ChunSnesTrack::ReadEvent(void) {
     }
 
     default:
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
                                     LOG_LEVEL_ERR,
-                                    L"ChunSnesSeq"));
+                                    "ChunSnesSeq"));
       bContinue = false;
       break;
   }
 
-  //std::wostringstream ssTrace;
-  //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
+  //std::ostringstream ssTrace;
+  //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
   return bContinue;

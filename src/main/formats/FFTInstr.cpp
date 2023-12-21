@@ -43,21 +43,21 @@ bool WdsInstrSet::GetHeaderInfo() {
     version = VERSION_WDS;
 
   //バイナリエディタ表示用
-  wostringstream theName;
-  theName << L"wds " << id;
+  ostringstream theName;
+  theName << "wds " << id;
   name = theName.str();
 
   //ヘッダーobjectの生成
   VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(WdsHdr));
   wdsHeader->AddSig(dwOffset, sizeof(long));
   wdsHeader->AddUnknownItem(dwOffset + 0x04, sizeof(long));
-  wdsHeader->AddSimpleItem(dwOffset + 0x08, sizeof(long), L"Header size? (0)");
+  wdsHeader->AddSimpleItem(dwOffset + 0x08, sizeof(long), "Header size? (0)");
   wdsHeader->AddUnknownItem(dwOffset + 0x0C, sizeof(long));
-  wdsHeader->AddSimpleItem(dwOffset + 0x10, sizeof(long), L"Header size? (1)");
-  wdsHeader->AddSimpleItem(dwOffset + 0x14, sizeof(long), L"AD-PCM body(.VB) size");
-  wdsHeader->AddSimpleItem(dwOffset + 0x18, sizeof(long), L"Header size? (2)");
-  wdsHeader->AddSimpleItem(dwOffset + 0x1C, sizeof(long), L"Number of Instruments");
-  wdsHeader->AddSimpleItem(dwOffset + 0x20, sizeof(long), L"Bank number");
+  wdsHeader->AddSimpleItem(dwOffset + 0x10, sizeof(long), "Header size? (1)");
+  wdsHeader->AddSimpleItem(dwOffset + 0x14, sizeof(long), "AD-PCM body(.VB) size");
+  wdsHeader->AddSimpleItem(dwOffset + 0x18, sizeof(long), "Header size? (2)");
+  wdsHeader->AddSimpleItem(dwOffset + 0x1C, sizeof(long), "Number of Instruments");
+  wdsHeader->AddSimpleItem(dwOffset + 0x20, sizeof(long), "Bank number");
   wdsHeader->AddUnknownItem(dwOffset + 0x24, sizeof(long));
   wdsHeader->AddUnknownItem(dwOffset + 0x28, sizeof(long));
   wdsHeader->AddUnknownItem(dwOffset + 0x2C, sizeof(long));
@@ -131,9 +131,9 @@ bool WdsInstr::LoadInstr() {
   // see the declaration of iFineTune for info on where to find the actual code and table for this in FFT
   rgn->fineTune = (short) ((double) rgndata.iFineTune * (100.0 / 256.0));
 
-  rgn->AddGeneralItem(dwOffset + 0x00, sizeof(uint32_t), L"Sample Offset");
-  rgn->AddGeneralItem(dwOffset + 0x04, sizeof(uint16_t), L"Loop Offset");
-  rgn->AddGeneralItem(dwOffset + 0x06, sizeof(uint16_t), L"Pitch Fine Tune");
+  rgn->AddGeneralItem(dwOffset + 0x00, sizeof(uint32_t), "Sample Offset");
+  rgn->AddGeneralItem(dwOffset + 0x04, sizeof(uint16_t), "Loop Offset");
+  rgn->AddGeneralItem(dwOffset + 0x06, sizeof(uint16_t), "Pitch Fine Tune");
 
   if (parInstrSet->version == WdsInstrSet::VERSION_WDS) {
     uint32_t adsr_rate = GetWord(dwOffset + 0x08);
@@ -150,12 +150,12 @@ bool WdsInstr::LoadInstr() {
     uint8_t Sm = (adsr_mode >> 4) & 0x07;
     uint8_t Rm = (adsr_mode >> 8) & 0x07;
 
-    rgn->AddGeneralItem(dwOffset + 0x08, sizeof(uint8_t), L"ADSR Attack Rate");
-    rgn->AddGeneralItem(dwOffset + 0x09, sizeof(uint8_t), L"ADSR Decay Rate & Sustain Level");
-    rgn->AddGeneralItem(dwOffset + 0x0a, sizeof(uint8_t), L"ADSR Sustain Rate");
-    rgn->AddGeneralItem(dwOffset + 0x0b, sizeof(uint8_t), L"ADSR Release Rate");
-    rgn->AddGeneralItem(dwOffset + 0x0c, sizeof(uint8_t), L"ADSR Attack Mode & Sustain Mode / Direction");
-    rgn->AddGeneralItem(dwOffset + 0x0d, sizeof(uint8_t), L"ADSR Release Mode");
+    rgn->AddGeneralItem(dwOffset + 0x08, sizeof(uint8_t), "ADSR Attack Rate");
+    rgn->AddGeneralItem(dwOffset + 0x09, sizeof(uint8_t), "ADSR Decay Rate & Sustain Level");
+    rgn->AddGeneralItem(dwOffset + 0x0a, sizeof(uint8_t), "ADSR Sustain Rate");
+    rgn->AddGeneralItem(dwOffset + 0x0b, sizeof(uint8_t), "ADSR Release Rate");
+    rgn->AddGeneralItem(dwOffset + 0x0c, sizeof(uint8_t), "ADSR Attack Mode & Sustain Mode / Direction");
+    rgn->AddGeneralItem(dwOffset + 0x0d, sizeof(uint8_t), "ADSR Release Mode");
     rgn->AddUnknown(dwOffset + 0x0e, sizeof(uint8_t));
     rgn->AddUnknown(dwOffset + 0x0f, sizeof(uint8_t));
 
@@ -166,12 +166,12 @@ bool WdsInstr::LoadInstr() {
     PSXConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
     aRgns.push_back(rgn);
 
-    rgn->AddGeneralItem(dwOffset + 0x08, sizeof(uint8_t), L"Attack Rate");
-    rgn->AddGeneralItem(dwOffset + 0x09, sizeof(uint8_t), L"Decay Rate");
-    rgn->AddGeneralItem(dwOffset + 0x0A, sizeof(uint8_t), L"Sustain Rate");
-    rgn->AddGeneralItem(dwOffset + 0x0B, sizeof(uint8_t), L"Release Rate");
-    rgn->AddGeneralItem(dwOffset + 0x0C, sizeof(uint8_t), L"Sustain Level");
-    rgn->AddGeneralItem(dwOffset + 0x0D, sizeof(uint8_t), L"Attack Rate Mode?");
+    rgn->AddGeneralItem(dwOffset + 0x08, sizeof(uint8_t), "Attack Rate");
+    rgn->AddGeneralItem(dwOffset + 0x09, sizeof(uint8_t), "Decay Rate");
+    rgn->AddGeneralItem(dwOffset + 0x0A, sizeof(uint8_t), "Sustain Rate");
+    rgn->AddGeneralItem(dwOffset + 0x0B, sizeof(uint8_t), "Release Rate");
+    rgn->AddGeneralItem(dwOffset + 0x0C, sizeof(uint8_t), "Sustain Level");
+    rgn->AddGeneralItem(dwOffset + 0x0D, sizeof(uint8_t), "Attack Rate Mode?");
     rgn->AddUnknown(dwOffset + 0x0E, sizeof(uint8_t));
     rgn->AddUnknown(dwOffset + 0x0F, sizeof(uint8_t));
   }

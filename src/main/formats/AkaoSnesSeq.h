@@ -96,7 +96,7 @@ class AkaoSnesSeq
               AkaoSnesMinorVersion minorVer,
               uint32_t seqdataOffset,
               uint32_t addrAPURelocBase,
-              std::wstring newName = L"Square AKAO SNES Seq");
+              std::string newName = "Square AKAO SNES Seq");
   virtual ~AkaoSnesSeq(void);
 
   virtual bool GetHeaderInfo(void);

@@ -17,7 +17,7 @@ class ChunSnesInstrSet:
                    uint16_t addrSampNumTable,
                    uint16_t addrSampleTable,
                    uint32_t spcDirAddr,
-                   const std::wstring &name = L"ChunSnesInstrSet");
+                   const std::string &name = "ChunSnesInstrSet");
   virtual ~ChunSnesInstrSet(void);
 
   virtual bool GetHeaderInfo();
@@ -45,7 +45,7 @@ class ChunSnesInstr
                 uint16_t addrInstr,
                 uint16_t addrSampleTable,
                 uint32_t spcDirAddr,
-                const std::wstring &name = L"ChunSnesInstr");
+                const std::string &name = "ChunSnesInstr");
   virtual ~ChunSnesInstr(void);
 
   virtual bool LoadInstr();

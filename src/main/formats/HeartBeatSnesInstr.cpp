@@ -13,7 +13,7 @@ HeartBeatSnesInstrSet::HeartBeatSnesInstrSet(RawFile *file,
                                              uint16_t addrSRCNTable,
                                              uint8_t songIndex,
                                              uint32_t spcDirAddr,
-                                             const std::wstring &name) :
+                                             const std::string &name) :
     VGMInstrSet(HeartBeatSnesFormat::name, file, offset, length, name), version(ver),
     addrSRCNTable(addrSRCNTable),
     songIndex(songIndex),
@@ -65,8 +65,8 @@ bool HeartBeatSnesInstrSet::GetInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    std::wostringstream instrName;
-    instrName << L"Instrument " << instrNum;
+    std::ostringstream instrName;
+    instrName << "Instrument " << instrNum;
     HeartBeatSnesInstr *newInstr = new HeartBeatSnesInstr(this,
                                                           version,
                                                           addrInstrHeader,
@@ -105,7 +105,7 @@ HeartBeatSnesInstr::HeartBeatSnesInstr(VGMInstrSet *instrSet,
                                        uint16_t addrSRCNTable,
                                        uint8_t songIndex,
                                        uint32_t spcDirAddr,
-                                       const std::wstring &name) :
+                                       const std::string &name) :
     VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), version(ver),
     addrSRCNTable(addrSRCNTable),
     songIndex(songIndex),
@@ -165,9 +165,9 @@ HeartBeatSnesRgn::HeartBeatSnesRgn(HeartBeatSnesInstr *instr, HeartBeatSnesVersi
   }
 
   AddSampNum(srcn, offset, 1);
-  AddSimpleItem(offset + 1, 1, L"ADSR1");
-  AddSimpleItem(offset + 2, 1, L"ADSR2");
-  AddSimpleItem(offset + 3, 1, L"GAIN");
+  AddSimpleItem(offset + 1, 1, "ADSR1");
+  AddSimpleItem(offset + 2, 1, "ADSR2");
+  AddSimpleItem(offset + 3, 1, "GAIN");
   AddUnityKey(72 - (int) (coarse_tuning), offset + 4, 1);
   AddFineTune((int16_t) (fine_tuning * 100.0), offset + 5, 1);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);

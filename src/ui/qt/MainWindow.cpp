@@ -45,8 +45,8 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
                         .arg(qVersion())
                         .arg(VGMTRANS_REVISION)
                         .arg(VGMTRANS_BRANCH)
-                        .toStdWString();
-  qtVGMRoot.UI_AddLogItem(new LogItem(infostring, LOG_LEVEL_INFO, L"VGMTransQt"));
+                        .toStdString();
+  qtVGMRoot.UI_AddLogItem(new LogItem(infostring, LOG_LEVEL_INFO, "VGMTransQt"));
 }
 
 void MainWindow::createElements() {
@@ -182,5 +182,5 @@ void MainWindow::openFileInternal(QString filename) {
     }
   }
 
-  qtVGMRoot.OpenRawFile(filename.toStdWString());
+  qtVGMRoot.OpenRawFile(filename.toStdString());
 }

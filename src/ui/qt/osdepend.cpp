@@ -2,12 +2,12 @@
 
 #include "osdepend.h"
 
-void Alert(const wchar_t *fmt, ...)
+void Alert(const char* fmt, ...)
 {
 
 }
 
-void LogDebug(const wchar_t *fmt, ...)
+void LogDebug(const char* fmt, ...)
 {
 
 }

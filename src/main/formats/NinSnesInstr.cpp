@@ -10,7 +10,7 @@ NinSnesInstrSet::NinSnesInstrSet(RawFile *file,
                                  NinSnesVersion ver,
                                  uint32_t offset,
                                  uint32_t spcDirAddr,
-                                 const std::wstring &name) :
+                                 const std::string &name) :
     VGMInstrSet(NinSnesFormat::name, file, offset, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
     konamiTuningTableAddress(0),
@@ -91,8 +91,8 @@ bool NinSnesInstrSet::GetInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    std::wostringstream instrName;
-    instrName << L"Instrument " << instr;
+    std::ostringstream instrName;
+    instrName << "Instrument " << instr;
     NinSnesInstr *newInstr =
         new NinSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
     newInstr->konamiTuningTableAddress = konamiTuningTableAddress;
@@ -123,7 +123,7 @@ NinSnesInstr::NinSnesInstr(VGMInstrSet *instrSet,
                            uint32_t theBank,
                            uint32_t theInstrNum,
                            uint32_t spcDirAddr,
-                           const std::wstring &name) :
+                           const std::string &name) :
     VGMInstr(instrSet, offset, NinSnesInstr::ExpectedSize(ver), theBank, theInstrNum, name), version(ver),
     spcDirAddr(spcDirAddr),
     konamiTuningTableAddress(0),
@@ -239,9 +239,9 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
   }
 
   AddSampNum(srcn, offset, 1);
-  AddSimpleItem(offset + 1, 1, L"ADSR1");
-  AddSimpleItem(offset + 2, 1, L"ADSR2");
-  AddSimpleItem(offset + 3, 1, L"GAIN");
+  AddSimpleItem(offset + 1, 1, "ADSR1");
+  AddSimpleItem(offset + 2, 1, "ADSR2");
+  AddSimpleItem(offset + 3, 1, "GAIN");
   if (version == NINSNES_EARLIER) {
     AddUnityKey(96 - (int) (coarse_tuning), offset + 4, 1);
     AddFineTune((int16_t) (fine_tuning * 100.0), offset + 4, 1);
@@ -267,7 +267,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
     unityKey = 71 - coarse_tuning;
     fineTune = (int16_t) (fine_tune_real * 100.0);
 
-    AddSimpleItem(offset + 4, 2, L"Tuning (Unused)");
+    AddSimpleItem(offset + 4, 2, "Tuning (Unused)");
   }
   else {
     AddUnityKey(96 - (int) (coarse_tuning), offset + 4, 1);

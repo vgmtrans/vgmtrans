@@ -16,7 +16,7 @@ class CompileSnesInstrSet:
                       uint16_t addrTuningTable,
                       uint16_t addrPitchTablePtrs,
                       uint32_t spcDirAddr,
-                      const std::wstring &name = L"CompileSnesInstrSet");
+                      const std::string &name = "CompileSnesInstrSet");
   virtual ~CompileSnesInstrSet(void);
 
   virtual bool GetHeaderInfo();
@@ -44,7 +44,7 @@ class CompileSnesInstr
                    uint16_t addrPitchTablePtrs,
                    uint8_t srcn,
                    uint32_t spcDirAddr,
-                   const std::wstring &name = L"CompileSnesInstr");
+                   const std::string &name = "CompileSnesInstr");
   virtual ~CompileSnesInstr(void);
 
   virtual bool LoadInstr();

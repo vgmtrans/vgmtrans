@@ -14,8 +14,8 @@
     struct _##type;    \
     typedef _##type type
 
-std::wstring StringToUpper(std::wstring myString);
-std::wstring StringToLower(std::wstring myString);
+std::string StringToUpper(std::string myString);
+std::string StringToLower(std::string myString);
 
 /**
 Converts a std::string to any class with a proper overload of the >> opertor
@@ -32,37 +32,7 @@ void FromString(const std::string &temp, T *out) {
 
 uint32_t StringToHex(const std::string &str);
 
-std::wstring ConvertToSafeFileName(const std::wstring &str);
-
-inline std::string wstring2string(const std::wstring &wstr) {
-  char *mbs = new char[wstr.length() * MB_CUR_MAX + 1];
-  wcstombs(mbs, wstr.c_str(), wstr.length() * MB_CUR_MAX + 1);
-  std::string str(mbs);
-  delete[] mbs;
-  return str;
-}
-
-inline std::wstring string2wstring(std::string &str) {
-  wchar_t *wcs = new wchar_t[str.length() + 1];
-  mbstowcs(wcs, str.c_str(), str.length() + 1);
-  std::wstring wstr(wcs);
-  delete[] wcs;
-  return wstr;
-}
-
-//std::string WstringToString(std::wstring& wstr)
-//{
-//	std::stringstream stream;
-//	stream << wstr;
-//	return stream.str();
-//}
-//
-//std::wstring StringToWstring(std::string& str)
-//{
-//	std::wostringstream stream;
-//	stream << str;
-//	return stream.str();
-//}
+std::string ConvertToSafeFileName(const std::string &str);
 
 inline int CountBytesOfVal(uint8_t *buf, uint32_t numBytes, uint8_t val) {
   int count = 0;
@@ -119,7 +89,7 @@ struct SizeOffsetPair {
   }
 };
 
-wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
+char* GetFileWithBase(const char* f, const char* newfile);
 
 
 #endif // !defined(COMMON_H)

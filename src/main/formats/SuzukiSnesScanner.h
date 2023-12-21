@@ -8,7 +8,7 @@ class SuzukiSnesScanner:
     public VGMScanner {
  public:
   SuzukiSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~SuzukiSnesScanner(void) {
   }

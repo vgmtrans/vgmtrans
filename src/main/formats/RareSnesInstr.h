@@ -10,14 +10,14 @@
 class RareSnesInstrSet:
     public VGMInstrSet {
  public:
-  RareSnesInstrSet(RawFile *file, uint32_t offset, uint32_t spcDirAddr, const std::wstring &name = L"RareSnesInstrSet");
+  RareSnesInstrSet(RawFile *file, uint32_t offset, uint32_t spcDirAddr, const std::string &name = "RareSnesInstrSet");
   RareSnesInstrSet(RawFile *file,
                    uint32_t offset,
                    uint32_t spcDirAddr,
                    const std::map<uint8_t, int8_t> &instrUnityKeyHints,
                    const std::map<uint8_t, int16_t> &instrPitchHints,
                    const std::map<uint8_t, uint16_t> &instrADSRHints,
-                   const std::wstring &name = L"RareSnesInstrSet");
+                   const std::string &name = "RareSnesInstrSet");
   virtual ~RareSnesInstrSet(void);
 
   virtual void Initialize();
@@ -52,7 +52,7 @@ class RareSnesInstr
                 int8_t transpose = 0,
                 int16_t pitch = 0,
                 uint16_t adsr = 0x8FE0,
-                const std::wstring &name = L"RareSnesInstr");
+                const std::string &name = "RareSnesInstr");
   virtual ~RareSnesInstr(void);
 
   virtual bool LoadInstr();

@@ -60,7 +60,7 @@ int PSF2Loader::psf2_decompress_block(
   blocks = new uint8[numblocks * 4];
 
   if (!blocks) {
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Out of Memory"), LOG_LEVEL_ERR, L"PSF2Loader"));
+    pRoot->AddLogItem(new LogItem(std::string("Out of Memory"), LOG_LEVEL_ERR, "PSF2Loader"));
     return -1;
   }
 
@@ -69,7 +69,7 @@ int PSF2Loader::psf2_decompress_block(
   zblock = new uint8[current_block];
 
   if (!zblock) {
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Out of Memory"), LOG_LEVEL_ERR, L"PSF2Loader"));
+    pRoot->AddLogItem(new LogItem(std::string("Out of Memory"), LOG_LEVEL_ERR, "PSF2Loader"));
     delete[] blocks;
     return -1;
   }
@@ -81,7 +81,7 @@ int PSF2Loader::psf2_decompress_block(
 
   destlen = blocksize;
   if (uncompress(decompressedblock, &destlen, zblock, current_block) != Z_OK) {
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Decompression failed"), LOG_LEVEL_ERR, L"PSF2Loader"));
+    pRoot->AddLogItem(new LogItem(std::string("Decompression failed"), LOG_LEVEL_ERR, "PSF2Loader"));
     delete[] zblock;
     delete[] blocks;
     return -1;
@@ -96,8 +96,7 @@ int PSF2Loader::psf2_decompress_block(
 int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned long dircount) {
   unsigned int i, j, k;
 
-  wchar_t wfilename[37];
-  unsigned char filename[37];
+  char filename[37];
   unsigned long offset = 0;
   unsigned long filesize = 0;
   unsigned long buffersize = 0;
@@ -120,7 +119,7 @@ int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned lon
 
       r = psf2unpack(file, offset + 0x14, filesize);
       if (r) {
-        pRoot->AddLogItem(new LogItem(std::wstring(L"Directory decompression failed"), LOG_LEVEL_ERR, L"PSF2Loader"));
+        pRoot->AddLogItem(new LogItem(std::string("Directory decompression failed"), LOG_LEVEL_ERR, "PSF2Loader"));
         return -1;
       }
     }
@@ -133,7 +132,7 @@ int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned lon
 
       dblock = new uint8[buffersize];
       if (!dblock) {
-        pRoot->AddLogItem(new LogItem(std::wstring(L"Out of Memory"), LOG_LEVEL_ERR, L"PSF2Loader"));
+        pRoot->AddLogItem(new LogItem(std::string("Out of Memory"), LOG_LEVEL_ERR, "PSF2Loader"));
         return -1;
       }
 
@@ -153,11 +152,9 @@ int PSF2Loader::psf2unpack(RawFile *file, unsigned long fileoffset, unsigned lon
           memcpy(newdataBuf + k, dblock, filesize);
           k += filesize;
         }
-
       }
 
-      mbstowcs(wfilename, (const char *) filename, sizeof(filename) / sizeof(filename[0]));
-      pRoot->CreateVirtFile(newdataBuf, actualFileSize, wfilename, file->GetFullPath());
+      pRoot->CreateVirtFile(newdataBuf, actualFileSize, filename, file->GetFullPath());
       delete[] dblock;
     }
   }

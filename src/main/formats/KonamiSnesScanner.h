@@ -8,7 +8,7 @@ class KonamiSnesScanner:
     public VGMScanner {
  public:
   KonamiSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~KonamiSnesScanner(void) {
   }

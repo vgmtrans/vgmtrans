@@ -71,7 +71,7 @@ public:
   VGMItem(VGMFile *vgmfile,
           uint32_t offset,
           uint32_t length = 0,
-          const std::wstring name = L"",
+          const std::string name = "",
           EventColor color = CLR_UNKNOWN);
 
   friend bool operator>(VGMItem &item1, VGMItem &item2);
@@ -86,9 +86,9 @@ public:
   virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
   virtual uint32_t GuessLength() { return unLength; };
   virtual void SetGuessedLength(){};
-  virtual std::vector<const wchar_t *> *GetMenuItemNames() { return nullptr; }
+  virtual std::vector<const char* > *GetMenuItemNames() { return nullptr; }
   virtual bool CallMenuItem(VGMItem *item, int menuItemNum) { return false; }
-  virtual std::wstring GetDescription() { return name; }
+  virtual std::string GetDescription() { return name; }
   virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
   virtual Icon GetIcon() { return ICON_BINARY; }
   virtual void AddToUI(VGMItem *parent, void *UI_specific);
@@ -106,7 +106,7 @@ protected:
 public:
   EventColor color;
   VGMFile *vgmfile;
-  std::wstring name;
+  std::string name;
   uint32_t dwOffset;  // offset in the pDoc data buffer
   uint32_t unLength;  // num of bytes the event engulfs
 };
@@ -121,7 +121,7 @@ public:
   VGMContainerItem(VGMFile *vgmfile,
                    uint32_t offset,
                    uint32_t length = 0,
-                   const std::wstring name = L"",
+                   const std::string name = "",
                    EventColor color = CLR_HEADER);
   virtual ~VGMContainerItem();
 
@@ -131,10 +131,10 @@ public:
   void AddToUI(VGMItem *parent, void *UI_specific) override;
   bool IsContainerItem() const override { return true; }
 
-  VGMHeader *AddHeader(uint32_t offset, uint32_t length, const std::wstring &name = L"Header");
+  VGMHeader *AddHeader(uint32_t offset, uint32_t length, const std::string &name = "Header");
 
   void AddItem(VGMItem *item);
-  void AddSimpleItem(uint32_t offset, uint32_t length, const std::wstring &name);
+  void AddSimpleItem(uint32_t offset, uint32_t length, const std::string &name);
   void AddUnknownItem(uint32_t offset, uint32_t length);
 
   template <class T>

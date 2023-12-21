@@ -14,7 +14,7 @@ class VGMSeqSection
   VGMSeqSection(VGMMultiSectionSeq *parentFile,
                 uint32_t theOffset,
                 uint32_t theLength = 0,
-                const std::wstring theName = L"Section",
+                const std::string theName = "Section",
                 EventColor color = CLR_HEADER);
   virtual ~VGMSeqSection(void);
 

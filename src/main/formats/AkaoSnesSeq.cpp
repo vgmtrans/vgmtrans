@@ -16,7 +16,7 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile *file,
                          AkaoSnesMinorVersion minorVer,
                          uint32_t seqdataOffset,
                          uint32_t addrAPURelocBase,
-                         std::wstring newName)
+                         std::string newName)
     : VGMSeq(AkaoSnesFormat::name, file, seqdataOffset, 0, newName),
       version(ver),
       minorVersion(minorVer),
@@ -54,21 +54,21 @@ bool AkaoSnesSeq::GetHeaderInfo(void) {
   else {
     // Later versions are relocatable
     if (version == AKAOSNES_V3) {
-      header->AddSimpleItem(curOffset, 2, L"ROM Address Base");
+      header->AddSimpleItem(curOffset, 2, "ROM Address Base");
       addrROMRelocBase = GetShort(curOffset);
       if (minorVersion != AKAOSNES_V3_FFMQ) {
         curOffset += 2;
       }
 
-      header->AddSimpleItem(curOffset + MAX_TRACKS * 2, 2, L"End Address");
+      header->AddSimpleItem(curOffset + MAX_TRACKS * 2, 2, "End Address");
       addrSequenceEnd = GetShortAddress(curOffset + MAX_TRACKS * 2);
     }
     else if (version == AKAOSNES_V4) {
-      header->AddSimpleItem(curOffset, 2, L"ROM Address Base");
+      header->AddSimpleItem(curOffset, 2, "ROM Address Base");
       addrROMRelocBase = GetShort(curOffset);
       curOffset += 2;
 
-      header->AddSimpleItem(curOffset, 2, L"End Address");
+      header->AddSimpleItem(curOffset, 2, "End Address");
       addrSequenceEnd = GetShortAddress(curOffset);
       curOffset += 2;
     }
@@ -83,12 +83,12 @@ bool AkaoSnesSeq::GetHeaderInfo(void) {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t addrTrackStart = GetShortAddress(curOffset);
     if (addrTrackStart != addrSequenceEnd) {
-      std::wstringstream trackName;
-      trackName << L"Track Pointer " << (trackIndex + 1);
+      std::stringstream trackName;
+      trackName << "Track Pointer " << (trackIndex + 1);
       header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
     }
     else {
-      header->AddSimpleItem(curOffset, 2, L"NULL");
+      header->AddSimpleItem(curOffset, 2, "NULL");
     }
     curOffset += 2;
   }
@@ -594,7 +594,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
   uint8_t statusByte = GetByte(curOffset++);
   bool bContinue = true;
 
-  std::wstringstream desc;
+  std::stringstream desc;
 
   AkaoSnesSeqEventType eventType = (AkaoSnesSeqEventType) 0;
   std::map<uint8_t, AkaoSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
@@ -604,27 +604,27 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
   switch (eventType) {
     case EVENT_UNKNOWN0:
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
       break;
     }
 
     case EVENT_UNKNOWN2: {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
       break;
     }
 
@@ -632,12 +632,12 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2
-          << L"  Arg3: " << (int) arg3;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2
+          << "  Arg3: " << (int) arg3;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
       break;
     }
 
@@ -646,13 +646,13 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
       uint8_t arg4 = GetByte(curOffset++);
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(L' ') << std::setw(0)
-          << L"  Arg1: " << (int) arg1
-          << L"  Arg2: " << (int) arg2
-          << L"  Arg3: " << (int) arg3
-          << L"  Arg4: " << (int) arg4;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
+          << std::dec << std::setfill(' ') << std::setw(0)
+          << "  Arg1: " << (int) arg1
+          << "  Arg2: " << (int) arg2
+          << "  Arg3: " << (int) arg3
+          << "  Arg4: " << (int) arg4;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
       break;
     }
 
@@ -676,7 +676,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
         uint8_t note = octave * 12 + noteIndex;
 
         if (percussion) {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, vel, dur, L"Percussion Note with Duration");
+          AddNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, vel, dur, "Percussion Note with Duration");
         }
         else {
           AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
@@ -686,7 +686,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
       }
       else if (noteIndex == parentSeq->STATUS_NOTEINDEX_TIE) {
         MakePrevDurNoteEnd(GetTime() + dur);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), CLR_TIE, ICON_NOTE);
         AddTime(len);
       }
       else {
@@ -697,13 +697,13 @@ bool AkaoSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_NOP: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
       break;
     }
 
     case EVENT_NOP1: {
       curOffset++;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), CLR_MISC, ICON_BINARY);
       break;
     }
 
@@ -727,10 +727,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t vol = GetByte(curOffset++);
 
       if (fadeLength != 0) {
-        desc << L"Fade Length: " << (int) fadeLength << L"  Volume: " << (int) vol;
+        desc << "Fade Length: " << (int) fadeLength << "  Volume: " << (int) vol;
         AddGenericEvent(beginOffset,
                         curOffset - beginOffset,
-                        L"Volume Fade",
+                        "Volume Fade",
                         desc.str().c_str(),
                         CLR_VOLUME,
                         ICON_CONTROL);
@@ -766,8 +766,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
       // TODO: apply volume scale
       if (fadeLength != 0) {
-        desc << L"Fade Length: " << (int) fadeLength << L"  Pan: " << (int) pan;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Pan Fade", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
+        desc << "Fade Length: " << (int) fadeLength << "  Pan: " << (int) pan;
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc.str().c_str(), CLR_PAN, ICON_CONTROL);
       }
       else {
         AddPan(beginOffset, curOffset - beginOffset, midiPan);
@@ -784,20 +784,20 @@ bool AkaoSnesTrack::ReadEvent(void) {
         pitchSlideDelay = GetByte(curOffset++);
         pitchSlideLength = GetByte(curOffset++);
         pitchSlideSemitones = GetByte(curOffset++);
-        desc << L"Delay: " << (int) pitchSlideDelay << L"  Length: " << (int) pitchSlideLength << L"  Key: "
-            << (int) pitchSlideSemitones << L" semitones";
+        desc << "Delay: " << (int) pitchSlideDelay << "  Length: " << (int) pitchSlideLength << "  Key: "
+            << (int) pitchSlideSemitones << " semitones";
       }
       else { // AKAOSNES_V2
         pitchSlideSemitones = GetByte(curOffset++);
         pitchSlideDelay = GetByte(curOffset++);
         pitchSlideLength = GetByte(curOffset++);
-        desc << L"Key: " << (int) pitchSlideSemitones << L" semitones  Delay: " << (int) pitchSlideDelay
-            << L"  Length: " << (int) pitchSlideLength;
+        desc << "Key: " << (int) pitchSlideSemitones << " semitones  Delay: " << (int) pitchSlideDelay
+            << "  Length: " << (int) pitchSlideLength;
       }
 
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Pitch Slide On",
+                      "Pitch Slide On",
                       desc.str().c_str(),
                       CLR_PITCHBEND,
                       ICON_CONTROL);
@@ -807,7 +807,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PITCH_SLIDE_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Pitch Slide Off",
+                      "Pitch Slide Off",
                       desc.str().c_str(),
                       CLR_PITCHBEND,
                       ICON_CONTROL);
@@ -817,10 +817,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PITCH_SLIDE: {
       uint8_t pitchSlideLength = GetByte(curOffset++);
       int8_t pitchSlideSemitones = GetByte(curOffset++);
-      desc << L"Length: " << (int) pitchSlideLength << L"  Key: " << (int) pitchSlideSemitones << L" semitones";
+      desc << "Length: " << (int) pitchSlideLength << "  Key: " << (int) pitchSlideSemitones << " semitones";
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Pitch Slide",
+                      "Pitch Slide",
                       desc.str().c_str(),
                       CLR_PITCHBEND,
                       ICON_CONTROL);
@@ -831,10 +831,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t lfoDelay = GetByte(curOffset++);
       uint8_t lfoRate = GetByte(curOffset++);
       uint8_t lfoDepth = GetByte(curOffset++);
-      desc << L"Delay: " << (int) lfoDelay << L"  Rate: " << (int) lfoRate << L"  Depth: " << (int) lfoDepth;
+      desc << "Delay: " << (int) lfoDelay << "  Rate: " << (int) lfoRate << "  Depth: " << (int) lfoDepth;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Vibrato",
+                      "Vibrato",
                       desc.str().c_str(),
                       CLR_MODULATION,
                       ICON_CONTROL);
@@ -844,7 +844,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_VIBRATO_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Vibrato Off",
+                      "Vibrato Off",
                       desc.str().c_str(),
                       CLR_MODULATION,
                       ICON_CONTROL);
@@ -855,10 +855,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t lfoDelay = GetByte(curOffset++);
       uint8_t lfoRate = GetByte(curOffset++);
       uint8_t lfoDepth = GetByte(curOffset++);
-      desc << L"Delay: " << (int) lfoDelay << L"  Rate: " << (int) lfoRate << L"  Depth: " << (int) lfoDepth;
+      desc << "Delay: " << (int) lfoDelay << "  Rate: " << (int) lfoRate << "  Depth: " << (int) lfoDepth;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Tremolo",
+                      "Tremolo",
                       desc.str().c_str(),
                       CLR_MODULATION,
                       ICON_CONTROL);
@@ -868,7 +868,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_TREMOLO_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Tremolo Off",
+                      "Tremolo Off",
                       desc.str().c_str(),
                       CLR_MODULATION,
                       ICON_CONTROL);
@@ -878,10 +878,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PAN_LFO_ON: {
       uint8_t lfoDepth = GetByte(curOffset++);
       uint8_t lfoRate = GetByte(curOffset++);
-      desc << L"Depth: " << (int) lfoDepth << L"  Rate: " << (int) lfoRate;
+      desc << "Depth: " << (int) lfoDepth << "  Rate: " << (int) lfoRate;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Pan LFO",
+                      "Pan LFO",
                       desc.str().c_str(),
                       CLR_MODULATION,
                       ICON_CONTROL);
@@ -892,10 +892,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t lfoDelay = GetByte(curOffset++);
       uint8_t lfoRate = GetByte(curOffset++);
       uint8_t lfoDepth = GetByte(curOffset++);
-      desc << L"Delay: " << (int) lfoDelay << L"  Rate: " << (int) lfoRate << L"  Depth: " << (int) lfoDepth;
+      desc << "Delay: " << (int) lfoDelay << "  Rate: " << (int) lfoRate << "  Depth: " << (int) lfoDepth;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Pan LFO",
+                      "Pan LFO",
                       desc.str().c_str(),
                       CLR_MODULATION,
                       ICON_CONTROL);
@@ -905,7 +905,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PAN_LFO_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Pan LFO Off",
+                      "Pan LFO Off",
                       desc.str().c_str(),
                       CLR_MODULATION,
                       ICON_CONTROL);
@@ -914,10 +914,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_NOISE_FREQ: {
       uint8_t newNCK = GetByte(curOffset++) & 0x1f;
-      desc << L"Noise Frequency (NCK): " << (int) newNCK;
+      desc << "Noise Frequency (NCK): " << (int) newNCK;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Noise Frequency",
+                      "Noise Frequency",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -927,7 +927,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_NOISE_ON: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Noise On",
+                      "Noise On",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -937,7 +937,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_NOISE_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Noise Off",
+                      "Noise Off",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -947,7 +947,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PITCHMOD_ON: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Pitch Modulation On",
+                      "Pitch Modulation On",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -957,7 +957,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PITCHMOD_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Pitch Modulation Off",
+                      "Pitch Modulation Off",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -965,12 +965,12 @@ bool AkaoSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_ECHO_ON: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo On", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_ECHO_OFF: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
@@ -998,7 +998,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_TRANSPOSE_REL: {
       int8_t newTranspose = GetByte(curOffset++);
-      AddTranspose(beginOffset, curOffset - beginOffset, transpose + newTranspose, L"Transpose (Relative)");
+      AddTranspose(beginOffset, curOffset - beginOffset, transpose + newTranspose, "Transpose (Relative)");
       break;
     }
 
@@ -1027,10 +1027,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_VOLUME_ENVELOPE: {
       uint8_t envelopeIndex = GetByte(curOffset++);
-      desc << L"Envelope: " << (int) envelopeIndex;
+      desc << "Envelope: " << (int) envelopeIndex;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Volume Envelope",
+                      "Volume Envelope",
                       desc.str().c_str(),
                       CLR_VOLUME,
                       ICON_CONTROL);
@@ -1039,10 +1039,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_GAIN_RELEASE: {
       uint8_t gain = GetByte(curOffset++) & 0x1f;
-      desc << L"GAIN: " << (int) gain;
+      desc << "GAIN: " << (int) gain;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Release Rate (GAIN)",
+                      "Release Rate (GAIN)",
                       desc.str().c_str(),
                       CLR_ADSR,
                       ICON_CONTROL);
@@ -1055,10 +1055,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
         rate = 100;
       }
 
-      desc << L"Note Length: " << (int) rate << " %";
+      desc << "Note Length: " << (int) rate << " %";
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Duration Rate",
+                      "Duration Rate",
                       desc.str().c_str(),
                       CLR_DURNOTE,
                       ICON_CONTROL);
@@ -1067,10 +1067,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_ADSR_AR: {
       uint8_t newAR = GetByte(curOffset++) & 15;
-      desc << L"AR: " << (int) newAR;
+      desc << "AR: " << (int) newAR;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"ADSR Attack Rate",
+                      "ADSR Attack Rate",
                       desc.str().c_str(),
                       CLR_ADSR,
                       ICON_CONTROL);
@@ -1079,10 +1079,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_ADSR_DR: {
       uint8_t newDR = GetByte(curOffset++) & 7;
-      desc << L"DR: " << (int) newDR;
+      desc << "DR: " << (int) newDR;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"ADSR Decay Rate",
+                      "ADSR Decay Rate",
                       desc.str().c_str(),
                       CLR_ADSR,
                       ICON_CONTROL);
@@ -1091,10 +1091,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_ADSR_SL: {
       uint8_t newSL = GetByte(curOffset++) & 7;
-      desc << L"SL: " << (int) newSL;
+      desc << "SL: " << (int) newSL;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"ADSR Sustain Level",
+                      "ADSR Sustain Level",
                       desc.str().c_str(),
                       CLR_ADSR,
                       ICON_CONTROL);
@@ -1103,10 +1103,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_ADSR_SR: {
       uint8_t newSR = GetByte(curOffset++) & 15;
-      desc << L"SR: " << (int) newSR;
+      desc << "SR: " << (int) newSR;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"ADSR Sustain Rate",
+                      "ADSR Sustain Rate",
                       desc.str().c_str(),
                       CLR_ADSR,
                       ICON_CONTROL);
@@ -1116,7 +1116,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_ADSR_DEFAULT: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Default ADSR",
+                      "Default ADSR",
                       desc.str().c_str(),
                       CLR_ADSR,
                       ICON_CONTROL);
@@ -1129,8 +1129,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
         count++;
       }
 
-      desc << L"Loop Count: " << (int) count;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Start", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
+      desc << "Loop Count: " << (int) count;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(), CLR_LOOP, ICON_STARTREP);
 
       loopStart[loopLevel] = curOffset;
       if (parentSeq->version == AKAOSNES_V4) {
@@ -1156,7 +1156,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
         curOffset = loopStart[prevLoopLevel];
       }
       else {
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(), CLR_LOOP, ICON_ENDREP);
 
         if (loopDecCount[prevLoopLevel] - 1 == 0) {
           // repeat end
@@ -1184,7 +1184,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_SLUR_ON: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Slur On (No Key Off/On)",
+                      "Slur On (No Key Off/On)",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -1195,7 +1195,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_SLUR_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Slur Off",
+                      "Slur Off",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -1206,7 +1206,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_LEGATO_ON: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Legato On (No Key Off)",
+                      "Legato On (No Key Off)",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -1217,7 +1217,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_LEGATO_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Legato Off",
+                      "Legato Off",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -1228,16 +1228,16 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_ONETIME_DURATION: {
       uint8_t dur = GetByte(curOffset++);
       onetimeDuration = dur;
-      desc << L"Duration: " << (int) dur;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Duration (One-Time)", desc.str().c_str(), CLR_DURNOTE);
+      desc << "Duration: " << (int) dur;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration (One-Time)", desc.str().c_str(), CLR_DURNOTE);
       break;
     }
 
     case EVENT_JUMP_TO_SFX_LO: {
       // TODO: EVENT_JUMP_TO_SFX_LO
       uint8_t sfxIndex = GetByte(curOffset++);
-      desc << L"SFX: " << (int) sfxIndex;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Jump to SFX (LOWORD)", desc.str().c_str());
+      desc << "SFX: " << (int) sfxIndex;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (LOWORD)", desc.str().c_str());
       bContinue = false;
       break;
     }
@@ -1245,8 +1245,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_JUMP_TO_SFX_HI: {
       // TODO: EVENT_JUMP_TO_SFX_HI
       uint8_t sfxIndex = GetByte(curOffset++);
-      desc << L"SFX: " << (int) sfxIndex;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Jump to SFX (HIWORD)", desc.str().c_str());
+      desc << "SFX: " << (int) sfxIndex;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (HIWORD)", desc.str().c_str());
       bContinue = false;
       break;
     }
@@ -1254,8 +1254,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PLAY_SFX: {
       // TODO: EVENT_PLAY_SFX
       uint8_t arg1 = GetByte(curOffset++);
-      desc << L"Arg1: " << (int) arg1;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Play SFX", desc.str().c_str());
+      desc << "Arg1: " << (int) arg1;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Play SFX", desc.str().c_str());
       break;
     }
 
@@ -1290,8 +1290,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
       }
 
       if (fadeLength != 0) {
-        desc << L"Fade Length: " << (int) fadeLength << L"  BPM: " << parentSeq->GetTempoInBPM(newTempo);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Tempo Fade", desc.str().c_str(), CLR_TEMPO, ICON_TEMPO);
+        desc << "Fade Length: " << (int) fadeLength << "  BPM: " << parentSeq->GetTempoInBPM(newTempo);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc.str().c_str(), CLR_TEMPO, ICON_TEMPO);
       }
       else {
         AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo));
@@ -1301,10 +1301,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_ECHO_VOLUME: {
       uint8_t vol = GetByte(curOffset++);
-      desc << L"Volume: " << (int) vol;
+      desc << "Volume: " << (int) vol;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Echo Volume",
+                      "Echo Volume",
                       desc.str().c_str(),
                       CLR_REVERB,
                       ICON_CONTROL);
@@ -1315,10 +1315,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint16_t fadeLength = GetByte(curOffset++);
       int8_t vol = GetByte(curOffset++);
 
-      desc << L"Fade Length: " << (int) fadeLength << L"  Volume: " << (int) vol;
+      desc << "Fade Length: " << (int) fadeLength << "  Volume: " << (int) vol;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Echo Volume Fade",
+                      "Echo Volume Fade",
                       desc.str().c_str(),
                       CLR_REVERB,
                       ICON_CONTROL);
@@ -1328,10 +1328,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_ECHO_FEEDBACK_FIR: {
       int8_t feedback = GetByte(curOffset++);
       uint8_t filterIndex = GetByte(curOffset++);
-      desc << L"Feedback: " << (int) feedback << L"  FIR: " << (int) filterIndex;
+      desc << "Feedback: " << (int) feedback << "  FIR: " << (int) filterIndex;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Echo Feedback & FIR",
+                      "Echo Feedback & FIR",
                       desc.str().c_str(),
                       CLR_REVERB,
                       ICON_CONTROL);
@@ -1349,11 +1349,11 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint16_t dest = GetShortAddress(curOffset);
       curOffset += 2;
 
-      desc << L"Count: " << (int) count << L"  Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+      desc << "Count: " << (int) count << "  Destination: $" << std::hex << std::setfill('0') << std::setw(4)
           << std::uppercase << (int) dest;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Loop Break / Jump to Volta",
+                      "Loop Break / Jump to Volta",
                       desc.str().c_str(),
                       CLR_LOOP,
                       ICON_ENDREP);
@@ -1394,26 +1394,26 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_GOTO: {
       uint16_t dest = GetShortAddress(curOffset);
       curOffset += 2;
-      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase << (int) dest;
+      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;
       if (!IsOffsetUsed(dest)) {
-        AddGenericEvent(beginOffset, length, L"Jump", desc.str().c_str(), CLR_LOOPFOREVER);
+        AddGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), CLR_LOOPFOREVER);
       }
       else {
-        bContinue = AddLoopForever(beginOffset, length, L"Jump");
+        bContinue = AddLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
 
     case EVENT_INC_CPU_SHARED_COUNTER: {
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Increment CPU-Shared Counter", desc.str().c_str());
+      AddUnknown(beginOffset, curOffset - beginOffset, "Increment CPU-Shared Counter", desc.str().c_str());
       break;
     }
 
     case EVENT_ZERO_CPU_SHARED_COUNTER: {
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Zero CPU-Shared Counter", desc.str().c_str());
+      AddUnknown(beginOffset, curOffset - beginOffset, "Zero CPU-Shared Counter", desc.str().c_str());
       break;
     }
 
@@ -1421,10 +1421,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint16_t fadeLength = GetByte(curOffset++);
       uint8_t feedback = GetByte(curOffset++);
 
-      desc << L"Fade Length: " << (int) fadeLength << L"  Feedback: " << (int) feedback;
+      desc << "Fade Length: " << (int) fadeLength << "  Feedback: " << (int) feedback;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Echo Feedback Fade",
+                      "Echo Feedback Fade",
                       desc.str().c_str(),
                       CLR_REVERB,
                       ICON_CONTROL);
@@ -1435,10 +1435,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint16_t fadeLength = GetByte(curOffset++);
       uint8_t filterIndex = GetByte(curOffset++);
 
-      desc << L"Fade Length: " << (int) fadeLength << L"  FIR: " << (int) vol;
+      desc << "Fade Length: " << (int) fadeLength << "  FIR: " << (int) vol;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Echo FIR Fade",
+                      "Echo FIR Fade",
                       desc.str().c_str(),
                       CLR_REVERB,
                       ICON_CONTROL);
@@ -1447,10 +1447,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_ECHO_FEEDBACK: {
       uint8_t feedback = GetByte(curOffset++);
-      desc << L"Feedback: " << (int) feedback;
+      desc << "Feedback: " << (int) feedback;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Echo Feedback",
+                      "Echo Feedback",
                       desc.str().c_str(),
                       CLR_REVERB,
                       ICON_CONTROL);
@@ -1459,24 +1459,24 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_ECHO_FIR: {
       uint8_t filterIndex = GetByte(curOffset++);
-      desc << L"FIR: " << (int) vol;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Echo FIR", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
+      desc << "FIR: " << (int) vol;
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR", desc.str().c_str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_CPU_CONTROLED_SET_VALUE: {
       uint8_t value = GetByte(curOffset++);
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Set Value for CPU-Controled Jump", desc.str().c_str());
+      AddUnknown(beginOffset, curOffset - beginOffset, "Set Value for CPU-Controled Jump", desc.str().c_str());
       break;
     }
 
     case EVENT_CPU_CONTROLED_JUMP: {
       uint16_t dest = GetShortAddress(curOffset);
       curOffset += 2;
-      desc << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4) << std::uppercase
+      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
            << (int)dest;
 
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"CPU-Controled Jump", desc.str(),
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "CPU-Controled Jump", desc.str(),
                       CLR_LOOP);
 
       if (jumpActivatedByMainCpu) {
@@ -1494,16 +1494,16 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t arg1 = GetByte(curOffset++) & 15;
       uint16_t dest = GetShortAddress(curOffset);
       curOffset += 2;
-      desc << L"Arg1: " << (int)arg1 << L"  Destination: $" << std::hex << std::setfill(L'0')
+      desc << "Arg1: " << (int)arg1 << "  Destination: $" << std::hex << std::setfill('0')
            << std::setw(4) << std::uppercase << (int)dest;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"CPU-Controled Jump", desc.str().c_str());
+      AddUnknown(beginOffset, curOffset - beginOffset, "CPU-Controled Jump", desc.str().c_str());
       break;
     }
 
     case EVENT_PERC_ON: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Percussion On",
+                      "Percussion On",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -1515,7 +1515,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_PERC_OFF: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Percussion Off",
+                      "Percussion Off",
                       desc.str().c_str(),
                       CLR_CHANGESTATE,
                       ICON_CONTROL);
@@ -1529,7 +1529,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
       // apparently, it is caused by wrong destination address of conditional branch
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Ignore Master Volume (Broken)",
+                      "Ignore Master Volume (Broken)",
                       desc.str().c_str(),
                       CLR_VOLUME,
                       ICON_CONTROL);
@@ -1539,7 +1539,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_IGNORE_MASTER_VOLUME: {
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Ignore Master Volume",
+                      "Ignore Master Volume",
                       desc.str().c_str(),
                       CLR_VOLUME,
                       ICON_CONTROL);
@@ -1548,10 +1548,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
     case EVENT_IGNORE_MASTER_VOLUME_BY_PROGNUM: {
       ignoreMasterVolumeProgNum = GetByte(curOffset++);
-      desc << L"Program Number: " << (int) ignoreMasterVolumeProgNum;
+      desc << "Program Number: " << (int) ignoreMasterVolumeProgNum;
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      L"Ignore Master Volume By Program Number",
+                      "Ignore Master Volume By Program Number",
                       desc.str().c_str(),
                       CLR_VOLUME,
                       ICON_CONTROL);
@@ -1565,17 +1565,17 @@ bool AkaoSnesTrack::ReadEvent(void) {
     }
 
     default:
-      desc << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, L"Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + desc.str()).c_str(),
+      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
                                     LOG_LEVEL_ERR,
-                                    L"AkaoSnesSeq"));
+                                    "AkaoSnesSeq"));
       bContinue = false;
       break;
   }
 
-  //wostringstream ssTrace;
-  //ssTrace << L"" << std::hex << std::setfill(L'0') << std::setw(8) << std::uppercase << beginOffset << L": " << std::setw(2) << (int)statusByte  << L" -> " << std::setw(8) << curOffset << std::endl;
+  //ostringstream ssTrace;
+  //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
   return bContinue;

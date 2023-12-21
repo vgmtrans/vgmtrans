@@ -58,7 +58,7 @@ class KonamiSnesSeq
     : public VGMSeq {
  public:
   KonamiSnesSeq
-      (RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::wstring newName = L"Konami SNES Seq");
+      (RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Konami SNES Seq");
   virtual ~KonamiSnesSeq(void);
 
   virtual bool GetHeaderInfo(void);

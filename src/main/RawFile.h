@@ -15,22 +15,22 @@ enum ProcessFlag {
 class RawFile {
  public:
   RawFile(void);
-  RawFile(const std::wstring name, uint32_t fileSize = 0, bool bCanRead = true, const VGMTag tag = VGMTag());
+  RawFile(const std::string name, uint32_t fileSize = 0, bool bCanRead = true, const VGMTag tag = VGMTag());
  public:
   virtual ~RawFile(void);
 
 //	void kill(void);
 
-  bool open(const std::wstring &filename);
+  bool open(const std::string &filename);
   void close();
   unsigned long size(void);
-  inline const wchar_t *GetFullPath() { return fullpath.c_str(); }
-  inline const wchar_t *GetFileName() { return filename.c_str(); }    //returns the filename with extension
-  inline const std::wstring &GetExtension() { return extension; }
-  inline const std::wstring &GetParRawFileFullPath() { return parRawFileFullPath; }
-  static std::wstring getFileNameFromPath(const std::wstring &s);
-  static std::wstring getExtFromPath(const std::wstring &s);
-  static std::wstring removeExtFromPath(const std::wstring &s);
+  inline const std::string& GetFullPath() { return fullpath; }
+  inline const std::string& GetFileName() { return filename; }    //returns the filename with extension
+  inline const std::string& GetExtension() { return extension; }
+  inline const std::string& GetParRawFileFullPath() { return parRawFileFullPath; }
+  static std::string getFileNameFromPath(const std::string& s);
+  static std::string getExtFromPath(const std::string& s);
+  static std::string removeExtFromPath(const std::string& s);
   VGMItem *GetItemFromOffset(long offset);
   VGMFile *GetVGMFileFromOffset(long offset);
 
@@ -111,10 +111,10 @@ class RawFile {
   std::filebuf *pbuf;
   bool bCanFileRead;
   unsigned long fileSize;
-  std::wstring fullpath;
-  std::wstring filename;
-  std::wstring extension;
-  std::wstring parRawFileFullPath;
+  std::string fullpath;
+  std::string filename;
+  std::string extension;
+  std::string parRawFileFullPath;
  public:
   std::list<VGMFile *> containedVGMFiles;
   VGMTag tag;
@@ -126,7 +126,7 @@ class VirtFile: public RawFile {
   VirtFile();
   VirtFile(uint8_t *data,
            uint32_t fileSize,
-           const std::wstring &name,
-           const wchar_t *parRawFileFullPath = L"",
+           const std::string &name,
+           const char* parRawFileFullPath = "",
            const VGMTag tag = VGMTag());
 };

@@ -15,17 +15,17 @@ class VGMColl
     : public VGMItem {
  public:
   BEGIN_MENU(VGMColl)
-      MENU_ITEM(VGMColl, OnSaveAllDLS, L"Save as MIDI and DLS.")
-      MENU_ITEM(VGMColl, OnSaveAllSF2, L"Save as MIDI and SoundFont 2.")
-      //MENU_ITEM(VGMFile, OnSaveAllAsRaw, L"Save all as original format")
+      MENU_ITEM(VGMColl, OnSaveAllDLS, "Save as MIDI and DLS.")
+      MENU_ITEM(VGMColl, OnSaveAllSF2, "Save as MIDI and SoundFont 2.")
+      //MENU_ITEM(VGMFile, OnSaveAllAsRaw, "Save all as original format")
   END_MENU()
 
-  VGMColl(std::wstring name = L"Unnamed Collection");
+  VGMColl(std::string name = "Unnamed Collection");
   virtual ~VGMColl(void);
 
   void RemoveFileAssocs();
-  const std::wstring *GetName(void) const;
-  void SetName(const std::wstring *newName);
+  const std::string *GetName(void) const;
+  void SetName(const std::string *newName);
   VGMSeq *GetSeq();
   void UseSeq(VGMSeq *theSeq);
   void AddInstrSet(VGMInstrSet *theInstrSet);
@@ -53,5 +53,5 @@ class VGMColl
   void UnpackSampColl(SynthFile &synthfile, VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps);
 
  protected:
-  std::wstring name;
+  std::string name;
 };

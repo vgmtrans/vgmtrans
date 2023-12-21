@@ -77,7 +77,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
   switch (index.column()) {
     case Property::Name: {
       if (role == Qt::DisplayRole) {
-        return QString::fromWCharArray(qtVGMRoot.vRawFile[index.row()]->GetFileName());
+        return QString::fromStdString(qtVGMRoot.vRawFile[index.row()]->GetFileName());
       } else if (role == Qt::DecorationRole) {
         static QIcon fileicon(":/images/file.svg");
         return fileicon;
@@ -128,7 +128,7 @@ RawFileListView::RawFileListView(QWidget *parent) : QTableView(parent) {
     QModelIndexList list = sm->selectedRows();
     for (auto &index : list) {
       auto rawfile = qtVGMRoot.vRawFile[index.row()];
-      std::wstring filepath = pRoot->UI_GetSaveFilePath(L"");
+      std::string filepath = pRoot->UI_GetSaveFilePath("");
       if (!filepath.empty()) {
         /* todo: free function in VGMExport */
         rawfile->OnSaveAsRaw();

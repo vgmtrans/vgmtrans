@@ -18,7 +18,7 @@ class HeartBeatSnesInstrSet:
                         uint16_t addrSRCNTable,
                         uint8_t songIndex,
                         uint32_t spcDirAddr,
-                        const std::wstring &name = L"HeartBeatSnesInstrSet");
+                        const std::string &name = "HeartBeatSnesInstrSet");
   virtual ~HeartBeatSnesInstrSet(void);
 
   virtual bool GetHeaderInfo();
@@ -48,7 +48,7 @@ class HeartBeatSnesInstr
                      uint16_t addrSRCNTable,
                      uint8_t songIndex,
                      uint32_t spcDirAddr,
-                     const std::wstring &name = L"HeartBeatSnesInstr");
+                     const std::string &name = "HeartBeatSnesInstr");
   virtual ~HeartBeatSnesInstr(void);
 
   virtual bool LoadInstr();

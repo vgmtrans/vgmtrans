@@ -44,7 +44,7 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
   }
 
   if (role == Qt::DisplayRole) {
-    return QString::fromStdWString(*file->GetName());
+    return QString::fromStdString(*file->GetName());
   } else if (role == Qt::DecorationRole) {
     return iconForFileType(file->GetFileType());
   }
@@ -123,7 +123,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
       m_collection_title->setText("No collection selected");
     } else {
       m_collection_title->setText(
-          QString::fromStdWString(*qtVGMRoot.vVGMColl[index.row()]->GetName()));
+          QString::fromStdString(*qtVGMRoot.vVGMColl[index.row()]->GetName()));
       m_collection_title->setReadOnly(false);
       commit_rename->setEnabled(true);
     }
@@ -136,7 +136,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
       return;
     }
 
-    auto title = m_collection_title->text().toStdWString();
+    auto title = m_collection_title->text().toStdString();
     /* This makes a copy, no worries */
     qtVGMRoot.vVGMColl[model_index.row()]->SetName(&title);
 

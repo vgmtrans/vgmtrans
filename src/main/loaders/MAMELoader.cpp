@@ -47,10 +47,9 @@ MAMELoader::~MAMELoader() {
 }
 
 int MAMELoader::LoadXML() {
-  const wstring xmlFilePath = pRoot->UI_GetResourceDirPath() + L"mame_roms.xml";
-  string xmlFilePathString = wstring2string(xmlFilePath);
+  const string xmlFilePath = pRoot->UI_GetResourceDirPath() + "mame_roms.xml";
 
-  TiXmlDocument doc(xmlFilePathString);
+  TiXmlDocument doc(xmlFilePath);
   if (!doc.LoadFile())        //if loading the xml file fails
   {
     return 1;
@@ -152,11 +151,10 @@ int MAMELoader::LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentr
 PostLoadCommand MAMELoader::Apply(RawFile *file) {
   if (!bLoadedXml)
     return KEEP_IT;
-  if (file->GetExtension() != L"zip")
+  if (file->GetExtension() != "zip")
     return KEEP_IT;
 
-  wstring fullfilename_w = file->GetFileName();
-  string fullfilename = wstring2string(fullfilename_w);
+  string fullfilename = file->GetFileName();
   size_t endoffilename = fullfilename.rfind('.');
   if (endoffilename == string::npos)
     return KEEP_IT;             // no '.' found in filename, so don't do anything
@@ -176,9 +174,9 @@ PostLoadCommand MAMELoader::Apply(RawFile *file) {
     return KEEP_IT;
 
   //try to open up the game zip
-  wstring fullpath = file->GetFullPath();
-  string test = wstring2string(fullpath);
-  unzFile cur_file = unzOpen(wstring2string(fullpath).c_str());
+  string fullpath = file->GetFullPath();
+  string test = fullpath;
+  unzFile cur_file = unzOpen(fullpath.c_str());
   if (!cur_file) {
     return KEEP_IT;
   }
@@ -316,7 +314,7 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroup *entry, const string &format, un
                                      swap_key2,
                                      addr_key,
                                      xor_key);
-      //pRoot->UI_WriteBufferToFile(L"opcodesdump", decrypt, destFileSize);
+      //pRoot->UI_WriteBufferToFile("opcodesdump", decrypt, destFileSize);
       delete[] decrypt;
     }
     else if (entry->encryption == "cps3") {
@@ -332,18 +330,18 @@ VirtFile *MAMELoader::LoadRomGroup(MAMERomGroup *entry, const string &format, un
         CPS3Decrypt::cps3_decode((uint32_t *)destFile, (uint32_t *)destFile, key1, key2,
                                  destFileSize);
       }
-//      wostringstream strstream;
-//      strstream << L"romgroup  - " << entry->type.c_str();
+//      ostringstream strstream;
+//      strstream << "romgroup  - " << entry->type.c_str();
 //      pRoot->UI_WriteBufferToFile(strstream.str(), destFile, destFileSize);
     }
   }
 
   //static int num = 0;
-  //wostringstream	fn;
-  //fn << L"romgroup " << num++;
+  //ostringstream	fn;
+  //fn << "romgroup " << num++;
   //pRoot->UI_WriteBufferToFile(fn.str().c_str(), destFile, destFileSize);
-  wostringstream strstream;
-  strstream << L"romgroup  - " << entry->type.c_str();
+  ostringstream strstream;
+  strstream << "romgroup  - " << entry->type.c_str();
   VirtFile *newVirtFile = new VirtFile(destFile, destFileSize, strstream.str());
   newVirtFile->DontUseLoaders();
   newVirtFile->DontUseScanners();

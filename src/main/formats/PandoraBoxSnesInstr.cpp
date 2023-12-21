@@ -13,7 +13,7 @@ PandoraBoxSnesInstrSet::PandoraBoxSnesInstrSet(RawFile *file,
                                                uint16_t addrGlobalInstrTable,
                                                uint8_t globalInstrumentCount,
                                                const std::map<uint8_t, uint16_t> &instrADSRHints,
-                                               const std::wstring &name) :
+                                               const std::string &name) :
     VGMInstrSet(PandoraBoxSnesFormat::name, file, addrLocalInstrTable, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
     addrLocalInstrTable(addrLocalInstrTable),
@@ -78,8 +78,8 @@ bool PandoraBoxSnesInstrSet::GetInstrPointers() {
       adsr = instrADSRHints[srcn];
     }
 
-    std::wostringstream instrName;
-    instrName << L"Instrument " << srcn;
+    std::ostringstream instrName;
+    instrName << "Instrument " << srcn;
     PandoraBoxSnesInstr *newInstr =
         new PandoraBoxSnesInstr(this, version, addrLocalInstrItem, instrNum, srcn, spcDirAddr, adsr, instrName.str());
     aInstrs.push_back(newInstr);
@@ -110,7 +110,7 @@ PandoraBoxSnesInstr::PandoraBoxSnesInstr(VGMInstrSet *instrSet,
                                          uint8_t srcn,
                                          uint32_t spcDirAddr,
                                          uint16_t adsr,
-                                         const std::wstring &name) :
+                                         const std::string &name) :
     VGMInstr(instrSet, offset, 1, 0, theInstrNum, name), version(ver),
     spcDirAddr(spcDirAddr),
     srcn(srcn),
@@ -151,7 +151,7 @@ PandoraBoxSnesRgn::PandoraBoxSnesRgn(PandoraBoxSnesInstr *instr,
   uint8_t adsr1 = adsr >> 8;
   uint8_t adsr2 = adsr & 0xff;
 
-  AddSimpleItem(dwOffset, 1, L"Global Instrument #");
+  AddSimpleItem(dwOffset, 1, "Global Instrument #");
 
   sampNum = srcn;
   unityKey = 45; // o3a = $1000

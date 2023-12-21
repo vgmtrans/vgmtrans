@@ -8,7 +8,7 @@ class NamcoSnesScanner:
     public VGMScanner {
  public:
   NamcoSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~NamcoSnesScanner(void) {
   }

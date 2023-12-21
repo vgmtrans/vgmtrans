@@ -17,35 +17,35 @@ SonyPS2InstrSet::~SonyPS2InstrSet(void) {
 
 
 bool SonyPS2InstrSet::GetHeaderInfo() {
-  name = L"Sony PS2 InstrSet";
+  name = "Sony PS2 InstrSet";
 
   // VERSION CHUNK
   uint32_t curOffset = dwOffset;
   GetBytes(curOffset, 16, &versCk);
-  VGMHeader *versCkHdr = AddHeader(curOffset, versCk.chunkSize, L"Version Chunk");
-  versCkHdr->AddSimpleItem(curOffset, 4, L"Creator");
-  versCkHdr->AddSimpleItem(curOffset + 4, 4, L"Type");
-  versCkHdr->AddSimpleItem(curOffset + 8, 4, L"Chunk Size");
-  versCkHdr->AddSimpleItem(curOffset + 12, 2, L"Reserved");
-  versCkHdr->AddSimpleItem(curOffset + 14, 1, L"Major Version");
-  versCkHdr->AddSimpleItem(curOffset + 15, 1, L"Minor Version");
+  VGMHeader *versCkHdr = AddHeader(curOffset, versCk.chunkSize, "Version Chunk");
+  versCkHdr->AddSimpleItem(curOffset, 4, "Creator");
+  versCkHdr->AddSimpleItem(curOffset + 4, 4, "Type");
+  versCkHdr->AddSimpleItem(curOffset + 8, 4, "Chunk Size");
+  versCkHdr->AddSimpleItem(curOffset + 12, 2, "Reserved");
+  versCkHdr->AddSimpleItem(curOffset + 14, 1, "Major Version");
+  versCkHdr->AddSimpleItem(curOffset + 15, 1, "Minor Version");
 
   // HEADER CHUNK
   curOffset += versCk.chunkSize;
   GetBytes(curOffset, 64, &hdrCk);
   unLength = hdrCk.fileSize;
 
-  VGMHeader *hdrCkHdr = AddHeader(curOffset, hdrCk.chunkSize, L"Header Chunk");
-  hdrCkHdr->AddSimpleItem(curOffset, 4, L"Creator");
-  hdrCkHdr->AddSimpleItem(curOffset + 4, 4, L"Type");
-  hdrCkHdr->AddSimpleItem(curOffset + 8, 4, L"Chunk Size");
-  hdrCkHdr->AddSimpleItem(curOffset + 12, 4, L"Entire Header Size");
-  hdrCkHdr->AddSimpleItem(curOffset + 16, 4, L"Body Size");
-  hdrCkHdr->AddSimpleItem(curOffset + 20, 4, L"Program Chunk Addr");
-  hdrCkHdr->AddSimpleItem(curOffset + 24, 4, L"SampleSet Chunk Addr");
-  hdrCkHdr->AddSimpleItem(curOffset + 28, 4, L"Sample Chunk Addr");
-  hdrCkHdr->AddSimpleItem(curOffset + 32, 4, L"VAG Info Chunk Addr");
-  //hdrCkHdr->AddSimpleItem(curOffset+36, 4, L"Sound Effect Timbre Chunk Addr");
+  VGMHeader *hdrCkHdr = AddHeader(curOffset, hdrCk.chunkSize, "Header Chunk");
+  hdrCkHdr->AddSimpleItem(curOffset, 4, "Creator");
+  hdrCkHdr->AddSimpleItem(curOffset + 4, 4, "Type");
+  hdrCkHdr->AddSimpleItem(curOffset + 8, 4, "Chunk Size");
+  hdrCkHdr->AddSimpleItem(curOffset + 12, 4, "Entire Header Size");
+  hdrCkHdr->AddSimpleItem(curOffset + 16, 4, "Body Size");
+  hdrCkHdr->AddSimpleItem(curOffset + 20, 4, "Program Chunk Addr");
+  hdrCkHdr->AddSimpleItem(curOffset + 24, 4, "SampleSet Chunk Addr");
+  hdrCkHdr->AddSimpleItem(curOffset + 28, 4, "Sample Chunk Addr");
+  hdrCkHdr->AddSimpleItem(curOffset + 32, 4, "VAG Info Chunk Addr");
+  //hdrCkHdr->AddSimpleItem(curOffset+36, 4, "Sound Effect Timbre Chunk Addr");
 
   // PROGRAM CHUNK
   // this is handled in GetInstrPointers()
@@ -56,20 +56,20 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
   sampSetCk.sampleSetOffsetAddr = new uint32_t[sampSetCk.maxSampleSetNumber + 1];
   sampSetCk.sampleSetParam = new SampSetParam[sampSetCk.maxSampleSetNumber + 1];
 
-  VGMHeader *sampSetCkHdr = AddHeader(curOffset, sampSetCk.chunkSize, L"SampleSet Chunk");
-  sampSetCkHdr->AddSimpleItem(curOffset, 4, L"Creator");
-  sampSetCkHdr->AddSimpleItem(curOffset + 4, 4, L"Type");
-  sampSetCkHdr->AddSimpleItem(curOffset + 8, 4, L"Chunk Size");
-  sampSetCkHdr->AddSimpleItem(curOffset + 12, 4, L"Max SampleSet Number");
+  VGMHeader *sampSetCkHdr = AddHeader(curOffset, sampSetCk.chunkSize, "SampleSet Chunk");
+  sampSetCkHdr->AddSimpleItem(curOffset, 4, "Creator");
+  sampSetCkHdr->AddSimpleItem(curOffset + 4, 4, "Type");
+  sampSetCkHdr->AddSimpleItem(curOffset + 8, 4, "Chunk Size");
+  sampSetCkHdr->AddSimpleItem(curOffset + 12, 4, "Max SampleSet Number");
 
   GetBytes(curOffset + 16, (sampSetCk.maxSampleSetNumber + 1) * sizeof(uint32_t), sampSetCk.sampleSetOffsetAddr);
   VGMHeader *sampSetParamOffsetHdr = sampSetCkHdr->AddHeader(curOffset + 16,
                                                              (sampSetCk.maxSampleSetNumber + 1) * sizeof(uint32_t),
-                                                             L"SampleSet Param Offsets");
+                                                             "SampleSet Param Offsets");
   VGMHeader *sampSetParamsHdr = sampSetCkHdr->AddHeader(curOffset + 16 + (sampSetCk.maxSampleSetNumber + 1) * sizeof(uint32_t),
-                              (sampSetCk.maxSampleSetNumber + 1) * sizeof(SampSetParam), L"SampleSet Params");
+                              (sampSetCk.maxSampleSetNumber + 1) * sizeof(SampSetParam), "SampleSet Params");
   for (uint32_t i = 0; i <= sampSetCk.maxSampleSetNumber; i++) {
-    sampSetParamOffsetHdr->AddSimpleItem(curOffset + 16 + i * sizeof(uint32_t), 4, L"Offset");
+    sampSetParamOffsetHdr->AddSimpleItem(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
     if (sampSetCk.sampleSetOffsetAddr[i] == 0xFFFFFFFF)
       continue;
     GetBytes(curOffset + sampSetCk.sampleSetOffsetAddr[i], sizeof(uint8_t) * 4, sampSetCk.sampleSetParam + i);
@@ -79,13 +79,13 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
              sampSetCk.sampleSetParam[i].sampleIndex);
     VGMHeader *sampSetParamHdr = sampSetParamsHdr->AddHeader(curOffset + sampSetCk.sampleSetOffsetAddr[i],
                                                              sizeof(uint8_t) * 4 + nSamples * sizeof(uint16_t),
-                                                             L"SampleSet Param");
-    sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i], 1, L"Vel Curve");
-    sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i] + 1, 1, L"Vel Limit Low");
-    sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i] + 2, 1, L"Vel Limit High");
-    sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i] + 3, 1, L"Number of Samples");
+                                                             "SampleSet Param");
+    sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i], 1, "Vel Curve");
+    sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i] + 1, 1, "Vel Limit Low");
+    sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i] + 2, 1, "Vel Limit High");
+    sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i] + 3, 1, "Number of Samples");
     for (uint32_t j = 0; j < nSamples; j++)
-      sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i] + 4 + j * 2, 2, L"Sample Index");
+      sampSetParamHdr->AddSimpleItem(curOffset + sampSetCk.sampleSetOffsetAddr[i] + 4 + j * 2, 2, "Sample Index");
   }
 
   // SAMPLE CHUNK
@@ -94,59 +94,59 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
   sampCk.sampleOffsetAddr = new uint32_t[sampCk.maxSampleNumber + 1];
   sampCk.sampleParam = new SampleParam[sampCk.maxSampleNumber + 1];
 
-  VGMHeader *sampCkHdr = AddHeader(curOffset, sampCk.chunkSize, L"Sample Chunk");
-  sampCkHdr->AddSimpleItem(curOffset, 4, L"Creator");
-  sampCkHdr->AddSimpleItem(curOffset + 4, 4, L"Type");
-  sampCkHdr->AddSimpleItem(curOffset + 8, 4, L"Chunk Size");
-  sampCkHdr->AddSimpleItem(curOffset + 12, 4, L"Max Sample Number");
+  VGMHeader *sampCkHdr = AddHeader(curOffset, sampCk.chunkSize, "Sample Chunk");
+  sampCkHdr->AddSimpleItem(curOffset, 4, "Creator");
+  sampCkHdr->AddSimpleItem(curOffset + 4, 4, "Type");
+  sampCkHdr->AddSimpleItem(curOffset + 8, 4, "Chunk Size");
+  sampCkHdr->AddSimpleItem(curOffset + 12, 4, "Max Sample Number");
 
   GetBytes(curOffset + 16, (sampCk.maxSampleNumber + 1) * sizeof(uint32_t), sampCk.sampleOffsetAddr);
   VGMHeader *sampleParamOffsetHdr = sampCkHdr->AddHeader(curOffset + 16,
                                                          (sampCk.maxSampleNumber + 1) * sizeof(uint32_t),
-                                                         L"Sample Param Offsets");
+                                                         "Sample Param Offsets");
   VGMHeader *sampleParamsHdr = sampCkHdr->AddHeader(curOffset + 16 + (sampCk.maxSampleNumber + 1) * sizeof(uint32_t),
                                                     (sampCk.maxSampleNumber + 1) * sizeof(SampleParam),
-                                                    L"Sample Params");
+                                                    "Sample Params");
   for (uint32_t i = 0; i <= sampCk.maxSampleNumber; i++) {
-    sampleParamOffsetHdr->AddSimpleItem(curOffset + 16 + i * sizeof(uint32_t), 4, L"Offset");
+    sampleParamOffsetHdr->AddSimpleItem(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
     GetBytes(curOffset + sampCk.sampleOffsetAddr[i], sizeof(SampleParam), sampCk.sampleParam + i);
     VGMHeader *sampleParamHdr = sampleParamsHdr->AddHeader(curOffset + sampCk.sampleOffsetAddr[i],
-                                                           sizeof(SampleParam), L"Sample Param");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i], 2, L"VAG Index");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 2, 1, L"Vel Range Low");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 3, 1, L"Vel Cross Fade");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 4, 1, L"Vel Range High");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 5, 1, L"Vel Follow Pitch");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 6, 1, L"Vel Follow Pitch Center");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 7, 1, L"Vel Follow Pitch Vel Curve");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 8, 1, L"Vel Follow Amp");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 9, 1, L"Vel Follow Amp Center");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 10, 1, L"Vel Follow Amp Vel Curve");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 11, 1, L"Sample Base Note");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 12, 1, L"Sample Detune");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 13, 1, L"Sample Panpot");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 14, 1, L"Sample Group");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 15, 1, L"Sample Priority");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 16, 1, L"Sample Volume");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 17, 1, L"Reserved");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 18, 2, L"Sample ADSR1");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 20, 2, L"Sample ADSR2");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 22, 1, L"Key Follow Attack Rate");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 23, 1, L"Key Follow Attack Rate Center");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 24, 1, L"Key Follow Decay Rate");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 25, 1, L"Key Follow Decay Rate Center");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 26, 1, L"Key Follow Sustain Rate");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 27, 1, L"Key Follow Sustain Rate Center");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 28, 1, L"Key Follow Release Rate");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 29, 1, L"Key Follow Release Rate Center");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 30, 1, L"Key Follow Sustain Level");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 31, 1, L"Key Follow Sustain Level Center");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 32, 2, L"Sample Pitch LFO Delay");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 34, 2, L"Sample Pitch LFO Fade");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 36, 2, L"Sample Amp LFO Delay");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 38, 2, L"Sample Amp LFO Fade");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 40, 1, L"Sample LFO Attributes");
-    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 41, 1, L"Sample SPU Attributes");
+                                                           sizeof(SampleParam), "Sample Param");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i], 2, "VAG Index");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 2, 1, "Vel Range Low");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 3, 1, "Vel Cross Fade");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 4, 1, "Vel Range High");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 5, 1, "Vel Follow Pitch");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 6, 1, "Vel Follow Pitch Center");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 7, 1, "Vel Follow Pitch Vel Curve");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 8, 1, "Vel Follow Amp");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 9, 1, "Vel Follow Amp Center");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 10, 1, "Vel Follow Amp Vel Curve");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 11, 1, "Sample Base Note");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 12, 1, "Sample Detune");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 13, 1, "Sample Panpot");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 14, 1, "Sample Group");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 15, 1, "Sample Priority");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 16, 1, "Sample Volume");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 17, 1, "Reserved");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 18, 2, "Sample ADSR1");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 20, 2, "Sample ADSR2");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 22, 1, "Key Follow Attack Rate");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 23, 1, "Key Follow Attack Rate Center");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 24, 1, "Key Follow Decay Rate");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 25, 1, "Key Follow Decay Rate Center");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 26, 1, "Key Follow Sustain Rate");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 27, 1, "Key Follow Sustain Rate Center");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 28, 1, "Key Follow Release Rate");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 29, 1, "Key Follow Release Rate Center");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 30, 1, "Key Follow Sustain Level");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 31, 1, "Key Follow Sustain Level Center");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 32, 2, "Sample Pitch LFO Delay");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 34, 2, "Sample Pitch LFO Fade");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 36, 2, "Sample Amp LFO Delay");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 38, 2, "Sample Amp LFO Fade");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 40, 1, "Sample LFO Attributes");
+    sampleParamHdr->AddSimpleItem(curOffset + sampCk.sampleOffsetAddr[i] + 41, 1, "Sample SPU Attributes");
   }
 
   // VAGInfo CHUNK
@@ -155,28 +155,28 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
   vagInfoCk.vagInfoOffsetAddr = new uint32_t[vagInfoCk.maxVagInfoNumber + 1];
   vagInfoCk.vagInfoParam = new VAGInfoParam[vagInfoCk.maxVagInfoNumber + 1];
 
-  VGMHeader *vagInfoCkHdr = AddHeader(curOffset, vagInfoCk.chunkSize, L"VAGInfo Chunk");
-  vagInfoCkHdr->AddSimpleItem(curOffset, 4, L"Creator");
-  vagInfoCkHdr->AddSimpleItem(curOffset + 4, 4, L"Type");
-  vagInfoCkHdr->AddSimpleItem(curOffset + 8, 4, L"Chunk Size");
-  vagInfoCkHdr->AddSimpleItem(curOffset + 12, 4, L"Max VAGInfo Number");
+  VGMHeader *vagInfoCkHdr = AddHeader(curOffset, vagInfoCk.chunkSize, "VAGInfo Chunk");
+  vagInfoCkHdr->AddSimpleItem(curOffset, 4, "Creator");
+  vagInfoCkHdr->AddSimpleItem(curOffset + 4, 4, "Type");
+  vagInfoCkHdr->AddSimpleItem(curOffset + 8, 4, "Chunk Size");
+  vagInfoCkHdr->AddSimpleItem(curOffset + 12, 4, "Max VAGInfo Number");
 
   GetBytes(curOffset + 16, (vagInfoCk.maxVagInfoNumber + 1) * sizeof(uint32_t), vagInfoCk.vagInfoOffsetAddr);
   VGMHeader *vagInfoParamOffsetHdr = vagInfoCkHdr->AddHeader(curOffset + 16,
                                                              (vagInfoCk.maxVagInfoNumber + 1) * sizeof(uint32_t),
-                                                             L"VAGInfo Param Offsets");
+                                                             "VAGInfo Param Offsets");
   VGMHeader *vagInfoParamsHdr = vagInfoCkHdr->AddHeader(curOffset + 16 + (vagInfoCk.maxVagInfoNumber + 1) * sizeof(uint32_t),
                                                   (vagInfoCk.maxVagInfoNumber + 1) * sizeof(VAGInfoParam),
-                                                  L"VAGInfo Params");
+                                                  "VAGInfo Params");
   for (uint32_t i = 0; i <= vagInfoCk.maxVagInfoNumber; i++) {
-    vagInfoParamOffsetHdr->AddSimpleItem(curOffset + 16 + i * sizeof(uint32_t), 4, L"Offset");
+    vagInfoParamOffsetHdr->AddSimpleItem(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
     GetBytes(curOffset + vagInfoCk.vagInfoOffsetAddr[i], sizeof(VAGInfoParam), vagInfoCk.vagInfoParam + i);
     VGMHeader *vagInfoParamHdr = vagInfoParamsHdr->AddHeader(curOffset + vagInfoCk.vagInfoOffsetAddr[i],
-                                                             sizeof(VAGInfoParam), L"VAGInfo Param");
-    vagInfoParamHdr->AddSimpleItem(curOffset + vagInfoCk.vagInfoOffsetAddr[i], 4, L"VAG Offset Addr");
-    vagInfoParamHdr->AddSimpleItem(curOffset + vagInfoCk.vagInfoOffsetAddr[i] + 4, 2, L"Sampling Rate");
-    vagInfoParamHdr->AddSimpleItem(curOffset + vagInfoCk.vagInfoOffsetAddr[i] + 6, 1, L"Loop Flag");
-    vagInfoParamHdr->AddSimpleItem(curOffset + vagInfoCk.vagInfoOffsetAddr[i] + 7, 1, L"Reserved");
+                                                             sizeof(VAGInfoParam), "VAGInfo Param");
+    vagInfoParamHdr->AddSimpleItem(curOffset + vagInfoCk.vagInfoOffsetAddr[i], 4, "VAG Offset Addr");
+    vagInfoParamHdr->AddSimpleItem(curOffset + vagInfoCk.vagInfoOffsetAddr[i] + 4, 2, "Sampling Rate");
+    vagInfoParamHdr->AddSimpleItem(curOffset + vagInfoCk.vagInfoOffsetAddr[i] + 6, 1, "Loop Flag");
+    vagInfoParamHdr->AddSimpleItem(curOffset + vagInfoCk.vagInfoOffsetAddr[i] + 7, 1, "Reserved");
   }
   return true;
 }
@@ -190,63 +190,63 @@ bool SonyPS2InstrSet::GetInstrPointers() {
   progCk.programOffsetAddr = new uint32_t[progCk.maxProgramNumber + 1];
   progCk.progParamBlock = new SonyPS2Instr::ProgParam[progCk.maxProgramNumber + 1];
 
-  VGMHeader *progCkHdr = AddHeader(curOffset, progCk.chunkSize, L"Program Chunk");
-  progCkHdr->AddSimpleItem(curOffset, 4, L"Creator");
-  progCkHdr->AddSimpleItem(curOffset + 4, 4, L"Type");
-  progCkHdr->AddSimpleItem(curOffset + 8, 4, L"Chunk Size");
-  progCkHdr->AddSimpleItem(curOffset + 12, 4, L"Max Program Number");
+  VGMHeader *progCkHdr = AddHeader(curOffset, progCk.chunkSize, "Program Chunk");
+  progCkHdr->AddSimpleItem(curOffset, 4, "Creator");
+  progCkHdr->AddSimpleItem(curOffset + 4, 4, "Type");
+  progCkHdr->AddSimpleItem(curOffset + 8, 4, "Chunk Size");
+  progCkHdr->AddSimpleItem(curOffset + 12, 4, "Max Program Number");
 
   GetBytes(curOffset + 16, (progCk.maxProgramNumber + 1) * sizeof(uint32_t), progCk.programOffsetAddr);
   VGMHeader *progParamOffsetHdr = progCkHdr->AddHeader(curOffset + 16,
                                                        (progCk.maxProgramNumber + 1) * sizeof(uint32_t),
-                                                       L"Program Param Offsets");
+                                                       "Program Param Offsets");
   VGMHeader *progParamsHdr = progCkHdr->AddHeader(curOffset + 16 + (progCk.maxProgramNumber + 1) * sizeof(uint32_t),
                                                   0/*(progCk.maxProgramNumber+1)*sizeof(SonyPS2Instr::ProgParam)*/,
-                                                  L"Program Params");
+                                                  "Program Params");
 
   this->RemoveContainer(aInstrs);            //Remove the instrument vector as a contained item of the VGMInstr, instead
   progParamsHdr->AddContainer(aInstrs);    //it will be the contained item of the "Program Params" item.  Thus showing
   //up in the treeview appropriately
 
   for (uint32_t i = 0; i <= progCk.maxProgramNumber; i++) {
-    progParamOffsetHdr->AddSimpleItem(curOffset + 16 + i * sizeof(uint32_t), 4, L"Offset");
+    progParamOffsetHdr->AddSimpleItem(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
     if (progCk.programOffsetAddr[i] == 0xFFFFFFFF)
       continue;
     GetBytes(curOffset + progCk.programOffsetAddr[i], sizeof(SonyPS2Instr::ProgParam), progCk.progParamBlock + i);
     //VGMHeader* progParamHdr = progParamsHdr->AddHeader(curOffset+progCk.programOffsetAddr[i],
-    //	sizeof(SonyPS2Instr::ProgParam), L"Program Param");
+    //	sizeof(SonyPS2Instr::ProgParam), "Program Param");
 
     SonyPS2Instr *instr = new SonyPS2Instr(this, curOffset + progCk.programOffsetAddr[i],
                                            sizeof(SonyPS2Instr::ProgParam), i / 128, i % 128);
     aInstrs.push_back(instr);
 
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i], 4, L"SplitBlock Addr");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 4, 1, L"Number of SplitBlocks");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 5, 1, L"Size of SplitBlock");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 6, 1, L"Program Volume");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 7, 1, L"Program Panpot");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 8, 1, L"Program Transpose");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 9, 1, L"Program Detune");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 10, 1, L"Key Follow Pan");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 11, 1, L"Key Follow Pan Center");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 12, 1, L"Program Attributes");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 13, 1, L"Reserved");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 14, 1, L"Program Pitch LFO Waveform");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 15, 1, L"Program Amp LFO Waveform");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 16, 1, L"Program Pitch LFO Start Phase");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 17, 1, L"Program Amp LFO Start Phase");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 18, 1, L"Program Pitch LFO Start Phase Random");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 19, 1, L"Program Amp LFO Start Phase Random");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 20, 2, L"Program Pitch LFO Cycle Period (msec)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 22, 2, L"Program Amp LFO Cycle Period (msec)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 24, 2, L"Program Pitch LFO Depth (+)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 26, 2, L"Program Pitch LFO Depth (-)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 28, 2, L"MIDI Pitch Modulation Max Amplitude (+)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 30, 2, L"MIDI Pitch Modulation Max Amplitude (-)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 32, 1, L"Program Amp LFO Depth (+)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 33, 1, L"Program Amp LFO Depth (-)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 34, 1, L"MIDI Amp Modulation Max Amplitude (+)");
-    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 35, 1, L"MIDI Amp Modulation Max Amplitude (-)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i], 4, "SplitBlock Addr");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 4, 1, "Number of SplitBlocks");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 5, 1, "Size of SplitBlock");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 6, 1, "Program Volume");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 7, 1, "Program Panpot");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 8, 1, "Program Transpose");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 9, 1, "Program Detune");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 10, 1, "Key Follow Pan");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 11, 1, "Key Follow Pan Center");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 12, 1, "Program Attributes");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 13, 1, "Reserved");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 14, 1, "Program Pitch LFO Waveform");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 15, 1, "Program Amp LFO Waveform");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 16, 1, "Program Pitch LFO Start Phase");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 17, 1, "Program Amp LFO Start Phase");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 18, 1, "Program Pitch LFO Start Phase Random");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 19, 1, "Program Amp LFO Start Phase Random");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 20, 2, "Program Pitch LFO Cycle Period (msec)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 22, 2, "Program Amp LFO Cycle Period (msec)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 24, 2, "Program Pitch LFO Depth (+)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 26, 2, "Program Pitch LFO Depth (-)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 28, 2, "MIDI Pitch Modulation Max Amplitude (+)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 30, 2, "MIDI Pitch Modulation Max Amplitude (-)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 32, 1, "Program Amp LFO Depth (+)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 33, 1, "Program Amp LFO Depth (-)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 34, 1, "MIDI Amp Modulation Max Amplitude (+)");
+    instr->AddSimpleItem(curOffset + progCk.programOffsetAddr[i] + 35, 1, "MIDI Amp Modulation Max Amplitude (-)");
 
     assert(progCk.progParamBlock[i].sizeSplitBlock == 20);    //make sure the size of a split block is indeed 20
     uint8_t nSplits = progCk.progParamBlock[i].nSplit;
@@ -255,28 +255,28 @@ bool SonyPS2InstrSet::GetInstrPointers() {
     instr->splitBlocks = new SonyPS2Instr::SplitBlock[nSplits];
     GetBytes(absSplitBlocksAddr, nSplits * sizeof(SonyPS2Instr::SplitBlock), instr->splitBlocks);
     VGMHeader *splitBlocksHdr = instr->AddHeader(absSplitBlocksAddr,
-                                                 nSplits * sizeof(SonyPS2Instr::SplitBlock), L"Split Blocks");
+                                                 nSplits * sizeof(SonyPS2Instr::SplitBlock), "Split Blocks");
     for (uint8_t j = 0; j < nSplits; j++) {
       uint32_t splitOff = absSplitBlocksAddr + j * sizeof(SonyPS2Instr::SplitBlock);
       VGMHeader *splitBlockHdr = splitBlocksHdr->AddHeader(splitOff,
-                                                           sizeof(SonyPS2Instr::SplitBlock), L"Split Block");
-      splitBlockHdr->AddSimpleItem(splitOff, 2, L"Sample Set Index");
-      splitBlockHdr->AddSimpleItem(splitOff + 2, 1, L"Split Range Low");
-      splitBlockHdr->AddSimpleItem(splitOff + 3, 1, L"Split Cross Fade");
-      splitBlockHdr->AddSimpleItem(splitOff + 4, 1, L"Split Range High");
-      splitBlockHdr->AddSimpleItem(splitOff + 5, 1, L"Split Number");
-      splitBlockHdr->AddSimpleItem(splitOff + 6, 2, L"Split Bend Range Low");
-      splitBlockHdr->AddSimpleItem(splitOff + 8, 2, L"Split Bend Range High");
-      splitBlockHdr->AddSimpleItem(splitOff + 10, 1, L"Key Follow Pitch");
-      splitBlockHdr->AddSimpleItem(splitOff + 11, 1, L"Key Follow Pitch Center");
-      splitBlockHdr->AddSimpleItem(splitOff + 12, 1, L"Key Follow Amp");
-      splitBlockHdr->AddSimpleItem(splitOff + 13, 1, L"Key Follow Amp Center");
-      splitBlockHdr->AddSimpleItem(splitOff + 14, 1, L"Key Follow Pan");
-      splitBlockHdr->AddSimpleItem(splitOff + 15, 1, L"Key Follow Pan Center");
-      splitBlockHdr->AddSimpleItem(splitOff + 16, 1, L"Split Volume");
-      splitBlockHdr->AddSimpleItem(splitOff + 17, 1, L"Split Panpot");
-      splitBlockHdr->AddSimpleItem(splitOff + 18, 1, L"Split Transpose");
-      splitBlockHdr->AddSimpleItem(splitOff + 19, 1, L"Split Detune");
+                                                           sizeof(SonyPS2Instr::SplitBlock), "Split Block");
+      splitBlockHdr->AddSimpleItem(splitOff, 2, "Sample Set Index");
+      splitBlockHdr->AddSimpleItem(splitOff + 2, 1, "Split Range Low");
+      splitBlockHdr->AddSimpleItem(splitOff + 3, 1, "Split Cross Fade");
+      splitBlockHdr->AddSimpleItem(splitOff + 4, 1, "Split Range High");
+      splitBlockHdr->AddSimpleItem(splitOff + 5, 1, "Split Number");
+      splitBlockHdr->AddSimpleItem(splitOff + 6, 2, "Split Bend Range Low");
+      splitBlockHdr->AddSimpleItem(splitOff + 8, 2, "Split Bend Range High");
+      splitBlockHdr->AddSimpleItem(splitOff + 10, 1, "Key Follow Pitch");
+      splitBlockHdr->AddSimpleItem(splitOff + 11, 1, "Key Follow Pitch Center");
+      splitBlockHdr->AddSimpleItem(splitOff + 12, 1, "Key Follow Amp");
+      splitBlockHdr->AddSimpleItem(splitOff + 13, 1, "Key Follow Amp Center");
+      splitBlockHdr->AddSimpleItem(splitOff + 14, 1, "Key Follow Pan");
+      splitBlockHdr->AddSimpleItem(splitOff + 15, 1, "Key Follow Pan Center");
+      splitBlockHdr->AddSimpleItem(splitOff + 16, 1, "Split Volume");
+      splitBlockHdr->AddSimpleItem(splitOff + 17, 1, "Split Panpot");
+      splitBlockHdr->AddSimpleItem(splitOff + 18, 1, "Split Transpose");
+      splitBlockHdr->AddSimpleItem(splitOff + 19, 1, "Split Detune");
     }
   }
 
@@ -298,7 +298,7 @@ SonyPS2Instr::SonyPS2Instr(VGMInstrSet *instrSet,
                            uint32_t length,
                            uint32_t theBank,
                            uint32_t theInstrNum)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, L"Program Param"),
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Program Param"),
       splitBlocks(0) {
   RemoveContainer(aRgns);
 }
@@ -407,8 +407,8 @@ bool SonyPS2SampColl::GetSampleInfo() {
 
     uint16_t sampleRate = vagInfoParam.vagSampleRate;
 
-    wostringstream name;
-    name << L"Sample " << samples.size();
+    ostringstream name;
+    name << "Sample " << samples.size();
     PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, sampleRate, name.str(), true);
     samples.push_back(samp);
 

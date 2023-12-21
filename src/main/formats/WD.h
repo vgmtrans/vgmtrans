@@ -64,7 +64,7 @@ class WDInstr
           uint32_t length,
           uint32_t theBank,
           uint32_t theInstrNum,
-          std::wstring name);
+          std::string name);
   virtual ~WDInstr(void);
   virtual bool LoadInstr();
 

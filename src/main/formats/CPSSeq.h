@@ -82,7 +82,7 @@ static const uint16_t lfo_rate_table[128] = {
 class CPSSeq:
     public VGMSeq {
 public:
-  CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmt_version, std::wstring &name);
+  CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmt_version, std::string &name);
   virtual ~CPSSeq(void);
 
   virtual bool GetHeaderInfo(void);

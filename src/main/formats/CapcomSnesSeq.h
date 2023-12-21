@@ -59,7 +59,7 @@ class CapcomSnesSeq
                 CapcomSnesVersion ver,
                 uint32_t seqdata_offset,
                 bool priorityInHeader,
-                std::wstring newName = L"Capcom SNES Seq");
+                std::string newName = "Capcom SNES Seq");
   virtual ~CapcomSnesSeq(void);
 
   virtual bool GetHeaderInfo(void);

@@ -10,7 +10,7 @@ class VGMMultiSectionSeq:
                      RawFile *file,
                      uint32_t offset,
                      uint32_t length = 0,
-                     std::wstring name = L"VGM Sequence");
+                     std::string name = "VGM Sequence");
   virtual ~VGMMultiSectionSeq();
 
   virtual void ResetVars();

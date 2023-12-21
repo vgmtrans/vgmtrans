@@ -315,33 +315,33 @@ class GetIdMatcher:
 // ***************
 
 class FilenameMatcher:
-    public SimpleMatcher<std::wstring> {
+    public SimpleMatcher<std::string> {
  public:
   FilenameMatcher(Format *format, bool bRequiresSampColl = false)
       : SimpleMatcher(format, bRequiresSampColl) { }
 
-  virtual bool GetSeqId(VGMSeq *seq, std::wstring &id) {
+  virtual bool GetSeqId(VGMSeq *seq, std::string &id) {
     RawFile *rawfile = seq->GetRawFile();
     id = rawfile->GetParRawFileFullPath();
-    if (id == L"")        //wonder if empty() is equivalent?
+    if (id == "")        //wonder if empty() is equivalent?
       id = rawfile->GetFullPath();
-    return (id != L"");
+    return (id != "");
   }
 
-  virtual bool GetInstrSetId(VGMInstrSet *instrset, std::wstring &id) {
+  virtual bool GetInstrSetId(VGMInstrSet *instrset, std::string &id) {
     RawFile *rawfile = instrset->GetRawFile();
     id = rawfile->GetParRawFileFullPath();
-    if (id == L"")        //wonder if empty() is equivalent?
+    if (id == "")        //wonder if empty() is equivalent?
       id = rawfile->GetFullPath();
-    return (id != L"");
+    return (id != "");
   }
 
-  virtual bool GetSampCollId(VGMSampColl *sampcoll, std::wstring &id) {
+  virtual bool GetSampCollId(VGMSampColl *sampcoll, std::string &id) {
     RawFile *rawfile = sampcoll->GetRawFile();
     id = rawfile->GetParRawFileFullPath();
-    if (id == L"")        //wonder if empty() is equivalent?
+    if (id == "")        //wonder if empty() is equivalent?
       id = rawfile->GetFullPath();
-    return (id != L"");
+    return (id != "");
   }
 };
 

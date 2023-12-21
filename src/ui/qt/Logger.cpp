@@ -86,7 +86,7 @@ void Logger::push(const LogItem *item) {
   }
 
   logger_textarea->appendHtml(QStringLiteral("<font color=%2>[%1] %3</font>")
-                                  .arg(QString::fromStdWString(item->GetSource()),
+                                  .arg(QString::fromStdString(item->GetSource()),
                                        QString(log_colors[static_cast<int>(item->GetLogLevel())]),
-                                       QString::fromStdWString(item->GetText())));
+                                       QString::fromStdString(item->GetText())));
 }

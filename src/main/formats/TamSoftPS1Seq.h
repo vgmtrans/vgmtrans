@@ -7,7 +7,7 @@
 class TamSoftPS1Seq:
     public VGMSeq {
  public:
-  TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong, const std::wstring &name = L"TamSoftPS1Seq");
+  TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong, const std::string &name = "TamSoftPS1Seq");
   virtual ~TamSoftPS1Seq(void);
 
   virtual bool GetHeaderInfo(void);

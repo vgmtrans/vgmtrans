@@ -8,7 +8,7 @@ class AkaoSnesScanner:
     public VGMScanner {
  public:
   AkaoSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~AkaoSnesScanner(void) {
   }

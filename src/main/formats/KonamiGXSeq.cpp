@@ -22,8 +22,8 @@ bool KonamiGXSeq::GetHeaderInfo(void) {
   //nNumTracks = GetByte(dwOffset+8);
   SetPPQN(0x30);
 
-  wostringstream theName;
-  theName << L"Konami GX Seq";
+  ostringstream theName;
+  theName << "Konami GX Seq";
   name = theName.str();
   return true;
 }
@@ -271,13 +271,13 @@ bool KonamiGXTrack::ReadEvent(void) {
 
       case 0xFD:
         curOffset += 4;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop", L"", CLR_LOOP);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
         break;
 
       case 0xFE:
         bInJump = true;
         jump_return_offset = curOffset + 4;
-        AddGenericEvent(beginOffset, jump_return_offset - beginOffset, L"Jump", L"", CLR_LOOP);
+        AddGenericEvent(beginOffset, jump_return_offset - beginOffset, "Jump", "", CLR_LOOP);
         curOffset = GetWordBE(curOffset);
         //if (curOffset > 0x100000)
         //	return 0;

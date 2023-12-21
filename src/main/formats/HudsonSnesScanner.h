@@ -8,7 +8,7 @@ class HudsonSnesScanner:
     public VGMScanner {
  public:
   HudsonSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~HudsonSnesScanner(void) {
   }

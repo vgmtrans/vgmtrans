@@ -11,7 +11,7 @@ CompileSnesInstrSet::CompileSnesInstrSet(RawFile *file,
                                          uint16_t addrTuningTable,
                                          uint16_t addrPitchTablePtrs,
                                          uint32_t spcDirAddr,
-                                         const std::wstring &name)
+                                         const std::string &name)
     : VGMInstrSet(CompileSnesFormat::name, file, addrTuningTable, 0, name), version(ver),
       addrTuningTable(addrTuningTable),
       addrPitchTablePtrs(addrPitchTablePtrs),
@@ -53,8 +53,8 @@ bool CompileSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::wostringstream instrName;
-    instrName << L"Instrument " << srcn;
+    std::ostringstream instrName;
+    instrName << "Instrument " << srcn;
     CompileSnesInstr *newInstr =
         new CompileSnesInstr(this, version, ofsInstrEntry, addrPitchTablePtrs, srcn, spcDirAddr, instrName.str());
     aInstrs.push_back(newInstr);
@@ -83,7 +83,7 @@ CompileSnesInstr::CompileSnesInstr(VGMInstrSet *instrSet,
                                    uint16_t addrPitchTablePtrs,
                                    uint8_t srcn,
                                    uint32_t spcDirAddr,
-                                   const std::wstring &name)
+                                   const std::string &name)
     : VGMInstr(instrSet, addrTuningTableItem, CompileSnesInstr::ExpectedSize(ver), 0, srcn, name), version(ver),
       addrPitchTablePtrs(addrPitchTablePtrs),
       spcDirAddr(spcDirAddr) {
@@ -157,7 +157,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
   }
   else {
     uint8_t pitchTableIndex = GetByte(addrTuningTableItem + 1);
-    AddSimpleItem(dwOffset + 1, 1, L"Pitch Table Index");
+    AddSimpleItem(dwOffset + 1, 1, "Pitch Table Index");
 
     if (pitchTableIndex == 0) {
       pitchTable.assign(std::begin(REGULAR_PITCH_TABLE), std::end(REGULAR_PITCH_TABLE));

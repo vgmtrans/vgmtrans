@@ -9,10 +9,10 @@ class ExtensionDiscriminator {
   ExtensionDiscriminator(void);
   ~ExtensionDiscriminator(void);
 
-  int AddExtensionScannerAssoc(std::wstring extension, VGMScanner *);
-  std::list<VGMScanner *> *GetScannerList(std::wstring extension);
+  int AddExtensionScannerAssoc(std::string extension, VGMScanner *);
+  std::list<VGMScanner *> *GetScannerList(std::string extension);
 
-  std::map<std::wstring, std::list<VGMScanner *> > mScannerExt;
+  std::map<std::string, std::list<VGMScanner *> > mScannerExt;
   static ExtensionDiscriminator &instance() {
     static ExtensionDiscriminator instance;
     return instance;

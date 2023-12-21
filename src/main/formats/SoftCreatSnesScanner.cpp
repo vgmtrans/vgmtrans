@@ -65,7 +65,7 @@ void SoftCreatSnesScanner::Scan(RawFile *file, void *info) {
 
 void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
   SoftCreatSnesVersion version = SOFTCREATSNES_NONE;
-  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
   // search song list
   uint32_t ofsLoadSeq;

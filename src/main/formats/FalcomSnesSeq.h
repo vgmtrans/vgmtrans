@@ -52,7 +52,7 @@ class FalcomSnesSeq
   FalcomSnesSeq(RawFile *file,
                     FalcomSnesVersion ver,
                     uint32_t seqdata_offset,
-                    std::wstring newName = L"Falcom SNES Seq");
+                    std::string newName = "Falcom SNES Seq");
   virtual ~FalcomSnesSeq(void);
 
   virtual bool GetHeaderInfo(void);

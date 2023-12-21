@@ -9,7 +9,7 @@ static constexpr std::array<uint8_t, 16> kMasterNoteLengths = {
 static constexpr std::array<uint8_t, 7> kDefaultNoteLengths = {0xc0, 0x60, 0x48, 0x30,
                                                                0x24, 0x18, 0x0c};
 
-ItikitiSnesSeq::ItikitiSnesSeq(RawFile *file, uint32_t offset, std::wstring new_name)
+ItikitiSnesSeq::ItikitiSnesSeq(RawFile *file, uint32_t offset, std::string new_name)
     : VGMSeq(ItikitiSnesFormat::name, file, offset, 0, std::move(new_name)) {
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
@@ -30,7 +30,7 @@ bool ItikitiSnesSeq::GetHeaderInfo() {
 
   VGMHeader *header = AddHeader(dwOffset, 0);
   header->AddUnknownItem(dwOffset, 1);
-  header->AddSimpleItem(dwOffset + 1, 1, L"Number of Tracks");
+  header->AddSimpleItem(dwOffset + 1, 1, "Number of Tracks");
 
   nNumTracks = GetByte(dwOffset + 1);
   if (nNumTracks == 0 || nNumTracks > 8)
@@ -41,8 +41,8 @@ bool ItikitiSnesSeq::GetHeaderInfo() {
   m_base_offset = static_cast<uint16_t>(first_address) - first_offset;
 
   for (unsigned int track_index = 0; track_index < nNumTracks; track_index++) {
-    std::wstringstream track_name;
-    track_name << L"Track " << (track_index + 1);
+    std::stringstream track_name;
+    track_name << "Track " << (track_index + 1);
 
     const uint32_t offset_to_pointer = dwOffset + 2 + (2 * track_index);
     header->AddSimpleItem(offset_to_pointer, 2, track_name.str());
@@ -145,36 +145,36 @@ bool ItikitiSnesTrack::ReadEvent() {
   const auto event_type = seq->GetEventType(command);
 
   bool stop_parser = false;
-  std::wstringstream description;
+  std::stringstream description;
   switch (event_type) {
     case ItikitiSnesSeqEventType::EVENT_UNKNOWN0:
-      description << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
+      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
                   << std::uppercase << command;
-      AddUnknown(start, curOffset - start, L"Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_DEBUG, L"ItikitiSnesSeq"));
+      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
+      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
+                                    LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
       break;
 
     case ItikitiSnesSeqEventType::EVENT_UNKNOWN1: {
       const auto arg1 = GetByte(curOffset++);
-      description << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                  << std::uppercase << command << std::dec << std::setfill(L' ') << std::setw(0)
-                  << L"  Arg1: " << arg1;
-      AddUnknown(start, curOffset - start, L"Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_DEBUG, L"ItikitiSnesSeq"));
+      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                  << std::uppercase << command << std::dec << std::setfill(' ') << std::setw(0)
+                  << "  Arg1: " << arg1;
+      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
+      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
+                                    LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_UNKNOWN2: {
       const auto arg1 = GetByte(curOffset++);
       const auto arg2 = GetByte(curOffset++);
-      description << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                  << std::uppercase << command << std::dec << std::setfill(L' ') << std::setw(0)
-                  << L"  Arg1: " << arg1 << L"  Arg2: " << arg2;
-      AddUnknown(start, curOffset - start, L"Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_DEBUG, L"ItikitiSnesSeq"));
+      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                  << std::uppercase << command << std::dec << std::setfill(' ') << std::setw(0)
+                  << "  Arg1: " << arg1 << "  Arg2: " << arg2;
+      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
+      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
+                                    LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
       break;
     }
 
@@ -182,12 +182,12 @@ bool ItikitiSnesTrack::ReadEvent() {
       const auto arg1 = GetByte(curOffset++);
       const auto arg2 = GetByte(curOffset++);
       const auto arg3 = GetByte(curOffset++);
-      description << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                  << std::uppercase << command << std::dec << std::setfill(L' ') << std::setw(0)
-                  << L"  Arg1: " << arg1 << L"  Arg2: " << arg2 << L"  Arg3: " << arg3;
-      AddUnknown(start, curOffset - start, L"Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_DEBUG, L"ItikitiSnesSeq"));
+      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                  << std::uppercase << command << std::dec << std::setfill(' ') << std::setw(0)
+                  << "  Arg1: " << arg1 << "  Arg2: " << arg2 << "  Arg3: " << arg3;
+      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
+      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
+                                    LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
       break;
     }
 
@@ -208,7 +208,7 @@ bool ItikitiSnesTrack::ReadEvent() {
         AddRest(start, curOffset - start, len);
       } else if (tie) {
         MakePrevDurNoteEnd(GetTime() + dur);
-        AddGenericEvent(start, curOffset - start, L"Tie", description.str(), CLR_TIE, ICON_NOTE);
+        AddGenericEvent(start, curOffset - start, "Tie", description.str(), CLR_TIE, ICON_NOTE);
         AddTime(len);
       } else {
         const uint8_t key_index = command >> 3;
@@ -227,16 +227,16 @@ bool ItikitiSnesTrack::ReadEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_MASTER_VOLUME: {
       const uint8_t vol = GetByte(curOffset++);
-      description << L"Volume: " << vol;
-      AddGenericEvent(start, curOffset - start, L"Master Volume", description.str(), CLR_VOLUME,
+      description << "Volume: " << vol;
+      AddGenericEvent(start, curOffset - start, "Master Volume", description.str(), CLR_VOLUME,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ECHO_VOLUME: {
       const uint8_t vol = GetByte(curOffset++);
-      description << L"Volume: " << vol;
-      AddGenericEvent(start, curOffset - start, L"Echo Volume", description.str(), CLR_REVERB,
+      description << "Volume: " << vol;
+      AddGenericEvent(start, curOffset - start, "Echo Volume", description.str(), CLR_REVERB,
                       ICON_CONTROL);
       break;
     }
@@ -250,8 +250,8 @@ bool ItikitiSnesTrack::ReadEvent() {
     case ItikitiSnesSeqEventType::EVENT_ECHO_FEEDBACK_FIR: {
       const int8_t feedback = static_cast<int8_t>(GetByte(curOffset++));
       const uint8_t filter_index = GetByte(curOffset++);
-      description << L"Feedback: " << feedback << L"  FIR: " << filter_index;
-      AddGenericEvent(start, curOffset - start, L"Echo Feedback & FIR", description.str(),
+      description << "Feedback: " << feedback << "  FIR: " << filter_index;
+      AddGenericEvent(start, curOffset - start, "Echo Feedback & FIR", description.str(),
                       CLR_REVERB, ICON_CONTROL);
       break;
     }
@@ -272,8 +272,8 @@ bool ItikitiSnesTrack::ReadEvent() {
     case ItikitiSnesSeqEventType::EVENT_NOISE_FREQ: {
       // Driver bug: This command sets the noise frequency for the next track from the current.
       const uint8_t nck = GetByte(curOffset++) & 0x1f;
-      description << L"Noise Frequency (NCK): " << nck;
-      AddGenericEvent(start, curOffset - start, L"Noise Frequency", description.str(),
+      description << "Noise Frequency (NCK): " << nck;
+      AddGenericEvent(start, curOffset - start, "Noise Frequency", description.str(),
                       CLR_CHANGESTATE, ICON_CONTROL);
       break;
     }
@@ -281,8 +281,8 @@ bool ItikitiSnesTrack::ReadEvent() {
     case ItikitiSnesSeqEventType::EVENT_SELECT_NOTE_LENGTH_PATTERN: {
       const uint16_t bits = GetShort(curOffset);
       curOffset += 2;
-      description << L"Length Bits: 0x" << std::hex << std::setfill(L'0') << std::setw(4) << bits;
-      AddGenericEvent(start, curOffset - start, L"Note Length Pattern", description.str(),
+      description << "Length Bits: 0x" << std::hex << std::setfill('0') << std::setw(4) << bits;
+      AddGenericEvent(start, curOffset - start, "Note Length Pattern", description.str(),
                       CLR_DURNOTE);
 
       size_t size_written = 0;
@@ -304,9 +304,9 @@ bool ItikitiSnesTrack::ReadEvent() {
       const uint8_t arg5 = GetByte(curOffset++);
       const uint8_t arg6 = GetByte(curOffset++);
       const uint8_t arg7 = GetByte(curOffset++);
-      description << L"Lengths: " << arg1 << L", " << arg2 << L", " << arg3 << L", " << arg4
-                  << L", " << arg5 << L", " << arg6 << L", " << arg7;
-      AddGenericEvent(start, curOffset - start, L"Custom Note Length Pattern", description.str(),
+      description << "Lengths: " << arg1 << ", " << arg2 << ", " << arg3 << ", " << arg4
+                  << ", " << arg5 << ", " << arg6 << ", " << arg7;
+      AddGenericEvent(start, curOffset - start, "Custom Note Length Pattern", description.str(),
                       CLR_DURNOTE);
 
       m_note_length_table[0] = arg1;
@@ -321,8 +321,8 @@ bool ItikitiSnesTrack::ReadEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_NOTE_NUMBER_BASE: {
       const uint8_t note_number = GetByte(curOffset++);
-      description << L"Note Number: " << note_number;
-      AddGenericEvent(start, curOffset - start, L"Note Number Base", description.str(),
+      description << "Note Number: " << note_number;
+      AddGenericEvent(start, curOffset - start, "Note Number Base", description.str(),
                       CLR_CHANGESTATE, ICON_CONTROL);
       m_note_number_base = note_number;
       break;
@@ -373,38 +373,38 @@ bool ItikitiSnesTrack::ReadEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_AR: {
       const uint8_t ar = GetByte(curOffset++) & 15;
-      description << L"AR: " << ar;
-      AddGenericEvent(start, curOffset - start, L"ADSR Attack Rate", description.str(), CLR_ADSR,
+      description << "AR: " << ar;
+      AddGenericEvent(start, curOffset - start, "ADSR Attack Rate", description.str(), CLR_ADSR,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_DR: {
       const uint8_t dr = GetByte(curOffset++) & 7;
-      description << L"DR: " << dr;
-      AddGenericEvent(start, curOffset - start, L"ADSR Decay Rate", description.str(), CLR_ADSR,
+      description << "DR: " << dr;
+      AddGenericEvent(start, curOffset - start, "ADSR Decay Rate", description.str(), CLR_ADSR,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_SL: {
       const uint8_t sl = GetByte(curOffset++) & 7;
-      description << L"SL: " << sl;
-      AddGenericEvent(start, curOffset - start, L"ADSR Sustain Level", description.str(), CLR_ADSR,
+      description << "SL: " << sl;
+      AddGenericEvent(start, curOffset - start, "ADSR Sustain Level", description.str(), CLR_ADSR,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_SR: {
       const uint8_t sr = GetByte(curOffset++) & 15;
-      description << L"SR: " << sr;
-      AddGenericEvent(start, curOffset - start, L"ADSR Sustain Rate", description.str(), CLR_ADSR,
+      description << "SR: " << sr;
+      AddGenericEvent(start, curOffset - start, "ADSR Sustain Rate", description.str(), CLR_ADSR,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_DEFAULT: {
-      AddGenericEvent(start, curOffset - start, L"Default ADSR", description.str(), CLR_ADSR,
+      AddGenericEvent(start, curOffset - start, "Default ADSR", description.str(), CLR_ADSR,
                       ICON_CONTROL);
       break;
     }
@@ -418,7 +418,7 @@ bool ItikitiSnesTrack::ReadEvent() {
     case ItikitiSnesSeqEventType::EVENT_TRANSPOSE_REL: {
       const int8_t transpose_amount = static_cast<int8_t>(GetByte(curOffset++));
       const int8_t new_transpose = static_cast<int8_t>(std::max(-128, std::min(127, transpose + transpose_amount)));
-      AddTranspose(start, curOffset - start, new_transpose, L"Transpose (Relative)");
+      AddTranspose(start, curOffset - start, new_transpose, "Transpose (Relative)");
       break;
     }
 
@@ -426,15 +426,15 @@ bool ItikitiSnesTrack::ReadEvent() {
         const uint8_t delay = GetByte(curOffset++);
         const uint8_t rate = GetByte(curOffset++);
         const uint8_t depth = GetByte(curOffset++);
-        description << L"Delay: " << delay << L"  Rate: " << rate << L"  Depth: " << depth;
-        AddGenericEvent(start, curOffset - start, L"Vibrato", description.str(), CLR_MODULATION,
+        description << "Delay: " << delay << "  Rate: " << rate << "  Depth: " << depth;
+        AddGenericEvent(start, curOffset - start, "Vibrato", description.str(), CLR_MODULATION,
                         ICON_CONTROL);
         break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_VIBRATO_OFF: {
       // The command changes vibrato depth to 0.
-      AddGenericEvent(start, curOffset - start, L"Vibrato Off", description.str(), CLR_MODULATION,
+      AddGenericEvent(start, curOffset - start, "Vibrato Off", description.str(), CLR_MODULATION,
                       ICON_CONTROL);
       break;
     }
@@ -444,14 +444,14 @@ bool ItikitiSnesTrack::ReadEvent() {
       const uint8_t delay = GetByte(curOffset++);
       const uint8_t rate = GetByte(curOffset++);
       const uint8_t depth = GetByte(curOffset++);
-      description << L"Delay: " << delay << L"  Rate: " << rate << L"  Depth: " << depth;
-      AddGenericEvent(start, curOffset - start, L"Tremolo", description.str(), CLR_MODULATION,
+      description << "Delay: " << delay << "  Rate: " << rate << "  Depth: " << depth;
+      AddGenericEvent(start, curOffset - start, "Tremolo", description.str(), CLR_MODULATION,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_TREMOLO_OFF: {
-      AddGenericEvent(start, curOffset - start, L"Tremolo Off", description.str(), CLR_MODULATION,
+      AddGenericEvent(start, curOffset - start, "Tremolo Off", description.str(), CLR_MODULATION,
                       ICON_CONTROL);
       break;
     }
@@ -459,55 +459,55 @@ bool ItikitiSnesTrack::ReadEvent() {
     case ItikitiSnesSeqEventType::EVENT_PAN_LFO_ON: {
       const uint8_t depth = GetByte(curOffset++);
       const uint8_t rate = GetByte(curOffset++);
-      description << L"Depth: " << depth << L"  Rate: " << rate;
-      AddGenericEvent(start, curOffset - start, L"Pan LFO", description.str(), CLR_MODULATION,
+      description << "Depth: " << depth << "  Rate: " << rate;
+      AddGenericEvent(start, curOffset - start, "Pan LFO", description.str(), CLR_MODULATION,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_PAN_LFO_OFF: {
-      AddGenericEvent(start, curOffset - start, L"Pan LFO Off", description.str(), CLR_MODULATION,
+      AddGenericEvent(start, curOffset - start, "Pan LFO Off", description.str(), CLR_MODULATION,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_NOISE_ON: {
-      AddGenericEvent(start, curOffset - start, L"Noise On", description.str(), CLR_CHANGESTATE,
+      AddGenericEvent(start, curOffset - start, "Noise On", description.str(), CLR_CHANGESTATE,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_NOISE_OFF: {
-      AddGenericEvent(start, curOffset - start, L"Noise Off", description.str(), CLR_CHANGESTATE,
+      AddGenericEvent(start, curOffset - start, "Noise Off", description.str(), CLR_CHANGESTATE,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_PITCH_MOD_ON: {
-      AddGenericEvent(start, curOffset - start, L"Pitch Modulation On", description.str(),
+      AddGenericEvent(start, curOffset - start, "Pitch Modulation On", description.str(),
                       CLR_CHANGESTATE, ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_PITCH_MOD_OFF: {
-      AddGenericEvent(start, curOffset - start, L"Pitch Modulation Off", description.str(),
+      AddGenericEvent(start, curOffset - start, "Pitch Modulation Off", description.str(),
                       CLR_CHANGESTATE, ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ECHO_ON: {
-      AddReverb(start, curOffset - start, 40, L"Echo On");
+      AddReverb(start, curOffset - start, 40, "Echo On");
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ECHO_OFF: {
-      AddReverb(start, curOffset - start, 0, L"Echo Off");
+      AddReverb(start, curOffset - start, 0, "Echo Off");
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_PORTAMENTO_ON: {
       const uint8_t speed = GetByte(curOffset++); // in ticks
-      AddPortamentoTime(start, curOffset - start, speed, L"Portamento");
+      AddPortamentoTime(start, curOffset - start, speed, "Portamento");
       AddPortamentoNoItem(true);
       break;
     }
@@ -520,26 +520,26 @@ bool ItikitiSnesTrack::ReadEvent() {
     case ItikitiSnesSeqEventType::EVENT_SPECIAL: {
       const uint8_t value = GetByte(curOffset++);
       if (value <= 0x7f) {
-        description << L"Range: " << value << L" semitones";
-        AddGenericEvent(start, curOffset - start, L"Note Randomization On", description.str(),
+        description << "Range: " << value << " semitones";
+        AddGenericEvent(start, curOffset - start, "Note Randomization On", description.str(),
                         CLR_CHANGESTATE, ICON_CONTROL);
       } else if (value == 0x83) {
         // Detailed behavior has not yet been analyzed
-        AddGenericEvent(start, curOffset - start, L"Change Volume Mode (Global)", description.str(),
+        AddGenericEvent(start, curOffset - start, "Change Volume Mode (Global)", description.str(),
                         CLR_VOLUME, ICON_CONTROL);
       } else {
-        description << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
-                    << std::uppercase << command << std::dec << std::setfill(L' ') << std::setw(0)
-                    << L"  Arg1: " << value;
-        AddUnknown(start, curOffset - start, L"Unknown Event", description.str());
-        pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + description.str()),
-                                      LOG_LEVEL_DEBUG, L"ItikitiSnesSeq"));
+        description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
+                    << std::uppercase << command << std::dec << std::setfill(' ') << std::setw(0)
+                    << "  Arg1: " << value;
+        AddUnknown(start, curOffset - start, "Unknown Event", description.str());
+        pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
+                                      LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
       }
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_NOTE_RANDOMIZATION_OFF: {
-      AddGenericEvent(start, curOffset - start, L"Note Randomization Off", description.str(),
+      AddGenericEvent(start, curOffset - start, "Note Randomization Off", description.str(),
                       CLR_CHANGESTATE, ICON_CONTROL);
       break;
     }
@@ -547,25 +547,25 @@ bool ItikitiSnesTrack::ReadEvent() {
     case ItikitiSnesSeqEventType::EVENT_PITCH_SLIDE: {
       const uint8_t length = GetByte(curOffset++); // in ticks
       const int8_t semitones = static_cast<int8_t>(GetByte(curOffset++));
-      description << L"Length: " << length << L"  Key: " << semitones << L" semitones";
-      AddGenericEvent(start, curOffset - start, L"Pitch Slide", description.str(), CLR_PITCHBEND,
+      description << "Length: " << length << "  Key: " << semitones << " semitones";
+      AddGenericEvent(start, curOffset - start, "Pitch Slide", description.str(), CLR_PITCHBEND,
                       ICON_CONTROL);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_LOOP_START: {
       const uint8_t count = GetByte(curOffset++);
-      description << L"Repeat Count: ";
+      description << "Repeat Count: ";
       if (count == 0)
-        description << L"Infinite";
+        description << "Infinite";
       else
         description << (count + 1);
-      AddGenericEvent(start, curOffset - start, L"Loop Start", description.str(), CLR_LOOP,
+      AddGenericEvent(start, curOffset - start, "Loop Start", description.str(), CLR_LOOP,
                       ICON_STARTREP);
 
       if (m_loop_level + 1 >= kItikitiSnesSeqMaxLoopLevel) {
-        pRoot->AddLogItem(new LogItem(std::wstring(L"Loop Start: nesting level is too much"),
-                                      LOG_LEVEL_WARN, L"ItikitiSnesSeq"));
+        pRoot->AddLogItem(new LogItem(std::string("Loop Start: nesting level is too much"),
+                                      LOG_LEVEL_WARN, "ItikitiSnesSeq"));
         stop_parser = true;
         break;
       }
@@ -579,15 +579,15 @@ bool ItikitiSnesTrack::ReadEvent() {
     case ItikitiSnesSeqEventType::EVENT_GOTO: {
       const uint16_t dest = ReadDecodedOffset(curOffset);
       curOffset += 2;
-      description << L"Destination: $" << std::hex << std::setfill(L'0') << std::setw(4)
+      description << "Destination: $" << std::hex << std::setfill('0') << std::setw(4)
                   << std::uppercase << dest;
       const auto length = curOffset - start;
 
       curOffset = dest;
       if (!IsOffsetUsed(dest)) {
-        AddGenericEvent(start, length, L"Jump", description.str(), CLR_LOOPFOREVER);
+        AddGenericEvent(start, length, "Jump", description.str(), CLR_LOOPFOREVER);
       } else {
-        stop_parser = !AddLoopForever(start, length, L"Jump");
+        stop_parser = !AddLoopForever(start, length, "Jump");
       }
       break;
     }
@@ -598,7 +598,7 @@ bool ItikitiSnesTrack::ReadEvent() {
         stop_parser = !AddLoopForever(start, curOffset - start);
         curOffset = m_loop_start_addresses[m_loop_level];
       } else {
-        AddGenericEvent(start, curOffset - start, L"Loop End", description.str(), CLR_LOOP,
+        AddGenericEvent(start, curOffset - start, "Loop End", description.str(), CLR_LOOP,
                         ICON_ENDREP);
 
         m_loop_counts[m_loop_level]--;
@@ -618,9 +618,9 @@ bool ItikitiSnesTrack::ReadEvent() {
       const uint16_t dest = ReadDecodedOffset(curOffset);
       curOffset += 2;
 
-      description << L"Count: " << target_count << L"  Destination: $" << std::hex << std::setfill(L'0')
+      description << "Count: " << target_count << "  Destination: $" << std::hex << std::setfill('0')
                   << std::setw(4) << std::uppercase << dest;
-      AddGenericEvent(start, curOffset - start, L"Loop Break / Jump to Volta", description.str(),
+      AddGenericEvent(start, curOffset - start, "Loop Break / Jump to Volta", description.str(),
                       CLR_LOOP, ICON_ENDREP);
       
       if (++m_alt_loop_count == target_count) {
@@ -631,11 +631,11 @@ bool ItikitiSnesTrack::ReadEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_UNDEFINED:
     default:
-      description << L"Event: 0x" << std::hex << std::setfill(L'0') << std::setw(2)
+      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
                   << std::uppercase << command;
-      AddUnknown(start, curOffset - start, L"Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::wstring(L"Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_ERR, L"ItikitiSnesSeq"));
+      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
+      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
+                                    LOG_LEVEL_ERR, "ItikitiSnesSeq"));
       stop_parser = true;
       break;
   }

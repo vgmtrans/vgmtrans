@@ -47,7 +47,7 @@ class PandoraBoxSnesSeq
   PandoraBoxSnesSeq(RawFile *file,
                     PandoraBoxSnesVersion ver,
                     uint32_t seqdata_offset,
-                    std::wstring newName = L"PandoraBox SNES Seq");
+                    std::string newName = "PandoraBox SNES Seq");
   virtual ~PandoraBoxSnesSeq(void);
 
   virtual bool GetHeaderInfo(void);

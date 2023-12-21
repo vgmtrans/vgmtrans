@@ -13,15 +13,15 @@
 
 QtVGMRoot qtVGMRoot;
 
-const std::wstring QtVGMRoot::UI_GetResourceDirPath() {
+const std::string QtVGMRoot::UI_GetResourceDirPath() {
 #if defined(Q_OS_WIN)
-  return (QApplication::applicationDirPath() + "/").toStdWString();
+  return (QApplication::applicationDirPath() + "/").toStdString();
 #elif defined(Q_OS_OSX)
-  return (QApplication::applicationDirPath() + "/../Resources/").toStdWString();
+  return (QApplication::applicationDirPath() + "/../Resources/").toStdString();
 #elif defined(Q_OS_LINUX)
-  return (QApplication::applicationDirPath() + "/").toStdWString();
+  return (QApplication::applicationDirPath() + "/").toStdString();
 #else
-  return (QApplication::applicationDirPath() + "/").toStdWString();
+  return (QApplication::applicationDirPath() + "/").toStdString();
 #endif
 }
 
@@ -94,33 +94,33 @@ void QtVGMRoot::UI_EndRemoveVGMFiles() {
   this->UI_EndedRemovingVGMFiles();
 }
 
-void QtVGMRoot::UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName,
+void QtVGMRoot::UI_AddItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                            void* UI_specific) {
   auto treeview = static_cast<VGMFileTreeView*>(UI_specific);
   treeview->addVGMItem(item, parent, itemName);
 }
 
-std::wstring QtVGMRoot::UI_GetOpenFilePath(const std::wstring&, const std::wstring&) {
-  std::wstring path = L"Placeholder";
+std::string QtVGMRoot::UI_GetOpenFilePath(const std::string&, const std::string&) {
+  std::string path = "Placeholder";
   return path;
 }
 
-std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggested_filename,
-                                           const std::wstring& extension) {
+std::string QtVGMRoot::UI_GetSaveFilePath(const std::string& suggested_filename,
+                                           const std::string& extension) {
   static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
   QFileDialog dialog(QApplication::activeWindow());
   dialog.setFileMode(QFileDialog::AnyFile);
-  dialog.selectFile(QString::fromStdWString(suggested_filename));
+  dialog.selectFile(QString::fromStdString(suggested_filename));
   dialog.setDirectory(selected_dir);
   dialog.setAcceptMode(QFileDialog::AcceptSave);
 
-  if (extension == L"mid") {
+  if (extension == "mid") {
     dialog.setDefaultSuffix("mid");
     dialog.setNameFilter("Standard MIDI (*.mid)");
-  } else if (extension == L"dls") {
+  } else if (extension == "dls") {
     dialog.setDefaultSuffix("dls");
     dialog.setNameFilter("Downloadable Sound (*.dls)");
-  } else if (extension == L"sf2") {
+  } else if (extension == "sf2") {
     dialog.setDefaultSuffix("sf2");
     dialog.setNameFilter("SoundFont\u00AE 2 (*.sf2)");
   } else {
@@ -129,13 +129,13 @@ std::wstring QtVGMRoot::UI_GetSaveFilePath(const std::wstring& suggested_filenam
 
   if (dialog.exec()) {
     selected_dir = dialog.directory().absolutePath();
-    return dialog.selectedFiles().at(0).toStdWString();
+    return dialog.selectedFiles().at(0).toStdString();
   } else {
     return {};
   }
 }
 
-std::wstring QtVGMRoot::UI_GetSaveDirPath(const std::wstring&) {
+std::string QtVGMRoot::UI_GetSaveDirPath(const std::string&) {
   static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
   QFileDialog dialog(QApplication::activeWindow());
   dialog.setFileMode(QFileDialog::FileMode::Directory);
@@ -144,7 +144,7 @@ std::wstring QtVGMRoot::UI_GetSaveDirPath(const std::wstring&) {
 
   if (dialog.exec()) {
     selected_dir = dialog.directory().absolutePath();
-    return dialog.selectedFiles().at(0).toStdWString();
+    return dialog.selectedFiles().at(0).toStdString();
   } else {
     return {};
   }

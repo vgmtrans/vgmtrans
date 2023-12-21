@@ -44,8 +44,8 @@ void CompileSnesScanner::Scan(RawFile *file, void *info) {
 void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
   CompileSnesVersion version = COMPILESNES_NONE;
 
-  std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
-  std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::string basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // scan for table pointer initialize code
   uint32_t ofsSetSongListAddress;
