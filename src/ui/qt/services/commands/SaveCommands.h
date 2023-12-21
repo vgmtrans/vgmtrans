@@ -22,7 +22,7 @@ template <typename TSavable>
 class SaveCommandContext : public CommandContext {
 private:
   shared_ptr<vector<TSavable*>> items{};
-  wstring path;
+  string path;
 
 public:
   SaveCommandContext() = default;
@@ -31,11 +31,11 @@ public:
     items = f;
   }
   void SetSavePath(const string& p) {
-    path = string2wstring(p);
+    path = p;
   }
 
   [[nodiscard]] const vector<TSavable*>& GetItems() const { return *items; }
-  [[nodiscard]] const wstring& GetPath() const { return path; }
+  [[nodiscard]] const string& GetPath() const { return path; }
 };
 
 /**
@@ -130,9 +130,9 @@ public:
       // and the Save() function still expects a file path, so we construct file paths for each file using GetName()
       auto specificFile = dynamic_cast<TSavable*>(file);
       if (specificFile) {
-        auto fileExtension = string2wstring((GetExtension() == "") ? "" : (string(".") + GetExtension()));
+        auto fileExtension = (GetExtension() == "") ? "" : (string(".") + GetExtension());
         fs::path filePath = path / fs::path(*file->GetName() + fileExtension);
-        Save(filePath.wstring(), specificFile);
+        Save(filePath.generic_string(), specificFile);
       }
     }
   }
@@ -143,14 +143,14 @@ public:
   }
 
   [[nodiscard]] virtual std::string GetExtension() const = 0;
-  virtual void Save(const wstring& path, TSavable* specificFile) const = 0;
+  virtual void Save(const string& path, TSavable* specificFile) const = 0;
 };
 
 class SaveAsOriginalFormatCommand : public SaveCommand<VGMFile> {
 public:
   SaveAsOriginalFormatCommand() : SaveCommand<VGMFile>(false) {}
 
-  void Save(const wstring& path, VGMFile* file) const override {
+  void Save(const string& path, VGMFile* file) const override {
     file->OnSaveAsRaw(path);
   }
   [[nodiscard]] string Name() const override { return "Save as original format"; }
@@ -162,7 +162,7 @@ class SaveAsMidiCommand : public SaveCommand<VGMSeq, VGMFile> {
 public:
   SaveAsMidiCommand() : SaveCommand<VGMSeq, VGMFile>(false) {}
 
-  void Save(const wstring& path, VGMSeq* seq) const override {
+  void Save(const string& path, VGMSeq* seq) const override {
     seq->SaveAsMidi(path);
   }
   [[nodiscard]] string Name() const override { return "Save as MIDI"; }
@@ -174,7 +174,7 @@ class SaveAsDLSCommand : public SaveCommand<VGMInstrSet, VGMFile> {
 public:
   SaveAsDLSCommand() : SaveCommand<VGMInstrSet, VGMFile>(false) {}
 
-  void Save(const wstring& path, VGMInstrSet* instrSet) const override {
+  void Save(const string& path, VGMInstrSet* instrSet) const override {
     instrSet->SaveAsDLS(path);
   }
   [[nodiscard]] string Name() const override { return "Save as DLS"; }
@@ -186,7 +186,7 @@ class SaveAsSF2Command : public SaveCommand<VGMInstrSet, VGMFile> {
 public:
   SaveAsSF2Command() : SaveCommand<VGMInstrSet, VGMFile>(false) {}
 
-  void Save(const wstring& path, VGMInstrSet* instrSet) const override {
+  void Save(const string& path, VGMInstrSet* instrSet) const override {
     instrSet->SaveAsSF2(path);
   }
   [[nodiscard]] string Name() const override { return "Save as SF2"; }
@@ -198,7 +198,7 @@ class SaveWavBatchCommand : public SaveCommand<VGMSampColl, VGMFile> {
 public:
   SaveWavBatchCommand() : SaveCommand<VGMSampColl, VGMFile>(true) {}
 
-  void Save(const wstring& path, VGMSampColl* sampColl) const override {
+  void Save(const string& path, VGMSampColl* sampColl) const override {
     sampColl->SaveAllAsWav(path);
   }
   [[nodiscard]] string Name() const override { return "Save all samples as WAV"; }
