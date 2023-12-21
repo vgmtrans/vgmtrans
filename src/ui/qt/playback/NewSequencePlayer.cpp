@@ -102,7 +102,7 @@ void NewSequencePlayer::seek(int samples) {
 
   // If we didn't find the event, or it's the last, jump to the end and let the audio callback stop playback
   if (it == state.eventSampleOffsets.end()) {
-    pRoot->AddLogItem(new LogItem(L"Could not seek to specified sample offset", LOG_LEVEL_WARN, L"MusicPlayer"));
+    pRoot->AddLogItem(new LogItem("Could not seek to specified sample offset", LOG_LEVEL_WARN, "MusicPlayer"));
     state.samplesOffset = state.eventSampleOffsets.back();
     state.eventOffset = state.events.size();
     return;
@@ -265,8 +265,8 @@ bool NewSequencePlayer::sendSF2ToVST(VGMColl* coll) {
   SF2File* sf2 = coll->CreateSF2File();
   if (!sf2) {
     pRoot->AddLogItem(
-        new LogItem(L"Failed to play collection as a soundfont file could not be produced.",
-                    LOG_LEVEL_ERR, L"SequencePlayer"));
+        new LogItem("Failed to play collection as a soundfont file could not be produced.",
+                    LOG_LEVEL_ERR, "SequencePlayer"));
     return false;
   }
 
