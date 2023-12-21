@@ -15,7 +15,7 @@ class QtVGMRoot final : public QObject, public VGMRoot {
 public:
   ~QtVGMRoot() override = default;
 
-  const std::wstring UI_GetResourceDirPath();
+  const std::string UI_GetResourceDirPath();
   void UI_SetRootPtr(VGMRoot** theRoot) override;
   void UI_PreExit() override;
   void UI_Exit() override;
@@ -36,13 +36,13 @@ public:
   void UI_RemoveVGMColl(VGMColl* targColl) override;
   void UI_BeginRemoveVGMFiles() override;
   void UI_EndRemoveVGMFiles() override;
-  void UI_AddItem(VGMItem* item, VGMItem* parent, const std::wstring& itemName,
+  void UI_AddItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
-  std::wstring UI_GetOpenFilePath(const std::wstring& suggestedFilename = L"",
-                                          const std::wstring& extension = L"") override;
-  std::wstring UI_GetSaveFilePath(const std::wstring& suggestedFilename,
-                                          const std::wstring& extension = L"") override;
-  std::wstring UI_GetSaveDirPath(const std::wstring& suggestedDir = L"") override;
+  std::string UI_GetOpenFilePath(const std::string& suggestedFilename = "",
+                                          const std::string& extension = "") override;
+  std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
+                                          const std::string& extension = "") override;
+  std::string UI_GetSaveDirPath(const std::string& suggestedDir = "") override;
 
 private:
   int rawFileLoadRecurseStack = 0;

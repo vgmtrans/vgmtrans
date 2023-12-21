@@ -10,7 +10,7 @@ NamcoSnesInstrSet::NamcoSnesInstrSet(RawFile *file,
                                      NamcoSnesVersion ver,
                                      uint32_t spcDirAddr,
                                      uint16_t addrTuningTable,
-                                     const std::wstring &name) :
+                                     const std::string &name) :
     VGMInstrSet(NamcoSnesFormat::name, file, addrTuningTable, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
     addrTuningTable(addrTuningTable) {
@@ -57,8 +57,8 @@ bool NamcoSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::wostringstream instrName;
-    instrName << L"Instrument " << srcn;
+    std::ostringstream instrName;
+    instrName << "Instrument " << srcn;
     NamcoSnesInstr *newInstr = new NamcoSnesInstr(this, version, srcn, spcDirAddr, ofsTuningEntry, instrName.str());
     aInstrs.push_back(newInstr);
   }
@@ -86,7 +86,7 @@ NamcoSnesInstr::NamcoSnesInstr(VGMInstrSet *instrSet,
                                uint8_t srcn,
                                uint32_t spcDirAddr,
                                uint16_t addrTuningEntry,
-                               const std::wstring &name) :
+                               const std::string &name) :
     VGMInstr(instrSet, addrTuningEntry, 0, 0, srcn, name), version(ver),
     spcDirAddr(spcDirAddr),
     addrTuningEntry(addrTuningEntry) {
@@ -139,7 +139,7 @@ NamcoSnesRgn::NamcoSnesRgn(NamcoSnesInstr *instr,
     fine_tuning += 1.0;
   }
 
-  AddSimpleItem(addrTuningEntry, 2, L"Sample Rate");
+  AddSimpleItem(addrTuningEntry, 2, "Sample Rate");
   unityKey = 71 - (int) coarse_tuning;
   fineTune = (int16_t) (fine_tuning * 100.0);
 

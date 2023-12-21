@@ -8,7 +8,7 @@ using namespace std;
 #define GSF_VERSION    0x22
 #define GSF_MAX_ROM_SIZE    0x2000000
 
-wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile);
+char* GetFileWithBase(const char* f, const char* newfile);
 
 GSFLoader::GSFLoader(void) {
 }
@@ -22,21 +22,21 @@ PostLoadCommand GSFLoader::Apply(RawFile *file) {
   if (memcmp(sig, "PSF", 3) == 0) {
     uint8_t version = sig[3];
     if (version == GSF_VERSION) {
-      const wchar_t *complaint;
+      const char* complaint;
       size_t exebufsize = GSF_MAX_ROM_SIZE;
       uint8_t *exebuf = NULL;
       //memset(exebuf, 0, exebufsize);
 
       complaint = psf_read_exe(file, exebuf, exebufsize);
       if (complaint) {
-        pRoot->AddLogItem(new LogItem(std::wstring(complaint), LOG_LEVEL_ERR, L"GSFLoader"));
+        pRoot->AddLogItem(new LogItem(std::string(complaint), LOG_LEVEL_ERR, "GSFLoader"));
         delete[] exebuf;
         return KEEP_IT;
       }
-      //pRoot->UI_WriteBufferToFile(L"uncomp.gba", exebuf, exebufsize);
+      //pRoot->UI_WriteBufferToFile("uncomp.gba", exebuf, exebufsize);
 
-      wstring str = file->GetFileName();
-      pRoot->CreateVirtFile(exebuf, (uint32_t) exebufsize, str.data(), L"", file->tag);
+      string str = file->GetFileName();
+      pRoot->CreateVirtFile(exebuf, (uint32_t) exebufsize, str.data(), "", file->tag);
       return DELETE_IT;
     }
   }
@@ -57,7 +57,7 @@ PostLoadCommand GSFLoader::Apply(RawFile *file) {
 **
 ** Returns the error message, or NULL on success
 */
-const wchar_t *GSFLoader::psf_read_exe(
+const char* GSFLoader::psf_read_exe(
     RawFile *file,
     unsigned char *&exebuffer,
     size_t &exebuffersize
@@ -67,7 +67,7 @@ const wchar_t *GSFLoader::psf_read_exe(
     return psf.GetError();
 
   // search exclusively for _lib tag, and if found, perform a recursive load
-  const wchar_t *psflibError = load_psf_libs(psf, file, exebuffer, exebuffersize);
+  const char* psflibError = load_psf_libs(psf, file, exebuffer, exebuffersize);
   if (psflibError != NULL)
     return psflibError;
 
@@ -81,40 +81,40 @@ const wchar_t *GSFLoader::psf_read_exe(
   uint32_t gsfRomSize = gsfExeHeadSeg->GetWord(0x08);
   delete gsfExeHeadSeg;
   if (gsfRomRegion != 0x08000000)
-    return L"GSF ROM offset points to unsupported region. (multi-boot GSF is not supported yet)";
+    return "GSF ROM offset points to unsupported region. (multi-boot GSF is not supported yet)";
   if (gsfRomStart + gsfRomSize > exebuffersize || (exebuffer == NULL && exebuffersize == 0))
-    return L"GSF ROM section start and/or size values are corrupt.";
+    return "GSF ROM section start and/or size values are corrupt.";
 
   if (exebuffer == NULL) {
     exebuffersize = gsfRomStart + gsfRomSize;
     exebuffer = new uint8_t[exebuffersize];
     if (exebuffer == NULL) {
-      return L"GSF ROM memory allocation error.";
+      return "GSF ROM memory allocation error.";
     }
     memset(exebuffer, 0, exebuffersize);
   }
 
   if (!psf.ReadExe(exebuffer + gsfRomStart, gsfRomSize, 0x0c))
-    return L"Decompression failed";
+    return "Decompression failed";
 
   // set tags to RawFile
   if (psf.tags.count("title") != 0) {
-    file->tag.title = string2wstring(psf.tags["title"]);
+    file->tag.title = psf.tags["title"];
   }
   if (psf.tags.count("artist") != 0) {
-    file->tag.artist = string2wstring(psf.tags["artist"]);
+    file->tag.artist = psf.tags["artist"];
   }
   if (psf.tags.count("game") != 0) {
-    file->tag.album = string2wstring(psf.tags["game"]);
+    file->tag.album = psf.tags["game"];
   }
   if (psf.tags.count("comment") != 0) {
-    file->tag.comment = string2wstring(psf.tags["comment"]);
+    file->tag.comment = psf.tags["comment"];
   }
 
   return NULL;
 }
 
-const wchar_t *GSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned char *&exebuffer, size_t &exebuffersize) {
+const char* GSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned char *&exebuffer, size_t &exebuffersize) {
   char libTagName[16];
   int libIndex = 1;
   while (true) {
@@ -127,19 +127,15 @@ const wchar_t *GSFLoader::load_psf_libs(PSFFile &psf, RawFile *file, unsigned ch
     if (itLibTag == psf.tags.end())
       break;
 
-    wchar_t tempfn[PATH_MAX] = {0};
-    mbstowcs(tempfn, itLibTag->second.c_str(), itLibTag->second.size());
-
-    wchar_t *fullPath;
-    fullPath = GetFileWithBase(file->GetFullPath(), tempfn);
+    auto fullPath = GetFileWithBase(file->GetFullPath().c_str(), itLibTag->second.c_str());
 
     // TODO: Make sure to limit recursion to avoid crashing.
     RawFile *newRawFile = new RawFile(fullPath);
-    const wchar_t *psflibError = NULL;
+    const char* psflibError = NULL;
     if (newRawFile->open(fullPath))
       psflibError = psf_read_exe(newRawFile, exebuffer, exebuffersize);
     else
-      psflibError = L"Unable to open lib file.";
+      psflibError = "Unable to open lib file.";
     delete fullPath;
     delete newRawFile;
 

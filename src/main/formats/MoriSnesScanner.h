@@ -8,7 +8,7 @@ class MoriSnesScanner:
     public VGMScanner {
  public:
   MoriSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~MoriSnesScanner(void) {
   }

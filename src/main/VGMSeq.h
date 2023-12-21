@@ -23,14 +23,14 @@ enum class PanVolumeCorrectionMode : uint8_t {
 class VGMSeq: public VGMFile {
  public:
   BEGIN_MENU_SUB(VGMSeq, VGMFile)
-      MENU_ITEM(VGMSeq, OnSaveAsMidi, L"Save as MIDI")
+      MENU_ITEM(VGMSeq, OnSaveAsMidi, "Save as MIDI")
   END_MENU()
 
   VGMSeq(const std::string &format,
          RawFile *file,
          uint32_t offset,
          uint32_t length = 0,
-         std::wstring name = L"VGM Sequence");
+         std::string name = "VGM Sequence");
   virtual ~VGMSeq(void);
 
   virtual Icon GetIcon() { return ICON_SEQ; }
@@ -81,7 +81,7 @@ class VGMSeq: public VGMFile {
   }
 
   bool OnSaveAsMidi(void);
-  virtual bool SaveAsMidi(const std::wstring &filepath);
+  virtual bool SaveAsMidi(const std::string &filepath);
 
   virtual bool HasActiveTracks();
   virtual void InactivateAllTracks();

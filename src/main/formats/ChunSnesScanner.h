@@ -8,7 +8,7 @@ class ChunSnesScanner:
     public VGMScanner {
  public:
   ChunSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~ChunSnesScanner(void) {
   }

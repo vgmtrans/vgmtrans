@@ -6,7 +6,7 @@ class FalcomSnesScanner:
     public VGMScanner {
  public:
   FalcomSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~FalcomSnesScanner(void) {
   }

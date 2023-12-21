@@ -159,7 +159,7 @@ const uint16_t decay_rate_table[64] = {
 class CPSArticTable
     : public VGMMiscFile {
 public:
-  CPSArticTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length);
+  CPSArticTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length);
   virtual ~CPSArticTable(void);
 
   virtual bool LoadMain();
@@ -175,7 +175,7 @@ public:
 class CPSSampleInfoTable
     : public VGMMiscFile {
 public:
-  CPSSampleInfoTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length = 0);
+  CPSSampleInfoTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length = 0);
   ~CPSSampleInfoTable(void);
 
 public:
@@ -187,7 +187,7 @@ public:
 class CPS2SampleInfoTable
     : public CPSSampleInfoTable {
 public:
-  CPS2SampleInfoTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length = 0);
+  CPS2SampleInfoTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length = 0);
 
   virtual bool LoadMain();
 };
@@ -195,7 +195,7 @@ public:
 class CPS3SampleInfoTable
     : public CPSSampleInfoTable {
 public:
-  CPS3SampleInfoTable(RawFile *file, std::wstring &name, uint32_t offset, uint32_t length = 0);
+  CPS3SampleInfoTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length = 0);
 
   virtual bool LoadMain();
 };
@@ -213,7 +213,7 @@ public:
               int numInstrBanks,
               CPSSampleInfoTable *sampInfoTable,
               CPSArticTable *articTable,
-              std::wstring &name);
+              std::string &name);
   virtual ~CPSInstrSet(void);
 
   virtual bool GetHeaderInfo();
@@ -239,7 +239,7 @@ public:
            uint32_t length,
            uint32_t theBank,
            uint32_t theInstrNum,
-           std::wstring &name);
+           std::string &name);
   virtual ~CPSInstr(void);
   virtual bool LoadInstr();
 protected:
@@ -265,7 +265,7 @@ class CPSSampColl
     : public VGMSampColl {
 public:
   CPSSampColl(RawFile *file, CPSInstrSet *instrset, CPSSampleInfoTable *sampinfotable, uint32_t offset,
-              uint32_t length = 0, std::wstring name = std::wstring(L"QSound Sample Collection"));
+              uint32_t length = 0, std::string name = std::string("QSound Sample Collection"));
   virtual bool GetHeaderInfo();
   virtual bool GetSampleInfo();
 

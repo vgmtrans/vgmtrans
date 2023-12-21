@@ -6,7 +6,7 @@ class PandoraBoxSnesScanner:
     public VGMScanner {
  public:
   PandoraBoxSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~PandoraBoxSnesScanner(void) {
   }

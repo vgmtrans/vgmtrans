@@ -48,7 +48,7 @@ bool PSFFile::Load(RawFile *file) {
   // Check file size.
   uint32_t fileSize = file->size();
   if (fileSize < 0x10) {
-    errorstr = L"PSF too small - likely corrupt";
+    errorstr = "PSF too small - likely corrupt";
     return false;
   }
 
@@ -56,7 +56,7 @@ bool PSFFile::Load(RawFile *file) {
   uint8_t psfSig[4];
   file->GetBytes(0, 4, psfSig);
   if (memcmp(psfSig, "PSF", 3) != 0) {
-    errorstr = L"Invalid PSF signature";
+    errorstr = "Invalid PSF signature";
     return false;
   }
 
@@ -72,14 +72,14 @@ bool PSFFile::Load(RawFile *file) {
   if ((reservedSize > fileSize) ||
       (exeSize > fileSize) ||
       ((16 + reservedSize + exeSize) > fileSize)) {
-    errorstr = L"PSF header is inconsistent";
+    errorstr = "PSF header is inconsistent";
     return false;
   }
 
   // Read compressed program section.
   uint8_t *zexebuf = new uint8_t[exeSize > 0 ? exeSize : 1];
   if (zexebuf == NULL) {
-    errorstr = L"Out of memory reading the file";
+    errorstr = "Out of memory reading the file";
     return false;
   }
   file->GetBytes(16 + reservedSize, exeSize, zexebuf);
@@ -87,7 +87,7 @@ bool PSFFile::Load(RawFile *file) {
 
   // Check program section CRC.
   if (exeCRC != crc32(crc32(0L, Z_NULL, 0), zexebuf, exeSize)) {
-    errorstr = L"CRC failure - executable data is corrupt";
+    errorstr = "CRC failure - executable data is corrupt";
     exeCompData->clear();
     return false;
   }
@@ -95,7 +95,7 @@ bool PSFFile::Load(RawFile *file) {
   // Read reserved section.
   uint8_t *reservebuf = new uint8_t[reservedSize ? reservedSize : 1];
   if (reservebuf == NULL) {
-    errorstr = L"Out of memory reading the file";
+    errorstr = "Out of memory reading the file";
     exeCompData->clear();
     return false;
   }
@@ -117,7 +117,7 @@ bool PSFFile::Load(RawFile *file) {
   // Check if tag field exists.
   char *tagSect = new char[tagSectionSize + 1];
   if (tagSect == NULL) {
-    errorstr = L"Out of memory reading the file";
+    errorstr = "Out of memory reading the file";
     exeCompData->clear();
     reservedData->clear();
     return false;
@@ -202,7 +202,7 @@ bool PSFFile::ReadExe(uint8_t *buf, size_t len, size_t stripLen) const {
   uLong destlen = (uLong) len;
   int zRet = myuncompress(buf, &destlen, exeCompData->data, (uLong) exeCompData->size, (uLong) stripLen);
   if (zRet != Z_OK) {
-    //errorstr = L"Decompression failed";
+    //errorstr = "Decompression failed";
     return false;
   }
   return true;
@@ -219,7 +219,7 @@ bool PSFFile::ReadExeDataSeg(DataSeg *&seg, size_t len, size_t stripLen) const {
   uLong destlen = (uLong) len;
   int zRet = myuncompress(buf, &destlen, exeCompData->data, (uLong) exeCompData->size, (uLong) stripLen);
   if (zRet != Z_OK) {
-    //errorstr = L"Decompression failed";
+    //errorstr = "Decompression failed";
     seg = NULL;
     delete newSeg;
     delete[] buf;
@@ -239,21 +239,21 @@ bool PSFFile::Decompress(size_t decompressed_size) {
       return true;
     }
     else {
-      errorstr = L"Decompression failed";
+      errorstr = "Decompression failed";
       return false;
     }
   }
 
   uint8_t *buf = new uint8_t[decompressed_size];
   if (buf == NULL) {
-    errorstr = L"Out of memory reading the file";
+    errorstr = "Out of memory reading the file";
     return false;
   }
 
   uLong destlen = (uLong) decompressed_size;
   int zRet = uncompress(buf, &destlen, exeCompData->data, (uLong) exeCompData->size);
   if (zRet != Z_STREAM_END) {
-    errorstr = L"Decompression failed";
+    errorstr = "Decompression failed";
     delete[] buf;
     return false;
   }
@@ -295,7 +295,7 @@ void PSFFile::Clear() {
   parent = NULL;
 }
 
-const wchar_t *PSFFile::GetError(void) const {
+const char* PSFFile::GetError(void) const {
   return errorstr;
 }
 

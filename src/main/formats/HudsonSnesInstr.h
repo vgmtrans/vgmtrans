@@ -17,7 +17,7 @@ class HudsonSnesInstrSet:
                      uint32_t length,
                      uint32_t spcDirAddr,
                      uint32_t addrSampTuningTable,
-                     const std::wstring &name = L"HudsonSnesInstrSet");
+                     const std::string &name = "HudsonSnesInstrSet");
   virtual ~HudsonSnesInstrSet(void);
 
   virtual bool GetHeaderInfo();
@@ -44,7 +44,7 @@ class HudsonSnesInstr
                   uint8_t instrNum,
                   uint32_t spcDirAddr,
                   uint32_t addrSampTuningTable,
-                  const std::wstring &name = L"HudsonSnesInstr");
+                  const std::string &name = "HudsonSnesInstr");
   virtual ~HudsonSnesInstr(void);
 
   virtual bool LoadInstr();

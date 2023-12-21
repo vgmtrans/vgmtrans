@@ -107,8 +107,8 @@ int VGMFileTreeView::getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item) 
 }
 
 
-void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name) {
-  auto item_name = QString::fromStdWString(name);
+void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name) {
+  auto item_name = QString::fromStdString(name);
   auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
   if (name == item->GetDescription()) {
     tree_item->setText(0, QString{"<b>%1</b><br>Offset: 0x%2 | Length: 0x%3"}
@@ -118,12 +118,12 @@ void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::wstr
   } else {
     tree_item->setText(0, QString{"<b>%1</b><br>%2<br>Offset: 0x%3 | Length: 0x%4"}
                               .arg(item_name)
-                              .arg(QString::fromStdWString(item->GetDescription()))
+                              .arg(QString::fromStdString(item->GetDescription()))
                               .arg(item->dwOffset, 1, 16)
                               .arg(item->unLength, 1, 16));
   }
   tree_item->setIcon(0, iconForItemType(item->GetIcon()));
-  tree_item->setToolTip(0, QString::fromStdWString(item->GetDescription()));
+  tree_item->setToolTip(0, QString::fromStdString(item->GetDescription()));
 
   if (parent != parent_cached) {
     parent_cached = parent;

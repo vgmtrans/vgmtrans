@@ -15,7 +15,7 @@ class NinSnesInstrSet:
                   NinSnesVersion ver,
                   uint32_t offset,
                   uint32_t spcDirAddr,
-                  const std::wstring &name = L"NinSnesInstrSet");
+                  const std::string &name = "NinSnesInstrSet");
   virtual ~NinSnesInstrSet(void);
 
   virtual bool GetHeaderInfo();
@@ -44,7 +44,7 @@ class NinSnesInstr
                uint32_t theBank,
                uint32_t theInstrNum,
                uint32_t spcDirAddr,
-               const std::wstring &name = L"NinSnesInstr");
+               const std::string &name = "NinSnesInstr");
   virtual ~NinSnesInstr(void);
 
   virtual bool LoadInstr();

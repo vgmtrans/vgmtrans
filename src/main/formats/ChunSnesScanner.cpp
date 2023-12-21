@@ -397,7 +397,7 @@ void ChunSnesScanner::Scan(RawFile *file, void *info) {
 void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile *file) {
   ChunSnesVersion version = CHUNSNES_NONE;
   ChunSnesMinorVersion minorVersion = CHUNSNES_NOMINORVERSION;
-  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
   // search song list and detect engine version
   uint32_t ofsLoadSeq;

@@ -13,7 +13,7 @@
 
 class MP2kSeq final : public VGMSeq {
    public:
-    MP2kSeq(RawFile *file, uint32_t offset, std::wstring name = L"MP2kSeq");
+    MP2kSeq(RawFile *file, uint32_t offset, std::string name = "MP2kSeq");
     ~MP2kSeq() = default;
 
     bool GetHeaderInfo(void) override;

@@ -84,8 +84,8 @@ SequencePlayer::SequencePlayer() {
   BASS_Init(-1, 44100, 0, nullptr, nullptr);
   if (BASS_ErrorGetCode() != BASS_OK) {
     pRoot->AddLogItem(new LogItem(
-        L"Failed to initialize audio device. Collection playback will not be available.",
-        LOG_LEVEL_ERR, L"SequencePlayer"));
+        "Failed to initialize audio device. Collection playback will not be available.",
+        LOG_LEVEL_ERR, "SequencePlayer"));
     return;
   }
 
@@ -161,16 +161,16 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
 
   VGMSeq *seq = coll->GetSeq();
   if (!seq) {
-    pRoot->AddLogItem(new LogItem(L"Failed to play collection as it lacks sequence data.",
-                                  LOG_LEVEL_ERR, L"SequencePlayer"));
+    pRoot->AddLogItem(new LogItem("Failed to play collection as it lacks sequence data.",
+                                  LOG_LEVEL_ERR, "SequencePlayer"));
     return false;
   }
 
   SF2File *sf2 = coll->CreateSF2File();
   if (!sf2) {
     pRoot->AddLogItem(
-        new LogItem(L"Failed to play collection as a soundfont file could not be produced.",
-                    LOG_LEVEL_ERR, L"SequencePlayer"));
+        new LogItem("Failed to play collection as a soundfont file could not be produced.",
+                    LOG_LEVEL_ERR, "SequencePlayer"));
     return false;
   }
 
@@ -182,9 +182,9 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
   HSOUNDFONT sf2_handle =
       BASS_MIDI_FontInitUser(&memory_file_callbacks, sf2_data_blob, BASS_MIDI_FONT_XGDRUMS);
   if (BASS_ErrorGetCode() != BASS_OK) {
-    pRoot->AddLogItem(new LogItem(L"Could not load soundfont. Maybe the system is running out of "
-                                  L"memory or the sountfont was too large?",
-                                  LOG_LEVEL_ERR, L"SequencePlayer"));
+    pRoot->AddLogItem(new LogItem("Could not load soundfont. Maybe the system is running out of "
+                                  "memory or the sountfont was too large?",
+                                  LOG_LEVEL_ERR, "SequencePlayer"));
     return false;
   }
 
@@ -197,7 +197,7 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
   if (BASS_ErrorGetCode() != BASS_OK) {
     BASS_MIDI_FontFree(sf2_handle);
 
-    pRoot->AddLogItem(new LogItem(L"Failed reading MIDI data", LOG_LEVEL_ERR, L"SequencePlayer"));
+    pRoot->AddLogItem(new LogItem("Failed reading MIDI data", LOG_LEVEL_ERR, "SequencePlayer"));
     return false;
   }
 
@@ -212,7 +212,7 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
     BASS_StreamFree(midi_stream);
 
     pRoot->AddLogItem(
-        new LogItem(L"Could not assign soundfont to MIDI data", LOG_LEVEL_ERR, L"SequencePlayer"));
+        new LogItem("Could not assign soundfont to MIDI data", LOG_LEVEL_ERR, "SequencePlayer"));
     return false;
   }
 
@@ -234,7 +234,7 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
   m_active_vgmcoll = coll;
   m_active_stream = midi_stream;
   m_loaded_sf = sf2_handle;
-  m_song_title = QString::fromStdWString(*m_active_vgmcoll->GetName());
+  m_song_title = QString::fromStdString(*m_active_vgmcoll->GetName());
   toggle();
 
   return true;

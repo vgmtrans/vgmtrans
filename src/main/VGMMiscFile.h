@@ -16,7 +16,7 @@ class VGMMiscFile:
               RawFile *file,
               uint32_t offset,
               uint32_t length = 0,
-              std::wstring name = L"VGMMiscFile");
+              std::string name = "VGMMiscFile");
 
   virtual FileType GetFileType() { return FILETYPE_MISC; }
 

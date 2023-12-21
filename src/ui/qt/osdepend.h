@@ -1,7 +1,7 @@
 #ifndef OSDEPEND_H
 #define OSDEPEND_H
 
-void Alert(const wchar_t *fmt, ...);
-void LogDebug(const wchar_t *fmt, ...);
+void Alert(const char* fmt, ...);
+void LogDebug(const char* fmt, ...);
 
 #endif // OSDEPEND_H

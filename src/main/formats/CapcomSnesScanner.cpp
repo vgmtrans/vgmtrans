@@ -115,8 +115,8 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) {
   uint32_t addrBGMHeader;
   uint32_t addrInstrTable;
 
-  wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
-  wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  string basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // find a song list
   hasSongList = file->SearchBytePattern(ptnReadSongList, ofsReadSongListASM);

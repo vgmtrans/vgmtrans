@@ -50,7 +50,7 @@ enum MoriSnesSeqEventType {
 class MoriSnesSeq
     : public VGMSeq {
  public:
-  MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::wstring newName = L"Mint SNES Seq");
+  MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Mint SNES Seq");
   virtual ~MoriSnesSeq(void);
 
   virtual bool GetHeaderInfo(void);

@@ -27,25 +27,25 @@ inline constexpr uint32_t operator&(VGMCollConversionTarget a, VGMCollConversion
 }
 
 template <VGMCollConversionTarget options>
-void SaveAs(VGMColl &coll, const std::wstring &dir_path) {
+void SaveAs(VGMColl &coll, const std::string &dir_path) {
   auto filename = ConvertToSafeFileName(*coll.GetName());
-  auto filepath = dir_path + L"/" + filename;
+  auto filepath = dir_path + "/" + filename;
 
   if constexpr ((options & VGMCollConversionTarget::MIDI) != 0) {
-    coll.seq->SaveAsMidi(filepath + L".mid");
+    coll.seq->SaveAsMidi(filepath + ".mid");
   }
 
   if constexpr ((options & VGMCollConversionTarget::DLS) != 0) {
     DLSFile dlsfile;
     if (coll.CreateDLSFile(dlsfile)) {
-      dlsfile.SaveDLSFile(filepath + L".dls");
+      dlsfile.SaveDLSFile(filepath + ".dls");
     }
   }
 
   if constexpr ((options & VGMCollConversionTarget::SF2) != 0) {
     SF2File *sf2file = coll.CreateSF2File();
     if (sf2file) {
-      sf2file->SaveSF2File(filepath + L".sf2");
+      sf2file->SaveSF2File(filepath + ".sf2");
     }
   }
 }

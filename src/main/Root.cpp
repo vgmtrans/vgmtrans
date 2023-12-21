@@ -100,7 +100,7 @@ void VGMRoot::Reset(void) {
 }
 
 // opens up a file from the filesystem and scans it for known formats
-bool VGMRoot::OpenRawFile(const wstring &filename) {
+bool VGMRoot::OpenRawFile(const string &filename) {
   RawFile *newRawFile = new RawFile(filename);
   if (!newRawFile->open(filename)) {
     delete newRawFile;
@@ -116,8 +116,8 @@ bool VGMRoot::OpenRawFile(const wstring &filename) {
 // the contents of PSF2 files
 bool VGMRoot::CreateVirtFile(uint8_t *databuf,
                              uint32_t fileSize,
-                             const wstring &filename,
-                             const wstring &parRawFileFullPath,
+                             const string &filename,
+                             const string &parRawFileFullPath,
                              const VGMTag tag) {
   assert(fileSize != 0);
 
@@ -186,9 +186,9 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
   if (iter != vRawFile.end())
     vRawFile.erase(iter);
   else
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a rawfile which cannot be found in vRawFile."),
+    pRoot->AddLogItem(new LogItem(std::string("Error: trying to delete a rawfile which cannot be found in vRawFile."),
                                   LOG_LEVEL_DEBUG,
-                                  L"Root"));
+                                  "Root"));
 
   delete targFile;
   return true;
@@ -215,9 +215,9 @@ void VGMRoot::RemoveVGMFile(VGMFile *targFile, bool bRemoveFromRaw) {
   if (iter != vVGMFile.end())
     vVGMFile.erase(iter);
   else
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a VGMFile which cannot be found in vVGMFile."),
+    pRoot->AddLogItem(new LogItem(std::string("Error: trying to delete a VGMFile which cannot be found in vVGMFile."),
                                   LOG_LEVEL_DEBUG,
-                                  L"Root"));
+                                  "Root"));
   if (bRemoveFromRaw)
     targFile->rawfile->RemoveContainedVGMFile(targFile);
   while (targFile->assocColls.size())
@@ -241,9 +241,9 @@ void VGMRoot::RemoveVGMColl(VGMColl *targColl) {
   if (iter != vVGMColl.end())
     vVGMColl.erase(iter);
   else
-    pRoot->AddLogItem(new LogItem(std::wstring(L"Error: trying to delete a VGMColl which cannot be found in vVGMColl."),
+    pRoot->AddLogItem(new LogItem(std::string("Error: trying to delete a VGMColl which cannot be found in vVGMColl."),
                                   LOG_LEVEL_DEBUG,
-                                  L"Root"));
+                                  "Root"));
   UI_RemoveVGMColl(targColl);
   delete targColl;
 }
@@ -272,12 +272,12 @@ void VGMRoot::UI_AddVGMFile(VGMFile *theFile) {
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_WriteBufferToFile(const wstring &filepath, uint8_t *buf, uint32_t size) {
+bool VGMRoot::UI_WriteBufferToFile(const string &filepath, uint8_t *buf, uint32_t size) {
   ofstream outfile(ghc::filesystem::path(filepath), ios::out | ios::trunc | ios::binary);
   if (!outfile.is_open()) {        //if attempt to open file failed
     pRoot->AddLogItem(new LogItem(
-      std::wstring(L"Error: could not open file " + filepath + L" for writing"),
-      LOG_LEVEL_ERR, L"Root"));
+      std::string("Error: could not open file " + filepath + " for writing"),
+      LOG_LEVEL_ERR, "Root"));
     return false;
   }
   outfile.write((const char *) buf, size);
@@ -295,7 +295,7 @@ bool VGMRoot::SaveAllAsRaw() {
       fs::path filepath = dirpath / fs::path(*file->GetName());
       uint8_t *buf = new uint8_t[file->unLength];        //create a buffer the size of the file
       file->GetBytes(file->dwOffset, file->unLength, buf);
-      result = UI_WriteBufferToFile(filepath.wstring(), buf, file->unLength);
+      result = UI_WriteBufferToFile(filepath.string(), buf, file->unLength);
       delete[] buf;
     }
     return true;
@@ -310,6 +310,6 @@ void VGMRoot::AddLogItem(LogItem *theLog) {
   UI_AddLogItem(theLog);
 }
 
-const std::wstring VGMRoot::UI_GetResourceDirPath() {
-  return std::wstring(fs::current_path().generic_wstring());
+const std::string VGMRoot::UI_GetResourceDirPath() {
+  return std::string(fs::current_path().generic_string());
 }

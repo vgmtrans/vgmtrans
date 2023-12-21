@@ -114,8 +114,8 @@ bool PSXSampColl::GetSampleInfo() {
           i += 16;
         }
 
-        wostringstream name;
-        name << L"Sample " << samples.size();
+        ostringstream name;
+        name << "Sample " << samples.size();
         PSXSamp *samp = new PSXSamp(this,
                                     beginOffset,
                                     i - beginOffset,
@@ -151,8 +151,8 @@ bool PSXSampColl::GetSampleInfo() {
         offSampEnd += 16;
       } while (!lastBlock);
 
-      wostringstream name;
-      name << L"Sample " << sampleIndex;
+      ostringstream name;
+      name << "Sample " << sampleIndex;
       PSXSamp *samp = new PSXSamp(this,
                                   dwOffset + it->offset,
                                   it->size,
@@ -272,7 +272,7 @@ const std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, 
 
 PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
-                 uint32_t theRate, wstring name, bool bSetloopOnConversion)
+                 uint32_t theRate, string name, bool bSetloopOnConversion)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
       bSetLoopOnConversion(bSetloopOnConversion) {
   bPSXLoopInfoPrioritizing = true;
@@ -298,13 +298,13 @@ void PSXSamp::ConvertToStdWave(uint8_t *buf) {
   for (uint32_t k = 0; k < dataLength; k += 0x10)                //for every adpcm chunk
   {
     if (dwOffset + k + 16 > vgmfile->GetEndOffset()) {
-      std::wstring log = L"\"" + name + L"\" unexpected EOF.";
-      pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, L"PSXSamp"));
+      std::string log = "\"" + name + "\" unexpected EOF.";
+      pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, "PSXSamp"));
       break;
     }
     else if (!addrOutOfVirtFile && k + 16 > unLength) {
-      std::wstring log = L"\"" + name + L"\" unexpected end of PSXSamp.";
-      pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, L"PSXSamp"));
+      std::string log = "\"" + name + "\" unexpected end of PSXSamp.";
+      pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, "PSXSamp"));
       addrOutOfVirtFile = true;
     }
 

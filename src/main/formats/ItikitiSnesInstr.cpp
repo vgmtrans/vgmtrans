@@ -4,7 +4,7 @@
 
 ItikitiSnesInstrSet::ItikitiSnesInstrSet(RawFile *file, uint32_t tuning_offset,
                                          uint32_t adsr_offset, uint16_t spc_dir_offset,
-                                         std::wstring name)
+                                         std::string name)
     : VGMInstrSet(ItikitiSnesFormat::name, file, adsr_offset, 0, std::move(name)),
       m_tuning_offset(tuning_offset), m_adsr_offset(adsr_offset), m_spc_dir_offset(spc_dir_offset),
       m_num_instruments_to_scan(128) {
@@ -29,8 +29,8 @@ bool ItikitiSnesInstrSet::GetInstrPointers() {
 
     srcns.push_back(srcn);
 
-    std::wostringstream instrument_name;
-    instrument_name << L"Instrument " << index;
+    std::ostringstream instrument_name;
+    instrument_name << "Instrument " << index;
     auto instrument =
         std::make_unique<ItikitiSnesInstr>(this, ins_tuning_offset, ins_adsr_offset, 0, srcn, srcn,
                                            spc_dir_offset(), instrument_name.str());
@@ -50,7 +50,7 @@ bool ItikitiSnesInstrSet::GetInstrPointers() {
 
 ItikitiSnesInstr::ItikitiSnesInstr(VGMInstrSet *instrument_set, uint32_t tuning_offset,
                                    uint32_t adsr_offset, uint32_t bank, uint32_t instrument_number,
-                                   uint8_t srcn, uint16_t spc_dir_offset, std::wstring name)
+                                   uint8_t srcn, uint16_t spc_dir_offset, std::string name)
     : VGMInstr(instrument_set, adsr_offset, 2, bank, instrument_number, std::move(name)),
       m_tuning_offset(tuning_offset), m_adsr_offset(adsr_offset), srcn(srcn),
       m_spc_dir_offset(spc_dir_offset) {
@@ -101,7 +101,7 @@ ItikitiSnesRgn::ItikitiSnesRgn(ItikitiSnesInstr *instrument, uint32_t tuning_off
   sampNum = srcn;
   unityKey = static_cast<uint8_t>(72 - static_cast<int>(coarse_tuning));
   fineTune = static_cast<int16_t>(fine_tuning * 100.0);
-  AddSimpleItem(adsr_offset, 1, L"ADSR1");
-  AddSimpleItem(adsr_offset + 1, 1, L"ADSR2");
+  AddSimpleItem(adsr_offset, 1, "ADSR1");
+  AddSimpleItem(adsr_offset + 1, 1, "ADSR2");
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 }

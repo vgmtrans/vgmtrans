@@ -13,7 +13,7 @@ DECLARE_FORMAT(CPS);
 // CPSSeq
 // ******
 
-CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, wstring &name)
+CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, string &name)
     : VGMSeq(CPSFormat::name, file, offset, 0, name),
       fmt_version(fmtVersion) {
   HasMonophonicTracks();
@@ -44,15 +44,15 @@ bool CPSSeq::GetTrackPointers(void) {
   if ((GetByte(dwOffset) & 0x80) > 0)
     return false;
 
-  this->AddHeader(dwOffset, 1, L"Sequence Flags");
-  VGMHeader *header = this->AddHeader(dwOffset + 1, GetShortBE(dwOffset + 1) - 1, L"Track Pointers");
+  this->AddHeader(dwOffset, 1, "Sequence Flags");
+  VGMHeader *header = this->AddHeader(dwOffset + 1, GetShortBE(dwOffset + 1) - 1, "Track Pointers");
 
   const int maxTracks = fmt_version <= VER_CPS1_502 ? 12 : 16;
 
   for (int i = 0; i < maxTracks; i++) {
     uint32_t offset = GetShortBE(dwOffset + 1 + i * 2);
     if (offset == 0) {
-      header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, L"No Track");
+      header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, "No Track");
       continue;
     }
     //if (GetShortBE(offset+dwOffset) == 0xE017)	//Rest, EndTrack (used by empty tracks)
@@ -78,7 +78,7 @@ bool CPSSeq::GetTrackPointers(void) {
         newTrack = new CPSTrackV1(this, offset + dwOffset);
     }
     aTracks.push_back(newTrack);
-    header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, L"Track Pointer");
+    header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, "Track Pointer");
   }
   if (aTracks.size() == 0)
     return false;

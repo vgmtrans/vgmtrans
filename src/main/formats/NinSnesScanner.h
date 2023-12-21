@@ -6,7 +6,7 @@ class NinSnesScanner:
     public VGMScanner {
  public:
   NinSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~NinSnesScanner(void) {
   }

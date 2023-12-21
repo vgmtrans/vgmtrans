@@ -285,6 +285,6 @@ class SF2File: public RiffFile {
   ~SF2File() = default;
 
   std::vector<uint8_t> SaveToMem();
-  bool SaveSF2File(const std::wstring &filepath);
+  bool SaveSF2File(const std::string &filepath);
 
 };

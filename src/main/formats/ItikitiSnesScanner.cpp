@@ -11,7 +11,7 @@ void ItikitiSnesScanner::Scan(RawFile *file, void *info) {
 }
 
 void ItikitiSnesScanner::ScanFromApuRam(RawFile *file) {
-  std::wstring name =
+  std::string name =
       file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
   uint32_t song_header_offset{};

@@ -2,17 +2,17 @@
 
 #include "LogItem.h"
 
-LogItem::LogItem(const std::wstring &text, LogLevel level, const std::wstring &source) :
+LogItem::LogItem(const std::string &text, LogLevel level, const std::string &source) :
     text(text),
     source(source),
     level(level) {
 }
 
-std::wstring LogItem::GetText() const {
-  return std::wstring(text);
+std::string LogItem::GetText() const {
+  return std::string(text);
 }
 
-const wchar_t *LogItem::GetCText() const {
+const char* LogItem::GetCText() const {
   return text.c_str();
 }
 
@@ -20,10 +20,10 @@ LogLevel LogItem::GetLogLevel() const {
   return level;
 }
 
-std::wstring LogItem::GetSource() const {
-  return std::wstring(source);
+std::string LogItem::GetSource() const {
+  return std::string(source);
 }
 
-const wchar_t *LogItem::GetCSource() const {
+const char* LogItem::GetCSource() const {
   return source.c_str();
 }

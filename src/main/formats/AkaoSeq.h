@@ -145,7 +145,7 @@ class AkaoSeq final :
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
-  [[nodiscard]] std::wstring ReadTimestampAsText();
+  [[nodiscard]] std::string ReadTimestampAsText();
   [[nodiscard]] double GetTempoInBPM(uint16_t tempo) const;
 
   [[nodiscard]] AkaoInstrSet* NewInstrSet() const;

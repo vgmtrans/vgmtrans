@@ -36,7 +36,7 @@ public:
 
   bool SaveDLS(VGMColl *coll);
 
-  virtual bool OpenRawFile(const wstring &filename);
+  virtual bool OpenRawFile(const string &filename);
 
   virtual bool Init();
 
@@ -48,13 +48,13 @@ public:
 
   virtual void UpdateCollections();
 
-  virtual wstring UI_GetOpenFilePath(const wstring& suggestedFilename = L"",
-                                          const wstring& extension = L"");
+  virtual string UI_GetOpenFilePath(const string& suggestedFilename = "",
+                                          const string& extension = "");
 
-  virtual wstring UI_GetSaveFilePath(const wstring& suggestedFilename,
-                                          const wstring& extension = L"");
+  virtual string UI_GetSaveFilePath(const string& suggestedFilename,
+                                          const string& extension = "");
 
-  virtual wstring UI_GetSaveDirPath(const wstring& suggestedDir = L"");
+  virtual string UI_GetSaveDirPath(const string& suggestedDir = "");
 
   set<fs::path> inputFiles = {};
   fs::path outputDir = fs::path(".");

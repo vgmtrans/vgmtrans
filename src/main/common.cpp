@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "common.h"
 
-std::wstring StringToUpper(std::wstring myString) {
+std::string StringToUpper(std::string myString) {
   const size_t length = myString.length();
   for (size_t i = 0; i != length; ++i) {
     myString[i] = toupper(myString[i]);
@@ -9,7 +9,7 @@ std::wstring StringToUpper(std::wstring myString) {
   return myString;
 }
 
-std::wstring StringToLower(std::wstring myString) {
+std::string StringToLower(std::string myString) {
   const size_t length = myString.length();
   for (size_t i = 0; i != length; ++i) {
     myString[i] = tolower(myString[i]);
@@ -24,55 +24,56 @@ uint32_t StringToHex(const std::string &str) {
   return value;
 }
 
-std::wstring ConvertToSafeFileName(const std::wstring &str) {
-  std::wstring filename;
+std::string ConvertToSafeFileName(const std::string &str) {
+  std::string filename;
   filename.reserve(str.length());
 
-  const wchar_t *forbiddenChars = L"\\/:,;*?\"<>|";
+  const char* forbiddenChars = "\\/:,;*?\"<>|";
   size_t pos_begin = 0;
   size_t pos_end;
-  while ((pos_end = str.find_first_of(forbiddenChars, pos_begin)) != std::wstring::npos) {
+  while ((pos_end = str.find_first_of(forbiddenChars, pos_begin)) != std::string::npos) {
     filename += str.substr(pos_begin, pos_end - pos_begin);
     if (filename[filename.length() - 1] != L' ') {
-      filename += L" ";
+      filename += " ";
     }
     pos_begin = pos_end + 1;
   }
   filename += str.substr(pos_begin);
 
   // right trim
-  filename.erase(filename.find_last_not_of(L" \n\r\t") + 1);
+  filename.erase(filename.find_last_not_of(" \n\r\t") + 1);
 
   return filename;
 }
 
-wchar_t *GetFileWithBase(const wchar_t *f, const wchar_t *newfile) {
-  static wchar_t *ret;
-  wchar_t *tp1;
+char* GetFileWithBase(const char* f, const char* newfile) {
+  static char* ret;
+  char *tp1;
 
 #if PSS_STYLE == 1
-  tp1=((wchar_t *)wcsrchr (f,'/'));
+  tp1 = ((char*)strrchr(f, '/'));
 #else
-  tp1 = ((wchar_t *) std::wcsrchr(f, '\\'));
+  tp1 = ((char*)strrchr(f, '\\'));
 #if PSS_STYLE != 3
   {
-    wchar_t *tp3;
+    char *tp3;
 
-    tp3 = ((wchar_t *) std::wcsrchr(f, '/'));
-    if (tp1 < tp3) tp1 = tp3;
+    tp3 = ((char*)strrchr(f, '/'));
+    if (tp1 < tp3) {
+      tp1 = tp3;
+    }
   }
 #endif
 #endif
   if (!tp1) {
-    ret = (wchar_t *) malloc(wcslen(newfile) + 1);
-    wcscpy(ret, newfile);
+    ret = (char*)malloc(strlen(newfile) + 1);  // +1 for the null terminator
+    strcpy(ret, newfile);
+  } else {
+    ret = (char*)malloc((tp1 - f + 2 + strlen(newfile)) * sizeof(char));  // 1 for the null terminator, 1 for the '/'.
+    memcpy(ret, f, (tp1 - f) * sizeof(char));
+    ret[tp1 - f] = '/';
+    ret[tp1 - f + 1] = '\0';
+    strcat(ret, newfile);
   }
-  else {
-    ret = (wchar_t *) malloc((tp1 - f + 2 + wcslen(newfile)) * sizeof(wchar_t));    // 1(NULL), 1(/).
-    memcpy(ret, f, (tp1 - f) * sizeof(wchar_t));
-    ret[tp1 - f] = L'/';
-    ret[tp1 - f + 1] = 0;
-    wcscat(ret, newfile);
-  }
-  return (ret);
+  return ret;
 }

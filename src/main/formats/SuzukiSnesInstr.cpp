@@ -13,7 +13,7 @@ SuzukiSnesInstrSet::SuzukiSnesInstrSet(RawFile *file,
                                        uint16_t addrVolumeTable,
                                        uint16_t addrADSRTable,
                                        uint16_t addrTuningTable,
-                                       const std::wstring &name) :
+                                       const std::string &name) :
     VGMInstrSet(SuzukiSnesFormat::name, file, addrSRCNTable, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
     addrSRCNTable(addrSRCNTable),
@@ -76,8 +76,8 @@ bool SuzukiSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::wostringstream instrName;
-    instrName << L"Instrument " << srcn;
+    std::ostringstream instrName;
+    instrName << "Instrument " << srcn;
     SuzukiSnesInstr *newInstr = new SuzukiSnesInstr(this,
                                                     version,
                                                     instrNum,
@@ -115,7 +115,7 @@ SuzukiSnesInstr::SuzukiSnesInstr(VGMInstrSet *instrSet,
                                  uint16_t addrVolumeTable,
                                  uint16_t addrADSRTable,
                                  uint16_t addrTuningTable,
-                                 const std::wstring &name) :
+                                 const std::string &name) :
     VGMInstr(instrSet, addrSRCNTable, 0, 0, instrNum, name), version(ver),
     spcDirAddr(spcDirAddr),
     addrSRCNTable(addrSRCNTable),
@@ -178,8 +178,8 @@ SuzukiSnesRgn::SuzukiSnesRgn(SuzukiSnesInstr *instr,
   int8_t coarse_tuning = GetByte(addrTuningTable + srcn * 2 + 1);
 
   AddSampNum(srcn, addrSRCNTable + instrNum, 1);
-  AddSimpleItem(addrADSRTable + srcn * 2, 1, L"ADSR1");
-  AddSimpleItem(addrADSRTable + srcn * 2 + 1, 1, L"ADSR2");
+  AddSimpleItem(addrADSRTable + srcn * 2, 1, "ADSR1");
+  AddSimpleItem(addrADSRTable + srcn * 2 + 1, 1, "ADSR2");
   AddFineTune((int16_t) (fine_tuning / 256.0 * 100.0), addrTuningTable + srcn * 2, 1);
   AddUnityKey(69 - coarse_tuning, addrTuningTable + srcn * 2 + 1, 1);
   AddVolume(vol / 256.0, addrVolumeTable + srcn * 2, 1);

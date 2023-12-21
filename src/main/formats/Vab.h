@@ -127,7 +127,7 @@ class VabInstr
            uint32_t length,
            uint32_t theBank,
            uint32_t theInstrNum,
-           const std::wstring &name = L"Instrument");
+           const std::string &name = "Instrument");
   virtual ~VabInstr(void);
 
   virtual bool LoadInstr();

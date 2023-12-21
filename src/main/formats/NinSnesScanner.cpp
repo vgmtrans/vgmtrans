@@ -904,8 +904,8 @@ void NinSnesScanner::Scan(RawFile *file, void *info) {
 void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
   NinSnesVersion version = NINSNES_NONE;
 
-  std::wstring basefilename = RawFile::removeExtFromPath(file->GetFileName());
-  std::wstring name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::string basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // get section pointer address
   uint32_t ofsIncSectionPtr;

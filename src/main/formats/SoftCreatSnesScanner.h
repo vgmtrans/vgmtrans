@@ -6,7 +6,7 @@ class SoftCreatSnesScanner:
     public VGMScanner {
  public:
   SoftCreatSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~SoftCreatSnesScanner(void) {
   }

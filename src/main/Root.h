@@ -30,11 +30,11 @@ class VGMRoot {
   bool Init(void);
   void Reset(void);
   void Exit(void);
-  virtual bool OpenRawFile(const std::wstring &filename);
+  virtual bool OpenRawFile(const std::string &filename);
   bool CreateVirtFile(uint8_t *databuf,
                       uint32_t fileSize,
-                      const std::wstring &filename,
-                      const std::wstring &parRawFileFullPath = L"",
+                      const std::string &filename,
+                      const std::string &parRawFileFullPath = "",
                       const VGMTag tag = VGMTag());
   bool SetupNewRawFile(RawFile *newRawFile);
   bool CloseRawFile(RawFile *targFile);
@@ -50,7 +50,7 @@ class VGMRoot {
     vLoader.push_back(new T());
   }
 
-  virtual const std::wstring UI_GetResourceDirPath();
+  virtual const std::string UI_GetResourceDirPath();
   virtual void UI_SetRootPtr(VGMRoot **theRoot) = 0;
   virtual void UI_PreExit() { }
   virtual void UI_Exit() = 0;
@@ -74,13 +74,13 @@ class VGMRoot {
   virtual void UI_EndRemoveVGMFiles() { }
   virtual void UI_RemoveVGMColl(VGMColl *theColl) { }
   //virtual void UI_RemoveVGMFileRange(VGMFile* first, VGMFile* last) {}
-  virtual void UI_AddItem(VGMItem *item, VGMItem *parent, const std::wstring &itemName, void *UI_specific) { }
-  virtual std::wstring
-      UI_GetOpenFilePath(const std::wstring &suggestedFilename = L"", const std::wstring &extension = L"") = 0;
-  virtual std::wstring
-      UI_GetSaveFilePath(const std::wstring &suggestedFilename, const std::wstring &extension = L"") = 0;
-  virtual std::wstring UI_GetSaveDirPath(const std::wstring &suggestedDir = L"") = 0;
-  virtual bool UI_WriteBufferToFile(const std::wstring &filepath, uint8_t *buf, uint32_t size);
+  virtual void UI_AddItem(VGMItem *item, VGMItem *parent, const std::string &itemName, void *UI_specific) { }
+  virtual std::string
+      UI_GetOpenFilePath(const std::string &suggestedFilename = "", const std::string &extension = "") = 0;
+  virtual std::string
+      UI_GetSaveFilePath(const std::string &suggestedFilename, const std::string &extension = "") = 0;
+  virtual std::string UI_GetSaveDirPath(const std::string &suggestedDir = "") = 0;
+  virtual bool UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, uint32_t size);
 
 
   bool SaveAllAsRaw();

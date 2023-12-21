@@ -15,7 +15,7 @@ class TriAcePS1Seq:
   } TrkInfo;
 
 
-  TriAcePS1Seq(RawFile *file, uint32_t offset, const std::wstring &name = std::wstring(L"TriAce Seq"));
+  TriAcePS1Seq(RawFile *file, uint32_t offset, const std::string &name = std::string("TriAce Seq"));
   virtual ~TriAcePS1Seq(void);
 
   virtual bool GetHeaderInfo(void);
@@ -34,7 +34,7 @@ class TriAcePS1ScorePattern
     : public VGMContainerItem {
  public:
   TriAcePS1ScorePattern(TriAcePS1Seq *parentSeq, uint32_t offset)
-      : VGMContainerItem(parentSeq, offset, 0, L"Score Pattern") { }
+      : VGMContainerItem(parentSeq, offset, 0, "Score Pattern") { }
 };
 
 

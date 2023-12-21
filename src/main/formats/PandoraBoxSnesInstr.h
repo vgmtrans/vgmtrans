@@ -18,7 +18,7 @@ class PandoraBoxSnesInstrSet:
                          uint16_t addrGlobalInstrTable,
                          uint8_t globalInstrumentCount,
                          const std::map<uint8_t, uint16_t> &instrADSRHints = std::map<uint8_t, uint16_t>(),
-                         const std::wstring &name = L"PandoraBoxSnesInstrSet");
+                         const std::string &name = "PandoraBoxSnesInstrSet");
   virtual ~PandoraBoxSnesInstrSet(void);
 
   virtual bool GetHeaderInfo();
@@ -50,7 +50,7 @@ class PandoraBoxSnesInstr
                       uint8_t srcn,
                       uint32_t spcDirAddr,
                       uint16_t adsr = 0x8fe0,
-                      const std::wstring &name = L"PandoraBoxSnesInstr");
+                      const std::string &name = "PandoraBoxSnesInstr");
   virtual ~PandoraBoxSnesInstr(void);
 
   virtual bool LoadInstr();

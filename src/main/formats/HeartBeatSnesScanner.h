@@ -8,7 +8,7 @@ class HeartBeatSnesScanner:
     public VGMScanner {
  public:
   HeartBeatSnesScanner(void) {
-    USE_EXTENSION(L"spc");
+    USE_EXTENSION("spc");
   }
   virtual ~HeartBeatSnesScanner(void) {
   }

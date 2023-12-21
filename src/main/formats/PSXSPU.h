@@ -160,7 +160,7 @@ void PSXConvADSR(T *realADSR,
       ((Sm & ~0x01) != 0) ||
       ((Sd & ~0x01) != 0) ||
       ((Sr & ~0x7F) != 0)) {
-    pRoot->AddLogItem(new LogItem(L"PSX ADSR Out Of Range.", LOG_LEVEL_ERR, L"PSXConvADSR"));
+    pRoot->AddLogItem(new LogItem("PSX ADSR Out Of Range.", LOG_LEVEL_ERR, "PSXConvADSR"));
     return;
   }
 
@@ -380,7 +380,7 @@ class PSXSamp
  public:
   PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
           uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
-          uint32_t theRate, std::wstring name, bool bSetLoopOnConversion = true);
+          uint32_t theRate, std::string name, bool bSetLoopOnConversion = true);
   virtual ~PSXSamp(void);
 
   // ratio of space conserved.  should generally be > 1

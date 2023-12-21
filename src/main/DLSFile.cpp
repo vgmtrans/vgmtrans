@@ -137,7 +137,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
 }
 
 // I should probably make this function part of a parent class for both Midi and DLS file
-bool DLSFile::SaveDLSFile(const std::wstring &filepath) {
+bool DLSFile::SaveDLSFile(const std::string &filepath) {
   vector<uint8_t> dlsBuf;
   WriteDLSToBuffer(dlsBuf);
   return pRoot->UI_WriteBufferToFile(filepath, dlsBuf.data(), static_cast<uint32_t>(dlsBuf.size()));

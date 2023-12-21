@@ -8,7 +8,7 @@ using namespace std;
 // VGMMiscFile
 // ***********
 
-VGMMiscFile::VGMMiscFile(const string &format, RawFile *file, uint32_t offset, uint32_t length, wstring name)
+VGMMiscFile::VGMMiscFile(const string &format, RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMFile(FILETYPE_MISC, format, file, offset, length, name) {
 
 }

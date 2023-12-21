@@ -75,23 +75,23 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
 }
 
 AkaoPs1Version AkaoScanner::DetermineVersionFromTag(RawFile *file) noexcept {
-  const std::wstring & album = file->tag.album;
-  if (album == L"Final Fantasy 7" || album == L"Final Fantasy VII")
+  const std::string & album = file->tag.album;
+  if (album == "Final Fantasy 7" || album == "Final Fantasy VII")
     return AkaoPs1Version::VERSION_1_0;
-  else if (album == L"SaGa Frontier")
+  else if (album == "SaGa Frontier")
     return AkaoPs1Version::VERSION_1_1;
-  else if (album == L"Front Mission 2" || album == L"Chocobo's Mysterious Dungeon")
+  else if (album == "Front Mission 2" || album == "Chocobo's Mysterious Dungeon")
     return AkaoPs1Version::VERSION_1_2;
-  else if (album == L"Parasite Eve")
+  else if (album == "Parasite Eve")
     return AkaoPs1Version::VERSION_2;
-  else if (album == L"Another Mind")
+  else if (album == "Another Mind")
     return AkaoPs1Version::VERSION_3_0;
-  else if (album == L"Chocobo Dungeon 2" || album == L"Final Fantasy 8" || album == L"Final Fantasy VIII"
-    || album == L"Chocobo Racing" || album == L"SaGa Frontier 2" || album == L"Racing Lagoon")
+  else if (album == "Chocobo Dungeon 2" || album == "Final Fantasy 8" || album == "Final Fantasy VIII"
+    || album == "Chocobo Racing" || album == "SaGa Frontier 2" || album == "Racing Lagoon")
     return AkaoPs1Version::VERSION_3_1;
-  else if (album == L"Legend of Mana" || album == L"Front Mission 3" || album == L"Chrono Cross"
-    || album == L"Vagrant Story" || album == L"Final Fantasy 9" || album == L"Final Fantasy IX"
-    || album == L"Final Fantasy Origins - FF2")
+  else if (album == "Legend of Mana" || album == "Front Mission 3" || album == "Chrono Cross"
+    || album == "Vagrant Story" || album == "Final Fantasy 9" || album == "Final Fantasy IX"
+    || album == "Final Fantasy Origins - FF2")
     return AkaoPs1Version::VERSION_3_2;
   return AkaoPs1Version::UNKNOWN;
 }

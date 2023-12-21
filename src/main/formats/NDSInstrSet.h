@@ -21,7 +21,7 @@ class NDSInstr;
 class NDSInstrSet : public VGMInstrSet {
 public:
   NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSampColl *psg_samples,
-              std::wstring name = L"NDS Instrument Bank");
+              std::string name = "NDS Instrument Bank");
   virtual bool GetInstrPointers();
 
   std::vector<VGMSampColl *> sampCollWAList;
@@ -75,7 +75,7 @@ static const int IMA_IndexTable[9] = {-1, -1, -1, -1, 2, 4, 6, 8};
 class NDSWaveArch : public VGMSampColl {
 public:
   NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length,
-              std::wstring name = L"NDS Wave Archive");
+              std::string name = "NDS Wave Archive");
   ~NDSWaveArch() override = default;
 
   bool GetHeaderInfo() override;
@@ -99,7 +99,7 @@ class NDSSamp : public VGMSamp {
 public:
   NDSSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0, uint32_t dataOffset = 0,
           uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16, uint32_t rate = 0,
-          uint8_t waveType = 0, std::wstring name = L"Sample");
+          uint8_t waveType = 0, std::string name = "Sample");
 
   virtual double GetCompressionRatio();  // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion

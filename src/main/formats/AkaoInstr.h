@@ -29,9 +29,9 @@ class AkaoInstrSet final : public VGMInstrSet {
                uint32_t instrOff,
                uint32_t dkitOff,
                uint32_t id,
-               std::wstring name = L"Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset, AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses, std::set<uint32_t> drum_instrument_addresses, std::wstring name = L"Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version, std::wstring name = L"Akao Instrument Bank (Dummy)");
+               std::string name = "Akao Instrument Bank");
+  AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset, AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses, std::set<uint32_t> drum_instrument_addresses, std::string name = "Akao Instrument Bank");
+  AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version, std::string name = "Akao Instrument Bank (Dummy)");
   bool GetInstrPointers() override;
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
@@ -59,7 +59,7 @@ class AkaoInstr: public VGMInstr {
             uint32_t length,
             uint32_t bank,
             uint32_t instrNum,
-            std::wstring name = L"Instrument");
+            std::string name = "Instrument");
   bool LoadInstr() override;
 
   [[nodiscard]] AkaoInstrSet * instrSet() const noexcept { return reinterpret_cast<AkaoInstrSet*>(this->parInstrSet); }
@@ -88,9 +88,9 @@ class AkaoDrumKit final : public AkaoInstr {
 class AkaoRgn final :
     public VGMRgn {
  public:
-  AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::wstring name = L"Region");
+  AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::string name = "Region");
   AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
-          uint8_t artIDNum, std::wstring name = L"Region");
+          uint8_t artIDNum, std::string name = "Region");
 
   bool LoadRgn() override;
 
@@ -122,8 +122,8 @@ struct AkaoArt {
 class AkaoSampColl final :
     public VGMSampColl {
  public:
-   AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::wstring name = L"Akao Sample Collection");
-   AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::wstring name = L"Akao Sample Collection");
+   AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name = "Akao Sample Collection");
+   AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::string name = "Akao Sample Collection");
 
   bool GetHeaderInfo() override;
   bool GetSampleInfo() override;

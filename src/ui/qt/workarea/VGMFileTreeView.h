@@ -54,7 +54,7 @@ public:
   void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
   void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
 
-  void addVGMItem(VGMItem *item, VGMItem *parent, const std::wstring &name);
+  void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name);
   auto getTreeWidgetItem(VGMItem *vgm_item) { return m_items.at(vgm_item); };
 
 private:

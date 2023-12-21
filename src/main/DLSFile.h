@@ -108,7 +108,7 @@ public:
   uint32_t GetSize() override;
 
   int WriteDLSToBuffer(std::vector<uint8_t> &buf);
-  bool SaveDLSFile(const std::wstring &filepath);
+  bool SaveDLSFile(const std::string &filepath);
 
 private:
   std::vector<std::unique_ptr<DLSInstr>> m_instrs;

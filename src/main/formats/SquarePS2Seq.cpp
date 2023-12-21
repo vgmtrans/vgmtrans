@@ -20,13 +20,13 @@ BGMSeq::~BGMSeq(void) {
 }
 
 bool BGMSeq::GetHeaderInfo(void) {
-  VGMHeader *header = AddHeader(dwOffset, 0x20, L"Header");
-  header->AddSimpleItem(dwOffset, 4, L"Signature");
-  header->AddSimpleItem(dwOffset + 0x4, 2, L"ID");
-  header->AddSimpleItem(dwOffset + 0x6, 2, L"Associated WD ID");
-  header->AddSimpleItem(dwOffset + 0x8, 1, L"Number of Tracks");
-  header->AddSimpleItem(dwOffset + 0xE, 2, L"PPQN");
-  header->AddSimpleItem(dwOffset + 0x10, 4, L"File length");
+  VGMHeader *header = AddHeader(dwOffset, 0x20, "Header");
+  header->AddSimpleItem(dwOffset, 4, "Signature");
+  header->AddSimpleItem(dwOffset + 0x4, 2, "ID");
+  header->AddSimpleItem(dwOffset + 0x6, 2, "Associated WD ID");
+  header->AddSimpleItem(dwOffset + 0x8, 1, "Number of Tracks");
+  header->AddSimpleItem(dwOffset + 0xE, 2, "PPQN");
+  header->AddSimpleItem(dwOffset + 0x10, 4, "File length");
 
   nNumTracks = GetByte(dwOffset + 8);
   seqID = GetShort(dwOffset + 4);
@@ -34,10 +34,10 @@ bool BGMSeq::GetHeaderInfo(void) {
   SetPPQN(GetShort(dwOffset + 0xE));
   unLength = GetWord(dwOffset + 0x10);
 
-  wostringstream theName;
-  theName << L"BGM " << seqID;
+  ostringstream theName;
+  theName << "BGM " << seqID;
   if (seqID != assocWDID)
-    theName << L"using WD " << assocWDID;
+    theName << "using WD " << assocWDID;
   name = theName.str();
   return true;
 }
@@ -75,9 +75,9 @@ bool BGMTrack::ReadEvent(void) {
   // address range check for safety
   if (!vgmfile->IsValidOffset(curOffset)) {
     if (readMode== ReadMode::READMODE_ADD_TO_UI) {
-      std::wostringstream message;
-	  message << *vgmfile->GetName() << L": Address out of range. Conversion aborted.";
-      pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, L"SquarePS2Seq"));
+      std::ostringstream message;
+	  message << *vgmfile->GetName() << ": Address out of range. Conversion aborted.";
+      pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, "SquarePS2Seq"));
     }
     return false;
   }
@@ -96,7 +96,7 @@ bool BGMTrack::ReadEvent(void) {
       //rest_time += current_delta_time;
       //if (nScanMode == MODE_SCAN)
       //	AddBGMEvent("Loop Begin", ICON_STARTREP, aBGMTracks[cur_track]->pTreeItem, offsetAtDelta, j-offsetAtDelta, BG_CLR_CYAN);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop Begin", L"", CLR_LOOP);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Begin", "", CLR_LOOP);
       break;
 
     // Loop end
@@ -105,7 +105,7 @@ bool BGMTrack::ReadEvent(void) {
 //		loop_counter++;
       //if (loop_counter < num_loops)
       //	j = loop_start;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"Loop End", L"", CLR_LOOP);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", CLR_LOOP);
       break;
 
     //end of track?
@@ -170,7 +170,7 @@ bool BGMTrack::ReadEvent(void) {
       break;
 
     case 0x18 :
-      AddNoteOff(beginOffset, curOffset - beginOffset, prevKey, L"Note off (prev key)");
+      AddNoteOff(beginOffset, curOffset - beginOffset, prevKey, "Note off (prev key)");
       prevKey = key;
       break;
 
@@ -252,7 +252,7 @@ bool BGMTrack::ReadEvent(void) {
       break;
 
     default :
-      AddGenericEvent(beginOffset, curOffset - beginOffset, L"UNKNOWN", L"", CLR_UNRECOGNIZED);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", CLR_UNRECOGNIZED);
       break;
 
   }

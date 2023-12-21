@@ -8,7 +8,7 @@
 // *****************
 
 TriAcePS1InstrSet::TriAcePS1InstrSet(RawFile *file, uint32_t offset)
-    : VGMInstrSet(TriAcePS1Format::name, file, offset, 0, L"TriAce InstrSet") {
+    : VGMInstrSet(TriAcePS1Format::name, file, offset, 0, "TriAce InstrSet") {
 }
 
 TriAcePS1InstrSet::~TriAcePS1InstrSet(void) {
@@ -23,9 +23,9 @@ TriAcePS1InstrSet::~TriAcePS1InstrSet(void) {
 //==============================================================
 bool TriAcePS1InstrSet::GetHeaderInfo() {
   VGMHeader *header = AddHeader(dwOffset, sizeof(TriAcePS1InstrSet::_InstrHeader));    //1,Sep.2009 revise
-  header->AddSimpleItem(dwOffset, 4, L"InstrSet Size");
-  header->AddSimpleItem(dwOffset + 4, 2, L"Instr Section Size");
-  //header->AddSimpleItem(dwOffset+6, 1, L"Number of Instruments");
+  header->AddSimpleItem(dwOffset, 4, "InstrSet Size");
+  header->AddSimpleItem(dwOffset + 4, 2, "Instr Section Size");
+  //header->AddSimpleItem(dwOffset+6, 1, "Number of Instruments");
 
   //-----------------------
   //1,Sep.2009 revise		to do こうしたい。
@@ -61,11 +61,11 @@ bool TriAcePS1InstrSet::GetInstrPointers() {
     TriAcePS1Instr *newInstr = new TriAcePS1Instr(this, i, 0, 0, 0);
     aInstrs.push_back(newInstr);
     GetBytes(i, sizeof(TriAcePS1Instr::InstrInfo), &newInstr->instrinfo);
-    newInstr->AddSimpleItem(i + 0, sizeof(short), L"Instrument Number");            //1,Sep.2009 revise
-    newInstr->AddSimpleItem(i + 2, sizeof(short), L"ADSR1");                        //1,Sep.2009 revise
-    newInstr->AddSimpleItem(i + 4, sizeof(short), L"ADSR2");                        //1,Sep.2009 revise
+    newInstr->AddSimpleItem(i + 0, sizeof(short), "Instrument Number");            //1,Sep.2009 revise
+    newInstr->AddSimpleItem(i + 2, sizeof(short), "ADSR1");                        //1,Sep.2009 revise
+    newInstr->AddSimpleItem(i + 4, sizeof(short), "ADSR2");                        //1,Sep.2009 revise
     newInstr->AddUnknownItem(i + 6, sizeof(char));                                  //1,Sep.2009 revise
-    newInstr->AddSimpleItem(i + 7, sizeof(char), L"Number of Rgns");                //1,Sep.2009 revise
+    newInstr->AddSimpleItem(i + 7, sizeof(char), "Number of Rgns");                //1,Sep.2009 revise
     i += sizeof(TriAcePS1Instr::RgnInfo) * (newInstr->instrinfo.numRgns);
   }
   return true;
@@ -121,19 +121,19 @@ bool TriAcePS1Instr::LoadInstr() {
     rgn->AddKeyHigh(rgninfo->note_range_high, rgn->dwOffset + 1);
     rgn->AddVelLow(rgninfo->vel_range_low, rgn->dwOffset + 2);
     rgn->AddVelHigh(rgninfo->vel_range_high, rgn->dwOffset + 3);
-    rgn->AddSimpleItem(rgn->dwOffset + 4, 4, L"Sample Offset");
+    rgn->AddSimpleItem(rgn->dwOffset + 4, 4, "Sample Offset");
     rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->dwOffset;
-    rgn->AddSimpleItem(rgn->dwOffset + 8, 4, L"Sample Loop Point");
+    rgn->AddSimpleItem(rgn->dwOffset + 8, 4, "Sample Loop Point");
     //rgn->loop.loopStatus = (rgninfo->loopOffset != rgninfo->sampOffset) && (rgninfo->loopOffset != 0);
     rgn->loop.loopStart = rgninfo->loopOffset;
-    rgn->AddSimpleItem(rgn->dwOffset + 12, 1, L"Attenuation");
+    rgn->AddSimpleItem(rgn->dwOffset + 12, 1, "Attenuation");
     rgn->AddUnityKey((int8_t) 0x3B - rgninfo->pitchTuneSemitones,
                      rgn->dwOffset + 13);  //You would think it would be 0x3C (middle c)
-    rgn->AddSimpleItem(rgn->dwOffset + 14, 1, L"Pitch Fine Tune");
+    rgn->AddSimpleItem(rgn->dwOffset + 14, 1, "Pitch Fine Tune");
     const int kTuningOffset = 22; // approx. 21.500638 from pitch table (0x10be vs 0x1000)
     rgn->fineTune = (short)((double)rgninfo->pitchTuneFine / 64.0 * 100) - kTuningOffset;
     rgn->sampCollPtr = ((VGMInstrSet *) this->vgmfile)->sampColl;
-    rgn->AddSimpleItem(rgn->dwOffset + 15, 5, L"Unknown values");
+    rgn->AddSimpleItem(rgn->dwOffset + 15, 5, "Unknown values");
 
 
     PSXConvADSR(rgn, instrinfo.ADSR1, instrinfo.ADSR2, false);

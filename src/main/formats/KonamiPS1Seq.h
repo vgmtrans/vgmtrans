@@ -12,7 +12,7 @@ public:
     static constexpr uint32_t kOffsetToTrackCount = 0x0c;
     static constexpr uint32_t kOffsetToTrackSizes = 0x10;
 
-    KonamiPS1Seq(RawFile *file, uint32_t offset, const std::wstring &name = L"KonamiPS1Seq");
+    KonamiPS1Seq(RawFile *file, uint32_t offset, const std::string &name = "KonamiPS1Seq");
 
     virtual ~KonamiPS1Seq() {
     }

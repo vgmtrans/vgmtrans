@@ -27,9 +27,9 @@ class VGMFile:
     public VGMContainerItem {
  public:
   BEGIN_MENU(VGMFile)
-      MENU_ITEM(VGMFile, OnClose, L"Close")
-      MENU_ITEM(VGMFile, OnSaveAsRaw, L"Save as original format")
-      //MENU_ITEM(VGMFile, OnSaveAllAsRaw, L"Save all as original format")
+      MENU_ITEM(VGMFile, OnClose, "Close")
+      MENU_ITEM(VGMFile, OnSaveAsRaw, "Save as original format")
+      //MENU_ITEM(VGMFile, OnSaveAllAsRaw, "Save all as original format")
   END_MENU()
 
  public:
@@ -38,7 +38,7 @@ class VGMFile:
           RawFile *theRawFile,
           uint32_t offset,
           uint32_t length = 0,
-          std::wstring theName = L"VGM File");
+          std::string theName = "VGM File");
   virtual ~VGMFile(void);
 
   virtual ItemType GetType() const { return ITEMTYPE_VGMFILE; }
@@ -46,7 +46,7 @@ class VGMFile:
 
   virtual void AddToUI(VGMItem *parent, void *UI_specific);
 
-  const std::wstring *GetName(void) const;
+  const std::string *GetName(void) const;
 
   bool OnClose();
   bool OnSaveAsRaw();
@@ -139,7 +139,7 @@ class VGMFile:
   FileType file_type;
   const std::string &format;
   uint32_t id;
-  std::wstring name;
+  std::string name;
  public:
   RawFile *rawfile;
   std::list<VGMColl *> assocColls;
@@ -155,14 +155,14 @@ class VGMFile:
 class VGMHeader:
     public VGMContainerItem {
  public:
-  VGMHeader(VGMItem *parItem, uint32_t offset = 0, uint32_t length = 0, const std::wstring &name = L"Header");
+  VGMHeader(VGMItem *parItem, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "Header");
   virtual ~VGMHeader();
 
   virtual Icon GetIcon() { return ICON_BINARY; };
 
-  void AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull, const std::wstring &name = L"Pointer");
-  void AddTempo(uint32_t offset, uint32_t length, const std::wstring &name = L"Tempo");
-  void AddSig(uint32_t offset, uint32_t length, const std::wstring &name = L"Signature");
+  void AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull, const std::string &name = "Pointer");
+  void AddTempo(uint32_t offset, uint32_t length, const std::string &name = "Tempo");
+  void AddSig(uint32_t offset, uint32_t length, const std::string &name = "Signature");
 
   //vector<VGMItem*> items;
 };
@@ -176,7 +176,7 @@ class VGMHeaderItem:
  public:
   enum HdrItemType { HIT_POINTER, HIT_TEMPO, HIT_SIG, HIT_GENERIC, HIT_UNKNOWN };        //HIT = Header Item Type
 
-  VGMHeaderItem(VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length, const std::wstring &name);
+  VGMHeaderItem(VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length, const std::string &name);
   virtual Icon GetIcon();
 
  public:

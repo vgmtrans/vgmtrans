@@ -63,7 +63,7 @@ void GraphResSnesScanner::Scan(RawFile *file, void *info) {
 
 void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
   GraphResSnesVersion version = GRAPHRESSNES_NONE;
-  std::wstring name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
 
   // search song header
   uint32_t ofsLoadSeq;
