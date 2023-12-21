@@ -58,21 +58,21 @@ std::string OpenSaveDirDialog() {
 }
 
 
-std::string OpenSaveFileDialog(const std::wstring& suggested_filename, const std::wstring& extension) {
+std::string OpenSaveFileDialog(const std::string& suggested_filename, const std::string& extension) {
   static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
   QFileDialog dialog(QApplication::activeWindow());
   dialog.setFileMode(QFileDialog::AnyFile);
-  dialog.selectFile(QString::fromStdWString(suggested_filename));
+  dialog.selectFile(QString::fromStdString(suggested_filename));
   dialog.setDirectory(selected_dir);
   dialog.setAcceptMode(QFileDialog::AcceptSave);
 
-  if (extension == L"mid") {
+  if (extension == "mid") {
     dialog.setDefaultSuffix("mid");
     dialog.setNameFilter("Standard MIDI (*.mid)");
-  } else if (extension == L"dls") {
+  } else if (extension == "dls") {
     dialog.setDefaultSuffix("dls");
     dialog.setNameFilter("Downloadable Sound (*.dls)");
-  } else if (extension == L"sf2") {
+  } else if (extension == "sf2") {
     dialog.setDefaultSuffix("sf2");
     dialog.setNameFilter("SoundFont\u00AE 2 (*.sf2)");
   } else {

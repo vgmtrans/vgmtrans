@@ -246,7 +246,7 @@ public:
       auto contextFactory = command->GetContextFactory();
       auto propSpecs = contextFactory->GetPropertySpecifications();
 
-      menu->addAction(command->Name().c_str(), [this, command, selectedFiles, propSpecs, contextFactory] {
+      menu->addAction(command->Name().c_str(), [command, selectedFiles, propSpecs, contextFactory] {
         PropertyMap propMap;
         for (const auto& propSpec : propSpecs) {
 
@@ -264,7 +264,7 @@ public:
               } else {
                 auto suggestedFileName = ConvertToSafeFileName(*(*selectedFiles)[0]->GetName());
                 auto fileExtension = get<string>(propSpec.defaultValue);
-                auto path = OpenSaveFileDialog(suggestedFileName, string2wstring(fileExtension));
+                auto path = OpenSaveFileDialog(suggestedFileName, fileExtension);
                 if (path.empty()) {
                   return;
                 }
