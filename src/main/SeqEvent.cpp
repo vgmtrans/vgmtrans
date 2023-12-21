@@ -6,8 +6,6 @@
 //  SeqEvent
 //  ********
 
-//DECLARE_MENU(SeqEvent)
-
 SeqEvent::SeqEvent(SeqTrack *pTrack,
                    uint32_t offset,
                    uint32_t length,

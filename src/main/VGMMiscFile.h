@@ -1,7 +1,6 @@
 #pragma once
 #include "common.h"
 #include "VGMFile.h"
-//#include "Menu.h"
 
 // ***********
 // VGMMiscFile

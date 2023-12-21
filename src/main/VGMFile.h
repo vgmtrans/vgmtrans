@@ -2,7 +2,6 @@
 #include "VGMItem.h"
 #include "DataSeg.h"
 #include "RawFile.h"
-#include "Menu.h"
 
 enum FmtID: unsigned int;
 class VGMColl;
@@ -10,28 +9,8 @@ class Format;
 
 enum FileType { FILETYPE_UNDEFINED, FILETYPE_SEQ, FILETYPE_INSTRSET, FILETYPE_SAMPCOLL, FILETYPE_MISC };
 
-
-// MACROS
-
-/*#define USING_FORMAT(fmt_id)									\
-	public:														\
-	virtual Format* GetFormat()									\
-	{															\
-		return pRoot->GetFormat(fmt_id);						\
-	}
-*/
-
-
-
 class VGMFile:
     public VGMContainerItem {
- public:
-  BEGIN_MENU(VGMFile)
-      MENU_ITEM(VGMFile, OnClose, "Close")
-      MENU_ITEM(VGMFile, OnSaveAsRaw, "Save as original format")
-      //MENU_ITEM(VGMFile, OnSaveAllAsRaw, "Save all as original format")
-  END_MENU()
-
  public:
   VGMFile(FileType fileType, /*FmtID fmtID,*/
           const std::string &format,

@@ -11,8 +11,6 @@
 
 using namespace std;
 
-DECLARE_MENU(VGMColl)
-
 VGMColl::VGMColl(string theName)
     : VGMItem(),
       name(theName),

@@ -5,8 +5,6 @@
 #include "VGMColl.h"
 #include "Root.h"
 
-DECLARE_MENU(VGMInstrSet)
-
 using namespace std;
 
 // ***********

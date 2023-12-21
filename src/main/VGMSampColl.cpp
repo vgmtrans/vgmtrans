@@ -10,9 +10,7 @@ using namespace std;
 // VGMSampColl
 // ***********
 
-DECLARE_MENU(VGMSampColl)
-
-VGMSampColl::VGMSampColl(const string &format, RawFile *rawfile, uint32_t offset, uint32_t length, string theName)
+VGMSampColl::VGMSampColl(const string &format, RawFile *rawfile, uint32_t offset, uint32_t length, wstring theName)
     : VGMFile(FILETYPE_SAMPCOLL, format, rawfile, offset, length, theName),
       parInstrSet(NULL),
       bLoadOnInstrSetMatch(false),
