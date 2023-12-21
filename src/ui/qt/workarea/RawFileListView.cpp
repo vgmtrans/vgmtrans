@@ -45,8 +45,7 @@ void RawFileListViewModel::AddRawFile() {
 void RawFileListViewModel::RemoveRawFile() {
   int position = static_cast<int>(qtVGMRoot.vRawFile.size());
   if (position >= 0) {
-    beginRemoveRows(QModelIndex(), position, position);
-    endRemoveRows();
+    dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
   }
 }
 
