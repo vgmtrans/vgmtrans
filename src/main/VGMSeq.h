@@ -2,7 +2,6 @@
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
-#include "Menu.h"
 
 class SeqTrack;
 class SeqEvent;
@@ -22,10 +21,6 @@ enum class PanVolumeCorrectionMode : uint8_t {
 
 class VGMSeq: public VGMFile {
  public:
-  BEGIN_MENU_SUB(VGMSeq, VGMFile)
-      MENU_ITEM(VGMSeq, OnSaveAsMidi, "Save as MIDI")
-  END_MENU()
-
   VGMSeq(const std::string &format,
          RawFile *file,
          uint32_t offset,

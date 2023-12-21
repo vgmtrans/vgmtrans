@@ -11,10 +11,6 @@ class VGMSamp;
 class VGMSampColl:
     public VGMFile {
  public:
-  BEGIN_MENU_SUB(VGMSampColl, VGMFile)
-      MENU_ITEM(VGMSampColl, OnSaveAllAsWav, "Save all as WAV")
-  END_MENU()
-
   VGMSampColl(const std::string &format, RawFile *rawfile, uint32_t offset, uint32_t length = 0,
               std::string theName = "VGMSampColl");
   VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset,

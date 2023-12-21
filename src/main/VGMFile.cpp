@@ -5,8 +5,6 @@
 #include "VGMFile.h"
 #include "Format.h"
 
-DECLARE_MENU(VGMFile)
-
 using namespace std;
 
 VGMFile::VGMFile(FileType fileType,

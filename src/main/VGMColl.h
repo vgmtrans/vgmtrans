@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common.h"
-#include "Menu.h"
+#include "VGMItem.h"
 
 class VGMSeq;
 class VGMInstrSet;
@@ -14,12 +14,6 @@ class SynthFile;
 class VGMColl
     : public VGMItem {
  public:
-  BEGIN_MENU(VGMColl)
-      MENU_ITEM(VGMColl, OnSaveAllDLS, "Save as MIDI and DLS.")
-      MENU_ITEM(VGMColl, OnSaveAllSF2, "Save as MIDI and SoundFont 2.")
-      //MENU_ITEM(VGMFile, OnSaveAllAsRaw, "Save all as original format")
-  END_MENU()
-
   VGMColl(std::string name = "Unnamed Collection");
   virtual ~VGMColl(void);
 

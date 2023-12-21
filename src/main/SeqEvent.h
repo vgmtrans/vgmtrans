@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMItem.h"
-#include "Menu.h"
 #include "MidiFile.h"
 
 #define DESCRIPTION(_str_)                                   \

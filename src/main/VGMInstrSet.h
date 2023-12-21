@@ -3,7 +3,6 @@
 #include "VGMFile.h"
 #include "DLSFile.h"
 #include "SF2File.h"
-#include "Menu.h"
 
 class VGMSampColl;
 class VGMInstr;
@@ -21,11 +20,6 @@ const float defaultReverbPercent = 0.25;
 class VGMInstrSet:
     public VGMFile {
  public:
-  BEGIN_MENU_SUB(VGMInstrSet, VGMFile)
-      MENU_ITEM(VGMInstrSet, OnSaveAsDLS, "Convert to DLS")
-      MENU_ITEM(VGMInstrSet, OnSaveAsSF2, "Convert to SoundFont 2")
-  END_MENU()
-
   VGMInstrSet(const std::string &format,
               RawFile *file,
               uint32_t offset,

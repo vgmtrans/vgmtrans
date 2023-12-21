@@ -7,9 +7,6 @@
 #include "Options.h"
 #include "Root.h"
 
-
-DECLARE_MENU(VGMSeq)
-
 using namespace std;
 
 VGMSeq::VGMSeq(const string &format, RawFile *file, uint32_t offset, uint32_t length, string name)
