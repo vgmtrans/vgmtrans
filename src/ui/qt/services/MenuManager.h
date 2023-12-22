@@ -190,7 +190,6 @@ public:
  * Given a list of objects, returns the list of Commands shared by all the instance types, as registered in the
  * MenuManager.
  * @param items The list of objects for which to find common Commands
- * @param commandManager A reference to a MenuManager
  * @return A list of commands shared by all items, ordered as they are in the first item's Command registry.
    */
   template <typename Base, typename T>
@@ -233,14 +232,19 @@ public:
   template <typename Base>
   struct has_getname<Base, decltype(std::declval<Base>().GetName(), void())> : std::true_type {};
 
+  /**
+ * Create a QMenu populated with actions for the commands common to all of the instances in the provided vector
+ * @param items The list of objects the actions of the QMenu should pertain to
+ * @return A QMenu populated with actions for the common commands, in the same order as they were registered for the first item
+   */
   template <typename Base, typename T = Base>
-  QMenu* CreateMenuForItems(shared_ptr<vector<T*>> selectedFiles) {
+  QMenu* CreateMenuForItems(shared_ptr<vector<T*>> items) {
 
     auto menu = new QMenu();
-    if (selectedFiles->empty()) {
+    if (items->empty()) {
       return nullptr;
     }
-    auto commands = FindCommonCommands<Base>(*selectedFiles);
+    auto commands = FindCommonCommands<Base>(*items);
 
     for (const auto& command : commands) {
 
@@ -253,7 +257,7 @@ public:
       auto contextFactory = command->GetContextFactory();
       auto propSpecs = contextFactory->GetPropertySpecifications();
 
-      menu->addAction(command->Name().c_str(), [command, selectedFiles, propSpecs, contextFactory] {
+      menu->addAction(command->Name().c_str(), [command, items, propSpecs, contextFactory] {
         PropertyMap propMap;
         for (const auto& propSpec : propSpecs) {
 
@@ -262,16 +266,16 @@ public:
             case PropertySpecValueType::DirPath:
               isDirPath = true;
             case PropertySpecValueType::Path:
-              if (isDirPath || selectedFiles->size() > 1) {
+              if (isDirPath || items->size() > 1) {
                 fs::path dirpath = fs::path(OpenSaveDirDialog());
                 if (dirpath.string().empty()) {
                   return;
                 }
                 propMap.insert({ propSpec.key, dirpath.generic_string() });
               } else {
-                std::string suggestedFileName = "";
+                std::string suggestedFileName;
                 if constexpr (has_getname<T>::value) {
-                  suggestedFileName = ConvertToSafeFileName(*(*selectedFiles)[0]->GetName());
+                  suggestedFileName = ConvertToSafeFileName(*(*items)[0]->GetName());
                 }
                 auto fileExtension = get<string>(propSpec.defaultValue);
                 auto path = OpenSaveFileDialog(suggestedFileName, fileExtension);
@@ -282,7 +286,7 @@ public:
               }
               break;
             case PropertySpecValueType::ItemList:
-              propMap.insert({ propSpec.key, selectedFiles });
+              propMap.insert({ propSpec.key, items });
               break;
           }
         }
