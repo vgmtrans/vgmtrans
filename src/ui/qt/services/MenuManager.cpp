@@ -43,7 +43,7 @@ template<typename T, typename Base>
 void MenuManager::RegisterCommands(const vector<shared_ptr<Command>>& commands) {
   commandsForType[typeid(T)] = commands;
 
-  if constexpr (!is_same<T, Base>::value && is_convertible<T*, Base*>::value) {
+  if constexpr (is_convertible<T*, Base*>::value) {
     auto checkFunc = [](void* base) -> bool { return dynamic_cast<T*>(static_cast<Base*>(base)) != nullptr; };
     auto typeErasedCheckFunc = static_cast<CheckFunc<void>>(checkFunc);
     commandsForCheckedType[typeid(Base)].emplace_back(typeErasedCheckFunc, commands);
