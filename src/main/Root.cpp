@@ -16,6 +16,7 @@
 #include "NDS2SFLoader.h"
 #include "NCSFLoader.h"
 #include "SPCLoader.h"
+#include "SPC2Loader.h"
 #include "RSNLoader.h"
 #include "MAMELoader.h"
 
@@ -73,6 +74,7 @@ bool VGMRoot::Init(void) {
   AddLoader<NDS2SFLoader>();
   AddLoader<NCSFLoader>();
   AddLoader<SPCLoader>();
+  AddLoader<SPC2Loader>();
   AddLoader<RSNLoader>();
   AddLoader<MAMELoader>();
 
