@@ -9,6 +9,12 @@ else()
   find_package(ZLIB)
 endif()
 
+message(INFO "Using built-in unarr")
+set(ENABLE_7Z OFF CACHE BOOL "Build with 7z support" FORCE)
+set(USE_SYSTEM_BZ2 OFF CACHE BOOL "Build with system bzip2 if possible" FORCE)
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr"
+        "${CMAKE_CURRENT_BINARY_DIR}/unarr" EXCLUDE_FROM_ALL)
+
 file(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp"
      "${PROJECT_SOURCE_DIR}/src/main/*.h")
 
@@ -19,5 +25,5 @@ target_include_directories(vgmtranscore PUBLIC . ./formats ./loaders
                                                ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC ZLIB::ZLIB minizip tinyxml ghc_filesystem
+  PUBLIC ZLIB::ZLIB unarr minizip tinyxml ghc_filesystem
   PRIVATE g_options g_warnings)
