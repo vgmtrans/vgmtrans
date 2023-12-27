@@ -12,7 +12,8 @@ endif()
 message(INFO "Using built-in unarr")
 set(ENABLE_7Z OFF CACHE BOOL "Build with 7z support" FORCE)
 set(USE_SYSTEM_BZ2 OFF CACHE BOOL "Build with system bzip2 if possible" FORCE)
-set(BUILD_SHARED_LIBS OFF "Build libunarr as a shared library" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libunarr as a shared library" FORCE)
+set(USE_SYSTEM_ZLIB OFF CACHE BOOL "Build with system zlib if possible" FORCE)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr"
         "${CMAKE_CURRENT_BINARY_DIR}/unarr" EXCLUDE_FROM_ALL)
 

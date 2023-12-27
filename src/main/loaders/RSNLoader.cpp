@@ -41,9 +41,13 @@ PostLoadCommand RSNLoader::Apply(RawFile *file) {
       pRoot->AddLogItem(new LogItem(string("Error decompressing file from rar archive:" + string(raw_filename)),
                                     LOG_LEVEL_ERR,"RSNLoader"));
       delete[] buffer;
+      ar_close_archive(ar);
+      ar_close(stream);
       return KEEP_IT;
     }
     pRoot->CreateVirtFile(buffer, size, raw_filename, "", file->tag);
   }
+  ar_close_archive(ar);
+  ar_close(stream);
   return DELETE_IT;
 }
