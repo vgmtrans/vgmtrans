@@ -26,7 +26,7 @@ VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
   if (!index.isValid()) {
-    return {};
+    return QVariant();
   }
 
   VGMFile *vgmfile = qtVGMRoot.vVGMFile.at(static_cast<unsigned long>(index.row()));
