@@ -37,7 +37,7 @@ bool VGMItem::IsItemAtOffset(uint32_t offset, bool includeContainer, bool matchS
   return GetItemFromOffset(offset, includeContainer, matchStartOffset) != nullptr;
 }
 
-VGMItem *VGMItem::GetItemFromOffset(uint32_t offset, bool /*includeContainer*/, bool matchStartOffset) {
+VGMItem *VGMItem::GetItemFromOffset(uint32_t offset, [[maybe_unused]] bool includeContainer, bool matchStartOffset) {
   if ((matchStartOffset ? offset == dwOffset : offset >= dwOffset) && (offset < dwOffset + unLength)) {
     return this;
   } else {
