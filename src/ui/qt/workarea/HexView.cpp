@@ -97,7 +97,7 @@ int HexView::getVirtualHeight() {
   return lineHeight * getTotalLines();
 }
 
-int HexView::getVirtualWidth() {
+int HexView::getVirtualWidth() const {
   const int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
                        HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
   return (numChars * charWidth) + SELECTION_PADDING;
@@ -167,7 +167,7 @@ void HexView::redrawOverlay() {
 
 bool HexView::event(QEvent *e) {
   if (e->type() == QEvent::ToolTip) {
-    QHelpEvent *helpevent = static_cast<QHelpEvent *>(e);
+    auto *helpevent = dynamic_cast<QHelpEvent *>(e);
 
     int offset = getOffsetFromPoint(helpevent->pos());
     if (offset < 0) {
@@ -193,7 +193,7 @@ void HexView::changeEvent(QEvent *event) {
     if (!scrollArea) return;
 
     scrollArea->installEventFilter(
-      new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
+      new LambdaEventFilter([this](QObject* /*obj*/, QEvent* event) -> bool {
           if (event->type() == QEvent::Resize) {
             redrawOverlay();
             // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
@@ -370,7 +370,7 @@ void HexView::paintEvent(QPaintEvent *e) {
   int endLine = (paintRect.bottom() + lineHeight - 1) / lineHeight;
 
   qreal dpr = devicePixelRatioF();
-  auto linePixmap = new QPixmap(getVirtualWidth() * dpr, lineHeight * dpr);
+  auto linePixmap = new QPixmap(static_cast<int>(getVirtualWidth() * dpr), static_cast<int>(lineHeight * dpr));
   linePixmap->setDevicePixelRatio(dpr);
   linePixmap->fill(Qt::transparent);
 
