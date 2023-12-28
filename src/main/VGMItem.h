@@ -71,7 +71,7 @@ public:
   VGMItem(VGMFile *vgmfile,
           uint32_t offset,
           uint32_t length = 0,
-          const std::string name = "",
+          std::string name = "",
           EventColor color = CLR_UNKNOWN);
 
   friend bool operator>(VGMItem &item1, VGMItem &item2);
@@ -87,20 +87,19 @@ public:
   virtual uint32_t GuessLength() { return unLength; };
   virtual void SetGuessedLength(){};
   virtual std::vector<const char* > *GetMenuItemNames() { return nullptr; }
-  virtual bool CallMenuItem(VGMItem *item, int menuItemNum) { return false; }
   virtual std::string GetDescription() { return name; }
-  virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
+  [[nodiscard]] virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
   virtual Icon GetIcon() { return ICON_BINARY; }
   virtual void AddToUI(VGMItem *parent, void *UI_specific);
   virtual bool IsContainerItem() const { return false; }
 
 protected:
   uint32_t GetBytes(uint32_t index, uint32_t count, void *buffer) const;
-  uint8_t GetByte(uint32_t offset) const;
-  uint16_t GetShort(uint32_t offset) const;
-  uint32_t GetWord(uint32_t offset) const;
-  uint16_t GetShortBE(uint32_t offset) const;
-  uint32_t GetWordBE(uint32_t offset) const;
+  [[nodiscard]] uint8_t GetByte(uint32_t offset) const;
+  [[nodiscard]] uint16_t GetShort(uint32_t offset) const;
+  [[nodiscard]] uint32_t GetWord(uint32_t offset) const;
+  [[nodiscard]] uint16_t GetShortBE(uint32_t offset) const;
+  [[nodiscard]] uint32_t GetWordBE(uint32_t offset) const;
   bool IsValidOffset(uint32_t offset) const;
 
 public:
@@ -121,7 +120,7 @@ public:
   VGMContainerItem(VGMFile *vgmfile,
                    uint32_t offset,
                    uint32_t length = 0,
-                   const std::string name = "",
+                   const std::string& name = "",
                    EventColor color = CLR_HEADER);
   virtual ~VGMContainerItem();
 

@@ -20,7 +20,7 @@ public:
   explicit HexView(VGMFile* vgmfile, QWidget *parent = nullptr);
   void setSelectedItem(VGMItem* item);
   void setFont(QFont& font);
-  int getVirtualWidth();
+  int getVirtualWidth() const;
 
 protected:
   bool event(QEvent *event) override;
@@ -32,7 +32,7 @@ protected:
   void mousePressEvent(QMouseEvent *event) override;
   void mouseMoveEvent(QMouseEvent *event) override;
   void mouseReleaseEvent(QMouseEvent *event) override;
-  void mouseDoubleClickEvent(QMouseEvent* event);
+  void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
   int getVirtualHeight();

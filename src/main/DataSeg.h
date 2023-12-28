@@ -9,10 +9,10 @@
 
 class DataSeg {
  public:
-  DataSeg(void);
-  ~DataSeg(void);
+  DataSeg();
+  ~DataSeg();
 
-  inline uint8_t &operator[](uint32_t offset) {
+  inline uint8_t &operator[](uint32_t offset) const {
     assert(offset >= startOff && (offset < (startOff + size)));
     return data[offset - startOff];
   }
@@ -24,38 +24,45 @@ class DataSeg {
   void clear();
 
 
-  inline void GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
+  inline void GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
     assert((nIndex >= startOff) && (nIndex + nCount <= endOff));
     memcpy(pBuffer, data + nIndex - startOff, nCount);
   }
 
-  inline uint8_t GetByte(uint32_t nIndex) {
+  [[nodiscard]] inline uint8_t GetByte(uint32_t nIndex) const {
     assert((nIndex >= startOff) && (nIndex + 1 <= endOff));
     return data[nIndex - startOff];
   }
 
-  inline uint16_t GetShort(uint32_t nIndex) {
+  [[nodiscard]] inline uint16_t GetShort(uint32_t nIndex) const {
     assert((nIndex >= startOff) && (nIndex + 2 <= endOff));
-    return *((uint16_t *) (data + nIndex - startOff));
+    return static_cast<uint16_t>(data[nIndex - startOff])
+           | static_cast<uint16_t>(data[nIndex + 1 - startOff]) << 8;
   }
 
-  inline uint32_t GetWord(uint32_t nIndex) {
+  [[nodiscard]] inline uint32_t GetWord(uint32_t nIndex) const {
     assert((nIndex >= startOff) && (nIndex + 4 <= endOff));
-    return *((uint32_t *) (data + nIndex - startOff));
+    return static_cast<uint32_t>(data[nIndex - startOff])
+           | static_cast<uint32_t>(data[nIndex + 1 - startOff]) << 8
+           | static_cast<uint32_t>(data[nIndex + 2 - startOff]) << 16
+           | static_cast<uint32_t>(data[nIndex + 3 - startOff]) << 24;
   }
 
-  inline uint16_t GetShortBE(uint32_t nIndex) {
+  [[nodiscard]] inline uint16_t GetShortBE(uint32_t nIndex) const {
     assert((nIndex >= startOff) && (nIndex + 2 <= endOff));
-    return ((uint8_t) (data[nIndex - startOff]) << 8) + ((uint8_t) data[nIndex + 1 - startOff]);
+    return (static_cast<uint16_t>(data[nIndex - startOff]) << 8)
+           + static_cast<uint16_t>(data[nIndex + 1 - startOff]);
   }
 
-  inline uint32_t GetWordBE(uint32_t nIndex) {
+  [[nodiscard]] inline uint32_t GetWordBE(uint32_t nIndex) const {
     assert((nIndex >= startOff) && (nIndex + 4 <= endOff));
-    return ((uint8_t) data[nIndex - startOff] << 24) + ((uint8_t) data[nIndex + 1 - startOff] << 16)
-        + ((uint8_t) data[nIndex + 2 - startOff] << 8) + (uint8_t) data[nIndex + 3 - startOff];
+    return (static_cast<uint32_t>(data[nIndex - startOff]) << 24)
+           + (static_cast<uint32_t>(data[nIndex + 1 - startOff]) << 16)
+           + (static_cast<uint32_t>(data[nIndex + 2 - startOff]) << 8)
+           + static_cast<uint32_t>(data[nIndex + 3 - startOff]);
   }
 
-  inline bool IsValidOffset(uint32_t nIndex) {
+  [[nodiscard]] inline bool IsValidOffset(uint32_t nIndex) const {
     return (nIndex >= startOff && nIndex < endOff);
   }
 
