@@ -193,7 +193,7 @@ void HexView::changeEvent(QEvent *event) {
     if (!scrollArea) return;
 
     scrollArea->installEventFilter(
-      new LambdaEventFilter([this](QObject* /*obj*/, QEvent* event) -> bool {
+      new LambdaEventFilter([this]([[maybe_unused]] QObject* obj, QEvent* event) -> bool {
           if (event->type() == QEvent::Resize) {
             redrawOverlay();
             // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
