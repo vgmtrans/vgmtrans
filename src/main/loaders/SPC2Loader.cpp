@@ -34,7 +34,7 @@ PostLoadCommand SPC2Loader::Apply(RawFile *file) {
   file->GetBytes(0, HEADER_SIZE, header);
 
   // Check for header signature. Support major revision 1.
-  if (memcmp(header, "KSPC\x01", 5) != 0) {
+  if (memcmp(header, "KSPC\x1A\x01", 6) != 0) {
     return KEEP_IT;
   }
 
