@@ -87,10 +87,14 @@ void QtVGMRoot::UI_RemoveVGMColl(VGMColl*) {
 }
 
 void QtVGMRoot::UI_BeginRemoveVGMFiles() {
+  if (rawFileLoadRecurseStack > 0)
+    return;
   this->UI_BeganRemovingVGMFiles();
 }
 
 void QtVGMRoot::UI_EndRemoveVGMFiles() {
+  if (rawFileLoadRecurseStack > 0)
+    return;
   this->UI_EndedRemovingVGMFiles();
 }
 
