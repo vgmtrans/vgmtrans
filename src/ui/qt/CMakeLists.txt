@@ -1,6 +1,20 @@
 # ~~~
 # Dependencies
 # ~~~
+include(ExternalProject)
+
+set(JUICYSF_DIR "${PROJECT_SOURCE_DIR}/external/juicysfplugin")
+set(JUICYSF_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/juicysfplugin")
+
+ExternalProject_Add(juicysfplugin
+        SOURCE_DIR "${JUICYSF_DIR}"
+        BINARY_DIR ${JUICYSF_BUILD_DIR}
+        CMAKE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                   -DCMAKE_GENERATOR=${CMAKE_GENERATOR}
+        BUILD_COMMAND ${CMAKE_COMMAND} --build . --target juicysfplugin_VST3 --parallel
+        INSTALL_COMMAND "")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/juicysfplugin/external/JUCE"
         "${CMAKE_CURRENT_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
@@ -109,6 +123,8 @@ add_executable(
   playback/PendingCalls.cpp
   playback/PendingCalls.h)
 
+add_dependencies(vgmtrans juicysfplugin)
+
 target_include_directories(vgmtrans PRIVATE
         .
         ./util
@@ -164,17 +180,18 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
                               PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/bin"
-            "${BUNDLE_PATH}/Contents/Resources")
+  add_custom_command(TARGET vgmtrans
+          POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                  "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
+                  "${BUNDLE_PATH}/Contents/Resources")
 
   add_custom_command(TARGET vgmtrans
           POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${CMAKE_SOURCE_DIR}/bin/vst"
-          "${BUNDLE_PATH}/Contents/Resources/vst")
+          COMMAND ${CMAKE_COMMAND} -E make_directory "${BUNDLE_PATH}/Contents/Resources/vst" &&
+                  ${CMAKE_COMMAND} -E copy_directory
+                  "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
+                  "${BUNDLE_PATH}/Contents/Resources/vst/juicysfplugin.vst3")
 
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   # Make sure the executable ends up in the binary directory without any
