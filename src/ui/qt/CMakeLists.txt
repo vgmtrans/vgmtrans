@@ -5,6 +5,24 @@ find_package(Qt6 COMPONENTS GuiPrivate QUIET)
 message(STATUS "Using Qt: ${Qt6_VERSION}")
 message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 
+# ~~~
+# Dependencies
+# ~~~
+include(ExternalProject)
+
+set(JUICYSF_DIR "${PROJECT_SOURCE_DIR}/external/juicysfplugin")
+set(JUICYSF_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/juicysfplugin")
+
+ExternalProject_Add(juicysfplugin
+        SOURCE_DIR "${JUICYSF_DIR}"
+        BINARY_DIR ${JUICYSF_BUILD_DIR}
+        CMAKE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                   -DCMAKE_GENERATOR=${CMAKE_GENERATOR}
+        BUILD_COMMAND ${CMAKE_COMMAND} --build . --target juicysfplugin_VST3 --parallel
+        INSTALL_COMMAND "")
+
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/juicysfplugin/external/JUCE"
         "${CMAKE_CURRENT_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
 
@@ -162,6 +180,8 @@ target_sources(vgmtrans
       playback/NewSequencePlayer.h
       playback/PendingCalls.h
 )
+
+add_dependencies(vgmtrans juicysfplugin)
 
 if(APPLE)
   target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
@@ -322,9 +342,11 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 
   add_custom_command(TARGET vgmtrans
           POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${CMAKE_SOURCE_DIR}/bin/vst"
-          "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst")
+          COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst" &&
+                  ${CMAKE_COMMAND} -E copy_directory
+                  "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
+                  "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst/juicysfplugin.vst3")
+
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   target_sources(vgmtrans
                  PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
