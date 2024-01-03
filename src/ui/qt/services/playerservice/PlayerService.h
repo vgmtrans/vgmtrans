@@ -8,23 +8,23 @@
 
 #include <QObject>
 #include <QTimer>
-#include "playback/NewSequencePlayer.h"
+#include "VSTSequencePlayer.h"
 
 class VGMColl;
 
-class SequencePlayer : public QObject {
+class PlayerService : public QObject {
   Q_OBJECT
 public:
   // Use the JUCE Singleton helpers as JUCE leak detection runs before static deconstructors and would therefore find
   // false positive memory leaks otherwise
-  JUCE_DECLARE_SINGLETON(SequencePlayer, false )
+  JUCE_DECLARE_SINGLETON(PlayerService, false )
 
-  SequencePlayer(const SequencePlayer &) = delete;
-  SequencePlayer &operator=(const SequencePlayer &) = delete;
-  SequencePlayer(SequencePlayer &&) = delete;
-  SequencePlayer &operator=(SequencePlayer &&) = delete;
+  PlayerService(const PlayerService &) = delete;
+  PlayerService &operator=(const PlayerService &) = delete;
+  PlayerService(PlayerService &&) = delete;
+  PlayerService &operator=(PlayerService &&) = delete;
 
-  ~SequencePlayer();
+  ~PlayerService();
 
   /**
    * Toggles the status of the player
@@ -77,9 +77,9 @@ signals:
 
 
 private:
-  SequencePlayer();
+  PlayerService();
 
-  NewSequencePlayer player;
+  VSTSequencePlayer player;
 
   VGMColl *m_active_vgmcoll{};
 
