@@ -253,6 +253,12 @@ endif()
 # ~~~
 # Install & package
 # ~~~
+<<<<<<< HEAD
+=======
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
+  set(RESOURCE_PATH "$<TARGET_FILE_DIR:vgmtrans>/../Resources")
+>>>>>>> d57967d8 (consolidate CMake logic for copying app resources)
 
 set(BUNDLE_CHANGELOG_FILE "")
 set(METAINFO_RELEASE_DESCRIPTION_XML "")
@@ -304,6 +310,7 @@ if(INSTALL_CHANGELOG)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  set(RESOURCE_PATH "$<TARGET_FILE_DIR:vgmtrans>/../Resources")
   set_target_properties(
     vgmtrans
     PROPERTIES MACOSX_BUNDLE true
@@ -325,17 +332,15 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
       INSTALL_RPATH "@executable_path/../Frameworks"
       INSTALL_RPATH_USE_LINK_PATH TRUE
   )
-  add_custom_command(TARGET vgmtrans
-          POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                  "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
-                  "$<TARGET_FILE_DIR:vgmtrans>/../Resources" &&
-                  ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst" &&
-                  ${CMAKE_COMMAND} -E copy_directory
-                  "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
-                  "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst/juicysfplugin.vst3")
 
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
+  # Make sure the executable ends up in the binary directory without any
+  # additional folders
+  set(RESOURCE_PATH "$<TARGET_FILE_DIR:vgmtrans>")
+
+  set_target_properties(
+    vgmtrans PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<$<CONFIG:Debug>:>")
   target_sources(vgmtrans
                  PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
                  
@@ -349,17 +354,8 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       --no-opengl-sw
       --skip-plugin-types tls
   )
-
-  add_custom_command(TARGET vgmtrans
-          POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
-          "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" &&
-          ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vst" &&
-          ${CMAKE_COMMAND} -E copy_directory
-          "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
-          "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vst/juicysfplugin.vst3")
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
+  set(RESOURCE_PATH "$<TARGET_FILE_DIR:vgmtrans>")
   set(APP_ID "io.github.vgmtrans.vgmtrans")
 
   set_target_properties(vgmtrans PROPERTIES
@@ -403,6 +399,16 @@ if (NOT NO_QT_DEPLOY)
   )
   install(SCRIPT ${deploy_script})
 endif()
+
+add_custom_command(TARGET vgmtrans
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
+        "${RESOURCE_PATH}" &&
+        ${CMAKE_COMMAND} -E make_directory "${RESOURCE_PATH}/vst" &&
+        ${CMAKE_COMMAND} -E copy_directory
+        "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
+        "${RESOURCE_PATH}/vst/juicysfplugin.vst3")
 
 # ~~~
 # CPack Setup
