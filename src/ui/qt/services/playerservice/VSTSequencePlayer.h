@@ -41,10 +41,10 @@ struct SeekChannelState {
   std::map<uint8_t, MidiEvent*> noteAfterTouch;
 };
 
-class NewSequencePlayer : public QObject, public juce::AudioIODeviceCallback {
+class VSTSequencePlayer : public QObject, public juce::AudioIODeviceCallback {
 public:
-  NewSequencePlayer();
-  ~NewSequencePlayer();
+  VSTSequencePlayer();
+  ~VSTSequencePlayer();
 
   void initialize();
 

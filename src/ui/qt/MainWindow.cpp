@@ -14,9 +14,9 @@
 #include "MenuBar.h"
 #include "PlaybackControls.h"
 #include "QtVGMRoot.h"
-#include "SequencePlayer.h"
 #include "services/commands/StitchCommands.h"
 #include "services/NotificationCenter.h"
+#include "services/playerservice/PlayerService.h"
 #include "services/Settings.h"
 #include "StatusBarContent.h"
 #include "TitleBar.h"
@@ -436,8 +436,8 @@ void MainWindow::routeSignals() {
           &PlaybackControls::showPlayInfo);
   connect(m_playback_controls, &PlaybackControls::stopPressed, m_coll_listview,
           &VGMCollListView::handleStopRequest);
-  connect(m_playback_controls, &PlaybackControls::seekingTo, SequencePlayer::getInstance(),
-          &SequencePlayer::seek);
+  connect(m_playback_controls, &PlaybackControls::seekingTo, PlayerService::getInstance(),
+          &PlayerService::seek);
   connect(&qtVGMRoot, &QtVGMRoot::UI_toastRequested, this, &MainWindow::showToast);
 
   auto *playShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);

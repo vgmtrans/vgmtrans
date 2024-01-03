@@ -8,8 +8,8 @@
 
 #include "ColorHelpers.h"
 #include "SeekBar.h"
-#include "SequencePlayer.h"
 #include "services/NotificationCenter.h"
+#include "services/playerservice/PlayerService.h"
 #include "UIHelpers.h"
 
 #include <QEvent>
@@ -106,14 +106,14 @@ void PlaybackControls::setupControls() {
   connect(NotificationCenter::the(), &NotificationCenter::vgmCollSelected, this,
           [this](VGMColl *coll, QWidget *) {
             m_hasSelectedCollection = coll != nullptr;
-            playerStatusChanged(SequencePlayer::getInstance()->playing());
+            playerStatusChanged(PlayerService::getInstance()->playing());
           });
-  connect(SequencePlayer::getInstance(), &SequencePlayer::statusChange, this,
+  connect(PlayerService::getInstance(), &PlayerService::statusChange, this,
           &PlaybackControls::playerStatusChanged);
-  connect(SequencePlayer::getInstance(), &SequencePlayer::playbackPositionChanged, this,
+  connect(PlayerService::getInstance(), &PlayerService::playbackPositionChanged, this,
           &PlaybackControls::playbackRangeUpdate);
   updateSeekBarVisibility();
-  playerStatusChanged(SequencePlayer::getInstance()->playing());
+  playerStatusChanged(PlayerService::getInstance()->playing());
 }
 
 void PlaybackControls::showPlayInfo() {
@@ -127,7 +127,7 @@ void PlaybackControls::changeEvent(QEvent *event) {
     const QString buttonStyle = toolBarButtonStyle(palette());
     m_play->setStyleSheet(buttonStyle);
     m_stop->setStyleSheet(buttonStyle);
-    playerStatusChanged(SequencePlayer::getInstance()->playing());
+    playerStatusChanged(PlayerService::getInstance()->playing());
   }
 }
 
@@ -164,7 +164,7 @@ void PlaybackControls::playbackRangeUpdate(int cur, int max, PositionChangeOrigi
 
 void PlaybackControls::playerStatusChanged(bool playing) {
   m_skipNextPlaybackSliderUpdate = false;
-  const bool hasActive = SequencePlayer::getInstance()->activeCollection() != nullptr;
+  const bool hasActive = PlayerService::getInstance()->activeCollection() != nullptr;
   const bool canPlay = m_hasSelectedCollection || hasActive;
 
   m_play->setEnabled(canPlay);

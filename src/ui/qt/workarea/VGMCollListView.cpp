@@ -7,9 +7,9 @@
 #include "VGMCollListView.h"
 
 #include "QtVGMRoot.h"
-#include "SequencePlayer.h"
 #include "services/MenuManager.h"
 #include "services/NotificationCenter.h"
+#include "services/playerservice/PlayerService.h"
 #include "util/Colors.h"
 #include "util/UIHelpers.h"
 #include <VGMColl.h>
@@ -144,7 +144,7 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, endResettingModel);
   connect(NotificationCenter::the(), &NotificationCenter::stitchPlanCollectionsChanged, this,
           &VGMCollListViewModel::setStitchPlanCollections);
-    connect(SequencePlayer::getInstance(), &SequencePlayer::statusChange, this,
+    connect(PlayerService::getInstance(), &PlayerService::statusChange, this,
       [this](bool) { refreshDecorationIcons(); });
 }
 
@@ -163,7 +163,7 @@ QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
   if (role == Qt::DisplayRole || role == Qt::EditRole) {
     return QString::fromStdString(coll->name());
   } else if (role == Qt::DecorationRole) {
-    const auto *player = SequencePlayer::getInstance();
+    const auto *player = PlayerService::getInstance();
     if (player->playing() && player->activeCollection() == coll) {
       return VGMPlayingCollIcon();
     }
@@ -511,8 +511,8 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
   if (list.empty() || !indexIsVisible(list[0]) || list[0].row() >= model()->rowCount()) {
-    if (SequencePlayer::getInstance()->activeCollection() != nullptr) {
-      SequencePlayer::getInstance()->toggle();
+    if (PlayerService::getInstance()->activeCollection() != nullptr) {
+      PlayerService::getInstance()->toggle();
       return;
     }
     nothingToPlay();
@@ -520,11 +520,11 @@ void VGMCollListView::handlePlaybackRequest() {
   }
 
   VGMColl *coll = qtVGMRoot.vgmColls()[list[0].row()];
-  SequencePlayer::getInstance()->playCollection(coll);
+  PlayerService::getInstance()->playCollection(coll);
 }
 
 void VGMCollListView::handleStopRequest() {
-  SequencePlayer::getInstance()->stop();
+  PlayerService::getInstance()->stop();
 }
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

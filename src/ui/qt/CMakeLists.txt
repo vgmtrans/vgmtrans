@@ -51,9 +51,10 @@ target_sources(vgmtrans
     MenuBar.cpp
     QtVGMRoot.cpp
     ReportDialog.cpp
-    SequencePlayer.cpp
     main_ui.cpp
     services/MenuManager.cpp
+    services/playerservice/PlayerService.cpp
+    services/playerservice/VSTSequencePlayer.cpp
     services/Settings.cpp
     services/NotificationCenter.cpp
     services/commands/StitchCommands.cpp
@@ -86,10 +87,6 @@ target_sources(vgmtrans
     workarea/VGMFileTreeView.cpp
     workarea/VGMFileView.cpp
     workarea/VGMFileListView.cpp
-    playback/InstrClient.cpp
-    playback/InstrServerMessage.cpp
-    playback/NewSequencePlayer.cpp
-    playback/PendingCalls.cpp
 
   PRIVATE
     FILE_SET HEADERS TYPE HEADERS
@@ -103,8 +100,9 @@ target_sources(vgmtrans
       MenuBar.h
       QtVGMRoot.h
       ReportDialog.h
-      SequencePlayer.h
       services/MenuManager.h
+      services/playerservice/PlayerService.h
+      services/playerservice/VSTSequencePlayer.h
       services/NotificationCenter.h
       services/Settings.h
       services/commands/Command.h
@@ -158,13 +156,6 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiRenderer.h
       workarea/hexview/HexViewRhiWidget.h
       workarea/hexview/HexViewRhiWindow.h
-  PRIVATE
-    FILE_SET headers_playback TYPE HEADERS BASE_DIRS playback
-    FILES
-      playback/InstrClient.h
-      playback/InstrServerMessage.h
-      playback/NewSequencePlayer.h
-      playback/PendingCalls.h
 )
 
 add_dependencies(vgmtrans juicysfplugin_VST3)
@@ -201,7 +192,8 @@ target_link_libraries(
           Qt6::GuiPrivate
           Qt6::Svg
           juce::juce_audio_utils
-          juce::juce_audio_processors)
+          juce::juce_audio_processors
+          juicysfplugin_network)
 
 if(Qt6DBus_FOUND)
   target_link_libraries(vgmtrans PRIVATE Qt6::DBus)
@@ -253,12 +245,6 @@ endif()
 # ~~~
 # Install & package
 # ~~~
-<<<<<<< HEAD
-=======
-if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
-  set(RESOURCE_PATH "$<TARGET_FILE_DIR:vgmtrans>/../Resources")
->>>>>>> d57967d8 (consolidate CMake logic for copying app resources)
 
 set(BUNDLE_CHANGELOG_FILE "")
 set(METAINFO_RELEASE_DESCRIPTION_XML "")

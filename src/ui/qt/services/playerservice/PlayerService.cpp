@@ -4,7 +4,10 @@
  * See the included LICENSE for more information
  */
 
-#include "SequencePlayer.h"
+#include "PlayerService.h"
+
+#include <algorithm>
+#include <cstddef>
 
 #include "LogManager.h"
 #include "QtVGMRoot.h"
@@ -16,9 +19,9 @@
 /* How often (in ms) the current ticks are polled */
 static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
 
-JUCE_IMPLEMENT_SINGLETON (SequencePlayer)
+JUCE_IMPLEMENT_SINGLETON (PlayerService)
 
-SequencePlayer::SequencePlayer() {
+PlayerService::PlayerService() {
   player.initialize();
 
   m_seekupdate_timer = new QTimer(this);
@@ -37,11 +40,11 @@ SequencePlayer::SequencePlayer() {
   });
 }
 
-SequencePlayer::~SequencePlayer() {
+PlayerService::~PlayerService() {
   clearSingletonInstance();
 }
 
-void SequencePlayer::toggle() {
+void PlayerService::toggle() {
   if (playing()) {
     player.pause();
     m_seekupdate_timer->stop();
@@ -54,7 +57,7 @@ void SequencePlayer::toggle() {
   statusChange(status);
 }
 
-void SequencePlayer::stop() {
+void PlayerService::stop() {
   /* Stop polling seekbar, reset it, propagate that we're done */
   playbackPositionChanged(0, 1, PositionChangeOrigin::Playback);
 
@@ -66,29 +69,29 @@ void SequencePlayer::stop() {
   statusChange(false);
 }
 
-void SequencePlayer::seek(int position, PositionChangeOrigin origin) {
+void PlayerService::seek(int position, PositionChangeOrigin origin) {
   player.seek(position);
   //  playbackPositionChanged(position, totalTicks(), origin);
   playbackPositionChanged(position, totalSamples(), origin);
 }
 
-bool SequencePlayer::playing() const {
+bool PlayerService::playing() const {
   return player.isPlaying();
 }
 
-int SequencePlayer::elapsedSamples() const {
+int PlayerService::elapsedSamples() const {
   return static_cast<int>(player.elapsedSamples());
 }
 
-int SequencePlayer::totalSamples() const {
+int PlayerService::totalSamples() const {
     return static_cast<int>(player.totalSamples());
 }
 
-QString SequencePlayer::songTitle() const {
+QString PlayerService::songTitle() const {
   return m_song_title;
 }
 
-bool SequencePlayer::playCollection(const VGMColl *coll) {
+bool PlayerService::playCollection(const VGMColl *coll) {
   if (coll == m_active_vgmcoll) {
     toggle();
     return false;
@@ -97,7 +100,7 @@ bool SequencePlayer::playCollection(const VGMColl *coll) {
   return loadCollection(coll, true);
 }
 
-bool SequencePlayer::setActiveCollection(const VGMColl *coll) {
+bool PlayerService::setActiveCollection(const VGMColl *coll) {
   if (coll == m_active_vgmcoll) {
     return false;
   }
@@ -106,7 +109,7 @@ bool SequencePlayer::setActiveCollection(const VGMColl *coll) {
   return loadCollection(coll, wasPlaying);
 }
 
-bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
+bool PlayerService::loadCollection(const VGMColl *coll, bool startPlaying) {
 
   VGMSeq *seq = coll->seq();
   if (!seq) {
@@ -143,6 +146,6 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
   return true;
 }
 
-const VGMColl* SequencePlayer::activeCollection() const {
+const VGMColl* PlayerService::activeCollection() const {
   return m_active_vgmcoll;
 }
