@@ -1,19 +1,18 @@
-#include "NewSequencePlayer.h"
+#include "VSTSequencePlayer.h"
 #include "Root.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
 #include "SF2File.h"
 #include "InstrClient.h"
 #include "InstrServerMessage.h"
-//#include "../../../external/juicysfplugin/src/InstrServerMessage.h"
 
 using namespace std;
 
 #define MAX_CHANNELS 48
 
-NewSequencePlayer::NewSequencePlayer() = default;
+VSTSequencePlayer::VSTSequencePlayer() = default;
 
-NewSequencePlayer::~NewSequencePlayer() {
+VSTSequencePlayer::~VSTSequencePlayer() {
   if (client && client->isConnected()) {
     client->disconnect();
   }
@@ -23,11 +22,11 @@ NewSequencePlayer::~NewSequencePlayer() {
   pluginInstance = nullptr;
 }
 
-void NewSequencePlayer::initialize() {
+void VSTSequencePlayer::initialize() {
   juce::String error = deviceManager.initialiseWithDefaultDevices(0, 2);
 }
 
-bool NewSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> const& onCompletion) {
+bool VSTSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> const& onCompletion) {
 
   // If we haven't loaded the VST yet, do it now.
   if (! pluginInstance) {
@@ -50,7 +49,7 @@ bool NewSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> cons
   return true;
 }
 
-void NewSequencePlayer::callAsyncIfNotInMessageThread(std::function<void()> fn) {
+void VSTSequencePlayer::callAsyncIfNotInMessageThread(std::function<void()> fn) {
   auto mm = juce::MessageManager::getInstance();
   auto inMessageThread = mm->isThisTheMessageThread();
   if (! inMessageThread) {
@@ -64,7 +63,7 @@ void NewSequencePlayer::callAsyncIfNotInMessageThread(std::function<void()> fn) 
 // deviceManager calls execute outside the "Messaging Thread", and MessageManager::callAsync ensures
 // that the block is run on the Messaging Thread. These methods may be invoked in the callback after
 // an SF2 is loaded, which runs on a separate, thread, hence the need.
-void NewSequencePlayer::stop() {
+void VSTSequencePlayer::stop() {
   state.musicState = MusicState::Stopped;
   callAsyncIfNotInMessageThread([this](){
     deviceManager.removeAudioCallback(this);
@@ -73,14 +72,14 @@ void NewSequencePlayer::stop() {
   state.samplesOffset = 0;
 }
 
-void NewSequencePlayer::pause() {
+void VSTSequencePlayer::pause() {
   state.musicState = MusicState::Paused;
   callAsyncIfNotInMessageThread([this](){
     deviceManager.removeAudioCallback(this);
   });
 }
 
-void NewSequencePlayer::play() {
+void VSTSequencePlayer::play() {
   callAsyncIfNotInMessageThread([this](){
     deviceManager.removeAudioCallback(this);
     deviceManager.addAudioCallback(this);
@@ -88,7 +87,7 @@ void NewSequencePlayer::play() {
   state.musicState = MusicState::Playing;
 }
 
-void NewSequencePlayer::seek(int samples) {
+void VSTSequencePlayer::seek(int samples) {
   // Remember original music state and pause playback while we're processing the seek
   MusicState originalMusicState = state.musicState;
   state.musicState = MusicState::Paused;
@@ -185,16 +184,16 @@ void NewSequencePlayer::seek(int samples) {
   state.musicState = originalMusicState;
 }
 
-void NewSequencePlayer::setSongEndCallback(std::function<void()> callback) {
+void VSTSequencePlayer::setSongEndCallback(std::function<void()> callback) {
   songEndCallback = callback;
 }
 
-void NewSequencePlayer::enqueueResetEvent() {
+void VSTSequencePlayer::enqueueResetEvent() {
   juce::MidiMessage resetEvent(0xF0, 0x7D, 0x7F, 0xF7);
   seekMidiBuffer.addEvent(resetEvent, 0);
 }
 
-juce::FileSearchPath NewSequencePlayer::getVSTSearchPath() {
+juce::FileSearchPath VSTSequencePlayer::getVSTSearchPath() {
   #if defined(Q_OS_MAC)
     juce::File appBundle = juce::File::getSpecialLocation(juce::File::currentApplicationFile);
     juce::File resourcesDir = appBundle.getChildFile("Contents/Resources");
@@ -207,7 +206,7 @@ juce::FileSearchPath NewSequencePlayer::getVSTSearchPath() {
   return vstDir;
 }
 
-bool NewSequencePlayer::loadVST() {
+bool VSTSequencePlayer::loadVST() {
   juce::String error;
 
   // Initialise the plugin format manager
@@ -253,7 +252,7 @@ bool NewSequencePlayer::loadVST() {
   return true;
 }
 
-bool NewSequencePlayer::sendSF2ToVST(VGMColl* coll) {
+bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
   client = make_unique<InstrClient>();
 
   juce::String hostname("127.0.0.1");
@@ -277,7 +276,7 @@ bool NewSequencePlayer::sendSF2ToVST(VGMColl* coll) {
   return true;
 }
 
-void NewSequencePlayer::clearState() {
+void VSTSequencePlayer::clearState() {
   state.events.clear();
   state.eventSampleOffsets.clear();
   state.eventOffset = 0;
@@ -285,7 +284,7 @@ void NewSequencePlayer::clearState() {
   state.sampleRate = deviceManager.getCurrentAudioDevice()->getCurrentSampleRate();
 }
 
-bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
+bool VSTSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   clearState();
 
   // Convert the VGMSeq to midi, then allocate a vector to hold every midi event in the sequence
@@ -331,7 +330,7 @@ bool NewSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   return true;
 }
 
-std::vector<int> NewSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>& events, int ppqn) const {
+std::vector<int> VSTSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>& events, int ppqn) const {
 
   // Set the default milliseconds per tick, derived from the midi file's PPQN - pulses (ticks) per
   // quarter and the default starting tempo of 120bpm.
@@ -367,7 +366,7 @@ std::vector<int> NewSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>&
   return realTimeEventOffsets;
 }
 
-juce::MidiMessage NewSequencePlayer::convertToChannelGroupMessage(MidiEvent* event) const {
+juce::MidiMessage VSTSequencePlayer::convertToChannelGroupMessage(MidiEvent* event) const {
   vector<uint8_t> eventData;
   event->WriteEvent(eventData, event->AbsTime);
   // Remove the delta time byte (which should be 0x00)
@@ -381,14 +380,14 @@ juce::MidiMessage NewSequencePlayer::convertToChannelGroupMessage(MidiEvent* eve
   return juce::MidiMessage(eventData.data(), eventData.size(), 0);
 }
 
-juce::MidiMessage NewSequencePlayer::convertToJuceMidiMessage(MidiEvent* event) const {
+juce::MidiMessage VSTSequencePlayer::convertToJuceMidiMessage(MidiEvent* event) const {
   vector<uint8_t> eventData;
   event->WriteEvent(eventData, event->AbsTime);
   return juce::MidiMessage(eventData.data()+1, eventData.size()-1, 0);
 }
 
 // Fill up a JUCE MidiBuffer for a specified duration of playback
-void NewSequencePlayer::populateMidiBuffer(juce::MidiBuffer& midiBuffer, int samples) {
+void VSTSequencePlayer::populateMidiBuffer(juce::MidiBuffer& midiBuffer, int samples) {
   while (
       (state.eventOffset < state.eventSampleOffsets.size()) &&
       (state.eventSampleOffsets[state.eventOffset] < (state.samplesOffset + samples))
@@ -431,7 +430,7 @@ void NewSequencePlayer::populateMidiBuffer(juce::MidiBuffer& midiBuffer, int sam
 //  }
 }
 
-void NewSequencePlayer::audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
+void VSTSequencePlayer::audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
                                                          int numInputChannels,
                                                          float* const* outputChannelData,
                                                          int numOutputChannels,
@@ -472,12 +471,12 @@ void NewSequencePlayer::audioDeviceIOCallbackWithContext (const float* const* in
   state.samplesOffset += numSamples;
 }
 
-void NewSequencePlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)
+void VSTSequencePlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)
 {
   pluginPlayer.audioDeviceAboutToStart(device);
 }
 
-void NewSequencePlayer::audioDeviceStopped()
+void VSTSequencePlayer::audioDeviceStopped()
 {
   pluginPlayer.audioDeviceStopped();
 }
