@@ -13,10 +13,7 @@
 [submodule "lib/fmt"]
 	path = lib/fmt
 	url = https://github.com/fmtlib/fmt.git
-[submodule "external/JUCE"]
-	path = external/JUCE
-	url = https://github.com/juce-framework/JUCE.git
-[submodule "external/juicysfplugin"]
-	path = external/juicysfplugin
+[submodule "lib/juicysfplugin"]
+	path = lib/juicysfplugin
 	url = https://github.com/mikelow/juicysfplugin.git
-    branch = cmake
+	branch = cmake
