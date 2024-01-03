@@ -10,7 +10,7 @@ message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 # ~~~
 
 set(JUICYSF_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/juicysfplugin")
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/juicysfplugin" ${JUICYSF_BUILD_DIR} EXCLUDE_FROM_ALL)
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/juicysfplugin" ${JUICYSF_BUILD_DIR} EXCLUDE_FROM_ALL)
 
 if(NOT TARGET QWindowKit::Widgets)
   set(QWINDOWKIT_BUILD_STATIC ON CACHE BOOL "" FORCE)
@@ -180,7 +180,7 @@ target_include_directories(vgmtrans PRIVATE
         ./util
         ./widgets
         ./workarea
-        "${PROJECT_SOURCE_DIR}/external/juicysfplugin/src")
+        "${PROJECT_SOURCE_DIR}/lib/juicysfplugin/src")
 
 set_target_properties(juce_recommended_config_flags PROPERTIES
         INTERFACE_COMPILE_DEFINITIONS
