@@ -57,9 +57,11 @@ add_executable(
   MenuBar.h
   QtVGMRoot.cpp
   QtVGMRoot.h
-  SequencePlayer.cpp
-  SequencePlayer.h
   main_ui.cpp
+  services/playerservice/PlayerService.cpp
+  services/playerservice/PlayerService.h
+  services/playerservice/VSTSequencePlayer.cpp
+  services/playerservice/VSTSequencePlayer.h
   services/MenuManager.cpp
   services/MenuManager.h
   services/Settings.cpp
@@ -107,14 +109,7 @@ add_executable(
   workarea/VGMFileView.h
   workarea/VGMFileListView.cpp
   workarea/VGMFileListView.h
-  playback/InstrClient.cpp
-  playback/InstrClient.h
-  playback/InstrServerMessage.cpp
-  playback/InstrServerMessage.h
-  playback/NewSequencePlayer.cpp
-  playback/NewSequencePlayer.h
-  playback/PendingCalls.cpp
-  playback/PendingCalls.h)
+)
 
 add_dependencies(vgmtrans juicysfplugin_VST3)
 
@@ -142,7 +137,8 @@ target_link_libraries(
           Qt::Widgets
           Qt::Svg
           juce::juce_audio_utils
-          juce::juce_audio_processors)
+          juce::juce_audio_processors
+          juicysfplugin_network)
 
 # Workaround macdeployqt not correctly deploying QtDbus
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
