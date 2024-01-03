@@ -12,7 +12,7 @@
 #include <QWhatsThis>
 #include <QPushButton>
 
-#include "SequencePlayer.h"
+#include "services/playerservice/PlayerService.h"
 #include "Helpers.h"
 #include "MarqueeLabel.h"
 #include "ClickJumpSlider.h"
@@ -76,8 +76,8 @@ void IconBar::setupControls() {
   m_title->setText("Playback interrupted");
   layout()->addWidget(m_title);
 
-  connect(SequencePlayer::getInstance(), &SequencePlayer::statusChange, this, &IconBar::playerStatusChanged);
-  connect(SequencePlayer::getInstance(), &SequencePlayer::playbackPositionChanged, this, &IconBar::playbackRangeUpdate);
+  connect(PlayerService::getInstance(), &PlayerService::statusChange, this, &IconBar::playerStatusChanged);
+  connect(PlayerService::getInstance(), &PlayerService::playbackPositionChanged, this, &IconBar::playbackRangeUpdate);
 }
 
 void IconBar::showPlayInfo() {
@@ -100,7 +100,7 @@ void IconBar::playerStatusChanged(bool playing) const {
     m_slider->setEnabled(true);
     m_play->setIcon(s_pauseicon);
     m_stop->setEnabled(true);
-    m_title->setText("Playing: " + SequencePlayer::getInstance()->songTitle());
+    m_title->setText("Playing: " + PlayerService::getInstance()->songTitle());
   } else {
     m_play->setIcon(s_playicon);
     const bool hasActive = SequencePlayer::the().activeCollection() != nullptr;
