@@ -1,23 +1,9 @@
 # ~~~
 # Dependencies
 # ~~~
-include(ExternalProject)
 
-set(JUICYSF_DIR "${PROJECT_SOURCE_DIR}/external/juicysfplugin")
 set(JUICYSF_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/juicysfplugin")
-
-ExternalProject_Add(juicysfplugin
-        SOURCE_DIR "${JUICYSF_DIR}"
-        BINARY_DIR ${JUICYSF_BUILD_DIR}
-        CMAKE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                   -DCMAKE_GENERATOR=${CMAKE_GENERATOR}
-        BUILD_COMMAND ${CMAKE_COMMAND} --build . --target juicysfplugin_VST3 --parallel
-        INSTALL_COMMAND "")
-
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/juicysfplugin/external/JUCE"
-        "${CMAKE_CURRENT_BINARY_DIR}/JUCE" EXCLUDE_FROM_ALL)
+add_subdirectory("${PROJECT_SOURCE_DIR}/external/juicysfplugin" ${JUICYSF_BUILD_DIR} EXCLUDE_FROM_ALL)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Homebrew installs Qt (up to at least 5.9.1) in /usr/local/qt*, ensure it can
@@ -140,7 +126,7 @@ add_executable(
   playback/PendingCalls.cpp
   playback/PendingCalls.h)
 
-add_dependencies(vgmtrans juicysfplugin)
+add_dependencies(vgmtrans juicysfplugin_VST3)
 
 if(APPLE)
   target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
@@ -218,16 +204,13 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
                               PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
-          "$<TARGET_FILE_DIR:vgmtrans>/../Resources"
-  )
-
+  # Copy MAME rom definitions, copy VST3 plugin
   add_custom_command(TARGET vgmtrans
           POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst" &&
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                  "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
+                  "$<TARGET_FILE_DIR:vgmtrans>/../Resources" &&
+                  ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst" &&
                   ${CMAKE_COMMAND} -E copy_directory
                   "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
                   "$<TARGET_FILE_DIR:vgmtrans>/../Resources/vst/juicysfplugin.vst3")
@@ -241,14 +224,16 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   target_sources(vgmtrans
                  PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
 
-  # Copy ROMs definitions for CPS
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
-      "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+  # Copy MAME rom definitions, copy VST3 plugin
+  add_custom_command(TARGET vgmtrans
+          POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
+          "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" &&
+          ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vst" &&
+          ${CMAKE_COMMAND} -E copy_directory
+          "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
+          "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vst/juicysfplugin.vst3")
 
   get_target_property(MOC_EXECUTABLE_LOCATION Qt${Qt_VERSION_MAJOR}::moc
                       IMPORTED_LOCATION)
