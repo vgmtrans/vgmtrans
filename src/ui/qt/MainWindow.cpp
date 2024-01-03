@@ -21,7 +21,7 @@
 #include "IconBar.h"
 #include "About.h"
 #include "Logger.h"
-#include "SequencePlayer.h"
+#include "services/playerservice/PlayerService.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
@@ -140,7 +140,7 @@ void MainWindow::routeSignals() {
           &VGMCollListView::handlePlaybackRequest);
   connect(m_coll_listview, &VGMCollListView::nothingToPlay, m_icon_bar, &IconBar::showPlayInfo);
   connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
-  connect(m_icon_bar, &IconBar::seekingTo, &SequencePlayer::getInstance(), &SequencePlayer::seek);
+  connect(m_icon_bar, &IconBar::seekingTo, PlayerService::getInstance(), &PlayerService::seek);
   connect(m_icon_bar, &IconBar::createPressed, [this]() {
     ManualCollectionDialog wiz(this);
     wiz.exec();
