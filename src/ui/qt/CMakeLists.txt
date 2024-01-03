@@ -3,7 +3,7 @@
 # ~~~
 
 set(JUICYSF_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/juicysfplugin")
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/juicysfplugin" ${JUICYSF_BUILD_DIR} EXCLUDE_FROM_ALL)
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/juicysfplugin" ${JUICYSF_BUILD_DIR} EXCLUDE_FROM_ALL)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Homebrew installs Qt (up to at least 5.9.1) in /usr/local/qt*, ensure it can
@@ -123,7 +123,7 @@ target_include_directories(vgmtrans PRIVATE
         ./util
         ./widgets
         ./workarea
-        "${PROJECT_SOURCE_DIR}/external/juicysfplugin/src")
+        "${PROJECT_SOURCE_DIR}/lib/juicysfplugin/src")
 
 set_target_properties(juce_recommended_config_flags PROPERTIES
         INTERFACE_COMPILE_DEFINITIONS
