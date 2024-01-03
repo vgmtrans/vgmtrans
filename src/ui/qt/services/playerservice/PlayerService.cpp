@@ -4,7 +4,7 @@
  * See the included LICENSE for more information
  */
 
-#include "SequencePlayer.h"
+#include "PlayerService.h"
 #include <algorithm>
 #include <cstddef>
 
@@ -16,9 +16,9 @@
 /* How often (in ms) the current ticks are polled */
 static constexpr auto TICK_POLL_INTERVAL_MS = 10;
 
-JUCE_IMPLEMENT_SINGLETON (SequencePlayer)
+JUCE_IMPLEMENT_SINGLETON (PlayerService)
 
-SequencePlayer::SequencePlayer() {
+PlayerService::PlayerService() {
   player.initialize();
 
   m_seekupdate_timer = new QTimer(this);
@@ -30,11 +30,11 @@ SequencePlayer::SequencePlayer() {
 //  m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
 }
 
-SequencePlayer::~SequencePlayer() {
+PlayerService::~PlayerService() {
   clearSingletonInstance();
 }
 
-void SequencePlayer::toggle() {
+void PlayerService::toggle() {
   if (playing()) {
     player.pause();
     m_seekupdate_timer->stop();
@@ -47,7 +47,7 @@ void SequencePlayer::toggle() {
   statusChange(status);
 }
 
-void SequencePlayer::stop() {
+void PlayerService::stop() {
   /* Stop polling seekbar, reset it, propagate that we're done */
   playbackPositionChanged(0, 1);
   statusChange(false);
@@ -58,28 +58,28 @@ void SequencePlayer::stop() {
   m_active_vgmcoll = nullptr;
 }
 
-void SequencePlayer::seek(int position) {
+void PlayerService::seek(int position) {
   player.seek(position);
   playbackPositionChanged(position, totalSamples());
 }
 
-bool SequencePlayer::playing() const {
+bool PlayerService::playing() const {
   return player.isPlaying();
 }
 
-int SequencePlayer::elapsedSamples() const {
+int PlayerService::elapsedSamples() const {
   return static_cast<int>(player.elapsedSamples());
 }
 
-int SequencePlayer::totalSamples() const {
+int PlayerService::totalSamples() const {
     return static_cast<int>(player.totalSamples());
 }
 
-QString SequencePlayer::songTitle() const {
+QString PlayerService::songTitle() const {
   return m_song_title;
 }
 
-bool SequencePlayer::playCollection(VGMColl *coll) {
+bool PlayerService::playCollection(VGMColl *coll) {
   if (coll == m_active_vgmcoll) {
     toggle();
     return false;
