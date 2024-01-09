@@ -3,7 +3,9 @@
 #include "common.h"
 #include "ScaleConversion.h"
 
+#ifndef M_PI_2
 #define M_PI_2      1.57079632679489661923132169163975144   /* pi/2           */
+#endif
 
 // A lot of games use a simple linear amplitude decay/release for their envelope.
 // In other words, the envelope level drops at a constant rate (say from
