@@ -57,7 +57,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
     updateHexViewFont(+0.5);
   });
 
-  QShortcut* shortcutEqual = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_Equal), this);
+  QShortcut* shortcutEqual = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this);
   connect(shortcutEqual, &QShortcut::activated, [&] {
     updateHexViewFont(+0.5);
   });
