@@ -36,7 +36,7 @@ class PSFFile {
   DataSeg *reservedData;
   uint32_t exeCRC;
   bool decompressed;
-  char *errorstr;
+  const char *errorstr;
   uint8_t *stripBuf;
   size_t stripBufSize;
 

@@ -300,7 +300,7 @@ bool MoriSnesTrack::ReadEvent(void) {
     case EVENT_NOTE_WITH_PARAM: {
       uint8_t keyOffset = statusByte & 0x1f;
 
-      char* eventName;
+      const char* eventName;
       if (eventType == EVENT_NOTE_WITH_PARAM) {
         uint8_t noteParam = GetByte(curOffset++);
         if (noteParam <= 0x7f) {
