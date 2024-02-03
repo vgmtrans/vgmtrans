@@ -65,7 +65,7 @@ bool CPSSeq::GetTrackPointers(void) {
       case VER_CPS1_200ff:
       case VER_CPS1_350:
       case VER_CPS1_425:
-        newTrack = new CPSTrackV1(this, offset);
+        newTrack = new CPSTrackV1(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset);
         break;
       case VER_200:
       case VER_201B:
@@ -75,7 +75,7 @@ bool CPSSeq::GetTrackPointers(void) {
         newTrack = new CPSTrackV2(this, offset + dwOffset);
         break;
       default:
-        newTrack = new CPSTrackV1(this, offset + dwOffset);
+        newTrack = new CPSTrackV1(this, CPSSynth::QSOUND, offset + dwOffset);
     }
     aTracks.push_back(newTrack);
     header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, "Track Pointer");

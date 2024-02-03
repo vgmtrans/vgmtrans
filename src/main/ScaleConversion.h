@@ -4,6 +4,7 @@ double LinAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten, int linearVolu
 
 uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal);
 uint8_t ConvertPercentAmpToStdMidiVal(double percent);
+uint8_t ConvertDBAttenuationToStdMidiVal(double dbAtten);
 double ConvertLogScaleValToAtten(double percent);
 double ConvertPercentAmplitudeToAttenDB(double percent);
 double ConvertPercentAmplitudeToAttenDB_SF2(double percent);

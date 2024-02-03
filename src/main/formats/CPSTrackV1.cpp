@@ -10,8 +10,8 @@ using namespace std;
 // *************
 
 
-CPSTrackV1::CPSTrackV1(CPSSeq *parentSeq, long offset, long length)
-    : SeqTrack(parentSeq, offset, length) {
+CPSTrackV1::CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, long offset, long length)
+    : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
   ResetVars();
 }
 
@@ -75,7 +75,12 @@ bool CPSTrackV1::ReadEvent(void) {
       // for 100% accuracy, we'd be shifting by 8, but that seems excessive for MIDI
       uint32_t absDur = (uint32_t) ((double) (delta / (double) (256 << 4)) * (double) (dur << 4));
 
-      key = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
+      if (channelSynth == CPSSynth::OKIM6295) {
+        // OKIM6295 doesn't control pitch, so we'll use middle C for all notes
+        key = 0x3C;
+      } else {
+        key = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
+      }
 
       // Tie note
       if ((noteState & 0x40) > 0) {
@@ -201,9 +206,25 @@ bool CPSTrackV1::ReadEvent(void) {
         break;
 
       case 0x07 :
-        vol = GetByte(curOffset++);
-        vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / (double) 0x1FFF);
-        this->AddVol(beginOffset, curOffset - beginOffset, vol);
+        switch (channelSynth) {
+          case QSOUND:
+            vol = GetByte(curOffset++);
+            vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / (double) 0x1FFF);
+            this->AddVol(beginOffset, curOffset - beginOffset, vol);
+            break;
+          case OKIM6295: {
+            constexpr uint8_t okiAttenTable[16] = { 32, 22, 16, 11, 8, 6, 4, 3, 2, 0, 0, 0, 0, 0, 0, 0};
+            vol = 8 - GetByte(curOffset++);
+            vol = ConvertPercentAmpToStdMidiVal(static_cast<double>(okiAttenTable[vol & 0xF]/32.0));
+            this->AddVol(beginOffset, curOffset - beginOffset, vol);
+            break;
+          }
+          case YM2151:
+            curOffset++;
+            vol = 0;
+            this->AddVol(beginOffset, curOffset - beginOffset, vol);
+            break;
+        }
         break;
 
       case 0x08 : {
@@ -226,8 +247,13 @@ bool CPSTrackV1::ReadEvent(void) {
 
       // Global Transpose
       case 0x0A : {
-        int8_t globTranspose = GetByte(curOffset++);
-        AddGlobalTranspose(beginOffset, curOffset - beginOffset, globTranspose);
+        // For now, skip 0x0A on CPS1, I'll come back to it for the YM2151 implementation
+        if (channelSynth == CPSSynth::OKIM6295 || channelSynth == CPSSynth::YM2151) {
+          curOffset++;
+          break;
+        }
+        int8_t globalTranspose = GetByte(curOffset++);
+        AddGlobalTranspose(beginOffset, curOffset - beginOffset, globalTranspose);
         break;
       }
 

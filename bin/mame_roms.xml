@@ -27,6 +27,10 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>rt_9.12b</rom>
         </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>rt_18.11c</rom>
+            <rom>rt_19.12c</rom>
+        </romgroup>
     </game>
     <game name="armwar" format="CPS" fmt_version="1.05a">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000" samp_table_length="0x6E0">
@@ -60,6 +64,10 @@
     <game name="cawing" format="CPS" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>ca_9.12b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>ca_18.11c</rom>
+            <rom>ca_19.12c</rom>
         </romgroup>
     </game>
     <game name="captcomm" format="CPS" fmt_version="CPS1_4.25">
@@ -500,10 +508,18 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>sf2_9.12a</rom>
         </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>sf2_18.11c</rom>
+            <rom>sf2_19.12c</rom>
+        </romgroup>
     </game>
     <game name="sf2ce" format="CPS" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>s92_09.11a</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>s92_18.11c</rom>
+            <rom>s92_19.12c</rom>
         </romgroup>
     </game>
     <game name="sf2hf" format="CPS" fmt_version="CPS1_4.25">

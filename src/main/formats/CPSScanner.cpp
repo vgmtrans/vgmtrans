@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Root.h"
 #include "CPSScanner.h"
 #include "CPSSeq.h"
 #include "CPSInstr.h"
@@ -222,7 +223,10 @@ void CPSScanner::LoadCPS1(MAMEGame *gameentry) {
 
   CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
 
-  MAMERomGroup *seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
+  CPS1SampleInstrSet *instrset = nullptr;
+  CPS1SampColl *sampcoll = nullptr;
+
+  MAMERomGroup* seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
   if (!seqRomGroupEntry)
     return;
   uint32_t seq_table_offset;
@@ -238,6 +242,37 @@ void CPSScanner::LoadCPS1(MAMEGame *gameentry) {
   }
 
   RawFile *programFile = seqRomGroupEntry->file;
+
+  MAMERomGroup* sampsRomGroupEntry = gameentry->GetRomGroupOfType("oki6295");
+  if (sampsRomGroupEntry && sampsRomGroupEntry->file) {
+    uint32_t instrTablePtrOffset = 4;
+    uint32_t instr_table_offset = programFile->GetShortBE(seq_table_offset + instrTablePtrOffset);
+
+    RawFile *samplesFile = sampsRomGroupEntry->file;
+
+    ostringstream name;
+    name.str("");
+    name << gameentry->name.c_str() << " oki msm6295 instrument set";
+    auto instrset_name = name.str();
+    name.str("");
+    name << gameentry->name.c_str() << " sample collection";
+    auto sampcoll_name = name.str();
+
+    instrset = new CPS1SampleInstrSet(programFile,
+                               fmt_ver,
+                               instr_table_offset,
+                               instrset_name);
+    if (!instrset->LoadVGMFile()) {
+      delete instrset;
+      instrset = NULL;
+    }
+
+    sampcoll = new CPS1SampColl(samplesFile, instrset, 0, samplesFile->size(), sampcoll_name);
+    if (!sampcoll->LoadVGMFile()) {
+      delete sampcoll;
+      sampcoll = NULL;
+    }
+  }
 
   string seq_table_name;
   ostringstream name;
@@ -278,7 +313,7 @@ void CPSScanner::LoadCPS1(MAMEGame *gameentry) {
     seqTable = NULL;
   }
 
-
+  int seqNum = 0;
   for (k = ptrsStart; (seq_table_length == 0 || k < seq_table_length); k += ptrSize) {
 
     seqPointer = programFile->GetShortBE(seq_table_offset + k);
@@ -290,12 +325,24 @@ void CPSScanner::LoadCPS1(MAMEGame *gameentry) {
     seqTable->AddSimpleItem(seq_table_offset + k, ptrSize, "Sequence Pointer");
 
     name.str("");
-    name << gameentry->name.c_str() << " seq " << (k-ptrsStart) / ptrSize;
+    name << gameentry->name.c_str() << " seq " << seqNum;
     string seqName = name.str();
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
-    //    printf("LOADING SEQ at %X\n", seqPointer);
+
     if (!newSeq->LoadVGMFile()) {
       delete newSeq;
+      continue;
+    }
+
+    name.str("");
+    name << gameentry->name.c_str() << " song " << seqNum++;
+    VGMColl* coll = new VGMColl(name.str());
+
+    coll->UseSeq(newSeq);
+    coll->AddInstrSet(instrset);
+    coll->AddSampColl(sampcoll);
+    if (!coll->Load()) {
+      delete coll;
     }
   }
 }
