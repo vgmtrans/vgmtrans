@@ -119,6 +119,11 @@ uint8_t ConvertPercentAmpToStdMidiVal(double percent) {
   return roundi(127.0 * sqrt(percent));
 }
 
+// db attenuation is expressed as a positive value. So, a reduction of 3.2db is expressed as 3.2, not -3.2.
+uint8_t ConvertDBAttenuationToStdMidiVal(double dbAtten) {
+  return roundi(pow(10, -dbAtten / 40.0));
+}
+
 double ConvertLogScaleValToAtten(double percent) {
   if (percent == 0)
     return 100.0;        // assume 0 is -100.0db attenuation

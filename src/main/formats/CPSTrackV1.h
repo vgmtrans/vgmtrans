@@ -2,13 +2,14 @@
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "CPSSeq.h"
+#include "CPSFormat.h"
 
 enum CPSFormatVer: uint8_t;
 
 class CPSTrackV1
     : public SeqTrack {
 public:
-  CPSTrackV1(CPSSeq *parentSeq, long offset = 0, long length = 0);
+  CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, long offset = 0, long length = 0);
   virtual void ResetVars();
   virtual void AddInitialMidiEvents(int trackNum);
   virtual bool ReadEvent(void);
@@ -17,6 +18,7 @@ private:
   CPSFormatVer GetVersion() { return ((CPSSeq *) this->parentSeq)->fmt_version; }
   void CalculateAndAddPortamentoTimeNoItem(int8_t noteDistance);
 
+  CPSSynth channelSynth;
   bool bPrevNoteTie;
   uint8_t prevTieNote;
   uint8_t curDeltaTable;

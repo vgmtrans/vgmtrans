@@ -396,8 +396,6 @@ class PSXSamp
 
 
  public:
-  VGMInstrSet *parentInstrSet;
-
   bool bSetLoopOnConversion;
   uint32_t dwCompSize;
   uint32_t dwUncompSize;
