@@ -2,11 +2,12 @@
 #include "CPSSeq.h"
 #include "CPSTrackV1.h"
 #include "CPSTrackV2.h"
-#include "CPSInstr.h"
+#include "CPS2Instr.h"
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
 
-DECLARE_FORMAT(CPS);
+DECLARE_FORMAT(CPS1);
+DECLARE_FORMAT(CPS2);
 
 
 // ******
@@ -14,7 +15,7 @@ DECLARE_FORMAT(CPS);
 // ******
 
 CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, string &name)
-    : VGMSeq(CPSFormat::name, file, offset, 0, name),
+    : VGMSeq(CPS2Format::name, file, offset, 0, name),
       fmt_version(fmtVersion) {
   HasMonophonicTracks();
   AlwaysWriteInitialVol(127);

@@ -42,14 +42,14 @@ private:
   static bool s_tables_computed;
 };
 
-class DailogicAdpcmSamp
+class DialogicAdpcmSamp
     : public VGMSamp {
 public:
 
-  DailogicAdpcmSamp(
+  DialogicAdpcmSamp(
       VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, string name
   );
-  virtual ~DailogicAdpcmSamp(void);
+  virtual ~DialogicAdpcmSamp(void);
 
   virtual double GetCompressionRatio();
   virtual void ConvertToStdWave(uint8_t *buf);
