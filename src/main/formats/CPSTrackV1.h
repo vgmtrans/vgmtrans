@@ -2,7 +2,7 @@
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "CPSSeq.h"
-#include "CPSFormat.h"
+#include "CPS2Format.h"
 
 enum CPSFormatVer: uint8_t;
 

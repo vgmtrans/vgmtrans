@@ -2,8 +2,8 @@
 #include "VGMSamp.h"
 #include "VGMRgn.h"
 #include "ScaleConversion.h"
-#include "CPSFormat.h"
-#include "CPSInstr.h"
+#include "CPS2Format.h"
+#include "CPS2Instr.h"
 #include "OkiAdpcm.h"
 
 using namespace std;
@@ -14,7 +14,7 @@ using namespace std;
 
 
 CPSArticTable::CPSArticTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length)
-    : VGMMiscFile(CPSFormat::name, file, offset, length, name) {
+    : VGMMiscFile(CPS2Format::name, file, offset, length, name) {
 }
 
 CPSArticTable::~CPSArticTable(void) {
@@ -61,7 +61,7 @@ CPSSampleInfoTable::CPSSampleInfoTable(RawFile *file,
                                        string &name,
                                        uint32_t offset,
                                        uint32_t length)
-    : VGMMiscFile(CPSFormat::name, file, offset, length, name) {
+    : VGMMiscFile(CPS2Format::name, file, offset, length, name) {
 }
 
 CPSSampleInfoTable::~CPSSampleInfoTable(void) {
@@ -174,69 +174,33 @@ bool CPS3SampleInfoTable::LoadMain() {
   return true;
 }
 
-// ******************
-// CPS1SampleInstrSet
-// ******************
-
-CPS1SampleInstrSet::CPS1SampleInstrSet(RawFile *file,
-                                       CPSFormatVer version,
-                                       uint32_t offset,
-                                       std::string &name)
-    : VGMInstrSet(CPSFormat::name, file, offset, 0, name),
-          fmt_version(version) {
-}
-
-CPS1SampleInstrSet::~CPS1SampleInstrSet(void) {
-}
-
-bool CPS1SampleInstrSet::GetInstrPointers() {
-  for (int i = 0; i < 128; ++i) {
-    auto offset = dwOffset + (i * 4);
-    if (!(GetByte(offset) & 0x80)) {
-      break;
-    }
-    std::ostringstream ss;
-    ss << "Instrument " << i;
-    string name = ss.str();
-    VGMInstr* instr = new VGMInstr(this, offset, 4, 0, i, name);
-    VGMRgn* rgn = new VGMRgn(instr, offset);
-    instr->unLength = 4;
-    rgn->unLength = 4;
-    // subtract 1 to account for the first OKIM6295 sample ptr always being null
-    rgn->sampNum = GetByte(offset+1) - 1;
-    instr->aRgns.push_back(rgn);
-    aInstrs.push_back(instr);
-  }
-  return true;
-}
-
 // ***********
-// CPSInstrSet
+// CPS2InstrSet
 // ***********
 
-CPSInstrSet::CPSInstrSet(RawFile *file,
+CPS2InstrSet::CPS2InstrSet(RawFile *file,
                          CPSFormatVer version,
                          uint32_t offset,
                          int numInstrBanks,
                          CPSSampleInfoTable *theSampInfoTable,
                          CPSArticTable *theArticTable,
                          string &name)
-    : VGMInstrSet(CPSFormat::name, file, offset, 0, name),
+    : VGMInstrSet(CPS2Format::name, file, offset, 0, name),
       fmt_version(version),
       num_instr_banks(numInstrBanks),
       sampInfoTable(theSampInfoTable),
       articTable(theArticTable) {
 }
 
-CPSInstrSet::~CPSInstrSet(void) {
+CPS2InstrSet::~CPS2InstrSet(void) {
 }
 
 
-bool CPSInstrSet::GetHeaderInfo() {
+bool CPS2InstrSet::GetHeaderInfo() {
   return true;
 }
 
-bool CPSInstrSet::GetInstrPointers() {
+bool CPS2InstrSet::GetInstrPointers() {
   // Load the instr_info tables.
 
   if (fmt_version <= VER_115) {
@@ -251,7 +215,7 @@ bool CPSInstrSet::GetInstrPointers() {
         std::ostringstream ss;
         ss << "Instrument " << bank * 256 << i;
         string name = ss.str();
-        aInstrs.push_back(new CPSInstr(this,
+        aInstrs.push_back(new CPS2Instr(this,
                                        dwOffset + i * 8 + (bank * 256 * 8),
                                        8,
                                        (bank * 2) + (i / 128),
@@ -302,7 +266,7 @@ bool CPSInstrSet::GetInstrPointers() {
           std::ostringstream ss;
           ss << "Instrument " << j << " bank " << bank;
           string name = ss.str();
-          aInstrs.push_back(new CPSInstr(this, instrPtr, 0, bank*2, j, name));
+          aInstrs.push_back(new CPS2Instr(this, instrPtr, 0, bank*2, j, name));
         }
         this->AddItem(instrPointersItem);
 
@@ -324,7 +288,7 @@ bool CPSInstrSet::GetInstrPointers() {
         std::ostringstream ss;
         ss << "Instrument " << totalInstrs << k;
         string name = ss.str();
-        aInstrs.push_back(new CPSInstr(this, j, instr_info_length, (i * 2) + (k / 128), (k % 128), name));
+        aInstrs.push_back(new CPS2Instr(this, j, instr_info_length, (i * 2) + (k / 128), (k % 128), name));
       }
       totalInstrs += k;
     }
@@ -334,10 +298,10 @@ bool CPSInstrSet::GetInstrPointers() {
 
 
 // ***********
-// CPSInstr
+// CPS2Instr
 // ***********
 
-CPSInstr::CPSInstr(VGMInstrSet *instrSet,
+CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
                    uint32_t offset,
                    uint32_t length,
                    uint32_t theBank,
@@ -346,11 +310,11 @@ CPSInstr::CPSInstr(VGMInstrSet *instrSet,
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {
 }
 
-CPSInstr::~CPSInstr(void) {
+CPS2Instr::~CPS2Instr(void) {
 }
 
 
-bool CPSInstr::LoadInstr() {
+bool CPS2Instr::LoadInstr() {
   vector<VGMRgn*> rgns;
   const CPSFormatVer formatVersion = GetFormatVer();
   if (formatVersion < VER_103) {
@@ -435,7 +399,7 @@ bool CPSInstr::LoadInstr() {
     rgn->AddSimpleItem(this->dwOffset + 2, 1, "Unknown");
     rgn->AddSimpleItem(this->dwOffset + 3, 1, "Articulation Index");
 
-    CPSArticTable *articTable = ((CPSInstrSet *) this->parInstrSet)->articTable;
+    CPSArticTable *articTable = ((CPS2InstrSet *) this->parInstrSet)->articTable;
     qs_artic_info *artic = &articTable->artics[progInfo.artic_index];
     rgn->sampNum = progInfo.sample_index;
     this->attack_rate = artic->attack_rate;
@@ -453,7 +417,7 @@ bool CPSInstr::LoadInstr() {
       rgn->sampNum -= 0x8000;
 
     // if the sample doesn't exist, set it to the first sample
-    if (rgn->sampNum >= ((CPSInstrSet *) parInstrSet)->sampInfoTable->numSamples)
+    if (rgn->sampNum >= ((CPS2InstrSet *) parInstrSet)->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
     uint16_t Ar = attack_rate_table[this->attack_rate];
@@ -507,10 +471,10 @@ bool CPSInstr::LoadInstr() {
     rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
     rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0x800);
 
-    if (rgn->sampNum == 0xFFFF || rgn->sampNum >= ((CPSInstrSet *) parInstrSet)->sampInfoTable->numSamples)
+    if (rgn->sampNum == 0xFFFF || rgn->sampNum >= ((CPS2InstrSet *) parInstrSet)->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
-    rgn->SetUnityKey(((CPSInstrSet *) parInstrSet)->sampInfoTable->infos[rgn->sampNum].unity_key);
+    rgn->SetUnityKey(((CPS2InstrSet *) parInstrSet)->sampInfoTable->infos[rgn->sampNum].unity_key);
     aRgns.push_back(rgn);
   }
   return true;
@@ -518,88 +482,27 @@ bool CPSInstr::LoadInstr() {
 
 
 // **************
-// CPS1SampColl
+// CPS2SampColl
 // **************
 
-CPS1SampColl::CPS1SampColl(RawFile *file,
-                           CPS1SampleInstrSet *theinstrset,
-                           uint32_t offset,
-                           uint32_t length,
-                           string name)
-    : VGMSampColl(CPSFormat::name, file, offset, length, name),
-      instrset(theinstrset) {
-}
-
-
-bool CPS1SampColl::GetHeaderInfo() {
-  auto header = AddHeader(8, 0x400-8, "Sample Pointers");
-
-  int i = 1;
-  for (int offset = 8; offset < 0x400; offset += 8) {
-    if (GetWord(offset) == 0xFFFFFFFF) {
-      break;
-    }
-    ostringstream startStream;
-    startStream << "Sample " << i << " Start";
-    auto startStr = startStream.str();
-    ostringstream endStream;
-    endStream << "Sample " << i++ << " End";
-    auto endStr = endStream.str();
-
-    header->AddSimpleItem(offset, 3, startStr);
-    header->AddSimpleItem(offset+3, 3, endStr);
-  }
-  return true;
-}
-
-bool CPS1SampColl::GetSampleInfo() {
-  constexpr int PTR_SIZE = 3;
-
-  int i = 1;
-  for (int offset = 8; offset < 0x400; offset += 8) {
-    auto sampAddr = GetShort(offset);
-    if (sampAddr == 0xFFFF) {
-      break;
-    }
-    auto begin = GetWordBE(offset) >> 8;
-    auto end = GetWordBE(offset+PTR_SIZE) >> 8;
-
-    ostringstream name;
-    name << "Sample " << i++;
-
-    auto sample = new DailogicAdpcmSamp(this, begin, end-begin, CPS1_OKIMSM6295_SAMPLE_RATE, name.str());
-    sample->SetWaveType(WT_PCM16);
-    sample->SetLoopStatus(false);
-    sample->unityKey = 0x3C;
-    samples.push_back(sample);
-  }
-  return true;
-}
-
-
-// **************
-// CPSSampColl
-// **************
-
-CPSSampColl::CPSSampColl(RawFile *file,
-                         CPSInstrSet *theinstrset,
+CPS2SampColl::CPS2SampColl(RawFile *file, CPS2InstrSet *theinstrset,
                          CPSSampleInfoTable *sampinfotable,
                          uint32_t offset,
                          uint32_t length,
                          string name)
-    : VGMSampColl(CPSFormat::name, file, offset, length, name),
+    : VGMSampColl(CPS2Format::name, file, offset, length, name),
       instrset(theinstrset),
       sampInfoTable(sampinfotable) {
 
 }
 
 
-bool CPSSampColl::GetHeaderInfo() {
+bool CPS2SampColl::GetHeaderInfo() {
   unLength = this->rawfile->size();
   return true;
 }
 
-bool CPSSampColl::GetSampleInfo() {
+bool CPS2SampColl::GetSampleInfo() {
 
   uint32_t numSamples = instrset->sampInfoTable->numSamples;
   uint32_t baseOffset;

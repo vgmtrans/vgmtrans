@@ -1,7 +1,7 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
-#include "CPSFormat.h"
+#include "CPS2Format.h"
 
 enum CPSFormatVer: uint8_t;
 

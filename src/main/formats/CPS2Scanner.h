@@ -1,10 +1,6 @@
 #pragma once
 #include "Scanner.h"
 
-class CPSInstrSet;
-class CPSSampColl;
-class CPSSampleInfoTable;
-class CPSArticTable;
 struct MAMEGame;
 
 enum CPSFormatVer: uint8_t {
@@ -39,11 +35,12 @@ enum CPSFormatVer: uint8_t {
   VER_CPS3
 };
 
-class CPSScanner:
+CPSFormatVer GetVersionEnum(string &versionStr);
+
+class CPS2Scanner :
     public VGMScanner {
 public:
-  virtual void Scan(RawFile *file, void *info = 0);
-private:
-  void LoadCPS1(MAMEGame *gameentry);
-  CPSFormatVer GetVersionEnum(std::string &versionStr);
+  virtual void Scan(RawFile* file, void *info = 0);
 };
+
+

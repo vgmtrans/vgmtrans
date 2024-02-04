@@ -127,30 +127,30 @@ void oki_adpcm_state::compute_tables()
 
 
 //  *****************
-//  DailogicAdpcmSamp
+//  DialogicAdpcmSamp
 //  *****************
 
-oki_adpcm_state DailogicAdpcmSamp::okiAdpcmState;
+oki_adpcm_state DialogicAdpcmSamp::okiAdpcmState;
 
-DailogicAdpcmSamp::DailogicAdpcmSamp(
+DialogicAdpcmSamp::DialogicAdpcmSamp(
     VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, string name
   )
     : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate, name) {
 
 }
 
-DailogicAdpcmSamp::~DailogicAdpcmSamp() {
+DialogicAdpcmSamp::~DialogicAdpcmSamp() {
 }
 
-double DailogicAdpcmSamp::GetCompressionRatio() {
+double DialogicAdpcmSamp::GetCompressionRatio() {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
 
-void DailogicAdpcmSamp::ConvertToStdWave(uint8_t *buf) {
+void DialogicAdpcmSamp::ConvertToStdWave(uint8_t *buf) {
 
   auto* uncompBuf = reinterpret_cast<int16_t*>(buf);
 
-  DailogicAdpcmSamp::okiAdpcmState.reset();
+  DialogicAdpcmSamp::okiAdpcmState.reset();
 
   int sampleNum = 0;
   for (uint32_t off = dwOffset; off < (dwOffset + unLength); ++off) {
@@ -158,7 +158,7 @@ void DailogicAdpcmSamp::ConvertToStdWave(uint8_t *buf) {
 
     for (int n = 0; n < 2; ++n) {
       uint8_t nibble = byte >> (((n & 1) << 2) ^ 4);
-      int16_t sample = DailogicAdpcmSamp::okiAdpcmState.clock(nibble);
+      int16_t sample = DialogicAdpcmSamp::okiAdpcmState.clock(nibble);
       uncompBuf[sampleNum++] = sample;
     }
   }

@@ -3,7 +3,7 @@
 #include "VGMSampColl.h"
 #include "VGMMiscFile.h"
 
-class CPSInstr;
+class CPS2Instr;
 
 enum CPSFormatVer: uint8_t;
 
@@ -200,41 +200,20 @@ public:
   virtual bool LoadMain();
 };
 
-// ******************
-// CPS1SampleInstrSet
-// ******************
-
-class CPS1SampleInstrSet
-    : public VGMInstrSet {
-public:
-  CPS1SampleInstrSet(RawFile *file,
-               CPSFormatVer fmt_version,
-               uint32_t offset,
-               std::string &name);
-  virtual ~CPS1SampleInstrSet(void);
-
-  virtual bool GetInstrPointers();
-
-public:
-  CPSFormatVer fmt_version;
-  CPSSampleInfoTable *sampInfoTable;
-};
-
 // **************
-// CPSInstrSet
+// CPS2InstrSet
 // **************
 
-class CPSInstrSet
-    : public VGMInstrSet {
+class CPS2InstrSet : public VGMInstrSet {
 public:
-  CPSInstrSet(RawFile *file,
+  CPS2InstrSet(RawFile *file,
               CPSFormatVer fmt_version,
               uint32_t offset,
               int numInstrBanks,
               CPSSampleInfoTable *sampInfoTable,
               CPSArticTable *articTable,
               std::string &name);
-  virtual ~CPSInstrSet(void);
+  virtual ~CPS2InstrSet(void);
 
   virtual bool GetHeaderInfo();
   virtual bool GetInstrPointers();
@@ -248,22 +227,21 @@ public:
 
 
 // ***********
-// CPSInstr
+// CPS2Instr
 // ***********
 
-class CPSInstr
-    : public VGMInstr {
+class CPS2Instr : public VGMInstr {
 public:
-  CPSInstr(VGMInstrSet *instrSet,
+  CPS2Instr(VGMInstrSet *instrSet,
            uint32_t offset,
            uint32_t length,
            uint32_t theBank,
            uint32_t theInstrNum,
            std::string &name);
-  virtual ~CPSInstr(void);
+  virtual ~CPS2Instr(void);
   virtual bool LoadInstr();
 protected:
-  CPSFormatVer GetFormatVer() { return ((CPSInstrSet *) parInstrSet)->fmt_version; }
+  CPSFormatVer GetFormatVer() { return ((CPS2InstrSet *) parInstrSet)->fmt_version; }
 
 protected:
   uint8_t attack_rate;
@@ -277,35 +255,18 @@ protected:
 };
 
 // **************
-// CPS1SampColl
+// CPS2SampColl
 // **************
 
-class CPS1SampColl
+class CPS2SampColl
     : public VGMSampColl {
 public:
-  CPS1SampColl(RawFile *file, CPS1SampleInstrSet *instrset, uint32_t offset,
-              uint32_t length = 0, std::string name = std::string("CPS1 Sample Collection"));
-  virtual bool GetHeaderInfo();
-  virtual bool GetSampleInfo();
-
-private:
-  vector<VGMItem*> samplePointers;
-  CPS1SampleInstrSet *instrset;
-};
-
-// **************
-// CPSSampColl
-// **************
-
-class CPSSampColl
-    : public VGMSampColl {
-public:
-  CPSSampColl(RawFile *file, CPSInstrSet *instrset, CPSSampleInfoTable *sampinfotable, uint32_t offset,
+  CPS2SampColl(RawFile *file, CPS2InstrSet *instrset, CPSSampleInfoTable *sampinfotable, uint32_t offset,
               uint32_t length = 0, std::string name = std::string("QSound Sample Collection"));
   virtual bool GetHeaderInfo();
   virtual bool GetSampleInfo();
 
 private:
-  CPSInstrSet *instrset;
+  CPS2InstrSet *instrset;
   CPSSampleInfoTable *sampInfoTable;
 };
