@@ -10,7 +10,6 @@
 [submodule "lib/minizip-ng"]
 	path = lib/minizip-ng
 	url = https://github.com/zlib-ng/minizip-ng.git
-[submodule "lib/juicysfplugin"]
-	path = lib/juicysfplugin
-	url = https://github.com/mikelow/juicysfplugin.git
-	branch = cmake
+[submodule "lib/ymmy"]
+	path = lib/ymmy
+	url = https://github.com/mikelow/ymmy.git
