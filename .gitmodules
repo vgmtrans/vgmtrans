@@ -1,7 +1,6 @@
 [submodule "win-deps"]
 	path = lib/vgmtrans-ext-win
 	url = ../vgmtrans-ext-win
-[submodule "lib/juicysfplugin"]
-	path = lib/juicysfplugin
-	url = https://github.com/mikelow/juicysfplugin.git
-    branch = cmake
+[submodule "lib/ymmy"]
+	path = lib/ymmy
+	url = https://github.com/mikelow/ymmy.git
