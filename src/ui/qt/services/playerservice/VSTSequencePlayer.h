@@ -7,7 +7,7 @@
 #include "juce_audio_devices/juce_audio_devices.h"
 #include "juce_audio_processors/juce_audio_processors.h"
 #include "juce_audio_utils/players/juce_AudioProcessorPlayer.h"
-#include "InstrClient.h"
+//#include "InstrClient.h"
 
 class VGMColl;
 class VGMSeq;
@@ -102,7 +102,7 @@ private:
   juce::MidiBuffer midiMessages;
   std::mutex midiMutex;
 
-  std::unique_ptr<InstrClient> client;
+//  std::unique_ptr<InstrClient> client;
 
   juce::MidiBuffer midiBuffer;
   juce::MidiBuffer seekMidiBuffer;
