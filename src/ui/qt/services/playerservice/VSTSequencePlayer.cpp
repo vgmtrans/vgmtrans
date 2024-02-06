@@ -3,8 +3,8 @@
 #include "VGMColl.h"
 #include "VGMSeq.h"
 #include "SF2File.h"
-#include "InstrClient.h"
-#include "InstrServerMessage.h"
+//#include "InstrClient.h"
+//#include "InstrServerMessage.h"
 
 using namespace std;
 
