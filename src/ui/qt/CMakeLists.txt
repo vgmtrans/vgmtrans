@@ -2,8 +2,8 @@
 # Dependencies
 # ~~~
 
-set(JUICYSF_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/juicysfplugin")
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/juicysfplugin" ${JUICYSF_BUILD_DIR} EXCLUDE_FROM_ALL)
+set(YMMY_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/ymmy")
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/ymmy" ${YMMY_BUILD_DIR} EXCLUDE_FROM_ALL)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Homebrew installs Qt (up to at least 5.9.1) in /usr/local/qt*, ensure it can
@@ -111,14 +111,14 @@ add_executable(
   workarea/VGMFileListView.h
 )
 
-add_dependencies(vgmtrans juicysfplugin_VST3)
+add_dependencies(vgmtrans ymmy_VST3)
 
 target_include_directories(vgmtrans PRIVATE
         .
         ./util
         ./widgets
         ./workarea
-        "${PROJECT_SOURCE_DIR}/lib/juicysfplugin/src")
+        "${PROJECT_SOURCE_DIR}/lib/ymmy/src")
 
 set_target_properties(juce_recommended_config_flags PROPERTIES
         INTERFACE_COMPILE_DEFINITIONS
@@ -137,8 +137,8 @@ target_link_libraries(
           Qt::Widgets
           Qt::Svg
           juce::juce_audio_utils
-          juce::juce_audio_processors
-          juicysfplugin_network)
+          juce::juce_audio_processors)
+#          juicysfplugin_network)
 
 # Workaround macdeployqt not correctly deploying QtDbus
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -223,8 +223,8 @@ add_custom_command(TARGET vgmtrans
         "${RESOURCE_PATH}" &&
         ${CMAKE_COMMAND} -E make_directory "${RESOURCE_PATH}/vst" &&
         ${CMAKE_COMMAND} -E copy_directory
-        "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
-        "${RESOURCE_PATH}/vst/juicysfplugin.vst3")
+        "${YMMY_BUILD_DIR}/ymmy_artefacts/${CMAKE_BUILD_TYPE}/VST3/ymmy.vst3"
+        "${RESOURCE_PATH}/vst/ymmy.vst3")
 
 set(CPACK_PACKAGE_NAME "vgmtrans")
 set(CPACK_PACKAGE_VENDOR "VGMTrans Team")

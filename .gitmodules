@@ -10,7 +10,6 @@
 [submodule "zlib"]
 	path = lib/zlib
 	url = https://github.com/madler/zlib.git
-[submodule "lib/juicysfplugin"]
-	path = lib/juicysfplugin
-	url = https://github.com/mikelow/juicysfplugin.git
-	branch = cmake
+[submodule "lib/ymmy"]
+	path = lib/ymmy
+	url = https://github.com/mikelow/ymmy.git
