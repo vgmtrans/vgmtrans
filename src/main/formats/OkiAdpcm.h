@@ -1,6 +1,10 @@
-// The oki_adpcm_state code comes from the MAME project. It is shared under the BSD-3-Clause license.
-// The original code is available at: https://github.com/mamedev/mame/blob/a5579831cae73eb13c01b10d74666ee41a217887/src/devices/sound/okiadpcm.cpp
-// The copyright holders are Andrew Gardner and Aaron Giles.
+// Emulation of the OKI MSM6295 DAC is provided by the oki_adpcm_state
+// class, which is adopted from the MAME project with gratitude. It is
+// licensed under the BSD-3-Clause. The copyright holders are
+// Andrew Gardner and Aaron Giles.
+//
+// The original code is available at:
+//  https://github.com/mamedev/mame/blob/master/src/devices/sound/okiadpcm.h
 
 #pragma once
 
