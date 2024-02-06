@@ -9,8 +9,8 @@ message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 # Dependencies
 # ~~~
 
-set(JUICYSF_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/juicysfplugin")
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/juicysfplugin" ${JUICYSF_BUILD_DIR} EXCLUDE_FROM_ALL)
+set(YMMY_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/ymmy")
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/ymmy" ${YMMY_BUILD_DIR} EXCLUDE_FROM_ALL)
 
 if(NOT TARGET QWindowKit::Widgets)
   set(QWINDOWKIT_BUILD_STATIC ON CACHE BOOL "" FORCE)
@@ -158,7 +158,7 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiWindow.h
 )
 
-add_dependencies(vgmtrans juicysfplugin_VST3)
+add_dependencies(vgmtrans ymmy_VST3)
 
 if(APPLE)
   target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
@@ -171,7 +171,7 @@ target_include_directories(vgmtrans PRIVATE
         ./util
         ./widgets
         ./workarea
-        "${PROJECT_SOURCE_DIR}/lib/juicysfplugin/src")
+        "${PROJECT_SOURCE_DIR}/lib/ymmy/src")
 
 set_target_properties(juce_recommended_config_flags PROPERTIES
         INTERFACE_COMPILE_DEFINITIONS
@@ -192,8 +192,8 @@ target_link_libraries(
           Qt6::GuiPrivate
           Qt6::Svg
           juce::juce_audio_utils
-          juce::juce_audio_processors
-          juicysfplugin_network)
+          juce::juce_audio_processors)
+#          juicysfplugin_network)
 
 if(Qt6DBus_FOUND)
   target_link_libraries(vgmtrans PRIVATE Qt6::DBus)
@@ -393,8 +393,8 @@ add_custom_command(TARGET vgmtrans
         "${RESOURCE_PATH}" &&
         ${CMAKE_COMMAND} -E make_directory "${RESOURCE_PATH}/vst" &&
         ${CMAKE_COMMAND} -E copy_directory
-        "${JUICYSF_BUILD_DIR}/juicysfplugin_artefacts/${CMAKE_BUILD_TYPE}/VST3/juicysfplugin.vst3"
-        "${RESOURCE_PATH}/vst/juicysfplugin.vst3")
+        "${YMMY_BUILD_DIR}/ymmy_artefacts/${CMAKE_BUILD_TYPE}/VST3/ymmy.vst3"
+        "${RESOURCE_PATH}/vst/ymmy.vst3")
 
 # ~~~
 # CPack Setup

@@ -16,7 +16,6 @@
 [submodule "external/JUCE"]
 	path = external/JUCE
 	url = https://github.com/juce-framework/JUCE.git
-[submodule "lib/juicysfplugin"]
-	path = lib/juicysfplugin
-	url = https://github.com/mikelow/juicysfplugin.git
-	branch = cmake
+[submodule "lib/ymmy"]
+	path = lib/ymmy
+	url = https://github.com/mikelow/ymmy.git
