@@ -8,7 +8,16 @@
 
 #include <QDialog>
 
+class QTabWidget;
+
 class About final : public QDialog {
    public:
     explicit About(QWidget *parent = nullptr);
+
+   private:
+    void setupInfoTab(QWidget* tab);
+    void setupLicensesTab(QWidget* tab);
+    void loadLicenses(QMap<QString, QString>& licenses);
+
+    QTabWidget* tabs{};
 };

@@ -102,6 +102,8 @@ jobs:
             -appimage -extra-plugins=platforms/,platformthemes/ \
             -qmake=/usr/lib/qt6/bin/qmake6 \
             -verbose=10
+          mkdir -p appdir/usr/share/licenses/VGMTrans
+          cp ../LICENSE/LICENSE appdir/usr/share/licenses/VGMTrans/
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
         uses: actions/upload-artifact@v3
