@@ -21,14 +21,8 @@ jobs:
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
         run: |
-          export LDFLAGS="-L/usr/local/opt/llvm/lib"
-          export CPPFLAGS="-I/usr/local/opt/llvm/include"
           cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.osx_min_ver }} \
                 -DCMAKE_OSX_ARCHITECTURES=${{ env.osx_arch }} \
-                -DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang \
-                -DCMAKE_CXX_COMPILER=/usr/local/opt/llvm/bin/clang++ \
-                -DCMAKE_BUILD_TYPE=Release \
-                -G Ninja \
                 -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
