@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Install dependencies"
         run: |
-          brew install -f --overwrite python@3.12 llvm@17 qt@6 ninja
+          brew install -f --overwrite llvm@17 qt@6 ninja
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
