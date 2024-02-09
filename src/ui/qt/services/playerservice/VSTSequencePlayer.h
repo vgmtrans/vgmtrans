@@ -97,6 +97,11 @@ private:
                                         const juce::AudioIODeviceCallbackContext& context) override;
 
 private:
+  std::vector<uint8_t> encode6BitVariableLengthQuantity(uint32_t value);
+  juce::MidiMessage createSysExMessage(uint8_t commandByte, uint8_t* data, uint32_t dataSize, uint8_t* eventBuffer);
+  uint64_t convertTo7BitMidiChunk(uint8_t* buf, uint8_t n);
+  void populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size);
+
   PlaybackState state;
 
   juce::MidiBuffer midiMessages;
@@ -106,6 +111,8 @@ private:
 
   juce::MidiBuffer midiBuffer;
   juce::MidiBuffer seekMidiBuffer;
+  juce::MidiBuffer sendSF2MidiBuffer;
+  bool readyToSendSF2 = false;
 
   juce::ScopedJuceInitialiser_GUI juceInitialiser;
   juce::AudioDeviceManager deviceManager;
