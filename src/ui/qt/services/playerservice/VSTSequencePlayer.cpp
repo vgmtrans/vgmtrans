@@ -13,9 +13,6 @@ using namespace std;
 VSTSequencePlayer::VSTSequencePlayer() = default;
 
 VSTSequencePlayer::~VSTSequencePlayer() {
-  if (client && client->isConnected()) {
-    client->disconnect();
-  }
   deviceManager.removeAudioCallback(this);
   deviceManager.closeAudioDevice();
   pluginPlayer.setProcessor(nullptr);
@@ -253,27 +250,158 @@ bool VSTSequencePlayer::loadVST() {
 }
 
 bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
-  client = make_unique<InstrClient>();
-
-  juce::String hostname("127.0.0.1");
-
-  if (! client->connectToSocket(hostname, kPortNumber, 5*1000)) {
-//  if (! client->connectToPipe(kPipeName, kPipeTimeout))  {
-    return false;
-  }
   SF2File* sf2 = coll->CreateSF2File();
   if (!sf2) {
     pRoot->AddLogItem(
         new LogItem("Failed to play collection as a soundfont file could not be produced.",
-                    LOG_LEVEL_ERR, "SequencePlayer"));
+                    LOG_LEVEL_ERR, "VSTSequencePlayer"));
     return false;
   }
 
   auto rawSF2 = sf2->SaveToMem();
-  auto memblk = juce::MemoryBlock(rawSF2, sf2->GetSize());
-  client->sendSF2File(memblk);
+  auto sf2Size = sf2->GetSize();
+  populateSF2MidiBuffer(rawSF2, sf2Size);
+
   delete[] rawSF2;
   return true;
+}
+
+// This reads n bytes from a buffer (where n is <= 7) and converts them into a n+1 size
+// chunk of 7-bit bytes. The first byte stores the 8th bit of every subsequent byte
+// starting from the 0th bit.
+uint64_t VSTSequencePlayer::convertTo7BitMidiChunk(uint8_t* buf, uint8_t n) {
+  uint64_t result = 0;
+  uint64_t firstByte = 0; // To store the combined 8th bits
+
+  // Iterate through the first n bytes of buf
+  for (uint8_t i = 0; i < n; ++i) {
+    // Extract the 8th bit and shift it into its position in the first byte
+    firstByte |= ((uint64_t)(buf[i] & 0x80) >> 7) << i;
+
+    // Clear the 8th bit of the current byte and place it in the result
+    result |= ((uint64_t)(buf[i] & 0x7F)) << (8 * ((n - 1) - i));
+  }
+
+  // Combine the first byte with the rest of the bytes in result
+  result |= firstByte << (8 * 7);
+  return result;
+}
+
+std::vector<uint8_t> VSTSequencePlayer::encode6BitVariableLengthQuantity(uint32_t value) {
+  std::vector<uint8_t> encodedBytes;
+  encodedBytes.reserve(6);
+
+  // Start with the least significant 7 bits of value
+  uint64_t buffer = value & 0x3F;
+
+  // Shift value to process next 7 bits
+  while (value >>= 6) {
+    // Move to the next 7 bits block and set the continuation bit
+    buffer <<= 8;
+    buffer |= ((value & 0x3F) | 0x40);
+  }
+
+  // Push bytes to the vector
+  while (true) {
+    encodedBytes.emplace_back(buffer & 0xFF);  // Push the least significant byte
+    if (buffer & 0x40) {
+      buffer >>= 8;  // Move to the next byte if the continuation bit is set
+    } else {
+      return encodedBytes;  // Last byte reached, exit loop
+    }
+  }
+}
+
+juce::MidiMessage VSTSequencePlayer::createSysExMessage(
+    uint8_t commandByte,
+    uint8_t* data,
+    uint32_t dataSize,
+    uint8_t* eventBuffer
+) {
+  int i = 0;
+  eventBuffer[i++] = 0xF0;
+  eventBuffer[i++] = 0x7D;
+  eventBuffer[i++] = commandByte;
+  memcpy(eventBuffer+i, data, dataSize);
+  i += dataSize;
+  eventBuffer[i++] = 0xF7;
+  return juce::MidiMessage(eventBuffer, i, 0);
+}
+
+void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size) {
+  // If an SF2 send is already queued, don't mess with the midi buffer
+  if (readyToSendSF2) {
+    return;
+  }
+
+  const size_t maxPacketSize = 64*1024 - 16; //65536-8;
+  const size_t chunkSize = 8; // Size of chunks to process
+  const size_t chunkDataSize = 7;
+
+  // Calculate the number of full chunks and the size of the last chunk (if any)
+  const size_t numFullChunks = sf2Size / chunkDataSize;
+  const size_t lastChunkSize = sf2Size % chunkDataSize;
+  const size_t chunksPerPacket = maxPacketSize / chunkSize;
+
+  auto packetBuf = new uint8_t[maxPacketSize];
+  auto eventBuf = new uint8_t[maxPacketSize];
+
+  auto test = encode6BitVariableLengthQuantity(0x1FFFFF);
+
+  // send a sysex message indicating the begin of the SF2 send and its total size
+  auto encodedSize = encode6BitVariableLengthQuantity(sf2Size);
+  auto startSF2SendEvent = createSysExMessage(
+    0x10,
+    encodedSize.data(),
+    encodedSize.size(),
+    eventBuf);
+
+  sendSF2MidiBuffer.addEvent(startSF2SendEvent, 0);
+
+  int chunkNum = 0;
+  int packetIx = 0;
+  for (size_t i = 0; i < numFullChunks; ++i) {
+    // Process each 8-byte chunk
+    uint64_t processedChunk = convertTo7BitMidiChunk(rawSF2 + i * chunkDataSize, chunkDataSize);
+
+    // Add the processed chunk to the packet data
+    for (int j = 7; j >= 0; --j) {
+      packetBuf[packetIx++] = (processedChunk >> (8 * j)) & 0xFF;
+    }
+    chunkNum += 1;
+    if (chunkNum == chunksPerPacket) {
+      // Packet is full. Store it in a MidiMessage and add it to the midiBuffer
+      auto packet = createSysExMessage(
+          0x11,
+          packetBuf,
+          packetIx,
+          eventBuf);
+      sendSF2MidiBuffer.addEvent(packet, 0);
+      packetIx = 0;
+      chunkNum = 0;
+    }
+  }
+
+  // Process the final partial data chunk if it exists
+  if (lastChunkSize > 0) {
+    uint64_t processedChunk = convertTo7BitMidiChunk(rawSF2 + numFullChunks * chunkDataSize, lastChunkSize);
+    for (int j = 7; j >= 0; --j) {
+      packetBuf[packetIx++] = (processedChunk >> (8 * j)) & 0xFF;
+    }
+  }
+
+  // Send the last packet if there's remaining data
+  if (packetIx > 0) {
+    auto packet = createSysExMessage(
+        0x11,
+        packetBuf,
+        packetIx,
+        eventBuf);
+    sendSF2MidiBuffer.addEvent(packet, 0);
+  }
+  readyToSendSF2 = true;
+  delete[] packetBuf;
+  delete[] eventBuf;
 }
 
 void VSTSequencePlayer::clearState() {
@@ -443,9 +571,18 @@ void VSTSequencePlayer::audioDeviceIOCallbackWithContext (const float* const* in
   buffer.clear();
   midiBuffer.clear();
 
+  // If the sendSF2MidiBuffer is non-empty, we'll exclusively process its messages in this
+  // callback iteration.
+  if (readyToSendSF2 && !sendSF2MidiBuffer.isEmpty()) {
+    pluginInstance->processBlock(buffer, sendSF2MidiBuffer);
+    sendSF2MidiBuffer.clear();
+    readyToSendSF2 = false;
+    return;
+  }
+
   // If the seekMidiBuffer is non-empty, we'll exclusively process its messages in this
   // callback iteration. After we clear the buffer, playback will commence next iteration.
-  if (! seekMidiBuffer.isEmpty()) {
+  if (!seekMidiBuffer.isEmpty()) {
     pluginInstance->processBlock(buffer, seekMidiBuffer);
     seekMidiBuffer.clear();
     return;
