@@ -22,6 +22,12 @@ MenuManager::MenuManager() {
       make_shared<SaveAsDLSCommand>(),
       make_shared<SaveAsOriginalFormatCommand>(),
   });
+  RegisterCommands<CPS1OPMInstrSet, VGMItem>({
+      make_shared<CloseVGMFileCommand>(),
+      make_shared<CommandSeparator>(),
+      make_shared<SaveAsOPMCommand>(),
+      make_shared<SaveAsOriginalFormatCommand>(),
+  });
   RegisterCommands<VGMSampColl, VGMItem>({
       make_shared<CloseVGMFileCommand>(),
       make_shared<CommandSeparator>(),

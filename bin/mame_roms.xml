@@ -351,6 +351,10 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x1000" >
             <rom>ms_09.12b</rom>
         </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>ms_18.11c</rom>
+            <rom>ms_19.12c</rom>
+        </romgroup>
     </game>
     <game name="mtwins" format="CPS1" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >

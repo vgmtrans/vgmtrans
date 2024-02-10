@@ -12,6 +12,7 @@
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
+#include "CPS1Instr.h"
 
 namespace fs = ghc::filesystem;
 
@@ -191,6 +192,17 @@ public:
   }
   [[nodiscard]] string Name() const override { return "Save as SF2"; }
   [[nodiscard]] string GetExtension() const override { return "sf2"; }
+};
+
+class SaveAsOPMCommand : public SaveCommand<CPS1OPMInstrSet, VGMFile> {
+public:
+  SaveAsOPMCommand() : SaveCommand<CPS1OPMInstrSet, VGMFile>(false) {}
+
+  void Save(const string& path, CPS1OPMInstrSet* instrSet) const override {
+    instrSet->SaveAsOPMFile(path);
+  }
+  [[nodiscard]] string Name() const override { return "Save as OPM"; }
+  [[nodiscard]] string GetExtension() const override { return "opm"; }
 };
 
 

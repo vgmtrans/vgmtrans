@@ -220,8 +220,10 @@ bool CPSTrackV1::ReadEvent(void) {
             break;
           }
           case YM2151:
-            curOffset++;
-            vol = 0;
+//            curOffset++;
+//            vol = 0;
+            vol = GetByte(curOffset++);
+            vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / (double) 0x1FFF);
             this->AddVol(beginOffset, curOffset - beginOffset, vol);
             break;
         }
