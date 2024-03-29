@@ -1,5 +1,6 @@
 <!DOCTYPE RCC><RCC version="1.0">
 <qresource>
+  <file>vgmtrans.png</file>
   <file>fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf</file>
   <file>images/open_file.svg</file>
   <file>images/player_play.svg</file>
@@ -21,6 +22,7 @@
   <file>images/binary.svg</file>
   <file>images/rest.svg</file>
   <file>images/tempo.svg</file>
-  <file>vgmtrans.png</file>
+  <file alias="legal/VGMTrans">../../../../LICENSE/LICENSE</file>
+  <file alias="legal/oki_adpcm_state">../../../../LICENSE/LICENSE_oki_adpcm_state</file>
 </qresource>
 </RCC>

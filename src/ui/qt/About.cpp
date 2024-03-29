@@ -7,17 +7,42 @@
 #include "About.h"
 
 #include <QVBoxLayout>
-#include <QHBoxLayout>
 #include <QLabel>
 #include <QPixmap>
 #include <QPushButton>
 #include <version.h>
+#include <QListWidget>
+#include <QTextEdit>
+#include <QDir>
+#include <QFile>
 
 About::About(QWidget *parent) : QDialog(parent) {
   setWindowTitle("About VGMTrans");
   setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint & Qt::Sheet);
   setWindowModality(Qt::WindowModal);
 
+  tabs = new QTabWidget(this);
+  tabs->setTabPosition(QTabWidget::TabPosition::North);
+
+  QWidget* infoTab = new QWidget();
+  QWidget* licensesTab = new QWidget();
+
+  setupInfoTab(infoTab);
+  setupLicensesTab(licensesTab);
+
+  tabs->addTab(infoTab, "Info");
+  tabs->addTab(licensesTab, "Licenses");
+
+  QVBoxLayout *layout = new QVBoxLayout(this);
+  layout->addWidget(tabs);
+  setLayout(layout);
+
+  auto close_btn = new QPushButton("Close");
+  connect(close_btn, &QPushButton::pressed, this, &QDialog::accept);
+  layout->addWidget(close_btn);
+}
+
+void About::setupInfoTab(QWidget* tab) {
   auto text = R"(
         <p style='font-size:36pt; font-weight:300; margin-bottom:0;'>VGMTrans</p>
         <p style='margin-top:0;'>Version: <b>%1 (%2, %3)</b></p>
@@ -45,13 +70,9 @@ About::About(QWidget *parent) : QDialog(parent) {
   QVBoxLayout *main_layout = new QVBoxLayout;
   QHBoxLayout *h_layout = new QHBoxLayout;
 
-  auto close_btn = new QPushButton("Close");
-  connect(close_btn, &QPushButton::pressed, this, &QDialog::accept);
-
-  setLayout(main_layout);
+  tab->setLayout(main_layout);
   main_layout->addLayout(h_layout);
   main_layout->addWidget(copyright);
-  main_layout->addWidget(close_btn);
 
   copyright->setAlignment(Qt::AlignCenter);
   copyright->setContentsMargins(0, 15, 0, 0);
@@ -59,6 +80,46 @@ About::About(QWidget *parent) : QDialog(parent) {
   h_layout->setAlignment(Qt::AlignLeft);
   h_layout->addWidget(logo);
   h_layout->addWidget(text_label);
+}
 
-  layout()->setSizeConstraint(QLayout::SetFixedSize);
+void About::setupLicensesTab(QWidget* tab) {
+  QHBoxLayout *layout = new QHBoxLayout(this);
+
+  QListWidget *listWidget = new QListWidget();
+  layout->addWidget(listWidget, 1);
+
+  QTextEdit *textEdit = new QTextEdit();
+  textEdit->setReadOnly(true);
+  layout->addWidget(textEdit, 3);
+
+  QMap<QString, QString> licenses;
+  loadLicenses(licenses);
+
+  for (const QString &lib : licenses.keys()) {
+    listWidget->addItem(lib);
+  }
+
+  connect(listWidget, &QListWidget::currentTextChanged, [textEdit, licenses](const QString &currentText) {
+    textEdit->setText(licenses.value(currentText));
+  });
+
+  tab->setLayout(layout);
+}
+
+void About::loadLicenses(QMap<QString, QString>& licenses) {
+  QDir directory(":/legal");
+
+  foreach (QString filename, directory.entryList(QDir::Files)) {
+    QFile file(directory.filePath(filename));
+
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+      QTextStream in(&file);
+      QString content = in.readAll();
+      licenses.insert(filename, content);
+
+      file.close();
+    } else {
+      qDebug() << "Failed to open file:" << filename;
+    }
+  }
 }
