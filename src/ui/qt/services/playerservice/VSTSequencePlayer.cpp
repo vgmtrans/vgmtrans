@@ -20,6 +20,10 @@ VSTSequencePlayer::~VSTSequencePlayer() {
 }
 
 void VSTSequencePlayer::initialize() {
+  initializeAudio();
+}
+
+void VSTSequencePlayer::initializeAudio() {
   juce::String error = deviceManager.initialiseWithDefaultDevices(0, 2);
 }
 
@@ -413,6 +417,9 @@ void VSTSequencePlayer::clearState() {
 }
 
 bool VSTSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
+  if (deviceManager.getCurrentAudioDevice() == nullptr) {
+    initializeAudio();
+  }
   clearState();
 
   // Convert the VGMSeq to midi, then allocate a vector to hold every midi event in the sequence
