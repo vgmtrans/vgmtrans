@@ -12,6 +12,7 @@
 #include "VGMSampColl.h"
 #include "VGMExport.h"
 #include "VGMColl.h"
+#include "CPS1Instr.h"
 
 namespace fs = std::filesystem;
 
@@ -188,6 +189,17 @@ public:
   }
   [[nodiscard]] std::string Name() const override { return "Save as SF2"; }
   [[nodiscard]] std::string GetExtension() const override { return "sf2"; }
+};
+
+class SaveAsOPMCommand : public SaveCommand<CPS1OPMInstrSet, VGMFile> {
+public:
+  SaveAsOPMCommand() : SaveCommand<CPS1OPMInstrSet, VGMFile>(false) {}
+
+  void Save(const string& path, CPS1OPMInstrSet* instrSet) const override {
+    instrSet->SaveAsOPMFile(path);
+  }
+  [[nodiscard]] string Name() const override { return "Save as OPM"; }
+  [[nodiscard]] string GetExtension() const override { return "opm"; }
 };
 
 
