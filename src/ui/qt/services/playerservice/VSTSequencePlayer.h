@@ -47,6 +47,7 @@ public:
   ~VSTSequencePlayer();
 
   void initialize();
+  void initializeAudio();
 
   /**
    * Loads a VGMColl for playback
