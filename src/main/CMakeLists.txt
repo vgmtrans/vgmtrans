@@ -23,7 +23,7 @@ file(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp"
 add_library(vgmtranscore OBJECT ${MAIN_FILES})
 
 configure_file("version.h.in" "version.h")
-target_include_directories(vgmtranscore PUBLIC . ./formats ./loaders
+target_include_directories(vgmtranscore PUBLIC . ./formats/common ./loaders
                                                ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore

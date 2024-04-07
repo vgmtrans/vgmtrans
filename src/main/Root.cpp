@@ -6,8 +6,8 @@
 #include "VGMColl.h"
 
 #include "Format.h"
-#include "AkaoFormat.h"
-#include "PS1Format.h"
+#include "formats/Akao/AkaoFormat.h"
+#include "formats/PS1/PS1Format.h"
 
 #include "PSF1Loader.h"
 #include "PSF2Loader.h"

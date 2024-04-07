@@ -4,7 +4,7 @@
 
 #include "pch.h"
 #include "PSXSPU.h"
-#include "PS1Format.h"
+#include "formats/PS1/PS1Format.h"
 
 using namespace std;
 

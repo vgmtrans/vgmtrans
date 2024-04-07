@@ -3,7 +3,7 @@
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "FFTFormat.h"
-#include "PS1Format.h"
+#include "formats/PS1/PS1Format.h"
 #include "Matcher.h"
 
 
