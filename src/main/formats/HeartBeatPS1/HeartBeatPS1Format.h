@@ -2,7 +2,7 @@
 #include "Format.h"
 #include "Root.h"
 #include "HeartBeatPS1Seq.h"
-#include "Vab.h"
+#include "formats/PS1/Vab.h"
 #include "HeartBeatPS1Scanner.h"
 #include "Matcher.h"
 #include "VGMColl.h"

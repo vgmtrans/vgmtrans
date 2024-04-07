@@ -1,7 +1,7 @@
 #pragma once
 #include "Scanner.h"
 #include "HeartBeatPS1Seq.h"
-#include "Vab.h"
+#include "formats/PS1/Vab.h"
 
 class HeartBeatPS1Scanner:
     public VGMScanner {
