@@ -6,12 +6,15 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  x86_64-apple-darwin:
-    name: macOS 11.x+, Intel
-    runs-on: macos-13
+  macos:
+    name: macOS 11.x+
+    runs-on: ${{ (matrix.target == 'x86_64' && 'macos-13') || 'macos-14' }}
+    strategy:
+      matrix:
+        target: [ "x86_64", "arm64" ]
     env:
       osx_min_ver: "11.0"
-      osx_arch: "x86_64"
+      HOMEBREW_PREFIX: ${{ (matrix.target == 'x86_64' && '/usr/local') || '/opt/homebrew' }}
     steps:
       - uses: actions/checkout@v3
       - name: "Install dependencies"
@@ -22,20 +25,20 @@ jobs:
       - name: "Prepare build"
         run: |
           cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.osx_min_ver }} \
-                -DCMAKE_OSX_ARCHITECTURES=${{ env.osx_arch }} \
+                -DCMAKE_OSX_ARCHITECTURES=${{ matrix.target }} \
                 -B build
       - name: "Build project"
         run: cmake --build build --config "Release" --parallel
       - working-directory: "build"
         name: "Package DMG (macOS)"
         run: |
-          /usr/local/opt/qt6/bin/macdeployqt \
+          ${{ env.HOMEBREW_PREFIX }}/bin/macdeployqt \
             bin/VGMTrans.app \
             -verbose=3 -dmg -always-overwrite -appstore-compliant
       - name: "Upload artifact"
         uses: actions/upload-artifact@v3
         with:
-          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ env.osx_arch }}-${{ runner.os }}.dmg
+          name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}.dmg
           path: "build/bin/VGMTrans.dmg"
   x86_64-pc-linux-gnu:
     runs-on: ubuntu-20.04
