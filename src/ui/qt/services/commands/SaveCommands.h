@@ -12,7 +12,7 @@
 #include "VGMSampColl.h"
 #include "VGMExport.h"
 #include "VGMColl.h"
-#include "CPS1Instr.h"
+#include "formats/CPS/CPS1Instr.h"
 
 namespace fs = std::filesystem;
 
