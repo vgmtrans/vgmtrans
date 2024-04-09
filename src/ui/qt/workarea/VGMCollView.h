@@ -30,8 +30,9 @@ public:
 
 public slots:
   void handleNewCollSelected(QModelIndex modelIndex);
+  void removeVGMColl(VGMColl* coll);
 
-private:
+public:
   VGMColl *m_coll;
 };
 
@@ -41,6 +42,7 @@ public:
   VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent = 0);
 
 private slots:
+  void removeVGMColl(VGMColl *coll);
   void doubleClickedSlot(QModelIndex);
   void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
   void selectRowForVGMFile(VGMFile *file);

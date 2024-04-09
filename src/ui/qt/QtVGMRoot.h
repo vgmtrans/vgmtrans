@@ -33,7 +33,6 @@ public:
   void UI_AddVGMSampColl(VGMSampColl* theSampColl) override;
   void UI_AddVGMMisc(VGMMiscFile* theMiscFile) override;
   void UI_AddVGMColl(VGMColl* theColl) override;
-  void UI_RemoveVGMColl(VGMColl* targColl) override;
   void UI_BeginRemoveVGMFiles() override;
   void UI_EndRemoveVGMFiles() override;
   void UI_AddItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
@@ -57,6 +56,7 @@ signals:
   void UI_AddedVGMFile();
   void UI_AddedVGMColl();
   void UI_RemovedVGMColl();
+  void UI_RemoveVGMColl(VGMColl* targColl) override;
   void UI_RemoveVGMFile(VGMFile* targFile) override;
   void UI_AddLogItem(LogItem* theLog) override;
 };

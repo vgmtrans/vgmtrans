@@ -125,6 +125,14 @@ bool VGMCollViewModel::containsVGMFile(VGMFile* file) {
   return m_coll->containsVGMFile(file);
 }
 
+void VGMCollViewModel::removeVGMColl(VGMColl* coll) {
+  if (m_coll != coll)
+    return;
+
+  // Select an invalid index to clear the view
+  handleNewCollSelected(QModelIndex());
+}
+
 
 VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
     : QGroupBox("Selected collection", parent) {
@@ -153,6 +161,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   m_listview->setSelectionRectVisible(true);
   m_listview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
+  connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMColl, this, &VGMCollView::removeVGMColl);
   connect(m_listview, &QListView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
   connect(m_listview->selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollView::handleSelectionChanged);
   connect(MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMCollView::selectRowForVGMFile);
@@ -189,6 +198,14 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   });
 
   setLayout(layout);
+}
+
+void VGMCollView::removeVGMColl(VGMColl *coll) {
+  if (vgmCollViewModel->m_coll != coll)
+    return;
+
+  m_collection_title->setText("No collection selected");
+  vgmCollViewModel->removeVGMColl(coll);
 }
 
 void VGMCollView::doubleClickedSlot(QModelIndex index) {
