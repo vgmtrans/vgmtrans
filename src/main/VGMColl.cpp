@@ -611,3 +611,24 @@ bool VGMColl::OnSaveAllSF2() {
   }
   return true;
 }
+
+// A helper lambda function to search a vector of VGMFile* for the file
+template<typename T>
+bool contains(const std::vector<T*>& vec, const VGMFile* file) {
+  return std::any_of(vec.begin(), vec.end(), [file](const VGMFile* elem) {
+    return elem == file;
+  });
+}
+
+bool VGMColl::containsVGMFile(const VGMFile* file) const {
+  // First, check if the file matches the seq property directly
+  if (seq == file) {
+    return true;
+  }
+
+  // Then, check in the vectors if the file is present
+  if (contains(instrsets, file) || contains(sampcolls, file) || contains(miscfiles, file)) {
+    return true;
+  }
+  return false;
+}

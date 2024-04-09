@@ -86,6 +86,46 @@ VGMFile *VGMCollViewModel::fileFromIndex(QModelIndex index) const {
   }
 }
 
+QModelIndex VGMCollViewModel::indexFromFile(VGMFile* file) const {
+  int row = 0;
+
+  // Check in miscfiles
+  auto miscIt = std::find(m_coll->miscfiles.begin(), m_coll->miscfiles.end(), file);
+  if (miscIt != m_coll->miscfiles.end()) {
+    return createIndex(std::distance(m_coll->miscfiles.begin(), miscIt), 0);
+  }
+  row += m_coll->miscfiles.size();
+
+  // Check in instrsets
+  auto instrIt = std::find(m_coll->instrsets.begin(), m_coll->instrsets.end(), file);
+  if (instrIt != m_coll->instrsets.end()) {
+    return createIndex(row + std::distance(m_coll->instrsets.begin(), instrIt), 0);
+  }
+  row += m_coll->instrsets.size();
+
+  // Check in sampcolls
+  auto sampIt = std::find(m_coll->sampcolls.begin(), m_coll->sampcolls.end(), file);
+  if (sampIt != m_coll->sampcolls.end()) {
+    return createIndex(row + std::distance(m_coll->sampcolls.begin(), sampIt), 0);
+  }
+  row += m_coll->sampcolls.size();
+
+  // Check if it's seq
+  if (m_coll->seq == file) {
+    return createIndex(row, 0);
+  }
+
+  // If not found, return an invalid QModelIndex
+  return QModelIndex();
+}
+
+bool VGMCollViewModel::containsVGMFile(VGMFile* file) {
+  if (!m_coll)
+    return false;
+  return m_coll->containsVGMFile(file);
+}
+
+
 VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
     : QGroupBox("Selected collection", parent) {
   auto layout = new QVBoxLayout();
@@ -107,13 +147,16 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   m_listview->setIconSize(QSize(16, 16));
   layout->addWidget(m_listview);
 
-  VGMCollViewModel *vgmCollViewModel = new VGMCollViewModel(collListSelModel, this);
+  vgmCollViewModel = new VGMCollViewModel(collListSelModel, this);
   m_listview->setModel(vgmCollViewModel);
   m_listview->setSelectionMode(QAbstractItemView::SingleSelection);
   m_listview->setSelectionRectVisible(true);
   m_listview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
   connect(m_listview, &QListView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
+  connect(m_listview->selectionModel(), &QItemSelectionModel::currentChanged, this, &VGMCollView::handleSelectionChanged);
+  connect(MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMCollView::selectRowForVGMFile);
+
 
   QObject::connect(collListSelModel, &QItemSelectionModel::currentChanged, [=](QModelIndex index) {
     if (!index.isValid() || qtVGMRoot.vVGMColl.empty() ||
@@ -151,4 +194,26 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 void VGMCollView::doubleClickedSlot(QModelIndex index) {
   auto file_to_open = qobject_cast<VGMCollViewModel *>(m_listview->model())->fileFromIndex(index);
   MdiArea::the()->newView(file_to_open);
+}
+
+void VGMCollView::handleSelectionChanged(const QModelIndex &current, const QModelIndex &previous) {
+  Q_UNUSED(previous);
+
+  if (current.isValid()) {
+    auto index = vgmCollViewModel->index(current.row());
+    VGMFile* file = vgmCollViewModel->fileFromIndex(index);
+    MdiArea::the()->focusView(file, this);
+  }
+}
+
+void VGMCollView::selectRowForVGMFile(VGMFile *file) {
+  if (!vgmCollViewModel->containsVGMFile(file)) {
+    m_listview->selectionModel()->clearSelection();
+    return;
+  }
+  auto index = vgmCollViewModel->indexFromFile(file);
+
+  // Select the row corresponding to the file
+  m_listview->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
+  m_listview->scrollTo(index, QAbstractItemView::EnsureVisible);
 }

@@ -37,6 +37,8 @@ class VGMColl
   bool OnSaveAllDLS();
   bool OnSaveAllSF2();
 
+  bool containsVGMFile(const VGMFile*) const;
+
   VGMSeq *seq;
   std::vector<VGMInstrSet *> instrsets;
   std::vector<VGMSampColl *> sampcolls;
