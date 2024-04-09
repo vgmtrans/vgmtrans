@@ -51,7 +51,7 @@ class VGMFileListView final : public QTableView {
 
    private slots:
     void onHeaderSectionResized(int index, int oldSize, int newSize);
-    void handleSelectionChanged(const QModelIndex &current, const QModelIndex &previous);
+    void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
 
    private:
     void keyPressEvent(QKeyEvent *input) override;

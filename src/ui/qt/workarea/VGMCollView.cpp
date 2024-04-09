@@ -154,7 +154,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   m_listview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
   connect(m_listview, &QListView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
-  connect(m_listview->selectionModel(), &QItemSelectionModel::currentChanged, this, &VGMCollView::handleSelectionChanged);
+  connect(m_listview->selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollView::handleSelectionChanged);
   connect(MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMCollView::selectRowForVGMFile);
 
 
@@ -196,14 +196,20 @@ void VGMCollView::doubleClickedSlot(QModelIndex index) {
   MdiArea::the()->newView(file_to_open);
 }
 
-void VGMCollView::handleSelectionChanged(const QModelIndex &current, const QModelIndex &previous) {
-  Q_UNUSED(previous);
+void VGMCollView::handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
+  Q_UNUSED(deselected);
 
-  if (current.isValid()) {
-    auto index = vgmCollViewModel->index(current.row());
-    VGMFile* file = vgmCollViewModel->fileFromIndex(index);
-    MdiArea::the()->focusView(file, this);
-  }
+  if (selected.indexes().isEmpty())
+    return;
+
+  QModelIndex firstSelectedIndex = selected.indexes().first();
+
+  if (!firstSelectedIndex.isValid())
+    return;
+
+  auto index = vgmCollViewModel->index(firstSelectedIndex.row());
+  VGMFile* file = vgmCollViewModel->fileFromIndex(index);
+  MdiArea::the()->focusView(file, this);
 }
 
 void VGMCollView::selectRowForVGMFile(VGMFile *file) {
