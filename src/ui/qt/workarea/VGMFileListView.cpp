@@ -144,7 +144,7 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QTableView(parent) {
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect( MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMFileListView::selectRowForVGMFile);
-  connect(selectionModel(), &QItemSelectionModel::currentChanged, this, &VGMFileListView::handleSelectionChanged);
+  connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::handleSelectionChanged);
 }
 
 void VGMFileListView::onHeaderSectionResized(int index, int oldSize, int newSize) {
@@ -235,13 +235,18 @@ void VGMFileListView::requestVGMFileView(QModelIndex index) {
   MdiArea::the()->newView(qtVGMRoot.vVGMFile[index.row()]);
 }
 
-void VGMFileListView::handleSelectionChanged(const QModelIndex &current, const QModelIndex &previous) {
-  Q_UNUSED(previous);
+void VGMFileListView::handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
+  Q_UNUSED(deselected);
 
-  if (current.isValid()) {
-    VGMFile* file = qtVGMRoot.vVGMFile[current.row()];
-    MdiArea::the()->focusView(file, this);
-  }
+  if (selected.indexes().isEmpty())
+    return;
+
+  QModelIndex firstSelectedIndex = selected.indexes().first();
+  if (!firstSelectedIndex.isValid())
+    return;
+
+  VGMFile* file = qtVGMRoot.vVGMFile[firstSelectedIndex.row()];
+  MdiArea::the()->focusView(file, this);
 }
 
 void VGMFileListView::selectRowForVGMFile(VGMFile *file) {

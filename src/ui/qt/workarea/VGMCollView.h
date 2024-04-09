@@ -42,7 +42,7 @@ public:
 
 private slots:
   void doubleClickedSlot(QModelIndex);
-  void handleSelectionChanged(const QModelIndex &current, const QModelIndex &previous);
+  void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
   void selectRowForVGMFile(VGMFile *file);
 
 private:
