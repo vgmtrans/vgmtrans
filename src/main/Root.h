@@ -41,7 +41,7 @@ class VGMRoot {
   void AddVGMFile(VGMFile *theFile);
   void RemoveVGMFile(VGMFile *theFile, bool bRemoveFromRaw = true);
   void AddVGMColl(VGMColl *theColl);
-  void RemoveVGMColl(VGMColl *theFile);
+  void RemoveVGMColl(VGMColl *theColl);
   void AddLogItem(LogItem *theLog);
   void AddScanner(const std::string &formatname);
 
