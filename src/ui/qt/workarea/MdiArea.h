@@ -31,8 +31,17 @@ public:
 
   void newView(VGMFile *file);
   void removeView(VGMFile *file);
+  void focusView(VGMFile *file, QWidget *caller);
+
+signals:
+  void vgmFileSelected(VGMFile *file);
+
+public slots:
+  void onSubWindowActivated(QMdiSubWindow *window);
 
 private:
   MdiArea(QWidget *parent = nullptr);
-  std::unordered_map<VGMFile *, QMdiSubWindow *> m_registered_views;
+  void ensureMaximizedSubWindow(QMdiSubWindow *window);
+  std::unordered_map<VGMFile *, QMdiSubWindow *> fileToWindowMap;
+  std::unordered_map<QMdiSubWindow *, VGMFile *> windowToFileMap;
 };

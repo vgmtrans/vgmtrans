@@ -143,6 +143,8 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QTableView(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
+  connect( MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMFileListView::selectRowForVGMFile);
+  connect(selectionModel(), &QItemSelectionModel::currentChanged, this, &VGMFileListView::handleSelectionChanged);
 }
 
 void VGMFileListView::onHeaderSectionResized(int index, int oldSize, int newSize) {
@@ -231,4 +233,30 @@ void VGMFileListView::removeVGMFile(VGMFile *file) {
 
 void VGMFileListView::requestVGMFileView(QModelIndex index) {
   MdiArea::the()->newView(qtVGMRoot.vVGMFile[index.row()]);
+}
+
+void VGMFileListView::handleSelectionChanged(const QModelIndex &current, const QModelIndex &previous) {
+  Q_UNUSED(previous);
+
+  if (current.isValid()) {
+    VGMFile* file = qtVGMRoot.vVGMFile[current.row()];
+    MdiArea::the()->focusView(file, this);
+  }
+}
+
+void VGMFileListView::selectRowForVGMFile(VGMFile *file) {
+
+  auto it = std::find(qtVGMRoot.vVGMFile.begin(), qtVGMRoot.vVGMFile.end(), file);
+  if (it == qtVGMRoot.vVGMFile.end())
+    return;
+  int row = static_cast<int>(std::distance(qtVGMRoot.vVGMFile.begin(), it));
+
+  // Select the row corresponding to the file
+  QModelIndex firstIndex = model()->index(row, 0); // First column of the row
+  QModelIndex lastIndex = model()->index(row, model()->columnCount() - 1); // Last column of the row
+
+  QItemSelection selection(firstIndex, lastIndex);
+  selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+
+  scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
 }

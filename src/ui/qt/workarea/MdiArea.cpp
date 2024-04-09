@@ -17,6 +17,8 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setTabsMovable(true);
   setTabsClosable(true);
 
+  connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
+
   auto *tab_bar = findChild<QTabBar *>();
   if (tab_bar) {
     #ifdef __APPLE__
@@ -29,9 +31,9 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
 }
 
 void MdiArea::newView(VGMFile *file) {
-  auto it = m_registered_views.find(file);
+  auto it = fileToWindowMap.find(file);
   // Check if a fileview for this vgmfile already exists
-  if (it != m_registered_views.end()) {
+  if (it != fileToWindowMap.end()) {
     // If it does, let's focus it
     auto *vgmfile_view = it->second;
     vgmfile_view->setFocus();
@@ -39,16 +41,16 @@ void MdiArea::newView(VGMFile *file) {
     // No VGMFileView could be found, we have to make one
     auto *vgmfile_view = new VGMFileView(file);
     auto tab = addSubWindow(vgmfile_view, Qt::SubWindow);
+    fileToWindowMap.insert(std::make_pair(file, tab));
+    windowToFileMap.insert(std::make_pair(tab, file));
     tab->show();
-
-    m_registered_views.insert(std::make_pair(file, tab));
   }
 }
 
 void MdiArea::removeView(VGMFile *file) {
   // Let's check if we have a VGMFileView to remove
-  auto it = m_registered_views.find(file);
-  if (it != m_registered_views.end()) {
+  auto it = fileToWindowMap.find(file);
+  if (it != fileToWindowMap.end()) {
     // Sanity check
     if (it->second) {
       // Close the tab (automatically deletes it)
@@ -56,6 +58,40 @@ void MdiArea::removeView(VGMFile *file) {
       it->second->close();
     }
     // Get rid of the saved pointers
-    m_registered_views.erase(file);
+    windowToFileMap.erase(it->second);
+    fileToWindowMap.erase(file);
+  }
+}
+
+void MdiArea::focusView(VGMFile *file, QWidget *caller) {
+  auto it = fileToWindowMap.find(file);
+  if (it != fileToWindowMap.end()) {
+    QMdiSubWindow *window = it->second;
+    setActiveSubWindow(window);
+
+    // Reassert the focus back to the caller
+    if (caller) {
+      caller->setFocus();
+    }
+  }
+}
+
+void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
+  // For some reason, if multiple documents are open, closing one document causes the others
+  // to become windowed instead of maximized. This fixes the problem.
+  ensureMaximizedSubWindow(window);
+
+  if (window) {
+    auto it = windowToFileMap.find(window);
+    if (it != windowToFileMap.end()) {
+      VGMFile *file = it->second;
+      emit vgmFileSelected(file);
+    }
+  }
+}
+
+void MdiArea::ensureMaximizedSubWindow(QMdiSubWindow *window) {
+  if (window && !window->isMaximized()) {
+    window->showMaximized();
   }
 }

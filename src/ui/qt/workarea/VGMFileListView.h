@@ -43,6 +43,7 @@ class VGMFileListView final : public QTableView {
    public slots:
     void requestVGMFileView(QModelIndex index);
     void removeVGMFile(VGMFile *file);
+    void selectRowForVGMFile(VGMFile *file);
 
    protected:
     void scrollContentsBy(int dx, int dy) override;
@@ -50,6 +51,7 @@ class VGMFileListView final : public QTableView {
 
    private slots:
     void onHeaderSectionResized(int index, int oldSize, int newSize);
+    void handleSelectionChanged(const QModelIndex &current, const QModelIndex &previous);
 
    private:
     void keyPressEvent(QKeyEvent *input) override;
