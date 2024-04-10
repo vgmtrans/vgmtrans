@@ -30,7 +30,6 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   m_hexScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   m_hexScrollArea->setWidgetResizable(true);
   m_hexScrollArea->setWidget(m_hexview);
-  m_hexScrollArea->show();
 
   m_splitter->addWidget(m_hexScrollArea);
   m_splitter->addWidget(m_treeview);

@@ -43,7 +43,7 @@ void MdiArea::newView(VGMFile *file) {
     auto tab = addSubWindow(vgmfile_view, Qt::SubWindow);
     fileToWindowMap.insert(std::make_pair(file, tab));
     windowToFileMap.insert(std::make_pair(tab, file));
-    tab->show();
+    tab->showMaximized();
   }
 }
 
