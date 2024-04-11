@@ -22,6 +22,7 @@ class MainWindow final : public QMainWindow {
 
 public:
   MainWindow();
+  void showEvent(QShowEvent* event) override;
 
 protected:
   void dragEnterEvent(QDragEnterEvent *event) override;
@@ -37,6 +38,7 @@ private:
 
   QDockWidget *m_rawfile_dock{};
   QDockWidget *m_vgmfile_dock{};
+  QDockWidget *m_coll_dock{};
   MenuBar *m_menu_bar{};
   IconBar *m_icon_bar{};
   Logger *m_logger{};

@@ -76,6 +76,8 @@ add_executable(
   widgets/MarqueeLabel.h
   widgets/TableView.cpp
   widgets/TableView.h
+  widgets/TitleBar.cpp
+  widgets/TitleBar.h
   workarea/HexView.cpp
   workarea/HexView.h
   workarea/MdiArea.cpp

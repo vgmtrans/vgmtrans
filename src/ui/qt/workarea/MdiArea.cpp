@@ -21,11 +21,8 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
 
   auto *tab_bar = findChild<QTabBar *>();
   if (tab_bar) {
-    #ifdef __APPLE__
-    tab_bar->setExpanding(true);
-    #else
+    tab_bar->setStyleSheet("QTabBar::tab { height: 30; }");
     tab_bar->setExpanding(false);
-    #endif
     tab_bar->setUsesScrollButtons(true);
   }
 }

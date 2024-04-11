@@ -13,6 +13,7 @@
 #include <QGridLayout>
 #include <QPushButton>
 #include <QMessageBox>
+#include <QLabel>
 #include <version.h>
 #include "ManualCollectionDialog.h"
 #include "MainWindow.h"
@@ -27,6 +28,7 @@
 #include "workarea/VGMCollListView.h"
 #include "workarea/VGMCollView.h"
 #include "workarea/MdiArea.h"
+#include "TitleBar.h"
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
@@ -56,15 +58,16 @@ void MainWindow::createElements() {
   m_rawfile_dock = new QDockWidget("Raw files");
   m_rawfile_dock->setWidget(new RawFileListView());
   m_rawfile_dock->setContentsMargins(0, 0, 0, 0);
-  m_rawfile_dock->setTitleBarWidget(new QWidget());
+  m_rawfile_dock->setTitleBarWidget(new TitleBar("Raw Files"));
 
-  m_vgmfile_dock = new QDockWidget("Detected music files");
+  m_vgmfile_dock = new QDockWidget("Detected Music Files");
   m_vgmfile_dock->setWidget(new VGMFileListView());
   m_vgmfile_dock->setContentsMargins(0, 0, 0, 0);
-  m_vgmfile_dock->setTitleBarWidget(new QWidget());
+  m_vgmfile_dock->setTitleBarWidget(new TitleBar("Detected Music Files"));
+
 
   addDockWidget(Qt::LeftDockWidgetArea, m_rawfile_dock);
-  tabifyDockWidget(m_rawfile_dock, m_vgmfile_dock);
+  splitDockWidget(m_rawfile_dock, m_vgmfile_dock, Qt::Orientation::Vertical);
   m_vgmfile_dock->setFocus();
 
   setCentralWidget(MdiArea::the());
@@ -86,22 +89,36 @@ void MainWindow::createElements() {
   coll_layout->addWidget(coll_list_area, 0, 1, -1, -1);
   coll_wrapper->setLayout(coll_layout);
 
-  auto coll_widget = new QDockWidget("Collections");
-  coll_widget->setWidget(coll_wrapper);
-  coll_widget->setContentsMargins(0, 0, 0, 0);
-  addDockWidget(Qt::BottomDockWidgetArea, coll_widget);
-  coll_widget->setTitleBarWidget(new QWidget());
+  m_coll_dock = new QDockWidget("Collections");
+  m_coll_dock->setWidget(coll_wrapper);
+  m_coll_dock->setContentsMargins(0, 0, 0, 0);
+  addDockWidget(Qt::BottomDockWidgetArea, m_coll_dock);
+  m_coll_dock->setTitleBarWidget(new QWidget());
 
   m_logger = new Logger();
   addDockWidget(Qt::BottomDockWidgetArea, m_logger);
   m_logger->setTitleBarWidget(new QWidget());
 
-  tabifyDockWidget(m_logger, coll_widget);
-  coll_widget->setFocus();
+  tabifyDockWidget(m_logger, m_coll_dock);
+  m_coll_dock->setFocus();
 
   QList<QDockWidget *> docks = findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly);
   m_menu_bar = new MenuBar(this, docks);
   setMenuBar(m_menu_bar);
+}
+
+void MainWindow::showEvent(QShowEvent* event) {
+  QMainWindow::showEvent(event);
+
+  // Set the initial heights of the docks in relation to the main window height
+  QList<int> sizes;
+  int totalHeight = this->height();
+  // Calculate the desired heights for the dock widgets
+  sizes << totalHeight * 3 / 10;   // Raw Files
+  sizes << totalHeight * 7 / 10;   // VGM Files
+  sizes << totalHeight / 4;        // Collections
+
+  resizeDocks({m_rawfile_dock, m_vgmfile_dock, m_coll_dock}, sizes, Qt::Vertical);
 }
 
 void MainWindow::routeSignals() {
@@ -141,7 +158,6 @@ void MainWindow::dropEvent(QDropEvent *event) {
     openFileInternal(file.toLocalFile());
   }
 
-  setBackgroundRole(QPalette::Dark);
   event->acceptProposedAction();
 }
 
