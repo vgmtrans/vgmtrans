@@ -11,7 +11,7 @@
 #include <typeinfo>
 #include <QMenu>
 #include "Root.h"
-#include "util/UIHelpers.h"
+#include "UIHelpers.h"
 
 #include <ghc/filesystem.hpp>
 

@@ -108,51 +108,18 @@ void VGMFileListModel::RemoveVGMFile() {
  *  VGMFileListView
  */
 
-VGMFileListView::VGMFileListView(QWidget *parent) : QTableView(parent) {
+VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setSelectionBehavior(QAbstractItemView::SelectRows);
-  setAlternatingRowColors(true);
-  setShowGrid(false);
-  setSortingEnabled(false);
-  setContextMenuPolicy(Qt::CustomContextMenu);
-  setWordWrap(false);
 
   view_model = new VGMFileListModel();
   setModel(view_model);
 
-  verticalHeader()->hide();
-  auto header_hor = horizontalHeader();
-  header_hor->setSectionsMovable(true);
-  header_hor->setHighlightSections(true);
-  header_hor->setSectionResizeMode(QHeaderView::Interactive);
-  header_hor->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-  header_hor->setSectionResizeMode(1, QHeaderView::Fixed);
-  header_hor->setStyleSheet("QHeaderView::section { padding-left: 6px; }");
-
-  // set the "Format" section header size
-  QFont headerFont = header_hor->font();
-  QFontMetrics fm(headerFont);
-  QVariant headerTextVariant = view_model->headerData(1, Qt::Horizontal, Qt::DisplayRole);
-  auto headerText = headerTextVariant.isValid() ? headerTextVariant.toString() : "Format";
-  int textWidth = fm.horizontalAdvance(headerText);
-  setColumnWidth(1, textWidth + 45);
-
-  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-
-  connect(header_hor, &QHeaderView::sectionResized, this, &VGMFileListView::onHeaderSectionResized);
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect( MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMFileListView::selectRowForVGMFile);
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::handleSelectionChanged);
-}
-
-void VGMFileListView::onHeaderSectionResized(int index, int oldSize, int newSize) {
-  // When a header section is resized, the other should full the rest of the header width
-  int otherIndex = (index == 0) ? 1 : 0;
-  int otherSize = width() - newSize;
-
-  setColumnWidth(otherIndex, otherSize);
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
@@ -207,23 +174,6 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
     default:
       QTableView::keyPressEvent(input);
   }
-}
-
-void VGMFileListView::scrollContentsBy(int dx, int dy) {
-  // Call the base class implementation with dx set to 0 to disable horizontal scrolling
-  // We disable horizontal scrolling so that we can hide final header column splitter
-  QTableView::scrollContentsBy(0, dy);
-}
-
-void VGMFileListView::resizeEvent(QResizeEvent *event) {
-  QAbstractItemView::resizeEvent(event);
-  resizeColumns();
-}
-
-void VGMFileListView::resizeColumns() {
-  // Ensure the columns take up the full width of the header. Only the "Name" column should expand/contract
-  int formatColumnWidth = columnWidth(1);
-  setColumnWidth(0, width() - formatColumnWidth);
 }
 
 void VGMFileListView::removeVGMFile(VGMFile *file) {

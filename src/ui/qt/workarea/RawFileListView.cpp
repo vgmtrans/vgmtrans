@@ -99,22 +99,13 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
  * RawFileListView
  */
 
-RawFileListView::RawFileListView(QWidget *parent) : QTableView(parent) {
+RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
   rawFileListViewModel = new RawFileListViewModel(this);
   setModel(rawFileListViewModel);
-  setAlternatingRowColors(true);
-  setShowGrid(false);
-  setWordWrap(false);
   setIconSize(QSize(16, 16));
 
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setSelectionBehavior(QAbstractItemView::SelectRows);
-
-  verticalHeader()->hide();
-  auto header_hor = horizontalHeader();
-  header_hor->setSectionsMovable(true);
-  header_hor->setHighlightSections(true);
-  header_hor->setSectionResizeMode(QHeaderView::Stretch);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
   rawfile_context_menu = new QMenu();
