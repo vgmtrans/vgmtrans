@@ -7,6 +7,7 @@
 #pragma once
 #include <QAbstractTableModel>
 #include <QTableView>
+#include "TableView.h"
 
 class RawFileListViewModel : public QAbstractTableModel {
   Q_OBJECT
@@ -25,7 +26,7 @@ private:
   enum Property : uint8_t { Name = 0, ContainedFiles = 1 };
 };
 
-class RawFileListView : public QTableView {
+class RawFileListView : public TableView {
   Q_OBJECT
 
 public:

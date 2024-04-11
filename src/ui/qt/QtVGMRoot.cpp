@@ -9,7 +9,7 @@
 #include <QString>
 #include "QtVGMRoot.h"
 #include "VGMFileTreeView.h"
-#include "util/UIHelpers.h"
+#include "UIHelpers.h"
 
 QtVGMRoot qtVGMRoot;
 

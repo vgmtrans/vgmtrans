@@ -10,6 +10,7 @@
 #include <QAbstractTableModel>
 #include <QKeyEvent>
 #include <QSortFilterProxyModel>
+#include "TableView.h"
 
 #include "services/MenuManager.h"
 
@@ -34,7 +35,7 @@ class VGMFileListModel : public QAbstractTableModel {
     enum Property : uint8_t { Name = 0, Format = 1 };
 };
 
-class VGMFileListView final : public QTableView {
+class VGMFileListView final : public TableView {
     Q_OBJECT
 
    public:
@@ -45,18 +46,12 @@ class VGMFileListView final : public QTableView {
     void removeVGMFile(VGMFile *file);
     void selectRowForVGMFile(VGMFile *file);
 
-   protected:
-    void scrollContentsBy(int dx, int dy) override;
-    void resizeEvent(QResizeEvent *event) override;
-
    private slots:
-    void onHeaderSectionResized(int index, int oldSize, int newSize);
     void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
 
    private:
     void keyPressEvent(QKeyEvent *input) override;
     void itemMenu(const QPoint &pos);
-    void resizeColumns();
 
     MenuManager menuManager;
 

@@ -15,8 +15,8 @@
 #include <QPushButton>
 
 #include "SequencePlayer.h"
-#include "util/Helpers.h"
-#include "util/MarqueeLabel.h"
+#include "Helpers.h"
+#include "MarqueeLabel.h"
 
 IconBar::IconBar(QWidget *parent) : QWidget(parent) {
   setLayout(new QHBoxLayout());

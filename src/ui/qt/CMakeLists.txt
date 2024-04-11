@@ -70,10 +70,12 @@ add_executable(
   util/Helpers.cpp
   util/Helpers.h
   util/LambdaEventFilter.h
-  util/MarqueeLabel.cpp
-  util/MarqueeLabel.h
   util/UIHelpers.cpp
   util/UIHelpers.h
+  widgets/MarqueeLabel.cpp
+  widgets/MarqueeLabel.h
+  widgets/TableView.cpp
+  widgets/TableView.h
   workarea/HexView.cpp
   workarea/HexView.h
   workarea/MdiArea.cpp
@@ -91,7 +93,7 @@ add_executable(
   workarea/VGMFileListView.cpp
   workarea/VGMFileListView.h)
 
-target_include_directories(vgmtrans PRIVATE . ./util ./workarea)
+target_include_directories(vgmtrans PRIVATE . ./util ./widgets ./workarea)
 
 target_link_libraries(
   vgmtrans
