@@ -103,6 +103,12 @@ int HexView::getVirtualWidth() const {
   return (numChars * charWidth) + SELECTION_PADDING;
 }
 
+int HexView::getVirtualWidthSansAscii() const {
+  const int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
+                       (HEX_TO_ASCII_SPACING_CHARS / 2);
+  return (numChars * charWidth) + SELECTION_PADDING;
+}
+
 int HexView::getTotalLines() {
   return (vgmfile->unLength + BYTES_PER_LINE - 1) / BYTES_PER_LINE;
 }

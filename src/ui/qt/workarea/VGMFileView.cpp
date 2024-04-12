@@ -18,7 +18,7 @@
 
 VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
-  m_splitter = new QSplitter(Qt::Horizontal, this);
+  m_splitter = new SnappingSplitter(Qt::Horizontal, this);
 
   setWindowTitle(QString::fromStdString(*m_vgmfile->GetName()));
   setWindowIcon(iconForFileType(m_vgmfile->GetFileType()));
@@ -36,6 +36,10 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   m_splitter->setSizes(QList<int>{hexViewWidth(), treeViewMinimumWidth});
   m_splitter->setStretchFactor(0, 0);
   m_splitter->setStretchFactor(1, 1);
+  m_splitter->persistState();
+  m_splitter->addCollapseRange(0, 0, hexViewWidthSansAscii());
+  m_splitter->addCollapseRange(0, hexViewWidthSansAscii(), hexViewWidth()
+  );
   m_hexScrollArea->setMaximumWidth(hexViewWidth());
   m_treeview->setMinimumWidth(treeViewMinimumWidth);
 
@@ -72,6 +76,10 @@ int VGMFileView::hexViewWidth() {
   return m_hexview->getVirtualWidth() + hexViewPadding;
 }
 
+int VGMFileView::hexViewWidthSansAscii() {
+  return m_hexview->getVirtualWidthSansAscii() - hexViewPadding;
+}
+
 void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
   // Increment the font size until it has an actual effect on width
   QFont font = m_hexview->font();
@@ -99,7 +107,11 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
   int fullWidthAfterResize = hexViewWidth();
   int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
   int newWidth = actualWidthBeforeResize + static_cast<int>(round(static_cast<float>(widthChange) * percentHexViewVisible));
+  m_splitter->clearCollapseRanges();
+  m_splitter->addCollapseRange(0, 0, hexViewWidthSansAscii());
+  m_splitter->addCollapseRange(0, hexViewWidthSansAscii(), fullWidthAfterResize);
   m_splitter->setSizes(QList<int>{newWidth, treeViewMinimumWidth});
+  m_splitter->persistState();
 }
 
 void VGMFileView::closeEvent(QCloseEvent *) {
