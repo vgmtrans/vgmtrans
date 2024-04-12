@@ -74,6 +74,8 @@ add_executable(
   util/UIHelpers.h
   widgets/MarqueeLabel.cpp
   widgets/MarqueeLabel.h
+  widgets/SnappingSplitter.cpp
+  widgets/SnappingSplitter.h
   widgets/TableView.cpp
   widgets/TableView.h
   widgets/TitleBar.cpp

@@ -8,6 +8,7 @@
 #include <QMdiSubWindow>
 #include <QSplitter>
 #include <QBuffer>
+#include "SnappingSplitter.h"
 
 class VGMFile;
 class HexView;
@@ -23,17 +24,18 @@ public:
 
 private:
   static constexpr int hexViewPadding = 15;  // Extra horizontal padding for view's max width
-  static constexpr int treeViewMinimumWidth = 235;
+  static constexpr int treeViewMinimumWidth = 200;
 
   void closeEvent(QCloseEvent *closeEvent) override;
   int hexViewWidth();
+  int hexViewWidthSansAscii();
   void updateHexViewFont(qreal sizeIncrement);
 
   VGMFileTreeView* m_treeview{};
   VGMFile* m_vgmfile{};
   QScrollArea* m_hexScrollArea;
   HexView* m_hexview{};
-  QSplitter* m_splitter;
+  SnappingSplitter* m_splitter;
 
 public slots:
   void onSelectionChange(VGMItem* item);

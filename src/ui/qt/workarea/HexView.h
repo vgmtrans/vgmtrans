@@ -21,6 +21,7 @@ public:
   void setSelectedItem(VGMItem* item);
   void setFont(QFont& font);
   int getVirtualWidth() const;
+  int getVirtualWidthSansAscii() const;
 
 protected:
   bool event(QEvent *event) override;
