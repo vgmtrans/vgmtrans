@@ -9,12 +9,12 @@
 #include <QShortcut>
 #include <QFont>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <VGMFile.h>
 #include "HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
 #include "Helpers.h"
-#include <QScrollBar>
 
 VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
@@ -28,6 +28,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   m_hexScrollArea = new QScrollArea;
   m_hexScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_hexScrollArea->horizontalScrollBar()->setEnabled(false);
   m_hexScrollArea->setWidgetResizable(true);
   m_hexScrollArea->setWidget(m_hexview);
 
@@ -37,13 +38,10 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   m_splitter->setStretchFactor(0, 0);
   m_splitter->setStretchFactor(1, 1);
   m_splitter->persistState();
-  m_splitter->addCollapseRange(0, 0, hexViewWidthSansAscii());
-  m_splitter->addCollapseRange(0, hexViewWidthSansAscii(), hexViewWidth()
-  );
+  m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
+  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewWidth());
   m_hexScrollArea->setMaximumWidth(hexViewWidth());
   m_treeview->setMinimumWidth(treeViewMinimumWidth);
-
-
 
   connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
 
@@ -73,11 +71,15 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 }
 
 int VGMFileView::hexViewWidth() {
-  return m_hexview->getVirtualWidth() + hexViewPadding;
+  return m_hexview->getViewportWidth();
 }
 
 int VGMFileView::hexViewWidthSansAscii() {
-  return m_hexview->getVirtualWidthSansAscii() - hexViewPadding;
+  return m_hexview->getViewportWidthSansAscii();
+}
+
+int VGMFileView::hexViewWidthSansAsciiAndAddress() {
+  return m_hexview->getViewportWidthSansAsciiAndAddress();
 }
 
 void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
@@ -107,9 +109,9 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
   int fullWidthAfterResize = hexViewWidth();
   int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
   int newWidth = actualWidthBeforeResize + static_cast<int>(round(static_cast<float>(widthChange) * percentHexViewVisible));
-  m_splitter->clearCollapseRanges();
-  m_splitter->addCollapseRange(0, 0, hexViewWidthSansAscii());
-  m_splitter->addCollapseRange(0, hexViewWidthSansAscii(), fullWidthAfterResize);
+  m_splitter->clearSnapRanges();
+  m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
+  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewWidth());
   m_splitter->setSizes(QList<int>{newWidth, treeViewMinimumWidth});
   m_splitter->persistState();
 }

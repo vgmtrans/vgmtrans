@@ -25,6 +25,7 @@
 #define ADDRESS_SPACING_CHARS 4
 #define HEX_TO_ASCII_SPACING_CHARS 4
 #define SELECTION_PADDING 20
+#define VIEWPORT_PADDING 15
 #define DIM_DURATION_MS 200
 
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
@@ -93,6 +94,14 @@ void HexView::setFont(QFont& font) {
   drawSelectedItem();
 }
 
+// The x offset to print hexadecimal
+int HexView::hexXOffset() {
+  if (showOffset)
+    return ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth);
+  else
+    return 0;
+}
+
 int HexView::getVirtualHeight() {
   return lineHeight * getTotalLines();
 }
@@ -107,6 +116,23 @@ int HexView::getVirtualWidthSansAscii() const {
   const int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
                        (HEX_TO_ASCII_SPACING_CHARS / 2);
   return (numChars * charWidth) + SELECTION_PADDING;
+}
+
+int HexView::getVirtualWidthSansAsciiAndAddress() const {
+  const int numChars = (BYTES_PER_LINE * 3) + (HEX_TO_ASCII_SPACING_CHARS / 2);
+  return (numChars * charWidth) + SELECTION_PADDING;
+}
+
+int HexView::getViewportWidth() const {
+  return getVirtualWidth() + VIEWPORT_PADDING;
+}
+
+int HexView::getViewportWidthSansAscii() const {
+  return getVirtualWidthSansAscii() - VIEWPORT_PADDING;
+}
+
+int HexView::getViewportWidthSansAsciiAndAddress() const {
+  return getVirtualWidthSansAsciiAndAddress() - VIEWPORT_PADDING;
 }
 
 int HexView::getTotalLines() {
@@ -157,8 +183,10 @@ void HexView::setSelectedItem(VGMItem *item) {
 }
 
 void HexView::resizeOverlays(int height) {
+  int x = hexXOffset() - (charWidth/2);
   overlay->setGeometry(
-      ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth) - charWidth/2, overlay->y(),
+      x,
+      overlay->y(),
       ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) * charWidth) + charWidth/2,
       height
   );
@@ -201,12 +229,46 @@ void HexView::changeEvent(QEvent *event) {
     scrollArea->installEventFilter(
       new LambdaEventFilter([this]([[maybe_unused]] QObject* obj, QEvent* event) -> bool {
           if (event->type() == QEvent::Resize) {
-            redrawOverlay();
+            QScrollArea* scrollArea = getContainingScrollArea(this);
+
+            printf("scrollArea->width: %d\n", scrollArea->width());
+
+            int scrollAreaWidth = scrollArea->width();
+            int scrollAreaHeight = scrollArea->height();
+
+            if (scrollAreaHeight != prevHeight) {
+              redrawOverlay();
+            }
+            prevHeight = scrollAreaHeight;
+
+            if (scrollAreaWidth == prevWidth ||
+                (scrollAreaWidth > getViewportWidthSansAsciiAndAddress() &&
+                scrollAreaWidth != getViewportWidthSansAscii() &&
+                scrollAreaWidth != getViewportWidth())) {
+
+              return false;
+            }
+            prevWidth = scrollAreaWidth;
+
+            bool prevShowOffset = showOffset;
+            showOffset = scrollAreaWidth > getViewportWidthSansAsciiAndAddress();
+
+            if (prevShowOffset != showOffset) {
+              prevSelectedItem = nullptr;
+              lineCache.clear();
+              drawSelectedItem();
+              redrawOverlay();
+            }
+
+            printf("scrollArea->width: %d  scrollArea->viewport()->width() %d  width(): %d\n",
+                   scrollArea->width(), scrollArea->viewport()->width(), QWidget::width());
+
             // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
             // scroll events don't trigger on resize, and the user could expand the viewport so that it's in view
             if (selectedItem && selectionView) {
               selectionView->show();
             }
+
             return false;
           }
           return false;
@@ -400,8 +462,11 @@ void HexView::paintEvent(QPaintEvent *e) {
 
 void HexView::printLine(QPainter& painter, int line) {
   painter.save();
-  printAddress(painter, line);
-  painter.translate((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth, 0);
+  if (showOffset) {
+    printAddress(painter, line);
+  }
+  painter.translate(hexXOffset(), 0);
+
   auto startAddress = vgmfile->dwOffset + (line * BYTES_PER_LINE);
   auto endAddress = vgmfile->dwOffset + vgmfile->unLength;
   printData(painter, startAddress, endAddress);
@@ -618,7 +683,7 @@ void HexView::drawSelectedItem() {
   int startColumn = baseOffset % BYTES_PER_LINE;
   int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
 
-  int widgetX = ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth) - SELECTION_PADDING;
+  int widgetX = hexXOffset() - SELECTION_PADDING;
   int widgetY = (startLine * lineHeight) - SELECTION_PADDING;
   int widgetWidth = (((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) *
                      charWidth) + (SELECTION_PADDING * 2);
@@ -631,7 +696,7 @@ void HexView::drawSelectedItem() {
 // Find the VGMFile offset represented at the given QPoint. Returns -1 for invalid points.
 int HexView::getOffsetFromPoint(QPoint pos) {
   auto halfCharWidth = charWidth / 2;
-  auto hexStart = (NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth;
+  auto hexStart = hexXOffset();
   auto hexEnd = hexStart + (BYTES_PER_LINE * 3 * charWidth);
 
   auto asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * charWidth);
