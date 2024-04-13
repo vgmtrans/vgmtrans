@@ -8,6 +8,7 @@
 
 #include "SnappingSplitter.h"
 #include <QMouseEvent>
+#include <QScrollArea>
 
 SnappingSplitter::SnappingSplitter(Qt::Orientation orientation, QWidget* parent)
     : QSplitter(orientation, parent) {
@@ -16,18 +17,26 @@ SnappingSplitter::SnappingSplitter(Qt::Orientation orientation, QWidget* parent)
 
 void SnappingSplitter::onSplitterMoved() {
   printf("splitterMoved\n");
-  enforceConfigurations();
+  enforceSnapRanges();
   state = saveState();
+  persistState();
 }
 
 void SnappingSplitter::resizeEvent(QResizeEvent* event) {
-  QSplitter::resizeEvent(event);
-  restoreState(state);
-  enforceConfigurationsOnResize();
+//  QSplitter::resizeEvent(event);
+//  if (bDoRestore) {
+    restoreState(state);
+    bDoRestore = false;
+//  }
+//  printf("sizes[0]: %d\n", sizes()[0]);
+
+    if (!enforceSnapRangesOnResize()) {
+      forceWidgetWidth(0);
+    }
 }
 
-void SnappingSplitter::enforceConfigurations() {
-  for (const CollapseRange& range : collapseRanges) {
+void SnappingSplitter::enforceSnapRanges() {
+  for (const SnapRange& range : snapRanges) {
     QList<int> sizes = this->sizes();
 
     int halfway = range.upperBound + (range.lowerBound - range.upperBound) / 2;
@@ -45,14 +54,17 @@ void SnappingSplitter::enforceConfigurations() {
 
 // On a resize event, we immediately collapse when the size is in range, because minimum
 // width settings on the other view may otherwise force sizing within the collapsed range
-void SnappingSplitter::enforceConfigurationsOnResize() {
-  for (const CollapseRange& range : collapseRanges) {
+bool SnappingSplitter::enforceSnapRangesOnResize() {
+  for (const SnapRange& range : snapRanges) {
     QList<int> sizes = this->sizes();
 
+//    printf("%d   %d  %d\n", sizes[range.index], range.lowerBound, range.upperBound);
     if (sizes[range.index] < range.upperBound && sizes[range.index] > range.lowerBound) {
         setSizesToLowerBound(range.index, range.lowerBound);
+        return true;
     }
   }
+  return false;
 }
 
 void SnappingSplitter::setSizesToUpperBound(int index, int threshold) {
@@ -60,23 +72,36 @@ void SnappingSplitter::setSizesToUpperBound(int index, int threshold) {
   newSizes[index] = threshold;
   newSizes[!index] = this->size().width() - threshold - this->handleWidth();
   this->setSizes(newSizes);
+  forceWidgetWidth(index);
 }
 
-void SnappingSplitter::setSizesToLowerBound(int index, int collapsePoint) {
+void SnappingSplitter:: setSizesToLowerBound(int index, int collapsePoint) {
   QList<int> newSizes = this->sizes();
   newSizes[index] = collapsePoint;
   newSizes[!index] = this->size().width() - collapsePoint - this->handleWidth();
   this->setSizes(newSizes);
+  forceWidgetWidth(index);
 }
 
-void SnappingSplitter::addCollapseRange(int index, int lowerBound, int upperBound) {
-  collapseRanges.append({index, lowerBound, upperBound});
+void SnappingSplitter::forceWidgetWidth(int index) {
+//  int size = sizes()[index];
+//  auto maybeScrollArea = dynamic_cast<QScrollArea*>(widget(index));
+//  if (maybeScrollArea) {
+//    maybeScrollArea->widget()->setFixedWidth(size);
+//  } else {
+//    widget(index)->setFixedWidth(size);
+//  }
 }
 
-void SnappingSplitter::clearCollapseRanges() {
-  collapseRanges.clear();
+void SnappingSplitter::addSnapRange(int index, int lowerBound, int upperBound) {
+  snapRanges.append({index, lowerBound, upperBound});
+}
+
+void SnappingSplitter::clearSnapRanges() {
+  snapRanges.clear();
 }
 
 void SnappingSplitter::persistState() {
   state = saveState();
+  bDoRestore = true;
 }

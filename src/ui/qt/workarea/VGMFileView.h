@@ -23,12 +23,13 @@ public:
   explicit VGMFileView(VGMFile *vgmFile);
 
 private:
-  static constexpr int hexViewPadding = 15;  // Extra horizontal padding for view's max width
-  static constexpr int treeViewMinimumWidth = 200;
+//  static constexpr int hexViewPadding = 15;  // Extra horizontal padding for view's max width
+  static constexpr int treeViewMinimumWidth = 220;
 
   void closeEvent(QCloseEvent *closeEvent) override;
   int hexViewWidth();
   int hexViewWidthSansAscii();
+  int hexViewWidthSansAsciiAndAddress();
   void updateHexViewFont(qreal sizeIncrement);
 
   VGMFileTreeView* m_treeview{};

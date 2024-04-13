@@ -22,6 +22,10 @@ public:
   void setFont(QFont& font);
   int getVirtualWidth() const;
   int getVirtualWidthSansAscii() const;
+  int getVirtualWidthSansAsciiAndAddress() const;
+  int getViewportWidth() const;
+  int getViewportWidthSansAscii() const;
+  int getViewportWidthSansAsciiAndAddress() const;
 
 protected:
   bool event(QEvent *event) override;
@@ -36,6 +40,7 @@ protected:
   void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
+  int hexXOffset();
   int getVirtualHeight();
   int getTotalLines();
   int getOffsetFromPoint(QPoint pos);
@@ -76,6 +81,9 @@ private:
   int lineHeight;
   bool addressAsHex = true;
   bool isDragging = false;
+  bool showOffset = true;
+  int prevWidth = 0;
+  int prevHeight = 0;
 
   QCache<int, QPixmap> lineCache;
   QGraphicsOpacityEffect* overlayOpacityEffect = nullptr;
