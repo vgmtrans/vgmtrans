@@ -14,10 +14,6 @@ TitleBar::TitleBar(const QString& title, QWidget *parent) : QWidget(parent) {
   QLabel *titleLabel = new QLabel(title);
   titleLayout->addWidget(titleLabel);
 
-  QFont labelFont;
-  labelFont.setFamily("Arial");
-  labelFont.setPointSize(11);
-  labelFont.setItalic(true);
-
+  QFont labelFont("Arial", -1, QFont::Bold, true);
   titleLabel->setFont(labelFont);
 }
