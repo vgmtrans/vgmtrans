@@ -23,6 +23,7 @@ public:
 private:
   static constexpr int treeViewMinimumWidth = 220;
 
+  void resetSnapRanges();
   void closeEvent(QCloseEvent *closeEvent) override;
   int hexViewWidth();
   int hexViewWidthSansAscii();
