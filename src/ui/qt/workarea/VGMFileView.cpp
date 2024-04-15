@@ -14,6 +14,7 @@
 #include "HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
+#include "SnappingSplitter.h"
 #include "Helpers.h"
 
 VGMFileView::VGMFileView(VGMFile *vgmfile)

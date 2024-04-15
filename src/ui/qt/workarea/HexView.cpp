@@ -183,9 +183,8 @@ void HexView::setSelectedItem(VGMItem *item) {
 }
 
 void HexView::resizeOverlays(int height) {
-  int x = hexXOffset() - (charWidth/2);
   overlay->setGeometry(
-      x,
+      hexXOffset() - (charWidth/2),
       overlay->y(),
       ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) * charWidth) + charWidth/2,
       height
@@ -231,8 +230,6 @@ void HexView::changeEvent(QEvent *event) {
           if (event->type() == QEvent::Resize) {
             QScrollArea* scrollArea = getContainingScrollArea(this);
 
-            printf("scrollArea->width: %d\n", scrollArea->width());
-
             int scrollAreaWidth = scrollArea->width();
             int scrollAreaHeight = scrollArea->height();
 
@@ -259,9 +256,6 @@ void HexView::changeEvent(QEvent *event) {
               drawSelectedItem();
               redrawOverlay();
             }
-
-            printf("scrollArea->width: %d  scrollArea->viewport()->width() %d  width(): %d\n",
-                   scrollArea->width(), scrollArea->viewport()->width(), QWidget::width());
 
             // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
             // scroll events don't trigger on resize, and the user could expand the viewport so that it's in view

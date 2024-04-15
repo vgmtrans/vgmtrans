@@ -7,7 +7,6 @@
 #pragma once
 
 #include <QSplitter>
-#include <QSplitterHandle>
 #include <QList>
 
 class QMouseEvent;
@@ -25,7 +24,7 @@ public:
   explicit SnappingSplitter(Qt::Orientation orientation, QWidget* parent = nullptr);
 
   void enforceSnapRanges();
-  bool enforceSnapRangesOnResize();
+  void enforceSnapRangesOnResize();
   void addSnapRange(int index, int lowerBound, int upperBound);
   void clearSnapRanges();
 
@@ -37,9 +36,7 @@ protected:
   void resizeEvent(QResizeEvent* event) override;
   void setSizesToUpperBound(int index, int threshold);
   void setSizesToLowerBound(int index, int threshold);
-  void forceWidgetWidth(int index);
 
 private:
   QList<SnapRange> snapRanges;
-  bool bDoRestore = false;
 };

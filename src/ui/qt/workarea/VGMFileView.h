@@ -6,10 +6,8 @@
 
 #pragma once
 #include <QMdiSubWindow>
-#include <QSplitter>
-#include <QBuffer>
-#include "SnappingSplitter.h"
 
+class SnappingSplitter;
 class VGMFile;
 class HexView;
 class VGMFileTreeView;
@@ -23,7 +21,6 @@ public:
   explicit VGMFileView(VGMFile *vgmFile);
 
 private:
-//  static constexpr int hexViewPadding = 15;  // Extra horizontal padding for view's max width
   static constexpr int treeViewMinimumWidth = 220;
 
   void closeEvent(QCloseEvent *closeEvent) override;
