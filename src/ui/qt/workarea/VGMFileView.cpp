@@ -39,8 +39,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   m_splitter->setStretchFactor(0, 0);
   m_splitter->setStretchFactor(1, 1);
   m_splitter->persistState();
-  m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
-  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewWidth());
+  resetSnapRanges();
   m_hexScrollArea->setMaximumWidth(hexViewWidth());
   m_treeview->setMinimumWidth(treeViewMinimumWidth);
 
@@ -69,6 +68,12 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   });
 
   setWidget(m_splitter);
+}
+
+void VGMFileView::resetSnapRanges() {
+  m_splitter->clearSnapRanges();
+  m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
+  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewWidth());
 }
 
 int VGMFileView::hexViewWidth() {
@@ -110,9 +115,7 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
   int fullWidthAfterResize = hexViewWidth();
   int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
   int newWidth = actualWidthBeforeResize + static_cast<int>(round(static_cast<float>(widthChange) * percentHexViewVisible));
-  m_splitter->clearSnapRanges();
-  m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
-  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewWidth());
+  resetSnapRanges();
   m_splitter->setSizes(QList<int>{newWidth, treeViewMinimumWidth});
   m_splitter->persistState();
 }
