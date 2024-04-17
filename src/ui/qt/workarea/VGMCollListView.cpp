@@ -102,7 +102,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   setItemDelegate(new VGMCollNameEditor);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
-  setSelectionMode(QAbstractItemView::SingleSelection);
+  setSelectionMode(QAbstractItemView::ExtendedSelection);
   setEditTriggers(QAbstractItemView::NoEditTriggers);
   setResizeMode(QListView::Adjust);
   setIconSize(QSize(16, 16));
