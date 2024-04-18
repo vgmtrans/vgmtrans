@@ -61,52 +61,6 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(p
   setItemDelegate(new VGMTreeDisplayItem());
 }
 
-// Override the focusInEvent to prevent item selection upon focus
-//void VGMFileTreeView::focusInEvent(QFocusEvent* event) {
-//
-//}
-//
-//void VGMFileTreeView::currentChanged(const QModelIndex &current, const QModelIndex &previous) {
-//  // On MacOS, there is a peculiar accessibility-related bug that causes an exception to be thrown here. It causes
-//  // multiple problems, including issues with tree item selection and a second MDI window not appearing. With no
-//  // good fix, for now we bypass QTreeView::currentChanged.
-//#ifdef Q_OS_MAC
-//  QAbstractItemView::currentChanged(current, previous);
-//#else
-//  QTreeView::currentChanged(current, previous);
-//#endif
-//}
-//
-//void VGMFileTreeView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
-//#ifdef Q_OS_MAC
-//  QAbstractItemView::selectionChanged(selected, deselected);
-//#else
-//  QTreeView::selectionChanged(selected, deselected);
-//#endif
-//}
-
-// Find the index to insert a child item, sorted by offset, using binary search
-int VGMFileTreeView::getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item) {
-  int newOffset = item->item_offset();
-  int left = 0;
-  int right = parent->childCount() - 1;
-
-  while (left <= right) {
-    int mid = left + (right - left) / 2;
-    VGMTreeItem* childItem = static_cast<VGMTreeItem*>(parent->child(mid));
-
-    if (childItem->item_offset() == newOffset) {
-      return mid;
-    } else if (childItem->item_offset() < newOffset) {
-      left = mid + 1;
-    } else {
-      right = mid - 1;
-    }
-  }
-  return left;
-}
-
-
 void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name) {
   auto item_name = QString::fromStdString(name);
   auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
@@ -187,16 +141,38 @@ void VGMFileTreeView::mouseDoubleClickEvent(QMouseEvent *event) {
 }
 
 void VGMFileTreeView::keyPressEvent(QKeyEvent *event) {
-
-  // On left arrow key press, collapse and select parent item if possible
   if (event->key() == Qt::Key_Left) {
     QTreeWidgetItem *current = currentItem();
-    if (current && current->parent()) {
+
+    // If the item has a parent and is not expanded, move to the parent
+    if (current && current->parent() && !isExpanded(indexFromItem(current))) {
       QTreeWidgetItem *parent = current->parent();
-      collapseItem(parent);
       setCurrentItem(parent);
       return;
     }
   }
+
+  // Call base class keyPressEvent for other keys and unhandled cases
   QTreeWidget::keyPressEvent(event);
+}
+
+// Find the index to insert a child item, sorted by offset, using binary search
+int VGMFileTreeView::getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item) {
+  int newOffset = item->item_offset();
+  int left = 0;
+  int right = parent->childCount() - 1;
+
+  while (left <= right) {
+    int mid = left + (right - left) / 2;
+    VGMTreeItem* childItem = static_cast<VGMTreeItem*>(parent->child(mid));
+
+    if (childItem->item_offset() == newOffset) {
+      return mid;
+    } else if (childItem->item_offset() < newOffset) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+  return left;
 }
