@@ -48,6 +48,8 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
           [&](QTreeWidgetItem *item, QTreeWidgetItem *) {
             if (item == nullptr) {
+              // If the VGMFileTreeView deselected, then so should the HexView
+              onSelectionChange(nullptr);
               return;
             }
             auto vgmitem = static_cast<VGMItem *>(item->data(0, Qt::UserRole).value<void *>());
