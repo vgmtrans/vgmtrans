@@ -71,7 +71,7 @@ Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
     return Qt::ItemIsEnabled;
   }
 
-  return QAbstractListModel::flags(index) | Qt::ItemIsEditable;
+  return QAbstractListModel::flags(index);
 }
 
 /*
@@ -103,10 +103,15 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
 
   setContextMenuPolicy(Qt::CustomContextMenu);
   setSelectionMode(QAbstractItemView::ExtendedSelection);
-  setEditTriggers(QAbstractItemView::NoEditTriggers);
   setResizeMode(QListView::Adjust);
   setIconSize(QSize(16, 16));
   setWrapping(true);
+
+#ifdef Q_OS_MAC
+  // On MacOS, a wrapping QListView gives unwanted padding to the scrollbar. This compensates.
+  int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+  setStyleSheet(QString("QListView {padding: -%1px;}").arg(scrollBarThickness / 2));
+#endif
 
   connect(this, &QListView::doubleClicked, this,
           &VGMCollListView::handlePlaybackRequest);
