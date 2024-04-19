@@ -15,6 +15,7 @@
 #include "QtVGMRoot.h"
 #include "MdiArea.h"
 #include "services/commands/GeneralCommands.h"
+#include "services/StatusManager.h"
 
 /*
  *  VGMFileListModel
@@ -119,7 +120,6 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect( MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMFileListView::selectRowForVGMFile);
-  connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::handleSelectionChanged);
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
@@ -190,18 +190,30 @@ void VGMFileListView::requestVGMFileView(QModelIndex index) {
   MdiArea::the()->newView(qtVGMRoot.vVGMFile[index.row()]);
 }
 
-void VGMFileListView::handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
-  Q_UNUSED(deselected);
+// Update the status bar for the current selection
+void VGMFileListView::updateStatusBar() {
+  if (!currentIndex().isValid())
+    return;
+  VGMFile* file = qtVGMRoot.vVGMFile[currentIndex().row()];
+  StatusManager::the()->updateStatusForItem(file);
+}
 
-  if (selected.indexes().isEmpty())
+// Update the status bar on focus
+void VGMFileListView::focusInEvent(QFocusEvent *event) {
+  TableView::focusInEvent(event);
+  updateStatusBar();
+}
+
+void VGMFileListView::currentChanged(const QModelIndex &current, const QModelIndex &previous) {
+  Q_UNUSED(previous);
+
+  if (!current.isValid())
     return;
 
-  QModelIndex firstSelectedIndex = selected.indexes().first();
-  if (!firstSelectedIndex.isValid())
-    return;
-
-  VGMFile* file = qtVGMRoot.vVGMFile[firstSelectedIndex.row()];
+  VGMFile *file = qtVGMRoot.vVGMFile[current.row()];
   MdiArea::the()->focusView(file, this);
+  if (this->hasFocus())
+    updateStatusBar();
 }
 
 void VGMFileListView::selectRowForVGMFile(VGMFile *file) {
@@ -217,6 +229,7 @@ void VGMFileListView::selectRowForVGMFile(VGMFile *file) {
 
   QItemSelection selection(firstIndex, lastIndex);
   selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+  setCurrentIndex(firstIndex);
 
   scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
 }

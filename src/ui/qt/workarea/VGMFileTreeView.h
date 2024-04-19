@@ -52,6 +52,7 @@ public:
 
   void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name);
   auto getTreeWidgetItem(VGMItem *vgm_item) { return m_items.at(vgm_item); };
+  void updateStatusBar();
 
 protected:
   void focusInEvent(QFocusEvent* event) override;
@@ -66,5 +67,6 @@ private:
 
   QTreeWidgetItem *parent_item_cached{};
   VGMItem *parent_cached{};
-  std::unordered_map<VGMItem *, QTreeWidgetItem *> m_items{};
+  std::unordered_map<VGMItem*, QTreeWidgetItem*> m_items{};
+  std::unordered_map<QTreeWidgetItem*, VGMItem*> m_treeItemToVGMItem{};
 };

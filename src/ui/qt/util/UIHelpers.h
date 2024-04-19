@@ -12,6 +12,7 @@ class QScrollArea;
 class QWidget;
 class QPixmap;
 class QGraphicsEffect;
+class VGMItem;
 
 QScrollArea* getContainingScrollArea(QWidget* widget);
 void applyEffectToPixmap(QPixmap &src, QPixmap &tgt, QGraphicsEffect *effect, int extent = 0);

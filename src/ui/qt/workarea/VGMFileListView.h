@@ -46,10 +46,10 @@ class VGMFileListView final : public TableView {
     void removeVGMFile(VGMFile *file);
     void selectRowForVGMFile(VGMFile *file);
 
-   private slots:
-    void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
-
    private:
+    void updateStatusBar();
+    void focusInEvent(QFocusEvent *event) override;
+    void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
     void keyPressEvent(QKeyEvent *input) override;
     void itemMenu(const QPoint &pos);
 

@@ -15,3 +15,5 @@ const QIcon &iconForFileType(FileType filetype);
 
 QColor colorForEventColor(VGMItem::EventColor eventColor);
 QColor textColorForEventColor(VGMItem::EventColor eventColor);
+
+QString getFullDescriptionForTooltip(VGMItem* item);

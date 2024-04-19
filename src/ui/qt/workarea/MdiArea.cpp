@@ -42,6 +42,7 @@ void MdiArea::newView(VGMFile *file) {
     fileToWindowMap.insert(std::make_pair(file, tab));
     windowToFileMap.insert(std::make_pair(tab, file));
     tab->showMaximized();
+    tab->setFocus();
   }
 }
 
@@ -64,11 +65,13 @@ void MdiArea::removeView(VGMFile *file) {
 void MdiArea::focusView(VGMFile *file, QWidget *caller) {
   auto it = fileToWindowMap.find(file);
   if (it != fileToWindowMap.end()) {
+
+    bool callerHadFocus = caller && caller->hasFocus();
     QMdiSubWindow *window = it->second;
-    setActiveSubWindow(window);
+    window->setFocus();
 
     // Reassert the focus back to the caller
-    if (caller) {
+    if (caller && callerHadFocus) {
       caller->setFocus();
     }
   }

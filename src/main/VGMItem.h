@@ -87,7 +87,7 @@ public:
   virtual uint32_t GuessLength() { return unLength; };
   virtual void SetGuessedLength(){};
   virtual std::vector<const char* > *GetMenuItemNames() { return nullptr; }
-  virtual std::string GetDescription() { return name; }
+  virtual std::string GetDescription() { return ""; }
   [[nodiscard]] virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
   virtual Icon GetIcon() { return ICON_BINARY; }
   virtual void AddToUI(VGMItem *parent, void *UI_specific);

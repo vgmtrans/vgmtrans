@@ -16,6 +16,7 @@ class Logger;
 class VGMCollListView;
 class VGMCollView;
 class QPushButton;
+class StatusBarContent;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -31,6 +32,7 @@ protected:
 
 private:
   void createElements();
+  void createStatusBar();
   void routeSignals();
 
   void OpenFile();
@@ -41,6 +43,7 @@ private:
   QDockWidget *m_coll_dock{};
   MenuBar *m_menu_bar{};
   IconBar *m_icon_bar{};
+  StatusBarContent *statusBarContent{};
   Logger *m_logger{};
   VGMCollListView *m_coll_listview{};
   VGMCollView *m_coll_view{};

@@ -209,7 +209,7 @@ bool HexView::event(QEvent *e) {
 
     VGMItem* item = vgmfile->GetItemFromOffset(offset, false);
     if (item) {
-      auto description = QString::fromStdString(item->GetDescription());
+      auto description = getFullDescriptionForTooltip(item);
       if (!description.isEmpty()) {
         QToolTip::showText(helpevent->globalPos(), description, this);
       }
