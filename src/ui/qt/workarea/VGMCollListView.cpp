@@ -173,16 +173,14 @@ void VGMCollListView::collectionMenu(const QPoint &pos) {
 
 void VGMCollListView::keyPressEvent(QKeyEvent *e) {
   switch (e->key()) {
-    case Qt::Key_Space: {
+    case Qt::Key_Enter:
+    case Qt::Key_Return:
+    case Qt::Key_Space:
       handlePlaybackRequest();
       break;
-    }
-
-    case Qt::Key_Escape: {
+    case Qt::Key_Escape:
       handleStopRequest();
       break;
-    }
-
     default:
       QListView::keyPressEvent(e);
   }

@@ -145,6 +145,10 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
 
 void VGMFileListView::keyPressEvent(QKeyEvent *input) {
   switch (input->key()) {
+    case Qt::Key_Enter:
+    case Qt::Key_Return:
+      requestVGMFileView(currentIndex());
+      break;
     case Qt::Key_Delete:
     case Qt::Key_Backspace: {
       if (!selectionModel()->hasSelection())

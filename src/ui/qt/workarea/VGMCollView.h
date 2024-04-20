@@ -41,6 +41,9 @@ class VGMCollView : public QGroupBox {
 public:
   VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent = 0);
 
+private:
+  void keyPressEvent(QKeyEvent *e) override;
+
 private slots:
   void removeVGMColl(VGMColl *coll);
   void doubleClickedSlot(QModelIndex);
