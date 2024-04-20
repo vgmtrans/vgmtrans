@@ -206,8 +206,10 @@ void VGMCollView::keyPressEvent(QKeyEvent *e) {
     case Qt::Key_Enter:
     case Qt::Key_Return: {
       QModelIndex currentIndex = m_listview->currentIndex();
-      auto model = qobject_cast<VGMCollViewModel *>(m_listview->model());
-      MdiArea::the()->newView(model->fileFromIndex(currentIndex));
+      if (currentIndex.isValid()) {
+        auto model = qobject_cast<VGMCollViewModel *>(m_listview->model());
+        MdiArea::the()->newView(model->fileFromIndex(currentIndex));
+      }
       break;
     }
     default:
