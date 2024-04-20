@@ -110,7 +110,9 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
 #ifdef Q_OS_MAC
   // On MacOS, a wrapping QListView gives unwanted padding to the scrollbar. This compensates.
   int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
-  setStyleSheet(QString("QListView {padding: -%1px;}").arg(scrollBarThickness / 2));
+  QMargins margins = viewportMargins();
+  margins.setBottom(margins.bottom() - scrollBarThickness);
+  setViewportMargins(margins);
 #endif
 
   connect(this, &QListView::doubleClicked, this,
