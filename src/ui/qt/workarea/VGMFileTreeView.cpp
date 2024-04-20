@@ -168,24 +168,9 @@ void VGMFileTreeView::focusInEvent(QFocusEvent* event) {
 }
 
 void VGMFileTreeView::currentChanged(const QModelIndex &current, const QModelIndex &previous) {
-  // On MacOS, there is a peculiar accessibility-related bug that causes an exception to be thrown here. It causes
-  // multiple problems, including issues with tree item selection and a second MDI window not appearing. With no
-  // good fix, for now we bypass QTreeView::currentChanged.
-#ifdef Q_OS_MAC
-  QAbstractItemView::currentChanged(current, previous);
-#else
   QTreeView::currentChanged(current, previous);
-#endif
 
   updateStatusBar();
-}
-
-void VGMFileTreeView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
-#ifdef Q_OS_MAC
-  QAbstractItemView::selectionChanged(selected, deselected);
-#else
-  QTreeView::selectionChanged(selected, deselected);
-#endif
 }
 
 void VGMFileTreeView::mousePressEvent(QMouseEvent *event) {

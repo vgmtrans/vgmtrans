@@ -89,7 +89,6 @@ public:
 protected:
   void focusInEvent(QFocusEvent* event) override;
   void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
-  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
   void mousePressEvent(QMouseEvent *event) override;
   void mouseDoubleClickEvent(QMouseEvent *event) override;
   void keyPressEvent(QKeyEvent *event) override;
