@@ -7,10 +7,11 @@
 #include "TitleBar.h"
 #include <QHBoxLayout>
 #include <QLabel>
+#include "Metrics.h"
 
 TitleBar::TitleBar(const QString& title, QWidget *parent) : QWidget(parent) {
   QHBoxLayout *titleLayout = new QHBoxLayout(this);
-  titleLayout->setContentsMargins(10, 5, 10, 5);
+  titleLayout->setContentsMargins(Margin::HCommon, 5, Margin::HCommon, 5);
   QLabel *titleLabel = new QLabel(title);
   titleLayout->addWidget(titleLabel);
 

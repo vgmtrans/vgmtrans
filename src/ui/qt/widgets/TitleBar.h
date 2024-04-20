@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QWidget>
+#include "Metrics.h"
 
 class TitleBar : public QWidget {
   Q_OBJECT
@@ -14,4 +15,11 @@ class TitleBar : public QWidget {
 public:
   explicit TitleBar(const QString& title, QWidget *parent = nullptr);
   virtual ~TitleBar() = default;
+
+  QSize sizeHint() const override {
+    return QSize(200, Size::VTab);
+  }
+  QSize minimumSizeHint() const override {
+    return QSize(200, Size::VTab);
+  }
 };

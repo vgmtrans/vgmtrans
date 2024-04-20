@@ -10,6 +10,7 @@
 #include <VGMFile.h>
 #include "VGMFileView.h"
 #include "Helpers.h"
+#include "Metrics.h"
 
 MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setViewMode(QMdiArea::TabbedView);
@@ -21,7 +22,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
 
   auto *tab_bar = findChild<QTabBar *>();
   if (tab_bar) {
-    tab_bar->setStyleSheet("QTabBar::tab { height: 30; }");
+    tab_bar->setStyleSheet(QString{"QTabBar::tab { height: %1; }"}.arg(Size::VTab));
     tab_bar->setExpanding(false);
     tab_bar->setUsesScrollButtons(true);
   }
