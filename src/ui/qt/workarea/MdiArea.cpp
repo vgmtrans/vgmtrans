@@ -9,8 +9,8 @@
 #include <QTabBar>
 #include <VGMFile.h>
 #include "VGMFileView.h"
-#include "Helpers.h"
 #include "Metrics.h"
+#include "services/NotificationCenter.h"
 
 MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setViewMode(QMdiArea::TabbedView);
@@ -19,6 +19,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setTabsClosable(true);
 
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &MdiArea::onVGMFileSelected);
 
   auto *tab_bar = findChild<QTabBar *>();
   if (tab_bar) {
@@ -62,7 +63,24 @@ void MdiArea::removeView(VGMFile *file) {
   }
 }
 
-void MdiArea::focusView(VGMFile *file, QWidget *caller) {
+void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
+  // For some reason, if multiple documents are open, closing one document causes the others
+  // to become windowed instead of maximized. This fixes the problem.
+  ensureMaximizedSubWindow(window);
+
+  if (window) {
+    auto it = windowToFileMap.find(window);
+    if (it != windowToFileMap.end()) {
+      VGMFile *file = it->second;
+      NotificationCenter::the()->selectVGMFile(file, this);
+    }
+  }
+}
+
+void MdiArea::onVGMFileSelected(VGMFile *file, QWidget *caller) {
+  if (caller == this)
+    return;
+
   auto it = fileToWindowMap.find(file);
   if (it != fileToWindowMap.end()) {
 
@@ -73,20 +91,6 @@ void MdiArea::focusView(VGMFile *file, QWidget *caller) {
     // Reassert the focus back to the caller
     if (caller && callerHadFocus) {
       caller->setFocus();
-    }
-  }
-}
-
-void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
-  // For some reason, if multiple documents are open, closing one document causes the others
-  // to become windowed instead of maximized. This fixes the problem.
-  ensureMaximizedSubWindow(window);
-
-  if (window) {
-    auto it = windowToFileMap.find(window);
-    if (it != windowToFileMap.end()) {
-      VGMFile *file = it->second;
-      emit vgmFileSelected(file);
     }
   }
 }

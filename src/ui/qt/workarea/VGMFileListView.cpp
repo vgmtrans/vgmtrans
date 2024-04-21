@@ -15,7 +15,7 @@
 #include "QtVGMRoot.h"
 #include "MdiArea.h"
 #include "services/commands/GeneralCommands.h"
-#include "services/StatusManager.h"
+#include "services/NotificationCenter.h"
 
 /*
  *  VGMFileListModel
@@ -119,7 +119,8 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
-  connect( MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMFileListView::selectRowForVGMFile);
+//  connect(MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMFileListView::selectRowForVGMFile);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
@@ -192,10 +193,12 @@ void VGMFileListView::requestVGMFileView(QModelIndex index) {
 
 // Update the status bar for the current selection
 void VGMFileListView::updateStatusBar() {
-  if (!currentIndex().isValid())
+  if (!currentIndex().isValid()) {
+    NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
+  }
   VGMFile* file = qtVGMRoot.vVGMFile[currentIndex().row()];
-  StatusManager::the()->updateStatusForItem(file);
+  NotificationCenter::the()->updateStatusForItem(file);
 }
 
 // Update the status bar on focus
@@ -207,16 +210,23 @@ void VGMFileListView::focusInEvent(QFocusEvent *event) {
 void VGMFileListView::currentChanged(const QModelIndex &current, const QModelIndex &previous) {
   Q_UNUSED(previous);
 
-  if (!current.isValid())
+
+  if (!current.isValid()) {
+    NotificationCenter::the()->selectVGMFile(nullptr, this);
     return;
+  }
 
   VGMFile *file = qtVGMRoot.vVGMFile[current.row()];
-  MdiArea::the()->focusView(file, this);
+  NotificationCenter::the()->selectVGMFile(file, this);
+//  MdiArea::the()->focusView(file, this);
+
   if (this->hasFocus())
     updateStatusBar();
 }
 
-void VGMFileListView::selectRowForVGMFile(VGMFile *file) {
+void VGMFileListView::onVGMFileSelected(VGMFile* file, QWidget* caller) {
+  if (caller == this)
+    return;
 
   auto it = std::find(qtVGMRoot.vVGMFile.begin(), qtVGMRoot.vVGMFile.end(), file);
   if (it == qtVGMRoot.vVGMFile.end())
@@ -226,6 +236,9 @@ void VGMFileListView::selectRowForVGMFile(VGMFile *file) {
   // Select the row corresponding to the file
   QModelIndex firstIndex = model()->index(row, 0); // First column of the row
   QModelIndex lastIndex = model()->index(row, model()->columnCount() - 1); // Last column of the row
+
+//  if (firstIndex == currentIndex())
+//    return;
 
   QItemSelection selection(firstIndex, lastIndex);
   selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);

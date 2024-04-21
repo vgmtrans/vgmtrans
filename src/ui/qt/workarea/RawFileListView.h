@@ -9,6 +9,8 @@
 #include <QTableView>
 #include "TableView.h"
 
+class VGMFile;
+
 class RawFileListViewModel : public QAbstractTableModel {
   Q_OBJECT
 public:
@@ -33,6 +35,7 @@ public:
   explicit RawFileListView(QWidget *parent = nullptr);
 
 private:
+  void onVGMFileSelected(VGMFile* vgmfile, QWidget* caller);
   void keyPressEvent(QKeyEvent *input) override;
   void rawFilesMenu(const QPoint &pos);
   void deleteRawFiles();

@@ -48,7 +48,7 @@ private slots:
   void removeVGMColl(VGMColl *coll);
   void doubleClickedSlot(QModelIndex);
   void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
-  void selectRowForVGMFile(VGMFile *file);
+  void onVGMFileSelected(VGMFile *file, QWidget* caller);
 
 private:
   VGMCollViewModel *vgmCollViewModel;

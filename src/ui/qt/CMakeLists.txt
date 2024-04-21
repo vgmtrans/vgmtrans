@@ -64,8 +64,8 @@ add_executable(
   main_ui.cpp
   services/MenuManager.cpp
   services/MenuManager.h
-  services/StatusManager.cpp
-  services/StatusManager.h
+  services/NotificationCenter.cpp
+  services/NotificationCenter.h
   services/commands/SaveCommands.h
   services/commands/GeneralCommands.h
   util/Colors.h

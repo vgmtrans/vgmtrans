@@ -11,7 +11,7 @@
 #include <QApplication>
 #include <QAccessible>
 #include "Helpers.h"
-#include "services/StatusManager.h"
+#include "services/NotificationCenter.h"
 
 void VGMTreeDisplayItem::paint(QPainter *painter, const QStyleOptionViewItem &option,
                                const QModelIndex &index) const {
@@ -154,17 +154,17 @@ void VGMFileTreeView::keyPressEvent(QKeyEvent *event) {
 void VGMFileTreeView::updateStatusBar() {
   QTreeWidgetItem *treeItem = currentItem();
   if (!treeItem) {
-    StatusManager::the()->updateStatusForItem(nullptr);
+    NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
   }
 
   VGMItem* vgmItem = m_treeItemToVGMItem[treeItem];
   if (!vgmItem) {
-    StatusManager::the()->updateStatusForItem(nullptr);
+    NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
   }
 
-  StatusManager::the()->updateStatusForItem(vgmItem);
+  NotificationCenter::the()->updateStatusForItem(vgmItem);
 }
 
 // Find the index to insert a child item, sorted by offset, using binary search
