@@ -26,6 +26,9 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
     tab_bar->setStyleSheet(QString{"QTabBar::tab { height: %1; }"}.arg(Size::VTab));
     tab_bar->setExpanding(false);
     tab_bar->setUsesScrollButtons(true);
+#ifdef Q_OS_MAC
+    tab_bar->setElideMode(Qt::ElideNone);
+#endif
   }
 }
 
@@ -44,6 +47,11 @@ void MdiArea::newView(VGMFile *file) {
     windowToFileMap.insert(std::make_pair(tab, file));
     tab->showMaximized();
     tab->setFocus();
+
+#ifdef Q_OS_MAC
+    auto newTitle = " " + vgmfile_view->windowTitle() + " ";
+    vgmfile_view->setWindowTitle(newTitle);
+#endif
   }
 }
 
