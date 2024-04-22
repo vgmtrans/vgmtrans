@@ -36,9 +36,12 @@ public:
 
 private:
   void onVGMFileSelected(VGMFile* vgmfile, QWidget* caller);
+  void focusInEvent(QFocusEvent *event);
+  void currentChanged(const QModelIndex &current, const QModelIndex &previous);
   void keyPressEvent(QKeyEvent *input) override;
   void rawFilesMenu(const QPoint &pos);
   void deleteRawFiles();
+  void updateStatusBar();
 
   RawFileListViewModel *rawFileListViewModel;
   QMenu *rawfile_context_menu;

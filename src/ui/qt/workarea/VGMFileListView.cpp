@@ -226,6 +226,11 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, QWidget* caller) {
   if (caller == this)
     return;
 
+  if (file == nullptr) {
+    this->clearSelection();
+    return;
+  }
+
   auto it = std::find(qtVGMRoot.vVGMFile.begin(), qtVGMRoot.vVGMFile.end(), file);
   if (it == qtVGMRoot.vVGMFile.end())
     return;

@@ -252,6 +252,11 @@ void VGMCollView::onVGMFileSelected(VGMFile *file, QWidget* caller) {
   if (caller == this)
     return;
 
+  if (file == nullptr) {
+    m_listview->clearSelection();
+    return;
+  }
+
   if (!vgmCollViewModel->containsVGMFile(file)) {
     m_listview->selectionModel()->clearSelection();
     return;

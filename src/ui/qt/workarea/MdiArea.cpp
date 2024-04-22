@@ -78,7 +78,7 @@ void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
 }
 
 void MdiArea::onVGMFileSelected(VGMFile *file, QWidget *caller) {
-  if (caller == this)
+  if (caller == this || file == nullptr)
     return;
 
   auto it = fileToWindowMap.find(file);
