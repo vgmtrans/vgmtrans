@@ -58,7 +58,7 @@ void MainWindow::createElements() {
   m_rawfile_dock = new QDockWidget("Raw files");
   m_rawfile_dock->setWidget(new RawFileListView());
   m_rawfile_dock->setContentsMargins(0, 0, 0, 0);
-  m_rawfile_dock->setTitleBarWidget(new TitleBar("Raw Files"));
+  m_rawfile_dock->setTitleBarWidget(new TitleBar("Scanned Files"));
 
   m_vgmfile_dock = new QDockWidget("Detected Music Files");
   m_vgmfile_dock->setWidget(new VGMFileListView());
