@@ -64,12 +64,12 @@ void StatusBarContent::setStatus(const QString& name, const QString& description
     iconLabel->clear();
 
   if (offset >= 0)
-    offsetLabel->setText(QString{"Offset: 0x%1"}.arg(offset));
+    offsetLabel->setText(QString{"Offset: 0x%1"}.arg(offset, 0, 16));
   else
     offsetLabel->clear();
 
   if (size >= 0)
-    sizeLabel->setText(QString{"Size: 0x%1"}.arg(size));
+    sizeLabel->setText(QString{"Size: 0x%1"}.arg(size, 0, 16));
   else
     sizeLabel->clear();
 }
