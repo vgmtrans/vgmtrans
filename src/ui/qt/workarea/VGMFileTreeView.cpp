@@ -66,7 +66,7 @@ void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::stri
   auto item_name = QString::fromStdString(name);
   auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
 
-  tree_item->setText(0, QString{"<b>%1</b>"}.arg(item_name));
+  tree_item->setText(0, item_name);
   tree_item->setIcon(0, iconForItemType(item->GetIcon()));
   tree_item->setToolTip(0, QString::fromStdString(item->GetDescription()));
 
