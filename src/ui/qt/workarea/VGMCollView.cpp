@@ -11,6 +11,7 @@
 #include <QListView>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QKeyEvent>
 
 #include <VGMFile.h>
 #include <VGMInstrSet.h>
@@ -198,6 +199,22 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   });
 
   setLayout(layout);
+}
+
+void VGMCollView::keyPressEvent(QKeyEvent *e) {
+  switch (e->key()) {
+    case Qt::Key_Enter:
+    case Qt::Key_Return: {
+      QModelIndex currentIndex = m_listview->currentIndex();
+      if (currentIndex.isValid()) {
+        auto model = qobject_cast<VGMCollViewModel *>(m_listview->model());
+        MdiArea::the()->newView(model->fileFromIndex(currentIndex));
+      }
+      break;
+    }
+    default:
+      QGroupBox::keyPressEvent(e);
+  }
 }
 
 void VGMCollView::removeVGMColl(VGMColl *coll) {
