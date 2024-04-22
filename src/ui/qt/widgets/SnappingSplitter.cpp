@@ -32,10 +32,10 @@ void SnappingSplitter::enforceSnapRanges() {
     if (sizes[range.index] <= range.upperBound && sizes[range.index] > range.lowerBound) {
       if (sizes[range.index] > halfway) {
         // Hold the size at upperBound until halfway point is crossed
-        setSizesToUpperBound(range.index, range.upperBound);
+        setSizesToBound(Upper, range);
       } else if (sizes[range.index] <= halfway) {
         // Collapse when halfway point is crossed
-        setSizesToLowerBound(range.index, range.lowerBound);
+        setSizesToBound(Lower, range);
       }
     }
   }
@@ -48,23 +48,27 @@ void SnappingSplitter::enforceSnapRangesOnResize() {
     QList<int> sizes = this->sizes();
 
     if (sizes[range.index] < range.upperBound && sizes[range.index] > range.lowerBound) {
-        setSizesToLowerBound(range.index, range.lowerBound);
+        setSizesToBound(Lower, range);
     }
   }
 }
 
-void SnappingSplitter::setSizesToUpperBound(int index, int threshold) {
+void SnappingSplitter::setSizesToBound(Bound bound, const SnapRange& range) {
   QList<int> newSizes = this->sizes();
-  newSizes[index] = threshold;
-  newSizes[!index] = this->size().width() - threshold - this->handleWidth();
-  this->setSizes(newSizes);
-}
 
-void SnappingSplitter:: setSizesToLowerBound(int index, int collapsePoint) {
-  QList<int> newSizes = this->sizes();
-  newSizes[index] = collapsePoint;
-  newSizes[!index] = this->size().width() - collapsePoint - this->handleWidth();
+  int targetSize = bound == Upper ? range.upperBound : range.lowerBound;
+  int fallbackSize = bound == Upper ? range.lowerBound : range.upperBound;
+
+  newSizes[range.index] = targetSize;
+  newSizes[!range.index] = this->size().width() - targetSize - this->handleWidth();
   this->setSizes(newSizes);
+
+  // If the new size couldn't be realized (likely due to min size of opposite index), reverse it
+  if (sizes()[range.index] != targetSize) {
+    newSizes[range.index] = fallbackSize;
+    newSizes[!range.index] = this->size().width() - fallbackSize - this->handleWidth();
+    this->setSizes(newSizes);
+  }
 }
 
 void SnappingSplitter::addSnapRange(int index, int lowerBound, int upperBound) {

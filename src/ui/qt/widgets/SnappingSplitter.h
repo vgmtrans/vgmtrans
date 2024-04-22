@@ -32,10 +32,13 @@ public:
   QByteArray state;
 
 protected:
+  enum Bound: bool {
+    Upper = true,
+    Lower = false
+  };
   void onSplitterMoved();
   void resizeEvent(QResizeEvent* event) override;
-  void setSizesToUpperBound(int index, int threshold);
-  void setSizesToLowerBound(int index, int threshold);
+  void setSizesToBound(Bound bound, const SnapRange& range);
 
 private:
   QList<SnapRange> snapRanges;
