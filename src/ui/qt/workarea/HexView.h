@@ -82,6 +82,7 @@ private:
   bool addressAsHex = true;
   bool isDragging = false;
   bool showOffset = true;
+  bool shouldDrawAscii = true;
   int prevWidth = 0;
   int prevHeight = 0;
 

@@ -248,9 +248,11 @@ void HexView::changeEvent(QEvent *event) {
             prevWidth = scrollAreaWidth;
 
             bool prevShowOffset = showOffset;
+            bool prevShouldDrawAscii = shouldDrawAscii;
             showOffset = scrollAreaWidth > getViewportWidthSansAsciiAndAddress();
+            shouldDrawAscii = scrollAreaWidth > getViewportWidthSansAscii();
 
-            if (prevShowOffset != showOffset) {
+            if (prevShowOffset != showOffset || prevShouldDrawAscii != shouldDrawAscii) {
               prevSelectedItem = nullptr;
               lineCache.clear();
               drawSelectedItem();
@@ -339,10 +341,13 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, QEvent* event) {
     painter.fillRect(QRect(0, 0, BYTES_PER_LINE * 3 * charWidth, overlay->height()),
                      QColor(0, 0, 0, 100));
 
-    painter.fillRect(QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + (charWidth / 2),
-                           0,
-                           BYTES_PER_LINE * charWidth, overlay->height()),
-                           QColor(0, 0, 0, 100));
+    if (shouldDrawAscii) {
+      painter.fillRect(
+          QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + (charWidth / 2),
+                0,
+                BYTES_PER_LINE * charWidth, overlay->height()),
+          QColor(0, 0, 0, 100));
+    }
 
     return true;
   }
@@ -570,6 +575,8 @@ void HexView::translateAndPrintAscii(
     QColor bgColor,
     QColor textColor
 ) {
+  if (!shouldDrawAscii)
+    return;
   painter.save();
   painter.translate(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS + offset) * charWidth, 0);
   printAscii(painter, data, length, bgColor, textColor);
