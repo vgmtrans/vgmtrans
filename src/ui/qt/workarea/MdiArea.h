@@ -36,6 +36,7 @@ private:
   MdiArea(QWidget *parent = nullptr);
   void onSubWindowActivated(QMdiSubWindow *window);
   void onVGMFileSelected(const VGMFile *file, QWidget *caller);
+  void keyPressEvent(QKeyEvent *) override;
   static void ensureMaximizedSubWindow(QMdiSubWindow *window);
   std::unordered_map<const VGMFile *, QMdiSubWindow *> fileToWindowMap;
   std::unordered_map<QMdiSubWindow *, VGMFile *> windowToFileMap;

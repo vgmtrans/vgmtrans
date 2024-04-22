@@ -8,6 +8,7 @@
 
 #include <QTabBar>
 #include <QApplication>
+#include <QKeyEvent>
 #include <VGMFile.h>
 #include "VGMFileView.h"
 #include "Metrics.h"
@@ -109,6 +110,22 @@ void MdiArea::onVGMFileSelected(const VGMFile *file, QWidget *caller) {
     // Reassert the focus back to the caller
     if (caller && callerHadFocus) {
       caller->setFocus();
+    }
+  }
+}
+
+void MdiArea::keyPressEvent(QKeyEvent* event) {
+  QMdiArea::keyPressEvent(event);
+
+  // Handle MacOS shortcut for switching tabs
+  if ((event->modifiers() & Qt::ShiftModifier) && (event->modifiers() & Qt::ControlModifier)) {
+    switch (event->key()) {
+      case Qt::Key_BracketLeft:
+        this->activatePreviousSubWindow();
+        break;
+      case Qt::Key_BracketRight:
+        this->activateNextSubWindow();
+        break;
     }
   }
 }
