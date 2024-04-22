@@ -64,6 +64,8 @@ add_executable(
   main_ui.cpp
   services/MenuManager.cpp
   services/MenuManager.h
+  services/NotificationCenter.cpp
+  services/NotificationCenter.h
   services/commands/SaveCommands.h
   services/commands/GeneralCommands.h
   util/Colors.h
@@ -76,6 +78,8 @@ add_executable(
   widgets/MarqueeLabel.h
   widgets/SnappingSplitter.cpp
   widgets/SnappingSplitter.h
+  widgets/StatusBarContent.cpp
+  widgets/StatusBarContent.h
   widgets/TableView.cpp
   widgets/TableView.h
   widgets/TitleBar.cpp

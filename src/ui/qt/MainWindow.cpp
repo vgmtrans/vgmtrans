@@ -14,6 +14,7 @@
 #include <QPushButton>
 #include <QMessageBox>
 #include <QLabel>
+#include <QStatusBar>
 #include <version.h>
 #include "ManualCollectionDialog.h"
 #include "MainWindow.h"
@@ -29,6 +30,7 @@
 #include "workarea/VGMCollView.h"
 #include "workarea/MdiArea.h"
 #include "TitleBar.h"
+#include "StatusBarContent.h"
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
@@ -105,6 +107,13 @@ void MainWindow::createElements() {
   QList<QDockWidget *> docks = findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly);
   m_menu_bar = new MenuBar(this, docks);
   setMenuBar(m_menu_bar);
+  createStatusBar();
+}
+
+void MainWindow::createStatusBar() {
+  statusBarContent = new StatusBarContent;
+  statusBar()->setMaximumHeight(statusBarContent->maximumHeight());
+  statusBar()->addPermanentWidget(statusBarContent, 1);
 }
 
 void MainWindow::showEvent(QShowEvent* event) {

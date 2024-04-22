@@ -11,6 +11,7 @@
 #include <QApplication>
 #include <QAccessible>
 #include "Helpers.h"
+#include "services/NotificationCenter.h"
 
 void VGMTreeDisplayItem::paint(QPainter *painter, const QStyleOptionViewItem &option,
                                const QModelIndex &index) const {
@@ -64,18 +65,8 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(p
 void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name) {
   auto item_name = QString::fromStdString(name);
   auto tree_item = new VGMTreeItem(item_name, item, nullptr, parent);
-  if (name == item->GetDescription()) {
-    tree_item->setText(0, QString{"<b>%1</b><br>Offset: 0x%2 | Length: 0x%3"}
-                              .arg(item_name)
-                              .arg(item->dwOffset, 1, 16)
-                              .arg(item->unLength, 1, 16));
-  } else {
-    tree_item->setText(0, QString{"<b>%1</b><br>%2<br>Offset: 0x%3 | Length: 0x%4"}
-                              .arg(item_name)
-                              .arg(QString::fromStdString(item->GetDescription()))
-                              .arg(item->dwOffset, 1, 16)
-                              .arg(item->unLength, 1, 16));
-  }
+
+  tree_item->setText(0, item_name);
   tree_item->setIcon(0, iconForItemType(item->GetIcon()));
   tree_item->setToolTip(0, QString::fromStdString(item->GetDescription()));
 
@@ -87,6 +78,7 @@ void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::stri
   int insertIndex = getSortedIndex(parent_item_cached, tree_item);
   parent_item_cached->insertChild(insertIndex, tree_item);
   m_items[item] = tree_item;
+  m_treeItemToVGMItem[tree_item] = item;
   tree_item->setData(0, Qt::UserRole, QVariant::fromValue((void *)item));
 }
 
@@ -104,6 +96,8 @@ void VGMFileTreeView::currentChanged(const QModelIndex &current, const QModelInd
 #else
   QTreeView::currentChanged(current, previous);
 #endif
+
+  updateStatusBar();
 }
 
 void VGMFileTreeView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
@@ -154,6 +148,23 @@ void VGMFileTreeView::keyPressEvent(QKeyEvent *event) {
 
   // Call base class keyPressEvent for other keys and unhandled cases
   QTreeWidget::keyPressEvent(event);
+}
+
+// Update the status bar for the current selection
+void VGMFileTreeView::updateStatusBar() {
+  QTreeWidgetItem *treeItem = currentItem();
+  if (!treeItem) {
+    NotificationCenter::the()->updateStatusForItem(nullptr);
+    return;
+  }
+
+  VGMItem* vgmItem = m_treeItemToVGMItem[treeItem];
+  if (!vgmItem) {
+    NotificationCenter::the()->updateStatusForItem(nullptr);
+    return;
+  }
+
+  NotificationCenter::the()->updateStatusForItem(vgmItem);
 }
 
 // Find the index to insert a child item, sorted by offset, using binary search

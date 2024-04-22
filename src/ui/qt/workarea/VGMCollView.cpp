@@ -22,6 +22,7 @@
 #include "QtVGMRoot.h"
 #include "Helpers.h"
 #include "MdiArea.h"
+#include "services/NotificationCenter.h"
 
 VGMCollViewModel::VGMCollViewModel(QItemSelectionModel *collListSelModel, QObject *parent)
     : QAbstractListModel(parent), m_coll(nullptr) {
@@ -165,7 +166,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMColl, this, &VGMCollView::removeVGMColl);
   connect(m_listview, &QListView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
   connect(m_listview->selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollView::handleSelectionChanged);
-  connect(MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMCollView::selectRowForVGMFile);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMCollView::onVGMFileSelected);
 
 
   QObject::connect(collListSelModel, &QItemSelectionModel::currentChanged, [=](QModelIndex index) {
@@ -243,10 +244,19 @@ void VGMCollView::handleSelectionChanged(const QItemSelection &selected, const Q
 
   auto index = vgmCollViewModel->index(firstSelectedIndex.row());
   VGMFile* file = vgmCollViewModel->fileFromIndex(index);
-  MdiArea::the()->focusView(file, this);
+  NotificationCenter::the()->selectVGMFile(file, this);
+  NotificationCenter::the()->updateStatusForItem(file);
 }
 
-void VGMCollView::selectRowForVGMFile(VGMFile *file) {
+void VGMCollView::onVGMFileSelected(VGMFile *file, QWidget* caller) {
+  if (caller == this)
+    return;
+
+  if (file == nullptr) {
+    m_listview->clearSelection();
+    return;
+  }
+
   if (!vgmCollViewModel->containsVGMFile(file)) {
     m_listview->selectionModel()->clearSelection();
     return;

@@ -2,12 +2,11 @@
 #include "VGMItem.h"
 #include "MidiFile.h"
 
-#define DESCRIPTION(_str_)                                   \
-    virtual std::string GetDescription()                    \
-    {                                                        \
+#define DESCRIPTION(_str_)                                  \
+    virtual std::string GetDescription() {                  \
         std::ostringstream    desc;                         \
-        desc << name << " -  " << _str_;                    \
-        return desc.str();                                   \
+        desc << _str_;                                      \
+        return desc.str();                                  \
     }
 
 
@@ -54,7 +53,7 @@ class SeqEvent:
            const std::string &desc = "");
   virtual ~SeqEvent(void) { }
   virtual std::string GetDescription() {
-    return desc.empty() ? std::string(name) : (std::string(name) + " - " + desc);
+    return desc;
   }
   virtual ItemType GetType() const { return ITEMTYPE_SEQEVENT; }
   virtual EventType GetEventType() { return EVENTTYPE_UNDEFINED; }

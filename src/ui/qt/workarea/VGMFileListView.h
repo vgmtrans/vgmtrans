@@ -19,7 +19,7 @@
 class VGMFileListModel : public QAbstractTableModel {
     Q_OBJECT
 
-   public:
+  public:
     explicit VGMFileListModel(QObject *parent = nullptr);
 
     QVariant data(const QModelIndex &index, int role) const override;
@@ -27,29 +27,29 @@ class VGMFileListModel : public QAbstractTableModel {
     int rowCount(const QModelIndex &parent) const override;
     int columnCount(const QModelIndex &parent) const override;
 
-   public slots:
+  public slots:
     void AddVGMFile();
     void RemoveVGMFile();
 
-   private:
+  private:
     enum Property : uint8_t { Name = 0, Format = 1 };
 };
 
 class VGMFileListView final : public TableView {
     Q_OBJECT
 
-   public:
+  public:
     explicit VGMFileListView(QWidget *parent = nullptr);
 
-   public slots:
+  public slots:
     void requestVGMFileView(QModelIndex index);
     void removeVGMFile(VGMFile *file);
-    void selectRowForVGMFile(VGMFile *file);
+    void onVGMFileSelected(VGMFile *file, QWidget* caller);
 
-   private slots:
-    void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
-
-   private:
+  private:
+    void updateStatusBar();
+    void focusInEvent(QFocusEvent *event) override;
+    void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
     void keyPressEvent(QKeyEvent *input) override;
     void itemMenu(const QPoint &pos);
 

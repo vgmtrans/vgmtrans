@@ -72,6 +72,12 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   setWidget(m_splitter);
 }
 
+void VGMFileView::focusInEvent(QFocusEvent* event) {
+  QMdiSubWindow::focusInEvent(event);
+
+  m_treeview->updateStatusBar();
+}
+
 void VGMFileView::resetSnapRanges() {
   m_splitter->clearSnapRanges();
   m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
@@ -134,6 +140,7 @@ void VGMFileView::onSelectionChange(VGMItem *item) {
     m_treeview->setCurrentItem(widget_item);
     m_treeview->blockSignals(false);
   } else {
+    m_treeview->setCurrentItem(nullptr);
     m_treeview->clearSelection();
   }
 }

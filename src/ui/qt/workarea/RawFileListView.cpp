@@ -9,7 +9,15 @@
 #include <QHeaderView>
 #include "RawFileListView.h"
 #include "RawFile.h"
+#include "VGMFile.h"
 #include "QtVGMRoot.h"
+#include "services/NotificationCenter.h"
+
+
+static const QIcon& fileIcon() {
+  static QIcon fileIcon(":/images/file.svg");
+  return fileIcon;
+}
 
 /*
  * RawFileListViewModel
@@ -78,8 +86,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
       if (role == Qt::DisplayRole) {
         return QString::fromStdString(qtVGMRoot.vRawFile[index.row()]->GetFileName());
       } else if (role == Qt::DecorationRole) {
-        static QIcon fileicon(":/images/file.svg");
-        return fileicon;
+        return fileIcon();
       }
       break;
     }
@@ -128,6 +135,7 @@ RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
 
   connect(this, &QAbstractItemView::customContextMenuRequested, this,
           &RawFileListView::rawFilesMenu);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &RawFileListView::onVGMFileSelected);
 }
 
 /*
@@ -168,4 +176,52 @@ void RawFileListView::deleteRawFiles() {
 
   std::for_each(std::begin(to_close), std::end(to_close),
                 [](RawFile *file) { qtVGMRoot.CloseRawFile(file); });
+}
+
+void RawFileListView::onVGMFileSelected(VGMFile* vgmfile, QWidget* caller) {
+  if (caller == this)
+    return;
+
+  if (vgmfile == nullptr) {
+    this->clearSelection();
+    return;
+  }
+
+  auto it = std::find(qtVGMRoot.vRawFile.begin(), qtVGMRoot.vRawFile.end(), vgmfile->rawfile);
+  if (it == qtVGMRoot.vRawFile.end())
+    return;
+  int row = static_cast<int>(std::distance(qtVGMRoot.vRawFile.begin(), it));
+
+  // Select the row corresponding to the file
+  QModelIndex firstIndex = model()->index(row, 0); // First column of the row
+  QModelIndex lastIndex = model()->index(row, model()->columnCount() - 1); // Last column of the row
+
+  QItemSelection selection(firstIndex, lastIndex);
+  selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+
+  scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
+}
+
+// Update the status bar on focus
+void RawFileListView::focusInEvent(QFocusEvent *event) {
+  TableView::focusInEvent(event);
+  updateStatusBar();
+}
+
+void RawFileListView::currentChanged(const QModelIndex &current, const QModelIndex &previous) {
+  TableView::currentChanged(current, previous);
+
+  if (this->hasFocus())
+    updateStatusBar();
+}
+
+// Update the status bar for the current selection
+void RawFileListView::updateStatusBar() {
+  if (!currentIndex().isValid()) {
+    NotificationCenter::the()->updateStatusForItem(nullptr);
+    return;
+  }
+  RawFile* file = qtVGMRoot.vRawFile[currentIndex().row()];
+  QString name = QString::fromStdString(file->GetFileName());
+  NotificationCenter::the()->updateStatus(name, "", &fileIcon(), -1, file->size());
 }

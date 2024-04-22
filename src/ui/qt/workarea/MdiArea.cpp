@@ -9,8 +9,8 @@
 #include <QTabBar>
 #include <VGMFile.h>
 #include "VGMFileView.h"
-#include "Helpers.h"
 #include "Metrics.h"
+#include "services/NotificationCenter.h"
 
 MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setViewMode(QMdiArea::TabbedView);
@@ -19,6 +19,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setTabsClosable(true);
 
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &MdiArea::onVGMFileSelected);
 
   auto *tab_bar = findChild<QTabBar *>();
   if (tab_bar) {
@@ -42,6 +43,7 @@ void MdiArea::newView(VGMFile *file) {
     fileToWindowMap.insert(std::make_pair(file, tab));
     windowToFileMap.insert(std::make_pair(tab, file));
     tab->showMaximized();
+    tab->setFocus();
   }
 }
 
@@ -61,19 +63,6 @@ void MdiArea::removeView(VGMFile *file) {
   }
 }
 
-void MdiArea::focusView(VGMFile *file, QWidget *caller) {
-  auto it = fileToWindowMap.find(file);
-  if (it != fileToWindowMap.end()) {
-    QMdiSubWindow *window = it->second;
-    setActiveSubWindow(window);
-
-    // Reassert the focus back to the caller
-    if (caller) {
-      caller->setFocus();
-    }
-  }
-}
-
 void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
   // For some reason, if multiple documents are open, closing one document causes the others
   // to become windowed instead of maximized. This fixes the problem.
@@ -83,7 +72,25 @@ void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
     auto it = windowToFileMap.find(window);
     if (it != windowToFileMap.end()) {
       VGMFile *file = it->second;
-      emit vgmFileSelected(file);
+      NotificationCenter::the()->selectVGMFile(file, this);
+    }
+  }
+}
+
+void MdiArea::onVGMFileSelected(VGMFile *file, QWidget *caller) {
+  if (caller == this || file == nullptr)
+    return;
+
+  auto it = fileToWindowMap.find(file);
+  if (it != fileToWindowMap.end()) {
+
+    bool callerHadFocus = caller && caller->hasFocus();
+    QMdiSubWindow *window = it->second;
+    window->setFocus();
+
+    // Reassert the focus back to the caller
+    if (caller && callerHadFocus) {
+      caller->setFocus();
     }
   }
 }
