@@ -92,7 +92,6 @@ protected:
   void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
   void mousePressEvent(QMouseEvent *event) override;
   void mouseDoubleClickEvent(QMouseEvent *event) override;
-  void scrollContentsBy(int dx, int dy) override;
   void keyPressEvent(QKeyEvent *event) override;
 
 private:

@@ -45,6 +45,13 @@ VMGFileTreeHeaderView::VMGFileTreeHeaderView(Qt::Orientation orientation, QWidge
 void VMGFileTreeHeaderView::showEvent(QShowEvent *event) {
   QFont headerFont = font();
   headerFont.setPointSize(headerFont.pointSize()-1);
+#ifdef Q_OS_MAC
+  // Hide the splitter that appears on the far right of the header. Oddly, setting border-right
+  // does not work, but setting border-top seems to reset the appearance altogether and remove the
+  // splitter. The margin and padding settings here get us back to the default appearance.
+  setStyleSheet("QHeaderView::section { border-top: 0px solid white; margin-left: 4px; padding-bottom: -1px; padding-top: -3px; }");
+  resizeSection(0, width());
+#endif
   detailsCheckBox->setFont(headerFont);
 
   QHeaderView::showEvent(event);
@@ -54,7 +61,7 @@ void VMGFileTreeHeaderView::resizeEvent(QResizeEvent *event) {
   QHeaderView::resizeEvent(event);
 
   // Resize the first and only section to 1 pixel beyond the width to hide the column splitter
-  resizeSection(0, width() + 1);
+  resizeSection(0, width());
   detailsCheckBox->move(width() - detailsCheckBox->width() - 10,
                     (height() - detailsCheckBox->height()) / 2);
 }
@@ -205,12 +212,6 @@ void VGMFileTreeView::mouseDoubleClickEvent(QMouseEvent *event) {
     // If not, treat the second click like a normal mousePressEvent
     mousePressEvent(event);
   }
-}
-
-void VGMFileTreeView::scrollContentsBy(int dx, int dy) {
-  // Call the base class implementation with dx set to 0 to disable horizontal scrolling
-  // We disable horizontal scrolling so that we can hide the header column splitter
-  QTreeWidget::scrollContentsBy(0, dy);
 }
 
 void VGMFileTreeView::keyPressEvent(QKeyEvent *event) {
