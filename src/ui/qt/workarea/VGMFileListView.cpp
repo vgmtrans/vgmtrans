@@ -119,7 +119,6 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
-//  connect(MdiArea::the(), &MdiArea::vgmFileSelected, this, &VGMFileListView::selectRowForVGMFile);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
 }
 

@@ -8,7 +8,7 @@
 #include <QHeaderView>
 
 TableView::TableView(QWidget *parent) : QTableView(parent) {
-  setAlternatingRowColors(true);
+  setAlternatingRowColors(false);
   setShowGrid(false);
   setSortingEnabled(false);
   setContextMenuPolicy(Qt::CustomContextMenu);
