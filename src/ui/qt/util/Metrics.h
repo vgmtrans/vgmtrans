@@ -7,7 +7,8 @@
 #pragma once
 
 namespace Size {
-  constexpr int VTab = 30;      // Tab Height
+  constexpr int VTab = 30;            // Tab Height
+  constexpr int HeaderCheckbox = 11;  // Width/Height of checkbox appearing in a QHeaderView
 }
 
 namespace Margin {

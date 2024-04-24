@@ -33,10 +33,14 @@ public:
   void updateStatusForItem(VGMItem* item);
   void selectVGMFile(VGMFile* vgmfile, QWidget* caller);
 
+  void vgmfiletree_setShowDetails(bool showDetails) { emit vgmfiletree_showDetailsChanged(showDetails); }
+
 private:
   explicit NotificationCenter(QObject *parent = nullptr);
 
 signals:
   void statusUpdated(const QString& name, const QString& description, const QIcon* icon, int offset, int size);
   void vgmFileSelected(VGMFile *file, QWidget* caller);
+
+  void vgmfiletree_showDetailsChanged(bool showDetails);
 };

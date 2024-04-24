@@ -10,11 +10,35 @@
 #include <QTreeWidgetItem>
 #include <QObject>
 #include <QStyledItemDelegate>
+#include <QHeaderView>
 #include <unordered_map>
 #include <utility>
-#include <VGMFile.h>
+#include "VGMFile.h"
 
 class VGMFile;
+class QCheckBox;
+
+// ***********************************
+// VMGFileTreeHeaderView
+// ***********************************
+
+class VMGFileTreeHeaderView : public QHeaderView {
+  Q_OBJECT
+
+public:
+  VMGFileTreeHeaderView(Qt::Orientation orientation, QWidget *parent = nullptr, bool showDetails = false);
+
+private:
+  QCheckBox* detailsCheckBox;
+  void resizeEvent(QResizeEvent *event);
+  void showEvent(QShowEvent *event);
+  void onShowDetailsChanged(bool showDetails);
+  void toggleShowDetails();
+};
+
+// ***********************************
+// VGMTreeItem
+// ***********************************
 
 class VGMTreeItem : public QTreeWidgetItem {
   static constexpr auto ItemType = QTreeWidgetItem::UserType + 1;
@@ -36,6 +60,10 @@ private:
   VGMItem *m_parent = nullptr;
 };
 
+// ***********************************
+// VGMTreeDisplayItem
+// ***********************************
+
 class VGMTreeDisplayItem : public QStyledItemDelegate {
   Q_OBJECT
 public:
@@ -43,6 +71,10 @@ public:
              const QModelIndex &index) const override;
   QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 };
+
+// ***********************************
+// VGMFileTreeView
+// ***********************************
 
 class VGMFileTreeView : public QTreeWidget {
   Q_OBJECT
@@ -60,11 +92,16 @@ protected:
   void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
   void mousePressEvent(QMouseEvent *event) override;
   void mouseDoubleClickEvent(QMouseEvent *event) override;
+  void scrollContentsBy(int dx, int dy) override;
   void keyPressEvent(QKeyEvent *event) override;
 
 private:
   int getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item);
+  void setItemText(VGMItem* item, VGMTreeItem* treeItem);
+  void onShowDetailsChanged(bool showDetails);
+  void updateItemTextRecursively(QTreeWidgetItem* item);
 
+  bool showDetails = false;
   QTreeWidgetItem *parent_item_cached{};
   VGMItem *parent_cached{};
   std::unordered_map<VGMItem*, QTreeWidgetItem*> m_items{};

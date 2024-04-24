@@ -15,6 +15,7 @@
 
 int main(int argc, char *argv[]) {
   QCoreApplication::setOrganizationName("VGMTrans");
+  QCoreApplication::setOrganizationDomain("vgmtrans.com");
   QCoreApplication::setApplicationName("VGMTrans");
 
   QApplication app(argc, argv);
