@@ -85,8 +85,8 @@ if(CCACHE)
   set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
 endif()
 
-# Defaulting to C++17
-target_compile_features(g_options INTERFACE cxx_std_17)
+# Defaulting to C++20
+target_compile_features(g_options INTERFACE cxx_std_20)
 
 if(MSVC)
   target_compile_options(
@@ -138,5 +138,7 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/lib/tinyxml"
 
 set(GHC_FILESYSTEM_WITH_INSTALL OFF)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/filesystem")
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/spdlog")
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/mio")
 
 add_subdirectory(src)
