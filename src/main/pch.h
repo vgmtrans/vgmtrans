@@ -27,8 +27,6 @@
 #include <wchar.h>
 #include <ctype.h>
 
-#include "portable.h"
-
 
 // countof definition with fallbacks. Taken from: http://www.g-truc.net/post-0708.html
 //  TODO: replace this with ibkt the simple C++11 definition when VS2015 is released
