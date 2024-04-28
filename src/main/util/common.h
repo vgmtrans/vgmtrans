@@ -1,5 +1,4 @@
-#if !defined(COMMON_H)
-#define COMMON_H
+#pragma once
 
 #include "pch.h"
 #include "helper.h"
@@ -90,6 +89,3 @@ struct SizeOffsetPair {
 };
 
 char* GetFileWithBase(const char* f, const char* newfile);
-
-
-#endif // !defined(COMMON_H)

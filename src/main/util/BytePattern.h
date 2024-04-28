@@ -1,8 +1,7 @@
 // Byte pattern class for flexible byte sequence search
 // Heavily inspired by SigScan at GameDeception.net
 
-#ifndef BYTEPATTERN_H
-#define BYTEPATTERN_H
+#pragma once
 
 class BytePattern {
  private:
@@ -32,5 +31,3 @@ class BytePattern {
   bool search(const void *buf, size_t buf_len, size_t &match_offset, size_t search_offset = 0) const;
   inline size_t length() const { return ptn_len; }
 };
-
-#endif
