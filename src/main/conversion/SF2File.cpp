@@ -1,16 +1,10 @@
 #include "pch.h"
+#include "version.h"
 #include "SF2File.h"
 #include "VGMInstrSet.h"
 #include "SynthFile.h"
 #include "ScaleConversion.h"
 #include "Root.h"
-
-#ifdef VGMTRANS_LEGACY
-  /* No worries about hard-coding, legacy will be dropped past this release*/
-  #define VGMTRANS_VERSION "v1.1-LEGACY"
-#else
-#include "version.h"
-#endif
 
 using namespace std;
 

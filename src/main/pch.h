@@ -1,9 +1,5 @@
 #pragma once
 
-#if defined(_MSC_VER) && defined(VGMTRANS_LEGACY)
-#include "stdafx.h"
-#endif
-
 #include <assert.h>
 #include <wchar.h>
 #include <cmath>
