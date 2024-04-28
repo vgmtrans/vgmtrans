@@ -4,8 +4,6 @@
 * refer to the included LICENSE.txt file
  */
 
-#pragma once
-
 #include "SnappingSplitter.h"
 
 SnappingSplitter::SnappingSplitter(Qt::Orientation orientation, QWidget* parent)
