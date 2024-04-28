@@ -1,9 +1,8 @@
+#pragma once
+
 #if defined(_MSC_VER) && defined(VGMTRANS_LEGACY)
 #include "stdafx.h"
 #endif
-
-#if !defined(PCH_H)
-#define PCH_H
 
 #include <assert.h>
 #include <wchar.h>
@@ -52,5 +51,3 @@ constexpr std::size_t countof(T const (&)[N]) noexcept {
 #endif
 
 using namespace std;
-
-#endif // !defined(PCH_H)
