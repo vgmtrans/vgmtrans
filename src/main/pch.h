@@ -27,6 +27,11 @@
 #include <wchar.h>
 #include <ctype.h>
 
+// Hack to prevent C2872 error for std::byte on MSVC
+// TODO: Remove this when global std namespaces aren't used anymore
+#if defined(_MSC_VER)
+#include <windows.h>
+#endif
 
 // C++11 countof definition taken from http://www.g-truc.net/post-0708.html
 template<typename T, std::size_t N>
