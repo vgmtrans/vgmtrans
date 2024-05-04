@@ -17,7 +17,7 @@ class VirtFile;
 enum LoadMethod { LM_APPEND, LM_APPEND_SWAP16, LM_DEINTERLACE };
 
 /**
-Converts a std::string to any class with a proper overload of the >> opertor
+Converts a std::string to any class with a proper overload of the >> operator
 @param temp			The string to be converted
 @param out	[OUT]	The container for the returned value
 */
