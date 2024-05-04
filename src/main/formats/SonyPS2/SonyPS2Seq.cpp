@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "SonyPS2Seq.h"
 
 DECLARE_FORMAT(SonyPS2);

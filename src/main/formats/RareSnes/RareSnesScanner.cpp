@@ -1,10 +1,17 @@
-#include "pch.h"
-#include "RareSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "RareSnesSeq.h"
 #include "RareSnesInstr.h"
 #include "SNESDSP.h"
+#include "ScannerManager.h"
 
-using namespace std;
+namespace vgmtrans::scanners {
+ScannerRegistration<RareSnesScanner> s_raresnes("RARESNES", {"spc"});
+}
 
 // ; Load DIR address
 // 10df: 8f 5d f2  mov   $f2,#$5d
@@ -105,8 +112,7 @@ void RareSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForRareSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForRareSnesFromROM(file);
   }
   return;
@@ -118,17 +124,15 @@ void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
   uint32_t ofsVCmdExecASM;
   uint32_t addrSeqHeader;
   uint32_t addrVCmdTable;
-  string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // find a sequence
   if (file->SearchBytePattern(ptnSongLoadDKC2, ofsSongLoadASM)) {
     addrSeqHeader = file->GetShort(file->GetByte(ofsSongLoadASM + 8));
-  }
-  else if (file->SearchBytePattern(ptnSongLoadDKC, ofsSongLoadASM) &&
+  } else if (file->SearchBytePattern(ptnSongLoadDKC, ofsSongLoadASM) &&
       file->GetShort(ofsSongLoadASM + 13) == file->GetShort(ofsSongLoadASM + 8) + 1) {
     addrSeqHeader = file->GetShort(ofsSongLoadASM + 8);
-  }
-  else {
+  } else {
     return;
   }
 
@@ -138,20 +142,16 @@ void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
     if (file->GetShort(addrVCmdTable + (0x0c * 2)) != 0) {
       if (file->GetShort(addrVCmdTable + (0x11 * 2)) != 0) {
         version = RARESNES_WNRN;
-      }
-      else {
+      } else {
         version = RARESNES_DKC2;
       }
-    }
-    else {
+    } else {
       version = RARESNES_KI;
     }
-  }
-  else if (file->SearchBytePattern(ptnVCmdExecDKC, ofsVCmdExecASM)) {
+  } else if (file->SearchBytePattern(ptnVCmdExecDKC, ofsVCmdExecASM)) {
     addrVCmdTable = file->GetShort(ofsVCmdExecASM + 12);
     version = RARESNES_DKC;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -180,12 +180,9 @@ void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
   uint32_t spcDirAddr = file->GetByte(ofsSetDIRASM + 4) << 8;
 
   // scan SRCN table
-  RareSnesInstrSet *newInstrSet = new RareSnesInstrSet(file,
-                                                       addrSRCNTable,
-                                                       spcDirAddr,
-                                                       newSeq->instrUnityKeyHints,
-                                                       newSeq->instrPitchHints,
-                                                       newSeq->instrADSRHints);
+    RareSnesInstrSet *newInstrSet = new RareSnesInstrSet(
+      file, addrSRCNTable, spcDirAddr, newSeq->instrUnityKeyHints,
+      newSeq->instrPitchHints, newSeq->instrADSRHints);
   if (!newInstrSet->LoadVGMFile()) {
     delete newInstrSet;
     return;
@@ -218,5 +215,4 @@ void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
   }
 }
 
-void RareSnesScanner::SearchForRareSnesFromROM(RawFile *file) {
-}
+void RareSnesScanner::SearchForRareSnesFromROM(RawFile *file) {}

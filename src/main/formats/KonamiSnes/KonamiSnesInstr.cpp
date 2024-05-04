@@ -1,8 +1,12 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "KonamiSnesInstr.h"
 #include "SNESDSP.h"
-
-using namespace std;
+#include <spdlog/fmt/fmt.h>
 
 // ******************
 // KonamiSnesInstrSet
@@ -78,16 +82,9 @@ bool KonamiSnesInstrSet::GetInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << instr;
-    KonamiSnesInstr *newInstr = new KonamiSnesInstr(this,
-                                                    version,
-                                                    addrInstrHeader,
-                                                    instr >> 7,
-                                                    instr & 0x7f,
-                                                    spcDirAddr,
-                                                    false,
-                                                    instrName.str());
+    KonamiSnesInstr *newInstr = new KonamiSnesInstr(
+      this, version, addrInstrHeader, instr >> 7, instr & 0x7f,
+      spcDirAddr, false, fmt::format("Instrument {}", instr));
     aInstrs.push_back(newInstr);
   }
   if (aInstrs.size() == 0) {
@@ -188,8 +185,7 @@ bool KonamiSnesInstr::IsValidHeader(RawFile *file,
 uint32_t KonamiSnesInstr::ExpectedSize(KonamiSnesVersion version) {
   if (version == KONAMISNES_V1 || version == KONAMISNES_V2 || version == KONAMISNES_V3) {
     return 8;
-  }
-  else {
+  } else {
     return 7;
   }
 }
@@ -240,12 +236,11 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint
   // volume is *decreased* by final volume value
   // so it is impossible to convert it in 100% accuracy
   // the following value 72.0 is chosen as a "average channel volume level (before pan processing)"
-  AddVolume(max(1.0 - (vol / 72.0), 0.0), offset + 6);
+  AddVolume(std::max(1.0 - (vol / 72.0), 0.0), offset + 6);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
-KonamiSnesRgn::~KonamiSnesRgn() {
-}
+KonamiSnesRgn::~KonamiSnesRgn() {}
 
 bool KonamiSnesRgn::LoadRgn() {
   return true;

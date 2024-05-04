@@ -1,21 +1,27 @@
-#include "pch.h"
-#include "FFTScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "FFTSeq.h"
 #include "FFTInstr.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<FFTScanner> s_fft_snes("FFT");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-FFTScanner::FFTScanner(void) {
-}
+FFTScanner::FFTScanner(void) {}
 
 //==============================================================
 //		Destructor
 //--------------------------------------------------------------
-FFTScanner::~FFTScanner(void) {
-}
+FFTScanner::~FFTScanner(void) {}
 
 //==============================================================
 //		scan "smds" and "wds"
@@ -23,7 +29,6 @@ FFTScanner::~FFTScanner(void) {
 void FFTScanner::Scan(RawFile *file, void *info) {
   SearchForFFTSeq(file);
   SearchForFFTwds(file);
-  return;
 }
 
 //==============================================================
@@ -43,7 +48,6 @@ void FFTScanner::SearchForFFTSeq(RawFile *file) {
   }
 }
 
-
 //==============================================================
 //		scan "wds"		(Instrumnt)
 //--------------------------------------------------------------
@@ -62,7 +66,7 @@ void FFTScanner::SearchForFFTwds(RawFile *file) {
       continue;
 
     uint32_t hdrSize = file->GetWord(i + 0x10);
-    //First 0x10 bytes of sample section should be 0s
+    // First 0x10 bytes of sample section should be 0s
     if (file->GetWord(i + hdrSize) != 0 || file->GetWord(i + hdrSize + 4) != 0 ||
         file->GetWord(i + hdrSize + 8) != 0 || file->GetWord(i + hdrSize + 12) != 0)
       continue;
@@ -75,4 +79,3 @@ void FFTScanner::SearchForFFTwds(RawFile *file) {
       delete newWds;
   }
 }
-

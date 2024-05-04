@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "KonamiGXScanner.h"
 #include "KonamiGXSeq.h"
 #include "MAMELoader.h"

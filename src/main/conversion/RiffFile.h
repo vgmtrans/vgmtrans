@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstring>
 #include "common.h"
+#include "helper.h"
 
 
 //////////////////////////////////////////////

@@ -21,7 +21,7 @@ typedef enum {
 class SynthFile {
  public:
   SynthFile(const std::string synth_name = "Instrument Set");
-  ~SynthFile(void);
+  ~SynthFile();
 
   SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, float reverb);
   SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, std::string Name, float reverb);
@@ -59,7 +59,6 @@ class SynthInstr {
 
   std::vector<SynthRgn *> vRgns;
   std::string name;
-
 };
 
 class SynthRgn {
@@ -131,7 +130,7 @@ class SynthSampInfo {
       : usUnityNote(unityNote), sFineTune(fineTune), attenuation(atten), cSampleLoops(sampleLoops),
         ulLoopType(loopType),
         ulLoopStart(loopStart), ulLoopLength(loopLength) { }
-  ~SynthSampInfo(void) { }
+  ~SynthSampInfo() { }
 
   void SetLoopInfo(Loop &loop, VGMSamp *samp);
   //void SetPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
@@ -140,7 +139,7 @@ class SynthSampInfo {
  public:
   uint16_t usUnityNote;
   int16_t sFineTune;
-  double attenuation;    // in decibels.
+  double attenuation;  // in decibels.
   int8_t cSampleLoops;
 
   uint32_t ulLoopType;
@@ -150,7 +149,7 @@ class SynthSampInfo {
 
 class SynthWave {
  public:
-  SynthWave(void)
+  SynthWave()
       : sampinfo(NULL),
         data(NULL),
         name("Untitled Wave") {
@@ -191,4 +190,3 @@ class SynthWave {
 
   std::string name;
 };
-

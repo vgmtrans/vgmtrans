@@ -1,4 +1,8 @@
-/**
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ *
  * GBA MusicPlayer2000 (Sappy)
  *
  * Special Thanks / Respects To:
@@ -7,9 +11,13 @@
  * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
-#include "pch.h"
 #include "MP2kScanner.h"
 #include "MP2kSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<MP2kScanner> s_mp2k("MP2K", {"gba", "gsf", "minigsf", "gsflib"});
+}
 
 #define SRCH_BUF_SIZE 0x20000
 

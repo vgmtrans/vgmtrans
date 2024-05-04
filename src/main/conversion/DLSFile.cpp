@@ -1,10 +1,9 @@
 /**
- * VGMTrans (c) - 2002-2021
+ * VGMTrans (c) - 2002-2024
  * Licensed under the zlib license
  * See the included LICENSE for more information
  */
 
-#include "pch.h"
 #include <algorithm>
 #include <numeric>
 #include "DLSFile.h"

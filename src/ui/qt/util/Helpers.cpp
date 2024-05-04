@@ -8,29 +8,26 @@
 #include "Colors.h"
 #include <QBitmap>
 
-const QIcon &iconForFileType(FileType filetype) {
-  switch (filetype) {
-    case FILETYPE_SEQ: {
+const QIcon &iconForFile(VGMFileVariant file) {
+  static Visitor icon{
+    [](VGMSeq *) -> const QIcon & {
       static QIcon i_gen{":/images/sequence.svg"};
       return i_gen;
-    }
-
-    case FILETYPE_INSTRSET: {
+    },
+    [](VGMInstrSet *) -> const QIcon & {
       static QIcon i_gen{":/images/instrument-set.svg"};
       return i_gen;
-    }
-
-    case FILETYPE_SAMPCOLL: {
+    },
+    [](VGMSampColl *) -> const QIcon & {
       static QIcon i_gen{":/images/sample-collection.svg"};
       return i_gen;
-    }
-
-    default:
-      break;
-  }
-
-  static QIcon i_gen{":/images/file.png"};
-  return i_gen;
+    },
+    [](VGMMiscFile *) -> const QIcon & {
+      static QIcon i_gen{":/images/binary.svg"};
+      return i_gen;
+    },
+  };
+  return std::visit(icon, file);
 }
 
 const QIcon &iconForItemType(VGMItem::Icon type) {

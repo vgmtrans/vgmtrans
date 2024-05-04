@@ -36,6 +36,6 @@ public:
   virtual bool GetSampleInfo();
 
 private:
-  vector<VGMItem*> samplePointers;
+  std::vector<VGMItem*> samplePointers;
   CPS1SampleInstrSet *instrset;
 };

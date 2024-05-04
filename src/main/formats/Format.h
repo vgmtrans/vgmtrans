@@ -1,13 +1,14 @@
 /**
- * VGMTrans (c) - 2002-2021
+ * VGMTrans (c) - 2002-2024
  * Licensed under the zlib license
  * See the included LICENSE for more information
  */
-
 #pragma once
-#include <vector>
-#include <map>
+
+#include <variant>
 #include <string>
+#include <map>
+#include <vector>
 
 class VGMColl;
 class VGMScanner;
@@ -15,16 +16,16 @@ class Matcher;
 class VGMScanner;
 
 #define DECLARE_FORMAT(_name_)               \
-  const _name_##Format* _name_##Format::_name_##FormatInstance = new _name_##Format(); \
+  _name_##Format _name_##FormatRegisterThis; \
   const std::string _name_##Format::name = #_name_;
 
-#define BEGIN_FORMAT(_name_)                                \
-  class _name_##Format : public Format {                    \
-  public:                                                   \
-    static const _name_##Format* _name_##FormatInstance;    \
-    static const std::string name;                          \
-    _name_##Format() : Format(#_name_) { Init(); }          \
-    virtual const std::string &GetName() { return name; }
+#define BEGIN_FORMAT(_name_)                                    \
+  class _name_##Format : public Format {                      \
+    public:                                                  \
+      static const _name_##Format _name_##FormatRegisterThis; \
+      static const std::string name;                          \
+      _name_##Format() : Format(#_name_) { Init(); }          \
+      virtual const std::string &GetName() { return name; }
 
 #define END_FORMAT() \
   }                  \
@@ -44,19 +45,19 @@ class VGMScanner;
 
 class Format;
 class VGMFile;
+class VGMSeq;
+class VGMInstrSet;
+class VGMSampColl;
+class VGMMiscFile;
 
-typedef std::map<std::string, Format *> FormatMap;
+using FormatMap = std::map<std::string, Format *>;
 
 class Format {
-protected:
-  static FormatMap &registry();
-
 public:
   Format(const std::string &scannerName);
   virtual ~Format();
 
   static Format *GetFormatFromName(const std::string &name);
-  static void DeleteFormatRegistry();
 
   virtual bool Init();
   virtual const std::string &GetName() = 0;
@@ -64,11 +65,13 @@ public:
   VGMScanner &GetScanner() const { return *scanner; }
   virtual Matcher *NewMatcher() { return nullptr; }
   virtual VGMColl *NewCollection();
-  virtual bool OnNewFile(VGMFile *file);
-  virtual bool OnCloseFile(VGMFile *file);
-  virtual bool OnMatch(std::vector<VGMFile *> &files) { return true; }
+  virtual bool OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+  virtual bool OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+  virtual bool OnMatch(std::vector<VGMFile *> &) { return true; }
 
-public:
   Matcher *matcher;
   VGMScanner *scanner;
+
+protected:
+    static FormatMap &registry();
 };

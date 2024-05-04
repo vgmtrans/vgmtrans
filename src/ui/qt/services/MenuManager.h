@@ -6,16 +6,15 @@
 
 #pragma once
 
-#include "common.h"
+#include <filesystem>
 #include <typeindex>
 #include <typeinfo>
 #include <QMenu>
+#include "common.h"
 #include "Root.h"
 #include "UIHelpers.h"
 
-#include <ghc/filesystem.hpp>
-
-namespace fs = ghc::filesystem;
+namespace fs = std::filesystem;
 
 class VGMFile;
 class VGMSeq;
@@ -36,18 +35,18 @@ enum class PropertySpecValueType {
 /**
  * A variant type used to store different types of property values in a PropertyMap
  */
-using PropertyValue = variant<
+using PropertyValue = std::variant<
     int,
     float,
-    string,
-    shared_ptr<vector<VGMFile*>>,
-    shared_ptr<vector<VGMSeq*>>,
-    shared_ptr<vector<VGMInstrSet*>>,
-    shared_ptr<vector<VGMSampColl*>>,
-    shared_ptr<vector<RawFile*>>
+    std::string,
+    std::shared_ptr<std::vector<VGMFile*>>,
+    std::shared_ptr<std::vector<VGMSeq*>>,
+    std::shared_ptr<std::vector<VGMInstrSet*>>,
+    std::shared_ptr<std::vector<VGMSampColl*>>,
+    std::shared_ptr<std::vector<RawFile*>>
 >;
 
-using PropertyMap = map<string, PropertyValue>;
+using PropertyMap = std::map<std::string, PropertyValue>;
 
 /**
  * The base class for a command context. The command context provides an interface for commands
@@ -64,13 +63,13 @@ public:
  * expose these specifications via the GetPropertySpecifications() method
  */
 struct PropertySpecification {
-  string key;
+  std::string key;
   PropertySpecValueType valueType;
-  string description;
+  std::string description;
   PropertyValue defaultValue;
 };
 
-using PropertySpecifications = vector<PropertySpecification>;
+using PropertySpecifications = std::vector<PropertySpecification>;
 
 /**
  * The base class of a factory for creating CommandContext objects. Implementations of this class are responsible
@@ -87,7 +86,7 @@ public:
    * @param properties A map of properties to be used for context creation.
    * @return A shared pointer to the created CommandContext object.
    */
-  [[nodiscard]] virtual shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const = 0;
+  [[nodiscard]] virtual std::shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const = 0;
 
   /**
    * Retrieves the specifications for the properties required to be set in the PropertyMap passed to CreateContext().
@@ -117,13 +116,13 @@ public:
    * selecting multiple sequences and executing the "Save to MIDI" command).
    * @return The name of the command.
    */
-  [[nodiscard]] virtual string Name() const = 0;
+  [[nodiscard]] virtual std::string Name() const = 0;
 
   /**
    * Gets the factory for creating a command context specific to this command.
    * @return A shared pointer to the CommandContextFactory.
    */
-  [[nodiscard]] virtual shared_ptr<CommandContextFactory> GetContextFactory() const = 0;
+  [[nodiscard]] virtual std::shared_ptr<CommandContextFactory> GetContextFactory() const = 0;
 };
 
 
@@ -133,14 +132,14 @@ public:
 class MenuManager {
 public:
   template<typename T, typename Base = T>
-  using CheckFunc = function<bool(Base*)>;
-  using CommandsList = vector<shared_ptr<Command>>;
+  using CheckFunc = std::function<bool(Base*)>;
+  using CommandsList = std::vector<std::shared_ptr<Command>>;
   template<typename T>
-  using CheckedTypeEntry = pair<CheckFunc<T>, CommandsList>;
+  using CheckedTypeEntry = std::pair<CheckFunc<T>, CommandsList>;
 
 private:
-  map<type_index, vector<shared_ptr<Command>>> commandsForType;
-  map<type_index, vector<CheckedTypeEntry<void>>> commandsForCheckedType;
+  std::map<std::type_index, std::vector<std::shared_ptr<Command>>> commandsForType;
+  std::map<std::type_index, std::vector<CheckedTypeEntry<void>>> commandsForCheckedType;
 
 public:
   MenuManager();
@@ -150,7 +149,7 @@ public:
    * @param commands A vector of commands to be registered.
    */
   template<typename T, typename Base = T>
-  void RegisterCommands(const vector<shared_ptr<Command>>& commands);
+  void RegisterCommands(const std::vector<std::shared_ptr<Command>>& commands);
 
   /**
    * Retrieves the list of commands suitable for a given item.
@@ -158,7 +157,7 @@ public:
    * @return A vector of shared pointers to the commands.
    */
   template<typename Base>
-  vector<shared_ptr<Command>> GetCommands(Base* base) {
+  std::vector<std::shared_ptr<Command>> GetCommands(Base* base) {
     if (!base) {
       return {}; // Return empty vector if base is nullptr
     }
@@ -172,7 +171,7 @@ public:
     }
 
     // Check for matches using full class hierarchy
-    auto baseTypeIndex = type_index(typeid(Base));
+    auto baseTypeIndex = std::type_index(typeid(Base));
     auto baseIt = commandsForCheckedType.find(baseTypeIndex);
     if (baseIt != commandsForCheckedType.end()) {
       for (const auto& pair : baseIt->second) {
@@ -193,25 +192,25 @@ public:
  * @return A list of commands shared by all items, ordered as they are in the first item's Command registry.
    */
   template <typename Base, typename T>
-  vector<shared_ptr<Command>> FindCommonCommands(const vector<T*>& items) {
+  std::vector<std::shared_ptr<Command>> FindCommonCommands(const std::vector<T*>& items) {
     if (items.empty()) {
       return {};
     }
 
-    vector<shared_ptr<Command>> commonCommands;
+    std::vector<std::shared_ptr<Command>> commonCommands;
     // Get commands of the first file as the reference order
     auto referenceCommands = GetCommands<Base>(items.front());
 
     // Iterate over each command in the reference list
     for (const auto& refCmd : referenceCommands) {
-      string refCmdName = refCmd->Name();
+      std::string refCmdName = refCmd->Name();
       bool isCommon = true;
 
       // Check if this command is present in all other files
       for (auto* item : items) {
         auto commands = GetCommands<Base>(item);
         if (none_of(commands.begin(), commands.end(),
-                    [&refCmdName](const shared_ptr<Command>& cmd) { return cmd->Name() == refCmdName; })) {
+                    [&refCmdName](const std::shared_ptr<Command>& cmd) { return cmd->Name() == refCmdName; })) {
           isCommon = false;
           break;
         }
@@ -238,7 +237,7 @@ public:
  * @return A QMenu populated with actions for the common commands, in the same order as they were registered for the first item
    */
   template <typename Base, typename T = Base>
-  QMenu* CreateMenuForItems(shared_ptr<vector<T*>> items) {
+  QMenu* CreateMenuForItems(std::shared_ptr<std::vector<T*>> items) {
 
     auto menu = new QMenu();
     if (items->empty()) {
@@ -277,7 +276,7 @@ public:
                 if constexpr (has_getname<T>::value) {
                   suggestedFileName = ConvertToSafeFileName(*(*items)[0]->GetName());
                 }
-                auto fileExtension = get<string>(propSpec.defaultValue);
+                auto fileExtension = get<std::string>(propSpec.defaultValue);
                 auto path = OpenSaveFileDialog(suggestedFileName, fileExtension);
                 if (path.empty()) {
                   return;

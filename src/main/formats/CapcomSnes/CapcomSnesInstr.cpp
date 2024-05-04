@@ -1,6 +1,10 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "CapcomSnesInstr.h"
-#include "Format.h"
+#include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
 #include "CapcomSnesFormat.h"
 
@@ -54,10 +58,9 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << instr;
-    CapcomSnesInstr
-        *newInstr = new CapcomSnesInstr(this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
+    CapcomSnesInstr *newInstr = new CapcomSnesInstr(
+      this, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr,
+      fmt::format("Instrument {}", instr));
     aInstrs.push_back(newInstr);
   }
   if (aInstrs.size() == 0) {

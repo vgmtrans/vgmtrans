@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "SegSatSeq.h"
 
 DECLARE_FORMAT(SegSat);

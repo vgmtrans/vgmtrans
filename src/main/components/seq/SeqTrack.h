@@ -1,15 +1,24 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
+
+#include <unordered_set>
+#include <sstream>
 #include "VGMItem.h"
 #include "VGMSeq.h"
+#include <spdlog/common.h>
+#include "LogManager.h"
 
 class VGMSeq;
 class SeqEvent;
 class MidiTrack;
 
-enum ReadMode: uint8_t;
+enum ReadMode : uint8_t;
 
-class SeqTrack:
-    public VGMContainerItem {
+class SeqTrack : public VGMContainerItem {
  public:
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::string name = "Track");
   virtual ~SeqTrack(void);
@@ -145,8 +154,8 @@ class SeqTrack:
 
   void AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName = "Global Transpose");
   void AddMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::string &sEventName, int8_t priority = 0, EventColor color = CLR_MISC);
-  void AddMarkerNoItem(const string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority);
-  void InsertMarkerNoItem(uint32_t absTime, const string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority);
+  void AddMarkerNoItem(const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority);
+  void InsertMarkerNoItem(uint32_t absTime, const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority);
 
   bool AddLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName = "Loop Forever");
 
@@ -190,5 +199,21 @@ class SeqTrack:
   //SETTINGS
   bool bDetermineTrackLengthEventByEvent;
   bool bWriteGenericEventAsTextEvent;
-
 };
+
+template<typename... Args>
+static std::string logEvent(uint8_t statusByte, spdlog::level::level_enum level = spdlog::level::err,
+  std::string title = "Event", Args... args) {
+
+  std::ostringstream description;
+  description <<  title << ": 0x" << std::hex << std::setfill('0') << std::setw(2)
+              << std::uppercase << statusByte << std::dec << std::setfill(' ') << std::setw(0);
+
+  // Use a fold expression to process each argument
+  int arg_idx = 1;
+  ((description << "  Arg" << arg_idx++ << ": " << args), ...);
+
+  auto str = description.str();
+  L_LOG(level, str);
+  return str;
+}

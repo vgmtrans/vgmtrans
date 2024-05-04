@@ -1,28 +1,37 @@
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #pragma once
 
+#include <string>
+#include <map>
+#include <vector>
+
 class VGMTag {
- public:
-  VGMTag(void);
-  VGMTag(const std::string &_title, const std::string &_artist = "", const std::string &_album = "");
-  virtual ~VGMTag(void);
+public:
+  VGMTag() = default;
+  VGMTag(std::string _title, std::string _artist = "", std::string _album = "");
+  ~VGMTag() = default;
 
-  bool HasTitle(void);
-  bool HasArtist(void);
-  bool HasAlbum(void);
-  bool HasComment(void);
-  bool HasTrackNumber(void);
-  bool HasLength(void);
+  bool HasTitle();
+  bool HasArtist();
+  bool HasAlbum();
+  bool HasComment();
+  bool HasTrackNumber();
+  bool HasLength();
 
- public:
   std::string title;
   std::string artist;
   std::string album;
   std::string comment;
-  std::map<std::string, std::vector<uint8_t> > binaries;
+  std::map<std::string, std::vector<uint8_t>> binaries;
 
-  /** Track number */
-  int track_number;
+  /* Track number */
+  int track_number = 0;
 
-  /** Length in seconds */
-  double length;
+  /* Length in seconds */
+  double length = 0;
 };

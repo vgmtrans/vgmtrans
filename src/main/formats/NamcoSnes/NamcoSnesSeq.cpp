@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "NamcoSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -566,14 +565,12 @@ bool NamcoSnesSeq::ReadEvent(void) {
       break;
     }
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "NamcoSnesSeq"));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   //std::ostringstream ssTrace;

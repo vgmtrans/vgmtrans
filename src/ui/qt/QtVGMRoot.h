@@ -20,14 +20,14 @@ public:
   void UI_PreExit() override;
   void UI_Exit() override;
   void UI_AddRawFile(RawFile* newFile) override;
-  void UI_CloseRawFile(RawFile* targFile) override;
+  void UI_CloseRawFile(RawFile* targFile);
 
   void UI_OnBeginLoadRawFile() override;
   void UI_OnEndLoadRawFile() override;
-  void UI_OnBeginScan() override;
-  void UI_SetScanInfo() override;
-  void UI_OnEndScan() override;
-  void UI_AddVGMFile(VGMFile* theFile) override;
+  void UI_OnBeginScan();
+  void UI_SetScanInfo();
+  void UI_OnEndScan();
+  void UI_AddVGMFile(VGMFileVariant file) override;
   void UI_AddVGMSeq(VGMSeq* theSeq) override;
   void UI_AddVGMInstrSet(VGMInstrSet* theInstrSet) override;
   void UI_AddVGMSampColl(VGMSampColl* theSampColl) override;
@@ -38,7 +38,7 @@ public:
   void UI_AddItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
   std::string UI_GetOpenFilePath(const std::string& suggestedFilename = "",
-                                          const std::string& extension = "") override;
+                                          const std::string& extension = "");
   std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
                                           const std::string& extension = "") override;
   std::string UI_GetSaveDirPath(const std::string& suggestedDir = "") override;
@@ -58,7 +58,7 @@ signals:
   void UI_RemovedVGMColl();
   void UI_RemoveVGMColl(VGMColl* targColl) override;
   void UI_RemoveVGMFile(VGMFile* targFile) override;
-  void UI_AddLogItem(LogItem* theLog) override;
+  void UI_Log(LogItem* theLog) override;
 };
 
 extern QtVGMRoot qtVGMRoot;

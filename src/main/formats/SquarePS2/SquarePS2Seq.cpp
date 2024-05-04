@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "SquarePS2Seq.h"
 
 DECLARE_FORMAT(SquarePS2);
@@ -38,7 +37,7 @@ bool BGMSeq::GetHeaderInfo(void) {
   theName << "BGM " << seqID;
   if (seqID != assocWDID)
     theName << "using WD " << assocWDID;
-  name = theName.str();
+  m_name = theName.str();
   return true;
 }
 
@@ -75,9 +74,7 @@ bool BGMTrack::ReadEvent(void) {
   // address range check for safety
   if (!vgmfile->IsValidOffset(curOffset)) {
     if (readMode== ReadMode::READMODE_ADD_TO_UI) {
-      std::ostringstream message;
-	  message << *vgmfile->GetName() << ": Address out of range. Conversion aborted.";
-      pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, "SquarePS2Seq"));
+      L_WARN("{}: Address out of range. Conversion aborted.", vgmfile->name());
     }
     return false;
   }

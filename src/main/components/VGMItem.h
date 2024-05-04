@@ -1,6 +1,8 @@
 #pragma once
 
 #include "common.h"
+#include <algorithm>
+#include <vector>
 
 template <class T>
 class Menu;

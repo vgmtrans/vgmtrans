@@ -1,26 +1,20 @@
+/*
+ * VGMTrans (c) 2002-2014
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #pragma once
-#include "Root.h"
+#include <variant>
+#include <map>
+#include <vector>
 #include "Format.h"
 
+class VGMMiscFile;
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMColl.h"
-
-
-/*#define USE_SIMPLE_MATCHER(fmt_id, id_var)													\
-	public:																					\
-	virtual void Announce()																	\
-	{																						\
-		Format* format = pRoot->GetFormat(fmt_id);											\
-		SimpleMatcher* matcher = (SimpleMatcher*)format->matcher;							\
-		vector<VGMFile*>* files = matcher->AddMatchItem(this, id_var);						\
-		if (files)																			\
-		{																					\
-			format->OnMatch(*files);														\
-			delete files;																	\
-		}																					\
-	}*/
 
 // *******
 // Matcher
@@ -28,55 +22,44 @@
 
 class Matcher {
  public:
-  Matcher(Format *format);
-  virtual ~Matcher();
+  explicit Matcher(Format *format);
+  virtual ~Matcher() = default;
 
-  //virtual bool Match() = 0;
-
- public:
-  virtual bool OnNewFile(VGMFile *file);
-  virtual bool OnCloseFile(VGMFile *file);
+  virtual bool OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+  virtual bool OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
   virtual bool MakeCollectionsForFile(VGMFile *file);
+
  protected:
-  virtual bool OnNewSeq(VGMSeq *seq) { return false; }
-  virtual bool OnNewInstrSet(VGMInstrSet *instrset) { return false; }
-  virtual bool OnNewSampColl(VGMSampColl *sampcoll) { return false; }
-  virtual bool OnCloseSeq(VGMSeq *seq) { return false; }
-  virtual bool OnCloseInstrSet(VGMInstrSet *instrset) { return false; }
-  virtual bool OnCloseSampColl(VGMSampColl *sampcoll) { return false; }
+  virtual bool OnNewSeq(VGMSeq *) { return false; }
+  virtual bool OnNewInstrSet(VGMInstrSet *) { return false; }
+  virtual bool OnNewSampColl(VGMSampColl *) { return false; }
+  virtual bool OnCloseSeq(VGMSeq *) { return false; }
+  virtual bool OnCloseInstrSet(VGMInstrSet *) { return false; }
+  virtual bool OnCloseSampColl(VGMSampColl *) { return false; }
 
   Format *fmt;
 };
-
-
 
 // *************
 // SimpleMatcher
 // *************
 
-//Simple Matcher is used for those collections that use only 1 Instr Set
-//and optionally 1 SampColl
+// Simple Matcher is used for those collections that use only 1 Instr Set
+// and optionally 1 SampColl
 
-template<class IdType>
-class SimpleMatcher:
-    public Matcher {
- public:
-
+template <class IdType>
+class SimpleMatcher : public Matcher {
  protected:
-
-  // The following functions should return with the id variable containing the retrieved id of the file.
-  // The bool return value is a flag for error: true on success and false on fail.
+    // The following functions should return with the id variable containing the retrieved id of the
+    // file. The bool return value is a flag for error: true on success and false on fail.
   virtual bool GetSeqId(VGMSeq *seq, IdType &id) = 0;
   virtual bool GetInstrSetId(VGMInstrSet *instrset, IdType &id) = 0;
   virtual bool GetSampCollId(VGMSampColl *sampcoll, IdType &id) = 0;
 
+  explicit SimpleMatcher(Format *format, bool bUsingSampColl = false)
+      : Matcher(format), bRequiresSampColl(bUsingSampColl) {}
 
-  SimpleMatcher(Format *format, bool bUsingSampColl = false)
-      : Matcher(format),
-        bRequiresSampColl(bUsingSampColl) {
-  }
-
-  virtual bool OnNewSeq(VGMSeq *seq) {
+  bool OnNewSeq(VGMSeq *seq) override {
     IdType id;
     bool success = this->GetSeqId(seq, id);
     if (!success)
@@ -84,7 +67,7 @@ class SimpleMatcher:
 
     seqs.insert(std::pair<IdType, VGMSeq *>(id, seq));
 
-    VGMInstrSet *matchingInstrSet = NULL;
+    VGMInstrSet *matchingInstrSet = nullptr;
     matchingInstrSet = instrsets[id];
     if (matchingInstrSet) {
       if (bRequiresSampColl) {
@@ -102,8 +85,7 @@ class SimpleMatcher:
             return false;
           }
         }
-      }
-      else {
+      } else {
         VGMColl *coll = fmt->NewCollection();
         if (!coll)
           return false;
@@ -120,7 +102,7 @@ class SimpleMatcher:
     return true;
   }
 
-  virtual bool OnNewInstrSet(VGMInstrSet *instrset) {
+  bool OnNewInstrSet(VGMInstrSet *instrset) override {
     IdType id;
     bool success = this->GetInstrSetId(instrset, id);
     if (!success)
@@ -138,19 +120,19 @@ class SimpleMatcher:
           OnCloseSampColl(matchingSampColl);
           return false;
         }
-        //pRoot->AddVGMFile(matchingSampColl);
+        // pRoot->AddVGMFile(matchingSampColl);
       }
     }
 
-    std::pair<typename std::multimap<IdType, VGMSeq *>::iterator, typename std::multimap<IdType, VGMSeq *>::iterator>
+    std::pair<typename std::multimap<IdType, VGMSeq *>::iterator,
+              typename std::multimap<IdType, VGMSeq *>::iterator>
         itPair;
     // equal_range(b) returns pair<iterator,iterator> representing the range
     // of element with key b
     itPair = seqs.equal_range(id);
     // Loop through range of maps with id key
-    for (typename std::multimap<IdType, VGMSeq *>::iterator it2 = itPair.first;
-         it2 != itPair.second;
-         ++it2) {
+    for (auto it2 = itPair.first;
+         it2 != itPair.second; ++it2) {
       VGMSeq *matchingSeq = (*it2).second;
 
       if (bRequiresSampColl) {
@@ -164,8 +146,7 @@ class SimpleMatcher:
           coll->AddSampColl(matchingSampColl);
           coll->Load();
         }
-      }
-      else {
+      } else {
         VGMColl *coll = fmt->NewCollection();
         if (!coll)
           return false;
@@ -181,7 +162,7 @@ class SimpleMatcher:
     return true;
   }
 
-  virtual bool OnNewSampColl(VGMSampColl *sampcoll) {
+  bool OnNewSampColl(VGMSampColl *sampcoll) override {
     if (bRequiresSampColl) {
       IdType id;
       bool success = this->GetSampCollId(sampcoll, id);
@@ -200,19 +181,19 @@ class SimpleMatcher:
             OnCloseSampColl(sampcoll);
             return false;
           }
-          //pRoot->AddVGMFile(sampcoll);
+          // pRoot->AddVGMFile(sampcoll);
         }
       }
 
-      std::pair<typename std::multimap<IdType, VGMSeq *>::iterator, typename std::multimap<IdType, VGMSeq *>::iterator>
+      std::pair<typename std::multimap<IdType, VGMSeq *>::iterator,
+                typename std::multimap<IdType, VGMSeq *>::iterator>
           itPair;
       // equal_range(b) returns pair<iterator,iterator> representing the range
       // of element with key b
       itPair = seqs.equal_range(id);
       // Loop through range of maps with id key
-      for (typename std::multimap<IdType, VGMSeq *>::iterator it2 = itPair.first;
-           it2 != itPair.second;
-           ++it2) {
+      for (auto it2 = itPair.first;
+           it2 != itPair.second; ++it2) {
         VGMSeq *matchingSeq = (*it2).second;
 
         if (matchingSeq && matchingInstrSet) {
@@ -234,15 +215,15 @@ class SimpleMatcher:
     return true;
   }
 
-  virtual bool OnCloseSeq(VGMSeq *seq) {
+  bool OnCloseSeq(VGMSeq *seq) override {
     IdType id;
     bool success = this->GetSeqId(seq, id);
     if (!success)
       return false;
 
-    //Find the first matching key.
-    typename std::multimap<IdType, VGMSeq *>::iterator itr = seqs.find(id);
-    //Search for the specific seq to remove.
+    // Find the first matching key.
+    auto itr = seqs.find(id);
+    // Search for the specific seq to remove.
     if (itr != seqs.end()) {
       do {
         if (itr->second == seq) {
@@ -256,7 +237,7 @@ class SimpleMatcher:
     return true;
   }
 
-  virtual bool OnCloseInstrSet(VGMInstrSet *instrset) {
+  bool OnCloseInstrSet(VGMInstrSet *instrset) override {
     IdType id;
     bool success = this->GetInstrSetId(instrset, id);
     if (!success)
@@ -265,7 +246,7 @@ class SimpleMatcher:
     return true;
   }
 
-  virtual bool OnCloseSampColl(VGMSampColl *sampcoll) {
+  bool OnCloseSampColl(VGMSampColl *sampcoll) override {
     IdType id;
     bool success = this->GetSampCollId(sampcoll, id);
     if (!success)
@@ -273,7 +254,6 @@ class SimpleMatcher:
     sampcolls.erase(id);
     return true;
   }
-
 
  private:
   bool bRequiresSampColl;
@@ -287,102 +267,98 @@ class SimpleMatcher:
 // GetIdMatcher
 // ************
 
-class GetIdMatcher:
-    public SimpleMatcher<uint32_t> {
+class GetIdMatcher : public SimpleMatcher<uint32_t> {
  public:
-  GetIdMatcher(Format *format, bool bRequiresSampColl = false)
-      : SimpleMatcher(format, bRequiresSampColl) { }
+  explicit GetIdMatcher(Format *format, bool bRequiresSampColl = false)
+      : SimpleMatcher(format, bRequiresSampColl) {}
 
-  virtual bool GetSeqId(VGMSeq *seq, uint32_t &id) {
+  bool GetSeqId(VGMSeq *seq, uint32_t &id) override {
     id = seq->GetID();
-    return (id != -1);
+    return (id != -1u);
   }
 
-  virtual bool GetInstrSetId(VGMInstrSet *instrset, uint32_t &id) {
+  bool GetInstrSetId(VGMInstrSet *instrset, uint32_t &id) override {
     id = instrset->GetID();
-    return (id != -1);
+    return (id != -1u);
   }
 
-  virtual bool GetSampCollId(VGMSampColl *sampcoll, uint32_t &id) {
+  bool GetSampCollId(VGMSampColl *sampcoll, uint32_t &id) override {
     id = sampcoll->GetID();
-    return (id != -1);
+    return (id != -1u);
   }
 };
-
 
 // ***************
 // FilenameMatcher
 // ***************
 
-class FilenameMatcher:
-    public SimpleMatcher<std::string> {
+class FilenameMatcher : public SimpleMatcher<std::string> {
  public:
-  FilenameMatcher(Format *format, bool bRequiresSampColl = false)
-      : SimpleMatcher(format, bRequiresSampColl) { }
+  explicit FilenameMatcher(Format *format, bool bRequiresSampColl = false)
+      : SimpleMatcher(format, bRequiresSampColl) {}
 
-  virtual bool GetSeqId(VGMSeq *seq, std::string &id) {
+  bool GetSeqId(VGMSeq *seq, std::string &id) override {
     RawFile *rawfile = seq->GetRawFile();
     id = rawfile->GetParRawFileFullPath();
-    if (id == "")        //wonder if empty() is equivalent?
-      id = rawfile->GetFullPath();
-    return (id != "");
+    if (id.empty()) {
+      id = rawfile->path();
+    }
+
+    return (!id.empty());
   }
 
-  virtual bool GetInstrSetId(VGMInstrSet *instrset, std::string &id) {
+  bool GetInstrSetId(VGMInstrSet *instrset, std::string &id) override {
     RawFile *rawfile = instrset->GetRawFile();
     id = rawfile->GetParRawFileFullPath();
-    if (id == "")        //wonder if empty() is equivalent?
-      id = rawfile->GetFullPath();
-    return (id != "");
+    if (id.empty()) {
+      id = rawfile->path();
+    }
+
+    return (!id.empty());
   }
 
-  virtual bool GetSampCollId(VGMSampColl *sampcoll, std::string &id) {
+  bool GetSampCollId(VGMSampColl *sampcoll, std::string &id) override {
     RawFile *rawfile = sampcoll->GetRawFile();
     id = rawfile->GetParRawFileFullPath();
-    if (id == "")        //wonder if empty() is equivalent?
-      id = rawfile->GetFullPath();
-    return (id != "");
+    if (id.empty()) {
+        id = rawfile->path();
+    }
+
+    return (!id.empty());
   }
 };
-
-
-
 
 // *************
 // FilegroupMatcher
 // *************
 
-//Filegroup matcher is sort of a last resort method because it's highly prone to error.  It attempts
-//to match based on an assumption of association between files by the fact they were
-//loaded from the same source RawFile.  This is necessary for formats that do not use any
-//built-in file association between sequences, instrument sets, and sample collections, like the
-//standard PS1 format (SEQ/VAB).
+// Filegroup matcher is sort of a last resort method because it's highly prone to error.  It
+// attempts to match based on an assumption of association between files by the fact they were
+// loaded from the same source RawFile.  This is necessary for formats that do not use any built-in
+// file association between sequences, instrument sets, and sample collections, like the standard
+// PS1 format (SEQ/VAB).
 
-//I should probably also program in some routines to allow it to be enabled or disabled based
-//on the type of RawFile that was loaded.  PSF files, for example, have an almost certain
-//association between the files contained within.  An entire cd image, on the other hand, does not.
+// I should probably also program in some routines to allow it to be enabled or disabled based
+// on the type of RawFile that was loaded.  PSF files, for example, have an almost certain
+// association between the files contained within.  An entire cd image, on the other hand, does not.
 
-class FilegroupMatcher:
-    public Matcher {
+class FilegroupMatcher : public Matcher {
  public:
-  FilegroupMatcher(Format *format);
+  explicit FilegroupMatcher(Format *format);
 
  protected:
-  virtual bool OnNewSeq(VGMSeq *seq);
-  virtual bool OnNewInstrSet(VGMInstrSet *instrset);
-  virtual bool OnNewSampColl(VGMSampColl *sampcoll);
+  bool OnNewSeq(VGMSeq *seq) override;
+  bool OnNewInstrSet(VGMInstrSet *instrset) override;
+  bool OnNewSampColl(VGMSampColl *sampcoll) override;
 
-  virtual bool OnCloseSeq(VGMSeq *seq);
-  virtual bool OnCloseInstrSet(VGMInstrSet *instrset);
-  virtual bool OnCloseSampColl(VGMSampColl *sampcoll);
+  bool OnCloseSeq(VGMSeq *seq) override;
+  bool OnCloseInstrSet(VGMInstrSet *instrset) override;
+  bool OnCloseSampColl(VGMSampColl *sampcoll) override;
 
   virtual void MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampcoll);
   virtual bool MakeCollectionsForFile(VGMFile *file);
 
   virtual void LookForMatch();
-
-  template<class T>
-  T *GetLargestVGMFileInList(std::list<T *> theList);
 
  protected:
   std::list<VGMSeq *> seqs;

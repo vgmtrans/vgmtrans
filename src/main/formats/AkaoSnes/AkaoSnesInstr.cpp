@@ -1,4 +1,10 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include <spdlog/fmt/fmt.h>
 #include "AkaoSnesInstr.h"
 #include "SNESDSP.h"
 
@@ -44,8 +50,7 @@ bool AkaoSnesInstrSet::GetInstrPointers() {
       // songs from Chrono Trigger ("World Revolution", "Last Battle") will do
       // this.
       instrumentMinOffset = 0x200;
-    }
-    else {
+    } else {
       instrumentMinOffset = spcDirAddr;
     }
     if (addrSampStart < instrumentMinOffset) {
@@ -55,8 +60,7 @@ bool AkaoSnesInstrSet::GetInstrPointers() {
     uint32_t ofsTuningEntry;
     if (version == AKAOSNES_V1 || version == AKAOSNES_V2) {
       ofsTuningEntry = addrTuningTable + srcn;
-    }
-    else {
+    } else {
       ofsTuningEntry = addrTuningTable + srcn * 2;
     }
 
@@ -77,9 +81,9 @@ bool AkaoSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << srcn;
-    AkaoSnesInstr *newInstr = new AkaoSnesInstr(this, version, srcn, spcDirAddr, addrTuningTable, addrADSRTable, instrName.str());
+    AkaoSnesInstr *newInstr = new AkaoSnesInstr(
+      this, version, srcn, spcDirAddr, addrTuningTable, addrADSRTable,
+      fmt::format("Instrument: {:#x}", srcn));
     aInstrs.push_back(newInstr);
   }
   if (aInstrs.size() == 0) {
@@ -223,8 +227,7 @@ AkaoSnesRgn::AkaoSnesRgn(VGMInstr *instr,
                          AkaoSnesVersion ver,
                          uint16_t addrTuningTable) :
     VGMRgn(instr, addrTuningTable, 0),
-    version(ver) {
-}
+    version(ver) {}
 
 bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
                                    uint32_t spcDirAddr,
@@ -236,8 +239,7 @@ bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
   if (version == AKAOSNES_V1) {
     adsr1 = 0xff;
     adsr2 = 0xe0;
-  }
-  else {
+  } else {
     adsr1 = GetByte(addrADSRTable + srcn * 2);
     adsr2 = GetByte(addrADSRTable + srcn * 2 + 1);
 
@@ -252,8 +254,7 @@ bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
     tuning2 = 0;
 
     AddSimpleItem(addrTuningTable + srcn, 1, "Tuning");
-  }
-  else {
+  } else {
     tuning1 = GetByte(addrTuningTable + srcn * 2);
     tuning2 = GetByte(addrTuningTable + srcn * 2 + 1);
 
@@ -263,8 +264,7 @@ bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
   double pitch_scale;
   if (tuning1 <= 0x7f) {
     pitch_scale = 1.0 + (tuning1 / 256.0);
-  }
-  else {
+  } else {
     pitch_scale = tuning1 / 256.0;
   }
   pitch_scale += tuning2 / 65536.0;
@@ -277,22 +277,20 @@ bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
   if (fine_tuning >= 0.5) {
     coarse_tuning += 1.0;
     fine_tuning -= 1.0;
-  }
-  else if (fine_tuning <= -0.5) {
+  } else if (fine_tuning <= -0.5) {
     coarse_tuning -= 1.0;
     fine_tuning += 1.0;
   }
 
   sampNum = srcn;
-  unityKey = 69 - (int) (coarse_tuning);
-  fineTune = (int16_t) (fine_tuning * 100.0);
+  unityKey = 69 - (int)(coarse_tuning);
+  fineTune = (int16_t)(fine_tuning * 100.0);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0xa0);
 
   return true;
 }
 
-AkaoSnesRgn::~AkaoSnesRgn() {
-}
+AkaoSnesRgn::~AkaoSnesRgn() {}
 
 bool AkaoSnesRgn::LoadRgn() {
   SetGuessedLength();
@@ -307,18 +305,14 @@ bool AkaoSnesRgn::LoadRgn() {
 AkaoSnesDrumKitRgn::AkaoSnesDrumKitRgn(AkaoSnesDrumKit *instr,
                                        AkaoSnesVersion ver,
                                        uint16_t addrTuningTable) :
-  AkaoSnesRgn(instr, ver, addrTuningTable) {
-}
+  AkaoSnesRgn(instr, ver, addrTuningTable) {}
 
 bool AkaoSnesDrumKitRgn::InitializePercussionRegion(uint8_t percussionIndex,
-                                                       uint32_t spcDirAddr,
-                                                       uint16_t addrADSRTable,
-                                                       uint16_t addrDrumKitTable)
+                                                    uint32_t spcDirAddr,
+                                                    uint16_t addrADSRTable,
+                                                    uint16_t addrDrumKitTable)
 {
-  ostringstream newName;
-  
-  newName << "Drum " << percussionIndex;
-  name = newName.str();
+  name = fmt::format("Drum {}", percussionIndex);
 
   uint32_t srcnOffset = addrDrumKitTable + percussionIndex * 3;
   uint32_t keyOffset = srcnOffset + 1;
@@ -346,5 +340,4 @@ bool AkaoSnesDrumKitRgn::InitializePercussionRegion(uint8_t percussionIndex,
   return true;
 }
 
-AkaoSnesDrumKitRgn::~AkaoSnesDrumKitRgn() {
-}
+AkaoSnesDrumKitRgn::~AkaoSnesDrumKitRgn() {}

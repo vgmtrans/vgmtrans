@@ -1,7 +1,15 @@
-#include "pch.h"
-#include "SuzukiSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<SuzukiSnesScanner> s_suzuki_snes("SUZUKISNES", {"spc"});
+}
 
 //; Seiken Densetsu 3 SPC
 //038b: fa f5 5c  mov   ($5c),($f5)
@@ -143,8 +151,7 @@ void SuzukiSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForSuzukiSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForSuzukiSnesFromROM(file);
   }
   return;
@@ -152,7 +159,7 @@ void SuzukiSnesScanner::Scan(RawFile *file, void *info) {
 
 void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
   SuzukiSnesVersion version = SUZUKISNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // search for note length table
   uint32_t ofsSongLoad;
@@ -160,12 +167,10 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
   if (file->SearchBytePattern(ptnLoadSongSD3, ofsSongLoad)) {
     addrSeqHeader = file->GetShort(ofsSongLoad + 16);
     version = SUZUKISNES_SD3;
-  }
-  else if (file->SearchBytePattern(ptnLoadSongBL, ofsSongLoad)) {
+  } else if (file->SearchBytePattern(ptnLoadSongBL, ofsSongLoad)) {
     addrSeqHeader = file->GetShort(ofsSongLoad + 17);
     version = SUZUKISNES_BL;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -196,8 +201,7 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
   uint16_t spcDirAddr;
   if (file->SearchBytePattern(ptnLoadDIR, ofsLoadDIR)) {
     spcDirAddr = file->GetByte(ofsLoadDIR + 4) << 8;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -211,8 +215,7 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
     addrVolumeTable = file->GetShort(ofsLoadInstr + 10);
     addrADSRTable = file->GetShort(ofsLoadInstr + 18);
     addrTuningTable = file->GetShort(ofsLoadInstr + 30);
-  }
-  else {
+  } else {
     return;
   }
 
@@ -224,5 +227,4 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
   }
 }
 
-void SuzukiSnesScanner::SearchForSuzukiSnesFromROM(RawFile *file) {
-}
+void SuzukiSnesScanner::SearchForSuzukiSnesFromROM(RawFile *file) {}

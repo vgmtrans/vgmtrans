@@ -1,10 +1,15 @@
-#include "pch.h"
-#include "AkaoFormat.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include <vector>
+#include <map>
+
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 #include "PSXSPU.h"
-
-using namespace std;
 
 bool AkaoColl::LoadMain() {
   AkaoInstrSet *instrset = reinterpret_cast<AkaoInstrSet *>(instrsets[0]);
@@ -22,16 +27,13 @@ bool AkaoColl::LoadMain() {
 
       if (!((rgn->artNum - sampcoll->starting_art_id) >= 0 &&
           rgn->artNum - sampcoll->starting_art_id < 200)) {
-        pRoot->AddLogItem(new LogItem(std::string("Articulation reference does not exist in the samp collection"),
-                                      LOG_LEVEL_ERR,
-                                      "AkaoColl"));
+
+        L_ERROR("Articulation #{} does not exist in the samp collection", rgn->artNum);
         art = &sampcoll->akArts.front();
       }
 
       if (rgn->artNum - sampcoll->starting_art_id >= sampcoll->akArts.size()) {
-        pRoot->AddLogItem(new LogItem(std::string("Referencing an articulation that was not loaded"),
-                                      LOG_LEVEL_ERR,
-                                      "AkaoColl"));
+        L_ERROR("Articulation #{} referenced but not loaded", rgn->artNum);
         art = &sampcoll->akArts.back();
       }
       else

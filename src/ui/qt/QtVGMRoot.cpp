@@ -62,7 +62,7 @@ void QtVGMRoot::UI_SetScanInfo() {
 void QtVGMRoot::UI_OnEndScan() {
 }
 
-void QtVGMRoot::UI_AddVGMFile(VGMFile*) {
+void QtVGMRoot::UI_AddVGMFile(VGMFileVariant file) {
   this->UI_AddedVGMFile();
 }
 

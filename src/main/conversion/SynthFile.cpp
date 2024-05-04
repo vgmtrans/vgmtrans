@@ -1,6 +1,12 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "SynthFile.h"
-#include "VGMInstrSet.h"
+
+#include <spdlog/fmt/fmt.h>
 #include "VGMSamp.h"
 
 using namespace std;
@@ -10,24 +16,23 @@ using namespace std;
 //				to DLS or SF2 formats.  Currently, the structure is identical to DLS.
 //  **********************************************************************************
 
-SynthFile::SynthFile(string synth_name)
+SynthFile::SynthFile(std::string synth_name)
     : name(synth_name) {
 
 }
 
-SynthFile::~SynthFile(void) {
+SynthFile::~SynthFile() {
   DeleteVect(vInstrs);
   DeleteVect(vWaves);
 }
 
 SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, float reverb) {
-  stringstream str;
-  str << "Instr bnk" << bank << " num" << instrNum;
-  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str.str(), reverb));
+  auto str = fmt::format("Instr bnk {} num {}", bank, instrNum);
+  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str, reverb));
   return vInstrs.back();
 }
 
-SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, string name, float reverb) {
+SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, std::string name, float reverb) {
   vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, name, reverb));
   return vInstrs.back();
 }
@@ -44,7 +49,7 @@ SynthWave *SynthFile::AddWave(uint16_t formatTag,
                               uint16_t bitsPerSample,
                               uint32_t waveDataSize,
                               unsigned char *waveData,
-                              string name) {
+                              std::string name) {
   vWaves.insert(vWaves.end(),
                 new SynthWave(formatTag,
                               channels,
@@ -65,18 +70,16 @@ SynthWave *SynthFile::AddWave(uint16_t formatTag,
 
 SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, float reverb)
     : ulBank(bank), ulInstrument(instrument), reverb(reverb) {
-  stringstream str;
-  str << "Instr bnk" << bank << " num" << instrument;
-  name = str.str();
+  name = fmt::format("Instr bnk {} num {}", bank, instrument);
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName, float reverb)
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, float reverb)
     : ulBank(bank), ulInstrument(instrument), name(instrName), reverb(reverb)  {
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName, vector<SynthRgn *> listRgns, float reverb)
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName, std::vector<SynthRgn *> listRgns, float reverb)
     : ulBank(bank), ulInstrument(instrument), name(instrName), reverb(reverb)  {
   //RiffFile::AlignName(name);
   vRgns = listRgns;
@@ -157,7 +160,6 @@ void SynthArt::AddPan(double thePan) {
   this->pan = thePan;
 }
 
-
 //  *************
 //  SynthSampInfo
 //  *************
@@ -173,12 +175,12 @@ void SynthSampInfo::SetLoopInfo(Loop &loop, VGMSamp *samp) {
 
   cSampleLoops = loop.loopStatus;
   ulLoopType = loop.loopType;
-  ulLoopStart = (loop.loopStartMeasure == LM_BYTES) ?
-                (uint32_t) ((loop.loopStart * compressionRatio) / origFormatBytesPerSamp) :
-                loop.loopStart;
-  ulLoopLength = (loop.loopLengthMeasure == LM_BYTES) ?
-                 (uint32_t) ((loop.loopLength * compressionRatio) / origFormatBytesPerSamp) :
-                 loop.loopLength;
+  ulLoopStart = (loop.loopStartMeasure == LM_BYTES)
+                  ? (uint32_t)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
+                  : loop.loopStart;
+  ulLoopLength = (loop.loopLengthMeasure == LM_BYTES)
+                   ? (uint32_t)((loop.loopLength * compressionRatio) / origFormatBytesPerSamp)
+                   : loop.loopLength;
 }
 
 void SynthSampInfo::SetPitchInfo(uint16_t unityNote, short fineTune, double atten) {
@@ -186,7 +188,6 @@ void SynthSampInfo::SetPitchInfo(uint16_t unityNote, short fineTune, double atte
   sFineTune = fineTune;
   attenuation = atten;
 }
-
 
 //  *********
 //  SynthWave
@@ -200,20 +201,16 @@ void SynthWave::ConvertTo16bitSigned() {
 
     int16_t *newData = new int16_t[this->dataSize];
     for (unsigned int i = 0; i < this->dataSize; i++)
-      newData[i] = ((int16_t) this->data[i] - 128) << 8;
+      newData[i] = ((int16_t)this->data[i] - 128) << 8;
     delete[] this->data;
-    this->data = (uint8_t *) newData;
+    this->data = (uint8_t *)newData;
     this->dataSize *= 2;
   }
 }
 
 SynthWave::~SynthWave() {
-  if (sampinfo) {
-    delete sampinfo;
-  }
-  if (data) {
-    delete[] data;
-  }
+  delete sampinfo;
+  delete[] data;
 }
 
 SynthSampInfo *SynthWave::AddSampInfo(void) {

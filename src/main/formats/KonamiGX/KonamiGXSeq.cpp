@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "KonamiGXSeq.h"
 
 DECLARE_FORMAT(KonamiGX);
@@ -24,7 +23,7 @@ bool KonamiGXSeq::GetHeaderInfo(void) {
 
   ostringstream theName;
   theName << "Konami GX Seq";
-  name = theName.str();
+  m_name = theName.str();
   return true;
 }
 

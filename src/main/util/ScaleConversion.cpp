@@ -1,10 +1,16 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
+#include <cmath>
+#include <algorithm>
 #include "common.h"
 #include "ScaleConversion.h"
 
 #ifndef M_PI_2
-#define M_PI_2      1.57079632679489661923132169163975144   /* pi/2           */
+#define M_PI_2 1.57079632679489661923132169163975144 /* pi/2           */
 #endif
 
 // A lot of games use a simple linear amplitude decay/release for their envelope.
@@ -43,7 +49,7 @@
 // decay/release rates if we simply plug in a time value from 0 atten to full atten
 // from a linear amplitude game. 
 
-//My approach at the moment is to calculate the time it takes to get to half volume
+// My approach at the moment is to calculate the time it takes to get to half volume
 // and then use that value accordingly with the SF2/DLS decay time.  In other words
 // Take the second graph, find where y = 10db, and the draw a line from the origin
 // through it to get your DLS/SF2 decay/release line 
@@ -58,7 +64,6 @@ double LinAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten, int linearVolu
   double linearToExpScale = log(linearMinDecibel - expMinDecibel) / log(2.0);
   return secondsToFullAtten * linearToExpScale;
 }
-
 
 uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal) {
   // MIDI uses the following formula for db attenuation on velocity/volume values.
@@ -98,17 +103,16 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal) {
   //   20*log10(x/127) = 40*log10(y/127)
   //   y = sqrt(x*127)
 
-
-  //In standard MIDI, the attenuation for volume in db is 40*log10(127/val) == 20*log10(127^2/val^2). (dls1 spec page 14)
+  // In standard MIDI, the attenuation for volume in db is 40*log10(127/val) == 20*log10(127^2/val^2). (dls1 spec page 14)
   // (Also stated in GM guidelines page 9 http://www.midi.org/techspecs/gmguide2.pdf)
-  //Here, the scale is different.  We get rid of the exponents
+  // Here, the scale is different.  We get rid of the exponents
   // so it's just 20*log10(127/val).
-  //Therefore, we must convert from one scale to the other.
-  //The equation for the first line is obvious.
-  //For the second line, I simply solved db = 40*log10(127/val) for val.
-  //The result is val = 127*10^(-0.025*db).  So, by plugging in the original val into
-  //the original scale equation, we get a db that we can plug into that second equation to get
-  //the new val.
+  // Therefore, we must convert from one scale to the other.
+  // The equation for the first line is obvious.
+  // For the second line, I simply solved db = 40*log10(127/val) for val.
+  // The result is val = 127*10^(-0.025*db).  So, by plugging in the original val into
+  // the original scale equation, we get a db that we can plug into that second equation to get
+  // the new val.
 
   return ConvertPercentAmpToStdMidiVal(percentVal / 127.0);
 }
@@ -116,19 +120,19 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal) {
 // Takes a percentage amplitude value - that is one using a -20*log10(percent) scale for db attenuation
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
 uint8_t ConvertPercentAmpToStdMidiVal(double percent) {
-  return roundi(127.0 * sqrt(percent));
+  return std::round(127.0 * sqrt(percent));
 }
 
 // db attenuation is expressed as a positive value. So, a reduction of 3.2db is expressed as 3.2, not -3.2.
 uint8_t ConvertDBAttenuationToStdMidiVal(double dbAtten) {
-  return roundi(pow(10, -dbAtten / 40.0));
+  return std::round(pow(10, -dbAtten / 40.0));
 }
 
 double ConvertLogScaleValToAtten(double percent) {
   if (percent == 0)
-    return 100.0;        // assume 0 is -100.0db attenuation
+    return 100.0;  // assume 0 is -100.0db attenuation
   double atten = 20 * log10(percent) * 2;
-  return min(-atten, 100.0);
+  return std::min(-atten, 100.0);
 }
 
 // Convert a percent of volume value to it's attenuation in decibels.
@@ -143,7 +147,7 @@ double ConvertPercentAmplitudeToAttenDB_SF2(double percent) {
   if (percent == 0)
     return 100.0;        // assume 0 is -100.0db attenuation
   double atten = 20 * log10(percent);
-  return min(-atten, 100.0);
+  return std::min(-atten, 100.0);
 }
 
 double SecondsToTimecents(double secs) {
@@ -152,7 +156,7 @@ double SecondsToTimecents(double secs) {
 
 // Convert percent pan to midi pan (with no scale conversion)
 uint8_t ConvertPercentPanValToStdMidiVal(double percent) {
-  uint8_t midiPan = roundi(percent * 126.0);
+  uint8_t midiPan = std::round(percent * 126.0);
   if (midiPan != 0) {
     midiPan++;
   }
@@ -183,7 +187,7 @@ uint8_t ConvertLinearPercentPanValToStdMidiVal(double percent, double *ptrVolume
     double percentLeft;
     double percentRight;
     ConvertStdMidiPanToVolumeBalance(midiPan, percentLeft, percentRight);
-    volumeScale = 1.0 / (percentLeft + percentRight); // <= 1.0
+    volumeScale = 1.0 / (percentLeft + percentRight);  // <= 1.0
   }
 
   if (ptrVolumeScale != NULL) {
@@ -259,7 +263,7 @@ uint8_t ConvertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight
 // Convert a pan value where 0 = left 0.5 = center and 1 = right to
 // 0.1% units where -50% = left 0 = center 50% = right (shared by DLS and SF2)
 long ConvertPercentPanTo10thPercentUnits(double percentPan) {
-  return roundi(percentPan * 1000) - 500;
+  return std::round(percentPan * 1000) - 500;
 }
 
 double PitchScaleToCents(double scale) {

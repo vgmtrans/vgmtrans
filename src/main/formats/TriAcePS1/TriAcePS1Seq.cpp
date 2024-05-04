@@ -1,9 +1,9 @@
 // The following sequence analysis code is based on the work of Sound Tester 774 from 2ch.net,
 // author of so2mml. The code is based on his write-up of the format specifications.  Many thanks to him.
 
-#include "pch.h"
 #include "TriAcePS1Seq.h"
 #include "SeqEvent.h"
+#include "helper.h"
 
 DECLARE_FORMAT(TriAcePS1);
 

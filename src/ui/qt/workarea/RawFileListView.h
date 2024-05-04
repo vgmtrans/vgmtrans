@@ -5,8 +5,6 @@
  */
 
 #pragma once
-#include <QAbstractTableModel>
-#include <QTableView>
 #include "TableView.h"
 
 class VGMFile;

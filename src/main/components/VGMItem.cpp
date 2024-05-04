@@ -1,15 +1,13 @@
-#include "pch.h"
 #include "VGMItem.h"
 #include "RawFile.h"
 #include "VGMFile.h"
 #include "Root.h"
-
-using namespace std;
+#include "helper.h"
 
 VGMItem::VGMItem() : color(CLR_UNKNOWN) {
 }
 
-VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, const string name, EventColor color)
+VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, const std::string name, EventColor color)
     : vgmfile(vgmfile), name(name), dwOffset(offset), unLength(length), color(color) {
 }
 
@@ -89,7 +87,7 @@ VGMContainerItem::VGMContainerItem() : VGMItem() {
 }
 
 VGMContainerItem::VGMContainerItem(
-    VGMFile *vgmfile, uint32_t offset, uint32_t length, const string& name, EventColor color)
+    VGMFile *vgmfile, uint32_t offset, uint32_t length, const std::string& name, EventColor color)
     : VGMItem(vgmfile, offset, length, name, color) {
   AddContainer(headers);
   AddContainer(localitems);

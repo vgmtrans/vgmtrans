@@ -4,16 +4,14 @@
  * See the included LICENSE for more information
  */
 
-#include <ghc/filesystem.hpp>
-#include <stdlib.h>
+#include <cstdlib>
+#include <iostream>
 
-#include "pch.h"
 #include "CLIVGMRoot.h"
-#include "VGMColl.h"
 #include "VGMExport.h"
 
 using namespace std;
-namespace fs = ghc::filesystem;
+namespace fs = std::filesystem;
 
 int main(int argc, char *argv[]) {
 
@@ -48,8 +46,6 @@ int main(int argc, char *argv[]) {
       success = true;
     }
   }
-
-  cliroot.Exit();
 
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }

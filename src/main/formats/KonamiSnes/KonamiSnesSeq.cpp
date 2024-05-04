@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "KonamiSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -46,7 +50,7 @@ const uint8_t KonamiSnesSeq::PAN_TABLE[] = {
 
 KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName)
     : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset), version(ver) {
-  name = newName;
+  m_name = newName;
 
   bAllowDiscontinuousTrackData = true;
 
@@ -417,7 +421,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
       vel = GetByte(curOffset++);
       bool hasNoteDuration = ((vel & 0x80) == 0);
       if (hasNoteDuration) {
-        noteDurationRate = min(vel, parentSeq->NOTE_DUR_RATE_MAX);
+        noteDurationRate = std::min(vel, parentSeq->NOTE_DUR_RATE_MAX);
         vel = GetByte(curOffset++);
       }
       vel &= 0x7f;
@@ -506,7 +510,7 @@ bool KonamiSnesTrack::ReadEvent(void) {
     case EVENT_TIE: {
       noteLength = GetByte(curOffset++);
       noteDurationRate = GetByte(curOffset++);
-      noteDurationRate = min(noteDurationRate, parentSeq->NOTE_DUR_RATE_MAX);
+      noteDurationRate = std::min(noteDurationRate, parentSeq->NOTE_DUR_RATE_MAX);
       if (prevNoteSlurred) {
         uint8_t dur = noteLength;
         if (noteDurationRate < parentSeq->NOTE_DUR_RATE_MAX) {
@@ -606,14 +610,14 @@ bool KonamiSnesTrack::ReadEvent(void) {
               PAN_VOLUME_RIGHT = parentSeq->PAN_VOLUME_RIGHT_V2;
             }
 
-            newPan = min(newPan, (uint8_t) 20);
+            newPan = std::min(newPan, (uint8_t) 20);
             volumeLeft = PAN_VOLUME_LEFT[newPan];
             volumeRight = PAN_VOLUME_RIGHT[newPan];
             break;
           }
 
           default:
-            newPan = min(newPan, (uint8_t) 40);
+            newPan = std::min(newPan, (uint8_t) 40);
             volumeLeft = KonamiSnesSeq::PAN_TABLE[40 - newPan];
             volumeRight = KonamiSnesSeq::PAN_TABLE[newPan];
         }
@@ -1084,14 +1088,12 @@ bool KonamiSnesTrack::ReadEvent(void) {
       break;
     }
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "KonamiSnesSeq"));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   //std::ostringstream ssTrace;

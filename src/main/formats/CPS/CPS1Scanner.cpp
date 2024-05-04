@@ -1,12 +1,14 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "Root.h"
 #include "CPS1Scanner.h"
 #include "CPSSeq.h"
 #include "CPS1Instr.h"
 #include "MAMELoader.h"
 #include "VGMMiscFile.h"
-
-using namespace std;
 
 class CPS1SampleInstrSet;
 
@@ -15,8 +17,7 @@ void CPS1Scanner::Scan(RawFile *file, void *info) {
   CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
 
   if (fmt_ver == VER_UNDEFINED) {
-    string alert = "XML entry uses an undefined format version: " + gameentry->fmt_version_str;
-    pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, "CPS1Scanner"));
+    L_ERROR("XML entry uses an undefined format version: {}", gameentry->fmt_version_str);
     return;
   }
 
@@ -48,8 +49,7 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     return;
 
   if (fmt_ver == VER_UNDEFINED) {
-    string alert = "XML entry uses an undefined QSound version: " + gameentry->fmt_version_str;
-    pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, "CPS1Scanner"));
+    L_ERROR("XML entry uses an undefined QSound version: {}", gameentry->fmt_version_str);
     return;
   }
 
@@ -62,13 +62,8 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
 
     RawFile *samplesFile = sampsRomGroupEntry->file;
 
-    ostringstream name;
-    name.str("");
-    name << gameentry->name.c_str() << " oki msm6295 instrument set";
-    auto instrset_name = name.str();
-    name.str("");
-    name << gameentry->name.c_str() << " sample collection";
-    auto sampcoll_name = name.str();
+    auto instrset_name = fmt::format("{} oki msm6295 instrument set", gameentry->name);
+    auto sampcoll_name = fmt::format("{} sample collection", gameentry->name);
 
     instrset = new CPS1SampleInstrSet(programFile,
                                       fmt_ver,
@@ -86,12 +81,7 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     }
   }
 
-  string seq_table_name;
-  ostringstream name;
-
-  name.str("");
-  name << gameentry->name.c_str() << " sequence pointer table";
-  seq_table_name = name.str();
+  std::string seq_table_name = fmt::format("{} sequence pointer table", gameentry->name);
 
   uint8_t ptrsStart;
   const uint8_t ptrSize = 2;
@@ -136,9 +126,7 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
 
     seqTable->AddSimpleItem(seq_table_offset + k, ptrSize, "Sequence Pointer");
 
-    name.str("");
-    name << gameentry->name.c_str() << " seq " << seqNum;
-    string seqName = name.str();
+    auto seqName = fmt::format("{} seq {}", gameentry->name, seqNum);
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
 
     if (!newSeq->LoadVGMFile()) {
@@ -146,9 +134,8 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
       continue;
     }
 
-    name.str("");
-    name << gameentry->name.c_str() << " song " << seqNum++;
-    VGMColl* coll = new VGMColl(name.str());
+    auto collName = fmt::format("{} song {}", gameentry->name, seqNum++);
+    VGMColl* coll = new VGMColl(collName);
 
     coll->UseSeq(newSeq);
     coll->AddInstrSet(instrset);

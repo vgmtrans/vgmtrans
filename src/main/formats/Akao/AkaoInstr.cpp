@@ -1,9 +1,12 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "AkaoInstr.h"
 #include "VGMSamp.h"
 #include "PSXSPU.h"
-
-using namespace std;
 
 // ************
 // AkaoInstrSet
@@ -50,7 +53,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
     if (custom_instrument_addresses.empty())
       dwOffset = first_drum_offset;
     else
-      dwOffset = min(first_instrument_offset, first_drum_offset);
+      dwOffset = std::min(first_instrument_offset, first_drum_offset);
   }
 
   this->custom_instrument_addresses = custom_instrument_addresses;
@@ -58,7 +61,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
 }
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset,
-  uint32_t end_boundary_offset, AkaoPs1Version version, string name)
+  uint32_t end_boundary_offset, AkaoPs1Version version, std::string name)
     : VGMInstrSet(AkaoFormat::name, file, offset, 0, std::move(name)), bMelInstrs(false),
       bDrumKit(false), instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset),
       version_(version)
@@ -130,7 +133,7 @@ bool AkaoInstr::LoadInstr() {
   SetGuessedLength();
 
   if (aRgns.empty())
-    pRoot->AddLogItem(new LogItem("Instrument has no regions.", LOG_LEVEL_WARN, "AkaoInstr"));
+    L_WARN("Instrument has no regions.");
 
   return true;
 }
@@ -224,7 +227,7 @@ bool AkaoDrumKit::LoadInstr() {
   SetGuessedLength();
 
   if (aRgns.empty())
-    pRoot->AddLogItem(new LogItem("Instrument has no regions.", LOG_LEVEL_WARN, "AkaoInstr"));
+    L_WARN("Instrument has no regions.");
 
   return true;
 }
@@ -284,7 +287,7 @@ AkaoSampColl::AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, st
   }
 
   sample_section_size = GetWord(file_location.instrAllOffset);
-  const uint32_t end_offset = max(file_location.instrAllOffset + 0x10 + sample_section_size,
+  const uint32_t end_offset = std::max(file_location.instrAllOffset + 0x10 + sample_section_size,
     file_location.instrDatOffset + 64 * file_location.numArticulations);
   unLength = end_offset - dwOffset;
 }
@@ -627,23 +630,18 @@ bool AkaoSampColl::GetSampleInfo() {
   }
 
   for (const auto & sample_offset : sample_offsets) {
-    ostringstream name;
-    name << "Sample " << samples.size();
-
     bool loop;
     const uint32_t offset = sample_section_offset + sample_offset;
     if (offset >= sample_section_offset + sample_section_size) {
       // Out of bounds
-      ostringstream message;
-      message << "The sample offset of AkaoRgn exceeds the sample section size."
-        << " Offset: 0x" << std::hex << std::uppercase << sample_offset
-        << " (0x" << std::hex << std::uppercase << offset << ")";
-      pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, "AkaoSampColl"));
+      L_ERROR("The sample offset of AkaoRgn exceeds the sample section size. "
+              "Offset: 0x{:X} (0x{:X})", sample_offset, offset);
       continue;
     }
 
     const uint32_t length = PSXSamp::GetSampleLength(rawfile, offset, sample_section_offset + sample_section_size, loop);
-    auto *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, 44100, name.str());
+    auto *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, 44100,
+      fmt::format("Sample {}", samples.size()));
 
     samples.push_back(samp);
   }

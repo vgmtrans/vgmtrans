@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "SonyPS2InstrSet.h"
 #include "PSXSPU.h"
 
@@ -17,7 +16,7 @@ SonyPS2InstrSet::~SonyPS2InstrSet(void) {
 
 
 bool SonyPS2InstrSet::GetHeaderInfo() {
-  name = "Sony PS2 InstrSet";
+  m_name = "Sony PS2 InstrSet";
 
   // VERSION CHUNK
   uint32_t curOffset = dwOffset;
@@ -407,9 +406,9 @@ bool SonyPS2SampColl::GetSampleInfo() {
 
     uint16_t sampleRate = vagInfoParam.vagSampleRate;
 
-    ostringstream name;
-    name << "Sample " << samples.size();
-    PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, sampleRate, name.str(), true);
+    auto name = fmt::format("Sample {}", samples.size());
+    PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1,
+      16, sampleRate, name, true);
     samples.push_back(samp);
 
     // Determine loop information from VAGInfo Param

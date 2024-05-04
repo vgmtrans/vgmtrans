@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "common.h"
 #include "CPS3Decrypt.h"
 

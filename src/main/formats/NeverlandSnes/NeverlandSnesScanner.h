@@ -1,16 +1,14 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
 
-class NeverlandSnesScanner:
-    public VGMScanner {
+class NeverlandSnesScanner : public VGMScanner {
  public:
-  NeverlandSnesScanner(void) {
-    USE_EXTENSION("spc");
-  }
-  virtual ~NeverlandSnesScanner(void) {
-  }
-
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForNeverlandSnesFromARAM(RawFile *file);
   void SearchForNeverlandSnesFromROM(RawFile *file);

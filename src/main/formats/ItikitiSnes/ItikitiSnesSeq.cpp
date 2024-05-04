@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "ItikitiSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -146,35 +150,25 @@ bool ItikitiSnesTrack::ReadEvent() {
 
   bool stop_parser = false;
   std::stringstream description;
+  std::string descr;
   switch (event_type) {
     case ItikitiSnesSeqEventType::EVENT_UNKNOWN0:
-      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
-                  << std::uppercase << command;
-      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
+      descr = logEvent(command, spdlog::level::debug);
+      AddUnknown(start, curOffset - start, "Unknown Event", descr);
       break;
 
     case ItikitiSnesSeqEventType::EVENT_UNKNOWN1: {
       const auto arg1 = GetByte(curOffset++);
-      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
-                  << std::uppercase << command << std::dec << std::setfill(' ') << std::setw(0)
-                  << "  Arg1: " << arg1;
-      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
+      descr = logEvent(command, spdlog::level::debug, "Event", arg1);
+      AddUnknown(start, curOffset - start, "Unknown Event", descr);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_UNKNOWN2: {
       const auto arg1 = GetByte(curOffset++);
       const auto arg2 = GetByte(curOffset++);
-      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
-                  << std::uppercase << command << std::dec << std::setfill(' ') << std::setw(0)
-                  << "  Arg1: " << arg1 << "  Arg2: " << arg2;
-      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
+      descr = logEvent(command, spdlog::level::debug, "Event", arg1, arg2);
+      AddUnknown(start, curOffset - start, "Unknown Event", descr);
       break;
     }
 
@@ -182,12 +176,8 @@ bool ItikitiSnesTrack::ReadEvent() {
       const auto arg1 = GetByte(curOffset++);
       const auto arg2 = GetByte(curOffset++);
       const auto arg3 = GetByte(curOffset++);
-      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
-                  << std::uppercase << command << std::dec << std::setfill(' ') << std::setw(0)
-                  << "  Arg1: " << arg1 << "  Arg2: " << arg2 << "  Arg3: " << arg3;
-      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
+      descr = logEvent(command, spdlog::level::debug, "Event", arg1, arg2, arg3);
+      AddUnknown(start, curOffset - start, "Unknown Event", descr);
       break;
     }
 
@@ -528,12 +518,8 @@ bool ItikitiSnesTrack::ReadEvent() {
         AddGenericEvent(start, curOffset - start, "Change Volume Mode (Global)", description.str(),
                         CLR_VOLUME, ICON_CONTROL);
       } else {
-        description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
-                    << std::uppercase << command << std::dec << std::setfill(' ') << std::setw(0)
-                    << "  Arg1: " << value;
-        AddUnknown(start, curOffset - start, "Unknown Event", description.str());
-        pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
-                                      LOG_LEVEL_DEBUG, "ItikitiSnesSeq"));
+        descr = logEvent(command, spdlog::level::debug, "Event", value);
+        AddUnknown(start, curOffset - start, "Unknown Event", descr);
       }
       break;
     }
@@ -564,8 +550,7 @@ bool ItikitiSnesTrack::ReadEvent() {
                       ICON_STARTREP);
 
       if (m_loop_level + 1 >= kItikitiSnesSeqMaxLoopLevel) {
-        pRoot->AddLogItem(new LogItem(std::string("Loop Start: nesting level is too much"),
-                                      LOG_LEVEL_WARN, "ItikitiSnesSeq"));
+        L_WARN("Loop Start: too many nesting loops");
         stop_parser = true;
         break;
       }
@@ -631,11 +616,8 @@ bool ItikitiSnesTrack::ReadEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_UNDEFINED:
     default:
-      description << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2)
-                  << std::uppercase << command;
-      AddUnknown(start, curOffset - start, "Unknown Event", description.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + description.str()),
-                                    LOG_LEVEL_ERR, "ItikitiSnesSeq"));
+      descr = logEvent(command);
+      AddUnknown(start, curOffset - start, "Unknown Event", descr);
       stop_parser = true;
       break;
   }

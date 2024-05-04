@@ -1,6 +1,14 @@
-#include "pch.h"
-#include "MoriSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "MoriSnesSeq.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<MoriSnesScanner> s_mori_snes("MORISNES", {"spc"});
+}
 
 //; Gokinjo Boukentai SPC
 //0c3c: 1c        asl   a                 ; song index in A
@@ -40,8 +48,7 @@ void MoriSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForMoriSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForMoriSnesFromROM(file);
   }
   return;
@@ -49,15 +56,14 @@ void MoriSnesScanner::Scan(RawFile *file, void *info) {
 
 void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
   MoriSnesVersion version = MORISNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // scan for song list table
   uint32_t ofsLoadSeq;
   uint16_t addrSongList;
   if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
     addrSongList = file->GetShort(ofsLoadSeq + 3);
-  }
-  else {
+  } else {
     return;
   }
 
@@ -100,5 +106,4 @@ void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
   }
 }
 
-void MoriSnesScanner::SearchForMoriSnesFromROM(RawFile *file) {
-}
+void MoriSnesScanner::SearchForMoriSnesFromROM(RawFile *file) {}

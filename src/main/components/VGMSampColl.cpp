@@ -1,27 +1,32 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMInstrSet.h"
-#include "Root.h"
 
-using namespace std;
+#include "VGMSamp.h"
+#include "Root.h"
+#include "Format.h"
+#include "helper.h"
 
 // ***********
 // VGMSampColl
 // ***********
 
-VGMSampColl::VGMSampColl(const string &format, RawFile *rawfile, uint32_t offset, uint32_t length, string theName)
-    : VGMFile(FILETYPE_SAMPCOLL, format, rawfile, offset, length, theName),
-      parInstrSet(NULL),
+VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, uint32_t offset, uint32_t length,
+                         std::string theName)
+    : VGMFile(format, rawfile, offset, length, std::move(theName)),
+      parInstrSet(nullptr),
       bLoadOnInstrSetMatch(false),
       bLoaded(false),
       sampDataOffset(0) {
   AddContainer<VGMSamp>(samples);
 }
 
-VGMSampColl::VGMSampColl(const string &format, RawFile *rawfile, VGMInstrSet *instrset,
-                         uint32_t offset, uint32_t length, string theName)
-    : VGMFile(FILETYPE_SAMPCOLL, format, rawfile, offset, length, theName),
+VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset,
+                         uint32_t offset, uint32_t length, std::string theName)
+    : VGMFile(format, rawfile, offset, length, std::move(theName)),
       parInstrSet(instrset),
       bLoadOnInstrSetMatch(false),
       bLoaded(false),
@@ -29,8 +34,21 @@ VGMSampColl::VGMSampColl(const string &format, RawFile *rawfile, VGMInstrSet *in
   AddContainer<VGMSamp>(samples);
 }
 
-VGMSampColl::~VGMSampColl(void) {
+VGMSampColl::~VGMSampColl() {
   DeleteVect<VGMSamp>(samples);
+}
+
+bool VGMSampColl::LoadVGMFile() {
+  bool val = Load();
+  if (!val) {
+    return false;
+  }
+
+  if (auto fmt = GetFormat(); fmt) {
+    fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+  }
+
+  return val;
 }
 
 
@@ -66,13 +84,14 @@ bool VGMSampColl::Load() {
     }
   }
 
-  UseRawFileData();
-  if (!parInstrSet)
+  if (!parInstrSet) {
+    rawfile->AddContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
     pRoot->AddVGMFile(this);
+  }
+
   bLoaded = true;
   return true;
 }
-
 
 bool VGMSampColl::GetHeaderInfo() {
   return true;
@@ -82,22 +101,10 @@ bool VGMSampColl::GetSampleInfo() {
   return true;
 }
 
-VGMSamp *VGMSampColl::AddSamp(uint32_t offset, uint32_t length, uint32_t dataOffset, uint32_t dataLength,
-                              uint8_t nChannels, uint16_t bps, uint32_t theRate, string name) {
-  VGMSamp *newSamp = new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels,
-                                 bps, theRate, name);
+VGMSamp *VGMSampColl::AddSamp(uint32_t offset, uint32_t length, uint32_t dataOffset,
+                              uint32_t dataLength, uint8_t nChannels, uint16_t bps,
+                              uint32_t theRate, std::string name) {
+  VGMSamp *newSamp = new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels, bps, theRate, name);
   samples.push_back(newSamp);
   return newSamp;
-}
-
-bool VGMSampColl::SaveAllAsWav(const string& dirpath) {
-  if (dirpath.length() != 0) {
-    for (uint32_t i = 0; i < samples.size(); i++) {
-      string filename = ConvertToSafeFileName(*GetName()) + " - " + ConvertToSafeFileName(samples[i]->name) + ".wav";
-      string filepath = dirpath + "/" + filename;
-      samples[i]->SaveAsWav(filepath);
-    }
-    return true;
-  }
-  return false;
 }

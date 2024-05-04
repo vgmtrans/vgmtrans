@@ -1,6 +1,11 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "PandoraBoxSnesInstr.h"
 #include "SNESDSP.h"
+#include <spdlog/fmt/fmt.h>
 
 // **********************
 // PandoraBoxSnesInstrSet
@@ -78,10 +83,9 @@ bool PandoraBoxSnesInstrSet::GetInstrPointers() {
       adsr = instrADSRHints[srcn];
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << srcn;
-    PandoraBoxSnesInstr *newInstr =
-        new PandoraBoxSnesInstr(this, version, addrLocalInstrItem, instrNum, srcn, spcDirAddr, adsr, instrName.str());
+    PandoraBoxSnesInstr *newInstr = new PandoraBoxSnesInstr(
+      this, version, addrLocalInstrItem, instrNum, srcn, spcDirAddr, adsr,
+      fmt::format("Instrument {}", srcn));
     aInstrs.push_back(newInstr);
   }
 

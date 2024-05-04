@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "PandoraBoxSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -344,13 +343,13 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
     case EVENT_PAN: {
       uint8_t newPan = GetByte(curOffset++);
 
-      newPan = min(newPan, (uint8_t) 128);
+      newPan = std::min(newPan, (uint8_t) 128);
       double linearPan = newPan / 128.0;
       double volumeScale;
       int8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan, &volumeScale);
 
       AddPan(beginOffset, curOffset - beginOffset, midiPan);
-      AddExpressionNoItem(roundi(127.0 * volumeScale));
+      AddExpressionNoItem(std::round(127.0 * volumeScale));
       break;
     }
 
@@ -571,14 +570,12 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
       break;
     }
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "PandoraBoxSnesSeq"));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   //std::ostringstream ssTrace;
@@ -604,7 +601,7 @@ uint8_t PandoraBoxSnesTrack::GetVolume(uint8_t volumeIndex) {
 
   // actual engine does not limit value,
   // but it probably does not expect value more than $7f
-  volume = min(volume, (uint8_t) 0x7f);
+  volume = std::min(volume, (uint8_t) 0x7f);
 
   return volume;
 }

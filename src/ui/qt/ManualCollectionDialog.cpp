@@ -1,5 +1,5 @@
 /**
- * VGMTrans (c) - 2002-2021
+ * VGMTrans (c) - 2002-2024
  * Licensed under the zlib license
  * See the included LICENSE for more information
  */
@@ -10,14 +10,11 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QLineEdit>
-#include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <QComboBox>
 #include <QRadioButton>
 #include <QCheckBox>
-#include <QVariant>
-#include <algorithm>
 #include <vector>
 
 #include "QtVGMRoot.h"
@@ -76,9 +73,14 @@ ManualCollectionDialog::ManualCollectionDialog(QWidget *parent) : QDialog(parent
 
 QListWidget *ManualCollectionDialog::makeSequenceList() {
   std::vector<VGMFile *> seqs;
-  std::copy_if(std::begin(qtVGMRoot.vVGMFile), std::end(qtVGMRoot.vVGMFile),
-               std::back_inserter(seqs),
-               [](VGMFile *file) { return file->GetFileType() == FILETYPE_SEQ; });
+  for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
+    if (std::holds_alternative<VGMSeq*>(fileVariant)) {
+      VGMSeq* seq = std::get<VGMSeq*>(fileVariant);
+      if (seq) {
+        seqs.push_back(seq);
+      }
+    }
+  }
 
   auto widget = new QListWidget();
   for (auto seq : seqs) {
@@ -91,32 +93,42 @@ QListWidget *ManualCollectionDialog::makeSequenceList() {
 }
 
 QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
-  std::vector<VGMFile *> seqs;
-  std::copy_if(std::begin(qtVGMRoot.vVGMFile), std::end(qtVGMRoot.vVGMFile),
-               std::back_inserter(seqs),
-               [](VGMFile *file) { return file->GetFileType() == FILETYPE_INSTRSET; });
+  std::vector<VGMFile *> instrSets;
+  for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
+    if (std::holds_alternative<VGMInstrSet*>(fileVariant)) {
+      VGMInstrSet* instrSet = std::get<VGMInstrSet*>(fileVariant);
+      if (instrSet) {
+        instrSets.push_back(instrSet);
+      }
+    }
+  }
 
   auto widget = new QListWidget();
-  for (auto seq : seqs) {
-    auto seq_item = new QListWidgetItem(widget);
-    seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
-    widget->setItemWidget(seq_item, new QCheckBox(QString::fromStdString(*seq->GetName())));
+  for (auto instrSet : instrSets) {
+    auto instrset_item = new QListWidgetItem(widget);
+    instrset_item->setData(Qt::UserRole, QVariant::fromValue((void *)instrSet));
+    widget->setItemWidget(instrset_item, new QCheckBox(QString::fromStdString(*instrSet->GetName())));
   }
 
   return widget;
 }
 
 QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
-  std::vector<VGMFile *> seqs;
-  std::copy_if(std::begin(qtVGMRoot.vVGMFile), std::end(qtVGMRoot.vVGMFile),
-               std::back_inserter(seqs),
-               [](VGMFile *file) { return file->GetFileType() == FILETYPE_SAMPCOLL; });
+  std::vector<VGMFile *> sampColls;
+  for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
+    if (std::holds_alternative<VGMSampColl*>(fileVariant)) {
+      VGMSampColl* sampColl = std::get<VGMSampColl*>(fileVariant);
+      if (sampColl) {
+        sampColls.push_back(sampColl);
+      }
+    }
+  }
 
   auto widget = new QListWidget();
-  for (auto seq : seqs) {
-    auto seq_item = new QListWidgetItem(widget);
-    seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
-    widget->setItemWidget(seq_item, new QCheckBox(QString::fromStdString(*seq->GetName())));
+  for (auto sampColl : sampColls) {
+    auto sampcoll_item = new QListWidgetItem(widget);
+    sampcoll_item->setData(Qt::UserRole, QVariant::fromValue((void *)sampColl));
+    widget->setItemWidget(sampcoll_item, new QCheckBox(QString::fromStdString(*sampColl->GetName())));
   }
 
   return widget;

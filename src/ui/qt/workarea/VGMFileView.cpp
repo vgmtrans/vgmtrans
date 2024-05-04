@@ -4,25 +4,25 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "VGMFileView.h"
 #include <QApplication>
 #include <QShortcut>
-#include <QFont>
 #include <QScrollArea>
 #include <QScrollBar>
-#include <VGMFile.h>
+#include "VGMFileView.h"
+#include "VGMFile.h"
 #include "HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
 #include "SnappingSplitter.h"
 #include "Helpers.h"
+#include "Root.h"
 
 VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
   m_splitter = new SnappingSplitter(Qt::Horizontal, this);
 
   setWindowTitle(QString::fromStdString(*m_vgmfile->GetName()));
-  setWindowIcon(iconForFileType(m_vgmfile->GetFileType()));
+  setWindowIcon(iconForFile(vgmFileToVariant(vgmfile)));
   setAttribute(Qt::WA_DeleteOnClose);
 
   m_treeview = new VGMFileTreeView(m_vgmfile, this);

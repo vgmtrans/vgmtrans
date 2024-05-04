@@ -1,31 +1,37 @@
-#include <string>
-#include "pch.h"
-#include "common.h"
-#include "NDSScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "NDSSeq.h"
 #include "NDSInstrSet.h"
+#include "ScannerManager.h"
 
-using namespace std;
-
-#define SRCH_BUF_SIZE 0x20000
+namespace vgmtrans::scanners {
+ScannerRegistration<NDSScanner> s_nds("NDS", {"nds", "sdat", "mini2sf", "2sf", "2sflib"});
+}
 
 void NDSScanner::Scan(RawFile *file, void *info) {
   SearchForSDAT(file);
-  return;
 }
 
 void NDSScanner::SearchForSDAT(RawFile *file) {
-  uint32_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 4 < nFileLength; i++) {
-    if ((*file)[i] == 'S' && (*file)[i + 1] == 'D' && (*file)[i + 2] == 'A' && (*file)[i + 3] == 'T'
-        && (*file)[i + 4] == 0xFF && (*file)[i + 5] == 0xFE && (*file)[i + 6] == 0
-        && (*file)[i + 7] == 0x01 && (file->GetShort(i + 12) < 0x100)
-        && (file->GetWord(i + 0x10) < 0x10000)) {
-      i += LoadFromSDAT(file, i);
+  using namespace std::string_literals;
+  const std::string signature = "SDAT\xFF\xFE\x00\x01"s;
+
+  auto it = std::search(file->begin(), file->end(),
+    std::boyer_moore_searcher(signature.begin(), signature.end()));
+  while (it != file->end()) {
+    int offset = it - file->begin();
+    if (file->get<u32>(offset + 0x10) < 0x10000) {
+      LoadFromSDAT(file, offset);
     }
+
+    it = std::search(std::next(it), file->end(),
+      std::boyer_moore_searcher(signature.begin(), signature.end()));
   }
 }
-
 
 // The following is pretty god-awful messy.  I should have created structs for the different
 // blocks and loading the entire blocks at a time.  
@@ -36,16 +42,16 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
   uint32_t nSeqs;
   uint32_t nBnks;
   uint32_t nWAs;
-  vector<string> seqNames;
-  vector<string> bnkNames;
-  vector<string> waNames;
-  vector<uint16_t> seqFileIDs;
-  vector<uint16_t> bnkFileIDs;
-  vector<uint16_t> waFileIDs;
-  vector<uint16_t> seqFileBnks;
-  vector<vector<uint16_t> > bnkWAs;
-  vector<NDSWaveArch *> WAs;
-  vector<pair<uint16_t, NDSInstrSet *> > BNKs;
+  std::vector<std::string> seqNames;
+  std::vector<std::string> bnkNames;
+  std::vector<std::string> waNames;
+  std::vector<uint16_t> seqFileIDs;
+  std::vector<uint16_t> bnkFileIDs;
+  std::vector<uint16_t> waFileIDs;
+  std::vector<uint16_t> seqFileBnks;
+  std::vector<std::vector<uint16_t> > bnkWAs;
+  std::vector<NDSWaveArch *> WAs;
+  std::vector<std::pair<uint16_t, NDSInstrSet *> > BNKs;
 
   uint32_t SDATLength = file->GetWord(baseOff + 8) + 8;
 
@@ -125,8 +131,8 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       bnkFileIDs.push_back((uint16_t) -1);
     else
       bnkFileIDs.push_back(file->GetShort(pBnkInfo));
-    bnkWAs.push_back(vector<uint16_t>());
-    vector<vector<uint16_t> >::reference ref = bnkWAs.back();
+    bnkWAs.push_back(std::vector<uint16_t>());
+    std::vector<std::vector<uint16_t> >::reference ref = bnkWAs.back();
     for (int j = 0; j < 4; j++) {
       uint16_t WANum = file->GetShort(pBnkInfo + 4 + (j * 2));
       //if (WANum > 0x200)			//insanity check
@@ -152,15 +158,15 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
   psg_sampcoll->LoadVGMFile();
 
   {
-    vector<uint16_t> vUniqueWAs;// = vector<uint16_t>(bnkWAs);
+    std::vector<uint16_t> vUniqueWAs;// = vector<uint16_t>(bnkWAs);
     for (uint32_t i = 0; i < bnkWAs.size(); i++)
       vUniqueWAs.insert(vUniqueWAs.end(), bnkWAs[i].begin(), bnkWAs[i].end());
     sort(vUniqueWAs.begin(), vUniqueWAs.end());
-    vector<uint16_t>::iterator new_end = unique(vUniqueWAs.begin(), vUniqueWAs.end());
+    std::vector<uint16_t>::iterator new_end = unique(vUniqueWAs.begin(), vUniqueWAs.end());
 
-    vector<bool> valid;
+    std::vector<bool> valid;
     valid.resize(nWAs);
-    for (vector<uint16_t>::iterator iter = vUniqueWAs.begin(); iter != new_end; iter++) {
+    for (std::vector<uint16_t>::iterator iter = vUniqueWAs.begin(); iter != new_end; iter++) {
       if ((*iter != (uint16_t) -1) && (*iter < valid.size()))
         valid[*iter] = 1;
     }
@@ -178,8 +184,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       uint32_t fileSize = file->GetWord(offset);
       NDSWaveArch *NewNDSwa = new NDSWaveArch(file, pWAFatData, fileSize, waNames[i]);
       if (!NewNDSwa->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(FormatString<string>("Failed to load NDSWaveArch at 0x%08x\n",
-                                                            pWAFatData).c_str(), LOG_LEVEL_ERR, "NDSScanner"));
+        L_ERROR("Failed to load NDSWaveArch at 0x{:08X}", pWAFatData);
         WAs.push_back(NULL);
         delete NewNDSwa;
         continue;
@@ -189,13 +194,13 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
   }
 
   {
-    vector<uint16_t> vUniqueBanks = vector<uint16_t>(seqFileBnks);
+    std::vector<uint16_t> vUniqueBanks = std::vector<uint16_t>(seqFileBnks);
     sort(vUniqueBanks.begin(), vUniqueBanks.end());
-    vector<uint16_t>::iterator new_end = unique(vUniqueBanks.begin(), vUniqueBanks.end());
+    std::vector<uint16_t>::iterator new_end = unique(vUniqueBanks.begin(), vUniqueBanks.end());
 
     //for (uint32_t i=0; i<nBnks; i++)
     //for (uint32_t i=0; i<seqFileBnks.size(); i++)
-    for (vector<uint16_t>::iterator iter = vUniqueBanks.begin(); iter != new_end; iter++) {
+    for (std::vector<uint16_t>::iterator iter = vUniqueBanks.begin(); iter != new_end; iter++) {
       if (*iter >= bnkFileIDs.size() /*0x1000*/|| bnkFileIDs[*iter]
           == (uint16_t) -1)    // > 0x1000 is idiot test for Phoenix Wright, which had many 0x1C80 values, as if they were 0xFFFF
         continue;
@@ -216,10 +221,9 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
           NewNDSInstrSet->sampCollWAList.push_back(NULL);
       }
       if (!NewNDSInstrSet->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(("Failed to load NDSInstrSet at " + std::to_string(
-                                                            pBnkFatData)).c_str(), LOG_LEVEL_ERR, "NDSScanner"));
+        L_ERROR("Failed to load NDSInstrSet at 0x{:08X}", pBnkFatData);
       }
-      pair<uint16_t, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
+      std::pair<uint16_t, NDSInstrSet *> theBank(*iter, NewNDSInstrSet);
       BNKs.push_back(theBank);
     }
   }
@@ -238,9 +242,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       uint32_t fileSize = file->GetWord(offset);
       NDSSeq *NewNDSSeq = new NDSSeq(file, pSeqFatData, fileSize, seqNames[i]);
       if (!NewNDSSeq->LoadVGMFile()) {
-        pRoot->AddLogItem(new LogItem(FormatString<string>("Failed to load NDSSeq at 0x%08x\n", pSeqFatData).c_str(),
-                                      LOG_LEVEL_ERR,
-                                      "NDSScanner"));
+        L_ERROR("Failed to load NDSSeq at 0x{:08X}", pSeqFatData);
       }
 
       VGMColl *coll = new VGMColl(seqNames[i]);

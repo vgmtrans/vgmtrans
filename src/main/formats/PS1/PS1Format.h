@@ -1,10 +1,15 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include "Format.h"
 #include "Root.h"
 #include "Matcher.h"
 #include "VGMColl.h"
 #include "PS1Seq.h"
-#include "Vab.h"
+#include "formats/PS1/Vab.h"
 #include "PS1SeqScanner.h"
 
 // *********
@@ -16,6 +21,3 @@ BEGIN_FORMAT(PS1)
   //USING_MATCHER_WITH_ARG(SimpleMatcher, true)
   USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
-
-
-

@@ -1,5 +1,12 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "FalcomSnesInstr.h"
+
+#include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
 
 // ******************
@@ -16,11 +23,9 @@ FalcomSnesInstrSet::FalcomSnesInstrSet(RawFile *file,
     VGMInstrSet(FalcomSnesFormat::name, file, offset, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
     addrSampToInstrTable(addrSampToInstrTable),
-    instrADSRHints(instrADSRHints) {
-}
+    instrADSRHints(instrADSRHints) {}
 
-FalcomSnesInstrSet::~FalcomSnesInstrSet() {
-}
+FalcomSnesInstrSet::~FalcomSnesInstrSet() {}
 
 bool FalcomSnesInstrSet::GetHeaderInfo() {
   return true;
@@ -74,10 +79,10 @@ bool FalcomSnesInstrSet::GetInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << instr;
-    FalcomSnesInstr *newInstr =
-        new FalcomSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f, srcn, spcDirAddr, instrName.str());
+    auto instrName = fmt::format("Instrument {}", instr);
+    FalcomSnesInstr *newInstr = new FalcomSnesInstr(
+      this, version, addrInstrHeader, instr >> 7, instr & 0x7f, srcn,
+      spcDirAddr, instrName);
     aInstrs.push_back(newInstr);
   }
   if (aInstrs.size() == 0) {
@@ -108,11 +113,9 @@ FalcomSnesInstr::FalcomSnesInstr(VGMInstrSet *instrSet,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, 5, theBank, theInstrNum, name), version(ver),
     srcn(srcn),
-    spcDirAddr(spcDirAddr) {
-}
+    spcDirAddr(spcDirAddr) {}
 
-FalcomSnesInstr::~FalcomSnesInstr() {
-}
+FalcomSnesInstr::~FalcomSnesInstr() {}
 
 bool FalcomSnesInstr::LoadInstr() {
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
@@ -176,8 +179,7 @@ FalcomSnesRgn::FalcomSnesRgn(FalcomSnesInstr *instr,
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 }
 
-FalcomSnesRgn::~FalcomSnesRgn() {
-}
+FalcomSnesRgn::~FalcomSnesRgn() {}
 
 bool FalcomSnesRgn::LoadRgn() {
   return true;

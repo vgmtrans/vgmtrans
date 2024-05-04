@@ -1,22 +1,21 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "VGMSeqNoTrks.h"
-#include "SeqEvent.h"
-#include "Root.h"
 
-using namespace std;
-
-VGMSeqNoTrks::VGMSeqNoTrks(const string &format, RawFile *file, uint32_t offset, string name)
-    : VGMSeq(format, file, offset, 0, name),
-      SeqTrack(this) {
+VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, std::string name)
+    : VGMSeq(format, file, offset, 0, name), SeqTrack(this) {
   ResetVars();
   VGMSeq::AddContainer<SeqEvent>(aEvents);
 }
 
-VGMSeqNoTrks::~VGMSeqNoTrks(void) {
-}
+VGMSeqNoTrks::~VGMSeqNoTrks() = default;
 
 void VGMSeqNoTrks::ResetVars() {
-  midiTracks.clear();        //no need to delete the contents, that happens when the midi is deleted
+  midiTracks.clear();  // no need to delete the contents, that happens when the midi is deleted
   TryExpandMidiTracks(nNumTracks);
 
   channel = 0;
@@ -26,7 +25,7 @@ void VGMSeqNoTrks::ResetVars() {
   SeqTrack::ResetVars();
 }
 
-//LoadMain() - loads all sequence data into the class
+// LoadMain() - loads all sequence data into the class
 bool VGMSeqNoTrks::LoadMain() {
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_ADD_TO_UI;
   if (!GetHeaderInfo())
@@ -37,7 +36,8 @@ bool VGMSeqNoTrks::LoadMain() {
 
   if (length() == 0) {
     VGMSeq::SetGuessedLength();
-//		length() = (aEvents.back()->dwOffset + aEvents.back()->unLength) - offset();			//length == to the end of the last event
+    //		length() = (aEvents.back()->dwOffset + aEvents.back()->unLength) - offset();
+    // length == to the end of the last event
   }
 
   return true;
@@ -69,9 +69,9 @@ bool VGMSeqNoTrks::LoadEvents(long stopTime) {
     }
 
   bInLoop = false;
-  curOffset = eventsOffset();    //start at beginning of track
+  curOffset = eventsOffset();  // start at beginning of track
   while (curOffset < rawfile->size()) {
-    if (GetTime() >= (unsigned) stopTime) {
+    if (GetTime() >= (unsigned)stopTime) {
       break;
     }
 
@@ -81,7 +81,6 @@ bool VGMSeqNoTrks::LoadEvents(long stopTime) {
   }
   return true;
 }
-
 
 MidiFile *VGMSeqNoTrks::ConvertToMidi() {
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_FIND_DELTA_LENGTH;
@@ -114,14 +113,14 @@ MidiFile *VGMSeqNoTrks::ConvertToMidi() {
 MidiTrack *VGMSeqNoTrks::GetFirstMidiTrack() {
   if (midiTracks.size() > 0) {
     return midiTracks[0];
-  }
-  else {
+  } else {
     return pMidiTrack;
   }
 }
 
-// checks whether or not we have already created the given number of MidiTracks.  If not, it appends the extra tracks.
-// doesn't ever need to be called directly by format code, since SetCurMidiTrack does so automatically.
+// checks whether or not we have already created the given number of MidiTracks.  If not, it appends
+// the extra tracks. doesn't ever need to be called directly by format code, since SetCurMidiTrack
+// does so automatically.
 void VGMSeqNoTrks::TryExpandMidiTracks(uint32_t numTracks) {
   if (VGMSeq::readMode != READMODE_CONVERT_TO_MIDI)
     return;
@@ -139,7 +138,6 @@ void VGMSeqNoTrks::SetCurTrack(uint32_t trackNum) {
   TryExpandMidiTracks(trackNum + 1);
   pMidiTrack = midiTracks[trackNum];
 }
-
 
 void VGMSeqNoTrks::AddTime(uint32_t delta) {
   VGMSeq::time += delta;

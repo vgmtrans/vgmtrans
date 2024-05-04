@@ -1,6 +1,11 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "ItikitiSnesInstr.h"
 #include "SNESDSP.h"
+#include <spdlog/fmt/fmt.h>
 
 ItikitiSnesInstrSet::ItikitiSnesInstrSet(RawFile *file, uint32_t tuning_offset,
                                          uint32_t adsr_offset, uint16_t spc_dir_offset,
@@ -29,11 +34,9 @@ bool ItikitiSnesInstrSet::GetInstrPointers() {
 
     srcns.push_back(srcn);
 
-    std::ostringstream instrument_name;
-    instrument_name << "Instrument " << index;
-    auto instrument =
-        std::make_unique<ItikitiSnesInstr>(this, ins_tuning_offset, ins_adsr_offset, 0, srcn, srcn,
-                                           spc_dir_offset(), instrument_name.str());
+    auto instrument = std::make_unique<ItikitiSnesInstr>(
+      this, ins_tuning_offset, ins_adsr_offset, 0, srcn, srcn, spc_dir_offset(),
+      fmt::format("Instrument {}", index));
     aInstrs.push_back(instrument.release());
   }
 

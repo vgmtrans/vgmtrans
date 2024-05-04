@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "AkaoSnesSeq.h"
 #include "AkaoSnesInstr.h"
 #include "ScaleConversion.h"
@@ -1565,11 +1569,8 @@ bool AkaoSnesTrack::ReadEvent(void) {
     }
 
     default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "AkaoSnesSeq"));
+      auto description = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", description);
       bContinue = false;
       break;
   }

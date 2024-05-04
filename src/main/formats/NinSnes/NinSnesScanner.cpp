@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "NinSnesFormat.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<NinSnesScanner> s_nin_snes("NINSNES", {"spc"});
+}
 
 //; Yoshi's Island SPC
 //; vcmd branches 80-ff
@@ -904,7 +913,7 @@ void NinSnesScanner::Scan(RawFile *file, void *info) {
 void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
   NinSnesVersion version = NINSNES_NONE;
 
-  std::string basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::string basefilename = removeExtFromPath(file->name());
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // get section pointer address
@@ -1444,7 +1453,7 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
       break;
     }
     if (firstSectionPtr >= addrSectionListPtr) {
-      addrSectionListCutoff = min(addrSectionListCutoff, firstSectionPtr);
+      addrSectionListCutoff = std::min(addrSectionListCutoff, firstSectionPtr);
     }
 
     uint16_t addrFirstSection = file->GetShort(firstSectionPtr);

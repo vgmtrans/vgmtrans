@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "GraphResSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "GraphResSnesSeq.h"
 #include "GraphResSnesInstr.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<GraphResSnesScanner> s_graph_snes("GRAPHSNES", {"spc"});
+}
 
 //; Mickey no Tokyo Disneyland Daibouken SPC
 //0620: 3f 24 05  call  $0524
@@ -54,8 +63,7 @@ void GraphResSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForGraphResSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForGraphResSnesFromROM(file);
   }
   return;
@@ -63,15 +71,14 @@ void GraphResSnesScanner::Scan(RawFile *file, void *info) {
 
 void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
   GraphResSnesVersion version = GRAPHRESSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // search song header
   uint32_t ofsLoadSeq;
   uint16_t addrSeqHeader;
   if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
     addrSeqHeader = file->GetByte(ofsLoadSeq + 4) | (file->GetByte(ofsLoadSeq + 8) << 8);
-  }
-  else {
+  } else {
     return;
   }
 
@@ -99,8 +106,7 @@ void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
   }
 }
 
-void GraphResSnesScanner::SearchForGraphResSnesFromROM(RawFile *file) {
-}
+void GraphResSnesScanner::SearchForGraphResSnesFromROM(RawFile *file) {}
 
 std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(RawFile *file) {
   std::map<uint8_t, uint8_t> dspRegMap;
@@ -110,8 +116,7 @@ std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(RawFile *file) 
   uint32_t addrDspRegList;
   if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM)) {
     addrDspRegList = file->GetShort(ofsDspRegInitASM + 7);
-  }
-  else {
+  } else {
     return dspRegMap;
   }
 

@@ -37,5 +37,5 @@ target_include_directories(vgmtranscore PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog ZLIB::ZLIB unarr minizip tinyxml ghc_filesystem mio
+  PUBLIC spdlog::spdlog ZLIB::ZLIB unarr minizip tinyxml mio
   PRIVATE g_options g_warnings)

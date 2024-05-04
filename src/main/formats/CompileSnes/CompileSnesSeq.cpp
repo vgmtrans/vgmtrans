@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "CompileSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -26,7 +30,7 @@ CompileSnesSeq::CompileSnesSeq(RawFile *file, CompileSnesVersion ver, uint32_t s
       STATUS_DURATION_DIRECT(0xde),
       STATUS_DURATION_MIN(0xdf),
       STATUS_DURATION_MAX(0xee) {
-  name = newName;
+  m_name = newName;
 
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
@@ -626,14 +630,12 @@ bool CompileSnesTrack::ReadEvent(void) {
       break;
     }
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "CompileSnesSeq"));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   //ostringstream ssTrace;

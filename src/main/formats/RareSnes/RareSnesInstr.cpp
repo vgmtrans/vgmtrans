@@ -1,8 +1,13 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "RareSnesInstr.h"
-#include "Format.h"
 #include "SNESDSP.h"
 #include "RareSnesFormat.h"
+#include <spdlog/fmt/fmt.h>
 
 // ****************
 // RareSnesInstrSet
@@ -31,8 +36,7 @@ RareSnesInstrSet::RareSnesInstrSet(RawFile *file,
   Initialize();
 }
 
-RareSnesInstrSet::~RareSnesInstrSet() {
-}
+RareSnesInstrSet::~RareSnesInstrSet() {}
 
 void RareSnesInstrSet::Initialize() {
   for (uint32_t srcn = 0; srcn < 256; srcn++) {
@@ -152,17 +156,9 @@ bool RareSnesInstrSet::GetInstrPointers() {
       adsr = itrADSR->second;
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << inst;
-    RareSnesInstr *newInstr = new RareSnesInstr(this,
-                                                dwOffset + inst,
-                                                inst >> 7,
-                                                inst & 0x7f,
-                                                spcDirAddr,
-                                                transpose,
-                                                pitch,
-                                                adsr,
-                                                instrName.str());
+    RareSnesInstr *newInstr = new RareSnesInstr(
+      this, dwOffset + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose,
+      pitch, adsr, fmt::format("Instrument: {:#x}", inst));
     aInstrs.push_back(newInstr);
   }
   return aInstrs.size() != 0;
@@ -231,8 +227,7 @@ RareSnesRgn::RareSnesRgn(RareSnesInstr *instr, uint32_t offset, int8_t transpose
   SNESConvADSR<VGMRgn>(this, adsr >> 8, adsr & 0xff, 0);
 }
 
-RareSnesRgn::~RareSnesRgn() {
-}
+RareSnesRgn::~RareSnesRgn() {}
 
 bool RareSnesRgn::LoadRgn() {
   return true;

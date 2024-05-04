@@ -1,17 +1,21 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
 #include "Options.h"
 #include "Root.h"
+#include "helper.h"
 
 using namespace std;
 
 //  ********
 //  SeqTrack
 //  ********
-
 
 SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, string name)
     : VGMContainerItem(parentFile, offset, length, name),
@@ -230,7 +234,7 @@ void SeqTrack::AddControllerSlide(uint32_t offset,
   for (unsigned int i = 0; i < dur; i++) {
     int8_t prevValInSlide = newVal;
 
-    newVal = roundi(prevVal + (valInc * (i + 1)));
+    newVal = std::round(prevVal + (valInc * (i + 1)));
     if (newVal < 0) {
       newVal = 0;
     }

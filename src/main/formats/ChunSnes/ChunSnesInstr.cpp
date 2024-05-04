@@ -1,5 +1,12 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "ChunSnesInstr.h"
+
+#include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
 
 // ****************
@@ -51,15 +58,13 @@ bool ChunSnesInstrSet::GetInstrPointers() {
   unsigned int nNumInstrs = GetByte(curOffset);
   if (version == CHUNSNES_SUMMER) {
     curOffset += 1;
-  }
-  else { // CHUNSNES_WINTER
+  } else {  // CHUNSNES_WINTER
     curOffset += 2;
   }
 
   for (unsigned int instrNum = 0; instrNum < nNumInstrs; instrNum++) {
-    std::stringstream instrName;
-    instrName << "Instrument " << (instrNum + 1);
-    AddSimpleItem(curOffset, 1, instrName.str().c_str());
+    auto instrName = fmt::format("Instrument {}", instrNum + 1);
+    AddSimpleItem(curOffset, 1, instrName);
 
     uint8_t globalInstrNum = GetByte(curOffset);
     curOffset++;
@@ -80,7 +85,8 @@ bool ChunSnesInstrSet::GetInstrPointers() {
         dwOffset = addrInstr;
       }
 
-      ChunSnesInstr *newInstr = new ChunSnesInstr(this, version, instrNum, addrInstr, addrSampleTable, spcDirAddr, instrName.str());
+      ChunSnesInstr *newInstr = new ChunSnesInstr(this, version, instrNum, addrInstr,
+        addrSampleTable, spcDirAddr, instrName);
       aInstrs.push_back(newInstr);
     }
   }
@@ -112,11 +118,9 @@ ChunSnesInstr::ChunSnesInstr(VGMInstrSet *instrSet,
                              const std::string &name) :
     VGMInstr(instrSet, addrInstr, 0, 0, theInstrNum, name), version(ver),
     addrSampleTable(addrSampleTable),
-    spcDirAddr(spcDirAddr) {
-}
+    spcDirAddr(spcDirAddr) {}
 
-ChunSnesInstr::~ChunSnesInstr() {
-}
+ChunSnesInstr::~ChunSnesInstr() {}
 
 bool ChunSnesInstr::LoadInstr() {
   uint8_t srcn = GetByte(dwOffset);
@@ -186,11 +190,11 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn
 
   // use ADSR sustain for release rate
   uint8_t sr_release = 0x19; // default release rate
-  ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, NULL, NULL, NULL, &this->release_time, NULL);
+  ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, NULL,
+    NULL, NULL, &this->release_time, NULL);
 }
 
-ChunSnesRgn::~ChunSnesRgn() {
-}
+ChunSnesRgn::~ChunSnesRgn() {}
 
 bool ChunSnesRgn::LoadRgn() {
   return true;

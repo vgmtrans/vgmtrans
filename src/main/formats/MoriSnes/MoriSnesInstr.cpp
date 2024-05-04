@@ -1,6 +1,11 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "MoriSnesInstr.h"
 #include "SNESDSP.h"
+#include <spdlog/fmt/fmt.h>
 
 // ****************
 // MoriSnesInstrSet
@@ -18,8 +23,7 @@ MoriSnesInstrSet::MoriSnesInstrSet(RawFile *file,
     instrumentHints(instrumentHints) {
 }
 
-MoriSnesInstrSet::~MoriSnesInstrSet() {
-}
+MoriSnesInstrSet::~MoriSnesInstrSet() {}
 
 bool MoriSnesInstrSet::GetHeaderInfo() {
   return true;
@@ -108,10 +112,9 @@ bool MoriSnesInstrSet::GetInstrPointers() {
       }
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << instrNum;
-    MoriSnesInstr *newInstr =
-        new MoriSnesInstr(this, version, instrNum, spcDirAddr, instrumentHints[instrAddress], instrName.str());
+    MoriSnesInstr *newInstr = new MoriSnesInstr(
+      this, version, instrNum, spcDirAddr, instrumentHints[instrAddress],
+      fmt::format("Instrument {}", instrNum));
     aInstrs.push_back(newInstr);
   }
 
@@ -176,13 +179,11 @@ bool MoriSnesInstr::LoadInstr() {
         return false;
       }
 
-      std::ostringstream seqOffsetName;
-      seqOffsetName << "Sequence Offset " << (int) percNoteKey;
-      AddSimpleItem(dwOffset + 1 + (percNoteKey * 2), 2, seqOffsetName.str().c_str());
+      auto seqOffsetName = fmt::format("Sequence Offset {}", percNoteKey);
+      AddSimpleItem(dwOffset + 1 + (percNoteKey * 2), 2, seqOffsetName);
 
-      std::ostringstream seqName;
-      seqName << "Envelope Sequence " << (int) percNoteKey;
-      AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, seqName.str().c_str());
+      auto seqName = fmt::format("Envelope Sequence {}", percNoteKey);
+      AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, seqName);
 
       uint16_t addrSampStart = GetShort(offDirEnt);
       MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);
@@ -257,8 +258,7 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
-MoriSnesRgn::~MoriSnesRgn() {
-}
+MoriSnesRgn::~MoriSnesRgn() {}
 
 bool MoriSnesRgn::LoadRgn() {
   return true;

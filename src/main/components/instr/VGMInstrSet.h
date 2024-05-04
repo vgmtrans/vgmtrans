@@ -10,61 +10,46 @@ class VGMRgn;
 class VGMSamp;
 class VGMRgnItem;
 
-
-const float defaultReverbPercent = 0.25;
+constexpr float defaultReverbPercent = 0.25;
 
 // ***********
 // VGMInstrSet
 // ***********
 
-class VGMInstrSet:
-    public VGMFile {
- public:
-  VGMInstrSet(const std::string &format,
-              RawFile *file,
-              uint32_t offset,
-              uint32_t length = 0,
-              std::string name = "VGMInstrSet",
-              VGMSampColl *theSampColl = NULL);
+class VGMInstrSet : public VGMFile {
+public:
+  VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
+              std::string name = "VGMInstrSet", VGMSampColl *theSampColl = NULL);
   virtual ~VGMInstrSet(void);
 
+  bool LoadVGMFile() override;
   virtual bool Load();
   virtual bool GetHeaderInfo();
   virtual bool GetInstrPointers();
   virtual bool LoadInstrs();
 
-  VGMInstr *AddInstr(uint32_t offset,
-                     uint32_t length,
-                     unsigned long bank,
-                     unsigned long instrNum,
+  VGMInstr *AddInstr(uint32_t offset, uint32_t length, unsigned long bank, unsigned long instrNum,
                      const std::string &instrName = "");
 
-  virtual FileType GetFileType() { return FILETYPE_INSTRSET; }
+  bool OnSaveAsDLS();
+  bool OnSaveAsSF2();
 
-  virtual bool SaveAsDLS(const std::string &filepath);
-  virtual bool SaveAsSF2(const std::string &filepath);
-
- public:
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
 
- protected:
+protected:
   bool allowEmptyInstrs;
 };
-
-
-
-
 
 // ********
 // VGMInstr
 // ********
 
-class VGMInstr:
-    public VGMContainerItem {
- public:
+class VGMInstr : public VGMContainerItem {
+public:
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
-           uint32_t instrNum, const std::string &name = "Instrument", float reverb = defaultReverbPercent);
+           uint32_t instrNum, const std::string &name = "Instrument",
+           float reverb = defaultReverbPercent);
   virtual ~VGMInstr(void);
 
   virtual Icon GetIcon() { return ICON_INSTR; };
@@ -78,7 +63,6 @@ class VGMInstr:
 
   virtual bool LoadInstr();
 
- public:
   uint32_t bank;
   uint32_t instrNum;
   float reverb;

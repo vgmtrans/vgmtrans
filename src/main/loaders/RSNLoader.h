@@ -6,13 +6,11 @@
 
 #pragma once
 
-#include "Loader.h"
+#include "FileLoader.h"
 
-class RSNLoader:
-    public VGMLoader {
+class RSNLoader: public FileLoader {
 public:
-  RSNLoader(void) = default;
-public:
-  virtual ~RSNLoader(void) = default;
-  virtual PostLoadCommand Apply(RawFile *theFile);
+  RSNLoader() = default;
+  void apply(const RawFile *theFile) override;
+
 };

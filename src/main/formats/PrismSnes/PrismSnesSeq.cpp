@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "PrismSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -770,10 +769,10 @@ bool PrismSnesTrack::ReadEvent(void) {
       // TODO: fix volume scale when L+R > 1.0?
       double volumeScale;
       int8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
-      volumeScale = min(volumeScale, 1.0); // workaround
+      volumeScale = std::min(volumeScale, 1.0); // workaround
 
       AddPan(beginOffset, curOffset - beginOffset, midiPan);
-      AddExpressionNoItem(roundi(127.0 * volumeScale));
+      AddExpressionNoItem(std::round(127.0 * volumeScale));
       break;
     }
 
@@ -933,14 +932,12 @@ bool PrismSnesTrack::ReadEvent(void) {
       break;
     }
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
-      pRoot->AddLogItem(new LogItem(std::string("Unknown Event - ") + desc.str(),
-                                    LOG_LEVEL_ERR,
-                                    std::string("PrismSnesSeq")));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   //assert(curOffset >= parentSeq->dwOffset);

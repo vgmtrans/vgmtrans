@@ -1,27 +1,13 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
 #include "VGMTag.h"
 
-VGMTag::VGMTag(void) :
-    title(),
-    album(),
-    artist(),
-    comment(),
-    track_number(0),
-    length(0.0) {
-}
-
-VGMTag::VGMTag(const std::string &_title, const std::string &_artist, const std::string &_album) :
-    title(_title),
-    album(_album),
-    artist(_artist),
-    comment(),
-    track_number(0),
-    length(0.0) {
-}
-
-VGMTag::~VGMTag(void) {
-}
+VGMTag::VGMTag(std::string _title, std::string _artist, std::string _album)
+    : title(std::move(_title)), album(std::move(_album)), artist(std::move(_artist)) {}
 
 bool VGMTag::HasTitle(void) {
   return !title.empty();

@@ -1,13 +1,14 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "ExtensionDiscriminator.h"
 
-//static ExtensionDiscriminator theExtensionDiscriminator;
-//ExtensionDiscriminator ExtensionDiscriminator::instance;
-
-ExtensionDiscriminator::ExtensionDiscriminator(void) {
+ExtensionDiscriminator::ExtensionDiscriminator() {
 }
 
-ExtensionDiscriminator::~ExtensionDiscriminator(void) {
+ExtensionDiscriminator::~ExtensionDiscriminator() {
 }
 
 

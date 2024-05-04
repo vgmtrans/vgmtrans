@@ -1,6 +1,18 @@
-#include "pch.h"
-#include "NeverlandSnesFormat.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include <vector>
+#include <map>
+
 #include "NeverlandSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<NeverlandSnesScanner> s_neverland_snes("NEVERLANDSNES", {"spc"});
+}
 
 //; Lufia SPC
 //16c3: 8f 10 08  mov   $08,#$10
@@ -54,8 +66,7 @@ void NeverlandSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForNeverlandSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForNeverlandSnesFromROM(file);
   }
   return;
@@ -64,7 +75,7 @@ void NeverlandSnesScanner::Scan(RawFile *file, void *info) {
 void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM(RawFile *file) {
   NeverlandSnesVersion version = NEVERLANDSNES_NONE;
 
-  std::string basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::string basefilename = removeExtFromPath(file->name());
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   uint32_t ofsLoadSong;
@@ -72,12 +83,10 @@ void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM(RawFile *file) {
   if (file->SearchBytePattern(ptnLoadSongS2C, ofsLoadSong)) {
     addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;
     version = NEVERLANDSNES_S2C;
-  }
-  else if (file->SearchBytePattern(ptnLoadSongSFC, ofsLoadSong)) {
+  } else if (file->SearchBytePattern(ptnLoadSongSFC, ofsLoadSong)) {
     addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;
     version = NEVERLANDSNES_SFC;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -88,5 +97,4 @@ void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM(RawFile *file) {
   }
 }
 
-void NeverlandSnesScanner::SearchForNeverlandSnesFromROM(RawFile *file) {
-}
+void NeverlandSnesScanner::SearchForNeverlandSnesFromROM(RawFile *file) {}

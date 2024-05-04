@@ -1,7 +1,10 @@
-#include "pch.h"
-#include "RiffFile.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
-using namespace std;
+#include "RiffFile.h"
 
 uint32_t Chunk::GetSize() {
   return 8 + GetPaddedSize(size);
@@ -65,7 +68,7 @@ void ListTypeChunk::Write(uint8_t *buffer) {
   }
 }
 
-RiffFile::RiffFile(string file_name, string form)
+RiffFile::RiffFile(std::string file_name, std::string form)
     : RIFFChunk(form),
       name(file_name) {
 }

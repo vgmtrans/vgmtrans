@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "GraphResSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -543,14 +547,12 @@ bool GraphResSnesTrack::ReadEvent(void) {
       bContinue = false;
       break;
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
+    default: {
+      auto descr = logEvent(statusByte);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "GraphResSnesSeq"));
       bContinue = false;
       break;
+    }
   }
 
   //std::ostringstream ssTrace;

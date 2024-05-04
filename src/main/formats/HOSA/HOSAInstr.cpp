@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "HOSAInstr.h"
 #include "VGMRgn.h"
 #include "PSXSPU.h"
@@ -35,7 +39,7 @@ bool HOSAInstrSet::GetHeaderInfo() {
   id = 0;                        //Bank number.
 
   //バイナリエディタ表示用
-  name = "HOSAWAH";
+  m_name = "HOSAWAH";
 
   //ヘッダーobjectの生成
   VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(InstrHeader));

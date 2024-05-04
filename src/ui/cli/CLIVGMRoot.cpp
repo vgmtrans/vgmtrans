@@ -4,15 +4,21 @@
  * See the included LICENSE for more information
  */
 
+#include <iostream>
+#include <filesystem>
+
 #include <version.h>
-#include "pch.h"
 #include "Format.h"
 #include "Matcher.h"
 #include "CLIVGMRoot.h"
 #include "DLSFile.h"
+#include "LogManager.h"
 #include "SF2File.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
+
+using namespace std;
+namespace fs = std::filesystem;
 
 CLIVGMRoot cliroot;
 
@@ -74,7 +80,7 @@ bool CLIVGMRoot::Init() {
     else {
       for(size_t i = numColls; i < GetNumCollections(); ++i) {
         VGMColl* coll = vVGMColl[i];
-        string collName = *coll->GetName();
+        string collName = coll->GetName();
         auto it = collNameMap.find(collName);
         pair<size_t, fs::path> p = make_pair(i, infile);
         if (it == collNameMap.end()) {
@@ -138,25 +144,24 @@ bool CLIVGMRoot::Init() {
 bool CLIVGMRoot::ExportAllCollections() {
   bool success = true;
   for (VGMColl* coll : vVGMColl) {
-    string collName = *coll->GetName();
+    string collName = coll->GetName();
     success &= ExportCollection(coll);
   }
   return success;
 }
 
 bool CLIVGMRoot::ExportCollection(VGMColl* coll) {
-    string collName = *coll->GetName();
+    string collName = coll->GetName();
     cout << "Exporting: " << collName << endl;
     return SaveMidi(coll) & SaveSF2(coll) & SaveDLS(coll);
 }
 
 bool CLIVGMRoot::SaveMidi(VGMColl* coll) {
   if (coll->seq != nullptr) {
-    string collName = *coll->GetName();
+    string collName = coll->GetName();
     string filepath = UI_GetSaveFilePath(collName, "mid");
     if (!coll->seq->SaveAsMidi(filepath)) {
-      pRoot->AddLogItem(new LogItem(std::string("Failed to save MIDI file"),
-        LOG_LEVEL_ERR, "VGMColl"));
+      L_ERROR("Failed to save MIDI file");
       return false;
     }
     cout << "\t" + filepath << endl;
@@ -165,7 +170,7 @@ bool CLIVGMRoot::SaveMidi(VGMColl* coll) {
 }
 
 bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
-  string collName = *coll->GetName();
+  string collName = coll->GetName();
   string filepath = UI_GetSaveFilePath(collName, "sf2");
   SF2File *sf2file = coll->CreateSF2File();
   bool success = false;
@@ -179,14 +184,13 @@ bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
     cout << "\t" + filepath << endl;
   }
   else {
-    pRoot->AddLogItem(new LogItem(std::string("Failed to save SF2 file"),
-      LOG_LEVEL_ERR, "VGMColl"));
+    L_ERROR("Failed to save SF2 file");
   }
   return success;
 }
 
 bool CLIVGMRoot::SaveDLS(VGMColl* coll) {
-  string collName = *coll->GetName();
+  string collName = coll->GetName();
   string filepath = UI_GetSaveFilePath(collName, "dls");
   DLSFile dlsfile;
   bool success = false;
@@ -199,8 +203,7 @@ bool CLIVGMRoot::SaveDLS(VGMColl* coll) {
     cout << "\t" + filepath << endl;
   }
   else {
-    pRoot->AddLogItem(new LogItem(std::string("Failed to save DLS file"),
-      LOG_LEVEL_ERR, "VGMColl"));
+    L_ERROR("Failed to save DLS file");
   }
   return success;
 }
@@ -209,7 +212,7 @@ void CLIVGMRoot::UI_SetRootPtr(VGMRoot** theRoot) {
   *theRoot = &cliroot;
 }
 
-void CLIVGMRoot::UI_AddLogItem(LogItem* theLog) {
+void CLIVGMRoot::UI_Log(LogItem* theLog) {
   if (theLog->GetLogLevel() <= LOG_LEVEL_WARN) {
     string source = theLog->GetSource();
     string text = theLog->GetText();
@@ -218,7 +221,8 @@ void CLIVGMRoot::UI_AddLogItem(LogItem* theLog) {
 }
 
 void CLIVGMRoot::UpdateCollections() {
-  for (VGMFile *targFile : vVGMFile) {
+  for (VGMFileVariant targVariant : vVGMFile) {
+    auto targFile = variantToVGMFile(targVariant);
     Format *fmt = targFile->GetFormat();
     if (fmt->matcher) {
       fmt->matcher->MakeCollectionsForFile(targFile);

@@ -6,6 +6,7 @@
 // The original code is available at:
 //  https://github.com/mamedev/mame/blob/master/src/devices/sound/okiadpcm.cpp
 
+#include <cmath>
 #include "OkiAdpcm.h"
 
 //**************************************************************************
@@ -133,7 +134,7 @@ void oki_adpcm_state::compute_tables()
 oki_adpcm_state DialogicAdpcmSamp::okiAdpcmState;
 
 DialogicAdpcmSamp::DialogicAdpcmSamp(
-    VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, string name
+    VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, std::string name
   )
     : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate, name) {
 

@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "Root.h"
 #include "CPS2Scanner.h"
 #include "CPSSeq.h"
@@ -6,9 +10,7 @@
 #include "MAMELoader.h"
 #include "CPS2Format.h"
 
-using namespace std;
-
-CPSFormatVer GetVersionEnum(string &versionStr) {
+CPSFormatVer GetVersionEnum(std::string &versionStr) {
   if (versionStr == "CPS1_2.00") return VER_CPS1_200;
   if (versionStr == "CPS1_2.00ff") return VER_CPS1_200ff;
   if (versionStr == "CPS1_3.50") return VER_CPS1_350;
@@ -45,8 +47,7 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
   CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
 
   if (fmt_ver == VER_UNDEFINED) {
-    string alert = "XML entry uses an undefined QSound version: " + gameentry->fmt_version_str;
-    pRoot->AddLogItem(new LogItem(alert, LOG_LEVEL_ERR, "CPS2Scanner"));
+    L_ERROR("XML entry uses an undefined QSound version: {}", gameentry->fmt_version_str);
     return;
   }
 
@@ -110,27 +111,17 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
   CPSSampleInfoTable *sampInfoTable = 0;
   CPSArticTable *articTable = 0;
 
-  string artic_table_name;
-  string instrset_name;
-  string samp_info_table_name;
-  string sampcoll_name;
-  string seq_table_name;
+  std::string artic_table_name;
+  std::string instrset_name;
+  std::string samp_info_table_name;
+  std::string sampcoll_name;
+  std::string seq_table_name;
 
-  ostringstream name;
-  name << gameentry->name.c_str() << " articulation table";
-  artic_table_name = name.str();
-  name.str("");
-  name << gameentry->name.c_str() << " instrument set";
-  instrset_name = name.str();
-  name.str("");
-  name << gameentry->name.c_str() << " sample collection";
-  sampcoll_name = name.str();
-  name.str("");
-  name << gameentry->name.c_str() << " sample info table";
-  samp_info_table_name = name.str();
-  name.str("");
-  name << gameentry->name.c_str() << " sequence pointer table";
-  seq_table_name = name.str();
+  artic_table_name = fmt::format("{} articulation table", gameentry->name);
+  instrset_name = fmt::format("{} instrument table", gameentry->name);
+  sampcoll_name = fmt::format("{} sample collection", gameentry->name);
+  samp_info_table_name = fmt::format("{} sample info table", gameentry->name);
+  seq_table_name =fmt::format("{} sequence pointer table", gameentry->name);
 
 
   RawFile *programFile = seqRomGroupEntry->file;
@@ -212,12 +203,9 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
 
     seqTable->AddSimpleItem(seq_table_offset + k, 4, "Sequence Pointer");
 
-    name.str("");
-    name << gameentry->name.c_str() << " song " << k / 4;
-    VGMColl *coll = new VGMColl(name.str());
-    name.str("");
-    name << gameentry->name.c_str() << " seq " << k / 4;
-    string seqName = name.str();
+    std::string collName = fmt::format("{} song {}", gameentry->name, k / 4);
+    VGMColl *coll = new VGMColl(collName);
+    std::string seqName = fmt::format("{} seq {}", gameentry->name, k / 4);
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
     if (newSeq->LoadVGMFile()) {
       coll->UseSeq(newSeq);
@@ -229,8 +217,7 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
       if (!coll->Load()) {
         delete coll;
       }
-    }
-    else {
+    } else {
       delete newSeq;
       delete coll;
     }

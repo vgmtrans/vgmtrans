@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "NinSnesSeq.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
@@ -221,7 +220,7 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
     if (section == NULL) {
       section = new NinSnesSection(this, sectionAddress);
       if (!section->Load()) {
-        pRoot->AddLogItem(new LogItem("Failed to load section\n", LOG_LEVEL_ERR, "NinSnesSeq"));
+        L_ERROR("Failed to load section");
         return false;
       }
       AddSection(section);
@@ -888,7 +887,7 @@ bool NinSnesTrack::ReadEvent(void) {
     case EVENT_NOTE: {
       uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = min(max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
+      duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
 
       // Note: Konami engine can have volume=0
       AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, "Note");
@@ -898,7 +897,7 @@ bool NinSnesTrack::ReadEvent(void) {
 
     case EVENT_TIE: {
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = min(max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
+      duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
       desc << "Duration: " << (int) duration;
       MakePrevDurNoteEnd(GetTime() + duration);
       AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), CLR_TIE);
@@ -924,7 +923,7 @@ bool NinSnesTrack::ReadEvent(void) {
       }
 
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = min(max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
+      duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
 
       // Note: Konami engine can have volume=0
       AddPercNoteByDur(beginOffset,
@@ -1749,14 +1748,12 @@ bool NinSnesTrack::ReadEvent(void) {
 
       // << INTELLIGENT SYSTEMS EVENTS END
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem(std::string("Unknown Event - ") + desc.str(),
-                                    LOG_LEVEL_ERR,
-                                    std::string("NinSnesSeq")));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   // Add the next "END" event to UI
@@ -1790,13 +1787,13 @@ void NinSnesTrack::GetVolumeBalance(uint16_t pan, double &volumeLeft, double &vo
   if (parentSeq->version == NINSNES_TOSE) {
     if (panIndex <= 10) {
       // pan right, decrease left volume
-      volumeLeft = (255 - 25 * max(10 - panIndex, 0)) / 256.0;
+      volumeLeft = (255 - 25 * std::max(10 - panIndex, 0)) / 256.0;
       volumeRight = 1.0;
     }
     else {
       // pan left, decrease right volume
       volumeLeft = 1.0;
-      volumeRight = (255 - 25 * max(panIndex - 10, 0)) / 256.0;
+      volumeRight = (255 - 25 * std::max(panIndex - 10, 0)) / 256.0;
     }
   }
   else {
@@ -1868,7 +1865,7 @@ int8_t NinSnesTrack::CalcPanValue(uint8_t pan, double &volumeScale, bool &revers
 
   // TODO: correct volume scale of TOSE sequence
   int8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
-  volumeScale = min(volumeScale, 1.0); // workaround
+  volumeScale = std::min(volumeScale, 1.0); // workaround
 
   return midiPan;
 }

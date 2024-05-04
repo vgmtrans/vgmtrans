@@ -1,5 +1,8 @@
-#include "pch.h"
-
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "Scanner.h"
 #include "Root.h"
 
@@ -10,18 +13,11 @@ VGMScanner::~VGMScanner(void) {
 }
 
 bool VGMScanner::Init() {
-  //if (!UseExtension())
+  // if (!UseExtension())
   //	return false;
   return true;
 }
 
 void VGMScanner::InitiateScan(RawFile *file, void *offset) {
-  pRoot->UI_SetScanInfo();
   this->Scan(file, offset);
 }
-
-
-//void VGMScanner::Scan(RawFile* file)
-//{
-//	return;
-//}

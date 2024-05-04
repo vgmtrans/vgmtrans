@@ -1,16 +1,14 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
 
-class NinSnesScanner:
-    public VGMScanner {
+class NinSnesScanner : public VGMScanner {
  public:
-  NinSnesScanner(void) {
-    USE_EXTENSION("spc");
-  }
-  virtual ~NinSnesScanner(void) {
-  }
-
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForNinSnesFromARAM(RawFile *file);
   void SearchForNinSnesFromROM(RawFile *file);

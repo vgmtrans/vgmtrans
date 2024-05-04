@@ -1,30 +1,24 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "SPCLoader.h"
-#include "Root.h"
 
-SPCLoader::SPCLoader(void) {
-}
-
-SPCLoader::~SPCLoader(void) {
-}
-
-PostLoadCommand SPCLoader::Apply(RawFile *file) {
+void SPCLoader::apply(const RawFile *file) {
   if (file->size() < 0x10180) {
-    return KEEP_IT;
+    return;
   }
 
-  char signature[34] = {0};
-  file->GetBytes(0, 33, signature);
-  if (memcmp(signature, "SNES-SPC700 Sound File Data", 27) != 0 || file->GetShort(0x21) != 0x1a1a) {
-    return KEEP_IT;
+  if (!std::equal(file->begin(), file->begin() + 27, "SNES-SPC700 Sound File Data") ||
+      file->GetShort(0x21) != 0x1a1a) {
+    return;
   }
 
-  uint8_t *spcData = new uint8_t[0x10000];
-  memcpy(spcData, file->buf.data + 0x100, 0x10000);
+  auto spcFile = std::make_shared<VirtFile>(*file, 0x100, 0x10000);
 
-  VirtFile *spcFile = new VirtFile(spcData, 0x10000, file->GetFileName());
-
-  std::vector<uint8_t> dsp(file->buf.data + 0x10100, file->buf.data + 0x10100 + 0x80);
+  std::vector<uint8_t> dsp(file->data() + 0x10100, file->data() + 0x10100 + 0x80);
   spcFile->tag.binaries["dsp"] = dsp;
 
   // Parse [ID666](http://vspcplay.raphnet.net/spc_file_format.txt) if available.
@@ -34,46 +28,44 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
     file->GetBytes(0x2e, 32, s);
     s[32] = '\0';
     std::string s_str = s;
-    spcFile->tag.title = s_str;
+    spcFile->tag.title = (s_str);
 
     file->GetBytes(0x4e, 32, s);
     s[32] = '\0';
     s_str = s;
-    spcFile->tag.album = s_str;
+    spcFile->tag.album = (s_str);
 
     file->GetBytes(0x7e, 32, s);
     s[32] = '\0';
     s_str = s;
-    spcFile->tag.comment = s_str;
+    spcFile->tag.comment = (s_str);
 
     if (file->GetByte(0xd2) < 0x30) {
       // binary format
       file->GetBytes(0xb0, 32, s);
       s[32] = '\0';
       s_str = s;
-      spcFile->tag.artist = s_str;
+      spcFile->tag.artist = (s_str);
 
-      spcFile->tag.length = (double) (file->GetWord(0xa9) & 0xffffff);
-    }
-    else {
+      spcFile->tag.length = (double)(file->GetWord(0xa9) & 0xffffff);
+    } else {
       // text format
       file->GetBytes(0xb1, 32, s);
       s[32] = '\0';
       s_str = s;
-      spcFile->tag.artist = s_str;
+      spcFile->tag.artist = (s_str);
 
       file->GetBytes(0xa9, 3, s);
       s[3] = '\0';
-      spcFile->tag.length = strtoul(s, NULL, 10);
+      spcFile->tag.length = strtoul(s, nullptr, 10);
     }
   }
 
   // Parse Extended ID666 if available
   if (file->size() >= 0x10208) {
-    char xid6_signature[4] = {0};
-    file->GetBytes(0x10200, 4, xid6_signature);
     uint32_t xid6_end_offset = 0x10208 + file->GetWord(0x10204);
-    if (memcmp(xid6_signature, "xid6", 4) == 0 && file->size() >= xid6_end_offset) {
+    if (std::equal(file->begin() + 0x10200, file->begin() + 0x10204, "xid6") &&
+        file->size() >= xid6_end_offset) {
       uint32_t xid6_offset = 0x10208;
       while (xid6_offset + 4 < xid6_end_offset) {
         uint8_t xid6_id = file->GetByte(xid6_offset);
@@ -84,8 +76,7 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
         uint16_t xid6_length;
         if (xid6_type == 0) {
           xid6_length = 0;
-        }
-        else {
+        } else {
           xid6_length = xid6_data;
         }
 
@@ -101,8 +92,9 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
 
           case 1: {
             // String (data contains null character)
-            std::string s_str = std::string((char *) (file->buf.data + xid6_offset + 4), xid6_length - 1);
-            std::string xid6_string = s_str;
+            std::string s_str =
+                std::string((char *)(file->data() + xid6_offset + 4), xid6_length - 1);
+            std::string xid6_string = (s_str);
             switch (xid6_id) {
               case 1:
                 // Song name
@@ -141,11 +133,5 @@ PostLoadCommand SPCLoader::Apply(RawFile *file) {
     }
   }
 
-  // Load SPC after parsing tag
-  if (!pRoot->SetupNewRawFile(spcFile)) {
-    delete spcFile;
-    return KEEP_IT;
-  }
-
-  return DELETE_IT;
+  enqueue(spcFile);
 }

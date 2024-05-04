@@ -1,13 +1,14 @@
 /**
- * VGMTrans (c) - 2002-2021
+ * VGMTrans (c) - 2002-2024
  * Licensed under the zlib license
  * See the included LICENSE for more information
  */
 
-#include "pch.h"
+#include <cmath>
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "Root.h"
+#include "helper.h"
 
 // *******
 // VGMSamp
@@ -15,7 +16,7 @@
 
 VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 string theName)
+                 std::string theName)
     : VGMItem(sampColl->vgmfile, offset, length, theName), dataOff(dataOffset), dataLength(dataLen),
       bps(theBPS), rate(theRate), channels(nChannels), parSampColl(sampColl) {
 }
@@ -42,7 +43,7 @@ void VGMSamp::ConvertToStdWave(uint8_t *buf) {
 }
 
 bool VGMSamp::OnSaveAsWav() {
-  string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "wav");
+  std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "wav");
   if (filepath.empty())
     return SaveAsWav(filepath);
   return false;
@@ -55,8 +56,7 @@ bool VGMSamp::SaveAsWav(const std::string &filepath) {
   else
     bufSize = (uint32_t)ceil((double)dataLength * GetCompressionRatio());
 
-  std::vector<uint8_t> uncompSampBuf(
-      bufSize);                           
+  std::vector<uint8_t> uncompSampBuf(bufSize);
   ConvertToStdWave(uncompSampBuf.data());
 
   uint16_t blockAlign = bps / 8 * channels;

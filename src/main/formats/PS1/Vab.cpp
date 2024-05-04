@@ -1,8 +1,7 @@
-#include "pch.h"
-#include "Vab.h"
+#include "formats/PS1/Vab.h"
 #include "Format.h"			//include PS1-specific format header file when it is ready
 #include "PSXSPU.h"
-#include "PS1Format.h"
+#include "formats/PS1/PS1Format.h"
 
 using namespace std;
 
@@ -22,7 +21,7 @@ bool Vab::GetHeaderInfo() {
     return false;
   }
 
-  name = "VAB";
+  m_name = "VAB";
 
   VGMHeader *vabHdr = AddHeader(dwOffset, 0x20, "VAB Header");
   vabHdr->AddSimpleItem(dwOffset + 0x00, 4, "ID");
@@ -61,15 +60,11 @@ bool Vab::GetInstrPointers() {
   VGMHeader *toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, "Tone Attributes Table");
 
   if (numPrograms > 128) {
-    std::stringstream message;
-    message << "Too many programs (" << numPrograms << ")  Offset: 0x" << std::hex << dwOffset;
-    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, "VAB"));
+    L_ERROR("Too many programs {}  Offset: 0x{:X}", numPrograms,  dwOffset);
     return false;
   }
   if (numVAGs > 255) {
-    std::stringstream message;
-    message << "Too many VAGs (" << numVAGs << ")  Offset: 0x" << std::hex << dwOffset;
-    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, "VAB"));
+    L_ERROR("Too many VAGs {}  Offset: 0x{:X}", numVAGs,  dwOffset);
     return false;
   }
 
@@ -93,9 +88,7 @@ bool Vab::GetInstrPointers() {
 
     uint8_t numTonesPerInstr = GetByte(offCurrProg);
     if (numTonesPerInstr > 32) {
-      char log[512];
-      snprintf(log, 512, "Too many tones (%u) in Program #%u.", numTonesPerInstr, progIndex);
-      pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, "Vab"));
+      L_WARN("Too many tones {} in Program #{}.", numTonesPerInstr, progIndex);
     }
     else if (numTonesPerInstr != 0) {
       VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex);
@@ -141,9 +134,7 @@ bool Vab::GetInstrPointers() {
         totalVAGSize += vagSize;
       }
       else {
-        char log[512];
-        snprintf(log, 512, "VAG #%u pointer (offset=0x%08X, size=%u) is invalid.", i, vagOffset, vagSize);
-        pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, "Vab"));
+        L_WARN("VAG #{} pointer (offset=0x{:08X}, size={}) is invalid.", i, vagOffset, vagSize);
       }
 
       vagOffset += vagSize;
@@ -251,9 +242,7 @@ bool VabRgn::LoadRgn() {
     sampNum = 0;
 
   if (keyLow > keyHigh) {
-    std::stringstream message;
-    message << "Low Key (" << keyLow << ") is higher than High Key (" << keyHigh << ")  Offset: 0x" << std::hex << dwOffset;
-    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, "VAB (VabRgn)"));
+    L_ERROR("Low Key ({}) is higher than High Key ({})  Offset: 0x{:X}", keyLow, keyHigh, dwOffset);
     return false;
   }
 

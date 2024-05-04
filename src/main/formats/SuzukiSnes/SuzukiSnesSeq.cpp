@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "SuzukiSnesSeq.h"
 
 DECLARE_FORMAT(SuzukiSnes);
@@ -889,14 +888,12 @@ bool SuzukiSnesTrack::ReadEvent(void) {
       break;
     }
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "CompileSnesSeq"));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   //ostringstream ssTrace;
