@@ -16,7 +16,9 @@ jobs:
       osx_min_ver: "11.0"
       HOMEBREW_PREFIX: ${{ (matrix.target == 'x86_64' && '/usr/local') || '/opt/homebrew' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: "Install dependencies"
         run: |
           brew install -f --overwrite qt@6
@@ -44,7 +46,9 @@ jobs:
     runs-on: ubuntu-20.04
     name: Linux, x64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: "Set environment variables"
         run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
@@ -111,9 +115,9 @@ jobs:
     runs-on: windows-2022
     name: Windows, x64
     steps:
-       - uses: actions/checkout@v3
+       - uses: actions/checkout@v4
          with:
-          submodules: true
+          submodules: recursive
        - uses: ilammy/msvc-dev-cmd@v1
        - name: "Prepare build"
          run: |
