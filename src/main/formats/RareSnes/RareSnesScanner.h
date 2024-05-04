@@ -1,16 +1,14 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
 
-class RareSnesScanner:
-    public VGMScanner {
+class RareSnesScanner : public VGMScanner {
  public:
-  RareSnesScanner(void) {
-    USE_EXTENSION("spc");
-  }
-  virtual ~RareSnesScanner(void) {
-  }
-
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForRareSnesFromARAM(RawFile *file);
   void SearchForRareSnesFromROM(RawFile *file);

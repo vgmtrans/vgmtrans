@@ -1,7 +1,17 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "ItikitiSnesScanner.h"
 #include "ItikitiSnesSeq.h"
 #include "ItikitiSnesInstr.h"
+#include "BytePattern.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<ItikitiSnesScanner> s_itikiti_snes("ITIKITISNES", {"spc"});
+}
 
 void ItikitiSnesScanner::Scan(RawFile *file, void *info) {
   if (file->size() == 0x10000)
@@ -12,7 +22,7 @@ void ItikitiSnesScanner::Scan(RawFile *file, void *info) {
 
 void ItikitiSnesScanner::ScanFromApuRam(RawFile *file) {
   std::string name =
-      file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+      file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   uint32_t song_header_offset{};
   if (!ScanSongHeader(file, song_header_offset))

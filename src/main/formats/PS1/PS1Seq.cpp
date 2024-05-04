@@ -1,11 +1,15 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "PS1Seq.h"
-#include "PS1Format.h"
+#include "formats/PS1/PS1Format.h"
 
 DECLARE_FORMAT(PS1)
 
-PS1Seq::PS1Seq(RawFile *file, uint32_t offset)
-    : VGMSeqNoTrks(PS1Format::name, file, offset) {
+PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, file, offset) {
   UseReverb();
   //bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
@@ -107,11 +111,8 @@ bool PS1Seq::ReadEvent(void) {
       }
 
       if (no_next_data) {
-        std::ostringstream message;
-        message << "SEQ parser has reached zero-filled data at 0x" << std::hex << std::uppercase
-                << beginOffset
-                << ". Parser terminates the analysis because it is considered to be out of bounds of the song data.";
-        pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_WARN, "PS1Seq"));
+        L_WARN("SEQ parser has reached zero-filled data at 0x{:X}. Parser terminates the analysis"
+          "because it is considered to be out of bounds of the song data.", beginOffset);
         return false;
       }
     }

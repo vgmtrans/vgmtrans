@@ -12,7 +12,6 @@
  * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
-#include "pch.h"
 #include "MP2kSeq.h"
 
 #include <array>
@@ -213,8 +212,8 @@ void MP2kTrack::handleStatusCommand(uint32_t beginOffset, uint8_t status_byte) {
         }
 
         default: {
-            pRoot->AddLogItem(new LogItem("Illegal status", LOG_LEVEL_ERR, "MP2kSeq"));
-            break;
+          L_ERROR("Illegal status");
+          break;
         }
     }
 }

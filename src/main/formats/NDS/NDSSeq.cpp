@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "NDSSeq.h"
 
 DECLARE_FORMAT(NDS);

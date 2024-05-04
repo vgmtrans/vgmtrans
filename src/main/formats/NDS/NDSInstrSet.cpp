@@ -1,5 +1,5 @@
 /**
- * VGMTrans (c) - 2002-2021
+ * VGMTrans (c) - 2002-2024
  * Licensed under the zlib license
  * See the included LICENSE for more information
  */
@@ -9,10 +9,10 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include <spdlog/fmt/fmt.h>
 #include "Loop.h"
 #include "NDSFormat.h"
 #include "VGMSampColl.h"
-#include "pch.h"
 #include "NDSInstrSet.h"
 #include "VGMRgn.h"
 
@@ -253,7 +253,7 @@ uint16_t NDSInstr::GetFallingRate(uint8_t DecayTime) {
 // NDSWaveArch
 // ***********
 
-NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, string name)
+NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMSampColl(NDSFormat::name, file, offset, length, name) {
 }
 
@@ -298,10 +298,9 @@ bool NDSWaveArch::GetSampleInfo() {
       dataLength = loopOff + nonLoopLength;
     }
 
-    std::ostringstream name;
-    name << "Sample " << (float)samples.size();
+    auto name = fmt::format("Sample {}", samples.size());
     NDSSamp *samp = new NDSSamp(this, pSample, dataStart + dataLength - pSample, dataStart,
-                                dataLength, nChannels, bps, rate, waveType, name.str());
+                                dataLength, nChannels, bps, rate, waveType, name);
 
     if (waveType == NDSSamp::IMA_ADPCM) {
       samp->SetLoopStartMeasure(LM_SAMPLES);
@@ -338,7 +337,7 @@ bool NDSPSG::GetSampleInfo() {
 
 NDSSamp::NDSSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 uint8_t theWaveType, string name)
+                 uint8_t theWaveType, std::string name)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
       waveType(theWaveType) {
 }

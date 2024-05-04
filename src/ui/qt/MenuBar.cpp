@@ -10,6 +10,7 @@
 #include <QDockWidget>
 #include "Options.h"
 #include "Root.h"
+#include "LogManager.h"
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
@@ -48,11 +49,9 @@ void MenuBar::appendOptionsMenu(const QList<QDockWidget *> &dockWidgets) {
       ConversionOptions::the().SetBankSelectStyle(BankSelectStyle::GS);
     } else if (text == "MMA") {
       ConversionOptions::the().SetBankSelectStyle(BankSelectStyle::MMA);
-      pRoot->UI_AddLogItem(
-          new LogItem("MMA style (CC0 * 128 + CC32) bank select was chosen and "
-                      "it will be used for bank select events in generated MIDIs. This "
-                      "will cause in-program playback to sound incorrect!",
-                      LOG_LEVEL_WARN, "VGMTransQt"));
+      L_WARN("MMA style (CC0 * 128 + CC32) bank select was chosen and "
+             "it will be used for bank select events in generated MIDIs. This "
+             "will cause in-program playback to sound incorrect!");
     }
   });
 

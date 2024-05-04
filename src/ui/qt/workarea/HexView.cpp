@@ -399,8 +399,8 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
           offsetIntoEvent += BYTES_PER_LINE - col;
           col = 0;
         } else {
-          int bytesToPrint = min(
-              min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
+          int bytesToPrint = std::min(
+              std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
               BYTES_PER_LINE);
           translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
           translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
@@ -484,7 +484,7 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) {
   }
 
   int startCol = static_cast<int>(startAddress - vgmfile->dwOffset) % BYTES_PER_LINE;
-  auto bytesToPrint = min(BYTES_PER_LINE - startCol, endAddress - startAddress);
+  auto bytesToPrint = std::min(BYTES_PER_LINE - startCol, endAddress - startAddress);
 
   auto defaultTextColor = painter.pen().color();
   QColor windowColor = this->palette().color(QPalette::Window);
@@ -509,7 +509,7 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) {
 
       // In case the event spans multiple lines, account for how far into the event we are at this line
       int offsetIntoEvent = std::max(0, startAddress - static_cast<int>(item->dwOffset));
-      auto numEventBytesToPrint = min(static_cast<int>(item->unLength - offsetIntoEvent), bytesToPrint - offset);
+      auto numEventBytesToPrint = std::min(static_cast<int>(item->unLength - offsetIntoEvent), bytesToPrint - offset);
       translateAndPrintHex(painter, data+offset, col, numEventBytesToPrint, bgColor, textColor);
       translateAndPrintAscii(painter, data + offset, col, numEventBytesToPrint, bgColor, textColor);
 

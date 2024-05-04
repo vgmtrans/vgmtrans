@@ -2,7 +2,6 @@
 // Most of the code below is based on his work.
 // Also, thanks to Antires for his ADPCM decompression routine.
 
-#include "pch.h"
 #include "PSXSPU.h"
 #include "formats/PS1/PS1Format.h"
 
@@ -298,13 +297,11 @@ void PSXSamp::ConvertToStdWave(uint8_t *buf) {
   for (uint32_t k = 0; k < dataLength; k += 0x10)                //for every adpcm chunk
   {
     if (dwOffset + k + 16 > vgmfile->GetEndOffset()) {
-      std::string log = "\"" + name + "\" unexpected EOF.";
-      pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, "PSXSamp"));
+      L_WARN("\"{}\" unexpected EOF.", name);
       break;
     }
     else if (!addrOutOfVirtFile && k + 16 > unLength) {
-      std::string log = "\"" + name + "\" unexpected end of PSXSamp.";
-      pRoot->AddLogItem(new LogItem(log.c_str(), LOG_LEVEL_WARN, "PSXSamp"));
+      L_WARN("\"{}\" unexpected end of PSXSamp.", name);
       addrOutOfVirtFile = true;
     }
 

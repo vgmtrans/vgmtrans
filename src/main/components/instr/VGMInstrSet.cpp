@@ -1,23 +1,25 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "VGMInstrSet.h"
+#include <spdlog/fmt/fmt.h>
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "VGMColl.h"
 #include "Root.h"
-
-using namespace std;
+#include "Format.h"
+#include "LogManager.h"
 
 // ***********
 // VGMInstrSet
 // ***********
 
-VGMInstrSet::VGMInstrSet(const string &format,/*FmtID fmtID,*/
-                         RawFile *file,
-                         uint32_t offset,
-                         uint32_t length,
-                         string name,
-                         VGMSampColl *theSampColl)
-    : VGMFile(FILETYPE_INSTRSET, /*fmtID,*/format, file, offset, length, name), sampColl(theSampColl), allowEmptyInstrs(false) {
+VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length,
+                         std::string name, VGMSampColl *theSampColl)
+    : VGMFile(format, file, offset, length, std::move(name)), sampColl(theSampColl) {
   AddContainer<VGMInstr>(aInstrs);
 }
 
@@ -26,18 +28,26 @@ VGMInstrSet::~VGMInstrSet() {
   delete sampColl;
 }
 
-
 VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
-                                unsigned long instrNum, const string &instrName) {
-  ostringstream name;
-  if (instrName == "")
-    name << "Instrument " << aInstrs.size();
-  else
-    name << instrName;
-
-  VGMInstr *instr = new VGMInstr(this, offset, length, bank, instrNum, name.str());
+                                unsigned long instrNum, const std::string &instrName) {
+  VGMInstr *instr =
+      new VGMInstr(this, offset, length, bank, instrNum,
+                   instrName.empty() ? fmt::format("Instrument {}", aInstrs.size()) : instrName);
   aInstrs.push_back(instr);
   return instr;
+}
+
+bool VGMInstrSet::LoadVGMFile() {
+  bool val = Load();
+  if (!val) {
+    return false;
+  }
+
+  if (auto fmt = GetFormat(); fmt) {
+    fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+  }
+
+  return val;
 }
 
 bool VGMInstrSet::Load() {
@@ -48,21 +58,21 @@ bool VGMInstrSet::Load() {
   if (!LoadInstrs())
     return false;
 
-  if (!allowEmptyInstrs && aInstrs.empty())
+  if (aInstrs.size() == 0)
     return false;
 
   if (unLength == 0) {
     SetGuessedLength();
   }
 
-  if (sampColl != NULL) {
+  if (sampColl != nullptr) {
     if (!sampColl->Load()) {
-      pRoot->AddLogItem(new LogItem("Failed to load VGMSampColl.", LOG_LEVEL_ERR, "VGMInstrSet"));
+      L_WARN("Failed to load VGMSampColl");
     }
   }
 
-  LoadLocalData();
-  UseLocalData();
+  rawfile->AddContainedVGMFile(
+      std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
   pRoot->AddVGMFile(this);
   return true;
 }
@@ -75,7 +85,6 @@ bool VGMInstrSet::GetInstrPointers() {
   return true;
 }
 
-
 bool VGMInstrSet::LoadInstrs() {
   size_t nInstrs = aInstrs.size();
   for (size_t i = 0; i < nInstrs; i++) {
@@ -85,63 +94,14 @@ bool VGMInstrSet::LoadInstrs() {
   return true;
 }
 
-bool VGMInstrSet::SaveAsDLS(const std::string &filepath) {
-  DLSFile dlsfile;
-  bool dlsCreationSucceeded = false;
-
-  if (!assocColls.empty()) {
-    dlsCreationSucceeded = assocColls.front()->CreateDLSFile(dlsfile);
-  } else {
-    std::ostringstream message;
-    message << name
-            << ": "
-               "Instrument sets that are not part of a collection cannot be "
-               "converted to DLS at the moment.";
-    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, "VGMInstrSet"));
-    return false;
-  }
-
-  if (dlsCreationSucceeded) {
-    return dlsfile.SaveDLSFile(filepath);
-  }
-  return false;
-}
-
-bool VGMInstrSet::SaveAsSF2(const std::string &filepath) {
-  SF2File *sf2file = NULL;
-
-  if (!assocColls.empty()) {
-    sf2file = assocColls.front()->CreateSF2File();
-  } else {
-    std::ostringstream message;
-    message << name
-            << ": "
-               "Instrument sets that are not part of a collection cannot be "
-               "converted to SF2 at the moment.";
-    pRoot->AddLogItem(new LogItem(message.str(), LOG_LEVEL_ERR, "VGMInstrSet"));
-    return false;
-  }
-
-  if (sf2file != NULL) {
-    bool bResult = sf2file->SaveSF2File(filepath);
-    delete sf2file;
-    return bResult;
-  }
-  return false;
-}
-
-
 // ********
 // VGMInstr
 // ********
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, const string &name, float reverb)
-    : VGMContainerItem(instrSet, offset, length, name),
-      parInstrSet(instrSet),
-      bank(theBank),
-      reverb(reverb),
-      instrNum(theInstrNum) {
+                   uint32_t theInstrNum, const std::string &name, float reverb)
+    : VGMContainerItem(instrSet, offset, length, name), parInstrSet(instrSet), bank(theBank),
+      reverb(reverb), instrNum(theInstrNum) {
   AddContainer<VGMRgn>(aRgns);
 }
 
@@ -162,15 +122,13 @@ VGMRgn *VGMInstr::AddRgn(VGMRgn *rgn) {
   return rgn;
 }
 
-VGMRgn *VGMInstr::AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow, uint8_t keyHigh,
-                         uint8_t velLow, uint8_t velHigh) {
+VGMRgn *VGMInstr::AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow,
+                         uint8_t keyHigh, uint8_t velLow, uint8_t velHigh) {
   VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
   aRgns.push_back(newRgn);
   return newRgn;
 }
 
-
 bool VGMInstr::LoadInstr() {
   return true;
 }
-

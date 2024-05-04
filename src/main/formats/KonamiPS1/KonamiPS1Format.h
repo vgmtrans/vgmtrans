@@ -1,9 +1,13 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include "Format.h"
 #include "Matcher.h"
 #include "Root.h"
 #include "KonamiPS1Scanner.h"
-
 
 // ***************
 // KonamiPS1Format

@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "TriAcePS1InstrSet.h"
 #include "VGMRgn.h"
 #include "PSXSPU.h"

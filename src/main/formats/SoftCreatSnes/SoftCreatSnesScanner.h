@@ -1,16 +1,14 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
 
-class SoftCreatSnesScanner:
-    public VGMScanner {
+class SoftCreatSnesScanner : public VGMScanner {
  public:
-  SoftCreatSnesScanner(void) {
-    USE_EXTENSION("spc");
-  }
-  virtual ~SoftCreatSnesScanner(void) {
-  }
-
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForSoftCreatSnesFromARAM(RawFile *file);
   void SearchForSoftCreatSnesFromROM(RawFile *file);

@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "CPSSeq.h"
 #include "CPSTrackV1.h"
 #include "CPSTrackV2.h"
@@ -9,12 +13,11 @@
 DECLARE_FORMAT(CPS1);
 DECLARE_FORMAT(CPS2);
 
-
 // ******
 // CPSSeq
 // ******
 
-CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, string &name)
+CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::string &name)
     : VGMSeq(CPS2Format::name, file, offset, 0, name),
       fmt_version(fmtVersion) {
   HasMonophonicTracks();
@@ -96,8 +99,8 @@ bool CPSSeq::PostLoad() {
   //  tempo.  It gets updated (250/4) times a second, always.  We will have to convert
   //  ticks in our sequence into absolute elapsed time, which means we also need to keep
   //  track of any tempo events that change the absolute time per tick.
-  vector<MidiEvent *> tempoEvents;
-  vector<MidiTrack *> &miditracks = midi->aTracks;
+  std::vector<MidiEvent *> tempoEvents;
+  std::vector<MidiTrack *> &miditracks = midi->aTracks;
 
   // First get all tempo events, we assume they occur on track 1
   for (unsigned int i = 0; i < miditracks[0]->aEvents.size(); i++) {
@@ -108,7 +111,7 @@ bool CPSSeq::PostLoad() {
 
   // For each track, gather all vibrato events, lfo events, pitch bend events and track end events
   for (unsigned int i = 0; i < miditracks.size(); i++) {
-    vector<MidiEvent *> events(tempoEvents);
+    std::vector<MidiEvent *> events(tempoEvents);
     MidiTrack *track = miditracks[i];
     int channel = this->aTracks[i]->channel;
 

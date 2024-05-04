@@ -1,5 +1,11 @@
-#include "pch.h"
+#include <string.h>
+#include <filesystem>
 #include "common.h"
+
+std::string removeExtFromPath(const std::string& s) {
+  std::filesystem::path p(s);
+  return (p.parent_path() / p.stem()).string();
+}
 
 std::string StringToUpper(std::string myString) {
   const size_t length = myString.length();
@@ -15,13 +21,6 @@ std::string StringToLower(std::string myString) {
     myString[i] = tolower(myString[i]);
   }
   return myString;
-}
-
-uint32_t StringToHex(const std::string &str) {
-  uint32_t value;
-  std::stringstream convert(str);
-  convert >> std::hex >> value;        //read seq_table as hexadecimal value
-  return value;
 }
 
 std::string ConvertToSafeFileName(const std::string &str) {

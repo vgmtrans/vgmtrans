@@ -2,9 +2,6 @@
 # Dependencies
 # ~~~
 
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/gsl-lite"
-                 "${CMAKE_CURRENT_BINARY_DIR}/gsl-lite" EXCLUDE_FROM_ALL)
-
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/bass"
                  "${CMAKE_CURRENT_BINARY_DIR}/bass" EXCLUDE_FROM_ALL)
 
@@ -112,7 +109,6 @@ target_link_libraries(
           vgmtranscore
           Qt::Widgets
           Qt::Svg
-          gsl-lite
           BASS::MIDI)
 
 # Workaround macdeployqt not correctly deploying QtDbus

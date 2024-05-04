@@ -1,5 +1,12 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "HudsonSnesInstr.h"
+
+#include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
 
 // ******************
@@ -46,10 +53,9 @@ bool HudsonSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << instrNum;
-    HudsonSnesInstr *newInstr =
-        new HudsonSnesInstr(this, version, ofsInstrEntry, instrNum, spcDirAddr, addrSampTuningTable, instrName.str());
+    HudsonSnesInstr *newInstr = new HudsonSnesInstr(
+      this, version, ofsInstrEntry, instrNum, spcDirAddr, addrSampTuningTable,
+      fmt::format("Instrument {}", instrNum));
     aInstrs.push_back(newInstr);
   }
   if (aInstrs.size() == 0) {

@@ -1,5 +1,11 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "HeartBeatSnesInstr.h"
+#include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
 
 // *********************
@@ -65,17 +71,9 @@ bool HeartBeatSnesInstrSet::GetInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << instrNum;
-    HeartBeatSnesInstr *newInstr = new HeartBeatSnesInstr(this,
-                                                          version,
-                                                          addrInstrHeader,
-                                                          instrNum >> 7,
-                                                          instrNum & 0x7f,
-                                                          addrSRCNTable,
-                                                          songIndex,
-                                                          spcDirAddr,
-                                                          instrName.str());
+    HeartBeatSnesInstr *newInstr = new HeartBeatSnesInstr(
+      this, version, addrInstrHeader, instrNum >> 7, instrNum & 0x7f, addrSRCNTable,
+      songIndex, spcDirAddr, fmt::format("Instrument {}", instrNum));
     aInstrs.push_back(newInstr);
   }
 
@@ -177,11 +175,11 @@ HeartBeatSnesRgn::HeartBeatSnesRgn(HeartBeatSnesInstr *instr, HeartBeatSnesVersi
   // so here I put a random value commonly used
   // TODO: obtain proper release rate from sequence
   uint8_t sr_release = 0x1c;
-  ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, NULL, NULL, NULL, &this->release_time, NULL);
+  ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, NULL,
+    NULL, NULL, &this->release_time, NULL);
 }
 
-HeartBeatSnesRgn::~HeartBeatSnesRgn() {
-}
+HeartBeatSnesRgn::~HeartBeatSnesRgn() {}
 
 bool HeartBeatSnesRgn::LoadRgn() {
   return true;

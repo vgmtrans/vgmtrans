@@ -1,3 +1,4 @@
+#include <spdlog/fmt/fmt.h>
 #include "CPS1Instr.h"
 #include "CPS2Format.h"
 #include "VGMRgn.h"
@@ -24,9 +25,7 @@ bool CPS1SampleInstrSet::GetInstrPointers() {
     if (!(GetByte(offset) & 0x80)) {
       break;
     }
-    std::ostringstream ss;
-    ss << "Instrument " << i;
-    string name = ss.str();
+    std::string name = fmt::format("Instrument {}", i);
     VGMInstr* instr = new VGMInstr(this, offset, 4, 0, i, name);
     VGMRgn* rgn = new VGMRgn(instr, offset);
     instr->unLength = 4;
@@ -47,7 +46,7 @@ CPS1SampColl::CPS1SampColl(RawFile *file,
                            CPS1SampleInstrSet *theinstrset,
                            uint32_t offset,
                            uint32_t length,
-                           string name)
+                           std::string name)
     : VGMSampColl(CPS1Format::name, file, offset, length, name),
       instrset(theinstrset) {
 }
@@ -61,12 +60,9 @@ bool CPS1SampColl::GetHeaderInfo() {
     if (GetWord(offset) == 0xFFFFFFFF) {
       break;
     }
-    ostringstream startStream;
-    startStream << "Sample " << i << " Start";
-    auto startStr = startStream.str();
-    ostringstream endStream;
-    endStream << "Sample " << i++ << " End";
-    auto endStr = endStream.str();
+    auto startStr = fmt::format("Sample {} Start", i);
+    auto endStr = fmt::format("Sample {} End", i);
+    i += 1;
 
     header->AddSimpleItem(offset, 3, startStr);
     header->AddSimpleItem(offset+3, 3, endStr);
@@ -86,9 +82,9 @@ bool CPS1SampColl::GetSampleInfo() {
     auto begin = GetWordBE(offset) >> 8;
     auto end = GetWordBE(offset+PTR_SIZE) >> 8;
 
-    ostringstream name;
-    name << "Sample " << i++;
-    auto sample = new DialogicAdpcmSamp(this, begin, end-begin, CPS1_OKIMSM6295_SAMPLE_RATE, name.str());
+    auto name = fmt::format("Sample {}", i);
+    i += 1;
+    auto sample = new DialogicAdpcmSamp(this, begin, end-begin, CPS1_OKIMSM6295_SAMPLE_RATE, name);
     sample->SetWaveType(WT_PCM16);
     sample->SetLoopStatus(false);
     sample->unityKey = 0x3C;

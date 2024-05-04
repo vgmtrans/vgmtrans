@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2021
+ * VGMTrans (c) 2002-2024
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -10,10 +10,17 @@
 #include <VGMFile.h>
 #include <VGMItem.h>
 
+const QIcon &iconForFile(VGMFileVariant file);
 const QIcon &iconForItemType(VGMItem::Icon type);
-const QIcon &iconForFileType(FileType filetype);
 
 QColor colorForEventColor(VGMItem::EventColor eventColor);
 QColor textColorForEventColor(VGMItem::EventColor eventColor);
 
 QString getFullDescriptionForTooltip(VGMItem* item);
+
+template<typename ... Base>
+struct Visitor : Base ... {
+  using Base::operator()...;
+};
+
+template<typename ... T> Visitor(T...) -> Visitor<T...>;

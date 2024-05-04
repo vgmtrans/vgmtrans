@@ -1,6 +1,12 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "PrismSnesInstr.h"
 #include "SNESDSP.h"
+#include <spdlog/fmt/fmt.h>
 
 // *****************
 // PrismSnesInstrSet
@@ -19,11 +25,9 @@ PrismSnesInstrSet::PrismSnesInstrSet(RawFile *file,
     addrADSR1Table(addrADSR1Table),
     addrADSR2Table(addrADSR2Table),
     addrTuningTableHigh(addrTuningTableHigh),
-    addrTuningTableLow(addrTuningTableLow) {
-}
+    addrTuningTableLow(addrTuningTableLow) {}
 
-PrismSnesInstrSet::~PrismSnesInstrSet() {
-}
+PrismSnesInstrSet::~PrismSnesInstrSet() {}
 
 bool PrismSnesInstrSet::GetHeaderInfo() {
   return true;
@@ -32,7 +36,7 @@ bool PrismSnesInstrSet::GetHeaderInfo() {
 bool PrismSnesInstrSet::GetInstrPointers() {
   usedSRCNs.clear();
   for (uint16_t srcn16 = 0; srcn16 < 0x100; srcn16++) {
-    uint8_t srcn = (uint8_t) srcn16;
+    uint8_t srcn = (uint8_t)srcn16;
 
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
     if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
@@ -70,17 +74,9 @@ bool PrismSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << srcn;
-    PrismSnesInstr *newInstr = new PrismSnesInstr(this,
-                                                  version,
-                                                  srcn,
-                                                  spcDirAddr,
-                                                  ofsADSR1Entry,
-                                                  ofsADSR2Entry,
-                                                  ofsTuningEntryHigh,
-                                                  ofsTuningEntryLow,
-                                                  instrName.str());
+    PrismSnesInstr *newInstr = new PrismSnesInstr(
+      this, version, srcn, spcDirAddr, ofsADSR1Entry, ofsADSR2Entry, ofsTuningEntryHigh,
+      ofsTuningEntryLow, fmt::format("Instrument: {:#x}", srcn));
     aInstrs.push_back(newInstr);
   }
 
@@ -182,8 +178,7 @@ PrismSnesRgn::PrismSnesRgn(PrismSnesInstr *instr,
   SetGuessedLength();
 }
 
-PrismSnesRgn::~PrismSnesRgn() {
-}
+PrismSnesRgn::~PrismSnesRgn() {}
 
 bool PrismSnesRgn::LoadRgn() {
   return true;

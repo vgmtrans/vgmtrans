@@ -1,6 +1,13 @@
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #pragma once
-#include <bitset>
-#include <climits>
+
+#include <set>
+#include <array>
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "AkaoFormatVersion.h"
@@ -227,5 +234,6 @@ class AkaoTrack final
   std::vector<uint32_t> conditional_jump_destinations;
 
  private:
-   [[nodiscard]] bool AnyUnvisitedJumpDestinations();
+  void logUnknownEvent(const std::string& opcode_str, u32 beginOffset);
+  [[nodiscard]] bool AnyUnvisitedJumpDestinations();
 };

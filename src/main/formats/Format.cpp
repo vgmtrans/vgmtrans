@@ -1,44 +1,38 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "Format.h"
+#include "Scanner.h"
 #include "Matcher.h"
 
-using namespace std;
-
-FormatMap& Format::registry() {
-  static FormatMap* registry = new FormatMap();
-  return *registry;
+FormatMap &Format::registry() {
+    static FormatMap registry;
+    return registry;
 }
 
-Format::Format(const string &formatName) :
-    scanner(NULL),
-    matcher(NULL) {
+Format::Format(const std::string &formatName) : matcher(nullptr), scanner(nullptr) {
   registry().insert(make_pair(formatName, this));
 }
 
-Format::~Format(void) {
-  if (scanner != NULL)
+Format::~Format() {
     delete scanner;
-  if (matcher != NULL)
     delete matcher;
 }
 
-void Format::DeleteFormatRegistry() {
-  for (auto& pair : registry()) {
-    delete pair.second;
-  }
-  registry().clear();
-}
-
-Format *Format::GetFormatFromName(const string &name) {
-  FormatMap::iterator findIt = registry().find(name);
+Format *Format::GetFormatFromName(const std::string &name) {
+  auto findIt = registry().find(name);
   if (findIt == registry().end())
-    return NULL;
+        return nullptr;
   return (*findIt).second;
 }
 
-bool Format::OnNewFile(VGMFile *file) {
-  if (!matcher)
+bool Format::OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+  if (!matcher) {
     return false;
+  }
   return matcher->OnNewFile(file);
 }
 
@@ -46,13 +40,14 @@ VGMColl *Format::NewCollection() {
   return new VGMColl();
 }
 
-bool Format::OnCloseFile(VGMFile *file) {
-  if (!matcher)
+bool Format::OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+  if (!matcher) {
     return false;
+  }
   return matcher->OnCloseFile(file);
 }
 
-bool Format::Init(void) {
+bool Format::Init() {
   scanner = NewScanner();
   matcher = NewMatcher();
   return true;

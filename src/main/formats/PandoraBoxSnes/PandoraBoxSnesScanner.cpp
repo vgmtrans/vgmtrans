@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "PandoraBoxSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "PandoraBoxSnesSeq.h"
 #include "PandoraBoxSnesInstr.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<PandoraBoxSnesScanner> s_pandorabox_snes("PANDORABOXSNES", {"spc"});
+}
 
 // ; Kishin Kourinden Oni SPC
 // f91d: 8d 10     mov   y,#$10
@@ -92,7 +101,7 @@ void PandoraBoxSnesScanner::Scan(RawFile *file, void *info) {
 
 void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM(RawFile *file) {
   PandoraBoxSnesVersion version = PANDORABOXSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   uint32_t ofsLoadSeq;
   uint16_t addrSeqHeader;
@@ -121,8 +130,7 @@ void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM(RawFile *file) {
   uint32_t ofsSetDIR;
   if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
     spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -142,23 +150,17 @@ void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM(RawFile *file) {
 
     uint16_t availInstrCountPtr = file->GetShort(ofsLoadSRCN + 9);
     globalInstrumentCount = file->GetByte(availInstrCountPtr);
-  }
-  else {
+  } else {
     return;
   }
 
-  PandoraBoxSnesInstrSet *newInstrSet = new PandoraBoxSnesInstrSet(file,
-                                                                   version,
-                                                                   spcDirAddr,
-                                                                   addrLocalInstrTable,
-                                                                   addrGlobalInstrTable,
-                                                                   globalInstrumentCount,
-                                                                   newSeq->instrADSRHints);
+    PandoraBoxSnesInstrSet *newInstrSet = new PandoraBoxSnesInstrSet(
+      file, version, spcDirAddr, addrLocalInstrTable, addrGlobalInstrTable, globalInstrumentCount,
+      newSeq->instrADSRHints);
   if (!newInstrSet->LoadVGMFile()) {
     delete newInstrSet;
     return;
   }
 }
 
-void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromROM(RawFile *file) {
-}
+void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromROM(RawFile *file) {}

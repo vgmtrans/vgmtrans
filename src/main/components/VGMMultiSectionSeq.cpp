@@ -1,8 +1,13 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "common.h"
 #include "Root.h"
 #include "Options.h"
 #include "VGMMultiSectionSeq.h"
+#include "helper.h"
 
 VGMMultiSectionSeq::VGMMultiSectionSeq(const std::string &format,
                                        RawFile *file,

@@ -1,15 +1,21 @@
-#include "pch.h"
-#include "OrgScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "OrgSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<OrgScanner> s_org("ORG");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 
-OrgScanner::OrgScanner(void) {
-}
+OrgScanner::OrgScanner() {}
 
-OrgScanner::~OrgScanner(void) {
-}
-
+OrgScanner::~OrgScanner() {}
 
 void OrgScanner::Scan(RawFile *file, void *info) {
   SearchForOrgSeq(file);

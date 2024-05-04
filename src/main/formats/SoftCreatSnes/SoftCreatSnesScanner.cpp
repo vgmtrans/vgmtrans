@@ -1,6 +1,15 @@
-#include "pch.h"
-#include "SoftCreatSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "SoftCreatSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<SoftCreatSnesScanner> s_softcreat_snes("SOFTWARECREATIONSSNES", {"spc"});
+}
 
 //; Plok!
 //0589: 7d        mov   a,x
@@ -56,8 +65,7 @@ void SoftCreatSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForSoftCreatSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForSoftCreatSnesFromROM(file);
   }
   return;
@@ -65,7 +73,7 @@ void SoftCreatSnesScanner::Scan(RawFile *file, void *info) {
 
 void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
   SoftCreatSnesVersion version = SOFTCREATSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // search song list
   uint32_t ofsLoadSeq;
@@ -86,8 +94,7 @@ void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
       return;
     }
     headerAlignSize = addrStartHigh - addrStartLow;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -98,8 +105,7 @@ void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
   if (file->SearchBytePattern(ptnVCmdExec, ofsVCmdExec)) {
     VCMD_CUTOFF = file->GetByte(ofsVCmdExec + 6);
     addrVCmdAddressTable = file->GetByte(ofsVCmdExec + 16);
-  }
-  else {
+  } else {
     return;
   }
 
@@ -140,5 +146,4 @@ void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
   }
 }
 
-void SoftCreatSnesScanner::SearchForSoftCreatSnesFromROM(RawFile *file) {
-}
+void SoftCreatSnesScanner::SearchForSoftCreatSnesFromROM(RawFile *file) {}

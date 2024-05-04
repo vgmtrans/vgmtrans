@@ -31,6 +31,7 @@
 #include "workarea/MdiArea.h"
 #include "TitleBar.h"
 #include "StatusBarContent.h"
+#include "LogManager.h"
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
@@ -50,7 +51,7 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
                         .arg(VGMTRANS_REVISION)
                         .arg(VGMTRANS_BRANCH)
                         .toStdString();
-  qtVGMRoot.UI_AddLogItem(new LogItem(infostring, LOG_LEVEL_INFO, "VGMTransQt"));
+  L_INFO(infostring);
 }
 
 void MainWindow::createElements() {

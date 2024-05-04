@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "NeverlandSnesSeq.h"
 
 DECLARE_FORMAT(NeverlandSnes);
@@ -61,10 +60,10 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
   // set name to the sequence
   if (rawName[0] != ('\0')) {
     std::string nameStr = std::string(rawName);
-    name = nameStr;
+    m_name = nameStr;
   }
   else {
-    name = "NeverlandSnesSeq";
+    m_name = "NeverlandSnesSeq";
   }
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
@@ -203,14 +202,12 @@ bool NeverlandSnesTrack::ReadEvent(void) {
       break;
     }
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
-      pRoot->AddLogItem(new LogItem(std::string("Unknown Event - ") + desc.str(),
-                                    LOG_LEVEL_ERR,
-                                    std::string("NeverlandSnesSeq")));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   //std::ostringstream ssTrace;

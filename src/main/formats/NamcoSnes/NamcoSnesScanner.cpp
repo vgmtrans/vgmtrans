@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "NamcoSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "NamcoSnesInstr.h"
 #include "NamcoSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<NamcoSnesScanner> s_namco_snes("NAMCOSNES", {"spc"});
+}
 
 // Wagan Paradise SPC
 // 05cc: 68 60     cmp   a,#$60
@@ -111,8 +120,7 @@ void NamcoSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForNamcoSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForNamcoSnesFromROM(file);
   }
   return;
@@ -120,7 +128,7 @@ void NamcoSnesScanner::Scan(RawFile *file, void *info) {
 
 void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
   NamcoSnesVersion version = NAMCOSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // search song list
   uint32_t ofsReadSongList;
@@ -128,8 +136,7 @@ void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
   if (file->SearchBytePattern(ptnReadSongList, ofsReadSongList)) {
     addrSongList = file->GetByte(ofsReadSongList + 5) | (file->GetByte(ofsReadSongList + 9) << 8);
     version = NAMCOSNES_STANDARD;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -140,8 +147,7 @@ void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
   if (file->SearchBytePattern(ptnStartSong, ofsStartSong)) {
     addrSongIndexArray = file->GetByte(ofsStartSong + 11);
     addrSongSlotIndex = file->GetByte(ofsStartSong + 15);
-  }
-  else {
+  } else {
     return;
   }
 
@@ -173,9 +179,9 @@ void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
   uint32_t ofsLoadInstrTuning;
   uint16_t addrTuningTable;
   if (file->SearchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
-    addrTuningTable = file->GetByte(ofsLoadInstrTuning + 8) | (file->GetByte(ofsLoadInstrTuning + 12) << 8);
-  }
-  else {
+        addrTuningTable =
+            file->GetByte(ofsLoadInstrTuning + 8) | (file->GetByte(ofsLoadInstrTuning + 12) << 8);
+  } else {
     return;
   }
 
@@ -192,8 +198,7 @@ void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
   }
 }
 
-void NamcoSnesScanner::SearchForNamcoSnesFromROM(RawFile *file) {
-}
+void NamcoSnesScanner::SearchForNamcoSnesFromROM(RawFile *file) {}
 
 std::map<uint8_t, uint8_t> NamcoSnesScanner::GetInitDspRegMap(RawFile *file) {
   std::map<uint8_t, uint8_t> dspRegMap;
@@ -205,8 +210,7 @@ std::map<uint8_t, uint8_t> NamcoSnesScanner::GetInitDspRegMap(RawFile *file) {
   if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInit)) {
     dspRegCount = file->GetByte(ofsDspRegInit + 15) / 2;
     addrDspRegValueList = file->GetShort(ofsDspRegInit + 3);
-  }
-  else {
+  } else {
     return dspRegMap;
   }
 

@@ -1,3 +1,8 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include <iterator>
 #include <string>
@@ -314,12 +319,12 @@ class SysexEvent
 public:
   SysexEvent(MidiTrack *prntTrk,
              uint32_t absoluteTime,
-             vector<uint8_t> sysexData,
+             std::vector<uint8_t> sysexData,
              int8_t thePriority = PRIORITY_MIDDLE);
   virtual MidiEventType GetEventType() { return MIDIEVENT_UNDEFINED; }
   virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time);
 
-  vector<uint8_t> sysexData;
+  std::vector<uint8_t> sysexData;
 };
 
 class VolumeEvent

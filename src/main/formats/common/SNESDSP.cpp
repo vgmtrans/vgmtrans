@@ -1,8 +1,12 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 // Many thanks to bsnes and snes9x.
 
-#include "pch.h"
 #include "SNESDSP.h"
-#include "Root.h"
+#include "LogManager.h"
 
 // *************
 // SNES Envelope
@@ -321,7 +325,7 @@ SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t
 }
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset, uint32_t maxNumSamps) :
-    VGMSampColl(format, instrset->rawfile, instrset, offset, 0),
+    VGMSampColl(format, instrset->GetRawFile(), instrset, offset, 0),
     spcDirAddr(offset) {
   SetDefaultTargets(maxNumSamps);
 }
@@ -335,7 +339,7 @@ SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
                            const std::vector<uint8_t> &targetSRCNs, std::string name) :
-    VGMSampColl(format, instrset->rawfile, instrset, offset, 0, name),
+    VGMSampColl(format, instrset->GetRawFile(), instrset, offset, 0, name),
     spcDirAddr(offset),
     targetSRCNs(targetSRCNs) {
 }
@@ -359,7 +363,6 @@ bool SNESSampColl::GetSampleInfo() {
   spcDirHeader = AddHeader(spcDirAddr, 0, "Sample DIR");
   for (std::vector<uint8_t>::iterator itr = this->targetSRCNs.begin(); itr != this->targetSRCNs.end(); ++itr) {
     uint8_t srcn = (*itr);
-    std::ostringstream name;
 
     uint32_t offDirEnt = spcDirAddr + (srcn * 4);
     if (!SNESSampColl::IsValidSampleDir(GetRawFile(), offDirEnt, true)) {
@@ -372,16 +375,11 @@ bool SNESSampColl::GetSampleInfo() {
     bool loop;
     uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart, loop);
 
-    name << "SA " << srcn;
-    spcDirHeader->AddSimpleItem(offDirEnt, 2, name.str().c_str());
+        spcDirHeader->AddSimpleItem(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
+        spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
 
-    name.str("");
-    name << "LSA " << srcn;
-    spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, name.str().c_str());
-
-    name.str("");
-    name << "Sample " << srcn;
-    SNESSamp *samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length, addrSampLoop, name.str());
+        SNESSamp *samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length,
+                                      addrSampLoop, fmt::format("Sample: {:#x}", srcn));
     samples.push_back(samp);
   }
   spcDirHeader->SetGuessedLength();
@@ -425,8 +423,7 @@ SNESSamp::SNESSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint
       brrLoopOffset(loopOffset) {
 }
 
-SNESSamp::~SNESSamp() {
-}
+SNESSamp::~SNESSamp() {}
 
 uint32_t SNESSamp::GetSampleLength(RawFile *file, uint32_t offset, bool &loop) {
   uint32_t currOffset = offset;
@@ -461,12 +458,10 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
   SetLoopStatus(0);
 
   assert(dataLength % 9 == 0);
-  for (uint32_t k = 0; k + 9 <= dataLength; k += 9)                //for every adpcm chunk
+  for (uint32_t k = 0; k + 9 <= dataLength; k += 9)  //for every adpcm chunk
   {
     if (dwOffset + k + 9 > GetRawFile()->size()) {
-      char log[512];
-      snprintf(log, 512, "\"%s\" unexpected EOF.", name.c_str());
-      pRoot->AddLogItem(new LogItem(log, LOG_LEVEL_WARN, "SNESSamp"));
+      L_WARN("Unexpected EOF ({})", (name));
       break;
     }
 

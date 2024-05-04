@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "AkaoScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<AkaoScanner> s_akao("AKAO");
+}
 
 void AkaoScanner::Scan(RawFile *file, void *info) {
   const AkaoPs1Version file_version = DetermineVersionFromTag(file);

@@ -6,7 +6,6 @@
 
 #include "common.h"
 #include "DLSFile.h"
-#include "MidiFile.h"
 #include "SF2File.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
@@ -16,36 +15,48 @@
  * saving various formats to disk
  */
 
-enum class VGMCollConversionTarget : uint32_t { MIDI = 1u << 0u, DLS = 1u << 1u, SF2 = 1u << 2u };
+namespace conversion {
 
-inline constexpr VGMCollConversionTarget operator|(VGMCollConversionTarget a, VGMCollConversionTarget b) {
-  return static_cast<VGMCollConversionTarget>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+enum class Target : uint32_t { MIDI = 1u << 0u, DLS = 1u << 1u, SF2 = 1u << 2u };
+
+inline constexpr Target operator|(Target a, Target b) {
+  return static_cast<Target>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
 }
 
-inline constexpr uint32_t operator&(VGMCollConversionTarget a, VGMCollConversionTarget b) {
+inline constexpr uint32_t operator&(Target a, Target b) {
   return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
 }
 
-template <VGMCollConversionTarget options>
+bool SaveAsDLS(const VGMInstrSet &set, const std::string &filepath);
+bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath);
+
+void SaveAllAsWav(const VGMSampColl &coll, const std::string &save_dir);
+
+bool SaveAsOriginal(const VGMFile& file, const std::string& filepath);
+bool SaveAsOriginal(const RawFile& rawfile, const std::string& filepath);
+
+template <Target options>
 void SaveAs(VGMColl &coll, const std::string &dir_path) {
-  auto filename = ConvertToSafeFileName(*coll.GetName());
+  auto filename = ConvertToSafeFileName(coll.GetName());
   auto filepath = dir_path + "/" + filename;
 
-  if constexpr ((options & VGMCollConversionTarget::MIDI) != 0) {
+  if constexpr ((options & Target::MIDI) != 0) {
     coll.seq->SaveAsMidi(filepath + ".mid");
   }
 
-  if constexpr ((options & VGMCollConversionTarget::DLS) != 0) {
+  if constexpr ((options & Target::DLS) != 0) {
     DLSFile dlsfile;
     if (coll.CreateDLSFile(dlsfile)) {
       dlsfile.SaveDLSFile(filepath + ".dls");
     }
   }
 
-  if constexpr ((options & VGMCollConversionTarget::SF2) != 0) {
+  if constexpr ((options & Target::SF2) != 0) {
     SF2File *sf2file = coll.CreateSF2File();
     if (sf2file) {
       sf2file->SaveSF2File(filepath + ".sf2");
     }
   }
+}
+
 }

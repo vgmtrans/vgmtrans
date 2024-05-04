@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "CompileSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "CompileSnesInstr.h"
 #include "CompileSnesSeq.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<CompileSnesScanner> s_compile_snes("COMPILESNES", {"spc"});
+}
 
 //; Super Puyo Puyo 2 SPC
 //08e6: e5 00 18  mov   a,$1800
@@ -44,7 +53,7 @@ void CompileSnesScanner::Scan(RawFile *file, void *info) {
 void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
   CompileSnesVersion version = COMPILESNES_NONE;
 
-  std::string basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::string basefilename = removeExtFromPath(file->name());
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // scan for table pointer initialize code
@@ -115,5 +124,4 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
   }
 }
 
-void CompileSnesScanner::SearchForCompileSnesFromROM(RawFile *file) {
-}
+void CompileSnesScanner::SearchForCompileSnesFromROM(RawFile *file) {}

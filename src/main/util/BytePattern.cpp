@@ -1,9 +1,15 @@
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 // Byte pattern class for flexible byte sequence search
 // Heavily inspired by SigScan at GameDeception.net
 
-#include "pch.h"
-
 #include <assert.h>
+#include <memory>
+#include <cstring>
 #include "BytePattern.h"
 
 BytePattern::BytePattern() :

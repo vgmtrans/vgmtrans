@@ -1,30 +1,36 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 
 #include "common.h"
-#include "VGMItem.h"
+#include <vector>
 
 class VGMSeq;
 class VGMInstrSet;
 class VGMSampColl;
+class VGMMiscFile;
+class VGMFile;
 class VGMSamp;
 class DLSFile;
 class SF2File;
 class SynthFile;
 
-class VGMColl
-    : public VGMItem {
+class VGMColl {
  public:
-  VGMColl(std::string name = "Unnamed Collection");
-  virtual ~VGMColl(void);
+  explicit VGMColl(std::string name = "Unnamed collection");
+  virtual ~VGMColl() = default;
 
   void RemoveFileAssocs();
-  const std::string *GetName(void) const;
+  [[nodiscard]] const std::string &GetName() const;
   void SetName(const std::string *newName);
-  VGMSeq *GetSeq();
+  [[nodiscard]] VGMSeq *GetSeq() const;
   void UseSeq(VGMSeq *theSeq);
   void AddInstrSet(VGMInstrSet *theInstrSet);
   void AddSampColl(VGMSampColl *theSampColl);
-  void AddMiscFile(VGMFile *theMiscFile);
+  void AddMiscFile(VGMMiscFile *theMiscFile);
   bool Load();
   virtual bool LoadMain() { return true; }
   virtual bool CreateDLSFile(DLSFile &dls);
@@ -34,20 +40,15 @@ class VGMColl
   virtual bool MainDLSCreation(DLSFile &dls);
   virtual void PostSynthFileCreation() {}
 
-  bool OnSaveAllDLS();
-  bool OnSaveAllSF2();
-
   bool containsVGMFile(const VGMFile*) const;
 
-  VGMSeq *seq;
+  VGMSeq *seq{};
   std::vector<VGMInstrSet *> instrsets;
   std::vector<VGMSampColl *> sampcolls;
-  std::vector<VGMFile *> miscfiles;
+  std::vector<VGMMiscFile *> miscfiles;
 
  protected:
   void UnpackSampColl(DLSFile &dls, VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps);
   void UnpackSampColl(SynthFile &synthfile, VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps);
-
- protected:
   std::string name;
 };

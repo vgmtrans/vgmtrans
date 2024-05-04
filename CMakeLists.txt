@@ -5,6 +5,9 @@
 # For object library linking
 cmake_minimum_required(VERSION 3.12)
 
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15.0" CACHE STRING "Minimum OSX version" FORCE)
+
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 project(
@@ -136,8 +139,6 @@ add_compile_definitions(TIXML_USE_STL)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/tinyxml"
                  "${CMAKE_CURRENT_BINARY_DIR}/tinyxml" EXCLUDE_FROM_ALL)
 
-set(GHC_FILESYSTEM_WITH_INSTALL OFF)
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/filesystem")
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/spdlog")
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/mio")
 

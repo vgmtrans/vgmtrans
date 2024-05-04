@@ -1,5 +1,11 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "NamcoSnesInstr.h"
+#include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
 
 // *****************
@@ -57,9 +63,8 @@ bool NamcoSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << srcn;
-    NamcoSnesInstr *newInstr = new NamcoSnesInstr(this, version, srcn, spcDirAddr, ofsTuningEntry, instrName.str());
+    NamcoSnesInstr *newInstr = new NamcoSnesInstr(this, version, srcn, spcDirAddr, ofsTuningEntry,
+fmt::format("Instrument {}", srcn));
     aInstrs.push_back(newInstr);
   }
 

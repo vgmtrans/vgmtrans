@@ -1,18 +1,16 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum SuzukiSnesVersion: uint8_t; // see SuzukiSnesFormat.h
+enum SuzukiSnesVersion : uint8_t;  // see SuzukiSnesFormat.h
 
-class SuzukiSnesScanner:
-    public VGMScanner {
+class SuzukiSnesScanner : public VGMScanner {
  public:
-  SuzukiSnesScanner(void) {
-    USE_EXTENSION("spc");
-  }
-  virtual ~SuzukiSnesScanner(void) {
-  }
-
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForSuzukiSnesFromARAM(RawFile *file);
   void SearchForSuzukiSnesFromROM(RawFile *file);

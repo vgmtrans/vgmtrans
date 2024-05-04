@@ -1,4 +1,5 @@
-#include "pch.h"
+#include <sstream>
+#include <cmath>
 #include "VGMSamp.h"
 #include "VGMRgn.h"
 #include "ScaleConversion.h"
@@ -443,8 +444,8 @@ bool CPS2Instr::LoadInstr() {
 
     if (this->sustain_level >= 0x7E && this->sustain_rate > 0 && this->decay_rate > 1) {
       //for a better approximation, we count the ticks to get from original Dr to original Sl
-      ticks = (long) ceil((0xFFFF - Sl) / (double) Dr);
-      ticks += (long) ceil(Sl / (double) Sr);
+      ticks = (long)ceil((0xFFFF - Sl) / (double) Dr);
+      ticks += (long)ceil(Sl / (double) Sr);
       rgn->decay_time = ticks * QSOUND_TICK_FREQ;
       Sl = 0;
     } else {

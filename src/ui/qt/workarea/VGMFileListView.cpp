@@ -5,10 +5,6 @@
  */
 
 #include <QHeaderView>
-#include <QMenu>
-#include <VGMInstrSet.h>
-#include <VGMSeq.h>
-#include <VGMSampColl.h>
 
 #include "VGMFileListView.h"
 #include "Helpers.h"
@@ -16,6 +12,11 @@
 #include "MdiArea.h"
 #include "services/commands/GeneralCommands.h"
 #include "services/NotificationCenter.h"
+#include "VGMFile.h"
+#include "VGMInstrSet.h"
+#include "VGMSeq.h"
+#include "VGMMiscFile.h"
+#include "VGMSampColl.h"
 
 /*
  *  VGMFileListModel
@@ -30,14 +31,15 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
     return QVariant();
   }
 
-  VGMFile *vgmfile = qtVGMRoot.vVGMFile.at(static_cast<unsigned long>(index.row()));
+  VGMFileVariant vgmfilevariant = qtVGMRoot.vVGMFile.at(index.row());
+  VGMFile* vgmfile = variantToVGMFile(vgmfilevariant);
 
   switch (index.column()) {
     case Property::Name: {
       if (role == Qt::DisplayRole) {
         return QString::fromStdString(*vgmfile->GetName());
       } else if (role == Qt::DecorationRole) {
-        return iconForFileType(vgmfile->GetFileType());
+        return iconForFile(vgmfilevariant);
       }
       break;
     }
@@ -124,7 +126,7 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
 
-  auto selectedFiles = make_shared<vector<VGMFile*>>();
+  auto selectedFiles = std::make_shared<std::vector<VGMFile*>>();
 
   if (!selectionModel()->hasSelection()) {
     return;
@@ -135,7 +137,7 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
   selectedFiles->reserve(list.size());
   for (const auto &index : list) {
     if (index.isValid()) {
-      selectedFiles->push_back(qtVGMRoot.vVGMFile[index.row()]);
+      selectedFiles->push_back(variantToVGMFile(qtVGMRoot.vVGMFile[index.row()]));
     }
   }
   auto menu = menuManager.CreateMenuForItems<VGMItem>(selectedFiles);
@@ -156,18 +158,9 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
         return;
 
       QModelIndexList list = selectionModel()->selectedRows();
-
-      vector<VGMFile*> selectedFiles;
-      selectedFiles.reserve(list.size());
-      for (const auto &index : list) {
-        if (index.isValid()) {
-          selectedFiles.push_back(qtVGMRoot.vVGMFile[index.row()]);
-        }
-      }
-
       pRoot->UI_BeginRemoveVGMFiles();
-      for (auto vgmfile : selectedFiles) {
-        vgmfile->OnClose();
+      for (auto it = list.rbegin(); it != list.rend(); ++it) {
+        qtVGMRoot.RemoveVGMFile(qtVGMRoot.vVGMFile[it->row()]);
       }
       pRoot->UI_EndRemoveVGMFiles();
 
@@ -187,7 +180,7 @@ void VGMFileListView::removeVGMFile(VGMFile *file) {
 }
 
 void VGMFileListView::requestVGMFileView(QModelIndex index) {
-  MdiArea::the()->newView(qtVGMRoot.vVGMFile[index.row()]);
+  MdiArea::the()->newView(variantToVGMFile(qtVGMRoot.vVGMFile[index.row()]));
 }
 
 // Update the status bar for the current selection
@@ -196,7 +189,7 @@ void VGMFileListView::updateStatusBar() {
     NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
   }
-  VGMFile* file = qtVGMRoot.vVGMFile[currentIndex().row()];
+  VGMFile* file = variantToVGMFile(qtVGMRoot.vVGMFile[currentIndex().row()]);
   NotificationCenter::the()->updateStatusForItem(file);
 }
 
@@ -214,7 +207,7 @@ void VGMFileListView::currentChanged(const QModelIndex &current, const QModelInd
     return;
   }
 
-  VGMFile *file = qtVGMRoot.vVGMFile[current.row()];
+  VGMFile *file = variantToVGMFile(qtVGMRoot.vVGMFile[current.row()]);
   NotificationCenter::the()->selectVGMFile(file, this);
 
   if (this->hasFocus())
@@ -230,7 +223,16 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, QWidget* caller) {
     return;
   }
 
-  auto it = std::find(qtVGMRoot.vVGMFile.begin(), qtVGMRoot.vVGMFile.end(), file);
+  auto it = std::find_if(qtVGMRoot.vVGMFile.begin(), qtVGMRoot.vVGMFile.end(), [&](const VGMFileVariant& var) {
+      // Use std::visit to access the actual object within the variant
+      bool matches = false;
+
+      std::visit([&](auto&& arg) {
+        matches = (file == arg);
+      }, var);
+
+      return matches;
+    });
   if (it == qtVGMRoot.vVGMFile.end())
     return;
   int row = static_cast<int>(std::distance(qtVGMRoot.vVGMFile.begin(), it));

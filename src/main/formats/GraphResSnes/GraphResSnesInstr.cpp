@@ -1,5 +1,11 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "GraphResSnesInstr.h"
+
+#include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
 
 // ********************
@@ -57,9 +63,8 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
       adsr = instrADSRHints[srcn];
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << srcn;
-    GraphResSnesInstr *newInstr = new GraphResSnesInstr(this, version, srcn, spcDirAddr, adsr, instrName.str());
+    GraphResSnesInstr *newInstr = new GraphResSnesInstr(
+      this, version, srcn, spcDirAddr, adsr, fmt::format("Instrument {}", srcn));
     aInstrs.push_back(newInstr);
   }
 

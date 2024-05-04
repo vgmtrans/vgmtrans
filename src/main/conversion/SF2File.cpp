@@ -1,6 +1,11 @@
-#include "pch.h"
-#include "version.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+#include <cmath>
 #include "SF2File.h"
+#include "version.h"
 #include "VGMInstrSet.h"
 #include "SynthFile.h"
 #include "ScaleConversion.h"
@@ -313,21 +318,21 @@ SF2File::SF2File(SynthFile *synthfile)
       // attackVolEnv
       instGenList.sfGenOper = attackVolEnv;
       instGenList.genAmount.shAmount =
-          (rgn->art->attack_time == 0) ? -32768 : roundi(SecondsToTimecents(rgn->art->attack_time));
+          (rgn->art->attack_time == 0) ? -32768 : std::round(SecondsToTimecents(rgn->art->attack_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
       // holdVolEnv
       instGenList.sfGenOper = holdVolEnv;
       instGenList.genAmount.shAmount =
-          (rgn->art->hold_time == 0) ? -32768 : roundi(SecondsToTimecents(rgn->art->hold_time));
+          (rgn->art->hold_time == 0) ? -32768 : std::round(SecondsToTimecents(rgn->art->hold_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
       // decayVolEnv
       instGenList.sfGenOper = decayVolEnv;
       instGenList.genAmount.shAmount =
-          (rgn->art->decay_time == 0) ? -32768 : roundi(SecondsToTimecents(rgn->art->decay_time));
+          (rgn->art->decay_time == 0) ? -32768 : std::round(SecondsToTimecents(rgn->art->decay_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
@@ -342,7 +347,7 @@ SF2File::SF2File(SynthFile *synthfile)
       // releaseVolEnv
       instGenList.sfGenOper = releaseVolEnv;
       instGenList.genAmount.shAmount =
-          (rgn->art->release_time == 0) ? -32768 : roundi(SecondsToTimecents(rgn->art->release_time));
+          (rgn->art->release_time == 0) ? -32768 : std::round(SecondsToTimecents(rgn->art->release_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
@@ -382,7 +387,6 @@ SF2File::SF2File(SynthFile *synthfile)
   size_t numSamps = synthfile->vWaves.size();
   shdrCk->size = (uint32_t) ((numSamps + 1) * sizeof(sfSample));
   shdrCk->data = new uint8_t[shdrCk->size];
-
 
   uint32_t sampOffset = 0;
   for (size_t i = 0; i < numSamps; i++) {
@@ -435,7 +439,6 @@ SF2File::SF2File(SynthFile *synthfile)
   pdtaCk->AddChildChunk(shdrCk);
 
   this->AddChildChunk(pdtaCk);
-
 }
 
 std::vector<uint8_t> SF2File::SaveToMem() {

@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "RareSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -34,7 +33,7 @@ const uint16_t RareSnesSeq::NOTE_PITCH_TABLE[128] = {
 
 RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdataOffset, string newName)
     : VGMSeq(RareSnesFormat::name, file, seqdataOffset), version(ver) {
-  name = newName;
+  m_name = newName;
 
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
@@ -339,7 +338,7 @@ bool RareSnesTrack::ReadEvent(void) {
       int8_t instrTuningDelta = 0;
       if (parentSeq->instrUnityKeyHints.find(spcInstr) == parentSeq->instrUnityKeyHints.end()) {
         parentSeq->instrUnityKeyHints[spcInstr] = spcTransposeAbs;
-        parentSeq->instrPitchHints[spcInstr] = (int16_t) roundi(GetTuningInSemitones(spcTuning) * 100.0);
+        parentSeq->instrPitchHints[spcInstr] = (int16_t)std::round(GetTuningInSemitones(spcTuning) * 100.0);
       }
       else {
         // check difference between preserved tuning and current tuning
@@ -497,7 +496,7 @@ bool RareSnesTrack::ReadEvent(void) {
                         ICON_STARTREP);
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
-          pRoot->AddLogItem(new LogItem("Subroutine nest level overflow\n", LOG_LEVEL_ERR, "RareSnesSeq"));
+          L_ERROR("Subroutine nest level overflow");
           bContinue = false;
           break;
         }
@@ -523,7 +522,7 @@ bool RareSnesTrack::ReadEvent(void) {
                         ICON_STARTREP);
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
-          pRoot->AddLogItem(new LogItem("Subroutine nest level overflow\n", LOG_LEVEL_ERR, "RareSnesSeq"));
+          L_ERROR("Subroutine nest level overflow");
           bContinue = false;
           break;
         }
@@ -545,7 +544,7 @@ bool RareSnesTrack::ReadEvent(void) {
                         ICON_ENDREP);
 
         if (rptNestLevel == 0) {
-          pRoot->AddLogItem(new LogItem("Subroutine nest level overflow\n", LOG_LEVEL_ERR, "RareSnesSeq"));
+          L_ERROR("Subroutine nest level overflow");
           bContinue = false;
           break;
         }
@@ -1224,14 +1223,12 @@ bool RareSnesTrack::ReadEvent(void) {
                         ICON_CONTROL);
         break;
 
-      default:
-        desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
-        pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                      LOG_LEVEL_ERR,
-                                      "RareSnesSeq"));
+      default: {
+        auto descr = logEvent(statusByte);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         bContinue = false;
         break;
+      }
     }
   }
 

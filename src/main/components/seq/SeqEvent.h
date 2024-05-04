@@ -1,14 +1,13 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #pragma once
 #include "VGMItem.h"
 #include "MidiFile.h"
-
-#define DESCRIPTION(_str_)                                  \
-    virtual std::string GetDescription() {                  \
-        std::ostringstream    desc;                         \
-        desc << _str_;                                      \
-        return desc.str();                                  \
-    }
-
+#include <spdlog/fmt/fmt.h>
 
 class SeqTrack;
 
@@ -67,7 +66,6 @@ class SeqEvent:
   std::string desc;
 };
 
-
 //  ***************
 //  DurNoteSeqEvent
 //  ***************
@@ -85,9 +83,12 @@ class DurNoteSeqEvent:
   virtual ~DurNoteSeqEvent(void) { }
   virtual EventType GetEventType() { return EVENTTYPE_DURNOTE; }
   virtual Icon GetIcon() { return ICON_NOTE; }
-  DESCRIPTION(
-      "Abs Key: " << (int) absKey << " (" << MidiEvent::GetNoteName(absKey) << ") " << "  Velocity: " << (int) vel
-          << "  Duration: " << dur)
+
+  std::string GetDescription() override {
+    return fmt::format("{} - abs key: {} ({}), velocity: {}, duration: {}", name,
+      static_cast<int>(absKey), MidiEvent::GetNoteName(absKey), static_cast<int>(vel), dur);
+  };
+
  public:
   uint8_t absKey;
   uint8_t vel;
@@ -98,8 +99,7 @@ class DurNoteSeqEvent:
 //  NoteOnSeqEvent
 //  ***************
 
-class NoteOnSeqEvent:
-    public SeqEvent {
+class NoteOnSeqEvent : public SeqEvent {
  public:
   NoteOnSeqEvent(SeqTrack *pTrack,
                  uint8_t absoluteKey,
@@ -110,8 +110,12 @@ class NoteOnSeqEvent:
   virtual ~NoteOnSeqEvent(void) { }
   virtual EventType GetEventType() { return EVENTTYPE_NOTEON; }
   virtual Icon GetIcon() { return ICON_NOTE; }
-  DESCRIPTION(
-      "Abs Key: " << (int) absKey << " (" << MidiEvent::GetNoteName(absKey) << ") " << "  Velocity: " << (int) vel)
+
+  std::string GetDescription() override {
+    return fmt::format("{} - abs key: {} ({}), velocity: {}", name,
+      static_cast<int>(absKey), MidiEvent::GetNoteName(absKey), static_cast<int>(vel));
+  };
+
  public:
   uint8_t absKey;
   uint8_t vel;
@@ -129,7 +133,12 @@ class NoteOffSeqEvent:
   virtual ~NoteOffSeqEvent(void) { }
   virtual EventType GetEventType() { return EVENTTYPE_NOTEOFF; }
   virtual Icon GetIcon() { return ICON_NOTE; }
-  DESCRIPTION("Abs Key: " << (int) absKey << " (" << MidiEvent::GetNoteName(absKey) << ") ")
+
+  std::string GetDescription() override {
+    return fmt::format("{} - abs key: {} ({})", name, static_cast<int>(absKey),
+      MidiEvent::GetNoteName(absKey));
+  };
+
  public:
   uint8_t absKey;
 };
@@ -138,15 +147,15 @@ class NoteOffSeqEvent:
 //  RestSeqEvent
 //  ************
 
-class RestSeqEvent:
-    public SeqEvent {
+class RestSeqEvent : public SeqEvent {
  public:
-  RestSeqEvent
-      (SeqTrack *pTrack, uint32_t duration, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~RestSeqEvent(void) { }
+  RestSeqEvent(SeqTrack *pTrack, uint32_t duration, uint32_t offset = 0, uint32_t length = 0,
+               const std::string &name = "");
+  virtual ~RestSeqEvent() {}
   virtual EventType GetEventType() { return EVENTTYPE_REST; }
   virtual Icon GetIcon() { return ICON_REST; }
-  DESCRIPTION("Duration: " << dur)
+
+  std::string GetDescription() override { return fmt::format("{} - duration: {}", name, dur); };
 
  public:
   uint32_t dur;
@@ -156,14 +165,16 @@ class RestSeqEvent:
 //  SetOctaveSeqEvent
 //  *****************
 
-class SetOctaveSeqEvent:
-    public SeqEvent {
+class SetOctaveSeqEvent : public SeqEvent {
  public:
-  SetOctaveSeqEvent
-      (SeqTrack *pTrack, uint8_t octave, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~SetOctaveSeqEvent(void) { }
-  DESCRIPTION("Octave: " << (int) octave)
- public:
+  SetOctaveSeqEvent(SeqTrack *pTrack, uint8_t octave, uint32_t offset = 0, uint32_t length = 0,
+                  const std::string &name = "");
+  virtual ~SetOctaveSeqEvent() { }
+
+  std::string GetDescription() override {
+    return fmt::format("{} - octave: {}", name, static_cast<int>(octave));
+  };
+
   uint8_t octave;
 };
 
@@ -171,16 +182,17 @@ class SetOctaveSeqEvent:
 //  VolSeqEvent
 //  ***********
 
-class VolSeqEvent:
-    public SeqEvent {
+class VolSeqEvent : public SeqEvent {
  public:
-  VolSeqEvent
-      (SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~VolSeqEvent(void) { }
+  VolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0,
+              const std::string &name = "");
+  virtual ~VolSeqEvent() {}
   virtual EventType GetEventType() { return EVENTTYPE_VOLUME; }
-  DESCRIPTION("Volume: " << (int) vol)
 
- public:
+  std::string GetDescription() override {
+    return fmt::format("{} - volume: {}", name, static_cast<int>(vol));
+  };
+
   uint8_t vol;
 };
 
@@ -188,38 +200,36 @@ class VolSeqEvent:
 //  VolSlideSeqEvent
 //  ****************
 
-class VolSlideSeqEvent:
-    public SeqEvent {
+class VolSlideSeqEvent : public SeqEvent {
  public:
-  VolSlideSeqEvent(SeqTrack *pTrack,
-                   uint8_t targetVolume,
-                   uint32_t duration,
-                   uint32_t offset = 0,
-                   uint32_t length = 0,
-                   const std::string &name = "");
-  virtual ~VolSlideSeqEvent(void) { }
+    VolSlideSeqEvent(SeqTrack *pTrack, uint8_t targetVolume, uint32_t duration, uint32_t offset = 0,
+                     uint32_t length = 0, const std::string &name = "");
+    virtual ~VolSlideSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_VOLUMESLIDE; }
-  DESCRIPTION("Target Volume: " << (int) targVol << "  Duration: " << dur)
 
- public:
+  std::string GetDescription() override {
+    return fmt::format("{} - target volume: {}, duration: {}", name,
+      static_cast<int>(targVol), dur);
+  };
+
   uint8_t targVol;
   uint32_t dur;
 };
-
 
 //  ***********
 //  MastVolSeqEvent
 //  ***********
 
-class MastVolSeqEvent:
-    public SeqEvent {
+class MastVolSeqEvent : public SeqEvent {
  public:
-  MastVolSeqEvent
-      (SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~MastVolSeqEvent(void) { }
-  DESCRIPTION("Master Volume: " << (int) vol)
+    MastVolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0,
+                    const std::string &name = "");
+    virtual ~MastVolSeqEvent(void) {}
 
- public:
+    std::string GetDescription() override {
+        return fmt::format("{} - master volume: {}", name, static_cast<int>(vol));
+    };
+
   uint8_t vol;
 };
 
@@ -227,19 +237,17 @@ class MastVolSeqEvent:
 //  MastVolSlideSeqEvent
 //  ****************
 
-class MastVolSlideSeqEvent:
-    public SeqEvent {
+class MastVolSlideSeqEvent : public SeqEvent {
  public:
-  MastVolSlideSeqEvent(SeqTrack *pTrack,
-                       uint8_t targetVolume,
-                       uint32_t duration,
-                       uint32_t offset = 0,
-                       uint32_t length = 0,
-                       const std::string &name = "");
-  virtual ~MastVolSlideSeqEvent(void) { }
-  DESCRIPTION("Target Volume: " << (int) targVol << "  Duration: " << dur)
+    MastVolSlideSeqEvent(SeqTrack *pTrack, uint8_t targetVolume, uint32_t duration,
+                         uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+    virtual ~MastVolSlideSeqEvent(void) {}
 
- public:
+    std::string GetDescription() override {
+        return fmt::format("{} - target volume: {}, duration: {}", name,
+          static_cast<int>(targVol), dur);
+    };
+
   uint8_t targVol;
   uint32_t dur;
 };
@@ -248,14 +256,16 @@ class MastVolSlideSeqEvent:
 //  ExpressionSeqEvent
 //  ******************
 
-class ExpressionSeqEvent:
-    public SeqEvent {
+class ExpressionSeqEvent : public SeqEvent {
  public:
-  ExpressionSeqEvent
-      (SeqTrack *pTrack, uint8_t level, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~ExpressionSeqEvent(void) { }
+  ExpressionSeqEvent(SeqTrack *pTrack, uint8_t level, uint32_t offset = 0, uint32_t length = 0,
+                     const std::string &name = "");
+  virtual ~ExpressionSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_EXPRESSION; }
-  DESCRIPTION("Expression: " << (int) level)
+
+  std::string GetDescription() override {
+    return fmt::format("{} - expression: {}", name, static_cast<int>(level));
+  };
 
  public:
   uint8_t level;
@@ -265,36 +275,36 @@ class ExpressionSeqEvent:
 //  ExpressionSlideSeqEvent
 //  ***********************
 
-class ExpressionSlideSeqEvent:
-    public SeqEvent {
+class ExpressionSlideSeqEvent : public SeqEvent {
  public:
-  ExpressionSlideSeqEvent(SeqTrack *pTrack,
-                          uint8_t targetExpression,
-                          uint32_t duration,
-                          uint32_t offset = 0,
-                          uint32_t length = 0,
-                          const std::string &name = "");
-  virtual ~ExpressionSlideSeqEvent(void) { }
+    ExpressionSlideSeqEvent(SeqTrack *pTrack, uint8_t targetExpression, uint32_t duration,
+                            uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+    virtual ~ExpressionSlideSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_EXPRESSIONSLIDE; }
-  DESCRIPTION("Target Expression: " << (int) targExpr << "  Duration: " << dur)
 
- public:
+  std::string GetDescription() override {
+    return fmt::format("{} - target expression: {}, duration: {}", name,
+      static_cast<int>(targExpr), dur);
+  };
+
   uint8_t targExpr;
   uint32_t dur;
 };
-
 
 //  ***********
 //  PanSeqEvent
 //  ***********
 
-class PanSeqEvent:
-    public SeqEvent {
+class PanSeqEvent : public SeqEvent {
  public:
-  PanSeqEvent(SeqTrack *pTrack, uint8_t pan, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~PanSeqEvent(void) { }
+  PanSeqEvent(SeqTrack *pTrack, uint8_t pan, uint32_t offset = 0, uint32_t length = 0,
+              const std::string &name = "");
+  virtual ~PanSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_PAN; }
-  DESCRIPTION("Pan: " << (int) pan)
+
+  std::string GetDescription() override {
+    return fmt::format("{} - pan: {}", name, static_cast<int>(pan));
+  };
 
  public:
   uint8_t pan;
@@ -304,72 +314,72 @@ class PanSeqEvent:
 //  PanSlideSeqEvent
 //  ****************
 
-class PanSlideSeqEvent:
-    public SeqEvent {
+class PanSlideSeqEvent : public SeqEvent {
  public:
-  PanSlideSeqEvent(SeqTrack *pTrack,
-                   uint8_t targetPan,
-                   uint32_t duration,
-                   uint32_t offset = 0,
-                   uint32_t length = 0,
-                   const std::string &name = "");
-  virtual ~PanSlideSeqEvent(void) { }
-  DESCRIPTION("Target Pan: " << (int) targPan << "  Duration: " << dur)
+  PanSlideSeqEvent(SeqTrack *pTrack, uint8_t targetPan, uint32_t duration, uint32_t offset = 0,
+                   uint32_t length = 0, const std::string &name = "");
+  virtual ~PanSlideSeqEvent() {}
+
+  std::string GetDescription() override {
+      return fmt::format("{} - target pan: {}, duration: {}", name,
+        static_cast<int>(targPan), dur);
+  };
 
  public:
   uint8_t targPan;
   uint32_t dur;
 };
 
-
 //  **************
 //  ReverbSeqEvent
 //  **************
 
-class ReverbSeqEvent:
-    public SeqEvent {
+class ReverbSeqEvent : public SeqEvent {
  public:
-  ReverbSeqEvent
-      (SeqTrack *pTrack, uint8_t reverb, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~ReverbSeqEvent(void) { }
+  ReverbSeqEvent(SeqTrack *pTrack, uint8_t reverb, uint32_t offset = 0, uint32_t length = 0,
+                 const std::string &name = "");
+  virtual ~ReverbSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_REVERB; }
-  DESCRIPTION("Reverb: " << (int) reverb)
 
- public:
+  std::string GetDescription() override {
+    return fmt::format("{} - reverb: {}", name, static_cast<int>(reverb));
+  };
+
   uint8_t reverb;
 };
-
 
 //  *****************
 //  PitchBendSeqEvent
 //  *****************
 
-class PitchBendSeqEvent:
-    public SeqEvent {
+class PitchBendSeqEvent : public SeqEvent {
  public:
-  PitchBendSeqEvent
-      (SeqTrack *pTrack, short thePitchBend, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+  PitchBendSeqEvent(SeqTrack *pTrack, short thePitchBend, uint32_t offset = 0,
+                    uint32_t length = 0, const std::string &name = "");
   virtual EventType GetEventType() { return EVENTTYPE_PITCHBEND; }
-  DESCRIPTION("Pitch Bend: " << pitchbend)
 
- public:
+  std::string GetDescription() override {
+    return fmt::format("{} - pitch bend: {}", name, static_cast<int>(pitchbend));
+  };
+
   short pitchbend;
 };
-
 
 //  **********************
 //  PitchBendRangeSeqEvent
 //  **********************
 
-class PitchBendRangeSeqEvent:
-    public SeqEvent {
+class PitchBendRangeSeqEvent : public SeqEvent {
  public:
-  PitchBendRangeSeqEvent(SeqTrack *pTrack, uint8_t semiTones, uint8_t cents,
-                         uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+  PitchBendRangeSeqEvent(SeqTrack *pTrack, uint8_t semiTones, uint8_t cents, uint32_t offset = 0,
+                         uint32_t length = 0, const std::string &name = "");
   virtual EventType GetEventType() { return EVENTTYPE_PITCHBENDRANGE; }
-  DESCRIPTION("Pitch Bend Range: " << semitones << " semitones, " << cents << " cents")
 
- public:
+  std::string GetDescription() override {
+    return fmt::format("{} - pitch bend range: {} semitones {} cents ", name,
+      static_cast<int>(semitones), static_cast<int>(cents));
+  };
+
   uint8_t semitones;
   uint8_t cents;
 };
@@ -378,15 +388,15 @@ class PitchBendRangeSeqEvent:
 //  FineTuningSeqEvent
 //  ******************
 
-class FineTuningSeqEvent:
-    public SeqEvent {
+class FineTuningSeqEvent : public SeqEvent {
  public:
-  FineTuningSeqEvent(SeqTrack *pTrack, double cents,
-                     uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+  FineTuningSeqEvent(SeqTrack *pTrack, double cents, uint32_t offset = 0, uint32_t length = 0,
+                     const std::string &name = "");
   virtual EventType GetEventType() { return EVENTTYPE_PITCHBENDRANGE; }
-  DESCRIPTION("Fine Tuning: " << cents << " cents")
+  std::string GetDescription() override {
+    return fmt::format("{} - fine tuning: {}", name, cents);
+  };
 
- public:
   double cents;
 };
 
@@ -394,15 +404,15 @@ class FineTuningSeqEvent:
 //  ModulationDepthRangeSeqEvent
 //  ****************************
 
-class ModulationDepthRangeSeqEvent:
-    public SeqEvent {
+class ModulationDepthRangeSeqEvent : public SeqEvent {
  public:
-  ModulationDepthRangeSeqEvent(SeqTrack *pTrack, double semitones,
-                               uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+  ModulationDepthRangeSeqEvent(SeqTrack *pTrack, double semitones, uint32_t offset = 0,
+                               uint32_t length = 0, const std::string &name = "");
   virtual EventType GetEventType() { return EVENTTYPE_PITCHBENDRANGE; }
-  DESCRIPTION("Modulation Depth Range: " << (semitones * 100.0) << " cents")
+  std::string GetDescription() override {
+    return fmt::format("{} - modulation depth range: {} cents", name, semitones * 100.0);
+  };
 
- public:
   double semitones;
 };
 
@@ -410,33 +420,34 @@ class ModulationDepthRangeSeqEvent:
 //  TransposeSeqEvent
 //  *****************
 
-class TransposeSeqEvent:
-    public SeqEvent {
+class TransposeSeqEvent : public SeqEvent {
  public:
-  TransposeSeqEvent
-      (SeqTrack *pTrack, int theTranspose, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+  TransposeSeqEvent(SeqTrack *pTrack, int theTranspose, uint32_t offset = 0, uint32_t length = 0,
+                    const std::string &name = "");
   virtual EventType GetEventType() { return EVENTTYPE_TRANSPOSE; }
-  DESCRIPTION("Transpose: " << transpose)
 
- public:
+  std::string GetDescription() override {
+      return fmt::format("{} - transpose: {}", name, transpose);
+  };
+
   int transpose;
 };
-
 
 //  ******************
 //  ModulationSeqEvent
 //  ******************
 
-class ModulationSeqEvent:
-    public SeqEvent {
+class ModulationSeqEvent : public SeqEvent {
  public:
-  ModulationSeqEvent
-      (SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~ModulationSeqEvent(void) { }
+  ModulationSeqEvent(SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0,
+                     const std::string &name = "");
+  virtual ~ModulationSeqEvent() {}
   virtual EventType GetEventType() { return EVENTTYPE_MODULATION; }
-  DESCRIPTION("Depth: " << (int) depth)
 
- public:
+  std::string GetDescription() override {
+      return fmt::format("{} - depth: {}", name, static_cast<int>(depth));
+  };
+
   uint8_t depth;
 };
 
@@ -444,16 +455,17 @@ class ModulationSeqEvent:
 //  BreathSeqEvent
 //  **************
 
-class BreathSeqEvent:
-    public SeqEvent {
+class BreathSeqEvent : public SeqEvent {
  public:
-  BreathSeqEvent
-      (SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~BreathSeqEvent(void) { }
+  BreathSeqEvent(SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0,
+                 const std::string &name = "");
+  virtual ~BreathSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_BREATH; }
-  DESCRIPTION("Breath: " << (int) depth)
 
- public:
+  std::string GetDescription() override {
+    return fmt::format("{} - breath: {}", name, static_cast<int>(depth));
+  };
+
   uint8_t depth;
 };
 
@@ -461,16 +473,17 @@ class BreathSeqEvent:
 //  SustainSeqEvent
 //  ****************
 
-class SustainSeqEvent:
-    public SeqEvent {
+class SustainSeqEvent : public SeqEvent {
  public:
-  SustainSeqEvent
-      (SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~SustainSeqEvent(void) { }
+  SustainSeqEvent(SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0,
+                  const std::string &name = "");
+  virtual ~SustainSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_SUSTAIN; }
-  DESCRIPTION("Sustain Pedal: " << (int) depth);
 
- public:
+  std::string GetDescription() override {
+    return fmt::format("{} - sustain pedal: {}", name, static_cast<int>(depth));
+  };
+
   uint8_t depth;
 };
 
@@ -478,14 +491,16 @@ class SustainSeqEvent:
 //  PortamentoSeqEvent
 //  ******************
 
-class PortamentoSeqEvent:
-    public SeqEvent {
+class PortamentoSeqEvent : public SeqEvent {
  public:
-  PortamentoSeqEvent
-      (SeqTrack *pTrack, bool bPortamento, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~PortamentoSeqEvent(void) { }
+  PortamentoSeqEvent(SeqTrack *pTrack, bool bPortamento, uint32_t offset = 0, uint32_t length = 0,
+                     const std::string &name = "");
+  virtual ~PortamentoSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_PORTAMENTO; }
-  DESCRIPTION("Portamento: " << (bOn) ? "On" : "Off")
+
+  std::string GetDescription() override {
+    return fmt::format("{} - portamento: {}", name, bOn ? "on" : "off");
+  };
 
  public:
   bool bOn;
@@ -495,35 +510,35 @@ class PortamentoSeqEvent:
 //  PortamentoTimeSeqEvent
 //  **********************
 
-class PortamentoTimeSeqEvent:
-    public SeqEvent {
+class PortamentoTimeSeqEvent : public SeqEvent {
  public:
-  PortamentoTimeSeqEvent
-      (SeqTrack *pTrack, uint8_t time, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  virtual ~PortamentoTimeSeqEvent(void) { }
+  PortamentoTimeSeqEvent(SeqTrack *pTrack, uint8_t time, uint32_t offset = 0, uint32_t length = 0,
+                         const std::string &name = "");
+  virtual ~PortamentoTimeSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_PORTAMENTOTIME; }
-  DESCRIPTION("Portamento Time: " << (int) time)
+
+  std::string GetDescription() override {
+    return fmt::format("{} - portamento time: {}", name, static_cast<int>(time));
+  };
 
  public:
   uint8_t time;
 };
 
-
 //  ******************
 //  ProgChangeSeqEvent
 //  ******************
 
-class ProgChangeSeqEvent:
-    public SeqEvent {
+class ProgChangeSeqEvent : public SeqEvent {
  public:
-  ProgChangeSeqEvent(SeqTrack *pTrack,
-                     uint32_t programNumber,
-                     uint32_t offset = 0,
-                     uint32_t length = 0,
-                     const std::string &name = "");
-  virtual ~ProgChangeSeqEvent(void) { }
+  ProgChangeSeqEvent(SeqTrack *pTrack, uint32_t programNumber, uint32_t offset = 0,
+                     uint32_t length = 0, const std::string &name = "");
+  virtual ~ProgChangeSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_PROGCHANGE; }
-  DESCRIPTION("Program Number: " << (int) progNum)
+
+  std::string GetDescription() override {
+    return fmt::format("{} - program number: {}", name, progNum);
+  };
 
  public:
   uint32_t progNum;
@@ -533,18 +548,15 @@ class ProgChangeSeqEvent:
 //  TempoSeqEvent
 //  *************
 
-class TempoSeqEvent:
-    public SeqEvent {
+class TempoSeqEvent : public SeqEvent {
  public:
-  TempoSeqEvent(SeqTrack *pTrack,
-                double beatsperminute,
-                uint32_t offset = 0,
-                uint32_t length = 0,
-                const std::string &name = "");
-  virtual ~TempoSeqEvent(void) { }
+  TempoSeqEvent(SeqTrack *pTrack, double beatsperminute, uint32_t offset = 0, uint32_t length = 0,
+              const std::string &name = "");
+  virtual ~TempoSeqEvent() {}
   virtual EventType GetEventType() { return EVENTTYPE_TEMPO; }
   virtual Icon GetIcon() { return ICON_TEMPO; }
-  DESCRIPTION("BPM: " << bpm)
+
+  std::string GetDescription() override { return fmt::format("{} - bpm: {}", name, bpm); };
 
  public:
   double bpm;
@@ -554,18 +566,16 @@ class TempoSeqEvent:
 //  TempoSlideSeqEvent
 //  ******************
 
-class TempoSlideSeqEvent:
-    public SeqEvent {
+class TempoSlideSeqEvent : public SeqEvent {
  public:
-  TempoSlideSeqEvent(SeqTrack *pTrack,
-                     double targBPM,
-                     uint32_t duration,
-                     uint32_t offset = 0,
-                     uint32_t length = 0,
-                     const std::string &name = "");
-  virtual ~TempoSlideSeqEvent(void) { }
+  TempoSlideSeqEvent(SeqTrack *pTrack, double targBPM, uint32_t duration, uint32_t offset = 0,
+                     uint32_t length = 0, const std::string &name = "");
+  virtual ~TempoSlideSeqEvent(void) {}
   virtual Icon GetIcon() { return ICON_TEMPO; }
-  DESCRIPTION("BPM: " << targbpm << "  Duration: " << dur)
+
+  std::string GetDescription() override {
+    return fmt::format("{} - target bpm: {}, duration: {}", name, targbpm, dur);
+  };
 
  public:
   double targbpm;
@@ -576,19 +586,18 @@ class TempoSlideSeqEvent:
 //  TimeSigSeqEvent
 //  ***************
 
-class TimeSigSeqEvent:
-    public SeqEvent {
+class TimeSigSeqEvent : public SeqEvent {
  public:
-  TimeSigSeqEvent(SeqTrack *pTrack,
-                  uint8_t numerator,
-                  uint8_t denominator,
-                  uint8_t theTicksPerQuarter,
-                  uint32_t offset = 0,
-                  uint32_t length = 0,
-                  const std::string &name = "");
-  virtual ~TimeSigSeqEvent(void) { }
+  TimeSigSeqEvent(SeqTrack *pTrack, uint8_t numerator, uint8_t denominator,
+                  uint8_t theTicksPerQuarter, uint32_t offset = 0, uint32_t length = 0,
+                const std::string &name = "");
+  virtual ~TimeSigSeqEvent(void) {}
   virtual EventType GetEventType() { return EVENTTYPE_TIMESIG; }
-  DESCRIPTION("Signature: " << (int) numer << "/" << (int) denom << "  Ticks Per Quarter: " << (int) ticksPerQuarter)
+
+  std::string GetDescription() override {
+    return fmt::format("{} - time signature: {}/{}, ticks per quarter: {}", name,
+      static_cast<int>(numer), static_cast<int>(denom), static_cast<int>(ticksPerQuarter));
+  };
 
  public:
   uint8_t numer;
@@ -600,8 +609,7 @@ class TimeSigSeqEvent:
 //  MarkerSeqEvent
 //  **************
 
-class MarkerSeqEvent:
-    public SeqEvent {
+class MarkerSeqEvent : public SeqEvent {
  public:
   MarkerSeqEvent(SeqTrack *pTrack,
                  const std::string &markername,
@@ -640,11 +648,11 @@ class MarkerSeqEvent:
 //  TrackEndSeqEvent
 //  ****************
 
-class TrackEndSeqEvent:
-    public SeqEvent {
+class TrackEndSeqEvent : public SeqEvent {
  public:
-  TrackEndSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "")
-      : SeqEvent(pTrack, offset, length, name, CLR_TRACKEND) { }
+  TrackEndSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0,
+                   const std::string &name = "")
+      : SeqEvent(pTrack, offset, length, name, CLR_TRACKEND) {}
   virtual EventType GetEventType() { return EVENTTYPE_TRACKEND; }
 };
 
@@ -652,10 +660,10 @@ class TrackEndSeqEvent:
 //  LoopForeverSeqEvent
 //  *******************
 
-class LoopForeverSeqEvent:
-    public SeqEvent {
+class LoopForeverSeqEvent : public SeqEvent {
  public:
-  LoopForeverSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "")
-      : SeqEvent(pTrack, offset, length, name, CLR_LOOPFOREVER) { }
+  LoopForeverSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0,
+                      const std::string &name = "")
+      : SeqEvent(pTrack, offset, length, name, CLR_LOOPFOREVER) {}
   virtual EventType GetEventType() { return EVENTTYPE_LOOPFOREVER; }
 };

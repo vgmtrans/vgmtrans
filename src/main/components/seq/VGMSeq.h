@@ -1,4 +1,10 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
+
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
@@ -7,7 +13,7 @@ class SeqTrack;
 class SeqEvent;
 class ISeqSlider;
 
-enum ReadMode: uint8_t {
+enum ReadMode : uint8_t {
   READMODE_ADD_TO_UI,
   READMODE_CONVERT_TO_MIDI,
   READMODE_FIND_DELTA_LENGTH
@@ -19,27 +25,25 @@ enum class PanVolumeCorrectionMode : uint8_t {
   kAdjustExpressionController
 };
 
-class VGMSeq: public VGMFile {
+class VGMSeq : public VGMFile {
  public:
-  VGMSeq(const std::string &format,
-         RawFile *file,
-         uint32_t offset,
-         uint32_t length = 0,
+  VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
          std::string name = "VGM Sequence");
   virtual ~VGMSeq(void);
 
   virtual Icon GetIcon() { return ICON_SEQ; }
 
-  virtual bool Load();                //Function to load all the information about the sequence
+  bool LoadVGMFile() override;
+  bool Load() override;              // Function to load all the information about the sequence
   virtual bool LoadMain();
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);    //Function to find all of the track pointers.   Returns number of total tracks.
-  virtual void ResetVars(void);
+  virtual bool GetHeaderInfo();
+  virtual bool GetTrackPointers();  // Function to find all of the track pointers.   Returns number of total tracks.
+  virtual void ResetVars();
   virtual MidiFile *ConvertToMidi();
   virtual MidiTrack *GetFirstMidiTrack();
   void SetPPQN(uint16_t ppqn);
-  uint16_t GetPPQN(void);
-  //void SetTimeSignature(uint8_t numer, denom);
+  uint16_t GetPPQN();
+  // void SetTimeSignature(uint8_t numer, denom);
   void AddInstrumentRef(uint32_t progNum);
 
   void UseReverb() { bReverb = true; }
@@ -92,15 +96,17 @@ class VGMSeq: public VGMFile {
   MidiFile *midi;
   double tempoBPM;
   uint16_t ppqn;
-  long time;                //absolute current time (ticks)
+  long time;                // absolute current time (ticks)
 
-//attributes
-  bool bMonophonicTracks;         //Only 1 voice at a time on a track.  We can assume note offs always use last note on key.
-                                  //which is important when drivers allow things like global transposition events mid note
-  bool bUseLinearAmplitudeScale;  //This will cause all all velocity, volume, and expression events to be
-                                  //automatically converted from a linear scale to MIDI's logarithmic scale
-  bool bUseLinearPanAmplitudeScale; //This will cause all all pan events to be automatically converted
-                                    //from a linear scale to MIDI's sin/cos scale
+  // attributes
+  bool bMonophonicTracks;   // Only 1 voice at a time on a track.  We can assume note offs always
+                            // use last note on key. which is important when drivers allow things
+                            // like global transposition events mid note
+  bool bUseLinearAmplitudeScale;  // This will cause all all velocity, volume, and expression
+                                  // events to be automatically converted from a linear scale to
+                                  // MIDI's logarithmic scale
+  bool bUseLinearPanAmplitudeScale; // This will cause all all pan events to be automatically
+                                    // converted from a linear scale to MIDI's sin/cos scale
   PanVolumeCorrectionMode panVolumeCorrectionMode;
   bool bAlwaysWriteInitialTempo;
   bool bAlwaysWriteInitialVol;
@@ -134,11 +140,10 @@ class VGMSeq: public VGMFile {
   bool bReverb;
   float reverbTime;
 
-  std::vector<SeqTrack *> aTracks;        //array of track pointers
+  std::vector<SeqTrack *> aTracks;  // array of track pointers
   std::vector<uint32_t> aInstrumentsUsed;
 
   std::vector<ISeqSlider *> aSliders;
 };
-
 
 extern uint8_t mode;

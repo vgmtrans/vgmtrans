@@ -1,6 +1,11 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "NinSnesInstr.h"
 #include "SNESDSP.h"
+#include <spdlog/fmt/fmt.h>
 
 // ****************
 // NinSnesInstrSet
@@ -91,10 +96,9 @@ bool NinSnesInstrSet::GetInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << instr;
-    NinSnesInstr *newInstr =
-        new NinSnesInstr(this, version, addrInstrHeader, instr >> 7, instr & 0x7f, spcDirAddr, instrName.str());
+    NinSnesInstr *newInstr = new NinSnesInstr(
+      this, version, addrInstrHeader, instr >> 7, instr & 0x7f,
+      spcDirAddr, fmt::format("Instrument {}", instr));
     newInstr->konamiTuningTableAddress = konamiTuningTableAddress;
     newInstr->konamiTuningTableSize = konamiTuningTableSize;
     aInstrs.push_back(newInstr);
@@ -276,8 +280,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
-NinSnesRgn::~NinSnesRgn() {
-}
+NinSnesRgn::~NinSnesRgn() {}
 
 bool NinSnesRgn::LoadRgn() {
   return true;

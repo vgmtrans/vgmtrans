@@ -58,7 +58,7 @@ int VGMCollListViewModel::rowCount(const QModelIndex &) const {
 
 QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
   if (role == Qt::DisplayRole || role == Qt::EditRole) {
-    return QString::fromStdString(*qtVGMRoot.vVGMColl[index.row()]->GetName());
+    return QString::fromStdString(qtVGMRoot.vVGMColl[index.row()]->GetName());
   } else if (role == Qt::DecorationRole) {
     return VGMCollIcon();
   }
@@ -142,7 +142,7 @@ void VGMCollListView::collectionMenu(const QPoint &pos) {
 
     for (auto &index : selectedIndexes()) {
       if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
-        SaveAs<VGMCollConversionTarget::MIDI | VGMCollConversionTarget::DLS>(*coll, save_path);
+        conversion::SaveAs<conversion::Target::MIDI | conversion::Target::DLS>(*coll, save_path);
       }
     }
   });
@@ -155,7 +155,7 @@ void VGMCollListView::collectionMenu(const QPoint &pos) {
 
     for (auto &index : selectedIndexes()) {
       if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
-        SaveAs<VGMCollConversionTarget::MIDI | VGMCollConversionTarget::SF2>(*coll, save_path);
+        conversion::SaveAs<conversion::Target::MIDI | conversion::Target::SF2>(*coll, save_path);
       }
     }
   });
@@ -168,8 +168,8 @@ void VGMCollListView::collectionMenu(const QPoint &pos) {
 
     for (auto &index : selectedIndexes()) {
       if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
-        SaveAs<VGMCollConversionTarget::MIDI | VGMCollConversionTarget::DLS |
-               VGMCollConversionTarget::SF2>(*coll, save_path);
+        conversion::SaveAs<conversion::Target::MIDI | conversion::Target::DLS |
+          conversion::Target::SF2>(*coll, save_path);
       }
     }
   });

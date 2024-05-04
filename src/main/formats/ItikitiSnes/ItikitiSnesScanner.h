@@ -1,12 +1,14 @@
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #pragma once
 #include "Scanner.h"
 
 class ItikitiSnesScanner: public VGMScanner {
  public:
-  ItikitiSnesScanner() {
-    USE_EXTENSION("spc");
-  }
-
   void Scan(RawFile *file, void *info) override;
   static void ScanFromApuRam(RawFile *file);
   static void ScanFromRom(RawFile *file);

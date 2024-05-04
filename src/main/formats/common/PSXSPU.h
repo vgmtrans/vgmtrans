@@ -1,10 +1,10 @@
 #pragma once
-#include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMItem.h"
 #include "ScaleConversion.h"
 #include "Root.h"
+#include "LogManager.h"
 
 // All of the ADSR calculations herein (except where inaccurate) are derived from Neill Corlett's work in
 // reverse-engineering the Playstation 1/2 SPU unit.
@@ -14,32 +14,14 @@
 
 typedef void v0;
 
-#ifdef    __cplusplus
+#ifdef __cplusplus
 #if defined __BORLANDC__
 typedef bool b8;
 #else
 typedef unsigned char b8;
 #endif
 #else
-typedef	char b8;
-#endif
-
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-#if defined _MSC_VER || defined __BORLANDC__
-typedef unsigned __int64 u64;
-#else
-typedef unsigned long long int u64;
-#endif
-
-typedef char s8;
-typedef short s16;
-typedef int s32;
-#if defined _MSC_VER || defined __BORLANDC__
-typedef __int64 s64;
-#else
-typedef long long int s64;
+typedef char b8;
 #endif
 
 typedef float f32;
@@ -52,39 +34,37 @@ class DLSArt;
 static unsigned long RateTable[160];
 static bool bRateTableInitialized = 0;
 
-
 //VAG format -----------------------------------
 //File Header
 typedef struct _VAGHdr {
-  u32 id;                                     //ID - "VAGp"
-  u32 ver;                                    //Version - 0x20
+  u32 id;       // ID - "VAGp"
+  u32 ver;      // Version - 0x20
   u32 __r1;
-  u32 len;                                    //Length of data
-  u32 rate;                                   //Sample rate
+  u32 len;      // Length of data
+  u32 rate;     // Sample rate
   u32 __r2[3];
   s8 title[32];
 } VAGHdr;
 
-
-//Sample Block
+// Sample Block
 typedef struct _VAGBlk {
   struct {
-    u8 range:4;
-    u8 filter:4;
+    u8 range : 4;
+    u8 filter : 4;
   };
 
   struct {
-    b8 end:1;                                 //End block
-    b8 looping:1;                             //VAG loops
-    b8 loop:1;                                //Loop start point
+    b8 end : 1;      //End block
+    b8 looping : 1;  //VAG loops
+    b8 loop : 1;     //Loop start point
   } flag;
 
-  s8 brr[14];                                //Compressed samples
+  s8 brr[14];  //Compressed samples
 } VAGBlk;
 
 
 //InitADSR is shamelessly ripped from P.E.Op.S
-static void InitADSR(void)
+static void InitADSR()
 {
   unsigned long r, rs, rd;
   int i;
@@ -106,7 +86,8 @@ static void InitADSR(void)
         rs *= 2;
       }
     }
-    if (r > 0x3FFFFFFF) r = 0x3FFFFFFF;
+    if (r > 0x3FFFFFFF)
+      r = 0x3FFFFFFF;
 
     RateTable[i] = r;
   }
@@ -160,13 +141,14 @@ void PSXConvADSR(T *realADSR,
       ((Sm & ~0x01) != 0) ||
       ((Sd & ~0x01) != 0) ||
       ((Sr & ~0x7F) != 0)) {
-    pRoot->AddLogItem(new LogItem("PSX ADSR Out Of Range.", LOG_LEVEL_ERR, "PSXConvADSR"));
+    L_ERROR("PSX ADSR parameter(s) out of range"
+            "({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
+            Am, Ar, Dr, Sl, Rm, Rr, Sm, Sd, Sr);
     return;
   }
 
   // PS1 games use 44k, PS2 uses 48k
   double sampleRate = bPS2 ? 48000 : 44100;
-
 
   int rateIncTable[8] = {0, 4, 6, 8, 9, 10, 11, 12};
   long envelope_level;
@@ -181,7 +163,8 @@ void PSXConvADSR(T *realADSR,
     bRateTableInitialized = true;
   }
 
-  //to get the dls 32 bit time cents, take log base 2 of number of seconds * 1200 * 65536 (dls1v11a.pdf p25).
+  // to get the dls 32 bit time cents, take log base 2 of number of seconds * 1200 * 65536
+  // (dls1v11a.pdf p25).
 
 //	if (RateTable[(Ar^0x7F)-0x10 + 32] == 0)
 //		realADSR->attack_time = 0;
@@ -189,12 +172,11 @@ void PSXConvADSR(T *realADSR,
 //	{
   if ((Ar ^ 0x7F) < 0x10)
     Ar = 0;
-  //if linear Ar Mode
+  // if linear Ar Mode
   if (Am == 0) {
     rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x10) + 32];
-    samples = ceil(0x7FFFFFFF / (double) rate);
-  }
-  else if (Am == 1) {
+    samples = ceil(0x7FFFFFFF / (double)rate);
+  } else if (Am == 1) {
     rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x10) + 32];
     samples = 0x60000000 / rate;
     remainder = 0x60000000 % rate;
@@ -205,14 +187,13 @@ void PSXConvADSR(T *realADSR,
   realADSR->attack_time = timeInSecs;
 //	}
 
-
-  //Decay Time
+  // Decay Time
 
   envelope_level = 0x7FFFFFFF;
 
   bool bSustainLevFound = false;
   uint32_t realSustainLevel;
-  //DLS decay rate value is to -96db (silence) not the sustain level
+  // DLS decay rate value is to -96db (silence) not the sustain level
   for (l = 0; envelope_level > 0; l++) {
     if (4 * (Dr ^ 0x1F) < 0x18)
       Dr = 0;
@@ -241,8 +222,7 @@ void PSXConvADSR(T *realADSR,
   // increasing... we won't even bother
   if (Sd == 0) {
     realADSR->sustain_time = -1;
-  }
-  else {
+  } else {
     if (Sr == 0x7F)
       realADSR->sustain_time = -1;        // this is actually infinite
     else {
@@ -250,10 +230,9 @@ void PSXConvADSR(T *realADSR,
       if (Sm == 0) {
         rate = RateTable[RoundToZero((Sr ^ 0x7F) - 0x0F) + 32];
         samples = ceil(0x7FFFFFFF / (double) rate);
-      }
-      else {
+      } else {
         l = 0;
-        //DLS decay rate value is to -96db (silence) not the sustain level
+        // DLS decay rate value is to -96db (silence) not the sustain level
         while (envelope_level > 0) {
           long envelope_level_diff;
           long envelope_level_target;
@@ -274,19 +253,17 @@ void PSXConvADSR(T *realADSR,
           l += steps;
         }
         samples = l;
-
       }
       timeInSecs = samples / sampleRate;
       realADSR->sustain_time = /*Sm ? timeInSecs : */LinAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
     }
   }
 
-  //Sustain Level
+  // Sustain Level
   //realADSR->sustain_level = (double)envelope_level/(double)0x7FFFFFFF;//(long)ceil((double)envelope_level * 0.030517578139210854);	//in DLS, sustain level is measured as a percentage
   if (Sl == 0)
     realSustainLevel = 0x07FFFFFF;
   realADSR->sustain_level = realSustainLevel / (double) 0x7FFFFFFF;
-
 
   // If decay is going unused, and there's a sustain rate with sustain level close to max...
   //  we'll put the sustain_rate in place of the decay rate.
@@ -296,14 +273,14 @@ void PSXConvADSR(T *realADSR,
     //realADSR->decay_time = 0.5;
   }
 
-  //Release Time
+  // Release Time
 
   //sustain_envelope_level = envelope_level;
 
-  //We do this because we measure release time from max volume to 0, not from sustain level to 0
+  // We do this because we measure release time from max volume to 0, not from sustain level to 0
   envelope_level = 0x7FFFFFFF;
 
-  //if linear Rr Mode
+  // if linear Rr Mode
   if (Rm == 0) {
     rate = RateTable[RoundToZero((4 * (Rr ^ 0x1F)) - 0x0C) + 32];
 
@@ -311,8 +288,7 @@ void PSXConvADSR(T *realADSR,
       samples = ceil((double) envelope_level / (double) rate);
     else
       samples = 0;
-  }
-  else if (Rm == 1) {
+  } else if (Rm == 1) {
     if ((Rr ^ 0x1F) * 4 < 0x18)
       Rr = 0;
     for (l = 0; envelope_level > 0; l++) {
@@ -347,16 +323,12 @@ void PSXConvADSR(T *realADSR,
   //realADSR->sustain_time = LinAmpDecayTimeToLinDBDecayTime(realADSR->sustain_time, 0x800);
   //realADSR->release_time = LinAmpDecayTimeToLinDBDecayTime(realADSR->release_time, 0x800);
 
-
-
-  //Calculations are done, so now add the articulation data
+  // Calculations are done, so now add the articulation data
   //artic->AddADSR(attack_time, Am, decay_time, sustain_lev, release_time, 0);
   return;
 }
 
-
-class PSXSampColl
-    : public VGMSampColl {
+class PSXSampColl : public VGMSampColl {
  public:
   PSXSampColl(const std::string &format, RawFile *rawfile, uint32_t offset, uint32_t length = 0);
   PSXSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset, uint32_t length = 0);
@@ -374,9 +346,7 @@ class PSXSampColl
   std::vector<SizeOffsetPair> vagLocations;
 };
 
-
-class PSXSamp
-    : public VGMSamp {
+class PSXSamp : public VGMSamp {
  public:
   PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
           uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
@@ -393,7 +363,6 @@ class PSXSamp
 
  private:
   void DecompVAGBlk(s16 *pSmp, VAGBlk *pVBlk, f32 *prev1, f32 *prev2);
-
 
  public:
   bool bSetLoopOnConversion;

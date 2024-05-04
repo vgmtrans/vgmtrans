@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "KonamiSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesInstr.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<KonamiSnesScanner> s_konami_snes("KONAMISNES", {"spc"});
+}
 
 //; Ganbare Goemon 4
 //13d6: 8f 00 0a  mov   $0a,#$00
@@ -499,7 +508,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
 
   bool hasSongList;
 
-  std::string basefilename = RawFile::removeExtFromPath(file->GetFileName());
+  std::string basefilename = removeExtFromPath(file->name());
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // TODO: Unsupported games

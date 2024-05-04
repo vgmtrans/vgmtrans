@@ -4,10 +4,9 @@
 #include "Root.h"
 #include "SoftCreatSnesScanner.h"
 
-
-// ***************
-// SoftCreatSnesFormat
-// ***************
+// ******************************
+// Software Creations SNES format
+// ******************************
 
 BEGIN_FORMAT(SoftCreatSnes)
   USING_SCANNER(SoftCreatSnesScanner)

@@ -7,6 +7,7 @@
 #include "common.h"
 #include "SPC2Loader.h"
 #include "Root.h"
+#include "LogManager.h"
 
 using namespace std;
 
@@ -83,9 +84,7 @@ PostLoadCommand SPC2Loader::Apply(RawFile *file) {
 
     // Save the reconstructed SPC file
     if (!pRoot->CreateVirtFile(spcFile, SPC_FILE_SIZE, originalSpcFilename, "", file->tag)) {
-      pRoot->AddLogItem(new LogItem((std::string("Failed to save SPC file: ") + originalSpcFilename.c_str()),
-                                    LOG_LEVEL_ERR,
-                                    "SPC2Loader"));
+      L_ERROR("Failed to save SPC file: {}", originalSpcFilename);
     }
   }
   return DELETE_IT;

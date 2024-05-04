@@ -12,6 +12,7 @@
 #include "VGMFile.h"
 #include "QtVGMRoot.h"
 #include "services/NotificationCenter.h"
+#include "VGMExport.h"
 
 
 static const QIcon& fileIcon() {
@@ -84,7 +85,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
   switch (index.column()) {
     case Property::Name: {
       if (role == Qt::DisplayRole) {
-        return QString::fromStdString(qtVGMRoot.vRawFile[index.row()]->GetFileName());
+        return QString::fromStdString(qtVGMRoot.vRawFile[index.row()]->name());
       } else if (role == Qt::DecorationRole) {
         return fileIcon();
       }
@@ -93,7 +94,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
 
     case Property::ContainedFiles: {
       if (role == Qt::DisplayRole) {
-        return QString::number(qtVGMRoot.vRawFile[index.row()]->containedVGMFiles.size());
+        return QString::number(qtVGMRoot.vRawFile[index.row()]->containedVGMFiles().size());
       }
       break;
     }
@@ -128,7 +129,7 @@ RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
       std::string filepath = pRoot->UI_GetSaveFilePath("");
       if (!filepath.empty()) {
         /* todo: free function in VGMExport */
-        rawfile->OnSaveAsRaw();
+        conversion::SaveAsOriginal(*rawfile, filepath);
       }
     }
   });
@@ -155,6 +156,7 @@ void RawFileListView::keyPressEvent(QKeyEvent *input) {
     case Qt::Key_Delete:
     case Qt::Key_Backspace: {
       deleteRawFiles();
+      break;
     }
 
     // Pass the event back to the base class, needed for keyboard navigation
@@ -168,14 +170,10 @@ void RawFileListView::deleteRawFiles() {
     return;
 
   QModelIndexList list = selectionModel()->selectedRows();
-  std::vector<RawFile *> to_close;
-  to_close.reserve(list.size());
-  for (auto &index : list) {
-    to_close.emplace_back(qtVGMRoot.vRawFile[index.row()]);
+  for (auto it = list.rbegin(); it != list.rend(); ++it) {
+    auto rawfile = qtVGMRoot.vRawFile[it->row()];
+    qtVGMRoot.CloseRawFile(rawfile);
   }
-
-  std::for_each(std::begin(to_close), std::end(to_close),
-                [](RawFile *file) { qtVGMRoot.CloseRawFile(file); });
 }
 
 void RawFileListView::onVGMFileSelected(VGMFile* vgmfile, QWidget* caller) {
@@ -222,6 +220,6 @@ void RawFileListView::updateStatusBar() {
     return;
   }
   RawFile* file = qtVGMRoot.vRawFile[currentIndex().row()];
-  QString name = QString::fromStdString(file->GetFileName());
+  QString name = QString::fromStdString(file->name());
   NotificationCenter::the()->updateStatus(name, "", &fileIcon(), -1, file->size());
 }

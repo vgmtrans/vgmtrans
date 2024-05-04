@@ -1,6 +1,12 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "SuzukiSnesInstr.h"
 #include "SNESDSP.h"
+#include <spdlog/fmt/fmt.h>
 
 // ******************
 // SuzukiSnesInstrSet
@@ -22,8 +28,7 @@ SuzukiSnesInstrSet::SuzukiSnesInstrSet(RawFile *file,
     addrTuningTable(addrTuningTable) {
 }
 
-SuzukiSnesInstrSet::~SuzukiSnesInstrSet() {
-}
+SuzukiSnesInstrSet::~SuzukiSnesInstrSet() {}
 
 bool SuzukiSnesInstrSet::GetHeaderInfo() {
   return true;
@@ -76,17 +81,9 @@ bool SuzukiSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << srcn;
-    SuzukiSnesInstr *newInstr = new SuzukiSnesInstr(this,
-                                                    version,
-                                                    instrNum,
-                                                    spcDirAddr,
-                                                    addrSRCNTable,
-                                                    addrVolumeTable,
-                                                    addrADSRTable,
-                                                    addrTuningTable,
-                                                    instrName.str());
+    SuzukiSnesInstr *newInstr = new SuzukiSnesInstr(
+      this, version, instrNum, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable,
+      addrTuningTable, fmt::format("Instrument: {:#x}", srcn));
     aInstrs.push_back(newInstr);
   }
   if (aInstrs.size() == 0) {
@@ -188,8 +185,7 @@ SuzukiSnesRgn::SuzukiSnesRgn(SuzukiSnesInstr *instr,
   SetGuessedLength();
 }
 
-SuzukiSnesRgn::~SuzukiSnesRgn() {
-}
+SuzukiSnesRgn::~SuzukiSnesRgn() {}
 
 bool SuzukiSnesRgn::LoadRgn() {
   return true;

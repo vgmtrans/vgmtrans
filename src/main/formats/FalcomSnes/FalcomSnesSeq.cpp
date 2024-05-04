@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "FalcomSnesSeq.h"
 #include "ScaleConversion.h"
 
@@ -403,7 +402,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
 
       // actual engine does not limit value here,
       // but the volume value must not be greater than 127
-      uint8_t midiVolume = min(newVolume, (uint8_t)127);
+      uint8_t midiVolume = std::min(newVolume, (uint8_t)127);
       AddVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
     }
@@ -416,7 +415,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, desc.str(), "", CLR_VOLUME, ICON_CONTROL);
 
       // add MIDI events only if updated
-      uint8_t newVolume = (uint8_t)max((int8_t)spcVolume - amount, 0);
+      uint8_t newVolume = (uint8_t)std::max((int8_t)spcVolume - amount, 0);
       if (newVolume != spcVolume) {
         spcVolume = newVolume;
         AddVolNoItem(spcVolume);
@@ -432,7 +431,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, desc.str(), "", CLR_VOLUME, ICON_CONTROL);
 
       // add MIDI events only if updated
-      uint8_t newVolume = (uint8_t)min(spcVolume + amount, 0x7f);
+      uint8_t newVolume = (uint8_t)std::min(spcVolume + amount, 0x7f);
       if (newVolume != spcVolume) {
         spcVolume = newVolume;
         AddVolNoItem(spcVolume);
@@ -458,7 +457,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, desc.str(), "", CLR_PAN, ICON_CONTROL);
 
       // add MIDI events only if updated
-      uint8_t newPan = (uint8_t)max((int8_t)spcPan - amount, 0);
+      uint8_t newPan = (uint8_t)std::max((int8_t)spcPan - amount, 0);
       if (newPan != spcPan) {
         spcPan = newPan;
 
@@ -477,7 +476,7 @@ bool FalcomSnesTrack::ReadEvent(void) {
       AddGenericEvent(beginOffset, curOffset - beginOffset, desc.str(), "", CLR_PAN, ICON_CONTROL);
 
       // add MIDI events only if updated
-      uint8_t newPan = (uint8_t)min(spcPan + amount, 0x7f);
+      uint8_t newPan = (uint8_t)std::min(spcPan + amount, 0x7f);
       if (newPan != spcPan) {
         spcPan = newPan;
 
@@ -698,11 +697,8 @@ bool FalcomSnesTrack::ReadEvent(void) {
     }
 
     default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "FalcomSnesSeq"));
+      auto description = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", description);
       bContinue = false;
       break;
   }

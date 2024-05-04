@@ -1,4 +1,13 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include <iomanip>
+
+#include <spdlog/fmt/fmt.h>
+#include <sstream>
 #include "ScaleConversion.h"
 #include "TamSoftPS1Seq.h"
 
@@ -38,8 +47,7 @@ TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong, co
   AlwaysWriteInitialReverb(0);
 }
 
-TamSoftPS1Seq::~TamSoftPS1Seq(void) {
-}
+TamSoftPS1Seq::~TamSoftPS1Seq(void) {}
 
 void TamSoftPS1Seq::ResetVars(void) {
   VGMSeq::ResetVars();
@@ -59,9 +67,8 @@ bool TamSoftPS1Seq::GetHeaderInfo(void) {
   type = GetShort(dwSongItemOffset);
   uint16_t seqHeaderRelOffset = GetShort(dwSongItemOffset + 2);
 
-  std::stringstream songTableItemName;
-  songTableItemName << "Song " << song;
-  VGMHeader *songTableItem = AddHeader(dwSongItemOffset, 4, songTableItemName.str());
+  std::string songTableItemName = fmt::format("Song {}", song);
+  VGMHeader *songTableItem = AddHeader(dwSongItemOffset, 4, songTableItemName);
   songTableItem->AddSimpleItem(dwSongItemOffset, 2, "BGM/SFX");
   songTableItem->AddSimpleItem(dwSongItemOffset + 2, 2, "Header Offset");
 
@@ -170,7 +177,7 @@ void TamSoftPS1Track::ResetVars(void) {
 }
 
 bool TamSoftPS1Track::ReadEvent(void) {
-  TamSoftPS1Seq *parentSeq = (TamSoftPS1Seq *) this->parentSeq;
+  TamSoftPS1Seq *parentSeq = (TamSoftPS1Seq *)this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= vgmfile->GetEndOffset()) {
@@ -248,7 +255,7 @@ bool TamSoftPS1Track::ReadEvent(void) {
 
         double cents = 0;
         if (lastNoteKey >= 0) {
-          cents = PitchScaleToCents((double) pitchRegValue / lastNotePitch);
+          cents = PitchScaleToCents((double)pitchRegValue / lastNotePitch);
           desc << " (" << cents << " cents)";
         }
 
@@ -264,7 +271,7 @@ bool TamSoftPS1Track::ReadEvent(void) {
 
         double cents = 0;
         if (lastNoteKey >= 0) {
-          cents = PitchScaleToCents((double) pitchRegValue / lastNotePitch);
+          cents = PitchScaleToCents((double)pitchRegValue / lastNotePitch);
           desc << " (" << cents << " cents)";
         }
 
@@ -288,7 +295,7 @@ bool TamSoftPS1Track::ReadEvent(void) {
       }
 
       case 0xE8: {
-        uint8_t midiReverb = roundi(fabs(parentSeq->reverbDepth / 32768.0) * 127.0);
+        uint8_t midiReverb = std::round(fabs(parentSeq->reverbDepth / 32768.0) * 127.0);
         AddReverb(beginOffset, curOffset - beginOffset, midiReverb, "Reverb On");
         break;
       }
@@ -347,14 +354,12 @@ bool TamSoftPS1Track::ReadEvent(void) {
         bContinue = AddEndOfTrack(beginOffset, curOffset - beginOffset);
         break;
 
-      default:
-        desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
-        pRoot->AddLogItem(new LogItem(std::string("Unknown Event - ") + desc.str(),
-                                      LOG_LEVEL_ERR,
-                                      std::string("TamSoftPS1Seq")));
+      default: {
+        auto descr = logEvent(statusByte);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         bContinue = false;
         break;
+      }
     }
   }
 
@@ -372,8 +377,7 @@ bool TamSoftPS1Track::ReadEvent(void) {
 void TamSoftPS1Track::FinalizeAllNotes() {
   if (lastNoteTime != GetTime()) {
     AddNoteOffNoItem(TAMSOFTPS1_KEY_OFFSET + lastNoteKey);
-  }
-  else {
+    } else {
     // zero length note (Choro Q Wonderful! DEMO.TSQ)
     // convert it to length=1 for safe
     InsertNoteOffNoItem(TAMSOFTPS1_KEY_OFFSET + lastNoteKey, lastNoteTime + 1);

@@ -1,5 +1,10 @@
+/*
+ * VGMTrans (c) 2002-2019
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
-#include "common.h"
+
 #include "VGMFile.h"
 
 // ***********
@@ -8,18 +13,12 @@
 
 class RawFile;
 
-class VGMMiscFile:
-    public VGMFile {
- public:
-  VGMMiscFile(const std::string &format,
-              RawFile *file,
-              uint32_t offset,
-              uint32_t length = 0,
+class VGMMiscFile : public VGMFile {
+public:
+  VGMMiscFile(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
               std::string name = "VGMMiscFile");
 
-  virtual FileType GetFileType() { return FILETYPE_MISC; }
-
+  bool LoadVGMFile() override;
   virtual bool LoadMain();
   virtual bool Load();
 };
-

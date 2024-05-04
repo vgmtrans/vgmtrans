@@ -7,10 +7,12 @@
 #pragma once
 
 #include "Root.h"
+#include <set>
+#include <filesystem>
 
 #define CLI_APP_NAME "vgmtrans"
 
-namespace fs = ghc::filesystem;
+namespace fs = std::filesystem;
 
 class CLIVGMRoot : public VGMRoot {
 
@@ -36,7 +38,7 @@ public:
 
   bool SaveDLS(VGMColl *coll);
 
-  virtual bool OpenRawFile(const string &filename);
+  bool OpenRawFile(const std::string &filename) override;
 
   virtual bool Init();
 
@@ -44,19 +46,19 @@ public:
 
   virtual void UI_Exit() {}
 
-  virtual void UI_AddLogItem(LogItem* theLog);
+  virtual void UI_Log(LogItem* theLog);
 
   virtual void UpdateCollections();
 
-  virtual string UI_GetOpenFilePath(const string& suggestedFilename = "",
-                                          const string& extension = "");
+  virtual std::string UI_GetOpenFilePath(const std::string& suggestedFilename = "",
+                                          const std::string& extension = "");
 
-  virtual string UI_GetSaveFilePath(const string& suggestedFilename,
-                                          const string& extension = "");
+  virtual std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
+                                          const std::string& extension = "");
 
-  virtual string UI_GetSaveDirPath(const string& suggestedDir = "");
+  virtual std::string UI_GetSaveDirPath(const std::string& suggestedDir = "");
 
-  set<fs::path> inputFiles = {};
+  std::set<fs::path> inputFiles = {};
   fs::path outputDir = fs::path(".");
 };
 

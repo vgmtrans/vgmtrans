@@ -1,5 +1,11 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 #include "VGMInstrSet.h"
+#include <set>
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "AkaoFormat.h"
@@ -94,8 +100,8 @@ class AkaoRgn final :
 
   bool LoadRgn() override;
 
-  unsigned short adsr1;                //raw psx ADSR1 value (articulation data)
-  unsigned short adsr2;                //raw psx ADSR2 value (articulation data)
+  unsigned short adsr1;  //raw psx ADSR1 value (articulation data)
+  unsigned short adsr2;  //raw psx ADSR2 value (articulation data)
   uint8_t artNum;
   uint8_t drumRelUnityKey;
 };
@@ -145,4 +151,3 @@ class AkaoSampColl final :
   uint32_t sample_section_offset;
   AkaoInstrDatLocation file_location;
 };
-

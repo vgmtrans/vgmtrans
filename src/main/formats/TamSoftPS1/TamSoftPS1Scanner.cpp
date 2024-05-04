@@ -1,11 +1,21 @@
-#include "pch.h"
-#include "TamSoftPS1Scanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "TamSoftPS1Seq.h"
+
+#include <spdlog/fmt/fmt.h>
 #include "TamSoftPS1Instr.h"
+#include "ScannerManager.h"
+namespace vgmtrans::scanners {
+ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TAMSOFTPS1", {"tsq", "tvb"});
+}
 
 void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
-  std::string basename(RawFile::removeExtFromPath(file->GetFileName()));
-  std::string extension(StringToLower(file->GetExtension()));
+  std::string basename(removeExtFromPath(file->name()));
+  std::string extension(StringToLower(file->extension()));
 
   if (extension == "tsq") {
     uint8_t numSongs = 0;
@@ -31,19 +41,15 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
     }
 
     for (uint8_t songIndex = 0; songIndex < numSongs; songIndex++) {
-      std::stringstream seqname;
-      seqname << basename << " (" << songIndex << ")";
-
-      TamSoftPS1Seq *newSeq = new TamSoftPS1Seq(file, 0, songIndex, seqname.str());
+      std::string seqname = fmt::format("{} ({})", basename, songIndex);
+      TamSoftPS1Seq *newSeq = new TamSoftPS1Seq(file, 0, songIndex, seqname);
       if (newSeq->LoadVGMFile()) {
         newSeq->unLength = file->size();
-      }
-      else {
+      } else {
         delete newSeq;
       }
     }
-  }
-  else if (extension == "tvb" || extension == "tvb2") {
+  } else if (extension == "tvb" || extension == "tvb2") {
     bool ps2 = false;
     if (extension == "tvb2") {
       // note: this is not a real extension
@@ -53,8 +59,7 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
     TamSoftPS1InstrSet *newInstrSet = new TamSoftPS1InstrSet(file, 0, ps2, basename);
     if (newInstrSet->LoadVGMFile()) {
       newInstrSet->unLength = file->size();
-    }
-    else {
+    } else {
       delete newInstrSet;
     }
   }

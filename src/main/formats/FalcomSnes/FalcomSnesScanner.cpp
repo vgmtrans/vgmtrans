@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "FalcomSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "FalcomSnesSeq.h"
 #include "FalcomSnesInstr.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<FalcomSnesScanner> s_falcom_snes("FALCOMSNES", {"spc"});
+}
 
 //; Ys V: Ushinawareta Suna no Miyako Kefin SPC
 //0c05: 4b 67     lsr   $67
@@ -73,8 +82,7 @@ void FalcomSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForFalcomSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForFalcomSnesFromROM(file);
   }
   return;
@@ -82,7 +90,7 @@ void FalcomSnesScanner::Scan(RawFile *file, void *info) {
 
 void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
   FalcomSnesVersion version = FALCOMSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   uint32_t ofsLoadSeq;
   uint16_t addrSeqHeader;
@@ -90,8 +98,7 @@ void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
     uint8_t addrSeqHeaderPtr = file->GetByte(ofsLoadSeq + 3);
     addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
     version = FALCOMSNES_YS5;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -106,8 +113,7 @@ void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
   uint32_t ofsSetDIR;
   if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
     spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
-  }
-  else {
+  } else {
     return;
   }
 
@@ -118,22 +124,16 @@ void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
   if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
     addrSampToInstrTable = file->GetShort(ofsLoadInstr + 3);
     addrInstrTable = file->GetShort(ofsLoadInstr + 21);
-  }
-  else {
+  } else {
     return;
   }
 
-  FalcomSnesInstrSet *newInstrSet = new FalcomSnesInstrSet(file,
-                                                           version,
-                                                           addrInstrTable,
-                                                           addrSampToInstrTable,
-                                                           spcDirAddr,
-                                                           newSeq->instrADSRHints);
+  FalcomSnesInstrSet *newInstrSet = new FalcomSnesInstrSet(
+    file, version, addrInstrTable, addrSampToInstrTable, spcDirAddr, newSeq->instrADSRHints);
   if (!newInstrSet->LoadVGMFile()) {
     delete newInstrSet;
     return;
   }
 }
 
-void FalcomSnesScanner::SearchForFalcomSnesFromROM(RawFile *file) {
-}
+void FalcomSnesScanner::SearchForFalcomSnesFromROM(RawFile *file) {}

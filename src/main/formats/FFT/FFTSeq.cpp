@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "FFTSeq.h"
 #include "FFTFormat.h"
 
@@ -39,7 +43,7 @@ bool FFTSeq::GetHeaderInfo(void) {
   int titleLength = ptPercussionTbl - ptSongTitle;
   char *songtitle = new char[titleLength];
   GetBytes(dwOffset + ptSongTitle, titleLength, songtitle);
-  this->name = std::string(songtitle, songtitle + titleLength);
+  m_name = std::string(songtitle, songtitle + titleLength);
   delete[] songtitle;
 
   VGMHeader *hdr = AddHeader(dwOffset, 0x22);

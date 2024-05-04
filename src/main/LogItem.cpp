@@ -1,5 +1,3 @@
-#include "pch.h"
-
 #include "LogItem.h"
 
 LogItem::LogItem(const std::string &text, LogLevel level, const std::string &source) :

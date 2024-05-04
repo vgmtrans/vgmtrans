@@ -47,7 +47,7 @@ class DialogicAdpcmSamp
 public:
 
   DialogicAdpcmSamp(
-      VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, string name
+      VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, std::string name
   );
   virtual ~DialogicAdpcmSamp(void);
 

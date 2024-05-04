@@ -42,13 +42,13 @@ int VGMCollViewModel::rowCount(const QModelIndex &parent) const {
 QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
   auto file = fileFromIndex(index);
   if (!file) {
-    return iconForFileType(FileType::FILETYPE_UNDEFINED);
+    return QIcon{":/images/file.svg"};
   }
 
   if (role == Qt::DisplayRole) {
     return QString::fromStdString(*file->GetName());
   } else if (role == Qt::DecorationRole) {
-    return iconForFileType(file->GetFileType());
+    return iconForFile(vgmFileToVariant(file));
   }
 
   return QVariant();
@@ -177,7 +177,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
       m_collection_title->setText("No collection selected");
     } else {
       m_collection_title->setText(
-          QString::fromStdString(*qtVGMRoot.vVGMColl[index.row()]->GetName()));
+          QString::fromStdString(qtVGMRoot.vVGMColl[index.row()]->GetName()));
       m_collection_title->setReadOnly(false);
       commit_rename->setEnabled(true);
     }

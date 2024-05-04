@@ -1,4 +1,10 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include <spdlog/fmt/fmt.h>
 #include "CompileSnesInstr.h"
 #include "SNESDSP.h"
 
@@ -53,10 +59,9 @@ bool CompileSnesInstrSet::GetInstrPointers() {
 
     usedSRCNs.push_back(srcn);
 
-    std::ostringstream instrName;
-    instrName << "Instrument " << srcn;
-    CompileSnesInstr *newInstr =
-        new CompileSnesInstr(this, version, ofsInstrEntry, addrPitchTablePtrs, srcn, spcDirAddr, instrName.str());
+    CompileSnesInstr *newInstr = new CompileSnesInstr(
+      this, version, ofsInstrEntry, addrPitchTablePtrs, srcn, spcDirAddr,
+      fmt::format("Instrument: {:#x}", srcn));
     aInstrs.push_back(newInstr);
   }
   if (aInstrs.size() == 0) {
@@ -86,11 +91,9 @@ CompileSnesInstr::CompileSnesInstr(VGMInstrSet *instrSet,
                                    const std::string &name)
     : VGMInstr(instrSet, addrTuningTableItem, CompileSnesInstr::ExpectedSize(ver), 0, srcn, name), version(ver),
       addrPitchTablePtrs(addrPitchTablePtrs),
-      spcDirAddr(spcDirAddr) {
-}
+      spcDirAddr(spcDirAddr) {}
 
-CompileSnesInstr::~CompileSnesInstr() {
-}
+CompileSnesInstr::~CompileSnesInstr() {}
 
 bool CompileSnesInstr::LoadInstr() {
   uint32_t offDirEnt = spcDirAddr + (instrNum * 4);
@@ -110,8 +113,7 @@ bool CompileSnesInstr::LoadInstr() {
 uint32_t CompileSnesInstr::ExpectedSize(CompileSnesVersion version) {
   if (version == COMPILESNES_ALESTE || version == COMPILESNES_JAKICRUSH) {
     return 1;
-  }
-  else {
+  } else {
     return 2;
   }
 }
@@ -184,7 +186,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
   uint8_t theUnityKey = 0;
   uint16_t bestPitchDistance = 0xffff;
   for (uint8_t key = 0; key < pitchTable.size(); key++) {
-    uint16_t pitchDistance = abs((int) pitchTable[key] - 0x1000);
+    uint16_t pitchDistance = abs((int)pitchTable[key] - 0x1000);
     if (pitchDistance < bestPitchDistance) {
       bestPitchDistance = pitchDistance;
       theUnityKey = key;
@@ -212,7 +214,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
 
   // set final result
   unityKey = theUnityKey - 24 - (int) (coarse_tuning);
-  fineTune = (int16_t) (fine_tuning * 100.0);
+  fineTune = (int16_t)(fine_tuning * 100.0);
 
   uint8_t adsr1 = 0x8f;
   uint8_t adsr2 = 0xe0;
@@ -220,8 +222,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
-CompileSnesRgn::~CompileSnesRgn() {
-}
+CompileSnesRgn::~CompileSnesRgn() {}
 
 bool CompileSnesRgn::LoadRgn() {
   return true;

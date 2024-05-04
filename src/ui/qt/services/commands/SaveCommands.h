@@ -6,14 +6,13 @@
 
 #pragma once
 
-#include <ghc/filesystem.hpp>
-
 #include "services/MenuManager.h"
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
+#include "VGMExport.h"
 
-namespace fs = ghc::filesystem;
+namespace fs = std::filesystem;
 
 /**
  * A command context for saving files. Provides a list of items to save and a path to save them to.
@@ -21,21 +20,21 @@ namespace fs = ghc::filesystem;
 template <typename TSavable>
 class SaveCommandContext : public CommandContext {
 private:
-  shared_ptr<vector<TSavable*>> items{};
-  string path;
+  std::shared_ptr<std::vector<TSavable*>> items{};
+  std::string path;
 
 public:
   SaveCommandContext() = default;
 
-  void SetItems(shared_ptr<vector<TSavable*>> f) {
+  void SetItems(std::shared_ptr<std::vector<TSavable*>> f) {
     items = f;
   }
-  void SetSavePath(const string& p) {
+  void SetSavePath(const std::string& p) {
     path = p;
   }
 
-  [[nodiscard]] const vector<TSavable*>& GetItems() const { return *items; }
-  [[nodiscard]] const string& GetPath() const { return path; }
+  [[nodiscard]] const std::vector<TSavable*>& GetItems() const { return *items; }
+  [[nodiscard]] const std::string& GetPath() const { return path; }
 };
 
 /**
@@ -60,16 +59,16 @@ public:
     fileExtension = extension;
   }
 
-  [[nodiscard]] shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const override {
-    auto context = make_shared<SaveCommandContext<TSavable>>();
+  [[nodiscard]] std::shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const override {
+    auto context = std::make_shared<SaveCommandContext<TSavable>>();
 
     if (properties.find("files") == properties.end() || properties.find("filePath") == properties.end()) {
       return nullptr;
     }
 
-    auto files = get<shared_ptr<vector<TSavable*>>>(properties.at("files"));
+    auto files = get<std::shared_ptr<std::vector<TSavable*>>>(properties.at("files"));
     context->SetItems(files);
-    context->SetSavePath(get<string>(properties.at("filePath")));
+    context->SetSavePath(get<std::string>(properties.at("filePath")));
     return context;
   }
 
@@ -77,7 +76,7 @@ public:
     auto filePathValueType = (alwaysSaveToDir) ? PropertySpecValueType::DirPath : PropertySpecValueType::Path;
     return {
         {"filePath", filePathValueType, "Path to the file or directory", fileExtension},
-        {"files", PropertySpecValueType::ItemList, "Vector of files", static_cast<shared_ptr<vector<TSavable*>>>(nullptr)},
+        {"files", PropertySpecValueType::ItemList, "Vector of files", static_cast<std::shared_ptr<std::vector<TSavable*>>>(nullptr)},
     };
   }
 };
@@ -92,12 +91,12 @@ public:
 template <typename TSavable, typename TInContext = TSavable>
 class SaveCommand : public Command {
 private:
-  shared_ptr<SaveCommandContextFactory<TInContext>> contextFactory;
+  std::shared_ptr<SaveCommandContextFactory<TInContext>> contextFactory;
   bool alwaysSaveToDir;
 
 public:
   explicit SaveCommand(bool alwaysSaveToDir = false)
-      : contextFactory(make_shared<SaveCommandContextFactory<TInContext>>(alwaysSaveToDir)),
+      : contextFactory(std::make_shared<SaveCommandContextFactory<TInContext>>(alwaysSaveToDir)),
         alwaysSaveToDir(alwaysSaveToDir) {
   }
 
@@ -130,31 +129,31 @@ public:
       // and the Save() function still expects a file path, so we construct file paths for each file using GetName()
       auto specificFile = dynamic_cast<TSavable*>(file);
       if (specificFile) {
-        auto fileExtension = (GetExtension() == "") ? "" : (string(".") + GetExtension());
+        auto fileExtension = (GetExtension() == "") ? "" : (std::string(".") + GetExtension());
         fs::path filePath = path / fs::path(*file->GetName() + fileExtension);
         Save(filePath.generic_string(), specificFile);
       }
     }
   }
 
-  [[nodiscard]] shared_ptr<CommandContextFactory> GetContextFactory() const override {
+  [[nodiscard]] std::shared_ptr<CommandContextFactory> GetContextFactory() const override {
     contextFactory->SetFileExtension(GetExtension());
     return contextFactory;
   }
 
   [[nodiscard]] virtual std::string GetExtension() const = 0;
-  virtual void Save(const string& path, TSavable* specificFile) const = 0;
+  virtual void Save(const std::string& path, TSavable* specificFile) const = 0;
 };
 
 class SaveAsOriginalFormatCommand : public SaveCommand<VGMFile> {
 public:
   SaveAsOriginalFormatCommand() : SaveCommand<VGMFile>(false) {}
 
-  void Save(const string& path, VGMFile* file) const override {
-    file->OnSaveAsRaw(path);
+  void Save(const std::string& path, VGMFile* file) const override {
+    conversion::SaveAsOriginal(*file, path);
   }
-  [[nodiscard]] string Name() const override { return "Save as original format"; }
-  [[nodiscard]] string GetExtension() const override { return ""; }
+  [[nodiscard]] std::string Name() const override { return "Save as original format"; }
+  [[nodiscard]] std::string GetExtension() const override { return ""; }
 };
 
 
@@ -162,11 +161,11 @@ class SaveAsMidiCommand : public SaveCommand<VGMSeq, VGMFile> {
 public:
   SaveAsMidiCommand() : SaveCommand<VGMSeq, VGMFile>(false) {}
 
-  void Save(const string& path, VGMSeq* seq) const override {
+  void Save(const std::string& path, VGMSeq* seq) const override {
     seq->SaveAsMidi(path);
   }
-  [[nodiscard]] string Name() const override { return "Save as MIDI"; }
-  [[nodiscard]] string GetExtension() const override { return "mid"; }
+  [[nodiscard]] std::string Name() const override { return "Save as MIDI"; }
+  [[nodiscard]] std::string GetExtension() const override { return "mid"; }
 };
 
 
@@ -174,11 +173,11 @@ class SaveAsDLSCommand : public SaveCommand<VGMInstrSet, VGMFile> {
 public:
   SaveAsDLSCommand() : SaveCommand<VGMInstrSet, VGMFile>(false) {}
 
-  void Save(const string& path, VGMInstrSet* instrSet) const override {
-    instrSet->SaveAsDLS(path);
+  void Save(const std::string& path, VGMInstrSet* instrSet) const override {
+    conversion::SaveAsDLS(*instrSet, path);
   }
-  [[nodiscard]] string Name() const override { return "Save as DLS"; }
-  [[nodiscard]] string GetExtension() const override { return "dls"; }
+  [[nodiscard]] std::string Name() const override { return "Save as DLS"; }
+  [[nodiscard]] std::string GetExtension() const override { return "dls"; }
 };
 
 
@@ -186,11 +185,11 @@ class SaveAsSF2Command : public SaveCommand<VGMInstrSet, VGMFile> {
 public:
   SaveAsSF2Command() : SaveCommand<VGMInstrSet, VGMFile>(false) {}
 
-  void Save(const string& path, VGMInstrSet* instrSet) const override {
-    instrSet->SaveAsSF2(path);
+  void Save(const std::string& path, VGMInstrSet* instrSet) const override {
+    conversion::SaveAsSF2(*instrSet, path);
   }
-  [[nodiscard]] string Name() const override { return "Save as SF2"; }
-  [[nodiscard]] string GetExtension() const override { return "sf2"; }
+  [[nodiscard]] std::string Name() const override { return "Save as SF2"; }
+  [[nodiscard]] std::string GetExtension() const override { return "sf2"; }
 };
 
 
@@ -198,9 +197,9 @@ class SaveWavBatchCommand : public SaveCommand<VGMSampColl, VGMFile> {
 public:
   SaveWavBatchCommand() : SaveCommand<VGMSampColl, VGMFile>(true) {}
 
-  void Save(const string& path, VGMSampColl* sampColl) const override {
-    sampColl->SaveAllAsWav(path);
+  void Save(const std::string& path, VGMSampColl* sampColl) const override {
+    conversion::SaveAllAsWav(*sampColl, path);
   }
-  [[nodiscard]] string Name() const override { return "Save all samples as WAV"; }
-  [[nodiscard]] string GetExtension() const override { return "wav"; }
+  [[nodiscard]] std::string Name() const override { return "Save all samples as WAV"; }
+  [[nodiscard]] std::string GetExtension() const override { return "wav"; }
 };

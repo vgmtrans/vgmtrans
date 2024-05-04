@@ -1,19 +1,25 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "HeartBeatPS1Scanner.h"
 #include "HeartBeatPS1Format.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<HeartBeatPS1Scanner> s_heartbeat_ps1("HEARTBEATPS1");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 
-HeartBeatPS1Scanner::HeartBeatPS1Scanner(void) {
-}
+HeartBeatPS1Scanner::HeartBeatPS1Scanner() {}
 
-HeartBeatPS1Scanner::~HeartBeatPS1Scanner(void) {
-}
-
+HeartBeatPS1Scanner::~HeartBeatPS1Scanner() {}
 
 void HeartBeatPS1Scanner::Scan(RawFile *file, void *info) {
   SearchForHeartBeatPS1VGMFile(file);
-  return;
 }
 
 std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile *file) {
@@ -146,8 +152,7 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
       HeartBeatPS1Seq *newHeartBeatPS1Seq = new HeartBeatPS1Seq(file, offset, total_size);
       if (newHeartBeatPS1Seq->LoadVGMFile()) {
         loadedFiles.push_back(newHeartBeatPS1Seq);
-      }
-      else {
+      } else {
         delete newHeartBeatPS1Seq;
       }
     }

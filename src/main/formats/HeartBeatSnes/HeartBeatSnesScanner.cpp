@@ -1,7 +1,16 @@
-#include "pch.h"
-#include "HeartBeatSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "HeartBeatSnesSeq.h"
 #include "HeartBeatSnesInstr.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<HeartBeatSnesScanner> s_heartbeat_snes("HEARTBEATSNES", {"spc"});
+}
 
 //; Dragon Quest 6 SPC
 //1b9c: ee        pop   y
@@ -97,8 +106,7 @@ void HeartBeatSnesScanner::Scan(RawFile *file, void *info) {
   uint32_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForHeartBeatSnesFromARAM(file);
-  }
-  else {
+  } else {
     SearchForHeartBeatSnesFromROM(file);
   }
   return;
@@ -106,7 +114,7 @@ void HeartBeatSnesScanner::Scan(RawFile *file, void *info) {
 
 void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile *file) {
   HeartBeatSnesVersion version = HEARTBEATSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // search song list
   uint32_t ofsReadSongList;
@@ -212,5 +220,4 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile *file) {
   }
 }
 
-void HeartBeatSnesScanner::SearchForHeartBeatSnesFromROM(RawFile *file) {
-}
+void HeartBeatSnesScanner::SearchForHeartBeatSnesFromROM(RawFile *file) {}

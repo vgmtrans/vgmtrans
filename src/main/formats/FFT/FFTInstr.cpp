@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "FFTFormat.h"
 #include "FFTInstr.h"
 #include "VGMSamp.h"
@@ -45,7 +44,7 @@ bool WdsInstrSet::GetHeaderInfo() {
   //バイナリエディタ表示用
   ostringstream theName;
   theName << "wds " << id;
-  name = theName.str();
+  m_name = theName.str();
 
   //ヘッダーobjectの生成
   VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(WdsHdr));

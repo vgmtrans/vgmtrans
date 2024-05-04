@@ -1,4 +1,8 @@
-#include "pch.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "MoriSnesSeq.h"
 
 DECLARE_FORMAT(MoriSnes);
@@ -381,7 +385,7 @@ bool MoriSnesTrack::ReadEvent(void) {
           newPan = 32;
         }
 
-        uint8_t midiPan = min(newPan * 4, 127);
+        uint8_t midiPan = std::min(newPan * 4, 127);
         AddPan(beginOffset, curOffset - beginOffset, midiPan);
       }
       else {
@@ -628,7 +632,7 @@ bool MoriSnesTrack::ReadEvent(void) {
     case EVENT_VOLUME_REL: {
       int8_t delta = GetByte(curOffset++);
 
-      int newVolume = min(max(spcVolume + delta, 0), 0xff);
+      int newVolume = std::min(std::max(spcVolume + delta, 0), 0xff);
       spcVolume += newVolume;
 
       AddVol(beginOffset, curOffset - beginOffset, spcVolume / 2, "Volume (Relative)");
@@ -653,14 +657,12 @@ bool MoriSnesTrack::ReadEvent(void) {
       break;
     }
 
-    default:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
-      pRoot->AddLogItem(new LogItem((std::string("Unknown Event - ") + desc.str()).c_str(),
-                                    LOG_LEVEL_ERR,
-                                    "MoriSnesSeq"));
+    default: {
+      auto descr = logEvent(statusByte);
+      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
+    }
   }
 
   //assert(curOffset >= dwOffset);

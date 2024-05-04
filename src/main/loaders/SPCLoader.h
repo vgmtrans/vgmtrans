@@ -1,12 +1,19 @@
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
-#include "Loader.h"
 
-class SPCLoader:
-    public VGMLoader {
- public:
-  SPCLoader(void);
- public:
-  virtual ~SPCLoader(void);
+#include "components/FileLoader.h"
+#include "LoaderManager.h"
 
-  virtual PostLoadCommand Apply(RawFile *theFile);
+class SPCLoader : public FileLoader {
+ public:
+    ~SPCLoader() = default;
+    void apply(const RawFile *) override;
 };
+
+namespace vgmtrans::loaders {
+LoaderRegistration<SPCLoader> _spc{"SPC"};
+}

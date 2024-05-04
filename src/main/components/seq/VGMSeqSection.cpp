@@ -1,5 +1,10 @@
-#include "pch.h"
+/*
+* VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "common.h"
+#include "helper.h"
 #include "VGMMultiSectionSeq.h"
 #include "SeqEvent.h"
 

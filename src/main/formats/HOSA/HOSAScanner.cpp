@@ -1,16 +1,23 @@
-#include "pch.h"
-#include "HOSAScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "HOSASeq.h"
 #include "HOSAInstr.h"
 #include "PSXSPU.h"
+#include "ScannerManager.h"
+
+namespace vgmtrans::scanners {
+ScannerRegistration<HOSAScanner> s_hosa("HOSA");
+}
 
 #define SRCH_BUF_SIZE 0x20000
 
-HOSAScanner::HOSAScanner(void) {
-}
+HOSAScanner::HOSAScanner() {}
 
-HOSAScanner::~HOSAScanner(void) {
-}
+HOSAScanner::~HOSAScanner() {}
 
 void HOSAScanner::Scan(RawFile *file, void *info) {
   HOSASeq *seq = SearchForHOSASeq(file);
@@ -52,12 +59,12 @@ void HOSAScanner::Scan(RawFile *file, void *info) {
 }
 
 HOSASeq *HOSAScanner::SearchForHOSASeq(RawFile *file) {
-  std::string name = file->tag.HasTitle() ? file->tag.title : RawFile::removeExtFromPath(file->GetFileName());
+  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   uint32_t nFileLength = file->size();
   for (uint32_t i = 0; i + 4 < nFileLength; i++) {
     // Signature must match
-    if (file->GetWordBE(i) != 0x484F5341 || file->GetByte(i + 4) != 'V')        //"HOSAV"
+    if (file->GetWordBE(i) != 0x484F5341 || file->GetByte(i + 4) != 'V')  //"HOSAV"
       continue;
     // Number of tracks must not exceed 24 (I'm pretty sure)
     if (file->GetByte(i + 6) > 24)
@@ -80,8 +87,8 @@ HOSASeq *HOSAScanner::SearchForHOSASeq(RawFile *file) {
   return NULL;
 }
 
-// This Scanner is quite imperfect.  It compares the offsets of the sample collection against the sample
-// offsets in the region data, assuming that samples will be referenced consecutively.
+// This Scanner is quite imperfect.  It compares the offsets of the sample collection against the
+// sample offsets in the region data, assuming that samples will be referenced consecutively.
 #define MIN_NUM_SAMPLES_COMPARE 5
 #define MIN_SAMPLES_MATCH 4
 HOSAInstrSet *HOSAScanner::SearchForHOSAInstrSet(RawFile *file, PSXSampColl *sampcoll) {

@@ -1,9 +1,16 @@
-#include "pch.h"
-#include "CapcomSnesScanner.h"
+/*
+ * VGMTrans (c) 2002-2024
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "CapcomSnesSeq.h"
 #include "CapcomSnesInstr.h"
+#include "ScannerManager.h"
 
-using namespace std;
+namespace vgmtrans::scanners {
+ScannerRegistration<CapcomSnesScanner> s_capcom_snes("CAPCOMSNES", {"spc"});
+}
 
 // ; Super Ghouls 'N Ghosts SPC
 // 03f5: 1c        asl   a
@@ -115,13 +122,13 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) {
   uint32_t addrBGMHeader;
   uint32_t addrInstrTable;
 
-  string basefilename = RawFile::removeExtFromPath(file->GetFileName());
-  string name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::string basefilename = removeExtFromPath(file->name());
+  std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // find a song list
   hasSongList = file->SearchBytePattern(ptnReadSongList, ofsReadSongListASM);
   if (hasSongList) {
-    addrSongList = min(file->GetShort(ofsReadSongListASM + 3), file->GetShort(ofsReadSongListASM + 8));
+    addrSongList = std::min(file->GetShort(ofsReadSongListASM + 3), file->GetShort(ofsReadSongListASM + 8));
   }
 
   // find BGM address
