@@ -22,10 +22,6 @@ LoaderRegistration<MAMELoader> _mame("MAME");
 }
 
 bool MAMERomGroup::GetHexAttribute(const std::string &attrName, uint32_t *out) const {
-    // auto strValue = attributes.at(attrName);
-    // if (strValue.empty()) {
-    //     return false;
-    // }
     auto it = attributes.find(attrName);
     if (it == attributes.end()) {
       return false; // Key not found
@@ -41,10 +37,6 @@ bool MAMERomGroup::GetHexAttribute(const std::string &attrName, uint32_t *out) c
 }
 
 MAMERomGroup *MAMEGame::GetRomGroupOfType(const std::string &strType) {
-    // for (auto it = romgroupentries.begin(); it != romgroupentries.end(); it++) {
-    //     if (it->type.compare(strType) == 0)
-    //         return &(*it);
-    // }
     for (std::list<MAMERomGroup>::iterator it = romgroupentries.begin(); it != romgroupentries.end(); it++) {
       if (it->type.compare(strType) == 0)
         return &(*it);
