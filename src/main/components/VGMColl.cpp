@@ -19,20 +19,20 @@
 VGMColl::VGMColl(std::string theName) : name(std::move(theName)) {}
 
 void VGMColl::RemoveFileAssocs() {
-    if (seq) {
-      seq->RemoveCollAssoc(this);
-      seq = nullptr;
-    }
+  if (seq) {
+    seq->RemoveCollAssoc(this);
+    seq = nullptr;
+  }
 
-    for (auto set : instrsets) {
-      set->RemoveCollAssoc(this);
-    }
-    for (auto samp : sampcolls) {
-      samp->RemoveCollAssoc(this);
-    }
-    for (auto file : miscfiles) {
-      file->RemoveCollAssoc(this);
-    }
+  for (auto set : instrsets) {
+    set->RemoveCollAssoc(this);
+  }
+  for (auto samp : sampcolls) {
+    samp->RemoveCollAssoc(this);
+  }
+  for (auto file : miscfiles) {
+    file->RemoveCollAssoc(this);
+  }
 }
 
 const std::string &VGMColl::GetName() const {

@@ -52,10 +52,13 @@ void RawFileListViewModel::AddRawFile() {
 }
 
 void RawFileListViewModel::RemoveRawFile() {
-  int position = static_cast<int>(qtVGMRoot.vRawFile.size());
-  if (position >= 0) {
-    dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
+  int position = static_cast<int>(qtVGMRoot.vRawFile.size()) - 1;
+  if (position < 0) {
+    return;
   }
+
+  beginRemoveRows(QModelIndex(), position, position);
+  endRemoveRows();
 }
 
 QVariant RawFileListViewModel::headerData(int column, Qt::Orientation orientation, int role) const {
