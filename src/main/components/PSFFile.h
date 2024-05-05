@@ -15,10 +15,10 @@
 
 class RawFile;
 
-class PSFFile2 {
+class PSFFile {
    public:
-    explicit PSFFile2(const RawFile &file);
-    ~PSFFile2() = default;
+    explicit PSFFile(const RawFile &file);
+    ~PSFFile() = default;
 
     [[nodiscard]] uint8_t version() const noexcept { return m_version; }
     [[nodiscard]] const std::map<std::string, std::string> &tags() const noexcept { return m_tags; }

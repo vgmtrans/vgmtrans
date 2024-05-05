@@ -8,7 +8,7 @@
 #include <zlib.h>
 #include "Root.h"
 #include "LogManager.h"
-#include "components/PSFFile2.h"
+#include "components/PSFFile.h"
 
 void PSF2Loader::apply(const RawFile *file) {
     /* Don't bother on a file too small */

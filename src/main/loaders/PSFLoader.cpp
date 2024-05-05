@@ -10,7 +10,7 @@
 #include <spdlog/fmt/fmt.h>
 
 #include "LogManager.h"
-#include "PSFFile2.h"
+#include "PSFFile.h"
 
 constexpr int PSF1_VERSION = 0x1;
 constexpr int GSF_VERSION = 0x22;
@@ -38,7 +38,7 @@ void PSFLoader::apply(const RawFile *file) {
  */
 void PSFLoader::psf_read_exe(const RawFile *file, int version) {
     try {
-        PSFFile2 psf(*file);
+        PSFFile psf(*file);
         std::filesystem::path basepath(file->path());
         auto libtag = psf.tags().find("_lib");
         if (libtag != psf.tags().end()) {
