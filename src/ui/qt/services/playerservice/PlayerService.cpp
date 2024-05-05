@@ -150,7 +150,7 @@ bool PlayerService::loadCollection(const VGMColl *coll, bool startPlaying) {
   m_active_vgmcoll = coll;
 //  m_active_stream = midi_stream;
 //  m_loaded_sf = sf2_handle;
-  m_song_title = QString::fromStdString(*m_active_vgmcoll->name());
+  m_song_title = QString::fromStdString(m_active_vgmcoll->name());
 //  toggle();
   if (startPlaying) {
     toggle();
