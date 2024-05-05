@@ -7,7 +7,7 @@
 #include "components/FileLoader.h"
 #include "LoaderManager.h"
 
-class PSFFile2;
+class PSFFile;
 
 class PSFLoader : public FileLoader {
    public:

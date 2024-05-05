@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "PSFFile2.h"
+#include "PSFFile.h"
 
 #include <exception>
 #include <algorithm>
@@ -15,7 +15,7 @@
 constexpr auto PSF_TAG_SIG = "[TAG]";
 constexpr auto PSF_TAG_SIG_LEN = 5;
 
-PSFFile2::PSFFile2(const RawFile &file) {
+PSFFile::PSFFile(const RawFile &file) {
     uint32_t fileSize = file.size();
     if (fileSize < 0x10) {
         throw std::length_error("PSF file smaller than header, likely corrupt");
@@ -66,7 +66,7 @@ PSFFile2::PSFFile2(const RawFile &file) {
     }
 }
 
-void PSFFile2::parseTags(std::span<const char> tag_section) {
+void PSFFile::parseTags(std::span<const char> tag_section) {
     size_t needle = PSF_TAG_SIG_LEN;
     while (needle < tag_section.size()) {
         // Search the end position of the current line.
