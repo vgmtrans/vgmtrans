@@ -18,9 +18,6 @@ CPS1SampleInstrSet::CPS1SampleInstrSet(RawFile *file,
       fmt_version(version) {
 }
 
-CPS1SampleInstrSet::~CPS1SampleInstrSet(void) {
-}
-
 bool CPS1SampleInstrSet::GetInstrPointers() {
   for (int i = 0; i < 128; ++i) {
     auto offset = dwOffset + (i * 4);
@@ -103,12 +100,9 @@ bool CPS1SampColl::GetSampleInfo() {
 CPS1OPMInstrSet::CPS1OPMInstrSet(RawFile *file,
                                CPSFormatVer version,
                                uint32_t offset,
-                               std::string &name)
+                               const std::string& name)
     : VGMInstrSet(CPS1Format::name, file, offset, 0, name),
       fmt_version(version) {
-}
-
-CPS1OPMInstrSet::~CPS1OPMInstrSet(void) {
 }
 
 bool CPS1OPMInstrSet::GetInstrPointers() {
@@ -117,11 +111,9 @@ bool CPS1OPMInstrSet::GetInstrPointers() {
     if (VGMFile::GetWord(offset) == 0 && VGMFile::GetWord(offset+4) == 0) {
       break;
     }
-    std::ostringstream ss;
-    ss << "Instrument " << i;
-    string name = ss.str();
 
-    auto instr = new CPS1OPMInstr(this, offset, sizeof(CPS1OPMInstrData), 0, i, name);
+    auto instr = new CPS1OPMInstr(this, offset, sizeof(CPS1OPMInstrData), 0,
+      i, fmt::format("Instrument {}", i));
     aInstrs.push_back(instr);
 //    auto offset = dwOffset + (i * 4);
 //    if (!(GetByte(offset) & 0x80)) {
@@ -199,11 +191,8 @@ CPS1OPMInstr::CPS1OPMInstr(VGMInstrSet *instrSet,
                      uint32_t length,
                      uint32_t theBank,
                      uint32_t theInstrNum,
-                     string &name)
+                     const std::string &name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {
-}
-
-CPS1OPMInstr::~CPS1OPMInstr(void) {
 }
 
 bool CPS1OPMInstr::LoadInstr() {

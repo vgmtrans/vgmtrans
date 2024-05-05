@@ -3,6 +3,7 @@
 #include "VGMInstrSet.h"
 #include "CPS1Scanner.h"
 #include "VGMSampColl.h"
+#include <sstream>
 
 // ******************
 // CPS1SampleInstrSet
@@ -51,10 +52,10 @@ public:
   CPS1OPMInstrSet(RawFile *file,
                  CPSFormatVer fmt_version,
                  uint32_t offset,
-                 std::string &name);
-  virtual ~CPS1OPMInstrSet(void);
+                 const std::string& name);
+  ~CPS1OPMInstrSet() override = default;
 
-  virtual bool GetInstrPointers();
+  bool GetInstrPointers() override;
   bool SaveAsOPMFile(const std::string &filepath);
 
 public:
@@ -184,9 +185,9 @@ public:
                uint32_t length,
                uint32_t theBank,
                uint32_t theInstrNum,
-               std::string &name);
-  virtual ~CPS1OPMInstr(void);
-  virtual bool LoadInstr();
+               const std::string& name);
+  ~CPS1OPMInstr() override = default;
+  bool LoadInstr() override;
 //protected:
 //  CPSFormatVer GetFormatVer() { return ((CPS1OPMInstr *) parInstrSet)->fmt_version; }
 

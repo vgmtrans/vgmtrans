@@ -195,11 +195,11 @@ class SaveAsOPMCommand : public SaveCommand<CPS1OPMInstrSet, VGMFile> {
 public:
   SaveAsOPMCommand() : SaveCommand<CPS1OPMInstrSet, VGMFile>(false) {}
 
-  void Save(const string& path, CPS1OPMInstrSet* instrSet) const override {
+  void Save(const std::string& path, CPS1OPMInstrSet* instrSet) const override {
     instrSet->SaveAsOPMFile(path);
   }
-  [[nodiscard]] string Name() const override { return "Save as OPM"; }
-  [[nodiscard]] string GetExtension() const override { return "opm"; }
+  [[nodiscard]] std::string Name() const override { return "Save as OPM"; }
+  [[nodiscard]] std::string GetExtension() const override { return "opm"; }
 };
 
 
