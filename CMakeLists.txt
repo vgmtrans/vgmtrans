@@ -4,6 +4,22 @@
 
 cmake_minimum_required(VERSION 3.23)
 
+# For cmake-presets v3
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_OBJCXX_STANDARD 20)
+add_compile_definitions($<$<NOT:$<CONFIG:Debug>>:NDEBUG>)
+
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15.0" CACHE STRING "Minimum OSX version" FORCE)
+
+# Use ccache if present on the system
+find_program(CCACHE ccache)
+if(CCACHE)
+  message(STATUS "Using ccache: ${CCACHE}")
+  set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE})
+  set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
+endif()
+
 project(
   VGMTrans
   VERSION 1.3
@@ -110,5 +126,4 @@ option(USE_SYSTEM_MINIZIP "Use system-provided minizip library" OFF)
 # ~~~
 
 add_subdirectory(src)
-
 
