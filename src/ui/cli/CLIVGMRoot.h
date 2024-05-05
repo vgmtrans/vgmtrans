@@ -40,21 +40,16 @@ public:
 
   bool OpenRawFile(const std::string &filename) override;
 
-  virtual bool Init();
+  bool Init() override;
 
-  virtual void UI_SetRootPtr(VGMRoot** theRoot);
+  void UI_SetRootPtr(VGMRoot** theRoot) override;
 
-  virtual void UI_Exit() {}
-
-  virtual void UI_Log(LogItem* theLog);
+  void UI_Log(LogItem* theLog) override;
 
   virtual void UpdateCollections();
 
-  virtual std::string UI_GetOpenFilePath(const std::string& suggestedFilename = "",
-                                          const std::string& extension = "");
-
-  virtual std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
-                                          const std::string& extension = "");
+  std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
+                                 const std::string& extension = "") override;
 
   virtual std::string UI_GetSaveDirPath(const std::string& suggestedDir = "");
 

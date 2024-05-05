@@ -231,11 +231,6 @@ void CLIVGMRoot::UpdateCollections() {
   vVGMFile.clear();
 }
 
-
-string CLIVGMRoot::UI_GetOpenFilePath(const string& suggestedFilename, const string& extension) {
-  return "Placeholder";
-}
-
 string CLIVGMRoot::UI_GetSaveFilePath(const string& suggestedFilename, const string& extension) {
   fs::path savePath = outputDir / fs::path(ConvertToSafeFileName(suggestedFilename) + "." + extension);
   return savePath.string();

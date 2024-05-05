@@ -29,12 +29,6 @@ void QtVGMRoot::UI_SetRootPtr(VGMRoot** theRoot) {
   *theRoot = &qtVGMRoot;
 }
 
-void QtVGMRoot::UI_PreExit() {
-}
-
-void QtVGMRoot::UI_Exit() {
-}
-
 void QtVGMRoot::UI_AddRawFile(RawFile*) {
   this->UI_AddedRawFile();
 }
