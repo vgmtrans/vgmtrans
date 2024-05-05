@@ -17,8 +17,6 @@ public:
 
   const std::string UI_GetResourceDirPath() override;
   void UI_SetRootPtr(VGMRoot** theRoot) override;
-  void UI_PreExit() override;
-  void UI_Exit() override;
   void UI_AddRawFile(RawFile* newFile) override;
   void UI_CloseRawFile(RawFile* targFile);
 

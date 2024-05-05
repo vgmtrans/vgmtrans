@@ -33,7 +33,7 @@ public:
   VGMRoot() = default;
   virtual ~VGMRoot() = default;
 
-  bool Init();
+  virtual bool Init();
   virtual bool OpenRawFile(const std::string &filename);
   bool CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::string &filename,
                       const std::string &parRawFileFullPath = "", VGMTag tag = VGMTag());
@@ -47,9 +47,8 @@ public:
 
   virtual const std::string UI_GetResourceDirPath();
   virtual void UI_SetRootPtr(VGMRoot **theRoot) = 0;
-  virtual void UI_PreExit() {}
-  virtual void UI_Exit() = 0;
   virtual void UI_AddRawFile(RawFile *) {}
+  virtual void UI_CloseRawFile(RawFile *targFile) {}
 
   virtual void UI_OnBeginLoadRawFile() {}
   virtual void UI_OnEndLoadRawFile() {}

@@ -132,6 +132,8 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
     // will be invalidated. Therefore, we can't simply erase using the iterator, but instead we
     // search for the RawFile to be deleted and erase if found.
     vRawFile.erase(std::remove(vRawFile.begin(), vRawFile.end(), targFile), vRawFile.end());
+
+    UI_CloseRawFile(targFile);
   } else {
     L_WARN("Requested deletion for RawFile but it was not found");
     return false;
