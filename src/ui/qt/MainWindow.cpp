@@ -148,6 +148,18 @@ void MainWindow::routeSignals() {
     ManualCollectionDialog wiz(this);
     wiz.exec();
   });
+
+  workerThread = new QThread(this);
+  worker = new Worker();
+  worker->moveToThread(workerThread);
+
+  qDebug() << "Main thread is: " << QThread::currentThreadId();
+
+  connect(workerThread, &QThread::finished, worker, &QObject::deleteLater);
+  connect(this, &MainWindow::operate, worker, &Worker::processFile);
+  connect(worker, &Worker::fileProcessed, this, &MainWindow::handleFileProcessed);
+
+  workerThread->start();
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -208,5 +220,12 @@ void MainWindow::openFileInternal(QString filename) {
     }
   }
 
-  qtVGMRoot.OpenRawFile(filename.toStdString());
+  qDebug() << "about to emit operate()";
+  emit operate(filename);
+}
+
+
+void MainWindow::handleFileProcessed(const QString &filename, bool success) {
+  // Handle file processing completion, update UI etc.
+  printf("handleFileProcessed\n");
 }

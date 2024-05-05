@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "QtVGMRoot.h"
+
 #include <QMainWindow>
 #include "workarea/VGMFileView.h"
 
@@ -38,6 +40,8 @@ private:
   void OpenFile();
   void openFileInternal(QString filename);
 
+  void handleFileProcessed(const QString &filename, bool success);
+
   QDockWidget *m_rawfile_dock{};
   QDockWidget *m_vgmfile_dock{};
   QDockWidget *m_coll_dock{};
@@ -48,4 +52,10 @@ private:
   VGMCollListView *m_coll_listview{};
   VGMCollView *m_coll_view{};
   QPushButton *m_manual_creation_btn{};
+
+  QThread* workerThread;
+  Worker* worker;
+
+signals:
+  void operate(const QString &filename);
 };

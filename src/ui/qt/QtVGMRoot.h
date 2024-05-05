@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QObject>
+#include <QThread>
 #include "Root.h"
 
 class QtVGMRoot final : public QObject, public VGMRoot {
@@ -62,3 +63,28 @@ signals:
 };
 
 extern QtVGMRoot qtVGMRoot;
+
+class Worker : public QObject {
+  Q_OBJECT
+
+public:
+  explicit Worker(QObject *parent = nullptr) : QObject(parent) {}
+
+
+signals:
+  void fileProcessed(const QString &filename, bool success);
+  void finished();  // Optional, if needed to signal completion of all files
+
+public slots:
+    void processFile(const QString &filename) {
+    qDebug() << "Processing file in thread" << QThread::currentThreadId();
+
+    // Simulate file processing
+    bool success = true;  // You would implement actual file processing here
+
+    qtVGMRoot.OpenRawFile(filename.toStdString());
+
+    // emit fileProcessed(filename, success);
+  }
+};
+
