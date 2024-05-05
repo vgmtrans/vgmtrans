@@ -126,7 +126,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
     UI_BeginRemoveVGMFiles();
     // Iterate over the contained files in reverse to not invalidate the iterator as we remove files
     for (auto it = vgmfiles.rbegin(); it != vgmfiles.rend(); ++it) {
-      RemoveVGMFile(**it);
+      RemoveVGMFile(**it, false);
     }
     UI_EndRemoveVGMFiles();
 
@@ -138,7 +138,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
     L_WARN("Requested deletion for RawFile but it was not found");
     return false;
   }
-
+  delete targFile;
   return true;
 }
 
@@ -152,7 +152,7 @@ void VGMRoot::AddVGMFile(
 // Removes a VGMFile from the interface.  The UI_RemoveVGMFile will handle the
 // interface-specific stuff
 void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveFromRaw) {
-  auto targFile = std::visit([](auto file) ->VGMFile * { return file; }, file);
+  auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
   Format *fmt = targFile->GetFormat();
@@ -180,6 +180,7 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
       CloseRawFile(rawFile);
     }
   }
+  delete targFile;
 }
 
 void VGMRoot::AddVGMColl(VGMColl *theColl) {
@@ -188,15 +189,15 @@ void VGMRoot::AddVGMColl(VGMColl *theColl) {
 }
 
 void VGMRoot::RemoveVGMColl(VGMColl *targColl) {
-    auto iter = find(vVGMColl.begin(), vVGMColl.end(), targColl);
-    if (iter != vVGMColl.end())
-        vVGMColl.erase(iter);
-    else
-        L_WARN("Requested deletion for VGMColl but it was not found");
+  auto iter = find(vVGMColl.begin(), vVGMColl.end(), targColl);
+  if (iter != vVGMColl.end())
+    vVGMColl.erase(iter);
+  else
+    L_WARN("Requested deletion for VGMColl but it was not found");
 
-    targColl->RemoveFileAssocs();
-    UI_RemoveVGMColl(targColl);
-    delete targColl;
+  targColl->RemoveFileAssocs();
+  UI_RemoveVGMColl(targColl);
+  delete targColl;
 }
 
 // This virtual function is called whenever a VGMFile is added to the interface.
