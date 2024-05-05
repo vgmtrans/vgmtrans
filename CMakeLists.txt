@@ -9,6 +9,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 add_compile_definitions($<$<NOT:$<CONFIG:Debug>>:NDEBUG>)
 
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15.0" CACHE STRING "Minimum OSX version" FORCE)
+
 # Use ccache if present on the system
 find_program(CCACHE ccache)
 if(CCACHE)
