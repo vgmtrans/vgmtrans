@@ -8,6 +8,7 @@
 
 #include <string>
 #include <cassert>
+#include <cstdint>
 #include <variant>
 
 #ifdef __FILE_NAME__
