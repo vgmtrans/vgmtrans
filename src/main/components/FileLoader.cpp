@@ -2,8 +2,8 @@
 
 #include <algorithm>
 
-std::vector<std::shared_ptr<RawFile>> FileLoader::results() {
-    std::vector<std::shared_ptr<RawFile>> res;
+std::vector<RawFile*> FileLoader::results() {
+    std::vector<RawFile*> res;
 
     if (!m_res.empty()) {
         std::move(std::begin(m_res), std::end(m_res), std::back_inserter(res));
@@ -13,6 +13,6 @@ std::vector<std::shared_ptr<RawFile>> FileLoader::results() {
     return res;
 }
 
-void FileLoader::enqueue(std::shared_ptr<RawFile> file) {
+void FileLoader::enqueue(RawFile* file) {
     m_res.emplace_back(file);
 }

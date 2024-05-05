@@ -10,11 +10,11 @@ class FileLoader {
    public:
     virtual ~FileLoader() = default;
     virtual void apply(const RawFile *) = 0;
-    [[nodiscard]] std::vector<std::shared_ptr<RawFile>> results();
+    [[nodiscard]] std::vector<RawFile*> results();
 
    protected:
-    void enqueue(std::shared_ptr<RawFile> file);
+    void enqueue(RawFile* file);
 
    private:
-    std::deque<std::shared_ptr<RawFile>> m_res;
+    std::deque<RawFile*> m_res;
 };

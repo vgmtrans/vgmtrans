@@ -43,7 +43,7 @@ void PSFLoader::psf_read_exe(const RawFile *file, int version) {
         auto libtag = psf.tags().find("_lib");
         if (libtag != psf.tags().end()) {
             auto newpath = basepath.replace_filename(libtag->second).string();
-            auto newfile = std::make_shared<DiskFile>(newpath);
+            auto newfile = new DiskFile(newpath);
             enqueue(newfile);
 
             /* Look for additional libraries in the same folder */
@@ -52,13 +52,13 @@ void PSFLoader::psf_read_exe(const RawFile *file, int version) {
                  libtag != psf.tags().end();
                  libtag = psf.tags().find(fmt::format("_lib{}", ++i))) {
               newpath = basepath.replace_filename(libtag->second).string();
-              newfile = std::make_shared<DiskFile>(newpath);
+              newfile = new DiskFile(newpath);
               enqueue(newfile);
          }
         }
 
         if (!psf.exe().empty()) {
-            auto newfile = std::make_shared<VirtFile>(
+            auto newfile = new VirtFile(
                 reinterpret_cast<const u8 *>(psf.exe().data()) + data_offset.at(version),
                 psf.exe().size() - data_offset.at(version), file->name(), file->path(), file->tag);
             enqueue(newfile);

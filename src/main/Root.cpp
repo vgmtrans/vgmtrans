@@ -52,7 +52,7 @@ bool VGMRoot::Init() {
 
 /* Opens up a file from the filesystem and scans it */
 bool VGMRoot::OpenRawFile(const std::string &filename) {
-    auto newfile = std::make_shared<DiskFile>(filename);
+    auto newfile = new DiskFile(filename);
     return SetupNewRawFile(newfile);
 }
 
@@ -61,18 +61,18 @@ bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::str
                              const std::string &parRawFileFullPath, VGMTag tag) {
     assert(fileSize != 0);
 
-    auto newVirtFile = std::make_shared<VirtFile>(databuf, fileSize, filename,
+    auto newVirtFile = new VirtFile(databuf, fileSize, filename,
       parRawFileFullPath, tag);
 
     return SetupNewRawFile(newVirtFile);
 }
 
 /* Applies loaders and scanners to a file, registering it if it contains anything */
-bool VGMRoot::SetupNewRawFile(std::shared_ptr<RawFile> newRawFile) {
+bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
   UI_OnBeginLoadRawFile();
   if (newRawFile->useLoaders()) {
     for (const auto &l : LoaderManager::get().loaders()) {
-      l->apply(newRawFile.get());
+      l->apply(newRawFile);
       auto res = l->results();
 
       /* If the loader extracted anything, we shouldn't have to scan */
@@ -95,20 +95,18 @@ bool VGMRoot::SetupNewRawFile(std::shared_ptr<RawFile> newRawFile) {
       ScannerManager::get().scanners_with_extension(newRawFile->extension());
     if (!specific_scanners.empty()) {
       for (const auto &scanner : specific_scanners) {
-        scanner->Scan(newRawFile.get());
+        scanner->Scan(newRawFile);
       }
     } else {
       for (const auto &scanner : ScannerManager::get().scanners()) {
-        scanner->Scan(newRawFile.get());
+        scanner->Scan(newRawFile);
       }
     }
   }
 
   if (!newRawFile->containedVGMFiles().empty()) {
-    // FIXME
-    auto &newref = m_activefiles.emplace_back(newRawFile);
-    vRawFile.emplace_back(newref.get());
-    UI_AddRawFile(newref.get());
+    vRawFile.emplace_back(newRawFile);
+    UI_AddRawFile(newRawFile);
   }
 
   UI_OnEndLoadRawFile();

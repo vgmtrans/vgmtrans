@@ -177,6 +177,7 @@ void RawFileListView::deleteRawFiles() {
     auto rawfile = qtVGMRoot.vRawFile[it->row()];
     qtVGMRoot.CloseRawFile(rawfile);
   }
+  clearSelection();
 }
 
 void RawFileListView::onVGMFileSelected(VGMFile* vgmfile, QWidget* caller) {
@@ -218,7 +219,7 @@ void RawFileListView::currentChanged(const QModelIndex &current, const QModelInd
 
 // Update the status bar for the current selection
 void RawFileListView::updateStatusBar() {
-  if (!currentIndex().isValid()) {
+  if (!currentIndex().isValid() || currentIndex().row() >= rawFileListViewModel->rowCount()) {
     NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
   }

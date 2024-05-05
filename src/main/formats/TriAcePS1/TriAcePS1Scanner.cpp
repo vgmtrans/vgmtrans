@@ -215,10 +215,10 @@ TriAcePS1Seq *TriAcePS1Scanner::TriAceSLZDecompress(RawFile *file, uint32_t cfOf
 
   // Create the new virtual file, and analyze the sequence
   std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
-  auto newVirtFile = std::make_shared<VirtFile>(uf, ufOff, name + std::string(" Sequence"),
-                                                     file->GetParRawFileFullPath().c_str());
+  auto newVirtFile = new VirtFile(uf, ufOff, name + std::string(" Sequence"),
+    file->GetParRawFileFullPath().c_str());
 
-  TriAcePS1Seq *newSeq = new TriAcePS1Seq(newVirtFile.get(), 0, name);
+  TriAcePS1Seq *newSeq = new TriAcePS1Seq(newVirtFile, 0, name);
   bool bLoadSucceed = newSeq->LoadVGMFile();
 
   newVirtFile->setUseLoaders(false);

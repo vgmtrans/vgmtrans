@@ -164,7 +164,7 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
       }
       pRoot->UI_EndRemoveVGMFiles();
 
-      this->clearSelection();
+      clearSelection();
       return;
     }
 
