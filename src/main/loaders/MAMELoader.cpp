@@ -196,7 +196,7 @@ void MAMELoader::apply(const RawFile *file) {
     fmt->GetScanner().Scan(nullptr, gameentry);
     for (auto &entry : gameentry->romgroupentries) {
         if (entry.file) {
-            enqueue(std::shared_ptr<VirtFile>(entry.file));
+            enqueue(entry.file);
         }
     }
 

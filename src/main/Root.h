@@ -37,7 +37,7 @@ public:
   virtual bool OpenRawFile(const std::string &filename);
   bool CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::string &filename,
                       const std::string &parRawFileFullPath = "", VGMTag tag = VGMTag());
-  bool SetupNewRawFile(std::shared_ptr<RawFile> newRawFile);
+  bool SetupNewRawFile(RawFile* newRawFile);
   bool CloseRawFile(RawFile *targFile);
   void AddVGMFile(VGMFileVariant file);
   void RemoveVGMFile(VGMFileVariant file, bool bRemoveFromRaw = true);
@@ -74,9 +74,6 @@ public:
   std::vector<RawFile *> vRawFile;
   std::vector<VGMColl *> vVGMColl;
   std::vector<VGMFileVariant> vVGMFile;
-
-private:
-  std::vector<std::shared_ptr<RawFile>> m_activefiles;
 };
 
 extern VGMRoot *pRoot;

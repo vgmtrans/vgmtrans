@@ -16,7 +16,7 @@ void SPCLoader::apply(const RawFile *file) {
     return;
   }
 
-  auto spcFile = std::make_shared<VirtFile>(*file, 0x100, 0x10000);
+  auto spcFile = new VirtFile(*file, 0x100, 0x10000);
 
   std::vector<uint8_t> dsp(file->data() + 0x10100, file->data() + 0x10100 + 0x80);
   spcFile->tag.binaries["dsp"] = dsp;
