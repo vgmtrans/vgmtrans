@@ -209,7 +209,8 @@ void MainWindow::dropEvent(QDropEvent *event) {
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
-  qtVGMRoot.Exit();
+  // Delete the PlayerService before JUCE shuts down to avoid a memory leak being reported.
+  PlayerService::deleteInstance();
   event->accept();
 }
 
