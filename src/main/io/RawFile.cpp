@@ -18,8 +18,8 @@ void RawFile::AddContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInst
 }
 
 void RawFile::RemoveContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> vgmfile) {
-    auto iter =
-        std::find_if(m_vgmfiles.begin(), m_vgmfiles.end(), [vgmfile](auto file) { return *file == vgmfile; });
+    auto iter = std::find_if(m_vgmfiles.begin(), m_vgmfiles.end(),
+      [vgmfile](auto file) { return *file == vgmfile; });
     if (iter != m_vgmfiles.end())
         m_vgmfiles.erase(iter);
     else {

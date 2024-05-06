@@ -40,7 +40,7 @@ public:
   bool SetupNewRawFile(RawFile* newRawFile);
   bool CloseRawFile(RawFile *targFile);
   void AddVGMFile(VGMFileVariant file);
-  void RemoveVGMFile(VGMFileVariant file, bool bRemoveFromRaw = true);
+  void RemoveVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
   void AddVGMColl(VGMColl *theColl);
   void RemoveVGMColl(VGMColl *theFile);
   void Log(LogItem *theLog);
