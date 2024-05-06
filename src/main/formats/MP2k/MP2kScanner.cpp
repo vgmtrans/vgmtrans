@@ -19,6 +19,8 @@
 #include <functional>
 #include <set>
 #include <span>
+#include <array>
+#include <functional>
 
 #include "VGMColl.h"
 #include "MP2kSeq.h"
