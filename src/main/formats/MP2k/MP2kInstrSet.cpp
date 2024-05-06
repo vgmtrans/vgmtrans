@@ -19,7 +19,7 @@ MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
                            const std::string &name)
     : VGMInstrSet(MP2kFormat::name, file, offset, count * 12, name), m_count(count),
       m_operating_rate(rate) {
-  sampColl = new VGMSampColl(MP2kFormat::name, file, nullptr, offset);
+  sampColl = new VGMSampColl(MP2kFormat::name, file, this, offset);
 }
 
 bool MP2kInstrSet::LoadInstrs() {
