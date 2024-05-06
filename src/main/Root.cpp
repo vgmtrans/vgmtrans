@@ -147,7 +147,7 @@ void VGMRoot::AddVGMFile(
 
 // Removes a VGMFile from the interface.  The UI_RemoveVGMFile will handle the
 // interface-specific stuff
-void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveRawFile) {
+void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveEmptyRawFile) {
   auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
@@ -169,7 +169,7 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
     RemoveVGMColl(targFile->assocColls.back());
   }
 
-  if (bRemoveRawFile) {
+  if (bRemoveEmptyRawFile) {
     const auto rawFile = targFile->GetRawFile();
     rawFile->RemoveContainedVGMFile(file);
     if (rawFile->containedVGMFiles().empty()) {

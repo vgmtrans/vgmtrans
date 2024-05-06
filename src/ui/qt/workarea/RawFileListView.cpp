@@ -56,6 +56,9 @@ void RawFileListViewModel::RemoveRawFile() {
   if (position >= 0) {
     beginRemoveRows(QModelIndex(), position, position);
     endRemoveRows();
+  } else {
+    // hack to refresh the view when deleting the last column
+    dataChanged(index(0, 0), index(0, 0));
   }
 }
 
