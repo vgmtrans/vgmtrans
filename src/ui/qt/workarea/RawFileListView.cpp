@@ -3,10 +3,10 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include <ranges>
 
 #include <QKeyEvent>
 #include <QMenu>
-#include <QHeaderView>
 #include "RawFileListView.h"
 #include "RawFile.h"
 #include "VGMFile.h"
@@ -53,12 +53,10 @@ void RawFileListViewModel::AddRawFile() {
 
 void RawFileListViewModel::RemoveRawFile() {
   int position = static_cast<int>(qtVGMRoot.vRawFile.size()) - 1;
-  if (position < 0) {
-    return;
+  if (position >= 0) {
+    beginRemoveRows(QModelIndex(), position, position);
+    endRemoveRows();
   }
-
-  beginRemoveRows(QModelIndex(), position, position);
-  endRemoveRows();
 }
 
 QVariant RawFileListViewModel::headerData(int column, Qt::Orientation orientation, int role) const {
@@ -173,8 +171,8 @@ void RawFileListView::deleteRawFiles() {
     return;
 
   QModelIndexList list = selectionModel()->selectedRows();
-  for (auto it = list.rbegin(); it != list.rend(); ++it) {
-    auto rawfile = qtVGMRoot.vRawFile[it->row()];
+  for (auto & idx : std::ranges::reverse_view(list)) {
+    const auto rawfile = qtVGMRoot.vRawFile[idx.row()];
     qtVGMRoot.CloseRawFile(rawfile);
   }
   clearSelection();

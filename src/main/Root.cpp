@@ -122,16 +122,12 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
   if (file != vRawFile.end()) {
     auto &vgmfiles = (*file)->containedVGMFiles();
     UI_BeginRemoveVGMFiles();
-    // Iterate over the contained files in reverse to not invalidate the iterator as we remove files
-    for (auto it = vgmfiles.rbegin(); it != vgmfiles.rend(); ++it) {
-      RemoveVGMFile(**it, false);
+    for (const auto & vgmfile : vgmfiles) {
+      RemoveVGMFile(*vgmfile, false);
     }
     UI_EndRemoveVGMFiles();
 
-    // Because the RemoveVGMFile() will wind up recursively calling this function, the `file` iter
-    // will be invalidated. Therefore, we can't simply erase using the iterator, but instead we
-    // search for the RawFile to be deleted and erase if found.
-    vRawFile.erase(std::remove(vRawFile.begin(), vRawFile.end(), targFile), vRawFile.end());
+    vRawFile.erase(file);
 
     UI_CloseRawFile(targFile);
   } else {
@@ -151,7 +147,7 @@ void VGMRoot::AddVGMFile(
 
 // Removes a VGMFile from the interface.  The UI_RemoveVGMFile will handle the
 // interface-specific stuff
-void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveFromRaw) {
+void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveRawFile) {
   auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
@@ -173,7 +169,7 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
     RemoveVGMColl(targFile->assocColls.back());
   }
 
-  if (bRemoveFromRaw) {
+  if (bRemoveRawFile) {
     const auto rawFile = targFile->GetRawFile();
     rawFile->RemoveContainedVGMFile(file);
     if (rawFile->containedVGMFiles().empty()) {

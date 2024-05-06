@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include <ranges>
+
 #include <QHeaderView>
 
 #include "VGMFileListView.h"
@@ -159,8 +161,8 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
 
       QModelIndexList list = selectionModel()->selectedRows();
       pRoot->UI_BeginRemoveVGMFiles();
-      for (auto it = list.rbegin(); it != list.rend(); ++it) {
-        qtVGMRoot.RemoveVGMFile(qtVGMRoot.vVGMFile[it->row()]);
+      for (auto & idx : std::ranges::reverse_view(list)) {
+        qtVGMRoot.RemoveVGMFile(qtVGMRoot.vVGMFile[idx.row()], true);
       }
       pRoot->UI_EndRemoveVGMFiles();
 
