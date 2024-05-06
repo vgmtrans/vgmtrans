@@ -23,7 +23,7 @@ class PlayerService : public QObject {
 public:
   // Use the JUCE Singleton helpers as JUCE leak detection runs before static deconstructors and would therefore find
   // false positive memory leaks otherwise
-  JUCE_DECLARE_SINGLETON(PlayerService, false )
+  JUCE_DECLARE_SINGLETON(PlayerService, true)
 
   PlayerService(const PlayerService &) = delete;
   PlayerService &operator=(const PlayerService &) = delete;
