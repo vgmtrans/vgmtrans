@@ -24,12 +24,12 @@ static const QIcon &VGMCollIcon() {
  * VGMCollListViewModel
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
-  auto startResettingModel = [=]() {
+  auto startResettingModel = [this]() {
     resettingModel = true;
     beginResetModel();
   };
 
-  auto endResettingModel = [=]() {
+  auto endResettingModel = [this]() {
     endResetModel();
     resettingModel = false;
   };
@@ -41,12 +41,12 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
 
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMColl,
-          [=]() {
+          [this]() {
             if (!resettingModel)
               dataChanged(index(0, 0), index(rowCount() - 1, 0));
           });
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMColl,
-          [=]() {
+          [this]() {
             if (!resettingModel)
               dataChanged(index(0, 0), index(rowCount() - 1, 0));
           });
@@ -119,7 +119,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
           &VGMCollListView::handlePlaybackRequest);
   connect(this, &QAbstractItemView::customContextMenuRequested, this,
           &VGMCollListView::collectionMenu);
-  connect(model, &VGMCollListViewModel::dataChanged, [=]() {
+  connect(model, &VGMCollListViewModel::dataChanged, [this]() {
     if (!selectedIndexes().empty()) {
       selectionModel()->currentChanged(selectedIndexes().front(), {});
     } else {

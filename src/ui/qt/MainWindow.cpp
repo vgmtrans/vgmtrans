@@ -134,7 +134,7 @@ void MainWindow::showEvent(QShowEvent* event) {
 void MainWindow::routeSignals() {
   connect(m_menu_bar, &MenuBar::openFile, this, &MainWindow::OpenFile);
   connect(m_menu_bar, &MenuBar::exit, this, &MainWindow::close);
-  connect(m_menu_bar, &MenuBar::showAbout, [=]() {
+  connect(m_menu_bar, &MenuBar::showAbout, [this]() {
     About about(this);
     about.exec();
   });
@@ -144,7 +144,7 @@ void MainWindow::routeSignals() {
   connect(m_coll_listview, &VGMCollListView::nothingToPlay, m_icon_bar, &IconBar::showPlayInfo);
   connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
   connect(m_icon_bar, &IconBar::seekingTo, &SequencePlayer::the(), &SequencePlayer::seek);
-  connect(m_icon_bar, &IconBar::createPressed, [=]() {
+  connect(m_icon_bar, &IconBar::createPressed, [this]() {
     ManualCollectionDialog wiz(this);
     wiz.exec();
   });
