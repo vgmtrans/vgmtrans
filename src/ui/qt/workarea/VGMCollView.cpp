@@ -168,7 +168,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMCollView::onVGMFileSelected);
 
 
-  QObject::connect(collListSelModel, &QItemSelectionModel::currentChanged, [=](QModelIndex index) {
+  QObject::connect(collListSelModel, &QItemSelectionModel::currentChanged, [this, commit_rename](QModelIndex index) {
     if (!index.isValid() || qtVGMRoot.vVGMColl.empty() ||
         static_cast<size_t>(index.row()) >= qtVGMRoot.vVGMColl.size()) {
       commit_rename->setEnabled(false);
@@ -182,7 +182,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
     }
   });
 
-  QObject::connect(commit_rename, &QPushButton::pressed, [=]() {
+  QObject::connect(commit_rename, &QPushButton::pressed, [this, collListSelModel]() {
     auto model_index = collListSelModel->currentIndex();
     if (!model_index.isValid() || qtVGMRoot.vVGMColl.empty() ||
         model_index.row() >= qtVGMRoot.vVGMColl.size()) {

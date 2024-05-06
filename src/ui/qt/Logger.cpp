@@ -54,7 +54,7 @@ void Logger::createElements() {
 void Logger::connectElements() {
   connect(logger_clear, &QPushButton::pressed, logger_textarea, &QPlainTextEdit::clear);
   connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          [=](int level) { m_level = level; });
+          [this](int level) { m_level = level; });
   connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
   connect(&qtVGMRoot, &QtVGMRoot::UI_Log, this, &Logger::push);
 }
