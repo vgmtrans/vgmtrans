@@ -5,11 +5,9 @@
  */
 
 #pragma once
-#include "RawFile.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
-#include "VGMColl.h"
 #include "NDSFormat.h"
 
 class NDSInstr;
@@ -22,7 +20,7 @@ class NDSInstrSet : public VGMInstrSet {
 public:
   NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSampColl *psg_samples,
               std::string name = "NDS Instrument Bank");
-  virtual bool GetInstrPointers();
+  bool GetInstrPointers() override;
 
   std::vector<VGMSampColl *> sampCollWAList;
 
@@ -40,11 +38,11 @@ public:
   NDSInstr(NDSInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, uint8_t instrType);
 
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
 
-  void GetSampCollPtr(VGMRgn *rgn, int waNum);
-  void GetArticData(VGMRgn *rgn, uint32_t offset);
-  uint16_t GetFallingRate(uint8_t DecayTime);
+  void GetSampCollPtr(VGMRgn *rgn, int waNum) const;
+  void GetArticData(VGMRgn *rgn, uint32_t offset) const;
+  uint16_t GetFallingRate(uint8_t DecayTime) const;
 
 private:
   uint8_t instrType;
@@ -70,7 +68,7 @@ static const unsigned AdpcmTable[89] = {
     0x1BDC, 0x1EA5, 0x21B6, 0x2515, 0x28CA, 0x2CDF, 0x315B, 0x364B, 0x3BB9, 0x41B2, 0x4844, 0x4F7E,
     0x5771, 0x602F, 0x69CE, 0x7462, 0x7FFF};
 
-static const int IMA_IndexTable[9] = {-1, -1, -1, -1, 2, 4, 6, 8};
+static constexpr int IMA_IndexTable[9] = {-1, -1, -1, -1, 2, 4, 6, 8};
 
 class NDSWaveArch : public VGMSampColl {
 public:
@@ -101,9 +99,9 @@ public:
           uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16, uint32_t rate = 0,
           uint8_t waveType = 0, std::string name = "Sample");
 
-  virtual double GetCompressionRatio();  // ratio of space conserved.  should generally be > 1
+  double GetCompressionRatio() override;  // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion
-  virtual void ConvertToStdWave(uint8_t *buf);
+  void ConvertToStdWave(uint8_t *buf) override;
 
   void ConvertImaAdpcm(uint8_t *buf);
 

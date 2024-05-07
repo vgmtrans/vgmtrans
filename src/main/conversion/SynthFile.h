@@ -20,16 +20,14 @@ typedef enum {
 
 class SynthFile {
  public:
-  SynthFile(const std::string synth_name = "Instrument Set");
+  SynthFile(std::string synth_name = "Instrument Set");
   ~SynthFile();
 
   SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, float reverb);
   SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, std::string Name, float reverb);
-  void DeleteInstr(uint32_t bank, uint32_t instrNum);
   SynthWave *AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
                      uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t *waveData,
                      std::string name = "Unnamed Wave");
-  void SetName(std::string synth_name);
 
   //int WriteDLSToBuffer(std::vector<uint8_t> &buf);
   //bool SaveDLSFile(const wchar_t* filepath);
@@ -42,36 +40,35 @@ class SynthFile {
 
 class SynthInstr {
  public:
-  SynthInstr(void);
   SynthInstr(uint32_t bank, uint32_t instrument, float reverb);
   SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, float reverb);
-  SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, std::vector<SynthRgn *> listRgns, float reverb);
-  ~SynthInstr(void);
+  SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName,
+             const std::vector<SynthRgn *>& listRgns, float reverb);
+  ~SynthInstr();
 
-  void AddRgnList(std::vector<SynthRgn> &RgnList);
-  SynthRgn *AddRgn(void);
-  SynthRgn *AddRgn(SynthRgn rgn);
+  SynthRgn *AddRgn();
+  SynthRgn *AddRgn(const SynthRgn& rgn);
 
  public:
   uint32_t ulBank;
   uint32_t ulInstrument;
+  std::string name;
   float reverb;
 
   std::vector<SynthRgn *> vRgns;
-  std::string name;
 };
 
 class SynthRgn {
  public:
-  SynthRgn(void) : sampinfo(NULL), art(NULL) { }
+  SynthRgn() : sampinfo(nullptr), art(nullptr) { }
   SynthRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
-      : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh), sampinfo(NULL), art(NULL) { }
+      : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh), sampinfo(nullptr), art(nullptr) { }
   SynthRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh, SynthArt &art);
-  ~SynthRgn(void);
+  ~SynthRgn();
 
-  SynthArt *AddArt(void);
+  SynthArt *AddArt();
   SynthArt *AddArt(std::vector<SynthConnectionBlock *> connBlocks);
-  SynthSampInfo *AddSampInfo(void);
+  SynthSampInfo *AddSampInfo();
   SynthSampInfo *AddSampInfo(SynthSampInfo wsmp);
   void SetRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0, uint16_t velHigh = 0x7F);
   void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
@@ -150,14 +147,15 @@ class SynthSampInfo {
 class SynthWave {
  public:
   SynthWave()
-      : sampinfo(NULL),
-        data(NULL),
+      : sampinfo(nullptr),
+        data(nullptr),
         name("Untitled Wave") {
     RiffFile::AlignName(name);
   }
   SynthWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec, uint16_t blockAlign,
             uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t *waveData, std::string waveName = "Untitled Wave")
-      : wFormatTag(formatTag),
+      : sampinfo(nullptr),
+        wFormatTag(formatTag),
         wChannels(channels),
         dwSamplesPerSec(samplesPerSec),
         dwAveBytesPerSec(aveBytesPerSec),
@@ -165,8 +163,7 @@ class SynthWave {
         wBitsPerSample(bitsPerSample),
         dataSize(waveDataSize),
         data(waveData),
-        sampinfo(NULL),
-        name(waveName) {
+        name(std::move(waveName)) {
     RiffFile::AlignName(name);
   }
   ~SynthWave(void);

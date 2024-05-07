@@ -65,7 +65,7 @@ bool FilegroupMatcher::OnNewSampColl(VGMSampColl *sampcoll) {
 }
 
 bool FilegroupMatcher::OnCloseSeq(VGMSeq *seq) {
-  auto iterator = std::find(seqs.begin(), seqs.end(), seq);
+  auto iterator = std::ranges::find(seqs, seq);
   if (iterator != seqs.end()) {
     seqs.erase(iterator);
   }
@@ -73,7 +73,7 @@ bool FilegroupMatcher::OnCloseSeq(VGMSeq *seq) {
 }
 
 bool FilegroupMatcher::OnCloseInstrSet(VGMInstrSet *instrset) {
-  auto iterator = std::find(instrsets.begin(), instrsets.end(), instrset);
+  auto iterator = std::ranges::find(instrsets, instrset);
   if (iterator != instrsets.end()) {
     instrsets.erase(iterator);
   }
@@ -81,7 +81,7 @@ bool FilegroupMatcher::OnCloseInstrSet(VGMInstrSet *instrset) {
 }
 
 bool FilegroupMatcher::OnCloseSampColl(VGMSampColl *sampcoll) {
-  auto iterator = std::find(sampcolls.begin(), sampcolls.end(), sampcoll);
+  auto iterator = std::ranges::find(sampcolls, sampcoll);
   if (iterator != sampcolls.end()) {
     sampcolls.erase(iterator);
   }
@@ -104,7 +104,7 @@ void FilegroupMatcher::MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampco
   else {
     VGMColl *coll = fmt->NewCollection();
     coll->SetName(instrset->GetName());
-    coll->UseSeq(NULL);
+    coll->UseSeq(nullptr);
     coll->AddInstrSet(instrset);
     coll->AddSampColl(sampcoll);
     if (!coll->Load()) {

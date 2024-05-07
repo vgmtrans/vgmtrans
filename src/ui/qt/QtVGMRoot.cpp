@@ -6,17 +6,16 @@
 
 #include <QApplication>
 #include <QFileDialog>
-#include <QString>
 #include "QtVGMRoot.h"
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
 
 QtVGMRoot qtVGMRoot;
 
-const std::string QtVGMRoot::UI_GetResourceDirPath() {
+std::string QtVGMRoot::UI_GetResourceDirPath() {
 #if defined(Q_OS_WIN)
   return (QApplication::applicationDirPath() + "/").toStdString();
-#elif defined(Q_OS_OSX)
+#elif defined(Q_OS_MACOS)
   return (QApplication::applicationDirPath() + "/../Resources/").toStdString();
 #elif defined(Q_OS_LINUX)
   return (QApplication::applicationDirPath() + "/").toStdString();

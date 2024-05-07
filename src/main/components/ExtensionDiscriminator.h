@@ -5,7 +5,6 @@
  */
 #pragma once
 
-#include "common.h"
 #include <list>
 #include <map>
 
@@ -16,8 +15,8 @@ class ExtensionDiscriminator {
   ExtensionDiscriminator();
   ~ExtensionDiscriminator();
 
-  int AddExtensionScannerAssoc(std::string extension, VGMScanner *);
-  std::list<VGMScanner *> *GetScannerList(std::string extension);
+  int AddExtensionScannerAssoc(const std::string& extension, VGMScanner *);
+  std::list<VGMScanner *> *GetScannerList(const std::string& extension);
 
   std::map<std::string, std::list<VGMScanner *> > mScannerExt;
   static ExtensionDiscriminator &instance() {

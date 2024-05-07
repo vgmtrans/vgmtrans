@@ -77,7 +77,7 @@ VirtFile::VirtFile(const RawFile &file, size_t offset, size_t limit)
 }
 
 VirtFile::VirtFile(const uint8_t *data, uint32_t fileSize, std::string name,
-                   std::string parent_fullpath, const VGMTag tag)
+                   std::string parent_fullpath, const VGMTag& tag)
     : m_name(std::move(name)), m_lpath(std::move(parent_fullpath)) {
     std::copy(data, data + fileSize, std::back_inserter(m_data));
 }

@@ -2,7 +2,6 @@
 
 #include <deque>
 #include <vector>
-#include <memory>
 
 #include "RawFile.h"
 

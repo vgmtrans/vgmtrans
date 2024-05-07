@@ -17,9 +17,9 @@ public:
   VGMSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0, uint32_t dataOffset = 0,
           uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16, uint32_t rate = 0,
           std::string name = "Sample");
-  virtual ~VGMSamp() = default;
+  ~VGMSamp() override = default;
 
-  virtual Icon GetIcon() { return ICON_SAMP; };
+  Icon GetIcon() override { return ICON_SAMP; };
 
   virtual double GetCompressionRatio();  // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion
@@ -31,10 +31,10 @@ public:
   inline void SetNumChannels(uint8_t nChannels) { channels = nChannels; }
   inline void SetDataOffset(uint32_t theDataOff) { dataOff = theDataOff; }
   inline void SetDataLength(uint32_t theDataLength) { dataLength = theDataLength; }
-  inline int GetLoopStatus() { return loop.loopStatus; }
+  inline int GetLoopStatus() const { return loop.loopStatus; }
   inline void SetLoopStatus(int loopStat) { loop.loopStatus = loopStat; }
   inline void SetLoopOffset(uint32_t loopStart) { loop.loopStart = loopStart; }
-  inline int GetLoopLength() { return loop.loopLength; }
+  inline int GetLoopLength() const { return loop.loopLength; }
   inline void SetLoopLength(uint32_t theLoopLength) { loop.loopLength = theLoopLength; }
   inline void SetLoopStartMeasure(LoopMeasure measure) { loop.loopStartMeasure = measure; }
   inline void SetLoopLengthMeasure(LoopMeasure measure) { loop.loopLengthMeasure = measure; }
@@ -55,7 +55,7 @@ public:
   Loop loop;
 
   /* FIXME: these placeholders value are not so clean... */
-  uint8_t unityKey = -1;
+  int8_t unityKey = -1;
   short fineTune = 0;
   double volume = -1;  // as percent of full volume.  This will be converted to attenuation for SynthFile
 

@@ -11,13 +11,12 @@ class VGMSampColl;
 // VGMRgn
 // ******
 
-class VGMRgn:
-    public VGMContainerItem {
+class VGMRgn : public VGMContainerItem {
  public:
   VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, const std::string &name = "Region");
   VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, uint8_t velLow,
          uint8_t velHigh, int sampNum, const std::string &name = "Region");
-  ~VGMRgn(void);
+  ~VGMRgn() override;
 
   virtual bool LoadRgn() { return true; }
 
@@ -98,8 +97,7 @@ class VGMRgn:
 // **********
 
 
-class VGMRgnItem:
-    public VGMItem {
+class VGMRgnItem : public VGMItem {
  public:
   enum RgnItemType {
     RIT_GENERIC,
@@ -115,8 +113,8 @@ class VGMRgnItem:
     RIT_SAMPNUM
   };        //HIT = Header Item Type
 
-  VGMRgnItem(VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, const std::string &name);
-  virtual Icon GetIcon();
+  VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, std::string name);
+  Icon GetIcon() override;
 
  public:
   RgnItemType type;

@@ -4,30 +4,30 @@
 #include "Root.h"
 #include "helper.h"
 
-VGMItem::VGMItem() : color(CLR_UNKNOWN) {
+VGMItem::VGMItem() : vgmfile(nullptr), dwOffset(0), unLength(0), color(CLR_UNKNOWN) {
 }
 
-VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, const std::string name, EventColor color)
-    : vgmfile(vgmfile), name(name), dwOffset(offset), unLength(length), color(color) {
+VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string name, EventColor color)
+    : vgmfile(vgmfile), name(std::move(name)), dwOffset(offset), unLength(length), color(color) {
 }
 
-bool operator>(VGMItem &item1, VGMItem &item2) {
+bool operator>(const VGMItem &item1, const VGMItem &item2) {
   return item1.dwOffset > item2.dwOffset;
 }
 
-bool operator<=(VGMItem &item1, VGMItem &item2) {
+bool operator<=(const VGMItem &item1, const VGMItem &item2) {
   return item1.dwOffset <= item2.dwOffset;
 }
 
-bool operator<(VGMItem &item1, VGMItem &item2) {
+bool operator<(const VGMItem &item1, const VGMItem &item2) {
   return item1.dwOffset < item2.dwOffset;
 }
 
-bool operator>=(VGMItem &item1, VGMItem &item2) {
+bool operator>=(const VGMItem &item1, const VGMItem &item2) {
   return item1.dwOffset >= item2.dwOffset;
 }
 
-RawFile *VGMItem::GetRawFile() {
+RawFile *VGMItem::GetRawFile() const {
   return vgmfile->rawfile;
 }
 
@@ -105,8 +105,7 @@ VGMItem *VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContai
   for (const auto *container : containers) {
     for (VGMItem *item : *container) {
       if (item->unLength == 0 || (offset >= item->dwOffset && offset < item->dwOffset + item->unLength)) {
-        VGMItem *foundItem = item->GetItemFromOffset(offset, includeContainer, matchStartOffset);
-        if (foundItem)
+        if (VGMItem *foundItem = item->GetItemFromOffset(offset, includeContainer, matchStartOffset))
           return foundItem;
       }
     }

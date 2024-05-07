@@ -29,9 +29,9 @@ class VGMSeq : public VGMFile {
  public:
   VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
          std::string name = "VGM Sequence");
-  virtual ~VGMSeq(void);
+  ~VGMSeq() override;
 
-  virtual Icon GetIcon() { return ICON_SEQ; }
+  Icon GetIcon() override { return ICON_SEQ; }
 
   bool LoadVGMFile() override;
   bool Load() override;              // Function to load all the information about the sequence
@@ -42,7 +42,7 @@ class VGMSeq : public VGMFile {
   virtual MidiFile *ConvertToMidi();
   virtual MidiTrack *GetFirstMidiTrack();
   void SetPPQN(uint16_t ppqn);
-  uint16_t GetPPQN();
+  uint16_t GetPPQN() const;
   // void SetTimeSignature(uint8_t numer, denom);
   void AddInstrumentRef(uint32_t progNum);
 
@@ -70,9 +70,9 @@ class VGMSeq : public VGMFile {
     initialPitchBendRangeSemiTones = semitones;
     initialPitchBendRangeCents = cents;
   }
-  void AlwaysWriteInitialTempo(double tempoBPM) {
+  void AlwaysWriteInitialTempo(double beatsPerMin) {
     bAlwaysWriteInitialTempo = true;
-    initialTempoBPM = tempoBPM;
+    initialTempoBPM = beatsPerMin;
   }
 
   void AlwaysWriteInitialMonoMode() {
@@ -91,9 +91,9 @@ class VGMSeq : public VGMFile {
   virtual bool PostLoad();
 
  public:
+  MidiFile *midi;
   uint32_t nNumTracks;
   ReadMode readMode;
-  MidiFile *midi;
   double tempoBPM;
   uint16_t ppqn;
   long time;                // absolute current time (ticks)

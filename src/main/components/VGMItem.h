@@ -3,6 +3,7 @@
 #include "common.h"
 #include <algorithm>
 #include <vector>
+#include <ranges>
 
 template <class T>
 class Menu;
@@ -75,14 +76,14 @@ public:
           uint32_t length = 0,
           std::string name = "",
           EventColor color = CLR_UNKNOWN);
+  virtual ~VGMItem() = default;
 
   friend bool operator>(VGMItem &item1, VGMItem &item2);
   friend bool operator<=(VGMItem &item1, VGMItem &item2);
   friend bool operator<(VGMItem &item1, VGMItem &item2);
   friend bool operator>=(VGMItem &item1, VGMItem &item2);
 
-public:
-  RawFile *GetRawFile();
+  RawFile *GetRawFile() const;
 
   virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
   virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
@@ -105,11 +106,11 @@ protected:
   bool IsValidOffset(uint32_t offset) const;
 
 public:
-  EventColor color;
   VGMFile *vgmfile;
   std::string name;
   uint32_t dwOffset;  // offset in the pDoc data buffer
   uint32_t unLength;  // num of bytes the event engulfs
+  EventColor color;
 };
 
 //  ****************
@@ -139,13 +140,14 @@ public:
   void AddUnknownItem(uint32_t offset, uint32_t length);
 
   template <class T>
-  void AddContainer(std::vector<T *> &container) {
-    containers.push_back((std::vector<VGMItem *> *)&container);
+  void AddContainer(std::vector<T*>& container) {
+    static_assert(std::is_base_of_v<VGMItem, T>, "T must be a subclass of VGMItem");
+    containers.push_back(reinterpret_cast<std::vector<VGMItem *> *>(&container));
   }
 
   template <class T>
   bool RemoveContainer(std::vector<T *> &container) {
-    auto iter = std::find(containers.begin(), containers.end(), (std::vector<VGMItem *> *)&container);
+    auto iter = std::ranges::find(containers, reinterpret_cast<std::vector<VGMItem*>*>(&container));
     if (iter != containers.end()) {
       containers.erase(iter);
       return true;

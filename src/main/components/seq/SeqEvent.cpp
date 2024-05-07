@@ -17,8 +17,8 @@ SeqEvent::SeqEvent(SeqTrack *pTrack,
                    EventColor color,
                    Icon icon,
                    const std::string &desc)
-    : VGMItem((VGMFile *) pTrack->parentSeq, offset, length, name, color), desc(desc), icon(icon), parentTrack(pTrack) {
-}
+    : VGMItem(pTrack->parentSeq, offset, length, name, color), channel(0),
+      parentTrack(pTrack), icon(icon), desc(desc) {}
 
 // ***************
 // DurNoteSeqEvent

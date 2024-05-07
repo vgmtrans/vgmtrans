@@ -22,7 +22,7 @@ public:
   VGMCollViewModel(QItemSelectionModel *collListSelModel, QObject *parent = 0);
 
   int rowCount(const QModelIndex &parent = QModelIndex()) const override;
-  QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+  QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
   [[nodiscard]] VGMFile *fileFromIndex(QModelIndex index) const;
   [[nodiscard]] QModelIndex indexFromFile(VGMFile* file) const;

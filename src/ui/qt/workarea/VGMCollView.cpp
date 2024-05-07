@@ -7,7 +7,6 @@
 #include "VGMCollView.h"
 
 #include <QVBoxLayout>
-#include <QLabel>
 #include <QListView>
 #include <QLineEdit>
 #include <QPushButton>
@@ -56,7 +55,7 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
 
 void VGMCollViewModel::handleNewCollSelected(QModelIndex modelIndex) {
   if (!modelIndex.isValid() || qtVGMRoot.vVGMColl.empty() ||
-      modelIndex.row() >= qtVGMRoot.vVGMColl.size()) {
+      static_cast<size_t>(modelIndex.row()) >= qtVGMRoot.vVGMColl.size()) {
     m_coll = nullptr;
   } else {
     m_coll = qtVGMRoot.vVGMColl[modelIndex.row()];
@@ -171,7 +170,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 
   QObject::connect(collListSelModel, &QItemSelectionModel::currentChanged, [=](QModelIndex index) {
     if (!index.isValid() || qtVGMRoot.vVGMColl.empty() ||
-        index.row() >= qtVGMRoot.vVGMColl.size()) {
+        static_cast<size_t>(index.row()) >= qtVGMRoot.vVGMColl.size()) {
       commit_rename->setEnabled(false);
       m_collection_title->setReadOnly(true);
       m_collection_title->setText("No collection selected");

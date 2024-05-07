@@ -121,7 +121,7 @@ class RawFile {
 class DiskFile final : public RawFile {
    public:
     DiskFile(const std::string &path);
-    ~DiskFile() = default;
+    ~DiskFile() override = default;
 
     [[nodiscard]] std::string name() const override { return m_path.filename().string(); };
     [[nodiscard]] std::string path() const override { return m_path.string(); };
@@ -154,8 +154,8 @@ class VirtFile final : public RawFile {
     VirtFile(const RawFile &, size_t offset = 0);
     VirtFile(const RawFile &, size_t offset, size_t limit);
     VirtFile(const uint8_t *data, uint32_t size, std::string name, std::string parent_fullpath = "",
-             VGMTag tag = VGMTag());
-    ~VirtFile() = default;
+             const VGMTag& tag = VGMTag());
+    ~VirtFile() override = default;
 
     [[nodiscard]] std::string name() const override { return m_name; };
     [[nodiscard]] std::string path() const override { return m_lpath.string(); };

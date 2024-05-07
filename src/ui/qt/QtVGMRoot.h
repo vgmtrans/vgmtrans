@@ -15,10 +15,10 @@ class QtVGMRoot final : public QObject, public VGMRoot {
 public:
   ~QtVGMRoot() override = default;
 
-  const std::string UI_GetResourceDirPath() override;
+  std::string UI_GetResourceDirPath() override;
   void UI_SetRootPtr(VGMRoot** theRoot) override;
   void UI_AddRawFile(RawFile* newFile) override;
-  void UI_CloseRawFile(RawFile* targFile);
+  void UI_CloseRawFile(RawFile* targFile) override;
 
   void UI_OnBeginLoadRawFile() override;
   void UI_OnEndLoadRawFile() override;

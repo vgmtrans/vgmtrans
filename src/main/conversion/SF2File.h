@@ -253,38 +253,31 @@ struct sfSample {
 
 #pragma pack(pop)   /* restore original alignment from stack */
 
-
 class SF2StringChunk: public Chunk {
  public:
-  SF2StringChunk(std::string ckSig, std::string info)
+  SF2StringChunk(const std::string& ckSig, const std::string& info)
       : Chunk(ckSig) {
-    SetData(info.c_str(), (uint32_t) info.length());
+    SetData(info.c_str(), static_cast<u32>(info.length()));
   }
 };
 
 class SF2InfoListChunk: public LISTChunk {
  public:
-  SF2InfoListChunk(std::string name);
+  SF2InfoListChunk(const std::string& name);
 };
-
 
 class SF2sdtaChunk: public LISTChunk {
  public:
   SF2sdtaChunk();
 };
 
-
-inline void WriteLIST(std::vector<uint8_t> &buf, std::string listName, uint32_t listSize);
-inline void AlignName(std::string &name);
-
 class SynthFile;
 
 class SF2File: public RiffFile {
  public:
   SF2File(SynthFile *synthfile);
-  ~SF2File() = default;
+  ~SF2File() override = default;
 
   std::vector<uint8_t> SaveToMem();
   bool SaveSF2File(const std::string &filepath);
-
 };

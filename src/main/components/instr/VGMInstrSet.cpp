@@ -100,8 +100,8 @@ bool VGMInstrSet::LoadInstrs() {
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
                    uint32_t theInstrNum, const std::string &name, float reverb)
-    : VGMContainerItem(instrSet, offset, length, name), parInstrSet(instrSet), bank(theBank),
-      reverb(reverb), instrNum(theInstrNum) {
+    : VGMContainerItem(instrSet, offset, length, std::move(name)), bank(theBank), instrNum(theInstrNum),
+      parInstrSet(instrSet), reverb(reverb) {
   AddContainer<VGMRgn>(aRgns);
 }
 

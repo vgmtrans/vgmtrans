@@ -99,9 +99,9 @@ class AkaoSnesSeq
               std::string newName = "Square AKAO SNES Seq");
   virtual ~AkaoSnesSeq(void);
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  virtual bool GetHeaderInfo();
+  virtual bool GetTrackPointers();
+  virtual void ResetVars();
 
   double GetTempoInBPM(uint8_t tempo);
 

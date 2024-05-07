@@ -6,9 +6,9 @@
 
 #include "VGMSeqNoTrks.h"
 
-VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, std::string name)
+VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, const std::string& name)
     : VGMSeq(format, file, offset, 0, name), SeqTrack(this) {
-  ResetVars();
+  VGMSeqNoTrks::ResetVars();
   VGMSeq::AddContainer<SeqEvent>(aEvents);
 }
 
@@ -71,7 +71,7 @@ bool VGMSeqNoTrks::LoadEvents(long stopTime) {
   bInLoop = false;
   curOffset = eventsOffset();  // start at beginning of track
   while (curOffset < rawfile->size()) {
-    if (GetTime() >= (unsigned)stopTime) {
+    if (GetTime() >= static_cast<u_long>(stopTime)) {
       break;
     }
 
@@ -86,27 +86,26 @@ MidiFile *VGMSeqNoTrks::ConvertToMidi() {
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_FIND_DELTA_LENGTH;
 
   if (!LoadEvents())
-    return NULL;
+    return nullptr;
   if (!PostLoad())
-    return NULL;
+    return nullptr;
 
-  long stopTime = -1;
-  stopTime = deltaLength;
+  long stopTime = deltaLength;
 
   MidiFile *newmidi = new MidiFile(this);
   this->midi = newmidi;
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_CONVERT_TO_MIDI;
   if (!LoadEvents(stopTime)) {
     delete midi;
-    this->midi = NULL;
-    return NULL;
+    this->midi = nullptr;
+    return nullptr;
   }
   if (!PostLoad()) {
     delete midi;
-    this->midi = NULL;
-    return NULL;
+    this->midi = nullptr;
+    return nullptr;
   }
-  this->midi = NULL;
+  this->midi = nullptr;
   return newmidi;
 }
 

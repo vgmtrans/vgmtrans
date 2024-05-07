@@ -57,8 +57,8 @@ bool VGMRoot::OpenRawFile(const std::string &filename) {
 }
 
 /* Creates a new file backed by RAM */
-bool VGMRoot::CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::string &filename,
-                             const std::string &parRawFileFullPath, VGMTag tag) {
+bool VGMRoot::CreateVirtFile(const uint8_t *databuf, uint32_t fileSize, const std::string& filename,
+                             const std::string &parRawFileFullPath, const VGMTag& tag) {
     assert(fileSize != 0);
 
     auto newVirtFile = new VirtFile(databuf, fileSize, filename,
@@ -118,7 +118,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
     return false;
   }
 
-  auto file = std::find(vRawFile.begin(), vRawFile.end(), targFile);
+  auto file = std::ranges::find(vRawFile, targFile);
   if (file != vRawFile.end()) {
     auto &vgmfiles = (*file)->containedVGMFiles();
     UI_BeginRemoveVGMFiles();
@@ -151,12 +151,11 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
   auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
-  Format *fmt = targFile->GetFormat();
-  if (fmt) {
+  if (Format *fmt = targFile->GetFormat()) {
     fmt->OnCloseFile(file);
   }
 
-  auto iter = std::find(vVGMFile.begin(), vVGMFile.end(), file);
+  auto iter = std::ranges::find(vVGMFile, file);
 
   if (iter != vVGMFile.end()) {
     UI_RemoveVGMFile(targFile);
@@ -185,7 +184,7 @@ void VGMRoot::AddVGMColl(VGMColl *theColl) {
 }
 
 void VGMRoot::RemoveVGMColl(VGMColl *targColl) {
-  auto iter = find(vVGMColl.begin(), vVGMColl.end(), targColl);
+  auto iter = std::ranges::find(vVGMColl, targColl);
   if (iter != vVGMColl.end())
     vVGMColl.erase(iter);
   else
@@ -214,7 +213,7 @@ void VGMRoot::UI_AddVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, uint32_t size) {
+bool VGMRoot::UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, size_t size) {
     std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
     if (!outfile.is_open()) {
@@ -232,6 +231,6 @@ void VGMRoot::Log(LogItem *theLog) {
   UI_Log(theLog);
 }
 
-const std::string VGMRoot::UI_GetResourceDirPath() {
+std::string VGMRoot::UI_GetResourceDirPath() {
   return std::string(std::filesystem::current_path().generic_string());
 }

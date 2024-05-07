@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+#include "common.h"
 #include "Scanner.h"
 
 class KonamiGXScanner:

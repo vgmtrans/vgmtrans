@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include <ranges>
 #include <spdlog/fmt/fmt.h>
 #include "VGMSeq.h"
 #include "Root.h"
@@ -20,24 +21,25 @@ MidiFile::MidiFile(VGMSeq *theAssocSeq)
   this->ppqn = assocSeq->ppqn;
 }
 
-MidiFile::~MidiFile(void) {
+MidiFile::~MidiFile() {
   DeleteVect<MidiTrack>(aTracks);
 }
 
-MidiTrack *MidiFile::AddTrack(void) {
+MidiTrack *MidiFile::AddTrack() {
   aTracks.push_back(new MidiTrack(this, bMonophonicTracks));
   return aTracks.back();
 }
 
 MidiTrack *MidiFile::InsertTrack(uint32_t trackNum) {
   if (trackNum + 1 > aTracks.size())
-    aTracks.resize(trackNum + 1, NULL);
+    aTracks.resize(trackNum + 1, nullptr);
+
   aTracks[trackNum] = new MidiTrack(this, bMonophonicTracks);
   return aTracks[trackNum];
 }
 
-int MidiFile::GetMidiTrackIndex(MidiTrack *midiTrack) {
-  auto it = std::find(aTracks.begin(), aTracks.end(), midiTrack);
+int MidiFile::GetMidiTrackIndex(const MidiTrack *midiTrack) {
+  auto it = std::ranges::find(aTracks, midiTrack);
   if (it != aTracks.end()) {
     return static_cast<int>(std::distance(aTracks.begin(), it));
   } else {
@@ -49,7 +51,7 @@ void MidiFile::SetPPQN(uint16_t ppqn) {
   this->ppqn = ppqn;
 }
 
-uint32_t MidiFile::GetPPQN() {
+uint32_t MidiFile::GetPPQN() const {
   return ppqn;
 }
 
@@ -68,7 +70,7 @@ void MidiFile::Sort(void) {
 bool MidiFile::SaveMidiFile(const std::string &filepath) {
   std::vector<uint8_t> midiBuf;
   WriteMidiToBuffer(midiBuf);
-  return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], (uint32_t)midiBuf.size());
+  return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], midiBuf.size());
 }
 
 void MidiFile::WriteMidiToBuffer(std::vector<uint8_t> &buf) {
@@ -108,28 +110,28 @@ void MidiFile::WriteMidiToBuffer(std::vector<uint8_t> &buf) {
 MidiTrack::MidiTrack(MidiFile *theParentSeq, bool monophonic)
     : parentSeq(theParentSeq),
       bMonophonic(monophonic),
-      DeltaTime(0),
-      prevDurEvent(NULL),
-      prevKey(0),
+      bHasEndOfTrack(false),
       channelGroup(0),
-      bHasEndOfTrack(false) {}
+      DeltaTime(0),
+      prevDurEvent(nullptr),
+      prevKey(0),
+      bSustain(false) {}
 
 MidiTrack::~MidiTrack(void) {
   DeleteVect<MidiEvent>(aEvents);
 }
 
 void MidiTrack::Sort(void) {
-  stable_sort(aEvents.begin(), aEvents.end(), PriorityCmp());  // Sort all the events by priority
-  stable_sort(aEvents.begin(), aEvents.end(),
-    AbsTimeCmp());  // Sort all the events by absolute time, so that delta times can be
-                         // recorded correctly
+  std::ranges::stable_sort(aEvents, PriorityCmp()); // Sort all the events by priority
+  std::ranges::stable_sort(aEvents, AbsTimeCmp());  // Sort all the events by absolute time,
+                                                             // so that delta times can be recorded correctly
   if (!bHasEndOfTrack && aEvents.size()) {
     aEvents.push_back(new EndOfTrackEvent(this, aEvents.back()->AbsTime));
     bHasEndOfTrack = true;
   }
 }
 
-void MidiTrack::WriteTrack(std::vector<uint8_t> &buf) {
+void MidiTrack::WriteTrack(std::vector<uint8_t> &buf) const {
   buf.push_back('M');
   buf.push_back('T');
   buf.push_back('r');
@@ -144,21 +146,20 @@ void MidiTrack::WriteTrack(std::vector<uint8_t> &buf) {
   std::vector<MidiEvent *> &globEvents = parentSeq->globalTrack.aEvents;
   finalEvents.insert(finalEvents.end(), globEvents.begin(), globEvents.end());
 
-  stable_sort(finalEvents.begin(), finalEvents.end(), PriorityCmp());    //Sort all the events by priority
-  stable_sort(finalEvents.begin(), finalEvents.end(),
-              AbsTimeCmp());  // Sort all the events by absolute time, so that delta times
-                                   // can be recorded correctly
+  std::ranges::stable_sort(finalEvents, PriorityCmp()); // Sort all the events by priority
+  std::ranges::stable_sort(finalEvents, AbsTimeCmp());  // Sort all the events by absolute time,
+                                                                 // so that delta times can be recorded correctly
 
   size_t numEvents = finalEvents.size();
 
   for (size_t i = 0; i < numEvents; i++)
     time = finalEvents[i]->WriteEvent(buf, time);  // write all events into the buffer
 
-  uint32_t trackSize = (uint32_t)(buf.size() - 8);  // -8 for MTrk and size that shouldn't be accounted for
-  buf[4] = (uint8_t)((trackSize & 0xFF000000) >> 24);
-  buf[5] = (uint8_t)((trackSize & 0x00FF0000) >> 16);
-  buf[6] = (uint8_t)((trackSize & 0x0000FF00) >> 8);
-  buf[7] = (uint8_t)(trackSize & 0x000000FF);
+  size_t trackSize = buf.size() - 8;  // -8 for MTrk and size that shouldn't be accounted for
+  buf[4] = static_cast<uint8_t>((trackSize & 0xFF000000) >> 24);
+  buf[5] = static_cast<uint8_t>((trackSize & 0x00FF0000) >> 16);
+  buf[6] = static_cast<uint8_t>((trackSize & 0x0000FF00) >> 8);
+  buf[7] = static_cast<uint8_t>(trackSize & 0x000000FF);
 }
 
 void MidiTrack::SetChannelGroup(int theChannelGroup) {
@@ -166,7 +167,7 @@ void MidiTrack::SetChannelGroup(int theChannelGroup) {
 }
 
 // Delta Time Functions
-uint32_t MidiTrack::GetDelta(void) {
+uint32_t MidiTrack::GetDelta() const {
   return DeltaTime;
 }
 
@@ -214,9 +215,8 @@ void MidiTrack::AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t d
 void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration) {
   uint32_t CurDelta = GetDelta();
   size_t nNumEvents = aEvents.size();
-  NoteEvent *ContNote;  // Continuted Note
 
-  ContNote = NULL;
+  NoteEvent* ContNote = nullptr;  // Continuted Note
   for (size_t curEvt = 0; curEvt < nNumEvents; curEvt++) {
     // Check for a event on this track with the following conditions:
     //	1. Its Event Delta Time is > current Delta Time.
@@ -229,7 +229,7 @@ void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uin
     //       a Note gets extended by a Note On event at the tick where another note expires.
     //       Valkyrie Profile: 225 Fragments of the Heart confirms, that this is NOT the case in the PS1 version.
     if (aEvents[curEvt]->AbsTime > CurDelta && aEvents[curEvt]->GetEventType() == MIDIEVENT_NOTEON) {
-      NoteEvent *NoteEvt = (NoteEvent *) aEvents[curEvt];
+      NoteEvent *NoteEvt = static_cast<NoteEvent*>(aEvents[curEvt]);
       if (NoteEvt->key == key && !NoteEvt->bNoteDown) {
         ContNote = NoteEvt;
         break;
@@ -237,7 +237,7 @@ void MidiTrack::AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uin
     }
   }
 
-  if (ContNote == NULL) {
+  if (ContNote == nullptr) {
     PurgePrevNoteOffs(CurDelta);
     aEvents.push_back(new NoteEvent(this, channel, CurDelta, true, key, vel));  // add note on
     NoteEvent *prevDurNoteOff = new NoteEvent(this, channel, CurDelta + duration, false, key);
@@ -262,7 +262,7 @@ void MidiTrack::PurgePrevNoteOffs() {
 
 void MidiTrack::PurgePrevNoteOffs(uint32_t absTime) {
   prevDurNoteOffs.erase(std::remove_if(prevDurNoteOffs.begin(), prevDurNoteOffs.end(),
-    [absTime](NoteEvent *e) { return e && e->AbsTime <= absTime; }),
+    [absTime](const NoteEvent *e) { return e && e->AbsTime <= absTime; }),
     prevDurNoteOffs.end());
 }
 
@@ -428,7 +428,7 @@ void MidiTrack::AddFineTuning(uint8_t channel, double cents) {
 
 void MidiTrack::InsertFineTuning(uint8_t channel, double cents, uint32_t absTime) {
   double semitones = std::max(-1.0, std::min(1.0, cents / 100.0));
-  int16_t midiTuning = std::min((int)(8192 * semitones + 0.5), 8191) + 8192;
+  int16_t midiTuning = std::min(static_cast<int>(8192 * semitones + 0.5), 8191) + 8192;
   InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
@@ -449,7 +449,7 @@ void MidiTrack::AddCoarseTuning(uint8_t channel, double semitones) {
 
 void MidiTrack::InsertCoarseTuning(uint8_t channel, double semitones, uint32_t absTime) {
   semitones = std::max(-64.0, std::min(64.0, semitones));
-  int16_t midiTuning = std::min((int)(128 * semitones + 0.5), 8191) + 8192;
+  int16_t midiTuning = std::min(static_cast<int>(128 * semitones + 0.5), 8191) + 8192;
   InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
@@ -470,7 +470,7 @@ void MidiTrack::AddModulationDepthRange(uint8_t channel, double semitones) {
 
 void MidiTrack::InsertModulationDepthRange(uint8_t channel, double semitones, uint32_t absTime) {
   semitones = std::max(-64.0, std::min(64.0, semitones));
-  int16_t midiTuning = std::min((int)(128 * semitones + 0.5), 8191) + 8192;
+  int16_t midiTuning = std::min(static_cast<int>(128 * semitones + 0.5), 8191) + 8192;
   InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
@@ -496,7 +496,7 @@ void MidiTrack::AddTempo(uint32_t microSeconds) {
 }
 
 void MidiTrack::AddTempoBPM(double BPM) {
-  uint32_t microSecs = (uint32_t) std::round((double) 60000000 / BPM);
+  uint32_t microSecs = static_cast<uint32_t>(std::round(60000000.0 / BPM));
   aEvents.push_back(new TempoEvent(this, GetDelta(), microSecs));
   //bAddedTempo = true;
 }
@@ -507,7 +507,7 @@ void MidiTrack::InsertTempo(uint32_t microSeconds, uint32_t absTime) {
 }
 
 void MidiTrack::InsertTempoBPM(double BPM, uint32_t absTime) {
-  uint32_t microSecs = (uint32_t) std::round((double) 60000000 / BPM);
+  uint32_t microSecs = static_cast<uint32_t>(std::round(60000000.0 / BPM));
   aEvents.push_back(new TempoEvent(this, absTime, microSecs));
   //bAddedTempo = true;
 }
@@ -633,7 +633,7 @@ void MidiTrack::InsertMarker(uint8_t channel,
 //  *********
 
 MidiEvent::MidiEvent(MidiTrack *thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, int8_t thePriority)
-    : prntTrk(thePrntTrk), AbsTime(absoluteTime), channel(theChannel), priority(thePriority) {
+    : prntTrk(thePrntTrk), channel(theChannel), AbsTime(absoluteTime), priority(thePriority) {
 }
 
 MidiEvent::~MidiEvent(void) {
@@ -655,8 +655,7 @@ bool MidiEvent::IsSysexEvent() {
 }
 
 void MidiEvent::WriteVarLength(std::vector<uint8_t> &buf, uint32_t value) {
-  unsigned long buffer;
-  buffer = value & 0x7F;
+  uint32_t buffer = value & 0x7F;
 
   while ((value >>= 7)) {
     buffer <<= 8;
@@ -664,7 +663,7 @@ void MidiEvent::WriteVarLength(std::vector<uint8_t> &buf, uint32_t value) {
   }
 
   while (true) {
-    buf.push_back((uint8_t) buffer);
+    buf.push_back(static_cast<uint8_t>(buffer));
     if (buffer & 0x80)
       buffer >>= 8;
     else
@@ -675,26 +674,21 @@ void MidiEvent::WriteVarLength(std::vector<uint8_t> &buf, uint32_t value) {
 uint32_t MidiEvent::WriteMetaEvent(std::vector<uint8_t> &buf,
                                    uint32_t time,
                                    uint8_t metaType,
-                                   uint8_t *data,
-                                   size_t dataSize) {
+                                   const uint8_t* data,
+                                   size_t dataSize) const {
   WriteVarLength(buf, AbsTime - time);
   buf.push_back(0xFF);
   buf.push_back(metaType);
-  WriteVarLength(buf, (uint32_t) dataSize);
+  WriteVarLength(buf, static_cast<uint32_t>(dataSize));
   for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++) {
     buf.push_back(data[dataIndex]);
   }
   return AbsTime;
 }
 
-uint32_t MidiEvent::WriteMetaTextEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType, std::string str) {
-  return WriteMetaEvent(buf, time, metaType, (uint8_t *) str.c_str(), str.length());
+uint32_t MidiEvent::WriteMetaTextEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType, const std::string& str) const {
+  return WriteMetaEvent(buf, time, metaType, (uint8_t *)str.c_str(), str.length());
 }
-
-//void MidiEvent::PrepareWrite(vector<MidiEvent*> & aEvents)
-//{
-//aEvents.push_back(MakeCopy());
-//}
 
 std::string MidiEvent::GetNoteName(int noteNumber) {
   const char* noteNames[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
@@ -729,11 +723,11 @@ bool MidiEvent::operator>(const MidiEvent &theMidiEvent) const {
 NoteEvent::NoteEvent(MidiTrack *prntTrk,
                      uint8_t channel,
                      uint32_t absoluteTime,
-                     bool bnoteDown,
+                     bool bNoteDown,
                      uint8_t theKey,
                      uint8_t theVel)
     : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_LOWER),
-      bNoteDown(bnoteDown),
+      bNoteDown(bNoteDown),
       key(theKey),
       vel(theVel) {
 }
@@ -819,7 +813,7 @@ uint32_t ControllerEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
 
 SysexEvent::SysexEvent(MidiTrack *prntTrk,
                        uint32_t absoluteTime,
-                       std::vector<uint8_t> sysexData,
+                       const std::vector<uint8_t>& sysexData,
                        int8_t thePriority)
     : MidiEvent(prntTrk, absoluteTime, 0, thePriority), sysexData(sysexData) {
 }
@@ -875,9 +869,9 @@ TempoEvent::TempoEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint32_t micro
 
 uint32_t TempoEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
   uint8_t data[3] = {
-      (uint8_t) ((microSecs & 0xFF0000) >> 16),
-      (uint8_t) ((microSecs & 0x00FF00) >> 8),
-      (uint8_t) (microSecs & 0x0000FF)
+      static_cast<uint8_t>((microSecs & 0xFF0000) >> 16),
+      static_cast<uint8_t>((microSecs & 0x00FF00) >> 8),
+      static_cast<uint8_t>(microSecs & 0x0000FF)
   };
   return WriteMetaEvent(buf, time, 0x51, data, 3);
 }
@@ -913,7 +907,7 @@ uint32_t TimeSigEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
   //denom is expressed in power of 2... so if we have 6/8 time.  it's 6 = 2^x  ==  ln6 / ln2
   uint8_t data[4] = {
       numer,
-      (uint8_t)(log((double) denom) / 0.69314718055994530941723212145818),
+      static_cast<uint8_t>(log(static_cast<double>(denom)) / 0.69314718055994530941723212145818),
       ticksPerQuarter,
       8
   };
@@ -930,7 +924,7 @@ EndOfTrackEvent::EndOfTrackEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
 
 
 uint32_t EndOfTrackEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
-  return WriteMetaEvent(buf, time, 0x2F, NULL, 0);
+  return WriteMetaEvent(buf, time, 0x2F, nullptr, 0);
 }
 
 //  *********

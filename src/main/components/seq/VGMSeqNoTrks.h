@@ -6,28 +6,27 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
+#include "SeqEvent.h"
 
 class VGMSeqNoTrks : public VGMSeq, public SeqTrack {
 public:
   VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset,
-               std::string name = "VGM Sequence");
+               const std::string& name = "VGM Sequence");
 
 public:
-  virtual ~VGMSeqNoTrks(void);
+  ~VGMSeqNoTrks(void) override;
 
-  virtual void ResetVars();
+  void ResetVars() override;
 
-  inline uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
-    return VGMSeq::GetBytes(nIndex, nCount, pBuffer);
-  }
-  inline uint8_t GetByte(uint32_t offset) { return VGMSeq::GetByte(offset); }
-  inline uint16_t GetShort(uint32_t offset) { return VGMSeq::GetShort(offset); }
-  inline uint32_t GetWord(uint32_t offset) { return VGMSeq::GetWord(offset); }
-  inline uint16_t GetShortBE(uint32_t offset) { return VGMSeq::GetShortBE(offset); }
-  inline uint32_t GetWordBE(uint32_t offset) { return VGMSeq::GetWordBE(offset); }
-  inline uint32_t &offset(void) { return VGMSeq::dwOffset; }
-  inline uint32_t &length(void) { return VGMSeq::unLength; }
-  inline std::string &name(void) { return VGMSeq::m_name; }
+  using VGMSeq::GetBytes;
+  using VGMSeq::GetByte;
+  using VGMSeq::GetShort;
+  using VGMSeq::GetWord;
+  using VGMSeq::GetShortBE;
+  using VGMSeq::GetWordBE;
+  inline uint32_t &offset() { return VGMSeq::dwOffset; }
+  inline uint32_t &length() { return VGMSeq::unLength; }
+  inline std::string &name() { return VGMSeq::m_name; }
 
   inline uint32_t &eventsOffset() { return dwEventsOffset; }
 
@@ -44,10 +43,10 @@ public:
   void SetCurTrack(uint32_t trackNum);
   void TryExpandMidiTracks(uint32_t numTracks);
 
-  virtual bool LoadMain();  // Function to load all the information about the sequence
+  bool LoadMain() override;  // Function to load all the information about the sequence
   virtual bool LoadEvents(long stopTime = 1000000);
-  virtual MidiFile *ConvertToMidi();
-  virtual MidiTrack *GetFirstMidiTrack();
+  MidiFile *ConvertToMidi() override;
+  MidiTrack *GetFirstMidiTrack() override;
 
   uint32_t dwEventsOffset;
 

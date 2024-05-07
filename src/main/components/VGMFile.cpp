@@ -25,7 +25,7 @@ void VGMFile::AddToUI(VGMItem *parent, void *UI_specific) {
   }
 }
 
-Format *VGMFile::GetFormat() {
+Format *VGMFile::GetFormat() const {
   return Format::GetFormatFromName(format);
 }
 
@@ -48,7 +48,7 @@ void VGMFile::AddCollAssoc(VGMColl *coll) {
 }
 
 void VGMFile::RemoveCollAssoc(VGMColl *coll) {
-  auto iter = find(assocColls.begin(), assocColls.end(), coll);
+  auto iter = std::ranges::find(assocColls, coll);
   if (iter != assocColls.end())
     assocColls.erase(iter);
 }
@@ -59,7 +59,7 @@ RawFile *VGMFile::GetRawFile() const {
   return rawfile;
 }
 
-uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
+uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
   // if unLength != 0, verify that we're within the bounds of the file, and truncate num read
   // bytes to end of file
   if (unLength != 0) {
@@ -76,7 +76,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) {
 // VGMHeader
 // *********
 
-VGMHeader::VGMHeader(VGMItem *parItem, uint32_t offset, uint32_t length, const std::string &name)
+VGMHeader::VGMHeader(const VGMItem *parItem, uint32_t offset, uint32_t length, const std::string &name)
     : VGMContainerItem(parItem->vgmfile, offset, length, name) {}
 
 VGMHeader::~VGMHeader() = default;
@@ -98,7 +98,7 @@ void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::string &name
 // VGMHeaderItem
 // *************
 
-VGMHeaderItem::VGMHeaderItem(VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
+VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
                              const std::string &name)
     : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType) {}
 

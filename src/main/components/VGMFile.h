@@ -15,16 +15,16 @@ class VGMFile : public VGMContainerItem {
 public:
   VGMFile(std::string format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
           std::string theName = "VGM File");
-  virtual ~VGMFile() = default;
+  ~VGMFile() override = default;
 
-  virtual void AddToUI(VGMItem *parent, void *UI_specific);
+  void AddToUI(VGMItem *parent, void *UI_specific) override;
 
   [[nodiscard]] const std::string *GetName() const;
   [[nodiscard]] std::string GetDescription() override;
 
   virtual bool LoadVGMFile() = 0;
   virtual bool Load() = 0;
-  Format *GetFormat();
+  Format *GetFormat() const;
   const std::string &GetFormatName();
 
   virtual uint32_t GetID() { return id; }
@@ -36,7 +36,7 @@ public:
   [[nodiscard]] size_t size() const noexcept { return unLength; }
   [[nodiscard]] std::string name() const noexcept { return m_name; }
 
-  uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer);
+  uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const;
 
   inline uint8_t GetByte(uint32_t offset) const { return rawfile->GetByte(offset); }
   inline uint16_t GetShort(uint32_t offset) const { return rawfile->GetShort(offset); }
@@ -45,13 +45,13 @@ public:
   inline uint32_t GetWordBE(uint32_t offset) const { return rawfile->GetWordBE(offset); }
   inline bool IsValidOffset(uint32_t offset) const { return rawfile->IsValidOffset(offset); }
 
-  size_t GetStartOffset() { return dwOffset; }
+  size_t GetStartOffset() const { return dwOffset; }
   /*
    * For whatever reason, you can create null-length VGMItems.
    * The only safe way for now is to
    * assume maximum length
    */
-  size_t GetEndOffset() { return rawfile->size(); }
+  size_t GetEndOffset() const { return rawfile->size(); }
 
   [[nodiscard]] const char *data() const { return rawfile->data() + dwOffset; }
 
@@ -70,11 +70,11 @@ protected:
 
 class VGMHeader : public VGMContainerItem {
 public:
-  VGMHeader(VGMItem *parItem, uint32_t offset = 0, uint32_t length = 0,
+  VGMHeader(const VGMItem *parItem, uint32_t offset = 0, uint32_t length = 0,
             const std::string &name = "Header");
-  virtual ~VGMHeader();
+  ~VGMHeader() override;
 
-  virtual Icon GetIcon() { return ICON_BINARY; };
+  Icon GetIcon() override { return ICON_BINARY; };
 
   void AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull,
                   const std::string &name = "Pointer");
@@ -96,9 +96,9 @@ public:
     HIT_UNKNOWN
   };  // HIT = Header Item Type
 
-  VGMHeaderItem(VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
+  VGMHeaderItem(const VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
                 const std::string &name);
-  virtual Icon GetIcon();
+  Icon GetIcon() override;
 
   HdrItemType type;
 };
