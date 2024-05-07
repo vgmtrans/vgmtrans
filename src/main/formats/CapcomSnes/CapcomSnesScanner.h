@@ -1,6 +1,7 @@
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
+#include "ExtensionDiscriminator.h"
 
 enum CapcomSnesVersion: uint8_t; // see CapcomSnesFormat.h
 

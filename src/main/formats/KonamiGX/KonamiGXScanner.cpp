@@ -17,7 +17,6 @@ void KonamiGXScanner::Scan(RawFile *file, void *info) {
     return;
 
   LoadSeqTable(seqRomGroupEntry->file, seq_table_offset);
-  return;
 }
 
 

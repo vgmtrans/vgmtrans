@@ -20,5 +20,5 @@ public:
 
   bool LoadVGMFile() override;
   virtual bool LoadMain();
-  virtual bool Load();
+  bool Load() override;
 };

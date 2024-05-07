@@ -16,8 +16,8 @@
 
 VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
-                 std::string theName)
-    : VGMItem(sampColl->vgmfile, offset, length, theName), dataOff(dataOffset), dataLength(dataLen),
+                 std::string name)
+    : VGMItem(sampColl->vgmfile, offset, length, std::move(name)), dataOff(dataOffset), dataLength(dataLen),
       bps(theBPS), rate(theRate), channels(nChannels), parSampColl(sampColl) {
 }
 
@@ -54,7 +54,7 @@ bool VGMSamp::SaveAsWav(const std::string &filepath) {
   if (this->ulUncompressedSize)
     bufSize = this->ulUncompressedSize;
   else
-    bufSize = (uint32_t)ceil((double)dataLength * GetCompressionRatio());
+    bufSize = static_cast<uint32_t>(ceil(dataLength * GetCompressionRatio()));
 
   std::vector<uint8_t> uncompSampBuf(bufSize);
   ConvertToStdWave(uncompSampBuf.data());
@@ -97,11 +97,11 @@ bool VGMSamp::SaveAsWav(const std::string &filepath) {
 
     uint32_t loopStart =
         (loop.loopStartMeasure == LM_BYTES)
-            ? (uint32_t)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
+            ? static_cast<uint32_t>((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
             : loop.loopStart;
     uint32_t loopLenInSamp =
         (loop.loopLengthMeasure == LM_BYTES)
-            ? (uint32_t)((loopLength * compressionRatio) / origFormatBytesPerSamp)
+            ? static_cast<uint32_t>((loopLength * compressionRatio) / origFormatBytesPerSamp)
             : loopLength;
     uint32_t loopEnd = loopStart + loopLenInSamp;
 
@@ -124,5 +124,5 @@ bool VGMSamp::SaveAsWav(const std::string &filepath) {
     PushTypeOnVect<uint32_t>(waveBuf, 0);                  // playcount
   }
 
-  return pRoot->UI_WriteBufferToFile(filepath, &waveBuf[0], (uint32_t)waveBuf.size());
+  return pRoot->UI_WriteBufferToFile(filepath, &waveBuf[0], waveBuf.size());
 }

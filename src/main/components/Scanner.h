@@ -4,7 +4,6 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "ExtensionDiscriminator.h"
 
 class RawFile;
 
@@ -20,6 +19,6 @@ class VGMScanner {
 
   virtual bool Init();
   //virtual bool UseExtension() {return true;}
-  void InitiateScan(RawFile *file, void *offset = 0);
-  virtual void Scan(RawFile *file, void *offset = 0) = 0;
+  void InitiateScan(RawFile *file, void *offset = nullptr);
+  virtual void Scan(RawFile *file, void *offset = nullptr) = 0;
 };

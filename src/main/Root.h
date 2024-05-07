@@ -35,8 +35,8 @@ public:
 
   virtual bool Init();
   virtual bool OpenRawFile(const std::string &filename);
-  bool CreateVirtFile(uint8_t *databuf, uint32_t fileSize, const std::string &filename,
-                      const std::string &parRawFileFullPath = "", VGMTag tag = VGMTag());
+  bool CreateVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
+                      const std::string& parRawFileFullPath = "", const VGMTag& tag = VGMTag());
   bool SetupNewRawFile(RawFile* newRawFile);
   bool CloseRawFile(RawFile *targFile);
   void AddVGMFile(VGMFileVariant file);
@@ -45,10 +45,10 @@ public:
   void RemoveVGMColl(VGMColl *theFile);
   void Log(LogItem *theLog);
 
-  virtual const std::string UI_GetResourceDirPath();
+  virtual std::string UI_GetResourceDirPath();
   virtual void UI_SetRootPtr(VGMRoot **theRoot) = 0;
   virtual void UI_AddRawFile(RawFile *) {}
-  virtual void UI_CloseRawFile(RawFile *targFile) {}
+  virtual void UI_CloseRawFile(RawFile *) {}
 
   virtual void UI_OnBeginLoadRawFile() {}
   virtual void UI_OnEndLoadRawFile() {}
@@ -61,14 +61,14 @@ public:
   virtual void UI_RemoveVGMFile(VGMFile *) {}
   virtual void UI_BeginRemoveVGMFiles() {}
   virtual void UI_EndRemoveVGMFiles() {}
-  virtual void UI_Log(LogItem *theLog) { }
+  virtual void UI_Log(LogItem *) { }
 
   virtual void UI_RemoveVGMColl(VGMColl *) {}
   virtual void UI_AddItem(VGMItem *, VGMItem *, const std::string &, void *) {}
   virtual std::string UI_GetSaveFilePath(const std::string &suggestedFilename,
                                          const std::string &extension = "") = 0;
   virtual std::string UI_GetSaveDirPath(const std::string &suggestedDir = "") = 0;
-  virtual bool UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, uint32_t size);
+  virtual bool UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, size_t size);
 
   std::vector<RawFile *> vRawFile;
   std::vector<VGMColl *> vVGMColl;

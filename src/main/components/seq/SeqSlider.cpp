@@ -29,8 +29,8 @@ TNumber SeqSlider<TNumber>::get(uint32_t time) const {
 
   // linear interpolation
   uint32_t step = time - this->time;
-  double alpha = (double) step / this->duration;
-  return (TNumber) (initialValue * (1.0 - alpha) + targetValue * alpha);
+  double alpha = static_cast<double>(step) / this->duration;
+  return static_cast<TNumber>(initialValue * (1.0 - alpha) + targetValue * alpha);
 }
 
 template<typename TNumber>

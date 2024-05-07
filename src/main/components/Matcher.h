@@ -7,14 +7,14 @@
 #pragma once
 #include <variant>
 #include <map>
-#include <vector>
 #include "Format.h"
 
-class VGMMiscFile;
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMColl.h"
+
+class VGMMiscFile;
 
 // *******
 // Matcher
@@ -67,12 +67,10 @@ class SimpleMatcher : public Matcher {
 
     seqs.insert(std::pair<IdType, VGMSeq *>(id, seq));
 
-    VGMInstrSet *matchingInstrSet = nullptr;
-    matchingInstrSet = instrsets[id];
-    if (matchingInstrSet) {
+
+    if (VGMInstrSet* matchingInstrSet = instrsets[id]) {
       if (bRequiresSampColl) {
-        VGMSampColl *matchingSampColl = sampcolls[id];
-        if (matchingSampColl) {
+        if (VGMSampColl *matchingSampColl = sampcolls[id]) {
           VGMColl *coll = fmt->NewCollection();
           if (!coll)
             return false;
@@ -111,7 +109,7 @@ class SimpleMatcher : public Matcher {
       return false;
     instrsets[id] = instrset;
 
-    VGMSampColl *matchingSampColl;
+    VGMSampColl *matchingSampColl = nullptr;
     if (bRequiresSampColl) {
       matchingSampColl = sampcolls[id];
       if (matchingSampColl && matchingSampColl->bLoadOnInstrSetMatch) {
@@ -355,8 +353,8 @@ class FilegroupMatcher : public Matcher {
   bool OnCloseInstrSet(VGMInstrSet *instrset) override;
   bool OnCloseSampColl(VGMSampColl *sampcoll) override;
 
+  bool MakeCollectionsForFile(VGMFile *file) override;
   virtual void MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampcoll);
-  virtual bool MakeCollectionsForFile(VGMFile *file);
 
   virtual void LookForMatch();
 

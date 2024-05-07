@@ -50,7 +50,7 @@ class SeqEvent:
                     EventColor color = CLR_UNKNOWN,
                     Icon icon = ICON_BINARY,
                     const std::string &desc = "");
-  virtual ~SeqEvent() = default;
+  ~SeqEvent() override = default;
   std::string GetDescription() override {
     return desc;
   }

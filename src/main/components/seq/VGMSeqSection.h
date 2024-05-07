@@ -1,9 +1,6 @@
 #pragma once
 
-#include "common.h"
 #include "VGMItem.h"
-#include "VGMFile.h"
-#include "VGMMultiSectionSeq.h"
 #include "SeqTrack.h"
 
 class VGMMultiSectionSeq;
@@ -14,9 +11,9 @@ class VGMSeqSection
   VGMSeqSection(VGMMultiSectionSeq *parentFile,
                 uint32_t theOffset,
                 uint32_t theLength = 0,
-                const std::string theName = "Section",
+                const std::string& name = "Section",
                 EventColor color = CLR_HEADER);
-  virtual ~VGMSeqSection(void);
+  ~VGMSeqSection() override;
 
   virtual bool Load();
   virtual bool GetTrackPointers();

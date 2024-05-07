@@ -51,7 +51,7 @@ public:
   std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
                                  const std::string& extension = "") override;
 
-  virtual std::string UI_GetSaveDirPath(const std::string& suggestedDir = "");
+  std::string UI_GetSaveDirPath(const std::string& suggestedDir = "") override;
 
   std::set<fs::path> inputFiles = {};
   fs::path outputDir = fs::path(".");

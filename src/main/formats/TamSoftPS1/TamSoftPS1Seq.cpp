@@ -351,7 +351,8 @@ bool TamSoftPS1Track::ReadEvent(void) {
 
       case 0xFF:
         // I'm quite not sure, but it looks like an end event
-        bContinue = AddEndOfTrack(beginOffset, curOffset - beginOffset);
+        AddEndOfTrack(beginOffset, curOffset - beginOffset);
+        bContinue = false;
         break;
 
       default: {

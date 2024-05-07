@@ -5,7 +5,6 @@
  */
 
 #include <cmath>
-#include <iterator>
 #include <numeric>
 #include <string>
 #include <vector>
@@ -15,6 +14,7 @@
 #include "VGMSampColl.h"
 #include "NDSInstrSet.h"
 #include "VGMRgn.h"
+#include "LogManager.h"
 
 // INTR_FREQUENCY is the interval in seconds between updates to the vol for articulation.
 // In the original software, this is done via an interrupt timer.
@@ -29,8 +29,8 @@ constexpr double INTR_FREQUENCY = 64 * 2728.0 / 33e6;
 
 NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSampColl *psg_samples,
                          std::string name)
-    : VGMInstrSet(NDSFormat::name, file, offset, length, name), m_psg_samples(psg_samples) {
-}
+    : VGMInstrSet(NDSFormat::name, file, offset, length, std::move(name)),
+      m_psg_samples(psg_samples) {}
 
 bool NDSInstrSet::GetInstrPointers() {
   uint32_t nInstruments = GetWord(dwOffset + 0x38);
@@ -88,7 +88,7 @@ bool NDSInstr::LoadInstr() {
       VGMRgn *rgn = AddRgn(dwOffset, 10, dutyCycle);
       GetArticData(rgn, dwOffset + 4);
 
-      rgn->sampCollPtr = ((NDSInstrSet *)parInstrSet)->m_psg_samples;
+      rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->m_psg_samples;
       /* We have to set this manually as all of our samples are generated at 440Hz (69 = A4) */
       rgn->SetUnityKey(69);
       break;
@@ -102,7 +102,7 @@ bool NDSInstr::LoadInstr() {
       VGMRgn *rgn = AddRgn(dwOffset, 10, 8);
       GetArticData(rgn, dwOffset + 4);
 
-      rgn->sampCollPtr = ((NDSInstrSet *)parInstrSet)->m_psg_samples;
+      rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->m_psg_samples;
       rgn->SetUnityKey(45);
 
       break;
@@ -148,17 +148,17 @@ bool NDSInstr::LoadInstr() {
 
       break;
     }
+    default:
+      break;
   }
   return true;
 }
 
-void NDSInstr::GetSampCollPtr(VGMRgn *rgn, int waNum) {
-  rgn->sampCollPtr = ((NDSInstrSet *)parInstrSet)->sampCollWAList[waNum];
+void NDSInstr::GetSampCollPtr(VGMRgn *rgn, int waNum) const {
+  rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->sampCollWAList[waNum];
 }
 
-void NDSInstr::GetArticData(VGMRgn *rgn, uint32_t offset) {
-  short realDecay;
-  short realRelease;
+void NDSInstr::GetArticData(VGMRgn *rgn, uint32_t offset) const {
   uint8_t realAttack;
   long realSustainLev;
   const uint8_t AttackTimeTable[] = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33, 0x3F, 0x49, 0x54,
@@ -190,8 +190,8 @@ void NDSInstr::GetArticData(VGMRgn *rgn, uint32_t offset) {
   else
     realAttack = 0xFF - AttackTime;
 
-  realDecay = GetFallingRate(DecayTime);
-  realRelease = GetFallingRate(ReleaseTime);
+  short realDecay = GetFallingRate(DecayTime);
+  short realRelease = GetFallingRate(ReleaseTime);
 
   int count = 0;
   for (long i = 0x16980; i != 0; i = (i * realAttack) >> 8)
@@ -213,7 +213,7 @@ void NDSInstr::GetArticData(VGMRgn *rgn, uint32_t offset) {
     rgn->sustain_level = 1.0;
   else
     // rgn->sustain_level = 20 * log10 ((92544.0-realSustainLev) / 92544.0);
-    rgn->sustain_level = (double)(0x16980 - realSustainLev) / (double)0x16980;
+    rgn->sustain_level = static_cast<double>(0x16980 - realSustainLev) / 0x16980;
 
   // we express release rate as time from maximum volume, not sustain level
   count = 0x16980 / realRelease;
@@ -226,10 +226,10 @@ void NDSInstr::GetArticData(VGMRgn *rgn, uint32_t offset) {
   else if (Pan == 64)
     rgn->pan = 0.5;
   else
-    rgn->pan = (double)Pan / (double)127;
+    rgn->pan = static_cast<double>(Pan) / 127;
 }
 
-uint16_t NDSInstr::GetFallingRate(uint8_t DecayTime) {
+uint16_t NDSInstr::GetFallingRate(uint8_t DecayTime) const {
   uint32_t realDecay;
   if (DecayTime == 0x7F)
     realDecay = 0xFFFF;
@@ -246,7 +246,7 @@ uint16_t NDSInstr::GetFallingRate(uint8_t DecayTime) {
                              // have tested all cases
     realDecay &= 0xFFFF;
   }
-  return (uint16_t)realDecay;
+  return static_cast<uint16_t>(realDecay);
 }
 
 // ***********
@@ -254,7 +254,7 @@ uint16_t NDSInstr::GetFallingRate(uint8_t DecayTime) {
 // ***********
 
 NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, std::string name)
-    : VGMSampColl(NDSFormat::name, file, offset, length, name) {
+    : VGMSampColl(NDSFormat::name, file, offset, length, std::move(name)) {
 }
 
 bool NDSWaveArch::GetHeaderInfo() {
@@ -280,6 +280,10 @@ bool NDSWaveArch::GetSampleInfo() {
         bps = 16;
         break;
       case NDSSamp::IMA_ADPCM:
+        bps = 16;
+        break;
+      default:
+        L_ERROR("Parsed invalid wave type: {}", waveType);
         bps = 16;
         break;
     }
@@ -338,7 +342,7 @@ bool NDSPSG::GetSampleInfo() {
 NDSSamp::NDSSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
                  uint8_t theWaveType, std::string name)
-    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
+    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, std::move(name)),
       waveType(theWaveType) {
 }
 

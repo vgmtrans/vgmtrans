@@ -6,23 +6,22 @@
 
 #include <algorithm>
 #include <numeric>
+#include <ranges>
+#include <vector>
 #include "DLSFile.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "Root.h"
 
-using namespace std;
-
 //  *******
 //  DLSFile
 //  *******
 
-DLSFile::DLSFile(string dls_name) : RiffFile(dls_name, "DLS ") {
-}
+DLSFile::DLSFile(std::string dls_name) : RiffFile(std::move(dls_name), "DLS ") {}
 
 std::vector<DLSInstr *> DLSFile::GetInstruments() {
   std::vector<DLSInstr *> instrs(m_instrs.size());
-  std::transform(std::begin(m_instrs), std::end(m_instrs), std::begin(instrs), [](auto &instr_pointer) {
+  std::ranges::transform(m_instrs, instrs.begin(), [](auto &instr_pointer) {
     return instr_pointer.get();
   });
 
@@ -31,7 +30,7 @@ std::vector<DLSInstr *> DLSFile::GetInstruments() {
 
 std::vector<DLSWave *> DLSFile::GetWaves() {
   std::vector<DLSWave *> waves(m_waves.size());
-  std::transform(std::begin(m_waves), std::end(m_waves), std::begin(waves), [](auto &wave_pointer) {
+  std::ranges::transform(m_waves, waves.begin(), [](auto &wave_pointer) {
     return wave_pointer.get();
   });
 
@@ -48,12 +47,9 @@ DLSInstr *DLSFile::AddInstr(unsigned long bank, unsigned long instrNum, std::str
   return instr;
 }
 
-void DLSFile::DeleteInstr(unsigned long, unsigned long) {
-}
-
 DLSWave *DLSFile::AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec,
                           int aveBytesPerSec, uint16_t blockAlign, uint16_t bitsPerSample,
-                          uint32_t waveDataSize, unsigned char *waveData, string wave_name) {
+                          uint32_t waveDataSize, unsigned char *waveData, std::string wave_name) {
   auto wave = m_waves
                   .emplace_back(std::make_unique<DLSWave>(formatTag, channels, samplesPerSec,
                                                           aveBytesPerSec, blockAlign, bitsPerSample,
@@ -85,9 +81,7 @@ uint32_t DLSFile::GetSize() {
   return dls_size;
 }
 
-int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
-  uint32_t theDWORD;
-
+int DLSFile::WriteDLSToBuffer(std::vector<uint8_t> &buf) {
   PushTypeOnVectBE<uint32_t>(buf, 0x52494646);   //"RIFF"
   PushTypeOnVect<uint32_t>(buf, GetSize() - 8);  // size
   PushTypeOnVectBE<uint32_t>(buf, 0x444C5320);   //"DLS "
@@ -96,7 +90,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
   PushTypeOnVect<uint32_t>(buf, 4);             // size
   PushTypeOnVect<uint32_t>(
       buf, static_cast<uint32_t>(m_instrs.size()));  // cInstruments - number of instruments
-  theDWORD = 4;                                     // account for 4 "lins" bytes
+  uint32_t theDWORD = 4;                                     // account for 4 "lins" bytes
   for (auto &instr : m_instrs)
     theDWORD += instr->GetSize();        // each "ins " list
   WriteLIST(buf, 0x6C696E73, theDWORD);  // Write the "lins" LIST
@@ -137,7 +131,7 @@ int DLSFile::WriteDLSToBuffer(vector<uint8_t> &buf) {
 
 // I should probably make this function part of a parent class for both Midi and DLS file
 bool DLSFile::SaveDLSFile(const std::string &filepath) {
-  vector<uint8_t> dlsBuf;
+  std::vector<uint8_t> dlsBuf;
   WriteDLSToBuffer(dlsBuf);
   return pRoot->UI_WriteBufferToFile(filepath, dlsBuf.data(), static_cast<uint32_t>(dlsBuf.size()));
 }
@@ -151,8 +145,8 @@ DLSInstr::DLSInstr(uint32_t bank, uint32_t instrument)
   RiffFile::AlignName(m_name);
 }
 
-DLSInstr::DLSInstr(uint32_t bank, uint32_t instrument, string instrName)
-    : ulBank(bank), ulInstrument(instrument), m_name(instrName) {
+DLSInstr::DLSInstr(uint32_t bank, uint32_t instrument, std::string instrName)
+    : ulBank(bank), ulInstrument(instrument), m_name(std::move(instrName)) {
   RiffFile::AlignName(m_name);
 }
 
@@ -171,7 +165,7 @@ uint32_t DLSInstr::GetSize() const {
   return dls_size;
 }
 
-void DLSInstr::Write(vector<uint8_t> &buf) {
+void DLSInstr::Write(std::vector<uint8_t> &buf) {
   uint32_t temp = GetSize() - 8;
   RiffFile::WriteLIST(buf, 0x696E7320, temp);                          // write "ins " list
   PushTypeOnVectBE<uint32_t>(buf, 0x696E7368);                         //"insh"
@@ -223,16 +217,16 @@ uint32_t DLSRgn::GetSize() const {
   return size;
 }
 
-void DLSRgn::Write(vector<uint8_t> &buf) {
-  RiffFile::WriteLIST(buf, 0x72676E32, (GetSize() - 8));                // write "rgn2" list
-  PushTypeOnVectBE<uint32_t>(buf, 0x72676E68);                          //"rgnh"
+void DLSRgn::Write(std::vector<uint8_t> &buf) const {
+  RiffFile::WriteLIST(buf, 0x72676E32, (GetSize() - 8));  // write "rgn2" list
+  PushTypeOnVectBE<uint32_t>(buf, 0x72676E68);                      //"rgnh"
   PushTypeOnVect<uint32_t>(buf, static_cast<uint32_t>(RGNH_SIZE - 8));  // size
   PushTypeOnVect<uint16_t>(buf, usKeyLow);                              // usLow  (key)
   PushTypeOnVect<uint16_t>(buf, usKeyHigh);                             // usHigh (key)
   PushTypeOnVect<uint16_t>(buf, usVelLow);                              // usLow  (vel)
   PushTypeOnVect<uint16_t>(buf, usVelHigh);                             // usHigh (vel)
-  PushTypeOnVect<uint16_t>(buf, 1);                                     // fusOptions
-  PushTypeOnVect<uint16_t>(buf, 0);                                     // usKeyGroup
+  PushTypeOnVect<uint16_t>(buf, 1);                                 // fusOptions
+  PushTypeOnVect<uint16_t>(buf, 0);                                 // usKeyGroup
 
   // new for dls2
   PushTypeOnVect<uint16_t>(buf, 1);  // NO CLUE
@@ -242,10 +236,10 @@ void DLSRgn::Write(vector<uint8_t> &buf) {
 
   PushTypeOnVectBE<uint32_t>(buf, 0x776C6E6B);   //"wlnk"
   PushTypeOnVect<uint32_t>(buf, WLNK_SIZE - 8);  // size
-  PushTypeOnVect<uint16_t>(buf, fusOptions);     // fusOptions
-  PushTypeOnVect<uint16_t>(buf, usPhaseGroup);   // usPhaseGroup
-  PushTypeOnVect<uint32_t>(buf, channel);        // ulChannel
-  PushTypeOnVect<uint32_t>(buf, tableIndex);     // ulTableIndex
+  PushTypeOnVect<uint16_t>(buf, fusOptions);         // fusOptions
+  PushTypeOnVect<uint16_t>(buf, usPhaseGroup);       // usPhaseGroup
+  PushTypeOnVect<uint32_t>(buf, channel);            // ulChannel
+  PushTypeOnVect<uint32_t>(buf, tableIndex);         // ulTableIndex
 
   if (m_art)
     m_art->Write(buf);
@@ -280,7 +274,7 @@ void DLSRgn::SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t the
 //  DLSArt
 //  ******
 
-uint32_t DLSArt::GetSize(void) {
+uint32_t DLSArt::GetSize() const {
   uint32_t size = 0;
   size += LIST_HDR_SIZE;  //"lar2" list
   size += 16;             //"art2" chunk + size + cbSize + cConnectionBlocks
@@ -289,7 +283,7 @@ uint32_t DLSArt::GetSize(void) {
   return size;
 }
 
-void DLSArt::Write(vector<uint8_t> &buf) {
+void DLSArt::Write(std::vector<uint8_t> &buf) const {
   RiffFile::WriteLIST(buf, 0x6C617232, GetSize() - 8);                       // write "lar2" list
   PushTypeOnVectBE<uint32_t>(buf, 0x61727432);                               //"art2"
   PushTypeOnVect<uint32_t>(buf, GetSize() - LIST_HDR_SIZE - 8);              // size
@@ -327,7 +321,7 @@ void DLSArt::AddPan(long pan) {
 //  ConnectionBlock
 //  ***************
 
-void ConnectionBlock::Write(vector<uint8_t> &buf) {
+void ConnectionBlock::Write(std::vector<uint8_t> &buf) const {
   PushTypeOnVect<uint16_t>(buf, usSource);       // usSource
   PushTypeOnVect<uint16_t>(buf, usControl);      // usControl
   PushTypeOnVect<uint16_t>(buf, usDestination);  // usDestination
@@ -347,7 +341,7 @@ uint32_t DLSWsmp::GetSize() const {
   return size;
 }
 
-void DLSWsmp::Write(vector<uint8_t> &buf) {
+void DLSWsmp::Write(std::vector<uint8_t> &buf) const {
   PushTypeOnVectBE<uint32_t>(buf, 0x77736D70);   //"wsmp"
   PushTypeOnVect<uint32_t>(buf, GetSize() - 8);  // size
   PushTypeOnVect<uint32_t>(buf, 20);             // cbSize (size of structure without loop record)
@@ -379,11 +373,11 @@ void DLSWsmp::SetLoopInfo(Loop &loop, VGMSamp *samp) {
   // In DLS, the value is in number of samples
   // if the val is a raw offset of the original format, multiply it by the compression ratio
   ulLoopStart = (loop.loopStartMeasure == LM_BYTES)
-                    ? (uint32_t)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
+                    ? static_cast<uint32_t>((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
                     : loop.loopStart;
 
   ulLoopLength = (loop.loopLengthMeasure == LM_BYTES)
-                     ? (uint32_t)((loop.loopLength * compressionRatio) / origFormatBytesPerSamp)
+                     ? static_cast<uint32_t>((loop.loopLength * compressionRatio) / origFormatBytesPerSamp)
                      : loop.loopLength;
 }
 
@@ -411,7 +405,7 @@ uint32_t DLSWave::GetSize() const {
   return size;
 }
 
-void DLSWave::Write(vector<uint8_t> &buf) {
+void DLSWave::Write(std::vector<uint8_t> &buf) {
   RiffFile::WriteLIST(buf, 0x77617665, GetSize() - 8);  // write "wave" list
   PushTypeOnVectBE<uint32_t>(buf, 0x666D7420);          //"fmt "
   PushTypeOnVect<uint32_t>(buf, 18);                    // size

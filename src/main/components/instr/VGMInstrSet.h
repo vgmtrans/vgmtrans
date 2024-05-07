@@ -1,8 +1,6 @@
 #pragma once
 #include "common.h"
 #include "VGMFile.h"
-#include "DLSFile.h"
-#include "SF2File.h"
 
 class VGMSampColl;
 class VGMInstr;
@@ -19,20 +17,17 @@ constexpr float defaultReverbPercent = 0.25;
 class VGMInstrSet : public VGMFile {
 public:
   VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
-              std::string name = "VGMInstrSet", VGMSampColl *theSampColl = NULL);
-  virtual ~VGMInstrSet(void);
+              std::string name = "VGMInstrSet", VGMSampColl *theSampColl = nullptr);
+  ~VGMInstrSet() override;
 
   bool LoadVGMFile() override;
-  virtual bool Load();
+  bool Load() override;
   virtual bool GetHeaderInfo();
   virtual bool GetInstrPointers();
   virtual bool LoadInstrs();
 
   VGMInstr *AddInstr(uint32_t offset, uint32_t length, unsigned long bank, unsigned long instrNum,
                      const std::string &instrName = "");
-
-  bool OnSaveAsDLS();
-  bool OnSaveAsSF2();
 
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
@@ -50,9 +45,9 @@ public:
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, const std::string &name = "Instrument",
            float reverb = defaultReverbPercent);
-  virtual ~VGMInstr(void);
+  ~VGMInstr() override;
 
-  virtual Icon GetIcon() { return ICON_INSTR; };
+  Icon GetIcon() override { return ICON_INSTR; };
 
   inline void SetBank(uint32_t bankNum);
   inline void SetInstrNum(uint32_t theInstrNum);
@@ -65,8 +60,8 @@ public:
 
   uint32_t bank;
   uint32_t instrNum;
+  VGMInstrSet *parInstrSet;
   float reverb;
 
-  VGMInstrSet *parInstrSet;
   std::vector<VGMRgn *> aRgns;
 };

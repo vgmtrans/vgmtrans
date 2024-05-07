@@ -9,17 +9,13 @@
 #include <spdlog/fmt/fmt.h>
 #include "VGMSamp.h"
 
-using namespace std;
-
 //  **********************************************************************************
 //  SynthFile - An intermediate class to lay out all of the the data necessary for Coll conversion
 //				to DLS or SF2 formats.  Currently, the structure is identical to DLS.
 //  **********************************************************************************
 
 SynthFile::SynthFile(std::string synth_name)
-    : name(synth_name) {
-
-}
+    : name(std::move(synth_name)) {}
 
 SynthFile::~SynthFile() {
   DeleteVect(vInstrs);
@@ -33,12 +29,8 @@ SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, float reverb) 
 }
 
 SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, std::string name, float reverb) {
-  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, name, reverb));
+  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, std::move(name), reverb));
   return vInstrs.back();
-}
-
-void SynthFile::DeleteInstr(uint32_t bank, uint32_t instrNum) {
-
 }
 
 SynthWave *SynthFile::AddWave(uint16_t formatTag,
@@ -59,7 +51,7 @@ SynthWave *SynthFile::AddWave(uint16_t formatTag,
                               bitsPerSample,
                               waveDataSize,
                               waveData,
-                              name));
+                              std::move(name)));
   return vWaves.back();
 }
 
@@ -75,12 +67,13 @@ SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, float reverb)
 }
 
 SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, float reverb)
-    : ulBank(bank), ulInstrument(instrument), name(instrName), reverb(reverb)  {
+    : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverb)  {
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, string instrName, std::vector<SynthRgn *> listRgns, float reverb)
-    : ulBank(bank), ulInstrument(instrument), name(instrName), reverb(reverb)  {
+SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName,
+                       const std::vector<SynthRgn *>& listRgns, float reverb)
+    : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverb)  {
   //RiffFile::AlignName(name);
   vRgns = listRgns;
 }
@@ -89,12 +82,12 @@ SynthInstr::~SynthInstr() {
   DeleteVect(vRgns);
 }
 
-SynthRgn *SynthInstr::AddRgn(void) {
+SynthRgn *SynthInstr::AddRgn() {
   vRgns.insert(vRgns.end(), new SynthRgn());
   return vRgns.back();
 }
 
-SynthRgn *SynthInstr::AddRgn(SynthRgn rgn) {
+SynthRgn *SynthInstr::AddRgn(const SynthRgn& rgn) {
   SynthRgn *newRgn = new SynthRgn();
   *newRgn = rgn;
   vRgns.insert(vRgns.end(), newRgn);
@@ -105,19 +98,19 @@ SynthRgn *SynthInstr::AddRgn(SynthRgn rgn) {
 //  SynthRgn
 //  ********
 
-SynthRgn::~SynthRgn(void) {
+SynthRgn::~SynthRgn() {
   if (sampinfo)
     delete sampinfo;
   if (art)
     delete art;
 }
 
-SynthArt *SynthRgn::AddArt(void) {
+SynthArt *SynthRgn::AddArt() {
   art = new SynthArt();
   return art;
 }
 
-SynthSampInfo *SynthRgn::AddSampInfo(void) {
+SynthSampInfo *SynthRgn::AddSampInfo() {
   sampinfo = new SynthSampInfo();
   return sampinfo;
 }
@@ -176,10 +169,10 @@ void SynthSampInfo::SetLoopInfo(Loop &loop, VGMSamp *samp) {
   cSampleLoops = loop.loopStatus;
   ulLoopType = loop.loopType;
   ulLoopStart = (loop.loopStartMeasure == LM_BYTES)
-                  ? (uint32_t)((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
+                  ? static_cast<uint32_t>((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
                   : loop.loopStart;
   ulLoopLength = (loop.loopLengthMeasure == LM_BYTES)
-                   ? (uint32_t)((loop.loopLength * compressionRatio) / origFormatBytesPerSamp)
+                   ? static_cast<uint32_t>((loop.loopLength * compressionRatio) / origFormatBytesPerSamp)
                    : loop.loopLength;
 }
 
@@ -201,9 +194,9 @@ void SynthWave::ConvertTo16bitSigned() {
 
     int16_t *newData = new int16_t[this->dataSize];
     for (unsigned int i = 0; i < this->dataSize; i++)
-      newData[i] = ((int16_t)this->data[i] - 128) << 8;
+      newData[i] = (static_cast<int16_t>(this->data[i]) - 128) << 8;
     delete[] this->data;
-    this->data = (uint8_t *)newData;
+    this->data = reinterpret_cast<uint8_t*>(newData);
     this->dataSize *= 2;
   }
 }

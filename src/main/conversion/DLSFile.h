@@ -7,7 +7,6 @@
 #pragma once
 
 #include "common.h"
-#include <memory>
 #include "RiffFile.h"
 
 struct Loop;
@@ -96,11 +95,9 @@ public:
 
   DLSInstr *AddInstr(unsigned long bank, unsigned long instrNum);
   DLSInstr *AddInstr(unsigned long bank, unsigned long instrNum, std::string Name);
-  void DeleteInstr(unsigned long bank, unsigned long instrNum);
   DLSWave *AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
                    uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
                    uint8_t *waveData, std::string name = "Unnamed Wave");
-  void SetName(std::string dls_name);
 
   std::vector<DLSInstr *> GetInstruments();
   std::vector<DLSWave *> GetWaves();
@@ -121,7 +118,6 @@ public:
   DLSInstr(uint32_t bank, uint32_t instrument);
   DLSInstr(uint32_t bank, uint32_t instrument, std::string instrName);
 
-  void AddRgnList(std::vector<DLSRgn> &RgnList);
   DLSRgn *AddRgn();
 
   uint32_t GetSize() const;
@@ -139,7 +135,8 @@ class DLSRgn {
 public:
   DLSRgn() = default;
   DLSRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
-      : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
+      : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh),
+        fusOptions(0), usPhaseGroup(0), channel(0), tableIndex(0) {}
 
   DLSArt *AddArt();
   DLSWsmp *AddWsmp();
@@ -149,7 +146,7 @@ public:
                        uint32_t theTableIndex);
 
   uint32_t GetSize() const;
-  void Write(std::vector<uint8_t> &buf);
+  void Write(std::vector<uint8_t> &buf) const;
 
 private:
   uint16_t usKeyLow;
@@ -168,15 +165,14 @@ private:
 
 class ConnectionBlock {
 public:
-  ConnectionBlock(void);
   ConnectionBlock(uint16_t source, uint16_t control, uint16_t destination, uint16_t transform,
                   int32_t scale)
       : usSource(source), usControl(control), usDestination(destination), usTransform(transform),
         lScale(scale) {}
   ~ConnectionBlock(void) {}
 
-  uint32_t GetSize() const { return 12; }
-  void Write(std::vector<uint8_t> &buf);
+  static uint32_t GetSize() { return 12; }
+  void Write(std::vector<uint8_t> &buf) const;
 
 private:
   uint16_t usSource;
@@ -189,14 +185,13 @@ private:
 class DLSArt {
 public:
   DLSArt() = default;
-  DLSArt(std::vector<ConnectionBlock> &connectionBlocks);
 
   void AddADSR(long attack_time, uint16_t atk_transform, long hold_time, long decay_time,
                long sustain_lev, long release_time, uint16_t rls_transform);
   void AddPan(long pan);
 
-  uint32_t GetSize(void);
-  void Write(std::vector<uint8_t> &buf);
+  uint32_t GetSize() const;
+  void Write(std::vector<uint8_t> &buf) const;
 
 private:
   std::vector<std::unique_ptr<ConnectionBlock>> m_blocks;
@@ -205,17 +200,12 @@ private:
 class DLSWsmp {
 public:
   DLSWsmp() = default;
-  DLSWsmp(uint16_t unityNote, int16_t fineTune, int32_t attenuation, char sampleLoops,
-          uint32_t loopType, uint32_t loopStart, uint32_t loopLength)
-      : usUnityNote(unityNote), sFineTune(fineTune), lAttenuation(attenuation),
-        cSampleLoops(sampleLoops), ulLoopType(loopType), ulLoopStart(loopStart),
-        ulLoopLength(loopLength) {}
 
   void SetLoopInfo(Loop &loop, VGMSamp *samp);
   void SetPitchInfo(uint16_t unityNote, short fineTune, long attenuation);
 
   uint32_t GetSize() const;
-  void Write(std::vector<uint8_t> &buf);
+  void Write(std::vector<uint8_t> &buf) const;
 
 private:
   unsigned short usUnityNote;
@@ -230,14 +220,12 @@ private:
 
 class DLSWave {
 public:
-  DLSWave() { RiffFile::AlignName(m_name); }
-  DLSWave(std::vector<uint8_t> &&data) : m_wave_data(data) {}
   DLSWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
           uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
           unsigned char *waveData, std::string waveName = "Untitled wave")
       : wFormatTag(formatTag), wChannels(channels), dwSamplesPerSec(samplesPerSec),
         dwAveBytesPerSec(aveBytesPerSec), wBlockAlign(blockAlign), wBitsPerSample(bitsPerSample),
-        m_name(waveName), m_wave_data(waveData, waveData + waveDataSize) {
+        m_name(std::move(waveName)), m_wave_data(waveData, waveData + waveDataSize) {
     RiffFile::AlignName(m_name);
   }
 

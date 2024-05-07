@@ -5,6 +5,7 @@
  */
 
 #include <climits>
+#include <ranges>
 
 #include "VGMSeq.h"
 #include "SeqEvent.h"
@@ -16,9 +17,11 @@
 
 VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMFile(format, file, offset, length, std::move(name)),
-      midi(NULL),
+      midi(nullptr),
+      nNumTracks(0),
+      readMode(READMODE_ADD_TO_UI),
+      time(0),
       bMonophonicTracks(false),
-      bReverb(false),
       bUseLinearAmplitudeScale(false),
       bUseLinearPanAmplitudeScale(false),
       bAlwaysWriteInitialTempo(false),
@@ -36,13 +39,11 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32
       initialPitchBendRangeSemiTones(2),  // GM standard.  Means +/- 2 semitones (4 total range)
       initialPitchBendRangeCents(0),
       initialTempoBPM(120),
-      nNumTracks(0),
-      time(0),
-      readMode(READMODE_ADD_TO_UI) {
+      bReverb(false) {
   AddContainer<SeqTrack>(aTracks);
 }
 
-VGMSeq::~VGMSeq(void) {
+VGMSeq::~VGMSeq() {
   DeleteVect<SeqTrack>(aTracks);
   DeleteVect<ISeqSlider>(aSliders);
   delete midi;
@@ -110,7 +111,7 @@ bool VGMSeq::LoadMain() {
     return false;
   if (!GetTrackPointers())
     return false;
-  nNumTracks = (uint32_t)aTracks.size();
+  nNumTracks = static_cast<uint32_t>(aTracks.size());
   if (nNumTracks == 0)
     return false;
 
@@ -119,10 +120,12 @@ bool VGMSeq::LoadMain() {
 
 bool VGMSeq::PostLoad() {
   if (readMode == READMODE_ADD_TO_UI) {
-    std::sort(aInstrumentsUsed.begin(), aInstrumentsUsed.end());
+    std::ranges::sort(aInstrumentsUsed);
 
     for (auto & aTrack : aTracks) {
-      std::sort(aTrack->aEvents.begin(), aTrack->aEvents.end(), [](const VGMItem *a, const VGMItem *b) { return a->dwOffset < b->dwOffset; });
+      std::ranges::sort(aTrack->aEvents, [](const VGMItem *a, const VGMItem *b) {
+        return a->dwOffset < b->dwOffset;
+      });
     }
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
     midi->Sort();
@@ -187,7 +190,6 @@ void VGMSeq::LoadTracksMain(long stopTime) {
   }
 
   // load all tracks
-  bool succeeded = true;
   if (bLoadTickByTick) {
     while (HasActiveTracks()) {
       // check time limit
@@ -315,13 +317,13 @@ void VGMSeq::SetPPQN(uint16_t ppqn) {
     midi->SetPPQN(ppqn);
 }
 
-uint16_t VGMSeq::GetPPQN() {
+uint16_t VGMSeq::GetPPQN() const {
   return this->ppqn;
   //return midi->GetPPQN();
 }
 
 void VGMSeq::AddInstrumentRef(uint32_t progNum) {
-  if (std::find(aInstrumentsUsed.begin(), aInstrumentsUsed.end(), progNum) == aInstrumentsUsed.end()) {
+  if (std::ranges::find(aInstrumentsUsed, progNum) == aInstrumentsUsed.end()) {
     aInstrumentsUsed.push_back(progNum);
   }
 }

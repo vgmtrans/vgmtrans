@@ -6,9 +6,6 @@
 
 #include "PSFFile.h"
 
-#include <exception>
-#include <algorithm>
-
 #include "util/decompression.h"
 #include "io/RawFile.h"
 
@@ -44,7 +41,7 @@ PSFFile::PSFFile(const RawFile &file) {
         auto exe_begin = file.begin() + 16 + reservedarea_size;
 
         if (m_exe_CRC !=
-            crc32(crc32(0L, Z_NULL, 0), reinterpret_cast<const Bytef *>(exe_begin), exe_size)) {
+            crc32(crc32(0L, nullptr, 0), reinterpret_cast<const Bytef *>(exe_begin), exe_size)) {
             throw std::runtime_error("CRC32 mismatch, data is corrupt");
         }
 
@@ -97,13 +94,13 @@ void PSFFile::parseTags(std::span<const char> tag_section) {
         // All characters 0x01-0x20 are considered whitespace.
         // (There must be no null (0x00) characters.)
         while (name_token_end > name_token && *(name_token_end - 1) <= 0x20)
-            name_token_end--;
+            --name_token_end;
         while (value_token_end > value_token && *(value_token_end - 1) <= 0x20)
-            value_token_end--;
+            --value_token_end;
         while (name_token < name_token_end && *(name_token) <= 0x20)
-            name_token++;
+            ++name_token;
         while (value_token < value_token_end && *(value_token) <= 0x20)
-            value_token++;
+            ++value_token;
 
         // Read variable=value as string.
         std::string name(tag_section.data() + std::distance(std::begin(tag_section), name_token),

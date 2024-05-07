@@ -44,7 +44,7 @@ void MenuBar::appendOptionsMenu(const QList<QDockWidget *> &dockWidgets) {
   act->setCheckable(true);
   bs_grp->addAction(act);
 
-  connect(bs_grp, &QActionGroup::triggered, [](QAction *bs_style) {
+  connect(bs_grp, &QActionGroup::triggered, [](const QAction *bs_style) {
     if (auto text = bs_style->text(); text == "GS (Default)") {
       ConversionOptions::the().SetBankSelectStyle(BankSelectStyle::GS);
     } else if (text == "MMA") {

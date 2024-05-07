@@ -14,14 +14,14 @@ template<typename TNumber>
 class SeqSlider: public ISeqSlider {
  public:
   SeqSlider(SeqTrack *track, uint32_t time, uint32_t duration, TNumber initialValue, TNumber targetValue);
-  virtual ~SeqSlider();
+  ~SeqSlider() override;
 
   virtual TNumber get(uint32_t time) const;
-  virtual void write(uint32_t time) const;
+  void write(uint32_t time) const override;
   virtual void writeMessage(TNumber value) const = 0;
   virtual bool changesAt(uint32_t time) const;
-  virtual bool isStarted(uint32_t time) const;
-  virtual bool isActive(uint32_t time) const;
+  bool isStarted(uint32_t time) const override;
+  bool isActive(uint32_t time) const override;
 
  public:
   SeqTrack *track;
@@ -34,23 +34,23 @@ class SeqSlider: public ISeqSlider {
 class VolSlider: public SeqSlider<uint8_t> {
  public:
   VolSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue);
-  virtual void writeMessage(uint8_t value) const;
+  void writeMessage(uint8_t value) const override;
 };
 
 class MasterVolSlider: public SeqSlider<uint8_t> {
  public:
   MasterVolSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue);
-  virtual void writeMessage(uint8_t value) const;
+  void writeMessage(uint8_t value) const override;
 };
 
 class ExpressionSlider: public SeqSlider<uint8_t> {
  public:
   ExpressionSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue);
-  virtual void writeMessage(uint8_t value) const;
+  void writeMessage(uint8_t value) const override;
 };
 
 class PanSlider: public SeqSlider<uint8_t> {
  public:
   PanSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue);
-  virtual void writeMessage(uint8_t value) const;
+  void writeMessage(uint8_t value) const override;
 };

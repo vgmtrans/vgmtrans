@@ -90,13 +90,12 @@ struct qs_samp_info {
   uint32_t end_addr;
   uint8_t unity_key;
 
-  qs_samp_info() {
-  }
+  qs_samp_info() = default;
 
   qs_samp_info(qs_samp_info_cps2* cps2) {
     this->start_addr = (cps2->bank << 16) | swap_bytes16(cps2->start_addr);
     this->loop_offset = (cps2->bank << 16) | swap_bytes16(cps2->loop_offset);
-    this->end_addr = swap_bytes16(cps2->end_addr) + (cps2->end_addr == 0) ? (cps2->bank + 1) << 16 : 0;
+    this->end_addr = (swap_bytes16(cps2->end_addr) + (cps2->end_addr == 0)) ? (cps2->bank + 1) << 16 : 0;
     this->unity_key = cps2->unity_key;
   }
 
