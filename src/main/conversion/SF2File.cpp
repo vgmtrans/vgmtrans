@@ -86,7 +86,7 @@ SF2File::SF2File(SynthFile *synthfile)
     SynthInstr *instr = synthfile->vInstrs[i];
 
     sfPresetHeader presetHdr{};
-    memcpy(presetHdr.achPresetName, instr->name.c_str(), std::min(instr->name.length(), 20ul));
+    memcpy(presetHdr.achPresetName, instr->name.c_str(), std::min(instr->name.length(), static_cast<size_t>(20)));
     presetHdr.wPreset = static_cast<uint16_t>(instr->ulInstrument);
 
     // Despite being a 16-bit value, SF2 only supports banks up to 127. Since
@@ -188,7 +188,7 @@ SF2File::SF2File(SynthFile *synthfile)
     SynthInstr *instr = synthfile->vInstrs[i];
 
     sfInst inst{};
-    memcpy(inst.achInstName, instr->name.c_str(), std::min(instr->name.length(),20ul));
+    memcpy(inst.achInstName, instr->name.c_str(), std::min(instr->name.length(), static_cast<size_t>(20)));
     inst.wInstBagNdx = rgnCounter;
     rgnCounter += instr->vRgns.size();
 
@@ -376,7 +376,7 @@ SF2File::SF2File(SynthFile *synthfile)
     SynthWave *wave = synthfile->vWaves[i];
 
     sfSample samp{};
-    memcpy(samp.achSampleName, wave->name.c_str(), std::min(wave->name.length(), 20ul));
+    memcpy(samp.achSampleName, wave->name.c_str(), std::min(wave->name.length(), static_cast<size_t>(20)));
     samp.dwStart = sampOffset;
     samp.dwEnd = samp.dwStart + (wave->dataSize / sizeof(uint16_t));
     sampOffset = samp.dwEnd + 46;        // plus the 46 padding samples required by sf2 spec
