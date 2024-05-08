@@ -7,7 +7,6 @@
 
 #include "StatusBarContent.h"
 #include <QHBoxLayout>
-#include <QIcon>
 #include "services/NotificationCenter.h"
 
 class QIcon;
