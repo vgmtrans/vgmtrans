@@ -225,6 +225,9 @@ void RareSnesSeq::LoadEventMap() {
       EventMap[0x30] = EVENT_TREMOLOOFF;
       //EventMap[0x31] = EVENT_RESET;
       break;
+    default:
+      L_WARN("Unknown version of Rare SNES format");
+      break;
   }
 }
 

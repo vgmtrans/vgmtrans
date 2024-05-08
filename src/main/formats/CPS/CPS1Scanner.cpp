@@ -103,6 +103,9 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     case VER_CPS1_502:
       seq_table_length = (uint32_t) (programFile->GetShortBE(seq_table_offset) * 2) + ptrsStart;
       break;
+    default:
+      L_ERROR("Unknown version of CPS1 format: {}", static_cast<uint8_t>(fmt_ver));
+      return;
   }
 
   unsigned int k = 0;
