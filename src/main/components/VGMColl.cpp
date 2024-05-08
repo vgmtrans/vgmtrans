@@ -545,6 +545,8 @@ SynthFile *VGMColl::CreateSynthFile() {
         else
           attenuation = 0;
 
+        sampInfo->SetPitchInfo(realUnityKey, realFineTune, attenuation);
+
         double sustainLevAttenDb;
         if (rgn->sustain_level == -1)
           sustainLevAttenDb = 0.0;
@@ -556,8 +558,6 @@ SynthFile *VGMColl::CreateSynthFile() {
         newArt->AddADSR(rgn->attack_time, static_cast<Transform>(rgn->attack_transform),
           rgn->hold_time, rgn->decay_time, sustainLevAttenDb, rgn->sustain_time, rgn->release_time,
           static_cast<Transform>(rgn->release_transform));
-
-        sampInfo->SetPitchInfo(realUnityKey, realFineTune, attenuation);
       }
     }
   }
