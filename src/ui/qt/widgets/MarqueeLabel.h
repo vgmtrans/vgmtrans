@@ -17,10 +17,10 @@ public:
   explicit MarqueeLabel(QWidget *parent = nullptr);
 
   QString text() const;
-  void setText(QString text);
+  void setText(const QString& text);
 
   QString separator() const;
-  void setSeparator(QString separator);
+  void setSeparator(const QString& separator);
 
   QSize sizeHint() const override;
   void hideEvent(QHideEvent *event) override;

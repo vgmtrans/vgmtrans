@@ -23,13 +23,13 @@ public:
 private:
   static constexpr int treeViewMinimumWidth = 220;
 
-  void resetSnapRanges();
+  void resetSnapRanges() const;
   void focusInEvent(QFocusEvent* event) override;
   void closeEvent(QCloseEvent *closeEvent) override;
-  int hexViewWidth();
-  int hexViewWidthSansAscii();
-  int hexViewWidthSansAsciiAndAddress();
-  void updateHexViewFont(qreal sizeIncrement);
+  int hexViewWidth() const;
+  int hexViewWidthSansAscii() const;
+  int hexViewWidthSansAsciiAndAddress() const;
+  void updateHexViewFont(qreal sizeIncrement) const;
 
   VGMFileTreeView* m_treeview{};
   VGMFile* m_vgmfile{};
@@ -38,5 +38,5 @@ private:
   SnappingSplitter* m_splitter;
 
 public slots:
-  void onSelectionChange(VGMItem* item);
+  void onSelectionChange(VGMItem* item) const;
 };

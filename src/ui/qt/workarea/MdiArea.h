@@ -30,13 +30,13 @@ public:
   MdiArea &operator=(MdiArea &&) = delete;
 
   void newView(VGMFile *file);
-  void removeView(VGMFile *file);
+  void removeView(const VGMFile *file);
 
 private:
   MdiArea(QWidget *parent = nullptr);
   void onSubWindowActivated(QMdiSubWindow *window);
-  void onVGMFileSelected(VGMFile *file, QWidget *caller);
-  void ensureMaximizedSubWindow(QMdiSubWindow *window);
-  std::unordered_map<VGMFile *, QMdiSubWindow *> fileToWindowMap;
+  void onVGMFileSelected(const VGMFile *file, QWidget *caller);
+  static void ensureMaximizedSubWindow(QMdiSubWindow *window);
+  std::unordered_map<const VGMFile *, QMdiSubWindow *> fileToWindowMap;
   std::unordered_map<QMdiSubWindow *, VGMFile *> windowToFileMap;
 };

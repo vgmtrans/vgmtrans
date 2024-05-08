@@ -36,13 +36,13 @@ public:
   }
 
   template<typename... Args>
-  void log(spdlog::level::level_enum lvl, const char* file, int line, fmt::format_string<Args...> fmt, Args&&... args) {
+  void log(spdlog::level::level_enum lvl, const char* file, int line, fmt::format_string<Args...> fmt, Args&&... args) const {
     if (lvl != spdlog::level::off) {
       logger_->log(spdlog::source_loc{file, line, ""}, lvl, fmt, std::forward<Args>(args)...);
     }
   }
 
-  void log(spdlog::level::level_enum lvl, const char* file, int line, const std::string& fmt_string) {
+  void log(spdlog::level::level_enum lvl, const char* file, int line, const std::string& fmt_string) const {
     if (lvl != spdlog::level::off) {
       logger_->log(spdlog::source_loc{file, line, ""}, lvl, "{}", fmt_string);
     }

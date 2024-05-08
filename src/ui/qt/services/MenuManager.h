@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <sys/syslog.h>
 #include <filesystem>
 #include <typeindex>
 #include <typeinfo>
@@ -13,6 +14,7 @@
 #include "common.h"
 #include "Root.h"
 #include "UIHelpers.h"
+#include "LogManager.h"
 
 namespace fs = std::filesystem;
 
@@ -153,7 +155,7 @@ public:
 
   /**
    * Retrieves the list of commands suitable for a given item.
-   * @param item The object instance for which commands are requested.
+   * @param base The object instance for which commands are requested.
    * @return A vector of shared pointers to the commands.
    */
   template<typename Base>
@@ -286,6 +288,9 @@ public:
               break;
             case PropertySpecValueType::ItemList:
               propMap.insert({ propSpec.key, items });
+              break;
+            default:
+              L_ERROR("Unknown PropertySpecValueType value: {}", static_cast<int>(propSpec.valueType));
               break;
           }
         }

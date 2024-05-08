@@ -8,13 +8,11 @@
 
 #include <QVBoxLayout>
 #include <QLabel>
-#include <QPixmap>
 #include <QPushButton>
 #include <version.h>
 #include <QListWidget>
 #include <QTextEdit>
 #include <QDir>
-#include <QFile>
 
 About::About(QWidget *parent) : QDialog(parent) {
   setWindowTitle("About VGMTrans");
@@ -52,7 +50,7 @@ void About::setupInfoTab(QWidget* tab) {
     )";
 
   QLabel *text_label =
-      new QLabel(QString(text).arg(VGMTRANS_VERSION).arg(VGMTRANS_REVISION).arg(VGMTRANS_BRANCH));
+      new QLabel(QString(text).arg(VGMTRANS_VERSION, VGMTRANS_REVISION, VGMTRANS_BRANCH));
   text_label->setTextInteractionFlags(Qt::TextBrowserInteraction);
   text_label->setOpenExternalLinks(true);
   text_label->setContentsMargins(15, 0, 15, 0);
@@ -95,8 +93,8 @@ void About::setupLicensesTab(QWidget* tab) {
   QMap<QString, QString> licenses;
   loadLicenses(licenses);
 
-  for (const QString &lib : licenses.keys()) {
-    listWidget->addItem(lib);
+  for (auto it = licenses.constBegin(); it != licenses.constEnd(); ++it) {
+    listWidget->addItem(it.key());
   }
 
   connect(listWidget, &QListWidget::currentTextChanged, [textEdit, licenses](const QString &currentText) {

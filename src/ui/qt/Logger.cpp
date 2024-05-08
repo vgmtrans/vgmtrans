@@ -78,7 +78,7 @@ void Logger::exportLog() {
   log.commit();
 }
 
-void Logger::push(const LogItem *item) {
+void Logger::push(const LogItem *item) const {
   static constexpr const char *log_colors[]{"red", "orange", "darkgrey", "black"};
 
   if (item->GetLogLevel() > m_level) {

@@ -6,7 +6,6 @@
 #include "VGMFileTreeView.h"
 
 #include <QTextDocument>
-#include <QAbstractTextDocumentLayout>
 #include <QPainter>
 #include <QApplication>
 #include <QAccessible>
@@ -66,11 +65,11 @@ void VMGFileTreeHeaderView::resizeEvent(QResizeEvent *event) {
                     (height() - detailsCheckBox->height()) / 2);
 }
 
-void VMGFileTreeHeaderView::onShowDetailsChanged(bool showDetails) {
+void VMGFileTreeHeaderView::onShowDetailsChanged(bool showDetails) const {
   detailsCheckBox->setChecked(showDetails);
 }
 
-void VMGFileTreeHeaderView::toggleShowDetails() {
+void VMGFileTreeHeaderView::toggleShowDetails() const {
   Settings::the()->VGMFileTreeView.setShowDetails(detailsCheckBox->isChecked());
 }
 
@@ -159,7 +158,7 @@ void VGMFileTreeView::addVGMItem(VGMItem *item, VGMItem *parent, const std::stri
   parent_item_cached->insertChild(insertIndex, tree_item);
   m_items[item] = tree_item;
   m_treeItemToVGMItem[tree_item] = item;
-  tree_item->setData(0, Qt::UserRole, QVariant::fromValue((void *)item));
+  tree_item->setData(0, Qt::UserRole, QVariant::fromValue(static_cast<void*>(item)));
 }
 
 // Override the focusInEvent to prevent item selection upon focus
@@ -233,7 +232,7 @@ void VGMFileTreeView::updateStatusBar() {
 }
 
 // Find the index to insert a child item, sorted by offset, using binary search
-int VGMFileTreeView::getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item) {
+int VGMFileTreeView::getSortedIndex(const QTreeWidgetItem* parent, const VGMTreeItem* item) {
   int newOffset = item->item_offset();
   int left = 0;
   int right = parent->childCount() - 1;
@@ -253,20 +252,20 @@ int VGMFileTreeView::getSortedIndex(QTreeWidgetItem* parent, VGMTreeItem* item) 
   return left;
 }
 
-void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) {
+void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
   auto name = QString::fromStdString(item->name);
   if (showDetails) {
     if (item->GetDescription().empty()) {
       treeItem->setText(0, QString{"<b>%1</b><br>Offset: 0x%2 | Length: 0x%3"}
-                               .arg(name)
-                               .arg(item->dwOffset, 1, 16)
-                               .arg(item->unLength, 1, 16));
+                               .arg(name,
+                                    QString::number(item->dwOffset, 16),
+                                    QString::number(item->unLength, 16)));
     } else {
       treeItem->setText(0, QString{"<b>%1</b><br>%2<br>Offset: 0x%3 | Length: 0x%4"}
-                               .arg(name)
-                               .arg(QString::fromStdString(item->GetDescription()))
-                               .arg(item->dwOffset, 1, 16)
-                               .arg(item->unLength, 1, 16));
+                               .arg(name,
+                                    QString::fromStdString(item->GetDescription()),
+                                    QString::number(item->dwOffset, 16),
+                                    QString::number(item->unLength, 16)));
     }
   } else {
     treeItem->setText(0, name);
@@ -292,9 +291,8 @@ void VGMFileTreeView::updateItemTextRecursively(QTreeWidgetItem* item) {
   if (!item) return;
 
   VGMTreeItem* vgmTreeItem = static_cast<VGMTreeItem*>(item);
-  VGMItem* vgmitem = m_treeItemToVGMItem[item];
 
-  if (vgmitem) {
+  if (VGMItem* vgmitem = m_treeItemToVGMItem[item]) {
     setItemText(vgmitem, vgmTreeItem);
   }
 

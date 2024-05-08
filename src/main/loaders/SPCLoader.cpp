@@ -5,6 +5,12 @@
  */
 
 #include "SPCLoader.h"
+#include "LogManager.h"
+#include "LoaderManager.h"
+
+namespace vgmtrans::loaders {
+LoaderRegistration<SPCLoader> _spc{"SPC"};
+}
 
 void SPCLoader::apply(const RawFile *file) {
   if (file->size() < 0x10180) {
@@ -47,7 +53,7 @@ void SPCLoader::apply(const RawFile *file) {
       s_str = s;
       spcFile->tag.artist = (s_str);
 
-      spcFile->tag.length = (double)(file->GetWord(0xa9) & 0xffffff);
+      spcFile->tag.length = file->GetWord(0xa9) & 0xffffff;
     } else {
       // text format
       file->GetBytes(0xb1, 32, s);
@@ -115,6 +121,9 @@ void SPCLoader::apply(const RawFile *file) {
                 // Comments
                 spcFile->tag.comment = xid6_string;
                 break;
+
+              default:
+                L_WARN("Unknown id6 tag id: {} in SPC", xid6_id);
             }
             break;
           }

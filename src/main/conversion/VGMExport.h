@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#pragma once
 
 #include "common.h"
 #include "DLSFile.h"
@@ -52,8 +53,7 @@ void SaveAs(VGMColl &coll, const std::string &dir_path) {
   }
 
   if constexpr ((options & Target::SF2) != 0) {
-    SF2File *sf2file = coll.CreateSF2File();
-    if (sf2file) {
+    if (SF2File *sf2file = coll.CreateSF2File()) {
       sf2file->SaveSF2File(filepath + ".sf2");
     }
   }

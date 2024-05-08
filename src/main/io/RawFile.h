@@ -9,7 +9,6 @@
 #include <string_view>
 #include <filesystem>
 #include <vector>
-#include <memory>
 #include <climits>
 #include <cassert>
 #include <variant>

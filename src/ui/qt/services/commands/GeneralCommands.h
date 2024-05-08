@@ -48,7 +48,7 @@ public:
   [[nodiscard]] std::shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const override {
     auto context = std::make_shared<ItemListCommandContext<T>>();
 
-    if (properties.find("items") == properties.end()) {
+    if (!properties.contains("items")) {
       return nullptr;
     }
 

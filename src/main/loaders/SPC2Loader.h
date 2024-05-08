@@ -13,7 +13,7 @@ class SPC2Loader:
 public:
   SPC2Loader(void) = default;
 public:
-  virtual ~SPC2Loader(void) = default;
-  virtual PostLoadCommand Apply(RawFile *theFile);
+  ~SPC2Loader() override = default;
+  PostLoadCommand Apply(RawFile *theFile) override;
 };
 

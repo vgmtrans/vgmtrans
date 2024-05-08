@@ -6,14 +6,9 @@
 #pragma once
 
 #include "components/FileLoader.h"
-#include "LoaderManager.h"
 
 class SPCLoader : public FileLoader {
  public:
-    ~SPCLoader() = default;
+    ~SPCLoader() override = default;
     void apply(const RawFile *) override;
 };
-
-namespace vgmtrans::loaders {
-LoaderRegistration<SPCLoader> _spc{"SPC"};
-}

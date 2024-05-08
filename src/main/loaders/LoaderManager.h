@@ -9,39 +9,41 @@ class FileLoader;
 using loaderSpawner = std::function<std::shared_ptr<FileLoader>()>;
 
 class LoaderManager final {
-   public:
-    static LoaderManager &get() {
-        static LoaderManager instance;
-        return instance;
-    }
+ public:
+  static LoaderManager &get() {
+    static LoaderManager instance;
+    return instance;
+  }
 
-    void add(const char *loader_name, loaderSpawner gen) {
-        m_generators.try_emplace(loader_name, gen);
-    }
+  LoaderManager(const LoaderManager &) = delete;
+  LoaderManager &operator=(const LoaderManager &) = delete;
+  LoaderManager(LoaderManager &&) = delete;
+  LoaderManager &operator=(LoaderManager &&) = delete;
 
-    std::vector<std::shared_ptr<FileLoader>> loaders() const {
-        std::vector<std::shared_ptr<FileLoader>> tmp(m_generators.size());
-        std::transform(m_generators.begin(), m_generators.end(), tmp.begin(),
-                       [](auto pair) { return pair.second(); });
+  void add(const char *loader_name, loaderSpawner gen) {
+    m_generators.try_emplace(loader_name, gen);
+  }
 
-        return tmp;
-    }
+  std::vector<std::shared_ptr<FileLoader>> loaders() const {
+    std::vector<std::shared_ptr<FileLoader>> tmp(m_generators.size());
+    std::transform(m_generators.begin(), m_generators.end(), tmp.begin(),
+                   [](auto pair) { return pair.second(); });
 
-   private:
-    LoaderManager() = default;
-    LoaderManager(const LoaderManager &) = default;
-    LoaderManager(LoaderManager &&) = default;
-    ~LoaderManager() = default;
+    return tmp;
+  }
 
-    std::unordered_map<std::string, loaderSpawner> m_generators;
+ private:
+  LoaderManager() = default;
+
+  std::unordered_map<std::string, loaderSpawner> m_generators;
 };
 
 namespace vgmtrans::loaders {
 template <typename T>
 class LoaderRegistration final {
-   public:
-    explicit LoaderRegistration(const char *id) {
-        LoaderManager::get().add(id, std::make_shared<T>);
-    }
+ public:
+  explicit LoaderRegistration(const char *id) {
+    LoaderManager::get().add(id, std::make_shared<T>);
+  }
 };
 }  // namespace vgmtrans::loaders

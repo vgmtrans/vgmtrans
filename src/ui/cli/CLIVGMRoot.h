@@ -32,7 +32,7 @@ public:
 
   bool ExportCollection(VGMColl* coll);
 
-  bool SaveMidi(VGMColl *coll);
+  bool SaveMidi(const VGMColl *coll);
 
   bool SaveSF2(VGMColl *coll);
 

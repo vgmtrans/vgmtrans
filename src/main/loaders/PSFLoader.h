@@ -5,19 +5,14 @@
  */
 #pragma once
 #include "components/FileLoader.h"
-#include "LoaderManager.h"
 
 class PSFFile;
 
 class PSFLoader : public FileLoader {
    public:
-    ~PSFLoader() = default;
+    ~PSFLoader() override = default;
     void apply(const RawFile *) override;
 
    private:
     void psf_read_exe(const RawFile *file, int version);
 };
-
-namespace vgmtrans::loaders {
-LoaderRegistration<PSFLoader> psf{"PSF"};
-}

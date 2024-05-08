@@ -13,7 +13,7 @@ class TableView : public QTableView {
 
 public:
   explicit TableView(QWidget *parent = nullptr);
-  virtual ~TableView() = default;
+  ~TableView() override = default;
 
   void setModel(QAbstractItemModel *model) override;
 

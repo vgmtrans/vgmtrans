@@ -10,16 +10,11 @@
 
 class PSF2Loader final : public FileLoader {
  public:
-    ~PSF2Loader() = default;
+    ~PSF2Loader() override = default;
     void apply(const RawFile *) override;
 
    private:
-    int psf2_decompress_block(const RawFile *file, unsigned fileoffset, unsigned blocknumber,
-                              unsigned numblocks, unsigned char *decompressedblock,
-                            unsigned blocksize);
+    static int psf2_decompress_block(const RawFile *file, unsigned fileoffset, unsigned blocknumber,
+                                     unsigned numblocks, unsigned char *decompressedblock, unsigned blocksize);
     int psf2unpack(const RawFile *file, unsigned long fileoffset, unsigned long dircount);
 };
-
-namespace vgmtrans::loaders {
-LoaderRegistration<PSF2Loader> _psf2("PSF2");
-}

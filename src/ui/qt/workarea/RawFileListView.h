@@ -33,13 +33,13 @@ public:
   explicit RawFileListView(QWidget *parent = nullptr);
 
 private:
-  void onVGMFileSelected(VGMFile* vgmfile, QWidget* caller);
+  void onVGMFileSelected(const VGMFile* vgmfile, const QWidget* caller);
   void focusInEvent(QFocusEvent *event) override;
   void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
   void keyPressEvent(QKeyEvent *input) override;
-  void rawFilesMenu(const QPoint &pos);
+  void rawFilesMenu(const QPoint &pos) const;
   void deleteRawFiles();
-  void updateStatusBar();
+  void updateStatusBar() const;
 
   RawFileListViewModel *rawFileListViewModel;
   QMenu *rawfile_context_menu;

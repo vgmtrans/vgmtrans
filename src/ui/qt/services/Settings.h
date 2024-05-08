@@ -35,8 +35,8 @@ public:
   struct VGMFileTreeViewSettings : public SettingsGroup {
     VGMFileTreeViewSettings(Settings* parent): SettingsGroup(parent) {}
 
-    bool showDetails();
-    void setShowDetails(bool);
+    bool showDetails() const;
+    void setShowDetails(bool) const;
   };
   VGMFileTreeViewSettings VGMFileTreeView;
 

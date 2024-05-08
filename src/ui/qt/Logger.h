@@ -18,7 +18,7 @@ class Logger : public QDockWidget {
 public:
   explicit Logger(QWidget *parent = nullptr);
 
-  void push(const LogItem *item);
+  void push(const LogItem *item) const;
 
 signals:
   void closeEvent(QCloseEvent *) override;

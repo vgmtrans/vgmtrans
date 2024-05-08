@@ -6,8 +6,6 @@
 
 #include "IconBar.h"
 
-#include <QToolBar>
-#include <QIcon>
 #include <QSlider>
 #include <QLabel>
 #include <QLayout>
@@ -33,8 +31,7 @@ void IconBar::setupControls() {
   connect(m_create, &QPushButton::pressed, this, &IconBar::createPressed);
   layout()->addWidget(m_create);
 
-  QFrame *line;
-  line = new QFrame(this);
+  QFrame* line = new QFrame(this);
   line->setFrameShape(QFrame::VLine);
   line->setFrameShadow(QFrame::Sunken);
   layout()->addWidget(line);
@@ -84,7 +81,7 @@ void IconBar::showPlayInfo() {
   m_play->clearFocus();
 }
 
-void IconBar::playbackRangeUpdate(int cur, int max) {
+void IconBar::playbackRangeUpdate(int cur, int max) const {
   if (max != m_slider->maximum()) {
     m_slider->setRange(0, max);
   }
@@ -94,7 +91,7 @@ void IconBar::playbackRangeUpdate(int cur, int max) {
   }
 }
 
-void IconBar::playerStatusChanged(bool playing) {
+void IconBar::playerStatusChanged(bool playing) const {
   if (playing) {
     m_slider->setEnabled(true);
     m_play->setIcon(s_pauseicon);

@@ -47,7 +47,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   overlay->hide();
 
   overlay->installEventFilter(
-      new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
+      new LambdaEventFilter([this](QObject* obj, const QEvent* event) -> bool {
         return this->handleOverlayPaintEvent(obj, event);
       })
   );
@@ -95,31 +95,31 @@ void HexView::setFont(QFont& font) {
 }
 
 // The x offset to print hexadecimal
-int HexView::hexXOffset() {
+int HexView::hexXOffset() const {
   if (showOffset)
     return ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth);
   else
     return 0;
 }
 
-int HexView::getVirtualHeight() {
+int HexView::getVirtualHeight() const {
   return lineHeight * getTotalLines();
 }
 
 int HexView::getVirtualWidth() const {
-  const int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
-                       HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
+  constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
+                           HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
   return (numChars * charWidth) + SELECTION_PADDING;
 }
 
 int HexView::getVirtualWidthSansAscii() const {
-  const int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
+  constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
                        (HEX_TO_ASCII_SPACING_CHARS / 2);
   return (numChars * charWidth) + SELECTION_PADDING;
 }
 
 int HexView::getVirtualWidthSansAsciiAndAddress() const {
-  const int numChars = (BYTES_PER_LINE * 3) + (HEX_TO_ASCII_SPACING_CHARS / 2);
+  constexpr int numChars = (BYTES_PER_LINE * 3) + (HEX_TO_ASCII_SPACING_CHARS / 2);
   return (numChars * charWidth) + SELECTION_PADDING;
 }
 
@@ -135,7 +135,7 @@ int HexView::getViewportWidthSansAsciiAndAddress() const {
   return getVirtualWidthSansAsciiAndAddress() - VIEWPORT_PADDING;
 }
 
-int HexView::getTotalLines() {
+int HexView::getTotalLines() const {
   return (vgmfile->unLength + BYTES_PER_LINE - 1) / BYTES_PER_LINE;
 }
 
@@ -182,7 +182,7 @@ void HexView::setSelectedItem(VGMItem *item) {
   }
 }
 
-void HexView::resizeOverlays(int height) {
+void HexView::resizeOverlays(int height) const {
   overlay->setGeometry(
       hexXOffset() - (charWidth/2),
       overlay->y(),
@@ -192,8 +192,7 @@ void HexView::resizeOverlays(int height) {
 }
 
 void HexView::redrawOverlay() {
-  QScrollArea* scrollArea = getContainingScrollArea(this);
-  if (scrollArea) {
+  if (QScrollArea* scrollArea = getContainingScrollArea(this)) {
     resizeOverlays(scrollArea->height());
   }
 }
@@ -207,8 +206,7 @@ bool HexView::event(QEvent *e) {
       return true;
     }
 
-    VGMItem* item = vgmfile->GetItemFromOffset(offset, false);
-    if (item) {
+    if (VGMItem* item = vgmfile->GetItemFromOffset(offset, false)) {
       auto description = getFullDescriptionForTooltip(item);
       if (!description.isEmpty()) {
         QToolTip::showText(helpevent->globalPos(), description, this);
@@ -226,7 +224,7 @@ void HexView::changeEvent(QEvent *event) {
     if (!scrollArea) return;
 
     scrollArea->installEventFilter(
-      new LambdaEventFilter([this]([[maybe_unused]] QObject* obj, QEvent* event) -> bool {
+      new LambdaEventFilter([this]([[maybe_unused]] QObject* obj, const QEvent* event) -> bool {
           if (event->type() == QEvent::Resize) {
             QScrollArea* scrollArea = getContainingScrollArea(this);
 
@@ -322,8 +320,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
     selectNewOffset:
       if (newOffset >= vgmfile->dwOffset && newOffset < (vgmfile->dwOffset + vgmfile->unLength)) {
         selectedOffset = newOffset;
-        auto item = vgmfile->GetItemFromOffset(newOffset, false);
-        if (item) {
+        if (auto item = vgmfile->GetItemFromOffset(newOffset, false)) {
           selectionChanged(item);
         }
       }
@@ -333,7 +330,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
   }
 }
 
-bool HexView::handleOverlayPaintEvent(QObject* obj, QEvent* event) {
+bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
   if (event->type() == QEvent::Paint) {
     auto overlay = qobject_cast<QWidget*>(obj);
 
@@ -459,7 +456,7 @@ void HexView::paintEvent(QPaintEvent *e) {
   }
 }
 
-void HexView::printLine(QPainter& painter, int line) {
+void HexView::printLine(QPainter& painter, int line) const {
   painter.save();
   if (showOffset) {
     printAddress(painter, line);
@@ -472,13 +469,13 @@ void HexView::printLine(QPainter& painter, int line) {
   painter.restore();
 }
 
-void HexView::printAddress(QPainter& painter, int line) {
+void HexView::printAddress(QPainter& painter, int line) const {
   auto fileOffset = vgmfile->dwOffset + (line * BYTES_PER_LINE);
   QString hexString = QString("%1").arg(fileOffset, 8, addressAsHex ? 16 : 10, QChar('0')).toUpper();
   painter.drawText(rect(), Qt::AlignLeft, hexString);
 }
 
-void HexView::printData(QPainter& painter, int startAddress, int endAddress) {
+void HexView::printData(QPainter& painter, int startAddress, int endAddress) const {
   if (endAddress > static_cast<int>(vgmfile->dwOffset + vgmfile->unLength) || (startAddress >= endAddress)) {
     return;
   }
@@ -494,8 +491,7 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) {
   int emptyAddressBytes = 0;
   auto offset = 0;
   while (offset < bytesToPrint) {
-    auto item = vgmfile->GetItemFromOffset(startAddress + offset, false);
-    if (item) {
+    if (auto item = vgmfile->GetItemFromOffset(startAddress + offset, false)) {
       if (emptyAddressBytes > 0) {
         int dataOffset = offset - emptyAddressBytes;
         int col = startCol + dataOffset;
@@ -529,11 +525,11 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) {
 
 void HexView::printHex(
     QPainter& painter,
-    uint8_t* data,
+    const uint8_t* data,
     int length,
     QColor bgColor,
     QColor textColor
-) {
+) const {
   // Draw background color
   auto width = length * charWidth * 3;
   int rectWidth = width;
@@ -555,12 +551,12 @@ void HexView::printHex(
 
 void HexView::translateAndPrintHex(
     QPainter& painter,
-    uint8_t* data,
+    const uint8_t* data,
     int offset,
     int length,
     QColor bgColor,
     QColor textColor
-) {
+) const {
   painter.save();
   painter.translate(offset * 3 * charWidth, 0);
   printHex(painter, data, length, bgColor, textColor);
@@ -569,12 +565,12 @@ void HexView::translateAndPrintHex(
 
 void HexView::translateAndPrintAscii(
     QPainter& painter,
-    uint8_t* data,
+    const uint8_t* data,
     int offset,
     int length,
     QColor bgColor,
     QColor textColor
-) {
+) const {
   if (!shouldDrawAscii)
     return;
   painter.save();
@@ -585,11 +581,11 @@ void HexView::translateAndPrintAscii(
 
 void HexView::printAscii(
     QPainter& painter,
-    uint8_t* data,
+    const uint8_t* data,
     int length,
     QColor bgColor,
     QColor textColor
-) {
+) const {
   // Draw background color
   auto width = length * charWidth;
   painter.fillRect(0, 0, width, lineHeight, bgColor);
@@ -670,12 +666,13 @@ void HexView::showOverlay(bool show, bool animate) {
   }
 }
 
-void HexView::drawSelectedItem() {
+void HexView::drawSelectedItem() const {
+  if (!selectionView) {
+    return;
+  }
   // Set a limit for selected item size, as it can halt the system to draw huge items
   if (!selectedItem || selectedItem->unLength > 0x3000) {
-    if (selectionView) {
-      selectionView->setGeometry(QRect(0, 0, 0, 0));
-    }
+    selectionView->setGeometry(QRect(0, 0, 0, 0));
     return;
   }
 
@@ -695,7 +692,7 @@ void HexView::drawSelectedItem() {
 }
 
 // Find the VGMFile offset represented at the given QPoint. Returns -1 for invalid points.
-int HexView::getOffsetFromPoint(QPoint pos) {
+int HexView::getOffsetFromPoint(QPoint pos) const {
   auto halfCharWidth = charWidth / 2;
   auto hexStart = hexXOffset();
   auto hexEnd = hexStart + (BYTES_PER_LINE * 3 * charWidth);

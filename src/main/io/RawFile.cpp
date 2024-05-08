@@ -18,8 +18,7 @@ void RawFile::AddContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInst
 }
 
 void RawFile::RemoveContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> vgmfile) {
-    auto iter = std::find_if(m_vgmfiles.begin(), m_vgmfiles.end(),
-      [vgmfile](auto file) { return *file == vgmfile; });
+    auto iter = std::ranges::find_if(m_vgmfiles, [vgmfile](auto file) { return *file == vgmfile; });
     if (iter != m_vgmfiles.end())
         m_vgmfiles.erase(iter);
     else {
@@ -73,11 +72,11 @@ VirtFile::VirtFile(const RawFile &file, size_t offset) : m_name(file.name()), m_
 
 VirtFile::VirtFile(const RawFile &file, size_t offset, size_t limit)
     : m_name(file.name()), m_lpath(file.path()) {
-    std::copy(file.data() + offset, file.data() + offset + limit, std::back_inserter(m_data));
+    std::copy_n(file.data() + offset, limit, std::back_inserter(m_data));
 }
 
 VirtFile::VirtFile(const uint8_t *data, uint32_t fileSize, std::string name,
                    std::string parent_fullpath, const VGMTag& tag)
     : m_name(std::move(name)), m_lpath(std::move(parent_fullpath)) {
-    std::copy(data, data + fileSize, std::back_inserter(m_data));
+    std::copy_n(data, fileSize, std::back_inserter(m_data));
 }
