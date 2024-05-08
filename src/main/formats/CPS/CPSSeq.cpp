@@ -202,11 +202,9 @@ bool CPSSeq::PostLoad() {
           TempoEvent *tempoevent = (TempoEvent *) event;
           mpqn = tempoevent->microSecs;
           mpt = mpqn / ppqn;
-        }
-        break;
-        case MIDIEVENT_ENDOFTRACK:
-
           break;
+        }
+
         case MIDIEVENT_MARKER: {
           MarkerEvent *marker = (MarkerEvent *) event;
 
@@ -253,8 +251,11 @@ bool CPSSeq::PostLoad() {
             pitchbendCents = (short) (((int8_t) marker->databyte1 / 128.0) * fmtPitchBendRange);
             track->InsertPitchBend(channel, (short) (((lfoCents + pitchbendCents) / (double) pitchbendRange) * 8192), curTicks);
           }
+          break;
         }
-        break;
+
+        default:
+          break;
       }
       startAbsTicks = curTicks;
     }

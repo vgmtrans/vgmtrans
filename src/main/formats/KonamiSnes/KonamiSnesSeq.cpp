@@ -234,6 +234,10 @@ void KonamiSnesSeq::LoadEventMap() {
       EventMap[0xfb] = EVENT_ADSR2;
       EventMap[0xfc] = EVENT_PROGCHANGEVOL;
       break;
+
+    default:
+      L_WARN("Unknown version of Konami SNES format");
+      break;
   }
 }
 

@@ -104,6 +104,9 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
       if (fmt_ver >= VER_130 && !seqRomGroupEntry->GetHexAttribute("artic_table", &artic_table_offset))
         return;
       break;
+    default:
+      L_ERROR("Unknown version of CPS2 format: {}", static_cast<uint8_t>(fmt_ver));
+      return;
   }
 
   CPS2InstrSet *instrset = 0;

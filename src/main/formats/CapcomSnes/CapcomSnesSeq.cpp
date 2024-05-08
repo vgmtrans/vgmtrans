@@ -127,6 +127,9 @@ void CapcomSnesSeq::LoadEventMap() {
       EventMap[0x1e] = EVENT_UNKNOWN1;
       EventMap[0x1f] = EVENT_UNKNOWN1;
       break;
+
+    default:
+      break;
   }
 }
 
@@ -500,6 +503,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
 			case EVENT_REPEAT_UNTIL_2: repeatSlot = 1; repeatEventName = "Repeat Until #2"; break;
 			case EVENT_REPEAT_UNTIL_3: repeatSlot = 2; repeatEventName = "Repeat Until #3"; break;
 			case EVENT_REPEAT_UNTIL_4: repeatSlot = 3; repeatEventName = "Repeat Until #4"; break;
+			default: break;
         }
 
         desc << "Times: " << (int) times << "  Destination: $" << std::hex << std::setfill('0') << std::setw(4)
@@ -553,6 +557,7 @@ bool CapcomSnesTrack::ReadEvent(void) {
 			case EVENT_REPEAT_BREAK_2: repeatSlot = 1; repeatEventName = "Repeat Break #2"; break;
 			case EVENT_REPEAT_BREAK_3: repeatSlot = 2; repeatEventName = "Repeat Break #3"; break;
 			case EVENT_REPEAT_BREAK_4: repeatSlot = 3; repeatEventName = "Repeat Break #4"; break;
+			default: break;
         }
 
         desc << "Note: { " << "Triplet: " << (isNoteTriplet() ? "On" : "Off") << "  " << "Slur: "
