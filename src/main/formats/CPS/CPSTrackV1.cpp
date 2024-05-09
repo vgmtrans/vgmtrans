@@ -354,9 +354,10 @@ bool CPSTrackV1::ReadEvent(void) {
           }
         }
         else {
-          if ((GetByte(curOffset) & 0x80) == 0)
-            jump = curOffset - GetByte(curOffset++);
-          else {
+          if ((GetByte(curOffset) & 0x80) == 0) {
+            uint8_t jumpByte = GetByte(curOffset++);
+            jump = curOffset - jumpByte;
+          } else {
             jump = curOffset + 2 + (int16_t)GetShortBE(curOffset);
             curOffset += 2;
           }
