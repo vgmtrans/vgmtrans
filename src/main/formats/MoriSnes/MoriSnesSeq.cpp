@@ -732,7 +732,7 @@ void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 
   while (bContinue) {
     uint16_t beginOffset = curOffset;
-    if (curOffset >= 0x10000) {
+    if (curOffset >= 0xffff) {
       break;
     }
 
@@ -762,7 +762,7 @@ void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
       }
 
       beginOffset = curOffset;
-      if (curOffset >= 0x10000) {
+      if (curOffset >= 0xffff) {
         break;
       }
 
