@@ -188,9 +188,11 @@ bool FFTTrack::ReadEvent(void) {
         //Octave Event
 
         //Set octave
-      case 0x94:
-        AddSetOctave(curOffset - 2, 2, GetByte(curOffset++));
+      case 0x94: {
+        uint8_t newOctave = GetByte(curOffset++);
+        AddSetOctave(beginOffset, curOffset - beginOffset, newOctave);
         break;
+      }
 
         //Inc octave
       case 0x95:
@@ -477,9 +479,11 @@ bool FFTTrack::ReadEvent(void) {
         //Volume Event
 
         // Volume
-      case 0xE0:
-        AddVol(curOffset - 2, 2, GetByte(curOffset++));
+      case 0xE0: {
+        uint8_t volByte = GetByte(curOffset++);
+        AddVol(beginOffset, curOffset - beginOffset, volByte);
         break;
+      }
 
         // add volume... add the value to the current vol.
       case 0xE1:
@@ -528,9 +532,11 @@ bool FFTTrack::ReadEvent(void) {
         //Panpot Event
 
         // Panpot
-      case 0xE8:
-        AddPan(curOffset - 2, 2, GetByte(curOffset++));
+      case 0xE8: {
+        uint8_t panpotByte = GetByte(curOffset++);
+        AddPan(beginOffset, curOffset - beginOffset, panpotByte);
         break;
+      }
 
         // unknown
       case 0xE9:
