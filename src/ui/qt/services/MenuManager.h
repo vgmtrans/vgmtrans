@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <sys/syslog.h>
 #include <filesystem>
 #include <typeindex>
 #include <typeinfo>
