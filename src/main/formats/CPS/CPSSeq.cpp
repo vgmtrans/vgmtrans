@@ -42,7 +42,7 @@ bool CPSSeq::GetHeaderInfo(void) {
 }
 
 
-bool CPSSeq::GetTrackPointers(void) {
+bool CPSSeq::GetTrackPointers() {
   // CPS1 games sometimes have this set. Suggests 4 byte seq.
   // Oddly, some tracks have first byte set to 0x92 in D&D Shadow Over Mystara
   if ((GetByte(dwOffset) & 0x80) > 0)

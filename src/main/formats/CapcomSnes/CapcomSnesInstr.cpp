@@ -53,7 +53,7 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
     }
 
     uint8_t srcn = GetByte(addrInstrHeader);
-    std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+    std::vector<uint8_t>::iterator itrSRCN = std::ranges::find(usedSRCNs, srcn);
     if (itrSRCN == usedSRCNs.end()) {
       usedSRCNs.push_back(srcn);
     }
@@ -67,7 +67,7 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
     return false;
   }
 
-  std::sort(usedSRCNs.begin(), usedSRCNs.end());
+  std::ranges::sort(usedSRCNs);
   SNESSampColl *newSampColl = new SNESSampColl(CapcomSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
@@ -91,8 +91,7 @@ CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet,
     spcDirAddr(spcDirAddr) {
 }
 
-CapcomSnesInstr::~CapcomSnesInstr() {
-}
+CapcomSnesInstr::~CapcomSnesInstr() {}
 
 bool CapcomSnesInstr::LoadInstr() {
   uint8_t srcn = GetByte(dwOffset);
@@ -151,7 +150,7 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset) :
   uint8_t gain = GetByte(offset + 3);
   int16_t pitch_scale = GetShortBE(offset + 4);
 
-  const double pitch_fixer = 4286.0 / 4096.0;
+  constexpr double pitch_fixer = 4286.0 / 4096.0;
   double fine_tuning;
   double coarse_tuning;
   fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
@@ -170,12 +169,12 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset) :
   AddSimpleItem(offset + 1, 1, "ADSR1");
   AddSimpleItem(offset + 2, 1, "ADSR2");
   AddSimpleItem(offset + 3, 1, "GAIN");
-  AddUnityKey(96 - (int) (coarse_tuning), offset + 4, 1);
-  AddFineTune((int16_t) (fine_tuning * 100.0), offset + 5, 1);
+  AddUnityKey(96 - static_cast<int>(coarse_tuning), offset + 4, 1);
+  AddFineTune(static_cast<int16_t>(fine_tuning * 100.0), offset + 5, 1);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
   uint8_t sl = (adsr2 >> 5);
-  EmulateSDSPGAIN(gain, (sl << 8) | 0xff, 0, NULL, &release_time);
+  EmulateSDSPGAIN(gain, (sl << 8) | 0xff, 0, nullptr, &release_time);
 }
 
 CapcomSnesRgn::~CapcomSnesRgn() {

@@ -75,8 +75,7 @@ QListWidget *ManualCollectionDialog::makeSequenceList() {
   std::vector<VGMFile *> seqs;
   for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
     if (std::holds_alternative<VGMSeq*>(fileVariant)) {
-      VGMSeq* seq = std::get<VGMSeq*>(fileVariant);
-      if (seq) {
+      if (VGMSeq* seq = std::get<VGMSeq*>(fileVariant)) {
         seqs.push_back(seq);
       }
     }
@@ -85,7 +84,7 @@ QListWidget *ManualCollectionDialog::makeSequenceList() {
   auto widget = new QListWidget();
   for (auto seq : seqs) {
     auto seq_item = new QListWidgetItem(widget);
-    seq_item->setData(Qt::UserRole, QVariant::fromValue((void *)seq));
+    seq_item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(seq)));
     widget->setItemWidget(seq_item, new QRadioButton(QString::fromStdString(*seq->GetName())));
   }
 
@@ -96,8 +95,7 @@ QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
   std::vector<VGMFile *> instrSets;
   for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
     if (std::holds_alternative<VGMInstrSet*>(fileVariant)) {
-      VGMInstrSet* instrSet = std::get<VGMInstrSet*>(fileVariant);
-      if (instrSet) {
+      if (VGMInstrSet* instrSet = std::get<VGMInstrSet*>(fileVariant)) {
         instrSets.push_back(instrSet);
       }
     }
@@ -106,7 +104,7 @@ QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
   auto widget = new QListWidget();
   for (auto instrSet : instrSets) {
     auto instrset_item = new QListWidgetItem(widget);
-    instrset_item->setData(Qt::UserRole, QVariant::fromValue((void *)instrSet));
+    instrset_item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(instrSet)));
     widget->setItemWidget(instrset_item, new QCheckBox(QString::fromStdString(*instrSet->GetName())));
   }
 
@@ -117,8 +115,7 @@ QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
   std::vector<VGMFile *> sampColls;
   for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
     if (std::holds_alternative<VGMSampColl*>(fileVariant)) {
-      VGMSampColl* sampColl = std::get<VGMSampColl*>(fileVariant);
-      if (sampColl) {
+      if (VGMSampColl* sampColl = std::get<VGMSampColl*>(fileVariant)) {
         sampColls.push_back(sampColl);
       }
     }
@@ -127,7 +124,7 @@ QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
   auto widget = new QListWidget();
   for (auto sampColl : sampColls) {
     auto sampcoll_item = new QListWidgetItem(widget);
-    sampcoll_item->setData(Qt::UserRole, QVariant::fromValue((void *)sampColl));
+    sampcoll_item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(sampColl)));
     widget->setItemWidget(sampcoll_item, new QCheckBox(QString::fromStdString(*sampColl->GetName())));
   }
 
@@ -142,7 +139,7 @@ void ManualCollectionDialog::createCollection() {
     auto item = m_seq_list->item(i);
     auto radio = qobject_cast<QRadioButton *>(m_seq_list->itemWidget(item));
     if (radio->isChecked()) {
-      chosen_seq = reinterpret_cast<VGMSeq *>(item->data(Qt::UserRole).value<void *>());
+      chosen_seq = static_cast<VGMSeq *>(item->data(Qt::UserRole).value<void *>());
       break;
     }
   }
@@ -157,7 +154,7 @@ void ManualCollectionDialog::createCollection() {
     auto item = m_instr_list->item(i);
     auto radio = qobject_cast<QCheckBox *>(m_instr_list->itemWidget(item));
     if (radio->checkState() == (Qt::Checked)) {
-      auto chosen_set = reinterpret_cast<VGMInstrSet *>(item->data(Qt::UserRole).value<void *>());
+      auto chosen_set = static_cast<VGMInstrSet *>(item->data(Qt::UserRole).value<void *>());
       coll->AddInstrSet(chosen_set);
     }
   }
@@ -171,7 +168,7 @@ void ManualCollectionDialog::createCollection() {
     auto item = m_samp_list->item(i);
     auto radio = qobject_cast<QCheckBox *>(m_samp_list->itemWidget(item));
     if (radio->checkState() == (Qt::Checked)) {
-      auto sampcoll = reinterpret_cast<VGMSampColl *>(item->data(Qt::UserRole).value<void *>());
+      auto sampcoll = static_cast<VGMSampColl *>(item->data(Qt::UserRole).value<void *>());
       coll->AddSampColl(sampcoll);
     }
   }

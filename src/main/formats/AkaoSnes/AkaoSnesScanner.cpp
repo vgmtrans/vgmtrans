@@ -333,14 +333,14 @@ void AkaoSnesScanner::Scan(RawFile *file, void *info) {
 }
 
 void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
-  AkaoSnesVersion version = AKAOSNES_NONE;
+  AkaoSnesVersion version;
   AkaoSnesMinorVersion minorVersion = AKAOSNES_NOMINORVERSION;
   std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // search for note length table
   uint32_t ofsReadNoteLength;
   uint16_t addrNoteLengthTable;
-  AkaoSnesVersion verReadNoteLength = AKAOSNES_NONE;
+  AkaoSnesVersion verReadNoteLength;
   if (file->SearchBytePattern(ptnReadNoteLengthV4, ofsReadNoteLength)) {
     addrNoteLengthTable = file->GetShort(ofsReadNoteLength + 6);
     verReadNoteLength = AKAOSNES_V4;

@@ -96,7 +96,7 @@ bool AkaoSnesInstrSet::GetInstrPointers() {
     aInstrs.push_back(newDrumKitInstr);
   }
 
-  std::sort(usedSRCNs.begin(), usedSRCNs.end());
+  std::ranges::sort(usedSRCNs);
   SNESSampColl *newSampColl = new SNESSampColl(AkaoSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
@@ -136,10 +136,8 @@ bool AkaoSnesInstr::LoadInstr() {
 
   AkaoSnesRgn *rgn = new AkaoSnesRgn(this, version, addrTuningTable);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  if (!rgn->InitializeRegion(instrNum, spcDirAddr, addrADSRTable) || !rgn->LoadRgn()) {
-    delete rgn;
-    return false;
-  }
+  rgn->InitializeRegion(instrNum, spcDirAddr, addrADSRTable);
+  rgn->LoadRgn();
   aRgns.push_back(rgn);
 
   SetGuessedLength();
@@ -174,8 +172,6 @@ bool AkaoSnesDrumKit::LoadInstr() {
     return false;
   }
 
-  uint16_t addrSampStart = GetShort(offDirEnt);
-
   uint8_t NOTE_DUR_TABLE_SIZE;
   switch (version) {
   case AKAOSNES_V1:
@@ -202,13 +198,13 @@ bool AkaoSnesDrumKit::LoadInstr() {
       return false;
     }
 
-    uint32_t offDirEnt = spcDirAddr + (rgn->sampNum * 4);
-    if (offDirEnt + 4 > 0x10000) {
+    uint32_t rgnOffDirEnt = spcDirAddr + (rgn->sampNum * 4);
+    if (rgnOffDirEnt + 4 > 0x10000) {
       delete rgn;
       return false;
     }
 
-    uint16_t addrSampStart = GetShort(offDirEnt);
+    uint16_t addrSampStart = GetShort(rgnOffDirEnt);
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
@@ -269,9 +265,8 @@ bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
   }
   pitch_scale += tuning2 / 65536.0;
 
-  double fine_tuning;
   double coarse_tuning;
-  fine_tuning = modf((log(pitch_scale) / log(2.0)) * 12.0, &coarse_tuning);
+  double fine_tuning = modf((log(pitch_scale) / log(2.0)) * 12.0, &coarse_tuning);
 
   // normalize
   if (fine_tuning >= 0.5) {
@@ -283,8 +278,8 @@ bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
   }
 
   sampNum = srcn;
-  unityKey = 69 - (int)(coarse_tuning);
-  fineTune = (int16_t)(fine_tuning * 100.0);
+  unityKey = 69 - static_cast<int>(coarse_tuning);
+  fineTune = static_cast<int16_t>(fine_tuning * 100.0);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0xa0);
 
   return true;
@@ -320,9 +315,10 @@ bool AkaoSnesDrumKitRgn::InitializePercussionRegion(uint8_t percussionIndex,
 
   uint8_t instrumentIndex = GetByte(srcnOffset);
 
-  if (instrumentIndex == 0 || instrumentIndex == 0xFF || !InitializeRegion(instrumentIndex, spcDirAddr, addrADSRTable)) {
+  if (instrumentIndex == 0 || instrumentIndex == 0xFF) {
     return false;
   }
+  InitializeRegion(instrumentIndex, spcDirAddr, addrADSRTable);
 
   keyLow = keyHigh = percussionIndex + KEY_BIAS;
 

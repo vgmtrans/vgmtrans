@@ -52,7 +52,7 @@ void CPSTrackV1::CalculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
   AddPortamentoTime14BitNoItem(durationInMillis);
 }
 
-bool CPSTrackV1::ReadEvent(void) {
+bool CPSTrackV1::ReadEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = GetByte(curOffset++);
 
@@ -530,9 +530,8 @@ bool CPSTrackV1::ReadEvent(void) {
         break;
       }
       case 0x1C : {
-        uint8_t tremeloDepth;
         if (GetVersion() < VER_171) {
-          tremeloDepth = GetByte(curOffset++);
+          const uint8_t tremeloDepth = GetByte(curOffset++);
           AddMarker(beginOffset,
                     curOffset - beginOffset,
                     string("tremelo"),

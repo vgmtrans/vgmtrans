@@ -68,7 +68,7 @@ bool CompileSnesInstrSet::GetInstrPointers() {
     return false;
   }
 
-  std::sort(usedSRCNs.begin(), usedSRCNs.end());
+  std::ranges::sort(usedSRCNs);
   SNESSampColl *newSampColl = new SNESSampColl(CompileSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
@@ -169,7 +169,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
       if (addrPitchTablePtr + 2 <= 0x10000) {
         uint32_t addrPitchTable = GetShort(addrPitchTablePtr) + 2;
         if (addrPitchTable + sizeof(REGULAR_PITCH_TABLE) <= 0x10000) {
-          for (uint8_t key = 0; key < sizeof(REGULAR_PITCH_TABLE) / sizeof(REGULAR_PITCH_TABLE[0]); key++) {
+          for (uint8_t key = 0; key < std::size(REGULAR_PITCH_TABLE); key++) {
             pitchTable.push_back(GetShort(addrPitchTable + (key * 2)));
           }
         }
@@ -186,7 +186,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
   uint8_t theUnityKey = 0;
   uint16_t bestPitchDistance = 0xffff;
   for (uint8_t key = 0; key < pitchTable.size(); key++) {
-    uint16_t pitchDistance = abs((int)pitchTable[key] - 0x1000);
+    uint16_t pitchDistance = abs(static_cast<int>(pitchTable[key]) - 0x1000);
     if (pitchDistance < bestPitchDistance) {
       bestPitchDistance = pitchDistance;
       theUnityKey = key;
@@ -195,9 +195,8 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
 
   // correct the pitch difference
   const double pitch_fixer = pitchTable[theUnityKey] / 4096.0;
-  double fine_tuning;
   double coarse_tuning;
-  fine_tuning = modf((log(pitch_fixer) / log(2.0)) * 12.0, &coarse_tuning);
+  double fine_tuning = modf((log(pitch_fixer) / log(2.0)) * 12.0, &coarse_tuning);
 
   // normalize
   if (fine_tuning >= 0.5) {
@@ -213,8 +212,8 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
   coarse_tuning += transpose;
 
   // set final result
-  unityKey = theUnityKey - 24 - (int) (coarse_tuning);
-  fineTune = (int16_t)(fine_tuning * 100.0);
+  unityKey = theUnityKey - 24 - static_cast<int>(coarse_tuning);
+  fineTune = static_cast<int16_t>(fine_tuning * 100.0);
 
   uint8_t adsr1 = 0x8f;
   uint8_t adsr2 = 0xe0;

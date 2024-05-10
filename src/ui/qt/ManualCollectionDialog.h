@@ -16,9 +16,9 @@ public:
   explicit ManualCollectionDialog(QWidget* parent = nullptr);
 
 private:
-  QListWidget* makeSequenceList();
-  QListWidget* makeInstrumentSetList();
-  QListWidget* makeSampleCollectionList();
+  static QListWidget* makeSequenceList();
+  static QListWidget* makeInstrumentSetList();
+  static QListWidget* makeSampleCollectionList();
 
   void createCollection();
 

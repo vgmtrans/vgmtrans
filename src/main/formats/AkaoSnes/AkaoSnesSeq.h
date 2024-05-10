@@ -97,16 +97,16 @@ class AkaoSnesSeq
               uint32_t seqdataOffset,
               uint32_t addrAPURelocBase,
               std::string newName = "Square AKAO SNES Seq");
-  virtual ~AkaoSnesSeq(void);
+  ~AkaoSnesSeq() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetTrackPointers();
-  virtual void ResetVars();
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
+  void ResetVars() override;
 
-  double GetTempoInBPM(uint8_t tempo);
+  double GetTempoInBPM(uint8_t tempo) const;
 
-  uint16_t ROMAddressToAPUAddress(uint16_t romAddress);
-  uint16_t GetShortAddress(uint32_t offset);
+  uint16_t ROMAddressToAPUAddress(uint16_t romAddress) const;
+  uint16_t GetShortAddress(uint32_t offset) const;
 
   AkaoSnesVersion version;
   AkaoSnesMinorVersion minorVersion;
@@ -133,11 +133,11 @@ class AkaoSnesTrack
     : public SeqTrack {
  public:
   AkaoSnesTrack(AkaoSnesSeq *parentFile, long offset = 0, long length = 0);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
+  void ResetVars() override;
+  bool ReadEvent() override;
 
-  uint16_t ROMAddressToAPUAddress(uint16_t romAddress);
-  uint16_t GetShortAddress(uint32_t offset);
+  uint16_t ROMAddressToAPUAddress(uint16_t romAddress) const;
+  uint16_t GetShortAddress(uint32_t offset) const;
 
  private:
   uint8_t onetimeDuration;

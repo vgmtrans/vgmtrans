@@ -111,7 +111,7 @@ void oki_adpcm_state::compute_tables()
   for (int step = 0; step <= 48; step++)
   {
     // compute the step value
-    int stepval = floor(16.0 * pow(11.0 / 10.0, (double)step));
+    int stepval = floor(16.0 * pow(11.0 / 10.0, static_cast<double>(step)));
 
     // loop over all nibbles and compute the difference
     for (int nib = 0; nib < 16; nib++)
@@ -133,15 +133,12 @@ void oki_adpcm_state::compute_tables()
 
 oki_adpcm_state DialogicAdpcmSamp::okiAdpcmState;
 
-DialogicAdpcmSamp::DialogicAdpcmSamp(
-    VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, std::string name
-  )
-    : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate, name) {
+DialogicAdpcmSamp::DialogicAdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length,
+                                     uint32_t theRate, std::string name)
+    : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate,
+         std::move(name)) {}
 
-}
-
-DialogicAdpcmSamp::~DialogicAdpcmSamp() {
-}
+DialogicAdpcmSamp::~DialogicAdpcmSamp() {}
 
 double DialogicAdpcmSamp::GetCompressionRatio() {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples

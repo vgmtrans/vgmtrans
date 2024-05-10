@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "ChunSnesFormat.h"
 
@@ -18,17 +17,17 @@ class ChunSnesInstrSet:
                    uint16_t addrSampleTable,
                    uint32_t spcDirAddr,
                    const std::string &name = "ChunSnesInstrSet");
-  virtual ~ChunSnesInstrSet(void);
+  ~ChunSnesInstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
   ChunSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
   uint16_t addrSampNumTable;
   uint16_t addrSampleTable;
+  uint32_t spcDirAddr;
   std::vector<uint8_t> usedSRCNs;
 };
 
@@ -46,9 +45,9 @@ class ChunSnesInstr
                 uint16_t addrSampleTable,
                 uint32_t spcDirAddr,
                 const std::string &name = "ChunSnesInstr");
-  virtual ~ChunSnesInstr(void);
+  ~ChunSnesInstr() override;
 
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
 
   ChunSnesVersion version;
 
@@ -65,9 +64,9 @@ class ChunSnesRgn
     : public VGMRgn {
  public:
   ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn, uint16_t addrRgn, uint32_t spcDirAddr);
-  virtual ~ChunSnesRgn(void);
+  ~ChunSnesRgn() override;
 
-  virtual bool LoadRgn();
+  bool LoadRgn() override;
 
   ChunSnesVersion version;
 };

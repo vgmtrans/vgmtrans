@@ -7,7 +7,6 @@
 #pragma once
 
 #include <QMainWindow>
-#include "workarea/VGMFileView.h"
 
 class QDockWidget;
 class MenuBar;

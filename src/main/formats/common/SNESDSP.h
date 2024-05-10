@@ -1,10 +1,11 @@
 #pragma once
 
-#include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMItem.h"
 #include "ScaleConversion.h"
+
+class VGMInstrSet;
 
 typedef struct _BRRBlk                //Sample Block
 {
@@ -106,16 +107,16 @@ class SNESSampColl
   SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, uint32_t maxNumSamps = 256);
   SNESSampColl(const std::string& format, RawFile* rawfile, uint32_t offset, const std::vector<uint8_t>& targetSRCNs, std::string name = "SNESSampColl");
   SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, const std::vector<uint8_t>& targetSRCNs, std::string name = "SNESSampColl");
-  virtual ~SNESSampColl();
+  ~SNESSampColl() override;
 
-  virtual bool GetSampleInfo();
+  bool GetSampleInfo() override;
 
-  static bool IsValidSampleDir(RawFile *file, uint32_t spcDirEntAddr, bool validateSample);
+  static bool IsValidSampleDir(const RawFile *file, uint32_t spcDirEntAddr, bool validateSample);
 
  protected:
-  VGMHeader *spcDirHeader;
-  std::vector<uint8_t> targetSRCNs;
+  VGMHeader *spcDirHeader{nullptr};
   uint32_t spcDirAddr;
+  std::vector<uint8_t> targetSRCNs;
 
   void SetDefaultTargets(uint32_t maxNumSamps);
 };
@@ -129,15 +130,15 @@ class SNESSamp
  public:
   SNESSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
            uint32_t dataLen, uint32_t loopOffset, std::string name = "BRR");
-  virtual ~SNESSamp(void);
+  ~SNESSamp() override;
 
-  static uint32_t GetSampleLength(RawFile *file, uint32_t offset, bool &loop);
+  static uint32_t GetSampleLength(const RawFile *file, uint32_t offset, bool &loop);
 
-  virtual double GetCompressionRatio();
-  virtual void ConvertToStdWave(uint8_t *buf);
+  double GetCompressionRatio() override;
+  void ConvertToStdWave(uint8_t *buf) override;
 
  private:
-  void DecompBRRBlk(int16_t *pSmp, BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2);
+  static void DecompBRRBlk(int16_t *pSmp, const BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2);
 
  private:
   uint32_t brrLoopOffset;

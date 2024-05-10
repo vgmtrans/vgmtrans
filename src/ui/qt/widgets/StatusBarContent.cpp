@@ -7,9 +7,8 @@
 
 #include "StatusBarContent.h"
 #include <QHBoxLayout>
+#include <QIcon>
 #include "services/NotificationCenter.h"
-
-class QIcon;
 
 constexpr int maxHeight = 25; // Maximum height of the status bar
 constexpr int iconLabelWidth = 16;

@@ -51,7 +51,7 @@ void CompileSnesScanner::Scan(RawFile *file, void *info) {
 }
 
 void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
-  CompileSnesVersion version = COMPILESNES_NONE;
+  CompileSnesVersion version;
 
   std::string basefilename = removeExtFromPath(file->name());
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;

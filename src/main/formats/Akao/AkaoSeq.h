@@ -152,13 +152,13 @@ class AkaoSeq final :
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
-  [[nodiscard]] std::string ReadTimestampAsText();
+  [[nodiscard]] std::string ReadTimestampAsText() const;
   [[nodiscard]] double GetTempoInBPM(uint16_t tempo) const;
 
   [[nodiscard]] AkaoInstrSet* NewInstrSet() const;
 
-  [[nodiscard]] static bool IsPossibleAkaoSeq(RawFile *file, uint32_t offset);
-  [[nodiscard]] static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
+  [[nodiscard]] static bool IsPossibleAkaoSeq(const RawFile *file, uint32_t offset);
+  [[nodiscard]] static AkaoPs1Version GuessVersion(const RawFile *file, uint32_t offset);
 
   [[nodiscard]] static uint32_t GetTrackAllocationBitsOffset(AkaoPs1Version version) noexcept {
     switch (version)
@@ -234,6 +234,6 @@ class AkaoTrack final
   std::vector<uint32_t> conditional_jump_destinations;
 
  private:
-  void logUnknownEvent(const std::string& opcode_str, u32 beginOffset);
+  void logUnknownEvent(const std::string& opcode_str, u32 beginOffset) const;
   [[nodiscard]] bool AnyUnvisitedJumpDestinations();
 };

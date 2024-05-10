@@ -5,7 +5,6 @@
  */
 
 #include <vector>
-#include <map>
 
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
@@ -25,19 +24,19 @@ bool AkaoColl::LoadMain() {
 
       AkaoArt *art;
 
-      if (!((rgn->artNum - sampcoll->starting_art_id) >= 0 &&
+      if (!((static_cast<int32_t>(rgn->artNum) - static_cast<int32_t>(sampcoll->starting_art_id)) >= 0 &&
           rgn->artNum - sampcoll->starting_art_id < 200)) {
 
         L_ERROR("Articulation #{} does not exist in the samp collection", rgn->artNum);
         art = &sampcoll->akArts.front();
+      } else {
+        if (rgn->artNum - sampcoll->starting_art_id >= sampcoll->akArts.size()) {
+          L_ERROR("Articulation #{} referenced but not loaded", rgn->artNum);
+          art = &sampcoll->akArts.back();
+        }
+        else
+          art = &sampcoll->akArts[rgn->artNum - sampcoll->starting_art_id];
       }
-
-      if (rgn->artNum - sampcoll->starting_art_id >= sampcoll->akArts.size()) {
-        L_ERROR("Articulation #{} referenced but not loaded", rgn->artNum);
-        art = &sampcoll->akArts.back();
-      }
-      else
-        art = &sampcoll->akArts[rgn->artNum - sampcoll->starting_art_id];
       rgn->SetSampNum(art->sample_num);
       if (art->loop_point != 0)
         rgn->SetLoopInfo(1, art->loop_point, sampcoll->samples[rgn->sampNum]->dataLength - art->loop_point);

@@ -60,11 +60,11 @@ class CapcomSnesSeq
                 uint32_t seqdata_offset,
                 bool priorityInHeader,
                 std::string newName = "Capcom SNES Seq");
-  virtual ~CapcomSnesSeq(void);
+  ~CapcomSnesSeq() override;
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
+  void ResetVars() override;
 
   CapcomSnesVersion version;
   std::map<uint8_t, CapcomSnesSeqEventType> EventMap;
@@ -77,11 +77,11 @@ class CapcomSnesSeq
   static const uint8_t volTable[];
   static const uint8_t panTable[];
 
-  double GetTempoInBPM();
-  double GetTempoInBPM(uint16_t tempo);
+  double GetTempoInBPM() const;
+  static double GetTempoInBPM(uint16_t tempo);
 
  private:
-  void LoadEventMap(void);
+  void LoadEventMap();
 };
 
 
@@ -89,20 +89,20 @@ class CapcomSnesTrack
     : public SeqTrack {
  public:
   CapcomSnesTrack(CapcomSnesSeq *parentFile, long offset = 0, long length = 0);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
-  virtual void OnTickBegin(void);
-  virtual void OnTickEnd(void);
+  void ResetVars() override;
+  bool ReadEvent() override;
+  void OnTickBegin() override;
+  void OnTickEnd() override;
 
-  uint8_t getNoteOctave(void);
+  uint8_t getNoteOctave() const;
   void setNoteOctave(uint8_t octave);
-  bool isNoteOctaveUp(void);
+  bool isNoteOctaveUp() const;
   void setNoteOctaveUp(bool octave_up);
-  bool isNoteDotted(void);
+  bool isNoteDotted() const;
   void setNoteDotted(bool dotted);
-  bool isNoteTriplet(void);
+  bool isNoteTriplet() const;
   void setNoteTriplet(bool triplet);
-  bool isNoteSlurred(void);
+  bool isNoteSlurred() const;
   void setNoteSlurred(bool slurred);
 
  private:
@@ -114,5 +114,5 @@ class CapcomSnesTrack
   bool lastNoteSlurred;
   int8_t lastKey;
 
-  double GetTuningInSemitones(int8_t tuning);
+  static double GetTuningInSemitones(int8_t tuning);
 };

@@ -10,8 +10,8 @@
 
 class AkaoScanner final : public VGMScanner {
  public:
-  void Scan(RawFile *file, void *info = 0) override;
+  void Scan(RawFile *file, void *info = nullptr) override;
 
  private:
-  static AkaoPs1Version DetermineVersionFromTag(RawFile *file) noexcept;
+  static AkaoPs1Version DetermineVersionFromTag(const RawFile *file) noexcept;
 };

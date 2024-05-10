@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QFile>
 #include <QFontDatabase>
+#include <QStyleFactory>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 

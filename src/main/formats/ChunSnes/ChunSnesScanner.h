@@ -11,9 +11,9 @@ enum ChunSnesVersion : uint8_t;  // see ChunSnesFormat.h
 
 class ChunSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForChunSnesFromARAM(RawFile *file);
-  void SearchForChunSnesFromROM(RawFile *file);
+  void Scan(RawFile *file, void *info) override;
+  static void SearchForChunSnesFromARAM(RawFile *file);
+  static void SearchForChunSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnLoadSeqSummerV2;
