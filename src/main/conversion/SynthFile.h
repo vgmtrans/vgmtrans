@@ -81,11 +81,9 @@ public:
 
 class SynthRgn {
  public:
-  SynthRgn() : usKeyLow(0), usKeyHigh(0x7F), usVelLow(0), usVelHigh(0x7F),
-        fusOptions(0), usPhaseGroup(0), channel(1), tableIndex(0), sampinfo(nullptr), art(nullptr) { }
+  SynthRgn() = default;
   SynthRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
-      : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh),
-        fusOptions(0), usPhaseGroup(0), channel(1), tableIndex(0), sampinfo(nullptr), art(nullptr) { }
+      : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
   ~SynthRgn();
 
   SynthArt *AddArt();
@@ -93,18 +91,18 @@ class SynthRgn {
   void SetRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0, uint16_t velHigh = 0x7F);
   void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
 
-  uint16_t usKeyLow;
-  uint16_t usKeyHigh;
-  uint16_t usVelLow;
-  uint16_t usVelHigh;
+  uint16_t usKeyLow {0};
+  uint16_t usKeyHigh {0x7F};
+  uint16_t usVelLow {0};
+  uint16_t usVelHigh {0x7F};
 
-  uint16_t fusOptions;    // would be used for DLS conversion
-  uint16_t usPhaseGroup;  // ''
-  uint32_t channel;       // ''
-  uint32_t tableIndex;
+  uint16_t fusOptions {0};    // would be used for DLS conversion
+  uint16_t usPhaseGroup {0};  // ''
+  uint32_t channel {1};       // ''
+  uint32_t tableIndex {0};
 
-  SynthSampInfo *sampinfo;
-  SynthArt *art;
+  SynthSampInfo *sampinfo {nullptr};
+  SynthArt *art {nullptr};
 };
 
 class SynthArt {
