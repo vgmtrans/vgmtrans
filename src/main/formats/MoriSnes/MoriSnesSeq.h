@@ -47,15 +47,14 @@ enum MoriSnesSeqEventType {
   EVENT_TIMEBASE,
 };
 
-class MoriSnesSeq
-    : public VGMSeq {
+class MoriSnesSeq : public VGMSeq {
  public:
-  MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Mint SNES Seq");
-  virtual ~MoriSnesSeq(void);
+  MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::string name = "Mint SNES Seq");
+  virtual ~MoriSnesSeq();
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  virtual bool GetHeaderInfo();
+  virtual bool GetTrackPointers();
+  virtual void ResetVars();
 
   double GetTempoInBPM(uint8_t tempo, bool fastTempo);
 
@@ -70,15 +69,15 @@ class MoriSnesSeq
   bool fastTempo;
 
  private:
-  void LoadEventMap(void);
+  void LoadEventMap();
 };
 
 class MoriSnesTrack
     : public SeqTrack {
  public:
   MoriSnesTrack(MoriSnesSeq *parentFile, long offset = 0, long length = 0);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
+  virtual void ResetVars();
+  virtual bool ReadEvent();
 
   void ParseInstrument(uint16_t instrAddress, uint8_t instrNum);
   void ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion = false, uint8_t percNoteKey = 0);
