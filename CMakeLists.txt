@@ -2,8 +2,8 @@
 # Licensed under the zlib license
 # Check the included LICENSE.txt for details
 
-# For object library linking
-cmake_minimum_required(VERSION 3.12)
+# For link creation (using CREATE_LINK in file())
+cmake_minimum_required(VERSION 3.14)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
