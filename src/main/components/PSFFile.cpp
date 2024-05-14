@@ -41,7 +41,7 @@ PSFFile::PSFFile(const RawFile &file) {
         auto exe_begin = file.begin() + 16 + reservedarea_size;
 
         if (m_exe_CRC !=
-            crc32(crc32(0L, nullptr, 0), reinterpret_cast<const Bytef *>(exe_begin), exe_size)) {
+            zng_crc32(zng_crc32(0L, nullptr, 0), reinterpret_cast<const Bytef *>(exe_begin), exe_size)) {
             throw std::runtime_error("CRC32 mismatch, data is corrupt");
         }
 

@@ -1,13 +1,27 @@
-find_package(minizip)
-if(NOT minizip_FOUND)
-  # Use our own, if there's no minizip there's probably also no zlib Also avoid
-  # risks of having to link to BZip2 on some platforms
-  message(INFO "Using built-in zlib and minizip")
-  add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib"
-                   "${CMAKE_CURRENT_BINARY_DIR}/zlib" EXCLUDE_FROM_ALL)
-else()
-  find_package(ZLIB)
-endif()
+set(ZLIB_ENABLE_TESTS OFF)
+set(ZLIBNG_ENABLE_TESTS OFF)
+set(WITH_GTEST OFF)
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib-ng"
+                 "${CMAKE_CURRENT_BINARY_DIR}/zlib-ng" EXCLUDE_FROM_ALL)
+
+set(MZ_COMPAT ON)
+set(MZ_ZLIB ON)
+set(MZ_BZIP2 OFF)
+set(MZ_LZMA OFF)
+set(MZ_ZSTD OFF)
+set(MZ_LIBCOMP OFF)
+set(MZ_PKCRYPT OFF)
+set(MZ_WZAES OFF)
+set(MZ_OPENSSL OFF)
+set(MZ_FETCH_LIBS OFF)
+set(MZ_FORCE_FETCH_LIBS OFF)
+set(MZ_DECOMPRESS_ONLY ON)
+set(SKIP_INSTALL_ALL ON)
+
+set(ZLIBNG_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/zlib-ng")
+
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/minizip-ng"
+                 "${CMAKE_CURRENT_BINARY_DIR}/minizip-ng" EXCLUDE_FROM_ALL)
 
 message(INFO "Using built-in unarr")
 set(ENABLE_7Z OFF CACHE BOOL "Build with 7z support" FORCE)
@@ -37,5 +51,5 @@ target_include_directories(vgmtranscore PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog ZLIB::ZLIB unarr minizip tinyxml mio
+  PUBLIC spdlog::spdlog unarr zlibstatic minizip tinyxml mio
   PRIVATE g_options g_warnings)

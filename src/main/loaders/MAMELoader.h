@@ -6,7 +6,7 @@
 #pragma once
 
 #include <sstream>
-#include <unzip.h>
+#include <minizip-ng/unzip.h>
 #include <list>
 
 #include "components/FileLoader.h"
