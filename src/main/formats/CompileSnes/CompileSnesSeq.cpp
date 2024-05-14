@@ -172,6 +172,9 @@ void CompileSnesSeq::LoadEventMap() {
       EventMap[0xa5] = EVENT_UNKNOWN1;
       EventMap[0xa6] = EVENT_UNKNOWN1;
       break;
+
+    default:
+      break;
   }
 }
 

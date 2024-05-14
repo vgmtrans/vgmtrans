@@ -530,6 +530,9 @@ bool NamcoSnesSeq::ReadEvent(void) {
                 AddPanNoItem(midiPan);
                 break;
               }
+
+              default:
+                break;
             }
           }
         }

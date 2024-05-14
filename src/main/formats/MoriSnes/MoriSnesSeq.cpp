@@ -13,8 +13,8 @@ DECLARE_FORMAT(MoriSnes);
 #define MAX_TRACKS  10
 #define SEQ_PPQN    48
 
-MoriSnesSeq::MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::string newName)
-    : VGMSeq(MoriSnesFormat::name, file, seqdataOffset, 0, newName),
+MoriSnesSeq::MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::string name)
+    : VGMSeq(MoriSnesFormat::name, file, seqdataOffset, 0, std::move(name)),
       version(ver) {
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
@@ -26,10 +26,10 @@ MoriSnesSeq::MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOff
   LoadEventMap();
 }
 
-MoriSnesSeq::~MoriSnesSeq(void) {
+MoriSnesSeq::~MoriSnesSeq() {
 }
 
-void MoriSnesSeq::ResetVars(void) {
+void MoriSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 
   spcTempo = 0x20;
@@ -39,7 +39,7 @@ void MoriSnesSeq::ResetVars(void) {
   InstrumentHints.clear();
 }
 
-bool MoriSnesSeq::GetHeaderInfo(void) {
+bool MoriSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
   uint32_t curOffset = dwOffset;
@@ -92,7 +92,7 @@ bool MoriSnesSeq::GetHeaderInfo(void) {
   return true;
 }
 
-bool MoriSnesSeq::GetTrackPointers(void) {
+bool MoriSnesSeq::GetTrackPointers() {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if (TrackStartAddress[trackIndex] != 0) {
       MoriSnesTrack *track = new MoriSnesTrack(this, TrackStartAddress[trackIndex]);
@@ -173,12 +173,12 @@ double MoriSnesSeq::GetTempoInBPM(uint8_t tempo, bool fastTempo) {
 
 MoriSnesTrack::MoriSnesTrack(MoriSnesSeq *parentFile, long offset, long length)
     : SeqTrack(parentFile, offset, length) {
-  ResetVars();
+  MoriSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
 }
 
-void MoriSnesTrack::ResetVars(void) {
+void MoriSnesTrack::ResetVars() {
   SeqTrack::ResetVars();
 
   tiedNoteKeys.clear();
@@ -193,8 +193,8 @@ void MoriSnesTrack::ResetVars(void) {
 }
 
 
-bool MoriSnesTrack::ReadEvent(void) {
-  MoriSnesSeq *parentSeq = (MoriSnesSeq *) this->parentSeq;
+bool MoriSnesTrack::ReadEvent() {
+  MoriSnesSeq *parentSeq = static_cast<MoriSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
@@ -722,17 +722,16 @@ void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
   }
 
   bool bContinue = true;
-  uint16_t curOffset = offset;
-  uint16_t seqStartAddress = curOffset;
-  uint16_t seqEndAddress = curOffset;
+  uint32_t curOffset = offset;
+  uint32_t seqStartAddress = curOffset;
+  uint32_t seqEndAddress = curOffset;
 
-  uint8_t instrDeltaTime = 0;
+  // uint8_t instrDeltaTime = 0;
   uint8_t instrCallStackPtr = 0;
   uint8_t instrCallStack[MORISNES_CALLSTACK_SIZE];
 
   while (bContinue) {
-    uint16_t beginOffset = curOffset;
-    if (curOffset >= 0x10000) {
+    if (curOffset >= 0xffff) {
       break;
     }
 
@@ -742,12 +741,12 @@ void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
 
     uint8_t statusByte = GetByte(curOffset++);
 
-    uint8_t newDelta = instrDeltaTime;
+    // uint8_t newDelta = instrDeltaTime;
     if (statusByte < 0x80) {
-      newDelta = statusByte;
-      if (newDelta != 0) {
-        instrDeltaTime = newDelta;
-      }
+      // newDelta = statusByte;
+      // if (newDelta != 0) {
+        // instrDeltaTime = newDelta;
+      // }
 
       statusByte = GetByte(curOffset);
       if (statusByte < 0x80) {
@@ -761,8 +760,7 @@ void MoriSnesTrack::ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
         }
       }
 
-      beginOffset = curOffset;
-      if (curOffset >= 0x10000) {
+      if (curOffset >= 0xffff) {
         break;
       }
 

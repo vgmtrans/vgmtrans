@@ -154,6 +154,9 @@ void AkaoSnesSeq::LoadEventMap() {
       STATUS_NOTEINDEX_TIE = 12;
       STATUS_NOTEINDEX_REST = 13;
       break;
+
+    default:
+      break;
   }
 
   // duration table

@@ -557,7 +557,10 @@ void NinSnesSeq::LoadEventMap() {
     case NINSNES_QUINTET_TS:
       EventMap[0xf4] = EVENT_QUINTET_TUNING;
       EventMap[0xff] = EVENT_QUINTET_ADSR;
-	  break;
+      break;
+
+    default:
+      break;
   }
 }
 
@@ -1576,6 +1579,9 @@ bool NinSnesTrack::ReadEvent(void) {
 
             break;
           }
+
+          default:
+            break;
         }
       }
 
