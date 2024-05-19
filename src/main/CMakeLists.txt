@@ -1,7 +1,11 @@
 # Define zlib-ng include directory and library path
 set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
-set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
 set(ZLIBNG_FOUND TRUE)
+if(UNIX)
+    set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/libz-ng.a")
+elseif(WIN32)
+    set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
+endif()
 
 # Configure minizip-ng to use zlib-ng
 set(MZ_COMPAT ON)

@@ -141,6 +141,8 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/lib/mio")
 
 
 #include zlib-ng sans tests
+set(BUILD_SHARED_LIBS OFF)
+
 set(ZLIB_ENABLE_TESTS OFF)
 set(ZLIBNG_ENABLE_TESTS OFF)
 set(WITH_GTEST OFF)
