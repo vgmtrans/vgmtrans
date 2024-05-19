@@ -1,13 +1,19 @@
-# Define zlib-ng include directory and library path
-set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
+# Add minizip-ng as a dependency
+# On initial set up, minizip-ng decides whether to use zlib-ng (over regular zlib) by searching for the lib, but it
+# wouldn't find it because it hasn't been built yet. We trick its CMake script by setting the variables that indicate
+# the lib was found with values that will be correct once it is built. zlib-ng will be built before minizip-ng because
+# we added it in the root CMakeLists.txt file.
+set(BUILD_SHARED_LIBS OFF)  # when this is true, minizip-ng will link to shared libs instead of static. We want static.
+
 set(ZLIBNG_FOUND TRUE)
+set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
 if(UNIX)
-    set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/libz-ng.a")
+  set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/libz-ng.a")
 elseif(WIN32)
-    set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
 endif()
 
-# Configure minizip-ng to use zlib-ng
+# Configure minizip-ng to use zlib and none of the other options
 set(MZ_COMPAT ON)
 set(MZ_ZLIB ON)
 set(MZ_BZIP2 OFF)
