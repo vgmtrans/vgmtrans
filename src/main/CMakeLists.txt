@@ -10,7 +10,11 @@ set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}
 if(UNIX)
   set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/libz-ng.a")
 elseif(WIN32)
-  set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  if(CMAKE_GENERATOR MATCHES "Visual Studio")
+    set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/$<CONFIG>/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  else()
+    set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  endif()
 endif()
 
 # Configure minizip-ng to use zlib and none of the other options
