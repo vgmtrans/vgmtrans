@@ -7,7 +7,7 @@
 #pragma once
 
 #define ZLIB_CONST
-#include <zlib-ng/zlib-ng.h>
+#include <zlib-ng.h>
 #include <stdexcept>
 #include <array>
 

@@ -1,9 +1,9 @@
-set(ZLIB_ENABLE_TESTS OFF)
-set(ZLIBNG_ENABLE_TESTS OFF)
-set(WITH_GTEST OFF)
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib-ng"
-                 "${CMAKE_CURRENT_BINARY_DIR}/zlib-ng" EXCLUDE_FROM_ALL)
+# Define zlib-ng include directory and library path
+set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
+set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
+set(ZLIBNG_FOUND TRUE)
 
+# Configure minizip-ng to use zlib-ng
 set(MZ_COMPAT ON)
 set(MZ_ZLIB ON)
 set(MZ_BZIP2 OFF)
@@ -18,8 +18,7 @@ set(MZ_FORCE_FETCH_LIBS OFF)
 set(MZ_DECOMPRESS_ONLY ON)
 set(SKIP_INSTALL_ALL ON)
 
-set(ZLIBNG_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/zlib-ng")
-
+# Add minizip-ng subdirectory
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/minizip-ng"
                  "${CMAKE_CURRENT_BINARY_DIR}/minizip-ng" EXCLUDE_FROM_ALL)
 
