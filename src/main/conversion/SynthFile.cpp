@@ -99,10 +99,8 @@ SynthRgn *SynthInstr::AddRgn(const SynthRgn& rgn) {
 //  ********
 
 SynthRgn::~SynthRgn() {
-  if (sampinfo)
-    delete sampinfo;
-  if (art)
-    delete art;
+  delete sampinfo;
+  delete art;
 }
 
 SynthArt *SynthRgn::AddArt() {
@@ -206,7 +204,7 @@ SynthWave::~SynthWave() {
   delete[] data;
 }
 
-SynthSampInfo *SynthWave::AddSampInfo(void) {
+SynthSampInfo *SynthWave::AddSampInfo() {
   sampinfo = new SynthSampInfo();
   return sampinfo;
 }

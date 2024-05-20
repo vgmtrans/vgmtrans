@@ -16,7 +16,7 @@ public:
   explicit StatusBarContent(QWidget *parent = nullptr);
 
 public slots:
-  void setStatus(const QString& name, const QString& description, const QIcon* icon = nullptr, int offset = -1, int size = -1);
+  void setStatus(const QString& name, const QString& description, const QIcon* icon = nullptr, int offset = -1, int size = -1) const;
 
 private:
   QLabel* iconLabel;

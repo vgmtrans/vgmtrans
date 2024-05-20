@@ -15,14 +15,14 @@ Settings::Settings(QObject *parent) :
 {
 }
 
-void Settings::VGMFileTreeViewSettings::setShowDetails(bool showDetails) {
+void Settings::VGMFileTreeViewSettings::setShowDetails(bool showDetails) const {
   settings.beginGroup("VGMFileTreeView");
   settings.setValue("showDetails", showDetails);
   settings.endGroup();
   NotificationCenter::the()->vgmfiletree_setShowDetails(showDetails);
 }
 
-bool Settings::VGMFileTreeViewSettings::showDetails() {
+bool Settings::VGMFileTreeViewSettings::showDetails() const {
   settings.beginGroup("VGMFileTreeView");
   bool showDetails = settings.value("showDetails", false).toBool();
   settings.endGroup();

@@ -26,7 +26,7 @@ QString MarqueeLabel::text() const {
   return m_label_text;
 }
 
-void MarqueeLabel::setText(QString text) {
+void MarqueeLabel::setText(const QString& text) {
   m_label_text = text;
   updateText();
   update();
@@ -55,7 +55,7 @@ void MarqueeLabel::showEvent(QShowEvent *) {
   }
 }
 
-void MarqueeLabel::setSeparator(QString separator) {
+void MarqueeLabel::setSeparator(const QString& separator) {
   m_separator = separator;
   updateText();
   update();

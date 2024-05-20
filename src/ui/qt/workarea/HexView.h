@@ -31,7 +31,7 @@ protected:
   bool event(QEvent *event) override;
   void changeEvent(QEvent *event) override;
   void keyPressEvent(QKeyEvent *event) override;
-  bool handleOverlayPaintEvent(QObject* obj, QEvent* event);
+  bool handleOverlayPaintEvent(QObject* obj, const QEvent* event) const;
   bool handleSelectedItemPaintEvent(QObject* obj, QEvent* event);
   void paintEvent(QPaintEvent *event) override;
   void mousePressEvent(QMouseEvent *event) override;
@@ -40,39 +40,39 @@ protected:
   void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
-  int hexXOffset();
-  int getVirtualHeight();
-  int getTotalLines();
-  int getOffsetFromPoint(QPoint pos);
-  void resizeOverlays(int height);
+  int hexXOffset() const;
+  int getVirtualHeight() const;
+  int getTotalLines() const;
+  int getOffsetFromPoint(QPoint pos) const;
+  void resizeOverlays(int height) const;
   void redrawOverlay();
-  void printLine(QPainter& painter, int line);
-  void printAddress(QPainter& painter, int line);
-  void printData(QPainter& painter, int startAddress, int endAddress);
+  void printLine(QPainter& painter, int line) const;
+  void printAddress(QPainter& painter, int line) const;
+  void printData(QPainter& painter, int startAddress, int endAddress) const;
   void translateAndPrintHex(QPainter& painter,
-                            uint8_t* data,
+                            const uint8_t* data,
                             int offset,
                             int length,
                             QColor bgColor,
-                            QColor textColor);
+                            QColor textColor) const;
   void printHex(QPainter& painter,
-                uint8_t* data,
+                const uint8_t* data,
                 int length,
                 QColor bgColor,
-                QColor textColor);
+                QColor textColor) const;
   void translateAndPrintAscii(QPainter& painter,
-                  uint8_t* data,
+                  const uint8_t* data,
                   int offset,
                   int length,
                   QColor bgColor,
-                  QColor textColor);
+                  QColor textColor) const;
   void printAscii(QPainter& painter,
-                  uint8_t* data,
+                  const uint8_t* data,
                   int length,
                   QColor bgColor,
-                  QColor textColor);
+                  QColor textColor) const;
   void showOverlay(bool show, bool animate);
-  void drawSelectedItem();
+  void drawSelectedItem() const;
 
   VGMFile* vgmfile;
   VGMItem* selectedItem;

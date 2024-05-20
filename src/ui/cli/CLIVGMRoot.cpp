@@ -36,7 +36,6 @@ void CLIVGMRoot::DisplayHelp() {
 
 // creates the output directory if it does not already exist
 bool CLIVGMRoot::MakeOutputDir() {
-  struct stat sb;
   if (!fs::exists(outputDir)) {
     // directory doesn't exist: need to create it
     if (!fs::create_directory(outputDir)) {
@@ -156,7 +155,7 @@ bool CLIVGMRoot::ExportCollection(VGMColl* coll) {
     return SaveMidi(coll) & SaveSF2(coll) & SaveDLS(coll);
 }
 
-bool CLIVGMRoot::SaveMidi(VGMColl* coll) {
+bool CLIVGMRoot::SaveMidi(const VGMColl* coll) {
   if (coll->seq != nullptr) {
     string collName = coll->GetName();
     string filepath = UI_GetSaveFilePath(collName, "mid");

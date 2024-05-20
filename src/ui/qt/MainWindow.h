@@ -36,7 +36,7 @@ private:
   void routeSignals();
 
   void OpenFile();
-  void openFileInternal(QString filename);
+  void openFileInternal(const QString& filename);
 
   QDockWidget *m_rawfile_dock{};
   QDockWidget *m_vgmfile_dock{};

@@ -9,18 +9,16 @@
 #include "Root.h"
 #include "LogManager.h"
 
-using namespace std;
-
 // SPC2 file specs available here: http://blog.kevtris.org/blogfiles/spc2_file_specification_v1.txt
 
 PostLoadCommand SPC2Loader::Apply(RawFile *file) {
   // Constants
-  const size_t HEADER_SIZE = 16;
-  const size_t SPC_DATA_BLOCK_SIZE = 1024;
-  const size_t RAM_BLOCK_SIZE = 256;
-  const size_t SPC_HEADER_SIZE = 256;
-  const size_t SPC_RAM_SIZE = 65536;
-  const size_t SPC_FILE_SIZE = SPC_HEADER_SIZE + SPC_RAM_SIZE + 128; // 256 byte header + 64KB RAM + 128 bytes DSP Registers
+  constexpr size_t HEADER_SIZE = 16;
+  constexpr size_t SPC_DATA_BLOCK_SIZE = 1024;
+  constexpr size_t RAM_BLOCK_SIZE = 256;
+  constexpr size_t SPC_HEADER_SIZE = 256;
+  constexpr size_t SPC_RAM_SIZE = 65536;
+  constexpr size_t SPC_FILE_SIZE = SPC_HEADER_SIZE + SPC_RAM_SIZE + 128; // 256 byte header + 64KB RAM + 128 bytes DSP Registers
 
   const size_t SPC_FILENAME_OFFSET = 992;
   const size_t SPC_FILENAME_SIZE = 28;
@@ -35,7 +33,7 @@ PostLoadCommand SPC2Loader::Apply(RawFile *file) {
   file->GetBytes(0, HEADER_SIZE, header);
 
   // Check for header signature. Support major revision 1.
-  if (memcmp(header, "KSPC\x1A\x01", 6) != 0) {
+  if (memcmp(header, reinterpret_cast<const void*>("KSPC\x1A\x01"), 6) != 0) {
     return KEEP_IT;
   }
 
@@ -76,7 +74,7 @@ PostLoadCommand SPC2Loader::Apply(RawFile *file) {
       uint8_t ramBlock[RAM_BLOCK_SIZE];
       size_t ramBlockOffset = 16 + (numSPCs * SPC_DATA_BLOCK_SIZE) + (blockIndex * RAM_BLOCK_SIZE);
       file->GetBytes(ramBlockOffset, RAM_BLOCK_SIZE, ramBlock);
-      std::copy(ramBlock, ramBlock + RAM_BLOCK_SIZE, spcFile + SPC_HEADER_SIZE + (j * RAM_BLOCK_SIZE));
+      std::copy_n(ramBlock, RAM_BLOCK_SIZE, spcFile + SPC_HEADER_SIZE + (j * RAM_BLOCK_SIZE));
     }
 
     // Add DSP Registers

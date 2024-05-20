@@ -21,8 +21,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &MdiArea::onVGMFileSelected);
 
-  auto *tab_bar = findChild<QTabBar *>();
-  if (tab_bar) {
+  if (auto *tab_bar = findChild<QTabBar *>()) {
     tab_bar->setStyleSheet(QString{"QTabBar::tab { height: %1; }"}.arg(Size::VTab));
     tab_bar->setExpanding(false);
     tab_bar->setUsesScrollButtons(true);
@@ -55,7 +54,7 @@ void MdiArea::newView(VGMFile *file) {
   }
 }
 
-void MdiArea::removeView(VGMFile *file) {
+void MdiArea::removeView(const VGMFile *file) {
   // Let's check if we have a VGMFileView to remove
   auto it = fileToWindowMap.find(file);
   if (it != fileToWindowMap.end()) {
@@ -85,7 +84,7 @@ void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
   }
 }
 
-void MdiArea::onVGMFileSelected(VGMFile *file, QWidget *caller) {
+void MdiArea::onVGMFileSelected(const VGMFile *file, QWidget *caller) {
   if (caller == this || file == nullptr)
     return;
 

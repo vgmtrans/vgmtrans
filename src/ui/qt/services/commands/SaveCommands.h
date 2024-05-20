@@ -62,7 +62,7 @@ public:
   [[nodiscard]] std::shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const override {
     auto context = std::make_shared<SaveCommandContext<TSavable>>();
 
-    if (properties.find("files") == properties.end() || properties.find("filePath") == properties.end()) {
+    if (!properties.contains("files") || !properties.contains("filePath")) {
       return nullptr;
     }
 
@@ -108,8 +108,7 @@ public:
     if (alwaysSaveToDir) {
       // alwaysSaveToDir indicates we were given a directory path and Save() also expects a directory path
       for (auto file : files) {
-        auto specificFile = dynamic_cast<TSavable*>(file);
-        if (specificFile) {
+        if (auto specificFile = dynamic_cast<TSavable*>(file)) {
           Save(path, specificFile);
         }
         return;
@@ -117,8 +116,7 @@ public:
     }
     if (files.size() == 1) {
       // In this case, path is a file path
-      auto file = dynamic_cast<TSavable*>(files[0]);
-      if (file) {
+      if (auto file = dynamic_cast<TSavable*>(files[0])) {
         Save(path, file);
         return;
       }
@@ -127,8 +125,7 @@ public:
     for (auto file : files) {
       // If alwaysSaveToDir is not set and there are multiple files, the path given is to a directory
       // and the Save() function still expects a file path, so we construct file paths for each file using GetName()
-      auto specificFile = dynamic_cast<TSavable*>(file);
-      if (specificFile) {
+      if (auto specificFile = dynamic_cast<TSavable*>(file)) {
         auto fileExtension = (GetExtension() == "") ? "" : (std::string(".") + GetExtension());
         fs::path filePath = path / fs::path(*file->GetName() + fileExtension);
         Save(filePath.generic_string(), specificFile);

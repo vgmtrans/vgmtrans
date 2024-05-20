@@ -19,18 +19,18 @@ class QLineEdit;
 class VGMCollViewModel : public QAbstractListModel {
   Q_OBJECT
 public:
-  VGMCollViewModel(QItemSelectionModel *collListSelModel, QObject *parent = 0);
+  VGMCollViewModel(const QItemSelectionModel *collListSelModel, QObject *parent = nullptr);
 
   int rowCount(const QModelIndex &parent = QModelIndex()) const override;
   QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
-  [[nodiscard]] VGMFile *fileFromIndex(QModelIndex index) const;
-  [[nodiscard]] QModelIndex indexFromFile(VGMFile* file) const;
-  bool containsVGMFile(VGMFile* file);
+  [[nodiscard]] VGMFile *fileFromIndex(const QModelIndex& index) const;
+  [[nodiscard]] QModelIndex indexFromFile(const VGMFile* file) const;
+  bool containsVGMFile(const VGMFile* file) const;
 
 public slots:
-  void handleNewCollSelected(QModelIndex modelIndex);
-  void removeVGMColl(VGMColl* coll);
+  void handleNewCollSelected(const QModelIndex& modelIndex);
+  void removeVGMColl(const VGMColl* coll);
 
 public:
   VGMColl *m_coll;
@@ -39,16 +39,16 @@ public:
 class VGMCollView : public QGroupBox {
   Q_OBJECT
 public:
-  VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent = 0);
+  VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent = nullptr);
 
 private:
   void keyPressEvent(QKeyEvent *e) override;
 
 private slots:
-  void removeVGMColl(VGMColl *coll);
-  void doubleClickedSlot(QModelIndex);
+  void removeVGMColl(const VGMColl *coll) const;
+  void doubleClickedSlot(const QModelIndex&) const;
   void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
-  void onVGMFileSelected(VGMFile *file, QWidget* caller);
+  void onVGMFileSelected(const VGMFile *file, const QWidget* caller) const;
 
 private:
   VGMCollViewModel *vgmCollViewModel;

@@ -3,7 +3,7 @@
 class CPS3Decrypt {
 
 public:
-  static void cps3_decode(uint32_t *src, uint32_t *dest, uint32_t key, uint32_t key2, uint32_t length);
+  static void cps3_decode(const uint32_t *src, uint32_t *dest, uint32_t key, uint32_t key2, uint32_t length);
 
 private:
   static uint16_t rotate_left(uint16_t value, int n);

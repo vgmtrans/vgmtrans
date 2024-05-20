@@ -7,13 +7,11 @@
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <QFileInfo>
-#include <QSplitter>
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QGridLayout>
 #include <QPushButton>
 #include <QMessageBox>
-#include <QLabel>
 #include <QStatusBar>
 #include <version.h>
 #include "ManualCollectionDialog.h"
@@ -45,11 +43,11 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
   routeSignals();
 
   auto infostring = QString("Running %1 (%4, %5), BASS %2, Qt %3")
-                        .arg(VGMTRANS_VERSION)
-                        .arg(int(BASS_GetVersion()), 0, 16)
-                        .arg(qVersion())
-                        .arg(VGMTRANS_REVISION)
-                        .arg(VGMTRANS_BRANCH)
+                        .arg(VGMTRANS_VERSION,
+                             QString::number(BASS_GetVersion(), 16),
+                             qVersion(),
+                             VGMTRANS_REVISION,
+                             VGMTRANS_BRANCH)
                         .toStdString();
   L_INFO(infostring);
 }
@@ -184,7 +182,7 @@ void MainWindow::OpenFile() {
   }
 }
 
-void MainWindow::openFileInternal(QString filename) {
+void MainWindow::openFileInternal(const QString& filename) {
   static QString UNSUPPORTED_RAW_IMAGE_WARNING{
       "'%1' is a raw image file. Data is unlikely to be read correctly, do you wish "
       "to continue anyway?"};

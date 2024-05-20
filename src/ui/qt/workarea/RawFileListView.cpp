@@ -8,12 +8,13 @@
 #include <QKeyEvent>
 #include <QMenu>
 #include "RawFileListView.h"
+
+#include "LogManager.h"
 #include "RawFile.h"
 #include "VGMFile.h"
 #include "QtVGMRoot.h"
 #include "services/NotificationCenter.h"
 #include "VGMExport.h"
-
 
 static const QIcon& fileIcon() {
   static QIcon fileIcon(":/images/file.svg");
@@ -102,6 +103,9 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
       }
       break;
     }
+    default:
+      L_WARN("requested data for unexpected column index: {}", index.column());
+      break;
   }
 
   return QVariant();
@@ -113,7 +117,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
 
 RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
   rawFileListViewModel = new RawFileListViewModel(this);
-  setModel(rawFileListViewModel);
+  RawFileListView::setModel(rawFileListViewModel);
   setIconSize(QSize(16, 16));
 
   setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -147,7 +151,7 @@ RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
  * This is different from the other context menus,
  * since the only possible action on a RawFile is removing it
  */
-void RawFileListView::rawFilesMenu(const QPoint &pos) {
+void RawFileListView::rawFilesMenu(const QPoint &pos) const {
   if (!indexAt(pos).isValid())
     return;
 
@@ -181,7 +185,7 @@ void RawFileListView::deleteRawFiles() {
   clearSelection();
 }
 
-void RawFileListView::onVGMFileSelected(VGMFile* vgmfile, QWidget* caller) {
+void RawFileListView::onVGMFileSelected(const VGMFile* vgmfile, const QWidget* caller) {
   if (caller == this)
     return;
 
@@ -190,7 +194,7 @@ void RawFileListView::onVGMFileSelected(VGMFile* vgmfile, QWidget* caller) {
     return;
   }
 
-  auto it = std::find(qtVGMRoot.vRawFile.begin(), qtVGMRoot.vRawFile.end(), vgmfile->rawfile);
+  auto it = std::ranges::find(qtVGMRoot.vRawFile, vgmfile->rawfile);
   if (it == qtVGMRoot.vRawFile.end())
     return;
   int row = static_cast<int>(std::distance(qtVGMRoot.vRawFile.begin(), it));
@@ -219,7 +223,7 @@ void RawFileListView::currentChanged(const QModelIndex &current, const QModelInd
 }
 
 // Update the status bar for the current selection
-void RawFileListView::updateStatusBar() {
+void RawFileListView::updateStatusBar() const {
   if (!currentIndex().isValid() || currentIndex().row() >= rawFileListViewModel->rowCount()) {
     NotificationCenter::the()->updateStatusForItem(nullptr);
     return;

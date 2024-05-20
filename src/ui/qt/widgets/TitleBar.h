@@ -14,7 +14,7 @@ class TitleBar : public QWidget {
 
 public:
   explicit TitleBar(const QString& title, QWidget *parent = nullptr);
-  virtual ~TitleBar() = default;
+  ~TitleBar() override = default;
 
   QSize sizeHint() const override {
     return QSize(200, Size::VTab);

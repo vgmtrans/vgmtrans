@@ -46,7 +46,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
 
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
-          [&](QTreeWidgetItem *item, QTreeWidgetItem *) {
+          [&](const QTreeWidgetItem *item, QTreeWidgetItem *) {
             if (item == nullptr) {
               // If the VGMFileTreeView deselected, then so should the HexView
               onSelectionChange(nullptr);
@@ -78,25 +78,25 @@ void VGMFileView::focusInEvent(QFocusEvent* event) {
   m_treeview->updateStatusBar();
 }
 
-void VGMFileView::resetSnapRanges() {
+void VGMFileView::resetSnapRanges() const {
   m_splitter->clearSnapRanges();
   m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
   m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewWidth());
 }
 
-int VGMFileView::hexViewWidth() {
+int VGMFileView::hexViewWidth() const {
   return m_hexview->getViewportWidth();
 }
 
-int VGMFileView::hexViewWidthSansAscii() {
+int VGMFileView::hexViewWidthSansAscii() const {
   return m_hexview->getViewportWidthSansAscii();
 }
 
-int VGMFileView::hexViewWidthSansAsciiAndAddress() {
+int VGMFileView::hexViewWidthSansAsciiAndAddress() const {
   return m_hexview->getViewportWidthSansAsciiAndAddress();
 }
 
-void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
+void VGMFileView::updateHexViewFont(qreal sizeIncrement) const {
   // Increment the font size until it has an actual effect on width
   QFont font = m_hexview->font();
   QFontMetricsF fontMetrics(font);
@@ -132,7 +132,7 @@ void VGMFileView::closeEvent(QCloseEvent *) {
   MdiArea::the()->removeView(m_vgmfile);
 }
 
-void VGMFileView::onSelectionChange(VGMItem *item) {
+void VGMFileView::onSelectionChange(VGMItem *item) const {
   m_hexview->setSelectedItem(item);
   if (item) {
     auto widget_item = m_treeview->getTreeWidgetItem(item);

@@ -12,7 +12,7 @@ class LambdaEventFilter : public QObject {
   using EventFilterFunction = std::function<bool(QObject*, QEvent*)>;
 
 public:
-  LambdaEventFilter(EventFilterFunction fn, QObject *parent = nullptr)
+  LambdaEventFilter(const EventFilterFunction& fn, QObject *parent = nullptr)
       : QObject(parent), m_function(fn) {}
 
   bool eventFilter(QObject *watched, QEvent *event) override {

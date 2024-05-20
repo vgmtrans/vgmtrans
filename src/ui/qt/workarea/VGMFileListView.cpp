@@ -52,6 +52,9 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
       }
       break;
     }
+    default:
+      L_WARN("requested data for unexpected column index: {}", index.column());
+      break;
   }
 
   return {};
@@ -114,11 +117,11 @@ void VGMFileListModel::RemoveVGMFile() {
  */
 
 VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
+  view_model = new VGMFileListModel();
+  VGMFileListView::setModel(view_model);
+
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setSelectionBehavior(QAbstractItemView::SelectRows);
-
-  view_model = new VGMFileListModel();
-  setModel(view_model);
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
@@ -176,17 +179,17 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
   }
 }
 
-void VGMFileListView::removeVGMFile(VGMFile *file) {
+void VGMFileListView::removeVGMFile(const VGMFile *file) const {
   MdiArea::the()->removeView(file);
   view_model->RemoveVGMFile();
 }
 
-void VGMFileListView::requestVGMFileView(QModelIndex index) {
+void VGMFileListView::requestVGMFileView(const QModelIndex& index) {
   MdiArea::the()->newView(variantToVGMFile(qtVGMRoot.vVGMFile[index.row()]));
 }
 
 // Update the status bar for the current selection
-void VGMFileListView::updateStatusBar() {
+void VGMFileListView::updateStatusBar() const {
   if (!currentIndex().isValid()) {
     NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
@@ -216,7 +219,7 @@ void VGMFileListView::currentChanged(const QModelIndex &current, const QModelInd
     updateStatusBar();
 }
 
-void VGMFileListView::onVGMFileSelected(VGMFile* file, QWidget* caller) {
+void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
   if (caller == this)
     return;
 
@@ -225,7 +228,7 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, QWidget* caller) {
     return;
   }
 
-  auto it = std::find_if(qtVGMRoot.vVGMFile.begin(), qtVGMRoot.vVGMFile.end(), [&](const VGMFileVariant& var) {
+  auto it = std::ranges::find_if(qtVGMRoot.vVGMFile, [&](const VGMFileVariant& var) {
       // Use std::visit to access the actual object within the variant
       bool matches = false;
 

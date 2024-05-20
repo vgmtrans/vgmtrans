@@ -41,9 +41,9 @@ signals:
 
 public slots:
   void handlePlaybackRequest();
-  void handleStopRequest();
+  static void handleStopRequest();
 
 private:
-  void collectionMenu(const QPoint &pos);
+  void collectionMenu(const QPoint &pos) const;
   void keyPressEvent(QKeyEvent *e) override;
 };

@@ -11,6 +11,11 @@
 
 #include "LogManager.h"
 #include "PSFFile.h"
+#include "LoaderManager.h"
+
+namespace vgmtrans::loaders {
+LoaderRegistration<PSFLoader> psf{"PSF"};
+}
 
 constexpr int PSF1_VERSION = 0x1;
 constexpr int GSF_VERSION = 0x22;
@@ -26,7 +31,7 @@ const std::unordered_map<int, size_t> data_offset = {{PSF1_VERSION, 0x800},
 void PSFLoader::apply(const RawFile *file) {
     if (std::equal(file->begin(), file->begin() + 3, "PSF")) {
         uint8_t version = file->get<u8>(3);
-        if (data_offset.find(version) != data_offset.end()) {
+        if (data_offset.contains(version)) {
             psf_read_exe(file, version);
         }
     }

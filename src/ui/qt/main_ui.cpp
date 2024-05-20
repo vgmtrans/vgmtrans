@@ -4,9 +4,7 @@
  * See the included LICENSE for more information
  */
 
-#include <QtGlobal>
 #include <QApplication>
-#include <QtPlugin>
 #include <QFile>
 #include <QFontDatabase>
 #include <QStyleFactory>

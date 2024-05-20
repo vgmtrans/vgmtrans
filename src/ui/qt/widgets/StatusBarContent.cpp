@@ -10,6 +10,8 @@
 #include <QIcon>
 #include "services/NotificationCenter.h"
 
+class QIcon;
+
 constexpr int maxHeight = 25; // Maximum height of the status bar
 constexpr int iconLabelWidth = 16;
 constexpr int nameLabelMinWidth = 140;
@@ -55,7 +57,7 @@ StatusBarContent::StatusBarContent(QWidget *parent) : QWidget(parent)
   connect(NotificationCenter::the(), &NotificationCenter::statusUpdated, this, &StatusBarContent::setStatus);
 }
 
-void StatusBarContent::setStatus(const QString& name, const QString& description, const QIcon* icon, int offset, int size) {
+void StatusBarContent::setStatus(const QString& name, const QString& description, const QIcon* icon, int offset, int size) const {
   nameLabel->setText(name);
   descriptionLabel->setText(description);
   if (icon)

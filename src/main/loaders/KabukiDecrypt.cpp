@@ -136,7 +136,7 @@ int KabukiDecrypter::bytedecode(int src, int swap_key1, int swap_key2, int xor_k
   return src;
 }
 
-void KabukiDecrypter::kabuki_decode(uint8_t *src,
+void KabukiDecrypter::kabuki_decode(const uint8_t *src,
                                     uint8_t *dest_op,
                                     uint8_t *dest_data,
                                     int base_addr,
@@ -145,12 +145,9 @@ void KabukiDecrypter::kabuki_decode(uint8_t *src,
                                     int swap_key2,
                                     int addr_key,
                                     int xor_key) {
-  int A;
-  int select;
-
-  for (A = 0; A < length; A++) {
+  for (int A = 0; A < length; A++) {
     /* decode opcodes */
-    select = (A + base_addr) + addr_key;
+    int select = (A + base_addr) + addr_key;
     dest_op[A] = bytedecode(src[A], swap_key1, swap_key2, xor_key, select);
 
     /* decode data */

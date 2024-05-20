@@ -15,15 +15,12 @@ namespace conversion {
 
 bool SaveAsDLS(const VGMInstrSet &set, const std::string &filepath) {
   DLSFile dlsfile;
-  bool dlsCreationSucceeded = false;
 
   if (set.assocColls.empty()) {
     return false;
   }
 
-  dlsCreationSucceeded = set.assocColls.front()->CreateDLSFile(dlsfile);
-
-  if (dlsCreationSucceeded) {
+  if (set.assocColls.front()->CreateDLSFile(dlsfile)) {
     return dlsfile.SaveDLSFile(filepath);
   }
   return false;
@@ -62,7 +59,7 @@ bool saveDataToFile(const char* begin, uint32_t length, const std::string& filep
   }
 
   try {
-    std::copy(begin,begin + length, std::ostreambuf_iterator<char>(out));
+    std::copy_n(begin, length, std::ostreambuf_iterator<char>(out));
   } catch (...) {
     return false;
   }

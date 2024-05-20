@@ -15,9 +15,9 @@ class About final : public QDialog {
     explicit About(QWidget *parent = nullptr);
 
    private:
-    void setupInfoTab(QWidget* tab);
+    static void setupInfoTab(QWidget* tab);
     void setupLicensesTab(QWidget* tab);
-    void loadLicenses(QMap<QString, QString>& licenses);
+    static void loadLicenses(QMap<QString, QString>& licenses);
 
     QTabWidget* tabs{};
 };

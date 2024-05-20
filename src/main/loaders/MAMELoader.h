@@ -30,7 +30,7 @@ void FromString(const std::string &temp, T *out) {
 }
 
 struct MAMERomGroup {
-    MAMERomGroup() : file(nullptr) {}
+    MAMERomGroup() : loadmethod(LM_APPEND), file(nullptr) {}
     template <class T>
     bool GetAttribute(const std::string &attrName, T *out) {
         std::string strValue = attributes[attrName];
@@ -64,17 +64,17 @@ typedef std::map<std::string, MAMEGame *> GameMap;
 class MAMELoader : public FileLoader {
    public:
     MAMELoader();
-    ~MAMELoader();
+    ~MAMELoader() override;
     void apply(const RawFile *theFile) override;
 
    private:
-    VirtFile *LoadRomGroup(const MAMERomGroup &romgroup, const std::string &format,
-                           unzFile &cur_file);
-    void DeleteBuffers(std::list<std::pair<uint8_t *, uint32_t>> &buffers);
+    static VirtFile *LoadRomGroup(const MAMERomGroup &romgroup, const std::string &format,
+                                  const unzFile &cur_file);
+    static void DeleteBuffers(const std::list<std::pair<uint8_t *, uint32_t>> &buffers);
 
     int LoadXML();
-    MAMEGame *LoadGameEntry(TiXmlElement *gameElmt);
-    int LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentry);
+    static MAMEGame *LoadGameEntry(TiXmlElement *gameElmt);
+    static int LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentry);
 
     GameMap gamemap;
     bool bLoadedXml;

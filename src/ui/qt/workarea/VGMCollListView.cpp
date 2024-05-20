@@ -6,10 +6,8 @@
 
 #include "VGMCollListView.h"
 
-#include <QEvent>
 #include <QMenu>
 #include <QLineEdit>
-#include <QObject>
 #include <VGMColl.h>
 #include <VGMExport.h>
 #include "SequencePlayer.h"
@@ -98,7 +96,7 @@ void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
 
 VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   auto model = new VGMCollListViewModel(this);
-  setModel(model);
+  VGMCollListView::setModel(model);
   setItemDelegate(new VGMCollNameEditor);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
@@ -128,7 +126,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   });
 }
 
-void VGMCollListView::collectionMenu(const QPoint &pos) {
+void VGMCollListView::collectionMenu(const QPoint &pos) const {
   if (selectedIndexes().empty()) {
     return;
   }

@@ -3,7 +3,7 @@
 
 class KabukiDecrypter {
  public:
-  static void kabuki_decode(uint8_t *src, uint8_t *dest_op, uint8_t *dest_data,
+  static void kabuki_decode(const uint8_t *src, uint8_t *dest_op, uint8_t *dest_data,
                             int base_addr, int length, int swap_key1, int swap_key2, int addr_key, int xor_key);
 
  private:

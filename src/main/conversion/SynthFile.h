@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common.h"
 #include "RiffFile.h"
 
 struct Loop;
@@ -9,7 +8,6 @@ class VGMSamp;
 class SynthInstr;
 class SynthRgn;
 class SynthArt;
-class SynthConnectionBlock;
 class SynthSampInfo;
 class SynthWave;
 
@@ -29,10 +27,6 @@ class SynthFile {
                      uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t *waveData,
                      std::string name = "Unnamed Wave");
 
-  //int WriteDLSToBuffer(std::vector<uint8_t> &buf);
-  //bool SaveDLSFile(const wchar_t* filepath);
-
- public:
   std::vector<SynthInstr *> vInstrs;
   std::vector<SynthWave *> vWaves;
   std::string name;
@@ -49,7 +43,6 @@ class SynthInstr {
   SynthRgn *AddRgn();
   SynthRgn *AddRgn(const SynthRgn& rgn);
 
- public:
   uint32_t ulBank;
   uint32_t ulInstrument;
   std::string name;
@@ -58,42 +51,64 @@ class SynthInstr {
   std::vector<SynthRgn *> vRgns;
 };
 
+class SynthSampInfo {
+public:
+  SynthSampInfo() = default;
+  SynthSampInfo(uint16_t unityNote,
+                int16_t fineTune,
+                double atten,
+                int8_t sampleLoops,
+                uint32_t loopType,
+                uint32_t loopStart,
+                uint32_t loopLength)
+      : usUnityNote(unityNote), sFineTune(fineTune), attenuation(atten), cSampleLoops(sampleLoops),
+        ulLoopType(loopType),
+        ulLoopStart(loopStart), ulLoopLength(loopLength) { }
+  ~SynthSampInfo() = default;
+
+  void SetLoopInfo(Loop &loop, VGMSamp *samp);
+  void SetPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
+
+  uint16_t usUnityNote;
+  int16_t sFineTune;
+  double attenuation;  // in decibels.
+  int8_t cSampleLoops;
+
+  uint32_t ulLoopType;
+  uint32_t ulLoopStart;
+  uint32_t ulLoopLength;
+};
+
 class SynthRgn {
  public:
-  SynthRgn() : sampinfo(nullptr), art(nullptr) { }
+  SynthRgn() = default;
   SynthRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
-      : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh), sampinfo(nullptr), art(nullptr) { }
-  SynthRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh, SynthArt &art);
+      : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
   ~SynthRgn();
 
   SynthArt *AddArt();
-  SynthArt *AddArt(std::vector<SynthConnectionBlock *> connBlocks);
   SynthSampInfo *AddSampInfo();
-  SynthSampInfo *AddSampInfo(SynthSampInfo wsmp);
   void SetRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0, uint16_t velHigh = 0x7F);
   void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
 
- public:
-  uint16_t usKeyLow;
-  uint16_t usKeyHigh;
-  uint16_t usVelLow;
-  uint16_t usVelHigh;
+  uint16_t usKeyLow {0};
+  uint16_t usKeyHigh {0x7F};
+  uint16_t usVelLow {0};
+  uint16_t usVelHigh {0x7F};
 
-  uint16_t fusOptions;
-  uint16_t usPhaseGroup;
-  uint32_t channel;
-  uint32_t tableIndex;
+  uint16_t fusOptions {0};    // would be used for DLS conversion
+  uint16_t usPhaseGroup {0};  // ''
+  uint32_t channel {1};       // ''
+  uint32_t tableIndex {0};
 
-  SynthSampInfo *sampinfo;
-  SynthArt *art;
+  SynthSampInfo *sampinfo {nullptr};
+  SynthArt *art {nullptr};
 };
 
 class SynthArt {
  public:
-  SynthArt(void) { }
-  SynthArt(std::vector<SynthConnectionBlock> &connectionBlocks);
-  //SynthArt(uint16_t source, uint16_t control, uint16_t destination, uint16_t transform);
-  ~SynthArt(void);
+  SynthArt() = default;
+  ~SynthArt();
 
   void AddADSR(double attack, Transform atk_transform, double hold, double decay, double sustain_lev,
                double sustain_time, double release_time, Transform rls_transform);
@@ -109,49 +124,10 @@ class SynthArt {
   double release_time;    // rate expressed as seconds from 100% to 0% level, even though the sustain level may not be 100%
   Transform attack_transform;
   Transform release_transform;
-
- private:
-  //vector<SynthConnectionBlock*> vConnBlocks;
-};
-
-class SynthSampInfo {
- public:
-  SynthSampInfo(void) { }
-  SynthSampInfo(uint16_t unityNote,
-                int16_t fineTune,
-                double atten,
-                int8_t sampleLoops,
-                uint32_t loopType,
-                uint32_t loopStart,
-                uint32_t loopLength)
-      : usUnityNote(unityNote), sFineTune(fineTune), attenuation(atten), cSampleLoops(sampleLoops),
-        ulLoopType(loopType),
-        ulLoopStart(loopStart), ulLoopLength(loopLength) { }
-  ~SynthSampInfo() { }
-
-  void SetLoopInfo(Loop &loop, VGMSamp *samp);
-  //void SetPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
-  void SetPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
-
- public:
-  uint16_t usUnityNote;
-  int16_t sFineTune;
-  double attenuation;  // in decibels.
-  int8_t cSampleLoops;
-
-  uint32_t ulLoopType;
-  uint32_t ulLoopStart;
-  uint32_t ulLoopLength;
 };
 
 class SynthWave {
  public:
-  SynthWave()
-      : sampinfo(nullptr),
-        data(nullptr),
-        name("Untitled Wave") {
-    RiffFile::AlignName(name);
-  }
   SynthWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec, uint16_t blockAlign,
             uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t *waveData, std::string waveName = "Untitled Wave")
       : sampinfo(nullptr),

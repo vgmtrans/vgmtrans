@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <QTableView>
 #include <QAbstractTableModel>
 #include <QKeyEvent>
 #include <QSortFilterProxyModel>
@@ -42,12 +41,12 @@ class VGMFileListView final : public TableView {
     explicit VGMFileListView(QWidget *parent = nullptr);
 
   public slots:
-    void requestVGMFileView(QModelIndex index);
-    void removeVGMFile(VGMFile *file);
-    void onVGMFileSelected(VGMFile *file, QWidget* caller);
+    static void requestVGMFileView(const QModelIndex& index);
+    void removeVGMFile(const VGMFile *file) const;
+    void onVGMFileSelected(VGMFile *file, const QWidget* caller);
 
   private:
-    void updateStatusBar();
+    void updateStatusBar() const;
     void focusInEvent(QFocusEvent *event) override;
     void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
     void keyPressEvent(QKeyEvent *input) override;

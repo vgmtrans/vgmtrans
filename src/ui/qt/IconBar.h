@@ -7,7 +7,6 @@
 #pragma once
 
 #include <QToolBar>
-#include <QIcon>
 
 class QSlider;
 class QPushButton;
@@ -28,8 +27,8 @@ signals:
   void createPressed();
 
 private slots:
-  void playerStatusChanged(bool playing);
-  void playbackRangeUpdate(int cur, int max);
+  void playerStatusChanged(bool playing) const;
+  void playbackRangeUpdate(int cur, int max) const;
 
 private:
   void setupControls();
