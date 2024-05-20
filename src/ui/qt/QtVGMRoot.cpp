@@ -4,8 +4,6 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <QApplication>
-#include <QFileDialog>
 #include "QtVGMRoot.h"
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
