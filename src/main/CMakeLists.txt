@@ -3,18 +3,13 @@
 # wouldn't find it because it hasn't been built yet. We trick its CMake script by setting the variables that indicate
 # the lib was found with values that will be correct once it is built. zlib-ng will be built before minizip-ng because
 # we added it in the root CMakeLists.txt file.
-set(BUILD_SHARED_LIBS OFF)  # when this is true, minizip-ng will link to shared libs instead of static. We want static.
 
-set(ZLIBNG_FOUND TRUE)
-set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
-if(UNIX)
-  set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/libz-ng.a")
-elseif(WIN32)
-  if(CMAKE_GENERATOR MATCHES "Visual Studio")
-    set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/$<CONFIG>/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
-  else()
-    set(ZLIBNG_LIBRARY "${CMAKE_BINARY_DIR}/lib/zlib-ng/${CMAKE_STATIC_LIBRARY_PREFIX}zlibstatic-ng$<$<CONFIG:Debug>:d>${CMAKE_STATIC_LIBRARY_SUFFIX}")
-  endif()
+option(USE_VENDORED_ZLIBNG "Use the vendored version of zlib-ng" ON)
+
+if (USE_VENDORED_ZLIBNG)
+  set(ZLIBNG_FOUND TRUE)
+  set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
+  set(ZLIBNG_LIBRARY $<TARGET_FILE:zlibstatic>)
 endif()
 
 # Configure minizip-ng to use zlib and none of the other options
@@ -35,6 +30,10 @@ set(SKIP_INSTALL_ALL ON)
 # Add minizip-ng subdirectory
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/minizip-ng"
                  "${CMAKE_CURRENT_BINARY_DIR}/minizip-ng" EXCLUDE_FROM_ALL)
+
+if (USE_VENDORED_ZLIBNG)
+  add_dependencies(minizip zlibstatic)
+endif()
 
 message(INFO "Using built-in unarr")
 set(ENABLE_7Z OFF CACHE BOOL "Build with 7z support" FORCE)
