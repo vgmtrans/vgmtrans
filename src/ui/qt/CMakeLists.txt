@@ -29,6 +29,18 @@ endif()
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 message(STATUS "Using Qt ${Qt6_VERSION}")
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(RESOURCE_DIR "${BUNDLE_PATH}/Contents/Resources")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(RESOURCE_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
+  set(RESOURCE_DIR "${CMAKE_INSTALL_PREFIX}/share/vgmtrans")
+else()
+  set(RESOURCE_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+endif()
+
+add_definitions(-DRESOURCE_DIR="${RESOURCE_DIR}")
+
 # ~~~
 # Build
 # ~~~
@@ -174,7 +186,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
     COMMAND
       ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
-      "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+      "${RESOURCE_DIR}")
 
   get_target_property(MOC_EXECUTABLE_LOCATION Qt${Qt_VERSION_MAJOR}::moc
                       IMPORTED_LOCATION)
@@ -214,11 +226,18 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
             "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
   install(TARGETS vgmtrans DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
-  install(
-    FILES resources/vgmtrans.png
-    DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/512x512/apps")
+  install(FILES resources/vgmtrans.png
+          DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/512x512/apps")
   install(FILES resources/VGMTrans.desktop
           DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications")
+  install(FILES "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
+          DESTINATION "${RESOURCE_DIR}")
+
+  set_target_properties(vgmtrans PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+  install(FILES
+          "${CMAKE_SOURCE_DIR}/lib/bass/libbass.so"
+          "${CMAKE_SOURCE_DIR}/lib/bass/libbassmidi.so"
+          DESTINATION "${CMAKE_INSTALL_PREFIX}/lib")
 endif()
 
 set(CPACK_PACKAGE_NAME "vgmtrans")

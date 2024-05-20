@@ -13,15 +13,7 @@
 QtVGMRoot qtVGMRoot;
 
 std::string QtVGMRoot::UI_GetResourceDirPath() {
-#if defined(Q_OS_WIN)
-  return (QApplication::applicationDirPath() + "/").toStdString();
-#elif defined(Q_OS_MACOS)
-  return (QApplication::applicationDirPath() + "/../Resources/").toStdString();
-#elif defined(Q_OS_LINUX)
-  return (QApplication::applicationDirPath() + "/").toStdString();
-#else
-  return (QApplication::applicationDirPath() + "/").toStdString();
-#endif
+  return std::string(RESOURCE_DIR) + "/";  // Use the macro defined in ui/qt/CMakeLists.txt
 }
 
 void QtVGMRoot::UI_SetRootPtr(VGMRoot** theRoot) {
