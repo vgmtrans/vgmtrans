@@ -182,7 +182,7 @@ void MAMELoader::apply(const RawFile *file) {
 
     unzFile cur_file = unzOpen(file->path().c_str());
     if (!cur_file) {
-        return;
+      return;
     }
 
     // Now we try to load the rom groups.  We save the created file into the rom MAMERomGroupEntry's
@@ -190,14 +190,14 @@ void MAMELoader::apply(const RawFile *file) {
     // Note that this does not check for an error, so the romgroup entry's file member may receive
     // NULL. This must be checked for in Scan().
     for (auto &entry : gameentry->romgroupentries) {
-        entry.file = LoadRomGroup(entry, gameentry->format, cur_file);
+      entry.file = LoadRomGroup(entry, gameentry->format, cur_file);
     }
 
     fmt->GetScanner().Scan(nullptr, gameentry);
     for (auto &entry : gameentry->romgroupentries) {
-        if (entry.file) {
-            enqueue(entry.file);
-        }
+      if (entry.file) {
+        enqueue(entry.file);
+      }
     }
 
     (void)unzClose(cur_file);
