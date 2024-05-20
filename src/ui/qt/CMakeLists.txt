@@ -30,6 +30,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 message(STATUS "Using Qt ${Qt6_VERSION}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
   set(RESOURCE_DIR "${BUNDLE_PATH}/Contents/Resources")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(RESOURCE_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
@@ -138,8 +139,6 @@ target_sources(vgmtrans PRIVATE ${UI_RESOURCES})
 # Install & package
 # ~~~
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
-
   set_target_properties(
     vgmtrans
     PROPERTIES MACOSX_BUNDLE true
