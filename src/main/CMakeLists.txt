@@ -7,6 +7,14 @@
 option(USE_VENDORED_ZLIBNG "Use the vendored version of zlib-ng" ON)
 
 if (USE_VENDORED_ZLIBNG)
+  #include zlib-ng sans tests
+  set(BUILD_SHARED_LIBS OFF)
+
+  set(ZLIB_ENABLE_TESTS OFF)
+  set(ZLIBNG_ENABLE_TESTS OFF)
+  set(WITH_GTEST OFF)
+  add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng" EXCLUDE_FROM_ALL)
+
   set(ZLIBNG_FOUND TRUE)
   set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
   set(ZLIBNG_LIBRARY $<TARGET_FILE:zlibstatic>)
@@ -22,14 +30,11 @@ set(MZ_LIBCOMP OFF)
 set(MZ_PKCRYPT OFF)
 set(MZ_WZAES OFF)
 set(MZ_OPENSSL OFF)
-set(MZ_FETCH_LIBS OFF)
-set(MZ_FORCE_FETCH_LIBS OFF)
 set(MZ_DECOMPRESS_ONLY ON)
 set(SKIP_INSTALL_ALL ON)
 
 # Add minizip-ng subdirectory
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/minizip-ng"
-                 "${CMAKE_CURRENT_BINARY_DIR}/minizip-ng" EXCLUDE_FROM_ALL)
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/minizip-ng" "${CMAKE_BINARY_DIR}/lib/minizip-ng" EXCLUDE_FROM_ALL)
 
 if (USE_VENDORED_ZLIBNG)
   add_dependencies(minizip zlibstatic)
@@ -40,8 +45,7 @@ set(ENABLE_7Z OFF CACHE BOOL "Build with 7z support" FORCE)
 set(USE_SYSTEM_BZ2 OFF CACHE BOOL "Build with system bzip2 if possible" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libunarr as a shared library" FORCE)
 set(USE_SYSTEM_ZLIB OFF CACHE BOOL "Build with system zlib if possible" FORCE)
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr"
-        "${CMAKE_CURRENT_BINARY_DIR}/unarr" EXCLUDE_FROM_ALL)
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr" "${CMAKE_BINARY_DIR}/lib/unarr" EXCLUDE_FROM_ALL)
 
 file(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp"
      "${PROJECT_SOURCE_DIR}/src/main/*.h")
