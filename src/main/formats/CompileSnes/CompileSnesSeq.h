@@ -44,12 +44,12 @@ class CompileSnesSeq
     : public VGMSeq {
  public:
   CompileSnesSeq
-      (RawFile *file, CompileSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Compile SNES Seq");
-  virtual ~CompileSnesSeq(void);
+      (RawFile *file, CompileSnesVersion ver, uint32_t seqdataOffset, std::string name = "Compile SNES Seq");
+  ~CompileSnesSeq() override;
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
+  void ResetVars() override;
 
   CompileSnesVersion version;
   std::map<uint8_t, CompileSnesSeqEventType> EventMap;
@@ -62,10 +62,10 @@ class CompileSnesSeq
 
   static const uint8_t noteDurTable[];
 
-  double GetTempoInBPM(uint8_t tempo);
+  static double GetTempoInBPM(uint8_t tempo);
 
  private:
-  void LoadEventMap(void);
+  void LoadEventMap();
 };
 
 
@@ -73,28 +73,28 @@ class CompileSnesTrack
     : public SeqTrack {
  public:
   CompileSnesTrack(CompileSnesSeq *parentFile, long offset = 0, long length = 0);
-  virtual void ResetVars(void);
-  virtual void AddInitialMidiEvents(int trackNum);
-  virtual bool ReadEvent(void);
+  void ResetVars() override;
+  void AddInitialMidiEvents(int trackNum) override;
+  bool ReadEvent() override;
 
-  uint8_t spcNoteDuration;
-  uint8_t spcFlags;
-  uint8_t spcVolume;
-  int8_t spcTranspose;
-  uint8_t spcTempo;
-  uint8_t spcSRCN;
-  int8_t spcPan;
+  uint8_t spcNoteDuration{};
+  uint8_t spcFlags{};
+  uint8_t spcVolume{};
+  int8_t spcTranspose{};
+  uint8_t spcTempo{};
+  uint8_t spcSRCN{};
+  int8_t spcPan{};
 
-  uint8_t spcInitialFlags;
-  uint8_t spcInitialVolume;
-  int8_t spcInitialTranspose;
-  uint8_t spcInitialTempo;
-  uint8_t spcInitialSRCN;
-  int8_t spcInitialPan;
+  uint8_t spcInitialFlags{};
+  uint8_t spcInitialVolume{};
+  int8_t spcInitialTranspose{};
+  uint8_t spcInitialTempo{};
+  uint8_t spcInitialSRCN{};
+  int8_t spcInitialPan{};
 
-  uint16_t subReturnAddress;
-  uint8_t repeatCount[256];
+  uint16_t subReturnAddress{};
+  uint8_t repeatCount[256]{};
 
  private:
-  bool ReadDurationBytes(uint32_t &offset, uint8_t &duration);
+  bool ReadDurationBytes(uint32_t& offset, uint8_t& duration) const;
 };

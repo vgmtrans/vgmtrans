@@ -12,7 +12,7 @@ CPS1SampleInstrSet::CPS1SampleInstrSet(RawFile *file,
                                        CPSFormatVer version,
                                        uint32_t offset,
                                        std::string &name)
-    : VGMInstrSet(CPS1Format::name, file, offset, 0, name),
+    : VGMInstrSet(CPS1Format::name, file, offset, 0, std::move(name)),
       fmt_version(version) {
 }
 
@@ -47,7 +47,7 @@ CPS1SampColl::CPS1SampColl(RawFile *file,
                            uint32_t offset,
                            uint32_t length,
                            std::string name)
-    : VGMSampColl(CPS1Format::name, file, offset, length, name),
+    : VGMSampColl(CPS1Format::name, file, offset, length, std::move(name)),
       instrset(theinstrset) {
 }
 

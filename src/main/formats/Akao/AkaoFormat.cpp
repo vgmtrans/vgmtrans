@@ -24,14 +24,14 @@ bool AkaoColl::LoadMain() {
 
       AkaoArt *art;
 
-      if (!((static_cast<int32_t>(rgn->artNum) - static_cast<int32_t>(sampcoll->starting_art_id)) >= 0 &&
+      if (!(static_cast<int32_t>(rgn->artNum) - static_cast<int32_t>(sampcoll->starting_art_id) >= 0 &&
           rgn->artNum - sampcoll->starting_art_id < 200)) {
 
-        L_ERROR("Articulation #{} does not exist in the samp collection", rgn->artNum);
+        L_ERROR("Articulation #{:d} does not exist in the samp collection", rgn->artNum);
         art = &sampcoll->akArts.front();
       } else {
         if (rgn->artNum - sampcoll->starting_art_id >= sampcoll->akArts.size()) {
-          L_ERROR("Articulation #{} referenced but not loaded", rgn->artNum);
+          L_ERROR("Articulation #{:d} referenced but not loaded", rgn->artNum);
           art = &sampcoll->akArts.back();
         }
         else

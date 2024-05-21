@@ -17,8 +17,8 @@ DECLARE_FORMAT(CPS2);
 // CPSSeq
 // ******
 
-CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::string &name)
-    : VGMSeq(CPS2Format::name, file, offset, 0, name),
+CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::string name)
+    : VGMSeq(CPS2Format::name, file, offset, 0, std::move(name)),
       fmt_version(fmtVersion) {
   HasMonophonicTracks();
   AlwaysWriteInitialVol(127);
@@ -136,7 +136,6 @@ bool CPSSeq::PostLoad() {
     uint32_t mpt = mpqn / ppqn;  // microseconds per MIDI tick
     short pitchbendCents = 0;         // pitch bend in cents
     uint32_t pitchbendRange = 200;    // pitch bend range in cents default 2 semitones
-    uint8_t pitchBendRangeMSB = 2;    // the pitch bend range that we actually encode
     double vibratoCents = 0;          // vibrato depth in cents
     uint16_t tremelo = 0;        // tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
     uint16_t lfoRate = 0;        // value added to lfo env every lfo tick
@@ -211,7 +210,7 @@ bool CPSSeq::PostLoad() {
           // A vibrato event, it will provide us the frequency range of the lfo
           if (marker->name == "vibrato") {
             vibratoCents = vibrato_depth_table[marker->databyte1] * (100 / 256.0);
-            pitchBendRangeMSB = static_cast<uint8_t>(ceil(static_cast<double>(vibratoCents + fmtPitchBendRange) / 100.0));
+            uint8_t pitchBendRangeMSB = static_cast<uint8_t>(ceil(static_cast<double>(vibratoCents + fmtPitchBendRange) / 100.0));
             pitchbendRange = pitchBendRangeMSB * 100;
             printf("Vibrato byte: %X  Vibrato cents: %f  Converted to range: %d in cents\n", marker->databyte1, vibratoCents, pitchbendRange);
 
