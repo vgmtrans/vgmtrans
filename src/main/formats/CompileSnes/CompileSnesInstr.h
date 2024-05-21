@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "CompileSnesFormat.h"
 
@@ -17,10 +16,10 @@ class CompileSnesInstrSet:
                       uint16_t addrPitchTablePtrs,
                       uint32_t spcDirAddr,
                       const std::string &name = "CompileSnesInstrSet");
-  virtual ~CompileSnesInstrSet(void);
+  ~CompileSnesInstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
   CompileSnesVersion version;
 
@@ -45,9 +44,9 @@ class CompileSnesInstr
                    uint8_t srcn,
                    uint32_t spcDirAddr,
                    const std::string &name = "CompileSnesInstr");
-  virtual ~CompileSnesInstr(void);
+  ~CompileSnesInstr() override;
 
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
 
   static uint32_t ExpectedSize(CompileSnesVersion version);
 
@@ -71,9 +70,9 @@ class CompileSnesRgn
                  uint16_t addrPitchTablePtrs,
                  uint8_t srcn,
                  uint32_t spcDirAddr);
-  virtual ~CompileSnesRgn(void);
+  ~CompileSnesRgn() override;
 
-  virtual bool LoadRgn();
+  bool LoadRgn() override;
 
   CompileSnesVersion version;
 };

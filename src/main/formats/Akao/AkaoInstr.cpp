@@ -34,8 +34,8 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
 }
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
-  AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses,
-  std::set<uint32_t> drum_instrument_addresses, std::string name)
+  AkaoPs1Version version, const std::set<uint32_t>& custom_instrument_addresses,
+  const std::set<uint32_t>& drum_instrument_addresses, std::string name)
   : VGMInstrSet(AkaoFormat::name, file, 0, 0, std::move(name)), bMelInstrs(false), bDrumKit(false),
   instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset), version_(version)
 {
@@ -150,8 +150,8 @@ AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t lengt
 
 bool AkaoDrumKit::LoadInstr() {
   if (version() >= AkaoPs1Version::VERSION_3_0) {
-    const uint32_t kRgnLength = 8;
     for (uint8_t drum_note_number = 0; drum_note_number < 128; drum_note_number++) {
+      constexpr uint32_t kRgnLength = 8;
       const uint32_t rgn_offset = dwOffset + drum_note_number * kRgnLength;
       if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
         break;
@@ -190,9 +190,9 @@ bool AkaoDrumKit::LoadInstr() {
     }
   }
   else if (version() >= AkaoPs1Version::VERSION_1_0) {
-    const uint8_t drum_octave = 2; // a drum note ignores octave, this is the octave number for midi remapping
     const uint32_t kRgnLength = version() >= AkaoPs1Version::VERSION_2 ? 6 : 5;
     for (uint8_t drum_key = 0; drum_key < 12; drum_key++) {
+      constexpr uint8_t drum_octave = 2; // a drum note ignores octave, this is the octave number for midi remapping
       const uint32_t rgn_offset = dwOffset + drum_key * kRgnLength;
       if (rgn_offset + kRgnLength > instrSet()->end_boundary_offset)
         break;
@@ -238,12 +238,12 @@ bool AkaoDrumKit::LoadInstr() {
 // *******
 AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
                  uint8_t artIDNum, std::string name)
-    : VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0, name), artNum(artIDNum),
-      adsr1(0), adsr2(0), drumRelUnityKey(0) {
+    : VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0, std::move(name)),
+      adsr1(0), adsr2(0), artNum(artIDNum), drumRelUnityKey(0) {
 }
 
 AkaoRgn::AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, std::string name)
-    : VGMRgn(instr, offset, length, name), artNum(0), adsr1(0), adsr2(0), drumRelUnityKey(0) {
+    : VGMRgn(instr, offset, length, std::move(name)), adsr1(0), adsr2(0), artNum(0), drumRelUnityKey(0) {
 }
 
 bool AkaoRgn::LoadRgn() {
@@ -292,7 +292,7 @@ AkaoSampColl::AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, st
   unLength = end_offset - dwOffset;
 }
 
-bool AkaoSampColl::IsPossibleAkaoSampColl(RawFile *file, uint32_t offset) {
+bool AkaoSampColl::IsPossibleAkaoSampColl(const RawFile *file, uint32_t offset) {
   if (offset + 0x50 > file->size())
     return false;
 
@@ -311,7 +311,7 @@ bool AkaoSampColl::IsPossibleAkaoSampColl(RawFile *file, uint32_t offset) {
   return true;
 }
 
-AkaoPs1Version AkaoSampColl::GuessVersion(RawFile *file, uint32_t offset) {
+AkaoPs1Version AkaoSampColl::GuessVersion(const RawFile *file, uint32_t offset) {
   if (file->GetWord(offset + 0x40) == 0) {
     const uint32_t num_articulations = file->GetWord(offset + 0x1C);
 

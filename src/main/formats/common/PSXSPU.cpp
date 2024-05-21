@@ -191,11 +191,11 @@ PSXSampColl *PSXSampColl::SearchForPSXADPCM(RawFile *file, const string &format)
     return bestSampColl;
   }
   else {
-    return NULL;
+    return nullptr;
   }
 }
 
-const std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, const string &format) {
+std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, const string &format) {
   std::vector<PSXSampColl *> sampColls;
   uint32_t nFileLength = file->size();
   for (uint32_t i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < nFileLength; i++) {
@@ -220,7 +220,7 @@ const std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, 
       int prevFilter = (file->GetByte(firstChunk + 16) & 0xF0) >> 4;
       for (uint32_t j = 0; j < NUM_CHUNKS_READAHEAD; j++) {
         uint32_t curChunk = firstChunk + 16 + j * 16;
-        uint8_t keyFlagByte = file->GetByte(curChunk + 1);
+        keyFlagByte = file->GetByte(curChunk + 1);
         if ((keyFlagByte & 0xFC) != 0) {
           bBad = true;
           break;
@@ -232,12 +232,12 @@ const std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, 
         }
 
         //do range and filter value comparison
-        int range = ((int) file->GetByte(firstChunk + 16 + j * 16)) & 0xF;
+        const int range = file->GetByte(firstChunk + 16 + j * 16) & 0xF;
         int diff = abs(range - prevRange);
         if (diff > maxRangeChange)
           maxRangeChange = diff;
         prevRange = range;
-        int filter = (((int) file->GetByte(firstChunk + 16 + j * 16)) & 0xF0) >> 4;
+        const int filter = (file->GetByte(firstChunk + 16 + j * 16) & 0xF0) >> 4;
         diff = abs(filter - prevFilter);
         if (diff > maxFilterChange)
           maxFilterChange = diff;
@@ -272,7 +272,7 @@ const std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, 
 PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
                  uint32_t theRate, string name, bool bSetloopOnConversion)
-    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, name),
+    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, std::move(name)),
       bSetLoopOnConversion(bSetloopOnConversion) {
   bPSXLoopInfoPrioritizing = true;
 }
@@ -285,7 +285,7 @@ double PSXSamp::GetCompressionRatio() {
 }
 
 void PSXSamp::ConvertToStdWave(uint8_t *buf) {
-  int16_t *uncompBuf = (int16_t *) buf;
+  int16_t *uncompBuf = reinterpret_cast<int16_t*>(buf);
   VAGBlk theBlock;
   f32 prev1 = 0;
   f32 prev2 = 0;
@@ -332,7 +332,7 @@ void PSXSamp::ConvertToStdWave(uint8_t *buf) {
   }
 }
 
-uint32_t PSXSamp::GetSampleLength(RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop) {
+uint32_t PSXSamp::GetSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop) {
   uint32_t curOffset = offset;
   while (curOffset < endOffset) {
     uint8_t keyFlagByte = file->GetByte(curOffset + 1);
@@ -355,7 +355,7 @@ uint32_t PSXSamp::GetSampleLength(RawFile *file, uint32_t offset, uint32_t endOf
 }
 
 //This next function is taken from Antires's work
-void PSXSamp::DecompVAGBlk(s16 *pSmp, VAGBlk *pVBlk, f32 *prev1, f32 *prev2) {
+void PSXSamp::DecompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, f32 *prev1, f32 *prev2) {
   u32 i, shift;                                //Shift amount for compressed samples
   f32 t;                                       //Temporary sample
   f32 f1, f2;
@@ -372,8 +372,8 @@ void PSXSamp::DecompVAGBlk(s16 *pSmp, VAGBlk *pVBlk, f32 *prev1, f32 *prev2) {
   shift = pVBlk->range + 16;
 
   for (i = 0; i < 14; i++) {
-    pSmp[i * 2] = ((s32) pVBlk->brr[i] << 28) >> shift;
-    pSmp[i * 2 + 1] = ((s32) (pVBlk->brr[i] & 0xF0) << 24) >> shift;
+    pSmp[i * 2] = (static_cast<s32>(pVBlk->brr[i]) << 28) >> shift;
+    pSmp[i * 2 + 1] = (static_cast<s32>(pVBlk->brr[i] & 0xF0) << 24) >> shift;
   }
 
   //Apply ADPCM decompression ----------------
@@ -387,7 +387,7 @@ void PSXSamp::DecompVAGBlk(s16 *pSmp, VAGBlk *pVBlk, f32 *prev1, f32 *prev2) {
 
     for (i = 0; i < 28; i++) {
       t = pSmp[i] + (p1 * f1) - (p2 * f2);
-      pSmp[i] = (s16) t;
+      pSmp[i] = static_cast<s16>(t);
       p2 = p1;
       p1 = t;
     }

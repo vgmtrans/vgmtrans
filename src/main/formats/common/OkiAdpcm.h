@@ -24,7 +24,7 @@ public:
 
   void reset();
   int16_t clock(uint8_t nibble);
-  int16_t output() { return m_signal; }
+  int16_t output() const { return m_signal; }
   void save();
   void restore();
 
@@ -49,10 +49,10 @@ public:
   DialogicAdpcmSamp(
       VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, std::string name
   );
-  virtual ~DialogicAdpcmSamp(void);
+  ~DialogicAdpcmSamp() override;
 
-  virtual double GetCompressionRatio();
-  virtual void ConvertToStdWave(uint8_t *buf);
+  double GetCompressionRatio() override;
+  void ConvertToStdWave(uint8_t *buf) override;
 
 private:
   static oki_adpcm_state okiAdpcmState;

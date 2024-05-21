@@ -17,8 +17,8 @@ using namespace std;
 static const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 8, 4 };
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
-    : VGMSeq(AkaoFormat::name, file, offset), instrument_set_offset_(0), drum_set_offset_(0),
-      seq_id(0), version_(version), condition(0) {
+    : VGMSeq(AkaoFormat::name, file, offset), seq_id(0), version_(version),
+      instrument_set_offset_(0), drum_set_offset_(0), condition(0) {
   UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   //UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController); // disabled, it only changes the volume and the pan slightly, and also its output becomes undefined if pan and volume slides are used at the same time
   bUsesIndividualArts = false;
@@ -33,7 +33,7 @@ void AkaoSeq::ResetVars() {
     condition = 2;
 }
 
-bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
+bool AkaoSeq::IsPossibleAkaoSeq(const RawFile *file, uint32_t offset) {
   if (offset + 0x10 > file->size())
     return false;
   if (file->GetWordBE(offset) != 0x414B414F)
@@ -60,7 +60,7 @@ bool AkaoSeq::IsPossibleAkaoSeq(RawFile *file, uint32_t offset) {
   return true;
 }
 
-AkaoPs1Version AkaoSeq::GuessVersion(RawFile *file, uint32_t offset) {
+AkaoPs1Version AkaoSeq::GuessVersion(const RawFile *file, uint32_t offset) {
   if (file->GetWord(offset + 0x2C) == 0)
     return AkaoPs1Version::VERSION_3_2;
   else if (file->GetWord(offset + 0x1C) == 0)
@@ -185,7 +185,7 @@ bool AkaoSeq::GetTrackPointers() {
   return true;
 }
 
-std::string AkaoSeq::ReadTimestampAsText() {
+std::string AkaoSeq::ReadTimestampAsText() const {
   const uint8_t year_bcd = GetByte(dwOffset + 0xA);
   const uint8_t month_bcd = GetByte(dwOffset + 0xB);
   const uint8_t day_bcd = GetByte(dwOffset + 0xC);
@@ -524,6 +524,7 @@ void AkaoSeq::LoadEventMap()
 
 AkaoTrack::AkaoTrack(AkaoSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
+  AkaoTrack::ResetVars();
 }
 
 void AkaoTrack::ResetVars() {
@@ -535,9 +536,9 @@ void AkaoTrack::ResetVars() {
 
   pattern_return_offset = 0;
 
-  std::fill(loop_begin_loc.begin(), loop_begin_loc.end(), 0);
+  std::ranges::fill(loop_begin_loc, 0);
   loop_layer = 0;
-  std::fill(loop_counter.begin(), loop_counter.end(), 0);
+  std::ranges::fill(loop_counter, 0);
 
   last_delta_time = 0;
   use_one_time_delta_time = false;
@@ -599,7 +600,7 @@ bool AkaoTrack::ReadEvent() {
       // in earlier verion, drum instrument will ignore the octave number
       uint8_t key = real_key;
       if (version <= AkaoPs1Version::VERSION_2) {
-        const uint8_t drum_octave = 2;
+        constexpr uint8_t drum_octave = 2;
         key = drum ? (drum_octave * 12) + relative_key : real_key;
       }
 
@@ -1492,7 +1493,7 @@ bool AkaoTrack::ReadEvent() {
     }
 
     case EVENT_FREE_RESERVED_VOICES: {
-      const uint8_t count = 0;
+      constexpr uint8_t count = 0;
       desc << "Number of Voices: " << count;
       AddGenericEvent(beginOffset, curOffset - beginOffset, "Free Reserved Voices", desc.str(), CLR_MISC);
       break;
@@ -1582,13 +1583,13 @@ bool AkaoTrack::ReadEvent() {
   return true;
 }
 
-void AkaoTrack::logUnknownEvent(const std::string& opcode_str, u32 beginOffset) {
+void AkaoTrack::logUnknownEvent(const std::string& opcode_str, u32 beginOffset) const {
   L_WARN("Unknown Event - Filename: {} Event: {} Address: {:#010X}", parentSeq->rawfile->name(),
     opcode_str, beginOffset);
 }
 
 bool AkaoTrack::AnyUnvisitedJumpDestinations()
 {
-  return std::any_of(conditional_jump_destinations.begin(), conditional_jump_destinations.end(),
+  return std::ranges::any_of(conditional_jump_destinations,
                      [this](uint32_t dest) { return !IsOffsetUsed(dest); });
 }

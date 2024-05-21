@@ -8,22 +8,21 @@ enum CapcomSnesVersion: uint8_t; // see CapcomSnesFormat.h
 class CapcomSnesScanner:
     public VGMScanner {
  public:
-  CapcomSnesScanner(void) {
+  CapcomSnesScanner() {
     USE_EXTENSION("spc");
   }
-  virtual ~CapcomSnesScanner(void) {
-  }
+  ~CapcomSnesScanner() override {}
 
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForCapcomSnesFromARAM(RawFile *file);
-  void SearchForCapcomSnesFromROM(RawFile *file);
+  void Scan(RawFile *file, void *info = nullptr) override;
+  void SearchForCapcomSnesFromARAM(RawFile *file) const;
+  static void SearchForCapcomSnesFromROM(RawFile *file);
 
  private:
-  int GetLengthOfSongList(RawFile *file, uint16_t addrSongList);
-  uint16_t GetCurrentPlayAddressFromARAM(RawFile *file, CapcomSnesVersion version, uint8_t channel);
-  int8_t GuessCurrentSongFromARAM(RawFile *file, CapcomSnesVersion version, uint16_t addrSongList);
-  bool IsValidBGMHeader(RawFile *file, uint32_t addrSongHeader);
-  std::map<uint8_t, uint8_t> GetInitDspRegMap(RawFile *file);
+  static int GetLengthOfSongList(const RawFile *file, uint16_t addrSongList);
+  static uint16_t GetCurrentPlayAddressFromARAM(const RawFile *file, CapcomSnesVersion version, uint8_t channel);
+  int8_t GuessCurrentSongFromARAM(const RawFile *file, CapcomSnesVersion version, uint16_t addrSongList) const;
+  static bool IsValidBGMHeader(const RawFile *file, uint32_t addrSongHeader);
+  static std::map<uint8_t, uint8_t> GetInitDspRegMap(const RawFile *file);
 
   static BytePattern ptnReadSongList;
   static BytePattern ptnReadBGMAddress;

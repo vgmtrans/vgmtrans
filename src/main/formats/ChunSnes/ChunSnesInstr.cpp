@@ -76,7 +76,7 @@ bool ChunSnesInstrSet::GetInstrPointers() {
 
     uint8_t srcn = GetByte(addrInstr);
     if (srcn != 0xff) {
-      std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+      std::vector<uint8_t>::iterator itrSRCN = std::ranges::find(usedSRCNs, srcn);
       if (itrSRCN == usedSRCNs.end()) {
         usedSRCNs.push_back(srcn);
       }
@@ -95,7 +95,7 @@ bool ChunSnesInstrSet::GetInstrPointers() {
     return false;
   }
 
-  std::sort(usedSRCNs.begin(), usedSRCNs.end());
+  std::ranges::sort(usedSRCNs);
   SNESSampColl *newSampColl = new SNESSampColl(ChunSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
@@ -190,8 +190,8 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn
 
   // use ADSR sustain for release rate
   uint8_t sr_release = 0x19; // default release rate
-  ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, NULL,
-    NULL, NULL, &this->release_time, NULL);
+  ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, nullptr,
+    nullptr, nullptr, &this->release_time, nullptr);
 }
 
 ChunSnesRgn::~ChunSnesRgn() {}

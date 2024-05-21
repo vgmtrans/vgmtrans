@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "AkaoSnesFormat.h"
 
@@ -11,7 +10,7 @@
 class AkaoSnesInstrSet:
     public VGMInstrSet {
  public:
-  static const uint32_t DRUMKIT_PROGRAM = (0x7F << 7);
+  static constexpr uint32_t DRUMKIT_PROGRAM = (0x7F << 7);
 
   AkaoSnesInstrSet(RawFile *file,
                    AkaoSnesVersion ver,
@@ -20,10 +19,10 @@ class AkaoSnesInstrSet:
                    uint16_t addrADSRTable,
                    uint16_t addrDrumKitTable,
                    const std::string &name = "AkaoSnesInstrSet");
-  virtual ~AkaoSnesInstrSet(void);
+  ~AkaoSnesInstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
   AkaoSnesVersion version;
 
@@ -49,9 +48,9 @@ class AkaoSnesInstr
                 uint16_t addrTuningTable,
                 uint16_t addrADSRTable,
                 const std::string &name = "AkaoSnesInstr");
-  virtual ~AkaoSnesInstr(void);
+  ~AkaoSnesInstr() override;
 
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
 
   AkaoSnesVersion version;
 
@@ -76,9 +75,9 @@ public:
                   uint16_t addrADSRTable,
                   uint16_t addrDrumKitTable,
                   const std::string &name = "AkaoSnesDrumKit");
-  virtual ~AkaoSnesDrumKit(void);
+  ~AkaoSnesDrumKit() override;
 
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
 
   AkaoSnesVersion version;
 
@@ -99,12 +98,12 @@ class AkaoSnesRgn
   AkaoSnesRgn(VGMInstr *instr,
               AkaoSnesVersion ver,
               uint16_t addrTuningTable);
-  virtual ~AkaoSnesRgn(void);
+  ~AkaoSnesRgn() override;
 
   bool InitializeRegion(uint8_t srcn,
                         uint32_t spcDirAddr,
                         uint16_t addrADSRTable);
-  virtual bool LoadRgn();
+  bool LoadRgn() override;
 
   AkaoSnesVersion version;
 };
@@ -121,17 +120,15 @@ public:
   // This value can be anything from 0 to 127, but being near the middle of
   // the range gives it a decent chance of not going out of range in either
   // direction.
-  static const uint8_t KEY_BIAS = 60;
+  static constexpr uint8_t KEY_BIAS = 60;
 
   AkaoSnesDrumKitRgn(AkaoSnesDrumKit *instr,
                      AkaoSnesVersion ver,
                      uint16_t addrTuningTable);
-  virtual ~AkaoSnesDrumKitRgn(void);
+  ~AkaoSnesDrumKitRgn() override;
 
   bool InitializePercussionRegion(uint8_t srcn,
                                   uint32_t spcDirAddr,
                                   uint16_t addrADSRTable,
                                   uint16_t addrDrumKitTable);
-
-  uint8_t srcn;
 };

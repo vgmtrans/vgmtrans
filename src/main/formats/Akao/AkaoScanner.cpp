@@ -83,7 +83,7 @@ void AkaoScanner::Scan(RawFile *file, void *info) {
   }
 }
 
-AkaoPs1Version AkaoScanner::DetermineVersionFromTag(RawFile *file) noexcept {
+AkaoPs1Version AkaoScanner::DetermineVersionFromTag(const RawFile *file) noexcept {
   const std::string & album = file->tag.album;
   if (album == "Final Fantasy 7" || album == "Final Fantasy VII")
     return AkaoPs1Version::VERSION_1_0;

@@ -6,6 +6,7 @@
 // Many thanks to bsnes and snes9x.
 
 #include "SNESDSP.h"
+#include "VGMInstrSet.h"
 #include "LogManager.h"
 
 // *************
@@ -83,12 +84,12 @@ uint32_t EmulateSDSPGAIN(uint8_t gain,
   }
 
   uint32_t total_samples = tick * SDSP_COUNTER_RATES[rate];
-  if (env_after_ptr != NULL) {
+  if (env_after_ptr != nullptr) {
     *env_after_ptr = env;
   }
 
   // calculate envelope time for soundfont use
-  if (sf2_envelope_time_ptr != NULL) {
+  if (sf2_envelope_time_ptr != nullptr) {
     double sf2_time;
     if (mode < 4) { // direct
       sf2_time = 0.0;
@@ -177,12 +178,6 @@ void ConvertSNESADSR(uint8_t adsr1,
   double sustain_time;
   double release_time;
 
-  bool have_attack_time = false;
-  bool have_decay_time = false;
-  bool have_sustain_level = false;
-  bool have_sustain_time = false;
-  bool have_release_time = false;
-
   int16_t env;
   int16_t env_after;
   uint32_t samples;
@@ -229,12 +224,6 @@ void ConvertSNESADSR(uint8_t adsr1,
     // decrease envelope by 8 for every sample
     samples = (env_sustain_start + 7) / 8;
     release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
-
-    have_attack_time = true;
-    have_decay_time = true;
-    have_sustain_level = true;
-    have_sustain_time = true;
-    have_release_time = true;
   }
   else {
     uint8_t mode = gain >> 5;
@@ -249,12 +238,6 @@ void ConvertSNESADSR(uint8_t adsr1,
       // decrease envelope by 8 for every sample
       samples = (env_from + 7) / 8;
       release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
-
-      have_attack_time = true;
-      have_decay_time = true;
-      have_sustain_level = true;
-      have_sustain_time = true;
-      have_release_time = true;
     }
     else {
       env = env_from;
@@ -284,32 +267,26 @@ void ConvertSNESADSR(uint8_t adsr1,
         samples = (env_from + 7) / 8;
         release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
       }
-
-      have_attack_time = true;
-      have_decay_time = true;
-      have_sustain_level = true;
-      have_sustain_time = true;
-      have_release_time = true;
     }
   }
 
-  if (ptr_attack_time != NULL && have_attack_time) {
+  if (ptr_attack_time != nullptr) {
     *ptr_attack_time = attack_time;
   }
 
-  if (ptr_decay_time != NULL && have_decay_time) {
+  if (ptr_decay_time != nullptr) {
     *ptr_decay_time = decay_time;
   }
 
-  if (ptr_sustain_level != NULL && have_sustain_level) {
+  if (ptr_sustain_level != nullptr) {
     *ptr_sustain_level = sustain_level;
   }
 
-  if (ptr_sustain_time != NULL && have_sustain_time) {
+  if (ptr_sustain_time != nullptr) {
     *ptr_sustain_time = sustain_time;
   }
 
-  if (ptr_release_time != NULL && have_release_time) {
+  if (ptr_release_time != nullptr) {
     *ptr_release_time = release_time;
   }
 }
@@ -332,14 +309,14 @@ SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uin
 
 SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t offset,
                            const std::vector<uint8_t> &targetSRCNs, std::string name) :
-    VGMSampColl(format, rawfile, offset, 0, name),
+    VGMSampColl(format, rawfile, offset, 0, std::move(name)),
     spcDirAddr(offset),
     targetSRCNs(targetSRCNs) {
 }
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
                            const std::vector<uint8_t> &targetSRCNs, std::string name) :
-    VGMSampColl(format, instrset->GetRawFile(), instrset, offset, 0, name),
+    VGMSampColl(format, instrset->GetRawFile(), instrset, offset, 0, std::move(name)),
     spcDirAddr(offset),
     targetSRCNs(targetSRCNs) {
 }
@@ -386,7 +363,7 @@ bool SNESSampColl::GetSampleInfo() {
   return samples.size() != 0;
 }
 
-bool SNESSampColl::IsValidSampleDir(RawFile *file, uint32_t spcDirEntAddr, bool validateSample) {
+bool SNESSampColl::IsValidSampleDir(const RawFile *file, uint32_t spcDirEntAddr, bool validateSample) {
   if (spcDirEntAddr + 4 > 0x10000) {
     return false;
   }
@@ -419,13 +396,13 @@ bool SNESSampColl::IsValidSampleDir(RawFile *file, uint32_t spcDirEntAddr, bool 
 
 SNESSamp::SNESSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                    uint32_t dataLen, uint32_t loopOffset, std::string name)
-    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, 1, 16, 32000, name),
+    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, 1, 16, 32000, std::move(name)),
       brrLoopOffset(loopOffset) {
 }
 
 SNESSamp::~SNESSamp() {}
 
-uint32_t SNESSamp::GetSampleLength(RawFile *file, uint32_t offset, bool &loop) {
+uint32_t SNESSamp::GetSampleLength(const RawFile *file, uint32_t offset, bool &loop) {
   uint32_t currOffset = offset;
   while (true) {
     if (currOffset + 9 > file->size()) {
@@ -471,7 +448,7 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
     theBlock.flag.loop = (GetByte(dwOffset + k) & 0x02) != 0;
 
     GetRawFile()->GetBytes(dwOffset + k + 1, 8, theBlock.brr);
-    DecompBRRBlk((int16_t *) (&buf[k * 32 / 9]),
+    DecompBRRBlk(reinterpret_cast<int16_t*>(&buf[k * 32 / 9]),
                  &theBlock,
                  &prev1,
                  &prev2);    //each decompressed pcm block is 32 bytes
@@ -509,25 +486,20 @@ static inline int32_t sclamp16(int32_t x) {
   return ((x > 32767) ? 32767 : (x < -32768) ? -32768 : x);
 }
 
-void SNESSamp::DecompBRRBlk(int16_t *pSmp, BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2) {
-  int32_t out, S1, S2;
-  int8_t sample1, sample2;
-  bool validHeader;
-  int i, nybble;
+void SNESSamp::DecompBRRBlk(int16_t *pSmp, const BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2) {
+  bool validHeader = (pVBlk->flag.range < 0xD);
 
-  validHeader = (pVBlk->flag.range < 0xD);
+  int32_t S1 = *prev1;
+  int32_t S2 = *prev2;
 
-  S1 = *prev1;
-  S2 = *prev2;
-
-  for (i = 0; i < 8; i++) {
-    sample1 = pVBlk->brr[i];
-    sample2 = sample1 << 4;
+  for (int i = 0; i < 8; i++) {
+    int8_t sample1 = pVBlk->brr[i];
+    int8_t sample2 = sample1 << 4;
     sample1 >>= 4;
     sample2 >>= 4;
 
-    for (nybble = 0; nybble < 2; nybble++) {
-      out = nybble ? (int32_t) sample2 : (int32_t) sample1;
+    for (int nybble = 0; nybble < 2; nybble++) {
+      int32_t out = nybble ? sample2 : sample1;
       out = validHeader ? ((out << pVBlk->flag.range) >> 1) : (out & ~0x7FF);
 
       switch (pVBlk->flag.filter) {
@@ -544,6 +516,8 @@ void SNESSamp::DecompBRRBlk(int16_t *pSmp, BRRBlk *pVBlk, int32_t *prev1, int32_
 
         case 3: // 115/64 - 13/16
           out += (S1 << 1) + ((-(S1 + (S1 << 2) + (S1 << 3))) >> 6) - S2 + (((S2 << 1) + S2) >> 4);
+          break;
+        default:
           break;
       }
 

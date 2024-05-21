@@ -36,8 +36,11 @@ class AkaoInstrSet final : public VGMInstrSet {
                uint32_t dkitOff,
                uint32_t id,
                std::string name = "Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset, AkaoPs1Version version, std::set<uint32_t> custom_instrument_addresses, std::set<uint32_t> drum_instrument_addresses, std::string name = "Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version, std::string name = "Akao Instrument Bank (Dummy)");
+  AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset, AkaoPs1Version version,
+    const std::set<uint32_t>& custom_instrument_addresses, const std::set<uint32_t>& drum_instrument_addresses,
+    std::string name = "Akao Instrument Bank");
+  AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version,
+    std::string name = "Akao Instrument Bank (Dummy)");
   bool GetInstrPointers() override;
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
@@ -136,8 +139,8 @@ class AkaoSampColl final :
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
-  [[nodiscard]] static bool IsPossibleAkaoSampColl(RawFile *file, uint32_t offset);
-  [[nodiscard]] static AkaoPs1Version GuessVersion(RawFile *file, uint32_t offset);
+  [[nodiscard]] static bool IsPossibleAkaoSampColl(const RawFile *file, uint32_t offset);
+  [[nodiscard]] static AkaoPs1Version GuessVersion(const RawFile *file, uint32_t offset);
 
   std::vector<AkaoArt> akArts;
   uint32_t starting_art_id;

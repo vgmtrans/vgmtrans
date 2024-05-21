@@ -11,9 +11,9 @@ enum CompileSnesVersion : uint8_t;  // see CompileSnesFormat.h
 
 class CompileSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForCompileSnesFromARAM(RawFile *file);
-  void SearchForCompileSnesFromROM(RawFile *file);
+  void Scan(RawFile *file, void *info) override;
+  static void SearchForCompileSnesFromARAM(RawFile *file);
+  static void SearchForCompileSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnSetSongListAddress;

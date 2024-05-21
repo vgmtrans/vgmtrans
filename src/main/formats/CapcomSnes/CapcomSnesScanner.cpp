@@ -110,29 +110,27 @@ void CapcomSnesScanner::Scan(RawFile *file, void *info) {
   return;
 }
 
-void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) {
-  CapcomSnesVersion version = CAPCOMSNES_NONE;
+void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) const {
+  CapcomSnesVersion version;
 
   uint32_t ofsReadSongListASM;
   uint32_t ofsReadBGMAddressASM;
   uint32_t ofsLoadInstrTableAddressASM;
-  bool hasSongList;
-  bool bgmAtFixedAddress;
-  uint32_t addrSongList;
-  uint32_t addrBGMHeader;
+  uint32_t addrSongList{0};
+  uint32_t addrBGMHeader{0};
   uint32_t addrInstrTable;
 
   std::string basefilename = removeExtFromPath(file->name());
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // find a song list
-  hasSongList = file->SearchBytePattern(ptnReadSongList, ofsReadSongListASM);
+  bool hasSongList = file->SearchBytePattern(ptnReadSongList, ofsReadSongListASM);
   if (hasSongList) {
     addrSongList = std::min(file->GetShort(ofsReadSongListASM + 3), file->GetShort(ofsReadSongListASM + 8));
   }
 
   // find BGM address
-  bgmAtFixedAddress = file->SearchBytePattern(ptnReadBGMAddress, ofsReadBGMAddressASM);
+  bool bgmAtFixedAddress = file->SearchBytePattern(ptnReadBGMAddress, ofsReadBGMAddressASM);
   if (bgmAtFixedAddress) {
     addrBGMHeader = (file->GetByte(ofsReadBGMAddressASM + 5) << 8) | file->GetByte(ofsReadBGMAddressASM + 8);
   }
@@ -236,10 +234,9 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) {
   }
 }
 
-void CapcomSnesScanner::SearchForCapcomSnesFromROM(RawFile *file) {
-}
+void CapcomSnesScanner::SearchForCapcomSnesFromROM(RawFile *file) {}
 
-uint16_t CapcomSnesScanner::GetCurrentPlayAddressFromARAM(RawFile *file, CapcomSnesVersion version, uint8_t channel) {
+uint16_t CapcomSnesScanner::GetCurrentPlayAddressFromARAM(const RawFile *file, CapcomSnesVersion version, uint8_t channel) {
   uint16_t currentAddress;
   if (version == CAPCOMSNES_V1_BGM_IN_LIST) {
     currentAddress = file->GetByte(0x00 + channel * 2 + 1) | (file->GetByte(0x10 + channel * 2 + 1) << 8);
@@ -250,7 +247,7 @@ uint16_t CapcomSnesScanner::GetCurrentPlayAddressFromARAM(RawFile *file, CapcomS
   return currentAddress;
 }
 
-int CapcomSnesScanner::GetLengthOfSongList(RawFile *file, uint16_t addrSongList) {
+int CapcomSnesScanner::GetLengthOfSongList(const RawFile *file, uint16_t addrSongList) {
   int length = 0;
 
   // do heuristic search for each songs
@@ -276,7 +273,7 @@ int CapcomSnesScanner::GetLengthOfSongList(RawFile *file, uint16_t addrSongList)
   return length;
 }
 
-int8_t CapcomSnesScanner::GuessCurrentSongFromARAM(RawFile *file, CapcomSnesVersion version, uint16_t addrSongList) {
+int8_t CapcomSnesScanner::GuessCurrentSongFromARAM(const RawFile *file, CapcomSnesVersion version, uint16_t addrSongList) const {
   int8_t guessedSongIndex = -1;
   int guessBestScore = INT_MAX;
 
@@ -327,7 +324,7 @@ int8_t CapcomSnesScanner::GuessCurrentSongFromARAM(RawFile *file, CapcomSnesVers
   return guessedSongIndex;
 }
 
-bool CapcomSnesScanner::IsValidBGMHeader(RawFile *file, uint32_t addrSongHeader) {
+bool CapcomSnesScanner::IsValidBGMHeader(const RawFile *file, uint32_t addrSongHeader) {
   if (addrSongHeader + 17 > 0x10000) {
     return false;
   }
@@ -342,12 +339,12 @@ bool CapcomSnesScanner::IsValidBGMHeader(RawFile *file, uint32_t addrSongHeader)
   return true;
 }
 
-std::map<uint8_t, uint8_t> CapcomSnesScanner::GetInitDspRegMap(RawFile *file) {
+std::map<uint8_t, uint8_t> CapcomSnesScanner::GetInitDspRegMap(const RawFile *file) {
   std::map<uint8_t, uint8_t> dspRegMap;
 
   uint32_t ofsDspRegInitASM;
   uint32_t ofsDspRegInitOldVerASM;
-  uint32_t dspRegCount = 0;
+  uint32_t dspRegCount;
   uint32_t addrDspRegList;
   uint32_t addrDspValueList;
 

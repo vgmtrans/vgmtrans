@@ -32,7 +32,7 @@ typedef long double f80;
 class DLSArt;
 
 static unsigned long RateTable[160];
-static bool bRateTableInitialized = 0;
+static bool bRateTableInitialized = false;
 
 //VAG format -----------------------------------
 //File Header
@@ -66,18 +66,15 @@ typedef struct _VAGBlk {
 //InitADSR is shamelessly ripped from P.E.Op.S
 static void InitADSR()
 {
-  unsigned long r, rs, rd;
-  int i;
-
   // build the rate table according to Neill's rules
   memset(RateTable, 0, sizeof(unsigned long) * 160);
 
-  r = 3;
-  rs = 1;
-  rd = 0;
+  uint32_t r = 3;
+  uint32_t rs = 1;
+  uint32_t rd = 0;
 
   // we start at pos 32 with the real values... everything before is 0
-  for (i = 32; i < 160; i++) {
+  for (int i = 32; i < 160; i++) {
     if (r < 0x3FFFFFFF) {
       r += rs;
       rd++;
@@ -151,11 +148,7 @@ void PSXConvADSR(T *realADSR,
   double sampleRate = bPS2 ? 48000 : 44100;
 
   int rateIncTable[8] = {0, 4, 6, 8, 9, 10, 11, 12};
-  long envelope_level;
-  double samples;
-  unsigned long rate;
-  unsigned long remainder;
-  double timeInSecs;
+  double samples{0};
   int l;
 
   if (!bRateTableInitialized) {
@@ -174,25 +167,24 @@ void PSXConvADSR(T *realADSR,
     Ar = 0;
   // if linear Ar Mode
   if (Am == 0) {
-    rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x10) + 32];
-    samples = ceil(0x7FFFFFFF / (double)rate);
+    uint32_t rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x10) + 32];
+    samples = ceil(0x7FFFFFFF / static_cast<double>(rate));
   } else if (Am == 1) {
-    rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x10) + 32];
+    uint32_t rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x10) + 32];
     samples = 0x60000000 / rate;
-    remainder = 0x60000000 % rate;
+    uint32_t remainder = 0x60000000 % rate;
     rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x18) + 32];
-    samples += ceil(fmax(0, 0x1FFFFFFF - remainder) / (double) rate);
+    samples += ceil(fmax(0, 0x1FFFFFFF - remainder) / static_cast<double>(rate));
   }
-  timeInSecs = samples / sampleRate;
-  realADSR->attack_time = timeInSecs;
+  realADSR->attack_time = samples / sampleRate;
 //	}
 
   // Decay Time
 
-  envelope_level = 0x7FFFFFFF;
+  long envelope_level = 0x7FFFFFFF;
 
   bool bSustainLevFound = false;
-  uint32_t realSustainLevel;
+  uint32_t realSustainLevel{0};
   // DLS decay rate value is to -96db (silence) not the sustain level
   for (l = 0; envelope_level > 0; l++) {
     if (4 * (Dr ^ 0x1F) < 0x18)
@@ -206,6 +198,7 @@ void PSXConvADSR(T *realADSR,
       case 5: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+10) + 32]; break;
       case 6: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+11) + 32]; break;
       case 7: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+12) + 32]; break;
+      default: break;
     }
     if (!bSustainLevFound && ((envelope_level >> 27) & 0xF) <= Sl) {
       realSustainLevel = envelope_level;
@@ -213,8 +206,7 @@ void PSXConvADSR(T *realADSR,
     }
   }
   samples = l;
-  timeInSecs = samples / sampleRate;
-  realADSR->decay_time = timeInSecs;
+  realADSR->decay_time = samples / sampleRate;
 
   // Sustain Rate
 
@@ -228,14 +220,14 @@ void PSXConvADSR(T *realADSR,
     else {
       // linear
       if (Sm == 0) {
-        rate = RateTable[RoundToZero((Sr ^ 0x7F) - 0x0F) + 32];
-        samples = ceil(0x7FFFFFFF / (double) rate);
+        uint32_t rate = RateTable[RoundToZero((Sr ^ 0x7F) - 0x0F) + 32];
+        samples = ceil(0x7FFFFFFF / static_cast<double>(rate));
       } else {
         l = 0;
         // DLS decay rate value is to -96db (silence) not the sustain level
         while (envelope_level > 0) {
-          long envelope_level_diff;
-          long envelope_level_target;
+          long envelope_level_diff{0};
+          long envelope_level_target{0};
 
           switch ((envelope_level >> 28) & 0x7) {
             case 0: envelope_level_target = 0x00000000; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+0 ) +  32]; break;
@@ -246,6 +238,7 @@ void PSXConvADSR(T *realADSR,
             case 5: envelope_level_target = 0x4fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+10) + 32]; break;
             case 6: envelope_level_target = 0x5fffffff; envelope_level_diff = RateTable[RoundToZero((Sr ^ 0x7F) - 0x1B + 11) + 32]; break;
             case 7: envelope_level_target = 0x6fffffff; envelope_level_diff = RateTable[RoundToZero((Sr ^ 0x7F) - 0x1B + 12) + 32]; break;
+            default: break;
           }
 
           long steps = (envelope_level - envelope_level_target + (envelope_level_diff - 1)) / envelope_level_diff;
@@ -254,7 +247,7 @@ void PSXConvADSR(T *realADSR,
         }
         samples = l;
       }
-      timeInSecs = samples / sampleRate;
+      double timeInSecs = samples / sampleRate;
       realADSR->sustain_time = /*Sm ? timeInSecs : */LinAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
     }
   }
@@ -263,7 +256,7 @@ void PSXConvADSR(T *realADSR,
   //realADSR->sustain_level = (double)envelope_level/(double)0x7FFFFFFF;//(long)ceil((double)envelope_level * 0.030517578139210854);	//in DLS, sustain level is measured as a percentage
   if (Sl == 0)
     realSustainLevel = 0x07FFFFFF;
-  realADSR->sustain_level = realSustainLevel / (double) 0x7FFFFFFF;
+  realADSR->sustain_level = realSustainLevel / static_cast<double>(0x7FFFFFFF);
 
   // If decay is going unused, and there's a sustain rate with sustain level close to max...
   //  we'll put the sustain_rate in place of the decay rate.
@@ -282,10 +275,10 @@ void PSXConvADSR(T *realADSR,
 
   // if linear Rr Mode
   if (Rm == 0) {
-    rate = RateTable[RoundToZero((4 * (Rr ^ 0x1F)) - 0x0C) + 32];
+    uint32_t rate = RateTable[RoundToZero((4 * (Rr ^ 0x1F)) - 0x0C) + 32];
 
     if (rate != 0)
-      samples = ceil((double) envelope_level / (double) rate);
+      samples = ceil(static_cast<double>(envelope_level) / rate);
     else
       samples = 0;
   } else if (Rm == 1) {
@@ -301,11 +294,12 @@ void PSXConvADSR(T *realADSR,
         case 5: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+10) + 32]; break;
         case 6: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+11) + 32]; break;
         case 7: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+12) + 32]; break;
+        default: break;
       }
     }
     samples = l;
   }
-  timeInSecs = samples / sampleRate;
+  double timeInSecs = samples / sampleRate;
 
   //theRate = timeInSecs / sustain_envelope_level;
   //timeInSecs = 0x7FFFFFFF * theRate;	//the release time value is more like a rate.  It is the time from max value to 0, not from sustain level.
@@ -338,9 +332,9 @@ class PSXSampColl : public VGMSampColl {
               uint32_t length,
               const std::vector<SizeOffsetPair> &vagLocations);
 
-  virtual bool GetSampleInfo();        //retrieve sample info, including pointers to data, # channels, rate, etc.
+  bool GetSampleInfo() override;        //retrieve sample info, including pointers to data, # channels, rate, etc.
   static PSXSampColl *SearchForPSXADPCM(RawFile *file, const std::string &format);
-  static const std::vector<PSXSampColl *> SearchForPSXADPCMs(RawFile *file, const std::string &format);
+  static std::vector<PSXSampColl *> SearchForPSXADPCMs(RawFile *file, const std::string &format);
 
  protected:
   std::vector<SizeOffsetPair> vagLocations;
@@ -351,22 +345,22 @@ class PSXSamp : public VGMSamp {
   PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
           uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
           uint32_t theRate, std::string name, bool bSetLoopOnConversion = true);
-  virtual ~PSXSamp(void);
+  ~PSXSamp() override;
 
   // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion
-  virtual double GetCompressionRatio();
-  virtual void ConvertToStdWave(uint8_t *buf);
+  double GetCompressionRatio() override;
+  void ConvertToStdWave(uint8_t *buf) override;
   void SetLoopOnConversion(bool bDoIt) { bSetLoopOnConversion = bDoIt; }
 
-  static uint32_t GetSampleLength(RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop);
+  static uint32_t GetSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop);
 
  private:
-  void DecompVAGBlk(s16 *pSmp, VAGBlk *pVBlk, f32 *prev1, f32 *prev2);
+  static void DecompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, f32 *prev1, f32 *prev2);
 
  public:
-  bool bSetLoopOnConversion;
-  uint32_t dwCompSize;
-  uint32_t dwUncompSize;
-  bool bLoops;
+  bool bSetLoopOnConversion{false};
+  uint32_t dwCompSize{0};
+  uint32_t dwUncompSize{0};
+  bool bLoops{false};
 };
