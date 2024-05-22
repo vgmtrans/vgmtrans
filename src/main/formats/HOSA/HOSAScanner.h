@@ -12,11 +12,11 @@ class PSXSampColl;
 
 class HOSAScanner : public VGMScanner {
  public:
-  HOSAScanner(void);
-  virtual ~HOSAScanner(void);
+  HOSAScanner();
+  ~HOSAScanner() override;
 
-  virtual void Scan(RawFile *file, void *info = 0);
-  HOSASeq *SearchForHOSASeq(RawFile *file);
-  HOSAInstrSet *SearchForHOSAInstrSet(RawFile *file, PSXSampColl *sampcoll);
-  bool RecursiveRgnCompare(RawFile *file, int i, int sampNum, int numSamples, int numFinds, uint32_t *sampOffsets);
+  void Scan(RawFile *file, void *info) override;
+  static HOSASeq *SearchForHOSASeq(RawFile *file);
+  static HOSAInstrSet *SearchForHOSAInstrSet(RawFile *file, const PSXSampColl *sampcoll);
+  static bool RecursiveRgnCompare(RawFile *file, int i, int sampNum, int numSamples, int numFinds, uint32_t *sampOffsets);
 };

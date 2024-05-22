@@ -70,7 +70,6 @@ void GraphResSnesScanner::Scan(RawFile *file, void *info) {
 }
 
 void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
-  GraphResSnesVersion version = GRAPHRESSNES_NONE;
   std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // search song header
@@ -82,7 +81,7 @@ void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
     return;
   }
 
-  version = GRAPHRESSNES_STANDARD;
+  GraphResSnesVersion version = GRAPHRESSNES_STANDARD;
 
   GraphResSnesSeq *newSeq = new GraphResSnesSeq(file, version, addrSeqHeader, name);
   if (!newSeq->LoadVGMFile()) {
@@ -108,7 +107,7 @@ void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
 
 void GraphResSnesScanner::SearchForGraphResSnesFromROM(RawFile *file) {}
 
-std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(RawFile *file) {
+std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(const RawFile *file) {
   std::map<uint8_t, uint8_t> dspRegMap;
 
   // find a code block which initializes dsp registers

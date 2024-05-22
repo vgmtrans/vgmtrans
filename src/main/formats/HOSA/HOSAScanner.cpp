@@ -6,6 +6,7 @@
 
 #include "HOSASeq.h"
 #include "HOSAInstr.h"
+#include "VGMColl.h"
 #include "PSXSPU.h"
 #include "ScannerManager.h"
 
@@ -21,17 +22,17 @@ HOSAScanner::~HOSAScanner() {}
 
 void HOSAScanner::Scan(RawFile *file, void *info) {
   HOSASeq *seq = SearchForHOSASeq(file);
-  if (seq == NULL) {
+  if (seq == nullptr) {
     return;
   }
 
   std::vector<PSXSampColl *> sampcolls = PSXSampColl::SearchForPSXADPCMs(file, HOSAFormat::name);
 
-  PSXSampColl *sampcoll = NULL;
-  HOSAInstrSet *instrset = NULL;
+  PSXSampColl *sampcoll = nullptr;
+  HOSAInstrSet *instrset = nullptr;
   for (size_t i = 0; i < sampcolls.size(); i++) {
     instrset = SearchForHOSAInstrSet(file, sampcolls[i]);
-    if (instrset != NULL) {
+    if (instrset != nullptr) {
       sampcoll = sampcolls[i];
       break;
     }
@@ -43,7 +44,7 @@ void HOSAScanner::Scan(RawFile *file, void *info) {
     }
   }
 
-  if (instrset == NULL) {
+  if (instrset == nullptr) {
     return;
   }
 
@@ -80,21 +81,21 @@ HOSASeq *HOSAScanner::SearchForHOSASeq(RawFile *file) {
     HOSASeq *seq = new HOSASeq(file, i, name);
     if (!seq->LoadVGMFile()) {
       delete seq;
-      return NULL;
+      return nullptr;
     }
     return seq;
   }
-  return NULL;
+  return nullptr;
 }
 
 // This Scanner is quite imperfect.  It compares the offsets of the sample collection against the
 // sample offsets in the region data, assuming that samples will be referenced consecutively.
 #define MIN_NUM_SAMPLES_COMPARE 5
 #define MIN_SAMPLES_MATCH 4
-HOSAInstrSet *HOSAScanner::SearchForHOSAInstrSet(RawFile *file, PSXSampColl *sampcoll) {
+HOSAInstrSet *HOSAScanner::SearchForHOSAInstrSet(RawFile *file, const PSXSampColl *sampcoll) {
   size_t numSamples = sampcoll->samples.size();
   if (numSamples < MIN_NUM_SAMPLES_COMPARE) {
-    return NULL;
+    return nullptr;
   }
 
   uint32_t *sampOffsets = new uint32_t[numSamples];
@@ -103,7 +104,7 @@ HOSAInstrSet *HOSAScanner::SearchForHOSAInstrSet(RawFile *file, PSXSampColl *sam
 
   uint32_t nFileLength = file->size();
   for (uint32_t i = 0x20; i + 0x14 < nFileLength; i++) {
-    if (RecursiveRgnCompare(file, i, 0, (int) numSamples, 0, sampOffsets)) {
+    if (RecursiveRgnCompare(file, i, 0, numSamples, 0, sampOffsets)) {
       for (; i >= 0x20; i -= 4) {
         if ((file->GetWord(i + 4) != 0) || (file->GetWord(i) != 0))
           continue;
@@ -112,7 +113,7 @@ HOSAInstrSet *HOSAScanner::SearchForHOSAInstrSet(RawFile *file, PSXSampColl *sam
         if (!instrset->LoadVGMFile()) {
           delete instrset;
           delete[] sampOffsets;
-          return NULL;
+          return nullptr;
         }
         delete[] sampOffsets;
         return instrset;
@@ -120,7 +121,7 @@ HOSAInstrSet *HOSAScanner::SearchForHOSAInstrSet(RawFile *file, PSXSampColl *sam
     }
   }
   delete[] sampOffsets;
-  return NULL;
+  return nullptr;
 }
 
 bool HOSAScanner::RecursiveRgnCompare(RawFile *file,
@@ -129,7 +130,7 @@ bool HOSAScanner::RecursiveRgnCompare(RawFile *file,
                                       int numSamples,
                                       int numFinds,
                                       uint32_t *sampOffsets) {
-  if (i < 0 || (uint32_t) (i + 0x14) >= file->size())
+  if (i < 0 || static_cast<uint32_t>(i + 0x14) >= file->size())
     return false;
   if (sampNum >= numSamples - 1)
     return (numFinds >= MIN_SAMPLES_MATCH);

@@ -34,8 +34,7 @@ bool FFTSeq::GetHeaderInfo(void) {
 //-----------------------------------------------------------
   unLength = GetShort(dwOffset + 0x08);
   nNumTracks = GetByte(dwOffset + 0x14);    //uint8_t (8bit)		GetWord() から修正
-  uint8_t cNumPercussion = GetByte(dwOffset + 0x15);    //uint8_t (8bit)	Quantity of Percussion struct
-//	unsigned char	cBankNum		= GetByte(dwOffset+0x16);
+  // uint8_t cNumPercussion = GetByte(dwOffset + 0x15);    //uint8_t (8bit)	Quantity of Percussion struct
   assocWdsID = GetShort(dwOffset + 0x16);    //uint16_t (16bit)	Default program bank No.
   uint16_t ptSongTitle = GetShort(dwOffset + 0x1E);    //uint16_t (16bit)	Pointer of music title (AscII strings)
   uint16_t ptPercussionTbl = GetShort(dwOffset + 0x20);    //uint16_t (16bit)	Pointer of Percussion struct
@@ -58,7 +57,7 @@ bool FFTSeq::GetHeaderInfo(void) {
   VGMHeader *trackPtrs = AddHeader(dwOffset + 0x22, nNumTracks * 2, "Track Pointers");
   for (unsigned int i = 0; i < nNumTracks; i++)
     trackPtrs->AddSimpleItem(dwOffset + 0x22 + i * 2, 2, "Track Pointer");
-  VGMHeader *titleHdr = AddHeader(dwOffset + ptSongTitle, titleLength, "Song Name");
+  AddHeader(dwOffset + ptSongTitle, titleLength, "Song Name");
 
 //	if(cNumPercussion!=0){										//これ、やっぱ、いらない。
 //		hdr->AddSimpleItem(dwOffset+ptPercussionTbl, cNumPercussion*5, "Drumkit Struct");
@@ -95,7 +94,7 @@ bool FFTSeq::GetTrackPointers(void) {
 
 FFTTrack::FFTTrack(FFTSeq *parentFile, long offset, long length)
     : SeqTrack(parentFile, offset, length) {
-  ResetVars();
+  FFTTrack::ResetVars();
 }
 
 void FFTTrack::ResetVars() {
@@ -121,9 +120,11 @@ void FFTTrack::ResetVars() {
 //	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "内蔵音源をMIDI変換するスレ(in http://www.2ch.net)"
 //						Add un-known command(op-code).
 //--------------------------------------------------
-bool FFTTrack::ReadEvent(void) {
+bool FFTTrack::ReadEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = GetByte(curOffset++);
+
+  std::string desc;
 
   if (status_byte < 0x80) //then it's a note on event
   {
@@ -209,7 +210,7 @@ bool FFTTrack::ReadEvent(void) {
       case 0x97: {
         uint8_t numer = GetByte(curOffset++);
         uint8_t denom = GetByte(curOffset++);
-        AddTimeSig(beginOffset, curOffset - beginOffset, numer, denom, (uint8_t) parentSeq->GetPPQN());
+        AddTimeSig(beginOffset, curOffset - beginOffset, numer, denom, static_cast<uint8_t>(parentSeq->GetPPQN()));
         break;
       }
 
@@ -290,6 +291,7 @@ bool FFTTrack::ReadEvent(void) {
       case 0xA2: {
         uint8_t cTempoSlideTimes = GetByte(curOffset++);        //slide times [ticks]
         uint8_t cTempoSlideTarget = (GetByte(curOffset++) * 256) / 218;        //Target Panpot
+        L_INFO("Found tempo slide event at {:X}. Not fully implemented. Duration: {:d}  Target BPM: {:d}", curOffset - 2, cTempoSlideTimes, cTempoSlideTarget);
         AddTempoBPM(beginOffset, curOffset - beginOffset, cTempoSlideTarget, "Tempo slide");
         break;
       }
@@ -345,12 +347,14 @@ bool FFTTrack::ReadEvent(void) {
         break;
 
         //unknown
-      case 0xB8:
-        curOffset++;
-        curOffset++;
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xB8: {
+        const auto arg1 = GetByte(curOffset++);
+        const auto arg2 = GetByte(curOffset++);
+        const auto arg3 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         //Reverb On
       case 0xBA :
@@ -370,86 +374,112 @@ bool FFTTrack::ReadEvent(void) {
         AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Reset", "", CLR_ADSR);
         break;
 
-      case 0xC2:
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Attack Rate?", "", CLR_ADSR);
+      case 0xC2: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Attack Rate?", desc, CLR_ADSR);
         break;
+      }
 
-      case 0xC4:
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Sustain Rate?", "", CLR_ADSR);
+      case 0xC4: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Sustain Rate?", desc, CLR_ADSR);
         break;
+      }
 
-      case 0xC5:
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Release Rate?", "", CLR_ADSR);
+      case 0xC5: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Release Rate?", desc, CLR_ADSR);
         break;
+      }
 
-      case 0xC6:
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xC6: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
-      case 0xC7:
-        curOffset++;
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xC7: {
+        const auto arg1 = GetByte(curOffset++);
+        const auto arg2 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
-      case 0xC8 :
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xC8 : {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
-      case 0xC9:
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Decay Rate?", "", CLR_ADSR);
+      case 0xC9: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Decay Rate?", desc, CLR_ADSR);
         break;
+      }
 
-      case 0xCA:
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Sustain Level?", "", CLR_ADSR);
+      case 0xCA: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Sustain Level?", desc, CLR_ADSR);
         break;
+      }
 
         //--------
         //Pitch bend Event
 
         // unknown
-      case 0xD0:
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xD0: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         // unknown
-      case 0xD1:
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xD1: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         // unknown
-      case 0xD2:
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend?", "", CLR_PITCHBEND);
+      case 0xD2: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend?", desc, CLR_PITCHBEND);
         break;
+      }
 
         //Portamento (Pitch bend slide)
       case 0xD4: {
         uint8_t cPitchSlideTimes = GetByte(curOffset++);        //slide times [ticks]
         uint8_t cPitchSlideDepth = GetByte(curOffset++);        //Target Panpot
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", "", CLR_PORTAMENTO);
+        desc = fmt::format("Duration: {:d} ticks  Target: {:d}", cPitchSlideTimes, cPitchSlideDepth);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc, CLR_PORTAMENTO);
         break;
       }
 
         // unknown
-      case 0xD6:
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Detune?", "", CLR_PITCHBEND);
+      case 0xD6: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Detune?", desc, CLR_PITCHBEND);
         break;
+      }
 
         // LFO Depth
       case 0xD7: {
         uint8_t cPitchLFO_Depth = GetByte(curOffset++);        //slide times [ticks]
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Pitch bend)", "", CLR_LFO);
+        desc = fmt::format("Depth: {:d}", cPitchLFO_Depth);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Pitch bend)", desc, CLR_LFO);
         break;
       }
 
@@ -458,17 +488,20 @@ bool FFTTrack::ReadEvent(void) {
         uint8_t cPitchLFO_Decay2 = GetByte(curOffset++);
         uint8_t cPitchLFO_Cycle = GetByte(curOffset++);
         uint8_t cPitchLFO_Decay1 = GetByte(curOffset++);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Pitch bend)", "", CLR_LFO);
+        desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cPitchLFO_Decay2, cPitchLFO_Cycle, cPitchLFO_Decay1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Pitch bend)", desc, CLR_LFO);
         break;
       }
 
         // LFO ?
-      case 0xD9:
-        curOffset++;
-        curOffset++;
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Pitch bend)", "", CLR_LFO);
+      case 0xD9: {
+        const auto arg1 = GetByte(curOffset++);
+        const auto arg2 = GetByte(curOffset++);
+        const auto arg3 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Pitch bend)", desc, CLR_LFO);
         break;
+      }
 
         // unknown
       case 0xDB:
@@ -486,10 +519,12 @@ bool FFTTrack::ReadEvent(void) {
       }
 
         // add volume... add the value to the current vol.
-      case 0xE1:
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xE1: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         // Volume slide
       case 0xE2: {
@@ -502,7 +537,8 @@ bool FFTTrack::ReadEvent(void) {
         // LFO Depth
       case 0xE3: {
         uint8_t cVolLFO_Depth = GetByte(curOffset++);        //
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Volume)", "", CLR_LFO);
+        desc = fmt::format("Depth: {:d}", cVolLFO_Depth);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Volume)", desc, CLR_LFO);
         break;
       }
 
@@ -511,17 +547,20 @@ bool FFTTrack::ReadEvent(void) {
         uint8_t cVolLFO_Decay2 = GetByte(curOffset++);
         uint8_t cVolLFO_Cycle = GetByte(curOffset++);
         uint8_t cVolLFO_Decay1 = GetByte(curOffset++);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Volume)", "", CLR_LFO);
+        desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cVolLFO_Decay2, cVolLFO_Cycle, cVolLFO_Decay1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Volume)", desc, CLR_LFO);
         break;
       }
 
         // LFO ?
-      case 0xE5:
-        curOffset++;
-        curOffset++;
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Volume)", "", CLR_LFO);
+      case 0xE5: {
+        const auto arg1 = GetByte(curOffset++);
+        const auto arg2 = GetByte(curOffset++);
+        const auto arg3 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Volume)", desc, CLR_LFO);
         break;
+      }
 
         // unknown
       case 0xE7:
@@ -539,10 +578,12 @@ bool FFTTrack::ReadEvent(void) {
       }
 
         // unknown
-      case 0xE9:
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xE9: {
+        uint8_t arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         // Panpot slide
       case 0xEA: {
@@ -555,7 +596,8 @@ bool FFTTrack::ReadEvent(void) {
         // LFO Depth
       case 0xEB: {
         uint8_t cPanLFO_Depth = GetByte(curOffset++);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Panpot)", "", CLR_LFO);
+        desc = fmt::format("Depth: {:d}", cPanLFO_Depth);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Panpot)", desc, CLR_LFO);
         break;
       }
 
@@ -564,66 +606,84 @@ bool FFTTrack::ReadEvent(void) {
         uint8_t cPanLFO_Decay2 = GetByte(curOffset++);
         uint8_t cPanLFO_Cycle = GetByte(curOffset++);
         uint8_t cPanLFO_Decay1 = GetByte(curOffset++);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Panpot)", "", CLR_LFO);
+        desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cPanLFO_Decay2, cPanLFO_Cycle, cPanLFO_Decay1);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Panpot)", desc, CLR_LFO);
         break;
       }
 
         // LFO ?
-      case 0xED:
-        curOffset++;
-        curOffset++;
-        curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Panpot)", "", CLR_LFO);
+      case 0xED: {
+        const auto arg1 = GetByte(curOffset++);
+        const auto arg2 = GetByte(curOffset++);
+        const auto arg3 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Panpot)", desc, CLR_LFO);
         break;
+      }
 
         // unknown
       case 0xEF:
-        AddUnknown(beginOffset, curOffset - beginOffset);
+        desc = describeUnknownEvent(status_byte);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
 
         //--------
         // Event
 
         //unknown
-      case 0xF8:
-        curOffset++;
-        curOffset++;
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xF8: {
+        const auto arg1 = GetByte(curOffset++);
+        const auto arg2 = GetByte(curOffset++);
+        const auto arg3 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         //unknown
-      case 0xF9:
-        curOffset++;
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xF9: {
+        const auto arg1 = GetByte(curOffset++);
+        const auto arg2 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         //unknown
-      case 0xFB:
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xFB: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         //unknown
-      case 0xFC:
-        curOffset++;
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xFC: {
+        const auto arg1 = GetByte(curOffset++);
+        const auto arg2 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         //unknown
-      case 0xFD:
-        curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+      case 0xFD: {
+        const auto arg1 = GetByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
         // Program(WDS) bank select
-      case 0xFE:
+      case 0xFE: {
         uint8_t cProgBankNum = GetByte(curOffset++);        //Bank Number [ticks]
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Program bank select", "", CLR_PROGCHANGE);
+        desc = fmt::format(" Bank: {:d}", cProgBankNum);
+        AddGenericEvent(beginOffset, curOffset - beginOffset, "Program bank select", desc, CLR_PROGCHANGE);
         break;
+      }
 
+      default:
+        break;
     }
   return true;
 }

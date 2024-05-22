@@ -66,7 +66,7 @@ bool HeartBeatSnesInstrSet::GetInstrPointers() {
       break;
     }
 
-    std::vector<uint8_t>::iterator itrSRCN = std::find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+    std::vector<uint8_t>::iterator itrSRCN = std::ranges::find(usedSRCNs, srcn);
     if (itrSRCN == usedSRCNs.end()) {
       usedSRCNs.push_back(srcn);
     }
@@ -81,7 +81,7 @@ bool HeartBeatSnesInstrSet::GetInstrPointers() {
     return false;
   }
 
-  std::sort(usedSRCNs.begin(), usedSRCNs.end());
+  std::ranges::sort(usedSRCNs);
   SNESSampColl *newSampColl = new SNESSampColl(HeartBeatSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
@@ -147,10 +147,9 @@ HeartBeatSnesRgn::HeartBeatSnesRgn(HeartBeatSnesInstr *instr, HeartBeatSnesVersi
   uint8_t gain = GetByte(offset + 3);
   int16_t pitch_scale = GetShortBE(offset + 4);
 
-  const double pitch_fixer = 4286.0 / 4096.0;
-  double fine_tuning;
+  constexpr double pitch_fixer = 4286.0 / 4096.0;
   double coarse_tuning;
-  fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
+  double fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
 
   // normalize
   if (fine_tuning >= 0.5) {
@@ -166,8 +165,8 @@ HeartBeatSnesRgn::HeartBeatSnesRgn(HeartBeatSnesInstr *instr, HeartBeatSnesVersi
   AddSimpleItem(offset + 1, 1, "ADSR1");
   AddSimpleItem(offset + 2, 1, "ADSR2");
   AddSimpleItem(offset + 3, 1, "GAIN");
-  AddUnityKey(72 - (int) (coarse_tuning), offset + 4, 1);
-  AddFineTune((int16_t) (fine_tuning * 100.0), offset + 5, 1);
+  AddUnityKey(72 - static_cast<int>(coarse_tuning), offset + 4, 1);
+  AddFineTune(static_cast<int16_t>(fine_tuning * 100.0), offset + 5, 1);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
   // use ADSR sustain for release rate
@@ -175,8 +174,8 @@ HeartBeatSnesRgn::HeartBeatSnesRgn(HeartBeatSnesInstr *instr, HeartBeatSnesVersi
   // so here I put a random value commonly used
   // TODO: obtain proper release rate from sequence
   uint8_t sr_release = 0x1c;
-  ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, NULL,
-    NULL, NULL, &this->release_time, NULL);
+  ConvertSNESADSR(adsr1, (adsr2 & 0xe0) | sr_release, gain, 0x7ff, nullptr,
+    nullptr, nullptr, &this->release_time, nullptr);
 }
 
 HeartBeatSnesRgn::~HeartBeatSnesRgn() {}

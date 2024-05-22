@@ -59,7 +59,7 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
     usedSRCNs.push_back(srcn);
 
     uint16_t adsr = 0x8fe0;
-    if (instrADSRHints.count(srcn)) {
+    if (instrADSRHints.contains(srcn)) {
       adsr = instrADSRHints[srcn];
     }
 
@@ -72,7 +72,7 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
     return false;
   }
 
-  std::sort(usedSRCNs.begin(), usedSRCNs.end());
+  std::ranges::sort(usedSRCNs);
   SNESSampColl *newSampColl = new SNESSampColl(GraphResSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;

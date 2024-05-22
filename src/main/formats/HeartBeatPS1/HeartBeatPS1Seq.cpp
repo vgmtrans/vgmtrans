@@ -89,7 +89,7 @@ bool HeartBeatPS1Seq::GetHeaderInfo(void) {
   nNumTracks = 16;
 
   uint8_t numer = GetByte(seqHeaderOffset + 0x0D);
-  uint8_t denom = GetByte(seqHeaderOffset + 0x0E);
+  // uint8_t denom = GetByte(seqHeaderOffset + 0x0E);
   if (numer == 0 || numer > 32) {                //sanity check
     return false;
   }
@@ -112,7 +112,7 @@ void HeartBeatPS1Seq::ResetVars(void) {
 
   uint8_t numer = GetByte(seqHeaderOffset + 0x0D);
   uint8_t denom = GetByte(seqHeaderOffset + 0x0E);
-  AddTimeSigNoItem(numer, 1 << denom, (uint8_t) GetPPQN());
+  AddTimeSigNoItem(numer, 1 << denom, static_cast<uint8_t>(GetPPQN()));
 }
 
 bool HeartBeatPS1Seq::ReadEvent(void) {
@@ -476,11 +476,11 @@ bool HeartBeatPS1Seq::ReadEvent(void) {
       return false;
 
     case 0xE0 : {
-      uint8_t hi = GetByte(curOffset++);
       uint8_t lo = GetByte(curOffset++);
-      AddPitchBendMidiFormat(beginOffset, curOffset - beginOffset, hi, lo);
-    }
+      uint8_t hi = GetByte(curOffset++);
+      AddPitchBendMidiFormat(beginOffset, curOffset - beginOffset, lo, hi);
       break;
+    }
 
     case 0xF0 : {
       if (status_byte == 0xFF) {
@@ -503,7 +503,7 @@ bool HeartBeatPS1Seq::ReadEvent(void) {
           case 0x58 : {
             uint8_t numer = GetByte(curOffset);
             uint8_t denom = GetByte(curOffset + 1);
-            AddTimeSig(beginOffset, curOffset + metaLen - beginOffset, numer, 1 << denom, (uint8_t) GetPPQN());
+            AddTimeSig(beginOffset, curOffset + metaLen - beginOffset, numer, 1 << denom, static_cast<uint8_t>(GetPPQN()));
             curOffset += metaLen;
             break;
           }
@@ -524,6 +524,9 @@ bool HeartBeatPS1Seq::ReadEvent(void) {
         return false;
       }
     }
+      break;
+
+    default:
       break;
   }
   return true;

@@ -5,13 +5,7 @@
  */
 #pragma once
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
-#include "FFTFormat.h"
-#include "formats/PS1/PS1Format.h"
-#include "Matcher.h"
-
-
 
 /****************************************************************/
 /*																*/
@@ -82,20 +76,20 @@ class WdsInstrSet:
     public VGMInstrSet {
  public:
   WdsInstrSet(RawFile *file, uint32_t offset);
-  virtual ~WdsInstrSet(void);
+  ~WdsInstrSet() override;
 
-  virtual bool GetHeaderInfo();    //ヘッダーの処理
+  bool GetHeaderInfo() override;    //ヘッダーの処理
   //ここで、Object"VabSampColl"を生成するべき？
   //（スキャナーでVBを検索すると、複数有るから解らなくなる。）
-  virtual bool GetInstrPointers();    //音色Object"WdsInstr"を生成する。
+  bool GetInstrPointers() override;    //音色Object"WdsInstr"を生成する。
   //"aInstrs"に、登録する。
   //各音色毎の処理
 
   enum Version { VERSION_DWDS, VERSION_WDS };
 
  public:
-  WdsHdr hdr;
-  Version version;
+  WdsHdr hdr{};
+  Version version{};
 
 /*	member of "VGMInstrSet"
 	VGMInstrSet::aInstrs		//音色情報のvector
@@ -113,14 +107,14 @@ class WdsInstr
     : public VGMInstr {
  public:
   WdsInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
-  virtual ~WdsInstr(void);
+  ~WdsInstr() override;
 
-  virtual bool LoadInstr();    //Object "WdsRgn"の生成、
+  bool LoadInstr() override;    //Object "WdsRgn"の生成、
   //"WdsRgn->LoadRgn()"の呼び出し
   //member "aRgns" へオブジェクトのポインタを登録
 
  public:
-  WdsRgnData rgndata;
+  WdsRgnData rgndata{};
 
 /*	member of "VGMInstr"
 	VGMInstr::aRgns				// 

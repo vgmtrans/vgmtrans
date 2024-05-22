@@ -214,7 +214,6 @@ bool HOSATrack::ReadEvent(void) {
         case (0x00):
           AddEndOfTrack(beginOffset, curOffset - beginOffset);
           return false;
-          break;
           //------------
           //Tempo
         case (0x01):
@@ -378,7 +377,7 @@ unsigned int        HOSATrack::DecodeVariable() {
   //----------------------------------
   do {
     cFread = GetByte(curOffset++);        //1 Byte Read
-    iVariable = (iVariable << 7) + ((unsigned int) cFread & 0x7F);
+    iVariable = (iVariable << 7) + (cFread & 0x7F);
     count--;
   } while ((count > 0) && (cFread & 0x80));
 

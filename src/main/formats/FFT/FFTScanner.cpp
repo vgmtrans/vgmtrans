@@ -6,7 +6,9 @@
 
 #include "FFTSeq.h"
 #include "FFTInstr.h"
+#include "FFTScanner.h"
 #include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<FFTScanner> s_fft_snes("FFT");
 }

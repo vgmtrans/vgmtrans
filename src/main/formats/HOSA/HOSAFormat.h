@@ -1,7 +1,6 @@
 #pragma once
 #include "Format.h"
 #include "Root.h"
-#include "VGMColl.h"
 #include "HOSAScanner.h"
 
 

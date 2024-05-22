@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "GraphResSnesFormat.h"
 
@@ -8,18 +7,17 @@
 // GraphResSnesInstrSet
 // ********************
 
-class GraphResSnesInstrSet:
-    public VGMInstrSet {
+class GraphResSnesInstrSet : public VGMInstrSet {
  public:
   GraphResSnesInstrSet(RawFile *file,
                        GraphResSnesVersion ver,
                        uint32_t spcDirAddr,
                        const std::map<uint8_t, uint16_t> &instrADSRHints = std::map<uint8_t, uint16_t>(),
                        const std::string &name = "GraphResSnesInstrSet");
-  virtual ~GraphResSnesInstrSet(void);
+  ~GraphResSnesInstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
   GraphResSnesVersion version;
 
@@ -33,8 +31,7 @@ class GraphResSnesInstrSet:
 // GraphResSnesInstr
 // *****************
 
-class GraphResSnesInstr
-    : public VGMInstr {
+class GraphResSnesInstr : public VGMInstr {
  public:
   GraphResSnesInstr(VGMInstrSet *instrSet,
                     GraphResSnesVersion ver,
@@ -42,9 +39,9 @@ class GraphResSnesInstr
                     uint32_t spcDirAddr,
                     uint16_t adsr = 0x8fe0,
                     const std::string &name = "GraphResSnesInstr");
-  virtual ~GraphResSnesInstr(void);
+  ~GraphResSnesInstr() override;
 
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
 
   GraphResSnesVersion version;
 
@@ -57,14 +54,13 @@ class GraphResSnesInstr
 // GraphResSnesRgn
 // ***************
 
-class GraphResSnesRgn
-    : public VGMRgn {
+class GraphResSnesRgn : public VGMRgn {
  public:
   GraphResSnesRgn
       (GraphResSnesInstr *instr, GraphResSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8fe0);
-  virtual ~GraphResSnesRgn(void);
+  ~GraphResSnesRgn() override;
 
-  virtual bool LoadRgn();
+  bool LoadRgn() override;
 
   GraphResSnesVersion version;
 };

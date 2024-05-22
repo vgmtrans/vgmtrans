@@ -71,7 +71,7 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
       // check sample/instrset size
       if (sampcoll_size != 0 || instrset_size != 0) {
         // check instrset id collision
-        if (std::find(insetset_ids.begin(), insetset_ids.end(), instrset_id) != insetset_ids.end()) {
+        if (std::ranges::find(insetset_ids, instrset_id) != insetset_ids.end()) {
           valid_instrset = false;
           break;
         }
@@ -137,7 +137,7 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
     // validate sequence header
     uint32_t seq_offset = HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size;
     if (seq_size != 0) {
-      const uint8_t SEQ_SIGNATURE[4] = {'q', 'Q', 'E', 'S'};
+      constexpr uint8_t SEQ_SIGNATURE[4] = {'q', 'Q', 'E', 'S'};
       if (!file->MatchBytes(SEQ_SIGNATURE, offset + seq_offset, sizeof(SEQ_SIGNATURE))) {
         continue;
       }

@@ -37,14 +37,13 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile *file,
   LoadEventMap();
 }
 
-AkaoSnesSeq::~AkaoSnesSeq(void) {
-}
+AkaoSnesSeq::~AkaoSnesSeq() {}
 
-void AkaoSnesSeq::ResetVars(void) {
+void AkaoSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 }
 
-bool AkaoSnesSeq::GetHeaderInfo(void) {
+bool AkaoSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 0);

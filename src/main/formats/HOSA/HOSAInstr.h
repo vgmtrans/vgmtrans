@@ -15,10 +15,10 @@ class HOSAInstrSet
 
  public:
   HOSAInstrSet(RawFile *file, uint32_t offset);
-  virtual ~HOSAInstrSet(void);
+  ~HOSAInstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
  public:
 
@@ -28,7 +28,7 @@ class HOSAInstrSet
   } InstrHeader;
 
  public:
-  InstrHeader instrheader;
+  InstrHeader instrheader{};
 };
 
 
@@ -62,10 +62,10 @@ class HOSAInstr
 
  public:
   HOSAInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
-  ~HOSAInstr() { if (rgns) delete[] rgns; }
-  virtual bool LoadInstr();
+  ~HOSAInstr() override { if (rgns) delete[] rgns; }
+  bool LoadInstr() override;
 
  public:
-  InstrInfo instrinfo;
+  InstrInfo instrinfo{};
   RgnInfo *rgns;
 };
