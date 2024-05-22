@@ -87,8 +87,8 @@ VGMContainerItem::VGMContainerItem() : VGMItem() {
 }
 
 VGMContainerItem::VGMContainerItem(
-    VGMFile *vgmfile, uint32_t offset, uint32_t length, const std::string& name, EventColor color)
-    : VGMItem(vgmfile, offset, length, name, color) {
+    VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string name, EventColor color)
+    : VGMItem(vgmfile, offset, length, std::move(name), color) {
   AddContainer(headers);
   AddContainer(localitems);
 }

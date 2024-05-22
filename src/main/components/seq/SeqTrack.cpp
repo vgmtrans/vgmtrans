@@ -57,7 +57,7 @@ void SeqTrack::ResetVisitedAddresses() {
   VisitedAddressMax = 0;
 }
 
-bool SeqTrack::ReadEvent(void) {
+bool SeqTrack::ReadEvent() {
   return false;        //by default, don't add any events, just stop immediately.
 }
 
@@ -135,8 +135,6 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
       deltaLength = GetTime();
     }
   }
-
-  return;
 }
 
 void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum) {
@@ -154,11 +152,9 @@ void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum) {
 
 void SeqTrack::AddInitialMidiEvents(int trackNum) {
   if (trackNum == 0)
-    pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
-  std::ostringstream ssTrackName;
-  ssTrackName << "Track: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << dwStartOffset
-      << std::endl;
-  pMidiTrack->AddTrackName(ssTrackName.str().c_str());
+    pMidiTrack->AddSeqName(*parentSeq->GetName());
+  std::string ssTrackName = fmt::format("Track: 0x{:02X}", dwStartOffset);
+  pMidiTrack->AddTrackName(ssTrackName);
 
   pMidiTrack->AddMidiPort(channelGroup);
 
@@ -309,7 +305,7 @@ void SeqTrack::AddGenericEvent(uint32_t offset,
         miditext += " - ";
         miditext += sEventDesc;
       }
-      pMidiTrack->AddText(miditext.c_str());
+      pMidiTrack->AddText(miditext);
     }
   }
 }
@@ -331,7 +327,7 @@ void SeqTrack::AddUnknown(uint32_t offset,
         miditext += " - ";
         miditext += sEventDesc;
       }
-      pMidiTrack->AddText(miditext.c_str());
+      pMidiTrack->AddText(miditext);
     }
   }
 }
@@ -401,7 +397,6 @@ void SeqTrack::AddNoteOnNoItem(int8_t key, int8_t velocity) {
   }
   prevKey = key;
   prevVel = velocity;
-  return;
 }
 
 
@@ -471,7 +466,6 @@ void SeqTrack::AddNoteOffNoItem(int8_t key) {
   else {
     AddPercNoteOffNoItem(cDrumNote);
   }
-  return;
 }
 
 
@@ -546,7 +540,6 @@ void SeqTrack::AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur) {
   }
   prevKey = key;
   prevVel = vel;
-  return;
 }
 
 void SeqTrack::AddNoteByDur_Extend(uint32_t offset,
@@ -576,7 +569,6 @@ void SeqTrack::AddNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur) {
   }
   prevKey = key;
   prevVel = vel;
-  return;
 }
 
 void SeqTrack::AddPercNoteByDur(uint32_t offset,
@@ -647,8 +639,8 @@ void SeqTrack::MakePrevDurNoteEnd() const {
 
 void SeqTrack::MakePrevDurNoteEnd(uint32_t absTime) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    for (auto it = pMidiTrack->prevDurNoteOffs.begin(); it != pMidiTrack->prevDurNoteOffs.end(); ++it) {
-      (*it)->AbsTime = absTime;
+    for (auto& prevDurNoteOff : pMidiTrack->prevDurNoteOffs) {
+      prevDurNoteOff->AbsTime = absTime;
     }
   }
 }
@@ -659,9 +651,9 @@ void SeqTrack::LimitPrevDurNoteEnd() const {
 
 void SeqTrack::LimitPrevDurNoteEnd(uint32_t absTime) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    for (auto it = pMidiTrack->prevDurNoteOffs.begin(); it != pMidiTrack->prevDurNoteOffs.end(); ++it) {
-      if ((*it)->AbsTime > absTime) {
-        (*it)->AbsTime = absTime;
+    for (auto& prevDurNoteOff : pMidiTrack->prevDurNoteOffs) {
+      if (prevDurNoteOff->AbsTime > absTime) {
+        prevDurNoteOff->AbsTime = absTime;
       }
     }
   }
