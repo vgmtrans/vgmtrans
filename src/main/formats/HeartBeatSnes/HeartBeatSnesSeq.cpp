@@ -35,8 +35,8 @@ const uint8_t HeartBeatSnesSeq::PAN_TABLE[22] = {
 HeartBeatSnesSeq::HeartBeatSnesSeq(RawFile *file,
                                    HeartBeatSnesVersion ver,
                                    uint32_t seqdataOffset,
-                                   std::string newName)
-    : VGMSeq(HeartBeatSnesFormat::name, file, seqdataOffset, 0, newName),
+                                   std::string name)
+    : VGMSeq(HeartBeatSnesFormat::name, file, seqdataOffset, 0, std::move(name)),
       version(ver) {
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
@@ -49,11 +49,11 @@ HeartBeatSnesSeq::HeartBeatSnesSeq(RawFile *file,
 HeartBeatSnesSeq::~HeartBeatSnesSeq(void) {
 }
 
-void HeartBeatSnesSeq::ResetVars(void) {
+void HeartBeatSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 }
 
-bool HeartBeatSnesSeq::GetHeaderInfo(void) {
+bool HeartBeatSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 0);
@@ -190,7 +190,7 @@ double HeartBeatSnesSeq::GetTempoInBPM(uint8_t tempo) {
 
 HeartBeatSnesTrack::HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, long offset, long length)
     : SeqTrack(parentFile, offset, length) {
-  ResetVars();
+  HeartBeatSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
 }
@@ -206,8 +206,8 @@ void HeartBeatSnesTrack::ResetVars(void) {
 }
 
 
-bool HeartBeatSnesTrack::ReadEvent(void) {
-  HeartBeatSnesSeq *parentSeq = (HeartBeatSnesSeq *) this->parentSeq;
+bool HeartBeatSnesTrack::ReadEvent() {
+  HeartBeatSnesSeq *parentSeq = static_cast<HeartBeatSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
@@ -219,7 +219,7 @@ bool HeartBeatSnesTrack::ReadEvent(void) {
 
   std::stringstream desc;
 
-  HeartBeatSnesSeqEventType eventType = (HeartBeatSnesSeqEventType) 0;
+  HeartBeatSnesSeqEventType eventType = static_cast<HeartBeatSnesSeqEventType>(0);
   std::map<uint8_t, HeartBeatSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
   if (pEventType != parentSeq->EventMap.end()) {
     eventType = pEventType->second;

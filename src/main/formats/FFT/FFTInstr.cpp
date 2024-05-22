@@ -42,9 +42,7 @@ bool WdsInstrSet::GetHeaderInfo() {
     version = VERSION_WDS;
 
   //バイナリエディタ表示用
-  ostringstream theName;
-  theName << "wds " << id;
-  m_name = theName.str();
+  m_name = fmt::format("wds {:d}", id);
 
   //ヘッダーobjectの生成
   VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(WdsHdr));
@@ -103,20 +101,18 @@ bool    WdsInstrSet::GetInstrPointers() {
 //		Constructor
 //--------------------------------------------------------------
 WdsInstr::WdsInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum) :
-    VGMInstr(instrSet, offset, length, theBank, theInstrNum) {
-}
+    VGMInstr(instrSet, offset, length, theBank, theInstrNum) {}
 
 //==============================================================
 //		Destructor
 //--------------------------------------------------------------
-WdsInstr::~WdsInstr(void) {
-}
+WdsInstr::~WdsInstr() {}
 
 //==============================================================
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
 bool WdsInstr::LoadInstr() {
-  WdsInstrSet *parInstrSet = (WdsInstrSet *) this->parInstrSet;
+  WdsInstrSet *parInstrSet = static_cast<WdsInstrSet*>(this->parInstrSet);
 
   GetBytes(dwOffset, sizeof(WdsRgnData), &rgndata);
   VGMRgn *rgn = new VGMRgn(this, dwOffset, unLength);
@@ -128,7 +124,7 @@ bool WdsInstr::LoadInstr() {
   rgn->unityKey = 0x3C - rgndata.iSemiToneTune;
   // an iFineTune value of 256 should equal 100 cents, and linear scaling seems to do the trick.
   // see the declaration of iFineTune for info on where to find the actual code and table for this in FFT
-  rgn->fineTune = (short) ((double) rgndata.iFineTune * (100.0 / 256.0));
+  rgn->fineTune = static_cast<int16_t>(rgndata.iFineTune * (100.0 / 256.0));
 
   rgn->AddGeneralItem(dwOffset + 0x00, sizeof(uint32_t), "Sample Offset");
   rgn->AddGeneralItem(dwOffset + 0x04, sizeof(uint16_t), "Loop Offset");

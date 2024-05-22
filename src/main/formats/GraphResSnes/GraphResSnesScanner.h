@@ -10,12 +10,12 @@
 
 class GraphResSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForGraphResSnesFromARAM(RawFile *file);
-  void SearchForGraphResSnesFromROM(RawFile *file);
+  void Scan(RawFile *file, void *info) override;
+  static void SearchForGraphResSnesFromARAM(RawFile *file);
+  static void SearchForGraphResSnesFromROM(RawFile *file);
 
  private:
-  std::map<uint8_t, uint8_t> GetInitDspRegMap(RawFile *file);
+  static std::map<uint8_t, uint8_t> GetInitDspRegMap(const RawFile *file);
 
   static BytePattern ptnLoadSeq;
   static BytePattern ptnDspRegInit;

@@ -79,7 +79,7 @@ class HeartBeatSnesSeq
   virtual bool GetTrackPointers(void);
   virtual void ResetVars(void);
 
-  double GetTempoInBPM(uint8_t tempo);
+  static double GetTempoInBPM(uint8_t tempo);
 
   HeartBeatSnesVersion version;
   std::map<uint8_t, HeartBeatSnesSeqEventType> EventMap;

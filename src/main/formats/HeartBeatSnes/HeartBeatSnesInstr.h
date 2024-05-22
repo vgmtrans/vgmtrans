@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "HeartBeatSnesFormat.h"
 
@@ -19,10 +18,10 @@ class HeartBeatSnesInstrSet:
                         uint8_t songIndex,
                         uint32_t spcDirAddr,
                         const std::string &name = "HeartBeatSnesInstrSet");
-  virtual ~HeartBeatSnesInstrSet(void);
+  ~HeartBeatSnesInstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
   HeartBeatSnesVersion version;
 
@@ -49,9 +48,9 @@ class HeartBeatSnesInstr
                      uint8_t songIndex,
                      uint32_t spcDirAddr,
                      const std::string &name = "HeartBeatSnesInstr");
-  virtual ~HeartBeatSnesInstr(void);
+  ~HeartBeatSnesInstr() override;
 
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
 
   HeartBeatSnesVersion version;
 
@@ -69,9 +68,9 @@ class HeartBeatSnesRgn
     : public VGMRgn {
  public:
   HeartBeatSnesRgn(HeartBeatSnesInstr *instr, HeartBeatSnesVersion ver, uint32_t offset);
-  virtual ~HeartBeatSnesRgn(void);
+  ~HeartBeatSnesRgn() override;
 
-  virtual bool LoadRgn();
+  bool LoadRgn() override;
 
   HeartBeatSnesVersion version;
 };

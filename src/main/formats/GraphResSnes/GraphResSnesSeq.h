@@ -47,11 +47,11 @@ class GraphResSnesSeq
  public:
   GraphResSnesSeq
       (RawFile *file, GraphResSnesVersion ver, uint32_t seqdata_offset, std::string newName = "GraphRes SNES Seq");
-  virtual ~GraphResSnesSeq(void);
+  ~GraphResSnesSeq() override;
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
+  void ResetVars() override;
 
   GraphResSnesVersion version;
   std::map<uint8_t, GraphResSnesSeqEventType> EventMap;
@@ -59,7 +59,7 @@ class GraphResSnesSeq
   std::map<uint8_t, uint16_t> instrADSRHints;
 
  private:
-  void LoadEventMap(void);
+  void LoadEventMap();
 };
 
 
@@ -67,8 +67,8 @@ class GraphResSnesTrack
     : public SeqTrack {
  public:
   GraphResSnesTrack(GraphResSnesSeq *parentFile, long offset = 0, long length = 0);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
+  void ResetVars() override;
+  bool ReadEvent() override;
 
  private:
   int8_t prevNoteKey;

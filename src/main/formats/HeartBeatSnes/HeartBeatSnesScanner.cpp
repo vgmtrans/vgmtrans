@@ -113,7 +113,7 @@ void HeartBeatSnesScanner::Scan(RawFile *file, void *info) {
 }
 
 void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile *file) {
-  HeartBeatSnesVersion version = HEARTBEATSNES_NONE;
+  HeartBeatSnesVersion version;
   std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
   // search song list

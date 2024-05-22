@@ -1,20 +1,17 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
-#include "Format.h"			//Replace with MP2k-specific format header when that's ready
 
 static const unsigned char delta_time_table[] = {0, 192, 144, 96, 72, 64, 48, 36, 32, 24, 18, 16, 12, 9, 8, 6, 4, 3, 2};
 
-class FFTSeq
-    : public VGMSeq {
+class FFTSeq : public VGMSeq {
  public:
   FFTSeq(RawFile *file, uint32_t offset);
-  virtual ~FFTSeq(void);
+  ~FFTSeq() override;
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool
-      GetTrackPointers(void);    //Function to find all of the track pointers.   Returns number of total tracks.
-  virtual uint32_t GetID() { return assocWdsID; }
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
+  uint32_t GetID() override { return assocWdsID; }
 
  protected:
   uint16_t seqID;
@@ -26,8 +23,8 @@ class FFTTrack
     : public SeqTrack {
  public:
   FFTTrack(FFTSeq *parentFile, long offset = 0, long length = 0);
-  virtual void ResetVars();
-  virtual bool ReadEvent(void);
+  void ResetVars() override;
+  bool ReadEvent() override;
 
  public:
   bool bNoteOn;
