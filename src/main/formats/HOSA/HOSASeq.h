@@ -10,12 +10,11 @@
 class HOSASeq: public VGMSeq {
  public:
   HOSASeq(RawFile *file, uint32_t offset, const std::string &name = "HOSA Seq");
-  virtual ~HOSASeq(void);
+  ~HOSASeq() override;
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool
-      GetTrackPointers(void);    //Function to find all of the track pointers.   Returns number of total tracks.
-  virtual uint32_t GetID() { return assocHOSA_ID; }
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
+  uint32_t GetID() override { return assocHOSA_ID; }
 
  protected:
   uint16_t seqID;
@@ -30,7 +29,7 @@ class HOSATrack: public SeqTrack {
  public:
   HOSATrack(HOSASeq *parentFile, long offset = 0, long length = 0);
 
-  virtual bool ReadEvent(void);
+  bool ReadEvent() override;
   void ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable);
   uint32_t DecodeVariable();    //Decode of 可変長
 
@@ -43,9 +42,9 @@ class HOSATrack: public SeqTrack {
 //  vector<unsigned int> listLength;		//
   int8_t cVelocity;           //Default velocity
   int8_t cNoteNum;            //Default Note Number
-  uint8_t cTempo;             //Tempo
-  uint8_t cInstrument;
-  uint8_t cVolume;
-  uint8_t cPanpot;
-  uint8_t cExpression;
+  uint8_t cTempo{};           //Tempo
+  uint8_t cInstrument{};
+  uint8_t cVolume{};
+  uint8_t cPanpot{};
+  uint8_t cExpression{};
 };

@@ -86,7 +86,7 @@ bool HOSAInstrSet::GetInstrPointers() {
 //--------------------------------------------------------------
 HOSAInstr::HOSAInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum),
-      rgns(NULL) {
+      rgns(nullptr) {
 }
 
 //==============================================================
@@ -106,8 +106,6 @@ bool HOSAInstr::LoadInstr() {
   rgns = new RgnInfo[instrinfo.numRgns];
   GetBytes((dwOffset + sizeof(InstrInfo)), (sizeof(RgnInfo) * instrinfo.numRgns), rgns);
 
-
-
   //ATLTRACE("LOADED INSTR   ProgNum: %X    BankNum: %X\n", instrinfo.progNum, instrinfo.bankNum);
 
   uint8_t cKeyLow = 0x00;
@@ -124,9 +122,9 @@ bool HOSAInstr::LoadInstr() {
     rgn->AddKeyHigh(rgninfo->note_range_high, rgn->dwOffset + 0x05);
     cKeyLow = (rgninfo->note_range_high) + 1;
 
-    rgn->AddUnityKey((int8_t) 0x3C + 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset + 0x06);
+    rgn->AddUnityKey(static_cast<int8_t>(0x3C)+ 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset + 0x06);
     rgn->AddSimpleItem(rgn->dwOffset + 0x07, 1, "Semi Tone Tune");
-    rgn->fineTune = (short) ((double) rgninfo->iFineTune * (100.0 / 256.0));
+    rgn->fineTune = static_cast<int16_t>(rgninfo->iFineTune * (100.0 / 256.0));
 
     // Might want to simplify the code below.  I'm being nitpicky.
     if (rgninfo->iPan == 0x80) rgn->pan = 0;
@@ -134,7 +132,7 @@ bool HOSAInstr::LoadInstr() {
     else if ((rgninfo->iPan == 0xC0) ||
         (rgninfo->iPan < 0x80))
       rgn->pan = 0.5;
-    else rgn->pan = (double) (rgninfo->iPan - 0x80) / (double) 0x7F;
+    else rgn->pan = static_cast<double>(rgninfo->iPan - 0x80) / 0x7F;
 
     // The ADSR value ordering is all messed up for the hell of it.  This was a bitch to reverse-engineer.
     rgn->AddSimpleItem(rgn->dwOffset + 0x0C, 4, "ADSR Values (non-standard ordering)");
@@ -146,12 +144,8 @@ bool HOSAInstr::LoadInstr() {
     uint8_t Am = (((rgninfo->ADSR_Am & 0xF) ^ 5) < 1) ? 1 : 0;    //Not sure what other role this nibble plays, if any.
     PSXConvADSR(rgn, Am, Ar, Dr, Sl, 1, 1, Sr, 1, Rr, false);
 
-
-
-
-
     // Unsure if volume is using a linear scale, but it sounds like it.
-    double vol = rgninfo->volume / (double) 255;
+    double vol = rgninfo->volume / 255.0;
     rgn->SetVolume(vol);
     aRgns.push_back(rgn);
   }

@@ -9,7 +9,6 @@
 #include "Root.h"
 #include "HudsonSnesScanner.h"
 
-
 // ****************
 // HudsonSnesFormat
 // ****************
