@@ -217,3 +217,8 @@ static std::string logEvent(uint8_t statusByte, spdlog::level::level_enum level 
   L_LOG(level, str);
   return str;
 }
+
+template<typename... Args>
+static std::string describeUnknownEvent(uint8_t statusByte, Args... args) {
+  return logEvent(statusByte, spdlog::level::off, "Event", args...);
+}

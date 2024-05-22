@@ -244,13 +244,13 @@ bool CompileSnesTrack::ReadEvent() {
 
   switch (eventType) {
     case EVENT_UNKNOWN0:
-      desc = logEvent(statusByte, spdlog::level::off, "Event", statusByte);
+      desc = describeUnknownEvent(statusByte);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", statusByte, arg1);
+      desc = describeUnknownEvent(statusByte, arg1);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
@@ -258,7 +258,7 @@ bool CompileSnesTrack::ReadEvent() {
     case EVENT_UNKNOWN2: {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", statusByte, arg1, arg2);
+      desc = describeUnknownEvent(statusByte, arg1, arg2);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
@@ -267,7 +267,7 @@ bool CompileSnesTrack::ReadEvent() {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", statusByte, arg1, arg2, arg3);
+      desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
@@ -277,7 +277,7 @@ bool CompileSnesTrack::ReadEvent() {
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
       uint8_t arg4 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", statusByte, arg1, arg2, arg3, arg4);
+      desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
@@ -288,7 +288,7 @@ bool CompileSnesTrack::ReadEvent() {
       uint8_t arg3 = GetByte(curOffset++);
       uint8_t arg4 = GetByte(curOffset++);
       uint8_t arg5 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", statusByte, arg1, arg2, arg3, arg4, arg5);
+      desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4, arg5);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
@@ -296,7 +296,7 @@ bool CompileSnesTrack::ReadEvent() {
     case EVENT_GOTO: {
       uint16_t dest = GetShort(curOffset);
       curOffset += 2;
-      desc = logEvent(dest, spdlog::level::off, "Destination");
+      desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;
@@ -463,7 +463,7 @@ bool CompileSnesTrack::ReadEvent() {
     case EVENT_CALL: {
       uint16_t dest = GetShort(curOffset);
       curOffset += 2;
-      desc = logEvent(dest, spdlog::level::off, "Destination");
+      desc = fmt::format("Destination: ${:04X}", dest);
 
       AddGenericEvent(beginOffset,
                       curOffset - beginOffset,

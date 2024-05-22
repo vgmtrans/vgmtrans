@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "FalcomSnesFormat.h"
 
@@ -25,10 +24,10 @@ class FalcomSnesInstrSet:
                      uint32_t spcDirAddr,
                      const std::map<uint8_t, uint16_t> &instrADSRHints,
                      const std::string &name = "FalcomSnesInstrSet");
-  virtual ~FalcomSnesInstrSet(void);
+  ~FalcomSnesInstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
   FalcomSnesVersion version;
 
@@ -54,12 +53,9 @@ class FalcomSnesInstr
                   uint8_t srcn,
                   uint32_t spcDirAddr,
                   const std::string &name = "FalcomSnesInstr");
-  virtual ~FalcomSnesInstr(void);
+  ~FalcomSnesInstr() override;
 
-  virtual bool LoadInstr();
-
-  static bool IsValidHeader
-      (RawFile *file, FalcomSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
+  bool LoadInstr() override;
 
   FalcomSnesVersion version;
 
@@ -79,9 +75,9 @@ class FalcomSnesRgn
              FalcomSnesVersion ver,
              uint32_t offset,
              uint8_t srcn);
-  virtual ~FalcomSnesRgn(void);
+  ~FalcomSnesRgn() override;
 
-  virtual bool LoadRgn();
+  bool LoadRgn() override;
 
   FalcomSnesVersion version;
 };

@@ -28,10 +28,10 @@ CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::str
     AlwaysWriteInitialPitchBendRange(12, 0);
 }
 
-CPSSeq::~CPSSeq(void) {
+CPSSeq::~CPSSeq() {
 }
 
-bool CPSSeq::GetHeaderInfo(void) {
+bool CPSSeq::GetHeaderInfo() {
   // for 100% accuracy, we'd left shift by 256, but that seems unnecessary and excessive
 
   if (fmt_version >= VER_200)
@@ -125,24 +125,24 @@ bool CPSSeq::PostLoad() {
     //  pitch bend range to be set, they need to occur before pitchbend events.
 
     // First, sort all the events by priority
-    stable_sort(events.begin(), events.end(), PriorityCmp());
+    std::ranges::stable_sort(events, PriorityCmp());
     // Next, sort all the events by absolute time, so that delta times can be recorded correctly
-    stable_sort(events.begin(), events.end(), AbsTimeCmp());
+    std::ranges::stable_sort(events, AbsTimeCmp());
 
     // And now we add vibrato and pitch bend events
     const uint32_t ppqn = GetPPQN();                    // pulses (ticks) per quarter note
-    const uint32_t mpLFOt = (uint32_t) ((1 / (250 / 4.0)) * 1000000);    // microseconds per LFO tick
+    constexpr uint32_t mpLFOt = static_cast<uint32_t>((1 / (250 / 4.0)) * 1000000);    // microseconds per LFO tick
     uint32_t mpqn = 500000;      // microseconds per quarter note - 120 bpm default
     uint32_t mpt = mpqn / ppqn;  // microseconds per MIDI tick
-    short pitchbendCents = 0;         // pitch bend in cents
+    int16_t pitchbendCents = 0;         // pitch bend in cents
     uint32_t pitchbendRange = 200;    // pitch bend range in cents default 2 semitones
     double vibratoCents = 0;          // vibrato depth in cents
     uint16_t tremelo = 0;        // tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
     uint16_t lfoRate = 0;        // value added to lfo env every lfo tick
     uint32_t lfoVal = 0;         // LFO envelope value. 0 - 0xFFFFFF .  Effective envelope range is -0x1000000 to +0x1000000
     int lfoStage = 0;            // 0 = rising from mid, 1 = falling from peak, 2 = falling from mid 3 = rising from bottom
-    short lfoCents = 0;          // cents adjustment from most recent LFO val excluding pitchbend.
-    long effectiveLfoVal = 0;
+    int16_t lfoCents = 0;          // cents adjustment from most recent LFO val excluding pitchbend.
+    int32_t effectiveLfoVal = 0;
     uint32_t startAbsTicks = 0;        // The MIDI tick time to start from for a given vibrato segment
 
     size_t numEvents = events.size();
@@ -153,12 +153,12 @@ bool CPSSeq::PostLoad() {
       if (curTicks > 0 /*&& (vibrato > 0 || tremelo > 0)*/ && startAbsTicks < curTicks) {
         long segmentDurTicks = curTicks - startAbsTicks;
         double segmentDur = segmentDurTicks * mpt;    // duration of this segment in micros
-        double lfoTicks = segmentDur / (double) mpLFOt;
-        double numLfoPhases = (lfoTicks * (double) lfoRate) / (double) 0x20000;
-        double lfoRatePerMidiTick = (numLfoPhases * 0x20000) / (double) segmentDurTicks;
+        double lfoTicks = segmentDur / static_cast<double>(mpLFOt);
+        double numLfoPhases = (lfoTicks * static_cast<double>(lfoRate)) / 0x20000;
+        double lfoRatePerMidiTick = (numLfoPhases * 0x20000) / static_cast<double>(segmentDurTicks);
 
-        const uint8_t tickRes = 16;
-        uint32_t lfoRatePerLoop = (uint32_t) ((tickRes * lfoRatePerMidiTick) * 256);
+        constexpr uint8_t tickRes = 16;
+        uint32_t lfoRatePerLoop = static_cast<uint32_t>((tickRes * lfoRatePerMidiTick) * 256);
 
         for (int t = 0; t < segmentDurTicks; t += tickRes) {
           lfoVal += lfoRatePerLoop;
@@ -168,25 +168,23 @@ bool CPSSeq::PostLoad() {
           }
           effectiveLfoVal = lfoVal;
           if (lfoStage == 1)
-            effectiveLfoVal = 0x1000000 - (long)lfoVal;
+            effectiveLfoVal = 0x1000000 - static_cast<int32_t>(lfoVal);
           else if (lfoStage == 2)
-            effectiveLfoVal = -((long) lfoVal);
+            effectiveLfoVal = -static_cast<int32_t>(lfoVal);
           else if (lfoStage == 3)
-            effectiveLfoVal = -0x1000000 + (long)lfoVal;
+            effectiveLfoVal = -0x1000000 + static_cast<int32_t>(lfoVal);
 
-          double lfoPercent = (effectiveLfoVal / (double) 0x1000000);
+          double lfoPercent = effectiveLfoVal / static_cast<double>(0x1000000);
 
           if (vibratoCents > 0) {
-            lfoCents = (short) (lfoPercent * vibratoCents);
+            lfoCents = static_cast<int16_t>(lfoPercent * vibratoCents);
             track->InsertPitchBend(channel,
-                                   (short) (((lfoCents + pitchbendCents) / (double) pitchbendRange) * 8192),
+                                   static_cast<int16_t>(((lfoCents + pitchbendCents) / static_cast<double>(pitchbendRange)) * 8192),
                                    startAbsTicks + t);
-//            printf("lfoCents: %d  pitchbendCents: %d  range: %d  value: %d\n", lfoCents, pitchbendCents, pitchbendRange,
-//                   (short) (((lfoCents + pitchbendCents) / (double) pitchbendRange) * 8192));
           }
 
           if (tremelo > 0) {
-            uint8_t expression = ConvertPercentAmpToStdMidiVal((0x10000 - (tremelo * fabs(lfoPercent))) / (double) 0x10000);
+            uint8_t expression = ConvertPercentAmpToStdMidiVal((0x10000 - (tremelo * fabs(lfoPercent))) / static_cast<double>(0x10000));
             track->InsertExpression(channel, expression, startAbsTicks + t);
           }
         }
@@ -198,14 +196,14 @@ bool CPSSeq::PostLoad() {
 
       switch (event->GetEventType()) {
         case MIDIEVENT_TEMPO: {
-          TempoEvent *tempoevent = (TempoEvent *) event;
+          TempoEvent *tempoevent = static_cast<TempoEvent*>(event);
           mpqn = tempoevent->microSecs;
           mpt = mpqn / ppqn;
           break;
         }
 
         case MIDIEVENT_MARKER: {
-          MarkerEvent *marker = (MarkerEvent *) event;
+          MarkerEvent *marker = static_cast<MarkerEvent*>(event);
 
           // A vibrato event, it will provide us the frequency range of the lfo
           if (marker->name == "vibrato") {
@@ -219,11 +217,11 @@ bool CPSSeq::PostLoad() {
             // (cents) and we're passing 14 bit resolution pitch bend events. It's arguably more
             // elegant to normalize pitch bend range to semitone units anyway.
             track->InsertPitchBendRange(channel, pitchBendRangeMSB, 0, curTicks);
-            lfoCents = (short) ((effectiveLfoVal / (double) 0x1000000) * vibratoCents);
+            lfoCents = static_cast<int16_t>((effectiveLfoVal / static_cast<double>(0x1000000)) * vibratoCents);
 
             if (curTicks > 0)
               track->InsertPitchBend(channel,
-                                     (short) (((lfoCents + pitchbendCents) / (double) pitchbendRange) * 8192),
+                                     static_cast<int16_t>((lfoCents + pitchbendCents) / static_cast<double>(pitchbendRange) * 8192),
                                      curTicks);
           }
           else if (marker->name == "tremelo") {
@@ -242,13 +240,13 @@ bool CPSSeq::PostLoad() {
             lfoStage = 0;
             lfoCents = 0;
             if (vibratoCents > 0)
-              track->InsertPitchBend(channel, (short) (((0 + pitchbendCents) / (double) pitchbendRange) * 8192), curTicks);
+              track->InsertPitchBend(channel, static_cast<int16_t>(((0 + pitchbendCents) / static_cast<double>(pitchbendRange)) * 8192), curTicks);
             if (tremelo > 0)
               track->InsertExpression(channel, 127, curTicks);
           }
           else if (marker->name == "pitchbend") {
-            pitchbendCents = (short) (((int8_t) marker->databyte1 / 128.0) * fmtPitchBendRange);
-            track->InsertPitchBend(channel, (short) (((lfoCents + pitchbendCents) / (double) pitchbendRange) * 8192), curTicks);
+            pitchbendCents = static_cast<int16_t>((static_cast<int8_t>(marker->databyte1) / 128.0) * fmtPitchBendRange);
+            track->InsertPitchBend(channel, static_cast<int16_t>((lfoCents + pitchbendCents) / static_cast<double>(pitchbendRange) * 8192), curTicks);
           }
           break;
         }

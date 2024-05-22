@@ -862,7 +862,7 @@ bool HeartBeatSnesTrack::ReadEvent(void) {
         }
 
         default: {
-          auto descr = fmt::format("Subevent: {:#04X}", static_cast<int>(subStatusByte));
+          auto descr = logEvent(subStatusByte, spdlog::level::err, "Subevent");
           AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
           bContinue = false;
           break;

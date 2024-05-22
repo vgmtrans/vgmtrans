@@ -10,12 +10,12 @@ class CPSTrackV1
     : public SeqTrack {
 public:
   CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, long offset = 0, long length = 0);
-  virtual void ResetVars();
-  virtual void AddInitialMidiEvents(int trackNum);
-  virtual bool ReadEvent(void);
+  void ResetVars() override;
+  void AddInitialMidiEvents(int trackNum) override;
+  bool ReadEvent() override;
 
 private:
-  CPSFormatVer GetVersion() { return ((CPSSeq *) this->parentSeq)->fmt_version; }
+  CPSFormatVer GetVersion() const { return (static_cast<CPSSeq*>(this->parentSeq))->fmt_version; }
   void CalculateAndAddPortamentoTimeNoItem(int8_t noteDistance);
 
   CPSSynth channelSynth;

@@ -9,7 +9,7 @@
 
 CPSTrackV2::CPSTrackV2(CPSSeq *parentSeq, long offset, long length)
     : SeqTrack(parentSeq, offset, length) {
-  ResetVars();
+  CPSTrackV2::ResetVars();
 }
 
 void CPSTrackV2::ResetVars() {
@@ -66,13 +66,13 @@ bool CPSTrackV2::ReadEvent(void) {
 
   int loopNum;
 
-  switch ((CPSv2SeqEventType)status_byte) {
+  switch (static_cast<CPSv2SeqEventType>(status_byte)) {
 
     case C1_TEMPO: {
       // Shares same logic as version < 1.40.  See comment on tempo in CPSTrackV1 for explanation.
       uint16_t tempo = GetShortBE(curOffset);
       curOffset += 2;
-      const double tempoDiv = ((CPSSeq*)this->parentSeq)->fmt_version == VER_CPS3 ? 3.4 : 3.2768;
+      const double tempoDiv = static_cast<CPSSeq*>(this->parentSeq)->fmt_version == VER_CPS3 ? 3.4 : 3.2768;
       double fTempo = tempo / tempoDiv;
 
       AddTempoBPM(beginOffset, curOffset - beginOffset, fTempo);
@@ -119,7 +119,7 @@ bool CPSTrackV2::ReadEvent(void) {
 
     case C6_VOLUME: {
       uint8_t vol = GetByte(curOffset++);
-      vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / (double) 0x1FFF);
+      vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
       this->AddVol(beginOffset, curOffset - beginOffset, vol);
       break;
     }
@@ -132,7 +132,7 @@ bool CPSTrackV2::ReadEvent(void) {
 
     case EVENT_C8: {
       uint8_t expression = GetByte(curOffset++);
-      expression = ConvertPercentAmpToStdMidiVal(((double)expression / 127.0));
+      expression = ConvertPercentAmpToStdMidiVal(expression / 127.0);
       this->AddExpression(beginOffset, curOffset - beginOffset, expression);
       break;
     }
@@ -236,7 +236,7 @@ bool CPSTrackV2::ReadEvent(void) {
       break;
 
     case DD_TRANSPOSE:
-      transpose += (int8_t)GetByte(curOffset++);
+      transpose += static_cast<int8_t>(GetByte(curOffset++));
       AddGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", "", CLR_CHANGESTATE);
       break;
 
@@ -252,7 +252,8 @@ bool CPSTrackV2::ReadEvent(void) {
 
     case E0_RESET_LFO: {
       //TODO: Go back and tweak this logic. It's doing something more.
-      uint8_t data = GetByte(curOffset++);
+      curOffset++;
+//      uint8_t data = GetByte(curOffset++);
 //      AddMarker(beginOffset,
 //                curOffset - beginOffset,
 //                string("resetlfo"),
@@ -265,7 +266,8 @@ bool CPSTrackV2::ReadEvent(void) {
     }
 
     case E1_LFO_RATE: {
-      uint8_t rate = GetByte(curOffset++);
+      curOffset++;
+//      uint8_t rate = GetByte(curOffset++);
 //      AddMarker(beginOffset,
 //                curOffset - beginOffset,
 //                string("lfo"),
@@ -278,7 +280,8 @@ bool CPSTrackV2::ReadEvent(void) {
     }
 
     case E2_TREMELO: {
-      uint8_t tremeloDepth = GetByte(curOffset++);
+      curOffset++;
+//      uint8_t tremeloDepth = GetByte(curOffset++);
 //      AddMarker(beginOffset,
 //                curOffset - beginOffset,
 //                string("tremelo"),

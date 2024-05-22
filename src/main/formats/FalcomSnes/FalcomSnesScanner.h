@@ -9,9 +9,9 @@
 
 class FalcomSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForFalcomSnesFromARAM(RawFile *file);
-  void SearchForFalcomSnesFromROM(RawFile *file);
+  void Scan(RawFile *file, void *info) override;
+  static void SearchForFalcomSnesFromARAM(RawFile *file);
+  static void SearchForFalcomSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnLoadSeq;
