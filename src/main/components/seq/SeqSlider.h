@@ -14,21 +14,21 @@ template<typename TNumber>
 class SeqSlider: public ISeqSlider {
  public:
   SeqSlider(SeqTrack *track, uint32_t time, uint32_t duration, TNumber initialValue, TNumber targetValue);
-  ~SeqSlider() override;
+  ~SeqSlider() override = default;
 
   virtual TNumber get(uint32_t time) const;
   void write(uint32_t time) const override;
   virtual void writeMessage(TNumber value) const = 0;
   virtual bool changesAt(uint32_t time) const;
   bool isStarted(uint32_t time) const override;
-  bool isActive(uint32_t time) const override;
+  bool isActive(uint32_t m_time) const override;
 
- public:
-  SeqTrack *track;
-  uint32_t time;
-  uint32_t duration;
-  TNumber initialValue;
-  TNumber targetValue;
+ protected:
+  SeqTrack *m_track;
+  uint32_t m_time;
+  uint32_t m_duration;
+  TNumber m_initialValue;
+  TNumber m_targetValue;
 };
 
 class VolSlider: public SeqSlider<uint8_t> {

@@ -36,9 +36,8 @@ void SeqTrack::ResetVars() {
   active = true;
   bInLoop = false;
   foreverLoops = 0;
-  deltaLength = -1;
+  totalTicks = -1;
   deltaTime = 0;
-  vel = 100;
   vol = 100;
   expression = 127;
   mastVol = 127;
@@ -108,14 +107,14 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     while (deltaTime == 0) {
       if (curOffset >= stopOffset) {
         if (readMode == READMODE_FIND_DELTA_LENGTH)
-          deltaLength = GetTime();
+          totalTicks = GetTime();
 
         active = false;
         break;
       }
 
       if (!ReadEvent()) {
-        deltaLength = GetTime();
+        totalTicks = GetTime();
         active = false;
         break;
       }
@@ -132,7 +131,7 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     }
 
     if (readMode == READMODE_FIND_DELTA_LENGTH) {
-      deltaLength = GetTime();
+      totalTicks = GetTime();
     }
   }
 }
@@ -211,9 +210,7 @@ uint32_t SeqTrack::ReadVarLen(uint32_t &offset) const {
   return value;
 }
 
-void SeqTrack::AddControllerSlide(uint32_t offset,
-                                  uint32_t length,
-                                  uint32_t dur,
+void SeqTrack::AddControllerSlide(uint32_t dur,
                                   uint8_t &prevVal,
                                   uint8_t targVal,
                                   uint8_t(*scalerFunc)(uint8_t),
@@ -691,9 +688,7 @@ void SeqTrack::AddVolSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new VolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    AddControllerSlide(offset,
-                       length,
-                       dur,
+    AddControllerSlide(dur,
                        vol,
                        targVol,
                        parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : nullptr,
@@ -753,9 +748,7 @@ void SeqTrack::AddExpressionSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new ExpressionSlideSeqEvent(this, targExpr, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    AddControllerSlide(offset,
-                       length,
-                       dur,
+    AddControllerSlide(dur,
                        expression,
                        targExpr,
                        parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : nullptr,
@@ -813,9 +806,7 @@ void SeqTrack::AddMastVolSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new MastVolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    AddControllerSlide(offset,
-                       length,
-                       dur,
+    AddControllerSlide(dur,
                        mastVol,
                        targVol,
                        parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : nullptr,
@@ -863,7 +854,7 @@ void SeqTrack::AddPanSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new PanSlideSeqEvent(this, targPan, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    AddControllerSlide(offset, length, dur, prevPan, targPan, nullptr, &MidiTrack::InsertPan);
+    AddControllerSlide(dur, prevPan, targPan, nullptr, &MidiTrack::InsertPan);
 }
 
 
@@ -1367,7 +1358,7 @@ void SeqTrack::AddEndOfTrack(uint32_t offset, uint32_t length, const std::string
 
 void SeqTrack::AddEndOfTrackNoItem() {
   if (readMode == READMODE_FIND_DELTA_LENGTH)
-    deltaLength = GetTime();
+    totalTicks = GetTime();
 }
 
 void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName) {
@@ -1422,7 +1413,7 @@ bool SeqTrack::AddLoopForever(uint32_t offset, uint32_t length, const std::strin
     return false;
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
-    deltaLength = GetTime();
+    totalTicks = GetTime();
     return (this->foreverLoops < ConversionOptions::the().GetNumSequenceLoops());
   }
   return true;

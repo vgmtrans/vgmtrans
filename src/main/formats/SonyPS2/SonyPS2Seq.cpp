@@ -92,20 +92,22 @@ bool SonyPS2Seq::ReadEvent(void) {
 
   switch (status_byte & 0xF0) {
     //note off event. Unlike SMF, there is no velocity data byte, just the note val.
-    case 0x80 :
-      key = GetDataByte(curOffset++);
+    case 0x80 : {
+      auto key = GetDataByte(curOffset++);
       AddNoteOff(beginOffset, curOffset - beginOffset, key);
       break;
+    }
 
     //note on event (note off if velocity is zero)
-    case 0x90 :
-      key = GetByte(curOffset++);
-      vel = GetDataByte(curOffset++);
+    case 0x90 : {
+      auto key = GetByte(curOffset++);
+      auto vel = GetDataByte(curOffset++);
       if (vel > 0)                                                    //if the velocity is > 0, it's a note on
         AddNoteOn(beginOffset, curOffset - beginOffset, key, vel);
       else                                                            //otherwise it's a note off
         AddNoteOff(beginOffset, curOffset - beginOffset, key);
       break;
+    }
 
     case 0xB0 : {
       uint8_t controlNum = GetByte(curOffset++);

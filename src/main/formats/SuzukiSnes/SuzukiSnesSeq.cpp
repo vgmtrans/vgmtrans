@@ -2,11 +2,13 @@
 
 DECLARE_FORMAT(SuzukiSnes);
 
+static constexpr int kMaxTracks = 8;
+static constexpr uint16_t kPpqn = 48;
+static constexpr uint8_t kNoteVelocity = 100;
+
 //  *************
 //  SuzukiSnesSeq
 //  *************
-#define MAX_TRACKS  8
-#define SEQ_PPQN    48
 
 const uint8_t SuzukiSnesSeq::NOTE_DUR_TABLE[13] = {
     0xc0, 0x90, 0x60, 0x48, 0x30, 0x24, 0x20, 0x18,
@@ -26,17 +28,17 @@ SuzukiSnesSeq::SuzukiSnesSeq(RawFile *file, SuzukiSnesVersion ver, uint32_t seqd
   LoadEventMap();
 }
 
-SuzukiSnesSeq::~SuzukiSnesSeq(void) {
+SuzukiSnesSeq::~SuzukiSnesSeq() {
 }
 
-void SuzukiSnesSeq::ResetVars(void) {
+void SuzukiSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 
   spcTempo = 0x81; // just in case
 }
 
-bool SuzukiSnesSeq::GetHeaderInfo(void) {
-  SetPPQN(SEQ_PPQN);
+bool SuzukiSnesSeq::GetHeaderInfo() {
+  SetPPQN(kPpqn);
 
   VGMHeader *header = AddHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
@@ -62,7 +64,7 @@ bool SuzukiSnesSeq::GetHeaderInfo(void) {
   }
 
   // create tracks
-  for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (int trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
     uint16_t addrTrackStart = GetShort(curOffset);
 
     if (addrTrackStart != 0) {
@@ -85,7 +87,7 @@ bool SuzukiSnesSeq::GetHeaderInfo(void) {
   return true;        //successful
 }
 
-bool SuzukiSnesSeq::GetTrackPointers(void) {
+bool SuzukiSnesSeq::GetTrackPointers() {
   return true;
 }
 
@@ -188,7 +190,7 @@ void SuzukiSnesSeq::LoadEventMap() {
 
 double SuzukiSnesSeq::GetTempoInBPM(uint8_t tempo) {
   if (tempo != 0) {
-    return (double) 60000000 / (125 * tempo * SEQ_PPQN);
+    return (double) 60000000 / (125 * tempo * kPpqn);
   }
   else {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -203,17 +205,16 @@ SuzukiSnesTrack::SuzukiSnesTrack(SuzukiSnesSeq *parentFile, long offset, long le
     : SeqTrack(parentFile, offset, length) {
 }
 
-void SuzukiSnesTrack::ResetVars(void) {
+void SuzukiSnesTrack::ResetVars() {
   SeqTrack::ResetVars();
 
-  vel = 100;
   octave = 6;
   spcVolume = 100;
   loopLevel = 0;
   infiniteLoopPoint = 0;
 }
 
-bool SuzukiSnesTrack::ReadEvent(void) {
+bool SuzukiSnesTrack::ReadEvent() {
   SuzukiSnesSeq *parentSeq = (SuzukiSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
@@ -306,7 +307,7 @@ bool SuzukiSnesTrack::ReadEvent(void) {
 
         // TODO: percussion note
 
-        AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
+        AddNoteByDur(beginOffset, curOffset - beginOffset, note, kNoteVelocity, dur);
         AddTime(dur);
       }
       else if (noteIndex == 13) {

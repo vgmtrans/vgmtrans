@@ -82,7 +82,7 @@ MidiFile *VGMSeq::ConvertToMidi() {
   // Find the greatest length of all tracks to use as stop point for every track
   long stopTime = -1;
   for (size_t i = 0; i < numTracks; i++)
-    stopTime = std::max(stopTime, aTracks[i]->deltaLength);
+    stopTime = std::max(stopTime, aTracks[i]->totalTicks);
 
   auto *newmidi = new MidiFile(this);
   this->midi = newmidi;

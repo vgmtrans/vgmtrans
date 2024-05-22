@@ -828,7 +828,7 @@ bool NinSnesTrack::ReadEvent(void) {
         // finish this section as soon as possible
         if (readMode == READMODE_FIND_DELTA_LENGTH) {
           for (size_t trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
-            parentSeq->aTracks[trackIndex]->deltaLength = GetTime();
+            parentSeq->aTracks[trackIndex]->totalTicks = GetTime();
           }
         }
         else if (readMode == READMODE_CONVERT_TO_MIDI) {

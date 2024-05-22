@@ -19,10 +19,10 @@ HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile *file, uint32_t offset, uint32_t length
   UseReverb();
 }
 
-HeartBeatPS1Seq::~HeartBeatPS1Seq(void) {
+HeartBeatPS1Seq::~HeartBeatPS1Seq() {
 }
 
-bool HeartBeatPS1Seq::GetHeaderInfo(void) {
+bool HeartBeatPS1Seq::GetHeaderInfo() {
   uint32_t curOffset = offset();
 
   uint32_t seq_size = GetWord(curOffset);
@@ -104,7 +104,7 @@ bool HeartBeatPS1Seq::GetHeaderInfo(void) {
   return true;
 }
 
-void HeartBeatPS1Seq::ResetVars(void) {
+void HeartBeatPS1Seq::ResetVars() {
   VGMSeqNoTrks::ResetVars();
 
   uint32_t initialTempo = (GetShortBE(seqHeaderOffset + 10) << 8) | GetByte(seqHeaderOffset + 10 + 2);
@@ -115,7 +115,7 @@ void HeartBeatPS1Seq::ResetVars(void) {
   AddTimeSigNoItem(numer, 1 << denom, static_cast<uint8_t>(GetPPQN()));
 }
 
-bool HeartBeatPS1Seq::ReadEvent(void) {
+bool HeartBeatPS1Seq::ReadEvent() {
   uint32_t beginOffset = curOffset;
 
   // in this format, end of track (FF 2F 00) comes without delta-time.
@@ -150,16 +150,17 @@ bool HeartBeatPS1Seq::ReadEvent(void) {
 
   switch (status_byte & 0xF0) {
     //note off
-    case 0x80 :
-      key = GetByte(curOffset++);
-      vel = GetByte(curOffset++);
+    case 0x80 : {
+      auto key = GetByte(curOffset++);
+      auto vel = GetByte(curOffset++);
       AddNoteOff(beginOffset, curOffset - beginOffset, key);
       break;
+    }
 
     //note event
-    case 0x90 :
-      key = GetByte(curOffset++);
-      vel = GetByte(curOffset++);
+    case 0x90 : {
+      auto key = GetByte(curOffset++);
+      auto vel = GetByte(curOffset++);
 
       // If the velocity is > 0, it's a note on. Otherwise, it's a note off
       if (vel > 0)
@@ -167,6 +168,7 @@ bool HeartBeatPS1Seq::ReadEvent(void) {
       else
         AddNoteOff(beginOffset, curOffset - beginOffset, key);
       break;
+    }
 
     case 0xA0 :
       AddUnknown(beginOffset, curOffset - beginOffset);

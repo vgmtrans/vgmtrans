@@ -68,7 +68,7 @@ bool OrgTrack::LoadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta)
   return true;
 }
 
-bool OrgTrack::ReadEvent(void) {
+bool OrgTrack::ReadEvent() {
   uint8_t key = GetByte(curOffset + (numNotes - curNote) * 4 + curNote);
   uint8_t vel = GetByte(curOffset + (numNotes - curNote) * 4 + numNotes * 2 + curNote) / 2;
   uint8_t dur = GetByte(curOffset + (numNotes - curNote) * 4 + numNotes + curNote);

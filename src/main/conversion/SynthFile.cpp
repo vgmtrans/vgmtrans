@@ -15,7 +15,7 @@
 //  **********************************************************************************
 
 SynthFile::SynthFile(std::string synth_name)
-    : name(std::move(synth_name)) {}
+    : m_name(std::move(synth_name)) {}
 
 SynthFile::~SynthFile() {
   DeleteVect(vInstrs);

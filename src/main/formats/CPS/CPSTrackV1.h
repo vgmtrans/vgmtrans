@@ -19,6 +19,8 @@ private:
   void CalculateAndAddPortamentoTimeNoItem(int8_t noteDistance);
 
   CPSSynth channelSynth;
+  uint32_t noteDuration;
+  int8_t key;
   bool bPrevNoteTie;
   uint8_t prevTieNote;
   uint8_t curDeltaTable;

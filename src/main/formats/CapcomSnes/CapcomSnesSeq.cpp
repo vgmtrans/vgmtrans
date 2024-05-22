@@ -48,9 +48,6 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile *file,
   LoadEventMap();
 }
 
-CapcomSnesSeq::~CapcomSnesSeq() {
-}
-
 void CapcomSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 
@@ -167,8 +164,8 @@ void CapcomSnesTrack::ResetVars() {
   transpose = 0;
   lastNoteSlurred = false;
   lastKey = -1;
-  for (int i = 0; i < CAPCOM_SNES_REPEAT_SLOT_MAX; i++) {
-    repeatCount[i] = 0;
+  for (uint8_t& i : repeatCount) {
+    i = 0;
   }
 }
 

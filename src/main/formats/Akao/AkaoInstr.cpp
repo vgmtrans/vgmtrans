@@ -20,7 +20,6 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
                            uint32_t theID,
                            std::string name)
     : VGMInstrSet(AkaoFormat::name, file, 0, length, std::move(name)), version_(version) {
-  allowEmptyInstrs = true;
   id = theID;
   instrSetOff = instrOff;
   drumkitOff = dkitOff;
@@ -39,8 +38,6 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
   : VGMInstrSet(AkaoFormat::name, file, 0, 0, std::move(name)), bMelInstrs(false), bDrumKit(false),
   instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset), version_(version)
 {
-  allowEmptyInstrs = true;
-
   uint32_t first_instrument_offset = 0;
   if (!custom_instrument_addresses.empty()) {
     first_instrument_offset = *custom_instrument_addresses.begin();
@@ -65,9 +62,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset,
     : VGMInstrSet(AkaoFormat::name, file, offset, 0, std::move(name)), bMelInstrs(false),
       bDrumKit(false), instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset),
       version_(version)
-{
-  allowEmptyInstrs = true;
-}
+{}
 
 bool AkaoInstrSet::GetInstrPointers() {
   if (bMelInstrs) {
@@ -652,10 +647,10 @@ bool AkaoSampColl::GetSampleInfo() {
   // now to verify and associate each articulation with a sample index value
   // for every sample of every instrument, we add sample_section offset, because those values
   //  are relative to the beginning of the sample section
-  for (uint32_t i = 0; i < akArts.size(); i++) {
+  for (auto& akArt : akArts) {
     for (uint32_t l = 0; l < samples.size(); l++) {
-      if (akArts[i].sample_offset + sample_section_offset == samples[l]->dwOffset) {
-        akArts[i].sample_num = l;
+      if (akArt.sample_offset + sample_section_offset == samples[l]->dwOffset) {
+        akArt.sample_num = l;
         break;
       }
     }

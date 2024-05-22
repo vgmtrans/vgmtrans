@@ -36,7 +36,7 @@ SF2InfoListChunk::SF2InfoListChunk(const std::string& name)
 //  *******
 
 SF2File::SF2File(SynthFile *synthfile)
-    : RiffFile(synthfile->name, "sfbk") {
+    : RiffFile(synthfile->m_name, "sfbk") {
 
   //***********
   // INFO chunk

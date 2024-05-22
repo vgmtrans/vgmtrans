@@ -3,14 +3,13 @@
 #include "SeqTrack.h"
 #include "SquarePS2Format.h"
 
-class BGMSeq:
-    public VGMSeq {
+class BGMSeq : public VGMSeq {
  public:
   BGMSeq(RawFile *file, uint32_t offset);
-  virtual ~BGMSeq(void);
+  ~BGMSeq() override = default;
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
   virtual uint32_t GetID() { return assocWDID; }
 
  protected:
@@ -19,10 +18,9 @@ class BGMSeq:
 };
 
 
-class BGMTrack
-    : public SeqTrack {
+class BGMTrack : public SeqTrack {
  public:
   BGMTrack(BGMSeq *parentSeq, long offset = 0, long length = 0);
 
-  virtual bool ReadEvent(void);
+  bool ReadEvent() override;
 };

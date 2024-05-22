@@ -18,7 +18,7 @@ HeartBeatPS1Scanner::HeartBeatPS1Scanner() {}
 
 HeartBeatPS1Scanner::~HeartBeatPS1Scanner() {}
 
-void HeartBeatPS1Scanner::Scan(RawFile *file, void *info) {
+void HeartBeatPS1Scanner::Scan(RawFile *file, void* /*info*/) {
   SearchForHeartBeatPS1VGMFile(file);
 }
 

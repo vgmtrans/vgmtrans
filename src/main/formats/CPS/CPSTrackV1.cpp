@@ -18,7 +18,7 @@ CPSTrackV1::CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, long offset, lo
 }
 
 void CPSTrackV1::ResetVars() {
-  dur = 0xFF;        // verified in progear (required there as well)
+  noteDuration = 0xFF;        // verified in progear (required there as well)
   bPrevNoteTie = false;
   prevTieNote = 0;
   curDeltaTable = 0;
@@ -73,7 +73,7 @@ bool CPSTrackV1::ReadEvent() {
     //if it's not a rest
     if ((status_byte & 0x1F) != 0) {
       // for 100% accuracy, we'd be shifting by 8, but that seems excessive for MIDI
-      uint32_t absDur = static_cast<uint32_t>((delta / static_cast<double>(256 << 4)) * (dur << 4));
+      uint32_t absDur = static_cast<uint32_t>((delta / static_cast<double>(256 << 4)) * (noteDuration << 4));
 
       if (channelSynth == CPSSynth::OKIM6295) {
         // OKIM6295 doesn't control pitch, so we'll use middle C for all notes
@@ -198,7 +198,7 @@ bool CPSTrackV1::ReadEvent() {
       }
 
       case 0x06 :
-        dur = GetByte(curOffset++);
+        noteDuration = GetByte(curOffset++);
         AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", CLR_CHANGESTATE);
         break;
 

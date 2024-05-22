@@ -13,14 +13,16 @@
 
 DECLARE_FORMAT(TamSoftPS1);
 
+static constexpr int kMaxTracksPS1 = 24;
+static constexpr int kMaxTracksPS2 = 48;
+static constexpr uint16_t kPpqn = 24;
+static constexpr uint8_t kNoteVelocity = 100;
+static constexpr uint32_t kHeaderSizePS1 = (4 * kMaxTracksPS1);
+static constexpr uint32_t kHeaderSizePS2 = (4 * kMaxTracksPS2);
+
 //  *************
 //  TamSoftPS1Seq
 //  *************
-#define TSQ_PPQN            24
-#define TSQ_MAX_TRACKS_PS1  24
-#define TSQ_MAX_TRACKS_PS2  48
-#define TSQ_HEADER_SIZE_PS1 (4 * TSQ_MAX_TRACKS_PS1)
-#define TSQ_HEADER_SIZE_PS2 (4 * TSQ_MAX_TRACKS_PS2)
 
 const uint16_t TamSoftPS1Seq::PITCH_TABLE[73] = {
     0x0100, 0x010F, 0x011F, 0x0130, 0x0142, 0x0155, 0x016A, 0x017F,
@@ -41,23 +43,23 @@ TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong, co
   bUseLinearAmplitudeScale = true;
 
   const double PSX_NTSC_FRAMERATE = 53222400.0 / 263.0 / 3413.0;
-  AlwaysWriteInitialTempo(60.0 / (TSQ_PPQN / PSX_NTSC_FRAMERATE));
+  AlwaysWriteInitialTempo(60.0 / (kPpqn / PSX_NTSC_FRAMERATE));
 
   UseReverb();
   AlwaysWriteInitialReverb(0);
 }
 
-TamSoftPS1Seq::~TamSoftPS1Seq(void) {}
+TamSoftPS1Seq::~TamSoftPS1Seq() {}
 
-void TamSoftPS1Seq::ResetVars(void) {
+void TamSoftPS1Seq::ResetVars() {
   VGMSeq::ResetVars();
 
   // default reverb depth depends on each games, probably
   reverbDepth = 0x4000;
 }
 
-bool TamSoftPS1Seq::GetHeaderInfo(void) {
-  SetPPQN(TSQ_PPQN);
+bool TamSoftPS1Seq::GetHeaderInfo() {
+  SetPPQN(kPpqn);
 
   uint32_t dwSongItemOffset = dwOffset + 4 * song;
   if (dwSongItemOffset + 4 > vgmfile->GetEndOffset()) {
@@ -87,14 +89,14 @@ bool TamSoftPS1Seq::GetHeaderInfo(void) {
 
       // PS2 version?
       ps2 = false;
-      if (dwHeaderOffset + TSQ_HEADER_SIZE_PS2 <= vgmfile->GetEndOffset()) {
+      if (dwHeaderOffset + kHeaderSizePS2 <= vgmfile->GetEndOffset()) {
         ps2 = true;
-        for (uint8_t trackIndex = 0; trackIndex < TSQ_MAX_TRACKS_PS2; trackIndex++) {
+        for (uint8_t trackIndex = 0; trackIndex < kMaxTracksPS2; trackIndex++) {
           uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
           uint8_t live = GetByte(dwTrackHeaderOffset);
           uint32_t dwRelTrackOffset = GetShort(dwTrackHeaderOffset + 2);
-          if ((live & 0x7f) != 0 || ((live & 0x80) != 0 && dwRelTrackOffset < TSQ_HEADER_SIZE_PS2)) {
+          if ((live & 0x7f) != 0 || ((live & 0x80) != 0 && dwRelTrackOffset < kHeaderSizePS2)) {
             ps2 = false;
             break;
           }
@@ -102,12 +104,12 @@ bool TamSoftPS1Seq::GetHeaderInfo(void) {
       }
 
       if (ps2) {
-        headerSize = TSQ_HEADER_SIZE_PS2;
-        maxTracks = TSQ_MAX_TRACKS_PS2;
+        headerSize = kHeaderSizePS2;
+        maxTracks = kMaxTracksPS2;
       }
       else {
-        headerSize = TSQ_HEADER_SIZE_PS1;
-        maxTracks = TSQ_MAX_TRACKS_PS1;
+        headerSize = kHeaderSizePS1;
+        maxTracks = kMaxTracksPS1;
       }
 
       if (dwHeaderOffset + headerSize > vgmfile->GetEndOffset()) {
@@ -154,7 +156,7 @@ bool TamSoftPS1Seq::GetHeaderInfo(void) {
   return true;
 }
 
-bool TamSoftPS1Seq::GetTrackPointers(void) {
+bool TamSoftPS1Seq::GetTrackPointers() {
   return true;
 }
 
@@ -164,19 +166,18 @@ bool TamSoftPS1Seq::GetTrackPointers(void) {
 
 TamSoftPS1Track::TamSoftPS1Track(TamSoftPS1Seq *parentFile, uint32_t offset)
     : SeqTrack(parentFile, offset) {
-  ResetVars();
+  TamSoftPS1Track::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
   //bWriteGenericEventAsTextEvent = true;
 }
 
-void TamSoftPS1Track::ResetVars(void) {
+void TamSoftPS1Track::ResetVars() {
   SeqTrack::ResetVars();
 
-  vel = 100;
   lastNoteKey = -1;
 }
 
-bool TamSoftPS1Track::ReadEvent(void) {
+bool TamSoftPS1Track::ReadEvent() {
   TamSoftPS1Seq *parentSeq = (TamSoftPS1Seq *)this->parentSeq;
 
   uint32_t beginOffset = curOffset;
@@ -211,7 +212,7 @@ bool TamSoftPS1Track::ReadEvent(void) {
       lastNotePitch = TamSoftPS1Seq::PITCH_TABLE[key];
     }
 
-    AddNoteOn(beginOffset, curOffset - beginOffset, TAMSOFTPS1_KEY_OFFSET + key, vel);
+    AddNoteOn(beginOffset, curOffset - beginOffset, TAMSOFTPS1_KEY_OFFSET + key, kNoteVelocity);
   }
   else {
     switch (statusByte) {

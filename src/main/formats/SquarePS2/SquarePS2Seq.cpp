@@ -15,10 +15,7 @@ BGMSeq::BGMSeq(RawFile *file, uint32_t offset)
   AlwaysWriteInitialVol(127);
 }
 
-BGMSeq::~BGMSeq(void) {
-}
-
-bool BGMSeq::GetHeaderInfo(void) {
+bool BGMSeq::GetHeaderInfo() {
   VGMHeader *header = AddHeader(dwOffset, 0x20, "Header");
   header->AddSimpleItem(dwOffset, 4, "Signature");
   header->AddSimpleItem(dwOffset + 0x4, 2, "ID");
@@ -41,7 +38,7 @@ bool BGMSeq::GetHeaderInfo(void) {
   return true;
 }
 
-bool BGMSeq::GetTrackPointers(void) {
+bool BGMSeq::GetTrackPointers() {
   uint32_t pos = dwOffset + 0x20;    //start at first track (fixed offset)
   for (unsigned int i = 0; i < nNumTracks; i++) {
     //HACK FOR TRUNCATED BGMS (ex. FFXII 113 Eastersand.psf2)
@@ -148,39 +145,43 @@ bool BGMTrack::ReadEvent(void) {
       break;
 
     //key on with velocity
-    case 0x11 :
-      key = GetByte(curOffset++);
-      vel = GetByte(curOffset++);
+    case 0x11 : {
+      auto key = GetByte(curOffset++);
+      auto vel = GetByte(curOffset++);
       AddNoteOn(beginOffset, curOffset - beginOffset, key, vel);
       break;
+    }
 
     //key on with prev velocity
-    case 0x12 :
-      key = GetByte(curOffset++);
+    case 0x12 : {
+      auto key = GetByte(curOffset++);
       AddNoteOn(beginOffset, curOffset - beginOffset, key, prevVel);
       break;
+    }
 
     // play previous key with velocity param
-    case 0x13 :
-      vel = GetByte(curOffset++);
+    case 0x13 : {
+      auto vel = GetByte(curOffset++);
       AddNoteOn(beginOffset, curOffset - beginOffset, prevKey, vel);
       break;
+    }
 
-    case 0x18 :
+    case 0x18 : {
       AddNoteOff(beginOffset, curOffset - beginOffset, prevKey, "Note off (prev key)");
-      prevKey = key;
       break;
+    }
 
     case 0x19 :
       curOffset += 2;
       AddUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0x1A :
-      key = GetByte(curOffset++);
+    case 0x1A : {
+      auto key = GetByte(curOffset++);
       AddNoteOff(beginOffset, curOffset - beginOffset, key);
       prevKey = key;
       break;
+    }
 
     // program change
     case 0x20 : {

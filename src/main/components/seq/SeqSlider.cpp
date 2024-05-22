@@ -11,15 +11,11 @@ SeqSlider<TNumber>::SeqSlider(SeqTrack *track,
                               uint32_t duration,
                               TNumber initialValue,
                               TNumber targetValue) :
-    track(track),
-    time(time),
-    duration(duration),
-    initialValue(initialValue),
-    targetValue(targetValue) {
-}
-
-template<typename TNumber>
-SeqSlider<TNumber>::~SeqSlider() {
+    m_track(track),
+    m_time(time),
+    m_duration(duration),
+    m_initialValue(initialValue),
+    m_targetValue(targetValue) {
 }
 
 template<typename TNumber>
@@ -28,9 +24,9 @@ TNumber SeqSlider<TNumber>::get(uint32_t time) const {
     return 0;
 
   // linear interpolation
-  uint32_t step = time - this->time;
-  double alpha = static_cast<double>(step) / this->duration;
-  return static_cast<TNumber>(initialValue * (1.0 - alpha) + targetValue * alpha);
+  uint32_t step = time - m_time;
+  double alpha = static_cast<double>(step) / m_duration;
+  return static_cast<TNumber>(m_initialValue * (1.0 - alpha) + m_targetValue * alpha);
 }
 
 template<typename TNumber>
@@ -44,7 +40,7 @@ bool SeqSlider<TNumber>::changesAt(uint32_t time) const {
   if (!isActive(time))
     return false;
 
-  if (time == this->time)
+  if (time == m_time)
     return true;
 
   return get(time) != get(time - 1);
@@ -52,12 +48,12 @@ bool SeqSlider<TNumber>::changesAt(uint32_t time) const {
 
 template<typename TNumber>
 bool SeqSlider<TNumber>::isStarted(uint32_t time) const {
-  return time >= this->time;
+  return time >= m_time;
 }
 
 template<typename TNumber>
 bool SeqSlider<TNumber>::isActive(uint32_t time) const {
-  return isStarted(time) && time <= this->time + this->duration;
+    return isStarted(time) && time <= (m_time + m_duration);
 }
 
 VolSlider::VolSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue) :
@@ -65,7 +61,7 @@ VolSlider::VolSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t 
 }
 
 void VolSlider::writeMessage(uint8_t value) const {
-  track->AddVolNoItem(value);
+  m_track->AddVolNoItem(value);
 }
 
 MasterVolSlider::MasterVolSlider(SeqTrack *track,
@@ -77,7 +73,7 @@ MasterVolSlider::MasterVolSlider(SeqTrack *track,
 }
 
 void MasterVolSlider::writeMessage(uint8_t value) const {
-  track->AddMasterVolNoItem(value);
+  m_track->AddMasterVolNoItem(value);
 }
 
 ExpressionSlider::ExpressionSlider(SeqTrack *track,
@@ -89,7 +85,7 @@ ExpressionSlider::ExpressionSlider(SeqTrack *track,
 }
 
 void ExpressionSlider::writeMessage(uint8_t value) const {
-  track->AddExpressionNoItem(value);
+  m_track->AddExpressionNoItem(value);
 }
 
 PanSlider::PanSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue) :
@@ -97,5 +93,5 @@ PanSlider::PanSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t 
 }
 
 void PanSlider::writeMessage(uint8_t value) const {
-  track->AddPanNoItem(value);
+  m_track->AddPanNoItem(value);
 }

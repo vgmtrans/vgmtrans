@@ -3,11 +3,12 @@
 
 DECLARE_FORMAT(PandoraBoxSnes);
 
+static constexpr int kMaxTracks = 8;
+static constexpr uint8_t kNoteVelocity = 100;
+
 //  *****************
 //  PandoraBoxSnesSeq
 //  *****************
-#define MAX_TRACKS  8
-#define SEQ_KEYOFS  0
 
 const uint8_t PandoraBoxSnesSeq::VOLUME_TABLE[16] = {
     0x00, 0x04, 0x08, 0x0c, 0x10, 0x14, 0x18, 0x1c,
@@ -29,16 +30,16 @@ PandoraBoxSnesSeq::PandoraBoxSnesSeq(RawFile *file,
   LoadEventMap();
 }
 
-PandoraBoxSnesSeq::~PandoraBoxSnesSeq(void) {
+PandoraBoxSnesSeq::~PandoraBoxSnesSeq() {
 }
 
-void PandoraBoxSnesSeq::ResetVars(void) {
+void PandoraBoxSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 
   AlwaysWriteInitialTempo(GetByte(dwOffset + 6));
 }
 
-bool PandoraBoxSnesSeq::GetHeaderInfo(void) {
+bool PandoraBoxSnesSeq::GetHeaderInfo() {
   uint32_t curOffset;
 
   VGMHeader *header = AddHeader(dwOffset, 0);
@@ -54,7 +55,7 @@ bool PandoraBoxSnesSeq::GetHeaderInfo(void) {
   SetPPQN(timebase / 4);
 
   curOffset = dwOffset + 0x10;
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
     uint16_t ofsTrackStart = GetShort(curOffset);
     if (ofsTrackStart != 0xffff) {
       std::stringstream trackName;
@@ -70,9 +71,9 @@ bool PandoraBoxSnesSeq::GetHeaderInfo(void) {
   return true;
 }
 
-bool PandoraBoxSnesSeq::GetTrackPointers(void) {
+bool PandoraBoxSnesSeq::GetTrackPointers() {
   uint32_t curOffset = dwOffset + 0x10;
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
     uint16_t ofsTrackStart = GetShort(curOffset);
     curOffset += 2;
     if (ofsTrackStart != 0xffff) {
@@ -144,12 +145,9 @@ PandoraBoxSnesTrack::PandoraBoxSnesTrack(PandoraBoxSnesSeq *parentFile, long off
   bWriteGenericEventAsTextEvent = false;
 }
 
-void PandoraBoxSnesTrack::ResetVars(void) {
+void PandoraBoxSnesTrack::ResetVars() {
   SeqTrack::ResetVars();
 
-  cKeyCorrection = SEQ_KEYOFS;
-
-  vel = 100;
   octave = 3;
   prevNoteKey = -1;
   prevNoteSlurred = false;
@@ -161,7 +159,7 @@ void PandoraBoxSnesTrack::ResetVars(void) {
   spcCallStackPtr = 0;
 }
 
-bool PandoraBoxSnesTrack::ReadEvent(void) {
+bool PandoraBoxSnesTrack::ReadEvent() {
   PandoraBoxSnesSeq *parentSeq = (PandoraBoxSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
@@ -280,7 +278,7 @@ bool PandoraBoxSnesTrack::ReadEvent(void) {
         }
         else {
           // note
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+          AddNoteByDur(beginOffset, curOffset - beginOffset, key, kNoteVelocity, dur);
           prevNoteKey = key;
         }
         prevNoteSlurred = noKeyoff;

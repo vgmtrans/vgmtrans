@@ -10,11 +10,13 @@ using namespace std;
 
 DECLARE_FORMAT(GraphResSnes);
 
+static constexpr int kMaxTracks = 8;
+static constexpr uint16_t kPpqn = 48;
+static constexpr uint8_t kNoteVelocity = 100;
+
 //  ***************
 //  GraphResSnesSeq
 //  ***************
-#define MAX_TRACKS  8
-#define SEQ_PPQN    48
 
 GraphResSnesSeq::GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_t seqdataOffset, std::string name)
     : VGMSeq(GraphResSnesFormat::name, file, seqdataOffset, 0, std::move(name)), version(ver) {
@@ -22,7 +24,7 @@ GraphResSnesSeq::GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_
   bAllowDiscontinuousTrackData = true;
   bUseLinearAmplitudeScale = true;
 
-  AlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * SEQ_PPQN)); // good ol' frame-based sequence!
+  AlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * kPpqn)); // good ol' frame-based sequence!
 
   UseReverb();
   AlwaysWriteInitialReverb(0);
@@ -30,23 +32,23 @@ GraphResSnesSeq::GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_
   LoadEventMap();
 }
 
-GraphResSnesSeq::~GraphResSnesSeq(void) {
+GraphResSnesSeq::~GraphResSnesSeq() {
 }
 
-void GraphResSnesSeq::ResetVars(void) {
+void GraphResSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 }
 
-bool GraphResSnesSeq::GetHeaderInfo(void) {
-  SetPPQN(SEQ_PPQN);
+bool GraphResSnesSeq::GetHeaderInfo() {
+  SetPPQN(kPpqn);
 
-  VGMHeader *header = AddHeader(dwOffset, 3 * MAX_TRACKS);
+  VGMHeader *header = AddHeader(dwOffset, 3 * kMaxTracks);
   if (dwOffset + header->unLength > 0x10000) {
     return false;
   }
 
   uint32_t curOffset = dwOffset;
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
 
@@ -68,7 +70,7 @@ bool GraphResSnesSeq::GetHeaderInfo(void) {
 bool GraphResSnesSeq::GetTrackPointers(void) {
   uint32_t curOffset = dwOffset;
   uint16_t addrTrackBase = GetShort(dwOffset + 1);
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
     bool trackUsed = (GetByte(curOffset++) != 0);
     uint16_t addrTrackStartVirt = GetShort(curOffset);
     curOffset += 2;
@@ -150,7 +152,6 @@ void GraphResSnesTrack::ResetVars(void) {
   prevNoteKey = -1;
   prevNoteSlurred = false;
   octave = 4;
-  vel = 100;
   defaultNoteLength = 1;
   durationRate = 8;
   spcPan = 0;
@@ -269,7 +270,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
           AddNoteByDur(beginOffset,
                        curOffset - beginOffset,
                        midiKey,
-                       vel,
+                       kNoteVelocity,
                        dur,
                        hasLength ? "Note with Duration" : "Note");
           AddTime(len);

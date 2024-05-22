@@ -18,7 +18,7 @@ VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add
 // this as an item because we do not want the VGMFile to be itself an item in the Item View
-void VGMFile::AddToUI(VGMItem *parent, void *UI_specific) {
+void VGMFile::AddToUI(VGMItem* /*parent*/, void* UI_specific) {
   for (auto &container : containers) {
     for (auto &j : *container)
       j->AddToUI(this, UI_specific);
@@ -81,7 +81,7 @@ VGMHeader::VGMHeader(const VGMItem *parItem, uint32_t offset, uint32_t length, c
 
 VGMHeader::~VGMHeader() = default;
 
-void VGMHeader::AddPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull,
+void VGMHeader::AddPointer(uint32_t offset, uint32_t length, uint32_t /*destAddress*/, bool /*notNull*/,
                            const std::string &name) {
   localitems.push_back(new VGMHeaderItem(this, VGMHeaderItem::HIT_POINTER, offset, length, name));
 }

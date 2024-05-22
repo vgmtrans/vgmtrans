@@ -14,11 +14,11 @@ PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, f
   //bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
 
-PS1Seq::~PS1Seq(void) {
+PS1Seq::~PS1Seq() {
 }
 
 
-bool PS1Seq::GetHeaderInfo(void) {
+bool PS1Seq::GetHeaderInfo() {
   name() = "PS1 SEQ";
 
   SetPPQN(GetShortBE(offset() + 8));
@@ -53,7 +53,7 @@ bool PS1Seq::GetHeaderInfo(void) {
   return true;
 }
 
-void PS1Seq::ResetVars(void) {
+void PS1Seq::ResetVars() {
   VGMSeqNoTrks::ResetVars();
 
   uint32_t initialTempo = (GetShortBE(offset() + 10) << 8) | GetByte(offset() + 12);
@@ -64,7 +64,7 @@ void PS1Seq::ResetVars(void) {
   AddTimeSig(offset() + 0x0D, 2, numer, 1 << denom, (uint8_t) GetPPQN());
 }
 
-bool PS1Seq::ReadEvent(void) {
+bool PS1Seq::ReadEvent() {
   uint32_t beginOffset = curOffset;
   uint32_t delta = ReadVarLen(curOffset);
   if (curOffset >= rawfile->size())
@@ -128,15 +128,16 @@ bool PS1Seq::ReadEvent(void) {
 
   switch (status_byte & 0xF0) {
     //note event
-    case 0x90 :
-      key = GetByte(curOffset++);
-      vel = GetByte(curOffset++);
+    case 0x90 : {
+      auto key = GetByte(curOffset++);
+      auto vel = GetByte(curOffset++);
       //if the velocity is > 0, it's a note on. otherwise it's a note off
       if (vel > 0)
         AddNoteOn(beginOffset, curOffset - beginOffset, key, vel);
       else
         AddNoteOff(beginOffset, curOffset - beginOffset, key);
       break;
+    }
 
     case 0xB0 : {
       uint8_t controlNum = GetByte(curOffset++);

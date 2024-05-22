@@ -8,8 +8,8 @@ class NDSSeq:
  public:
   NDSSeq(RawFile *file, uint32_t offset, uint32_t length = 0, std::string theName = "NDSSeq");
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
+  virtual bool GetHeaderInfo();
+  virtual bool GetTrackPointers();
 
 };
 
@@ -19,8 +19,9 @@ class NDSTrack
  public:
   NDSTrack(NDSSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars();
-  virtual bool ReadEvent(void);
+  virtual bool ReadEvent();
 
+  uint32_t dur;
   uint8_t jumpCount;
   uint32_t loopReturnOffset;
   bool hasLoopReturnOffset;

@@ -110,7 +110,7 @@ bool VGMMultiSectionSeq::IsOffsetUsed(uint32_t offset) {
   return IsItemAtOffset(offset, false);
 }
 
-bool VGMMultiSectionSeq::ReadEvent(long stopTime) {
+bool VGMMultiSectionSeq::ReadEvent(long /*stopTime*/) {
   return false;        //by default, don't add any events, just stop immediately.
 }
 
