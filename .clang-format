@@ -28,11 +28,11 @@ MaxEmptyLinesToKeep: 1
 NamespaceIndentation: None
 PointerAlignment: Left
 ReflowComments:  true
-SortIncludes:    "Never"
+SortIncludes:    false
 SpaceBeforeParens: ControlStatements
 SpaceInEmptyParentheses: false
 SpacesBeforeTrailingComments: 2
 SpacesInContainerLiterals: true
-Standard:        "c++20"
+Standard:        "c++17"
 TabWidth:        2
 UseTab:          Never
