@@ -82,12 +82,12 @@ static const uint16_t lfo_rate_table[128] = {
 class CPSSeq:
     public VGMSeq {
 public:
-  CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmt_version, std::string &name);
-  virtual ~CPSSeq(void);
+  CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmt_version, std::string name);
+  ~CPSSeq() override;
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual bool PostLoad(void);
+  bool GetHeaderInfo() override;
+  bool GetTrackPointers() override;
+  bool PostLoad() override;
 
 public:
   CPSFormatVer fmt_version;

@@ -15,10 +15,10 @@
 // *******
 
 VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-                 uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
+                 uint32_t dataLen, uint8_t nChannels, uint16_t bps, uint32_t rate,
                  std::string name)
     : VGMItem(sampColl->vgmfile, offset, length, std::move(name)), dataOff(dataOffset), dataLength(dataLen),
-      bps(theBPS), rate(theRate), channels(nChannels), parSampColl(sampColl) {
+      bps(bps), rate(rate), channels(nChannels), parSampColl(sampColl) {
 }
 
 double VGMSamp::GetCompressionRatio() {

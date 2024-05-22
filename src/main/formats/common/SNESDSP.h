@@ -59,10 +59,10 @@ void SNESConvADSR(T *rgn, uint8_t adsr1, uint8_t adsr2, uint8_t gain) {
 
   if (adsr_enabled) {
     // ADSR mode
-    uint8_t ar = adsr1 & 0x0f;
-    uint8_t dr = (adsr1 & 0x70) >> 4;
+    // uint8_t ar = adsr1 & 0x0f;
+    // uint8_t dr = (adsr1 & 0x70) >> 4;
     uint8_t sl = (adsr2 & 0xe0) >> 5;
-    uint8_t sr = adsr2 & 0x1f;
+    // uint8_t sr = adsr2 & 0x1f;
 
     ConvertSNESADSR(adsr1,
                     adsr2,

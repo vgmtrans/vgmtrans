@@ -65,7 +65,7 @@ bool VGMSampColl::Load() {
 
   if (unLength == 0) {
     for (std::vector<VGMSamp *>::iterator itr = samples.begin(); itr != samples.end(); ++itr) {
-      VGMSamp *samp = (*itr);
+      VGMSamp *samp = *itr;
 
       // Some formats can have negative sample offset
       // For example, Konami's SNES format and Hudson's SNES format

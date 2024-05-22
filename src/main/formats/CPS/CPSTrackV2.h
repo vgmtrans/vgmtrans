@@ -58,11 +58,11 @@ class CPSTrackV2
     : public SeqTrack {
 public:
   CPSTrackV2(CPSSeq *parentSeq, long offset = 0, long length = 0);
-  virtual void ResetVars();
-  virtual bool ReadEvent(void);
+  void ResetVars() override;
+  bool ReadEvent() override;
 
 private:
-  CPSFormatVer GetVersion() { return ((CPSSeq *) this->parentSeq)->fmt_version; }
+  CPSFormatVer GetVersion() const { return static_cast<CPSSeq*>(this->parentSeq)->fmt_version; }
   uint32_t ReadVarLength();
 
   bool bPrevNoteTie;

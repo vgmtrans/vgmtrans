@@ -325,14 +325,14 @@ bool CapcomSnesTrack::ReadEvent() {
 
     switch (eventType) {
       case EVENT_UNKNOWN0: {
-        auto descr = logEvent(statusByte, spdlog::level::off);
+        auto descr = describeUnknownEvent(statusByte);
         AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
       }
 
       case EVENT_UNKNOWN1: {
         uint8_t arg1 = GetByte(curOffset++);
-        auto descr = logEvent(statusByte, spdlog::level::off, "Event", arg1);
+        auto descr = describeUnknownEvent(statusByte, arg1);
         AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
       }
@@ -340,7 +340,7 @@ bool CapcomSnesTrack::ReadEvent() {
       case EVENT_UNKNOWN2: {
         uint8_t arg1 = GetByte(curOffset++);
         uint8_t arg2 = GetByte(curOffset++);
-        auto descr = logEvent(statusByte, spdlog::level::off, "Event", arg1, arg2);
+        auto descr = describeUnknownEvent(statusByte, arg1, arg2);
         AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
       }
@@ -349,7 +349,7 @@ bool CapcomSnesTrack::ReadEvent() {
         uint8_t arg1 = GetByte(curOffset++);
         uint8_t arg2 = GetByte(curOffset++);
         uint8_t arg3 = GetByte(curOffset++);
-        auto descr = logEvent(statusByte, spdlog::level::off, "Event", arg1, arg2, arg3);
+        auto descr = describeUnknownEvent(statusByte, arg1, arg2, arg3);
         AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
       }
@@ -359,7 +359,7 @@ bool CapcomSnesTrack::ReadEvent() {
         uint8_t arg2 = GetByte(curOffset++);
         uint8_t arg3 = GetByte(curOffset++);
         uint8_t arg4 = GetByte(curOffset++);
-        auto descr = logEvent(statusByte, spdlog::level::off, "Event", arg1, arg2, arg3, arg4);
+        auto descr = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
         AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
       }

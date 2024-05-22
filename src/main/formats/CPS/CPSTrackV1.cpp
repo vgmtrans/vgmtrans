@@ -7,8 +7,6 @@
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
 
-using namespace std;
-
 // *************
 // CPSTrackV1
 // *************
@@ -16,12 +14,12 @@ using namespace std;
 
 CPSTrackV1::CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, long offset, long length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
-  ResetVars();
+  CPSTrackV1::ResetVars();
 }
 
 void CPSTrackV1::ResetVars() {
   dur = 0xFF;        // verified in progear (required there as well)
-  bPrevNoteTie = 0;
+  bPrevNoteTie = false;
   prevTieNote = 0;
   curDeltaTable = 0;
   noteState = 0;
@@ -56,8 +54,6 @@ bool CPSTrackV1::ReadEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = GetByte(curOffset++);
 
-  uint32_t delta;
-
   if (status_byte >= 0x20) {
 
     if ((noteState & 0x30) == 0)
@@ -71,13 +67,13 @@ bool CPSTrackV1::ReadEvent() {
 
     // effectively, use the highest 3 bits of the status byte as index to delta_table.
     // this code starts at 0xBB3 in sfa2
-    delta = delta_table[curDeltaTable][((status_byte >> 5) & 7) - 1];
+    uint32_t delta = delta_table[curDeltaTable][((status_byte >> 5) & 7) - 1];
     delta <<= 4;
 
     //if it's not a rest
     if ((status_byte & 0x1F) != 0) {
       // for 100% accuracy, we'd be shifting by 8, but that seems excessive for MIDI
-      uint32_t absDur = (uint32_t) ((double) (delta / (double) (256 << 4)) * (double) (dur << 4));
+      uint32_t absDur = static_cast<uint32_t>((delta / static_cast<double>(256 << 4)) * (dur << 4));
 
       if (channelSynth == CPSSynth::OKIM6295) {
         // OKIM6295 doesn't control pitch, so we'll use middle C for all notes
@@ -171,10 +167,7 @@ bool CPSTrackV1::ReadEvent() {
         break;
 
       case 0x05 : {
-        CPSFormatVer fmt_version = ((CPSSeq *) parentSeq)->fmt_version;
-        //if (isEqual(fmt_version, 1.71))
-
-        if (((CPSSeq *) parentSeq)->fmt_version >= VER_140) {
+        if ((static_cast<CPSSeq*>(parentSeq))->fmt_version >= VER_140) {
           // This byte is clearly the desired BPM, however there is a loss of resolution when the driver
           // converts this value because it is represented with 16 bits... See the table in sfa3 at 0x3492.
           // I've decided to keep the desired BPM rather than use the exact tempo value from the table
@@ -213,7 +206,7 @@ bool CPSTrackV1::ReadEvent() {
         switch (channelSynth) {
           case QSOUND:
             vol = GetByte(curOffset++);
-            vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / (double) 0x1FFF);
+            vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
             this->AddVol(beginOffset, curOffset - beginOffset, vol);
             break;
           case OKIM6295: {
@@ -274,7 +267,7 @@ bool CPSTrackV1::ReadEvent() {
         //double cents = (pitchbend / 256.0) * 100;
         AddMarker(beginOffset,
                   curOffset - beginOffset,
-                  string("pitchbend"),
+                  std::string("pitchbend"),
                   pitchbend,
                   0,
                   "Pitch Bend",
@@ -287,14 +280,8 @@ bool CPSTrackV1::ReadEvent() {
         // Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every 1/(250/4) seconds until we hit target key.
         // A portamento rate value of 0 means instantaneous slide
         uint8_t portamentoRate = GetByte(curOffset++);
-        uint16_t value = 0;
-        // the rate is represented as decacents per second, but is passed in on an inverse 14 bit scale (from 0-0x3FFF)
-        // value of 0 means a rate of 0x3FFF decacents per second - the fastest slide
-        // value of 0x3FFF means 0 decacents per second - no slide
         if (portamentoRate != 0) {
           auto centsPerSecond = static_cast<uint16_t>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
-          auto decacentsPerSecond = std::min(static_cast<uint16_t>(centsPerSecond / 10), static_cast<uint16_t>(0x3FFF));
-          value = 0x3FFF - decacentsPerSecond;
           portamentoCentsPerSec = centsPerSecond;
         } else {
           portamentoCentsPerSec = 0;
@@ -342,36 +329,38 @@ bool CPSTrackV1::ReadEvent() {
           curOffset++;
         }
 
-        uint32_t jump;
-        if (((CPSSeq *) parentSeq)->fmt_version <= VER_CPS1_425) {
-          jump = GetShortBE(curOffset);
-          curOffset += 2;
-
-          // sf2ce seq 0x84 seems to have a bug at D618
-          // where it jumps to offset 0. verified with mame debugger.
-          if (jump == 0) {
-            return false;
-          }
-        }
-        else {
-          if ((GetByte(curOffset) & 0x80) == 0) {
-            uint8_t jumpByte = GetByte(curOffset++);
-            jump = curOffset - jumpByte;
-          } else {
-            jump = curOffset + 2 + (int16_t)GetShortBE(curOffset);
+        {
+          uint32_t jump;
+          if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
+            jump = GetShortBE(curOffset);
             curOffset += 2;
+
+            // sf2ce seq 0x84 seems to have a bug at D618
+            // where it jumps to offset 0. verified with mame debugger.
+            if (jump == 0) {
+              return false;
+            }
           }
-        }
+          else {
+            if ((GetByte(curOffset) & 0x80) == 0) {
+              uint8_t jumpByte = GetByte(curOffset++);
+              jump = curOffset - jumpByte;
+            } else {
+              jump = curOffset + 2 + static_cast<int16_t>(GetShortBE(curOffset));
+              curOffset += 2;
+            }
+          }
 
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
+          AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
 
-        if (loop[loopNum] == 0) {
-          bInLoop = false;
-          loopOffset[loopNum] = 0;
-        }
-        else {
-//          printf("%X JUMPING TO %X\n", curOffset, jump);
-          curOffset = jump;
+          if (loop[loopNum] == 0) {
+            bInLoop = false;
+            loopOffset[loopNum] = 0;
+          }
+          else {
+            //          printf("%X JUMPING TO %X\n", curOffset, jump);
+            curOffset = jump;
+          }
         }
         break;
 
@@ -401,12 +390,11 @@ bool CPSTrackV1::ReadEvent() {
             curOffset += 2;
             AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP);
 
-//            printf("%X LOOP BREAK JUMPING TO %X\n", curOffset, jump);
-            if (((CPSSeq *) parentSeq)->fmt_version <= VER_CPS1_425) {
+            if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
               curOffset = jump;
             }
             else {
-              curOffset += (int16_t)jump;
+              curOffset += static_cast<int16_t>(jump);
             }
           }
         }
@@ -418,11 +406,11 @@ bool CPSTrackV1::ReadEvent() {
       case 0x16 : {
 
         uint32_t jump;
-        if (((CPSSeq *) parentSeq)->fmt_version <= VER_CPS1_425) {
+        if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
           jump = GetShortBE(curOffset);
         }
         else {
-          jump = curOffset + 2 + (short)GetShortBE(curOffset);
+          jump = curOffset + 2 + static_cast<int16_t>(GetShortBE(curOffset));
         }
 
 //        printf("%X LOOP ALWAYS JUMPING TO %X\n", curOffset, jump);
@@ -459,13 +447,12 @@ bool CPSTrackV1::ReadEvent() {
       }
 
       //Vibrato depth...
-      case 0x1B : {
-        uint8_t vibratoDepth;
+      case 0x1B :
         if (GetVersion() < VER_171) {
-          vibratoDepth = GetByte(curOffset++);
+          uint8_t vibratoDepth = GetByte(curOffset++);
           AddMarker(beginOffset,
                     curOffset - beginOffset,
-                    string("vibrato"),
+                    std::string("vibrato"),
                     vibratoDepth,
                     0,
                     "Vibrato",
@@ -477,12 +464,11 @@ bool CPSTrackV1::ReadEvent() {
           uint8_t type = GetByte(curOffset++);
           uint8_t data = GetByte(curOffset++);
           switch (type) {
-
             // vibrato
             case 0:
               AddMarker(beginOffset,
                         curOffset - beginOffset,
-                        string("vibrato"),
+                        std::string("vibrato"),
                         data,
                         0,
                         "Vibrato",
@@ -494,7 +480,7 @@ bool CPSTrackV1::ReadEvent() {
             case 1:
               AddMarker(beginOffset,
                         curOffset - beginOffset,
-                        string("tremelo"),
+                        std::string("tremelo"),
                         data,
                         0,
                         "Tremelo",
@@ -506,7 +492,7 @@ bool CPSTrackV1::ReadEvent() {
             case 2:
               AddMarker(beginOffset,
                         curOffset - beginOffset,
-                        string("lfo"),
+                        std::string("lfo"),
                         data,
                         0,
                         "LFO Rate",
@@ -518,23 +504,24 @@ bool CPSTrackV1::ReadEvent() {
             case 3:
               AddMarker(beginOffset,
                         curOffset - beginOffset,
-                        string("resetlfo"),
+                        std::string("resetlfo"),
                         data,
                         0,
                         "LFO Reset",
                         PRIORITY_MIDDLE,
                         CLR_LFO);
               break;
+            default:
+              break;
           }
         }
         break;
-      }
-      case 0x1C : {
+      case 0x1C :
         if (GetVersion() < VER_171) {
           const uint8_t tremeloDepth = GetByte(curOffset++);
           AddMarker(beginOffset,
                     curOffset - beginOffset,
-                    string("tremelo"),
+                    std::string("tremelo"),
                     tremeloDepth,
                     0,
                     "Tremelo",
@@ -547,7 +534,6 @@ bool CPSTrackV1::ReadEvent() {
           AddUnknown(beginOffset, curOffset - beginOffset);
         }
         break;
-      }
 
       // LFO rate (for versions < 1.71)
       case 0x1D : {
@@ -555,7 +541,7 @@ bool CPSTrackV1::ReadEvent() {
         if (GetVersion() < VER_171)
           AddMarker(beginOffset,
                     curOffset - beginOffset,
-                    string("lfo"),
+                    std::string("lfo"),
                     rate,
                     0,
                     "LFO Rate",
@@ -572,7 +558,7 @@ bool CPSTrackV1::ReadEvent() {
         if (GetVersion() < VER_171)
           AddMarker(beginOffset,
                     curOffset - beginOffset,
-                    string("resetlfo"),
+                    std::string("resetlfo"),
                     data,
                     0,
                     "LFO Reset",
@@ -584,7 +570,7 @@ bool CPSTrackV1::ReadEvent() {
       break;
       case 0x1F : {
         uint8_t value = GetByte(curOffset++);
-        if (((CPSSeq *) parentSeq)->fmt_version < VER_116) {
+        if (static_cast<CPSSeq*>(parentSeq)->fmt_version < VER_116) {
           AddBankSelectNoItem(2 + (value / 128));
           AddProgramChange(beginOffset, curOffset - beginOffset, value % 128);
         }

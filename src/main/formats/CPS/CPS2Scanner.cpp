@@ -9,8 +9,9 @@
 #include "CPS2Instr.h"
 #include "MAMELoader.h"
 #include "CPS2Format.h"
+#include "VGMColl.h"
 
-CPSFormatVer GetVersionEnum(std::string &versionStr) {
+CPSFormatVer GetVersionEnum(const std::string &versionStr) {
   if (versionStr == "CPS1_2.00") return VER_CPS1_200;
   if (versionStr == "CPS1_2.00ff") return VER_CPS1_200ff;
   if (versionStr == "CPS1_3.50") return VER_CPS1_350;
@@ -43,7 +44,7 @@ CPSFormatVer GetVersionEnum(std::string &versionStr) {
 }
 
 void CPS2Scanner::Scan(RawFile *file, void *info) {
-  MAMEGame *gameentry = (MAMEGame *) info;
+  MAMEGame *gameentry = static_cast<MAMEGame*>(info);
   CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
 
   if (fmt_ver == VER_UNDEFINED) {
@@ -56,7 +57,7 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
   if (!seqRomGroupEntry || !sampsRomGroupEntry)
     return;
   uint32_t seq_table_offset;
-  uint32_t seq_table_length = 0;
+  uint32_t seq_table_length;
   uint32_t instr_table_offset;
   uint32_t samp_table_offset;
   uint32_t samp_table_length = 0;
@@ -109,10 +110,10 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
       return;
   }
 
-  CPS2InstrSet *instrset = 0;
-  CPS2SampColl *sampcoll = 0;
-  CPSSampleInfoTable *sampInfoTable = 0;
-  CPSArticTable *articTable = 0;
+  CPS2InstrSet *instrset;
+  CPS2SampColl *sampcoll;
+  CPSSampleInfoTable *sampInfoTable;
+  CPSArticTable *articTable = nullptr;
 
   std::string artic_table_name;
   std::string instrset_name;
@@ -146,7 +147,7 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
     articTable = new CPSArticTable(programFile, artic_table_name, artic_table_offset, artic_table_length);
     if (!articTable->LoadVGMFile()) {
       delete articTable;
-      articTable = NULL;
+      articTable = nullptr;
     }
   }
 
@@ -159,12 +160,12 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
                              instrset_name);
   if (!instrset->LoadVGMFile()) {
     delete instrset;
-    instrset = NULL;
+    instrset = nullptr;
   }
   sampcoll = new CPS2SampColl(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
   if (!sampcoll->LoadVGMFile()) {
     delete sampcoll;
-    sampcoll = NULL;
+    sampcoll = nullptr;
   }
 
 
@@ -186,7 +187,7 @@ void CPS2Scanner::Scan(RawFile *file, void *info) {
   VGMMiscFile *seqTable = new VGMMiscFile(CPS2Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
   if (!seqTable->LoadVGMFile()) {
     delete seqTable;
-    seqTable = NULL;
+    return;
   }
 
   //HACK

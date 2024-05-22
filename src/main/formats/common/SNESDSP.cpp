@@ -72,7 +72,7 @@ uint32_t EmulateSDSPGAIN(uint8_t gain,
 
     while (env < env_to) {
       env += 0x20;
-      if (mode > 6 && (unsigned) env_prev >= 0x600) {
+      if (mode > 6 && static_cast<unsigned>(env_prev) >= 0x600) {
         env += 0x8 - 0x20; // 7: two-slope linear increase
       }
       env_prev = env;
@@ -466,21 +466,21 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
   }
 }
 
-static inline int32_t absolute(int32_t x) {
-  return ((x < 0) ? -x : x);
-}
+// static inline int32_t absolute(int32_t x) {
+//   return ((x < 0) ? -x : x);
+// }
 
 static inline int32_t sclip15(int32_t x) {
   return ((x & 16384) ? (x | ~16383) : (x & 16383));
 }
 
-static inline int32_t sclamp8(int32_t x) {
-  return ((x > 127) ? 127 : (x < -128) ? -128 : x);
-}
+// static inline int32_t sclamp8(int32_t x) {
+//   return ((x > 127) ? 127 : (x < -128) ? -128 : x);
+// }
 
-static inline int32_t sclamp15(int32_t x) {
-  return ((x > 16383) ? 16383 : (x < -16384) ? -16384 : x);
-}
+// static inline int32_t sclamp15(int32_t x) {
+//   return ((x > 16383) ? 16383 : (x < -16384) ? -16384 : x);
+// }
 
 static inline int32_t sclamp16(int32_t x) {
   return ((x > 32767) ? 32767 : (x < -32768) ? -32768 : x);

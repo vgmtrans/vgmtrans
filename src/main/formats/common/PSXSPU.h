@@ -147,7 +147,7 @@ void PSXConvADSR(T *realADSR,
   // PS1 games use 44k, PS2 uses 48k
   double sampleRate = bPS2 ? 48000 : 44100;
 
-  int rateIncTable[8] = {0, 4, 6, 8, 9, 10, 11, 12};
+  // int rateIncTable[8] = {0, 4, 6, 8, 9, 10, 11, 12};
   double samples{0};
   int l;
 

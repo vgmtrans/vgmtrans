@@ -92,18 +92,18 @@ struct qs_samp_info {
 
   qs_samp_info() = default;
 
-  qs_samp_info(qs_samp_info_cps2* cps2) {
+  qs_samp_info(const qs_samp_info_cps2* cps2) {
     this->start_addr = (cps2->bank << 16) | swap_bytes16(cps2->start_addr);
     this->loop_offset = (cps2->bank << 16) | swap_bytes16(cps2->loop_offset);
     this->end_addr = (swap_bytes16(cps2->end_addr) + (cps2->end_addr == 0)) ? (cps2->bank + 1) << 16 : 0;
     this->unity_key = cps2->unity_key;
   }
 
-  qs_samp_info(qs_samp_info_cps3* cps3) {
+  qs_samp_info(const qs_samp_info_cps3* cps3) {
     this->start_addr = swap_bytes32(cps3->start_addr);
     this->loop_offset = swap_bytes32(cps3->loop_offset);
     this->end_addr = swap_bytes32(cps3->end_addr);
-    this->unity_key = (uint8_t)swap_bytes32(cps3->unity_key);
+    this->unity_key = static_cast<uint8_t>(swap_bytes32(cps3->unity_key));
   }
 };
 
@@ -158,13 +158,13 @@ const uint16_t decay_rate_table[64] = {
 class CPSArticTable
     : public VGMMiscFile {
 public:
-  CPSArticTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length);
-  virtual ~CPSArticTable(void);
+  CPSArticTable(RawFile *file, std::string name, uint32_t offset, uint32_t length);
+  ~CPSArticTable() override;
 
-  virtual bool LoadMain();
+  bool LoadMain() override;
 
 public:
-  qs_artic_info *artics;
+  qs_artic_info *artics{};
 };
 
 // ******************
@@ -174,29 +174,29 @@ public:
 class CPSSampleInfoTable
     : public VGMMiscFile {
 public:
-  CPSSampleInfoTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length = 0);
-  ~CPSSampleInfoTable(void);
+  CPSSampleInfoTable(RawFile *file, std::string name, uint32_t offset, uint32_t length = 0);
+  ~CPSSampleInfoTable() override;
 
 public:
-  sample_info* infos;
+  sample_info* infos{nullptr};
 
-  uint32_t numSamples;
+  uint32_t numSamples{};
 };
 
 class CPS2SampleInfoTable
     : public CPSSampleInfoTable {
 public:
-  CPS2SampleInfoTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length = 0);
+  CPS2SampleInfoTable(RawFile *file, std::string name, uint32_t offset, uint32_t length = 0);
 
-  virtual bool LoadMain();
+  bool LoadMain() override;
 };
 
 class CPS3SampleInfoTable
     : public CPSSampleInfoTable {
 public:
-  CPS3SampleInfoTable(RawFile *file, std::string &name, uint32_t offset, uint32_t length = 0);
+  CPS3SampleInfoTable(RawFile *file, std::string name, uint32_t offset, uint32_t length = 0);
 
-  virtual bool LoadMain();
+  bool LoadMain() override;
 };
 
 // **************
@@ -211,15 +211,15 @@ public:
               int numInstrBanks,
               CPSSampleInfoTable *sampInfoTable,
               CPSArticTable *articTable,
-              std::string &name);
-  virtual ~CPS2InstrSet(void);
+              std::string name);
+  ~CPS2InstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
 public:
-  uint32_t num_instr_banks;
-  CPSFormatVer fmt_version;
+  CPSFormatVer fmt_version{VER_UNDEFINED};
+  uint32_t num_instr_banks{};
   CPSSampleInfoTable *sampInfoTable;
   CPSArticTable *articTable;
 };
@@ -236,21 +236,21 @@ public:
            uint32_t length,
            uint32_t theBank,
            uint32_t theInstrNum,
-           std::string &name);
-  virtual ~CPS2Instr(void);
-  virtual bool LoadInstr();
+           std::string name);
+  ~CPS2Instr() override;
+  bool LoadInstr() override;
 protected:
-  CPSFormatVer GetFormatVer() { return ((CPS2InstrSet *) parInstrSet)->fmt_version; }
+  CPSFormatVer GetFormatVer() const { return (static_cast<CPS2InstrSet*>(parInstrSet))->fmt_version; }
 
 protected:
-  uint8_t attack_rate;
-  uint8_t decay_rate;
-  uint8_t sustain_level;
-  uint8_t sustain_rate;
-  uint8_t release_rate;
+  uint8_t attack_rate{};
+  uint8_t decay_rate{};
+  uint8_t sustain_level{};
+  uint8_t sustain_rate{};
+  uint8_t release_rate{};
 
-  int info_ptr;        //pointer to start of instrument set block
-  int nNumRegions;
+  int info_ptr{};        //pointer to start of instrument set block
+  int nNumRegions{};
 };
 
 // **************
@@ -262,8 +262,8 @@ class CPS2SampColl
 public:
   CPS2SampColl(RawFile *file, CPS2InstrSet *instrset, CPSSampleInfoTable *sampinfotable, uint32_t offset,
               uint32_t length = 0, std::string name = std::string("QSound Sample Collection"));
-  virtual bool GetHeaderInfo();
-  virtual bool GetSampleInfo();
+  bool GetHeaderInfo() override;
+  bool GetSampleInfo() override;
 
 private:
   CPS2InstrSet *instrset;

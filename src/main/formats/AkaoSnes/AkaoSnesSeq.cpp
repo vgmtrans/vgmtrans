@@ -609,13 +609,13 @@ bool AkaoSnesTrack::ReadEvent(void) {
 
   switch (eventType) {
     case EVENT_UNKNOWN0:
-      desc = logEvent(statusByte, spdlog::level::off);
+      desc = describeUnknownEvent(statusByte);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", arg1);
+      desc = describeUnknownEvent(statusByte, arg1);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
@@ -623,7 +623,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_UNKNOWN2: {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", arg1, arg2);
+      desc = describeUnknownEvent(statusByte, arg1, arg2);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
@@ -632,7 +632,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t arg1 = GetByte(curOffset++);
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", arg1, arg2, arg3);
+      desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
@@ -642,7 +642,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
       uint8_t arg2 = GetByte(curOffset++);
       uint8_t arg3 = GetByte(curOffset++);
       uint8_t arg4 = GetByte(curOffset++);
-      desc = logEvent(statusByte, spdlog::level::off, "Event", arg1, arg2, arg3, arg4);
+      desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
       AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }

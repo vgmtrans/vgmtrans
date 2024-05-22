@@ -1,6 +1,5 @@
 #pragma once
 #include "Format.h"
-#include "VGMColl.h"
 #include "CPS2Scanner.h"
 #include "CPS1Scanner.h"
 

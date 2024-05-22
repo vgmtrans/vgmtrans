@@ -35,11 +35,11 @@ enum CPSFormatVer: uint8_t {
   VER_CPS3
 };
 
-CPSFormatVer GetVersionEnum(std::string &versionStr);
+CPSFormatVer GetVersionEnum(const std::string &versionStr);
 
 class CPS2Scanner : public VGMScanner {
 public:
-  virtual void Scan(RawFile* file, void *info = 0);
+  void Scan(RawFile* file, void *info) override;
 };
 
 

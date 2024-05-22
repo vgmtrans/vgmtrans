@@ -9,11 +9,12 @@
 #include "CPS1Instr.h"
 #include "MAMELoader.h"
 #include "VGMMiscFile.h"
+#include "VGMColl.h"
 
 class CPS1SampleInstrSet;
 
 void CPS1Scanner::Scan(RawFile *file, void *info) {
-  MAMEGame *gameentry = (MAMEGame *) info;
+  MAMEGame *gameentry = static_cast<MAMEGame*>(info);
   CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
 
   if (fmt_ver == VER_UNDEFINED) {
@@ -48,11 +49,6 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
       !seqRomGroupEntry->GetHexAttribute("seq_table", &seq_table_offset))
     return;
 
-  if (fmt_ver == VER_UNDEFINED) {
-    L_ERROR("XML entry uses an undefined QSound version: {}", gameentry->fmt_version_str);
-    return;
-  }
-
   RawFile *programFile = seqRomGroupEntry->file;
 
   MAMERomGroup* sampsRomGroupEntry = gameentry->GetRomGroupOfType("oki6295");
@@ -71,20 +67,20 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
                                       instrset_name);
     if (!instrset->LoadVGMFile()) {
       delete instrset;
-      instrset = NULL;
+      instrset = nullptr;
     }
 
     sampcoll = new CPS1SampColl(samplesFile, instrset, 0, samplesFile->size(), sampcoll_name);
     if (!sampcoll->LoadVGMFile()) {
       delete sampcoll;
-      sampcoll = NULL;
+      sampcoll = nullptr;
     }
   }
 
   std::string seq_table_name = fmt::format("{} sequence pointer table", gameentry->name);
 
   uint8_t ptrsStart;
-  const uint8_t ptrSize = 2;
+  constexpr uint8_t ptrSize = 2;
 
   switch (fmt_ver) {
     case VER_CPS1_500: ptrsStart = 2; break;
@@ -98,24 +94,24 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     case VER_CPS1_350:
     case VER_CPS1_425:
     case VER_CPS1_500:
-      seq_table_length = (uint32_t) (programFile->GetByte(seq_table_offset) * 2) + ptrsStart;
+      seq_table_length = static_cast<uint32_t>(programFile->GetByte(seq_table_offset) * 2) + ptrsStart;
       break;
     case VER_CPS1_502:
-      seq_table_length = (uint32_t) (programFile->GetShortBE(seq_table_offset) * 2) + ptrsStart;
+      seq_table_length = static_cast<uint32_t>(programFile->GetShortBE(seq_table_offset) * 2) + ptrsStart;
       break;
     default:
       L_ERROR("Unknown version of CPS1 format: {}", static_cast<uint8_t>(fmt_ver));
       return;
   }
 
-  unsigned int k = 0;
-  uint32_t seqPointer = 0;
+  unsigned int k;
+  uint32_t seqPointer;
 
   // Add SeqTable as Miscfile
   VGMMiscFile *seqTable = new VGMMiscFile(CPS1Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
   if (!seqTable->LoadVGMFile()) {
     delete seqTable;
-    seqTable = NULL;
+    return;
   }
 
   int seqNum = 0;
