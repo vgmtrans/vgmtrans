@@ -106,7 +106,7 @@ bool HudsonSnesInstr::LoadInstr() {
     return false;
   }
 
-  HudsonSnesRgn *rgn = new HudsonSnesRgn(this, version, dwOffset, spcDirAddr, ofsTuningEnt);
+  HudsonSnesRgn *rgn = new HudsonSnesRgn(this, version, dwOffset, ofsTuningEnt);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   aRgns.push_back(rgn);
 
@@ -120,11 +120,10 @@ bool HudsonSnesInstr::LoadInstr() {
 HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
                              HudsonSnesVersion ver,
                              uint32_t offset,
-                             uint32_t spcDirAddr,
                              uint32_t addrTuningEntry) :
     VGMRgn(instr, offset, 4),
     version(ver) {
-  uint8_t srcn = GetByte(dwOffset);
+//  uint8_t srcn = GetByte(dwOffset);
   uint8_t adsr1 = GetByte(dwOffset + 1);
   uint8_t adsr2 = GetByte(dwOffset + 2);
   uint8_t gain = GetByte(dwOffset + 3);

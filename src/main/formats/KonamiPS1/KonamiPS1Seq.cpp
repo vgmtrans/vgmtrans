@@ -40,7 +40,7 @@ bool KonamiPS1Seq::GetHeaderInfo() {
 
   uint32_t numTracks = GetWord(dwOffset + kOffsetToTrackCount);
   VGMHeader *trackSizeHeader = AddHeader(dwOffset + kHeaderSize, 2 * numTracks, "Track Size");
-  for (size_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
+  for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
     std::string itemName = fmt::format("Track {} size", trackIndex + 1);
     trackSizeHeader->AddSimpleItem(trackSizeHeader->dwOffset + (trackIndex * 2), 2, itemName);
   }
@@ -51,7 +51,7 @@ bool KonamiPS1Seq::GetHeaderInfo() {
 bool KonamiPS1Seq::GetTrackPointers() {
   uint32_t numTracks = GetWord(dwOffset + kOffsetToTrackCount);
   uint32_t trackStart = dwOffset + kHeaderSize + (numTracks * 2);
-  for (size_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
+  for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
     uint16_t trackSize = GetShort(dwOffset + kHeaderSize + (trackIndex * 2));
     KonamiPS1Track *track = new KonamiPS1Track(this, trackStart, trackSize);
     aTracks.push_back(track);

@@ -65,7 +65,6 @@ private:
   CPSFormatVer GetVersion() const { return static_cast<CPSSeq*>(this->parentSeq)->fmt_version; }
   uint32_t ReadVarLength();
 
-  bool bPrevNoteTie;
   int8_t loopCounter[4];
   uint32_t loopOffset[4];    //used for detecting infinite loops
 };

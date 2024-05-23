@@ -53,6 +53,6 @@ class ItikitiSnesRgn : public VGMRgn {
   bool LoadRgn() override { return true; }
 
 private:
-  uint32_t m_tuning_offset{};
-  uint32_t m_adsr_offset{};
+  // uint32_t m_tuning_offset{};
+  // uint32_t m_adsr_offset{};
 };

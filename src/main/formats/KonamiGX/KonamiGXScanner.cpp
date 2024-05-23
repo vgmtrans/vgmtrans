@@ -21,8 +21,7 @@ void KonamiGXScanner::Scan(RawFile *file, void *info) {
 
 
 void KonamiGXScanner::LoadSeqTable(RawFile *file, uint32_t offset) {
-  uint32_t nFileLength;
-  nFileLength = file->size();
+  uint32_t nFileLength = static_cast<uint32_t>(file->size());
   while (offset < nFileLength) {
     uint32_t seqOffset = file->GetWordBE(offset);
     if (seqOffset == 0 || seqOffset >= nFileLength)

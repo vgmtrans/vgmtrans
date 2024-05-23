@@ -110,7 +110,7 @@ BytePattern HudsonSnesScanner::ptnLoadDIRV0(
 	,
 	6);
 
-void HudsonSnesScanner::Scan(RawFile *file, void *info) {
+void HudsonSnesScanner::Scan(RawFile* file, void* /*info*/) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForHudsonSnesFromARAM(file);

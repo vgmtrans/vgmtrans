@@ -93,13 +93,13 @@ HOSASeq *HOSAScanner::SearchForHOSASeq(RawFile *file) {
 #define MIN_NUM_SAMPLES_COMPARE 5
 #define MIN_SAMPLES_MATCH 4
 HOSAInstrSet *HOSAScanner::SearchForHOSAInstrSet(RawFile *file, const PSXSampColl *sampcoll) {
-  size_t numSamples = sampcoll->samples.size();
+  int numSamples = static_cast<int>(sampcoll->samples.size());
   if (numSamples < MIN_NUM_SAMPLES_COMPARE) {
     return nullptr;
   }
 
   uint32_t *sampOffsets = new uint32_t[numSamples];
-  for (unsigned int i = 0; i < numSamples; i++)
+  for (int i = 0; i < numSamples; i++)
     sampOffsets[i] = sampcoll->samples[i]->dwOffset - sampcoll->dwOffset;
 
   size_t nFileLength = file->size();

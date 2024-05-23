@@ -381,7 +381,7 @@ void DLSWsmp::SetLoopInfo(Loop &loop, VGMSamp *samp) {
                      : loop.loopLength;
 }
 
-void DLSWsmp::SetPitchInfo(uint16_t unityNote, short fineTune, long attenuation) {
+void DLSWsmp::SetPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenuation) {
   usUnityNote = unityNote;
   sFineTune = fineTune;
   lAttenuation = attenuation;

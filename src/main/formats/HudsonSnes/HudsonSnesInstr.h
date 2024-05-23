@@ -63,9 +63,8 @@ class HudsonSnesInstr
 class HudsonSnesRgn
     : public VGMRgn {
  public:
-  HudsonSnesRgn
-      (HudsonSnesInstr *instr, HudsonSnesVersion ver, uint32_t offset, uint32_t spcDirAddr, uint32_t addrTuningEntry);
-  virtual ~HudsonSnesRgn(void);
+  HudsonSnesRgn(HudsonSnesInstr *instr, HudsonSnesVersion ver, uint32_t offset, uint32_t addrTuningEntry);
+  virtual ~HudsonSnesRgn();
 
   virtual bool LoadRgn();
 

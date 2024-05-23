@@ -69,10 +69,6 @@ bool SegSatSeq::ReadEvent() {
     }
     else if (status_byte == 0x81)        //loop x # of events
     {
-      uint16_t test1 = GetShortBE(curOffset);
-      uint32_t test2 = GetShortBE(curOffset);
-      uint32_t test3 = eventsOffset();
-      uint8_t test4 = GetByte(curOffset);
       uint32_t loopOffset = eventsOffset() + GetShortBE(curOffset);
       curOffset += 2;
       remainingEventsInLoop = GetByte(curOffset++);

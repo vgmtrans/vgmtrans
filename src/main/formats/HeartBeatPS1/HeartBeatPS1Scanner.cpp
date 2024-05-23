@@ -145,7 +145,7 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
     }
 
     if (seq_size != 0) {
-      HeartBeatPS1Seq *newHeartBeatPS1Seq = new HeartBeatPS1Seq(file, offset, total_size);
+      HeartBeatPS1Seq *newHeartBeatPS1Seq = new HeartBeatPS1Seq(file, static_cast<uint32_t>(offset), total_size);
       if (newHeartBeatPS1Seq->LoadVGMFile()) {
         loadedFiles.push_back(newHeartBeatPS1Seq);
       } else {

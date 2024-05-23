@@ -31,7 +31,7 @@ public:
   inline uint32_t &eventsOffset() { return dwEventsOffset; }
 
   // this function must be called in GetHeaderInfo or before LoadEvents is called
-  inline void SetEventsOffset(long offset) {
+  inline void SetEventsOffset(uint32_t offset) {
     dwEventsOffset = offset;
     if (SeqTrack::readMode == READMODE_ADD_TO_UI) {
       SeqTrack::dwOffset = offset;
