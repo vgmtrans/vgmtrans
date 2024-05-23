@@ -108,7 +108,7 @@ class ItikitiSnesSeq : public VGMSeq {
 
 class ItikitiSnesTrack : public SeqTrack {
  public:
-  ItikitiSnesTrack(ItikitiSnesSeq *seq, long offset = 0, long length = 0);
+  ItikitiSnesTrack(ItikitiSnesSeq *seq, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
 

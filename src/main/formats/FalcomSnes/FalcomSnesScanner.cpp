@@ -79,11 +79,11 @@ BytePattern FalcomSnesScanner::ptnLoadInstr(
 	23);
 
 void FalcomSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForFalcomSnesFromARAM(file);
   } else {
-    SearchForFalcomSnesFromROM(file);
+    // Search from ROM unimplemented
   }
   return;
 }
@@ -135,5 +135,3 @@ void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void FalcomSnesScanner::SearchForFalcomSnesFromROM(RawFile *file) {}

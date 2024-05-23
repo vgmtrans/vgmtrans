@@ -69,7 +69,7 @@ class PandoraBoxSnesSeq
 class PandoraBoxSnesTrack
     : public SeqTrack {
  public:
-  PandoraBoxSnesTrack(PandoraBoxSnesSeq *parentFile, long offset = 0, long length = 0);
+  PandoraBoxSnesTrack(PandoraBoxSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void ResetVars(void);
   virtual bool ReadEvent(void);
 

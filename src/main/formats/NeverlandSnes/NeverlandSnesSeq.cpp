@@ -118,7 +118,7 @@ uint16_t NeverlandSnesSeq::GetShortAddress(uint32_t offset) {
 //  NeverlandSnesTrack
 //  ******************
 
-NeverlandSnesTrack::NeverlandSnesTrack(NeverlandSnesSeq *parentFile, long offset, long length)
+NeverlandSnesTrack::NeverlandSnesTrack(NeverlandSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   ResetVars();
   bDetermineTrackLengthEventByEvent = true;

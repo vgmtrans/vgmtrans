@@ -92,7 +92,7 @@ bool FFTSeq::GetTrackPointers(void) {
 //  FFTTrack
 //  ********
 
-FFTTrack::FFTTrack(FFTSeq *parentFile, long offset, long length)
+FFTTrack::FFTTrack(FFTSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   FFTTrack::ResetVars();
 }

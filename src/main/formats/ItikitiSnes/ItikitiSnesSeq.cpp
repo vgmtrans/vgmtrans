@@ -125,7 +125,7 @@ void ItikitiSnesSeq::LoadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEven
   event_map[0x2f] = ItikitiSnesSeqEventType::EVENT_LOOP_BREAK;
 }
 
-ItikitiSnesTrack::ItikitiSnesTrack(ItikitiSnesSeq *seq, long offset, long length)
+ItikitiSnesTrack::ItikitiSnesTrack(ItikitiSnesSeq *seq, uint32_t offset, uint32_t length)
     : SeqTrack(seq, offset, length) {
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;

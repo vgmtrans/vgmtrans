@@ -13,7 +13,6 @@ class AkaoSnesScanner : public VGMScanner {
  public:
   virtual void Scan(RawFile *file, void *info = 0);
   static void SearchForAkaoSnesFromARAM(RawFile *file);
-  static void SearchForAkaoSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnReadNoteLengthV1;

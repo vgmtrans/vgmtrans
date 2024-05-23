@@ -13,7 +13,6 @@ class KonamiSnesScanner : public VGMScanner {
  public:
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForKonamiSnesFromARAM(RawFile *file);
-  void SearchForKonamiSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnSetSongHeaderAddressGG4;

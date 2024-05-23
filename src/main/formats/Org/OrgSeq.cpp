@@ -37,7 +37,7 @@ bool OrgSeq::GetHeaderInfo(void) {
   return true;        //successful
 }
 
-OrgTrack::OrgTrack(OrgSeq *parentFile, long offset, long length, uint8_t realTrk)
+OrgTrack::OrgTrack(OrgSeq *parentFile, uint32_t offset, uint32_t length, uint8_t realTrk)
     : SeqTrack(parentFile, offset, length), realTrkNum(realTrk) {
 }
 

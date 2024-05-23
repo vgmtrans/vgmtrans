@@ -88,7 +88,7 @@ class CapcomSnesSeq
 class CapcomSnesTrack
     : public SeqTrack {
  public:
-  CapcomSnesTrack(CapcomSnesSeq *parentFile, long offset = 0, long length = 0);
+  CapcomSnesTrack(CapcomSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
   void OnTickBegin() override;

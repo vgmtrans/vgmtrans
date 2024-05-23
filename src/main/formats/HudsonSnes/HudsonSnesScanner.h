@@ -13,7 +13,6 @@ class HudsonSnesScanner : public VGMScanner {
  public:
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForHudsonSnesFromARAM(RawFile *file);
-  void SearchForHudsonSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnNoteLenTable;

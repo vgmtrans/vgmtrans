@@ -623,7 +623,7 @@ uint16_t NinSnesSeq::GetShortAddress(uint32_t offset) {
 //  NinSnesSection
 //  **************
 
-NinSnesSection::NinSnesSection(NinSnesSeq *parentFile, long offset, long length)
+NinSnesSection::NinSnesSection(NinSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : VGMSeqSection(parentFile, offset, length) {
 }
 
@@ -715,7 +715,7 @@ void NinSnesTrackSharedData::ResetVars(void) {
 //  NinSnesTrack
 //  ************
 
-NinSnesTrack::NinSnesTrack(NinSnesSection *parentSection, long offset, long length, const std::string &theName)
+NinSnesTrack::NinSnesTrack(NinSnesSection *parentSection, uint32_t offset, uint32_t length, const std::string &theName)
     : SeqTrack(parentSection->parentSeq, offset, length, theName),
       parentSection(parentSection),
       shared(NULL),

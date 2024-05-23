@@ -148,13 +148,12 @@ BytePattern SuzukiSnesScanner::ptnLoadInstr(
 	41);
 
 void SuzukiSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForSuzukiSnesFromARAM(file);
   } else {
-    SearchForSuzukiSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
@@ -226,5 +225,3 @@ void SuzukiSnesScanner::SearchForSuzukiSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void SuzukiSnesScanner::SearchForSuzukiSnesFromROM(RawFile *file) {}

@@ -13,7 +13,7 @@ constexpr auto PSF_TAG_SIG = "[TAG]";
 constexpr auto PSF_TAG_SIG_LEN = 5;
 
 PSFFile::PSFFile(const RawFile &file) {
-    uint32_t fileSize = file.size();
+    size_t fileSize = file.size();
     if (fileSize < 0x10) {
         throw std::length_error("PSF file smaller than header, likely corrupt");
     }
@@ -41,7 +41,7 @@ PSFFile::PSFFile(const RawFile &file) {
         auto exe_begin = file.begin() + 16 + reservedarea_size;
 
         if (m_exe_CRC !=
-            zng_crc32(zng_crc32(0L, nullptr, 0), reinterpret_cast<const Bytef *>(exe_begin), exe_size)) {
+            zng_crc32(zng_crc32(0L, nullptr, 0), reinterpret_cast<const Bytef *>(exe_begin), static_cast<uint32_t>(exe_size))) {
             throw std::runtime_error("CRC32 mismatch, data is corrupt");
         }
 
@@ -49,8 +49,8 @@ PSFFile::PSFFile(const RawFile &file) {
     }
 
     // Check existence of tag section.
-    uint32_t tag_section_offset = 16 + reservedarea_size + exe_size;
-    uint32_t tag_section_size = fileSize - tag_section_offset;
+    size_t tag_section_offset = 16 + reservedarea_size + exe_size;
+    size_t tag_section_size = fileSize - tag_section_offset;
     bool valid_tag_section = false;
     if (tag_section_size >= PSF_TAG_SIG_LEN) {
         valid_tag_section =

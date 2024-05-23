@@ -7,7 +7,7 @@
 #include "ScaleConversion.h"
 
 
-CPSTrackV2::CPSTrackV2(CPSSeq *parentSeq, long offset, long length)
+CPSTrackV2::CPSTrackV2(CPSSeq *parentSeq, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length) {
   CPSTrackV2::ResetVars();
 }

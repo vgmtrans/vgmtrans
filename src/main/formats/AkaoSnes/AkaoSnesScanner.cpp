@@ -322,14 +322,13 @@ BytePattern AkaoSnesScanner::ptnReadPercussionTableV4(
   ,
   24);
 
-void AkaoSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+void AkaoSnesScanner::Scan(RawFile* file, void* /*info*/) {
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForAkaoSnesFromARAM(file);
   } else {
-    SearchForAkaoSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
@@ -587,5 +586,3 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void AkaoSnesScanner::SearchForAkaoSnesFromROM(RawFile *file) {}

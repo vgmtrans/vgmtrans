@@ -111,14 +111,13 @@ BytePattern HudsonSnesScanner::ptnLoadDIRV0(
 	6);
 
 void HudsonSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForHudsonSnesFromARAM(file);
   }
   else {
-    SearchForHudsonSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile *file) {
@@ -286,5 +285,3 @@ void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile *file) {
     }
   }
 }
-
-void HudsonSnesScanner::SearchForHudsonSnesFromROM(RawFile *file) {}

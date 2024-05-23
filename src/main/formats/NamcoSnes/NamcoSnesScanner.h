@@ -13,7 +13,6 @@ class NamcoSnesScanner : public VGMScanner {
  public:
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForNamcoSnesFromARAM(RawFile *file);
-  void SearchForNamcoSnesFromROM(RawFile *file);
 
  private:
   std::map<uint8_t, uint8_t> GetInitDspRegMap(RawFile *file);

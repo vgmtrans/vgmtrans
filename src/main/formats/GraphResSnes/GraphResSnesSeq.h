@@ -66,7 +66,7 @@ class GraphResSnesSeq
 class GraphResSnesTrack
     : public SeqTrack {
  public:
-  GraphResSnesTrack(GraphResSnesSeq *parentFile, long offset = 0, long length = 0);
+  GraphResSnesTrack(GraphResSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
 

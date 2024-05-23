@@ -12,7 +12,7 @@
 // *************
 
 
-CPSTrackV1::CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, long offset, long length)
+CPSTrackV1::CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
   CPSTrackV1::ResetVars();
 }

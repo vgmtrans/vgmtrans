@@ -45,7 +45,7 @@ bool VGMMultiSectionSeq::LoadMain() {
   return true;
 }
 
-bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, long stopTime) {
+bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, uint32_t stopTime) {
   this->readMode = readMode;
 
   curOffset = dwStartOffset;
@@ -79,7 +79,7 @@ bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, long stopTime) {
   return succeeded;
 }
 
-bool VGMMultiSectionSeq::LoadSection(VGMSeqSection *section, long stopTime) {
+bool VGMMultiSectionSeq::LoadSection(VGMSeqSection *section, uint32_t stopTime) {
   // reset variables
   assert(aTracks.size() == 0 || aTracks.size() == section->aTracks.size());
   for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {

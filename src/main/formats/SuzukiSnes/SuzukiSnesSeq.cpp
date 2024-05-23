@@ -201,7 +201,7 @@ double SuzukiSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  SuzukiSnesTrack
 //  ***************
 
-SuzukiSnesTrack::SuzukiSnesTrack(SuzukiSnesSeq *parentFile, long offset, long length)
+SuzukiSnesTrack::SuzukiSnesTrack(SuzukiSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
 }
 

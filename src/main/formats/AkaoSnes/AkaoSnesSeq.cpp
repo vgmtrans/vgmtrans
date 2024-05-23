@@ -565,7 +565,7 @@ uint16_t AkaoSnesSeq::GetShortAddress(uint32_t offset) const {
 //  AkaoSnesTrack
 //  ************
 
-AkaoSnesTrack::AkaoSnesTrack(AkaoSnesSeq *parentFile, long offset, long length)
+AkaoSnesTrack::AkaoSnesTrack(AkaoSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   AkaoSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -1366,7 +1366,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_GOTO: {
       uint16_t dest = GetShortAddress(curOffset);
       curOffset += 2;
-      auto desc = fmt::format("Destination: ${:04X}", dest);
+      desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;

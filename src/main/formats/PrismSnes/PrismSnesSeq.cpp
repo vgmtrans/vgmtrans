@@ -224,7 +224,7 @@ double PrismSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  PrismSnesTrack
 //  **************
 
-PrismSnesTrack::PrismSnesTrack(PrismSnesSeq *parentFile, long offset, long length)
+PrismSnesTrack::PrismSnesTrack(PrismSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   ResetVars();
   bDetermineTrackLengthEventByEvent = true;

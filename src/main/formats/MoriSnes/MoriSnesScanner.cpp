@@ -45,13 +45,12 @@ BytePattern MoriSnesScanner::ptnSetDIR(
 	6);
 
 void MoriSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForMoriSnesFromARAM(file);
   } else {
-    SearchForMoriSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
@@ -105,5 +104,3 @@ void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
     }
   }
 }
-
-void MoriSnesScanner::SearchForMoriSnesFromROM(RawFile *file) {}

@@ -900,14 +900,13 @@ BytePattern NinSnesScanner::ptnInstrVCmdTS(
 	33);
 
 void NinSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForNinSnesFromARAM(file);
   }
   else {
-    SearchForNinSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
@@ -1680,7 +1679,4 @@ void NinSnesScanner::SearchForNinSnesFromARAM(RawFile *file) {
     delete newInstrSet;
     return;
   }
-}
-
-void NinSnesScanner::SearchForNinSnesFromROM(RawFile *file) {
 }

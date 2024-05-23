@@ -605,7 +605,7 @@ bool AkaoSampColl::GetSampleInfo() {
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
   if (sample_section_offset + sample_section_size > rawfile->size())
-    sample_section_size = rawfile->size() - sample_section_offset;
+    sample_section_size = static_cast<uint32_t>(rawfile->size()) - sample_section_offset;
 
   //check the last 10 bytes to make sure they aren't null, if they are, abbreviate things till there is no 0x10 block of null bytes
   if (GetWord(sample_section_offset + sample_section_size - 0x10) == 0) {
@@ -617,7 +617,7 @@ bool AkaoSampColl::GetSampleInfo() {
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
   if (sample_section_offset + sample_section_size > rawfile->size())
-    sample_section_size = rawfile->size();
+    sample_section_size = static_cast<uint32_t>(rawfile->size());
 
   std::set<uint32_t> sample_offsets;
   for (const auto & art : akArts) {

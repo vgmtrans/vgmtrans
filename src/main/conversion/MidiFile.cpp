@@ -975,7 +975,7 @@ GlobalTransposeEvent::GlobalTransposeEvent(MidiTrack *prntTrk, uint32_t absolute
   semitones = theSemitones;
 }
 
-uint32_t GlobalTransposeEvent::WriteEvent(std::vector<uint8_t> &buf, uint32_t time) {
+uint32_t GlobalTransposeEvent::WriteEvent(std::vector<uint8_t>& /*buf*/, uint32_t time) {
   this->prntTrk->parentSeq->globalTranspose = this->semitones;
   return time;
 }

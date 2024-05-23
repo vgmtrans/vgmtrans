@@ -197,7 +197,7 @@ PSXSampColl *PSXSampColl::SearchForPSXADPCM(RawFile *file, const string &format)
 
 std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, const string &format) {
   std::vector<PSXSampColl *> sampColls;
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < nFileLength; i++) {
     // if we have 16 0s in a row.
     if (file->GetWord(i) == 0 && file->GetWord(i + 4) == 0 && file->GetWord(i + 8) == 0 && file->GetWord(i + 12) == 0) {

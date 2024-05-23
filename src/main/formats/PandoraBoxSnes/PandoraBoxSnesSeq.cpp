@@ -138,7 +138,7 @@ void PandoraBoxSnesSeq::LoadEventMap() {
 //  PandoraBoxSnesTrack
 //  *****************
 
-PandoraBoxSnesTrack::PandoraBoxSnesTrack(PandoraBoxSnesSeq *parentFile, long offset, long length)
+PandoraBoxSnesTrack::PandoraBoxSnesTrack(PandoraBoxSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   ResetVars();
   bDetermineTrackLengthEventByEvent = true;

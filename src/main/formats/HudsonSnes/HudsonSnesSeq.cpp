@@ -496,7 +496,7 @@ void HudsonSnesSeq::LoadEventMap() {
 //  HudsonSnesTrack
 //  ***************
 
-HudsonSnesTrack::HudsonSnesTrack(HudsonSnesSeq *parentFile, long offset, long length)
+HudsonSnesTrack::HudsonSnesTrack(HudsonSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   HudsonSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;

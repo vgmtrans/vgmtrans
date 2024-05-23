@@ -22,7 +22,7 @@ class FFTSeq : public VGMSeq {
 class FFTTrack
     : public SeqTrack {
  public:
-  FFTTrack(FFTSeq *parentFile, long offset = 0, long length = 0);
+  FFTTrack(FFTSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
 

@@ -100,7 +100,7 @@ class PrismSnesSeq
 class PrismSnesTrack
     : public SeqTrack {
  public:
-  PrismSnesTrack(PrismSnesSeq *parentFile, long offset = 0, long length = 0);
+  PrismSnesTrack(PrismSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void ResetVars(void);
   virtual bool ReadEvent(void);
 

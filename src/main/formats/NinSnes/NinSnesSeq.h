@@ -173,7 +173,7 @@ protected:
 class NinSnesSection
     : public VGMSeqSection {
  public:
-  NinSnesSection(NinSnesSeq *parentFile, long offset = 0, long length = 0);
+  NinSnesSection(NinSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
 
   virtual bool GetTrackPointers();
 
@@ -185,7 +185,7 @@ class NinSnesTrack
     : public SeqTrack {
  public:
   NinSnesTrack
-      (NinSnesSection *parentSection, long offset = 0, long length = 0, const std::string &theName = "NinSnes Track");
+      (NinSnesSection *parentSection, uint32_t offset = 0, uint32_t length = 0, const std::string &theName = "NinSnes Track");
 
   virtual void ResetVars(void);
   virtual bool ReadEvent(void);

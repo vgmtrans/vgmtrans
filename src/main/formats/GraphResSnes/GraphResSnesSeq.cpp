@@ -139,7 +139,7 @@ void GraphResSnesSeq::LoadEventMap() {
 //  GraphResSnesTrack
 //  *****************
 
-GraphResSnesTrack::GraphResSnesTrack(GraphResSnesSeq *parentFile, long offset, long length)
+GraphResSnesTrack::GraphResSnesTrack(GraphResSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   GraphResSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;

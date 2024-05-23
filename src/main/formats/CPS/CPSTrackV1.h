@@ -9,7 +9,7 @@ enum CPSFormatVer: uint8_t;
 class CPSTrackV1
     : public SeqTrack {
 public:
-  CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, long offset = 0, long length = 0);
+  CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   void AddInitialMidiEvents(int trackNum) override;
   bool ReadEvent() override;

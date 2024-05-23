@@ -189,7 +189,7 @@ double CompileSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  CompileSnesTrack
 //  ****************
 
-CompileSnesTrack::CompileSnesTrack(CompileSnesSeq *parentFile, long offset, long length)
+CompileSnesTrack::CompileSnesTrack(CompileSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;

@@ -60,7 +60,7 @@ void TriAcePS1Seq::ResetVars(void) {
 // TriAcePS1Track
 // **************
 
-TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq *parentSeq, long offset, long length)
+TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq *parentSeq, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length) {
 }
 

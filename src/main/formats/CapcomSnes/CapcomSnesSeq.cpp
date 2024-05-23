@@ -147,7 +147,7 @@ double CapcomSnesSeq::GetTempoInBPM(uint16_t tempo) {
 //  CapcomSnesTrack
 //  ************
 
-CapcomSnesTrack::CapcomSnesTrack(CapcomSnesSeq *parentFile, long offset, long length)
+CapcomSnesTrack::CapcomSnesTrack(CapcomSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   CapcomSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;

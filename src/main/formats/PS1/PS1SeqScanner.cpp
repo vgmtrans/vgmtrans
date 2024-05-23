@@ -22,7 +22,7 @@ PS1SeqScanner::PS1SeqScanner() {}
 
 PS1SeqScanner::~PS1SeqScanner() {}
 
-void PS1SeqScanner::Scan(RawFile *file, void *info) {
+void PS1SeqScanner::Scan(RawFile* file, void* /*info*/) {
   auto seqs = SearchForPS1Seq(file);
   auto vabs = SearchForVab(file);
   if (vabs.empty() || vabs[0]->dwOffset != 0) {
@@ -31,7 +31,6 @@ void PS1SeqScanner::Scan(RawFile *file, void *info) {
 }
 
 std::vector<PS1Seq *> PS1SeqScanner::SearchForPS1Seq(RawFile *file) {
-  uint32_t nFileLength = file->size();
   std::vector<PS1Seq *> loadedFiles;
 
   using namespace std::string_literals;
@@ -55,7 +54,6 @@ std::vector<PS1Seq *> PS1SeqScanner::SearchForPS1Seq(RawFile *file) {
 }
 
 std::vector<Vab *> PS1SeqScanner::SearchForVab(RawFile *file) {
-  uint32_t nFileLength = file->size();
   std::vector<Vab *> loadedFiles;
 
   using namespace std::string_literals;

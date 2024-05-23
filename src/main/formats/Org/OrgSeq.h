@@ -22,7 +22,7 @@ class OrgSeq:
 class OrgTrack
     : public SeqTrack {
  public:
-  OrgTrack(OrgSeq *parentFile, long offset, long length, uint8_t realTrk);
+  OrgTrack(OrgSeq *parentFile, uint32_t offset, uint32_t length, uint8_t realTrk);
 
   virtual bool LoadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta);
   virtual bool ReadEvent(void);

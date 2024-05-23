@@ -62,7 +62,7 @@ void HOSAScanner::Scan(RawFile *file, void *info) {
 HOSASeq *HOSAScanner::SearchForHOSASeq(RawFile *file) {
   std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
 
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 4 < nFileLength; i++) {
     // Signature must match
     if (file->GetWordBE(i) != 0x484F5341 || file->GetByte(i + 4) != 'V')  //"HOSAV"
@@ -102,7 +102,7 @@ HOSAInstrSet *HOSAScanner::SearchForHOSAInstrSet(RawFile *file, const PSXSampCol
   for (unsigned int i = 0; i < numSamples; i++)
     sampOffsets[i] = sampcoll->samples[i]->dwOffset - sampcoll->dwOffset;
 
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0x20; i + 0x14 < nFileLength; i++) {
     if (RecursiveRgnCompare(file, i, 0, numSamples, 0, sampOffsets)) {
       for (; i >= 0x20; i -= 4) {

@@ -89,14 +89,13 @@ BytePattern PandoraBoxSnesScanner::ptnLoadSRCN(
 	22);
 
 void PandoraBoxSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForPandoraBoxSnesFromARAM(file);
   }
   else {
-    SearchForPandoraBoxSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM(RawFile *file) {
@@ -162,5 +161,3 @@ void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromROM(RawFile *file) {}

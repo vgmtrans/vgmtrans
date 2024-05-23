@@ -69,7 +69,7 @@ class VGMRgn : public VGMContainerItem {
   //uint32_t channel;
   //uint32_t tableIndex;
 
-  int sampNum;
+  uint32_t sampNum;
   uint32_t sampOffset;        //optional value. If a sample offset is provided, then find the sample number based on this offset.
   // This is an absolute offset into the SampColl.  It's not necessarily relative to the beginning of the
   // actual sample data, unless the sample data begins at offset 0.

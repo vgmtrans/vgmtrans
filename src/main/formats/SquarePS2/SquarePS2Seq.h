@@ -20,7 +20,7 @@ class BGMSeq : public VGMSeq {
 
 class BGMTrack : public SeqTrack {
  public:
-  BGMTrack(BGMSeq *parentSeq, long offset = 0, long length = 0);
+  BGMTrack(BGMSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
   bool ReadEvent() override;
 };

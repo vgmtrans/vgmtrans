@@ -28,8 +28,8 @@ VGMInstrSet::~VGMInstrSet() {
   delete sampColl;
 }
 
-VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
-                                unsigned long instrNum, const std::string &instrName) {
+VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, uint32_t bank,
+                                uint32_t instrNum, const std::string &instrName) {
   VGMInstr *instr =
       new VGMInstr(this, offset, length, bank, instrNum,
                    instrName.empty() ? fmt::format("Instrument {}", aInstrs.size()) : instrName);

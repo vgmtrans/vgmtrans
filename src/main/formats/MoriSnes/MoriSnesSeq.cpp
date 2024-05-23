@@ -171,7 +171,7 @@ double MoriSnesSeq::GetTempoInBPM(uint8_t tempo, bool fastTempo) {
 //  MoriSnesTrack
 //  ***************
 
-MoriSnesTrack::MoriSnesTrack(MoriSnesSeq *parentFile, long offset, long length)
+MoriSnesTrack::MoriSnesTrack(MoriSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   MoriSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;

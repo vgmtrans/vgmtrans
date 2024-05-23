@@ -208,10 +208,10 @@ public:
   void Write(std::vector<uint8_t> &buf) const;
 
 private:
-  unsigned short usUnityNote;
-  short sFineTune;
-  long lAttenuation;
-  char cSampleLoops;
+  uint16_t usUnityNote;
+  int16_t sFineTune;
+  int32_t lAttenuation;
+  int8_t cSampleLoops;
 
   uint32_t ulLoopType;
   uint32_t ulLoopStart;

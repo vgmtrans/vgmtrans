@@ -43,7 +43,7 @@ CPSFormatVer GetVersionEnum(const std::string &versionStr) {
   return VER_UNDEFINED;
 }
 
-void CPS2Scanner::Scan(RawFile *file, void *info) {
+void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
   MAMEGame *gameentry = static_cast<MAMEGame*>(info);
   CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
 

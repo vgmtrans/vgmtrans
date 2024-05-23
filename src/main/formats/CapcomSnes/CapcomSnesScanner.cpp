@@ -100,14 +100,13 @@ BytePattern CapcomSnesScanner::ptnLoadInstrTableAddress(
 	12);
 
 void CapcomSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForCapcomSnesFromARAM(file);
   }
   else {
-    SearchForCapcomSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) const {
@@ -233,8 +232,6 @@ void CapcomSnesScanner::SearchForCapcomSnesFromARAM(RawFile *file) const {
     return;
   }
 }
-
-void CapcomSnesScanner::SearchForCapcomSnesFromROM(RawFile *file) {}
 
 uint16_t CapcomSnesScanner::GetCurrentPlayAddressFromARAM(const RawFile *file, CapcomSnesVersion version, uint8_t channel) {
   uint16_t currentAddress;

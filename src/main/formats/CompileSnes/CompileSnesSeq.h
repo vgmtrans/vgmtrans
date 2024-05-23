@@ -72,7 +72,7 @@ class CompileSnesSeq
 class CompileSnesTrack
     : public SeqTrack {
  public:
-  CompileSnesTrack(CompileSnesSeq *parentFile, long offset = 0, long length = 0);
+  CompileSnesTrack(CompileSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   void AddInitialMidiEvents(int trackNum) override;
   bool ReadEvent() override;

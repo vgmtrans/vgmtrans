@@ -165,7 +165,7 @@ double FalcomSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  FalcomSnesTrack
 //  ***************
 
-FalcomSnesTrack::FalcomSnesTrack(FalcomSnesSeq *parentFile, long offset, long length)
+FalcomSnesTrack::FalcomSnesTrack(FalcomSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   FalcomSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;

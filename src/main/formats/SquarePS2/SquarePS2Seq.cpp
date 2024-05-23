@@ -57,7 +57,7 @@ bool BGMSeq::GetTrackPointers() {
 // ********
 
 
-BGMTrack::BGMTrack(BGMSeq *parentSeq, long offset, long length)
+BGMTrack::BGMTrack(BGMSeq *parentSeq, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length) {
 }
 

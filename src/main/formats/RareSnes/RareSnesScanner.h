@@ -11,7 +11,6 @@ class RareSnesScanner : public VGMScanner {
  public:
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForRareSnesFromARAM(RawFile *file);
-  void SearchForRareSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnLoadDIR;

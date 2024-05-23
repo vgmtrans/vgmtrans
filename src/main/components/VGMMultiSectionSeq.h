@@ -3,8 +3,7 @@
 #include "VGMSeq.h"
 #include "VGMSeqSection.h"
 
-class VGMMultiSectionSeq:
-    public VGMSeq {
+class VGMMultiSectionSeq : public VGMSeq {
  public:
   VGMMultiSectionSeq(const std::string& format,
                      RawFile *file,
@@ -21,8 +20,8 @@ class VGMMultiSectionSeq:
   VGMSeqSection *GetSectionFromOffset(uint32_t offset);
 
  protected:
-  bool LoadTracks(ReadMode readMode, long stopTime = 1000000) override;
-  virtual bool LoadSection(VGMSeqSection *section, long stopTime = 1000000);
+  bool LoadTracks(ReadMode readMode, uint32_t stopTime = 1000000) override;
+  virtual bool LoadSection(VGMSeqSection *section, uint32_t stopTime = 1000000);
   virtual bool IsOffsetUsed(uint32_t offset);
   virtual bool ReadEvent(long stopTime);
 

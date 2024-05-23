@@ -62,13 +62,12 @@ BytePattern SoftCreatSnesScanner::ptnVCmdExec(
 	20);
 
 void SoftCreatSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForSoftCreatSnesFromARAM(file);
   } else {
-    SearchForSoftCreatSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
@@ -145,5 +144,3 @@ void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void SoftCreatSnesScanner::SearchForSoftCreatSnesFromROM(RawFile *file) {}

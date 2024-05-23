@@ -99,7 +99,7 @@ bool MP2kSeq::GetTrackPointers(void) {
 //  MP2kTrack
 //  *********
 
-MP2kTrack::MP2kTrack(MP2kSeq *parentFile, long offset, long length)
+MP2kTrack::MP2kTrack(MP2kSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
 }
 

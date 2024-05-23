@@ -195,7 +195,7 @@ void ChunSnesSeq::LoadEventMap() {
 
 double ChunSnesSeq::GetTempoInBPM(uint8_t tempo) {
   if (tempo != 0) {
-    return (double) tempo;
+    return static_cast<double>(tempo);
   }
   else {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -206,7 +206,7 @@ double ChunSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  ChunSnesTrack
 //  *************
 
-ChunSnesTrack::ChunSnesTrack(ChunSnesSeq *parentFile, long offset, long length)
+ChunSnesTrack::ChunSnesTrack(ChunSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   ChunSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;

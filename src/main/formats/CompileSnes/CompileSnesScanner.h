@@ -13,7 +13,6 @@ class CompileSnesScanner : public VGMScanner {
  public:
   void Scan(RawFile *file, void *info) override;
   static void SearchForCompileSnesFromARAM(RawFile *file);
-  static void SearchForCompileSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnSetSongListAddress;

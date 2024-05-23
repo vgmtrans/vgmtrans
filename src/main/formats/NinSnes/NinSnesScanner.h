@@ -11,7 +11,6 @@ class NinSnesScanner : public VGMScanner {
  public:
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForNinSnesFromARAM(RawFile *file);
-  void SearchForNinSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnBranchForVcmd;
