@@ -8,12 +8,14 @@
 
 DECLARE_FORMAT(ChunSnes);
 
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr int SEQ_KEY_OFFSET = 24;
+static constexpr uint8_t NOTE_VELOCITY = 100;
+
 //  ***********
 //  ChunSnesSeq
 //  ***********
-#define MAX_TRACKS  8
-#define SEQ_PPQN    48
-#define SEQ_KEYOFS  24
 
 ChunSnesSeq::ChunSnesSeq(RawFile *file,
                          ChunSnesVersion ver,
@@ -193,7 +195,7 @@ void ChunSnesSeq::LoadEventMap() {
 
 double ChunSnesSeq::GetTempoInBPM(uint8_t tempo) {
   if (tempo != 0) {
-    return (double) tempo;
+    return static_cast<double>(tempo);
   }
   else {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -204,7 +206,7 @@ double ChunSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  ChunSnesTrack
 //  *************
 
-ChunSnesTrack::ChunSnesTrack(ChunSnesSeq *parentFile, long offset, long length)
+ChunSnesTrack::ChunSnesTrack(ChunSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   ChunSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -214,9 +216,8 @@ ChunSnesTrack::ChunSnesTrack(ChunSnesSeq *parentFile, long offset, long length)
 void ChunSnesTrack::ResetVars() {
   SeqTrack::ResetVars();
 
-  cKeyCorrection = SEQ_KEYOFS;
+  cKeyCorrection = SEQ_KEY_OFFSET;
 
-  vel = 100;
   prevNoteKey = -1;
   prevNoteSlurred = false;
   noteLength = 1;
@@ -348,7 +349,7 @@ bool ChunSnesTrack::ReadEvent() {
           AddGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration", desc, CLR_TIE, ICON_NOTE);
         }
         else {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+          AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);
         }
         AddTime(noteLength);
       }

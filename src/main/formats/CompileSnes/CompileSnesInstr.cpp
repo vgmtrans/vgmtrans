@@ -103,7 +103,7 @@ bool CompileSnesInstr::LoadInstr() {
 
   uint16_t addrSampStart = GetShort(offDirEnt);
 
-  CompileSnesRgn *rgn = new CompileSnesRgn(this, version, dwOffset, addrPitchTablePtrs, instrNum, spcDirAddr);
+  CompileSnesRgn *rgn = new CompileSnesRgn(this, version, dwOffset, addrPitchTablePtrs);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   aRgns.push_back(rgn);
 
@@ -125,9 +125,7 @@ uint32_t CompileSnesInstr::ExpectedSize(CompileSnesVersion version) {
 CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
                                CompileSnesVersion ver,
                                uint16_t addrTuningTableItem,
-                               uint16_t addrPitchTablePtrs,
-                               uint8_t srcn,
-                               uint32_t spcDirAddr)
+                               uint16_t addrPitchTablePtrs)
     : VGMRgn(instr, addrTuningTableItem, CompileSnesInstr::ExpectedSize(ver)),
       version(ver) {
 

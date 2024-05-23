@@ -57,7 +57,7 @@ enum CPSv2SeqEventType {
 class CPSTrackV2
     : public SeqTrack {
 public:
-  CPSTrackV2(CPSSeq *parentSeq, long offset = 0, long length = 0);
+  CPSTrackV2(CPSSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
 
@@ -65,7 +65,6 @@ private:
   CPSFormatVer GetVersion() const { return static_cast<CPSSeq*>(this->parentSeq)->fmt_version; }
   uint32_t ReadVarLength();
 
-  bool bPrevNoteTie;
   int8_t loopCounter[4];
   uint32_t loopOffset[4];    //used for detecting infinite loops
 };

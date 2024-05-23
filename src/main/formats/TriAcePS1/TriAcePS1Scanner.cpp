@@ -27,7 +27,7 @@ void TriAcePS1Scanner::Scan(RawFile *file, void *info) {
 }
 
 void TriAcePS1Scanner::SearchForSLZSeq(RawFile *file) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 0x40 < nFileLength; i++) {
     uint32_t sig1 = file->GetWordBE(i);
     uint8_t mode;
@@ -87,7 +87,7 @@ void TriAcePS1Scanner::SearchForSLZSeq(RawFile *file) {
 }
 
 void TriAcePS1Scanner::SearchForInstrSet(RawFile *file, std::vector<TriAcePS1InstrSet *> &instrsets) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 4; i + 0x800 < nFileLength; i++) {
     uint8_t precedingByte = file->GetByte(i + 3);
     if (precedingByte != 0)

@@ -109,13 +109,12 @@ BytePattern RareSnesScanner::ptnVCmdExecDKC2(
 	12);
 
 void RareSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForRareSnesFromARAM(file);
   } else {
-    SearchForRareSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
@@ -214,5 +213,3 @@ void RareSnesScanner::SearchForRareSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void RareSnesScanner::SearchForRareSnesFromROM(RawFile *file) {}

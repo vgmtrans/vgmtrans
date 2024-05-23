@@ -27,7 +27,7 @@ class HOSASeq: public VGMSeq {
 //--------------------------------------------------------------
 class HOSATrack: public SeqTrack {
  public:
-  HOSATrack(HOSASeq *parentFile, long offset = 0, long length = 0);
+  HOSATrack(HOSASeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
 
   bool ReadEvent() override;
   void ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable);

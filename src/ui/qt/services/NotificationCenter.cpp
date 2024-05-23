@@ -11,7 +11,7 @@
 NotificationCenter::NotificationCenter(QObject *parent) : QObject(parent) {
 }
 
-void NotificationCenter::updateStatus(const QString& name, const QString& description, const QIcon* icon, int offset, int size) {
+void NotificationCenter::updateStatus(const QString& name, const QString& description, const QIcon* icon, uint32_t offset, uint32_t size) {
   emit statusUpdated(name, description, icon, offset, size);
 }
 

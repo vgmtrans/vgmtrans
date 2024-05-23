@@ -21,7 +21,7 @@ class KonamiGXSeq:
 class KonamiGXTrack
     : public SeqTrack {
  public:
-  KonamiGXTrack(KonamiGXSeq *parentSeq, long offset = 0, long length = 0);
+  KonamiGXTrack(KonamiGXSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
   virtual bool ReadEvent(void);
 

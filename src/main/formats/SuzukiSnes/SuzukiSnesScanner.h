@@ -13,7 +13,6 @@ class SuzukiSnesScanner : public VGMScanner {
  public:
   virtual void Scan(RawFile *file, void *info = 0);
   void SearchForSuzukiSnesFromARAM(RawFile *file);
-  void SearchForSuzukiSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnLoadSongSD3;

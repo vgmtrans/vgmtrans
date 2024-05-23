@@ -80,9 +80,9 @@ MidiFile *VGMSeq::ConvertToMidi() {
   }
 
   // Find the greatest length of all tracks to use as stop point for every track
-  long stopTime = -1;
+  long stopTime = 0;
   for (size_t i = 0; i < numTracks; i++)
-    stopTime = std::max(stopTime, aTracks[i]->deltaLength);
+    stopTime = std::max(stopTime, aTracks[i]->totalTicks);
 
   auto *newmidi = new MidiFile(this);
   this->midi = newmidi;
@@ -134,7 +134,7 @@ bool VGMSeq::PostLoad() {
   return true;
 }
 
-bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime) {
+bool VGMSeq::LoadTracks(ReadMode readMode, uint32_t stopTime) {
   bool succeeded = true;
 
   // set read mode
@@ -165,7 +165,7 @@ bool VGMSeq::LoadTracks(ReadMode readMode, long stopTime) {
   return succeeded;
 }
 
-void VGMSeq::LoadTracksMain(long stopTime) {
+void VGMSeq::LoadTracksMain(uint32_t stopTime) {
   // determine the stop offsets
   uint32_t *aStopOffset = new uint32_t[nNumTracks];
   for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {

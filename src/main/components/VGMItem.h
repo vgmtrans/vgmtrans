@@ -123,7 +123,7 @@ public:
   VGMContainerItem(VGMFile *vgmfile,
                    uint32_t offset,
                    uint32_t length = 0,
-                   const std::string& name = "",
+                   std::string name = "",
                    EventColor color = CLR_HEADER);
   virtual ~VGMContainerItem();
 

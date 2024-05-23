@@ -90,7 +90,7 @@ MidiFile *VGMSeqNoTrks::ConvertToMidi() {
   if (!PostLoad())
     return nullptr;
 
-  long stopTime = deltaLength;
+  long stopTime = totalTicks;
 
   MidiFile *newmidi = new MidiFile(this);
   this->midi = newmidi;

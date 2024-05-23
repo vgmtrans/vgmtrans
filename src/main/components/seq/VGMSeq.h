@@ -86,8 +86,8 @@ class VGMSeq : public VGMFile {
   virtual int GetForeverLoops();
 
  protected:
-  virtual bool LoadTracks(ReadMode readMode, long stopTime = 1000000);
-  virtual void LoadTracksMain(long stopTime);
+  virtual bool LoadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
+  virtual void LoadTracksMain(uint32_t stopTime);
   virtual bool PostLoad();
 
  public:
@@ -96,7 +96,7 @@ class VGMSeq : public VGMFile {
   ReadMode readMode;
   double tempoBPM;
   uint16_t ppqn;
-  long time;                // absolute current time (ticks)
+  uint32_t time;                // absolute current time (ticks)
 
   // attributes
   bool bMonophonicTracks;   // Only 1 voice at a time on a track.  We can assume note offs always

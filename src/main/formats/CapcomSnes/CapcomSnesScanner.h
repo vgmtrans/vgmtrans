@@ -15,7 +15,6 @@ class CapcomSnesScanner:
 
   void Scan(RawFile *file, void *info = nullptr) override;
   void SearchForCapcomSnesFromARAM(RawFile *file) const;
-  static void SearchForCapcomSnesFromROM(RawFile *file);
 
  private:
   static int GetLengthOfSongList(const RawFile *file, uint16_t addrSongList);

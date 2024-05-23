@@ -28,8 +28,8 @@ VGMInstrSet::~VGMInstrSet() {
   delete sampColl;
 }
 
-VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, unsigned long bank,
-                                unsigned long instrNum, const std::string &instrName) {
+VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, uint32_t bank,
+                                uint32_t instrNum, const std::string &instrName) {
   VGMInstr *instr =
       new VGMInstr(this, offset, length, bank, instrNum,
                    instrName.empty() ? fmt::format("Instrument {}", aInstrs.size()) : instrName);
@@ -58,7 +58,7 @@ bool VGMInstrSet::Load() {
   if (!LoadInstrs())
     return false;
 
-  if (aInstrs.size() == 0)
+  if (aInstrs.empty())
     return false;
 
   if (unLength == 0) {
@@ -99,7 +99,7 @@ bool VGMInstrSet::LoadInstrs() {
 // ********
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, const std::string &name, float reverb)
+                   uint32_t theInstrNum, std::string name, float reverb)
     : VGMContainerItem(instrSet, offset, length, std::move(name)), bank(theBank), instrNum(theInstrNum),
       parInstrSet(instrSet), reverb(reverb) {
   AddContainer<VGMRgn>(aRgns);

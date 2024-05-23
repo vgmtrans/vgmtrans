@@ -267,7 +267,7 @@ double KonamiSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  KonamiSnesTrack
 //  ************
 
-KonamiSnesTrack::KonamiSnesTrack(KonamiSnesSeq *parentFile, long offset, long length)
+KonamiSnesTrack::KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   ResetVars();
   bDetermineTrackLengthEventByEvent = true;

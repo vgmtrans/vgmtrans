@@ -116,7 +116,7 @@ class RareSnesSeq
 class RareSnesTrack
     : public SeqTrack {
  public:
-  RareSnesTrack(RareSnesSeq *parentFile, long offset = 0, long length = 0);
+  RareSnesTrack(RareSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void ResetVars(void);
   virtual bool ReadEvent(void);
   virtual void OnTickBegin(void);

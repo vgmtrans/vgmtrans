@@ -103,13 +103,12 @@ BytePattern HeartBeatSnesScanner::ptnSaveSeqHeaderAddress(
 	16);
 
 void HeartBeatSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForHeartBeatSnesFromARAM(file);
   } else {
-    SearchForHeartBeatSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile *file) {
@@ -219,5 +218,3 @@ void HeartBeatSnesScanner::SearchForHeartBeatSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void HeartBeatSnesScanner::SearchForHeartBeatSnesFromROM(RawFile *file) {}

@@ -60,13 +60,12 @@ BytePattern GraphResSnesScanner::ptnDspRegInit(
 	18);
 
 void GraphResSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForGraphResSnesFromARAM(file);
   } else {
-    SearchForGraphResSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
@@ -104,8 +103,6 @@ void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void GraphResSnesScanner::SearchForGraphResSnesFromROM(RawFile *file) {}
 
 std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(const RawFile *file) {
   std::map<uint8_t, uint8_t> dspRegMap;

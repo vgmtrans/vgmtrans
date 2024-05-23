@@ -13,7 +13,6 @@ class ChunSnesScanner : public VGMScanner {
  public:
   void Scan(RawFile *file, void *info) override;
   static void SearchForChunSnesFromARAM(RawFile *file);
-  static void SearchForChunSnesFromROM(RawFile *file);
 
  private:
   static BytePattern ptnLoadSeqSummerV2;

@@ -34,11 +34,11 @@ constexpr u8 STATE_PITCHBEND = 5;
 constexpr u8 STATE_MODULATION = 6;
 
 MP2kSeq::MP2kSeq(RawFile *file, uint32_t offset, std::string name)
-    : VGMSeq(MP2kFormat::name, file, offset, 0, name) {
+    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)) {
   bAllowDiscontinuousTrackData = true;
 }
 
-bool MP2kSeq::GetHeaderInfo(void) {
+bool MP2kSeq::GetHeaderInfo() {
   if (dwOffset + 2 > vgmfile->GetEndOffset()) {
     return false;
   }
@@ -99,11 +99,11 @@ bool MP2kSeq::GetTrackPointers(void) {
 //  MP2kTrack
 //  *********
 
-MP2kTrack::MP2kTrack(MP2kSeq *parentFile, long offset, long length)
+MP2kTrack::MP2kTrack(MP2kSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
 }
 
-bool MP2kTrack::ReadEvent(void) {
+bool MP2kTrack::ReadEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = GetByte(curOffset++);
   bool bContinue = true;
@@ -202,7 +202,7 @@ void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
     }
 
     case STATE_PITCHBEND: {
-      AddPitchBend(beginOffset, curOffset - beginOffset, ((int16_t)(status_byte - 0x40)) * 128);
+      AddPitchBend(beginOffset, curOffset - beginOffset, static_cast<int16_t>(status_byte - 0x40) * 128);
       break;
     }
 

@@ -493,14 +493,13 @@ BytePattern KonamiSnesScanner::ptnLoadPercInstrGG4(
 	13);
 
 void KonamiSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForKonamiSnesFromARAM(file);
   }
   else {
-    SearchForKonamiSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
@@ -749,7 +748,4 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
     delete newInstrSet;
     return;
   }
-}
-
-void KonamiSnesScanner::SearchForKonamiSnesFromROM(RawFile *file) {
 }

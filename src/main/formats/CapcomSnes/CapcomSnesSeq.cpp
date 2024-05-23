@@ -48,9 +48,6 @@ CapcomSnesSeq::CapcomSnesSeq(RawFile *file,
   LoadEventMap();
 }
 
-CapcomSnesSeq::~CapcomSnesSeq() {
-}
-
 void CapcomSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 
@@ -150,7 +147,7 @@ double CapcomSnesSeq::GetTempoInBPM(uint16_t tempo) {
 //  CapcomSnesTrack
 //  ************
 
-CapcomSnesTrack::CapcomSnesTrack(CapcomSnesSeq *parentFile, long offset, long length)
+CapcomSnesTrack::CapcomSnesTrack(CapcomSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   CapcomSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -167,8 +164,8 @@ void CapcomSnesTrack::ResetVars() {
   transpose = 0;
   lastNoteSlurred = false;
   lastKey = -1;
-  for (int i = 0; i < CAPCOM_SNES_REPEAT_SLOT_MAX; i++) {
-    repeatCount[i] = 0;
+  for (uint8_t& i : repeatCount) {
+    i = 0;
   }
 }
 

@@ -124,13 +124,12 @@ BytePattern PrismSnesScanner::ptnLoadInstrTuning(
 	22);
 
 void PrismSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForPrismSnesFromARAM(file);
   } else {
-    SearchForPrismSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
@@ -217,5 +216,3 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void PrismSnesScanner::SearchForPrismSnesFromROM(RawFile *file) {}

@@ -229,7 +229,7 @@ class MidiFile {
 class MidiEvent {
  public:
   MidiEvent(MidiTrack *thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, int8_t thePriority);
-  virtual ~MidiEvent(void);
+  virtual ~MidiEvent() = default;
   virtual MidiEventType GetEventType() = 0;
   bool IsMetaEvent();
   bool IsSysexEvent();
@@ -539,7 +539,7 @@ class EndOfTrackEvent
 class TextEvent
     : public MidiEvent {
  public:
-  TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &str);
+  TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str);
   MidiEventType GetEventType() override { return MIDIEVENT_TEXT; }
   uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
@@ -549,7 +549,7 @@ class TextEvent
 class SeqNameEvent
     : public MidiEvent {
  public:
-  SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &str);
+  SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str);
   MidiEventType GetEventType() override { return MIDIEVENT_TEXT; }
   uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
@@ -559,7 +559,7 @@ class SeqNameEvent
 class TrackNameEvent
     : public MidiEvent {
  public:
-  TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, const std::string &str);
+  TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str);
   MidiEventType GetEventType() override { return MIDIEVENT_TEXT; }
   uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 

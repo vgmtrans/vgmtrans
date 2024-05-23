@@ -70,7 +70,7 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
       instrset = nullptr;
     }
 
-    sampcoll = new CPS1SampColl(samplesFile, instrset, 0, samplesFile->size(), sampcoll_name);
+    sampcoll = new CPS1SampColl(samplesFile, instrset, 0, static_cast<uint32_t>(samplesFile->size()), sampcoll_name);
     if (!sampcoll->LoadVGMFile()) {
       delete sampcoll;
       sampcoll = nullptr;

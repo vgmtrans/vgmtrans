@@ -381,7 +381,7 @@ void DLSWsmp::SetLoopInfo(Loop &loop, VGMSamp *samp) {
                      : loop.loopLength;
 }
 
-void DLSWsmp::SetPitchInfo(uint16_t unityNote, short fineTune, long attenuation) {
+void DLSWsmp::SetPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenuation) {
   usUnityNote = unityNote;
   sFineTune = fineTune;
   lAttenuation = attenuation;
@@ -420,7 +420,7 @@ void DLSWave::Write(std::vector<uint8_t> &buf) {
 
   PushTypeOnVectBE<uint32_t>(buf, 0x64617461);  // "data"
   /* size: this is the ACTUAL size, not the even-aligned size */
-  PushTypeOnVect<uint32_t>(buf, m_wave_data.size());
+  PushTypeOnVect<uint32_t>(buf, static_cast<uint32_t>(m_wave_data.size()));
   buf.insert(buf.end(), std::begin(m_wave_data), std::end(m_wave_data));  // Write the sample
   if (m_wave_data.size() % 2) {
     buf.push_back(0);

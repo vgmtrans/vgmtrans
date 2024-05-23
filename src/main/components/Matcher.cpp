@@ -36,7 +36,7 @@ bool Matcher::OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, V
   return false;
 }
 
-bool Matcher::MakeCollectionsForFile(VGMFile *file) {
+bool Matcher::MakeCollectionsForFile(VGMFile* /*file*/) {
   return false;
 }
 
@@ -130,7 +130,7 @@ void FilegroupMatcher::LookForMatch() {
   }
 }
 
-bool FilegroupMatcher::MakeCollectionsForFile(VGMFile *file) {
+bool FilegroupMatcher::MakeCollectionsForFile(VGMFile* /*file*/) {
 
   if (instrsets.size() >= 1 && sampcolls.size() >= 1) {
 

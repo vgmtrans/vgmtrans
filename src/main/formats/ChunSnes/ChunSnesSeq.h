@@ -89,7 +89,7 @@ class ChunSnesSeq
 class ChunSnesTrack
     : public SeqTrack {
  public:
-  ChunSnesTrack(ChunSnesSeq *parentFile, long offset = 0, long length = 0);
+  ChunSnesTrack(ChunSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
 

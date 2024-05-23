@@ -117,11 +117,11 @@ BytePattern NamcoSnesScanner::ptnDspRegInit(
 	18);
 
 void NamcoSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForNamcoSnesFromARAM(file);
   } else {
-    SearchForNamcoSnesFromROM(file);
+    // Search from ROM unimplemented
   }
   return;
 }
@@ -197,8 +197,6 @@ void NamcoSnesScanner::SearchForNamcoSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void NamcoSnesScanner::SearchForNamcoSnesFromROM(RawFile *file) {}
 
 std::map<uint8_t, uint8_t> NamcoSnesScanner::GetInitDspRegMap(RawFile *file) {
   std::map<uint8_t, uint8_t> dspRegMap;

@@ -10,11 +10,13 @@ using namespace std;
 
 DECLARE_FORMAT(GraphResSnes);
 
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr uint8_t NOTE_VELOCITY = 100;
+
 //  ***************
 //  GraphResSnesSeq
 //  ***************
-#define MAX_TRACKS  8
-#define SEQ_PPQN    48
 
 GraphResSnesSeq::GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_t seqdataOffset, std::string name)
     : VGMSeq(GraphResSnesFormat::name, file, seqdataOffset, 0, std::move(name)), version(ver) {
@@ -30,14 +32,14 @@ GraphResSnesSeq::GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_
   LoadEventMap();
 }
 
-GraphResSnesSeq::~GraphResSnesSeq(void) {
+GraphResSnesSeq::~GraphResSnesSeq() {
 }
 
-void GraphResSnesSeq::ResetVars(void) {
+void GraphResSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 }
 
-bool GraphResSnesSeq::GetHeaderInfo(void) {
+bool GraphResSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 3 * MAX_TRACKS);
@@ -137,7 +139,7 @@ void GraphResSnesSeq::LoadEventMap() {
 //  GraphResSnesTrack
 //  *****************
 
-GraphResSnesTrack::GraphResSnesTrack(GraphResSnesSeq *parentFile, long offset, long length)
+GraphResSnesTrack::GraphResSnesTrack(GraphResSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   GraphResSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -150,7 +152,6 @@ void GraphResSnesTrack::ResetVars(void) {
   prevNoteKey = -1;
   prevNoteSlurred = false;
   octave = 4;
-  vel = 100;
   defaultNoteLength = 1;
   durationRate = 8;
   spcPan = 0;
@@ -269,7 +270,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
           AddNoteByDur(beginOffset,
                        curOffset - beginOffset,
                        midiKey,
-                       vel,
+                       NOTE_VELOCITY,
                        dur,
                        hasLength ? "Note with Duration" : "Note");
           AddTime(len);

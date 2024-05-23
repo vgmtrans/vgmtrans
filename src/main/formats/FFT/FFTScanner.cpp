@@ -18,12 +18,12 @@ ScannerRegistration<FFTScanner> s_fft_snes("FFT");
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-FFTScanner::FFTScanner(void) {}
+FFTScanner::FFTScanner() {}
 
 //==============================================================
 //		Destructor
 //--------------------------------------------------------------
-FFTScanner::~FFTScanner(void) {}
+FFTScanner::~FFTScanner() {}
 
 //==============================================================
 //		scan "smds" and "wds"
@@ -37,7 +37,7 @@ void FFTScanner::Scan(RawFile *file, void *info) {
 //		scan "smds"		(Sequence)
 //--------------------------------------------------------------
 void FFTScanner::SearchForFFTSeq(RawFile *file) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 4 < nFileLength; i++) {
     if (file->GetWordBE(i) != 0x736D6473)
       continue;
@@ -57,7 +57,7 @@ void FFTScanner::SearchForFFTSeq(RawFile *file) {
 //		object "SampColl" は、class "WdsInstrSet"内で生成する。
 //--------------------------------------------------------------
 void FFTScanner::SearchForFFTwds(RawFile *file) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 0x30 < nFileLength; i++) {
     uint32_t sig = file->GetWordBE(i);
     if (sig != 0x64776473 && sig != 0x77647320)

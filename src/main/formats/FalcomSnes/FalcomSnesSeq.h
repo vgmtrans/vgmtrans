@@ -79,7 +79,7 @@ class FalcomSnesSeq
 class FalcomSnesTrack
     : public SeqTrack {
  public:
-  FalcomSnesTrack(FalcomSnesSeq *parentFile, long offset = 0, long length = 0);
+  FalcomSnesTrack(FalcomSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
 

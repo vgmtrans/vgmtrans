@@ -29,7 +29,7 @@ class SynthFile {
 
   std::vector<SynthInstr *> vInstrs;
   std::vector<SynthWave *> vWaves;
-  std::string name;
+  std::string m_name;
 };
 
 class SynthInstr {

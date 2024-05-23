@@ -45,7 +45,6 @@ bool Vab::GetHeaderInfo() {
 
 bool Vab::GetInstrPointers() {
   uint32_t nEndOffset = GetEndOffset();
-  uint32_t nMaxLength = nEndOffset - dwOffset;
 
   uint32_t offProgs = dwOffset + 0x20;
   uint32_t offToneAttrs = offProgs + (16 * 128);

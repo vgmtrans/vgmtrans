@@ -15,6 +15,7 @@ DECLARE_FORMAT(Akao);
 using namespace std;
 
 static const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 8, 4 };
+static constexpr uint8_t NOTE_VELOCITY = 100;
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
     : VGMSeq(AkaoFormat::name, file, offset), seq_id(0), version_(version),
@@ -604,7 +605,7 @@ bool AkaoTrack::ReadEvent() {
         key = drum ? (drum_octave * 12) + relative_key : real_key;
       }
 
-      AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+      AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);
       AddTime(delta_time);
     }
     else if (op_tie)

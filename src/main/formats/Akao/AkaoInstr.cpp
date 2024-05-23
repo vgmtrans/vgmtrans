@@ -20,7 +20,6 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
                            uint32_t theID,
                            std::string name)
     : VGMInstrSet(AkaoFormat::name, file, 0, length, std::move(name)), version_(version) {
-  allowEmptyInstrs = true;
   id = theID;
   instrSetOff = instrOff;
   drumkitOff = dkitOff;
@@ -39,8 +38,6 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
   : VGMInstrSet(AkaoFormat::name, file, 0, 0, std::move(name)), bMelInstrs(false), bDrumKit(false),
   instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset), version_(version)
 {
-  allowEmptyInstrs = true;
-
   uint32_t first_instrument_offset = 0;
   if (!custom_instrument_addresses.empty()) {
     first_instrument_offset = *custom_instrument_addresses.begin();
@@ -65,9 +62,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset,
     : VGMInstrSet(AkaoFormat::name, file, offset, 0, std::move(name)), bMelInstrs(false),
       bDrumKit(false), instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset),
       version_(version)
-{
-  allowEmptyInstrs = true;
-}
+{}
 
 bool AkaoInstrSet::GetInstrPointers() {
   if (bMelInstrs) {
@@ -299,8 +294,8 @@ bool AkaoSampColl::IsPossibleAkaoSampColl(const RawFile *file, uint32_t offset) 
   if (file->GetWordBE(offset) != 0x414B414F)
     return false;
 
-  if (file->GetWord(offset + 0x24) != 0 || file->GetWord(offset + 0x28) != 0 || file->GetWord(offset + 0x2C) != 0 &&
-    file->GetWord(offset + 0x30) != 0 || file->GetWord(offset + 0x34) != 0 || file->GetWord(offset + 0x38) != 0 &&
+  if ((file->GetWord(offset + 0x24) != 0 || file->GetWord(offset + 0x28) != 0 || file->GetWord(offset + 0x2C) != 0) &&
+    (file->GetWord(offset + 0x30) != 0 || file->GetWord(offset + 0x34) != 0 || file->GetWord(offset + 0x38)) != 0 &&
     file->GetWord(offset + 0x3C) != 0)
     return false;
 
@@ -610,7 +605,7 @@ bool AkaoSampColl::GetSampleInfo() {
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
   if (sample_section_offset + sample_section_size > rawfile->size())
-    sample_section_size = rawfile->size() - sample_section_offset;
+    sample_section_size = static_cast<uint32_t>(rawfile->size()) - sample_section_offset;
 
   //check the last 10 bytes to make sure they aren't null, if they are, abbreviate things till there is no 0x10 block of null bytes
   if (GetWord(sample_section_offset + sample_section_size - 0x10) == 0) {
@@ -622,7 +617,7 @@ bool AkaoSampColl::GetSampleInfo() {
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
   if (sample_section_offset + sample_section_size > rawfile->size())
-    sample_section_size = rawfile->size();
+    sample_section_size = static_cast<uint32_t>(rawfile->size());
 
   std::set<uint32_t> sample_offsets;
   for (const auto & art : akArts) {
@@ -652,10 +647,10 @@ bool AkaoSampColl::GetSampleInfo() {
   // now to verify and associate each articulation with a sample index value
   // for every sample of every instrument, we add sample_section offset, because those values
   //  are relative to the beginning of the sample section
-  for (uint32_t i = 0; i < akArts.size(); i++) {
+  for (auto& akArt : akArts) {
     for (uint32_t l = 0; l < samples.size(); l++) {
-      if (akArts[i].sample_offset + sample_section_offset == samples[l]->dwOffset) {
-        akArts[i].sample_num = l;
+      if (akArt.sample_offset + sample_section_offset == samples[l]->dwOffset) {
+        akArt.sample_num = l;
         break;
       }
     }

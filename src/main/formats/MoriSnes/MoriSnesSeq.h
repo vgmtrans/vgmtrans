@@ -75,7 +75,7 @@ class MoriSnesSeq : public VGMSeq {
 class MoriSnesTrack
     : public SeqTrack {
  public:
-  MoriSnesTrack(MoriSnesSeq *parentFile, long offset = 0, long length = 0);
+  MoriSnesTrack(MoriSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void ResetVars();
   virtual bool ReadEvent();
 

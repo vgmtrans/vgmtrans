@@ -3,12 +3,14 @@
 
 DECLARE_FORMAT(FalcomSnes);
 
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr int SEQ_KEY_OFFSET = 25;
+static constexpr uint8_t NOTE_VELOCITY = 100;
+
 //  *************
 //  FalcomSnesSeq
 //  *************
-#define MAX_TRACKS  8
-#define SEQ_PPQN    48
-#define SEQ_KEYOFS  25
 
 const uint8_t FalcomSnesSeq::VOLUME_TABLE[129] = {
   64, 64, 64, 64, 64, 64, 64, 64,
@@ -163,7 +165,7 @@ double FalcomSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  FalcomSnesTrack
 //  ***************
 
-FalcomSnesTrack::FalcomSnesTrack(FalcomSnesSeq *parentFile, long offset, long length)
+FalcomSnesTrack::FalcomSnesTrack(FalcomSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   FalcomSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -173,9 +175,8 @@ FalcomSnesTrack::FalcomSnesTrack(FalcomSnesSeq *parentFile, long offset, long le
 void FalcomSnesTrack::ResetVars() {
   SeqTrack::ResetVars();
 
-  cKeyCorrection = SEQ_KEYOFS;
+  cKeyCorrection = SEQ_KEY_OFFSET;
 
-  vel = 100;
   octave = 0;
   prevNoteKey = -1;
   prevNoteSlurred = false;
@@ -316,7 +317,7 @@ bool FalcomSnesTrack::ReadEvent() {
         }
         else {
           // note
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+          AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);
           prevNoteKey = key;
         }
         prevNoteSlurred = noKeyoff;

@@ -392,13 +392,13 @@ BytePattern ChunSnesScanner::ptnProgChangeVCmdWinter(
 	,
 	106);
 
-void ChunSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+void ChunSnesScanner::Scan(RawFile* file, void* /*info*/) {
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForChunSnesFromARAM(file);
   }
   else {
-    SearchForChunSnesFromROM(file);
+    // Search from ROM is unimplemented
   }
   return;
 }
@@ -593,5 +593,3 @@ void ChunSnesScanner::SearchForChunSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void ChunSnesScanner::SearchForChunSnesFromROM(RawFile *file) {}

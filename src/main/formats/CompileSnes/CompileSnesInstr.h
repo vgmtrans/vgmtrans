@@ -67,9 +67,7 @@ class CompileSnesRgn
   CompileSnesRgn(CompileSnesInstr *instr,
                  CompileSnesVersion ver,
                  uint16_t addrTuningTableItem,
-                 uint16_t addrPitchTablePtrs,
-                 uint8_t srcn,
-                 uint32_t spcDirAddr);
+                 uint16_t addrPitchTablePtrs);
   ~CompileSnesRgn() override;
 
   bool LoadRgn() override;

@@ -12,8 +12,7 @@ SettingsGroup::SettingsGroup(Settings* parent) : parent(parent), settings(parent
 
 Settings::Settings(QObject *parent) :
       VGMFileTreeView(this)
-{
-}
+{}
 
 void Settings::VGMFileTreeViewSettings::setShowDetails(bool showDetails) const {
   settings.beginGroup("VGMFileTreeView");

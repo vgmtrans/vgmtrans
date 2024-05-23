@@ -116,9 +116,9 @@ bool CapcomSnesInstr::IsValidHeader(RawFile *file, uint32_t addrInstrHeader, uin
 
   uint8_t srcn = file->GetByte(addrInstrHeader);
   uint8_t adsr1 = file->GetByte(addrInstrHeader + 1);
-  uint8_t adsr2 = file->GetByte(addrInstrHeader + 2);
+//  uint8_t adsr2 = file->GetByte(addrInstrHeader + 2);
   uint8_t gain = file->GetByte(addrInstrHeader + 3);
-  int16_t pitch_scale = file->GetShortBE(addrInstrHeader + 4);
+//  int16_t pitch_scale = file->GetShortBE(addrInstrHeader + 4);
 
   if (srcn >= 0x80 || (adsr1 == 0 && gain == 0)) {
     return false;

@@ -395,9 +395,7 @@ bool CPS2Instr::LoadInstr() {
     this->release_rate = artic->release_rate;
   }
 
-  for (int i=0; i<rgns.size(); i++) {
-    VGMRgn *rgn = rgns[i];
-
+  for (auto rgn : rgns) {
     // Fix for Dungeons and Dragons Shadow Over Mystara
     if (rgn->sampNum >= 0x8000)
       rgn->sampNum -= 0x8000;
@@ -455,10 +453,10 @@ bool CPS2Instr::LoadInstr() {
     rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
     rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0x800);
 
-    if (rgn->sampNum == 0xFFFF || rgn->sampNum >= (static_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->numSamples)
+    if (rgn->sampNum == 0xFFFF || rgn->sampNum >= (dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
-    rgn->SetUnityKey((static_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->infos[rgn->sampNum].unity_key);
+    rgn->SetUnityKey((dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->infos[rgn->sampNum].unity_key);
     aRgns.push_back(rgn);
   }
   return true;
@@ -482,7 +480,7 @@ CPS2SampColl::CPS2SampColl(RawFile *file, CPS2InstrSet *theinstrset,
 
 
 bool CPS2SampColl::GetHeaderInfo() {
-  unLength = this->rawfile->size();
+  unLength = static_cast<uint32_t>(this->rawfile->size());
   return true;
 }
 

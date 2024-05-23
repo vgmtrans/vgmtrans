@@ -21,19 +21,19 @@ namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");
 }
 
-bool MAMERomGroup::GetHexAttribute(const std::string &attrName, uint32_t *out) const {
-    auto it = attributes.find(attrName);
-    if (it == attributes.end()) {
-      return false; // Key not found
-    }
+bool MAMERomGroup::GetHexAttribute(const std::string& attrName, uint32_t* out) const {
+  auto it = attributes.find(attrName);
+  if (it == attributes.end()) {
+    return false; // Key not found
+  }
 
-    auto strValue = it->second;
-    if (strValue.empty()) {
-      return false; // Value is empty
-    }
+  auto strValue = it->second;
+  if (strValue.empty()) {
+    return false; // Value is empty
+  }
 
-    *out = std::strtoul(strValue.c_str(), nullptr, 16);
-    return true;
+  *out = static_cast<uint32_t>(std::strtoul(strValue.c_str(), nullptr, 16));
+  return true;
 }
 
 MAMERomGroup *MAMEGame::GetRomGroupOfType(const std::string &strType) {
@@ -233,7 +233,7 @@ VirtFile *MAMELoader::LoadRomGroup(const MAMERomGroup &entry, const std::string 
         }
 
         uint8_t *buf = new uint8_t[info.uncompressed_size];
-        ret = unzReadCurrentFile(cur_file, buf, info.uncompressed_size);
+        ret = unzReadCurrentFile(cur_file, buf, static_cast<uint32_t>(info.uncompressed_size));
         if (ret != info.uncompressed_size) {
             // error reading file in zip archive
             delete[] buf;

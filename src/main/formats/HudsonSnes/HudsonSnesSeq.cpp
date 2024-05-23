@@ -7,11 +7,12 @@
 
 DECLARE_FORMAT(HudsonSnes);
 
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+
 //  *************
 //  HudsonSnesSeq
 //  *************
-#define MAX_TRACKS  8
-#define SEQ_PPQN    48
 
 HudsonSnesSeq::HudsonSnesSeq(RawFile *file, HudsonSnesVersion ver, uint32_t seqdataOffset, std::string name)
     : VGMSeq(HudsonSnesFormat::name, file, seqdataOffset, 0, std::move(name)),
@@ -33,10 +34,7 @@ HudsonSnesSeq::HudsonSnesSeq(RawFile *file, HudsonSnesVersion ver, uint32_t seqd
   LoadEventMap();
 }
 
-HudsonSnesSeq::~HudsonSnesSeq(void) {
-}
-
-void HudsonSnesSeq::ResetVars(void) {
+void HudsonSnesSeq::ResetVars() {
   VGMSeq::ResetVars();
 
   DisableNoteVelocity = false;
@@ -46,7 +44,7 @@ void HudsonSnesSeq::ResetVars(void) {
   UserCarry = false;
 }
 
-bool HudsonSnesSeq::GetHeaderInfo(void) {
+bool HudsonSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 0);
@@ -498,7 +496,7 @@ void HudsonSnesSeq::LoadEventMap() {
 //  HudsonSnesTrack
 //  ***************
 
-HudsonSnesTrack::HudsonSnesTrack(HudsonSnesSeq *parentFile, long offset, long length)
+HudsonSnesTrack::HudsonSnesTrack(HudsonSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   HudsonSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;

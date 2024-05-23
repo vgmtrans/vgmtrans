@@ -97,7 +97,7 @@ class HeartBeatSnesSeq
 class HeartBeatSnesTrack
     : public SeqTrack {
  public:
-  HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, long offset = 0, long length = 0);
+  HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
 

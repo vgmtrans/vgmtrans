@@ -9,11 +9,13 @@
 
 DECLARE_FORMAT(AkaoSnes);
 
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint8_t NOTE_VELOCITY = 100;
+
 //  **********
 //  AkaoSnesSeq
 //  **********
-#define MAX_TRACKS  8
-#define SEQ_PPQN    48
 
 AkaoSnesSeq::AkaoSnesSeq(RawFile *file,
                          AkaoSnesVersion ver,
@@ -563,17 +565,16 @@ uint16_t AkaoSnesSeq::GetShortAddress(uint32_t offset) const {
 //  AkaoSnesTrack
 //  ************
 
-AkaoSnesTrack::AkaoSnesTrack(AkaoSnesSeq *parentFile, long offset, long length)
+AkaoSnesTrack::AkaoSnesTrack(AkaoSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   AkaoSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
 }
 
-void AkaoSnesTrack::ResetVars(void) {
+void AkaoSnesTrack::ResetVars() {
   SeqTrack::ResetVars();
 
-  vel = 100;
   octave = 6;
   onetimeDuration = 0;
   loopLevel = 0;
@@ -666,10 +667,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
         uint8_t note = octave * 12 + noteIndex;
 
         if (percussion) {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, vel, dur, "Percussion Note with Duration");
+          AddNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, NOTE_VELOCITY, dur, "Percussion Note with Duration");
         }
         else {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
+          AddNoteByDur(beginOffset, curOffset - beginOffset, note, NOTE_VELOCITY, dur);
         }
 
         AddTime(len);
@@ -1365,7 +1366,7 @@ bool AkaoSnesTrack::ReadEvent(void) {
     case EVENT_GOTO: {
       uint16_t dest = GetShortAddress(curOffset);
       curOffset += 2;
-      auto desc = fmt::format("Destination: ${:04X}", dest);
+      desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;

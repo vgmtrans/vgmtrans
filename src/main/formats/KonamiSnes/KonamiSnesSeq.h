@@ -94,7 +94,7 @@ class KonamiSnesSeq
 class KonamiSnesTrack
     : public SeqTrack {
  public:
-  KonamiSnesTrack(KonamiSnesSeq *parentFile, long offset = 0, long length = 0);
+  KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void ResetVars(void);
   virtual bool ReadEvent(void);
 

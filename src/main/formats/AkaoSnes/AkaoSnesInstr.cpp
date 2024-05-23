@@ -226,7 +226,7 @@ AkaoSnesRgn::AkaoSnesRgn(VGMInstr *instr,
     version(ver) {}
 
 bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
-                                   uint32_t spcDirAddr,
+                                   uint32_t /*spcDirAddr*/,
                                    uint16_t addrADSRTable)
 {
   uint16_t addrTuningTable = dwOffset;

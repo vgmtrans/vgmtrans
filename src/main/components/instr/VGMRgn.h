@@ -13,9 +13,9 @@ class VGMSampColl;
 
 class VGMRgn : public VGMContainerItem {
  public:
-  VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, const std::string &name = "Region");
+  VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::string name = "Region");
   VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, uint8_t velLow,
-         uint8_t velHigh, int sampNum, const std::string &name = "Region");
+         uint8_t velHigh, int sampNum, std::string name = "Region");
   ~VGMRgn() override;
 
   virtual bool LoadRgn() { return true; }
@@ -69,7 +69,7 @@ class VGMRgn : public VGMContainerItem {
   //uint32_t channel;
   //uint32_t tableIndex;
 
-  int sampNum;
+  uint32_t sampNum;
   uint32_t sampOffset;        //optional value. If a sample offset is provided, then find the sample number based on this offset.
   // This is an absolute offset into the SampColl.  It's not necessarily relative to the beginning of the
   // actual sample data, unless the sample data begins at offset 0.

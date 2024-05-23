@@ -60,7 +60,7 @@ class CapcomSnesSeq
                 uint32_t seqdata_offset,
                 bool priorityInHeader,
                 std::string newName = "Capcom SNES Seq");
-  ~CapcomSnesSeq() override;
+  ~CapcomSnesSeq() override = default;
 
   bool GetHeaderInfo() override;
   bool GetTrackPointers() override;
@@ -88,7 +88,7 @@ class CapcomSnesSeq
 class CapcomSnesTrack
     : public SeqTrack {
  public:
-  CapcomSnesTrack(CapcomSnesSeq *parentFile, long offset = 0, long length = 0);
+  CapcomSnesTrack(CapcomSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
   void OnTickBegin() override;

@@ -55,7 +55,7 @@ bool KonamiGXSeq::GetTrackPointers(void) {
 // *************
 
 
-KonamiGXTrack::KonamiGXTrack(KonamiGXSeq *parentSeq, long offset, long length)
+KonamiGXTrack::KonamiGXTrack(KonamiGXSeq *parentSeq, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length), bInJump(false) {
 }
 

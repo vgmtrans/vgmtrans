@@ -202,16 +202,16 @@ public:
   DLSWsmp() = default;
 
   void SetLoopInfo(Loop &loop, VGMSamp *samp);
-  void SetPitchInfo(uint16_t unityNote, short fineTune, long attenuation);
+  void SetPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenuation);
 
   uint32_t GetSize() const;
   void Write(std::vector<uint8_t> &buf) const;
 
 private:
-  unsigned short usUnityNote;
-  short sFineTune;
-  long lAttenuation;
-  char cSampleLoops;
+  uint16_t usUnityNote;
+  int16_t sFineTune;
+  int32_t lAttenuation;
+  int8_t cSampleLoops;
 
   uint32_t ulLoopType;
   uint32_t ulLoopStart;
@@ -220,9 +220,9 @@ private:
 
 class DLSWave {
 public:
-  DLSWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
+  DLSWave(uint16_t formatTag, uint16_t channels, uint32_t samplesPerSec, uint32_t aveBytesPerSec,
           uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
-          unsigned char *waveData, std::string waveName = "Untitled wave")
+          uint8_t* waveData, std::string waveName = "Untitled wave")
       : wFormatTag(formatTag), wChannels(channels), dwSamplesPerSec(samplesPerSec),
         dwAveBytesPerSec(aveBytesPerSec), wBlockAlign(blockAlign), wBitsPerSample(bitsPerSample),
         m_name(std::move(waveName)), m_wave_data(waveData, waveData + waveDataSize) {
@@ -241,12 +241,12 @@ public:
   void Write(std::vector<uint8_t> &buf);
 
 private:
-  unsigned short wFormatTag;
-  unsigned short wChannels;
+  uint16_t wFormatTag;
+  uint16_t wChannels;
   uint32_t dwSamplesPerSec;
   uint32_t dwAveBytesPerSec;
-  unsigned short wBlockAlign;
-  unsigned short wBitsPerSample;
+  uint16_t wBlockAlign;
+  uint16_t wBitsPerSample;
 
   std::string m_name{"Untitled wave"};
   std::vector<uint8_t> m_wave_data;

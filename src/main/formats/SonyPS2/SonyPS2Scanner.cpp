@@ -21,7 +21,7 @@ void SonyPS2Scanner::Scan(RawFile *file, void *info) {
 }
 
 void SonyPS2Scanner::SearchForSeq(RawFile *file) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 0x40 < nFileLength; i++) {
     uint32_t sig1 = file->GetWord(i);
     uint32_t sig2 = file->GetWord(i + 4);
@@ -45,7 +45,7 @@ void SonyPS2Scanner::SearchForSeq(RawFile *file) {
 }
 
 void SonyPS2Scanner::SearchForInstrSet(RawFile *file) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 0x40 < nFileLength; i++) {
     uint32_t sig1 = file->GetWord(i);
     uint32_t sig2 = file->GetWord(i + 4);

@@ -26,14 +26,11 @@ public:
   virtual bool GetInstrPointers();
   virtual bool LoadInstrs();
 
-  VGMInstr *AddInstr(uint32_t offset, uint32_t length, unsigned long bank, unsigned long instrNum,
+  VGMInstr *AddInstr(uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum,
                      const std::string &instrName = "");
 
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
-
-protected:
-  bool allowEmptyInstrs;
 };
 
 // ********
@@ -43,7 +40,7 @@ protected:
 class VGMInstr : public VGMContainerItem {
 public:
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
-           uint32_t instrNum, const std::string &name = "Instrument",
+           uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
   ~VGMInstr() override;
 

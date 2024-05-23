@@ -201,7 +201,7 @@ bool MoriSnesInstr::LoadInstr() {
 
 MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
                          MoriSnesVersion ver,
-                         uint32_t spcDirAddr,
+                         uint32_t /*spcDirAddr*/,
                          const MoriSnesInstrHint &instrHint,
                          int8_t percNoteKey) :
     VGMRgn(instr, instrHint.rgnAddress, 7),

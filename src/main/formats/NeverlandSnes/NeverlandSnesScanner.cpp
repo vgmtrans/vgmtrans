@@ -63,13 +63,12 @@ BytePattern NeverlandSnesScanner::ptnLoadSongS2C(
 	22);
 
 void NeverlandSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForNeverlandSnesFromARAM(file);
   } else {
-    SearchForNeverlandSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM(RawFile *file) {
@@ -96,5 +95,3 @@ void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void NeverlandSnesScanner::SearchForNeverlandSnesFromROM(RawFile *file) {}

@@ -188,7 +188,7 @@ double HeartBeatSnesSeq::GetTempoInBPM(uint8_t tempo) {
 //  HeartBeatSnesTrack
 //  ******************
 
-HeartBeatSnesTrack::HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, long offset, long length)
+HeartBeatSnesTrack::HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   HeartBeatSnesTrack::ResetVars();
   bDetermineTrackLengthEventByEvent = true;

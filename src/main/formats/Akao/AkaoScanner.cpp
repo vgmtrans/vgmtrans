@@ -12,7 +12,7 @@ namespace vgmtrans::scanners {
 ScannerRegistration<AkaoScanner> s_akao("AKAO");
 }
 
-void AkaoScanner::Scan(RawFile *file, void *info) {
+void AkaoScanner::Scan(RawFile* file, void* /*info*/) {
   const AkaoPs1Version file_version = DetermineVersionFromTag(file);
 
   for (uint32_t offset = 0; offset + 0x60 < file->size(); offset++) {

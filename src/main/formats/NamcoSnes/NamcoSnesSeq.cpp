@@ -3,11 +3,13 @@
 
 DECLARE_FORMAT(NamcoSnes);
 
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr uint8_t NOTE_VELOCITY = 100;
+
 //  ************
 //  NamcoSnesSeq
 //  ************
-#define MAX_TRACKS  8
-#define SEQ_PPQN    48
 
 NamcoSnesSeq::NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, uint32_t seqdataOffset, std::string newName)
     : VGMSeqNoTrks(NamcoSnesFormat::name, file, seqdataOffset, newName),
@@ -22,13 +24,12 @@ NamcoSnesSeq::NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, uint32_t seqdata
   LoadEventMap();
 }
 
-NamcoSnesSeq::~NamcoSnesSeq(void) {
+NamcoSnesSeq::~NamcoSnesSeq() {
 }
 
-void NamcoSnesSeq::ResetVars(void) {
+void NamcoSnesSeq::ResetVars() {
   VGMSeqNoTrks::ResetVars();
 
-  vel = 100;
   spcDeltaTime = 1;
   spcDeltaTimeScale = 1;
   subReturnAddress = 0;
@@ -42,7 +43,7 @@ void NamcoSnesSeq::ResetVars(void) {
   }
 }
 
-bool NamcoSnesSeq::GetHeaderInfo(void) {
+bool NamcoSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
   nNumTracks = MAX_TRACKS;
 
@@ -110,7 +111,7 @@ void NamcoSnesSeq::LoadEventMap() {
   ControlChangeNames[CONTROL_ADSR] = "ADSR";
 }
 
-bool NamcoSnesSeq::ReadEvent(void) {
+bool NamcoSnesSeq::ReadEvent() {
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
@@ -410,7 +411,7 @@ bool NamcoSnesSeq::ReadEvent(void) {
 
             if (keyByte != NOTE_NUMBER_REST) {
               prevNoteKey[trackIndex] = key;
-              AddNoteOnNoItem(key, vel);
+              AddNoteOnNoItem(key, NOTE_VELOCITY);
             }
           }
         }
@@ -583,7 +584,7 @@ bool NamcoSnesSeq::ReadEvent(void) {
   return bContinue;
 }
 
-bool NamcoSnesSeq::PostLoad(void) {
+bool NamcoSnesSeq::PostLoad() {
   bool succeeded = VGMSeqNoTrks::PostLoad();
 
   if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
@@ -593,7 +594,7 @@ bool NamcoSnesSeq::PostLoad(void) {
   return succeeded;
 }
 
-void NamcoSnesSeq::KeyOffAllNotes(void) {
+void NamcoSnesSeq::KeyOffAllNotes() {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if (prevNoteKey[trackIndex] != -1) {
       channel = trackIndex;

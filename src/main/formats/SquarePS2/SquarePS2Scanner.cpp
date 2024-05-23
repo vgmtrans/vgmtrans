@@ -54,7 +54,7 @@ void SquarePS2Scanner::SearchForBGMSeq(RawFile *file) {
 void SquarePS2Scanner::SearchForWDSet(RawFile *file) {
   uint32_t numRegions, firstRgnPtr;
 
-  uint32_t nFileLength = file->size();
+  size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 0x3000 < nFileLength; i++) {
     if (file->get<u8>(i) == 'W' && file->get<u8>(i + 1) == 'D' && file->get<u8>(i + 3) < 0x03) {
       if (file->GetWord(i + 0x14) == 0 && file->GetWord(i + 0x18) == 0 &&

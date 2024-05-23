@@ -45,13 +45,13 @@ public:
   inline uint32_t GetWordBE(uint32_t offset) const { return rawfile->GetWordBE(offset); }
   inline bool IsValidOffset(uint32_t offset) const { return rawfile->IsValidOffset(offset); }
 
-  size_t GetStartOffset() const { return dwOffset; }
+  uint32_t GetStartOffset() const { return dwOffset; }
   /*
    * For whatever reason, you can create null-length VGMItems.
    * The only safe way for now is to
    * assume maximum length
    */
-  size_t GetEndOffset() const { return rawfile->size(); }
+  uint32_t GetEndOffset() const { return static_cast<uint32_t>(rawfile->size()); }
 
   [[nodiscard]] const char *data() const { return rawfile->data() + dwOffset; }
 

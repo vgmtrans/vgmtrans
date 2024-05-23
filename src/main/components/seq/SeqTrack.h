@@ -52,7 +52,7 @@ class SeqTrack : public VGMContainerItem {
  protected:
   virtual void OnEvent(uint32_t offset, uint32_t length);
   virtual void AddEvent(SeqEvent *pSeqEvent);
-  void AddControllerSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t &prevVal, uint8_t targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
+  void AddControllerSlide(uint32_t dur, uint8_t &prevVal, uint8_t targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
  public:
   void AddGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, EventColor color, Icon icon = ICON_BINARY);
   void AddSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::string &sEventName = "Set Octave");
@@ -164,18 +164,18 @@ class SeqTrack : public VGMContainerItem {
 
   VGMSeq *parentSeq;
   MidiTrack *pMidiTrack;
-  bool bMonophonic;
+
   int channel;
   int channelGroup;
-
-  long deltaLength;
-  int foreverLoops;
   bool active;            //indicates whether a VGMSeq is loading this track
+  long totalTicks;
+  int foreverLoops;
 
+  std::vector<SeqEvent *> aEvents;
+
+ protected:
+  bool bMonophonic;
   long deltaTime;            //delta time, an interval to the next event (ticks)
-  int8_t vel;
-  int8_t key;
-  uint32_t dur;
   uint8_t prevKey;
   uint8_t prevVel;
   uint8_t octave;
@@ -193,9 +193,6 @@ class SeqTrack : public VGMContainerItem {
   //Table Related Variables
   int8_t cKeyCorrection;    //steps to offset the key by
 
-  std::vector<SeqEvent *> aEvents;
-
- protected:
   //SETTINGS
   bool bDetermineTrackLengthEventByEvent;
   bool bWriteGenericEventAsTextEvent;

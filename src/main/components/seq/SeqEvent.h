@@ -596,12 +596,14 @@ class MarkerSeqEvent : public SeqEvent {
                  uint32_t length = 0,
                  const std::string &name = "",
                  EventColor color = CLR_MARKER)
-      : SeqEvent(pTrack, offset, length, name, color), databyte1(databyte1), databyte2(databyte2) { }
+      : SeqEvent(pTrack, offset, length, name, color), databyte1(databyte1), databyte2(databyte2),
+        markerName(markername) {}
   EventType GetEventType() override { return EVENTTYPE_MARKER; }
 
  public:
   uint8_t databyte1;
   uint8_t databyte2;
+  std::string markerName;
 };
 
 //  ***************

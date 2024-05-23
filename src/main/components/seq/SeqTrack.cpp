@@ -36,9 +36,8 @@ void SeqTrack::ResetVars() {
   active = true;
   bInLoop = false;
   foreverLoops = 0;
-  deltaLength = -1;
+  totalTicks = -1;
   deltaTime = 0;
-  vel = 100;
   vol = 100;
   expression = 127;
   mastVol = 127;
@@ -57,7 +56,7 @@ void SeqTrack::ResetVisitedAddresses() {
   VisitedAddressMax = 0;
 }
 
-bool SeqTrack::ReadEvent(void) {
+bool SeqTrack::ReadEvent() {
   return false;        //by default, don't add any events, just stop immediately.
 }
 
@@ -108,14 +107,14 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     while (deltaTime == 0) {
       if (curOffset >= stopOffset) {
         if (readMode == READMODE_FIND_DELTA_LENGTH)
-          deltaLength = GetTime();
+          totalTicks = GetTime();
 
         active = false;
         break;
       }
 
       if (!ReadEvent()) {
-        deltaLength = GetTime();
+        totalTicks = GetTime();
         active = false;
         break;
       }
@@ -132,11 +131,9 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     }
 
     if (readMode == READMODE_FIND_DELTA_LENGTH) {
-      deltaLength = GetTime();
+      totalTicks = GetTime();
     }
   }
-
-  return;
 }
 
 void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum) {
@@ -154,11 +151,9 @@ void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum) {
 
 void SeqTrack::AddInitialMidiEvents(int trackNum) {
   if (trackNum == 0)
-    pMidiTrack->AddSeqName(parentSeq->GetName()->c_str());
-  std::ostringstream ssTrackName;
-  ssTrackName << "Track: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << dwStartOffset
-      << std::endl;
-  pMidiTrack->AddTrackName(ssTrackName.str().c_str());
+    pMidiTrack->AddSeqName(*parentSeq->GetName());
+  std::string ssTrackName = fmt::format("Track: 0x{:02X}", dwStartOffset);
+  pMidiTrack->AddTrackName(ssTrackName);
 
   pMidiTrack->AddMidiPort(channelGroup);
 
@@ -215,9 +210,7 @@ uint32_t SeqTrack::ReadVarLen(uint32_t &offset) const {
   return value;
 }
 
-void SeqTrack::AddControllerSlide(uint32_t offset,
-                                  uint32_t length,
-                                  uint32_t dur,
+void SeqTrack::AddControllerSlide(uint32_t dur,
                                   uint8_t &prevVal,
                                   uint8_t targVal,
                                   uint8_t(*scalerFunc)(uint8_t),
@@ -309,7 +302,7 @@ void SeqTrack::AddGenericEvent(uint32_t offset,
         miditext += " - ";
         miditext += sEventDesc;
       }
-      pMidiTrack->AddText(miditext.c_str());
+      pMidiTrack->AddText(miditext);
     }
   }
 }
@@ -331,7 +324,7 @@ void SeqTrack::AddUnknown(uint32_t offset,
         miditext += " - ";
         miditext += sEventDesc;
       }
-      pMidiTrack->AddText(miditext.c_str());
+      pMidiTrack->AddText(miditext);
     }
   }
 }
@@ -401,7 +394,6 @@ void SeqTrack::AddNoteOnNoItem(int8_t key, int8_t velocity) {
   }
   prevKey = key;
   prevVel = velocity;
-  return;
 }
 
 
@@ -471,7 +463,6 @@ void SeqTrack::AddNoteOffNoItem(int8_t key) {
   else {
     AddPercNoteOffNoItem(cDrumNote);
   }
-  return;
 }
 
 
@@ -546,7 +537,6 @@ void SeqTrack::AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur) {
   }
   prevKey = key;
   prevVel = vel;
-  return;
 }
 
 void SeqTrack::AddNoteByDur_Extend(uint32_t offset,
@@ -576,7 +566,6 @@ void SeqTrack::AddNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur) {
   }
   prevKey = key;
   prevVel = vel;
-  return;
 }
 
 void SeqTrack::AddPercNoteByDur(uint32_t offset,
@@ -647,8 +636,8 @@ void SeqTrack::MakePrevDurNoteEnd() const {
 
 void SeqTrack::MakePrevDurNoteEnd(uint32_t absTime) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    for (auto it = pMidiTrack->prevDurNoteOffs.begin(); it != pMidiTrack->prevDurNoteOffs.end(); ++it) {
-      (*it)->AbsTime = absTime;
+    for (auto& prevDurNoteOff : pMidiTrack->prevDurNoteOffs) {
+      prevDurNoteOff->AbsTime = absTime;
     }
   }
 }
@@ -659,9 +648,9 @@ void SeqTrack::LimitPrevDurNoteEnd() const {
 
 void SeqTrack::LimitPrevDurNoteEnd(uint32_t absTime) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    for (auto it = pMidiTrack->prevDurNoteOffs.begin(); it != pMidiTrack->prevDurNoteOffs.end(); ++it) {
-      if ((*it)->AbsTime > absTime) {
-        (*it)->AbsTime = absTime;
+    for (auto& prevDurNoteOff : pMidiTrack->prevDurNoteOffs) {
+      if (prevDurNoteOff->AbsTime > absTime) {
+        prevDurNoteOff->AbsTime = absTime;
       }
     }
   }
@@ -699,9 +688,7 @@ void SeqTrack::AddVolSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new VolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    AddControllerSlide(offset,
-                       length,
-                       dur,
+    AddControllerSlide(dur,
                        vol,
                        targVol,
                        parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : nullptr,
@@ -761,9 +748,7 @@ void SeqTrack::AddExpressionSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new ExpressionSlideSeqEvent(this, targExpr, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    AddControllerSlide(offset,
-                       length,
-                       dur,
+    AddControllerSlide(dur,
                        expression,
                        targExpr,
                        parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : nullptr,
@@ -821,9 +806,7 @@ void SeqTrack::AddMastVolSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new MastVolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    AddControllerSlide(offset,
-                       length,
-                       dur,
+    AddControllerSlide(dur,
                        mastVol,
                        targVol,
                        parentSeq->bUseLinearAmplitudeScale ? Convert7bitPercentVolValToStdMidiVal : nullptr,
@@ -871,7 +854,7 @@ void SeqTrack::AddPanSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
     AddEvent(new PanSlideSeqEvent(this, targPan, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    AddControllerSlide(offset, length, dur, prevPan, targPan, nullptr, &MidiTrack::InsertPan);
+    AddControllerSlide(dur, prevPan, targPan, nullptr, &MidiTrack::InsertPan);
 }
 
 
@@ -1375,7 +1358,7 @@ void SeqTrack::AddEndOfTrack(uint32_t offset, uint32_t length, const std::string
 
 void SeqTrack::AddEndOfTrackNoItem() {
   if (readMode == READMODE_FIND_DELTA_LENGTH)
-    deltaLength = GetTime();
+    totalTicks = GetTime();
 }
 
 void SeqTrack::AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName) {
@@ -1430,7 +1413,7 @@ bool SeqTrack::AddLoopForever(uint32_t offset, uint32_t length, const std::strin
     return false;
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
-    deltaLength = GetTime();
+    totalTicks = GetTime();
     return (this->foreverLoops < ConversionOptions::the().GetNumSequenceLoops());
   }
   return true;

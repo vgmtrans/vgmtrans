@@ -39,15 +39,14 @@ BytePattern CompileSnesScanner::ptnSetSongListAddress(
 	,
 	29);
 
-void CompileSnesScanner::Scan(RawFile *file, void *info) {
-  uint32_t nFileLength = file->size();
+void CompileSnesScanner::Scan(RawFile* file, void* /*info*/) {
+  size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
     SearchForCompileSnesFromARAM(file);
   }
   else {
-    SearchForCompileSnesFromROM(file);
+    // Search from ROM unimplemented
   }
-  return;
 }
 
 void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
@@ -123,5 +122,3 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
     return;
   }
 }
-
-void CompileSnesScanner::SearchForCompileSnesFromROM(RawFile *file) {}

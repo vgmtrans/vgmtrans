@@ -79,7 +79,7 @@ bool HOSASeq::GetTrackPointers(void) {
 //	Output
 //		Nothing
 //==============================================================
-HOSATrack::HOSATrack(HOSASeq *parentFile, long offset, long length) :
+HOSATrack::HOSATrack(HOSASeq *parentFile, uint32_t offset, uint32_t length) :
     SeqTrack(parentFile, offset, length),
     iDeltaTimeCom(0),         //Default delta time for Command
     iDeltaTimeNote(0),        //Default delta time for Note

@@ -623,7 +623,7 @@ uint16_t NinSnesSeq::GetShortAddress(uint32_t offset) {
 //  NinSnesSection
 //  **************
 
-NinSnesSection::NinSnesSection(NinSnesSeq *parentFile, long offset, long length)
+NinSnesSection::NinSnesSection(NinSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : VGMSeqSection(parentFile, offset, length) {
 }
 
@@ -715,7 +715,7 @@ void NinSnesTrackSharedData::ResetVars(void) {
 //  NinSnesTrack
 //  ************
 
-NinSnesTrack::NinSnesTrack(NinSnesSection *parentSection, long offset, long length, const std::string &theName)
+NinSnesTrack::NinSnesTrack(NinSnesSection *parentSection, uint32_t offset, uint32_t length, const std::string &theName)
     : SeqTrack(parentSection->parentSeq, offset, length, theName),
       parentSection(parentSection),
       shared(NULL),
@@ -828,7 +828,7 @@ bool NinSnesTrack::ReadEvent(void) {
         // finish this section as soon as possible
         if (readMode == READMODE_FIND_DELTA_LENGTH) {
           for (size_t trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
-            parentSeq->aTracks[trackIndex]->deltaLength = GetTime();
+            parentSeq->aTracks[trackIndex]->totalTicks = GetTime();
           }
         }
         else if (readMode == READMODE_CONVERT_TO_MIDI) {

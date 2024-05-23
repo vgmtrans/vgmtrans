@@ -129,10 +129,9 @@ class AkaoSnesSeq
 };
 
 
-class AkaoSnesTrack
-    : public SeqTrack {
- public:
-  AkaoSnesTrack(AkaoSnesSeq *parentFile, long offset = 0, long length = 0);
+class AkaoSnesTrack : public SeqTrack {
+public:
+  AkaoSnesTrack(AkaoSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void ResetVars() override;
   bool ReadEvent() override;
 

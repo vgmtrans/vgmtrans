@@ -245,7 +245,7 @@ double RareSnesSeq::GetTempoInBPM(uint8_t tempo, uint8_t timerFreq) {
 //  RareSnesTrack
 //  ************
 
-RareSnesTrack::RareSnesTrack(RareSnesSeq *parentFile, long offset, long length)
+RareSnesTrack::RareSnesTrack(RareSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
   ResetVars();
   bDetermineTrackLengthEventByEvent = true;
