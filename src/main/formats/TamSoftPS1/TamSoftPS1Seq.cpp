@@ -13,12 +13,12 @@
 
 DECLARE_FORMAT(TamSoftPS1);
 
-static constexpr int kMaxTracksPS1 = 24;
-static constexpr int kMaxTracksPS2 = 48;
-static constexpr uint16_t kPpqn = 24;
-static constexpr uint8_t kNoteVelocity = 100;
-static constexpr uint32_t kHeaderSizePS1 = (4 * kMaxTracksPS1);
-static constexpr uint32_t kHeaderSizePS2 = (4 * kMaxTracksPS2);
+static constexpr int MAX_TRACKS_PS1 = 24;
+static constexpr int MAX_TRACKS_PS2 = 48;
+static constexpr uint16_t SEQ_PPQN = 24;
+static constexpr uint8_t NOTE_VELOCITY = 100;
+static constexpr uint32_t HEADER_SIZE_PS1 = (4 * MAX_TRACKS_PS1);
+static constexpr uint32_t HEADER_SIZE_PS2 = (4 * MAX_TRACKS_PS2);
 
 //  *************
 //  TamSoftPS1Seq
@@ -43,7 +43,7 @@ TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong, co
   bUseLinearAmplitudeScale = true;
 
   const double PSX_NTSC_FRAMERATE = 53222400.0 / 263.0 / 3413.0;
-  AlwaysWriteInitialTempo(60.0 / (kPpqn / PSX_NTSC_FRAMERATE));
+  AlwaysWriteInitialTempo(60.0 / (SEQ_PPQN / PSX_NTSC_FRAMERATE));
 
   UseReverb();
   AlwaysWriteInitialReverb(0);
@@ -59,7 +59,7 @@ void TamSoftPS1Seq::ResetVars() {
 }
 
 bool TamSoftPS1Seq::GetHeaderInfo() {
-  SetPPQN(kPpqn);
+  SetPPQN(SEQ_PPQN);
 
   uint32_t dwSongItemOffset = dwOffset + 4 * song;
   if (dwSongItemOffset + 4 > vgmfile->GetEndOffset()) {
@@ -89,14 +89,14 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
 
       // PS2 version?
       ps2 = false;
-      if (dwHeaderOffset + kHeaderSizePS2 <= vgmfile->GetEndOffset()) {
+      if (dwHeaderOffset + HEADER_SIZE_PS2 <= vgmfile->GetEndOffset()) {
         ps2 = true;
-        for (uint8_t trackIndex = 0; trackIndex < kMaxTracksPS2; trackIndex++) {
+        for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS_PS2; trackIndex++) {
           uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
           uint8_t live = GetByte(dwTrackHeaderOffset);
           uint32_t dwRelTrackOffset = GetShort(dwTrackHeaderOffset + 2);
-          if ((live & 0x7f) != 0 || ((live & 0x80) != 0 && dwRelTrackOffset < kHeaderSizePS2)) {
+          if ((live & 0x7f) != 0 || ((live & 0x80) != 0 && dwRelTrackOffset < HEADER_SIZE_PS2)) {
             ps2 = false;
             break;
           }
@@ -104,12 +104,12 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
       }
 
       if (ps2) {
-        headerSize = kHeaderSizePS2;
-        maxTracks = kMaxTracksPS2;
+        headerSize = HEADER_SIZE_PS2;
+        maxTracks = MAX_TRACKS_PS2;
       }
       else {
-        headerSize = kHeaderSizePS1;
-        maxTracks = kMaxTracksPS1;
+        headerSize = HEADER_SIZE_PS1;
+        maxTracks = MAX_TRACKS_PS1;
       }
 
       if (dwHeaderOffset + headerSize > vgmfile->GetEndOffset()) {
@@ -212,7 +212,7 @@ bool TamSoftPS1Track::ReadEvent() {
       lastNotePitch = TamSoftPS1Seq::PITCH_TABLE[key];
     }
 
-    AddNoteOn(beginOffset, curOffset - beginOffset, TAMSOFTPS1_KEY_OFFSET + key, kNoteVelocity);
+    AddNoteOn(beginOffset, curOffset - beginOffset, TAMSOFTPS1_KEY_OFFSET + key, NOTE_VELOCITY);
   }
   else {
     switch (statusByte) {

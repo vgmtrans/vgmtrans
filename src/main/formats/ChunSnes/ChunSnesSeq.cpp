@@ -8,10 +8,10 @@
 
 DECLARE_FORMAT(ChunSnes);
 
-static constexpr int kMaxTracks = 8;
-static constexpr uint16_t kPpqn = 48;
-static constexpr int kKeyCorrectionOffset = 24;
-static constexpr uint8_t kNoteVelocity = 100;
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr int SEQ_KEY_OFFSET = 24;
+static constexpr uint8_t NOTE_VELOCITY = 100;
 
 //  ***********
 //  ChunSnesSeq
@@ -46,7 +46,7 @@ void ChunSnesSeq::ResetVars() {
 }
 
 bool ChunSnesSeq::GetHeaderInfo() {
-  SetPPQN(kPpqn);
+  SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
@@ -60,7 +60,7 @@ bool ChunSnesSeq::GetHeaderInfo() {
 
   header->AddSimpleItem(curOffset, 1, "Number of Tracks");
   nNumTracks = GetByte(curOffset++);
-  if (nNumTracks == 0 || nNumTracks > kMaxTracks) {
+  if (nNumTracks == 0 || nNumTracks > MAX_TRACKS) {
     return false;
   }
 
@@ -216,7 +216,7 @@ ChunSnesTrack::ChunSnesTrack(ChunSnesSeq *parentFile, uint32_t offset, uint32_t 
 void ChunSnesTrack::ResetVars() {
   SeqTrack::ResetVars();
 
-  cKeyCorrection = kKeyCorrectionOffset;
+  cKeyCorrection = SEQ_KEY_OFFSET;
 
   prevNoteKey = -1;
   prevNoteSlurred = false;
@@ -349,7 +349,7 @@ bool ChunSnesTrack::ReadEvent() {
           AddGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration", desc, CLR_TIE, ICON_NOTE);
         }
         else {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, kNoteVelocity, dur);
+          AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);
         }
         AddTime(noteLength);
       }

@@ -3,9 +3,9 @@
 
 DECLARE_FORMAT(NamcoSnes);
 
-static constexpr int kMaxTracks = 8;
-static constexpr uint16_t kPpqn = 48;
-static constexpr uint8_t kNoteVelocity = 100;
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr uint8_t NOTE_VELOCITY = 100;
 
 //  ************
 //  NamcoSnesSeq
@@ -17,7 +17,7 @@ NamcoSnesSeq::NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, uint32_t seqdata
   bAllowDiscontinuousTrackData = true;
   bUseLinearAmplitudeScale = true;
 
-  AlwaysWriteInitialTempo(60000000.0 / (kPpqn * (125 * 0x86)));
+  AlwaysWriteInitialTempo(60000000.0 / (SEQ_PPQN * (125 * 0x86)));
 
   UseReverb();
 
@@ -36,7 +36,7 @@ void NamcoSnesSeq::ResetVars() {
   loopCount = 0;
   loopCountAlt = 0;
 
-  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     prevNoteKey[trackIndex] = -1;
     prevNoteType[trackIndex] = NOTE_MELODY;
     instrNum[trackIndex] = -1;
@@ -44,8 +44,8 @@ void NamcoSnesSeq::ResetVars() {
 }
 
 bool NamcoSnesSeq::GetHeaderInfo() {
-  SetPPQN(kPpqn);
-  nNumTracks = kMaxTracks;
+  SetPPQN(SEQ_PPQN);
+  nNumTracks = MAX_TRACKS;
 
   SetEventsOffset(VGMSeq::dwOffset);
   return true;
@@ -411,7 +411,7 @@ bool NamcoSnesSeq::ReadEvent() {
 
             if (keyByte != NOTE_NUMBER_REST) {
               prevNoteKey[trackIndex] = key;
-              AddNoteOnNoItem(key, kNoteVelocity);
+              AddNoteOnNoItem(key, NOTE_VELOCITY);
             }
           }
         }
@@ -595,7 +595,7 @@ bool NamcoSnesSeq::PostLoad() {
 }
 
 void NamcoSnesSeq::KeyOffAllNotes() {
-  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if (prevNoteKey[trackIndex] != -1) {
       channel = trackIndex;
       SetCurTrack(channel);

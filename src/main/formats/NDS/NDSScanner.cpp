@@ -12,7 +12,7 @@ namespace vgmtrans::scanners {
 ScannerRegistration<NDSScanner> s_nds("NDS", {"nds", "sdat", "mini2sf", "2sf", "2sflib"});
 }
 
-void NDSScanner::Scan(RawFile *file, void *info) {
+void NDSScanner::Scan(RawFile* file, void* /*info*/) {
   SearchForSDAT(file);
 }
 
@@ -23,7 +23,7 @@ void NDSScanner::SearchForSDAT(RawFile *file) {
   auto it = std::search(file->begin(), file->end(),
     std::boyer_moore_searcher(signature.begin(), signature.end()));
   while (it != file->end()) {
-    int offset = it - file->begin();
+    size_t offset = it - file->begin();
     if (file->get<u32>(offset + 0x10) < 0x10000) {
       LoadFromSDAT(file, offset);
     }

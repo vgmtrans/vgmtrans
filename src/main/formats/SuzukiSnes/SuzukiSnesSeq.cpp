@@ -2,9 +2,9 @@
 
 DECLARE_FORMAT(SuzukiSnes);
 
-static constexpr int kMaxTracks = 8;
-static constexpr uint16_t kPpqn = 48;
-static constexpr uint8_t kNoteVelocity = 100;
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr uint8_t NOTE_VELOCITY = 100;
 
 //  *************
 //  SuzukiSnesSeq
@@ -38,7 +38,7 @@ void SuzukiSnesSeq::ResetVars() {
 }
 
 bool SuzukiSnesSeq::GetHeaderInfo() {
-  SetPPQN(kPpqn);
+  SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
@@ -64,7 +64,7 @@ bool SuzukiSnesSeq::GetHeaderInfo() {
   }
 
   // create tracks
-  for (int trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t addrTrackStart = GetShort(curOffset);
 
     if (addrTrackStart != 0) {
@@ -190,7 +190,7 @@ void SuzukiSnesSeq::LoadEventMap() {
 
 double SuzukiSnesSeq::GetTempoInBPM(uint8_t tempo) {
   if (tempo != 0) {
-    return (double) 60000000 / (125 * tempo * kPpqn);
+    return (double) 60000000 / (125 * tempo * SEQ_PPQN);
   }
   else {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -307,7 +307,7 @@ bool SuzukiSnesTrack::ReadEvent() {
 
         // TODO: percussion note
 
-        AddNoteByDur(beginOffset, curOffset - beginOffset, note, kNoteVelocity, dur);
+        AddNoteByDur(beginOffset, curOffset - beginOffset, note, NOTE_VELOCITY, dur);
         AddTime(dur);
       }
       else if (noteIndex == 13) {

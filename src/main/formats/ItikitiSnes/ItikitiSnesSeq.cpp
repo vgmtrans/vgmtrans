@@ -8,7 +8,7 @@
 
 DECLARE_FORMAT(ItikitiSnes);
 
-static constexpr uint8_t kNoteVelocity = 100;
+static constexpr uint8_t NOTE_VELOCITY = 100;
 static constexpr std::array<uint8_t, 16> kMasterNoteLengths = {
     0xc0, 0x90, 0x60, 0x48, 0x40, 0x30, 0x24, 0x20, 0x18, 0x12, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03};
 static constexpr std::array<uint8_t, 7> kDefaultNoteLengths = {0xc0, 0x60, 0x48, 0x30,
@@ -204,7 +204,7 @@ bool ItikitiSnesTrack::ReadEvent() {
       } else {
         const uint8_t key_index = command >> 3;
         const int8_t key = static_cast<int8_t>(kItikitiSnesSeqNoteKeyBias + key_index - 6 + m_note_number_base);
-        AddNoteByDur(start, curOffset - start, key, kNoteVelocity, dur);
+        AddNoteByDur(start, curOffset - start, key, NOTE_VELOCITY, dur);
         AddTime(len);
       }
       break;

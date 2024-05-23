@@ -7,8 +7,8 @@
 
 DECLARE_FORMAT(HudsonSnes);
 
-static constexpr int kMaxTracks = 8;
-static constexpr uint16_t kPpqn = 48;
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
 
 //  *************
 //  HudsonSnesSeq
@@ -45,7 +45,7 @@ void HudsonSnesSeq::ResetVars() {
 }
 
 bool HudsonSnesSeq::GetHeaderInfo() {
-  SetPPQN(kPpqn);
+  SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
@@ -340,7 +340,7 @@ bool HudsonSnesSeq::GetTrackPointersInHeaderInfo(VGMHeader *header, uint32_t &of
   TrackAvailableBits = GetByte(curOffset++);
 
   // read track addresses (DSP channel 8 to 1)
-  for (int trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if ((TrackAvailableBits & (1 << trackIndex)) != 0) {
       if (curOffset + 2 > 0x10000) {
         offset = curOffset;
@@ -360,7 +360,7 @@ bool HudsonSnesSeq::GetTrackPointersInHeaderInfo(VGMHeader *header, uint32_t &of
 }
 
 bool HudsonSnesSeq::GetTrackPointers(void) {
-  for (int trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if ((TrackAvailableBits & (1 << trackIndex)) != 0) {
       HudsonSnesTrack *track = new HudsonSnesTrack(this, TrackAddresses[trackIndex]);
       aTracks.push_back(track);

@@ -5,9 +5,9 @@
 
 DECLARE_FORMAT(PrismSnes);
 
-static constexpr int kMaxTracks = 24;
-static constexpr uint16_t kPpqn = 48;
-static constexpr uint8_t kNoteVelocity = 100;
+static constexpr int MAX_TRACKS = 24;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr uint8_t NOTE_VELOCITY = 100;
 
 //  ************
 //  PrismSnesSeq
@@ -62,12 +62,12 @@ void PrismSnesSeq::ResetVars() {
 }
 
 bool PrismSnesSeq::GetHeaderInfo() {
-  SetPPQN(kPpqn);
+  SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 0);
 
   uint32_t curOffset = dwOffset;
-  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks + 1; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS + 1; trackIndex++) {
     if (curOffset + 1 > 0x10000) {
       return false;
     }
@@ -77,7 +77,7 @@ bool PrismSnesSeq::GetHeaderInfo() {
       header->AddSimpleItem(curOffset, 1, "Header End");
       break;
     }
-    if (trackIndex >= kMaxTracks) {
+    if (trackIndex >= MAX_TRACKS) {
       return false;
     }
 
@@ -213,7 +213,7 @@ void PrismSnesSeq::LoadEventMap() {
 
 double PrismSnesSeq::GetTempoInBPM(uint8_t tempo) {
   if (tempo != 0) {
-    return 60000000.0 / (kPpqn * (125 * tempo));
+    return 60000000.0 / (SEQ_PPQN * (125 * tempo));
   }
   else {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -348,16 +348,16 @@ bool PrismSnesTrack::ReadEvent() {
 
       if (prevNoteSlurred && key == prevNoteKey) {
         MakePrevDurNoteEnd(GetTime() + dur);
-        desc << "Abs Key: " << key << " (" << MidiEvent::GetNoteName(key) << "  Velocity: " << kNoteVelocity << "  Duration: "
+        desc << "Abs Key: " << key << " (" << MidiEvent::GetNoteName(key) << "  Velocity: " << NOTE_VELOCITY << "  Duration: "
             << dur;
         AddGenericEvent(beginOffset, curOffset - beginOffset, "Note (Tied)", desc.str(), CLR_DURNOTE, ICON_NOTE);
       }
       else {
         if (eventType == EVENT_NOISE_NOTE) {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, kNoteVelocity, dur, "Noise Note");
+          AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur, "Noise Note");
         }
         else {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, kNoteVelocity, dur, "Note");
+          AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur, "Note");
         }
       }
       AddTime(len);
@@ -393,7 +393,7 @@ bool PrismSnesTrack::ReadEvent() {
           "  Length: " << len << "  Duration: " << dur;
       AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
 
-      AddNoteByDurNoItem(noteNumberFrom, kNoteVelocity, dur);
+      AddNoteByDurNoItem(noteNumberFrom, NOTE_VELOCITY, dur);
       AddTime(len);
       break;
     }

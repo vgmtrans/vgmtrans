@@ -10,9 +10,9 @@ using namespace std;
 
 DECLARE_FORMAT(GraphResSnes);
 
-static constexpr int kMaxTracks = 8;
-static constexpr uint16_t kPpqn = 48;
-static constexpr uint8_t kNoteVelocity = 100;
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr uint8_t NOTE_VELOCITY = 100;
 
 //  ***************
 //  GraphResSnesSeq
@@ -24,7 +24,7 @@ GraphResSnesSeq::GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_
   bAllowDiscontinuousTrackData = true;
   bUseLinearAmplitudeScale = true;
 
-  AlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * kPpqn)); // good ol' frame-based sequence!
+  AlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * SEQ_PPQN)); // good ol' frame-based sequence!
 
   UseReverb();
   AlwaysWriteInitialReverb(0);
@@ -40,15 +40,15 @@ void GraphResSnesSeq::ResetVars() {
 }
 
 bool GraphResSnesSeq::GetHeaderInfo() {
-  SetPPQN(kPpqn);
+  SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 3 * kMaxTracks);
+  VGMHeader *header = AddHeader(dwOffset, 3 * MAX_TRACKS);
   if (dwOffset + header->unLength > 0x10000) {
     return false;
   }
 
   uint32_t curOffset = dwOffset;
-  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
 
@@ -70,7 +70,7 @@ bool GraphResSnesSeq::GetHeaderInfo() {
 bool GraphResSnesSeq::GetTrackPointers(void) {
   uint32_t curOffset = dwOffset;
   uint16_t addrTrackBase = GetShort(dwOffset + 1);
-  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     bool trackUsed = (GetByte(curOffset++) != 0);
     uint16_t addrTrackStartVirt = GetShort(curOffset);
     curOffset += 2;
@@ -270,7 +270,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
           AddNoteByDur(beginOffset,
                        curOffset - beginOffset,
                        midiKey,
-                       kNoteVelocity,
+                       NOTE_VELOCITY,
                        dur,
                        hasLength ? "Note with Duration" : "Note");
           AddTime(len);

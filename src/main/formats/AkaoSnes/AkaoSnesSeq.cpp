@@ -9,9 +9,9 @@
 
 DECLARE_FORMAT(AkaoSnes);
 
-static constexpr uint16_t kPpqn = 48;
-static constexpr int kMaxTracks = 8;
-static constexpr uint8_t kNoteVelocity = 100;
+static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr int MAX_TRACKS = 8;
+static constexpr uint8_t NOTE_VELOCITY = 100;
 
 //  **********
 //  AkaoSnesSeq
@@ -46,7 +46,7 @@ void AkaoSnesSeq::ResetVars() {
 }
 
 bool AkaoSnesSeq::GetHeaderInfo() {
-  SetPPQN(kPpqn);
+  SetPPQN(SEQ_PPQN);
 
   VGMHeader *header = AddHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
@@ -65,8 +65,8 @@ bool AkaoSnesSeq::GetHeaderInfo() {
         curOffset += 2;
       }
 
-      header->AddSimpleItem(curOffset + kMaxTracks * 2, 2, "End Address");
-      addrSequenceEnd = GetShortAddress(curOffset + kMaxTracks * 2);
+      header->AddSimpleItem(curOffset + MAX_TRACKS * 2, 2, "End Address");
+      addrSequenceEnd = GetShortAddress(curOffset + MAX_TRACKS * 2);
     }
     else if (version == AKAOSNES_V4) {
       header->AddSimpleItem(curOffset, 2, "ROM Address Base");
@@ -85,7 +85,7 @@ bool AkaoSnesSeq::GetHeaderInfo() {
     unLength = addrSequenceEnd - dwOffset;
   }
 
-  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t addrTrackStart = GetShortAddress(curOffset);
     if (addrTrackStart != addrSequenceEnd) {
       std::stringstream trackName;
@@ -115,7 +115,7 @@ bool AkaoSnesSeq::GetTrackPointers(void) {
     curOffset += 4;
   }
 
-  for (uint8_t trackIndex = 0; trackIndex < kMaxTracks; trackIndex++) {
+  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t addrTrackStart = GetShortAddress(curOffset);
     if (addrTrackStart != addrSequenceEnd) {
       AkaoSnesTrack *track = new AkaoSnesTrack(this, addrTrackStart);
@@ -545,7 +545,7 @@ void AkaoSnesSeq::LoadEventMap() {
 
 double AkaoSnesSeq::GetTempoInBPM(uint8_t tempo) const {
   if (tempo != 0 && TIMER0_FREQUENCY != 0) {
-    return 60000000.0 / (kPpqn * (125 * TIMER0_FREQUENCY)) * (tempo / 256.0);
+    return 60000000.0 / (SEQ_PPQN * (125 * TIMER0_FREQUENCY)) * (tempo / 256.0);
   }
   else {
     // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -667,10 +667,10 @@ bool AkaoSnesTrack::ReadEvent(void) {
         uint8_t note = octave * 12 + noteIndex;
 
         if (percussion) {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, kNoteVelocity, dur, "Percussion Note with Duration");
+          AddNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, NOTE_VELOCITY, dur, "Percussion Note with Duration");
         }
         else {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, note, kNoteVelocity, dur);
+          AddNoteByDur(beginOffset, curOffset - beginOffset, note, NOTE_VELOCITY, dur);
         }
 
         AddTime(len);
