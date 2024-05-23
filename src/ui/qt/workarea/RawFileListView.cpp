@@ -230,5 +230,5 @@ void RawFileListView::updateStatusBar() const {
   }
   RawFile* file = qtVGMRoot.vRawFile[currentIndex().row()];
   QString name = QString::fromStdString(file->name());
-  NotificationCenter::the()->updateStatus(name, "", &fileIcon(), -1, file->size());
+  NotificationCenter::the()->updateStatus(name, "", &fileIcon(), -1, static_cast<uint32_t>(file->size()));
 }

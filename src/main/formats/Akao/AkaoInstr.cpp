@@ -294,8 +294,8 @@ bool AkaoSampColl::IsPossibleAkaoSampColl(const RawFile *file, uint32_t offset) 
   if (file->GetWordBE(offset) != 0x414B414F)
     return false;
 
-  if (file->GetWord(offset + 0x24) != 0 || file->GetWord(offset + 0x28) != 0 || file->GetWord(offset + 0x2C) != 0 &&
-    file->GetWord(offset + 0x30) != 0 || file->GetWord(offset + 0x34) != 0 || file->GetWord(offset + 0x38) != 0 &&
+  if ((file->GetWord(offset + 0x24) != 0 || file->GetWord(offset + 0x28) != 0 || file->GetWord(offset + 0x2C) != 0) &&
+    (file->GetWord(offset + 0x30) != 0 || file->GetWord(offset + 0x34) != 0 || file->GetWord(offset + 0x38)) != 0 &&
     file->GetWord(offset + 0x3C) != 0)
     return false;
 

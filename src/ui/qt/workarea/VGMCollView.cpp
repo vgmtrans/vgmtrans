@@ -93,21 +93,21 @@ QModelIndex VGMCollViewModel::indexFromFile(const VGMFile* file) const {
   // Check in miscfiles
   auto miscIt = std::ranges::find(m_coll->miscfiles, file);
   if (miscIt != m_coll->miscfiles.end()) {
-    return createIndex(std::distance(m_coll->miscfiles.begin(), miscIt), 0);
+    return createIndex(static_cast<int>(std::distance(m_coll->miscfiles.begin(), miscIt)), 0);
   }
   row += m_coll->miscfiles.size();
 
   // Check in instrsets
   auto instrIt = std::ranges::find(m_coll->instrsets, file);
   if (instrIt != m_coll->instrsets.end()) {
-    return createIndex(row + std::distance(m_coll->instrsets.begin(), instrIt), 0);
+    return createIndex(row + static_cast<int>(std::distance(m_coll->instrsets.begin(), instrIt)), 0);
   }
   row += m_coll->instrsets.size();
 
   // Check in sampcolls
   auto sampIt = std::ranges::find(m_coll->sampcolls, file);
   if (sampIt != m_coll->sampcolls.end()) {
-    return createIndex(row + std::distance(m_coll->sampcolls.begin(), sampIt), 0);
+    return createIndex(row + static_cast<int>(std::distance(m_coll->sampcolls.begin(), sampIt)), 0);
   }
   row += m_coll->sampcolls.size();
 
