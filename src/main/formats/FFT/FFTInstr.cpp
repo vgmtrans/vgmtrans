@@ -5,8 +5,6 @@
 
 const float defaultFFTReverbPercent = 0.5;
 
-const float defaultFFTReverbPercent = 0.75;
-
 /****************************************************************/
 /*																*/
 /*			Instrument Set		(Bank全体)						*/
@@ -103,7 +101,7 @@ bool    WdsInstrSet::parseInstrPointers() {
 //		Constructor
 //--------------------------------------------------------------
 WdsInstr::WdsInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum) :
-    VGMInstr(instrSet, offset, length, theBank, theInstrNum, L"Instrument", defaultFFTReverbPercent) {}
+    VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Instrument", defaultFFTReverbPercent) {}
 
 //==============================================================
 //		Destructor
