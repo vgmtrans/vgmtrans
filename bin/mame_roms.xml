@@ -640,9 +640,11 @@
             <rom>sfiii3n/sfiii3-simm1.2</rom>
             <rom>sfiii3n/sfiii3-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs">
             <rom>sfiii3n/sfiii3-simm3.0</rom>
             <rom>sfiii3n/sfiii3-simm3.1</rom>
+            <rom>sfiii3n/sfiii3-simm3.2</rom>
+            <rom>sfiii3n/sfiii3-simm3.3</rom>
         </romgroup>
     </game>
     <game name="sfiii3n" format="CPS2" fmt_version="CPS3">

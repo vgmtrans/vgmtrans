@@ -60,7 +60,7 @@ CPSSampleInfoTable::CPSSampleInfoTable(RawFile *file,
     : VGMMiscFile(CPS2Format::name, file, offset, length, std::move(name)) {
 }
 
-CPSSampleInfoTable::~CPSSampleInfoTable(void) {
+CPSSampleInfoTable::~CPSSampleInfoTable() {
   if (infos) {
     delete[] infos;
   }
@@ -186,9 +186,6 @@ CPS2InstrSet::CPS2InstrSet(RawFile *file,
       articTable(theArticTable) {
 }
 
-CPS2InstrSet::~CPS2InstrSet() {}
-
-
 bool CPS2InstrSet::GetHeaderInfo() {
   return true;
 }
@@ -246,6 +243,10 @@ bool CPS2InstrSet::GetInstrPointers() {
         for (uint8_t j = 0; j < 128; j++) {
           uint16_t instrPtrOffset = GetShortBE(bankOff + (j*2));
           uint32_t instrPtr = instrPtrOffset + bankOff;
+          // We are not guaranteed a 0xFFFF separator sequence between instruments, so instead we
+          // calculate length of each using the next instr pointer if possible.
+          uint32_t nextInstrPtrOffset = GetShortBE(bankOff + ((j+1)*2));
+          uint32_t instrLength = nextInstrPtrOffset == 0 || j == 127 ? 0 : nextInstrPtrOffset - instrPtrOffset;
           if (instrPtrOffset == 0) {
             continue;
           }
@@ -254,7 +255,7 @@ bool CPS2InstrSet::GetInstrPointers() {
           instrPointersItem->AddSimpleItem(bankOff + (j*2), 2, pointerStream.str());
 
           auto name = fmt::format("Instrument: {:d}  bank: {:d}", j, bank);
-          aInstrs.push_back(new CPS2Instr(this, instrPtr, 0, bank*2, j, name));
+          aInstrs.push_back(new CPS2Instr(this, instrPtr, instrLength, bank*2, j, name));
         }
         this->AddItem(instrPointersItem);
 
@@ -295,10 +296,6 @@ CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
                      std::string name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, std::move(name)) {
 }
-
-CPS2Instr::~CPS2Instr(void) {
-}
-
 
 bool CPS2Instr::LoadInstr() {
   std::vector<VGMRgn*> rgns;
@@ -349,6 +346,9 @@ bool CPS2Instr::LoadInstr() {
     uint8_t prevKeyHigh = 0;
     uint32_t off;
     for (off = dwOffset; GetShort(off) != 0xFFFF; off += 12) {
+      if (unLength != 0 && off >= dwOffset + unLength)
+        break;
+
       VGMRgn* rgn = new VGMRgn(this, off, 12);
       rgns.push_back(rgn);
 
@@ -359,7 +359,7 @@ bool CPS2Instr::LoadInstr() {
       rgn->AddKeyHigh(progInfo.key_high, off + 0, 1);
       rgn->keyLow = prevKeyHigh + 1;
       prevKeyHigh = progInfo.key_high;
-      rgn->AddSampNum(progInfo.sample_index, off+5, 1);
+      rgn->AddSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+5, 1);
       rgn->AddSimpleItem(off + 7, 1, "Attack Rate");
       rgn->AddSimpleItem(off + 8, 1, "Decay Rate");
       rgn->AddSimpleItem(off + 9, 1, "Sustain Level");

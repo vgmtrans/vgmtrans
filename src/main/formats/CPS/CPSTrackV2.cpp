@@ -119,7 +119,7 @@ bool CPSTrackV2::ReadEvent(void) {
 
     case C6_VOLUME: {
       uint8_t vol = GetByte(curOffset++);
-      vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
+      vol = ConvertPercentAmpToStdMidiVal(vol / 127.0);
       this->AddVol(beginOffset, curOffset - beginOffset, vol);
       break;
     }

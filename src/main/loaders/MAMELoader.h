@@ -14,7 +14,7 @@
 class TiXmlElement;
 class VirtFile;
 
-enum LoadMethod { LM_APPEND, LM_APPEND_SWAP16, LM_DEINTERLACE };
+enum LoadMethod { LM_APPEND, LM_APPEND_SWAP16, LM_DEINTERLACE, LM_DEINTERLACE_PAIRS };
 
 /**
 Converts a std::string to any class with a proper overload of the >> operator
