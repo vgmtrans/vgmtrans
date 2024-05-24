@@ -15,8 +15,8 @@ public:
   CPS1SampleInstrSet(RawFile *file,
                      CPSFormatVer fmt_version,
                      uint32_t offset,
-                     std::string &name);
-  ~CPS1SampleInstrSet() override;
+                     std::string name);
+  ~CPS1SampleInstrSet() override = default;
 
   bool GetInstrPointers() override;
 

@@ -13,7 +13,7 @@
 CPS1SampleInstrSet::CPS1SampleInstrSet(RawFile *file,
                                        CPSFormatVer version,
                                        uint32_t offset,
-                                       std::string &name)
+                                       std::string name)
     : VGMInstrSet(CPS1Format::name, file, offset, 0, std::move(name)),
       fmt_version(version) {
 }
