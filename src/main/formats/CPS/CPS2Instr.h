@@ -41,8 +41,8 @@ struct qs_prog_info_ver_cps3 {
   uint8_t unknown1;
   uint8_t unknown2;
   uint8_t unknown3;
-  uint8_t unknown4;
-  uint8_t sample_index;
+  uint8_t sample_index_hi;
+  uint8_t sample_index_lo;
   uint8_t unknown6;
   uint8_t attack_rate;
   uint8_t decay_rate;
@@ -212,7 +212,7 @@ public:
               CPSSampleInfoTable *sampInfoTable,
               CPSArticTable *articTable,
               std::string name);
-  ~CPS2InstrSet() override;
+  ~CPS2InstrSet() override = default;
 
   bool GetHeaderInfo() override;
   bool GetInstrPointers() override;
@@ -237,7 +237,7 @@ public:
            uint32_t theBank,
            uint32_t theInstrNum,
            std::string name);
-  ~CPS2Instr() override;
+  ~CPS2Instr() override = default;
   bool LoadInstr() override;
 protected:
   CPSFormatVer GetFormatVer() const { return (static_cast<CPS2InstrSet*>(parInstrSet))->fmt_version; }

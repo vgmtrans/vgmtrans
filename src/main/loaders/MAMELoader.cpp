@@ -140,6 +140,8 @@ int MAMELoader::LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentr
         romgroupentry.loadmethod = LM_APPEND_SWAP16;
     else if (load_method == "deinterlace")
         romgroupentry.loadmethod = LM_DEINTERLACE;
+    else if (load_method == "deinterlace_pairs")
+        romgroupentry.loadmethod = LM_DEINTERLACE_PAIRS;
     else
         return 1;
 
@@ -287,6 +289,25 @@ VirtFile *MAMELoader::LoadRomGroup(const MAMERomGroup &entry, const std::string 
                     destFile[curDestOffset++] = buf.first[curRomOffset];
                 }
                 curRomOffset++;
+            }
+            break;
+        }
+        case LM_DEINTERLACE_PAIRS: {
+            uint32_t curDestOffset = 0;
+            uint32_t curRomOffset = 0;
+            auto it = buffers.begin();
+            while (curDestOffset < destFileSize && it != buffers.end()) {
+              // Deinterlace the first pair
+              if (it != buffers.end()) {
+                auto& buf1 = *it++;
+                auto& buf2 = it != buffers.end() ? *it++ : buf1; // if second buffer doesn't exist, use the first buffer again
+                while (curDestOffset < destFileSize && curRomOffset < buf1.second && curRomOffset < buf2.second) {
+                  destFile[curDestOffset++] = buf1.first[curRomOffset];
+                  destFile[curDestOffset++] = buf2.first[curRomOffset];
+                  curRomOffset++;
+                }
+                curRomOffset = 0; // reset for the next pair
+              }
             }
             break;
         }
