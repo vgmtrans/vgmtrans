@@ -196,7 +196,7 @@ void VGMCollListView::handlePlaybackRequest() {
   }
 
   VGMColl *coll = qtVGMRoot.vgmColls()[list[0].row()];
-  PlayerService::getInstance().playCollection(coll);
+  PlayerService::getInstance()->playCollection(coll);
 }
 
 void VGMCollListView::handleStopRequest() {
