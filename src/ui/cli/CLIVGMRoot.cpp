@@ -65,13 +65,14 @@ bool CLIVGMRoot::Init() {
   // get collection for each input file
   size_t inputFileCtr = 0;
   size_t numColls = 0;
+  size_t numVGMFiles = 0;
   // map for deconflicting identical collection names using input filenames
   map<string, vector<pair<size_t, fs::path>>> collNameMap {};
   for (fs::path infile : inputFiles) {
     if (!OpenRawFile(infile.string())) {  // file not found
       return false;
     }
-    UpdateCollections();
+    numVGMFiles = UpdateCollections(numVGMFiles);
     size_t numCollsAdded = GetNumCollections() - numColls;
     if (numCollsAdded == 0) {
       cout << "File " << infile.string() << " is not a recognized music file" << endl;
@@ -219,14 +220,16 @@ void CLIVGMRoot::UI_Log(LogItem* theLog) {
   }
 }
 
-void CLIVGMRoot::UpdateCollections() {
-  for (VGMFileVariant targVariant : vgmFiles()) {
-    auto targFile = variantToVGMFile(targVariant);
+size_t CLIVGMRoot::UpdateCollections(size_t startOffset) {
+  auto files = vgmFiles();
+  for (int i = startOffset; i < files.size(); ++i) {
+    auto targFile = variantToVGMFile(files[i]);
     Format *fmt = targFile->GetFormat();
-    if (fmt->matcher) {
+    if (fmt && fmt->matcher) {
       fmt->matcher->MakeCollectionsForFile(targFile);
     }
   }
+  return vgmFiles().size();
 }
 
 string CLIVGMRoot::UI_GetSaveFilePath(const string& suggestedFilename, const string& extension) {
