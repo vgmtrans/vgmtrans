@@ -44,7 +44,7 @@ VGMItem *VGMItem::GetItemFromOffset(uint32_t offset, [[maybe_unused]] bool inclu
 }
 
 void VGMItem::AddToUI(VGMItem *parent, void *UI_specific) {
-  pRoot->UI_AddItem(this, parent, name, UI_specific);
+  g_root->UI_AddItem(this, parent, name, UI_specific);
 }
 
 uint32_t VGMItem::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {

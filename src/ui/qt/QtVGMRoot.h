@@ -36,9 +36,9 @@ public:
   void UI_AddItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
   std::string UI_GetOpenFilePath(const std::string& suggestedFilename = "",
-                                          const std::string& extension = "");
+                                 const std::string& extension = "");
   std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
-                                          const std::string& extension = "") override;
+                                 const std::string& extension = "") override;
   std::string UI_GetSaveDirPath(const std::string& suggestedDir = "") override;
 
 private:

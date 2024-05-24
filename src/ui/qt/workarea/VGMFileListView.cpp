@@ -33,7 +33,7 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
     return QVariant();
   }
 
-  VGMFileVariant vgmfilevariant = qtVGMRoot.vVGMFile.at(index.row());
+  VGMFileVariant vgmfilevariant = qtVGMRoot.vgmFiles().at(index.row());
   VGMFile* vgmfile = variantToVGMFile(vgmfilevariant);
 
   switch (index.column()) {
@@ -85,7 +85,7 @@ int VGMFileListModel::rowCount(const QModelIndex &parent) const {
     return 0;
   }
 
-  return static_cast<int>(qtVGMRoot.vVGMFile.size());
+  return static_cast<int>(qtVGMRoot.vgmFiles().size());
 }
 
 int VGMFileListModel::columnCount(const QModelIndex &parent) const {
@@ -97,13 +97,13 @@ int VGMFileListModel::columnCount(const QModelIndex &parent) const {
 }
 
 void VGMFileListModel::AddVGMFile() {
-  int position = static_cast<int>(qtVGMRoot.vVGMFile.size()) - 1;
+  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
   beginInsertRows(QModelIndex(), position, position);
   endInsertRows();
 }
 
 void VGMFileListModel::RemoveVGMFile() {
-  int position = static_cast<int>(qtVGMRoot.vVGMFile.size()) - 1;
+  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
   if (position < 0) {
     return;
   }
@@ -142,7 +142,7 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
   selectedFiles->reserve(list.size());
   for (const auto &index : list) {
     if (index.isValid()) {
-      selectedFiles->push_back(variantToVGMFile(qtVGMRoot.vVGMFile[index.row()]));
+      selectedFiles->push_back(variantToVGMFile(qtVGMRoot.vgmFiles()[index.row()]));
     }
   }
   auto menu = menuManager.CreateMenuForItems<VGMItem>(selectedFiles);
@@ -163,11 +163,11 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
         return;
 
       QModelIndexList list = selectionModel()->selectedRows();
-      pRoot->UI_BeginRemoveVGMFiles();
+      g_root->UI_BeginRemoveVGMFiles();
       for (auto & idx : std::ranges::reverse_view(list)) {
-        qtVGMRoot.RemoveVGMFile(qtVGMRoot.vVGMFile[idx.row()], true);
+        qtVGMRoot.RemoveVGMFile(qtVGMRoot.vgmFiles()[idx.row()], true);
       }
-      pRoot->UI_EndRemoveVGMFiles();
+      g_root->UI_EndRemoveVGMFiles();
 
       clearSelection();
       return;
@@ -185,7 +185,7 @@ void VGMFileListView::removeVGMFile(const VGMFile *file) const {
 }
 
 void VGMFileListView::requestVGMFileView(const QModelIndex& index) {
-  MdiArea::the()->newView(variantToVGMFile(qtVGMRoot.vVGMFile[index.row()]));
+  MdiArea::the()->newView(variantToVGMFile(qtVGMRoot.vgmFiles()[index.row()]));
 }
 
 // Update the status bar for the current selection
@@ -194,7 +194,7 @@ void VGMFileListView::updateStatusBar() const {
     NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
   }
-  VGMFile* file = variantToVGMFile(qtVGMRoot.vVGMFile[currentIndex().row()]);
+  VGMFile* file = variantToVGMFile(qtVGMRoot.vgmFiles()[currentIndex().row()]);
   NotificationCenter::the()->updateStatusForItem(file);
 }
 
@@ -212,7 +212,7 @@ void VGMFileListView::currentChanged(const QModelIndex &current, const QModelInd
     return;
   }
 
-  VGMFile *file = variantToVGMFile(qtVGMRoot.vVGMFile[current.row()]);
+  VGMFile *file = variantToVGMFile(qtVGMRoot.vgmFiles()[current.row()]);
   NotificationCenter::the()->selectVGMFile(file, this);
 
   if (this->hasFocus())
@@ -228,7 +228,7 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
     return;
   }
 
-  auto it = std::ranges::find_if(qtVGMRoot.vVGMFile, [&](const VGMFileVariant& var) {
+  auto it = std::ranges::find_if(qtVGMRoot.vgmFiles(), [&](const VGMFileVariant& var) {
       // Use std::visit to access the actual object within the variant
       bool matches = false;
 
@@ -238,9 +238,9 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
 
       return matches;
     });
-  if (it == qtVGMRoot.vVGMFile.end())
+  if (it == qtVGMRoot.vgmFiles().end())
     return;
-  int row = static_cast<int>(std::distance(qtVGMRoot.vVGMFile.begin(), it));
+  int row = static_cast<int>(std::distance(qtVGMRoot.vgmFiles().begin(), it));
 
   // Select the row corresponding to the file
   QModelIndex firstIndex = model()->index(row, 0); // First column of the row

@@ -34,7 +34,7 @@ int RawFileListViewModel::rowCount(const QModelIndex &parent) const {
   if (parent.isValid())
     return 0;
 
-  return static_cast<int>(qtVGMRoot.vRawFile.size());
+  return static_cast<int>(qtVGMRoot.rawFiles().size());
 }
 
 int RawFileListViewModel::columnCount(const QModelIndex &parent) const {
@@ -45,7 +45,7 @@ int RawFileListViewModel::columnCount(const QModelIndex &parent) const {
 }
 
 void RawFileListViewModel::AddRawFile() {
-  int position = static_cast<int>(qtVGMRoot.vRawFile.size()) - 1;
+  int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
   if (position >= 0) {
     beginInsertRows(QModelIndex(), position, position);
     endInsertRows();
@@ -53,7 +53,7 @@ void RawFileListViewModel::AddRawFile() {
 }
 
 void RawFileListViewModel::RemoveRawFile() {
-  int position = static_cast<int>(qtVGMRoot.vRawFile.size()) - 1;
+  int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
   if (position >= 0) {
     beginRemoveRows(QModelIndex(), position, position);
     endRemoveRows();
@@ -90,7 +90,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
   switch (index.column()) {
     case Property::Name: {
       if (role == Qt::DisplayRole) {
-        return QString::fromStdString(qtVGMRoot.vRawFile[index.row()]->name());
+        return QString::fromStdString(qtVGMRoot.rawFiles()[index.row()]->name());
       } else if (role == Qt::DecorationRole) {
         return fileIcon();
       }
@@ -99,7 +99,7 @@ QVariant RawFileListViewModel::data(const QModelIndex &index, int role) const {
 
     case Property::ContainedFiles: {
       if (role == Qt::DisplayRole) {
-        return QString::number(qtVGMRoot.vRawFile[index.row()]->containedVGMFiles().size());
+        return QString::number(qtVGMRoot.rawFiles()[index.row()]->containedVGMFiles().size());
       }
       break;
     }
@@ -133,8 +133,8 @@ RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
 
     QModelIndexList list = sm->selectedRows();
     for (auto &index : list) {
-      auto rawfile = qtVGMRoot.vRawFile[index.row()];
-      std::string filepath = pRoot->UI_GetSaveFilePath("");
+      auto rawfile = qtVGMRoot.rawFiles()[index.row()];
+      std::string filepath = g_root->UI_GetSaveFilePath("");
       if (!filepath.empty()) {
         /* todo: free function in VGMExport */
         conversion::SaveAsOriginal(*rawfile, filepath);
@@ -179,7 +179,7 @@ void RawFileListView::deleteRawFiles() {
 
   QModelIndexList list = selectionModel()->selectedRows();
   for (auto & idx : std::ranges::reverse_view(list)) {
-    const auto rawfile = qtVGMRoot.vRawFile[idx.row()];
+    const auto rawfile = qtVGMRoot.rawFiles()[idx.row()];
     qtVGMRoot.CloseRawFile(rawfile);
   }
   clearSelection();
@@ -194,10 +194,10 @@ void RawFileListView::onVGMFileSelected(const VGMFile* vgmfile, const QWidget* c
     return;
   }
 
-  auto it = std::ranges::find(qtVGMRoot.vRawFile, vgmfile->rawfile);
-  if (it == qtVGMRoot.vRawFile.end())
+  auto it = std::ranges::find(qtVGMRoot.rawFiles(), vgmfile->rawfile);
+  if (it == qtVGMRoot.rawFiles().end())
     return;
-  int row = static_cast<int>(std::distance(qtVGMRoot.vRawFile.begin(), it));
+  int row = static_cast<int>(std::distance(qtVGMRoot.rawFiles().begin(), it));
 
   // Select the row corresponding to the file
   QModelIndex firstIndex = model()->index(row, 0); // First column of the row
@@ -228,7 +228,7 @@ void RawFileListView::updateStatusBar() const {
     NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
   }
-  RawFile* file = qtVGMRoot.vRawFile[currentIndex().row()];
+  RawFile* file = qtVGMRoot.rawFiles()[currentIndex().row()];
   QString name = QString::fromStdString(file->name());
   NotificationCenter::the()->updateStatus(name, "", &fileIcon(), -1, static_cast<uint32_t>(file->size()));
 }

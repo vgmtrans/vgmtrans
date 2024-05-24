@@ -86,7 +86,7 @@ bool VGMSampColl::Load() {
 
   if (!parInstrSet) {
     rawfile->AddContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
-    pRoot->AddVGMFile(this);
+    g_root->AddVGMFile(this);
   }
 
   bLoaded = true;

@@ -70,7 +70,7 @@ void MidiFile::Sort() {
 bool MidiFile::SaveMidiFile(const std::string &filepath) {
   std::vector<uint8_t> midiBuf;
   WriteMidiToBuffer(midiBuf);
-  return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], midiBuf.size());
+  return g_root->UI_WriteBufferToFile(filepath, &midiBuf[0], midiBuf.size());
 }
 
 void MidiFile::WriteMidiToBuffer(std::vector<uint8_t> &buf) {

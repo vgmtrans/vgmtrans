@@ -133,7 +133,7 @@ int DLSFile::WriteDLSToBuffer(std::vector<uint8_t> &buf) {
 bool DLSFile::SaveDLSFile(const std::string &filepath) {
   std::vector<uint8_t> dlsBuf;
   WriteDLSToBuffer(dlsBuf);
-  return pRoot->UI_WriteBufferToFile(filepath, dlsBuf.data(), static_cast<uint32_t>(dlsBuf.size()));
+  return g_root->UI_WriteBufferToFile(filepath, dlsBuf.data(), static_cast<uint32_t>(dlsBuf.size()));
 }
 
 //  *******

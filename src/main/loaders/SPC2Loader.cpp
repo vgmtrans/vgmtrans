@@ -81,7 +81,7 @@ PostLoadCommand SPC2Loader::Apply(RawFile *file) {
     std::copy(spcDataBlock + 512, spcDataBlock + 640, spcFile + SPC_HEADER_SIZE + SPC_RAM_SIZE);
 
     // Save the reconstructed SPC file
-    if (!pRoot->CreateVirtFile(spcFile, SPC_FILE_SIZE, originalSpcFilename, "", file->tag)) {
+    if (!g_root->CreateVirtFile(spcFile, SPC_FILE_SIZE, originalSpcFilename, "", file->tag)) {
       L_ERROR("Failed to save SPC file: {}", originalSpcFilename);
     }
   }

@@ -43,7 +43,7 @@ void VGMSamp::ConvertToStdWave(uint8_t *buf) {
 }
 
 bool VGMSamp::OnSaveAsWav() {
-  std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "wav");
+  std::string filepath = g_root->UI_GetSaveFilePath(ConvertToSafeFileName(name), "wav");
   if (filepath.empty())
     return SaveAsWav(filepath);
   return false;
@@ -124,5 +124,5 @@ bool VGMSamp::SaveAsWav(const std::string &filepath) {
     PushTypeOnVect<uint32_t>(waveBuf, 0);                  // playcount
   }
 
-  return pRoot->UI_WriteBufferToFile(filepath, &waveBuf[0], waveBuf.size());
+  return g_root->UI_WriteBufferToFile(filepath, &waveBuf[0], waveBuf.size());
 }

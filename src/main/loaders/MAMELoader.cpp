@@ -54,7 +54,7 @@ MAMELoader::~MAMELoader() {
 }
 
 int MAMELoader::LoadXML() {
-    const std::string xmlFilePath = pRoot->UI_GetResourceDirPath() + "mame_roms.xml";
+    const std::string xmlFilePath = g_root->UI_GetResourceDirPath() + "mame_roms.xml";
 
     TiXmlDocument doc(xmlFilePath);
     if (!doc.LoadFile())  // if loading the xml file fails

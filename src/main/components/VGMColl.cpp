@@ -81,7 +81,7 @@ void VGMColl::AddMiscFile(VGMMiscFile *theMiscFile) {
 bool VGMColl::Load() {
   if (!LoadMain())
     return false;
-  pRoot->AddVGMColl(this);
+  g_root->AddVGMColl(this);
   return true;
 }
 

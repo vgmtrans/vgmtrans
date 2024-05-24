@@ -14,7 +14,7 @@ AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: "Yes"
-BasedOnStyle: Google
+BreakBeforeBraces: WebKit
 ColumnLimit:     100
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 ConstructorInitializerIndentWidth: 4
@@ -27,6 +27,7 @@ Language:        Cpp
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: None
 PointerAlignment: Left
+ReferenceAlignment: Left
 ReflowComments:  true
 SortIncludes:    false
 SpaceBeforeParens: ControlStatements
