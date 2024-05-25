@@ -8,13 +8,12 @@ on:
 jobs:
   macos:
     name: macOS 11.x+
-    runs-on: ${{ (matrix.target == 'x86_64' && 'macos-13') || 'macos-14' }}
+    runs-on: ${{ (matrix.target == 'intel' && 'macos-13') || 'macos-14' }}
     strategy:
       matrix:
-        target: [ "x86_64", "arm64" ]
+        target: [ "intel", "arm64" ]
     env:
-      osx_min_ver: "11.0"
-      HOMEBREW_PREFIX: ${{ (matrix.target == 'x86_64' && '/usr/local') || '/opt/homebrew' }}
+      HOMEBREW_PREFIX: ${{ (matrix.target == 'intel' && '/usr/local') || '/opt/homebrew' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,24 +25,22 @@ jobs:
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
       - name: "Prepare build"
-        run: |
-          cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.osx_min_ver }} \
-                -DCMAKE_OSX_ARCHITECTURES=${{ matrix.target }} \
-                -B build
+        run: cmake --preset "macos-${{ matrix.target }}"
       - name: "Build project"
-        run: cmake --build build --config "Release" --parallel
-      - working-directory: "build"
-        name: "Package DMG (macOS)"
+        # $(sysctl -n hw.logicalcpu) is required to not make XCode spawn infinite threads...
+        run: cmake --build --preset "macos-${{ matrix.target }}-release" --parallel $(sysctl -n hw.logicalcpu)
+      - name: "Package DMG (macOS)"
+        working-directory: "build/macos-${{ matrix.target }}/"
         run: |
           ${{ env.HOMEBREW_PREFIX }}/bin/macdeployqt \
             bin/VGMTrans.app \
             -verbose=3 -dmg -always-overwrite -appstore-compliant
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}.dmg
-          path: "build/bin/VGMTrans.dmg"
-  x86_64-pc-linux-gnu:
+          path: "build/macos-${{ matrix.target }}/bin/VGMTrans.dmg"
+  linux:
     runs-on: ubuntu-20.04
     name: Linux, x64
     steps:
@@ -58,11 +55,12 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 17
+          sudo ./llvm.sh 18
           sudo add-apt-repository ppa:okirby/qt6-backports
           sudo apt-get update && sudo apt-get upgrade -y
-          sudo apt-get install -y pkg-config \
-            clang-17 lld-17 ninja-build \
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            clang-18 lld-18 ninja-build \
             qt6-base-dev libqt6svg6-dev libqt6svg6 \
             qt6-tools-dev qt6-tools-dev-tools libgl1-mesa-dev \
             libjack-dev libsndfile1-dev libpulse-dev
@@ -70,32 +68,29 @@ jobs:
       - name: "Prepare build"
         run: |
           export LDFLAGS="-L/usr/local/opt/llvm/lib"
-          export CPPFLAGS="-I/usr/local/opt/llvm/include"
-          cmake \
-            -DCMAKE_C_COMPILER=clang-17 \
-            -DCMAKE_CXX_COMPILER=clang++-17 \
-            -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_BUILD_TYPE=Release \
-            -GNinja \
-            -B build
+          export CPPFLAGS="-I/usr/local/opt/llvm/include -fuse-ld=lld"
+          export CC=clang-18
+          export CXX=clang++-18
+          cmake --preset linux-x64 \
+            -G "Ninja Multi-Config" \
+            -DCMAKE_INSTALL_PREFIX=/usr
       - name: "Build project"
+        run: cmake --build --preset linux-x64-release
+      - name: "Run install target"
         run: |
-         cmake \
-          --build build \
-          --config "Release" \
-          --parallel
+          export DESTDIR=appdir
+          cmake --build --preset linux-x64-release --target install
       - name: "Make AppImage"
-        working-directory: "build"
+        working-directory: "build/linux-x64"
         run: |
           echo "Creating AppDir structure for AppImage"
-          DESTDIR=appdir ninja install
           find appdir/
           mkdir -p appdir/usr/share
-          cp ../bin/mame_roms.xml appdir/usr/bin
-          cp ../src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
-          cp ../src/ui/qt/resources/vgmtrans.png appdir/
+          cp ${{ github.workspace }}/bin/mame_roms.xml appdir/usr/bin
+          cp ${{ github.workspace }}/src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
+          cp ${{ github.workspace }}/src/ui/qt/resources/vgmtrans.png appdir/
           mkdir -p appdir/usr/lib
-          cp ../lib/bass/*.so appdir/usr/lib/
+          cp ${{ github.workspace }}/lib/bass/*.so appdir/usr/lib/
           echo "Downloading linuxdeployqt"
           wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
           chmod a+x linuxdeployqt-continuous-x86_64.AppImage
@@ -106,32 +101,37 @@ jobs:
             -qmake=/usr/lib/qt6/bin/qmake6 \
             -verbose=10
           mkdir -p appdir/usr/share/licenses/VGMTrans
-          cp ../LICENSE/LICENSE appdir/usr/share/licenses/VGMTrans/
+          cp ${{ github.workspace }}/LICENSE/LICENSE appdir/usr/share/licenses/VGMTrans/
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.AppImage
-          path: "build/VGMTrans.AppImage"
-  x86_64-pc-windows-msvc:
+          path: "build/linux-x64/VGMTrans.AppImage"
+  windows:
     runs-on: windows-2022
-    name: Windows, x64
+    strategy:
+      matrix:
+        target: ["x64"]
+    name: Windows, ${{ matrix.target }}
     steps:
        - uses: actions/checkout@v4
          with:
           submodules: recursive
           show-progress: false
        - uses: ilammy/msvc-dev-cmd@v1
+         with:
+            arch: ${{ matrix.target }}
        - name: "Prepare build"
          run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          cmake -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -GNinja -B build
+          cmake --preset win-x64
        - name: "Build project"
-         run: cmake --build build --config "Release" --parallel
+         run: cmake --build --preset win-x64-release
        - name: "Package artifact"
-         run: 7z a "VGMTrans.zip" -r .\build\bin*
+         run: 7z a "VGMTrans.zip" -r .\build\win-x64\bin*
        - name: "Upload artifact"
-         uses: actions/upload-artifact@v3
+         uses: actions/upload-artifact@v4
          with:
            name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
            path: VGMTrans.zip
