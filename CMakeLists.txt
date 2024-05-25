@@ -2,15 +2,24 @@
 # Licensed under the zlib license
 # Check the included LICENSE.txt for details
 
-# For object library linking
-cmake_minimum_required(VERSION 3.12)
+# For cmake-presets v3
+cmake_minimum_required(VERSION 3.21)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD 20)
+
+# Use ccache if present on the system
+find_program(CCACHE ccache)
+if(CCACHE)
+  set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
+endif()
 
 project(
   VGMTrans
   VERSION 1.1
   LANGUAGES CXX)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 find_package(Git)
 if(GIT_FOUND)
@@ -47,18 +56,6 @@ else()
   set(VCS_BRANCH "unknown")
 endif()
 
-add_library(g_options INTERFACE)
-add_library(g_warnings INTERFACE)
-
-# Default to Release if build type wasn't specified
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE
-      "Release"
-      CACHE STRING "Build type (Release/Debug/RelWithDebInfo/MinSizeRel)" FORCE)
-endif()
-
-message(STATUS "Will build in ${CMAKE_BUILD_TYPE} mode")
-
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 if(APPLE AND EXISTS /usr/local/lib/)
@@ -70,65 +67,8 @@ endif()
 # Options
 #
 
-option(ENABLE_ASAN "Enable address sanitizer" OFF)
 option(ENABLE_UI_QT "Build the UI (Qt)" ON)
 option(ENABLE_CLI "Build the CLI application" ON)
-option(ENABLE_LIBCPP "Build using libc++" OFF)
-
-#
-# Compiler and build settings
-#
-
-# Use ccache if present on the system
-find_program(CCACHE ccache)
-if(CCACHE)
-  set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
-endif()
-
-# Defaulting to C++20
-target_compile_features(g_options INTERFACE cxx_std_20)
-
-if(MSVC)
-  target_compile_options(
-    g_options
-    INTERFACE /permissive- /Zc:strictStrings-)
-  target_compile_definitions(
-    g_options
-    INTERFACE NOMINMAX _CRT_SECURE_NO_DEPRECATE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE _USE_MATH_DEFINES)
-  target_compile_options(g_warnings INTERFACE /W3)
-else()
-  if(ENABLE_ASAN)
-    target_compile_options(g_options INTERFACE -fsanitize=address)
-    target_link_libraries(g_options INTERFACE -fsanitize=address)
-  endif()
-
-  if(NOT ${CMAKE_BUILD_TYPE} MATCHES "Release")
-    target_compile_options(
-      g_warnings
-      INTERFACE -Wall
-                # -Werror turn on, someday
-                -Wextra
-                -Wshadow
-                -Wunused
-                -Wold-style-cast
-                -Woverloaded-virtual
-                -Wcast-align
-                -Wnull-dereference)
-  endif()
-
-  # The c++17 filesystem library requires some thinkering with compile flags
-  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    target_link_libraries(g_options INTERFACE stdc++fs)
-  elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    if(ENABLE_LIBCPP)
-      target_compile_options(g_options INTERFACE -stdlib=libc++)
-    else()
-      if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
-        target_link_libraries(g_options INTERFACE stdc++fs)
-      endif()
-    endif()
-  endif()
-endif()
 
 # Include our own until we switch to TinyXML2 (should also be moved to
 # vgmtranscore)

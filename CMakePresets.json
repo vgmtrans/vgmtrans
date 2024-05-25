@@ -1,0 +1,152 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "environment": {
+                "CXXFLAGS": "/permissive- /Zc:strictStrings- /W3 -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_USE_MATH_DEFINES"
+            }
+        },
+        {
+            "name": "win-x64",
+            "inherits": "windows-base",
+            "displayName": "Windows x64",
+            "description": "Build VGMTrans for Windows x64",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            }
+        },
+        {
+            "name": "win-arm64",
+            "inherits": "windows-base",
+            "displayName": "Windows ARM64",
+            "description": "Build VGMTrans for Windows ARM64",
+            "architecture": {
+                "value": "arm64",
+                "strategy": "external"
+            }
+        },
+        {
+            "name": "macos-base",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "hidden": true,
+            "environment": {
+                "CXXFLAGS": "-Wall -Wextra -Wshadow -Wunused -Wold-style-cast -Woverloaded-virtual -Wcast-align -Wnull-dereference"
+            }
+        },
+        {
+            "name": "macos-intel",
+            "inherits": "macos-base",
+            "displayName": "VGMTrans (Intel)",
+            "description": "Build VGMTrans for Intel Macs",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+                "CMAKE_OSX_ARCHITECTURES": "x86_64h"
+            }
+        },
+        {
+            "name": "macos-arm64",
+            "inherits": "macos-base",
+            "displayName": "VGMTrans (Apple Silicon)",
+            "description": "Build VGMTrans for Apple Silicon Macs",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+                "CMAKE_OSX_ARCHITECTURES": "arm64"
+            }
+        },
+        {
+            "name": "linux-x64",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "displayName": "Build VGMTrans for Linux x64",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "environment": {
+                "CXXFLAGS": "$penv{CXXFLAGS} -lstdc++fs -Wall -Wextra -Wshadow -Wunused -Wold-style-cast -Woverloaded-virtual -Wcast-align -Wnull-dereference"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "win-x64-debug",
+            "displayName": "Windows x64, Debug",
+            "configurePreset": "win-x64",
+            "configuration": "Debug"
+        },
+        {
+            "name": "win-x64-release",
+            "displayName": "Windows x64, Release",
+            "configurePreset": "win-x64",
+            "configuration": "Release"
+        },
+        {
+            "name": "win-arm64-debug",
+            "displayName": "Windows ARM64, Debug",
+            "configurePreset": "win-arm64",
+            "configuration": "Debug"
+        },
+        {
+            "name": "win-arm64-release",
+            "displayName": "Windows ARM64, Release",
+            "configurePreset": "win-arm64",
+            "configuration": "Release"
+        },
+        {
+            "name": "macos-intel-debug",
+            "displayName": "macOS Intel, Debug",
+            "configurePreset": "macos-intel",
+            "configuration": "Debug"
+        },
+        {
+            "name": "macos-intel-release",
+            "displayName": "macOS Release, Debug",
+            "configurePreset": "macos-intel",
+            "configuration": "Release"
+        },
+        {
+            "name": "macos-arm64-debug",
+            "displayName": "macOS Apple Silicon, Debug",
+            "configurePreset": "macos-arm64",
+            "configuration": "Debug"
+        },
+        {
+            "name": "macos-arm64-release",
+            "displayName": "macOS Apple Silicon, Release",
+            "configurePreset": "macos-arm64",
+            "configuration": "Release"
+        },
+        {
+            "name": "linux-x64-debug",
+            "displayName": "Linux x64, Debug",
+            "configurePreset": "linux-x64",
+            "configuration": "Debug"
+        },
+        {
+            "name": "linux-x64-release",
+            "displayName": "Linux x64, Release",
+            "configurePreset": "linux-x64",
+            "configuration": "Release"
+        }
+    ]
+}
