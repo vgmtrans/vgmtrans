@@ -204,3 +204,4 @@ cmake-build-*
 
 # Visual Studio Code
 .vscode
+compile_commands.json
