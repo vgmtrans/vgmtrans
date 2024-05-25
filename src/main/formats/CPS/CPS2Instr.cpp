@@ -382,7 +382,7 @@ bool CPS2Instr::LoadInstr() {
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
 
     rgn->AddSimpleItem(this->dwOffset,     2, "Sample Info Index");
-    rgn->AddSimpleItem(this->dwOffset + 2, 1, "Unknown");
+    rgn->AddFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
     rgn->AddSimpleItem(this->dwOffset + 3, 1, "Articulation Index");
 
     const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->parInstrSet)->articTable;
