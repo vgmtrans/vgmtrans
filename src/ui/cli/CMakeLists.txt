@@ -6,8 +6,4 @@ add_executable(
 
 target_include_directories(vgmtrans-cli PUBLIC "${PROJECT_BINARY_DIR}/src")
 
-target_link_libraries(
-  vgmtrans-cli
-  PRIVATE g_options
-          g_warnings
-          vgmtranscore)
+target_link_libraries(vgmtrans-cli PRIVATE vgmtranscore)

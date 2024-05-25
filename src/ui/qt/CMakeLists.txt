@@ -104,9 +104,7 @@ target_include_directories(vgmtrans PRIVATE . ./util ./widgets ./workarea)
 
 target_link_libraries(
   vgmtrans
-  PRIVATE g_options
-          g_warnings
-          vgmtranscore
+  PRIVATE vgmtranscore
           Qt::Widgets
           Qt::Svg
           BASS::MIDI)

@@ -68,4 +68,4 @@ target_include_directories(vgmtranscore PUBLIC
 target_link_libraries(
   vgmtranscore
   PUBLIC spdlog::spdlog unarr zlibstatic minizip tinyxml mio
-  PRIVATE g_options g_warnings)
+)
