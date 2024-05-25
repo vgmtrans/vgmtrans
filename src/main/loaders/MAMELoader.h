@@ -14,7 +14,8 @@
 class TiXmlElement;
 class VirtFile;
 
-enum LoadMethod { LM_APPEND, LM_APPEND_SWAP16, LM_DEINTERLACE, LM_DEINTERLACE_PAIRS };
+enum class LoadMethod { APPEND, APPEND_SWAP16, DEINTERLACE, DEINTERLACE_PAIRS };
+enum class LoadOrder { NORMAL, REVERSE };
 
 /**
 Converts a std::string to any class with a proper overload of the >> operator
@@ -30,7 +31,7 @@ void FromString(const std::string &temp, T *out) {
 }
 
 struct MAMERomGroup {
-    MAMERomGroup() : loadmethod(LM_APPEND), file(nullptr) {}
+    MAMERomGroup() {}
     template <class T>
     bool GetAttribute(const std::string &attrName, T *out) {
         std::string strValue = attributes[attrName];
@@ -42,12 +43,13 @@ struct MAMERomGroup {
     }
     bool GetHexAttribute(const std::string &attrName, uint32_t *out) const;
 
-    LoadMethod loadmethod;
+    LoadMethod loadmethod{LoadMethod::APPEND};
+    LoadOrder load_order{LoadOrder::NORMAL};
     std::string type;
     std::string encryption;
     std::map<const std::string, std::string> attributes;
     std::list<std::string> roms;
-    VirtFile *file;
+    VirtFile *file{};
 };
 
 struct MAMEGame {
