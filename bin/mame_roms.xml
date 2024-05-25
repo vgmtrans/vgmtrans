@@ -79,7 +79,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="2" samp_table="0x3D95" artic_table="0x40BD">
             <rom>tko.01</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace" load_order="reverse">
             <rom>tkoj5_a.simm5</rom>
             <rom>tkoj5_b.simm5</rom>
         </romgroup>
@@ -209,7 +209,7 @@
             <rom>jojon/jojo-simm1.2</rom>
             <rom>jojon/jojo-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>jojon/jojo-simm3.0</rom>
             <rom>jojon/jojo-simm3.1</rom>
         </romgroup>
@@ -221,7 +221,7 @@
             <rom>jojo-simm1.2</rom>
             <rom>jojo-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>jojo-simm3.0</rom>
             <rom>jojo-simm3.1</rom>
         </romgroup>
@@ -233,7 +233,7 @@
             <rom>jojoban/jojoba-simm1.2</rom>
             <rom>jojoban/jojoba-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>jojoban/jojoba-simm3.0</rom>
             <rom>jojoban/jojoba-simm3.1</rom>
         </romgroup>
@@ -245,7 +245,7 @@
             <rom>jojoba-simm1.2</rom>
             <rom>jojoba-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>jojoba-simm3.0</rom>
             <rom>jojoba-simm3.1</rom>
         </romgroup>
@@ -254,7 +254,7 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3EF4" num_instr_banks="3" samp_table="0x40B8" artic_table="0x4428">
             <rom>maj_01.1a</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace" load_order="reverse">
             <rom>maj5_a.simm5</rom>
             <rom>maj5_b.simm5</rom>
         </romgroup>
@@ -458,7 +458,7 @@
             <rom>redearthn/redearth-simm1.2</rom>
             <rom>redearthn/redearth-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>redearthn/redearth-simm3.0</rom>
             <rom>redearthn/redearth-simm3.1</rom>
         </romgroup>
@@ -470,7 +470,7 @@
             <rom>redearth-simm1.2</rom>
             <rom>redearth-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>redearth-simm3.0</rom>
             <rom>redearth-simm3.1</rom>
         </romgroup>
@@ -592,7 +592,7 @@
             <rom>sfiiin/sfiii-simm1.2</rom>
             <rom>sfiiin/sfiii-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>sfiiin/sfiii-simm3.0</rom>
             <rom>sfiiin/sfiii-simm3.1</rom>
         </romgroup>
@@ -604,7 +604,7 @@
             <rom>sfiii-simm1.2</rom>
             <rom>sfiii-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>sfiii-simm3.0</rom>
             <rom>sfiii-simm3.1</rom>
         </romgroup>
@@ -616,7 +616,7 @@
             <rom>sfiii2n/sfiii2-simm1.2</rom>
             <rom>sfiii2n/sfiii2-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>sfiii2n/sfiii2-simm3.0</rom>
             <rom>sfiii2n/sfiii2-simm3.1</rom>
         </romgroup>
@@ -628,7 +628,7 @@
             <rom>sfiii2-simm1.2</rom>
             <rom>sfiii2-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>sfiii2-simm3.0</rom>
             <rom>sfiii2-simm3.1</rom>
         </romgroup>
@@ -640,7 +640,7 @@
             <rom>sfiii3n/sfiii3-simm1.2</rom>
             <rom>sfiii3n/sfiii3-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace_pairs">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>sfiii3n/sfiii3-simm3.0</rom>
             <rom>sfiii3n/sfiii3-simm3.1</rom>
             <rom>sfiii3n/sfiii3-simm3.2</rom>
@@ -654,9 +654,11 @@
             <rom>sfiii3-simm1.2</rom>
             <rom>sfiii3-simm1.3</rom>
         </romgroup>
-        <romgroup type="qsound" load_method="deinterlace">
+        <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>sfiii3-simm3.0</rom>
             <rom>sfiii3-simm3.1</rom>
+            <rom>sfiii3-simm3.2</rom>
+            <rom>sfiii3-simm3.3</rom>
         </romgroup>
     </game>
     <game name="sgemf" format="CPS2" fmt_version="1.30">

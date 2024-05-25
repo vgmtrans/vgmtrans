@@ -32,7 +32,7 @@ struct qs_prog_info_ver_103 {
 
 struct qs_prog_info_ver_130 {
   uint16_t sample_index;
-  uint8_t unknown;
+  int8_t fine_tune;
   uint8_t artic_index;
 };
 
