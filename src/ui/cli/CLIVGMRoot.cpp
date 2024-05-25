@@ -78,7 +78,7 @@ bool CLIVGMRoot::Init() {
     }
     else {
       for(size_t i = numColls; i < GetNumCollections(); ++i) {
-        VGMColl* coll = vVGMColl[i];
+        VGMColl* coll = vgmColls()[i];
         string collName = coll->GetName();
         auto it = collNameMap.find(collName);
         pair<size_t, fs::path> p = make_pair(i, infile);
@@ -129,7 +129,7 @@ bool CLIVGMRoot::Init() {
           }
           // update collection name to be unique
           string newCollName = collNameIt->first + suffix;
-          vVGMColl[p.first]->SetName(&newCollName);
+          vgmColls()[p.first]->SetName(&newCollName);
         }
       }
     }
@@ -142,7 +142,7 @@ bool CLIVGMRoot::Init() {
 
 bool CLIVGMRoot::ExportAllCollections() {
   bool success = true;
-  for (VGMColl* coll : vVGMColl) {
+  for (VGMColl* coll : vgmColls()) {
     string collName = coll->GetName();
     success &= ExportCollection(coll);
   }
@@ -220,14 +220,13 @@ void CLIVGMRoot::UI_Log(LogItem* theLog) {
 }
 
 void CLIVGMRoot::UpdateCollections() {
-  for (VGMFileVariant targVariant : vVGMFile) {
+  for (VGMFileVariant targVariant : vgmFiles()) {
     auto targFile = variantToVGMFile(targVariant);
     Format *fmt = targFile->GetFormat();
     if (fmt->matcher) {
       fmt->matcher->MakeCollectionsForFile(targFile);
     }
   }
-  vVGMFile.clear();
 }
 
 string CLIVGMRoot::UI_GetSaveFilePath(const string& suggestedFilename, const string& extension) {

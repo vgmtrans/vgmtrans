@@ -70,9 +70,14 @@ public:
   virtual std::string UI_GetSaveDirPath(const std::string &suggestedDir = "") = 0;
   virtual bool UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, size_t size);
 
-  std::vector<RawFile *> vRawFile;
-  std::vector<VGMColl *> vVGMColl;
-  std::vector<VGMFileVariant> vVGMFile;
+  const std::vector<RawFile*>& rawFiles() { return m_rawfiles; }
+  const std::vector<VGMFileVariant>& vgmFiles() { return m_vgmfiles; }
+  const std::vector<VGMColl*>& vgmColls() { return m_vgmcolls; }
+
+private:
+  std::vector<RawFile *> m_rawfiles;
+  std::vector<VGMFileVariant> m_vgmfiles;
+  std::vector<VGMColl *> m_vgmcolls;
 };
 
 extern VGMRoot *pRoot;

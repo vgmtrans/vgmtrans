@@ -51,12 +51,12 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {
-  return static_cast<int>(qtVGMRoot.vVGMColl.size());
+  return static_cast<int>(qtVGMRoot.vgmColls().size());
 }
 
 QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
   if (role == Qt::DisplayRole || role == Qt::EditRole) {
-    return QString::fromStdString(qtVGMRoot.vVGMColl[index.row()]->GetName());
+    return QString::fromStdString(qtVGMRoot.vgmColls()[index.row()]->GetName());
   } else if (role == Qt::DecorationRole) {
     return VGMCollIcon();
   }
@@ -86,7 +86,7 @@ void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
                                      const QModelIndex &index) const {
   auto *line_edit = qobject_cast<QLineEdit *>(editor);
   auto new_name = line_edit->text().toStdString();
-  qtVGMRoot.vVGMColl[index.row()]->SetName(&new_name);
+  qtVGMRoot.vgmColls()[index.row()]->SetName(&new_name);
   model->dataChanged(index, index);
 }
 
@@ -139,7 +139,7 @@ void VGMCollListView::collectionMenu(const QPoint &pos) const {
     }
 
     for (auto &index : selectedIndexes()) {
-      if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
+      if (auto coll = qtVGMRoot.vgmColls()[index.row()]; coll) {
         conversion::SaveAs<conversion::Target::MIDI | conversion::Target::DLS>(*coll, save_path);
       }
     }
@@ -152,7 +152,7 @@ void VGMCollListView::collectionMenu(const QPoint &pos) const {
     }
 
     for (auto &index : selectedIndexes()) {
-      if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
+      if (auto coll = qtVGMRoot.vgmColls()[index.row()]; coll) {
         conversion::SaveAs<conversion::Target::MIDI | conversion::Target::SF2>(*coll, save_path);
       }
     }
@@ -165,7 +165,7 @@ void VGMCollListView::collectionMenu(const QPoint &pos) const {
     }
 
     for (auto &index : selectedIndexes()) {
-      if (auto coll = qtVGMRoot.vVGMColl[index.row()]; coll) {
+      if (auto coll = qtVGMRoot.vgmColls()[index.row()]; coll) {
         conversion::SaveAs<conversion::Target::MIDI | conversion::Target::DLS |
           conversion::Target::SF2>(*coll, save_path);
       }
@@ -198,7 +198,7 @@ void VGMCollListView::handlePlaybackRequest() {
     return;
   }
 
-  VGMColl *coll = qtVGMRoot.vVGMColl[list[0].row()];
+  VGMColl *coll = qtVGMRoot.vgmColls()[list[0].row()];
   SequencePlayer::the().playCollection(coll);
 }
 
