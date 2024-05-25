@@ -33,6 +33,9 @@
             "architecture": {
                 "value": "arm64",
                 "strategy": "external"
+            },
+            "cacheVariables": {
+                "ENABLE_UI_QT": false
             }
         },
         {
@@ -76,7 +79,8 @@
         {
             "name": "linux-x64",
             "binaryDir": "${sourceDir}/build/${presetName}",
-            "displayName": "Build VGMTrans for Linux x64",
+            "displayName": "Linux x64",
+            "description": "Build VGMTrans for Linux x64",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
