@@ -73,7 +73,8 @@ ManualCollectionDialog::ManualCollectionDialog(QWidget *parent) : QDialog(parent
 
 QListWidget *ManualCollectionDialog::makeSequenceList() {
   std::vector<VGMFile *> seqs;
-  for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
+  const auto& files = qtVGMRoot.vgmFiles();
+  for (const auto& fileVariant : files) {
     if (std::holds_alternative<VGMSeq*>(fileVariant)) {
       if (VGMSeq* seq = std::get<VGMSeq*>(fileVariant)) {
         seqs.push_back(seq);
@@ -93,7 +94,8 @@ QListWidget *ManualCollectionDialog::makeSequenceList() {
 
 QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
   std::vector<VGMFile *> instrSets;
-  for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
+  const auto& files = qtVGMRoot.vgmFiles();
+  for (const auto& fileVariant : files) {
     if (std::holds_alternative<VGMInstrSet*>(fileVariant)) {
       if (VGMInstrSet* instrSet = std::get<VGMInstrSet*>(fileVariant)) {
         instrSets.push_back(instrSet);
@@ -113,7 +115,8 @@ QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
 
 QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
   std::vector<VGMFile *> sampColls;
-  for (const auto& fileVariant : qtVGMRoot.vVGMFile) {
+  const auto& files = qtVGMRoot.vgmFiles();
+  for (const auto& fileVariant : files) {
     if (std::holds_alternative<VGMSampColl*>(fileVariant)) {
       if (VGMSampColl* sampColl = std::get<VGMSampColl*>(fileVariant)) {
         sampColls.push_back(sampColl);

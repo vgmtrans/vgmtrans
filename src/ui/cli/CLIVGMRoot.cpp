@@ -65,20 +65,21 @@ bool CLIVGMRoot::Init() {
   // get collection for each input file
   size_t inputFileCtr = 0;
   size_t numColls = 0;
+  size_t numVGMFiles = 0;
   // map for deconflicting identical collection names using input filenames
   map<string, vector<pair<size_t, fs::path>>> collNameMap {};
   for (fs::path infile : inputFiles) {
     if (!OpenRawFile(infile.string())) {  // file not found
       return false;
     }
-    UpdateCollections();
+    numVGMFiles = UpdateCollections(numVGMFiles);
     size_t numCollsAdded = GetNumCollections() - numColls;
     if (numCollsAdded == 0) {
       cout << "File " << infile.string() << " is not a recognized music file" << endl;
     }
     else {
       for(size_t i = numColls; i < GetNumCollections(); ++i) {
-        VGMColl* coll = vVGMColl[i];
+        VGMColl* coll = vgmColls()[i];
         string collName = coll->GetName();
         auto it = collNameMap.find(collName);
         pair<size_t, fs::path> p = make_pair(i, infile);
@@ -129,7 +130,7 @@ bool CLIVGMRoot::Init() {
           }
           // update collection name to be unique
           string newCollName = collNameIt->first + suffix;
-          vVGMColl[p.first]->SetName(&newCollName);
+          vgmColls()[p.first]->SetName(&newCollName);
         }
       }
     }
@@ -142,7 +143,7 @@ bool CLIVGMRoot::Init() {
 
 bool CLIVGMRoot::ExportAllCollections() {
   bool success = true;
-  for (VGMColl* coll : vVGMColl) {
+  for (VGMColl* coll : vgmColls()) {
     string collName = coll->GetName();
     success &= ExportCollection(coll);
   }
@@ -219,15 +220,16 @@ void CLIVGMRoot::UI_Log(LogItem* theLog) {
   }
 }
 
-void CLIVGMRoot::UpdateCollections() {
-  for (VGMFileVariant targVariant : vVGMFile) {
-    auto targFile = variantToVGMFile(targVariant);
+size_t CLIVGMRoot::UpdateCollections(size_t startOffset) {
+  auto files = vgmFiles();
+  for (int i = startOffset; i < files.size(); ++i) {
+    auto targFile = variantToVGMFile(files[i]);
     Format *fmt = targFile->GetFormat();
-    if (fmt->matcher) {
+    if (fmt && fmt->matcher) {
       fmt->matcher->MakeCollectionsForFile(targFile);
     }
   }
-  vVGMFile.clear();
+  return vgmFiles().size();
 }
 
 string CLIVGMRoot::UI_GetSaveFilePath(const string& suggestedFilename, const string& extension) {

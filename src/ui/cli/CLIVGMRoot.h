@@ -19,7 +19,7 @@ class CLIVGMRoot : public VGMRoot {
 public:
 
   size_t GetNumCollections() {
-    return vVGMColl.size();
+    return vgmColls().size();
   }
 
   void DisplayUsage();
@@ -46,7 +46,7 @@ public:
 
   void UI_Log(LogItem* theLog) override;
 
-  virtual void UpdateCollections();
+  size_t UpdateCollections(size_t startOffset);
 
   std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
                                  const std::string& extension = "") override;

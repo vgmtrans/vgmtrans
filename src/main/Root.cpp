@@ -105,7 +105,7 @@ bool VGMRoot::SetupNewRawFile(RawFile *newRawFile) {
   }
 
   if (!newRawFile->containedVGMFiles().empty()) {
-    vRawFile.emplace_back(newRawFile);
+    m_rawfiles.emplace_back(newRawFile);
     UI_AddRawFile(newRawFile);
   }
 
@@ -118,8 +118,8 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
     return false;
   }
 
-  auto file = std::ranges::find(vRawFile, targFile);
-  if (file != vRawFile.end()) {
+  auto file = std::ranges::find(m_rawfiles, targFile);
+  if (file != m_rawfiles.end()) {
     auto &vgmfiles = (*file)->containedVGMFiles();
     UI_BeginRemoveVGMFiles();
     for (const auto & vgmfile : vgmfiles) {
@@ -127,7 +127,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
     }
     UI_EndRemoveVGMFiles();
 
-    vRawFile.erase(file);
+    m_rawfiles.erase(file);
 
     UI_CloseRawFile(targFile);
   } else {
@@ -140,7 +140,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
 
 void VGMRoot::AddVGMFile(
   std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
-  vVGMFile.push_back(file);
+  m_vgmfiles.push_back(file);
   L_INFO("Loaded {} successfully.", *variantToVGMFile(file)->GetName());
   UI_AddVGMFile(file);
 }
@@ -155,11 +155,11 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
     fmt->OnCloseFile(file);
   }
 
-  auto iter = std::ranges::find(vVGMFile, file);
+  auto iter = std::ranges::find(m_vgmfiles, file);
 
-  if (iter != vVGMFile.end()) {
+  if (iter != m_vgmfiles.end()) {
     UI_RemoveVGMFile(targFile);
-    vVGMFile.erase(iter);
+    m_vgmfiles.erase(iter);
   } else {
     L_WARN("Requested deletion for VGMFile but it was not found");
   }
@@ -179,14 +179,14 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
 }
 
 void VGMRoot::AddVGMColl(VGMColl *theColl) {
-    vVGMColl.push_back(theColl);
+    m_vgmcolls.push_back(theColl);
     UI_AddVGMColl(theColl);
 }
 
 void VGMRoot::RemoveVGMColl(VGMColl *targColl) {
-  auto iter = std::ranges::find(vVGMColl, targColl);
-  if (iter != vVGMColl.end())
-    vVGMColl.erase(iter);
+  auto iter = std::ranges::find(m_vgmcolls, targColl);
+  if (iter != m_vgmcolls.end())
+    m_vgmcolls.erase(iter);
   else
     L_WARN("Requested deletion for VGMColl but it was not found");
 

@@ -54,11 +54,11 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
 }
 
 void VGMCollViewModel::handleNewCollSelected(const QModelIndex& modelIndex) {
-  if (!modelIndex.isValid() || qtVGMRoot.vVGMColl.empty() ||
-      static_cast<size_t>(modelIndex.row()) >= qtVGMRoot.vVGMColl.size()) {
+  if (!modelIndex.isValid() || qtVGMRoot.vgmColls().empty() ||
+      static_cast<size_t>(modelIndex.row()) >= qtVGMRoot.vgmColls().size()) {
     m_coll = nullptr;
   } else {
-    m_coll = qtVGMRoot.vVGMColl[modelIndex.row()];
+    m_coll = qtVGMRoot.vgmColls()[modelIndex.row()];
   }
 
   dataChanged(index(0, 0), modelIndex);
@@ -170,14 +170,14 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 
   QObject::connect(collListSelModel, &QItemSelectionModel::currentChanged,
     [this, commit_rename](const QModelIndex& index) {
-    if (!index.isValid() || qtVGMRoot.vVGMColl.empty() ||
-        static_cast<size_t>(index.row()) >= qtVGMRoot.vVGMColl.size()) {
+    if (!index.isValid() || qtVGMRoot.vgmColls().empty() ||
+        static_cast<size_t>(index.row()) >= qtVGMRoot.vgmColls().size()) {
       commit_rename->setEnabled(false);
       m_collection_title->setReadOnly(true);
       m_collection_title->setText("No collection selected");
     } else {
       m_collection_title->setText(
-          QString::fromStdString(qtVGMRoot.vVGMColl[index.row()]->GetName()));
+          QString::fromStdString(qtVGMRoot.vgmColls()[index.row()]->GetName()));
       m_collection_title->setReadOnly(false);
       commit_rename->setEnabled(true);
     }
@@ -185,14 +185,14 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 
   QObject::connect(commit_rename, &QPushButton::pressed, [this, collListSelModel]() {
     auto model_index = collListSelModel->currentIndex();
-    if (!model_index.isValid() || qtVGMRoot.vVGMColl.empty() ||
-        model_index.row() >= qtVGMRoot.vVGMColl.size()) {
+    if (!model_index.isValid() || qtVGMRoot.vgmColls().empty() ||
+        model_index.row() >= qtVGMRoot.vgmColls().size()) {
       return;
     }
 
     auto title = m_collection_title->text().toStdString();
     /* This makes a copy, no worries */
-    qtVGMRoot.vVGMColl[model_index.row()]->SetName(&title);
+    qtVGMRoot.vgmColls()[model_index.row()]->SetName(&title);
 
     auto coll_list_model = collListSelModel->model();
     coll_list_model->dataChanged(coll_list_model->index(0, 0),
