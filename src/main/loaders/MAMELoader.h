@@ -31,7 +31,6 @@ void FromString(const std::string &temp, T *out) {
 }
 
 struct MAMERomGroup {
-    MAMERomGroup() {}
     template <class T>
     bool GetAttribute(const std::string &attrName, T *out) {
         std::string strValue = attributes[attrName];

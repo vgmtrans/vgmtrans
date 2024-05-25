@@ -23,8 +23,7 @@ namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");
 }
 
-bool MAMERomGroup::GetHexAttribute(const std::string& attrName, uint32_t* out) const
-{
+bool MAMERomGroup::GetHexAttribute(const std::string& attrName, uint32_t* out) const {
   auto it = attributes.find(attrName);
   if (it == attributes.end()) {
     return false;  // Key not found
@@ -39,24 +38,21 @@ bool MAMERomGroup::GetHexAttribute(const std::string& attrName, uint32_t* out) c
   return true;
 }
 
-MAMERomGroup* MAMEGame::GetRomGroupOfType(const std::string& strType)
-{
-  for (std::list<MAMERomGroup>::iterator it = romgroupentries.begin(); it != romgroupentries.end();
-       ++it) {
-    if (it->type.compare(strType) == 0)
-      return &(*it);
+MAMERomGroup* MAMEGame::GetRomGroupOfType(const std::string& strType) {
+  if (auto group = std::ranges::find_if(
+          romgroupentries, [&strType](const auto& group) { return group.type == strType; });
+      group != romgroupentries.end()) {
+    return std::addressof(*group);
   }
 
   return nullptr;
 }
 
-MAMELoader::MAMELoader()
-{
+MAMELoader::MAMELoader() {
   bLoadedXml = !LoadXML();
 }
 
-MAMELoader::~MAMELoader()
-{
+MAMELoader::~MAMELoader() {
   DeleteMap<std::string, MAMEGame>(gamemap);
 }
 
@@ -85,8 +81,7 @@ int MAMELoader::LoadXML() {
   return 0;
 }
 
-MAMEGame* MAMELoader::LoadGameEntry(TiXmlElement* gameElmt)
-{
+MAMEGame* MAMELoader::LoadGameEntry(TiXmlElement* gameElmt) {
   MAMEGame* gameentry = new MAMEGame;
   std::string gamename, fmtVersionStr;
 
@@ -117,8 +112,7 @@ MAMEGame* MAMELoader::LoadGameEntry(TiXmlElement* gameElmt)
   return gameentry;
 }
 
-int MAMELoader::LoadRomGroupEntry(TiXmlElement* romgroupElmt, MAMEGame* gameentry)
-{
+int MAMELoader::LoadRomGroupEntry(TiXmlElement* romgroupElmt, MAMEGame* gameentry) {
   MAMERomGroup romgroupentry;
 
   // First, get the "type" and "load_method" attributes.  If they don't exist, we return with an
@@ -178,8 +172,7 @@ int MAMELoader::LoadRomGroupEntry(TiXmlElement* romgroupElmt, MAMEGame* gameentr
   return 0;
 }
 
-void MAMELoader::apply(const RawFile* file)
-{
+void MAMELoader::apply(const RawFile* file) {
   if (!bLoadedXml || file->extension() != "zip")
     return;
 
@@ -227,8 +220,7 @@ void MAMELoader::apply(const RawFile* file)
 }
 
 VirtFile* MAMELoader::LoadRomGroup(const MAMERomGroup& entry, const std::string& format,
-                                   const unzFile& cur_file)
-{
+                                   const unzFile& cur_file) {
   uint32_t destFileSize = 0;
   std::list<std::pair<uint8_t*, uint32_t>> buffers;
   auto roms = entry.roms;
@@ -299,86 +291,86 @@ VirtFile* MAMELoader::LoadRomGroup(const MAMERomGroup& entry, const std::string&
       break;
     }
 
-  // append the files and swap every 16 byte word
-  case LoadMethod::APPEND_SWAP16: {
-    uint32_t curDestOffset = 0;
+    // append the files and swap every 16 byte word
+    case LoadMethod::APPEND_SWAP16: {
+      uint32_t curDestOffset = 0;
 
-    if (entry.load_order == LoadOrder::REVERSE) {
-      for (auto it = buffers.rbegin(); it != buffers.rend(); ++it) {
-        uint8_t* romBuf = it->first;
-        uint32_t romSize = it->second;
-        for (uint32_t i = 0; i < romSize; i += 2) {
-          destFile[curDestOffset + i] = romBuf[i + 1];
-          destFile[curDestOffset + i + 1] = romBuf[i];
-        }
-        curDestOffset += romSize;
-      }
-    } else {
-      for (auto& bufInfo : buffers) {
-        uint8_t* buf = bufInfo.first;
-        uint32_t romSize = bufInfo.second;
-        for (uint32_t i = 0; i < romSize; i += 2) {
-          destFile[curDestOffset + i] = buf[i + 1];
-          destFile[curDestOffset + i + 1] = buf[i];
-        }
-        curDestOffset += romSize;
-      }
-    }
-    break;
-  }
-
-  // Deinterlace the bytes from each rom.
-  // For example, for an entry of 2 roms, read from rom 1, then rom 2, then rom 1, then rom 2.
-  case LoadMethod::DEINTERLACE: {
-    uint32_t curDestOffset = 0;
-    uint32_t curRomOffset = 0;
-
-    while (curDestOffset < destFileSize) {
       if (entry.load_order == LoadOrder::REVERSE) {
-        for (auto & buffer : std::ranges::reverse_view(buffers))
-          destFile[curDestOffset++] = buffer.first[curRomOffset];
-      }
-      else {
-        for (auto& bufInfo : buffers)
-          destFile[curDestOffset++] = bufInfo.first[curRomOffset];
-      }
-      curRomOffset++;
-    }
-    break;
-  }
-
-  case LoadMethod::DEINTERLACE_PAIRS: {
-    if (buffers.size() % 2 > 0) {
-      L_ERROR("MAMELoader was going to load a rom group by deinterlacing rom pairs, but there"
-              "an odd number of roms in the group. Aborting.");
-      DeleteBuffers(buffers);
-      return nullptr;
-    }
-
-    uint32_t curDestOffset = 0;
-    uint32_t curRomOffset = 0;
-    auto it = buffers.begin();
-
-    while (curDestOffset < destFileSize && it != buffers.end()) {
-      // Get the next pair
-      if (it != buffers.end()) {
-        auto& buf1 = *it++;
-        auto& buf2 = *it++;
-
-        auto firstBuf = entry.load_order == LoadOrder::REVERSE ? &buf2 : &buf1;
-        auto secondBuf = entry.load_order == LoadOrder::REVERSE ? &buf1 : &buf2;
-
-        while (curDestOffset < destFileSize && curRomOffset < firstBuf->second &&
-               curRomOffset < secondBuf->second) {
-          destFile[curDestOffset++] = firstBuf->first[curRomOffset];
-          destFile[curDestOffset++] = secondBuf->first[curRomOffset];
-          curRomOffset++;
+        for (auto it = buffers.rbegin(); it != buffers.rend(); ++it) {
+          uint8_t* romBuf = it->first;
+          uint32_t romSize = it->second;
+          for (uint32_t i = 0; i < romSize; i += 2) {
+            destFile[curDestOffset + i] = romBuf[i + 1];
+            destFile[curDestOffset + i + 1] = romBuf[i];
+          }
+          curDestOffset += romSize;
         }
-        curRomOffset = 0;  // Reset for the next pair
+      } else {
+        for (auto& bufInfo : buffers) {
+          uint8_t* buf = bufInfo.first;
+          uint32_t romSize = bufInfo.second;
+          for (uint32_t i = 0; i < romSize; i += 2) {
+            destFile[curDestOffset + i] = buf[i + 1];
+            destFile[curDestOffset + i + 1] = buf[i];
+          }
+          curDestOffset += romSize;
+        }
       }
+      break;
     }
-    break;
-  }
+
+    // Deinterlace the bytes from each rom.
+    // For example, for an entry of 2 roms, read from rom 1, then rom 2, then rom 1, then rom 2.
+    case LoadMethod::DEINTERLACE: {
+      uint32_t curDestOffset = 0;
+      uint32_t curRomOffset = 0;
+
+      while (curDestOffset < destFileSize) {
+        if (entry.load_order == LoadOrder::REVERSE) {
+          for (auto & buffer : std::ranges::reverse_view(buffers))
+            destFile[curDestOffset++] = buffer.first[curRomOffset];
+        }
+        else {
+          for (auto& bufInfo : buffers)
+            destFile[curDestOffset++] = bufInfo.first[curRomOffset];
+        }
+        curRomOffset++;
+      }
+      break;
+    }
+
+    case LoadMethod::DEINTERLACE_PAIRS: {
+      if (buffers.size() % 2 > 0) {
+        L_ERROR("MAMELoader was going to load a rom group by deinterlacing rom pairs, but there"
+                "an odd number of roms in the group. Aborting.");
+        DeleteBuffers(buffers);
+        return nullptr;
+      }
+
+      uint32_t curDestOffset = 0;
+      uint32_t curRomOffset = 0;
+      auto it = buffers.begin();
+
+      while (curDestOffset < destFileSize && it != buffers.end()) {
+        // Get the next pair
+        if (it != buffers.end()) {
+          auto& buf1 = *it++;
+          auto& buf2 = *it++;
+
+          auto firstBuf = entry.load_order == LoadOrder::REVERSE ? &buf2 : &buf1;
+          auto secondBuf = entry.load_order == LoadOrder::REVERSE ? &buf1 : &buf2;
+
+          while (curDestOffset < destFileSize && curRomOffset < firstBuf->second &&
+                 curRomOffset < secondBuf->second) {
+            destFile[curDestOffset++] = firstBuf->first[curRomOffset];
+            destFile[curDestOffset++] = secondBuf->first[curRomOffset];
+            curRomOffset++;
+          }
+          curRomOffset = 0;  // Reset for the next pair
+        }
+      }
+      break;
+    }
   }
   DeleteBuffers(buffers);
 
@@ -419,8 +411,7 @@ VirtFile* MAMELoader::LoadRomGroup(const MAMERomGroup& entry, const std::string&
   return newVirtFile;
 }
 
-void MAMELoader::DeleteBuffers(const std::list<std::pair<uint8_t*, uint32_t>>& buffers)
-{
+void MAMELoader::DeleteBuffers(const std::list<std::pair<uint8_t*, uint32_t>>& buffers) {
   for (auto& buf : buffers) {
     delete[] buf.first;
   }
