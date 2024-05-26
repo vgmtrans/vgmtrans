@@ -32,13 +32,8 @@ CPSSeq::~CPSSeq() {
 }
 
 bool CPSSeq::GetHeaderInfo() {
-  // for 100% accuracy, we'd left shift by 256, but that seems unnecessary and excessive
-
-  if (fmt_version >= VER_200)
-    SetPPQN(0x30);
-  else
-    SetPPQN(0x30 << 4);
-  return true;        //successful
+  SetPPQN(0x30);
+  return true;
 }
 
 
@@ -156,11 +151,9 @@ bool CPSSeq::PostLoad() {
         double lfoTicks = segmentDur / static_cast<double>(mpLFOt);
         double numLfoPhases = (lfoTicks * static_cast<double>(lfoRate)) / 0x20000;
         double lfoRatePerMidiTick = (numLfoPhases * 0x20000) / static_cast<double>(segmentDurTicks);
+        uint32_t lfoRatePerLoop = static_cast<uint32_t>(lfoRatePerMidiTick * 256);
 
-        constexpr uint8_t tickRes = (fmt_version >= VER_200) ? 1 : 16;
-        uint32_t lfoRatePerLoop = static_cast<uint32_t>((tickRes * lfoRatePerMidiTick) * 256);
-
-        for (int t = 0; t < segmentDurTicks; t += tickRes) {
+        for (int t = 0; t < segmentDurTicks; ++t) {
           lfoVal += lfoRatePerLoop;
           if (lfoVal > 0xFFFFFF) {
             lfoVal -= 0x1000000;
@@ -188,7 +181,6 @@ bool CPSSeq::PostLoad() {
             track->InsertExpression(channel, expression, startAbsTicks + t);
           }
         }
-        // TODO add adjustment for segmentDurTicks % tickRes
       }
 
       uint32_t fmtPitchBendRange = fmt_version >= VER_200 ? 1200 : 50;
