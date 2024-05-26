@@ -135,7 +135,7 @@ bool CPSSeq::PostLoad() {
     uint32_t mpqn = 500000;      // microseconds per quarter note - 120 bpm default
     uint32_t mpt = mpqn / ppqn;  // microseconds per MIDI tick
     int16_t pitchbendCents = 0;         // pitch bend in cents
-    uint32_t pitchbendRange = 200;    // pitch bend range in cents default 2 semitones
+    uint32_t pitchbendRange = fmt_version >= VER_200 ? 1200 : 200;    // pitch bend range in cents default 2 semitones
     double vibratoCents = 0;          // vibrato depth in cents
     uint16_t tremelo = 0;        // tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
     uint16_t lfoRate = 0;        // value added to lfo env every lfo tick
@@ -157,7 +157,7 @@ bool CPSSeq::PostLoad() {
         double numLfoPhases = (lfoTicks * static_cast<double>(lfoRate)) / 0x20000;
         double lfoRatePerMidiTick = (numLfoPhases * 0x20000) / static_cast<double>(segmentDurTicks);
 
-        constexpr uint8_t tickRes = 16;
+        constexpr uint8_t tickRes = (fmt_version >= VER_200) ? 1 : 16;
         uint32_t lfoRatePerLoop = static_cast<uint32_t>((tickRes * lfoRatePerMidiTick) * 256);
 
         for (int t = 0; t < segmentDurTicks; t += tickRes) {
@@ -191,8 +191,7 @@ bool CPSSeq::PostLoad() {
         // TODO add adjustment for segmentDurTicks % tickRes
       }
 
-//      uint32_t fmtPitchBendRange = fmt_version != VER_201B ? 50 : 1200;
-      uint32_t fmtPitchBendRange = 50;
+      uint32_t fmtPitchBendRange = fmt_version >= VER_200 ? 1200 : 50;
 
       switch (event->GetEventType()) {
         case MIDIEVENT_TEMPO: {
@@ -211,13 +210,13 @@ bool CPSSeq::PostLoad() {
             uint8_t pitchBendRangeMSB = static_cast<uint8_t>(ceil(static_cast<double>(vibratoCents + fmtPitchBendRange) / 100.0));
             pitchbendRange = pitchBendRangeMSB * 100;
             printf("Vibrato byte: %X  Vibrato cents: %f  Converted to range: %d in cents\n", marker->databyte1, vibratoCents, pitchbendRange);
-
             // Fluidsynth does not support pitch bend range LSB, so we'll round up the value to the
             // nearest MSB. This doesn't really matter, as we calculate pitch bend in absolute terms
             // (cents) and we're passing 14 bit resolution pitch bend events. It's arguably more
             // elegant to normalize pitch bend range to semitone units anyway.
             track->InsertPitchBendRange(channel, pitchBendRangeMSB, 0, curTicks);
             lfoCents = static_cast<int16_t>((effectiveLfoVal / static_cast<double>(0x1000000)) * vibratoCents);
+            printf("lfoCents: %d  pitchBendCents: %d  effectiveLfoVal %X\n", lfoCents, pitchbendCents, effectiveLfoVal);
 
             if (curTicks > 0)
               track->InsertPitchBend(channel,
