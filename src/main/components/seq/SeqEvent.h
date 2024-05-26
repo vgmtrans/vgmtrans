@@ -184,10 +184,27 @@ class VolSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_VOLUME; }
 
   std::string GetDescription() override {
-    return fmt::format("{} - volume: {}", name, static_cast<int>(vol));
+    return fmt::format("{} - volume: {:d}", name, vol);
   };
 
   uint8_t vol;
+};
+
+//  *******************
+//  Volume14BitSeqEvent
+//  *******************
+
+class Volume14BitSeqEvent : public SeqEvent {
+public:
+  Volume14BitSeqEvent(SeqTrack *pTrack, uint16_t volume, uint32_t offset = 0, uint32_t length = 0,
+                      const std::string &name = "");
+  EventType GetEventType() override { return EVENTTYPE_VOLUME; }
+
+  std::string GetDescription() override {
+    return fmt::format("{} - volume: {:d}", name, m_volume);
+  };
+
+  uint16_t m_volume;
 };
 
 //  ****************

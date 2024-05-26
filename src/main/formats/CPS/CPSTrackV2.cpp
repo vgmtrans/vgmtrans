@@ -13,6 +13,8 @@ CPSTrackV2::CPSTrackV2(CPSSeq *parentSeq, uint32_t offset, uint32_t length)
 }
 
 void CPSTrackV2::ResetVars() {
+  m_master_volume = 0;
+  m_secondary_volume = 0x40;
   memset(loopCounter, 0, sizeof(loopCounter));
   memset(loopOffset, 0, sizeof(loopOffset));
   SeqTrack::ResetVars();
@@ -116,10 +118,11 @@ bool CPSTrackV2::ReadEvent() {
       break;
     }
 
-    case C6_VOLUME: {
-      uint8_t vol = GetByte(curOffset++);
-      vol = ConvertPercentAmpToStdMidiVal(vol / 127.0);
-      this->AddVol(beginOffset, curOffset - beginOffset, vol);
+    case C6_TRACK_MASTER_VOLUME: {
+      m_master_volume = GetByte(curOffset++);
+      double volume_percent = m_master_volume * m_secondary_volume / (127.0 * 127.0);
+      uint16_t final_volume = ConvertPercentAmpToStd14BitMidiVal(volume_percent);
+      AddVolume14Bit(beginOffset, curOffset - beginOffset, final_volume, "Track Master Volume");
       break;
     }
 
@@ -130,9 +133,10 @@ bool CPSTrackV2::ReadEvent() {
     }
 
     case EVENT_C8: {
-      uint8_t expression = GetByte(curOffset++);
-      expression = ConvertPercentAmpToStdMidiVal(expression / 127.0);
-      this->AddExpression(beginOffset, curOffset - beginOffset, expression);
+      m_secondary_volume = GetByte(curOffset++);
+      double volume_percent = m_master_volume * m_secondary_volume / (127.0 * 127.0);
+      uint16_t final_volume = ConvertPercentAmpToStd14BitMidiVal(volume_percent);
+      AddVolume14Bit(beginOffset, curOffset - beginOffset, final_volume);
       break;
     }
 

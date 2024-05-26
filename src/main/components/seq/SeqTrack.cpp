@@ -678,6 +678,33 @@ void SeqTrack::AddVolNoItem(uint8_t newVol) {
   vol = newVol;
 }
 
+void SeqTrack::AddVolume14Bit(uint32_t offset, uint32_t length, uint16_t volume, const std::string &sEventName) {
+  OnEvent(offset, length);
+
+  if (readMode == READMODE_ADD_TO_UI && !IsItemAtOffset(offset, false, true))
+    AddEvent(new Volume14BitSeqEvent(this, volume, offset, length, sEventName));
+  AddVolume14BitNoItem(volume);
+}
+
+// Add a 14 bit volume event by writing to controllers 39 and 7. Note that we assume the parameter
+// is in the range of 0 -> 127^2, but we normalize the value to the full 14 bit range: 0 -> (1 << 14) - 1
+void SeqTrack::AddVolume14BitNoItem(uint16_t volume) {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    double newVolPercent = std::min(volume / (127.0 * 127.0), 1.0);
+    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
+      newVolPercent *= panVolumeCorrectionRate;
+    if (parentSeq->bUseLinearAmplitudeScale)
+      newVolPercent = sqrt(newVolPercent);
+
+    const uint16_t finalVol = static_cast<uint16_t>(std::min(newVolPercent * 16383.0, 16383.0));
+    uint8_t volume_hi = static_cast<uint8_t>((finalVol >> 7) & 0x7F);
+    uint8_t volume_lo = static_cast<uint8_t>(finalVol & 0x7F);
+    pMidiTrack->AddVolumeFine(channel, volume_lo);
+    pMidiTrack->AddVol(channel, volume_hi);
+  }
+  vol = static_cast<uint8_t>((volume >> 7) & 0x7F);
+}
+
 void SeqTrack::AddVolSlide(uint32_t offset,
                            uint32_t length,
                            uint32_t dur,
