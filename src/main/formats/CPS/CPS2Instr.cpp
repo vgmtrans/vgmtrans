@@ -359,7 +359,10 @@ bool CPS2Instr::LoadInstr() {
       rgn->AddKeyHigh(progInfo.key_high, off + 0, 1);
       rgn->keyLow = prevKeyHigh + 1;
       prevKeyHigh = progInfo.key_high;
-      rgn->AddSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+5, 1);
+
+      auto volume_percent = ((64 + progInfo.volume_adjustment) & 0x7F) / 64.0;
+      rgn->AddVolume(volume_percent, off+2, 1);
+      rgn->AddSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+4, 2);
       rgn->AddSimpleItem(off + 7, 1, "Attack Rate");
       rgn->AddSimpleItem(off + 8, 1, "Decay Rate");
       rgn->AddSimpleItem(off + 9, 1, "Sustain Level");

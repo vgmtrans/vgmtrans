@@ -117,13 +117,13 @@ uint8_t Convert7bitPercentVolValToStdMidiVal(uint8_t percentVal) {
   return ConvertPercentAmpToStdMidiVal(percentVal / 127.0);
 }
 
-// Takes a percentage amplitude value - that is one using a -20*log10(percent) scale for db attenuation
+// Takes a percentage amplitude value - one using a -20*log10(percent) scale for db attenuation
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
 uint8_t ConvertPercentAmpToStdMidiVal(double percent) {
   return std::round(127.0 * sqrt(percent));
 }
 
-// Takes a percentage amplitude value - that is one using a -20*log10(percent) scale for db attenuation
+// Takes a percentage amplitude value - one using a -20*log10(percent) scale for db attenuation
 // and converts it to a standard 14 bit midi value that uses -40*log10(x/(127*127)) for db attenuation
 uint16_t ConvertPercentAmpToStd14BitMidiVal(double percent) {
   return std::round((127.0 * 127.0) * sqrt(percent));

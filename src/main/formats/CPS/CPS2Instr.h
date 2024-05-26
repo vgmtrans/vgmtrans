@@ -39,7 +39,7 @@ struct qs_prog_info_ver_130 {
 struct qs_prog_info_ver_cps3 {
   uint8_t key_high;
   uint8_t unknown1;
-  uint8_t unknown2;
+  int8_t volume_adjustment;  // range of -64 to +63, where -64 is silence and +63 (almost) doubles the volume
   uint8_t unknown3;
   uint8_t sample_index_hi;
   uint8_t sample_index_lo;
