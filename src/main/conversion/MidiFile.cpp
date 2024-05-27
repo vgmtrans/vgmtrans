@@ -294,6 +294,10 @@ void MidiTrack::InsertVol(uint8_t channel, uint8_t vol, uint32_t absTime) {
   aEvents.push_back(new VolumeEvent(this, channel, absTime, vol));
 }
 
+void MidiTrack::AddVolumeFine(uint8_t channel, uint8_t volume_lsb) {
+  aEvents.push_back(new VolumeFineEvent(this, channel, GetDelta(), volume_lsb));
+}
+
 //TODO: Master Volume sysex events are meant to be global to device, not per channel.
 // For per channel master volume, we should add a system for normalizing controller vol events.
 void MidiTrack::AddMasterVol(uint8_t channel, uint8_t mastVol) {

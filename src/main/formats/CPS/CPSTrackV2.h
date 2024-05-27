@@ -13,7 +13,7 @@ enum CPSv2SeqEventType {
   C3_PITCHBEND,
   C4_PROGCHANGE,
   C5_VIBRATO,
-  C6_VOLUME,
+  C6_TRACK_MASTER_VOLUME,
   EVENT_C7,
   EVENT_C8,
   C9_PORTAMENTO,
@@ -65,6 +65,8 @@ private:
   CPSFormatVer GetVersion() const { return static_cast<CPSSeq*>(this->parentSeq)->fmt_version; }
   uint32_t ReadVarLength();
 
+  uint8_t m_master_volume{0};
+  uint8_t m_secondary_volume{0x40};
   int8_t loopCounter[4];
   uint32_t loopOffset[4];    //used for detecting infinite loops
 };

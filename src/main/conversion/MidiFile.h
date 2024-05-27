@@ -97,6 +97,7 @@ class MidiTrack {
   //void InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, int8_t priority = PRIORITY_HIGHER);
   void AddVol(uint8_t channel, uint8_t vol/*, int8_t priority = PRIORITY_MIDDLE*/);
   void InsertVol(uint8_t channel, uint8_t vol, uint32_t absTime/*, int8_t priority = PRIORITY_MIDDLE*/);
+  void AddVolumeFine(uint8_t channel, uint8_t volume_lsb);
   void AddMasterVol(uint8_t channel, uint8_t mastVol/*, int8_t priority = PRIORITY_HIGHER*/);
   void InsertMasterVol(uint8_t channel, uint8_t mastVol, uint32_t absTime/*, int8_t priority = PRIORITY_HIGHER*/);
   void AddPan(uint8_t channel, uint8_t pan);
@@ -327,6 +328,14 @@ class VolumeEvent
  public:
   VolumeEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t volume)
       : ControllerEvent(prntTrk, channel, absoluteTime, 7, volume, PRIORITY_MIDDLE) { }
+  MidiEventType GetEventType() override { return MIDIEVENT_VOLUME; }
+};
+
+class VolumeFineEvent
+    : public ControllerEvent {
+public:
+  VolumeFineEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t volume_lsb)
+      : ControllerEvent(prntTrk, channel, absoluteTime, 39, volume_lsb, PRIORITY_MIDDLE) { }
   MidiEventType GetEventType() override { return MIDIEVENT_VOLUME; }
 };
 

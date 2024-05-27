@@ -32,13 +32,8 @@ CPSSeq::~CPSSeq() {
 }
 
 bool CPSSeq::GetHeaderInfo() {
-  // for 100% accuracy, we'd left shift by 256, but that seems unnecessary and excessive
-
-  if (fmt_version >= VER_200)
-    SetPPQN(0x30);
-  else
-    SetPPQN(0x30 << 4);
-  return true;        //successful
+  SetPPQN(0x30);
+  return true;
 }
 
 
@@ -135,7 +130,10 @@ bool CPSSeq::PostLoad() {
     uint32_t mpqn = 500000;      // microseconds per quarter note - 120 bpm default
     uint32_t mpt = mpqn / ppqn;  // microseconds per MIDI tick
     int16_t pitchbendCents = 0;         // pitch bend in cents
-    uint32_t pitchbendRange = 200;    // pitch bend range in cents default 2 semitones
+    // This represents the pitch bend range set for the MIDI track. It will change to accomodate
+    // vibrato depth. When vibrato depth changes, this becomes the format's actual pitch bend range
+    // (fmtPitchBendRange) plus the range of vibrato depth, ceiled to the nearest semitone.
+    uint32_t pitchbendRange = fmt_version >= VER_200 ? 1200 : 200; // pitch bend range in cents.
     double vibratoCents = 0;          // vibrato depth in cents
     uint16_t tremelo = 0;        // tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
     uint16_t lfoRate = 0;        // value added to lfo env every lfo tick
@@ -150,17 +148,19 @@ bool CPSSeq::PostLoad() {
       MidiEvent *event = events[j];
       uint32_t curTicks = event->AbsTime;            //current absolute ticks
 
-      if (curTicks > 0 /*&& (vibrato > 0 || tremelo > 0)*/ && startAbsTicks < curTicks) {
+      // For the span of time since the prior event, fill in any pitch and expression events that
+      // should occur as a result of LFO fluctuation when vibrato and/or tremelo depth are set.
+      if (curTicks > 0 /*&& (vibratoCents > 0 || tremelo > 0)*/ && startAbsTicks < curTicks) {
+
+        // Calculate the elapsed time in this segment and determine the incremental change in the LFO per tick.
         long segmentDurTicks = curTicks - startAbsTicks;
         double segmentDur = segmentDurTicks * mpt;    // duration of this segment in micros
         double lfoTicks = segmentDur / static_cast<double>(mpLFOt);
         double numLfoPhases = (lfoTicks * static_cast<double>(lfoRate)) / 0x20000;
         double lfoRatePerMidiTick = (numLfoPhases * 0x20000) / static_cast<double>(segmentDurTicks);
+        uint32_t lfoRatePerLoop = static_cast<uint32_t>(lfoRatePerMidiTick * 256);
 
-        constexpr uint8_t tickRes = 16;
-        uint32_t lfoRatePerLoop = static_cast<uint32_t>((tickRes * lfoRatePerMidiTick) * 256);
-
-        for (int t = 0; t < segmentDurTicks; t += tickRes) {
+        for (int t = 0; t < segmentDurTicks; ++t) {
           lfoVal += lfoRatePerLoop;
           if (lfoVal > 0xFFFFFF) {
             lfoVal -= 0x1000000;
@@ -176,6 +176,7 @@ bool CPSSeq::PostLoad() {
 
           double lfoPercent = effectiveLfoVal / static_cast<double>(0x1000000);
 
+          // If the track has enabled vibrato at this point, insert pitch bend events.
           if (vibratoCents > 0) {
             lfoCents = static_cast<int16_t>(lfoPercent * vibratoCents);
             track->InsertPitchBend(channel,
@@ -183,17 +184,18 @@ bool CPSSeq::PostLoad() {
                                    startAbsTicks + t);
           }
 
+          // If the track has enabled tremelo at this point, insert expression events.
           if (tremelo > 0) {
             uint8_t expression = ConvertPercentAmpToStdMidiVal((0x10000 - (tremelo * fabs(lfoPercent))) / static_cast<double>(0x10000));
             track->InsertExpression(channel, expression, startAbsTicks + t);
           }
         }
-        // TODO add adjustment for segmentDurTicks % tickRes
       }
 
-//      uint32_t fmtPitchBendRange = fmt_version != VER_201B ? 50 : 1200;
-      uint32_t fmtPitchBendRange = 50;
+      uint32_t fmtPitchBendRange = fmt_version >= VER_200 ? 1200 : 50;
 
+      // We just handled LFO-induced events in the span between the prior event up to this one. Now,
+      // check if the event is a tempo or marker event, which require special handling.
       switch (event->GetEventType()) {
         case MIDIEVENT_TEMPO: {
           TempoEvent *tempoevent = static_cast<TempoEvent*>(event);
@@ -210,7 +212,6 @@ bool CPSSeq::PostLoad() {
             vibratoCents = vibrato_depth_table[marker->databyte1] * (100 / 256.0);
             uint8_t pitchBendRangeMSB = static_cast<uint8_t>(ceil(static_cast<double>(vibratoCents + fmtPitchBendRange) / 100.0));
             pitchbendRange = pitchBendRangeMSB * 100;
-            printf("Vibrato byte: %X  Vibrato cents: %f  Converted to range: %d in cents\n", marker->databyte1, vibratoCents, pitchbendRange);
 
             // Fluidsynth does not support pitch bend range LSB, so we'll round up the value to the
             // nearest MSB. This doesn't really matter, as we calculate pitch bend in absolute terms

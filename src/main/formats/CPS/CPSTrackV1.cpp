@@ -68,12 +68,10 @@ bool CPSTrackV1::ReadEvent() {
     // effectively, use the highest 3 bits of the status byte as index to delta_table.
     // this code starts at 0xBB3 in sfa2
     uint32_t delta = delta_table[curDeltaTable][((status_byte >> 5) & 7) - 1];
-    delta <<= 4;
 
     //if it's not a rest
     if ((status_byte & 0x1F) != 0) {
-      // for 100% accuracy, we'd be shifting by 8, but that seems excessive for MIDI
-      uint32_t absDur = static_cast<uint32_t>((delta / static_cast<double>(256 << 4)) * (noteDuration << 4));
+      uint32_t absDur = static_cast<uint32_t>((delta / 256.0) * noteDuration);
 
       if (channelSynth == CPSSynth::OKIM6295) {
         // OKIM6295 doesn't control pitch, so we'll use middle C for all notes

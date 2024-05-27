@@ -89,6 +89,8 @@ class SeqTrack : public VGMContainerItem {
   void LimitPrevDurNoteEnd(uint32_t absTime) const;
   void AddVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Volume");
   void AddVolNoItem(uint8_t vol);
+  void AddVolume14Bit(uint32_t offset, uint32_t length, uint16_t volume, const std::string &sEventName = "Volume");
+  void AddVolume14BitNoItem(uint16_t volume);
   void AddVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Volume Slide");
   void InsertVol(uint32_t offset, uint32_t length, uint8_t vol, uint32_t absTime, const std::string &sEventName = "Volume");
   void AddExpression(uint32_t offset, uint32_t length, uint8_t level, const std::string &sEventName = "Expression");

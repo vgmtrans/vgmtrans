@@ -88,6 +88,13 @@ SetOctaveSeqEvent::SetOctaveSeqEvent(SeqTrack *pTrack,
 VolSeqEvent::VolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset, uint32_t length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, CLR_VOLUME), vol(volume) { }
 
+// ***********
+// Volume14BitSeqEvent
+// ***********
+
+Volume14BitSeqEvent::Volume14BitSeqEvent(SeqTrack *pTrack, uint16_t volume, uint32_t offset, uint32_t length, const std::string &name)
+    : SeqEvent(pTrack, offset, length, name, CLR_VOLUME), m_volume(volume) { }
+
 // ****************
 // VolSlideSeqEvent
 // ****************

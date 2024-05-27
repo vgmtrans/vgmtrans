@@ -359,7 +359,20 @@ bool CPS2Instr::LoadInstr() {
       rgn->AddKeyHigh(progInfo.key_high, off + 0, 1);
       rgn->keyLow = prevKeyHigh + 1;
       prevKeyHigh = progInfo.key_high;
-      rgn->AddSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+5, 1);
+
+      // When the region pan value != -1, the CPS3 driver completely overrides the track state pan
+      // (otherwise it's ignored). SF2 and DLS don't do this; they combine region pan with track pan.
+      uint8_t pan = progInfo.pan_override == -1 ? 64 : progInfo.pan_override;
+      rgn->AddPan(pan, off+1, 1, "Pan Override");
+
+      auto volume_percent = ((64 + progInfo.volume_adjustment) & 0x7F) / 64.0;
+      rgn->AddVolume(volume_percent, off+2, 1);
+      rgn->AddUnknown(off+3, 1);
+      rgn->AddSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+4, 2);
+
+      auto fine_tune_cents = static_cast<int16_t>(std::lround((progInfo.fine_tune / 128.0) * 100));
+      rgn->AddFineTune(fine_tune_cents, off+6, 1);
+
       rgn->AddSimpleItem(off + 7, 1, "Attack Rate");
       rgn->AddSimpleItem(off + 8, 1, "Decay Rate");
       rgn->AddSimpleItem(off + 9, 1, "Sustain Level");
