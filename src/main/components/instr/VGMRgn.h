@@ -33,7 +33,7 @@ class VGMRgn : public VGMContainerItem {
   void AddUnknown(uint32_t offset, uint32_t length);
   void SetFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
   void SetPan(uint8_t pan);
-  void AddPan(uint8_t pan, uint32_t offset, uint32_t length = 1);
+  void AddPan(uint8_t pan, uint32_t offset, uint32_t length = 1, const std::string& name = "Pan");
   //void SetAttenuation(long attenuation);
   //void AddAttenuation(long atten, uint32_t offset, uint32_t length = 1);
   void SetVolume(double volume);

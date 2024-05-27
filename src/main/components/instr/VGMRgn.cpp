@@ -119,9 +119,9 @@ void VGMRgn::AddUnknown(uint32_t offset, uint32_t length) {
 }
 
 //assumes pan is given as 0-127 value, converts it to our double -1.0 to 1.0 format
-void VGMRgn::AddPan(uint8_t p, uint32_t offset, uint32_t length) {
+void VGMRgn::AddPan(uint8_t p, uint32_t offset, uint32_t length, const std::string& name) {
   SetPan(p);
-  items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_PAN, offset, length, "Pan"));
+  items.push_back(new VGMRgnItem(this, VGMRgnItem::RIT_PAN, offset, length, name));
 }
 
 void VGMRgn::SetVolume(double vol) {

@@ -363,7 +363,7 @@ bool CPS2Instr::LoadInstr() {
       // When the region pan value != -1, the CPS3 driver completely overrides the track state pan
       // (otherwise it's ignored). SF2 and DLS don't do this; they combine region pan with track pan.
       uint8_t pan = progInfo.pan_override == -1 ? 64 : progInfo.pan_override;
-      rgn->AddPan(pan, off+1, 1);
+      rgn->AddPan(pan, off+1, 1, "Pan Override");
 
       auto volume_percent = ((64 + progInfo.volume_adjustment) & 0x7F) / 64.0;
       rgn->AddVolume(volume_percent, off+2, 1);
