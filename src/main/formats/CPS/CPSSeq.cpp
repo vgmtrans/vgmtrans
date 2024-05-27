@@ -212,7 +212,6 @@ bool CPSSeq::PostLoad() {
             vibratoCents = vibrato_depth_table[marker->databyte1] * (100 / 256.0);
             uint8_t pitchBendRangeMSB = static_cast<uint8_t>(ceil(static_cast<double>(vibratoCents + fmtPitchBendRange) / 100.0));
             pitchbendRange = pitchBendRangeMSB * 100;
-            // printf("Vibrato byte: %X  Vibrato cents: %f  Converted to range: %d in cents\n", marker->databyte1, vibratoCents, pitchbendRange);
 
             // Fluidsynth does not support pitch bend range LSB, so we'll round up the value to the
             // nearest MSB. This doesn't really matter, as we calculate pitch bend in absolute terms
@@ -220,7 +219,6 @@ bool CPSSeq::PostLoad() {
             // elegant to normalize pitch bend range to semitone units anyway.
             track->InsertPitchBendRange(channel, pitchBendRangeMSB, 0, curTicks);
             lfoCents = static_cast<int16_t>((effectiveLfoVal / static_cast<double>(0x1000000)) * vibratoCents);
-            // printf("lfoCents: %d  pitchBendCents: %d  effectiveLfoVal %X\n", lfoCents, pitchbendCents, effectiveLfoVal);
 
             if (curTicks > 0)
               track->InsertPitchBend(channel,
