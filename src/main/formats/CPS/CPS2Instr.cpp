@@ -367,6 +367,7 @@ bool CPS2Instr::LoadInstr() {
 
       auto volume_percent = ((64 + progInfo.volume_adjustment) & 0x7F) / 64.0;
       rgn->AddVolume(volume_percent, off+2, 1);
+      rgn->AddUnknown(off+3, 1);
       rgn->AddSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+4, 2);
 
       auto fine_tune_cents = static_cast<int16_t>(std::lround((progInfo.fine_tune / 128.0) * 100));
