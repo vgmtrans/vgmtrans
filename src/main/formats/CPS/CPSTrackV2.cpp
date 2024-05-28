@@ -126,7 +126,7 @@ bool CPSTrackV2::ReadEvent() {
       break;
     }
 
-    case EVENT_C7: {
+    case C7_PAN: {
       uint8_t pan = GetByte(curOffset++);
       AddPan(beginOffset, curOffset - beginOffset, pan);
       break;
@@ -142,6 +142,7 @@ bool CPSTrackV2::ReadEvent() {
 
     case C9_PORTAMENTO:
       curOffset++;
+      AddUnknown(beginOffset, curOffset-beginOffset, "Portamento");
       break;
 
     case EVENT_CA:
@@ -162,11 +163,13 @@ bool CPSTrackV2::ReadEvent() {
       AddUnknown(beginOffset, curOffset-beginOffset);
       break;
 
-    case EVENT_CE:  // jump relative?
-      curOffset++;
-      curOffset++;
-      AddLoopForever(beginOffset, curOffset - beginOffset);
-      break;
+    case CE_GOTO: {
+      int16_t relative_offset = static_cast<int16_t>(GetShortBE(curOffset));
+      curOffset += 2;
+      auto should_continue = AddLoopForever(beginOffset, curOffset - beginOffset);
+      curOffset += relative_offset;
+      return should_continue;;
+    }
 
     case EVENT_CF: // jumps to a new offset
       break;
@@ -199,8 +202,9 @@ bool CPSTrackV2::ReadEvent() {
 
       uint8_t loopCount = GetByte(curOffset++);
       if (loopCount == 0) {
-        AddLoopForever(beginOffset, curOffset - beginOffset);
-        return true;
+        auto should_continue = AddLoopForever(beginOffset, curOffset - beginOffset);
+        curOffset = loopOffset[loopNum];
+        return should_continue;
       }
       loopCounter[loopNum]--;
       if (loopCounter[loopNum] == 0) {      //finished loop
@@ -314,16 +318,23 @@ bool CPSTrackV2::ReadEvent() {
       break;
 
     // NEW IN CPS3 (maybe sfiii2 specifically)
-    case EVENT_E7:
-      curOffset++;
-      AddUnknown(beginOffset, curOffset-beginOffset);
+    case E7_FINE_TUNE: {
+      const int8_t fine_tune = GetByte(curOffset++);
+      auto cents = ((fine_tune - 64)/ 64.0) * 100;
+      AddFineTuning(beginOffset, curOffset-beginOffset, cents);
       break;
+    }
 
     // NEW IN CPS3 (maybe sfiii3 specifically)
-    case EVENT_E8:
-      curOffset += 2;
-      AddUnknown(beginOffset, curOffset-beginOffset);
+    // This seems to be used to trigger events in the game itself. For example, this event controls
+    // sfiii3's intro animation sequence which is timed to the music.
+    case E8_META_EVENT: {
+      uint8_t slot = GetByte(curOffset++);
+      uint8_t value = GetByte(curOffset++);
+      auto description = fmt::format("Slot: {:d} Value: {:d}", slot, value);
+      AddGenericEvent(beginOffset, curOffset - beginOffset, "Meta Event", description, CLR_MARKER);
       break;
+    }
 
     case FF_END:
       AddEndOfTrack(beginOffset, curOffset-beginOffset);
