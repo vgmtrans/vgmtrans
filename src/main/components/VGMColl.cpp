@@ -291,15 +291,14 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
         //		realSampNum += finalSampColls[k]->samples.size();	//so now we add all previous sample collection samples to the value to get the real (absolute) sampNum
         //}
 
-
-        DLSRgn *newRgn = newInstr->AddRgn();
-        newRgn->SetRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
-        newRgn->SetWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
-
         if (realSampNum >= finalSamps.size()) {
           L_ERROR("Sample {} does not exist", realSampNum);
           realSampNum = finalSamps.size() - 1;
         }
+
+        DLSRgn *newRgn = newInstr->AddRgn();
+        newRgn->SetRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
+        newRgn->SetWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
 
         VGMSamp *samp = finalSamps[realSampNum]; //sampColl->samples[rgn->sampNum];
         DLSWsmp *newWsmp = newRgn->AddWsmp();

@@ -419,15 +419,16 @@ bool CPS2Instr::LoadInstr() {
 
     uint16_t Ar = attack_rate_table[this->attack_rate];
     uint16_t Dr = decay_rate_table[this->decay_rate];
-    uint16_t Sl = linear_table[this->sustain_level];
+    uint16_t Sl = sustain_level_table[this->sustain_level];
     uint16_t Sr = decay_rate_table[this->sustain_rate];
     uint16_t Rr = decay_rate_table[this->release_rate];
 
+    const double UPDATE_RATE_IN_HZ = formatVersion == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
     // The rate values are all measured from max to min, as the SF2 and DLS specs call for.
     //  In the actual code, the envelope level starts at different points
     // Attack rate 134A in sfa2
     long ticks = Ar ? 0xFFFF / Ar : 0;
-    rgn->attack_time = (Ar == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
+    rgn->attack_time = (Ar == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
 
     // Decay rate 1365 in sfa2
     //  Let's check if we should substitute the sustain rate for the decay rate.
@@ -440,11 +441,11 @@ bool CPS2Instr::LoadInstr() {
       //for a better approximation, we count the ticks to get from original Dr to original Sl
       ticks = static_cast<long>(ceil((0xFFFF - Sl)) / static_cast<double>(Dr));
       ticks += static_cast<long>(ceil(Sl / static_cast<double>(Sr)));
-      rgn->decay_time = ticks * QSOUND_TICK_FREQ;
+      rgn->decay_time = ticks / UPDATE_RATE_IN_HZ;
       Sl = 0;
     } else {
       ticks = Dr ? (0xFFFF / Dr) : 0;
-      rgn->decay_time = (Dr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
+      rgn->decay_time = (Dr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
     }
     rgn->decay_time = LinAmpDecayTimeToLinDBDecayTime(rgn->decay_time, 0x800);
 
@@ -459,11 +460,11 @@ bool CPS2Instr::LoadInstr() {
 
     // Sustain rate 138D in sfa2
     ticks = Sr ? 0xFFFF / Sr : 0;
-    rgn->sustain_time = (Sr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
+    rgn->sustain_time = (Sr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
     rgn->sustain_time = LinAmpDecayTimeToLinDBDecayTime(rgn->sustain_time, 0x800);
 
     ticks = Rr ? 0xFFFF / Rr : 0xFFFF;
-    rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks * QSOUND_TICK_FREQ;
+    rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
     rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0x800);
 
     if (rgn->sampNum == 0xFFFF || rgn->sampNum >= (dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->numSamples)

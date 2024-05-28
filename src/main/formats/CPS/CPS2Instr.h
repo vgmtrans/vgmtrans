@@ -107,15 +107,16 @@ struct qs_samp_info {
   }
 };
 
-// The QSound interrupt clock is set to 250hz in mame.  But the main sound
+// The QSound interrupt clock is set to 250hz in mame, but the main sound
 // code runs only every 4th tick. (see the "and 3" instruction at 0xF9 in sfa2 code)
-#define QSOUND_TICK_FREQ (1/(250/4.0))
+constexpr double CPS2_DRIVER_RATE_HZ = 250 / 4.0;
+// In CPS3, sound driver iterations are triggered by the vblank interrupt (IRQ 12) which runs at 59.6hz
+constexpr double CPS3_DRIVER_RATE_HZ = 59.599491;
 
+// The following tables are used by all versions of sample-based CPS drivers, with the
+// exception of the sustain level table not present in CPS3 (but it's virtually linear).
 
-// the tables below are taken from sfa2
-//  have verified that the exact same values are stored in dinosaurs & cadillacs (early qsound driver)
-
-const uint16_t linear_table[128] = {
+const uint16_t sustain_level_table[128] = {
     0, 0x3FF, 0x5FE, 0x7FF, 0x9FE, 0xBFE, 0xDFD, 0xFFF, 0x11FE, 0x13FE,
     0x15FD, 0x17FE, 0x19FD, 0x1BFD, 0x1DFC, 0x1FFF, 0x21FD, 0x23FE, 0x25FD,
     0x27FE, 0x29FD, 0x2BFD, 0x2DFC, 0x2FFE, 0x31FD, 0x33FD, 0x35FC, 0x37FD,
