@@ -89,9 +89,11 @@ bool CPSSeq::PostLoad() {
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return true;
 
+  const double UPDATE_RATE_IN_HZ = (fmt_version == VER_CPS3) ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
+
   // We need to add pitch bend events for vibrato, which is controlled by a software LFO
   //  This is actually a bit tricky because the LFO is running independent of the sequence
-  //  tempo.  It gets updated (250/4) times a second, always.  We will have to convert
+  //  tempo, always updating at the rate of the driver irq.  We will have to convert
   //  ticks in our sequence into absolute elapsed time, which means we also need to keep
   //  track of any tempo events that change the absolute time per tick.
   std::vector<MidiEvent *> tempoEvents;
@@ -126,7 +128,7 @@ bool CPSSeq::PostLoad() {
 
     // And now we add vibrato and pitch bend events
     const uint32_t ppqn = GetPPQN();                    // pulses (ticks) per quarter note
-    constexpr uint32_t mpLFOt = static_cast<uint32_t>((1 / (250 / 4.0)) * 1000000);    // microseconds per LFO tick
+    const uint32_t mpLFOt = static_cast<uint32_t>(1000000 / UPDATE_RATE_IN_HZ);    // microseconds per LFO tick
     uint32_t mpqn = 500000;      // microseconds per quarter note - 120 bpm default
     uint32_t mpt = mpqn / ppqn;  // microseconds per MIDI tick
     int16_t pitchbendCents = 0;         // pitch bend in cents
