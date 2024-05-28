@@ -21,7 +21,7 @@ enum CPSv2SeqEventType {
   EVENT_CB,
   EVENT_CC,
   EVENT_CD,
-  EVENT_CE,
+  CE_GOTO,
   EVENT_CF,
   D0_LOOP_1_START,
   D1_LOOP_2_START,

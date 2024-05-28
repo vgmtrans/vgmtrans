@@ -163,11 +163,13 @@ bool CPSTrackV2::ReadEvent() {
       AddUnknown(beginOffset, curOffset-beginOffset);
       break;
 
-    case EVENT_CE:  // jump relative?
-      curOffset++;
-      curOffset++;
-      AddLoopForever(beginOffset, curOffset - beginOffset);
-      break;
+    case CE_GOTO: {
+      int16_t relative_offset = static_cast<int16_t>(GetShortBE(curOffset));
+      curOffset += 2;
+      auto should_continue = AddLoopForever(beginOffset, curOffset - beginOffset);
+      curOffset += relative_offset;
+      return should_continue;;
+    }
 
     case EVENT_CF: // jumps to a new offset
       break;
@@ -200,8 +202,9 @@ bool CPSTrackV2::ReadEvent() {
 
       uint8_t loopCount = GetByte(curOffset++);
       if (loopCount == 0) {
-        AddLoopForever(beginOffset, curOffset - beginOffset);
-        return true;
+        auto should_continue = AddLoopForever(beginOffset, curOffset - beginOffset);
+        curOffset = loopOffset[loopNum];
+        return should_continue;
       }
       loopCounter[loopNum]--;
       if (loopCounter[loopNum] == 0) {      //finished loop

@@ -402,7 +402,6 @@ bool CPSTrackV1::ReadEvent() {
 
       // Loop Always
       case 0x16 : {
-
         uint32_t jump;
         if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
           jump = GetShortBE(curOffset);
@@ -410,12 +409,9 @@ bool CPSTrackV1::ReadEvent() {
         else {
           jump = curOffset + 2 + static_cast<int16_t>(GetShortBE(curOffset));
         }
-
-//        printf("%X LOOP ALWAYS JUMPING TO %X\n", curOffset, jump);
-        bool bResult = AddLoopForever(beginOffset, 3);
+        bool should_continue = AddLoopForever(beginOffset, 3);
         curOffset = jump;
-
-        return bResult;
+        return should_continue;
       }
 
       case 0x17 :
