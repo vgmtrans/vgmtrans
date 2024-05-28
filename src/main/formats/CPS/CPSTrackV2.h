@@ -14,7 +14,7 @@ enum CPSv2SeqEventType {
   C4_PROGCHANGE,
   C5_VIBRATO,
   C6_TRACK_MASTER_VOLUME,
-  EVENT_C7,
+  C7_PAN,
   EVENT_C8,
   C9_PORTAMENTO,
   EVENT_CA,
@@ -46,8 +46,8 @@ enum CPSv2SeqEventType {
   EVENT_E4,
   EVENT_E5,
   EVENT_E6,
-  EVENT_E7,
-  EVENT_E8,
+  E7_FINE_TUNE,
+  E8_META_EVENT,
   FF_END = 0XFF,
 };
 

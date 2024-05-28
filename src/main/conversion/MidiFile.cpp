@@ -455,7 +455,7 @@ void MidiTrack::AddCoarseTuning(uint8_t channel, double semitones) {
 void MidiTrack::InsertCoarseTuning(uint8_t channel, double semitones, uint32_t absTime) {
   semitones = std::max(-64.0, std::min(64.0, semitones));
   int16_t midiTuning = std::min(static_cast<int>(lround(128 * semitones)), 8191) + 8192;
-  InsertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
+  InsertCoarseTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
 void MidiTrack::AddModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb) {
