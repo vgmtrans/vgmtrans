@@ -130,7 +130,7 @@ bool CLIVGMRoot::Init() {
           }
           // update collection name to be unique
           string newCollName = collNameIt->first + suffix;
-          vgmColls()[p.first]->SetName(&newCollName);
+          vgmColls()[p.first]->SetName(newCollName);
         }
       }
     }
