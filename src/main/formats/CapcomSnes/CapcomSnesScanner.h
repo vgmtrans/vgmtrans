@@ -1,18 +1,12 @@
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
-#include "ExtensionDiscriminator.h"
 
 enum CapcomSnesVersion: uint8_t; // see CapcomSnesFormat.h
 
 class CapcomSnesScanner:
     public VGMScanner {
  public:
-  CapcomSnesScanner() {
-    USE_EXTENSION("spc");
-  }
-  ~CapcomSnesScanner() override {}
-
   void Scan(RawFile *file, void *info = nullptr) override;
   void SearchForCapcomSnesFromARAM(RawFile *file) const;
 
