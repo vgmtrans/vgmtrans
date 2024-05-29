@@ -132,14 +132,13 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
-  auto selectedFiles = std::make_shared<std::vector<VGMFile*>>();
-
   if (!selectionModel()->hasSelection()) {
     return;
   }
 
   QModelIndexList list = selectionModel()->selectedRows();
 
+  auto selectedFiles = std::make_shared<std::vector<VGMFile*>>();
   selectedFiles->reserve(list.size());
   for (const auto &index : list) {
     if (index.isValid()) {

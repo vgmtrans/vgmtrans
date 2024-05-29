@@ -135,14 +135,13 @@ RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
  * since the only possible action on a RawFile is removing it
  */
 void RawFileListView::rawFilesMenu(const QPoint &pos) const {
-  auto selectedFiles = std::make_shared<std::vector<RawFile*>>();
-
   if (!selectionModel()->hasSelection()) {
     return;
   }
 
   QModelIndexList list = selectionModel()->selectedRows();
 
+  auto selectedFiles = std::make_shared<std::vector<RawFile*>>();
   selectedFiles->reserve(list.size());
   for (const auto &index : list) {
     if (index.isValid()) {
