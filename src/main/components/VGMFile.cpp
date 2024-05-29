@@ -28,7 +28,7 @@ Format *VGMFile::format() const {
   return Format::GetFormatFromName(m_format);
 }
 
-const std::string& VGMFile::formatName() {
+std::string VGMFile::formatName() {
   return m_format;
 }
 

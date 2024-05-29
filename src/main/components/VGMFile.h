@@ -24,7 +24,7 @@ public:
   virtual bool LoadVGMFile() = 0;
   virtual bool Load() = 0;
   Format* format() const;
-  const std::string& formatName();
+  [[nodiscard]] std::string formatName();
 
   virtual uint32_t GetID() const { return id; }
   void setId(uint32_t newId) { id = newId; }
