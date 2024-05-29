@@ -16,3 +16,6 @@ ed533cd46d853523d184ff1a60f769223ee97845
 
 # Rename VGMItem / VGMFile fields
 2805d09d53698dd0e4745db8bb64497294c589d4
+
+# Rename VGMColl fields and methods
+48b1d0d95a2f97fef62e6fe1d4a4af30dbaee1c5
