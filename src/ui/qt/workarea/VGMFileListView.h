@@ -11,8 +11,6 @@
 #include <QSortFilterProxyModel>
 #include "TableView.h"
 
-#include "services/MenuManager.h"
-
 #include "VGMFile.h"
 
 class VGMFileListModel : public QAbstractTableModel {
@@ -51,8 +49,6 @@ class VGMFileListView final : public TableView {
     void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
     void keyPressEvent(QKeyEvent *input) override;
     void itemMenu(const QPoint &pos);
-
-    MenuManager menuManager;
 
     VGMFileListModel *view_model;
 };

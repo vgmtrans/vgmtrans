@@ -27,17 +27,19 @@ MenuManager::MenuManager() {
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
-});
+  });
   RegisterCommands<VGMFile, VGMItem>({
       std::make_shared<CloseVGMFileCommand>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
-});
+  });
 
   RegisterCommands<RawFile>({
-      std::make_shared<CloseVGMFileCommand>(),
+      std::make_shared<SaveAsOriginalFormatCommand<RawFile>>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<CloseRawFileCommand>(),
   });
 }
 

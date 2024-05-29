@@ -148,7 +148,6 @@ public:
   SaveAsOriginalFormatCommand() : SaveCommand<TFile>(false) {}
 
   void Save(const std::string& path, TFile* file) const override {
-    // SaveHelper(path, file, std::is_same<TFile, VGMFile>());
     conversion::SaveAsOriginal(*file, path);
   }
   [[nodiscard]] std::string Name() const override { return "Save as original format"; }

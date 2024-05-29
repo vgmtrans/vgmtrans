@@ -1,0 +1,124 @@
+
+#pragma once
+
+#include <filesystem>
+#include <typeindex>
+#include <map>
+
+class VGMFile;
+class VGMSeq;
+class VGMInstrSet;
+class VGMSampColl;
+class RawFile;
+
+/**
+ * Represents the type of value a property holds in a CommandContext's PropertyMap.
+ */
+enum class PropertySpecValueType {
+  Path,           ///< Represents a file path or directory path if an ItemList property is present with > 1 items
+  DirPath,        ///< Represents a directory path
+  ItemList,       ///< Represents a list of items, such as selected files in the VGMFileListView
+};
+
+/**
+ * A variant type used to store different types of property values in a PropertyMap
+ */
+using PropertyValue = std::variant<
+    int,
+    float,
+    std::string,
+    std::shared_ptr<std::vector<VGMFile*>>,
+    std::shared_ptr<std::vector<VGMSeq*>>,
+    std::shared_ptr<std::vector<VGMInstrSet*>>,
+    std::shared_ptr<std::vector<VGMSampColl*>>,
+    std::shared_ptr<std::vector<RawFile*>>
+>;
+
+using PropertyMap = std::map<std::string, PropertyValue>;
+
+/**
+ * The base class for a command context. The command context provides an interface for commands
+ * to receive data. CommandContexts are created indirectly by CommandContextFactories via the CreateContext() method.
+ */
+class CommandContext {
+public:
+  virtual ~CommandContext() = default;
+};
+
+/**
+ * PropertySpecifications specify the keys and values types required for the PropertyMap that will
+ * be passed into a CommandContextFactory's CreateContext() method. A CommandContextFactory will
+ * expose these specifications via the GetPropertySpecifications() method
+ */
+struct PropertySpecification {
+  std::string key;
+  PropertySpecValueType valueType;
+  std::string description;
+  PropertyValue defaultValue;
+};
+
+using PropertySpecifications = std::vector<PropertySpecification>;
+
+/**
+ * The base class of a factory for creating CommandContext objects. Implementations of this class are responsible
+ * for creating a CommandContext that will be passed into a Command's Execute() method. It does this via the
+ * CreateContext() method, which expects a PropertyMap. The key and value types required to be set in the PropertyMap
+ * are given via the GetPropertySpecifications() method.
+ */
+class CommandContextFactory {
+public:
+  virtual ~CommandContextFactory() = default;
+
+  /**
+   * Creates a CommandContext object based on the provided properties.
+   * @param properties A map of properties to be used for context creation.
+   * @return A shared pointer to the created CommandContext object.
+   */
+  [[nodiscard]] virtual std::shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const = 0;
+
+  /**
+   * Retrieves the specifications for the properties required to be set in the PropertyMap passed to CreateContext().
+   * @return A list of property specifications.
+   */
+  [[nodiscard]] virtual PropertySpecifications GetPropertySpecifications() const = 0;
+};
+
+
+/**
+ * Base class for all commands. A Command is the same thing as a menu action. The GetContextFactory() method
+ * provides a factory that can be used to generate the CommandContext required by the Execute method.
+ */
+class Command {
+public:
+  virtual ~Command() = default;
+
+  /**
+   * Executes the command within the given context.
+   * @param context A reference to the CommandContext which will provide the data needed to execute the command.
+   */
+  virtual void Execute(CommandContext& context) = 0;
+
+  /**
+   * Retrieves the name of the command to appear in the UI. Commands must use unique Names, or they will
+   * break the behavior of batch command processing (an example of batch processing is
+   * selecting multiple sequences and executing the "Save to MIDI" command).
+   * @return The name of the command.
+   */
+  [[nodiscard]] virtual std::string Name() const = 0;
+
+  /**
+   * Gets the factory for creating a command context specific to this command.
+   * @return A shared pointer to the CommandContextFactory.
+   */
+  [[nodiscard]] virtual std::shared_ptr<CommandContextFactory> GetContextFactory() const = 0;
+};
+
+class CommandSeparator : public Command {
+public:
+  CommandSeparator() = default;
+
+  void Execute(CommandContext&) override {}
+
+  [[nodiscard]] std::shared_ptr<CommandContextFactory> GetContextFactory() const override { return nullptr; }
+  [[nodiscard]] std::string Name() const override { return "separator"; }
+};

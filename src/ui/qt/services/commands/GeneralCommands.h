@@ -6,18 +6,8 @@
 
 #pragma once
 
-#include "services/MenuManager.h"
+#include "services/commands/Command.h"
 #include "VGMFile.h"
-
-class CommandSeparator : public Command {
-public:
-  CommandSeparator() = default;
-
-  void Execute(CommandContext&) override {}
-
-  [[nodiscard]] std::shared_ptr<CommandContextFactory> GetContextFactory() const override { return nullptr; }
-  [[nodiscard]] std::string Name() const override { return "separator"; }
-};
 
 /**
  * A command context that provides a vector of pointers
