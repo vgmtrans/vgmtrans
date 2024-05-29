@@ -228,8 +228,8 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
         VGMSampColl *sampColl = rgn->sampCollPtr;
         if (!sampColl) {
           // If rgn is of an InstrSet with an embedded SampColl, use that SampColl.
-          if (static_cast<VGMInstrSet*>(rgn->vgmfile)->sampColl)
-            sampColl = static_cast<VGMInstrSet*>(rgn->vgmfile)->sampColl;
+          if (static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl)
+            sampColl = static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl;
 
             // If that does not exist, assume the first SampColl
           else
@@ -430,8 +430,8 @@ SynthFile *VGMColl::CreateSynthFile() {
         VGMSampColl *sampColl = rgn->sampCollPtr;
         if (!sampColl) {
           // If rgn is of an InstrSet with an embedded SampColl, use that SampColl.
-          if (static_cast<VGMInstrSet*>(rgn->vgmfile)->sampColl)
-            sampColl = static_cast<VGMInstrSet*>(rgn->vgmfile)->sampColl;
+          if (static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl)
+            sampColl = static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl;
 
             // If that does not exist, assume the first SampColl
           else

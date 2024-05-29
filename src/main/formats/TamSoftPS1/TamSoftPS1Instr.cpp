@@ -13,12 +13,12 @@ TamSoftPS1InstrSet::~TamSoftPS1InstrSet() {
 }
 
 bool TamSoftPS1InstrSet::GetHeaderInfo() {
-  if (dwOffset + 0x800 > vgmfile->GetEndOffset()) {
+  if (dwOffset + 0x800 > vgmFile()->GetEndOffset()) {
     return false;
   }
 
   uint32_t sampCollSize = GetWord(0x3fc);
-  if (dwOffset + 0x800 + sampCollSize > vgmfile->GetEndOffset()) {
+  if (dwOffset + 0x800 + sampCollSize > vgmFile()->GetEndOffset()) {
     return false;
   }
   unLength = 0x800 + sampCollSize;

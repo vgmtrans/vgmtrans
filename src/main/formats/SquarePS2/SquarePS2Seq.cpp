@@ -69,9 +69,9 @@ bool BGMTrack::ReadEvent(void) {
   AddTime(ReadVarLen(curOffset));
 
   // address range check for safety
-  if (!vgmfile->IsValidOffset(curOffset)) {
+  if (!vgmFile()->IsValidOffset(curOffset)) {
     if (readMode== ReadMode::READMODE_ADD_TO_UI) {
-      L_WARN("{}: Address out of range. Conversion aborted.", vgmfile->name());
+      L_WARN("{}: Address out of range. Conversion aborted.", vgmFile()->name());
     }
     return false;
   }

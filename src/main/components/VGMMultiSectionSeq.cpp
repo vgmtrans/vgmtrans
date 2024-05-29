@@ -57,7 +57,7 @@ bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, uint32_t stopTime) {
   ResetVars();
 
   // load all tracks
-  uint32_t stopOffset = vgmfile->GetEndOffset();
+  uint32_t stopOffset = vgmFile()->GetEndOffset();
   while (curOffset < stopOffset && time < stopTime) {
     if (!ReadEvent(stopTime)) {
       break;

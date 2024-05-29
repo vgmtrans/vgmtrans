@@ -72,7 +72,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) cons
 // *********
 
 VGMHeader::VGMHeader(const VGMItem *parItem, uint32_t offset, uint32_t length, const std::string &name)
-    : VGMContainerItem(parItem->vgmfile, offset, length, name) {}
+    : VGMContainerItem(parItem->vgmFile(), offset, length, name) {}
 
 VGMHeader::~VGMHeader() = default;
 
@@ -95,7 +95,7 @@ void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::string &name
 
 VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
                              const std::string &name)
-    : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType) {}
+    : VGMItem(hdr->vgmFile(), offset, length, name, CLR_HEADER), type(theType) {}
 
 VGMItem::Icon VGMHeaderItem::GetIcon() {
   switch (type) {

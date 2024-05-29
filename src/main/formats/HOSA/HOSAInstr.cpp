@@ -90,7 +90,7 @@ HOSAInstr::HOSAInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, ui
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
 bool HOSAInstr::LoadInstr() {
-  if (dwOffset + sizeof(InstrInfo) > vgmfile->GetEndOffset()) {
+  if (dwOffset + sizeof(InstrInfo) > vgmFile()->GetEndOffset()) {
     return false;
   }
 

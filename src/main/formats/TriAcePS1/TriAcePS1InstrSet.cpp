@@ -131,7 +131,7 @@ bool TriAcePS1Instr::LoadInstr() {
     rgn->AddSimpleItem(rgn->dwOffset + 14, 1, "Pitch Fine Tune");
     const int kTuningOffset = 22; // approx. 21.500638 from pitch table (0x10be vs 0x1000)
     rgn->fineTune = (short)((double)rgninfo->pitchTuneFine / 64.0 * 100) - kTuningOffset;
-    rgn->sampCollPtr = ((VGMInstrSet *) this->vgmfile)->sampColl;
+    rgn->sampCollPtr = ((VGMInstrSet *) this->vgmFile())->sampColl;
     rgn->AddSimpleItem(rgn->dwOffset + 15, 5, "Unknown values");
 
 
