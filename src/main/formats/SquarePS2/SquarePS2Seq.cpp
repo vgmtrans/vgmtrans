@@ -34,7 +34,7 @@ bool BGMSeq::GetHeaderInfo() {
   theName << "BGM " << seqID;
   if (seqID != assocWDID)
     theName << "using WD " << assocWDID;
-  m_name = theName.str();
+  setName(theName.str());
   return true;
 }
 
@@ -42,7 +42,7 @@ bool BGMSeq::GetTrackPointers() {
   uint32_t pos = dwOffset + 0x20;    //start at first track (fixed offset)
   for (unsigned int i = 0; i < nNumTracks; i++) {
     //HACK FOR TRUNCATED BGMS (ex. FFXII 113 Eastersand.psf2)
-    if (pos >= GetRawFile()->size())
+    if (pos >= rawFile()->size())
       return true;
     //END HACK
     uint32_t trackSize = GetWord(pos);        //get the track size (first word before track data)
@@ -69,9 +69,9 @@ bool BGMTrack::ReadEvent(void) {
   AddTime(ReadVarLen(curOffset));
 
   // address range check for safety
-  if (!vgmfile->IsValidOffset(curOffset)) {
+  if (!vgmFile()->IsValidOffset(curOffset)) {
     if (readMode== ReadMode::READMODE_ADD_TO_UI) {
-      L_WARN("{}: Address out of range. Conversion aborted.", vgmfile->name());
+      L_WARN("{}: Address out of range. Conversion aborted.", vgmFile()->name());
     }
     return false;
   }

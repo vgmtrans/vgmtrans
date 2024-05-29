@@ -92,7 +92,7 @@ void FilegroupMatcher::MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampco
   if (seqs.size() >= 1) {
     for(VGMSeq *seq : seqs) {
       VGMColl *coll = fmt->NewCollection();
-      coll->SetName(seq->GetName());
+      coll->SetName(seq->name());
       coll->UseSeq(seq);
       coll->AddInstrSet(instrset);
       coll->AddSampColl(sampcoll);
@@ -103,7 +103,7 @@ void FilegroupMatcher::MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampco
   }
   else {
     VGMColl *coll = fmt->NewCollection();
-    coll->SetName(instrset->GetName());
+    coll->SetName(instrset->name());
     coll->UseSeq(nullptr);
     coll->AddInstrSet(instrset);
     coll->AddSampColl(sampcoll);
@@ -145,7 +145,7 @@ bool FilegroupMatcher::MakeCollectionsForFile(VGMFile* /*file*/) {
     // into the same VGMCollection
     for(VGMSeq *seq : seqs) {
       VGMColl *coll = fmt->NewCollection();
-      coll->SetName(seq->GetName());
+      coll->SetName(seq->name());
       coll->UseSeq(seq);
       for (VGMInstrSet* instrset : instrsets) {
         for (VGMSampColl* sampcoll : sampcolls) {

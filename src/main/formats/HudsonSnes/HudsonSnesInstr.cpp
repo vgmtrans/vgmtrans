@@ -42,7 +42,7 @@ bool HudsonSnesInstrSet::GetInstrPointers() {
     uint8_t srcn = GetByte(ofsInstrEntry);
 
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
@@ -63,7 +63,7 @@ bool HudsonSnesInstrSet::GetInstrPointers() {
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(HudsonSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(HudsonSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;

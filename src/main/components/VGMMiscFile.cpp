@@ -27,7 +27,7 @@ bool VGMMiscFile::LoadVGMFile() {
     return false;
   }
 
-  if (auto fmt = GetFormat(); fmt) {
+  if (auto fmt = format(); fmt) {
     fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
   }
 
@@ -42,7 +42,7 @@ bool VGMMiscFile::Load() {
     return false;
   }
 
-  rawfile->AddContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
+  rawFile()->AddContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
   pRoot->AddVGMFile(this);
   return true;
 }

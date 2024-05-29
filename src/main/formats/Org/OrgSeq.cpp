@@ -3,7 +3,7 @@
 DECLARE_FORMAT(Org);
 
 OrgSeq::OrgSeq(RawFile *file, uint32_t offset)
-    : VGMSeq(OrgFormat::name, file, offset) {
+    : VGMSeq(OrgFormat::name, file, offset, 0, "Org Seq") {
 }
 
 OrgSeq::~OrgSeq(void) {
@@ -13,7 +13,6 @@ bool OrgSeq::GetHeaderInfo(void) {
   waitTime = GetShort(dwOffset + 6);
   beatsPerMeasure = GetByte(dwOffset + 8);
   SetPPQN(GetByte(dwOffset + 9));
-  m_name = "Org Seq";
 
   uint32_t notesSoFar = 0;        //this must be used to determine the length of the entire seq
 

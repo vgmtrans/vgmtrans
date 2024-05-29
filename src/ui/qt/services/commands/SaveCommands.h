@@ -127,7 +127,7 @@ public:
       // and the Save() function still expects a file path, so we construct file paths for each file using GetName()
       if (auto specificFile = dynamic_cast<TSavable*>(file)) {
         auto fileExtension = (GetExtension() == "") ? "" : (std::string(".") + GetExtension());
-        fs::path filePath = path / fs::path(*file->GetName() + fileExtension);
+        fs::path filePath = path / fs::path(file->name() + fileExtension);
         Save(filePath.generic_string(), specificFile);
       }
     }

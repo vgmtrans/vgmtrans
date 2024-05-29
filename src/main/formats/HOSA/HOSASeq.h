@@ -14,7 +14,7 @@ class HOSASeq: public VGMSeq {
 
   bool GetHeaderInfo() override;
   bool GetTrackPointers() override;
-  uint32_t GetID() override { return assocHOSA_ID; }
+  uint32_t GetID() const override { return assocHOSA_ID; }
 
  protected:
   uint16_t seqID;

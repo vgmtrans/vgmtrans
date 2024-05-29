@@ -13,12 +13,12 @@ TamSoftPS1InstrSet::~TamSoftPS1InstrSet() {
 }
 
 bool TamSoftPS1InstrSet::GetHeaderInfo() {
-  if (dwOffset + 0x800 > vgmfile->GetEndOffset()) {
+  if (dwOffset + 0x800 > vgmFile()->GetEndOffset()) {
     return false;
   }
 
   uint32_t sampCollSize = GetWord(0x3fc);
-  if (dwOffset + 0x800 + sampCollSize > vgmfile->GetEndOffset()) {
+  if (dwOffset + 0x800 + sampCollSize > vgmFile()->GetEndOffset()) {
     return false;
   }
   unLength = 0x800 + sampCollSize;
@@ -33,7 +33,7 @@ bool TamSoftPS1InstrSet::GetInstrPointers() {
     bool vagLoop;
     uint32_t vagOffset = 0x800 + GetWord(dwOffset + 4 * instrNum);
     if (vagOffset < unLength) {
-      SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::GetSampleLength(rawfile, vagOffset, dwOffset + unLength, vagLoop));
+      SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::GetSampleLength(rawFile(), vagOffset, dwOffset + unLength, vagLoop));
       vagLocations.push_back(vagLocation);
 
       TamSoftPS1Instr *newInstr = new TamSoftPS1Instr(this, instrNum,

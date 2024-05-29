@@ -60,10 +60,10 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
   // set name to the sequence
   if (rawName[0] != ('\0')) {
     std::string nameStr = std::string(rawName);
-    m_name = nameStr;
+    setName(nameStr);
   }
   else {
-    m_name = "NeverlandSnesSeq";
+    setName("NeverlandSnesSeq");
   }
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {

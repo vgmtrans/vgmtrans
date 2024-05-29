@@ -32,9 +32,7 @@ const uint16_t RareSnesSeq::NOTE_PITCH_TABLE[128] = {
 };
 
 RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdataOffset, string newName)
-    : VGMSeq(RareSnesFormat::name, file, seqdataOffset), version(ver) {
-  m_name = newName;
-
+    : VGMSeq(RareSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
   bLoadTickByTick = true;
   bAllowDiscontinuousTrackData = true;
 

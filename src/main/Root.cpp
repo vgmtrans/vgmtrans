@@ -141,7 +141,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
 void VGMRoot::AddVGMFile(
   std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
   m_vgmfiles.push_back(file);
-  L_INFO("Loaded {} successfully.", *variantToVGMFile(file)->GetName());
+  L_INFO("Loaded {} successfully.", variantToVGMFile(file)->name());
   UI_AddVGMFile(file);
 }
 
@@ -151,7 +151,7 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
   auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
-  if (Format *fmt = targFile->GetFormat()) {
+  if (Format *fmt = targFile->format()) {
     fmt->OnCloseFile(file);
   }
 
@@ -169,7 +169,7 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
   }
 
   if (bRemoveEmptyRawFile) {
-    const auto rawFile = targFile->GetRawFile();
+    const auto rawFile = targFile->rawFile();
     rawFile->RemoveContainedVGMFile(file);
     if (rawFile->containedVGMFiles().empty()) {
       CloseRawFile(rawFile);

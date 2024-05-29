@@ -35,7 +35,7 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
   uint16_t addrSampEntryMax = 0xffff;
   for (uint8_t srcn = 0; srcn <= 0x7f; srcn++) {
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
@@ -73,7 +73,7 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(GraphResSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(GraphResSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;

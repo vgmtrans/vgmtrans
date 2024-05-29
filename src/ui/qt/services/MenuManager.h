@@ -230,7 +230,7 @@ public:
   struct has_getname : std::false_type {};
 
   template <typename Base>
-  struct has_getname<Base, decltype(std::declval<Base>().GetName(), void())> : std::true_type {};
+  struct has_getname<Base, decltype(std::declval<Base>().name(), void())> : std::true_type {};
 
   /**
  * Create a QMenu populated with actions for the commands common to all of the instances in the provided vector
@@ -275,7 +275,7 @@ public:
               } else {
                 std::string suggestedFileName;
                 if constexpr (has_getname<T>::value) {
-                  suggestedFileName = ConvertToSafeFileName(*(*items)[0]->GetName());
+                  suggestedFileName = ConvertToSafeFileName((*items)[0]->name());
                 }
                 auto fileExtension = get<std::string>(propSpec.defaultValue);
                 auto path = OpenSaveFileDialog(suggestedFileName, fileExtension);

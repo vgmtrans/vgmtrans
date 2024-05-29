@@ -20,7 +20,7 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
                            uint32_t theID,
                            std::string name)
     : VGMInstrSet(AkaoFormat::name, file, 0, length, std::move(name)), version_(version) {
-  id = theID;
+  setId(theID);
   instrSetOff = instrOff;
   drumkitOff = dkitOff;
   bMelInstrs = instrSetOff > 0;
@@ -104,7 +104,7 @@ AkaoInstr::AkaoInstr(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, u
 }
 
 bool AkaoInstr::LoadInstr() {
-  for (int k = 0; dwOffset + k * 8 < GetRawFile()->size(); k++) {
+  for (int k = 0; dwOffset + k * 8 < rawFile()->size(); k++) {
     if (version() < AkaoPs1Version::VERSION_3_0) {
       if (GetByte(dwOffset + k * 8) >= 0x80) {
         AddSimpleItem(dwOffset + k * 8, 8, "Region Terminator");
@@ -343,7 +343,7 @@ bool AkaoSampColl::GetHeaderInfo() {
     hdr->AddSimpleItem(dwOffset + 0x18, 4, "Starting Articulation ID");
     hdr->AddSimpleItem(dwOffset + 0x1C, 4, "Number of Articulations");
 
-    id = GetShort(0x4 + dwOffset);
+    setId(GetShort(0x4 + dwOffset));
     sample_section_size = GetWord(0x14 + dwOffset);
     starting_art_id = GetWord(0x18 + dwOffset);
     nNumArts = GetWord(0x1C + dwOffset);
@@ -395,7 +395,7 @@ bool AkaoSampColl::GetHeaderInfo() {
 bool AkaoSampColl::GetSampleInfo() {
   //Read Articulation Data
   const uint32_t kAkaoArtSize = (version() >= AkaoPs1Version::VERSION_3_1) ? 0x10 : 0x40;
-  if (arts_offset + kAkaoArtSize * nNumArts > rawfile->size())
+  if (arts_offset + kAkaoArtSize * nNumArts > rawFile()->size())
     return false;
 
   for (uint32_t i = 0; i < nNumArts; i++) {
@@ -604,8 +604,8 @@ bool AkaoSampColl::GetSampleInfo() {
 
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
-  if (sample_section_offset + sample_section_size > rawfile->size())
-    sample_section_size = static_cast<uint32_t>(rawfile->size()) - sample_section_offset;
+  if (sample_section_offset + sample_section_size > rawFile()->size())
+    sample_section_size = static_cast<uint32_t>(rawFile()->size()) - sample_section_offset;
 
   //check the last 10 bytes to make sure they aren't null, if they are, abbreviate things till there is no 0x10 block of null bytes
   if (GetWord(sample_section_offset + sample_section_size - 0x10) == 0) {
@@ -616,8 +616,8 @@ bool AkaoSampColl::GetSampleInfo() {
 
   // if the official total file size is greater than the file size of the document
   // then shorten the sample section size to the actual end of the document
-  if (sample_section_offset + sample_section_size > rawfile->size())
-    sample_section_size = static_cast<uint32_t>(rawfile->size());
+  if (sample_section_offset + sample_section_size > rawFile()->size())
+    sample_section_size = static_cast<uint32_t>(rawFile()->size());
 
   std::set<uint32_t> sample_offsets;
   for (const auto & art : akArts) {
@@ -634,7 +634,7 @@ bool AkaoSampColl::GetSampleInfo() {
       continue;
     }
 
-    const uint32_t length = PSXSamp::GetSampleLength(rawfile, offset, sample_section_offset + sample_section_size, loop);
+    const uint32_t length = PSXSamp::GetSampleLength(rawFile(), offset, sample_section_offset + sample_section_size, loop);
     auto *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, 44100,
       fmt::format("Sample {}", samples.size()));
 

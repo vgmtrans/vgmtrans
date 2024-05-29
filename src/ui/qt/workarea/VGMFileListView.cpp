@@ -39,7 +39,7 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
   switch (index.column()) {
     case Property::Name: {
       if (role == Qt::DisplayRole) {
-        return QString::fromStdString(*vgmfile->GetName());
+        return QString::fromStdString(vgmfile->name());
       } else if (role == Qt::DecorationRole) {
         return iconForFile(vgmfilevariant);
       }
@@ -48,7 +48,7 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
 
     case Property::Format: {
       if (role == Qt::DisplayRole) {
-        return QString::fromStdString(vgmfile->GetFormatName());
+        return QString::fromStdString(vgmfile->formatName());
       }
       break;
     }

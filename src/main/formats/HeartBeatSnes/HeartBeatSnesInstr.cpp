@@ -60,7 +60,7 @@ bool HeartBeatSnesInstrSet::GetInstrPointers() {
       continue;
     }
 
-    if (!SNESSampColl::IsValidSampleDir(rawfile, offDirEnt, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), offDirEnt, true)) {
       // safety logic
       unLength = instrNum * 6;
       break;
@@ -82,7 +82,7 @@ bool HeartBeatSnesInstrSet::GetInstrPointers() {
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(HeartBeatSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(HeartBeatSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;

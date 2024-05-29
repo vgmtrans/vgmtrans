@@ -302,7 +302,7 @@ SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t
 }
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset, uint32_t maxNumSamps) :
-    VGMSampColl(format, instrset->GetRawFile(), instrset, offset, 0),
+    VGMSampColl(format, instrset->rawFile(), instrset, offset, 0),
     spcDirAddr(offset) {
   SetDefaultTargets(maxNumSamps);
 }
@@ -316,7 +316,7 @@ SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset,
                            const std::vector<uint8_t> &targetSRCNs, std::string name) :
-    VGMSampColl(format, instrset->GetRawFile(), instrset, offset, 0, std::move(name)),
+    VGMSampColl(format, instrset->rawFile(), instrset, offset, 0, std::move(name)),
     spcDirAddr(offset),
     targetSRCNs(targetSRCNs) {
 }
@@ -342,7 +342,7 @@ bool SNESSampColl::GetSampleInfo() {
     uint8_t srcn = (*itr);
 
     uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(GetRawFile(), offDirEnt, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), offDirEnt, true)) {
       continue;
     }
 
@@ -350,7 +350,7 @@ bool SNESSampColl::GetSampleInfo() {
     uint16_t addrSampLoop = GetShort(offDirEnt + 2);
 
     bool loop;
-    uint32_t length = SNESSamp::GetSampleLength(GetRawFile(), addrSampStart, loop);
+    uint32_t length = SNESSamp::GetSampleLength(rawFile(), addrSampStart, loop);
 
         spcDirHeader->AddSimpleItem(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
         spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
@@ -437,8 +437,8 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
   assert(dataLength % 9 == 0);
   for (uint32_t k = 0; k + 9 <= dataLength; k += 9)  //for every adpcm chunk
   {
-    if (dwOffset + k + 9 > GetRawFile()->size()) {
-      L_WARN("Unexpected EOF ({})", (name));
+    if (dwOffset + k + 9 > rawFile()->size()) {
+      L_WARN("Unexpected EOF ({})", (name()));
       break;
     }
 
@@ -447,7 +447,7 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
     theBlock.flag.end = (GetByte(dwOffset + k) & 0x01) != 0;
     theBlock.flag.loop = (GetByte(dwOffset + k) & 0x02) != 0;
 
-    GetRawFile()->GetBytes(dwOffset + k + 1, 8, theBlock.brr);
+    rawFile()->GetBytes(dwOffset + k + 1, 8, theBlock.brr);
     DecompBRRBlk(reinterpret_cast<int16_t*>(&buf[k * 32 / 9]),
                  &theBlock,
                  &prev1,

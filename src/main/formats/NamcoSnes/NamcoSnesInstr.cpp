@@ -41,7 +41,7 @@ bool NamcoSnesInstrSet::GetInstrPointers() {
   usedSRCNs.clear();
   for (uint8_t srcn = 0; srcn < maxSampCount; srcn++) {
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
@@ -73,7 +73,7 @@ fmt::format("Instrument {}", srcn));
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(NamcoSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(NamcoSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;

@@ -253,9 +253,9 @@ int VGMFileTreeView::getSortedIndex(const QTreeWidgetItem* parent, const VGMTree
 }
 
 void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
-  auto name = QString::fromStdString(item->name);
+  auto name = QString::fromStdString(item->name());
   if (showDetails) {
-    if (item->GetDescription().empty()) {
+    if (item->description().empty()) {
       treeItem->setText(0, QString{"<b>%1</b><br>Offset: 0x%2 | Length: 0x%3"}
                                .arg(name,
                                     QString::number(item->dwOffset, 16),
@@ -263,7 +263,7 @@ void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
     } else {
       treeItem->setText(0, QString{"<b>%1</b><br>%2<br>Offset: 0x%3 | Length: 0x%4"}
                                .arg(name,
-                                    QString::fromStdString(item->GetDescription()),
+                                    QString::fromStdString(item->description()),
                                     QString::number(item->dwOffset, 16),
                                     QString::number(item->unLength, 16)));
     }
@@ -271,7 +271,7 @@ void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
     treeItem->setText(0, name);
   }
   treeItem->setIcon(0, iconForItemType(item->GetIcon()));
-  treeItem->setToolTip(0, QString::fromStdString(item->GetDescription()));
+  treeItem->setToolTip(0, QString::fromStdString(item->description()));
 }
 
 void VGMFileTreeView::onShowDetailsChanged(bool show) {

@@ -45,10 +45,10 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
       continue;
     }
 
-    if (!CapcomSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr, false)) {
+    if (!CapcomSnesInstr::IsValidHeader(this->rawFile(), addrInstrHeader, spcDirAddr, false)) {
       break;
     }
-    if (!CapcomSnesInstr::IsValidHeader(this->rawfile, addrInstrHeader, spcDirAddr, true)) {
+    if (!CapcomSnesInstr::IsValidHeader(this->rawFile(), addrInstrHeader, spcDirAddr, true)) {
       continue;
     }
 
@@ -68,7 +68,7 @@ bool CapcomSnesInstrSet::GetInstrPointers() {
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(CapcomSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(CapcomSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;

@@ -18,7 +18,7 @@ static const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 
 static constexpr uint8_t NOTE_VELOCITY = 100;
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
-    : VGMSeq(AkaoFormat::name, file, offset), seq_id(0), version_(version),
+    : VGMSeq(AkaoFormat::name, file, offset, 0, "Akao Seq"), seq_id(0), version_(version),
       instrument_set_offset_(0), drum_set_offset_(0), condition(0) {
   UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   //UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController); // disabled, it only changes the volume and the pan slightly, and also its output becomes undefined if pan and volume slides are used at the same time
@@ -30,7 +30,7 @@ void AkaoSeq::ResetVars() {
   VGMSeq::ResetVars();
 
   condition = 0;
-  if (rawfile->tag.album == "Final Fantasy 9" && rawfile->tag.title == "Final Battle")
+  if (rawFile()->tag.album == "Final Fantasy 9" && rawFile()->tag.title == "Final Battle")
     condition = 2;
 }
 
@@ -92,7 +92,7 @@ bool AkaoSeq::GetHeaderInfo() {
     hdr->AddSimpleItem(dwOffset + 0x34, 4, "Drumkit Data Pointer");
 
     unLength = GetShort(dwOffset + 6);
-    id = GetShort(dwOffset + 0x14);
+    setId(GetShort(dwOffset + 0x14));
     track_header_offset = 0x40;
   }
   else if (version() == AkaoPs1Version::VERSION_2) {
@@ -123,8 +123,6 @@ bool AkaoSeq::GetHeaderInfo() {
   else {
     return false;
   }
-
-  m_name = "Akao Seq";
 
   SetPPQN(0x30);
   seq_id = GetShort(dwOffset + 4);
@@ -227,10 +225,10 @@ AkaoInstrSet* AkaoSeq::NewInstrSet() const {
       length = unLength - (drum_set_offset() - dwOffset);
 
     return length != 0
-      ? new AkaoInstrSet(rawfile, length, version(), instrument_set_offset(), drum_set_offset(), id, "Akao Instr Set")
-      : new AkaoInstrSet(rawfile, dwOffset, dwOffset + unLength, version());
+      ? new AkaoInstrSet(rawFile(), length, version(), instrument_set_offset(), drum_set_offset(), GetID(), "Akao Instr Set")
+      : new AkaoInstrSet(rawFile(), dwOffset, dwOffset + unLength, version());
   } else {
-    return new AkaoInstrSet(rawfile, dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses);
+    return new AkaoInstrSet(rawFile(), dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses);
   }
 }
 
@@ -1585,7 +1583,7 @@ bool AkaoTrack::ReadEvent() {
 }
 
 void AkaoTrack::logUnknownEvent(const std::string& opcode_str, u32 beginOffset) const {
-  L_WARN("Unknown Event - Filename: {} Event: {} Address: {:#010X}", parentSeq->rawfile->name(),
+  L_WARN("Unknown Event - Filename: {} Event: {} Address: {:#010X}", parentSeq->rawFile()->name(),
     opcode_str, beginOffset);
 }
 

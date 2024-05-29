@@ -9,12 +9,11 @@
 #include "Format.h"
 
 VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
-                 uint32_t length, std::string theName)
-    : VGMContainerItem(this, offset, length),
-      rawfile(theRawFile),
-      format(std::move(fmt)),
-      id(-1),
-      m_name(std::move(theName)) {}
+                 uint32_t length, std::string name)
+    : VGMContainerItem(this, offset, length, std::move(name)),
+      m_rawfile(theRawFile),
+      m_format(std::move(fmt)),
+      id(-1) {}
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add
 // this as an item because we do not want the VGMFile to be itself an item in the Item View
@@ -25,21 +24,17 @@ void VGMFile::AddToUI(VGMItem* /*parent*/, void* UI_specific) {
   }
 }
 
-Format *VGMFile::GetFormat() const {
-  return Format::GetFormatFromName(format);
+Format *VGMFile::format() const {
+  return Format::GetFormatFromName(m_format);
 }
 
-const std::string& VGMFile::GetFormatName() {
-  return format;
+std::string VGMFile::formatName() {
+  return m_format;
 }
 
-const std::string* VGMFile::GetName() const {
-  return &m_name;
-}
-
-std::string VGMFile::GetDescription() {
-  auto filename = this->rawfile->name();
-  auto formatName = this->GetFormat()->GetName();
+std::string VGMFile::description() {
+  auto filename = this->m_rawfile->name();
+  auto formatName = this->format()->GetName();
   return "Format: " + formatName + "     Source File: \"" + filename + "\"";
 }
 
@@ -54,9 +49,9 @@ void VGMFile::RemoveCollAssoc(VGMColl *coll) {
 }
 
 // These functions are common to all VGMItems, but no reason to refer to vgmfile
-// or call GetRawFile() if the item itself is a VGMFile
-RawFile *VGMFile::GetRawFile() const {
-  return rawfile;
+// or call rawFile() if the item itself is a VGMFile
+RawFile *VGMFile::rawFile() const {
+  return m_rawfile;
 }
 
 uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
@@ -69,7 +64,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) cons
       nCount = endOff - nIndex;
   }
 
-  return rawfile->GetBytes(nIndex, nCount, pBuffer);
+  return m_rawfile->GetBytes(nIndex, nCount, pBuffer);
 }
 
 // *********
@@ -77,7 +72,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) cons
 // *********
 
 VGMHeader::VGMHeader(const VGMItem *parItem, uint32_t offset, uint32_t length, const std::string &name)
-    : VGMContainerItem(parItem->vgmfile, offset, length, name) {}
+    : VGMContainerItem(parItem->vgmFile(), offset, length, name) {}
 
 VGMHeader::~VGMHeader() = default;
 
@@ -100,7 +95,7 @@ void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::string &name
 
 VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
                              const std::string &name)
-    : VGMItem(hdr->vgmfile, offset, length, name, CLR_HEADER), type(theType) {}
+    : VGMItem(hdr->vgmFile(), offset, length, name, CLR_HEADER), type(theType) {}
 
 VGMItem::Icon VGMHeaderItem::GetIcon() {
   switch (type) {

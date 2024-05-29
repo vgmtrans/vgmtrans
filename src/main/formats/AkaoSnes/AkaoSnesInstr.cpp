@@ -38,7 +38,7 @@ bool AkaoSnesInstrSet::GetInstrPointers() {
   uint8_t srcn_max = (version == AKAOSNES_V1) ? 0x7f : 0x3f;
   for (uint8_t srcn = 0; srcn <= srcn_max; srcn++) {
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
@@ -97,7 +97,7 @@ bool AkaoSnesInstrSet::GetInstrPointers() {
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(AkaoSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(AkaoSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;
@@ -307,7 +307,7 @@ bool AkaoSnesDrumKitRgn::InitializePercussionRegion(uint8_t percussionIndex,
                                                     uint16_t addrADSRTable,
                                                     uint16_t addrDrumKitTable)
 {
-  name = fmt::format("Drum {}", percussionIndex);
+  setName(fmt::format("Drum {}", percussionIndex));
 
   uint32_t srcnOffset = addrDrumKitTable + percussionIndex * 3;
   uint32_t keyOffset = srcnOffset + 1;

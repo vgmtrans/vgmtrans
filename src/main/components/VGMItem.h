@@ -83,14 +83,18 @@ public:
   friend bool operator<(VGMItem &item1, VGMItem &item2);
   friend bool operator>=(VGMItem &item1, VGMItem &item2);
 
-  RawFile *GetRawFile() const;
+  [[nodiscard]] std::string name() const noexcept { return m_name; }
+  void setName(const std::string& newName) { m_name = newName; }
+
+  [[nodiscard]] VGMFile* vgmFile() const { return m_vgmfile; }
+  [[nodiscard]] RawFile* rawFile() const;
 
   virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
   virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
   virtual uint32_t GuessLength() { return unLength; };
   virtual void SetGuessedLength(){};
   virtual std::vector<const char* > *GetMenuItemNames() { return nullptr; }
-  virtual std::string GetDescription() { return ""; }
+  virtual std::string description() { return ""; }
   [[nodiscard]] virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
   virtual Icon GetIcon() { return ICON_BINARY; }
   virtual void AddToUI(VGMItem *parent, void *UI_specific);
@@ -106,11 +110,13 @@ protected:
   bool IsValidOffset(uint32_t offset) const;
 
 public:
-  VGMFile *vgmfile;
-  std::string name;
   uint32_t dwOffset;  // offset in the pDoc data buffer
   uint32_t unLength;  // num of bytes the event engulfs
   EventColor color;
+
+private:
+  VGMFile *m_vgmfile;
+  std::string m_name;
 };
 
 //  ****************

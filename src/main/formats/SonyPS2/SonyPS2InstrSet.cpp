@@ -8,7 +8,7 @@ using namespace std;
 // ***************
 
 SonyPS2InstrSet::SonyPS2InstrSet(RawFile *file, uint32_t offset)
-    : VGMInstrSet(SonyPS2Format::name, file, offset) {
+    : VGMInstrSet(SonyPS2Format::name, file, offset, 0, "Sony PS2 InstrSet") {
 }
 
 SonyPS2InstrSet::~SonyPS2InstrSet(void) {
@@ -16,8 +16,6 @@ SonyPS2InstrSet::~SonyPS2InstrSet(void) {
 
 
 bool SonyPS2InstrSet::GetHeaderInfo() {
-  m_name = "Sony PS2 InstrSet";
-
   // VERSION CHUNK
   uint32_t curOffset = dwOffset;
   GetBytes(curOffset, 16, &versCk);
@@ -392,7 +390,7 @@ bool SonyPS2SampColl::GetSampleInfo() {
     // Get offset, length, and samplerate from VAGInfo Param
     SonyPS2InstrSet::VAGInfoParam &vagInfoParam = vagInfoCk.vagInfoParam[i];
     uint32_t offset = vagInfoParam.vagOffsetAddr;
-    uint32_t length = (i == numVagInfos - 1) ? this->rawfile->size() - offset :
+    uint32_t length = (i == numVagInfos - 1) ? this->rawFile()->size() - offset :
                       vagInfoCk.vagInfoParam[i + 1].vagOffsetAddr - offset;
 
     // We need to perform a hackish check to make sure the last ADPCM block was not

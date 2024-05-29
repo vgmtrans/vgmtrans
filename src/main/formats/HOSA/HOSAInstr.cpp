@@ -16,7 +16,7 @@
 //		Constructor
 //--------------------------------------------------------------
 HOSAInstrSet::HOSAInstrSet(RawFile *file, uint32_t offset)
-    : VGMInstrSet(HOSAFormat::name, file, offset, 0, "HOSAWAH ") {
+    : VGMInstrSet(HOSAFormat::name, file, offset, 0, "HOSAWAH") {
 }
 
 //==============================================================
@@ -36,10 +36,7 @@ bool HOSAInstrSet::GetHeaderInfo() {
 
   //"hdr"構造体へそのまま転送
   GetBytes(dwOffset, sizeof(InstrHeader), &instrheader);
-  id = 0;                        //Bank number.
-
-  //バイナリエディタ表示用
-  m_name = "HOSAWAH";
+  setId(0);                        //Bank number.
 
   //ヘッダーobjectの生成
   VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(InstrHeader));
@@ -93,7 +90,7 @@ HOSAInstr::HOSAInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, ui
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
 bool HOSAInstr::LoadInstr() {
-  if (dwOffset + sizeof(InstrInfo) > vgmfile->GetEndOffset()) {
+  if (dwOffset + sizeof(InstrInfo) > vgmFile()->GetEndOffset()) {
     return false;
   }
 

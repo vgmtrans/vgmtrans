@@ -39,7 +39,7 @@ bool PrismSnesInstrSet::GetInstrPointers() {
     uint8_t srcn = (uint8_t)srcn16;
 
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
@@ -85,7 +85,7 @@ bool PrismSnesInstrSet::GetInstrPointers() {
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(PrismSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(PrismSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;

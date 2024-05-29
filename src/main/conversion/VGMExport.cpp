@@ -45,7 +45,7 @@ bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath) {
 void SaveAllAsWav(const VGMSampColl &coll, const std::string &save_dir) {
   for (auto &sample : coll.samples) {
     auto path = fmt::format("{}/{} - {}.wav",
-      save_dir, ConvertToSafeFileName(*coll.GetName()), ConvertToSafeFileName(sample->name));
+      save_dir, ConvertToSafeFileName(coll.name()), ConvertToSafeFileName(sample->name()));
     sample->SaveAsWav(path);
   }
 }
@@ -77,6 +77,6 @@ bool SaveAsOriginal(const RawFile& rawfile, const std::string& filepath) {
 }
 
 bool SaveAsOriginal(const VGMFile& file, const std::string& filepath) {
-  return saveDataToFile(file.rawfile->begin() + file.dwOffset, file.unLength, filepath);
+  return saveDataToFile(file.rawFile()->begin() + file.dwOffset, file.unLength, filepath);
 }
 }  // namespace conversion

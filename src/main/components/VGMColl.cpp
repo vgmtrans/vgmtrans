@@ -41,8 +41,8 @@ const std::string &VGMColl::GetName() const {
     return name;
 }
 
-void VGMColl::SetName(const std::string *newName) {
-  name = *newName;
+void VGMColl::SetName(const std::string& newName) {
+  name = newName;
 }
 
 VGMSeq *VGMColl::GetSeq() const {
@@ -102,7 +102,7 @@ void VGMColl::UnpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vec
 
     uint16_t blockAlign = samp->bps / 8 * samp->channels;
     dls.AddWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                samp->bps, bufSize, uncompSampBuf, samp->name);
+                samp->bps, bufSize, uncompSampBuf, samp->name());
     finalSamps.push_back(samp);
   }
 }
@@ -125,12 +125,12 @@ void VGMColl::UnpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, 
 
     uint16_t blockAlign = samp->bps / 8 * samp->channels;
     SynthWave *wave = synthfile.AddWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                                        samp->bps, bufSize, uncompSampBuf, samp->name);
+                                        samp->bps, bufSize, uncompSampBuf, samp->name());
     finalSamps.push_back(samp);
 
     // If we don't have any loop information, then don't create a sampInfo structure for the Wave
     if (samp->loop.loopStatus == -1) {
-      L_ERROR("No loop information for {} - some parameters might be incorrect", samp->name);
+      L_ERROR("No loop information for {} - some parameters might be incorrect", samp->name());
       return;
     }
 
@@ -202,7 +202,7 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
     for (size_t i = 0; i < nInstrs; i++) {
       VGMInstr *vgminstr = set->aInstrs[i];
       size_t nRgns = vgminstr->aRgns.size();
-      std::string name = vgminstr->name;
+      std::string name = vgminstr->name();
       auto bank_no = vgminstr->bank;
       /*
       * The ulBank field follows this structure:
@@ -228,8 +228,8 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
         VGMSampColl *sampColl = rgn->sampCollPtr;
         if (!sampColl) {
           // If rgn is of an InstrSet with an embedded SampColl, use that SampColl.
-          if (static_cast<VGMInstrSet*>(rgn->vgmfile)->sampColl)
-            sampColl = static_cast<VGMInstrSet*>(rgn->vgmfile)->sampColl;
+          if (static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl)
+            sampColl = static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl;
 
             // If that does not exist, assume the first SampColl
           else
@@ -430,8 +430,8 @@ SynthFile *VGMColl::CreateSynthFile() {
         VGMSampColl *sampColl = rgn->sampCollPtr;
         if (!sampColl) {
           // If rgn is of an InstrSet with an embedded SampColl, use that SampColl.
-          if (static_cast<VGMInstrSet*>(rgn->vgmfile)->sampColl)
-            sampColl = static_cast<VGMInstrSet*>(rgn->vgmfile)->sampColl;
+          if (static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl)
+            sampColl = static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl;
 
             // If that does not exist, assume the first SampColl
           else

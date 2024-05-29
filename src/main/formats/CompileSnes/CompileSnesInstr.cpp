@@ -35,7 +35,7 @@ bool CompileSnesInstrSet::GetInstrPointers() {
   usedSRCNs.clear();
   for (uint8_t srcn = 0; srcn <= 0x3f; srcn++) {
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawfile, addrDIRentry, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
@@ -69,7 +69,7 @@ bool CompileSnesInstrSet::GetInstrPointers() {
   }
 
   std::ranges::sort(usedSRCNs);
-  SNESSampColl *newSampColl = new SNESSampColl(CompileSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(CompileSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;

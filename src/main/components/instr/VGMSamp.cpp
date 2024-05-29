@@ -17,7 +17,7 @@
 VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, uint16_t bps, uint32_t rate,
                  std::string name)
-    : VGMItem(sampColl->vgmfile, offset, length, std::move(name)), dataOff(dataOffset), dataLength(dataLen),
+    : VGMItem(sampColl->vgmFile(), offset, length, std::move(name)), dataOff(dataOffset), dataLength(dataLen),
       bps(bps), rate(rate), channels(nChannels), parSampColl(sampColl) {
 }
 
@@ -43,7 +43,7 @@ void VGMSamp::ConvertToStdWave(uint8_t *buf) {
 }
 
 bool VGMSamp::OnSaveAsWav() {
-  std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "wav");
+  std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name()), "wav");
   if (filepath.empty())
     return SaveAsWav(filepath);
   return false;

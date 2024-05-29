@@ -174,7 +174,7 @@ void VGMRgn::AddSampNum(int sn, uint32_t offset, uint32_t length) {
 // **********
 
 VGMRgnItem::VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, std::string name)
-    : VGMItem(rgn->vgmfile, offset, length, std::move(name)), type(theType) {
+    : VGMItem(rgn->vgmFile(), offset, length, std::move(name)), type(theType) {
 }
 
 VGMItem::Icon VGMRgnItem::GetIcon() {

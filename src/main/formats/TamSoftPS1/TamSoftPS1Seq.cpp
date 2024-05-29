@@ -62,7 +62,7 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
   uint32_t dwSongItemOffset = dwOffset + 4 * song;
-  if (dwSongItemOffset + 4 > vgmfile->GetEndOffset()) {
+  if (dwSongItemOffset + 4 > vgmFile()->GetEndOffset()) {
     return false;
   }
 
@@ -89,7 +89,7 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
 
       // PS2 version?
       ps2 = false;
-      if (dwHeaderOffset + HEADER_SIZE_PS2 <= vgmfile->GetEndOffset()) {
+      if (dwHeaderOffset + HEADER_SIZE_PS2 <= vgmFile()->GetEndOffset()) {
         ps2 = true;
         for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS_PS2; trackIndex++) {
           uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
@@ -112,7 +112,7 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
         maxTracks = MAX_TRACKS_PS1;
       }
 
-      if (dwHeaderOffset + headerSize > vgmfile->GetEndOffset()) {
+      if (dwHeaderOffset + headerSize > vgmFile()->GetEndOffset()) {
         return false;
       }
 
@@ -131,7 +131,7 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
         trackHeader->AddSimpleItem(dwTrackHeaderOffset + 2, 2, "Track Offset");
 
         if (live != 0) {
-          if (dwHeaderOffset + dwRelTrackOffset < vgmfile->GetEndOffset()) {
+          if (dwHeaderOffset + dwRelTrackOffset < vgmFile()->GetEndOffset()) {
             TamSoftPS1Track *track = new TamSoftPS1Track(this, dwHeaderOffset + dwRelTrackOffset);
             aTracks.push_back(track);
           }
@@ -181,7 +181,7 @@ bool TamSoftPS1Track::ReadEvent() {
   TamSoftPS1Seq *parentSeq = (TamSoftPS1Seq *)this->parentSeq;
 
   uint32_t beginOffset = curOffset;
-  if (curOffset >= vgmfile->GetEndOffset()) {
+  if (curOffset >= vgmFile()->GetEndOffset()) {
     FinalizeAllNotes();
     return false;
   }

@@ -63,7 +63,7 @@ bool HeartBeatPS1Seq::GetHeaderInfo() {
 
   // check total file size
   uint32_t total_size = HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size + seq_size;
-  if (total_size > 0x200000 || offset() + total_size > rawfile->size()) {
+  if (total_size > 0x200000 || offset() + total_size > rawFile()->size()) {
     return false;
   }
 
@@ -120,7 +120,7 @@ bool HeartBeatPS1Seq::ReadEvent() {
 
   // in this format, end of track (FF 2F 00) comes without delta-time.
   // so handle that crazy sequence the first.
-  if (curOffset + 3 <= rawfile->size()) {
+  if (curOffset + 3 <= rawFile()->size()) {
     if (GetByte(curOffset) == 0xff &&
         GetByte(curOffset + 1) == 0x2f &&
         GetByte(curOffset + 2) == 0x00) {
@@ -131,7 +131,7 @@ bool HeartBeatPS1Seq::ReadEvent() {
   }
 
   uint32_t delta = ReadVarLen(curOffset);
-  if (curOffset >= rawfile->size())
+  if (curOffset >= rawFile()->size())
     return false;
   AddTime(delta);
 
@@ -486,12 +486,12 @@ bool HeartBeatPS1Seq::ReadEvent() {
 
     case 0xF0 : {
       if (status_byte == 0xFF) {
-        if (curOffset + 1 > rawfile->size())
+        if (curOffset + 1 > rawFile()->size())
           return false;
 
         uint8_t metaNum = GetByte(curOffset++);
         uint32_t metaLen = ReadVarLen(curOffset);
-        if (curOffset + metaLen > rawfile->size())
+        if (curOffset + metaLen > rawFile()->size())
           return false;
 
         switch (metaNum) {

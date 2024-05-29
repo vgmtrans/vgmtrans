@@ -182,8 +182,8 @@ QColor textColorForEventColor(VGMItem::EventColor eventColor) {
 }
 
 QString getFullDescriptionForTooltip(VGMItem* item) {
-  QString name = QString::fromStdString(item->name);
-  QString description = QString::fromStdString(item->GetDescription());
+  QString name = QString::fromStdString(item->name());
+  QString description = QString::fromStdString(item->description());
 
   return QString{"<nobr><h3>%1</h3>%2</nobr>"}.arg(name, description);
 }

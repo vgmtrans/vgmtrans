@@ -45,7 +45,7 @@ QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
   }
 
   if (role == Qt::DisplayRole) {
-    return QString::fromStdString(*file->GetName());
+    return QString::fromStdString(file->name());
   } else if (role == Qt::DecorationRole) {
     return iconForFile(vgmFileToVariant(file));
   }
@@ -192,7 +192,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 
     auto title = m_collection_title->text().toStdString();
     /* This makes a copy, no worries */
-    qtVGMRoot.vgmColls()[model_index.row()]->SetName(&title);
+    qtVGMRoot.vgmColls()[model_index.row()]->SetName(title);
 
     auto coll_list_model = collListSelModel->model();
     coll_list_model->dataChanged(coll_list_model->index(0, 0),

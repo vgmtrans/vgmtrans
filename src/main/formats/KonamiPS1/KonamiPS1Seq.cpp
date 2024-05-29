@@ -27,7 +27,7 @@ void KonamiPS1Seq::ResetVars() {
 }
 
 bool KonamiPS1Seq::GetHeaderInfo() {
-  if (!IsKDT1Seq(rawfile, dwOffset)) {
+  if (!IsKDT1Seq(rawFile(), dwOffset)) {
     return false;
   }
 
@@ -118,7 +118,7 @@ bool KonamiPS1Track::ReadEvent() {
   KonamiPS1Seq *parentSeq = (KonamiPS1Seq *)this->parentSeq;
 
   uint32_t beginOffset = curOffset;
-  if (curOffset >= vgmfile->GetEndOffset()) {
+  if (curOffset >= vgmFile()->GetEndOffset()) {
     return false;
   }
 

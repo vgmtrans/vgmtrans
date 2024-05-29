@@ -39,7 +39,7 @@ MP2kSeq::MP2kSeq(RawFile *file, uint32_t offset, std::string name)
 }
 
 bool MP2kSeq::GetHeaderInfo() {
-  if (dwOffset + 2 > vgmfile->GetEndOffset()) {
+  if (dwOffset + 2 > vgmFile()->GetEndOffset()) {
     return false;
   }
 
@@ -50,7 +50,7 @@ bool MP2kSeq::GetHeaderInfo() {
   if (nNumTracks == 0 || nNumTracks > 24) {
     return false;
   }
-  if (dwOffset + 8 + nNumTracks * 4 > vgmfile->GetEndOffset()) {
+  if (dwOffset + 8 + nNumTracks * 4 > vgmFile()->GetEndOffset()) {
     return false;
   }
 
@@ -144,7 +144,7 @@ bool MP2kTrack::ReadEvent() {
 
     // Add next end of track event
     if (readMode == READMODE_ADD_TO_UI) {
-      if (dwEndTrackOffset < this->parentSeq->vgmfile->GetEndOffset()) {
+      if (dwEndTrackOffset < this->parentSeq->vgmFile()->GetEndOffset()) {
         uint8_t nextCmdByte = GetByte(dwEndTrackOffset);
         if (nextCmdByte == 0xB1) {
           AddEndOfTrack(dwEndTrackOffset, 1);

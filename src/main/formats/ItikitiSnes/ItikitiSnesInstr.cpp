@@ -43,7 +43,7 @@ bool ItikitiSnesInstrSet::GetInstrPointers() {
   if (aInstrs.empty())
     return false;
 
-  auto sampleColl = std::make_unique<SNESSampColl>(ItikitiSnesFormat::name, this->rawfile, spc_dir_offset(), srcns);
+  auto sampleColl = std::make_unique<SNESSampColl>(ItikitiSnesFormat::name, this->rawFile(), spc_dir_offset(), srcns);
   if (!sampleColl->LoadVGMFile())
     return false;
   (void)sampleColl.release();

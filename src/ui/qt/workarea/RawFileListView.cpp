@@ -194,7 +194,7 @@ void RawFileListView::onVGMFileSelected(const VGMFile* vgmfile, const QWidget* c
     return;
   }
 
-  auto it = std::ranges::find(qtVGMRoot.rawFiles(), vgmfile->rawfile);
+  auto it = std::ranges::find(qtVGMRoot.rawFiles(), vgmfile->rawFile());
   if (it == qtVGMRoot.rawFiles().end())
     return;
   int row = static_cast<int>(std::distance(qtVGMRoot.rawFiles().begin(), it));

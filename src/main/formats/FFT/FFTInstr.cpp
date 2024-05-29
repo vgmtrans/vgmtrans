@@ -34,7 +34,7 @@ bool WdsInstrSet::GetHeaderInfo() {
   //"hdr"構造体へそのまま転送
   GetBytes(dwOffset, sizeof(WdsHdr), &hdr);
   unLength = hdr.szHeader1 + hdr.szSampColl;    //header size + samp coll size
-  id = hdr.iBank;                        //Bank number.
+  setId(hdr.iBank);                        //Bank number.
 
   if (hdr.sig == 0x73647764)
     version = VERSION_DWDS;
@@ -42,7 +42,7 @@ bool WdsInstrSet::GetHeaderInfo() {
     version = VERSION_WDS;
 
   //バイナリエディタ表示用
-  m_name = fmt::format("wds {:d}", id);
+  setName(fmt::format("wds {:d}", GetID()));
 
   //ヘッダーobjectの生成
   VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(WdsHdr));
