@@ -142,17 +142,18 @@ public:
   virtual void Save(const std::string& path, TSavable* specificFile) const = 0;
 };
 
-class SaveAsOriginalFormatCommand : public SaveCommand<VGMFile> {
+template<typename TFile>
+class SaveAsOriginalFormatCommand : public SaveCommand<TFile> {
 public:
-  SaveAsOriginalFormatCommand() : SaveCommand<VGMFile>(false) {}
+  SaveAsOriginalFormatCommand() : SaveCommand<TFile>(false) {}
 
-  void Save(const std::string& path, VGMFile* file) const override {
+  void Save(const std::string& path, TFile* file) const override {
+    // SaveHelper(path, file, std::is_same<TFile, VGMFile>());
     conversion::SaveAsOriginal(*file, path);
   }
   [[nodiscard]] std::string Name() const override { return "Save as original format"; }
   [[nodiscard]] std::string GetExtension() const override { return ""; }
 };
-
 
 class SaveAsMidiCommand : public SaveCommand<VGMSeq, VGMFile> {
 public:
