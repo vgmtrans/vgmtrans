@@ -297,11 +297,11 @@ void PSXSamp::ConvertToStdWave(uint8_t *buf) {
   for (uint32_t k = 0; k < dataLength; k += 0x10)                //for every adpcm chunk
   {
     if (dwOffset + k + 16 > vgmfile->GetEndOffset()) {
-      L_WARN("\"{}\" unexpected EOF.", name);
+      L_WARN("\"{}\" unexpected EOF.", name());
       break;
     }
     else if (!addrOutOfVirtFile && k + 16 > unLength) {
-      L_WARN("\"{}\" unexpected end of PSXSamp.", name);
+      L_WARN("\"{}\" unexpected end of PSXSamp.", name());
       addrOutOfVirtFile = true;
     }
 

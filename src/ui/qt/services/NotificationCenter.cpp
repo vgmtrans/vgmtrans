@@ -21,7 +21,7 @@ void NotificationCenter::updateStatusForItem(VGMItem* item) {
     return;
   }
 
-  QString name = QString::fromStdString(item->name);
+  QString name = QString::fromStdString(item->name());
   QString description = QString::fromStdString(item->description());
 
   QString formattedName = QString{"<b>%1</b>"}.arg(name);

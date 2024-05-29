@@ -45,7 +45,7 @@ bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath) {
 void SaveAllAsWav(const VGMSampColl &coll, const std::string &save_dir) {
   for (auto &sample : coll.samples) {
     auto path = fmt::format("{}/{} - {}.wav",
-      save_dir, ConvertToSafeFileName(coll.name()), ConvertToSafeFileName(sample->name));
+      save_dir, ConvertToSafeFileName(coll.name()), ConvertToSafeFileName(sample->name()));
     sample->SaveAsWav(path);
   }
 }

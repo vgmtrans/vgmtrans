@@ -83,7 +83,8 @@ public:
   friend bool operator<(VGMItem &item1, VGMItem &item2);
   friend bool operator>=(VGMItem &item1, VGMItem &item2);
 
-  void setName(const std::string& newName) { name = newName; }
+  [[nodiscard]] std::string name() const noexcept { return m_name; }
+  void setName(const std::string& newName) { m_name = newName; }
 
   RawFile *rawFile() const;
 
@@ -109,10 +110,12 @@ protected:
 
 public:
   VGMFile *vgmfile;
-  std::string name;
   uint32_t dwOffset;  // offset in the pDoc data buffer
   uint32_t unLength;  // num of bytes the event engulfs
   EventColor color;
+
+private:
+  std::string m_name;
 };
 
 //  ****************

@@ -8,7 +8,7 @@ VGMItem::VGMItem() : vgmfile(nullptr), dwOffset(0), unLength(0), color(CLR_UNKNO
 }
 
 VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string name, EventColor color)
-    : vgmfile(vgmfile), name(std::move(name)), dwOffset(offset), unLength(length), color(color) {
+    : vgmfile(vgmfile), m_name(std::move(name)), dwOffset(offset), unLength(length), color(color) {
 }
 
 bool operator>(const VGMItem &item1, const VGMItem &item2) {
@@ -44,7 +44,7 @@ VGMItem *VGMItem::GetItemFromOffset(uint32_t offset, [[maybe_unused]] bool inclu
 }
 
 void VGMItem::AddToUI(VGMItem *parent, void *UI_specific) {
-  pRoot->UI_AddItem(this, parent, name, UI_specific);
+  pRoot->UI_AddItem(this, parent, name(), UI_specific);
 }
 
 uint32_t VGMItem::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {

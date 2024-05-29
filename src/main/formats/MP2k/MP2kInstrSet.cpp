@@ -80,7 +80,7 @@ int MP2kInstrSet::MakeOrGetSample(size_t sample_pointer) {
   samp->rate = m_operating_rate;
   samp->volume = 1;
   samp->bps = 8;
-  samp->name = fmt::format("{:#x}", sample_pointer);
+  samp->setName(fmt::format("{:#x}", sample_pointer));
 
   samp->SetLoopStartMeasure(LM_SAMPLES);
   samp->SetLoopLengthMeasure(LM_SAMPLES);
@@ -135,7 +135,7 @@ bool MP2kInstr::LoadInstr() {
     case 0x30:
       [[fallthrough]];
     case 0x38: {
-      name = "Single-region instrument";
+      setName("Single-region instrument");
       unLength = 12;
 
       bool no_resampling = (m_type & 0xFF) == 0x08;
@@ -147,7 +147,7 @@ bool MP2kInstr::LoadInstr() {
       if (sample_pointer == 0) {
         /* Sometimes the instrument table can have weird values */
         L_INFO("Tried to load a sample that pointed to nothing for instr @{:#x}", dwOffset);
-        name += " (invalid)";
+        setName(name() += " (invalid)");
         break;
       }
 
@@ -159,7 +159,7 @@ bool MP2kInstr::LoadInstr() {
         SetADSR(rgn, m_data.w2);
       } else {
         L_WARN("No sample could be loaded for {:#x}", sample_pointer);
-        name += " (sample missing)";
+        setName(name() += " (sample missing)");
       }
 
       break;
@@ -174,7 +174,7 @@ bool MP2kInstr::LoadInstr() {
       [[fallthrough]];
     case 0x0a: {
       static constexpr const char *cycles[] = {"12,5%", "25%", "50%", "75%"};
-      name = fmt::format("PSG square {}", m_data.w1 < 4 ? cycles[m_data.w1] : "???");
+      setName(fmt::format("PSG square {}", m_data.w1 < 4 ? cycles[m_data.w1] : "???"));
       unLength = 12;
       break;
     }
@@ -183,7 +183,7 @@ bool MP2kInstr::LoadInstr() {
     case 0x03:
       [[fallthrough]];
     case 0x0b: {
-      name = "PSG programmable waveform";
+      setName("PSG programmable waveform");
       unLength = 12;
       break;
     }
@@ -192,14 +192,14 @@ bool MP2kInstr::LoadInstr() {
     case 0x04:
       [[fallthrough]];
     case 0x0c: {
-      name = "PSG noise";
+      setName("PSG noise");
       unLength = 12;
       break;
     }
 
     /* Multi-region instrument */
     case 0x40: {
-      name = "Multi-region instrument";
+      setName("Multi-region instrument");
       unLength = 12;
 
       u32 base_pointer = m_data.w1 & 0x3ffffff;
@@ -256,7 +256,7 @@ bool MP2kInstr::LoadInstr() {
 
     /* Full-keyboard instrument */
     case 0x80: {
-      name = "Full-keyboard instrument";
+      setName("Full-keyboard instrument");
       unLength = 12;
 
       u32 base_pointer = m_data.w1 & 0x3ffffff;

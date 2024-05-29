@@ -9,12 +9,11 @@
 #include "Format.h"
 
 VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
-                 uint32_t length, std::string theName)
-    : VGMContainerItem(this, offset, length),
+                 uint32_t length, std::string name)
+    : VGMContainerItem(this, offset, length, std::move(name)),
       m_rawfile(theRawFile),
       m_format(std::move(fmt)),
-      id(-1),
-      m_name(std::move(theName)) {}
+      id(-1) {}
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add
 // this as an item because we do not want the VGMFile to be itself an item in the Item View

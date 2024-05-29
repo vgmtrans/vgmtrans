@@ -84,7 +84,7 @@ class DurNoteSeqEvent:
   Icon GetIcon() override { return ICON_NOTE; }
 
   std::string description() override {
-    return fmt::format("{} - abs key: {} ({}), velocity: {}, duration: {}", name,
+    return fmt::format("{} - abs key: {} ({}), velocity: {}, duration: {}", name(),
       static_cast<int>(absKey), MidiEvent::GetNoteName(absKey), static_cast<int>(vel), dur);
   };
 
@@ -110,7 +110,7 @@ class NoteOnSeqEvent : public SeqEvent {
   Icon GetIcon() override { return ICON_NOTE; }
 
   std::string description() override {
-    return fmt::format("{} - abs key: {} ({}), velocity: {}", name,
+    return fmt::format("{} - abs key: {} ({}), velocity: {}", name(),
       static_cast<int>(absKey), MidiEvent::GetNoteName(absKey), static_cast<int>(vel));
   };
 
@@ -132,7 +132,7 @@ class NoteOffSeqEvent:
   Icon GetIcon() override { return ICON_NOTE; }
 
   std::string description() override {
-    return fmt::format("{} - abs key: {} ({})", name, static_cast<int>(absKey),
+    return fmt::format("{} - abs key: {} ({})", name(), static_cast<int>(absKey),
       MidiEvent::GetNoteName(absKey));
   };
 
@@ -151,7 +151,7 @@ class RestSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_REST; }
   Icon GetIcon() override { return ICON_REST; }
 
-  std::string description() override { return fmt::format("{} - duration: {}", name, dur); };
+  std::string description() override { return fmt::format("{} - duration: {}", name(), dur); };
 
  public:
   uint32_t dur;
@@ -167,7 +167,7 @@ class SetOctaveSeqEvent : public SeqEvent {
                     const std::string &name = "");
 
   std::string description() override {
-    return fmt::format("{} - octave: {}", name, static_cast<int>(octave));
+    return fmt::format("{} - octave: {}", name(), static_cast<int>(octave));
   };
 
   uint8_t octave;
@@ -184,7 +184,7 @@ class VolSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_VOLUME; }
 
   std::string description() override {
-    return fmt::format("{} - volume: {:d}", name, vol);
+    return fmt::format("{} - volume: {:d}", name(), vol);
   };
 
   uint8_t vol;
@@ -201,7 +201,7 @@ public:
   EventType GetEventType() override { return EVENTTYPE_VOLUME; }
 
   std::string description() override {
-    return fmt::format("{} - volume: {:d}", name, m_volume);
+    return fmt::format("{} - volume: {:d}", name(), m_volume);
   };
 
   uint16_t m_volume;
@@ -218,7 +218,7 @@ class VolSlideSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_VOLUMESLIDE; }
 
   std::string description() override {
-    return fmt::format("{} - target volume: {}, duration: {}", name,
+    return fmt::format("{} - target volume: {}, duration: {}", name(),
       static_cast<int>(targVol), dur);
   };
 
@@ -236,7 +236,7 @@ class MastVolSeqEvent : public SeqEvent {
                     const std::string &name = "");
 
     std::string description() override {
-        return fmt::format("{} - master volume: {}", name, static_cast<int>(vol));
+        return fmt::format("{} - master volume: {}", name(), static_cast<int>(vol));
     };
 
   uint8_t vol;
@@ -252,7 +252,7 @@ class MastVolSlideSeqEvent : public SeqEvent {
                          uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
 
     std::string description() override {
-        return fmt::format("{} - target volume: {}, duration: {}", name,
+        return fmt::format("{} - target volume: {}, duration: {}", name(),
           static_cast<int>(targVol), dur);
     };
 
@@ -271,7 +271,7 @@ class ExpressionSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_EXPRESSION; }
 
   std::string description() override {
-    return fmt::format("{} - expression: {}", name, static_cast<int>(level));
+    return fmt::format("{} - expression: {}", name(), static_cast<int>(level));
   };
 
  public:
@@ -289,7 +289,7 @@ class ExpressionSlideSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_EXPRESSIONSLIDE; }
 
   std::string description() override {
-    return fmt::format("{} - target expression: {}, duration: {}", name,
+    return fmt::format("{} - target expression: {}, duration: {}", name(),
       static_cast<int>(targExpr), dur);
   };
 
@@ -308,7 +308,7 @@ class PanSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_PAN; }
 
   std::string description() override {
-    return fmt::format("{} - pan: {}", name, static_cast<int>(pan));
+    return fmt::format("{} - pan: {}", name(), static_cast<int>(pan));
   };
 
  public:
@@ -325,7 +325,7 @@ class PanSlideSeqEvent : public SeqEvent {
                    uint32_t length = 0, const std::string &name = "");
 
   std::string description() override {
-      return fmt::format("{} - target pan: {}, duration: {}", name,
+      return fmt::format("{} - target pan: {}, duration: {}", name(),
         static_cast<int>(targPan), dur);
   };
 
@@ -345,7 +345,7 @@ class ReverbSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_REVERB; }
 
   std::string description() override {
-    return fmt::format("{} - reverb: {}", name, static_cast<int>(reverb));
+    return fmt::format("{} - reverb: {}", name(), static_cast<int>(reverb));
   };
 
   uint8_t reverb;
@@ -362,7 +362,7 @@ class PitchBendSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_PITCHBEND; }
 
   std::string description() override {
-    return fmt::format("{} - pitch bend: {}", name, static_cast<int>(pitchbend));
+    return fmt::format("{} - pitch bend: {}", name(), static_cast<int>(pitchbend));
   };
 
   short pitchbend;
@@ -379,7 +379,7 @@ class PitchBendRangeSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_PITCHBENDRANGE; }
 
   std::string description() override {
-    return fmt::format("{} - pitch bend range: {} semitones {} cents ", name,
+    return fmt::format("{} - pitch bend range: {} semitones {} cents ", name(),
       static_cast<int>(semitones), static_cast<int>(cents));
   };
 
@@ -397,7 +397,7 @@ class FineTuningSeqEvent : public SeqEvent {
                      const std::string &name = "");
   EventType GetEventType() override { return EVENTTYPE_PITCHBENDRANGE; }
   std::string description() override {
-    return fmt::format("{} - fine tuning: {}", name, cents);
+    return fmt::format("{} - fine tuning: {}", name(), cents);
   };
 
   double cents;
@@ -413,7 +413,7 @@ class ModulationDepthRangeSeqEvent : public SeqEvent {
                                uint32_t length = 0, const std::string &name = "");
   EventType GetEventType() override { return EVENTTYPE_PITCHBENDRANGE; }
   std::string description() override {
-    return fmt::format("{} - modulation depth range: {} cents", name, semitones * 100.0);
+    return fmt::format("{} - modulation depth range: {} cents", name(), semitones * 100.0);
   };
 
   double semitones;
@@ -430,7 +430,7 @@ class TransposeSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_TRANSPOSE; }
 
   std::string description() override {
-      return fmt::format("{} - transpose: {}", name, transpose);
+      return fmt::format("{} - transpose: {}", name(), transpose);
   };
 
   int transpose;
@@ -447,7 +447,7 @@ class ModulationSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_MODULATION; }
 
   std::string description() override {
-      return fmt::format("{} - depth: {}", name, static_cast<int>(depth));
+      return fmt::format("{} - depth: {}", name(), static_cast<int>(depth));
   };
 
   uint8_t depth;
@@ -464,7 +464,7 @@ class BreathSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_BREATH; }
 
   std::string description() override {
-    return fmt::format("{} - breath: {}", name, static_cast<int>(depth));
+    return fmt::format("{} - breath: {}", name(), static_cast<int>(depth));
   };
 
   uint8_t depth;
@@ -481,7 +481,7 @@ class SustainSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_SUSTAIN; }
 
   std::string description() override {
-    return fmt::format("{} - sustain pedal: {}", name, static_cast<int>(depth));
+    return fmt::format("{} - sustain pedal: {}", name(), static_cast<int>(depth));
   };
 
   uint8_t depth;
@@ -498,7 +498,7 @@ class PortamentoSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_PORTAMENTO; }
 
   std::string description() override {
-    return fmt::format("{} - portamento: {}", name, bOn ? "on" : "off");
+    return fmt::format("{} - portamento: {}", name(), bOn ? "on" : "off");
   };
 
  public:
@@ -516,7 +516,7 @@ class PortamentoTimeSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_PORTAMENTOTIME; }
 
   std::string description() override {
-    return fmt::format("{} - portamento time: {}", name, static_cast<int>(time));
+    return fmt::format("{} - portamento time: {}", name(), static_cast<int>(time));
   };
 
  public:
@@ -534,7 +534,7 @@ class ProgChangeSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_PROGCHANGE; }
 
   std::string description() override {
-    return fmt::format("{} - program number: {}", name, progNum);
+    return fmt::format("{} - program number: {}", name(), progNum);
   };
 
  public:
@@ -552,7 +552,7 @@ class TempoSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_TEMPO; }
   Icon GetIcon() override { return ICON_TEMPO; }
 
-  std::string description() override { return fmt::format("{} - bpm: {}", name, bpm); };
+  std::string description() override { return fmt::format("{} - bpm: {}", name(), bpm); };
 
  public:
   double bpm;
@@ -569,7 +569,7 @@ class TempoSlideSeqEvent : public SeqEvent {
   Icon GetIcon() override { return ICON_TEMPO; }
 
   std::string description() override {
-    return fmt::format("{} - target bpm: {}, duration: {}", name, targbpm, dur);
+    return fmt::format("{} - target bpm: {}, duration: {}", name(), targbpm, dur);
   };
 
  public:
@@ -589,7 +589,7 @@ class TimeSigSeqEvent : public SeqEvent {
   EventType GetEventType() override { return EVENTTYPE_TIMESIG; }
 
   std::string description() override {
-    return fmt::format("{} - time signature: {}/{}, ticks per quarter: {}", name,
+    return fmt::format("{} - time signature: {}/{}, ticks per quarter: {}", name(),
       static_cast<int>(numer), static_cast<int>(denom), static_cast<int>(ticksPerQuarter));
   };
 

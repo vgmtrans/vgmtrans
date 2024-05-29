@@ -43,7 +43,7 @@ void VGMSamp::ConvertToStdWave(uint8_t *buf) {
 }
 
 bool VGMSamp::OnSaveAsWav() {
-  std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name), "wav");
+  std::string filepath = pRoot->UI_GetSaveFilePath(ConvertToSafeFileName(name()), "wav");
   if (filepath.empty())
     return SaveAsWav(filepath);
   return false;

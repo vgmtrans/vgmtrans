@@ -307,7 +307,7 @@ bool AkaoSnesDrumKitRgn::InitializePercussionRegion(uint8_t percussionIndex,
                                                     uint16_t addrADSRTable,
                                                     uint16_t addrDrumKitTable)
 {
-  name = fmt::format("Drum {}", percussionIndex);
+  setName(fmt::format("Drum {}", percussionIndex));
 
   uint32_t srcnOffset = addrDrumKitTable + percussionIndex * 3;
   uint32_t keyOffset = srcnOffset + 1;

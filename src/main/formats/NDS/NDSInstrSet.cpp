@@ -68,7 +68,7 @@ bool NDSInstr::LoadInstr() {
   // All of the undefined case values below are used for tone or noise channels
   switch (instrType) {
     case 0x01: {
-      name = "Single-Region Instrument";
+      setName("Single-Region Instrument");
       unLength = 10;
 
       VGMRgn *rgn = AddRgn(dwOffset, 10, GetShort(dwOffset));
@@ -82,7 +82,7 @@ bool NDSInstr::LoadInstr() {
       uint8_t dutyCycle = GetByte(dwOffset) & 0x07;
       std::string dutyCycles[8] = {"12.5%", "25%", "37.5%", "50%",
                                     "62.5%", "75%", "87.5%", "0%"};
-      name = "PSG Wave (" + dutyCycles[dutyCycle] + ")";
+      setName("PSG Wave (" + dutyCycles[dutyCycle] + ")");
       unLength = 10;
 
       VGMRgn *rgn = AddRgn(dwOffset, 10, dutyCycle);
@@ -95,7 +95,7 @@ bool NDSInstr::LoadInstr() {
     }
 
     case 0x03: {
-      name = "PSG Noise";
+      setName("PSG Noise");
       unLength = 10;
 
       /* The noise sample is the 8th in our PSG sample collection */
@@ -109,7 +109,7 @@ bool NDSInstr::LoadInstr() {
     }
 
     case 0x10: {
-      name = "Drumset";
+      setName("Drumset");
 
       uint8_t lowKey = GetByte(dwOffset);
       uint8_t highKey = GetByte(dwOffset + 1);
@@ -126,7 +126,7 @@ bool NDSInstr::LoadInstr() {
     }
 
     case 0x11: {
-      name = "Multi-Region Instrument";
+      setName("Multi-Region Instrument");
       uint8_t keyRanges[8];
       uint8_t nRgns = 0;
       for (int i = 0; i < 8; i++) {
@@ -519,7 +519,7 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   SetLoopLengthMeasure(LM_SAMPLES);
   ulUncompressedSize = 32768 * bps / 8;
 
-  name = "PSG_duty_" + std::to_string(duty_cycle);
+  setName("PSG_duty_" + std::to_string(duty_cycle));
 }
 
 void NDSPSGSamp::ConvertToStdWave(uint8_t *buf) {

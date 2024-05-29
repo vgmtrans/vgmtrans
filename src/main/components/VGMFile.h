@@ -14,7 +14,7 @@ class Format;
 class VGMFile : public VGMContainerItem {
 public:
   VGMFile(std::string format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
-          std::string theName = "VGM File");
+          std::string name = "VGM File");
   ~VGMFile() override = default;
 
   void AddToUI(VGMItem *parent, void *UI_specific) override;
@@ -34,7 +34,6 @@ public:
   [[nodiscard]] RawFile *rawFile() const;
 
   [[nodiscard]] size_t size() const noexcept { return unLength; }
-  [[nodiscard]] std::string name() const noexcept { return m_name; }
 
   uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const;
 
@@ -61,7 +60,6 @@ private:
   RawFile* m_rawfile;
   std::string m_format;
   uint32_t id;
-  std::string m_name;
 };
 
 // *********

@@ -253,7 +253,7 @@ int VGMFileTreeView::getSortedIndex(const QTreeWidgetItem* parent, const VGMTree
 }
 
 void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
-  auto name = QString::fromStdString(item->name);
+  auto name = QString::fromStdString(item->name());
   if (showDetails) {
     if (item->description().empty()) {
       treeItem->setText(0, QString{"<b>%1</b><br>Offset: 0x%2 | Length: 0x%3"}
