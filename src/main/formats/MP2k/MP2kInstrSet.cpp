@@ -32,8 +32,8 @@ bool MP2kInstrSet::LoadInstrs() {
 bool MP2kInstrSet::GetInstrPointers() {
   for (int i = 0; i < m_count; i++) {
     size_t cur_ofs = dwOffset + i * 12;
-    MP2kInstrData data{rawfile->get<u32>(cur_ofs), rawfile->get<u32>(cur_ofs + 4),
-                       rawfile->get<u32>(cur_ofs + 8)};
+    MP2kInstrData data{rawFile()->get<u32>(cur_ofs), rawFile()->get<u32>(cur_ofs + 4),
+                       rawFile()->get<u32>(cur_ofs + 8)};
     aInstrs.push_back(new MP2kInstr(this, cur_ofs, 0, 0, i, data));
   }
 
@@ -41,7 +41,7 @@ bool MP2kInstrSet::GetInstrPointers() {
 }
 
 int MP2kInstrSet::MakeOrGetSample(size_t sample_pointer) {
-  if (sample_pointer == 0 || sample_pointer >= GetRawFile()->size()) {
+  if (sample_pointer == 0 || sample_pointer >= rawFile()->size()) {
     L_WARN("Invalid sample pointer {:#x}", sample_pointer);
     return -1;
   }
@@ -51,10 +51,10 @@ int MP2kInstrSet::MakeOrGetSample(size_t sample_pointer) {
   }
 
   /* First 3 bytes are unused */
-  auto loop = GetRawFile()->getBE<u32>(sample_pointer);
-  auto pitch = GetRawFile()->get<u32>(sample_pointer + 4);
-  auto loop_pos = GetRawFile()->get<u32>(sample_pointer + 8);
-  auto len = GetRawFile()->get<u32>(sample_pointer + 12);
+  auto loop = rawFile()->getBE<u32>(sample_pointer);
+  auto pitch = rawFile()->get<u32>(sample_pointer + 4);
+  auto loop_pos = rawFile()->get<u32>(sample_pointer + 8);
+  auto len = rawFile()->get<u32>(sample_pointer + 12);
   /* Filter out samples with invalid lengths */
   if (len < 16 || len > 0x3FFFFF) {
     return -1;
@@ -211,7 +211,7 @@ bool MP2kInstr::LoadInstr() {
       int current_index;
       /* Scan the whole table for changes and keep track of splits */
       for (int key = 0; key < 128; key++) {
-        int index = GetRawFile()->get<u8>(region_table + key);
+        int index = rawFile()->get<u8>(region_table + key);
 
         current_index = index;
         if (prev_index != current_index) {
@@ -228,13 +228,13 @@ bool MP2kInstr::LoadInstr() {
       for (int i = 0; i < index_list.size(); i++) {
         u32 offset = base_pointer + 12 * index_list[i];
 
-        auto type = GetRawFile()->get<u8>(offset);
+        auto type = rawFile()->get<u8>(offset);
         if (type & 0x07) {
           L_WARN("GameBoy instrument in key-split (what game is this?!)");
           continue;
         }
 
-        u32 sample_pointer = GetRawFile()->get<u32>(offset + 4) & 0x3ffffff;
+        u32 sample_pointer = rawFile()->get<u32>(offset + 4) & 0x3ffffff;
         if (sample_pointer == 0) {
           continue;
         }
@@ -245,7 +245,7 @@ bool MP2kInstr::LoadInstr() {
           VGMRgn *rgn = AddRgn(dwOffset, unLength, sample_id, split_list[i], split_list[i + 1] - 1);
 
           // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
-          SetADSR(rgn, GetRawFile()->get<u32>(offset + 8));
+          SetADSR(rgn, rawFile()->get<u32>(offset + 8));
         } else {
           continue;
         }
@@ -264,11 +264,11 @@ bool MP2kInstr::LoadInstr() {
       for (int key = 0; key < 128; key++) {
         u32 offset = base_pointer + 12 * key;
 
-        u32 type = GetRawFile()->get<u8>(offset);
-        u32 keynum = GetRawFile()->get<u8>(offset + 1);
-        u32 pan = GetRawFile()->get<u8>(offset + 3);
+        u32 type = rawFile()->get<u8>(offset);
+        u32 keynum = rawFile()->get<u8>(offset + 1);
+        u32 pan = rawFile()->get<u8>(offset + 3);
 
-        u32 sample_pointer = GetRawFile()->get<u32>(offset + 4) & 0x3ffffff;
+        u32 sample_pointer = rawFile()->get<u32>(offset + 4) & 0x3ffffff;
         if (sample_pointer == 0) {
           continue;
         }
@@ -281,13 +281,13 @@ bool MP2kInstr::LoadInstr() {
             // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
             rgn->SetPan(pan);
 
-            u32 pitch = GetRawFile()->get<u32>(sample_pointer + 4);
+            u32 pitch = rawFile()->get<u32>(sample_pointer + 4);
             double delta_note = 12.0 * log2(static_cast<MP2kInstrSet *>(parInstrSet)->sampleRate() *
                                             1024.0 / pitch);
             int rootkey = 60 + int(round(delta_note));
 
             rgn->SetUnityKey(rootkey - keynum + key);
-            SetADSR(rgn, GetRawFile()->get<u32>(offset + 8));
+            SetADSR(rgn, rawFile()->get<u32>(offset + 8));
           }
         } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
           /* Make noise sample here... */

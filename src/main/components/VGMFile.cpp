@@ -11,7 +11,7 @@
 VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
                  uint32_t length, std::string theName)
     : VGMContainerItem(this, offset, length),
-      rawfile(theRawFile),
+      m_rawfile(theRawFile),
       m_format(std::move(fmt)),
       id(-1),
       m_name(std::move(theName)) {}
@@ -34,7 +34,7 @@ const std::string& VGMFile::formatName() {
 }
 
 std::string VGMFile::description() {
-  auto filename = this->rawfile->name();
+  auto filename = this->m_rawfile->name();
   auto formatName = this->format()->GetName();
   return "Format: " + formatName + "     Source File: \"" + filename + "\"";
 }
@@ -50,9 +50,9 @@ void VGMFile::RemoveCollAssoc(VGMColl *coll) {
 }
 
 // These functions are common to all VGMItems, but no reason to refer to vgmfile
-// or call GetRawFile() if the item itself is a VGMFile
-RawFile *VGMFile::GetRawFile() const {
-  return rawfile;
+// or call rawFile() if the item itself is a VGMFile
+RawFile *VGMFile::rawFile() const {
+  return m_rawfile;
 }
 
 uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
@@ -65,7 +65,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) cons
       nCount = endOff - nIndex;
   }
 
-  return rawfile->GetBytes(nIndex, nCount, pBuffer);
+  return m_rawfile->GetBytes(nIndex, nCount, pBuffer);
 }
 
 // *********

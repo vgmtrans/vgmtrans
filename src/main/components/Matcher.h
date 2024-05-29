@@ -296,7 +296,7 @@ class FilenameMatcher : public SimpleMatcher<std::string> {
       : SimpleMatcher(format, bRequiresSampColl) {}
 
   bool GetSeqId(VGMSeq *seq, std::string &id) override {
-    RawFile *rawfile = seq->GetRawFile();
+    RawFile *rawfile = seq->rawFile();
     id = rawfile->GetParRawFileFullPath();
     if (id.empty()) {
       id = rawfile->path();
@@ -306,7 +306,7 @@ class FilenameMatcher : public SimpleMatcher<std::string> {
   }
 
   bool GetInstrSetId(VGMInstrSet *instrset, std::string &id) override {
-    RawFile *rawfile = instrset->GetRawFile();
+    RawFile *rawfile = instrset->rawFile();
     id = rawfile->GetParRawFileFullPath();
     if (id.empty()) {
       id = rawfile->path();
@@ -316,7 +316,7 @@ class FilenameMatcher : public SimpleMatcher<std::string> {
   }
 
   bool GetSampCollId(VGMSampColl *sampcoll, std::string &id) override {
-    RawFile *rawfile = sampcoll->GetRawFile();
+    RawFile *rawfile = sampcoll->rawFile();
     id = rawfile->GetParRawFileFullPath();
     if (id.empty()) {
         id = rawfile->path();

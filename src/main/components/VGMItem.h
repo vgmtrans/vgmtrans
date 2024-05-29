@@ -83,7 +83,9 @@ public:
   friend bool operator<(VGMItem &item1, VGMItem &item2);
   friend bool operator>=(VGMItem &item1, VGMItem &item2);
 
-  RawFile *GetRawFile() const;
+  void setName(const std::string& newName) { name = newName; }
+
+  RawFile *rawFile() const;
 
   virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
   virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);

@@ -6,10 +6,10 @@
 using namespace std;
 
 Vab::Vab(RawFile *file, uint32_t offset)
-    : VGMInstrSet(PS1Format::name, file, offset) {
+    : VGMInstrSet(PS1Format::name, file, offset, 0, "VAB") {
 }
 
-Vab::~Vab(void) {
+Vab::~Vab() {
 }
 
 
@@ -20,8 +20,6 @@ bool Vab::GetHeaderInfo() {
   if (nMaxLength < 0x20) {
     return false;
   }
-
-  m_name = "VAB";
 
   VGMHeader *vabHdr = AddHeader(dwOffset, 0x20, "VAB Header");
   vabHdr->AddSimpleItem(dwOffset + 0x00, 4, "ID");
@@ -143,7 +141,7 @@ bool Vab::GetInstrPointers() {
     // single VAB file?
     if (dwOffset == 0 && vagLocations.size() != 0) {
       // load samples as well
-      PSXSampColl *newSampColl = new PSXSampColl(m_format, this, vagStartOffset, totalVAGSize, vagLocations);
+      PSXSampColl *newSampColl = new PSXSampColl(formatName(), this, vagStartOffset, totalVAGSize, vagLocations);
       if (newSampColl->LoadVGMFile()) {
         pRoot->AddVGMFile(newSampColl);
         //this->sampColl = newSampColl;

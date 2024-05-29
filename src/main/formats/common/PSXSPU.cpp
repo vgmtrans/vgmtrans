@@ -18,7 +18,7 @@ PSXSampColl::PSXSampColl(const string &format, RawFile *rawfile, uint32_t offset
 }
 
 PSXSampColl::PSXSampColl(const string &format, VGMInstrSet *instrset, uint32_t offset, uint32_t length)
-    : VGMSampColl(format, instrset->rawfile, instrset, offset, length) {
+    : VGMSampColl(format, instrset->rawFile(), instrset, offset, length) {
 }
 
 PSXSampColl::PSXSampColl(const string &format,
@@ -26,7 +26,7 @@ PSXSampColl::PSXSampColl(const string &format,
                          uint32_t offset,
                          uint32_t length,
                          const std::vector<SizeOffsetPair> &vagLocations)
-    : VGMSampColl(format, instrset->rawfile, instrset, offset, length), vagLocations(vagLocations) {
+    : VGMSampColl(format, instrset->rawFile(), instrset, offset, length), vagLocations(vagLocations) {
 }
 
 bool PSXSampColl::GetSampleInfo() {
@@ -322,7 +322,7 @@ void PSXSamp::ConvertToStdWave(uint8_t *buf) {
       }
     }
 
-    GetRawFile()->GetBytes(dwOffset + k + 2, 14, theBlock.brr);
+    rawFile()->GetBytes(dwOffset + k + 2, 14, theBlock.brr);
 
     //each decompressed pcm block is 52 bytes   EDIT: (wait, isn't it 56 bytes? or is it 28?)
     DecompVAGBlk(uncompBuf + ((k * 28) / 16),

@@ -71,7 +71,7 @@ bool VGMInstrSet::Load() {
     }
   }
 
-  rawfile->AddContainedVGMFile(
+  rawFile()->AddContainedVGMFile(
       std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
   pRoot->AddVGMFile(this);
   return true;

@@ -27,8 +27,8 @@ bool operator>=(const VGMItem &item1, const VGMItem &item2) {
   return item1.dwOffset >= item2.dwOffset;
 }
 
-RawFile *VGMItem::GetRawFile() const {
-  return vgmfile->rawfile;
+RawFile *VGMItem::rawFile() const {
+  return vgmfile->rawFile();
 }
 
 bool VGMItem::IsItemAtOffset(uint32_t offset, bool includeContainer, bool matchStartOffset) {

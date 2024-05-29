@@ -70,7 +70,7 @@ bool VGMSeqNoTrks::LoadEvents(long stopTime) {
 
   bInLoop = false;
   curOffset = eventsOffset();  // start at beginning of track
-  while (curOffset < rawfile->size()) {
+  while (curOffset < rawFile()->size()) {
     if (GetTime() >= static_cast<u_long>(stopTime)) {
       break;
     }

@@ -38,7 +38,7 @@ bool PS1Seq::GetHeaderInfo() {
 
   if (GetByte(offset() + 0xF) == 0 && GetByte(offset() + 0x10) == 0) {
     SetEventsOffset(offset() + 0x0F + 4);
-    PS1Seq *newPS1Seq = new PS1Seq(rawfile, offset() + GetShortBE(offset() + 0x11) + 0x13 - 6);
+    PS1Seq *newPS1Seq = new PS1Seq(rawFile(), offset() + GetShortBE(offset() + 0x11) + 0x13 - 6);
     if (!newPS1Seq->LoadVGMFile()) {
       delete newPS1Seq;
     }
@@ -67,7 +67,7 @@ void PS1Seq::ResetVars() {
 bool PS1Seq::ReadEvent() {
   uint32_t beginOffset = curOffset;
   uint32_t delta = ReadVarLen(curOffset);
-  if (curOffset >= rawfile->size())
+  if (curOffset >= rawFile()->size())
     return false;
   AddTime(delta);
 

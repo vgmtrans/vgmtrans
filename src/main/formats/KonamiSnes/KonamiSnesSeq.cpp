@@ -49,9 +49,7 @@ const uint8_t KonamiSnesSeq::PAN_TABLE[] = {
 };
 
 KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName)
-    : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset), version(ver) {
-  m_name = newName;
-
+    : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
   bAllowDiscontinuousTrackData = true;
 
   UseReverb();

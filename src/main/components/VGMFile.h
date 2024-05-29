@@ -26,23 +26,24 @@ public:
   Format* format() const;
   const std::string& formatName();
 
-  virtual uint32_t GetID() { return id; }
+  virtual uint32_t GetID() const { return id; }
+  void setId(uint32_t newId) { id = newId; }
 
   void AddCollAssoc(VGMColl *coll);
   void RemoveCollAssoc(VGMColl *coll);
-  [[nodiscard]] RawFile *GetRawFile() const;
+  [[nodiscard]] RawFile *rawFile() const;
 
   [[nodiscard]] size_t size() const noexcept { return unLength; }
   [[nodiscard]] std::string name() const noexcept { return m_name; }
 
   uint32_t GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const;
 
-  inline uint8_t GetByte(uint32_t offset) const { return rawfile->GetByte(offset); }
-  inline uint16_t GetShort(uint32_t offset) const { return rawfile->GetShort(offset); }
-  inline uint32_t GetWord(uint32_t offset) const { return rawfile->GetWord(offset); }
-  inline uint16_t GetShortBE(uint32_t offset) const { return rawfile->GetShortBE(offset); }
-  inline uint32_t GetWordBE(uint32_t offset) const { return rawfile->GetWordBE(offset); }
-  inline bool IsValidOffset(uint32_t offset) const { return rawfile->IsValidOffset(offset); }
+  inline uint8_t GetByte(uint32_t offset) const { return m_rawfile->GetByte(offset); }
+  inline uint16_t GetShort(uint32_t offset) const { return m_rawfile->GetShort(offset); }
+  inline uint32_t GetWord(uint32_t offset) const { return m_rawfile->GetWord(offset); }
+  inline uint16_t GetShortBE(uint32_t offset) const { return m_rawfile->GetShortBE(offset); }
+  inline uint32_t GetWordBE(uint32_t offset) const { return m_rawfile->GetWordBE(offset); }
+  inline bool IsValidOffset(uint32_t offset) const { return m_rawfile->IsValidOffset(offset); }
 
   uint32_t GetStartOffset() const { return dwOffset; }
   /*
@@ -50,14 +51,14 @@ public:
    * The only safe way for now is to
    * assume maximum length
    */
-  uint32_t GetEndOffset() const { return static_cast<uint32_t>(rawfile->size()); }
+  uint32_t GetEndOffset() const { return static_cast<uint32_t>(m_rawfile->size()); }
 
-  [[nodiscard]] const char *data() const { return rawfile->data() + dwOffset; }
+  [[nodiscard]] const char *data() const { return m_rawfile->data() + dwOffset; }
 
-  RawFile* rawfile;
   std::vector<VGMColl*> assocColls;
 
-protected:
+private:
+  RawFile* m_rawfile;
   std::string m_format;
   uint32_t id;
   std::string m_name;

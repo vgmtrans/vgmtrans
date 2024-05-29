@@ -33,7 +33,7 @@ bool TamSoftPS1InstrSet::GetInstrPointers() {
     bool vagLoop;
     uint32_t vagOffset = 0x800 + GetWord(dwOffset + 4 * instrNum);
     if (vagOffset < unLength) {
-      SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::GetSampleLength(rawfile, vagOffset, dwOffset + unLength, vagLoop));
+      SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::GetSampleLength(rawFile(), vagOffset, dwOffset + unLength, vagLoop));
       vagLocations.push_back(vagLocation);
 
       TamSoftPS1Instr *newInstr = new TamSoftPS1Instr(this, instrNum,

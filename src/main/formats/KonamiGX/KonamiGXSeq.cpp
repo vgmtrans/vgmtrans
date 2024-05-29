@@ -9,7 +9,7 @@ using namespace std;
 // ***********
 
 KonamiGXSeq::KonamiGXSeq(RawFile *file, uint32_t offset)
-    : VGMSeq(KonamiGXFormat::name, file, offset) {
+    : VGMSeq(KonamiGXFormat::name, file, offset, 0, "Konami GX Seq") {
   UseReverb();
   AlwaysWriteInitialVol(127);
 }
@@ -20,10 +20,6 @@ KonamiGXSeq::~KonamiGXSeq(void) {
 bool KonamiGXSeq::GetHeaderInfo(void) {
   //nNumTracks = GetByte(dwOffset+8);
   SetPPQN(0x30);
-
-  ostringstream theName;
-  theName << "Konami GX Seq";
-  m_name = theName.str();
   return true;
 }
 

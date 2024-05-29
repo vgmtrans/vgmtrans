@@ -27,7 +27,7 @@ void KonamiPS1Seq::ResetVars() {
 }
 
 bool KonamiPS1Seq::GetHeaderInfo() {
-  if (!IsKDT1Seq(rawfile, dwOffset)) {
+  if (!IsKDT1Seq(rawFile(), dwOffset)) {
     return false;
   }
 

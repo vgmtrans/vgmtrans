@@ -494,7 +494,7 @@ CPS2SampColl::CPS2SampColl(RawFile *file, CPS2InstrSet *theinstrset,
 
 
 bool CPS2SampColl::GetHeaderInfo() {
-  unLength = static_cast<uint32_t>(this->rawfile->size());
+  unLength = static_cast<uint32_t>(this->rawFile()->size());
   return true;
 }
 

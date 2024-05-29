@@ -57,7 +57,7 @@ bool KonamiSnesInstrSet::GetInstrPointers() {
       return false;
     }
 
-    if (!KonamiSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, false)) {
+    if (!KonamiSnesInstr::IsValidHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr, false)) {
       if (instr < firstBankedInstr) {
         continue;
       }
@@ -65,7 +65,7 @@ bool KonamiSnesInstrSet::GetInstrPointers() {
         break;
       }
     }
-    if (!KonamiSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, true)) {
+    if (!KonamiSnesInstr::IsValidHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr, true)) {
       continue;
     }
 
@@ -97,7 +97,7 @@ bool KonamiSnesInstrSet::GetInstrPointers() {
   aInstrs.push_back(newInstr);
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(KonamiSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(KonamiSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;

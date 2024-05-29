@@ -169,7 +169,7 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
   }
 
   if (bRemoveEmptyRawFile) {
-    const auto rawFile = targFile->GetRawFile();
+    const auto rawFile = targFile->rawFile();
     rawFile->RemoveContainedVGMFile(file);
     if (rawFile->containedVGMFiles().empty()) {
       CloseRawFile(rawFile);

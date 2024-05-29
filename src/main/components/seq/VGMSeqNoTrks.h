@@ -26,7 +26,9 @@ public:
   using VGMSeq::GetWordBE;
   inline uint32_t &offset() { return VGMSeq::dwOffset; }
   inline uint32_t &length() { return VGMSeq::unLength; }
-  inline std::string &name() { return VGMSeq::m_name; }
+  inline std::string name() { return VGMSeq::name(); }
+
+  inline RawFile* rawFile() { return rawFile(); }
 
   inline uint32_t &eventsOffset() { return dwEventsOffset; }
 

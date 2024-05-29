@@ -55,7 +55,7 @@ bool WDInstrSet::GetHeaderInfo() {
   header->AddSimpleItem(dwOffset + 0x8, 4, "Number of Instruments");
   header->AddSimpleItem(dwOffset + 0xC, 4, "Number of Regions");
 
-  id = GetShort(0x2 + dwOffset);
+  setId(GetShort(0x2 + dwOffset));
   dwSampSectSize = GetWord(0x4 + dwOffset);
   dwNumInstrs = GetWord(0x8 + dwOffset);
   dwTotalRegions = GetWord(0xC + dwOffset);
@@ -63,7 +63,7 @@ bool WDInstrSet::GetHeaderInfo() {
   if (dwSampSectSize < 0x40)  // Some songs in the Bouncer have bizarre values here
     dwSampSectSize = 0;
 
-  m_name = fmt::format("WD {}", id);
+  setName(fmt::format("WD {}", GetID()));
 
   uint32_t sampCollOff = dwOffset + GetWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
 

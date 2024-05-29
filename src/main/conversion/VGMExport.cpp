@@ -77,6 +77,6 @@ bool SaveAsOriginal(const RawFile& rawfile, const std::string& filepath) {
 }
 
 bool SaveAsOriginal(const VGMFile& file, const std::string& filepath) {
-  return saveDataToFile(file.rawfile->begin() + file.dwOffset, file.unLength, filepath);
+  return saveDataToFile(file.rawFile()->begin() + file.dwOffset, file.unLength, filepath);
 }
 }  // namespace conversion

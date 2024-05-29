@@ -53,8 +53,8 @@ void RareSnesInstrSet::Initialize() {
   }
 
   unLength = 0x100;
-  if (dwOffset + unLength > GetRawFile()->size()) {
-    unLength = GetRawFile()->size() - dwOffset;
+  if (dwOffset + unLength > rawFile()->size()) {
+    unLength = rawFile()->size() - dwOffset;
   }
   ScanAvailableInstruments();
 }
@@ -83,7 +83,7 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
       continue;
     }
 
-    if (!SNESSampColl::IsValidSampleDir(rawfile, offDirEnt, true)) {
+    if (!SNESSampColl::IsValidSampleDir(rawFile(), offDirEnt, true)) {
       continue;
     }
 

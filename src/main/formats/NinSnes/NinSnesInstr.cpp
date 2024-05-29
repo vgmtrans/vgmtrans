@@ -78,10 +78,10 @@ bool NinSnesInstrSet::GetInstrPointers() {
       // example: Yoshi's Island - Bowser (ff ff ff ff)
       continue;
     }
-    if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, false)) {
+    if (!NinSnesInstr::IsValidHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr, false)) {
       break;
     }
-    if (!NinSnesInstr::IsValidHeader(this->rawfile, version, addrInstrHeader, spcDirAddr, true)) {
+    if (!NinSnesInstr::IsValidHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr, true)) {
       continue;
     }
 
@@ -108,7 +108,7 @@ bool NinSnesInstrSet::GetInstrPointers() {
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(NinSnesFormat::name, this->rawfile, spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = new SNESSampColl(NinSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
   if (!newSampColl->LoadVGMFile()) {
     delete newSampColl;
     return false;
