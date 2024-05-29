@@ -12,6 +12,7 @@ class VGMSeq;
 class VGMInstrSet;
 class VGMSampColl;
 class RawFile;
+class VGMColl;
 
 /**
  * Represents the type of value a property holds in a CommandContext's PropertyMap.
@@ -33,7 +34,8 @@ using PropertyValue = std::variant<
     std::shared_ptr<std::vector<VGMSeq*>>,
     std::shared_ptr<std::vector<VGMInstrSet*>>,
     std::shared_ptr<std::vector<VGMSampColl*>>,
-    std::shared_ptr<std::vector<RawFile*>>
+    std::shared_ptr<std::vector<RawFile*>>,
+    std::shared_ptr<std::vector<VGMColl*>>
 >;
 
 using PropertyMap = std::map<std::string, PropertyValue>;

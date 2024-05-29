@@ -11,6 +11,7 @@
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMExport.h"
+#include "VGMColl.h"
 
 namespace fs = std::filesystem;
 
@@ -111,8 +112,8 @@ public:
         if (auto specificFile = dynamic_cast<TSavable*>(file)) {
           Save(path, specificFile);
         }
-        return;
       }
+      return;
     }
     if (files.size() == 1) {
       // In this case, path is a file path
@@ -199,4 +200,42 @@ public:
   }
   [[nodiscard]] std::string Name() const override { return "Save all samples as WAV"; }
   [[nodiscard]] std::string GetExtension() const override { return "wav"; }
+};
+
+template <conversion::Target options>
+class SaveCollCommand : public SaveCommand<VGMColl> {
+public:
+  SaveCollCommand() : SaveCommand<VGMColl>(true) {}
+
+  void Save(const std::string& path, VGMColl* coll) const override {
+    conversion::SaveAs<options>(*coll, path);
+  }
+  [[nodiscard]] std::string Name() const override {
+    std::vector<std::string> parts;
+    if constexpr ((options & conversion::Target::MIDI) != 0) {
+      parts.emplace_back("MIDI");
+    }
+    if constexpr ((options & conversion::Target::SF2) != 0) {
+      parts.emplace_back("SF2");
+    }
+    if constexpr ((options & conversion::Target::DLS) != 0) {
+      parts.emplace_back("DLS");
+    }
+
+    std::string name = "Export as ";
+    for (size_t i = 0; i < parts.size(); ++i) {
+      name += parts[i];
+      if (i < parts.size() - 1) {
+        if (parts.size() == 2) {            // Only two options: use " and " between them
+          name += " and ";
+        } else if (i < parts.size() - 2) {  // More than two options, comma separator
+          name += ", ";
+        } else {                            // Last element in a list of more than two, use ", and "
+          name += ", and ";
+        }
+      }
+    }
+    return name;
+  }
+  [[nodiscard]] std::string GetExtension() const override { return ""; }
 };

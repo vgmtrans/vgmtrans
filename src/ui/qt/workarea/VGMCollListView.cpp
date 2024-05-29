@@ -6,12 +6,12 @@
 
 #include "VGMCollListView.h"
 
-#include <QMenu>
 #include <QLineEdit>
 #include <VGMColl.h>
 #include <VGMExport.h>
 #include "SequencePlayer.h"
 #include "QtVGMRoot.h"
+#include "services/MenuManager.h"
 
 static const QIcon &VGMCollIcon() {
   static QIcon icon(":/images/collection.svg");
@@ -131,49 +131,22 @@ void VGMCollListView::collectionMenu(const QPoint &pos) const {
     return;
   }
 
-  auto *vgmcoll_menu = new QMenu();
-  vgmcoll_menu->addAction("Export as MIDI and DLS", [this]() {
-    auto save_path = qtVGMRoot.UI_GetSaveDirPath();
-    if (save_path.empty()) {
-      return;
-    }
+  if (!selectionModel()->hasSelection()) {
+    return;
+  }
 
-    for (auto &index : selectedIndexes()) {
-      if (auto coll = qtVGMRoot.vgmColls()[index.row()]; coll) {
-        conversion::SaveAs<conversion::Target::MIDI | conversion::Target::DLS>(*coll, save_path);
-      }
-    }
-  });
+  QModelIndexList list = selectionModel()->selectedRows();
 
-  vgmcoll_menu->addAction("Export as MIDI and SF2", [this]() {
-    auto save_path = qtVGMRoot.UI_GetSaveDirPath();
-    if (save_path.empty()) {
-      return;
+  auto selectedColls = std::make_shared<std::vector<VGMColl*>>();
+  selectedColls->reserve(list.size());
+  for (const auto &index : list) {
+    if (index.isValid()) {
+      selectedColls->push_back(qtVGMRoot.vgmColls()[index.row()]);
     }
-
-    for (auto &index : selectedIndexes()) {
-      if (auto coll = qtVGMRoot.vgmColls()[index.row()]; coll) {
-        conversion::SaveAs<conversion::Target::MIDI | conversion::Target::SF2>(*coll, save_path);
-      }
-    }
-  });
-
-  vgmcoll_menu->addAction("Export as MIDI, DLS and SF2", [this]() {
-    auto save_path = qtVGMRoot.UI_GetSaveDirPath();
-    if (save_path.empty()) {
-      return;
-    }
-
-    for (auto &index : selectedIndexes()) {
-      if (auto coll = qtVGMRoot.vgmColls()[index.row()]; coll) {
-        conversion::SaveAs<conversion::Target::MIDI | conversion::Target::DLS |
-          conversion::Target::SF2>(*coll, save_path);
-      }
-    }
-  });
-
-  vgmcoll_menu->exec(mapToGlobal(pos));
-  vgmcoll_menu->deleteLater();
+  }
+  auto menu = MenuManager::the()->CreateMenuForItems<VGMColl>(selectedColls);
+  menu->exec(mapToGlobal(pos));
+  menu->deleteLater();
 }
 
 void VGMCollListView::keyPressEvent(QKeyEvent *e) {
