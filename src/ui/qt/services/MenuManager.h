@@ -8,8 +8,6 @@
 
 #include "services/commands/Command.h"
 #include <filesystem>
-#include <typeindex>
-#include <typeinfo>
 #include <QMenu>
 #include "common.h"
 #include "Root.h"
