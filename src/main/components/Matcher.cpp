@@ -92,22 +92,22 @@ void FilegroupMatcher::MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampco
   if (seqs.size() >= 1) {
     for(VGMSeq *seq : seqs) {
       VGMColl *coll = fmt->NewCollection();
-      coll->SetName(seq->name());
-      coll->UseSeq(seq);
-      coll->AddInstrSet(instrset);
-      coll->AddSampColl(sampcoll);
-      if (!coll->Load()) {
+      coll->setName(seq->name());
+      coll->useSeq(seq);
+      coll->addInstrSet(instrset);
+      coll->addSampColl(sampcoll);
+      if (!coll->load()) {
         delete coll;
       }
     }
   }
   else {
     VGMColl *coll = fmt->NewCollection();
-    coll->SetName(instrset->name());
-    coll->UseSeq(nullptr);
-    coll->AddInstrSet(instrset);
-    coll->AddSampColl(sampcoll);
-    if (!coll->Load()) {
+    coll->setName(instrset->name());
+    coll->useSeq(nullptr);
+    coll->addInstrSet(instrset);
+    coll->addSampColl(sampcoll);
+    if (!coll->load()) {
       delete coll;
     }
   }
@@ -145,15 +145,15 @@ bool FilegroupMatcher::MakeCollectionsForFile(VGMFile* /*file*/) {
     // into the same VGMCollection
     for(VGMSeq *seq : seqs) {
       VGMColl *coll = fmt->NewCollection();
-      coll->SetName(seq->name());
-      coll->UseSeq(seq);
+      coll->setName(seq->name());
+      coll->useSeq(seq);
       for (VGMInstrSet* instrset : instrsets) {
         for (VGMSampColl* sampcoll : sampcolls) {
-          coll->AddInstrSet(instrset);
-          coll->AddSampColl(sampcoll);
+          coll->addInstrSet(instrset);
+          coll->addSampColl(sampcoll);
         }
       }
-      if (!coll->Load()) {
+      if (!coll->load()) {
         delete coll;
       }
     }

@@ -10,9 +10,9 @@
 #include "AkaoInstr.h"
 #include "PSXSPU.h"
 
-bool AkaoColl::LoadMain() {
-  AkaoInstrSet *instrset = reinterpret_cast<AkaoInstrSet *>(instrsets[0]);
-  AkaoSampColl *sampcoll = reinterpret_cast<AkaoSampColl *>(sampcolls[0]);
+bool AkaoColl::loadMain() {
+  AkaoInstrSet *instrset = reinterpret_cast<AkaoInstrSet *>(instrSets()[0]);
+  AkaoSampColl *sampcoll = reinterpret_cast<AkaoSampColl *>(sampColls()[0]);
 
   //Set the sample numbers of each region using the articulation data references of each region
   for (uint32_t i = 0; i < instrset->aInstrs.size(); i++) {
@@ -55,13 +55,13 @@ bool AkaoColl::LoadMain() {
   return true;
 }
 
-void AkaoColl::PreSynthFileCreation() {
-  if (!static_cast<AkaoSeq*>(seq)->bUsesIndividualArts)    //only do this if the 0xA1 event is actually used
+void AkaoColl::preSynthFileCreation() {
+  if (!static_cast<AkaoSeq*>(seq())->bUsesIndividualArts)    //only do this if the 0xA1 event is actually used
     return;
 
-  AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrsets[0]);
+  AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrSets()[0]);
 
-  AkaoSampColl *sampcoll = reinterpret_cast<AkaoSampColl *>(sampcolls[0]);
+  AkaoSampColl *sampcoll = reinterpret_cast<AkaoSampColl *>(sampColls()[0]);
   const uint32_t numArts = static_cast<uint32_t>(sampcoll->akArts.size());
   numAddedInstrs = numArts;
 
@@ -86,13 +86,13 @@ void AkaoColl::PreSynthFileCreation() {
   }
 }
 
-void AkaoColl::PostSynthFileCreation() {
+void AkaoColl::postSynthFileCreation() {
   //if the 0xA1 event isn't used in the sequence, then we didn't modify the instrset
   //so skip this
-  if (!static_cast<AkaoSeq*>(seq)->bUsesIndividualArts)
+  if (!static_cast<AkaoSeq*>(seq())->bUsesIndividualArts)
     return;
 
-  AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrsets[0]);
+  AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrSets()[0]);
   for (size_t i = 0; i < numAddedInstrs; i++) {
     delete instrSet->aInstrs.back();
     instrSet->aInstrs.pop_back();

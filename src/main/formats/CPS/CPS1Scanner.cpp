@@ -136,10 +136,10 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     auto collName = fmt::format("{} song {}", gameentry->name, seqNum++);
     VGMColl* coll = new VGMColl(collName);
 
-    coll->UseSeq(newSeq);
-    coll->AddInstrSet(instrset);
-    coll->AddSampColl(sampcoll);
-    if (!coll->Load()) {
+    coll->useSeq(newSeq);
+    coll->addInstrSet(instrset);
+    coll->addSampColl(sampcoll);
+    if (!coll->load()) {
       delete coll;
     }
   }

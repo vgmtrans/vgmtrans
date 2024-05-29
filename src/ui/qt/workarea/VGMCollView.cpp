@@ -34,8 +34,8 @@ int VGMCollViewModel::rowCount(const QModelIndex &parent) const {
     return 0;
   }
   // plus one because of the VGMColl sequence
-  return static_cast<int>(m_coll->instrsets.size() + m_coll->sampcolls.size() +
-                          m_coll->miscfiles.size() + 1);
+  return static_cast<int>(m_coll->instrSets().size() + m_coll->sampColls().size() +
+                          m_coll->miscFiles().size() + 1);
 }
 
 QVariant VGMCollViewModel::data(const QModelIndex &index, int role) const {
@@ -66,24 +66,24 @@ void VGMCollViewModel::handleNewCollSelected(const QModelIndex& modelIndex) {
 
 VGMFile *VGMCollViewModel::fileFromIndex(const QModelIndex& index) const {
   size_t row = index.row();
-  auto num_instrsets = m_coll->instrsets.size();
-  auto num_sampcolls = m_coll->sampcolls.size();
-  auto num_miscfiles = m_coll->miscfiles.size();
+  auto num_instrsets = m_coll->instrSets().size();
+  auto num_sampcolls = m_coll->sampColls().size();
+  auto num_miscfiles = m_coll->miscFiles().size();
 
   if (row < num_miscfiles) {
-    return m_coll->miscfiles[row];
+    return m_coll->miscFiles()[row];
   }
 
   row -= num_miscfiles;
   if (row < num_instrsets) {
-    return m_coll->instrsets[row];
+    return m_coll->instrSets()[row];
   }
 
   row -= num_instrsets;
   if (row < num_sampcolls) {
-    return m_coll->sampcolls[row];
+    return m_coll->sampColls()[row];
   } else {
-    return m_coll->seq;
+    return m_coll->seq();
   }
 }
 
@@ -91,28 +91,28 @@ QModelIndex VGMCollViewModel::indexFromFile(const VGMFile* file) const {
   int row = 0;
 
   // Check in miscfiles
-  auto miscIt = std::ranges::find(m_coll->miscfiles, file);
-  if (miscIt != m_coll->miscfiles.end()) {
-    return createIndex(static_cast<int>(std::distance(m_coll->miscfiles.begin(), miscIt)), 0);
+  auto miscIt = std::ranges::find(m_coll->miscFiles(), file);
+  if (miscIt != m_coll->miscFiles().end()) {
+    return createIndex(static_cast<int>(std::distance(m_coll->miscFiles().begin(), miscIt)), 0);
   }
-  row += m_coll->miscfiles.size();
+  row += m_coll->miscFiles().size();
 
   // Check in instrsets
-  auto instrIt = std::ranges::find(m_coll->instrsets, file);
-  if (instrIt != m_coll->instrsets.end()) {
-    return createIndex(row + static_cast<int>(std::distance(m_coll->instrsets.begin(), instrIt)), 0);
+  auto instrIt = std::ranges::find(m_coll->instrSets(), file);
+  if (instrIt != m_coll->instrSets().end()) {
+    return createIndex(row + static_cast<int>(std::distance(m_coll->instrSets().begin(), instrIt)), 0);
   }
-  row += m_coll->instrsets.size();
+  row += m_coll->instrSets().size();
 
   // Check in sampcolls
-  auto sampIt = std::ranges::find(m_coll->sampcolls, file);
-  if (sampIt != m_coll->sampcolls.end()) {
-    return createIndex(row + static_cast<int>(std::distance(m_coll->sampcolls.begin(), sampIt)), 0);
+  auto sampIt = std::ranges::find(m_coll->sampColls(), file);
+  if (sampIt != m_coll->sampColls().end()) {
+    return createIndex(row + static_cast<int>(std::distance(m_coll->sampColls().begin(), sampIt)), 0);
   }
-  row += m_coll->sampcolls.size();
+  row += m_coll->sampColls().size();
 
   // Check if it's seq
-  if (m_coll->seq == file) {
+  if (m_coll->seq() == file) {
     return createIndex(row, 0);
   }
 
@@ -177,7 +177,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
       m_collection_title->setText("No collection selected");
     } else {
       m_collection_title->setText(
-          QString::fromStdString(qtVGMRoot.vgmColls()[index.row()]->GetName()));
+          QString::fromStdString(qtVGMRoot.vgmColls()[index.row()]->name()));
       m_collection_title->setReadOnly(false);
       commit_rename->setEnabled(true);
     }
@@ -192,7 +192,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 
     auto title = m_collection_title->text().toStdString();
     /* This makes a copy, no worries */
-    qtVGMRoot.vgmColls()[model_index.row()]->SetName(title);
+    qtVGMRoot.vgmColls()[model_index.row()]->setName(title);
 
     auto coll_list_model = collListSelModel->model();
     coll_list_model->dataChanged(coll_list_model->index(0, 0),

@@ -80,7 +80,7 @@ bool CLIVGMRoot::Init() {
     else {
       for(size_t i = numColls; i < GetNumCollections(); ++i) {
         VGMColl* coll = vgmColls()[i];
-        string collName = coll->GetName();
+        string collName = coll->name();
         auto it = collNameMap.find(collName);
         pair<size_t, fs::path> p = make_pair(i, infile);
         if (it == collNameMap.end()) {
@@ -130,7 +130,7 @@ bool CLIVGMRoot::Init() {
           }
           // update collection name to be unique
           string newCollName = collNameIt->first + suffix;
-          vgmColls()[p.first]->SetName(newCollName);
+          vgmColls()[p.first]->setName(newCollName);
         }
       }
     }
@@ -144,23 +144,23 @@ bool CLIVGMRoot::Init() {
 bool CLIVGMRoot::ExportAllCollections() {
   bool success = true;
   for (VGMColl* coll : vgmColls()) {
-    string collName = coll->GetName();
+    string collName = coll->name();
     success &= ExportCollection(coll);
   }
   return success;
 }
 
 bool CLIVGMRoot::ExportCollection(VGMColl* coll) {
-    string collName = coll->GetName();
+    string collName = coll->name();
     cout << "Exporting: " << collName << endl;
     return SaveMidi(coll) & SaveSF2(coll) & SaveDLS(coll);
 }
 
 bool CLIVGMRoot::SaveMidi(const VGMColl* coll) {
-  if (coll->seq != nullptr) {
-    string collName = coll->GetName();
+  if (coll->m_seq != nullptr) {
+    string collName = coll->name();
     string filepath = UI_GetSaveFilePath(collName, "mid");
-    if (!coll->seq->SaveAsMidi(filepath)) {
+    if (!coll->m_seq->SaveAsMidi(filepath)) {
       L_ERROR("Failed to save MIDI file");
       return false;
     }
@@ -170,9 +170,9 @@ bool CLIVGMRoot::SaveMidi(const VGMColl* coll) {
 }
 
 bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
-  string collName = coll->GetName();
+  string collName = coll->name();
   string filepath = UI_GetSaveFilePath(collName, "sf2");
-  SF2File *sf2file = coll->CreateSF2File();
+  SF2File *sf2file = coll->createSF2File();
   bool success = false;
   if (sf2file != nullptr) {
     if (sf2file->SaveSF2File(filepath)) {
@@ -190,11 +190,11 @@ bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
 }
 
 bool CLIVGMRoot::SaveDLS(VGMColl* coll) {
-  string collName = coll->GetName();
+  string collName = coll->name();
   string filepath = UI_GetSaveFilePath(collName, "dls");
   DLSFile dlsfile;
   bool success = false;
-  if (coll->CreateDLSFile(dlsfile)) {
+  if (coll->createDLSFile(dlsfile)) {
     if (dlsfile.SaveDLSFile(filepath)) {
       success = true;
     }

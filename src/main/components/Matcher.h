@@ -74,11 +74,11 @@ class SimpleMatcher : public Matcher {
           VGMColl *coll = fmt->NewCollection();
           if (!coll)
             return false;
-          coll->SetName(seq->name());
-          coll->UseSeq(seq);
-          coll->AddInstrSet(matchingInstrSet);
-          coll->AddSampColl(matchingSampColl);
-          if (!coll->Load()) {
+          coll->setName(seq->name());
+          coll->useSeq(seq);
+          coll->addInstrSet(matchingInstrSet);
+          coll->addSampColl(matchingSampColl);
+          if (!coll->load()) {
             delete coll;
             return false;
           }
@@ -87,10 +87,10 @@ class SimpleMatcher : public Matcher {
         VGMColl *coll = fmt->NewCollection();
         if (!coll)
           return false;
-        coll->SetName(seq->name());
-        coll->UseSeq(seq);
-        coll->AddInstrSet(matchingInstrSet);
-        if (!coll->Load()) {
+        coll->setName(seq->name());
+        coll->useSeq(seq);
+        coll->addInstrSet(matchingInstrSet);
+        if (!coll->load()) {
           delete coll;
           return false;
         }
@@ -138,20 +138,20 @@ class SimpleMatcher : public Matcher {
           VGMColl *coll = fmt->NewCollection();
           if (!coll)
             return false;
-          coll->SetName(matchingSeq->name());
-          coll->UseSeq(matchingSeq);
-          coll->AddInstrSet(instrset);
-          coll->AddSampColl(matchingSampColl);
-          coll->Load();
+          coll->setName(matchingSeq->name());
+          coll->useSeq(matchingSeq);
+          coll->addInstrSet(instrset);
+          coll->addSampColl(matchingSampColl);
+          coll->load();
         }
       } else {
         VGMColl *coll = fmt->NewCollection();
         if (!coll)
           return false;
-        coll->SetName(matchingSeq->name());
-        coll->UseSeq(matchingSeq);
-        coll->AddInstrSet(instrset);
-        if (!coll->Load()) {
+        coll->setName(matchingSeq->name());
+        coll->useSeq(matchingSeq);
+        coll->addInstrSet(instrset);
+        if (!coll->load()) {
           delete coll;
           return false;
         }
@@ -198,11 +198,11 @@ class SimpleMatcher : public Matcher {
           VGMColl *coll = fmt->NewCollection();
           if (!coll)
             return false;
-          coll->SetName(matchingSeq->name());
-          coll->UseSeq(matchingSeq);
-          coll->AddInstrSet(matchingInstrSet);
-          coll->AddSampColl(sampcoll);
-          if (!coll->Load()) {
+          coll->setName(matchingSeq->name());
+          coll->useSeq(matchingSeq);
+          coll->addInstrSet(matchingInstrSet);
+          coll->addSampColl(sampcoll);
+          if (!coll->load()) {
             delete coll;
             return false;
           }
