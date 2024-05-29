@@ -3,7 +3,8 @@
 
 #include <filesystem>
 #include <typeindex>
-#include <typeinfo>
+#include <variant>
+#include <vector>
 #include <map>
 
 class VGMFile;
