@@ -48,7 +48,7 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
 
     case Property::Format: {
       if (role == Qt::DisplayRole) {
-        return QString::fromStdString(vgmfile->GetFormatName());
+        return QString::fromStdString(vgmfile->formatName());
       }
       break;
     }

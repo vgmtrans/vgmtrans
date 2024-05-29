@@ -151,7 +151,7 @@ void VGMRoot::RemoveVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
   auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
-  if (Format *fmt = targFile->GetFormat()) {
+  if (Format *fmt = targFile->format()) {
     fmt->OnCloseFile(file);
   }
 

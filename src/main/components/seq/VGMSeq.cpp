@@ -55,7 +55,7 @@ bool VGMSeq::LoadVGMFile() {
     return false;
   }
 
-  if (auto fmt = GetFormat(); fmt) {
+  if (auto fmt = format(); fmt) {
     fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
   }
 

@@ -19,12 +19,12 @@ public:
 
   void AddToUI(VGMItem *parent, void *UI_specific) override;
 
-  [[nodiscard]] std::string GetDescription() override;
+  [[nodiscard]] std::string description() override;
 
   virtual bool LoadVGMFile() = 0;
   virtual bool Load() = 0;
-  Format *GetFormat() const;
-  const std::string &GetFormatName();
+  Format* format() const;
+  const std::string& formatName();
 
   virtual uint32_t GetID() { return id; }
 
@@ -54,11 +54,11 @@ public:
 
   [[nodiscard]] const char *data() const { return rawfile->data() + dwOffset; }
 
-  RawFile *rawfile;
-  std::vector<VGMColl *> assocColls;
+  RawFile* rawfile;
+  std::vector<VGMColl*> assocColls;
 
 protected:
-  std::string format;
+  std::string m_format;
   uint32_t id;
   std::string m_name;
 };

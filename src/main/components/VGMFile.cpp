@@ -12,7 +12,7 @@ VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
                  uint32_t length, std::string theName)
     : VGMContainerItem(this, offset, length),
       rawfile(theRawFile),
-      format(std::move(fmt)),
+      m_format(std::move(fmt)),
       id(-1),
       m_name(std::move(theName)) {}
 
@@ -25,17 +25,17 @@ void VGMFile::AddToUI(VGMItem* /*parent*/, void* UI_specific) {
   }
 }
 
-Format *VGMFile::GetFormat() const {
-  return Format::GetFormatFromName(format);
+Format *VGMFile::format() const {
+  return Format::GetFormatFromName(m_format);
 }
 
-const std::string& VGMFile::GetFormatName() {
-  return format;
+const std::string& VGMFile::formatName() {
+  return m_format;
 }
 
-std::string VGMFile::GetDescription() {
+std::string VGMFile::description() {
   auto filename = this->rawfile->name();
-  auto formatName = this->GetFormat()->GetName();
+  auto formatName = this->format()->GetName();
   return "Format: " + formatName + "     Source File: \"" + filename + "\"";
 }
 

@@ -224,7 +224,7 @@ size_t CLIVGMRoot::UpdateCollections(size_t startOffset) {
   auto files = vgmFiles();
   for (int i = startOffset; i < files.size(); ++i) {
     auto targFile = variantToVGMFile(files[i]);
-    Format *fmt = targFile->GetFormat();
+    Format *fmt = targFile->format();
     if (fmt && fmt->matcher) {
       fmt->matcher->MakeCollectionsForFile(targFile);
     }

@@ -143,7 +143,7 @@ bool Vab::GetInstrPointers() {
     // single VAB file?
     if (dwOffset == 0 && vagLocations.size() != 0) {
       // load samples as well
-      PSXSampColl *newSampColl = new PSXSampColl(format, this, vagStartOffset, totalVAGSize, vagLocations);
+      PSXSampColl *newSampColl = new PSXSampColl(m_format, this, vagStartOffset, totalVAGSize, vagLocations);
       if (newSampColl->LoadVGMFile()) {
         pRoot->AddVGMFile(newSampColl);
         //this->sampColl = newSampColl;

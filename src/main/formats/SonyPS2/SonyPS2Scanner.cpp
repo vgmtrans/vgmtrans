@@ -89,7 +89,7 @@ void SonyPS2Scanner::SearchForSampColl(RawFile *file) {
     }
 
     SonyPS2SampColl *sampColl = new SonyPS2SampColl(file, 0);
-    Format *fmt = sampColl->GetFormat();
+    Format *fmt = sampColl->format();
     if (fmt)
       fmt->OnNewFile(sampColl);
   }
