@@ -83,8 +83,7 @@ void SonyPS2Scanner::SearchForSampColl(RawFile *file) {
       uint8_t *newdataBuf = new uint8_t[newFileSize];
       file->GetBytes(0, file->size(), newdataBuf + 16);
       memset(newdataBuf, 0, 16);
-      pRoot->CreateVirtFile(newdataBuf, newFileSize, file->name(),
-                            file->GetParRawFileFullPath().c_str());
+      pRoot->CreateVirtFile(newdataBuf, newFileSize, file->name(), file->path().string());
       return;
     }
 

@@ -36,8 +36,6 @@ class RawFile {
     [[nodiscard]] virtual std::string stem() const noexcept = 0;
     [[nodiscard]] virtual std::string extension() const = 0;
 
-    virtual std::string GetParRawFileFullPath() const { return {}; }
-
     [[nodiscard]] bool IsValidOffset(uint32_t ofs) const noexcept { return ofs < size(); }
 
     [[nodiscard]] bool useLoaders() const noexcept { return m_flags & UseLoaders; }
@@ -126,7 +124,7 @@ class DiskFile final : public RawFile {
     [[nodiscard]] std::string name() const override { return m_path.filename().string(); };
     [[nodiscard]] std::filesystem::path path() const override { return m_path; };
     [[nodiscard]] size_t size() const noexcept override { return m_data.length(); };
-    [[nodiscard]] std::string stem() const noexcept override { return m_path.stem(); };
+    [[nodiscard]] std::string stem() const noexcept override { return m_path.stem().string(); };
     [[nodiscard]] std::string extension() const override {
         auto tmp = m_path.extension().string();
         if (!tmp.empty()) {
@@ -166,11 +164,11 @@ class VirtFile final : public RawFile {
       if (tmp.empty()) {
         std::filesystem::path tmp2(m_name);
         if (tmp2.has_filename()) {
-          return tmp2.stem();
+          return tmp2.stem().string();
         }
       }
 
-      return tmp;
+      return tmp.string();
     };
     [[nodiscard]] std::string extension() const override {
         auto tmp = m_lpath.extension().string();
@@ -185,8 +183,6 @@ class VirtFile final : public RawFile {
 
         return tmp;
     }
-
-    std::string GetParRawFileFullPath() const override { return m_lpath.string(); }
 
     const char *data() const override { return m_data.data(); }
     const char &operator[](size_t offset) const override { return m_data[offset]; }
