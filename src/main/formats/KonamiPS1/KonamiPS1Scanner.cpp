@@ -17,7 +17,7 @@ void KonamiPS1Scanner::Scan(RawFile *file, void *info) {
   int numSeqFiles = 0;
   while (offset < file->size()) {
     if (KonamiPS1Seq::IsKDT1Seq(file, offset)) {
-      std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+      std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
       if (numSeqFiles >= 1) {
         name += fmt::format("({})", numSeqFiles + 1);
       }

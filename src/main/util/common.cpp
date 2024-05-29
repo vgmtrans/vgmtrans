@@ -2,25 +2,18 @@
 #include <filesystem>
 #include "common.h"
 
-std::string removeExtFromPath(const std::string& s) {
-  std::filesystem::path p(s);
-  return (p.parent_path() / p.stem()).string();
+std::string toUpper(const std::string& input) {
+  std::string output = input;
+  std::transform(output.begin(), output.end(), output.begin(),
+                 [](unsigned char c) { return std::toupper(c); });
+  return output;
 }
 
-std::string StringToUpper(std::string myString) {
-  const size_t length = myString.length();
-  for (size_t i = 0; i != length; ++i) {
-    myString[i] = toupper(myString[i]);
-  }
-  return myString;
-}
-
-std::string StringToLower(std::string myString) {
-  const size_t length = myString.length();
-  for (size_t i = 0; i != length; ++i) {
-    myString[i] = tolower(myString[i]);
-  }
-  return myString;
+std::string toLower(const std::string& input) {
+  std::string output = input;
+  std::transform(output.begin(), output.end(), output.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return output;
 }
 
 std::string ConvertToSafeFileName(const std::string &str) {

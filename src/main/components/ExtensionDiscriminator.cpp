@@ -19,7 +19,7 @@ int ExtensionDiscriminator::AddExtensionScannerAssoc(const std::string& extensio
 }
 
 std::list<VGMScanner *> *ExtensionDiscriminator::GetScannerList(const std::string& extension) {
-  std::map<std::string, std::list<VGMScanner *> >::iterator iter = mScannerExt.find(StringToLower(extension));
+  std::map<std::string, std::list<VGMScanner *> >::iterator iter = mScannerExt.find(toLower(extension));
   if (iter == mScannerExt.end())
     return NULL;
   else

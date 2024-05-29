@@ -74,7 +74,7 @@ void NeverlandSnesScanner::Scan(RawFile *file, void *info) {
 void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM(RawFile *file) {
   NeverlandSnesVersion version = NEVERLANDSNES_NONE;
 
-  std::string basefilename = removeExtFromPath(file->name());
+  std::string basefilename = file->stem();
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   uint32_t ofsLoadSong;

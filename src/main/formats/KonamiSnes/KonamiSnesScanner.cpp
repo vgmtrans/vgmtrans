@@ -507,7 +507,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
 
   bool hasSongList;
 
-  std::string basefilename = removeExtFromPath(file->name());
+  std::string basefilename = file->stem();
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // TODO: Unsupported games

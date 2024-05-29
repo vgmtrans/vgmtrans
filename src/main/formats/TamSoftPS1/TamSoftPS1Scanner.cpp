@@ -14,8 +14,8 @@ ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TAMSOFTPS1", {"tsq", "tvb"
 }
 
 void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
-  std::string basename(removeExtFromPath(file->name()));
-  std::string extension(StringToLower(file->extension()));
+  std::string basename(file->stem());
+  std::string extension(file->extension());
 
   if (extension == "tsq") {
     uint8_t numSongs = 0;

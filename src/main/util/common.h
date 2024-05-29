@@ -50,10 +50,8 @@ class VGMMiscFile;
 
 using VGMFileVariant = std::variant<VGMSeq*, VGMInstrSet*, VGMSampColl*, VGMMiscFile*>;
 
-std::string removeExtFromPath(const std::string& s);
-
-std::string StringToUpper(std::string myString);
-std::string StringToLower(std::string myString);
+std::string toUpper(const std::string& input);
+std::string toLower(const std::string& input);
 
 std::string ConvertToSafeFileName(const std::string &str);
 
