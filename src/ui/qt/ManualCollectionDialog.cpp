@@ -151,17 +151,17 @@ void ManualCollectionDialog::createCollection() {
     QMessageBox::critical(this, "Error creating collection", "A music sequence must be selected");
     return;
   }
-  coll->UseSeq(chosen_seq);
+  coll->useSeq(chosen_seq);
 
   for (int i = 0; i < m_instr_list->count(); i++) {
     auto item = m_instr_list->item(i);
     auto radio = qobject_cast<QCheckBox *>(m_instr_list->itemWidget(item));
     if (radio->checkState() == (Qt::Checked)) {
       auto chosen_set = static_cast<VGMInstrSet *>(item->data(Qt::UserRole).value<void *>());
-      coll->AddInstrSet(chosen_set);
+      coll->addInstrSet(chosen_set);
     }
   }
-  if (coll->instrsets.empty()) {
+  if (coll->instrSets().empty()) {
     QMessageBox::critical(this, "Error creating collection",
                           "At least an instrument set must be selected");
     return;
@@ -172,10 +172,10 @@ void ManualCollectionDialog::createCollection() {
     auto radio = qobject_cast<QCheckBox *>(m_samp_list->itemWidget(item));
     if (radio->checkState() == (Qt::Checked)) {
       auto sampcoll = static_cast<VGMSampColl *>(item->data(Qt::UserRole).value<void *>());
-      coll->AddSampColl(sampcoll);
+      coll->addSampColl(sampcoll);
     }
   }
-  if (coll->sampcolls.empty()) {
+  if (coll->sampColls().empty()) {
     QMessageBox::warning(this, windowTitle(),
                           "No sample collections were selected\nThe instrument bank will be silent...");
   }

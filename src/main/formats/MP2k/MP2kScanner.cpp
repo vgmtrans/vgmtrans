@@ -134,11 +134,11 @@ void MP2kScanner::Scan(RawFile *file, void *info) {
       if (seq != seqs.end()) {
         for (auto seqval : seq->second) {
           auto coll = new VGMColl("MP2k Collection");
-          coll->UseSeq(seqval);
-          coll->AddInstrSet(iset);
-          coll->AddSampColl(iset->sampColl);
+          coll->useSeq(seqval);
+          coll->addInstrSet(iset);
+          coll->addSampColl(iset->sampColl);
 
-          if (!coll->Load()) {
+          if (!coll->load()) {
             delete coll;
           }
         }

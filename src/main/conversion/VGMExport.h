@@ -38,22 +38,22 @@ bool SaveAsOriginal(const RawFile& rawfile, const std::string& filepath);
 
 template <Target options>
 void SaveAs(VGMColl &coll, const std::string &dir_path) {
-  auto filename = ConvertToSafeFileName(coll.GetName());
+  auto filename = ConvertToSafeFileName(coll.name());
   auto filepath = dir_path + "/" + filename;
 
   if constexpr ((options & Target::MIDI) != 0) {
-    coll.seq->SaveAsMidi(filepath + ".mid");
+    coll.seq()->SaveAsMidi(filepath + ".mid");
   }
 
   if constexpr ((options & Target::DLS) != 0) {
     DLSFile dlsfile;
-    if (coll.CreateDLSFile(dlsfile)) {
+    if (coll.createDLSFile(dlsfile)) {
       dlsfile.SaveDLSFile(filepath + ".dls");
     }
   }
 
   if constexpr ((options & Target::SF2) != 0) {
-    if (SF2File *sf2file = coll.CreateSF2File()) {
+    if (SF2File *sf2file = coll.createSF2File()) {
       sf2file->SaveSF2File(filepath + ".sf2");
     }
   }

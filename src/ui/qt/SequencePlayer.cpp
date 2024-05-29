@@ -158,13 +158,13 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
     return false;
   }
 
-  VGMSeq *seq = coll->GetSeq();
+  VGMSeq *seq = coll->seq();
   if (!seq) {
     L_ERROR("Failed to play collection as it lacks sequence data.");
     return false;
   }
 
-  SF2File *sf2 = coll->CreateSF2File();
+  SF2File *sf2 = coll->createSF2File();
   if (!sf2) {
     L_ERROR("Failed to play collection as a soundfont file could not be produced.");
     return false;
@@ -228,7 +228,7 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
   m_active_vgmcoll = coll;
   m_active_stream = midi_stream;
   m_loaded_sf = sf2_handle;
-  m_song_title = QString::fromStdString(m_active_vgmcoll->GetName());
+  m_song_title = QString::fromStdString(m_active_vgmcoll->name());
   toggle();
 
   return true;

@@ -77,10 +77,10 @@ void TriAcePS1Scanner::SearchForSLZSeq(RawFile *file) {
 
     std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
     VGMColl *coll = new VGMColl(name);
-    coll->UseSeq(seq);
+    coll->useSeq(seq);
     for (uint32_t i = 0; i < instrsets.size(); i++)
-      coll->AddInstrSet(instrsets[i]);
-    if (!coll->Load()) {
+      coll->addInstrSet(instrsets[i]);
+    if (!coll->load()) {
       delete coll;
     }
   }

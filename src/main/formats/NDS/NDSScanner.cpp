@@ -246,7 +246,7 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       }
 
       VGMColl *coll = new VGMColl(seqNames[i]);
-      coll->UseSeq(NewNDSSeq);
+      coll->useSeq(NewNDSSeq);
       uint32_t bnkIndex = 0;
       for (uint32_t j = 0; j < BNKs.size(); j++) {
         if (seqFileBnks[i] == BNKs[j].first) {
@@ -256,14 +256,14 @@ uint32_t NDSScanner::LoadFromSDAT(RawFile *file, uint32_t baseOff) {
       }
       
       NDSInstrSet *instrset = BNKs[bnkIndex].second;
-      coll->AddSampColl(psg_sampcoll);
-      coll->AddInstrSet(BNKs[bnkIndex].second);
+      coll->addSampColl(psg_sampcoll);
+      coll->addInstrSet(BNKs[bnkIndex].second);
       for (int j = 0; j < 4; j++) {
         short WAnum = bnkWAs[seqFileBnks[i]][j];
         if (WAnum != -1)
-          coll->AddSampColl(WAs[WAnum]);
+          coll->addSampColl(WAs[WAnum]);
       }
-      if (!coll->Load()) {
+      if (!coll->load()) {
         delete coll;
       }
     }

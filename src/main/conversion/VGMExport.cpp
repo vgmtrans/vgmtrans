@@ -20,7 +20,7 @@ bool SaveAsDLS(const VGMInstrSet &set, const std::string &filepath) {
     return false;
   }
 
-  if (set.assocColls.front()->CreateDLSFile(dlsfile)) {
+  if (set.assocColls.front()->createDLSFile(dlsfile)) {
     return dlsfile.SaveDLSFile(filepath);
   }
   return false;
@@ -31,7 +31,7 @@ bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath) {
     return false;
   }
 
-  if (auto sf2file = set.assocColls.front()->CreateSF2File(); sf2file) {
+  if (auto sf2file = set.assocColls.front()->createSF2File(); sf2file) {
     bool bResult = sf2file->SaveSF2File(filepath);
     delete sf2file;
     return bResult;

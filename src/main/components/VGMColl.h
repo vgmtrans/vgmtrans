@@ -23,32 +23,37 @@ class VGMColl {
   explicit VGMColl(std::string name = "Unnamed collection");
   virtual ~VGMColl() = default;
 
-  void RemoveFileAssocs();
-  [[nodiscard]] const std::string& GetName() const;
-  void SetName(const std::string& newName);
-  [[nodiscard]] VGMSeq *GetSeq() const;
-  void UseSeq(VGMSeq *theSeq);
-  void AddInstrSet(VGMInstrSet *theInstrSet);
-  void AddSampColl(VGMSampColl *theSampColl);
-  void AddMiscFile(VGMMiscFile *theMiscFile);
-  bool Load();
-  virtual bool LoadMain() { return true; }
-  virtual bool CreateDLSFile(DLSFile &dls);
-  virtual SF2File *CreateSF2File();
-  virtual void PreSynthFileCreation() {}
-  virtual SynthFile *CreateSynthFile();
-  virtual bool MainDLSCreation(DLSFile &dls);
-  virtual void PostSynthFileCreation() {}
+  void removeFileAssocs();
+  [[nodiscard]] const std::string& name() const;
+  void setName(const std::string& newName);
+  [[nodiscard]] VGMSeq* seq() const;
+  void useSeq(VGMSeq* theSeq);
+  void addInstrSet(VGMInstrSet* theInstrSet);
+  void addSampColl(VGMSampColl* theSampColl);
+  void addMiscFile(VGMMiscFile* theMiscFile);
+  bool load();
+  virtual bool loadMain() { return true; }
+  virtual bool createDLSFile(DLSFile& dls);
+  virtual SF2File* createSF2File();
+  virtual void preSynthFileCreation() {}
+  virtual SynthFile* createSynthFile();
+  virtual bool mainDLSCreation(DLSFile& dls);
+  virtual void postSynthFileCreation() {}
 
   bool containsVGMFile(const VGMFile*) const;
 
-  VGMSeq *seq{};
-  std::vector<VGMInstrSet *> instrsets;
-  std::vector<VGMSampColl *> sampcolls;
-  std::vector<VGMMiscFile *> miscfiles;
+  const std::vector<VGMInstrSet*>& instrSets() { return m_instrsets; }
+  const std::vector<VGMSampColl*>& sampColls() { return m_sampcolls; }
+  const std::vector<VGMMiscFile*>& miscFiles() { return m_miscfiles; }
 
- protected:
-  static void UnpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps);
-  static void UnpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps);
-  std::string name;
+ private:
+  static void unpackSampColl(DLSFile& dls, const VGMSampColl* sampColl, std::vector<VGMSamp*>& finalSamps);
+  static void unpackSampColl(SynthFile& synthfile, const VGMSampColl* sampColl, std::vector<VGMSamp*>& finalSamps);
+
+  std::vector<VGMInstrSet*> m_instrsets;
+  std::vector<VGMSampColl*> m_sampcolls;
+  std::vector<VGMMiscFile*> m_miscfiles;
+
+  VGMSeq* m_seq{};
+  std::string m_name;
 };

@@ -212,13 +212,13 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
     std::string seqName = fmt::format("{} seq {}", gameentry->name, k / 4);
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
     if (newSeq->LoadVGMFile()) {
-      coll->UseSeq(newSeq);
-      coll->AddInstrSet(instrset);
-      coll->AddSampColl(sampcoll);
-      coll->AddMiscFile(sampInfoTable);
+      coll->useSeq(newSeq);
+      coll->addInstrSet(instrset);
+      coll->addSampColl(sampcoll);
+      coll->addMiscFile(sampInfoTable);
       if (articTable)
-        coll->AddMiscFile(articTable);
-      if (!coll->Load()) {
+        coll->addMiscFile(articTable);
+      if (!coll->load()) {
         delete coll;
       }
     } else {

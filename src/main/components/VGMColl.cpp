@@ -18,74 +18,74 @@
 #include "Options.h"
 #include "LogManager.h"
 
-VGMColl::VGMColl(std::string theName) : name(std::move(theName)) {}
+VGMColl::VGMColl(std::string theName) : m_name(std::move(theName)) {}
 
-void VGMColl::RemoveFileAssocs() {
-  if (seq) {
-    seq->RemoveCollAssoc(this);
-    seq = nullptr;
+void VGMColl::removeFileAssocs() {
+  if (m_seq) {
+    m_seq->RemoveCollAssoc(this);
+    m_seq = nullptr;
   }
 
-  for (auto set : instrsets) {
+  for (auto set : m_instrsets) {
     set->RemoveCollAssoc(this);
   }
-  for (auto samp : sampcolls) {
+  for (auto samp : m_sampcolls) {
     samp->RemoveCollAssoc(this);
   }
-  for (auto file : miscfiles) {
+  for (auto file : m_miscfiles) {
     file->RemoveCollAssoc(this);
   }
 }
 
-const std::string &VGMColl::GetName() const {
-    return name;
+const std::string &VGMColl::name() const {
+    return m_name;
 }
 
-void VGMColl::SetName(const std::string& newName) {
-  name = newName;
+void VGMColl::setName(const std::string& newName) {
+  m_name = newName;
 }
 
-VGMSeq *VGMColl::GetSeq() const {
-  return seq;
+VGMSeq *VGMColl::seq() const {
+  return m_seq;
 }
 
-void VGMColl::UseSeq(VGMSeq *theSeq) {
+void VGMColl::useSeq(VGMSeq *theSeq) {
   if (theSeq != nullptr)
     theSeq->AddCollAssoc(this);
-  if (seq && (theSeq != seq))  // if we associated with a previous sequence
-    seq->RemoveCollAssoc(this);
-  seq = theSeq;
+  if (m_seq && (theSeq != m_seq))  // if we associated with a previous sequence
+    m_seq->RemoveCollAssoc(this);
+  m_seq = theSeq;
 }
 
-void VGMColl::AddInstrSet(VGMInstrSet *theInstrSet) {
+void VGMColl::addInstrSet(VGMInstrSet *theInstrSet) {
   if (theInstrSet != nullptr) {
     theInstrSet->AddCollAssoc(this);
-    instrsets.push_back(theInstrSet);
+    m_instrsets.push_back(theInstrSet);
   }
 }
 
-void VGMColl::AddSampColl(VGMSampColl *theSampColl) {
+void VGMColl::addSampColl(VGMSampColl *theSampColl) {
   if (theSampColl != nullptr) {
     theSampColl->AddCollAssoc(this);
-    sampcolls.push_back(theSampColl);
+    m_sampcolls.push_back(theSampColl);
   }
 }
 
-void VGMColl::AddMiscFile(VGMMiscFile *theMiscFile) {
+void VGMColl::addMiscFile(VGMMiscFile *theMiscFile) {
   if (theMiscFile != nullptr) {
     theMiscFile->AddCollAssoc(this);
-    miscfiles.push_back(theMiscFile);
+    m_miscfiles.push_back(theMiscFile);
   }
 }
 
-bool VGMColl::Load() {
-  if (!LoadMain())
+bool VGMColl::load() {
+  if (!loadMain())
     return false;
   pRoot->AddVGMColl(this);
   return true;
 }
 
-void VGMColl::UnpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
+void VGMColl::unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
   assert(sampColl != nullptr);
 
   size_t nSamples = sampColl->samples.size();
@@ -107,7 +107,7 @@ void VGMColl::UnpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vec
   }
 }
 
-void VGMColl::UnpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
+void VGMColl::unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
   assert(sampColl != nullptr);
 
   size_t nSamples = sampColl->samples.size();
@@ -148,18 +148,18 @@ void VGMColl::UnpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, 
   }
 }
 
-bool VGMColl::CreateDLSFile(DLSFile &dls) {
+bool VGMColl::createDLSFile(DLSFile &dls) {
   bool result = true;
-  PreSynthFileCreation();
-  result &= MainDLSCreation(dls);
-  PostSynthFileCreation();
+  preSynthFileCreation();
+  result &= mainDLSCreation(dls);
+  postSynthFileCreation();
   return result;
 }
 
-SF2File *VGMColl::CreateSF2File() {
-  SynthFile *synthfile = CreateSynthFile();
+SF2File *VGMColl::createSF2File() {
+  SynthFile *synthfile = createSynthFile();
   if (!synthfile) {
-    L_ERROR("SF2 conversion for '{}' aborted", name);
+    L_ERROR("SF2 conversion for '{}' aborted", m_name);
     return nullptr;
   }
   SF2File *sf2file = new SF2File(synthfile);
@@ -167,9 +167,9 @@ SF2File *VGMColl::CreateSF2File() {
   return sf2file;
 }
 
-bool VGMColl::MainDLSCreation(DLSFile &dls) {
-  if (instrsets.empty()) {
-    L_ERROR("{} has no instruments", name);
+bool VGMColl::mainDLSCreation(DLSFile &dls) {
+  if (m_instrsets.empty()) {
+    L_ERROR("{} has no instruments", m_name);
     return false;
   }
 
@@ -177,27 +177,27 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
   std::vector<VGMSampColl *> finalSampColls;
 
   /* Grab samples either from the local sampcolls or from the instrument sets */
-  if (!sampcolls.empty()) {
-    for (auto & sampcoll : sampcolls) {
+  if (!m_sampcolls.empty()) {
+    for (auto & sampcoll : m_sampcolls) {
       finalSampColls.push_back(sampcoll);
-      UnpackSampColl(dls, sampcoll, finalSamps);
+      unpackSampColl(dls, sampcoll, finalSamps);
     }
   } else {
-    for (auto & instrset : instrsets) {
+    for (auto & instrset : m_instrsets) {
       if (auto instrset_sampcoll = instrset->sampColl) {
         finalSampColls.push_back(instrset_sampcoll);
-        UnpackSampColl(dls, instrset_sampcoll, finalSamps);
+        unpackSampColl(dls, instrset_sampcoll, finalSamps);
       }
     }
   }
 
     if (finalSamps.empty()) {
-      L_ERROR("No sample collection present for '{}'", name);
+      L_ERROR("No sample collection present for '{}'", m_name);
       return false;
     }
 
-  for (size_t inst = 0; inst < instrsets.size(); inst++) {
-    VGMInstrSet *set = instrsets[inst];
+  for (size_t inst = 0; inst < m_instrsets.size(); inst++) {
+    VGMInstrSet *set = m_instrsets[inst];
     size_t nInstrs = set->aInstrs.size();
     for (size_t i = 0; i < nInstrs; i++) {
       VGMInstr *vgminstr = set->aInstrs[i];
@@ -376,13 +376,13 @@ bool VGMColl::MainDLSCreation(DLSFile &dls) {
   return true;
 }
 
-SynthFile *VGMColl::CreateSynthFile() {
-  if (instrsets.empty()) {
-    L_ERROR("{} has no instruments", name);
+SynthFile *VGMColl::createSynthFile() {
+  if (m_instrsets.empty()) {
+    L_ERROR("{} has no instruments", m_name);
     return nullptr;
   }
 
-  PreSynthFileCreation();
+  preSynthFileCreation();
 
   /* FIXME: shared_ptr eventually */
   SynthFile *synthfile = new SynthFile("SynthFile");
@@ -391,29 +391,29 @@ SynthFile *VGMColl::CreateSynthFile() {
   std::vector<VGMSampColl *> finalSampColls;
 
   /* Grab samples either from the local sampcolls or from the instrument sets */
-  if (!sampcolls.empty()) {
-    for (auto & sampcoll : sampcolls) {
+  if (!m_sampcolls.empty()) {
+    for (auto & sampcoll : m_sampcolls) {
       finalSampColls.push_back(sampcoll);
-      UnpackSampColl(*synthfile, sampcoll, finalSamps);
+      unpackSampColl(*synthfile, sampcoll, finalSamps);
     }
   } else {
-    for (auto & instrset : instrsets) {
+    for (auto & instrset : m_instrsets) {
       if (auto instrset_sampcoll = instrset->sampColl) {
         finalSampColls.push_back(instrset_sampcoll);
-        UnpackSampColl(*synthfile, instrset_sampcoll, finalSamps);
+        unpackSampColl(*synthfile, instrset_sampcoll, finalSamps);
       }
     }
   }
 
   if (finalSamps.empty()) {
-    L_ERROR("No sample collection present for '{}'", name);
+    L_ERROR("No sample collection present for '{}'", m_name);
     delete synthfile;
-    PostSynthFileCreation();
+    postSynthFileCreation();
     return nullptr;
   }
 
-  for (size_t inst = 0; inst < instrsets.size(); inst++) {
-    VGMInstrSet *set = instrsets[inst];
+  for (size_t inst = 0; inst < m_instrsets.size(); inst++) {
+    VGMInstrSet *set = m_instrsets[inst];
     size_t nInstrs = set->aInstrs.size();
     for (size_t i = 0; i < nInstrs; i++) {
       VGMInstr *vgminstr = set->aInstrs[i];
@@ -472,7 +472,7 @@ SynthFile *VGMColl::CreateSynthFile() {
         }
         if (sampCollNum == finalSampColls.size()) {
           L_ERROR("SampColl does not exist");
-          PostSynthFileCreation();
+          postSynthFileCreation();
           return nullptr;
         }
         //   now we add the number of samples from the preceding SampColls to the value to
@@ -560,7 +560,7 @@ SynthFile *VGMColl::CreateSynthFile() {
       }
     }
   }
-  PostSynthFileCreation();
+  postSynthFileCreation();
   return synthfile;
 }
 
@@ -574,12 +574,12 @@ bool contains(const std::vector<T*>& vec, const VGMFile* file) {
 
 bool VGMColl::containsVGMFile(const VGMFile* file) const {
   // First, check if the file matches the seq property directly
-  if (seq == file) {
+  if (m_seq == file) {
     return true;
   }
 
   // Then, check if the file is present in any of the file vectors
-  if (contains(instrsets, file) || contains(sampcolls, file) || contains(miscfiles, file)) {
+  if (contains(m_instrsets, file) || contains(m_sampcolls, file) || contains(m_miscfiles, file)) {
     return true;
   }
   return false;

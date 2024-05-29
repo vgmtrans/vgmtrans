@@ -190,7 +190,7 @@ void VGMRoot::RemoveVGMColl(VGMColl *targColl) {
   else
     L_WARN("Requested deletion for VGMColl but it was not found");
 
-  targColl->RemoveFileAssocs();
+  targColl->removeFileAssocs();
   UI_RemoveVGMColl(targColl);
   delete targColl;
 }
