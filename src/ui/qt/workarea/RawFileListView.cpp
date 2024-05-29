@@ -6,7 +6,6 @@
 #include <ranges>
 
 #include <QKeyEvent>
-#include <QMenu>
 #include "RawFileListView.h"
 
 #include "LogManager.h"
@@ -14,6 +13,7 @@
 #include "VGMFile.h"
 #include "QtVGMRoot.h"
 #include "services/NotificationCenter.h"
+#include "services/MenuManager.h"
 #include "VGMExport.h"
 
 static const QIcon& fileIcon() {
@@ -124,23 +124,6 @@ RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
   setSelectionBehavior(QAbstractItemView::SelectRows);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
-  rawfile_context_menu = new QMenu();
-  QAction *rawfile_remove = rawfile_context_menu->addAction("Remove");
-  connect(rawfile_remove, &QAction::triggered, this, &RawFileListView::deleteRawFiles);
-  rawfile_context_menu->addAction("Save raw unpacked image(s)", [sm = selectionModel()]() {
-    if (!sm->hasSelection())
-      return;
-
-    QModelIndexList list = sm->selectedRows();
-    for (auto &index : list) {
-      auto rawfile = qtVGMRoot.rawFiles()[index.row()];
-      std::string filepath = pRoot->UI_GetSaveFilePath("");
-      if (!filepath.empty()) {
-        /* todo: free function in VGMExport */
-        conversion::SaveAsOriginal(*rawfile, filepath);
-      }
-    }
-  });
 
   connect(this, &QAbstractItemView::customContextMenuRequested, this,
           &RawFileListView::rawFilesMenu);
@@ -152,10 +135,23 @@ RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
  * since the only possible action on a RawFile is removing it
  */
 void RawFileListView::rawFilesMenu(const QPoint &pos) const {
-  if (!indexAt(pos).isValid())
-    return;
+  auto selectedFiles = std::make_shared<std::vector<RawFile*>>();
 
-  rawfile_context_menu->exec(mapToGlobal(pos));
+  if (!selectionModel()->hasSelection()) {
+    return;
+  }
+
+  QModelIndexList list = selectionModel()->selectedRows();
+
+  selectedFiles->reserve(list.size());
+  for (const auto &index : list) {
+    if (index.isValid()) {
+      selectedFiles->push_back(qtVGMRoot.rawFiles()[index.row()]);
+    }
+  }
+  auto menu = MenuManager::the()->CreateMenuForItems<RawFile>(selectedFiles);
+  menu->exec(mapToGlobal(pos));
+  menu->deleteLater();
 }
 
 void RawFileListView::keyPressEvent(QKeyEvent *input) {

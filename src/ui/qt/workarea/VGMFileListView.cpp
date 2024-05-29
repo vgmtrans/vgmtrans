@@ -12,13 +12,13 @@
 #include "Helpers.h"
 #include "QtVGMRoot.h"
 #include "MdiArea.h"
-#include "services/commands/GeneralCommands.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
 #include "VGMInstrSet.h"
 #include "VGMSeq.h"
 #include "VGMMiscFile.h"
 #include "VGMSampColl.h"
+#include "services/MenuManager.h"
 
 /*
  *  VGMFileListModel
@@ -123,6 +123,8 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setSelectionBehavior(QAbstractItemView::SelectRows);
 
+  setContextMenuPolicy(Qt::CustomContextMenu);
+
   connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
@@ -130,7 +132,6 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
-
   auto selectedFiles = std::make_shared<std::vector<VGMFile*>>();
 
   if (!selectionModel()->hasSelection()) {
@@ -145,7 +146,7 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
       selectedFiles->push_back(variantToVGMFile(qtVGMRoot.vgmFiles()[index.row()]));
     }
   }
-  auto menu = menuManager.CreateMenuForItems<VGMItem>(selectedFiles);
+  auto menu = MenuManager::the()->CreateMenuForItems<VGMItem>(selectedFiles);
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
 }

@@ -65,6 +65,7 @@ add_executable(
   services/Settings.h
   services/NotificationCenter.cpp
   services/NotificationCenter.h
+  services/commands/Command.h
   services/commands/SaveCommands.h
   services/commands/GeneralCommands.h
   util/Colors.h

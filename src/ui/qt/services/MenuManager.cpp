@@ -10,32 +10,36 @@
 
 MenuManager::MenuManager() {
   RegisterCommands<VGMSeq, VGMItem>({
-      std::make_shared<CloseVGMFileCommand>(),
-      std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsMidiCommand>(),
-      std::make_shared<SaveAsOriginalFormatCommand>(),
+      std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<CloseVGMFileCommand>(),
   });
   RegisterCommands<VGMInstrSet, VGMItem>({
-      std::make_shared<CloseVGMFileCommand>(),
-      std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsSF2Command>(),
       std::make_shared<SaveAsDLSCommand>(),
-      std::make_shared<SaveAsOriginalFormatCommand>(),
+      std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<CloseVGMFileCommand>(),
   });
   RegisterCommands<VGMSampColl, VGMItem>({
-      std::make_shared<CloseVGMFileCommand>(),
-      std::make_shared<CommandSeparator>(),
       std::make_shared<SaveWavBatchCommand>(),
-      std::make_shared<SaveAsOriginalFormatCommand>(),
+      std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<CloseVGMFileCommand>(),
   });
   RegisterCommands<VGMFile, VGMItem>({
       std::make_shared<CloseVGMFileCommand>(),
       std::make_shared<CommandSeparator>(),
-      std::make_shared<SaveAsOriginalFormatCommand>(),
+      std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<CloseVGMFileCommand>(),
   });
 
   RegisterCommands<RawFile>({
-      std::make_shared<CloseVGMFileCommand>(),
+      std::make_shared<SaveAsOriginalFormatCommand<RawFile>>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<CloseRawFileCommand>(),
   });
 }
 
