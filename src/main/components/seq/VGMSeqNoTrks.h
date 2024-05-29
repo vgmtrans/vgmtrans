@@ -28,7 +28,7 @@ public:
   inline uint32_t &length() { return VGMSeq::unLength; }
   inline std::string name() { return VGMSeq::name(); }
 
-  inline RawFile* rawFile() { return rawFile(); }
+  inline RawFile* rawFile() { return VGMSeq::rawFile(); }
 
   inline uint32_t &eventsOffset() { return dwEventsOffset; }
 
