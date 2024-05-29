@@ -33,10 +33,6 @@ const std::string& VGMFile::GetFormatName() {
   return format;
 }
 
-const std::string* VGMFile::GetName() const {
-  return &m_name;
-}
-
 std::string VGMFile::GetDescription() {
   auto filename = this->rawfile->name();
   auto formatName = this->GetFormat()->GetName();

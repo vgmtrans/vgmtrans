@@ -19,7 +19,6 @@ public:
 
   void AddToUI(VGMItem *parent, void *UI_specific) override;
 
-  [[nodiscard]] const std::string *GetName() const;
   [[nodiscard]] std::string GetDescription() override;
 
   virtual bool LoadVGMFile() = 0;

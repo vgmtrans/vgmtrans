@@ -48,7 +48,7 @@ void HOSAScanner::Scan(RawFile *file, void *info) {
     return;
   }
 
-  VGMColl *coll = new VGMColl(*seq->GetName());
+  VGMColl *coll = new VGMColl(seq->name());
   coll->UseSeq(seq);
   coll->AddInstrSet(instrset);
   coll->AddSampColl(sampcoll);

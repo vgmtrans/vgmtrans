@@ -141,7 +141,7 @@ bool VGMRoot::CloseRawFile(RawFile *targFile) {
 void VGMRoot::AddVGMFile(
   std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
   m_vgmfiles.push_back(file);
-  L_INFO("Loaded {} successfully.", *variantToVGMFile(file)->GetName());
+  L_INFO("Loaded {} successfully.", variantToVGMFile(file)->name());
   UI_AddVGMFile(file);
 }
 

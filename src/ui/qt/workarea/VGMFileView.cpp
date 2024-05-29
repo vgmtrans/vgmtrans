@@ -21,7 +21,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
   m_splitter = new SnappingSplitter(Qt::Horizontal, this);
 
-  setWindowTitle(QString::fromStdString(*m_vgmfile->GetName()));
+  setWindowTitle(QString::fromStdString(m_vgmfile->name()));
   setWindowIcon(iconForFile(vgmFileToVariant(vgmfile)));
   setAttribute(Qt::WA_DeleteOnClose);
 

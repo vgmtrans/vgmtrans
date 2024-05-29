@@ -24,8 +24,8 @@ class VGMColl {
   virtual ~VGMColl() = default;
 
   void RemoveFileAssocs();
-  [[nodiscard]] const std::string &GetName() const;
-  void SetName(const std::string *newName);
+  [[nodiscard]] const std::string& GetName() const;
+  void SetName(const std::string& newName);
   [[nodiscard]] VGMSeq *GetSeq() const;
   void UseSeq(VGMSeq *theSeq);
   void AddInstrSet(VGMInstrSet *theInstrSet);

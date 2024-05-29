@@ -41,8 +41,8 @@ const std::string &VGMColl::GetName() const {
     return name;
 }
 
-void VGMColl::SetName(const std::string *newName) {
-  name = *newName;
+void VGMColl::SetName(const std::string& newName) {
+  name = newName;
 }
 
 VGMSeq *VGMColl::GetSeq() const {

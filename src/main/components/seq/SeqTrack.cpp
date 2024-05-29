@@ -151,7 +151,7 @@ void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum) {
 
 void SeqTrack::AddInitialMidiEvents(int trackNum) {
   if (trackNum == 0)
-    pMidiTrack->AddSeqName(*parentSeq->GetName());
+    pMidiTrack->AddSeqName(parentSeq->name());
   std::string ssTrackName = fmt::format("Track: 0x{:02X}", dwStartOffset);
   pMidiTrack->AddTrackName(ssTrackName);
 

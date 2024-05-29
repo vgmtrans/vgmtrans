@@ -195,7 +195,7 @@ void VGMSeq::LoadTracksMain(uint32_t stopTime) {
       // check time limit
       if (time >= stopTime) {
         if (readMode == READMODE_ADD_TO_UI) {
-          L_WARN("{} - reached tick-by-tick stop time during load.", *GetName());
+          L_WARN("{} - reached tick-by-tick stop time during load.", name());
         }
 
         InactivateAllTracks();

@@ -86,7 +86,7 @@ void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
                                      const QModelIndex &index) const {
   auto *line_edit = qobject_cast<QLineEdit *>(editor);
   auto new_name = line_edit->text().toStdString();
-  qtVGMRoot.vgmColls()[index.row()]->SetName(&new_name);
+  qtVGMRoot.vgmColls()[index.row()]->SetName(new_name);
   model->dataChanged(index, index);
 }
 
