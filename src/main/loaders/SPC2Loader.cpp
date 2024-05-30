@@ -6,12 +6,16 @@
 
 #include "common.h"
 #include "SPC2Loader.h"
-#include "Root.h"
+#include "LoaderManager.h"
 #include "LogManager.h"
 
 // SPC2 file specs available here: http://blog.kevtris.org/blogfiles/spc2_file_specification_v1.txt
 
-PostLoadCommand SPC2Loader::Apply(RawFile *file) {
+namespace vgmtrans::loaders {
+LoaderRegistration<SPC2Loader> _spc2{"SP2"};
+}
+
+void SPC2Loader::apply(const RawFile *file) {
   // Constants
   constexpr size_t HEADER_SIZE = 16;
   constexpr size_t SPC_DATA_BLOCK_SIZE = 1024;
@@ -25,7 +29,7 @@ PostLoadCommand SPC2Loader::Apply(RawFile *file) {
 
   // File size sanity check. Max ram block size is 16MB, and we'll add a generous 1MB for everything else.
   if (file->size() > (65536*256) + (1024*1024)) {
-    return KEEP_IT;
+    return;
   }
 
   // Read header
@@ -34,7 +38,7 @@ PostLoadCommand SPC2Loader::Apply(RawFile *file) {
 
   // Check for header signature. Support major revision 1.
   if (memcmp(header, reinterpret_cast<const void*>("KSPC\x1A\x01"), 6) != 0) {
-    return KEEP_IT;
+    return;
   }
 
   // Extract number of SPCs
@@ -81,9 +85,7 @@ PostLoadCommand SPC2Loader::Apply(RawFile *file) {
     std::copy(spcDataBlock + 512, spcDataBlock + 640, spcFile + SPC_HEADER_SIZE + SPC_RAM_SIZE);
 
     // Save the reconstructed SPC file
-    if (!pRoot->CreateVirtFile(spcFile, SPC_FILE_SIZE, originalSpcFilename, "", file->tag)) {
-      L_ERROR("Failed to save SPC file: {}", originalSpcFilename);
-    }
+    auto virtFile = new VirtFile(spcFile, SPC_FILE_SIZE, originalSpcFilename, "", file->tag);
+    enqueue(virtFile);
   }
-  return DELETE_IT;
 }
