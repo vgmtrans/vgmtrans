@@ -28,7 +28,7 @@ void RSNLoader::apply(const RawFile *file) {
   }
 
   auto path = file->path();
-  auto stream = ar_open_file(path.c_str());
+  auto stream = ar_open_file(path.string().c_str());
   ar_archive *ar = ar_open_rar_archive(stream);
 
   while (ar_parse_entry(ar)) {

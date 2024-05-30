@@ -192,7 +192,7 @@ void MAMELoader::apply(const RawFile* file) {
     return;
   }
 
-  unzFile cur_file = unzOpen(file->path().c_str());
+  unzFile cur_file = unzOpen(file->path().string().c_str());
   if (!cur_file) {
     return;
   }

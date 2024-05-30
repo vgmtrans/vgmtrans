@@ -112,7 +112,7 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
         }
       }
 
-      enqueue(new VirtFile(newdataBuf, actualFileSize, filename, file->path()));
+      enqueue(new VirtFile(newdataBuf, actualFileSize, filename, file->path().string()));
       delete[] dblock;
     }
   }
