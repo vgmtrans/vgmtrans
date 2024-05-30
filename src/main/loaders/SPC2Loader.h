@@ -6,14 +6,12 @@
 
 #pragma once
 
-#include "Loader.h"
+#include "FileLoader.h"
 
-class SPC2Loader:
-    public VGMLoader {
+class SPC2Loader : public FileLoader {
 public:
-  SPC2Loader(void) = default;
-public:
+  SPC2Loader() = default;
   ~SPC2Loader() override = default;
-  PostLoadCommand Apply(RawFile *theFile) override;
+  void apply(const RawFile *) override;
 };
 
