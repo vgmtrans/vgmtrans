@@ -52,7 +52,7 @@ void CompileSnesScanner::Scan(RawFile* file, void* /*info*/) {
 void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
   CompileSnesVersion version;
 
-  std::string basefilename = removeExtFromPath(file->name());
+  std::string basefilename = file->stem();
   std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
 
   // scan for table pointer initialize code

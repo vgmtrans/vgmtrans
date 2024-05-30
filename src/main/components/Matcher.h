@@ -297,32 +297,17 @@ class FilenameMatcher : public SimpleMatcher<std::string> {
 
   bool GetSeqId(VGMSeq *seq, std::string &id) override {
     RawFile *rawfile = seq->rawFile();
-    id = rawfile->GetParRawFileFullPath();
-    if (id.empty()) {
-      id = rawfile->path();
-    }
-
-    return (!id.empty());
+    return !rawfile->path().empty();
   }
 
   bool GetInstrSetId(VGMInstrSet *instrset, std::string &id) override {
     RawFile *rawfile = instrset->rawFile();
-    id = rawfile->GetParRawFileFullPath();
-    if (id.empty()) {
-      id = rawfile->path();
-    }
-
-    return (!id.empty());
+    return !rawfile->path().empty();
   }
 
   bool GetSampCollId(VGMSampColl *sampcoll, std::string &id) override {
     RawFile *rawfile = sampcoll->rawFile();
-    id = rawfile->GetParRawFileFullPath();
-    if (id.empty()) {
-        id = rawfile->path();
-    }
-
-    return (!id.empty());
+    return !rawfile->path().empty();
   }
 };
 

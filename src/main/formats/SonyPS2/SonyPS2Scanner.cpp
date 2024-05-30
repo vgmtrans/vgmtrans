@@ -73,7 +73,7 @@ void SonyPS2Scanner::SearchForSampColl(RawFile *file) {
     return;
   }
 
-  if (StringToLower(file->extension()) == "bd") {
+  if (file->extension() == "bd") {
     // Hack for incorrectly ripped bd files.  Should ALWAYS start with 16 0x00 bytes (must...
     // suppress... rage) If it doesn't, we'll throw out this file and create a new one with the
     // correct formating
@@ -83,8 +83,7 @@ void SonyPS2Scanner::SearchForSampColl(RawFile *file) {
       uint8_t *newdataBuf = new uint8_t[newFileSize];
       file->GetBytes(0, file->size(), newdataBuf + 16);
       memset(newdataBuf, 0, 16);
-      pRoot->CreateVirtFile(newdataBuf, newFileSize, file->name(),
-                            file->GetParRawFileFullPath().c_str());
+      pRoot->CreateVirtFile(newdataBuf, newFileSize, file->name(), file->path().string());
       return;
     }
 

@@ -176,11 +176,7 @@ void MAMELoader::apply(const RawFile* file) {
   if (!bLoadedXml || file->extension() != "zip")
     return;
 
-  std::string fullfilename = file->name();
-  size_t endoffilename = fullfilename.rfind('.');
-  if (endoffilename == std::string::npos)
-    return;  // no '.' found in filename, so don't do anything
-  std::string filename = fullfilename.substr(0, endoffilename);
+  std::string filename = file->stem();
 
   /* Look for the game in our databse */
   GameMap::iterator it = gamemap.find(filename);
@@ -196,7 +192,7 @@ void MAMELoader::apply(const RawFile* file) {
     return;
   }
 
-  unzFile cur_file = unzOpen(file->path().c_str());
+  unzFile cur_file = unzOpen(file->path().string().c_str());
   if (!cur_file) {
     return;
   }

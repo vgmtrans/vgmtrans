@@ -100,7 +100,7 @@ void PandoraBoxSnesScanner::Scan(RawFile *file, void *info) {
 
 void PandoraBoxSnesScanner::SearchForPandoraBoxSnesFromARAM(RawFile *file) {
   PandoraBoxSnesVersion version = PANDORABOXSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
 
   uint32_t ofsLoadSeq;
   uint16_t addrSeqHeader;

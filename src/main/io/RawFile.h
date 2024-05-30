@@ -31,11 +31,10 @@ class RawFile {
     virtual ~RawFile() = default;
 
     [[nodiscard]] virtual std::string name() const = 0;
-    [[nodiscard]] virtual std::string path() const = 0;
+    [[nodiscard]] virtual std::filesystem::path path() const = 0;
     [[nodiscard]] virtual size_t size() const noexcept = 0;
+    [[nodiscard]] virtual std::string stem() const noexcept = 0;
     [[nodiscard]] virtual std::string extension() const = 0;
-
-    virtual std::string GetParRawFileFullPath() const { return {}; }
 
     [[nodiscard]] bool IsValidOffset(uint32_t ofs) const noexcept { return ofs < size(); }
 
@@ -123,12 +122,13 @@ class DiskFile final : public RawFile {
     ~DiskFile() override = default;
 
     [[nodiscard]] std::string name() const override { return m_path.filename().string(); };
-    [[nodiscard]] std::string path() const override { return m_path.string(); };
+    [[nodiscard]] std::filesystem::path path() const override { return m_path; };
     [[nodiscard]] size_t size() const noexcept override { return m_data.length(); };
+    [[nodiscard]] std::string stem() const noexcept override { return m_path.stem().string(); };
     [[nodiscard]] std::string extension() const override {
         auto tmp = m_path.extension().string();
         if (!tmp.empty()) {
-            return tmp.substr(1, tmp.size() - 1);
+            return toLower(tmp.substr(1, tmp.size() - 1));
         }
 
         return tmp;
@@ -157,23 +157,32 @@ class VirtFile final : public RawFile {
     ~VirtFile() override = default;
 
     [[nodiscard]] std::string name() const override { return m_name; };
-    [[nodiscard]] std::string path() const override { return m_lpath.string(); };
-    [[nodiscard]] size_t size() const noexcept override { return m_data.size(); };
+    [[nodiscard]] std::filesystem::path path() const override { return m_lpath; };
+    [[nodiscard]] size_t size() const noexcept override {return m_data.size(); };
+    [[nodiscard]] std::string stem() const noexcept override {
+      auto tmp = m_lpath.stem();
+      if (tmp.empty()) {
+        std::filesystem::path tmp2(m_name);
+        if (tmp2.has_filename()) {
+          return tmp2.stem().string();
+        }
+      }
+
+      return tmp.string();
+    };
     [[nodiscard]] std::string extension() const override {
         auto tmp = m_lpath.extension().string();
         if (!tmp.empty()) {
-            return tmp.substr(1, tmp.size() - 1);
+            return toLower(tmp.substr(1, tmp.size() - 1));
         } else {
             std::filesystem::path tmp2(m_name);
             if (tmp2.has_extension()) {
-                return tmp2.extension().string().substr(1, tmp2.extension().string().size() - 1);
+                return toLower(tmp2.extension().string().substr(1, tmp2.extension().string().size() - 1));
             }
         }
 
         return tmp;
     }
-
-    std::string GetParRawFileFullPath() const override { return m_lpath.string(); }
 
     const char *data() const override { return m_data.data(); }
     const char &operator[](size_t offset) const override { return m_data[offset]; }

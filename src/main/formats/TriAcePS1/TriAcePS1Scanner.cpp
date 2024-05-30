@@ -75,7 +75,7 @@ void TriAcePS1Scanner::SearchForSLZSeq(RawFile *file) {
     if (!instrsets.size())
       return;
 
-    std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+    std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
     VGMColl *coll = new VGMColl(name);
     coll->useSeq(seq);
     for (uint32_t i = 0; i < instrsets.size(); i++)
@@ -214,9 +214,9 @@ TriAcePS1Seq *TriAcePS1Scanner::TriAceSLZDecompress(RawFile *file, uint32_t cfOf
   // pRoot->UI_WriteBufferToFile("uncomp.raw", uf, ufOff);
 
   // Create the new virtual file, and analyze the sequence
-  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
-  auto newVirtFile = new VirtFile(uf, ufOff, name + std::string(" Sequence"),
-    file->GetParRawFileFullPath().c_str());
+  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
+  auto newVirtFile = new VirtFile(uf, ufOff, fmt::format("{} Sequence", name),
+                                  file->path().string());
 
   TriAcePS1Seq *newSeq = new TriAcePS1Seq(newVirtFile, 0, name);
   bool bLoadSucceed = newSeq->LoadVGMFile();

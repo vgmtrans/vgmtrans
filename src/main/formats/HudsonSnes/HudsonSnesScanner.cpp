@@ -122,7 +122,7 @@ void HudsonSnesScanner::Scan(RawFile* file, void* /*info*/) {
 
 void HudsonSnesScanner::SearchForHudsonSnesFromARAM(RawFile *file) {
   HudsonSnesVersion version = HUDSONSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : removeExtFromPath(file->name());
+  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
 
   // search for note length table
   uint32_t ofsNoteLenTable;

@@ -65,7 +65,7 @@ void PSFLoader::psf_read_exe(const RawFile *file, int version) {
         if (!psf.exe().empty()) {
             auto newfile = new VirtFile(
                 reinterpret_cast<const u8 *>(psf.exe().data()) + data_offset.at(version),
-                psf.exe().size() - data_offset.at(version), file->name(), file->path(), file->tag);
+                psf.exe().size() - data_offset.at(version), file->name(), file->path().string(), file->tag);
             enqueue(newfile);
         }
     } catch (std::exception e) {
