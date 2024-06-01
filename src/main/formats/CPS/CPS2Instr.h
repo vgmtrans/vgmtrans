@@ -2,6 +2,7 @@
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMMiscFile.h"
+#include "CPS2Format.h"
 
 class CPS2Instr;
 
@@ -106,12 +107,6 @@ struct qs_samp_info {
     this->unity_key = static_cast<uint8_t>(swap_bytes32(cps3->unity_key));
   }
 };
-
-// The QSound interrupt clock is set to 250hz in mame, but the main sound
-// code runs only every 4th tick. (see the "and 3" instruction at 0xF9 in sfa2 code)
-constexpr double CPS2_DRIVER_RATE_HZ = 250 / 4.0;
-// In CPS3, sound driver iterations are triggered by the vblank interrupt (IRQ 12) which runs at 59.6hz
-constexpr double CPS3_DRIVER_RATE_HZ = 59.599491;
 
 // The following tables are used by all versions of sample-based CPS drivers, with the
 // exception of the sustain level table not present in CPS3 (but it's virtually linear).

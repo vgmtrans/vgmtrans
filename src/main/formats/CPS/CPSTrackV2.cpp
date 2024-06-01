@@ -58,7 +58,7 @@ bool CPSTrackV2::ReadEvent() {
   if (status_byte < 0xC0) {
     uint8_t velocity = status_byte & 0x3F;
     uint8_t midiVel = ConvertPercentAmpToStdMidiVal(static_cast<double>(velocity) / static_cast<double>(0x3F));
-    uint8_t note = GetByte(curOffset++);
+    uint8_t note = GetByte(curOffset++) & 0x7F;
     uint32_t duration = ReadVarLength();
     AddNoteByDur(beginOffset, curOffset - beginOffset, note, midiVel, duration);
     return true;
@@ -72,12 +72,14 @@ bool CPSTrackV2::ReadEvent() {
 
     case C1_TEMPO: {
       // Shares same logic as version < 1.40.  See comment on tempo in CPSTrackV1 for explanation.
-      uint16_t tempo = GetShortBE(curOffset);
+      uint16_t ticks_per_iteration = GetShortBE(curOffset);
       curOffset += 2;
-      const double tempoDiv = static_cast<CPSSeq*>(this->parentSeq)->fmt_version == VER_CPS3 ? 3.4 : 3.2768;
-      double fTempo = tempo / tempoDiv;
-
-      AddTempoBPM(beginOffset, curOffset - beginOffset, fTempo);
+      auto internal_ppqn = parentSeq->GetPPQN() << 8;
+      auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
+      auto fmt_version = static_cast<CPSSeq*>(parentSeq)->fmt_version;
+      const double ITERATIONS_PER_SEC = fmt_version == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
+      const uint32_t micros_per_beat = lround((iterations_per_beat / ITERATIONS_PER_SEC) * 1000000);
+      AddTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
       break;
     }
 

@@ -447,7 +447,7 @@ bool CPS2Instr::LoadInstr() {
       ticks = Dr ? (0xFFFF / Dr) : 0;
       rgn->decay_time = (Dr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
     }
-    rgn->decay_time = LinAmpDecayTimeToLinDBDecayTime(rgn->decay_time, 0x800);
+    rgn->decay_time = LinAmpDecayTimeToLinDBDecayTime(rgn->decay_time, 0xFFFF / 8);
 
     // Sustain level
     //    if the Decay rate is 0, then the sustain level is effectively max
@@ -461,11 +461,11 @@ bool CPS2Instr::LoadInstr() {
     // Sustain rate 138D in sfa2
     ticks = Sr ? 0xFFFF / Sr : 0;
     rgn->sustain_time = (Sr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
-    rgn->sustain_time = LinAmpDecayTimeToLinDBDecayTime(rgn->sustain_time, 0x800);
+    rgn->sustain_time = LinAmpDecayTimeToLinDBDecayTime(rgn->sustain_time, 0xFFFF / 8);
 
     ticks = Rr ? 0xFFFF / Rr : 0xFFFF;
     rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
-    rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0x800);
+    rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0xFFFF / 8);
 
     if (rgn->sampNum == 0xFFFF || rgn->sampNum >= (dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->numSamples)
       rgn->sampNum = 0;
