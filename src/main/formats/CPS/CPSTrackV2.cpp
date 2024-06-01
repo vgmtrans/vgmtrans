@@ -76,7 +76,9 @@ bool CPSTrackV2::ReadEvent() {
       curOffset += 2;
       auto internal_ppqn = parentSeq->GetPPQN() << 8;
       auto iterationsPerBeat = static_cast<double>(internal_ppqn) / ticksPerIteration;
-      const uint32_t microsPerBeat = lround((iterationsPerBeat / CPS3_DRIVER_RATE_HZ) * 1000000);
+      auto fmt_version = static_cast<CPSSeq*>(parentSeq)->fmt_version;
+      const double ITERATIONS_PER_SEC = fmt_version == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
+      const uint32_t microsPerBeat = lround((iterationsPerBeat / ITERATIONS_PER_SEC) * 1000000);
       AddTempo(beginOffset, curOffset - beginOffset, microsPerBeat);
       break;
     }
