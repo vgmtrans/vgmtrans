@@ -173,24 +173,21 @@ bool CPSTrackV1::ReadEvent() {
           AddTempoBPM(beginOffset, curOffset - beginOffset, tempo);
         }
         else {
-          // In versions < 1.40, the tempo value is subtracted from the remaining delta duration every tick.
-          // We know the ppqn is 48 (0x30) because this results in clean looking MIDIs.  Internally,
-          // 0x30 is left-shifted by 8 to get 0x3000 for finer resolution.
-          // We also know that a tick is run 62.75 times a second, because the Z80 interrupt timer is 250 Hz, but code
-          // at 0xF9 in sfa2 shows it runs once every 4 ticks (250/4 = 62.5).  There are 0.5 seconds in a beat at 120bpm.
-          // So, to get the tempo value that would equal 120bpm...
-          // 62.75*0.5*x = 12288
-          //   x = 393.216
-          // We divide this by 120 to get the value we divide by to convert to BPM, or put another way:
-          // (0x3000 / (62.5*0.5)) / x = 120
-          //   x = 3.2768
-          // So we must divide the provided tempo value by 3.2768 to get the actual BPM.  Btw, there is a table in
-          // sfa3 at 0x3492 which converts a BPM index to the x value in the first equation.  It seems to confirm our math
-          uint16_t tempo = GetShortBE(curOffset);
-          double fTempo = tempo / 3.2768;
+          // In versions < 1.40, the tempo value is represented as the number of ticks to subtract
+          // from a ticks-to-next-event state variable every iteration of the driver. We know the
+          // driver iterates at (250 / 4) hz (see CPS2_DRIVER_RATE_HZ). We also know the PPQN aligns
+          // with 48 ticks per beat, but driver timing is done with 16 bits of resolution,
+          // so there are 48 << 8 internal ticks per beat.
+          // We want to get the microseconds per beat, as this is how MIDI represents tempo.
+          // First we calculate the iterations per beat: (48 << 8) / ticks per iteration
+          // Then we calculate the seconds per beat: iterations per beat / DRIVER_RATE_IN_HZ
+          // Convert to microseconds and we're good to go.
+          uint16_t ticksPerIteration = GetShortBE(curOffset);
           curOffset += 2;
-          AddTempoBPM(beginOffset, curOffset - beginOffset, fTempo);
-          //RecordMidiSetTempoBPM(current_delta_time, flValue1, hFile);
+          auto internal_ppqn = parentSeq->GetPPQN() << 8;
+          auto iterationsPerBeat = static_cast<double>(internal_ppqn) / ticksPerIteration;
+          const uint32_t microsPerBeat = lround((iterationsPerBeat / CPS2_DRIVER_RATE_HZ) * 1000000);
+          AddTempo(beginOffset, curOffset - beginOffset, microsPerBeat);
         }
         break;
       }
