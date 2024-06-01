@@ -72,14 +72,14 @@ bool CPSTrackV2::ReadEvent() {
 
     case C1_TEMPO: {
       // Shares same logic as version < 1.40.  See comment on tempo in CPSTrackV1 for explanation.
-      uint16_t ticksPerIteration = GetShortBE(curOffset);
+      uint16_t ticks_per_iteration = GetShortBE(curOffset);
       curOffset += 2;
       auto internal_ppqn = parentSeq->GetPPQN() << 8;
-      auto iterationsPerBeat = static_cast<double>(internal_ppqn) / ticksPerIteration;
+      auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
       auto fmt_version = static_cast<CPSSeq*>(parentSeq)->fmt_version;
       const double ITERATIONS_PER_SEC = fmt_version == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
-      const uint32_t microsPerBeat = lround((iterationsPerBeat / ITERATIONS_PER_SEC) * 1000000);
-      AddTempo(beginOffset, curOffset - beginOffset, microsPerBeat);
+      const uint32_t micros_per_beat = lround((iterations_per_beat / ITERATIONS_PER_SEC) * 1000000);
+      AddTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
       break;
     }
 

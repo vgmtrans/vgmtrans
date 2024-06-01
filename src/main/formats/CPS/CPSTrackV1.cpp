@@ -182,12 +182,12 @@ bool CPSTrackV1::ReadEvent() {
           // First we calculate the iterations per beat: (48 << 8) / ticks per iteration
           // Then we calculate the seconds per beat: iterations per beat / DRIVER_RATE_IN_HZ
           // Convert to microseconds and we're good to go.
-          uint16_t ticksPerIteration = GetShortBE(curOffset);
+          uint16_t ticks_per_iteration = GetShortBE(curOffset);
           curOffset += 2;
           auto internal_ppqn = parentSeq->GetPPQN() << 8;
-          auto iterationsPerBeat = static_cast<double>(internal_ppqn) / ticksPerIteration;
-          const uint32_t microsPerBeat = lround((iterationsPerBeat / CPS2_DRIVER_RATE_HZ) * 1000000);
-          AddTempo(beginOffset, curOffset - beginOffset, microsPerBeat);
+          auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
+          const uint32_t micros_per_beat = lround((iterations_per_beat / CPS2_DRIVER_RATE_HZ) * 1000000);
+          AddTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
         }
         break;
       }
