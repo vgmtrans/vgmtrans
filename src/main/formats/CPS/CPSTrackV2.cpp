@@ -58,7 +58,7 @@ bool CPSTrackV2::ReadEvent() {
   if (status_byte < 0xC0) {
     uint8_t velocity = status_byte & 0x3F;
     uint8_t midiVel = ConvertPercentAmpToStdMidiVal(static_cast<double>(velocity) / static_cast<double>(0x3F));
-    uint8_t note = GetByte(curOffset++);
+    uint8_t note = GetByte(curOffset++) & 0x7F;
     uint32_t duration = ReadVarLength();
     AddNoteByDur(beginOffset, curOffset - beginOffset, note, midiVel, duration);
     return true;
