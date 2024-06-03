@@ -12,6 +12,10 @@ jobs:
     strategy:
       matrix:
         target: [ "intel", "arm64" ]
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
     env:
       HOMEBREW_PREFIX: ${{ (matrix.target == 'intel' && '/usr/local') || '/opt/homebrew' }}
     steps:
@@ -35,6 +39,12 @@ jobs:
           ${{ env.HOMEBREW_PREFIX }}/bin/macdeployqt \
             bin/VGMTrans.app \
             -verbose=3 -dmg -always-overwrite -appstore-compliant
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        if: ${{ github.event_name != 'pull_request' }}
+        with:
+          subject-name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}
+          subject-path: "build/macos-${{ matrix.target }}/bin/VGMTrans.dmg"
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4
         with:
@@ -43,6 +53,10 @@ jobs:
   linux:
     runs-on: ubuntu-20.04
     name: Linux, x64
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,6 +117,12 @@ jobs:
           mkdir -p appdir/usr/share/licenses/VGMTrans
           cp ${{ github.workspace }}/LICENSE/LICENSE appdir/usr/share/licenses/VGMTrans/
           mv VGMTrans*.AppImage VGMTrans.AppImage
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        if: ${{ github.event_name != 'pull_request' }}
+        with:
+          subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
+          subject-path: "build/linux-x64/VGMTrans.AppImage"
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4
         with:
@@ -113,6 +133,10 @@ jobs:
     strategy:
       matrix:
         target: ['x64', 'arm64']
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
     name: Windows, ${{ matrix.target }}
     steps:
        - uses: actions/checkout@v4
@@ -131,6 +155,12 @@ jobs:
          run: cmake --build --preset win-${{ matrix.target }}-release
        - name: "Package artifact"
          run: 7z a "VGMTrans.zip" -r .\build\win-${{ matrix.target }}\bin*
+       - name: Generate artifact attestation
+         uses: actions/attest-build-provenance@v1
+         if: ${{ github.event_name != 'pull_request' }}
+         with:
+           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
+           subject-path: VGMTrans.zip
        - name: "Upload artifact"
          uses: actions/upload-artifact@v4
          with:
