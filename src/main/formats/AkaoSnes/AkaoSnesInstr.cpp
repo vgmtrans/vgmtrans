@@ -138,7 +138,7 @@ bool AkaoSnesInstr::LoadInstr() {
   rgn->sampOffset = addrSampStart - spcDirAddr;
   rgn->InitializeRegion(instrNum, spcDirAddr, addrADSRTable);
   rgn->LoadRgn();
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   SetGuessedLength();
   return true;
@@ -208,7 +208,7 @@ bool AkaoSnesDrumKit::LoadInstr() {
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
 
   SetGuessedLength();

@@ -110,7 +110,7 @@ bool GraphResSnesInstr::LoadInstr() {
 
   GraphResSnesRgn *rgn = new GraphResSnesRgn(this, version, instrNum, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   SetGuessedLength();
   return true;

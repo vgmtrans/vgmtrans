@@ -136,7 +136,7 @@ bool PrismSnesInstr::LoadInstr() {
                                        addrTuningEntryHigh,
                                        addrTuningEntryLow);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   SetGuessedLength();
   return true;

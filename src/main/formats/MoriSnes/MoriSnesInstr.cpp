@@ -167,7 +167,7 @@ bool MoriSnesInstr::LoadInstr() {
     uint16_t addrSampStart = GetShort(offDirEnt);
     MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint);
     rgn->sampOffset = addrSampStart - spcDirAddr;
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   else {
     for (uint8_t percNoteKey = 0; percNoteKey < instrHintDir.percHints.size(); percNoteKey++) {
@@ -188,7 +188,7 @@ bool MoriSnesInstr::LoadInstr() {
       uint16_t addrSampStart = GetShort(offDirEnt);
       MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);
       rgn->sampOffset = addrSampStart - spcDirAddr;
-      aRgns.push_back(rgn);
+      AddRgn(rgn);
     }
   }
 

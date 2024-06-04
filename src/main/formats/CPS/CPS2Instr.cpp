@@ -471,7 +471,7 @@ bool CPS2Instr::LoadInstr() {
       rgn->sampNum = 0;
 
     rgn->SetUnityKey((dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->infos[rgn->sampNum].unity_key);
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   return true;
 }

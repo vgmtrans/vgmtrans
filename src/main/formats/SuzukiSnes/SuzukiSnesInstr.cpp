@@ -147,7 +147,7 @@ bool SuzukiSnesInstr::LoadInstr() {
                                          addrADSRTable,
                                          addrTuningTable);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   SetGuessedLength();
   return true;

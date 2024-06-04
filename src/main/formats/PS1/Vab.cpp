@@ -186,7 +186,7 @@ bool VabInstr::LoadInstr() {
       delete rgn;
       return false;
     }
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   return true;
 }

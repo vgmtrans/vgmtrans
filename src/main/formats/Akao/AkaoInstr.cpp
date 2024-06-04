@@ -123,11 +123,11 @@ bool AkaoInstr::LoadInstr() {
       delete rgn;
       return false;
     }
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   SetGuessedLength();
 
-  if (aRgns.empty())
+  if (regions().empty())
     L_WARN("Instrument has no regions.");
 
   return true;
@@ -221,7 +221,7 @@ bool AkaoDrumKit::LoadInstr() {
 
   SetGuessedLength();
 
-  if (aRgns.empty())
+  if (regions().empty())
     L_WARN("Instrument has no regions.");
 
   return true;

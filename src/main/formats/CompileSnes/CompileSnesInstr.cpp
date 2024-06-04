@@ -105,7 +105,7 @@ bool CompileSnesInstr::LoadInstr() {
 
   CompileSnesRgn *rgn = new CompileSnesRgn(this, version, dwOffset, addrPitchTablePtrs);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }

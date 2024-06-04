@@ -109,7 +109,7 @@ bool WDInstr::LoadInstr() {
   unsigned int k = 0;
   while (k * 0x20 < unLength) {
     auto *rgn = new WDRgn(this, k * 0x20 + dwOffset);
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
 
     rgn->addSimpleChild(k * 0x20 + dwOffset, 1, "Stereo Region Flag");
     rgn->addSimpleChild(k * 0x20 + 1 + dwOffset, 1, "First/Last Region Flags");
@@ -164,41 +164,43 @@ bool WDInstr::LoadInstr() {
   // First, do key and velocity ranges
   uint8_t prevKeyHigh = 0;
   uint8_t prevVelHigh = 0;
-  for (uint32_t k = 0; k < aRgns.size(); k++) {
+  for (size_t k = 0; k < regions().size(); k++) {
+    auto region = dynamic_cast<WDRgn*>(regions()[k]);
+    auto prevRegion = k > 0 ? regions()[k-1] : nullptr;
     // Key Ranges
-      if (((WDRgn *)aRgns[k])->bFirstRegion)  //&& !instrument[i].region[k].bLastRegion) //used in ffx2 0049 YRP
+    if (region->bFirstRegion)  //&& !instrument[i].region[k].bLastRegion) //used in ffx2 0049 YRP
                                             // battle 1.  check out first instrument, flags are weird
-      aRgns[k]->keyLow = 0;
-    else if (k > 0) {
-      if (aRgns[k]->keyHigh == aRgns[k - 1]->keyHigh)
-        aRgns[k]->keyLow = aRgns[k - 1]->keyLow;
+      region->keyLow = 0;
+    else if (prevRegion) {
+      if (region->keyHigh == prevRegion->keyHigh)
+        region->keyLow = prevRegion->keyLow;
       else
-        aRgns[k]->keyLow = aRgns[k - 1]->keyHigh + 1;
+        region->keyLow = prevRegion->keyHigh + 1;
       }
       else
-        aRgns[k]->keyLow = 0;
+        region->keyLow = 0;
 
-    if (((WDRgn *)aRgns[k])->bLastRegion)
-      aRgns[k]->keyHigh = 0x7F;
+    if (region->bLastRegion)
+      region->keyHigh = 0x7F;
 
     // Velocity ranges
-    if (aRgns[k]->velHigh == prevVelHigh)
-      aRgns[k]->velLow = aRgns[k - 1]->velLow;
+    if (region->velHigh == prevVelHigh && prevRegion)
+      region->velLow = prevRegion->velLow;
     else
-      aRgns[k]->velLow = prevVelHigh + 1;
-    prevVelHigh = aRgns[k]->velHigh;
+      region->velLow = prevVelHigh + 1;
+    prevVelHigh = region->velHigh;
 
     if (k == 0) //if it's the first region of the instrument
-      aRgns[k]->velLow = 0;
-    else if (aRgns[k]->velHigh == aRgns[k - 1]->velHigh) {
-      aRgns[k]->velLow = aRgns[k - 1]->velLow;
-      aRgns[k]->velHigh = 0x7F;     // FFX 0022, aka sight of spira, was giving me problems, hence this
-      aRgns[k - 1]->velHigh = 0x7F; // hDLSFile.aInstrs.back()->aRgns.back()->usVelHigh = 0x7F;
+      region->velLow = 0;
+    else if (region->velHigh == prevRegion->velHigh) {
+      region->velLow = prevRegion->velLow;
+      region->velHigh = 0x7F;     // FFX 0022, aka sight of spira, was giving me problems, hence this
+      prevRegion->velHigh = 0x7F; // hDLSFile.aInstrs.back()->aRgns.back()->usVelHigh = 0x7F;
     }
-    else if (aRgns[k - 1]->velHigh == 0x7F)
-      aRgns[k]->velLow = 0;
+    else if (prevRegion->velHigh == 0x7F)
+     region->velLow = 0;
     else
-      aRgns[k]->velLow = aRgns[k - 1]->velHigh + 1;
+      region->velLow = prevRegion->velHigh + 1;
   }
   return true;
 }

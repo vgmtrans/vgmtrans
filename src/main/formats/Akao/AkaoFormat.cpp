@@ -16,12 +16,10 @@ bool AkaoColl::loadMain() {
 
   //Set the sample numbers of each region using the articulation data references of each region
   for (uint32_t i = 0; i < instrset->aInstrs.size(); i++) {
-    AkaoInstr *instr = reinterpret_cast<AkaoInstr *>(instrset->aInstrs[i]);
-    std::vector<VGMRgn *> *rgns = &instr->aRgns;
-    for (uint32_t j = 0; j < rgns->size(); j++) {
-      AkaoRgn *rgn = reinterpret_cast<AkaoRgn *>((*rgns)[j]);
+    auto instr = dynamic_cast<AkaoInstr*>(instrset->aInstrs[i]);
 
-
+    for (const auto vgmregion : instr->regions()) {
+      const auto rgn = dynamic_cast<AkaoRgn*>(vgmregion);
       AkaoArt *art;
 
       if (!(static_cast<int32_t>(rgn->artNum) - static_cast<int32_t>(sampcoll->starting_art_id) >= 0 &&
@@ -80,7 +78,7 @@ void AkaoColl::preSynthFileCreation() {
     rgn->unityKey = art->unityKey;
     rgn->fineTune = art->fineTune;
 
-    newInstr->aRgns.push_back(rgn);
+    newInstr->AddRgn(rgn);
 
     instrSet->aInstrs.push_back(newInstr);
   }

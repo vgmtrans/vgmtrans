@@ -32,7 +32,7 @@ bool CPS1SampleInstrSet::GetInstrPointers() {
     rgn->unLength = 4;
     // subtract 1 to account for the first OKIM6295 sample ptr always being null
     rgn->sampNum = GetByte(offset+1) - 1;
-    instr->aRgns.push_back(rgn);
+    instr->AddRgn(rgn);
     aInstrs.push_back(instr);
   }
   return true;

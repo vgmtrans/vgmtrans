@@ -142,7 +142,7 @@ bool KonamiSnesInstr::LoadInstr() {
 
   KonamiSnesRgn *rgn = new KonamiSnesRgn(this, version, dwOffset, percussion);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }

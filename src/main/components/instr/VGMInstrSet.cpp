@@ -113,7 +113,7 @@ void VGMInstr::SetInstrNum(uint32_t theInstrNum) {
 }
 
 VGMRgn *VGMInstr::AddRgn(VGMRgn *rgn) {
-  aRgns.push_back(rgn);
+  m_regions.emplace_back(rgn);
   addChild(rgn);
   return rgn;
 }
@@ -121,7 +121,7 @@ VGMRgn *VGMInstr::AddRgn(VGMRgn *rgn) {
 VGMRgn *VGMInstr::AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow,
                          uint8_t keyHigh, uint8_t velLow, uint8_t velHigh) {
   VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
-  aRgns.push_back(newRgn);
+  m_regions.emplace_back(newRgn);
   addChild(newRgn);
   return newRgn;
 }

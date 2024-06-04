@@ -108,7 +108,7 @@ bool HudsonSnesInstr::LoadInstr() {
 
   HudsonSnesRgn *rgn = new HudsonSnesRgn(this, version, dwOffset, ofsTuningEnt);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }

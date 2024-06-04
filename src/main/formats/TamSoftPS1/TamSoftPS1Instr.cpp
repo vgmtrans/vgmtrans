@@ -73,7 +73,7 @@ bool TamSoftPS1Instr::LoadInstr() {
 
   TamSoftPS1Rgn *rgn = new TamSoftPS1Rgn(this, dwOffset + 0x400, parInstrSet->ps2);
   rgn->sampNum = instrNum;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
   return true;
 }
 

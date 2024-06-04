@@ -148,7 +148,7 @@ bool NinSnesInstr::LoadInstr() {
 
   NinSnesRgn *rgn = new NinSnesRgn(this, version, dwOffset, konamiTuningTableAddress, konamiTuningTableSize);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }

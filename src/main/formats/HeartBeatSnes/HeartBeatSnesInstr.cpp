@@ -130,7 +130,7 @@ bool HeartBeatSnesInstr::LoadInstr() {
 
   HeartBeatSnesRgn *rgn = new HeartBeatSnesRgn(this, version, dwOffset);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }

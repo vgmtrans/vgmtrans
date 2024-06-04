@@ -104,7 +104,7 @@ bool CapcomSnesInstr::LoadInstr() {
 
   CapcomSnesRgn *rgn = new CapcomSnesRgn(this, dwOffset);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }

@@ -140,7 +140,7 @@ bool TriAcePS1Instr::LoadInstr() {
     //  also, be aware the same scale may be employed for vol and expression events (haven't investigated).
     //long dlsAtten = -(ConvertPercentVolToAttenDB(rgninfo->attenuation/((double)255)) * DLS_DECIBEL_UNIT);
     //rgn->SetAttenuation(dlsAtten);
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   return true;
 }

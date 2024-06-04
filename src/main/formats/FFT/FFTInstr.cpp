@@ -155,11 +155,11 @@ bool WdsInstr::LoadInstr() {
     rgn->AddUnknown(dwOffset + 0x0f, sizeof(uint8_t));
 
     PSXConvADSR(rgn, Am >> 2, Ar, Dr, Sl, Sm >> 2, (Sm >> 1) & 1, Sr, Rm >> 2, Rr, false);
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   else if (parInstrSet->version == WdsInstrSet::VERSION_DWDS) {
     PSXConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
 
     rgn->AddGeneralItem(dwOffset + 0x08, sizeof(uint8_t), "Attack Rate");
     rgn->AddGeneralItem(dwOffset + 0x09, sizeof(uint8_t), "Decay Rate");

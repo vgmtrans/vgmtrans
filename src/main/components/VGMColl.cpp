@@ -201,7 +201,7 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
     size_t nInstrs = set->aInstrs.size();
     for (size_t i = 0; i < nInstrs; i++) {
       VGMInstr *vgminstr = set->aInstrs[i];
-      size_t nRgns = vgminstr->aRgns.size();
+      size_t nRgns = vgminstr->regions().size();
       std::string name = vgminstr->name();
       auto bank_no = vgminstr->bank;
       /*
@@ -220,7 +220,7 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
       }
       DLSInstr *newInstr = dls.AddInstr(bank_no, vgminstr->instrNum, name);
       for (uint32_t j = 0; j < nRgns; j++) {
-        VGMRgn *rgn = vgminstr->aRgns[j];
+        VGMRgn *rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
         //					continue;
 
@@ -417,12 +417,12 @@ SynthFile *VGMColl::createSynthFile() {
     size_t nInstrs = set->aInstrs.size();
     for (size_t i = 0; i < nInstrs; i++) {
       VGMInstr *vgminstr = set->aInstrs[i];
-      size_t nRgns = vgminstr->aRgns.size();
+      size_t nRgns = vgminstr->regions().size();
       if (nRgns == 0)  // do not write an instrument if it has no regions
         continue;
       SynthInstr *newInstr = synthfile->AddInstr(vgminstr->bank, vgminstr->instrNum, vgminstr->reverb);
       for (uint32_t j = 0; j < nRgns; j++) {
-        VGMRgn *rgn = vgminstr->aRgns[j];
+        VGMRgn *rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
         //					continue;
 

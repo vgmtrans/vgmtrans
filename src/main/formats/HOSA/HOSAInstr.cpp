@@ -144,7 +144,7 @@ bool HOSAInstr::LoadInstr() {
     // Unsure if volume is using a linear scale, but it sounds like it.
     double vol = rgninfo->volume / 255.0;
     rgn->SetVolume(vol);
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   return true;
 }

@@ -143,7 +143,7 @@ bool ChunSnesInstr::LoadInstr() {
 
   ChunSnesRgn *rgn = new ChunSnesRgn(this, version, srcn, addrRgn, spcDirAddr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   SetGuessedLength();
   return true;

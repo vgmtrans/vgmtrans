@@ -127,7 +127,7 @@ bool FalcomSnesInstr::LoadInstr() {
 
   FalcomSnesRgn *rgn = new FalcomSnesRgn(this, version, dwOffset, srcn);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }

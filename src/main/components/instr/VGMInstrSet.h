@@ -45,6 +45,8 @@ public:
 
   Icon GetIcon() override { return ICON_INSTR; };
 
+  const std::vector<VGMRgn*>& regions() { return m_regions; }
+
   inline void SetBank(uint32_t bankNum);
   inline void SetInstrNum(uint32_t theInstrNum);
 
@@ -59,5 +61,6 @@ public:
   VGMInstrSet *parInstrSet;
   float reverb;
 
-  std::vector<VGMRgn *> aRgns;
+private:
+  std::vector<VGMRgn*> m_regions;
 };

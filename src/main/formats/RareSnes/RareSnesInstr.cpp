@@ -202,7 +202,7 @@ bool RareSnesInstr::LoadInstr() {
 
   RareSnesRgn *rgn = new RareSnesRgn(this, dwOffset, transpose, pitch, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
   return true;
 }
 

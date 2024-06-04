@@ -68,7 +68,7 @@ bool ItikitiSnesInstr::LoadInstr() {
 
   auto region = std::make_unique<ItikitiSnesRgn>(this, m_tuning_offset, m_adsr_offset, srcn);
   region->sampOffset = sample_offset - spc_dir_offset();
-  aRgns.push_back(region.release());
+  AddRgn(region.release());
 
   return true;
 }
