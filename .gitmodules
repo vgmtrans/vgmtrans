@@ -10,3 +10,6 @@
 [submodule "lib/minizip-ng"]
 	path = lib/minizip-ng
 	url = https://github.com/zlib-ng/minizip-ng.git
+[submodule "lib/tinyxml2"]
+	path = lib/tinyxml2
+	url = https://github.com/leethomason/tinyxml2.git
