@@ -93,7 +93,7 @@ bool NinSnesSeq::GetHeaderInfo() {
   }
 
   // events will be added later, see ReadEvent
-  header = AddHeader(dwStartOffset, 0);
+  header = addHeader(dwStartOffset, 0);
   return true;
 }
 
@@ -118,7 +118,7 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
   if (sectionAddress == 0) {
     // End
     if (!IsOffsetUsed(beginOffset)) {
-      header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Section Playlist End");
+      header->addSimpleChild(beginOffset, curOffset - beginOffset, "Section Playlist End");
     }
     bContinue = false;
   }
@@ -183,11 +183,11 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
 
     // add event to sequence
     if (!IsOffsetUsed(beginOffset)) {
-      header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Playlist Jump");
+      header->addSimpleChild(beginOffset, curOffset - beginOffset, "Playlist Jump");
 
       // add the last event too, if available
       if (curOffset + 1 < 0x10000 && GetShort(curOffset) == 0x0000) {
-        header->AddSimpleItem(curOffset, 2, "Playlist End");
+        header->addSimpleChild(curOffset, 2, "Playlist End");
       }
     }
 
@@ -213,7 +213,7 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
 
     // Play the section
     if (!IsOffsetUsed(beginOffset)) {
-      header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Section Pointer");
+      header->addSimpleChild(beginOffset, curOffset - beginOffset, "Section Pointer");
     }
 
     NinSnesSection *section = (NinSnesSection *) GetSectionFromOffset(sectionAddress);
@@ -631,7 +631,7 @@ bool NinSnesSection::GetTrackPointers() {
   NinSnesSeq *parentSeq = (NinSnesSeq *) this->parentSeq;
   uint32_t curOffset = dwOffset;
 
-  VGMHeader *header = AddHeader(curOffset, 16);
+  VGMHeader *header = addHeader(curOffset, 16);
   uint8_t numActiveTracks = 0;
   for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if (curOffset + 1 >= 0x10000) {
@@ -672,7 +672,7 @@ bool NinSnesSection::GetTrackPointers() {
     char name[32];
     snprintf(name, 32, "Track Pointer #%d", trackIndex + 1);
 
-    header->AddSimpleItem(curOffset, 2, name);
+    header->addSimpleChild(curOffset, 2, name);
     curOffset += 2;
   }
 

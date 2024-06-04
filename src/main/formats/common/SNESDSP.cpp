@@ -337,7 +337,7 @@ void SNESSampColl::SetDefaultTargets(uint32_t maxNumSamps) {
 }
 
 bool SNESSampColl::GetSampleInfo() {
-  spcDirHeader = AddHeader(spcDirAddr, 0, "Sample DIR");
+  spcDirHeader = addHeader(spcDirAddr, 0, "Sample DIR");
   for (std::vector<uint8_t>::iterator itr = this->targetSRCNs.begin(); itr != this->targetSRCNs.end(); ++itr) {
     uint8_t srcn = (*itr);
 
@@ -352,8 +352,8 @@ bool SNESSampColl::GetSampleInfo() {
     bool loop;
     uint32_t length = SNESSamp::GetSampleLength(rawFile(), addrSampStart, loop);
 
-        spcDirHeader->AddSimpleItem(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
-        spcDirHeader->AddSimpleItem(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
+        spcDirHeader->addSimpleChild(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
+        spcDirHeader->addSimpleChild(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
 
         SNESSamp *samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length,
                                       addrSampLoop, fmt::format("Sample: {:#x}", srcn));

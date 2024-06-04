@@ -175,8 +175,8 @@ SuzukiSnesRgn::SuzukiSnesRgn(SuzukiSnesInstr *instr,
   int8_t coarse_tuning = GetByte(addrTuningTable + srcn * 2 + 1);
 
   AddSampNum(srcn, addrSRCNTable + instrNum, 1);
-  AddSimpleItem(addrADSRTable + srcn * 2, 1, "ADSR1");
-  AddSimpleItem(addrADSRTable + srcn * 2 + 1, 1, "ADSR2");
+  addSimpleChild(addrADSRTable + srcn * 2, 1, "ADSR1");
+  addSimpleChild(addrADSRTable + srcn * 2 + 1, 1, "ADSR2");
   AddFineTune((int16_t) (fine_tuning / 256.0 * 100.0), addrTuningTable + srcn * 2, 1);
   AddUnityKey(69 - coarse_tuning, addrTuningTable + srcn * 2 + 1, 1);
   AddVolume(vol / 256.0, addrVolumeTable + srcn * 2, 1);

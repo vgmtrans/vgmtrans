@@ -123,7 +123,7 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
       continue;
     }
 
-    seqTable->AddSimpleItem(seq_table_offset + k, ptrSize, "Sequence Pointer");
+    seqTable->addSimpleChild(seq_table_offset + k, ptrSize, "Sequence Pointer");
 
     auto seqName = fmt::format("{} seq {}", gameentry->name, seqNum);
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);

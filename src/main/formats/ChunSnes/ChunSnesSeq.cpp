@@ -48,7 +48,7 @@ void ChunSnesSeq::ResetVars() {
 bool ChunSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
   if (curOffset + 2 > 0x10000) {
     return false;
@@ -58,7 +58,7 @@ bool ChunSnesSeq::GetHeaderInfo() {
   initialTempo = GetByte(curOffset++);
   AlwaysWriteInitialTempo(GetTempoInBPM(initialTempo));
 
-  header->AddSimpleItem(curOffset, 1, "Number of Tracks");
+  header->addSimpleChild(curOffset, 1, "Number of Tracks");
   nNumTracks = GetByte(curOffset++);
   if (nNumTracks == 0 || nNumTracks > MAX_TRACKS) {
     return false;
@@ -77,7 +77,7 @@ bool ChunSnesSeq::GetHeaderInfo() {
 
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
-    header->AddSimpleItem(curOffset, 2, trackName.str());
+    header->addSimpleChild(curOffset, 2, trackName.str());
 
     ChunSnesTrack *track = new ChunSnesTrack(this, addrTrackStart);
     track->index = static_cast<uint8_t>(aTracks.size());

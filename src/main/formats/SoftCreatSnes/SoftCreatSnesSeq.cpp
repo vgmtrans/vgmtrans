@@ -35,7 +35,7 @@ void SoftCreatSnesSeq::ResetVars(void) {
 bool SoftCreatSnesSeq::GetHeaderInfo(void) {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, headerAlignSize * MAX_TRACKS);
+  VGMHeader *header = addHeader(dwOffset, headerAlignSize * MAX_TRACKS);
   if (dwOffset + headerAlignSize * MAX_TRACKS > 0x10000) {
     return false;
   }
@@ -49,8 +49,8 @@ bool SoftCreatSnesSeq::GetHeaderInfo(void) {
 
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
-    header->AddSimpleItem(addrTrackLowPtr, 1, trackName.str() + " (LSB)");
-    header->AddSimpleItem(addrTrackHighPtr, 1, trackName.str() + " (MSB)");
+    header->addSimpleChild(addrTrackLowPtr, 1, trackName.str() + " (LSB)");
+    header->addSimpleChild(addrTrackHighPtr, 1, trackName.str() + " (MSB)");
 
     uint16_t addrTrackStart = GetByte(addrTrackLowPtr) | (GetByte(addrTrackHighPtr) << 8);
     if (addrTrackStart != 0xffff) {

@@ -18,7 +18,7 @@ class MidiTrack;
 
 enum ReadMode : uint8_t;
 
-class SeqTrack : public VGMContainerItem {
+class SeqTrack : public VGMItem {
  public:
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::string name = "Track");
   ~SeqTrack() override;
@@ -26,9 +26,11 @@ class SeqTrack : public VGMContainerItem {
   void ResetVisitedAddresses();
 
   Icon GetIcon() override { return ICON_TRACK; };
+  VGMItem* GetItemFromOffset(uint32_t offset, bool matchStartOffset) override;
 
   virtual bool LoadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
   virtual void LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
+  virtual void LoadTrackPostProcessing();
   virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
   virtual void AddInitialMidiEvents(int trackNum);
   virtual bool ReadEvent();

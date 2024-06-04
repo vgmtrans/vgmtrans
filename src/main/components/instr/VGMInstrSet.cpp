@@ -20,7 +20,7 @@
 VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length,
                          std::string name, VGMSampColl *theSampColl)
     : VGMFile(format, file, offset, length, std::move(name)), sampColl(theSampColl) {
-  AddContainer<VGMInstr>(aInstrs);
+  addChildren(aInstrs);
 }
 
 VGMInstrSet::~VGMInstrSet() {
@@ -100,9 +100,9 @@ bool VGMInstrSet::LoadInstrs() {
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
                    uint32_t theInstrNum, std::string name, float reverb)
-    : VGMContainerItem(instrSet, offset, length, std::move(name)), bank(theBank), instrNum(theInstrNum),
+    : VGMItem(instrSet, offset, length, std::move(name)), bank(theBank), instrNum(theInstrNum),
       parInstrSet(instrSet), reverb(reverb) {
-  AddContainer<VGMRgn>(aRgns);
+  addChildren(aRgns);
 }
 
 VGMInstr::~VGMInstr() {

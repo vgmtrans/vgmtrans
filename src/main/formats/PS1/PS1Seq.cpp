@@ -29,10 +29,10 @@ bool PS1Seq::GetHeaderInfo() {
   if (numer == 0 || numer > 32)                //sanity check
     return false;
 
-  VGMHeader *seqHeader = VGMSeq::AddHeader(offset(), 11, "Sequence Header");
-  seqHeader->AddSimpleItem(offset(), 4, "ID");
-  seqHeader->AddSimpleItem(offset() + 0x04, 4, "Version");
-  seqHeader->AddSimpleItem(offset() + 0x08, 2, "Resolution of quarter note");
+  VGMHeader *seqHeader = VGMSeq::addHeader(offset(), 11, "Sequence Header");
+  seqHeader->addSimpleChild(offset(), 4, "ID");
+  seqHeader->addSimpleChild(offset() + 0x04, 4, "Version");
+  seqHeader->addSimpleChild(offset() + 0x08, 2, "Resolution of quarter note");
   seqHeader->AddTempo(offset() + 0x0A, 3);
   seqHeader->AddSig(offset() + 0x0D, 2); // Rhythm (Numerator) and Rhythm (Denominator) (2^n)
 

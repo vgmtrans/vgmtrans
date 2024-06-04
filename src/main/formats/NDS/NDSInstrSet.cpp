@@ -34,7 +34,7 @@ NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSam
 
 bool NDSInstrSet::GetInstrPointers() {
   uint32_t nInstruments = GetWord(dwOffset + 0x38);
-  VGMHeader *instrptrHdr = AddHeader(dwOffset + 0x38, nInstruments * 4 + 4, "Instrument Pointers");
+  VGMHeader *instrptrHdr = addHeader(dwOffset + 0x38, nInstruments * 4 + 4, "Instrument Pointers");
 
   for (uint32_t i = 0; i < nInstruments; i++) {
     uint32_t instrPtrOff = dwOffset + 0x3C + i * 4;
@@ -47,9 +47,9 @@ bool NDSInstrSet::GetInstrPointers() {
     uint32_t pInstr = temp >> 8;
     aInstrs.push_back(new NDSInstr(this, pInstr + dwOffset, 0, 0, i, instrType));
 
-    VGMHeader *hdr = instrptrHdr->AddHeader(instrPtrOff, 4, "Pointer");
-    hdr->AddSimpleItem(instrPtrOff, 1, "Type");
-    hdr->AddSimpleItem(instrPtrOff + 1, 3, "Offset");
+    VGMHeader *hdr = instrptrHdr->addHeader(instrPtrOff, 4, "Pointer");
+    hdr->addSimpleChild(instrPtrOff, 1, "Type");
+    hdr->addSimpleChild(instrPtrOff + 1, 3, "Offset");
   }
 
   return true;

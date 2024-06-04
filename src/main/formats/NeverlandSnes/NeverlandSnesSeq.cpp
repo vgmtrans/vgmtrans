@@ -30,7 +30,7 @@ void NeverlandSnesSeq::ResetVars(void) {
 bool NeverlandSnesSeq::GetHeaderInfo(void) {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
   if (version == NEVERLANDSNES_SFC) {
     header->unLength = 0x40;
   }
@@ -42,13 +42,13 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
     return false;
   }
 
-  header->AddSimpleItem(dwOffset, 3, "Signature");
-  header->AddUnknownItem(dwOffset + 3, 1);
+  header->addSimpleChild(dwOffset, 3, "Signature");
+  header->addUnknownChild(dwOffset + 3, 1);
 
   const size_t NAME_SIZE = 12;
   char rawName[NAME_SIZE + 1] = {0};
   GetBytes(dwOffset + 4, NAME_SIZE, rawName);
-  header->AddSimpleItem(dwOffset + 4, 12, "Song Name");
+  header->addSimpleChild(dwOffset + 4, 12, "Song Name");
 
   // trim name text
   for (int i = NAME_SIZE - 1; i >= 0; i--) {
@@ -72,7 +72,7 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
 
     std::stringstream trackSignName;
     trackSignName << "Track " << (trackIndex + 1) << " Entry";
-    header->AddSimpleItem(trackSignPtr, 1, trackSignName.str());
+    header->addSimpleChild(trackSignPtr, 1, trackSignName.str());
 
     uint16_t sectionListOffsetPtr = dwOffset + 0x20 + (trackIndex * 2);
     if (trackSign != 0xff) {
@@ -80,13 +80,13 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
 
       std::stringstream playlistName;
       playlistName << "Track " << (trackIndex + 1) << " Playlist Pointer";
-      header->AddSimpleItem(sectionListOffsetPtr, 2, playlistName.str());
+      header->addSimpleChild(sectionListOffsetPtr, 2, playlistName.str());
 
       NeverlandSnesTrack *track = new NeverlandSnesTrack(this, sectionListAddress);
       aTracks.push_back(track);
     }
     else {
-      header->AddSimpleItem(sectionListOffsetPtr, 2, "NULL");
+      header->addSimpleChild(sectionListOffsetPtr, 2, "NULL");
     }
   }
 

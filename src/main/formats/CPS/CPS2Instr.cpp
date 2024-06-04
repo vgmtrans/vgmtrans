@@ -31,14 +31,14 @@ bool CPSArticTable::LoadMain() {
       continue;
 
     auto name = fmt::format("Articulation {:d}", i);
-    VGMContainerItem *containerItem = new VGMContainerItem(this, off, sizeof(qs_artic_info), name);
-    containerItem->AddSimpleItem(off, 1, "Attack Rate");
-    containerItem->AddSimpleItem(off + 1, 1, "Decay Rate");
-    containerItem->AddSimpleItem(off + 2, 1, "Sustain Level");
-    containerItem->AddSimpleItem(off + 3, 1, "Sustain Rate");
-    containerItem->AddSimpleItem(off + 4, 1, "Release Rate");
-    containerItem->AddSimpleItem(off + 5, 3, "Unknown");
-    this->AddItem(containerItem);
+    VGMItem *containerItem = new VGMItem(this, off, sizeof(qs_artic_info), name);
+    containerItem->addSimpleChild(off, 1, "Attack Rate");
+    containerItem->addSimpleChild(off + 1, 1, "Decay Rate");
+    containerItem->addSimpleChild(off + 2, 1, "Sustain Level");
+    containerItem->addSimpleChild(off + 3, 1, "Sustain Rate");
+    containerItem->addSimpleChild(off + 4, 1, "Release Rate");
+    containerItem->addSimpleChild(off + 5, 3, "Unknown");
+    addChild(containerItem);
   }
   //unLength = off - dwOffset;
   int numArtics = unLength / sizeof(qs_artic_info);
@@ -86,13 +86,13 @@ bool CPS2SampleInfoTable::LoadMain() {
 
     auto name = fmt::format("Sample Info: {:d}", i);
 
-    VGMContainerItem *containerItem = new VGMContainerItem(this, off, sizeof(qs_samp_info_cps2), name);
-    containerItem->AddSimpleItem(off + 0, 1, "Bank");
-    containerItem->AddSimpleItem(off + 1, 2, "Offset");
-    containerItem->AddSimpleItem(off + 3, 2, "Loop Offset");
-    containerItem->AddSimpleItem(off + 5, 2, "End Offset");
-    containerItem->AddSimpleItem(off + 7, 1, "Unity Key");
-    this->AddItem(containerItem);
+    VGMItem *containerItem = new VGMItem(this, off, sizeof(qs_samp_info_cps2), name);
+    containerItem->addSimpleChild(off + 0, 1, "Bank");
+    containerItem->addSimpleChild(off + 1, 2, "Offset");
+    containerItem->addSimpleChild(off + 3, 2, "Loop Offset");
+    containerItem->addSimpleChild(off + 5, 2, "End Offset");
+    containerItem->addSimpleChild(off + 7, 1, "Unity Key");
+    addChild(containerItem);
   }
   unLength = off - 8 - dwOffset;
   this->numSamples = unLength / 8;
@@ -150,12 +150,12 @@ bool CPS3SampleInfoTable::LoadMain() {
 
     auto name = fmt::format("Sample Info: {:d}", i);
 
-    VGMContainerItem *containerItem = new VGMContainerItem(this, off, 16, name);
-    containerItem->AddSimpleItem(off + 0, 4, "Offset");
-    containerItem->AddSimpleItem(off + 4, 4, "Loop Offset");
-    containerItem->AddSimpleItem(off + 8, 4, "End Offset");
-    containerItem->AddSimpleItem(off + 12, 4, "Unity Key");
-    this->AddItem(containerItem);
+    VGMItem *containerItem = new VGMItem(this, off, 16, name);
+    containerItem->addSimpleChild(off + 0, 4, "Offset");
+    containerItem->addSimpleChild(off + 4, 4, "Loop Offset");
+    containerItem->addSimpleChild(off + 8, 4, "End Offset");
+    containerItem->addSimpleChild(off + 12, 4, "Unity Key");
+    addChild(containerItem);
 
     sample_info& info = infos[i];
     info.start_addr = GetWordBE(off + 0);
@@ -237,7 +237,7 @@ bool CPS2InstrSet::GetInstrPointers() {
         uint32_t bankOff = instr_table_ptrs[bank] - 0x6000000;
 
         auto pointersName = fmt::format("Bank {:d} Instrument Pointers", bank);
-        auto instrPointersItem = new VGMContainerItem(vgmFile(), bankOff, 128*2, pointersName, CLR_HEADER);
+        auto instrPointersItem = new VGMItem(vgmFile(), bankOff, 128*2, pointersName, CLR_HEADER);
 
         // For each bank, iterate over all instr ptrs and create instruments
         for (uint8_t j = 0; j < 128; j++) {
@@ -252,12 +252,12 @@ bool CPS2InstrSet::GetInstrPointers() {
           }
           std::ostringstream pointerStream;
           pointerStream << "Instrument Pointer " << j;
-          instrPointersItem->AddSimpleItem(bankOff + (j*2), 2, pointerStream.str());
+          instrPointersItem->addSimpleChild(bankOff + (j*2), 2, pointerStream.str());
 
           auto name = fmt::format("Instrument: {:d}  bank: {:d}", j, bank);
           aInstrs.push_back(new CPS2Instr(this, instrPtr, instrLength, bank*2, j, name));
         }
-        this->AddItem(instrPointersItem);
+        addChild(instrPointersItem);
 
         continue;
       }
@@ -303,14 +303,14 @@ bool CPS2Instr::LoadInstr() {
   if (formatVersion < VER_103) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
-    rgn->AddSimpleItem(this->dwOffset,     1, "Sample Info Index");
-    rgn->AddSimpleItem(this->dwOffset + 1, 1, "Unknown / Ignored");
-    rgn->AddSimpleItem(this->dwOffset + 2, 1, "Attack Rate");
-    rgn->AddSimpleItem(this->dwOffset + 3, 1, "Decay Rate");
-    rgn->AddSimpleItem(this->dwOffset + 4, 1, "Sustain Level");
-    rgn->AddSimpleItem(this->dwOffset + 5, 1, "Sustain Rate");
-    rgn->AddSimpleItem(this->dwOffset + 6, 1, "Release Rate");
-    rgn->AddSimpleItem(this->dwOffset + 7, 1, "Unknown");
+    rgn->addSimpleChild(this->dwOffset,     1, "Sample Info Index");
+    rgn->addSimpleChild(this->dwOffset + 1, 1, "Unknown / Ignored");
+    rgn->addSimpleChild(this->dwOffset + 2, 1, "Attack Rate");
+    rgn->addSimpleChild(this->dwOffset + 3, 1, "Decay Rate");
+    rgn->addSimpleChild(this->dwOffset + 4, 1, "Sustain Level");
+    rgn->addSimpleChild(this->dwOffset + 5, 1, "Sustain Rate");
+    rgn->addSimpleChild(this->dwOffset + 6, 1, "Release Rate");
+    rgn->addSimpleChild(this->dwOffset + 7, 1, "Unknown");
 
     qs_prog_info_ver_101 progInfo;
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_101), &progInfo);
@@ -329,11 +329,11 @@ bool CPS2Instr::LoadInstr() {
 
     rgn->AddSampNum(progInfo.sample_index, this->dwOffset, 2);
     rgn->AddFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
-    rgn->AddSimpleItem(this->dwOffset + 3, 1, "Attack Rate");
-    rgn->AddSimpleItem(this->dwOffset + 4, 1, "Decay Rate");
-    rgn->AddSimpleItem(this->dwOffset + 5, 1, "Sustain Level");
-    rgn->AddSimpleItem(this->dwOffset + 6, 1, "Sustain Rate");
-    rgn->AddSimpleItem(this->dwOffset + 7, 1, "Release Rate");
+    rgn->addSimpleChild(this->dwOffset + 3, 1, "Attack Rate");
+    rgn->addSimpleChild(this->dwOffset + 4, 1, "Decay Rate");
+    rgn->addSimpleChild(this->dwOffset + 5, 1, "Sustain Level");
+    rgn->addSimpleChild(this->dwOffset + 6, 1, "Sustain Rate");
+    rgn->addSimpleChild(this->dwOffset + 7, 1, "Release Rate");
 
     this->attack_rate = progInfo.attack_rate;
     this->decay_rate = progInfo.decay_rate;
@@ -373,11 +373,11 @@ bool CPS2Instr::LoadInstr() {
       auto fine_tune_cents = static_cast<int16_t>(std::lround((progInfo.fine_tune / 128.0) * 100));
       rgn->AddFineTune(fine_tune_cents, off+6, 1);
 
-      rgn->AddSimpleItem(off + 7, 1, "Attack Rate");
-      rgn->AddSimpleItem(off + 8, 1, "Decay Rate");
-      rgn->AddSimpleItem(off + 9, 1, "Sustain Level");
-      rgn->AddSimpleItem(off + 10, 1, "Sustain Rate");
-      rgn->AddSimpleItem(off + 11, 1, "Release Rate");
+      rgn->addSimpleChild(off + 7, 1, "Attack Rate");
+      rgn->addSimpleChild(off + 8, 1, "Decay Rate");
+      rgn->addSimpleChild(off + 9, 1, "Sustain Level");
+      rgn->addSimpleChild(off + 10, 1, "Sustain Rate");
+      rgn->addSimpleChild(off + 11, 1, "Release Rate");
 
 
       this->attack_rate = progInfo.attack_rate;
@@ -394,9 +394,9 @@ bool CPS2Instr::LoadInstr() {
     qs_prog_info_ver_130 progInfo;
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
 
-    rgn->AddSimpleItem(this->dwOffset,     2, "Sample Info Index");
+    rgn->addSimpleChild(this->dwOffset,     2, "Sample Info Index");
     rgn->AddFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
-    rgn->AddSimpleItem(this->dwOffset + 3, 1, "Articulation Index");
+    rgn->addSimpleChild(this->dwOffset + 3, 1, "Articulation Index");
 
     const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->parInstrSet)->articTable;
     const qs_artic_info* artic = &articTable->artics[progInfo.artic_index];

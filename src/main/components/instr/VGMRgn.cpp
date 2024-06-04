@@ -11,7 +11,7 @@
 // ******
 
 VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, std::string name)
-    : VGMContainerItem(instr->parInstrSet, offset, length, std::move(name)),
+    : VGMItem(instr->parInstrSet, offset, length, std::move(name)),
       parInstr(instr),
       keyLow(0),
       keyHigh(0x7F),
@@ -32,12 +32,12 @@ VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, std::string na
       sustain_time(0),
       release_transform(no_transform),
       release_time(0) {
-  AddContainer<VGMRgnItem>(items);
+  addChildren(items);
 }
 
 VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t theKeyLow, uint8_t theKeyHigh,
                uint8_t theVelLow, uint8_t theVelHigh, int theSampNum, std::string name)
-    : VGMContainerItem(instr->parInstrSet, offset, length, std::move(name)),
+    : VGMItem(instr->parInstrSet, offset, length, std::move(name)),
       parInstr(instr),
       keyLow(theKeyLow),
       keyHigh(theKeyHigh),
@@ -58,7 +58,7 @@ VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t theKey
       sustain_time(0),
       release_transform(no_transform),
       release_time(0) {
-  AddContainer<VGMRgnItem>(items);
+  addChildren(items);
 }
 
 VGMRgn::~VGMRgn() {

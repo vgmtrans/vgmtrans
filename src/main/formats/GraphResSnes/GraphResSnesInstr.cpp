@@ -131,8 +131,8 @@ GraphResSnesRgn::GraphResSnesRgn(GraphResSnesInstr *instr,
   uint8_t adsr2 = adsr & 0xff;
 
   uint32_t offDirEnt = spcDirAddr + srcn * 4;
-  AddSimpleItem(offDirEnt, 2, "SA");
-  AddSimpleItem(offDirEnt + 2, 2, "LSA");
+  addSimpleChild(offDirEnt, 2, "SA");
+  addSimpleChild(offDirEnt + 2, 2, "LSA");
 
   sampNum = srcn;
   unityKey = 57; // o4a = $1000

@@ -56,27 +56,27 @@ void HeartBeatSnesSeq::ResetVars() {
 bool HeartBeatSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
   if (curOffset + 2 > 0x10000) {
     return false;
   }
 
-  header->AddSimpleItem(curOffset, 2, "Instrument Table Pointer");
+  header->addSimpleChild(curOffset, 2, "Instrument Table Pointer");
   curOffset += 2;
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t ofsTrackStart = GetShort(curOffset);
     if (ofsTrackStart == 0) {
       // example: Dragon Quest 6 - Brave Fight
-      header->AddSimpleItem(curOffset, 2, "Track Pointer End");
+      header->addSimpleChild(curOffset, 2, "Track Pointer End");
       // curOffset += 2;
       break;
     }
 
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
-    header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+    header->addSimpleChild(curOffset, 2, trackName.str().c_str());
 
     curOffset += 2;
   }

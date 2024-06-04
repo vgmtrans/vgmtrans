@@ -230,9 +230,9 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint
   AddSampNum(srcn, offset, 1);
   AddUnityKey(72 - (int) (coarse_tuning), offset + 1, 1);
   AddFineTune((int16_t) (fine_tuning * 100.0), offset + 2, 1);
-  AddSimpleItem(offset + 3, 1, "ADSR1");
-  AddSimpleItem(offset + 4, 1, use_adsr ? "ADSR2" : "GAIN");
-  AddSimpleItem(offset + 5, 1, "Pan");
+  addSimpleChild(offset + 3, 1, "ADSR1");
+  addSimpleChild(offset + 4, 1, use_adsr ? "ADSR2" : "GAIN");
+  addSimpleChild(offset + 5, 1, "Pan");
   // volume is *decreased* by final volume value
   // so it is impossible to convert it in 100% accuracy
   // the following value 72.0 is chosen as a "average channel volume level (before pan processing)"

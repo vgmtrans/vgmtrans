@@ -6,7 +6,7 @@
 class VGMMultiSectionSeq;
 
 class VGMSeqSection
-    : public VGMContainerItem {
+    : public VGMItem {
  public:
   VGMSeqSection(VGMMultiSectionSeq *parentFile,
                 uint32_t theOffset,

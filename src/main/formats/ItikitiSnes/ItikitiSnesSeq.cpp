@@ -33,9 +33,9 @@ void ItikitiSnesSeq::ResetVars() {
 bool ItikitiSnesSeq::GetHeaderInfo() {
   SetPPQN(kItikitiSnesSeqTimebase);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
-  header->AddUnknownItem(dwOffset, 1);
-  header->AddSimpleItem(dwOffset + 1, 1, "Number of Tracks");
+  VGMHeader *header = addHeader(dwOffset, 0);
+  header->addUnknownChild(dwOffset, 1);
+  header->addSimpleChild(dwOffset + 1, 1, "Number of Tracks");
 
   nNumTracks = GetByte(dwOffset + 1);
   if (nNumTracks == 0 || nNumTracks > 8)
@@ -50,7 +50,7 @@ bool ItikitiSnesSeq::GetHeaderInfo() {
     track_name << "Track " << (track_index + 1);
 
     const uint32_t offset_to_pointer = dwOffset + 2 + (2 * track_index);
-    header->AddSimpleItem(offset_to_pointer, 2, track_name.str());
+    header->addSimpleChild(offset_to_pointer, 2, track_name.str());
   }
 
   header->SetGuessedLength();

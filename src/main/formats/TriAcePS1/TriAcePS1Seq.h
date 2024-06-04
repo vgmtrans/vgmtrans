@@ -31,10 +31,10 @@ class TriAcePS1Seq:
 };
 
 class TriAcePS1ScorePattern
-    : public VGMContainerItem {
+    : public VGMItem {
  public:
   TriAcePS1ScorePattern(TriAcePS1Seq *parentSeq, uint32_t offset)
-      : VGMContainerItem(parentSeq, offset, 0, "Score Pattern") { }
+      : VGMItem(parentSeq, offset, 0, "Score Pattern") { }
 };
 
 

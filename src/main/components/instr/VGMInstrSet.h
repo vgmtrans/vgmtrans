@@ -37,7 +37,7 @@ public:
 // VGMInstr
 // ********
 
-class VGMInstr : public VGMContainerItem {
+class VGMInstr : public VGMItem {
 public:
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, std::string name = "Instrument",

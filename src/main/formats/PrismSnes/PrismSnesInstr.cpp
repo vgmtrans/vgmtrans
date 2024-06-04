@@ -162,8 +162,8 @@ PrismSnesRgn::PrismSnesRgn(PrismSnesInstr *instr,
   double coarse_tuning;
   fine_tuning = modf(tuning / 256.0, &coarse_tuning) * 100.0;
 
-  AddSimpleItem(addrADSR1Entry, 1, "ADSR1");
-  AddSimpleItem(addrADSR2Entry, 1, "ADSR2");
+  addSimpleChild(addrADSR1Entry, 1, "ADSR1");
+  addSimpleChild(addrADSR2Entry, 1, "ADSR2");
   AddUnityKey(93 - (int) coarse_tuning, addrTuningEntryHigh, 1);
   AddFineTune((int16_t) fine_tuning, addrTuningEntryLow, 1);
 

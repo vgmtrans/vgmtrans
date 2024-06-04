@@ -40,13 +40,22 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32
       initialPitchBendRangeCents(0),
       initialTempoBPM(120),
       bReverb(false) {
-  AddContainer<SeqTrack>(aTracks);
+  // addChildren(aTracks);
 }
 
 VGMSeq::~VGMSeq() {
   DeleteVect<SeqTrack>(aTracks);
   DeleteVect<ISeqSlider>(aSliders);
   delete midi;
+}
+
+VGMItem* VGMSeq::GetItemFromOffset(uint32_t offset, bool matchStartOffset) {
+  for (const auto child : children()) {
+    if (VGMItem *foundItem = child->GetItemFromOffset(offset, matchStartOffset))
+      return foundItem;
+  }
+
+  return nullptr;
 }
 
 bool VGMSeq::LoadVGMFile() {
@@ -151,6 +160,8 @@ bool VGMSeq::LoadTracks(ReadMode readMode, uint32_t stopTime) {
   }
 
   LoadTracksMain(stopTime);
+  addChildren(aTracks);
+
   if (readMode == READMODE_ADD_TO_UI) {
     SetGuessedLength();
     if (unLength == 0) {
@@ -257,6 +268,9 @@ void VGMSeq::LoadTracksMain(uint32_t stopTime) {
       aTracks[trackNum]->LoadTrackMainLoop(aStopOffset[trackNum], stopTime);
       aTracks[trackNum]->active = false;
     }
+  }
+  for (const auto track : aTracks) {
+    track->LoadTrackPostProcessing();
   }
   delete[] aStopOffset;
 }

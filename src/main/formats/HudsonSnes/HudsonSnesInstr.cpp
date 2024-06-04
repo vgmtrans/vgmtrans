@@ -128,10 +128,10 @@ HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
   uint8_t adsr2 = GetByte(dwOffset + 2);
   uint8_t gain = GetByte(dwOffset + 3);
 
-  AddSimpleItem(dwOffset, 1, "SRCN");
-  AddSimpleItem(dwOffset + 1, 1, "ADSR(1)");
-  AddSimpleItem(dwOffset + 2, 1, "ADSR(2)");
-  AddSimpleItem(dwOffset + 3, 1, "GAIN");
+  addSimpleChild(dwOffset, 1, "SRCN");
+  addSimpleChild(dwOffset + 1, 1, "ADSR(1)");
+  addSimpleChild(dwOffset + 2, 1, "ADSR(2)");
+  addSimpleChild(dwOffset + 3, 1, "GAIN");
 
   const double pitch_fixer = 4286.0 / 4096.0;  // from pitch table ($10be vs $1000)
   const double pitch_scale = GetShortBE(addrTuningEntry) / 256.0;
@@ -157,9 +157,9 @@ HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
   unityKey = 72 - static_cast<int>(coarse_tuning);
   fineTune = static_cast<int16_t>(fine_tuning * 100.0);
 
-  AddSimpleItem(addrTuningEntry, 2, "Pitch Multiplier");
-  AddSimpleItem(addrTuningEntry + 2, 1, "Coarse Tune");
-  AddSimpleItem(addrTuningEntry + 3, 1, "Fine Tune");
+  addSimpleChild(addrTuningEntry, 2, "Pitch Multiplier");
+  addSimpleChild(addrTuningEntry + 2, 1, "Coarse Tune");
+  addSimpleChild(addrTuningEntry + 3, 1, "Fine Tune");
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 

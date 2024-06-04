@@ -36,11 +36,11 @@ bool ChunSnesInstrSet::GetHeaderInfo() {
   }
 
   unsigned int nNumInstrs = GetByte(curOffset);
-  AddSimpleItem(curOffset, 1, "Number of Instruments");
+  addSimpleChild(curOffset, 1, "Number of Instruments");
   curOffset++;
 
   if (version != CHUNSNES_SUMMER) { // CHUNSNES_WINTER
-    AddUnknownItem(curOffset, 1);
+    addUnknownChild(curOffset, 1);
     curOffset++;
   }
 
@@ -64,7 +64,7 @@ bool ChunSnesInstrSet::GetInstrPointers() {
 
   for (unsigned int instrNum = 0; instrNum < nNumInstrs; instrNum++) {
     auto instrName = fmt::format("Instrument {}", instrNum + 1);
-    AddSimpleItem(curOffset, 1, instrName);
+    addSimpleChild(curOffset, 1, instrName);
 
     uint8_t globalInstrNum = GetByte(curOffset);
     curOffset++;
@@ -124,7 +124,7 @@ ChunSnesInstr::~ChunSnesInstr() {}
 
 bool ChunSnesInstr::LoadInstr() {
   uint8_t srcn = GetByte(dwOffset);
-  AddSimpleItem(dwOffset, 1, "Sample Number");
+  addSimpleChild(dwOffset, 1, "Sample Number");
   if (srcn == 0xff) {
     return false;
   }
@@ -157,10 +157,10 @@ ChunSnesRgn::ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn
     VGMRgn(instr, addrRgn, 8),
     version(ver) {
   AddUnknown(dwOffset, 2);
-  AddSimpleItem(dwOffset + 2, 1, "ADSR(1)");
-  AddSimpleItem(dwOffset + 3, 1, "ADSR(2)");
-  AddSimpleItem(dwOffset + 4, 1, "GAIN");
-  AddSimpleItem(dwOffset + 5, 2, "Tuning");
+  addSimpleChild(dwOffset + 2, 1, "ADSR(1)");
+  addSimpleChild(dwOffset + 3, 1, "ADSR(2)");
+  addSimpleChild(dwOffset + 4, 1, "GAIN");
+  addSimpleChild(dwOffset + 5, 2, "Tuning");
   AddUnknown(dwOffset + 7, 1);
 
   const uint8_t adsr1 = GetByte(dwOffset + 2);

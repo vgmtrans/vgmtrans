@@ -48,7 +48,7 @@ void AkaoSnesSeq::ResetVars() {
 bool AkaoSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
   if (version == AKAOSNES_V1 || version == AKAOSNES_V2) {
     // Earlier versions are not relocatable
@@ -59,21 +59,21 @@ bool AkaoSnesSeq::GetHeaderInfo() {
   else {
     // Later versions are relocatable
     if (version == AKAOSNES_V3) {
-      header->AddSimpleItem(curOffset, 2, "ROM Address Base");
+      header->addSimpleChild(curOffset, 2, "ROM Address Base");
       addrROMRelocBase = GetShort(curOffset);
       if (minorVersion != AKAOSNES_V3_FFMQ) {
         curOffset += 2;
       }
 
-      header->AddSimpleItem(curOffset + MAX_TRACKS * 2, 2, "End Address");
+      header->addSimpleChild(curOffset + MAX_TRACKS * 2, 2, "End Address");
       addrSequenceEnd = GetShortAddress(curOffset + MAX_TRACKS * 2);
     }
     else if (version == AKAOSNES_V4) {
-      header->AddSimpleItem(curOffset, 2, "ROM Address Base");
+      header->addSimpleChild(curOffset, 2, "ROM Address Base");
       addrROMRelocBase = GetShort(curOffset);
       curOffset += 2;
 
-      header->AddSimpleItem(curOffset, 2, "End Address");
+      header->addSimpleChild(curOffset, 2, "End Address");
       addrSequenceEnd = GetShortAddress(curOffset);
       curOffset += 2;
     }
@@ -90,10 +90,10 @@ bool AkaoSnesSeq::GetHeaderInfo() {
     if (addrTrackStart != addrSequenceEnd) {
       std::stringstream trackName;
       trackName << "Track Pointer " << (trackIndex + 1);
-      header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+      header->addSimpleChild(curOffset, 2, trackName.str().c_str());
     }
     else {
-      header->AddSimpleItem(curOffset, 2, "NULL");
+      header->addSimpleChild(curOffset, 2, "NULL");
     }
     curOffset += 2;
   }

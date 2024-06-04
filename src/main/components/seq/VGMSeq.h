@@ -32,6 +32,7 @@ class VGMSeq : public VGMFile {
   ~VGMSeq() override;
 
   Icon GetIcon() override { return ICON_SEQ; }
+  VGMItem* GetItemFromOffset(uint32_t offset, bool matchStartOffset);
 
   bool LoadVGMFile() override;
   bool Load() override;              // Function to load all the information about the sequence

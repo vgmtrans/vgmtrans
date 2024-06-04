@@ -14,9 +14,9 @@ VGMSeqSection::VGMSeqSection(VGMMultiSectionSeq *parentFile,
                              uint32_t theLength,
                              const std::string& name,
                              EventColor color)
-    : VGMContainerItem(parentFile, theOffset, theLength, name, color),
+    : VGMItem(parentFile, theOffset, theLength, name, color),
       parentSeq(parentFile) {
-  AddContainer<SeqTrack>(aTracks);
+  addChildren(aTracks);
 }
 
 VGMSeqSection::~VGMSeqSection() {

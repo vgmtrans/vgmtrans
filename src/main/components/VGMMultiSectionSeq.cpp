@@ -16,8 +16,8 @@ VGMMultiSectionSeq::VGMMultiSectionSeq(const std::string& format,
                                        std::string name)
     : VGMSeq(format, file, offset, length, std::move(name)),
       dwStartOffset(offset) {
-  AddContainer<VGMSeqSection>(aSections);
-  RemoveContainer<SeqTrack>(aTracks);
+  addChildren(aSections);
+  // RemoveContainer<SeqTrack>(aTracks);
 }
 
 VGMMultiSectionSeq::~VGMMultiSectionSeq() {

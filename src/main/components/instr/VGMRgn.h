@@ -11,7 +11,7 @@ class VGMSampColl;
 // VGMRgn
 // ******
 
-class VGMRgn : public VGMContainerItem {
+class VGMRgn : public VGMItem {
  public:
   VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::string name = "Region");
   VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, uint8_t velLow,

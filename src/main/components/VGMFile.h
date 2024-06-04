@@ -11,7 +11,7 @@
 class VGMColl;
 class Format;
 
-class VGMFile : public VGMContainerItem {
+class VGMFile : public VGMItem {
 public:
   VGMFile(std::string format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
           std::string name = "VGM File");
@@ -66,7 +66,7 @@ private:
 // VGMHeader
 // *********
 
-class VGMHeader : public VGMContainerItem {
+class VGMHeader : public VGMItem {
 public:
   VGMHeader(const VGMItem *parItem, uint32_t offset = 0, uint32_t length = 0,
             const std::string &name = "Header");

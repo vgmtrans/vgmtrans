@@ -9,6 +9,8 @@
 #include "Helpers.h"
 #include "UIHelpers.h"
 #include "LambdaEventFilter.h"
+#include "SeqTrack.h"
+
 #include <QFontDatabase>
 #include <QPainter>
 #include <QApplication>
@@ -206,7 +208,7 @@ bool HexView::event(QEvent *e) {
       return true;
     }
 
-    if (VGMItem* item = vgmfile->GetItemFromOffset(offset, false)) {
+    if (VGMItem* item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(offset, false)) {
       auto description = getFullDescriptionForTooltip(item);
       if (!description.isEmpty()) {
         QToolTip::showText(helpevent->globalPos(), description, this);
@@ -320,7 +322,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
     selectNewOffset:
       if (newOffset >= vgmfile->dwOffset && newOffset < (vgmfile->dwOffset + vgmfile->unLength)) {
         selectedOffset = newOffset;
-        if (auto item = vgmfile->GetItemFromOffset(newOffset, false)) {
+        if (auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(newOffset, false)) {
           selectionChanged(item);
         }
       }
@@ -388,8 +390,8 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
         pixmapPainter.save();
         pixmapPainter.translate(0, line * lineHeight);
 
-        // If the selected item is a container item, then we need to draw all of its sub items.
-        if (selectedItem->IsContainerItem()) {
+        // If the selected item has children, draw them.
+        if (!selectedItem->children().empty()) {
           int startAddress = selectedItem->dwOffset + offsetIntoEvent;
           int endAddress = selectedItem->dwOffset + selectedItem->unLength;
           printData(pixmapPainter, startAddress, endAddress);
@@ -491,7 +493,8 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) con
   int emptyAddressBytes = 0;
   auto offset = 0;
   while (offset < bytesToPrint) {
-    if (auto item = vgmfile->GetItemFromOffset(startAddress + offset, false)) {
+    // if (auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(startAddress + offset, false)) {
+    if (auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(startAddress + offset, false)) {
       if (emptyAddressBytes > 0) {
         int dataOffset = offset - emptyAddressBytes;
         int col = startCol + dataOffset;
@@ -724,7 +727,7 @@ void HexView::mousePressEvent(QMouseEvent *event) {
     }
 
     this->selectedOffset = offset;
-    auto item = vgmfile->GetItemFromOffset(offset, false);
+    auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(offset, false);
     if (item == selectedItem) {
       selectionChanged(nullptr);
     } else {
@@ -758,7 +761,7 @@ void HexView::mouseMoveEvent(QMouseEvent *event) {
         (selectedOffset < (selectedItem->dwOffset + selectedItem->unLength))) {
       return;
     }
-    auto item = vgmfile->GetItemFromOffset(offset, false);
+    auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(offset, false);
     if (item != selectedItem) {
       selectionChanged(item);
     }

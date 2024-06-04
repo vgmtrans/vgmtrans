@@ -31,18 +31,18 @@ bool KonamiPS1Seq::GetHeaderInfo() {
     return false;
   }
 
-  VGMHeader *header = AddHeader(dwOffset, kHeaderSize);
+  VGMHeader *header = addHeader(dwOffset, kHeaderSize);
   header->AddSig(dwOffset, 4);
-  header->AddSimpleItem(dwOffset + kOffsetToFileSize, 4, "Size");
-  header->AddSimpleItem(dwOffset + kOffsetToTimebase, 4, "Timebase");
+  header->addSimpleChild(dwOffset + kOffsetToFileSize, 4, "Size");
+  header->addSimpleChild(dwOffset + kOffsetToTimebase, 4, "Timebase");
   SetPPQN(GetWord(dwOffset + kOffsetToTimebase));
-  header->AddSimpleItem(dwOffset + kOffsetToTrackCount, 4, "Number Of Tracks");
+  header->addSimpleChild(dwOffset + kOffsetToTrackCount, 4, "Number Of Tracks");
 
   uint32_t numTracks = GetWord(dwOffset + kOffsetToTrackCount);
-  VGMHeader *trackSizeHeader = AddHeader(dwOffset + kHeaderSize, 2 * numTracks, "Track Size");
+  VGMHeader *trackSizeHeader = addHeader(dwOffset + kHeaderSize, 2 * numTracks, "Track Size");
   for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
     std::string itemName = fmt::format("Track {} size", trackIndex + 1);
-    trackSizeHeader->AddSimpleItem(trackSizeHeader->dwOffset + (trackIndex * 2), 2, itemName);
+    trackSizeHeader->addSimpleChild(trackSizeHeader->dwOffset + (trackIndex * 2), 2, itemName);
   }
 
   return true;

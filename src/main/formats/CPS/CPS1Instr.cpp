@@ -53,7 +53,7 @@ CPS1SampColl::CPS1SampColl(RawFile *file,
 
 
 bool CPS1SampColl::GetHeaderInfo() {
-  auto header = AddHeader(8, 0x400-8, "Sample Pointers");
+  auto header = addHeader(8, 0x400-8, "Sample Pointers");
 
   int i = 1;
   for (int offset = 8; offset < 0x400; offset += 8) {
@@ -64,8 +64,8 @@ bool CPS1SampColl::GetHeaderInfo() {
     auto endStr = fmt::format("Sample {} End", i);
     i += 1;
 
-    header->AddSimpleItem(offset, 3, startStr);
-    header->AddSimpleItem(offset+3, 3, endStr);
+    header->addSimpleChild(offset, 3, startStr);
+    header->addSimpleChild(offset+3, 3, endStr);
   }
   return true;
 }

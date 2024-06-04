@@ -40,7 +40,7 @@ void SuzukiSnesSeq::ResetVars() {
 bool SuzukiSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
 
   // skip unknown stream
@@ -52,12 +52,12 @@ bool SuzukiSnesSeq::GetHeaderInfo() {
 
       uint8_t firstByte = GetByte(curOffset);
       if (firstByte >= 0x80) {
-        header->AddSimpleItem(curOffset, 1, "Unknown Items End");
+        header->addSimpleChild(curOffset, 1, "Unknown Items End");
         curOffset++;
         break;
       }
       else {
-        header->AddUnknownItem(curOffset, 5);
+        header->addUnknownChild(curOffset, 5);
         curOffset += 5;
       }
     }
@@ -70,13 +70,13 @@ bool SuzukiSnesSeq::GetHeaderInfo() {
     if (addrTrackStart != 0) {
       std::stringstream trackName;
       trackName << "Track Pointer " << (trackIndex + 1);
-      header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+      header->addSimpleChild(curOffset, 2, trackName.str().c_str());
 
       aTracks.push_back(new SuzukiSnesTrack(this, addrTrackStart));
     }
     else {
       // example: Super Mario RPG - Where Am I Going?
-      header->AddSimpleItem(curOffset, 2, "NULL");
+      header->addSimpleChild(curOffset, 2, "NULL");
     }
 
     curOffset += 2;

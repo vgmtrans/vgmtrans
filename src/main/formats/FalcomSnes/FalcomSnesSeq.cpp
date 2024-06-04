@@ -59,7 +59,7 @@ void FalcomSnesSeq::ResetVars() {
 bool FalcomSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
   if (dwOffset + 0x20 > 0x10000) {
     return false;
   }
@@ -70,15 +70,15 @@ bool FalcomSnesSeq::GetHeaderInfo() {
     if (ofsTrackStart != 0) {
       std::stringstream trackName;
       trackName << "Track Pointer " << (trackIndex + 1);
-      header->AddSimpleItem(curOffset, 2, trackName.str());
+      header->addSimpleChild(curOffset, 2, trackName.str());
     }
     else {
-      header->AddSimpleItem(curOffset, 2, "NULL");
+      header->addSimpleChild(curOffset, 2, "NULL");
     }
     curOffset += 2;
   }
 
-  header->AddSimpleItem(dwOffset + 0x18, 7, "Duration Table");
+  header->addSimpleChild(dwOffset + 0x18, 7, "Duration Table");
   for (uint8_t offset = 0; offset < 7; offset++) {
     NoteDurTable.push_back(GetByte(dwOffset + 0x18 + offset));
   }

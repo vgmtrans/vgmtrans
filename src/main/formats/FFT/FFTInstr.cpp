@@ -45,19 +45,19 @@ bool WdsInstrSet::GetHeaderInfo() {
   setName(fmt::format("wds {:d}", GetID()));
 
   //ヘッダーobjectの生成
-  VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(WdsHdr));
+  VGMHeader *wdsHeader = addHeader(dwOffset, sizeof(WdsHdr));
   wdsHeader->AddSig(dwOffset, sizeof(long));
-  wdsHeader->AddUnknownItem(dwOffset + 0x04, sizeof(long));
-  wdsHeader->AddSimpleItem(dwOffset + 0x08, sizeof(long), "Header size? (0)");
-  wdsHeader->AddUnknownItem(dwOffset + 0x0C, sizeof(long));
-  wdsHeader->AddSimpleItem(dwOffset + 0x10, sizeof(long), "Header size? (1)");
-  wdsHeader->AddSimpleItem(dwOffset + 0x14, sizeof(long), "AD-PCM body(.VB) size");
-  wdsHeader->AddSimpleItem(dwOffset + 0x18, sizeof(long), "Header size? (2)");
-  wdsHeader->AddSimpleItem(dwOffset + 0x1C, sizeof(long), "Number of Instruments");
-  wdsHeader->AddSimpleItem(dwOffset + 0x20, sizeof(long), "Bank number");
-  wdsHeader->AddUnknownItem(dwOffset + 0x24, sizeof(long));
-  wdsHeader->AddUnknownItem(dwOffset + 0x28, sizeof(long));
-  wdsHeader->AddUnknownItem(dwOffset + 0x2C, sizeof(long));
+  wdsHeader->addUnknownChild(dwOffset + 0x04, sizeof(long));
+  wdsHeader->addSimpleChild(dwOffset + 0x08, sizeof(long), "Header size? (0)");
+  wdsHeader->addUnknownChild(dwOffset + 0x0C, sizeof(long));
+  wdsHeader->addSimpleChild(dwOffset + 0x10, sizeof(long), "Header size? (1)");
+  wdsHeader->addSimpleChild(dwOffset + 0x14, sizeof(long), "AD-PCM body(.VB) size");
+  wdsHeader->addSimpleChild(dwOffset + 0x18, sizeof(long), "Header size? (2)");
+  wdsHeader->addSimpleChild(dwOffset + 0x1C, sizeof(long), "Number of Instruments");
+  wdsHeader->addSimpleChild(dwOffset + 0x20, sizeof(long), "Bank number");
+  wdsHeader->addUnknownChild(dwOffset + 0x24, sizeof(long));
+  wdsHeader->addUnknownChild(dwOffset + 0x28, sizeof(long));
+  wdsHeader->addUnknownChild(dwOffset + 0x2C, sizeof(long));
 
   //波形objectの生成
   sampColl = new PSXSampColl(FFTFormat::name, this, dwOffset + hdr.szHeader1, hdr.szSampColl);

@@ -42,13 +42,13 @@ void PandoraBoxSnesSeq::ResetVars() {
 bool PandoraBoxSnesSeq::GetHeaderInfo() {
   uint32_t curOffset;
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
   if (dwOffset + 0x20 > 0x10000) {
     return false;
   }
 
-  AddSimpleItem(dwOffset + 6, 1, "Tempo");
-  AddSimpleItem(dwOffset + 7, 1, "Timebase");
+  addSimpleChild(dwOffset + 6, 1, "Tempo");
+  addSimpleChild(dwOffset + 7, 1, "Timebase");
 
   uint8_t timebase = GetByte(dwOffset + 7);
   assert((timebase % 4) == 0);
@@ -60,10 +60,10 @@ bool PandoraBoxSnesSeq::GetHeaderInfo() {
     if (ofsTrackStart != 0xffff) {
       std::stringstream trackName;
       trackName << "Track Pointer " << (trackIndex + 1);
-      header->AddSimpleItem(curOffset, 2, trackName.str());
+      header->addSimpleChild(curOffset, 2, trackName.str());
     }
     else {
-      header->AddSimpleItem(curOffset, 2, "NULL");
+      header->addSimpleChild(curOffset, 2, "NULL");
     }
     curOffset += 2;
   }
