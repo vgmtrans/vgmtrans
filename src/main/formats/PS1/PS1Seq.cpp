@@ -9,7 +9,7 @@
 
 DECLARE_FORMAT(PS1)
 
-PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, file, offset) {
+PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, file, offset, "PS1 Seq") {
   UseReverb();
   //bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
@@ -19,8 +19,6 @@ PS1Seq::~PS1Seq() {
 
 
 bool PS1Seq::GetHeaderInfo() {
-  name() = "PS1 SEQ";
-
   SetPPQN(GetShortBE(offset() + 8));
   nNumTracks = 16;
 

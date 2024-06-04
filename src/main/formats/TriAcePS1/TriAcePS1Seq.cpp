@@ -13,18 +13,12 @@ DECLARE_FORMAT(TriAcePS1);
 
 TriAcePS1Seq::TriAcePS1Seq(RawFile *file, uint32_t offset, const std::string &name)
     : VGMSeq(TriAcePS1Format::name, file, offset, 0, name) {
-  addChildren(aScorePatterns);
   UseLinearAmplitudeScale();
   UseReverb();
   AlwaysWriteInitialPitchBendRange(12, 0);
 }
 
-TriAcePS1Seq::~TriAcePS1Seq() {
-  DeleteVect<TriAcePS1ScorePattern>(aScorePatterns);
-}
-
-
-bool TriAcePS1Seq::GetHeaderInfo(void) {
+bool TriAcePS1Seq::GetHeaderInfo() {
   SetPPQN(0x30);
 
   header = addHeader(dwOffset, 0xD5);
@@ -38,7 +32,7 @@ bool TriAcePS1Seq::GetHeaderInfo(void) {
   return true;
 }
 
-bool TriAcePS1Seq::GetTrackPointers(void) {
+bool TriAcePS1Seq::GetTrackPointers() {
   VGMHeader *TrkInfoHeader = header->addHeader(dwOffset + 0x16, 6 * 32, "Track Info Blocks");
 
 
@@ -52,8 +46,16 @@ bool TriAcePS1Seq::GetTrackPointers(void) {
   return true;
 }
 
-void TriAcePS1Seq::ResetVars(void) {
+void TriAcePS1Seq::ResetVars() {
   VGMSeq::ResetVars();
+}
+
+bool TriAcePS1Seq::PostLoad() {
+  bool success = VGMSeq::PostLoad();
+  if (readMode == READMODE_ADD_TO_UI) {
+    addChildren(aScorePatterns);
+  }
+  return success;
 }
 
 // **************
@@ -86,7 +88,6 @@ void TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
   }
   AddEndOfTrack(scorePatternPtrOffset, 2);
   unLength = scorePatternPtrOffset + 2 - dwOffset;
-  return;
 }
 
 

@@ -85,7 +85,7 @@ public:
   friend bool operator<(VGMItem &item1, VGMItem &item2);
   friend bool operator>=(VGMItem &item1, VGMItem &item2);
 
-  [[nodiscard]] std::string name() const noexcept { return m_name; }
+  [[nodiscard]] const std::string& name() const noexcept { return m_name; }
   void setName(const std::string& newName) { m_name = newName; }
 
   [[nodiscard]] VGMFile* vgmFile() const { return m_vgmfile; }
@@ -132,6 +132,8 @@ protected:
   [[nodiscard]] uint16_t GetShortBE(uint32_t offset) const;
   [[nodiscard]] uint32_t GetWordBE(uint32_t offset) const;
   bool IsValidOffset(uint32_t offset) const;
+  // FIXME: clearChildren() is a workaround for VGMSeqNoTrks' multiple inheritance diamond problem
+  void clearChildren() { m_children.clear(); }
 
 public:
   uint32_t dwOffset;  // offset in the pDoc data buffer

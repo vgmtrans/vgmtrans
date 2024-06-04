@@ -26,23 +26,20 @@ void VGMSeqNoTrks::ResetVars() {
 
 // LoadMain() - loads all sequence data into the class
 bool VGMSeqNoTrks::LoadMain() {
-  this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_ADD_TO_UI;
+  this->SeqTrack::readMode = READMODE_ADD_TO_UI;
+  this->VGMSeq::readMode = READMODE_ADD_TO_UI;
   if (!GetHeaderInfo())
     return false;
 
   if (!LoadEvents())
     return false;
 
-
-  // VGMSeq::children() = std::move(SeqTrack::children());
-  // std::move_append(a.vec.begin(), a.vec.end(), b.vec.begin(), b.vec.end());
-  // VGMSeq::m_children.insert(VGMSeq::m_children.end(),std::make_move_iterator(SeqTrack::m_children.begin()),
-    // std::make_move_iterator(SeqTrack::m_children.end()));
-  // std::move(SeqTrack::m_children.begin(), SeqTrack::m_children.end(), std::back_inserter(VGMSeq::m_children));
-  // m_children.assign(section->aTracks.begin(), section->aTracks.end());
-  // std::move_iterator<decltype(SeqTrack::m_children.begin())> move_begin(SeqTrack::m_children.begin());
-  // std::move_iterator<decltype(SeqTrack::m_children.end())> move_end(SeqTrack::m_children.end());
-  // VGMSeq::m_children.insert(VGMSeq::m_children.end(), move_begin, move_end);
+  // Workaround for this VGMSeqNoTrks' multiple inheritance diamond problem. Both VGMSeq and
+  // SeqTrack have their own m_children fields. VGMSeq is the one we care about. We need to transfer
+  // SeqTrack::m_children into VGMSeq::m_children and then clear it from SeqTrack so that their
+  // destructors don't doubly delete the children.
+  VGMSeq::addChildren(SeqTrack::children());
+  SeqTrack::clearChildren();
 
   if (length() == 0) {
     VGMSeq::SetGuessedLength();

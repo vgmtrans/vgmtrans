@@ -200,10 +200,7 @@ bool SonyPS2InstrSet::GetInstrPointers() {
   VGMHeader *progParamsHdr = progCkHdr->addHeader(curOffset + 16 + (progCk.maxProgramNumber + 1) * sizeof(uint32_t),
                                                   0/*(progCk.maxProgramNumber+1)*sizeof(SonyPS2Instr::ProgParam)*/,
                                                   "Program Params");
-
-  // this->RemoveContainer(aInstrs);            //Remove the instrument vector as a contained item of the VGMInstr, instead
-  progParamsHdr->addChildren(aInstrs);    //it will be the contained item of the "Program Params" item.  Thus showing
-  //up in the treeview appropriately
+  progParamsHdr->addChildren(aInstrs);
 
   for (uint32_t i = 0; i <= progCk.maxProgramNumber; i++) {
     progParamOffsetHdr->addSimpleChild(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
