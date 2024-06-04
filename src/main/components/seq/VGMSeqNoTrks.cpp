@@ -33,10 +33,19 @@ bool VGMSeqNoTrks::LoadMain() {
   if (!LoadEvents())
     return false;
 
+
+  // VGMSeq::children() = std::move(SeqTrack::children());
+  // std::move_append(a.vec.begin(), a.vec.end(), b.vec.begin(), b.vec.end());
+  // VGMSeq::m_children.insert(VGMSeq::m_children.end(),std::make_move_iterator(SeqTrack::m_children.begin()),
+    // std::make_move_iterator(SeqTrack::m_children.end()));
+  // std::move(SeqTrack::m_children.begin(), SeqTrack::m_children.end(), std::back_inserter(VGMSeq::m_children));
+  // m_children.assign(section->aTracks.begin(), section->aTracks.end());
+  // std::move_iterator<decltype(SeqTrack::m_children.begin())> move_begin(SeqTrack::m_children.begin());
+  // std::move_iterator<decltype(SeqTrack::m_children.end())> move_end(SeqTrack::m_children.end());
+  // VGMSeq::m_children.insert(VGMSeq::m_children.end(), move_begin, move_end);
+
   if (length() == 0) {
     VGMSeq::SetGuessedLength();
-    //		length() = (aEvents.back()->dwOffset + aEvents.back()->unLength) - offset();
-    // length == to the end of the last event
   }
 
   return true;

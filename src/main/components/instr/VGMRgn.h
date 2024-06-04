@@ -16,7 +16,6 @@ class VGMRgn : public VGMItem {
   VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::string name = "Region");
   VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, uint8_t velLow,
          uint8_t velHigh, int sampNum, std::string name = "Region");
-  ~VGMRgn() override;
 
   virtual bool LoadRgn() { return true; }
 
@@ -87,8 +86,6 @@ class VGMRgn : public VGMItem {
   double sustain_time;        //in seconds (we don't support positive rate here, as is possible on psx)
   uint16_t release_transform;
   double release_time;        //in seconds
-
-  std::vector<VGMRgnItem *> items;
 };
 
 

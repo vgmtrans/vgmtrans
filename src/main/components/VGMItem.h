@@ -110,7 +110,7 @@ public:
   virtual Icon GetIcon() { return ICON_BINARY; }
   virtual void AddToUI(VGMItem *parent, void *UI_specific);
 
-  std::vector<VGMItem*> children() { return m_children; }
+  const std::vector<VGMItem*>& children() { return m_children; }
   VGMItem* addChild(VGMItem* child);
   VGMItem* addSimpleChild(uint32_t offset, uint32_t length, const std::string &name);
   VGMItem* addUnknownChild(uint32_t offset, uint32_t length);

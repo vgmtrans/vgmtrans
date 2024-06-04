@@ -15,7 +15,6 @@ class VGMSampColl : public VGMFile {
               std::string theName = "VGMSampColl");
   VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset, uint32_t offset,
                 uint32_t length = 0, std::string theName = "VGMSampColl");
-  ~VGMSampColl() override;
   void UseInstrSet(VGMInstrSet *instrset) { parInstrSet = instrset; }
 
   bool LoadVGMFile() override;
