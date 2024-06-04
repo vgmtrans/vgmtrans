@@ -24,12 +24,6 @@ SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::st
       bDetermineTrackLengthEventByEvent(false),
       bWriteGenericEventAsTextEvent(false) {
   SeqTrack::ResetVars();
-
-  // addChildren(aEvents);
-}
-
-SeqTrack::~SeqTrack() {
-  DeleteVect<SeqEvent>(aEvents);
 }
 
 void SeqTrack::ResetVars() {
@@ -54,15 +48,6 @@ void SeqTrack::ResetVisitedAddresses() {
   VisitedAddresses.clear();
   VisitedAddresses.reserve(8192);
   VisitedAddressMax = 0;
-}
-
-VGMItem* SeqTrack::GetItemFromOffset(uint32_t offset, bool matchStartOffset) {
-   for (const auto child : children()) {
-     if (VGMItem *foundItem = child->GetItemFromOffset(offset, matchStartOffset))
-       return foundItem;
-   }
-
-   return nullptr;
 }
 
 bool SeqTrack::ReadEvent() {
@@ -143,10 +128,6 @@ void SeqTrack::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
       totalTicks = GetTime();
     }
   }
-}
-
-void SeqTrack::LoadTrackPostProcessing() {
-  addChildren(aEvents);
 }
 
 void SeqTrack::SetChannelAndGroupFromTrkNum(int theTrackNum) {
@@ -278,10 +259,7 @@ void SeqTrack::AddEvent(SeqEvent *pSeqEvent) {
   if (readMode != READMODE_ADD_TO_UI)
     return;
 
-  //if (!bInLoop)
-  aEvents.push_back(pSeqEvent);
-  //else
-  //	delete pSeqEvent;
+  addChild(pSeqEvent);
 
   // care for a case where the new event is located before the start address
   // (example: Donkey Kong Country - Map, Track 7 of 8)

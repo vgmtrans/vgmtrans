@@ -13,7 +13,6 @@ class VGMSeqSection
                 uint32_t theLength = 0,
                 const std::string& name = "Section",
                 EventColor color = CLR_HEADER);
-  ~VGMSeqSection() override;
 
   virtual bool Load();
   virtual bool GetTrackPointers();

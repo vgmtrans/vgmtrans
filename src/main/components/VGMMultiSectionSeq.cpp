@@ -16,15 +16,6 @@ VGMMultiSectionSeq::VGMMultiSectionSeq(const std::string& format,
                                        std::string name)
     : VGMSeq(format, file, offset, length, std::move(name)),
       dwStartOffset(offset) {
-  addChildren(aSections);
-  // RemoveContainer<SeqTrack>(aTracks);
-}
-
-VGMMultiSectionSeq::~VGMMultiSectionSeq() {
-  // Clear all track pointers to prevent delete, they must be aliases of section tracks
-  aTracks.clear();
-
-  DeleteVect<VGMSeqSection>(aSections);
 }
 
 void VGMMultiSectionSeq::ResetVars() {
@@ -64,20 +55,31 @@ bool VGMMultiSectionSeq::LoadTracks(ReadMode readMode, uint32_t stopTime) {
     }
   }
 
+  return PostLoad();
+}
+
+bool VGMMultiSectionSeq::PostLoad() {
   if (readMode == READMODE_ADD_TO_UI) {
+    std::ranges::sort(aInstrumentsUsed);
+
+    for (const auto& track : aTracks) {
+      track->sortChildrenByOffset();
+    }
+    for (const auto& section : aSections) {
+      section->addChildren(section->aTracks);
+    }
+    addChildren(aSections);
     SetGuessedLength();
     if (unLength == 0) {
       return false;
     }
+  } else if (readMode == READMODE_CONVERT_TO_MIDI) {
+    midi->Sort();
   }
 
-  bool succeeded = true;
-  if (!PostLoad()) {
-    succeeded = false;
-  }
-
-  return succeeded;
+  return true;
 }
+
 
 bool VGMMultiSectionSeq::LoadSection(VGMSeqSection *section, uint32_t stopTime) {
   // reset variables

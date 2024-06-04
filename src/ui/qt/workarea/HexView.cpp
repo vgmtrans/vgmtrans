@@ -208,7 +208,7 @@ bool HexView::event(QEvent *e) {
       return true;
     }
 
-    if (VGMItem* item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(offset, false)) {
+    if (VGMItem* item = vgmfile->GetItemFromOffset(offset, false)) {
       auto description = getFullDescriptionForTooltip(item);
       if (!description.isEmpty()) {
         QToolTip::showText(helpevent->globalPos(), description, this);
@@ -322,7 +322,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
     selectNewOffset:
       if (newOffset >= vgmfile->dwOffset && newOffset < (vgmfile->dwOffset + vgmfile->unLength)) {
         selectedOffset = newOffset;
-        if (auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(newOffset, false)) {
+        if (auto item = vgmfile->GetItemFromOffset(newOffset, false)) {
           selectionChanged(item);
         }
       }
@@ -494,7 +494,7 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) con
   auto offset = 0;
   while (offset < bytesToPrint) {
     // if (auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(startAddress + offset, false)) {
-    if (auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(startAddress + offset, false)) {
+    if (auto item = vgmfile->GetItemFromOffset(startAddress + offset, false)) {
       if (emptyAddressBytes > 0) {
         int dataOffset = offset - emptyAddressBytes;
         int col = startCol + dataOffset;
@@ -727,7 +727,7 @@ void HexView::mousePressEvent(QMouseEvent *event) {
     }
 
     this->selectedOffset = offset;
-    auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(offset, false);
+    auto item = vgmfile->GetItemFromOffset(offset, false);
     if (item == selectedItem) {
       selectionChanged(nullptr);
     } else {
@@ -761,7 +761,7 @@ void HexView::mouseMoveEvent(QMouseEvent *event) {
         (selectedOffset < (selectedItem->dwOffset + selectedItem->unLength))) {
       return;
     }
-    auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(offset, false);
+    auto item = vgmfile->GetItemFromOffset(offset, false);
     if (item != selectedItem) {
       selectionChanged(item);
     }

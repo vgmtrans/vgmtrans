@@ -9,7 +9,6 @@
 VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, const std::string& name)
     : VGMSeq(format, file, offset, 0, name), SeqTrack(this) {
   VGMSeqNoTrks::ResetVars();
-  VGMSeq::addChildren(aEvents);
 }
 
 VGMSeqNoTrks::~VGMSeqNoTrks() = default;

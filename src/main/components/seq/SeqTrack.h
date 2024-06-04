@@ -21,21 +21,19 @@ enum ReadMode : uint8_t;
 class SeqTrack : public VGMItem {
  public:
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::string name = "Track");
-  ~SeqTrack() override;
+
   virtual void ResetVars();
   void ResetVisitedAddresses();
 
   Icon GetIcon() override { return ICON_TRACK; };
-  VGMItem* GetItemFromOffset(uint32_t offset, bool matchStartOffset) override;
 
   virtual bool LoadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
   virtual void LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
-  virtual void LoadTrackPostProcessing();
   virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
   virtual void AddInitialMidiEvents(int trackNum);
   virtual bool ReadEvent();
-  virtual void OnTickBegin() { };
-  virtual void OnTickEnd() { };
+  virtual void OnTickBegin() {}
+  virtual void OnTickEnd() {}
 
   uint32_t GetTime() const;
   void SetTime(uint32_t NewDelta) const;
@@ -174,8 +172,6 @@ class SeqTrack : public VGMItem {
   bool active;            //indicates whether a VGMSeq is loading this track
   long totalTicks;
   int foreverLoops;
-
-  std::vector<SeqEvent *> aEvents;
 
  protected:
   bool bMonophonic;

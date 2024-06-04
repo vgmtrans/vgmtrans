@@ -10,7 +10,6 @@ class VGMMultiSectionSeq : public VGMSeq {
                      uint32_t offset,
                      uint32_t length = 0,
                      std::string name = "VGM Sequence");
-  ~VGMMultiSectionSeq() override;
 
   void ResetVars() override;
   bool LoadMain() override;
@@ -21,6 +20,7 @@ class VGMMultiSectionSeq : public VGMSeq {
 
  protected:
   bool LoadTracks(ReadMode readMode, uint32_t stopTime = 1000000) override;
+  bool PostLoad() override;
   virtual bool LoadSection(VGMSeqSection *section, uint32_t stopTime = 1000000);
   virtual bool IsOffsetUsed(uint32_t offset);
   virtual bool ReadEvent(long stopTime);

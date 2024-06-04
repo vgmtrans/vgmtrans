@@ -86,6 +86,8 @@ bool CPSSeq::GetTrackPointers() {
 }
 
 bool CPSSeq::PostLoad() {
+  bool succeeded = VGMSeq::PostLoad();
+
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return true;
 
@@ -261,6 +263,5 @@ bool CPSSeq::PostLoad() {
     }
   }
 
-
-  return VGMSeq::PostLoad();
+  return succeeded;
 }
