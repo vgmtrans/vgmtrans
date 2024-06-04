@@ -407,6 +407,12 @@ bool CPSTrackV1::ReadEvent() {
           jump = curOffset + 2 + static_cast<int16_t>(GetShortBE(curOffset));
         }
         bool should_continue = AddLoopForever(beginOffset, 3);
+        if (readMode == READMODE_ADD_TO_UI) {
+          curOffset += 2;
+          if (GetByte(curOffset) == 0x17) {
+            AddEndOfTrack(curOffset, 1);
+          }
+        }
         curOffset = jump;
         return should_continue;
       }
