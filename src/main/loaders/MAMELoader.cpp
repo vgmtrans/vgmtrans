@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <tinyxml.h>
+#include <tinyxml2.h>
 #include <spdlog/fmt/fmt.h>
 #include <cstdlib>
 #include <ranges>
@@ -57,21 +57,21 @@ MAMELoader::~MAMELoader() {
 }
 
 int MAMELoader::LoadXML() {
-    const std::string xmlFilePath = pRoot->UI_GetResourceDirPath() + "mame_roms.xml";
+  const std::string xmlFilePath = pRoot->UI_GetResourceDirPath() + "mame_roms.xml";
 
-  TiXmlDocument doc(xmlFilePath);
-  if (!doc.LoadFile())  // if loading the xml file fails
+  tinyxml2::XMLDocument doc;
+  if (doc.LoadFile(xmlFilePath.c_str()) != tinyxml2::XML_SUCCESS)  // if loading the xml file fails
     return 1;
 
-  TiXmlElement* rootElmt = doc.FirstChildElement();
-  const std::string& className = rootElmt->ValueStr();
+  tinyxml2::XMLElement* rootElmt = doc.FirstChildElement();
+  std::string className = rootElmt->Name();
   if (className != "romlist")
     return 1;
 
   /// for all "game" elements
-  for (TiXmlElement* gameElmt = rootElmt->FirstChildElement(); gameElmt != nullptr;
+  for (tinyxml2::XMLElement* gameElmt = rootElmt->FirstChildElement(); gameElmt != nullptr;
        gameElmt = gameElmt->NextSiblingElement()) {
-    if (gameElmt->ValueStr() != "game")
+    if (std::string(gameElmt->Name()) != "game")
       return 1;
     MAMEGame* gameentry = LoadGameEntry(gameElmt);
     if (!gameentry)
@@ -81,26 +81,30 @@ int MAMELoader::LoadXML() {
   return 0;
 }
 
-MAMEGame* MAMELoader::LoadGameEntry(TiXmlElement* gameElmt) {
+MAMEGame* MAMELoader::LoadGameEntry(tinyxml2::XMLElement* gameElmt) {
   MAMEGame* gameentry = new MAMEGame;
-  std::string gamename, fmtVersionStr;
+  const char* gamename = nullptr, *format = nullptr, *fmtVersionStr = nullptr;
 
-  if (gameElmt->QueryValueAttribute("name", &gameentry->name) != TIXML_SUCCESS) {
+  if (gameElmt->QueryStringAttribute("name", &gamename) != tinyxml2::XML_SUCCESS) {
     delete gameentry;
     return nullptr;
   }
-  if (gameElmt->QueryValueAttribute("format", &gameentry->format) != TIXML_SUCCESS) {
+  if (gameElmt->QueryStringAttribute("format", &format) != tinyxml2::XML_SUCCESS) {
     delete gameentry;
     return nullptr;
   }
-  if (gameElmt->QueryValueAttribute("fmt_version", &gameentry->fmt_version_str) != TIXML_SUCCESS) {
+  if (gameElmt->QueryStringAttribute("fmt_version", &fmtVersionStr) != tinyxml2::XML_SUCCESS)
     gameentry->fmt_version_str = "";
-  }
+  else
+    gameentry->fmt_version_str = fmtVersionStr;
+
+  gameentry->name = gamename;
+  gameentry->format = format;
 
   // Load rom groups
-  for (TiXmlElement* romgroupElmt = gameElmt->FirstChildElement(); romgroupElmt != nullptr;
+  for (tinyxml2::XMLElement* romgroupElmt = gameElmt->FirstChildElement(); romgroupElmt != nullptr;
        romgroupElmt = romgroupElmt->NextSiblingElement()) {
-    if (romgroupElmt->ValueStr() != "romgroup") {
+    if (std::string(romgroupElmt->Name()) != "romgroup") {
       delete gameentry;
       return nullptr;
     }
@@ -112,33 +116,42 @@ MAMEGame* MAMELoader::LoadGameEntry(TiXmlElement* gameElmt) {
   return gameentry;
 }
 
-int MAMELoader::LoadRomGroupEntry(TiXmlElement* romgroupElmt, MAMEGame* gameentry) {
+int MAMELoader::LoadRomGroupEntry(tinyxml2::XMLElement* romgroupElmt, MAMEGame* gameentry) {
   MAMERomGroup romgroupentry;
+  const char* entry_type = nullptr, *load_method2 = nullptr, *load_order2 = nullptr;
 
   // First, get the "type" and "load_method" attributes.  If they don't exist, we return with an
   // error.
-  if (romgroupElmt->QueryValueAttribute("type", &romgroupentry.type) != TIXML_SUCCESS)
+  if (romgroupElmt->QueryStringAttribute("type", &entry_type) != tinyxml2::XML_SUCCESS)
     return 1;
+  else
+    romgroupentry.type = entry_type;
 
   std::string load_method;
-  if (romgroupElmt->QueryValueAttribute("load_method", &load_method) != TIXML_SUCCESS)
+  if (romgroupElmt->QueryStringAttribute("load_method", &load_method2) != tinyxml2::XML_SUCCESS)
     return 1;
+  else
+    load_method = load_method2;
 
   std::string load_order;
-  if (romgroupElmt->QueryValueAttribute("load_order", &load_order) != TIXML_SUCCESS)
+  if (romgroupElmt->QueryStringAttribute("load_order", &load_order2) != tinyxml2::XML_SUCCESS)
     load_order = "normal";
+  else
+    load_order = load_order2;
 
   // Read the encryption type string, if it exists
-  romgroupElmt->QueryValueAttribute("encryption", &romgroupentry.encryption);
+  const char* entry_encryption = nullptr;
+  romgroupElmt->QueryStringAttribute("encryption", &entry_encryption);
+  if (entry_encryption != nullptr)
+    romgroupentry.encryption = entry_encryption;
 
   // Iterate through the attributes of the romgroup element, recording any user-defined values.
-  for (TiXmlAttribute* attr = romgroupElmt->FirstAttribute(); attr; attr = attr->Next()) {
-    // NameTStr() is returning an std::string because we have defined TIXML_USE_STL
-    const std::string& attrName = attr->NameTStr();
+  for (const tinyxml2::XMLAttribute* attr = romgroupElmt->FirstAttribute(); attr; attr = attr->Next()) {
+    const std::string attrName = attr->Name();
     // Ignore the attribute if it is "type" or "load_method"; we already dealt with those, they
     // are mandated.
     if (attrName.compare("type") && attrName.compare("load_method"))
-      romgroupentry.attributes[attrName] = attr->ValueStr();
+      romgroupentry.attributes[attrName] = attr->Value();
   }
 
   if (load_method == "append")
@@ -160,9 +173,9 @@ int MAMELoader::LoadRomGroupEntry(TiXmlElement* romgroupElmt, MAMEGame* gameentr
     return 1;
 
   // load rom entries
-  for (TiXmlElement* romElmt = romgroupElmt->FirstChildElement(); romElmt != nullptr;
+  for (tinyxml2::XMLElement* romElmt = romgroupElmt->FirstChildElement(); romElmt != nullptr;
        romElmt = romElmt->NextSiblingElement()) {
-    const std::string& elmtName = romElmt->ValueStr();
+    const std::string& elmtName = romElmt->Name();
     if (elmtName != "rom")
       return 1;
     romgroupentry.roms.push_back(romElmt->GetText());

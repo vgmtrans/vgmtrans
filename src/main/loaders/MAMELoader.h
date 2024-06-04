@@ -11,7 +11,10 @@
 
 #include "components/FileLoader.h"
 
-class TiXmlElement;
+namespace tinyxml2 {
+  class XMLElement;
+}
+
 class VirtFile;
 
 enum class LoadMethod { APPEND, APPEND_SWAP16, DEINTERLACE, DEINTERLACE_PAIRS };
@@ -74,8 +77,8 @@ class MAMELoader : public FileLoader {
     static void DeleteBuffers(const std::list<std::pair<uint8_t *, uint32_t>> &buffers);
 
     int LoadXML();
-    static MAMEGame *LoadGameEntry(TiXmlElement *gameElmt);
-    static int LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentry);
+    static MAMEGame *LoadGameEntry(tinyxml2::XMLElement *gameElmt);
+    static int LoadRomGroupEntry(tinyxml2::XMLElement *romgroupElmt, MAMEGame *gameentry);
 
     GameMap gamemap;
     bool bLoadedXml;

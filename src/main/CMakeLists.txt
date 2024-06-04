@@ -47,6 +47,9 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libunarr as a shared library" FORCE)
 set(USE_SYSTEM_ZLIB OFF CACHE BOOL "Build with system zlib if possible" FORCE)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr" "${CMAKE_BINARY_DIR}/lib/unarr" EXCLUDE_FROM_ALL)
 
+message(INFO "Using built-in tinyxml2")
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/tinyxml2" "${CMAKE_CURRENT_BINARY_DIR}/tinyxml2" EXCLUDE_FROM_ALL)
+
 file(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp"
      "${PROJECT_SOURCE_DIR}/src/main/*.h")
 
@@ -67,5 +70,5 @@ target_include_directories(vgmtranscore PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog unarr zlibstatic minizip tinyxml mio
+  PUBLIC spdlog::spdlog unarr zlibstatic minizip tinyxml2 mio
 )
