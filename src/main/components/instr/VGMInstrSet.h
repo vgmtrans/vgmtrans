@@ -31,6 +31,18 @@ public:
 
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
+
+// protected:
+//   void disableAutoAddTracksAsRootChildren() { autoAddTrackAsRootChildren = false; }
+//
+// private:
+//   bool autoAddTrackAsRootChildren{true};
+
+protected:
+  void setInstrsParentItem(VGMItem*);
+
+private:
+  VGMItem* m_instrs_parent{this};
 };
 
 // ********
@@ -61,6 +73,11 @@ public:
   VGMInstrSet *parInstrSet;
   float reverb;
 
+
+protected:
+  void disableAutoAddRegionsAsChildren() { autoAddRegionsAsChildren = false; }
+
 private:
+  bool autoAddRegionsAsChildren{true};
   std::vector<VGMRgn*> m_regions;
 };

@@ -9,9 +9,10 @@ using namespace std;
 
 SonyPS2InstrSet::SonyPS2InstrSet(RawFile *file, uint32_t offset)
     : VGMInstrSet(SonyPS2Format::name, file, offset, 0, "Sony PS2 InstrSet") {
+  // disableAutoAddTracksAsRootChildren();
 }
 
-SonyPS2InstrSet::~SonyPS2InstrSet(void) {
+SonyPS2InstrSet::~SonyPS2InstrSet() {
 }
 
 
@@ -200,7 +201,6 @@ bool SonyPS2InstrSet::GetInstrPointers() {
   VGMHeader *progParamsHdr = progCkHdr->addHeader(curOffset + 16 + (progCk.maxProgramNumber + 1) * sizeof(uint32_t),
                                                   0/*(progCk.maxProgramNumber+1)*sizeof(SonyPS2Instr::ProgParam)*/,
                                                   "Program Params");
-  progParamsHdr->addChildren(aInstrs);
 
   for (uint32_t i = 0; i <= progCk.maxProgramNumber; i++) {
     progParamOffsetHdr->addSimpleChild(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
@@ -274,6 +274,8 @@ bool SonyPS2InstrSet::GetInstrPointers() {
     }
   }
 
+  progParamsHdr->addChildren(aInstrs);
+
   uint32_t maxProgNum = progCk.maxProgramNumber;
   progParamsHdr->unLength = (curOffset + progCk.programOffsetAddr[maxProgNum]) + sizeof(SonyPS2Instr::ProgParam) +
       progCk.progParamBlock[maxProgNum].nSplit * sizeof(SonyPS2Instr::SplitBlock) - progParamsHdr->dwOffset;
@@ -294,10 +296,9 @@ SonyPS2Instr::SonyPS2Instr(VGMInstrSet *instrSet,
                            uint32_t theInstrNum)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Program Param"),
       splitBlocks(0) {
-  // RemoveContainer(aRgns);
 }
 
-SonyPS2Instr::~SonyPS2Instr(void) {
+SonyPS2Instr::~SonyPS2Instr() {
   if (splitBlocks)
     delete[] splitBlocks;
 }

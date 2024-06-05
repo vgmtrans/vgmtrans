@@ -35,6 +35,10 @@ VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, uint32_t bank,
   return instr;
 }
 
+void VGMInstrSet::setInstrsParentItem(VGMItem* item) {
+  m_instrs_parent = item;
+}
+
 bool VGMInstrSet::LoadVGMFile() {
   bool val = Load();
   if (!val) {
@@ -59,7 +63,7 @@ bool VGMInstrSet::Load() {
   if (aInstrs.empty())
     return false;
 
-  addChildren(aInstrs);
+  m_instrs_parent->addChildren(aInstrs);
 
   if (unLength == 0) {
     SetGuessedLength();
