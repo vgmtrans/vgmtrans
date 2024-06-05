@@ -35,10 +35,6 @@ VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, uint32_t bank,
   return instr;
 }
 
-void VGMInstrSet::setInstrsParentItem(VGMItem* item) {
-  m_instrs_parent = item;
-}
-
 bool VGMInstrSet::LoadVGMFile() {
   bool val = Load();
   if (!val) {
@@ -63,7 +59,8 @@ bool VGMInstrSet::Load() {
   if (aInstrs.empty())
     return false;
 
-  m_instrs_parent->addChildren(aInstrs);
+  if (autoAddInstrumentsAsChildren)
+    addChildren(aInstrs);
 
   if (unLength == 0) {
     SetGuessedLength();
@@ -118,7 +115,8 @@ void VGMInstr::SetInstrNum(uint32_t theInstrNum) {
 
 VGMRgn *VGMInstr::AddRgn(VGMRgn *rgn) {
   m_regions.emplace_back(rgn);
-  addChild(rgn);
+  if (autoAddRegionsAsChildren)
+    addChild(rgn);
   return rgn;
 }
 
@@ -126,7 +124,8 @@ VGMRgn *VGMInstr::AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t 
                          uint8_t keyHigh, uint8_t velLow, uint8_t velHigh) {
   VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
   m_regions.emplace_back(newRgn);
-  addChild(newRgn);
+  if (autoAddRegionsAsChildren)
+    addChild(newRgn);
   return newRgn;
 }
 

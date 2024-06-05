@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "VGMFile.h"
+#include "helper.h"
 
 class VGMSampColl;
 class VGMInstr;
@@ -32,17 +33,11 @@ public:
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
 
-// protected:
-//   void disableAutoAddTracksAsRootChildren() { autoAddTrackAsRootChildren = false; }
-//
-// private:
-//   bool autoAddTrackAsRootChildren{true};
-
 protected:
-  void setInstrsParentItem(VGMItem*);
+   void disableAutoAddInstrumentsAsChildren() { autoAddInstrumentsAsChildren = false; }
 
 private:
-  VGMItem* m_instrs_parent{this};
+   bool autoAddInstrumentsAsChildren{true};
 };
 
 // ********
@@ -76,6 +71,7 @@ public:
 
 protected:
   void disableAutoAddRegionsAsChildren() { autoAddRegionsAsChildren = false; }
+  void deleteRegions() { DeleteVect(m_regions); }
 
 private:
   bool autoAddRegionsAsChildren{true};

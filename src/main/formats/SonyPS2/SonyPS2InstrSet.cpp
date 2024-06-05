@@ -9,7 +9,10 @@ using namespace std;
 
 SonyPS2InstrSet::SonyPS2InstrSet(RawFile *file, uint32_t offset)
     : VGMInstrSet(SonyPS2Format::name, file, offset, 0, "Sony PS2 InstrSet") {
-  // disableAutoAddTracksAsRootChildren();
+  // Instruments are represented by the "Program Param" struct which are contained as a list within
+  // the "Program Chunk". We want to disable the defualt VGMInstrSet behavior of adding instruments
+  // as root children, instead we'll add them as children of the Program Chunk ourselves.
+  disableAutoAddInstrumentsAsChildren();
 }
 
 SonyPS2InstrSet::~SonyPS2InstrSet() {
@@ -294,15 +297,23 @@ SonyPS2Instr::SonyPS2Instr(VGMInstrSet *instrSet,
                            uint32_t length,
                            uint32_t theBank,
                            uint32_t theInstrNum)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Program Param"),
-      splitBlocks(0) {
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Program Param") {
+  // The regions we create do not line up with any data structure in the format, so we will not add
+  // them as children. The format uses "split blocks" to define key regions, but it layers velocity
+  // regions on top of them in a separate "sample set params" data structure. As such, split blocks
+  // do not map 1:1 with our concept of regions: if a split block links to a sample set param with
+  // multiple velocity zones, we'll need to make a region for each.
+  disableAutoAddRegionsAsChildren();
 }
 
 SonyPS2Instr::~SonyPS2Instr() {
   if (splitBlocks)
     delete[] splitBlocks;
-}
 
+  // Since we do not add regions as children, which ~VGMItem() deletes for us,
+  // we must delete the regions vector ourselves
+  deleteRegions();
+}
 
 bool SonyPS2Instr::LoadInstr() {
   SonyPS2InstrSet *instrset = (SonyPS2InstrSet *) parInstrSet;
