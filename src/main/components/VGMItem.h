@@ -93,15 +93,6 @@ public:
 
   virtual bool IsItemAtOffset(uint32_t offset, bool matchStartOffset = false);
   VGMItem* GetItemFromOffset(uint32_t offset, bool matchStartOffset = false);
-  // virtual VGMItem* GetItemFromOffset(uint32_t offset, bool matchStartOffset, std::function<bool(const VGMItem*)> filterFunc);
-  // template<typename... FilterTypes>
-  // VGMItem* GetItemFromOffsetExcludingTypes(uint32_t offset, bool matchStartOffset) {
-  //   auto filterFunc = [](const VGMItem* item) -> bool {
-  //     return (... || dynamic_cast<const FilterTypes*>(item));
-  //   };
-  //
-  //   return GetItemFromOffset(offset, matchStartOffset, filterFunc);
-  // }
 
   virtual uint32_t GuessLength();
   virtual void SetGuessedLength();

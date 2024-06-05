@@ -54,28 +54,6 @@ VGMItem* VGMItem::GetItemFromOffset(uint32_t offset, bool matchStartOffset) {
   return nullptr;
 }
 
-// VGMItem* VGMItem::GetItemFromOffset(uint32_t offset, bool matchStartOffset, std::function<bool(const VGMItem*)> filterFunc) {
-//   for (const auto& child : m_children) {
-//     if (VGMItem* foundItem = child->GetItemFromOffset(offset, matchStartOffset, filterFunc)) {
-//       return foundItem;
-//     }
-//   }
-//
-//   if (!filterFunc(this)) {
-//     if ((matchStartOffset ? offset == dwOffset : offset >= dwOffset) && (offset < dwOffset + unLength)) {
-//       return this;
-//     }
-//   }
-//   return nullptr;
-// }
-
-// void VGMItem::AddToUI(VGMItem *parent, void *UI_specific) {
-  // pRoot->UI_AddItem(this, parent, name(), UI_specific);
-  // for (const auto child : m_children) {
-    // pRoot->UI_AddItem(child, this, name(), UI_specific);
-  // }
-// }
-
 void VGMItem::AddToUI(VGMItem *parent, void *UI_specific) {
   pRoot->UI_AddItem(this, parent, name(), UI_specific);
 

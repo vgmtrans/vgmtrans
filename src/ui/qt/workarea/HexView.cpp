@@ -493,7 +493,6 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) con
   int emptyAddressBytes = 0;
   auto offset = 0;
   while (offset < bytesToPrint) {
-    // if (auto item = vgmfile->GetItemFromOffsetExcludingTypes<VGMFile, SeqTrack>(startAddress + offset, false)) {
     if (auto item = vgmfile->GetItemFromOffset(startAddress + offset, false)) {
       if (emptyAddressBytes > 0) {
         int dataOffset = offset - emptyAddressBytes;
