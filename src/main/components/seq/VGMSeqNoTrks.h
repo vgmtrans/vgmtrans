@@ -14,7 +14,7 @@ public:
                const std::string& name = "VGM Sequence");
 
 public:
-  ~VGMSeqNoTrks(void) override;
+  ~VGMSeqNoTrks() override;
 
   void ResetVars() override;
 

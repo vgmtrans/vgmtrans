@@ -148,7 +148,7 @@ bool NinSnesInstr::LoadInstr() {
 
   NinSnesRgn *rgn = new NinSnesRgn(this, version, dwOffset, konamiTuningTableAddress, konamiTuningTableSize);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }
@@ -243,9 +243,9 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
   }
 
   AddSampNum(srcn, offset, 1);
-  AddSimpleItem(offset + 1, 1, "ADSR1");
-  AddSimpleItem(offset + 2, 1, "ADSR2");
-  AddSimpleItem(offset + 3, 1, "GAIN");
+  addChild(offset + 1, 1, "ADSR1");
+  addChild(offset + 2, 1, "ADSR2");
+  addChild(offset + 3, 1, "GAIN");
   if (version == NINSNES_EARLIER) {
     AddUnityKey(96 - (int) (coarse_tuning), offset + 4, 1);
     AddFineTune((int16_t) (fine_tuning * 100.0), offset + 4, 1);
@@ -271,7 +271,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
     unityKey = 71 - coarse_tuning;
     fineTune = (int16_t) (fine_tune_real * 100.0);
 
-    AddSimpleItem(offset + 4, 2, "Tuning (Unused)");
+    addChild(offset + 4, 2, "Tuning (Unused)");
   }
   else {
     AddUnityKey(96 - (int) (coarse_tuning), offset + 4, 1);

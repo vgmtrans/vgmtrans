@@ -47,12 +47,12 @@ void HudsonSnesSeq::ResetVars() {
 bool HudsonSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
 
   // track addresses
   if (version == HUDSONSNES_V0 || version == HUDSONSNES_V1) {
-    VGMHeader *trackPtrHeader = header->AddHeader(curOffset, 0, "Track Pointers");
+    VGMHeader *trackPtrHeader = header->addHeader(curOffset, 0, "Track Pointers");
     if (!GetTrackPointersInHeaderInfo(trackPtrHeader, curOffset)) {
       return false;
     }
@@ -75,17 +75,17 @@ bool HudsonSnesSeq::GetHeaderInfo() {
 
     switch (eventType) {
       case HEADER_EVENT_END: {
-        header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Header End");
+        header->addChild(beginOffset, curOffset - beginOffset, "Header End");
         goto header_end;
       }
 
       case HEADER_EVENT_TIMEBASE: {
-        VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Timebase");
-        aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *aHeader = header->addHeader(beginOffset, 1, "Timebase");
+        aHeader->addChild(beginOffset, 1, "Event ID");
 
         // actual music engine decreases timebase based on the following value.
         // however, we always use SEQ_PPQN and adjust note lengths when necessary instead.
-        aHeader->AddSimpleItem(curOffset, 1, "Timebase");
+        aHeader->addChild(curOffset, 1, "Timebase");
         TimebaseShift = GetByte(curOffset++) & 3;
 
         aHeader->unLength = curOffset - beginOffset;
@@ -93,8 +93,8 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_TRACKS: {
-        VGMHeader *trackPtrHeader = header->AddHeader(beginOffset, 0, "Track Pointers");
-        trackPtrHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *trackPtrHeader = header->addHeader(beginOffset, 0, "Track Pointers");
+        trackPtrHeader->addChild(beginOffset, 1, "Event ID");
         if (!GetTrackPointersInHeaderInfo(trackPtrHeader, curOffset)) {
           return false;
         }
@@ -103,10 +103,10 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_INSTRUMENTS_V1: {
-        VGMHeader *instrHeader = header->AddHeader(beginOffset, 1, "Instruments");
-        instrHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *instrHeader = header->addHeader(beginOffset, 1, "Instruments");
+        instrHeader->addChild(beginOffset, 1, "Event ID");
 
-        instrHeader->AddSimpleItem(curOffset, 1, "Size");
+        instrHeader->addChild(curOffset, 1, "Size");
         uint8_t tableSize = GetByte(curOffset++);
         if (curOffset + tableSize > 0x10000) {
           return false;
@@ -121,11 +121,11 @@ bool HudsonSnesSeq::GetHeaderInfo() {
           uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
           std::stringstream instrName;
           instrName << "Instrument " << instrNum;
-          VGMHeader *aInstrHeader = instrHeader->AddHeader(addrInstrItem, 4, instrName.str().c_str());
-          aInstrHeader->AddSimpleItem(addrInstrItem, 1, "SRCN");
-          aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, "ADSR(1)");
-          aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, "ADSR(2)");
-          aInstrHeader->AddSimpleItem(addrInstrItem + 3, 1, "GAIN");
+          VGMHeader *aInstrHeader = instrHeader->addHeader(addrInstrItem, 4, instrName.str().c_str());
+          aInstrHeader->addChild(addrInstrItem, 1, "SRCN");
+          aInstrHeader->addChild(addrInstrItem + 1, 1, "ADSR(1)");
+          aInstrHeader->addChild(addrInstrItem + 2, 1, "ADSR(2)");
+          aInstrHeader->addChild(addrInstrItem + 3, 1, "GAIN");
         }
         curOffset += tableSize;
 
@@ -134,10 +134,10 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_PERCUSSIONS_V1: {
-        VGMHeader *percHeader = header->AddHeader(beginOffset, 1, "Percussions");
-        percHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *percHeader = header->addHeader(beginOffset, 1, "Percussions");
+        percHeader->addChild(beginOffset, 1, "Event ID");
 
-        percHeader->AddSimpleItem(curOffset, 1, "Size");
+        percHeader->addChild(curOffset, 1, "Size");
         uint8_t tableSize = GetByte(curOffset++);
         if (curOffset + tableSize > 0x10000) {
           return false;
@@ -151,11 +151,11 @@ bool HudsonSnesSeq::GetHeaderInfo() {
           uint16_t addrPercItem = PercussionTableAddress + percNote * 4;
           std::stringstream percNoteName;
           percNoteName << "Percussion " << percNote;
-          VGMHeader *percNoteHeader = percHeader->AddHeader(addrPercItem, 4, percNoteName.str().c_str());
-          percNoteHeader->AddSimpleItem(addrPercItem, 1, "Instrument");
-          percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, "Unity Key");
-          percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, "Volume");
-          percNoteHeader->AddSimpleItem(addrPercItem + 3, 1, "Pan");
+          VGMHeader *percNoteHeader = percHeader->addHeader(addrPercItem, 4, percNoteName.str().c_str());
+          percNoteHeader->addChild(addrPercItem, 1, "Instrument");
+          percNoteHeader->addChild(addrPercItem + 1, 1, "Unity Key");
+          percNoteHeader->addChild(addrPercItem + 2, 1, "Volume");
+          percNoteHeader->addChild(addrPercItem + 3, 1, "Pan");
         }
         curOffset += tableSize;
 
@@ -164,10 +164,10 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_INSTRUMENTS_V2: {
-        VGMHeader *instrHeader = header->AddHeader(beginOffset, 1, "Instruments");
-        instrHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *instrHeader = header->addHeader(beginOffset, 1, "Instruments");
+        instrHeader->addChild(beginOffset, 1, "Event ID");
 
-        instrHeader->AddSimpleItem(curOffset, 1, "Number of Items");
+        instrHeader->addChild(curOffset, 1, "Number of Items");
         uint8_t tableSize = GetByte(curOffset++) * 4;
         if (curOffset + tableSize > 0x10000) {
           return false;
@@ -182,11 +182,11 @@ bool HudsonSnesSeq::GetHeaderInfo() {
           uint16_t addrInstrItem = InstrumentTableAddress + instrNum * 4;
           std::stringstream instrName;
           instrName << "Instrument " << instrNum;
-          VGMHeader *aInstrHeader = instrHeader->AddHeader(addrInstrItem, 4, instrName.str().c_str());
-          aInstrHeader->AddSimpleItem(addrInstrItem, 1, "SRCN");
-          aInstrHeader->AddSimpleItem(addrInstrItem + 1, 1, "ADSR(1)");
-          aInstrHeader->AddSimpleItem(addrInstrItem + 2, 1, "ADSR(2)");
-          aInstrHeader->AddSimpleItem(addrInstrItem + 3, 1, "GAIN");
+          VGMHeader *aInstrHeader = instrHeader->addHeader(addrInstrItem, 4, instrName.str().c_str());
+          aInstrHeader->addChild(addrInstrItem, 1, "SRCN");
+          aInstrHeader->addChild(addrInstrItem + 1, 1, "ADSR(1)");
+          aInstrHeader->addChild(addrInstrItem + 2, 1, "ADSR(2)");
+          aInstrHeader->addChild(addrInstrItem + 3, 1, "GAIN");
         }
         curOffset += tableSize;
 
@@ -195,10 +195,10 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_PERCUSSIONS_V2: {
-        VGMHeader *percHeader = header->AddHeader(beginOffset, 1, "Percussions");
-        percHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *percHeader = header->addHeader(beginOffset, 1, "Percussions");
+        percHeader->addChild(beginOffset, 1, "Event ID");
 
-        percHeader->AddSimpleItem(curOffset, 1, "Number of Items");
+        percHeader->addChild(curOffset, 1, "Number of Items");
         uint8_t tableSize = GetByte(curOffset++) * 4;
         if (curOffset + tableSize > 0x10000) {
           return false;
@@ -212,11 +212,11 @@ bool HudsonSnesSeq::GetHeaderInfo() {
           uint16_t addrPercItem = PercussionTableAddress + percNote * 4;
           std::stringstream percNoteName;
           percNoteName << "Percussion " << percNote;
-          VGMHeader *percNoteHeader = percHeader->AddHeader(addrPercItem, 4, percNoteName.str().c_str());
-          percNoteHeader->AddSimpleItem(addrPercItem, 1, "Instrument");
-          percNoteHeader->AddSimpleItem(addrPercItem + 1, 1, "Unity Key");
-          percNoteHeader->AddSimpleItem(addrPercItem + 2, 1, "Volume");
-          percNoteHeader->AddSimpleItem(addrPercItem + 3, 1, "Pan");
+          VGMHeader *percNoteHeader = percHeader->addHeader(addrPercItem, 4, percNoteName.str().c_str());
+          percNoteHeader->addChild(addrPercItem, 1, "Instrument");
+          percNoteHeader->addChild(addrPercItem + 1, 1, "Unity Key");
+          percNoteHeader->addChild(addrPercItem + 2, 1, "Volume");
+          percNoteHeader->addChild(addrPercItem + 3, 1, "Pan");
         }
         curOffset += tableSize;
 
@@ -225,16 +225,16 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_05: {
-        VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Unknown");
-        aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *aHeader = header->addHeader(beginOffset, 1, "Unknown");
+        aHeader->addChild(beginOffset, 1, "Event ID");
 
-        aHeader->AddSimpleItem(curOffset, 1, "Number of Items");
+        aHeader->addChild(curOffset, 1, "Number of Items");
         uint8_t tableSize = GetByte(curOffset++) * 2;
         if (curOffset + tableSize > 0x10000) {
           return false;
         }
 
-        aHeader->AddUnknownItem(curOffset, tableSize);
+        aHeader->addUnknownChild(curOffset, tableSize);
         curOffset += tableSize;
 
         aHeader->unLength = curOffset - beginOffset;
@@ -242,16 +242,16 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_06: {
-        VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Unknown");
-        aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *aHeader = header->addHeader(beginOffset, 1, "Unknown");
+        aHeader->addChild(beginOffset, 1, "Event ID");
 
-        aHeader->AddSimpleItem(curOffset, 1, "Number of Items");
+        aHeader->addChild(curOffset, 1, "Number of Items");
         uint8_t tableSize = GetByte(curOffset++) * 2;
         if (curOffset + tableSize > 0x10000) {
           return false;
         }
 
-        aHeader->AddUnknownItem(curOffset, tableSize);
+        aHeader->addUnknownChild(curOffset, tableSize);
         curOffset += tableSize;
 
         aHeader->unLength = curOffset - beginOffset;
@@ -259,24 +259,24 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_ECHO_PARAM: {
-        VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Echo Param");
-        aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *aHeader = header->addHeader(beginOffset, 1, "Echo Param");
+        aHeader->addChild(beginOffset, 1, "Event ID");
 
-        aHeader->AddSimpleItem(curOffset, 1, "Use Default Echo");
+        aHeader->addChild(curOffset, 1, "Use Default Echo");
         uint8_t useDefaultEcho = GetByte(curOffset++);
 
         if (useDefaultEcho == 0) {
-          aHeader->AddSimpleItem(curOffset, 1, "EVOL(L)");
+          aHeader->addChild(curOffset, 1, "EVOL(L)");
           curOffset++;
-          aHeader->AddSimpleItem(curOffset, 1, "EVOL(R)");
+          aHeader->addChild(curOffset, 1, "EVOL(R)");
           curOffset++;
-          aHeader->AddSimpleItem(curOffset, 1, "EDL");
+          aHeader->addChild(curOffset, 1, "EDL");
           curOffset++;
-          aHeader->AddSimpleItem(curOffset, 1, "EFB");
+          aHeader->addChild(curOffset, 1, "EFB");
           curOffset++;
-		  aHeader->AddSimpleItem(curOffset, 1, "FIR");
+		  aHeader->addChild(curOffset, 1, "FIR");
           curOffset++;
-          aHeader->AddSimpleItem(curOffset, 1, "EON");
+          aHeader->addChild(curOffset, 1, "EON");
           curOffset++;
         }
 
@@ -285,10 +285,10 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_NOTE_VELOCITY: {
-        VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Note Velocity");
-        aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *aHeader = header->addHeader(beginOffset, 1, "Note Velocity");
+        aHeader->addChild(beginOffset, 1, "Event ID");
 
-        aHeader->AddSimpleItem(curOffset, 1, "Note Velocity On/Off");
+        aHeader->addChild(curOffset, 1, "Note Velocity On/Off");
         uint8_t noteVelOn = GetByte(curOffset++);
         if (noteVelOn != 0) {
           NoteEventHasVelocity = true;
@@ -299,16 +299,16 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       case HEADER_EVENT_09: {
-        VGMHeader *aHeader = header->AddHeader(beginOffset, 1, "Unknown");
-        aHeader->AddSimpleItem(beginOffset, 1, "Event ID");
+        VGMHeader *aHeader = header->addHeader(beginOffset, 1, "Unknown");
+        aHeader->addChild(beginOffset, 1, "Event ID");
 
-        aHeader->AddSimpleItem(curOffset, 1, "Number of Items");
+        aHeader->addChild(curOffset, 1, "Number of Items");
         uint8_t tableSize = GetByte(curOffset++) * 2;
         if (curOffset + tableSize > 0x10000) {
           return false;
         }
 
-        aHeader->AddUnknownItem(curOffset, tableSize);
+        aHeader->addUnknownChild(curOffset, tableSize);
         curOffset += tableSize;
 
         aHeader->unLength = curOffset - beginOffset;
@@ -316,7 +316,7 @@ bool HudsonSnesSeq::GetHeaderInfo() {
       }
 
       default:
-        header->AddUnknownItem(beginOffset, curOffset - beginOffset);
+        header->addUnknownChild(beginOffset, curOffset - beginOffset);
         goto header_end;
     }
   }
@@ -336,7 +336,7 @@ bool HudsonSnesSeq::GetTrackPointersInHeaderInfo(VGMHeader *header, uint32_t &of
   }
 
   // flag field that indicates track availability
-  header->AddSimpleItem(curOffset, 1, "Track Availability");
+  header->addChild(curOffset, 1, "Track Availability");
   TrackAvailableBits = GetByte(curOffset++);
 
   // read track addresses (DSP channel 8 to 1)
@@ -349,7 +349,7 @@ bool HudsonSnesSeq::GetTrackPointersInHeaderInfo(VGMHeader *header, uint32_t &of
 
       std::stringstream trackName;
       trackName << "Track Pointer " << (trackIndex + 1);
-      header->AddSimpleItem(curOffset, 2, trackName.str().c_str());
+      header->addChild(curOffset, 2, trackName.str().c_str());
       TrackAddresses[trackIndex] = GetShort(curOffset);
       curOffset += 2;
     }

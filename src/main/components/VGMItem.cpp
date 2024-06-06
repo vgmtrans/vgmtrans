@@ -11,6 +11,10 @@ VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string
     : m_vgmfile(vgmfile), m_name(std::move(name)), dwOffset(offset), unLength(length), color(color) {
 }
 
+VGMItem::~VGMItem() {
+  DeleteVect(m_children);
+}
+
 bool operator>(const VGMItem &item1, const VGMItem &item2) {
   return item1.dwOffset > item2.dwOffset;
 }
@@ -31,20 +35,31 @@ RawFile *VGMItem::rawFile() const {
   return m_vgmfile->rawFile();
 }
 
-bool VGMItem::IsItemAtOffset(uint32_t offset, bool includeContainer, bool matchStartOffset) {
-  return GetItemFromOffset(offset, includeContainer, matchStartOffset) != nullptr;
+bool VGMItem::IsItemAtOffset(uint32_t offset, bool matchStartOffset) {
+  return GetItemFromOffset(offset, matchStartOffset) != nullptr;
 }
 
-VGMItem *VGMItem::GetItemFromOffset(uint32_t offset, [[maybe_unused]] bool includeContainer, bool matchStartOffset) {
-  if ((matchStartOffset ? offset == dwOffset : offset >= dwOffset) && (offset < dwOffset + unLength)) {
-    return this;
-  } else {
-    return nullptr;
+VGMItem* VGMItem::GetItemFromOffset(uint32_t offset, bool matchStartOffset) {
+  if (m_children.empty()) {
+    if ((matchStartOffset ? offset == dwOffset : offset >= dwOffset) && (offset < dwOffset + unLength)) {
+      return this;
+    }
   }
+
+  for (const auto child : m_children) {
+    if (VGMItem *foundItem = child->GetItemFromOffset(offset, matchStartOffset))
+      return foundItem;
+  }
+
+  return nullptr;
 }
 
 void VGMItem::AddToUI(VGMItem *parent, void *UI_specific) {
   pRoot->UI_AddItem(this, parent, name(), UI_specific);
+
+  for (const auto child : m_children) {
+    child->AddToUI(this, UI_specific);
+  }
 }
 
 uint32_t VGMItem::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
@@ -77,107 +92,70 @@ bool VGMItem::IsValidOffset(uint32_t offset) const {
   return m_vgmfile->IsValidOffset(offset);
 }
 
-//  ****************
-//  VGMContainerItem
-//  ****************
-
-VGMContainerItem::VGMContainerItem() : VGMItem() {
-  AddContainer(headers);
-  AddContainer(localitems);
+VGMItem* VGMItem::addChild(VGMItem *item) {
+  m_children.emplace_back(item);
+  return item;
 }
 
-VGMContainerItem::VGMContainerItem(
-    VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string name, EventColor color)
-    : VGMItem(vgmfile, offset, length, std::move(name), color) {
-  AddContainer(headers);
-  AddContainer(localitems);
+VGMItem* VGMItem::addChild(uint32_t offset, uint32_t length, const std::string &name) {
+  auto child = new VGMItem(vgmFile(), offset, length, name, CLR_HEADER);
+  m_children.emplace_back(child);
+  return child;
 }
 
-VGMContainerItem::~VGMContainerItem() {
-  DeleteVect(headers);
-  DeleteVect(localitems);
+VGMItem* VGMItem::addUnknownChild(uint32_t offset, uint32_t length) {
+  auto child = new VGMItem(vgmFile(), offset, length, "Unknown");
+  m_children.emplace_back(child);
+  return child;
 }
 
-// Get the bottom-most VGMItem at a given offset. If includeContainer is false, only return
-// a non-VGMContainerItem. Otherwise, return the bottom-most VGMContainerItem if a
-// non-VGMContainerItem does not exist at the offset.
-VGMItem *VGMContainerItem::GetItemFromOffset(uint32_t offset, bool includeContainer, bool matchStartOffset) {
-  for (const auto *container : containers) {
-    for (VGMItem *item : *container) {
-      if (item->unLength == 0 || (offset >= item->dwOffset && offset < item->dwOffset + item->unLength)) {
-        if (VGMItem *foundItem = item->GetItemFromOffset(offset, includeContainer, matchStartOffset))
-          return foundItem;
-      }
+VGMHeader* VGMItem::addHeader(uint32_t offset, uint32_t length, const std::string &name) {
+  auto *header = new VGMHeader(this, offset, length, name);
+  m_children.emplace_back(header);
+  return header;
+}
+
+void VGMItem::sortChildrenByOffset() {
+  std::ranges::sort(m_children, [](const VGMItem *a, const VGMItem *b) {
+    return a->dwOffset < b->dwOffset;
+  });
+
+  // Recursively sort the children of each child, if they have any children
+  for (VGMItem* child : m_children) {
+    if (!child->children().empty()) {
+      child->sortChildrenByOffset();
     }
-  }
-
-  if (includeContainer && (matchStartOffset ? offset == dwOffset : offset >= dwOffset) &&
-      (offset < dwOffset + unLength)) {
-    return this;
-  } else {
-    return nullptr;
   }
 }
 
 // Guess length of a container from its descendants
-uint32_t VGMContainerItem::GuessLength() {
+uint32_t VGMItem::GuessLength() {
+  if (m_children.empty()) {
+    return unLength;
+  }
+  // NOTE: child items can sometimes overlap each other
   uint32_t guessedLength = 0;
+  for (const auto child : m_children) {
+    assert(dwOffset <= child->dwOffset);
 
-  // NOTE: children items can sometimes overlap each other
-  for (const auto *container : containers) {
-    for (VGMItem *item : *container) {
-      assert(dwOffset <= item->dwOffset);
+    uint32_t itemLength = child->unLength;
+    if (unLength == 0) {
+      itemLength = child->GuessLength();
+    }
 
-      uint32_t itemLength = item->unLength;
-      if (unLength == 0) {
-        itemLength = item->GuessLength();
-      }
-
-      uint32_t expectedLength = item->dwOffset + itemLength - dwOffset;
-      if (guessedLength < expectedLength) {
-        guessedLength = expectedLength;
-      }
+    uint32_t expectedLength = child->dwOffset + itemLength - dwOffset;
+    if (guessedLength < expectedLength) {
+      guessedLength = expectedLength;
     }
   }
-
   return guessedLength;
 }
 
-void VGMContainerItem::SetGuessedLength() {
-  for (const auto *container : containers) {
-    for (VGMItem *item : *container) {
-      item->SetGuessedLength();
-    }
+void VGMItem::SetGuessedLength() {
+  for (const auto child : m_children) {
+    child->SetGuessedLength();
   }
-
   if (unLength == 0) {
     unLength = GuessLength();
   }
-}
-
-void VGMContainerItem::AddToUI(VGMItem *parent, void *UI_specific) {
-  VGMItem::AddToUI(parent, UI_specific);
-  for (const auto *container : containers) {
-    for (VGMItem *item : *container) {
-      item->AddToUI(this, UI_specific);
-    }
-  }
-}
-
-VGMHeader *VGMContainerItem::AddHeader(uint32_t offset, uint32_t length, const std::string &name) {
-  auto *header = new VGMHeader(this, offset, length, name);
-  headers.push_back(header);
-  return header;
-}
-
-void VGMContainerItem::AddItem(VGMItem *item) {
-  localitems.push_back(item);
-}
-
-void VGMContainerItem::AddSimpleItem(uint32_t offset, uint32_t length, const std::string &name) {
-  localitems.push_back(new VGMItem(vgmFile(), offset, length, name, CLR_HEADER));
-}
-
-void VGMContainerItem::AddUnknownItem(uint32_t offset, uint32_t length) {
-  localitems.push_back(new VGMItem(vgmFile(), offset, length, "Unknown"));
 }

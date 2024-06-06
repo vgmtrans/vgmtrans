@@ -147,7 +147,7 @@ bool MP2kInstr::LoadInstr() {
       if (sample_pointer == 0) {
         /* Sometimes the instrument table can have weird values */
         L_INFO("Tried to load a sample that pointed to nothing for instr @{:#x}", dwOffset);
-        setName(name() += " (invalid)");
+        setName(name() + " (invalid)");
         break;
       }
 
@@ -159,7 +159,7 @@ bool MP2kInstr::LoadInstr() {
         SetADSR(rgn, m_data.w2);
       } else {
         L_WARN("No sample could be loaded for {:#x}", sample_pointer);
-        setName(name() += " (sample missing)");
+        setName(name() + " (sample missing)");
       }
 
       break;

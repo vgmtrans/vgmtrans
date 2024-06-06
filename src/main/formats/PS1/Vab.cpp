@@ -21,20 +21,20 @@ bool Vab::GetHeaderInfo() {
     return false;
   }
 
-  VGMHeader *vabHdr = AddHeader(dwOffset, 0x20, "VAB Header");
-  vabHdr->AddSimpleItem(dwOffset + 0x00, 4, "ID");
-  vabHdr->AddSimpleItem(dwOffset + 0x04, 4, "Version");
-  vabHdr->AddSimpleItem(dwOffset + 0x08, 4, "VAB ID");
-  vabHdr->AddSimpleItem(dwOffset + 0x0c, 4, "Total Size");
-  vabHdr->AddSimpleItem(dwOffset + 0x10, 2, "Reserved");
-  vabHdr->AddSimpleItem(dwOffset + 0x12, 2, "Number of Programs");
-  vabHdr->AddSimpleItem(dwOffset + 0x14, 2, "Number of Tones");
-  vabHdr->AddSimpleItem(dwOffset + 0x16, 2, "Number of VAGs");
-  vabHdr->AddSimpleItem(dwOffset + 0x18, 1, "Master Volume");
-  vabHdr->AddSimpleItem(dwOffset + 0x19, 1, "Master Pan");
-  vabHdr->AddSimpleItem(dwOffset + 0x1a, 1, "Bank Attributes 1");
-  vabHdr->AddSimpleItem(dwOffset + 0x1b, 1, "Bank Attributes 2");
-  vabHdr->AddSimpleItem(dwOffset + 0x1c, 4, "Reserved");
+  VGMHeader *vabHdr = addHeader(dwOffset, 0x20, "VAB Header");
+  vabHdr->addChild(dwOffset + 0x00, 4, "ID");
+  vabHdr->addChild(dwOffset + 0x04, 4, "Version");
+  vabHdr->addChild(dwOffset + 0x08, 4, "VAB ID");
+  vabHdr->addChild(dwOffset + 0x0c, 4, "Total Size");
+  vabHdr->addChild(dwOffset + 0x10, 2, "Reserved");
+  vabHdr->addChild(dwOffset + 0x12, 2, "Number of Programs");
+  vabHdr->addChild(dwOffset + 0x14, 2, "Number of Tones");
+  vabHdr->addChild(dwOffset + 0x16, 2, "Number of VAGs");
+  vabHdr->addChild(dwOffset + 0x18, 1, "Master Volume");
+  vabHdr->addChild(dwOffset + 0x19, 1, "Master Pan");
+  vabHdr->addChild(dwOffset + 0x1a, 1, "Bank Attributes 1");
+  vabHdr->addChild(dwOffset + 0x1b, 1, "Bank Attributes 2");
+  vabHdr->addChild(dwOffset + 0x1c, 4, "Reserved");
 
   GetBytes(dwOffset, 0x20, &hdr);
 
@@ -53,8 +53,8 @@ bool Vab::GetInstrPointers() {
 
   uint32_t offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
 
-  VGMHeader *progsHdr = AddHeader(offProgs, 16 * 128, "Program Table");
-  VGMHeader *toneAttrsHdr = AddHeader(offToneAttrs, 32 * 16, "Tone Attributes Table");
+  VGMHeader *progsHdr = addHeader(offProgs, 16 * 128, "Program Table");
+  VGMHeader *toneAttrsHdr = addHeader(offToneAttrs, 32 * 16, "Tone Attributes Table");
 
   if (numPrograms > 128) {
     L_ERROR("Too many programs {}  Offset: 0x{:X}", numPrograms,  dwOffset);
@@ -92,16 +92,16 @@ bool Vab::GetInstrPointers() {
       aInstrs.push_back(newInstr);
       GetBytes(offCurrProg, 0x10, &newInstr->attr);
 
-      VGMHeader *hdr = progsHdr->AddHeader(offCurrProg, 0x10, "Program");
-      hdr->AddSimpleItem(offCurrProg + 0x00, 1, "Number of Tones");
-      hdr->AddSimpleItem(offCurrProg + 0x01, 1, "Volume");
-      hdr->AddSimpleItem(offCurrProg + 0x02, 1, "Priority");
-      hdr->AddSimpleItem(offCurrProg + 0x03, 1, "Mode");
-      hdr->AddSimpleItem(offCurrProg + 0x04, 1, "Pan");
-      hdr->AddSimpleItem(offCurrProg + 0x05, 1, "Reserved");
-      hdr->AddSimpleItem(offCurrProg + 0x06, 2, "Attribute");
-      hdr->AddSimpleItem(offCurrProg + 0x08, 4, "Reserved");
-      hdr->AddSimpleItem(offCurrProg + 0x0c, 4, "Reserved");
+      VGMHeader *hdr = progsHdr->addHeader(offCurrProg, 0x10, "Program");
+      hdr->addChild(offCurrProg + 0x00, 1, "Number of Tones");
+      hdr->addChild(offCurrProg + 0x01, 1, "Volume");
+      hdr->addChild(offCurrProg + 0x02, 1, "Priority");
+      hdr->addChild(offCurrProg + 0x03, 1, "Mode");
+      hdr->addChild(offCurrProg + 0x04, 1, "Pan");
+      hdr->addChild(offCurrProg + 0x05, 1, "Reserved");
+      hdr->addChild(offCurrProg + 0x06, 2, "Attribute");
+      hdr->addChild(offCurrProg + 0x08, 4, "Reserved");
+      hdr->addChild(offCurrProg + 0x0c, 4, "Reserved");
 
       newInstr->masterVol = GetByte(offCurrProg + 0x01);
 
@@ -115,7 +115,7 @@ bool Vab::GetInstrPointers() {
     char name[256];
     std::vector<SizeOffsetPair> vagLocations;
     uint32_t totalVAGSize = 0;
-    VGMHeader *vagOffsetHdr = AddHeader(offVAGOffsets, 2 * 256, "VAG Pointer Table");
+    VGMHeader *vagOffsetHdr = addHeader(offVAGOffsets, 2 * 256, "VAG Pointer Table");
 
     uint32_t vagStartOffset = offVAGOffsets + 2 * 256;
     uint32_t vagOffset = vagStartOffset;
@@ -124,7 +124,7 @@ bool Vab::GetInstrPointers() {
       uint32_t vagSize = GetShort(offVAGOffsets + i * 2) * 8;
 
       snprintf(name, 256, "VAG Size /8 #%u", i);
-      vagOffsetHdr->AddSimpleItem(offVAGOffsets + i * 2, 2, name);
+      vagOffsetHdr->addChild(offVAGOffsets + i * 2, 2, name);
 
       if (vagOffset + vagSize <= nEndOffset) {
         vagLocations.emplace_back(vagOffset, vagSize);
@@ -186,7 +186,7 @@ bool VabInstr::LoadInstr() {
       delete rgn;
       return false;
     }
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   return true;
 }

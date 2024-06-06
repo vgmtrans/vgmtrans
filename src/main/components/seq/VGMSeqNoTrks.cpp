@@ -9,7 +9,6 @@
 VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, const std::string& name)
     : VGMSeq(format, file, offset, 0, name), SeqTrack(this) {
   VGMSeqNoTrks::ResetVars();
-  VGMSeq::AddContainer<SeqEvent>(aEvents);
 }
 
 VGMSeqNoTrks::~VGMSeqNoTrks() = default;
@@ -27,17 +26,23 @@ void VGMSeqNoTrks::ResetVars() {
 
 // LoadMain() - loads all sequence data into the class
 bool VGMSeqNoTrks::LoadMain() {
-  this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_ADD_TO_UI;
+  this->SeqTrack::readMode = READMODE_ADD_TO_UI;
+  this->VGMSeq::readMode = READMODE_ADD_TO_UI;
   if (!GetHeaderInfo())
     return false;
 
   if (!LoadEvents())
     return false;
 
+  // Workaround for this VGMSeqNoTrks' multiple inheritance diamond problem. Both VGMSeq and
+  // SeqTrack have their own m_children fields. VGMSeq is the one we care about. We need to transfer
+  // SeqTrack::m_children into VGMSeq::m_children and then clear it from SeqTrack so that their
+  // destructors don't doubly delete the children.
+  VGMSeq::addChildren(SeqTrack::children());
+  SeqTrack::clearChildren();
+
   if (length() == 0) {
     VGMSeq::SetGuessedLength();
-    //		length() = (aEvents.back()->dwOffset + aEvents.back()->unLength) - offset();
-    // length == to the end of the last event
   }
 
   return true;

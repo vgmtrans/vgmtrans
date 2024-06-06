@@ -14,13 +14,8 @@ VGMSeqSection::VGMSeqSection(VGMMultiSectionSeq *parentFile,
                              uint32_t theLength,
                              const std::string& name,
                              EventColor color)
-    : VGMContainerItem(parentFile, theOffset, theLength, name, color),
+    : VGMItem(parentFile, theOffset, theLength, name, color),
       parentSeq(parentFile) {
-  AddContainer<SeqTrack>(aTracks);
-}
-
-VGMSeqSection::~VGMSeqSection() {
-  DeleteVect<SeqTrack>(aTracks);
 }
 
 bool VGMSeqSection::Load() {
@@ -41,8 +36,8 @@ bool VGMSeqSection::GetTrackPointers() {
 
 bool VGMSeqSection::PostLoad() {
   if (parentSeq->readMode == READMODE_ADD_TO_UI) {
-    for (uint32_t i = 0; i < aTracks.size(); i++) {
-      std::ranges::sort(aTracks[i]->aEvents, ItemPtrOffsetCmp());
+    for (const auto track : aTracks) {
+      track->sortChildrenByOffset();
     }
   }
 

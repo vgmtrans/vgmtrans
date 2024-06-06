@@ -43,15 +43,15 @@ bool CPSSeq::GetTrackPointers() {
   if ((GetByte(dwOffset) & 0x80) > 0)
     return false;
 
-  this->AddHeader(dwOffset, 1, "Sequence Flags");
-  VGMHeader *header = this->AddHeader(dwOffset + 1, GetShortBE(dwOffset + 1) - 1, "Track Pointers");
+  this->addHeader(dwOffset, 1, "Sequence Flags");
+  VGMHeader *header = this->addHeader(dwOffset + 1, GetShortBE(dwOffset + 1) - 1, "Track Pointers");
 
   const int maxTracks = fmt_version <= VER_CPS1_502 ? 12 : 16;
 
   for (int i = 0; i < maxTracks; i++) {
     uint32_t offset = GetShortBE(dwOffset + 1 + i * 2);
     if (offset == 0) {
-      header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, "No Track");
+      header->addChild(dwOffset + 1 + (i * 2), 2, "No Track");
       continue;
     }
     //if (GetShortBE(offset+dwOffset) == 0xE017)	//Rest, EndTrack (used by empty tracks)
@@ -77,7 +77,7 @@ bool CPSSeq::GetTrackPointers() {
         newTrack = new CPSTrackV1(this, CPSSynth::QSOUND, offset + dwOffset);
     }
     aTracks.push_back(newTrack);
-    header->AddSimpleItem(dwOffset + 1 + (i * 2), 2, "Track Pointer");
+    header->addChild(dwOffset + 1 + (i * 2), 2, "Track Pointer");
   }
   if (aTracks.size() == 0)
     return false;
@@ -86,6 +86,8 @@ bool CPSSeq::GetTrackPointers() {
 }
 
 bool CPSSeq::PostLoad() {
+  bool succeeded = VGMSeq::PostLoad();
+
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return true;
 
@@ -261,6 +263,5 @@ bool CPSSeq::PostLoad() {
     }
   }
 
-
-  return VGMSeq::PostLoad();
+  return succeeded;
 }

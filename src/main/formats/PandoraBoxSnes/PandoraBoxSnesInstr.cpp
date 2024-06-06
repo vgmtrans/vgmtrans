@@ -134,7 +134,7 @@ bool PandoraBoxSnesInstr::LoadInstr() {
 
   PandoraBoxSnesRgn *rgn = new PandoraBoxSnesRgn(this, version, dwOffset, srcn, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   SetGuessedLength();
   return true;
@@ -155,7 +155,7 @@ PandoraBoxSnesRgn::PandoraBoxSnesRgn(PandoraBoxSnesInstr *instr,
   uint8_t adsr1 = adsr >> 8;
   uint8_t adsr2 = adsr & 0xff;
 
-  AddSimpleItem(dwOffset, 1, "Global Instrument #");
+  addChild(dwOffset, 1, "Global Instrument #");
 
   sampNum = srcn;
   unityKey = 45; // o3a = $1000

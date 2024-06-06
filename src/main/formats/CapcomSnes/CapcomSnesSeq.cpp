@@ -58,11 +58,11 @@ void CapcomSnesSeq::ResetVars() {
 bool CapcomSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *seqHeader = AddHeader(dwOffset, (priorityInHeader ? 1 : 0) + MAX_TRACKS * 2, "Sequence Header");
+  VGMHeader *seqHeader = addHeader(dwOffset, (priorityInHeader ? 1 : 0) + MAX_TRACKS * 2, "Sequence Header");
   uint32_t curHeaderOffset = dwOffset;
 
   if (priorityInHeader) {
-    seqHeader->AddSimpleItem(curHeaderOffset, 1, "Priority");
+    seqHeader->addChild(curHeaderOffset, 1, "Priority");
     curHeaderOffset++;
   }
 

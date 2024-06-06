@@ -68,7 +68,7 @@ bool ItikitiSnesInstr::LoadInstr() {
 
   auto region = std::make_unique<ItikitiSnesRgn>(this, m_tuning_offset, m_adsr_offset, srcn);
   region->sampOffset = sample_offset - spc_dir_offset();
-  aRgns.push_back(region.release());
+  AddRgn(region.release());
 
   return true;
 }
@@ -104,7 +104,7 @@ ItikitiSnesRgn::ItikitiSnesRgn(ItikitiSnesInstr *instrument, uint32_t tuning_off
   sampNum = srcn;
   unityKey = static_cast<uint8_t>(72 - static_cast<int>(coarse_tuning));
   fineTune = static_cast<int16_t>(fine_tuning * 100.0);
-  AddSimpleItem(adsr_offset, 1, "ADSR1");
-  AddSimpleItem(adsr_offset + 1, 1, "ADSR2");
+  addChild(adsr_offset, 1, "ADSR1");
+  addChild(adsr_offset + 1, 1, "ADSR2");
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 }

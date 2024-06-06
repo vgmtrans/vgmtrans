@@ -70,9 +70,9 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
   uint16_t seqHeaderRelOffset = GetShort(dwSongItemOffset + 2);
 
   std::string songTableItemName = fmt::format("Song {}", song);
-  VGMHeader *songTableItem = AddHeader(dwSongItemOffset, 4, songTableItemName);
-  songTableItem->AddSimpleItem(dwSongItemOffset, 2, "BGM/SFX");
-  songTableItem->AddSimpleItem(dwSongItemOffset + 2, 2, "Header Offset");
+  VGMHeader *songTableItem = addHeader(dwSongItemOffset, 4, songTableItemName);
+  songTableItem->addChild(dwSongItemOffset, 2, "BGM/SFX");
+  songTableItem->addChild(dwSongItemOffset + 2, 2, "Header Offset");
 
   if (seqHeaderRelOffset < dwSongItemOffset + 4) {
     return false;
@@ -116,19 +116,19 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
         return false;
       }
 
-      VGMHeader *seqHeader = AddHeader(dwHeaderOffset, headerSize);
+      VGMHeader *seqHeader = addHeader(dwHeaderOffset, headerSize);
       for (uint8_t trackIndex = 0; trackIndex < maxTracks; trackIndex++) {
         uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
         std::stringstream trackHeaderName;
         trackHeaderName << "Track " << (trackIndex + 1);
-        VGMHeader *trackHeader = seqHeader->AddHeader(dwTrackHeaderOffset, 4, trackHeaderName.str());
+        VGMHeader *trackHeader = seqHeader->addHeader(dwTrackHeaderOffset, 4, trackHeaderName.str());
 
         uint8_t live = GetByte(dwTrackHeaderOffset);
         uint32_t dwRelTrackOffset = GetShort(dwTrackHeaderOffset + 2);
-        trackHeader->AddSimpleItem(dwTrackHeaderOffset, 1, "Active/Inactive");
-        trackHeader->AddSimpleItem(dwTrackHeaderOffset + 1, 1, "Padding");
-        trackHeader->AddSimpleItem(dwTrackHeaderOffset + 2, 2, "Track Offset");
+        trackHeader->addChild(dwTrackHeaderOffset, 1, "Active/Inactive");
+        trackHeader->addChild(dwTrackHeaderOffset + 1, 1, "Padding");
+        trackHeader->addChild(dwTrackHeaderOffset + 2, 2, "Track Offset");
 
         if (live != 0) {
           if (dwHeaderOffset + dwRelTrackOffset < vgmFile()->GetEndOffset()) {

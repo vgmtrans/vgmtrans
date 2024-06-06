@@ -32,7 +32,7 @@ bool CPS1SampleInstrSet::GetInstrPointers() {
     rgn->unLength = 4;
     // subtract 1 to account for the first OKIM6295 sample ptr always being null
     rgn->sampNum = GetByte(offset+1) - 1;
-    instr->aRgns.push_back(rgn);
+    instr->AddRgn(rgn);
     aInstrs.push_back(instr);
   }
   return true;
@@ -53,7 +53,7 @@ CPS1SampColl::CPS1SampColl(RawFile *file,
 
 
 bool CPS1SampColl::GetHeaderInfo() {
-  auto header = AddHeader(8, 0x400-8, "Sample Pointers");
+  auto header = addHeader(8, 0x400-8, "Sample Pointers");
 
   int i = 1;
   for (int offset = 8; offset < 0x400; offset += 8) {
@@ -64,8 +64,8 @@ bool CPS1SampColl::GetHeaderInfo() {
     auto endStr = fmt::format("Sample {} End", i);
     i += 1;
 
-    header->AddSimpleItem(offset, 3, startStr);
-    header->AddSimpleItem(offset+3, 3, endStr);
+    header->addChild(offset, 3, startStr);
+    header->addChild(offset+3, 3, endStr);
   }
   return true;
 }

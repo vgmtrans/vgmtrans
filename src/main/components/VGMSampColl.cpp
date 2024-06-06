@@ -21,7 +21,6 @@ VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, uint32_t o
       bLoaded(false),
       sampDataOffset(0),
       parInstrSet(nullptr) {
-  AddContainer<VGMSamp>(samples);
 }
 
 VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset,
@@ -31,11 +30,6 @@ VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSe
       bLoaded(false),
       sampDataOffset(0),
       parInstrSet(instrset) {
-  AddContainer<VGMSamp>(samples);
-}
-
-VGMSampColl::~VGMSampColl() {
-  DeleteVect<VGMSamp>(samples);
 }
 
 bool VGMSampColl::LoadVGMFile() {
@@ -62,6 +56,8 @@ bool VGMSampColl::Load() {
 
   if (samples.size() == 0)
     return false;
+
+  addChildren(samples);
 
   if (unLength == 0) {
     for (std::vector<VGMSamp *>::iterator itr = samples.begin(); itr != samples.end(); ++itr) {

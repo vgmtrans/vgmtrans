@@ -65,7 +65,7 @@ void RareSnesSeq::ResetVars(void) {
 bool RareSnesSeq::GetHeaderInfo(void) {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *seqHeader = AddHeader(dwOffset, MAX_TRACKS * 2 + 2, "Sequence Header");
+  VGMHeader *seqHeader = addHeader(dwOffset, MAX_TRACKS * 2 + 2, "Sequence Header");
   uint32_t curHeaderOffset = dwOffset;
   for (int i = 0; i < MAX_TRACKS; i++) {
     uint16_t trkOff = GetShort(curHeaderOffset);
@@ -74,7 +74,7 @@ bool RareSnesSeq::GetHeaderInfo(void) {
   }
   initialTempo = GetByte(curHeaderOffset);
   seqHeader->AddTempo(curHeaderOffset++, 1, "Tempo");
-  seqHeader->AddUnknownItem(curHeaderOffset++, 1);
+  seqHeader->addUnknownChild(curHeaderOffset++, 1);
 
   return true;        //successful
 }

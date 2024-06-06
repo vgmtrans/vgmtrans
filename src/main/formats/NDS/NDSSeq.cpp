@@ -9,22 +9,22 @@ NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
 }
 
 bool NDSSeq::GetHeaderInfo(void) {
-  VGMHeader *SSEQHdr = AddHeader(dwOffset, 0x10, "SSEQ Chunk Header");
+  VGMHeader *SSEQHdr = addHeader(dwOffset, 0x10, "SSEQ Chunk Header");
   SSEQHdr->AddSig(dwOffset, 8);
-  SSEQHdr->AddSimpleItem(dwOffset + 8, 4, "Size");
-  SSEQHdr->AddSimpleItem(dwOffset + 12, 2, "Header Size");
-  SSEQHdr->AddUnknownItem(dwOffset + 14, 2);
-  //SeqChunkHdr->AddSimpleItem(dwOffset, 4, "Blah");
+  SSEQHdr->addChild(dwOffset + 8, 4, "Size");
+  SSEQHdr->addChild(dwOffset + 12, 2, "Header Size");
+  SSEQHdr->addUnknownChild(dwOffset + 14, 2);
+  //SeqChunkHdr->addSimpleChild(dwOffset, 4, "Blah");
   unLength = GetShort(dwOffset + 8);
   SetPPQN(0x30);
   return true;        //successful
 }
 
 bool NDSSeq::GetTrackPointers(void) {
-  VGMHeader *DATAHdr = AddHeader(dwOffset + 0x10, 0xC, "DATA Chunk Header");
+  VGMHeader *DATAHdr = addHeader(dwOffset + 0x10, 0xC, "DATA Chunk Header");
   DATAHdr->AddSig(dwOffset + 0x10, 4);
-  DATAHdr->AddSimpleItem(dwOffset + 0x10 + 4, 4, "Size");
-  DATAHdr->AddSimpleItem(dwOffset + 0x10 + 8, 4, "Data Pointer");
+  DATAHdr->addChild(dwOffset + 0x10 + 4, 4, "Size");
+  DATAHdr->addChild(dwOffset + 0x10 + 8, 4, "Data Pointer");
   uint32_t offset = dwOffset + 0x1C;
   uint8_t b = GetByte(offset);
   aTracks.push_back(new NDSTrack(this));
@@ -32,8 +32,8 @@ bool NDSSeq::GetTrackPointers(void) {
   //FE XX XX signifies multiple tracks, each true bit in the XX values signifies there is a track for that channel
   if (b == 0xFE)
   {
-    VGMHeader *TrkPtrs = AddHeader(offset, 0, "Track Pointers");
-    TrkPtrs->AddSimpleItem(offset, 3, "Valid Tracks");
+    VGMHeader *TrkPtrs = addHeader(offset, 0, "Track Pointers");
+    TrkPtrs->addChild(offset, 3, "Valid Tracks");
     offset += 3;    //but all we need to do is check for subsequent 0x93 track pointer events
     b = GetByte(offset);
     uint32_t songDelay = 0;
@@ -50,7 +50,7 @@ bool NDSSeq::GetTrackPointers(void) {
         } while (c & 0x80);
       }
       songDelay += value;
-      TrkPtrs->AddSimpleItem(beginOffset, offset - beginOffset, "Delay");
+      TrkPtrs->addChild(beginOffset, offset - beginOffset, "Delay");
       //songDelay += SeqTrack::ReadVarLen(++offset);
       b = GetByte(offset);
       break;
@@ -59,7 +59,7 @@ bool NDSSeq::GetTrackPointers(void) {
     //Track/Channel assignment and pointer.  Channel # is irrelevant
     while (b == 0x93)
     {
-      TrkPtrs->AddSimpleItem(offset, 5, "Track Pointer");
+      TrkPtrs->addChild(offset, 5, "Track Pointer");
       uint32_t trkOffset = GetByte(offset + 2) + (GetByte(offset + 3) << 8) +
           (GetByte(offset + 4) << 16) + dwOffset + 0x1C;
       NDSTrack *newTrack = new NDSTrack(this, trkOffset);

@@ -30,13 +30,13 @@ bool HeartBeatPS1Seq::GetHeaderInfo() {
     return false;
   }
 
-  VGMHeader *header = VGMSeq::AddHeader(curOffset, 0x3c);
+  VGMHeader *header = VGMSeq::addHeader(curOffset, 0x3c);
 
-  header->AddSimpleItem(curOffset, 4, "Sequence Size");
-  header->AddSimpleItem(curOffset + 4, 2, "Sequence ID");
-  header->AddSimpleItem(curOffset + 6, 1, "Number of Instrument Set");
-  header->AddSimpleItem(curOffset + 7, 1, "Load Position");
-  header->AddSimpleItem(curOffset + 8, 4, "Reserved");
+  header->addChild(curOffset, 4, "Sequence Size");
+  header->addChild(curOffset + 4, 2, "Sequence ID");
+  header->addChild(curOffset + 6, 1, "Number of Instrument Set");
+  header->addChild(curOffset + 7, 1, "Load Position");
+  header->addChild(curOffset + 8, 4, "Reserved");
 
   curOffset += 0x0c;
 
@@ -48,12 +48,12 @@ bool HeartBeatPS1Seq::GetHeaderInfo() {
 
     std::ostringstream instrHeaderName;
     instrHeaderName << "Instrument Set " << (instrset_index + 1);
-    VGMHeader *instrHeader = header->AddHeader(curOffset, 0x0c, instrHeaderName.str());
+    VGMHeader *instrHeader = header->addHeader(curOffset, 0x0c, instrHeaderName.str());
 
-    instrHeader->AddSimpleItem(curOffset, 4, "Sample Collection Size");
-    instrHeader->AddSimpleItem(curOffset + 4, 4, "Instrument Set Size");
-    instrHeader->AddSimpleItem(curOffset + 8, 2, "Instrument Set ID");
-    instrHeader->AddUnknownItem(curOffset + 10, 2);
+    instrHeader->addChild(curOffset, 4, "Sample Collection Size");
+    instrHeader->addChild(curOffset + 4, 4, "Instrument Set Size");
+    instrHeader->addChild(curOffset + 8, 2, "Instrument Set ID");
+    instrHeader->addUnknownChild(curOffset + 10, 2);
 
     total_instr_size += sampcoll_size;
     total_instr_size += instrset_size;
@@ -75,15 +75,15 @@ bool HeartBeatPS1Seq::GetHeaderInfo() {
   // save sequence data offset
   seqHeaderOffset = offset() + HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size;
 
-  VGMHeader *seqHeader = VGMSeq::AddHeader(seqHeaderOffset, 0x10, "Sequence Header");
+  VGMHeader *seqHeader = VGMSeq::addHeader(seqHeaderOffset, 0x10, "Sequence Header");
 
-  seqHeader->AddSimpleItem(seqHeaderOffset, 4, "Signature");
-  seqHeader->AddSimpleItem(seqHeaderOffset + 4, 2, "Version");
-  seqHeader->AddUnknownItem(seqHeaderOffset + 6, 2);
-  seqHeader->AddSimpleItem(seqHeaderOffset + 8, 2, "PPQN");
+  seqHeader->addChild(seqHeaderOffset, 4, "Signature");
+  seqHeader->addChild(seqHeaderOffset + 4, 2, "Version");
+  seqHeader->addUnknownChild(seqHeaderOffset + 6, 2);
+  seqHeader->addChild(seqHeaderOffset + 8, 2, "PPQN");
   seqHeader->AddTempo(seqHeaderOffset + 10, 3, "Initial Tempo");
-  seqHeader->AddSimpleItem(seqHeaderOffset + 13, 2, "Time Signature");
-  seqHeader->AddSimpleItem(seqHeaderOffset + 15, 1, "Number of Tracks");
+  seqHeader->addChild(seqHeaderOffset + 13, 2, "Time Signature");
+  seqHeader->addChild(seqHeaderOffset + 15, 1, "Number of Tracks");
 
   SetPPQN(GetShortBE(seqHeaderOffset + 8));
   nNumTracks = 16;

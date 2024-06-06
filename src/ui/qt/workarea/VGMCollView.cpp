@@ -65,6 +65,9 @@ void VGMCollViewModel::handleNewCollSelected(const QModelIndex& modelIndex) {
 }
 
 VGMFile *VGMCollViewModel::fileFromIndex(const QModelIndex& index) const {
+  if (!m_coll)
+    return nullptr;
+
   size_t row = index.row();
   auto num_instrsets = m_coll->instrSets().size();
   auto num_sampcolls = m_coll->sampColls().size();

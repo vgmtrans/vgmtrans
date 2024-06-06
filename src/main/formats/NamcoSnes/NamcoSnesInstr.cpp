@@ -110,7 +110,7 @@ bool NamcoSnesInstr::LoadInstr() {
 
   NamcoSnesRgn *rgn = new NamcoSnesRgn(this, version, instrNum, spcDirAddr, addrTuningEntry);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   SetGuessedLength();
   return true;
@@ -144,7 +144,7 @@ NamcoSnesRgn::NamcoSnesRgn(NamcoSnesInstr *instr,
     fine_tuning += 1.0;
   }
 
-  AddSimpleItem(addrTuningEntry, 2, "Sample Rate");
+  addChild(addrTuningEntry, 2, "Sample Rate");
   unityKey = 71 - (int) coarse_tuning;
   fineTune = (int16_t) (fine_tuning * 100.0);
 

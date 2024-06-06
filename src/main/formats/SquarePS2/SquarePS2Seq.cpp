@@ -16,13 +16,13 @@ BGMSeq::BGMSeq(RawFile *file, uint32_t offset)
 }
 
 bool BGMSeq::GetHeaderInfo() {
-  VGMHeader *header = AddHeader(dwOffset, 0x20, "Header");
-  header->AddSimpleItem(dwOffset, 4, "Signature");
-  header->AddSimpleItem(dwOffset + 0x4, 2, "ID");
-  header->AddSimpleItem(dwOffset + 0x6, 2, "Associated WD ID");
-  header->AddSimpleItem(dwOffset + 0x8, 1, "Number of Tracks");
-  header->AddSimpleItem(dwOffset + 0xE, 2, "PPQN");
-  header->AddSimpleItem(dwOffset + 0x10, 4, "File length");
+  VGMHeader *header = addHeader(dwOffset, 0x20, "Header");
+  header->addChild(dwOffset, 4, "Signature");
+  header->addChild(dwOffset + 0x4, 2, "ID");
+  header->addChild(dwOffset + 0x6, 2, "Associated WD ID");
+  header->addChild(dwOffset + 0x8, 1, "Number of Tracks");
+  header->addChild(dwOffset + 0xE, 2, "PPQN");
+  header->addChild(dwOffset + 0x10, 4, "File length");
 
   nNumTracks = GetByte(dwOffset + 8);
   seqID = GetShort(dwOffset + 4);

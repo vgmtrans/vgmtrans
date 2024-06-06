@@ -69,11 +69,11 @@ TamSoftPS1Instr::~TamSoftPS1Instr() {
 bool TamSoftPS1Instr::LoadInstr() {
   TamSoftPS1InstrSet *parInstrSet = (TamSoftPS1InstrSet *) this->parInstrSet;
 
-  AddSimpleItem(dwOffset, 4, "Sample Offset");
+  addChild(dwOffset, 4, "Sample Offset");
 
   TamSoftPS1Rgn *rgn = new TamSoftPS1Rgn(this, dwOffset + 0x400, parInstrSet->ps2);
   rgn->sampNum = instrNum;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
   return true;
 }
 
@@ -84,8 +84,8 @@ bool TamSoftPS1Instr::LoadInstr() {
 TamSoftPS1Rgn::TamSoftPS1Rgn(TamSoftPS1Instr *instr, uint32_t offset, bool ps2) :
     VGMRgn(instr, offset, 4) {
   unityKey = TAMSOFTPS1_KEY_OFFSET + 48;
-  AddSimpleItem(offset, 2, "ADSR1");
-  AddSimpleItem(offset + 2, 2, "ADSR2");
+  addChild(offset, 2, "ADSR1");
+  addChild(offset + 2, 2, "ADSR2");
 
   uint16_t adsr1 = GetShort(offset);
   uint16_t adsr2 = GetShort(offset + 2);

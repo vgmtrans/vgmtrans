@@ -31,20 +31,27 @@ public:
 
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
+
+protected:
+   void disableAutoAddInstrumentsAsChildren() { autoAddInstrumentsAsChildren = false; }
+
+private:
+   bool autoAddInstrumentsAsChildren{true};
 };
 
 // ********
 // VGMInstr
 // ********
 
-class VGMInstr : public VGMContainerItem {
+class VGMInstr : public VGMItem {
 public:
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
-  ~VGMInstr() override;
 
   Icon GetIcon() override { return ICON_INSTR; };
+
+  const std::vector<VGMRgn*>& regions() { return m_regions; }
 
   inline void SetBank(uint32_t bankNum);
   inline void SetInstrNum(uint32_t theInstrNum);
@@ -53,12 +60,19 @@ public:
   VGMRgn *AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
                  uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
 
-  virtual bool LoadInstr();
+  virtual bool LoadInstr() { return true; }
 
   uint32_t bank;
   uint32_t instrNum;
   VGMInstrSet *parInstrSet;
   float reverb;
 
-  std::vector<VGMRgn *> aRgns;
+
+protected:
+  void disableAutoAddRegionsAsChildren() { autoAddRegionsAsChildren = false; }
+  void deleteRegions();
+
+private:
+  bool autoAddRegionsAsChildren{true};
+  std::vector<VGMRgn*> m_regions;
 };

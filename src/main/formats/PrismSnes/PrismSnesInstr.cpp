@@ -136,7 +136,7 @@ bool PrismSnesInstr::LoadInstr() {
                                        addrTuningEntryHigh,
                                        addrTuningEntryLow);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   SetGuessedLength();
   return true;
@@ -162,8 +162,8 @@ PrismSnesRgn::PrismSnesRgn(PrismSnesInstr *instr,
   double coarse_tuning;
   fine_tuning = modf(tuning / 256.0, &coarse_tuning) * 100.0;
 
-  AddSimpleItem(addrADSR1Entry, 1, "ADSR1");
-  AddSimpleItem(addrADSR2Entry, 1, "ADSR2");
+  addChild(addrADSR1Entry, 1, "ADSR1");
+  addChild(addrADSR2Entry, 1, "ADSR2");
   AddUnityKey(93 - (int) coarse_tuning, addrTuningEntryHigh, 1);
   AddFineTune((int16_t) fine_tuning, addrTuningEntryLow, 1);
 

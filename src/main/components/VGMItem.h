@@ -76,29 +76,42 @@ public:
           uint32_t length = 0,
           std::string name = "",
           EventColor color = CLR_UNKNOWN);
-  virtual ~VGMItem() = default;
+  virtual ~VGMItem();
 
   friend bool operator>(VGMItem &item1, VGMItem &item2);
   friend bool operator<=(VGMItem &item1, VGMItem &item2);
   friend bool operator<(VGMItem &item1, VGMItem &item2);
   friend bool operator>=(VGMItem &item1, VGMItem &item2);
 
-  [[nodiscard]] std::string name() const noexcept { return m_name; }
+  [[nodiscard]] const std::string& name() const noexcept { return m_name; }
   void setName(const std::string& newName) { m_name = newName; }
 
   [[nodiscard]] VGMFile* vgmFile() const { return m_vgmfile; }
   [[nodiscard]] RawFile* rawFile() const;
 
-  virtual bool IsItemAtOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
-  virtual VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false);
-  virtual uint32_t GuessLength() { return unLength; };
-  virtual void SetGuessedLength(){};
-  virtual std::vector<const char* > *GetMenuItemNames() { return nullptr; }
+  virtual bool IsItemAtOffset(uint32_t offset, bool matchStartOffset = false);
+  VGMItem* GetItemFromOffset(uint32_t offset, bool matchStartOffset = false);
+
+  virtual uint32_t GuessLength();
+  virtual void SetGuessedLength();
   virtual std::string description() { return ""; }
   [[nodiscard]] virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
   virtual Icon GetIcon() { return ICON_BINARY; }
   virtual void AddToUI(VGMItem *parent, void *UI_specific);
-  virtual bool IsContainerItem() const { return false; }
+
+  const std::vector<VGMItem*>& children() { return m_children; }
+  VGMItem* addChild(VGMItem* child);
+  VGMItem* addChild(uint32_t offset, uint32_t length, const std::string &name);
+  VGMItem* addUnknownChild(uint32_t offset, uint32_t length);
+  VGMHeader* addHeader(uint32_t offset, uint32_t length, const std::string &name = "Header");
+
+  template <std::ranges::input_range Range>
+  requires std::convertible_to<std::ranges::range_value_t<Range>, VGMItem*>
+  void addChildren(const Range& items) {
+    std::ranges::copy(items, std::back_inserter(m_children));
+  }
+
+  void sortChildrenByOffset();
 
 protected:
   uint32_t GetBytes(uint32_t index, uint32_t count, void *buffer) const;
@@ -108,6 +121,8 @@ protected:
   [[nodiscard]] uint16_t GetShortBE(uint32_t offset) const;
   [[nodiscard]] uint32_t GetWordBE(uint32_t offset) const;
   bool IsValidOffset(uint32_t offset) const;
+  // FIXME: clearChildren() is a workaround for VGMSeqNoTrks' multiple inheritance diamond problem
+  void clearChildren() { m_children.clear(); }
 
 public:
   uint32_t dwOffset;  // offset in the pDoc data buffer
@@ -115,57 +130,9 @@ public:
   EventColor color;
 
 private:
+  std::vector<VGMItem *> m_children;
   VGMFile *m_vgmfile;
   std::string m_name;
-};
-
-//  ****************
-//  VGMContainerItem
-//  ****************
-
-class VGMContainerItem : public VGMItem {
-public:
-  VGMContainerItem();
-  VGMContainerItem(VGMFile *vgmfile,
-                   uint32_t offset,
-                   uint32_t length = 0,
-                   std::string name = "",
-                   EventColor color = CLR_HEADER);
-  virtual ~VGMContainerItem();
-
-  VGMItem *GetItemFromOffset(uint32_t offset, bool includeContainer = true, bool matchStartOffset = false) override;
-  uint32_t GuessLength() override;
-  void SetGuessedLength() override;
-  void AddToUI(VGMItem *parent, void *UI_specific) override;
-  bool IsContainerItem() const override { return true; }
-
-  VGMHeader *AddHeader(uint32_t offset, uint32_t length, const std::string &name = "Header");
-
-  void AddItem(VGMItem *item);
-  void AddSimpleItem(uint32_t offset, uint32_t length, const std::string &name);
-  void AddUnknownItem(uint32_t offset, uint32_t length);
-
-  template <class T>
-  void AddContainer(std::vector<T*>& container) {
-    static_assert(std::is_base_of_v<VGMItem, T>, "T must be a subclass of VGMItem");
-    containers.push_back(reinterpret_cast<std::vector<VGMItem *> *>(&container));
-  }
-
-  template <class T>
-  bool RemoveContainer(std::vector<T *> &container) {
-    auto iter = std::ranges::find(containers, reinterpret_cast<std::vector<VGMItem*>*>(&container));
-    if (iter != containers.end()) {
-      containers.erase(iter);
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-public:
-  std::vector<VGMHeader *> headers;
-  std::vector<std::vector<VGMItem *> *> containers;
-  std::vector<VGMItem *> localitems;
 };
 
 struct ItemPtrOffsetCmp {

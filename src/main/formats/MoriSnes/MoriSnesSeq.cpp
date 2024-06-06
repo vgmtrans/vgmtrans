@@ -43,7 +43,7 @@ bool MoriSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
   uint32_t curOffset = dwOffset;
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
 
   // reset track start addresses
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
@@ -55,7 +55,7 @@ bool MoriSnesSeq::GetHeaderInfo() {
     uint32_t beginOffset = curOffset;
     uint8_t statusByte = GetByte(curOffset++);
     if (statusByte == 0xff) {
-      header->AddSimpleItem(beginOffset, curOffset - beginOffset, "Header End");
+      header->addChild(beginOffset, curOffset - beginOffset, "Header End");
       break;
     }
 
@@ -76,10 +76,10 @@ bool MoriSnesSeq::GetHeaderInfo() {
 
       std::stringstream trackName;
       trackName << "Track " << (trackIndex + 1) << " Offset";
-      header->AddSimpleItem(beginOffset, curOffset - beginOffset, trackName.str().c_str());
+      header->addChild(beginOffset, curOffset - beginOffset, trackName.str().c_str());
     }
     else {
-      header->AddUnknownItem(beginOffset, curOffset - beginOffset);
+      header->addUnknownChild(beginOffset, curOffset - beginOffset);
       break;
     }
 

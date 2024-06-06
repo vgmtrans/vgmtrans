@@ -12,6 +12,7 @@
 #include "Root.h"
 #include "Format.h"
 #include "LogManager.h"
+#include "helper.h"
 
 // ***********
 // VGMInstrSet
@@ -20,11 +21,9 @@
 VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length,
                          std::string name, VGMSampColl *theSampColl)
     : VGMFile(format, file, offset, length, std::move(name)), sampColl(theSampColl) {
-  AddContainer<VGMInstr>(aInstrs);
 }
 
 VGMInstrSet::~VGMInstrSet() {
-  DeleteVect<VGMInstr>(aInstrs);
   delete sampColl;
 }
 
@@ -60,6 +59,9 @@ bool VGMInstrSet::Load() {
 
   if (aInstrs.empty())
     return false;
+
+  if (autoAddInstrumentsAsChildren)
+    addChildren(aInstrs);
 
   if (unLength == 0) {
     SetGuessedLength();
@@ -100,13 +102,8 @@ bool VGMInstrSet::LoadInstrs() {
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
                    uint32_t theInstrNum, std::string name, float reverb)
-    : VGMContainerItem(instrSet, offset, length, std::move(name)), bank(theBank), instrNum(theInstrNum),
+    : VGMItem(instrSet, offset, length, std::move(name)), bank(theBank), instrNum(theInstrNum),
       parInstrSet(instrSet), reverb(reverb) {
-  AddContainer<VGMRgn>(aRgns);
-}
-
-VGMInstr::~VGMInstr() {
-  DeleteVect<VGMRgn>(aRgns);
 }
 
 void VGMInstr::SetBank(uint32_t bankNum) {
@@ -118,17 +115,21 @@ void VGMInstr::SetInstrNum(uint32_t theInstrNum) {
 }
 
 VGMRgn *VGMInstr::AddRgn(VGMRgn *rgn) {
-  aRgns.push_back(rgn);
+  m_regions.emplace_back(rgn);
+  if (autoAddRegionsAsChildren)
+    addChild(rgn);
   return rgn;
 }
 
 VGMRgn *VGMInstr::AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow,
                          uint8_t keyHigh, uint8_t velLow, uint8_t velHigh) {
   VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
-  aRgns.push_back(newRgn);
+  m_regions.emplace_back(newRgn);
+  if (autoAddRegionsAsChildren)
+    addChild(newRgn);
   return newRgn;
 }
 
-bool VGMInstr::LoadInstr() {
-  return true;
+void VGMInstr::deleteRegions() {
+  DeleteVect(m_regions);
 }

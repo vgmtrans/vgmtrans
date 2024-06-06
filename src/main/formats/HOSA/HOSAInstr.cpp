@@ -39,9 +39,9 @@ bool HOSAInstrSet::GetHeaderInfo() {
   setId(0);                        //Bank number.
 
   //ヘッダーobjectの生成
-  VGMHeader *wdsHeader = AddHeader(dwOffset, sizeof(InstrHeader));
+  VGMHeader *wdsHeader = addHeader(dwOffset, sizeof(InstrHeader));
   wdsHeader->AddSig(dwOffset, 8);
-  wdsHeader->AddSimpleItem(dwOffset + 8, sizeof(uint32_t), "Number of Instruments");
+  wdsHeader->addChild(dwOffset + 8, sizeof(uint32_t), "Number of Instruments");
 
   //波形objectの生成
 //	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800); // moved to HOSAScanner
@@ -97,7 +97,7 @@ bool HOSAInstr::LoadInstr() {
   // Get the instr data
   GetBytes(dwOffset, sizeof(InstrInfo), &instrinfo);
   unLength = sizeof(InstrInfo) + sizeof(RgnInfo) * instrinfo.numRgns;
-  AddSimpleItem(dwOffset, sizeof(uint32_t), "Number of Rgns");
+  addChild(dwOffset, sizeof(uint32_t), "Number of Rgns");
 
   // Get the rgn data
   rgns = new RgnInfo[instrinfo.numRgns];
@@ -110,7 +110,7 @@ bool HOSAInstr::LoadInstr() {
     RgnInfo *rgninfo = &rgns[i];
     VGMRgn *rgn = new VGMRgn(this, dwOffset + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
 
-    rgn->AddSimpleItem(rgn->dwOffset, 4, "Sample Offset");
+    rgn->addChild(rgn->dwOffset, 4, "Sample Offset");
     rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->dwOffset;
 
     rgn->velLow = 0x00;
@@ -120,7 +120,7 @@ bool HOSAInstr::LoadInstr() {
     cKeyLow = (rgninfo->note_range_high) + 1;
 
     rgn->AddUnityKey(static_cast<int8_t>(0x3C)+ 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset + 0x06);
-    rgn->AddSimpleItem(rgn->dwOffset + 0x07, 1, "Semi Tone Tune");
+    rgn->addChild(rgn->dwOffset + 0x07, 1, "Semi Tone Tune");
     rgn->fineTune = static_cast<int16_t>(rgninfo->iFineTune * (100.0 / 256.0));
 
     // Might want to simplify the code below.  I'm being nitpicky.
@@ -132,7 +132,7 @@ bool HOSAInstr::LoadInstr() {
     else rgn->pan = static_cast<double>(rgninfo->iPan - 0x80) / 0x7F;
 
     // The ADSR value ordering is all messed up for the hell of it.  This was a bitch to reverse-engineer.
-    rgn->AddSimpleItem(rgn->dwOffset + 0x0C, 4, "ADSR Values (non-standard ordering)");
+    rgn->addChild(rgn->dwOffset + 0x0C, 4, "ADSR Values (non-standard ordering)");
     uint8_t Ar = (rgninfo->ADSR_vals >> 20) & 0x7F;
     uint8_t Dr = (rgninfo->ADSR_vals >> 16) & 0xF;
     uint8_t Sr = ((rgninfo->ADSR_vals >> 8) & 0xFF) >> 1;
@@ -144,7 +144,7 @@ bool HOSAInstr::LoadInstr() {
     // Unsure if volume is using a linear scale, but it sounds like it.
     double vol = rgninfo->volume / 255.0;
     rgn->SetVolume(vol);
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   return true;
 }

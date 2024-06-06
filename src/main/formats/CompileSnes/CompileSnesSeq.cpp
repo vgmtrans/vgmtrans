@@ -46,9 +46,9 @@ void CompileSnesSeq::ResetVars() {
 bool CompileSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
 
-  header->AddSimpleItem(dwOffset, 1, "Number of Tracks");
+  header->addChild(dwOffset, 1, "Number of Tracks");
   nNumTracks = GetByte(dwOffset);
   if (nNumTracks == 0 || nNumTracks > 8) {
     return false;
@@ -59,20 +59,20 @@ bool CompileSnesSeq::GetHeaderInfo() {
     std::stringstream trackName;
     trackName << "Track " << (trackIndex + 1);
 
-    VGMHeader *trackHeader = header->AddHeader(curOffset, 14, trackName.str().c_str());
-    trackHeader->AddSimpleItem(curOffset, 1, "Channel");
-    trackHeader->AddSimpleItem(curOffset + 1, 1, "Flags");
-    trackHeader->AddSimpleItem(curOffset + 2, 1, "Volume");
-    trackHeader->AddSimpleItem(curOffset + 3, 1, "Volume Envelope");
-    trackHeader->AddSimpleItem(curOffset + 4, 1, "Vibrato");
-    trackHeader->AddSimpleItem(curOffset + 5, 1, "Transpose");
+    VGMHeader *trackHeader = header->addHeader(curOffset, 14, trackName.str().c_str());
+    trackHeader->addChild(curOffset, 1, "Channel");
+    trackHeader->addChild(curOffset + 1, 1, "Flags");
+    trackHeader->addChild(curOffset + 2, 1, "Volume");
+    trackHeader->addChild(curOffset + 3, 1, "Volume Envelope");
+    trackHeader->addChild(curOffset + 4, 1, "Vibrato");
+    trackHeader->addChild(curOffset + 5, 1, "Transpose");
     trackHeader->AddTempo(curOffset + 6, 1);
-    trackHeader->AddSimpleItem(curOffset + 7, 1, "Branch ID (Channel #)");
-    trackHeader->AddSimpleItem(curOffset + 8, 2, "Score Pointer");
-    trackHeader->AddSimpleItem(curOffset + 10, 1, "SRCN");
-    trackHeader->AddSimpleItem(curOffset + 11, 1, "ADSR");
-    trackHeader->AddSimpleItem(curOffset + 12, 1, "Pan");
-    trackHeader->AddSimpleItem(curOffset + 13, 1, "Reserved");
+    trackHeader->addChild(curOffset + 7, 1, "Branch ID (Channel #)");
+    trackHeader->addChild(curOffset + 8, 2, "Score Pointer");
+    trackHeader->addChild(curOffset + 10, 1, "SRCN");
+    trackHeader->addChild(curOffset + 11, 1, "ADSR");
+    trackHeader->addChild(curOffset + 12, 1, "Pan");
+    trackHeader->addChild(curOffset + 13, 1, "Reserved");
     curOffset += 14;
   }
 

@@ -127,7 +127,7 @@ bool FalcomSnesInstr::LoadInstr() {
 
   FalcomSnesRgn *rgn = new FalcomSnesRgn(this, version, dwOffset, srcn);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }
@@ -169,8 +169,8 @@ FalcomSnesRgn::FalcomSnesRgn(FalcomSnesInstr *instr,
   }
 
   sampNum = srcn;
-  AddSimpleItem(offset, 1, "ADSR1");
-  AddSimpleItem(offset + 1, 1, "ADSR2");
+  addChild(offset, 1, "ADSR1");
+  addChild(offset + 1, 1, "ADSR2");
   AddUnityKey(96 - static_cast<int>(coarse_tuning), offset + 3, 1);
   AddFineTune(static_cast<int16_t>(fine_tuning * 100.0), offset + 4, 1);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);

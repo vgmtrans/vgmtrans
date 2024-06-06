@@ -98,13 +98,13 @@ class SonyPS2Instr
   } SplitBlock;
 
   SonyPS2Instr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
-  virtual ~SonyPS2Instr(void);
+  ~SonyPS2Instr() override;
 
-  virtual bool LoadInstr();
+  bool LoadInstr() override;
   int8_t ConvertPanVal(uint8_t panVal);
 
  public:
-  SplitBlock *splitBlocks;
+  SplitBlock *splitBlocks{};
 };
 
 
@@ -245,10 +245,10 @@ class SonyPS2InstrSet
   } VAGInfoCk;
 
   SonyPS2InstrSet(RawFile *file, uint32_t offset);
-  virtual ~SonyPS2InstrSet(void);
+  ~SonyPS2InstrSet() override;
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  bool GetHeaderInfo() override;
+  bool GetInstrPointers() override;
 
  protected:
   VersCk versCk;
@@ -269,5 +269,5 @@ class SonyPS2SampColl
  public:
   SonyPS2SampColl(RawFile *file, uint32_t offset, uint32_t length = 0);
 
-  virtual bool GetSampleInfo();
+  bool GetSampleInfo() override;
 };

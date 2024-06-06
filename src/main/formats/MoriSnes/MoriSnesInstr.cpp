@@ -151,7 +151,7 @@ MoriSnesInstr::~MoriSnesInstr() {
 }
 
 bool MoriSnesInstr::LoadInstr() {
-  AddSimpleItem(dwOffset, 1, "Melody/Percussion");
+  addChild(dwOffset, 1, "Melody/Percussion");
 
   if (!instrHintDir.percussion) {
     MoriSnesInstrHint *instrHint = &instrHintDir.instrHint;
@@ -162,12 +162,12 @@ bool MoriSnesInstr::LoadInstr() {
       return false;
     }
 
-    AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, "Envelope Sequence");
+    addChild(instrHint->seqAddress, instrHint->seqSize, "Envelope Sequence");
 
     uint16_t addrSampStart = GetShort(offDirEnt);
     MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint);
     rgn->sampOffset = addrSampStart - spcDirAddr;
-    aRgns.push_back(rgn);
+    AddRgn(rgn);
   }
   else {
     for (uint8_t percNoteKey = 0; percNoteKey < instrHintDir.percHints.size(); percNoteKey++) {
@@ -180,15 +180,15 @@ bool MoriSnesInstr::LoadInstr() {
       }
 
       auto seqOffsetName = fmt::format("Sequence Offset {}", percNoteKey);
-      AddSimpleItem(dwOffset + 1 + (percNoteKey * 2), 2, seqOffsetName);
+      addChild(dwOffset + 1 + (percNoteKey * 2), 2, seqOffsetName);
 
       auto seqName = fmt::format("Envelope Sequence {}", percNoteKey);
-      AddSimpleItem(instrHint->seqAddress, instrHint->seqSize, seqName);
+      addChild(instrHint->seqAddress, instrHint->seqSize, seqName);
 
       uint16_t addrSampStart = GetShort(offDirEnt);
       MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);
       rgn->sampOffset = addrSampStart - spcDirAddr;
-      aRgns.push_back(rgn);
+      AddRgn(rgn);
     }
   }
 
@@ -233,10 +233,10 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
   }
 
   AddSampNum(srcn, rgnAddress, 1);
-  AddSimpleItem(rgnAddress + 1, 1, "ADSR1");
-  AddSimpleItem(rgnAddress + 2, 1, "ADSR2");
-  AddSimpleItem(rgnAddress + 3, 1, "GAIN");
-  AddSimpleItem(rgnAddress + 4, 1, "Key-Off Delay");
+  addChild(rgnAddress + 1, 1, "ADSR1");
+  addChild(rgnAddress + 2, 1, "ADSR2");
+  addChild(rgnAddress + 3, 1, "GAIN");
+  addChild(rgnAddress + 4, 1, "Key-Off Delay");
   AddUnityKey(72 - (int) (coarse_tuning), rgnAddress + 5, 1);
   AddFineTune((int16_t) (fine_tuning * 100.0), rgnAddress + 6, 1);
   if (instrHint.pan > 0) {

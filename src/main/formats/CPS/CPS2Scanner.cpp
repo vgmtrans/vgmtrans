@@ -205,7 +205,7 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
       seqPointer = programFile->GetWordBE(seq_table_offset + k) & 0x0FFFFF;
     }
 
-    seqTable->AddSimpleItem(seq_table_offset + k, 4, "Sequence Pointer");
+    seqTable->addChild(seq_table_offset + k, 4, "Sequence Pointer");
 
     std::string collName = fmt::format("{} song {}", gameentry->name, k / 4);
     VGMColl *coll = new VGMColl(collName);

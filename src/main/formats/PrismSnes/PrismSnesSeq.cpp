@@ -44,7 +44,7 @@ PrismSnesSeq::~PrismSnesSeq() {
 
 void PrismSnesSeq::DemandEnvelopeContainer(uint32_t offset) {
   if (envContainer == NULL) {
-    envContainer = AddHeader(offset, 0, "Envelopes");
+    envContainer = addHeader(offset, 0, "Envelopes");
   }
 
   if (offset < envContainer->dwOffset) {
@@ -64,7 +64,7 @@ void PrismSnesSeq::ResetVars() {
 bool PrismSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(dwOffset, 0);
 
   uint32_t curOffset = dwOffset;
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS + 1; trackIndex++) {
@@ -74,7 +74,7 @@ bool PrismSnesSeq::GetHeaderInfo() {
 
     uint8_t channel = GetByte(curOffset);
     if (channel >= 0x80) {
-      header->AddSimpleItem(curOffset, 1, "Header End");
+      header->addChild(curOffset, 1, "Header End");
       break;
     }
     if (trackIndex >= MAX_TRACKS) {
@@ -83,17 +83,17 @@ bool PrismSnesSeq::GetHeaderInfo() {
 
     std::stringstream trackName;
     trackName << "Track " << (trackIndex + 1);
-    VGMHeader *trackHeader = header->AddHeader(curOffset, 4, trackName.str());
+    VGMHeader *trackHeader = header->addHeader(curOffset, 4, trackName.str());
 
-    trackHeader->AddSimpleItem(curOffset, 1, "Logical Channel");
+    trackHeader->addChild(curOffset, 1, "Logical Channel");
     curOffset++;
 
     uint8_t a01 = GetByte(curOffset);
-    trackHeader->AddSimpleItem(curOffset, 1, "Physical Channel + Flags");
+    trackHeader->addChild(curOffset, 1, "Physical Channel + Flags");
     curOffset++;
 
     uint16_t addrTrackStart = GetShort(curOffset);
-    trackHeader->AddSimpleItem(curOffset, 2, "Track Pointer");
+    trackHeader->addChild(curOffset, 2, "Track Pointer");
     curOffset += 2;
 
     PrismSnesTrack *track = new PrismSnesTrack(this, addrTrackStart);
@@ -1012,7 +1012,7 @@ void PrismSnesTrack::AddVolumeEnvelope(uint16_t envelopeAddress) {
     std::ostringstream envelopeName;
     envelopeName << "Volume Envelope ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
         << envelopeAddress << ")";
-    VGMHeader *envHeader = parentSeq->envContainer->AddHeader(envelopeAddress, 0, envelopeName.str());
+    VGMHeader *envHeader = parentSeq->envContainer->addHeader(envelopeAddress, 0, envelopeName.str());
 
     uint16_t envOffset = 0;
     while (envelopeAddress + envOffset + 2 <= 0x10000) {
@@ -1025,7 +1025,7 @@ void PrismSnesTrack::AddVolumeEnvelope(uint16_t envelopeAddress) {
         uint16_t newAddress = GetByte(envelopeAddress + envOffset + 2);
 
         eventName << "Jump to $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << newAddress;
-        envHeader->AddSimpleItem(envelopeAddress + envOffset, 4, eventName.str());
+        envHeader->addChild(envelopeAddress + envOffset, 4, eventName.str());
         envOffset += 4;
         break;
       }
@@ -1034,7 +1034,7 @@ void PrismSnesTrack::AddVolumeEnvelope(uint16_t envelopeAddress) {
       uint8_t deltaTime = GetByte(envelopeAddress + envOffset + 3);
       eventName << "Volume: " << volumeFrom << "  Volume Delta: " << volumeDelta << "  Envelope Speed: "
           << envelopeSpeed << "  Delta-Time: " << deltaTime;
-      envHeader->AddSimpleItem(envelopeAddress + envOffset, 4, eventName.str());
+      envHeader->addChild(envelopeAddress + envOffset, 4, eventName.str());
       envOffset += 4;
 
       // workaround: quit to prevent out of bound
@@ -1053,7 +1053,7 @@ void PrismSnesTrack::AddPanEnvelope(uint16_t envelopeAddress) {
     std::ostringstream envelopeName;
     envelopeName << "Pan Envelope ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
         << envelopeAddress << ")";
-    VGMHeader *envHeader = parentSeq->envContainer->AddHeader(envelopeAddress, 0, envelopeName.str());
+    VGMHeader *envHeader = parentSeq->envContainer->addHeader(envelopeAddress, 0, envelopeName.str());
 
     uint16_t envOffset = 0;
     while (envOffset < 0x100) {
@@ -1066,13 +1066,13 @@ void PrismSnesTrack::AddPanEnvelope(uint16_t envelopeAddress) {
 
         eventName << "Jump to $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
             << (envelopeAddress + newOffset);
-        envHeader->AddSimpleItem(envelopeAddress + envOffset, 2, eventName.str());
+        envHeader->addChild(envelopeAddress + envOffset, 2, eventName.str());
         envOffset += 2;
         break;
       }
 
       eventName << "Pan: " << newPan;
-      envHeader->AddSimpleItem(envelopeAddress + envOffset, 1, eventName.str());
+      envHeader->addChild(envelopeAddress + envOffset, 1, eventName.str());
       envOffset++;
 
       // workaround: quit to prevent out of bound
@@ -1091,7 +1091,7 @@ void PrismSnesTrack::AddEchoVolumeEnvelope(uint16_t envelopeAddress) {
     std::ostringstream envelopeName;
     envelopeName << "Echo Volume Envelope ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
         << envelopeAddress << ")";
-    VGMHeader *envHeader = parentSeq->envContainer->AddHeader(envelopeAddress, 0, envelopeName.str());
+    VGMHeader *envHeader = parentSeq->envContainer->addHeader(envelopeAddress, 0, envelopeName.str());
 
     uint16_t envOffset = 0;
     while (envOffset < 0x100) {
@@ -1104,7 +1104,7 @@ void PrismSnesTrack::AddEchoVolumeEnvelope(uint16_t envelopeAddress) {
 
         eventName << "Jump to $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
             << (envelopeAddress + newOffset);
-        envHeader->AddSimpleItem(envelopeAddress + envOffset, 2, eventName.str());
+        envHeader->addChild(envelopeAddress + envOffset, 2, eventName.str());
         envOffset += 2;
         break;
       }
@@ -1114,7 +1114,7 @@ void PrismSnesTrack::AddEchoVolumeEnvelope(uint16_t envelopeAddress) {
       int8_t echoVolumeMono = GetByte(envelopeAddress + envOffset + 3);
       eventName << "Delta-Time: " << deltaTime << "  Left Volume: " << echoVolumeLeft << "  Right Volume: "
           << echoVolumeRight << "  Mono Volume: " << echoVolumeMono;
-      envHeader->AddSimpleItem(envelopeAddress + envOffset, 4, eventName.str());
+      envHeader->addChild(envelopeAddress + envOffset, 4, eventName.str());
       envOffset += 4;
 
       // workaround: quit to prevent out of bound
@@ -1133,7 +1133,7 @@ void PrismSnesTrack::AddGAINEnvelope(uint16_t envelopeAddress) {
     std::ostringstream envelopeName;
     envelopeName << "GAIN Envelope ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
         << envelopeAddress << ")";
-    VGMHeader *envHeader = parentSeq->envContainer->AddHeader(envelopeAddress, 0, envelopeName.str());
+    VGMHeader *envHeader = parentSeq->envContainer->addHeader(envelopeAddress, 0, envelopeName.str());
 
     uint16_t envOffset = 0;
     while (envOffset < 0x100) {
@@ -1146,7 +1146,7 @@ void PrismSnesTrack::AddGAINEnvelope(uint16_t envelopeAddress) {
 
         eventName << "Jump to $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
             << (envelopeAddress + newOffset);
-        envHeader->AddSimpleItem(envelopeAddress + envOffset, 2, eventName.str());
+        envHeader->addChild(envelopeAddress + envOffset, 2, eventName.str());
         envOffset += 2;
         break;
       }
@@ -1154,7 +1154,7 @@ void PrismSnesTrack::AddGAINEnvelope(uint16_t envelopeAddress) {
       uint8_t deltaTime = GetByte(envelopeAddress + envOffset + 1);
       eventName << "GAIN: $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << gain << std::dec
           << std::setfill(' ') << std::setw(0) << ", Delta-Time: " << deltaTime;
-      envHeader->AddSimpleItem(envelopeAddress + envOffset, 2, eventName.str());
+      envHeader->addChild(envelopeAddress + envOffset, 2, eventName.str());
       envOffset += 2;
 
       // workaround: quit to prevent out of bound
@@ -1173,6 +1173,6 @@ void PrismSnesTrack::AddPanTable(uint16_t panTableAddress) {
     std::ostringstream eventName;
     eventName << "Pan Table ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << panTableAddress
         << ")";
-    parentSeq->envContainer->AddSimpleItem(panTableAddress, 21, eventName.str());
+    parentSeq->envContainer->addChild(panTableAddress, 21, eventName.str());
   }
 }

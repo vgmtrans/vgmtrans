@@ -9,6 +9,8 @@
 #include "Helpers.h"
 #include "UIHelpers.h"
 #include "LambdaEventFilter.h"
+#include "SeqTrack.h"
+
 #include <QFontDatabase>
 #include <QPainter>
 #include <QApplication>
@@ -388,8 +390,8 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
         pixmapPainter.save();
         pixmapPainter.translate(0, line * lineHeight);
 
-        // If the selected item is a container item, then we need to draw all of its sub items.
-        if (selectedItem->IsContainerItem()) {
+        // If the selected item has children, draw them.
+        if (!selectedItem->children().empty()) {
           int startAddress = selectedItem->dwOffset + offsetIntoEvent;
           int endAddress = selectedItem->dwOffset + selectedItem->unLength;
           printData(pixmapPainter, startAddress, endAddress);

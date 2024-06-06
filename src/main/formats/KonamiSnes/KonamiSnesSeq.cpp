@@ -74,7 +74,7 @@ bool KonamiSnesSeq::GetHeaderInfo(void) {
   // For instance: Ganbare Goemon 3 - Title
   nNumTracks = MAX_TRACKS;
 
-  VGMHeader *seqHeader = AddHeader(dwOffset, nNumTracks * 2, "Sequence Header");
+  VGMHeader *seqHeader = addHeader(dwOffset, nNumTracks * 2, "Sequence Header");
   for (uint32_t trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
     uint32_t trackPointerOffset = dwOffset + (trackNumber * 2);
     if (trackPointerOffset + 2 > 0x10000) {

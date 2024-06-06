@@ -9,7 +9,7 @@
 
 DECLARE_FORMAT(PS1)
 
-PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, file, offset) {
+PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, file, offset, "PS1 Seq") {
   UseReverb();
   //bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
@@ -19,8 +19,6 @@ PS1Seq::~PS1Seq() {
 
 
 bool PS1Seq::GetHeaderInfo() {
-  name() = "PS1 SEQ";
-
   SetPPQN(GetShortBE(offset() + 8));
   nNumTracks = 16;
 
@@ -29,10 +27,10 @@ bool PS1Seq::GetHeaderInfo() {
   if (numer == 0 || numer > 32)                //sanity check
     return false;
 
-  VGMHeader *seqHeader = VGMSeq::AddHeader(offset(), 11, "Sequence Header");
-  seqHeader->AddSimpleItem(offset(), 4, "ID");
-  seqHeader->AddSimpleItem(offset() + 0x04, 4, "Version");
-  seqHeader->AddSimpleItem(offset() + 0x08, 2, "Resolution of quarter note");
+  VGMHeader *seqHeader = VGMSeq::addHeader(offset(), 11, "Sequence Header");
+  seqHeader->addChild(offset(), 4, "ID");
+  seqHeader->addChild(offset() + 0x04, 4, "Version");
+  seqHeader->addChild(offset() + 0x08, 2, "Resolution of quarter note");
   seqHeader->AddTempo(offset() + 0x0A, 3);
   seqHeader->AddSig(offset() + 0x0D, 2); // Rhythm (Numerator) and Rhythm (Denominator) (2^n)
 

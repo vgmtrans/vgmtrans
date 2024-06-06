@@ -42,7 +42,7 @@ void GraphResSnesSeq::ResetVars() {
 bool GraphResSnesSeq::GetHeaderInfo() {
   SetPPQN(SEQ_PPQN);
 
-  VGMHeader *header = AddHeader(dwOffset, 3 * MAX_TRACKS);
+  VGMHeader *header = addHeader(dwOffset, 3 * MAX_TRACKS);
   if (dwOffset + header->unLength > 0x10000) {
     return false;
   }
@@ -54,12 +54,12 @@ bool GraphResSnesSeq::GetHeaderInfo() {
 
     bool trackUsed = (GetByte(curOffset) != 0);
     if (trackUsed) {
-      header->AddSimpleItem(curOffset, 1, "Enable Track");
+      header->addChild(curOffset, 1, "Enable Track");
     }
     else {
-      header->AddSimpleItem(curOffset, 1, "Disable Track");
+      header->addChild(curOffset, 1, "Disable Track");
     }
-    header->AddSimpleItem(curOffset + 1, 2, trackName.str());
+    header->addChild(curOffset + 1, 2, trackName.str());
     curOffset += 3;
   }
 

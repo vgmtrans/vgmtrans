@@ -104,7 +104,7 @@ bool CapcomSnesInstr::LoadInstr() {
 
   CapcomSnesRgn *rgn = new CapcomSnesRgn(this, dwOffset);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  aRgns.push_back(rgn);
+  AddRgn(rgn);
 
   return true;
 }
@@ -166,9 +166,9 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset) :
   }
 
   AddSampNum(srcn, offset, 1);
-  AddSimpleItem(offset + 1, 1, "ADSR1");
-  AddSimpleItem(offset + 2, 1, "ADSR2");
-  AddSimpleItem(offset + 3, 1, "GAIN");
+  addChild(offset + 1, 1, "ADSR1");
+  addChild(offset + 2, 1, "ADSR2");
+  addChild(offset + 3, 1, "GAIN");
   AddUnityKey(96 - static_cast<int>(coarse_tuning), offset + 4, 1);
   AddFineTune(static_cast<int16_t>(fine_tuning * 100.0), offset + 5, 1);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
