@@ -141,7 +141,7 @@ struct CPS1OPMInstrData {
   uint8_t DT2_D2R[4];
   uint8_t D1L_RR[4];
 
-  OPMData convertToOPMData(std::string& name) const {
+  OPMData convertToOPMData(const std::string& name) const {
     // LFO
     OPMData::LFO lfo{};
     lfo.WF = (LFO_ENABLE_AND_WF >> 5) & 0b11;

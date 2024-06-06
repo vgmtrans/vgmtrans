@@ -202,5 +202,5 @@ bool CPS1OPMInstr::LoadInstr() {
 }
 
 std::string CPS1OPMInstr::toOPMString(int num) {
-  return opmData.convertToOPMData(name).toOPMString(num);
+  return opmData.convertToOPMData(name()).toOPMString(num);
 }
