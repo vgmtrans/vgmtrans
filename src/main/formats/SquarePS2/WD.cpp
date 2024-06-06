@@ -50,10 +50,10 @@ WDInstrSet::WDInstrSet(RawFile *file, uint32_t offset)
 
 bool WDInstrSet::GetHeaderInfo() {
   VGMHeader *header = addHeader(dwOffset, 0x10, "Header");
-  header->addSimpleChild(dwOffset + 0x2, 2, "ID");
-  header->addSimpleChild(dwOffset + 0x4, 4, "Sample Section Size");
-  header->addSimpleChild(dwOffset + 0x8, 4, "Number of Instruments");
-  header->addSimpleChild(dwOffset + 0xC, 4, "Number of Regions");
+  header->addChild(dwOffset + 0x2, 2, "ID");
+  header->addChild(dwOffset + 0x4, 4, "Sample Section Size");
+  header->addChild(dwOffset + 0x8, 4, "Number of Instruments");
+  header->addChild(dwOffset + 0xC, 4, "Number of Regions");
 
   setId(GetShort(0x2 + dwOffset));
   dwSampSectSize = GetWord(0x4 + dwOffset);
@@ -111,19 +111,19 @@ bool WDInstr::LoadInstr() {
     auto *rgn = new WDRgn(this, k * 0x20 + dwOffset);
     AddRgn(rgn);
 
-    rgn->addSimpleChild(k * 0x20 + dwOffset, 1, "Stereo Region Flag");
-    rgn->addSimpleChild(k * 0x20 + 1 + dwOffset, 1, "First/Last Region Flags");
-    rgn->addSimpleChild(k * 0x20 + 2 + dwOffset, 2, "Unknown Flag");
-    rgn->addSimpleChild(k * 0x20 + 0x4 + dwOffset, 4, "Sample Offset");
-    rgn->addSimpleChild(k * 0x20 + 0x8 + dwOffset, 4, "Loop Start");
-    rgn->addSimpleChild(k * 0x20 + 0xC + dwOffset, 2, "ADSR1");
-    rgn->addSimpleChild(k * 0x20 + 0xE + dwOffset, 2, "ADSR2");
-    rgn->addSimpleChild(k * 0x20 + 0x12 + dwOffset, 1, "Finetune");
-    rgn->addSimpleChild(k * 0x20 + 0x13 + dwOffset, 1, "UnityKey");
-    rgn->addSimpleChild(k * 0x20 + 0x14 + dwOffset, 1, "Key High");
-    rgn->addSimpleChild(k * 0x20 + 0x15 + dwOffset, 1, "Velocity High");
-    rgn->addSimpleChild(k * 0x20 + 0x16 + dwOffset, 1, "Attenuation");
-    rgn->addSimpleChild(k * 0x20 + 0x17 + dwOffset, 1, "Pan");
+    rgn->addChild(k * 0x20 + dwOffset, 1, "Stereo Region Flag");
+    rgn->addChild(k * 0x20 + 1 + dwOffset, 1, "First/Last Region Flags");
+    rgn->addChild(k * 0x20 + 2 + dwOffset, 2, "Unknown Flag");
+    rgn->addChild(k * 0x20 + 0x4 + dwOffset, 4, "Sample Offset");
+    rgn->addChild(k * 0x20 + 0x8 + dwOffset, 4, "Loop Start");
+    rgn->addChild(k * 0x20 + 0xC + dwOffset, 2, "ADSR1");
+    rgn->addChild(k * 0x20 + 0xE + dwOffset, 2, "ADSR2");
+    rgn->addChild(k * 0x20 + 0x12 + dwOffset, 1, "Finetune");
+    rgn->addChild(k * 0x20 + 0x13 + dwOffset, 1, "UnityKey");
+    rgn->addChild(k * 0x20 + 0x14 + dwOffset, 1, "Key High");
+    rgn->addChild(k * 0x20 + 0x15 + dwOffset, 1, "Velocity High");
+    rgn->addChild(k * 0x20 + 0x16 + dwOffset, 1, "Attenuation");
+    rgn->addChild(k * 0x20 + 0x17 + dwOffset, 1, "Pan");
 
     rgn->bStereoRegion = GetByte(k * 0x20 + dwOffset) & 0x1u;
     rgn->bUnknownFlag2 = GetByte(k * 0x20 + 2 + dwOffset) & 0x1u;

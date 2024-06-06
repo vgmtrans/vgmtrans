@@ -47,16 +47,16 @@ bool FFTSeq::GetHeaderInfo(void) {
 
   VGMHeader *hdr = addHeader(dwOffset, 0x22);
   hdr->AddSig(dwOffset, 4);
-  hdr->addSimpleChild(dwOffset + 0x08, 2, "Size");
-  hdr->addSimpleChild(dwOffset + 0x14, 1, "Track count");
-  hdr->addSimpleChild(dwOffset + 0x15, 1, "Drum instrument count");
-  hdr->addSimpleChild(dwOffset + 0x16, 1, "Associated Sample Set ID");
-  hdr->addSimpleChild(dwOffset + 0x1E, 2, "Song title Pointer");
-  hdr->addSimpleChild(dwOffset + 0x20, 2, "Drumkit Data Pointer");
+  hdr->addChild(dwOffset + 0x08, 2, "Size");
+  hdr->addChild(dwOffset + 0x14, 1, "Track count");
+  hdr->addChild(dwOffset + 0x15, 1, "Drum instrument count");
+  hdr->addChild(dwOffset + 0x16, 1, "Associated Sample Set ID");
+  hdr->addChild(dwOffset + 0x1E, 2, "Song title Pointer");
+  hdr->addChild(dwOffset + 0x20, 2, "Drumkit Data Pointer");
 
   VGMHeader *trackPtrs = addHeader(dwOffset + 0x22, nNumTracks * 2, "Track Pointers");
   for (unsigned int i = 0; i < nNumTracks; i++)
-    trackPtrs->addSimpleChild(dwOffset + 0x22 + i * 2, 2, "Track Pointer");
+    trackPtrs->addChild(dwOffset + 0x22 + i * 2, 2, "Track Pointer");
   addHeader(dwOffset + ptSongTitle, titleLength, "Song Name");
 
 //	if(cNumPercussion!=0){										//これ、やっぱ、いらない。

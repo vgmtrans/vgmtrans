@@ -55,10 +55,10 @@ bool MP2kSeq::GetHeaderInfo() {
   }
 
   VGMHeader *seqHdr = addHeader(dwOffset, 8 + nNumTracks * 4, "Sequence header");
-  seqHdr->addSimpleChild(dwOffset, 1, "Number of tracks");
-  seqHdr->addSimpleChild(dwOffset + 1, 1, "Unknown");
-  seqHdr->addSimpleChild(dwOffset + 2, 1, "Priority");
-  seqHdr->addSimpleChild(dwOffset + 3, 1, "Reverb");
+  seqHdr->addChild(dwOffset, 1, "Number of tracks");
+  seqHdr->addChild(dwOffset + 1, 1, "Unknown");
+  seqHdr->addChild(dwOffset + 2, 1, "Priority");
+  seqHdr->addChild(dwOffset + 3, 1, "Reverb");
 
   uint32_t dwInstPtr = GetWord(dwOffset + 4);
   seqHdr->AddPointer(dwOffset + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");

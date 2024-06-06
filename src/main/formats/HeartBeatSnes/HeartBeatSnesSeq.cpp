@@ -62,21 +62,21 @@ bool HeartBeatSnesSeq::GetHeaderInfo() {
     return false;
   }
 
-  header->addSimpleChild(curOffset, 2, "Instrument Table Pointer");
+  header->addChild(curOffset, 2, "Instrument Table Pointer");
   curOffset += 2;
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t ofsTrackStart = GetShort(curOffset);
     if (ofsTrackStart == 0) {
       // example: Dragon Quest 6 - Brave Fight
-      header->addSimpleChild(curOffset, 2, "Track Pointer End");
+      header->addChild(curOffset, 2, "Track Pointer End");
       // curOffset += 2;
       break;
     }
 
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
-    header->addSimpleChild(curOffset, 2, trackName.str().c_str());
+    header->addChild(curOffset, 2, trackName.str().c_str());
 
     curOffset += 2;
   }

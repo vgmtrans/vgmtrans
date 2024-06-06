@@ -70,15 +70,15 @@ bool FalcomSnesSeq::GetHeaderInfo() {
     if (ofsTrackStart != 0) {
       std::stringstream trackName;
       trackName << "Track Pointer " << (trackIndex + 1);
-      header->addSimpleChild(curOffset, 2, trackName.str());
+      header->addChild(curOffset, 2, trackName.str());
     }
     else {
-      header->addSimpleChild(curOffset, 2, "NULL");
+      header->addChild(curOffset, 2, "NULL");
     }
     curOffset += 2;
   }
 
-  header->addSimpleChild(dwOffset + 0x18, 7, "Duration Table");
+  header->addChild(dwOffset + 0x18, 7, "Duration Table");
   for (uint8_t offset = 0; offset < 7; offset++) {
     NoteDurTable.push_back(GetByte(dwOffset + 0x18 + offset));
   }

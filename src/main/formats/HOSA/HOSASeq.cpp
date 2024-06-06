@@ -43,7 +43,7 @@ bool HOSASeq::GetHeaderInfo(void) {
 //	Delect object is in "VGMContainerItem::~VGMContainerItem()"
   VGMHeader *hdr = addHeader(dwOffset, 0x0050);
   hdr->AddSig(dwOffset, 4);
-  hdr->addSimpleChild(dwOffset + 0x06, 1, "Quantity of Tracks");
+  hdr->addChild(dwOffset + 0x06, 1, "Quantity of Tracks");
 
   SetPPQN(0x30);                                //Timebase
 

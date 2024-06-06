@@ -71,8 +71,8 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
 
   std::string songTableItemName = fmt::format("Song {}", song);
   VGMHeader *songTableItem = addHeader(dwSongItemOffset, 4, songTableItemName);
-  songTableItem->addSimpleChild(dwSongItemOffset, 2, "BGM/SFX");
-  songTableItem->addSimpleChild(dwSongItemOffset + 2, 2, "Header Offset");
+  songTableItem->addChild(dwSongItemOffset, 2, "BGM/SFX");
+  songTableItem->addChild(dwSongItemOffset + 2, 2, "Header Offset");
 
   if (seqHeaderRelOffset < dwSongItemOffset + 4) {
     return false;
@@ -126,9 +126,9 @@ bool TamSoftPS1Seq::GetHeaderInfo() {
 
         uint8_t live = GetByte(dwTrackHeaderOffset);
         uint32_t dwRelTrackOffset = GetShort(dwTrackHeaderOffset + 2);
-        trackHeader->addSimpleChild(dwTrackHeaderOffset, 1, "Active/Inactive");
-        trackHeader->addSimpleChild(dwTrackHeaderOffset + 1, 1, "Padding");
-        trackHeader->addSimpleChild(dwTrackHeaderOffset + 2, 2, "Track Offset");
+        trackHeader->addChild(dwTrackHeaderOffset, 1, "Active/Inactive");
+        trackHeader->addChild(dwTrackHeaderOffset + 1, 1, "Padding");
+        trackHeader->addChild(dwTrackHeaderOffset + 2, 2, "Track Offset");
 
         if (live != 0) {
           if (dwHeaderOffset + dwRelTrackOffset < vgmFile()->GetEndOffset()) {

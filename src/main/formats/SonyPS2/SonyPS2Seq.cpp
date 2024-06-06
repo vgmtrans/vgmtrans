@@ -25,15 +25,15 @@ bool SonyPS2Seq::GetHeaderInfo(void) {
   //read the version chunk
   GetBytes(curOffset, 0x10, &versCk);
   VGMHeader *versCkHdr = VGMSeq::addHeader(curOffset, versCk.chunkSize, "Version Chunk");
-  versCkHdr->addSimpleChild(curOffset, 4, "Creator");
-  versCkHdr->addSimpleChild(curOffset + 4, 4, "Type");
+  versCkHdr->addChild(curOffset, 4, "Creator");
+  versCkHdr->addChild(curOffset + 4, 4, "Type");
   curOffset += versCk.chunkSize;
 
   //read the header chunk
   GetBytes(curOffset, 0x20, &hdrCk);
   VGMHeader *hdrCkHdr = VGMSeq::addHeader(curOffset, hdrCk.chunkSize, "Header Chunk");
-  hdrCkHdr->addSimpleChild(curOffset, 4, "Creator");
-  hdrCkHdr->addSimpleChild(curOffset + 4, 4, "Type");
+  hdrCkHdr->addChild(curOffset, 4, "Creator");
+  hdrCkHdr->addChild(curOffset + 4, 4, "Type");
   curOffset += hdrCk.chunkSize;
   //Now we're at the Midi chunk, which starts with the sig "SCEIMidi" (in 32bit little endian)
   midiChunkSize = GetWord(curOffset + 8);

@@ -51,7 +51,7 @@ bool CPSSeq::GetTrackPointers() {
   for (int i = 0; i < maxTracks; i++) {
     uint32_t offset = GetShortBE(dwOffset + 1 + i * 2);
     if (offset == 0) {
-      header->addSimpleChild(dwOffset + 1 + (i * 2), 2, "No Track");
+      header->addChild(dwOffset + 1 + (i * 2), 2, "No Track");
       continue;
     }
     //if (GetShortBE(offset+dwOffset) == 0xE017)	//Rest, EndTrack (used by empty tracks)
@@ -77,7 +77,7 @@ bool CPSSeq::GetTrackPointers() {
         newTrack = new CPSTrackV1(this, CPSSynth::QSOUND, offset + dwOffset);
     }
     aTracks.push_back(newTrack);
-    header->addSimpleChild(dwOffset + 1 + (i * 2), 2, "Track Pointer");
+    header->addChild(dwOffset + 1 + (i * 2), 2, "Track Pointer");
   }
   if (aTracks.size() == 0)
     return false;

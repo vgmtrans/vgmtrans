@@ -47,8 +47,8 @@ bool PandoraBoxSnesSeq::GetHeaderInfo() {
     return false;
   }
 
-  addSimpleChild(dwOffset + 6, 1, "Tempo");
-  addSimpleChild(dwOffset + 7, 1, "Timebase");
+  addChild(dwOffset + 6, 1, "Tempo");
+  addChild(dwOffset + 7, 1, "Timebase");
 
   uint8_t timebase = GetByte(dwOffset + 7);
   assert((timebase % 4) == 0);
@@ -60,10 +60,10 @@ bool PandoraBoxSnesSeq::GetHeaderInfo() {
     if (ofsTrackStart != 0xffff) {
       std::stringstream trackName;
       trackName << "Track Pointer " << (trackIndex + 1);
-      header->addSimpleChild(curOffset, 2, trackName.str());
+      header->addChild(curOffset, 2, trackName.str());
     }
     else {
-      header->addSimpleChild(curOffset, 2, "NULL");
+      header->addChild(curOffset, 2, "NULL");
     }
     curOffset += 2;
   }

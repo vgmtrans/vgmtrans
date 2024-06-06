@@ -62,7 +62,7 @@ bool CapcomSnesSeq::GetHeaderInfo() {
   uint32_t curHeaderOffset = dwOffset;
 
   if (priorityInHeader) {
-    seqHeader->addSimpleChild(curHeaderOffset, 1, "Priority");
+    seqHeader->addChild(curHeaderOffset, 1, "Priority");
     curHeaderOffset++;
   }
 

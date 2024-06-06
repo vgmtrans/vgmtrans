@@ -42,13 +42,13 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
     return false;
   }
 
-  header->addSimpleChild(dwOffset, 3, "Signature");
+  header->addChild(dwOffset, 3, "Signature");
   header->addUnknownChild(dwOffset + 3, 1);
 
   const size_t NAME_SIZE = 12;
   char rawName[NAME_SIZE + 1] = {0};
   GetBytes(dwOffset + 4, NAME_SIZE, rawName);
-  header->addSimpleChild(dwOffset + 4, 12, "Song Name");
+  header->addChild(dwOffset + 4, 12, "Song Name");
 
   // trim name text
   for (int i = NAME_SIZE - 1; i >= 0; i--) {
@@ -72,7 +72,7 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
 
     std::stringstream trackSignName;
     trackSignName << "Track " << (trackIndex + 1) << " Entry";
-    header->addSimpleChild(trackSignPtr, 1, trackSignName.str());
+    header->addChild(trackSignPtr, 1, trackSignName.str());
 
     uint16_t sectionListOffsetPtr = dwOffset + 0x20 + (trackIndex * 2);
     if (trackSign != 0xff) {
@@ -80,13 +80,13 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
 
       std::stringstream playlistName;
       playlistName << "Track " << (trackIndex + 1) << " Playlist Pointer";
-      header->addSimpleChild(sectionListOffsetPtr, 2, playlistName.str());
+      header->addChild(sectionListOffsetPtr, 2, playlistName.str());
 
       NeverlandSnesTrack *track = new NeverlandSnesTrack(this, sectionListAddress);
       aTracks.push_back(track);
     }
     else {
-      header->addSimpleChild(sectionListOffsetPtr, 2, "NULL");
+      header->addChild(sectionListOffsetPtr, 2, "NULL");
     }
   }
 

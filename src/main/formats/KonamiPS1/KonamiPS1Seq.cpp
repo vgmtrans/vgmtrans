@@ -33,16 +33,16 @@ bool KonamiPS1Seq::GetHeaderInfo() {
 
   VGMHeader *header = addHeader(dwOffset, kHeaderSize);
   header->AddSig(dwOffset, 4);
-  header->addSimpleChild(dwOffset + kOffsetToFileSize, 4, "Size");
-  header->addSimpleChild(dwOffset + kOffsetToTimebase, 4, "Timebase");
+  header->addChild(dwOffset + kOffsetToFileSize, 4, "Size");
+  header->addChild(dwOffset + kOffsetToTimebase, 4, "Timebase");
   SetPPQN(GetWord(dwOffset + kOffsetToTimebase));
-  header->addSimpleChild(dwOffset + kOffsetToTrackCount, 4, "Number Of Tracks");
+  header->addChild(dwOffset + kOffsetToTrackCount, 4, "Number Of Tracks");
 
   uint32_t numTracks = GetWord(dwOffset + kOffsetToTrackCount);
   VGMHeader *trackSizeHeader = addHeader(dwOffset + kHeaderSize, 2 * numTracks, "Track Size");
   for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
     std::string itemName = fmt::format("Track {} size", trackIndex + 1);
-    trackSizeHeader->addSimpleChild(trackSizeHeader->dwOffset + (trackIndex * 2), 2, itemName);
+    trackSizeHeader->addChild(trackSizeHeader->dwOffset + (trackIndex * 2), 2, itemName);
   }
 
   return true;

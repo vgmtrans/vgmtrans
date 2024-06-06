@@ -48,8 +48,8 @@ bool NDSInstrSet::GetInstrPointers() {
     aInstrs.push_back(new NDSInstr(this, pInstr + dwOffset, 0, 0, i, instrType));
 
     VGMHeader *hdr = instrptrHdr->addHeader(instrPtrOff, 4, "Pointer");
-    hdr->addSimpleChild(instrPtrOff, 1, "Type");
-    hdr->addSimpleChild(instrPtrOff + 1, 3, "Offset");
+    hdr->addChild(instrPtrOff, 1, "Type");
+    hdr->addChild(instrPtrOff + 1, 3, "Offset");
   }
 
   return true;

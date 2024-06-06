@@ -22,19 +22,19 @@ bool Vab::GetHeaderInfo() {
   }
 
   VGMHeader *vabHdr = addHeader(dwOffset, 0x20, "VAB Header");
-  vabHdr->addSimpleChild(dwOffset + 0x00, 4, "ID");
-  vabHdr->addSimpleChild(dwOffset + 0x04, 4, "Version");
-  vabHdr->addSimpleChild(dwOffset + 0x08, 4, "VAB ID");
-  vabHdr->addSimpleChild(dwOffset + 0x0c, 4, "Total Size");
-  vabHdr->addSimpleChild(dwOffset + 0x10, 2, "Reserved");
-  vabHdr->addSimpleChild(dwOffset + 0x12, 2, "Number of Programs");
-  vabHdr->addSimpleChild(dwOffset + 0x14, 2, "Number of Tones");
-  vabHdr->addSimpleChild(dwOffset + 0x16, 2, "Number of VAGs");
-  vabHdr->addSimpleChild(dwOffset + 0x18, 1, "Master Volume");
-  vabHdr->addSimpleChild(dwOffset + 0x19, 1, "Master Pan");
-  vabHdr->addSimpleChild(dwOffset + 0x1a, 1, "Bank Attributes 1");
-  vabHdr->addSimpleChild(dwOffset + 0x1b, 1, "Bank Attributes 2");
-  vabHdr->addSimpleChild(dwOffset + 0x1c, 4, "Reserved");
+  vabHdr->addChild(dwOffset + 0x00, 4, "ID");
+  vabHdr->addChild(dwOffset + 0x04, 4, "Version");
+  vabHdr->addChild(dwOffset + 0x08, 4, "VAB ID");
+  vabHdr->addChild(dwOffset + 0x0c, 4, "Total Size");
+  vabHdr->addChild(dwOffset + 0x10, 2, "Reserved");
+  vabHdr->addChild(dwOffset + 0x12, 2, "Number of Programs");
+  vabHdr->addChild(dwOffset + 0x14, 2, "Number of Tones");
+  vabHdr->addChild(dwOffset + 0x16, 2, "Number of VAGs");
+  vabHdr->addChild(dwOffset + 0x18, 1, "Master Volume");
+  vabHdr->addChild(dwOffset + 0x19, 1, "Master Pan");
+  vabHdr->addChild(dwOffset + 0x1a, 1, "Bank Attributes 1");
+  vabHdr->addChild(dwOffset + 0x1b, 1, "Bank Attributes 2");
+  vabHdr->addChild(dwOffset + 0x1c, 4, "Reserved");
 
   GetBytes(dwOffset, 0x20, &hdr);
 
@@ -93,15 +93,15 @@ bool Vab::GetInstrPointers() {
       GetBytes(offCurrProg, 0x10, &newInstr->attr);
 
       VGMHeader *hdr = progsHdr->addHeader(offCurrProg, 0x10, "Program");
-      hdr->addSimpleChild(offCurrProg + 0x00, 1, "Number of Tones");
-      hdr->addSimpleChild(offCurrProg + 0x01, 1, "Volume");
-      hdr->addSimpleChild(offCurrProg + 0x02, 1, "Priority");
-      hdr->addSimpleChild(offCurrProg + 0x03, 1, "Mode");
-      hdr->addSimpleChild(offCurrProg + 0x04, 1, "Pan");
-      hdr->addSimpleChild(offCurrProg + 0x05, 1, "Reserved");
-      hdr->addSimpleChild(offCurrProg + 0x06, 2, "Attribute");
-      hdr->addSimpleChild(offCurrProg + 0x08, 4, "Reserved");
-      hdr->addSimpleChild(offCurrProg + 0x0c, 4, "Reserved");
+      hdr->addChild(offCurrProg + 0x00, 1, "Number of Tones");
+      hdr->addChild(offCurrProg + 0x01, 1, "Volume");
+      hdr->addChild(offCurrProg + 0x02, 1, "Priority");
+      hdr->addChild(offCurrProg + 0x03, 1, "Mode");
+      hdr->addChild(offCurrProg + 0x04, 1, "Pan");
+      hdr->addChild(offCurrProg + 0x05, 1, "Reserved");
+      hdr->addChild(offCurrProg + 0x06, 2, "Attribute");
+      hdr->addChild(offCurrProg + 0x08, 4, "Reserved");
+      hdr->addChild(offCurrProg + 0x0c, 4, "Reserved");
 
       newInstr->masterVol = GetByte(offCurrProg + 0x01);
 
@@ -124,7 +124,7 @@ bool Vab::GetInstrPointers() {
       uint32_t vagSize = GetShort(offVAGOffsets + i * 2) * 8;
 
       snprintf(name, 256, "VAG Size /8 #%u", i);
-      vagOffsetHdr->addSimpleChild(offVAGOffsets + i * 2, 2, name);
+      vagOffsetHdr->addChild(offVAGOffsets + i * 2, 2, name);
 
       if (vagOffset + vagSize <= nEndOffset) {
         vagLocations.emplace_back(vagOffset, vagSize);

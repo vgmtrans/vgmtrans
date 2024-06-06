@@ -162,9 +162,9 @@ HeartBeatSnesRgn::HeartBeatSnesRgn(HeartBeatSnesInstr *instr, HeartBeatSnesVersi
   }
 
   AddSampNum(srcn, offset, 1);
-  addSimpleChild(offset + 1, 1, "ADSR1");
-  addSimpleChild(offset + 2, 1, "ADSR2");
-  addSimpleChild(offset + 3, 1, "GAIN");
+  addChild(offset + 1, 1, "ADSR1");
+  addChild(offset + 2, 1, "ADSR2");
+  addChild(offset + 3, 1, "GAIN");
   AddUnityKey(72 - static_cast<int>(coarse_tuning), offset + 4, 1);
   AddFineTune(static_cast<int16_t>(fine_tuning * 100.0), offset + 5, 1);
   SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);

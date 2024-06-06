@@ -35,7 +35,7 @@ bool ItikitiSnesSeq::GetHeaderInfo() {
 
   VGMHeader *header = addHeader(dwOffset, 0);
   header->addUnknownChild(dwOffset, 1);
-  header->addSimpleChild(dwOffset + 1, 1, "Number of Tracks");
+  header->addChild(dwOffset + 1, 1, "Number of Tracks");
 
   nNumTracks = GetByte(dwOffset + 1);
   if (nNumTracks == 0 || nNumTracks > 8)
@@ -50,7 +50,7 @@ bool ItikitiSnesSeq::GetHeaderInfo() {
     track_name << "Track " << (track_index + 1);
 
     const uint32_t offset_to_pointer = dwOffset + 2 + (2 * track_index);
-    header->addSimpleChild(offset_to_pointer, 2, track_name.str());
+    header->addChild(offset_to_pointer, 2, track_name.str());
   }
 
   header->SetGuessedLength();

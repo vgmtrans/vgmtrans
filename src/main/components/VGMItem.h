@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <vector>
 #include <ranges>
-#include <typeindex>
-#include <unordered_set>
 
 template <class T>
 class Menu;
@@ -103,7 +101,7 @@ public:
 
   const std::vector<VGMItem*>& children() { return m_children; }
   VGMItem* addChild(VGMItem* child);
-  VGMItem* addSimpleChild(uint32_t offset, uint32_t length, const std::string &name);
+  VGMItem* addChild(uint32_t offset, uint32_t length, const std::string &name);
   VGMItem* addUnknownChild(uint32_t offset, uint32_t length);
   VGMHeader* addHeader(uint32_t offset, uint32_t length, const std::string &name = "Header");
 

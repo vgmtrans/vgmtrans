@@ -239,8 +239,8 @@ bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
     adsr1 = GetByte(addrADSRTable + srcn * 2);
     adsr2 = GetByte(addrADSRTable + srcn * 2 + 1);
 
-    addSimpleChild(addrADSRTable + srcn * 2, 1, "ADSR1");
-    addSimpleChild(addrADSRTable + srcn * 2 + 1, 1, "ADSR2");
+    addChild(addrADSRTable + srcn * 2, 1, "ADSR1");
+    addChild(addrADSRTable + srcn * 2 + 1, 1, "ADSR2");
   }
 
   uint8_t tuning1;
@@ -249,12 +249,12 @@ bool AkaoSnesRgn::InitializeRegion(uint8_t srcn,
     tuning1 = GetByte(addrTuningTable + srcn);
     tuning2 = 0;
 
-    addSimpleChild(addrTuningTable + srcn, 1, "Tuning");
+    addChild(addrTuningTable + srcn, 1, "Tuning");
   } else {
     tuning1 = GetByte(addrTuningTable + srcn * 2);
     tuning2 = GetByte(addrTuningTable + srcn * 2 + 1);
 
-    addSimpleChild(addrTuningTable + srcn * 2, 2, "Tuning");
+    addChild(addrTuningTable + srcn * 2, 2, "Tuning");
   }
 
   double pitch_scale;
@@ -326,7 +326,7 @@ bool AkaoSnesDrumKitRgn::InitializePercussionRegion(uint8_t percussionIndex,
   unityKey = (unityKey + KEY_BIAS) - GetByte(keyOffset) + percussionIndex;
   
   AddSampNum(sampNum, srcnOffset);
-  addSimpleChild(keyOffset, 1, "Key");
+  addChild(keyOffset, 1, "Key");
 
   uint8_t panValue = GetByte(panOffset);
   if (panValue < 0x80) {

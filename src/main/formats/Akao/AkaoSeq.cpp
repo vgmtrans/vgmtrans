@@ -83,13 +83,13 @@ bool AkaoSeq::GetHeaderInfo() {
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     VGMHeader *hdr = addHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
-    hdr->addSimpleChild(dwOffset + 0x4, 2, "ID");
-    hdr->addSimpleChild(dwOffset + 0x6, 2, "Size");
-    hdr->addSimpleChild(dwOffset + 0x8, 2, "Reverb Type");
-    hdr->addSimpleChild(dwOffset + 0x14, 2, "Associated Sample Set ID");
-    hdr->addSimpleChild(dwOffset + 0x20, 4, "Number of Tracks (# of true bits)");
-    hdr->addSimpleChild(dwOffset + 0x30, 4, "Instrument Data Pointer");
-    hdr->addSimpleChild(dwOffset + 0x34, 4, "Drumkit Data Pointer");
+    hdr->addChild(dwOffset + 0x4, 2, "ID");
+    hdr->addChild(dwOffset + 0x6, 2, "Size");
+    hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
+    hdr->addChild(dwOffset + 0x14, 2, "Associated Sample Set ID");
+    hdr->addChild(dwOffset + 0x20, 4, "Number of Tracks (# of true bits)");
+    hdr->addChild(dwOffset + 0x30, 4, "Instrument Data Pointer");
+    hdr->addChild(dwOffset + 0x34, 4, "Drumkit Data Pointer");
 
     unLength = GetShort(dwOffset + 6);
     setId(GetShort(dwOffset + 0x14));
@@ -98,10 +98,10 @@ bool AkaoSeq::GetHeaderInfo() {
   else if (version() == AkaoPs1Version::VERSION_2) {
     VGMHeader *hdr = addHeader(dwOffset, 0x20);
     hdr->AddSig(dwOffset, 4);
-    hdr->addSimpleChild(dwOffset + 0x4, 2, "ID");
-    hdr->addSimpleChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
-    hdr->addSimpleChild(dwOffset + 0x8, 2, "Reverb Type");
-    hdr->addSimpleChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
+    hdr->addChild(dwOffset + 0x4, 2, "ID");
+    hdr->addChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
+    hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
+    hdr->addChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
 
     unLength = 0x10 + GetShort(dwOffset + 6);
     track_header_offset = 0x20;
@@ -109,13 +109,13 @@ bool AkaoSeq::GetHeaderInfo() {
   else if (version() < AkaoPs1Version::VERSION_2) {
     VGMHeader *hdr = addHeader(dwOffset, 0x14);
     hdr->AddSig(dwOffset, 4);
-    hdr->addSimpleChild(dwOffset + 0x4, 2, "ID");
-    hdr->addSimpleChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
-    hdr->addSimpleChild(dwOffset + 0x8, 2, "Reverb Type");
+    hdr->addChild(dwOffset + 0x4, 2, "ID");
+    hdr->addChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
+    hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
     std::ostringstream timestamp_text;
     timestamp_text << "Timestamp (" << ReadTimestampAsText() << ")";
-    hdr->addSimpleChild(dwOffset + 0xA, 6, timestamp_text.str());
-    hdr->addSimpleChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
+    hdr->addChild(dwOffset + 0xA, 6, timestamp_text.str());
+    hdr->addChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
 
     unLength = 0x10 + GetShort(dwOffset + 6);
     track_header_offset = 0x14;
@@ -145,7 +145,7 @@ bool AkaoSeq::GetHeaderInfo() {
   for (unsigned int i = 0; i < nNumTracks; i++) {
     std::stringstream name;
     name << "Offset: Track " << (i + 1);
-    track_pointer_header->addSimpleChild(dwOffset + track_header_offset + (i * 2), 2, name.str());
+    track_pointer_header->addChild(dwOffset + track_header_offset + (i * 2), 2, name.str());
   }
 
   return true;

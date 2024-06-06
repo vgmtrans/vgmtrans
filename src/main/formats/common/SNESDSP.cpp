@@ -352,8 +352,8 @@ bool SNESSampColl::GetSampleInfo() {
     bool loop;
     uint32_t length = SNESSamp::GetSampleLength(rawFile(), addrSampStart, loop);
 
-        spcDirHeader->addSimpleChild(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
-        spcDirHeader->addSimpleChild(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
+        spcDirHeader->addChild(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
+        spcDirHeader->addChild(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
 
         SNESSamp *samp = new SNESSamp(this, addrSampStart, length, addrSampStart, length,
                                       addrSampLoop, fmt::format("Sample: {:#x}", srcn));

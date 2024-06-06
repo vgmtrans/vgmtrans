@@ -1,7 +1,6 @@
 #pragma once
 #include "common.h"
 #include "VGMFile.h"
-#include "helper.h"
 
 class VGMSampColl;
 class VGMInstr;
@@ -61,7 +60,7 @@ public:
   VGMRgn *AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
                  uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
 
-  virtual bool LoadInstr();
+  virtual bool LoadInstr() { return true; }
 
   uint32_t bank;
   uint32_t instrNum;
@@ -71,7 +70,7 @@ public:
 
 protected:
   void disableAutoAddRegionsAsChildren() { autoAddRegionsAsChildren = false; }
-  void deleteRegions() { DeleteVect(m_regions); }
+  void deleteRegions();
 
 private:
   bool autoAddRegionsAsChildren{true};

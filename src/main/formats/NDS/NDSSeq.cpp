@@ -11,8 +11,8 @@ NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
 bool NDSSeq::GetHeaderInfo(void) {
   VGMHeader *SSEQHdr = addHeader(dwOffset, 0x10, "SSEQ Chunk Header");
   SSEQHdr->AddSig(dwOffset, 8);
-  SSEQHdr->addSimpleChild(dwOffset + 8, 4, "Size");
-  SSEQHdr->addSimpleChild(dwOffset + 12, 2, "Header Size");
+  SSEQHdr->addChild(dwOffset + 8, 4, "Size");
+  SSEQHdr->addChild(dwOffset + 12, 2, "Header Size");
   SSEQHdr->addUnknownChild(dwOffset + 14, 2);
   //SeqChunkHdr->addSimpleChild(dwOffset, 4, "Blah");
   unLength = GetShort(dwOffset + 8);
@@ -23,8 +23,8 @@ bool NDSSeq::GetHeaderInfo(void) {
 bool NDSSeq::GetTrackPointers(void) {
   VGMHeader *DATAHdr = addHeader(dwOffset + 0x10, 0xC, "DATA Chunk Header");
   DATAHdr->AddSig(dwOffset + 0x10, 4);
-  DATAHdr->addSimpleChild(dwOffset + 0x10 + 4, 4, "Size");
-  DATAHdr->addSimpleChild(dwOffset + 0x10 + 8, 4, "Data Pointer");
+  DATAHdr->addChild(dwOffset + 0x10 + 4, 4, "Size");
+  DATAHdr->addChild(dwOffset + 0x10 + 8, 4, "Data Pointer");
   uint32_t offset = dwOffset + 0x1C;
   uint8_t b = GetByte(offset);
   aTracks.push_back(new NDSTrack(this));
@@ -33,7 +33,7 @@ bool NDSSeq::GetTrackPointers(void) {
   if (b == 0xFE)
   {
     VGMHeader *TrkPtrs = addHeader(offset, 0, "Track Pointers");
-    TrkPtrs->addSimpleChild(offset, 3, "Valid Tracks");
+    TrkPtrs->addChild(offset, 3, "Valid Tracks");
     offset += 3;    //but all we need to do is check for subsequent 0x93 track pointer events
     b = GetByte(offset);
     uint32_t songDelay = 0;
@@ -50,7 +50,7 @@ bool NDSSeq::GetTrackPointers(void) {
         } while (c & 0x80);
       }
       songDelay += value;
-      TrkPtrs->addSimpleChild(beginOffset, offset - beginOffset, "Delay");
+      TrkPtrs->addChild(beginOffset, offset - beginOffset, "Delay");
       //songDelay += SeqTrack::ReadVarLen(++offset);
       b = GetByte(offset);
       break;
@@ -59,7 +59,7 @@ bool NDSSeq::GetTrackPointers(void) {
     //Track/Channel assignment and pointer.  Channel # is irrelevant
     while (b == 0x93)
     {
-      TrkPtrs->addSimpleChild(offset, 5, "Track Pointer");
+      TrkPtrs->addChild(offset, 5, "Track Pointer");
       uint32_t trkOffset = GetByte(offset + 2) + (GetByte(offset + 3) << 8) +
           (GetByte(offset + 4) << 16) + dwOffset + 0x1C;
       NDSTrack *newTrack = new NDSTrack(this, trkOffset);

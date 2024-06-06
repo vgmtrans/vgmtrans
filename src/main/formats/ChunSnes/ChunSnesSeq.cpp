@@ -58,7 +58,7 @@ bool ChunSnesSeq::GetHeaderInfo() {
   initialTempo = GetByte(curOffset++);
   AlwaysWriteInitialTempo(GetTempoInBPM(initialTempo));
 
-  header->addSimpleChild(curOffset, 1, "Number of Tracks");
+  header->addChild(curOffset, 1, "Number of Tracks");
   nNumTracks = GetByte(curOffset++);
   if (nNumTracks == 0 || nNumTracks > MAX_TRACKS) {
     return false;
@@ -77,7 +77,7 @@ bool ChunSnesSeq::GetHeaderInfo() {
 
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
-    header->addSimpleChild(curOffset, 2, trackName.str());
+    header->addChild(curOffset, 2, trackName.str());
 
     ChunSnesTrack *track = new ChunSnesTrack(this, addrTrackStart);
     track->index = static_cast<uint8_t>(aTracks.size());

@@ -70,7 +70,7 @@ bool AkaoInstrSet::GetInstrPointers() {
     int i = 0;
     //-1 aka 0xFFFF if signed or 0 and past the first pointer value
     for (int j = instrSetOff; (GetShort(j) != static_cast<uint16_t>(-1)) && ((GetShort(j) != 0) || i == 0) && i < 16; j += 2) {
-      SSEQHdr->addSimpleChild(j, 2, "Instr Pointer");
+      SSEQHdr->addChild(j, 2, "Instr Pointer");
       aInstrs.push_back(new AkaoInstr(this, instrSetOff + 0x20 + GetShort(j), 0, 1, i++));
     }
   }
@@ -107,13 +107,13 @@ bool AkaoInstr::LoadInstr() {
   for (int k = 0; dwOffset + k * 8 < rawFile()->size(); k++) {
     if (version() < AkaoPs1Version::VERSION_3_0) {
       if (GetByte(dwOffset + k * 8) >= 0x80) {
-        addSimpleChild(dwOffset + k * 8, 8, "Region Terminator");
+        addChild(dwOffset + k * 8, 8, "Region Terminator");
         break;
       }
     }
     else {
       if (GetByte(dwOffset + k * 8 + 5) == 0) {
-        addSimpleChild(dwOffset + k * 8, 8, "Region Terminator");
+        addChild(dwOffset + k * 8, 8, "Region Terminator");
         break;
       }
     }
@@ -337,11 +337,11 @@ bool AkaoSampColl::GetHeaderInfo() {
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     VGMHeader *hdr = addHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
-    hdr->addSimpleChild(dwOffset + 4, 2, "ID");
-    hdr->addSimpleChild(dwOffset + 0x10, 4, "SPU Destination Address");
-    hdr->addSimpleChild(dwOffset + 0x14, 4, "Sample Section Size");
-    hdr->addSimpleChild(dwOffset + 0x18, 4, "Starting Articulation ID");
-    hdr->addSimpleChild(dwOffset + 0x1C, 4, "Number of Articulations");
+    hdr->addChild(dwOffset + 4, 2, "ID");
+    hdr->addChild(dwOffset + 0x10, 4, "SPU Destination Address");
+    hdr->addChild(dwOffset + 0x14, 4, "Sample Section Size");
+    hdr->addChild(dwOffset + 0x18, 4, "Starting Articulation ID");
+    hdr->addChild(dwOffset + 0x1C, 4, "Number of Articulations");
 
     setId(GetShort(0x4 + dwOffset));
     sample_section_size = GetWord(0x14 + dwOffset);
@@ -352,11 +352,11 @@ bool AkaoSampColl::GetHeaderInfo() {
   else if (version() >= AkaoPs1Version::VERSION_1_1) {
     VGMHeader *hdr = addHeader(dwOffset, 0x40);
     hdr->AddSig(dwOffset, 4);
-    hdr->addSimpleChild(dwOffset + 0x10, 4, "SPU Destination Address");
-    hdr->addSimpleChild(dwOffset + 0x14, 4, "Sample Section Size");
-    hdr->addSimpleChild(dwOffset + 0x18, 4, "Starting Articulation ID");
+    hdr->addChild(dwOffset + 0x10, 4, "SPU Destination Address");
+    hdr->addChild(dwOffset + 0x14, 4, "Sample Section Size");
+    hdr->addChild(dwOffset + 0x18, 4, "Starting Articulation ID");
     if (version() >= AkaoPs1Version::VERSION_1_2)
-      hdr->addSimpleChild(dwOffset + 0x1C, 4, "Ending Articulation ID");
+      hdr->addChild(dwOffset + 0x1C, 4, "Ending Articulation ID");
 
     sample_section_size = GetWord(0x14 + dwOffset);
     starting_art_id = GetWord(0x18 + dwOffset);
@@ -374,8 +374,8 @@ bool AkaoSampColl::GetHeaderInfo() {
   else if (version() == AkaoPs1Version::VERSION_1_0) {
     VGMHeader *hdr = addHeader(file_location.instrAllOffset, 0x10);
     hdr->AddSig(dwOffset, 4);
-    hdr->addSimpleChild(file_location.instrAllOffset, 4, "SPU Destination Address");
-    hdr->addSimpleChild(file_location.instrAllOffset + 4, 4, "Sample Section Size");
+    hdr->addChild(file_location.instrAllOffset, 4, "SPU Destination Address");
+    hdr->addChild(file_location.instrAllOffset + 4, 4, "Sample Section Size");
 
     sample_section_offset = file_location.instrAllOffset + 0x10;
     sample_section_size = GetWord(file_location.instrAllOffset + 4);
@@ -404,12 +404,12 @@ bool AkaoSampColl::GetSampleInfo() {
     if (version() >= AkaoPs1Version::VERSION_3_1) {
       const uint32_t art_offset = arts_offset + i * 0x10;
       VGMHeader *ArtHdr = addHeader(art_offset, 16, "Articulation");
-      ArtHdr->addSimpleChild(art_offset, 4, "Sample Offset");
-      ArtHdr->addSimpleChild(art_offset + 4, 4, "Loop Point");
-      ArtHdr->addSimpleChild(art_offset + 8, 2, "Fine Tune");
-      ArtHdr->addSimpleChild(art_offset + 10, 2, "Unity Key");
-      ArtHdr->addSimpleChild(art_offset + 12, 2, "ADSR1");
-      ArtHdr->addSimpleChild(art_offset + 14, 2, "ADSR2");
+      ArtHdr->addChild(art_offset, 4, "Sample Offset");
+      ArtHdr->addChild(art_offset + 4, 4, "Loop Point");
+      ArtHdr->addChild(art_offset + 8, 2, "Fine Tune");
+      ArtHdr->addChild(art_offset + 10, 2, "Unity Key");
+      ArtHdr->addChild(art_offset + 12, 2, "ADSR1");
+      ArtHdr->addChild(art_offset + 14, 2, "ADSR2");
 
       const int16_t raw_fine_tune = GetShort(art_offset + 8);
       const double freq_multiplier = (raw_fine_tune >= 0)
@@ -430,28 +430,28 @@ bool AkaoSampColl::GetSampleInfo() {
     else if (version() == AkaoPs1Version::VERSION_3_0) {
       const uint32_t art_offset = arts_offset + i * 0x40;
       VGMHeader *ArtHdr = addHeader(art_offset, 0x40, "Articulation");
-      ArtHdr->addSimpleChild(art_offset, 4, "Sample Offset");
-      ArtHdr->addSimpleChild(art_offset + 4, 4, "Loop Point");
-      ArtHdr->addSimpleChild(art_offset + 8, 4, "Base Pitch (C)");
-      ArtHdr->addSimpleChild(art_offset + 0x0C, 4, "Base Pitch (C#)");
-      ArtHdr->addSimpleChild(art_offset + 0x10, 4, "Base Pitch (D)");
-      ArtHdr->addSimpleChild(art_offset + 0x14, 4, "Base Pitch (D#)");
-      ArtHdr->addSimpleChild(art_offset + 0x18, 4, "Base Pitch (E)");
-      ArtHdr->addSimpleChild(art_offset + 0x1C, 4, "Base Pitch (F)");
-      ArtHdr->addSimpleChild(art_offset + 0x20, 4, "Base Pitch (F#)");
-      ArtHdr->addSimpleChild(art_offset + 0x24, 4, "Base Pitch (G)");
-      ArtHdr->addSimpleChild(art_offset + 0x28, 4, "Base Pitch (G#)");
-      ArtHdr->addSimpleChild(art_offset + 0x2C, 4, "Base Pitch (A)");
-      ArtHdr->addSimpleChild(art_offset + 0x30, 4, "Base Pitch (A#)");
-      ArtHdr->addSimpleChild(art_offset + 0x34, 4, "Base Pitch (B)");
-      ArtHdr->addSimpleChild(art_offset + 0x38, 1, "ADSR Attack Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x39, 1, "ADSR Decay Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x3A, 1, "ADSR Sustain Level");
-      ArtHdr->addSimpleChild(art_offset + 0x3B, 1, "ADSR Sustain Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x3C, 1, "ADSR Release Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x3D, 1, "ADSR Attack Mode");
-      ArtHdr->addSimpleChild(art_offset + 0x3E, 1, "ADSR Sustain Mode");
-      ArtHdr->addSimpleChild(art_offset + 0x3F, 1, "ADSR Release Mode");
+      ArtHdr->addChild(art_offset, 4, "Sample Offset");
+      ArtHdr->addChild(art_offset + 4, 4, "Loop Point");
+      ArtHdr->addChild(art_offset + 8, 4, "Base Pitch (C)");
+      ArtHdr->addChild(art_offset + 0x0C, 4, "Base Pitch (C#)");
+      ArtHdr->addChild(art_offset + 0x10, 4, "Base Pitch (D)");
+      ArtHdr->addChild(art_offset + 0x14, 4, "Base Pitch (D#)");
+      ArtHdr->addChild(art_offset + 0x18, 4, "Base Pitch (E)");
+      ArtHdr->addChild(art_offset + 0x1C, 4, "Base Pitch (F)");
+      ArtHdr->addChild(art_offset + 0x20, 4, "Base Pitch (F#)");
+      ArtHdr->addChild(art_offset + 0x24, 4, "Base Pitch (G)");
+      ArtHdr->addChild(art_offset + 0x28, 4, "Base Pitch (G#)");
+      ArtHdr->addChild(art_offset + 0x2C, 4, "Base Pitch (A)");
+      ArtHdr->addChild(art_offset + 0x30, 4, "Base Pitch (A#)");
+      ArtHdr->addChild(art_offset + 0x34, 4, "Base Pitch (B)");
+      ArtHdr->addChild(art_offset + 0x38, 1, "ADSR Attack Rate");
+      ArtHdr->addChild(art_offset + 0x39, 1, "ADSR Decay Rate");
+      ArtHdr->addChild(art_offset + 0x3A, 1, "ADSR Sustain Level");
+      ArtHdr->addChild(art_offset + 0x3B, 1, "ADSR Sustain Rate");
+      ArtHdr->addChild(art_offset + 0x3C, 1, "ADSR Release Rate");
+      ArtHdr->addChild(art_offset + 0x3D, 1, "ADSR Attack Mode");
+      ArtHdr->addChild(art_offset + 0x3E, 1, "ADSR Sustain Mode");
+      ArtHdr->addChild(art_offset + 0x3F, 1, "ADSR Release Mode");
 
       const uint8_t ar = GetByte(art_offset + 0x38);
       const uint8_t dr = GetByte(art_offset + 0x39);
@@ -481,28 +481,28 @@ bool AkaoSampColl::GetSampleInfo() {
 
       const uint32_t art_offset = arts_offset + i * 0x40;
       VGMHeader *ArtHdr = addHeader(art_offset, 0x40, "Articulation");
-      ArtHdr->addSimpleChild(art_offset, 4, "Sample Offset");
-      ArtHdr->addSimpleChild(art_offset + 4, 4, "Loop Point");
-      ArtHdr->addSimpleChild(art_offset + 8, 1, "ADSR Attack Rate");
-      ArtHdr->addSimpleChild(art_offset + 9, 1, "ADSR Decay Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x0A, 1, "ADSR Sustain Level");
-      ArtHdr->addSimpleChild(art_offset + 0x0B, 1, "ADSR Sustain Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x0C, 1, "ADSR Release Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x0D, 1, "ADSR Attack Mode");
-      ArtHdr->addSimpleChild(art_offset + 0x0E, 1, "ADSR Sustain Mode");
-      ArtHdr->addSimpleChild(art_offset + 0x0F, 1, "ADSR Release Mode");
-      ArtHdr->addSimpleChild(art_offset + 0x10, 4, "Base Pitch (C)");
-      ArtHdr->addSimpleChild(art_offset + 0x14, 4, "Base Pitch (C#)");
-      ArtHdr->addSimpleChild(art_offset + 0x18, 4, "Base Pitch (D)");
-      ArtHdr->addSimpleChild(art_offset + 0x1C, 4, "Base Pitch (D#)");
-      ArtHdr->addSimpleChild(art_offset + 0x20, 4, "Base Pitch (E)");
-      ArtHdr->addSimpleChild(art_offset + 0x24, 4, "Base Pitch (F)");
-      ArtHdr->addSimpleChild(art_offset + 0x28, 4, "Base Pitch (F#)");
-      ArtHdr->addSimpleChild(art_offset + 0x2C, 4, "Base Pitch (G)");
-      ArtHdr->addSimpleChild(art_offset + 0x30, 4, "Base Pitch (G#)");
-      ArtHdr->addSimpleChild(art_offset + 0x34, 4, "Base Pitch (A)");
-      ArtHdr->addSimpleChild(art_offset + 0x38, 4, "Base Pitch (A#)");
-      ArtHdr->addSimpleChild(art_offset + 0x3C, 4, "Base Pitch (B)");
+      ArtHdr->addChild(art_offset, 4, "Sample Offset");
+      ArtHdr->addChild(art_offset + 4, 4, "Loop Point");
+      ArtHdr->addChild(art_offset + 8, 1, "ADSR Attack Rate");
+      ArtHdr->addChild(art_offset + 9, 1, "ADSR Decay Rate");
+      ArtHdr->addChild(art_offset + 0x0A, 1, "ADSR Sustain Level");
+      ArtHdr->addChild(art_offset + 0x0B, 1, "ADSR Sustain Rate");
+      ArtHdr->addChild(art_offset + 0x0C, 1, "ADSR Release Rate");
+      ArtHdr->addChild(art_offset + 0x0D, 1, "ADSR Attack Mode");
+      ArtHdr->addChild(art_offset + 0x0E, 1, "ADSR Sustain Mode");
+      ArtHdr->addChild(art_offset + 0x0F, 1, "ADSR Release Mode");
+      ArtHdr->addChild(art_offset + 0x10, 4, "Base Pitch (C)");
+      ArtHdr->addChild(art_offset + 0x14, 4, "Base Pitch (C#)");
+      ArtHdr->addChild(art_offset + 0x18, 4, "Base Pitch (D)");
+      ArtHdr->addChild(art_offset + 0x1C, 4, "Base Pitch (D#)");
+      ArtHdr->addChild(art_offset + 0x20, 4, "Base Pitch (E)");
+      ArtHdr->addChild(art_offset + 0x24, 4, "Base Pitch (F)");
+      ArtHdr->addChild(art_offset + 0x28, 4, "Base Pitch (F#)");
+      ArtHdr->addChild(art_offset + 0x2C, 4, "Base Pitch (G)");
+      ArtHdr->addChild(art_offset + 0x30, 4, "Base Pitch (G#)");
+      ArtHdr->addChild(art_offset + 0x34, 4, "Base Pitch (A)");
+      ArtHdr->addChild(art_offset + 0x38, 4, "Base Pitch (A#)");
+      ArtHdr->addChild(art_offset + 0x3C, 4, "Base Pitch (B)");
 
       const uint32_t sample_start_address = GetWord(art_offset);
       const uint32_t loop_start_address = GetWord(art_offset + 4);
@@ -537,28 +537,28 @@ bool AkaoSampColl::GetSampleInfo() {
 
       const uint32_t art_offset = file_location.instrDatOffset + i * 0x40;
       VGMHeader *ArtHdr = addHeader(art_offset, 0x40, "Articulation");
-      ArtHdr->addSimpleChild(art_offset, 4, "Sample Offset");
-      ArtHdr->addSimpleChild(art_offset + 4, 4, "Loop Point");
-      ArtHdr->addSimpleChild(art_offset + 8, 1, "ADSR Attack Rate");
-      ArtHdr->addSimpleChild(art_offset + 9, 1, "ADSR Decay Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x0A, 1, "ADSR Sustain Level");
-      ArtHdr->addSimpleChild(art_offset + 0x0B, 1, "ADSR Sustain Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x0C, 1, "ADSR Release Rate");
-      ArtHdr->addSimpleChild(art_offset + 0x0D, 1, "ADSR Attack Mode");
-      ArtHdr->addSimpleChild(art_offset + 0x0E, 1, "ADSR Sustain Mode");
-      ArtHdr->addSimpleChild(art_offset + 0x0F, 1, "ADSR Release Mode");
-      ArtHdr->addSimpleChild(art_offset + 0x10, 4, "Base Pitch (C)");
-      ArtHdr->addSimpleChild(art_offset + 0x14, 4, "Base Pitch (C#)");
-      ArtHdr->addSimpleChild(art_offset + 0x18, 4, "Base Pitch (D)");
-      ArtHdr->addSimpleChild(art_offset + 0x1C, 4, "Base Pitch (D#)");
-      ArtHdr->addSimpleChild(art_offset + 0x20, 4, "Base Pitch (E)");
-      ArtHdr->addSimpleChild(art_offset + 0x24, 4, "Base Pitch (F)");
-      ArtHdr->addSimpleChild(art_offset + 0x28, 4, "Base Pitch (F#)");
-      ArtHdr->addSimpleChild(art_offset + 0x2C, 4, "Base Pitch (G)");
-      ArtHdr->addSimpleChild(art_offset + 0x30, 4, "Base Pitch (G#)");
-      ArtHdr->addSimpleChild(art_offset + 0x34, 4, "Base Pitch (A)");
-      ArtHdr->addSimpleChild(art_offset + 0x38, 4, "Base Pitch (A#)");
-      ArtHdr->addSimpleChild(art_offset + 0x3C, 4, "Base Pitch (B)");
+      ArtHdr->addChild(art_offset, 4, "Sample Offset");
+      ArtHdr->addChild(art_offset + 4, 4, "Loop Point");
+      ArtHdr->addChild(art_offset + 8, 1, "ADSR Attack Rate");
+      ArtHdr->addChild(art_offset + 9, 1, "ADSR Decay Rate");
+      ArtHdr->addChild(art_offset + 0x0A, 1, "ADSR Sustain Level");
+      ArtHdr->addChild(art_offset + 0x0B, 1, "ADSR Sustain Rate");
+      ArtHdr->addChild(art_offset + 0x0C, 1, "ADSR Release Rate");
+      ArtHdr->addChild(art_offset + 0x0D, 1, "ADSR Attack Mode");
+      ArtHdr->addChild(art_offset + 0x0E, 1, "ADSR Sustain Mode");
+      ArtHdr->addChild(art_offset + 0x0F, 1, "ADSR Release Mode");
+      ArtHdr->addChild(art_offset + 0x10, 4, "Base Pitch (C)");
+      ArtHdr->addChild(art_offset + 0x14, 4, "Base Pitch (C#)");
+      ArtHdr->addChild(art_offset + 0x18, 4, "Base Pitch (D)");
+      ArtHdr->addChild(art_offset + 0x1C, 4, "Base Pitch (D#)");
+      ArtHdr->addChild(art_offset + 0x20, 4, "Base Pitch (E)");
+      ArtHdr->addChild(art_offset + 0x24, 4, "Base Pitch (F)");
+      ArtHdr->addChild(art_offset + 0x28, 4, "Base Pitch (F#)");
+      ArtHdr->addChild(art_offset + 0x2C, 4, "Base Pitch (G)");
+      ArtHdr->addChild(art_offset + 0x30, 4, "Base Pitch (G#)");
+      ArtHdr->addChild(art_offset + 0x34, 4, "Base Pitch (A)");
+      ArtHdr->addChild(art_offset + 0x38, 4, "Base Pitch (A#)");
+      ArtHdr->addChild(art_offset + 0x3C, 4, "Base Pitch (B)");
 
       const uint32_t sample_start_address = GetWord(art_offset);
       const uint32_t loop_start_address = GetWord(art_offset + 4);

@@ -64,8 +64,8 @@ bool CPS1SampColl::GetHeaderInfo() {
     auto endStr = fmt::format("Sample {} End", i);
     i += 1;
 
-    header->addSimpleChild(offset, 3, startStr);
-    header->addSimpleChild(offset+3, 3, endStr);
+    header->addChild(offset, 3, startStr);
+    header->addChild(offset+3, 3, endStr);
   }
   return true;
 }

@@ -54,12 +54,12 @@ bool GraphResSnesSeq::GetHeaderInfo() {
 
     bool trackUsed = (GetByte(curOffset) != 0);
     if (trackUsed) {
-      header->addSimpleChild(curOffset, 1, "Enable Track");
+      header->addChild(curOffset, 1, "Enable Track");
     }
     else {
-      header->addSimpleChild(curOffset, 1, "Disable Track");
+      header->addChild(curOffset, 1, "Disable Track");
     }
-    header->addSimpleChild(curOffset + 1, 2, trackName.str());
+    header->addChild(curOffset + 1, 2, trackName.str());
     curOffset += 3;
   }
 

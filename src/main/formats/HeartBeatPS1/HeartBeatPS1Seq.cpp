@@ -32,11 +32,11 @@ bool HeartBeatPS1Seq::GetHeaderInfo() {
 
   VGMHeader *header = VGMSeq::addHeader(curOffset, 0x3c);
 
-  header->addSimpleChild(curOffset, 4, "Sequence Size");
-  header->addSimpleChild(curOffset + 4, 2, "Sequence ID");
-  header->addSimpleChild(curOffset + 6, 1, "Number of Instrument Set");
-  header->addSimpleChild(curOffset + 7, 1, "Load Position");
-  header->addSimpleChild(curOffset + 8, 4, "Reserved");
+  header->addChild(curOffset, 4, "Sequence Size");
+  header->addChild(curOffset + 4, 2, "Sequence ID");
+  header->addChild(curOffset + 6, 1, "Number of Instrument Set");
+  header->addChild(curOffset + 7, 1, "Load Position");
+  header->addChild(curOffset + 8, 4, "Reserved");
 
   curOffset += 0x0c;
 
@@ -50,9 +50,9 @@ bool HeartBeatPS1Seq::GetHeaderInfo() {
     instrHeaderName << "Instrument Set " << (instrset_index + 1);
     VGMHeader *instrHeader = header->addHeader(curOffset, 0x0c, instrHeaderName.str());
 
-    instrHeader->addSimpleChild(curOffset, 4, "Sample Collection Size");
-    instrHeader->addSimpleChild(curOffset + 4, 4, "Instrument Set Size");
-    instrHeader->addSimpleChild(curOffset + 8, 2, "Instrument Set ID");
+    instrHeader->addChild(curOffset, 4, "Sample Collection Size");
+    instrHeader->addChild(curOffset + 4, 4, "Instrument Set Size");
+    instrHeader->addChild(curOffset + 8, 2, "Instrument Set ID");
     instrHeader->addUnknownChild(curOffset + 10, 2);
 
     total_instr_size += sampcoll_size;
@@ -77,13 +77,13 @@ bool HeartBeatPS1Seq::GetHeaderInfo() {
 
   VGMHeader *seqHeader = VGMSeq::addHeader(seqHeaderOffset, 0x10, "Sequence Header");
 
-  seqHeader->addSimpleChild(seqHeaderOffset, 4, "Signature");
-  seqHeader->addSimpleChild(seqHeaderOffset + 4, 2, "Version");
+  seqHeader->addChild(seqHeaderOffset, 4, "Signature");
+  seqHeader->addChild(seqHeaderOffset + 4, 2, "Version");
   seqHeader->addUnknownChild(seqHeaderOffset + 6, 2);
-  seqHeader->addSimpleChild(seqHeaderOffset + 8, 2, "PPQN");
+  seqHeader->addChild(seqHeaderOffset + 8, 2, "PPQN");
   seqHeader->AddTempo(seqHeaderOffset + 10, 3, "Initial Tempo");
-  seqHeader->addSimpleChild(seqHeaderOffset + 13, 2, "Time Signature");
-  seqHeader->addSimpleChild(seqHeaderOffset + 15, 1, "Number of Tracks");
+  seqHeader->addChild(seqHeaderOffset + 13, 2, "Time Signature");
+  seqHeader->addChild(seqHeaderOffset + 15, 1, "Number of Tracks");
 
   SetPPQN(GetShortBE(seqHeaderOffset + 8));
   nNumTracks = 16;

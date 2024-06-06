@@ -49,8 +49,8 @@ bool SoftCreatSnesSeq::GetHeaderInfo(void) {
 
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
-    header->addSimpleChild(addrTrackLowPtr, 1, trackName.str() + " (LSB)");
-    header->addSimpleChild(addrTrackHighPtr, 1, trackName.str() + " (MSB)");
+    header->addChild(addrTrackLowPtr, 1, trackName.str() + " (LSB)");
+    header->addChild(addrTrackHighPtr, 1, trackName.str() + " (MSB)");
 
     uint16_t addrTrackStart = GetByte(addrTrackLowPtr) | (GetByte(addrTrackHighPtr) << 8);
     if (addrTrackStart != 0xffff) {

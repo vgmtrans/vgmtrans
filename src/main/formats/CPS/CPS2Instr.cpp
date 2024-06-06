@@ -32,12 +32,12 @@ bool CPSArticTable::LoadMain() {
 
     auto name = fmt::format("Articulation {:d}", i);
     VGMItem *containerItem = new VGMItem(this, off, sizeof(qs_artic_info), name);
-    containerItem->addSimpleChild(off, 1, "Attack Rate");
-    containerItem->addSimpleChild(off + 1, 1, "Decay Rate");
-    containerItem->addSimpleChild(off + 2, 1, "Sustain Level");
-    containerItem->addSimpleChild(off + 3, 1, "Sustain Rate");
-    containerItem->addSimpleChild(off + 4, 1, "Release Rate");
-    containerItem->addSimpleChild(off + 5, 3, "Unknown");
+    containerItem->addChild(off, 1, "Attack Rate");
+    containerItem->addChild(off + 1, 1, "Decay Rate");
+    containerItem->addChild(off + 2, 1, "Sustain Level");
+    containerItem->addChild(off + 3, 1, "Sustain Rate");
+    containerItem->addChild(off + 4, 1, "Release Rate");
+    containerItem->addChild(off + 5, 3, "Unknown");
     addChild(containerItem);
   }
   //unLength = off - dwOffset;
@@ -87,11 +87,11 @@ bool CPS2SampleInfoTable::LoadMain() {
     auto name = fmt::format("Sample Info: {:d}", i);
 
     VGMItem *containerItem = new VGMItem(this, off, sizeof(qs_samp_info_cps2), name);
-    containerItem->addSimpleChild(off + 0, 1, "Bank");
-    containerItem->addSimpleChild(off + 1, 2, "Offset");
-    containerItem->addSimpleChild(off + 3, 2, "Loop Offset");
-    containerItem->addSimpleChild(off + 5, 2, "End Offset");
-    containerItem->addSimpleChild(off + 7, 1, "Unity Key");
+    containerItem->addChild(off + 0, 1, "Bank");
+    containerItem->addChild(off + 1, 2, "Offset");
+    containerItem->addChild(off + 3, 2, "Loop Offset");
+    containerItem->addChild(off + 5, 2, "End Offset");
+    containerItem->addChild(off + 7, 1, "Unity Key");
     addChild(containerItem);
   }
   unLength = off - 8 - dwOffset;
@@ -151,10 +151,10 @@ bool CPS3SampleInfoTable::LoadMain() {
     auto name = fmt::format("Sample Info: {:d}", i);
 
     VGMItem *containerItem = new VGMItem(this, off, 16, name);
-    containerItem->addSimpleChild(off + 0, 4, "Offset");
-    containerItem->addSimpleChild(off + 4, 4, "Loop Offset");
-    containerItem->addSimpleChild(off + 8, 4, "End Offset");
-    containerItem->addSimpleChild(off + 12, 4, "Unity Key");
+    containerItem->addChild(off + 0, 4, "Offset");
+    containerItem->addChild(off + 4, 4, "Loop Offset");
+    containerItem->addChild(off + 8, 4, "End Offset");
+    containerItem->addChild(off + 12, 4, "Unity Key");
     addChild(containerItem);
 
     sample_info& info = infos[i];
@@ -252,7 +252,7 @@ bool CPS2InstrSet::GetInstrPointers() {
           }
           std::ostringstream pointerStream;
           pointerStream << "Instrument Pointer " << j;
-          instrPointersItem->addSimpleChild(bankOff + (j*2), 2, pointerStream.str());
+          instrPointersItem->addChild(bankOff + (j*2), 2, pointerStream.str());
 
           auto name = fmt::format("Instrument: {:d}  bank: {:d}", j, bank);
           aInstrs.push_back(new CPS2Instr(this, instrPtr, instrLength, bank*2, j, name));
@@ -303,14 +303,14 @@ bool CPS2Instr::LoadInstr() {
   if (formatVersion < VER_103) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
-    rgn->addSimpleChild(this->dwOffset,     1, "Sample Info Index");
-    rgn->addSimpleChild(this->dwOffset + 1, 1, "Unknown / Ignored");
-    rgn->addSimpleChild(this->dwOffset + 2, 1, "Attack Rate");
-    rgn->addSimpleChild(this->dwOffset + 3, 1, "Decay Rate");
-    rgn->addSimpleChild(this->dwOffset + 4, 1, "Sustain Level");
-    rgn->addSimpleChild(this->dwOffset + 5, 1, "Sustain Rate");
-    rgn->addSimpleChild(this->dwOffset + 6, 1, "Release Rate");
-    rgn->addSimpleChild(this->dwOffset + 7, 1, "Unknown");
+    rgn->addChild(this->dwOffset,     1, "Sample Info Index");
+    rgn->addChild(this->dwOffset + 1, 1, "Unknown / Ignored");
+    rgn->addChild(this->dwOffset + 2, 1, "Attack Rate");
+    rgn->addChild(this->dwOffset + 3, 1, "Decay Rate");
+    rgn->addChild(this->dwOffset + 4, 1, "Sustain Level");
+    rgn->addChild(this->dwOffset + 5, 1, "Sustain Rate");
+    rgn->addChild(this->dwOffset + 6, 1, "Release Rate");
+    rgn->addChild(this->dwOffset + 7, 1, "Unknown");
 
     qs_prog_info_ver_101 progInfo;
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_101), &progInfo);
@@ -329,11 +329,11 @@ bool CPS2Instr::LoadInstr() {
 
     rgn->AddSampNum(progInfo.sample_index, this->dwOffset, 2);
     rgn->AddFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
-    rgn->addSimpleChild(this->dwOffset + 3, 1, "Attack Rate");
-    rgn->addSimpleChild(this->dwOffset + 4, 1, "Decay Rate");
-    rgn->addSimpleChild(this->dwOffset + 5, 1, "Sustain Level");
-    rgn->addSimpleChild(this->dwOffset + 6, 1, "Sustain Rate");
-    rgn->addSimpleChild(this->dwOffset + 7, 1, "Release Rate");
+    rgn->addChild(this->dwOffset + 3, 1, "Attack Rate");
+    rgn->addChild(this->dwOffset + 4, 1, "Decay Rate");
+    rgn->addChild(this->dwOffset + 5, 1, "Sustain Level");
+    rgn->addChild(this->dwOffset + 6, 1, "Sustain Rate");
+    rgn->addChild(this->dwOffset + 7, 1, "Release Rate");
 
     this->attack_rate = progInfo.attack_rate;
     this->decay_rate = progInfo.decay_rate;
@@ -373,11 +373,11 @@ bool CPS2Instr::LoadInstr() {
       auto fine_tune_cents = static_cast<int16_t>(std::lround((progInfo.fine_tune / 128.0) * 100));
       rgn->AddFineTune(fine_tune_cents, off+6, 1);
 
-      rgn->addSimpleChild(off + 7, 1, "Attack Rate");
-      rgn->addSimpleChild(off + 8, 1, "Decay Rate");
-      rgn->addSimpleChild(off + 9, 1, "Sustain Level");
-      rgn->addSimpleChild(off + 10, 1, "Sustain Rate");
-      rgn->addSimpleChild(off + 11, 1, "Release Rate");
+      rgn->addChild(off + 7, 1, "Attack Rate");
+      rgn->addChild(off + 8, 1, "Decay Rate");
+      rgn->addChild(off + 9, 1, "Sustain Level");
+      rgn->addChild(off + 10, 1, "Sustain Rate");
+      rgn->addChild(off + 11, 1, "Release Rate");
 
 
       this->attack_rate = progInfo.attack_rate;
@@ -394,9 +394,9 @@ bool CPS2Instr::LoadInstr() {
     qs_prog_info_ver_130 progInfo;
     GetBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
 
-    rgn->addSimpleChild(this->dwOffset,     2, "Sample Info Index");
+    rgn->addChild(this->dwOffset,     2, "Sample Info Index");
     rgn->AddFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
-    rgn->addSimpleChild(this->dwOffset + 3, 1, "Articulation Index");
+    rgn->addChild(this->dwOffset + 3, 1, "Articulation Index");
 
     const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->parInstrSet)->articTable;
     const qs_artic_info* artic = &articTable->artics[progInfo.artic_index];

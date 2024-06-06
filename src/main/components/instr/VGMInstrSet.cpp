@@ -12,6 +12,7 @@
 #include "Root.h"
 #include "Format.h"
 #include "LogManager.h"
+#include "helper.h"
 
 // ***********
 // VGMInstrSet
@@ -129,6 +130,6 @@ VGMRgn *VGMInstr::AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t 
   return newRgn;
 }
 
-bool VGMInstr::LoadInstr() {
-  return true;
+void VGMInstr::deleteRegions() {
+  DeleteVect(m_regions);
 }

@@ -97,7 +97,7 @@ VGMItem* VGMItem::addChild(VGMItem *item) {
   return item;
 }
 
-VGMItem* VGMItem::addSimpleChild(uint32_t offset, uint32_t length, const std::string &name) {
+VGMItem* VGMItem::addChild(uint32_t offset, uint32_t length, const std::string &name) {
   auto child = new VGMItem(vgmFile(), offset, length, name, CLR_HEADER);
   m_children.emplace_back(child);
   return child;

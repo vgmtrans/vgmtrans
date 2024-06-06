@@ -48,7 +48,7 @@ bool CompileSnesSeq::GetHeaderInfo() {
 
   VGMHeader *header = addHeader(dwOffset, 0);
 
-  header->addSimpleChild(dwOffset, 1, "Number of Tracks");
+  header->addChild(dwOffset, 1, "Number of Tracks");
   nNumTracks = GetByte(dwOffset);
   if (nNumTracks == 0 || nNumTracks > 8) {
     return false;
@@ -60,19 +60,19 @@ bool CompileSnesSeq::GetHeaderInfo() {
     trackName << "Track " << (trackIndex + 1);
 
     VGMHeader *trackHeader = header->addHeader(curOffset, 14, trackName.str().c_str());
-    trackHeader->addSimpleChild(curOffset, 1, "Channel");
-    trackHeader->addSimpleChild(curOffset + 1, 1, "Flags");
-    trackHeader->addSimpleChild(curOffset + 2, 1, "Volume");
-    trackHeader->addSimpleChild(curOffset + 3, 1, "Volume Envelope");
-    trackHeader->addSimpleChild(curOffset + 4, 1, "Vibrato");
-    trackHeader->addSimpleChild(curOffset + 5, 1, "Transpose");
+    trackHeader->addChild(curOffset, 1, "Channel");
+    trackHeader->addChild(curOffset + 1, 1, "Flags");
+    trackHeader->addChild(curOffset + 2, 1, "Volume");
+    trackHeader->addChild(curOffset + 3, 1, "Volume Envelope");
+    trackHeader->addChild(curOffset + 4, 1, "Vibrato");
+    trackHeader->addChild(curOffset + 5, 1, "Transpose");
     trackHeader->AddTempo(curOffset + 6, 1);
-    trackHeader->addSimpleChild(curOffset + 7, 1, "Branch ID (Channel #)");
-    trackHeader->addSimpleChild(curOffset + 8, 2, "Score Pointer");
-    trackHeader->addSimpleChild(curOffset + 10, 1, "SRCN");
-    trackHeader->addSimpleChild(curOffset + 11, 1, "ADSR");
-    trackHeader->addSimpleChild(curOffset + 12, 1, "Pan");
-    trackHeader->addSimpleChild(curOffset + 13, 1, "Reserved");
+    trackHeader->addChild(curOffset + 7, 1, "Branch ID (Channel #)");
+    trackHeader->addChild(curOffset + 8, 2, "Score Pointer");
+    trackHeader->addChild(curOffset + 10, 1, "SRCN");
+    trackHeader->addChild(curOffset + 11, 1, "ADSR");
+    trackHeader->addChild(curOffset + 12, 1, "Pan");
+    trackHeader->addChild(curOffset + 13, 1, "Reserved");
     curOffset += 14;
   }
 

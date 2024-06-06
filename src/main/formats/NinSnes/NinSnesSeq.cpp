@@ -118,7 +118,7 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
   if (sectionAddress == 0) {
     // End
     if (!IsOffsetUsed(beginOffset)) {
-      header->addSimpleChild(beginOffset, curOffset - beginOffset, "Section Playlist End");
+      header->addChild(beginOffset, curOffset - beginOffset, "Section Playlist End");
     }
     bContinue = false;
   }
@@ -183,11 +183,11 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
 
     // add event to sequence
     if (!IsOffsetUsed(beginOffset)) {
-      header->addSimpleChild(beginOffset, curOffset - beginOffset, "Playlist Jump");
+      header->addChild(beginOffset, curOffset - beginOffset, "Playlist Jump");
 
       // add the last event too, if available
       if (curOffset + 1 < 0x10000 && GetShort(curOffset) == 0x0000) {
-        header->addSimpleChild(curOffset, 2, "Playlist End");
+        header->addChild(curOffset, 2, "Playlist End");
       }
     }
 
@@ -213,7 +213,7 @@ bool NinSnesSeq::ReadEvent(long stopTime) {
 
     // Play the section
     if (!IsOffsetUsed(beginOffset)) {
-      header->addSimpleChild(beginOffset, curOffset - beginOffset, "Section Pointer");
+      header->addChild(beginOffset, curOffset - beginOffset, "Section Pointer");
     }
 
     NinSnesSection *section = (NinSnesSection *) GetSectionFromOffset(sectionAddress);
@@ -672,7 +672,7 @@ bool NinSnesSection::GetTrackPointers() {
     char name[32];
     snprintf(name, 32, "Track Pointer #%d", trackIndex + 1);
 
-    header->addSimpleChild(curOffset, 2, name);
+    header->addChild(curOffset, 2, name);
     curOffset += 2;
   }
 

@@ -22,10 +22,10 @@ bool TriAcePS1Seq::GetHeaderInfo() {
   SetPPQN(0x30);
 
   header = addHeader(dwOffset, 0xD5);
-  header->addSimpleChild(dwOffset + 2, 2, "Size");
-  header->addSimpleChild(dwOffset + 0xB, 4, "Song title");
-  header->addSimpleChild(dwOffset + 0xF, 1, "BPM");
-  header->addSimpleChild(dwOffset + 0x10, 2, "Time Signature");
+  header->addChild(dwOffset + 2, 2, "Size");
+  header->addChild(dwOffset + 0xB, 4, "Song title");
+  header->addChild(dwOffset + 0xF, 1, "BPM");
+  header->addChild(dwOffset + 0x10, 2, "Time Signature");
 
   unLength = GetShort(dwOffset + 2);
   AlwaysWriteInitialTempo(GetByte(dwOffset + 0xF));
@@ -82,7 +82,7 @@ void TriAcePS1Track::LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     uint32_t endOffset = ReadScorePattern(scorePatternOffset);
     if (seq->curScorePattern)
       seq->curScorePattern->unLength = endOffset - seq->curScorePattern->dwOffset;
-    addSimpleChild(scorePatternPtrOffset, 2, "Score Pattern Ptr");
+    addChild(scorePatternPtrOffset, 2, "Score Pattern Ptr");
     scorePatternPtrOffset += 2;
     scorePatternOffset = GetShort(scorePatternPtrOffset);
   }
