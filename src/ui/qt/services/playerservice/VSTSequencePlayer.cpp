@@ -46,7 +46,7 @@ bool VSTSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> cons
   std::thread myThread(bgLoadSF2);
   myThread.detach();
 
-  prepMidiPlayback(coll->GetSeq());
+  prepMidiPlayback(coll->seq());
   enqueueResetEvent();
   return true;
 }
@@ -255,7 +255,7 @@ bool VSTSequencePlayer::loadVST() {
 }
 
 bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
-  SF2File* sf2 = coll->CreateSF2File();
+  SF2File* sf2 = coll->createSF2File();
   if (!sf2) {
     L_ERROR("Failed to play collection as a soundfont file could not be produced.");
     return false;
