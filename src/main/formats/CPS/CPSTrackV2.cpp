@@ -169,6 +169,11 @@ bool CPSTrackV2::ReadEvent() {
       int16_t relative_offset = static_cast<int16_t>(GetShortBE(curOffset));
       curOffset += 2;
       auto should_continue = AddLoopForever(beginOffset, curOffset - beginOffset);
+      if (readMode == READMODE_ADD_TO_UI) {
+        if (GetByte(curOffset) == 0xFF) {
+          AddEndOfTrack(curOffset, 1);
+        }
+      }
       curOffset += relative_offset;
       return should_continue;;
     }
@@ -205,6 +210,11 @@ bool CPSTrackV2::ReadEvent() {
       uint8_t loopCount = GetByte(curOffset++);
       if (loopCount == 0) {
         auto should_continue = AddLoopForever(beginOffset, curOffset - beginOffset);
+        if (readMode == READMODE_ADD_TO_UI) {
+          if (GetByte(curOffset) == 0xFF) {
+            AddEndOfTrack(curOffset, 1);
+          }
+        }
         curOffset = loopOffset[loopNum];
         return should_continue;
       }

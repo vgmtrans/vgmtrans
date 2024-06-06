@@ -23,10 +23,7 @@ MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
 }
 
 bool MP2kInstrSet::LoadInstrs() {
-  bool res = VGMInstrSet::LoadInstrs();
-  sampColl = nullptr;
-
-  return res;
+  return VGMInstrSet::LoadInstrs();
 }
 
 bool MP2kInstrSet::GetInstrPointers() {

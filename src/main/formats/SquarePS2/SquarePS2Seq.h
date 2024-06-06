@@ -10,7 +10,7 @@ class BGMSeq : public VGMSeq {
 
   bool GetHeaderInfo() override;
   bool GetTrackPointers() override;
-  virtual uint32_t GetID() { return assocWDID; }
+  uint32_t GetID() const override { return assocWDID; }
 
  protected:
   unsigned short seqID;
