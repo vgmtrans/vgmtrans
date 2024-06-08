@@ -619,6 +619,8 @@
         <romgroup type="qsound" load_method="deinterlace_pairs" load_order="reverse">
             <rom>sfiii2n/sfiii2-simm3.0</rom>
             <rom>sfiii2n/sfiii2-simm3.1</rom>
+            <rom>sfiii2n/sfiii2-simm3.2</rom>
+            <rom>sfiii2n/sfiii2-simm3.3</rom>
         </romgroup>
     </game>
     <game name="sfiii2n" format="CPS2" fmt_version="CPS3">
