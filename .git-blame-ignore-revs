@@ -22,3 +22,6 @@ ed533cd46d853523d184ff1a60f769223ee97845
 
 # Rename the rest of the vgmtranscore methods (hopefully)
 6bcd74f826462ed5ea4ff52c28e9f9dad605251c
+
+# Rename the Qt implementation methods
+f21c279c8dbeadda11ee065c0db19473006d8b55
