@@ -63,121 +63,117 @@ typedef enum {
 class MidiTrack {
  public:
   MidiTrack(MidiFile *parentSeq, bool bMonophonic);
-  virtual ~MidiTrack(void);
+  virtual ~MidiTrack();
 
-  void Sort(void);
-  void WriteTrack(std::vector<uint8_t> &buf) const;
+  void sort();
+  void writeTrack(std::vector<uint8_t> &buf) const;
 
-  //void SetChannel(int theChannel);
-  void SetChannelGroup(int theChannelGroup);
+  //void setChannel(int theChannel);
+  void setChannelGroup(int theChannelGroup);
 
-  uint32_t GetDelta() const;
-  void SetDelta(uint32_t NewDelta);
-  void AddDelta(uint32_t AddDelta);
-  void SubtractDelta(uint32_t SubtractDelta);
-  void ResetDelta();
+  uint32_t getDelta() const;
+  void setDelta(uint32_t NewDelta);
+  void addDelta(uint32_t AddDelta);
+  void subtractDelta(uint32_t SubtractDelta);
+  void resetDelta();
 
-  void AddNoteOn(uint8_t channel, int8_t key, int8_t vel);
-  void InsertNoteOn(uint8_t channel, int8_t key, int8_t vel, uint32_t absTime);
-  void AddNoteOff(uint8_t channel, int8_t key);
-  void InsertNoteOff(uint8_t channel, int8_t key, uint32_t absTime);
-  void AddNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
-  void AddNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
-  void InsertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime);
-  void PurgePrevNoteOffs();
-  void PurgePrevNoteOffs(uint32_t absTime);
-  void AddControllerEvent(uint8_t channel,
+  void addNoteOn(uint8_t channel, int8_t key, int8_t vel);
+  void insertNoteOn(uint8_t channel, int8_t key, int8_t vel, uint32_t absTime);
+  void addNoteOff(uint8_t channel, int8_t key);
+  void insertNoteOff(uint8_t channel, int8_t key, uint32_t absTime);
+  void addNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
+  void addNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration);
+  void insertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime);
+  void purgePrevNoteOffs();
+  void purgePrevNoteOffs(uint32_t absTime);
+  void addControllerEvent(uint8_t channel,
                           uint8_t controllerNum,
                           uint8_t theDataByte); // This function should be used for only redirection output of MIDI-like formats
-  void InsertControllerEvent(uint8_t channel,
+  void insertControllerEvent(uint8_t channel,
                              uint8_t controllerNum,
                              uint8_t theDataByte,
                              uint32_t absTime); // This function should be used for only redirection output of MIDI-like formats
-  //void AddVolMarker(uint8_t channel, uint8_t vol, int8_t priority = PRIORITY_HIGHER);
-  //void InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, int8_t priority = PRIORITY_HIGHER);
-  void AddVol(uint8_t channel, uint8_t vol/*, int8_t priority = PRIORITY_MIDDLE*/);
-  void InsertVol(uint8_t channel, uint8_t vol, uint32_t absTime/*, int8_t priority = PRIORITY_MIDDLE*/);
-  void AddVolumeFine(uint8_t channel, uint8_t volume_lsb);
-  void AddMasterVol(uint8_t channel, uint8_t mastVol/*, int8_t priority = PRIORITY_HIGHER*/);
-  void InsertMasterVol(uint8_t channel, uint8_t mastVol, uint32_t absTime/*, int8_t priority = PRIORITY_HIGHER*/);
-  void AddPan(uint8_t channel, uint8_t pan);
-  void InsertPan(uint8_t channel, uint8_t pan, uint32_t absTime);
-  void AddExpression(uint8_t channel, uint8_t expression);
-  void InsertExpression(uint8_t channel, uint8_t expression, uint32_t absTime);
-  void AddReverb(uint8_t channel, uint8_t reverb);
-  void InsertReverb(uint8_t channel, uint8_t reverb, uint32_t absTime);
-  void AddModulation(uint8_t channel, uint8_t depth);
-  void InsertModulation(uint8_t channel, uint8_t depth, uint32_t absTime);
-  void AddBreath(uint8_t channel, uint8_t depth);
-  void InsertBreath(uint8_t channel, uint8_t depth, uint32_t absTime);
-  void AddSustain(uint8_t channel, uint8_t depth);
-  void InsertSustain(uint8_t channel, uint8_t depth, uint32_t absTime);
-  void AddPortamento(uint8_t channel, bool bOn);
-  void InsertPortamento(uint8_t channel, bool bOn, uint32_t absTime);
-  void AddPortamentoTime(uint8_t channel, uint8_t time);
-  void InsertPortamentoTime(uint8_t channel, uint8_t time, uint32_t absTime);
-  void AddPortamentoTimeFine(uint8_t channel, uint8_t time);
-  void InsertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime);
-  void AddPortamentoControl(uint8_t channel, uint8_t key);
-  void AddMono(uint8_t channel);
-  void InsertMono(uint8_t channel, uint32_t absTime);
+  void addVol(uint8_t channel, uint8_t vol/*, int8_t priority = PRIORITY_MIDDLE*/);
+  void insertVol(uint8_t channel, uint8_t vol, uint32_t absTime/*, int8_t priority = PRIORITY_MIDDLE*/);
+  void addVolumeFine(uint8_t channel, uint8_t volume_lsb);
+  void addMasterVol(uint8_t channel, uint8_t mastVol/*, int8_t priority = PRIORITY_HIGHER*/);
+  void insertMasterVol(uint8_t channel, uint8_t mastVol, uint32_t absTime/*, int8_t priority = PRIORITY_HIGHER*/);
+  void addPan(uint8_t channel, uint8_t pan);
+  void insertPan(uint8_t channel, uint8_t pan, uint32_t absTime);
+  void addExpression(uint8_t channel, uint8_t expression);
+  void insertExpression(uint8_t channel, uint8_t expression, uint32_t absTime);
+  void addReverb(uint8_t channel, uint8_t reverb);
+  void insertReverb(uint8_t channel, uint8_t reverb, uint32_t absTime);
+  void addModulation(uint8_t channel, uint8_t depth);
+  void insertModulation(uint8_t channel, uint8_t depth, uint32_t absTime);
+  void addBreath(uint8_t channel, uint8_t depth);
+  void insertBreath(uint8_t channel, uint8_t depth, uint32_t absTime);
+  void addSustain(uint8_t channel, uint8_t depth);
+  void insertSustain(uint8_t channel, uint8_t depth, uint32_t absTime);
+  void addPortamento(uint8_t channel, bool bOn);
+  void insertPortamento(uint8_t channel, bool bOn, uint32_t absTime);
+  void addPortamentoTime(uint8_t channel, uint8_t time);
+  void insertPortamentoTime(uint8_t channel, uint8_t time, uint32_t absTime);
+  void addPortamentoTimeFine(uint8_t channel, uint8_t time);
+  void insertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime);
+  void addPortamentoControl(uint8_t channel, uint8_t key);
+  void addMono(uint8_t channel);
+  void insertMono(uint8_t channel, uint32_t absTime);
 
-  void AddPitchBend(uint8_t channel, int16_t bend);
-  void InsertPitchBend(uint8_t channel, short bend, uint32_t absTime);
-  void AddPitchBendRange(uint8_t channel, uint16_t cents);
-  void InsertPitchBendRange(uint8_t channel, uint16_t cents, uint32_t absTime);
-  void AddFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb);
-  void InsertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
-  void AddFineTuning(uint8_t channel, double cents);
-  void InsertFineTuning(uint8_t channel, double cents, uint32_t absTime);
-  void AddCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb);
-  void InsertCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
-  void AddCoarseTuning(uint8_t channel, double semitones);
-  void InsertCoarseTuning(uint8_t channel, double semitones, uint32_t absTime);
-  void AddModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb);
-  void InsertModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
-  void AddModulationDepthRange(uint8_t channel, double semitones);
-  void InsertModulationDepthRange(uint8_t channel, double semitones, uint32_t absTime);
-  //void AddTranspose(uint8_t channel, int transpose);
-  void AddProgramChange(uint8_t channel, uint8_t progNum);
-  void AddBankSelect(uint8_t channel, uint8_t bank);
-  void AddBankSelectFine(uint8_t channel, uint8_t lsb);
-  void InsertBankSelect(uint8_t channel, uint8_t bank, uint32_t absTime);
+  void addPitchBend(uint8_t channel, int16_t bend);
+  void insertPitchBend(uint8_t channel, short bend, uint32_t absTime);
+  void addPitchBendRange(uint8_t channel, uint16_t cents);
+  void insertPitchBendRange(uint8_t channel, uint16_t cents, uint32_t absTime);
+  void addFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb);
+  void insertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
+  void addFineTuning(uint8_t channel, double cents);
+  void insertFineTuning(uint8_t channel, double cents, uint32_t absTime);
+  void addCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb);
+  void insertCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
+  void addCoarseTuning(uint8_t channel, double semitones);
+  void insertCoarseTuning(uint8_t channel, double semitones, uint32_t absTime);
+  void addModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb);
+  void insertModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
+  void addModulationDepthRange(uint8_t channel, double semitones);
+  void insertModulationDepthRange(uint8_t channel, double semitones, uint32_t absTime);
+  void addProgramChange(uint8_t channel, uint8_t progNum);
+  void addBankSelect(uint8_t channel, uint8_t bank);
+  void addBankSelectFine(uint8_t channel, uint8_t lsb);
+  void insertBankSelect(uint8_t channel, uint8_t bank, uint32_t absTime);
 
-  void AddTempo(uint32_t microSeconds);
-  void AddTempoBPM(double BPM);
-  void InsertTempo(uint32_t microSeconds, uint32_t absTime);
-  void InsertTempoBPM(double BPM, uint32_t absTime);
-  void AddMidiPort(uint8_t port);
-  void InsertMidiPort(uint8_t port, uint32_t absTime);
-  void AddTimeSig(uint8_t numer, uint8_t denom, uint8_t clicksPerQuarter);
-  void InsertTimeSig(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime);
-  void AddEndOfTrack(void);
-  void InsertEndOfTrack(uint32_t absTime);
-  void AddText(const std::string &str);
-  void InsertText(const std::string &str, uint32_t absTime);
-  void AddSeqName(const std::string &str);
-  void InsertSeqName(const std::string &str, uint32_t absTime);
-  void AddTrackName(const std::string &str);
-  void InsertTrackName(const std::string &str, uint32_t absTime);
-  void AddGMReset();
-  void InsertGMReset(uint32_t absTime);
-  void AddGM2Reset();
-  void InsertGM2Reset(uint32_t absTime);
-  void AddGSReset();
-  void InsertGSReset(uint32_t absTime);
-  void AddXGReset();
-  void InsertXGReset(uint32_t absTime);
+  void addTempo(uint32_t microSeconds);
+  void addTempoBPM(double BPM);
+  void insertTempo(uint32_t microSeconds, uint32_t absTime);
+  void insertTempoBPM(double BPM, uint32_t absTime);
+  void addMidiPort(uint8_t port);
+  void insertMidiPort(uint8_t port, uint32_t absTime);
+  void addTimeSig(uint8_t numer, uint8_t denom, uint8_t clicksPerQuarter);
+  void insertTimeSig(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime);
+  void addEndOfTrack();
+  void insertEndOfTrack(uint32_t absTime);
+  void addText(const std::string &str);
+  void insertText(const std::string &str, uint32_t absTime);
+  void addSeqName(const std::string &str);
+  void insertSeqName(const std::string &str, uint32_t absTime);
+  void addTrackName(const std::string &str);
+  void insertTrackName(const std::string &str, uint32_t absTime);
+  void addGMReset();
+  void insertGMReset(uint32_t absTime);
+  void addGM2Reset();
+  void insertGM2Reset(uint32_t absTime);
+  void addGSReset();
+  void insertGSReset(uint32_t absTime);
+  void addXGReset();
+  void insertXGReset(uint32_t absTime);
 
   // SPECIAL EVENTS
-  //void AddTranspose(int8_t semitones);
-  void InsertGlobalTranspose(uint32_t absTime, int8_t semitones);
-  void AddMarker(uint8_t channel,
+  void insertGlobalTranspose(uint32_t absTime, int8_t semitones);
+  void addMarker(uint8_t channel,
                  const std::string &markername,
                  uint8_t databyte1,
                  uint8_t databyte2,
                  int8_t priority = PRIORITY_MIDDLE);
-  void InsertMarker(uint8_t channel,
+  void insertMarker(uint8_t channel,
                     const std::string &markername,
                     uint8_t databyte1,
                     uint8_t databyte2,
@@ -204,14 +200,14 @@ class MidiFile {
  public:
   MidiFile(VGMSeq *assocSeq);
   ~MidiFile();
-  MidiTrack *AddTrack();
-  MidiTrack *InsertTrack(uint32_t trackNum);
-  int GetMidiTrackIndex(const MidiTrack *midiTrack);
-  void SetPPQN(uint16_t ppqn);
-  uint32_t GetPPQN() const;
-  void WriteMidiToBuffer(std::vector<uint8_t> &buf);
-  void Sort(void);
-  bool SaveMidiFile(const std::string &filepath);
+  MidiTrack *addTrack();
+  MidiTrack *insertTrack(uint32_t trackNum);
+  int getMidiTrackIndex(const MidiTrack *midiTrack);
+  void setPPQN(uint16_t ppqn);
+  uint32_t ppqn() const;
+  void writeMidiToBuffer(std::vector<uint8_t> &buf);
+  void sort();
+  bool saveMidiFile(const std::string &filepath);
 
  protected:
   //bool bAddedTempo;
@@ -219,37 +215,38 @@ class MidiFile {
 
  public:
   VGMSeq *assocSeq;
-  uint16_t ppqn;
 
   std::vector<MidiTrack *> aTracks;
   MidiTrack globalTrack;            //events in the globalTrack will be copied into every other track
   int8_t globalTranspose;
   bool bMonophonicTracks;
+
+private:
+  uint16_t m_ppqn;
 };
 
 class MidiEvent {
  public:
   MidiEvent(MidiTrack *thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, int8_t thePriority);
   virtual ~MidiEvent() = default;
-  virtual MidiEventType GetEventType() = 0;
-  bool IsMetaEvent();
-  bool IsSysexEvent();
-  static void WriteVarLength(std::vector<uint8_t> &buf, uint32_t value);
-  //virtual void PrepareWrite(void/*vector<MidiEvent*> & aEvents*/);
-  virtual uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) = 0;
-  uint32_t WriteMetaEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
+  virtual MidiEventType eventType() = 0;
+  bool isMetaEvent();
+  bool isSysexEvent();
+  static void writeVarLength(std::vector<uint8_t> &buf, uint32_t value);
+  virtual uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) = 0;
+  uint32_t writeMetaEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
     const uint8_t* data, size_t dataSize) const;
-  uint32_t WriteMetaTextEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
+  uint32_t writeMetaTextEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType,
     const std::string& str) const;
 
-  static std::string GetNoteName(int noteNumber);
+  static std::string getNoteName(int noteNumber);
 
   bool operator<(const MidiEvent &) const;
   bool operator>(const MidiEvent &) const;
 
   MidiTrack *prntTrk;
   uint8_t channel;
-  uint32_t AbsTime;            //absolute time... the number of ticks from the very beginning of the sequence at which this event occurs
+  uint32_t absTime;            //absolute time... the number of ticks from the very beginning of the sequence at which this event occurs
   int8_t priority;
 };
 
@@ -263,7 +260,7 @@ class PriorityCmp {
 class AbsTimeCmp {
  public:
   bool operator()(const MidiEvent *a, const MidiEvent *b) const {
-    return (a->AbsTime < b->AbsTime);
+    return (a->absTime < b->absTime);
   }
 };
 
@@ -272,8 +269,8 @@ class NoteEvent
  public:
   NoteEvent
       (MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, bool bNoteDown, uint8_t theKey, uint8_t theVel = 64);
-  MidiEventType GetEventType() override { return MIDIEVENT_NOTEON; }
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  MidiEventType eventType() override { return MIDIEVENT_NOTEON; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   bool bNoteDown;
   int8_t key;
@@ -303,8 +300,8 @@ class ControllerEvent
                   uint8_t controllerNum,
                   uint8_t theDataByte,
                   int8_t thePriority = PRIORITY_MIDDLE);
-  MidiEventType GetEventType() override { return MIDIEVENT_UNDEFINED; }
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  MidiEventType eventType() override { return MIDIEVENT_UNDEFINED; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   uint8_t controlNum;
   uint8_t dataByte;
@@ -317,8 +314,8 @@ public:
              uint32_t absoluteTime,
              const std::vector<uint8_t>& sysexData,
              int8_t thePriority = PRIORITY_MIDDLE);
-  MidiEventType GetEventType() override { return MIDIEVENT_UNDEFINED; }
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  MidiEventType eventType() override { return MIDIEVENT_UNDEFINED; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   std::vector<uint8_t> sysexData;
 };
@@ -328,7 +325,7 @@ class VolumeEvent
  public:
   VolumeEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t volume)
       : ControllerEvent(prntTrk, channel, absoluteTime, 7, volume, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_VOLUME; }
+  MidiEventType eventType() override { return MIDIEVENT_VOLUME; }
 };
 
 class VolumeFineEvent
@@ -336,7 +333,7 @@ class VolumeFineEvent
 public:
   VolumeFineEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t volume_lsb)
       : ControllerEvent(prntTrk, channel, absoluteTime, 39, volume_lsb, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_VOLUME; }
+  MidiEventType eventType() override { return MIDIEVENT_VOLUME; }
 };
 
 class ExpressionEvent
@@ -344,7 +341,7 @@ class ExpressionEvent
  public:
   ExpressionEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t expression)
       : ControllerEvent(prntTrk, channel, absoluteTime, 11, expression, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_EXPRESSION; }
+  MidiEventType eventType() override { return MIDIEVENT_EXPRESSION; }
 };
 
 class SustainEvent
@@ -352,7 +349,7 @@ class SustainEvent
  public:
   SustainEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t depth)
       : ControllerEvent(prntTrk, channel, absoluteTime, 64, depth, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_SUSTAIN; }
+  MidiEventType eventType() override { return MIDIEVENT_SUSTAIN; }
 };
 
 class PortamentoEvent
@@ -360,7 +357,7 @@ class PortamentoEvent
  public:
   PortamentoEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t bOn)
       : ControllerEvent(prntTrk, channel, absoluteTime, 65, (bOn) ? 0x7F : 0, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_PORTAMENTO; }
+  MidiEventType eventType() override { return MIDIEVENT_PORTAMENTO; }
 };
 
 class PortamentoTimeEvent
@@ -368,7 +365,7 @@ class PortamentoTimeEvent
  public:
   PortamentoTimeEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t time)
       : ControllerEvent(prntTrk, channel, absoluteTime, 5, time, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_PORTAMENTOTIME; }
+  MidiEventType eventType() override { return MIDIEVENT_PORTAMENTOTIME; }
 };
 
 class PortamentoTimeFineEvent
@@ -376,7 +373,7 @@ class PortamentoTimeFineEvent
 public:
   PortamentoTimeFineEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t time)
       : ControllerEvent(prntTrk, channel, absoluteTime, 37, time, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_PORTAMENTOTIMEFINE; }
+  MidiEventType eventType() override { return MIDIEVENT_PORTAMENTOTIMEFINE; }
 };
 
 class PortamentoControlEvent
@@ -384,7 +381,7 @@ class PortamentoControlEvent
 public:
   PortamentoControlEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t key)
       : ControllerEvent(prntTrk, channel, absoluteTime, 84, key, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_PORTAMENTOCONTROL; }
+  MidiEventType eventType() override { return MIDIEVENT_PORTAMENTOCONTROL; }
 };
 
 class PanEvent
@@ -392,7 +389,7 @@ class PanEvent
  public:
   PanEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t pan)
       : ControllerEvent(prntTrk, channel, absoluteTime, 10, pan, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_PAN; }
+  MidiEventType eventType() override { return MIDIEVENT_PAN; }
 };
 
 class ModulationEvent
@@ -400,7 +397,7 @@ class ModulationEvent
  public:
   ModulationEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t depth)
       : ControllerEvent(prntTrk, channel, absoluteTime, 1, depth, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_MODULATION; }
+  MidiEventType eventType() override { return MIDIEVENT_MODULATION; }
 };
 
 class BreathEvent
@@ -408,7 +405,7 @@ class BreathEvent
  public:
   BreathEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t depth)
       : ControllerEvent(prntTrk, channel, absoluteTime, 2, depth, PRIORITY_MIDDLE) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_BREATH; }
+  MidiEventType eventType() override { return MIDIEVENT_BREATH; }
 };
 
 class BankSelectEvent
@@ -416,7 +413,7 @@ class BankSelectEvent
  public:
   BankSelectEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t bank)
       : ControllerEvent(prntTrk, channel, absoluteTime, 0, bank, PRIORITY_HIGH) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_BANKSELECT; }
+  MidiEventType eventType() override { return MIDIEVENT_BANKSELECT; }
 };
 
 class BankSelectFineEvent
@@ -424,7 +421,7 @@ class BankSelectFineEvent
  public:
   BankSelectFineEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t bank)
       : ControllerEvent(prntTrk, channel, absoluteTime, 32, bank, PRIORITY_HIGH) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_BANKSELECTFINE; }
+  MidiEventType eventType() override { return MIDIEVENT_BANKSELECTFINE; }
 };
 
 /*
@@ -455,7 +452,7 @@ class MasterVolEvent
 public:
   MasterVolEvent(MidiTrack *prntTrk, uint8_t /* channel */, uint32_t absoluteTime, uint8_t msb)
       : SysexEvent(prntTrk, absoluteTime, {0x07, 0x7F, 0x7F, 0x04, 0x01, 0, msb }, PRIORITY_HIGHER) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_MASTERVOL; }
+  MidiEventType eventType() override { return MIDIEVENT_MASTERVOL; }
 };
 
 /*
@@ -475,16 +472,16 @@ class MonoEvent
  public:
   MonoEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime)
       : ControllerEvent(prntTrk, channel, absoluteTime, 126, 0, PRIORITY_HIGHER) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_MONO; }
+  MidiEventType eventType() override { return MIDIEVENT_MONO; }
 };
 
 class ProgChangeEvent
     : public MidiEvent {
  public:
   ProgChangeEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t progNum);
-  MidiEventType GetEventType() override { return MIDIEVENT_PROGRAMCHANGE; }
+  MidiEventType eventType() override { return MIDIEVENT_PROGRAMCHANGE; }
   //virtual ProgChangeEvent* MakeCopy();
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   uint8_t programNum;
 };
@@ -493,9 +490,9 @@ class PitchBendEvent
     : public MidiEvent {
  public:
   PitchBendEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, int16_t bend);
-  MidiEventType GetEventType() override { return MIDIEVENT_PITCHBEND; }
+  MidiEventType eventType() override { return MIDIEVENT_PITCHBEND; }
   //virtual PitchBendEvent* MakeCopy();
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   int16_t bend;
 };
@@ -505,9 +502,9 @@ class TempoEvent
     : public MidiEvent {
  public:
   TempoEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint32_t microSeconds);
-  MidiEventType GetEventType() override { return MIDIEVENT_TEMPO; }
+  MidiEventType eventType() override { return MIDIEVENT_TEMPO; }
   //virtual TempoEvent* MakeCopy();
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   uint32_t microSecs;
 };
@@ -515,9 +512,9 @@ class TempoEvent
 class MidiPortEvent : public MidiEvent {
 public:
   MidiPortEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint8_t port);
-  MidiEventType GetEventType() override { return MIDIEVENT_MIDIPORT; }
+  MidiEventType eventType() override { return MIDIEVENT_MIDIPORT; }
   // virtual TimeSigEvent* MakeCopy();
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   uint8_t port;
 };
@@ -527,9 +524,9 @@ class TimeSigEvent
  public:
   TimeSigEvent
       (MidiTrack *prntTrk, uint32_t absoluteTime, uint8_t numerator, uint8_t denominator, uint8_t clicksPerQuarter);
-  MidiEventType GetEventType() override { return MIDIEVENT_TIMESIG; }
+  MidiEventType eventType() override { return MIDIEVENT_TIMESIG; }
   //virtual TimeSigEvent* MakeCopy();
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   uint8_t numer;
   uint8_t denom;
@@ -540,17 +537,17 @@ class EndOfTrackEvent
     : public MidiEvent {
  public:
   EndOfTrackEvent(MidiTrack *prntTrk, uint32_t absoluteTime);
-  MidiEventType GetEventType() override { return MIDIEVENT_ENDOFTRACK; }
+  MidiEventType eventType() override { return MIDIEVENT_ENDOFTRACK; }
   //virtual EndOfTrackEvent* MakeCopy();
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 };
 
 class TextEvent
     : public MidiEvent {
  public:
   TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str);
-  MidiEventType GetEventType() override { return MIDIEVENT_TEXT; }
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  MidiEventType eventType() override { return MIDIEVENT_TEXT; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   std::string text;
 };
@@ -559,8 +556,8 @@ class SeqNameEvent
     : public MidiEvent {
  public:
   SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str);
-  MidiEventType GetEventType() override { return MIDIEVENT_TEXT; }
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  MidiEventType eventType() override { return MIDIEVENT_TEXT; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   std::string text;
 };
@@ -569,8 +566,8 @@ class TrackNameEvent
     : public MidiEvent {
  public:
   TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str);
-  MidiEventType GetEventType() override { return MIDIEVENT_TEXT; }
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  MidiEventType eventType() override { return MIDIEVENT_TEXT; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   std::string text;
 };
@@ -580,8 +577,8 @@ class GlobalTransposeEvent
     : public MidiEvent {
  public:
   GlobalTransposeEvent(MidiTrack *prntTrk, uint32_t absoluteTime, int8_t semitones);
-  MidiEventType GetEventType() override { return MIDIEVENT_GLOBALTRANSPOSE; }
-  uint32_t WriteEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+  MidiEventType eventType() override { return MIDIEVENT_GLOBALTRANSPOSE; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 
   int8_t semitones;
 };
@@ -598,8 +595,8 @@ class MarkerEvent
               int8_t thePriority = PRIORITY_MIDDLE)
       : MidiEvent(prntTrk, absoluteTime, channel, thePriority), name(name), databyte1(databyte1),
         databyte2(databyte2) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_MARKER; }
-  uint32_t WriteEvent(std::vector<uint8_t>& /*buf*/, uint32_t time) override { return time; }
+  MidiEventType eventType() override { return MIDIEVENT_MARKER; }
+  uint32_t writeEvent(std::vector<uint8_t>& /*buf*/, uint32_t time) override { return time; }
 
   std::string name;
   uint8_t databyte1, databyte2;
@@ -610,7 +607,7 @@ class GMResetEvent
  public:
   GMResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
        : SysexEvent(prntTrk, absoluteTime, { 0x05, 0x7E, 0x7F, 0x09, 0x01 }, PRIORITY_HIGHEST) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_RESET; }
+  MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
 
 class GM2ResetEvent
@@ -618,7 +615,7 @@ class GM2ResetEvent
  public:
   GM2ResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
        : SysexEvent(prntTrk, absoluteTime, { 0x05, 0x7E, 0x7F, 0x09, 0x03 }, PRIORITY_HIGHEST) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_RESET; }
+  MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
 
 class GSResetEvent
@@ -627,7 +624,7 @@ class GSResetEvent
   GSResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
        : SysexEvent(prntTrk, absoluteTime, { 0x0A, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41 },
                     PRIORITY_HIGHEST) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_RESET; }
+  MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
 
 class XGResetEvent
@@ -636,7 +633,7 @@ class XGResetEvent
   XGResetEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
        : SysexEvent(prntTrk, absoluteTime,  { 0x08, 0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00 },
                     PRIORITY_HIGHEST) { }
-  MidiEventType GetEventType() override { return MIDIEVENT_RESET; }
+  MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
 
 

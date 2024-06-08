@@ -142,9 +142,9 @@ class SynthWave {
         name(std::move(waveName)) {
     RiffFile::alignName(name);
   }
-  ~SynthWave(void);
+  ~SynthWave();
 
-  SynthSampInfo *addSampInfo(void);
+  SynthSampInfo *addSampInfo();
 
   void convertTo16bitSigned();
 

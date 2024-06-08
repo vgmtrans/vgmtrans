@@ -20,22 +20,22 @@ namespace fs = std::filesystem;
  */
 template <typename TSavable>
 class SaveCommandContext : public CommandContext {
-private:
-  std::shared_ptr<std::vector<TSavable*>> items{};
-  std::string path;
-
 public:
   SaveCommandContext() = default;
 
-  void SetItems(std::shared_ptr<std::vector<TSavable*>> f) {
-    items = f;
+  void setItems(std::shared_ptr<std::vector<TSavable*>> f) {
+    m_items = f;
   }
-  void SetSavePath(const std::string& p) {
-    path = p;
+  void setSavePath(const std::string& p) {
+    m_path = p;
   }
 
-  [[nodiscard]] const std::vector<TSavable*>& GetItems() const { return *items; }
-  [[nodiscard]] const std::string& GetPath() const { return path; }
+  [[nodiscard]] const std::vector<TSavable*>& items() const { return *m_items; }
+  [[nodiscard]] const std::string& path() const { return m_path; }
+
+private:
+  std::shared_ptr<std::vector<TSavable*>> m_items{};
+  std::string m_path;
 };
 
 /**
@@ -46,21 +46,17 @@ public:
  */
 template <typename TSavable>
 class SaveCommandContextFactory : public CommandContextFactory {
-private:
-  bool alwaysSaveToDir;
-  std::string fileExtension;
-
 public:
   explicit SaveCommandContextFactory(bool alwaysSaveToDir, std::string fileExtension = "") :
         CommandContextFactory(),
         alwaysSaveToDir(alwaysSaveToDir),
         fileExtension(std::move(fileExtension)) {}
 
-  void SetFileExtension(const std::string& extension) {
+  void setFileExtension(const std::string& extension) {
     fileExtension = extension;
   }
 
-  [[nodiscard]] std::shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const override {
+  [[nodiscard]] std::shared_ptr<CommandContext> createContext(const PropertyMap& properties) const override {
     auto context = std::make_shared<SaveCommandContext<TSavable>>();
 
     if (!properties.contains("files") || !properties.contains("filePath")) {
@@ -68,18 +64,22 @@ public:
     }
 
     auto files = get<std::shared_ptr<std::vector<TSavable*>>>(properties.at("files"));
-    context->SetItems(files);
-    context->SetSavePath(get<std::string>(properties.at("filePath")));
+    context->setItems(files);
+    context->setSavePath(get<std::string>(properties.at("filePath")));
     return context;
   }
 
-  [[nodiscard]] PropertySpecifications GetPropertySpecifications() const override {
+  [[nodiscard]] PropertySpecifications propertySpecifications() const override {
     auto filePathValueType = (alwaysSaveToDir) ? PropertySpecValueType::DirPath : PropertySpecValueType::Path;
     return {
         {"filePath", filePathValueType, "Path to the file or directory", fileExtension},
         {"files", PropertySpecValueType::ItemList, "Vector of files", static_cast<std::shared_ptr<std::vector<TSavable*>>>(nullptr)},
     };
   }
+
+private:
+  bool alwaysSaveToDir;
+  std::string fileExtension;
 };
 
 
@@ -91,26 +91,22 @@ public:
  */
 template <typename TSavable, typename TInContext = TSavable>
 class SaveCommand : public Command {
-private:
-  std::shared_ptr<SaveCommandContextFactory<TInContext>> contextFactory;
-  bool alwaysSaveToDir;
-
 public:
   explicit SaveCommand(bool alwaysSaveToDir = false)
-      : contextFactory(std::make_shared<SaveCommandContextFactory<TInContext>>(alwaysSaveToDir)),
+      : m_contextFactory(std::make_shared<SaveCommandContextFactory<TInContext>>(alwaysSaveToDir)),
         alwaysSaveToDir(alwaysSaveToDir) {
   }
 
-  void Execute(CommandContext& context) override {
+  void execute(CommandContext& context) override {
     auto& vgmContext = dynamic_cast<SaveCommandContext<TInContext>&>(context);
-    const auto& files = vgmContext.GetItems();
-    const auto& path = vgmContext.GetPath();
+    const auto& files = vgmContext.items();
+    const auto& path = vgmContext.path();
 
     if (alwaysSaveToDir) {
       // alwaysSaveToDir indicates we were given a directory path and Save() also expects a directory path
       for (auto file : files) {
         if (auto specificFile = dynamic_cast<TSavable*>(file)) {
-          Save(path, specificFile);
+          save(path, specificFile);
         }
       }
       return;
@@ -118,7 +114,7 @@ public:
     if (files.size() == 1) {
       // In this case, path is a file path
       if (auto file = dynamic_cast<TSavable*>(files[0])) {
-        Save(path, file);
+        save(path, file);
         return;
       }
     }
@@ -127,20 +123,24 @@ public:
       // If alwaysSaveToDir is not set and there are multiple files, the path given is to a directory
       // and the Save() function still expects a file path, so we construct file paths for each file using GetName()
       if (auto specificFile = dynamic_cast<TSavable*>(file)) {
-        auto fileExtension = (GetExtension() == "") ? "" : (std::string(".") + GetExtension());
+        auto fileExtension = (extension() == "") ? "" : (std::string(".") + extension());
         fs::path filePath = path / fs::path(file->name() + fileExtension);
-        Save(filePath.generic_string(), specificFile);
+        save(filePath.generic_string(), specificFile);
       }
     }
   }
 
-  [[nodiscard]] std::shared_ptr<CommandContextFactory> GetContextFactory() const override {
-    contextFactory->SetFileExtension(GetExtension());
-    return contextFactory;
+  [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override {
+    m_contextFactory->setFileExtension(extension());
+    return m_contextFactory;
   }
 
-  [[nodiscard]] virtual std::string GetExtension() const = 0;
-  virtual void Save(const std::string& path, TSavable* specificFile) const = 0;
+  [[nodiscard]] virtual std::string extension() const = 0;
+  virtual void save(const std::string& path, TSavable* specificFile) const = 0;
+
+private:
+  std::shared_ptr<SaveCommandContextFactory<TInContext>> m_contextFactory;
+  bool alwaysSaveToDir;
 };
 
 template<typename TFile>
@@ -148,22 +148,22 @@ class SaveAsOriginalFormatCommand : public SaveCommand<TFile> {
 public:
   SaveAsOriginalFormatCommand() : SaveCommand<TFile>(false) {}
 
-  void Save(const std::string& path, TFile* file) const override {
+  void save(const std::string& path, TFile* file) const override {
     conversion::saveAsOriginal(*file, path);
   }
-  [[nodiscard]] std::string Name() const override { return "Save as original format"; }
-  [[nodiscard]] std::string GetExtension() const override { return ""; }
+  [[nodiscard]] std::string name() const override { return "Save as original format"; }
+  [[nodiscard]] std::string extension() const override { return ""; }
 };
 
 class SaveAsMidiCommand : public SaveCommand<VGMSeq, VGMFile> {
 public:
   SaveAsMidiCommand() : SaveCommand<VGMSeq, VGMFile>(false) {}
 
-  void Save(const std::string& path, VGMSeq* seq) const override {
+  void save(const std::string& path, VGMSeq* seq) const override {
     seq->saveAsMidi(path);
   }
-  [[nodiscard]] std::string Name() const override { return "Save as MIDI"; }
-  [[nodiscard]] std::string GetExtension() const override { return "mid"; }
+  [[nodiscard]] std::string name() const override { return "Save as MIDI"; }
+  [[nodiscard]] std::string extension() const override { return "mid"; }
 };
 
 
@@ -171,11 +171,11 @@ class SaveAsDLSCommand : public SaveCommand<VGMInstrSet, VGMFile> {
 public:
   SaveAsDLSCommand() : SaveCommand<VGMInstrSet, VGMFile>(false) {}
 
-  void Save(const std::string& path, VGMInstrSet* instrSet) const override {
+  void save(const std::string& path, VGMInstrSet* instrSet) const override {
     conversion::saveAsDLS(*instrSet, path);
   }
-  [[nodiscard]] std::string Name() const override { return "Save as DLS"; }
-  [[nodiscard]] std::string GetExtension() const override { return "dls"; }
+  [[nodiscard]] std::string name() const override { return "Save as DLS"; }
+  [[nodiscard]] std::string extension() const override { return "dls"; }
 };
 
 
@@ -183,11 +183,11 @@ class SaveAsSF2Command : public SaveCommand<VGMInstrSet, VGMFile> {
 public:
   SaveAsSF2Command() : SaveCommand<VGMInstrSet, VGMFile>(false) {}
 
-  void Save(const std::string& path, VGMInstrSet* instrSet) const override {
+  void save(const std::string& path, VGMInstrSet* instrSet) const override {
     conversion::saveAsSF2(*instrSet, path);
   }
-  [[nodiscard]] std::string Name() const override { return "Save as SF2"; }
-  [[nodiscard]] std::string GetExtension() const override { return "sf2"; }
+  [[nodiscard]] std::string name() const override { return "Save as SF2"; }
+  [[nodiscard]] std::string extension() const override { return "sf2"; }
 };
 
 
@@ -195,11 +195,11 @@ class SaveWavBatchCommand : public SaveCommand<VGMSampColl, VGMFile> {
 public:
   SaveWavBatchCommand() : SaveCommand<VGMSampColl, VGMFile>(true) {}
 
-  void Save(const std::string& path, VGMSampColl* sampColl) const override {
+  void save(const std::string& path, VGMSampColl* sampColl) const override {
     conversion::saveAllAsWav(*sampColl, path);
   }
-  [[nodiscard]] std::string Name() const override { return "Save all samples as WAV"; }
-  [[nodiscard]] std::string GetExtension() const override { return "wav"; }
+  [[nodiscard]] std::string name() const override { return "Save all samples as WAV"; }
+  [[nodiscard]] std::string extension() const override { return "wav"; }
 };
 
 template <conversion::Target options>
@@ -207,10 +207,10 @@ class SaveCollCommand : public SaveCommand<VGMColl> {
 public:
   SaveCollCommand() : SaveCommand<VGMColl>(true) {}
 
-  void Save(const std::string& path, VGMColl* coll) const override {
+  void save(const std::string& path, VGMColl* coll) const override {
     conversion::saveAs<options>(*coll, path);
   }
-  [[nodiscard]] std::string Name() const override {
+  [[nodiscard]] std::string name() const override {
     std::vector<std::string> parts;
     if constexpr ((options & conversion::Target::MIDI) != 0) {
       parts.emplace_back("MIDI");
@@ -237,5 +237,5 @@ public:
     }
     return name;
   }
-  [[nodiscard]] std::string GetExtension() const override { return ""; }
+  [[nodiscard]] std::string extension() const override { return ""; }
 };

@@ -29,34 +29,25 @@ void QtVGMRoot::UI_setRootPtr(VGMRoot** theRoot) {
 }
 
 void QtVGMRoot::UI_addRawFile(RawFile*) {
-  this->UI_AddedRawFile();
+  this->UI_addedRawFile();
 }
 
 void QtVGMRoot::UI_closeRawFile(RawFile*) {
-  this->UI_RemovedRawFile();
+  this->UI_removedRawFile();
 }
 
 void QtVGMRoot::UI_onBeginLoadRawFile() {
   if (rawFileLoadRecurseStack++ == 0)
-    this->UI_BeganLoadingRawFile();
+    this->UI_beganLoadingRawFile();
 }
 
 void QtVGMRoot::UI_onEndLoadRawFile() {
   if (--rawFileLoadRecurseStack == 0)
-    this->UI_EndedLoadingRawFile();
-}
-
-void QtVGMRoot::UI_OnBeginScan() {
-}
-
-void QtVGMRoot::UI_SetScanInfo() {
-}
-
-void QtVGMRoot::UI_OnEndScan() {
+    this->UI_endedLoadingRawFile();
 }
 
 void QtVGMRoot::UI_addVGMFile(VGMFileVariant file) {
-  this->UI_AddedVGMFile();
+  this->UI_addedVGMFile();
 }
 
 void QtVGMRoot::UI_addVGMSeq(VGMSeq*) {
@@ -72,15 +63,15 @@ void QtVGMRoot::UI_addVGMMisc(VGMMiscFile*) {
 }
 
 void QtVGMRoot::UI_addVGMColl(VGMColl*) {
-  this->UI_AddedVGMColl();
+  this->UI_addedVGMColl();
 }
 
 void QtVGMRoot::UI_beginRemoveVGMFiles() {
-  this->UI_BeganRemovingVGMFiles();
+  this->UI_beganRemovingVGMFiles();
 }
 
 void QtVGMRoot::UI_endRemoveVGMFiles() {
-  this->UI_EndedRemovingVGMFiles();
+  this->UI_endedRemovingVGMFiles();
 }
 
 void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
@@ -89,16 +80,11 @@ void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& it
   treeview->addVGMItem(item, parent, itemName);
 }
 
-std::string QtVGMRoot::UI_GetOpenFilePath(const std::string&, const std::string&) {
-  std::string path = "Placeholder";
-  return path;
-}
-
 std::string QtVGMRoot::UI_getSaveFilePath(const std::string& suggested_filename,
                                            const std::string& extension) {
-  return OpenSaveFileDialog(suggested_filename, extension);
+  return openSaveFileDialog(suggested_filename, extension);
 }
 
 std::string QtVGMRoot::UI_getSaveDirPath(const std::string&) {
-  return OpenSaveDirDialog();
+  return openSaveDirDialog();
 }

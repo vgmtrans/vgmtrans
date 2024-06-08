@@ -37,17 +37,17 @@ std::vector<DLSWave *> DLSFile::waves() {
   return waves;
 }
 
-DLSInstr *DLSFile::AddInstr(unsigned long bank, unsigned long instrNum) {
+DLSInstr *DLSFile::addInstr(unsigned long bank, unsigned long instrNum) {
   auto instr = m_instrs.emplace_back(std::make_unique<DLSInstr>(bank, instrNum)).get();
   return instr;
 }
 
-DLSInstr *DLSFile::AddInstr(unsigned long bank, unsigned long instrNum, std::string instr_name) {
+DLSInstr *DLSFile::addInstr(unsigned long bank, unsigned long instrNum, std::string instr_name) {
   auto instr = m_instrs.emplace_back(std::make_unique<DLSInstr>(bank, instrNum, instr_name)).get();
   return instr;
 }
 
-DLSWave *DLSFile::AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec,
+DLSWave *DLSFile::addWave(uint16_t formatTag, uint16_t channels, int samplesPerSec,
                           int aveBytesPerSec, uint16_t blockAlign, uint16_t bitsPerSample,
                           uint32_t waveDataSize, unsigned char *waveData, std::string wave_name) {
   auto wave = m_waves
@@ -72,7 +72,7 @@ uint32_t DLSFile::size() {
   dls_size += static_cast<uint32_t>(m_waves.size()) * sizeof(uint32_t);  // each wave gets a poolcue
   dls_size += LIST_HDR_SIZE;  //"wvpl" list (wave pool - contains all the "wave" lists)
   for (auto &wave : m_waves) {
-    dls_size += wave->GetSize();
+    dls_size += wave->size();
   }
   dls_size += LIST_HDR_SIZE;                       //"INFO" list
   dls_size += 8;                                   //"INAM" + size
@@ -108,16 +108,16 @@ int DLSFile::writeDLSToBuffer(std::vector<uint8_t> &buf) {
   theDWORD = 0;
   for (auto &wave : m_waves) {
     pushTypeOnVect<uint32_t>(buf, theDWORD);  // write the poolcue for each sample
-    theDWORD += wave->GetSize();              // increment the offset to the next wave
+    theDWORD += wave->size();              // increment the offset to the next wave
   }
 
   theDWORD = 4;
   for (auto &wave : m_waves) {
-    theDWORD += wave->GetSize();  // each "wave" list
+    theDWORD += wave->size();  // each "wave" list
   }
   writeLIST(buf, 0x7776706C, theDWORD);  // Write the "wvpl" LIST
   for (auto &wave : m_waves) {
-    wave->Write(buf);  // Write each "wave" list
+    wave->write(buf);  // Write each "wave" list
   }
 
   theDWORD = 12 + static_cast<uint32_t>(name.size());  //"INFO" + "INAM" + size + the string size
@@ -206,7 +206,7 @@ uint32_t DLSRgn::size() const {
   size += LIST_HDR_SIZE;  //"rgn2" list
   size += RGNH_SIZE;      // rgnh chunk
   if (m_wsmp) {
-    size += m_wsmp->GetSize();
+    size += m_wsmp->size();
   }
 
   size += WLNK_SIZE;
@@ -232,7 +232,7 @@ void DLSRgn::write(std::vector<uint8_t> &buf) const {
   pushTypeOnVect<uint16_t>(buf, 1);  // NO CLUE
 
   if (m_wsmp)
-    m_wsmp->Write(buf);  // write the "wsmp" chunk
+    m_wsmp->write(buf);  // write the "wsmp" chunk
 
   pushTypeOnVectBE<uint32_t>(buf, 0x776C6E6B);   //"wlnk"
   pushTypeOnVect<uint32_t>(buf, WLNK_SIZE - 8);  // size
@@ -312,7 +312,7 @@ void DLSArt::addADSR(long attack_time, uint16_t atk_transform, long hold_time, l
       CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_EG1_RELEASETIME, rls_transform, release_time));
 }
 
-void DLSArt::AddPan(long pan) {
+void DLSArt::addPan(long pan) {
   m_blocks.emplace_back(std::make_unique<ConnectionBlock>(CONN_SRC_NONE, CONN_SRC_NONE,
                                                              CONN_DST_PAN, CONN_TRN_NONE, pan));
 }
@@ -333,7 +333,7 @@ void ConnectionBlock::write(std::vector<uint8_t> &buf) const {
 //  DLSWsmp
 //  *******
 
-uint32_t DLSWsmp::GetSize() const {
+uint32_t DLSWsmp::size() const {
   uint32_t size = 0;
   size += 28;  // all the variables minus the loop info
   if (cSampleLoops)
@@ -341,9 +341,9 @@ uint32_t DLSWsmp::GetSize() const {
   return size;
 }
 
-void DLSWsmp::Write(std::vector<uint8_t> &buf) const {
+void DLSWsmp::write(std::vector<uint8_t> &buf) const {
   pushTypeOnVectBE<uint32_t>(buf, 0x77736D70);   //"wsmp"
-  pushTypeOnVect<uint32_t>(buf, GetSize() - 8);  // size
+  pushTypeOnVect<uint32_t>(buf, size() - 8);  // size
   pushTypeOnVect<uint32_t>(buf, 20);             // cbSize (size of structure without loop record)
   pushTypeOnVect<uint16_t>(buf, usUnityNote);    // usUnityNote
   pushTypeOnVect<int16_t>(buf, sFineTune);       // sFineTune
@@ -359,7 +359,7 @@ void DLSWsmp::Write(std::vector<uint8_t> &buf) const {
   }
 }
 
-void DLSWsmp::SetLoopInfo(Loop &loop, VGMSamp *samp) {
+void DLSWsmp::setLoopInfo(Loop &loop, VGMSamp *samp) {
   const int origFormatBytesPerSamp = samp->bps / 8;
   double compressionRatio = samp->compressionRatio();
 
@@ -381,7 +381,7 @@ void DLSWsmp::SetLoopInfo(Loop &loop, VGMSamp *samp) {
                      : loop.loopLength;
 }
 
-void DLSWsmp::SetPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenuation) {
+void DLSWsmp::setPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenuation) {
   usUnityNote = unityNote;
   sFineTune = fineTune;
   lAttenuation = attenuation;
@@ -391,13 +391,13 @@ void DLSWsmp::SetPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenua
 //  DLSWave
 //  *******
 
-uint32_t DLSWave::GetSize() const {
+uint32_t DLSWave::size() const {
   uint32_t size = 0;
   size += LIST_HDR_SIZE;          //"wave" list
   size += 8;                      //"fmt " chunk + size
   size += 18;                     // fmt chunk data
   size += 8;                      //"data" chunk + size
-  size += this->GetSampleSize();  // dataSize;			    //size of sample data
+  size += this->sampleSize();  // dataSize;			    //size of sample data
 
   size += LIST_HDR_SIZE;                       //"INFO" list
   size += 8;                                   //"INAM" + size
@@ -405,8 +405,8 @@ uint32_t DLSWave::GetSize() const {
   return size;
 }
 
-void DLSWave::Write(std::vector<uint8_t> &buf) {
-  RiffFile::writeLIST(buf, 0x77617665, GetSize() - 8);  // write "wave" list
+void DLSWave::write(std::vector<uint8_t> &buf) {
+  RiffFile::writeLIST(buf, 0x77617665, size() - 8);  // write "wave" list
   pushTypeOnVectBE<uint32_t>(buf, 0x666D7420);          //"fmt "
   pushTypeOnVect<uint32_t>(buf, 18);                    // size
   pushTypeOnVect<uint16_t>(buf, wFormatTag);            // wFormatTag

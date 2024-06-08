@@ -131,7 +131,7 @@ void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
   if (midiTracks.size() < numTracks) {
     size_t initialTrackSize = midiTracks.size();
     for (size_t i = 0; i < numTracks - initialTrackSize; i++)
-      midiTracks.push_back(midi->AddTrack());
+      midiTracks.push_back(midi->addTrack());
   }
 }
 
@@ -147,6 +147,6 @@ void VGMSeqNoTrks::addTime(uint32_t delta) {
   VGMSeq::time += delta;
   if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
     for (uint32_t i = 0; i < midiTracks.size(); i++)
-      midiTracks[i]->AddDelta(delta);
+      midiTracks[i]->addDelta(delta);
   }
 }

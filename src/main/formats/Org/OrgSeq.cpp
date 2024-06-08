@@ -41,7 +41,7 @@ OrgTrack::OrgTrack(OrgSeq *parentFile, uint32_t offset, uint32_t length, uint8_t
 }
 
 bool OrgTrack::loadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta) {
-  pMidiTrack = parentSeq->midi->AddTrack();
+  pMidiTrack = parentSeq->midi->addTrack();
   //SetChannelAndGroupFromTrkNum(trackNum);
 
   if (realTrkNum > 7)
@@ -49,7 +49,7 @@ bool OrgTrack::loadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta)
   else
     channel = trackNum;
   channelGroup = 0;
-  pMidiTrack->SetChannelGroup(channelGroup);
+  pMidiTrack->setChannelGroup(channelGroup);
 
   if (trackNum == 0) {
     addTempo(0, 0, ((OrgSeq *) parentSeq)->waitTime * 4000);

@@ -32,13 +32,13 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
     resettingModel = false;
   };
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_BeganLoadingRawFile, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_EndedLoadingRawFile, endResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_BeganRemovingVGMFiles, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_EndedRemovingVGMFiles, endResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMFiles, endResettingModel);
 
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMColl,
+  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl,
           [this]() {
             if (!resettingModel)
               dataChanged(index(0, 0), index(rowCount() - 1, 0));
@@ -144,7 +144,7 @@ void VGMCollListView::collectionMenu(const QPoint &pos) const {
       selectedColls->push_back(qtVGMRoot.vgmColls()[index.row()]);
     }
   }
-  auto menu = MenuManager::the()->CreateMenuForItems<VGMColl>(selectedColls);
+  auto menu = MenuManager::the()->createMenuForItems<VGMColl>(selectedColls);
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
 }

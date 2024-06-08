@@ -14,17 +14,17 @@
  */
 template <typename T>
 class ItemListCommandContext : public CommandContext {
-private:
-  std::shared_ptr<std::vector<T*>> items{};
-
 public:
   ItemListCommandContext() = default;
 
-  void SetItems(std::shared_ptr<std::vector<T*>> f) {
-    items = f;
+  void setItems(std::shared_ptr<std::vector<T*>> f) {
+    m_items = f;
   }
 
-  [[nodiscard]] const std::vector<T*>& GetItems() const { return *items; }
+  [[nodiscard]] const std::vector<T*>& items() const { return *m_items; }
+
+private:
+  std::shared_ptr<std::vector<T*>> m_items{};
 };
 
 /**
@@ -35,7 +35,7 @@ class ItemListContextFactory : public CommandContextFactory {
 public:
   explicit ItemListContextFactory() : CommandContextFactory() {}
 
-  [[nodiscard]] std::shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const override {
+  [[nodiscard]] std::shared_ptr<CommandContext> createContext(const PropertyMap& properties) const override {
     auto context = std::make_shared<ItemListCommandContext<T>>();
 
     if (!properties.contains("items")) {
@@ -43,11 +43,11 @@ public:
     }
 
     auto files = get<std::shared_ptr<std::vector<T*>>>(properties.at("items"));
-    context->SetItems(files);
+    context->setItems(files);
     return context;
   }
 
-  [[nodiscard]] PropertySpecifications GetPropertySpecifications() const override {
+  [[nodiscard]] PropertySpecifications propertySpecifications() const override {
     return {
         {"items", PropertySpecValueType::ItemList, "Vector of files",
           static_cast<std::shared_ptr<std::vector<T*>>>(nullptr)},
@@ -60,29 +60,29 @@ public:
  */
 template <typename TClosable>
 class CloseCommand : public Command {
-private:
-  std::shared_ptr<ItemListContextFactory<TClosable>> contextFactory;
-
 public:
   CloseCommand()
-      : contextFactory(std::make_shared<ItemListContextFactory<TClosable>>()) {}
+      : m_contextFactory(std::make_shared<ItemListContextFactory<TClosable>>()) {}
 
-  void Execute(CommandContext& context) override {
+  void execute(CommandContext& context) override {
     auto& vgmContext = dynamic_cast<ItemListCommandContext<TClosable>&>(context);
-    const auto& files = vgmContext.GetItems();
+    const auto& files = vgmContext.items();
 
     for (auto file : files) {
       auto specificFile = dynamic_cast<TClosable*>(file);
-      Close(specificFile);
+      close(specificFile);
     }
   }
 
-  [[nodiscard]] std::shared_ptr<CommandContextFactory> GetContextFactory() const override {
-    return contextFactory;
+  [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override {
+    return m_contextFactory;
   }
 
-  virtual void Close(TClosable* specificFile) const = 0;
-  [[nodiscard]] std::string Name() const override { return "Close"; }
+  virtual void close(TClosable* specificFile) const = 0;
+  [[nodiscard]] std::string name() const override { return "Close"; }
+
+private:
+  std::shared_ptr<ItemListContextFactory<TClosable>> m_contextFactory;
 };
 
 /**
@@ -92,7 +92,7 @@ class CloseVGMFileCommand : public CloseCommand<VGMFile> {
 public:
   CloseVGMFileCommand() : CloseCommand<VGMFile>() {}
 
-  void Close(VGMFile* file) const override {
+  void close(VGMFile* file) const override {
     pRoot->removeVGMFile(vgmFileToVariant(file));
   }
 };
@@ -104,7 +104,7 @@ class CloseRawFileCommand : public CloseCommand<RawFile> {
 public:
   CloseRawFileCommand() : CloseCommand<RawFile>() {}
 
-  void Close(RawFile* file) const override {
+  void close(RawFile* file) const override {
     pRoot->closeRawFile(file);
   }
 };

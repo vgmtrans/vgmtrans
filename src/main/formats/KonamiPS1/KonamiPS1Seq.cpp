@@ -176,7 +176,7 @@ bool KonamiPS1Track::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN Data Entry",
           description.str(), CLR_MISC);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->AddControllerEvent(channel, command, paramByte);
+          pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
         break;
 
@@ -197,7 +197,7 @@ bool KonamiPS1Track::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Stereo Widening (?)",
                         description.str(), CLR_PAN, ICON_CONTROL);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->AddControllerEvent(channel, command, paramByte);
+          pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
         break;
 
@@ -211,7 +211,7 @@ bool KonamiPS1Track::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Set Channe", description.str(),
                         CLR_PAN, ICON_CONTROL);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->AddControllerEvent(channel, command, paramByte);
+          pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
         break;
 
@@ -272,7 +272,7 @@ bool KonamiPS1Track::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)", description.str(),
                         CLR_MISC);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->AddControllerEvent(channel, command, paramByte);
+          pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
         break;
 
@@ -287,7 +287,7 @@ bool KonamiPS1Track::readEvent() {
                           CLR_MISC);
         }
         if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->AddControllerEvent(channel, command, paramByte);
+          pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
         break;
 
@@ -296,7 +296,7 @@ bool KonamiPS1Track::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Seq Beat", description.str(),
                         CLR_MISC);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->AddControllerEvent(channel, command, paramByte);
+          pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
         break;
 
@@ -308,7 +308,7 @@ bool KonamiPS1Track::readEvent() {
       default:
         addUnknown(beginOffset, curOffset - beginOffset);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->AddControllerEvent(channel, command, paramByte);
+          pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
 
         // bContinue = false;

@@ -78,13 +78,13 @@ public:
    * @param properties A map of properties to be used for context creation.
    * @return A shared pointer to the created CommandContext object.
    */
-  [[nodiscard]] virtual std::shared_ptr<CommandContext> CreateContext(const PropertyMap& properties) const = 0;
+  [[nodiscard]] virtual std::shared_ptr<CommandContext> createContext(const PropertyMap& properties) const = 0;
 
   /**
    * Retrieves the specifications for the properties required to be set in the PropertyMap passed to CreateContext().
    * @return A list of property specifications.
    */
-  [[nodiscard]] virtual PropertySpecifications GetPropertySpecifications() const = 0;
+  [[nodiscard]] virtual PropertySpecifications propertySpecifications() const = 0;
 };
 
 
@@ -100,7 +100,7 @@ public:
    * Executes the command within the given context.
    * @param context A reference to the CommandContext which will provide the data needed to execute the command.
    */
-  virtual void Execute(CommandContext& context) = 0;
+  virtual void execute(CommandContext& context) = 0;
 
   /**
    * Retrieves the name of the command to appear in the UI. Commands must use unique Names, or they will
@@ -108,21 +108,21 @@ public:
    * selecting multiple sequences and executing the "Save to MIDI" command).
    * @return The name of the command.
    */
-  [[nodiscard]] virtual std::string Name() const = 0;
+  [[nodiscard]] virtual std::string name() const = 0;
 
   /**
    * Gets the factory for creating a command context specific to this command.
    * @return A shared pointer to the CommandContextFactory.
    */
-  [[nodiscard]] virtual std::shared_ptr<CommandContextFactory> GetContextFactory() const = 0;
+  [[nodiscard]] virtual std::shared_ptr<CommandContextFactory> contextFactory() const = 0;
 };
 
 class CommandSeparator : public Command {
 public:
   CommandSeparator() = default;
 
-  void Execute(CommandContext&) override {}
+  void execute(CommandContext&) override {}
 
-  [[nodiscard]] std::shared_ptr<CommandContextFactory> GetContextFactory() const override { return nullptr; }
-  [[nodiscard]] std::string Name() const override { return "separator"; }
+  [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override { return nullptr; }
+  [[nodiscard]] std::string name() const override { return "separator"; }
 };
