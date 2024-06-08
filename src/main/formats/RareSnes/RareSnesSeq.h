@@ -83,11 +83,11 @@ class RareSnesSeq
     : public VGMSeq {
  public:
   RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdata_offset, std::string newName = "Rare SNES Seq");
-  virtual ~RareSnesSeq(void);
+  virtual ~RareSnesSeq();
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  virtual bool parseHeader();
+  virtual bool parseTrackPointers();
+  virtual void resetVars();
 
   RareSnesVersion version;
   std::map<uint8_t, RareSnesSeqEventType> EventMap;
@@ -106,10 +106,10 @@ class RareSnesSeq
   int8_t presetVolR[5];                           // volume preset R
   uint16_t presetADSR[5];                       // ADSR preset
 
-  double GetTempoInBPM(uint8_t tempo, uint8_t timerFreq);
+  double getTempoInBPM(uint8_t tempo, uint8_t timerFreq);
 
  private:
-  void LoadEventMap(void);
+  void loadEventMap();
 };
 
 
@@ -117,17 +117,17 @@ class RareSnesTrack
     : public SeqTrack {
  public:
   RareSnesTrack(RareSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
-  virtual void OnTickBegin(void);
-  virtual void OnTickEnd(void);
+  virtual void resetVars();
+  virtual bool readEvent();
+  virtual void onTickBegin();
+  virtual void onTickEnd();
 
-  void AddVolLR(uint32_t offset,
+  void addVolLR(uint32_t offset,
                 uint32_t length,
                 int8_t spcVolL,
                 int8_t spcVolR,
                 const std::string &sEventName = "Volume L/R");
-  void AddVolLRNoItem(int8_t spcVolL, int8_t spcVolR);
+  void addVolLRNoItem(int8_t spcVolL, int8_t spcVolR);
 
  private:
   uint8_t rptNestLevel;                          // nest level for repeat-subroutine command
@@ -146,6 +146,6 @@ class RareSnesTrack
   uint8_t altNoteByte1;                          // note number preset 1
   uint8_t altNoteByte2;                          // note number preset 2
 
-  double GetTuningInSemitones(int8_t tuning);
-  void CalcVolPanFromVolLR(int8_t volL, int8_t volR, uint8_t &midiVol, uint8_t &midiPan);
+  double getTuningInSemitones(int8_t tuning);
+  void calculateVolPanFromVolLR(int8_t volL, int8_t volR, uint8_t &midiVol, uint8_t &midiPan);
 };

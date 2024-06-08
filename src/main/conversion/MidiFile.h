@@ -124,8 +124,8 @@ class MidiTrack {
 
   void AddPitchBend(uint8_t channel, int16_t bend);
   void InsertPitchBend(uint8_t channel, short bend, uint32_t absTime);
-  void AddPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t cents);
-  void InsertPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t cents, uint32_t absTime);
+  void AddPitchBendRange(uint8_t channel, uint16_t cents);
+  void InsertPitchBendRange(uint8_t channel, uint16_t cents, uint32_t absTime);
   void AddFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb);
   void InsertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime);
   void AddFineTuning(uint8_t channel, double cents);

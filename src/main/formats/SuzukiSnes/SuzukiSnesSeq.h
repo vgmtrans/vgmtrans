@@ -75,13 +75,13 @@ class SuzukiSnesSeq
  public:
   SuzukiSnesSeq
       (RawFile *file, SuzukiSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Square SUZUKI SNES Seq");
-  virtual ~SuzukiSnesSeq(void);
+  virtual ~SuzukiSnesSeq();
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  virtual bool parseHeader();
+  virtual bool parseTrackPointers();
+  virtual void resetVars();
 
-  double GetTempoInBPM(uint8_t tempo);
+  double getTempoInBPM(uint8_t tempo);
 
   SuzukiSnesVersion version;
   std::map<uint8_t, SuzukiSnesSeqEventType> EventMap;
@@ -91,7 +91,7 @@ class SuzukiSnesSeq
   uint8_t spcTempo;
 
  private:
-  void LoadEventMap(void);
+  void loadEventMap();
 };
 
 
@@ -99,8 +99,8 @@ class SuzukiSnesTrack
     : public SeqTrack {
  public:
   SuzukiSnesTrack(SuzukiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
+  virtual void resetVars();
+  virtual bool readEvent();
 
  private:
   uint16_t infiniteLoopPoint;

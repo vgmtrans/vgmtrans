@@ -11,7 +11,7 @@ struct MAMEGame;
 
 class CPS1Scanner : public VGMScanner {
 public:
-  void Scan(RawFile* file, void *info) override;
+  void scan(RawFile* file, void *info) override;
 private:
-  static void LoadCPS1(MAMEGame* gameentry, CPSFormatVer fmt_ver);
+  static void loadCPS1(MAMEGame* gameentry, CPSFormatVer fmt_ver);
 };

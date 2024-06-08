@@ -25,17 +25,17 @@ GraphResSnesInstrSet::GraphResSnesInstrSet(RawFile *file,
 GraphResSnesInstrSet::~GraphResSnesInstrSet() {
 }
 
-bool GraphResSnesInstrSet::GetHeaderInfo() {
+bool GraphResSnesInstrSet::parseHeader() {
   return true;
 }
 
-bool GraphResSnesInstrSet::GetInstrPointers() {
+bool GraphResSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
 
   uint16_t addrSampEntryMax = 0xffff;
   for (uint8_t srcn = 0; srcn <= 0x7f; srcn++) {
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
+    if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
@@ -43,7 +43,7 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
       break;
     }
 
-    uint16_t addrSampStart = GetShort(addrDIRentry);
+    uint16_t addrSampStart = readShort(addrDIRentry);
     if (addrSampStart < addrDIRentry + 4) {
       break;
     }
@@ -74,7 +74,7 @@ bool GraphResSnesInstrSet::GetInstrPointers() {
 
   std::ranges::sort(usedSRCNs);
   SNESSampColl *newSampColl = new SNESSampColl(GraphResSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->LoadVGMFile()) {
+  if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
   }
@@ -100,19 +100,19 @@ GraphResSnesInstr::GraphResSnesInstr(VGMInstrSet *instrSet,
 GraphResSnesInstr::~GraphResSnesInstr() {
 }
 
-bool GraphResSnesInstr::LoadInstr() {
+bool GraphResSnesInstr::loadInstr() {
   uint32_t offDirEnt = spcDirAddr + (instrNum * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = GetShort(offDirEnt);
+  uint16_t addrSampStart = readShort(offDirEnt);
 
   GraphResSnesRgn *rgn = new GraphResSnesRgn(this, version, instrNum, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  AddRgn(rgn);
+  addRgn(rgn);
 
-  SetGuessedLength();
+  setGuessedLength();
   return true;
 }
 
@@ -137,12 +137,12 @@ GraphResSnesRgn::GraphResSnesRgn(GraphResSnesInstr *instr,
   sampNum = srcn;
   unityKey = 57; // o4a = $1000
   fineTune = 0;
-  SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
+  snesConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 }
 
 GraphResSnesRgn::~GraphResSnesRgn() {
 }
 
-bool GraphResSnesRgn::LoadRgn() {
+bool GraphResSnesRgn::loadRgn() {
   return true;
 }

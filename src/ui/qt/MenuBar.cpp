@@ -46,9 +46,9 @@ void MenuBar::appendOptionsMenu(const QList<QDockWidget *> &dockWidgets) {
 
   connect(bs_grp, &QActionGroup::triggered, [](const QAction *bs_style) {
     if (auto text = bs_style->text(); text == "GS (Default)") {
-      ConversionOptions::the().SetBankSelectStyle(BankSelectStyle::GS);
+      ConversionOptions::the().setBankSelectStyle(BankSelectStyle::GS);
     } else if (text == "MMA") {
-      ConversionOptions::the().SetBankSelectStyle(BankSelectStyle::MMA);
+      ConversionOptions::the().setBankSelectStyle(BankSelectStyle::MMA);
       L_WARN("MMA style (CC0 * 128 + CC32) bank select was chosen and "
              "it will be used for bank select events in generated MIDIs. This "
              "will cause in-program playback to sound incorrect!");

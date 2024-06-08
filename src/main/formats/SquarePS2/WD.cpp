@@ -48,24 +48,24 @@ static constexpr float defaultWDReverbPercent = 0.75;
 WDInstrSet::WDInstrSet(RawFile *file, uint32_t offset)
     : VGMInstrSet(SquarePS2Format::name, file, offset) {}
 
-bool WDInstrSet::GetHeaderInfo() {
+bool WDInstrSet::parseHeader() {
   VGMHeader *header = addHeader(dwOffset, 0x10, "Header");
   header->addChild(dwOffset + 0x2, 2, "ID");
   header->addChild(dwOffset + 0x4, 4, "Sample Section Size");
   header->addChild(dwOffset + 0x8, 4, "Number of Instruments");
   header->addChild(dwOffset + 0xC, 4, "Number of Regions");
 
-  setId(GetShort(0x2 + dwOffset));
-  dwSampSectSize = GetWord(0x4 + dwOffset);
-  dwNumInstrs = GetWord(0x8 + dwOffset);
-  dwTotalRegions = GetWord(0xC + dwOffset);
+  setId(readShort(0x2 + dwOffset));
+  dwSampSectSize = readWord(0x4 + dwOffset);
+  dwNumInstrs = readWord(0x8 + dwOffset);
+  dwTotalRegions = readWord(0xC + dwOffset);
 
   if (dwSampSectSize < 0x40)  // Some songs in the Bouncer have bizarre values here
     dwSampSectSize = 0;
 
-  setName(fmt::format("WD {}", GetID()));
+  setName(fmt::format("WD {}", id()));
 
-  uint32_t sampCollOff = dwOffset + GetWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
+  uint32_t sampCollOff = dwOffset + readWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
 
   sampColl = new PSXSampColl(SquarePS2Format::name, this, sampCollOff, dwSampSectSize);
   unLength = sampCollOff + dwSampSectSize - dwOffset;
@@ -73,23 +73,23 @@ bool WDInstrSet::GetHeaderInfo() {
   return true;
 }
 
-bool WDInstrSet::GetInstrPointers() {
+bool WDInstrSet::parseInstrPointers() {
   uint32_t j = 0x20 + dwOffset;
 
   // check for bouncer WDs with 0xFFFFFFFF as the last instr pointer.  If it's there ignore it
   for (uint32_t i = 0; i < dwNumInstrs; i++) {
-    if (GetWord(j + i * 4) == 0xFFFFFFFF)
+    if (readWord(j + i * 4) == 0xFFFFFFFF)
       dwNumInstrs = i;
   }
 
   for (uint32_t i = 0; i < dwNumInstrs; i++) {
     uint32_t instrLength;
     if (i != dwNumInstrs - 1)  // while not the last instr
-      instrLength = GetWord(j + ((i + 1) * 4)) - GetWord(j + (i * 4));
+      instrLength = readWord(j + ((i + 1) * 4)) - readWord(j + (i * 4));
     else
-      instrLength = sampColl->dwOffset - (GetWord(j + (i * 4)) + dwOffset);
+      instrLength = sampColl->dwOffset - (readWord(j + (i * 4)) + dwOffset);
 
-    auto *newWDInstr = new WDInstr(this, dwOffset + GetWord(j + (i * 4)), instrLength,
+    auto *newWDInstr = new WDInstr(this, dwOffset + readWord(j + (i * 4)), instrLength,
       0, i, fmt::format("Instrument {}", i));
     aInstrs.push_back(newWDInstr);
   }
@@ -105,11 +105,11 @@ WDInstr::WDInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name, defaultWDReverbPercent) {
 }
 
-bool WDInstr::LoadInstr() {
+bool WDInstr::loadInstr() {
   unsigned int k = 0;
   while (k * 0x20 < unLength) {
     auto *rgn = new WDRgn(this, k * 0x20 + dwOffset);
-    AddRgn(rgn);
+    addRgn(rgn);
 
     rgn->addChild(k * 0x20 + dwOffset, 1, "Stereo Region Flag");
     rgn->addChild(k * 0x20 + 1 + dwOffset, 1, "First/Last Region Flags");
@@ -125,23 +125,23 @@ bool WDInstr::LoadInstr() {
     rgn->addChild(k * 0x20 + 0x16 + dwOffset, 1, "Attenuation");
     rgn->addChild(k * 0x20 + 0x17 + dwOffset, 1, "Pan");
 
-    rgn->bStereoRegion = GetByte(k * 0x20 + dwOffset) & 0x1u;
-    rgn->bUnknownFlag2 = GetByte(k * 0x20 + 2 + dwOffset) & 0x1u;
-    rgn->bFirstRegion = GetByte(k * 0x20 + 1 + dwOffset) & 0x1u;
-    rgn->bLastRegion = (GetByte(k * 0x20 + 1 + dwOffset) & 0x2u) >> 1u;
-    rgn->sampOffset = GetWord(k * 0x20 + 0x4 + dwOffset) & 0xFFFFFFF0;  // The & is there because FFX points to 0x----C offsets for some very odd reason
-    rgn->loop.loopStart = GetWord(k * 0x20 + 0x8 + dwOffset);
-    rgn->ADSR1 = GetShort(k * 0x20 + 0xC + dwOffset);
-    rgn->ADSR2 = GetShort(k * 0x20 + 0xE + dwOffset);
-    rgn->fineTune = GetByte(k * 0x20 + 0x12 + dwOffset);
-    rgn->unityKey = 0x3A - GetByte(k * 0x20 + 0x13 + dwOffset);
-    rgn->keyHigh = GetByte(k * 0x20 + 0x14 + dwOffset);
-    rgn->velHigh = Convert7bitPercentVolValToStdMidiVal(GetByte(k * 0x20 + 0x15 + dwOffset));
+    rgn->bStereoRegion = readByte(k * 0x20 + dwOffset) & 0x1u;
+    rgn->bUnknownFlag2 = readByte(k * 0x20 + 2 + dwOffset) & 0x1u;
+    rgn->bFirstRegion = readByte(k * 0x20 + 1 + dwOffset) & 0x1u;
+    rgn->bLastRegion = (readByte(k * 0x20 + 1 + dwOffset) & 0x2u) >> 1u;
+    rgn->sampOffset = getWord(k * 0x20 + 0x4 + dwOffset) & 0xFFFFFFF0;  // The & is there because FFX points to 0x----C offsets for some very odd reason
+    rgn->loop.loopStart = getWord(k * 0x20 + 0x8 + dwOffset);
+    rgn->ADSR1 = readShort(k * 0x20 + 0xC + dwOffset);
+    rgn->ADSR2 = readShort(k * 0x20 + 0xE + dwOffset);
+    rgn->fineTune = readByte(k * 0x20 + 0x12 + dwOffset);
+    rgn->unityKey = 0x3A - readByte(k * 0x20 + 0x13 + dwOffset);
+    rgn->keyHigh = readByte(k * 0x20 + 0x14 + dwOffset);
+    rgn->velHigh = convert7bitPercentVolValToStdMidiVal(readByte(k * 0x20 + 0x15 + dwOffset));
 
-    uint8_t vol = GetByte(k * 0x20 + 0x16 + dwOffset);
-    rgn->SetVolume(vol / 127.0);
+    uint8_t vol = readByte(k * 0x20 + 0x16 + dwOffset);
+    rgn->setVolume(vol / 127.0);
 
-    rgn->pan = (double) GetByte(k * 0x20 + 0x17 + dwOffset);        //need to convert
+    rgn->pan = (double) readByte(k * 0x20 + 0x17 + dwOffset);        //need to convert
 
     if (rgn->pan == 255)
       rgn->pan = 1.0;
@@ -156,7 +156,7 @@ bool WDInstr::LoadInstr() {
 
     rgn->fineTune =
         (short) ceil(((finetune_table[rgn->fineTune] - 0x10000) * finetune_coeff) - 50);
-    PSXConvADSR<WDRgn>(rgn, rgn->ADSR1, rgn->ADSR2, true);
+    psxConvADSR<WDRgn>(rgn, rgn->ADSR1, rgn->ADSR2, true);
 
     k++;
   }

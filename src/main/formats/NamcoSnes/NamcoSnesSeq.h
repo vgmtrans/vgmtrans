@@ -50,12 +50,12 @@ class NamcoSnesSeq
     : public VGMSeqNoTrks {
  public:
   NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Namco SNES Seq");
-  virtual ~NamcoSnesSeq(void);
+  virtual ~NamcoSnesSeq();
 
-  virtual bool GetHeaderInfo(void);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
-  virtual bool PostLoad(void);
+  virtual bool parseHeader();
+  virtual void resetVars();
+  virtual bool readEvent();
+  virtual bool postLoad();
 
   NamcoSnesVersion version;
   std::map<uint8_t, NamcoSnesSeqEventType> EventMap;
@@ -63,8 +63,8 @@ class NamcoSnesSeq
   std::map<NamcoSnesSeqControlType, std::string> ControlChangeNames;
 
  private:
-  void LoadEventMap(void);
-  void KeyOffAllNotes(void);
+  void loadEventMap();
+  void keyOffAllNotes();
 
   uint8_t NOTE_NUMBER_REST;
   uint8_t NOTE_NUMBER_NOISE_MIN;

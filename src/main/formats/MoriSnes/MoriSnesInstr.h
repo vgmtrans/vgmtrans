@@ -52,10 +52,10 @@ class MoriSnesInstrSet:
                    std::vector<uint16_t> instrumentAddresses,
                    std::map<uint16_t, MoriSnesInstrHintDir> instrumentHints,
                    const std::string &name = "MoriSnesInstrSet");
-  virtual ~MoriSnesInstrSet(void);
+  virtual ~MoriSnesInstrSet();
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  virtual bool parseHeader();
+  virtual bool parseInstrPointers();
 
   MoriSnesVersion version;
 
@@ -79,9 +79,9 @@ class MoriSnesInstr
                 uint32_t spcDirAddr,
                 const MoriSnesInstrHintDir &instrHintDir,
                 const std::string &name = "MoriSnesInstr");
-  virtual ~MoriSnesInstr(void);
+  virtual ~MoriSnesInstr();
 
-  virtual bool LoadInstr();
+  virtual bool loadInstr();
 
   MoriSnesVersion version;
 
@@ -102,9 +102,9 @@ class MoriSnesRgn
               uint32_t spcDirAddr,
               const MoriSnesInstrHint &instrHint,
               int8_t percNoteKey = -1);
-  virtual ~MoriSnesRgn(void);
+  virtual ~MoriSnesRgn();
 
-  virtual bool LoadRgn();
+  virtual bool loadRgn();
 
   MoriSnesVersion version;
 };

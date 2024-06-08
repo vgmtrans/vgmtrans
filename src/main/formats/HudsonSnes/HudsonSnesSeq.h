@@ -107,10 +107,10 @@ class HudsonSnesSeq
       (RawFile *file, HudsonSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Hudson SNES Seq");
   ~HudsonSnesSeq() override = default;
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointersInHeaderInfo(VGMHeader *header, uint32_t &offset);
-  bool GetTrackPointers() override;
-  void ResetVars() override;
+  bool parseHeader() override;
+  bool parseTrackPointersInHeader(VGMHeader *header, uint32_t &offset);
+  bool parseTrackPointers() override;
+  void resetVars() override;
 
   HudsonSnesVersion version;
   std::map<uint8_t, HudsonSnesSeqEventType> EventMap;
@@ -141,8 +141,8 @@ class HudsonSnesTrack
     : public SeqTrack {
  public:
   HudsonSnesTrack(HudsonSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  void ResetVars() override;
-  bool ReadEvent() override;
+  void resetVars() override;
+  bool readEvent() override;
 
  private:
   uint8_t vel;

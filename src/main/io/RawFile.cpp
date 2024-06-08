@@ -13,11 +13,11 @@
 /* RawFile */
 
 /* FIXME: we own the VGMFile, should use unique_ptr instead */
-void RawFile::AddContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>> vgmfile) {
+void RawFile::addContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>> vgmfile) {
     m_vgmfiles.emplace_back(vgmfile);
 }
 
-void RawFile::RemoveContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> vgmfile) {
+void RawFile::removeContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> vgmfile) {
     auto iter = std::ranges::find_if(m_vgmfiles, [vgmfile](auto file) { return *file == vgmfile; });
     if (iter != m_vgmfiles.end())
         m_vgmfiles.erase(iter);
@@ -26,20 +26,20 @@ void RawFile::RemoveContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSa
     }
 }
 
-uint32_t RawFile::GetBytes(size_t offset, uint32_t nCount, void *pBuffer) const {
+uint32_t RawFile::readBytes(size_t offset, uint32_t nCount, void *pBuffer) const {
     memcpy(pBuffer, data() + offset, nCount);
     return nCount;
 }
 
-bool RawFile::MatchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const {
+bool RawFile::matchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const {
     return memcmp(data() + offset, pattern, nCount) == 0;
 }
 
-bool RawFile::MatchBytePattern(const BytePattern &pattern, size_t offset) const {
+bool RawFile::matchBytePattern(const BytePattern &pattern, size_t offset) const {
     return pattern.match(data() + offset, pattern.length());
 }
 
-bool RawFile::SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
+bool RawFile::searchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
                                 uint32_t nSearchOffset, uint32_t nSearchSize) const {
     if (nSearchOffset >= size())
         return false;
@@ -52,7 +52,7 @@ bool RawFile::SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffs
 
     for (size_t offset = nSearchOffset; offset < nSearchOffset + nSearchSize - pattern.length();
          offset++) {
-        if (MatchBytePattern(pattern, offset)) {
+        if (matchBytePattern(pattern, offset)) {
             nMatchOffset = offset;
             return true;
         }

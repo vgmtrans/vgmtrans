@@ -11,19 +11,19 @@ class VGMMultiSectionSeq : public VGMSeq {
                      uint32_t length = 0,
                      std::string name = "VGM Sequence");
 
-  void ResetVars() override;
-  bool LoadMain() override;
+  void resetVars() override;
+  bool loadMain() override;
 
-  void AddSection(VGMSeqSection *section);
-  bool AddLoopForeverNoItem();
-  VGMSeqSection *GetSectionFromOffset(uint32_t offset);
+  void addSection(VGMSeqSection *section);
+  bool addLoopForeverNoItem();
+  VGMSeqSection *getSectionAtOffset(uint32_t offset);
 
  protected:
-  bool LoadTracks(ReadMode readMode, uint32_t stopTime = 1000000) override;
-  bool PostLoad() override;
-  virtual bool LoadSection(VGMSeqSection *section, uint32_t stopTime = 1000000);
-  virtual bool IsOffsetUsed(uint32_t offset);
-  virtual bool ReadEvent(long stopTime);
+  bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000) override;
+  bool postLoad() override;
+  virtual bool loadSection(VGMSeqSection *section, uint32_t stopTime = 1000000);
+  virtual bool isOffsetUsed(uint32_t offset);
+  virtual bool readEvent(long stopTime);
 
  public:
   uint32_t dwStartOffset;
@@ -35,5 +35,5 @@ class VGMMultiSectionSeq : public VGMSeq {
   int foreverLoops;
 
  private:
-  bool GetTrackPointers() override { return false; }
+  bool parseTrackPointers() override { return false; }
 };

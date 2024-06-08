@@ -23,19 +23,19 @@ namespace fs = std::filesystem;
 CLIVGMRoot cliroot;
 
 // displays a usage message
-void CLIVGMRoot::DisplayUsage() {
+void CLIVGMRoot::displayUsage() {
   cerr << "Usage: " << CLI_APP_NAME << " input_file1 input_file2 ... -o output_directory" << endl;
 }
 
 // displays a help message
-void CLIVGMRoot::DisplayHelp() {
+void CLIVGMRoot::displayHelp() {
   cerr << "VGMTrans version " << VGMTRANS_VERSION << endl;
   cerr << "Converts music files used in console video games into industry-standard MIDI and DLS/SF2 files." << endl << endl;
-  DisplayUsage();
+  displayUsage();
 }
 
 // creates the output directory if it does not already exist
-bool CLIVGMRoot::MakeOutputDir() {
+bool CLIVGMRoot::makeOutputDir() {
   if (!fs::exists(outputDir)) {
     // directory doesn't exist: need to create it
     if (!fs::create_directory(outputDir)) {
@@ -47,20 +47,20 @@ bool CLIVGMRoot::MakeOutputDir() {
   return true;
 }
 
-bool CLIVGMRoot::OpenRawFile(const string &filename) {
+bool CLIVGMRoot::openRawFile(const string &filename) {
   string fname = filename;
   cout << "Loading " << fname << endl;
-  return VGMRoot::OpenRawFile(filename);
+  return VGMRoot::openRawFile(filename);
 }
 
-bool CLIVGMRoot::Init() {
+bool CLIVGMRoot::init() {
   if (inputFiles.empty()) {
     cerr << "Error: must provide at least one input file" << endl;
-    DisplayUsage();
+    displayUsage();
     return false;
   }
 
-  VGMRoot::Init();
+  VGMRoot::init();
 
   // get collection for each input file
   size_t inputFileCtr = 0;
@@ -69,16 +69,16 @@ bool CLIVGMRoot::Init() {
   // map for deconflicting identical collection names using input filenames
   map<string, vector<pair<size_t, fs::path>>> collNameMap {};
   for (fs::path infile : inputFiles) {
-    if (!OpenRawFile(infile.string())) {  // file not found
+    if (!openRawFile(infile.string())) {  // file not found
       return false;
     }
-    numVGMFiles = UpdateCollections(numVGMFiles);
-    size_t numCollsAdded = GetNumCollections() - numColls;
+    numVGMFiles = updateCollections(numVGMFiles);
+    size_t numCollsAdded = numCollections() - numColls;
     if (numCollsAdded == 0) {
       cout << "File " << infile.string() << " is not a recognized music file" << endl;
     }
     else {
-      for(size_t i = numColls; i < GetNumCollections(); ++i) {
+      for(size_t i = numColls; i < numCollections(); ++i) {
         VGMColl* coll = vgmColls()[i];
         string collName = coll->name();
         auto it = collNameMap.find(collName);
@@ -137,30 +137,30 @@ bool CLIVGMRoot::Init() {
 
     cout << "\nInput files:        " << inputFileCtr << endl;
     cout << "Output collections: " << numColls << endl << endl;
-    return MakeOutputDir();
+    return makeOutputDir();
   }
 }
 
-bool CLIVGMRoot::ExportAllCollections() {
+bool CLIVGMRoot::exportAllCollections() {
   bool success = true;
   for (VGMColl* coll : vgmColls()) {
     string collName = coll->name();
-    success &= ExportCollection(coll);
+    success &= exportCollection(coll);
   }
   return success;
 }
 
-bool CLIVGMRoot::ExportCollection(VGMColl* coll) {
+bool CLIVGMRoot::exportCollection(VGMColl* coll) {
     string collName = coll->name();
     cout << "Exporting: " << collName << endl;
-    return SaveMidi(coll) & SaveSF2(coll) & SaveDLS(coll);
+    return saveMidi(coll) & saveSF2(coll) & saveDLS(coll);
 }
 
-bool CLIVGMRoot::SaveMidi(const VGMColl* coll) {
+bool CLIVGMRoot::saveMidi(const VGMColl* coll) {
   if (coll->seq() != nullptr) {
     string collName = coll->name();
-    string filepath = UI_GetSaveFilePath(collName, "mid");
-    if (!coll->seq()->SaveAsMidi(filepath)) {
+    string filepath = UI_getSaveFilePath(collName, "mid");
+    if (!coll->seq()->saveAsMidi(filepath)) {
       L_ERROR("Failed to save MIDI file");
       return false;
     }
@@ -169,13 +169,13 @@ bool CLIVGMRoot::SaveMidi(const VGMColl* coll) {
   return true;
 }
 
-bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
+bool CLIVGMRoot::saveSF2(VGMColl* coll) {
   string collName = coll->name();
-  string filepath = UI_GetSaveFilePath(collName, "sf2");
+  string filepath = UI_getSaveFilePath(collName, "sf2");
   SF2File *sf2file = coll->createSF2File();
   bool success = false;
   if (sf2file != nullptr) {
-    if (sf2file->SaveSF2File(filepath)) {
+    if (sf2file->saveSF2File(filepath)) {
       success = true;
     }
     delete sf2file;
@@ -189,13 +189,13 @@ bool CLIVGMRoot::SaveSF2(VGMColl* coll) {
   return success;
 }
 
-bool CLIVGMRoot::SaveDLS(VGMColl* coll) {
+bool CLIVGMRoot::saveDLS(VGMColl* coll) {
   string collName = coll->name();
-  string filepath = UI_GetSaveFilePath(collName, "dls");
+  string filepath = UI_getSaveFilePath(collName, "dls");
   DLSFile dlsfile;
   bool success = false;
   if (coll->createDLSFile(dlsfile)) {
-    if (dlsfile.SaveDLSFile(filepath)) {
+    if (dlsfile.saveDLSFile(filepath)) {
       success = true;
     }
   }
@@ -208,35 +208,35 @@ bool CLIVGMRoot::SaveDLS(VGMColl* coll) {
   return success;
 }
 
-void CLIVGMRoot::UI_SetRootPtr(VGMRoot** theRoot) {
+void CLIVGMRoot::UI_setRootPtr(VGMRoot** theRoot) {
   *theRoot = &cliroot;
 }
 
-void CLIVGMRoot::UI_Log(LogItem* theLog) {
-  if (theLog->GetLogLevel() <= LOG_LEVEL_WARN) {
-    string source = theLog->GetSource();
-    string text = theLog->GetText();
+void CLIVGMRoot::UI_log(LogItem* theLog) {
+  if (theLog->logLevel() <= LOG_LEVEL_WARN) {
+    string source = theLog->source();
+    string text = theLog->text();
     cerr << "[" << source << "]" << text << endl;
   }
 }
 
-size_t CLIVGMRoot::UpdateCollections(size_t startOffset) {
+size_t CLIVGMRoot::updateCollections(size_t startOffset) {
   auto files = vgmFiles();
   for (int i = startOffset; i < files.size(); ++i) {
     auto targFile = variantToVGMFile(files[i]);
     Format *fmt = targFile->format();
     if (fmt && fmt->matcher) {
-      fmt->matcher->MakeCollectionsForFile(targFile);
+      fmt->matcher->makeCollectionsForFile(targFile);
     }
   }
   return vgmFiles().size();
 }
 
-string CLIVGMRoot::UI_GetSaveFilePath(const string& suggestedFilename, const string& extension) {
+string CLIVGMRoot::UI_getSaveFilePath(const string& suggestedFilename, const string& extension) {
   fs::path savePath = outputDir / fs::path(ConvertToSafeFileName(suggestedFilename) + "." + extension);
   return savePath.string();
 }
 
-string CLIVGMRoot::UI_GetSaveDirPath(const std::string& suggestedDir) {
+string CLIVGMRoot::UI_getSaveDirPath(const std::string& suggestedDir) {
   return this->outputDir.string();
 }

@@ -39,22 +39,22 @@ HeartBeatSnesSeq::HeartBeatSnesSeq(RawFile *file,
     : VGMSeq(HeartBeatSnesFormat::name, file, seqdataOffset, 0, std::move(name)),
       version(ver) {
   bLoadTickByTick = true;
-  bAllowDiscontinuousTrackData = true;
+  setAllowDiscontinuousTrackData(true);
 
-  UseReverb();
+  useReverb();
 
-  LoadEventMap();
+  loadEventMap();
 }
 
 HeartBeatSnesSeq::~HeartBeatSnesSeq(void) {
 }
 
-void HeartBeatSnesSeq::ResetVars() {
-  VGMSeq::ResetVars();
+void HeartBeatSnesSeq::resetVars() {
+  VGMSeq::resetVars();
 }
 
-bool HeartBeatSnesSeq::GetHeaderInfo() {
-  SetPPQN(SEQ_PPQN);
+bool HeartBeatSnesSeq::parseHeader() {
+  setPPQN(SEQ_PPQN);
 
   VGMHeader *header = addHeader(dwOffset, 0);
   uint32_t curOffset = dwOffset;
@@ -66,7 +66,7 @@ bool HeartBeatSnesSeq::GetHeaderInfo() {
   curOffset += 2;
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    uint16_t ofsTrackStart = GetShort(curOffset);
+    uint16_t ofsTrackStart = readShort(curOffset);
     if (ofsTrackStart == 0) {
       // example: Dragon Quest 6 - Brave Fight
       header->addChild(curOffset, 2, "Track Pointer End");
@@ -84,13 +84,13 @@ bool HeartBeatSnesSeq::GetHeaderInfo() {
   return true;
 }
 
-bool HeartBeatSnesSeq::GetTrackPointers(void) {
+bool HeartBeatSnesSeq::parseTrackPointers(void) {
   uint32_t curOffset = dwOffset;
 
   curOffset += 2;
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    uint16_t ofsTrackStart = GetShort(curOffset);
+    uint16_t ofsTrackStart = readShort(curOffset);
     curOffset += 2;
     if (ofsTrackStart == 0) {
       break;
@@ -108,7 +108,7 @@ bool HeartBeatSnesSeq::GetTrackPointers(void) {
   return true;
 }
 
-void HeartBeatSnesSeq::LoadEventMap() {
+void HeartBeatSnesSeq::loadEventMap() {
   int statusByte;
 
   EventMap[0x00] = EVENT_END;
@@ -175,7 +175,7 @@ void HeartBeatSnesSeq::LoadEventMap() {
   SubEventMap[0x09] = SUBEVENT_SURROUND;
 }
 
-double HeartBeatSnesSeq::GetTempoInBPM(uint8_t tempo) {
+double HeartBeatSnesSeq::getTempoInBPM(uint8_t tempo) {
   if (tempo != 0) {
     return 60000000.0 / (SEQ_PPQN * (125 * 0x10)) * (tempo / 256.0);
   }
@@ -190,13 +190,13 @@ double HeartBeatSnesSeq::GetTempoInBPM(uint8_t tempo) {
 
 HeartBeatSnesTrack::HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
-  HeartBeatSnesTrack::ResetVars();
+  HeartBeatSnesTrack::resetVars();
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
 }
 
-void HeartBeatSnesTrack::ResetVars(void) {
-  SeqTrack::ResetVars();
+void HeartBeatSnesTrack::resetVars(void) {
+  SeqTrack::resetVars();
 
   spcNoteDuration = 0x10;
   spcNoteDurRate = 0xaf;
@@ -206,7 +206,7 @@ void HeartBeatSnesTrack::ResetVars(void) {
 }
 
 
-bool HeartBeatSnesTrack::ReadEvent() {
+bool HeartBeatSnesTrack::readEvent() {
   HeartBeatSnesSeq *parentSeq = static_cast<HeartBeatSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
@@ -214,7 +214,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
     return false;
   }
 
-  uint8_t statusByte = GetByte(curOffset++);
+  uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
@@ -228,36 +228,36 @@ bool HeartBeatSnesTrack::ReadEvent() {
   switch (eventType) {
     case EVENT_UNKNOWN0: {
       desc = describeUnknownEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_END: {
-      AddEndOfTrack(beginOffset, curOffset - beginOffset);
+      addEndOfTrack(beginOffset, curOffset - beginOffset);
       bContinue = false;
       break;
     }
@@ -266,7 +266,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
       spcNoteDuration = statusByte;
       desc = fmt::format("Length: {:d}", spcNoteDuration);
 
-      uint8_t noteParam = GetByte(curOffset);
+      uint8_t noteParam = readByte(curOffset);
       if (noteParam < 0x80) {
         curOffset++;
         uint8_t durIndex = noteParam >> 4;
@@ -277,7 +277,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
           durIndex, spcNoteDurRate, velIndex, spcNoteVolume);
       }
 
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Note Length & Param",
                       desc,
@@ -298,8 +298,8 @@ bool HeartBeatSnesTrack::ReadEvent() {
         dur = (dur > 2) ? dur - 1 : 1;
       }
 
-      AddNoteByDur(beginOffset, curOffset - beginOffset, key, spcNoteVolume / 2, dur, "Note");
-      AddTime(spcNoteDuration);
+      addNoteByDur(beginOffset, curOffset - beginOffset, key, spcNoteVolume / 2, dur, "Note");
+      addTime(spcNoteDuration);
       break;
     }
 
@@ -315,19 +315,19 @@ bool HeartBeatSnesTrack::ReadEvent() {
       }
 
       desc = fmt::format("Duration: {:d}", dur);
-      MakePrevDurNoteEnd(GetTime() + dur);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, CLR_TIE);
-      AddTime(spcNoteDuration);
+      makePrevDurNoteEnd(getTime() + dur);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, CLR_TIE);
+      addTime(spcNoteDuration);
       break;
     }
 
     case EVENT_REST: {
-      AddRest(beginOffset, curOffset - beginOffset, spcNoteDuration);
+      addRest(beginOffset, curOffset - beginOffset, spcNoteDuration);
       break;
     }
 
     case EVENT_SLUR_ON: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Slur On",
                       desc,
@@ -338,7 +338,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_SLUR_OFF: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Slur Off",
                       desc,
@@ -349,13 +349,13 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_PROGCHANGE: {
-      uint8_t newProgNum = GetByte(curOffset++);
-      AddProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true);
+      uint8_t newProgNum = readByte(curOffset++);
+      addProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true);
       break;
     }
 
     case EVENT_PAN: {
-      uint8_t newPan = GetByte(curOffset++);
+      uint8_t newPan = readByte(curOffset++);
 
       uint8_t panIndex = std::min<uint8_t>(newPan & 0x1fu, 20u);
 
@@ -363,16 +363,16 @@ bool HeartBeatSnesTrack::ReadEvent() {
       uint8_t volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex];
 
       double linearPan = static_cast<double>(volumeRight) / (volumeLeft + volumeRight);
-      uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
+      uint8_t midiPan = convertLinearPercentPanValToStdMidiVal(linearPan);
 
       // TODO: apply volume scale
-      AddPan(beginOffset, curOffset - beginOffset, midiPan);
+      addPan(beginOffset, curOffset - beginOffset, midiPan);
       break;
     }
 
     case EVENT_PAN_FADE: {
-      uint8_t fadeLength = GetByte(curOffset++);
-      uint8_t newPan = GetByte(curOffset++);
+      uint8_t fadeLength = readByte(curOffset++);
+      uint8_t newPan = readByte(curOffset++);
 
       uint8_t panIndex = min<uint8_t>((newPan & 0x1Fu), 20u);
 
@@ -380,20 +380,20 @@ bool HeartBeatSnesTrack::ReadEvent() {
       double volumeRight = HeartBeatSnesSeq::PAN_TABLE[panIndex] / 128.0;
 
       double linearPan = (double) volumeRight / (volumeLeft + volumeRight);
-      uint8_t midiPan = ConvertLinearPercentPanValToStdMidiVal(linearPan);
+      uint8_t midiPan = convertLinearPercentPanValToStdMidiVal(linearPan);
 
       // TODO: fade in real curve, apply volume scale
-      AddPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);
+      addPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);
       break;
     }
 
     case EVENT_VIBRATO_ON: {
-      uint8_t vibratoDelay = GetByte(curOffset++);
-      uint8_t vibratoRate = GetByte(curOffset++);
-      uint8_t vibratoDepth = GetByte(curOffset++);
+      uint8_t vibratoDelay = readByte(curOffset++);
+      uint8_t vibratoRate = readByte(curOffset++);
+      uint8_t vibratoDepth = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibratoDelay, vibratoRate, vibratoDepth);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Vibrato",
                       desc,
@@ -403,9 +403,9 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_VIBRATO_FADE: {
-      uint8_t fadeLength = GetByte(curOffset++);
+      uint8_t fadeLength = readByte(curOffset++);
       desc = fmt::format("Length: {:d}", fadeLength);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Vibrato Fade",
                       desc,
@@ -415,7 +415,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_VIBRATO_OFF: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Vibrato Off",
                       desc,
@@ -425,45 +425,45 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_MASTER_VOLUME: {
-      uint8_t newVol = GetByte(curOffset++);
-      AddMasterVol(beginOffset, curOffset - beginOffset, newVol / 2);
+      uint8_t newVol = readByte(curOffset++);
+      addMasterVol(beginOffset, curOffset - beginOffset, newVol / 2);
       break;
     }
 
     case EVENT_MASTER_VOLUME_FADE: {
-      uint8_t fadeLength = GetByte(curOffset++);
-      uint8_t newVol = GetByte(curOffset++);
+      uint8_t fadeLength = readByte(curOffset++);
+      uint8_t newVol = readByte(curOffset++);
 
       // desc = fmt::format("Length: {:d}  Volume: {:d}", fadeLength, newVol);
-      AddMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
+      addMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
       break;
     }
 
     case EVENT_TEMPO: {
-      uint8_t newTempo = GetByte(curOffset++);
-      AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo));
+      uint8_t newTempo = readByte(curOffset++);
+      addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
       break;
     }
 
     case EVENT_GLOBAL_TRANSPOSE: {
-      int8_t semitones = GetByte(curOffset++);
-      AddGlobalTranspose(beginOffset, curOffset - beginOffset, semitones);
+      int8_t semitones = readByte(curOffset++);
+      addGlobalTranspose(beginOffset, curOffset - beginOffset, semitones);
       break;
     }
 
     case EVENT_TRANSPOSE: {
-      int8_t semitones = GetByte(curOffset++);
-      AddTranspose(beginOffset, curOffset - beginOffset, semitones);
+      int8_t semitones = readByte(curOffset++);
+      addTranspose(beginOffset, curOffset - beginOffset, semitones);
       break;
     }
 
     case EVENT_TREMOLO_ON: {
-      uint8_t tremoloDelay = GetByte(curOffset++);
-      uint8_t tremoloRate = GetByte(curOffset++);
-      uint8_t tremoloDepth = GetByte(curOffset++);
+      uint8_t tremoloDelay = readByte(curOffset++);
+      uint8_t tremoloRate = readByte(curOffset++);
+      uint8_t tremoloDepth = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", tremoloDelay, tremoloRate, tremoloDepth);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Tremolo",
                       desc,
@@ -473,7 +473,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_TREMOLO_OFF: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Tremolo Off",
                       desc,
@@ -483,25 +483,25 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_VOLUME: {
-      uint8_t newVol = GetByte(curOffset++);
-      AddVol(beginOffset, curOffset - beginOffset, newVol / 2);
+      uint8_t newVol = readByte(curOffset++);
+      addVol(beginOffset, curOffset - beginOffset, newVol / 2);
       break;
     }
 
     case EVENT_VOLUME_FADE: {
-      uint8_t fadeLength = GetByte(curOffset++);
-      uint8_t newVol = GetByte(curOffset++);
-      AddVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
+      uint8_t fadeLength = readByte(curOffset++);
+      uint8_t newVol = readByte(curOffset++);
+      addVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
       break;
     }
 
     case EVENT_PITCH_ENVELOPE_TO: {
-      uint8_t pitchEnvDelay = GetByte(curOffset++);
-      uint8_t pitchEnvLength = GetByte(curOffset++);
-      int8_t pitchEnvSemitones = static_cast<int8_t>(GetByte(curOffset++));
+      uint8_t pitchEnvDelay = readByte(curOffset++);
+      uint8_t pitchEnvLength = readByte(curOffset++);
+      int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
 
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay, pitchEnvLength, pitchEnvSemitones);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pitch Envelope (To)",
                       desc,
@@ -511,12 +511,12 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_PITCH_ENVELOPE_FROM: {
-      uint8_t pitchEnvDelay = GetByte(curOffset++);
-      uint8_t pitchEnvLength = GetByte(curOffset++);
-      int8_t pitchEnvSemitones = static_cast<int8_t>(GetByte(curOffset++));
+      uint8_t pitchEnvDelay = readByte(curOffset++);
+      uint8_t pitchEnvLength = readByte(curOffset++);
+      int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
 
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay, pitchEnvLength, pitchEnvSemitones);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pitch Envelope (From)",
                       desc,
@@ -526,7 +526,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_PITCH_ENVELOPE_OFF: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pitch Envelope Off",
                       desc,
@@ -536,16 +536,16 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_TUNING: {
-      uint8_t newTuning = GetByte(curOffset++);
-      AddFineTuning(beginOffset, curOffset - beginOffset, (newTuning / 256.0) * 100.0);
+      uint8_t newTuning = readByte(curOffset++);
+      addFineTuning(beginOffset, curOffset - beginOffset, (newTuning / 256.0) * 100.0);
       break;
     }
 
     case EVENT_ECHO_VOLUME: {
-      uint8_t spcEVOL_L = GetByte(curOffset++);
-      uint8_t spcEVOL_R = GetByte(curOffset++);
+      uint8_t spcEVOL_L = readByte(curOffset++);
+      uint8_t spcEVOL_R = readByte(curOffset++);
       desc = fmt::format("Volume Left: {:d}  Volume Right: {:d}", spcEVOL_L, spcEVOL_R);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Echo Volume",
                       desc,
@@ -555,34 +555,34 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_ECHO_PARAM: {
-      uint8_t spcEDL = GetByte(curOffset++);
-      uint8_t spcEFB = GetByte(curOffset++);
-      uint8_t spcFIR = GetByte(curOffset++);
+      uint8_t spcEDL = readByte(curOffset++);
+      uint8_t spcEFB = readByte(curOffset++);
+      uint8_t spcFIR = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Feedback: {:d}  FIR: {:d}", spcEDL, spcEFB, spcFIR);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc, CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_ECHO_OFF: {
-      AddReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
+      addReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
       break;
     }
 
     case EVENT_ECHO_ON: {
-      AddReverb(beginOffset, curOffset - beginOffset, 100, "Echo On");
+      addReverb(beginOffset, curOffset - beginOffset, 100, "Echo On");
       break;
     }
 
     case EVENT_ECHO_FIR: {
       curOffset += 8; // FIR C0-C7
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR", desc, CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_ADSR: {
-      uint8_t adsr1 = GetByte(curOffset++);
-      uint8_t adsr2 = GetByte(curOffset++);
+      uint8_t adsr1 = readByte(curOffset++);
+      uint8_t adsr2 = readByte(curOffset++);
 
       uint8_t ar = adsr1 & 0x0f;
       uint8_t dr = (adsr1 & 0x70) >> 4;
@@ -590,45 +590,45 @@ bool HeartBeatSnesTrack::ReadEvent() {
       uint8_t sr = adsr2 & 0x1f;
 
       desc = fmt::format("AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}", ar, dr, sl, sr);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_NOTE_PARAM: {
-      uint8_t noteParam = GetByte(curOffset++);
+      uint8_t noteParam = readByte(curOffset++);
       uint8_t durIndex = noteParam >> 4;
       uint8_t velIndex = noteParam & 0x0f;
       spcNoteDurRate = HeartBeatSnesSeq::NOTE_DUR_TABLE[durIndex];
       spcNoteVolume = HeartBeatSnesSeq::NOTE_VEL_TABLE[velIndex];
       desc += fmt::format("  Duration: {:d} ({:d})  Velocity: {:d} ({:d})",
           durIndex, spcNoteDurRate, velIndex, spcNoteVolume);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc, CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc, CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_GOTO: {
-      int16_t destOffset = GetShort(curOffset);
+      int16_t destOffset = readShort(curOffset);
       curOffset += 2;
       uint16_t dest = parentSeq->dwOffset + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;
-      if (!IsOffsetUsed(dest)) {
-        AddGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
+      if (!isOffsetUsed(dest)) {
+        addGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
       }
       else {
-        bContinue = AddLoopForever(beginOffset, length, "Jump");
+        bContinue = addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
 
     case EVENT_CALL: {
-      int16_t destOffset = GetShort(curOffset);
+      int16_t destOffset = readShort(curOffset);
       curOffset += 2;
       uint16_t dest = parentSeq->dwOffset + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pattern Play",
                       desc,
@@ -642,13 +642,13 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_RET: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc, CLR_LOOP, ICON_ENDREP);
       curOffset = parentSeq->dwOffset + subReturnOffset;
       break;
     }
 
     case EVENT_NOISE_ON: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Noise On",
                       desc,
@@ -658,7 +658,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_NOISE_OFF: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Noise Off",
                       desc,
@@ -668,9 +668,9 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_NOISE_FREQ: {
-      uint8_t newNCK = GetByte(curOffset++) & 0x1f;
+      uint8_t newNCK = readByte(curOffset++) & 0x1f;
       desc = fmt::format("Noise Frequency (NCK): {:d}", newNCK);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Noise Frequency",
                       desc,
@@ -680,7 +680,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
     }
 
     case EVENT_SUBEVENT: {
-      uint8_t subStatusByte = GetByte(curOffset++);
+      uint8_t subStatusByte = readByte(curOffset++);
       HeartBeatSnesSeqSubEventType subEventType = static_cast<HeartBeatSnesSeqSubEventType>(0);
       std::map<uint8_t, HeartBeatSnesSeqSubEventType>::iterator
           pSubEventType = parentSeq->SubEventMap.find(subStatusByte);
@@ -691,47 +691,47 @@ bool HeartBeatSnesTrack::ReadEvent() {
       switch (subEventType) {
         case SUBEVENT_UNKNOWN0:
           desc = logEvent(subStatusByte, spdlog::level::off, "Subevent");
-          AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+          addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
           break;
 
         case SUBEVENT_UNKNOWN1: {
-          uint8_t arg1 = GetByte(curOffset++);
+          uint8_t arg1 = readByte(curOffset++);
           desc = logEvent(subStatusByte, spdlog::level::off, "Subevent", arg1);
-          AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+          addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
           break;
         }
 
         case SUBEVENT_UNKNOWN2: {
-          uint8_t arg1 = GetByte(curOffset++);
-          uint8_t arg2 = GetByte(curOffset++);
+          uint8_t arg1 = readByte(curOffset++);
+          uint8_t arg2 = readByte(curOffset++);
           desc = logEvent(subStatusByte, spdlog::level::off, "Subevent", arg1, arg2);
-          AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+          addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
           break;
         }
 
         case SUBEVENT_UNKNOWN3: {
-          uint8_t arg1 = GetByte(curOffset++);
-          uint8_t arg2 = GetByte(curOffset++);
-          uint8_t arg3 = GetByte(curOffset++);
+          uint8_t arg1 = readByte(curOffset++);
+          uint8_t arg2 = readByte(curOffset++);
+          uint8_t arg3 = readByte(curOffset++);
           desc = logEvent(subStatusByte, spdlog::level::off, "Subevent", arg1, arg2, arg3);
-          AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+          addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
           break;
         }
 
         case SUBEVENT_UNKNOWN4: {
-          uint8_t arg1 = GetByte(curOffset++);
-          uint8_t arg2 = GetByte(curOffset++);
-          uint8_t arg3 = GetByte(curOffset++);
-          uint8_t arg4 = GetByte(curOffset++);
+          uint8_t arg1 = readByte(curOffset++);
+          uint8_t arg2 = readByte(curOffset++);
+          uint8_t arg3 = readByte(curOffset++);
+          uint8_t arg4 = readByte(curOffset++);
           desc = logEvent(subStatusByte, spdlog::level::off, "Subevent", arg1, arg2, arg3, arg4);
-          AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+          addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
           break;
         }
 
         case SUBEVENT_LOOP_COUNT: {
-          loopCount = GetByte(curOffset++);
+          loopCount = readByte(curOffset++);
           desc = fmt::format("Times: {:d}", loopCount);
-          AddGenericEvent(beginOffset,
+          addGenericEvent(beginOffset,
                           curOffset - beginOffset,
                           "Loop Count",
                           desc,
@@ -741,11 +741,11 @@ bool HeartBeatSnesTrack::ReadEvent() {
         }
 
         case SUBEVENT_LOOP_AGAIN: {
-          int16_t destOffset = GetShort(curOffset);
+          int16_t destOffset = readShort(curOffset);
           curOffset += 2;
           uint16_t dest = parentSeq->dwOffset + destOffset;
           desc = fmt::format("Destination: ${:04X}", dest);
-          AddGenericEvent(beginOffset,
+          addGenericEvent(beginOffset,
                           curOffset - beginOffset,
                           "Loop Again",
                           desc,
@@ -762,9 +762,9 @@ bool HeartBeatSnesTrack::ReadEvent() {
         }
 
         case SUBEVENT_ADSR_AR: {
-          uint8_t newAR = GetByte(curOffset++) & 15;
+          uint8_t newAR = readByte(curOffset++) & 15;
           desc = fmt::format("AR: {:d}", newAR);
-          AddGenericEvent(beginOffset,
+          addGenericEvent(beginOffset,
                           curOffset - beginOffset,
                           "ADSR Attack Rate",
                           desc,
@@ -774,9 +774,9 @@ bool HeartBeatSnesTrack::ReadEvent() {
         }
 
         case SUBEVENT_ADSR_DR: {
-          uint8_t newDR = GetByte(curOffset++) & 7;
+          uint8_t newDR = readByte(curOffset++) & 7;
           desc = fmt::format("DR: {:d}", newDR);
-          AddGenericEvent(beginOffset,
+          addGenericEvent(beginOffset,
                           curOffset - beginOffset,
                           "ADSR Decay Rate",
                           desc,
@@ -786,9 +786,9 @@ bool HeartBeatSnesTrack::ReadEvent() {
         }
 
         case SUBEVENT_ADSR_SL: {
-          uint8_t newSL = GetByte(curOffset++) & 7;
+          uint8_t newSL = readByte(curOffset++) & 7;
           desc = fmt::format("SL: {:d}", newSL);
-          AddGenericEvent(beginOffset,
+          addGenericEvent(beginOffset,
                           curOffset - beginOffset,
                           "ADSR Sustain Level",
                           desc,
@@ -798,9 +798,9 @@ bool HeartBeatSnesTrack::ReadEvent() {
         }
 
         case SUBEVENT_ADSR_RR: {
-          uint8_t newRR = GetByte(curOffset++) & 15;
+          uint8_t newRR = readByte(curOffset++) & 15;
           desc = fmt::format("RR: {:d}", newRR);
-          AddGenericEvent(beginOffset,
+          addGenericEvent(beginOffset,
                           curOffset - beginOffset,
                           "ADSR Release Rate",
                           desc,
@@ -810,9 +810,9 @@ bool HeartBeatSnesTrack::ReadEvent() {
         }
 
         case SUBEVENT_ADSR_SR: {
-          uint8_t newSR = GetByte(curOffset++) & 15;
+          uint8_t newSR = readByte(curOffset++) & 15;
           desc = fmt::format("SR: {:d}", newSR);
-          AddGenericEvent(beginOffset,
+          addGenericEvent(beginOffset,
                           curOffset - beginOffset,
                           "ADSR Sustain Rate",
                           desc,
@@ -822,17 +822,17 @@ bool HeartBeatSnesTrack::ReadEvent() {
         }
 
         case SUBEVENT_SURROUND: {
-          bool invertLeft = GetByte(curOffset++) != 0;
-          bool invertRight = GetByte(curOffset++) != 0;
+          bool invertLeft = readByte(curOffset++) != 0;
+          bool invertRight = readByte(curOffset++) != 0;
           desc = fmt::format("Invert Left: {}  Invert Right: {}",
                              invertLeft ? "On" : "Off", invertRight ? "On" : "Off");
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "Surround", desc, CLR_PAN, ICON_CONTROL);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Surround", desc, CLR_PAN, ICON_CONTROL);
           break;
         }
 
         default: {
           auto descr = logEvent(subStatusByte, spdlog::level::err, "Subevent");
-          AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
+          addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
           bContinue = false;
           break;
         }
@@ -843,7 +843,7 @@ bool HeartBeatSnesTrack::ReadEvent() {
 
     default: {
       auto descr = logEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
     }

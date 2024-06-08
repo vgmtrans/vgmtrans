@@ -22,11 +22,11 @@ CPSArticTable::~CPSArticTable() {
     delete[] artics;
 }
 
-bool CPSArticTable::LoadMain() {
+bool CPSArticTable::loadMain() {
   uint32_t off = dwOffset;
   for (int i = 0; off < dwOffset + unLength; i++, off += sizeof(qs_artic_info)) {
-    uint32_t test1 = GetWord(off);
-    uint32_t test2 = GetWord(off + 4);
+    uint32_t test1 = readWord(off);
+    uint32_t test2 = readWord(off + 4);
     if ((test1 == 0 && test2 == 0) || (test1 == 0xFFFFFFFF && test2 == 0xFFFFFFFF))
       continue;
 
@@ -43,7 +43,7 @@ bool CPSArticTable::LoadMain() {
   //unLength = off - dwOffset;
   int numArtics = unLength / sizeof(qs_artic_info);
   artics = new qs_artic_info[numArtics];
-  GetBytes(dwOffset, unLength, artics);
+  readBytes(dwOffset, unLength, artics);
 
   return true;
 }
@@ -74,15 +74,15 @@ CPS2SampleInfoTable::CPS2SampleInfoTable(RawFile *file,
     : CPSSampleInfoTable(file, std::move(name), offset, length) {
 }
 
-bool CPS2SampleInfoTable::LoadMain() {
+bool CPS2SampleInfoTable::loadMain() {
   uint32_t off = dwOffset;
   uint32_t test1 = 1, test2 = 1;
   if (unLength == 0)
     unLength = 0xFFFFFFFF - dwOffset;
   for (int i = 0; (test1 || test2) && ((test1 != 0xFFFFFFFF) || (test2 != 0xFFFFFFFF)) && off < dwOffset + unLength;
        i++, off += 8) {
-    test1 = GetWord(off + 8);
-    test2 = GetWord(off + 12);
+    test1 = readWord(off + 8);
+    test2 = readWord(off + 12);
 
     auto name = fmt::format("Sample Info: {:d}", i);
 
@@ -101,11 +101,11 @@ bool CPS2SampleInfoTable::LoadMain() {
 
   for (off = 0; off < numSamples * 8; off += 8) {
 
-    uint8_t bank = GetByte(dwOffset + off + 0);
-    uint16_t start_addr = GetShort(dwOffset + off + 1);
-    uint16_t loop_offset= GetShort(dwOffset + off + 3);
-    uint16_t end_addr = GetShort(dwOffset + off + 5);
-    uint8_t unity_key = GetByte(dwOffset + off + 7);
+    uint8_t bank = readByte(dwOffset + off + 0);
+    uint16_t start_addr = readShort(dwOffset + off + 1);
+    uint16_t loop_offset= readShort(dwOffset + off + 3);
+    uint16_t end_addr = readShort(dwOffset + off + 5);
+    uint8_t unity_key = readByte(dwOffset + off + 7);
 
     sample_info& info = infos[off/8];
     info.start_addr = (bank << 16) | (start_addr);
@@ -139,7 +139,7 @@ CPS3SampleInfoTable::CPS3SampleInfoTable(RawFile *file,
 //    delete[] infos;
 //}
 
-bool CPS3SampleInfoTable::LoadMain() {
+bool CPS3SampleInfoTable::loadMain() {
 
   this->numSamples = unLength / 16;
 
@@ -158,10 +158,10 @@ bool CPS3SampleInfoTable::LoadMain() {
     addChild(containerItem);
 
     sample_info& info = infos[i];
-    info.start_addr = GetWordBE(off + 0);
-    info.loop_offset = GetWordBE(off + 4);
-    info.end_addr = GetWordBE(off + 8);
-    info.unity_key = static_cast<uint8_t>(GetWordBE(off + 12));
+    info.start_addr = readWordBE(off + 0);
+    info.loop_offset = readWordBE(off + 4);
+    info.end_addr = readWordBE(off + 8);
+    info.unity_key = static_cast<uint8_t>(readWordBE(off + 12));
 
     i++;
   }
@@ -186,11 +186,11 @@ CPS2InstrSet::CPS2InstrSet(RawFile *file,
       articTable(theArticTable) {
 }
 
-bool CPS2InstrSet::GetHeaderInfo() {
+bool CPS2InstrSet::parseHeader() {
   return true;
 }
 
-bool CPS2InstrSet::GetInstrPointers() {
+bool CPS2InstrSet::parseInstrPointers() {
   // Load the instr_info tables.
 
   if (fmt_version <= VER_115) {
@@ -223,10 +223,10 @@ bool CPS2InstrSet::GetInstrPointers() {
     std::vector<uint32_t> instr_table_ptrs;
     for (unsigned int i = 0; i < num_instr_banks; i++) {
       if (fmt_version == VER_CPS3) {
-        instr_table_ptrs.push_back(GetWordBE(dwOffset + i * 4));    //get the instr table ptrs
+        instr_table_ptrs.push_back(readWordBE(dwOffset + i * 4));    //get the instr table ptrs
       }
       else {
-        instr_table_ptrs.push_back(GetShort(dwOffset + i * 2));    //get the instr table ptrs
+        instr_table_ptrs.push_back(readShort(dwOffset + i * 2));    //get the instr table ptrs
       }
     }
     int totalInstrs = 0;
@@ -241,11 +241,11 @@ bool CPS2InstrSet::GetInstrPointers() {
 
         // For each bank, iterate over all instr ptrs and create instruments
         for (uint8_t j = 0; j < 128; j++) {
-          uint16_t instrPtrOffset = GetShortBE(bankOff + (j*2));
+          uint16_t instrPtrOffset = readShortBE(bankOff + (j*2));
           uint32_t instrPtr = instrPtrOffset + bankOff;
           // We are not guaranteed a 0xFFFF separator sequence between instruments, so instead we
           // calculate length of each using the next instr pointer if possible.
-          uint32_t nextInstrPtrOffset = GetShortBE(bankOff + ((j+1)*2));
+          uint32_t nextInstrPtrOffset = readShortBE(bankOff + ((j+1)*2));
           uint32_t instrLength = nextInstrPtrOffset == 0 || j == 127 ? 0 : nextInstrPtrOffset - instrPtrOffset;
           if (instrPtrOffset == 0) {
             continue;
@@ -271,7 +271,7 @@ bool CPS2InstrSet::GetInstrPointers() {
         endOffset = instr_table_ptrs[i] + instr_info_length * 256;//4*0x7F;
 
       for (int j = instr_table_ptrs[i]; j < endOffset; j += instr_info_length, k++) {
-        if (GetShort(j) == 0 && GetByte(j + 2) == 0 && i != 0)
+        if (readShort(j) == 0 && readByte(j + 2) == 0 && i != 0)
           break;
 
         auto name = fmt::format("Instrument {:d}", k);
@@ -297,10 +297,10 @@ CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, std::move(name)) {
 }
 
-bool CPS2Instr::LoadInstr() {
+bool CPS2Instr::loadInstr() {
   std::vector<VGMRgn*> rgns;
-  const CPSFormatVer formatVersion = GetFormatVer();
-  if (formatVersion < VER_103) {
+  const CPSFormatVer formatVer = formatVersion();
+  if (formatVer < VER_103) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
     rgn->addChild(this->dwOffset,     1, "Sample Info Index");
@@ -313,7 +313,7 @@ bool CPS2Instr::LoadInstr() {
     rgn->addChild(this->dwOffset + 7, 1, "Unknown");
 
     qs_prog_info_ver_101 progInfo;
-    GetBytes(dwOffset, sizeof(qs_prog_info_ver_101), &progInfo);
+    readBytes(dwOffset, sizeof(qs_prog_info_ver_101), &progInfo);
     rgn->sampNum = progInfo.sample_index;
     this->attack_rate = progInfo.attack_rate;
     this->decay_rate = progInfo.decay_rate;
@@ -321,14 +321,14 @@ bool CPS2Instr::LoadInstr() {
     this->sustain_rate = progInfo.sustain_rate;
     this->release_rate = progInfo.release_rate;
   }
-  else if (formatVersion < VER_130 || formatVersion == VER_200 || formatVersion == VER_201B) {
+  else if (formatVer < VER_130 || formatVer == VER_200 || formatVer == VER_201B) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
     qs_prog_info_ver_103 progInfo;
-    GetBytes(dwOffset, sizeof(qs_prog_info_ver_103), &progInfo);
+    readBytes(dwOffset, sizeof(qs_prog_info_ver_103), &progInfo);
 
-    rgn->AddSampNum(progInfo.sample_index, this->dwOffset, 2);
-    rgn->AddFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
+    rgn->addSampNum(progInfo.sample_index, this->dwOffset, 2);
+    rgn->addFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
     rgn->addChild(this->dwOffset + 3, 1, "Attack Rate");
     rgn->addChild(this->dwOffset + 4, 1, "Decay Rate");
     rgn->addChild(this->dwOffset + 5, 1, "Sustain Level");
@@ -341,11 +341,11 @@ bool CPS2Instr::LoadInstr() {
     this->sustain_rate = progInfo.sustain_rate;
     this->release_rate = progInfo.release_rate;
   }
-  else if (formatVersion == VER_CPS3) {
+  else if (formatVer == VER_CPS3) {
 
     uint8_t prevKeyHigh = 0;
     uint32_t off;
-    for (off = dwOffset; GetShort(off) != 0xFFFF; off += 12) {
+    for (off = dwOffset; readShort(off) != 0xFFFF; off += 12) {
       if (unLength != 0 && off >= dwOffset + unLength)
         break;
 
@@ -353,25 +353,25 @@ bool CPS2Instr::LoadInstr() {
       rgns.push_back(rgn);
 
       qs_prog_info_ver_cps3 progInfo;
-      GetBytes(off, sizeof(qs_prog_info_ver_cps3), &progInfo);
+      readBytes(off, sizeof(qs_prog_info_ver_cps3), &progInfo);
 
       //    rgn->AddFineTune( (int16_t)((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
-      rgn->AddKeyHigh(progInfo.key_high, off + 0, 1);
+      rgn->addKeyHigh(progInfo.key_high, off + 0, 1);
       rgn->keyLow = prevKeyHigh + 1;
       prevKeyHigh = progInfo.key_high;
 
       // When the region pan value != -1, the CPS3 driver completely overrides the track state pan
       // (otherwise it's ignored). SF2 and DLS don't do this; they combine region pan with track pan.
       uint8_t pan = progInfo.pan_override == -1 ? 64 : progInfo.pan_override;
-      rgn->AddPan(pan, off+1, 1, "Pan Override");
+      rgn->addPan(pan, off+1, 1, "Pan Override");
 
       auto volume_percent = ((64 + progInfo.volume_adjustment) & 0x7F) / 64.0;
-      rgn->AddVolume(volume_percent, off+2, 1);
-      rgn->AddUnknown(off+3, 1);
-      rgn->AddSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+4, 2);
+      rgn->addVolume(volume_percent, off+2, 1);
+      rgn->addUnknown(off+3, 1);
+      rgn->addSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+4, 2);
 
       auto fine_tune_cents = static_cast<int16_t>(std::lround((progInfo.fine_tune / 128.0) * 100));
-      rgn->AddFineTune(fine_tune_cents, off+6, 1);
+      rgn->addFineTune(fine_tune_cents, off+6, 1);
 
       rgn->addChild(off + 7, 1, "Attack Rate");
       rgn->addChild(off + 8, 1, "Decay Rate");
@@ -392,10 +392,10 @@ bool CPS2Instr::LoadInstr() {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, "Region");
     rgns.push_back(rgn);
     qs_prog_info_ver_130 progInfo;
-    GetBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
+    readBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
 
     rgn->addChild(this->dwOffset,     2, "Sample Info Index");
-    rgn->AddFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
+    rgn->addFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
     rgn->addChild(this->dwOffset + 3, 1, "Articulation Index");
 
     const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->parInstrSet)->articTable;
@@ -423,7 +423,7 @@ bool CPS2Instr::LoadInstr() {
     uint16_t Sr = decay_rate_table[this->sustain_rate];
     uint16_t Rr = decay_rate_table[this->release_rate];
 
-    const double UPDATE_RATE_IN_HZ = formatVersion == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
+    const double UPDATE_RATE_IN_HZ = formatVer == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
     // The rate values are all measured from max to min, as the SF2 and DLS specs call for.
     //  In the actual code, the envelope level starts at different points
     // Attack rate 134A in sfa2
@@ -447,7 +447,7 @@ bool CPS2Instr::LoadInstr() {
       ticks = Dr ? (0xFFFF / Dr) : 0;
       rgn->decay_time = (Dr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
     }
-    rgn->decay_time = LinAmpDecayTimeToLinDBDecayTime(rgn->decay_time, 0xFFFF / 8);
+    rgn->decay_time = linearAmpDecayTimeToLinDBDecayTime(rgn->decay_time, 0xFFFF / 8);
 
     // Sustain level
     //    if the Decay rate is 0, then the sustain level is effectively max
@@ -461,17 +461,17 @@ bool CPS2Instr::LoadInstr() {
     // Sustain rate 138D in sfa2
     ticks = Sr ? 0xFFFF / Sr : 0;
     rgn->sustain_time = (Sr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
-    rgn->sustain_time = LinAmpDecayTimeToLinDBDecayTime(rgn->sustain_time, 0xFFFF / 8);
+    rgn->sustain_time = linearAmpDecayTimeToLinDBDecayTime(rgn->sustain_time, 0xFFFF / 8);
 
     ticks = Rr ? 0xFFFF / Rr : 0xFFFF;
     rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
-    rgn->release_time = LinAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0xFFFF / 8);
+    rgn->release_time = linearAmpDecayTimeToLinDBDecayTime(rgn->release_time, 0xFFFF / 8);
 
     if (rgn->sampNum == 0xFFFF || rgn->sampNum >= (dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
-    rgn->SetUnityKey((dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->infos[rgn->sampNum].unity_key);
-    AddRgn(rgn);
+    rgn->setUnityKey((dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->infos[rgn->sampNum].unity_key);
+    addRgn(rgn);
   }
   return true;
 }
@@ -493,12 +493,12 @@ CPS2SampColl::CPS2SampColl(RawFile *file, CPS2InstrSet *theinstrset,
 }
 
 
-bool CPS2SampColl::GetHeaderInfo() {
+bool CPS2SampColl::parseHeader() {
   unLength = static_cast<uint32_t>(this->rawFile()->size());
   return true;
 }
 
-bool CPS2SampColl::GetSampleInfo() {
+bool CPS2SampColl::parseSampleInfo() {
 
   uint32_t numSamples = instrset->sampInfoTable->numSamples;
   uint32_t baseOffset = 0;
@@ -531,7 +531,7 @@ bool CPS2SampColl::GetSampleInfo() {
     // CPS3 frequency is (42954545 hz / 3) / 384) ~= 37287
     // CPS2 frequency is (60 MHz / 2 / 1248) ~= 24038
     uint32_t frequency = instrset->fmt_version == VER_CPS3 ? 37287 : 24038;
-    VGMSamp *newSamp = AddSamp(sampOffset,
+    VGMSamp *newSamp = addSamp(sampOffset,
                                sampLength,
                                sampOffset,
                                sampLength,
@@ -539,13 +539,13 @@ bool CPS2SampColl::GetSampleInfo() {
                                8,
                                frequency,
                                fmt::format("Sample {:d}", i));
-    newSamp->SetWaveType(WT_PCM8);
+    newSamp->setWaveType(WT_PCM8);
     if (sampLength - relativeLoopOffset < 40)
-      newSamp->SetLoopStatus(false);
+      newSamp->setLoopStatus(false);
     else {
-      newSamp->SetLoopStatus(true);
-      newSamp->SetLoopOffset(relativeLoopOffset);
-      newSamp->SetLoopLength(sampLength - relativeLoopOffset);
+      newSamp->setLoopStatus(true);
+      newSamp->setLoopOffset(relativeLoopOffset);
+      newSamp->setLoopLength(sampLength - relativeLoopOffset);
     }
     newSamp->unityKey = unity_key;
   }

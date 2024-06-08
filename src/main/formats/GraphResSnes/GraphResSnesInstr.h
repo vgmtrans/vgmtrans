@@ -16,8 +16,8 @@ class GraphResSnesInstrSet : public VGMInstrSet {
                        const std::string &name = "GraphResSnesInstrSet");
   ~GraphResSnesInstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
   GraphResSnesVersion version;
 
@@ -41,7 +41,7 @@ class GraphResSnesInstr : public VGMInstr {
                     const std::string &name = "GraphResSnesInstr");
   ~GraphResSnesInstr() override;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
   GraphResSnesVersion version;
 
@@ -60,7 +60,7 @@ class GraphResSnesRgn : public VGMRgn {
       (GraphResSnesInstr *instr, GraphResSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8fe0);
   ~GraphResSnesRgn() override;
 
-  bool LoadRgn() override;
+  bool loadRgn() override;
 
   GraphResSnesVersion version;
 };

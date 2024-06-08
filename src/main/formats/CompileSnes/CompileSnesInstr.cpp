@@ -27,30 +27,30 @@ CompileSnesInstrSet::CompileSnesInstrSet(RawFile *file,
 CompileSnesInstrSet::~CompileSnesInstrSet() {
 }
 
-bool CompileSnesInstrSet::GetHeaderInfo() {
+bool CompileSnesInstrSet::parseHeader() {
   return true;
 }
 
-bool CompileSnesInstrSet::GetInstrPointers() {
+bool CompileSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
   for (uint8_t srcn = 0; srcn <= 0x3f; srcn++) {
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
+    if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
-    uint16_t addrSampStart = GetShort(addrDIRentry);
+    uint16_t addrSampStart = readShort(addrDIRentry);
     if (addrSampStart < spcDirAddr) {
       continue;
     }
 
-    uint32_t ofsInstrEntry = addrTuningTable + (srcn * CompileSnesInstr::ExpectedSize(version));
-    if (ofsInstrEntry + CompileSnesInstr::ExpectedSize(version) > 0x10000) {
+    uint32_t ofsInstrEntry = addrTuningTable + (srcn * CompileSnesInstr::expectedSize(version));
+    if (ofsInstrEntry + CompileSnesInstr::expectedSize(version) > 0x10000) {
       break;
     }
 
     if (version != COMPILESNES_ALESTE && version != COMPILESNES_JAKICRUSH) {
-      uint8_t pitchTableIndex = GetByte(ofsInstrEntry + 1);
+      uint8_t pitchTableIndex = readByte(ofsInstrEntry + 1);
       if (pitchTableIndex >= 0x80) {
         // apparently it's too large
         continue;
@@ -70,7 +70,7 @@ bool CompileSnesInstrSet::GetInstrPointers() {
 
   std::ranges::sort(usedSRCNs);
   SNESSampColl *newSampColl = new SNESSampColl(CompileSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->LoadVGMFile()) {
+  if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
   }
@@ -89,28 +89,28 @@ CompileSnesInstr::CompileSnesInstr(VGMInstrSet *instrSet,
                                    uint8_t srcn,
                                    uint32_t spcDirAddr,
                                    const std::string &name)
-    : VGMInstr(instrSet, addrTuningTableItem, CompileSnesInstr::ExpectedSize(ver), 0, srcn, name), version(ver),
+    : VGMInstr(instrSet, addrTuningTableItem, CompileSnesInstr::expectedSize(ver), 0, srcn, name), version(ver),
       addrPitchTablePtrs(addrPitchTablePtrs),
       spcDirAddr(spcDirAddr) {}
 
 CompileSnesInstr::~CompileSnesInstr() {}
 
-bool CompileSnesInstr::LoadInstr() {
+bool CompileSnesInstr::loadInstr() {
   uint32_t offDirEnt = spcDirAddr + (instrNum * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = GetShort(offDirEnt);
+  uint16_t addrSampStart = readShort(offDirEnt);
 
   CompileSnesRgn *rgn = new CompileSnesRgn(this, version, dwOffset, addrPitchTablePtrs);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  AddRgn(rgn);
+  addRgn(rgn);
 
   return true;
 }
 
-uint32_t CompileSnesInstr::ExpectedSize(CompileSnesVersion version) {
+uint32_t CompileSnesInstr::expectedSize(CompileSnesVersion version) {
   if (version == COMPILESNES_ALESTE || version == COMPILESNES_JAKICRUSH) {
     return 1;
   } else {
@@ -126,11 +126,11 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
                                CompileSnesVersion ver,
                                uint16_t addrTuningTableItem,
                                uint16_t addrPitchTablePtrs)
-    : VGMRgn(instr, addrTuningTableItem, CompileSnesInstr::ExpectedSize(ver)),
+    : VGMRgn(instr, addrTuningTableItem, CompileSnesInstr::expectedSize(ver)),
       version(ver) {
 
-  int8_t transpose = GetByte(addrTuningTableItem);
-  AddUnityKey(transpose, addrTuningTableItem, 1);
+  int8_t transpose = readByte(addrTuningTableItem);
+  addUnityKey(transpose, addrTuningTableItem, 1);
 
   const uint16_t REGULAR_PITCH_TABLE[0x77] = {
       0x0012, 0x0013, 0x0014, 0x0015, 0x0017, 0x0018, 0x0019, 0x001b,
@@ -156,7 +156,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
     pitchTable.assign(std::begin(REGULAR_PITCH_TABLE), std::end(REGULAR_PITCH_TABLE));
   }
   else {
-    uint8_t pitchTableIndex = GetByte(addrTuningTableItem + 1);
+    uint8_t pitchTableIndex = readByte(addrTuningTableItem + 1);
     addChild(dwOffset + 1, 1, "Pitch Table Index");
 
     if (pitchTableIndex == 0) {
@@ -165,10 +165,10 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
     else {
       uint32_t addrPitchTablePtr = addrPitchTablePtrs + (pitchTableIndex * 2);
       if (addrPitchTablePtr + 2 <= 0x10000) {
-        uint32_t addrPitchTable = GetShort(addrPitchTablePtr) + 2;
+        uint32_t addrPitchTable = readShort(addrPitchTablePtr) + 2;
         if (addrPitchTable + sizeof(REGULAR_PITCH_TABLE) <= 0x10000) {
           for (uint8_t key = 0; key < std::size(REGULAR_PITCH_TABLE); key++) {
-            pitchTable.push_back(GetShort(addrPitchTable + (key * 2)));
+            pitchTable.push_back(readShort(addrPitchTable + (key * 2)));
           }
         }
       }
@@ -216,11 +216,11 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
   uint8_t adsr1 = 0x8f;
   uint8_t adsr2 = 0xe0;
   uint8_t gain = 0;
-  SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
+  snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
 CompileSnesRgn::~CompileSnesRgn() {}
 
-bool CompileSnesRgn::LoadRgn() {
+bool CompileSnesRgn::loadRgn() {
   return true;
 }

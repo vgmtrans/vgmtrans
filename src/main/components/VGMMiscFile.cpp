@@ -17,32 +17,32 @@ VGMMiscFile::VGMMiscFile(const std::string &format, RawFile *file, uint32_t offs
     : VGMFile(format, file, offset, length, std::move(name)) {
 }
 
-bool VGMMiscFile::LoadMain() {
+bool VGMMiscFile::loadMain() {
   return true;
 }
 
-bool VGMMiscFile::LoadVGMFile() {
-  bool val = Load();
+bool VGMMiscFile::loadVGMFile() {
+  bool val = load();
   if (!val) {
     return false;
   }
 
   if (auto fmt = format(); fmt) {
-    fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
   }
 
   return val;
 }
 
-bool VGMMiscFile::Load() {
-  if (!LoadMain()) {
+bool VGMMiscFile::load() {
+  if (!loadMain()) {
     return false;
   }
   if (unLength == 0) {
     return false;
   }
 
-  rawFile()->AddContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
-  pRoot->AddVGMFile(this);
+  rawFile()->addContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
+  pRoot->addVGMFile(this);
   return true;
 }

@@ -14,10 +14,10 @@
 
 CPSTrackV1::CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
-  CPSTrackV1::ResetVars();
+  CPSTrackV1::resetVars();
 }
 
-void CPSTrackV1::ResetVars() {
+void CPSTrackV1::resetVars() {
   noteDuration = 0xFF;        // verified in progear (required there as well)
   bPrevNoteTie = false;
   prevTieNote = 0;
@@ -28,15 +28,15 @@ void CPSTrackV1::ResetVars() {
   prevPortamentoDuration = 0;
   memset(loop, 0, sizeof(loop));
   memset(loopOffset, 0, sizeof(loopOffset));
-  SeqTrack::ResetVars();
+  SeqTrack::resetVars();
 }
 
-void CPSTrackV1::AddInitialMidiEvents(int trackNum) {
-  SeqTrack::AddInitialMidiEvents(trackNum);
-  AddPortamentoTime14BitNoItem(0);
+void CPSTrackV1::addInitialMidiEvents(int trackNum) {
+  SeqTrack::addInitialMidiEvents(trackNum);
+  addPortamentoTime14BitNoItem(0);
 }
 
-void CPSTrackV1::CalculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
+void CPSTrackV1::calculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
   // Portamento time will be expressed in milliseconds
   uint16_t durationInMillis = 0;
   if (portamentoCentsPerSec > 0) {
@@ -47,12 +47,12 @@ void CPSTrackV1::CalculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
     return;
   }
   prevPortamentoDuration = durationInMillis;
-  AddPortamentoTime14BitNoItem(durationInMillis);
+  addPortamentoTime14BitNoItem(durationInMillis);
 }
 
-bool CPSTrackV1::ReadEvent() {
+bool CPSTrackV1::readEvent() {
   uint32_t beginOffset = curOffset;
-  uint8_t status_byte = GetByte(curOffset++);
+  uint8_t status_byte = readByte(curOffset++);
 
   if (status_byte >= 0x20) {
 
@@ -83,51 +83,51 @@ bool CPSTrackV1::ReadEvent() {
       // Tie note
       if ((noteState & 0x40) > 0) {
         if (!bPrevNoteTie) {
-          AddNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied / with portamento)");
-          AddPortamentoNoItem(true);
+          addNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied / with portamento)");
+          addPortamentoNoItem(true);
         }
         else if (key != prevTieNote) {
-          CalculateAndAddPortamentoTimeNoItem(key - prevTieNote);
-          AddNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied)");
-          AddNoteOffNoItem(prevTieNote);
+          calculateAndAddPortamentoTimeNoItem(key - prevTieNote);
+          addNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied)");
+          addNoteOffNoItem(prevTieNote);
         }
         else
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_NOTEON);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_NOTEON);
         bPrevNoteTie = true;
         prevTieNote = key;
       }
       else {
         if (bPrevNoteTie) {
           if (key != prevTieNote) {
-            CalculateAndAddPortamentoTimeNoItem(key - prevTieNote);
-            AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
-            AddNoteOffNoItem(prevTieNote);
-            InsertPortamentoNoItem(false, GetTime()+absDur);
+            calculateAndAddPortamentoTimeNoItem(key - prevTieNote);
+            addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+            addNoteOffNoItem(prevTieNote);
+            insertPortamentoNoItem(false, getTime()+absDur);
           }
           else {
-            AddTime(absDur);
+            addTime(absDur);
             delta -= absDur;
-            AddNoteOff(beginOffset, curOffset - beginOffset, prevTieNote, "Note Off (tied)");
-            AddPortamentoNoItem(false);
+            addNoteOff(beginOffset, curOffset - beginOffset, prevTieNote, "Note Off (tied)");
+            addPortamentoNoItem(false);
           }
         }
         else {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+          addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
         }
         bPrevNoteTie = false;
       }
     }
     else {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Rest", "", CLR_REST);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Rest", "", CLR_REST);
     }
-    AddTime(delta);
+    addTime(delta);
   }
   else {
     int loopNum;
     switch (status_byte) {
       case 0x00 :
         noteState ^= 0x20;
-        AddGenericEvent(beginOffset,
+        addGenericEvent(beginOffset,
                         curOffset - beginOffset,
                         "Note State xor 0x20 (change duration table)",
                         "",
@@ -135,7 +135,7 @@ bool CPSTrackV1::ReadEvent() {
         break;
       case 0x01 :
         noteState ^= 0x40;
-        AddGenericEvent(beginOffset,
+        addGenericEvent(beginOffset,
                         curOffset - beginOffset,
                         "Note State xor 0x40 (Toggle tie)",
                         "",
@@ -143,7 +143,7 @@ bool CPSTrackV1::ReadEvent() {
         break;
       case 0x02 :
         noteState |= (1 << 4);
-        AddGenericEvent(beginOffset,
+        addGenericEvent(beginOffset,
                         curOffset - beginOffset,
                         "Note State |= 0x10 (change duration table)",
                         "",
@@ -151,7 +151,7 @@ bool CPSTrackV1::ReadEvent() {
         break;
       case 0x03 :
         noteState ^= 8;
-        AddGenericEvent(beginOffset,
+        addGenericEvent(beginOffset,
                         curOffset - beginOffset,
                         "Note State xor 8 (change octave)",
                         "",
@@ -160,8 +160,8 @@ bool CPSTrackV1::ReadEvent() {
 
       case 0x04 :
         noteState &= 0x97;
-        noteState |= GetByte(curOffset++);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Change Note State (& 0x97)", "", CLR_CHANGESTATE);
+        noteState |= readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Change Note State (& 0x97)", "", CLR_CHANGESTATE);
         break;
 
       case 0x05 : {
@@ -169,8 +169,8 @@ bool CPSTrackV1::ReadEvent() {
           // This byte is clearly the desired BPM, however there is a loss of resolution when the driver
           // converts this value because it is represented with 16 bits... See the table in sfa3 at 0x3492.
           // I've decided to keep the desired BPM rather than use the exact tempo value from the table
-          uint8_t tempo = GetByte(curOffset++);
-          AddTempoBPM(beginOffset, curOffset - beginOffset, tempo);
+          uint8_t tempo = readByte(curOffset++);
+          addTempoBPM(beginOffset, curOffset - beginOffset, tempo);
         }
         else {
           // In versions < 1.40, the tempo value is represented as the number of ticks to subtract
@@ -182,48 +182,48 @@ bool CPSTrackV1::ReadEvent() {
           // First we calculate the iterations per beat: (48 << 8) / ticks per iteration
           // Then we calculate the seconds per beat: iterations per beat / DRIVER_RATE_IN_HZ
           // Convert to microseconds and we're good to go.
-          uint16_t ticks_per_iteration = GetShortBE(curOffset);
+          uint16_t ticks_per_iteration = getShortBE(curOffset);
           curOffset += 2;
-          auto internal_ppqn = parentSeq->GetPPQN() << 8;
+          auto internal_ppqn = parentSeq->ppqn() << 8;
           auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
           const uint32_t micros_per_beat = lround((iterations_per_beat / CPS2_DRIVER_RATE_HZ) * 1000000);
-          AddTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
+          addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
         }
         break;
       }
 
       case 0x06 :
-        noteDuration = GetByte(curOffset++);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", CLR_CHANGESTATE);
+        noteDuration = readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", CLR_CHANGESTATE);
         break;
 
       case 0x07 :
         switch (channelSynth) {
           case QSOUND:
-            vol = GetByte(curOffset++);
-            vol = ConvertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
-            this->AddVol(beginOffset, curOffset - beginOffset, vol);
+            vol = readByte(curOffset++);
+            vol = convertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
+            this->addVol(beginOffset, curOffset - beginOffset, vol);
             break;
           case OKIM6295: {
             constexpr uint8_t okiAttenTable[16] = { 32, 22, 16, 11, 8, 6, 4, 3, 2, 0, 0, 0, 0, 0, 0, 0};
-            vol = 8 - GetByte(curOffset++);
-            vol = ConvertPercentAmpToStdMidiVal(static_cast<double>(okiAttenTable[vol & 0xF]/32.0));
-            this->AddVol(beginOffset, curOffset - beginOffset, vol);
+            vol = 8 - readByte(curOffset++);
+            vol = convertPercentAmpToStdMidiVal(static_cast<double>(okiAttenTable[vol & 0xF]/32.0));
+            this->addVol(beginOffset, curOffset - beginOffset, vol);
             break;
           }
           case YM2151:
             curOffset++;
             vol = 0;
-            this->AddVol(beginOffset, curOffset - beginOffset, vol);
+            this->addVol(beginOffset, curOffset - beginOffset, vol);
             break;
         }
         break;
 
       case 0x08 : {
-        uint8_t progNum = GetByte(curOffset++);
+        uint8_t progNum = readByte(curOffset++);
         //if (((CPSSeq*)parentSeq)->fmt_version < VER_116) {
-        AddBankSelectNoItem((bank * 2) + (progNum / 128));
-        AddProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
+        addBankSelectNoItem((bank * 2) + (progNum / 128));
+        addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
         //}
         //else
         //	AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
@@ -233,8 +233,8 @@ bool CPSTrackV1::ReadEvent() {
       //effectively sets the octave
       case 0x09 :
         noteState &= 0xF8;
-        noteState |= GetByte(curOffset++);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Set Octave", "", CLR_CHANGESTATE);
+        noteState |= readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Octave", "", CLR_CHANGESTATE);
         break;
 
       // Global Transpose
@@ -244,23 +244,23 @@ bool CPSTrackV1::ReadEvent() {
           curOffset++;
           break;
         }
-        int8_t globalTranspose = GetByte(curOffset++);
-        AddGlobalTranspose(beginOffset, curOffset - beginOffset, globalTranspose);
+        int8_t globalTranspose = readByte(curOffset++);
+        addGlobalTranspose(beginOffset, curOffset - beginOffset, globalTranspose);
         break;
       }
 
       //Transpose
       case 0x0B :
-        transpose = GetByte(curOffset++);
-        AddTranspose(beginOffset, curOffset - beginOffset, transpose);
+        transpose = readByte(curOffset++);
+        addTranspose(beginOffset, curOffset - beginOffset, transpose);
         break;
 
       //Pitch bend - only gets applied at Note-on, but don't care.  It's used mostly as a detune for chorus effect
       // pitch bend value is a signed byte with a range of +/- 50 cents.
       case 0x0C : {
-        uint8_t pitchbend = GetByte(curOffset++);
+        uint8_t pitchbend = readByte(curOffset++);
         //double cents = (pitchbend / 256.0) * 100;
-        AddMarker(beginOffset,
+        addMarker(beginOffset,
                   curOffset - beginOffset,
                   std::string("pitchbend"),
                   pitchbend,
@@ -274,14 +274,14 @@ bool CPSTrackV1::ReadEvent() {
       case 0x0D : {
         // Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every 1/(250/4) seconds until we hit target key.
         // A portamento rate value of 0 means instantaneous slide
-        uint8_t portamentoRate = GetByte(curOffset++);
+        uint8_t portamentoRate = readByte(curOffset++);
         if (portamentoRate != 0) {
           auto centsPerSecond = static_cast<uint16_t>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
           portamentoCentsPerSec = centsPerSecond;
         } else {
           portamentoCentsPerSec = 0;
         }
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", CLR_PORTAMENTOTIME);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", CLR_PORTAMENTOTIME);
         break;
       }
 
@@ -304,7 +304,7 @@ bool CPSTrackV1::ReadEvent() {
         if (loop[loopNum] == 0 && loopOffset[loopNum] == 0)                        //first time hitting loop
         {
           loopOffset[loopNum] = curOffset;
-          loop[loopNum] = GetByte(curOffset++);    //set the number of times to loop
+          loop[loopNum] = readByte(curOffset++);    //set the number of times to loop
           bInLoop = true;
         }
         else if (loopOffset[loopNum] != curOffset) {
@@ -327,7 +327,7 @@ bool CPSTrackV1::ReadEvent() {
         {
           uint32_t jump;
           if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
-            jump = GetShortBE(curOffset);
+            jump = getShortBE(curOffset);
             curOffset += 2;
 
             // sf2ce seq 0x84 seems to have a bug at D618
@@ -337,16 +337,16 @@ bool CPSTrackV1::ReadEvent() {
             }
           }
           else {
-            if ((GetByte(curOffset) & 0x80) == 0) {
-              uint8_t jumpByte = GetByte(curOffset++);
+            if ((readByte(curOffset) & 0x80) == 0) {
+              uint8_t jumpByte = readByte(curOffset++);
               jump = curOffset - jumpByte;
             } else {
-              jump = curOffset + 2 + static_cast<int16_t>(GetShortBE(curOffset));
+              jump = curOffset + 2 + static_cast<int16_t>(getShortBE(curOffset));
               curOffset += 2;
             }
           }
 
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
 
           if (loop[loopNum] == 0) {
             bInLoop = false;
@@ -379,11 +379,11 @@ bool CPSTrackV1::ReadEvent() {
           loop[loopNum] = 0;
           loopOffset[loopNum] = 0;
           noteState &= 0x97;
-          noteState |= GetByte(curOffset++);
+          noteState |= readByte(curOffset++);
           {
-            uint16_t jump = GetShortBE(curOffset);
+            uint16_t jump = getShortBE(curOffset);
             curOffset += 2;
-            AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP);
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP);
 
             if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
               curOffset = jump;
@@ -401,16 +401,16 @@ bool CPSTrackV1::ReadEvent() {
       case 0x16 : {
         uint32_t jump;
         if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
-          jump = GetShortBE(curOffset);
+          jump = getShortBE(curOffset);
         }
         else {
-          jump = curOffset + 2 + static_cast<int16_t>(GetShortBE(curOffset));
+          jump = curOffset + 2 + static_cast<int16_t>(getShortBE(curOffset));
         }
-        bool should_continue = AddLoopForever(beginOffset, 3);
+        bool should_continue = addLoopForever(beginOffset, 3);
         if (readMode == READMODE_ADD_TO_UI) {
           curOffset += 2;
-          if (GetByte(curOffset) == 0x17) {
-            AddEndOfTrack(curOffset, 1);
+          if (readByte(curOffset) == 0x17) {
+            addEndOfTrack(curOffset, 1);
           }
         }
         curOffset = jump;
@@ -418,36 +418,36 @@ bool CPSTrackV1::ReadEvent() {
       }
 
       case 0x17 :
-        AddEndOfTrack(beginOffset, curOffset - beginOffset);
+        addEndOfTrack(beginOffset, curOffset - beginOffset);
         return false;
 
       // pan
       case 0x18 : {
         //the pan value is b/w 0 and 0x20.  0 - hard left, 0x10 - center, 0x20 - hard right
-        uint8_t pan = GetByte(curOffset++) * 4;
+        uint8_t pan = readByte(curOffset++) * 4;
         if (pan != 0)
           pan--;
-        this->AddPan(beginOffset, curOffset - beginOffset, pan);
+        this->addPan(beginOffset, curOffset - beginOffset, pan);
         break;
       }
 
       case 0x19 :
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Reg9 Event (unknown to MAME)");
+        addUnknown(beginOffset, curOffset - beginOffset, "Reg9 Event (unknown to MAME)");
         break;
 
       case 0x1A : {
-        vol = GetByte(curOffset++);
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", CLR_UNKNOWN);
+        vol = readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", CLR_UNKNOWN);
         //this->AddMasterVol(beginOffset, curOffset-beginOffset, vol);
         break;
       }
 
       //Vibrato depth...
       case 0x1B :
-        if (GetVersion() < VER_171) {
-          uint8_t vibratoDepth = GetByte(curOffset++);
-          AddMarker(beginOffset,
+        if (version() < VER_171) {
+          uint8_t vibratoDepth = readByte(curOffset++);
+          addMarker(beginOffset,
                     curOffset - beginOffset,
                     std::string("vibrato"),
                     vibratoDepth,
@@ -458,12 +458,12 @@ bool CPSTrackV1::ReadEvent() {
         }
         else {
           // First data byte defines behavior 0-3
-          uint8_t type = GetByte(curOffset++);
-          uint8_t data = GetByte(curOffset++);
+          uint8_t type = readByte(curOffset++);
+          uint8_t data = readByte(curOffset++);
           switch (type) {
             // vibrato
             case 0:
-              AddMarker(beginOffset,
+              addMarker(beginOffset,
                         curOffset - beginOffset,
                         std::string("vibrato"),
                         data,
@@ -475,7 +475,7 @@ bool CPSTrackV1::ReadEvent() {
 
             // tremelo
             case 1:
-              AddMarker(beginOffset,
+              addMarker(beginOffset,
                         curOffset - beginOffset,
                         std::string("tremelo"),
                         data,
@@ -487,7 +487,7 @@ bool CPSTrackV1::ReadEvent() {
 
             // LFO rate
             case 2:
-              AddMarker(beginOffset,
+              addMarker(beginOffset,
                         curOffset - beginOffset,
                         std::string("lfo"),
                         data,
@@ -499,7 +499,7 @@ bool CPSTrackV1::ReadEvent() {
 
             // LFO reset
             case 3:
-              AddMarker(beginOffset,
+              addMarker(beginOffset,
                         curOffset - beginOffset,
                         std::string("resetlfo"),
                         data,
@@ -514,9 +514,9 @@ bool CPSTrackV1::ReadEvent() {
         }
         break;
       case 0x1C :
-        if (GetVersion() < VER_171) {
-          const uint8_t tremeloDepth = GetByte(curOffset++);
-          AddMarker(beginOffset,
+        if (version() < VER_171) {
+          const uint8_t tremeloDepth = readByte(curOffset++);
+          addMarker(beginOffset,
                     curOffset - beginOffset,
                     std::string("tremelo"),
                     tremeloDepth,
@@ -528,15 +528,15 @@ bool CPSTrackV1::ReadEvent() {
         else {
           // I'm not sure at all about the behavior here, need to test
           curOffset += 2;
-          AddUnknown(beginOffset, curOffset - beginOffset);
+          addUnknown(beginOffset, curOffset - beginOffset);
         }
         break;
 
       // LFO rate (for versions < 1.71)
       case 0x1D : {
-        uint8_t rate = GetByte(curOffset++);
-        if (GetVersion() < VER_171)
-          AddMarker(beginOffset,
+        uint8_t rate = readByte(curOffset++);
+        if (version() < VER_171)
+          addMarker(beginOffset,
                     curOffset - beginOffset,
                     std::string("lfo"),
                     rate,
@@ -545,15 +545,15 @@ bool CPSTrackV1::ReadEvent() {
                     PRIORITY_MIDDLE,
                     CLR_LFO);
         else
-          AddUnknown(beginOffset, curOffset - beginOffset, "NOP");
+          addUnknown(beginOffset, curOffset - beginOffset, "NOP");
         break;
       }
 
       // Reset LFO state (for versions < 1.71)
       case 0x1E : {
-        uint8_t data = GetByte(curOffset++);
-        if (GetVersion() < VER_171)
-          AddMarker(beginOffset,
+        uint8_t data = readByte(curOffset++);
+        if (version() < VER_171)
+          addMarker(beginOffset,
                     curOffset - beginOffset,
                     std::string("resetlfo"),
                     data,
@@ -562,19 +562,19 @@ bool CPSTrackV1::ReadEvent() {
                     PRIORITY_MIDDLE,
                     CLR_LFO);
         else
-          AddUnknown(beginOffset, curOffset - beginOffset, "NOP");
+          addUnknown(beginOffset, curOffset - beginOffset, "NOP");
       }
       break;
       case 0x1F : {
-        uint8_t value = GetByte(curOffset++);
+        uint8_t value = readByte(curOffset++);
         if (static_cast<CPSSeq*>(parentSeq)->fmt_version < VER_116) {
-          AddBankSelectNoItem(2 + (value / 128));
-          AddProgramChange(beginOffset, curOffset - beginOffset, value % 128);
+          addBankSelectNoItem(2 + (value / 128));
+          addProgramChange(beginOffset, curOffset - beginOffset, value % 128);
         }
         else {
           bank = value;
-          AddBankSelectNoItem(bank * 2);
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "Bank Change", "", CLR_PROGCHANGE);
+          addBankSelectNoItem(bank * 2);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Bank Change", "", CLR_PROGCHANGE);
         }
 
         break;
@@ -582,26 +582,26 @@ bool CPSTrackV1::ReadEvent() {
 
       case 0x20 :
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+        addUnknown(beginOffset, curOffset - beginOffset);
         break;
 
       case 0x21 :
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+        addUnknown(beginOffset, curOffset - beginOffset);
         break;
 
       case 0x22 :
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+        addUnknown(beginOffset, curOffset - beginOffset);
         break;
 
       case 0x23 :
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset);
+        addUnknown(beginOffset, curOffset - beginOffset);
         break;
 
       default :
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", CLR_UNRECOGNIZED);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", CLR_UNRECOGNIZED);
     }
   }
   return true;

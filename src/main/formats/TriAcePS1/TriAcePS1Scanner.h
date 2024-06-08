@@ -14,8 +14,8 @@ class TriAcePS1Scanner : public VGMScanner {
   TriAcePS1Scanner();
   ~TriAcePS1Scanner();
 
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForSLZSeq(RawFile *file);
-  void SearchForInstrSet(RawFile *file, std::vector<TriAcePS1InstrSet *> &instrsets);
-  TriAcePS1Seq *TriAceSLZDecompress(RawFile *file, uint32_t cfOff);
+  virtual void scan(RawFile *file, void *info = 0);
+  void searchForSLZSeq(RawFile *file);
+  void searchForInstrSet(RawFile *file, std::vector<TriAcePS1InstrSet *> &instrsets);
+  TriAcePS1Seq *decompressTriAceSLZFile(RawFile *file, uint32_t cfOff);
 };

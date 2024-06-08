@@ -5,10 +5,10 @@
  */
 #include "Scanner.h"
 
-bool VGMScanner::Init() {
+bool VGMScanner::init() {
   return true;
 }
 
-void VGMScanner::InitiateScan(RawFile *file, void *offset) {
-  this->Scan(file, offset);
+void VGMScanner::initiateScan(RawFile *file, void *offset) {
+  this->scan(file, offset);
 }

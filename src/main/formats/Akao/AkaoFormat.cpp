@@ -35,11 +35,11 @@ bool AkaoColl::loadMain() {
         else
           art = &sampcoll->akArts[rgn->artNum - sampcoll->starting_art_id];
       }
-      rgn->SetSampNum(art->sample_num);
+      rgn->setSampNum(art->sample_num);
       if (art->loop_point != 0)
-        rgn->SetLoopInfo(1, art->loop_point, sampcoll->samples[rgn->sampNum]->dataLength - art->loop_point);
+        rgn->setLoopInfo(1, art->loop_point, sampcoll->samples[rgn->sampNum]->dataLength - art->loop_point);
 
-      PSXConvADSR<AkaoRgn>(rgn, art->ADSR1, art->ADSR2, false);
+      psxConvADSR<AkaoRgn>(rgn, art->ADSR1, art->ADSR2, false);
       if (instr->bDrumKit)
         rgn->unityKey = art->unityKey + rgn->keyLow - rgn->drumRelUnityKey;
       else
@@ -69,16 +69,16 @@ void AkaoColl::preSynthFileCreation() {
 
     AkaoRgn *rgn = new AkaoRgn(newInstr, 0, 0);
 
-    rgn->SetSampNum(art->sample_num);
+    rgn->setSampNum(art->sample_num);
     if (art->loop_point != 0)
-      rgn->SetLoopInfo(1, art->loop_point, sampcoll->samples[rgn->sampNum]->dataLength - art->loop_point);
+      rgn->setLoopInfo(1, art->loop_point, sampcoll->samples[rgn->sampNum]->dataLength - art->loop_point);
 
-    PSXConvADSR<AkaoRgn>(rgn, art->ADSR1, art->ADSR2, false);
+    psxConvADSR<AkaoRgn>(rgn, art->ADSR1, art->ADSR2, false);
 
     rgn->unityKey = art->unityKey;
     rgn->fineTune = art->fineTune;
 
-    newInstr->AddRgn(rgn);
+    newInstr->addRgn(rgn);
 
     instrSet->aInstrs.push_back(newInstr);
   }

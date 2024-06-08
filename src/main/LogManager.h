@@ -21,7 +21,7 @@ protected:
   void sink_it_(const spdlog::details::log_msg& msg) override {
     auto level = convertSpdlogLevel(msg.level);
     auto logItem = new LogItem( fmt::to_string(msg.payload), level, msg.source.filename);
-    pRoot->Log(logItem);
+    pRoot->log(logItem);
   }
 
   void flush_() override {}
@@ -30,7 +30,7 @@ protected:
 // Singleton LogManager class
 class LogManager {
 public:
-  static LogManager& Instance() {
+  static LogManager& the() {
     static LogManager instance;
     return instance;
   }
@@ -65,7 +65,7 @@ private:
 };
 
 // Logging Macros
-#define L_LOG(level, ...) LogManager::Instance().log(level, THIS_FILE_NAME, __LINE__, __VA_ARGS__)
+#define L_LOG(level, ...) LogManager::the().log(level, THIS_FILE_NAME, __LINE__, __VA_ARGS__)
 #define L_ERROR(...) L_LOG(spdlog::level::err, __VA_ARGS__)
 #define L_WARN(...) L_LOG(spdlog::level::warn, __VA_ARGS__)
 #define L_INFO(...) L_LOG(spdlog::level::info, __VA_ARGS__)

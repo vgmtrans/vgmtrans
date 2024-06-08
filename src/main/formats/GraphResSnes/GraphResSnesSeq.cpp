@@ -21,26 +21,26 @@ static constexpr uint8_t NOTE_VELOCITY = 100;
 GraphResSnesSeq::GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_t seqdataOffset, std::string name)
     : VGMSeq(GraphResSnesFormat::name, file, seqdataOffset, 0, std::move(name)), version(ver) {
   bLoadTickByTick = true;
-  bAllowDiscontinuousTrackData = true;
-  bUseLinearAmplitudeScale = true;
+  setAllowDiscontinuousTrackData(true);
+  setUseLinearAmplitudeScale(true);
 
-  AlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * SEQ_PPQN)); // good ol' frame-based sequence!
+  setAlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * SEQ_PPQN)); // good ol' frame-based sequence!
 
-  UseReverb();
-  AlwaysWriteInitialReverb(0);
+  useReverb();
+  setAlwaysWriteInitialReverb(0);
 
-  LoadEventMap();
+  loadEventMap();
 }
 
 GraphResSnesSeq::~GraphResSnesSeq() {
 }
 
-void GraphResSnesSeq::ResetVars() {
-  VGMSeq::ResetVars();
+void GraphResSnesSeq::resetVars() {
+  VGMSeq::resetVars();
 }
 
-bool GraphResSnesSeq::GetHeaderInfo() {
-  SetPPQN(SEQ_PPQN);
+bool GraphResSnesSeq::parseHeader() {
+  setPPQN(SEQ_PPQN);
 
   VGMHeader *header = addHeader(dwOffset, 3 * MAX_TRACKS);
   if (dwOffset + header->unLength > 0x10000) {
@@ -52,7 +52,7 @@ bool GraphResSnesSeq::GetHeaderInfo() {
     std::stringstream trackName;
     trackName << "Track Pointer " << (trackIndex + 1);
 
-    bool trackUsed = (GetByte(curOffset) != 0);
+    bool trackUsed = (readByte(curOffset) != 0);
     if (trackUsed) {
       header->addChild(curOffset, 1, "Enable Track");
     }
@@ -67,12 +67,12 @@ bool GraphResSnesSeq::GetHeaderInfo() {
 }
 
 
-bool GraphResSnesSeq::GetTrackPointers(void) {
+bool GraphResSnesSeq::parseTrackPointers(void) {
   uint32_t curOffset = dwOffset;
-  uint16_t addrTrackBase = GetShort(dwOffset + 1);
+  uint16_t addrTrackBase = readShort(dwOffset + 1);
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    bool trackUsed = (GetByte(curOffset++) != 0);
-    uint16_t addrTrackStartVirt = GetShort(curOffset);
+    bool trackUsed = (readByte(curOffset++) != 0);
+    uint16_t addrTrackStartVirt = readShort(curOffset);
     curOffset += 2;
     uint16_t addrTrackStart = 24 + addrTrackStartVirt - addrTrackBase + dwOffset;
 
@@ -85,7 +85,7 @@ bool GraphResSnesSeq::GetTrackPointers(void) {
   return true;
 }
 
-void GraphResSnesSeq::LoadEventMap() {
+void GraphResSnesSeq::loadEventMap() {
   int statusByte;
 
   for (statusByte = 0x00; statusByte <= 0x7f; statusByte++) {
@@ -141,13 +141,13 @@ void GraphResSnesSeq::LoadEventMap() {
 
 GraphResSnesTrack::GraphResSnesTrack(GraphResSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
-  GraphResSnesTrack::ResetVars();
+  GraphResSnesTrack::resetVars();
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
 }
 
-void GraphResSnesTrack::ResetVars(void) {
-  SeqTrack::ResetVars();
+void GraphResSnesTrack::resetVars(void) {
+  SeqTrack::resetVars();
 
   prevNoteKey = -1;
   prevNoteSlurred = false;
@@ -164,7 +164,7 @@ void GraphResSnesTrack::ResetVars(void) {
   }
 }
 
-bool GraphResSnesTrack::ReadEvent(void) {
+bool GraphResSnesTrack::readEvent(void) {
   GraphResSnesSeq *parentSeq = static_cast<GraphResSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
@@ -172,7 +172,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
     return false;
   }
 
-  uint8_t statusByte = GetByte(curOffset++);
+  uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
@@ -186,40 +186,40 @@ bool GraphResSnesTrack::ReadEvent(void) {
   switch (eventType) {
     case EVENT_UNKNOWN0:
       desc = describeUnknownEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
-      uint8_t arg4 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
+      uint8_t arg4 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -229,7 +229,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
 
       uint8_t len;
       if (hasLength) {
-        len = GetByte(curOffset++);
+        len = readByte(curOffset++);
       }
       else {
         len = defaultNoteLength;
@@ -239,13 +239,13 @@ bool GraphResSnesTrack::ReadEvent(void) {
       uint8_t dur = max(min(len * durRate / 8, len - 1), 1);
 
       if (key == 7) {
-        AddRest(beginOffset, curOffset - beginOffset, len);
+        addRest(beginOffset, curOffset - beginOffset, len);
         prevNoteKey = -1;
       }
       else if (key == 15) {
         // undefined event
-        AddUnknown(beginOffset, curOffset - beginOffset);
-        AddTime(len);
+        addUnknown(beginOffset, curOffset - beginOffset);
+        addTime(len);
         prevNoteKey = -1;
       }
       else {
@@ -262,25 +262,25 @@ bool GraphResSnesTrack::ReadEvent(void) {
         int8_t midiKey = (octave * 12) + NOTE_KEY_TABLE[key];
         if (prevNoteSlurred && midiKey == prevNoteKey) {
           desc = fmt::format("Duration: {:d}", dur);
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, CLR_TIE, ICON_NOTE);
-          MakePrevDurNoteEnd(GetTime() + dur);
-          AddTime(len);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, CLR_TIE, ICON_NOTE);
+          makePrevDurNoteEnd(getTime() + dur);
+          addTime(len);
         }
         else {
-          AddNoteByDur(beginOffset,
+          addNoteByDur(beginOffset,
                        curOffset - beginOffset,
                        midiKey,
                        NOTE_VELOCITY,
                        dur,
                        hasLength ? "Note with Duration" : "Note");
-          AddTime(len);
+          addTime(len);
         }
 
         prevNoteKey = midiKey;
       }
 
       // handle the next slur/tie event here
-      if (curOffset + 1 <= 0x10000 && GetByte(curOffset) == 0xfe) {
+      if (curOffset + 1 <= 0x10000 && readByte(curOffset) == 0xfe) {
         prevNoteSlurred = true;
       }
       else {
@@ -292,51 +292,51 @@ bool GraphResSnesTrack::ReadEvent(void) {
 
     case EVENT_INSTANT_VOLUME: {
       uint8_t vol = statusByte & 15;
-      AddVol(beginOffset, curOffset - beginOffset, vol);
+      addVol(beginOffset, curOffset - beginOffset, vol);
       break;
     }
 
     case EVENT_INSTANT_OCTAVE: {
       octave = statusByte & 15;
       desc = fmt::format("Octave {:d}", octave);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc, CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc, CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_TRANSPOSE: {
-      int8_t newTranspose = GetByte(curOffset++);
-      AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+      int8_t newTranspose = readByte(curOffset++);
+      addTranspose(beginOffset, curOffset - beginOffset, newTranspose);
       break;
     }
 
     case EVENT_MASTER_VOLUME: {
-      int8_t newVolL = GetByte(curOffset++);
-      int8_t newVolR = GetByte(curOffset++);
+      int8_t newVolL = readByte(curOffset++);
+      int8_t newVolR = readByte(curOffset++);
       int8_t newVol = min(abs((int) newVolL) + abs((int) newVolR), 255) / 2; // workaround: convert to mono
-      AddMasterVol(beginOffset, curOffset - beginOffset, newVol, "Master Volume L/R");
+      addMasterVol(beginOffset, curOffset - beginOffset, newVol, "Master Volume L/R");
       break;
     }
 
     case EVENT_ECHO_VOLUME: {
-      int8_t newVolL = GetByte(curOffset++);
-      int8_t newVolR = GetByte(curOffset++);
+      int8_t newVolL = readByte(curOffset++);
+      int8_t newVolR = readByte(curOffset++);
       desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", newVolL, newVolR);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_INC_OCTAVE: {
-      AddIncrementOctave(beginOffset, curOffset - beginOffset);
+      addIncrementOctave(beginOffset, curOffset - beginOffset);
       break;
     }
 
     case EVENT_DEC_OCTAVE: {
-      AddDecrementOctave(beginOffset, curOffset - beginOffset);
+      addDecrementOctave(beginOffset, curOffset - beginOffset);
       break;
     }
 
     case EVENT_LOOP_START: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "", desc, CLR_LOOP, ICON_STARTREP);
 
       if (loopStackPtr == 0) {
         // stack overflow
@@ -349,12 +349,12 @@ bool GraphResSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_LOOP_END: {
-      int8_t count = GetByte(curOffset++);
-      uint16_t dest = GetShort(curOffset);
+      int8_t count = readByte(curOffset++);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       dest += beginOffset; // relative offset to address
       desc = fmt::format("Times: {:d}  Destination: ${:04X}", count, dest);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, CLR_LOOP, ICON_ENDREP);
 
       if (loopStackPtr >= GRAPHRESSNES_LOOP_LEVEL_MAX) {
         // access violation
@@ -386,35 +386,35 @@ bool GraphResSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_DURATION_RATE: {
-      uint8_t newDurationRate = GetByte(curOffset++);
+      uint8_t newDurationRate = readByte(curOffset++);
       durationRate = newDurationRate;
       desc = fmt::format("Duration Rate: {:d}/8", newDurationRate);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, CLR_DURNOTE);
       break;
     }
 
     case EVENT_DSP_WRITE: {
-      uint8_t dspReg = GetByte(curOffset++);
-      uint8_t dspValue = GetByte(curOffset++);
+      uint8_t dspReg = readByte(curOffset++);
+      uint8_t dspValue = readByte(curOffset++);
       desc = fmt::format("Register: ${:02X}  Value: ${:d}", dspReg, dspValue);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Write to DSP", desc, CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Write to DSP", desc, CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_NOISE_TOGGLE: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On/Off", desc, CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On/Off", desc, CLR_CHANGESTATE, ICON_CONTROL);
       break;
     }
 
     case EVENT_VOLUME: {
-      int8_t newVol = GetByte(curOffset++);
-      AddVol(beginOffset, curOffset - beginOffset, min(abs((int) newVol), 127));
+      int8_t newVol = readByte(curOffset++);
+      addVol(beginOffset, curOffset - beginOffset, min(abs((int) newVol), 127));
       break;
     }
 
     case EVENT_MASTER_VOLUME_FADE: {
-      uint8_t vol = GetByte(curOffset++);
-      AddGenericEvent(beginOffset,
+      uint8_t vol = readByte(curOffset++);
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Master Volume Fade",
                       fmt::format("Delta Volume: {:d}", vol),
@@ -424,7 +424,7 @@ bool GraphResSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_PAN: {
-      spcPan = GetByte(curOffset++);
+      spcPan = readByte(curOffset++);
       int8_t pan = min(max(spcPan, static_cast<int8_t>(-15)), static_cast<int8_t>(15));
 
       double volumeLeft;
@@ -438,25 +438,25 @@ bool GraphResSnesTrack::ReadEvent(void) {
         volumeRight = (15 + pan) / 15.0;
       }
 
-      uint8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight);
+      uint8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight);
 
       // TODO: apply volume scale
-      AddPan(beginOffset, curOffset - beginOffset, midiPan);
+      addPan(beginOffset, curOffset - beginOffset, midiPan);
       break;
     }
 
     case EVENT_ADSR: {
-      uint16_t newADSR = GetShort(curOffset);
+      uint16_t newADSR = readShort(curOffset);
       curOffset += 2;
       spcADSR = newADSR;
 
       desc = fmt::format("ADSR: {:04X}", newADSR);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_RET: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc, CLR_LOOP, ICON_ENDREP);
 
       if (callStackPtr == 0) {
         // access violation
@@ -469,12 +469,12 @@ bool GraphResSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_CALL: {
-      uint16_t dest = GetShort(curOffset);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       dest += beginOffset; // relative offset to address
 
       desc = fmt::format("Destination: ${:04X}", dest);
-      AddGenericEvent(beginOffset, 3, "Pattern Play", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, 3, "Pattern Play", desc, CLR_LOOP, ICON_STARTREP);
 
       if (callStackPtr >= GRAPHRESSNES_CALLSTACK_SIZE) {
         // stack overflow
@@ -492,48 +492,48 @@ bool GraphResSnesTrack::ReadEvent(void) {
     }
 
     case EVENT_GOTO: {
-      uint16_t dest = GetShort(curOffset);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       dest += beginOffset; // relative offset to address
       desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;
-      if (!IsOffsetUsed(dest)) {
-        AddGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
+      if (!isOffsetUsed(dest)) {
+        addGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
       }
       else {
-        bContinue = AddLoopForever(beginOffset, length, "Jump");
+        bContinue = addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
 
     case EVENT_PROGCHANGE: {
-      uint8_t newProg = GetByte(curOffset++);
+      uint8_t newProg = readByte(curOffset++);
       spcInstr = newProg;
-      AddProgramChange(beginOffset, curOffset - beginOffset, newProg, true);
+      addProgramChange(beginOffset, curOffset - beginOffset, newProg, true);
       break;
     }
 
     case EVENT_DEFAULT_LENGTH: {
-      defaultNoteLength = GetByte(curOffset++);
+      defaultNoteLength = readByte(curOffset++);
       desc = fmt::format("Duration: {:d}", defaultNoteLength);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Default Note Length", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Default Note Length", desc, CLR_DURNOTE);
       break;
     }
 
     case EVENT_SLUR:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc, CLR_TIE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc, CLR_TIE);
       break;
 
     case EVENT_END:
-      AddEndOfTrack(beginOffset, curOffset - beginOffset);
+      addEndOfTrack(beginOffset, curOffset - beginOffset);
       bContinue = false;
       break;
 
     default: {
       auto descr = logEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       bContinue = false;
       break;
     }

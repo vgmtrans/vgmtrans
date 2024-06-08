@@ -206,5 +206,5 @@ void MainWindow::openFileInternal(const QString& filename) {
     }
   }
 
-  qtVGMRoot.OpenRawFile(filename.toStdString());
+  qtVGMRoot.openRawFile(filename.toStdString());
 }

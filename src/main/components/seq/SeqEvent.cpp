@@ -18,7 +18,7 @@ SeqEvent::SeqEvent(SeqTrack *pTrack,
                    Icon icon,
                    const std::string &desc)
     : VGMItem(pTrack->parentSeq, offset, length, name, color), channel(0),
-      parentTrack(pTrack), icon(icon), desc(desc) {}
+      parentTrack(pTrack), m_icon(icon), m_description(desc) {}
 
 // ***************
 // DurNoteSeqEvent
@@ -200,9 +200,9 @@ PitchBendSeqEvent::PitchBendSeqEvent(SeqTrack *pTrack,
 // PitchBendRangeSeqEvent
 // **********************
 
-PitchBendRangeSeqEvent::PitchBendRangeSeqEvent(SeqTrack *pTrack, uint8_t theSemiTones, uint8_t theCents,
+PitchBendRangeSeqEvent::PitchBendRangeSeqEvent(SeqTrack *pTrack, uint16_t cents,
                                                uint32_t offset, uint32_t length, const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, CLR_PITCHBENDRANGE), semitones(theSemiTones), cents(theCents) { }
+    : SeqEvent(pTrack, offset, length, name, CLR_PITCHBENDRANGE), m_cents(cents) { }
 
 // ******************
 // FineTuningSeqEvent
@@ -210,7 +210,7 @@ PitchBendRangeSeqEvent::PitchBendRangeSeqEvent(SeqTrack *pTrack, uint8_t theSemi
 
 FineTuningSeqEvent::FineTuningSeqEvent(SeqTrack *pTrack, double cents,
                                        uint32_t offset, uint32_t length, const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, CLR_MISC), cents(cents) { }
+    : SeqEvent(pTrack, offset, length, name, CLR_MISC), m_cents(cents) { }
 
 // ****************************
 // ModulationDepthRangeSeqEvent
@@ -218,7 +218,7 @@ FineTuningSeqEvent::FineTuningSeqEvent(SeqTrack *pTrack, double cents,
 
 ModulationDepthRangeSeqEvent::ModulationDepthRangeSeqEvent(SeqTrack *pTrack, double semitones,
                                                            uint32_t offset, uint32_t length, const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, CLR_MISC), semitones(semitones) { }
+    : SeqEvent(pTrack, offset, length, name, CLR_MISC), m_semitones(semitones) { }
 
 // *****************
 // TransposeSeqEvent
@@ -229,7 +229,7 @@ TransposeSeqEvent::TransposeSeqEvent(SeqTrack *pTrack,
                                      uint32_t offset,
                                      uint32_t length,
                                      const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, CLR_TRANSPOSE), transpose(theTranspose) { }
+    : SeqEvent(pTrack, offset, length, name, CLR_TRANSPOSE), m_transpose(theTranspose) { }
 
 // ******************
 // ModulationSeqEvent

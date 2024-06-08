@@ -31,25 +31,25 @@ CompileSnesSeq::CompileSnesSeq(RawFile *file, CompileSnesVersion ver, uint32_t s
       STATUS_DURATION_MIN(0xdf),
       STATUS_DURATION_MAX(0xee) {
   bLoadTickByTick = true;
-  bAllowDiscontinuousTrackData = true;
+  setAllowDiscontinuousTrackData(true);
 
-  LoadEventMap();
+  loadEventMap();
 }
 
 CompileSnesSeq::~CompileSnesSeq() {
 }
 
-void CompileSnesSeq::ResetVars() {
-  VGMSeq::ResetVars();
+void CompileSnesSeq::resetVars() {
+  VGMSeq::resetVars();
 }
 
-bool CompileSnesSeq::GetHeaderInfo() {
-  SetPPQN(SEQ_PPQN);
+bool CompileSnesSeq::parseHeader() {
+  setPPQN(SEQ_PPQN);
 
   VGMHeader *header = addHeader(dwOffset, 0);
 
   header->addChild(dwOffset, 1, "Number of Tracks");
-  nNumTracks = GetByte(dwOffset);
+  nNumTracks = readByte(dwOffset);
   if (nNumTracks == 0 || nNumTracks > 8) {
     return false;
   }
@@ -66,7 +66,7 @@ bool CompileSnesSeq::GetHeaderInfo() {
     trackHeader->addChild(curOffset + 3, 1, "Volume Envelope");
     trackHeader->addChild(curOffset + 4, 1, "Vibrato");
     trackHeader->addChild(curOffset + 5, 1, "Transpose");
-    trackHeader->AddTempo(curOffset + 6, 1);
+    trackHeader->addTempo(curOffset + 6, 1);
     trackHeader->addChild(curOffset + 7, 1, "Branch ID (Channel #)");
     trackHeader->addChild(curOffset + 8, 2, "Score Pointer");
     trackHeader->addChild(curOffset + 10, 1, "SRCN");
@@ -80,22 +80,22 @@ bool CompileSnesSeq::GetHeaderInfo() {
 }
 
 
-bool CompileSnesSeq::GetTrackPointers(void) {
+bool CompileSnesSeq::parseTrackPointers(void) {
   uint32_t curOffset = dwOffset + 1;
   for (uint8_t trackIndex = 0; trackIndex < nNumTracks; trackIndex++) {
-    uint16_t ofsTrackStart = GetShort(curOffset + 8);
+    uint16_t ofsTrackStart = readShort(curOffset + 8);
 
     CompileSnesTrack *track = new CompileSnesTrack(this, ofsTrackStart);
-    track->spcInitialFlags = GetByte(curOffset + 1);
-    track->spcInitialVolume = GetByte(curOffset + 2);
-    track->spcInitialTranspose = static_cast<int8_t>(GetByte(curOffset + 5));
-    track->spcInitialTempo = GetByte(curOffset + 6);
-    track->spcInitialSRCN = GetByte(curOffset + 10);
-    track->spcInitialPan = static_cast<int8_t>(GetByte(curOffset + 12));
+    track->spcInitialFlags = readByte(curOffset + 1);
+    track->spcInitialVolume = readByte(curOffset + 2);
+    track->spcInitialTranspose = static_cast<int8_t>(readByte(curOffset + 5));
+    track->spcInitialTempo = readByte(curOffset + 6);
+    track->spcInitialSRCN = readByte(curOffset + 10);
+    track->spcInitialPan = static_cast<int8_t>(readByte(curOffset + 12));
     aTracks.push_back(track);
 
     if (trackIndex == 0) {
-      AlwaysWriteInitialTempo(GetTempoInBPM(track->spcInitialTempo));
+      setAlwaysWriteInitialTempo(getTempoInBPM(track->spcInitialTempo));
     }
 
     curOffset += 14;
@@ -104,7 +104,7 @@ bool CompileSnesSeq::GetTrackPointers(void) {
   return true;
 }
 
-void CompileSnesSeq::LoadEventMap() {
+void CompileSnesSeq::loadEventMap() {
   for (unsigned int statusByte = 0x00; statusByte <= 0x7f; statusByte++) {
     EventMap[statusByte] = EVENT_NOTE;
   }
@@ -176,7 +176,7 @@ void CompileSnesSeq::LoadEventMap() {
   }
 }
 
-double CompileSnesSeq::GetTempoInBPM(uint8_t tempo) {
+double CompileSnesSeq::getTempoInBPM(uint8_t tempo) {
   // cite: <http://www6.atpages.jp/appsouko/work/TAS/doc/fps.html>
   constexpr double SNES_NTSC_FRAMERATE = 39375000.0 / 655171.0;
 
@@ -195,8 +195,8 @@ CompileSnesTrack::CompileSnesTrack(CompileSnesSeq *parentFile, uint32_t offset, 
   bWriteGenericEventAsTextEvent = false;
 }
 
-void CompileSnesTrack::ResetVars() {
-  SeqTrack::ResetVars();
+void CompileSnesTrack::resetVars() {
+  SeqTrack::resetVars();
 
   cKeyCorrection = SEQ_KEYOFS;
 
@@ -212,18 +212,18 @@ void CompileSnesTrack::ResetVars() {
   transpose = spcTranspose;
 }
 
-void CompileSnesTrack::AddInitialMidiEvents(int trackNum) {
-  SeqTrack::AddInitialMidiEvents(trackNum);
+void CompileSnesTrack::addInitialMidiEvents(int trackNum) {
+  SeqTrack::addInitialMidiEvents(trackNum);
 
   double volumeScale;
-  AddProgramChangeNoItem(spcSRCN, true);
-  AddVolNoItem(Convert7bitPercentVolValToStdMidiVal(spcVolume / 2));
-  AddPanNoItem(Convert7bitLinearPercentPanValToStdMidiVal(static_cast<uint8_t>(spcPan + 0x80) / 2, &volumeScale));
-  AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
-  AddReverbNoItem(0);
+  addProgramChangeNoItem(spcSRCN, true);
+  addVolNoItem(convert7bitPercentVolValToStdMidiVal(spcVolume / 2));
+  addPanNoItem(convert7bitLinearPercentPanValToStdMidiVal(static_cast<uint8_t>(spcPan + 0x80) / 2, &volumeScale));
+  addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
+  addReverbNoItem(0);
 }
 
-bool CompileSnesTrack::ReadEvent() {
+bool CompileSnesTrack::readEvent() {
   CompileSnesSeq *parentSeq = static_cast<CompileSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
@@ -231,7 +231,7 @@ bool CompileSnesTrack::ReadEvent() {
     return false;
   }
 
-  uint8_t statusByte = GetByte(curOffset++);
+  uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
@@ -245,77 +245,77 @@ bool CompileSnesTrack::ReadEvent() {
   switch (eventType) {
     case EVENT_UNKNOWN0:
       desc = describeUnknownEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
-      uint8_t arg4 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
+      uint8_t arg4 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN5: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
-      uint8_t arg4 = GetByte(curOffset++);
-      uint8_t arg5 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
+      uint8_t arg4 = readByte(curOffset++);
+      uint8_t arg5 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4, arg5);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_GOTO: {
-      uint16_t dest = GetShort(curOffset);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;
-      if (!IsOffsetUsed(dest)) {
-        AddGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
+      if (!isOffsetUsed(dest)) {
+        addGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
       }
       else {
-        bContinue = AddLoopForever(beginOffset, length, "Jump");
+        bContinue = addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
 
     case EVENT_LOOP_END: {
-      uint8_t repeatNest = GetByte(curOffset++);
-      uint16_t dest = GetShort(curOffset);
+      uint8_t repeatNest = readByte(curOffset++);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
 
       desc = fmt::format("Nest Level: {:d}  Destination: ${:04X}", repeatNest, dest);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat End", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat End", desc, CLR_LOOP, ICON_ENDREP);
 
       repeatCount[repeatNest]--;
       if (repeatCount[repeatNest] != 0) {
@@ -325,15 +325,15 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_END: {
-      AddEndOfTrack(beginOffset, curOffset - beginOffset);
+      addEndOfTrack(beginOffset, curOffset - beginOffset);
       bContinue = false;
       break;
     }
 
     case EVENT_VIBRATO: {
-      uint8_t envelopeIndex = GetByte(curOffset++);
+      uint8_t envelopeIndex = readByte(curOffset++);
       desc = fmt::format("Envelope Index: {:d}", envelopeIndex);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Vibrato",
                       desc,
@@ -343,9 +343,9 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_PORTAMENTO_TIME: {
-      uint8_t rate = GetByte(curOffset++);
+      uint8_t rate = readByte(curOffset++);
       desc = fmt::format("Rate: {:d}", rate);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Portamento Time",
                       desc,
@@ -355,17 +355,17 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_VOLUME: {
-      uint8_t newVolume = GetByte(curOffset++);
+      uint8_t newVolume = readByte(curOffset++);
       spcVolume = newVolume;
-      uint8_t midiVolume = Convert7bitPercentVolValToStdMidiVal(spcVolume / 2);
-      AddVol(beginOffset, curOffset - beginOffset, midiVolume);
+      uint8_t midiVolume = convert7bitPercentVolValToStdMidiVal(spcVolume / 2);
+      addVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
     }
 
     case EVENT_VOLUME_ENVELOPE: {
-      uint8_t envelopeIndex = GetByte(curOffset++);
+      uint8_t envelopeIndex = readByte(curOffset++);
       desc = fmt::format("Envelope Index: {:d}", envelopeIndex);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Volume Envelope",
                       desc,
@@ -375,17 +375,17 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_TRANSPOSE: {
-      int8_t delta = static_cast<int8_t>(GetByte(curOffset++));
+      int8_t delta = static_cast<int8_t>(readByte(curOffset++));
       spcTranspose += delta;
-      AddTranspose(beginOffset, curOffset - beginOffset, spcTranspose, "Transpose (Relative)");
+      addTranspose(beginOffset, curOffset - beginOffset, spcTranspose, "Transpose (Relative)");
       break;
     }
 
     case EVENT_VOLUME_REL: {
-      int8_t delta = static_cast<int8_t>(GetByte(curOffset++));
+      int8_t delta = static_cast<int8_t>(readByte(curOffset++));
       spcVolume += delta;
-      uint8_t midiVolume = Convert7bitPercentVolValToStdMidiVal(spcVolume / 2);
-      AddVol(beginOffset, curOffset - beginOffset, midiVolume, "Volume (Relative)");
+      uint8_t midiVolume = convert7bitPercentVolValToStdMidiVal(spcVolume / 2);
+      addVol(beginOffset, curOffset - beginOffset, midiVolume, "Volume (Relative)");
       break;
     }
 
@@ -393,39 +393,39 @@ bool CompileSnesTrack::ReadEvent() {
       bool rest = (statusByte == 0x00);
 
       uint8_t duration;
-      bool hasDuration = ReadDurationBytes(curOffset, duration);
+      bool hasDuration = readDurationBytes(curOffset, duration);
       if (hasDuration) {
         spcNoteDuration = duration;
       }
 
       if (rest) {
-        AddRest(beginOffset, curOffset - beginOffset, spcNoteDuration);
+        addRest(beginOffset, curOffset - beginOffset, spcNoteDuration);
       }
       else {
         uint8_t noteNumber = statusByte - 1;
-        AddNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, 100, spcNoteDuration,
+        addNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, 100, spcNoteDuration,
                      hasDuration ? "Note with Duration" : "Note");
-        AddTime(spcNoteDuration);
+        addTime(spcNoteDuration);
       }
       break;
     }
 
     case EVENT_LOOP_COUNT: {
-      uint8_t repeatNest = GetByte(curOffset++);
-      uint8_t times = GetByte(curOffset++);
+      uint8_t repeatNest = readByte(curOffset++);
+      uint8_t times = readByte(curOffset++);
       int actualTimes = (times == 0) ? 256 : times;
 
       desc = fmt::format("Nest Level: {:d}  Times: {:d}", repeatNest, actualTimes);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Count", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Count", desc, CLR_LOOP, ICON_STARTREP);
 
       repeatCount[repeatNest] = times;
       break;
     }
 
     case EVENT_FLAGS: {
-      uint8_t flags = GetByte(curOffset++);
+      uint8_t flags = readByte(curOffset++);
       spcFlags = flags;
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Flags",
                       desc,
@@ -435,23 +435,23 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_TEMPO: {
-      uint8_t newTempo = GetByte(curOffset++);
+      uint8_t newTempo = readByte(curOffset++);
       spcTempo = newTempo;
-      AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo));
+      addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
       break;
     }
 
     case EVENT_TUNING: {
       int16_t newTuning;
       if (parentSeq->version == COMPILESNES_ALESTE || parentSeq->version == COMPILESNES_JAKICRUSH) {
-        newTuning = static_cast<int8_t>(GetByte(curOffset++));
+        newTuning = static_cast<int8_t>(readByte(curOffset++));
       }
       else {
-        newTuning = static_cast<int16_t>(GetShort(curOffset));
+        newTuning = static_cast<int16_t>(readShort(curOffset));
         curOffset += 2;
       }
 
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Tuning",
                       fmt::format("Pitch Register Delta: {:d}", newTuning),
@@ -461,11 +461,11 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_CALL: {
-      uint16_t dest = GetShort(curOffset);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
 
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pattern Play",
                       desc,
@@ -478,7 +478,7 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_RET: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "End Pattern",
                       desc,
@@ -489,21 +489,21 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_PROGCHANGE: {
-      uint8_t newProg = GetByte(curOffset++);
-      AddProgramChange(beginOffset, curOffset - beginOffset, newProg, true);
+      uint8_t newProg = readByte(curOffset++);
+      addProgramChange(beginOffset, curOffset - beginOffset, newProg, true);
       break;
     }
 
     case EVENT_ADSR: {
-      uint8_t envelopeIndex = GetByte(curOffset++);
+      uint8_t envelopeIndex = readByte(curOffset++);
       desc = fmt::format("Envelope Index: {:d}", envelopeIndex);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_VOLUME, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_VOLUME, ICON_CONTROL);
       break;
     }
 
     case EVENT_PORTAMENTO_ON: {
       spcFlags |= COMPILESNES_FLAGS_PORTAMENTO;
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Portamento On",
                       desc,
@@ -514,7 +514,7 @@ bool CompileSnesTrack::ReadEvent() {
 
     case EVENT_PORTAMENTO_OFF: {
       spcFlags &= ~COMPILESNES_FLAGS_PORTAMENTO;
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Portamento Off",
                       desc,
@@ -524,9 +524,9 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_PANPOT_ENVELOPE: {
-      uint8_t envelopeIndex = GetByte(curOffset++);
+      uint8_t envelopeIndex = readByte(curOffset++);
       desc = fmt::format("Envelope Index: {:d}", envelopeIndex);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Panpot Envelope",
                       desc,
@@ -536,23 +536,23 @@ bool CompileSnesTrack::ReadEvent() {
     }
 
     case EVENT_PAN: {
-      int8_t newPan = GetByte(curOffset++);
+      int8_t newPan = readByte(curOffset++);
       spcPan = newPan;
 
       double volumeScale;
-      uint8_t midiPan = Convert7bitLinearPercentPanValToStdMidiVal(static_cast<uint8_t>(newPan + 0x80) / 2, &volumeScale);
-      AddExpressionNoItem(ConvertPercentAmpToStdMidiVal(volumeScale));
-      AddPan(beginOffset, curOffset - beginOffset, midiPan);
+      uint8_t midiPan = convert7bitLinearPercentPanValToStdMidiVal(static_cast<uint8_t>(newPan + 0x80) / 2, &volumeScale);
+      addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
+      addPan(beginOffset, curOffset - beginOffset, midiPan);
       break;
     }
 
     case EVENT_LOOP_BREAK: {
-      uint8_t repeatNest = GetByte(curOffset++);
-      uint16_t dest = GetShort(curOffset);
+      uint8_t repeatNest = readByte(curOffset++);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
 
       desc = fmt::format("Nest Level: {:d}  Destination: ${:04X}", repeatNest, dest);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", desc, CLR_LOOP, ICON_ENDREP);
 
       repeatCount[repeatNest]--;
       if (repeatCount[repeatNest] == 0) {
@@ -563,14 +563,14 @@ bool CompileSnesTrack::ReadEvent() {
 
     case EVENT_DURATION_DIRECT: {
       uint8_t duration;
-      if (!ReadDurationBytes(curOffset, duration)) {
+      if (!readDurationBytes(curOffset, duration)) {
         // address out of range
         return false;
       }
       spcNoteDuration = duration;
 
       desc = fmt::format("Duration: {:d}", duration);
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Duration (Direct)",
                       desc,
@@ -581,34 +581,34 @@ bool CompileSnesTrack::ReadEvent() {
 
     case EVENT_DURATION: {
       uint8_t duration;
-      if (!ReadDurationBytes(curOffset, duration)) {
+      if (!readDurationBytes(curOffset, duration)) {
         // address out of range
         return false;
       }
       spcNoteDuration = duration;
 
       desc = fmt::format("Duration: {:d}", duration);
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Duration", desc, CLR_DURNOTE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration", desc, CLR_DURNOTE, ICON_CONTROL);
       break;
     }
 
     case EVENT_PERCUSSION_NOTE: {
       uint8_t duration;
-      bool hasDuration = ReadDurationBytes(curOffset, duration);
+      bool hasDuration = readDurationBytes(curOffset, duration);
       if (hasDuration) {
         spcNoteDuration = duration;
       }
 
       uint8_t percNoteNumber = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
-      AddPercNoteByDur(beginOffset, curOffset - beginOffset, percNoteNumber, 100, spcNoteDuration,
+      addPercNoteByDur(beginOffset, curOffset - beginOffset, percNoteNumber, 100, spcNoteDuration,
                        hasDuration ? "Percussion Note with Duration" : "Percussion Note");
-      AddTime(spcNoteDuration);
+      addTime(spcNoteDuration);
       break;
     }
 
     default: {
       auto descr = logEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
     }
@@ -621,20 +621,20 @@ bool CompileSnesTrack::ReadEvent() {
   return bContinue;
 }
 
-bool CompileSnesTrack::ReadDurationBytes(uint32_t& offset, uint8_t& duration) const {
+bool CompileSnesTrack::readDurationBytes(uint32_t& offset, uint8_t& duration) const {
   CompileSnesSeq *parentSeq = static_cast<CompileSnesSeq*>(this->parentSeq);
 
   uint32_t curOffset = offset;
   bool durationDispatched = false;
   while (curOffset < 0x10000) {
-    uint8_t statusByte = GetByte(curOffset++);
+    uint8_t statusByte = readByte(curOffset++);
 
     if (statusByte == parentSeq->STATUS_DURATION_DIRECT) {
       if (curOffset >= 0x10000) {
         break;
       }
 
-      duration = GetByte(curOffset++);
+      duration = readByte(curOffset++);
       offset = curOffset;
       durationDispatched = true;
     }

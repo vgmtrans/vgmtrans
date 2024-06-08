@@ -56,7 +56,7 @@ void Logger::connectElements() {
   connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged),
           [this](int level) { m_level = level; });
   connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_Log, this, &Logger::push);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_log, this, &Logger::push);
 }
 
 void Logger::exportLog() {
@@ -81,14 +81,14 @@ void Logger::exportLog() {
 void Logger::push(const LogItem *item) const {
   static constexpr const char *log_colors[]{"red", "orange", "darkgrey", "black"};
 
-  if (item->GetLogLevel() > m_level) {
+  if (item->logLevel() > m_level) {
     return;
   }
 
   // If the source string is empty, don't print it, otherwise encapsulate it in brackets
-  auto source = item->GetSource().empty() ? ""
-    : "[" + QString::fromStdString(item->GetSource()) + "]";
+  auto source = item->source().empty() ? ""
+    : "[" + QString::fromStdString(item->source()) + "]";
   logger_textarea->appendHtml(QStringLiteral("<font color=%2>%1 %3</font>")
-    .arg(source, QString(log_colors[static_cast<int>(item->GetLogLevel())]),
-      QString::fromStdString(item->GetText())));
+    .arg(source, QString(log_colors[static_cast<int>(item->logLevel())]),
+      QString::fromStdString(item->text())));
 }

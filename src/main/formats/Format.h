@@ -24,24 +24,24 @@ class VGMScanner;
     public:                                                  \
       static const _name_##Format _name_##FormatRegisterThis; \
       static const std::string name;                          \
-      _name_##Format() : Format(#_name_) { Init(); }          \
-      virtual const std::string &GetName() { return name; }
+      _name_##Format() : Format(#_name_) { init(); }          \
+      virtual const std::string& getName() { return name; }
 
 #define END_FORMAT() \
   }                  \
   ;
 
 #define USING_SCANNER(theScanner) \
-  virtual VGMScanner *NewScanner() { return new theScanner; }
+  virtual VGMScanner* newScanner() { return new theScanner; }
 
 #define USING_MATCHER(matcher) \
-  virtual Matcher *NewMatcher() { return new matcher(this); }
+  virtual Matcher* newMatcher() { return new matcher(this); }
 
 #define USING_MATCHER_WITH_ARG(matcher, arg) \
-  virtual Matcher *NewMatcher() { return new matcher(this, arg); }
+  virtual Matcher* newMatcher() { return new matcher(this, arg); }
 
 #define USING_COLL(coll) \
-  virtual VGMColl *NewCollection() { return new coll(); }
+  virtual VGMColl* newCollection() { return new coll(); }
 
 class Format;
 class VGMFile;
@@ -57,17 +57,17 @@ public:
   Format(const std::string &scannerName);
   virtual ~Format();
 
-  static Format *GetFormatFromName(const std::string &name);
+  static Format *getFormatFromName(const std::string &name);
 
-  virtual bool Init();
-  virtual const std::string &GetName() = 0;
-  virtual VGMScanner *NewScanner() { return nullptr; }
-  VGMScanner &GetScanner() const { return *scanner; }
-  virtual Matcher *NewMatcher() { return nullptr; }
-  virtual VGMColl *NewCollection();
-  virtual bool OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-  virtual bool OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-  virtual bool OnMatch(std::vector<VGMFile *> &) { return true; }
+  virtual bool init();
+  virtual const std::string &getName() = 0;
+  virtual VGMScanner *newScanner() { return nullptr; }
+  VGMScanner &getScanner() const { return *scanner; }
+  virtual Matcher *newMatcher() { return nullptr; }
+  virtual VGMColl *newCollection();
+  virtual bool onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+  virtual bool onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+  virtual bool onMatch(std::vector<VGMFile *> &) { return true; }
 
   Matcher *matcher;
   VGMScanner *scanner;

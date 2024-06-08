@@ -28,33 +28,33 @@ inline constexpr uint32_t operator&(Target a, Target b) {
   return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
 }
 
-bool SaveAsDLS(const VGMInstrSet &set, const std::string &filepath);
-bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath);
+bool saveAsDLS(const VGMInstrSet &set, const std::string &filepath);
+bool saveAsSF2(const VGMInstrSet &set, const std::string &filepath);
 
-void SaveAllAsWav(const VGMSampColl &coll, const std::string &save_dir);
+void saveAllAsWav(const VGMSampColl &coll, const std::string &save_dir);
 
-bool SaveAsOriginal(const VGMFile& file, const std::string& filepath);
-bool SaveAsOriginal(const RawFile& rawfile, const std::string& filepath);
+bool saveAsOriginal(const VGMFile& file, const std::string& filepath);
+bool saveAsOriginal(const RawFile& rawfile, const std::string& filepath);
 
 template <Target options>
-void SaveAs(VGMColl &coll, const std::string &dir_path) {
+void saveAs(VGMColl &coll, const std::string &dir_path) {
   auto filename = ConvertToSafeFileName(coll.name());
   auto filepath = dir_path + "/" + filename;
 
   if constexpr ((options & Target::MIDI) != 0) {
-    coll.seq()->SaveAsMidi(filepath + ".mid");
+    coll.seq()->saveAsMidi(filepath + ".mid");
   }
 
   if constexpr ((options & Target::DLS) != 0) {
     DLSFile dlsfile;
     if (coll.createDLSFile(dlsfile)) {
-      dlsfile.SaveDLSFile(filepath + ".dls");
+      dlsfile.saveDLSFile(filepath + ".dls");
     }
   }
 
   if constexpr ((options & Target::SF2) != 0) {
     if (SF2File *sf2file = coll.createSF2File()) {
-      sf2file->SaveSF2File(filepath + ".sf2");
+      sf2file->saveSF2File(filepath + ".sf2");
     }
   }
 }

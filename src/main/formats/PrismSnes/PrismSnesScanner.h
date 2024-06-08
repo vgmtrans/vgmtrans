@@ -9,8 +9,8 @@
 
 class PrismSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForPrismSnesFromARAM(RawFile *file);
+  virtual void scan(RawFile *file, void *info = 0);
+  void searchForPrismSnesFromARAM(RawFile *file);
 
  private:
   static BytePattern ptnLoadSeq;

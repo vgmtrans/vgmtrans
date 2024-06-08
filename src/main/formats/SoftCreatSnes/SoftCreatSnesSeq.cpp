@@ -16,24 +16,24 @@ SoftCreatSnesSeq::SoftCreatSnesSeq(RawFile *file,
     : VGMSeq(SoftCreatSnesFormat::name, file, seqdataOffset, 0, newName), version(ver),
       headerAlignSize(headerAlignSize) {
   bLoadTickByTick = true;
-  bAllowDiscontinuousTrackData = true;
-  bUseLinearAmplitudeScale = true;
+  setAllowDiscontinuousTrackData(true);
+  setUseLinearAmplitudeScale(true);
 
-  UseReverb();
-  AlwaysWriteInitialReverb(0);
+  useReverb();
+  setAlwaysWriteInitialReverb(0);
 
-  LoadEventMap();
+  loadEventMap();
 }
 
 SoftCreatSnesSeq::~SoftCreatSnesSeq(void) {
 }
 
-void SoftCreatSnesSeq::ResetVars(void) {
-  VGMSeq::ResetVars();
+void SoftCreatSnesSeq::resetVars(void) {
+  VGMSeq::resetVars();
 }
 
-bool SoftCreatSnesSeq::GetHeaderInfo(void) {
-  SetPPQN(SEQ_PPQN);
+bool SoftCreatSnesSeq::parseHeader(void) {
+  setPPQN(SEQ_PPQN);
 
   VGMHeader *header = addHeader(dwOffset, headerAlignSize * MAX_TRACKS);
   if (dwOffset + headerAlignSize * MAX_TRACKS > 0x10000) {
@@ -52,7 +52,7 @@ bool SoftCreatSnesSeq::GetHeaderInfo(void) {
     header->addChild(addrTrackLowPtr, 1, trackName.str() + " (LSB)");
     header->addChild(addrTrackHighPtr, 1, trackName.str() + " (MSB)");
 
-    uint16_t addrTrackStart = GetByte(addrTrackLowPtr) | (GetByte(addrTrackHighPtr) << 8);
+    uint16_t addrTrackStart = readByte(addrTrackLowPtr) | (readByte(addrTrackHighPtr) << 8);
     if (addrTrackStart != 0xffff) {
       SoftCreatSnesTrack *track = new SoftCreatSnesTrack(this, addrTrackStart);
       aTracks.push_back(track);
@@ -62,11 +62,11 @@ bool SoftCreatSnesSeq::GetHeaderInfo(void) {
   return true;
 }
 
-bool SoftCreatSnesSeq::GetTrackPointers(void) {
+bool SoftCreatSnesSeq::parseTrackPointers(void) {
   return true;
 }
 
-void SoftCreatSnesSeq::LoadEventMap() {
+void SoftCreatSnesSeq::loadEventMap() {
   if (version == SOFTCREATSNES_NONE) {
     return;
   }
@@ -81,16 +81,16 @@ void SoftCreatSnesSeq::LoadEventMap() {
 
 SoftCreatSnesTrack::SoftCreatSnesTrack(SoftCreatSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
-  ResetVars();
+  resetVars();
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
 }
 
-void SoftCreatSnesTrack::ResetVars(void) {
-  SeqTrack::ResetVars();
+void SoftCreatSnesTrack::resetVars(void) {
+  SeqTrack::resetVars();
 }
 
-bool SoftCreatSnesTrack::ReadEvent(void) {
+bool SoftCreatSnesTrack::readEvent(void) {
   SoftCreatSnesSeq *parentSeq = (SoftCreatSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
@@ -98,7 +98,7 @@ bool SoftCreatSnesTrack::ReadEvent(void) {
     return false;
   }
 
-  uint8_t statusByte = GetByte(curOffset++);
+  uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::stringstream desc;
@@ -112,60 +112,60 @@ bool SoftCreatSnesTrack::ReadEvent(void) {
   switch (eventType) {
     case EVENT_UNKNOWN0:
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2
           << "  Arg3: " << (int) arg3;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
-      uint8_t arg4 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
+      uint8_t arg4 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2
           << "  Arg3: " << (int) arg3
           << "  Arg4: " << (int) arg4;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     default: {
       auto descr = logEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
     }

@@ -15,10 +15,10 @@ class TriAcePS1InstrSet
 
  public:
   TriAcePS1InstrSet(RawFile *file, uint32_t offset);
-  virtual ~TriAcePS1InstrSet(void);
+  virtual ~TriAcePS1InstrSet();
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  virtual bool parseHeader();
+  virtual bool parseInstrPointers();
 
  public:
 
@@ -79,7 +79,7 @@ class TriAcePS1Instr
  public:
   TriAcePS1Instr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
   ~TriAcePS1Instr() { if (rgns) delete[] rgns; }
-  virtual bool LoadInstr();
+  virtual bool loadInstr();
 
  public:
   InstrInfo instrinfo;

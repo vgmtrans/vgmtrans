@@ -9,8 +9,8 @@
 
 class NeverlandSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForNeverlandSnesFromARAM(RawFile *file);
+  virtual void scan(RawFile *file, void *info = 0);
+  void searchForNeverlandSnesFromARAM(RawFile *file);
 
  private:
   static BytePattern ptnLoadSongSFC;

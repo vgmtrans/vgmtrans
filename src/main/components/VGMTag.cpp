@@ -9,26 +9,26 @@
 VGMTag::VGMTag(std::string _title, std::string _artist, std::string _album)
     : title(std::move(_title)), artist(std::move(_artist)), album(std::move(_album)) {}
 
-bool VGMTag::HasTitle() const {
+bool VGMTag::hasTitle() const {
   return !title.empty();
 }
 
-bool VGMTag::HasArtist() const {
+bool VGMTag::hasArtist() const {
   return !album.empty();
 }
 
-bool VGMTag::HasAlbum() const {
+bool VGMTag::hasAlbum() const {
   return !artist.empty();
 }
 
-bool VGMTag::HasComment() const {
+bool VGMTag::hasComment() const {
   return !comment.empty();
 }
 
-bool VGMTag::HasTrackNumber() const {
+bool VGMTag::hasTrackNumber() const {
   return track_number != 0;
 }
 
-bool VGMTag::HasLength() const {
+bool VGMTag::hasLength() const {
   return length != 0.0;
 }

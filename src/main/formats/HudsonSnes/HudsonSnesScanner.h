@@ -11,8 +11,8 @@ enum HudsonSnesVersion : uint8_t;  // see HudsonSnesFormat.h
 
 class HudsonSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForHudsonSnesFromARAM(RawFile *file);
+  virtual void scan(RawFile *file, void *info = 0);
+  void searchForHudsonSnesFromARAM(RawFile *file);
 
  private:
   static BytePattern ptnNoteLenTable;

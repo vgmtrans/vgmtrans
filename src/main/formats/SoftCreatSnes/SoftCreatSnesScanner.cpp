@@ -61,34 +61,34 @@ BytePattern SoftCreatSnesScanner::ptnVCmdExec(
 	,
 	20);
 
-void SoftCreatSnesScanner::Scan(RawFile *file, void *info) {
+void SoftCreatSnesScanner::scan(RawFile *file, void *info) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForSoftCreatSnesFromARAM(file);
+    searchForSoftCreatSnesFromARAM(file);
   } else {
     // Search from ROM unimplemented
   }
 }
 
-void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
+void SoftCreatSnesScanner::searchForSoftCreatSnesFromARAM(RawFile *file) {
   SoftCreatSnesVersion version = SOFTCREATSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
+  std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song list
   uint32_t ofsLoadSeq;
   uint16_t addrSeqList;
   uint8_t songIndexMax;
   uint8_t headerAlignSize;
-  if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-    addrSeqList = file->GetShort(ofsLoadSeq + 16);
+  if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
+    addrSeqList = file->readShort(ofsLoadSeq + 16);
 
-    songIndexMax = file->GetByte(ofsLoadSeq + 2);
+    songIndexMax = file->readByte(ofsLoadSeq + 2);
     if (songIndexMax == 0) {
       return;
     }
 
-    uint16_t addrStartLow = file->GetByte(ofsLoadSeq + 16);
-    uint16_t addrStartHigh = file->GetByte(ofsLoadSeq + 9);
+    uint16_t addrStartLow = file->readByte(ofsLoadSeq + 16);
+    uint16_t addrStartHigh = file->readByte(ofsLoadSeq + 9);
     if (addrStartLow > addrStartHigh || addrStartHigh - addrStartLow > songIndexMax) {
       return;
     }
@@ -101,9 +101,9 @@ void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
   uint32_t ofsVCmdExec;
   uint8_t VCMD_CUTOFF;
   uint16_t addrVCmdAddressTable;
-  if (file->SearchBytePattern(ptnVCmdExec, ofsVCmdExec)) {
-    VCMD_CUTOFF = file->GetByte(ofsVCmdExec + 6);
-    addrVCmdAddressTable = file->GetByte(ofsVCmdExec + 16);
+  if (file->searchBytePattern(ptnVCmdExec, ofsVCmdExec)) {
+    VCMD_CUTOFF = file->readByte(ofsVCmdExec + 6);
+    addrVCmdAddressTable = file->readByte(ofsVCmdExec + 16);
   } else {
     return;
   }
@@ -139,7 +139,7 @@ void SoftCreatSnesScanner::SearchForSoftCreatSnesFromARAM(RawFile *file) {
 
   uint32_t addrSeqHeader = addrSeqList + songIndex;
   SoftCreatSnesSeq *newSeq = new SoftCreatSnesSeq(file, version, addrSeqHeader, headerAlignSize, name);
-  if (!newSeq->LoadVGMFile()) {
+  if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }

@@ -55,9 +55,9 @@ class FalcomSnesSeq
                     std::string newName = "Falcom SNES Seq");
   ~FalcomSnesSeq() override;
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
-  void ResetVars() override;
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  void resetVars() override;
 
   static const uint8_t VOLUME_TABLE[129];
 
@@ -69,10 +69,10 @@ class FalcomSnesSeq
   std::map<uint16_t, uint8_t> repeatCountMap;
   std::map<uint8_t, uint16_t> instrADSRHints;
 
-  static double GetTempoInBPM(uint8_t tempo);
+  static double getTempoInBPM(uint8_t tempo);
 
  private:
-  void LoadEventMap();
+  void loadEventMap();
 };
 
 
@@ -80,10 +80,10 @@ class FalcomSnesTrack
     : public SeqTrack {
  public:
   FalcomSnesTrack(FalcomSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  void ResetVars() override;
-  bool ReadEvent() override;
+  void resetVars() override;
+  bool readEvent() override;
 
-  static int8_t CalcPanValue(uint8_t pan, double &volumeScale);
+  static int8_t calculatePanValue(uint8_t pan, double &volumeScale);
 
  private:
   int8_t prevNoteKey;

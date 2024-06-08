@@ -11,8 +11,8 @@ enum KonamiSnesVersion : uint8_t;  // see KonamiSnesFormat.h
 
 class KonamiSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForKonamiSnesFromARAM(RawFile *file);
+  virtual void scan(RawFile *file, void *info = 0);
+  void searchForKonamiSnesFromARAM(RawFile *file);
 
  private:
   static BytePattern ptnSetSongHeaderAddressGG4;

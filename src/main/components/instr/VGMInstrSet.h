@@ -20,23 +20,23 @@ public:
               std::string name = "VGMInstrSet", VGMSampColl *theSampColl = nullptr);
   ~VGMInstrSet() override;
 
-  bool LoadVGMFile() override;
-  bool Load() override;
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
-  virtual bool LoadInstrs();
+  bool loadVGMFile() override;
+  bool load() override;
+  virtual bool parseHeader();
+  virtual bool parseInstrPointers();
+  virtual bool loadInstrs();
 
-  VGMInstr *AddInstr(uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum,
+  VGMInstr *addInstr(uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum,
                      const std::string &instrName = "");
 
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
 
 protected:
-   void disableAutoAddInstrumentsAsChildren() { autoAddInstrumentsAsChildren = false; }
+   void disableAutoAddInstrumentsAsChildren() { m_auto_add_instruments_as_children = false; }
 
 private:
-   bool autoAddInstrumentsAsChildren{true};
+   bool m_auto_add_instruments_as_children{true};
 };
 
 // ********
@@ -49,18 +49,18 @@ public:
            uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
 
-  Icon GetIcon() override { return ICON_INSTR; };
+  Icon icon() override { return ICON_INSTR; };
 
   const std::vector<VGMRgn*>& regions() { return m_regions; }
 
-  inline void SetBank(uint32_t bankNum);
-  inline void SetInstrNum(uint32_t theInstrNum);
+  inline void setBank(uint32_t bankNum);
+  inline void setInstrNum(uint32_t theInstrNum);
 
-  VGMRgn *AddRgn(VGMRgn *rgn);
-  VGMRgn *AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
+  VGMRgn *addRgn(VGMRgn *rgn);
+  VGMRgn *addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
                  uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
 
-  virtual bool LoadInstr() { return true; }
+  virtual bool loadInstr() { return true; }
 
   uint32_t bank;
   uint32_t instrNum;
@@ -69,10 +69,10 @@ public:
 
 
 protected:
-  void disableAutoAddRegionsAsChildren() { autoAddRegionsAsChildren = false; }
+  void disableAutoAddRegionsAsChildren() { m_auto_add_regions_as_children = false; }
   void deleteRegions();
 
 private:
-  bool autoAddRegionsAsChildren{true};
+  bool m_auto_add_regions_as_children{true};
   std::vector<VGMRgn*> m_regions;
 };

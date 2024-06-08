@@ -62,35 +62,35 @@ BytePattern NeverlandSnesScanner::ptnLoadSongS2C(
 	,
 	22);
 
-void NeverlandSnesScanner::Scan(RawFile *file, void *info) {
+void NeverlandSnesScanner::scan(RawFile *file, void *info) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForNeverlandSnesFromARAM(file);
+    searchForNeverlandSnesFromARAM(file);
   } else {
     // Search from ROM unimplemented
   }
 }
 
-void NeverlandSnesScanner::SearchForNeverlandSnesFromARAM(RawFile *file) {
+void NeverlandSnesScanner::searchForNeverlandSnesFromARAM(RawFile *file) {
   NeverlandSnesVersion version = NEVERLANDSNES_NONE;
 
   std::string basefilename = file->stem();
-  std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::string name = file->tag.hasTitle() ? file->tag.title : basefilename;
 
   uint32_t ofsLoadSong;
   uint16_t addrSeqHeader;
-  if (file->SearchBytePattern(ptnLoadSongS2C, ofsLoadSong)) {
-    addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;
+  if (file->searchBytePattern(ptnLoadSongS2C, ofsLoadSong)) {
+    addrSeqHeader = file->readByte(ofsLoadSong + 4) << 8;
     version = NEVERLANDSNES_S2C;
-  } else if (file->SearchBytePattern(ptnLoadSongSFC, ofsLoadSong)) {
-    addrSeqHeader = file->GetByte(ofsLoadSong + 4) << 8;
+  } else if (file->searchBytePattern(ptnLoadSongSFC, ofsLoadSong)) {
+    addrSeqHeader = file->readByte(ofsLoadSong + 4) << 8;
     version = NEVERLANDSNES_SFC;
   } else {
     return;
   }
 
   NeverlandSnesSeq *newSeq = new NeverlandSnesSeq(file, version, addrSeqHeader);
-  if (!newSeq->LoadVGMFile()) {
+  if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }

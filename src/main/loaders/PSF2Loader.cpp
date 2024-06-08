@@ -20,7 +20,7 @@ void PSF2Loader::apply(const RawFile *file) {
       return;
 }
 
-    u32 sig = file->GetWord(0);
+    u32 sig = file->readWord(0);
     if ((sig & 0x00FFFFFF) == 0x465350 && ((sig & 0xFF000000) == 0x02000000)) {
         auto dircount = file->get<u32>(0x10);
         psf2unpack(file, 0x14, dircount);
@@ -38,14 +38,14 @@ int PSF2Loader::psf2_decompress_block(const RawFile *file, unsigned fileoffset,
   size_t destlen;
   u8 *blocks = new u8[numblocks * 4];
 
-  file->GetBytes(fileoffset, numblocks * 4, blocks);
+  file->readBytes(fileoffset, numblocks * 4, blocks);
   unsigned long current_block = get32lsb(blocks + (blocknumber * 4));
   u8 *zblock = new u8[current_block];
 
   int tempOffset = fileoffset + numblocks * 4;
   for (u32 i = 0; i < blocknumber; i++)
     tempOffset += get32lsb(blocks + (i * 4));
-  file->GetBytes(tempOffset, current_block, zblock);
+  file->readBytes(tempOffset, current_block, zblock);
 
   destlen = blocksize;
   if (zng_uncompress(decompressedblock, &destlen, zblock, current_block) != Z_OK) {
@@ -71,12 +71,12 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
   memset(filename, 0, std::size(filename));
 
   for (u32 i = 0; i < dircount; i++) {
-    file->GetBytes(i * 48 + fileoffset, 36, filename);
-    file->GetBytes(i * 48 + fileoffset + 36, 4, &offset);
-    file->GetBytes(i * 48 + fileoffset + 36 + 4, 4, &filesize);
-    file->GetBytes(i * 48 + fileoffset + 36 + 4 + 4, 4, &buffersize);
+    file->readBytes(i * 48 + fileoffset, 36, filename);
+    file->readBytes(i * 48 + fileoffset + 36, 4, &offset);
+    file->readBytes(i * 48 + fileoffset + 36 + 4, 4, &filesize);
+    file->readBytes(i * 48 + fileoffset + 36 + 4 + 4, 4, &buffersize);
     if ((filesize == 0) && (buffersize == 0)) {
-      file->GetBytes(offset + 0x10, 4, &filesize);
+      file->readBytes(offset + 0x10, 4, &filesize);
 
       r = psf2unpack(file, offset + 0x14, filesize);
       if (r) {

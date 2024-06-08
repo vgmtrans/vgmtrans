@@ -15,7 +15,7 @@
 
 // Emulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
 // return elapsed time in sample count, and final env value if requested.
-uint32_t EmulateSDSPGAIN(uint8_t gain,
+uint32_t emulateSDSPGAIN(uint8_t gain,
                          int16_t env_from,
                          int16_t env_to,
                          int16_t *env_after_ptr,
@@ -96,7 +96,7 @@ uint32_t EmulateSDSPGAIN(uint8_t gain,
     }
     else if (mode == 4) { // 4: linear decrease
       uint32_t total_samples_full = (0x800 / 0x20) * SDSP_COUNTER_RATES[rate];
-      sf2_time = LinAmpDecayTimeToLinDBDecayTime(total_samples_full / 32000.0, 0x800);
+      sf2_time = linearAmpDecayTimeToLinDBDecayTime(total_samples_full / 32000.0, 0x800);
     }
     else if (mode == 5) { // 5: exponential decrease
       // Exponential decrease mode is almost exponential.
@@ -109,8 +109,8 @@ uint32_t EmulateSDSPGAIN(uint8_t gain,
       else {
         if (env_from > 255) {
           // exponential part
-          double decibelAtStart = ConvertPercentAmplitudeToAttenDB(env_from / 2047.0);
-          double decibelAtExpFinal = ConvertPercentAmplitudeToAttenDB(env_exp_final / 2047.0);
+          double decibelAtStart = convertPercentAmplitudeToAttenDB(env_from / 2047.0);
+          double decibelAtExpFinal = convertPercentAmplitudeToAttenDB(env_exp_final / 2047.0);
           double timeAtExpFinal = (tick_exp * SDSP_COUNTER_RATES[rate]) / 32000.0;
           sf2_time = timeAtExpFinal * (-100.0 / (decibelAtExpFinal - decibelAtStart));
         }
@@ -131,8 +131,8 @@ uint32_t EmulateSDSPGAIN(uint8_t gain,
               tick_total--;
             }
 
-            double decibelAtStart = ConvertPercentAmplitudeToAttenDB(env_from / 2047.0);
-            double decibelAtFinal = ConvertPercentAmplitudeToAttenDB(env_final / 2047.0);
+            double decibelAtStart = convertPercentAmplitudeToAttenDB(env_from / 2047.0);
+            double decibelAtFinal = convertPercentAmplitudeToAttenDB(env_final / 2047.0);
             double timeAtExpFinal = (tick_total * SDSP_COUNTER_RATES[rate]) / 32000.0;
             sf2_time = timeAtExpFinal * (-100.0 / (decibelAtFinal - decibelAtStart));
           }
@@ -161,7 +161,7 @@ uint32_t EmulateSDSPGAIN(uint8_t gain,
 
 // See Anomie's S-DSP document for technical details
 // http://www.romhacking.net/documents/191/
-void ConvertSNESADSR(uint8_t adsr1,
+void convertSNESADSR(uint8_t adsr1,
                      uint8_t adsr2,
                      uint8_t gain,
                      uint16_t env_from,
@@ -206,7 +206,7 @@ void ConvertSNESADSR(uint8_t adsr1,
     }
     else {
       uint8_t dr_rate = 0x10 | (dr << 1);
-      EmulateSDSPGAIN(0xa0 | dr_rate, env, (sl << 8) | 0xff, &env_after, &decay_time); // exponential decrease
+      emulateSDSPGAIN(0xa0 | dr_rate, env, (sl << 8) | 0xff, &env_after, &decay_time); // exponential decrease
       env_sustain_start = env_after;
       env = env_after;
     }
@@ -217,13 +217,13 @@ void ConvertSNESADSR(uint8_t adsr1,
       sustain_time = -1; // infinite
     }
     else {
-      EmulateSDSPGAIN(0xa0 | sr, env, 0, &env_after, &sustain_time); // exponential decrease
+      emulateSDSPGAIN(0xa0 | sr, env, 0, &env_after, &sustain_time); // exponential decrease
     }
 
     // release
     // decrease envelope by 8 for every sample
     samples = (env_sustain_start + 7) / 8;
-    release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+    release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
   }
   else {
     uint8_t mode = gain >> 5;
@@ -237,13 +237,13 @@ void ConvertSNESADSR(uint8_t adsr1,
       // release
       // decrease envelope by 8 for every sample
       samples = (env_from + 7) / 8;
-      release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+      release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
     }
     else {
       env = env_from;
       int16_t env_to = (mode >= 6) ? 0x7ff : 0;
       double sf2_env_time;
-      EmulateSDSPGAIN(gain, env, env_to, &env_after, &sf2_env_time);
+      emulateSDSPGAIN(gain, env, env_to, &env_after, &sf2_env_time);
 
       if (mode >= 6) {
         attack_time = sf2_env_time;
@@ -254,7 +254,7 @@ void ConvertSNESADSR(uint8_t adsr1,
         // release
         // decrease envelope by 8 for every sample
         samples = (env_to + 7) / 8;
-        release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+        release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
       }
       else {
         attack_time = 0.0;
@@ -265,7 +265,7 @@ void ConvertSNESADSR(uint8_t adsr1,
         // release
         // decrease envelope by 8 for every sample
         samples = (env_from + 7) / 8;
-        release_time = LinAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+        release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
       }
     }
   }
@@ -298,13 +298,13 @@ void ConvertSNESADSR(uint8_t adsr1,
 SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t offset, uint32_t maxNumSamps) :
     VGMSampColl(format, rawfile, offset, 0),
     spcDirAddr(offset) {
-  SetDefaultTargets(maxNumSamps);
+  setDefaultTargets(maxNumSamps);
 }
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset, uint32_t maxNumSamps) :
     VGMSampColl(format, instrset->rawFile(), instrset, offset, 0),
     spcDirAddr(offset) {
-  SetDefaultTargets(maxNumSamps);
+  setDefaultTargets(maxNumSamps);
 }
 
 SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, uint32_t offset,
@@ -324,7 +324,7 @@ SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, uin
 SNESSampColl::~SNESSampColl() {
 }
 
-void SNESSampColl::SetDefaultTargets(uint32_t maxNumSamps) {
+void SNESSampColl::setDefaultTargets(uint32_t maxNumSamps) {
   // limit sample count to 256
   if (maxNumSamps > 256) {
     maxNumSamps = 256;
@@ -336,21 +336,21 @@ void SNESSampColl::SetDefaultTargets(uint32_t maxNumSamps) {
   }
 }
 
-bool SNESSampColl::GetSampleInfo() {
+bool SNESSampColl::parseSampleInfo() {
   spcDirHeader = addHeader(spcDirAddr, 0, "Sample DIR");
   for (std::vector<uint8_t>::iterator itr = this->targetSRCNs.begin(); itr != this->targetSRCNs.end(); ++itr) {
     uint8_t srcn = (*itr);
 
     uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawFile(), offDirEnt, true)) {
+    if (!SNESSampColl::isValidSampleDir(rawFile(), offDirEnt, true)) {
       continue;
     }
 
-    uint16_t addrSampStart = GetShort(offDirEnt);
-    uint16_t addrSampLoop = GetShort(offDirEnt + 2);
+    uint16_t addrSampStart = readShort(offDirEnt);
+    uint16_t addrSampLoop = readShort(offDirEnt + 2);
 
     bool loop;
-    uint32_t length = SNESSamp::GetSampleLength(rawFile(), addrSampStart, loop);
+    uint32_t length = SNESSamp::getSampleLength(rawFile(), addrSampStart, loop);
 
         spcDirHeader->addChild(offDirEnt, 2, fmt::format("SA: {:#x}", srcn));
         spcDirHeader->addChild(offDirEnt + 2, 2, fmt::format("LSA: {:#x}", srcn));
@@ -359,24 +359,24 @@ bool SNESSampColl::GetSampleInfo() {
                                       addrSampLoop, fmt::format("Sample: {:#x}", srcn));
     samples.push_back(samp);
   }
-  spcDirHeader->SetGuessedLength();
+  spcDirHeader->setGuessedLength();
   return samples.size() != 0;
 }
 
-bool SNESSampColl::IsValidSampleDir(const RawFile *file, uint32_t spcDirEntAddr, bool validateSample) {
+bool SNESSampColl::isValidSampleDir(const RawFile *file, uint32_t spcDirEntAddr, bool validateSample) {
   if (spcDirEntAddr + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = file->GetShort(spcDirEntAddr);
-  uint16_t addrSampLoop = file->GetShort(spcDirEntAddr + 2);
+  uint16_t addrSampStart = file->readShort(spcDirEntAddr);
+  uint16_t addrSampLoop = file->readShort(spcDirEntAddr + 2);
   if (addrSampLoop < addrSampStart || addrSampStart + 9 >= 0x10000) {
     return false;
   }
 
   if (validateSample) {
     bool loop;
-    uint32_t length = SNESSamp::GetSampleLength(file, addrSampStart, loop);
+    uint32_t length = SNESSamp::getSampleLength(file, addrSampStart, loop);
     if (length == 0) {
       return false;
     }
@@ -402,7 +402,7 @@ SNESSamp::SNESSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint
 
 SNESSamp::~SNESSamp() {}
 
-uint32_t SNESSamp::GetSampleLength(const RawFile *file, uint32_t offset, bool &loop) {
+uint32_t SNESSamp::getSampleLength(const RawFile *file, uint32_t offset, bool &loop) {
   uint32_t currOffset = offset;
   while (true) {
     if (currOffset + 9 > file->size()) {
@@ -410,7 +410,7 @@ uint32_t SNESSamp::GetSampleLength(const RawFile *file, uint32_t offset, bool &l
       return 0;
     }
 
-    uint8_t flag = file->GetByte(currOffset);
+    uint8_t flag = file->readByte(currOffset);
     currOffset += 9;
 
     // end?
@@ -422,17 +422,17 @@ uint32_t SNESSamp::GetSampleLength(const RawFile *file, uint32_t offset, bool &l
   return (currOffset - offset);
 }
 
-double SNESSamp::GetCompressionRatio() {
+double SNESSamp::compressionRatio() {
   return ((16.0 / 9.0) * 2); //aka 3.55...;
 }
 
-void SNESSamp::ConvertToStdWave(uint8_t *buf) {
+void SNESSamp::convertToStdWave(uint8_t *buf) {
   BRRBlk theBlock;
   int32_t prev1 = 0;
   int32_t prev2 = 0;
 
   // loopStatus is initiated to -1.  We should default it now to not loop
-  SetLoopStatus(0);
+  setLoopStatus(0);
 
   assert(dataLength % 9 == 0);
   for (uint32_t k = 0; k + 9 <= dataLength; k += 9)  //for every adpcm chunk
@@ -442,13 +442,13 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
       break;
     }
 
-    theBlock.flag.range = (GetByte(dwOffset + k) & 0xf0) >> 4;
-    theBlock.flag.filter = (GetByte(dwOffset + k) & 0x0c) >> 2;
-    theBlock.flag.end = (GetByte(dwOffset + k) & 0x01) != 0;
-    theBlock.flag.loop = (GetByte(dwOffset + k) & 0x02) != 0;
+    theBlock.flag.range = (readByte(dwOffset + k) & 0xf0) >> 4;
+    theBlock.flag.filter = (readByte(dwOffset + k) & 0x0c) >> 2;
+    theBlock.flag.end = (readByte(dwOffset + k) & 0x01) != 0;
+    theBlock.flag.loop = (readByte(dwOffset + k) & 0x02) != 0;
 
-    rawFile()->GetBytes(dwOffset + k + 1, 8, theBlock.brr);
-    DecompBRRBlk(reinterpret_cast<int16_t*>(&buf[k * 32 / 9]),
+    rawFile()->readBytes(dwOffset + k + 1, 8, theBlock.brr);
+    decompBRRBlk(reinterpret_cast<int16_t*>(&buf[k * 32 / 9]),
                  &theBlock,
                  &prev1,
                  &prev2);    //each decompressed pcm block is 32 bytes
@@ -456,9 +456,9 @@ void SNESSamp::ConvertToStdWave(uint8_t *buf) {
     if (theBlock.flag.end) {
       if (theBlock.flag.loop) {
         if (brrLoopOffset <= dwOffset + k) {
-          SetLoopOffset(brrLoopOffset - dwOffset);
-          SetLoopLength((k + 9) - (brrLoopOffset - dwOffset));
-          SetLoopStatus(1);
+          setLoopOffset(brrLoopOffset - dwOffset);
+          setLoopLength((k + 9) - (brrLoopOffset - dwOffset));
+          setLoopStatus(1);
         }
       }
       break;
@@ -486,7 +486,7 @@ static inline int32_t sclamp16(int32_t x) {
   return ((x > 32767) ? 32767 : (x < -32768) ? -32768 : x);
 }
 
-void SNESSamp::DecompBRRBlk(int16_t *pSmp, const BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2) {
+void SNESSamp::decompBRRBlk(int16_t *pSmp, const BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2) {
   bool validHeader = (pVBlk->flag.range < 0xD);
 
   int32_t S1 = *prev1;

@@ -22,12 +22,12 @@ SF2InfoListChunk::SF2InfoListChunk(const std::string& name)
   sfVersionTag versionTag;        //soundfont version 2.01
   versionTag.wMajor = 2;
   versionTag.wMinor = 1;
-  ifilCk->SetData(&versionTag, sizeof(versionTag));
-  AddChildChunk(ifilCk);
-  AddChildChunk(new SF2StringChunk("isng", "EMU8000"));
-  AddChildChunk(new SF2StringChunk("INAM", name));
-  AddChildChunk(new SF2StringChunk("ICRD", std::string(c_time_string)));
-  AddChildChunk(new SF2StringChunk("ISFT", std::string("VGMTrans " + std::string(VGMTRANS_VERSION))));
+  ifilCk->setData(&versionTag, sizeof(versionTag));
+  addChildChunk(ifilCk);
+  addChildChunk(new SF2StringChunk("isng", "EMU8000"));
+  addChildChunk(new SF2StringChunk("INAM", name));
+  addChildChunk(new SF2StringChunk("ICRD", std::string(c_time_string)));
+  addChildChunk(new SF2StringChunk("ISFT", std::string("VGMTrans " + std::string(VGMTRANS_VERSION))));
 }
 
 
@@ -41,7 +41,7 @@ SF2File::SF2File(SynthFile *synthfile)
   //***********
   // INFO chunk
   //***********
-  AddChildChunk(new SF2InfoListChunk(name));
+  addChildChunk(new SF2InfoListChunk(name));
 
   // sdta chunk and its child smpl chunk containing all samples
   LISTChunk *sdtaCk = new LISTChunk("sdta");
@@ -49,13 +49,14 @@ SF2File::SF2File(SynthFile *synthfile)
 
   // Concatanate all of the samples together and add the result to the smpl chunk data
   size_t numWaves = synthfile->vWaves.size();
-  smplCk->size = 0;
+  uint32_t smplCkSize = 0;
   for (size_t i = 0; i < numWaves; i++) {
     SynthWave *wave = synthfile->vWaves[i];
-    wave->ConvertTo16bitSigned();
-    smplCk->size += wave->dataSize + (46 * 2);    // plus the 46 padding samples required by sf2 spec
+    wave->convertTo16bitSigned();
+    smplCkSize += wave->dataSize + (46 * 2);    // plus the 46 padding samples required by sf2 spec
   }
-  smplCk->data = new uint8_t[smplCk->size];
+  smplCk->setSize(smplCkSize);
+  smplCk->data = new uint8_t[smplCkSize];
   uint32_t bufPtr = 0;
   for (size_t i = 0; i < numWaves; i++) {
     SynthWave *wave = synthfile->vWaves[i];
@@ -65,8 +66,8 @@ SF2File::SF2File(SynthFile *synthfile)
     bufPtr += wave->dataSize + (46 * 2);        // plus the 46 padding samples required by sf2 spec
   }
 
-  sdtaCk->AddChildChunk(smplCk);
-  this->AddChildChunk(sdtaCk);
+  sdtaCk->addChildChunk(smplCk);
+  this->addChildChunk(sdtaCk);
 
   //***********
   // pdta chunk
@@ -79,8 +80,8 @@ SF2File::SF2File(SynthFile *synthfile)
   //***********
   Chunk *phdrCk = new Chunk("phdr");
   size_t numInstrs = synthfile->vInstrs.size();
-  phdrCk->size = static_cast<uint32_t>((numInstrs + 1) * sizeof(sfPresetHeader));
-  phdrCk->data = new uint8_t[phdrCk->size];
+  phdrCk->setSize(static_cast<uint32_t>((numInstrs + 1) * sizeof(sfPresetHeader)));
+  phdrCk->data = new uint8_t[phdrCk->size()];
 
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
@@ -111,15 +112,15 @@ SF2File::SF2File(SynthFile *synthfile)
   sfPresetHeader presetHdr{};
   presetHdr.wPresetBagNdx = static_cast<uint16_t>(numInstrs);
   memcpy(phdrCk->data + (numInstrs * sizeof(sfPresetHeader)), &presetHdr, sizeof(sfPresetHeader));
-  pdtaCk->AddChildChunk(phdrCk);
+  pdtaCk->addChildChunk(phdrCk);
 
   //***********
   // pbag chunk
   //***********
   Chunk *pbagCk = new Chunk("pbag");
   constexpr size_t ITEMS_IN_PGEN = 2;
-  pbagCk->size = static_cast<uint32_t>((numInstrs + 1) * sizeof(sfPresetBag));
-  pbagCk->data = new uint8_t[pbagCk->size];
+  pbagCk->setSize(static_cast<uint32_t>((numInstrs + 1) * sizeof(sfPresetBag)));
+  pbagCk->data = new uint8_t[pbagCk->size()];
   for (size_t i = 0; i < numInstrs; i++) {
     sfPresetBag presetBag{};
     presetBag.wGenNdx = static_cast<uint16_t>(i * ITEMS_IN_PGEN);
@@ -131,7 +132,7 @@ SF2File::SF2File(SynthFile *synthfile)
   sfPresetBag presetBag{};
   presetBag.wGenNdx = static_cast<uint16_t>(numInstrs * ITEMS_IN_PGEN);
   memcpy(pbagCk->data + (numInstrs * sizeof(sfPresetBag)), &presetBag, sizeof(sfPresetBag));
-  pdtaCk->AddChildChunk(pbagCk);
+  pdtaCk->addChildChunk(pbagCk);
 
   //***********
   // pmod chunk
@@ -139,21 +140,21 @@ SF2File::SF2File(SynthFile *synthfile)
   Chunk *pmodCk = new Chunk("pmod");
   //  create the terminal field
   sfModList modList{};
-  pmodCk->SetData(&modList, sizeof(sfModList));
+  pmodCk->setData(&modList, sizeof(sfModList));
   //modList.sfModSrcOper = cc1_Mod;
   //modList.sfModDestOper = startAddrsOffset;
   //modList.modAmount = 0;
   //modList.sfModAmtSrcOper = cc1_Mod;
   //modList.sfModTransOper = linear;
-  pdtaCk->AddChildChunk(pmodCk);
+  pdtaCk->addChildChunk(pmodCk);
 
   //***********
   // pgen chunk
   //***********
   Chunk *pgenCk = new Chunk("pgen");
   //pgenCk->size = (synthfile->vInstrs.size()+1) * sizeof(sfGenList);
-  pgenCk->size = static_cast<uint32_t>((synthfile->vInstrs.size() * sizeof(sfGenList) * ITEMS_IN_PGEN) + sizeof(sfGenList));
-  pgenCk->data = new uint8_t[pgenCk->size];
+  pgenCk->setSize(static_cast<uint32_t>((synthfile->vInstrs.size() * sizeof(sfGenList) * ITEMS_IN_PGEN) + sizeof(sfGenList)));
+  pgenCk->data = new uint8_t[pgenCk->size()];
   uint32_t dataPtr = 0;
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
@@ -175,14 +176,14 @@ SF2File::SF2File(SynthFile *synthfile)
   sfGenList genList{};
   memcpy(pgenCk->data + dataPtr, &genList, sizeof(sfGenList));
 
-  pdtaCk->AddChildChunk(pgenCk);
+  pdtaCk->addChildChunk(pgenCk);
 
   //***********
   // inst chunk
   //***********
   Chunk *instCk = new Chunk("inst");
-  instCk->size = static_cast<uint32_t>((synthfile->vInstrs.size() + 1) * sizeof(sfInst));
-  instCk->data = new uint8_t[instCk->size];
+  instCk->setSize(static_cast<uint32_t>((synthfile->vInstrs.size() + 1) * sizeof(sfInst)));
+  instCk->data = new uint8_t[instCk->size()];
   uint16_t rgnCounter = 0;
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
@@ -198,7 +199,7 @@ SF2File::SF2File(SynthFile *synthfile)
   sfInst inst{};
   inst.wInstBagNdx = rgnCounter;
   memcpy(instCk->data + (numInstrs * sizeof(sfInst)), &inst, sizeof(sfInst));
-  pdtaCk->AddChildChunk(instCk);
+  pdtaCk->addChildChunk(instCk);
 
   //***********
   // ibag chunk - stores all zones (regions) for instruments
@@ -209,8 +210,8 @@ SF2File::SF2File(SynthFile *synthfile)
   for (size_t i = 0; i < numInstrs; i++)
     numTotalRgns += synthfile->vInstrs[i]->vRgns.size();
 
-  ibagCk->size = (numTotalRgns + 1) * sizeof(sfInstBag);
-  ibagCk->data = new uint8_t[ibagCk->size];
+  ibagCk->setSize((numTotalRgns + 1) * sizeof(sfInstBag));
+  ibagCk->data = new uint8_t[ibagCk->size()];
 
   rgnCounter = 0;
   int instGenCounter = 0;
@@ -232,7 +233,7 @@ SF2File::SF2File(SynthFile *synthfile)
   instBag.wInstGenNdx = instGenCounter;
   instBag.wInstModNdx = 0;
   memcpy(ibagCk->data + (rgnCounter * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
-  pdtaCk->AddChildChunk(ibagCk);
+  pdtaCk->addChildChunk(ibagCk);
 
   //***********
   // imod chunk
@@ -240,15 +241,15 @@ SF2File::SF2File(SynthFile *synthfile)
   Chunk *imodCk = new Chunk("imod");
   //  create the terminal field
   memset(&modList, 0, sizeof(sfModList));
-  imodCk->SetData(&modList, sizeof(sfModList));
-  pdtaCk->AddChildChunk(imodCk);
+  imodCk->setData(&modList, sizeof(sfModList));
+  pdtaCk->addChildChunk(imodCk);
 
   //***********
   // igen chunk
   //***********
   Chunk *igenCk = new Chunk("igen");
-  igenCk->size = (numTotalRgns * sizeof(sfInstGenList) * 12) + sizeof(sfInstGenList);
-  igenCk->data = new uint8_t[igenCk->size];
+  igenCk->setSize((numTotalRgns * sizeof(sfInstGenList) * 12) + sizeof(sfInstGenList));
+  igenCk->data = new uint8_t[igenCk->size()];
   dataPtr = 0;
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
@@ -283,7 +284,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
       // pan
       instGenList.sfGenOper = pan;
-      instGenList.genAmount.shAmount = static_cast<int16_t>(ConvertPercentPanTo10thPercentUnits(rgn->art->pan));
+      instGenList.genAmount.shAmount = static_cast<int16_t>(convertPercentPanTo10thPercentUnits(rgn->art->pan));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
@@ -302,21 +303,21 @@ SF2File::SF2File(SynthFile *synthfile)
       // attackVolEnv
       instGenList.sfGenOper = attackVolEnv;
       instGenList.genAmount.shAmount =
-          (rgn->art->attack_time == 0) ? -32768 : std::round(SecondsToTimecents(rgn->art->attack_time));
+          (rgn->art->attack_time == 0) ? -32768 : std::round(secondsToTimecents(rgn->art->attack_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
       // holdVolEnv
       instGenList.sfGenOper = holdVolEnv;
       instGenList.genAmount.shAmount =
-          (rgn->art->hold_time == 0) ? -32768 : std::round(SecondsToTimecents(rgn->art->hold_time));
+          (rgn->art->hold_time == 0) ? -32768 : std::round(secondsToTimecents(rgn->art->hold_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
       // decayVolEnv
       instGenList.sfGenOper = decayVolEnv;
       instGenList.genAmount.shAmount =
-          (rgn->art->decay_time == 0) ? -32768 : std::round(SecondsToTimecents(rgn->art->decay_time));
+          (rgn->art->decay_time == 0) ? -32768 : std::round(secondsToTimecents(rgn->art->decay_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
@@ -331,7 +332,7 @@ SF2File::SF2File(SynthFile *synthfile)
       // releaseVolEnv
       instGenList.sfGenOper = releaseVolEnv;
       instGenList.genAmount.shAmount =
-          (rgn->art->release_time == 0) ? -32768 : std::round(SecondsToTimecents(rgn->art->release_time));
+          (rgn->art->release_time == 0) ? -32768 : std::round(secondsToTimecents(rgn->art->release_time));
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
@@ -360,7 +361,7 @@ SF2File::SF2File(SynthFile *synthfile)
   memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
   //memset(ibagCk->data + (numRgns*sizeof(sfInstBag)), 0, sizeof(sfInstBag));
   //igenCk->SetData(&genList, sizeof(sfGenList));
-  pdtaCk->AddChildChunk(igenCk);
+  pdtaCk->addChildChunk(igenCk);
 
   //***********
   // shdr chunk
@@ -368,8 +369,8 @@ SF2File::SF2File(SynthFile *synthfile)
   Chunk *shdrCk = new Chunk("shdr");
 
   size_t numSamps = synthfile->vWaves.size();
-  shdrCk->size = static_cast<uint32_t>((numSamps + 1) * sizeof(sfSample));
-  shdrCk->data = new uint8_t[shdrCk->size];
+  shdrCk->setSize(static_cast<uint32_t>((numSamps + 1) * sizeof(sfSample)));
+  shdrCk->data = new uint8_t[shdrCk->size()];
 
   uint32_t sampOffset = 0;
   for (size_t i = 0; i < numSamps; i++) {
@@ -418,19 +419,19 @@ SF2File::SF2File(SynthFile *synthfile)
 
   //  add terminal sfSample
   memset(shdrCk->data + (numSamps * sizeof(sfSample)), 0, sizeof(sfSample));
-  pdtaCk->AddChildChunk(shdrCk);
+  pdtaCk->addChildChunk(shdrCk);
 
-  this->AddChildChunk(pdtaCk);
+  this->addChildChunk(pdtaCk);
 }
 
-std::vector<uint8_t> SF2File::SaveToMem() {
-  std::vector<uint8_t> buf(GetSize());
-  Write(buf.data());
+std::vector<uint8_t> SF2File::saveToMem() {
+  std::vector<uint8_t> buf(size());
+  write(buf.data());
   return buf;
 }
 
-bool SF2File::SaveSF2File(const std::string &filepath) {
-  auto buf = SaveToMem();
-  bool result = pRoot->UI_WriteBufferToFile(filepath, buf.data(), buf.size());
+bool SF2File::saveSF2File(const std::string &filepath) {
+  auto buf = saveToMem();
+  bool result = pRoot->UI_writeBufferToFile(filepath, buf.data(), buf.size());
   return result;
 }

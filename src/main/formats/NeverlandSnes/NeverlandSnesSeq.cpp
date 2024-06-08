@@ -11,24 +11,24 @@ DECLARE_FORMAT(NeverlandSnes);
 NeverlandSnesSeq::NeverlandSnesSeq(RawFile *file, NeverlandSnesVersion ver, uint32_t seqdataOffset)
     : VGMSeq(NeverlandSnesFormat::name, file, seqdataOffset), version(ver) {
   bLoadTickByTick = true;
-  bAllowDiscontinuousTrackData = true;
-  bUseLinearAmplitudeScale = true;
+  setAllowDiscontinuousTrackData(true);
+  setUseLinearAmplitudeScale(true);
 
-  UseReverb();
-  AlwaysWriteInitialReverb(0);
+  useReverb();
+  setAlwaysWriteInitialReverb(0);
 
-  LoadEventMap();
+  loadEventMap();
 }
 
 NeverlandSnesSeq::~NeverlandSnesSeq(void) {
 }
 
-void NeverlandSnesSeq::ResetVars(void) {
-  VGMSeq::ResetVars();
+void NeverlandSnesSeq::resetVars(void) {
+  VGMSeq::resetVars();
 }
 
-bool NeverlandSnesSeq::GetHeaderInfo(void) {
-  SetPPQN(SEQ_PPQN);
+bool NeverlandSnesSeq::parseHeader(void) {
+  setPPQN(SEQ_PPQN);
 
   VGMHeader *header = addHeader(dwOffset, 0);
   if (version == NEVERLANDSNES_SFC) {
@@ -47,7 +47,7 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
 
   const size_t NAME_SIZE = 12;
   char rawName[NAME_SIZE + 1] = {0};
-  GetBytes(dwOffset + 4, NAME_SIZE, rawName);
+  readBytes(dwOffset + 4, NAME_SIZE, rawName);
   header->addChild(dwOffset + 4, 12, "Song Name");
 
   // trim name text
@@ -68,7 +68,7 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t trackSignPtr = dwOffset + 0x10 + trackIndex;
-    uint8_t trackSign = GetByte(trackSignPtr);
+    uint8_t trackSign = readByte(trackSignPtr);
 
     std::stringstream trackSignName;
     trackSignName << "Track " << (trackIndex + 1) << " Entry";
@@ -76,7 +76,7 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
 
     uint16_t sectionListOffsetPtr = dwOffset + 0x20 + (trackIndex * 2);
     if (trackSign != 0xff) {
-      uint16_t sectionListAddress = GetShortAddress(sectionListOffsetPtr);
+      uint16_t sectionListAddress = getShortAddress(sectionListOffsetPtr);
 
       std::stringstream playlistName;
       playlistName << "Track " << (trackIndex + 1) << " Playlist Pointer";
@@ -93,15 +93,15 @@ bool NeverlandSnesSeq::GetHeaderInfo(void) {
   return true;
 }
 
-bool NeverlandSnesSeq::GetTrackPointers(void) {
+bool NeverlandSnesSeq::parseTrackPointers(void) {
   return true;
 }
 
-void NeverlandSnesSeq::LoadEventMap() {
+void NeverlandSnesSeq::loadEventMap() {
   // TODO: NeverlandSnesSeq::LoadEventMap
 }
 
-uint16_t NeverlandSnesSeq::ConvertToAPUAddress(uint16_t offset) {
+uint16_t NeverlandSnesSeq::convertToApuAddress(uint16_t offset) {
   if (version == NEVERLANDSNES_S2C) {
     return dwOffset + offset;
   }
@@ -110,8 +110,8 @@ uint16_t NeverlandSnesSeq::ConvertToAPUAddress(uint16_t offset) {
   }
 }
 
-uint16_t NeverlandSnesSeq::GetShortAddress(uint32_t offset) {
-  return ConvertToAPUAddress(GetShort(offset));
+uint16_t NeverlandSnesSeq::getShortAddress(uint32_t offset) {
+  return convertToApuAddress(readShort(offset));
 }
 
 //  ******************
@@ -120,16 +120,16 @@ uint16_t NeverlandSnesSeq::GetShortAddress(uint32_t offset) {
 
 NeverlandSnesTrack::NeverlandSnesTrack(NeverlandSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
-  ResetVars();
+  resetVars();
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
 }
 
-void NeverlandSnesTrack::ResetVars(void) {
-  SeqTrack::ResetVars();
+void NeverlandSnesTrack::resetVars(void) {
+  SeqTrack::resetVars();
 }
 
-bool NeverlandSnesTrack::ReadEvent(void) {
+bool NeverlandSnesTrack::readEvent(void) {
   NeverlandSnesSeq *parentSeq = (NeverlandSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
@@ -137,7 +137,7 @@ bool NeverlandSnesTrack::ReadEvent(void) {
     return false;
   }
 
-  uint8_t statusByte = GetByte(curOffset++);
+  uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::stringstream desc;
@@ -151,60 +151,60 @@ bool NeverlandSnesTrack::ReadEvent(void) {
   switch (eventType) {
     case EVENT_UNKNOWN0:
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2
           << "  Arg3: " << (int) arg3;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
-      uint8_t arg4 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
+      uint8_t arg4 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2
           << "  Arg3: " << (int) arg3
           << "  Arg4: " << (int) arg4;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     default: {
       auto descr = logEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
     }
@@ -217,12 +217,12 @@ bool NeverlandSnesTrack::ReadEvent(void) {
   return bContinue;
 }
 
-uint16_t NeverlandSnesTrack::ConvertToAPUAddress(uint16_t offset) {
+uint16_t NeverlandSnesTrack::convertToApuAddress(uint16_t offset) {
   NeverlandSnesSeq *parentSeq = (NeverlandSnesSeq *) this->parentSeq;
-  return parentSeq->ConvertToAPUAddress(offset);
+  return parentSeq->convertToApuAddress(offset);
 }
 
-uint16_t NeverlandSnesTrack::GetShortAddress(uint32_t offset) {
+uint16_t NeverlandSnesTrack::getShortAddress(uint32_t offset) {
   NeverlandSnesSeq *parentSeq = (NeverlandSnesSeq *) this->parentSeq;
-  return parentSeq->GetShortAddress(offset);
+  return parentSeq->getShortAddress(offset);
 }

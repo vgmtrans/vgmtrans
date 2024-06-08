@@ -51,8 +51,8 @@ public:
   );
   ~DialogicAdpcmSamp() override;
 
-  double GetCompressionRatio() override;
-  void ConvertToStdWave(uint8_t *buf) override;
+  double compressionRatio() override;
+  void convertToStdWave(uint8_t *buf) override;
 
 private:
   static oki_adpcm_state okiAdpcmState;

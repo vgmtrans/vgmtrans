@@ -16,8 +16,8 @@ class ItikitiSnesInstrSet : public VGMInstrSet {
   ItikitiSnesInstrSet(RawFile *file, uint32_t tuning_offset, uint32_t adsr_offset,
                       uint16_t spc_dir_offset, std::string name = "ItikitiSnesInstrSet");
 
-  bool GetHeaderInfo() override { return true; }
-  bool GetInstrPointers() override;
+  bool parseHeader() override { return true; }
+  bool parseInstrPointers() override;
 
   [[nodiscard]] uint16_t spc_dir_offset() const { return m_spc_dir_offset; }
 
@@ -34,7 +34,7 @@ class ItikitiSnesInstr : public VGMInstr {
                    uint32_t bank, uint32_t instrument_number, uint8_t srcn, uint16_t spc_dir_offset,
                    std::string name = "ItikitiSnesInstr");
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
   [[nodiscard]] uint16_t spc_dir_offset() const { return m_spc_dir_offset; }
 
@@ -50,7 +50,7 @@ class ItikitiSnesRgn : public VGMRgn {
   ItikitiSnesRgn(ItikitiSnesInstr *instrument, uint32_t tuning_offset, uint32_t adsr_offset,
                  uint8_t srcn);
 
-  bool LoadRgn() override { return true; }
+  bool loadRgn() override { return true; }
 
 private:
   // uint32_t m_tuning_offset{};

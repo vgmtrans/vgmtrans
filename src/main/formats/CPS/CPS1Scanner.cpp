@@ -13,9 +13,9 @@
 
 class CPS1SampleInstrSet;
 
-void CPS1Scanner::Scan(RawFile *file, void *info) {
+void CPS1Scanner::scan(RawFile *file, void *info) {
   MAMEGame *gameentry = static_cast<MAMEGame*>(info);
-  CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
+  CPSFormatVer fmt_ver = versionEnum(gameentry->fmt_version_str);
 
   if (fmt_ver == VER_UNDEFINED) {
     L_ERROR("XML entry uses an undefined format version: {}", gameentry->fmt_version_str);
@@ -29,32 +29,32 @@ void CPS1Scanner::Scan(RawFile *file, void *info) {
     case VER_CPS1_425:
     case VER_CPS1_500:
     case VER_CPS1_502:
-      LoadCPS1(gameentry, fmt_ver);
+      loadCPS1(gameentry, fmt_ver);
       break;
     default:
       break;
   }
 }
 
-void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
+void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   CPS1SampleInstrSet *instrset = nullptr;
   CPS1SampColl *sampcoll = nullptr;
 
-  MAMERomGroup* seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
+  MAMERomGroup* seqRomGroupEntry = gameentry->getRomGroupOfType("audiocpu");
   if (!seqRomGroupEntry)
     return;
   uint32_t seq_table_offset;
   uint32_t seq_table_length;
   if (!seqRomGroupEntry->file ||
-      !seqRomGroupEntry->GetHexAttribute("seq_table", &seq_table_offset))
+      !seqRomGroupEntry->getHexAttribute("seq_table", &seq_table_offset))
     return;
 
   RawFile *programFile = seqRomGroupEntry->file;
 
-  MAMERomGroup* sampsRomGroupEntry = gameentry->GetRomGroupOfType("oki6295");
+  MAMERomGroup* sampsRomGroupEntry = gameentry->getRomGroupOfType("oki6295");
   if (sampsRomGroupEntry && sampsRomGroupEntry->file) {
     uint32_t instrTablePtrOffset = 4;
-    uint32_t instr_table_offset = programFile->GetShortBE(seq_table_offset + instrTablePtrOffset);
+    uint32_t instr_table_offset = programFile->readShortBE(seq_table_offset + instrTablePtrOffset);
 
     RawFile *samplesFile = sampsRomGroupEntry->file;
 
@@ -65,13 +65,13 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
                                       fmt_ver,
                                       instr_table_offset,
                                       instrset_name);
-    if (!instrset->LoadVGMFile()) {
+    if (!instrset->loadVGMFile()) {
       delete instrset;
       instrset = nullptr;
     }
 
     sampcoll = new CPS1SampColl(samplesFile, instrset, 0, static_cast<uint32_t>(samplesFile->size()), sampcoll_name);
-    if (!sampcoll->LoadVGMFile()) {
+    if (!sampcoll->loadVGMFile()) {
       delete sampcoll;
       sampcoll = nullptr;
     }
@@ -94,10 +94,10 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     case VER_CPS1_350:
     case VER_CPS1_425:
     case VER_CPS1_500:
-      seq_table_length = static_cast<uint32_t>(programFile->GetByte(seq_table_offset) * 2) + ptrsStart;
+      seq_table_length = static_cast<uint32_t>(programFile->readByte(seq_table_offset) * 2) + ptrsStart;
       break;
     case VER_CPS1_502:
-      seq_table_length = static_cast<uint32_t>(programFile->GetShortBE(seq_table_offset) * 2) + ptrsStart;
+      seq_table_length = static_cast<uint32_t>(programFile->readShortBE(seq_table_offset) * 2) + ptrsStart;
       break;
     default:
       L_ERROR("Unknown version of CPS1 format: {}", static_cast<uint8_t>(fmt_ver));
@@ -109,7 +109,7 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
 
   // Add SeqTable as Miscfile
   VGMMiscFile *seqTable = new VGMMiscFile(CPS1Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
-  if (!seqTable->LoadVGMFile()) {
+  if (!seqTable->loadVGMFile()) {
     delete seqTable;
     return;
   }
@@ -117,7 +117,7 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   int seqNum = 0;
   for (k = ptrsStart; (seq_table_length == 0 || k < seq_table_length); k += ptrSize) {
 
-    seqPointer = programFile->GetShortBE(seq_table_offset + k);
+    seqPointer = programFile->readShortBE(seq_table_offset + k);
 
     if (seqPointer == 0) {
       continue;
@@ -128,7 +128,7 @@ void CPS1Scanner::LoadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     auto seqName = fmt::format("{} seq {}", gameentry->name, seqNum);
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
 
-    if (!newSeq->LoadVGMFile()) {
+    if (!newSeq->loadVGMFile()) {
       delete newSeq;
       continue;
     }

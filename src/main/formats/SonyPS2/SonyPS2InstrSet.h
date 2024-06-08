@@ -100,8 +100,8 @@ class SonyPS2Instr
   SonyPS2Instr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
   ~SonyPS2Instr() override;
 
-  bool LoadInstr() override;
-  int8_t ConvertPanVal(uint8_t panVal);
+  bool loadInstr() override;
+  int8_t convertPanValue(uint8_t panVal);
 
  public:
   SplitBlock *splitBlocks{};
@@ -247,8 +247,8 @@ class SonyPS2InstrSet
   SonyPS2InstrSet(RawFile *file, uint32_t offset);
   ~SonyPS2InstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
  protected:
   VersCk versCk;
@@ -269,5 +269,5 @@ class SonyPS2SampColl
  public:
   SonyPS2SampColl(RawFile *file, uint32_t offset, uint32_t length = 0);
 
-  bool GetSampleInfo() override;
+  bool parseSampleInfo() override;
 };

@@ -9,9 +9,9 @@ class OrgSeq:
  public:
   OrgSeq(RawFile *file, uint32_t offset);
  public:
-  virtual ~OrgSeq(void);
+  virtual ~OrgSeq();
 
-  virtual bool GetHeaderInfo(void);
+  virtual bool parseHeader();
 
  public:
   uint16_t waitTime;        //I believe this is the millis per tick
@@ -24,8 +24,8 @@ class OrgTrack
  public:
   OrgTrack(OrgSeq *parentFile, uint32_t offset, uint32_t length, uint8_t realTrk);
 
-  virtual bool LoadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta);
-  virtual bool ReadEvent(void);
+  virtual bool loadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta);
+  virtual bool readEvent();
 
  public:
   uint8_t prevPan;

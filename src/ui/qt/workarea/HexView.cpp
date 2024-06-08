@@ -208,7 +208,7 @@ bool HexView::event(QEvent *e) {
       return true;
     }
 
-    if (VGMItem* item = vgmfile->GetItemFromOffset(offset, false)) {
+    if (VGMItem* item = vgmfile->getItemAtOffset(offset, false)) {
       auto description = getFullDescriptionForTooltip(item);
       if (!description.isEmpty()) {
         QToolTip::showText(helpevent->globalPos(), description, this);
@@ -322,7 +322,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
     selectNewOffset:
       if (newOffset >= vgmfile->dwOffset && newOffset < (vgmfile->dwOffset + vgmfile->unLength)) {
         selectedOffset = newOffset;
-        if (auto item = vgmfile->GetItemFromOffset(newOffset, false)) {
+        if (auto item = vgmfile->getItemAtOffset(newOffset, false)) {
           selectionChanged(item);
         }
       }
@@ -376,7 +376,7 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
 
       auto itemData = std::vector<uint8_t>(selectedItem->unLength);
-      vgmfile->GetBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
+      vgmfile->readBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
 
       QColor bgColor = colorForEventColor(selectedItem->color);
       QColor textColor = textColorForEventColor(selectedItem->color);
@@ -489,11 +489,11 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) con
   QColor windowColor = this->palette().color(QPalette::Window);
 
   uint8_t data[16];
-  vgmfile->GetBytes(startAddress, bytesToPrint, data);
+  vgmfile->readBytes(startAddress, bytesToPrint, data);
   int emptyAddressBytes = 0;
   auto offset = 0;
   while (offset < bytesToPrint) {
-    if (auto item = vgmfile->GetItemFromOffset(startAddress + offset, false)) {
+    if (auto item = vgmfile->getItemAtOffset(startAddress + offset, false)) {
       if (emptyAddressBytes > 0) {
         int dataOffset = offset - emptyAddressBytes;
         int col = startCol + dataOffset;
@@ -726,7 +726,7 @@ void HexView::mousePressEvent(QMouseEvent *event) {
     }
 
     this->selectedOffset = offset;
-    auto item = vgmfile->GetItemFromOffset(offset, false);
+    auto item = vgmfile->getItemAtOffset(offset, false);
     if (item == selectedItem) {
       selectionChanged(nullptr);
     } else {
@@ -760,7 +760,7 @@ void HexView::mouseMoveEvent(QMouseEvent *event) {
         (selectedOffset < (selectedItem->dwOffset + selectedItem->unLength))) {
       return;
     }
-    auto item = vgmfile->GetItemFromOffset(offset, false);
+    auto item = vgmfile->getItemAtOffset(offset, false);
     if (item != selectedItem) {
       selectionChanged(item);
     }

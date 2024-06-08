@@ -20,36 +20,36 @@ DECLARE_FORMAT(CPS2);
 CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::string name)
     : VGMSeq(CPS2Format::name, file, offset, 0, std::move(name)),
       fmt_version(fmtVersion) {
-  HasMonophonicTracks();
-  AlwaysWriteInitialVol(127);
-  AlwaysWriteInitialMonoMode();
+  usesMonophonicTracks();
+  setAlwaysWriteInitialVol(127);
+  setAlwaysWriteInitialMonoMode(true);
   // Until we add CPS3 vibrato and pitch bend using markers, set the default pitch bend range here
   if (fmt_version >= VER_200)
-    AlwaysWriteInitialPitchBendRange(12, 0);
+    setAlwaysWriteInitialPitchBendRange(12 * 100);
 }
 
 CPSSeq::~CPSSeq() {
 }
 
-bool CPSSeq::GetHeaderInfo() {
-  SetPPQN(0x30);
+bool CPSSeq::parseHeader() {
+  setPPQN(0x30);
   return true;
 }
 
 
-bool CPSSeq::GetTrackPointers() {
+bool CPSSeq::parseTrackPointers() {
   // CPS1 games sometimes have this set. Suggests 4 byte seq.
   // Oddly, some tracks have first byte set to 0x92 in D&D Shadow Over Mystara
-  if ((GetByte(dwOffset) & 0x80) > 0)
+  if ((readByte(dwOffset) & 0x80) > 0)
     return false;
 
   this->addHeader(dwOffset, 1, "Sequence Flags");
-  VGMHeader *header = this->addHeader(dwOffset + 1, GetShortBE(dwOffset + 1) - 1, "Track Pointers");
+  VGMHeader *header = this->addHeader(dwOffset + 1, readShortBE(dwOffset + 1) - 1, "Track Pointers");
 
   const int maxTracks = fmt_version <= VER_CPS1_502 ? 12 : 16;
 
   for (int i = 0; i < maxTracks; i++) {
-    uint32_t offset = GetShortBE(dwOffset + 1 + i * 2);
+    uint32_t offset = readShortBE(dwOffset + 1 + i * 2);
     if (offset == 0) {
       header->addChild(dwOffset + 1 + (i * 2), 2, "No Track");
       continue;
@@ -85,8 +85,8 @@ bool CPSSeq::GetTrackPointers() {
   return true;
 }
 
-bool CPSSeq::PostLoad() {
-  bool succeeded = VGMSeq::PostLoad();
+bool CPSSeq::postLoad() {
+  bool succeeded = VGMSeq::postLoad();
 
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return true;
@@ -129,10 +129,9 @@ bool CPSSeq::PostLoad() {
     std::ranges::stable_sort(events, AbsTimeCmp());
 
     // And now we add vibrato and pitch bend events
-    const uint32_t ppqn = GetPPQN();                    // pulses (ticks) per quarter note
     const uint32_t mpLFOt = static_cast<uint32_t>(1000000 / UPDATE_RATE_IN_HZ);    // microseconds per LFO tick
     uint32_t mpqn = 500000;      // microseconds per quarter note - 120 bpm default
-    uint32_t mpt = mpqn / ppqn;  // microseconds per MIDI tick
+    uint32_t mpt = mpqn / ppqn();  // microseconds per MIDI tick = microseconds per quarter / pulses per quarter note
     int16_t pitchbendCents = 0;         // pitch bend in cents
     // This represents the pitch bend range set for the MIDI track. It will change to accomodate
     // vibrato depth. When vibrato depth changes, this becomes the format's actual pitch bend range
@@ -190,7 +189,7 @@ bool CPSSeq::PostLoad() {
 
           // If the track has enabled tremelo at this point, insert expression events.
           if (tremelo > 0) {
-            uint8_t expression = ConvertPercentAmpToStdMidiVal((0x10000 - (tremelo * fabs(lfoPercent))) / static_cast<double>(0x10000));
+            uint8_t expression = convertPercentAmpToStdMidiVal((0x10000 - (tremelo * fabs(lfoPercent))) / static_cast<double>(0x10000));
             track->InsertExpression(channel, expression, startAbsTicks + t);
           }
         }
@@ -204,7 +203,7 @@ bool CPSSeq::PostLoad() {
         case MIDIEVENT_TEMPO: {
           TempoEvent *tempoevent = static_cast<TempoEvent*>(event);
           mpqn = tempoevent->microSecs;
-          mpt = mpqn / ppqn;
+          mpt = mpqn / ppqn();
           break;
         }
 
@@ -221,7 +220,7 @@ bool CPSSeq::PostLoad() {
             // nearest MSB. This doesn't really matter, as we calculate pitch bend in absolute terms
             // (cents) and we're passing 14 bit resolution pitch bend events. It's arguably more
             // elegant to normalize pitch bend range to semitone units anyway.
-            track->InsertPitchBendRange(channel, pitchBendRangeMSB, 0, curTicks);
+            track->InsertPitchBendRange(channel, pitchbendRange, curTicks);
             lfoCents = static_cast<int16_t>((effectiveLfoVal / static_cast<double>(0x1000000)) * vibratoCents);
 
             if (curTicks > 0)

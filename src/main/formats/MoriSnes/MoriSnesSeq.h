@@ -52,11 +52,11 @@ class MoriSnesSeq : public VGMSeq {
   MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::string name = "Mint SNES Seq");
   virtual ~MoriSnesSeq();
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetTrackPointers();
-  virtual void ResetVars();
+  virtual bool parseHeader();
+  virtual bool parseTrackPointers();
+  virtual void resetVars();
 
-  double GetTempoInBPM(uint8_t tempo, bool fastTempo);
+  double getTempoInBPM(uint8_t tempo, bool fastTempo);
 
   MoriSnesVersion version;
   std::map<uint8_t, MoriSnesSeqEventType> EventMap;
@@ -69,18 +69,18 @@ class MoriSnesSeq : public VGMSeq {
   bool fastTempo;
 
  private:
-  void LoadEventMap();
+  void loadEventMap();
 };
 
 class MoriSnesTrack
     : public SeqTrack {
  public:
   MoriSnesTrack(MoriSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  virtual void ResetVars();
-  virtual bool ReadEvent();
+  virtual void resetVars();
+  virtual bool readEvent();
 
-  void ParseInstrument(uint16_t instrAddress, uint8_t instrNum);
-  void ParseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion = false, uint8_t percNoteKey = 0);
+  void parseInstrument(uint16_t instrAddress, uint8_t instrNum);
+  void parseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion = false, uint8_t percNoteKey = 0);
 
  private:
   std::list<int8_t> tiedNoteKeys;

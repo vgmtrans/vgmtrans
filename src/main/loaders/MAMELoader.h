@@ -23,7 +23,7 @@ Converts a std::string to any class with a proper overload of the >> operator
 @param out	[OUT]	The container for the returned value
 */
 template <class T>
-void FromString(const std::string &temp, T *out) {
+void fromString(const std::string &temp, T *out) {
   std::istringstream val(temp);
   val >> *out;
 
@@ -32,15 +32,15 @@ void FromString(const std::string &temp, T *out) {
 
 struct MAMERomGroup {
     template <class T>
-    bool GetAttribute(const std::string &attrName, T *out) {
+    bool getAttribute(const std::string &attrName, T *out) {
         std::string strValue = attributes[attrName];
         if (strValue.empty())
             return false;  // Attribute name does not exist.
 
-        FromString(strValue, out);
+        fromString(strValue, out);
         return true;
     }
-    bool GetHexAttribute(const std::string &attrName, uint32_t *out) const;
+    bool getHexAttribute(const std::string &attrName, uint32_t *out) const;
 
     LoadMethod loadmethod{LoadMethod::APPEND};
     LoadOrder load_order{LoadOrder::NORMAL};
@@ -52,7 +52,7 @@ struct MAMERomGroup {
 };
 
 struct MAMEGame {
-    MAMERomGroup *GetRomGroupOfType(const std::string &strType);
+    MAMERomGroup *getRomGroupOfType(const std::string &strType);
 
     std::string name;
     std::string format;
@@ -69,13 +69,13 @@ class MAMELoader : public FileLoader {
     void apply(const RawFile *theFile) override;
 
    private:
-    static VirtFile *LoadRomGroup(const MAMERomGroup &romgroup, const std::string &format,
+    static VirtFile *loadRomGroup(const MAMERomGroup &romgroup, const std::string &format,
                                   const unzFile &cur_file);
-    static void DeleteBuffers(const std::list<std::pair<uint8_t *, uint32_t>> &buffers);
+    static void deleteBuffers(const std::list<std::pair<uint8_t *, uint32_t>> &buffers);
 
-    int LoadXML();
-    static MAMEGame *LoadGameEntry(TiXmlElement *gameElmt);
-    static int LoadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentry);
+    int loadXML();
+    static MAMEGame *loadGameEntry(TiXmlElement *gameElmt);
+    static int loadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentry);
 
     GameMap gamemap;
     bool bLoadedXml;

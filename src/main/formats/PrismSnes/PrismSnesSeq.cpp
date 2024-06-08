@@ -29,20 +29,20 @@ PrismSnesSeq::PrismSnesSeq(RawFile *file, PrismSnesVersion ver, uint32_t seqdata
     : VGMSeq(PrismSnesFormat::name, file, seqdataOffset, 0, newName), version(ver),
       envContainer(NULL) {
   bLoadTickByTick = true;
-  bAllowDiscontinuousTrackData = true;
-  bUseLinearAmplitudeScale = true;
+  setAllowDiscontinuousTrackData(true);
+  setUseLinearAmplitudeScale(true);
 
-  UseReverb();
-  AlwaysWriteInitialReverb(0);
-  AlwaysWriteInitialTempo(GetTempoInBPM(0x82));
+  useReverb();
+  setAlwaysWriteInitialReverb(0);
+  setAlwaysWriteInitialTempo(getTempoInBPM(0x82));
 
-  LoadEventMap();
+  loadEventMap();
 }
 
 PrismSnesSeq::~PrismSnesSeq() {
 }
 
-void PrismSnesSeq::DemandEnvelopeContainer(uint32_t offset) {
+void PrismSnesSeq::demandEnvelopeContainer(uint32_t offset) {
   if (envContainer == NULL) {
     envContainer = addHeader(offset, 0, "Envelopes");
   }
@@ -55,14 +55,14 @@ void PrismSnesSeq::DemandEnvelopeContainer(uint32_t offset) {
   }
 }
 
-void PrismSnesSeq::ResetVars() {
-  VGMSeq::ResetVars();
+void PrismSnesSeq::resetVars() {
+  VGMSeq::resetVars();
 
   conditionSwitch = false;
 }
 
-bool PrismSnesSeq::GetHeaderInfo() {
-  SetPPQN(SEQ_PPQN);
+bool PrismSnesSeq::parseHeader() {
+  setPPQN(SEQ_PPQN);
 
   VGMHeader *header = addHeader(dwOffset, 0);
 
@@ -72,7 +72,7 @@ bool PrismSnesSeq::GetHeaderInfo() {
       return false;
     }
 
-    uint8_t channel = GetByte(curOffset);
+    uint8_t channel = readByte(curOffset);
     if (channel >= 0x80) {
       header->addChild(curOffset, 1, "Header End");
       break;
@@ -88,11 +88,11 @@ bool PrismSnesSeq::GetHeaderInfo() {
     trackHeader->addChild(curOffset, 1, "Logical Channel");
     curOffset++;
 
-    uint8_t a01 = GetByte(curOffset);
+    uint8_t a01 = readByte(curOffset);
     trackHeader->addChild(curOffset, 1, "Physical Channel + Flags");
     curOffset++;
 
-    uint16_t addrTrackStart = GetShort(curOffset);
+    uint16_t addrTrackStart = readShort(curOffset);
     trackHeader->addChild(curOffset, 2, "Track Pointer");
     curOffset += 2;
 
@@ -103,11 +103,11 @@ bool PrismSnesSeq::GetHeaderInfo() {
   return true;
 }
 
-bool PrismSnesSeq::GetTrackPointers(void) {
+bool PrismSnesSeq::parseTrackPointers(void) {
   return true;
 }
 
-void PrismSnesSeq::LoadEventMap() {
+void PrismSnesSeq::loadEventMap() {
   int statusByte;
 
   for (statusByte = 0x00; statusByte <= 0x7f; statusByte++) {
@@ -211,7 +211,7 @@ void PrismSnesSeq::LoadEventMap() {
   }
 }
 
-double PrismSnesSeq::GetTempoInBPM(uint8_t tempo) {
+double PrismSnesSeq::getTempoInBPM(uint8_t tempo) {
   if (tempo != 0) {
     return 60000000.0 / (SEQ_PPQN * (125 * tempo));
   }
@@ -226,13 +226,13 @@ double PrismSnesSeq::GetTempoInBPM(uint8_t tempo) {
 
 PrismSnesTrack::PrismSnesTrack(PrismSnesSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
-  ResetVars();
+  resetVars();
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
 }
 
-void PrismSnesTrack::ResetVars() {
-  SeqTrack::ResetVars();
+void PrismSnesTrack::resetVars() {
+  SeqTrack::resetVars();
 
   panTable.assign(std::begin(PrismSnesSeq::PAN_TABLE_1), std::end(PrismSnesSeq::PAN_TABLE_1));
 
@@ -247,7 +247,7 @@ void PrismSnesTrack::ResetVars() {
   subReturnAddr = 0;
 }
 
-bool PrismSnesTrack::ReadEvent() {
+bool PrismSnesTrack::readEvent() {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
@@ -255,7 +255,7 @@ bool PrismSnesTrack::ReadEvent() {
     return false;
   }
 
-  uint8_t statusByte = GetByte(curOffset++);
+  uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::stringstream desc;
@@ -269,60 +269,60 @@ bool PrismSnesTrack::ReadEvent() {
   switch (eventType) {
     case EVENT_UNKNOWN0:
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2
           << "  Arg3: " << (int) arg3;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
-      uint8_t arg4 = GetByte(curOffset++);
+      uint8_t arg1 = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
+      uint8_t arg4 = readByte(curOffset++);
       desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
           << std::dec << std::setfill(' ') << std::setw(0)
           << "  Arg1: " << (int) arg1
           << "  Arg2: " << (int) arg2
           << "  Arg3: " << (int) arg3
           << "  Arg4: " << (int) arg4;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_NOP2: {
       curOffset += 2;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str(), CLR_MISC, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str(), CLR_MISC, ICON_BINARY);
       break;
     }
 
@@ -331,36 +331,36 @@ bool PrismSnesTrack::ReadEvent() {
       uint8_t key = statusByte & 0x7f;
 
       uint8_t len;
-      if (!ReadDeltaTime(curOffset, len)) {
+      if (!readDeltaTime(curOffset, len)) {
         return false;
       }
 
       uint8_t durDelta;
-      if (!ReadDuration(curOffset, len, durDelta)) {
+      if (!readDuration(curOffset, len, durDelta)) {
         return false;
       }
 
-      uint8_t dur = GetDuration(curOffset, len, durDelta);
+      uint8_t dur = getDuration(curOffset, len, durDelta);
 
       if (slur) {
         prevNoteSlurred = true;
       }
 
       if (prevNoteSlurred && key == prevNoteKey) {
-        MakePrevDurNoteEnd(GetTime() + dur);
+        makePrevDurNoteEnd(getTime() + dur);
         desc << "Abs Key: " << key << " (" << MidiEvent::GetNoteName(key) << "  Velocity: " << NOTE_VELOCITY << "  Duration: "
             << dur;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Note (Tied)", desc.str(), CLR_DURNOTE, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Note (Tied)", desc.str(), CLR_DURNOTE, ICON_NOTE);
       }
       else {
         if (eventType == EVENT_NOISE_NOTE) {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur, "Noise Note");
+          addNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur, "Noise Note");
         }
         else {
-          AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur, "Note");
+          addNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur, "Note");
         }
       }
-      AddTime(len);
+      addTime(len);
 
       prevNoteKey = key;
       prevNoteSlurred = false;
@@ -368,95 +368,95 @@ bool PrismSnesTrack::ReadEvent() {
     }
 
     case EVENT_PITCH_SLIDE: {
-      uint8_t noteFrom = GetByte(curOffset++);
-      uint8_t noteTo = GetByte(curOffset++);
+      uint8_t noteFrom = readByte(curOffset++);
+      uint8_t noteTo = readByte(curOffset++);
 
       uint8_t noteNumberFrom = noteFrom & 0x7f;
       uint8_t noteNumberTo = noteTo & 0x7f;
 
       uint8_t len;
-      if (!ReadDeltaTime(curOffset, len)) {
+      if (!readDeltaTime(curOffset, len)) {
         return false;
       }
 
       uint8_t durDelta;
-      if (!ReadDuration(curOffset, len, durDelta)) {
+      if (!readDuration(curOffset, len, durDelta)) {
         return false;
       }
 
-      uint8_t dur = GetDuration(curOffset, len, durDelta);
+      uint8_t dur = getDuration(curOffset, len, durDelta);
 
       desc << "Note Number (From): " << noteNumberFrom << " ("
           << ((noteFrom & 0x80) != 0 ? "Noise" : MidiEvent::GetNoteName(noteNumberFrom)) << ")" <<
           "  Note Number (To): " << noteNumberTo << " ("
           << ((noteTo & 0x80) != 0 ? "Noise" : MidiEvent::GetNoteName(noteNumberTo)) << ")" <<
           "  Length: " << len << "  Duration: " << dur;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
 
-      AddNoteByDurNoItem(noteNumberFrom, NOTE_VELOCITY, dur);
-      AddTime(len);
+      addNoteByDurNoItem(noteNumberFrom, NOTE_VELOCITY, dur);
+      addTime(len);
       break;
     }
 
     case EVENT_TIE_WITH_DUR: {
       uint8_t len;
-      if (!ReadDeltaTime(curOffset, len)) {
+      if (!readDeltaTime(curOffset, len)) {
         return false;
       }
 
       uint8_t durDelta;
-      if (!ReadDuration(curOffset, len, durDelta)) {
+      if (!readDuration(curOffset, len, durDelta)) {
         return false;
       }
 
-      uint8_t dur = GetDuration(curOffset, len, durDelta);
+      uint8_t dur = getDuration(curOffset, len, durDelta);
 
       desc << "Length: " << len << "  Duration: " << dur;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie with Duration", desc.str(), CLR_TIE, ICON_NOTE);
-      MakePrevDurNoteEnd(GetTime() + dur);
-      AddTime(len);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie with Duration", desc.str(), CLR_TIE, ICON_NOTE);
+      makePrevDurNoteEnd(getTime() + dur);
+      addTime(len);
       break;
     }
 
     case EVENT_TIE: {
       prevNoteSlurred = true;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(), CLR_TIE, ICON_NOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(), CLR_TIE, ICON_NOTE);
       break;
     }
 
     case EVENT_UNKNOWN_EVENT_ED: {
-      uint8_t arg1 = GetByte(curOffset++);
-      uint16_t arg2 = GetShort(curOffset);
+      uint8_t arg1 = readByte(curOffset++);
+      uint16_t arg2 = readShort(curOffset);
       curOffset += 2;
       desc << "Arg1: " << arg1 << "  Arg2: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
           << arg2;
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
       break;
     }
 
     case EVENT_REST: {
       uint8_t len;
-      if (!ReadDeltaTime(curOffset, len)) {
+      if (!readDeltaTime(curOffset, len)) {
         return false;
       }
 
       desc << "Duration: " << len;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Rest", desc.str(), CLR_REST, ICON_REST);
-      AddTime(len);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Rest", desc.str(), CLR_REST, ICON_REST);
+      addTime(len);
       break;
     }
 
     case EVENT_TEMPO: {
-      uint8_t newTempo = GetByte(curOffset++);
-      AddTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->GetTempoInBPM(newTempo));
+      uint8_t newTempo = readByte(curOffset++);
+      addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
       break;
     }
 
     case EVENT_CONDITIONAL_JUMP: {
-      uint16_t dest = GetShort(curOffset);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump", desc.str(), CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump", desc.str(), CLR_LOOP);
 
       if (parentSeq->conditionSwitch) {
         curOffset = dest;
@@ -466,12 +466,12 @@ bool PrismSnesTrack::ReadEvent() {
 
     case EVENT_CONDITION: {
       parentSeq->conditionSwitch = true;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Condition On", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Condition On", desc.str(), CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_RESTORE_ECHO_PARAM: {
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Restore Echo Param",
                       desc.str(),
@@ -481,128 +481,128 @@ bool PrismSnesTrack::ReadEvent() {
     }
 
     case EVENT_SAVE_ECHO_PARAM: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Save Echo Param", desc.str(), CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Save Echo Param", desc.str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_SLUR_OFF: {
       slur = false;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
       break;
     }
 
     case EVENT_SLUR_ON: {
       slur = true;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
       break;
     }
 
     case EVENT_VOLUME_ENVELOPE: {
-      uint16_t envelopeAddress = GetShort(curOffset);
+      uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << envelopeAddress;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Volume Envelope", desc.str(), CLR_VOLUME, ICON_CONTROL);
-      AddVolumeEnvelope(envelopeAddress);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Envelope", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      addVolumeEnvelope(envelopeAddress);
       break;
     }
 
     case EVENT_DEFAULT_PAN_TABLE_1: {
       panTable.assign(std::begin(PrismSnesSeq::PAN_TABLE_1), std::end(PrismSnesSeq::PAN_TABLE_1));
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Default Pan Table #1", desc.str(), CLR_PAN, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Default Pan Table #1", desc.str(), CLR_PAN, ICON_CONTROL);
       break;
     }
 
     case EVENT_DEFAULT_PAN_TABLE_2: {
       panTable.assign(std::begin(PrismSnesSeq::PAN_TABLE_2), std::end(PrismSnesSeq::PAN_TABLE_2));
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Default Pan Table #2", desc.str(), CLR_PAN, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Default Pan Table #2", desc.str(), CLR_PAN, ICON_CONTROL);
       break;
     }
 
     case EVENT_INC_APU_PORT_3: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Increment APU Port 3", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Increment APU Port 3", desc.str(), CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_INC_APU_PORT_2: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Increment APU Port 2", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Increment APU Port 2", desc.str(), CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_PLAY_SONG_3: {
-      uint8_t songIndex = GetByte(curOffset++);
+      uint8_t songIndex = readByte(curOffset++);
       desc << "Song Index: " << songIndex;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (3)", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (3)", desc.str(), CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_PLAY_SONG_2: {
-      uint8_t songIndex = GetByte(curOffset++);
+      uint8_t songIndex = readByte(curOffset++);
       desc << "Song Index: " << songIndex;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (2)", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (2)", desc.str(), CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_PLAY_SONG_1: {
-      uint8_t songIndex = GetByte(curOffset++);
+      uint8_t songIndex = readByte(curOffset++);
       desc << "Song Index: " << songIndex;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (1)", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (1)", desc.str(), CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_TRANSPOSE_REL: {
-      int8_t delta = GetByte(curOffset++);
-      AddTranspose(beginOffset, curOffset - beginOffset, transpose + delta, "Transpose (Relative)");
+      int8_t delta = readByte(curOffset++);
+      addTranspose(beginOffset, curOffset - beginOffset, transpose + delta, "Transpose (Relative)");
       break;
     }
 
     case EVENT_PAN_ENVELOPE: {
-      uint16_t envelopeAddress = GetShort(curOffset);
+      uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
-      uint16_t envelopeSpeed = GetByte(curOffset++);
+      uint16_t envelopeSpeed = readByte(curOffset++);
       desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << envelopeAddress
           << "  Speed: " << std::dec << std::setfill(' ') << std::setw(0) << envelopeSpeed;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan Envelope", desc.str(), CLR_PAN, ICON_CONTROL);
-      AddPanEnvelope(envelopeAddress);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Envelope", desc.str(), CLR_PAN, ICON_CONTROL);
+      addPanEnvelope(envelopeAddress);
       break;
     }
 
     case EVENT_PAN_TABLE: {
-      uint16_t panTableAddress = GetShort(curOffset);
+      uint16_t panTableAddress = readShort(curOffset);
       curOffset += 2;
       desc << "Pan Table: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << panTableAddress;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan Table", desc.str(), CLR_PAN, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Table", desc.str(), CLR_PAN, ICON_CONTROL);
 
       // update pan table
       if (panTableAddress + 21 <= 0x10000) {
         uint8_t newPanTable[21];
-        GetBytes(panTableAddress, 21, newPanTable);
+        readBytes(panTableAddress, 21, newPanTable);
         panTable.assign(std::begin(newPanTable), std::end(newPanTable));
       }
 
-      AddPanTable(panTableAddress);
+      addPanTable(panTableAddress);
       break;
     }
 
     case EVENT_DEFAULT_LENGTH_OFF: {
       defaultLength = 0;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Default Length Off", desc.str(), CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Default Length Off", desc.str(), CLR_DURNOTE);
       break;
     }
 
     case EVENT_DEFAULT_LENGTH: {
-      defaultLength = GetByte(curOffset++);
+      defaultLength = readByte(curOffset++);
       desc << "Duration: " << defaultLength;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Default Length", desc.str(), CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Default Length", desc.str(), CLR_DURNOTE);
       break;
     }
 
     case EVENT_LOOP_UNTIL: {
-      uint8_t count = GetByte(curOffset++);
-      uint16_t dest = GetShort(curOffset);
+      uint8_t count = readByte(curOffset++);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc << "Loop Count: " << count << "  Destination: $" << std::hex << std::setfill('0') << std::setw(4)
           << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until", desc.str(), CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       bool doJump;
       if (loopCount == 0) {
@@ -627,12 +627,12 @@ bool PrismSnesTrack::ReadEvent() {
     }
 
     case EVENT_LOOP_UNTIL_ALT: {
-      uint8_t count = GetByte(curOffset++);
-      uint16_t dest = GetShort(curOffset);
+      uint8_t count = readByte(curOffset++);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc << "Loop Count: " << count << "  Destination: $" << std::hex << std::setfill('0') << std::setw(4)
           << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until (Alt)", desc.str(), CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until (Alt)", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       bool doJump;
       if (loopCountAlt == 0) {
@@ -657,7 +657,7 @@ bool PrismSnesTrack::ReadEvent() {
     }
 
     case EVENT_RET: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc.str(), CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       if (subReturnAddr != 0) {
         curOffset = subReturnAddr;
@@ -668,10 +668,10 @@ bool PrismSnesTrack::ReadEvent() {
     }
 
     case EVENT_CALL: {
-      uint16_t dest = GetShort(curOffset);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc.str(), CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc.str(), CLR_LOOP, ICON_STARTREP);
 
       subReturnAddr = curOffset;
       curOffset = dest;
@@ -680,21 +680,21 @@ bool PrismSnesTrack::ReadEvent() {
     }
 
     case EVENT_GOTO: {
-      uint16_t dest = GetShort(curOffset);
+      uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
       uint32_t length = curOffset - beginOffset;
 
-      if (curOffset < 0x10000 && GetByte(curOffset) == 0xff) {
-        AddGenericEvent(curOffset, 1, "End of Track", "", CLR_TRACKEND, ICON_TRACKEND);
+      if (curOffset < 0x10000 && readByte(curOffset) == 0xff) {
+        addGenericEvent(curOffset, 1, "End of Track", "", CLR_TRACKEND, ICON_TRACKEND);
       }
 
       curOffset = dest;
-      if (!IsOffsetUsed(dest)) {
-        AddGenericEvent(beginOffset, length, "Jump", desc.str(), CLR_LOOPFOREVER);
+      if (!isOffsetUsed(dest)) {
+        addGenericEvent(beginOffset, length, "Jump", desc.str(), CLR_LOOPFOREVER);
       }
       else {
-        bContinue = AddLoopForever(beginOffset, length, "Jump");
+        bContinue = addLoopForever(beginOffset, length, "Jump");
       }
 
       if (curOffset < dwOffset) {
@@ -705,41 +705,41 @@ bool PrismSnesTrack::ReadEvent() {
     }
 
     case EVENT_TRANSPOSE: {
-      int8_t newTranspose = GetByte(curOffset++);
-      AddTranspose(beginOffset, curOffset - beginOffset, newTranspose);
+      int8_t newTranspose = readByte(curOffset++);
+      addTranspose(beginOffset, curOffset - beginOffset, newTranspose);
       break;
     }
 
     case EVENT_TUNING: {
-      uint8_t newTuning = GetByte(curOffset++);
+      uint8_t newTuning = readByte(curOffset++);
       double semitones = newTuning / 256.0;
-      AddFineTuning(beginOffset, curOffset - beginOffset, semitones * 100.0);
+      addFineTuning(beginOffset, curOffset - beginOffset, semitones * 100.0);
       break;
     }
 
     case EVENT_VIBRATO_DELAY: {
-      uint8_t lfoDelay = GetByte(curOffset++);
+      uint8_t lfoDelay = readByte(curOffset++);
       desc << "Delay: " << (int) lfoDelay;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Delay", desc.str(), CLR_MODULATION, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Delay", desc.str(), CLR_MODULATION, ICON_CONTROL);
       break;
     }
 
     case EVENT_VIBRATO_OFF: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc.str(), CLR_MODULATION, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc.str(), CLR_MODULATION, ICON_CONTROL);
       break;
     }
 
     case EVENT_VIBRATO: {
-      uint8_t lfoDelay = GetByte(curOffset++);
-      uint8_t arg2 = GetByte(curOffset++);
-      uint8_t arg3 = GetByte(curOffset++);
+      uint8_t lfoDelay = readByte(curOffset++);
+      uint8_t arg2 = readByte(curOffset++);
+      uint8_t arg3 = readByte(curOffset++);
       desc << "Delay: " << (int) lfoDelay << "  Arg2: " << (int) arg2 << "  Arg3: " << (int) arg3;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str(), CLR_MODULATION, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str(), CLR_MODULATION, ICON_CONTROL);
       break;
     }
 
     case EVENT_VOLUME_REL: {
-      int8_t delta = GetByte(curOffset++);
+      int8_t delta = readByte(curOffset++);
       if (spcVolume + delta > 255) {
         spcVolume = 255;
       }
@@ -749,12 +749,12 @@ bool PrismSnesTrack::ReadEvent() {
       else {
         spcVolume += delta;
       }
-      AddVol(beginOffset, curOffset - beginOffset, spcVolume / 2, "Volume (Relative)");
+      addVol(beginOffset, curOffset - beginOffset, spcVolume / 2, "Volume (Relative)");
       break;
     }
 
     case EVENT_PAN: {
-      uint8_t newPan = GetByte(curOffset++);
+      uint8_t newPan = readByte(curOffset++);
       if (newPan > 20) {
         // unexpected value
         newPan = 20;
@@ -769,41 +769,41 @@ bool PrismSnesTrack::ReadEvent() {
 
       // TODO: fix volume scale when L+R > 1.0?
       double volumeScale;
-      int8_t midiPan = ConvertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
+      int8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
       volumeScale = std::min(volumeScale, 1.0); // workaround
 
-      AddPan(beginOffset, curOffset - beginOffset, midiPan);
-      AddExpressionNoItem(std::round(127.0 * volumeScale));
+      addPan(beginOffset, curOffset - beginOffset, midiPan);
+      addExpressionNoItem(std::round(127.0 * volumeScale));
       break;
     }
 
     case EVENT_VOLUME: {
-      uint8_t newVolume = GetByte(curOffset++);
+      uint8_t newVolume = readByte(curOffset++);
       spcVolume = newVolume;
-      AddVol(beginOffset, curOffset - beginOffset, spcVolume / 2);
+      addVol(beginOffset, curOffset - beginOffset, spcVolume / 2);
       break;
     }
 
     case EVENT_GAIN_ENVELOPE_REST: {
-      uint16_t envelopeAddress = GetShort(curOffset);
+      uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << envelopeAddress;
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "GAIN Envelope (Rest)",
                       desc.str(),
                       CLR_ADSR,
                       ICON_CONTROL);
-      AddGAINEnvelope(envelopeAddress);
+      addGAINEnvelope(envelopeAddress);
       break;
     }
 
     case EVENT_GAIN_ENVELOPE_DECAY_TIME: {
-      uint8_t dur = GetByte(curOffset++);
-      uint8_t gain = GetByte(curOffset++);
+      uint8_t dur = readByte(curOffset++);
+      uint8_t gain = readByte(curOffset++);
       desc << "Duration: Full-Length - " << dur << "  GAIN: $" << std::hex << std::setfill('0') << std::setw(2)
           << std::uppercase << gain;
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "GAIN Envelope Decay Time",
                       desc.str(),
@@ -814,128 +814,128 @@ bool PrismSnesTrack::ReadEvent() {
 
     case EVENT_MANUAL_DURATION_OFF: {
       manualDuration = false;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Manual Duration Off", desc.str(), CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Manual Duration Off", desc.str(), CLR_DURNOTE);
       break;
     }
 
     case EVENT_MANUAL_DURATION_ON: {
       manualDuration = true;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Manual Duration On", desc.str(), CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Manual Duration On", desc.str(), CLR_DURNOTE);
       break;
     }
 
     case EVENT_AUTO_DURATION_THRESHOLD: {
       manualDuration = false;
-      autoDurationThreshold = GetByte(curOffset++);
+      autoDurationThreshold = readByte(curOffset++);
       desc << "Duration: Full-Length - " << autoDurationThreshold;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Auto Duration Threshold", desc.str(), CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Auto Duration Threshold", desc.str(), CLR_DURNOTE);
       break;
     }
 
     case EVENT_GAIN_ENVELOPE_SUSTAIN: {
-      uint16_t envelopeAddress = GetShort(curOffset);
+      uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << envelopeAddress;
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "GAIN Envelope (Sustain)",
                       desc.str(),
                       CLR_ADSR,
                       ICON_CONTROL);
-      AddGAINEnvelope(envelopeAddress);
+      addGAINEnvelope(envelopeAddress);
       break;
     }
 
     case EVENT_ECHO_VOLUME_ENVELOPE: {
-      uint16_t envelopeAddress = GetShort(curOffset);
+      uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << envelopeAddress;
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Echo Volume Envelope",
                       desc.str(),
                       CLR_REVERB,
                       ICON_CONTROL);
-      AddEchoVolumeEnvelope(envelopeAddress);
+      addEchoVolumeEnvelope(envelopeAddress);
       break;
     }
 
     case EVENT_ECHO_VOLUME: {
-      int8_t echoVolumeLeft = GetByte(curOffset++);
-      int8_t echoVolumeRight = GetByte(curOffset++);
-      int8_t echoVolumeMono = GetByte(curOffset++);
+      int8_t echoVolumeLeft = readByte(curOffset++);
+      int8_t echoVolumeRight = readByte(curOffset++);
+      int8_t echoVolumeMono = readByte(curOffset++);
       desc << "Left Volume: " << echoVolumeLeft << "  Right Volume: " << echoVolumeRight << "  Mono Volume: "
           << echoVolumeMono;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc.str(), CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc.str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_ECHO_OFF: {
-      AddReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
+      addReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
       break;
     }
 
     case EVENT_ECHO_ON: {
-      AddReverb(beginOffset, curOffset - beginOffset, 40, "Echo On");
+      addReverb(beginOffset, curOffset - beginOffset, 40, "Echo On");
       break;
     }
 
     case EVENT_ECHO_PARAM: {
-      int8_t echoFeedback = GetByte(curOffset++);
-      int8_t echoVolumeLeft = GetByte(curOffset++);
-      int8_t echoVolumeRight = GetByte(curOffset++);
-      int8_t echoVolumeMono = GetByte(curOffset++);
+      int8_t echoFeedback = readByte(curOffset++);
+      int8_t echoVolumeLeft = readByte(curOffset++);
+      int8_t echoVolumeRight = readByte(curOffset++);
+      int8_t echoVolumeMono = readByte(curOffset++);
       desc << "Feedback: " << echoFeedback << "  Left Volume: " << echoVolumeLeft << "  Right Volume: "
           << echoVolumeRight << "  Mono Volume: " << echoVolumeMono;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc.str(), CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc.str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_ADSR: {
-      uint8_t param = GetByte(curOffset);
+      uint8_t param = readByte(curOffset);
       if (param >= 0x80) {
-        uint8_t adsr1 = GetByte(curOffset++);
-        uint8_t adsr2 = GetByte(curOffset++);
+        uint8_t adsr1 = readByte(curOffset++);
+        uint8_t adsr2 = readByte(curOffset++);
         desc << "ADSR(1): $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << adsr1 <<
             "  ADSR(2): $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << adsr2;
       }
       else {
-        uint8_t instrNum = GetByte(curOffset++);
+        uint8_t instrNum = readByte(curOffset++);
         desc << "Instrument: " << instrNum;
       }
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_GAIN_ENVELOPE_DECAY: {
-      uint16_t envelopeAddress = GetShort(curOffset);
+      uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << envelopeAddress;
-      AddGenericEvent(beginOffset,
+      addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "GAIN Envelope (Decay)",
                       desc.str(),
                       CLR_ADSR,
                       ICON_CONTROL);
-      AddGAINEnvelope(envelopeAddress);
+      addGAINEnvelope(envelopeAddress);
       break;
     }
 
     case EVENT_INSTRUMENT: {
-      uint8_t instrNum = GetByte(curOffset++);
-      AddProgramChange(beginOffset, curOffset - beginOffset, instrNum, true);
+      uint8_t instrNum = readByte(curOffset++);
+      addProgramChange(beginOffset, curOffset - beginOffset, instrNum, true);
       break;
     }
 
     case EVENT_END: {
-      AddEndOfTrack(beginOffset, curOffset - beginOffset);
+      addEndOfTrack(beginOffset, curOffset - beginOffset);
       bContinue = false;
       break;
     }
 
     default: {
       auto descr = logEvent(statusByte);
-      AddUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
       bContinue = false;
       break;
     }
@@ -950,7 +950,7 @@ bool PrismSnesTrack::ReadEvent() {
   return bContinue;
 }
 
-bool PrismSnesTrack::ReadDeltaTime(uint32_t &curOffset, uint8_t &len) {
+bool PrismSnesTrack::readDeltaTime(uint32_t &curOffset, uint8_t &len) {
   if (curOffset + 1 > 0x10000) {
     return false;
   }
@@ -959,18 +959,18 @@ bool PrismSnesTrack::ReadDeltaTime(uint32_t &curOffset, uint8_t &len) {
     len = defaultLength;
   }
   else {
-    len = GetByte(curOffset++);
+    len = readByte(curOffset++);
   }
   return true;
 }
 
-bool PrismSnesTrack::ReadDuration(uint32_t &curOffset, uint8_t len, uint8_t &durDelta) {
+bool PrismSnesTrack::readDuration(uint32_t &curOffset, uint8_t len, uint8_t &durDelta) {
   if (curOffset + 1 > 0x10000) {
     return false;
   }
 
   if (manualDuration) {
-    durDelta = GetByte(curOffset++);
+    durDelta = readByte(curOffset++);
   }
   else {
     durDelta = len >> 1;
@@ -987,10 +987,10 @@ bool PrismSnesTrack::ReadDuration(uint32_t &curOffset, uint8_t len, uint8_t &dur
   return true;
 }
 
-uint8_t PrismSnesTrack::GetDuration(uint32_t curOffset, uint8_t len, uint8_t durDelta) {
+uint8_t PrismSnesTrack::getDuration(uint32_t curOffset, uint8_t len, uint8_t durDelta) {
   // TODO: adjust duration for slur/tie
   if (curOffset + 1 <= 0x10000) {
-    uint8_t nextStatusByte = GetByte(curOffset);
+    uint8_t nextStatusByte = readByte(curOffset);
     if (nextStatusByte == 0xee || nextStatusByte == 0xf4 || nextStatusByte == 0xce || nextStatusByte == 0xf5) {
       durDelta = 0;
     }
@@ -1004,11 +1004,11 @@ uint8_t PrismSnesTrack::GetDuration(uint32_t curOffset, uint8_t len, uint8_t dur
   return len - durDelta;
 }
 
-void PrismSnesTrack::AddVolumeEnvelope(uint16_t envelopeAddress) {
+void PrismSnesTrack::addVolumeEnvelope(uint16_t envelopeAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
-  parentSeq->DemandEnvelopeContainer(envelopeAddress);
+  parentSeq->demandEnvelopeContainer(envelopeAddress);
 
-  if (!IsOffsetUsed(envelopeAddress)) {
+  if (!isOffsetUsed(envelopeAddress)) {
     std::ostringstream envelopeName;
     envelopeName << "Volume Envelope ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
         << envelopeAddress << ")";
@@ -1018,11 +1018,11 @@ void PrismSnesTrack::AddVolumeEnvelope(uint16_t envelopeAddress) {
     while (envelopeAddress + envOffset + 2 <= 0x10000) {
       std::ostringstream eventName;
 
-      uint8_t volumeFrom = GetByte(envelopeAddress + envOffset);
-      int8_t volumeDelta = GetByte(envelopeAddress + envOffset + 1);
+      uint8_t volumeFrom = readByte(envelopeAddress + envOffset);
+      int8_t volumeDelta = readByte(envelopeAddress + envOffset + 1);
       if (volumeFrom == 0 && volumeDelta == 0) {
         // $00 $00 $xx $yy sets offset to $yyxx
-        uint16_t newAddress = GetByte(envelopeAddress + envOffset + 2);
+        uint16_t newAddress = readByte(envelopeAddress + envOffset + 2);
 
         eventName << "Jump to $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << newAddress;
         envHeader->addChild(envelopeAddress + envOffset, 4, eventName.str());
@@ -1030,8 +1030,8 @@ void PrismSnesTrack::AddVolumeEnvelope(uint16_t envelopeAddress) {
         break;
       }
 
-      uint8_t envelopeSpeed = GetByte(envelopeAddress + envOffset + 2);
-      uint8_t deltaTime = GetByte(envelopeAddress + envOffset + 3);
+      uint8_t envelopeSpeed = readByte(envelopeAddress + envOffset + 2);
+      uint8_t deltaTime = readByte(envelopeAddress + envOffset + 3);
       eventName << "Volume: " << volumeFrom << "  Volume Delta: " << volumeDelta << "  Envelope Speed: "
           << envelopeSpeed << "  Delta-Time: " << deltaTime;
       envHeader->addChild(envelopeAddress + envOffset, 4, eventName.str());
@@ -1045,11 +1045,11 @@ void PrismSnesTrack::AddVolumeEnvelope(uint16_t envelopeAddress) {
   }
 }
 
-void PrismSnesTrack::AddPanEnvelope(uint16_t envelopeAddress) {
+void PrismSnesTrack::addPanEnvelope(uint16_t envelopeAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
-  parentSeq->DemandEnvelopeContainer(envelopeAddress);
+  parentSeq->demandEnvelopeContainer(envelopeAddress);
 
-  if (!IsOffsetUsed(envelopeAddress)) {
+  if (!isOffsetUsed(envelopeAddress)) {
     std::ostringstream envelopeName;
     envelopeName << "Pan Envelope ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
         << envelopeAddress << ")";
@@ -1059,10 +1059,10 @@ void PrismSnesTrack::AddPanEnvelope(uint16_t envelopeAddress) {
     while (envOffset < 0x100) {
       std::ostringstream eventName;
 
-      uint8_t newPan = GetByte(envelopeAddress + envOffset);
+      uint8_t newPan = readByte(envelopeAddress + envOffset);
       if (newPan >= 0x80) {
         // $ff $xx sets offset to $xx
-        uint8_t newOffset = GetByte(envelopeAddress + envOffset + 1);
+        uint8_t newOffset = readByte(envelopeAddress + envOffset + 1);
 
         eventName << "Jump to $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
             << (envelopeAddress + newOffset);
@@ -1083,11 +1083,11 @@ void PrismSnesTrack::AddPanEnvelope(uint16_t envelopeAddress) {
   }
 }
 
-void PrismSnesTrack::AddEchoVolumeEnvelope(uint16_t envelopeAddress) {
+void PrismSnesTrack::addEchoVolumeEnvelope(uint16_t envelopeAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
-  parentSeq->DemandEnvelopeContainer(envelopeAddress);
+  parentSeq->demandEnvelopeContainer(envelopeAddress);
 
-  if (!IsOffsetUsed(envelopeAddress)) {
+  if (!isOffsetUsed(envelopeAddress)) {
     std::ostringstream envelopeName;
     envelopeName << "Echo Volume Envelope ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
         << envelopeAddress << ")";
@@ -1097,10 +1097,10 @@ void PrismSnesTrack::AddEchoVolumeEnvelope(uint16_t envelopeAddress) {
     while (envOffset < 0x100) {
       std::ostringstream eventName;
 
-      uint8_t deltaTime = GetByte(envelopeAddress + envOffset);
+      uint8_t deltaTime = readByte(envelopeAddress + envOffset);
       if (deltaTime == 0xff) {
         // $ff $xx sets offset to $xx
-        uint8_t newOffset = GetByte(envelopeAddress + envOffset + 1);
+        uint8_t newOffset = readByte(envelopeAddress + envOffset + 1);
 
         eventName << "Jump to $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
             << (envelopeAddress + newOffset);
@@ -1109,9 +1109,9 @@ void PrismSnesTrack::AddEchoVolumeEnvelope(uint16_t envelopeAddress) {
         break;
       }
 
-      int8_t echoVolumeLeft = GetByte(envelopeAddress + envOffset + 1);
-      int8_t echoVolumeRight = GetByte(envelopeAddress + envOffset + 2);
-      int8_t echoVolumeMono = GetByte(envelopeAddress + envOffset + 3);
+      int8_t echoVolumeLeft = readByte(envelopeAddress + envOffset + 1);
+      int8_t echoVolumeRight = readByte(envelopeAddress + envOffset + 2);
+      int8_t echoVolumeMono = readByte(envelopeAddress + envOffset + 3);
       eventName << "Delta-Time: " << deltaTime << "  Left Volume: " << echoVolumeLeft << "  Right Volume: "
           << echoVolumeRight << "  Mono Volume: " << echoVolumeMono;
       envHeader->addChild(envelopeAddress + envOffset, 4, eventName.str());
@@ -1125,11 +1125,11 @@ void PrismSnesTrack::AddEchoVolumeEnvelope(uint16_t envelopeAddress) {
   }
 }
 
-void PrismSnesTrack::AddGAINEnvelope(uint16_t envelopeAddress) {
+void PrismSnesTrack::addGAINEnvelope(uint16_t envelopeAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
-  parentSeq->DemandEnvelopeContainer(envelopeAddress);
+  parentSeq->demandEnvelopeContainer(envelopeAddress);
 
-  if (!IsOffsetUsed(envelopeAddress)) {
+  if (!isOffsetUsed(envelopeAddress)) {
     std::ostringstream envelopeName;
     envelopeName << "GAIN Envelope ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
         << envelopeAddress << ")";
@@ -1139,10 +1139,10 @@ void PrismSnesTrack::AddGAINEnvelope(uint16_t envelopeAddress) {
     while (envOffset < 0x100) {
       std::ostringstream eventName;
 
-      uint8_t gain = GetByte(envelopeAddress + envOffset);
+      uint8_t gain = readByte(envelopeAddress + envOffset);
       if (gain == 0xff) {
         // $ff $xx sets offset to $xx
-        uint8_t newOffset = GetByte(envelopeAddress + envOffset + 1);
+        uint8_t newOffset = readByte(envelopeAddress + envOffset + 1);
 
         eventName << "Jump to $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase
             << (envelopeAddress + newOffset);
@@ -1151,7 +1151,7 @@ void PrismSnesTrack::AddGAINEnvelope(uint16_t envelopeAddress) {
         break;
       }
 
-      uint8_t deltaTime = GetByte(envelopeAddress + envOffset + 1);
+      uint8_t deltaTime = readByte(envelopeAddress + envOffset + 1);
       eventName << "GAIN: $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << gain << std::dec
           << std::setfill(' ') << std::setw(0) << ", Delta-Time: " << deltaTime;
       envHeader->addChild(envelopeAddress + envOffset, 2, eventName.str());
@@ -1165,11 +1165,11 @@ void PrismSnesTrack::AddGAINEnvelope(uint16_t envelopeAddress) {
   }
 }
 
-void PrismSnesTrack::AddPanTable(uint16_t panTableAddress) {
+void PrismSnesTrack::addPanTable(uint16_t panTableAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
-  parentSeq->DemandEnvelopeContainer(panTableAddress);
+  parentSeq->demandEnvelopeContainer(panTableAddress);
 
-  if (!IsOffsetUsed(panTableAddress)) {
+  if (!isOffsetUsed(panTableAddress)) {
     std::ostringstream eventName;
     eventName << "Pan Table ($" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << panTableAddress
         << ")";

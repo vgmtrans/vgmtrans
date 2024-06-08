@@ -13,18 +13,18 @@ VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
     : VGMItem(this, offset, length, std::move(name)),
       m_rawfile(theRawFile),
       m_format(std::move(fmt)),
-      id(-1) {}
+      m_id(-1) {}
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add
 // this as an item because we do not want the VGMFile to be itself an item in the Item View
-void VGMFile::AddToUI(VGMItem* /*parent*/, void* UI_specific) {
+void VGMFile::addToUI(VGMItem* /*parent*/, void* UI_specific) {
   for (const auto child : children()) {
-    child->AddToUI(this, UI_specific);
+    child->addToUI(this, UI_specific);
   }
 }
 
 Format *VGMFile::format() const {
-  return Format::GetFormatFromName(m_format);
+  return Format::getFormatFromName(m_format);
 }
 
 std::string VGMFile::formatName() {
@@ -33,15 +33,15 @@ std::string VGMFile::formatName() {
 
 std::string VGMFile::description() {
   auto filename = this->m_rawfile->name();
-  auto formatName = this->format()->GetName();
+  auto formatName = this->format()->getName();
   return "Format: " + formatName + "     Source File: \"" + filename + "\"";
 }
 
-void VGMFile::AddCollAssoc(VGMColl *coll) {
+void VGMFile::addCollAssoc(VGMColl *coll) {
   assocColls.push_back(coll);
 }
 
-void VGMFile::RemoveCollAssoc(VGMColl *coll) {
+void VGMFile::removeCollAssoc(VGMColl *coll) {
   auto iter = std::ranges::find(assocColls, coll);
   if (iter != assocColls.end())
     assocColls.erase(iter);
@@ -53,7 +53,7 @@ RawFile *VGMFile::rawFile() const {
   return m_rawfile;
 }
 
-uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
+uint32_t VGMFile::readBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
   // if unLength != 0, verify that we're within the bounds of the file, and truncate num read
   // bytes to end of file
   if (unLength != 0) {
@@ -63,7 +63,7 @@ uint32_t VGMFile::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) cons
       nCount = endOff - nIndex;
   }
 
-  return m_rawfile->GetBytes(nIndex, nCount, pBuffer);
+  return m_rawfile->readBytes(nIndex, nCount, pBuffer);
 }
 
 // *********
@@ -75,16 +75,16 @@ VGMHeader::VGMHeader(const VGMItem *parItem, uint32_t offset, uint32_t length, c
 
 VGMHeader::~VGMHeader() = default;
 
-void VGMHeader::AddPointer(uint32_t offset, uint32_t length, uint32_t /*destAddress*/, bool /*notNull*/,
+void VGMHeader::addPointer(uint32_t offset, uint32_t length, uint32_t /*destAddress*/, bool /*notNull*/,
                            const std::string &name) {
   addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_POINTER, offset, length, name));
 }
 
-void VGMHeader::AddTempo(uint32_t offset, uint32_t length, const std::string &name) {
+void VGMHeader::addTempo(uint32_t offset, uint32_t length, const std::string &name) {
   addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_TEMPO, offset, length, name));
 }
 
-void VGMHeader::AddSig(uint32_t offset, uint32_t length, const std::string &name) {
+void VGMHeader::addSig(uint32_t offset, uint32_t length, const std::string &name) {
   addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_SIG, offset, length, name));
 }
 
@@ -96,7 +96,7 @@ VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType theType, uint32_t
                              const std::string &name)
     : VGMItem(hdr->vgmFile(), offset, length, name, CLR_HEADER), type(theType) {}
 
-VGMItem::Icon VGMHeaderItem::GetIcon() {
+VGMItem::Icon VGMHeaderItem::icon() {
   switch (type) {
     case HIT_UNKNOWN:
       return ICON_UNKNOWN;

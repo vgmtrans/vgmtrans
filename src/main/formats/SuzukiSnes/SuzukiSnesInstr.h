@@ -19,10 +19,10 @@ class SuzukiSnesInstrSet:
                      uint16_t addrADSRTable,
                      uint16_t addrTuningTable,
                      const std::string &name = "SuzukiSnesInstrSet");
-  virtual ~SuzukiSnesInstrSet(void);
+  virtual ~SuzukiSnesInstrSet();
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  virtual bool parseHeader();
+  virtual bool parseInstrPointers();
 
   SuzukiSnesVersion version;
 
@@ -51,9 +51,9 @@ class SuzukiSnesInstr
                   uint16_t addrADSRTable,
                   uint16_t addrTuningTable,
                   const std::string &name = "SuzukiSnesInstr");
-  virtual ~SuzukiSnesInstr(void);
+  virtual ~SuzukiSnesInstr();
 
-  virtual bool LoadInstr();
+  virtual bool loadInstr();
 
   SuzukiSnesVersion version;
 
@@ -80,9 +80,9 @@ class SuzukiSnesRgn
                 uint16_t addrVolumeTable,
                 uint16_t addrADSRTable,
                 uint16_t addrTuningTable);
-  virtual ~SuzukiSnesRgn(void);
+  virtual ~SuzukiSnesRgn();
 
-  virtual bool LoadRgn();
+  virtual bool loadRgn();
 
   SuzukiSnesVersion version;
 };

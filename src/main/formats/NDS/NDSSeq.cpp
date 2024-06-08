@@ -8,25 +8,25 @@ NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMSeq(NDSFormat::name, file, offset, length, name) {
 }
 
-bool NDSSeq::GetHeaderInfo(void) {
+bool NDSSeq::parseHeader(void) {
   VGMHeader *SSEQHdr = addHeader(dwOffset, 0x10, "SSEQ Chunk Header");
-  SSEQHdr->AddSig(dwOffset, 8);
+  SSEQHdr->addSig(dwOffset, 8);
   SSEQHdr->addChild(dwOffset + 8, 4, "Size");
   SSEQHdr->addChild(dwOffset + 12, 2, "Header Size");
   SSEQHdr->addUnknownChild(dwOffset + 14, 2);
   //SeqChunkHdr->addSimpleChild(dwOffset, 4, "Blah");
-  unLength = GetShort(dwOffset + 8);
-  SetPPQN(0x30);
+  unLength = readShort(dwOffset + 8);
+  setPPQN(0x30);
   return true;        //successful
 }
 
-bool NDSSeq::GetTrackPointers(void) {
+bool NDSSeq::parseTrackPointers(void) {
   VGMHeader *DATAHdr = addHeader(dwOffset + 0x10, 0xC, "DATA Chunk Header");
-  DATAHdr->AddSig(dwOffset + 0x10, 4);
+  DATAHdr->addSig(dwOffset + 0x10, 4);
   DATAHdr->addChild(dwOffset + 0x10 + 4, 4, "Size");
   DATAHdr->addChild(dwOffset + 0x10 + 8, 4, "Data Pointer");
   uint32_t offset = dwOffset + 0x1C;
-  uint8_t b = GetByte(offset);
+  uint8_t b = readByte(offset);
   aTracks.push_back(new NDSTrack(this));
 
   //FE XX XX signifies multiple tracks, each true bit in the XX values signifies there is a track for that channel
@@ -35,7 +35,7 @@ bool NDSSeq::GetTrackPointers(void) {
     VGMHeader *TrkPtrs = addHeader(offset, 0, "Track Pointers");
     TrkPtrs->addChild(offset, 3, "Valid Tracks");
     offset += 3;    //but all we need to do is check for subsequent 0x93 track pointer events
-    b = GetByte(offset);
+    b = readByte(offset);
     uint32_t songDelay = 0;
 
     while (b == 0x80) {
@@ -43,16 +43,16 @@ bool NDSSeq::GetTrackPointers(void) {
       uint8_t c;
       uint32_t beginOffset = offset;
       offset++;
-      if ((value = GetByte(offset++)) & 0x80) {
+      if ((value = readByte(offset++)) & 0x80) {
         value &= 0x7F;
         do {
-          value = (value << 7) + ((c = GetByte(offset++)) & 0x7F);
+          value = (value << 7) + ((c = readByte(offset++)) & 0x7F);
         } while (c & 0x80);
       }
       songDelay += value;
       TrkPtrs->addChild(beginOffset, offset - beginOffset, "Delay");
       //songDelay += SeqTrack::ReadVarLen(++offset);
-      b = GetByte(offset);
+      b = readByte(offset);
       break;
     }
 
@@ -60,13 +60,13 @@ bool NDSSeq::GetTrackPointers(void) {
     while (b == 0x93)
     {
       TrkPtrs->addChild(offset, 5, "Track Pointer");
-      uint32_t trkOffset = GetByte(offset + 2) + (GetByte(offset + 3) << 8) +
-          (GetByte(offset + 4) << 16) + dwOffset + 0x1C;
+      uint32_t trkOffset = readByte(offset + 2) + (readByte(offset + 3) << 8) +
+          (readByte(offset + 4) << 16) + dwOffset + 0x1C;
       NDSTrack *newTrack = new NDSTrack(this, trkOffset);
       aTracks.push_back(newTrack);
       //newTrack->
       offset += 5;
-      b = GetByte(offset);
+      b = readByte(offset);
     }
     TrkPtrs->unLength = offset - TrkPtrs->dwOffset;
   }
@@ -81,70 +81,70 @@ bool NDSSeq::GetTrackPointers(void) {
 
 NDSTrack::NDSTrack(NDSSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
-  ResetVars();
+  resetVars();
   bDetermineTrackLengthEventByEvent = true;
 }
 
-void NDSTrack::ResetVars() {
+void NDSTrack::resetVars() {
   jumpCount = 0;
   loopReturnOffset = 0;
   hasLoopReturnOffset = false;
-  SeqTrack::ResetVars();
+  SeqTrack::resetVars();
 }
 
-bool NDSTrack::ReadEvent(void) {
+bool NDSTrack::readEvent(void) {
   uint32_t beginOffset = curOffset;
-  uint8_t status_byte = GetByte(curOffset++);
+  uint8_t status_byte = readByte(curOffset++);
 
   if (status_byte < 0x80) //then it's a note on event
   {
-    uint8_t vel = GetByte(curOffset++);
-    dur = ReadVarLen(curOffset);//GetByte(curOffset++);
-    AddNoteByDur(beginOffset, curOffset - beginOffset, status_byte, vel, dur);
+    uint8_t vel = readByte(curOffset++);
+    dur = readVarLen(curOffset);//GetByte(curOffset++);
+    addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, vel, dur);
     if (noteWithDelta) {
-      AddTime(dur);
+      addTime(dur);
     }
   }
   else
     switch (status_byte) {
       case 0x80:
-        dur = ReadVarLen(curOffset);
-        AddRest(beginOffset, curOffset - beginOffset, dur);
+        dur = readVarLen(curOffset);
+        addRest(beginOffset, curOffset - beginOffset, dur);
         break;
 
       case 0x81: {
-        uint8_t newProg = (uint8_t) ReadVarLen(curOffset);
-        AddProgramChange(beginOffset, curOffset - beginOffset, newProg);
+        uint8_t newProg = (uint8_t) readVarLen(curOffset);
+        addProgramChange(beginOffset, curOffset - beginOffset, newProg);
         break;
       }
 
       // [loveemu] open track, however should not handle in this function
       case 0x93:
         curOffset += 4;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Open Track");
+        addUnknown(beginOffset, curOffset - beginOffset, "Open Track");
         break;
 
       case 0x94: {
-        uint32_t jumpAddr = GetByte(curOffset) + (GetByte(curOffset + 1) << 8)
-            + (GetByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
+        uint32_t jumpAddr = readByte(curOffset) + (readByte(curOffset + 1) << 8)
+            + (readByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
         curOffset += 3;
 
         // Add an End Track if it exists afterward, for completeness sake
-        if (readMode == READMODE_ADD_TO_UI && !IsOffsetUsed(curOffset)) {
-          if (GetByte(curOffset) == 0xFF) {
-            AddGenericEvent(curOffset, 1, "End of Track", "", CLR_TRACKEND, ICON_TRACKEND);
+        if (readMode == READMODE_ADD_TO_UI && !isOffsetUsed(curOffset)) {
+          if (readByte(curOffset) == 0xFF) {
+            addGenericEvent(curOffset, 1, "End of Track", "", CLR_TRACKEND, ICON_TRACKEND);
           }
         }
 
         // The event usually appears at last of the song, but there can be an exception.
         // See Zelda The Spirit Tracks - SSEQ_0018 (overworld train theme)
         bool bContinue = true;
-        if (IsOffsetUsed(jumpAddr)) {
-          AddLoopForever(beginOffset, 4, "Loop");
+        if (isOffsetUsed(jumpAddr)) {
+          addLoopForever(beginOffset, 4, "Loop");
           bContinue = false;
         }
         else {
-          AddGenericEvent(beginOffset, 4, "Jump", "", CLR_LOOPFOREVER);
+          addGenericEvent(beginOffset, 4, "Jump", "", CLR_LOOPFOREVER);
         }
 
         curOffset = jumpAddr;
@@ -154,9 +154,9 @@ bool NDSTrack::ReadEvent(void) {
       case 0x95:
         hasLoopReturnOffset = true;
         loopReturnOffset = curOffset + 3;
-        AddGenericEvent(beginOffset, curOffset + 3 - beginOffset, "Call", "", CLR_LOOP);
-        curOffset = GetByte(curOffset) + (GetByte(curOffset + 1) << 8)
-            + (GetByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
+        addGenericEvent(beginOffset, curOffset + 3 - beginOffset, "Call", "", CLR_LOOP);
+        curOffset = readByte(curOffset) + (readByte(curOffset + 1) << 8)
+            + (readByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
         break;
 
       // [loveemu] (ex: Hanjuku Hero DS: NSE_45, New Mario Bros: BGM_AMB_CHIKA, Slime Morimori Dragon Quest 2: SE_187, SE_210, Advance Wars)
@@ -165,27 +165,27 @@ bool NDSTrack::ReadEvent(void) {
         int16_t randMin;
         int16_t randMax;
 
-        subStatusByte = GetByte(curOffset++);
-        randMin = (signed) GetShort(curOffset);
+        subStatusByte = readByte(curOffset++);
+        randMin = (signed) readShort(curOffset);
         curOffset += 2;
-        randMax = (signed) GetShort(curOffset);
+        randMax = (signed) readShort(curOffset);
         curOffset += 2;
 
-        AddUnknown(beginOffset, curOffset - beginOffset, "Cmd with Random Value");
+        addUnknown(beginOffset, curOffset - beginOffset, "Cmd with Random Value");
         break;
       }
 
       // [loveemu] (ex: New Mario Bros: BGM_AMB_SABAKU)
       case 0xA1: {
-        uint8_t subStatusByte = GetByte(curOffset++);
-        uint8_t varNumber = GetByte(curOffset++);
+        uint8_t subStatusByte = readByte(curOffset++);
+        uint8_t varNumber = readByte(curOffset++);
 
-        AddUnknown(beginOffset, curOffset - beginOffset, "Cmd with Variable");
+        addUnknown(beginOffset, curOffset - beginOffset, "Cmd with Variable");
         break;
       }
 
       case 0xA2: {
-        AddUnknown(beginOffset, curOffset - beginOffset, "If");
+        addUnknown(beginOffset, curOffset - beginOffset, "If");
         break;
       }
 
@@ -210,183 +210,183 @@ bool NDSTrack::ReadEvent(void) {
             "If Variable >", "If Variable <=", "If Variable <", "If Variable !="
         };
 
-        varNumber = GetByte(curOffset++);
-        val = GetShort(curOffset);
+        varNumber = readByte(curOffset++);
+        val = readShort(curOffset);
         curOffset += 2;
 
-        AddUnknown(beginOffset, curOffset - beginOffset, eventName[status_byte - 0xB0]);
+        addUnknown(beginOffset, curOffset - beginOffset, eventName[status_byte - 0xB0]);
         break;
       }
 
       case 0xC0: {
-        uint8_t pan = GetByte(curOffset++);
-        AddPan(beginOffset, curOffset - beginOffset, pan);
+        uint8_t pan = readByte(curOffset++);
+        addPan(beginOffset, curOffset - beginOffset, pan);
         break;
       }
 
       case 0xC1:
-        vol = GetByte(curOffset++);
-        AddVol(beginOffset, curOffset - beginOffset, vol);
+        vol = readByte(curOffset++);
+        addVol(beginOffset, curOffset - beginOffset, vol);
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_BOSS1_)
       case 0xC2: {
-        uint8_t mvol = GetByte(curOffset++);
-        AddUnknown(beginOffset, curOffset - beginOffset, "Master Volume");
+        uint8_t mvol = readByte(curOffset++);
+        addUnknown(beginOffset, curOffset - beginOffset, "Master Volume");
         break;
       }
 
       // [loveemu] (ex: Puyo Pop Fever 2: BGM00)
       case 0xC3: {
-        int8_t transpose = (signed) GetByte(curOffset++);
-        AddTranspose(beginOffset, curOffset - beginOffset, transpose);
+        int8_t transpose = (signed) readByte(curOffset++);
+        addTranspose(beginOffset, curOffset - beginOffset, transpose);
 //			AddGenericEvent(beginOffset, curOffset-beginOffset, "Transpose", NULL, BG_CLR_GREEN);
         break;
       }
 
       // [loveemu] pitch bend (ex: Castlevania Dawn of Sorrow: BGM_BOSS2)
       case 0xC4: {
-        int16_t bend = (signed) GetByte(curOffset++) * 64;
-        AddPitchBend(beginOffset, curOffset - beginOffset, bend);
+        int16_t bend = (signed) readByte(curOffset++) * 64;
+        addPitchBend(beginOffset, curOffset - beginOffset, bend);
         break;
       }
 
       // [loveemu] pitch bend range (ex: Castlevania Dawn of Sorrow: BGM_BOSS2)
       case 0xC5: {
-        uint8_t semitones = GetByte(curOffset++);
-        AddPitchBendRange(beginOffset, curOffset - beginOffset, semitones);
+        uint8_t semitones = readByte(curOffset++);
+        addPitchBendRange(beginOffset, curOffset - beginOffset, semitones * 100);
         break;
       }
 
       // [loveemu] (ex: Children of Mana: SEQ_BGM000)
       case 0xC6:
         curOffset++;
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Priority", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", "", CLR_CHANGESTATE);
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
       case 0xC7: {
-        uint8_t notewait = GetByte(curOffset++);
+        uint8_t notewait = readByte(curOffset++);
         noteWithDelta = (notewait != 0);
-        AddUnknown(beginOffset, curOffset - beginOffset, "Notewait Mode");
+        addUnknown(beginOffset, curOffset - beginOffset, "Notewait Mode");
         break;
       }
 
       // [loveemu] (ex: Hanjuku Hero DS: NSE_42)
       case 0xC8:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Tie");
+        addUnknown(beginOffset, curOffset - beginOffset, "Tie");
         break;
 
       // [loveemu] (ex: Hanjuku Hero DS: NSE_50)
       case 0xC9:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Portamento Control");
+        addUnknown(beginOffset, curOffset - beginOffset, "Portamento Control");
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
       case 0xCA: {
-        uint8_t amount = GetByte(curOffset++);
-        AddModulation(beginOffset, curOffset - beginOffset, amount, "Modulation Depth");
+        uint8_t amount = readByte(curOffset++);
+        addModulation(beginOffset, curOffset - beginOffset, amount, "Modulation Depth");
         break;
       }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
       case 0xCB:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Modulation Speed");
+        addUnknown(beginOffset, curOffset - beginOffset, "Modulation Speed");
         break;
 
       // [loveemu] (ex: Children of Mana: SEQ_BGM001)
       case 0xCC:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Modulation Type");
+        addUnknown(beginOffset, curOffset - beginOffset, "Modulation Type");
         break;
 
       // [loveemu] (ex: Phoenix Wright - Ace Attorney: BGM021)
       case 0xCD:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Modulation Range");
+        addUnknown(beginOffset, curOffset - beginOffset, "Modulation Range");
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
       case 0xCE: {
-        bool bPortOn = (GetByte(curOffset++) != 0);
-        AddPortamento(beginOffset, curOffset - beginOffset, bPortOn);
+        bool bPortOn = (readByte(curOffset++) != 0);
+        addPortamento(beginOffset, curOffset - beginOffset, bPortOn);
         break;
       }
 
       // [loveemu] (ex: Bomberman: SEQ_AREA04)
       case 0xCF: {
-        uint8_t portTime = GetByte(curOffset++);
-        AddPortamentoTime(beginOffset, curOffset - beginOffset, portTime);
+        uint8_t portTime = readByte(curOffset++);
+        addPortamentoTime(beginOffset, curOffset - beginOffset, portTime);
         break;
       }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
       case 0xD0:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Attack Rate");
+        addUnknown(beginOffset, curOffset - beginOffset, "Attack Rate");
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
       case 0xD1:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Decay Rate");
+        addUnknown(beginOffset, curOffset - beginOffset, "Decay Rate");
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
       case 0xD2:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Sustain Level");
+        addUnknown(beginOffset, curOffset - beginOffset, "Sustain Level");
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
       case 0xD3:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Release Rate");
+        addUnknown(beginOffset, curOffset - beginOffset, "Release Rate");
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
       case 0xD4:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Loop Start");
+        addUnknown(beginOffset, curOffset - beginOffset, "Loop Start");
         break;
 
       case 0xD5: {
-        uint8_t expression = GetByte(curOffset++);
-        AddExpression(beginOffset, curOffset - beginOffset, expression);
+        uint8_t expression = readByte(curOffset++);
+        addExpression(beginOffset, curOffset - beginOffset, expression);
         break;
       }
 
       // [loveemu]
       case 0xD6:
         curOffset++;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Print Variable");
+        addUnknown(beginOffset, curOffset - beginOffset, "Print Variable");
         break;
 
       // [loveemu] (ex: Children of Mana: SEQ_BGM001)
       case 0xE0:
         curOffset += 2;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Modulation Delay");
+        addUnknown(beginOffset, curOffset - beginOffset, "Modulation Delay");
         break;
 
       case 0xE1: {
-        uint16_t bpm = GetShort(curOffset);
+        uint16_t bpm = readShort(curOffset);
         curOffset += 2;
-        AddTempoBPM(beginOffset, curOffset - beginOffset, bpm);
+        addTempoBPM(beginOffset, curOffset - beginOffset, bpm);
         break;
       }
 
       // [loveemu] (ex: Hippatte! Puzzle Bobble: SEQ_1pbgm03)
       case 0xE3:
         curOffset += 2;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Sweep Pitch");
+        addUnknown(beginOffset, curOffset - beginOffset, "Sweep Pitch");
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
       case 0xFC:
-        AddUnknown(beginOffset, curOffset - beginOffset, "Loop End");
+        addUnknown(beginOffset, curOffset - beginOffset, "Loop End");
         break;
 
       case 0xFD: {
@@ -394,11 +394,11 @@ bool NDSTrack::ReadEvent(void) {
         // However, a complicated sequence with a ton of conditional events, it sometimes confuses the parser and causes an infinite loop.
         // See Animal Crossing: Wild World - SSEQ_270
         bool bContinue = true;
-        if (!hasLoopReturnOffset || IsOffsetUsed(loopReturnOffset)) {
+        if (!hasLoopReturnOffset || isOffsetUsed(loopReturnOffset)) {
           bContinue = false;
         }
 
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Return", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Return", "", CLR_LOOP);
         curOffset = loopReturnOffset;
         return bContinue;
 	  }
@@ -406,15 +406,15 @@ bool NDSTrack::ReadEvent(void) {
       // [loveemu] allocate track, however should not handle in this function
       case 0xFE:
         curOffset += 2;
-        AddUnknown(beginOffset, curOffset - beginOffset, "Allocate Track");
+        addUnknown(beginOffset, curOffset - beginOffset, "Allocate Track");
         break;
 
       case 0xFF:
-        AddEndOfTrack(beginOffset, curOffset - beginOffset);
+        addEndOfTrack(beginOffset, curOffset - beginOffset);
         return false;
 
       default:
-        AddUnknown(beginOffset, curOffset - beginOffset);
+        addUnknown(beginOffset, curOffset - beginOffset);
         return false;
     }
   return true;

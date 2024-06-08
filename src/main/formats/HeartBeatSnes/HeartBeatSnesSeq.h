@@ -75,11 +75,11 @@ class HeartBeatSnesSeq
       (RawFile *file, HeartBeatSnesVersion ver, uint32_t seqdataOffset, std::string newName = "HeartBeat SNES Seq");
   ~HeartBeatSnesSeq() override;
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
-  void ResetVars() override;
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  void resetVars() override;
 
-  static double GetTempoInBPM(uint8_t tempo);
+  static double getTempoInBPM(uint8_t tempo);
 
   HeartBeatSnesVersion version;
   std::map<uint8_t, HeartBeatSnesSeqEventType> EventMap;
@@ -90,7 +90,7 @@ class HeartBeatSnesSeq
   static const uint8_t PAN_TABLE[22];
 
  private:
-  void LoadEventMap(void);
+  void loadEventMap();
 };
 
 
@@ -98,8 +98,8 @@ class HeartBeatSnesTrack
     : public SeqTrack {
  public:
   HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  void ResetVars() override;
-  bool ReadEvent() override;
+  void resetVars() override;
+  bool readEvent() override;
 
  private:
   uint8_t spcNoteDuration;

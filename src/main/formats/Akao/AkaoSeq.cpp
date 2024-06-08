@@ -20,69 +20,69 @@ static constexpr uint8_t NOTE_VELOCITY = 100;
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
     : VGMSeq(AkaoFormat::name, file, offset, 0, "Akao Seq"), seq_id(0), version_(version),
       instrument_set_offset_(0), drum_set_offset_(0), condition(0) {
-  UseLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
+  usesLinearAmplitudeScale();        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   //UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController); // disabled, it only changes the volume and the pan slightly, and also its output becomes undefined if pan and volume slides are used at the same time
   bUsesIndividualArts = false;
-  UseReverb();
+  useReverb();
 }
 
-void AkaoSeq::ResetVars() {
-  VGMSeq::ResetVars();
+void AkaoSeq::resetVars() {
+  VGMSeq::resetVars();
 
   condition = 0;
   if (rawFile()->tag.album == "Final Fantasy 9" && rawFile()->tag.title == "Final Battle")
     condition = 2;
 }
 
-bool AkaoSeq::IsPossibleAkaoSeq(const RawFile *file, uint32_t offset) {
+bool AkaoSeq::isPossibleAkaoSeq(const RawFile *file, uint32_t offset) {
   if (offset + 0x10 > file->size())
     return false;
-  if (file->GetWordBE(offset) != 0x414B414F)
+  if (file->readWordBE(offset) != 0x414B414F)
     return false;
 
-  const AkaoPs1Version version = GuessVersion(file, offset);
-  const uint32_t track_bits_offset = GetTrackAllocationBitsOffset(version);
+  const AkaoPs1Version version = guessVersion(file, offset);
+  const uint32_t track_bits_offset = getTrackAllocationBitsOffset(version);
   if (offset + track_bits_offset + 4 > file->size())
     return false;
 
-  const uint32_t track_bits = file->GetWord(offset + track_bits_offset);
+  const uint32_t track_bits = file->readWord(offset + track_bits_offset);
   if (version <= AkaoPs1Version::VERSION_2) {
     if ((track_bits & ~0xffffff) != 0)
       return false;
   }
 
   if (version >= AkaoPs1Version::VERSION_3_0) {
-    if (file->GetWord(offset + 0x2C) != 0 || file->GetWord(offset + 0x28) != 0)
+    if (file->readWord(offset + 0x2C) != 0 || file->readWord(offset + 0x28) != 0)
       return false;
-    if (file->GetWord(offset + 0x38) != 0 || file->GetWord(offset + 0x3C) != 0)
+    if (file->readWord(offset + 0x38) != 0 || file->readWord(offset + 0x3C) != 0)
       return false;
   }
 
   return true;
 }
 
-AkaoPs1Version AkaoSeq::GuessVersion(const RawFile *file, uint32_t offset) {
-  if (file->GetWord(offset + 0x2C) == 0)
+AkaoPs1Version AkaoSeq::guessVersion(const RawFile *file, uint32_t offset) {
+  if (file->readWord(offset + 0x2C) == 0)
     return AkaoPs1Version::VERSION_3_2;
-  else if (file->GetWord(offset + 0x1C) == 0)
+  else if (file->readWord(offset + 0x1C) == 0)
     return AkaoPs1Version::VERSION_2;
   else
     return AkaoPs1Version::VERSION_1_1;
 }
 
-bool AkaoSeq::GetHeaderInfo() {
+bool AkaoSeq::parseHeader() {
   if (version() == AkaoPs1Version::UNKNOWN)
     return false;
 
   const uint32_t track_bits = (version() >= AkaoPs1Version::VERSION_3_0)
-    ? GetWord(dwOffset + 0x20)
-    : GetWord(dwOffset + 0x10);
+    ? readWord(dwOffset + 0x20)
+    : readWord(dwOffset + 0x10);
   nNumTracks = static_cast<uint32_t>(std::bitset<32>(track_bits).count()); // popcount
 
   uint32_t track_header_offset;
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     VGMHeader *hdr = addHeader(dwOffset, 0x40);
-    hdr->AddSig(dwOffset, 4);
+    hdr->addSig(dwOffset, 4);
     hdr->addChild(dwOffset + 0x4, 2, "ID");
     hdr->addChild(dwOffset + 0x6, 2, "Size");
     hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
@@ -91,41 +91,41 @@ bool AkaoSeq::GetHeaderInfo() {
     hdr->addChild(dwOffset + 0x30, 4, "Instrument Data Pointer");
     hdr->addChild(dwOffset + 0x34, 4, "Drumkit Data Pointer");
 
-    unLength = GetShort(dwOffset + 6);
-    setId(GetShort(dwOffset + 0x14));
+    unLength = readShort(dwOffset + 6);
+    setId(readShort(dwOffset + 0x14));
     track_header_offset = 0x40;
   }
   else if (version() == AkaoPs1Version::VERSION_2) {
     VGMHeader *hdr = addHeader(dwOffset, 0x20);
-    hdr->AddSig(dwOffset, 4);
+    hdr->addSig(dwOffset, 4);
     hdr->addChild(dwOffset + 0x4, 2, "ID");
     hdr->addChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
     hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
     hdr->addChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
 
-    unLength = 0x10 + GetShort(dwOffset + 6);
+    unLength = 0x10 + readShort(dwOffset + 6);
     track_header_offset = 0x20;
   }
   else if (version() < AkaoPs1Version::VERSION_2) {
     VGMHeader *hdr = addHeader(dwOffset, 0x14);
-    hdr->AddSig(dwOffset, 4);
+    hdr->addSig(dwOffset, 4);
     hdr->addChild(dwOffset + 0x4, 2, "ID");
     hdr->addChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
     hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
     std::ostringstream timestamp_text;
-    timestamp_text << "Timestamp (" << ReadTimestampAsText() << ")";
+    timestamp_text << "Timestamp (" << readTimestampAsText() << ")";
     hdr->addChild(dwOffset + 0xA, 6, timestamp_text.str());
     hdr->addChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
 
-    unLength = 0x10 + GetShort(dwOffset + 6);
+    unLength = 0x10 + readShort(dwOffset + 6);
     track_header_offset = 0x14;
   }
   else {
     return false;
   }
 
-  SetPPQN(0x30);
-  seq_id = GetShort(dwOffset + 4);
+  setPPQN(0x30);
+  seq_id = readShort(dwOffset + 4);
 
   LoadEventMap();
 
@@ -133,8 +133,8 @@ bool AkaoSeq::GetHeaderInfo() {
   {
     //There must be either a melodic instrument section, a drumkit, or both.  We determine
     //the start of the InstrSet based on whether a melodic instrument section is given.
-    const uint32_t instrOff = GetWord(dwOffset + 0x30);
-    const uint32_t drumkitOff = GetWord(dwOffset + 0x34);
+    const uint32_t instrOff = readWord(dwOffset + 0x30);
+    const uint32_t drumkitOff = readWord(dwOffset + 0x34);
     if (instrOff != 0)
       set_instrument_set_offset(dwOffset + 0x30 + instrOff);
     if (drumkitOff != 0)
@@ -152,7 +152,7 @@ bool AkaoSeq::GetHeaderInfo() {
 }
 
 
-bool AkaoSeq::GetTrackPointers() {
+bool AkaoSeq::parseTrackPointers() {
   uint32_t track_header_offset;
   switch (version())
   {
@@ -177,20 +177,20 @@ bool AkaoSeq::GetTrackPointers() {
   for (unsigned int i = 0; i < nNumTracks; i++) {
     const uint32_t p = track_header_offset + (i * 2);
     const uint32_t base = p + (version() >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
-    const uint32_t relative_offset = GetShort(dwOffset + p);
+    const uint32_t relative_offset = readShort(dwOffset + p);
     const uint32_t track_offset = base + relative_offset;
     aTracks.push_back(new AkaoTrack(this, dwOffset + track_offset));
   }
   return true;
 }
 
-std::string AkaoSeq::ReadTimestampAsText() const {
-  const uint8_t year_bcd = GetByte(dwOffset + 0xA);
-  const uint8_t month_bcd = GetByte(dwOffset + 0xB);
-  const uint8_t day_bcd = GetByte(dwOffset + 0xC);
-  const uint8_t hour_bcd = GetByte(dwOffset + 0xD);
-  const uint8_t minute_bcd = GetByte(dwOffset + 0xE);
-  const uint8_t second_bcd = GetByte(dwOffset + 0xF);
+std::string AkaoSeq::readTimestampAsText() const {
+  const uint8_t year_bcd = readByte(dwOffset + 0xA);
+  const uint8_t month_bcd = readByte(dwOffset + 0xB);
+  const uint8_t day_bcd = readByte(dwOffset + 0xC);
+  const uint8_t hour_bcd = readByte(dwOffset + 0xD);
+  const uint8_t minute_bcd = readByte(dwOffset + 0xE);
+  const uint8_t second_bcd = readByte(dwOffset + 0xF);
 
   // Should we solve the year 2000 problem?
   const unsigned int year_bcd_full = 0x1900 + year_bcd;
@@ -205,10 +205,10 @@ std::string AkaoSeq::ReadTimestampAsText() const {
   return text.str();
 }
 
-double AkaoSeq::GetTempoInBPM(uint16_t tempo) const {
+double AkaoSeq::getTempoInBPM(uint16_t tempo) const {
   if (tempo != 0) {
     const uint16_t freq = (version() == AkaoPs1Version::VERSION_1_0) ? 0x43D1 : 0x44E8;
-    return 60.0 / (ppqn * (65536.0 / tempo) * (freq / (33868800.0 / 8)));
+    return 60.0 / (ppqn() * (65536.0 / tempo) * (freq / (33868800.0 / 8)));
   }
   else {
     // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -216,7 +216,7 @@ double AkaoSeq::GetTempoInBPM(uint16_t tempo) const {
   }
 }
 
-AkaoInstrSet* AkaoSeq::NewInstrSet() const {
+AkaoInstrSet* AkaoSeq::newInstrSet() const {
   if (version() >= AkaoPs1Version::VERSION_3_0) {
     uint32_t length = 0;
     if (has_instrument_set_offset())
@@ -225,7 +225,7 @@ AkaoInstrSet* AkaoSeq::NewInstrSet() const {
       length = unLength - (drum_set_offset() - dwOffset);
 
     return length != 0
-      ? new AkaoInstrSet(rawFile(), length, version(), instrument_set_offset(), drum_set_offset(), GetID(), "Akao Instr Set")
+      ? new AkaoInstrSet(rawFile(), length, version(), instrument_set_offset(), drum_set_offset(), id(), "Akao Instr Set")
       : new AkaoInstrSet(rawFile(), dwOffset, dwOffset + unLength, version());
   } else {
     return new AkaoInstrSet(rawFile(), dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses);
@@ -523,11 +523,11 @@ void AkaoSeq::LoadEventMap()
 
 AkaoTrack::AkaoTrack(AkaoSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
-  AkaoTrack::ResetVars();
+  AkaoTrack::resetVars();
 }
 
-void AkaoTrack::ResetVars() {
-  SeqTrack::ResetVars();
+void AkaoTrack::resetVars() {
+  SeqTrack::resetVars();
 
   slur = false;
   legato = false;
@@ -548,11 +548,11 @@ void AkaoTrack::ResetVars() {
   conditional_jump_destinations.clear();
 }
 
-bool AkaoTrack::ReadEvent() {
+bool AkaoTrack::readEvent() {
   AkaoSeq *parentSeq = seq();
   const AkaoPs1Version version = parentSeq->version();
   const uint32_t beginOffset = curOffset;
-  const uint8_t status_byte = GetByte(curOffset++);
+  const uint8_t status_byte = readByte(curOffset++);
 
   std::stringstream desc;
 
@@ -575,7 +575,7 @@ bool AkaoTrack::ReadEvent() {
 
     uint8_t delta_time = 0;
     if (op_note_with_length)
-      delta_time = GetByte(curOffset++);
+      delta_time = readByte(curOffset++);
     if (use_one_time_delta_time) {
       delta_time = one_time_delta_time;
       use_one_time_delta_time = false;
@@ -603,23 +603,23 @@ bool AkaoTrack::ReadEvent() {
         key = drum ? (drum_octave * 12) + relative_key : real_key;
       }
 
-      AddNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);
-      AddTime(delta_time);
+      addNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);
+      addTime(delta_time);
     }
     else if (op_tie)
     {
-      MakePrevDurNoteEnd(GetTime() + dur);
-      AddTime(delta_time);
+      makePrevDurNoteEnd(getTime() + dur);
+      addTime(delta_time);
       desc << "Length: " << delta_time << "  Duration: " << dur;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(), CLR_TIE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(), CLR_TIE);
     }
     else // rest
     {
-      AddRest(beginOffset, curOffset - beginOffset, delta_time);
+      addRest(beginOffset, curOffset - beginOffset, delta_time);
     }
   }
   else if ((status_byte >= 0x9A) && (status_byte <= 0x9F)) {
-    AddUnknown(beginOffset, curOffset - beginOffset, "Undefined");
+    addUnknown(beginOffset, curOffset - beginOffset, "Undefined");
     return false; // they should not be used
   }
   else {
@@ -627,7 +627,7 @@ bool AkaoTrack::ReadEvent() {
 
     if (version >= AkaoPs1Version::VERSION_3_0 && status_byte == 0xFE)
     {
-      const uint8_t op = GetByte(curOffset++);
+      const uint8_t op = readByte(curOffset++);
       const auto event_iterator = parentSeq->sub_event_map.find(op);
       if (event_iterator != parentSeq->sub_event_map.end())
         event = event_iterator->second;
@@ -636,7 +636,7 @@ bool AkaoTrack::ReadEvent() {
     }
     else if ((version == AkaoPs1Version::VERSION_1_2 || version == AkaoPs1Version::VERSION_2) && status_byte == 0xFC)
     {
-      const uint8_t op = GetByte(curOffset++);
+      const uint8_t op = readByte(curOffset++);
       const auto event_iterator = parentSeq->sub_event_map.find(op);
       if (event_iterator != parentSeq->sub_event_map.end())
         event = event_iterator->second;
@@ -654,109 +654,109 @@ bool AkaoTrack::ReadEvent() {
 
     switch (event) {
     case EVENT_END:
-      AddEndOfTrack(beginOffset, curOffset - beginOffset);
+      addEndOfTrack(beginOffset, curOffset - beginOffset);
       return false;
 
     case EVENT_PROGCHANGE: {
       // change program to articulation number
       parentSeq->bUsesIndividualArts = true;
-      const uint8_t artNum = GetByte(curOffset++);
-      AddBankSelectNoItem(0);
-      AddProgramChange(beginOffset, curOffset - beginOffset, artNum);
+      const uint8_t artNum = readByte(curOffset++);
+      addBankSelectNoItem(0);
+      addProgramChange(beginOffset, curOffset - beginOffset, artNum);
       break;
     }
 
     case EVENT_ONE_TIME_DURATION: {
-      const uint8_t delta_time = GetByte(curOffset++);
+      const uint8_t delta_time = readByte(curOffset++);
       last_delta_time = one_time_delta_time = delta_time;
       use_one_time_delta_time = true;
       desc << "Length: " << delta_time;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Next Note Length", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Next Note Length", desc.str(), CLR_CHANGESTATE);
       break;
     }
 
     case EVENT_VOLUME: {
-      const uint8_t vol = GetByte(curOffset++);
-      AddVol(beginOffset, curOffset - beginOffset, vol);
+      const uint8_t vol = readByte(curOffset++);
+      addVol(beginOffset, curOffset - beginOffset, vol);
       break;
     }
 
     case EVENT_VOLUME_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t vol = GetByte(curOffset++);
-      AddVolSlide(beginOffset, curOffset - beginOffset, length, vol);
+      const uint8_t vol = readByte(curOffset++);
+      addVolSlide(beginOffset, curOffset - beginOffset, length, vol);
       break;
     }
 
     case EVENT_PITCH_SLIDE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const int8_t semitones = GetByte(curOffset++);
+      const int8_t semitones = readByte(curOffset++);
       desc << "Length: " << length << "  Key: " << semitones << " semitones";
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
       break;
     }
 
     case EVENT_OCTAVE: {
-      const uint8_t new_octave = GetByte(curOffset++);
-      AddSetOctave(beginOffset, curOffset - beginOffset, new_octave);
+      const uint8_t new_octave = readByte(curOffset++);
+      addSetOctave(beginOffset, curOffset - beginOffset, new_octave);
       break;
     }
 
     case EVENT_INCREMENT_OCTAVE:
       // The formula below is more accurate implementation of this (at least in FF7), but who cares?
       //octave = (octave + 1) & 0xf;
-      AddIncrementOctave(beginOffset, curOffset - beginOffset);
+      addIncrementOctave(beginOffset, curOffset - beginOffset);
       break;
 
     case EVENT_DECREMENT_OCTAVE:
       // The formula below is more accurate implementation of this (at least in FF7), but who cares?
       //octave = (octave - 1) & 0xf;
-      AddDecrementOctave(beginOffset, curOffset - beginOffset);
+      addDecrementOctave(beginOffset, curOffset - beginOffset);
       break;
 
     case EVENT_EXPRESSION: {
-      const uint8_t expression = GetByte(curOffset++);
-      AddExpression(beginOffset, curOffset - beginOffset, expression);
+      const uint8_t expression = readByte(curOffset++);
+      addExpression(beginOffset, curOffset - beginOffset, expression);
       break;
     }
 
     case EVENT_EXPRESSION_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t expression = GetByte(curOffset++);
-      AddExpressionSlide(beginOffset, curOffset - beginOffset, length, expression);
+      const uint8_t expression = readByte(curOffset++);
+      addExpressionSlide(beginOffset, curOffset - beginOffset, length, expression);
       break;
     }
 
     case EVENT_EXPRESSION_FADE_PER_NOTE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t expression = GetByte(curOffset++);
+      const uint8_t expression = readByte(curOffset++);
       desc << "Target Expression: " << expression << "  Duration: " << length;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Expression Slide Per Note", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Expression Slide Per Note", desc.str(), CLR_VOLUME, ICON_CONTROL);
       break;
     }
 
     case EVENT_PAN: {
       // TODO: volume balance conversion
-      const uint8_t pan = GetByte(curOffset++); // 0-127
-      AddPan(beginOffset, curOffset - beginOffset, pan);
+      const uint8_t pan = readByte(curOffset++); // 0-127
+      addPan(beginOffset, curOffset - beginOffset, pan);
       break;
     }
 
     case EVENT_PAN_FADE: {
       // TODO: volume balance conversion
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t pan = GetByte(curOffset++);
-      AddPanSlide(beginOffset, curOffset - beginOffset, length, pan);
+      const uint8_t pan = readByte(curOffset++);
+      addPanSlide(beginOffset, curOffset - beginOffset, length, pan);
       break;
     }
 
     case EVENT_NOISE_CLOCK: {
-      const uint8_t raw_clock = GetByte(curOffset++);
+      const uint8_t raw_clock = readByte(curOffset++);
       const bool relative = (raw_clock & 0xc0) != 0;
       if (relative)
       {
@@ -769,69 +769,69 @@ bool AkaoTrack::ReadEvent() {
         const uint8_t clock = raw_clock & 0x3f;
         desc << "Clock: " << clock;
       }
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Clock", desc.str(), CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Clock", desc.str(), CLR_CHANGESTATE, ICON_CONTROL);
       break;
     }
 
     case EVENT_ADSR_ATTACK_RATE: {
-      const uint8_t ar = GetByte(curOffset++); // 0-127
+      const uint8_t ar = readByte(curOffset++); // 0-127
       desc << "AR: " << ar;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_ADSR_DECAY_RATE: {
-      const uint8_t dr = GetByte(curOffset++); // 0-15
+      const uint8_t dr = readByte(curOffset++); // 0-15
       desc << "DR: " << dr;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_ADSR_SUSTAIN_LEVEL: {
-      const uint8_t sl = GetByte(curOffset++); // 0-15
+      const uint8_t sl = readByte(curOffset++); // 0-15
       desc << "SL: " << sl;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Level", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Level", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_ADSR_DECAY_RATE_AND_SUSTAIN_LEVEL: {
-      const uint8_t dr = GetByte(curOffset++); // 0-15
-      const uint8_t sl = GetByte(curOffset++); // 0-15
+      const uint8_t dr = readByte(curOffset++); // 0-15
+      const uint8_t sl = readByte(curOffset++); // 0-15
       desc << "DR: " << dr << "  SL: " << sl;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate & Sustain Level", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate & Sustain Level", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_ADSR_SUSTAIN_RATE: {
-      const uint8_t sr = GetByte(curOffset++); // 0-127
+      const uint8_t sr = readByte(curOffset++); // 0-127
       desc << "SR: " << sr;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_ADSR_RELEASE_RATE: {
-      const uint8_t rr = GetByte(curOffset++); // 0-127
+      const uint8_t rr = readByte(curOffset++); // 0-127
       desc << "RR: " << rr;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_RESET_ADSR:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Reset ADSR", "", CLR_ADSR);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reset ADSR", "", CLR_ADSR);
       break;
 
     case EVENT_VIBRATO: {
-      const uint8_t delay = GetByte(curOffset++);
-      const uint8_t raw_rate = GetByte(curOffset++);
+      const uint8_t delay = readByte(curOffset++);
+      const uint8_t raw_rate = readByte(curOffset++);
       const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
-      const uint8_t type = GetByte(curOffset++); // 0-15
+      const uint8_t type = readByte(curOffset++); // 0-15
       desc << "Delay: " << delay << "  Rate: " << rate << "  LFO Type: " << type;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str(), CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_VIBRATO_DEPTH: {
-      const uint8_t raw_depth = GetByte(curOffset++);
+      const uint8_t raw_depth = readByte(curOffset++);
       const uint8_t depth = raw_depth & 0x7f;
       const uint8_t depth_type = (raw_depth & 0x80) >> 7;
       desc << "Depth: " << depth;
@@ -841,116 +841,116 @@ bool AkaoTrack::ReadEvent() {
       else {
         desc << " (1/1 scale, approx 700 cents at maximum)";
       }
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Depth", desc.str(), CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Depth", desc.str(), CLR_LFO);
       break;
     }
 
     case EVENT_VIBRATO_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", "", CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", "", CLR_LFO);
       break;
 
     case EVENT_ADSR_ATTACK_MODE: {
-      const uint8_t ar_mode = GetByte(curOffset++);
+      const uint8_t ar_mode = readByte(curOffset++);
       desc << "Mode: " << ar_mode;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_TREMOLO: {
-      const uint8_t delay = GetByte(curOffset++);
-      const uint8_t raw_rate = GetByte(curOffset++);
+      const uint8_t delay = readByte(curOffset++);
+      const uint8_t raw_rate = readByte(curOffset++);
       const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
-      const uint8_t type = GetByte(curOffset++); // 0-15
+      const uint8_t type = readByte(curOffset++); // 0-15
       desc << "Delay: " << delay << "  Rate: " << rate << "  LFO Type: " << type;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc.str(), CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_TREMOLO_DEPTH: {
-      const uint8_t depth = GetByte(curOffset++);
+      const uint8_t depth = readByte(curOffset++);
       desc << "Depth: " << depth;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc.str(), CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc.str(), CLR_LFO);
       break;
     }
 
     case EVENT_TREMOLO_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Off", "", CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Off", "", CLR_LFO);
       break;
 
     case EVENT_ADSR_SUSTAIN_MODE: {
-      const uint8_t sr_mode = GetByte(curOffset++);
+      const uint8_t sr_mode = readByte(curOffset++);
       desc << "Mode: " << sr_mode;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_PAN_LFO: {
-      const uint8_t raw_rate = GetByte(curOffset++);
+      const uint8_t raw_rate = readByte(curOffset++);
       const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
-      const uint8_t type = GetByte(curOffset++); // 0-15
+      const uint8_t type = readByte(curOffset++); // 0-15
       desc << "Rate: " << rate << "  LFO Type: " << type;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO", desc.str(), CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_PAN_LFO_DEPTH: {
-      const uint8_t depth = GetByte(curOffset++);
+      const uint8_t depth = readByte(curOffset++);
       desc << "Depth: " << depth;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Depth", desc.str(), CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Depth", desc.str(), CLR_LFO);
       break;
     }
 
     case EVENT_PAN_LFO_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Off", "", CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Off", "", CLR_LFO);
       break;
 
     case EVENT_ADSR_RELEASE_MODE: {
-      const uint8_t rr_mode = GetByte(curOffset++);
+      const uint8_t rr_mode = readByte(curOffset++);
       desc << "Mode: " << rr_mode;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate Mode", desc.str(), CLR_ADSR, ICON_CONTROL);
       break;
     }
 
     case EVENT_TRANSPOSE_ABS: {
-      const int8_t key = GetByte(curOffset++);
-      AddTranspose(beginOffset, curOffset - beginOffset, key);
+      const int8_t key = readByte(curOffset++);
+      addTranspose(beginOffset, curOffset - beginOffset, key);
       break;
     }
 
     case EVENT_TRANSPOSE_REL: {
-      const int8_t key = GetByte(curOffset++);
-      AddTranspose(beginOffset, curOffset - beginOffset, transpose + key, "Transpose (Relative)");
+      const int8_t key = readByte(curOffset++);
+      addTranspose(beginOffset, curOffset - beginOffset, transpose + key, "Transpose (Relative)");
       break;
     }
 
     case EVENT_REVERB_ON:
       // TODO: reverb control
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "", CLR_REVERB);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "", CLR_REVERB);
       break;
 
     case EVENT_REVERB_OFF:
       // TODO: reverb control
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "", CLR_REVERB);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "", CLR_REVERB);
       break;
 
     case EVENT_NOISE_ON:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", "", CLR_PROGCHANGE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", "", CLR_PROGCHANGE, ICON_CONTROL);
       break;
 
     case EVENT_NOISE_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", "", CLR_PROGCHANGE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", "", CLR_PROGCHANGE, ICON_CONTROL);
       break;
 
     case EVENT_PITCH_MOD_ON:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On", "", CLR_PROGCHANGE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On", "", CLR_PROGCHANGE, ICON_CONTROL);
       break;
 
     case EVENT_PITCH_MOD_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) Off", "", CLR_PROGCHANGE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) Off", "", CLR_PROGCHANGE, ICON_CONTROL);
       break;
 
     case EVENT_LOOP_START:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Start", "", CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Start", "", CLR_LOOP, ICON_STARTREP);
 
       loop_layer = (loop_layer + 1) & 3;
       loop_begin_loc[loop_layer] = curOffset;
@@ -958,11 +958,11 @@ bool AkaoTrack::ReadEvent() {
       break;
 
     case EVENT_LOOP_UNTIL: {
-      const uint8_t raw_count = GetByte(curOffset++);
+      const uint8_t raw_count = readByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
 
       desc << "Count: " << count;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Until", desc.str(), CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Until", desc.str(), CLR_LOOP, ICON_ENDREP);
 
       loop_counter[loop_layer]++;
       if (loop_counter[loop_layer] == count)
@@ -977,7 +977,7 @@ bool AkaoTrack::ReadEvent() {
     }
 
     case EVENT_LOOP_AGAIN: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Again", "", CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Again", "", CLR_LOOP, ICON_ENDREP);
 
       loop_counter[loop_layer]++;
       curOffset = loop_begin_loc[loop_layer];
@@ -986,134 +986,134 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_RESET_VOICE_EFFECTS:
       // Reset noise, FM modulation, reverb, etc.
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Reset Voice Effects", "", CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reset Voice Effects", "", CLR_CHANGESTATE, ICON_CONTROL);
       break;
 
     case EVENT_SLUR_ON:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur On (No Key Off, No Retrigger)", "", CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On (No Key Off, No Retrigger)", "", CLR_CHANGESTATE, ICON_CONTROL);
       slur = true;
       break;
 
     case EVENT_SLUR_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", "", CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", "", CLR_CHANGESTATE, ICON_CONTROL);
       slur = false;
       break;
 
     case EVENT_NOISE_ON_DELAY_TOGGLE: {
-      const uint8_t raw_delay = GetByte(curOffset++);
+      const uint8_t raw_delay = readByte(curOffset++);
       const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
       desc << "Delay: " << delay;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On & Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On & Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       break;
     }
 
     case EVENT_NOISE_DELAY_TOGGLE: {
-      const uint8_t raw_delay = GetByte(curOffset++);
+      const uint8_t raw_delay = readByte(curOffset++);
       const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
       desc << "Delay: " << delay;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Noise On/Off Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On/Off Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       break;
     }
 
     case EVENT_LEGATO_ON:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Legato On (No Key Off)", "", CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Legato On (No Key Off)", "", CLR_CHANGESTATE, ICON_CONTROL);
       legato = true;
       break;
 
     case EVENT_LEGATO_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Legato Off", "", CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Legato Off", "", CLR_CHANGESTATE, ICON_CONTROL);
       legato = false;
       break;
 
     case EVENT_PITCH_MOD_ON_DELAY_TOGGLE: {
-      const uint8_t raw_delay = GetByte(curOffset++);
+      const uint8_t raw_delay = readByte(curOffset++);
       const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
       desc << "Delay: " << delay;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On & Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On & Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       break;
     }
 
     case EVENT_PITCH_MOD_DELAY_TOGGLE: {
-      const uint8_t raw_delay = GetByte(curOffset++);
+      const uint8_t raw_delay = readByte(curOffset++);
       const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
       desc << "Delay: " << delay;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On/Off Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On/Off Delay Switching", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
       break;
     }
 
     case EVENT_PITCH_SIDE_CHAIN_ON:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Side Chain On", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Side Chain On", "", CLR_MISC);
       break;
 
     case EVENT_PITCH_SIDE_CHAIN_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Side Chain Off", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Side Chain Off", "", CLR_MISC);
       break;
 
     case EVENT_PITCH_TO_VOLUME_SIDE_CHAIN_ON:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch-Volume Side Chain On", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch-Volume Side Chain On", "", CLR_MISC);
       break;
 
     case EVENT_PITCH_TO_VOLUME_SIDE_CHAIN_OFF:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pitch-Volume Side Chain Off", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch-Volume Side Chain Off", "", CLR_MISC);
       break;
 
     case EVENT_TUNING_ABS:
     {
       // signed data byte.  range of 1 octave (0x7F = +1 octave, 0x80 = -1 octave)
-      tuning = GetByte(curOffset++);
+      tuning = readByte(curOffset++);
 
       const int div = tuning >= 0 ? 128 : 256;
       const double scale = tuning / static_cast<double>(div);
       const double cents = (scale / log(2.0)) * 1200.0;
       desc << "Tuning: " << cents << " cents (" << tuning << "/" << div << ")";
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tuning", desc.str(), CLR_MISC, ICON_CONTROL);
-      AddFineTuningNoItem(cents);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning", desc.str(), CLR_MISC, ICON_CONTROL);
+      addFineTuningNoItem(cents);
       break;
     }
 
     case EVENT_TUNING_REL: {
-      const int8_t relative_tuning = GetByte(curOffset++);
+      const int8_t relative_tuning = readByte(curOffset++);
       tuning += relative_tuning;
 
       const int div = tuning >= 0 ? 128 : 256;
       const double scale = tuning / static_cast<double>(div);
       const double cents = (scale / log(2.0)) * 1200.0;
       desc << "Amount: " << relative_tuning <<  "  Tuning: " << cents << " cents (" << tuning << "/" << div << ")";
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tuning (Relative)", desc.str(), CLR_MISC, ICON_CONTROL);
-      AddFineTuningNoItem(cents);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning (Relative)", desc.str(), CLR_MISC, ICON_CONTROL);
+      addFineTuningNoItem(cents);
       break;
     }
 
     case EVENT_PORTAMENTO_ON: {
-      const uint8_t raw_speed = GetByte(curOffset++);
+      const uint8_t raw_speed = readByte(curOffset++);
       const uint16_t speed = raw_speed == 0 ? 256 : raw_speed;
       desc << "Time: " << speed << " tick(s)";
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
       //AddPortamentoTimeNoItem(speed);
-      AddPortamentoNoItem(true);
+      addPortamentoNoItem(true);
       break;
     }
 
     case EVENT_PORTAMENTO_OFF: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Off", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Off", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
       //AddPortamentoTimeNoItem(0);
-      AddPortamentoNoItem(false);
+      addPortamentoNoItem(false);
       break;
     }
 
     case EVENT_FIXED_DURATION: {
-      const int8_t relative_length = GetByte(curOffset++);
+      const int8_t relative_length = readByte(curOffset++);
       const int16_t length = std::min(std::max(last_delta_time + relative_length, 1), 255);
       delta_time_overwrite = length;
       desc << "Duration (Relative Amount): " << relative_length;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Fixed Note Length", desc.str(), CLR_MISC, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Fixed Note Length", desc.str(), CLR_MISC, ICON_CONTROL);
       break;
     }
 
     case EVENT_VIBRATO_DEPTH_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t raw_depth = GetByte(curOffset++);
+      const uint8_t raw_depth = readByte(curOffset++);
       const uint8_t depth = raw_depth & 0x7f;
       const uint8_t depth_type = (raw_depth & 0x80) >> 7;
       desc << "Duration: " << length << "  Target Depth: " << depth;
@@ -1123,121 +1123,121 @@ bool AkaoTrack::ReadEvent() {
       else {
         desc << " (1/1 scale, approx 700 cents at maximum)";
       }
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Depth Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Depth Slide", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_TREMOLO_DEPTH_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t depth = GetByte(curOffset++);
+      const uint8_t depth = readByte(curOffset++);
       desc << "Duration: " << length << "  Target Depth: " << depth;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth Slide", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_PAN_LFO_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t depth = GetByte(curOffset++);
+      const uint8_t depth = readByte(curOffset++);
       desc << "Duration: " << length << "  Target Depth: " << depth;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Depth Slide", desc.str(), CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Depth Slide", desc.str(), CLR_LFO);
       break;
     }
 
     case EVENT_VIBRATO_RATE_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t rate = GetByte(curOffset++);
+      const uint8_t rate = readByte(curOffset++);
       desc << "Duration: " << length << "  Target Rate: " << rate;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_TREMOLO_RATE_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t rate = GetByte(curOffset++);
+      const uint8_t rate = readByte(curOffset++);
       desc << "Duration: " << length << "  Target Rate: " << rate;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_PAN_LFO_RATE_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t rate = GetByte(curOffset++);
+      const uint8_t rate = readByte(curOffset++);
       desc << "Duration: " << length << "  Target Rate: " << rate;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Rate Slide", desc.str(), CLR_LFO, ICON_CONTROL);
       break;
     }
 
     case EVENT_E0: {
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_E1: {
       curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_E2: {
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_TEMPO: {
-      const uint16_t raw_tempo = GetShort(curOffset);
+      const uint16_t raw_tempo = readShort(curOffset);
       curOffset += 2;
 
-      const double bpm = parentSeq->GetTempoInBPM(raw_tempo);
-      AddTempoBPM(beginOffset, curOffset - beginOffset, bpm);
+      const double bpm = parentSeq->getTempoInBPM(raw_tempo);
+      addTempoBPM(beginOffset, curOffset - beginOffset, bpm);
       break;
     }
 
     case EVENT_TEMPO_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint16_t raw_tempo = GetShort(curOffset);
+      const uint16_t raw_tempo = readShort(curOffset);
       curOffset += 2;
 
-      const double bpm = parentSeq->GetTempoInBPM(raw_tempo);
-      AddTempoBPMSlide(beginOffset, curOffset - beginOffset, length, bpm);
+      const double bpm = parentSeq->getTempoInBPM(raw_tempo);
+      addTempoBPMSlide(beginOffset, curOffset - beginOffset, length, bpm);
       break;
     }
 
     case EVENT_REVERB_DEPTH: {
-      const int16_t depth = GetShort(curOffset);
+      const int16_t depth = readShort(curOffset);
       curOffset += 2;
 
       desc << "Depth: " << depth;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(), CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_REVERB_DEPTH_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const int16_t depth = GetShort(curOffset);
+      const int16_t depth = readShort(curOffset);
       curOffset += 2;
 
       desc << "Duration: " << length << "  Target Depth: " << depth;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth Slide", desc.str(), CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth Slide", desc.str(), CLR_REVERB, ICON_CONTROL);
       break;
     }
 
     case EVENT_DRUM_ON_V1: {
-      const int16_t relative_drum_offset = GetShort(curOffset);
+      const int16_t relative_drum_offset = readShort(curOffset);
       curOffset += 2;
       const uint32_t drum_instrset_offset = curOffset + relative_drum_offset;
 
       desc << "Offset: 0x" << std::hex << std::setfill('0') << std::uppercase << drum_instrset_offset;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
 
       if (readMode == READMODE_ADD_TO_UI) {
         parentSeq->drum_instrument_addresses.insert(drum_instrset_offset);
@@ -1246,8 +1246,8 @@ bool AkaoTrack::ReadEvent() {
             std::distance(parentSeq->drum_instrument_addresses.begin(),
                           parentSeq->drum_instrument_addresses.find(drum_instrset_offset)));
 
-        AddBankSelectNoItem(127 - instrument_index);
-        AddProgramChangeNoItem(127, false);
+        addBankSelectNoItem(127 - instrument_index);
+        addProgramChangeNoItem(127, false);
         drum = true;
         // channel = 9;
       }
@@ -1256,9 +1256,9 @@ bool AkaoTrack::ReadEvent() {
     }
 
     case EVENT_DRUM_ON_V2: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
-      AddBankSelectNoItem(127);
-      AddProgramChangeNoItem(127, false);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit On", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addBankSelectNoItem(127);
+      addProgramChangeNoItem(127, false);
       drum = true;
       //channel = 9;
       break;
@@ -1266,12 +1266,12 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_DRUM_OFF:
       // TODO: restore program change for regular instrument
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit Off", "", CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit Off", "", CLR_PROGCHANGE, ICON_PROGCHANGE);
       drum = false;
       break;
 
     case EVENT_UNCONDITIONAL_JUMP: {
-      const int16_t relative_offset = GetShort(curOffset);
+      const int16_t relative_offset = readShort(curOffset);
       const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
@@ -1279,19 +1279,19 @@ bool AkaoTrack::ReadEvent() {
       desc << "Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
       curOffset = dest;
 
-      if (!IsOffsetUsed(dest)) {
-        AddGenericEvent(beginOffset, length, "Jump", desc.str(), CLR_LOOPFOREVER);
+      if (!isOffsetUsed(dest)) {
+        addGenericEvent(beginOffset, length, "Jump", desc.str(), CLR_LOOPFOREVER);
       }
       else {
-        if (!AddLoopForever(beginOffset, length, "Jump"))
-          return AnyUnvisitedJumpDestinations();
+        if (!addLoopForever(beginOffset, length, "Jump"))
+          return anyUnvisitedJumpDestinations();
       }
       break;
     }
 
     case EVENT_CPU_CONDITIONAL_JUMP: {
-      const uint8_t target_value = GetByte(curOffset++);
-      const int16_t relative_offset = GetShort(curOffset);
+      const uint8_t target_value = readByte(curOffset++);
+      const int16_t relative_offset = readShort(curOffset);
       const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
@@ -1302,7 +1302,7 @@ bool AkaoTrack::ReadEvent() {
         // This event performs conditional jump if certain CPU variable matches to the condValue.
         // VGMTrans will simply try to parse all events as far as possible, instead.
         // (Test case: FF9 416 Final Battle)
-        if (!IsOffsetUsed(beginOffset)) {
+        if (!isOffsetUsed(beginOffset)) {
           // For the first time, VGMTrans just skips the event,
           // but remembers the destination address for future jump.
           conditional_jump_destinations.push_back(dest);
@@ -1316,20 +1316,20 @@ bool AkaoTrack::ReadEvent() {
           curOffset = dest;
       }
 
-      AddGenericEvent(beginOffset, length, "CPU-Conditional Jump", desc.str(), CLR_LOOP);
+      addGenericEvent(beginOffset, length, "CPU-Conditional Jump", desc.str(), CLR_LOOP);
       break;
     }
 
     case EVENT_LOOP_BRANCH: {
-      const uint8_t raw_count = GetByte(curOffset++);
+      const uint8_t raw_count = readByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
-      const int16_t relative_offset = GetShort(curOffset);
+      const int16_t relative_offset = readShort(curOffset);
       const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
       desc << "Count: " << count << "  Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
-      AddGenericEvent(beginOffset, length, "Repeat Branch", desc.str(), CLR_MISC);
+      addGenericEvent(beginOffset, length, "Repeat Branch", desc.str(), CLR_MISC);
 
       if (loop_counter[loop_layer] + 1 == count)
         curOffset = dest;
@@ -1338,15 +1338,15 @@ bool AkaoTrack::ReadEvent() {
     }
 
     case EVENT_LOOP_BREAK: {
-      const uint8_t raw_count = GetByte(curOffset++);
+      const uint8_t raw_count = readByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
-      const int16_t relative_offset = GetShort(curOffset);
+      const int16_t relative_offset = readShort(curOffset);
       const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
       desc << "Count: " << count << "  Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
-      AddGenericEvent(beginOffset, length, "Repeat Break", desc.str(), CLR_MISC);
+      addGenericEvent(beginOffset, length, "Repeat Break", desc.str(), CLR_MISC);
 
       if (loop_counter[loop_layer] + 1 == count)
         curOffset = dest;
@@ -1357,121 +1357,121 @@ bool AkaoTrack::ReadEvent() {
 
     case EVENT_PROGCHANGE_NO_ATTACK: {
       parentSeq->bUsesIndividualArts = true;
-      const uint8_t artNum = GetByte(curOffset++);
-      AddBankSelectNoItem(0);
-      AddProgramChange(beginOffset, curOffset - beginOffset, artNum, false, "Program Change w/o Attack Sample");
+      const uint8_t artNum = readByte(curOffset++);
+      addBankSelectNoItem(0);
+      addProgramChange(beginOffset, curOffset - beginOffset, artNum, false, "Program Change w/o Attack Sample");
       break;
     }
 
     case EVENT_F3_FF7: {
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_F3_SAGAFRO: {
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_OVERLAY_VOICE_ON: {
       parentSeq->bUsesIndividualArts = true;
-      const uint8_t artNum = GetByte(curOffset++);
-      const uint8_t artNum2 = GetByte(curOffset++);
+      const uint8_t artNum = readByte(curOffset++);
+      const uint8_t artNum2 = readByte(curOffset++);
 
       desc << "Program Number for Primary Voice: " << artNum << "  Program Number for Secondary Voice: " << artNum2;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Voice On (With Program Change)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
-      AddBankSelectNoItem(0);
-      AddProgramChangeNoItem(artNum, false);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Voice On (With Program Change)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addBankSelectNoItem(0);
+      addProgramChangeNoItem(artNum, false);
       break;
     }
 
     case EVENT_OVERLAY_VOICE_OFF: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Voice Off", "", CLR_MISC, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Voice Off", "", CLR_MISC, ICON_CONTROL);
       break;
     }
 
     case EVENT_OVERLAY_VOLUME_BALANCE: {
-      const uint8_t balance = GetByte(curOffset++);
+      const uint8_t balance = readByte(curOffset++);
       const int primary_percent = (127 - balance) * 100 / 256;
       const int secondary_percent = balance * 100 / 256;
       desc << "Balance: " << balance << " (Primary Voice Volume " << primary_percent << "%, Secondary Voice Volume " << secondary_percent << "%)";
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Volume Balance", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Volume Balance", desc.str(), CLR_VOLUME, ICON_CONTROL);
       break;
     }
 
     case EVENT_OVERLAY_VOLUME_BALANCE_FADE: {
-      const uint8_t raw_length = GetByte(curOffset++);
+      const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
-      const uint8_t balance = GetByte(curOffset++);
+      const uint8_t balance = readByte(curOffset++);
       const int primary_percent = (127 - balance) * 100 / 256;
       const int secondary_percent = balance * 100 / 256;
       desc << "Duration: " << length << "  Target Balance: " << balance << " (Primary Voice Volume " << primary_percent << "%, Secondary Voice Volume " << secondary_percent << "%)";
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Volume Balance Fade", desc.str(), CLR_VOLUME, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Volume Balance Fade", desc.str(), CLR_VOLUME, ICON_CONTROL);
       break;
     }
 
     case EVENT_ALTERNATE_VOICE_ON: {
-      const uint8_t rr = GetByte(curOffset++); // 0-127
+      const uint8_t rr = readByte(curOffset++); // 0-127
       desc << "Release Rate: " << rr;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Alternate Voice On", desc.str(), CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Alternate Voice On", desc.str(), CLR_MISC);
       break;
     }
 
     case EVENT_ALTERNATE_VOICE_OFF: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Alternate Voice Off", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Alternate Voice Off", "", CLR_MISC);
       break;
     }
 
     case EVENT_FC_0C: {
       curOffset += 2;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_FC_0D: {
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_FC_0E: {
       curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_FC_0F: {
       curOffset += 2;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_FC_10: {
       curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_FC_11: {
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_PATTERN: {
-      const int16_t relative_offset = GetShort(curOffset);
+      const int16_t relative_offset = readShort(curOffset);
       const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
       desc << "Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
-      AddGenericEvent(beginOffset, length, "Play Pattern", desc.str(), CLR_MISC);
+      addGenericEvent(beginOffset, length, "Play Pattern", desc.str(), CLR_MISC);
 
       pattern_return_offset = curOffset;
       curOffset = dest;
@@ -1479,43 +1479,43 @@ bool AkaoTrack::ReadEvent() {
     }
 
     case EVENT_END_PATTERN: {
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", "", CLR_MISC);
       curOffset = pattern_return_offset;
       break;
     }
 
     case EVENT_ALLOC_RESERVED_VOICES: {
-      const uint8_t count = GetByte(curOffset++);
+      const uint8_t count = readByte(curOffset++);
       desc << "Number of Voices: " << count;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Allocate Reserved Voices", desc.str(), CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Allocate Reserved Voices", desc.str(), CLR_MISC);
       break;
     }
 
     case EVENT_FREE_RESERVED_VOICES: {
       constexpr uint8_t count = 0;
       desc << "Number of Voices: " << count;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Free Reserved Voices", desc.str(), CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Free Reserved Voices", desc.str(), CLR_MISC);
       break;
     }
 
     case EVENT_TIME_SIGNATURE: {
       // Both of arguments can be zero: Front Mission 3: 1-08 Setup 2.psf
-      const uint8_t ticksPerBeat = GetByte(curOffset++);
-      const uint8_t beatsPerMeasure = GetByte(curOffset++);
+      const uint8_t ticksPerBeat = readByte(curOffset++);
+      const uint8_t beatsPerMeasure = readByte(curOffset++);
       if (ticksPerBeat != 0 && beatsPerMeasure != 0) {
-        const uint8_t denom = static_cast<uint8_t>((parentSeq->ppqn * 4) / ticksPerBeat); // or should it always be 4? no idea
-        AddTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat);
+        const uint8_t denom = static_cast<uint8_t>((parentSeq->ppqn() * 4) / ticksPerBeat); // or should it always be 4? no idea
+        addTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat);
       } else {
-        AddGenericEvent(beginOffset, curOffset - beginOffset, "Time Signature", "", CLR_TIMESIG, ICON_TIMESIG);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Time Signature", "", CLR_TIMESIG, ICON_TIMESIG);
       }
       break;
     }
 
     case EVENT_MEASURE: {
-      const uint16_t measure = GetShort(curOffset);
+      const uint16_t measure = readShort(curOffset);
       curOffset += 2;
       desc << "Measure: " << measure;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Marker (Measure Number)", desc.str(), CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Marker (Measure Number)", desc.str(), CLR_MISC);
       // TODO: write midi marker event
       break;
     }
@@ -1524,18 +1524,18 @@ bool AkaoTrack::ReadEvent() {
       // Chrono Cross - 114 Shadow Forest
       // Chrono Cross - 119 Hydra Marshes
       // Chrono Cross - 302 Chronopolis
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_PROGCHANGE_KEY_SPLIT_V1: {
-      const int16_t relative_key_split_regions_offset = GetShort(curOffset);
+      const int16_t relative_key_split_regions_offset = readShort(curOffset);
       curOffset += 2;
       const uint32_t key_split_regions_offset = curOffset + relative_key_split_regions_offset;
 
       desc << "Offset: 0x" << std::hex << std::setfill('0') << std::uppercase << key_split_regions_offset;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Program Change (Key-Split Instrument)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change (Key-Split Instrument)", desc.str(), CLR_PROGCHANGE, ICON_PROGCHANGE);
 
       if (readMode == READMODE_ADD_TO_UI) {
         parentSeq->custom_instrument_addresses.insert(key_split_regions_offset);
@@ -1544,36 +1544,36 @@ bool AkaoTrack::ReadEvent() {
             std::distance(parentSeq->custom_instrument_addresses.begin(),
                           parentSeq->custom_instrument_addresses.find(key_split_regions_offset)));
 
-        AddBankSelectNoItem(1);
-        AddProgramChangeNoItem(instrument_index, false);
+        addBankSelectNoItem(1);
+        addProgramChangeNoItem(instrument_index, false);
       }
       break;
     }
 
     case EVENT_PROGCHANGE_KEY_SPLIT_V2: {
-      const uint8_t progNum = GetByte(curOffset++);
-      AddBankSelectNoItem(1);
-      AddProgramChange(beginOffset, curOffset - beginOffset, progNum, false, "Program Change (Key-Split Instrument)");
+      const uint8_t progNum = readByte(curOffset++);
+      addBankSelectNoItem(1);
+      addProgramChange(beginOffset, curOffset - beginOffset, progNum, false, "Program Change (Key-Split Instrument)");
       break;
     }
 
     case EVENT_FE_1C: {
       curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       break;
     }
 
     case EVENT_USE_RESERVED_VOICES:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Use Reserved Voices", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Use Reserved Voices", "", CLR_MISC);
       break;
 
     case EVENT_USE_NO_RESERVED_VOICES:
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Use No Reserved Voices", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Use No Reserved Voices", "", CLR_MISC);
       break;
 
     default:
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(opcode_str, beginOffset);
       return false;
     }
@@ -1587,8 +1587,8 @@ void AkaoTrack::logUnknownEvent(const std::string& opcode_str, u32 beginOffset) 
     opcode_str, beginOffset);
 }
 
-bool AkaoTrack::AnyUnvisitedJumpDestinations()
+bool AkaoTrack::anyUnvisitedJumpDestinations()
 {
   return std::ranges::any_of(conditional_jump_destinations,
-                     [this](uint32_t dest) { return !IsOffsetUsed(dest); });
+                     [this](uint32_t dest) { return !isOffsetUsed(dest); });
 }

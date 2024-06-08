@@ -22,144 +22,144 @@ class SeqTrack : public VGMItem {
  public:
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::string name = "Track");
 
-  virtual void ResetVars();
-  void ResetVisitedAddresses();
+  virtual void resetVars();
+  void resetVisitedAddresses();
 
-  Icon GetIcon() override { return ICON_TRACK; };
+  Icon icon() override { return ICON_TRACK; };
 
-  virtual bool LoadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
-  virtual void LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
-  virtual void SetChannelAndGroupFromTrkNum(int theTrackNum);
-  virtual void AddInitialMidiEvents(int trackNum);
-  virtual bool ReadEvent();
-  virtual void OnTickBegin() {}
-  virtual void OnTickEnd() {}
+  virtual bool loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
+  virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
+  virtual void setChannelAndGroupFromTrkNum(int theTrackNum);
+  virtual void addInitialMidiEvents(int trackNum);
+  virtual bool readEvent();
+  virtual void onTickBegin() {}
+  virtual void onTickEnd() {}
 
-  uint32_t GetTime() const;
-  void SetTime(uint32_t NewDelta) const;
-  void AddTime(uint32_t AddDelta);
+  uint32_t getTime() const;
+  void setTime(uint32_t NewDelta) const;
+  void addTime(uint32_t AddDelta);
 
-  uint32_t ReadVarLen(uint32_t &offset) const;
+  uint32_t readVarLen(uint32_t &offset) const;
 
  public:
-  virtual bool IsOffsetUsed(uint32_t offset);
+  virtual bool isOffsetUsed(uint32_t offset);
 
   uint32_t dwStartOffset;
 
-  std::unordered_set<uint32_t> VisitedAddresses;
-  uint32_t VisitedAddressMax;
+  std::unordered_set<uint32_t> visitedAddresses;
+  uint32_t visitedAddressMax;
 
  protected:
-  virtual void OnEvent(uint32_t offset, uint32_t length);
-  virtual void AddEvent(SeqEvent *pSeqEvent);
-  void AddControllerSlide(uint32_t dur, uint8_t &prevVal, uint8_t targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
+  virtual void onEvent(uint32_t offset, uint32_t length);
+  virtual void addEvent(SeqEvent *pSeqEvent);
+  void addControllerSlide(uint32_t dur, uint8_t &prevVal, uint8_t targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
  public:
-  void AddGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, EventColor color, Icon icon = ICON_BINARY);
-  void AddSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::string &sEventName = "Set Octave");
-  void AddIncrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName = "Increment Octave");    // 1,Sep.2009 revise
-  void AddDecrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName = "Decrement Octave");    // 1,Sep.2009 revise
-  void AddRest(uint32_t offset, uint32_t length, uint32_t restTime, const std::string &sEventName = "Rest");
-  void AddHold(uint32_t offset, uint32_t length, const std::string &sEventName = "Hold");
-  void AddUnknown(uint32_t offset, uint32_t length, const std::string &sEventName = "Unknown Event", const std::string &sEventDesc = "");
+  void addGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, EventColor color, Icon icon = ICON_BINARY);
+  void addSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::string &sEventName = "Set Octave");
+  void addIncrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName = "Increment Octave");    // 1,Sep.2009 revise
+  void addDecrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName = "Decrement Octave");    // 1,Sep.2009 revise
+  void addRest(uint32_t offset, uint32_t length, uint32_t restTime, const std::string &sEventName = "Rest");
+  void addHold(uint32_t offset, uint32_t length, const std::string &sEventName = "Hold");
+  void addUnknown(uint32_t offset, uint32_t length, const std::string &sEventName = "Unknown Event", const std::string &sEventDesc = "");
 
-  void AddNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const std::string &sEventName = "Note On");
-  void AddNoteOnNoItem(int8_t key, int8_t vel);
-  void AddPercNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const std::string &sEventName = "Percussion Note On");
-  void AddPercNoteOnNoItem(int8_t key, int8_t vel);
-  void InsertNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t absTime, const std::string &sEventName = "Note On");
+  void addNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const std::string &sEventName = "Note On");
+  void addNoteOnNoItem(int8_t key, int8_t vel);
+  void addPercNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const std::string &sEventName = "Percussion Note On");
+  void addPercNoteOnNoItem(int8_t key, int8_t vel);
+  void insertNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t absTime, const std::string &sEventName = "Note On");
 
-  void AddNoteOff(uint32_t offset, uint32_t length, int8_t key, const std::string &sEventName = "Note Off");
-  void AddNoteOffNoItem(int8_t key);
-  void AddPercNoteOff(uint32_t offset, uint32_t length, int8_t key, const std::string &sEventName = "Percussion Note Off");
-  void AddPercNoteOffNoItem(int8_t key);
-  void InsertNoteOff(uint32_t offset, uint32_t length, int8_t key, uint32_t absTime, const std::string &sEventName = "Note Off");
-  void InsertNoteOffNoItem(int8_t key, uint32_t absTime) const;
+  void addNoteOff(uint32_t offset, uint32_t length, int8_t key, const std::string &sEventName = "Note Off");
+  void addNoteOffNoItem(int8_t key);
+  void addPercNoteOff(uint32_t offset, uint32_t length, int8_t key, const std::string &sEventName = "Percussion Note Off");
+  void addPercNoteOffNoItem(int8_t key);
+  void insertNoteOff(uint32_t offset, uint32_t length, int8_t key, uint32_t absTime, const std::string &sEventName = "Note Off");
+  void insertNoteOffNoItem(int8_t key, uint32_t absTime) const;
 
-  void AddNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::string &sEventName = "Note with Duration");
-  void AddNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
-  void AddNoteByDur_Extend(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::string &sEventName = "Note with Duration (Extended)");
-  void AddNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur);
-  void AddPercNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::string &sEventName = "Percussion Note with Duration");
-  void AddPercNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
-  void InsertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint32_t absTime, const std::string &sEventName = "Note On With Duration");
+  void addNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::string &sEventName = "Note with Duration");
+  void addNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
+  void addNoteByDur_Extend(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::string &sEventName = "Note with Duration (Extended)");
+  void addNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur);
+  void addPercNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::string &sEventName = "Percussion Note with Duration");
+  void addPercNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
+  void insertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint32_t absTime, const std::string &sEventName = "Note On With Duration");
 
-  void MakePrevDurNoteEnd() const;
-  void MakePrevDurNoteEnd(uint32_t absTime) const;
-  void LimitPrevDurNoteEnd() const;
-  void LimitPrevDurNoteEnd(uint32_t absTime) const;
-  void AddVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Volume");
-  void AddVolNoItem(uint8_t vol);
-  void AddVolume14Bit(uint32_t offset, uint32_t length, uint16_t volume, const std::string &sEventName = "Volume");
-  void AddVolume14BitNoItem(uint16_t volume);
-  void AddVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Volume Slide");
-  void InsertVol(uint32_t offset, uint32_t length, uint8_t vol, uint32_t absTime, const std::string &sEventName = "Volume");
-  void AddExpression(uint32_t offset, uint32_t length, uint8_t level, const std::string &sEventName = "Expression");
-  void AddExpressionNoItem(uint8_t level);
-  void AddExpressionSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targExpr, const std::string &sEventName = "Expression Slide");
-  void InsertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const std::string &sEventName = "Expression");
-  void AddMasterVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Master Volume");
-  void AddMasterVolNoItem(uint8_t newVol);
-  void AddMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Master Volume Slide");
+  void makePrevDurNoteEnd() const;
+  void makePrevDurNoteEnd(uint32_t absTime) const;
+  void limitPrevDurNoteEnd() const;
+  void limitPrevDurNoteEnd(uint32_t absTime) const;
+  void addVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Volume");
+  void addVolNoItem(uint8_t vol);
+  void addVolume14Bit(uint32_t offset, uint32_t length, uint16_t volume, const std::string &sEventName = "Volume");
+  void addVolume14BitNoItem(uint16_t volume);
+  void addVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Volume Slide");
+  void insertVol(uint32_t offset, uint32_t length, uint8_t vol, uint32_t absTime, const std::string &sEventName = "Volume");
+  void addExpression(uint32_t offset, uint32_t length, uint8_t level, const std::string &sEventName = "Expression");
+  void addExpressionNoItem(uint8_t level);
+  void addExpressionSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targExpr, const std::string &sEventName = "Expression Slide");
+  void insertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const std::string &sEventName = "Expression");
+  void addMasterVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Master Volume");
+  void addMasterVolNoItem(uint8_t newVol);
+  void addMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Master Volume Slide");
 
-  void AddPan(uint32_t offset, uint32_t length, uint8_t pan, const std::string &sEventName = "Pan");
-  void AddPanNoItem(uint8_t pan);
-  void AddPanSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targPan, const std::string &sEventName = "Pan Slide");
-  void InsertPan(uint32_t offset, uint32_t length, uint8_t pan, uint32_t absTime, const std::string &sEventName = "Pan");
-  void AddReverb(uint32_t offset, uint32_t length, uint8_t reverb, const std::string &sEventName = "Reverb");
-  void AddReverbNoItem(uint8_t reverb);
-  void AddMonoNoItem() const;
-  void InsertReverb(uint32_t offset, uint32_t length, uint8_t reverb, uint32_t absTime, const std::string &sEventName = "Reverb");
-  void AddPitchBend(uint32_t offset, uint32_t length, int16_t bend, const std::string &sEventName = "Pitch Bend");
-  void AddPitchBendRange(uint32_t offset, uint32_t length, uint8_t semitones, uint8_t cents = 0, const std::string &sEventName = "Pitch Bend Range");
-  void AddPitchBendRangeNoItem(uint8_t range, uint8_t cents = 0) const;
-  void AddFineTuning(uint32_t offset, uint32_t length, double cents, const std::string &sEventName = "Fine Tuning");
-  void AddFineTuningNoItem(double cents) const;
-  void AddModulationDepthRange(uint32_t offset, uint32_t length, double semitones, const std::string &sEventName = "Modulation Depth Range");
-  void AddModulationDepthRangeNoItem(double semitones) const;
-  void AddTranspose(uint32_t offset, uint32_t length, int8_t transpose, const std::string &sEventName = "Transpose");
-  void AddPitchBendMidiFormat(uint32_t offset, uint32_t length, uint8_t lo, uint8_t hi, const std::string &sEventName = "Pitch Bend");
-  void AddModulation(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Modulation Depth");
-  void InsertModulation(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Modulation Depth");
-  void AddBreath(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Breath Depth");
-  void InsertBreath(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Breath Depth");
+  void addPan(uint32_t offset, uint32_t length, uint8_t pan, const std::string &sEventName = "Pan");
+  void addPanNoItem(uint8_t pan);
+  void addPanSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targPan, const std::string &sEventName = "Pan Slide");
+  void insertPan(uint32_t offset, uint32_t length, uint8_t pan, uint32_t absTime, const std::string &sEventName = "Pan");
+  void addReverb(uint32_t offset, uint32_t length, uint8_t reverb, const std::string &sEventName = "Reverb");
+  void addReverbNoItem(uint8_t reverb);
+  void addMonoNoItem() const;
+  void insertReverb(uint32_t offset, uint32_t length, uint8_t reverb, uint32_t absTime, const std::string &sEventName = "Reverb");
+  void addPitchBend(uint32_t offset, uint32_t length, int16_t bend, const std::string &sEventName = "Pitch Bend");
+  void addPitchBendRange(uint32_t offset, uint32_t length, uint16_t cents, const std::string &sEventName = "Pitch Bend Range");
+  void addPitchBendRangeNoItem(uint16_t cents) const;
+  void addFineTuning(uint32_t offset, uint32_t length, double cents, const std::string &sEventName = "Fine Tuning");
+  void addFineTuningNoItem(double cents) const;
+  void addModulationDepthRange(uint32_t offset, uint32_t length, double semitones, const std::string &sEventName = "Modulation Depth Range");
+  void addModulationDepthRangeNoItem(double semitones) const;
+  void addTranspose(uint32_t offset, uint32_t length, int8_t transpose, const std::string &sEventName = "Transpose");
+  void addPitchBendMidiFormat(uint32_t offset, uint32_t length, uint8_t lo, uint8_t hi, const std::string &sEventName = "Pitch Bend");
+  void addModulation(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Modulation Depth");
+  void insertModulation(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Modulation Depth");
+  void addBreath(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Breath Depth");
+  void insertBreath(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Breath Depth");
 
-  void AddSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Sustain");
-  void InsertSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Sustain");
-  void AddPortamento(uint32_t offset, uint32_t length, bool bOn, const std::string &sEventName = "Portamento");
-  void AddPortamentoNoItem(bool bOn) const;
-  void InsertPortamento(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const std::string &sEventName = "Portamento");
-  void InsertPortamentoNoItem(bool bOn, uint32_t absTime) const;
-  void AddPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, const std::string &sEventName = "Portamento Time");
-  void AddPortamentoTimeNoItem(uint8_t time) const;
-  void InsertPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, uint32_t absTime, const std::string &sEventName = "Portamento Time");
-  void InsertPortamentoTimeNoItem(uint8_t time, uint32_t absTime) const;
-  void AddPortamentoTime14Bit(uint32_t offset, uint32_t length, uint16_t time, const std::string &sEventName = "Portamento Time");
-  void AddPortamentoTime14BitNoItem(uint16_t time) const;
-  void AddPortamentoControlNoItem(uint8_t key) const;
-  void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const std::string &sEventName = "Program Change");
-  void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const std::string &sEventName = "Program Change");
-  void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const std::string &sEventName = "Program Change");
-  void AddProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, uint8_t chan, const std::string &sEventName = "Program Change");
-  void AddProgramChangeNoItem(uint32_t progNum, bool requireBank) const;
-  void AddBankSelectNoItem(uint8_t bank) const;
-  void AddTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuarter, const std::string &sEventName = "Tempo");
-  void AddTempoNoItem(uint32_t microsPerQuarter) const;
-  void AddTempoSlide(uint32_t offset, uint32_t length, uint32_t dur, uint32_t targMicrosPerQuarter, const std::string &sEventName = "Tempo Slide");
-  void AddTempoBPM(uint32_t offset, uint32_t length, double bpm, const std::string &sEventName = "Tempo");
-  void AddTempoBPMNoItem(double bpm) const;
-  void AddTempoBPMSlide(uint32_t offset, uint32_t length, uint32_t dur, double targBPM, const std::string &sEventName = "Tempo Slide");
-  void AddTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, const std::string &sEventName = "Time Signature");
-  void AddTimeSigNoItem(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter) const;
-  void InsertTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime, const std::string &sEventName = "Time Signature");
-  void AddEndOfTrack(uint32_t offset, uint32_t length, const std::string &sEventName = "Track End");
-  void AddEndOfTrackNoItem();
+  void addSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Sustain");
+  void insertSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Sustain");
+  void addPortamento(uint32_t offset, uint32_t length, bool bOn, const std::string &sEventName = "Portamento");
+  void addPortamentoNoItem(bool bOn) const;
+  void insertPortamento(uint32_t offset, uint32_t length, bool bOn, uint32_t absTime, const std::string &sEventName = "Portamento");
+  void insertPortamentoNoItem(bool bOn, uint32_t absTime) const;
+  void addPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, const std::string &sEventName = "Portamento Time");
+  void addPortamentoTimeNoItem(uint8_t time) const;
+  void insertPortamentoTime(uint32_t offset, uint32_t length, uint8_t time, uint32_t absTime, const std::string &sEventName = "Portamento Time");
+  void insertPortamentoTimeNoItem(uint8_t time, uint32_t absTime) const;
+  void addPortamentoTime14Bit(uint32_t offset, uint32_t length, uint16_t time, const std::string &sEventName = "Portamento Time");
+  void addPortamentoTime14BitNoItem(uint16_t time) const;
+  void addPortamentoControlNoItem(uint8_t key) const;
+  void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const std::string &sEventName = "Program Change");
+  void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const std::string &sEventName = "Program Change");
+  void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const std::string &sEventName = "Program Change");
+  void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, uint8_t chan, const std::string &sEventName = "Program Change");
+  void addProgramChangeNoItem(uint32_t progNum, bool requireBank) const;
+  void addBankSelectNoItem(uint8_t bank) const;
+  void addTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuarter, const std::string &sEventName = "Tempo");
+  void addTempoNoItem(uint32_t microsPerQuarter) const;
+  void addTempoSlide(uint32_t offset, uint32_t length, uint32_t dur, uint32_t targMicrosPerQuarter, const std::string &sEventName = "Tempo Slide");
+  void addTempoBPM(uint32_t offset, uint32_t length, double bpm, const std::string &sEventName = "Tempo");
+  void addTempoBPMNoItem(double bpm) const;
+  void addTempoBPMSlide(uint32_t offset, uint32_t length, uint32_t dur, double targBPM, const std::string &sEventName = "Tempo Slide");
+  void addTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, const std::string &sEventName = "Time Signature");
+  void addTimeSigNoItem(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter) const;
+  void insertTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime, const std::string &sEventName = "Time Signature");
+  void addEndOfTrack(uint32_t offset, uint32_t length, const std::string &sEventName = "Track End");
+  void addEndOfTrackNoItem();
 
-  void AddGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName = "Global Transpose");
-  void AddMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::string &sEventName, int8_t priority = 0, EventColor color = CLR_MISC);
-  void AddMarkerNoItem(const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority) const;
-  void InsertMarkerNoItem(uint32_t absTime, const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority) const;
+  void addGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName = "Global Transpose");
+  void addMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::string &sEventName, int8_t priority = 0, EventColor color = CLR_MISC);
+  void addMarkerNoItem(const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority) const;
+  void insertMarkerNoItem(uint32_t absTime, const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority) const;
 
-  bool AddLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName = "Loop Forever");
+  bool addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName = "Loop Forever");
 
  public:
   ReadMode readMode;        //state variable that determines behavior for all methods.  Are we adding UI items or converting to MIDI?

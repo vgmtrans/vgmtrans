@@ -37,7 +37,7 @@ BEGIN_FORMAT(NinSnes)
   USING_SCANNER(NinSnesScanner)
   USING_MATCHER(FilegroupMatcher)
 
-  static inline bool IsQuintetVersion(NinSnesVersion version) {
+  static inline bool isQuintetVersion(NinSnesVersion version) {
     return version == NINSNES_QUINTET_ACTR ||
         version == NINSNES_QUINTET_ACTR2 ||
         version == NINSNES_QUINTET_IOG ||

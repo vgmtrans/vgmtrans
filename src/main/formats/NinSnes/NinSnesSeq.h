@@ -89,7 +89,7 @@ class NinSnesTrackSharedData {
  public:
   NinSnesTrackSharedData();
 
-  virtual void ResetVars(void);
+  virtual void resetVars();
 
   uint8_t spcNoteDuration;
   uint8_t spcNoteDurRate;
@@ -116,15 +116,15 @@ class NinSnesSeq:
              std::string theName = "NinSnes Seq");
   virtual ~NinSnesSeq();
 
-  virtual bool GetHeaderInfo();
-  virtual void ResetVars();
-  virtual bool ReadEvent(long stopTime);
+  virtual bool parseHeader();
+  virtual void resetVars();
+  virtual bool readEvent(long stopTime);
 
-  double GetTempoInBPM();
-  double GetTempoInBPM(uint8_t tempo);
+  double getTempoInBPM();
+  double getTempoInBPM(uint8_t tempo);
 
-  uint16_t ConvertToAPUAddress(uint16_t offset);
-  uint16_t GetShortAddress(uint32_t offset);
+  uint16_t convertToAPUAddress(uint16_t offset);
+  uint16_t getShortAddress(uint32_t offset);
 
   NinSnesVersion version;
   uint8_t STATUS_END;
@@ -164,8 +164,8 @@ protected:
   VGMHeader *header;
 
  private:
-  void LoadEventMap(void);
-  void LoadStandardVcmdMap(uint8_t statusByte);
+  void loadEventMap();
+  void loadStandardVcmdMap(uint8_t statusByte);
 
   uint8_t spcPercussionBaseInit;
 };
@@ -175,10 +175,10 @@ class NinSnesSection
  public:
   NinSnesSection(NinSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
 
-  virtual bool GetTrackPointers();
+  virtual bool parseTrackPointers();
 
-  uint16_t ConvertToAPUAddress(uint16_t offset);
-  uint16_t GetShortAddress(uint32_t offset);
+  uint16_t convertToApuAddress(uint16_t offset);
+  uint16_t getShortAddress(uint32_t offset);
 };
 
 class NinSnesTrack
@@ -187,14 +187,14 @@ class NinSnesTrack
   NinSnesTrack
       (NinSnesSection *parentSection, uint32_t offset = 0, uint32_t length = 0, const std::string &theName = "NinSnes Track");
 
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
+  virtual void resetVars();
+  virtual bool readEvent();
 
-  uint16_t ConvertToAPUAddress(uint16_t offset);
-  uint16_t GetShortAddress(uint32_t offset);
-  void GetVolumeBalance(uint16_t pan, double &volumeLeft, double &volumeRight);
-  uint8_t ReadPanTable(uint16_t pan);
-  int8_t CalcPanValue(uint8_t pan, double &volumeScale, bool &reverseLeft, bool &reverseRight);
+  uint16_t convertToApuAddress(uint16_t offset);
+  uint16_t getShortAddress(uint32_t offset);
+  void getVolumeBalance(uint16_t pan, double &volumeLeft, double &volumeRight);
+  uint8_t readPanTable(uint16_t pan);
+  int8_t calculatePanValue(uint8_t pan, double &volumeScale, bool &reverseLeft, bool &reverseRight);
 
   NinSnesSection *parentSection;
   NinSnesTrackSharedData *shared;

@@ -74,17 +74,17 @@ class ItikitiSnesSeq : public VGMSeq {
  public:
   ItikitiSnesSeq(RawFile *file, uint32_t offset, std::string new_name = "Square ITIKITI SNES Seq");
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
-  void ResetVars() override;
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  void resetVars() override;
 
   [[nodiscard]] uint16_t base_offset() const { return m_base_offset; }
   [[nodiscard]] uint16_t decode_offset(uint16_t offset) const { return offset + m_base_offset; }
-  [[nodiscard]] uint16_t ReadDecodedOffset(uint32_t offset) {
-    return decode_offset(GetShort(offset));
+  [[nodiscard]] uint16_t readDecodedOffset(uint32_t offset) {
+    return decode_offset(readShort(offset));
   }
 
-  [[nodiscard]] static double GetTempoInBpm(uint8_t tempo) {
+  [[nodiscard]] static double getTempoInBpm(uint8_t tempo) {
     constexpr auto ppqn = kItikitiSnesSeqTimebase;
     constexpr auto timer_freq = kItikitiSnesSeqTimerFreq;
     if (tempo == 0) {
@@ -94,14 +94,14 @@ class ItikitiSnesSeq : public VGMSeq {
     return 60000000.0 / (ppqn * (125 * timer_freq)) * (tempo / 256.0);
   }
 
-  [[nodiscard]] ItikitiSnesSeqEventType GetEventType(uint8_t command) const {
+  [[nodiscard]] ItikitiSnesSeqEventType getEventType(uint8_t command) const {
     const auto event_type_iterator = m_event_map.find(command);
     return event_type_iterator != m_event_map.end() ? event_type_iterator->second
                                                     : ItikitiSnesSeqEventType::EVENT_UNDEFINED;
   }
 
  private:
-  static void LoadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEventType> &event_map);
+  static void loadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEventType> &event_map);
   std::unordered_map<uint8_t, ItikitiSnesSeqEventType> m_event_map{};
   uint16_t m_base_offset{};
 };
@@ -109,16 +109,16 @@ class ItikitiSnesSeq : public VGMSeq {
 class ItikitiSnesTrack : public SeqTrack {
  public:
   ItikitiSnesTrack(ItikitiSnesSeq *seq, uint32_t offset = 0, uint32_t length = 0);
-  void ResetVars() override;
-  bool ReadEvent() override;
+  void resetVars() override;
+  bool readEvent() override;
 
   [[nodiscard]] ItikitiSnesSeq *seq() const {
     return reinterpret_cast<ItikitiSnesSeq *>(parentSeq);
   }
 
   [[nodiscard]] uint16_t decode_offset(uint16_t offset) const { return seq()->decode_offset(offset); }
-  [[nodiscard]] uint16_t ReadDecodedOffset(uint32_t offset) const {
-    return seq()->ReadDecodedOffset(offset);
+  [[nodiscard]] uint16_t readDecodedOffset(uint32_t offset) const {
+    return seq()->readDecodedOffset(offset);
   }
 
  private:

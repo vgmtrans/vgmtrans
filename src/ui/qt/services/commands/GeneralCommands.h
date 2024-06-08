@@ -93,7 +93,7 @@ public:
   CloseVGMFileCommand() : CloseCommand<VGMFile>() {}
 
   void Close(VGMFile* file) const override {
-    pRoot->RemoveVGMFile(vgmFileToVariant(file));
+    pRoot->removeVGMFile(vgmFileToVariant(file));
   }
 };
 
@@ -105,6 +105,6 @@ public:
   CloseRawFileCommand() : CloseCommand<RawFile>() {}
 
   void Close(RawFile* file) const override {
-    pRoot->CloseRawFile(file);
+    pRoot->closeRawFile(file);
   }
 };

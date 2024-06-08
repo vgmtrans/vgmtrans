@@ -21,9 +21,9 @@ class SynthFile {
   SynthFile(std::string synth_name = "Instrument Set");
   ~SynthFile();
 
-  SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, float reverb);
-  SynthInstr *AddInstr(uint32_t bank, uint32_t instrNum, std::string Name, float reverb);
-  SynthWave *AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
+  SynthInstr *addInstr(uint32_t bank, uint32_t instrNum, float reverb);
+  SynthInstr *addInstr(uint32_t bank, uint32_t instrNum, std::string Name, float reverb);
+  SynthWave *addWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
                      uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t *waveData,
                      std::string name = "Unnamed Wave");
 
@@ -40,8 +40,8 @@ class SynthInstr {
              const std::vector<SynthRgn *>& listRgns, float reverb);
   ~SynthInstr();
 
-  SynthRgn *AddRgn();
-  SynthRgn *AddRgn(const SynthRgn& rgn);
+  SynthRgn *addRgn();
+  SynthRgn *addRgn(const SynthRgn& rgn);
 
   uint32_t ulBank;
   uint32_t ulInstrument;
@@ -66,8 +66,8 @@ public:
         ulLoopStart(loopStart), ulLoopLength(loopLength) { }
   ~SynthSampInfo() = default;
 
-  void SetLoopInfo(Loop &loop, VGMSamp *samp);
-  void SetPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
+  void setLoopInfo(Loop &loop, VGMSamp *samp);
+  void setPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
 
   uint16_t usUnityNote;
   int16_t sFineTune;
@@ -86,10 +86,10 @@ class SynthRgn {
       : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
   ~SynthRgn();
 
-  SynthArt *AddArt();
-  SynthSampInfo *AddSampInfo();
-  void SetRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0, uint16_t velHigh = 0x7F);
-  void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
+  SynthArt *addArt();
+  SynthSampInfo *addSampInfo();
+  void setRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0, uint16_t velHigh = 0x7F);
+  void setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
 
   uint16_t usKeyLow {0};
   uint16_t usKeyHigh {0x7F};
@@ -110,9 +110,9 @@ class SynthArt {
   SynthArt() = default;
   ~SynthArt();
 
-  void AddADSR(double attack, Transform atk_transform, double hold, double decay, double sustain_lev,
+  void addADSR(double attack, Transform atk_transform, double hold, double decay, double sustain_lev,
                double sustain_time, double release_time, Transform rls_transform);
-  void AddPan(double pan);
+  void addPan(double pan);
 
   double pan;                // -100% = left channel 100% = right channel 0 = 50/50
 
@@ -140,13 +140,13 @@ class SynthWave {
         dataSize(waveDataSize),
         data(waveData),
         name(std::move(waveName)) {
-    RiffFile::AlignName(name);
+    RiffFile::alignName(name);
   }
   ~SynthWave(void);
 
-  SynthSampInfo *AddSampInfo(void);
+  SynthSampInfo *addSampInfo(void);
 
-  void ConvertTo16bitSigned();
+  void convertTo16bitSigned();
 
  public:
   SynthSampInfo *sampinfo;

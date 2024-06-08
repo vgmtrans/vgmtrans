@@ -13,7 +13,7 @@
 
 namespace conversion {
 
-bool SaveAsDLS(const VGMInstrSet &set, const std::string &filepath) {
+bool saveAsDLS(const VGMInstrSet &set, const std::string &filepath) {
   DLSFile dlsfile;
 
   if (set.assocColls.empty()) {
@@ -21,18 +21,18 @@ bool SaveAsDLS(const VGMInstrSet &set, const std::string &filepath) {
   }
 
   if (set.assocColls.front()->createDLSFile(dlsfile)) {
-    return dlsfile.SaveDLSFile(filepath);
+    return dlsfile.saveDLSFile(filepath);
   }
   return false;
 }
 
-bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath) {
+bool saveAsSF2(const VGMInstrSet &set, const std::string &filepath) {
   if (set.assocColls.empty()) {
     return false;
   }
 
   if (auto sf2file = set.assocColls.front()->createSF2File(); sf2file) {
-    bool bResult = sf2file->SaveSF2File(filepath);
+    bool bResult = sf2file->saveSF2File(filepath);
     delete sf2file;
     return bResult;
   }
@@ -42,11 +42,11 @@ bool SaveAsSF2(const VGMInstrSet &set, const std::string &filepath) {
 
 
 
-void SaveAllAsWav(const VGMSampColl &coll, const std::string &save_dir) {
+void saveAllAsWav(const VGMSampColl &coll, const std::string &save_dir) {
   for (auto &sample : coll.samples) {
     auto path = fmt::format("{}/{} - {}.wav",
       save_dir, ConvertToSafeFileName(coll.name()), ConvertToSafeFileName(sample->name()));
-    sample->SaveAsWav(path);
+    sample->saveAsWav(path);
   }
 }
 
@@ -72,11 +72,11 @@ bool saveDataToFile(const char* begin, uint32_t length, const std::string& filep
   return true;
 }
 
-bool SaveAsOriginal(const RawFile& rawfile, const std::string& filepath) {
+bool saveAsOriginal(const RawFile& rawfile, const std::string& filepath) {
   return saveDataToFile(rawfile.begin(), rawfile.size(), filepath);
 }
 
-bool SaveAsOriginal(const VGMFile& file, const std::string& filepath) {
+bool saveAsOriginal(const VGMFile& file, const std::string& filepath) {
   return saveDataToFile(file.rawFile()->begin() + file.dwOffset, file.unLength, filepath);
 }
 }  // namespace conversion

@@ -9,8 +9,8 @@ class SegSatSeq:
   SegSatSeq(RawFile *file, uint32_t offset);
   virtual ~SegSatSeq();
 
-  virtual bool GetHeaderInfo();
-  virtual bool ReadEvent();
+  virtual bool parseHeader();
+  virtual bool readEvent();
 
  public:
   uint8_t headerFlag;

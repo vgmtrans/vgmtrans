@@ -64,11 +64,11 @@ class KonamiSnesSeq
  public:
   KonamiSnesSeq
       (RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Konami SNES Seq");
-  virtual ~KonamiSnesSeq(void);
+  virtual ~KonamiSnesSeq();
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  virtual bool parseHeader();
+  virtual bool parseTrackPointers();
+  virtual void resetVars();
 
   uint8_t tempo;
 
@@ -83,11 +83,11 @@ class KonamiSnesSeq
 
   uint8_t NOTE_DUR_RATE_MAX;
 
-  double GetTempoInBPM();
-  double GetTempoInBPM(uint8_t tempo);
+  double getTempoInBPM();
+  double getTempoInBPM(uint8_t tempo);
 
  private:
-  void LoadEventMap(void);
+  void loadEventMap();
 };
 
 
@@ -95,8 +95,8 @@ class KonamiSnesTrack
     : public SeqTrack {
  public:
   KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
+  virtual void resetVars();
+  virtual bool readEvent();
 
   uint8_t noteLength;
   uint8_t noteDurationRate;
@@ -120,6 +120,6 @@ class KonamiSnesTrack
   bool prevNoteSlurred;
 
  private:
-  double GetTuningInSemitones(int8_t tuning);
-  uint8_t ConvertGAINAmountToGAIN(uint8_t gainAmount);
+  double getTuningInSemitones(int8_t tuning);
+  uint8_t convertGAINAmountToGAIN(uint8_t gainAmount);
 };

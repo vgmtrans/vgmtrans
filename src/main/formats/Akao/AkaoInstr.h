@@ -41,7 +41,7 @@ class AkaoInstrSet final : public VGMInstrSet {
     std::string name = "Akao Instrument Bank");
   AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version,
     std::string name = "Akao Instrument Bank (Dummy)");
-  bool GetInstrPointers() override;
+  bool parseInstrPointers() override;
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
@@ -69,7 +69,7 @@ class AkaoInstr: public VGMInstr {
             uint32_t bank,
             uint32_t instrNum,
             std::string name = "Instrument");
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
   [[nodiscard]] AkaoInstrSet * instrSet() const noexcept { return reinterpret_cast<AkaoInstrSet*>(this->parInstrSet); }
 
@@ -86,7 +86,7 @@ class AkaoInstr: public VGMInstr {
 class AkaoDrumKit final : public AkaoInstr {
  public:
   AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum);
-  bool LoadInstr() override;
+  bool loadInstr() override;
 };
 
 
@@ -101,7 +101,7 @@ class AkaoRgn final :
   AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
           uint8_t artIDNum, std::string name = "Region");
 
-  bool LoadRgn() override;
+  bool loadRgn() override;
 
   unsigned short adsr1;  //raw psx ADSR1 value (articulation data)
   unsigned short adsr2;  //raw psx ADSR2 value (articulation data)
@@ -134,13 +134,13 @@ class AkaoSampColl final :
    AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name = "Akao Sample Collection");
    AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::string name = "Akao Sample Collection");
 
-  bool GetHeaderInfo() override;
-  bool GetSampleInfo() override;
+  bool parseHeader() override;
+  bool parseSampleInfo() override;
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
-  [[nodiscard]] static bool IsPossibleAkaoSampColl(const RawFile *file, uint32_t offset);
-  [[nodiscard]] static AkaoPs1Version GuessVersion(const RawFile *file, uint32_t offset);
+  [[nodiscard]] static bool isPossibleAkaoSampColl(const RawFile *file, uint32_t offset);
+  [[nodiscard]] static AkaoPs1Version guessVersion(const RawFile *file, uint32_t offset);
 
   std::vector<AkaoArt> akArts;
   uint32_t starting_art_id;

@@ -12,7 +12,7 @@ class VGMScanner {
   VGMScanner() = default;
   virtual ~VGMScanner() = default;
 
-  virtual bool Init();
-  void InitiateScan(RawFile *file, void *offset = nullptr);
-  virtual void Scan(RawFile *file, void *offset = nullptr) = 0;
+  virtual bool init();
+  void initiateScan(RawFile *file, void *offset = nullptr);
+  virtual void scan(RawFile *file, void *offset = nullptr) = 0;
 };

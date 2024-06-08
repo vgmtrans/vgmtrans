@@ -12,7 +12,7 @@
 
 QtVGMRoot qtVGMRoot;
 
-std::string QtVGMRoot::UI_GetResourceDirPath() {
+std::string QtVGMRoot::UI_getResourceDirPath() {
 #if defined(Q_OS_WIN)
   return (QApplication::applicationDirPath() + "/").toStdString();
 #elif defined(Q_OS_MACOS)
@@ -24,24 +24,24 @@ std::string QtVGMRoot::UI_GetResourceDirPath() {
 #endif
 }
 
-void QtVGMRoot::UI_SetRootPtr(VGMRoot** theRoot) {
+void QtVGMRoot::UI_setRootPtr(VGMRoot** theRoot) {
   *theRoot = &qtVGMRoot;
 }
 
-void QtVGMRoot::UI_AddRawFile(RawFile*) {
+void QtVGMRoot::UI_addRawFile(RawFile*) {
   this->UI_AddedRawFile();
 }
 
-void QtVGMRoot::UI_CloseRawFile(RawFile*) {
+void QtVGMRoot::UI_closeRawFile(RawFile*) {
   this->UI_RemovedRawFile();
 }
 
-void QtVGMRoot::UI_OnBeginLoadRawFile() {
+void QtVGMRoot::UI_onBeginLoadRawFile() {
   if (rawFileLoadRecurseStack++ == 0)
     this->UI_BeganLoadingRawFile();
 }
 
-void QtVGMRoot::UI_OnEndLoadRawFile() {
+void QtVGMRoot::UI_onEndLoadRawFile() {
   if (--rawFileLoadRecurseStack == 0)
     this->UI_EndedLoadingRawFile();
 }
@@ -55,35 +55,35 @@ void QtVGMRoot::UI_SetScanInfo() {
 void QtVGMRoot::UI_OnEndScan() {
 }
 
-void QtVGMRoot::UI_AddVGMFile(VGMFileVariant file) {
+void QtVGMRoot::UI_addVGMFile(VGMFileVariant file) {
   this->UI_AddedVGMFile();
 }
 
-void QtVGMRoot::UI_AddVGMSeq(VGMSeq*) {
+void QtVGMRoot::UI_addVGMSeq(VGMSeq*) {
 }
 
-void QtVGMRoot::UI_AddVGMInstrSet(VGMInstrSet*) {
+void QtVGMRoot::UI_addVGMInstrSet(VGMInstrSet*) {
 }
 
-void QtVGMRoot::UI_AddVGMSampColl(VGMSampColl*) {
+void QtVGMRoot::UI_addVGMSampColl(VGMSampColl*) {
 }
 
-void QtVGMRoot::UI_AddVGMMisc(VGMMiscFile*) {
+void QtVGMRoot::UI_addVGMMisc(VGMMiscFile*) {
 }
 
-void QtVGMRoot::UI_AddVGMColl(VGMColl*) {
+void QtVGMRoot::UI_addVGMColl(VGMColl*) {
   this->UI_AddedVGMColl();
 }
 
-void QtVGMRoot::UI_BeginRemoveVGMFiles() {
+void QtVGMRoot::UI_beginRemoveVGMFiles() {
   this->UI_BeganRemovingVGMFiles();
 }
 
-void QtVGMRoot::UI_EndRemoveVGMFiles() {
+void QtVGMRoot::UI_endRemoveVGMFiles() {
   this->UI_EndedRemovingVGMFiles();
 }
 
-void QtVGMRoot::UI_AddItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
+void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                            void* UI_specific) {
   auto treeview = static_cast<VGMFileTreeView*>(UI_specific);
   treeview->addVGMItem(item, parent, itemName);
@@ -94,11 +94,11 @@ std::string QtVGMRoot::UI_GetOpenFilePath(const std::string&, const std::string&
   return path;
 }
 
-std::string QtVGMRoot::UI_GetSaveFilePath(const std::string& suggested_filename,
+std::string QtVGMRoot::UI_getSaveFilePath(const std::string& suggested_filename,
                                            const std::string& extension) {
   return OpenSaveFileDialog(suggested_filename, extension);
 }
 
-std::string QtVGMRoot::UI_GetSaveDirPath(const std::string&) {
+std::string QtVGMRoot::UI_getSaveDirPath(const std::string&) {
   return OpenSaveDirDialog();
 }

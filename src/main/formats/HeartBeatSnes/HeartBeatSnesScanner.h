@@ -11,8 +11,8 @@ enum HeartBeatSnesVersion : uint8_t;  // see HeartBeatSnesFormat.h
 
 class HeartBeatSnesScanner : public VGMScanner {
  public:
-  void Scan(RawFile *file, void *info) override;
-  static void SearchForHeartBeatSnesFromARAM(RawFile *file);
+  void scan(RawFile *file, void *info) override;
+  static void searchForHeartBeatSnesFromARAM(RawFile *file);
 
  private:
   static BytePattern ptnReadSongList;

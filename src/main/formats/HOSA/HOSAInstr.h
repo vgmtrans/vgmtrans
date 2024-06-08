@@ -17,8 +17,8 @@ class HOSAInstrSet
   HOSAInstrSet(RawFile *file, uint32_t offset);
   ~HOSAInstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
  public:
 
@@ -63,7 +63,7 @@ class HOSAInstr
  public:
   HOSAInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
   ~HOSAInstr() override { if (rgns) delete[] rgns; }
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
  public:
   InstrInfo instrinfo{};

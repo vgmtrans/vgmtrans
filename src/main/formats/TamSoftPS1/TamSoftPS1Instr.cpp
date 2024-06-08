@@ -12,13 +12,13 @@ TamSoftPS1InstrSet::TamSoftPS1InstrSet(RawFile *file, uint32_t offset, bool ps2,
 TamSoftPS1InstrSet::~TamSoftPS1InstrSet() {
 }
 
-bool TamSoftPS1InstrSet::GetHeaderInfo() {
-  if (dwOffset + 0x800 > vgmFile()->GetEndOffset()) {
+bool TamSoftPS1InstrSet::parseHeader() {
+  if (dwOffset + 0x800 > vgmFile()->endOffset()) {
     return false;
   }
 
-  uint32_t sampCollSize = GetWord(0x3fc);
-  if (dwOffset + 0x800 + sampCollSize > vgmFile()->GetEndOffset()) {
+  uint32_t sampCollSize = readWord(0x3fc);
+  if (dwOffset + 0x800 + sampCollSize > vgmFile()->endOffset()) {
     return false;
   }
   unLength = 0x800 + sampCollSize;
@@ -26,14 +26,14 @@ bool TamSoftPS1InstrSet::GetHeaderInfo() {
   return true;
 }
 
-bool TamSoftPS1InstrSet::GetInstrPointers() {
+bool TamSoftPS1InstrSet::parseInstrPointers() {
   std::vector<SizeOffsetPair> vagLocations;
 
   for (uint32_t instrNum = 0; instrNum < 256; instrNum++) {
     bool vagLoop;
-    uint32_t vagOffset = 0x800 + GetWord(dwOffset + 4 * instrNum);
+    uint32_t vagOffset = 0x800 + readWord(dwOffset + 4 * instrNum);
     if (vagOffset < unLength) {
-      SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::GetSampleLength(rawFile(), vagOffset, dwOffset + unLength, vagLoop));
+      SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::getSampleLength(rawFile(), vagOffset, dwOffset + unLength, vagLoop));
       vagLocations.push_back(vagLocation);
 
       TamSoftPS1Instr *newInstr = new TamSoftPS1Instr(this, instrNum,
@@ -47,7 +47,7 @@ bool TamSoftPS1InstrSet::GetInstrPointers() {
   }
 
   PSXSampColl *newSampColl = new PSXSampColl(TamSoftPS1Format::name, this, dwOffset + 0x800, unLength - 0x800, vagLocations);
-  if (!newSampColl->LoadVGMFile()) {
+  if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
   }
@@ -66,14 +66,14 @@ TamSoftPS1Instr::TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, uint8_t instrNum,
 TamSoftPS1Instr::~TamSoftPS1Instr() {
 }
 
-bool TamSoftPS1Instr::LoadInstr() {
+bool TamSoftPS1Instr::loadInstr() {
   TamSoftPS1InstrSet *parInstrSet = (TamSoftPS1InstrSet *) this->parInstrSet;
 
   addChild(dwOffset, 4, "Sample Offset");
 
   TamSoftPS1Rgn *rgn = new TamSoftPS1Rgn(this, dwOffset + 0x400, parInstrSet->ps2);
   rgn->sampNum = instrNum;
-  AddRgn(rgn);
+  addRgn(rgn);
   return true;
 }
 
@@ -87,19 +87,19 @@ TamSoftPS1Rgn::TamSoftPS1Rgn(TamSoftPS1Instr *instr, uint32_t offset, bool ps2) 
   addChild(offset, 2, "ADSR1");
   addChild(offset + 2, 2, "ADSR2");
 
-  uint16_t adsr1 = GetShort(offset);
-  uint16_t adsr2 = GetShort(offset + 2);
+  uint16_t adsr1 = readShort(offset);
+  uint16_t adsr2 = readShort(offset + 2);
   if (ps2) {
     // Choro Q HG2 default ADSR (set by progInitWork)
     adsr1 = 0x13FF;
     adsr2 = 0x5FC5;
   }
-  PSXConvADSR<TamSoftPS1Rgn>(this, adsr1, adsr2, ps2);
+  psxConvADSR<TamSoftPS1Rgn>(this, adsr1, adsr2, ps2);
 }
 
 TamSoftPS1Rgn::~TamSoftPS1Rgn() {
 }
 
-bool TamSoftPS1Rgn::LoadRgn() {
+bool TamSoftPS1Rgn::loadRgn() {
   return true;
 }

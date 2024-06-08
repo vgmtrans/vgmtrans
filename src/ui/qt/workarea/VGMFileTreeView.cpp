@@ -130,7 +130,7 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(p
 
   // Items to be added to the top level have their parent set at the vgmfile
   m_items[file] = invisibleRootItem();
-  file->AddToUI(nullptr, this);
+  file->addToUI(nullptr, this);
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   horizontalScrollBar()->setEnabled(false);
 
@@ -270,7 +270,7 @@ void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
   } else {
     treeItem->setText(0, name);
   }
-  treeItem->setIcon(0, iconForItemType(item->GetIcon()));
+  treeItem->setIcon(0, iconForItemType(item->icon()));
   treeItem->setToolTip(0, QString::fromStdString(item->description()));
 }
 

@@ -14,8 +14,8 @@ class CapcomSnesInstrSet:
       (RawFile *file, uint32_t offset, uint32_t spcDirAddr, const std::string &name = "CapcomSnesInstrSet");
   ~CapcomSnesInstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
  protected:
   uint32_t spcDirAddr;
@@ -37,9 +37,9 @@ class CapcomSnesInstr
                   const std::string &name = "CapcomSnesInstr");
   ~CapcomSnesInstr() override;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
-  static bool IsValidHeader(RawFile *file, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
+  static bool isValidHeader(RawFile *file, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
 
  protected:
   uint32_t spcDirAddr;
@@ -55,5 +55,5 @@ class CapcomSnesRgn
   CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset);
   ~CapcomSnesRgn() override;
 
-  bool LoadRgn() override;
+  bool loadRgn() override;
 };

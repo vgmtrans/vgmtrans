@@ -85,9 +85,9 @@ public:
   CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmt_version, std::string name);
   ~CPSSeq() override;
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
-  bool PostLoad() override;
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  bool postLoad() override;
 
 public:
   CPSFormatVer fmt_version;

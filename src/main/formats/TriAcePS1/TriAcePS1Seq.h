@@ -17,11 +17,11 @@ class TriAcePS1Seq:
 
   TriAcePS1Seq(RawFile *file, uint32_t offset, const std::string &name = std::string("TriAce Seq"));
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
-  void ResetVars() override;
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  void resetVars() override;
 
-  bool PostLoad() override;
+  bool postLoad() override;
 
   VGMHeader *header;
   TrkInfo TrkInfos[32];
@@ -44,11 +44,11 @@ class TriAcePS1Track
  public:
   TriAcePS1Track(TriAcePS1Seq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
-  virtual void LoadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
-  uint32_t ReadScorePattern(uint32_t offset);
-  virtual bool IsOffsetUsed(uint32_t offset);
-  virtual void AddEvent(SeqEvent *pSeqEvent);
-  virtual bool ReadEvent(void);
+  virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
+  uint32_t readScorePattern(uint32_t offset);
+  virtual bool isOffsetUsed(uint32_t offset);
+  virtual void addEvent(SeqEvent *pSeqEvent);
+  virtual bool readEvent();
 
   uint8_t impliedNoteDur;
   uint8_t impliedVelocity;

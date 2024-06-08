@@ -9,10 +9,10 @@ SegSatSeq::SegSatSeq(RawFile *file, uint32_t offset)
 SegSatSeq::~SegSatSeq() {
 }
 
-bool SegSatSeq::GetHeaderInfo() {
+bool SegSatSeq::parseHeader() {
   //unLength = GetShort(dwOffset+8);
-  SetPPQN(GetShortBE(offset()));
-  SetEventsOffset(GetShortBE(offset() + 4) + offset());
+  setPPQN(readShortBE(offset()));
+  setEventsOffset(readShortBE(offset() + 4) + offset());
   //TryExpandMidiTracks(16);
   nNumTracks = 16;
 
@@ -29,7 +29,7 @@ bool SegSatSeq::GetHeaderInfo() {
 
 int counter = 0;
 
-bool SegSatSeq::ReadEvent() {
+bool SegSatSeq::readEvent() {
   if (bInLoop) {
     remainingEventsInLoop--;
     if (remainingEventsInLoop == -1) {
@@ -39,50 +39,50 @@ bool SegSatSeq::ReadEvent() {
   }
 
   uint32_t beginOffset = curOffset;
-  uint8_t status_byte = GetByte(curOffset++);
+  uint8_t status_byte = readByte(curOffset++);
 
   if (status_byte <= 0x7F)            // note on
   {
     channel = status_byte & 0x0F;
-    SetCurTrack(channel);
-    auto key = GetByte(curOffset++);
-    auto vel = GetByte(curOffset++);
-    auto noteDuration = GetByte(curOffset++);
-    AddTime(GetByte(curOffset++));
-    AddNoteByDur(beginOffset, curOffset - beginOffset, key, vel, noteDuration);
+    setCurTrack(channel);
+    auto key = readByte(curOffset++);
+    auto vel = readByte(curOffset++);
+    auto noteDuration = readByte(curOffset++);
+    addTime(readByte(curOffset++));
+    addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, noteDuration);
   }
   else {
     if ((status_byte & 0xF0) == 0xB0) {
       curOffset += 3;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
     }
     else if ((status_byte & 0xF0) == 0xC0) {
       channel = status_byte & 0x0F;
-      SetCurTrack(channel);
-      uint8_t progNum = GetByte(curOffset++);
+      setCurTrack(channel);
+      uint8_t progNum = readByte(curOffset++);
       curOffset++;
-      AddProgramChange(beginOffset, curOffset - beginOffset, progNum);
+      addProgramChange(beginOffset, curOffset - beginOffset, progNum);
     }
     else if ((status_byte & 0xF0) == 0xE0) {
       curOffset += 2;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
     }
     else if (status_byte == 0x81)        //loop x # of events
     {
-      uint32_t loopOffset = eventsOffset() + GetShortBE(curOffset);
+      uint32_t loopOffset = eventsOffset() + readShortBE(curOffset);
       curOffset += 2;
-      remainingEventsInLoop = GetByte(curOffset++);
+      remainingEventsInLoop = readByte(curOffset++);
       loopEndPos = curOffset;
-      AddGenericEvent(beginOffset, curOffset - beginOffset, "Reference Event", "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reference Event", "", CLR_LOOP);
       curOffset = loopOffset;
       bInLoop = true;
     }
     else if (status_byte == 0x82) {
       curOffset++;
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
     }
     else if (status_byte == 0x83) {
-      AddEndOfTrack(beginOffset, curOffset - beginOffset);
+      addEndOfTrack(beginOffset, curOffset - beginOffset);
       return false;
     }
   }

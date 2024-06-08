@@ -15,7 +15,7 @@ ItikitiSnesInstrSet::ItikitiSnesInstrSet(RawFile *file, uint32_t tuning_offset,
       m_num_instruments_to_scan(128) {
 }
 
-bool ItikitiSnesInstrSet::GetInstrPointers() {
+bool ItikitiSnesInstrSet::parseInstrPointers() {
   std::vector<uint8_t> srcns;
   for (int index = 0; index < m_num_instruments_to_scan; index++) {
     const uint32_t ins_tuning_offset = m_tuning_offset + 2 * index;
@@ -23,7 +23,7 @@ bool ItikitiSnesInstrSet::GetInstrPointers() {
     if (ins_tuning_offset + 2 > 0x10000 || ins_adsr_offset + 2 > 0x10000)
       break;
 
-    const uint16_t adsr = GetShort(ins_adsr_offset);
+    const uint16_t adsr = readShort(ins_adsr_offset);
     if (adsr == 0 || adsr == 0xffff)
       continue;
 
@@ -44,7 +44,7 @@ bool ItikitiSnesInstrSet::GetInstrPointers() {
     return false;
 
   auto sampleColl = std::make_unique<SNESSampColl>(ItikitiSnesFormat::name, this->rawFile(), spc_dir_offset(), srcns);
-  if (!sampleColl->LoadVGMFile())
+  if (!sampleColl->loadVGMFile())
     return false;
   (void)sampleColl.release();
 
@@ -59,16 +59,16 @@ ItikitiSnesInstr::ItikitiSnesInstr(VGMInstrSet *instrument_set, uint32_t tuning_
       m_spc_dir_offset(spc_dir_offset) {
 }
 
-bool ItikitiSnesInstr::LoadInstr() {
+bool ItikitiSnesInstr::loadInstr() {
   const auto offset = spc_dir_offset() + (srcn * 4);
   if (offset + 4 > 0x10000)
     return false;
 
-  const auto sample_offset = GetShort(offset);
+  const auto sample_offset = readShort(offset);
 
   auto region = std::make_unique<ItikitiSnesRgn>(this, m_tuning_offset, m_adsr_offset, srcn);
   region->sampOffset = sample_offset - spc_dir_offset();
-  AddRgn(region.release());
+  addRgn(region.release());
 
   return true;
 }
@@ -77,9 +77,9 @@ bool ItikitiSnesInstr::LoadInstr() {
 ItikitiSnesRgn::ItikitiSnesRgn(ItikitiSnesInstr *instrument, uint32_t tuning_offset,
                                uint32_t adsr_offset, uint8_t srcn)
     : VGMRgn(instrument, adsr_offset, 2) {
-  const uint16_t tuning = GetShortBE(tuning_offset);
-  const uint8_t adsr1 = GetByte(adsr_offset) | 0x80;
-  const uint8_t adsr2 = GetByte(adsr_offset + 1);
+  const uint16_t tuning = getShortBE(tuning_offset);
+  const uint8_t adsr1 = readByte(adsr_offset) | 0x80;
+  const uint8_t adsr2 = readByte(adsr_offset + 1);
 
   double pitch_scale;
   if (tuning <= 0x7fff) {
@@ -106,5 +106,5 @@ ItikitiSnesRgn::ItikitiSnesRgn(ItikitiSnesInstr *instrument, uint32_t tuning_off
   fineTune = static_cast<int16_t>(fine_tuning * 100.0);
   addChild(adsr_offset, 1, "ADSR1");
   addChild(adsr_offset + 1, 1, "ADSR2");
-  SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
+  snesConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 }

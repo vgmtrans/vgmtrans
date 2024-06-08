@@ -36,7 +36,7 @@ class RawFile {
     [[nodiscard]] virtual std::string stem() const noexcept = 0;
     [[nodiscard]] virtual std::string extension() const = 0;
 
-    [[nodiscard]] bool IsValidOffset(uint32_t ofs) const noexcept { return ofs < size(); }
+    [[nodiscard]] bool isValidOffset(uint32_t ofs) const noexcept { return ofs < size(); }
 
     [[nodiscard]] bool useLoaders() const noexcept { return m_flags & UseLoaders; }
     void setUseLoaders(bool enable) noexcept {
@@ -90,23 +90,23 @@ class RawFile {
     virtual const char *data() const = 0;
 
     virtual const char &operator[](size_t i) const = 0;
-    virtual uint8_t GetByte(size_t offset) const = 0;
-    virtual uint16_t GetShort(size_t offset) const = 0;
-    virtual uint32_t GetWord(size_t offset) const = 0;
-    virtual uint16_t GetShortBE(size_t offset) const = 0;
-    virtual uint32_t GetWordBE(size_t offset) const = 0;
+    virtual uint8_t readByte(size_t offset) const = 0;
+    virtual uint16_t readShort(size_t offset) const = 0;
+    virtual uint32_t readWord(size_t offset) const = 0;
+    virtual uint16_t readShortBE(size_t offset) const = 0;
+    virtual uint32_t readWordBE(size_t offset) const = 0;
 
-    uint32_t GetBytes(size_t offset, uint32_t nCount, void *pBuffer) const;
-    bool MatchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const;
-    bool MatchBytePattern(const BytePattern &pattern, size_t offset) const;
-    bool SearchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
+    uint32_t readBytes(size_t offset, uint32_t nCount, void *pBuffer) const;
+    bool matchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const;
+    bool matchBytePattern(const BytePattern &pattern, size_t offset) const;
+    bool searchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
                            uint32_t nSearchOffset = 0, uint32_t nSearchSize = static_cast<uint32_t>(-1)) const;
 
     [[nodiscard]] const auto &containedVGMFiles() const noexcept {
         return m_vgmfiles;
     }
-    void AddContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>);
-    void RemoveContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>);
+    void addContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>);
+    void removeContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>);
 
     VGMTag tag;
 
@@ -136,11 +136,11 @@ class DiskFile final : public RawFile {
 
     const char *data() const override { return m_data.data(); }
     const char &operator[](size_t offset) const override { return m_data[offset]; }
-    uint8_t GetByte(size_t offset) const override { return m_data[offset]; }
-    uint16_t GetShort(size_t offset) const override { return get<u16>(offset); }
-    uint32_t GetWord(size_t offset) const override { return get<u32>(offset); }
-    uint16_t GetShortBE(size_t offset) const override { return getBE<u16>(offset); }
-    uint32_t GetWordBE(size_t offset) const override { return getBE<u32>(offset); }
+    uint8_t readByte(size_t offset) const override { return m_data[offset]; }
+    uint16_t readShort(size_t offset) const override { return get<u16>(offset); }
+    uint32_t readWord(size_t offset) const override { return get<u32>(offset); }
+    uint16_t readShortBE(size_t offset) const override { return getBE<u16>(offset); }
+    uint32_t readWordBE(size_t offset) const override { return getBE<u32>(offset); }
 
    private:
     mio::mmap_source m_data;
@@ -186,11 +186,11 @@ class VirtFile final : public RawFile {
 
     const char *data() const override { return m_data.data(); }
     const char &operator[](size_t offset) const override { return m_data[offset]; }
-    uint8_t GetByte(size_t offset) const override { return m_data[offset]; }
-    uint16_t GetShort(size_t offset) const override { return get<u16>(offset); }
-    uint32_t GetWord(size_t offset) const override { return get<u32>(offset); }
-    uint16_t GetShortBE(size_t offset) const override { return getBE<u16>(offset); }
-    uint32_t GetWordBE(size_t offset) const override { return getBE<u32>(offset); }
+    uint8_t readByte(size_t offset) const override { return m_data[offset]; }
+    uint16_t readShort(size_t offset) const override { return get<u16>(offset); }
+    uint32_t readWord(size_t offset) const override { return get<u32>(offset); }
+    uint16_t readShortBE(size_t offset) const override { return getBE<u16>(offset); }
+    uint32_t readWordBE(size_t offset) const override { return getBE<u32>(offset); }
 
    private:
     std::vector<char> m_data;

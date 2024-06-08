@@ -23,14 +23,14 @@ PSFFile::PSFFile(const RawFile &file) {
     }
 
     m_version = file[3];
-    uint32_t reservedarea_size = file.GetWord(4);
+    uint32_t reservedarea_size = file.readWord(4);
     if (reservedarea_size) {
         m_reserved_data.resize(reservedarea_size);
-        file.GetBytes(16, reservedarea_size, m_reserved_data.data());
+        file.readBytes(16, reservedarea_size, m_reserved_data.data());
     }
 
-    size_t exe_size = file.GetWord(8);
-    m_exe_CRC = file.GetWord(12);
+    size_t exe_size = file.readWord(8);
+    m_exe_CRC = file.readWord(12);
 
     if ((reservedarea_size > fileSize) || (exe_size > fileSize) ||
         ((16 + reservedarea_size + exe_size) > fileSize)) {

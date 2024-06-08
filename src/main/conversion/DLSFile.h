@@ -99,13 +99,13 @@ public:
                    uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
                    uint8_t *waveData, std::string name = "Unnamed Wave");
 
-  std::vector<DLSInstr *> GetInstruments();
-  std::vector<DLSWave *> GetWaves();
+  std::vector<DLSInstr *> instruments();
+  std::vector<DLSWave *> waves();
 
-  uint32_t GetSize() override;
+  uint32_t size() override;
 
-  int WriteDLSToBuffer(std::vector<uint8_t> &buf);
-  bool SaveDLSFile(const std::string &filepath);
+  int writeDLSToBuffer(std::vector<uint8_t> &buf);
+  bool saveDLSFile(const std::string &filepath);
 
 private:
   std::vector<std::unique_ptr<DLSInstr>> m_instrs;
@@ -118,10 +118,10 @@ public:
   DLSInstr(uint32_t bank, uint32_t instrument);
   DLSInstr(uint32_t bank, uint32_t instrument, std::string instrName);
 
-  DLSRgn *AddRgn();
+  DLSRgn *addRgn();
 
-  uint32_t GetSize() const;
-  void Write(std::vector<uint8_t> &buf);
+  uint32_t size() const;
+  void write(std::vector<uint8_t> &buf);
 
 private:
   uint32_t ulBank;
@@ -138,15 +138,15 @@ public:
       : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh),
         fusOptions(0), usPhaseGroup(0), channel(0), tableIndex(0) {}
 
-  DLSArt *AddArt();
-  DLSWsmp *AddWsmp();
-  void SetRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0,
+  DLSArt *addArt();
+  DLSWsmp *addWsmp();
+  void setRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0,
                  uint16_t velHigh = 0x7F);
-  void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel,
+  void setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel,
                        uint32_t theTableIndex);
 
-  uint32_t GetSize() const;
-  void Write(std::vector<uint8_t> &buf) const;
+  uint32_t size() const;
+  void write(std::vector<uint8_t> &buf) const;
 
 private:
   uint16_t usKeyLow;
@@ -171,8 +171,8 @@ public:
         lScale(scale) {}
   ~ConnectionBlock(void) {}
 
-  static uint32_t GetSize() { return 12; }
-  void Write(std::vector<uint8_t> &buf) const;
+  static uint32_t size() { return 12; }
+  void write(std::vector<uint8_t> &buf) const;
 
 private:
   uint16_t usSource;
@@ -186,7 +186,7 @@ class DLSArt {
 public:
   DLSArt() = default;
 
-  void AddADSR(long attack_time, uint16_t atk_transform, long hold_time, long decay_time,
+  void addADSR(long attack_time, uint16_t atk_transform, long hold_time, long decay_time,
                long sustain_lev, long release_time, uint16_t rls_transform);
   void AddPan(long pan);
 
@@ -226,7 +226,7 @@ public:
       : wFormatTag(formatTag), wChannels(channels), dwSamplesPerSec(samplesPerSec),
         dwAveBytesPerSec(aveBytesPerSec), wBlockAlign(blockAlign), wBitsPerSample(bitsPerSample),
         m_name(std::move(waveName)), m_wave_data(waveData, waveData + waveDataSize) {
-    RiffFile::AlignName(m_name);
+    RiffFile::alignName(m_name);
   }
 
   //	This function will always return an even value, to maintain the alignment

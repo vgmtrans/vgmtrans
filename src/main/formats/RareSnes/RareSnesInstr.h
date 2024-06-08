@@ -18,13 +18,13 @@ class RareSnesInstrSet:
                    const std::map<uint8_t, int16_t> &instrPitchHints,
                    const std::map<uint8_t, uint16_t> &instrADSRHints,
                    const std::string &name = "RareSnesInstrSet");
-  virtual ~RareSnesInstrSet(void);
+  virtual ~RareSnesInstrSet();
 
   virtual void Initialize();
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  virtual bool parseHeader();
+  virtual bool parseInstrPointers();
 
-  const std::vector<uint8_t> &GetAvailableInstruments();
+  const std::vector<uint8_t> &getAvailableInstruments();
 
  protected:
   uint32_t spcDirAddr;
@@ -53,9 +53,9 @@ class RareSnesInstr
                 int16_t pitch = 0,
                 uint16_t adsr = 0x8FE0,
                 const std::string &name = "RareSnesInstr");
-  virtual ~RareSnesInstr(void);
+  virtual ~RareSnesInstr();
 
-  virtual bool LoadInstr();
+  virtual bool loadInstr();
 
  protected:
   uint32_t spcDirAddr;
@@ -72,9 +72,9 @@ class RareSnesRgn
     : public VGMRgn {
  public:
   RareSnesRgn(RareSnesInstr *instr, uint32_t offset, int8_t transpose = 0, int16_t pitch = 0, uint16_t adsr = 0x8FE0);
-  virtual ~RareSnesRgn(void);
+  virtual ~RareSnesRgn();
 
-  virtual bool LoadRgn();
+  virtual bool loadRgn();
 
  protected:
   int8_t transpose;

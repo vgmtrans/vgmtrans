@@ -12,9 +12,9 @@ class HOSASeq: public VGMSeq {
   HOSASeq(RawFile *file, uint32_t offset, const std::string &name = "HOSA Seq");
   ~HOSASeq() override;
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
-  uint32_t GetID() const override { return assocHOSA_ID; }
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  uint32_t id() const override { return assocHOSA_ID; }
 
  protected:
   uint16_t seqID;
@@ -29,9 +29,9 @@ class HOSATrack: public SeqTrack {
  public:
   HOSATrack(HOSASeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
 
-  bool ReadEvent() override;
+  bool readEvent() override;
   void ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable);
-  uint32_t DecodeVariable();    //Decode of 可変長
+  uint32_t decodeVariable();    //Decode of 可変長
 
  public:
   uint32_t iDeltaTimeCom;     //Default delta time for Command

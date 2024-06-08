@@ -26,8 +26,8 @@ class FalcomSnesInstrSet:
                      const std::string &name = "FalcomSnesInstrSet");
   ~FalcomSnesInstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
   FalcomSnesVersion version;
 
@@ -55,7 +55,7 @@ class FalcomSnesInstr
                   const std::string &name = "FalcomSnesInstr");
   ~FalcomSnesInstr() override;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
   FalcomSnesVersion version;
 
@@ -77,7 +77,7 @@ class FalcomSnesRgn
              uint8_t srcn);
   ~FalcomSnesRgn() override;
 
-  bool LoadRgn() override;
+  bool loadRgn() override;
 
   FalcomSnesVersion version;
 };

@@ -140,11 +140,11 @@ DialogicAdpcmSamp::DialogicAdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uin
 
 DialogicAdpcmSamp::~DialogicAdpcmSamp() {}
 
-double DialogicAdpcmSamp::GetCompressionRatio() {
+double DialogicAdpcmSamp::compressionRatio() {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
 
-void DialogicAdpcmSamp::ConvertToStdWave(uint8_t *buf) {
+void DialogicAdpcmSamp::convertToStdWave(uint8_t *buf) {
 
   auto* uncompBuf = reinterpret_cast<int16_t*>(buf);
 
@@ -152,7 +152,7 @@ void DialogicAdpcmSamp::ConvertToStdWave(uint8_t *buf) {
 
   int sampleNum = 0;
   for (uint32_t off = dwOffset; off < (dwOffset + unLength); ++off) {
-    uint8_t byte = GetByte(off);
+    uint8_t byte = readByte(off);
 
     for (int n = 0; n < 2; ++n) {
       uint8_t nibble = byte >> (((n & 1) << 2) ^ 4);

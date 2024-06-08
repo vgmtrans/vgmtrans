@@ -59,23 +59,23 @@ BytePattern GraphResSnesScanner::ptnDspRegInit(
 	,
 	18);
 
-void GraphResSnesScanner::Scan(RawFile *file, void *info) {
+void GraphResSnesScanner::scan(RawFile *file, void *info) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForGraphResSnesFromARAM(file);
+    searchForGraphResSnesFromARAM(file);
   } else {
     // Search from ROM unimplemented
   }
 }
 
-void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
-  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
+void GraphResSnesScanner::searchForGraphResSnesFromARAM(RawFile *file) {
+  std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song header
   uint32_t ofsLoadSeq;
   uint16_t addrSeqHeader;
-  if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-    addrSeqHeader = file->GetByte(ofsLoadSeq + 4) | (file->GetByte(ofsLoadSeq + 8) << 8);
+  if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
+    addrSeqHeader = file->readByte(ofsLoadSeq + 4) | (file->readByte(ofsLoadSeq + 8) << 8);
   } else {
     return;
   }
@@ -83,13 +83,13 @@ void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
   GraphResSnesVersion version = GRAPHRESSNES_STANDARD;
 
   GraphResSnesSeq *newSeq = new GraphResSnesSeq(file, version, addrSeqHeader, name);
-  if (!newSeq->LoadVGMFile()) {
+  if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }
 
   // get sample map address from DIR register value
-  std::map<uint8_t, uint8_t> dspRegMap = GetInitDspRegMap(file);
+  std::map<uint8_t, uint8_t> dspRegMap = getInitDspRegMap(file);
   std::map<uint8_t, uint8_t>::iterator itSpcDIR = dspRegMap.find(0x5d);
   if (itSpcDIR == dspRegMap.end()) {
     return;
@@ -98,20 +98,20 @@ void GraphResSnesScanner::SearchForGraphResSnesFromARAM(RawFile *file) {
 
   // scan SRCN table
   GraphResSnesInstrSet *newInstrSet = new GraphResSnesInstrSet(file, version, spcDirAddr, newSeq->instrADSRHints);
-  if (!newInstrSet->LoadVGMFile()) {
+  if (!newInstrSet->loadVGMFile()) {
     delete newInstrSet;
     return;
   }
 }
 
-std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(const RawFile *file) {
+std::map<uint8_t, uint8_t> GraphResSnesScanner::getInitDspRegMap(const RawFile *file) {
   std::map<uint8_t, uint8_t> dspRegMap;
 
   // find a code block which initializes dsp registers
   uint32_t ofsDspRegInitASM;
   uint32_t addrDspRegList;
-  if (file->SearchBytePattern(ptnDspRegInit, ofsDspRegInitASM)) {
-    addrDspRegList = file->GetShort(ofsDspRegInitASM + 7);
+  if (file->searchBytePattern(ptnDspRegInit, ofsDspRegInitASM)) {
+    addrDspRegList = file->readShort(ofsDspRegInitASM + 7);
   } else {
     return dspRegMap;
   }
@@ -123,12 +123,12 @@ std::map<uint8_t, uint8_t> GraphResSnesScanner::GetInitDspRegMap(const RawFile *
       break;
     }
 
-    uint8_t dspReg = file->GetByte(curOffset++);
+    uint8_t dspReg = file->readByte(curOffset++);
     if (dspReg == 0xff) {
       break;
     }
 
-    uint8_t dspValue = file->GetByte(curOffset++);
+    uint8_t dspValue = file->readByte(curOffset++);
     dspRegMap[dspReg] = dspValue;
   }
 

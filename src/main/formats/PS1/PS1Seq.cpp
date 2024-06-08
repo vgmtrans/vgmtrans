@@ -10,7 +10,7 @@
 DECLARE_FORMAT(PS1)
 
 PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, file, offset, "PS1 Seq") {
-  UseReverb();
+  useReverb();
   //bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
 
@@ -18,12 +18,12 @@ PS1Seq::~PS1Seq() {
 }
 
 
-bool PS1Seq::GetHeaderInfo() {
-  SetPPQN(GetShortBE(offset() + 8));
+bool PS1Seq::parseHeader() {
+  setPPQN(readShortBE(offset() + 8));
   nNumTracks = 16;
 
-  uint8_t numer = GetByte(offset() + 0x0D);
-  uint8_t denom = GetByte(offset() + 0x0E);
+  uint8_t numer = readByte(offset() + 0x0D);
+  uint8_t denom = readByte(offset() + 0x0E);
   if (numer == 0 || numer > 32)                //sanity check
     return false;
 
@@ -31,13 +31,13 @@ bool PS1Seq::GetHeaderInfo() {
   seqHeader->addChild(offset(), 4, "ID");
   seqHeader->addChild(offset() + 0x04, 4, "Version");
   seqHeader->addChild(offset() + 0x08, 2, "Resolution of quarter note");
-  seqHeader->AddTempo(offset() + 0x0A, 3);
-  seqHeader->AddSig(offset() + 0x0D, 2); // Rhythm (Numerator) and Rhythm (Denominator) (2^n)
+  seqHeader->addTempo(offset() + 0x0A, 3);
+  seqHeader->addSig(offset() + 0x0D, 2); // Rhythm (Numerator) and Rhythm (Denominator) (2^n)
 
-  if (GetByte(offset() + 0xF) == 0 && GetByte(offset() + 0x10) == 0) {
-    SetEventsOffset(offset() + 0x0F + 4);
-    PS1Seq *newPS1Seq = new PS1Seq(rawFile(), offset() + GetShortBE(offset() + 0x11) + 0x13 - 6);
-    if (!newPS1Seq->LoadVGMFile()) {
+  if (readByte(offset() + 0xF) == 0 && readByte(offset() + 0x10) == 0) {
+    setEventsOffset(offset() + 0x0F + 4);
+    PS1Seq *newPS1Seq = new PS1Seq(rawFile(), offset() + readShortBE(offset() + 0x11) + 0x13 - 6);
+    if (!newPS1Seq->loadVGMFile()) {
       delete newPS1Seq;
     }
     //short relOffset = (short)GetShortBE(curOffset);
@@ -45,31 +45,31 @@ bool PS1Seq::GetHeaderInfo() {
     //curOffset += relOffset;
   }
   else {
-    SetEventsOffset(offset() + 0x0F);
+    setEventsOffset(offset() + 0x0F);
   }
 
   return true;
 }
 
-void PS1Seq::ResetVars() {
-  VGMSeqNoTrks::ResetVars();
+void PS1Seq::resetVars() {
+  VGMSeqNoTrks::resetVars();
 
-  uint32_t initialTempo = (GetShortBE(offset() + 10) << 8) | GetByte(offset() + 12);
-  AddTempo(offset() + 10, 3, initialTempo);
+  uint32_t initialTempo = (readShortBE(offset() + 10) << 8) | readByte(offset() + 12);
+  addTempo(offset() + 10, 3, initialTempo);
 
-  uint8_t numer = GetByte(offset() + 0x0D);
-  uint8_t denom = GetByte(offset() + 0x0E);
-  AddTimeSig(offset() + 0x0D, 2, numer, 1 << denom, (uint8_t) GetPPQN());
+  uint8_t numer = readByte(offset() + 0x0D);
+  uint8_t denom = readByte(offset() + 0x0E);
+  addTimeSig(offset() + 0x0D, 2, numer, 1 << denom, (uint8_t) ppqn());
 }
 
-bool PS1Seq::ReadEvent() {
+bool PS1Seq::readEvent() {
   uint32_t beginOffset = curOffset;
-  uint32_t delta = ReadVarLen(curOffset);
+  uint32_t delta = readVarLen(curOffset);
   if (curOffset >= rawFile()->size())
     return false;
-  AddTime(delta);
+  addTime(delta);
 
-  uint8_t status_byte = GetByte(curOffset++);
+  uint8_t status_byte = readByte(curOffset++);
 
   //if (status_byte == 0)				//Jump Relative
   //{
@@ -102,7 +102,7 @@ bool PS1Seq::ReadEvent() {
       constexpr size_t kZeroDataLengthThreshold = 10;
       bool no_next_data = true;
       for (off_t off = beginOffset; off < beginOffset + kZeroDataLengthThreshold; off++) {
-        if (GetByte(off) != 0) {
+        if (readByte(off) != 0) {
           no_next_data = false;
           break;
         }
@@ -122,35 +122,35 @@ bool PS1Seq::ReadEvent() {
 
 
   channel = status_byte & 0x0F;
-  SetCurTrack(channel);
+  setCurTrack(channel);
 
   switch (status_byte & 0xF0) {
     //note event
     case 0x90 : {
-      auto key = GetByte(curOffset++);
-      auto vel = GetByte(curOffset++);
+      auto key = readByte(curOffset++);
+      auto vel = readByte(curOffset++);
       //if the velocity is > 0, it's a note on. otherwise it's a note off
       if (vel > 0)
-        AddNoteOn(beginOffset, curOffset - beginOffset, key, vel);
+        addNoteOn(beginOffset, curOffset - beginOffset, key, vel);
       else
-        AddNoteOff(beginOffset, curOffset - beginOffset, key);
+        addNoteOff(beginOffset, curOffset - beginOffset, key);
       break;
     }
 
     case 0xB0 : {
-      uint8_t controlNum = GetByte(curOffset++);
-      uint8_t value = GetByte(curOffset++);
+      uint8_t controlNum = readByte(curOffset++);
+      uint8_t value = readByte(curOffset++);
       switch (controlNum)
       {
         //bank select
         case 0 :
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "Bank Select", "", CLR_MISC);
-          AddBankSelectNoItem(value);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Bank Select", "", CLR_MISC);
+          addBankSelectNoItem(value);
           break;
 
         //data entry
         case 6 :
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "NRPN Data Entry", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN Data Entry", "", CLR_MISC);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->AddControllerEvent(channel, controlNum, value);
           }
@@ -158,42 +158,42 @@ bool PS1Seq::ReadEvent() {
 
         //volume
         case 7 :
-          AddVol(beginOffset, curOffset - beginOffset, value);
+          addVol(beginOffset, curOffset - beginOffset, value);
           break;
 
         //pan
         case 10 :
-          AddPan(beginOffset, curOffset - beginOffset, value);
+          addPan(beginOffset, curOffset - beginOffset, value);
           break;
 
         //expression
         case 11 :
-          AddExpression(beginOffset, curOffset - beginOffset, value);
+          addExpression(beginOffset, curOffset - beginOffset, value);
           break;
 
         //damper (hold)
         case 64 :
-          AddSustainEvent(beginOffset, curOffset - beginOffset, value);
+          addSustainEvent(beginOffset, curOffset - beginOffset, value);
           break;
 
         //reverb depth (_SsContExternal)
         case 91 :
-          AddReverb(beginOffset, curOffset - beginOffset, value);
+          addReverb(beginOffset, curOffset - beginOffset, value);
           break;
 
         //(0x62) NRPN 1 (LSB)
         case 98 :
           switch (value) {
             case 20 :
-              AddGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1 #20", "", CLR_MISC);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1 #20", "", CLR_MISC);
               break;
 
             case 30 :
-              AddGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1 #30", "", CLR_MISC);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1 #30", "", CLR_MISC);
               break;
 
             default:
-              AddGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1", "", CLR_MISC);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1", "", CLR_MISC);
               break;
           }
 
@@ -206,15 +206,15 @@ bool PS1Seq::ReadEvent() {
         case 99 :
           switch (value) {
             case 20 :
-              AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", CLR_LOOP);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", CLR_LOOP);
               break;
 
             case 30 :
-              AddGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", CLR_LOOP);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", CLR_LOOP);
               break;
 
             default:
-              AddGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 2", "", CLR_MISC);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 2", "", CLR_MISC);
               break;
           }
 
@@ -225,7 +225,7 @@ bool PS1Seq::ReadEvent() {
 
         //(0x64) RPN 1 (LSB), no effect?
         case 100 :
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "RPN 1", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "RPN 1", "", CLR_MISC);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->AddControllerEvent(channel, controlNum, value);
           }
@@ -233,7 +233,7 @@ bool PS1Seq::ReadEvent() {
 
         //(0x65) RPN 2 (MSB), no effect?
         case 101 :
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "RPN 2", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "RPN 2", "", CLR_MISC);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->AddControllerEvent(channel, controlNum, value);
           }
@@ -241,14 +241,14 @@ bool PS1Seq::ReadEvent() {
 
         //reset all controllers
         case 121 :
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "Reset All Controllers", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Reset All Controllers", "", CLR_MISC);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->AddControllerEvent(channel, controlNum, value);
           }
           break;
 
         default:
-          AddGenericEvent(beginOffset, curOffset - beginOffset, "Control Event", "", CLR_UNKNOWN);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Control Event", "", CLR_UNKNOWN);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->AddControllerEvent(channel, controlNum, value);
           }
@@ -258,45 +258,45 @@ bool PS1Seq::ReadEvent() {
       break;
 
     case 0xC0 : {
-      uint8_t progNum = GetByte(curOffset++);
-      AddProgramChange(beginOffset, curOffset - beginOffset, progNum);
+      uint8_t progNum = readByte(curOffset++);
+      addProgramChange(beginOffset, curOffset - beginOffset, progNum);
     }
       break;
 
     case 0xE0 : {
-      uint8_t hi = GetByte(curOffset++);
-      uint8_t lo = GetByte(curOffset++);
-      AddPitchBendMidiFormat(beginOffset, curOffset - beginOffset, hi, lo);
+      uint8_t hi = readByte(curOffset++);
+      uint8_t lo = readByte(curOffset++);
+      addPitchBendMidiFormat(beginOffset, curOffset - beginOffset, hi, lo);
     }
       break;
 
     case 0xF0 : {
       if (status_byte == 0xFF) {
-        switch (GetByte(curOffset++)) {
+        switch (readByte(curOffset++)) {
           //tempo.  This is different from SMF, where we'd expect a 51 then 03.  Also, supports a string of tempo events
           case 0x51 :
-            AddTempo(beginOffset, curOffset + 3 - beginOffset, (GetShortBE(curOffset) << 8) | GetByte(curOffset + 2));
+            addTempo(beginOffset, curOffset + 3 - beginOffset, (readShortBE(curOffset) << 8) | readByte(curOffset + 2));
             curOffset += 3;
             break;
 
           case 0x2F :
-            AddEndOfTrack(beginOffset, curOffset - beginOffset);
+            addEndOfTrack(beginOffset, curOffset - beginOffset);
             return false;
 
           default :
-            AddUnknown(beginOffset, curOffset - beginOffset, "Meta Event");
+            addUnknown(beginOffset, curOffset - beginOffset, "Meta Event");
             return false;
         }
       }
       else {
-        AddUnknown(beginOffset, curOffset - beginOffset);
+        addUnknown(beginOffset, curOffset - beginOffset);
         return false;
       }
     }
       break;
 
     default:
-      AddUnknown(beginOffset, curOffset - beginOffset);
+      addUnknown(beginOffset, curOffset - beginOffset);
       return false;
   }
   return true;

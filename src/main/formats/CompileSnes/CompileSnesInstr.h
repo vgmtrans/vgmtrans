@@ -18,8 +18,8 @@ class CompileSnesInstrSet:
                       const std::string &name = "CompileSnesInstrSet");
   ~CompileSnesInstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
   CompileSnesVersion version;
 
@@ -46,9 +46,9 @@ class CompileSnesInstr
                    const std::string &name = "CompileSnesInstr");
   ~CompileSnesInstr() override;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
-  static uint32_t ExpectedSize(CompileSnesVersion version);
+  static uint32_t expectedSize(CompileSnesVersion version);
 
   CompileSnesVersion version;
 
@@ -70,7 +70,7 @@ class CompileSnesRgn
                  uint16_t addrPitchTablePtrs);
   ~CompileSnesRgn() override;
 
-  bool LoadRgn() override;
+  bool loadRgn() override;
 
   CompileSnesVersion version;
 };
