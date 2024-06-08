@@ -17,9 +17,9 @@ public:
                const std::string &name = "MP2K Instrument bank");
   ~MP2kInstrSet() = default;
 
-  bool LoadInstrs() override;
-  bool GetInstrPointers() override;
-  int MakeOrGetSample(size_t sample_pointer);
+  bool loadInstrs() override;
+  bool parseInstrPointers() override;
+  int makeOrGetSample(size_t sample_pointer);
   int sampleRate() const noexcept { return m_operating_rate; };
 
 private:
@@ -40,10 +40,10 @@ public:
             MP2kInstrData data);
   ~MP2kInstr() = default;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
 private:
-  void SetADSR(VGMRgn *dest, u32 data);
+  void setADSR(VGMRgn *dest, u32 data);
 
   u8 m_type = 0;
   MP2kInstrData m_data;
@@ -58,7 +58,7 @@ public:
            uint16_t bps = 16, uint32_t rate = 0, uint8_t waveType = 0, std::string name = "Sample");
   ~MP2kSamp() = default;
 
-  void ConvertToStdWave(u8 *buf) override;
+  void convertToStdWave(u8 *buf) override;
 
 private:
   MP2kWaveType m_type;

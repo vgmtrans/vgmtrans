@@ -19,10 +19,10 @@ SonyPS2InstrSet::~SonyPS2InstrSet() {
 }
 
 
-bool SonyPS2InstrSet::GetHeaderInfo() {
+bool SonyPS2InstrSet::parseHeader() {
   // VERSION CHUNK
   uint32_t curOffset = dwOffset;
-  GetBytes(curOffset, 16, &versCk);
+  readBytes(curOffset, 16, &versCk);
   VGMHeader *versCkHdr = addHeader(curOffset, versCk.chunkSize, "Version Chunk");
   versCkHdr->addChild(curOffset, 4, "Creator");
   versCkHdr->addChild(curOffset + 4, 4, "Type");
@@ -33,7 +33,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
 
   // HEADER CHUNK
   curOffset += versCk.chunkSize;
-  GetBytes(curOffset, 64, &hdrCk);
+  readBytes(curOffset, 64, &hdrCk);
   unLength = hdrCk.fileSize;
 
   VGMHeader *hdrCkHdr = addHeader(curOffset, hdrCk.chunkSize, "Header Chunk");
@@ -53,7 +53,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
 
   // SAMPLESET CHUNK
   curOffset = dwOffset + hdrCk.samplesetChunkAddr;
-  GetBytes(curOffset, 16, &sampSetCk);
+  readBytes(curOffset, 16, &sampSetCk);
   sampSetCk.sampleSetOffsetAddr = new uint32_t[sampSetCk.maxSampleSetNumber + 1];
   sampSetCk.sampleSetParam = new SampSetParam[sampSetCk.maxSampleSetNumber + 1];
 
@@ -63,7 +63,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
   sampSetCkHdr->addChild(curOffset + 8, 4, "Chunk Size");
   sampSetCkHdr->addChild(curOffset + 12, 4, "Max SampleSet Number");
 
-  GetBytes(curOffset + 16, (sampSetCk.maxSampleSetNumber + 1) * sizeof(uint32_t), sampSetCk.sampleSetOffsetAddr);
+  readBytes(curOffset + 16, (sampSetCk.maxSampleSetNumber + 1) * sizeof(uint32_t), sampSetCk.sampleSetOffsetAddr);
   VGMHeader *sampSetParamOffsetHdr = sampSetCkHdr->addHeader(curOffset + 16,
                                                              (sampSetCk.maxSampleSetNumber + 1) * sizeof(uint32_t),
                                                              "SampleSet Param Offsets");
@@ -73,10 +73,10 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
     sampSetParamOffsetHdr->addChild(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
     if (sampSetCk.sampleSetOffsetAddr[i] == 0xFFFFFFFF)
       continue;
-    GetBytes(curOffset + sampSetCk.sampleSetOffsetAddr[i], sizeof(uint8_t) * 4, sampSetCk.sampleSetParam + i);
+    readBytes(curOffset + sampSetCk.sampleSetOffsetAddr[i], sizeof(uint8_t) * 4, sampSetCk.sampleSetParam + i);
     uint8_t nSamples = sampSetCk.sampleSetParam[i].nSample;
     sampSetCk.sampleSetParam[i].sampleIndex = new uint16_t[nSamples];
-    GetBytes(curOffset + sampSetCk.sampleSetOffsetAddr[i] + sizeof(uint8_t) * 4, nSamples * sizeof(uint16_t),
+    readBytes(curOffset + sampSetCk.sampleSetOffsetAddr[i] + sizeof(uint8_t) * 4, nSamples * sizeof(uint16_t),
              sampSetCk.sampleSetParam[i].sampleIndex);
     VGMHeader *sampSetParamHdr = sampSetParamsHdr->addHeader(curOffset + sampSetCk.sampleSetOffsetAddr[i],
                                                              sizeof(uint8_t) * 4 + nSamples * sizeof(uint16_t),
@@ -91,7 +91,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
 
   // SAMPLE CHUNK
   curOffset = dwOffset + hdrCk.sampleChunkAddr;
-  GetBytes(curOffset, 16, &sampCk);
+  readBytes(curOffset, 16, &sampCk);
   sampCk.sampleOffsetAddr = new uint32_t[sampCk.maxSampleNumber + 1];
   sampCk.sampleParam = new SampleParam[sampCk.maxSampleNumber + 1];
 
@@ -101,7 +101,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
   sampCkHdr->addChild(curOffset + 8, 4, "Chunk Size");
   sampCkHdr->addChild(curOffset + 12, 4, "Max Sample Number");
 
-  GetBytes(curOffset + 16, (sampCk.maxSampleNumber + 1) * sizeof(uint32_t), sampCk.sampleOffsetAddr);
+  readBytes(curOffset + 16, (sampCk.maxSampleNumber + 1) * sizeof(uint32_t), sampCk.sampleOffsetAddr);
   VGMHeader *sampleParamOffsetHdr = sampCkHdr->addHeader(curOffset + 16,
                                                          (sampCk.maxSampleNumber + 1) * sizeof(uint32_t),
                                                          "Sample Param Offsets");
@@ -110,7 +110,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
                                                     "Sample Params");
   for (uint32_t i = 0; i <= sampCk.maxSampleNumber; i++) {
     sampleParamOffsetHdr->addChild(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
-    GetBytes(curOffset + sampCk.sampleOffsetAddr[i], sizeof(SampleParam), sampCk.sampleParam + i);
+    readBytes(curOffset + sampCk.sampleOffsetAddr[i], sizeof(SampleParam), sampCk.sampleParam + i);
     VGMHeader *sampleParamHdr = sampleParamsHdr->addHeader(curOffset + sampCk.sampleOffsetAddr[i],
                                                            sizeof(SampleParam), "Sample Param");
     sampleParamHdr->addChild(curOffset + sampCk.sampleOffsetAddr[i], 2, "VAG Index");
@@ -152,7 +152,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
 
   // VAGInfo CHUNK
   curOffset = dwOffset + hdrCk.vagInfoChunkAddr;
-  GetBytes(curOffset, 16, &vagInfoCk);
+  readBytes(curOffset, 16, &vagInfoCk);
   vagInfoCk.vagInfoOffsetAddr = new uint32_t[vagInfoCk.maxVagInfoNumber + 1];
   vagInfoCk.vagInfoParam = new VAGInfoParam[vagInfoCk.maxVagInfoNumber + 1];
 
@@ -162,7 +162,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
   vagInfoCkHdr->addChild(curOffset + 8, 4, "Chunk Size");
   vagInfoCkHdr->addChild(curOffset + 12, 4, "Max VAGInfo Number");
 
-  GetBytes(curOffset + 16, (vagInfoCk.maxVagInfoNumber + 1) * sizeof(uint32_t), vagInfoCk.vagInfoOffsetAddr);
+  readBytes(curOffset + 16, (vagInfoCk.maxVagInfoNumber + 1) * sizeof(uint32_t), vagInfoCk.vagInfoOffsetAddr);
   VGMHeader *vagInfoParamOffsetHdr = vagInfoCkHdr->addHeader(curOffset + 16,
                                                              (vagInfoCk.maxVagInfoNumber + 1) * sizeof(uint32_t),
                                                              "VAGInfo Param Offsets");
@@ -171,7 +171,7 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
                                                   "VAGInfo Params");
   for (uint32_t i = 0; i <= vagInfoCk.maxVagInfoNumber; i++) {
     vagInfoParamOffsetHdr->addChild(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
-    GetBytes(curOffset + vagInfoCk.vagInfoOffsetAddr[i], sizeof(VAGInfoParam), vagInfoCk.vagInfoParam + i);
+    readBytes(curOffset + vagInfoCk.vagInfoOffsetAddr[i], sizeof(VAGInfoParam), vagInfoCk.vagInfoParam + i);
     VGMHeader *vagInfoParamHdr = vagInfoParamsHdr->addHeader(curOffset + vagInfoCk.vagInfoOffsetAddr[i],
                                                              sizeof(VAGInfoParam), "VAGInfo Param");
     vagInfoParamHdr->addChild(curOffset + vagInfoCk.vagInfoOffsetAddr[i], 4, "VAG Offset Addr");
@@ -182,11 +182,11 @@ bool SonyPS2InstrSet::GetHeaderInfo() {
   return true;
 }
 
-bool SonyPS2InstrSet::GetInstrPointers() {
+bool SonyPS2InstrSet::parseInstrPointers() {
   uint32_t curOffset = dwOffset + hdrCk.programChunkAddr;
   //Now we're at the Program chunk, which starts with the sig "SCEIProg" (in 32bit little endian)
   //read in the first 4 values.  The programs will be read within GetInstrPointers()
-  GetBytes(curOffset, 16, &progCk);
+  readBytes(curOffset, 16, &progCk);
 
   progCk.programOffsetAddr = new uint32_t[progCk.maxProgramNumber + 1];
   progCk.progParamBlock = new SonyPS2Instr::ProgParam[progCk.maxProgramNumber + 1];
@@ -197,7 +197,7 @@ bool SonyPS2InstrSet::GetInstrPointers() {
   progCkHdr->addChild(curOffset + 8, 4, "Chunk Size");
   progCkHdr->addChild(curOffset + 12, 4, "Max Program Number");
 
-  GetBytes(curOffset + 16, (progCk.maxProgramNumber + 1) * sizeof(uint32_t), progCk.programOffsetAddr);
+  readBytes(curOffset + 16, (progCk.maxProgramNumber + 1) * sizeof(uint32_t), progCk.programOffsetAddr);
   VGMHeader *progParamOffsetHdr = progCkHdr->addHeader(curOffset + 16,
                                                        (progCk.maxProgramNumber + 1) * sizeof(uint32_t),
                                                        "Program Param Offsets");
@@ -209,7 +209,7 @@ bool SonyPS2InstrSet::GetInstrPointers() {
     progParamOffsetHdr->addChild(curOffset + 16 + i * sizeof(uint32_t), 4, "Offset");
     if (progCk.programOffsetAddr[i] == 0xFFFFFFFF)
       continue;
-    GetBytes(curOffset + progCk.programOffsetAddr[i], sizeof(SonyPS2Instr::ProgParam), progCk.progParamBlock + i);
+    readBytes(curOffset + progCk.programOffsetAddr[i], sizeof(SonyPS2Instr::ProgParam), progCk.progParamBlock + i);
     //VGMHeader* progParamHdr = progParamsHdr->addHeader(curOffset+progCk.programOffsetAddr[i],
     //	sizeof(SonyPS2Instr::ProgParam), "Program Param");
 
@@ -250,7 +250,7 @@ bool SonyPS2InstrSet::GetInstrPointers() {
     instr->unLength += nSplits * sizeof(SonyPS2Instr::SplitBlock);
     uint32_t absSplitBlocksAddr = curOffset + progCk.programOffsetAddr[i] + progCk.progParamBlock[i].splitBlockAddr;
     instr->splitBlocks = new SonyPS2Instr::SplitBlock[nSplits];
-    GetBytes(absSplitBlocksAddr, nSplits * sizeof(SonyPS2Instr::SplitBlock), instr->splitBlocks);
+    readBytes(absSplitBlocksAddr, nSplits * sizeof(SonyPS2Instr::SplitBlock), instr->splitBlocks);
     VGMHeader *splitBlocksHdr = instr->addHeader(absSplitBlocksAddr,
                                                  nSplits * sizeof(SonyPS2Instr::SplitBlock), "Split Blocks");
     for (uint8_t j = 0; j < nSplits; j++) {
@@ -315,7 +315,7 @@ SonyPS2Instr::~SonyPS2Instr() {
   deleteRegions();
 }
 
-bool SonyPS2Instr::LoadInstr() {
+bool SonyPS2Instr::loadInstr() {
   SonyPS2InstrSet *instrset = (SonyPS2InstrSet *) parInstrSet;
   SonyPS2InstrSet::ProgCk &progCk = instrset->progCk;
   SonyPS2InstrSet::SampSetCk &sampSetCk = instrset->sampSetCk;
@@ -336,40 +336,40 @@ bool SonyPS2Instr::LoadInstr() {
       uint8_t noteHigh = splitblock.splitRangeHigh;
       if (noteHigh < noteLow)
         noteHigh = 0x7F;
-      uint8_t sampSetVelLow = Convert7bitPercentVolValToStdMidiVal(sampSetParam.velLimitLow);
-      uint8_t sampSetVelHigh = Convert7bitPercentVolValToStdMidiVal(sampSetParam.velLimitHigh);
-      uint8_t velLow = Convert7bitPercentVolValToStdMidiVal(sampParam.velRangeLow);//sampSetParam.velLimitLow;
-      uint8_t velHigh = Convert7bitPercentVolValToStdMidiVal(sampParam.velRangeHigh);//sampSetParam.velLimitHigh;
+      uint8_t sampSetVelLow = convert7bitPercentVolValToStdMidiVal(sampSetParam.velLimitLow);
+      uint8_t sampSetVelHigh = convert7bitPercentVolValToStdMidiVal(sampSetParam.velLimitHigh);
+      uint8_t velLow = convert7bitPercentVolValToStdMidiVal(sampParam.velRangeLow);//sampSetParam.velLimitLow;
+      uint8_t velHigh = convert7bitPercentVolValToStdMidiVal(sampParam.velRangeHigh);//sampSetParam.velLimitHigh;
       if (velLow < sampSetVelLow)
         velLow = sampSetVelLow;
       if (velHigh > sampSetVelHigh)
         velHigh = sampSetVelHigh;
 
       uint8_t unityNote = sampParam.sampleBaseNote;
-      VGMRgn *rgn = this->AddRgn(0, 0, sampNum, noteLow, noteHigh, velLow, velHigh);
+      VGMRgn *rgn = this->addRgn(0, 0, sampNum, noteLow, noteHigh, velLow, velHigh);
       rgn->unityKey = unityNote;
       //rgn->SetPan(sampParam.samplePanpot);
-      int16_t pan = 0x40 + ConvertPanVal(sampParam.samplePanpot) + ConvertPanVal(progParam.progPanpot) +
-          ConvertPanVal(splitblock.splitPanpot);
+      int16_t pan = 0x40 + convertPanValue(sampParam.samplePanpot) + convertPanValue(progParam.progPanpot) +
+          convertPanValue(splitblock.splitPanpot);
       if (pan > 0x7F) pan = 0x7F;
       if (pan < 0) pan = 0;
       //double realPan = (pan-0x40)* (1.0/(double)0x40);
-      rgn->SetPan((uint8_t) pan);
-      rgn->SetFineTune(splitblock.splitTranspose * 100 + splitblock.splitDetune);
+      rgn->setPan((uint8_t) pan);
+      rgn->setFineTune(splitblock.splitTranspose * 100 + splitblock.splitDetune);
 
       long vol = progParam.progVolume * splitblock.splitVolume * sampParam.sampleVolume;
       //we divide the above value by 127^3 to get the percent vol it represents.  Then we convert it to DB units.
       //0xA0000 = 1db in the DLS lScale val for atten (dls1 specs p30)
       double percentvol = vol / (double) (127 * 127 * 127);
-      rgn->SetVolume(percentvol);
-      PSXConvADSR(rgn, sampParam.sampleAdsr1, sampParam.sampleAdsr2, true);
+      rgn->setVolume(percentvol);
+      psxConvADSR(rgn, sampParam.sampleAdsr1, sampParam.sampleAdsr2, true);
       //splitblock->splitRangeLow
     }
   }
   return true;
 }
 
-int8_t SonyPS2Instr::ConvertPanVal(uint8_t panVal) {
+int8_t SonyPS2Instr::convertPanValue(uint8_t panVal) {
   // Actually, it may be C1 is center, but i don't care to fix that right now since
   // I have yet to see an occurence of >0x7F pan
   if (panVal > 0x7F)        //if it's > 0x7F, 0x80 == right, 0xBF center 0xFF left
@@ -385,11 +385,11 @@ int8_t SonyPS2Instr::ConvertPanVal(uint8_t panVal) {
 
 SonyPS2SampColl::SonyPS2SampColl(RawFile *rawfile, uint32_t offset, uint32_t length)
     : VGMSampColl(SonyPS2Format::name, rawfile, offset, length) {
-  this->LoadOnInstrMatch();
-  pRoot->AddVGMFile(this);
+  this->setShouldLoadOnInstrSetMatch(true);
+  pRoot->addVGMFile(this);
 }
 
-bool SonyPS2SampColl::GetSampleInfo() {
+bool SonyPS2SampColl::parseSampleInfo() {
   SonyPS2InstrSet *instrset = (SonyPS2InstrSet *) parInstrSet;
   if (!instrset)
     return false;
@@ -407,7 +407,7 @@ bool SonyPS2SampColl::GetSampleInfo() {
     // previous block as the last.  It is just a strange quirk found among PS1/PS2 games
     // It should be safe to just check test the first 4 bytes as these values would be inconceivable
     // in any other case  (especially as bit 4 of second byte signifies the loop start point).
-    uint32_t testWord = this->GetWordBE(offset + length - 16);
+    uint32_t testWord = this->readWordBE(offset + length - 16);
     if (testWord == 0x00077777)
       length -= 16;
 
@@ -421,7 +421,7 @@ bool SonyPS2SampColl::GetSampleInfo() {
     // Determine loop information from VAGInfo Param
     if (vagInfoParam.vagAttribute == SCEHD_VAG_1SHOT) {
       samp->SetLoopOnConversion(false);
-      samp->SetLoopStatus(0);
+      samp->setLoopStatus(0);
     }
     else if (vagInfoParam.vagAttribute == SCEHD_VAG_LOOP)
       samp->SetLoopOnConversion(true);

@@ -15,15 +15,15 @@ public:
   MP2kSeq(RawFile *file, uint32_t offset, std::string name = "MP2kSeq");
   ~MP2kSeq() = default;
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
 };
 
 class MP2kTrack final : public SeqTrack {
 public:
   MP2kTrack(MP2kSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
-  bool ReadEvent() override;
+  bool readEvent() override;
 
 private:
   uint8_t state = 0;

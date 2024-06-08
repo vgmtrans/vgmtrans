@@ -9,8 +9,8 @@
 
 class PandoraBoxSnesScanner : public VGMScanner {
  public:
-  virtual void Scan(RawFile *file, void *info = 0);
-  void SearchForPandoraBoxSnesFromARAM(RawFile *file);
+  virtual void scan(RawFile *file, void *info = 0);
+  void searchForPandoraBoxSnesFromARAM(RawFile *file);
 
  private:
   static BytePattern ptnLoadSeqKKO;

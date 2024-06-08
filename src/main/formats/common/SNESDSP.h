@@ -42,8 +42,8 @@ static unsigned const SDSP_COUNTER_RATES [32] =
 
 // Emulate GAIN envelope while (increase: env < env_to, or decrease: env > env_to)
 // return elapsed time in sample count, and final env value if requested.
-uint32_t EmulateSDSPGAIN (uint8_t gain, int16_t env_from, int16_t env_to, int16_t *env_after_ptr, double *sf2_envelope_time_ptr);
-void ConvertSNESADSR(uint8_t adsr1,
+uint32_t emulateSDSPGAIN (uint8_t gain, int16_t env_from, int16_t env_to, int16_t *env_after_ptr, double *sf2_envelope_time_ptr);
+void convertSNESADSR(uint8_t adsr1,
                      uint8_t adsr2,
                      uint8_t gain,
                      uint16_t env_from,
@@ -54,7 +54,7 @@ void ConvertSNESADSR(uint8_t adsr1,
                      double *ptr_release_time);
 
 template<class T>
-void SNESConvADSR(T *rgn, uint8_t adsr1, uint8_t adsr2, uint8_t gain) {
+void snesConvADSR(T *rgn, uint8_t adsr1, uint8_t adsr2, uint8_t gain) {
   bool adsr_enabled = (adsr1 & 0x80) != 0;
 
   if (adsr_enabled) {
@@ -64,7 +64,7 @@ void SNESConvADSR(T *rgn, uint8_t adsr1, uint8_t adsr2, uint8_t gain) {
     uint8_t sl = (adsr2 & 0xe0) >> 5;
     // uint8_t sr = adsr2 & 0x1f;
 
-    ConvertSNESADSR(adsr1,
+    convertSNESADSR(adsr1,
                     adsr2,
                     gain,
                     0x7ff,
@@ -83,7 +83,7 @@ void SNESConvADSR(T *rgn, uint8_t adsr1, uint8_t adsr2, uint8_t gain) {
       }
     }
     else if (rgn->sustain_time != -1) {
-      double decibelAtSustainStart = ConvertPercentAmplitudeToAttenDB(rgn->sustain_level);
+      double decibelAtSustainStart = convertPercentAmplitudeToAttenDB(rgn->sustain_level);
       double decayTimeRate = decibelAtSustainStart / -100.0;
       rgn->decay_time = (rgn->decay_time * decayTimeRate) + (rgn->sustain_time * (1.0 - decayTimeRate));
 
@@ -109,16 +109,16 @@ class SNESSampColl
   SNESSampColl(const std::string& format, VGMInstrSet* instrset, uint32_t offset, const std::vector<uint8_t>& targetSRCNs, std::string name = "SNESSampColl");
   ~SNESSampColl() override;
 
-  bool GetSampleInfo() override;
+  bool parseSampleInfo() override;
 
-  static bool IsValidSampleDir(const RawFile *file, uint32_t spcDirEntAddr, bool validateSample);
+  static bool isValidSampleDir(const RawFile *file, uint32_t spcDirEntAddr, bool validateSample);
 
  protected:
   VGMHeader *spcDirHeader{nullptr};
   uint32_t spcDirAddr;
   std::vector<uint8_t> targetSRCNs;
 
-  void SetDefaultTargets(uint32_t maxNumSamps);
+  void setDefaultTargets(uint32_t maxNumSamps);
 };
 
 // ********
@@ -132,13 +132,13 @@ class SNESSamp
            uint32_t dataLen, uint32_t loopOffset, std::string name = "BRR");
   ~SNESSamp() override;
 
-  static uint32_t GetSampleLength(const RawFile *file, uint32_t offset, bool &loop);
+  static uint32_t getSampleLength(const RawFile *file, uint32_t offset, bool &loop);
 
-  double GetCompressionRatio() override;
-  void ConvertToStdWave(uint8_t *buf) override;
+  double compressionRatio() override;
+  void convertToStdWave(uint8_t *buf) override;
 
  private:
-  static void DecompBRRBlk(int16_t *pSmp, const BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2);
+  static void decompBRRBlk(int16_t *pSmp, const BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2);
 
  private:
   uint32_t brrLoopOffset;

@@ -61,7 +61,7 @@ VolSlider::VolSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t 
 }
 
 void VolSlider::writeMessage(uint8_t value) const {
-  m_track->AddVolNoItem(value);
+  m_track->addVolNoItem(value);
 }
 
 MasterVolSlider::MasterVolSlider(SeqTrack *track,
@@ -73,7 +73,7 @@ MasterVolSlider::MasterVolSlider(SeqTrack *track,
 }
 
 void MasterVolSlider::writeMessage(uint8_t value) const {
-  m_track->AddMasterVolNoItem(value);
+  m_track->addMasterVolNoItem(value);
 }
 
 ExpressionSlider::ExpressionSlider(SeqTrack *track,
@@ -85,7 +85,7 @@ ExpressionSlider::ExpressionSlider(SeqTrack *track,
 }
 
 void ExpressionSlider::writeMessage(uint8_t value) const {
-  m_track->AddExpressionNoItem(value);
+  m_track->addExpressionNoItem(value);
 }
 
 PanSlider::PanSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue) :
@@ -93,5 +93,5 @@ PanSlider::PanSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t 
 }
 
 void PanSlider::writeMessage(uint8_t value) const {
-  m_track->AddPanNoItem(value);
+  m_track->addPanNoItem(value);
 }

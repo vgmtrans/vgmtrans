@@ -18,7 +18,7 @@ void SPCLoader::apply(const RawFile *file) {
   }
 
   if (!std::equal(file->begin(), file->begin() + 27, "SNES-SPC700 Sound File Data") ||
-      file->GetShort(0x21) != 0x1a1a) {
+      file->readShort(0x21) != 0x1a1a) {
     return;
   }
 
@@ -28,40 +28,40 @@ void SPCLoader::apply(const RawFile *file) {
   spcFile->tag.binaries["dsp"] = dsp;
 
   // Parse [ID666](http://vspcplay.raphnet.net/spc_file_format.txt) if available.
-  if (file->GetByte(0x23) == 0x1a) {
+  if (file->readByte(0x23) == 0x1a) {
     char s[256];
 
-    file->GetBytes(0x2e, 32, s);
+    file->readBytes(0x2e, 32, s);
     s[32] = '\0';
     std::string s_str = s;
     spcFile->tag.title = (s_str);
 
-    file->GetBytes(0x4e, 32, s);
+    file->readBytes(0x4e, 32, s);
     s[32] = '\0';
     s_str = s;
     spcFile->tag.album = (s_str);
 
-    file->GetBytes(0x7e, 32, s);
+    file->readBytes(0x7e, 32, s);
     s[32] = '\0';
     s_str = s;
     spcFile->tag.comment = (s_str);
 
-    if (file->GetByte(0xd2) < 0x30) {
+    if (file->readByte(0xd2) < 0x30) {
       // binary format
-      file->GetBytes(0xb0, 32, s);
+      file->readBytes(0xb0, 32, s);
       s[32] = '\0';
       s_str = s;
       spcFile->tag.artist = (s_str);
 
-      spcFile->tag.length = file->GetWord(0xa9) & 0xffffff;
+      spcFile->tag.length = file->readWord(0xa9) & 0xffffff;
     } else {
       // text format
-      file->GetBytes(0xb1, 32, s);
+      file->readBytes(0xb1, 32, s);
       s[32] = '\0';
       s_str = s;
       spcFile->tag.artist = (s_str);
 
-      file->GetBytes(0xa9, 3, s);
+      file->readBytes(0xa9, 3, s);
       s[3] = '\0';
       spcFile->tag.length = strtoul(s, nullptr, 10);
     }
@@ -69,14 +69,14 @@ void SPCLoader::apply(const RawFile *file) {
 
   // Parse Extended ID666 if available
   if (file->size() >= 0x10208) {
-    uint32_t xid6_end_offset = 0x10208 + file->GetWord(0x10204);
+    uint32_t xid6_end_offset = 0x10208 + file->readWord(0x10204);
     if (std::equal(file->begin() + 0x10200, file->begin() + 0x10204, "xid6") &&
         file->size() >= xid6_end_offset) {
       uint32_t xid6_offset = 0x10208;
       while (xid6_offset + 4 < xid6_end_offset) {
-        uint8_t xid6_id = file->GetByte(xid6_offset);
-        uint8_t xid6_type = file->GetByte(xid6_offset + 1);
-        uint16_t xid6_data = file->GetByte(xid6_offset + 2);
+        uint8_t xid6_id = file->readByte(xid6_offset);
+        uint8_t xid6_type = file->readByte(xid6_offset + 1);
+        uint16_t xid6_data = file->readByte(xid6_offset + 2);
 
         // get the length of this field
         uint16_t xid6_length;

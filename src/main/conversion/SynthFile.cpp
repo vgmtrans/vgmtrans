@@ -18,22 +18,22 @@ SynthFile::SynthFile(std::string synth_name)
     : m_name(std::move(synth_name)) {}
 
 SynthFile::~SynthFile() {
-  DeleteVect(vInstrs);
-  DeleteVect(vWaves);
+  deleteVect(vInstrs);
+  deleteVect(vWaves);
 }
 
-SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, float reverb) {
+SynthInstr *SynthFile::addInstr(uint32_t bank, uint32_t instrNum, float reverb) {
   auto str = fmt::format("Instr bnk {} num {}", bank, instrNum);
   vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str, reverb));
   return vInstrs.back();
 }
 
-SynthInstr *SynthFile::AddInstr(uint32_t bank, uint32_t instrNum, std::string name, float reverb) {
+SynthInstr *SynthFile::addInstr(uint32_t bank, uint32_t instrNum, std::string name, float reverb) {
   vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, std::move(name), reverb));
   return vInstrs.back();
 }
 
-SynthWave *SynthFile::AddWave(uint16_t formatTag,
+SynthWave *SynthFile::addWave(uint16_t formatTag,
                               uint16_t channels,
                               int samplesPerSec,
                               int aveBytesPerSec,
@@ -79,15 +79,15 @@ SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName
 }
 
 SynthInstr::~SynthInstr() {
-  DeleteVect(vRgns);
+  deleteVect(vRgns);
 }
 
-SynthRgn *SynthInstr::AddRgn() {
+SynthRgn *SynthInstr::addRgn() {
   vRgns.insert(vRgns.end(), new SynthRgn());
   return vRgns.back();
 }
 
-SynthRgn *SynthInstr::AddRgn(const SynthRgn& rgn) {
+SynthRgn *SynthInstr::addRgn(const SynthRgn& rgn) {
   SynthRgn *newRgn = new SynthRgn();
   *newRgn = rgn;
   vRgns.insert(vRgns.end(), newRgn);
@@ -103,24 +103,24 @@ SynthRgn::~SynthRgn() {
   delete art;
 }
 
-SynthArt *SynthRgn::AddArt() {
+SynthArt *SynthRgn::addArt() {
   art = new SynthArt();
   return art;
 }
 
-SynthSampInfo *SynthRgn::AddSampInfo() {
+SynthSampInfo *SynthRgn::addSampInfo() {
   sampinfo = new SynthSampInfo();
   return sampinfo;
 }
 
-void SynthRgn::SetRanges(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh) {
+void SynthRgn::setRanges(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh) {
   usKeyLow = keyLow;
   usKeyHigh = keyHigh;
   usVelLow = velLow;
   usVelHigh = velHigh;
 }
 
-void SynthRgn::SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex) {
+void SynthRgn::setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex) {
   fusOptions = options;
   usPhaseGroup = phaseGroup;
   channel = theChannel;
@@ -135,7 +135,7 @@ SynthArt::~SynthArt() {
   //DeleteVect(vConnBlocks);
 }
 
-void SynthArt::AddADSR(double attack, Transform atk_transform, double hold, double decay,
+void SynthArt::addADSR(double attack, Transform atk_transform, double hold, double decay,
                        double sustain_level, double sustain, double release, Transform rls_transform) {
   this->attack_time = attack;
   this->attack_transform = atk_transform;
@@ -147,7 +147,7 @@ void SynthArt::AddADSR(double attack, Transform atk_transform, double hold, doub
   this->release_transform = rls_transform;
 }
 
-void SynthArt::AddPan(double thePan) {
+void SynthArt::addPan(double thePan) {
   this->pan = thePan;
 }
 
@@ -155,9 +155,9 @@ void SynthArt::AddPan(double thePan) {
 //  SynthSampInfo
 //  *************
 
-void SynthSampInfo::SetLoopInfo(Loop &loop, VGMSamp *samp) {
+void SynthSampInfo::setLoopInfo(Loop &loop, VGMSamp *samp) {
   const int origFormatBytesPerSamp = samp->bps / 8;
-  double compressionRatio = samp->GetCompressionRatio();
+  double compressionRatio = samp->compressionRatio();
 
   // If the sample loops, but the loop length is 0, then assume the length should
   // extend to the end of the sample.
@@ -174,7 +174,7 @@ void SynthSampInfo::SetLoopInfo(Loop &loop, VGMSamp *samp) {
                    : loop.loopLength;
 }
 
-void SynthSampInfo::SetPitchInfo(uint16_t unityNote, short fineTune, double atten) {
+void SynthSampInfo::setPitchInfo(uint16_t unityNote, short fineTune, double atten) {
   usUnityNote = unityNote;
   sFineTune = fineTune;
   attenuation = atten;
@@ -184,7 +184,7 @@ void SynthSampInfo::SetPitchInfo(uint16_t unityNote, short fineTune, double atte
 //  SynthWave
 //  *********
 
-void SynthWave::ConvertTo16bitSigned() {
+void SynthWave::convertTo16bitSigned() {
   if (wBitsPerSample == 8) {
     this->wBitsPerSample = 16;
     this->wBlockAlign = 16 / 8 * this->wChannels;
@@ -204,7 +204,7 @@ SynthWave::~SynthWave() {
   delete[] data;
 }
 
-SynthSampInfo *SynthWave::AddSampInfo() {
+SynthSampInfo *SynthWave::addSampInfo() {
   sampinfo = new SynthSampInfo();
   return sampinfo;
 }

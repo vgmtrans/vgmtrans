@@ -18,11 +18,11 @@ VGMSeqSection::VGMSeqSection(VGMMultiSectionSeq *parentFile,
       parentSeq(parentFile) {
 }
 
-bool VGMSeqSection::Load() {
+bool VGMSeqSection::load() {
   ReadMode readMode = parentSeq->readMode;
 
   if (readMode == READMODE_ADD_TO_UI) {
-    if (!GetTrackPointers()) {
+    if (!parseTrackPointers()) {
       return false;
     }
   }
@@ -30,11 +30,11 @@ bool VGMSeqSection::Load() {
   return true;
 }
 
-bool VGMSeqSection::GetTrackPointers() {
+bool VGMSeqSection::parseTrackPointers() {
   return true;
 }
 
-bool VGMSeqSection::PostLoad() {
+bool VGMSeqSection::postLoad() {
   if (parentSeq->readMode == READMODE_ADD_TO_UI) {
     for (const auto track : aTracks) {
       track->sortChildrenByOffset();

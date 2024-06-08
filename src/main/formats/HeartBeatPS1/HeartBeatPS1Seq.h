@@ -12,9 +12,9 @@ class HeartBeatPS1Seq:
   HeartBeatPS1Seq(RawFile *file, uint32_t offset, uint32_t length = 0, const std::string &name = "HeartBeatPS1Seq");
   ~HeartBeatPS1Seq() override;
 
-  bool GetHeaderInfo() override;
-  void ResetVars() override;
-  bool ReadEvent() override;
+  bool parseHeader() override;
+  void resetVars() override;
+  bool readEvent() override;
 
  private:
   uint8_t key;

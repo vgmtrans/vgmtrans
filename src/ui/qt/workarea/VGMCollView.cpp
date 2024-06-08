@@ -165,7 +165,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   m_listview->setSelectionRectVisible(true);
   m_listview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMColl, this, &VGMCollView::removeVGMColl);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl, this, &VGMCollView::removeVGMColl);
   connect(m_listview, &QListView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
   connect(m_listview->selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollView::handleSelectionChanged);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMCollView::onVGMFileSelected);

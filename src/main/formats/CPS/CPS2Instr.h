@@ -157,7 +157,7 @@ public:
   CPSArticTable(RawFile *file, std::string name, uint32_t offset, uint32_t length);
   ~CPSArticTable() override;
 
-  bool LoadMain() override;
+  bool loadMain() override;
 
 public:
   qs_artic_info *artics{};
@@ -184,7 +184,7 @@ class CPS2SampleInfoTable
 public:
   CPS2SampleInfoTable(RawFile *file, std::string name, uint32_t offset, uint32_t length = 0);
 
-  bool LoadMain() override;
+  bool loadMain() override;
 };
 
 class CPS3SampleInfoTable
@@ -192,7 +192,7 @@ class CPS3SampleInfoTable
 public:
   CPS3SampleInfoTable(RawFile *file, std::string name, uint32_t offset, uint32_t length = 0);
 
-  bool LoadMain() override;
+  bool loadMain() override;
 };
 
 // **************
@@ -210,8 +210,8 @@ public:
               std::string name);
   ~CPS2InstrSet() override = default;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
 public:
   CPSFormatVer fmt_version{VER_UNDEFINED};
@@ -234,9 +234,9 @@ public:
            uint32_t theInstrNum,
            std::string name);
   ~CPS2Instr() override = default;
-  bool LoadInstr() override;
+  bool loadInstr() override;
 protected:
-  CPSFormatVer GetFormatVer() const { return (static_cast<CPS2InstrSet*>(parInstrSet))->fmt_version; }
+  CPSFormatVer formatVersion() const { return (static_cast<CPS2InstrSet*>(parInstrSet))->fmt_version; }
 
 protected:
   uint8_t attack_rate{};
@@ -258,8 +258,8 @@ class CPS2SampColl
 public:
   CPS2SampColl(RawFile *file, CPS2InstrSet *instrset, CPSSampleInfoTable *sampinfotable, uint32_t offset,
               uint32_t length = 0, std::string name = std::string("QSound Sample Collection"));
-  bool GetHeaderInfo() override;
-  bool GetSampleInfo() override;
+  bool parseHeader() override;
+  bool parseSampleInfo() override;
 
 private:
   CPS2InstrSet *instrset;

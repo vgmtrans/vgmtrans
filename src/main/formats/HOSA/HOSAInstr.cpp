@@ -32,15 +32,15 @@ HOSAInstrSet::~HOSAInstrSet(void) {
 //	Memo:
 //		VGMInstrSet::Load()関数から呼ばれる
 //==============================================================
-bool HOSAInstrSet::GetHeaderInfo() {
+bool HOSAInstrSet::parseHeader() {
 
   //"hdr"構造体へそのまま転送
-  GetBytes(dwOffset, sizeof(InstrHeader), &instrheader);
+  readBytes(dwOffset, sizeof(InstrHeader), &instrheader);
   setId(0);                        //Bank number.
 
   //ヘッダーobjectの生成
   VGMHeader *wdsHeader = addHeader(dwOffset, sizeof(InstrHeader));
-  wdsHeader->AddSig(dwOffset, 8);
+  wdsHeader->addSig(dwOffset, 8);
   wdsHeader->addChild(dwOffset + 8, sizeof(uint32_t), "Number of Instruments");
 
   //波形objectの生成
@@ -57,13 +57,13 @@ bool HOSAInstrSet::GetHeaderInfo() {
 //	Memo:
 //		VGMInstrSet::Load()関数から呼ばれる
 //==============================================================
-bool HOSAInstrSet::GetInstrPointers() {
+bool HOSAInstrSet::parseInstrPointers() {
 
   uint32_t iOffset = dwOffset + sizeof(InstrHeader);    //pointer of attribute table
 
   //音色数だけ繰り返す。
   for (unsigned int i = 0; i < instrheader.numInstr; i++) {
-    HOSAInstr *newInstr = new HOSAInstr(this, dwOffset + GetWord(iOffset), 0, i / 0x80, i % 0x80);
+    HOSAInstr *newInstr = new HOSAInstr(this, dwOffset + readWord(iOffset), 0, i / 0x80, i % 0x80);
     aInstrs.push_back(newInstr);
     iOffset += 4;
   }
@@ -89,19 +89,19 @@ HOSAInstr::HOSAInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, ui
 //==============================================================
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
-bool HOSAInstr::LoadInstr() {
-  if (dwOffset + sizeof(InstrInfo) > vgmFile()->GetEndOffset()) {
+bool HOSAInstr::loadInstr() {
+  if (dwOffset + sizeof(InstrInfo) > vgmFile()->endOffset()) {
     return false;
   }
 
   // Get the instr data
-  GetBytes(dwOffset, sizeof(InstrInfo), &instrinfo);
+  readBytes(dwOffset, sizeof(InstrInfo), &instrinfo);
   unLength = sizeof(InstrInfo) + sizeof(RgnInfo) * instrinfo.numRgns;
   addChild(dwOffset, sizeof(uint32_t), "Number of Rgns");
 
   // Get the rgn data
   rgns = new RgnInfo[instrinfo.numRgns];
-  GetBytes((dwOffset + sizeof(InstrInfo)), (sizeof(RgnInfo) * instrinfo.numRgns), rgns);
+  readBytes((dwOffset + sizeof(InstrInfo)), (sizeof(RgnInfo) * instrinfo.numRgns), rgns);
 
   //ATLTRACE("LOADED INSTR   ProgNum: %X    BankNum: %X\n", instrinfo.progNum, instrinfo.bankNum);
 
@@ -116,10 +116,10 @@ bool HOSAInstr::LoadInstr() {
     rgn->velLow = 0x00;
     rgn->velHigh = 0x7F;
     rgn->keyLow = cKeyLow;
-    rgn->AddKeyHigh(rgninfo->note_range_high, rgn->dwOffset + 0x05);
+    rgn->addKeyHigh(rgninfo->note_range_high, rgn->dwOffset + 0x05);
     cKeyLow = (rgninfo->note_range_high) + 1;
 
-    rgn->AddUnityKey(static_cast<int8_t>(0x3C)+ 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset + 0x06);
+    rgn->addUnityKey(static_cast<int8_t>(0x3C)+ 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset + 0x06);
     rgn->addChild(rgn->dwOffset + 0x07, 1, "Semi Tone Tune");
     rgn->fineTune = static_cast<int16_t>(rgninfo->iFineTune * (100.0 / 256.0));
 
@@ -139,12 +139,12 @@ bool HOSAInstr::LoadInstr() {
     uint8_t Rr = (rgninfo->ADSR_vals >> 4) & 0x1F;
     uint8_t Sl = rgninfo->ADSR_vals & 0xF;
     uint8_t Am = (((rgninfo->ADSR_Am & 0xF) ^ 5) < 1) ? 1 : 0;    //Not sure what other role this nibble plays, if any.
-    PSXConvADSR(rgn, Am, Ar, Dr, Sl, 1, 1, Sr, 1, Rr, false);
+    psxConvADSR(rgn, Am, Ar, Dr, Sl, 1, 1, Sr, 1, Rr, false);
 
     // Unsure if volume is using a linear scale, but it sounds like it.
     double vol = rgninfo->volume / 255.0;
-    rgn->SetVolume(vol);
-    AddRgn(rgn);
+    rgn->setVolume(vol);
+    addRgn(rgn);
   }
   return true;
 }

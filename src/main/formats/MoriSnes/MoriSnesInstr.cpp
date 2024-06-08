@@ -25,11 +25,11 @@ MoriSnesInstrSet::MoriSnesInstrSet(RawFile *file,
 
 MoriSnesInstrSet::~MoriSnesInstrSet() {}
 
-bool MoriSnesInstrSet::GetHeaderInfo() {
+bool MoriSnesInstrSet::parseHeader() {
   return true;
 }
 
-bool MoriSnesInstrSet::GetInstrPointers() {
+bool MoriSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
 
   if (instrumentAddresses.size() == 0) {
@@ -89,7 +89,7 @@ bool MoriSnesInstrSet::GetInstrPointers() {
         continue;
       }
 
-      uint8_t srcn = GetByte(rgnAddress);
+      uint8_t srcn = readByte(rgnAddress);
       std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
       if (itrSRCN == usedSRCNs.end()) {
         usedSRCNs.push_back(srcn);
@@ -104,7 +104,7 @@ bool MoriSnesInstrSet::GetInstrPointers() {
           continue;
         }
 
-        uint8_t srcn = GetByte(rgnAddress);
+        uint8_t srcn = readByte(rgnAddress);
         std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
         if (itrSRCN == usedSRCNs.end()) {
           usedSRCNs.push_back(srcn);
@@ -124,7 +124,7 @@ bool MoriSnesInstrSet::GetInstrPointers() {
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
   SNESSampColl *newSampColl = new SNESSampColl(MoriSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->LoadVGMFile()) {
+  if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
   }
@@ -150,12 +150,12 @@ MoriSnesInstr::MoriSnesInstr(VGMInstrSet *instrSet,
 MoriSnesInstr::~MoriSnesInstr() {
 }
 
-bool MoriSnesInstr::LoadInstr() {
+bool MoriSnesInstr::loadInstr() {
   addChild(dwOffset, 1, "Melody/Percussion");
 
   if (!instrHintDir.percussion) {
     MoriSnesInstrHint *instrHint = &instrHintDir.instrHint;
-    uint8_t srcn = GetByte(instrHint->rgnAddress);
+    uint8_t srcn = readByte(instrHint->rgnAddress);
 
     uint32_t offDirEnt = spcDirAddr + (srcn * 4);
     if (offDirEnt + 4 > 0x10000) {
@@ -164,15 +164,15 @@ bool MoriSnesInstr::LoadInstr() {
 
     addChild(instrHint->seqAddress, instrHint->seqSize, "Envelope Sequence");
 
-    uint16_t addrSampStart = GetShort(offDirEnt);
+    uint16_t addrSampStart = readShort(offDirEnt);
     MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint);
     rgn->sampOffset = addrSampStart - spcDirAddr;
-    AddRgn(rgn);
+    addRgn(rgn);
   }
   else {
     for (uint8_t percNoteKey = 0; percNoteKey < instrHintDir.percHints.size(); percNoteKey++) {
       MoriSnesInstrHint *instrHint = &instrHintDir.percHints[percNoteKey];
-      uint8_t srcn = GetByte(instrHint->rgnAddress);
+      uint8_t srcn = readByte(instrHint->rgnAddress);
 
       uint32_t offDirEnt = spcDirAddr + (srcn * 4);
       if (offDirEnt + 4 > 0x10000) {
@@ -185,10 +185,10 @@ bool MoriSnesInstr::LoadInstr() {
       auto seqName = fmt::format("Envelope Sequence {}", percNoteKey);
       addChild(instrHint->seqAddress, instrHint->seqSize, seqName);
 
-      uint16_t addrSampStart = GetShort(offDirEnt);
+      uint16_t addrSampStart = readShort(offDirEnt);
       MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);
       rgn->sampOffset = addrSampStart - spcDirAddr;
-      AddRgn(rgn);
+      addRgn(rgn);
     }
   }
 
@@ -209,13 +209,13 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
   uint16_t rgnAddress = instrHint.rgnAddress;
   uint16_t curOffset = rgnAddress;
 
-  uint8_t srcn = GetByte(curOffset++);
-  uint8_t adsr1 = GetByte(curOffset++);
-  uint8_t adsr2 = GetByte(curOffset++);
-  uint8_t gain = GetByte(curOffset++);
-  uint8_t keyOffDelay = GetByte(curOffset++);
-  int8_t key = GetByte(curOffset++);
-  uint8_t tuning = GetByte(curOffset++);
+  uint8_t srcn = readByte(curOffset++);
+  uint8_t adsr1 = readByte(curOffset++);
+  uint8_t adsr2 = readByte(curOffset++);
+  uint8_t gain = readByte(curOffset++);
+  uint8_t keyOffDelay = readByte(curOffset++);
+  int8_t key = readByte(curOffset++);
+  uint8_t tuning = readByte(curOffset++);
 
   double fine_tuning;
   double coarse_tuning;
@@ -232,13 +232,13 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
     fine_tuning += 1.0;
   }
 
-  AddSampNum(srcn, rgnAddress, 1);
+  addSampNum(srcn, rgnAddress, 1);
   addChild(rgnAddress + 1, 1, "ADSR1");
   addChild(rgnAddress + 2, 1, "ADSR2");
   addChild(rgnAddress + 3, 1, "GAIN");
   addChild(rgnAddress + 4, 1, "Key-Off Delay");
-  AddUnityKey(72 - (int) (coarse_tuning), rgnAddress + 5, 1);
-  AddFineTune((int16_t) (fine_tuning * 100.0), rgnAddress + 6, 1);
+  addUnityKey(72 - (int) (coarse_tuning), rgnAddress + 5, 1);
+  addFineTune((int16_t) (fine_tuning * 100.0), rgnAddress + 6, 1);
   if (instrHint.pan > 0) {
     pan = instrHint.pan / 32.0;
   }
@@ -255,11 +255,11 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
     keyLow = percNoteKey;
     keyHigh = percNoteKey;
   }
-  SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
+  snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
 MoriSnesRgn::~MoriSnesRgn() {}
 
-bool MoriSnesRgn::LoadRgn() {
+bool MoriSnesRgn::loadRgn() {
   return true;
 }

@@ -322,34 +322,34 @@ BytePattern AkaoSnesScanner::ptnReadPercussionTableV4(
   ,
   24);
 
-void AkaoSnesScanner::Scan(RawFile* file, void* /*info*/) {
+void AkaoSnesScanner::scan(RawFile* file, void* /*info*/) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForAkaoSnesFromARAM(file);
+    searchForAkaoSnesFromARAM(file);
   } else {
     // Search from ROM unimplemented
   }
 }
 
-void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
+void AkaoSnesScanner::searchForAkaoSnesFromARAM(RawFile *file) {
   AkaoSnesVersion version;
   AkaoSnesMinorVersion minorVersion = AKAOSNES_NOMINORVERSION;
-  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
+  std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search for note length table
   uint32_t ofsReadNoteLength;
   uint16_t addrNoteLengthTable;
   AkaoSnesVersion verReadNoteLength;
-  if (file->SearchBytePattern(ptnReadNoteLengthV4, ofsReadNoteLength)) {
-    addrNoteLengthTable = file->GetShort(ofsReadNoteLength + 6);
+  if (file->searchBytePattern(ptnReadNoteLengthV4, ofsReadNoteLength)) {
+    addrNoteLengthTable = file->readShort(ofsReadNoteLength + 6);
     verReadNoteLength = AKAOSNES_V4;
   }
-  else if (file->SearchBytePattern(ptnReadNoteLengthV2, ofsReadNoteLength)) {
-    addrNoteLengthTable = file->GetShort(ofsReadNoteLength + 8);
+  else if (file->searchBytePattern(ptnReadNoteLengthV2, ofsReadNoteLength)) {
+    addrNoteLengthTable = file->readShort(ofsReadNoteLength + 8);
     verReadNoteLength = AKAOSNES_V2;
   }
-  else if (file->SearchBytePattern(ptnReadNoteLengthV1, ofsReadNoteLength)) {
-    addrNoteLengthTable = file->GetShort(ofsReadNoteLength + 8);
+  else if (file->searchBytePattern(ptnReadNoteLengthV1, ofsReadNoteLength)) {
+    addrNoteLengthTable = file->readShort(ofsReadNoteLength + 8);
     verReadNoteLength = AKAOSNES_V1;
   }
   else {
@@ -361,15 +361,15 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
   uint8_t firstVCmd;
   uint16_t addrVCmdAddressTable;
   uint16_t addrVCmdLengthTable;
-  if (file->SearchBytePattern(ptnVCmdExecRS3, ofsVCmdExec)) {
-    firstVCmd = file->GetByte(ofsVCmdExec + 1);
-    addrVCmdAddressTable = file->GetShort(ofsVCmdExec + 11);
-    addrVCmdLengthTable = file->GetShort(ofsVCmdExec + 17);
+  if (file->searchBytePattern(ptnVCmdExecRS3, ofsVCmdExec)) {
+    firstVCmd = file->readByte(ofsVCmdExec + 1);
+    addrVCmdAddressTable = file->readShort(ofsVCmdExec + 11);
+    addrVCmdLengthTable = file->readShort(ofsVCmdExec + 17);
   }
-  else if (file->SearchBytePattern(ptnVCmdExecFF4, ofsVCmdExec)) {
-    firstVCmd = file->GetByte(ofsVCmdExec + 1);
-    addrVCmdAddressTable = file->GetShort(ofsVCmdExec + 9);
-    addrVCmdLengthTable = file->GetShort(ofsVCmdExec + 16);
+  else if (file->searchBytePattern(ptnVCmdExecFF4, ofsVCmdExec)) {
+    firstVCmd = file->readByte(ofsVCmdExec + 1);
+    addrVCmdAddressTable = file->readShort(ofsVCmdExec + 9);
+    addrVCmdLengthTable = file->readShort(ofsVCmdExec + 16);
   }
   else {
     return;
@@ -380,24 +380,24 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
   uint16_t addrSeqHeader;
   uint16_t addrAPURelocBase;
   bool relocatable;
-  if (file->SearchBytePattern(ptnReadSeqHeaderV4, ofsReadSeqHeader)) {
-    addrSeqHeader = file->GetShort(ofsReadSeqHeader + 1);
-    addrAPURelocBase = (file->GetByte(ofsReadSeqHeader + 13) << 8) | file->GetByte(ofsReadSeqHeader + 11);
+  if (file->searchBytePattern(ptnReadSeqHeaderV4, ofsReadSeqHeader)) {
+    addrSeqHeader = file->readShort(ofsReadSeqHeader + 1);
+    addrAPURelocBase = (file->readByte(ofsReadSeqHeader + 13) << 8) | file->readByte(ofsReadSeqHeader + 11);
     relocatable = true;
   }
-  else if (file->SearchBytePattern(ptnReadSeqHeaderFFMQ, ofsReadSeqHeader)) {
-    addrSeqHeader = file->GetShort(ofsReadSeqHeader + 3) + 1; // don't miss +1
-    addrAPURelocBase = (file->GetByte(ofsReadSeqHeader + 13) << 8) | file->GetByte(ofsReadSeqHeader + 11);
+  else if (file->searchBytePattern(ptnReadSeqHeaderFFMQ, ofsReadSeqHeader)) {
+    addrSeqHeader = file->readShort(ofsReadSeqHeader + 3) + 1; // don't miss +1
+    addrAPURelocBase = (file->readByte(ofsReadSeqHeader + 13) << 8) | file->readByte(ofsReadSeqHeader + 11);
     relocatable = true;
     minorVersion = AKAOSNES_V3_FFMQ;
   }
-  else if (file->SearchBytePattern(ptnReadSeqHeaderV2, ofsReadSeqHeader)) {
-    addrSeqHeader = file->GetShort(ofsReadSeqHeader + 18);
+  else if (file->searchBytePattern(ptnReadSeqHeaderV2, ofsReadSeqHeader)) {
+    addrSeqHeader = file->readShort(ofsReadSeqHeader + 18);
     addrAPURelocBase = addrSeqHeader;
     relocatable = false;
   }
-  else if (file->SearchBytePattern(ptnReadSeqHeaderV1, ofsReadSeqHeader)) {
-    addrSeqHeader = file->GetShort(ofsReadSeqHeader + 7);
+  else if (file->searchBytePattern(ptnReadSeqHeaderV1, ofsReadSeqHeader)) {
+    addrSeqHeader = file->readShort(ofsReadSeqHeader + 7);
     addrAPURelocBase = addrSeqHeader;
     relocatable = false;
   }
@@ -478,30 +478,30 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
       0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00,
       0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01,
       0x02, 0x01, 0x02, 0x01, 0x03, 0x02, 0x01, 0x01, 0x01, 0x03, 0x00, 0x00, 0x01, 0x00, 0x00};
-  if (file->MatchBytes(FF4_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FF4_VCMD_LEN_TABLE))) {
+  if (file->matchBytes(FF4_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FF4_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V1_FF4;
   }
-  else if (file->MatchBytes(RS1_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(RS1_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(RS1_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(RS1_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V2_RS1;
   }
-  else if (file->MatchBytes(FF5_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FF5_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(FF5_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FF5_VCMD_LEN_TABLE))) {
     if (minorVersion != AKAOSNES_V3_FFMQ) {
       minorVersion = AKAOSNES_V3_FF5;
     }
   }
-  else if (file->MatchBytes(SD2_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(SD2_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(SD2_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(SD2_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V3_SD2;
   }
-  else if (file->MatchBytes(RS2_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(RS2_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(RS2_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(RS2_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V4_RS2;
   }
-  else if (file->MatchBytes(LAL_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(LAL_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(LAL_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(LAL_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V4_LAL;
   }
-  else if (file->MatchBytes(FF6_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FF6_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(FF6_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FF6_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V4_FF6;
   }
-  else if (file->MatchBytes(FM_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FM_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(FM_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(FM_VCMD_LEN_TABLE))) {
     //; Chrono Trigger SPC
     //1cf6: 28 0f     and   a,#$0f
     //1cf8: c4 7b     mov   $7b,a
@@ -513,38 +513,38 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
         ,
         5);
 
-    uint16_t addrVCmdF9 = file->GetShort(addrVCmdAddressTable + 53 * 2);
-    if (file->MatchBytePattern(ptnVCmdF9CT, addrVCmdF9)) {
+    uint16_t addrVCmdF9 = file->readShort(addrVCmdAddressTable + 53 * 2);
+    if (file->matchBytePattern(ptnVCmdF9CT, addrVCmdF9)) {
       minorVersion = AKAOSNES_V4_CT;
     }
     else {
       minorVersion = AKAOSNES_V4_FM;
     }
   }
-  else if (file->MatchBytes(RS3_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(RS3_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(RS3_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(RS3_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V4_RS3;
   }
-  else if (file->MatchBytes(GH_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(GH_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(GH_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(GH_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V4_GH;
   }
-  else if (file->MatchBytes(BSGAME_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(BSGAME_VCMD_LEN_TABLE))) {
+  else if (file->matchBytes(BSGAME_VCMD_LEN_TABLE, addrVCmdLengthTable, sizeof(BSGAME_VCMD_LEN_TABLE))) {
     minorVersion = AKAOSNES_V4_BSGAME;
   }
 
   // load sequence
   AkaoSnesSeq *newSeq = new AkaoSnesSeq(file, version, minorVersion, addrSeqHeader, addrAPURelocBase, name);
-  if (!newSeq->LoadVGMFile()) {
+  if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }
 
   uint32_t ofsLoadDIR;
   uint16_t spcDirAddr;
-  if (file->SearchBytePattern(ptnLoadDIRV1, ofsLoadDIR)) {
-    spcDirAddr = file->GetByte(ofsLoadDIR + 1) << 8;
+  if (file->searchBytePattern(ptnLoadDIRV1, ofsLoadDIR)) {
+    spcDirAddr = file->readByte(ofsLoadDIR + 1) << 8;
   }
-  else if (file->SearchBytePattern(ptnLoadDIRV3, ofsLoadDIR)) {
-    spcDirAddr = file->GetByte(ofsLoadDIR + 3) << 8;
+  else if (file->searchBytePattern(ptnLoadDIRV3, ofsLoadDIR)) {
+    spcDirAddr = file->readByte(ofsLoadDIR + 3) << 8;
   }
   else {
     return;
@@ -554,26 +554,26 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
   uint16_t addrTuningTable;
   uint16_t addrADSRTable;
   uint16_t addrPercussionTable;
-  if (version == AKAOSNES_V1 && file->SearchBytePattern(ptnLoadInstrV1, ofsLoadInstr)) {
-    addrTuningTable = file->GetShort(ofsLoadInstr + 5);
+  if (version == AKAOSNES_V1 && file->searchBytePattern(ptnLoadInstrV1, ofsLoadInstr)) {
+    addrTuningTable = file->readShort(ofsLoadInstr + 5);
     addrADSRTable = 0; // N/A
   }
-  else if (version == AKAOSNES_V2 && file->SearchBytePattern(ptnLoadInstrV2, ofsLoadInstr)) {
-    addrTuningTable = file->GetShort(ofsLoadInstr + 4);
-    addrADSRTable = file->GetShort(ofsLoadInstr + 34);
+  else if (version == AKAOSNES_V2 && file->searchBytePattern(ptnLoadInstrV2, ofsLoadInstr)) {
+    addrTuningTable = file->readShort(ofsLoadInstr + 4);
+    addrADSRTable = file->readShort(ofsLoadInstr + 34);
   }
-  else if (file->SearchBytePattern(ptnLoadInstrV3, ofsLoadInstr)) {
-    addrTuningTable = file->GetShort(ofsLoadInstr + 3);
-    addrADSRTable = file->GetShort(ofsLoadInstr + 15);
+  else if (file->searchBytePattern(ptnLoadInstrV3, ofsLoadInstr)) {
+    addrTuningTable = file->readShort(ofsLoadInstr + 3);
+    addrADSRTable = file->readShort(ofsLoadInstr + 15);
   }
   else {
     return;
   }
 
   uint32_t ofsReadPercussionTable;
-  if (file->SearchBytePattern(ptnReadPercussionTableV4, ofsReadPercussionTable))
+  if (file->searchBytePattern(ptnReadPercussionTableV4, ofsReadPercussionTable))
   {
-    addrPercussionTable = file->GetShort(ofsReadPercussionTable + 19);
+    addrPercussionTable = file->readShort(ofsReadPercussionTable + 19);
   }
   else
   {
@@ -581,7 +581,7 @@ void AkaoSnesScanner::SearchForAkaoSnesFromARAM(RawFile *file) {
   }
 
   AkaoSnesInstrSet *newInstrSet = new AkaoSnesInstrSet(file, version, spcDirAddr, addrTuningTable, addrADSRTable, addrPercussionTable);
-  if (!newInstrSet->LoadVGMFile()) {
+  if (!newInstrSet->loadVGMFile()) {
     delete newInstrSet;
     return;
   }

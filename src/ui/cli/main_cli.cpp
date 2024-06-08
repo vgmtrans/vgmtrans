@@ -21,13 +21,13 @@ int main(int argc, char *argv[]) {
   for(int i = 1; i < argc; ++i) {
     string s(argv[i]);
     if ((s == "-h") || (s == "--help")) {
-      cliroot.DisplayHelp();
+      cliroot.displayHelp();
       return EXIT_SUCCESS;
     }
     else if (s == "-o") {
       if (i == argc - 1) {
         cerr << "Error: expected output directory" << endl;
-        cliroot.DisplayUsage();
+        cliroot.displayUsage();
         return EXIT_FAILURE;
       }
       else {
@@ -41,8 +41,8 @@ int main(int argc, char *argv[]) {
 
   bool success = false;
 
-  if (cliroot.Init()) {
-    if (cliroot.ExportAllCollections()) {
+  if (cliroot.init()) {
+    if (cliroot.exportAllCollections()) {
       success = true;
     }
   }

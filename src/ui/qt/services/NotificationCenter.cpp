@@ -25,7 +25,7 @@ void NotificationCenter::updateStatusForItem(VGMItem* item) {
   QString description = QString::fromStdString(item->description());
 
   QString formattedName = QString{"<b>%1</b>"}.arg(name);
-  QIcon icon = iconForItemType(item->GetIcon());
+  QIcon icon = iconForItemType(item->icon());
 
   emit statusUpdated(formattedName, description, &icon, item->dwOffset, item->unLength);
 }

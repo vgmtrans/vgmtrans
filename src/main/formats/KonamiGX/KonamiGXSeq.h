@@ -7,10 +7,10 @@ class KonamiGXSeq:
     public VGMSeq {
  public:
   KonamiGXSeq(RawFile *file, uint32_t offset);
-  virtual ~KonamiGXSeq(void);
+  virtual ~KonamiGXSeq();
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
+  virtual bool parseHeader();
+  virtual bool parseTrackPointers();
   //bool LoadTracks(void);
 
  protected:
@@ -23,7 +23,7 @@ class KonamiGXTrack
  public:
   KonamiGXTrack(KonamiGXSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
-  virtual bool ReadEvent(void);
+  virtual bool readEvent(void);
 
  private:
   bool bInJump;

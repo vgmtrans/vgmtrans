@@ -19,10 +19,10 @@ class KonamiSnesInstrSet:
                      uint32_t percInstrOffset,
                      uint32_t spcDirAddr,
                      const std::string &name = "KonamiSnesInstrSet");
-  virtual ~KonamiSnesInstrSet(void);
+  virtual ~KonamiSnesInstrSet();
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  virtual bool parseHeader();
+  virtual bool parseInstrPointers();
 
   KonamiSnesVersion version;
 
@@ -49,13 +49,13 @@ class KonamiSnesInstr
                   uint32_t spcDirAddr,
                   bool percussion,
                   const std::string &name = "KonamiSnesInstr");
-  virtual ~KonamiSnesInstr(void);
+  virtual ~KonamiSnesInstr();
 
-  virtual bool LoadInstr();
+  virtual bool loadInstr();
 
-  static bool IsValidHeader
+  static bool isValidHeader
       (RawFile *file, KonamiSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
-  static uint32_t ExpectedSize(KonamiSnesVersion version);
+  static uint32_t expectedSize(KonamiSnesVersion version);
 
   KonamiSnesVersion version;
 
@@ -72,9 +72,9 @@ class KonamiSnesRgn
     : public VGMRgn {
  public:
   KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint32_t offset, bool percussion);
-  virtual ~KonamiSnesRgn(void);
+  virtual ~KonamiSnesRgn();
 
-  virtual bool LoadRgn();
+  virtual bool loadRgn();
 
   KonamiSnesVersion version;
 };

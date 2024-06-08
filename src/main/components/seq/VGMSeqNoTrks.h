@@ -16,14 +16,14 @@ public:
 public:
   ~VGMSeqNoTrks() override;
 
-  void ResetVars() override;
+  void resetVars() override;
 
-  using VGMSeq::GetBytes;
-  using VGMSeq::GetByte;
-  using VGMSeq::GetShort;
-  using VGMSeq::GetWord;
-  using VGMSeq::GetShortBE;
-  using VGMSeq::GetWordBE;
+  using VGMSeq::readBytes;
+  using VGMSeq::readByte;
+  using VGMSeq::readShort;
+  using VGMSeq::readWord;
+  using VGMSeq::readShortBE;
+  using VGMSeq::readWordBE;
   inline uint32_t &offset() { return VGMSeq::dwOffset; }
   inline uint32_t &length() { return VGMSeq::unLength; }
   inline std::string name() { return VGMSeq::name(); }
@@ -33,22 +33,22 @@ public:
   inline uint32_t &eventsOffset() { return dwEventsOffset; }
 
   // this function must be called in GetHeaderInfo or before LoadEvents is called
-  inline void SetEventsOffset(uint32_t offset) {
+  inline void setEventsOffset(uint32_t offset) {
     dwEventsOffset = offset;
     if (SeqTrack::readMode == READMODE_ADD_TO_UI) {
       SeqTrack::dwOffset = offset;
     }
   }
 
-  virtual void AddTime(uint32_t delta);
+  virtual void addTime(uint32_t delta);
 
-  void SetCurTrack(uint32_t trackNum);
-  void TryExpandMidiTracks(uint32_t numTracks);
+  void setCurTrack(uint32_t trackNum);
+  void tryExpandMidiTracks(uint32_t numTracks);
 
-  bool LoadMain() override;  // Function to load all the information about the sequence
-  virtual bool LoadEvents(long stopTime = 1000000);
-  MidiFile *ConvertToMidi() override;
-  MidiTrack *GetFirstMidiTrack() override;
+  bool loadMain() override;  // Function to load all the information about the sequence
+  virtual bool loadEvents(long stopTime = 1000000);
+  MidiFile *convertToMidi() override;
+  MidiTrack *firstMidiTrack() override;
 
   uint32_t dwEventsOffset;
 

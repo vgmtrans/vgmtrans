@@ -20,8 +20,8 @@ class HeartBeatSnesInstrSet:
                         const std::string &name = "HeartBeatSnesInstrSet");
   ~HeartBeatSnesInstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
   HeartBeatSnesVersion version;
 
@@ -50,7 +50,7 @@ class HeartBeatSnesInstr
                      const std::string &name = "HeartBeatSnesInstr");
   ~HeartBeatSnesInstr() override;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
   HeartBeatSnesVersion version;
 
@@ -70,7 +70,7 @@ class HeartBeatSnesRgn
   HeartBeatSnesRgn(HeartBeatSnesInstr *instr, HeartBeatSnesVersion ver, uint32_t offset);
   ~HeartBeatSnesRgn() override;
 
-  bool LoadRgn() override;
+  bool loadRgn() override;
 
   HeartBeatSnesVersion version;
 };

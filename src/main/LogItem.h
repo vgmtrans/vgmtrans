@@ -6,16 +6,18 @@ enum LogLevel { LOG_LEVEL_ERR, LOG_LEVEL_WARN, LOG_LEVEL_INFO, LOG_LEVEL_DEBUG }
 
 class LogItem {
  public:
-  LogItem(const std::string &text, LogLevel level, const std::string &source);
+  LogItem(const std::string &text, LogLevel level, const std::string &source) :
+      m_text(text),
+      m_source(source),
+      m_level(level) {
+  }
 
-  std::string GetText() const;
-  const char* GetCText() const;
-  LogLevel GetLogLevel() const;
-  std::string GetSource() const;
-  const char* GetCSource() const;
+  const std::string& text() const { return m_text; };
+  LogLevel logLevel() const { return m_level; }
+  const std::string& source() const { return m_source; };
 
- protected:
-  std::string text;
-  std::string source;
-  LogLevel level;
+ private:
+  std::string m_text;
+  std::string m_source;
+  LogLevel m_level;
 };

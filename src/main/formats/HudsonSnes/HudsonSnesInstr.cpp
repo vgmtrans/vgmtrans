@@ -28,21 +28,21 @@ HudsonSnesInstrSet::HudsonSnesInstrSet(RawFile *file,
 HudsonSnesInstrSet::~HudsonSnesInstrSet() {
 }
 
-bool HudsonSnesInstrSet::GetHeaderInfo() {
+bool HudsonSnesInstrSet::parseHeader() {
   return true;
 }
 
-bool HudsonSnesInstrSet::GetInstrPointers() {
+bool HudsonSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
   for (uint8_t instrNum = 0; instrNum < unLength / 4; instrNum++) {
     uint32_t ofsInstrEntry = dwOffset + (instrNum * 4);
     if (ofsInstrEntry + 4 > 0x10000) {
       break;
     }
-    uint8_t srcn = GetByte(ofsInstrEntry);
+    uint8_t srcn = readByte(ofsInstrEntry);
 
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
+    if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
@@ -64,7 +64,7 @@ bool HudsonSnesInstrSet::GetInstrPointers() {
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
   SNESSampColl *newSampColl = new SNESSampColl(HudsonSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->LoadVGMFile()) {
+  if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
   }
@@ -91,15 +91,15 @@ HudsonSnesInstr::HudsonSnesInstr(VGMInstrSet *instrSet,
 HudsonSnesInstr::~HudsonSnesInstr() {
 }
 
-bool HudsonSnesInstr::LoadInstr() {
-  uint8_t srcn = GetByte(dwOffset);
+bool HudsonSnesInstr::loadInstr() {
+  uint8_t srcn = readByte(dwOffset);
 
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = GetShort(offDirEnt);
+  uint16_t addrSampStart = readShort(offDirEnt);
 
   uint32_t ofsTuningEnt = addrSampTuningTable + srcn * 4;
   if (ofsTuningEnt + 4 > 0x10000) {
@@ -108,7 +108,7 @@ bool HudsonSnesInstr::LoadInstr() {
 
   HudsonSnesRgn *rgn = new HudsonSnesRgn(this, version, dwOffset, ofsTuningEnt);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  AddRgn(rgn);
+  addRgn(rgn);
 
   return true;
 }
@@ -124,9 +124,9 @@ HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
     VGMRgn(instr, offset, 4),
     version(ver) {
 //  uint8_t srcn = GetByte(dwOffset);
-  uint8_t adsr1 = GetByte(dwOffset + 1);
-  uint8_t adsr2 = GetByte(dwOffset + 2);
-  uint8_t gain = GetByte(dwOffset + 3);
+  uint8_t adsr1 = readByte(dwOffset + 1);
+  uint8_t adsr2 = readByte(dwOffset + 2);
+  uint8_t gain = readByte(dwOffset + 3);
 
   addChild(dwOffset, 1, "SRCN");
   addChild(dwOffset + 1, 1, "ADSR(1)");
@@ -134,12 +134,12 @@ HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
   addChild(dwOffset + 3, 1, "GAIN");
 
   const double pitch_fixer = 4286.0 / 4096.0;  // from pitch table ($10be vs $1000)
-  const double pitch_scale = GetShortBE(addrTuningEntry) / 256.0;
+  const double pitch_scale = getShortBE(addrTuningEntry) / 256.0;
   double coarse_tuning;
   double fine_tuning = modf((log(pitch_scale * pitch_fixer) / log(2.0)) * 12.0, &coarse_tuning);
 
-  const int8_t coarse_tuning_byte = GetByte(addrTuningEntry + 2);
-  const int8_t fine_tuning_byte = GetByte(addrTuningEntry + 3);
+  const int8_t coarse_tuning_byte = readByte(addrTuningEntry + 2);
+  const int8_t fine_tuning_byte = readByte(addrTuningEntry + 3);
   coarse_tuning += coarse_tuning_byte;
   fine_tuning += fine_tuning_byte / 256.0;
 
@@ -160,12 +160,12 @@ HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
   addChild(addrTuningEntry, 2, "Pitch Multiplier");
   addChild(addrTuningEntry + 2, 1, "Coarse Tune");
   addChild(addrTuningEntry + 3, 1, "Fine Tune");
-  SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
+  snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
 HudsonSnesRgn::~HudsonSnesRgn() {
 }
 
-bool HudsonSnesRgn::LoadRgn() {
+bool HudsonSnesRgn::loadRgn() {
   return true;
 }

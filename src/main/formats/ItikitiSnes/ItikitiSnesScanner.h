@@ -10,10 +10,10 @@
 
 class ItikitiSnesScanner: public VGMScanner {
  public:
-  void Scan(RawFile *file, void *info) override;
-  static void ScanFromApuRam(RawFile *file);
-  static void ScanFromRom(RawFile *file);
+  void scan(RawFile *file, void *info) override;
+  static void scanFromApuRam(RawFile *file);
+  static void scanFromRom(RawFile *file);
 
  private:
-  static bool ScanSongHeader(RawFile *file, uint32_t &song_header_offset);
+  static bool scanSongHeader(RawFile *file, uint32_t &song_header_offset);
 };

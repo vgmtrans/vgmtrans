@@ -123,32 +123,32 @@ BytePattern PrismSnesScanner::ptnLoadInstrTuning(
 	,
 	22);
 
-void PrismSnesScanner::Scan(RawFile *file, void *info) {
+void PrismSnesScanner::scan(RawFile *file, void *info) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForPrismSnesFromARAM(file);
+    searchForPrismSnesFromARAM(file);
   } else {
     // Search from ROM unimplemented
   }
 }
 
-void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
+void PrismSnesScanner::searchForPrismSnesFromARAM(RawFile *file) {
   PrismSnesVersion version = PRISMSNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
+  std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song list
   uint32_t ofsLoadSeq;
   uint16_t addrSeqList;
-  if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-    addrSeqList = file->GetShort(ofsLoadSeq + 1);
+  if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
+    addrSeqList = file->readShort(ofsLoadSeq + 1);
   } else {
     return;
   }
 
   uint32_t ofsExecVCmd;
   uint16_t addrVoiceCmdAddressTable;
-  if (file->SearchBytePattern(ptnExecVCmd, ofsExecVCmd)) {
-    addrVoiceCmdAddressTable = file->GetShort(ofsExecVCmd + 18);
+  if (file->searchBytePattern(ptnExecVCmd, ofsExecVCmd)) {
+    addrVoiceCmdAddressTable = file->readShort(ofsExecVCmd + 18);
     if (addrVoiceCmdAddressTable + (2 * 0x40) > 0x10000) {
       return;
     }
@@ -157,10 +157,10 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
   }
 
   // detect engine version
-  if (file->GetShort(addrVoiceCmdAddressTable) == file->GetShort(addrVoiceCmdAddressTable + 32)) {
+  if (file->readShort(addrVoiceCmdAddressTable) == file->readShort(addrVoiceCmdAddressTable + 32)) {
     version = PRISMSNES_CGV;
-  } else if (file->GetShort(addrVoiceCmdAddressTable) ==
-               file->GetShort(addrVoiceCmdAddressTable + 10)) {
+  } else if (file->readShort(addrVoiceCmdAddressTable) ==
+               file->readShort(addrVoiceCmdAddressTable + 10)) {
     version = PRISMSNES_DO;
   } else {
     version = PRISMSNES_DO2;
@@ -170,21 +170,21 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
   int8_t songIndex = 0;
 
   uint32_t addrSeqHeaderPtr = addrSeqList + (songIndex * 2);
-  uint32_t addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
+  uint32_t addrSeqHeader = file->readShort(addrSeqHeaderPtr);
   PrismSnesSeq *newSeq = new PrismSnesSeq(file, version, addrSeqHeader, name);
-  if (!newSeq->LoadVGMFile()) {
+  if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }
 
   uint32_t ofsSetDSPd;
   uint16_t spcDirAddr;
-  if (file->SearchBytePattern(ptnSetDSPd, ofsSetDSPd)) {
-    uint16_t addrDspRegTabled = file->GetByte(ofsSetDSPd + 3) | (file->GetByte(ofsSetDSPd + 1) << 8);
+  if (file->searchBytePattern(ptnSetDSPd, ofsSetDSPd)) {
+    uint16_t addrDspRegTabled = file->readByte(ofsSetDSPd + 3) | (file->readByte(ofsSetDSPd + 1) << 8);
     if (addrDspRegTabled + 8 > 0x10000) {
       return;
     }
-    spcDirAddr = file->GetByte(addrDspRegTabled + 5) << 8;
+    spcDirAddr = file->readByte(addrDspRegTabled + 5) << 8;
   } else {
     return;
   }
@@ -192,9 +192,9 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
   uint32_t ofsLoadInstr;
   uint16_t addrADSR1Table;
   uint16_t addrADSR2Table;
-  if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
-    addrADSR1Table = file->GetShort(ofsLoadInstr + 11);
-    addrADSR2Table = file->GetShort(ofsLoadInstr + 17);
+  if (file->searchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
+    addrADSR1Table = file->readShort(ofsLoadInstr + 11);
+    addrADSR2Table = file->readShort(ofsLoadInstr + 17);
   } else {
     return;
   }
@@ -202,16 +202,16 @@ void PrismSnesScanner::SearchForPrismSnesFromARAM(RawFile *file) {
   uint32_t ofsLoadInstrTuning;
   uint16_t adsrTuningTableHigh;
   uint16_t adsrTuningTableLow;
-  if (file->SearchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
-    adsrTuningTableHigh = file->GetShort(ofsLoadInstrTuning + 3);
-    adsrTuningTableLow = file->GetShort(ofsLoadInstrTuning + 11);
+  if (file->searchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
+    adsrTuningTableHigh = file->readShort(ofsLoadInstrTuning + 3);
+    adsrTuningTableLow = file->readShort(ofsLoadInstrTuning + 11);
   } else {
     return;
   }
 
   PrismSnesInstrSet *newInstrSet = new PrismSnesInstrSet(
     file, version, spcDirAddr, addrADSR1Table, addrADSR2Table, adsrTuningTableHigh, adsrTuningTableLow);
-  if (!newInstrSet->LoadVGMFile()) {
+  if (!newInstrSet->loadVGMFile()) {
     delete newInstrSet;
     return;
   }

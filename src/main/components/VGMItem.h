@@ -89,15 +89,15 @@ public:
   [[nodiscard]] VGMFile* vgmFile() const { return m_vgmfile; }
   [[nodiscard]] RawFile* rawFile() const;
 
-  virtual bool IsItemAtOffset(uint32_t offset, bool matchStartOffset = false);
-  VGMItem* GetItemFromOffset(uint32_t offset, bool matchStartOffset = false);
+  virtual bool isItemAtOffset(uint32_t offset, bool matchStartOffset = false);
+  VGMItem* getItemAtOffset(uint32_t offset, bool matchStartOffset = false);
 
-  virtual uint32_t GuessLength();
-  virtual void SetGuessedLength();
+  virtual uint32_t guessLength();
+  virtual void setGuessedLength();
   virtual std::string description() { return ""; }
-  [[nodiscard]] virtual ItemType GetType() const { return ITEMTYPE_UNDEFINED; }
-  virtual Icon GetIcon() { return ICON_BINARY; }
-  virtual void AddToUI(VGMItem *parent, void *UI_specific);
+  [[nodiscard]] virtual ItemType type() const { return ITEMTYPE_UNDEFINED; }
+  virtual Icon icon() { return ICON_BINARY; }
+  virtual void addToUI(VGMItem *parent, void *UI_specific);
 
   const std::vector<VGMItem*>& children() { return m_children; }
   VGMItem* addChild(VGMItem* child);
@@ -114,13 +114,13 @@ public:
   void sortChildrenByOffset();
 
 protected:
-  uint32_t GetBytes(uint32_t index, uint32_t count, void *buffer) const;
-  [[nodiscard]] uint8_t GetByte(uint32_t offset) const;
-  [[nodiscard]] uint16_t GetShort(uint32_t offset) const;
-  [[nodiscard]] uint32_t GetWord(uint32_t offset) const;
-  [[nodiscard]] uint16_t GetShortBE(uint32_t offset) const;
-  [[nodiscard]] uint32_t GetWordBE(uint32_t offset) const;
-  bool IsValidOffset(uint32_t offset) const;
+  uint32_t readBytes(uint32_t index, uint32_t count, void *buffer) const;
+  [[nodiscard]] uint8_t readByte(uint32_t offset) const;
+  [[nodiscard]] uint16_t readShort(uint32_t offset) const;
+  [[nodiscard]] uint32_t getWord(uint32_t offset) const;
+  [[nodiscard]] uint16_t getShortBE(uint32_t offset) const;
+  [[nodiscard]] uint32_t getWordBE(uint32_t offset) const;
+  bool isValidOffset(uint32_t offset) const;
   // FIXME: clearChildren() is a workaround for VGMSeqNoTrks' multiple inheritance diamond problem
   void clearChildren() { m_children.clear(); }
 

@@ -64,7 +64,7 @@ typedef struct _VAGBlk {
 
 
 //InitADSR is shamelessly ripped from P.E.Op.S
-static void InitADSR()
+static void initADSR()
 {
   // build the rate table according to Neill's rules
   memset(RateTable, 0, sizeof(unsigned long) * 160);
@@ -90,23 +90,23 @@ static void InitADSR()
   }
 }
 
-inline int RoundToZero(int val) {
+inline int roundToZero(int val) {
   if (val < 0)
     val = 0;
   return val;
 }
 
-inline constexpr uint16_t ComposePSXADSR1(uint8_t am, uint8_t ar, uint8_t dr, uint8_t sl) {
+inline constexpr uint16_t composePSXADSR1(uint8_t am, uint8_t ar, uint8_t dr, uint8_t sl) {
   return ((am & 1) << 15) | ((ar & 0x7f) << 8) | ((dr & 0xf) << 4) | (sl & 0x0f);
 }
 
-inline constexpr uint16_t ComposePSXADSR2(uint8_t sm, uint8_t sd, uint8_t sr, uint8_t rm,
+inline constexpr uint16_t composePSXADSR2(uint8_t sm, uint8_t sd, uint8_t sr, uint8_t rm,
                                          uint8_t rr) {
   return ((sm & 1) << 15) | ((sd & 1) << 14) | ((sr & 0x7f) << 6) | ((rm & 1) << 5) | (rr & 0x1f);
 }
 
 template<class T>
-void PSXConvADSR(T *realADSR, unsigned short ADSR1, unsigned short ADSR2, bool bPS2) {
+void psxConvADSR(T *realADSR, unsigned short ADSR1, unsigned short ADSR2, bool bPS2) {
 
   uint8_t Am = (ADSR1 & 0x8000) >> 15;    // if 1, then Exponential, else linear
   uint8_t Ar = (ADSR1 & 0x7F00) >> 8;
@@ -120,12 +120,12 @@ void PSXConvADSR(T *realADSR, unsigned short ADSR1, unsigned short ADSR2, bool b
   uint8_t Sd = (ADSR2 & 0x4000) >> 14;
   uint8_t Sr = (ADSR2 >> 6) & 0x7F;
 
-  PSXConvADSR(realADSR, Am, Ar, Dr, Sl, Sm, Sd, Sr, Rm, Rr, bPS2);
+  psxConvADSR(realADSR, Am, Ar, Dr, Sl, Sm, Sd, Sr, Rm, Rr, bPS2);
 }
 
 
 template<class T>
-void PSXConvADSR(T *realADSR,
+void psxConvADSR(T *realADSR,
                  uint8_t Am, uint8_t Ar, uint8_t Dr, uint8_t Sl,
                  uint8_t Sm, uint8_t Sd, uint8_t Sr, uint8_t Rm, uint8_t Rr, bool bPS2) {
   // Make sure all the ADSR values are within the valid ranges
@@ -152,7 +152,7 @@ void PSXConvADSR(T *realADSR,
   int l;
 
   if (!bRateTableInitialized) {
-    InitADSR();
+    initADSR();
     bRateTableInitialized = true;
   }
 
@@ -167,13 +167,13 @@ void PSXConvADSR(T *realADSR,
     Ar = 0;
   // if linear Ar Mode
   if (Am == 0) {
-    uint32_t rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x10) + 32];
+    uint32_t rate = RateTable[roundToZero((Ar ^ 0x7F) - 0x10) + 32];
     samples = ceil(0x7FFFFFFF / static_cast<double>(rate));
   } else if (Am == 1) {
-    uint32_t rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x10) + 32];
+    uint32_t rate = RateTable[roundToZero((Ar ^ 0x7F) - 0x10) + 32];
     samples = 0x60000000 / rate;
     uint32_t remainder = 0x60000000 % rate;
-    rate = RateTable[RoundToZero((Ar ^ 0x7F) - 0x18) + 32];
+    rate = RateTable[roundToZero((Ar ^ 0x7F) - 0x18) + 32];
     samples += ceil(fmax(0, 0x1FFFFFFF - remainder) / static_cast<double>(rate));
   }
   realADSR->attack_time = samples / sampleRate;
@@ -190,14 +190,14 @@ void PSXConvADSR(T *realADSR,
     if (4 * (Dr ^ 0x1F) < 0x18)
       Dr = 0;
     switch ((envelope_level>>28)&0x7) {
-      case 0: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+0 ) +  32]; break;
-      case 1: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+4 ) +  32]; break;
-      case 2: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+6 ) +  32]; break;
-      case 3: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+8 ) +  32]; break;
-      case 4: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+9 ) +  32]; break;
-      case 5: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+10) + 32]; break;
-      case 6: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+11) + 32]; break;
-      case 7: envelope_level -= RateTable[RoundToZero( (4*(Dr^0x1F))-0x18+12) + 32]; break;
+      case 0: envelope_level -= RateTable[roundToZero( (4*(Dr^0x1F))-0x18+0 ) +  32]; break;
+      case 1: envelope_level -= RateTable[roundToZero( (4*(Dr^0x1F))-0x18+4 ) +  32]; break;
+      case 2: envelope_level -= RateTable[roundToZero( (4*(Dr^0x1F))-0x18+6 ) +  32]; break;
+      case 3: envelope_level -= RateTable[roundToZero( (4*(Dr^0x1F))-0x18+8 ) +  32]; break;
+      case 4: envelope_level -= RateTable[roundToZero( (4*(Dr^0x1F))-0x18+9 ) +  32]; break;
+      case 5: envelope_level -= RateTable[roundToZero( (4*(Dr^0x1F))-0x18+10) + 32]; break;
+      case 6: envelope_level -= RateTable[roundToZero( (4*(Dr^0x1F))-0x18+11) + 32]; break;
+      case 7: envelope_level -= RateTable[roundToZero( (4*(Dr^0x1F))-0x18+12) + 32]; break;
       default: break;
     }
     if (!bSustainLevFound && ((envelope_level >> 27) & 0xF) <= Sl) {
@@ -220,7 +220,7 @@ void PSXConvADSR(T *realADSR,
     else {
       // linear
       if (Sm == 0) {
-        uint32_t rate = RateTable[RoundToZero((Sr ^ 0x7F) - 0x0F) + 32];
+        uint32_t rate = RateTable[roundToZero((Sr ^ 0x7F) - 0x0F) + 32];
         samples = ceil(0x7FFFFFFF / static_cast<double>(rate));
       } else {
         l = 0;
@@ -230,14 +230,14 @@ void PSXConvADSR(T *realADSR,
           long envelope_level_target{0};
 
           switch ((envelope_level >> 28) & 0x7) {
-            case 0: envelope_level_target = 0x00000000; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+0 ) +  32]; break;
-            case 1: envelope_level_target = 0x0fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+4 ) +  32]; break;
-            case 2: envelope_level_target = 0x1fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+6 ) +  32]; break;
-            case 3: envelope_level_target = 0x2fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+8 ) +  32]; break;
-            case 4: envelope_level_target = 0x3fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+9 ) +  32]; break;
-            case 5: envelope_level_target = 0x4fffffff; envelope_level_diff = RateTable[RoundToZero( (Sr^0x7F)-0x1B+10) + 32]; break;
-            case 6: envelope_level_target = 0x5fffffff; envelope_level_diff = RateTable[RoundToZero((Sr ^ 0x7F) - 0x1B + 11) + 32]; break;
-            case 7: envelope_level_target = 0x6fffffff; envelope_level_diff = RateTable[RoundToZero((Sr ^ 0x7F) - 0x1B + 12) + 32]; break;
+            case 0: envelope_level_target = 0x00000000; envelope_level_diff = RateTable[roundToZero( (Sr^0x7F)-0x1B+0 ) +  32]; break;
+            case 1: envelope_level_target = 0x0fffffff; envelope_level_diff = RateTable[roundToZero( (Sr^0x7F)-0x1B+4 ) +  32]; break;
+            case 2: envelope_level_target = 0x1fffffff; envelope_level_diff = RateTable[roundToZero( (Sr^0x7F)-0x1B+6 ) +  32]; break;
+            case 3: envelope_level_target = 0x2fffffff; envelope_level_diff = RateTable[roundToZero( (Sr^0x7F)-0x1B+8 ) +  32]; break;
+            case 4: envelope_level_target = 0x3fffffff; envelope_level_diff = RateTable[roundToZero( (Sr^0x7F)-0x1B+9 ) +  32]; break;
+            case 5: envelope_level_target = 0x4fffffff; envelope_level_diff = RateTable[roundToZero( (Sr^0x7F)-0x1B+10) + 32]; break;
+            case 6: envelope_level_target = 0x5fffffff; envelope_level_diff = RateTable[roundToZero((Sr ^ 0x7F) - 0x1B + 11) + 32]; break;
+            case 7: envelope_level_target = 0x6fffffff; envelope_level_diff = RateTable[roundToZero((Sr ^ 0x7F) - 0x1B + 12) + 32]; break;
             default: break;
           }
 
@@ -248,7 +248,7 @@ void PSXConvADSR(T *realADSR,
         samples = l;
       }
       double timeInSecs = samples / sampleRate;
-      realADSR->sustain_time = /*Sm ? timeInSecs : */LinAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
+      realADSR->sustain_time = /*Sm ? timeInSecs : */linearAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
     }
   }
 
@@ -275,7 +275,7 @@ void PSXConvADSR(T *realADSR,
 
   // if linear Rr Mode
   if (Rm == 0) {
-    uint32_t rate = RateTable[RoundToZero((4 * (Rr ^ 0x1F)) - 0x0C) + 32];
+    uint32_t rate = RateTable[roundToZero((4 * (Rr ^ 0x1F)) - 0x0C) + 32];
 
     if (rate != 0)
       samples = ceil(static_cast<double>(envelope_level) / rate);
@@ -286,14 +286,14 @@ void PSXConvADSR(T *realADSR,
       Rr = 0;
     for (l = 0; envelope_level > 0; l++) {
       switch ((envelope_level >> 28) & 0x7) {
-        case 0: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+0 ) +  32]; break;
-        case 1: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+4 ) +  32]; break;
-        case 2: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+6 ) +  32]; break;
-        case 3: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+8 ) +  32]; break;
-        case 4: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+9 ) +  32]; break;
-        case 5: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+10) + 32]; break;
-        case 6: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+11) + 32]; break;
-        case 7: envelope_level -= RateTable[RoundToZero( (4*(Rr^0x1F))-0x18+12) + 32]; break;
+        case 0: envelope_level -= RateTable[roundToZero( (4*(Rr^0x1F))-0x18+0 ) +  32]; break;
+        case 1: envelope_level -= RateTable[roundToZero( (4*(Rr^0x1F))-0x18+4 ) +  32]; break;
+        case 2: envelope_level -= RateTable[roundToZero( (4*(Rr^0x1F))-0x18+6 ) +  32]; break;
+        case 3: envelope_level -= RateTable[roundToZero( (4*(Rr^0x1F))-0x18+8 ) +  32]; break;
+        case 4: envelope_level -= RateTable[roundToZero( (4*(Rr^0x1F))-0x18+9 ) +  32]; break;
+        case 5: envelope_level -= RateTable[roundToZero( (4*(Rr^0x1F))-0x18+10) + 32]; break;
+        case 6: envelope_level -= RateTable[roundToZero( (4*(Rr^0x1F))-0x18+11) + 32]; break;
+        case 7: envelope_level -= RateTable[roundToZero( (4*(Rr^0x1F))-0x18+12) + 32]; break;
         default: break;
       }
     }
@@ -306,7 +306,7 @@ void PSXConvADSR(T *realADSR,
   //if (Rm == 0) // if it's linear
   //	timeInSecs *=  LINEAR_RELEASE_COMPENSATION;
 
-  realADSR->release_time = /*Rm ? timeInSecs : */LinAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
+  realADSR->release_time = /*Rm ? timeInSecs : */linearAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
 
   // We need to compensate the decay and release times to represent them as the time from full vol to -100db
   // where the drop in db is a fixed amount per time unit (SoundFont2 spec for vol envelopes, pg44.)
@@ -332,9 +332,9 @@ class PSXSampColl : public VGMSampColl {
               uint32_t length,
               const std::vector<SizeOffsetPair> &vagLocations);
 
-  bool GetSampleInfo() override;        //retrieve sample info, including pointers to data, # channels, rate, etc.
-  static PSXSampColl *SearchForPSXADPCM(RawFile *file, const std::string &format);
-  static std::vector<PSXSampColl *> SearchForPSXADPCMs(RawFile *file, const std::string &format);
+  bool parseSampleInfo() override;        //retrieve sample info, including pointers to data, # channels, rate, etc.
+  static PSXSampColl *searchForPSXADPCM(RawFile *file, const std::string &format);
+  static std::vector<PSXSampColl *> searchForPSXADPCMs(RawFile *file, const std::string &format);
 
  protected:
   std::vector<SizeOffsetPair> vagLocations;
@@ -349,14 +349,14 @@ class PSXSamp : public VGMSamp {
 
   // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion
-  double GetCompressionRatio() override;
-  void ConvertToStdWave(uint8_t *buf) override;
+  double compressionRatio() override;
+  void convertToStdWave(uint8_t *buf) override;
   void SetLoopOnConversion(bool bDoIt) { bSetLoopOnConversion = bDoIt; }
 
-  static uint32_t GetSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop);
+  static uint32_t getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop);
 
  private:
-  static void DecompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, f32 *prev1, f32 *prev2);
+  static void decompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, f32 *prev1, f32 *prev2);
 
  public:
   bool bSetLoopOnConversion{false};

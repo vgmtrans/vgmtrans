@@ -15,14 +15,14 @@ MidiFile::MidiFile(VGMSeq *theAssocSeq)
       globalTrack(this, false),
       globalTranspose(0),
       bMonophonicTracks(false) {
-  this->bMonophonicTracks = assocSeq->bMonophonicTracks;
+  this->bMonophonicTracks = assocSeq->usesMonophonicTracks();
   this->globalTrack.bMonophonic = this->bMonophonicTracks;
 
-  this->ppqn = assocSeq->ppqn;
+  this->ppqn = assocSeq->ppqn();
 }
 
 MidiFile::~MidiFile() {
-  DeleteVect<MidiTrack>(aTracks);
+  deleteVect<MidiTrack>(aTracks);
 }
 
 MidiTrack *MidiFile::AddTrack() {
@@ -70,7 +70,7 @@ void MidiFile::Sort() {
 bool MidiFile::SaveMidiFile(const std::string &filepath) {
   std::vector<uint8_t> midiBuf;
   WriteMidiToBuffer(midiBuf);
-  return pRoot->UI_WriteBufferToFile(filepath, &midiBuf[0], midiBuf.size());
+  return pRoot->UI_writeBufferToFile(filepath, &midiBuf[0], midiBuf.size());
 }
 
 void MidiFile::WriteMidiToBuffer(std::vector<uint8_t> &buf) {
@@ -118,7 +118,7 @@ MidiTrack::MidiTrack(MidiFile *theParentSeq, bool monophonic)
       bSustain(false) {}
 
 MidiTrack::~MidiTrack() {
-  DeleteVect<MidiEvent>(aEvents);
+  deleteVect<MidiEvent>(aEvents);
 }
 
 void MidiTrack::Sort() {
@@ -402,15 +402,17 @@ void MidiTrack::InsertPitchBend(uint8_t channel, int16_t bend, uint32_t absTime)
   aEvents.push_back(new PitchBendEvent(this, channel, absTime, bend));
 }
 
-void MidiTrack::AddPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t cents) {
-  InsertPitchBendRange(channel, semitones, cents, GetDelta());
+void MidiTrack::AddPitchBendRange(uint8_t channel, uint16_t cents) {
+  InsertPitchBendRange(channel, cents, GetDelta());
 }
 
-void MidiTrack::InsertPitchBendRange(uint8_t channel, uint8_t semitones, uint8_t cents, uint32_t absTime) {
+void MidiTrack::InsertPitchBendRange(uint8_t channel, uint16_t cents, uint32_t absTime) {
+  uint8_t semitones = cents / 100;
+  uint8_t finetune_cents = cents % 100;
   // We push the LSB controller event first as somee virtual instruments only react upon receiving MSB
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 0, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, cents, PRIORITY_HIGHER - 1));
+  aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, finetune_cents, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, semitones, PRIORITY_HIGHER - 1));
 }
 

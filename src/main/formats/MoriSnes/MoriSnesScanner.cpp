@@ -44,24 +44,24 @@ BytePattern MoriSnesScanner::ptnSetDIR(
 	,
 	6);
 
-void MoriSnesScanner::Scan(RawFile *file, void *info) {
+void MoriSnesScanner::scan(RawFile *file, void *info) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForMoriSnesFromARAM(file);
+    searchForMoriSnesFromARAM(file);
   } else {
     // Search from ROM unimplemented
   }
 }
 
-void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
+void MoriSnesScanner::searchForMoriSnesFromARAM(RawFile *file) {
   MoriSnesVersion version = MORISNES_NONE;
-  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
+  std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // scan for song list table
   uint32_t ofsLoadSeq;
   uint16_t addrSongList;
-  if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-    addrSongList = file->GetShort(ofsLoadSeq + 3);
+  if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
+    addrSongList = file->readShort(ofsLoadSeq + 3);
   } else {
     return;
   }
@@ -80,16 +80,16 @@ void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
   // scan DIR address
   uint32_t ofsSetDIR;
   uint16_t spcDirAddr = 0;
-  if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
-    spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+  if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
+    spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
   }
 
   uint32_t addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
   if (addrSongHeaderPtr + 2 <= 0x10000) {
-    uint16_t addrSongHeader = file->GetShort(addrSongHeaderPtr);
+    uint16_t addrSongHeader = file->readShort(addrSongHeaderPtr);
 
     MoriSnesSeq *newSeq = new MoriSnesSeq(file, version, addrSongHeader, name);
-    if (!newSeq->LoadVGMFile()) {
+    if (!newSeq->loadVGMFile()) {
       delete newSeq;
       return;
     }
@@ -97,7 +97,7 @@ void MoriSnesScanner::SearchForMoriSnesFromARAM(RawFile *file) {
     if (spcDirAddr != 0) {
       MoriSnesInstrSet *newInstrSet =
           new MoriSnesInstrSet(file, version, spcDirAddr, newSeq->InstrumentAddresses, newSeq->InstrumentHints);
-      if (!newInstrSet->LoadVGMFile()) {
+      if (!newInstrSet->loadVGMFile()) {
         delete newInstrSet;
         return;
       }

@@ -14,9 +14,9 @@ class VGMSeqSection
                 const std::string& name = "Section",
                 EventColor color = CLR_HEADER);
 
-  virtual bool Load();
-  virtual bool GetTrackPointers();
-  virtual bool PostLoad();
+  virtual bool load();
+  virtual bool parseTrackPointers();
+  virtual bool postLoad();
 
   VGMMultiSectionSeq *parentSeq;
   std::vector<SeqTrack *> aTracks;

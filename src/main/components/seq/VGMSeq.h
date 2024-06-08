@@ -31,90 +31,98 @@ class VGMSeq : public VGMFile {
          std::string name = "VGM Sequence");
   ~VGMSeq() override;
 
-  Icon GetIcon() override { return ICON_SEQ; }
+  Icon icon() override { return ICON_SEQ; }
 
-  bool LoadVGMFile() override;
-  bool Load() override;              // Function to load all the information about the sequence
-  virtual bool LoadMain();
-  virtual bool GetHeaderInfo();
-  virtual bool GetTrackPointers();  // Function to find all of the track pointers.   Returns number of total tracks.
-  virtual void ResetVars();
-  virtual MidiFile *ConvertToMidi();
-  virtual MidiTrack *GetFirstMidiTrack();
-  void SetPPQN(uint16_t ppqn);
-  uint16_t GetPPQN() const;
-  // void SetTimeSignature(uint8_t numer, denom);
-  void AddInstrumentRef(uint32_t progNum);
+  bool loadVGMFile() override;
+  bool load() override;              // Function to load all the information about the sequence
+  virtual bool loadMain();
+  virtual bool parseHeader();
+  virtual bool parseTrackPointers();  // Function to find all of the track pointers.   Returns number of total tracks.
+  virtual void resetVars();
+  virtual MidiFile *convertToMidi();
+  virtual MidiTrack *firstMidiTrack();
+  void setPPQN(uint16_t ppqn);
+  [[nodiscard]] uint16_t ppqn() const;
+  // void setTimeSignature(uint8_t numer, denom);
+  void addInstrumentRef(uint32_t progNum);
 
-  void UseReverb() { bReverb = true; }
-  void HasMonophonicTracks() { bMonophonicTracks = true; }
-  void UseLinearAmplitudeScale() { bUseLinearAmplitudeScale = true; }
-  void UseLinearPanAmplitudeScale(PanVolumeCorrectionMode mode) {
-    bUseLinearPanAmplitudeScale = true;
+  void useReverb() { m_use_reverb = true; }
+
+  bool usesMonophonicTracks() { return m_use_monophonic_tracks; }
+  void setUsesMonophonicTracks() { m_use_monophonic_tracks = true; }
+
+  bool usesLinearAmplitudeScale() { return m_use_linear_amplitude_scale; }
+  void setUseLinearAmplitudeScale(bool set) { m_use_linear_amplitude_scale = set; }
+
+  void useLinearPanAmplitudeScale(PanVolumeCorrectionMode mode) {
+    m_use_linear_pan_amplitude_scale = true;
     panVolumeCorrectionMode = mode;
   }
-  void AlwaysWriteInitialVol(uint8_t theVol = 100) {
-    bAlwaysWriteInitialVol = true;
-    initialVol = theVol;
+
+  bool alwaysWriteInitialVol() { return m_always_write_initial_vol; }
+  void setAlwaysWriteInitialVol(uint8_t theVol = 100) {
+    m_always_write_initial_vol = true;
+    m_initial_volume = theVol;
   }
-  void AlwaysWriteInitialExpression(uint8_t level = 127) {
-    bAlwaysWriteInitialExpression = true;
-    initialExpression = level;
+  bool alwaysWriteInitialExpression() { return m_always_write_initial_expression; }
+  void setAlwaysWriteInitialExpression(uint8_t level = 127) {
+    m_always_write_initial_expression = true;
+    m_initial_expression = level;
   }
-  void AlwaysWriteInitialReverb(uint8_t level = 127) {
-    bAlwaysWriteInitialReverb = true;
-    initialReverb = level;
+
+  bool alwaysWriteInitialReverb() { return m_always_write_initial_expression; }
+  void setAlwaysWriteInitialReverb(uint8_t level = 127) {
+    m_always_write_initial_reverb = true;
+    m_initial_reverb_level = level;
   }
-  void AlwaysWriteInitialPitchBendRange(uint8_t semitones, uint8_t cents) {
-    bAlwaysWriteInitialPitchBendRange = true;
-    initialPitchBendRangeSemiTones = semitones;
-    initialPitchBendRangeCents = cents;
+
+  bool alwaysWriteInitialPitchBendRange() { return m_always_write_initial_pitch_bend_range; }
+  void setAlwaysWriteInitialPitchBendRange(uint16_t cents) {
+    m_always_write_initial_pitch_bend_range = true;
+    m_initial_pitch_bend_range_cents = cents;
   }
-  void AlwaysWriteInitialTempo(double beatsPerMin) {
-    bAlwaysWriteInitialTempo = true;
+
+  bool alwaysWriteInitialTempo() { return m_always_write_initial_tempo; }
+  void setAlwaysWriteInitialTempo(double beatsPerMin) {
+    m_always_write_initial_tempo = true;
     initialTempoBPM = beatsPerMin;
   }
 
-  void AlwaysWriteInitialMonoMode() {
-    bAlwaysWriteInitialMono = true;
-  }
+  bool alwaysWriteInitialMonoMode() { return m_always_write_initial_mono_mode; }
+  void setAlwaysWriteInitialMonoMode(bool set) { m_always_write_initial_mono_mode = set; }
+  bool allowDiscontinuousTrackData() { return m_allow_discontinuous_track_data; }
+  void setAllowDiscontinuousTrackData(bool allow) { m_allow_discontinuous_track_data = allow; }
 
-  virtual bool SaveAsMidi(const std::string &filepath);
+  bool saveAsMidi(const std::string &filepath);
 
-  virtual bool HasActiveTracks();
-  virtual void InactivateAllTracks();
-  virtual int GetForeverLoops();
+  void deactivateAllTracks();
+
+  uint8_t initialVolume() { return m_initial_volume; }
+  void setInitialVolume(uint8_t volume) { m_initial_volume = volume; }
+  uint8_t initialExpression() { return m_initial_expression; }
+  void setInitialExpression(uint8_t expression) { m_initial_expression = expression; }
+  uint8_t initialReverbLevel() { return m_initial_reverb_level; }
+  void setInitialReverbLevel(uint8_t reverb_level) { m_initial_reverb_level = reverb_level; }
+  uint16_t initialPitchBendRange() { return m_initial_pitch_bend_range_cents; }
+  void setInitialPitchBendRange(uint16_t cents) { m_initial_pitch_bend_range_cents = cents; }
 
  protected:
-  virtual bool LoadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
-  virtual void LoadTracksMain(uint32_t stopTime);
-  virtual bool PostLoad();
+  virtual bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
+  virtual void loadTracksMain(uint32_t stopTime);
+  virtual bool postLoad();
+
+private:
+  bool hasActiveTracks();
+  int foreverLoopCount();
 
  public:
   MidiFile *midi;
   uint32_t nNumTracks;
   ReadMode readMode;
   double tempoBPM;
-  uint16_t ppqn;
   uint32_t time;                // absolute current time (ticks)
 
-  // attributes
-  bool bMonophonicTracks;   // Only 1 voice at a time on a track.  We can assume note offs always
-                            // use last note on key. which is important when drivers allow things
-                            // like global transposition events mid note
-  bool bUseLinearAmplitudeScale;  // This will cause all all velocity, volume, and expression
-                                  // events to be automatically converted from a linear scale to
-                                  // MIDI's logarithmic scale
-  bool bUseLinearPanAmplitudeScale; // This will cause all all pan events to be automatically
-                                    // converted from a linear scale to MIDI's sin/cos scale
   PanVolumeCorrectionMode panVolumeCorrectionMode;
-  bool bAlwaysWriteInitialTempo;
-  bool bAlwaysWriteInitialVol;
-  bool bAlwaysWriteInitialExpression;
-  bool bAlwaysWriteInitialReverb;
-  bool bAlwaysWriteInitialPitchBendRange;
-  bool bAlwaysWriteInitialMono;
-  bool bAllowDiscontinuousTrackData;
 
   // True if each tracks in a sequence needs to be loaded simultaneously in tick by tick, as the real music player does.
   // Pros:
@@ -131,19 +139,40 @@ class VGMSeq : public VGMFile {
   // processing a tick because you want to go to a new section.
   bool bIncTickAfterProcessingTracks;
 
-  uint8_t initialVol;
-  uint8_t initialExpression;
-  uint8_t initialReverb;
-  uint8_t initialPitchBendRangeSemiTones, initialPitchBendRangeCents;
   double initialTempoBPM;
-
-  bool bReverb;
-  float reverbTime;
 
   std::vector<SeqTrack *> aTracks;  // array of track pointers
   std::vector<uint32_t> aInstrumentsUsed;
 
   std::vector<ISeqSlider *> aSliders;
+
+private:
+  uint16_t m_ppqn;
+
+  uint8_t m_initial_volume;
+  uint8_t m_initial_expression;
+  uint8_t m_initial_reverb_level;
+  uint16_t m_initial_pitch_bend_range_cents;
+
+  bool m_always_write_initial_tempo;
+  bool m_always_write_initial_vol;
+  bool m_always_write_initial_expression;
+  bool m_always_write_initial_reverb;
+  bool m_always_write_initial_pitch_bend_range;
+  bool m_always_write_initial_mono_mode;
+  bool m_allow_discontinuous_track_data;
+
+  // attributes
+  bool m_use_monophonic_tracks;   // Only 1 voice at a time on a track.  We can assume note offs always
+                                // use last note on key. which is important when drivers allow things
+                                // like global transposition events mid note
+  bool m_use_linear_amplitude_scale;  // This will cause all all velocity, volume, and expression
+                                  // events to be automatically converted from a linear scale to
+                                  // MIDI's logarithmic scale
+  bool m_use_linear_pan_amplitude_scale; // This will cause all all pan events to be automatically
+                                    // converted from a linear scale to MIDI's sin/cos scale
+  bool m_use_reverb;
+
 };
 
 extern uint8_t mode;

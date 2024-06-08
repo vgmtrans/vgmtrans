@@ -43,7 +43,7 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
             if (!resettingModel)
               dataChanged(index(0, 0), index(rowCount() - 1, 0));
           });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMColl,
+  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl,
           [this]() {
             if (!resettingModel)
               dataChanged(index(0, 0), index(rowCount() - 1, 0));

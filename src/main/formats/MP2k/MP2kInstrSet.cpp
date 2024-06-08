@@ -22,11 +22,11 @@ MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
   sampColl = new VGMSampColl(MP2kFormat::name, file, this, offset);
 }
 
-bool MP2kInstrSet::LoadInstrs() {
-  return VGMInstrSet::LoadInstrs();
+bool MP2kInstrSet::loadInstrs() {
+  return VGMInstrSet::loadInstrs();
 }
 
-bool MP2kInstrSet::GetInstrPointers() {
+bool MP2kInstrSet::parseInstrPointers() {
   for (int i = 0; i < m_count; i++) {
     size_t cur_ofs = dwOffset + i * 12;
     MP2kInstrData data{rawFile()->get<u32>(cur_ofs), rawFile()->get<u32>(cur_ofs + 4),
@@ -37,7 +37,7 @@ bool MP2kInstrSet::GetInstrPointers() {
   return true;
 }
 
-int MP2kInstrSet::MakeOrGetSample(size_t sample_pointer) {
+int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   if (sample_pointer == 0 || sample_pointer >= rawFile()->size()) {
     L_WARN("Invalid sample pointer {:#x}", sample_pointer);
     return -1;
@@ -79,19 +79,19 @@ int MP2kInstrSet::MakeOrGetSample(size_t sample_pointer) {
   samp->bps = 8;
   samp->setName(fmt::format("{:#x}", sample_pointer));
 
-  samp->SetLoopStartMeasure(LM_SAMPLES);
-  samp->SetLoopLengthMeasure(LM_SAMPLES);
+  samp->setLoopStartMeasure(LM_SAMPLES);
+  samp->setLoopLengthMeasure(LM_SAMPLES);
   if (loop == 0x40) {
     /* Uncompressed, looping */
-    samp->SetLoopStatus(true);
-    samp->SetLoopOffset(loop_pos);
-    samp->SetLoopLength(len - loop_pos + 1);
+    samp->setLoopStatus(true);
+    samp->setLoopOffset(loop_pos);
+    samp->setLoopLength(len - loop_pos + 1);
   } else if (loop == 0x00) {
     /* Uncompressed, not looping */
-    samp->SetLoopStatus(false);
+    samp->setLoopStatus(false);
   } else if (loop == 0x01) {
     /* Compressed sample, not looping */
-    samp->SetLoopStatus(false);
+    samp->setLoopStatus(false);
   } else {
     /* Invalid loop, assume the whole thing is garbage */
     L_ERROR("Garbage loop data {}", loop);
@@ -109,7 +109,7 @@ MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, 
     : VGMInstr(set, offset, length, bank, number), m_type(data.w0 & 0xFF), m_data(data) {
 }
 
-bool MP2kInstr::LoadInstr() {
+bool MP2kInstr::loadInstr() {
   /* Unused instrument marking */
   if (m_data.w0 == 0x3c01 && m_data.w1 == 0x02 && m_data.w2 == 0x0F0000) {
     return true;
@@ -149,11 +149,11 @@ bool MP2kInstr::LoadInstr() {
       }
 
       if (auto sample_id =
-              static_cast<MP2kInstrSet *>(parInstrSet)->MakeOrGetSample(sample_pointer);
+              static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
           sample_id != -1) {
-        VGMRgn *rgn = AddRgn(dwOffset, unLength, sample_id);
+        VGMRgn *rgn = addRgn(dwOffset, unLength, sample_id);
         // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
-        SetADSR(rgn, m_data.w2);
+        setADSR(rgn, m_data.w2);
       } else {
         L_WARN("No sample could be loaded for {:#x}", sample_pointer);
         setName(name() + " (sample missing)");
@@ -237,12 +237,12 @@ bool MP2kInstr::LoadInstr() {
         }
 
         if (auto sample_id =
-                static_cast<MP2kInstrSet *>(parInstrSet)->MakeOrGetSample(sample_pointer);
+                static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
             sample_id != -1) {
-          VGMRgn *rgn = AddRgn(dwOffset, unLength, sample_id, split_list[i], split_list[i + 1] - 1);
+          VGMRgn *rgn = addRgn(dwOffset, unLength, sample_id, split_list[i], split_list[i + 1] - 1);
 
           // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
-          SetADSR(rgn, rawFile()->get<u32>(offset + 8));
+          setADSR(rgn, rawFile()->get<u32>(offset + 8));
         } else {
           continue;
         }
@@ -272,19 +272,19 @@ bool MP2kInstr::LoadInstr() {
 
         if ((type & 0x0f) == 0 || (type & 0x0f) == 8) {
           if (auto sample_id =
-                  static_cast<MP2kInstrSet *>(parInstrSet)->MakeOrGetSample(sample_pointer);
+                  static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
               sample_id != -1) {
-            VGMRgn *rgn = AddRgn(dwOffset, unLength, sample_id, key, key);
+            VGMRgn *rgn = addRgn(dwOffset, unLength, sample_id, key, key);
             // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
-            rgn->SetPan(pan);
+            rgn->setPan(pan);
 
             u32 pitch = rawFile()->get<u32>(sample_pointer + 4);
             double delta_note = 12.0 * log2(static_cast<MP2kInstrSet *>(parInstrSet)->sampleRate() *
                                             1024.0 / pitch);
             int rootkey = 60 + int(round(delta_note));
 
-            rgn->SetUnityKey(rootkey - keynum + key);
-            SetADSR(rgn, rawFile()->get<u32>(offset + 8));
+            rgn->setUnityKey(rootkey - keynum + key);
+            setADSR(rgn, rawFile()->get<u32>(offset + 8));
           }
         } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
           /* Make noise sample here... */
@@ -302,7 +302,7 @@ bool MP2kInstr::LoadInstr() {
   return true;
 }
 
-void MP2kInstr::SetADSR(VGMRgn *rgn, u32 adsr) {
+void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
   int attack = adsr & 0xFF;
   int decay = (adsr >> 8) & 0xFF;
   int sustain = (adsr >> 16) & 0xFF;
@@ -349,10 +349,10 @@ MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kWaveType type, uint32_t offset, ui
     : VGMSamp(sampColl, offset, length, dataOffset, dataLength, channels, bps, rate, name),
       m_type(type){};
 
-void MP2kSamp::ConvertToStdWave(u8 *buf) {
+void MP2kSamp::convertToStdWave(u8 *buf) {
   switch (m_type) {
     case MP2kWaveType::PCM8: {
-      GetBytes(dataOff, dataLength, buf);
+      readBytes(dataOff, dataLength, buf);
       for (unsigned int i = 0; i < dataLength; i++) {
         buf[i] ^= 0x80;
       }
@@ -378,7 +378,7 @@ void MP2kSamp::ConvertToStdWave(u8 *buf) {
       unsigned int nblocks = dataLength / 64;  // 64 samples per block
 
       char(*data)[33] = new char[nblocks][33];
-      GetBytes(dataOff, dataLength, data);
+      readBytes(dataOff, dataLength, data);
 
       for (unsigned int block = 0; block < nblocks; ++block) {
         int8_t sample = data[block][0];

@@ -27,7 +27,7 @@ VGMInstrSet::~VGMInstrSet() {
   delete sampColl;
 }
 
-VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, uint32_t bank,
+VGMInstr *VGMInstrSet::addInstr(uint32_t offset, uint32_t length, uint32_t bank,
                                 uint32_t instrNum, const std::string &instrName) {
   VGMInstr *instr =
       new VGMInstr(this, offset, length, bank, instrNum,
@@ -36,61 +36,61 @@ VGMInstr *VGMInstrSet::AddInstr(uint32_t offset, uint32_t length, uint32_t bank,
   return instr;
 }
 
-bool VGMInstrSet::LoadVGMFile() {
-  bool val = Load();
+bool VGMInstrSet::loadVGMFile() {
+  bool val = load();
   if (!val) {
     return false;
   }
 
   if (auto fmt = format(); fmt) {
-    fmt->OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
   }
 
   return val;
 }
 
-bool VGMInstrSet::Load() {
-  if (!GetHeaderInfo())
+bool VGMInstrSet::load() {
+  if (!parseHeader())
     return false;
-  if (!GetInstrPointers())
+  if (!parseInstrPointers())
     return false;
-  if (!LoadInstrs())
+  if (!loadInstrs())
     return false;
 
   if (aInstrs.empty())
     return false;
 
-  if (autoAddInstrumentsAsChildren)
+  if (m_auto_add_instruments_as_children)
     addChildren(aInstrs);
 
   if (unLength == 0) {
-    SetGuessedLength();
+    setGuessedLength();
   }
 
   if (sampColl != nullptr) {
-    if (!sampColl->Load()) {
+    if (!sampColl->load()) {
       L_WARN("Failed to load VGMSampColl");
     }
   }
 
-  rawFile()->AddContainedVGMFile(
+  rawFile()->addContainedVGMFile(
       std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
-  pRoot->AddVGMFile(this);
+  pRoot->addVGMFile(this);
   return true;
 }
 
-bool VGMInstrSet::GetHeaderInfo() {
+bool VGMInstrSet::parseHeader() {
   return true;
 }
 
-bool VGMInstrSet::GetInstrPointers() {
+bool VGMInstrSet::parseInstrPointers() {
   return true;
 }
 
-bool VGMInstrSet::LoadInstrs() {
+bool VGMInstrSet::loadInstrs() {
   size_t nInstrs = aInstrs.size();
   for (size_t i = 0; i < nInstrs; i++) {
-    if (!aInstrs[i]->LoadInstr())
+    if (!aInstrs[i]->loadInstr())
       return false;
   }
   return true;
@@ -106,30 +106,30 @@ VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint
       parInstrSet(instrSet), reverb(reverb) {
 }
 
-void VGMInstr::SetBank(uint32_t bankNum) {
+void VGMInstr::setBank(uint32_t bankNum) {
   bank = bankNum;
 }
 
-void VGMInstr::SetInstrNum(uint32_t theInstrNum) {
+void VGMInstr::setInstrNum(uint32_t theInstrNum) {
   instrNum = theInstrNum;
 }
 
-VGMRgn *VGMInstr::AddRgn(VGMRgn *rgn) {
+VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {
   m_regions.emplace_back(rgn);
-  if (autoAddRegionsAsChildren)
+  if (m_auto_add_regions_as_children)
     addChild(rgn);
   return rgn;
 }
 
-VGMRgn *VGMInstr::AddRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow,
+VGMRgn *VGMInstr::addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow,
                          uint8_t keyHigh, uint8_t velLow, uint8_t velHigh) {
   VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
   m_regions.emplace_back(newRgn);
-  if (autoAddRegionsAsChildren)
+  if (m_auto_add_regions_as_children)
     addChild(newRgn);
   return newRgn;
 }
 
 void VGMInstr::deleteRegions() {
-  DeleteVect(m_regions);
+  deleteVect(m_regions);
 }

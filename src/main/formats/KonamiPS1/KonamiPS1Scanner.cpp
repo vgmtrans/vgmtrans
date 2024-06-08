@@ -12,18 +12,18 @@ namespace vgmtrans::scanners {
 ScannerRegistration<KonamiPS1Scanner> s_konami_ps1("KONAMIPS1");
 }
 
-void KonamiPS1Scanner::Scan(RawFile *file, void *info) {
+void KonamiPS1Scanner::scan(RawFile *file, void *info) {
   uint32_t offset = 0;
   int numSeqFiles = 0;
   while (offset < file->size()) {
-    if (KonamiPS1Seq::IsKDT1Seq(file, offset)) {
-      std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
+    if (KonamiPS1Seq::isKDT1Seq(file, offset)) {
+      std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
       if (numSeqFiles >= 1) {
         name += fmt::format("({})", numSeqFiles + 1);
       }
 
       KonamiPS1Seq *newSeq = new KonamiPS1Seq(file, offset, name);
-      if (newSeq->LoadVGMFile()) {
+      if (newSeq->loadVGMFile()) {
         offset += newSeq->unLength;
         numSeqFiles++;
         continue;

@@ -17,12 +17,12 @@ public:
   VGMTag(std::string _title, std::string _artist = "", std::string _album = "");
   ~VGMTag() = default;
 
-  bool HasTitle() const;
-  bool HasArtist() const;
-  bool HasAlbum() const;
-  bool HasComment() const;
-  bool HasTrackNumber() const;
-  bool HasLength() const;
+  bool hasTitle() const;
+  bool hasArtist() const;
+  bool hasAlbum() const;
+  bool hasComment() const;
+  bool hasTrackNumber() const;
+  bool hasLength() const;
 
   std::string title;
   std::string artist;

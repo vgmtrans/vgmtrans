@@ -33,42 +33,42 @@ public:
   VGMRoot() = default;
   virtual ~VGMRoot() = default;
 
-  virtual bool Init();
-  virtual bool OpenRawFile(const std::string &filename);
-  bool CreateVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
+  virtual bool init();
+  virtual bool openRawFile(const std::string &filename);
+  bool createVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
                       const std::string& parRawFileFullPath = "", const VGMTag& tag = VGMTag());
-  bool SetupNewRawFile(RawFile* newRawFile);
-  bool CloseRawFile(RawFile *targFile);
-  void AddVGMFile(VGMFileVariant file);
-  void RemoveVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
-  void AddVGMColl(VGMColl *theColl);
-  void RemoveVGMColl(VGMColl *theFile);
-  void Log(LogItem *theLog);
+  bool setupNewRawFile(RawFile* newRawFile);
+  bool closeRawFile(RawFile *targFile);
+  void addVGMFile(VGMFileVariant file);
+  void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
+  void addVGMColl(VGMColl *theColl);
+  void removeVGMColl(VGMColl *theFile);
+  void log(LogItem *theLog);
 
-  virtual std::string UI_GetResourceDirPath();
-  virtual void UI_SetRootPtr(VGMRoot **theRoot) = 0;
-  virtual void UI_AddRawFile(RawFile *) {}
-  virtual void UI_CloseRawFile(RawFile *) {}
+  virtual std::string UI_getResourceDirPath();
+  virtual void UI_setRootPtr(VGMRoot **theRoot) = 0;
+  virtual void UI_addRawFile(RawFile *) {}
+  virtual void UI_closeRawFile(RawFile *) {}
 
-  virtual void UI_OnBeginLoadRawFile() {}
-  virtual void UI_OnEndLoadRawFile() {}
-  virtual void UI_AddVGMFile(VGMFileVariant file);
-  virtual void UI_AddVGMSeq(VGMSeq *) {}
-  virtual void UI_AddVGMInstrSet(VGMInstrSet *) {}
-  virtual void UI_AddVGMSampColl(VGMSampColl *) {}
-  virtual void UI_AddVGMMisc(VGMMiscFile *) {}
-  virtual void UI_AddVGMColl(VGMColl *) {}
-  virtual void UI_RemoveVGMFile(VGMFile *) {}
-  virtual void UI_BeginRemoveVGMFiles() {}
-  virtual void UI_EndRemoveVGMFiles() {}
-  virtual void UI_Log(LogItem *) { }
+  virtual void UI_onBeginLoadRawFile() {}
+  virtual void UI_onEndLoadRawFile() {}
+  virtual void UI_addVGMFile(VGMFileVariant file);
+  virtual void UI_addVGMSeq(VGMSeq *) {}
+  virtual void UI_addVGMInstrSet(VGMInstrSet *) {}
+  virtual void UI_addVGMSampColl(VGMSampColl *) {}
+  virtual void UI_addVGMMisc(VGMMiscFile *) {}
+  virtual void UI_addVGMColl(VGMColl *) {}
+  virtual void UI_removeVGMFile(VGMFile *) {}
+  virtual void UI_beginRemoveVGMFiles() {}
+  virtual void UI_endRemoveVGMFiles() {}
+  virtual void UI_log(LogItem *) { }
 
-  virtual void UI_RemoveVGMColl(VGMColl *) {}
-  virtual void UI_AddItem(VGMItem *, VGMItem *, const std::string &, void *) {}
-  virtual std::string UI_GetSaveFilePath(const std::string &suggestedFilename,
+  virtual void UI_removeVGMColl(VGMColl *) {}
+  virtual void UI_addItem(VGMItem *, VGMItem *, const std::string &, void *) {}
+  virtual std::string UI_getSaveFilePath(const std::string &suggestedFilename,
                                          const std::string &extension = "") = 0;
-  virtual std::string UI_GetSaveDirPath(const std::string &suggestedDir = "") = 0;
-  virtual bool UI_WriteBufferToFile(const std::string &filepath, uint8_t *buf, size_t size);
+  virtual std::string UI_getSaveDirPath(const std::string &suggestedDir = "") = 0;
+  virtual bool UI_writeBufferToFile(const std::string &filepath, uint8_t *buf, size_t size);
 
   const std::vector<RawFile*>& rawFiles() { return m_rawfiles; }
   const std::vector<VGMFileVariant>& vgmFiles() { return m_vgmfiles; }

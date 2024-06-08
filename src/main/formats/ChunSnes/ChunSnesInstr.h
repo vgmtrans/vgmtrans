@@ -19,8 +19,8 @@ class ChunSnesInstrSet:
                    const std::string &name = "ChunSnesInstrSet");
   ~ChunSnesInstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
   ChunSnesVersion version;
 
@@ -47,7 +47,7 @@ class ChunSnesInstr
                 const std::string &name = "ChunSnesInstr");
   ~ChunSnesInstr() override;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
   ChunSnesVersion version;
 
@@ -66,7 +66,7 @@ class ChunSnesRgn
   ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn, uint16_t addrRgn, uint32_t spcDirAddr);
   ~ChunSnesRgn() override;
 
-  bool LoadRgn() override;
+  bool loadRgn() override;
 
   ChunSnesVersion version;
 };

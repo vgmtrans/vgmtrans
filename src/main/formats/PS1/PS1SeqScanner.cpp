@@ -22,15 +22,15 @@ PS1SeqScanner::PS1SeqScanner() {}
 
 PS1SeqScanner::~PS1SeqScanner() {}
 
-void PS1SeqScanner::Scan(RawFile* file, void* /*info*/) {
-  auto seqs = SearchForPS1Seq(file);
-  auto vabs = SearchForVab(file);
+void PS1SeqScanner::scan(RawFile* file, void* /*info*/) {
+  auto seqs = searchForPS1Seq(file);
+  auto vabs = searchForVab(file);
   if (vabs.empty() || vabs[0]->dwOffset != 0) {
-    PSXSampColl::SearchForPSXADPCM(file, PS1Format::name);
+    PSXSampColl::searchForPSXADPCM(file, PS1Format::name);
   }
 }
 
-std::vector<PS1Seq *> PS1SeqScanner::SearchForPS1Seq(RawFile *file) {
+std::vector<PS1Seq *> PS1SeqScanner::searchForPS1Seq(RawFile *file) {
   std::vector<PS1Seq *> loadedFiles;
 
   using namespace std::string_literals;
@@ -40,7 +40,7 @@ std::vector<PS1Seq *> PS1SeqScanner::SearchForPS1Seq(RawFile *file) {
 
   while (it != file->end()) {
     PS1Seq *newPS1Seq = new PS1Seq(file, it - file->begin());
-    if (newPS1Seq->LoadVGMFile()) {
+    if (newPS1Seq->loadVGMFile()) {
       loadedFiles.push_back(newPS1Seq);
     } else {
       delete newPS1Seq;
@@ -53,7 +53,7 @@ std::vector<PS1Seq *> PS1SeqScanner::SearchForPS1Seq(RawFile *file) {
   return loadedFiles;
 }
 
-std::vector<Vab *> PS1SeqScanner::SearchForVab(RawFile *file) {
+std::vector<Vab *> PS1SeqScanner::searchForVab(RawFile *file) {
   std::vector<Vab *> loadedFiles;
 
   using namespace std::string_literals;
@@ -63,7 +63,7 @@ std::vector<Vab *> PS1SeqScanner::SearchForVab(RawFile *file) {
 
   while (it != file->end()) {
     Vab *newVab = new Vab(file, it - file->begin());
-    if (newVab->LoadVGMFile()) {
+    if (newVab->loadVGMFile()) {
       loadedFiles.push_back(newVab);
     } else {
       delete newVab;

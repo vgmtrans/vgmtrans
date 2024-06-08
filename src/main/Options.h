@@ -27,11 +27,11 @@ public:
 
   ~ConversionOptions() = default;
 
-  BankSelectStyle GetBankSelectStyle() const { return m_bs_style; }
-  void SetBankSelectStyle(BankSelectStyle style) { m_bs_style = style; }
+  BankSelectStyle bankSelectStyle() const { return m_bs_style; }
+  void setBankSelectStyle(BankSelectStyle style) { m_bs_style = style; }
 
-  int GetNumSequenceLoops() const { return m_sequence_loops; }
-  void SetNumSequenceLoops(int numLoops) { m_sequence_loops = numLoops; }
+  int numSequenceLoops() const { return m_sequence_loops; }
+  void setNumSequenceLoops(int numLoops) { m_sequence_loops = numLoops; }
 
 private:
   ConversionOptions() = default;

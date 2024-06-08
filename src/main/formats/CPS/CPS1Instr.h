@@ -17,7 +17,7 @@ public:
                      std::string &name);
   ~CPS1SampleInstrSet() override;
 
-  bool GetInstrPointers() override;
+  bool parseInstrPointers() override;
 
 public:
   CPSFormatVer fmt_version;
@@ -32,8 +32,8 @@ class CPS1SampColl
 public:
   CPS1SampColl(RawFile *file, CPS1SampleInstrSet *instrset, uint32_t offset,
                uint32_t length = 0, std::string name = std::string("CPS1 Sample Collection"));
-  bool GetHeaderInfo() override;
-  bool GetSampleInfo() override;
+  bool parseHeader() override;
+  bool parseSampleInfo() override;
 
 private:
   std::vector<VGMItem*> samplePointers;

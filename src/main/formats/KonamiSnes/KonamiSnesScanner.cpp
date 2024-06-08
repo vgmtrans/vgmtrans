@@ -492,23 +492,23 @@ BytePattern KonamiSnesScanner::ptnLoadPercInstrGG4(
 	,
 	13);
 
-void KonamiSnesScanner::Scan(RawFile *file, void *info) {
+void KonamiSnesScanner::scan(RawFile *file, void *info) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForKonamiSnesFromARAM(file);
+    searchForKonamiSnesFromARAM(file);
   }
   else {
     // Search from ROM unimplemented
   }
 }
 
-void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
+void KonamiSnesScanner::searchForKonamiSnesFromARAM(RawFile *file) {
   KonamiSnesVersion version = KONAMISNES_NONE;
 
   bool hasSongList;
 
   std::string basefilename = file->stem();
-  std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::string name = file->tag.hasTitle() ? file->tag.title : basefilename;
 
   // TODO: Unsupported games
   // Tiny Toon Adventures: Buster Bus
@@ -521,26 +521,26 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
   uint16_t addrSongList;
   int8_t primarySongIndex;
   uint8_t vcmdLenItemSize;
-  if (file->SearchBytePattern(ptnSetSongHeaderAddressGG4, ofsSetSongHeaderAddress)) {
-    addrSongHeader = file->GetByte(ofsSetSongHeaderAddress + 1) | (file->GetByte(ofsSetSongHeaderAddress + 4) << 8);
+  if (file->searchBytePattern(ptnSetSongHeaderAddressGG4, ofsSetSongHeaderAddress)) {
+    addrSongHeader = file->readByte(ofsSetSongHeaderAddress + 1) | (file->readByte(ofsSetSongHeaderAddress + 4) << 8);
     vcmdLenItemSize = 2;
     hasSongList = false;
   }
-  else if (file->SearchBytePattern(ptnReadSongListPNTB, ofsReadSongList)) {
-    addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
-    primarySongIndex = file->GetByte(ofsReadSongList + 31);
+  else if (file->searchBytePattern(ptnReadSongListPNTB, ofsReadSongList)) {
+    addrSongList = file->readByte(ofsReadSongList + 3) | (file->readByte(ofsReadSongList + 6) << 8);
+    primarySongIndex = file->readByte(ofsReadSongList + 31);
     vcmdLenItemSize = 1;
     hasSongList = true;
   }
-  else if (file->SearchBytePattern(ptnReadSongListAXE, ofsReadSongList)) {
-    addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
-    primarySongIndex = file->GetByte(ofsReadSongList + 32);
+  else if (file->searchBytePattern(ptnReadSongListAXE, ofsReadSongList)) {
+    addrSongList = file->readByte(ofsReadSongList + 3) | (file->readByte(ofsReadSongList + 6) << 8);
+    primarySongIndex = file->readByte(ofsReadSongList + 32);
     vcmdLenItemSize = 2;
     hasSongList = true;
   }
-  else if (file->SearchBytePattern(ptnReadSongListCNTR3, ofsReadSongList)) {
-    addrSongList = file->GetByte(ofsReadSongList + 3) | (file->GetByte(ofsReadSongList + 6) << 8);
-    primarySongIndex = file->GetByte(ofsReadSongList + 32);
+  else if (file->searchBytePattern(ptnReadSongListCNTR3, ofsReadSongList)) {
+    addrSongList = file->readByte(ofsReadSongList + 3) | (file->readByte(ofsReadSongList + 6) << 8);
+    primarySongIndex = file->readByte(ofsReadSongList + 32);
     vcmdLenItemSize = 1;
     hasSongList = true;
   }
@@ -552,8 +552,8 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
   uint32_t ofsJumpToVcmd;
   uint16_t addrVcmdLengthTable;
   uint8_t vcmd6XCountInList;
-  if (file->SearchBytePattern(ptnJumpToVcmdGG4, ofsJumpToVcmd)) {
-    addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 11);
+  if (file->searchBytePattern(ptnJumpToVcmdGG4, ofsJumpToVcmd)) {
+    addrVcmdLengthTable = file->readShort(ofsJumpToVcmd + 11);
     vcmd6XCountInList = 0;
 
     // check table length
@@ -561,15 +561,15 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
       return;
     }
   }
-  else if (file->SearchBytePattern(ptnJumpToVcmdCNTR3, ofsJumpToVcmd)) {
-    addrVcmdLengthTable = file->GetShort(ofsJumpToVcmd + 17);
+  else if (file->searchBytePattern(ptnJumpToVcmdCNTR3, ofsJumpToVcmd)) {
+    addrVcmdLengthTable = file->readShort(ofsJumpToVcmd + 17);
 
     uint32_t ofsBranchForVcmd6x;
-    if (file->SearchBytePattern(ptnBranchForVcmd6xCNTR3, ofsBranchForVcmd6x)) {
+    if (file->searchBytePattern(ptnBranchForVcmd6xCNTR3, ofsBranchForVcmd6x)) {
       // vcmd 60-64 is in the list
       vcmd6XCountInList = 5;
     }
-    else if (file->SearchBytePattern(ptnBranchForVcmd6xMDR2, ofsBranchForVcmd6x)) {
+    else if (file->searchBytePattern(ptnBranchForVcmd6xMDR2, ofsBranchForVcmd6x)) {
       // vcmd 60-61 is in the list
       vcmd6XCountInList = 2;
     }
@@ -600,10 +600,10 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
   }
   else {
     assert(vcmd6XCountInList == 0);
-    if (file->GetByte(addrVcmdLengthTable + (0xed - 0xe0) * vcmdLenItemSize) == 3) {
+    if (file->readByte(addrVcmdLengthTable + (0xed - 0xe0) * vcmdLenItemSize) == 3) {
       version = KONAMISNES_V4;
     }
-    else if (file->GetByte(addrVcmdLengthTable + (0xfc - 0xe0) * vcmdLenItemSize) == 2) {
+    else if (file->readByte(addrVcmdLengthTable + (0xfc - 0xe0) * vcmdLenItemSize) == 2) {
       version = KONAMISNES_V5;
     }
     else {
@@ -623,7 +623,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
         return;
       }
 
-      addrSongHeader = file->GetShort(addrSongHeaderPtr + 3);
+      addrSongHeader = file->readShort(addrSongHeaderPtr + 3);
       if (addrSongHeader != 0) {
         break;
       }
@@ -633,7 +633,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
   }
 
   KonamiSnesSeq *newSeq = new KonamiSnesSeq(file, version, addrSongHeader, name);
-  if (!newSeq->LoadVGMFile()) {
+  if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }
@@ -642,11 +642,11 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
   uint32_t ofsSetDIR;
   uint16_t spcDirAddr;
   std::map<std::string, std::vector<uint8_t>>::iterator itrDSP;
-  if (file->SearchBytePattern(ptnSetDIRGG4, ofsSetDIR)) {
-    spcDirAddr = file->GetByte(ofsSetDIR + 4) << 8;
+  if (file->searchBytePattern(ptnSetDIRGG4, ofsSetDIR)) {
+    spcDirAddr = file->readByte(ofsSetDIR + 4) << 8;
   }
-  else if (file->SearchBytePattern(ptnSetDIRCNTR3, ofsSetDIR)) {
-    spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+  else if (file->searchBytePattern(ptnSetDIRCNTR3, ofsSetDIR)) {
+    spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
   }
   else if ((itrDSP = file->tag.binaries.find("dsp")) != file->tag.binaries.end()) {
     // read DIR from SPC700 snapshot
@@ -662,76 +662,76 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
   uint16_t addrBankedInstrTable;
   uint8_t firstBankedInstr;
   uint16_t addrPercInstrTable;
-  if (file->SearchBytePattern(ptnLoadInstrJOP, ofsLoadInstr)) {
-    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 8) | (file->GetByte(ofsLoadInstr + 11) << 8);
-    firstBankedInstr = file->GetByte(ofsLoadInstr + 4);
+  if (file->searchBytePattern(ptnLoadInstrJOP, ofsLoadInstr)) {
+    addrCommonInstrTable = file->readByte(ofsLoadInstr + 8) | (file->readByte(ofsLoadInstr + 11) << 8);
+    firstBankedInstr = file->readByte(ofsLoadInstr + 4);
 
-    uint16_t addrCurrentBank = file->GetShort(ofsLoadInstr + 23);
-    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 26);
-    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+    uint16_t addrCurrentBank = file->readShort(ofsLoadInstr + 23);
+    uint16_t addrInstrTableBanks = file->readShort(ofsLoadInstr + 26);
+    addrBankedInstrTable = file->readShort(addrInstrTableBanks + file->readByte(addrCurrentBank));
 
     // scan for percussive instrument table
     uint32_t ofsLoadPercInstr;
-    if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
-      addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+    if (file->searchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
+      addrPercInstrTable = file->readByte(ofsLoadPercInstr + 1) | (file->readByte(ofsLoadPercInstr + 4) << 8);
     }
     else {
       return;
     }
   }
-  else if (file->SearchBytePattern(ptnLoadInstrGP, ofsLoadInstr)) {
-    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 14) | (file->GetByte(ofsLoadInstr + 17) << 8);
-    firstBankedInstr = file->GetByte(ofsLoadInstr + 10);
+  else if (file->searchBytePattern(ptnLoadInstrGP, ofsLoadInstr)) {
+    addrCommonInstrTable = file->readByte(ofsLoadInstr + 14) | (file->readByte(ofsLoadInstr + 17) << 8);
+    firstBankedInstr = file->readByte(ofsLoadInstr + 10);
 
-    uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 29);
-    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 31);
-    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+    uint8_t addrCurrentBank = file->readByte(ofsLoadInstr + 29);
+    uint16_t addrInstrTableBanks = file->readShort(ofsLoadInstr + 31);
+    addrBankedInstrTable = file->readShort(addrInstrTableBanks + file->readByte(addrCurrentBank));
 
     // scan for percussive instrument table
     uint32_t ofsLoadPercInstr;
-    if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
-      addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+    if (file->searchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
+      addrPercInstrTable = file->readByte(ofsLoadPercInstr + 1) | (file->readByte(ofsLoadPercInstr + 4) << 8);
     }
     else {
       return;
     }
   }
-  else if (file->SearchBytePattern(ptnLoadInstrGG4, ofsLoadInstr)) {
-    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 18) << 8);
-    firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
+  else if (file->searchBytePattern(ptnLoadInstrGG4, ofsLoadInstr)) {
+    addrCommonInstrTable = file->readByte(ofsLoadInstr + 15) | (file->readByte(ofsLoadInstr + 18) << 8);
+    firstBankedInstr = file->readByte(ofsLoadInstr + 11);
 
-    uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 30);
-    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 32);
-    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+    uint8_t addrCurrentBank = file->readByte(ofsLoadInstr + 30);
+    uint16_t addrInstrTableBanks = file->readShort(ofsLoadInstr + 32);
+    addrBankedInstrTable = file->readShort(addrInstrTableBanks + file->readByte(addrCurrentBank));
 
     // scan for percussive instrument table
     uint32_t ofsLoadPercInstr;
-    if (file->SearchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
-      addrPercInstrTable = file->GetByte(ofsLoadPercInstr + 1) | (file->GetByte(ofsLoadPercInstr + 4) << 8);
+    if (file->searchBytePattern(ptnLoadPercInstrGG4, ofsLoadPercInstr)) {
+      addrPercInstrTable = file->readByte(ofsLoadPercInstr + 1) | (file->readByte(ofsLoadPercInstr + 4) << 8);
     }
     else {
       return;
     }
   }
-  else if (file->SearchBytePattern(ptnLoadInstrPNTB, ofsLoadInstr)) {
-    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 12) | (file->GetByte(ofsLoadInstr + 15) << 8);
-    firstBankedInstr = file->GetByte(ofsLoadInstr + 8);
+  else if (file->searchBytePattern(ptnLoadInstrPNTB, ofsLoadInstr)) {
+    addrCommonInstrTable = file->readByte(ofsLoadInstr + 12) | (file->readByte(ofsLoadInstr + 15) << 8);
+    firstBankedInstr = file->readByte(ofsLoadInstr + 8);
 
-    uint8_t addrCurrentBank = file->GetByte(ofsLoadInstr + 27);
-    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 29);
-    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank));
+    uint8_t addrCurrentBank = file->readByte(ofsLoadInstr + 27);
+    uint16_t addrInstrTableBanks = file->readShort(ofsLoadInstr + 29);
+    addrBankedInstrTable = file->readShort(addrInstrTableBanks + file->readByte(addrCurrentBank));
 
-    addrPercInstrTable = file->GetByte(ofsLoadInstr + 46) | (file->GetByte(ofsLoadInstr + 49) << 8);
+    addrPercInstrTable = file->readByte(ofsLoadInstr + 46) | (file->readByte(ofsLoadInstr + 49) << 8);
   }
-  else if (file->SearchBytePattern(ptnLoadInstrCNTR3, ofsLoadInstr)) {
-    addrCommonInstrTable = file->GetByte(ofsLoadInstr + 15) | (file->GetByte(ofsLoadInstr + 19) << 8);
-    firstBankedInstr = file->GetByte(ofsLoadInstr + 11);
+  else if (file->searchBytePattern(ptnLoadInstrCNTR3, ofsLoadInstr)) {
+    addrCommonInstrTable = file->readByte(ofsLoadInstr + 15) | (file->readByte(ofsLoadInstr + 19) << 8);
+    firstBankedInstr = file->readByte(ofsLoadInstr + 11);
 
-    uint16_t addrCurrentBank = file->GetShort(ofsLoadInstr + 32);
-    uint16_t addrInstrTableBanks = file->GetShort(ofsLoadInstr + 37);
-    addrBankedInstrTable = file->GetShort(addrInstrTableBanks + file->GetByte(addrCurrentBank) * 2);
+    uint16_t addrCurrentBank = file->readShort(ofsLoadInstr + 32);
+    uint16_t addrInstrTableBanks = file->readShort(ofsLoadInstr + 37);
+    addrBankedInstrTable = file->readShort(addrInstrTableBanks + file->readByte(addrCurrentBank) * 2);
 
-    addrPercInstrTable = file->GetByte(ofsLoadInstr + 59) | (file->GetByte(ofsLoadInstr + 63) << 8);
+    addrPercInstrTable = file->readByte(ofsLoadInstr + 59) | (file->readByte(ofsLoadInstr + 63) << 8);
   }
   else {
     return;
@@ -744,7 +744,7 @@ void KonamiSnesScanner::SearchForKonamiSnesFromARAM(RawFile *file) {
                                                            firstBankedInstr,
                                                            addrPercInstrTable,
                                                            spcDirAddr);
-  if (!newInstrSet->LoadVGMFile()) {
+  if (!newInstrSet->loadVGMFile()) {
     delete newInstrSet;
     return;
   }

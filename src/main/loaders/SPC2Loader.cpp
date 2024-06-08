@@ -34,7 +34,7 @@ void SPC2Loader::apply(const RawFile *file) {
 
   // Read header
   uint8_t header[HEADER_SIZE];
-  file->GetBytes(0, HEADER_SIZE, header);
+  file->readBytes(0, HEADER_SIZE, header);
 
   // Check for header signature. Support major revision 1.
   if (memcmp(header, reinterpret_cast<const void*>("KSPC\x1A\x01"), 6) != 0) {
@@ -49,7 +49,7 @@ void SPC2Loader::apply(const RawFile *file) {
     // Read SPC data block
     uint8_t spcDataBlock[SPC_DATA_BLOCK_SIZE];
     size_t spcBlockOffset = HEADER_SIZE + (i * SPC_DATA_BLOCK_SIZE);
-    file->GetBytes(spcBlockOffset, SPC_DATA_BLOCK_SIZE, spcDataBlock);
+    file->readBytes(spcBlockOffset, SPC_DATA_BLOCK_SIZE, spcDataBlock);
 
     // Reconstruct the SPC file's RAM
     auto *spcFile = new uint8_t[SPC_FILE_SIZE];
@@ -77,7 +77,7 @@ void SPC2Loader::apply(const RawFile *file) {
       uint16_t blockIndex = spcDataBlock[j * 2] | (spcDataBlock[j * 2 + 1] << 8);
       uint8_t ramBlock[RAM_BLOCK_SIZE];
       size_t ramBlockOffset = 16 + (numSPCs * SPC_DATA_BLOCK_SIZE) + (blockIndex * RAM_BLOCK_SIZE);
-      file->GetBytes(ramBlockOffset, RAM_BLOCK_SIZE, ramBlock);
+      file->readBytes(ramBlockOffset, RAM_BLOCK_SIZE, ramBlock);
       std::copy_n(ramBlock, RAM_BLOCK_SIZE, spcFile + SPC_HEADER_SIZE + (j * RAM_BLOCK_SIZE));
     }
 

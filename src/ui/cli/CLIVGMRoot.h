@@ -18,40 +18,40 @@ class CLIVGMRoot : public VGMRoot {
 
 public:
 
-  size_t GetNumCollections() {
+  size_t numCollections() {
     return vgmColls().size();
   }
 
-  void DisplayUsage();
+  void displayUsage();
 
-  void DisplayHelp();
+  void displayHelp();
 
-  bool MakeOutputDir();
+  bool makeOutputDir();
 
-  bool ExportAllCollections();
+  bool exportAllCollections();
 
-  bool ExportCollection(VGMColl* coll);
+  bool exportCollection(VGMColl* coll);
 
-  bool SaveMidi(const VGMColl *coll);
+  bool saveMidi(const VGMColl *coll);
 
-  bool SaveSF2(VGMColl *coll);
+  bool saveSF2(VGMColl *coll);
 
-  bool SaveDLS(VGMColl *coll);
+  bool saveDLS(VGMColl *coll);
 
-  bool OpenRawFile(const std::string &filename) override;
+  bool openRawFile(const std::string &filename) override;
 
-  bool Init() override;
+  bool init() override;
 
-  void UI_SetRootPtr(VGMRoot** theRoot) override;
+  void UI_setRootPtr(VGMRoot** theRoot) override;
 
-  void UI_Log(LogItem* theLog) override;
+  void UI_log(LogItem* theLog) override;
 
-  size_t UpdateCollections(size_t startOffset);
+  size_t updateCollections(size_t startOffset);
 
-  std::string UI_GetSaveFilePath(const std::string& suggestedFilename,
+  std::string UI_getSaveFilePath(const std::string& suggestedFilename,
                                  const std::string& extension = "") override;
 
-  std::string UI_GetSaveDirPath(const std::string& suggestedDir = "") override;
+  std::string UI_getSaveDirPath(const std::string& suggestedDir = "") override;
 
   std::set<fs::path> inputFiles = {};
   fs::path outputDir = fs::path(".");

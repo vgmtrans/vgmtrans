@@ -19,10 +19,10 @@ class PandoraBoxSnesInstrSet:
                          uint8_t globalInstrumentCount,
                          const std::map<uint8_t, uint16_t> &instrADSRHints = std::map<uint8_t, uint16_t>(),
                          const std::string &name = "PandoraBoxSnesInstrSet");
-  virtual ~PandoraBoxSnesInstrSet(void);
+  virtual ~PandoraBoxSnesInstrSet();
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  virtual bool parseHeader();
+  virtual bool parseInstrPointers();
 
   PandoraBoxSnesVersion version;
 
@@ -51,9 +51,9 @@ class PandoraBoxSnesInstr
                       uint32_t spcDirAddr,
                       uint16_t adsr = 0x8fe0,
                       const std::string &name = "PandoraBoxSnesInstr");
-  virtual ~PandoraBoxSnesInstr(void);
+  virtual ~PandoraBoxSnesInstr();
 
-  virtual bool LoadInstr();
+  virtual bool loadInstr();
 
   PandoraBoxSnesVersion version;
 
@@ -76,9 +76,9 @@ class PandoraBoxSnesRgn
                     uint8_t srcn,
                     uint32_t spcDirAddr,
                     uint16_t adsr = 0x8fe0);
-  virtual ~PandoraBoxSnesRgn(void);
+  virtual ~PandoraBoxSnesRgn();
 
-  virtual bool LoadRgn();
+  virtual bool loadRgn();
 
   PandoraBoxSnesVersion version;
 };

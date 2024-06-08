@@ -17,14 +17,14 @@ public:
     virtual ~KonamiPS1Seq() {
     }
 
-    virtual bool GetHeaderInfo(void);
-    virtual bool GetTrackPointers(void);
-    virtual void ResetVars(void);
+    virtual bool parseHeader();
+    virtual bool parseTrackPointers();
+    virtual void resetVars();
 
-    static bool IsKDT1Seq(RawFile *file, uint32_t offset);
+    static bool isKDT1Seq(RawFile *file, uint32_t offset);
 
-    static uint32_t GetKDT1FileSize(RawFile *file, uint32_t offset) {
-        return kHeaderSize + file->GetWord(offset + kOffsetToFileSize);
+    static uint32_t getKDT1FileSize(RawFile *file, uint32_t offset) {
+        return kHeaderSize + file->readWord(offset + kOffsetToFileSize);
     }
 };
 
@@ -32,8 +32,8 @@ class KonamiPS1Track : public SeqTrack {
 public:
     KonamiPS1Track(KonamiPS1Seq *parentSeq, uint32_t offset, uint32_t length);
 
-    virtual void ResetVars(void);
-    virtual bool ReadEvent(void);
+    virtual void resetVars();
+    virtual bool readEvent();
 
 private:
     bool skipDeltaTime;

@@ -29,21 +29,21 @@ PrismSnesInstrSet::PrismSnesInstrSet(RawFile *file,
 
 PrismSnesInstrSet::~PrismSnesInstrSet() {}
 
-bool PrismSnesInstrSet::GetHeaderInfo() {
+bool PrismSnesInstrSet::parseHeader() {
   return true;
 }
 
-bool PrismSnesInstrSet::GetInstrPointers() {
+bool PrismSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
   for (uint16_t srcn16 = 0; srcn16 < 0x100; srcn16++) {
     uint8_t srcn = (uint8_t)srcn16;
 
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
+    if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
-    uint16_t addrSampStart = GetShort(addrDIRentry);
+    uint16_t addrSampStart = readShort(addrDIRentry);
     if (addrSampStart < spcDirAddr) {
       continue;
     }
@@ -86,7 +86,7 @@ bool PrismSnesInstrSet::GetInstrPointers() {
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
   SNESSampColl *newSampColl = new SNESSampColl(PrismSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->LoadVGMFile()) {
+  if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
   }
@@ -119,13 +119,13 @@ PrismSnesInstr::PrismSnesInstr(VGMInstrSet *instrSet,
 PrismSnesInstr::~PrismSnesInstr() {
 }
 
-bool PrismSnesInstr::LoadInstr() {
+bool PrismSnesInstr::loadInstr() {
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = GetShort(offDirEnt);
+  uint16_t addrSampStart = readShort(offDirEnt);
 
   PrismSnesRgn *rgn = new PrismSnesRgn(this,
                                        version,
@@ -136,9 +136,9 @@ bool PrismSnesInstr::LoadInstr() {
                                        addrTuningEntryHigh,
                                        addrTuningEntryLow);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  AddRgn(rgn);
+  addRgn(rgn);
 
-  SetGuessedLength();
+  setGuessedLength();
   return true;
 }
 
@@ -156,7 +156,7 @@ PrismSnesRgn::PrismSnesRgn(PrismSnesInstr *instr,
                            uint16_t addrTuningEntryLow) :
     VGMRgn(instr, addrADSR1Entry, 0),
     version(ver) {
-  int16_t tuning = GetByte(addrTuningEntryLow) | (GetByte(addrTuningEntryHigh) << 8);
+  int16_t tuning = readByte(addrTuningEntryLow) | (readByte(addrTuningEntryHigh) << 8);
 
   double fine_tuning;
   double coarse_tuning;
@@ -164,22 +164,22 @@ PrismSnesRgn::PrismSnesRgn(PrismSnesInstr *instr,
 
   addChild(addrADSR1Entry, 1, "ADSR1");
   addChild(addrADSR2Entry, 1, "ADSR2");
-  AddUnityKey(93 - (int) coarse_tuning, addrTuningEntryHigh, 1);
-  AddFineTune((int16_t) fine_tuning, addrTuningEntryLow, 1);
+  addUnityKey(93 - (int) coarse_tuning, addrTuningEntryHigh, 1);
+  addFineTune((int16_t) fine_tuning, addrTuningEntryLow, 1);
 
-  uint8_t adsr1 = GetByte(addrADSR1Entry);
-  uint8_t adsr2 = GetByte(addrADSR2Entry);
+  uint8_t adsr1 = readByte(addrADSR1Entry);
+  uint8_t adsr2 = readByte(addrADSR2Entry);
   uint8_t gain = 0x9c;
-  SNESConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
+  snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
   // put a random release time, it would be better than plain key off (actual music engine never do key off)
-  release_time = LinAmpDecayTimeToLinDBDecayTime(0.002 * SDSP_COUNTER_RATES[0x14], 0x7ff);
+  release_time = linearAmpDecayTimeToLinDBDecayTime(0.002 * SDSP_COUNTER_RATES[0x14], 0x7ff);
 
-  SetGuessedLength();
+  setGuessedLength();
 }
 
 PrismSnesRgn::~PrismSnesRgn() {}
 
-bool PrismSnesRgn::LoadRgn() {
+bool PrismSnesRgn::loadRgn() {
   return true;
 }

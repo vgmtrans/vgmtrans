@@ -11,7 +11,7 @@
 #include "CPS2Format.h"
 #include "VGMColl.h"
 
-CPSFormatVer GetVersionEnum(const std::string &versionStr) {
+CPSFormatVer versionEnum(const std::string &versionStr) {
   if (versionStr == "CPS1_2.00") return VER_CPS1_200;
   if (versionStr == "CPS1_2.00ff") return VER_CPS1_200ff;
   if (versionStr == "CPS1_3.50") return VER_CPS1_350;
@@ -43,17 +43,17 @@ CPSFormatVer GetVersionEnum(const std::string &versionStr) {
   return VER_UNDEFINED;
 }
 
-void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
+void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   MAMEGame *gameentry = static_cast<MAMEGame*>(info);
-  CPSFormatVer fmt_ver = GetVersionEnum(gameentry->fmt_version_str);
+  CPSFormatVer fmt_ver = versionEnum(gameentry->fmt_version_str);
 
   if (fmt_ver == VER_UNDEFINED) {
     L_ERROR("XML entry uses an undefined QSound version: {}", gameentry->fmt_version_str);
     return;
   }
 
-  MAMERomGroup *seqRomGroupEntry = gameentry->GetRomGroupOfType("audiocpu");
-  MAMERomGroup *sampsRomGroupEntry = gameentry->GetRomGroupOfType("qsound");
+  MAMERomGroup *seqRomGroupEntry = gameentry->getRomGroupOfType("audiocpu");
+  MAMERomGroup *sampsRomGroupEntry = gameentry->getRomGroupOfType("qsound");
   if (!seqRomGroupEntry || !sampsRomGroupEntry)
     return;
   uint32_t seq_table_offset;
@@ -65,11 +65,11 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
   uint32_t artic_table_length = 0x800;
   uint32_t num_instr_banks;
   if (!seqRomGroupEntry->file || !sampsRomGroupEntry->file ||
-      !seqRomGroupEntry->GetHexAttribute("seq_table", &seq_table_offset) ||
-      !seqRomGroupEntry->GetHexAttribute("samp_table", &samp_table_offset) ||
-      !seqRomGroupEntry->GetAttribute("num_instr_banks", &num_instr_banks))
+      !seqRomGroupEntry->getHexAttribute("seq_table", &seq_table_offset) ||
+      !seqRomGroupEntry->getHexAttribute("samp_table", &samp_table_offset) ||
+      !seqRomGroupEntry->getAttribute("num_instr_banks", &num_instr_banks))
     return;
-  seqRomGroupEntry->GetHexAttribute("samp_table_length", &samp_table_length);
+  seqRomGroupEntry->getHexAttribute("samp_table_length", &samp_table_length);
 
   switch (fmt_ver) {
     case VER_100:
@@ -82,13 +82,13 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
     case VER_106B:
     case VER_115C:
     case VER_115:
-      if (!seqRomGroupEntry->GetHexAttribute("instr_table", &instr_table_offset))
+      if (!seqRomGroupEntry->getHexAttribute("instr_table", &instr_table_offset))
         return;
       break;
     case VER_200:
     case VER_201B:
     case VER_CPS3:
-      if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
+      if (!seqRomGroupEntry->getHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
       break;
     case VER_116B:
@@ -100,9 +100,9 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
     case VER_180:
     case VER_210:
     case VER_211:
-      if (!seqRomGroupEntry->GetHexAttribute("instr_table_ptrs", &instr_table_offset))
+      if (!seqRomGroupEntry->getHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
-      if (fmt_ver >= VER_130 && !seqRomGroupEntry->GetHexAttribute("artic_table", &artic_table_offset))
+      if (fmt_ver >= VER_130 && !seqRomGroupEntry->getHexAttribute("artic_table", &artic_table_offset))
         return;
       break;
     default:
@@ -142,10 +142,10 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
   else {
     sampInfoTable = new CPS3SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
   }
-  sampInfoTable->LoadVGMFile();
+  sampInfoTable->loadVGMFile();
   if (artic_table_offset) {
     articTable = new CPSArticTable(programFile, artic_table_name, artic_table_offset, artic_table_length);
-    if (!articTable->LoadVGMFile()) {
+    if (!articTable->loadVGMFile()) {
       delete articTable;
       articTable = nullptr;
     }
@@ -158,12 +158,12 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
                              sampInfoTable,
                              articTable,
                              instrset_name);
-  if (!instrset->LoadVGMFile()) {
+  if (!instrset->loadVGMFile()) {
     delete instrset;
     instrset = nullptr;
   }
   sampcoll = new CPS2SampColl(samplesFile, instrset, sampInfoTable, 0, 0, sampcoll_name);
-  if (!sampcoll->LoadVGMFile()) {
+  if (!sampcoll->loadVGMFile()) {
     delete sampcoll;
     sampcoll = nullptr;
   }
@@ -175,7 +175,7 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
   unsigned int k = 0;
   uint32_t seqPointer = 0;
   while (seqPointer == 0)
-    seqPointer = programFile->GetWordBE(seq_table_offset + (k++ * 4)) & 0x0FFFFF;
+    seqPointer = programFile->readWordBE(seq_table_offset + (k++ * 4)) & 0x0FFFFF;
   if (fmt_ver == VER_CPS3) {
     seq_table_length = seqPointer - 8;
   }
@@ -185,7 +185,7 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
 
   // Add SeqTable as Miscfile
   VGMMiscFile *seqTable = new VGMMiscFile(CPS2Format::name, seqRomGroupEntry->file, seq_table_offset, seq_table_length, seq_table_name);
-  if (!seqTable->LoadVGMFile()) {
+  if (!seqTable->loadVGMFile()) {
     delete seqTable;
     return;
   }
@@ -194,15 +194,15 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
   //k < 0x58 &&
   for (k = 0; (seq_table_length == 0 || k < seq_table_length); k += 4) {
 
-    if (programFile->GetWordBE(seq_table_offset + k) == 0)
+    if (programFile->readWordBE(seq_table_offset + k) == 0)
       continue;
 
     if (fmt_ver == VER_CPS3) {
-      seqPointer = programFile->GetWordBE(seq_table_offset + k) + seq_table_offset - 8;
+      seqPointer = programFile->readWordBE(seq_table_offset + k) + seq_table_offset - 8;
     }
     else {
       // & 0x0FFFFF because SSF2 sets 0x100000 for some reason
-      seqPointer = programFile->GetWordBE(seq_table_offset + k) & 0x0FFFFF;
+      seqPointer = programFile->readWordBE(seq_table_offset + k) & 0x0FFFFF;
     }
 
     seqTable->addChild(seq_table_offset + k, 4, "Sequence Pointer");
@@ -211,7 +211,7 @@ void CPS2Scanner::Scan(RawFile* /*file*/, void* info) {
     VGMColl *coll = new VGMColl(collName);
     std::string seqName = fmt::format("{} seq {}", gameentry->name, k / 4);
     CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
-    if (newSeq->LoadVGMFile()) {
+    if (newSeq->loadVGMFile()) {
       coll->useSeq(newSeq);
       coll->addInstrSet(instrset);
       coll->addSampColl(sampcoll);

@@ -29,7 +29,7 @@ PSXSampColl::PSXSampColl(const string &format,
     : VGMSampColl(format, instrset->rawFile(), instrset, offset, length), vagLocations(vagLocations) {
 }
 
-bool PSXSampColl::GetSampleInfo() {
+bool PSXSampColl::parseSampleInfo() {
   if (vagLocations.size() == 0) {
     //We scan through the sample section, and determine the offsets and size of each sample
     //We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
@@ -37,13 +37,13 @@ bool PSXSampColl::GetSampleInfo() {
 
     uint32_t nEndOffset = dwOffset + unLength;
     if (unLength == 0)
-      nEndOffset = GetEndOffset();
+      nEndOffset = endOffset();
 
     uint32_t i = dwOffset;
     while (i + 32 <= nEndOffset) {
       bool isSample = false;
 
-      if (GetWord(i) == 0 && GetWord(i + 4) == 0 && GetWord(i + 8) == 0 && GetWord(i + 12) == 0) {
+      if (readWord(i) == 0 && readWord(i + 4) == 0 && readWord(i + 8) == 0 && readWord(i + 12) == 0) {
         // most of samples starts with 0s
         isSample = true;
       }
@@ -55,7 +55,7 @@ bool PSXSampColl::GetSampleInfo() {
         uint8_t continueByte = 0xff;
         bool badBlock = false;
         while (i + (countOfContinue * 16) + 16 <= nEndOffset) {
-          uint8_t keyFlagByte = GetByte(i + (countOfContinue * 16) + 1);
+          uint8_t keyFlagByte = readByte(i + (countOfContinue * 16) + 1);
 
           if ((keyFlagByte & 0xF8) != 0) {
             badBlock = true;
@@ -84,13 +84,13 @@ bool PSXSampColl::GetSampleInfo() {
 
       if (isSample) {
         uint32_t extraGunkLength = 0;
-        uint8_t filterRangeByte = GetByte(i + 16);
-        uint8_t keyFlagByte = GetByte(i + 16 + 1);
+        uint8_t filterRangeByte = readByte(i + 16);
+        uint8_t keyFlagByte = readByte(i + 16 + 1);
         if ((keyFlagByte & 0xF8) != 0)
           break;
 
         //if (filterRangeByte == 0 && keyFlagByte == 0)	// Breaking on FFXII 309 - Eruyt Village at 61D50 of the WD
-        if (GetWord(i + 16) == 0 && GetWord(i + 20) == 0 && GetWord(i + 24) == 0 && GetWord(i + 28) == 0)
+        if (readWord(i + 16) == 0 && readWord(i + 20) == 0 && readWord(i + 24) == 0 && readWord(i + 28) == 0)
           break;
 
         uint32_t beginOffset = i;
@@ -99,13 +99,13 @@ bool PSXSampColl::GetSampleInfo() {
         //skip through until we reach the chunk with the end flag set
         bool loopEnd = false;
         while (i + 16 <= nEndOffset && !loopEnd) {
-          loopEnd = ((GetByte(i + 1) & 1) != 0);
+          loopEnd = ((readByte(i + 1) & 1) != 0);
           i += 16;
         }
 
         //deal with exceptional cases where we see 00 07 77 77 77 77 77 etc.
         while (i + 16 <= nEndOffset) {
-          loopEnd = ((GetByte(i + 1) & 1) != 0);
+          loopEnd = ((readByte(i + 1) & 1) != 0);
           if (!loopEnd) {
             break;
           }
@@ -146,7 +146,7 @@ bool PSXSampColl::GetSampleInfo() {
           break;
         }
 
-        lastBlock = ((GetByte(offSampEnd + 1) & 1) != 0);
+        lastBlock = ((readByte(offSampEnd + 1) & 1) != 0);
         offSampEnd += 16;
       } while (!lastBlock);
 
@@ -176,8 +176,8 @@ bool PSXSampColl::GetSampleInfo() {
 #define MIN_ALLOWED_FILTER_DIFF 0
 
 // GENERIC FUNCTION USED FOR SCANNERS
-PSXSampColl *PSXSampColl::SearchForPSXADPCM(RawFile *file, const string &format) {
-  const std::vector<PSXSampColl *> &sampColls = SearchForPSXADPCMs(file, format);
+PSXSampColl *PSXSampColl::searchForPSXADPCM(RawFile *file, const string &format) {
+  const std::vector<PSXSampColl *> &sampColls = searchForPSXADPCMs(file, format);
   if (sampColls.size() != 0) {
     // pick up one of the SampColls
     size_t bestSampleCount = 0;
@@ -195,16 +195,16 @@ PSXSampColl *PSXSampColl::SearchForPSXADPCM(RawFile *file, const string &format)
   }
 }
 
-std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, const string &format) {
+std::vector<PSXSampColl *> PSXSampColl::searchForPSXADPCMs(RawFile *file, const string &format) {
   std::vector<PSXSampColl *> sampColls;
   size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < nFileLength; i++) {
     // if we have 16 0s in a row.
-    if (file->GetWord(i) == 0 && file->GetWord(i + 4) == 0 && file->GetWord(i + 8) == 0 && file->GetWord(i + 12) == 0) {
+    if (file->readWord(i) == 0 && file->readWord(i + 4) == 0 && file->readWord(i + 8) == 0 && file->readWord(i + 12) == 0) {
       bool bBad = false;
       uint32_t firstChunk = i + 16;
-      uint8_t filterRangeByte = file->GetByte(firstChunk);
-      uint8_t keyFlagByte = file->GetByte(firstChunk + 1);
+      uint8_t filterRangeByte = file->readByte(firstChunk);
+      uint8_t keyFlagByte = file->readByte(firstChunk + 1);
 
       if (filterRangeByte == 0 && keyFlagByte == 0)
         continue;
@@ -215,29 +215,29 @@ std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, const 
 
       uint8_t maxRangeChange = 0;
       uint8_t maxFilterChange = 0;
-      int prevRange = file->GetByte(firstChunk + 16)
+      int prevRange = file->readByte(firstChunk + 16)
           & 0xF;                    //+16 because we're skipping the first chunk for uncertain reasons
-      int prevFilter = (file->GetByte(firstChunk + 16) & 0xF0) >> 4;
+      int prevFilter = (file->readByte(firstChunk + 16) & 0xF0) >> 4;
       for (uint32_t j = 0; j < NUM_CHUNKS_READAHEAD; j++) {
         uint32_t curChunk = firstChunk + 16 + j * 16;
-        keyFlagByte = file->GetByte(curChunk + 1);
+        keyFlagByte = file->readByte(curChunk + 1);
         if ((keyFlagByte & 0xFC) != 0) {
           bBad = true;
           break;
         }
-        if ((file->GetWord(curChunk) == 0
-            && ((file->GetWord(curChunk + 4) == 0) || file->GetWord(curChunk + 8) == 0))) {
+        if ((file->readWord(curChunk) == 0
+            && ((file->readWord(curChunk + 4) == 0) || file->readWord(curChunk + 8) == 0))) {
           bBad = true;
           break;
         }
 
         //do range and filter value comparison
-        const int range = file->GetByte(firstChunk + 16 + j * 16) & 0xF;
+        const int range = file->readByte(firstChunk + 16 + j * 16) & 0xF;
         int diff = abs(range - prevRange);
         if (diff > maxRangeChange)
           maxRangeChange = diff;
         prevRange = range;
-        const int filter = (file->GetByte(firstChunk + 16 + j * 16) & 0xF0) >> 4;
+        const int filter = (file->readByte(firstChunk + 16 + j * 16) & 0xF0) >> 4;
         diff = abs(filter - prevFilter);
         if (diff > maxFilterChange)
           maxFilterChange = diff;
@@ -250,7 +250,7 @@ std::vector<PSXSampColl *> PSXSampColl::SearchForPSXADPCMs(RawFile *file, const 
         continue;
 
       PSXSampColl *newSampColl = new PSXSampColl(PS1Format::name, file, i);
-      if (!newSampColl->LoadVGMFile()) {
+      if (!newSampColl->loadVGMFile()) {
         delete newSampColl;
         continue;
       }
@@ -280,23 +280,23 @@ PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32
 PSXSamp::~PSXSamp() {
 }
 
-double PSXSamp::GetCompressionRatio() {
+double PSXSamp::compressionRatio() {
   return ((28.0 / 16.0) * 2); //aka 3.5;
 }
 
-void PSXSamp::ConvertToStdWave(uint8_t *buf) {
+void PSXSamp::convertToStdWave(uint8_t *buf) {
   int16_t *uncompBuf = reinterpret_cast<int16_t*>(buf);
   VAGBlk theBlock;
   f32 prev1 = 0;
   f32 prev2 = 0;
 
   if (this->bSetLoopOnConversion)
-    SetLoopStatus(0); //loopStatus is initiated to -1.  We should default it now to not loop
+    setLoopStatus(0); //loopStatus is initiated to -1.  We should default it now to not loop
 
   bool addrOutOfVirtFile = false;
   for (uint32_t k = 0; k < dataLength; k += 0x10)                //for every adpcm chunk
   {
-    if (dwOffset + k + 16 > vgmFile()->GetEndOffset()) {
+    if (dwOffset + k + 16 > vgmFile()->endOffset()) {
       L_WARN("\"{}\" unexpected EOF.", name());
       break;
     }
@@ -305,37 +305,37 @@ void PSXSamp::ConvertToStdWave(uint8_t *buf) {
       addrOutOfVirtFile = true;
     }
 
-    theBlock.range = GetByte(dwOffset + k) & 0xF;
-    theBlock.filter = (GetByte(dwOffset + k) & 0xF0) >> 4;
-    theBlock.flag.end = GetByte(dwOffset + k + 1) & 1;
-    theBlock.flag.looping = (GetByte(dwOffset + k + 1) & 2) > 0;
+    theBlock.range = readByte(dwOffset + k) & 0xF;
+    theBlock.filter = (readByte(dwOffset + k) & 0xF0) >> 4;
+    theBlock.flag.end = readByte(dwOffset + k + 1) & 1;
+    theBlock.flag.looping = (readByte(dwOffset + k + 1) & 2) > 0;
 
     //this can be the loop point, but in wd, this info is stored in the instrset
-    theBlock.flag.loop = (GetByte(dwOffset + k + 1) & 4) > 0;
+    theBlock.flag.loop = (readByte(dwOffset + k + 1) & 4) > 0;
     if (this->bSetLoopOnConversion) {
       if (theBlock.flag.loop) {
-        this->SetLoopOffset(k);
-        this->SetLoopLength(dataLength - k);
+        this->setLoopOffset(k);
+        this->setLoopLength(dataLength - k);
       }
       if (theBlock.flag.end && theBlock.flag.looping) {
-        SetLoopStatus(1);
+        setLoopStatus(1);
       }
     }
 
-    rawFile()->GetBytes(dwOffset + k + 2, 14, theBlock.brr);
+    rawFile()->readBytes(dwOffset + k + 2, 14, theBlock.brr);
 
     //each decompressed pcm block is 52 bytes   EDIT: (wait, isn't it 56 bytes? or is it 28?)
-    DecompVAGBlk(uncompBuf + ((k * 28) / 16),
+    decompVAGBlk(uncompBuf + ((k * 28) / 16),
                  &theBlock,
                  &prev1,
                  &prev2);
   }
 }
 
-uint32_t PSXSamp::GetSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop) {
+uint32_t PSXSamp::getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop) {
   uint32_t curOffset = offset;
   while (curOffset < endOffset) {
-    uint8_t keyFlagByte = file->GetByte(curOffset + 1);
+    uint8_t keyFlagByte = file->readByte(curOffset + 1);
 
     curOffset += 16;
 
@@ -355,7 +355,7 @@ uint32_t PSXSamp::GetSampleLength(const RawFile *file, uint32_t offset, uint32_t
 }
 
 //This next function is taken from Antires's work
-void PSXSamp::DecompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, f32 *prev1, f32 *prev2) {
+void PSXSamp::decompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, f32 *prev1, f32 *prev2) {
   u32 i, shift;                                //Shift amount for compressed samples
   f32 t;                                       //Temporary sample
   f32 f1, f2;

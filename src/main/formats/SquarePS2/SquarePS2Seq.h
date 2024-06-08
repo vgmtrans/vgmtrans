@@ -8,9 +8,9 @@ class BGMSeq : public VGMSeq {
   BGMSeq(RawFile *file, uint32_t offset);
   ~BGMSeq() override = default;
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
-  uint32_t GetID() const override { return assocWDID; }
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  uint32_t id() const override { return assocWDID; }
 
  protected:
   unsigned short seqID;
@@ -22,5 +22,5 @@ class BGMTrack : public SeqTrack {
  public:
   BGMTrack(BGMSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
-  bool ReadEvent() override;
+  bool readEvent() override;
 };

@@ -12,7 +12,7 @@
 #include <filesystem>
 
 template <class T>
-void DeleteVect(std::vector<T *> &vect) {
+void deleteVect(std::vector<T *> &vect) {
   for (auto p : vect) {
     delete p;
   }
@@ -20,7 +20,7 @@ void DeleteVect(std::vector<T *> &vect) {
 }
 
 template <class T>
-void DeleteList(std::list<T *> &list) {
+void deleteList(std::list<T *> &list) {
   for (auto p : list) {
     delete p;
   }
@@ -28,7 +28,7 @@ void DeleteList(std::list<T *> &list) {
 }
 
 template <class T1, class T2>
-void DeleteMap(std::map<T1, T2 *> &container) {
+void deleteMap(std::map<T1, T2 *> &container) {
   for (auto el : container) {
     delete el.second;
   }
@@ -36,18 +36,18 @@ void DeleteMap(std::map<T1, T2 *> &container) {
 }
 
 template <class T>
-inline void PushTypeOnVect(std::vector<uint8_t> &theVector, T unit) {
+inline void pushTypeOnVect(std::vector<uint8_t> &theVector, T unit) {
   theVector.insert(theVector.end(), reinterpret_cast<uint8_t *>(&unit),
                    reinterpret_cast<uint8_t *>(&unit) + sizeof(T));
 }
 
 template <class T>
-inline void PushTypeOnVectBE(std::vector<uint8_t> &theVector, T unit) {
+inline void pushTypeOnVectBE(std::vector<uint8_t> &theVector, T unit) {
   for (uint32_t i = 0; i < sizeof(T); i++) {
     theVector.push_back(*(reinterpret_cast<uint8_t *>(&unit) - i + sizeof(T) - 1));
   }
 }
 
-inline void PushBackStringOnVector(std::vector<uint8_t> &theVector, std::string &str) {
+inline void pushBackStringOnVector(std::vector<uint8_t> &theVector, std::string &str) {
   theVector.insert(theVector.end(), str.data(), str.data() + str.length());
 }

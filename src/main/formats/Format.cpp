@@ -22,33 +22,33 @@ Format::~Format() {
     delete matcher;
 }
 
-Format *Format::GetFormatFromName(const std::string &name) {
+Format *Format::getFormatFromName(const std::string &name) {
   auto findIt = registry().find(name);
   if (findIt == registry().end())
         return nullptr;
   return (*findIt).second;
 }
 
-bool Format::OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+bool Format::onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
   if (!matcher) {
     return false;
   }
-  return matcher->OnNewFile(file);
+  return matcher->onNewFile(file);
 }
 
-VGMColl *Format::NewCollection() {
+VGMColl *Format::newCollection() {
   return new VGMColl();
 }
 
-bool Format::OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+bool Format::onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
   if (!matcher) {
     return false;
   }
-  return matcher->OnCloseFile(file);
+  return matcher->onCloseFile(file);
 }
 
-bool Format::Init() {
-  scanner = NewScanner();
-  matcher = NewMatcher();
+bool Format::init() {
+  scanner = newScanner();
+  matcher = newMatcher();
   return true;
 }

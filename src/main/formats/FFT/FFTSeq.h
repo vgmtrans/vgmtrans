@@ -9,9 +9,9 @@ class FFTSeq : public VGMSeq {
   FFTSeq(RawFile *file, uint32_t offset);
   ~FFTSeq() override;
 
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
-  uint32_t GetID() const override { return assocWdsID; }
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  uint32_t id() const override { return assocWdsID; }
 
  protected:
   uint16_t seqID;
@@ -23,8 +23,8 @@ class FFTTrack
     : public SeqTrack {
  public:
   FFTTrack(FFTSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  void ResetVars() override;
-  bool ReadEvent() override;
+  void resetVars() override;
+  bool readEvent() override;
 
  public:
   bool bNoteOn;

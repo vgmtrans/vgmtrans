@@ -21,8 +21,8 @@ class AkaoSnesInstrSet:
                    const std::string &name = "AkaoSnesInstrSet");
   ~AkaoSnesInstrSet() override;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
   AkaoSnesVersion version;
 
@@ -50,7 +50,7 @@ class AkaoSnesInstr
                 const std::string &name = "AkaoSnesInstr");
   ~AkaoSnesInstr() override;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
   AkaoSnesVersion version;
 
@@ -77,7 +77,7 @@ public:
                   const std::string &name = "AkaoSnesDrumKit");
   ~AkaoSnesDrumKit() override;
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
   AkaoSnesVersion version;
 
@@ -100,10 +100,10 @@ class AkaoSnesRgn
               uint16_t addrTuningTable);
   ~AkaoSnesRgn() override;
 
-  bool InitializeRegion(uint8_t srcn,
+  bool initializeRegion(uint8_t srcn,
                         uint32_t spcDirAddr,
                         uint16_t addrADSRTable);
-  bool LoadRgn() override;
+  bool loadRgn() override;
 
   AkaoSnesVersion version;
 };
@@ -127,7 +127,7 @@ public:
                      uint16_t addrTuningTable);
   ~AkaoSnesDrumKitRgn() override;
 
-  bool InitializePercussionRegion(uint8_t srcn,
+  bool initializePercussionRegion(uint8_t srcn,
                                   uint32_t spcDirAddr,
                                   uint16_t addrADSRTable,
                                   uint16_t addrDrumKitTable);

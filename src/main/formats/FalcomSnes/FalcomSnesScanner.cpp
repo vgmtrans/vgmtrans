@@ -78,32 +78,32 @@ BytePattern FalcomSnesScanner::ptnLoadInstr(
 	,
 	23);
 
-void FalcomSnesScanner::Scan(RawFile *file, void *info) {
+void FalcomSnesScanner::scan(RawFile *file, void *info) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForFalcomSnesFromARAM(file);
+    searchForFalcomSnesFromARAM(file);
   } else {
     // Search from ROM unimplemented
   }
   return;
 }
 
-void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
+void FalcomSnesScanner::searchForFalcomSnesFromARAM(RawFile *file) {
   FalcomSnesVersion version;
-  std::string name = file->tag.HasTitle() ? file->tag.title : file->stem();
+  std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   uint32_t ofsLoadSeq;
   uint16_t addrSeqHeader;
-  if (file->SearchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-    uint8_t addrSeqHeaderPtr = file->GetByte(ofsLoadSeq + 3);
-    addrSeqHeader = file->GetShort(addrSeqHeaderPtr);
+  if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
+    uint8_t addrSeqHeaderPtr = file->readByte(ofsLoadSeq + 3);
+    addrSeqHeader = file->readShort(addrSeqHeaderPtr);
     version = FALCOMSNES_YS5;
   } else {
     return;
   }
 
   FalcomSnesSeq *newSeq = new FalcomSnesSeq(file, version, addrSeqHeader, name);
-  if (!newSeq->LoadVGMFile()) {
+  if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }
@@ -111,8 +111,8 @@ void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
   // scan for DIR address
   uint16_t spcDirAddr;
   uint32_t ofsSetDIR;
-  if (file->SearchBytePattern(ptnSetDIR, ofsSetDIR)) {
-    spcDirAddr = file->GetByte(ofsSetDIR + 1) << 8;
+  if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
+    spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
   } else {
     return;
   }
@@ -121,16 +121,16 @@ void FalcomSnesScanner::SearchForFalcomSnesFromARAM(RawFile *file) {
   uint32_t ofsLoadInstr;
   uint16_t addrSampToInstrTable;
   uint16_t addrInstrTable;
-  if (file->SearchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
-    addrSampToInstrTable = file->GetShort(ofsLoadInstr + 3);
-    addrInstrTable = file->GetShort(ofsLoadInstr + 21);
+  if (file->searchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
+    addrSampToInstrTable = file->readShort(ofsLoadInstr + 3);
+    addrInstrTable = file->readShort(ofsLoadInstr + 21);
   } else {
     return;
   }
 
   FalcomSnesInstrSet *newInstrSet = new FalcomSnesInstrSet(
     file, version, addrInstrTable, addrSampToInstrTable, spcDirAddr, newSeq->instrADSRHints);
-  if (!newInstrSet->LoadVGMFile()) {
+  if (!newInstrSet->loadVGMFile()) {
     delete newInstrSet;
     return;
   }

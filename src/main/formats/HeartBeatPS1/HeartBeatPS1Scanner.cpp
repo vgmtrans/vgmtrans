@@ -14,19 +14,19 @@ ScannerRegistration<HeartBeatPS1Scanner> s_heartbeat_ps1("HEARTBEATPS1");
 
 #define SRCH_BUF_SIZE 0x20000
 
-void HeartBeatPS1Scanner::Scan(RawFile *file, void* /*info*/) {
-  SearchForHeartBeatPS1VGMFile(file);
+void HeartBeatPS1Scanner::scan(RawFile *file, void* /*info*/) {
+  searchForHeartBeatPS1VGMFile(file);
 }
 
-std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile *file) {
+std::vector<VGMFile *> HeartBeatPS1Scanner::searchForHeartBeatPS1VGMFile(RawFile *file) {
   std::vector<VGMFile *> loadedFiles;
 
   for (size_t offset = 0; offset + HEARTBEATPS1_SND_HEADER_SIZE <= file->size(); offset++) {
     size_t curOffset = offset;
 
-    const uint32_t seq_size = file->GetWord(curOffset);
-    const uint16_t seq_id = file->GetShort(curOffset + 4);
-    const uint8_t num_instrsets = file->GetByte(curOffset + 6);
+    const uint32_t seq_size = file->readWord(curOffset);
+    const uint16_t seq_id = file->readShort(curOffset + 4);
+    const uint8_t num_instrsets = file->readByte(curOffset + 6);
 
     // check SEQ size
     if (seq_size != 0) {
@@ -54,9 +54,9 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
     uint32_t total_instr_size = 0;
     std::vector<uint16_t> insetset_ids;
     for (uint8_t instrset_index = 0; instrset_index < 4; instrset_index++) {
-      const uint32_t sampcoll_size = file->GetWord(curOffset);
-      const uint32_t instrset_size = file->GetWord(curOffset + 0x04);
-      const uint16_t instrset_id = file->GetShort(curOffset + 0x08);
+      const uint32_t sampcoll_size = file->readWord(curOffset);
+      const uint32_t instrset_size = file->readWord(curOffset + 0x04);
+      const uint16_t instrset_id = file->readShort(curOffset + 0x08);
 
       // check instrset id
       if (instrset_id > 4 && instrset_id != 0xFFFF) {
@@ -107,7 +107,7 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
         }
 
         // check unused bits of the first loop flag
-        uint8_t sampLoopInfo = file->GetByte(sampLoopInfoOffset);
+        uint8_t sampLoopInfo = file->readByte(sampLoopInfoOffset);
         if ((sampLoopInfo & 0xF8) != 0) {
           valid_instrset = false;
           break;
@@ -134,7 +134,7 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
     uint32_t seq_offset = HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size;
     if (seq_size != 0) {
       constexpr uint8_t SEQ_SIGNATURE[4] = {'q', 'Q', 'E', 'S'};
-      if (!file->MatchBytes(SEQ_SIGNATURE, offset + seq_offset, sizeof(SEQ_SIGNATURE))) {
+      if (!file->matchBytes(SEQ_SIGNATURE, offset + seq_offset, sizeof(SEQ_SIGNATURE))) {
         continue;
       }
     }
@@ -146,7 +146,7 @@ std::vector<VGMFile *> HeartBeatPS1Scanner::SearchForHeartBeatPS1VGMFile(RawFile
 
     if (seq_size != 0) {
       HeartBeatPS1Seq *newHeartBeatPS1Seq = new HeartBeatPS1Seq(file, static_cast<uint32_t>(offset), total_size);
-      if (newHeartBeatPS1Seq->LoadVGMFile()) {
+      if (newHeartBeatPS1Seq->loadVGMFile()) {
         loadedFiles.push_back(newHeartBeatPS1Seq);
       } else {
         delete newHeartBeatPS1Seq;

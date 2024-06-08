@@ -18,7 +18,7 @@ SegSatScanner::SegSatScanner() {}
 
 SegSatScanner::~SegSatScanner() {}
 
-void SegSatScanner::Scan(RawFile *file, void *info) {
+void SegSatScanner::scan(RawFile *file, void *info) {
   uint32_t nFileLength;
   uint8_t *buf;
   uint32_t j;
@@ -29,13 +29,13 @@ void SegSatScanner::Scan(RawFile *file, void *info) {
     return;
   }
   buf = new uint8_t[SRCH_BUF_SIZE];
-  file->GetBytes(0, SRCH_BUF_SIZE, buf);
+  file->readBytes(0, SRCH_BUF_SIZE, buf);
   j = 0;
   for (uint32_t i = 0; i + 4 < nFileLength; i++) {
     if (j + 4 > SRCH_BUF_SIZE) {
       memcpy(buf, buf + j, 3);
       // TODO: This entire method should be rewritten, as this can read beyond the length of the file
-      file->GetBytes(i + 3, j, buf + 3);
+      file->readBytes(i + 3, j, buf + 3);
       j = 0;
     }
     if (buf[j] == 0x01 && buf[j + 1] == 0 && buf[j + 2] == 0 && buf[j + 3] == 0 && buf[j + 4] == 6
@@ -43,7 +43,7 @@ void SegSatScanner::Scan(RawFile *file, void *info) {
 
       SegSatSeq *newSegSatSeq = new SegSatSeq(file, i + 5);//this, pDoc, pDoc->GetWord(i+24 + k*8)-0x8000000);
 
-      if (!newSegSatSeq->LoadVGMFile())
+      if (!newSegSatSeq->loadVGMFile())
         delete newSegSatSeq;
     }
     j++;

@@ -12,7 +12,7 @@ VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string
 }
 
 VGMItem::~VGMItem() {
-  DeleteVect(m_children);
+  deleteVect(m_children);
 }
 
 bool operator>(const VGMItem &item1, const VGMItem &item2) {
@@ -35,11 +35,11 @@ RawFile *VGMItem::rawFile() const {
   return m_vgmfile->rawFile();
 }
 
-bool VGMItem::IsItemAtOffset(uint32_t offset, bool matchStartOffset) {
-  return GetItemFromOffset(offset, matchStartOffset) != nullptr;
+bool VGMItem::isItemAtOffset(uint32_t offset, bool matchStartOffset) {
+  return getItemAtOffset(offset, matchStartOffset) != nullptr;
 }
 
-VGMItem* VGMItem::GetItemFromOffset(uint32_t offset, bool matchStartOffset) {
+VGMItem* VGMItem::getItemAtOffset(uint32_t offset, bool matchStartOffset) {
   if (m_children.empty()) {
     if ((matchStartOffset ? offset == dwOffset : offset >= dwOffset) && (offset < dwOffset + unLength)) {
       return this;
@@ -47,49 +47,49 @@ VGMItem* VGMItem::GetItemFromOffset(uint32_t offset, bool matchStartOffset) {
   }
 
   for (const auto child : m_children) {
-    if (VGMItem *foundItem = child->GetItemFromOffset(offset, matchStartOffset))
+    if (VGMItem *foundItem = child->getItemAtOffset(offset, matchStartOffset))
       return foundItem;
   }
 
   return nullptr;
 }
 
-void VGMItem::AddToUI(VGMItem *parent, void *UI_specific) {
-  pRoot->UI_AddItem(this, parent, name(), UI_specific);
+void VGMItem::addToUI(VGMItem *parent, void *UI_specific) {
+  pRoot->UI_addItem(this, parent, name(), UI_specific);
 
   for (const auto child : m_children) {
-    child->AddToUI(this, UI_specific);
+    child->addToUI(this, UI_specific);
   }
 }
 
-uint32_t VGMItem::GetBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
-  return m_vgmfile->GetBytes(nIndex, nCount, pBuffer);
+uint32_t VGMItem::readBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
+  return m_vgmfile->readBytes(nIndex, nCount, pBuffer);
 }
 
-uint8_t VGMItem::GetByte(uint32_t offset) const {
-  return m_vgmfile->GetByte(offset);
+uint8_t VGMItem::readByte(uint32_t offset) const {
+  return m_vgmfile->readByte(offset);
 }
 
-uint16_t VGMItem::GetShort(uint32_t offset) const {
-  return m_vgmfile->GetShort(offset);
+uint16_t VGMItem::readShort(uint32_t offset) const {
+  return m_vgmfile->readShort(offset);
 }
 
-uint32_t VGMItem::GetWord(uint32_t offset) const {
-  return m_vgmfile->GetWord(offset);
+uint32_t VGMItem::getWord(uint32_t offset) const {
+  return m_vgmfile->readWord(offset);
 }
 
 // GetShort Big Endian
-uint16_t VGMItem::GetShortBE(uint32_t offset) const {
-  return m_vgmfile->GetShortBE(offset);
+uint16_t VGMItem::getShortBE(uint32_t offset) const {
+  return m_vgmfile->readShortBE(offset);
 }
 
 // GetWord Big Endian
-uint32_t VGMItem::GetWordBE(uint32_t offset) const {
-  return m_vgmfile->GetWordBE(offset);
+uint32_t VGMItem::getWordBE(uint32_t offset) const {
+  return m_vgmfile->readWordBE(offset);
 }
 
-bool VGMItem::IsValidOffset(uint32_t offset) const {
-  return m_vgmfile->IsValidOffset(offset);
+bool VGMItem::isValidOffset(uint32_t offset) const {
+  return m_vgmfile->isValidOffset(offset);
 }
 
 VGMItem* VGMItem::addChild(VGMItem *item) {
@@ -129,7 +129,7 @@ void VGMItem::sortChildrenByOffset() {
 }
 
 // Guess length of a container from its descendants
-uint32_t VGMItem::GuessLength() {
+uint32_t VGMItem::guessLength() {
   if (m_children.empty()) {
     return unLength;
   }
@@ -140,7 +140,7 @@ uint32_t VGMItem::GuessLength() {
 
     uint32_t itemLength = child->unLength;
     if (unLength == 0) {
-      itemLength = child->GuessLength();
+      itemLength = child->guessLength();
     }
 
     uint32_t expectedLength = child->dwOffset + itemLength - dwOffset;
@@ -151,11 +151,11 @@ uint32_t VGMItem::GuessLength() {
   return guessedLength;
 }
 
-void VGMItem::SetGuessedLength() {
+void VGMItem::setGuessedLength() {
   for (const auto child : m_children) {
-    child->SetGuessedLength();
+    child->setGuessedLength();
   }
   if (unLength == 0) {
-    unLength = GuessLength();
+    unLength = guessLength();
   }
 }

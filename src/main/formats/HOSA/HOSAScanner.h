@@ -15,8 +15,8 @@ class HOSAScanner : public VGMScanner {
   HOSAScanner();
   ~HOSAScanner() override;
 
-  void Scan(RawFile *file, void *info) override;
-  static HOSASeq *SearchForHOSASeq(RawFile *file);
-  static HOSAInstrSet *SearchForHOSAInstrSet(RawFile *file, const PSXSampColl *sampcoll);
-  static bool RecursiveRgnCompare(RawFile *file, int i, int sampNum, int numSamples, int numFinds, uint32_t *sampOffsets);
+  void scan(RawFile *file, void *info) override;
+  static HOSASeq* searchForHOSASeq(RawFile *file);
+  static HOSAInstrSet* searchForHOSAInstrSet(RawFile *file, const PSXSampColl *sampcoll);
+  static bool recursiveRgnCompare(RawFile *file, int i, int sampNum, int numSamples, int numFinds, uint32_t *sampOffsets);
 };

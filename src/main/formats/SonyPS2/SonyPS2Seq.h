@@ -22,9 +22,9 @@ class SonyPS2Seq:
   SonyPS2Seq(RawFile *file, uint32_t offset);
   virtual ~SonyPS2Seq();
 
-  virtual bool GetHeaderInfo();
-  virtual bool ReadEvent();
-  uint8_t GetDataByte(uint32_t offset);
+  virtual bool parseHeader();
+  virtual bool readEvent();
+  uint8_t getDataByte(uint32_t offset);
 
  private:
   VersCk versCk;

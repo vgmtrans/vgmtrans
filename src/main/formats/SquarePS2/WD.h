@@ -12,8 +12,8 @@ class WDInstrSet : public VGMInstrSet {
   WDInstrSet(RawFile *file, uint32_t offset);
   ~WDInstrSet() override = default;
 
-  bool GetHeaderInfo() override;
-  bool GetInstrPointers() override;
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
 
   uint32_t dwSampSectSize{};
   uint32_t dwNumInstrs{};
@@ -29,7 +29,7 @@ class WDInstr : public VGMInstr {
   WDInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
           uint32_t theInstrNum, const std::string& name);
   ~WDInstr() override = default;
-  bool LoadInstr() override;
+  bool loadInstr() override;
 };
 
 // *****

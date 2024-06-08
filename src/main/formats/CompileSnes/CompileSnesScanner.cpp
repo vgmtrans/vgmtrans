@@ -39,38 +39,38 @@ BytePattern CompileSnesScanner::ptnSetSongListAddress(
 	,
 	29);
 
-void CompileSnesScanner::Scan(RawFile* file, void* /*info*/) {
+void CompileSnesScanner::scan(RawFile* file, void* /*info*/) {
   size_t nFileLength = file->size();
   if (nFileLength == 0x10000) {
-    SearchForCompileSnesFromARAM(file);
+    searchForCompileSnesFromARAM(file);
   }
   else {
     // Search from ROM unimplemented
   }
 }
 
-void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
+void CompileSnesScanner::searchForCompileSnesFromARAM(RawFile *file) {
   CompileSnesVersion version;
 
   std::string basefilename = file->stem();
-  std::string name = file->tag.HasTitle() ? file->tag.title : basefilename;
+  std::string name = file->tag.hasTitle() ? file->tag.title : basefilename;
 
   // scan for table pointer initialize code
   uint32_t ofsSetSongListAddress;
-  if (!file->SearchBytePattern(ptnSetSongListAddress, ofsSetSongListAddress)) {
+  if (!file->searchBytePattern(ptnSetSongListAddress, ofsSetSongListAddress)) {
     return;
   }
 
   // determine the header address of Compile SPC engine
-  uint16_t addrEngineHeader = file->GetShort(ofsSetSongListAddress + 1);
+  uint16_t addrEngineHeader = file->readShort(ofsSetSongListAddress + 1);
   if (addrEngineHeader < 0x0100 && addrEngineHeader + 18 > 0x10000) {
     return;
   }
 
   // classify engine version
-  uint8_t addrSongListReg = file->GetByte(ofsSetSongListAddress + 4);
+  uint8_t addrSongListReg = file->readByte(ofsSetSongListAddress + 4);
   if (addrSongListReg == 0x4e) {
-    if (file->GetShortBE(ofsSetSongListAddress - 4) == 0x280c) { // and a,#$0c
+    if (file->readShortBE(ofsSetSongListAddress - 4) == 0x280c) { // and a,#$0c
       version = COMPILESNES_JAKICRUSH;
     }
     else {
@@ -78,7 +78,7 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
     }
   }
   else {
-    if (file->GetShortBE(ofsSetSongListAddress - 4) == 0x280c) { // and a,#$0c
+    if (file->readShortBE(ofsSetSongListAddress - 4) == 0x280c) { // and a,#$0c
       version = COMPILESNES_SUPERPUYO;
     }
     else {
@@ -87,7 +87,7 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
   }
 
   // determine the song list address
-  uint16_t addrSongList = file->GetShort(addrEngineHeader);
+  uint16_t addrSongList = file->readShort(addrEngineHeader);
 
   // TODO: guess song index
   int8_t guessedSongIndex = -1;
@@ -97,27 +97,27 @@ void CompileSnesScanner::SearchForCompileSnesFromARAM(RawFile *file) {
 
   uint32_t addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
   if (addrSongHeaderPtr + 2 <= 0x10000) {
-    uint16_t addrSongHeader = file->GetShort(addrSongHeaderPtr);
-    uint8_t numTracks = file->GetByte(addrSongHeader);
+    uint16_t addrSongHeader = file->readShort(addrSongHeaderPtr);
+    uint8_t numTracks = file->readByte(addrSongHeader);
     if (numTracks > 0 && numTracks <= 8) {
       CompileSnesSeq *newSeq = new CompileSnesSeq(file, version, addrSongHeader, name);
-      if (!newSeq->LoadVGMFile()) {
+      if (!newSeq->loadVGMFile()) {
         delete newSeq;
         return;
       }
     }
   }
 
-  uint16_t spcDirAddr = file->GetByte(addrEngineHeader + 0x0e) << 8;
+  uint16_t spcDirAddr = file->readByte(addrEngineHeader + 0x0e) << 8;
 
-  uint16_t addrTuningTable = file->GetShort(addrEngineHeader + 0x12);
+  uint16_t addrTuningTable = file->readShort(addrEngineHeader + 0x12);
   uint16_t addrPitchTablePtrs = 0;
   if (version != COMPILESNES_ALESTE && version != COMPILESNES_JAKICRUSH) {
-    addrPitchTablePtrs = file->GetShort(addrEngineHeader + 0x16);
+    addrPitchTablePtrs = file->readShort(addrEngineHeader + 0x16);
   }
 
   CompileSnesInstrSet *newInstrSet = new CompileSnesInstrSet(file, version, addrTuningTable, addrPitchTablePtrs, spcDirAddr);
-  if (!newInstrSet->LoadVGMFile()) {
+  if (!newInstrSet->loadVGMFile()) {
     delete newInstrSet;
     return;
   }

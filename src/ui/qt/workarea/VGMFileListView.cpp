@@ -125,7 +125,7 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
 
   setContextMenuPolicy(Qt::CustomContextMenu);
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_RemoveVGMFile, this, &VGMFileListView::removeVGMFile);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
@@ -163,11 +163,11 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
         return;
 
       QModelIndexList list = selectionModel()->selectedRows();
-      pRoot->UI_BeginRemoveVGMFiles();
+      pRoot->UI_beginRemoveVGMFiles();
       for (auto & idx : std::ranges::reverse_view(list)) {
-        qtVGMRoot.RemoveVGMFile(qtVGMRoot.vgmFiles()[idx.row()], true);
+        qtVGMRoot.removeVGMFile(qtVGMRoot.vgmFiles()[idx.row()], true);
       }
-      pRoot->UI_EndRemoveVGMFiles();
+      pRoot->UI_endRemoveVGMFiles();
 
       clearSelection();
       return;

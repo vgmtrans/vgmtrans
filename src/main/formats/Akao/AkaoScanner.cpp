@@ -12,46 +12,46 @@ namespace vgmtrans::scanners {
 ScannerRegistration<AkaoScanner> s_akao("AKAO");
 }
 
-void AkaoScanner::Scan(RawFile* file, void* /*info*/) {
-  const AkaoPs1Version file_version = DetermineVersionFromTag(file);
+void AkaoScanner::scan(RawFile* file, void* /*info*/) {
+  const AkaoPs1Version file_version = determineVersionFromTag(file);
 
   for (uint32_t offset = 0; offset + 0x60 < file->size(); offset++) {
     //sig must match ascii characters "AKAO"
-    if (file->GetWordBE(offset) != 0x414B414F)
+    if (file->readWordBE(offset) != 0x414B414F)
       continue;
 
-    const uint16_t seq_length = file->GetShort(offset + 6);
+    const uint16_t seq_length = file->readShort(offset + 6);
     if (seq_length != 0) {
       // Sequence
-      if (!AkaoSeq::IsPossibleAkaoSeq(file, offset))
+      if (!AkaoSeq::isPossibleAkaoSeq(file, offset))
         continue;
 
       AkaoPs1Version version = file_version;
       if (version == AkaoPs1Version::UNKNOWN)
-        version = AkaoSeq::GuessVersion(file, offset);
+        version = AkaoSeq::guessVersion(file, offset);
       AkaoSeq *seq = new AkaoSeq(file, offset, version);
-      if (!seq->LoadVGMFile()) {
+      if (!seq->loadVGMFile()) {
         delete seq;
         continue;
       }
 
-      AkaoInstrSet* instrset = seq->NewInstrSet();
+      AkaoInstrSet* instrset = seq->newInstrSet();
       if (instrset == nullptr)
         continue;
-      if (!instrset->LoadVGMFile())
+      if (!instrset->loadVGMFile())
         delete instrset;
     }
     else {
       // Samples
-      if (!AkaoSampColl::IsPossibleAkaoSampColl(file, offset))
+      if (!AkaoSampColl::isPossibleAkaoSampColl(file, offset))
         continue;
 
       AkaoPs1Version version = file_version;
       if (version == AkaoPs1Version::UNKNOWN)
-        version = AkaoSampColl::GuessVersion(file, offset);
+        version = AkaoSampColl::guessVersion(file, offset);
 
       AkaoSampColl *sampColl = new AkaoSampColl(file, offset, version);
-      if (!sampColl->LoadVGMFile())
+      if (!sampColl->loadVGMFile())
         delete sampColl;
     }
   }
@@ -63,27 +63,27 @@ void AkaoScanner::Scan(RawFile* file, void* /*info*/) {
 
     std::vector<AkaoInstrDatLocation> instrLocations;
 
-    if (file->GetWord(instrLocation.instrAllOffset) == 0x1010
-      && file->GetWord(instrLocation.instrDatOffset) == 0x1010)
+    if (file->readWord(instrLocation.instrAllOffset) == 0x1010
+      && file->readWord(instrLocation.instrDatOffset) == 0x1010)
       instrLocations.push_back(instrLocation);
 
     // Add choir samples for One-Winged Angel.
     // It is unlikely that any other song will load this sample collection in actual gameplay.
-    if (file->GetWord(instr2Location.instrAllOffset) == 0x38560 &&
-        file->GetWord(instr2Location.instrDatOffset) == 0x38560)
+    if (file->readWord(instr2Location.instrAllOffset) == 0x38560 &&
+        file->readWord(instr2Location.instrDatOffset) == 0x38560)
       instrLocations.push_back(instr2Location);
 
     if (!instrLocations.empty()) {
       for (const auto & loc : instrLocations) {
         auto *sampColl = new AkaoSampColl(file, loc);
-        if (!sampColl->LoadVGMFile())
+        if (!sampColl->loadVGMFile())
           delete sampColl;
       }
     }
   }
 }
 
-AkaoPs1Version AkaoScanner::DetermineVersionFromTag(const RawFile *file) noexcept {
+AkaoPs1Version AkaoScanner::determineVersionFromTag(const RawFile *file) noexcept {
   const std::string & album = file->tag.album;
   if (album == "Final Fantasy 7" || album == "Final Fantasy VII")
     return AkaoPs1Version::VERSION_1_0;

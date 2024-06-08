@@ -149,7 +149,7 @@ public:
   SaveAsOriginalFormatCommand() : SaveCommand<TFile>(false) {}
 
   void Save(const std::string& path, TFile* file) const override {
-    conversion::SaveAsOriginal(*file, path);
+    conversion::saveAsOriginal(*file, path);
   }
   [[nodiscard]] std::string Name() const override { return "Save as original format"; }
   [[nodiscard]] std::string GetExtension() const override { return ""; }
@@ -160,7 +160,7 @@ public:
   SaveAsMidiCommand() : SaveCommand<VGMSeq, VGMFile>(false) {}
 
   void Save(const std::string& path, VGMSeq* seq) const override {
-    seq->SaveAsMidi(path);
+    seq->saveAsMidi(path);
   }
   [[nodiscard]] std::string Name() const override { return "Save as MIDI"; }
   [[nodiscard]] std::string GetExtension() const override { return "mid"; }
@@ -172,7 +172,7 @@ public:
   SaveAsDLSCommand() : SaveCommand<VGMInstrSet, VGMFile>(false) {}
 
   void Save(const std::string& path, VGMInstrSet* instrSet) const override {
-    conversion::SaveAsDLS(*instrSet, path);
+    conversion::saveAsDLS(*instrSet, path);
   }
   [[nodiscard]] std::string Name() const override { return "Save as DLS"; }
   [[nodiscard]] std::string GetExtension() const override { return "dls"; }
@@ -184,7 +184,7 @@ public:
   SaveAsSF2Command() : SaveCommand<VGMInstrSet, VGMFile>(false) {}
 
   void Save(const std::string& path, VGMInstrSet* instrSet) const override {
-    conversion::SaveAsSF2(*instrSet, path);
+    conversion::saveAsSF2(*instrSet, path);
   }
   [[nodiscard]] std::string Name() const override { return "Save as SF2"; }
   [[nodiscard]] std::string GetExtension() const override { return "sf2"; }
@@ -196,7 +196,7 @@ public:
   SaveWavBatchCommand() : SaveCommand<VGMSampColl, VGMFile>(true) {}
 
   void Save(const std::string& path, VGMSampColl* sampColl) const override {
-    conversion::SaveAllAsWav(*sampColl, path);
+    conversion::saveAllAsWav(*sampColl, path);
   }
   [[nodiscard]] std::string Name() const override { return "Save all samples as WAV"; }
   [[nodiscard]] std::string GetExtension() const override { return "wav"; }
@@ -208,7 +208,7 @@ public:
   SaveCollCommand() : SaveCommand<VGMColl>(true) {}
 
   void Save(const std::string& path, VGMColl* coll) const override {
-    conversion::SaveAs<options>(*coll, path);
+    conversion::saveAs<options>(*coll, path);
   }
   [[nodiscard]] std::string Name() const override {
     std::vector<std::string> parts;

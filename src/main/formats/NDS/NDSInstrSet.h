@@ -20,7 +20,7 @@ class NDSInstrSet : public VGMInstrSet {
 public:
   NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSampColl *psg_samples,
               std::string name = "NDS Instrument Bank");
-  bool GetInstrPointers() override;
+  bool parseInstrPointers() override;
 
   std::vector<VGMSampColl *> sampCollWAList;
 
@@ -38,11 +38,11 @@ public:
   NDSInstr(NDSInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, uint8_t instrType);
 
-  bool LoadInstr() override;
+  bool loadInstr() override;
 
-  void GetSampCollPtr(VGMRgn *rgn, int waNum) const;
-  void GetArticData(VGMRgn *rgn, uint32_t offset) const;
-  uint16_t GetFallingRate(uint8_t DecayTime) const;
+  void getSampCollPtr(VGMRgn *rgn, int waNum) const;
+  void getArticData(VGMRgn *rgn, uint32_t offset) const;
+  uint16_t getFallingRate(uint8_t DecayTime) const;
 
 private:
   uint8_t instrType;
@@ -76,8 +76,8 @@ public:
               std::string name = "NDS Wave Archive");
   ~NDSWaveArch() override = default;
 
-  bool GetHeaderInfo() override;
-  bool GetSampleInfo() override;
+  bool parseHeader() override;
+  bool parseSampleInfo() override;
 };
 
 class NDSPSG : public VGMSampColl {
@@ -86,7 +86,7 @@ public:
   ~NDSPSG() override = default;
   
 private:
-  bool GetSampleInfo() override;
+  bool parseSampleInfo() override;
 };
 
 // *******
@@ -99,11 +99,11 @@ public:
           uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16, uint32_t rate = 0,
           uint8_t waveType = 0, std::string name = "Sample");
 
-  double GetCompressionRatio() override;  // ratio of space conserved.  should generally be > 1
+  double compressionRatio() override;  // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion
-  void ConvertToStdWave(uint8_t *buf) override;
+  void convertToStdWave(uint8_t *buf) override;
 
-  void ConvertImaAdpcm(uint8_t *buf);
+  void convertImaAdpcm(uint8_t *buf);
 
   static inline void clamp_step_index(int &stepIndex);
   static inline void clamp_sample(int &decompSample);
@@ -120,7 +120,7 @@ public:
   ~NDSPSGSamp() override = default;
 
 private:
-  void ConvertToStdWave(uint8_t *buf) override;
+  void convertToStdWave(uint8_t *buf) override;
 
   /* We use -1 to indicate noise */
   double m_duty_cycle{-1};

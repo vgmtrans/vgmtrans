@@ -30,7 +30,7 @@ PandoraBoxSnesInstrSet::PandoraBoxSnesInstrSet(RawFile *file,
 PandoraBoxSnesInstrSet::~PandoraBoxSnesInstrSet() {
 }
 
-bool PandoraBoxSnesInstrSet::GetHeaderInfo() {
+bool PandoraBoxSnesInstrSet::parseHeader() {
   if (globalInstrumentCount == 0) {
     return false;
   }
@@ -41,13 +41,13 @@ bool PandoraBoxSnesInstrSet::GetHeaderInfo() {
 
   // read global instrument table into vector
   for (uint8_t globalInstrNum = 0; globalInstrNum < globalInstrumentCount; globalInstrNum++) {
-    globalInstrTable.push_back(GetByte(addrGlobalInstrTable + globalInstrNum));
+    globalInstrTable.push_back(readByte(addrGlobalInstrTable + globalInstrNum));
   }
 
   return true;
 }
 
-bool PandoraBoxSnesInstrSet::GetInstrPointers() {
+bool PandoraBoxSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
 
   for (uint8_t instrNum = 0; instrNum <= 0x7f; instrNum++) {
@@ -56,7 +56,7 @@ bool PandoraBoxSnesInstrSet::GetInstrPointers() {
       break;
     }
 
-    uint8_t globalInstrNum = GetByte(addrLocalInstrItem);
+    uint8_t globalInstrNum = readByte(addrLocalInstrItem);
 
     // search instrument number and get SRCN
     // note: actual engine do backward search, but I do not care
@@ -69,7 +69,7 @@ bool PandoraBoxSnesInstrSet::GetInstrPointers() {
     uint8_t srcn = std::distance(globalInstrTable.begin(), iterInstrItem);
 
     uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-    if (!SNESSampColl::IsValidSampleDir(rawFile(), addrDIRentry, true)) {
+    if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       break;
     }
 
@@ -95,7 +95,7 @@ bool PandoraBoxSnesInstrSet::GetInstrPointers() {
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
   SNESSampColl *newSampColl = new SNESSampColl(PandoraBoxSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
-  if (!newSampColl->LoadVGMFile()) {
+  if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
   }
@@ -124,19 +124,19 @@ PandoraBoxSnesInstr::PandoraBoxSnesInstr(VGMInstrSet *instrSet,
 PandoraBoxSnesInstr::~PandoraBoxSnesInstr() {
 }
 
-bool PandoraBoxSnesInstr::LoadInstr() {
+bool PandoraBoxSnesInstr::loadInstr() {
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = GetShort(offDirEnt);
+  uint16_t addrSampStart = readShort(offDirEnt);
 
   PandoraBoxSnesRgn *rgn = new PandoraBoxSnesRgn(this, version, dwOffset, srcn, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  AddRgn(rgn);
+  addRgn(rgn);
 
-  SetGuessedLength();
+  setGuessedLength();
   return true;
 }
 
@@ -160,12 +160,12 @@ PandoraBoxSnesRgn::PandoraBoxSnesRgn(PandoraBoxSnesInstr *instr,
   sampNum = srcn;
   unityKey = 45; // o3a = $1000
   fineTune = 0;
-  SNESConvADSR<VGMRgn>(this, adsr1, adsr2, 0x7f);
+  snesConvADSR<VGMRgn>(this, adsr1, adsr2, 0x7f);
 }
 
 PandoraBoxSnesRgn::~PandoraBoxSnesRgn() {
 }
 
-bool PandoraBoxSnesRgn::LoadRgn() {
+bool PandoraBoxSnesRgn::loadRgn() {
   return true;
 }

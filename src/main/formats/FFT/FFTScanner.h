@@ -11,7 +11,7 @@ class FFTScanner : public VGMScanner {
   FFTScanner();
   ~FFTScanner() override;
 
-  void Scan(RawFile *file, void *info) override;  // scan "smds" and "wds"
-  static void SearchForFFTSeq(RawFile *file);               // scan "smds"
-  static void SearchForFFTwds(RawFile *file);               // scan "wds"
+  void scan(RawFile *file, void *info) override;  // scan "smds" and "wds"
+  static void searchForFFTSeq(RawFile *file);               // scan "smds"
+  static void searchForFFTwds(RawFile *file);               // scan "wds"
 };

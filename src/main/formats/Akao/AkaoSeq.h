@@ -146,21 +146,21 @@ class AkaoSeq final :
  public:
   explicit AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version);
 
-  void ResetVars() override;
-  bool GetHeaderInfo() override;
-  bool GetTrackPointers() override;
+  void resetVars() override;
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
-  [[nodiscard]] std::string ReadTimestampAsText() const;
-  [[nodiscard]] double GetTempoInBPM(uint16_t tempo) const;
+  [[nodiscard]] std::string readTimestampAsText() const;
+  [[nodiscard]] double getTempoInBPM(uint16_t tempo) const;
 
-  [[nodiscard]] AkaoInstrSet* NewInstrSet() const;
+  [[nodiscard]] AkaoInstrSet* newInstrSet() const;
 
-  [[nodiscard]] static bool IsPossibleAkaoSeq(const RawFile *file, uint32_t offset);
-  [[nodiscard]] static AkaoPs1Version GuessVersion(const RawFile *file, uint32_t offset);
+  [[nodiscard]] static bool isPossibleAkaoSeq(const RawFile *file, uint32_t offset);
+  [[nodiscard]] static AkaoPs1Version guessVersion(const RawFile *file, uint32_t offset);
 
-  [[nodiscard]] static uint32_t GetTrackAllocationBitsOffset(AkaoPs1Version version) noexcept {
+  [[nodiscard]] static uint32_t getTrackAllocationBitsOffset(AkaoPs1Version version) noexcept {
     switch (version)
     {
     case AkaoPs1Version::VERSION_1_0:
@@ -211,8 +211,8 @@ class AkaoTrack final
  public:
   explicit AkaoTrack(AkaoSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
 
-  void ResetVars() override;
-  bool ReadEvent() override;
+  void resetVars() override;
+  bool readEvent() override;
 
   [[nodiscard]] AkaoSeq * seq() const noexcept {
     return reinterpret_cast<AkaoSeq*>(this->parentSeq);
@@ -235,5 +235,5 @@ class AkaoTrack final
 
  private:
   void logUnknownEvent(const std::string& opcode_str, u32 beginOffset) const;
-  [[nodiscard]] bool AnyUnvisitedJumpDestinations();
+  [[nodiscard]] bool anyUnvisitedJumpDestinations();
 };

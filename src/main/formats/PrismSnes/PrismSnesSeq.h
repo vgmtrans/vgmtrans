@@ -73,27 +73,27 @@ class PrismSnesSeq
     : public VGMSeq {
  public:
   PrismSnesSeq(RawFile *file, PrismSnesVersion ver, uint32_t seqdataOffset, std::string newName = "I'Max SNES Seq");
-  virtual ~PrismSnesSeq(void);
+  virtual ~PrismSnesSeq();
 
-  virtual bool GetHeaderInfo(void);
-  virtual bool GetTrackPointers(void);
-  virtual void ResetVars(void);
+  virtual bool parseHeader();
+  virtual bool parseTrackPointers();
+  virtual void resetVars();
 
   PrismSnesVersion version;
   std::map<uint8_t, PrismSnesSeqEventType> EventMap;
 
   VGMHeader *envContainer;
-  void DemandEnvelopeContainer(uint32_t offset);
+  void demandEnvelopeContainer(uint32_t offset);
 
   static const uint8_t PAN_TABLE_1[21];
   static const uint8_t PAN_TABLE_2[21];
 
   bool conditionSwitch;
 
-  double GetTempoInBPM(uint8_t tempo);
+  double getTempoInBPM(uint8_t tempo);
 
  private:
-  void LoadEventMap(void);
+  void loadEventMap();
 };
 
 
@@ -101,8 +101,8 @@ class PrismSnesTrack
     : public SeqTrack {
  public:
   PrismSnesTrack(PrismSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
-  virtual void ResetVars(void);
-  virtual bool ReadEvent(void);
+  virtual void resetVars();
+  virtual bool readEvent();
 
   std::vector<uint8_t> panTable;
 
@@ -118,13 +118,13 @@ class PrismSnesTrack
   uint8_t loopCountAlt;
   uint16_t subReturnAddr;
 
-  bool ReadDeltaTime(uint32_t &curOffset, uint8_t &len);
-  bool ReadDuration(uint32_t &curOffset, uint8_t len, uint8_t &durDelta);
-  uint8_t GetDuration(uint32_t curOffset, uint8_t len, uint8_t durDelta);
+  bool readDeltaTime(uint32_t &curOffset, uint8_t &len);
+  bool readDuration(uint32_t &curOffset, uint8_t len, uint8_t &durDelta);
+  uint8_t getDuration(uint32_t curOffset, uint8_t len, uint8_t durDelta);
 
-  void AddVolumeEnvelope(uint16_t envelopeAddress);
-  void AddPanEnvelope(uint16_t envelopeAddress);
-  void AddEchoVolumeEnvelope(uint16_t envelopeAddress);
-  void AddGAINEnvelope(uint16_t envelopeAddress);
-  void AddPanTable(uint16_t panTableAddress);
+  void addVolumeEnvelope(uint16_t envelopeAddress);
+  void addPanEnvelope(uint16_t envelopeAddress);
+  void addEchoVolumeEnvelope(uint16_t envelopeAddress);
+  void addGAINEnvelope(uint16_t envelopeAddress);
+  void addPanTable(uint16_t panTableAddress);
 };

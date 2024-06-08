@@ -58,12 +58,12 @@ class CPSTrackV2
     : public SeqTrack {
 public:
   CPSTrackV2(CPSSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
-  void ResetVars() override;
-  bool ReadEvent() override;
+  void resetVars() override;
+  bool readEvent() override;
 
 private:
-  CPSFormatVer GetVersion() const { return static_cast<CPSSeq*>(this->parentSeq)->fmt_version; }
-  uint32_t ReadVarLength();
+  CPSFormatVer version() const { return static_cast<CPSSeq*>(this->parentSeq)->fmt_version; }
+  uint32_t readVarLength();
 
   uint8_t m_master_volume{0};
   uint8_t m_secondary_volume{0x40};

@@ -13,7 +13,7 @@ namespace vgmtrans::scanners {
 ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TAMSOFTPS1", {"tsq", "tvb"});
 }
 
-void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
+void TamSoftPS1Scanner::scan(RawFile *file, void *info) {
   std::string basename(file->stem());
   std::string extension(file->extension());
 
@@ -26,7 +26,7 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
         break;
       }
 
-      uint32_t a32 = file->GetWord(dwSongItemOffset);
+      uint32_t a32 = file->readWord(dwSongItemOffset);
       if (a32 == 0xfffff0) {
         break;
       }
@@ -34,7 +34,7 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
         continue;
       }
 
-      uint16_t seqHeaderRelOffset = file->GetWord(dwSongItemOffset + 2);
+      uint16_t seqHeaderRelOffset = file->readWord(dwSongItemOffset + 2);
       if (seqHeaderBoundaryOffset > seqHeaderRelOffset) {
         seqHeaderBoundaryOffset = seqHeaderRelOffset;
       }
@@ -43,7 +43,7 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
     for (uint8_t songIndex = 0; songIndex < numSongs; songIndex++) {
       std::string seqname = fmt::format("{} ({})", basename, songIndex);
       TamSoftPS1Seq *newSeq = new TamSoftPS1Seq(file, 0, songIndex, seqname);
-      if (newSeq->LoadVGMFile()) {
+      if (newSeq->loadVGMFile()) {
         newSeq->unLength = file->size();
       } else {
         delete newSeq;
@@ -57,7 +57,7 @@ void TamSoftPS1Scanner::Scan(RawFile *file, void *info) {
     }
 
     TamSoftPS1InstrSet *newInstrSet = new TamSoftPS1InstrSet(file, 0, ps2, basename);
-    if (newInstrSet->LoadVGMFile()) {
+    if (newInstrSet->loadVGMFile()) {
       newInstrSet->unLength = file->size();
     } else {
       delete newInstrSet;

@@ -21,7 +21,7 @@ void RSNLoader::apply(const RawFile *file) {
 
   // Read header
   uint8_t rarHeader[FILE_SIGNATURE_SIZE];
-  file->GetBytes(0, FILE_SIGNATURE_SIZE, rarHeader);
+  file->readBytes(0, FILE_SIGNATURE_SIZE, rarHeader);
 
   if (memcmp(rarHeader, reinterpret_cast<const void *>("Rar!\x1A\x07\x00"), FILE_SIGNATURE_SIZE) != 0) {
     return;

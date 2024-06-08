@@ -13,8 +13,8 @@ Vab::~Vab() {
 }
 
 
-bool Vab::GetHeaderInfo() {
-  uint32_t nEndOffset = GetEndOffset();
+bool Vab::parseHeader() {
+  uint32_t nEndOffset = endOffset();
   uint32_t nMaxLength = nEndOffset - dwOffset;
 
   if (nMaxLength < 0x20) {
@@ -36,20 +36,20 @@ bool Vab::GetHeaderInfo() {
   vabHdr->addChild(dwOffset + 0x1b, 1, "Bank Attributes 2");
   vabHdr->addChild(dwOffset + 0x1c, 4, "Reserved");
 
-  GetBytes(dwOffset, 0x20, &hdr);
+  readBytes(dwOffset, 0x20, &hdr);
 
   return true;
 }
 
-bool Vab::GetInstrPointers() {
-  uint32_t nEndOffset = GetEndOffset();
+bool Vab::parseInstrPointers() {
+  uint32_t nEndOffset = endOffset();
 
   uint32_t offProgs = dwOffset + 0x20;
   uint32_t offToneAttrs = offProgs + (16 * 128);
 
-  uint16_t numPrograms = GetShort(dwOffset + 0x12);
-  uint16_t numTones = GetShort(dwOffset + 0x14);
-  uint16_t numVAGs = GetShort(dwOffset + 0x16);
+  uint16_t numPrograms = readShort(dwOffset + 0x12);
+  uint16_t numTones = readShort(dwOffset + 0x14);
+  uint16_t numVAGs = readShort(dwOffset + 0x16);
 
   uint32_t offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
 
@@ -83,14 +83,14 @@ bool Vab::GetInstrPointers() {
       break;
     }
 
-    uint8_t numTonesPerInstr = GetByte(offCurrProg);
+    uint8_t numTonesPerInstr = readByte(offCurrProg);
     if (numTonesPerInstr > 32) {
       L_WARN("Too many tones {} in Program #{}.", numTonesPerInstr, progIndex);
     }
     else if (numTonesPerInstr != 0) {
       VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex);
       aInstrs.push_back(newInstr);
-      GetBytes(offCurrProg, 0x10, &newInstr->attr);
+      readBytes(offCurrProg, 0x10, &newInstr->attr);
 
       VGMHeader *hdr = progsHdr->addHeader(offCurrProg, 0x10, "Program");
       hdr->addChild(offCurrProg + 0x00, 1, "Number of Tones");
@@ -103,7 +103,7 @@ bool Vab::GetInstrPointers() {
       hdr->addChild(offCurrProg + 0x08, 4, "Reserved");
       hdr->addChild(offCurrProg + 0x0c, 4, "Reserved");
 
-      newInstr->masterVol = GetByte(offCurrProg + 0x01);
+      newInstr->masterVol = readByte(offCurrProg + 0x01);
 
       toneAttrsHdr->unLength = offCurrToneAttrs + (32 * 16) - offToneAttrs;
 
@@ -121,7 +121,7 @@ bool Vab::GetInstrPointers() {
     uint32_t vagOffset = vagStartOffset;
 
     for (uint32_t i = 0; i < numVAGs; i++) {
-      uint32_t vagSize = GetShort(offVAGOffsets + i * 2) * 8;
+      uint32_t vagSize = readShort(offVAGOffsets + i * 2) * 8;
 
       snprintf(name, 256, "VAG Size /8 #%u", i);
       vagOffsetHdr->addChild(offVAGOffsets + i * 2, 2, name);
@@ -142,8 +142,8 @@ bool Vab::GetInstrPointers() {
     if (dwOffset == 0 && vagLocations.size() != 0) {
       // load samples as well
       PSXSampColl *newSampColl = new PSXSampColl(formatName(), this, vagStartOffset, totalVAGSize, vagLocations);
-      if (newSampColl->LoadVGMFile()) {
-        pRoot->AddVGMFile(newSampColl);
+      if (newSampColl->loadVGMFile()) {
+        pRoot->addVGMFile(newSampColl);
         //this->sampColl = newSampColl;
       }
       else {
@@ -178,15 +178,15 @@ VabInstr::~VabInstr(void) {
 }
 
 
-bool VabInstr::LoadInstr() {
+bool VabInstr::loadInstr() {
   int8_t numRgns = attr.tones;
   for (int i = 0; i < numRgns; i++) {
     VabRgn *rgn = new VabRgn(this, dwOffset + i * 0x20);
-    if (!rgn->LoadRgn()) {
+    if (!rgn->loadRgn()) {
       delete rgn;
       return false;
     }
-    AddRgn(rgn);
+    addRgn(rgn);
   }
   return true;
 }
@@ -204,35 +204,35 @@ VabRgn::VabRgn(VabInstr *instr, uint32_t offset)
 }
 
 
-bool VabRgn::LoadRgn() {
+bool VabRgn::loadRgn() {
   VabInstr *instr = (VabInstr *) parInstr;
   unLength = 0x20;
-  GetBytes(dwOffset, 0x20, &attr);
+  readBytes(dwOffset, 0x20, &attr);
 
-  AddGeneralItem(dwOffset, 1, "Priority");
-  AddGeneralItem(dwOffset + 1, 1, "Mode (use reverb?)");
-  AddVolume((GetByte(dwOffset + 2) * instr->masterVol) / (127.0 * 127.0), dwOffset + 2, 1);
-  AddPan(GetByte(dwOffset + 3), dwOffset + 3);
-  AddUnityKey(GetByte(dwOffset + 4), dwOffset + 4);
-  AddGeneralItem(dwOffset + 5, 1, "Pitch Tune");
-  AddKeyLow(GetByte(dwOffset + 6), dwOffset + 6);
-  AddKeyHigh(GetByte(dwOffset + 7), dwOffset + 7);
-  AddGeneralItem(dwOffset + 8, 1, "Vibrato Width");
-  AddGeneralItem(dwOffset + 9, 1, "Vibrato Time");
-  AddGeneralItem(dwOffset + 10, 1, "Portamento Width");
-  AddGeneralItem(dwOffset + 11, 1, "Portamento Holding Time");
-  AddGeneralItem(dwOffset + 12, 1, "Pitch Bend Min");
-  AddGeneralItem(dwOffset + 13, 1, "Pitch Bend Max");
-  AddGeneralItem(dwOffset + 14, 1, "Reserved");
-  AddGeneralItem(dwOffset + 15, 1, "Reserved");
-  AddGeneralItem(dwOffset + 16, 2, "ADSR1");
-  AddGeneralItem(dwOffset + 18, 2, "ADSR2");
-  AddGeneralItem(dwOffset + 20, 2, "Parent Program");
-  AddSampNum(GetShort(dwOffset + 22) - 1, dwOffset + 22, 2);
-  AddGeneralItem(dwOffset + 24, 2, "Reserved");
-  AddGeneralItem(dwOffset + 26, 2, "Reserved");
-  AddGeneralItem(dwOffset + 28, 2, "Reserved");
-  AddGeneralItem(dwOffset + 30, 2, "Reserved");
+  addGeneralItem(dwOffset, 1, "Priority");
+  addGeneralItem(dwOffset + 1, 1, "Mode (use reverb?)");
+  addVolume((readByte(dwOffset + 2) * instr->masterVol) / (127.0 * 127.0), dwOffset + 2, 1);
+  addPan(readByte(dwOffset + 3), dwOffset + 3);
+  addUnityKey(readByte(dwOffset + 4), dwOffset + 4);
+  addGeneralItem(dwOffset + 5, 1, "Pitch Tune");
+  addKeyLow(readByte(dwOffset + 6), dwOffset + 6);
+  addKeyHigh(readByte(dwOffset + 7), dwOffset + 7);
+  addGeneralItem(dwOffset + 8, 1, "Vibrato Width");
+  addGeneralItem(dwOffset + 9, 1, "Vibrato Time");
+  addGeneralItem(dwOffset + 10, 1, "Portamento Width");
+  addGeneralItem(dwOffset + 11, 1, "Portamento Holding Time");
+  addGeneralItem(dwOffset + 12, 1, "Pitch Bend Min");
+  addGeneralItem(dwOffset + 13, 1, "Pitch Bend Max");
+  addGeneralItem(dwOffset + 14, 1, "Reserved");
+  addGeneralItem(dwOffset + 15, 1, "Reserved");
+  addGeneralItem(dwOffset + 16, 2, "ADSR1");
+  addGeneralItem(dwOffset + 18, 2, "ADSR2");
+  addGeneralItem(dwOffset + 20, 2, "Parent Program");
+  addSampNum(readShort(dwOffset + 22) - 1, dwOffset + 22, 2);
+  addGeneralItem(dwOffset + 24, 2, "Reserved");
+  addGeneralItem(dwOffset + 26, 2, "Reserved");
+  addGeneralItem(dwOffset + 28, 2, "Reserved");
+  addGeneralItem(dwOffset + 30, 2, "Reserved");
   ADSR1 = attr.adsr1;
   ADSR2 = attr.adsr2;
   if ((int) sampNum < 0)
@@ -248,10 +248,10 @@ bool VabRgn::LoadRgn() {
   // If it exceeds 127, driver clips the value and it will become 127. (In Hokuto no Ken, at least)
   // I am not sure if the interpretation of this value depends on a driver or VAB version.
   // The following code takes the byte as signed, since it could be a typical extended implementation.
-  int8_t ft = (int8_t) GetByte(dwOffset + 5);
+  int8_t ft = (int8_t) readByte(dwOffset + 5);
   double cents = ft * 100.0 / 128.0;
-  SetFineTune((int16_t) cents);
+  setFineTune((int16_t) cents);
 
-  PSXConvADSR<VabRgn>(this, ADSR1, ADSR2, false);
+  psxConvADSR<VabRgn>(this, ADSR1, ADSR2, false);
   return true;
 }

@@ -25,17 +25,17 @@ class Matcher {
   explicit Matcher(Format *format);
   virtual ~Matcher() = default;
 
-  virtual bool OnNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-  virtual bool OnCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-  virtual bool MakeCollectionsForFile(VGMFile *file);
+  virtual bool onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+  virtual bool onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+  virtual bool makeCollectionsForFile(VGMFile *file);
 
  protected:
-  virtual bool OnNewSeq(VGMSeq *) { return false; }
-  virtual bool OnNewInstrSet(VGMInstrSet *) { return false; }
-  virtual bool OnNewSampColl(VGMSampColl *) { return false; }
-  virtual bool OnCloseSeq(VGMSeq *) { return false; }
-  virtual bool OnCloseInstrSet(VGMInstrSet *) { return false; }
-  virtual bool OnCloseSampColl(VGMSampColl *) { return false; }
+  virtual bool onNewSeq(VGMSeq *) { return false; }
+  virtual bool onNewInstrSet(VGMInstrSet *) { return false; }
+  virtual bool onNewSampColl(VGMSampColl *) { return false; }
+  virtual bool onCloseSeq(VGMSeq *) { return false; }
+  virtual bool onCloseInstrSet(VGMInstrSet *) { return false; }
+  virtual bool onCloseSampColl(VGMSampColl *) { return false; }
 
   Format *fmt;
 };
@@ -52,16 +52,16 @@ class SimpleMatcher : public Matcher {
  protected:
     // The following functions should return with the id variable containing the retrieved id of the
     // file. The bool return value is a flag for error: true on success and false on fail.
-  virtual bool GetSeqId(VGMSeq *seq, IdType &id) = 0;
-  virtual bool GetInstrSetId(VGMInstrSet *instrset, IdType &id) = 0;
-  virtual bool GetSampCollId(VGMSampColl *sampcoll, IdType &id) = 0;
+  virtual bool seqId(VGMSeq *seq, IdType &id) = 0;
+  virtual bool instrSetId(VGMInstrSet *instrset, IdType &id) = 0;
+  virtual bool sampCollId(VGMSampColl *sampcoll, IdType &id) = 0;
 
   explicit SimpleMatcher(Format *format, bool bUsingSampColl = false)
       : Matcher(format), bRequiresSampColl(bUsingSampColl) {}
 
-  bool OnNewSeq(VGMSeq *seq) override {
+  bool onNewSeq(VGMSeq *seq) override {
     IdType id;
-    bool success = this->GetSeqId(seq, id);
+    bool success = this->seqId(seq, id);
     if (!success)
       return false;
 
@@ -71,7 +71,7 @@ class SimpleMatcher : public Matcher {
     if (VGMInstrSet* matchingInstrSet = instrsets[id]) {
       if (bRequiresSampColl) {
         if (VGMSampColl *matchingSampColl = sampcolls[id]) {
-          VGMColl *coll = fmt->NewCollection();
+          VGMColl *coll = fmt->newCollection();
           if (!coll)
             return false;
           coll->setName(seq->name());
@@ -84,7 +84,7 @@ class SimpleMatcher : public Matcher {
           }
         }
       } else {
-        VGMColl *coll = fmt->NewCollection();
+        VGMColl *coll = fmt->newCollection();
         if (!coll)
           return false;
         coll->setName(seq->name());
@@ -100,9 +100,9 @@ class SimpleMatcher : public Matcher {
     return true;
   }
 
-  bool OnNewInstrSet(VGMInstrSet *instrset) override {
+  bool onNewInstrSet(VGMInstrSet *instrset) override {
     IdType id;
-    bool success = this->GetInstrSetId(instrset, id);
+    bool success = this->instrSetId(instrset, id);
     if (!success)
       return false;
     if (instrsets[id])
@@ -112,10 +112,10 @@ class SimpleMatcher : public Matcher {
     VGMSampColl *matchingSampColl = nullptr;
     if (bRequiresSampColl) {
       matchingSampColl = sampcolls[id];
-      if (matchingSampColl && matchingSampColl->bLoadOnInstrSetMatch) {
-        matchingSampColl->UseInstrSet(instrset);
-        if (!matchingSampColl->Load()) {
-          OnCloseSampColl(matchingSampColl);
+      if (matchingSampColl && matchingSampColl->shouldLoadOnInstrSetMatch()) {
+        matchingSampColl->useInstrSet(instrset);
+        if (!matchingSampColl->load()) {
+          onCloseSampColl(matchingSampColl);
           return false;
         }
         // pRoot->AddVGMFile(matchingSampColl);
@@ -135,7 +135,7 @@ class SimpleMatcher : public Matcher {
 
       if (bRequiresSampColl) {
         if (matchingSampColl) {
-          VGMColl *coll = fmt->NewCollection();
+          VGMColl *coll = fmt->newCollection();
           if (!coll)
             return false;
           coll->setName(matchingSeq->name());
@@ -145,7 +145,7 @@ class SimpleMatcher : public Matcher {
           coll->load();
         }
       } else {
-        VGMColl *coll = fmt->NewCollection();
+        VGMColl *coll = fmt->newCollection();
         if (!coll)
           return false;
         coll->setName(matchingSeq->name());
@@ -160,10 +160,10 @@ class SimpleMatcher : public Matcher {
     return true;
   }
 
-  bool OnNewSampColl(VGMSampColl *sampcoll) override {
+  bool onNewSampColl(VGMSampColl *sampcoll) override {
     if (bRequiresSampColl) {
       IdType id;
-      bool success = this->GetSampCollId(sampcoll, id);
+      bool success = this->sampCollId(sampcoll, id);
       if (!success)
         return false;
       if (sampcolls[id])
@@ -173,10 +173,10 @@ class SimpleMatcher : public Matcher {
       VGMInstrSet *matchingInstrSet = instrsets[id];
 
       if (matchingInstrSet) {
-        if (sampcoll->bLoadOnInstrSetMatch) {
-          sampcoll->UseInstrSet(matchingInstrSet);
-          if (!sampcoll->Load()) {
-            OnCloseSampColl(sampcoll);
+        if (sampcoll->shouldLoadOnInstrSetMatch()) {
+          sampcoll->useInstrSet(matchingInstrSet);
+          if (!sampcoll->load()) {
+            onCloseSampColl(sampcoll);
             return false;
           }
           // pRoot->AddVGMFile(sampcoll);
@@ -195,7 +195,7 @@ class SimpleMatcher : public Matcher {
         VGMSeq *matchingSeq = (*it2).second;
 
         if (matchingSeq && matchingInstrSet) {
-          VGMColl *coll = fmt->NewCollection();
+          VGMColl *coll = fmt->newCollection();
           if (!coll)
             return false;
           coll->setName(matchingSeq->name());
@@ -213,9 +213,9 @@ class SimpleMatcher : public Matcher {
     return true;
   }
 
-  bool OnCloseSeq(VGMSeq *seq) override {
+  bool onCloseSeq(VGMSeq *seq) override {
     IdType id;
-    bool success = this->GetSeqId(seq, id);
+    bool success = this->seqId(seq, id);
     if (!success)
       return false;
 
@@ -235,18 +235,18 @@ class SimpleMatcher : public Matcher {
     return true;
   }
 
-  bool OnCloseInstrSet(VGMInstrSet *instrset) override {
+  bool onCloseInstrSet(VGMInstrSet *instrset) override {
     IdType id;
-    bool success = this->GetInstrSetId(instrset, id);
+    bool success = this->instrSetId(instrset, id);
     if (!success)
       return false;
     instrsets.erase(id);
     return true;
   }
 
-  bool OnCloseSampColl(VGMSampColl *sampcoll) override {
+  bool onCloseSampColl(VGMSampColl *sampcoll) override {
     IdType id;
-    bool success = this->GetSampCollId(sampcoll, id);
+    bool success = this->sampCollId(sampcoll, id);
     if (!success)
       return false;
     sampcolls.erase(id);
@@ -270,18 +270,18 @@ class GetIdMatcher : public SimpleMatcher<uint32_t> {
   explicit GetIdMatcher(Format *format, bool bRequiresSampColl = false)
       : SimpleMatcher(format, bRequiresSampColl) {}
 
-  bool GetSeqId(VGMSeq *seq, uint32_t &id) override {
-    id = seq->GetID();
+  bool seqId(VGMSeq *seq, uint32_t &id) override {
+    id = seq->id();
     return (id != -1u);
   }
 
-  bool GetInstrSetId(VGMInstrSet *instrset, uint32_t &id) override {
-    id = instrset->GetID();
+  bool instrSetId(VGMInstrSet *instrset, uint32_t &id) override {
+    id = instrset->id();
     return (id != -1u);
   }
 
-  bool GetSampCollId(VGMSampColl *sampcoll, uint32_t &id) override {
-    id = sampcoll->GetID();
+  bool sampCollId(VGMSampColl *sampcoll, uint32_t &id) override {
+    id = sampcoll->id();
     return (id != -1u);
   }
 };
@@ -295,17 +295,17 @@ class FilenameMatcher : public SimpleMatcher<std::string> {
   explicit FilenameMatcher(Format *format, bool bRequiresSampColl = false)
       : SimpleMatcher(format, bRequiresSampColl) {}
 
-  bool GetSeqId(VGMSeq *seq, std::string &id) override {
+  bool seqId(VGMSeq *seq, std::string &id) override {
     RawFile *rawfile = seq->rawFile();
     return !rawfile->path().empty();
   }
 
-  bool GetInstrSetId(VGMInstrSet *instrset, std::string &id) override {
+  bool instrSetId(VGMInstrSet *instrset, std::string &id) override {
     RawFile *rawfile = instrset->rawFile();
     return !rawfile->path().empty();
   }
 
-  bool GetSampCollId(VGMSampColl *sampcoll, std::string &id) override {
+  bool sampCollId(VGMSampColl *sampcoll, std::string &id) override {
     RawFile *rawfile = sampcoll->rawFile();
     return !rawfile->path().empty();
   }
@@ -330,18 +330,18 @@ class FilegroupMatcher : public Matcher {
   explicit FilegroupMatcher(Format *format);
 
  protected:
-  bool OnNewSeq(VGMSeq *seq) override;
-  bool OnNewInstrSet(VGMInstrSet *instrset) override;
-  bool OnNewSampColl(VGMSampColl *sampcoll) override;
+  bool onNewSeq(VGMSeq *seq) override;
+  bool onNewInstrSet(VGMInstrSet *instrset) override;
+  bool onNewSampColl(VGMSampColl *sampcoll) override;
 
-  bool OnCloseSeq(VGMSeq *seq) override;
-  bool OnCloseInstrSet(VGMInstrSet *instrset) override;
-  bool OnCloseSampColl(VGMSampColl *sampcoll) override;
+  bool onCloseSeq(VGMSeq *seq) override;
+  bool onCloseInstrSet(VGMInstrSet *instrset) override;
+  bool onCloseSampColl(VGMSampColl *sampcoll) override;
 
-  bool MakeCollectionsForFile(VGMFile *file) override;
-  virtual void MakeCollection(VGMInstrSet *instrset, VGMSampColl *sampcoll);
+  bool makeCollectionsForFile(VGMFile *file) override;
+  virtual void makeCollection(VGMInstrSet *instrset, VGMSampColl *sampcoll);
 
-  virtual void LookForMatch();
+  virtual void lookForMatch();
 
  protected:
   std::list<VGMSeq *> seqs;

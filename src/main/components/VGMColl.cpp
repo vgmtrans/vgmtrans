@@ -22,18 +22,18 @@ VGMColl::VGMColl(std::string theName) : m_name(std::move(theName)) {}
 
 void VGMColl::removeFileAssocs() {
   if (m_seq) {
-    m_seq->RemoveCollAssoc(this);
+    m_seq->removeCollAssoc(this);
     m_seq = nullptr;
   }
 
   for (auto set : m_instrsets) {
-    set->RemoveCollAssoc(this);
+    set->removeCollAssoc(this);
   }
   for (auto samp : m_sampcolls) {
-    samp->RemoveCollAssoc(this);
+    samp->removeCollAssoc(this);
   }
   for (auto file : m_miscfiles) {
-    file->RemoveCollAssoc(this);
+    file->removeCollAssoc(this);
   }
 }
 
@@ -51,29 +51,29 @@ VGMSeq *VGMColl::seq() const {
 
 void VGMColl::useSeq(VGMSeq *theSeq) {
   if (theSeq != nullptr)
-    theSeq->AddCollAssoc(this);
+    theSeq->addCollAssoc(this);
   if (m_seq && (theSeq != m_seq))  // if we associated with a previous sequence
-    m_seq->RemoveCollAssoc(this);
+    m_seq->removeCollAssoc(this);
   m_seq = theSeq;
 }
 
 void VGMColl::addInstrSet(VGMInstrSet *theInstrSet) {
   if (theInstrSet != nullptr) {
-    theInstrSet->AddCollAssoc(this);
+    theInstrSet->addCollAssoc(this);
     m_instrsets.push_back(theInstrSet);
   }
 }
 
 void VGMColl::addSampColl(VGMSampColl *theSampColl) {
   if (theSampColl != nullptr) {
-    theSampColl->AddCollAssoc(this);
+    theSampColl->addCollAssoc(this);
     m_sampcolls.push_back(theSampColl);
   }
 }
 
 void VGMColl::addMiscFile(VGMMiscFile *theMiscFile) {
   if (theMiscFile != nullptr) {
-    theMiscFile->AddCollAssoc(this);
+    theMiscFile->addCollAssoc(this);
     m_miscfiles.push_back(theMiscFile);
   }
 }
@@ -81,7 +81,7 @@ void VGMColl::addMiscFile(VGMMiscFile *theMiscFile) {
 bool VGMColl::load() {
   if (!loadMain())
     return false;
-  pRoot->AddVGMColl(this);
+  pRoot->addVGMColl(this);
   return true;
 }
 
@@ -96,9 +96,9 @@ void VGMColl::unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vec
     if (samp->ulUncompressedSize)
       bufSize = samp->ulUncompressedSize;
     else
-      bufSize = static_cast<uint32_t>(ceil(samp->dataLength * samp->GetCompressionRatio()));
+      bufSize = static_cast<uint32_t>(ceil(samp->dataLength * samp->compressionRatio()));
     auto* uncompSampBuf = new uint8_t[bufSize];    // create a new memory space for the uncompressed wave
-    samp->ConvertToStdWave(uncompSampBuf);            // and uncompress into that space
+    samp->convertToStdWave(uncompSampBuf);            // and uncompress into that space
 
     uint16_t blockAlign = samp->bps / 8 * samp->channels;
     dls.AddWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
@@ -118,13 +118,13 @@ void VGMColl::unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, 
     if (samp->ulUncompressedSize)
       bufSize = samp->ulUncompressedSize;
     else
-      bufSize = static_cast<uint32_t>(ceil(samp->dataLength * samp->GetCompressionRatio()));
+      bufSize = static_cast<uint32_t>(ceil(samp->dataLength * samp->compressionRatio()));
 
     uint8_t *uncompSampBuf = new uint8_t[bufSize];    // create a new memory space for the uncompressed wave
-    samp->ConvertToStdWave(uncompSampBuf);            // and uncompress into that space
+    samp->convertToStdWave(uncompSampBuf);            // and uncompress into that space
 
     uint16_t blockAlign = samp->bps / 8 * samp->channels;
-    SynthWave *wave = synthfile.AddWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
+    SynthWave *wave = synthfile.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
                                         samp->bps, bufSize, uncompSampBuf, samp->name());
     finalSamps.push_back(samp);
 
@@ -134,17 +134,17 @@ void VGMColl::unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, 
       return;
     }
 
-    SynthSampInfo *sampInfo = wave->AddSampInfo();
+    SynthSampInfo *sampInfo = wave->addSampInfo();
     if (samp->bPSXLoopInfoPrioritizing) {
       if (samp->loop.loopStart != 0 || samp->loop.loopLength != 0)
-        sampInfo->SetLoopInfo(samp->loop, samp);
+        sampInfo->setLoopInfo(samp->loop, samp);
     } else
-      sampInfo->SetLoopInfo(samp->loop, samp);
+      sampInfo->setLoopInfo(samp->loop, samp);
 
-    double attenuation = (samp->volume != -1) ? ConvertLogScaleValToAtten(samp->volume) : 0;
+    double attenuation = (samp->volume != -1) ? convertLogScaleValToAtten(samp->volume) : 0;
     uint8_t unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
     short fineTune = samp->fineTune;
-    sampInfo->SetPitchInfo(unityKey, fineTune, attenuation);
+    sampInfo->setPitchInfo(unityKey, fineTune, attenuation);
   }
 }
 
@@ -210,7 +210,7 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
       * where F = 0 if the instrument is melodic, 1 otherwise
       * (length of each CC is 7 bits, obviously)
       */
-      if (auto bs = ConversionOptions::the().GetBankSelectStyle(); bs == BankSelectStyle::GS) {
+      if (auto bs = ConversionOptions::the().bankSelectStyle(); bs == BankSelectStyle::GS) {
         bank_no &= 0x7f;
         bank_no = bank_no << 8;
       } else if (bs == BankSelectStyle::MMA) {
@@ -296,12 +296,12 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
           realSampNum = finalSamps.size() - 1;
         }
 
-        DLSRgn *newRgn = newInstr->AddRgn();
-        newRgn->SetRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
-        newRgn->SetWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
+        DLSRgn *newRgn = newInstr->addRgn();
+        newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
+        newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
 
         VGMSamp *samp = finalSamps[realSampNum]; //sampColl->samples[rgn->sampNum];
-        DLSWsmp *newWsmp = newRgn->AddWsmp();
+        DLSWsmp *newWsmp = newRgn->addWsmp();
 
         // This is a really loopy way of determining the loop information, pardon the pun.  However, it works.
         // There might be a way to simplify this, but I don't want to test out whether another method breaks anything just yet
@@ -347,27 +347,27 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
         if (rgn->volume == -1 && samp->volume == -1)
           realAttenuation = 0;
         else if (rgn->volume == -1)
-          realAttenuation = static_cast<long>(-(ConvertLogScaleValToAtten(samp->volume) * DLS_DECIBEL_UNIT * 10));
+          realAttenuation = static_cast<long>(-(convertLogScaleValToAtten(samp->volume) * DLS_DECIBEL_UNIT * 10));
         else
-          realAttenuation = static_cast<long>(-(ConvertLogScaleValToAtten(rgn->volume) * DLS_DECIBEL_UNIT * 10));
+          realAttenuation = static_cast<long>(-(convertLogScaleValToAtten(rgn->volume) * DLS_DECIBEL_UNIT * 10));
 
-        long convAttack = static_cast<long>(std::round(SecondsToTimecents(rgn->attack_time) * 65536));
-        long convHold = static_cast<long>(std::round(SecondsToTimecents(rgn->hold_time) * 65536));
-        long convDecay = static_cast<long>(std::round(SecondsToTimecents(rgn->decay_time) * 65536));
+        long convAttack = static_cast<long>(std::round(secondsToTimecents(rgn->attack_time) * 65536));
+        long convHold = static_cast<long>(std::round(secondsToTimecents(rgn->hold_time) * 65536));
+        long convDecay = static_cast<long>(std::round(secondsToTimecents(rgn->decay_time) * 65536));
         long convSustainLev;
         if (rgn->sustain_level == -1)
           convSustainLev = 0x03e80000;        //sustain at full if no sustain level provided
         else {
           // the DLS envelope is a range from 0 to -96db.
-          double attenInDB = ConvertLogScaleValToAtten(rgn->sustain_level);
+          double attenInDB = convertLogScaleValToAtten(rgn->sustain_level);
           convSustainLev = static_cast<long>(((96.0 - attenInDB) / 96.0) * 0x03e80000);
         }
 
-        long convRelease = static_cast<long>(std::round(SecondsToTimecents(rgn->release_time) * 65536));
+        long convRelease = static_cast<long>(std::round(secondsToTimecents(rgn->release_time) * 65536));
 
-        DLSArt *newArt = newRgn->AddArt();
-        newArt->AddPan(ConvertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
-        newArt->AddADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
+        DLSArt *newArt = newRgn->addArt();
+        newArt->AddPan(convertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
+        newArt->addADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
 
         newWsmp->SetPitchInfo(realUnityKey, realFineTune, realAttenuation);
       }
@@ -420,7 +420,7 @@ SynthFile *VGMColl::createSynthFile() {
       size_t nRgns = vgminstr->regions().size();
       if (nRgns == 0)  // do not write an instrument if it has no regions
         continue;
-      SynthInstr *newInstr = synthfile->AddInstr(vgminstr->bank, vgminstr->instrNum, vgminstr->reverb);
+      SynthInstr *newInstr = synthfile->addInstr(vgminstr->bank, vgminstr->instrNum, vgminstr->reverb);
       for (uint32_t j = 0; j < nRgns; j++) {
         VGMRgn *rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
@@ -480,9 +480,9 @@ SynthFile *VGMColl::createSynthFile() {
         for (uint32_t k = 0; k < sampCollNum; k++)
           realSampNum += finalSampColls[k]->samples.size();
 
-        SynthRgn *newRgn = newInstr->AddRgn();
-        newRgn->SetRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
-        newRgn->SetWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
+        SynthRgn *newRgn = newInstr->addRgn();
+        newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
+        newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
 
         if (realSampNum >= finalSamps.size()) {
           L_ERROR("Sample {} does not exist", realSampNum);
@@ -490,7 +490,7 @@ SynthFile *VGMColl::createSynthFile() {
         }
 
         VGMSamp *samp = finalSamps[realSampNum];  // sampColl->samples[rgn->sampNum];
-        SynthSampInfo *sampInfo = newRgn->AddSampInfo();
+        SynthSampInfo *sampInfo = newRgn->addSampInfo();
 
         // This is a really loopy way of determining the loop information, pardon the pun.  However, it works.
         // There might be a way to simplify this, but I don't want to test out whether another method breaks anything just yet
@@ -500,10 +500,10 @@ SynthFile *VGMColl::createSynthFile() {
         if (samp->bPSXLoopInfoPrioritizing) {
           if (samp->loop.loopStatus != -1) {
             if (samp->loop.loopStart != 0 || samp->loop.loopLength != 0)
-              sampInfo->SetLoopInfo(samp->loop, samp);
+              sampInfo->setLoopInfo(samp->loop, samp);
             else {
               rgn->loop.loopStatus = samp->loop.loopStatus;
-              sampInfo->SetLoopInfo(rgn->loop, samp);
+              sampInfo->setLoopInfo(rgn->loop, samp);
             }
           } else {
             delete synthfile;
@@ -514,13 +514,13 @@ SynthFile *VGMColl::createSynthFile() {
         // If it doesn't, then use the sample's loop info.
         else if (rgn->loop.loopStatus == -1) {
           if (samp->loop.loopStatus != -1)
-            sampInfo->SetLoopInfo(samp->loop, samp);
+            sampInfo->setLoopInfo(samp->loop, samp);
           else {
             delete synthfile;
             throw;
           }
         } else
-          sampInfo->SetLoopInfo(rgn->loop, samp);
+          sampInfo->setLoopInfo(rgn->loop, samp);
 
         int8_t realUnityKey;
         if (rgn->unityKey == -1)
@@ -538,23 +538,23 @@ SynthFile *VGMColl::createSynthFile() {
 
         double attenuation;
         if (rgn->volume != -1)
-          attenuation = ConvertLogScaleValToAtten(rgn->volume);
+          attenuation = convertLogScaleValToAtten(rgn->volume);
         else if (samp->volume != -1)
-          attenuation = ConvertLogScaleValToAtten(samp->volume);
+          attenuation = convertLogScaleValToAtten(samp->volume);
         else
           attenuation = 0;
 
-        sampInfo->SetPitchInfo(realUnityKey, realFineTune, attenuation);
+        sampInfo->setPitchInfo(realUnityKey, realFineTune, attenuation);
 
         double sustainLevAttenDb;
         if (rgn->sustain_level == -1)
           sustainLevAttenDb = 0.0;
         else
-          sustainLevAttenDb = ConvertPercentAmplitudeToAttenDB_SF2(rgn->sustain_level);
+          sustainLevAttenDb = convertPercentAmplitudeToAttenDB_SF2(rgn->sustain_level);
 
-        SynthArt *newArt = newRgn->AddArt();
-        newArt->AddPan(rgn->pan);
-        newArt->AddADSR(rgn->attack_time, static_cast<Transform>(rgn->attack_transform),
+        SynthArt *newArt = newRgn->addArt();
+        newArt->addPan(rgn->pan);
+        newArt->addADSR(rgn->attack_time, static_cast<Transform>(rgn->attack_transform),
           rgn->hold_time, rgn->decay_time, sustainLevAttenDb, rgn->sustain_time, rgn->release_time,
           static_cast<Transform>(rgn->release_transform));
       }

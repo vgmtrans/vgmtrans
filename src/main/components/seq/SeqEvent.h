@@ -52,18 +52,18 @@ class SeqEvent:
                     const std::string &desc = "");
   ~SeqEvent() override = default;
   std::string description() override {
-    return desc;
+    return m_description;
   }
-  [[nodiscard]] ItemType GetType() const override { return ITEMTYPE_SEQEVENT; }
-  virtual EventType GetEventType() { return EVENTTYPE_UNDEFINED; }
-  Icon GetIcon() override { return icon; }
+  [[nodiscard]] ItemType type() const override { return ITEMTYPE_SEQEVENT; }
+  virtual EventType eventType() { return EVENTTYPE_UNDEFINED; }
+  Icon icon() override { return m_icon; }
 
  public:
   uint8_t channel;
   SeqTrack *parentTrack;
  private:
-  Icon icon;
-  std::string desc;
+  Icon m_icon;
+  std::string m_description;
 };
 
 //  ***************
@@ -80,8 +80,8 @@ class DurNoteSeqEvent:
                   uint32_t offset = 0,
                   uint32_t length = 0,
                   const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_DURNOTE; }
-  Icon GetIcon() override { return ICON_NOTE; }
+  EventType eventType() override { return EVENTTYPE_DURNOTE; }
+  Icon icon() override { return ICON_NOTE; }
 
   std::string description() override {
     return fmt::format("{} - abs key: {} ({}), velocity: {}, duration: {}", name(),
@@ -106,8 +106,8 @@ class NoteOnSeqEvent : public SeqEvent {
                  uint32_t offset = 0,
                  uint32_t length = 0,
                  const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_NOTEON; }
-  Icon GetIcon() override { return ICON_NOTE; }
+  EventType eventType() override { return EVENTTYPE_NOTEON; }
+  Icon icon() override { return ICON_NOTE; }
 
   std::string description() override {
     return fmt::format("{} - abs key: {} ({}), velocity: {}", name(),
@@ -128,8 +128,8 @@ class NoteOffSeqEvent:
  public:
   NoteOffSeqEvent
       (SeqTrack *pTrack, uint8_t absoluteKey, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_NOTEOFF; }
-  Icon GetIcon() override { return ICON_NOTE; }
+  EventType eventType() override { return EVENTTYPE_NOTEOFF; }
+  Icon icon() override { return ICON_NOTE; }
 
   std::string description() override {
     return fmt::format("{} - abs key: {} ({})", name(), static_cast<int>(absKey),
@@ -148,8 +148,8 @@ class RestSeqEvent : public SeqEvent {
  public:
   RestSeqEvent(SeqTrack *pTrack, uint32_t duration, uint32_t offset = 0, uint32_t length = 0,
                const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_REST; }
-  Icon GetIcon() override { return ICON_REST; }
+  EventType eventType() override { return EVENTTYPE_REST; }
+  Icon icon() override { return ICON_REST; }
 
   std::string description() override { return fmt::format("{} - duration: {}", name(), dur); };
 
@@ -181,7 +181,7 @@ class VolSeqEvent : public SeqEvent {
  public:
   VolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0,
               const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_VOLUME; }
+  EventType eventType() override { return EVENTTYPE_VOLUME; }
 
   std::string description() override {
     return fmt::format("{} - volume: {:d}", name(), vol);
@@ -198,7 +198,7 @@ class Volume14BitSeqEvent : public SeqEvent {
 public:
   Volume14BitSeqEvent(SeqTrack *pTrack, uint16_t volume, uint32_t offset = 0, uint32_t length = 0,
                       const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_VOLUME; }
+  EventType eventType() override { return EVENTTYPE_VOLUME; }
 
   std::string description() override {
     return fmt::format("{} - volume: {:d}", name(), m_volume);
@@ -215,7 +215,7 @@ class VolSlideSeqEvent : public SeqEvent {
  public:
   VolSlideSeqEvent(SeqTrack *pTrack, uint8_t targetVolume, uint32_t duration, uint32_t offset = 0,
                    uint32_t length = 0, const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_VOLUMESLIDE; }
+  EventType eventType() override { return EVENTTYPE_VOLUMESLIDE; }
 
   std::string description() override {
     return fmt::format("{} - target volume: {}, duration: {}", name(),
@@ -268,7 +268,7 @@ class ExpressionSeqEvent : public SeqEvent {
  public:
   ExpressionSeqEvent(SeqTrack *pTrack, uint8_t level, uint32_t offset = 0, uint32_t length = 0,
                      const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_EXPRESSION; }
+  EventType eventType() override { return EVENTTYPE_EXPRESSION; }
 
   std::string description() override {
     return fmt::format("{} - expression: {}", name(), static_cast<int>(level));
@@ -286,7 +286,7 @@ class ExpressionSlideSeqEvent : public SeqEvent {
  public:
     ExpressionSlideSeqEvent(SeqTrack *pTrack, uint8_t targetExpression, uint32_t duration,
                             uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_EXPRESSIONSLIDE; }
+  EventType eventType() override { return EVENTTYPE_EXPRESSIONSLIDE; }
 
   std::string description() override {
     return fmt::format("{} - target expression: {}, duration: {}", name(),
@@ -305,7 +305,7 @@ class PanSeqEvent : public SeqEvent {
  public:
   PanSeqEvent(SeqTrack *pTrack, uint8_t pan, uint32_t offset = 0, uint32_t length = 0,
               const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_PAN; }
+  EventType eventType() override { return EVENTTYPE_PAN; }
 
   std::string description() override {
     return fmt::format("{} - pan: {}", name(), static_cast<int>(pan));
@@ -342,7 +342,7 @@ class ReverbSeqEvent : public SeqEvent {
  public:
   ReverbSeqEvent(SeqTrack *pTrack, uint8_t reverb, uint32_t offset = 0, uint32_t length = 0,
                  const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_REVERB; }
+  EventType eventType() override { return EVENTTYPE_REVERB; }
 
   std::string description() override {
     return fmt::format("{} - reverb: {}", name(), static_cast<int>(reverb));
@@ -359,7 +359,7 @@ class PitchBendSeqEvent : public SeqEvent {
  public:
   PitchBendSeqEvent(SeqTrack *pTrack, short thePitchBend, uint32_t offset = 0,
                     uint32_t length = 0, const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_PITCHBEND; }
+  EventType eventType() override { return EVENTTYPE_PITCHBEND; }
 
   std::string description() override {
     return fmt::format("{} - pitch bend: {}", name(), static_cast<int>(pitchbend));
@@ -374,17 +374,16 @@ class PitchBendSeqEvent : public SeqEvent {
 
 class PitchBendRangeSeqEvent : public SeqEvent {
  public:
-  PitchBendRangeSeqEvent(SeqTrack *pTrack, uint8_t semiTones, uint8_t cents, uint32_t offset = 0,
+  PitchBendRangeSeqEvent(SeqTrack *pTrack, uint16_t cents, uint32_t offset = 0,
                          uint32_t length = 0, const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_PITCHBENDRANGE; }
+  EventType eventType() override { return EVENTTYPE_PITCHBENDRANGE; }
 
   std::string description() override {
-    return fmt::format("{} - pitch bend range: {} semitones {} cents ", name(),
-      static_cast<int>(semitones), static_cast<int>(cents));
+    return fmt::format("{} - pitch bend range: {:d} cents ", name(), m_cents);
   };
 
-  uint8_t semitones;
-  uint8_t cents;
+private:
+  uint16_t m_cents;
 };
 
 //  ******************
@@ -395,12 +394,13 @@ class FineTuningSeqEvent : public SeqEvent {
  public:
   FineTuningSeqEvent(SeqTrack *pTrack, double cents, uint32_t offset = 0, uint32_t length = 0,
                      const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_PITCHBENDRANGE; }
+  EventType eventType() override { return EVENTTYPE_PITCHBENDRANGE; }
   std::string description() override {
-    return fmt::format("{} - fine tuning: {}", name(), cents);
+    return fmt::format("{} - fine tuning: {}", name(), m_cents);
   };
 
-  double cents;
+private:
+  double m_cents;
 };
 
 //  ****************************
@@ -411,12 +411,13 @@ class ModulationDepthRangeSeqEvent : public SeqEvent {
  public:
   ModulationDepthRangeSeqEvent(SeqTrack *pTrack, double semitones, uint32_t offset = 0,
                                uint32_t length = 0, const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_PITCHBENDRANGE; }
+  EventType eventType() override { return EVENTTYPE_PITCHBENDRANGE; }
   std::string description() override {
-    return fmt::format("{} - modulation depth range: {} cents", name(), semitones * 100.0);
+    return fmt::format("{} - modulation depth range: {} cents", name(), m_semitones * 100.0);
   };
 
-  double semitones;
+private:
+  double m_semitones;
 };
 
 //  *****************
@@ -427,13 +428,14 @@ class TransposeSeqEvent : public SeqEvent {
  public:
   TransposeSeqEvent(SeqTrack *pTrack, int theTranspose, uint32_t offset = 0, uint32_t length = 0,
                     const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_TRANSPOSE; }
+  EventType eventType() override { return EVENTTYPE_TRANSPOSE; }
 
   std::string description() override {
-      return fmt::format("{} - transpose: {}", name(), transpose);
+      return fmt::format("{} - transpose: {}", name(), m_transpose);
   };
 
-  int transpose;
+private:
+  int m_transpose;
 };
 
 //  ******************
@@ -444,7 +446,7 @@ class ModulationSeqEvent : public SeqEvent {
  public:
   ModulationSeqEvent(SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0,
                      const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_MODULATION; }
+  EventType eventType() override { return EVENTTYPE_MODULATION; }
 
   std::string description() override {
       return fmt::format("{} - depth: {}", name(), static_cast<int>(depth));
@@ -461,7 +463,7 @@ class BreathSeqEvent : public SeqEvent {
  public:
   BreathSeqEvent(SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0,
                  const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_BREATH; }
+  EventType eventType() override { return EVENTTYPE_BREATH; }
 
   std::string description() override {
     return fmt::format("{} - breath: {}", name(), static_cast<int>(depth));
@@ -478,7 +480,7 @@ class SustainSeqEvent : public SeqEvent {
  public:
   SustainSeqEvent(SeqTrack *pTrack, uint8_t theDepth, uint32_t offset = 0, uint32_t length = 0,
                   const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_SUSTAIN; }
+  EventType eventType() override { return EVENTTYPE_SUSTAIN; }
 
   std::string description() override {
     return fmt::format("{} - sustain pedal: {}", name(), static_cast<int>(depth));
@@ -495,7 +497,7 @@ class PortamentoSeqEvent : public SeqEvent {
  public:
   PortamentoSeqEvent(SeqTrack *pTrack, bool bPortamento, uint32_t offset = 0, uint32_t length = 0,
                      const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_PORTAMENTO; }
+  EventType eventType() override { return EVENTTYPE_PORTAMENTO; }
 
   std::string description() override {
     return fmt::format("{} - portamento: {}", name(), bOn ? "on" : "off");
@@ -513,7 +515,7 @@ class PortamentoTimeSeqEvent : public SeqEvent {
  public:
   PortamentoTimeSeqEvent(SeqTrack *pTrack, uint8_t time, uint32_t offset = 0, uint32_t length = 0,
                          const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_PORTAMENTOTIME; }
+  EventType eventType() override { return EVENTTYPE_PORTAMENTOTIME; }
 
   std::string description() override {
     return fmt::format("{} - portamento time: {}", name(), static_cast<int>(time));
@@ -531,7 +533,7 @@ class ProgChangeSeqEvent : public SeqEvent {
  public:
   ProgChangeSeqEvent(SeqTrack *pTrack, uint32_t programNumber, uint32_t offset = 0,
                      uint32_t length = 0, const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_PROGCHANGE; }
+  EventType eventType() override { return EVENTTYPE_PROGCHANGE; }
 
   std::string description() override {
     return fmt::format("{} - program number: {}", name(), progNum);
@@ -549,8 +551,8 @@ class TempoSeqEvent : public SeqEvent {
  public:
   TempoSeqEvent(SeqTrack *pTrack, double beatsperminute, uint32_t offset = 0, uint32_t length = 0,
               const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_TEMPO; }
-  Icon GetIcon() override { return ICON_TEMPO; }
+  EventType eventType() override { return EVENTTYPE_TEMPO; }
+  Icon icon() override { return ICON_TEMPO; }
 
   std::string description() override { return fmt::format("{} - bpm: {}", name(), bpm); };
 
@@ -566,7 +568,7 @@ class TempoSlideSeqEvent : public SeqEvent {
  public:
   TempoSlideSeqEvent(SeqTrack *pTrack, double targBPM, uint32_t duration, uint32_t offset = 0,
                      uint32_t length = 0, const std::string &name = "");
-  Icon GetIcon() override { return ICON_TEMPO; }
+  Icon icon() override { return ICON_TEMPO; }
 
   std::string description() override {
     return fmt::format("{} - target bpm: {}, duration: {}", name(), targbpm, dur);
@@ -586,7 +588,7 @@ class TimeSigSeqEvent : public SeqEvent {
   TimeSigSeqEvent(SeqTrack *pTrack, uint8_t numerator, uint8_t denominator,
                   uint8_t theTicksPerQuarter, uint32_t offset = 0, uint32_t length = 0,
                 const std::string &name = "");
-  EventType GetEventType() override { return EVENTTYPE_TIMESIG; }
+  EventType eventType() override { return EVENTTYPE_TIMESIG; }
 
   std::string description() override {
     return fmt::format("{} - time signature: {}/{}, ticks per quarter: {}", name(),
@@ -615,7 +617,7 @@ class MarkerSeqEvent : public SeqEvent {
                  EventColor color = CLR_MARKER)
       : SeqEvent(pTrack, offset, length, name, color), databyte1(databyte1), databyte2(databyte2),
         markerName(markername) {}
-  EventType GetEventType() override { return EVENTTYPE_MARKER; }
+  EventType eventType() override { return EVENTTYPE_MARKER; }
 
  public:
   uint8_t databyte1;
@@ -649,7 +651,7 @@ class TrackEndSeqEvent : public SeqEvent {
   explicit TrackEndSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0,
                    const std::string &name = "")
       : SeqEvent(pTrack, offset, length, name, CLR_TRACKEND) {}
-  EventType GetEventType() override { return EVENTTYPE_TRACKEND; }
+  EventType eventType() override { return EVENTTYPE_TRACKEND; }
 };
 
 //  *******************
@@ -661,5 +663,5 @@ class LoopForeverSeqEvent : public SeqEvent {
   explicit LoopForeverSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0,
                       const std::string &name = "")
       : SeqEvent(pTrack, offset, length, name, CLR_LOOPFOREVER) {}
-  EventType GetEventType() override { return EVENTTYPE_LOOPFOREVER; }
+  EventType eventType() override { return EVENTTYPE_LOOPFOREVER; }
 };

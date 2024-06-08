@@ -12,5 +12,5 @@ class KonamiPS1Scanner : public VGMScanner {
 
   virtual ~KonamiPS1Scanner() {}
 
-  virtual void Scan(RawFile *file, void *info = 0);
+  virtual void scan(RawFile *file, void *info = 0);
 };

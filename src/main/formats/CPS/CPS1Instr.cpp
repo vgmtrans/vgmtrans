@@ -19,10 +19,10 @@ CPS1SampleInstrSet::CPS1SampleInstrSet(RawFile *file,
 CPS1SampleInstrSet::~CPS1SampleInstrSet(void) {
 }
 
-bool CPS1SampleInstrSet::GetInstrPointers() {
+bool CPS1SampleInstrSet::parseInstrPointers() {
   for (int i = 0; i < 128; ++i) {
     auto offset = dwOffset + (i * 4);
-    if (!(GetByte(offset) & 0x80)) {
+    if (!(readByte(offset) & 0x80)) {
       break;
     }
     std::string name = fmt::format("Instrument {}", i);
@@ -31,8 +31,8 @@ bool CPS1SampleInstrSet::GetInstrPointers() {
     instr->unLength = 4;
     rgn->unLength = 4;
     // subtract 1 to account for the first OKIM6295 sample ptr always being null
-    rgn->sampNum = GetByte(offset+1) - 1;
-    instr->AddRgn(rgn);
+    rgn->sampNum = readByte(offset+1) - 1;
+    instr->addRgn(rgn);
     aInstrs.push_back(instr);
   }
   return true;
@@ -52,12 +52,12 @@ CPS1SampColl::CPS1SampColl(RawFile *file,
 }
 
 
-bool CPS1SampColl::GetHeaderInfo() {
+bool CPS1SampColl::parseHeader() {
   auto header = addHeader(8, 0x400-8, "Sample Pointers");
 
   int i = 1;
   for (int offset = 8; offset < 0x400; offset += 8) {
-    if (GetWord(offset) == 0xFFFFFFFF) {
+    if (readWord(offset) == 0xFFFFFFFF) {
       break;
     }
     auto startStr = fmt::format("Sample {} Start", i);
@@ -70,23 +70,23 @@ bool CPS1SampColl::GetHeaderInfo() {
   return true;
 }
 
-bool CPS1SampColl::GetSampleInfo() {
+bool CPS1SampColl::parseSampleInfo() {
   constexpr int PTR_SIZE = 3;
 
   int i = 1;
   for (int offset = 8; offset < 0x400; offset += 8) {
-    auto sampAddr = GetShort(offset);
+    auto sampAddr = readShort(offset);
     if (sampAddr == 0xFFFF) {
       break;
     }
-    auto begin = GetWordBE(offset) >> 8;
-    auto end = GetWordBE(offset+PTR_SIZE) >> 8;
+    auto begin = readWordBE(offset) >> 8;
+    auto end = readWordBE(offset+PTR_SIZE) >> 8;
 
     auto name = fmt::format("Sample {}", i);
     i += 1;
     auto sample = new DialogicAdpcmSamp(this, begin, end-begin, CPS1_OKIMSM6295_SAMPLE_RATE, name);
-    sample->SetWaveType(WT_PCM16);
-    sample->SetLoopStatus(false);
+    sample->setWaveType(WT_PCM16);
+    sample->setLoopStatus(false);
     sample->unityKey = 0x3C;
     samples.push_back(sample);
   }

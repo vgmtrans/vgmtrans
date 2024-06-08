@@ -18,10 +18,10 @@ class HudsonSnesInstrSet:
                      uint32_t spcDirAddr,
                      uint32_t addrSampTuningTable,
                      const std::string &name = "HudsonSnesInstrSet");
-  virtual ~HudsonSnesInstrSet(void);
+  virtual ~HudsonSnesInstrSet();
 
-  virtual bool GetHeaderInfo();
-  virtual bool GetInstrPointers();
+  virtual bool parseHeader();
+  virtual bool parseInstrPointers();
 
   HudsonSnesVersion version;
 
@@ -45,9 +45,9 @@ class HudsonSnesInstr
                   uint32_t spcDirAddr,
                   uint32_t addrSampTuningTable,
                   const std::string &name = "HudsonSnesInstr");
-  virtual ~HudsonSnesInstr(void);
+  virtual ~HudsonSnesInstr();
 
-  virtual bool LoadInstr();
+  virtual bool loadInstr();
 
   HudsonSnesVersion version;
 
@@ -66,7 +66,7 @@ class HudsonSnesRgn
   HudsonSnesRgn(HudsonSnesInstr *instr, HudsonSnesVersion ver, uint32_t offset, uint32_t addrTuningEntry);
   virtual ~HudsonSnesRgn();
 
-  virtual bool LoadRgn();
+  virtual bool loadRgn();
 
   HudsonSnesVersion version;
 };

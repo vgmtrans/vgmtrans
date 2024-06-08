@@ -46,7 +46,7 @@ void RareSnesInstrSet::Initialize() {
       break;
     }
 
-    if (GetShort(offDirEnt) == 0) {
+    if (readShort(offDirEnt) == 0) {
       maxSRCNValue = srcn - 1;
       break;
     }
@@ -64,7 +64,7 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
 
   bool firstZero = true;
   for (uint32_t inst = 0; inst < unLength; inst++) {
-    uint8_t srcn = GetByte(dwOffset + inst);
+    uint8_t srcn = readByte(dwOffset + inst);
 
     if (srcn == 0) {
       if (firstZero) {
@@ -83,12 +83,12 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
       continue;
     }
 
-    if (!SNESSampColl::IsValidSampleDir(rawFile(), offDirEnt, true)) {
+    if (!SNESSampColl::isValidSampleDir(rawFile(), offDirEnt, true)) {
       continue;
     }
 
-    uint16_t addrSampStart = GetShort(offDirEnt);
-    uint16_t addrSampLoop = GetShort(offDirEnt + 2);
+    uint16_t addrSampStart = readShort(offDirEnt);
+    uint16_t addrSampLoop = readShort(offDirEnt + 2);
     // not in DIR table
     if (addrSampStart < spcDirAddr + (inst * 4)) {
       continue;
@@ -106,18 +106,18 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
   }
 }
 
-bool RareSnesInstrSet::GetHeaderInfo() {
+bool RareSnesInstrSet::parseHeader() {
   return true;
 }
 
-bool RareSnesInstrSet::GetInstrPointers() {
+bool RareSnesInstrSet::parseInstrPointers() {
   // make a loopup table for duplicated instruments,
   // to give them appropriate instrument metadata
   // (it's a workaround for wrong instrument tuning)
   std::map<uint16_t, uint8_t> addrToInstrLookups;
   for (auto itr = instrUnityKeyHints.begin(); itr != instrUnityKeyHints.end(); ++itr) {
     uint8_t inst = (*itr).first;
-    uint8_t srcn = GetByte(dwOffset + inst);
+    uint8_t srcn = readByte(dwOffset + inst);
 
     uint32_t offDirEnt = spcDirAddr + (srcn * 4);
     if (addrToInstrLookups.count(offDirEnt) == 0) {
@@ -127,7 +127,7 @@ bool RareSnesInstrSet::GetInstrPointers() {
 
   for (std::vector<uint8_t>::iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr) {
     uint8_t inst = (*itr);
-    uint8_t srcn = GetByte(dwOffset + inst);
+    uint8_t srcn = readByte(dwOffset + inst);
 
     uint8_t inst_remapped = inst;
     uint32_t offDirEnt = spcDirAddr + (srcn * 4);
@@ -164,7 +164,7 @@ bool RareSnesInstrSet::GetInstrPointers() {
   return aInstrs.size() != 0;
 }
 
-const std::vector<uint8_t> &RareSnesInstrSet::GetAvailableInstruments() {
+const std::vector<uint8_t> &RareSnesInstrSet::getAvailableInstruments() {
   return availInstruments;
 }
 
@@ -191,18 +191,18 @@ RareSnesInstr::RareSnesInstr(VGMInstrSet *instrSet,
 RareSnesInstr::~RareSnesInstr() {
 }
 
-bool RareSnesInstr::LoadInstr() {
-  uint8_t srcn = GetByte(dwOffset);
+bool RareSnesInstr::loadInstr() {
+  uint8_t srcn = readByte(dwOffset);
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = GetShort(offDirEnt);
+  uint16_t addrSampStart = readShort(offDirEnt);
 
   RareSnesRgn *rgn = new RareSnesRgn(this, dwOffset, transpose, pitch, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
-  AddRgn(rgn);
+  addRgn(rgn);
   return true;
 }
 
@@ -222,13 +222,13 @@ RareSnesRgn::RareSnesRgn(RareSnesInstr *instr, uint32_t offset, int8_t transpose
 
   // NOTE_PITCH_TABLE[73] == 0x1000
   // 0x80 + (73 - 36) = 0xA5
-  SetUnityKey(36 + 36 - realTranspose);
-  SetFineTune(realPitch);
-  SNESConvADSR<VGMRgn>(this, adsr >> 8, adsr & 0xff, 0);
+  setUnityKey(36 + 36 - realTranspose);
+  setFineTune(realPitch);
+  snesConvADSR<VGMRgn>(this, adsr >> 8, adsr & 0xff, 0);
 }
 
 RareSnesRgn::~RareSnesRgn() {}
 
-bool RareSnesRgn::LoadRgn() {
+bool RareSnesRgn::loadRgn() {
   return true;
 }

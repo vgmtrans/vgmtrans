@@ -170,7 +170,7 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
     return false;
   }
 
-  auto rawSF2 = sf2->SaveToMem();
+  auto rawSF2 = sf2->saveToMem();
   /* Deleted by MemFile::mem_close */
   auto sf2_data_blob = new MemFile::DataBlob{0, std::move(rawSF2)};
 
@@ -183,7 +183,7 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
     return false;
   }
 
-  MidiFile *midi = seq->ConvertToMidi();
+  MidiFile *midi = seq->convertToMidi();
   std::vector<uint8_t> raw_midi;
   midi->WriteMidiToBuffer(raw_midi);
   /* Set up the MIDI stream */

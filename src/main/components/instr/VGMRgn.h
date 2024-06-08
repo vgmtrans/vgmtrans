@@ -17,37 +17,37 @@ class VGMRgn : public VGMItem {
   VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, uint8_t velLow,
          uint8_t velHigh, int sampNum, std::string name = "Region");
 
-  virtual bool LoadRgn() { return true; }
+  virtual bool loadRgn() { return true; }
 
-  //VGMArt* AddArt(vector<connectionBlock*> connBlocks);
-  //VGMSamp* AddSamp(void);
-  void SetRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
-  void SetUnityKey(uint8_t unityNote);
-  void SetSampNum(uint8_t sampNumber);
-  void SetLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength);
-  void SetADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
+  //VGMArt* addArt(vector<connectionBlock*> connBlocks);
+  //VGMSamp* addSamp(void);
+  void setRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
+  void setUnityKey(uint8_t unityNote);
+  void setSampNum(uint8_t sampNumber);
+  void setLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength);
+  void setADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
                uint16_t rls_transform, long release_time);
 
-  void AddGeneralItem(uint32_t offset, uint32_t length, const std::string &name);
-  void AddUnknown(uint32_t offset, uint32_t length);
-  void SetFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
-  void SetPan(uint8_t pan);
-  void AddPan(uint8_t pan, uint32_t offset, uint32_t length = 1, const std::string& name = "Pan");
-  //void SetAttenuation(long attenuation);
-  //void AddAttenuation(long atten, uint32_t offset, uint32_t length = 1);
-  void SetVolume(double volume);
-  void AddVolume(double volume, uint32_t offset, uint32_t length = 1);
-  void AddUnityKey(uint8_t unityKey, uint32_t offset, uint32_t length = 1);
-  void AddFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length = 1);
-  void AddKeyLow(uint8_t keyLow, uint32_t offset, uint32_t length = 1);
-  void AddKeyHigh(uint8_t keyHigh, uint32_t offset, uint32_t length = 1);
-  void AddVelLow(uint8_t velLow, uint32_t offset, uint32_t length = 1);
-  void AddVelHigh(uint8_t velHigh, uint32_t offset, uint32_t length = 1);
-  void AddSampNum(int sampNum, uint32_t offset, uint32_t length = 1);
-  //void SetAttack();
-  //void SetDelay();
-  //void SetSustain();
-  //void SetRelease();
+  void addGeneralItem(uint32_t offset, uint32_t length, const std::string &name);
+  void addUnknown(uint32_t offset, uint32_t length);
+  void setFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
+  void setPan(uint8_t pan);
+  void addPan(uint8_t pan, uint32_t offset, uint32_t length = 1, const std::string& name = "Pan");
+  //void setAttenuation(long attenuation);
+  //void addAttenuation(long atten, uint32_t offset, uint32_t length = 1);
+  void setVolume(double volume);
+  void addVolume(double volume, uint32_t offset, uint32_t length = 1);
+  void addUnityKey(uint8_t unityKey, uint32_t offset, uint32_t length = 1);
+  void addFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length = 1);
+  void addKeyLow(uint8_t keyLow, uint32_t offset, uint32_t length = 1);
+  void addKeyHigh(uint8_t keyHigh, uint32_t offset, uint32_t length = 1);
+  void addVelLow(uint8_t velLow, uint32_t offset, uint32_t length = 1);
+  void addVelHigh(uint8_t velHigh, uint32_t offset, uint32_t length = 1);
+  void addSampNum(int sampNum, uint32_t offset, uint32_t length = 1);
+  //void setAttack();
+  //void setDelay();
+  //void setSustain();
+  //void setRelease();
 
   //void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
 
@@ -111,7 +111,7 @@ class VGMRgnItem : public VGMItem {
   };        //HIT = Header Item Type
 
   VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, std::string name);
-  Icon GetIcon() override;
+  Icon icon() override;
 
  public:
   RgnItemType type;
