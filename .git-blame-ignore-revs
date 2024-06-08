@@ -19,3 +19,6 @@ ed533cd46d853523d184ff1a60f769223ee97845
 
 # Rename VGMColl fields and methods
 48b1d0d95a2f97fef62e6fe1d4a4af30dbaee1c5
+
+# Rename the rest of the vgmtranscore methods (hopefully)
+95dbf01ba6c7047b2f8d6e7de5c51284783ccaf2
