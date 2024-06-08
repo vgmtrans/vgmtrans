@@ -373,7 +373,7 @@ bool NamcoSnesSeq::readEvent() {
           else {
             key = keyByte;
             noteType = NOTE_MELODY;
-            desc << " [" << (trackIndex + 1) << "] " << key << " (" << MidiEvent::GetNoteName(key + transpose)
+            desc << " [" << (trackIndex + 1) << "] " << key << " (" << MidiEvent::getNoteName(key + transpose)
                 << ")";
           }
 

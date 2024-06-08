@@ -129,7 +129,7 @@ bool VGMSeq::postLoad() {
       return false;
     }
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
-    midi->Sort();
+    midi->sort();
   }
 
   return true;
@@ -224,7 +224,7 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
       if (readMode == READMODE_CONVERT_TO_MIDI) {
         for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
           if (aTracks.at(trackNum)->pMidiTrack != nullptr) {
-            aTracks[trackNum]->pMidiTrack->SetDelta(time);
+            aTracks[trackNum]->pMidiTrack->setDelta(time);
           }
         }
       }
@@ -303,7 +303,7 @@ void VGMSeq::resetVars() {
 void VGMSeq::setPPQN(uint16_t ppqn) {
   this->m_ppqn = ppqn;
   if (readMode == READMODE_CONVERT_TO_MIDI)
-    midi->SetPPQN(ppqn);
+    midi->setPPQN(ppqn);
 }
 
 uint16_t VGMSeq::ppqn() const {
@@ -321,7 +321,7 @@ bool VGMSeq::saveAsMidi(const std::string &filepath) {
   MidiFile *midi = this->convertToMidi();
   if (!midi)
     return false;
-  bool result = midi->SaveMidiFile(filepath);
+  bool result = midi->saveMidiFile(filepath);
   delete midi;
   return result;
 }

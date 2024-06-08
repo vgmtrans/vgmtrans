@@ -104,7 +104,7 @@ bool CPSSeq::postLoad() {
   // First get all tempo events, we assume they occur on track 1
   for (unsigned int i = 0; i < miditracks[0]->aEvents.size(); i++) {
     MidiEvent *event = miditracks[0]->aEvents[i];
-    if (event->GetEventType() == MIDIEVENT_TEMPO)
+    if (event->eventType() == MIDIEVENT_TEMPO)
       tempoEvents.push_back(event);
   }
 
@@ -116,7 +116,7 @@ bool CPSSeq::postLoad() {
 
     for (unsigned int j = 0; j < track->aEvents.size(); j++) {
       MidiEvent *event = miditracks[i]->aEvents[j];
-      MidiEventType type = event->GetEventType();
+      MidiEventType type = event->eventType();
       if (type == MIDIEVENT_MARKER || type == MIDIEVENT_PITCHBEND || type == MIDIEVENT_ENDOFTRACK)
         events.push_back(event);
     }
@@ -149,7 +149,7 @@ bool CPSSeq::postLoad() {
     size_t numEvents = events.size();
     for (size_t j = 0; j < numEvents; j++) {
       MidiEvent *event = events[j];
-      uint32_t curTicks = event->AbsTime;            //current absolute ticks
+      uint32_t curTicks = event->absTime;            //current absolute ticks
 
       // For the span of time since the prior event, fill in any pitch and expression events that
       // should occur as a result of LFO fluctuation when vibrato and/or tremelo depth are set.
@@ -182,7 +182,7 @@ bool CPSSeq::postLoad() {
           // If the track has enabled vibrato at this point, insert pitch bend events.
           if (vibratoCents > 0) {
             lfoCents = static_cast<int16_t>(lfoPercent * vibratoCents);
-            track->InsertPitchBend(channel,
+            track->insertPitchBend(channel,
                                    static_cast<int16_t>(((lfoCents + pitchbendCents) / static_cast<double>(pitchbendRange)) * 8192),
                                    startAbsTicks + t);
           }
@@ -190,7 +190,7 @@ bool CPSSeq::postLoad() {
           // If the track has enabled tremelo at this point, insert expression events.
           if (tremelo > 0) {
             uint8_t expression = convertPercentAmpToStdMidiVal((0x10000 - (tremelo * fabs(lfoPercent))) / static_cast<double>(0x10000));
-            track->InsertExpression(channel, expression, startAbsTicks + t);
+            track->insertExpression(channel, expression, startAbsTicks + t);
           }
         }
       }
@@ -199,7 +199,7 @@ bool CPSSeq::postLoad() {
 
       // We just handled LFO-induced events in the span between the prior event up to this one. Now,
       // check if the event is a tempo or marker event, which require special handling.
-      switch (event->GetEventType()) {
+      switch (event->eventType()) {
         case MIDIEVENT_TEMPO: {
           TempoEvent *tempoevent = static_cast<TempoEvent*>(event);
           mpqn = tempoevent->microSecs;
@@ -220,18 +220,18 @@ bool CPSSeq::postLoad() {
             // nearest MSB. This doesn't really matter, as we calculate pitch bend in absolute terms
             // (cents) and we're passing 14 bit resolution pitch bend events. It's arguably more
             // elegant to normalize pitch bend range to semitone units anyway.
-            track->InsertPitchBendRange(channel, pitchbendRange, curTicks);
+            track->insertPitchBendRange(channel, pitchbendRange, curTicks);
             lfoCents = static_cast<int16_t>((effectiveLfoVal / static_cast<double>(0x1000000)) * vibratoCents);
 
             if (curTicks > 0)
-              track->InsertPitchBend(channel,
+              track->insertPitchBend(channel,
                                      static_cast<int16_t>((lfoCents + pitchbendCents) / static_cast<double>(pitchbendRange) * 8192),
                                      curTicks);
           }
           else if (marker->name == "tremelo") {
             tremelo = tremelo_depth_table[marker->databyte1];
             if (tremelo == 0)
-              track->InsertExpression(channel, 127, curTicks);
+              track->insertExpression(channel, 127, curTicks);
           }
           else if (marker->name == "lfo") {
             lfoRate = lfo_rate_table[marker->databyte1];
@@ -244,13 +244,13 @@ bool CPSSeq::postLoad() {
             lfoStage = 0;
             lfoCents = 0;
             if (vibratoCents > 0)
-              track->InsertPitchBend(channel, static_cast<int16_t>(((0 + pitchbendCents) / static_cast<double>(pitchbendRange)) * 8192), curTicks);
+              track->insertPitchBend(channel, static_cast<int16_t>(((0 + pitchbendCents) / static_cast<double>(pitchbendRange)) * 8192), curTicks);
             if (tremelo > 0)
-              track->InsertExpression(channel, 127, curTicks);
+              track->insertExpression(channel, 127, curTicks);
           }
           else if (marker->name == "pitchbend") {
             pitchbendCents = static_cast<int16_t>((static_cast<int8_t>(marker->databyte1) / 128.0) * fmtPitchBendRange);
-            track->InsertPitchBend(channel, static_cast<int16_t>((lfoCents + pitchbendCents) / static_cast<double>(pitchbendRange) * 8192), curTicks);
+            track->insertPitchBend(channel, static_cast<int16_t>((lfoCents + pitchbendCents) / static_cast<double>(pitchbendRange) * 8192), curTicks);
           }
           break;
         }

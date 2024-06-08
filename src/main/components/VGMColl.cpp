@@ -101,7 +101,7 @@ void VGMColl::unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vec
     samp->convertToStdWave(uncompSampBuf);            // and uncompress into that space
 
     uint16_t blockAlign = samp->bps / 8 * samp->channels;
-    dls.AddWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
+    dls.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
                 samp->bps, bufSize, uncompSampBuf, samp->name());
     finalSamps.push_back(samp);
   }
@@ -218,7 +218,7 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
         const uint8_t bank_lsb = bank_no & 0x7f;
         bank_no = (bank_msb << 8) | bank_lsb;
       }
-      DLSInstr *newInstr = dls.AddInstr(bank_no, vgminstr->instrNum, name);
+      DLSInstr *newInstr = dls.addInstr(bank_no, vgminstr->instrNum, name);
       for (uint32_t j = 0; j < nRgns; j++) {
         VGMRgn *rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
@@ -311,10 +311,10 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
         if (samp->bPSXLoopInfoPrioritizing) {
           if (samp->loop.loopStatus != -1) {
             if (samp->loop.loopStart != 0 || samp->loop.loopLength != 0)
-              newWsmp->SetLoopInfo(samp->loop, samp);
+              newWsmp->setLoopInfo(samp->loop, samp);
             else {
               rgn->loop.loopStatus = samp->loop.loopStatus;
-              newWsmp->SetLoopInfo(rgn->loop, samp);
+              newWsmp->setLoopInfo(rgn->loop, samp);
             }
           } else
               throw;
@@ -323,11 +323,11 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
           // If it doesn't, then use the sample's loop info.
         else if (rgn->loop.loopStatus == -1) {
           if (samp->loop.loopStatus != -1)
-            newWsmp->SetLoopInfo(samp->loop, samp);
+            newWsmp->setLoopInfo(samp->loop, samp);
           else
             throw;
         } else
-          newWsmp->SetLoopInfo(rgn->loop, samp);
+          newWsmp->setLoopInfo(rgn->loop, samp);
 
         int8_t realUnityKey;
         if (rgn->unityKey == -1)
@@ -366,10 +366,10 @@ bool VGMColl::mainDLSCreation(DLSFile &dls) {
         long convRelease = static_cast<long>(std::round(secondsToTimecents(rgn->release_time) * 65536));
 
         DLSArt *newArt = newRgn->addArt();
-        newArt->AddPan(convertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
+        newArt->addPan(convertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
         newArt->addADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
 
-        newWsmp->SetPitchInfo(realUnityKey, realFineTune, realAttenuation);
+        newWsmp->setPitchInfo(realUnityKey, realFineTune, realAttenuation);
       }
     }
   }

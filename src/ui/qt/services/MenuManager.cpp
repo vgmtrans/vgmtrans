@@ -9,26 +9,26 @@
 #include "services/commands/SaveCommands.h"
 
 MenuManager::MenuManager() {
-  RegisterCommands<VGMSeq, VGMItem>({
+  registerCommands<VGMSeq, VGMItem>({
       std::make_shared<SaveAsMidiCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
   });
-  RegisterCommands<VGMInstrSet, VGMItem>({
+  registerCommands<VGMInstrSet, VGMItem>({
       std::make_shared<SaveAsSF2Command>(),
       std::make_shared<SaveAsDLSCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
   });
-  RegisterCommands<VGMSampColl, VGMItem>({
+  registerCommands<VGMSampColl, VGMItem>({
       std::make_shared<SaveWavBatchCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
   });
-  RegisterCommands<VGMFile, VGMItem>({
+  registerCommands<VGMFile, VGMItem>({
       std::make_shared<CloseVGMFileCommand>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
@@ -36,13 +36,13 @@ MenuManager::MenuManager() {
       std::make_shared<CloseVGMFileCommand>(),
   });
 
-  RegisterCommands<RawFile>({
+  registerCommands<RawFile>({
       std::make_shared<SaveAsOriginalFormatCommand<RawFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseRawFileCommand>(),
   });
 
-  RegisterCommands<VGMColl>({
+  registerCommands<VGMColl>({
       std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::SF2>>(),
       std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::DLS>>(),
       std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::SF2
@@ -51,7 +51,7 @@ MenuManager::MenuManager() {
 }
 
 template<typename T, typename Base>
-void MenuManager::RegisterCommands(const std::vector<std::shared_ptr<Command>>& commands) {
+void MenuManager::registerCommands(const std::vector<std::shared_ptr<Command>>& commands) {
   commandsForType[typeid(T)] = commands;
 
   if constexpr (std::is_convertible_v<T*, Base*>) {

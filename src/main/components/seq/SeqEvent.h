@@ -85,7 +85,7 @@ class DurNoteSeqEvent:
 
   std::string description() override {
     return fmt::format("{} - abs key: {} ({}), velocity: {}, duration: {}", name(),
-      static_cast<int>(absKey), MidiEvent::GetNoteName(absKey), static_cast<int>(vel), dur);
+      static_cast<int>(absKey), MidiEvent::getNoteName(absKey), static_cast<int>(vel), dur);
   };
 
  public:
@@ -111,7 +111,7 @@ class NoteOnSeqEvent : public SeqEvent {
 
   std::string description() override {
     return fmt::format("{} - abs key: {} ({}), velocity: {}", name(),
-      static_cast<int>(absKey), MidiEvent::GetNoteName(absKey), static_cast<int>(vel));
+      static_cast<int>(absKey), MidiEvent::getNoteName(absKey), static_cast<int>(vel));
   };
 
  public:
@@ -133,7 +133,7 @@ class NoteOffSeqEvent:
 
   std::string description() override {
     return fmt::format("{} - abs key: {} ({})", name(), static_cast<int>(absKey),
-      MidiEvent::GetNoteName(absKey));
+      MidiEvent::getNoteName(absKey));
   };
 
  public:

@@ -25,7 +25,7 @@
  */
 
 VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_AddedVGMFile, this, &VGMFileListModel::AddVGMFile);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMFile, this, &VGMFileListModel::addVGMFile);
 }
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
@@ -96,13 +96,13 @@ int VGMFileListModel::columnCount(const QModelIndex &parent) const {
   return 2;
 }
 
-void VGMFileListModel::AddVGMFile() {
+void VGMFileListModel::addVGMFile() {
   int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
   beginInsertRows(QModelIndex(), position, position);
   endInsertRows();
 }
 
-void VGMFileListModel::RemoveVGMFile() {
+void VGMFileListModel::removeVGMFile() {
   int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
   if (position < 0) {
     return;
@@ -145,7 +145,7 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
       selectedFiles->push_back(variantToVGMFile(qtVGMRoot.vgmFiles()[index.row()]));
     }
   }
-  auto menu = MenuManager::the()->CreateMenuForItems<VGMItem>(selectedFiles);
+  auto menu = MenuManager::the()->createMenuForItems<VGMItem>(selectedFiles);
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
 }
@@ -181,7 +181,7 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
 
 void VGMFileListView::removeVGMFile(const VGMFile *file) const {
   MdiArea::the()->removeView(file);
-  view_model->RemoveVGMFile();
+  view_model->removeVGMFile();
 }
 
 void VGMFileListView::requestVGMFileView(const QModelIndex& index) {

@@ -93,9 +93,9 @@ class DLSFile : public RiffFile {
 public:
   DLSFile(std::string dls_name = "Instrument Set");
 
-  DLSInstr *AddInstr(unsigned long bank, unsigned long instrNum);
-  DLSInstr *AddInstr(unsigned long bank, unsigned long instrNum, std::string Name);
-  DLSWave *AddWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
+  DLSInstr *addInstr(unsigned long bank, unsigned long instrNum);
+  DLSInstr *addInstr(unsigned long bank, unsigned long instrNum, std::string Name);
+  DLSWave *addWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
                    uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
                    uint8_t *waveData, std::string name = "Unnamed Wave");
 
@@ -169,7 +169,7 @@ public:
                   int32_t scale)
       : usSource(source), usControl(control), usDestination(destination), usTransform(transform),
         lScale(scale) {}
-  ~ConnectionBlock(void) {}
+  ~ConnectionBlock() {}
 
   static uint32_t size() { return 12; }
   void write(std::vector<uint8_t> &buf) const;
@@ -188,7 +188,7 @@ public:
 
   void addADSR(long attack_time, uint16_t atk_transform, long hold_time, long decay_time,
                long sustain_lev, long release_time, uint16_t rls_transform);
-  void AddPan(long pan);
+  void addPan(long pan);
 
   uint32_t GetSize() const;
   void Write(std::vector<uint8_t> &buf) const;
@@ -201,11 +201,11 @@ class DLSWsmp {
 public:
   DLSWsmp() = default;
 
-  void SetLoopInfo(Loop &loop, VGMSamp *samp);
-  void SetPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenuation);
+  void setLoopInfo(Loop &loop, VGMSamp *samp);
+  void setPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenuation);
 
-  uint32_t GetSize() const;
-  void Write(std::vector<uint8_t> &buf) const;
+  [[nodiscard]] uint32_t size() const;
+  void write(std::vector<uint8_t> &buf) const;
 
 private:
   uint16_t usUnityNote;
@@ -231,14 +231,14 @@ public:
 
   //	This function will always return an even value, to maintain the alignment
   // necessary for the RIFF format.
-  unsigned long GetSampleSize() const {
+  unsigned long sampleSize() const {
     if (m_wave_data.size() % 2)
       return m_wave_data.size() + 1;
     else
       return m_wave_data.size();
   }
-  uint32_t GetSize() const;
-  void Write(std::vector<uint8_t> &buf);
+  uint32_t size() const;
+  void write(std::vector<uint8_t> &buf);
 
 private:
   uint16_t wFormatTag;

@@ -49,7 +49,7 @@ public:
    * @param commands A vector of commands to be registered.
    */
   template<typename T, typename Base = T>
-  void RegisterCommands(const std::vector<std::shared_ptr<Command>>& commands);
+  void registerCommands(const std::vector<std::shared_ptr<Command>>& commands);
 
   /**
    * Retrieves the list of commands suitable for a given item.
@@ -57,7 +57,7 @@ public:
    * @return A vector of shared pointers to the commands.
    */
   template<typename Base>
-  std::vector<std::shared_ptr<Command>> GetCommands(Base* base) {
+  std::vector<std::shared_ptr<Command>> getCommands(Base* base) {
     if (!base) {
       return {}; // Return empty vector if base is nullptr
     }
@@ -92,25 +92,25 @@ public:
  * @return A list of commands shared by all items, ordered as they are in the first item's Command registry.
    */
   template <typename Base, typename T>
-  std::vector<std::shared_ptr<Command>> FindCommonCommands(const std::vector<T*>& items) {
+  std::vector<std::shared_ptr<Command>> findCommonCommands(const std::vector<T*>& items) {
     if (items.empty()) {
       return {};
     }
 
     std::vector<std::shared_ptr<Command>> commonCommands;
     // Get commands of the first file as the reference order
-    auto referenceCommands = GetCommands<Base>(items.front());
+    auto referenceCommands = getCommands<Base>(items.front());
 
     // Iterate over each command in the reference list
     for (const auto& refCmd : referenceCommands) {
-      std::string refCmdName = refCmd->Name();
+      std::string refCmdName = refCmd->name();
       bool isCommon = true;
 
       // Check if this command is present in all other files
       for (auto* item : items) {
-        auto commands = GetCommands<Base>(item);
+        auto commands = getCommands<Base>(item);
         if (none_of(commands.begin(), commands.end(),
-                    [&refCmdName](const std::shared_ptr<Command>& cmd) { return cmd->Name() == refCmdName; })) {
+                    [&refCmdName](const std::shared_ptr<Command>& cmd) { return cmd->name() == refCmdName; })) {
           isCommon = false;
           break;
         }
@@ -137,13 +137,13 @@ public:
  * @return A QMenu populated with actions for the common commands, in the same order as they were registered for the first item
    */
   template <typename Base, typename T = Base>
-  QMenu* CreateMenuForItems(std::shared_ptr<std::vector<T*>> items) {
+  QMenu* createMenuForItems(std::shared_ptr<std::vector<T*>> items) {
 
     auto menu = new QMenu();
     if (items->empty()) {
       return nullptr;
     }
-    auto commands = FindCommonCommands<Base>(*items);
+    auto commands = findCommonCommands<Base>(*items);
 
     for (const auto& command : commands) {
 
@@ -153,10 +153,10 @@ public:
         continue;
       }
 
-      auto contextFactory = command->GetContextFactory();
-      auto propSpecs = contextFactory->GetPropertySpecifications();
+      auto contextFactory = command->contextFactory();
+      auto propSpecs = contextFactory->propertySpecifications();
 
-      menu->addAction(command->Name().c_str(), [command, items, propSpecs, contextFactory] {
+      menu->addAction(command->name().c_str(), [command, items, propSpecs, contextFactory] {
         PropertyMap propMap;
         for (const auto& propSpec : propSpecs) {
 
@@ -166,7 +166,7 @@ public:
               isDirPath = true;
             case PropertySpecValueType::Path:
               if (isDirPath || items->size() > 1) {
-                fs::path dirpath = fs::path(OpenSaveDirDialog());
+                fs::path dirpath = fs::path(openSaveDirDialog());
                 if (dirpath.string().empty()) {
                   return;
                 }
@@ -177,7 +177,7 @@ public:
                   suggestedFileName = ConvertToSafeFileName((*items)[0]->name());
                 }
                 auto fileExtension = get<std::string>(propSpec.defaultValue);
-                auto path = OpenSaveFileDialog(suggestedFileName, fileExtension);
+                auto path = openSaveFileDialog(suggestedFileName, fileExtension);
                 if (path.empty()) {
                   return;
                 }
@@ -192,11 +192,11 @@ public:
               break;
           }
         }
-        auto context = contextFactory->CreateContext(propMap);
+        auto context = contextFactory->createContext(propMap);
         if (!context) {
           return;
         }
-        command->Execute(*context);
+        command->execute(*context);
       });
     }
     return menu;

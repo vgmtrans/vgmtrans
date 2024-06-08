@@ -26,8 +26,8 @@ static const QIcon& fileIcon() {
  */
 
 RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_AddedRawFile, this, &RawFileListViewModel::AddRawFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_RemovedRawFile, this, &RawFileListViewModel::RemoveRawFile);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, &RawFileListViewModel::addRawFile);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_removedRawFile, this, &RawFileListViewModel::removeRawFile);
 }
 
 int RawFileListViewModel::rowCount(const QModelIndex &parent) const {
@@ -44,7 +44,7 @@ int RawFileListViewModel::columnCount(const QModelIndex &parent) const {
   return 2;
 }
 
-void RawFileListViewModel::AddRawFile() {
+void RawFileListViewModel::addRawFile() {
   int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
   if (position >= 0) {
     beginInsertRows(QModelIndex(), position, position);
@@ -52,7 +52,7 @@ void RawFileListViewModel::AddRawFile() {
   }
 }
 
-void RawFileListViewModel::RemoveRawFile() {
+void RawFileListViewModel::removeRawFile() {
   int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
   if (position >= 0) {
     beginRemoveRows(QModelIndex(), position, position);
@@ -148,7 +148,7 @@ void RawFileListView::rawFilesMenu(const QPoint &pos) const {
       selectedFiles->push_back(qtVGMRoot.rawFiles()[index.row()]);
     }
   }
-  auto menu = MenuManager::the()->CreateMenuForItems<RawFile>(selectedFiles);
+  auto menu = MenuManager::the()->createMenuForItems<RawFile>(selectedFiles);
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
 }

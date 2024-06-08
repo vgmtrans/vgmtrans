@@ -74,7 +74,7 @@ bool VGMMultiSectionSeq::postLoad() {
       return false;
     }
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
-    midi->Sort();
+    midi->sort();
   }
 
   return true;

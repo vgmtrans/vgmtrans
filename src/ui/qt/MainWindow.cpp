@@ -130,7 +130,7 @@ void MainWindow::showEvent(QShowEvent* event) {
 }
 
 void MainWindow::routeSignals() {
-  connect(m_menu_bar, &MenuBar::openFile, this, &MainWindow::OpenFile);
+  connect(m_menu_bar, &MenuBar::openFile, this, &MainWindow::openFile);
   connect(m_menu_bar, &MenuBar::exit, this, &MainWindow::close);
   connect(m_menu_bar, &MenuBar::showAbout, [this]() {
     About about(this);
@@ -169,7 +169,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
   event->acceptProposedAction();
 }
 
-void MainWindow::OpenFile() {
+void MainWindow::openFile() {
   auto filenames = QFileDialog::getOpenFileNames(
       this, "Select a file...", QStandardPaths::writableLocation(QStandardPaths::MusicLocation),
       "All files (*)");

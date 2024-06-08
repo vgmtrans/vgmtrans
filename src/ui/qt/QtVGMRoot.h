@@ -22,9 +22,6 @@ public:
 
   void UI_onBeginLoadRawFile() override;
   void UI_onEndLoadRawFile() override;
-  void UI_OnBeginScan();
-  void UI_SetScanInfo();
-  void UI_OnEndScan();
   void UI_addVGMFile(VGMFileVariant file) override;
   void UI_addVGMSeq(VGMSeq* theSeq) override;
   void UI_addVGMInstrSet(VGMInstrSet* theInstrSet) override;
@@ -35,25 +32,23 @@ public:
   void UI_endRemoveVGMFiles() override;
   void UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
-  std::string UI_GetOpenFilePath(const std::string& suggestedFilename = "",
-                                          const std::string& extension = "");
   std::string UI_getSaveFilePath(const std::string& suggestedFilename,
-                                          const std::string& extension = "") override;
-  std::string UI_getSaveDirPath(const std::string& suggestedDir = "") override;
+                                          const std::string& extension) override;
+  std::string UI_getSaveDirPath(const std::string& suggestedDir) override;
 
 private:
   int rawFileLoadRecurseStack = 0;
 
 signals:
-  void UI_BeganLoadingRawFile();
-  void UI_EndedLoadingRawFile();
-  void UI_BeganRemovingVGMFiles();
-  void UI_EndedRemovingVGMFiles();
-  void UI_AddedRawFile();
-  void UI_RemovedRawFile();
-  void UI_AddedVGMFile();
-  void UI_AddedVGMColl();
-  void UI_RemovedVGMColl();
+  void UI_beganLoadingRawFile();
+  void UI_endedLoadingRawFile();
+  void UI_beganRemovingVGMFiles();
+  void UI_endedRemovingVGMFiles();
+  void UI_addedRawFile();
+  void UI_removedRawFile();
+  void UI_addedVGMFile();
+  void UI_addedVGMColl();
+  void UI_removedVGMColl();
   void UI_removeVGMColl(VGMColl* targColl) override;
   void UI_removeVGMFile(VGMFile* targFile) override;
   void UI_log(LogItem* theLog) override;

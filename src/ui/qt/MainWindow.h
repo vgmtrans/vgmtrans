@@ -34,7 +34,7 @@ private:
   void createStatusBar();
   void routeSignals();
 
-  void OpenFile();
+  void openFile();
   void openFileInternal(const QString& filename);
 
   QDockWidget *m_rawfile_dock{};

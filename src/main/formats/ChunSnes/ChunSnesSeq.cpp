@@ -345,7 +345,7 @@ bool ChunSnesTrack::readEvent() {
         if (prevNoteSlurred && key == prevNoteKey) {
           // slurred note with same key works as tie
           makePrevDurNoteEnd(getTime() + dur);
-          desc = fmt::format("Abs Key: {} ({})   Duration: {}", key, MidiEvent::GetNoteName(key), dur);
+          desc = fmt::format("Abs Key: {} ({})   Duration: {}", key, MidiEvent::getNoteName(key), dur);
           addGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration", desc, CLR_TIE, ICON_NOTE);
         }
         else {

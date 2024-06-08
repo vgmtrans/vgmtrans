@@ -348,7 +348,7 @@ bool PrismSnesTrack::readEvent() {
 
       if (prevNoteSlurred && key == prevNoteKey) {
         makePrevDurNoteEnd(getTime() + dur);
-        desc << "Abs Key: " << key << " (" << MidiEvent::GetNoteName(key) << "  Velocity: " << NOTE_VELOCITY << "  Duration: "
+        desc << "Abs Key: " << key << " (" << MidiEvent::getNoteName(key) << "  Velocity: " << NOTE_VELOCITY << "  Duration: "
             << dur;
         addGenericEvent(beginOffset, curOffset - beginOffset, "Note (Tied)", desc.str(), CLR_DURNOTE, ICON_NOTE);
       }
@@ -387,9 +387,9 @@ bool PrismSnesTrack::readEvent() {
       uint8_t dur = getDuration(curOffset, len, durDelta);
 
       desc << "Note Number (From): " << noteNumberFrom << " ("
-          << ((noteFrom & 0x80) != 0 ? "Noise" : MidiEvent::GetNoteName(noteNumberFrom)) << ")" <<
+          << ((noteFrom & 0x80) != 0 ? "Noise" : MidiEvent::getNoteName(noteNumberFrom)) << ")" <<
           "  Note Number (To): " << noteNumberTo << " ("
-          << ((noteTo & 0x80) != 0 ? "Noise" : MidiEvent::GetNoteName(noteNumberTo)) << ")" <<
+          << ((noteTo & 0x80) != 0 ? "Noise" : MidiEvent::getNoteName(noteNumberTo)) << ")" <<
           "  Length: " << len << "  Duration: " << dur;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str(), CLR_PITCHBEND, ICON_CONTROL);
 

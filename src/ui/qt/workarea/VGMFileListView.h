@@ -25,8 +25,8 @@ class VGMFileListModel : public QAbstractTableModel {
     int columnCount(const QModelIndex &parent) const override;
 
   public slots:
-    void AddVGMFile();
-    void RemoveVGMFile();
+    void addVGMFile();
+    void removeVGMFile();
 
   private:
     enum Property : uint8_t { Name = 0, Format = 1 };
