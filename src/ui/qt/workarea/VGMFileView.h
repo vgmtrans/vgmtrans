@@ -26,7 +26,7 @@ private:
   void resetSnapRanges() const;
   void focusInEvent(QFocusEvent* event) override;
   void closeEvent(QCloseEvent *closeEvent) override;
-  int hexViewWidth() const;
+  int hexViewFullWidth() const;
   int hexViewWidthSansAscii() const;
   int hexViewWidthSansAsciiAndAddress() const;
   void updateHexViewFont(qreal sizeIncrement) const;

@@ -71,9 +71,23 @@ void MdiArea::removeView(const VGMFile *file) {
 }
 
 void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
+  if (!window)
+    return;
+
   // For some reason, if multiple documents are open, closing one document causes the others
   // to become windowed instead of maximized. This fixes the problem.
   ensureMaximizedSubWindow(window);
+
+  // Another quirk: paintEvents for all subWindows, not just the active one, are fired
+  // unless we manually hide them.
+  for (auto subWindow : subWindowList()) {
+    if (subWindow == window) {
+      qDebug() << "skipping this window";
+      subWindow->widget()->setHidden(false);
+    } else {
+      subWindow->widget()->setHidden(true);
+    }
+  }
 
   if (window) {
     auto it = windowToFileMap.find(window);

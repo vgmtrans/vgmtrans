@@ -35,12 +35,12 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   m_splitter->addWidget(m_hexScrollArea);
   m_splitter->addWidget(m_treeview);
-  m_splitter->setSizes(QList<int>{hexViewWidth(), treeViewMinimumWidth});
+  m_splitter->setSizes(QList<int>{hexViewFullWidth(), treeViewMinimumWidth});
   m_splitter->setStretchFactor(0, 0);
   m_splitter->setStretchFactor(1, 1);
   m_splitter->persistState();
   resetSnapRanges();
-  m_hexScrollArea->setMaximumWidth(hexViewWidth());
+  m_hexScrollArea->setMaximumWidth(hexViewFullWidth());
   m_treeview->setMinimumWidth(treeViewMinimumWidth);
 
   connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
@@ -81,11 +81,11 @@ void VGMFileView::focusInEvent(QFocusEvent* event) {
 void VGMFileView::resetSnapRanges() const {
   m_splitter->clearSnapRanges();
   m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
-  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewWidth());
+  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewFullWidth());
 }
 
-int VGMFileView::hexViewWidth() const {
-  return m_hexview->getViewportWidth();
+int VGMFileView::hexViewFullWidth() const {
+  return m_hexview->getViewportFullWidth();
 }
 
 int VGMFileView::hexViewWidthSansAscii() const {
@@ -113,14 +113,14 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) const {
 
   // Updating the font will shrink or expand the maximum possible width of the hex view
   int actualWidthBeforeResize = m_splitter->sizes()[0];
-  int fullWidthBeforeResize = hexViewWidth();
+  int fullWidthBeforeResize = hexViewFullWidth();
 
   m_hexview->setFont(font);
-  m_hexScrollArea->setMaximumWidth(hexViewWidth());
+  m_hexScrollArea->setMaximumWidth(hexViewFullWidth());
 
   // We'll scale the hex view size such that approximately the same portion of text will be visible
   float percentHexViewVisible = static_cast<float>(actualWidthBeforeResize) / static_cast<float>(fullWidthBeforeResize);
-  int fullWidthAfterResize = hexViewWidth();
+  int fullWidthAfterResize = hexViewFullWidth();
   int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
   int newWidth = actualWidthBeforeResize + static_cast<int>(round(static_cast<float>(widthChange) * percentHexViewVisible));
   resetSnapRanges();
