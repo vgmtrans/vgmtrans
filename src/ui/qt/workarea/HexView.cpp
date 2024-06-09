@@ -22,7 +22,7 @@
 #include <QToolTip>
 #include <QStyle>
 
-constexpr qsizetype NUM_CACHED_LINE_PIXMAPS = 300;
+constexpr qsizetype NUM_CACHED_LINE_PIXMAPS = 600;
 constexpr int BYTES_PER_LINE = 16;
 constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int ADDRESS_SPACING_CHARS = 4;
