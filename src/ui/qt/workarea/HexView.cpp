@@ -84,6 +84,7 @@ void HexView::setFont(QFont& font) {
   fontMetrics = QFontMetrics(font);
   // We need to use horizontalAdvance(), as averageCharWidth() doesn't capture letter spacing.
   this->charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
+  this->charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2));
   this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
 
   QWidget::setFont(font);
@@ -215,9 +216,9 @@ void HexView::setSelectedItem(VGMItem *item) {
 
 void HexView::resizeOverlays(int height) const {
   overlay->setGeometry(
-      hexXOffset() - (charWidth/2),
+      hexXOffset() - charHalfWidth,
       overlay->y(),
-      ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) * charWidth) + charWidth/2,
+      ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) * charWidth) + charHalfWidth,
       height
   );
 }
@@ -371,7 +372,7 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
 
     if (shouldDrawAscii) {
       painter.fillRect(
-          QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + (charWidth / 2),
+          QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + charHalfWidth,
                 0,
                 BYTES_PER_LINE * charWidth, overlay->height()),
           QColor(0, 0, 0, 100));
@@ -422,14 +423,12 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
         pixmapPainter.translate(0, line * lineHeight);
 
         auto linePixmap = lineCache.object(startLine + line);
+        int bytesToPrint = std::min(
+                              std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
+                              BYTES_PER_LINE);
         if (linePixmap) {
-
-          int bytesToPrint = std::min(
-            std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
-            BYTES_PER_LINE);
-
           QRect sourceRect = calculateSelectionRectForLine(col, bytesToPrint);
-          QRect targetRect((col * 3 * charWidth) - (charWidth / 2), 0, bytesToPrint * 3 * charWidth, lineHeight);
+          QRect targetRect((col * 3 * charWidth) - charHalfWidth, 0, bytesToPrint * 3 * charWidth, lineHeight);
           pixmapPainter.drawPixmap(targetRect, *linePixmap, sourceRect);
 
           offsetIntoEvent += bytesToPrint;
@@ -444,9 +443,6 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
             offsetIntoEvent += BYTES_PER_LINE - col;
             col = 0;
           } else {
-            int bytesToPrint = std::min(
-                std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
-                BYTES_PER_LINE);
             translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
             translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
 
@@ -479,7 +475,7 @@ QRect HexView::calculateSelectionRectForLine(int startColumn, int length) {
   int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
   int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth;
   // left = 0;
-  left -= charWidth / 2;
+  left -= charHalfWidth;
   // int right = left + (length * 3 * charWidth);
   int width = length * 3 * charWidth;
   return QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
@@ -607,7 +603,7 @@ void HexView::printHex(
   auto width = length * charWidth * 3;
   int rectWidth = width;
   int rectHeight = lineHeight;
-  painter.fillRect(-charWidth/2, 0, rectWidth, rectHeight, bgColor);
+  painter.fillRect(-charHalfWidth, 0, rectWidth, rectHeight, bgColor);
 
   // Draw bytes string
   QString hexString;
@@ -766,7 +762,6 @@ void HexView::drawSelectedItem() const {
 
 // Find the VGMFile offset represented at the given QPoint. Returns -1 for invalid points.
 int HexView::getOffsetFromPoint(QPoint pos) const {
-  auto halfCharWidth = charWidth / 2;
   auto hexStart = hexXOffset();
   auto hexEnd = hexStart + (BYTES_PER_LINE * 3 * charWidth);
 
@@ -774,8 +769,8 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
   auto asciiEnd = asciiStart + (BYTES_PER_LINE * charWidth);
 
   int byteNum = -1;
-  if (pos.x() >= hexStart - halfCharWidth && pos.x() < hexEnd - halfCharWidth) {
-    byteNum = ((pos.x() - hexStart + halfCharWidth) / charWidth) / 3;
+  if (pos.x() >= hexStart - charHalfWidth && pos.x() < hexEnd - charHalfWidth) {
+    byteNum = ((pos.x() - hexStart + charHalfWidth) / charWidth) / 3;
   } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
     byteNum = (pos.x() - asciiStart) / charWidth;
   }
