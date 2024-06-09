@@ -124,13 +124,6 @@ int HexView::getVirtualHeight() const {
   return lineHeight * getTotalLines();
 }
 
-// int HexView::getScrollBarWidth() {
-//   if (m_scrollbar_thickness == -1) {
-//     m_scrollbar_thickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
-//
-//   }
-// }
-
 int HexView::getVirtualFullWidth() {
   if (m_virtual_full_width == -1) {
     constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
