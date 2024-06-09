@@ -499,7 +499,7 @@ QRect HexView::calculateSelectionRectForLine(int startColumn, int length) {
   int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
   int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth;
   // left = 0;
-  left -= charWidth / 2;
+  left -= charHalfWidth;
   // int right = left + (length * 3 * charWidth);
   int width = length * 3 * charWidth;
   return QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
