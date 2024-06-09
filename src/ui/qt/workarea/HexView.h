@@ -45,7 +45,7 @@ private:
   int getVirtualHeight() const;
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
-  std::pair<QRect,QRect> calculateSelectionRectsForLine(int startColumn, int length, qreal dpr);
+  std::pair<QRect,QRect> calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const;
   void resizeOverlays(int height) const;
   void redrawOverlay();
   void printLine(QPainter& painter, int line) const;

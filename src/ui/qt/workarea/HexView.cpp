@@ -22,14 +22,19 @@
 #include <QToolTip>
 #include <QStyle>
 
-#define NUM_CACHED_LINE_PIXMAPS 300
-#define BYTES_PER_LINE 16
-#define NUM_ADDRESS_NIBBLES 8
-#define ADDRESS_SPACING_CHARS 4
-#define HEX_TO_ASCII_SPACING_CHARS 4
-#define SELECTION_PADDING 20
-#define VIEWPORT_PADDING 10
-#define DIM_DURATION_MS 200
+constexpr qsizetype NUM_CACHED_LINE_PIXMAPS = 300;
+constexpr int BYTES_PER_LINE = 16;
+constexpr int NUM_ADDRESS_NIBBLES = 8;
+constexpr int ADDRESS_SPACING_CHARS = 4;
+constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
+constexpr int SELECTION_PADDING = 20;
+constexpr int VIEWPORT_PADDING = 10;
+constexpr int DIM_DURATION_MS = 200;
+constexpr qreal OVERLAY_OPACITY_LEVEL = 0.8;
+const QColor SHADOW_COLOR = Qt::black;
+constexpr int SHADOW_OFFSET_X = 1;
+constexpr int SHADOW_OFFSET_Y = 2;
+constexpr int SHADOW_BLUR_RADIUS = 20;
 
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
       QWidget(parent), vgmfile(vgmfile), selectedItem(nullptr) {
@@ -425,28 +430,30 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
         int bytesToPrint = std::min(
                       std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
                       BYTES_PER_LINE);
-        auto linePixmap = lineCache.object(startLine + line);
-        if (linePixmap) {
-          // Hex selection
-          auto [hexRect, asciiRect] = calculateSelectionRectsForLine(col, bytesToPrint, dpr);
+
+        // If there is a cached pixmap of the line, copy portions of it to construct the selected item pixmap
+        if (auto linePixmap = lineCache.object(startLine + line)) {
+          // Hex segment
+          auto [hex_rect, ascii_rect] = calculateSelectionRectsForLine(col, bytesToPrint, dpr);
           QRect targetRect((col * 3 * charWidth) - charHalfWidth, 0,
             bytesToPrint * 3 * charWidth, lineHeight);
-          pixmapPainter.drawPixmap(targetRect, *linePixmap, hexRect);
+          pixmapPainter.drawPixmap(targetRect, *linePixmap, hex_rect);
 
-          // ASCII selection
-          int asciiStartInChars = (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
-          targetRect = { (asciiStartInChars + col) * charWidth, 0,
-            bytesToPrint * charWidth, lineHeight };
-          pixmapPainter.drawPixmap(targetRect, *linePixmap, asciiRect);
-
+          // ASCII segment
+          if (shouldDrawAscii) {
+            int ascii_start_in_chars = (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
+            targetRect = { (ascii_start_in_chars + col) * charWidth, 0,
+              bytesToPrint * charWidth, lineHeight };
+            pixmapPainter.drawPixmap(targetRect, *linePixmap, ascii_rect);
+          }
           offsetIntoEvent += bytesToPrint;
           col = 0;
         }
         else {
           // If the selected item has children, draw them.
           if (!selectedItem->children().empty()) {
-            int startAddress = selectedItem->dwOffset + offsetIntoEvent;
-            int endAddress = selectedItem->dwOffset + selectedItem->unLength;
+            int startAddress = static_cast<int>(selectedItem->dwOffset + offsetIntoEvent);
+            int endAddress = static_cast<int>(selectedItem->dwOffset + selectedItem->unLength);
             printData(pixmapPainter, startAddress, endAddress);
             offsetIntoEvent += BYTES_PER_LINE - col;
             col = 0;
@@ -462,8 +469,9 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       }
       auto glowEffect = new QGraphicsDropShadowEffect();
       glowEffect->setBlurRadius(SELECTION_PADDING);
-      glowEffect->setColor(Qt::black);
-      glowEffect->setOffset(0, 0);
+      glowEffect->setColor(SHADOW_COLOR);
+      glowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
+      glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
 
       selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
       selectionViewPixmap.setDevicePixelRatio(dpr);
@@ -477,7 +485,7 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
   return false;
 }
 
-std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) {
+std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const {
   int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
   int asciiStartOffsetInChars = hexCharsStartOffsetInChars + (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
   int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth - charHalfWidth;
@@ -513,6 +521,18 @@ void HexView::paintEvent(QPaintEvent *e) {
 
   painter.translate(0, startLine * lineHeight);
   for (int line = startLine; line <= endLine; line++) {
+    // Skip drawing lines that are totally eclipsed by the selected item
+    if (selectedItem && selectedItem->unLength >= BYTES_PER_LINE) {
+      auto startAddress = vgmfile->dwOffset + (line * BYTES_PER_LINE);
+      auto endAddress = startAddress + BYTES_PER_LINE;
+      if (selectedItem->dwOffset <= startAddress && selectedItem->dwOffset + selectedItem->unLength >= endAddress) {
+        if (shouldDrawOffset)
+          printAddress(painter, line);
+        painter.translate(0, lineHeight);
+        continue;
+      }
+    }
+
     auto cachedPixmap = lineCache.object(line);
     if (!cachedPixmap) {
       auto linePixmap = new QPixmap(static_cast<int>(getVirtualFullWidth() * dpr), static_cast<int>(lineHeight * dpr));
@@ -713,7 +733,7 @@ void HexView::showOverlay(bool show, bool animate) {
     overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
     overlayAnimation->setDuration(DIM_DURATION_MS);
     overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 0 : overlayOpacityEffect->opacity());
-    overlayAnimation->setEndValue(1.0);
+    overlayAnimation->setEndValue(OVERLAY_OPACITY_LEVEL);
     overlayAnimation->setEasingCurve(QEasingCurve::OutQuad);
 
     QObject::connect(overlayAnimation, &QPropertyAnimation::finished, [this]() {
@@ -732,7 +752,7 @@ void HexView::showOverlay(bool show, bool animate) {
 
     overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
     overlayAnimation->setDuration(DIM_DURATION_MS);
-    overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 1.0 : overlayOpacityEffect->opacity());
+    overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? OVERLAY_OPACITY_LEVEL : overlayOpacityEffect->opacity());
     overlayAnimation->setEndValue(0.0);
 
     // Connect the finished signal of the animation to a lambda function
