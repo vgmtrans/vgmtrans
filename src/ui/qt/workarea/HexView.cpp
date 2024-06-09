@@ -493,16 +493,18 @@ std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, 
   return { hexRect, asciiRect };
 }
 
-QRect HexView::calculateSelectionRectForLine(int startColumn, int length) {
-  qreal dpr = devicePixelRatioF();
-
+std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) {
   int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
-  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth;
-  // left = 0;
-  left -= charHalfWidth;
-  // int right = left + (length * 3 * charWidth);
+  int asciiStartOffsetInChars = hexCharsStartOffsetInChars + (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
+  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth - charHalfWidth;
   int width = length * 3 * charWidth;
-  return QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
+  QRect hexRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
+
+  left = (asciiStartOffsetInChars + startColumn) * charWidth;
+  width = length * charWidth;
+  QRect asciiRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
+
+  return { hexRect, asciiRect };
 }
 
 void HexView::paintEvent(QPaintEvent *e) {
