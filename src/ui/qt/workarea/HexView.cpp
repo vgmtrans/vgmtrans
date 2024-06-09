@@ -493,7 +493,7 @@ std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, 
   return { hexRect, asciiRect };
 }
 
-std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) {
+std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const {
   int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
   int asciiStartOffsetInChars = hexCharsStartOffsetInChars + (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
   int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth - charHalfWidth;
