@@ -81,11 +81,7 @@ void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
   // Another quirk: paintEvents for all subWindows, not just the active one, are fired
   // unless we manually hide them.
   for (auto subWindow : subWindowList()) {
-    if (subWindow == window) {
-      subWindow->widget()->setHidden(false);
-    } else {
-      subWindow->widget()->setHidden(true);
-    }
+    subWindow->widget()->setHidden(subWindow != window);
   }
 
   if (window) {
