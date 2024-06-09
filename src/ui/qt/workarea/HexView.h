@@ -74,11 +74,13 @@ private:
                   QColor textColor) const;
   void showOverlay(bool show, bool animate);
   void drawSelectedItem() const;
+  QRect calculateSelectionRectForLine(int startOffset, int length);
 
   VGMFile* vgmfile;
   VGMItem* selectedItem;
   int selectedOffset;
   int charWidth;
+  int charHalfWidth;
   int lineHeight;
   bool addressAsHex = true;
   bool isDragging = false;

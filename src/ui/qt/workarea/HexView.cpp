@@ -130,8 +130,7 @@ int HexView::getVirtualFullWidth() {
 
 int HexView::getVirtualWidthSansAscii() {
   if (m_virtual_width_sans_ascii == -1) {
-    constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
-                         0; // (HEX_TO_ASCII_SPACING_CHARS / 2);
+    constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
     m_virtual_width_sans_ascii = (numChars * charWidth) + SELECTION_PADDING;
   }
   return m_virtual_width_sans_ascii;
@@ -139,7 +138,7 @@ int HexView::getVirtualWidthSansAscii() {
 
 int HexView::getVirtualWidthSansAsciiAndAddress() {
   if (m_virtual_width_sans_ascii_and_address == -1) {
-    constexpr int numChars = (BYTES_PER_LINE * 3) + 0; //(HEX_TO_ASCII_SPACING_CHARS / 2);
+    constexpr int numChars = BYTES_PER_LINE * 3;
     m_virtual_width_sans_ascii_and_address = (numChars * charWidth) + SELECTION_PADDING;
   }
   return m_virtual_width_sans_ascii_and_address;
@@ -414,28 +413,46 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       pixmapPainter.setFont(this->font());
       pixmapPainter.translate(SELECTION_PADDING, SELECTION_PADDING);
 
+      int startLine = baseOffset / BYTES_PER_LINE;
+
       int col = startColumn;
       int offsetIntoEvent = 0;
       for (int line=0; line<numLines; line++) {
         pixmapPainter.save();
         pixmapPainter.translate(0, line * lineHeight);
 
-        // If the selected item has children, draw them.
-        if (!selectedItem->children().empty()) {
-          int startAddress = selectedItem->dwOffset + offsetIntoEvent;
-          int endAddress = selectedItem->dwOffset + selectedItem->unLength;
-          printData(pixmapPainter, startAddress, endAddress);
-          offsetIntoEvent += BYTES_PER_LINE - col;
-          col = 0;
-        } else {
+        auto linePixmap = lineCache.object(startLine + line);
+        if (linePixmap) {
+
           int bytesToPrint = std::min(
-              std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
-              BYTES_PER_LINE);
-          translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
-          translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+            std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
+            BYTES_PER_LINE);
+
+          QRect sourceRect = calculateSelectionRectForLine(col, bytesToPrint);
+          QRect targetRect((col * 3 * charWidth) - (charWidth / 2), 0, bytesToPrint * 3 * charWidth, lineHeight);
+          pixmapPainter.drawPixmap(targetRect, *linePixmap, sourceRect);
 
           offsetIntoEvent += bytesToPrint;
           col = 0;
+        }
+        else {
+          // If the selected item has children, draw them.
+          if (!selectedItem->children().empty()) {
+            int startAddress = selectedItem->dwOffset + offsetIntoEvent;
+            int endAddress = selectedItem->dwOffset + selectedItem->unLength;
+            printData(pixmapPainter, startAddress, endAddress);
+            offsetIntoEvent += BYTES_PER_LINE - col;
+            col = 0;
+          } else {
+            int bytesToPrint = std::min(
+                std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
+                BYTES_PER_LINE);
+            translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+            translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+
+            offsetIntoEvent += bytesToPrint;
+            col = 0;
+          }
         }
         pixmapPainter.restore();
       }
@@ -454,6 +471,18 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
     return true;
   }
   return false;
+}
+
+QRect HexView::calculateSelectionRectForLine(int startColumn, int length) {
+  qreal dpr = devicePixelRatioF();
+
+  int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
+  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth;
+  // left = 0;
+  left -= charWidth / 2;
+  // int right = left + (length * 3 * charWidth);
+  int width = length * 3 * charWidth;
+  return QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
 }
 
 void HexView::paintEvent(QPaintEvent *e) {
@@ -475,23 +504,23 @@ void HexView::paintEvent(QPaintEvent *e) {
   int endLine = (paintRect.bottom() + lineHeight - 1) / lineHeight;
 
   qreal dpr = devicePixelRatioF();
-  auto linePixmap = new QPixmap(static_cast<int>(getVirtualFullWidth() * dpr), static_cast<int>(lineHeight * dpr));
-  linePixmap->setDevicePixelRatio(dpr);
-  linePixmap->fill(Qt::transparent);
-
-  QPainter linePainter(linePixmap);
-  linePainter.setFont(this->font());
-  linePainter.setRenderHints(painter.renderHints());
-  linePainter.setPen(painter.pen());
-  linePainter.setBrush(painter.brush());
 
   painter.translate(0, startLine * lineHeight);
   for (int line = startLine; line <= endLine; line++) {
     auto cachedPixmap = lineCache.object(line);
     if (!cachedPixmap) {
+      auto linePixmap = new QPixmap(static_cast<int>(getVirtualFullWidth() * dpr), static_cast<int>(lineHeight * dpr));
+      linePixmap->setDevicePixelRatio(dpr);
       linePixmap->fill(Qt::transparent);
+
+      QPainter linePainter(linePixmap);
+      linePainter.setFont(this->font());
+      linePainter.setRenderHints(painter.renderHints());
+      linePainter.setPen(painter.pen());
+      linePainter.setBrush(painter.brush());
+
       printLine(linePainter, line);
-      lineCache.insert(line, new QPixmap(*linePixmap));
+      lineCache.insert(line, linePixmap);
       painter.drawPixmap(0, 0, *linePixmap);
     } else {
       painter.drawPixmap(0, 0, *cachedPixmap);
