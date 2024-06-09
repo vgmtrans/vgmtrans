@@ -456,8 +456,9 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
           translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
           translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
 
-          offsetIntoEvent += bytesToPrint;
-          col = 0;
+            offsetIntoEvent += bytesToPrint;
+            col = 0;
+          }
         }
       }
       pixmapPainter.restore();
@@ -490,6 +491,18 @@ std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, 
   QRect asciiRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
 
   return { hexRect, asciiRect };
+}
+
+QRect HexView::calculateSelectionRectForLine(int startColumn, int length) {
+  qreal dpr = devicePixelRatioF();
+
+  int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
+  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth;
+  // left = 0;
+  left -= charWidth / 2;
+  // int right = left + (length * 3 * charWidth);
+  int width = length * 3 * charWidth;
+  return QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
 }
 
 void HexView::paintEvent(QPaintEvent *e) {
