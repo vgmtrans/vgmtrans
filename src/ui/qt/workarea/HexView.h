@@ -45,6 +45,7 @@ private:
   int getVirtualHeight() const;
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
+  std::pair<QRect,QRect> calculateSelectionRectsForLine(int startColumn, int length, qreal dpr);
   void resizeOverlays(int height) const;
   void redrawOverlay();
   void printLine(QPainter& painter, int line) const;
@@ -74,7 +75,6 @@ private:
                   QColor textColor) const;
   void showOverlay(bool show, bool animate);
   void drawSelectedItem() const;
-  QRect calculateSelectionRectForLine(int startOffset, int length);
 
   VGMFile* vgmfile;
   VGMItem* selectedItem;

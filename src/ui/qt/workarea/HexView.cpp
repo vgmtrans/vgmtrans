@@ -422,14 +422,22 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
         pixmapPainter.save();
         pixmapPainter.translate(0, line * lineHeight);
 
-        auto linePixmap = lineCache.object(startLine + line);
         int bytesToPrint = std::min(
-                              std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
-                              BYTES_PER_LINE);
+                      std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
+                      BYTES_PER_LINE);
+        auto linePixmap = lineCache.object(startLine + line);
         if (linePixmap) {
-          QRect sourceRect = calculateSelectionRectForLine(col, bytesToPrint);
-          QRect targetRect((col * 3 * charWidth) - charHalfWidth, 0, bytesToPrint * 3 * charWidth, lineHeight);
-          pixmapPainter.drawPixmap(targetRect, *linePixmap, sourceRect);
+          // Hex selection
+          auto [hexRect, asciiRect] = calculateSelectionRectsForLine(col, bytesToPrint, dpr);
+          QRect targetRect((col * 3 * charWidth) - charHalfWidth, 0,
+            bytesToPrint * 3 * charWidth, lineHeight);
+          pixmapPainter.drawPixmap(targetRect, *linePixmap, hexRect);
+
+          // ASCII selection
+          int asciiStartInChars = (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
+          targetRect = { (asciiStartInChars + col) * charWidth, 0,
+            bytesToPrint * charWidth, lineHeight };
+          pixmapPainter.drawPixmap(targetRect, *linePixmap, asciiRect);
 
           offsetIntoEvent += bytesToPrint;
           col = 0;
@@ -469,16 +477,18 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
   return false;
 }
 
-QRect HexView::calculateSelectionRectForLine(int startColumn, int length) {
-  qreal dpr = devicePixelRatioF();
-
+std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) {
   int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
-  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth;
-  // left = 0;
-  left -= charHalfWidth;
-  // int right = left + (length * 3 * charWidth);
+  int asciiStartOffsetInChars = hexCharsStartOffsetInChars + (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
+  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth - charHalfWidth;
   int width = length * 3 * charWidth;
-  return QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
+  QRect hexRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
+
+  left = (asciiStartOffsetInChars + startColumn) * charWidth;
+  width = length * charWidth;
+  QRect asciiRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
+
+  return { hexRect, asciiRect };
 }
 
 void HexView::paintEvent(QPaintEvent *e) {
