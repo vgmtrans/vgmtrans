@@ -56,7 +56,10 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
 
   overlay->installEventFilter(
       new LambdaEventFilter([this](QObject* obj, const QEvent* event) -> bool {
-        return this->handleOverlayPaintEvent(obj, event);
+        if (event->type() == QEvent::Paint) {
+          return this->handleOverlayPaintEvent(obj, event);
+        }
+        return false;
       })
   );
 
@@ -66,7 +69,10 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   selectionView = new QWidget(this);
   selectionView->installEventFilter(
       new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
-        return this->handleSelectedItemPaintEvent(obj, event);
+        if (event->type() == QEvent::Paint) {
+          return handleSelectedItemPaintEvent(obj, event);
+        }
+        return false;
       })
   );
 }
@@ -268,7 +274,7 @@ void HexView::changeEvent(QEvent *event) {
             int scrollAreaWidth = scrollArea->width();
             int scrollAreaHeight = scrollArea->height();
 
-            if (scrollAreaHeight != prevHeight) {
+            if (scrollAreaHeight > prevHeight) {
               redrawOverlay();
             }
             prevHeight = scrollAreaHeight;
@@ -368,121 +374,115 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 }
 
 bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
-  if (event->type() == QEvent::Paint) {
-    auto overlay = qobject_cast<QWidget*>(obj);
+  auto overlay = qobject_cast<QWidget*>(obj);
 
-    QPainter painter(static_cast<QWidget*>(obj));
-    painter.fillRect(QRect(0, 0, BYTES_PER_LINE * 3 * charWidth, overlay->height()),
-                     QColor(0, 0, 0, 100));
+  QPainter painter(static_cast<QWidget*>(obj));
+  painter.fillRect(QRect(0, 0, BYTES_PER_LINE * 3 * charWidth, overlay->height()),
+                   QColor(0, 0, 0, 100));
 
-    if (shouldDrawAscii) {
-      painter.fillRect(
-          QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + charHalfWidth,
-                0,
-                BYTES_PER_LINE * charWidth, overlay->height()),
-          QColor(0, 0, 0, 100));
-    }
-
-    return true;
+  if (shouldDrawAscii) {
+    painter.fillRect(
+        QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + charHalfWidth,
+              0,
+              BYTES_PER_LINE * charWidth, overlay->height()),
+        QColor(0, 0, 0, 100));
   }
-  return false;
+
+  return true;
 }
 
 bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
-  if (event->type() == QEvent::Paint) {
-    if (!selectedItem) {
-      return true;
-    }
-    auto widget = static_cast<QWidget*>(obj);
-    if (prevSelectedItem != selectedItem) {
+  if (!selectedItem) {
+    return true;
+  }
+  auto widget = static_cast<QWidget*>(obj);
+  if (prevSelectedItem != selectedItem) {
 
-      prevSelectedItem = selectedItem;
+    prevSelectedItem = selectedItem;
 
-      qreal dpr = devicePixelRatioF();
-      auto widgetSize = widget->size();
-      auto pixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
-      pixmap.setDevicePixelRatio(dpr);
-      pixmap.fill(Qt::transparent);
+    qreal dpr = devicePixelRatioF();
+    auto widgetSize = widget->size();
+    auto pixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
+    pixmap.setDevicePixelRatio(dpr);
+    pixmap.fill(Qt::transparent);
 
-      QPainter pixmapPainter = QPainter(&pixmap);
+    QPainter pixmapPainter = QPainter(&pixmap);
 
-      int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
-      int startColumn = baseOffset % BYTES_PER_LINE;
-      int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
+    int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
+    int startColumn = baseOffset % BYTES_PER_LINE;
+    int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
 
-      auto itemData = std::vector<uint8_t>(selectedItem->unLength);
-      vgmfile->readBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
+    auto itemData = std::vector<uint8_t>(selectedItem->unLength);
+    vgmfile->readBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
 
-      QColor bgColor = colorForEventColor(selectedItem->color);
-      QColor textColor = textColorForEventColor(selectedItem->color);
+    QColor bgColor = colorForEventColor(selectedItem->color);
+    QColor textColor = textColorForEventColor(selectedItem->color);
 
-      pixmapPainter.setFont(this->font());
-      pixmapPainter.translate(SELECTION_PADDING, SELECTION_PADDING);
+    pixmapPainter.setFont(this->font());
+    pixmapPainter.translate(SELECTION_PADDING, SELECTION_PADDING);
 
-      int startLine = baseOffset / BYTES_PER_LINE;
+    int startLine = baseOffset / BYTES_PER_LINE;
 
-      int col = startColumn;
-      int offsetIntoEvent = 0;
-      for (int line=0; line<numLines; line++) {
-        pixmapPainter.save();
-        pixmapPainter.translate(0, line * lineHeight);
+    int col = startColumn;
+    int offsetIntoEvent = 0;
+    for (int line=0; line<numLines; line++) {
+      pixmapPainter.save();
+      pixmapPainter.translate(0, line * lineHeight);
 
-        int bytesToPrint = std::min(
-                      std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
-                      BYTES_PER_LINE);
+      int bytesToPrint = std::min(
+                    std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
+                    BYTES_PER_LINE);
 
-        // If there is a cached pixmap of the line, copy portions of it to construct the selected item pixmap
-        if (auto linePixmap = lineCache.object(startLine + line)) {
-          // Hex segment
-          auto [hex_rect, ascii_rect] = calculateSelectionRectsForLine(col, bytesToPrint, dpr);
-          QRect targetRect((col * 3 * charWidth) - charHalfWidth, 0,
-            bytesToPrint * 3 * charWidth, lineHeight);
-          pixmapPainter.drawPixmap(targetRect, *linePixmap, hex_rect);
+      // If there is a cached pixmap of the line, copy portions of it to construct the selected item pixmap
+      if (auto linePixmap = lineCache.object(startLine + line)) {
+        // Hex segment
+        auto [hex_rect, ascii_rect] = calculateSelectionRectsForLine(col, bytesToPrint, dpr);
+        QRect targetRect((col * 3 * charWidth) - charHalfWidth, 0,
+          bytesToPrint * 3 * charWidth, lineHeight);
+        pixmapPainter.drawPixmap(targetRect, *linePixmap, hex_rect);
 
-          // ASCII segment
-          if (shouldDrawAscii) {
-            int ascii_start_in_chars = (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
-            targetRect = { (ascii_start_in_chars + col) * charWidth, 0,
-              bytesToPrint * charWidth, lineHeight };
-            pixmapPainter.drawPixmap(targetRect, *linePixmap, ascii_rect);
-          }
+        // ASCII segment
+        if (shouldDrawAscii) {
+          int ascii_start_in_chars = (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
+          targetRect = { (ascii_start_in_chars + col) * charWidth, 0,
+            bytesToPrint * charWidth, lineHeight };
+          pixmapPainter.drawPixmap(targetRect, *linePixmap, ascii_rect);
+        }
+        offsetIntoEvent += bytesToPrint;
+        col = 0;
+      }
+      else {
+        // If the selected item has children, draw them.
+        if (!selectedItem->children().empty()) {
+          int startAddress = static_cast<int>(selectedItem->dwOffset + offsetIntoEvent);
+          int endAddress = static_cast<int>(selectedItem->dwOffset + selectedItem->unLength);
+          printData(pixmapPainter, startAddress, endAddress);
+          offsetIntoEvent += BYTES_PER_LINE - col;
+          col = 0;
+        } else {
+          translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+          translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
+
           offsetIntoEvent += bytesToPrint;
           col = 0;
         }
-        else {
-          // If the selected item has children, draw them.
-          if (!selectedItem->children().empty()) {
-            int startAddress = static_cast<int>(selectedItem->dwOffset + offsetIntoEvent);
-            int endAddress = static_cast<int>(selectedItem->dwOffset + selectedItem->unLength);
-            printData(pixmapPainter, startAddress, endAddress);
-            offsetIntoEvent += BYTES_PER_LINE - col;
-            col = 0;
-          } else {
-            translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
-            translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
-
-            offsetIntoEvent += bytesToPrint;
-            col = 0;
-          }
-        }
-        pixmapPainter.restore();
       }
-      auto glowEffect = new QGraphicsDropShadowEffect();
-      glowEffect->setBlurRadius(SELECTION_PADDING);
-      glowEffect->setColor(SHADOW_COLOR);
-      glowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
-      glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
-
-      selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
-      selectionViewPixmap.setDevicePixelRatio(dpr);
-      selectionViewPixmap.fill(Qt::transparent);
-      applyEffectToPixmap(pixmap, selectionViewPixmap, glowEffect, 0);
+      pixmapPainter.restore();
     }
-    QPainter painter(widget);
-    painter.drawPixmap(0, 0, selectionViewPixmap);
-    return true;
+    auto glowEffect = new QGraphicsDropShadowEffect();
+    glowEffect->setBlurRadius(SELECTION_PADDING);
+    glowEffect->setColor(SHADOW_COLOR);
+    glowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
+    glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
+
+    selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
+    selectionViewPixmap.setDevicePixelRatio(dpr);
+    selectionViewPixmap.fill(Qt::transparent);
+    applyEffectToPixmap(pixmap, selectionViewPixmap, glowEffect, 0);
   }
-  return false;
+  QPainter painter(widget);
+  painter.drawPixmap(0, 0, selectionViewPixmap);
+  return true;
 }
 
 std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const {
