@@ -30,11 +30,12 @@ constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 constexpr int SELECTION_PADDING = 20;
 constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
-constexpr qreal OVERLAY_OPACITY_LEVEL = 0.8;
+constexpr int OVERLAY_ALPHA = 80;
 const QColor SHADOW_COLOR = Qt::black;
 constexpr int SHADOW_OFFSET_X = 1;
 constexpr int SHADOW_OFFSET_Y = 2;
-constexpr int SHADOW_BLUR_RADIUS = 20;
+constexpr int SHADOW_BLUR_RADIUS = SELECTION_PADDING;
+constexpr int OVERLAY_HEIGHT_IN_SCREENS = 5;
 
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
       QWidget(parent), vgmfile(vgmfile), selectedItem(nullptr) {
@@ -52,6 +53,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   overlay = new QWidget(this);
   overlay->setAttribute(Qt::WA_NoSystemBackground);
   overlay->setAttribute(Qt::WA_TranslucentBackground);
+  // overlay->setAttribute(Qt::WA_OpaquePaintEvent);
   overlay->hide();
 
   overlay->installEventFilter(
@@ -97,10 +99,10 @@ void HexView::setFont(QFont& font) {
   this->charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
   this->charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2));
   this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
+  this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
 
   QWidget::setFont(font);
-  this->setMinimumWidth(getVirtualFullWidth());
-  this->setFixedHeight(getVirtualHeight());
+  updateSize();
 
   // Force everything to redraw
   prevSelectedItem = nullptr;
@@ -171,6 +173,16 @@ int HexView::getViewportWidthSansAsciiAndAddress() {
   return getVirtualWidthSansAsciiAndAddress() + VIEWPORT_PADDING;
 }
 
+void HexView::updateSize() {
+  const QScrollArea* scrollArea = getContainingScrollArea(this);
+  const int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+  const int scrollAreaWidth = scrollArea ? scrollArea->width() : getVirtualFullWidth();
+  // It is important that the width is not greater than its container. If it is greater, scrolling
+  // will invalidate the entire viewport rather than just the area scrolled into view
+  const int hexViewWidth = scrollAreaWidth - scrollBarThickness - 2;
+  setFixedSize({hexViewWidth, getVirtualHeight()});
+}
+
 int HexView::getTotalLines() const {
   return (vgmfile->unLength + BYTES_PER_LINE - 1) / BYTES_PER_LINE;
 }
@@ -218,18 +230,21 @@ void HexView::setSelectedItem(VGMItem *item) {
   }
 }
 
-void HexView::resizeOverlays(int height) const {
+void HexView::resizeOverlays(int y, int viewportHeight) const {
+  auto xStart = hexXOffset() - charHalfWidth;
+  const int overlayHeight = viewportHeight * OVERLAY_HEIGHT_IN_SCREENS;
   overlay->setGeometry(
-      hexXOffset() - charHalfWidth,
-      overlay->y(),
-      ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) * charWidth) + charHalfWidth,
-      height
+      xStart,
+      std::max(0, y - ((overlayHeight - viewportHeight) / 2)),
+      width() - xStart,
+      overlayHeight
   );
 }
 
 void HexView::redrawOverlay() {
   if (QScrollArea* scrollArea = getContainingScrollArea(this)) {
-    resizeOverlays(scrollArea->height());
+    int y = scrollArea->verticalScrollBar()->value();
+    resizeOverlays(y, scrollArea->height());
   }
 }
 
@@ -267,7 +282,9 @@ void HexView::changeEvent(QEvent *event) {
             int scrollAreaWidth = scrollArea->width();
             int scrollAreaHeight = scrollArea->height();
 
-            if (scrollAreaHeight > prevHeight) {
+            updateSize();
+
+            if (scrollAreaHeight * (OVERLAY_HEIGHT_IN_SCREENS - 1) > overlay->height()) {
               redrawOverlay();
             }
             prevHeight = scrollAreaHeight;
@@ -306,7 +323,14 @@ void HexView::changeEvent(QEvent *event) {
     );
 
     connect(scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this, scrollArea](int value) {
-      overlay->move(overlay->x(), value);
+      // If the overlay has moved out of frame, center it back into frame
+      if (value < overlay->geometry().top() || value + scrollArea->height() > overlay->geometry().bottom()) {
+        overlay->move(
+          overlay->x(),
+          std::max(0, value - ((overlay->height() - scrollArea->height()) / 2))
+        );
+      }
+
       if (selectedItem != nullptr) {
         int startLine = value / lineHeight;
         int endLine = (value + scrollArea->height()) / lineHeight;
@@ -371,7 +395,7 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
 
   QPainter painter(static_cast<QWidget*>(obj));
   painter.fillRect(QRect(0, 0, BYTES_PER_LINE * 3 * charWidth, overlay->height()),
-                   QColor(0, 0, 0, 100));
+                   QColor(0, 0, 0, OVERLAY_ALPHA));
 
   if (shouldDrawAscii) {
     painter.fillRect(
@@ -464,10 +488,9 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       pixmapPainter.restore();
     }
     auto glowEffect = new QGraphicsDropShadowEffect();
-    glowEffect->setBlurRadius(SELECTION_PADDING);
+    glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
     glowEffect->setColor(SHADOW_COLOR);
     glowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
-    glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
 
     selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
     selectionViewPixmap.setDevicePixelRatio(dpr);
@@ -523,7 +546,7 @@ void HexView::paintEvent(QPaintEvent *e) {
 #endif
 
   int startLine = paintRect.top() / lineHeight;
-  int endLine = (paintRect.bottom() + lineHeight - 1) / lineHeight;
+  int endLine = paintRect.bottom() / lineHeight;
 
   qreal dpr = devicePixelRatioF();
 
@@ -741,7 +764,7 @@ void HexView::showOverlay(bool show, bool animate) {
     overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
     overlayAnimation->setDuration(DIM_DURATION_MS);
     overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 0 : overlayOpacityEffect->opacity());
-    overlayAnimation->setEndValue(OVERLAY_OPACITY_LEVEL);
+    overlayAnimation->setEndValue(1.0);
     overlayAnimation->setEasingCurve(QEasingCurve::OutQuad);
 
     QObject::connect(overlayAnimation, &QPropertyAnimation::finished, [this]() {
@@ -760,7 +783,7 @@ void HexView::showOverlay(bool show, bool animate) {
 
     overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
     overlayAnimation->setDuration(DIM_DURATION_MS);
-    overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? OVERLAY_OPACITY_LEVEL : overlayOpacityEffect->opacity());
+    overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 1.0 : overlayOpacityEffect->opacity());
     overlayAnimation->setEndValue(0.0);
 
     // Connect the finished signal of the animation to a lambda function

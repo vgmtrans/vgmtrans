@@ -43,10 +43,11 @@ protected:
 private:
   int hexXOffset() const;
   int getVirtualHeight() const;
+  void updateSize();
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
   std::pair<QRect,QRect> calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const;
-  void resizeOverlays(int height) const;
+  void resizeOverlays(int y, int viewportHeight) const;
   void redrawOverlay();
   void printLine(QPainter& painter, int line) const;
   void printAddress(QPainter& painter, int line) const;

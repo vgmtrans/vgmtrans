@@ -14,7 +14,7 @@
 #include <QStandardPaths>
 #include <QApplication>
 
-QScrollArea* getContainingScrollArea(QWidget* widget) {
+QScrollArea* getContainingScrollArea(const QWidget* widget) {
   QWidget* viewport = widget->parentWidget();
   if (viewport) {
     auto* scrollArea = qobject_cast<QScrollArea*>(viewport->parentWidget());
