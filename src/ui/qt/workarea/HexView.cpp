@@ -53,7 +53,6 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   overlay = new QWidget(this);
   overlay->setAttribute(Qt::WA_NoSystemBackground);
   overlay->setAttribute(Qt::WA_TranslucentBackground);
-  // overlay->setAttribute(Qt::WA_OpaquePaintEvent);
   overlay->hide();
 
   overlay->installEventFilter(
