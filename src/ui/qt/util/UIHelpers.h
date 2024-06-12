@@ -14,7 +14,7 @@ class QPixmap;
 class QGraphicsEffect;
 class VGMItem;
 
-QScrollArea* getContainingScrollArea(QWidget* widget);
+QScrollArea* getContainingScrollArea(const QWidget* widget);
 void applyEffectToPixmap(QPixmap &src, QPixmap &tgt, QGraphicsEffect *effect, int extent = 0);
 
 std::string openSaveFileDialog(const std::string& suggested_filename, const std::string& extension);
