@@ -27,14 +27,14 @@ constexpr int BYTES_PER_LINE = 16;
 constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int ADDRESS_SPACING_CHARS = 4;
 constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
-constexpr int SELECTION_PADDING = 20;
+constexpr int SELECTION_PADDING = 18;
 constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
 constexpr int OVERLAY_ALPHA = 80;
 const QColor SHADOW_COLOR = Qt::black;
 constexpr int SHADOW_OFFSET_X = 1;
 constexpr int SHADOW_OFFSET_Y = 2;
-constexpr int SHADOW_BLUR_RADIUS = SELECTION_PADDING;
+constexpr int SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2;
 constexpr int OVERLAY_HEIGHT_IN_SCREENS = 5;
 
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
@@ -230,12 +230,11 @@ void HexView::setSelectedItem(VGMItem *item) {
 }
 
 void HexView::resizeOverlays(int y, int viewportHeight) const {
-  auto xStart = hexXOffset() - charHalfWidth;
   const int overlayHeight = viewportHeight * OVERLAY_HEIGHT_IN_SCREENS;
   overlay->setGeometry(
-      xStart,
+      hexXOffset() - charHalfWidth,
       std::max(0, y - ((overlayHeight - viewportHeight) / 2)),
-      width() - xStart,
+      width(),
       overlayHeight
   );
 }
