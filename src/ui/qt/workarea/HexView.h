@@ -9,6 +9,8 @@
 #include <QWidget>
 #include <QCache>
 
+class QParallelAnimationGroup;
+class QGraphicsDropShadowEffect;
 class VGMFile;
 class VGMItem;
 class QGraphicsOpacityEffect;
@@ -96,7 +98,11 @@ private:
 
   QCache<int, QPixmap> lineCache;
   QGraphicsOpacityEffect* overlayOpacityEffect = nullptr;
-  QPropertyAnimation* overlayAnimation = nullptr;
+  QGraphicsDropShadowEffect* selectedItemShadowEffect = nullptr;
+  QParallelAnimationGroup* overlayAnimation = nullptr;
+  QPropertyAnimation* overlayOpacityAnimation = nullptr;
+  QPropertyAnimation* selectedItemShadowBlurAnimation = nullptr;
+  QPropertyAnimation* selectedItemShadowOffsetAnimation = nullptr;
   QWidget* overlay;
   QWidget* selectionView = nullptr;
   VGMItem* prevSelectedItem = nullptr;

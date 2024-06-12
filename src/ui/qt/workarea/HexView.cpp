@@ -17,6 +17,7 @@
 #include <QPaintEvent>
 #include <QGraphicsDropShadowEffect>
 #include <QPropertyAnimation>
+#include <QParallelAnimationGroup>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QToolTip>
@@ -67,7 +68,14 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   overlayOpacityEffect = new QGraphicsOpacityEffect(this);
   overlay->setGraphicsEffect(overlayOpacityEffect);
 
+  selectedItemShadowEffect = new QGraphicsDropShadowEffect();
+  selectedItemShadowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
+  selectedItemShadowEffect->setColor(SHADOW_COLOR);
+  selectedItemShadowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
+
   selectionView = new QWidget(this);
+  selectionView->setGraphicsEffect(selectedItemShadowEffect);
+
   selectionView->installEventFilter(
       new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
         if (event->type() == QEvent::Paint) {
@@ -191,7 +199,7 @@ void HexView::setSelectedItem(VGMItem *item) {
 
   if (selectedItem == nullptr) {
     showOverlay(false, true);
-    selectionView->hide();
+    // selectionView->hide();
     prevSelectedItem = nullptr;
     return;
   }
@@ -407,10 +415,13 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
 }
 
 bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
+  auto widget = static_cast<QWidget*>(obj);
   if (!selectedItem) {
+    QPainter painter(widget);
+    painter.drawPixmap(0, 0, selectionViewPixmap);
     return true;
   }
-  auto widget = static_cast<QWidget*>(obj);
+  // auto widget = static_cast<QWidget*>(obj);
   if (prevSelectedItem != selectedItem) {
 
     prevSelectedItem = selectedItem;
@@ -484,15 +495,26 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       }
       pixmapPainter.restore();
     }
-    auto glowEffect = new QGraphicsDropShadowEffect();
-    glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
-    glowEffect->setColor(SHADOW_COLOR);
-    glowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
+    // auto glowEffect = new QGraphicsDropShadowEffect();
+    // glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
+    // glowEffect->setColor(SHADOW_COLOR);
+    // glowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
+
+
+    // selectedItemShadowEffect = new QGraphicsDropShadowEffect();
+    // selectedItemShadowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
+    // selectedItemShadowEffect->setColor(SHADOW_COLOR);
+    // selectedItemShadowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
+
 
     selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
     selectionViewPixmap.setDevicePixelRatio(dpr);
-    selectionViewPixmap.fill(Qt::transparent);
-    applyEffectToPixmap(pixmap, selectionViewPixmap, glowEffect, 0);
+    // selectionViewPixmap.fill(Qt::transparent);
+    selectionViewPixmap = pixmap;
+
+    // applyEffectToPixmap(pixmap, selectionViewPixmap, selectedItemShadowEffect, 0);
+    // selectionView->setGraphicsEffect(selectedItemShadowEffect);
+
   }
   QPainter painter(widget);
   painter.drawPixmap(0, 0, selectionViewPixmap);
@@ -718,7 +740,13 @@ void HexView::showOverlay(bool show, bool animate) {
   if (! animate) {
     if (overlayAnimation) {
       overlayAnimation->stop();
+      delete overlayOpacityAnimation;
+      delete selectedItemShadowBlurAnimation;
+      delete selectedItemShadowOffsetAnimation;
       delete overlayAnimation;
+      overlayOpacityAnimation = nullptr;
+      selectedItemShadowBlurAnimation = nullptr;
+      selectedItemShadowOffsetAnimation = nullptr;
       overlayAnimation = nullptr;
     }
     if (show) {
@@ -732,7 +760,7 @@ void HexView::showOverlay(bool show, bool animate) {
   if (show) {
     if (
         (overlayAnimation == nullptr && !overlay->isHidden()) ||
-        (overlayAnimation && (overlayAnimation->endValue() == 1.0))
+        (overlayAnimation && (overlayOpacityAnimation->endValue() == 1.0))
      ) {
       return;
     }
@@ -740,42 +768,99 @@ void HexView::showOverlay(bool show, bool animate) {
     // If a current animation is running, stop it and delete it - we replace it with a new animation
     if (overlayAnimation && overlayAnimation->state() == QAbstractAnimation::Running) {
       overlayAnimation->stop();
+      delete overlayOpacityAnimation;
+      delete selectedItemShadowBlurAnimation;
+      delete selectedItemShadowOffsetAnimation;
       delete overlayAnimation;
+      overlayOpacityAnimation = nullptr;
+      selectedItemShadowBlurAnimation = nullptr;
+      selectedItemShadowOffsetAnimation = nullptr;
       overlayAnimation = nullptr;
     }
 
-    overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
-    overlayAnimation->setDuration(DIM_DURATION_MS);
-    overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 0 : overlayOpacityEffect->opacity());
-    overlayAnimation->setEndValue(1.0);
-    overlayAnimation->setEasingCurve(QEasingCurve::OutQuad);
+    overlayAnimation = new QParallelAnimationGroup();
+
+    overlayOpacityAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
+    overlayOpacityAnimation->setDuration(DIM_DURATION_MS);
+    overlayOpacityAnimation->setStartValue(overlayOpacityEffect == nullptr ? 0 : overlayOpacityEffect->opacity());
+    overlayOpacityAnimation->setEndValue(1.0);
+    overlayOpacityAnimation->setEasingCurve(QEasingCurve::OutQuad);
+
+    selectedItemShadowBlurAnimation = new QPropertyAnimation(selectedItemShadowEffect, "blurRadius");
+    selectedItemShadowBlurAnimation->setDuration(DIM_DURATION_MS);
+    selectedItemShadowBlurAnimation->setStartValue(selectedItemShadowEffect == nullptr ? 0 : selectedItemShadowEffect->blurRadius());
+    selectedItemShadowBlurAnimation->setEndValue(SHADOW_BLUR_RADIUS);
+    selectedItemShadowBlurAnimation->setEasingCurve(QEasingCurve::OutQuad);
+
+    selectedItemShadowOffsetAnimation = new QPropertyAnimation(selectedItemShadowEffect, "offset");
+    selectedItemShadowOffsetAnimation->setDuration(DIM_DURATION_MS);
+    selectedItemShadowOffsetAnimation->setStartValue(selectedItemShadowEffect == nullptr ? QPointF(0, 0) : selectedItemShadowEffect->offset());
+    selectedItemShadowOffsetAnimation->setEndValue(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
+    selectedItemShadowOffsetAnimation->setEasingCurve(QEasingCurve::OutQuad);
+
+    overlayAnimation->addAnimation(overlayOpacityAnimation);
+    overlayAnimation->addAnimation(selectedItemShadowBlurAnimation);
+    overlayAnimation->addAnimation(selectedItemShadowOffsetAnimation);
+
 
     QObject::connect(overlayAnimation, &QPropertyAnimation::finished, [this]() {
+      overlayOpacityAnimation = nullptr;
+      selectedItemShadowBlurAnimation = nullptr;
+      selectedItemShadowOffsetAnimation = nullptr;
       overlayAnimation = nullptr;
     });
 
     overlayAnimation->start(QAbstractAnimation::DeleteWhenStopped);
     overlay->show();
+
+    // selectedItemShadowBlurAnimation->start(QAbstractAnimation::DeleteWhenStopped);
   } else {
     // If a current animation is running, stop it and delete it - we replace it with a new animation
     if (overlayAnimation && overlayAnimation->state() == QAbstractAnimation::Running) {
       overlayAnimation->stop();
+      delete overlayOpacityAnimation;
+      delete selectedItemShadowBlurAnimation;
+      delete selectedItemShadowOffsetAnimation;
       delete overlayAnimation;
+      overlayOpacityAnimation = nullptr;
+      selectedItemShadowBlurAnimation = nullptr;
+      selectedItemShadowOffsetAnimation = nullptr;
       overlayAnimation = nullptr;
     }
 
-    overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
-    overlayAnimation->setDuration(DIM_DURATION_MS);
-    overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 1.0 : overlayOpacityEffect->opacity());
-    overlayAnimation->setEndValue(0.0);
+    overlayAnimation = new QParallelAnimationGroup();
+
+    overlayOpacityAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
+    overlayOpacityAnimation->setDuration(DIM_DURATION_MS);
+    overlayOpacityAnimation->setStartValue(overlayOpacityEffect == nullptr ? 1.0 : overlayOpacityEffect->opacity());
+    overlayOpacityAnimation->setEndValue(0.0);
+
+    selectedItemShadowBlurAnimation = new QPropertyAnimation(selectedItemShadowEffect, "blurRadius");
+    selectedItemShadowBlurAnimation->setDuration(DIM_DURATION_MS);
+    selectedItemShadowBlurAnimation->setStartValue(selectedItemShadowEffect == nullptr ? SHADOW_BLUR_RADIUS : selectedItemShadowEffect->blurRadius());
+    selectedItemShadowBlurAnimation->setEndValue(0.0);
+
+    selectedItemShadowOffsetAnimation = new QPropertyAnimation(selectedItemShadowEffect, "offset");
+    selectedItemShadowOffsetAnimation->setDuration(DIM_DURATION_MS);
+    selectedItemShadowOffsetAnimation->setStartValue(selectedItemShadowEffect == nullptr ? QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y) : selectedItemShadowEffect->offset());
+    selectedItemShadowOffsetAnimation->setEndValue(QPointF(0, 0));
+
+    overlayAnimation->addAnimation(overlayOpacityAnimation);
+    overlayAnimation->addAnimation(selectedItemShadowBlurAnimation);
+    overlayAnimation->addAnimation(selectedItemShadowOffsetAnimation);
 
     // Connect the finished signal of the animation to a lambda function
     QObject::connect(overlayAnimation, &QPropertyAnimation::finished, [this]() {
       overlay->hide();
+      selectionView->hide();
+      overlayOpacityAnimation = nullptr;
+      selectedItemShadowBlurAnimation = nullptr;
+      selectedItemShadowOffsetAnimation = nullptr;
       overlayAnimation = nullptr;
     });
 
     overlayAnimation->start(QAbstractAnimation::DeleteWhenStopped);
+    // selectedItemShadowBlurAnimation->start(QAbstractAnimation::DeleteWhenStopped);
   }
 }
 
