@@ -20,12 +20,13 @@ public:
   explicit HexView(VGMFile* vgmfile, QWidget *parent = nullptr);
   void setSelectedItem(VGMItem* item);
   void setFont(QFont& font);
-  int getVirtualWidth() const;
-  int getVirtualWidthSansAscii() const;
-  int getVirtualWidthSansAsciiAndAddress() const;
-  int getViewportWidth() const;
-  int getViewportWidthSansAscii() const;
-  int getViewportWidthSansAsciiAndAddress() const;
+  [[nodiscard]] int getVirtualFullWidth();
+  [[nodiscard]] int getVirtualWidthSansAscii();
+  [[nodiscard]] int getVirtualWidthSansAsciiAndAddress();
+  [[nodiscard]] int getActualVirtualWidth();
+  [[nodiscard]] int getViewportFullWidth();
+  [[nodiscard]] int getViewportWidthSansAscii();
+  [[nodiscard]] int getViewportWidthSansAsciiAndAddress();
 
 protected:
   bool event(QEvent *event) override;
@@ -44,6 +45,7 @@ private:
   int getVirtualHeight() const;
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
+  std::pair<QRect,QRect> calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const;
   void resizeOverlays(int height) const;
   void redrawOverlay();
   void printLine(QPainter& painter, int line) const;
@@ -78,13 +80,18 @@ private:
   VGMItem* selectedItem;
   int selectedOffset;
   int charWidth;
+  int charHalfWidth;
   int lineHeight;
   bool addressAsHex = true;
   bool isDragging = false;
-  bool showOffset = true;
+  bool shouldDrawOffset = true;
   bool shouldDrawAscii = true;
   int prevWidth = 0;
   int prevHeight = 0;
+
+  int m_virtual_full_width{-1};
+  int m_virtual_width_sans_ascii{-1};
+  int m_virtual_width_sans_ascii_and_address{-1};
 
   QCache<int, QPixmap> lineCache;
   QGraphicsOpacityEffect* overlayOpacityEffect = nullptr;

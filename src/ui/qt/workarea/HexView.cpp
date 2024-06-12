@@ -20,15 +20,21 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QToolTip>
+#include <QStyle>
 
-#define NUM_CACHED_LINE_PIXMAPS 300
-#define BYTES_PER_LINE 16
-#define NUM_ADDRESS_NIBBLES 8
-#define ADDRESS_SPACING_CHARS 4
-#define HEX_TO_ASCII_SPACING_CHARS 4
-#define SELECTION_PADDING 20
-#define VIEWPORT_PADDING 15
-#define DIM_DURATION_MS 200
+constexpr qsizetype NUM_CACHED_LINE_PIXMAPS = 600;
+constexpr int BYTES_PER_LINE = 16;
+constexpr int NUM_ADDRESS_NIBBLES = 8;
+constexpr int ADDRESS_SPACING_CHARS = 4;
+constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
+constexpr int SELECTION_PADDING = 20;
+constexpr int VIEWPORT_PADDING = 10;
+constexpr int DIM_DURATION_MS = 200;
+constexpr qreal OVERLAY_OPACITY_LEVEL = 0.8;
+const QColor SHADOW_COLOR = Qt::black;
+constexpr int SHADOW_OFFSET_X = 1;
+constexpr int SHADOW_OFFSET_Y = 2;
+constexpr int SHADOW_BLUR_RADIUS = 20;
 
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
       QWidget(parent), vgmfile(vgmfile), selectedItem(nullptr) {
@@ -50,7 +56,10 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
 
   overlay->installEventFilter(
       new LambdaEventFilter([this](QObject* obj, const QEvent* event) -> bool {
-        return this->handleOverlayPaintEvent(obj, event);
+        if (event->type() == QEvent::Paint) {
+          return this->handleOverlayPaintEvent(obj, event);
+        }
+        return false;
       })
   );
 
@@ -60,7 +69,10 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   selectionView = new QWidget(this);
   selectionView->installEventFilter(
       new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
-        return this->handleSelectedItemPaintEvent(obj, event);
+        if (event->type() == QEvent::Paint) {
+          return handleSelectedItemPaintEvent(obj, event);
+        }
+        return false;
       })
   );
 }
@@ -83,14 +95,18 @@ void HexView::setFont(QFont& font) {
   fontMetrics = QFontMetrics(font);
   // We need to use horizontalAdvance(), as averageCharWidth() doesn't capture letter spacing.
   this->charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
+  this->charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2));
   this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
 
   QWidget::setFont(font);
-  this->setMinimumWidth(getVirtualWidth());
+  this->setMinimumWidth(getVirtualFullWidth());
   this->setFixedHeight(getVirtualHeight());
 
   // Force everything to redraw
   prevSelectedItem = nullptr;
+  m_virtual_full_width = -1;
+  m_virtual_width_sans_ascii = -1;
+  m_virtual_width_sans_ascii_and_address = -1;
   lineCache.clear();
   redrawOverlay();
   drawSelectedItem();
@@ -98,7 +114,7 @@ void HexView::setFont(QFont& font) {
 
 // The x offset to print hexadecimal
 int HexView::hexXOffset() const {
-  if (showOffset)
+  if (shouldDrawOffset)
     return ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth);
   else
     return 0;
@@ -108,33 +124,51 @@ int HexView::getVirtualHeight() const {
   return lineHeight * getTotalLines();
 }
 
-int HexView::getVirtualWidth() const {
-  constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
-                           HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
-  return (numChars * charWidth) + SELECTION_PADDING;
+int HexView::getVirtualFullWidth() {
+  if (m_virtual_full_width == -1) {
+    constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
+                             HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
+    m_virtual_full_width = (numChars * charWidth) + SELECTION_PADDING;
+  }
+  return m_virtual_full_width;
 }
 
-int HexView::getVirtualWidthSansAscii() const {
-  constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
-                       (HEX_TO_ASCII_SPACING_CHARS / 2);
-  return (numChars * charWidth) + SELECTION_PADDING;
+int HexView::getVirtualWidthSansAscii() {
+  if (m_virtual_width_sans_ascii == -1) {
+    constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
+    m_virtual_width_sans_ascii = (numChars * charWidth) + SELECTION_PADDING;
+  }
+  return m_virtual_width_sans_ascii;
 }
 
-int HexView::getVirtualWidthSansAsciiAndAddress() const {
-  constexpr int numChars = (BYTES_PER_LINE * 3) + (HEX_TO_ASCII_SPACING_CHARS / 2);
-  return (numChars * charWidth) + SELECTION_PADDING;
+int HexView::getVirtualWidthSansAsciiAndAddress() {
+  if (m_virtual_width_sans_ascii_and_address == -1) {
+    constexpr int numChars = BYTES_PER_LINE * 3;
+    m_virtual_width_sans_ascii_and_address = (numChars * charWidth) + SELECTION_PADDING;
+  }
+  return m_virtual_width_sans_ascii_and_address;
 }
 
-int HexView::getViewportWidth() const {
-  return getVirtualWidth() + VIEWPORT_PADDING;
+int HexView::getActualVirtualWidth() {
+  if (shouldDrawAscii) {
+    return getVirtualFullWidth();
+  }
+  if (shouldDrawOffset) {
+    return getVirtualWidthSansAscii();
+  }
+  return getVirtualWidthSansAsciiAndAddress();
 }
 
-int HexView::getViewportWidthSansAscii() const {
-  return getVirtualWidthSansAscii() - VIEWPORT_PADDING;
+int HexView::getViewportFullWidth() {
+  return getVirtualFullWidth() + VIEWPORT_PADDING;
 }
 
-int HexView::getViewportWidthSansAsciiAndAddress() const {
-  return getVirtualWidthSansAsciiAndAddress() - VIEWPORT_PADDING;
+int HexView::getViewportWidthSansAscii() {
+  return getVirtualWidthSansAscii() + VIEWPORT_PADDING;
+}
+
+int HexView::getViewportWidthSansAsciiAndAddress() {
+  return getVirtualWidthSansAsciiAndAddress() + VIEWPORT_PADDING;
 }
 
 int HexView::getTotalLines() const {
@@ -186,9 +220,9 @@ void HexView::setSelectedItem(VGMItem *item) {
 
 void HexView::resizeOverlays(int height) const {
   overlay->setGeometry(
-      hexXOffset() - (charWidth/2),
+      hexXOffset() - charHalfWidth,
       overlay->y(),
-      ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) * charWidth) + charWidth/2,
+      ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) * charWidth) + charHalfWidth,
       height
   );
 }
@@ -233,7 +267,7 @@ void HexView::changeEvent(QEvent *event) {
             int scrollAreaWidth = scrollArea->width();
             int scrollAreaHeight = scrollArea->height();
 
-            if (scrollAreaHeight != prevHeight) {
+            if (scrollAreaHeight > prevHeight) {
               redrawOverlay();
             }
             prevHeight = scrollAreaHeight;
@@ -241,18 +275,18 @@ void HexView::changeEvent(QEvent *event) {
             if (scrollAreaWidth == prevWidth ||
                 (scrollAreaWidth > getViewportWidthSansAsciiAndAddress() &&
                 scrollAreaWidth != getViewportWidthSansAscii() &&
-                scrollAreaWidth != getViewportWidth())) {
+                scrollAreaWidth != getViewportFullWidth())) {
 
               return false;
             }
             prevWidth = scrollAreaWidth;
 
-            bool prevShowOffset = showOffset;
+            bool prevShowOffset = shouldDrawOffset;
             bool prevShouldDrawAscii = shouldDrawAscii;
-            showOffset = scrollAreaWidth > getViewportWidthSansAsciiAndAddress();
+            shouldDrawOffset = scrollAreaWidth > getViewportWidthSansAsciiAndAddress();
             shouldDrawAscii = scrollAreaWidth > getViewportWidthSansAscii();
 
-            if (prevShowOffset != showOffset || prevShouldDrawAscii != shouldDrawAscii) {
+            if (prevShowOffset != shouldDrawOffset || prevShouldDrawAscii != shouldDrawAscii) {
               prevSelectedItem = nullptr;
               lineCache.clear();
               drawSelectedItem();
@@ -333,97 +367,129 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 }
 
 bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
-  if (event->type() == QEvent::Paint) {
-    auto overlay = qobject_cast<QWidget*>(obj);
+  auto overlay = qobject_cast<QWidget*>(obj);
 
-    QPainter painter(static_cast<QWidget*>(obj));
-    painter.fillRect(QRect(0, 0, BYTES_PER_LINE * 3 * charWidth, overlay->height()),
-                     QColor(0, 0, 0, 100));
+  QPainter painter(static_cast<QWidget*>(obj));
+  painter.fillRect(QRect(0, 0, BYTES_PER_LINE * 3 * charWidth, overlay->height()),
+                   QColor(0, 0, 0, 100));
 
-    if (shouldDrawAscii) {
-      painter.fillRect(
-          QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + (charWidth / 2),
-                0,
-                BYTES_PER_LINE * charWidth, overlay->height()),
-          QColor(0, 0, 0, 100));
-    }
-
-    return true;
+  if (shouldDrawAscii) {
+    painter.fillRect(
+        QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + charHalfWidth,
+              0,
+              BYTES_PER_LINE * charWidth, overlay->height()),
+        QColor(0, 0, 0, 100));
   }
-  return false;
+
+  return true;
 }
 
 bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
-  if (event->type() == QEvent::Paint) {
-    if (!selectedItem) {
-      return true;
-    }
-    auto widget = static_cast<QWidget*>(obj);
-    if (prevSelectedItem != selectedItem) {
+  if (!selectedItem) {
+    return true;
+  }
+  auto widget = static_cast<QWidget*>(obj);
+  if (prevSelectedItem != selectedItem) {
 
-      prevSelectedItem = selectedItem;
+    prevSelectedItem = selectedItem;
 
-      qreal dpr = devicePixelRatioF();
-      auto widgetSize = widget->size();
-      auto pixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
-      pixmap.setDevicePixelRatio(dpr);
-      pixmap.fill(Qt::transparent);
+    qreal dpr = devicePixelRatioF();
+    auto widgetSize = widget->size();
+    auto pixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
+    pixmap.setDevicePixelRatio(dpr);
+    pixmap.fill(Qt::transparent);
 
-      QPainter pixmapPainter = QPainter(&pixmap);
+    QPainter pixmapPainter = QPainter(&pixmap);
 
-      int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
-      int startColumn = baseOffset % BYTES_PER_LINE;
-      int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
+    int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
+    int startColumn = baseOffset % BYTES_PER_LINE;
+    int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
 
-      auto itemData = std::vector<uint8_t>(selectedItem->unLength);
-      vgmfile->readBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
+    auto itemData = std::vector<uint8_t>(selectedItem->unLength);
+    vgmfile->readBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
 
-      QColor bgColor = colorForEventColor(selectedItem->color);
-      QColor textColor = textColorForEventColor(selectedItem->color);
+    QColor bgColor = colorForEventColor(selectedItem->color);
+    QColor textColor = textColorForEventColor(selectedItem->color);
 
-      pixmapPainter.setFont(this->font());
-      pixmapPainter.translate(SELECTION_PADDING, SELECTION_PADDING);
+    pixmapPainter.setFont(this->font());
+    pixmapPainter.translate(SELECTION_PADDING, SELECTION_PADDING);
 
-      int col = startColumn;
-      int offsetIntoEvent = 0;
-      for (int line=0; line<numLines; line++) {
-        pixmapPainter.save();
-        pixmapPainter.translate(0, line * lineHeight);
+    int startLine = baseOffset / BYTES_PER_LINE;
 
+    int col = startColumn;
+    int offsetIntoEvent = 0;
+    for (int line=0; line<numLines; line++) {
+      pixmapPainter.save();
+      pixmapPainter.translate(0, line * lineHeight);
+
+      int bytesToPrint = std::min(
+                    std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
+                    BYTES_PER_LINE);
+
+      // If there is a cached pixmap of the line, copy portions of it to construct the selected item pixmap
+      if (auto linePixmap = lineCache.object(startLine + line)) {
+        // Hex segment
+        auto [hex_rect, ascii_rect] = calculateSelectionRectsForLine(col, bytesToPrint, dpr);
+        QRect targetRect((col * 3 * charWidth) - charHalfWidth, 0,
+          bytesToPrint * 3 * charWidth, lineHeight);
+        pixmapPainter.drawPixmap(targetRect, *linePixmap, hex_rect);
+
+        // ASCII segment
+        if (shouldDrawAscii) {
+          int ascii_start_in_chars = (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
+          targetRect = { (ascii_start_in_chars + col) * charWidth, 0,
+            bytesToPrint * charWidth, lineHeight };
+          pixmapPainter.drawPixmap(targetRect, *linePixmap, ascii_rect);
+        }
+        offsetIntoEvent += bytesToPrint;
+        col = 0;
+      }
+      else {
         // If the selected item has children, draw them.
         if (!selectedItem->children().empty()) {
-          int startAddress = selectedItem->dwOffset + offsetIntoEvent;
-          int endAddress = selectedItem->dwOffset + selectedItem->unLength;
+          int startAddress = static_cast<int>(selectedItem->dwOffset + offsetIntoEvent);
+          int endAddress = static_cast<int>(selectedItem->dwOffset + selectedItem->unLength);
           printData(pixmapPainter, startAddress, endAddress);
           offsetIntoEvent += BYTES_PER_LINE - col;
           col = 0;
         } else {
-          int bytesToPrint = std::min(
-              std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent, BYTES_PER_LINE - col),
-              BYTES_PER_LINE);
           translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
           translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
 
           offsetIntoEvent += bytesToPrint;
           col = 0;
         }
-        pixmapPainter.restore();
       }
-      auto glowEffect = new QGraphicsDropShadowEffect();
-      glowEffect->setBlurRadius(SELECTION_PADDING);
-      glowEffect->setColor(Qt::black);
-      glowEffect->setOffset(0, 0);
-
-      selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
-      selectionViewPixmap.setDevicePixelRatio(dpr);
-      selectionViewPixmap.fill(Qt::transparent);
-      applyEffectToPixmap(pixmap, selectionViewPixmap, glowEffect, 0);
+      pixmapPainter.restore();
     }
-    QPainter painter(widget);
-    painter.drawPixmap(0, 0, selectionViewPixmap);
-    return true;
+    auto glowEffect = new QGraphicsDropShadowEffect();
+    glowEffect->setBlurRadius(SELECTION_PADDING);
+    glowEffect->setColor(SHADOW_COLOR);
+    glowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
+    glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
+
+    selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
+    selectionViewPixmap.setDevicePixelRatio(dpr);
+    selectionViewPixmap.fill(Qt::transparent);
+    applyEffectToPixmap(pixmap, selectionViewPixmap, glowEffect, 0);
   }
-  return false;
+  QPainter painter(widget);
+  painter.drawPixmap(0, 0, selectionViewPixmap);
+  return true;
+}
+
+std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const {
+  int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
+  int asciiStartOffsetInChars = hexCharsStartOffsetInChars + (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
+  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth - charHalfWidth;
+  int width = length * 3 * charWidth;
+  QRect hexRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
+
+  left = (asciiStartOffsetInChars + startColumn) * charWidth;
+  width = length * charWidth;
+  QRect asciiRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
+
+  return { hexRect, asciiRect };
 }
 
 void HexView::paintEvent(QPaintEvent *e) {
@@ -432,35 +498,59 @@ void HexView::paintEvent(QPaintEvent *e) {
 
   QRect paintRect = e->rect();
 
+#ifdef Q_OS_MAC
+  // On MacOS, the scrollbar appears only upon scrolling and extra paint events are sent to draw it.
+  // We want to ignore these paint events if they don't overlap with the drawn HexView area.
+  int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+  if (paintRect.left() >= getActualVirtualWidth() - VIEWPORT_PADDING - scrollBarThickness + 2) {
+    return;
+  }
+#endif
+
   int startLine = paintRect.top() / lineHeight;
   int endLine = (paintRect.bottom() + lineHeight - 1) / lineHeight;
 
   qreal dpr = devicePixelRatioF();
-  auto linePixmap = new QPixmap(static_cast<int>(getVirtualWidth() * dpr), static_cast<int>(lineHeight * dpr));
-  linePixmap->setDevicePixelRatio(dpr);
-  linePixmap->fill(Qt::transparent);
-
-  QPainter linePainter(linePixmap);
-  linePainter.setFont(this->font());
-  linePainter.setRenderHints(painter.renderHints());
-  linePainter.setPen(painter.pen());
-  linePainter.setBrush(painter.brush());
 
   painter.translate(0, startLine * lineHeight);
   for (int line = startLine; line <= endLine; line++) {
-    if (!this->lineCache.contains(line)) {
-      linePixmap->fill(Qt::transparent);
-      printLine(linePainter, line);
-      lineCache.insert(line, new QPixmap(*linePixmap));
+    // Skip drawing lines that are totally eclipsed by the selected item
+    if (selectedItem && selectedItem->unLength >= BYTES_PER_LINE) {
+      auto startAddress = vgmfile->dwOffset + (line * BYTES_PER_LINE);
+      auto endAddress = startAddress + BYTES_PER_LINE;
+      if (selectedItem->dwOffset <= startAddress && selectedItem->dwOffset + selectedItem->unLength >= endAddress) {
+        if (shouldDrawOffset)
+          printAddress(painter, line);
+        painter.translate(0, lineHeight);
+        continue;
+      }
     }
-    painter.drawPixmap(0, 0, *lineCache.object(line));
+
+    auto cachedPixmap = lineCache.object(line);
+    if (!cachedPixmap) {
+      auto linePixmap = new QPixmap(static_cast<int>(getVirtualFullWidth() * dpr), static_cast<int>(lineHeight * dpr));
+      linePixmap->setDevicePixelRatio(dpr);
+      linePixmap->fill(Qt::transparent);
+
+      QPainter linePainter(linePixmap);
+      linePainter.setFont(this->font());
+      linePainter.setRenderHints(painter.renderHints());
+      linePainter.setPen(painter.pen());
+      linePainter.setBrush(painter.brush());
+
+      printLine(linePainter, line);
+      lineCache.insert(line, linePixmap);
+      painter.drawPixmap(0, 0, *linePixmap);
+    } else {
+      painter.drawPixmap(0, 0, *cachedPixmap);
+    }
     painter.translate(0, lineHeight);
   }
 }
 
 void HexView::printLine(QPainter& painter, int line) const {
   painter.save();
-  if (showOffset) {
+  if (shouldDrawOffset) {
     printAddress(painter, line);
   }
   painter.translate(hexXOffset(), 0);
@@ -536,7 +626,7 @@ void HexView::printHex(
   auto width = length * charWidth * 3;
   int rectWidth = width;
   int rectHeight = lineHeight;
-  painter.fillRect(-charWidth/2, 0, rectWidth, rectHeight, bgColor);
+  painter.fillRect(-charHalfWidth, 0, rectWidth, rectHeight, bgColor);
 
   // Draw bytes string
   QString hexString;
@@ -636,7 +726,7 @@ void HexView::showOverlay(bool show, bool animate) {
     overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
     overlayAnimation->setDuration(DIM_DURATION_MS);
     overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 0 : overlayOpacityEffect->opacity());
-    overlayAnimation->setEndValue(1.0);
+    overlayAnimation->setEndValue(OVERLAY_OPACITY_LEVEL);
     overlayAnimation->setEasingCurve(QEasingCurve::OutQuad);
 
     QObject::connect(overlayAnimation, &QPropertyAnimation::finished, [this]() {
@@ -655,7 +745,7 @@ void HexView::showOverlay(bool show, bool animate) {
 
     overlayAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
     overlayAnimation->setDuration(DIM_DURATION_MS);
-    overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? 1.0 : overlayOpacityEffect->opacity());
+    overlayAnimation->setStartValue(overlayOpacityEffect == nullptr ? OVERLAY_OPACITY_LEVEL : overlayOpacityEffect->opacity());
     overlayAnimation->setEndValue(0.0);
 
     // Connect the finished signal of the animation to a lambda function
@@ -695,7 +785,6 @@ void HexView::drawSelectedItem() const {
 
 // Find the VGMFile offset represented at the given QPoint. Returns -1 for invalid points.
 int HexView::getOffsetFromPoint(QPoint pos) const {
-  auto halfCharWidth = charWidth / 2;
   auto hexStart = hexXOffset();
   auto hexEnd = hexStart + (BYTES_PER_LINE * 3 * charWidth);
 
@@ -703,8 +792,8 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
   auto asciiEnd = asciiStart + (BYTES_PER_LINE * charWidth);
 
   int byteNum = -1;
-  if (pos.x() >= hexStart - halfCharWidth && pos.x() < hexEnd - halfCharWidth) {
-    byteNum = ((pos.x() - hexStart + halfCharWidth) / charWidth) / 3;
+  if (pos.x() >= hexStart - charHalfWidth && pos.x() < hexEnd - charHalfWidth) {
+    byteNum = ((pos.x() - hexStart + charHalfWidth) / charWidth) / 3;
   } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
     byteNum = (pos.x() - asciiStart) / charWidth;
   }
