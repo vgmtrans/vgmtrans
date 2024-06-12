@@ -76,6 +76,7 @@ private:
                   int length,
                   QColor bgColor,
                   QColor textColor) const;
+  void initAnimations();
   void showOverlay(bool show, bool animate);
   void drawSelectedItem() const;
 
@@ -99,10 +100,7 @@ private:
   QCache<int, QPixmap> lineCache;
   QGraphicsOpacityEffect* overlayOpacityEffect = nullptr;
   QGraphicsDropShadowEffect* selectedItemShadowEffect = nullptr;
-  QParallelAnimationGroup* overlayAnimation = nullptr;
-  QPropertyAnimation* overlayOpacityAnimation = nullptr;
-  QPropertyAnimation* selectedItemShadowBlurAnimation = nullptr;
-  QPropertyAnimation* selectedItemShadowOffsetAnimation = nullptr;
+  QParallelAnimationGroup* selectionAnimation = nullptr;
   QWidget* overlay;
   QWidget* selectionView = nullptr;
   VGMItem* prevSelectedItem = nullptr;
