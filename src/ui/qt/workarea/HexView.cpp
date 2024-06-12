@@ -478,9 +478,8 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
           translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
           translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
 
-            offsetIntoEvent += bytesToPrint;
-            col = 0;
-          }
+          offsetIntoEvent += bytesToPrint;
+          col = 0;
         }
       }
       pixmapPainter.restore();
@@ -498,20 +497,6 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
   QPainter painter(widget);
   painter.drawPixmap(0, 0, selectionViewPixmap);
   return true;
-}
-
-std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const {
-  int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
-  int asciiStartOffsetInChars = hexCharsStartOffsetInChars + (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
-  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth - charHalfWidth;
-  int width = length * 3 * charWidth;
-  QRect hexRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
-
-  left = (asciiStartOffsetInChars + startColumn) * charWidth;
-  width = length * charWidth;
-  QRect asciiRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
-
-  return { hexRect, asciiRect };
 }
 
 std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const {
