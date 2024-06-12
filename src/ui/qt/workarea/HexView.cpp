@@ -201,7 +201,6 @@ void HexView::setSelectedItem(VGMItem *item) {
 
   if (selectedItem == nullptr) {
     showOverlay(false, true);
-    // selectionView->hide();
     prevSelectedItem = nullptr;
     return;
   }
@@ -418,12 +417,15 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
 
 bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
   auto widget = static_cast<QWidget*>(obj);
+
+  // When no item is selected, paint using the cached pixmap. This is necessary because the
+  // selected item is still visible during the deselection animation, after which it will be hidden
   if (!selectedItem) {
     QPainter painter(widget);
     painter.drawPixmap(0, 0, selectionViewPixmap);
     return true;
   }
-  // auto widget = static_cast<QWidget*>(obj);
+
   if (prevSelectedItem != selectedItem) {
 
     prevSelectedItem = selectedItem;
@@ -497,26 +499,9 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       }
       pixmapPainter.restore();
     }
-    // auto glowEffect = new QGraphicsDropShadowEffect();
-    // glowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
-    // glowEffect->setColor(SHADOW_COLOR);
-    // glowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
-
-
-    // selectedItemShadowEffect = new QGraphicsDropShadowEffect();
-    // selectedItemShadowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
-    // selectedItemShadowEffect->setColor(SHADOW_COLOR);
-    // selectedItemShadowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
-
-
     selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
     selectionViewPixmap.setDevicePixelRatio(dpr);
-    // selectionViewPixmap.fill(Qt::transparent);
     selectionViewPixmap = pixmap;
-
-    // applyEffectToPixmap(pixmap, selectionViewPixmap, selectedItemShadowEffect, 0);
-    // selectionView->setGraphicsEffect(selectedItemShadowEffect);
-
   }
   QPainter painter(widget);
   painter.drawPixmap(0, 0, selectionViewPixmap);
