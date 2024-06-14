@@ -57,9 +57,9 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   overlay->hide();
 
   overlay->installEventFilter(
-      new LambdaEventFilter([this](QObject* obj, const QEvent* event) -> bool {
+      new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
         if (event->type() == QEvent::Paint) {
-          return this->handleOverlayPaintEvent(obj, event);
+          return this->handleOverlayPaintEvent(obj, static_cast<QPaintEvent*>(event));
         }
         return false;
       })
@@ -73,19 +73,19 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
   selectedItemShadowEffect->setColor(SHADOW_COLOR);
   selectedItemShadowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
 
-  initAnimations();
-
   selectionView = new QWidget(this);
   selectionView->setGraphicsEffect(selectedItemShadowEffect);
 
   selectionView->installEventFilter(
       new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
         if (event->type() == QEvent::Paint) {
-          return handleSelectedItemPaintEvent(obj, event);
+          return handleSelectedItemPaintEvent(obj, static_cast<QPaintEvent*>(event));
         }
         return false;
       })
   );
+
+  initAnimations();
 }
 
 void HexView::setFont(QFont& font) {
@@ -114,7 +114,8 @@ void HexView::setFont(QFont& font) {
   updateSize();
 
   // Force everything to redraw
-  prevSelectedItem = nullptr;
+  selectionViewPixmap = QPixmap();
+  selectionViewPixmapWithShadow = QPixmap();
   m_virtual_full_width = -1;
   m_virtual_width_sans_ascii = -1;
   m_virtual_width_sans_ascii_and_address = -1;
@@ -200,11 +201,14 @@ void HexView::setSelectedItem(VGMItem *item) {
   selectedItem = item;
 
   if (selectedItem == nullptr) {
-    showOverlay(false, true);
-    prevSelectedItem = nullptr;
+    showSelectedItem(false, true);
     return;
   }
-  showOverlay(true, true);
+  // Invalidate the cached selected item pixmaps
+  selectionViewPixmap = QPixmap();
+  selectionViewPixmapWithShadow = QPixmap();
+
+  showSelectedItem(true, true);
   drawSelectedItem();
   selectionView->show();
 
@@ -311,7 +315,8 @@ void HexView::changeEvent(QEvent *event) {
             shouldDrawAscii = scrollAreaWidth > getViewportWidthSansAscii();
 
             if (prevShowOffset != shouldDrawOffset || prevShouldDrawAscii != shouldDrawAscii) {
-              prevSelectedItem = nullptr;
+              selectionViewPixmap = QPixmap();
+              selectionViewPixmapWithShadow = QPixmap();
               lineCache.clear();
               drawSelectedItem();
               redrawOverlay();
@@ -397,7 +402,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
   }
 }
 
-bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
+bool HexView::handleOverlayPaintEvent(QObject* obj, QPaintEvent* event) const {
   auto overlay = qobject_cast<QWidget*>(obj);
 
   QPainter painter(static_cast<QWidget*>(obj));
@@ -415,7 +420,7 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, const QEvent* event) const {
   return true;
 }
 
-bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
+bool HexView::handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event) {
   auto widget = static_cast<QWidget*>(obj);
 
   // When no item is selected, paint using the cached pixmap. This is necessary because the
@@ -426,17 +431,19 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
     return true;
   }
 
-  if (prevSelectedItem != selectedItem) {
+  bool shouldDrawNonShadowedItem = selectionViewPixmap.isNull();
+  bool shouldDrawShadowedItem = selectionViewPixmapWithShadow.isNull() && !selectedItemShadowEffect->isEnabled();
 
-    prevSelectedItem = selectedItem;
+  qreal dpr = devicePixelRatioF();
 
-    qreal dpr = devicePixelRatioF();
+  if (shouldDrawNonShadowedItem) {
     auto widgetSize = widget->size();
-    auto pixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
-    pixmap.setDevicePixelRatio(dpr);
-    pixmap.fill(Qt::transparent);
+    // auto pixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
+    selectionViewPixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
+    selectionViewPixmap.setDevicePixelRatio(dpr);
+    selectionViewPixmap.fill(Qt::transparent);
 
-    QPainter pixmapPainter = QPainter(&pixmap);
+    QPainter pixmapPainter = QPainter(&selectionViewPixmap);
 
     int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
     int startColumn = baseOffset % BYTES_PER_LINE;
@@ -499,12 +506,27 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QEvent* event) {
       }
       pixmapPainter.restore();
     }
-    selectionViewPixmap = QPixmap(pixmap.width(), pixmap.height());
-    selectionViewPixmap.setDevicePixelRatio(dpr);
-    selectionViewPixmap = pixmap;
   }
+  if (shouldDrawShadowedItem) {
+    selectionViewPixmapWithShadow = QPixmap(selectionViewPixmap.width(), selectionViewPixmap.height());
+    selectionViewPixmapWithShadow.setDevicePixelRatio(dpr);
+
+    auto shadowEffect = new QGraphicsDropShadowEffect();
+    shadowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
+    shadowEffect->setColor(SHADOW_COLOR);
+    shadowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
+
+    selectionViewPixmapWithShadow.fill(Qt::transparent);
+    applyEffectToPixmap(selectionViewPixmap, selectionViewPixmapWithShadow, shadowEffect, 0);
+  }
+
+  QPixmap* pixmapToDraw = selectedItemShadowEffect->isEnabled() ? &selectionViewPixmap : &selectionViewPixmapWithShadow;
+
+  qDebug() << "handleSelectedItemPaintEvent. bDrawNonShadowedItem: " << shouldDrawNonShadowedItem << " bDrawShadowedItem: " << shouldDrawShadowedItem;
+  qDebug() << "shadowEffectEnabled? " << selectedItemShadowEffect->isEnabled();
+
   QPainter painter(widget);
-  painter.drawPixmap(0, 0, selectionViewPixmap);
+  painter.drawPixmap(0, 0, *pixmapToDraw);
   return true;
 }
 
@@ -750,9 +772,14 @@ void HexView::initAnimations() {
 
   QObject::connect(selectionAnimation, &QPropertyAnimation::finished,
     [this, overlayOpacityAnimation, selectedItemShadowBlurAnimation, selectedItemShadowOffsetAnimation]() {
+    // After the animation has finished, we draw the final shadowed pixmap to cache so that the
+    // effect doesn't have to be redrawn on every subsequent draw pass
+    selectedItemShadowEffect->setEnabled(false);
     if (selectionAnimation->direction() == QAbstractAnimation::Backward) {
       overlay->hide();
       selectionView->hide();
+      selectionViewPixmap = QPixmap();
+      selectionViewPixmapWithShadow = QPixmap();
     }
     auto quadCurve = selectionAnimation->direction() == QAbstractAnimation::Backward ? QEasingCurve::OutQuad : QEasingCurve::InQuad;
     auto expoCurve = selectionAnimation->direction() == QAbstractAnimation::Backward ? QEasingCurve::OutExpo : QEasingCurve::InExpo;
@@ -763,9 +790,10 @@ void HexView::initAnimations() {
 
 }
 
-void HexView::showOverlay(bool show, bool animate) {
+void HexView::showSelectedItem(bool show, bool animate) {
   if (! animate) {
     selectionAnimation->stop();
+    selectedItemShadowEffect->setEnabled(false);
     if (show) {
       overlay->show();
     } else {
@@ -805,6 +833,7 @@ void HexView::showOverlay(bool show, bool animate) {
       selectionAnimation->start();
     }
   }
+  selectedItemShadowEffect->setEnabled(true);
 }
 
 void HexView::drawSelectedItem() const {

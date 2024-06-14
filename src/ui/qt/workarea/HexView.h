@@ -34,8 +34,8 @@ protected:
   bool event(QEvent *event) override;
   void changeEvent(QEvent *event) override;
   void keyPressEvent(QKeyEvent *event) override;
-  bool handleOverlayPaintEvent(QObject* obj, const QEvent* event) const;
-  bool handleSelectedItemPaintEvent(QObject* obj, QEvent* event);
+  bool handleOverlayPaintEvent(QObject* obj, QPaintEvent* event) const;
+  bool handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event);
   void paintEvent(QPaintEvent *event) override;
   void mousePressEvent(QMouseEvent *event) override;
   void mouseMoveEvent(QMouseEvent *event) override;
@@ -77,7 +77,7 @@ private:
                   QColor bgColor,
                   QColor textColor) const;
   void initAnimations();
-  void showOverlay(bool show, bool animate);
+  void showSelectedItem(bool show, bool animate);
   void drawSelectedItem() const;
 
   VGMFile* vgmfile;
@@ -103,8 +103,8 @@ private:
   QParallelAnimationGroup* selectionAnimation = nullptr;
   QWidget* overlay;
   QWidget* selectionView = nullptr;
-  VGMItem* prevSelectedItem = nullptr;
   QPixmap selectionViewPixmap;
+  QPixmap selectionViewPixmapWithShadow;
 
 signals:
   void selectionChanged(VGMItem* item);
