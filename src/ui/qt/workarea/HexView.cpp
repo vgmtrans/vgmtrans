@@ -411,6 +411,7 @@ bool HexView::handleOverlayPaintEvent(QObject* obj, QPaintEvent* event) const {
   int drawHeight = eventRect.height();
   int drawYPos = eventRect.y();
 
+  // Sometimes the entire view is invalidated. We only need to draw the portion inside the viewport.
   if (eventRect.height() > scrollArea->viewport()->height()) {
     drawHeight = scrollArea->viewport()->height();
     drawYPos = scrollArea->verticalScrollBar()->value() - overlay->y();
@@ -448,7 +449,6 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event) {
 
   if (shouldDrawNonShadowedItem) {
     auto widgetSize = widget->size();
-    // auto pixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
     selectionViewPixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
     selectionViewPixmap.setDevicePixelRatio(dpr);
     selectionViewPixmap.fill(Qt::transparent);
