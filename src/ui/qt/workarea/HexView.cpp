@@ -404,17 +404,27 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 
 bool HexView::handleOverlayPaintEvent(QObject* obj, QPaintEvent* event) const {
   auto overlay = qobject_cast<QWidget*>(obj);
-
+  auto scrollArea = getContainingScrollArea(overlay->parentWidget());
   QPainter painter(static_cast<QWidget*>(obj));
-  painter.fillRect(QRect(0, 0, BYTES_PER_LINE * 3 * charWidth, overlay->height()),
-                   QColor(0, 0, 0, OVERLAY_ALPHA));
+
+  auto eventRect = event->rect();
+  int drawHeight = eventRect.height();
+  int drawYPos = eventRect.y();
+
+  if (eventRect.height() > scrollArea->viewport()->height()) {
+    drawHeight = scrollArea->viewport()->height();
+    drawYPos = scrollArea->verticalScrollBar()->value() - overlay->y();
+  }
+
+  painter.fillRect(QRect(0, drawYPos, BYTES_PER_LINE * 3 * charWidth, drawHeight),
+    QColor(0, 0, 0, OVERLAY_ALPHA));
 
   if (shouldDrawAscii) {
     painter.fillRect(
         QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + charHalfWidth,
-              0,
-              BYTES_PER_LINE * charWidth, overlay->height()),
-        QColor(0, 0, 0, 100));
+              drawYPos,
+              BYTES_PER_LINE * charWidth, drawHeight),
+        QColor(0, 0, 0, OVERLAY_ALPHA));
   }
 
   return true;
@@ -521,12 +531,12 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event) {
   }
 
   QPixmap* pixmapToDraw = selectedItemShadowEffect->isEnabled() ? &selectionViewPixmap : &selectionViewPixmapWithShadow;
-
-  qDebug() << "handleSelectedItemPaintEvent. bDrawNonShadowedItem: " << shouldDrawNonShadowedItem << " bDrawShadowedItem: " << shouldDrawShadowedItem;
-  qDebug() << "shadowEffectEnabled? " << selectedItemShadowEffect->isEnabled();
-
   QPainter painter(widget);
-  painter.drawPixmap(0, 0, *pixmapToDraw);
+
+  auto eventRect = event->rect();
+  QRect sourceRect = QRect(eventRect.topLeft() * dpr, eventRect.size() * dpr);
+  painter.drawPixmap(eventRect, *pixmapToDraw, sourceRect);
+
   return true;
 }
 
