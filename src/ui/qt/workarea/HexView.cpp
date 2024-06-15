@@ -791,8 +791,8 @@ void HexView::initAnimations() {
       selectionViewPixmap = QPixmap();
       selectionViewPixmapWithShadow = QPixmap();
     }
-    auto quadCurve = selectionAnimation->direction() == QAbstractAnimation::Backward ? QEasingCurve::OutQuad : QEasingCurve::InQuad;
-    auto expoCurve = selectionAnimation->direction() == QAbstractAnimation::Backward ? QEasingCurve::OutExpo : QEasingCurve::InExpo;
+    auto quadCurve = selectionAnimation->direction() == QAbstractAnimation::Forward ? QEasingCurve::InQuad : QEasingCurve::OutQuad;
+    auto expoCurve = selectionAnimation->direction() == QAbstractAnimation::Forward ? QEasingCurve::InExpo : QEasingCurve::OutExpo;
     overlayOpacityAnimation->setEasingCurve(quadCurve);
     selectedItemShadowBlurAnimation->setEasingCurve(quadCurve);
     selectedItemShadowOffsetAnimation->setEasingCurve(expoCurve);
