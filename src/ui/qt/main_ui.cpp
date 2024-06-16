@@ -16,9 +16,7 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setOrganizationDomain("vgmtrans.com");
   QCoreApplication::setApplicationName("VGMTrans");
 
-#ifdef Q_OS_LINUX
-  QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::RoundPreferFloor);
-#endif
+  QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
 
   QApplication app(argc, argv);
   #ifdef _WIN32
