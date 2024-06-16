@@ -777,8 +777,14 @@ void HexView::initAnimations() {
   selectedItemShadowOffsetAnimation->setEasingCurve(QEasingCurve::OutQuad);
 
   selectionAnimation->addAnimation(overlayOpacityAnimation);
-  selectionAnimation->addAnimation(selectedItemShadowBlurAnimation);
-  selectionAnimation->addAnimation(selectedItemShadowOffsetAnimation);
+
+  // Qt shadow animations don't play well with non-integer DPRs. There can be jitter, depending
+  // on the y offset of the widget being animated. Easiest solution is to not animate in this case.
+  auto dpr = devicePixelRatioF();
+  if (dpr == std::floor(dpr)) {
+    selectionAnimation->addAnimation(selectedItemShadowOffsetAnimation);
+    selectionAnimation->addAnimation(selectedItemShadowBlurAnimation);
+  }
 
   QObject::connect(selectionAnimation, &QPropertyAnimation::finished,
     [this, overlayOpacityAnimation, selectedItemShadowBlurAnimation, selectedItemShadowOffsetAnimation]() {
