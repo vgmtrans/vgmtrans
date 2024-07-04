@@ -142,7 +142,7 @@ void VSTSequencePlayer::seek(int samples) {
       channelStates[chan].pitchBend = pitchBendEvent;
       continue;
     }
-    if (event->IsSysexEvent()) {
+    if (event->isSysexEvent()) {
       sysexEvents.push_back(event);
       continue;
     }
@@ -261,8 +261,8 @@ bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
     return false;
   }
 
-  auto rawSF2 = sf2->SaveToMem();
-  auto sf2Size = sf2->GetSize();
+  auto rawSF2 = sf2->saveToMem();
+  auto sf2Size = sf2->size();
   populateSF2MidiBuffer(rawSF2, sf2Size);
 
   delete[] rawSF2;
@@ -422,7 +422,7 @@ bool VSTSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   clearState();
 
   // Convert the VGMSeq to midi, then allocate a vector to hold every midi event in the sequence
-  MidiFile* midiFile = seq->ConvertToMidi();
+  MidiFile* midiFile = seq->convertToMidi();
   state.midiFile.reset(midiFile);
 
   size_t reserveSize = 0;
@@ -460,7 +460,7 @@ bool VSTSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
   stable_sort(state.events.begin(), state.events.end(), AbsTimeCmp());
 
   // Calculate sample offset times for all midi events
-  state.eventSampleOffsets = generateEventSampleTimes(state.events, midiFile->GetPPQN());
+  state.eventSampleOffsets = generateEventSampleTimes(state.events, midiFile->ppqn());
   return true;
 }
 
@@ -480,20 +480,20 @@ std::vector<int> VSTSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>&
   for(size_t i = 0; i < events.size(); ++i) {
     MidiEvent* event = events[i];
 
-    if (event->GetEventType() == MidiEventType::MIDIEVENT_TEMPO) {
+    if (event->eventType() == MidiEventType::MIDIEVENT_TEMPO) {
 
       // When we encounter a tempo event, we record the time offset of the event in both samples and ticks.
       // Then, to calculate the sample time offset of any subsequent event, we substitute the sample offset
       // of the most recent tempo event with the number of ticks that led up to that tempo event. Then, we take
       // the remaining ticks and multiply them by millisPerTick. Add these together and we're done.
-      lastTempoAbsTimeInSamples = ((event->AbsTime - lastTempoAbsTimeInTicks) * millisPerTick) + lastTempoAbsTimeInSamples;
-      lastTempoAbsTimeInTicks = event->AbsTime;
+      lastTempoAbsTimeInSamples = ((event->absTime - lastTempoAbsTimeInTicks) * millisPerTick) + lastTempoAbsTimeInSamples;
+      lastTempoAbsTimeInTicks = event->absTime;
 
       TempoEvent* tempoEvent = static_cast<TempoEvent*>(event);
       microsPerQuarter = static_cast<int>(tempoEvent->microSecs);
       millisPerTick = static_cast<double>(microsPerQuarter)/ ppqn / 1000.0;
     }
-    double eventTimeInMs = ((event->AbsTime - lastTempoAbsTimeInTicks) * millisPerTick) + lastTempoAbsTimeInSamples;
+    double eventTimeInMs = ((event->absTime - lastTempoAbsTimeInTicks) * millisPerTick) + lastTempoAbsTimeInSamples;
     realTimeEventOffsets[i] = static_cast<int>(eventTimeInMs * sampleRate / 1000.0);
   }
 
@@ -502,7 +502,7 @@ std::vector<int> VSTSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>&
 
 juce::MidiMessage VSTSequencePlayer::convertToChannelGroupMessage(MidiEvent* event) const {
   vector<uint8_t> eventData;
-  event->WriteEvent(eventData, event->AbsTime);
+  event->writeEvent(eventData, event->absTime);
   // Remove the delta time byte (which should be 0x00)
   eventData.erase(eventData.begin());
   // Wrap the original event around a Sysex Event with arbitrary type 0x7D. First data byte is channel group
@@ -516,7 +516,7 @@ juce::MidiMessage VSTSequencePlayer::convertToChannelGroupMessage(MidiEvent* eve
 
 juce::MidiMessage VSTSequencePlayer::convertToJuceMidiMessage(MidiEvent* event) const {
   vector<uint8_t> eventData;
-  event->WriteEvent(eventData, event->AbsTime);
+  event->writeEvent(eventData, event->absTime);
   return juce::MidiMessage(eventData.data()+1, eventData.size()-1, 0);
 }
 
@@ -530,22 +530,22 @@ void VSTSequencePlayer::populateMidiBuffer(juce::MidiBuffer& midiBuffer, int sam
     int offset = state.eventSampleOffsets[state.eventOffset] - state.samplesOffset;
 
     // Ignore Meta events because they will be filtered by JUCE (and are irrelevant anyway).
-    if (midiEvent->IsMetaEvent() ||
-        midiEvent->GetEventType() == MidiEventType::MIDIEVENT_MARKER) {
+    if (midiEvent->isMetaEvent() ||
+        midiEvent->eventType() == MidiEventType::MIDIEVENT_MARKER) {
       state.eventOffset++;
       continue;
     }
 
     // If it's a sysex event, pass it as is
-    else if (midiEvent->IsSysexEvent()) {
+    else if (midiEvent->isSysexEvent()) {
       juce::MidiMessage msg = convertToJuceMidiMessage(midiEvent);
       midiBuffer.addEvent(msg, offset);
-    } else if (midiEvent->GetEventType() == MidiEventType::MIDIEVENT_GLOBALTRANSPOSE) {
+    } else if (midiEvent->eventType() == MidiEventType::MIDIEVENT_GLOBALTRANSPOSE) {
       // Global transpose events are not actual MIDI events but instead change sequence-level state
       // when written, affecting all subsequent notes. As such, we call WriteEvent() but don't pass
       // the event into the buffer as there is no data to send.
       vector<uint8_t> eventData;
-      midiEvent->WriteEvent(eventData, midiEvent->AbsTime);
+      midiEvent->writeEvent(eventData, midiEvent->absTime);
     } else {
       // Otherwise we wrap the event in a sysex event of our creation. We do this because we need
       // to pass channelGroup information to allow for > 16 midi channel playback. Other methods of
