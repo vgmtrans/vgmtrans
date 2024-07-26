@@ -44,11 +44,14 @@ bool SegSatSeq::readEvent() {
   if (status_byte <= 0x7F)            // note on
   {
     channel = status_byte & 0x0F;
+    u16 durBit8 = (status_byte & 0x40) << 2;
+    u16 deltaBit8 = (status_byte & 0x20) << 3;
     setCurTrack(channel);
     auto key = readByte(curOffset++);
     auto vel = readByte(curOffset++);
-    auto noteDuration = readByte(curOffset++);
-    addTime(readByte(curOffset++));
+    u16 noteDuration = readByte(curOffset++) | durBit8;
+    u16 deltaTime = readByte(curOffset++) | deltaBit8;
+    addTime(deltaTime);
     addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, noteDuration);
   }
   else {
