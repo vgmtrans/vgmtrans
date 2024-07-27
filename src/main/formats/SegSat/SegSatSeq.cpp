@@ -65,7 +65,7 @@ bool SegSatSeq::readEvent() {
     u16 durBit8 = (status_byte & 0x40) << 2;
     u16 deltaBit8 = (status_byte & 0x20) << 3;
     if ((status_byte & 0x10) > 0) {
-      L_INFO("found 0x10 bit on for note on status byte {:x}", beginOffset);
+      L_DEBUG("found 0x10 bit on for note on status byte {:x}", beginOffset);
     }
     setCurTrack(channel);
     auto key = readByte(curOffset++);
