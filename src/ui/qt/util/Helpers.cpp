@@ -125,6 +125,8 @@ QColor colorForEventColor(VGMItem::EventColor eventColor) {
       return EventColors::CLR_GREEN;
     case VGMItem::CLR_PROGCHANGE:
       return EventColors::CLR_PERIWINKLE;
+    case VGMItem::CLR_BANKSELECT:
+      return EventColors::CLR_PERIWINKLE;
     case VGMItem::CLR_TRANSPOSE:
       return EventColors::CLR_DARK_GREEN;
     case VGMItem::CLR_PRIORITY:

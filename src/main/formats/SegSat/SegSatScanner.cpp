@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "SegSatScanner.h"
 #include "SegSatSeq.h"
 #include "ScannerManager.h"
 
@@ -21,8 +22,6 @@ std::array<u8, 4> uint32ToBytes(u32 num) {
 }
 
 void SegSatScanner::scan(RawFile *file, void *info) {
-  u8* buf;
-
   constexpr u32 minSeqSize = 16;
 
   u32 fileLength = file->size();
@@ -82,7 +81,7 @@ void SegSatScanner::scan(RawFile *file, void *info) {
         continue;
       }
 
-      SegSatSeq* seq = new SegSatSeq(file, i + seqPtr);
+      SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, "Sega Saturn Sequence");
       if (!seq->loadVGMFile())
         delete seq;
     }

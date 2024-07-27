@@ -141,9 +141,12 @@ class SeqTrack : public VGMItem {
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const std::string &sEventName = "Program Change");
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, uint8_t chan, const std::string &sEventName = "Program Change");
   void addProgramChangeNoItem(uint32_t progNum, bool requireBank) const;
+  void addBankSelect(uint32_t offset, uint32_t length, uint8_t bank, const std::string& sEventName = "Bank Select");
   void addBankSelectNoItem(uint8_t bank) const;
   void addTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuarter, const std::string &sEventName = "Tempo");
   void addTempoNoItem(uint32_t microsPerQuarter) const;
+  void insertTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuarter, uint32_t absTime, const std::string &sEventName = "Tempo");
+  void insertTempoNoItem(uint32_t microsPerQuarter, uint32_t absTime) const;
   void addTempoSlide(uint32_t offset, uint32_t length, uint32_t dur, uint32_t targMicrosPerQuarter, const std::string &sEventName = "Tempo Slide");
   void addTempoBPM(uint32_t offset, uint32_t length, double bpm, const std::string &sEventName = "Tempo");
   void addTempoBPMNoItem(double bpm) const;
@@ -153,6 +156,7 @@ class SeqTrack : public VGMItem {
   void insertTimeSig(uint32_t offset, uint32_t length, uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime, const std::string &sEventName = "Time Signature");
   void addEndOfTrack(uint32_t offset, uint32_t length, const std::string &sEventName = "Track End");
   void addEndOfTrackNoItem();
+  void addControllerEventNoItem(uint8_t controllerType, uint8_t controllerValue) const;
 
   void addGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName = "Global Transpose");
   void addMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::string &sEventName, int8_t priority = 0, EventColor color = CLR_MISC);

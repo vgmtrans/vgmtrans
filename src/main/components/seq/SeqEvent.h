@@ -24,6 +24,7 @@ enum EventType {
   EVENTTYPE_PAN,
   EVENTTYPE_REVERB,
   EVENTTYPE_PROGCHANGE,
+  EVENTTYPE_BANKSELECT,
   EVENTTYPE_PITCHBEND,
   EVENTTYPE_PITCHBENDRANGE,
   EVENTTYPE_FINETUNING,
@@ -541,6 +542,24 @@ class ProgChangeSeqEvent : public SeqEvent {
 
  public:
   uint32_t progNum;
+};
+
+//  ******************
+//  ProgChangeSeqEvent
+//  ******************
+
+class BankSelectSeqEvent : public SeqEvent {
+public:
+  BankSelectSeqEvent(SeqTrack *pTrack, uint32_t bank, uint32_t offset = 0,
+                     uint32_t length = 0, const std::string &name = "");
+  EventType eventType() override { return EVENTTYPE_BANKSELECT; }
+
+  std::string description() override {
+    return fmt::format("{} - bank: {}", name(), bank);
+  };
+
+public:
+  uint32_t bank;
 };
 
 //  *************

@@ -11,7 +11,7 @@
 class VGMSeqNoTrks : public VGMSeq, public SeqTrack {
 public:
   VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset,
-               const std::string& name = "VGM Sequence");
+               std::string name = "VGM Sequence");
 
 public:
   ~VGMSeqNoTrks() override;
