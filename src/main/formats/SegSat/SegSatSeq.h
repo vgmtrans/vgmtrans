@@ -1,19 +1,20 @@
 #pragma once
 #include "VGMSeqNoTrks.h"
-#include "SegSatFormat.h"
-#include "SegSatScanner.h"
 
 class SegSatSeq:
     public VGMSeqNoTrks {
  public:
-  SegSatSeq(RawFile *file, uint32_t offset);
-  virtual ~SegSatSeq();
+  SegSatSeq(RawFile *file, uint32_t offset, std::string name);
+  ~SegSatSeq() override = default;
 
-  virtual bool parseHeader();
-  virtual bool readEvent();
+  void resetVars() override;
+  bool parseHeader() override;
+  bool readEvent() override;
 
  public:
-  uint8_t headerFlag;
-  int remainingEventsInLoop;
-  uint32_t loopEndPos;
+  u32 normalTrackOffset;
+  int remainingEventsInLoop = -1;
+  u32 loopEndPos = -1;
+  u32 foreverLoopStart = -1;
+  u32 durationAccumulator = 0;
 };

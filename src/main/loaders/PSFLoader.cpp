@@ -18,11 +18,13 @@ LoaderRegistration<PSFLoader> psf{"PSF"};
 }
 
 constexpr int PSF1_VERSION = 0x1;
+constexpr int SSF_VERSION = 0x11;
 constexpr int GSF_VERSION = 0x22;
 constexpr int SNSF_VERSION = 0x23;
 constexpr int NDS2SF_VERSION = 0x24;
 constexpr int NCSF_VERSION = 0x25;
 const std::unordered_map<int, size_t> data_offset = {{PSF1_VERSION, 0x800},
+                                                     {SSF_VERSION, 0x04},
                                                      {GSF_VERSION, 0x0C},
                                                      {SNSF_VERSION, 0x08},
                                                      {NDS2SF_VERSION, 0x08},

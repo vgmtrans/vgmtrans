@@ -1245,6 +1245,15 @@ void SeqTrack::addProgramChangeNoItem(uint32_t progNum, bool requireBank) const 
   }
 }
 
+void SeqTrack::addBankSelect(uint32_t offset, uint32_t length, uint8_t bank, const std::string& sEventName) {
+  onEvent(offset, length);
+
+  if (readMode == READMODE_ADD_TO_UI) {
+    addEvent(new BankSelectSeqEvent(this, bank, offset, length, sEventName));
+  }
+  addBankSelectNoItem(bank);
+}
+
 void SeqTrack::addBankSelectNoItem(uint8_t bank) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (auto style = ConversionOptions::the().bankSelectStyle();
@@ -1269,9 +1278,30 @@ void SeqTrack::addTempo(uint32_t offset, uint32_t length, uint32_t microsPerQuar
 void SeqTrack::addTempoNoItem(uint32_t microsPerQuarter) const {
   parentSeq->tempoBPM = 60000000.0 / microsPerQuarter;
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    // Some MIDI tool can recognise tempo event only in the first track.
+    // Some MIDI engines only recognise tempo events in the first track.
     MidiTrack *pFirstMidiTrack = parentSeq->firstMidiTrack();
     pFirstMidiTrack->insertTempo(microsPerQuarter, pMidiTrack->getDelta());
+  }
+}
+
+void SeqTrack::insertTempo(uint32_t offset,
+                           uint32_t length,
+                           uint32_t microsPerQuarter,
+                           uint32_t absTime,
+                           const std::string &sEventName) {
+  onEvent(offset, length);
+
+  double bpm = 60000000.0 / microsPerQuarter;
+  if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
+    addEvent(new TempoSeqEvent(this, bpm, offset, length, sEventName));
+  insertTempoNoItem(microsPerQuarter, absTime);
+}
+
+void SeqTrack::insertTempoNoItem(uint32_t microsPerQuarter, uint32_t absTime) const {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    // Some MIDI tool can recognise tempo event only in the first track.
+    MidiTrack *pFirstMidiTrack = parentSeq->firstMidiTrack();
+    pFirstMidiTrack->insertTempo(microsPerQuarter, absTime);
   }
 }
 
@@ -1374,6 +1404,12 @@ void SeqTrack::addEndOfTrackNoItem() {
   if (readMode == READMODE_FIND_DELTA_LENGTH)
     totalTicks = getTime();
 }
+
+void SeqTrack::addControllerEventNoItem(uint8_t controllerType, uint8_t controllerValue) const {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->addControllerEvent(channel, controllerType, controllerValue);
+}
+
 
 void SeqTrack::addGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName) {
   onEvent(offset, length);

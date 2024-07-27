@@ -297,6 +297,17 @@ ProgChangeSeqEvent::ProgChangeSeqEvent(SeqTrack *pTrack,
                                        const std::string &name)
     : SeqEvent(pTrack, offset, length, name, CLR_PROGCHANGE), progNum(programNumber) { }
 
+// ******************
+// BankSelectSeqEvent
+// ******************
+
+BankSelectSeqEvent::BankSelectSeqEvent(SeqTrack *pTrack,
+                                       uint32_t bank,
+                                       uint32_t offset,
+                                       uint32_t length,
+                                       const std::string &name)
+    : SeqEvent(pTrack, offset, length, name, CLR_BANKSELECT), bank(bank) { }
+
 // *************
 // TempoSeqEvent
 // *************

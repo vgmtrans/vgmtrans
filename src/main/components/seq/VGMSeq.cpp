@@ -93,11 +93,7 @@ MidiFile *VGMSeq::convertToMidi() {
 }
 
 MidiTrack *VGMSeq::firstMidiTrack() {
-  MidiTrack *pFirstMidiTrack = nullptr;
-  if (!aTracks.empty()) {
-    pFirstMidiTrack = aTracks[0]->pMidiTrack;
-  }
-  return pFirstMidiTrack;
+  return aTracks.empty() ? nullptr : aTracks[0]->pMidiTrack;
 }
 
 // Load() - Function to load all the sequence data into the class

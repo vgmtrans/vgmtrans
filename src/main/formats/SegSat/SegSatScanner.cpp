@@ -4,51 +4,90 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "SegSatScanner.h"
 #include "SegSatSeq.h"
 #include "ScannerManager.h"
+#include <array>
 
-// namespace vgmtrans::scanners {
-// ScannerRegistration<SegSatScanner> s_segsat("SEGSAT");
-// }
+namespace vgmtrans::scanners {
+ScannerRegistration<SegSatScanner> s_segsat("SEGSAT");
+}
 
-
-#define SRCH_BUF_SIZE 0x20000
-
-SegSatScanner::SegSatScanner() {}
-
-SegSatScanner::~SegSatScanner() {}
+std::array<u8, 4> uint32ToBytes(u32 num) {
+  std::array<u8, 4> bytes;
+  bytes[0] = (num >> 24) & 0xFF;
+  bytes[1] = (num >> 16) & 0xFF;
+  bytes[2] = (num >> 8) & 0xFF;
+  bytes[3] = num & 0xFF;
+  return bytes;
+}
 
 void SegSatScanner::scan(RawFile *file, void *info) {
-  uint32_t nFileLength;
-  uint8_t *buf;
-  uint32_t j;
-  uint32_t progPos = 0;
+  constexpr u32 minSeqSize = 16;
 
-  nFileLength = file->size();
-  if (nFileLength < SRCH_BUF_SIZE) {
-    return;
-  }
-  buf = new uint8_t[SRCH_BUF_SIZE];
-  file->readBytes(0, SRCH_BUF_SIZE, buf);
-  j = 0;
-  for (uint32_t i = 0; i + 4 < nFileLength; i++) {
-    if (j + 4 > SRCH_BUF_SIZE) {
-      memcpy(buf, buf + j, 3);
-      // TODO: This entire method should be rewritten, as this can read beyond the length of the file
-      file->readBytes(i + 3, j, buf + 3);
-      j = 0;
+  u32 fileLength = file->size();
+
+  for (u32 i = 0; i + 0x20 < fileLength; i++) {
+
+    u32 firstWord = file->readWordBE(i);
+    // If the first word is 0, skip the first 3 bytes
+    if (firstWord == 0) {
+      i += 2;
+      continue;
     }
-    if (buf[j] == 0x01 && buf[j + 1] == 0 && buf[j + 2] == 0 && buf[j + 3] == 0 && buf[j + 4] == 6
-        && (buf[j + 5] & 0xF0) == 0/* && buf[j+6] == 0x30*/) {
-
-      SegSatSeq *newSegSatSeq = new SegSatSeq(file, i + 5);//this, pDoc, pDoc->GetWord(i+24 + k*8)-0x8000000);
-
-      if (!newSegSatSeq->loadVGMFile())
-        delete newSegSatSeq;
+    // If the first three bytes are 0 and the last is non-zero, skip the first 2 bytes
+    if (firstWord <= 0xFF) {
+      i += 1;
+      continue;
     }
-    j++;
-  }
 
-  delete[] buf;
-  return;
+    // We expect the first and third bytes to be 0, the second byte to be non-zero
+    auto firstWordBytes = uint32ToBytes(firstWord);
+    if (firstWordBytes[0] != 0 || firstWordBytes[1] == 0 || firstWordBytes[2] != 0)
+      continue;
+
+    // Calculate if the size of the header + a miniscule single sequence would exceed the file size.
+    u16 numSeqs = firstWordBytes[1];
+    if (2 + (numSeqs * 4) + minSeqSize > fileLength)
+      continue;
+
+    // We expect the first seq offset to be immediately after the header
+    u32 firstSeqPtr = file->readWordBE(i + 2);
+    if (firstSeqPtr != 2 + (numSeqs * 4))
+      continue;
+
+    // Check that sequence pointers don't exceed file size and that they are ordered
+    u32 prevSeqPtr = 0;
+    bool bInvalid = false;
+    for (u16 s = 0; s < numSeqs; s++) {
+      u32 seqPtr = file->readWordBE(i + 2 + (s * 4));
+      if (seqPtr <= prevSeqPtr || (i + seqPtr + minSeqSize) > fileLength) {
+        bInvalid = true;
+        break;
+      }
+      prevSeqPtr = seqPtr;
+    }
+    if (bInvalid)
+      continue;
+
+    for (int n = 0; n < numSeqs; ++n) {
+      u32 seqPtr = file->readWordBE(i + 2 + (n * 4));
+      u16 tempoTrkPtr = 8;
+      u16 numTempoEvents = file->readShortBE(i + seqPtr + 2);
+      u16 firstNonTempoTrkPtr = file->readShortBE(i + seqPtr + 4);
+      u16 loopedTempoEventPtr = file->readShortBE(i + seqPtr + 6);
+      if (loopedTempoEventPtr >= firstNonTempoTrkPtr ||
+          tempoTrkPtr + (numTempoEvents * 8) != firstNonTempoTrkPtr) {
+        L_ERROR("SegSat sequence had unexpected tempo track pointer");
+        continue;
+      }
+
+      SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, "Sega Saturn Sequence");
+      if (!seq->loadVGMFile())
+        delete seq;
+    }
+
+    u32 lastSeqPtr = file->readWordBE(i + 2 + ((numSeqs-1) * 4));
+    i += lastSeqPtr + minSeqSize;
+  }
 }

@@ -6,8 +6,8 @@
 
 #include "VGMSeqNoTrks.h"
 
-VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, const std::string& name)
-    : VGMSeq(format, file, offset, 0, name), SeqTrack(this) {
+VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, std::string name)
+    : VGMSeq(format, file, offset, 0, std::move(name)), SeqTrack(this) {
   VGMSeqNoTrks::resetVars();
 }
 
