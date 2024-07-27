@@ -7,6 +7,7 @@
 #include "SegSatScanner.h"
 #include "SegSatSeq.h"
 #include "ScannerManager.h"
+#include <array>
 
 namespace vgmtrans::scanners {
 ScannerRegistration<SegSatScanner> s_segsat("SEGSAT");
