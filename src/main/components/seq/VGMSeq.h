@@ -48,62 +48,63 @@ class VGMSeq : public VGMFile {
 
   void useReverb() { m_use_reverb = true; }
 
-  bool usesMonophonicTracks() { return m_use_monophonic_tracks; }
+  [[nodiscard]] bool usesMonophonicTracks() const { return m_use_monophonic_tracks; }
   void setUsesMonophonicTracks() { m_use_monophonic_tracks = true; }
 
-  bool usesLinearAmplitudeScale() { return m_use_linear_amplitude_scale; }
+  [[nodiscard]] bool usesLinearAmplitudeScale() const { return m_use_linear_amplitude_scale; }
   void setUseLinearAmplitudeScale(bool set) { m_use_linear_amplitude_scale = set; }
 
-  void useLinearPanAmplitudeScale(PanVolumeCorrectionMode mode) {
+  [[nodiscard]] bool usesLinearPanAmplitudeScale() const { return m_use_linear_pan_amplitude_scale; }
+  void setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode mode) {
     m_use_linear_pan_amplitude_scale = true;
     panVolumeCorrectionMode = mode;
   }
 
-  bool alwaysWriteInitialVol() { return m_always_write_initial_vol; }
+  [[nodiscard]] bool alwaysWriteInitialVol() const { return m_always_write_initial_vol; }
   void setAlwaysWriteInitialVol(uint8_t theVol = 100) {
     m_always_write_initial_vol = true;
     m_initial_volume = theVol;
   }
-  bool alwaysWriteInitialExpression() { return m_always_write_initial_expression; }
+  [[nodiscard]] bool alwaysWriteInitialExpression() const { return m_always_write_initial_expression; }
   void setAlwaysWriteInitialExpression(uint8_t level = 127) {
     m_always_write_initial_expression = true;
     m_initial_expression = level;
   }
 
-  bool alwaysWriteInitialReverb() { return m_always_write_initial_expression; }
+  [[nodiscard]] bool alwaysWriteInitialReverb() const { return m_always_write_initial_expression; }
   void setAlwaysWriteInitialReverb(uint8_t level = 127) {
     m_always_write_initial_reverb = true;
     m_initial_reverb_level = level;
   }
 
-  bool alwaysWriteInitialPitchBendRange() { return m_always_write_initial_pitch_bend_range; }
+  [[nodiscard]] bool alwaysWriteInitialPitchBendRange() const { return m_always_write_initial_pitch_bend_range; }
   void setAlwaysWriteInitialPitchBendRange(uint16_t cents) {
     m_always_write_initial_pitch_bend_range = true;
     m_initial_pitch_bend_range_cents = cents;
   }
 
-  bool alwaysWriteInitialTempo() { return m_always_write_initial_tempo; }
+  [[nodiscard]] bool alwaysWriteInitialTempo() const { return m_always_write_initial_tempo; }
   void setAlwaysWriteInitialTempo(double beatsPerMin) {
     m_always_write_initial_tempo = true;
     initialTempoBPM = beatsPerMin;
   }
 
-  bool alwaysWriteInitialMonoMode() { return m_always_write_initial_mono_mode; }
+  [[nodiscard]] bool alwaysWriteInitialMonoMode() const { return m_always_write_initial_mono_mode; }
   void setAlwaysWriteInitialMonoMode(bool set) { m_always_write_initial_mono_mode = set; }
-  bool allowDiscontinuousTrackData() { return m_allow_discontinuous_track_data; }
+  [[nodiscard]] bool allowDiscontinuousTrackData() const { return m_allow_discontinuous_track_data; }
   void setAllowDiscontinuousTrackData(bool allow) { m_allow_discontinuous_track_data = allow; }
 
   bool saveAsMidi(const std::string &filepath);
 
   void deactivateAllTracks();
 
-  uint8_t initialVolume() { return m_initial_volume; }
+  [[nodiscard]] uint8_t initialVolume() const { return m_initial_volume; }
   void setInitialVolume(uint8_t volume) { m_initial_volume = volume; }
-  uint8_t initialExpression() { return m_initial_expression; }
+  [[nodiscard]] uint8_t initialExpression() const { return m_initial_expression; }
   void setInitialExpression(uint8_t expression) { m_initial_expression = expression; }
-  uint8_t initialReverbLevel() { return m_initial_reverb_level; }
+  [[nodiscard]] uint8_t initialReverbLevel() const { return m_initial_reverb_level; }
   void setInitialReverbLevel(uint8_t reverb_level) { m_initial_reverb_level = reverb_level; }
-  uint16_t initialPitchBendRange() { return m_initial_pitch_bend_range_cents; }
+  [[nodiscard]] uint16_t initialPitchBendRange() const { return m_initial_pitch_bend_range_cents; }
   void setInitialPitchBendRange(uint16_t cents) { m_initial_pitch_bend_range_cents = cents; }
 
  protected:
