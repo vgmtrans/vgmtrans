@@ -13,7 +13,7 @@ DECLARE_FORMAT(HOSA);
 HOSASeq::HOSASeq(RawFile *file, uint32_t offset, const std::string &name)
     : VGMSeq(HOSAFormat::name, file, offset, 0, name) {
   useReverb();
-  usesLinearAmplitudeScale();
+  setUseLinearAmplitudeScale(true);
 }
 
 //==============================================================

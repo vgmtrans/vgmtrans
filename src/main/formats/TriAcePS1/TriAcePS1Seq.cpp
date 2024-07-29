@@ -13,7 +13,7 @@ DECLARE_FORMAT(TriAcePS1);
 
 TriAcePS1Seq::TriAcePS1Seq(RawFile *file, uint32_t offset, const std::string &name)
     : VGMSeq(TriAcePS1Format::name, file, offset, 0, name) {
-  usesLinearAmplitudeScale();
+  setUseLinearAmplitudeScale(true);
   useReverb();
   setAlwaysWriteInitialPitchBendRange(12 * 100);
 }
