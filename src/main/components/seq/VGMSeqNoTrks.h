@@ -24,13 +24,13 @@ public:
   using VGMSeq::readWord;
   using VGMSeq::readShortBE;
   using VGMSeq::readWordBE;
-  inline uint32_t &offset() { return VGMSeq::dwOffset; }
-  inline uint32_t &length() { return VGMSeq::unLength; }
-  inline std::string name() { return VGMSeq::name(); }
+  [[nodiscard]] inline uint32_t &offset() { return VGMSeq::dwOffset; }
+  [[nodiscard]] inline uint32_t &length() { return VGMSeq::unLength; }
+  [[nodiscard]] inline std::string name() { return VGMSeq::name(); }
 
-  inline RawFile* rawFile() { return VGMSeq::rawFile(); }
+  [[nodiscard]] inline RawFile* rawFile() { return VGMSeq::rawFile(); }
 
-  inline uint32_t &eventsOffset() { return dwEventsOffset; }
+  [[nodiscard]] inline uint32_t &eventsOffset() { return dwEventsOffset; }
 
   // this function must be called in GetHeaderInfo or before LoadEvents is called
   inline void setEventsOffset(uint32_t offset) {

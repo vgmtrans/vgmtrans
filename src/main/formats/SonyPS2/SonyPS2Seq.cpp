@@ -8,19 +8,15 @@ using namespace std;
 // BGMSeq
 // ******
 
-SonyPS2Seq::SonyPS2Seq(RawFile *file, uint32_t offset)
-    : VGMSeqNoTrks(SonyPS2Format::name, file, offset),
+SonyPS2Seq::SonyPS2Seq(RawFile *file, uint32_t offset, std::string name)
+    : VGMSeqNoTrks(SonyPS2Format::name, file, offset, std::move(name)),
       compOption(0),
       bSkipDeltaTime(0) {
   setUseLinearAmplitudeScale(true);        // Onimusha: Kaede Theme track 2 for example of linear vol scale.
   useReverb();
 }
 
-SonyPS2Seq::~SonyPS2Seq(void) {
-}
-
-bool SonyPS2Seq::parseHeader(void) {
-  name() = "Sony PS2 Seq";
+bool SonyPS2Seq::parseHeader() {
   uint32_t curOffset = offset();
   //read the version chunk
   readBytes(curOffset, 0x10, &versCk);
