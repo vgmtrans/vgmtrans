@@ -19,11 +19,11 @@ class SonyPS2Seq:
     uint32_t seSongChunkAddr;
   } HdrCk;
 
-  SonyPS2Seq(RawFile *file, uint32_t offset);
-  virtual ~SonyPS2Seq();
+  SonyPS2Seq(RawFile *file, uint32_t offset, std::string name);
+  ~SonyPS2Seq() override = default;
 
-  virtual bool parseHeader();
-  virtual bool readEvent();
+  bool parseHeader() override;
+  bool readEvent() override;
   uint8_t getDataByte(uint32_t offset);
 
  private:

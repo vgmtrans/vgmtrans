@@ -38,7 +38,7 @@ void SonyPS2Scanner::searchForSeq(RawFile *file) {
     if (sig1 != 0x53434549 || sig2 != 0x4D696469)  // "SCEIMidi" in ASCII
       continue;
 
-    SonyPS2Seq *newSeq = new SonyPS2Seq(file, i);
+    SonyPS2Seq *newSeq = new SonyPS2Seq(file, i, "Sony PS2 Seq");
     if (!newSeq->loadVGMFile())
       delete newSeq;
   }
