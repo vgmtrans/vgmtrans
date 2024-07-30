@@ -171,17 +171,15 @@ class VirtFile final : public RawFile {
       return tmp.string();
     };
     [[nodiscard]] std::string extension() const override {
-        auto tmp = m_lpath.extension().string();
-        if (!tmp.empty()) {
-            return toLower(tmp.substr(1, tmp.size() - 1));
-        } else {
-            std::filesystem::path tmp2(m_name);
-            if (tmp2.has_extension()) {
-                return toLower(tmp2.extension().string().substr(1, tmp2.extension().string().size() - 1));
-            }
-        }
-
-        return tmp;
+      std::filesystem::path tmp2(m_name);
+      if (tmp2.has_extension()) {
+        return toLower(tmp2.extension().string().substr(1, tmp2.extension().string().size() - 1));
+      }
+      auto tmp = m_lpath.extension().string();
+      if (!tmp.empty()) {
+        return toLower(tmp.substr(1, tmp.size() - 1));
+      }
+      return "";
     }
 
     const char *data() const override { return m_data.data(); }
