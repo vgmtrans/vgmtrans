@@ -144,7 +144,7 @@ enum AkaoSeqEventType {
 class AkaoSeq final :
     public VGMSeq {
  public:
-  explicit AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version);
+  explicit AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name);
 
   void resetVars() override;
   bool parseHeader() override;
