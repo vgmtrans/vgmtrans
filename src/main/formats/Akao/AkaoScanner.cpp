@@ -29,7 +29,11 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       AkaoPs1Version version = file_version;
       if (version == AkaoPs1Version::UNKNOWN)
         version = AkaoSeq::guessVersion(file, offset);
-      AkaoSeq *seq = new AkaoSeq(file, offset, version);
+
+      u16 id = file->readShort(offset + 4);
+      auto name = fmt::format("Akao Seq {:02X}", id);
+
+      AkaoSeq *seq = new AkaoSeq(file, offset, version, name);
       if (!seq->loadVGMFile()) {
         delete seq;
         continue;
@@ -50,7 +54,10 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       if (version == AkaoPs1Version::UNKNOWN)
         version = AkaoSampColl::guessVersion(file, offset);
 
-      AkaoSampColl *sampColl = new AkaoSampColl(file, offset, version);
+      u16 id = file->readShort(offset + 4);
+      auto name = fmt::format("Akao Sample Collection {:02X}", id);
+
+      AkaoSampColl *sampColl = new AkaoSampColl(file, offset, version, name);
       if (!sampColl->loadVGMFile())
         delete sampColl;
     }
