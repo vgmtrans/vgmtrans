@@ -225,10 +225,10 @@ AkaoInstrSet* AkaoSeq::newInstrSet() const {
       length = unLength - (drum_set_offset() - dwOffset);
 
     return length != 0
-      ? new AkaoInstrSet(rawFile(), length, version(), instrument_set_offset(), drum_set_offset(), id(), "Akao Instr Set")
-      : new AkaoInstrSet(rawFile(), dwOffset, dwOffset + unLength, version());
+      ? new AkaoInstrSet(rawFile(), length, version(), instrument_set_offset(), drum_set_offset(), seq_id, "Akao Instr Set")
+      : new AkaoInstrSet(rawFile(), dwOffset, dwOffset + unLength, version(), seq_id);
   } else {
-    return new AkaoInstrSet(rawFile(), dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses);
+    return new AkaoInstrSet(rawFile(), dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses, seq_id);
   }
 }
 

@@ -38,9 +38,9 @@ class AkaoInstrSet final : public VGMInstrSet {
                std::string name = "Akao Instrument Bank");
   AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset, AkaoPs1Version version,
     const std::set<uint32_t>& custom_instrument_addresses, const std::set<uint32_t>& drum_instrument_addresses,
-    std::string name = "Akao Instrument Bank");
+    uint32_t id, std::string name = "Akao Instrument Bank");
   AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version,
-    std::string name = "Akao Instrument Bank (Dummy)");
+    uint32_t id, std::string name = "Akao Instrument Bank (Dummy)");
   bool parseInstrPointers() override;
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
@@ -144,12 +144,13 @@ class AkaoSampColl final :
 
   std::vector<AkaoArt> akArts;
   uint32_t starting_art_id;
+  uint32_t ending_art_id;
+  uint32_t nNumArts;
   uint16_t sample_set_id;
 
  private:
   AkaoPs1Version version_;
   uint32_t sample_section_size;
-  uint32_t nNumArts;
   uint32_t arts_offset;
   uint32_t sample_section_offset;
   AkaoInstrDatLocation file_location;

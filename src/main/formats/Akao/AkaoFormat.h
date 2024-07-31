@@ -2,7 +2,7 @@
 #include "Format.h"
 #include "AkaoScanner.h"
 #include "VGMColl.h"
-#include "Matcher.h"
+#include "AkaoMatcher.h"
 
 class AkaoInstrSet;
 
@@ -29,6 +29,6 @@ class AkaoColl final :
 
 BEGIN_FORMAT(Akao)
   USING_SCANNER(AkaoScanner)
-  USING_MATCHER(FilegroupMatcher)
+  USING_MATCHER(AkaoMatcher)
   USING_COLL(AkaoColl)
 END_FORMAT()
