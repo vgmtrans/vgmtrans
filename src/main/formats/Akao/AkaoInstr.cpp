@@ -17,10 +17,10 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
                            AkaoPs1Version version,
                            uint32_t instrOff,
                            uint32_t dkitOff,
-                           uint32_t theID,
+                           uint32_t id,
                            std::string name)
     : VGMInstrSet(AkaoFormat::name, file, 0, length, std::move(name)), version_(version) {
-  setId(theID);
+  setId(id);
   instrSetOff = instrOff;
   drumkitOff = dkitOff;
   bMelInstrs = instrSetOff > 0;
@@ -34,10 +34,11 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
   AkaoPs1Version version, const std::set<uint32_t>& custom_instrument_addresses,
-  const std::set<uint32_t>& drum_instrument_addresses, std::string name)
+  const std::set<uint32_t>& drum_instrument_addresses, uint32_t id, std::string name)
   : VGMInstrSet(AkaoFormat::name, file, 0, 0, std::move(name)), bMelInstrs(false), bDrumKit(false),
   instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset), version_(version)
 {
+  setId(id);
   uint32_t first_instrument_offset = 0;
   if (!custom_instrument_addresses.empty()) {
     first_instrument_offset = *custom_instrument_addresses.begin();
@@ -58,11 +59,13 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset,
 }
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset,
-  uint32_t end_boundary_offset, AkaoPs1Version version, std::string name)
+  uint32_t end_boundary_offset, AkaoPs1Version version, uint32_t id, std::string name)
     : VGMInstrSet(AkaoFormat::name, file, offset, 0, std::move(name)), bMelInstrs(false),
       bDrumKit(false), instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset),
       version_(version)
-{}
+{
+  setId(id);
+}
 
 bool AkaoInstrSet::parseInstrPointers() {
   if (bMelInstrs) {
@@ -360,7 +363,6 @@ bool AkaoSampColl::parseHeader() {
 
     sample_section_size = readWord(0x14 + dwOffset);
     starting_art_id = readWord(0x18 + dwOffset);
-    uint32_t ending_art_id;
     if (version() == AkaoPs1Version::VERSION_1_1)
       ending_art_id = 0x80;
     else {
