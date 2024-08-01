@@ -107,6 +107,10 @@ class AkaoRgn final :
   unsigned short adsr2;  //raw psx ADSR2 value (articulation data)
   uint8_t artNum;
   uint8_t drumRelUnityKey;
+  uint8_t attackRate;
+  uint8_t sustainRate;
+  uint8_t sustainMode;
+  uint8_t releaseRate;
 };
 
 

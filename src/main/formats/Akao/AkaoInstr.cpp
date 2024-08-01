@@ -249,7 +249,12 @@ bool AkaoRgn::loadRgn() {
   artNum = readByte(dwOffset + 0); //- first_sample_id;
   addKeyLow(readByte(dwOffset + 1), dwOffset + 1);
   addKeyHigh(readByte(dwOffset + 2), dwOffset + 2);
-  // TODO: ADSR conversion?
+  attackRate = readByte(dwOffset + 3);
+  sustainRate = readByte(dwOffset + 4);
+  sustainMode = readByte(dwOffset + 5);
+  releaseRate = readByte(dwOffset + 6);
+  // TODO: Need to confirm the details of these ADSR values. Sustain Mode values are using 3 bits
+  //  which indicates it's more than sustain mode.
   addGeneralItem(dwOffset + 3, 1, "ADSR Attack Rate");
   addGeneralItem(dwOffset + 4, 1, "ADSR Sustain Rate");
   addGeneralItem(dwOffset + 5, 1, "ADSR Sustain Mode");

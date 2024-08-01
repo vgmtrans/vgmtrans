@@ -66,7 +66,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
       });
       if (it != sampColls.end()) {
         sampCollsToCheck.push_back(*it);
-      } else {
+      } else if (seq->rawFile()->extension() != "psf") {
         return false;
       }
     }
@@ -82,7 +82,8 @@ bool AkaoMatcher::tryCreateCollection(int id) {
       for (const auto &region : instr->regions()) {
         AkaoRgn* akaoRegion = static_cast<AkaoRgn*>(region);
         // We will exclude articulation id 0, as it often indicates an unused artic
-        if (akaoRegion->artNum != 0)
+        // Also ignoring values > 0x60 is a hack that allows compatability with many psfs.
+        if (akaoRegion->artNum != 0 && akaoRegion->artNum <= 0x60)
           requiredArtIds.emplace_back(akaoRegion->artNum);
       }
     }
