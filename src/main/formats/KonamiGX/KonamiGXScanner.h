@@ -10,6 +10,8 @@
 class KonamiGXScanner:
     public VGMScanner {
  public:
+  explicit KonamiGXScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void loadSeqTable(RawFile *file, uint32_t offset);
 };

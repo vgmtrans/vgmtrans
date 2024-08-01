@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<NinSnesScanner> s_nin_snes("NINSNES", {"spc"});
+ScannerRegistration<NinSnesScanner> s_nin_snes("NinSnes", {"spc"});
 }
 
 //; Yoshi's Island SPC

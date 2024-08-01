@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<FalcomSnesScanner> s_falcom_snes("FALCOMSNES", {"spc"});
+ScannerRegistration<FalcomSnesScanner> s_falcom_snes("FalcomSnes", {"spc"});
 }
 
 //; Ys V: Ushinawareta Suna no Miyako Kefin SPC

@@ -8,8 +8,7 @@
 
 class FFTScanner : public VGMScanner {
  public:
-  FFTScanner();
-  ~FFTScanner() override;
+  explicit FFTScanner(Format* format) : VGMScanner(format) {}
 
   void scan(RawFile *file, void *info) override;  // scan "smds" and "wds"
   static void searchForFFTSeq(RawFile *file);               // scan "smds"

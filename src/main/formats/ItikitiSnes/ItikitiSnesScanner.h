@@ -10,6 +10,8 @@
 
 class ItikitiSnesScanner: public VGMScanner {
  public:
+  explicit ItikitiSnesScanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile *file, void *info) override;
   static void scanFromApuRam(RawFile *file);
   static void scanFromRom(RawFile *file);

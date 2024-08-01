@@ -28,7 +28,7 @@
 #include "LogManager.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {
-ScannerRegistration<MP2kScanner> s_mp2k("MP2K", {"gba", "gsf", "minigsf", "gsflib"});
+ScannerRegistration<MP2kScanner> s_mp2k("MP2k", {"gba", "gsf", "minigsf", "gsflib"});
 }
 
 static constexpr int samplerate_LUT[16] = {-1,    5734,  7884,  10512, 13379, 15768, 18157, 21024,

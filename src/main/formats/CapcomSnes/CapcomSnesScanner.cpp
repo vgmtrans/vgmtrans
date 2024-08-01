@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<CapcomSnesScanner> s_capcom_snes("CAPCOMSNES", {"spc"});
+ScannerRegistration<CapcomSnesScanner> s_capcom_snes("CapcomSnes", {"spc"});
 }
 
 // ; Super Ghouls 'N Ghosts SPC

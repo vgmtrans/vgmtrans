@@ -11,8 +11,7 @@ class TriAcePS1InstrSet;
 
 class TriAcePS1Scanner : public VGMScanner {
  public:
-  TriAcePS1Scanner();
-  ~TriAcePS1Scanner();
+  explicit TriAcePS1Scanner(Format* format) : VGMScanner(format) {}
 
   virtual void scan(RawFile *file, void *info = 0);
   void searchForSLZSeq(RawFile *file);

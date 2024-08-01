@@ -11,6 +11,8 @@ enum KonamiSnesVersion : uint8_t;  // see KonamiSnesFormat.h
 
 class KonamiSnesScanner : public VGMScanner {
  public:
+  explicit KonamiSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForKonamiSnesFromARAM(RawFile *file);
 

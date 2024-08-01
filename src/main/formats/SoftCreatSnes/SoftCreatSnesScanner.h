@@ -9,6 +9,8 @@
 
 class SoftCreatSnesScanner : public VGMScanner {
  public:
+  explicit SoftCreatSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForSoftCreatSnesFromARAM(RawFile *file);
 

@@ -16,10 +16,6 @@ ScannerRegistration<HOSAScanner> s_hosa("HOSA");
 
 #define SRCH_BUF_SIZE 0x20000
 
-HOSAScanner::HOSAScanner() {}
-
-HOSAScanner::~HOSAScanner() {}
-
 void HOSAScanner::scan(RawFile *file, void *info) {
   HOSASeq *seq = searchForHOSASeq(file);
   if (seq == nullptr) {

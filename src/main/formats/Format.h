@@ -9,9 +9,9 @@
 #include <string>
 #include <map>
 #include <vector>
+#include "Scanner.h"
 
 class VGMColl;
-class VGMScanner;
 class Matcher;
 class VGMScanner;
 
@@ -31,8 +31,8 @@ class VGMScanner;
   }                  \
   ;
 
-#define USING_SCANNER(theScanner) \
-  virtual VGMScanner* newScanner() { return new theScanner; }
+#define USING_SCANNER(scanner) \
+  virtual VGMScanner* newScanner() { return new scanner(this); }
 
 #define USING_MATCHER(matcher) \
   virtual Matcher* newMatcher() { return new matcher(this); }
@@ -54,10 +54,11 @@ using FormatMap = std::map<std::string, Format *>;
 
 class Format {
 public:
-  Format(const std::string &scannerName);
+  Format(const std::string &formatName);
   virtual ~Format();
 
-  static Format *getFormatFromName(const std::string &name);
+  static Format *formatFromName(const std::string &name);
+  static std::vector<Format*> formats();
 
   virtual bool init();
   virtual const std::string &getName() = 0;

@@ -8,5 +8,7 @@
 
 class TamSoftPS1Scanner : public VGMScanner {
  public:
+  explicit TamSoftPS1Scanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
 };

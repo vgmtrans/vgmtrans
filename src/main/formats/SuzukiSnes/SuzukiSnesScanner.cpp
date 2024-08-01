@@ -8,7 +8,7 @@
 #include "SuzukiSnesSeq.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {
-ScannerRegistration<SuzukiSnesScanner> s_suzuki_snes("SUZUKISNES", {"spc"});
+ScannerRegistration<SuzukiSnesScanner> s_suzuki_snes("SuzukiSnes", {"spc"});
 }
 
 //; Seiken Densetsu 3 SPC

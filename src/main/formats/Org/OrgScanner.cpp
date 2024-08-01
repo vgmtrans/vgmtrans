@@ -8,14 +8,10 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<OrgScanner> s_org("ORG");
+ScannerRegistration<OrgScanner> s_org("Org");
 }
 
 #define SRCH_BUF_SIZE 0x20000
-
-OrgScanner::OrgScanner() {}
-
-OrgScanner::~OrgScanner() {}
 
 void OrgScanner::scan(RawFile *file, void *info) {
   searchForOrgSeq(file);

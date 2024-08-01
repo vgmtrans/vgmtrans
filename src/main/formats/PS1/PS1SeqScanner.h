@@ -10,8 +10,7 @@
 
 class PS1SeqScanner : public VGMScanner {
  public:
-  PS1SeqScanner();
-  virtual ~PS1SeqScanner();
+  explicit PS1SeqScanner(Format* format) : VGMScanner(format) {}
 
   virtual void scan(RawFile *file, void *info = 0);
   std::vector<PS1Seq *> searchForPS1Seq(RawFile *file);

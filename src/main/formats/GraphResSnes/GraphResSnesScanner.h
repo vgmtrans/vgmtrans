@@ -10,6 +10,8 @@
 
 class GraphResSnesScanner : public VGMScanner {
  public:
+  explicit GraphResSnesScanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile *file, void *info) override;
   static void searchForGraphResSnesFromARAM(RawFile *file);
 

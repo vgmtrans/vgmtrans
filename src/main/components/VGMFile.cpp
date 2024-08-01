@@ -24,7 +24,7 @@ void VGMFile::addToUI(VGMItem* /*parent*/, void* UI_specific) {
 }
 
 Format *VGMFile::format() const {
-  return Format::getFormatFromName(m_format);
+  return Format::formatFromName(m_format);
 }
 
 std::string VGMFile::formatName() {

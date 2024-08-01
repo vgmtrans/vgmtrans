@@ -10,7 +10,7 @@
 #include <array>
 
 namespace vgmtrans::scanners {
-ScannerRegistration<SegSatScanner> s_segsat("SEGSAT");
+ScannerRegistration<SegSatScanner> s_segsat("SegSat");
 }
 
 std::array<u8, 4> uint32ToBytes(u32 num) {

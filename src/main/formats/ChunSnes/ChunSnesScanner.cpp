@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<ChunSnesScanner> s_chun_snes("CHUNSNES", {"spc"});
+ScannerRegistration<ChunSnesScanner> s_chun_snes("ChunSnes", {"spc"});
 }
 
 //; Otogirisou SPC

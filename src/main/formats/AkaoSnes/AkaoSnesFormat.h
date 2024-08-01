@@ -13,7 +13,6 @@ BEGIN_FORMAT(AkaoSnes)
   USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-
 // AKAO SNES is used by a lot of games, but they have minor differences each other.
 // Here I classify them into 4 versions roughly, and try to handle game-specific differences by minor version code.
 enum AkaoSnesVersion: uint8_t {

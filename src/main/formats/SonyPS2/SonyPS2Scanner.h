@@ -8,6 +8,8 @@
 
 class SonyPS2Scanner : public VGMScanner {
  public:
+  explicit SonyPS2Scanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForSeq(RawFile *file);
   void searchForInstrSet(RawFile *file);

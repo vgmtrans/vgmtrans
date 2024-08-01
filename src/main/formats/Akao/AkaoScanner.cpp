@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<AkaoScanner> s_akao("AKAO");
+ScannerRegistration<AkaoScanner> s_akao("Akao");
 }
 
 void AkaoScanner::scan(RawFile* file, void* /*info*/) {

@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<NamcoSnesScanner> s_namco_snes("NAMCOSNES", {"spc"});
+ScannerRegistration<NamcoSnesScanner> s_namco_snes("NamcoSnes", {"spc"});
 }
 
 // Wagan Paradise SPC

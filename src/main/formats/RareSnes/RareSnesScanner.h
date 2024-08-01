@@ -9,6 +9,8 @@
 
 class RareSnesScanner : public VGMScanner {
  public:
+  explicit RareSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForRareSnesFromARAM(RawFile *file);
 

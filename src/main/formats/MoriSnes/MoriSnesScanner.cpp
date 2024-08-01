@@ -7,7 +7,7 @@
 #include "MoriSnesSeq.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {
-ScannerRegistration<MoriSnesScanner> s_mori_snes("MORISNES", {"spc"});
+ScannerRegistration<MoriSnesScanner> s_mori_snes("MoriSnes", {"spc"});
 }
 
 //; Gokinjo Boukentai SPC

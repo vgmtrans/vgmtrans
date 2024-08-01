@@ -11,7 +11,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<NeverlandSnesScanner> s_neverland_snes("NEVERLANDSNES", {"spc"});
+ScannerRegistration<NeverlandSnesScanner> s_neverland_snes("NeverlandSnes", {"spc"});
 }
 
 //; Lufia SPC

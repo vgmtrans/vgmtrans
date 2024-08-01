@@ -8,6 +8,8 @@
 
 class NDSScanner : public VGMScanner {
  public:
+  explicit NDSScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForSDAT(RawFile *file);
   uint32_t loadFromSDAT(RawFile *file, uint32_t offset);

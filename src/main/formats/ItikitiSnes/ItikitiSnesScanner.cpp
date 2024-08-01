@@ -10,7 +10,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<ItikitiSnesScanner> s_itikiti_snes("ITIKITISNES", {"spc"});
+ScannerRegistration<ItikitiSnesScanner> s_itikiti_snes("ItikitiSnes", {"spc"});
 }
 
 void ItikitiSnesScanner::scan(RawFile *file, void *info) {
