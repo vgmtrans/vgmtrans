@@ -13,14 +13,14 @@ class AkaoInstrSet;
 class AkaoColl final :
     public VGMColl {
  public:
-  explicit AkaoColl(std::string name = "Unnamed Collection") : VGMColl(std::move(name)), origInstrSet(nullptr), numAddedInstrs(0) {}
+  explicit AkaoColl(std::string name = "Unnamed Collection") : VGMColl(std::move(name)), origInstrSet(nullptr), numInstrsToAdd(0) {}
 
   bool loadMain() override;
   void preSynthFileCreation() override;
   void postSynthFileCreation() override;
 
   AkaoInstrSet *origInstrSet;
-  uint32_t numAddedInstrs;
+  uint32_t numInstrsToAdd;
 };
 
 // **********
