@@ -88,6 +88,10 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       }
     }
   }
+
+  if (auto akaoMatcher = dynamic_cast<AkaoMatcher*>(format->matcher)) {
+    akaoMatcher->onFinishedScan(file);
+  }
 }
 
 AkaoPs1Version AkaoScanner::determineVersionFromTag(const RawFile *file) noexcept {
