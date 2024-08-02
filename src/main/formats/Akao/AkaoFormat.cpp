@@ -21,7 +21,6 @@ AkaoColl::mapSampleCollections() {
   std::unordered_map<int, int> artIdToSampleNumMap;
   std::unordered_map<int, AkaoSampColl *> artIdToSampCollMap;
 
-  // First order the sa
   std::transform(sampColls().begin(), sampColls().end(), std::back_inserter(orderedSampColls),
                  [](VGMSampColl *vgm) { return static_cast<AkaoSampColl *>(vgm); });
 
