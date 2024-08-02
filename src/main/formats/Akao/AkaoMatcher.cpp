@@ -2,10 +2,47 @@
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 
+void AkaoMatcher::onFinishedScan(RawFile* rawfile) {
+  // psflib files are loaded recursively with psf files. We want to scan the psflib and the psf
+  // files together as if they're one file, so ignore this callback and wait for the psf to finish.
+  if (rawfile->extension() == "psflib")
+    return;
+
+  std::vector<int> keys;
+  keys.reserve(seqs.size());
+  for (const auto& pair : seqs) {
+    keys.push_back(pair.first);
+  }
+
+  for (int key : keys) {
+    if (seqs.find(key) != seqs.end()) {
+      AkaoSeq* seq = seqs[key];
+      tryCreateCollection(seq->seq_id);
+    }
+  }
+
+  // We assume psf files contain all of the files necessary to form a collection. Therefore, we
+  // treat each one as a one-off and remove all of its detected files from future match consideration.
+  if (rawfile->extension() == "psf") {
+    auto eraseByRawFile = [rawfile](auto& map) {
+      std::erase_if(map, [rawfile](const auto& pair) {
+          return pair.second->rawFile() == rawfile;
+      });
+    };
+    auto eraseByRawFileVec = [rawfile](auto& vec) {
+      vec.erase(std::remove_if(vec.begin(), vec.end(), [rawfile](auto* elem) {
+          return elem->rawFile() == rawfile;
+      }), vec.end());
+    };
+    eraseByRawFile(seqs);
+    eraseByRawFile(instrSets);
+    eraseByRawFileVec(sampColls);
+  }
+}
+
 bool AkaoMatcher::onNewSeq(VGMSeq* seq) {
   if (auto akaoSeq = dynamic_cast<AkaoSeq *>(seq)) {
     seqs[akaoSeq->seq_id] = akaoSeq;
-    return tryCreateCollection(akaoSeq->seq_id);
   }
   return true;
 }
@@ -13,7 +50,6 @@ bool AkaoMatcher::onNewSeq(VGMSeq* seq) {
 bool AkaoMatcher::onNewInstrSet(VGMInstrSet* instrSet) {
   if (auto akaoInstrSet = dynamic_cast<AkaoInstrSet*>(instrSet)) {
     instrSets[akaoInstrSet->id()] = akaoInstrSet;
-    return tryCreateCollection(akaoInstrSet->id());
   }
   return true;
 }
@@ -21,10 +57,6 @@ bool AkaoMatcher::onNewInstrSet(VGMInstrSet* instrSet) {
 bool AkaoMatcher::onNewSampColl(VGMSampColl* sampColl) {
   if (auto akaoSampColl = dynamic_cast<AkaoSampColl*>(sampColl)) {
     sampColls.push_back(akaoSampColl);
-    for (const auto& pair : seqs) {
-      AkaoSeq* seq = pair.second;
-      return tryCreateCollection(seq->seq_id);
-    }
   }
   return true;
 }
@@ -59,14 +91,14 @@ bool AkaoMatcher::tryCreateCollection(int id) {
     AkaoInstrSet* instrSet = itInstrSet->second;
 
     std::vector<AkaoSampColl *> sampCollsToCheck;
-    // id() represents the associated sample set id
+    // seq->id() represents the associated sample set id
     if (seq->id() != -1) {
       auto it = std::find_if(sampColls.begin(), sampColls.end(), [seq](AkaoSampColl *sc) {
         return sc->id() == seq->id();
       });
       if (it != sampColls.end()) {
         sampCollsToCheck.push_back(*it);
-      } else if (seq->rawFile()->extension() != "psf") {
+      } else if (seq->rawFile()->extension() != "psf") {  // PSF files may optimize out the IDs, so be lenient
         return false;
       }
     }
@@ -97,7 +129,11 @@ bool AkaoMatcher::tryCreateCollection(int id) {
         return artId >= sc->starting_art_id && artId < (sc->starting_art_id + sc->nNumArts);
       });
 
-      if (matches) {
+      // It is possible that no instrument regions reference any articulations in the associated
+      // sample collection (FF8 106, for ex). In this case, the sequence still references the
+      // sample collection via "Key-split" program changes where an articulation is specified rather
+      // than an instrument. Therefore, always include the associated sample collection.
+      if (matches || sc->id() == seq->id()) {
         matchingSampColls.push_back(sc);
 
         // Remove the IDs covered by this sample collection
