@@ -20,7 +20,7 @@ DECLARE_FORMAT(CPS2);
 CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::string name)
     : VGMSeq(CPS2Format::name, file, offset, 0, std::move(name)),
       fmt_version(fmtVersion) {
-  usesMonophonicTracks();
+  setUsesMonophonicTracks();
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialMonoMode(true);
   // Until we add CPS3 vibrato and pitch bend using markers, set the default pitch bend range here

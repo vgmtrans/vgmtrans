@@ -5,6 +5,7 @@
 #include "AkaoMatcher.h"
 
 class AkaoInstrSet;
+class AkaoArt;
 
 // ********
 // AkaoColl
@@ -21,6 +22,9 @@ class AkaoColl final :
 
   AkaoInstrSet *origInstrSet;
   uint32_t numInstrsToAdd;
+
+private:
+  std::tuple<std::map<int, AkaoArt*>, std::map<int, int>, std::map<int, AkaoSampColl*>> mapSampleCollections();
 };
 
 // **********
