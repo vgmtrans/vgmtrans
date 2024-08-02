@@ -5,32 +5,31 @@
  */
 
 #include <vector>
-
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 #include "PSXSPU.h"
 
-bool AkaoColl::loadMain() {
-  AkaoInstrSet *instrset = reinterpret_cast<AkaoInstrSet *>(instrSets()[0]);
+// Generate maps to help route the relationships to and from articulations, especially for games
+// that load more than one sample collection at a time.
+std::tuple<std::map<int, AkaoArt*>, std::map<int, int>, std::map<int, AkaoSampColl*>> AkaoColl::mapSampleCollections() {
   std::vector<AkaoSampColl*> orderedSampColls;
   orderedSampColls.reserve(sampColls().size());
-  std::transform(sampColls().begin(), sampColls().end(), std::back_inserter(orderedSampColls),
-                     [](VGMSampColl* vgm) {
-                         return static_cast<AkaoSampColl*>(vgm);
-                     });
 
-  // Sort the sample collections by starting_art_id
-  std::sort(orderedSampColls.begin(), orderedSampColls.end(), [](AkaoSampColl *a, AkaoSampColl *b) {
-    return a->starting_art_id < b->starting_art_id;
-  });
-
-  // Maps for articulation ids
   std::map<int, AkaoArt*> artIdToArtMap;
   std::map<int, int> artIdToSampleNumMap;
   std::map<int, AkaoSampColl*> artIdToSampCollMap;
 
-  int cumulativeSamples = 0;
+  // First order the sa
+  std::transform(sampColls().begin(), sampColls().end(), std::back_inserter(orderedSampColls),
+                 [](VGMSampColl* vgm) {
+                     return static_cast<AkaoSampColl*>(vgm);
+                 });
 
+  std::sort(orderedSampColls.begin(), orderedSampColls.end(), [](AkaoSampColl *a, AkaoSampColl *b) {
+    return a->starting_art_id < b->starting_art_id;
+  });
+
+  int cumulativeSamples = 0;
   for (auto *sampcoll : orderedSampColls) {
     for (int i = 0; i < sampcoll->nNumArts; ++i) {
       int artId = sampcoll->starting_art_id + i;
@@ -40,6 +39,14 @@ bool AkaoColl::loadMain() {
     }
     cumulativeSamples += sampcoll->samples.size();
   }
+
+  return std::make_tuple(artIdToArtMap, artIdToSampleNumMap, artIdToSampCollMap);
+}
+
+bool AkaoColl::loadMain() {
+  AkaoInstrSet *instrset = reinterpret_cast<AkaoInstrSet *>(instrSets()[0]);
+
+  auto [artIdToArtMap, artIdToSampleNumMap, artIdToSampCollMap] = mapSampleCollections();
 
   for (auto *vgminstr : instrset->aInstrs) {
     auto* instr = dynamic_cast<AkaoInstr*>(vgminstr);
@@ -98,35 +105,10 @@ void AkaoColl::preSynthFileCreation() {
     return;
 
   AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrSets()[0]);
+  auto [artIdToArtMap, artIdToSampleNumMap, artIdToSampCollMap] = mapSampleCollections();
 
-  std::vector<AkaoSampColl*> orderedSampColls;
-  orderedSampColls.reserve(sampColls().size());
-  std::transform(sampColls().begin(), sampColls().end(), std::back_inserter(orderedSampColls),
-                     [](VGMSampColl* vgm) {
-                         return static_cast<AkaoSampColl*>(vgm);
-                     });
-
-  std::sort(orderedSampColls.begin(), orderedSampColls.end(), [](AkaoSampColl *a, AkaoSampColl *b) {
-    return a->starting_art_id < b->starting_art_id;
-  });
-
-  std::map<int, AkaoArt*> artIdToArtMap;
-  std::map<int, int> artIdToSampleNumMap;
-  std::map<int, AkaoSampColl*> artIdToSampCollMap;
-
-  int cumulativeSamples = 0;
-
-  for (auto *sampcoll : orderedSampColls) {
-    for (int i = 0; i < sampcoll->nNumArts; ++i) {
-      int artId = sampcoll->starting_art_id + i;
-      artIdToArtMap[artId] = &sampcoll->akArts[i];
-      artIdToSampleNumMap[artId] = sampcoll->akArts[i].sample_num + cumulativeSamples;
-      artIdToSampCollMap[artId] = sampcoll;
-    }
-    cumulativeSamples += sampcoll->samples.size();
-  }
-
-  for(auto sampcoll : orderedSampColls) {
+  for(auto vgmsampcoll : sampColls()) {
+    const auto sampcoll = dynamic_cast<AkaoSampColl*>(vgmsampcoll);
     const uint32_t numArts = static_cast<uint32_t>(sampcoll->akArts.size());
     numInstrsToAdd = numArts;
 
