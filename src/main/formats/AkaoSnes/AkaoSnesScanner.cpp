@@ -8,7 +8,7 @@
 #include "AkaoSnesSeq.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {
-ScannerRegistration<AkaoSnesScanner> s_akao_snes("AKAOSNES", {"spc"});
+ScannerRegistration<AkaoSnesScanner> s_akao_snes("AkaoSnes", {"spc"});
 }
 
 //; Final Fantasy 4 SPC

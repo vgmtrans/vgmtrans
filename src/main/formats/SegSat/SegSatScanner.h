@@ -8,5 +8,7 @@
 
 class SegSatScanner : public VGMScanner {
  public:
+  explicit SegSatScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
 };

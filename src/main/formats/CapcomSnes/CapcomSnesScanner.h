@@ -7,6 +7,8 @@ enum CapcomSnesVersion: uint8_t; // see CapcomSnesFormat.h
 class CapcomSnesScanner:
     public VGMScanner {
  public:
+  explicit CapcomSnesScanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile *file, void *info = nullptr) override;
   void searchForCapcomSnesFromARAM(RawFile *file) const;
 

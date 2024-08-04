@@ -12,8 +12,7 @@ class PSXSampColl;
 
 class HOSAScanner : public VGMScanner {
  public:
-  HOSAScanner();
-  ~HOSAScanner() override;
+  explicit HOSAScanner(Format* format) : VGMScanner(format) {}
 
   void scan(RawFile *file, void *info) override;
   static HOSASeq* searchForHOSASeq(RawFile *file);

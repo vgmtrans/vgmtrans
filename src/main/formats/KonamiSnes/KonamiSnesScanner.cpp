@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<KonamiSnesScanner> s_konami_snes("KONAMISNES", {"spc"});
+ScannerRegistration<KonamiSnesScanner> s_konami_snes("KonamiSnes", {"spc"});
 }
 
 //; Ganbare Goemon 4

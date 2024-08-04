@@ -9,6 +9,8 @@
 
 class NinSnesScanner : public VGMScanner {
  public:
+  explicit NinSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForNinSnesFromARAM(RawFile *file);
 

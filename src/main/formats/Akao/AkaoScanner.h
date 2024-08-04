@@ -10,6 +10,8 @@
 
 class AkaoScanner final : public VGMScanner {
  public:
+  explicit AkaoScanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile *file, void *info = nullptr) override;
 
  private:

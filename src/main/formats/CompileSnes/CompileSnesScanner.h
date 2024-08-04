@@ -11,6 +11,8 @@ enum CompileSnesVersion : uint8_t;  // see CompileSnesFormat.h
 
 class CompileSnesScanner : public VGMScanner {
  public:
+  explicit CompileSnesScanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile *file, void *info) override;
   static void searchForCompileSnesFromARAM(RawFile *file);
 

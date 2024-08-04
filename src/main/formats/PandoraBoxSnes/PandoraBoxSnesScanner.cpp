@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<PandoraBoxSnesScanner> s_pandorabox_snes("PANDORABOXSNES", {"spc"});
+ScannerRegistration<PandoraBoxSnesScanner> s_pandorabox_snes("PandoraBoxSnes", {"spc"});
 }
 
 // ; Kishin Kourinden Oni SPC

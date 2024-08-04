@@ -10,7 +10,7 @@
 
 class HeartBeatPS1Scanner : public VGMScanner {
  public:
-  HeartBeatPS1Scanner() = default;
+  explicit HeartBeatPS1Scanner(Format* format) : VGMScanner(format) {}
   ~HeartBeatPS1Scanner() override = default;;
 
   void scan(RawFile *file, void *info) override;

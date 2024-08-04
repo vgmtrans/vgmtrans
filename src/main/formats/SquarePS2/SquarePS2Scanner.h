@@ -8,8 +8,7 @@
 
 class SquarePS2Scanner : public VGMScanner {
  public:
-  SquarePS2Scanner();
-  ~SquarePS2Scanner();
+  explicit SquarePS2Scanner(Format* format) : VGMScanner(format) {}
 
   virtual void scan(RawFile *file, void *info);
   void searchForBGMSeq(RawFile *file);

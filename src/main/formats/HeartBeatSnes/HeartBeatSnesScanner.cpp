@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<HeartBeatSnesScanner> s_heartbeat_snes("HEARTBEATSNES", {"spc"});
+ScannerRegistration<HeartBeatSnesScanner> s_heartbeat_snes("HeartBeatSnes", {"spc"});
 }
 
 //; Dragon Quest 6 SPC

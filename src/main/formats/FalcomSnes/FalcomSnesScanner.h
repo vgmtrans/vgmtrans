@@ -9,6 +9,8 @@
 
 class FalcomSnesScanner : public VGMScanner {
  public:
+  explicit FalcomSnesScanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile *file, void *info) override;
   static void searchForFalcomSnesFromARAM(RawFile *file);
 

@@ -8,7 +8,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<SoftCreatSnesScanner> s_softcreat_snes("SOFTWARECREATIONSSNES", {"spc"});
+ScannerRegistration<SoftCreatSnesScanner> s_softcreat_snes("SoftCreatSnes", {"spc"});
 }
 
 //; Plok!

@@ -9,8 +9,8 @@
 #include "Matcher.h"
 
 FormatMap &Format::registry() {
-    static FormatMap registry;
-    return registry;
+  static FormatMap registry;
+  return registry;
 }
 
 Format::Format(const std::string &formatName) : matcher(nullptr), scanner(nullptr) {
@@ -18,14 +18,14 @@ Format::Format(const std::string &formatName) : matcher(nullptr), scanner(nullpt
 }
 
 Format::~Format() {
-    delete scanner;
-    delete matcher;
+  delete scanner;
+  delete matcher;
 }
 
-Format *Format::getFormatFromName(const std::string &name) {
+Format *Format::formatFromName(const std::string &name) {
   auto findIt = registry().find(name);
   if (findIt == registry().end())
-        return nullptr;
+    return nullptr;
   return (*findIt).second;
 }
 

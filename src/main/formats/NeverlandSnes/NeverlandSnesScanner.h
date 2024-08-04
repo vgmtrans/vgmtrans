@@ -9,6 +9,8 @@
 
 class NeverlandSnesScanner : public VGMScanner {
  public:
+  explicit NeverlandSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForNeverlandSnesFromARAM(RawFile *file);
 

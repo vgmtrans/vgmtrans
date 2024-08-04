@@ -13,14 +13,10 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<PS1SeqScanner> s_ps1seq("PS1SEQ");
+ScannerRegistration<PS1SeqScanner> s_ps1seq("PS1");
 }
 
 constexpr int SRCH_BUF_SIZE = 0x20000;
-
-PS1SeqScanner::PS1SeqScanner() {}
-
-PS1SeqScanner::~PS1SeqScanner() {}
 
 void PS1SeqScanner::scan(RawFile* file, void* /*info*/) {
   auto seqs = searchForPS1Seq(file);

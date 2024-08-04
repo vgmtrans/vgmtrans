@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<KonamiPS1Scanner> s_konami_ps1("KONAMIPS1");
+ScannerRegistration<KonamiPS1Scanner> s_konami_ps1("KonamiPS1");
 }
 
 void KonamiPS1Scanner::scan(RawFile *file, void *info) {

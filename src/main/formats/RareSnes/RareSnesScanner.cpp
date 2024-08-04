@@ -10,7 +10,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<RareSnesScanner> s_raresnes("RARESNES", {"spc"});
+ScannerRegistration<RareSnesScanner> s_raresnes("RareSnes", {"spc"});
 }
 
 // ; Load DIR address

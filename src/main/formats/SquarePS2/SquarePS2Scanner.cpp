@@ -8,14 +8,10 @@
 #include "WD.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {
-ScannerRegistration<SquarePS2Scanner> s_squareps2("SQUAREPS2");
+ScannerRegistration<SquarePS2Scanner> s_squareps2("SquarePS2");
 }
 
 #define SRCH_BUF_SIZE 0x20000
-
-SquarePS2Scanner::SquarePS2Scanner(void) {}
-
-SquarePS2Scanner::~SquarePS2Scanner(void) {}
 
 void SquarePS2Scanner::scan(RawFile *file, void *info) {
   searchForBGMSeq(file);

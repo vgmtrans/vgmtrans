@@ -187,7 +187,7 @@ void MAMELoader::apply(const RawFile* file) {
   MAMEGame* gameentry = it->second;
 
   /* Check if we support this format */
-  Format* fmt = Format::getFormatFromName(gameentry->format);
+  Format* fmt = Format::formatFromName(gameentry->format);
   if (!fmt) {
     return;
   }

@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<CompileSnesScanner> s_compile_snes("COMPILESNES", {"spc"});
+ScannerRegistration<CompileSnesScanner> s_compile_snes("CompileSnes", {"spc"});
 }
 
 //; Super Puyo Puyo 2 SPC

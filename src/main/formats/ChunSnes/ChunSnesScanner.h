@@ -11,6 +11,8 @@ enum ChunSnesVersion : uint8_t;  // see ChunSnesFormat.h
 
 class ChunSnesScanner : public VGMScanner {
  public:
+  explicit ChunSnesScanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile *file, void *info) override;
   static void searchForChunSnesFromARAM(RawFile *file);
 

@@ -6,8 +6,9 @@
 #include <functional>
 #include <memory>
 #include <initializer_list>
+#include "Format.h"
+#include "Scanner.h"
 
-class VGMScanner;
 using scannerSpawner = std::function<std::shared_ptr<VGMScanner>()>;
 
 class ScannerManager final {
@@ -22,8 +23,8 @@ class ScannerManager final {
   ScannerManager(ScannerManager &&) = delete;
   ScannerManager &operator=(ScannerManager &&) = delete;
 
-  void add(const char *scanner_name, scannerSpawner gen) {
-    m_generators.emplace(scanner_name, std::move(gen));
+  void add(const char *format_name, scannerSpawner gen) {
+    m_generators.emplace(format_name, std::move(gen));
   }
 
   void addExtensionBinding(const char *ext, scannerSpawner gen) {
@@ -57,17 +58,27 @@ class ScannerManager final {
 namespace vgmtrans::scanners {
 template <typename T>
 class ScannerRegistration final {
-   public:
-    explicit ScannerRegistration(const char *id) {
-        ScannerManager::get().add(id, std::make_shared<T>);
-    }
+ public:
+  explicit ScannerRegistration(const char* formatName) {
+    ScannerManager::get().add(formatName, [formatName]() -> std::shared_ptr<VGMScanner> {
+      auto format = Format::formatFromName(formatName);
+      return std::make_shared<T>(format);
+    });
+  }
 
-    ScannerRegistration(const char *id, std::initializer_list<const char *> exts) {
-        auto &sm = ScannerManager::get();
-        sm.add(id, std::make_shared<T>);
-        for(auto ext : exts) {
-            sm.addExtensionBinding(ext, std::make_shared<T>);
-        }
+  ScannerRegistration(const char* formatName, std::initializer_list<const char*> exts) {
+    auto &sm = ScannerManager::get();
+    sm.add(formatName, [formatName]() -> std::shared_ptr<VGMScanner> {
+      auto format = Format::formatFromName(formatName);
+      return std::make_shared<T>(format);
+    });
+
+    for (auto ext : exts) {
+      sm.addExtensionBinding(ext, [formatName]() -> std::shared_ptr<VGMScanner> {
+        auto format = Format::formatFromName(formatName);
+        return std::make_shared<T>(format);
+      });
     }
+  }
 };
 }  // namespace vgmtrans::scanners

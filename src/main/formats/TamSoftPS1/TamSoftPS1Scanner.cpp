@@ -10,7 +10,7 @@
 #include "TamSoftPS1Instr.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {
-ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TAMSOFTPS1", {"tsq", "tvb"});
+ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TamSoftPS1", {"tsq", "tvb"});
 }
 
 void TamSoftPS1Scanner::scan(RawFile *file, void *info) {

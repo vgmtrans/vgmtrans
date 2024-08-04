@@ -39,6 +39,8 @@ CPSFormatVer versionEnum(const std::string &versionStr);
 
 class CPS2Scanner : public VGMScanner {
 public:
+  explicit CPS2Scanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile* file, void *info) override;
 };
 

@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<PrismSnesScanner> s_prism_snes("PRISMSNES", {"spc"});
+ScannerRegistration<PrismSnesScanner> s_prism_snes("PrismSnes", {"spc"});
 }
 
 //; Dual Orb 2 SPC

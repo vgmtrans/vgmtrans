@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<HudsonSnesScanner> s_hudson_snes("HUDSONSNES", {"spc"});
+ScannerRegistration<HudsonSnesScanner> s_hudson_snes("HudsonSnes", {"spc"});
 }
 
 BytePattern HudsonSnesScanner::ptnNoteLenTable("\xc0\x60\x30\x18\x0c\x06\x03\x01", "xxxxxxxx", 8);

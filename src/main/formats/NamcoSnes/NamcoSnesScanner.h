@@ -11,6 +11,8 @@ enum NamcoSnesVersion : uint8_t;  // see NamcoSnesFormat.h
 
 class NamcoSnesScanner : public VGMScanner {
  public:
+  explicit NamcoSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForNamcoSnesFromARAM(RawFile *file);
 

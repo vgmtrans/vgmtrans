@@ -11,6 +11,8 @@ enum MoriSnesVersion : uint8_t;  // see MoriSnesFormat.h
 
 class MoriSnesScanner : public VGMScanner {
  public:
+  explicit MoriSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForMoriSnesFromARAM(RawFile *file);
 

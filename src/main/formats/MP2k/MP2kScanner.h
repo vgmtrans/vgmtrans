@@ -13,6 +13,8 @@
 /* Scanner for the MP2K (aka Sappy) GBA format */
 class MP2kScanner final : public VGMScanner {
 public:
+  explicit MP2kScanner(Format* format) : VGMScanner(format) {}
+
   void scan(RawFile *file, void *info = 0) override;
 
 private:

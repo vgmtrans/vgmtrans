@@ -11,6 +11,8 @@ enum SuzukiSnesVersion : uint8_t;  // see SuzukiSnesFormat.h
 
 class SuzukiSnesScanner : public VGMScanner {
  public:
+  explicit SuzukiSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForSuzukiSnesFromARAM(RawFile *file);
 

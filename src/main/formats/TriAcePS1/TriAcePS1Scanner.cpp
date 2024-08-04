@@ -12,14 +12,10 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<TriAcePS1Scanner> s_triace_ps1("TRIACEPS1");
+ScannerRegistration<TriAcePS1Scanner> s_triace_ps1("TriAcePS1");
 }
 
 #define DEFAULT_UFSIZE 0x100000
-
-TriAcePS1Scanner::TriAcePS1Scanner(void) {}
-
-TriAcePS1Scanner::~TriAcePS1Scanner(void) {}
 
 void TriAcePS1Scanner::scan(RawFile *file, void *info) {
   searchForSLZSeq(file);

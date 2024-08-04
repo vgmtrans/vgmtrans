@@ -9,6 +9,8 @@
 
 class PrismSnesScanner : public VGMScanner {
  public:
+  explicit PrismSnesScanner(Format* format) : VGMScanner(format) {}
+
   virtual void scan(RawFile *file, void *info = 0);
   void searchForPrismSnesFromARAM(RawFile *file);
 

@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<GraphResSnesScanner> s_graph_snes("GRAPHSNES", {"spc"});
+ScannerRegistration<GraphResSnesScanner> s_graph_snes("GraphResSnes", {"spc"});
 }
 
 //; Mickey no Tokyo Disneyland Daibouken SPC

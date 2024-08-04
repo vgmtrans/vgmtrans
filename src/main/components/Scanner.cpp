@@ -5,6 +5,8 @@
  */
 #include "Scanner.h"
 
+VGMScanner::VGMScanner(Format *format): format(format) {}
+
 bool VGMScanner::init() {
   return true;
 }
