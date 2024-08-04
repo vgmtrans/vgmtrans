@@ -98,8 +98,12 @@ bool AkaoMatcher::tryCreateCollection(int id) {
       });
       if (it != sampColls.end()) {
         sampCollsToCheck.push_back(*it);
-      } else if (seq->rawFile()->extension() != "psf") {  // PSF files may optimize out the IDs, so be lenient
-        return false;
+      } else {
+        // PSF files may optimize out the IDs, so be lenient
+        auto extension = toLower(seq->rawFile()->extension());
+        if (extension != "psf" && extension != "minipsf") {
+          return false;
+        }
       }
     }
     // Add the rest of the sample collections that are not already in sampCollsToCheck
