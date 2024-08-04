@@ -141,7 +141,6 @@ bool AkaoMatcher::tryCreateCollection(int id) {
           return false;
         }
 
-        std::cout << "Collection created successfully!" << std::endl;
         return true;
       }
     }

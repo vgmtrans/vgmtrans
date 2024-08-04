@@ -11,20 +11,22 @@ class AkaoArt;
 // AkaoColl
 // ********
 
-class AkaoColl final :
-    public VGMColl {
- public:
-  explicit AkaoColl(std::string name = "Unnamed Collection") : VGMColl(std::move(name)), origInstrSet(nullptr), numInstrsToAdd(0) {}
+class AkaoColl final : public VGMColl {
+public:
+  explicit AkaoColl(std::string name = "Unnamed Collection")
+      : VGMColl(std::move(name)) {}
 
   bool loadMain() override;
   void preSynthFileCreation() override;
   void postSynthFileCreation() override;
 
-  AkaoInstrSet *origInstrSet;
-  uint32_t numInstrsToAdd;
+  AkaoInstrSet *origInstrSet = nullptr;
+  uint32_t numInstrsToAdd = 0;
 
 private:
-  std::tuple<std::map<int, AkaoArt*>, std::map<int, int>, std::map<int, AkaoSampColl*>> mapSampleCollections();
+  std::tuple<std::unordered_map<int, AkaoArt *>, std::unordered_map<int, int>,
+             std::unordered_map<int, AkaoSampColl *>>
+  mapSampleCollections();
 };
 
 // **********

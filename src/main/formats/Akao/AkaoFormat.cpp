@@ -11,19 +11,19 @@
 
 // Generate maps to help route the relationships to and from articulations, especially for games
 // that load more than one sample collection at a time.
-std::tuple<std::map<int, AkaoArt*>, std::map<int, int>, std::map<int, AkaoSampColl*>> AkaoColl::mapSampleCollections() {
-  std::vector<AkaoSampColl*> orderedSampColls;
+std::tuple<std::unordered_map<int, AkaoArt *>, std::unordered_map<int, int>,
+           std::unordered_map<int, AkaoSampColl *>>
+AkaoColl::mapSampleCollections() {
+  std::vector<AkaoSampColl *> orderedSampColls;
   orderedSampColls.reserve(sampColls().size());
 
-  std::map<int, AkaoArt*> artIdToArtMap;
-  std::map<int, int> artIdToSampleNumMap;
-  std::map<int, AkaoSampColl*> artIdToSampCollMap;
+  std::unordered_map<int, AkaoArt *> artIdToArtMap;
+  std::unordered_map<int, int> artIdToSampleNumMap;
+  std::unordered_map<int, AkaoSampColl *> artIdToSampCollMap;
 
   // First order the sa
   std::transform(sampColls().begin(), sampColls().end(), std::back_inserter(orderedSampColls),
-                 [](VGMSampColl* vgm) {
-                     return static_cast<AkaoSampColl*>(vgm);
-                 });
+                 [](VGMSampColl *vgm) { return static_cast<AkaoSampColl *>(vgm); });
 
   std::sort(orderedSampColls.begin(), orderedSampColls.end(), [](AkaoSampColl *a, AkaoSampColl *b) {
     return a->starting_art_id < b->starting_art_id;
@@ -40,7 +40,7 @@ std::tuple<std::map<int, AkaoArt*>, std::map<int, int>, std::map<int, AkaoSampCo
     cumulativeSamples += sampcoll->samples.size();
   }
 
-  return std::make_tuple(artIdToArtMap, artIdToSampleNumMap, artIdToSampCollMap);
+  return std::make_tuple(std::move(artIdToArtMap), std::move(artIdToSampleNumMap), std::move(artIdToSampCollMap));
 }
 
 bool AkaoColl::loadMain() {
@@ -50,8 +50,11 @@ bool AkaoColl::loadMain() {
 
   for (auto *vgminstr : instrset->aInstrs) {
     auto* instr = dynamic_cast<AkaoInstr*>(vgminstr);
-    auto regions = instr->regions();
-    for (auto *vgmregion : regions) {
+    if (!instr) {
+      L_ERROR("AkaoInstrSet contained an instrument that wasn't an AkaoInstr.");
+      return false;
+    }
+    for (auto* vgmregion : instr->regions()) {
       auto *rgn = dynamic_cast<AkaoRgn*>(vgmregion);
       auto itArt = artIdToArtMap.find(rgn->artNum);
 
@@ -66,9 +69,9 @@ bool AkaoColl::loadMain() {
       if (art->loop_point != 0) {
         AkaoSampColl *sampColl = artIdToSampCollMap[rgn->artNum];
         if (rgn->sampNum < sampColl->samples.size()) {
-          rgn->setLoopInfo(1, art->loop_point, sampColl->samples[art->sample_num]->dataLength - art->loop_point);
-        }
-        else
+          rgn->setLoopInfo(1, art->loop_point,
+                           sampColl->samples[art->sample_num]->dataLength - art->loop_point);
+        } else
           L_ERROR("Akao region points to out-of-range sample (#{:d}) in {}.", rgn->sampNum, sampColl->name());
       }
 
@@ -101,13 +104,13 @@ bool AkaoColl::loadMain() {
 }
 
 void AkaoColl::preSynthFileCreation() {
-  if (!static_cast<AkaoSeq*>(seq())->bUsesIndividualArts)    //only do this if the 0xA1 event is actually used
+  if (!static_cast<AkaoSeq*>(seq())->bUsesIndividualArts)  // only do this if the 0xA1 event is actually used
     return;
 
   AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrSets()[0]);
   auto [artIdToArtMap, artIdToSampleNumMap, artIdToSampCollMap] = mapSampleCollections();
 
-  for(auto vgmsampcoll : sampColls()) {
+  for (auto vgmsampcoll : sampColls()) {
     const auto sampcoll = dynamic_cast<AkaoSampColl*>(vgmsampcoll);
     const uint32_t numArts = static_cast<uint32_t>(sampcoll->akArts.size());
     numInstrsToAdd = numArts;
@@ -119,7 +122,8 @@ void AkaoColl::preSynthFileCreation() {
       AkaoRgn *rgn = new AkaoRgn(newInstr, 0, 0);
 
       if (art->loop_point != 0)
-        rgn->setLoopInfo(1, art->loop_point, sampcoll->samples[art->sample_num]->dataLength - art->loop_point);
+        rgn->setLoopInfo(1, art->loop_point,
+                         sampcoll->samples[art->sample_num]->dataLength - art->loop_point);
 
       auto itSampleNum = artIdToSampleNumMap.find(art->artID);
       if (itSampleNum != artIdToSampleNumMap.end()) {
@@ -139,8 +143,8 @@ void AkaoColl::preSynthFileCreation() {
 }
 
 void AkaoColl::postSynthFileCreation() {
-  //if the 0xA1 event isn't used in the sequence, then we didn't modify the instrset
-  //so skip this
+  // if the 0xA1 event isn't used in the sequence, then we didn't modify the instrset
+  // so skip this
   if (!static_cast<AkaoSeq*>(seq())->bUsesIndividualArts)
     return;
 
