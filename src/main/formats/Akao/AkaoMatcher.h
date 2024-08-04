@@ -15,12 +15,15 @@ class VGMSampColl;
 class AkaoSeq;
 class AkaoInstrSet;
 class AkaoSampColl;
+class RawFile;
 
 class AkaoMatcher : public Matcher {
  public:
   explicit AkaoMatcher(Format *format)
     : Matcher(format) {}
   ~AkaoMatcher() override = default;
+
+  void onFinishedScan(RawFile* rawfile);
 
  protected:
   bool onNewSeq(VGMSeq* seq) override;
