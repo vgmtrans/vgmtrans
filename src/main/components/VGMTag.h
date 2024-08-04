@@ -14,8 +14,9 @@
 class VGMTag {
 public:
   VGMTag() = default;
-  VGMTag(std::string _title, std::string _artist = "", std::string _album = "");
+  VGMTag(std::string _title, std::string _artist = "", std::string _album = "", std::string _comment = "");
   ~VGMTag() = default;
+  static VGMTag fromPsfTags(const std::map<std::string, std::string>& psfTags);
 
   bool hasTitle() const;
   bool hasArtist() const;
