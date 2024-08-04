@@ -100,7 +100,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
         sampCollsToCheck.push_back(*it);
       } else {
         // PSF files may optimize out the IDs, so be lenient
-        auto extension = toLower(seq->rawFile()->extension());
+        auto extension = seq->rawFile()->extension();
         if (extension != "psf" && extension != "minipsf") {
           return false;
         }
