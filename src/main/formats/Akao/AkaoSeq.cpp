@@ -17,8 +17,8 @@ using namespace std;
 static const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 8, 4 };
 static constexpr uint8_t NOTE_VELOCITY = 100;
 
-AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version)
-    : VGMSeq(AkaoFormat::name, file, offset, 0, "Akao Seq"), seq_id(0), version_(version),
+AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name)
+    : VGMSeq(AkaoFormat::name, file, offset, 0, std::move(name)), seq_id(0), version_(version),
       instrument_set_offset_(0), drum_set_offset_(0), condition(0) {
   setUseLinearAmplitudeScale(true);        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   //UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController); // disabled, it only changes the volume and the pan slightly, and also its output becomes undefined if pan and volume slides are used at the same time
@@ -225,10 +225,10 @@ AkaoInstrSet* AkaoSeq::newInstrSet() const {
       length = unLength - (drum_set_offset() - dwOffset);
 
     return length != 0
-      ? new AkaoInstrSet(rawFile(), length, version(), instrument_set_offset(), drum_set_offset(), id(), "Akao Instr Set")
-      : new AkaoInstrSet(rawFile(), dwOffset, dwOffset + unLength, version());
+      ? new AkaoInstrSet(rawFile(), length, version(), instrument_set_offset(), drum_set_offset(), seq_id, "Akao Instr Set")
+      : new AkaoInstrSet(rawFile(), dwOffset, dwOffset + unLength, version(), seq_id);
   } else {
-    return new AkaoInstrSet(rawFile(), dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses);
+    return new AkaoInstrSet(rawFile(), dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses, seq_id);
   }
 }
 
