@@ -15,7 +15,7 @@ DECLARE_FORMAT(Akao);
 using namespace std;
 
 static const uint16_t DELTA_TIME_TABLE[] = { 192, 96, 48, 24, 12, 6, 3, 32, 16, 8, 4 };
-static constexpr uint8_t NOTE_VELOCITY = 100;
+static constexpr uint8_t NOTE_VELOCITY = 127;
 
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name)
     : VGMSeq(AkaoFormat::name, file, offset, 0, std::move(name)), seq_id(0), version_(version),

@@ -60,6 +60,12 @@ bool RawFile::searchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffs
     return false;
 }
 
+std::string RawFile::readNullTerminatedString(size_t offset, size_t maxLength) const {
+  const char* stringPtr = data() + offset;
+  size_t length = strnlen(stringPtr, maxLength);
+  return std::string(stringPtr, length);
+}
+
 /* DiskFile */
 
 DiskFile::DiskFile(const std::string &path) : m_data(mio::mmap_source(path)), m_path(path) {}
