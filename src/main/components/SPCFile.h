@@ -39,9 +39,9 @@ public:
 private:
   bool m_hasID666Tag;
   uint8_t m_versionMinor;
-  std::array<u8, 64 * 1024> m_ram; // 64KB RAM
-  std::array<u8, 128> m_dspRegisters; // DSP Registers
-  std::array<u8, 64> m_extraRam; // Extra RAM
+  std::array<u8, 64 * 1024> m_ram;
+  std::array<u8, 128> m_dspRegisters;
+  std::array<u8, 64> m_extraRam;
   ID666Tag m_id666Tag;
 
   void loadID666Tag(const RawFile& file);

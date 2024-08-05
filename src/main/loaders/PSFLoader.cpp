@@ -47,27 +47,30 @@ void PSFLoader::psf_read_exe(const RawFile *file, int version) {
   try {
     PSFFile psf(*file);
     std::filesystem::path basepath(file->path());
-    auto libtag = psf.tags().find("_lib");
-    if (libtag != psf.tags().end()) {
-      auto newpath = basepath.replace_filename(libtag->second).string();
-      auto newfile = new DiskFile(newpath);
-      enqueue(newfile);
-
-      /* Look for additional libraries in the same folder */
-      int i = 1;
-      for (libtag = psf.tags().find(fmt::format("_lib{}", i));
-           libtag != psf.tags().end();
-           libtag = psf.tags().find(fmt::format("_lib{}", ++i))) {
-        newpath = basepath.replace_filename(libtag->second).string();
-        newfile = new DiskFile(newpath);
+    for (const auto& libKey : {"_lib", "_Lib"}) {
+      auto libtag = psf.tags().find(libKey);
+      if (libtag != psf.tags().end()) {
+        auto newpath = basepath.replace_filename(libtag->second).string();
+        auto newfile = new DiskFile(newpath);
         enqueue(newfile);
+
+        /* Look for additional libraries in the same folder */
+        int i = 1;
+        for (libtag = psf.tags().find(fmt::format("_lib{}", i));
+             libtag != psf.tags().end();
+             libtag = psf.tags().find(fmt::format("_lib{}", ++i))) {
+          newpath = basepath.replace_filename(libtag->second).string();
+          newfile = new DiskFile(newpath);
+          enqueue(newfile);
+        }
       }
     }
 
     if (!psf.exe().empty()) {
+      auto tag = tagFromPSFFile(psf);
       auto newfile = new VirtFile(
       reinterpret_cast<const u8 *>(psf.exe().data()) + data_offset.at(version),
-      psf.exe().size() - data_offset.at(version), file->name(), file->path().string(), file->tag);
+      psf.exe().size() - data_offset.at(version), file->name(), file->path().string(), tag);
       enqueue(newfile);
     }
   } catch (std::exception e) {

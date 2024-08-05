@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include "VGMTag.h"
 #include <cstdint>
 #include <vector>
 #include <map>
@@ -14,6 +15,9 @@
 #include <climits>
 
 class RawFile;
+class PSFFile;
+
+VGMTag tagFromPSFFile(const PSFFile& psf);
 
 class PSFFile {
    public:

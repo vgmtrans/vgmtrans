@@ -10,14 +10,10 @@
 #include <stdexcept>
 
 VGMTag tagFromSPCFile(const SPCFile& spc) {
-  auto id666 = spc.id666Tag();
+  const auto& id666 = spc.id666Tag();
   const auto& dsp = spc.dsp();
 
-  auto tag = VGMTag();
-  tag.title = id666.songTitle;
-  tag.artist = id666.artist;
-  tag.album = id666.gameTitle;
-  tag.comment = id666.comments;
+  auto tag = VGMTag(id666.songTitle, id666.artist, id666.gameTitle, id666.comments);
   tag.binaries["dsp"] = std::vector(dsp.begin(), dsp.end());
   return tag;
 }
