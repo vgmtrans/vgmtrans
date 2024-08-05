@@ -67,7 +67,7 @@ void PSFLoader::psf_read_exe(const RawFile *file, int version) {
     }
 
     if (!psf.exe().empty()) {
-      auto tag = tagFromPSFFile(psf);
+      auto tag = PSFFile::tagFromPSFFile(psf);
       auto newfile = new VirtFile(
       reinterpret_cast<const u8 *>(psf.exe().data()) + data_offset.at(version),
       psf.exe().size() - data_offset.at(version), file->name(), file->path().string(), tag);

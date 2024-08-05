@@ -24,12 +24,12 @@ struct ID666Tag {
   u8 emulatorUsed;
 };
 
-VGMTag tagFromSPCFile(const SPCFile&);
-
 class SPCFile {
 public:
   explicit SPCFile(const RawFile& file);
   ~SPCFile() = default;
+
+  static VGMTag tagFromSPCFile(const SPCFile&);
 
   [[nodiscard]] const std::array<u8, 64 * 1024>& ram() const { return m_ram; }
   [[nodiscard]] const std::array<u8, 128>& dsp() const { return m_dspRegisters; }

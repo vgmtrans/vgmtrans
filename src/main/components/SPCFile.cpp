@@ -9,7 +9,7 @@
 #include "VGMTag.h"
 #include <stdexcept>
 
-VGMTag tagFromSPCFile(const SPCFile& spc) {
+VGMTag SPCFile::tagFromSPCFile(const SPCFile& spc) {
   const auto& id666 = spc.id666Tag();
   const auto& dsp = spc.dsp();
 
