@@ -65,8 +65,8 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
 
   if (file->size() >= 0x1A8000) {
     // Hard-coded loader for Final Fantasy 7 PSF
-    const AkaoInstrDatLocation instrLocation(0xf0000, 0x166000, 0, 128);
-    const AkaoInstrDatLocation instr2Location(0x168000, 0x1a6000, 53, 75); // One-Winged Angel
+    const AkaoInstrDatLocation instrLocation(0xe0000, 0x156000, 0, 128);
+    const AkaoInstrDatLocation instr2Location(0x158000, 0x196000, 53, 75); // One-Winged Angel
 
     std::vector<AkaoInstrDatLocation> instrLocations;
 
@@ -76,9 +76,9 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
 
     // Add choir samples for One-Winged Angel.
     // It is unlikely that any other song will load this sample collection in actual gameplay.
-    if (file->readWord(instr2Location.instrAllOffset) == 0x38560 &&
-        file->readWord(instr2Location.instrDatOffset) == 0x38560)
-      instrLocations.push_back(instr2Location);
+    // if (file->readWord(instr2Location.instrAllOffset) == 0x38560 &&
+    //     file->readWord(instr2Location.instrDatOffset) == 0x38560)
+    //   instrLocations.push_back(instr2Location);
 
     if (!instrLocations.empty()) {
       for (const auto & loc : instrLocations) {
