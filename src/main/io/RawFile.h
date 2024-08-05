@@ -95,6 +95,7 @@ class RawFile {
     virtual uint32_t readWord(size_t offset) const = 0;
     virtual uint16_t readShortBE(size_t offset) const = 0;
     virtual uint32_t readWordBE(size_t offset) const = 0;
+    std::string readNullTerminatedString(size_t offset, size_t maxLength) const;
 
     uint32_t readBytes(size_t offset, uint32_t nCount, void *pBuffer) const;
     bool matchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const;

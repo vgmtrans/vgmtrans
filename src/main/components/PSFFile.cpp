@@ -12,6 +12,16 @@
 constexpr auto PSF_TAG_SIG = "[TAG]";
 constexpr auto PSF_TAG_SIG_LEN = 5;
 
+VGMTag PSFFile::tagFromPSFFile(const PSFFile& psf) {
+  auto& psfTags = psf.tags();
+  return VGMTag(
+    psfTags.contains("title") ? psfTags.at("title") : "",
+    psfTags.contains("artist") ? psfTags.at("artist") : "",
+    psfTags.contains("game") ? psfTags.at("game") : "",
+    psfTags.contains("comment") ? psfTags.at("comment") : ""
+  );
+}
+
 PSFFile::PSFFile(const RawFile &file) {
     size_t fileSize = file.size();
     if (fileSize < 0x10) {

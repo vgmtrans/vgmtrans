@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include "VGMTag.h"
 #include <cstdint>
 #include <vector>
 #include <map>
@@ -14,11 +15,14 @@
 #include <climits>
 
 class RawFile;
+class PSFFile;
 
 class PSFFile {
    public:
     explicit PSFFile(const RawFile &file);
     ~PSFFile() = default;
+
+    static VGMTag tagFromPSFFile(const PSFFile& psf);
 
     [[nodiscard]] uint8_t version() const noexcept { return m_version; }
     [[nodiscard]] const std::map<std::string, std::string> &tags() const noexcept { return m_tags; }

@@ -60,6 +60,12 @@ bool RawFile::searchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffs
     return false;
 }
 
+std::string RawFile::readNullTerminatedString(size_t offset, size_t maxLength) const {
+  const char* stringPtr = data() + offset;
+  size_t length = strnlen(stringPtr, maxLength);
+  return std::string(stringPtr, length);
+}
+
 /* DiskFile */
 
 DiskFile::DiskFile(const std::string &path) : m_data(mio::mmap_source(path)), m_path(path) {}
@@ -76,7 +82,8 @@ VirtFile::VirtFile(const RawFile &file, size_t offset, size_t limit)
 }
 
 VirtFile::VirtFile(const uint8_t *data, uint32_t fileSize, std::string name,
-                   std::string parent_fullpath, const VGMTag& /*tag*/)
+                   std::string parent_fullpath, const VGMTag& tag)
     : m_name(std::move(name)), m_lpath(std::move(parent_fullpath)) {
-    std::copy_n(data, fileSize, std::back_inserter(m_data));
+  std::copy_n(data, fileSize, std::back_inserter(m_data));
+  this->tag = tag;
 }
