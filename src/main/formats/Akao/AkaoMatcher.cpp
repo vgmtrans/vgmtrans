@@ -92,11 +92,11 @@ bool AkaoMatcher::tryCreateCollection(int id) {
 
     std::vector<AkaoSampColl *> sampCollsToCheck;
     // seq->id() represents the associated sample set id
-    if (seq->id() != -1) {
-      auto it = std::find_if(sampColls.begin(), sampColls.end(), [seq](AkaoSampColl *sc) {
+    if (seq->id() > 0) {
+      auto it = std::find_if(sampColls.rbegin(), sampColls.rend(), [seq](AkaoSampColl *sc) {
         return sc->id() == seq->id();
       });
-      if (it != sampColls.end()) {
+      if (it != sampColls.rend()) {
         sampCollsToCheck.push_back(*it);
       } else {
         // PSF files may optimize out the IDs, so be lenient
@@ -106,7 +106,8 @@ bool AkaoMatcher::tryCreateCollection(int id) {
         }
       }
     }
-    // Add the rest of the sample collections that are not already in sampCollsToCheck
+    // Add the rest of the sample collections that are not already in sampCollsToCheck.
+    // Iterate in reverse to prioritize sample collections most recently scanned.
     for (auto* sc : std::ranges::reverse_view(sampColls)) {
       if (std::find(sampCollsToCheck.begin(), sampCollsToCheck.end(), sc) == sampCollsToCheck.end()) {
         sampCollsToCheck.push_back(sc);
