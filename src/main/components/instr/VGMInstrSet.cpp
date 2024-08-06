@@ -57,9 +57,6 @@ bool VGMInstrSet::load() {
   if (!loadInstrs())
     return false;
 
-  if (aInstrs.empty())
-    return false;
-
   if (m_auto_add_instruments_as_children)
     addChildren(aInstrs);
 
