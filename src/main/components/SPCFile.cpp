@@ -105,7 +105,7 @@ void SPCFile::loadExtendedID666Tag(const RawFile& file, size_t offset) {
             m_id666Tag.comments = file.readNullTerminatedString(currentOffset + 4, dataLength);
             break;
           default:
-            L_WARN("Unknown id6 tag id: {} in SPC", id);
+            L_INFO("Ignored id6 tag id: {} in SPC", id);
             break;
         }
         currentOffset += 4 + ((dataLength + 3) & ~3); // Align to 32-bit boundary

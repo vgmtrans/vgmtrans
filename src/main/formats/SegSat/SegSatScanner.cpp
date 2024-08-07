@@ -78,8 +78,8 @@ void SegSatScanner::scan(RawFile *file, void *info) {
       u16 loopedTempoEventPtr = file->readShortBE(i + seqPtr + 6);
       if (loopedTempoEventPtr >= firstNonTempoTrkPtr ||
           tempoTrkPtr + (numTempoEvents * 8) != firstNonTempoTrkPtr) {
-        L_ERROR("SegSat sequence had unexpected tempo track pointer");
-        continue;
+        L_DEBUG("Unexpected tempo track pointer in prospective SegSat sequence");
+        break;
       }
 
       SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, "Sega Saturn Sequence");
