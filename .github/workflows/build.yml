@@ -33,12 +33,42 @@ jobs:
       - name: "Build project"
         # $(sysctl -n hw.logicalcpu) is required to not make XCode spawn infinite threads...
         run: cmake --build --preset "macos-${{ matrix.target }}-release" --parallel $(sysctl -n hw.logicalcpu)
+
       - name: "Package DMG (macOS)"
         working-directory: "build/macos-${{ matrix.target }}/"
         run: |
           ${{ env.HOMEBREW_PREFIX }}/bin/macdeployqt \
             bin/VGMTrans.app \
-            -verbose=3 -dmg -always-overwrite -appstore-compliant
+            -verbose=3 -always-overwrite -appstore-compliant
+
+      - name: "Checkout create-dmg"
+        uses: actions/checkout@v4
+        with:
+          repository: create-dmg/create-dmg
+          path: "./build/macos-${{ matrix.target }}/create-dmg"
+          ref: master
+
+      - name: Build macOS DMG
+        shell: bash
+        working-directory: "build/macos-${{ matrix.target }}/"
+        run: |
+          ./create-dmg/create-dmg \
+            --no-internet-enable \
+            --volname "VGMTrans" \
+            --volicon "bin/VGMTrans.app/Contents/Resources/appicon.icns" \
+            --background "bin/dmg/bg.tif" \
+            --text-size 12 \
+            --window-pos 400 400 \
+            --window-size 550 380 \
+            --icon-size 80 \
+            --icon "VGMTrans.app" 250 113 \
+            --hide-extension "VGMTrans.app" \
+            --app-drop-link 460 110 \
+            --add-file "Fix Script" "bin/dmg/selfsign" 250 258 \
+            --add-file "README_MACOS.txt" "bin/dmg/README_MACOS.txt" 460 258 \
+            "bin/VGMTrans.dmg" \
+            "bin"
+
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         if: ${{ github.event_name != 'pull_request' }}
