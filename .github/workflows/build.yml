@@ -56,7 +56,7 @@ jobs:
             --no-internet-enable \
             --volname "VGMTrans" \
             --volicon "bin/VGMTrans.app/Contents/Resources/appicon.icns" \
-            --background "bin/dmg/bg.tif" \
+            --background "${{ github.workspace }}/bin/dmg/bg.tif" \
             --text-size 12 \
             --window-pos 400 400 \
             --window-size 550 380 \
@@ -64,8 +64,8 @@ jobs:
             --icon "VGMTrans.app" 250 113 \
             --hide-extension "VGMTrans.app" \
             --app-drop-link 460 110 \
-            --add-file "Fix Script" "bin/dmg/selfsign" 250 258 \
-            --add-file "README_MACOS.txt" "bin/dmg/README_MACOS.txt" 460 258 \
+            --add-file "Fix Script" "${{ github.workspace }}/bin/dmg/selfsign" 250 258 \
+            --add-file "README_MACOS.txt" "${{ github.workspace }}/bin/dmg/README_MACOS.txt" 460 258 \
             "bin/VGMTrans.dmg" \
             "bin"
 
