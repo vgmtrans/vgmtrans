@@ -162,7 +162,7 @@ jobs:
     runs-on: windows-2022
     strategy:
       matrix:
-        target: ['x64', 'arm64']
+        target: ['x64']
     permissions:
       id-token: write
       contents: read
