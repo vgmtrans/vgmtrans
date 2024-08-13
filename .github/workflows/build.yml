@@ -32,7 +32,7 @@ jobs:
         run: cmake --preset "macos-${{ matrix.target }}"
       - name: "Build project"
         # $(sysctl -n hw.logicalcpu) is required to not make XCode spawn infinite threads...
-        run: cmake --build --preset "macos-${{ matrix.target }}-release" --parallel $(sysctl -n hw.logicalcpu)
+        run: cmake --build --preset "macos-${{ matrix.target }}-release" --parallel $(sysctl -n hw.logicalcpu) --target vgmtrans
 
       - name: "Package DMG (macOS)"
         working-directory: "build/macos-${{ matrix.target }}/"
@@ -182,7 +182,7 @@ jobs:
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           cmake --preset win-${{ matrix.target }}
        - name: "Build project"
-         run: cmake --build --preset win-${{ matrix.target }}-release
+         run: cmake --build --preset win-${{ matrix.target }}-release --target vgmtrans
        - name: "Package artifact"
          run: 7z a "VGMTrans.zip" -r .\build\win-${{ matrix.target }}\bin*
        - name: Generate artifact attestation
