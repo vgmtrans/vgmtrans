@@ -183,8 +183,29 @@ jobs:
           cmake --preset win-${{ matrix.target }}
        - name: "Build project"
          run: cmake --build --preset win-${{ matrix.target }}-release --target vgmtrans
+
+       - name: "Extract Version"
+         id: get_version
+         run: |
+           $content = Get-Content CMakeLists.txt
+           $projectBlock = $content | Select-String -Pattern 'project\s*\(\s*VGMTrans\s+VERSION\s+(\d+\.\d+)' | ForEach-Object { $_.Matches.Groups[1].Value }
+           if ($projectBlock) {
+               $version = $projectBlock.Trim()
+               echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+           } else {
+               throw "VERSION not found in CMakeLists.txt"
+           }
+
+       - name: "Rename bin directory"
+         run: |
+           Rename-Item ".\build\win-${{ matrix.target }}\bin" ".\build\win-${{ matrix.target }}\vgmtrans-${{ env.VERSION }}-windows-${{ matrix.target }}"
+
+       - name: "Delete empty directories"
+         run: Get-ChildItem -Directory -Recurse | Where-Object { $_.GetFileSystemInfos().Count -eq 0 } | Remove-Item -Force -Recurse
+
        - name: "Package artifact"
-         run: 7z a "VGMTrans.zip" -r .\build\win-${{ matrix.target }}\bin*
+         run: 7z a "VGMTrans.zip" -r ".\build\win-${{ matrix.target }}\vgmtrans-${{ env.VERSION }}-windows-${{ matrix.target }}\*"
+
        - name: Generate artifact attestation
          uses: actions/attest-build-provenance@v1
          if: ${{ github.event_name != 'pull_request' }}
