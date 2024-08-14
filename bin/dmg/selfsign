@@ -17,31 +17,14 @@ echo -e "For information on why this error occurs and how this tool\nfixes the i
 
 if [ ! -d "$appDIR" ]; then
   echo ""
-  echo -e "Execution result: ${RED}You haven't installed ${appBashName} yet, please install it first.${NC}"
+  echo -e "${RED}You haven't installed ${appBashName} yet, please install it first.${NC}"
 else
   echo -e "${YELLOW}Please enter your login password, and then press enter. (The password is invisible during input)${NC}"
-
-  # Check Gatekeeper status
-  gatekeeper_status=$(spctl --status)
-  gatekeeper_disabled=false
-  if [[ $gatekeeper_status == *"disabled"* ]]; then
-    gatekeeper_disabled=true
-  fi
-
-  # Disable Gatekeeper if it was not already disabled
-  if ! $gatekeeper_disabled; then
-    sudo spctl --master-disable
-  fi
 
   sudo xattr -rd com.apple.quarantine /Applications/"$appBashName"
   sudo codesign --sign - --force --deep /Applications/"$appBashName"
 
-  # Re-enable Gatekeeper if it was not disabled before
-  if ! $gatekeeper_disabled; then
-    sudo spctl --master-enable
-  fi
-
-  echo -e "Execution result: ${GREEN}Fixed. You should now be able to run ${appBashName} without an error.${NC}"
+  echo -e "${GREEN}Fixed. You should now be able to run ${appBashName} without an error.${NC}"
 fi
 
 echo -e "You can close this window now"
