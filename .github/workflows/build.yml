@@ -199,7 +199,7 @@ jobs:
 
        - name: "Rename bin directory"
          run: |
-           Rename-Item ".\build\win-${{ matrix.target }}\bin" ".\build\win-${{ matrix.target }}\vgmtrans-${{ env.VERSION }}-windows-${{ matrix.target }}"
+           Rename-Item ".\build\win-${{ matrix.target }}\bin" "vgmtrans-${{ env.VERSION }}-windows-${{ matrix.target }}"
 
        - name: "Delete empty directories"
          run: Get-ChildItem -Directory -Recurse | Where-Object { $_.GetFileSystemInfos().Count -eq 0 } | Remove-Item -Force -Recurse
