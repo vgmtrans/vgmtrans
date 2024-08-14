@@ -187,14 +187,15 @@ jobs:
        - name: "Extract Version"
          id: get_version
          run: |
-           $content = Get-Content CMakeLists.txt
-           $projectBlock = $content | Select-String -Pattern 'project\s*\(\s*VGMTrans\s+VERSION\s+(\d+\.\d+)' | ForEach-Object { $_.Matches.Groups[1].Value }
-           if ($projectBlock) {
-               $version = $projectBlock.Trim()
+            $content = Get-Content CMakeLists.txt | Out-String
+            $pattern = 'project\s*\(\s*VGMTrans\s+VERSION\s+(\d+\.\d+)'
+            $match = [regex]::Match($content, $pattern)
+            if ($match.Success) {
+               $version = $match.Groups[1].Value.Trim()
                echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-           } else {
-               throw "VERSION not found in CMakeLists.txt"
-           }
+            } else {
+              throw "VERSION not found in CMakeLists.txt"
+            }
 
        - name: "Rename bin directory"
          run: |
