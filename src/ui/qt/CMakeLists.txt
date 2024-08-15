@@ -142,8 +142,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   add_custom_command(
     TARGET vgmtrans
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/bin"
-            "${BUNDLE_PATH}/Contents/Resources")
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
+    "${BUNDLE_PATH}/Contents/Resources/")
 
   get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
   add_custom_command(
