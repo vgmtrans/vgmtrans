@@ -115,7 +115,7 @@ bool AkaoInstr::loadInstr() {
       }
     }
     else {
-      if (readByte(dwOffset + k * 8 + 5) == 0) {
+      if (getWord(dwOffset + k * 8) == 0) {
         addChild(dwOffset + k * 8, 8, "Region Terminator");
         break;
       }
@@ -126,7 +126,27 @@ bool AkaoInstr::loadInstr() {
       delete rgn;
       return false;
     }
-    addRgn(rgn);
+    if (k > 0) {
+      // Some tracks have apparently malformed key low / key high regions, where sections of the
+      // keyboard are left unaccounted for, but notes still play in these regions.
+      // For ex: Saga Frontier 2 - Thema instrument 0 (harp). The logic below ensures
+      // all keys are covered, though it is imperfect as the wrong regions are being extended.
+      auto prevRgn = regions().back();
+      if (rgn->keyHigh > prevRgn->keyHigh && rgn->keyLow > prevRgn->keyHigh) {
+        addRgn(rgn);
+      } else if (rgn->keyHigh == prevRgn->keyHigh) {
+        // TODO: replace the last region with this one?
+      }
+      if (rgn->keyLow - prevRgn->keyHigh > 1) {
+        rgn->keyLow = prevRgn->keyHigh + 1;
+      }
+    } else {
+      addRgn(rgn);
+    }
+  }
+  if (!regions().empty()) {
+    regions().front()->keyLow = 0;
+    regions().back()->keyHigh = 0x7F;
   }
   setGuessedLength();
 
@@ -173,7 +193,10 @@ bool AkaoDrumKit::loadInstr() {
       rgn->setVolume(volume);
       rgn->addGeneralItem(rgn_offset, 1, "Associated Articulation ID");
       rgn->addGeneralItem(rgn_offset + 1, 1, "Relative Unity Key");
-      // TODO: set ADSR to the region
+      rgn->attackRate = readByte(dwOffset + 2);
+      rgn->sustainRate = readByte(dwOffset + 3);
+      rgn->sustainMode = readByte(dwOffset + 4);
+      rgn->releaseRate = readByte(dwOffset + 5);
       rgn->addGeneralItem(rgn_offset + 2, 1, "ADSR Attack Rate");
       rgn->addGeneralItem(rgn_offset + 3, 1, "ADSR Sustain Rate");
       rgn->addGeneralItem(rgn_offset + 4, 1, "ADSR Sustain Mode");

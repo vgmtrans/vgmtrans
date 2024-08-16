@@ -221,6 +221,7 @@ class AkaoTrack final
  protected:
   bool slur;
   bool legato;
+  bool portamento;
   bool drum;
   uint32_t pattern_return_offset;
   std::array<uint32_t, 4> loop_begin_loc;

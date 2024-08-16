@@ -20,6 +20,7 @@ static constexpr uint8_t NOTE_VELOCITY = 127;
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name)
     : VGMSeq(AkaoFormat::name, file, offset, 0, std::move(name)), seq_id(0), version_(version),
       instrument_set_offset_(0), drum_set_offset_(0), condition(0) {
+  setAlwaysWriteInitialPitchBendRange(12 * 100);
   setUseLinearAmplitudeScale(true);        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   //UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController); // disabled, it only changes the volume and the pan slightly, and also its output becomes undefined if pan and volume slides are used at the same time
   bUsesIndividualArts = false;
@@ -531,6 +532,7 @@ void AkaoTrack::resetVars() {
 
   slur = false;
   legato = false;
+  portamento = false;
   drum = false;
 
   pattern_return_offset = 0;
@@ -603,6 +605,9 @@ bool AkaoTrack::readEvent() {
         key = drum ? (drum_octave * 12) + relative_key : real_key;
       }
 
+      if (portamento) {
+        addPortamentoControlNoItem(prevKey);
+      }
       addNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);
       addTime(delta_time);
     }
@@ -1064,10 +1069,8 @@ bool AkaoTrack::readEvent() {
 
       const int div = tuning >= 0 ? 128 : 256;
       const double scale = tuning / static_cast<double>(div);
-      const double cents = (scale / log(2.0)) * 1200.0;
-      desc << "Tuning: " << cents << " cents (" << tuning << "/" << div << ")";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning", desc.str(), CLR_MISC, ICON_CONTROL);
-      addFineTuningNoItem(cents);
+      s16 bend = std::min(static_cast<s16>((scale / log(2.0)) * 8192), static_cast<s16>(8191));
+      addPitchBend(beginOffset, curOffset-beginOffset, bend);
       break;
     }
 
@@ -1089,15 +1092,17 @@ bool AkaoTrack::readEvent() {
       const uint16_t speed = raw_speed == 0 ? 256 : raw_speed;
       desc << "Time: " << speed << " tick(s)";
       addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
-      //AddPortamentoTimeNoItem(speed);
+      double millisPerTick = 60000.0 / (parentSeq->tempoBPM * parentSeq->ppqn());
+      addPortamentoTime14BitNoItem(millisPerTick * speed);
       addPortamentoNoItem(true);
+      portamento = true;
       break;
     }
 
     case EVENT_PORTAMENTO_OFF: {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Off", desc.str(), CLR_PORTAMENTO, ICON_CONTROL);
-      //AddPortamentoTimeNoItem(0);
       addPortamentoNoItem(false);
+      portamento = false;
       break;
     }
 
