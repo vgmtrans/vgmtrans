@@ -203,8 +203,6 @@ jobs:
            if ($match.Success) {
                $version = $match.Groups[1].Value.Trim()
                echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-               $artifactPath = "VGMTrans-v$version.zip"
-               echo "ARTIFACT_PATH=$artifactPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
            } else {
                throw "VERSION not found in CMakeLists.txt"
            }
@@ -213,18 +211,18 @@ jobs:
          run: Get-ChildItem -Directory -Recurse | Where-Object { $_.GetFileSystemInfos().Count -eq 0 } | Remove-Item -Force -Recurse
 
        - name: "Package artifact"
-         run: 7z a ${{ env.ARTIFACT_PATH }} -r ".\build\win-${{ matrix.target }}\bin\*"
+         run: 7z a "VGMTrans-v${{ env.VERSION }}.zip" -r ".\build\win-${{ matrix.target }}\bin\*"
 
        - name: Generate artifact attestation
          uses: actions/attest-build-provenance@v1
          if: ${{ github.event_name != 'pull_request' }}
          with:
            subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-           subject-path: ${{ env.ARTIFACT_PATH }}
+           subject-path: "VGMTrans-v${{ env.VERSION }}.zip"
 
        - name: "Upload artifact"
          uses: actions/upload-artifact@v4
          with:
            name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-           path: ${{ env.ARTIFACT_PATH }}
+           path: "VGMTrans-v${{ env.VERSION }}.zip"
        
