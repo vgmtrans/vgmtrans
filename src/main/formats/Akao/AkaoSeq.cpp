@@ -1069,8 +1069,7 @@ bool AkaoTrack::readEvent() {
 
       const int div = tuning >= 0 ? 128 : 256;
       const double scale = tuning / static_cast<double>(div);
-      s16 bend = std::min(static_cast<s16>((scale / log(2.0)) * 8192), static_cast<s16>(8191));
-      addPitchBend(beginOffset, curOffset-beginOffset, bend);
+      addPitchBendAsPercent(beginOffset, curOffset-beginOffset, scale / log(2.0));
       break;
     }
 

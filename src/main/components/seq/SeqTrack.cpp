@@ -958,6 +958,14 @@ void SeqTrack::addPitchBend(uint32_t offset, uint32_t length, int16_t bend, cons
     pMidiTrack->addPitchBend(channel, bend);
 }
 
+void SeqTrack::addPitchBendAsPercent(uint32_t offset, uint32_t length, double percent, const std::string &sEventName) {
+  const s16 minVal = -8192;
+  const s16 maxVal = 8191;
+  const s16 bendVal = static_cast<s16>(percent * 8192);
+  s16 bend = std::max(std::min(bendVal, maxVal), minVal);
+  addPitchBend(offset, length, bend, sEventName);
+}
+
 void SeqTrack::addPitchBendRange(uint32_t offset, uint32_t length, uint16_t cents, const std::string &sEventName) {
   onEvent(offset, length);
 
