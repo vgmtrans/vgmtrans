@@ -64,7 +64,7 @@ jobs:
             --icon "VGMTrans.app" 208 97 \
             --hide-extension "VGMTrans.app" \
             --app-drop-link 380 97 \
-            --add-file "Fix Script" "${{ github.workspace }}/bin/dmg/selfsign" 208 280 \
+            --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 208 280 \
             --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 380 280 \
             "bin/VGMTrans.dmg" \
             "bin"
