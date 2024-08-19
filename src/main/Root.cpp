@@ -15,6 +15,7 @@
 #include "VGMMiscFile.h"
 #include "Format.h"
 #include "Scanner.h"
+#include "Matcher.h"
 
 #include "FileLoader.h"
 #include "LoaderManager.h"
@@ -96,10 +97,16 @@ bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
     if (!specific_scanners.empty()) {
       for (const auto &scanner : specific_scanners) {
         scanner->scan(newRawFile);
+        if (auto matcher = scanner->format()->matcher) {
+          matcher->onFinishedScan(newRawFile);
+        }
       }
     } else {
       for (const auto &scanner : ScannerManager::get().scanners()) {
         scanner->scan(newRawFile);
+        if (auto matcher = scanner->format()->matcher) {
+          matcher->onFinishedScan(newRawFile);
+        }
       }
     }
   }

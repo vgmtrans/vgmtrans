@@ -14,9 +14,10 @@ class VGMScanner {
   virtual ~VGMScanner() = default;
 
   virtual bool init();
-  void initiateScan(RawFile *file, void *offset = nullptr);
   virtual void scan(RawFile *file, void *offset = nullptr) = 0;
 
+  Format* format() const { return m_format; }
+
 protected:
-  Format* format;
+  Format* m_format;
 };

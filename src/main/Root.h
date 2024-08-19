@@ -25,9 +25,6 @@ class LogItem;
 VGMFile* variantToVGMFile(VGMFileVariant variant);
 VGMFileVariant vgmFileToVariant(VGMFile* vgmfile);
 
-// global switch indicating if we are in CLI mode
-inline bool g_isCliMode = false;
-
 class VGMRoot {
 public:
   VGMRoot() = default;

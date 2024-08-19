@@ -14,10 +14,6 @@ using namespace std;
 namespace fs = std::filesystem;
 
 int main(int argc, char *argv[]) {
-
-  // set global switch
-  g_isCliMode = true;
-
   for(int i = 1; i < argc; ++i) {
     string s(argv[i]);
     if ((s == "-h") || (s == "--help")) {

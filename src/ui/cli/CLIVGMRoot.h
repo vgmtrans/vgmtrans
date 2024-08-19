@@ -46,8 +46,6 @@ public:
 
   void UI_log(LogItem* theLog) override;
 
-  size_t updateCollections(size_t startOffset);
-
   std::string UI_getSaveFilePath(const std::string& suggestedFilename,
                                  const std::string& extension = "") override;
 
