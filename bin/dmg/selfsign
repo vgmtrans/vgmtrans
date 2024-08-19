@@ -13,7 +13,7 @@ appBashName=${appName// /\ }
 appDIR="/Applications/${appBashName}"
 
 echo -e "This script fixes the error message:\n\n\"${appBashName}\" is damaged and can't be opened.\n"
-echo -e "For information on why this error occurs and how this tool\nfixes the issue, see README_MACOS.txt."
+echo -e "For information on why this error occurs and how this tool\nfixes the issue, see the README included in the dmg."
 
 if [ ! -d "$appDIR" ]; then
   echo ""
