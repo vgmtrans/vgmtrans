@@ -43,11 +43,12 @@ public:
 
 private:
   void keyPressEvent(QKeyEvent *e) override;
+  void itemMenu(const QPoint &pos);
 
 private slots:
   void removeVGMColl(const VGMColl *coll) const;
   void doubleClickedSlot(const QModelIndex&) const;
-  void handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
+  void handleCurrentChanged(const QModelIndex &current, const QModelIndex &previous);
   void onVGMFileSelected(const VGMFile *file, const QWidget* caller) const;
 
 private:

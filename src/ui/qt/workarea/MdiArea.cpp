@@ -7,6 +7,7 @@
 #include "MdiArea.h"
 
 #include <QTabBar>
+#include <QApplication>
 #include <VGMFile.h>
 #include "VGMFileView.h"
 #include "Metrics.h"
@@ -100,9 +101,10 @@ void MdiArea::onVGMFileSelected(const VGMFile *file, QWidget *caller) {
   auto it = fileToWindowMap.find(file);
   if (it != fileToWindowMap.end()) {
 
-    bool callerHadFocus = caller && caller->hasFocus();
+    QWidget* focusedWidget = QApplication::focusWidget();
+    bool callerHadFocus = focusedWidget && caller && caller->isAncestorOf(focusedWidget);
     QMdiSubWindow *window = it->second;
-    window->setFocus();
+    setActiveSubWindow(window);
 
     // Reassert the focus back to the caller
     if (caller && callerHadFocus) {
