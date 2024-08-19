@@ -17,11 +17,11 @@ When opening VGMTrans, you may encounter this message:
 
 This message is misleading - your download is fine. The issue stems from Apple's Gatekeeper service, which blocks apps that haven't been notarized. Notarization is Apple's process for controlling software distribution on macOS, requiring developers to pay $99 annually - even for free and open-source software. We believe this requirement is monopolistic and harmful to both users and developers. Rather than pay the fee, we've provided a workaround.
 
-------------------------
-What the Fix Script Does
-------------------------
+-------------------------------------
+What the "Unblock & Sign" Script Does
+-------------------------------------
 
-The Fix Script will:
+The script will:
 
 - Remove the quarantine attribute: This lets macOS know the app is safe to run.
 - Self-sign the app: This provides a basic signature so macOS allows the app to run.
