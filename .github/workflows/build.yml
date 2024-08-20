@@ -59,13 +59,13 @@ jobs:
             --background "${{ github.workspace }}/bin/dmg/bg.tif" \
             --text-size 12 \
             --window-pos 400 400 \
-            --window-size 550 380 \
+            --window-size 700 400 \
             --icon-size 80 \
-            --icon "VGMTrans.app" 250 113 \
+            --icon "VGMTrans.app" 313 97 \
             --hide-extension "VGMTrans.app" \
-            --app-drop-link 460 110 \
-            --add-file "Fix Script" "${{ github.workspace }}/bin/dmg/selfsign" 250 258 \
-            --add-file "README_MACOS.txt" "${{ github.workspace }}/bin/dmg/README_MACOS.txt" 460 258 \
+            --app-drop-link 520 97 \
+            --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 313 280 \
+            --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 520 280 \
             "bin/VGMTrans.dmg" \
             "bin"
 
