@@ -23,17 +23,6 @@ jobs:
         with:
           submodules: recursive
           show-progress: false
-      - name: "Extract version from CMakeLists.txt"
-        id: extract_version
-        run: |
-          content=$(cat CMakeLists.txt)  
-          if [[ "$content" =~ project\([[:space:]]*VGMTrans[[:space:]]+VERSION[[:space:]]+([0-9]+\.[0-9]+) ]]; then
-            version="${BASH_REMATCH[1]}"
-            echo "VERSION=$version" >> $GITHUB_ENV
-          else
-            echo "VERSION not found in CMakeLists.txt"
-            exit 1
-          fi
       - name: "Install dependencies"
         run: |
           brew install -f --overwrite qt@6
@@ -74,19 +63,19 @@ jobs:
             --app-drop-link 520 97 \
             --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 313 280 \
             --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 520 280 \
-            "bin/VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.dmg" \
+            "bin/VGMTrans-${{ github.sha }}.dmg" \
             "bin"
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}
-          subject-path: "build/macos-${{ matrix.target }}/bin/VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.dmg"
+          subject-path: "build/macos-${{ matrix.target }}/bin/VGMTrans-${{ github.sha }}.dmg"
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4
         with:
-          name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}-v${{ env.VERSION }}.dmg
-          path: "build/macos-${{ matrix.target }}/bin/VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.dmg"
+          name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}.dmg
+          path: "build/macos-${{ matrix.target }}/bin/VGMTrans-${{ github.sha }}.dmg"
   linux:
     runs-on: ubuntu-20.04
     name: Linux, x64
@@ -194,35 +183,22 @@ jobs:
        - name: "Build project"
          run: cmake --build --preset win-${{ matrix.target }}-release --target vgmtrans
 
-       - name: "Extract Version and Set Artifact Path"
-         id: set_artifact_path
-         run: |
-           $content = Get-Content CMakeLists.txt | Out-String
-           $pattern = 'project\s*\(\s*VGMTrans\s+VERSION\s+(\d+\.\d+)'
-           $match = [regex]::Match($content, $pattern)
-           if ($match.Success) {
-               $version = $match.Groups[1].Value.Trim()
-               echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-           } else {
-               throw "VERSION not found in CMakeLists.txt"
-           }
-
        - name: "Delete empty directories"
          run: Get-ChildItem -Directory -Recurse | Where-Object { $_.GetFileSystemInfos().Count -eq 0 } | Remove-Item -Force -Recurse
 
        - name: "Package artifact"
-         run: 7z a "VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.zip" -r ".\build\win-${{ matrix.target }}\bin\*"
+         run: 7z a "VGMTrans-${{ github.sha }}.zip" -r ".\build\win-${{ matrix.target }}\bin\*"
 
        - name: Generate artifact attestation
          uses: actions/attest-build-provenance@v1
          if: ${{ github.event_name != 'pull_request' }}
          with:
            subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-           subject-path: "VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.zip"
+           subject-path: "VGMTrans-${{ github.sha }}.zip"
 
        - name: "Upload artifact"
          uses: actions/upload-artifact@v4
          with:
            name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-           path: "VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.zip"
+           path: "VGMTrans-${{ github.sha }}.zip"
        
