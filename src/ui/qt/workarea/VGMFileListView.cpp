@@ -251,7 +251,11 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
 
   QItemSelection selection(firstIndex, lastIndex);
   selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+  // Prevent the currentChanged callback from triggering so that we don't recursively
+  // call NotificationCenter::selectVGMFile()
+  selectionModel()->blockSignals(true);
   setCurrentIndex(firstIndex);
+  selectionModel()->blockSignals(false);
 
   scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
 }

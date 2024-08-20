@@ -22,6 +22,7 @@
 #include "Helpers.h"
 #include "MdiArea.h"
 #include "services/NotificationCenter.h"
+#include "services/MenuManager.h"
 
 VGMCollViewModel::VGMCollViewModel(const QItemSelectionModel *collListSelModel, QObject *parent)
     : QAbstractListModel(parent), m_coll(nullptr) {
@@ -161,13 +162,16 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
 
   vgmCollViewModel = new VGMCollViewModel(collListSelModel, this);
   m_listview->setModel(vgmCollViewModel);
-  m_listview->setSelectionMode(QAbstractItemView::SingleSelection);
+  m_listview->setSelectionMode(QAbstractItemView::ExtendedSelection);
   m_listview->setSelectionRectVisible(true);
   m_listview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
+  setContextMenuPolicy(Qt::CustomContextMenu);
+
   connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl, this, &VGMCollView::removeVGMColl);
+  connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollView::itemMenu);
   connect(m_listview, &QListView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
-  connect(m_listview->selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollView::handleSelectionChanged);
+  connect(m_listview->selectionModel(), &QItemSelectionModel::currentChanged, this, &VGMCollView::handleCurrentChanged);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMCollView::onVGMFileSelected);
 
 
@@ -205,6 +209,26 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   setLayout(layout);
 }
 
+void VGMCollView::itemMenu(const QPoint &pos) {
+  const auto selectionModel = m_listview->selectionModel();
+  if (!selectionModel->hasSelection()) {
+    return;
+  }
+
+  QModelIndexList list = selectionModel->selectedRows();
+
+  auto selectedFiles = std::make_shared<std::vector<VGMFile*>>();
+  selectedFiles->reserve(list.size());
+  for (const auto &index : list) {
+    if (index.isValid()) {
+      selectedFiles->push_back(vgmCollViewModel->fileFromIndex(index));
+    }
+  }
+  auto menu = MenuManager::the()->createMenuForItems<VGMItem>(selectedFiles);
+  menu->exec(mapToGlobal(pos));
+  menu->deleteLater();
+}
+
 void VGMCollView::keyPressEvent(QKeyEvent *e) {
   switch (e->key()) {
     case Qt::Key_Enter:
@@ -234,21 +258,18 @@ void VGMCollView::doubleClickedSlot(const QModelIndex& index) const {
   MdiArea::the()->newView(file_to_open);
 }
 
-void VGMCollView::handleSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected) {
-  Q_UNUSED(deselected);
+void VGMCollView::handleCurrentChanged(const QModelIndex &current, const QModelIndex &previous) {
+  Q_UNUSED(previous);
 
-  if (selected.indexes().isEmpty())
+  if (!current.isValid()) {
+    NotificationCenter::the()->selectVGMFile(nullptr, this);
     return;
+  }
 
-  QModelIndex firstSelectedIndex = selected.indexes().first();
-
-  if (!firstSelectedIndex.isValid())
-    return;
-
-  auto index = vgmCollViewModel->index(firstSelectedIndex.row());
-  VGMFile* file = vgmCollViewModel->fileFromIndex(index);
+  VGMFile *file = vgmCollViewModel->fileFromIndex(current);
   NotificationCenter::the()->selectVGMFile(file, this);
-  NotificationCenter::the()->updateStatusForItem(file);
+  if (this->hasFocus() || m_listview->hasFocus())
+    NotificationCenter::the()->updateStatusForItem(file);
 }
 
 void VGMCollView::onVGMFileSelected(const VGMFile *file, const QWidget* caller) const {
@@ -266,7 +287,10 @@ void VGMCollView::onVGMFileSelected(const VGMFile *file, const QWidget* caller) 
   }
   auto index = vgmCollViewModel->indexFromFile(file);
 
-  // Select the row corresponding to the file
+  // Select the row corresponding to the file and block signals to prevent a recursive
+  // call to NotificationCenter::selectVGMFile()
+  m_listview->blockSignals(true);
   m_listview->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
+  m_listview->blockSignals(false);
   m_listview->scrollTo(index, QAbstractItemView::EnsureVisible);
 }
