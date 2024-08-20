@@ -74,19 +74,19 @@ jobs:
             --app-drop-link 520 97 \
             --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 313 280 \
             --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 520 280 \
-            "bin/VGMTrans-v${{ env.VERSION }}.dmg" \
+            "bin/VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.dmg" \
             "bin"
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}
-          subject-path: "build/macos-${{ matrix.target }}/bin/VGMTrans-v${{ env.VERSION }}.dmg"
+          subject-path: "build/macos-${{ matrix.target }}/bin/VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.dmg"
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4
         with:
           name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}-v${{ env.VERSION }}.dmg
-          path: "build/macos-${{ matrix.target }}/bin/VGMTrans-v${{ env.VERSION }}.dmg"
+          path: "build/macos-${{ matrix.target }}/bin/VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.dmg"
   linux:
     runs-on: ubuntu-20.04
     name: Linux, x64
@@ -211,18 +211,18 @@ jobs:
          run: Get-ChildItem -Directory -Recurse | Where-Object { $_.GetFileSystemInfos().Count -eq 0 } | Remove-Item -Force -Recurse
 
        - name: "Package artifact"
-         run: 7z a "VGMTrans-v${{ env.VERSION }}.zip" -r ".\build\win-${{ matrix.target }}\bin\*"
+         run: 7z a "VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.zip" -r ".\build\win-${{ matrix.target }}\bin\*"
 
        - name: Generate artifact attestation
          uses: actions/attest-build-provenance@v1
          if: ${{ github.event_name != 'pull_request' }}
          with:
            subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-           subject-path: "VGMTrans-v${{ env.VERSION }}.zip"
+           subject-path: "VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.zip"
 
        - name: "Upload artifact"
          uses: actions/upload-artifact@v4
          with:
            name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-           path: "VGMTrans-v${{ env.VERSION }}.zip"
+           path: "VGMTrans-v${{ env.VERSION }}-${{ github.sha }}.zip"
        
