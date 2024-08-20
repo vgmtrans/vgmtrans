@@ -962,7 +962,7 @@ void SeqTrack::addPitchBendAsPercent(uint32_t offset, uint32_t length, double pe
   const s16 minVal = -8192;
   const s16 maxVal = 8191;
   const s16 bendVal = static_cast<s16>(percent * 8192);
-  s16 bend = std::max(std::min(bendVal, maxVal), minVal);
+  s16 bend = std::clamp(bendVal, minVal, maxVal);
   addPitchBend(offset, length, bend, sEventName);
 }
 
