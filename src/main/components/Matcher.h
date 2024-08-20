@@ -21,15 +21,16 @@ class VGMMiscFile;
 // *******
 
 class Matcher {
- public:
+public:
   explicit Matcher(Format *format);
   virtual ~Matcher() = default;
 
+  virtual void onFinishedScan(RawFile *rawfile) {}
+
   virtual bool onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
   virtual bool onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-  virtual bool makeCollectionsForFile(VGMFile *file);
 
- protected:
+protected:
   virtual bool onNewSeq(VGMSeq *) { return false; }
   virtual bool onNewInstrSet(VGMInstrSet *) { return false; }
   virtual bool onNewSampColl(VGMSampColl *) { return false; }
@@ -49,9 +50,9 @@ class Matcher {
 
 template <class IdType>
 class SimpleMatcher : public Matcher {
- protected:
-    // The following functions should return with the id variable containing the retrieved id of the
-    // file. The bool return value is a flag for error: true on success and false on fail.
+protected:
+  // The following functions should return with the id variable containing the retrieved id of the
+  // file. The bool return value is a flag for error: true on success and false on fail.
   virtual bool seqId(VGMSeq *seq, IdType &id) = 0;
   virtual bool instrSetId(VGMInstrSet *instrset, IdType &id) = 0;
   virtual bool sampCollId(VGMSampColl *sampcoll, IdType &id) = 0;
@@ -67,8 +68,7 @@ class SimpleMatcher : public Matcher {
 
     seqs.insert(std::pair<IdType, VGMSeq *>(id, seq));
 
-
-    if (VGMInstrSet* matchingInstrSet = instrsets[id]) {
+    if (VGMInstrSet *matchingInstrSet = instrsets[id]) {
       if (bRequiresSampColl) {
         if (VGMSampColl *matchingSampColl = sampcolls[id]) {
           VGMColl *coll = fmt->newCollection();
@@ -129,8 +129,7 @@ class SimpleMatcher : public Matcher {
     // of element with key b
     itPair = seqs.equal_range(id);
     // Loop through range of maps with id key
-    for (auto it2 = itPair.first;
-         it2 != itPair.second; ++it2) {
+    for (auto it2 = itPair.first; it2 != itPair.second; ++it2) {
       VGMSeq *matchingSeq = (*it2).second;
 
       if (bRequiresSampColl) {
@@ -190,8 +189,7 @@ class SimpleMatcher : public Matcher {
       // of element with key b
       itPair = seqs.equal_range(id);
       // Loop through range of maps with id key
-      for (auto it2 = itPair.first;
-           it2 != itPair.second; ++it2) {
+      for (auto it2 = itPair.first; it2 != itPair.second; ++it2) {
         VGMSeq *matchingSeq = (*it2).second;
 
         if (matchingSeq && matchingInstrSet) {
@@ -253,7 +251,7 @@ class SimpleMatcher : public Matcher {
     return true;
   }
 
- private:
+private:
   bool bRequiresSampColl;
 
   std::multimap<IdType, VGMSeq *> seqs;
@@ -266,7 +264,7 @@ class SimpleMatcher : public Matcher {
 // ************
 
 class GetIdMatcher : public SimpleMatcher<uint32_t> {
- public:
+public:
   explicit GetIdMatcher(Format *format, bool bRequiresSampColl = false)
       : SimpleMatcher(format, bRequiresSampColl) {}
 
@@ -291,7 +289,7 @@ class GetIdMatcher : public SimpleMatcher<uint32_t> {
 // ***************
 
 class FilenameMatcher : public SimpleMatcher<std::string> {
- public:
+public:
   explicit FilenameMatcher(Format *format, bool bRequiresSampColl = false)
       : SimpleMatcher(format, bRequiresSampColl) {}
 
@@ -314,25 +312,25 @@ class FilenameMatcher : public SimpleMatcher<std::string> {
   }
 };
 
-// *************
+// ****************
 // FilegroupMatcher
-// *************
+// ****************
 
-// Filegroup matcher is sort of a last resort method because it's highly prone to error.  It
-// attempts to match based on an assumption of association between files by the fact they were
-// loaded from the same source RawFile.  This is necessary for formats that do not use any built-in
-// file association between sequences, instrument sets, and sample collections, like the standard
-// PS1 format (SEQ/VAB).
-
-// I should probably also program in some routines to allow it to be enabled or disabled based
-// on the type of RawFile that was loaded.  PSF files, for example, have an almost certain
-// association between the files contained within.  An entire cd image, on the other hand, does not.
+// FilegroupMatcher handles formats where the only method of associating sequences, instrument sets,
+// and sample collections is that they are loaded together within the same RawFile. When loading is
+// complete, FilegroupMatcher processes the VGMFiles in the order they were added and groups them
+// into collections: thus, it assumes association by order. FilegroupMatcher does not retain
+// state between loads, so it will never create a collection that spans multiple RawFiles, with the
+// exception that FilegroupMatcher processes a psf file and all of its psflib dependencies together
+// as a single load.
 
 class FilegroupMatcher : public Matcher {
- public:
+public:
   explicit FilegroupMatcher(Format *format);
 
- protected:
+  void onFinishedScan(RawFile *rawfile) override;
+
+protected:
   bool onNewSeq(VGMSeq *seq) override;
   bool onNewInstrSet(VGMInstrSet *instrset) override;
   bool onNewSampColl(VGMSampColl *sampcoll) override;
@@ -341,12 +339,9 @@ class FilegroupMatcher : public Matcher {
   bool onCloseInstrSet(VGMInstrSet *instrset) override;
   bool onCloseSampColl(VGMSampColl *sampcoll) override;
 
-  bool makeCollectionsForFile(VGMFile *file) override;
-  virtual void makeCollection(VGMInstrSet *instrset, VGMSampColl *sampcoll);
-
   virtual void lookForMatch();
 
- protected:
+protected:
   std::list<VGMSeq *> seqs;
   std::list<VGMInstrSet *> instrsets;
   std::list<VGMSampColl *> sampcolls;

@@ -5,12 +5,8 @@
  */
 #include "Scanner.h"
 
-VGMScanner::VGMScanner(Format *format): format(format) {}
+VGMScanner::VGMScanner(Format *format): m_format(format) {}
 
 bool VGMScanner::init() {
   return true;
-}
-
-void VGMScanner::initiateScan(RawFile *file, void *offset) {
-  this->scan(file, offset);
 }

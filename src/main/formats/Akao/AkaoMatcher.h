@@ -23,7 +23,7 @@ class AkaoMatcher : public Matcher {
     : Matcher(format) {}
   ~AkaoMatcher() override = default;
 
-  void onFinishedScan(RawFile* rawfile);
+  void onFinishedScan(RawFile* rawfile) override;
 
  protected:
   bool onNewSeq(VGMSeq* seq) override;

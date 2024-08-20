@@ -6,6 +6,7 @@
 
 #include "Matcher.h"
 #include "Root.h"
+#include <regex>
 
 using namespace std;
 
@@ -36,31 +37,38 @@ bool Matcher::onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, V
   return false;
 }
 
-bool Matcher::makeCollectionsForFile(VGMFile* /*file*/) {
-  return false;
-}
-
 // ****************
 // FilegroupMatcher
 // ****************
 
 FilegroupMatcher::FilegroupMatcher(Format *format) : Matcher(format) {}
 
+
+void FilegroupMatcher::onFinishedScan(RawFile* rawfile) {
+  // xsflib files are loaded recursively with xsf files. We want to scan the xsflib and the xsf
+  // files together as if they're one file, so ignore this callback and wait for the xsf to finish.
+  if (std::regex_match(rawfile->extension(), std::regex(R"(\w*sf\w?lib$)")))
+    return;
+
+  lookForMatch();
+
+  seqs.clear();
+  instrsets.clear();
+  sampcolls.clear();
+}
+
 bool FilegroupMatcher::onNewSeq(VGMSeq *seq) {
   seqs.push_back(seq);
-  lookForMatch();
   return true;
 }
 
 bool FilegroupMatcher::onNewInstrSet(VGMInstrSet *instrset) {
   instrsets.push_back(instrset);
-  lookForMatch();
   return true;
 }
 
 bool FilegroupMatcher::onNewSampColl(VGMSampColl *sampcoll) {
   sampcolls.push_back(sampcoll);
-  lookForMatch();
   return true;
 }
 
@@ -88,79 +96,30 @@ bool FilegroupMatcher::onCloseSampColl(VGMSampColl *sampcoll) {
   return true;
 }
 
-void FilegroupMatcher::makeCollection(VGMInstrSet *instrset, VGMSampColl *sampcoll) {
-  if (seqs.size() >= 1) {
-    for(VGMSeq *seq : seqs) {
-      VGMColl *coll = fmt->newCollection();
-      coll->setName(seq->name());
-      coll->useSeq(seq);
-      coll->addInstrSet(instrset);
-      coll->addSampColl(sampcoll);
-      if (!coll->load()) {
-        delete coll;
+void FilegroupMatcher::lookForMatch() {
+  while (!seqs.empty() && !instrsets.empty()) {
+    VGMSeq* seq = seqs.front();
+    seqs.pop_front();
+    VGMInstrSet* instrset = instrsets.front();
+    instrsets.pop_front();
+    VGMSampColl* sampcoll = nullptr;
+    if (instrset->sampColl == nullptr) {
+      if (sampcolls.empty()) {
+        continue;
       }
+      sampcoll = sampcolls.front();
+      sampcolls.pop_front();
     }
-  }
-  else {
+
     VGMColl *coll = fmt->newCollection();
-    coll->setName(instrset->name());
-    coll->useSeq(nullptr);
+    coll->setName(seq->name());
+    coll->useSeq(seq);
     coll->addInstrSet(instrset);
-    coll->addSampColl(sampcoll);
+    if (sampcoll != nullptr) {
+      coll->addSampColl(sampcoll);
+    }
     if (!coll->load()) {
       delete coll;
     }
   }
-}
-
-void FilegroupMatcher::lookForMatch() {
-
-  if (g_isCliMode) {
-    // in CLI mode, do not update collections dynamically
-    return;
-  }
-
-  if (instrsets.size() == 1 && sampcolls.size() == 1) {
-    VGMInstrSet* instrset = instrsets.front();
-    VGMSampColl* sampcoll = sampcolls.front();
-    makeCollection(instrset, sampcoll);
-    seqs.clear();
-    instrsets.clear();
-    sampcolls.clear();
-  }
-}
-
-bool FilegroupMatcher::makeCollectionsForFile(VGMFile* /*file*/) {
-
-  if (instrsets.size() >= 1 && sampcolls.size() >= 1) {
-
-    // make one VGMCollection for each sequence
-
-    // NOTE: this only uses the first instrument set & sample collection
-    // VGMInstrSet *instrset = instrsets.front();
-    // VGMSampColl *sampcoll = sampcolls.front();
-    // MakeCollection(instrset, sampcoll);
-
-    // alternatively, we can combine all instrument sets & sample collections
-    // into the same VGMCollection
-    for(VGMSeq *seq : seqs) {
-      VGMColl *coll = fmt->newCollection();
-      coll->setName(seq->name());
-      coll->useSeq(seq);
-      for (VGMInstrSet* instrset : instrsets) {
-        for (VGMSampColl* sampcoll : sampcolls) {
-          coll->addInstrSet(instrset);
-          coll->addSampColl(sampcoll);
-        }
-      }
-      if (!coll->load()) {
-        delete coll;
-      }
-    }
-  }
-
-  seqs.clear();
-  instrsets.clear();
-  sampcolls.clear();
-  return true;
 }

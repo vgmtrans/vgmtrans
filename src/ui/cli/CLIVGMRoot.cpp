@@ -72,7 +72,6 @@ bool CLIVGMRoot::init() {
     if (!openRawFile(infile.string())) {  // file not found
       return false;
     }
-    numVGMFiles = updateCollections(numVGMFiles);
     size_t numCollsAdded = numCollections() - numColls;
     if (numCollsAdded == 0) {
       cout << "File " << infile.string() << " is not a recognized music file" << endl;
@@ -218,18 +217,6 @@ void CLIVGMRoot::UI_log(LogItem* theLog) {
     string text = theLog->text();
     cerr << "[" << source << "]" << text << endl;
   }
-}
-
-size_t CLIVGMRoot::updateCollections(size_t startOffset) {
-  auto files = vgmFiles();
-  for (int i = startOffset; i < files.size(); ++i) {
-    auto targFile = variantToVGMFile(files[i]);
-    Format *fmt = targFile->format();
-    if (fmt && fmt->matcher) {
-      fmt->matcher->makeCollectionsForFile(targFile);
-    }
-  }
-  return vgmFiles().size();
 }
 
 string CLIVGMRoot::UI_getSaveFilePath(const string& suggestedFilename, const string& extension) {
