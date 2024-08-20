@@ -33,21 +33,18 @@ jobs:
       - name: "Build project"
         # $(sysctl -n hw.logicalcpu) is required to not make XCode spawn infinite threads...
         run: cmake --build --preset "macos-${{ matrix.target }}-release" --parallel $(sysctl -n hw.logicalcpu) --target vgmtrans
-
       - name: "Package DMG (macOS)"
         working-directory: "build/macos-${{ matrix.target }}/"
         run: |
           ${{ env.HOMEBREW_PREFIX }}/bin/macdeployqt \
             bin/VGMTrans.app \
             -verbose=3 -always-overwrite -appstore-compliant
-
       - name: "Checkout create-dmg"
         uses: actions/checkout@v4
         with:
           repository: create-dmg/create-dmg
           path: "./build/macos-${{ matrix.target }}/create-dmg"
           ref: master
-
       - name: Build macOS DMG
         shell: bash
         working-directory: "build/macos-${{ matrix.target }}/"
@@ -66,20 +63,19 @@ jobs:
             --app-drop-link 520 97 \
             --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 313 280 \
             --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 520 280 \
-            "bin/VGMTrans.dmg" \
+            "bin/VGMTrans-${{ github.sha }}.dmg" \
             "bin"
-
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}
-          subject-path: "build/macos-${{ matrix.target }}/bin/VGMTrans.dmg"
+          subject-path: "build/macos-${{ matrix.target }}/bin/VGMTrans-${{ github.sha }}.dmg"
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4
         with:
           name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}.dmg
-          path: "build/macos-${{ matrix.target }}/bin/VGMTrans.dmg"
+          path: "build/macos-${{ matrix.target }}/bin/VGMTrans-${{ github.sha }}.dmg"
   linux:
     runs-on: ubuntu-20.04
     name: Linux, x64
@@ -173,27 +169,36 @@ jobs:
          with:
           submodules: recursive
           show-progress: false
-       - name: Source vcvars for ${{ matrix.target }}
+
+       - name: "Source vcvars for ${{ matrix.target }}"
          uses: ilammy/msvc-dev-cmd@v1
          with:
             arch: ${{ matrix.target != 'x64' && (format('{0}_{1}', 'amd64', matrix.target)) || matrix.target }}
+
        - name: "Prepare build"
          run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           cmake --preset win-${{ matrix.target }}
+
        - name: "Build project"
          run: cmake --build --preset win-${{ matrix.target }}-release --target vgmtrans
+
+       - name: "Delete empty directories"
+         run: Get-ChildItem -Directory -Recurse | Where-Object { $_.GetFileSystemInfos().Count -eq 0 } | Remove-Item -Force -Recurse
+
        - name: "Package artifact"
-         run: 7z a "VGMTrans.zip" -r .\build\win-${{ matrix.target }}\bin*
+         run: 7z a "VGMTrans-${{ github.sha }}.zip" -r ".\build\win-${{ matrix.target }}\bin\*"
+
        - name: Generate artifact attestation
          uses: actions/attest-build-provenance@v1
          if: ${{ github.event_name != 'pull_request' }}
          with:
            subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-           subject-path: VGMTrans.zip
+           subject-path: "VGMTrans-${{ github.sha }}.zip"
+
        - name: "Upload artifact"
          uses: actions/upload-artifact@v4
          with:
            name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-           path: VGMTrans.zip
+           path: "VGMTrans-${{ github.sha }}.zip"
        
