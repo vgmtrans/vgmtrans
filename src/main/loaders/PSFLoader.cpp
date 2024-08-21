@@ -31,6 +31,8 @@ const std::unordered_map<int, size_t> data_offset = {{PSF1_VERSION, 0x800},
                                                      {NCSF_VERSION, 0x0}};
 
 void PSFLoader::apply(const RawFile *file) {
+  if (file->size() <= 16)
+    return;
   if (std::equal(file->begin(), file->begin() + 3, "PSF")) {
     uint8_t version = file->get<u8>(3);
     if (data_offset.contains(version)) {

@@ -28,7 +28,7 @@ void SPC2Loader::apply(const RawFile *file) {
   const size_t SPC_FILENAME_SIZE = 28;
 
   // File size sanity check. Max ram block size is 16MB, and we'll add a generous 1MB for everything else.
-  if (file->size() > (65536*256) + (1024*1024)) {
+  if (file->size() > (65536*256) + (1024*1024) || file->size() < HEADER_SIZE) {
     return;
   }
 
