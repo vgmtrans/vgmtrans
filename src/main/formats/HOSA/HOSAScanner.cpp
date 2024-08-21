@@ -9,6 +9,7 @@
 #include "VGMColl.h"
 #include "PSXSPU.h"
 #include "ScannerManager.h"
+#include "VGMMiscFile.h"
 
 namespace vgmtrans::scanners {
 ScannerRegistration<HOSAScanner> s_hosa("HOSA");
@@ -22,7 +23,11 @@ void HOSAScanner::scan(RawFile *file, void *info) {
     return;
   }
 
-  std::vector<PSXSampColl *> sampcolls = PSXSampColl::searchForPSXADPCMs(file, HOSAFormat::name);
+  // Scan for PSXSampColls if we haven't already
+  std::vector<PSXSampColl *> sampcolls = file->containedVGMFilesOfType<PSXSampColl>();
+  if (sampcolls.empty()) {
+    sampcolls = PSXSampColl::searchForPSXADPCMs(file, HOSAFormat::name);
+  }
 
   PSXSampColl *sampcoll = nullptr;
   HOSAInstrSet *instrset = nullptr;

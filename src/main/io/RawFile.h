@@ -14,6 +14,7 @@
 #include <variant>
 #include "mio.hpp"
 
+#include "Root.h"
 #include "util/common.h"
 #include "components/VGMTag.h"
 
@@ -105,6 +106,17 @@ class RawFile {
 
     [[nodiscard]] const auto &containedVGMFiles() const noexcept {
         return m_vgmfiles;
+    }
+
+    template <typename T>
+    [[nodiscard]] const std::vector<T*> containedVGMFilesOfType() const noexcept {
+      std::vector<T*> files = {};
+      for (const auto& vgmfile : m_vgmfiles) {
+        if (T* fileOfType = variantToType<T>(*vgmfile)) {
+          files.emplace_back(fileOfType);
+        }
+      }
+      return files;
     }
     void addContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>);
     void removeContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>);

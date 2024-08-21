@@ -55,7 +55,7 @@ void PSFLoader::psf_read_exe(const RawFile *file, int version) {
         enqueue(newfile);
 
         /* Look for additional libraries in the same folder */
-        int i = 1;
+        int i = 2;
         for (libtag = psf.tags().find(fmt::format("_lib{}", i));
              libtag != psf.tags().end();
              libtag = psf.tags().find(fmt::format("_lib{}", ++i))) {

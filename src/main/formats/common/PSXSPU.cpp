@@ -165,7 +165,7 @@ bool PSXSampColl::parseSampleInfo() {
       sampleIndex++;
     }
   }
-  return true;
+  return unLength > 0x20;
 }
 
 
