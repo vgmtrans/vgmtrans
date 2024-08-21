@@ -485,7 +485,7 @@ SynthFile *VGMColl::createSynthFile() {
         newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
 
         if (realSampNum >= finalSamps.size()) {
-          L_ERROR("Sample {} does not exist", realSampNum);
+          L_ERROR("Sample {} does not exist. Instr index: {:d}, Instr num: {:d}, Region index: {:d}", realSampNum, i, vgminstr->instrNum, j);
           realSampNum = finalSamps.size() - 1;
         }
 

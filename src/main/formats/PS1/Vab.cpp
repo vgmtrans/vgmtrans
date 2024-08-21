@@ -88,11 +88,13 @@ bool Vab::parseInstrPointers() {
       L_WARN("Too many tones {} in Program #{}.", numTonesPerInstr, progIndex);
     }
     else if (numTonesPerInstr != 0) {
-      VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex);
+      auto instrName = fmt::format("Instrument {:d}", progIndex);
+      VabInstr *newInstr = new VabInstr(this, offCurrToneAttrs, 0x20 * 16, 0, progIndex, instrName);
       aInstrs.push_back(newInstr);
       readBytes(offCurrProg, 0x10, &newInstr->attr);
 
-      VGMHeader *hdr = progsHdr->addHeader(offCurrProg, 0x10, "Program");
+      const auto progName = fmt::format("Program {:d}", progIndex);
+      VGMHeader *hdr = progsHdr->addHeader(offCurrProg, 0x10, progName);
       hdr->addChild(offCurrProg + 0x00, 1, "Number of Tones");
       hdr->addChild(offCurrProg + 0x01, 1, "Volume");
       hdr->addChild(offCurrProg + 0x02, 1, "Priority");
@@ -247,8 +249,8 @@ bool VabRgn::loadRgn() {
   // gocha: AFAIK, the valid range of pitch is 0-127. It must not be negative.
   // If it exceeds 127, driver clips the value and it will become 127. (In Hokuto no Ken, at least)
   // I am not sure if the interpretation of this value depends on a driver or VAB version.
-  // The following code takes the byte as signed, since it could be a typical extended implementation.
-  int8_t ft = (int8_t) readByte(dwOffset + 5);
+  uint8_t ft = readByte(dwOffset + 5);
+  ft = std::min(ft, static_cast<u8>(127));
   double cents = ft * 100.0 / 128.0;
   setFineTune((int16_t) cents);
 
