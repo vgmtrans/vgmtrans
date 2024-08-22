@@ -22,6 +22,12 @@ class VGMSampColl;
 class VGMMiscFile;
 class LogItem;
 
+template <typename T>
+T* variantToType(VGMFileVariant variant) {
+  T* vgmFilePtr = nullptr;
+  std::visit([&vgmFilePtr](auto *vgm) { vgmFilePtr = dynamic_cast<T*>(vgm); }, variant);
+  return vgmFilePtr;
+}
 VGMFile* variantToVGMFile(VGMFileVariant variant);
 VGMFileVariant vgmFileToVariant(VGMFile* vgmfile);
 

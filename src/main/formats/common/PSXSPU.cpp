@@ -165,7 +165,7 @@ bool PSXSampColl::parseSampleInfo() {
       sampleIndex++;
     }
   }
-  return true;
+  return unLength > 0x20;
 }
 
 
@@ -221,7 +221,7 @@ std::vector<PSXSampColl *> PSXSampColl::searchForPSXADPCMs(RawFile *file, const 
       for (uint32_t j = 0; j < NUM_CHUNKS_READAHEAD; j++) {
         uint32_t curChunk = firstChunk + 16 + j * 16;
         keyFlagByte = file->readByte(curChunk + 1);
-        if ((keyFlagByte & 0xFC) != 0) {
+        if ((keyFlagByte & 0xF0) != 0) {
           bBad = true;
           break;
         }

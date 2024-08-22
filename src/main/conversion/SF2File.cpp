@@ -90,16 +90,15 @@ SF2File::SF2File(SynthFile *synthfile)
     memcpy(presetHdr.achPresetName, instr->name.c_str(), std::min(instr->name.length(), static_cast<size_t>(20)));
     presetHdr.wPreset = static_cast<uint16_t>(instr->ulInstrument);
 
-    // Despite being a 16-bit value, SF2 only supports banks up to 127. Since
-    // it's pretty common to have either MSB or LSB be 0, we'll use whatever
-    // one is not zero, with preference for MSB.
+    // Despite being a 16-bit value, SF2 only supports banks up to 128. Since
+    // it's pretty common to have either MSB or LSB be 0, we'll use MSB if the
+    // value is greater than 128
     uint16_t bank16 = static_cast<uint16_t>(instr->ulBank);
 
-    if ((bank16 & 0xFF00) == 0) {
-      presetHdr.wBank = bank16 & 0x7F;
-    }
-    else {
+    if (bank16 > 128) {
       presetHdr.wBank = (bank16 >> 8) & 0x7F;
+    } else {
+      presetHdr.wBank = bank16;
     }
     presetHdr.wPresetBagNdx = static_cast<uint16_t>(i);
     presetHdr.dwLibrary = 0;

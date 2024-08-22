@@ -19,6 +19,9 @@ LoaderRegistration<RSNLoader> _rsn("RSN");
 
 void RSNLoader::apply(const RawFile *file) {
 
+  if (file->size() < FILE_SIGNATURE_SIZE)
+    return;
+
   // Read header
   uint8_t rarHeader[FILE_SIGNATURE_SIZE];
   file->readBytes(0, FILE_SIGNATURE_SIZE, rarHeader);
