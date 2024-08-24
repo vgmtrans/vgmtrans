@@ -161,8 +161,6 @@ bool WDInstr::loadInstr() {
   }
 
   // First, do key and velocity ranges
-  uint8_t prevKeyHigh = 0;
-  uint8_t prevVelHigh = 0;
   for (size_t k = 0; k < regions().size(); k++) {
     auto region = dynamic_cast<WDRgn*>(regions()[k]);
     auto prevRegion = k > 0 ? regions()[k-1] : nullptr;
@@ -181,25 +179,6 @@ bool WDInstr::loadInstr() {
 
     if (region->bLastRegion)
       region->keyHigh = 0x7F;
-
-    // Velocity ranges
-    if (region->velHigh == prevVelHigh && prevRegion)
-      region->velLow = prevRegion->velLow;
-    else
-      region->velLow = prevVelHigh + 1;
-    prevVelHigh = region->velHigh;
-
-    if (k == 0) //if it's the first region of the instrument
-      region->velLow = 0;
-    else if (region->velHigh == prevRegion->velHigh) {
-      region->velLow = prevRegion->velLow;
-      region->velHigh = 0x7F;     // FFX 0022, aka sight of spira, was giving me problems, hence this
-      prevRegion->velHigh = 0x7F; // hDLSFile.aInstrs.back()->aRgns.back()->usVelHigh = 0x7F;
-    }
-    else if (prevRegion->velHigh == 0x7F)
-     region->velLow = 0;
-    else
-      region->velLow = prevRegion->velHigh + 1;
   }
   return true;
 }
